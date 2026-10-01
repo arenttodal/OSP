@@ -10,32 +10,6 @@
 namespace osp::research
 {
 
-RootChoice chooseRoot (const AnalysisData* analysis, std::optional<double> overrideMidi)
-{
-    RootChoice choice;
-    const bool hasEstimate = analysis != nullptr && analysis->pitch.midiNote >= 0 && analysis->pitch.fundamentalHz > 0.0;
-
-    if (hasEstimate && analysis->pitch.detected)
-        choice.sourceF0Hz = analysis->pitch.fundamentalHz;
-
-    if (overrideMidi)
-    {
-        choice.rootMidi = *overrideMidi;
-        choice.origin = "override";
-    }
-    else if (hasEstimate)
-    {
-        choice.rootMidi = hzToMidi (analysis->pitch.fundamentalHz);
-        choice.origin = analysis->pitch.detected ? "analysis" : "analysis-low-confidence";
-    }
-    else
-    {
-        choice.rootMidi = 60.0;
-        choice.origin = "fallback";
-    }
-    return choice;
-}
-
 RenderOutput renderSequence (const AudioData& source, double rootMidi, const MidiSequence& sequence,
                              const RenderConfig& config)
 {

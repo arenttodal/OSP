@@ -64,10 +64,17 @@ void SamplerVoice::kill() noexcept
     envelope.reset();
 }
 
-void SamplerVoice::render (float* left, float* right, int numSamples) noexcept
+void SamplerVoice::setEnvelopeSettings (const AdsrSettings& adsr) noexcept
+{
+    envelope.prepare (sampleRate, adsr); // keeps the current stage and level
+}
+
+void SamplerVoice::render (float* left, float* right, int numSamples, double pitchRatio) noexcept
 {
     if (! active)
         return;
+
+    const double step = increment * pitchRatio;
 
     const float* dataL = src->channelData (0);
     const float* dataR = src->channelData (1);
@@ -75,7 +82,7 @@ void SamplerVoice::render (float* left, float* right, int numSamples) noexcept
     const bool stereoOutput = right != left;
 
     // Finished once every tap of the kernel lies beyond the last source sample.
-    const double endPosition = static_cast<double> (src->numFrames()) + static_cast<double> (sinc->reachFor (increment));
+    const double endPosition = static_cast<double> (src->numFrames()) + static_cast<double> (sinc->reachFor (step));
 
     for (int i = 0; i < numSamples; ++i)
     {
@@ -104,7 +111,7 @@ void SamplerVoice::render (float* left, float* right, int numSamples) noexcept
             return;
         }
 
-        sinc->computeKernel (position, increment, kernel);
+        sinc->computeKernel (position, step, kernel);
         const float l = SincInterpolator::apply (kernel, dataL);
 
         if (stereoOutput)
@@ -119,7 +126,7 @@ void SamplerVoice::render (float* left, float* right, int numSamples) noexcept
             left[i] += 0.5f * (l + r) * env;
         }
 
-        position += increment;
+        position += step;
     }
 }
 

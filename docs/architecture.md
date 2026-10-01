@@ -122,11 +122,47 @@ Rules already enforced by the design:
   golden tests compare robust metrics and treat the stored sample hash as
   informational.
 
+## Plugin (Phase 1)
+
+`apps/plugin` builds AU/VST3/Standalone with `juce_add_plugin`. It links `osp_dsp` and
+compiles the I/O sources with the plugin's own JUCE settings.
+
+```
+ drop / Load… / state recall ─► loader thread (juce::ThreadPool, 1 thread)
+        message thread              │  hash → SampleStore import → decode → analysis (cached)
+                                    │  → PlaybackSource + waveform overview → LoadedInstrument
+                                    ▼
+                  finished-loads queue (mutex: loader ↔ message thread only)
+                                    │  20 Hz timer
+                                    ▼
+             ModelExchange::publish ──(atomic pointer)──► audio thread: takePending()
+             collectGarbage()  ◄──(atomic generation)── publishOldestInUse()
+```
+
+- **Audio thread** (`processBlock`): keyboard-state merge, instrument swap, parameter
+  changes (ADSR, gain, velocity range, pitch offset), sample-accurate MIDI (note on/off,
+  sustain, pitch bend, all-notes-off), `BaselineSampler::render`. No allocation, locks or
+  I/O. When a new instrument arrives, the previous one is kept in a fixed array of 8
+  retired slots until no voice reads it, so held notes finish on the old sample.
+- **Message thread**: parameters (`AudioProcessorValueTreeState`), editor, state,
+  publishing loaded instruments and freeing retired ones (`ModelExchange`).
+- **Root override** is applied as a pitch offset (`analysisRoot − userRoot`), so changing
+  the root never rebuilds playback data and affects sounding notes immediately.
+- **Sample store** (`SampleStore`): imported files are copied once as
+  `<sha256><ext>`; analysis is cached as `<sha256>.analysis.json` and reused unless the
+  analyser version changed. Session state stores hash, file name, original path and the
+  root override — never audio.
+- **State** (`getStateInformation`): APVTS parameters + an `Instrument` child, plus
+  `stateVersion`. Recall looks up the store by hash, falls back to the original path,
+  and warns if the content changed.
+
 ## Recorded deviations from the suggested layout
 
 - `src/research/` added: the renderer logic is a library so tests share it.
 - `src/presets/` not created yet: nothing to put in it until Phase 1 state/presets.
 - `apps/standalone/`: the standalone app comes from the JUCE plugin target
   (`juce_add_plugin(... FORMATS AU VST3 Standalone)`), so there is no separate app.
+- `RootChoice` (root selection + character description) lives in `src/model` because
+  the renderer and the plugin must agree on it.
 - Pitch branch A lives in `audio/pitch/` (the resampler is the first pitch engine).
 - `tests/support/` holds shared test helpers.

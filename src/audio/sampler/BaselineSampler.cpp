@@ -26,6 +26,40 @@ void BaselineSampler::prepare (double outputSampleRate, int /*maximumBlockSize*/
     outputGain = static_cast<float> (dbToGain (config.outputGainDb));
     pedalDown = false;
     noteCounter = 0;
+    pitchRatio = 1.0;
+}
+
+void BaselineSampler::setEnvelope (const AdsrSettings& adsr) noexcept
+{
+    config.adsr = adsr;
+    for (auto& voice : voices)
+        voice.setEnvelopeSettings (adsr);
+}
+
+void BaselineSampler::setOutputGainDb (double db) noexcept
+{
+    config.outputGainDb = db;
+    outputGain = static_cast<float> (dbToGain (db));
+}
+
+void BaselineSampler::setPitchOffsetSemitones (double semitones) noexcept
+{
+    pitchRatio = semitonesToRatio (semitones);
+}
+
+bool BaselineSampler::isSourceInUse (const PlaybackSource* source) const noexcept
+{
+    for (const auto& voice : voices)
+        if (voice.isActive() && voice.source() == source)
+            return true;
+    return false;
+}
+
+void BaselineSampler::killVoicesUsing (const PlaybackSource* source) noexcept
+{
+    for (auto& voice : voices)
+        if (voice.isActive() && voice.source() == source)
+            voice.kill();
 }
 
 double BaselineSampler::incrementFor (double note, double rootMidi, double sourceRate, double outputRate) noexcept
@@ -199,7 +233,7 @@ void BaselineSampler::render (float* const* output, int numChannels, int numSamp
     float* right = numChannels > 1 ? output[1] : output[0];
 
     for (auto& voice : voices)
-        voice.render (left, right, numSamples);
+        voice.render (left, right, numSamples, pitchRatio);
 
     for (int ch = 0; ch < std::min (numChannels, 2); ++ch)
         for (int i = 0; i < numSamples; ++i)

@@ -49,8 +49,8 @@ struct SamplerSettings
     - ADSR, sustain pedal, voice stealing (released -> quietest -> oldest) with a
       short fade into spare "tail" slots so stealing does not click
 
-    Threading: prepare() and setSettings() allocate and must be called off the audio
-    thread. setSource(), the note functions and render() are real-time safe.
+    Threading: prepare() allocates and must be called off the audio thread. Everything
+    else (setSource, the note functions, the runtime setters and render) is real-time safe.
 */
 class BaselineSampler
 {
@@ -67,7 +67,25 @@ public:
         reading until its kernel has fully left the source, so reads extend up to two
         kernel reaches past either end.
     */
-    int requiredSourcePadding() const noexcept { return interpolator ? 2 * interpolator->maxReach() + 4 : 0; }
+    int requiredSourcePadding() const noexcept { return requiredSourcePaddingFor (config.interpolationZeroCrossings); }
+
+    /** Same, for building a PlaybackSource before the sampler is prepared (worker threads). */
+    static int requiredSourcePaddingFor (int interpolationZeroCrossings) noexcept
+    {
+        return 2 * SincInterpolator::maxReachFor (interpolationZeroCrossings) + 4;
+    }
+
+    // Runtime controls (real-time safe; take effect immediately).
+    void setEnvelope (const AdsrSettings& adsr) noexcept;
+    void setOutputGainDb (double db) noexcept;
+    void setVelocityRangeDb (double db) noexcept { config.velocityRangeDb = db; }
+    /** Global pitch offset applied to every voice (pitch bend + fine tune), in semitones. */
+    void setPitchOffsetSemitones (double semitones) noexcept;
+
+    /** True if any voice still reads from this source (used before freeing an old source). */
+    bool isSourceInUse (const PlaybackSource* source) const noexcept;
+    /** Immediately silences every voice that reads from this source. */
+    void killVoicesUsing (const PlaybackSource* source) noexcept;
 
     void noteOn (int note, int velocity) noexcept;
     void noteOff (int note) noexcept;
@@ -104,6 +122,7 @@ private:
     bool pedalDown = false;
     std::uint64_t noteCounter = 0;
     float outputGain = 1.0f;
+    double pitchRatio = 1.0;
 };
 
 } // namespace osp

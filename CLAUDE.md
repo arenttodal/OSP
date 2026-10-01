@@ -11,6 +11,10 @@ cmake -B build -G Ninja            # add -DOSP_JUCE_DIR=... -DOSP_CATCH2_DIR=...
 cmake --build build
 ctest --test-dir build --output-on-failure
 ./build/apps/research-renderer/research-renderer --help
+
+# plugin (AU/VST3/Standalone) + headless plugin tests
+cmake -B build-plugin -G Ninja -DOSP_BUILD_PLUGIN=ON && cmake --build build-plugin
+ctest --test-dir build-plugin --output-on-failure
 ```
 
 Keep `ctest` green on every commit. Never leave the main branch broken.
@@ -72,7 +76,9 @@ adding fields must be documented in `docs/analysis-schema.md`.
   **pure C++20, no JUCE** (`osp_dsp` library). Keep it that way.
 - `src/io`, `src/midi/MidiFileIO*` — JUCE-backed file formats, JSON, hashing.
 - `src/research` — renderer/corpus/metrics/benchmark library used by the CLI and tests.
-- `apps/research-renderer` — the CLI. `apps/plugin` — JUCE plugin + standalone.
+- `apps/research-renderer` — the CLI. `apps/plugin` — JUCE plugin + standalone
+  (processor, loader thread, sample store, minimal editor). New instruments reach the
+  audio thread only through `ModelExchange`; never share mutable state with it.
 - Tests: Catch2, tags `[unit]`, `[integration]`, `[regression]`.
 
 ## Conventions

@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14          # Apple Silicon: primary target
+            plugin: ON
+          - os: ubuntu-24.04
+            plugin: ON
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libasound2-dev libfreetype-dev libfontconfig1-dev \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxext-dev libxcomposite-dev xvfb
+
+      - name: macOS dependencies
+        if: runner.os == 'macOS'
+        run: brew install ninja
+
+      - name: Configure
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DOSP_BUILD_PLUGIN=${{ matrix.plugin }}
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Editor snapshot (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p snapshots
+          OSP_SNAPSHOT_DIR=$PWD/snapshots xvfb-run -a ./build/apps/plugin/osp_plugin_tests "[ui]"
+
+      - name: Benchmark
+        run: ./build/apps/research-renderer/research-renderer --benchmark --output-json benchmark-${{ matrix.os }}.json
+
+      - name: Validate AU (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p ~/Library/Audio/Plug-Ins/Components
+          cp -R build/apps/plugin/OSP_Plugin_artefacts/Release/AU/OSP.component ~/Library/Audio/Plug-Ins/Components/
+          killall -9 AudioComponentRegistrar || true
+          auval -v aumu Osp1 Ospx
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: osp-${{ matrix.os }}
+          path: |
+            benchmark-*.json
+            snapshots/
+            build/apps/plugin/OSP_Plugin_artefacts/Release/VST3/
+          if-no-files-found: ignore

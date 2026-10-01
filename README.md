@@ -28,8 +28,27 @@ tested on Linux). Offline builds can use local checkouts:
 cmake -B build -DOSP_JUCE_DIR=/path/to/JUCE -DOSP_CATCH2_DIR=/path/to/Catch2
 ```
 
-Options: `-DOSP_BUILD_TESTS=OFF`, `-DOSP_BUILD_PLUGIN=ON` (JUCE plugin/standalone; on
-Linux this needs the usual JUCE GUI packages — X11, freetype, fontconfig, ALSA).
+Options: `-DOSP_BUILD_TESTS=OFF`, `-DOSP_BUILD_PLUGIN=ON`.
+
+## The instrument (Phase 1: baseline sampler plugin)
+
+```sh
+cmake -B build-plugin -G Ninja -DCMAKE_BUILD_TYPE=Release -DOSP_BUILD_PLUGIN=ON
+cmake --build build-plugin
+ctest --test-dir build-plugin --output-on-failure      # adds the headless plugin tests
+```
+
+Artefacts land in `build-plugin/apps/plugin/OSP_Plugin_artefacts/Release/`: `AU/OSP.component`
+(macOS), `VST3/OSP.vst3` and `Standalone/OSP(.app)`. Copy the AU/VST3 into
+`~/Library/Audio/Plug-Ins/Components` / `.../VST3` (macOS) to use them in a DAW.
+
+Drop a WAV/AIFF onto the window (or use *Load…* / *Load example*), play. The detected
+root is shown and can be overridden; Attack, Release, Velocity range, Fine tune, Bend
+range and Output are automatable. Imported samples are copied (by content hash) into
+`~/Library/Application Support/OSP/Samples` (macOS) or `~/.config/OSP/Samples` (Linux)
+so sessions recall even if the original file moves; set `OSP_SAMPLE_STORE` to override.
+On Linux the plugin build needs the usual JUCE GUI packages (X11, Xrandr, Xinerama,
+Xcursor, freetype, fontconfig, ALSA headers).
 
 ## The research renderer
 

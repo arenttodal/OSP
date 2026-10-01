@@ -29,8 +29,7 @@ double round (double value, int decimals)
     if (! std::isfinite (value))
         return 0.0;
     const double scale = std::pow (10.0, decimals);
-    const double r = std::round (value * scale) / scale;
-    return r == 0.0 ? 0.0 : r; // no "-0"
+    return std::round (value * scale) / scale + 0.0; // + 0.0 turns -0 into 0
 }
 
 juce::var number (double value, int decimals) { return juce::var (round (value, decimals)); }

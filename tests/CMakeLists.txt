@@ -10,6 +10,7 @@ add_executable(osp_tests
     unit/HashTests.cpp
     unit/MidiTests.cpp
     unit/AnalysisTests.cpp
+    unit/ModelExchangeTests.cpp
     integration/RenderIntegrationTests.cpp
     integration/CorpusIntegrationTests.cpp
     regression/GoldenTests.cpp

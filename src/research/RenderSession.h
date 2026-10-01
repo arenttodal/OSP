@@ -3,6 +3,7 @@
 #include "core/AudioData.h"
 #include "midi/MidiEvent.h"
 #include "model/AnalysisData.h"
+#include "model/RootChoice.h"
 #include "research/RenderConfig.h"
 
 #include <optional>
@@ -11,20 +12,8 @@
 namespace osp::research
 {
 
-/** Which root the renderer played the source at, and why. */
-struct RootChoice
-{
-    double rootMidi = 60.0;     ///< fractional: includes the detected cents offset
-    std::string origin;         ///< "override", "analysis", "analysis-low-confidence", "fallback"
-    double sourceF0Hz = 0.0;    ///< measured source F0 (0 if unknown); used to predict output pitch
-};
-
-/**
-    Resolves the playback root: explicit override > detected pitch > low-confidence
-    estimate > C4 fallback. A low-confidence choice is labelled so it is never mistaken
-    for a certain one.
-*/
-RootChoice chooseRoot (const AnalysisData* analysis, std::optional<double> overrideMidi);
+using osp::RootChoice;
+using osp::chooseRoot;
 
 struct RenderOutput
 {

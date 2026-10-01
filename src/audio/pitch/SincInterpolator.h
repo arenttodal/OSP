@@ -31,6 +31,9 @@ public:
 
     int zeroCrossings() const noexcept { return numZeroCrossings; }
 
+    /** maxReach() of an interpolator constructed with these arguments. */
+    static int maxReachFor (int zeroCrossings, double maxStretch = 16.0) noexcept;
+
     /** Furthest any read reaches away from its read position, in source samples. */
     int maxReach() const noexcept { return reach; }
 

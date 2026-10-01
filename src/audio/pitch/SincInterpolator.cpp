@@ -27,11 +27,16 @@ namespace
     constexpr double kaiserBeta = 9.0; // ~ -90 dB sidelobes
 }
 
+int SincInterpolator::maxReachFor (int zeroCrossings, double maxStretch) noexcept
+{
+    return static_cast<int> (std::ceil (std::clamp (zeroCrossings, 2, 32) * std::clamp (maxStretch, 1.0, 16.0))) + 2;
+}
+
 SincInterpolator::SincInterpolator (int zeroCrossings, double maxStretch)
     : numZeroCrossings (std::clamp (zeroCrossings, 2, 32)),
       maxStretchFactor (std::clamp (maxStretch, 1.0, 16.0))
 {
-    reach = static_cast<int> (std::ceil (numZeroCrossings * maxStretchFactor)) + 2;
+    reach = maxReachFor (zeroCrossings, maxStretch);
 
     sincTable.resize (static_cast<std::size_t> (numZeroCrossings * sincResolution + 2));
     for (std::size_t i = 0; i < sincTable.size(); ++i)

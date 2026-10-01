@@ -42,8 +42,14 @@ public:
     /** Immediately silences the voice. */
     void kill() noexcept;
 
-    /** Adds output into left/right (right may equal left for mono output). */
-    void render (float* left, float* right, int numSamples) noexcept;
+    /** Changes envelope times/levels without restarting the envelope (real-time safe). */
+    void setEnvelopeSettings (const AdsrSettings& adsr) noexcept;
+
+    /**
+        Adds output into left/right (right may equal left for mono output).
+        pitchRatio scales the note's increment (pitch bend, fine tune).
+    */
+    void render (float* left, float* right, int numSamples, double pitchRatio = 1.0) noexcept;
 
     bool isActive() const noexcept { return active; }
     bool isReleased() const noexcept { return released; }

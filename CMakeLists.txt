@@ -48,6 +48,7 @@ add_library(osp_dsp STATIC
     src/analysis/spectrum/SpectralAnalyzer.cpp
     src/analysis/stereo/StereoAnalyzer.cpp
     src/midi/MidiFixtures.cpp
+    src/model/RootChoice.cpp
 )
 target_include_directories(osp_dsp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 osp_set_warnings(osp_dsp)
@@ -112,6 +113,10 @@ target_link_libraries(osp_research PUBLIC osp_dsp osp_juce_headless)
 target_compile_definitions(osp_research PUBLIC OSP_VERSION_STRING="${PROJECT_VERSION}")
 osp_set_warnings(osp_research)
 
+if(OSP_BUILD_TESTS)
+    enable_testing()
+endif()
+
 add_subdirectory(apps/research-renderer)
 
 if(OSP_BUILD_PLUGIN)
@@ -119,6 +124,5 @@ if(OSP_BUILD_PLUGIN)
 endif()
 
 if(OSP_BUILD_TESTS)
-    enable_testing()
     add_subdirectory(tests)
 endif()

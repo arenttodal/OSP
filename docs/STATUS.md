@@ -1,6 +1,6 @@
 # Status
 
-_Last updated: Phase 0 complete (pending review with the real corpus)._
+_Last updated: Phase 0 complete; Phase 1 (playable sampler plugin) implemented. Both pending review with the real corpus and on macOS hosts._
 
 ## Milestone checklist — Phase 0: research harness + baseline engine
 
@@ -21,19 +21,36 @@ _Last updated: Phase 0 complete (pending review with the real corpus)._
 - [ ] Run the real 80-file corpus (requires the files locally — see Blockers)
 - [x] Optional minimal standalone/plugin (see Phase 1 below)
 
+## Milestone checklist — Phase 1: playable sampler
+
+- [x] JUCE plugin target: AU (macOS) + VST3 + Standalone, CMake only
+- [x] Drag & drop / Load… / Load example (synthetic vowel until owned examples exist)
+- [x] Background loading: hash → managed sample store → decode → analysis (cached) → playback data
+- [x] Lock-free instrument hand-over to the audio thread with deferred destruction (`ModelExchange`)
+- [x] Root detection shown; manual root override (pitch offset, no rebuild)
+- [x] Waveform overview, character line ("SUSTAINED · TONAL · VIBRATO"), keyboard, voice count
+- [x] MIDI: note on/off, velocity, sustain pedal, pitch bend (range parameter), all-notes-off
+- [x] 24 voices, ADSR (attack/release automatable), velocity range, fine tune, output gain
+- [x] Session state: parameters + sample hash/name/path + root override; recall from the sample store
+- [x] Headless plugin tests (load, chromatic pitch, SR changes, root override, recall, bad files)
+- [ ] Host validation on macOS: auval, pluginval, Logic / Ableton / Reaper (needs a Mac)
+- [ ] Exit check with real corpus samples in a DAW
+
 ## DONE
 
 - Pure C++20 DSP/analysis library (`osp_dsp`) independent of JUCE; JUCE used for file
   formats, MIDI files, JSON, SHA-256.
 - Deterministic rendering: bit-identical across runs and across block sizes
   (32–1024); seed-dependent randomisation in baseline B.
-- 64 Catch2 test cases (unit/integration/regression) + performance smoke; all green.
+- 65 Catch2 test cases (unit/integration/regression) + performance smoke + 5 plugin
+  test cases; all green on Linux (GCC 13).
+- Phase 1 plugin: see checklist above.
 - Synthetic ground-truth generators and a synthetic mini-corpus generator
   (`--generate-test-signals`), including deliberately broken/unsupported files.
 
 ## IN PROGRESS
 
-- Phase 1 (playable JUCE sampler) — see below.
+- Nothing. Waiting for review of Phase 0/1 before the Phase 2 pitch bake-off.
 
 ## NEXT
 
@@ -44,6 +61,9 @@ _Last updated: Phase 0 complete (pending review with the real corpus)._
 
 - The real research corpus is not in the repository (by design: git-ignored). Corpus
   success counts and real-source pitch observations need a local run.
+- macOS could not be built in the development container (Linux); the CI workflow
+  (`.github/workflows/ci.yml`) builds and tests on macOS arm64. AU validation (auval)
+  and DAW testing need a Mac.
 
 ## KNOWN ISSUES
 
@@ -65,3 +85,8 @@ _Last updated: Phase 0 complete (pending review with the real corpus)._
   silence after the source ends.
 - JUCE writes integer AIFF only; float AIFF-C is read (tested) but never written.
 - Cross-platform bit-identity is not guaranteed (libm); golden tests use tolerances.
+- Plugin: no undo/redo of sample loads yet (parameters have an UndoManager); multi-file
+  drops use the first file; mod wheel / channel pressure have no destination yet; no
+  MPE; the UI is a debug UI (no scaling options beyond window resize).
+- Plugin: a host that never calls processBlock keeps the previous instrument alive in
+  memory until processing starts (by design of the hand-over; harmless).

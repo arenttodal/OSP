@@ -11,6 +11,11 @@ ctest --test-dir build --output-on-failure      # everything
 | `integration` | file → analysis → fixture renders → metrics; determinism and block-size independence; output sample-rate changes; stored vs fresh analysis; unpitched sources; safety-check detection; full corpus run over a mixed folder incl. broken/unsupported files |
 | `regression` | golden renders (below) |
 | `performance-smoke` | `research-renderer --benchmark --seconds 3` must run |
+| `plugin` (with `-DOSP_BUILD_PLUGIN=ON`) | the real `AudioProcessor`, headless: load → analysis → chromatic playback through `processBlock`, host sample-rate changes, root override, session save/recall after the original file is deleted (bit-identical audio), bad files keeping the previous instrument, unpitched sources |
+
+The editor has a hidden snapshot test (needs a display):
+`OSP_SNAPSHOT_DIR=/tmp xvfb-run ./build-plugin/apps/plugin/osp_plugin_tests "[ui]"`
+writes `osp-editor-empty.png` / `osp-editor-loaded.png`.
 
 ## MIDI fixtures
 
