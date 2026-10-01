@@ -88,5 +88,9 @@ _Last updated: Phase 0 complete; Phase 1 (playable sampler plugin) implemented. 
 - Plugin: no undo/redo of sample loads yet (parameters have an UndoManager); multi-file
   drops use the first file; mod wheel / channel pressure have no destination yet; no
   MPE; the UI is a debug UI (no scaling options beyond window resize).
+- Plugin RT caveat: merging on-screen keyboard events uses JUCE's
+  `MidiKeyboardState::processNextMidiBuffer`, which takes a short internal lock and can
+  grow the MIDI buffer when UI notes are injected. Standard JUCE practice, but it bends
+  Rule 1; replace with a lock-free FIFO from the UI when the real UI is built.
 - Plugin: a host that never calls processBlock keeps the previous instrument alive in
   memory until processing starts (by design of the hand-over; harmless).
