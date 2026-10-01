@@ -33,7 +33,8 @@ _Last updated: Phase 0 complete; Phase 1 (playable sampler plugin) implemented. 
 - [x] 24 voices, ADSR (attack/release automatable), velocity range, fine tune, output gain
 - [x] Session state: parameters + sample hash/name/path + root override; recall from the sample store
 - [x] Headless plugin tests (load, chromatic pitch, SR changes, root override, recall, bad files)
-- [ ] Host validation on macOS: auval, pluginval, Logic / Ableton / Reaper (needs a Mac)
+- [x] macOS 14 / Apple Silicon: build, all tests, `auval` (CI)
+- [ ] Host validation: pluginval, Logic / Ableton / Reaper (needs a Mac)
 - [ ] Exit check with real corpus samples in a DAW
 
 ## DONE
@@ -43,7 +44,7 @@ _Last updated: Phase 0 complete; Phase 1 (playable sampler plugin) implemented. 
 - Deterministic rendering: bit-identical across runs and across block sizes
   (32–1024); seed-dependent randomisation in baseline B.
 - 65 Catch2 test cases (unit/integration/regression) + performance smoke + 5 plugin
-  test cases; all green on Linux (GCC 13).
+  test cases; all green on Linux (GCC 13) and macOS 14 arm64 (Apple Clang 15, CI).
 - Phase 1 plugin: see checklist above.
 - Synthetic ground-truth generators and a synthetic mini-corpus generator
   (`--generate-test-signals`), including deliberately broken/unsupported files.
@@ -61,9 +62,7 @@ _Last updated: Phase 0 complete; Phase 1 (playable sampler plugin) implemented. 
 
 - The real research corpus is not in the repository (by design: git-ignored). Corpus
   success counts and real-source pitch observations need a local run.
-- macOS could not be built in the development container (Linux); the CI workflow
-  (`.github/workflows/ci.yml`) builds and tests on macOS arm64. AU validation (auval)
-  and DAW testing need a Mac.
+- DAW testing (Logic, Ableton, Reaper) needs a Mac; CI covers build, tests and auval.
 
 ## KNOWN ISSUES
 

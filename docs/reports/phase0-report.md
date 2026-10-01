@@ -1,6 +1,7 @@
 # Phase 0 report — research harness + baseline engine
 
-_Status: complete on Linux; macOS build verified by CI (`.github/workflows/ci.yml`).
+_Status: complete. Verified on Linux (GCC 13) and on macOS 14 / Apple Silicon in CI
+(build, all tests, benchmark, `auval` AU validation: **AU VALIDATION SUCCEEDED**).
 The private 80-file corpus was not available in the development environment, so
 corpus figures below come from the synthetic ground-truth set. Run the corpus
 locally before signing off (command at the end)._
@@ -112,10 +113,13 @@ development VM (Intel Xeon @ 2.1 GHz, shared cloud machine):
 | 16 sustained voices | 547 µs / 2667 µs = **20.5 %** | 805 µs | 3.8 ms* |
 | 24 voices, dense retriggers (stealing every 50 ms) | 919 µs = **34.5 %** | 1394 µs | 6.3 ms* |
 
-\* worst-case spikes on a shared VM are dominated by scheduler preemption; the render
-path performs no allocation, locking or I/O. CI publishes the same benchmark for the
-macOS arm64 runner (artifact `benchmark-macos-14.json`); Apple Silicon is expected to be
-roughly 2x faster per core. Target (spec §64): < 25 % mean for 16 voices — met even here.
+| macOS 14, Apple Silicon (GitHub-hosted VM), 24 voices dense | 697 µs = **26.1 %** | 1875 µs | 9.5 ms* |
+
+\* worst-case spikes on shared VMs are dominated by scheduler preemption; the render
+path performs no allocation, locking or I/O. Target (spec §64): < 25 % mean for 16
+sustained voices — met on the Xeon VM (20.5 %); the Apple Silicon CI runner is a
+virtualised, shared machine, so measure on a real Mac before drawing conclusions.
+Either way the interpolator is the obvious first optimisation (see §7).
 
 ## 7. Known weaknesses
 
