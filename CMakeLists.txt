@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 3.25)
 
 project(OSP
     VERSION 0.1.0
@@ -36,6 +36,7 @@ add_library(osp_dsp STATIC
     src/core/Statistics.cpp
     src/audio/envelopes/Adsr.cpp
     src/audio/pitch/SincInterpolator.cpp
+    src/audio/pitch/OfflinePitchShifter.cpp
     src/audio/voices/SamplerVoice.cpp
     src/audio/sampler/BaselineSampler.cpp
     src/audio/utility/TestSignals.cpp
@@ -46,12 +47,14 @@ add_library(osp_dsp STATIC
     src/analysis/loudness/EnvelopeAnalyzer.cpp
     src/analysis/onset/OnsetDetector.cpp
     src/analysis/spectrum/SpectralAnalyzer.cpp
+    src/analysis/spectrum/SpectralEnvelope.cpp
     src/analysis/stereo/StereoAnalyzer.cpp
     src/midi/MidiFixtures.cpp
     src/model/RootChoice.cpp
     src/model/PlaybackPreparation.cpp
 )
 target_include_directories(osp_dsp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(osp_dsp PRIVATE signalsmith-stretch)
 osp_set_warnings(osp_dsp)
 
 # ---------------------------------------------------------------------------
@@ -108,6 +111,7 @@ add_library(osp_research STATIC
     src/research/Benchmark.cpp
     src/research/SourceAnalysis.cpp
     src/research/TestSignalSet.cpp
+    src/research/Bakeoff.cpp
 )
 target_include_directories(osp_research PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(osp_research PUBLIC osp_dsp osp_juce_headless)

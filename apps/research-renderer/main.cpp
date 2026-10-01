@@ -7,6 +7,7 @@
 #include "io/JsonUtil.h"
 #include "midi/MidiFileIO.h"
 #include "midi/MidiFixtures.h"
+#include "research/Bakeoff.h"
 #include "research/Benchmark.h"
 #include "research/CorpusIndex.h"
 #include "research/CorpusRunner.h"
@@ -67,6 +68,10 @@ CORPUS
 FIXTURES / TEST DATA
   --write-fixtures <dir>          write the standard MIDI fixtures (reference C4)
   --generate-test-signals <dir>   write synthetic ground-truth sources (+ a broken and an unsupported file)
+
+PITCH BAKE-OFF (Phase 2)
+  --bakeoff <plan.json> [--output <dir>]      render blind A/B/C clips + key.json + listening.json
+  --bakeoff-score <dir> --ratings <file>      join ratings with the key -> score.md / score.json
 
 BENCHMARK
   --benchmark [--voices 24] [--seconds 20] [--sample-rate 48000] [--block-size 128] [--output-json <f>] [--no-retrigger]
@@ -507,6 +512,29 @@ int main (int argc, char** argv)
             return commandIndex (args);
         if (args.has ("--benchmark"))
             return commandBenchmark (args);
+        if (args.has ("--bakeoff"))
+        {
+            const auto plan = loadBakeoffPlan (args.get ("--bakeoff"), error);
+            if (! plan)
+                return fail (exitInput, error);
+            const fs::path output = args.get ("--output", "research/bakeoff/" + plan->name);
+            const auto summary = runBakeoff (*plan, output, [] (const std::string& line) { std::cout << line << std::endl; });
+            for (const auto& e : summary.errors)
+                std::cerr << "warning: " << e << "\n";
+            std::cout << summary.clips << " clips in " << summary.groups << " groups -> " << output.string()
+                      << " (engine key: " << summary.keyFile.string() << ")\n";
+            return summary.clips > 0 ? exitOk : exitProcessing;
+        }
+        if (args.has ("--bakeoff-score"))
+        {
+            if (! args.has ("--ratings"))
+                return fail (exitUsage, "--bakeoff-score needs --ratings <file>");
+            std::string report;
+            if (! scoreBakeoff (args.get ("--bakeoff-score"), args.get ("--ratings"), report, error))
+                return fail (exitInput, error);
+            std::cout << report;
+            return exitOk;
+        }
         if (args.has ("--write-fixtures"))
         {
             std::vector<std::string> written;

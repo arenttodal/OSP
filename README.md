@@ -11,7 +11,7 @@ competing DSP engines against a fixed corpus. Progress: [docs/STATUS.md](docs/ST
 
 ## Build
 
-Requirements: CMake ≥ 3.22, a C++20 compiler (Xcode 14+/AppleClang, GCC 11+, Clang 14+
+Requirements: CMake ≥ 3.25, a C++20 compiler (Xcode 14+/AppleClang, GCC 11+, Clang 14+
 or MSVC 2022), Ninja (optional), Git. JUCE 8.0.9 and Catch2 3.9.1 are fetched
 automatically.
 

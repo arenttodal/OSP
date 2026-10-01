@@ -29,6 +29,25 @@ else()
     FetchContent_MakeAvailable(juce)
 endif()
 
+# Signalsmith Stretch (MIT): pitch/time engine candidate for the Phase 2 bake-off.
+set(OSP_STRETCH_TAG "1.4.0" CACHE STRING "signalsmith-stretch git tag")
+set(OSP_STRETCH_DIR "" CACHE PATH "Local signalsmith-stretch checkout (skips download)")
+set(OSP_LINEAR_DIR "" CACHE PATH "Local signalsmith-linear checkout (needed with OSP_STRETCH_DIR offline)")
+if(OSP_LINEAR_DIR)
+    add_subdirectory(${OSP_LINEAR_DIR} ${CMAKE_BINARY_DIR}/_deps/linear-build EXCLUDE_FROM_ALL)
+endif()
+if(OSP_STRETCH_DIR)
+    add_subdirectory(${OSP_STRETCH_DIR} ${CMAKE_BINARY_DIR}/_deps/stretch-build EXCLUDE_FROM_ALL)
+else()
+    FetchContent_Declare(signalsmith-stretch
+        GIT_REPOSITORY https://github.com/Signalsmith-Audio/signalsmith-stretch.git
+        GIT_TAG ${OSP_STRETCH_TAG}
+        GIT_SHALLOW TRUE)
+    FetchContent_MakeAvailable(signalsmith-stretch)
+endif()
+# Third-party headers: SYSTEM so our warning flags do not apply to them.
+set_target_properties(signalsmith-stretch signalsmith-linear PROPERTIES SYSTEM TRUE)
+
 if(OSP_BUILD_TESTS)
     if(OSP_CATCH2_DIR)
         add_subdirectory(${OSP_CATCH2_DIR} ${CMAKE_BINARY_DIR}/_deps/catch2-build EXCLUDE_FROM_ALL)

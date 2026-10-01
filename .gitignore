@@ -27,6 +27,7 @@ compile_commands.json
 !/research/renders/README.md
 /research/reports/*
 !/research/reports/README.md
+/research/bakeoff/*/
 
 # Python
 __pycache__/

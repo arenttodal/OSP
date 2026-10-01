@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "name": "pitch-bakeoff-1",
+  "description": "Phase 2 pitch-engine bake-off: one source per family from the research corpus, root -24..+24, engines A (resampling), B (Signalsmith plain), C (Signalsmith + formant compensation).",
+  "corpusRoot": "research/corpus",
+  "sources": [
+    { "family": "synth", "path": "misc/Analog_Freeze_Freeze_2024-01-25_101950-1.wav" },
+    { "family": "vocal", "path": "vocals/VOK_ADLIB-St_2025-10-13_100555-1.wav" },
+    { "family": "bowed", "path": "nyckelharpa/Nyckelharpa_Bounce_2026-03-31_203133.wav" },
+    { "family": "organ", "path": "trampeorgel/Trampeorgel_Bounce_2026-05-15_130535.wav" },
+    { "family": "pluck", "path": "plucks/Plucks_Bounce_Bounce_2026-06-21_131927-3.wav" }
+  ],
+  "offsets": [-24, -12, 0, 12, 24],
+  "engines": ["A", "B", "C"],
+  "clipSeconds": 3.0,
+  "outputSampleRate": 48000,
+  "listeningRmsDbfs": -20,
+  "seed": 1
+}
