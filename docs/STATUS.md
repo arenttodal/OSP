@@ -18,7 +18,7 @@ _Last updated: Phase 0 complete; Phase 1 (playable sampler plugin) implemented. 
 - [x] P0-12 Corpus runner (profiles, engines, parallel jobs, failure isolation, summary.md/json)
 - [x] Golden render regression system (8 cases) + render safety checks
 - [x] Benchmark (`--benchmark`) + CTest performance smoke test
-- [ ] Run the real 80-file corpus (requires the files locally — see Blockers)
+- [x] Run the real 80-file corpus: 80/80 analysed, 800 renders, 0 errors (`docs/reports/corpus-run-1.md`)
 - [x] Optional minimal standalone/plugin (see Phase 1 below)
 
 ## Milestone checklist — Phase 1: playable sampler
@@ -55,13 +55,12 @@ _Last updated: Phase 0 complete; Phase 1 (playable sampler plugin) implemented. 
 
 ## NEXT
 
-- Review Phase 0 against the real corpus (`--corpus research/corpus --profile standard --engines A,B`).
+- Decide on the corpus-run findings: start-at-onset and playback-gain options, `Sus`
+  filename/pitch offsets, root choice for harmonics (`docs/reports/corpus-run-1.md`).
 - Phase 2 pitch bake-off (A resampling / B Signalsmith Stretch / C formant-aware), see the Phase 0 report.
 
 ## BLOCKERS
 
-- The real research corpus is not in the repository (by design: git-ignored). Corpus
-  success counts and real-source pitch observations need a local run.
 - DAW testing (Logic, Ableton, Reaper) needs a Mac; CI covers build, tests and auval.
 
 ## KNOWN ISSUES

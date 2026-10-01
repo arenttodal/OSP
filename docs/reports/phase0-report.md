@@ -2,9 +2,8 @@
 
 _Status: complete. Verified on Linux (GCC 13) and on macOS 14 / Apple Silicon in CI
 (build, all tests, benchmark, `auval` AU validation: **AU VALIDATION SUCCEEDED**).
-The private 80-file corpus was not available in the development environment, so
-corpus figures below come from the synthetic ground-truth set. Run the corpus
-locally before signing off (command at the end)._
+The full 80-file corpus was run afterwards: 80/80 analysed, 800 renders, 0 errors —
+see `corpus-run-1.md` for the real-corpus results and findings._
 
 ## 1. Repository architecture
 
@@ -72,7 +71,11 @@ corpus run over a folder containing broken and unsupported files.
 
 ## 4. Corpus success/failure counts
 
-**Real corpus: not run** (files not present here). Synthetic stand-in
+**Real corpus (80 files):** 80 analysed, 0 failed; 800 renders: 766 ok, 34 warning
+(all explained by the sources), 0 error; pitch 66 high / 11 moderate / 3 low / 0 none.
+Details in `corpus-run-1.md`.
+
+Synthetic stand-in, run before the corpus was available
 (`--generate-test-signals`: 13 audio files in 7 encodings at 44.1–96 kHz + 1 broken
 WAV + 1 text file), `--profile standard --engines A,B`:
 
@@ -92,7 +95,13 @@ offsets are reported (e.g. −23 c within 1 c). Noise, silence, impulses and a 1
 never claim a pitch (`detected: false`, confidence < 0.4, warning + `null` in JSON).
 Vibrato rate/depth and tremolo rate/depth are measured within ~5 %.
 
-Expected behaviour on the real corpus, to verify:
+On the real corpus (see `corpus-run-1.md`) these expectations held: stable material
+(organ, synths, bowed, most vocals and plucks) is high confidence; moderate/low cases are
+genuinely ambiguous sources (harmonics alternating with the pitch 3:1 below, drone strings,
+a violin take that sounds an octave up). One open question: the `Sus` files' names
+differ from their clearly detected pitches by a semitone or more.
+
+Expectations written before the corpus run:
 
 - **Strong**: synths, organ, vowels, bowed sustains, sax — stable harmonic material.
 - **Watch**: plucks with inharmonic/bright attacks (attack frames may disagree; the
