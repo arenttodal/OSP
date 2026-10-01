@@ -9,6 +9,7 @@
 
 #include <fstream>
 #include <set>
+#include <utility>
 
 using namespace osp;
 using namespace osp::research;
@@ -38,6 +39,7 @@ TEST_CASE ("bake-off: blind clips, key, scoring", "[integration][bakeoff]")
     std::set<std::string> engines;
     juce::var ratings = json::object();
     auto items = json::array();
+    bool leftBlank = false;
     for (const auto& c : *clips)
     {
         engines.insert (json::getString (c, "engine"));
@@ -47,7 +49,9 @@ TEST_CASE ("bake-off: blind clips, key, scoring", "[integration][bakeoff]")
         auto r = json::object();
         json::set (r, "clip", c["id"]);
         json::set (r, "identity", json::getString (c, "engine") == "A" ? 5 : 3);
-        json::set (r, "beauty", 4);
+        // One B take is left unrated on beauty: a blank must not count as a 0.
+        if (json::getString (c, "engine") != "B" || std::exchange (leftBlank, true))
+            json::set (r, "beauty", 4);
         json::set (r, "artifacts", 4);
         json::set (r, "best", json::getString (c, "engine") == "A");
         items.append (r);
@@ -69,6 +73,7 @@ TEST_CASE ("bake-off: blind clips, key, scoring", "[integration][bakeoff]")
     REQUIRE (json::writeFile (dir / "ratings.json", ratings, error));
     std::string report;
     REQUIRE (scoreBakeoff (dir / "out", dir / "ratings.json", report, error));
-    CHECK (report.find ("| A | 2 | 5 |") != std::string::npos);
+    CHECK (report.find ("| A | 2 | 5 | 4 | 4 | 2 |") != std::string::npos);
+    CHECK (report.find ("| B | 2 | 3 | 4 | 4 | 0 |") != std::string::npos);
     CHECK (std::filesystem::exists (dir / "out" / "score.md"));
 }

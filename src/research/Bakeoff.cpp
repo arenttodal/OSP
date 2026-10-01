@@ -378,10 +378,29 @@ bool scoreBakeoff (const std::filesystem::path& outputDir, const std::filesystem
         for (const auto& c : *clips)
             clipById[json::getString (c, "id")] = c;
 
+    // Each scale keeps its own count: a listener may pick a best take without rating
+    // every scale, and a blank must not count as a 0.
+    struct Scale
+    {
+        int n = 0;
+        double sum = 0;
+
+        void add (const juce::var& rating, const char* name)
+        {
+            const auto& v = rating[name];
+            if (v.isInt() || v.isInt64() || v.isDouble())
+            {
+                sum += static_cast<double> (v);
+                ++n;
+            }
+        }
+
+        double mean() const { return n > 0 ? json::round (sum / n, 2) : 0.0; }
+    };
     struct Tally
     {
         int n = 0, best = 0;
-        double identity = 0, beauty = 0, artifacts = 0;
+        Scale identity, beauty, artifacts;
     };
     // key: dimension ("all", family, band) -> engine -> tally
     std::map<std::string, std::map<std::string, Tally>> table;
@@ -401,9 +420,9 @@ bool scoreBakeoff (const std::filesystem::path& outputDir, const std::filesystem
             {
                 auto& t = table[dim][engine];
                 ++t.n;
-                t.identity += json::getDouble (r, "identity", 0.0);
-                t.beauty += json::getDouble (r, "beauty", 0.0);
-                t.artifacts += json::getDouble (r, "artifacts", 0.0);
+                t.identity.add (r, "identity");
+                t.beauty.add (r, "beauty");
+                t.artifacts.add (r, "artifacts");
                 t.best += json::getBool (r, "best", false) ? 1 : 0;
             }
             ++used;
@@ -417,7 +436,8 @@ bool scoreBakeoff (const std::filesystem::path& outputDir, const std::filesystem
 
     std::ostringstream md;
     md << "# Bake-off score: " << json::getString (*key, "name") << "\n\n"
-       << used << " ratings. Scores are means on 1–5 (artifacts: 5 = none); wins = times chosen best in its group.\n\n";
+       << used << " rated clips. Scores are means on 1–5 over the clips rated on that scale (artifacts: 5 = none; "
+          "blank = not rated); wins = times chosen best in its group.\n\n";
     auto score = json::object();
     for (const auto& [dim, engines] : table)
     {
@@ -425,14 +445,15 @@ bool scoreBakeoff (const std::filesystem::path& outputDir, const std::filesystem
         auto dimJson = json::object();
         for (const auto& [engine, t] : engines)
         {
-            const auto mean = [&] (double v) { return t.n > 0 ? json::round (v / t.n, 2) : 0.0; };
-            md << "| " << engine << " | " << t.n << " | " << mean (t.identity) << " | " << mean (t.beauty) << " | "
-               << mean (t.artifacts) << " | " << t.best << " |\n";
+            const auto cell = [] (const Scale& sc) { return sc.n > 0 ? juce::String (sc.mean()).toStdString() : std::string ("–"); };
+            md << "| " << engine << " | " << t.n << " | " << cell (t.identity) << " | " << cell (t.beauty) << " | "
+               << cell (t.artifacts) << " | " << t.best << " |\n";
             auto e = json::object();
             json::set (e, "n", t.n);
-            json::set (e, "identity", mean (t.identity));
-            json::set (e, "beauty", mean (t.beauty));
-            json::set (e, "artifacts", mean (t.artifacts));
+            json::set (e, "identity", t.identity.mean());
+            json::set (e, "beauty", t.beauty.mean());
+            json::set (e, "artifacts", t.artifacts.mean());
+            json::set (e, "rated", t.identity.n);
             json::set (e, "wins", t.best);
             json::set (dimJson, engine.c_str(), e);
         }

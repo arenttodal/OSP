@@ -1,4 +1,4 @@
-# Pitch bake-off 1 — guard-rail findings (listening pending)
+# Pitch bake-off 1 — results and decision
 
 Plan: `research/bakeoff/plan-1.json` (seed 1). There are 5 sources, each a family
 representative, at 5 offsets (−24, −12, 0, +12, +24 semitones), rendered by 3 engines.
@@ -11,10 +11,62 @@ That gives 75 clips in 25 blind groups.
 Every clip starts at the analysed onset and gets the same level preparation. It is
 trimmed to its group's common length, faded and RMS-matched to −20 dBFS.
 
-The numbers below are **guard rails only**. The decision comes from the listening
-ratings, which are being collected on the private blind page
-(`research/bakeoff/listening-page/`). When the ratings are in, they are scored with
-`research-renderer --bakeoff-score`.
+The numbers in the guard-rail section are measurements only. The decision comes from
+the blind listening ratings in `research/bakeoff/pitch-bakeoff-1.ratings.json`, which
+are scored with `research-renderer --bakeoff-score`.
+
+## Listening results (one listener, 2026-10-01)
+
+21 of 25 groups have a "best" pick. The missing ones are the bowed, synth and vocal 0
+controls and bowed +24. The listener mostly rated only the take they preferred, plus
+any clearly broken ones, so the **wins** are the signal. The means only cover the
+takes that were rated.
+
+Winner per group, shown as identity/beauty/artifacts of the winning take:
+
+| family | −24 | −12 | +12 | +24 |
+|---|---|---|---|---|
+| organ | **B** 5/5/5 | **B** 5/4/5 | **B** 5/5/5 | **B** 5/5/2 |
+| vocal | **A** 3/4/3 | **A** 4/4/4 | **B** 5/5/5 | **B** 4/3/3 |
+| bowed | **A** 4/4/4 | **B** 4/4/4 | **A** 4/4/3 | — |
+| synth | **A** 5/5/5 | **A** 4/4/4 | C 4/4/3 | **A** 4/4/4 |
+| pluck | **B** 5/5/4 | **B** 4/4/4 | **A** 4/4/4 | **A** 4/4/4 |
+
+Wins outside the 0 controls: **A 9, B 9, C 1**.
+
+**C was rated 1/1/1 every time it was scored away from the root**: 8 times across organ,
+vocal and bowed at ±12 and ±24. Its only non-control win was synth +12.
+
+### Reading
+
+- **Organ: B 4 of 4.** Resampling changes the speed of the bellows and tremulant
+  movement and the length of the note. B keeps the instrument's time behaviour.
+- **Vocal and pluck split by direction.** B wins where resampling's speed change is
+  unnatural: a voice sped up (chipmunk, fast vibrato), and a pluck slowed down (a
+  smeared, slow attack and an overlong decay). A wins where its speed change sounds
+  plausible: a voice going down, and a pluck going up (a higher string decays faster).
+- **Synth: A.** Static spectra lose nothing to resampling, and A has no phasiness.
+- **Bowed: mixed** (A, B, A).
+
+## Decision
+
+1. **Engine C (formant compensation via Signalsmith) is rejected** as a default or
+   branch. It stays in the research tool only. Formant control returns later as a
+   CHARACTER / Reimagined transformation on top of the chosen branch (Phase 6), not as
+   the pitch engine.
+2. **A (resampling) stays the default.** Overall it ties with B, and the rule set
+   before listening keeps the simpler engine on a tie (spec §24: do not "improve"
+   resampling automatically).
+3. **B becomes a second pitch branch, "Natural"**, built as offline register anchors
+   (spec §27) at −24, −12, +12 and +24. Notes resample from the nearest anchor (at most
+   ±6 semitones), so the audio thread does the same cheap work as A. The anchors are
+   built by the render/cache worker after the instrument is already playable.
+4. In the plugin, **Pitch Character** (Advanced panel, spec §13) chooses between
+   *Tape* (A) and *Natural* (B). The Original ↔ Reimagined control may blend between
+   them later.
+5. The evidence is one listener and one source per family. Whether *Natural* should be
+   the automatic default for some sources (organ-like sustains, upward vocals, downward
+   plucks) is an **open question** for a second round with more sources per family.
 
 ## Pitch accuracy and spectral-envelope shift
 

@@ -46,8 +46,9 @@ _Last updated: Phase 0 complete; Phase 1 (playable sampler plugin) implemented; 
 - [x] Scoring (`--bakeoff-score dir --ratings file`): per engine / family / offset band
 - [x] Run 1 rendered: 5 families x 5 offsets x 3 engines = 75 clips (`docs/reports/pitch-bakeoff-1.md`)
 - [x] Blind listening page (`research/bakeoff/listening-page/`), ratings stored with the page
-- [ ] Listening ratings collected and scored
-- [ ] Decision: default engine per family / offset range (keep A where it ties)
+- [x] Listening ratings collected and scored (`research/bakeoff/pitch-bakeoff-1.ratings.json`)
+- [x] Decision: A default, C rejected, B as "Natural" register anchors (`docs/reports/pitch-bakeoff-1.md`)
+- [ ] Natural pitch branch (offline anchors) in the plugin
 
 ## DONE
 
