@@ -1,0 +1,83 @@
+One-Sample Performance Instrument research corpus
+Files: 80
+
+01. 808 - FRAME C (Freeze) [2022-08-03 223952].wav
+02. AA - PROPHET 6 - SAMPLING SESSION 1 - CLIP406.aif
+03. Analog (Freeze) (Freeze) [2024-01-25 101950]-1.wav
+04. Arent Second Take sax  [2024-02-06 220708]-3.wav
+05. BASS - REESE - G [2023-11-27 220203].wav
+06. BTS - AV1 - VIOLIN DRY - RR - A#_01.wav
+07. BTS - AV1 - VIOLIN DRY - RR - A#_09.wav
+08. F (Freeze) (Freeze) [2021-02-15 130619].wav
+09. Gåte X Arn - Mi Jord -  V1 -  Fiolin 1 (Freeze) [2025-05-31 150855].wav
+10. Gåte X Arn - Nokon -  Flageolett (Freeze) [2025-05-31 150852].wav
+11. LV BRIDGE_01 [2025-10-13 101813]-1.wav
+12. LV BRIDGE_01 [2025-10-13 101813].wav
+13. Nyckelharpa (Bounce) [2026-03-31 203132]-1.wav
+14. Nyckelharpa (Bounce) [2026-03-31 203133].wav
+15. Nyckelharpa (Bounce) [2026-03-31 203134]-1.wav
+16. Nyckelharpa (Bounce) [2026-03-31 203134].wav
+17. ORG 3 (Freeze) [2021-02-23 165314].wav
+18. Plucks (Bounce) (Bounce) [2026-06-21 131923]-1.wav
+19. Plucks (Bounce) (Bounce) [2026-06-21 131923]-2.wav
+20. Plucks (Bounce) (Bounce) [2026-06-21 131923]-3.wav
+21. Plucks (Bounce) (Bounce) [2026-06-21 131923]-4.wav
+22. Plucks (Bounce) (Bounce) [2026-06-21 131923].wav
+23. Plucks (Bounce) (Bounce) [2026-06-21 131925]-4.wav
+24. Plucks (Bounce) (Bounce) [2026-06-21 131925]-5.wav
+25. Plucks (Bounce) (Bounce) [2026-06-21 131925]-6.wav
+26. Plucks (Bounce) (Bounce) [2026-06-21 131926]-2.wav
+27. Plucks (Bounce) (Bounce) [2026-06-21 131926]-3.wav
+28. Plucks (Bounce) (Bounce) [2026-06-21 131926]-4.wav
+29. Plucks (Bounce) (Bounce) [2026-06-21 131926].wav
+30. Plucks (Bounce) (Bounce) [2026-06-21 131927]-1.wav
+31. Plucks (Bounce) (Bounce) [2026-06-21 131927]-3.wav
+32. Plucks (Bounce) (Bounce) [2026-06-21 131927]-4.wav
+33. Plucks (Bounce) (Bounce) [2026-06-21 131927]-5.wav
+34. Sus A Med.wav
+35. Sus D Med.wav
+36. Sus E Medium.wav
+37. Sus G Slow.wav
+38. Sus Harm D Trem.wav
+39. Sus Harm E Trem Low.wav
+40. Sus Harm E Trem.wav
+41. Sus Harm G Trem.wav
+42. TREM 1 2 (Freeze) (Freeze) [2021-02-21 125439].wav
+43. Tagel Puck (Bounce) [2026-06-21 144438]-1.wav
+44. Tagel Puck (Bounce) [2026-06-21 144438]-2.wav
+45. Tagel Puck (Bounce) [2026-06-21 144438]-3.wav
+46. Tagel Puck (Bounce) [2026-06-21 144438].wav
+47. Tagel Puck (Bounce) [2026-06-21 144439]-1.wav
+48. Tagel Puck (Bounce) [2026-06-21 144439]-2.wav
+49. Tagel Puck (Bounce) [2026-06-21 144439]-3.wav
+50. Tagel Puck (Bounce) [2026-06-21 144439]-4.wav
+51. Tagel Puck (Bounce) [2026-06-21 144439]-5.wav
+52. Tagel Puck (Bounce) [2026-06-21 144439]-6.wav
+53. Tagel Puck (Bounce) [2026-06-21 144439]-7.wav
+54. Tagel Puck (Bounce) [2026-06-21 144439]-8.wav
+55. Tagel Puck (Bounce) [2026-06-21 144439].wav
+56. Tagel Puck (Bounce) [2026-06-21 144440].wav
+57. Trampeorgel (Bounce) [2026-05-15 130531].wav
+58. Trampeorgel (Bounce) [2026-05-15 130532]-1.wav
+59. Trampeorgel (Bounce) [2026-05-15 130532].wav
+60. Trampeorgel (Bounce) [2026-05-15 130533].wav
+61. Trampeorgel (Bounce) [2026-05-15 130535].wav
+62. Trampeorgel (Bounce) [2026-05-15 130536]-1.wav
+63. Trampeorgel (Bounce) [2026-05-15 130536].wav
+64. Trampeorgel (Bounce) [2026-05-15 130537]-1.wav
+65. Trampeorgel (Bounce) [2026-05-15 130537]-2.wav
+66. Trampeorgel (Bounce) [2026-05-15 130537].wav
+67. Trampeorgel (Bounce) [2026-05-15 130538]-1.wav
+68. Trampeorgel (Bounce) [2026-05-15 130538]-2.wav
+69. Trampeorgel (Bounce) [2026-05-15 130538].wav
+70. Trampeorgel (Bounce) [2026-05-15 130539]-1.wav
+71. Trampeorgel (Bounce) [2026-05-15 130539]-2.wav
+72. Trampeorgel (Bounce) [2026-05-15 130539].wav
+73. VOK ADLIB-St [2025-10-13 100555]-1.wav
+74. VOK ADLIB-St [2025-10-13 100555]-2.wav
+75. VOK ADLIB-St [2025-10-13 100555]-3.wav
+76. VOK ADLIB-St [2025-10-13 100555]-4.wav
+77. VOK MOODS-St [2025-10-13 100821].wav
+78. VOK MOODS-St [2025-10-13 100936]-1.wav
+79. VOK MOODS-St [2025-10-13 100936].wav
+80. VOK MOODS-St [2025-10-13 101112].wav

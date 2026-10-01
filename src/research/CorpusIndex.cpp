@@ -49,7 +49,7 @@ CorpusIndex buildCorpusIndex (const std::filesystem::path& root)
         }
         if (! it->is_regular_file (ec))
             continue;
-        if (name == "index.json" || name.rfind ("README", 0) == 0)
+        if (name == "index.json" || name.rfind ("README", 0) == 0 || name.rfind ("MANIFEST", 0) == 0)
             continue;
 
         CorpusEntry entry;

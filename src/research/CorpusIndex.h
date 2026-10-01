@@ -36,7 +36,7 @@ struct CorpusIndex
 /**
     Recursively scans a directory. Every regular file is listed (unsupported ones are
     marked, not dropped, so the summary can report them). Hidden files and files
-    named index.json / README* are ignored.
+    named index.json, README* or MANIFEST* are ignored.
 */
 CorpusIndex buildCorpusIndex (const std::filesystem::path& root);
 
