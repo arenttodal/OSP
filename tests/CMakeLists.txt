@@ -11,6 +11,7 @@ add_executable(osp_tests
     unit/MidiTests.cpp
     unit/AnalysisTests.cpp
     unit/ModelExchangeTests.cpp
+    unit/PlaybackPreparationTests.cpp
     integration/RenderIntegrationTests.cpp
     integration/CorpusIntegrationTests.cpp
     regression/GoldenTests.cpp

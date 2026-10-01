@@ -142,6 +142,42 @@ TEST_CASE ("render: unpitched sources still render, with a labelled fallback roo
     CHECK (m.notes.empty()); // no pitch claims without a known source F0
 }
 
+TEST_CASE ("render: start-at-onset and level matching", "[integration][playback]")
+{
+    // A quiet tone that starts after 0.6 s of silence (like the organ's bellows pre-roll).
+    auto source = testsignals::sine (220.0, 2.0, 48000.0, 0.01, 2);
+    for (auto& ch : source.channels)
+        std::fill (ch.begin(), ch.begin() + static_cast<long> (0.6 * 48000.0), 0.0f);
+    const auto analysis = test::analyse (source);
+    const auto seq = fixtures::repetition (57);
+
+    RenderConfig plain;
+    RenderConfig prepared;
+    prepared.playback.startAtOnset = true;
+    prepared.playback.normaliseLevel = true;
+
+    MetricsContext context;
+    context.expectedSampleRate = 48000.0;
+    context.sequence = &seq;
+
+    const auto a = renderSequence (source, 57.0, seq, plain, preparePlayback (analysis, plain.playback));
+    const auto b = renderSequence (source, 57.0, seq, prepared, preparePlayback (analysis, prepared.playback));
+
+    // Plain playback: the 0.4 s notes end before the tone arrives.
+    const auto ma = computeMetrics (a.audio, context);
+    CHECK (ma.peakDbfs < -60.0);
+
+    // Prepared playback: every note sounds immediately, at a usable level.
+    const auto mb = computeMetrics (b.audio, context);
+    CHECK (mb.status() == "ok");
+    CHECK (mb.peakDbfs > -35.0); // -16 dBFS RMS target (~-13 peak), -9 dB headroom, -8.7 dB for velocity 90
+    const auto firstNoteWindow = std::vector<float> (b.audio.channels[0].begin() + 2400, b.audio.channels[0].begin() + 4800);
+    float early = 0.0f;
+    for (float v : firstNoteWindow)
+        early = std::max (early, std::abs (v));
+    CHECK (early > 0.01f); // sound within 50-100 ms of the first note-on
+}
+
 TEST_CASE ("render: safety checks catch corrupted output", "[integration]")
 {
     auto audio = testsignals::sine (440.0, 0.5, 48000.0, 0.5, 2);

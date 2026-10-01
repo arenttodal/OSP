@@ -54,11 +54,13 @@ RENDERING
         [--config <config.json>]     research/configs/*.json
         [--seed <n>] [--sample-rate <hz>|source] [--block-size <n>]
         [--metrics <metrics.json>]   write render metrics (also printed as a summary)
+        [--start file|onset]         start notes at sample 0 (default) or just before the analysed onset
+        [--level raw|normalise]      play at recorded level (default) or match levels (max RMS -16 dBFS)
   Fixtures: repetition, dynamics, register, melody, chords, long-hold, long-chord, repeated-sustains
         (generated at the source root; --fixture-reference <note> to override)
 
 CORPUS
-  --corpus <dir> [--profile quick|standard|sustain|full] [--engines A,B]
+  --corpus <dir> [--profile quick|standard|sustain|full] [--engines A,B] [--start ..] [--level ..]
         [--reports <dir>] [--renders <dir>] [--jobs <n>] [--no-audio] [--config <f>] [--seed <n>] [--strict]
   --index <dir> [--output-index <index.json>]
 
@@ -181,6 +183,26 @@ std::optional<RenderConfig> configFromArgs (const Args& args, std::string& error
             error = "invalid --sample-rate '" + text + "'";
             return std::nullopt;
         }
+    }
+    if (args.has ("--start"))
+    {
+        const auto mode = args.get ("--start");
+        if (mode != "file" && mode != "onset")
+        {
+            error = "invalid --start '" + mode + "' (file or onset)";
+            return std::nullopt;
+        }
+        config.playback.startAtOnset = mode == "onset";
+    }
+    if (args.has ("--level"))
+    {
+        const auto mode = args.get ("--level");
+        if (mode != "raw" && mode != "normalise" && mode != "normalize")
+        {
+            error = "invalid --level '" + mode + "' (raw or normalise)";
+            return std::nullopt;
+        }
+        config.playback.normaliseLevel = mode != "raw";
     }
     if (args.has ("--block-size"))
     {
@@ -306,7 +328,8 @@ int commandRender (const Args& args)
     if (sequence.events.empty())
         std::cerr << "warning: MIDI sequence contains no note events\n";
 
-    const auto output = renderSequence (source.audio, root.rootMidi, sequence, *config);
+    const auto preparation = preparePlayback (source.analysis, config->playback);
+    const auto output = renderSequence (source.audio, root.rootMidi, sequence, *config, preparation);
 
     MetricsContext context;
     context.expectedChannels = 2;
@@ -326,6 +349,10 @@ int commandRender (const Args& args)
         json::set (metricsJson, "rootMidi", json::number (root.rootMidi, 3));
         json::set (metricsJson, "rootOrigin", json::str (root.origin));
         json::set (metricsJson, "seed", static_cast<juce::int64> (config->sampler.seed));
+        json::set (metricsJson, "startAtOnset", config->playback.startAtOnset);
+        json::set (metricsJson, "normaliseLevel", config->playback.normaliseLevel);
+        json::set (metricsJson, "startSeconds", json::number (preparation.startSeconds, 4));
+        json::set (metricsJson, "playbackGainDb", json::number (preparation.gainDb, 2));
         if (! json::writeFile (args.get ("--metrics"), metricsJson, error))
             return fail (exitProcessing, error);
     }

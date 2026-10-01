@@ -50,6 +50,10 @@ those within 40 dB of the maximum RMS (and above −100 dBFS). Sources longer th
 | `rangeCents` | 5th–95th percentile spread of agreeing frames |
 | `vibrato` | `{rateHz, depthCents (peak deviation), strength}` from the autocorrelation of the cents contour (3–9 Hz, longest agreeing run) when strength ≥ 0.5 and depth ≥ 3 cents; else `null` |
 
+Root policy: the **sounding pitch** wins. Filenames are never used for the root; for
+harmonics and other sources that alternate with a sub-pitch, the majority (sounding)
+pitch is the root and the alternation lowers the confidence.
+
 A low-confidence estimate is still reported (it can seed a UI suggestion) but
 `detected` is `false`, a warning is added, and renders label the root
 `analysis-low-confidence`.
@@ -118,8 +122,8 @@ floor −120), `centroidHz`, `flux`, `flatness`.
 
 | File | Producer | Key fields |
 |---|---|---|
-| `<fixture>[.<engine>].metrics.json` | renderer / corpus | `schemaVersion`, `status`, safety counts, levels, `notes[]`, `issues[]`, `sampleHash`, `fixture`, `fixtureVersion`, `engine`, `rootMidi`, `rootOrigin`, `seed` |
+| `<fixture>[.<engine>].metrics.json` | renderer / corpus | `schemaVersion`, `status`, safety counts, levels, `notes[]`, `issues[]`, `sampleHash`, `fixture`, `fixtureVersion`, `engine`, `rootMidi`, `rootOrigin`, `seed`, `startAtOnset`, `normaliseLevel`, `startSeconds`, `playbackGainDb` |
 | `index.json` | `--index`, corpus | `schemaVersion`, `files[] {id, path, filename, extension, sizeBytes, supported, duplicateOf?}` |
 | `summary.json` | corpus | `schemaVersion`, `counts`, `files[]` with per-file status, root and renders |
-| `research/configs/*.json` | hand-written | `schemaVersion`, `engine`, `sampleRate`, `blockSize`, `seed`, `sampler{}`, `randomization{}` |
+| `research/configs/*.json` | hand-written | `schemaVersion`, `engine`, `sampleRate`, `blockSize`, `seed`, `sampler{}`, `randomization{}`, `playback{startAtOnset, normaliseLevel, targetMaxRmsDbfs}` |
 | benchmark JSON | `--benchmark --output-json` | `schemaVersion`, `config`, block timing statistics |

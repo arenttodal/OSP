@@ -100,7 +100,7 @@ TEST_CASE ("JSON: render config loads with defaults for missing fields", "[unit]
 
 TEST_CASE ("JSON: committed research configs parse", "[unit][json]")
 {
-    for (const auto* name : { "baseline-a.json", "baseline-b.json" })
+    for (const auto* name : { "baseline-a.json", "baseline-b.json", "prepared-a.json" })
     {
         std::string error;
         const auto config = research::loadRenderConfig (std::filesystem::path (OSP_SOURCE_DIR) / "research" / "configs" / name, error);

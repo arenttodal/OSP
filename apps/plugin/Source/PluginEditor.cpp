@@ -49,7 +49,10 @@ void WaveformView::paint (juce::Graphics& g)
         const auto& lo = instrument->peakMin;
         const auto& hi = instrument->peakMax;
         const float mid = bounds.getCentreY();
-        const float scale = bounds.getHeight() * 0.45f;
+        float maxAbs = 1.0e-4f; // display is scaled to the recording's own peak so quiet sources stay visible
+        for (std::size_t i = 0; i < hi.size(); ++i)
+            maxAbs = std::max ({ maxAbs, hi[i], -lo[i] });
+        const float scale = bounds.getHeight() * 0.45f / maxAbs;
         const int width = getWidth();
         g.setColour (colours::wave.withAlpha (loading ? 0.3f : 0.85f));
         for (int x = 0; x < width; ++x)
@@ -60,7 +63,15 @@ void WaveformView::paint (juce::Graphics& g)
             g.drawVerticalLine (x, top, std::max (top + 1.0f, bottom));
         }
     }
-    else if (! loading)
+    if (instrument != nullptr && instrument->startSeconds > 0.0 && instrument->durationSeconds > 0.0)
+    {
+        // Notes start here (analysed onset), not at the beginning of the file.
+        const auto x = static_cast<float> (instrument->startSeconds / instrument->durationSeconds) * bounds.getWidth();
+        g.setColour (colours::accent.withAlpha (0.8f));
+        g.drawVerticalLine (static_cast<int> (x), bounds.getY(), bounds.getBottom());
+    }
+
+    if ((instrument == nullptr || instrument->peakMax.empty()) && ! loading)
     {
         g.setColour (colours::text);
         g.setFont (juce::FontOptions (28.0f, juce::Font::bold));

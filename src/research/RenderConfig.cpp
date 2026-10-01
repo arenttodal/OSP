@@ -79,6 +79,11 @@ std::optional<RenderConfig> loadRenderConfig (const std::filesystem::path& path,
     s.stealFadeSeconds = json::getDouble (sampler, "stealFadeSeconds", s.stealFadeSeconds);
     s.seed = static_cast<std::uint64_t> (json::getDouble (root, "seed", static_cast<double> (s.seed)));
 
+    const auto& playback = root["playback"];
+    config.playback.startAtOnset = json::getBool (playback, "startAtOnset", config.playback.startAtOnset);
+    config.playback.normaliseLevel = json::getBool (playback, "normaliseLevel", config.playback.normaliseLevel);
+    config.playback.targetMaxRmsDbfs = json::getDouble (playback, "targetMaxRmsDbfs", config.playback.targetMaxRmsDbfs);
+
     const auto& random = root["randomization"];
     s.randomization.gainDb = json::getDouble (random, "gainDb", s.randomization.gainDb);
     s.randomization.detuneCents = json::getDouble (random, "detuneCents", s.randomization.detuneCents);

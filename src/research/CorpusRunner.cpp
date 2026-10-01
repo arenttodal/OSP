@@ -73,6 +73,7 @@ namespace
             record.error = error;
 
         record.root = chooseRoot (&source.analysis, std::nullopt);
+        const auto preparation = preparePlayback (source.analysis, options.config.playback);
         const int reference = fixtureReferenceNote (record.root.rootMidi);
 
         for (const auto& fixtureName : options.fixtures)
@@ -90,7 +91,7 @@ namespace
                 {
                     auto config = options.config;
                     config.engine = engine;
-                    const auto output = renderSequence (source.audio, record.root.rootMidi, *sequence, config);
+                    const auto output = renderSequence (source.audio, record.root.rootMidi, *sequence, config, preparation);
 
                     MetricsContext context;
                     context.expectedChannels = 2;
@@ -118,6 +119,10 @@ namespace
                     json::set (metricsJson, "rootMidi", json::number (record.root.rootMidi, 3));
                     json::set (metricsJson, "rootOrigin", json::str (record.root.origin));
                     json::set (metricsJson, "seed", static_cast<juce::int64> (config.sampler.seed));
+                    json::set (metricsJson, "startAtOnset", config.playback.startAtOnset);
+                    json::set (metricsJson, "normaliseLevel", config.playback.normaliseLevel);
+                    json::set (metricsJson, "startSeconds", json::number (preparation.startSeconds, 4));
+                    json::set (metricsJson, "playbackGainDb", json::number (preparation.gainDb, 2));
                     json::writeFile (options.reportsDir / folder / (base + ".metrics.json"), metricsJson, error);
 
                     render.status = metrics.status();
@@ -342,6 +347,8 @@ CorpusRunSummary runCorpus (const CorpusRunOptions& options)
     json::set (root, "engines", json::stringArray (engineNames));
     json::set (root, "seed", static_cast<juce::int64> (options.config.sampler.seed));
     json::set (root, "outputSampleRate", json::number (options.config.sampleRate, 1));
+    json::set (root, "startAtOnset", options.config.playback.startAtOnset);
+    json::set (root, "normaliseLevel", options.config.playback.normaliseLevel);
     auto counts = json::object();
     json::set (counts, "totalFiles", summary.totalFiles);
     json::set (counts, "supportedFiles", summary.supportedFiles);

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "description": "Baseline A plus non-destructive playback preparation: notes start just before the analysed onset and every source is level-matched (max RMS -16 dBFS, peak-limited). This is what the plugin uses.",
+  "engine": "A",
+  "sampleRate": 48000,
+  "blockSize": 128,
+  "maxTailSeconds": 15,
+  "seed": 1,
+  "playback": {
+    "startAtOnset": true,
+    "normaliseLevel": true,
+    "targetMaxRmsDbfs": -16
+  }
+}

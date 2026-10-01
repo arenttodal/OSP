@@ -35,6 +35,8 @@ _Last updated: Phase 0 complete; Phase 1 (playable sampler plugin) implemented. 
 - [x] Headless plugin tests (load, chromatic pitch, SR changes, root override, recall, bad files)
 - [x] macOS 14 / Apple Silicon: build, all tests, `auval` (CI)
 - [ ] Host validation: pluginval, Logic / Ableton / Reaper (needs a Mac)
+- [x] Playback preparation: start at the analysed onset + level matching (plugin default; research option)
+- [x] Session recall stores the exact playback model (bit-identical recall even if analysis changes)
 - [ ] Exit check with real corpus samples in a DAW
 
 ## DONE
@@ -55,8 +57,6 @@ _Last updated: Phase 0 complete; Phase 1 (playable sampler plugin) implemented. 
 
 ## NEXT
 
-- Decide on the corpus-run findings: start-at-onset and playback-gain options, `Sus`
-  filename/pitch offsets, root choice for harmonics (`docs/reports/corpus-run-1.md`).
 - Phase 2 pitch bake-off (A resampling / B Signalsmith Stretch / C formant-aware), see the Phase 0 report.
 
 ## BLOCKERS

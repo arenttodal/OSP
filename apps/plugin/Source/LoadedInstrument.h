@@ -30,6 +30,8 @@ struct LoadedInstrument
     std::string rootOrigin;          ///< "analysis", "analysis-low-confidence", "fallback"
 
     PlaybackSource playback;
+    double startSeconds = 0.0;       ///< where notes start reading (analysed onset minus pre-roll)
+    double playbackGainDb = 0.0;     ///< non-destructive level match
 
     /** Waveform overview: min/max per bucket of the mono mix. */
     std::vector<float> peakMin;

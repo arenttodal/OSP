@@ -179,6 +179,28 @@ TEST_CASE ("plugin: bad files fail cleanly and keep the previous instrument", "[
     CHECK (pitchOf (playNote (p, 57, 48000.0, 0.5)) == Approx (220.0).epsilon (0.006));
 }
 
+TEST_CASE ("plugin: a sample with a slow start speaks immediately", "[plugin]")
+{
+    // 0.6 s of silence before a quiet tone (like the organ's bellows pre-roll).
+    TempDir tmp;
+    auto audio = testsignals::sine (220.0, 2.0, 48000.0, 0.01, 2);
+    for (auto& ch : audio.channels)
+        std::fill (ch.begin(), ch.begin() + 28800, 0.0f);
+    const auto file = writeSource (tmp.dir, "late.wav", audio);
+
+    OspAudioProcessor p;
+    loadAndWait (p, file);
+    REQUIRE (p.currentInstrument() != nullptr);
+    CHECK (p.currentInstrument()->startSeconds == Approx (0.57).margin (0.02));
+    CHECK (p.currentInstrument()->playbackGainDb > 20.0);
+
+    const auto out = playNote (p, 57, 48000.0, 0.2);
+    float early = 0.0f;
+    for (std::size_t i = 2400; i < 4800; ++i) // 50-100 ms after note-on
+        early = std::max (early, std::abs (out.channels[0][i]));
+    CHECK (early > 0.01f);
+}
+
 TEST_CASE ("plugin: an unpitched sample is still playable", "[plugin]")
 {
     TempDir tmp;

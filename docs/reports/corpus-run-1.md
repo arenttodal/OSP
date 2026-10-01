@@ -78,6 +78,26 @@ All 34 warnings are expected behaviour of baseline A on real material, not engin
    long stable run within ±100 cents); expressive vocals with glides don't qualify. Fine
    for now; revisit if the Performance Engine needs vibrato parameters.
 
+## Decisions (after review)
+
+- **Trust the sound, not the filename.** The `Sus` names may be pitch-shifted or simply
+  wrong; detected pitch is authoritative. No special handling.
+- **Harmonics: the root is the sounding pitch.** For the `Harm … Trem` files the majority
+  pitch is already the sounding harmonic (F6, F5, D#5, A#4), so the current root choice
+  stands; their moderate confidence remains as an honest signal of the alternating
+  sub-pitch.
+- **Start at the sound and match levels.** Implemented as non-destructive playback
+  options (`PlaybackOptions`: `startAtOnset`, `normaliseLevel`), off in baselines A/B,
+  on in the plugin and in `research/configs/prepared-a.json`.
+
+Effect on the corpus (`--engines A --start onset --level normalise`, standard profile):
+
+| | plain A | prepared A |
+|---|---|---|
+| renders with warnings | 17 / 400 | 3 / 400 (all source pitch behaviour) |
+| `near-silent` | 13 | 0 |
+| chord-render peak level across the corpus | −50.1 … −5.9 dBFS (44 dB spread) | −24.8 … −11.8 dBFS (13 dB spread) |
+
 ## Reproduce
 
 ```sh

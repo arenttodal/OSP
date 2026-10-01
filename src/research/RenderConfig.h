@@ -1,6 +1,7 @@
 #pragma once
 
 #include "audio/sampler/BaselineSampler.h"
+#include "model/PlaybackPreparation.h"
 
 #include <filesystem>
 #include <optional>
@@ -29,6 +30,7 @@ struct RenderConfig
     int blockSize = 128;              ///< processing block, mirrors a host callback
     double maxTailSeconds = 15.0;     ///< render stops this long after the last event at the latest
     SamplerSettings sampler {};
+    PlaybackOptions playback {};      ///< start-at-onset / level normalisation (off = plain baselines)
 
     /** Settings actually used for the engine (B turns randomisation on). */
     SamplerSettings effectiveSamplerSettings() const;

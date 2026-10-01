@@ -5,6 +5,7 @@
 #include "io/AnalysisJson.h"
 #include "io/AudioFileIO.h"
 #include "io/ContentHash.h"
+#include "model/PlaybackPreparation.h"
 #include "model/RootChoice.h"
 
 #include <algorithm>
@@ -168,11 +169,27 @@ LoadResult loadInstrument (const LoadRequest& request, SampleStore& store, std::
         instrument->analysis = std::move (*analysis);
 
         // 5. Playback data.
-        const auto root = chooseRoot (&instrument->analysis, std::nullopt);
+        auto root = chooseRoot (&instrument->analysis, std::nullopt);
+        if (request.savedPlayback)
+        {
+            root.rootMidi = request.savedPlayback->rootMidi;
+            root.origin = request.savedPlayback->rootOrigin;
+        }
         instrument->analysisRootMidi = root.rootMidi;
         instrument->rootOrigin = root.origin;
+        // The instrument starts notes at the sound (not at sample 0) and plays every
+        // source at a comparable level; both are non-destructive (corpus-run-1 findings).
+        PlaybackOptions playbackOptions;
+        playbackOptions.startAtOnset = true;
+        playbackOptions.normaliseLevel = true;
+        auto preparation = preparePlayback (instrument->analysis, playbackOptions);
+        if (request.savedPlayback)
+            preparation = { request.savedPlayback->startSeconds, request.savedPlayback->gainDb };
+        instrument->startSeconds = preparation.startSeconds;
+        instrument->playbackGainDb = preparation.gainDb;
         instrument->playback = PlaybackSource (decoded.audio, root.rootMidi,
-                                               BaselineSampler::requiredSourcePaddingFor (playbackZeroCrossings));
+                                               BaselineSampler::requiredSourcePaddingFor (playbackZeroCrossings),
+                                               preparation.startSeconds, preparation.gainDb);
         instrument->character = describeCharacter (instrument->analysis);
         instrument->durationSeconds = decoded.audio.durationSeconds();
 

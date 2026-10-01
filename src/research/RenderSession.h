@@ -3,6 +3,7 @@
 #include "core/AudioData.h"
 #include "midi/MidiEvent.h"
 #include "model/AnalysisData.h"
+#include "model/PlaybackPreparation.h"
 #include "model/RootChoice.h"
 #include "research/RenderConfig.h"
 
@@ -30,6 +31,6 @@ struct RenderOutput
     Deterministic: identical inputs and config produce identical samples.
 */
 RenderOutput renderSequence (const AudioData& source, double rootMidi, const MidiSequence& sequence,
-                             const RenderConfig& config);
+                             const RenderConfig& config, const PlaybackPreparation& preparation = {});
 
 } // namespace osp::research

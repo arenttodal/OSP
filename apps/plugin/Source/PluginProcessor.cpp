@@ -6,6 +6,9 @@
 #include "core/PitchMath.h"
 #include "io/AudioFileIO.h"
 
+#include <cstdio>
+#include <cstdlib>
+
 namespace osp::plugin
 {
 
@@ -361,6 +364,23 @@ double OspAudioProcessor::effectiveRootMidi() const
 //==============================================================================
 // State
 
+namespace
+{
+    // Doubles are stored as round-trip-exact text: recall must reproduce the same audio.
+    juce::String exactString (double value)
+    {
+        char buffer[40];
+        std::snprintf (buffer, sizeof (buffer), "%.17g", value);
+        return buffer;
+    }
+
+    double exactValue (const juce::var& v, double fallback)
+    {
+        const auto text = v.toString();
+        return text.isEmpty() ? fallback : std::strtod (text.toRawUTF8(), nullptr);
+    }
+}
+
 void OspAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     auto stateTree = parameters.copyState();
@@ -373,9 +393,13 @@ void OspAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
         instrumentTree.setProperty ("contentHash", juce::String (instrument->contentHash), nullptr);
         instrumentTree.setProperty ("filename", juce::String (instrument->filename), nullptr);
         instrumentTree.setProperty ("originalPath", juce::String (instrument->originalPath), nullptr);
+        instrumentTree.setProperty ("playbackRootMidi", exactString (instrument->analysisRootMidi), nullptr);
+        instrumentTree.setProperty ("rootOrigin", juce::String (instrument->rootOrigin), nullptr);
+        instrumentTree.setProperty ("startSeconds", exactString (instrument->startSeconds), nullptr);
+        instrumentTree.setProperty ("playbackGainDb", exactString (instrument->playbackGainDb), nullptr);
     }
     if (const auto overrideMidi = rootOverride())
-        instrumentTree.setProperty ("rootOverride", *overrideMidi, nullptr);
+        instrumentTree.setProperty ("rootOverride", exactString (*overrideMidi), nullptr);
     stateTree.appendChild (instrumentTree, nullptr);
 
     if (auto xml = stateTree.createXml())
@@ -394,7 +418,7 @@ void OspAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
     parameters.replaceState (stateTree);
 
     if (instrumentTree.hasProperty ("rootOverride"))
-        setRootOverride (static_cast<double> (instrumentTree["rootOverride"]));
+        setRootOverride (exactValue (instrumentTree["rootOverride"], 60.0));
     else
         setRootOverride (std::nullopt);
 
@@ -405,6 +429,15 @@ void OspAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
         request.expectedHash = hash.toStdString();
         request.filename = instrumentTree["filename"].toString().toStdString();
         request.originalPath = instrumentTree["originalPath"].toString().toStdString();
+        if (instrumentTree.hasProperty ("playbackRootMidi"))
+        {
+            LoadRequest::SavedPlayback saved;
+            saved.rootMidi = exactValue (instrumentTree["playbackRootMidi"], 60.0);
+            saved.rootOrigin = instrumentTree["rootOrigin"].toString().toStdString();
+            saved.startSeconds = exactValue (instrumentTree["startSeconds"], 0.0);
+            saved.gainDb = exactValue (instrumentTree["playbackGainDb"], 0.0);
+            request.savedPlayback = saved;
+        }
         enqueueLoad (std::move (request));
     }
 }

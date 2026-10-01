@@ -146,6 +146,10 @@ compiles the I/O sources with the plugin's own JUCE settings.
   retired slots until no voice reads it, so held notes finish on the old sample.
 - **Message thread**: parameters (`AudioProcessorValueTreeState`), editor, state,
   publishing loaded instruments and freeing retired ones (`ModelExchange`).
+- **Playback preparation** (`model/PlaybackPreparation`): notes start just before the
+  analysed onset and each source is level-matched (max RMS −16 dBFS, peak-limited), both
+  non-destructive and baked into the immutable `PlaybackSource` off the audio thread.
+  Off by default in the research baselines A/B; on in the plugin.
 - **Root override** is applied as a pitch offset (`analysisRoot − userRoot`), so changing
   the root never rebuilds playback data and affects sounding notes immediately.
 - **Sample store** (`SampleStore`): imported files are copied once as
@@ -153,7 +157,9 @@ compiles the I/O sources with the plugin's own JUCE settings.
   analyser version changed. Session state stores hash, file name, original path and the
   root override — never audio.
 - **State** (`getStateInformation`): APVTS parameters + an `Instrument` child, plus
-  `stateVersion`. Recall looks up the store by hash, falls back to the original path,
+  `stateVersion`. The child also stores the playback model actually used (root, root
+  origin, start offset, playback gain) as round-trip-exact text, so a reopened project is
+  bit-identical even if analysis improves later. Recall looks up the store by hash, falls back to the original path,
   and warns if the content changed.
 
 ## Recorded deviations from the suggested layout

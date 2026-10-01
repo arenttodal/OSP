@@ -178,8 +178,8 @@ void BaselineSampler::noteOn (int note, int velocity) noexcept
     params.note = note;
     params.velocity = velocity;
     params.increment = incrementFor (note + detuneCents / 100.0, source->rootMidi(), source->sampleRate(), sampleRate);
-    params.gain = static_cast<float> (dbToGain (gainDb));
-    params.startPosition = startOffsetSeconds * source->sampleRate();
+    params.gain = static_cast<float> (dbToGain (gainDb) * source->playbackGain());
+    params.startPosition = source->startFrame() + startOffsetSeconds * source->sampleRate();
     params.startOrder = eventIndex;
     slot->start (params);
 }

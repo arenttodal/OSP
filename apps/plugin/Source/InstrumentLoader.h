@@ -44,6 +44,17 @@ struct LoadRequest
     std::string expectedHash;          ///< state recall: look up the store first
     std::string originalPath;          ///< state recall: fallback location
     std::string filename;              ///< state recall: display name
+
+    /** State recall: the playback model the session was saved with. Restored exactly so a
+        project sounds identical after reopening, even if the analyser has changed since. */
+    struct SavedPlayback
+    {
+        double rootMidi = 60.0;
+        std::string rootOrigin;
+        double startSeconds = 0.0;
+        double gainDb = 0.0;
+    };
+    std::optional<SavedPlayback> savedPlayback;
 };
 
 struct LoadResult

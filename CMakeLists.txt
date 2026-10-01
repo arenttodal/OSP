@@ -49,6 +49,7 @@ add_library(osp_dsp STATIC
     src/analysis/stereo/StereoAnalyzer.cpp
     src/midi/MidiFixtures.cpp
     src/model/RootChoice.cpp
+    src/model/PlaybackPreparation.cpp
 )
 target_include_directories(osp_dsp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 osp_set_warnings(osp_dsp)

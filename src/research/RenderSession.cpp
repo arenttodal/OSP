@@ -11,7 +11,7 @@ namespace osp::research
 {
 
 RenderOutput renderSequence (const AudioData& source, double rootMidi, const MidiSequence& sequence,
-                             const RenderConfig& config)
+                             const RenderConfig& config, const PlaybackPreparation& preparation)
 {
     RenderOutput output;
     const double outputRate = config.sampleRate > 0.0 ? config.sampleRate : source.sampleRate;
@@ -19,7 +19,8 @@ RenderOutput renderSequence (const AudioData& source, double rootMidi, const Mid
 
     BaselineSampler sampler;
     sampler.prepare (outputRate, blockSize, config.effectiveSamplerSettings());
-    const PlaybackSource playback (source, rootMidi, sampler.requiredSourcePadding());
+    const PlaybackSource playback (source, rootMidi, sampler.requiredSourcePadding(), preparation.startSeconds,
+                                   preparation.gainDb);
     sampler.setSource (&playback);
 
     const auto& events = sequence.events;

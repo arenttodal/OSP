@@ -64,6 +64,7 @@ $R --source source.wav --midi research/midi/melody.mid --output out.wav
 $R --source source.wav --fixture register --output out.wav --metrics out.json
 $R --source source.wav --midi test.mid --analysis report.json --output out.wav   # reuse stored analysis
 $R --source source.wav --fixture chords --root A3 --engine B --seed 7 --output out.wav
+$R --source source.wav --fixture repetition --start onset --level normalise --output out.wav  # as the plugin plays it
 
 # Whole corpus (continues past broken files; writes research/reports + research/renders)
 $R --corpus research/corpus --profile standard --engines A,B
