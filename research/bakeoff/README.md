@@ -16,3 +16,8 @@ one length (the shortest natural length, so duration does not reveal the engine)
 faded, RMS-matched to −20 dBFS and named randomly. `key.json` maps names to engines and
 holds guard-rail metrics (pitch error, spectral-envelope shift, stereo, render time).
 `listening.json` has groups and clip ids only.
+
+Blind listening page: `python3 research/bakeoff/listening-page/build.py <run> <out>`
+embeds `listening.json` (never `key.json`) into `template.html` and copies the clips.
+Ratings export as `{ "ratings": [{clip, identity, beauty, artifacts, best}] }`, the
+format `--bakeoff-score` reads. Run 1 findings: `docs/reports/pitch-bakeoff-1.md`.

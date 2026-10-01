@@ -1,6 +1,6 @@
 # Status
 
-_Last updated: Phase 0 complete; Phase 1 (playable sampler plugin) implemented. Both pending review with the real corpus and on macOS hosts._
+_Last updated: Phase 0 complete; Phase 1 (playable sampler plugin) implemented; Phase 2 pitch bake-off rendered, listening ratings pending._
 
 ## Milestone checklist — Phase 0: research harness + baseline engine
 
@@ -39,6 +39,16 @@ _Last updated: Phase 0 complete; Phase 1 (playable sampler plugin) implemented. 
 - [x] Session recall stores the exact playback model (bit-identical recall even if analysis changes)
 - [ ] Exit check with real corpus samples in a DAW
 
+## Milestone checklist — Phase 2: pitch engine bake-off
+
+- [x] Offline pitch engines: A resampling, B Signalsmith Stretch 1.4.0 (MIT), C Signalsmith + formant compensation
+- [x] Bake-off runner (`--bakeoff plan.json`): blind clips, common length, RMS-matched, `key.json` guard rails
+- [x] Scoring (`--bakeoff-score dir --ratings file`): per engine / family / offset band
+- [x] Run 1 rendered: 5 families x 5 offsets x 3 engines = 75 clips (`docs/reports/pitch-bakeoff-1.md`)
+- [x] Blind listening page (`research/bakeoff/listening-page/`), ratings stored with the page
+- [ ] Listening ratings collected and scored
+- [ ] Decision: default engine per family / offset range (keep A where it ties)
+
 ## DONE
 
 - Pure C++20 DSP/analysis library (`osp_dsp`) independent of JUCE; JUCE used for file
@@ -53,11 +63,12 @@ _Last updated: Phase 0 complete; Phase 1 (playable sampler plugin) implemented. 
 
 ## IN PROGRESS
 
-- Nothing. Waiting for review of Phase 0/1 before the Phase 2 pitch bake-off.
+- Phase 2 pitch bake-off: waiting on blind listening ratings for run 1.
 
 ## NEXT
 
-- Phase 2 pitch bake-off (A resampling / B Signalsmith Stretch / C formant-aware), see the Phase 0 report.
+- Score run 1 and record the engine decision; wire the winner (if not A) as an
+  offline-prepared option behind `ModelExchange`, with A/B renders against baselines A and B.
 
 ## BLOCKERS
 
@@ -90,5 +101,9 @@ _Last updated: Phase 0 complete; Phase 1 (playable sampler plugin) implemented. 
   `MidiKeyboardState::processNextMidiBuffer`, which takes a short internal lock and can
   grow the MIDI buffer when UI notes are injected. Standard JUCE practice, but it bends
   Rule 1; replace with a lock-free FIFO from the UI when the real UI is built.
+- Bake-off engine C (formant compensation) goes an octave or more off pitch at ±24
+  on organ and bowed sources; B (same library, plain) is clean there.
+- The cepstral envelope-shift metric is only reliable on synthetic sources; on real
+  high-F0 or broadband sources it is noise. Guard rail only.
 - Plugin: a host that never calls processBlock keeps the previous instrument alive in
   memory until processing starts (by design of the hand-over; harmless).
