@@ -59,7 +59,7 @@ private:
         std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
     };
 
-    OspAudioProcessor& processor;
+    OspAudioProcessor& ospProcessor;
     WaveformView waveform;
     juce::Label rootLabel, characterLabel, detailLabel, statusLabel;
     juce::ComboBox rootBox;

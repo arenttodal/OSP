@@ -78,7 +78,7 @@ TEST_CASE ("audio files: loading never modifies the source file", "[unit][io]")
     const auto before = std::filesystem::last_write_time (dir / "s.wav");
     const auto size = std::filesystem::file_size (dir / "s.wav");
     REQUIRE (io::loadAudioFile (dir / "s.wav").ok);
-    CHECK (std::filesystem::last_write_time (dir / "s.wav") == before);
+    CHECK ((std::filesystem::last_write_time (dir / "s.wav") == before)); // double parens: libc++ file_time_type is not printable
     CHECK (std::filesystem::file_size (dir / "s.wav") == size);
 }
 

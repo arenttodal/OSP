@@ -87,7 +87,7 @@ void WaveformView::paint (juce::Graphics& g)
 //==============================================================================
 OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     : AudioProcessorEditor (p),
-      processor (p),
+      ospProcessor (p),
       keyboard (p.keyboardState, juce::MidiKeyboardComponent::horizontalKeyboard)
 {
     addAndMakeVisible (waveform);
@@ -108,15 +108,15 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     rootBox.onChange = [this] {
         const int id = rootBox.getSelectedId();
         if (id == 1)
-            processor.setRootOverride (std::nullopt);
+            ospProcessor.setRootOverride (std::nullopt);
         else if (id >= 2)
-            processor.setRootOverride (static_cast<double> (id - 2));
+            ospProcessor.setRootOverride (static_cast<double> (id - 2));
         refreshInstrumentInfo();
     };
     addAndMakeVisible (rootBox);
 
     loadButton.onClick = [this] { chooseFile(); };
-    exampleButton.onClick = [this] { processor.loadExample(); };
+    exampleButton.onClick = [this] { ospProcessor.loadExample(); };
     addAndMakeVisible (loadButton);
     addAndMakeVisible (exampleButton);
 
@@ -131,7 +131,7 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
         knob.label.setText (knobInfo[i].second, juce::dontSendNotification);
         knob.label.setJustificationType (juce::Justification::centred);
         knob.label.setColour (juce::Label::textColourId, colours::dim);
-        knob.attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (processor.parameters, knobInfo[i].first,
+        knob.attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (ospProcessor.parameters, knobInfo[i].first,
                                                                                                 knob.slider);
         addAndMakeVisible (knob.slider);
         addAndMakeVisible (knob.label);
@@ -205,7 +205,7 @@ void OspAudioProcessorEditor::filesDropped (const juce::StringArray& files, int,
         if (io::isSupportedAudioExtension (std::filesystem::path (f.toStdString())))
         {
             // Multi-sample sets arrive in a later phase; use the first supported file for now.
-            processor.loadFile (juce::File (f));
+            ospProcessor.loadFile (juce::File (f));
             return;
         }
 }
@@ -217,16 +217,16 @@ void OspAudioProcessorEditor::chooseFile()
                           [this] (const juce::FileChooser& fc) {
                               const auto file = fc.getResult();
                               if (file.existsAsFile())
-                                  processor.loadFile (file);
+                                  ospProcessor.loadFile (file);
                           });
 }
 
 void OspAudioProcessorEditor::refreshInstrumentInfo()
 {
-    const auto instrument = processor.currentInstrument();
+    const auto instrument = ospProcessor.currentInstrument();
     waveform.setInstrument (instrument);
 
-    const auto overrideMidi = processor.rootOverride();
+    const auto overrideMidi = ospProcessor.rootOverride();
     rootBox.setSelectedId (overrideMidi ? static_cast<int> (std::lround (*overrideMidi)) + 2 : 1, juce::dontSendNotification);
 
     if (instrument == nullptr)
@@ -260,10 +260,10 @@ void OspAudioProcessorEditor::refreshInstrumentInfo()
 
 void OspAudioProcessorEditor::timerCallback()
 {
-    const auto state = processor.loadState();
+    const auto state = ospProcessor.loadState();
     waveform.setLoading (state == OspAudioProcessor::LoadState::loading);
 
-    const auto instrument = processor.currentInstrument();
+    const auto instrument = ospProcessor.currentInstrument();
     const auto generation = instrument != nullptr ? instrument->generation : 0;
     if (generation != shownGeneration || state != shownState)
     {
@@ -281,8 +281,8 @@ void OspAudioProcessorEditor::timerCallback()
         case OspAudioProcessor::LoadState::failed: status = "Could not load that file"; break;
     }
     const auto dot = juce::String::fromUTF8 ("  \xc2\xb7  ");
-    status << dot << "voices " << processor.activeVoices.load();
-    const auto message = processor.statusMessage();
+    status << dot << "voices " << ospProcessor.activeVoices.load();
+    const auto message = ospProcessor.statusMessage();
     if (message.isNotEmpty())
         status << dot << message;
     statusLabel.setText (status, juce::dontSendNotification);
