@@ -1,0 +1,412 @@
+<title>OSP Pitch Bake-off</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one listening column; each group is a bench row of three blind clips with
+   rating scales, a sticky header carries progress and save state. */
+:root {
+  --bg: #eef0ec;
+  --surface: #f8f9f6;
+  --fg: #1c2320;
+  --muted: #5b6862;
+  --line: #d3d9d4;
+  --accent: #2c6b59;      /* tape-deck green: play, selection */
+  --accent-ink: #f4f8f6;
+  --best: #a8761c;        /* brass: the chosen take */
+  --best-soft: #f2e6cc;
+  --warn: #9a3b2b;
+  --font-display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #131715; --surface: #1b201e; --fg: #e3e8e4; --muted: #96a29c; --line: #2b3330;
+    --accent: #6cc1a4; --accent-ink: #0f1513; --best: #d9a84e; --best-soft: #3a2f1a; --warn: #e08a76;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #131715; --surface: #1b201e; --fg: #e3e8e4; --muted: #96a29c; --line: #2b3330;
+  --accent: #6cc1a4; --accent-ink: #0f1513; --best: #d9a84e; --best-soft: #3a2f1a; --warn: #e08a76;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 980px; margin: 0 auto; padding-inline: 16px; padding-block: 0 64px; }
+
+header.top {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--line);
+}
+.top-inner { max-width: 980px; margin: 0 auto; padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+.brand { font-family: var(--font-display); font-weight: 700; font-size: 18px; letter-spacing: -0.01em; }
+.brand span { color: var(--muted); font-weight: 500; }
+.progress { display: flex; align-items: center; gap: 10px; flex: 1 1 220px; min-width: 0; }
+.bar { flex: 1; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+.count { font-family: var(--font-data); font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pill { font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.pill.ok { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); color: var(--accent); }
+.pill.warn { border-color: color-mix(in srgb, var(--warn) 50%, var(--line)); color: var(--warn); }
+button.ghost { font: inherit; font-size: 13px; padding: 5px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer; }
+button.ghost:hover { border-color: var(--accent); }
+button:focus-visible, input:focus-visible + label, .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.intro { padding-block: 28px 8px; display: grid; gap: 10px; max-width: 68ch; }
+.intro h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(26px, 4vw, 34px); line-height: 1.15; margin: 0; text-wrap: balance; letter-spacing: -0.015em; }
+.intro p { margin: 0; color: var(--muted); }
+.legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px 20px; padding-block: 8px 4px; font-size: 13px; color: var(--muted); }
+.legend b { color: var(--fg); font-weight: 600; }
+
+.filters { display: flex; flex-wrap: wrap; gap: 8px; padding-block: 18px 6px; align-items: center; }
+.chip { font: inherit; font-size: 13px; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--fg); cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.filters .sep { width: 1px; height: 22px; background: var(--line); margin-inline: 4px; }
+
+.family { padding-block: 26px 0; }
+.family h2 { font-family: var(--font-display); font-size: 20px; margin: 0 0 4px; letter-spacing: -0.01em; }
+.family .src { margin: 0 0 12px; font-size: 13px; color: var(--muted); }
+.family .src code { font-family: var(--font-data); font-size: 12px; }
+
+.group { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px 16px; margin-block: 10px; }
+.group.done { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.ghead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin-bottom: 10px; }
+.shift { font-family: var(--font-data); font-weight: 500; font-size: 18px; font-variant-numeric: tabular-nums; }
+.notes { font-family: var(--font-data); font-size: 13px; color: var(--muted); }
+.gstate { margin-left: auto; font-size: 12px; color: var(--muted); }
+.group.done .gstate { color: var(--accent); }
+
+.takes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 760px) { .takes { grid-template-columns: minmax(0, 1fr); } }
+.take { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px 12px; display: grid; gap: 10px; min-width: 0; background: var(--bg); }
+.take.best { border-color: var(--best); background: color-mix(in srgb, var(--best-soft) 55%, var(--bg)); }
+.take-top { display: flex; align-items: center; gap: 10px; }
+.label { font-family: var(--font-display); font-weight: 700; font-size: 20px; width: 1.2em; }
+.play { flex: none; width: 38px; height: 38px; border-radius: 50%; border: none; background: var(--accent); color: var(--accent-ink); cursor: pointer; display: grid; place-items: center; }
+.play svg { width: 14px; height: 14px; fill: currentColor; }
+.track { flex: 1; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; min-width: 0; }
+.track > i { display: block; height: 100%; width: 0; background: var(--accent); }
+
+.scale { display: grid; grid-template-columns: 74px minmax(0, 1fr); align-items: center; gap: 8px; }
+.scale .name { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.seg { display: grid; grid-template-columns: repeat(5, 1fr); border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label { text-align: center; font-family: var(--font-data); font-size: 13px; padding: 4px 0; cursor: pointer; border-left: 1px solid var(--line); user-select: none; }
+.seg label:first-of-type { border-left: none; }
+.seg input:checked + label { background: var(--accent); color: var(--accent-ink); }
+.bestpick { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.bestpick input { accent-color: var(--best); width: 16px; height: 16px; }
+
+.foot { padding-block: 32px 0; color: var(--muted); font-size: 13px; display: grid; gap: 8px; max-width: 68ch; }
+.copied { color: var(--accent); }
+@media (prefers-reduced-motion: reduce) { .bar > i { transition: none; } }
+</style>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">OSP <span>pitch bake-off 1</span></div>
+    <div class="progress"><div class="bar" aria-hidden="true"><i id="bar"></i></div><span class="count" id="count">0 / 25 groups</span></div>
+    <span class="pill" id="save">Connecting…</span>
+    <button class="ghost" id="copy" type="button">Copy ratings</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="intro">
+    <h1>Which pitch engine makes your sounds better instruments?</h1>
+    <p>Each group is one recording from your corpus, played as a held note at one transposition. The three takes X, Y and Z are the same note through three pitch engines, in a random order that changes per group. They are trimmed to the same length and matched in loudness, so judge only how they sound.</p>
+    <div class="legend">
+      <div><b>Identity</b> 1 = unrecognisable, 5 = clearly the same instrument</div>
+      <div><b>Beauty</b> 1 = unpleasant, 5 = I want to play this</div>
+      <div><b>Artifacts</b> 1 = distracting, 5 = clean</div>
+      <div><b>Best</b> the take you would rather play</div>
+    </div>
+  </section>
+
+  <nav class="filters" aria-label="Filter groups" id="filters"></nav>
+  <div id="groups"></div>
+
+  <section class="foot">
+    <p>Ratings save as you go. Groups at 0 semitones are a control: the three takes should sound almost the same there.</p>
+    <p id="copyhelp">If saving is unavailable, use <b>Copy ratings</b> and paste the result into our conversation.</p>
+  </section>
+</main>
+
+<script>
+const RUN = "pitch-bakeoff-1";
+const DATA = /*OSP_DATA*/null;
+
+const FAMILY_INFO = {
+  organ: { title: "Organ", source: "Trampeorgel (Bounce) [2026-05-15 130535]" },
+  vocal: { title: "Vocal", source: "VOK ADLIB-St [2025-10-13 100555]-1" },
+  bowed: { title: "Bowed", source: "Nyckelharpa (Bounce) [2026-03-31 203133]" },
+  synth: { title: "Synth", source: "Analog (Freeze) (Freeze) [2024-01-25 101950]-1" },
+  pluck: { title: "Pluck", source: "Plucks (Bounce) (Bounce) [2026-06-21 131927]-3" },
+};
+const FAMILY_ORDER = ["organ", "vocal", "bowed", "synth", "pluck"];
+const SCALES = [["identity", "Identity"], ["beauty", "Beauty"], ["artifacts", "Artifacts"]];
+const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+
+function noteToMidi(name) {
+  const m = /^([A-G])(#?)(-?\d+)$/.exec(name || "");
+  if (!m) return null;
+  return (parseInt(m[3], 10) + 1) * 12 + NOTE_NAMES.indexOf(m[1] + m[2]);
+}
+function midiToNote(n) { return NOTE_NAMES[((n % 12) + 12) % 12] + (Math.floor(n / 12) - 1); }
+function slug(id) { return id.replace(/\s+/g, "_").replace(/\+/g, "p").replace(/-/g, "m"); }
+function shiftText(st) { return st === 0 ? "0 st" : (st > 0 ? "+" : "−") + Math.abs(st) + " st"; }
+
+const groups = DATA.groups.slice().sort((a, b) =>
+  FAMILY_ORDER.indexOf(a.family) - FAMILY_ORDER.indexOf(b.family) || a.offsetSemitones - b.offsetSemitones);
+
+// state[groupSlug] = { group, best, clips: { id: {identity, beauty, artifacts} } }
+let state = {};
+try { state = JSON.parse(localStorage.getItem("osp-bakeoff-" + RUN) || "{}") || {}; } catch (e) { state = {}; }
+
+let db = null;
+let filterFamily = "all";
+let onlyOpen = false;
+
+const saveEl = document.getElementById("save");
+function setSave(text, kind) { saveEl.textContent = text; saveEl.className = "pill" + (kind ? " " + kind : ""); }
+
+function groupState(g) {
+  const key = slug(g.id);
+  if (!state[key]) state[key] = { group: g.id, best: null, clips: {} };
+  return state[key];
+}
+function isDone(g) {
+  const s = state[slug(g.id)];
+  if (!s || !s.best) return false;
+  return g.clips.every(id => s.clips[id] && SCALES.every(([k]) => s.clips[id][k]));
+}
+
+// ---------- audio: one take plays at a time ----------
+let current = null;
+const players = new Map();
+function playerFor(id) {
+  if (!players.has(id)) {
+    const audio = new Audio("clips/" + id + ".wav");
+    audio.preload = "none";
+    players.set(id, audio);
+  }
+  return players.get(id);
+}
+const PLAY = '<svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 1.5v11l9-5.5z"/></svg>';
+const STOP = '<svg viewBox="0 0 14 14" aria-hidden="true"><rect x="2.5" y="2.5" width="9" height="9" rx="1"/></svg>';
+function stopCurrent() {
+  if (!current) return;
+  current.audio.pause();
+  current.audio.currentTime = 0;
+  current.button.innerHTML = PLAY;
+  current.button.setAttribute("aria-label", "Play " + current.label);
+  current.fill.style.width = "0";
+  current = null;
+}
+function toggle(id, button, fill, label) {
+  if (current && current.id === id) { stopCurrent(); return; }
+  stopCurrent();
+  const audio = playerFor(id);
+  current = { id, audio, button, fill, label };
+  button.innerHTML = STOP;
+  button.setAttribute("aria-label", "Stop " + label);
+  audio.ontimeupdate = () => { if (current && current.id === id && audio.duration) fill.style.width = (100 * audio.currentTime / audio.duration) + "%"; };
+  audio.onended = () => { if (current && current.id === id) stopCurrent(); };
+  audio.play().catch(() => stopCurrent());
+}
+
+// ---------- saving ----------
+const pending = new Map();
+function persistLocal() { try { localStorage.setItem("osp-bakeoff-" + RUN, JSON.stringify(state)); } catch (e) {} }
+function save(g) {
+  persistLocal();
+  if (!db) return;
+  const key = slug(g.id);
+  clearTimeout(pending.get(key));
+  setSave("Saving…");
+  pending.set(key, setTimeout(async () => {
+    pending.delete(key);
+    try {
+      await db.doc("ratings/" + key).set({ ...state[key], run: RUN, updatedAt: new Date().toISOString() });
+      if (pending.size === 0) setSave("Saved", "ok");
+    } catch (e) {
+      setSave("Not saved online, kept in this browser", "warn");
+    }
+  }, 500));
+}
+
+// ---------- rendering ----------
+function renderFilters() {
+  const nav = document.getElementById("filters");
+  nav.innerHTML = "";
+  const make = (text, pressed, onClick) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "chip"; b.textContent = text;
+    b.setAttribute("aria-pressed", pressed ? "true" : "false");
+    b.addEventListener("click", onClick);
+    nav.appendChild(b);
+  };
+  make("All sources", filterFamily === "all", () => { filterFamily = "all"; render(); });
+  for (const f of FAMILY_ORDER) make(FAMILY_INFO[f].title, filterFamily === f, () => { filterFamily = f; render(); });
+  const sep = document.createElement("span"); sep.className = "sep"; nav.appendChild(sep);
+  make("Unfinished only", onlyOpen, () => { onlyOpen = !onlyOpen; render(); });
+}
+
+function renderProgress() {
+  const done = groups.filter(isDone).length;
+  document.getElementById("count").textContent = done + " / " + groups.length + " groups";
+  document.getElementById("bar").style.width = (100 * done / groups.length) + "%";
+}
+
+function scaleRow(g, id, key, name) {
+  const s = groupState(g);
+  const row = document.createElement("div");
+  row.className = "scale";
+  const label = document.createElement("span"); label.className = "name"; label.textContent = name; label.id = "n-" + id + "-" + key;
+  const seg = document.createElement("div"); seg.className = "seg"; seg.setAttribute("role", "radiogroup"); seg.setAttribute("aria-labelledby", label.id);
+  for (let v = 1; v <= 5; v++) {
+    const input = document.createElement("input");
+    input.type = "radio"; input.name = "r-" + id + "-" + key; input.id = "r-" + id + "-" + key + "-" + v; input.value = v;
+    input.checked = (s.clips[id] && s.clips[id][key]) === v;
+    input.addEventListener("change", () => {
+      s.clips[id] = Object.assign({}, s.clips[id], { [key]: v });
+      save(g); renderProgress(); markGroup(g);
+    });
+    const l = document.createElement("label"); l.htmlFor = input.id; l.textContent = v;
+    seg.append(input, l);
+  }
+  row.append(label, seg);
+  return row;
+}
+
+const groupEls = new Map();
+function markGroup(g) {
+  const el = groupEls.get(g.id);
+  if (!el) return;
+  const done = isDone(g);
+  el.classList.toggle("done", done);
+  const s = state[slug(g.id)] || {};
+  const rated = g.clips.filter(id => s.clips && s.clips[id] && SCALES.every(([k]) => s.clips[id][k])).length;
+  el.querySelector(".gstate").textContent = done ? "Done" : rated + " of 3 rated" + (s.best ? ", best picked" : "");
+  el.querySelectorAll(".take").forEach(t => t.classList.toggle("best", s.best === t.dataset.clip));
+}
+
+function renderGroup(g) {
+  const s = groupState(g);
+  const el = document.createElement("article");
+  el.className = "group";
+  const root = noteToMidi(g.sourceRoot);
+  const target = root == null ? "" : midiToNote(root + g.offsetSemitones);
+  el.innerHTML = '<div class="ghead"><span class="shift"></span><span class="notes"></span><span class="gstate"></span></div><div class="takes"></div>';
+  el.querySelector(".shift").textContent = shiftText(g.offsetSemitones);
+  el.querySelector(".notes").textContent = g.sourceRoot + (target && g.offsetSemitones !== 0 ? " → " + target : " (as recorded)");
+  const takes = el.querySelector(".takes");
+  ["X", "Y", "Z"].forEach((letter, i) => {
+    const id = g.clips[i];
+    const take = document.createElement("div");
+    take.className = "take"; take.dataset.clip = id;
+    const top = document.createElement("div"); top.className = "take-top";
+    const name = document.createElement("span"); name.className = "label"; name.textContent = letter;
+    const button = document.createElement("button"); button.type = "button"; button.className = "play"; button.innerHTML = PLAY;
+    const labelText = letter + ", " + g.family + " " + shiftText(g.offsetSemitones);
+    button.setAttribute("aria-label", "Play " + labelText);
+    const track = document.createElement("div"); track.className = "track"; const fill = document.createElement("i"); track.appendChild(fill);
+    button.addEventListener("click", () => toggle(id, button, fill, labelText));
+    top.append(name, button, track);
+    take.appendChild(top);
+    for (const [key, nm] of SCALES) take.appendChild(scaleRow(g, id, key, nm));
+    const best = document.createElement("label"); best.className = "bestpick";
+    const radio = document.createElement("input"); radio.type = "radio"; radio.name = "best-" + slug(g.id); radio.id = "best-" + id;
+    radio.checked = s.best === id;
+    radio.addEventListener("change", () => { s.best = id; save(g); renderProgress(); markGroup(g); });
+    best.append(radio, document.createTextNode("Best of the three"));
+    take.appendChild(best);
+    takes.appendChild(take);
+  });
+  groupEls.set(g.id, el);
+  markGroup(g);
+  return el;
+}
+
+function render() {
+  stopCurrent();
+  renderFilters();
+  const host = document.getElementById("groups");
+  host.innerHTML = "";
+  groupEls.clear();
+  for (const f of FAMILY_ORDER) {
+    if (filterFamily !== "all" && filterFamily !== f) continue;
+    const list = groups.filter(g => g.family === f && (!onlyOpen || !isDone(g)));
+    if (!list.length) continue;
+    const section = document.createElement("section");
+    section.className = "family";
+    const h = document.createElement("h2"); h.textContent = FAMILY_INFO[f].title;
+    const src = document.createElement("p"); src.className = "src";
+    src.innerHTML = "Source: <code></code>"; src.querySelector("code").textContent = FAMILY_INFO[f].source;
+    section.append(h, src);
+    for (const g of list) section.appendChild(renderGroup(g));
+    host.appendChild(section);
+  }
+  if (!host.children.length) {
+    const p = document.createElement("p"); p.className = "foot"; p.textContent = "Every group in this view is finished.";
+    host.appendChild(p);
+  }
+  renderProgress();
+}
+
+// ---------- copy ----------
+function ratingsJson() {
+  const ratings = [];
+  for (const g of groups) {
+    const s = state[slug(g.id)];
+    if (!s) continue;
+    for (const id of g.clips) {
+      const r = s.clips[id] || {};
+      if (!r.identity && !r.beauty && !r.artifacts && s.best !== id) continue;
+      ratings.push({ clip: id, group: g.id, identity: r.identity || null, beauty: r.beauty || null, artifacts: r.artifacts || null, best: s.best === id });
+    }
+  }
+  return JSON.stringify({ run: RUN, ratings }, null, 1);
+}
+document.getElementById("copy").addEventListener("click", async () => {
+  const text = ratingsJson();
+  const help = document.getElementById("copyhelp");
+  try {
+    await navigator.clipboard.writeText(text);
+    help.innerHTML = '<span class="copied">Ratings copied.</span> Paste them into our conversation if saving was unavailable.';
+  } catch (e) {
+    help.textContent = "";
+    const area = document.createElement("textarea");
+    area.value = text; area.rows = 6; area.style.width = "100%"; area.readOnly = true;
+    help.appendChild(area); area.select();
+  }
+});
+
+render();
+
+// ---------- shared store ----------
+(async () => {
+  try {
+    db = window.claude && window.claude.use ? await window.claude.use("db") : null;
+  } catch (e) { db = null; }
+  if (!db) { setSave("Saved in this browser only", "warn"); return; }
+  setSave("Saved", "ok");
+  db.collection("ratings").onSnapshot(snap => {
+    let changed = false;
+    for (const doc of snap.docs) {
+      if (pending.has(doc.id)) continue; // our own newer edit is on its way
+      const body = doc.data();
+      if (!body || body.run !== RUN) continue;
+      state[doc.id] = { group: body.group, best: body.best || null, clips: Object.assign({}, body.clips || {}) };
+      changed = true;
+    }
+    if (changed) { persistLocal(); render(); }
+  }, () => setSave("Not saved online, kept in this browser", "warn"));
+})();
+</script>

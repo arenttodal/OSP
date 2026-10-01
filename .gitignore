@@ -28,6 +28,7 @@ compile_commands.json
 /research/reports/*
 !/research/reports/README.md
 /research/bakeoff/*/
+!/research/bakeoff/listening-page/
 
 # Python
 __pycache__/
