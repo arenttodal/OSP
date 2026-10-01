@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "status": "ok",
+  "sampleRate": 48000.0,
+  "channels": 2,
+  "frames": 205312,
+  "durationSeconds": 4.2773,
+  "peakDbfs": -17.79,
+  "rmsDbfs": -27.66,
+  "dcOffset": [0.0, 0.0],
+  "nanCount": 0,
+  "infCount": 0,
+  "clippedSamples": 0,
+  "centroidMeanHz": 887.1,
+  "centroidStdHz": 35.1,
+  "outputPitchHz": 220.152,
+  "outputPitchConfidence": 0.977,
+  "maxAbsCentsError": 0.58,
+  "notes": [
+    {
+      "timeSeconds": 0.0,
+      "note": 57,
+      "expectedHz": 220.0,
+      "detectedHz": 219.926,
+      "centsError": -0.58,
+      "confidence": 0.985,
+      "evaluated": true
+    },
+    {
+      "timeSeconds": 0.5,
+      "note": 57,
+      "expectedHz": 220.0,
+      "detectedHz": 219.926,
+      "centsError": -0.58,
+      "confidence": 0.985,
+      "evaluated": true
+    },
+    {
+      "timeSeconds": 1.0,
+      "note": 57,
+      "expectedHz": 220.0,
+      "detectedHz": 219.926,
+      "centsError": -0.58,
+      "confidence": 0.985,
+      "evaluated": true
+    },
+    {
+      "timeSeconds": 1.5,
+      "note": 57,
+      "expectedHz": 220.0,
+      "detectedHz": 219.926,
+      "centsError": -0.58,
+      "confidence": 0.985,
+      "evaluated": true
+    },
+    {
+      "timeSeconds": 2.0,
+      "note": 57,
+      "expectedHz": 220.0,
+      "detectedHz": 219.926,
+      "centsError": -0.58,
+      "confidence": 0.985,
+      "evaluated": true
+    },
+    {
+      "timeSeconds": 2.5,
+      "note": 57,
+      "expectedHz": 220.0,
+      "detectedHz": 219.926,
+      "centsError": -0.58,
+      "confidence": 0.985,
+      "evaluated": true
+    },
+    {
+      "timeSeconds": 3.0,
+      "note": 57,
+      "expectedHz": 220.0,
+      "detectedHz": 219.926,
+      "centsError": -0.58,
+      "confidence": 0.985,
+      "evaluated": true
+    },
+    {
+      "timeSeconds": 3.5,
+      "note": 57,
+      "expectedHz": 220.0,
+      "detectedHz": 219.926,
+      "centsError": -0.58,
+      "confidence": 0.985,
+      "evaluated": true
+    }
+  ],
+  "issues": [],
+  "sampleHash": "fc388fc13b6499280685278b48bcb96447e54f18387a7bb9debe7673a1b853ce",
+  "case": "vowel-repetition-a",
+  "fixture": "repetition",
+  "fixtureVersion": 1,
+  "engine": "baseline-a",
+  "seed": 1
+}

@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "status": "ok",
+  "sampleRate": 48000.0,
+  "channels": 2,
+  "frames": 397312,
+  "durationSeconds": 8.2773,
+  "peakDbfs": -17.04,
+  "rmsDbfs": -36.11,
+  "dcOffset": [0.001928, 0.001928],
+  "nanCount": 0,
+  "infCount": 0,
+  "clippedSamples": 0,
+  "centroidMeanHz": 2494.0,
+  "centroidStdHz": 1460.4,
+  "outputPitchHz": 103.92,
+  "outputPitchConfidence": 0.19,
+  "maxAbsCentsError": 7.72,
+  "notes": [
+    {
+      "timeSeconds": 0.0,
+      "note": 40,
+      "expectedHz": 82.407,
+      "detectedHz": 82.586,
+      "centsError": 3.75,
+      "confidence": 0.945,
+      "evaluated": true
+    },
+    {
+      "timeSeconds": 0.5,
+      "note": 42,
+      "expectedHz": 92.499,
+      "detectedHz": 92.517,
+      "centsError": 0.35,
+      "confidence": 0.948,
+      "evaluated": true
+    },
+    {
+      "timeSeconds": 1.0,
+      "note": 44,
+      "expectedHz": 103.826,
+      "detectedHz": 103.928,
+      "centsError": 1.7,
+      "confidence": 0.949,
+      "evaluated": true
+    },
+    {
+      "timeSeconds": 1.5,
+      "note": 40,
+      "expectedHz": 82.407,
+      "detectedHz": 82.125,
+      "centsError": -5.93,
+      "confidence": 0.911,
+      "evaluated": true
+    },
+    {
+      "timeSeconds": 2.0,
+      "note": 47,
+      "expectedHz": 123.471,
+      "detectedHz": 123.461,
+      "centsError": -0.14,
+      "confidence": 0.958,
+      "evaluated": true
+    },
+    {
+      "timeSeconds": 3.0,
+      "note": 47,
+      "expectedHz": 123.471,
+      "detectedHz": 123.746,
+      "centsError": 3.86,
+      "confidence": 0.886,
+      "evaluated": true
+    },
+    {
+      "timeSeconds": 3.25,
+      "note": 47,
+      "expectedHz": 123.471,
+      "detectedHz": 123.16,
+      "centsError": -4.37,
+      "confidence": 0.882,
+      "evaluated": true
+    },
+    {
+      "timeSeconds": 3.5,
+      "note": 45,
+      "expectedHz": 110.0,
+      "detectedHz": 110.293,
+      "centsError": 4.6,
+      "confidence": 0.95,
+      "evaluated": true
+    },
+    {
+      "timeSeconds": 4.0,
+      "note": 42,
+      "expectedHz": 92.499,
+      "detectedHz": 92.609,
+      "centsError": 2.07,
+      "confidence": 0.918,
+      "evaluated": true
+    },
+    {
+      "timeSeconds": 4.5,
+      "note": 45,
+      "expectedHz": 110.0,
+      "detectedHz": 109.563,
+      "centsError": -6.89,
+      "confidence": 0.952,
+      "evaluated": true
+    },
+    {
+      "timeSeconds": 5.0,
+      "note": 44,
+      "expectedHz": 103.826,
+      "detectedHz": 103.923,
+      "centsError": 1.61,
+      "confidence": 0.949,
+      "evaluated": true
+    },
+    {
+      "timeSeconds": 5.5,
+      "note": 42,
+      "expectedHz": 92.499,
+      "detectedHz": 92.721,
+      "centsError": 4.15,
+      "confidence": 0.919,
+      "evaluated": true
+    },
+    {
+      "timeSeconds": 6.0,
+      "note": 35,
+      "expectedHz": 61.735,
+      "detectedHz": 61.461,
+      "centsError": -7.72,
+      "confidence": 0.905,
+      "evaluated": true
+    },
+    {
+      "timeSeconds": 6.5,
+      "note": 40,
+      "expectedHz": 82.407,
+      "detectedHz": 82.407,
+      "centsError": 0.01,
+      "confidence": 0.927,
+      "evaluated": true
+    }
+  ],
+  "issues": [],
+  "sampleHash": "2b48356443a424b27f51d559d7f2d0d8ece161eb3e19bdf481b2af517eed6296",
+  "case": "pluck-melody-b",
+  "fixture": "melody",
+  "fixtureVersion": 1,
+  "engine": "baseline-b",
+  "seed": 3
+}

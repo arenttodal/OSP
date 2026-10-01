@@ -1,0 +1,132 @@
+# Architecture
+
+Phase 0 deliberately keeps the system small: a pure-C++ DSP/analysis library, a thin
+JUCE I/O layer, a research library, and a CLI. The future plugin reuses the same DSP.
+
+```
+                   ┌──────────────────────── osp_research (static) ─────────────────────────┐
+ research-renderer │ RenderSession  RenderMetrics  CorpusIndex  CorpusRunner  Benchmark      │
+ (CLI)  ─────────► │ SourceAnalysis  Fixtures  RenderConfig  TestSignalSet                   │
+ osp_tests ──────► └───────┬───────────────────────────────────────────┬─────────────────────┘
+                           │                                           │
+            ┌──────────────▼──────────────┐             ┌──────────────▼─────────────────────┐
+            │ osp_dsp (static, pure C++20)│             │ I/O sources (compiled per target)  │
+            │ core/      Prng, PitchMath, │             │ io/AudioFileIO   (JUCE formats)    │
+            │            Fft, Statistics, │             │ io/ContentHash   (JUCE SHA-256)    │
+            │            AudioData        │             │ io/JsonUtil, io/AnalysisJson (JSON)│
+            │ audio/     sampler, voices, │             │ midi/MidiFileIO  (JUCE MidiFile)   │
+            │            pitch, envelopes,│             └──────────────┬─────────────────────┘
+            │            utility          │                            │
+            │ analysis/  pitch, onset,    │             ┌──────────────▼─────────────────────┐
+            │            spectrum,        │             │ osp_juce_headless (static)         │
+            │            loudness, stereo │             │ juce_core, juce_audio_basics,      │
+            │ model/     AnalysisData,    │             │ juce_audio_formats, juce_cryptography│
+            │            PlaybackSource   │             └────────────────────────────────────┘
+            │ midi/      MidiEvent,       │
+            │            MidiFixtures     │
+            └─────────────────────────────┘
+```
+
+## Module boundaries
+
+### `osp_dsp` — pure C++20 (no JUCE, no I/O)
+
+Everything that does signal processing or analysis lives here, so it can be unit
+tested, run in the CLI, in a plugin, on a worker thread or on the audio thread
+without dragging in a framework. Deviation from "use JUCE for everything": JUCE's
+`dsp::FFT` and buffers would tie analysis to JUCE's module system and per-target
+compilation; a 60-line radix-2 FFT and `std::vector` planar buffers are simpler to
+reason about and portable. JUCE is still used for everything it is good at (file
+formats, MIDI files, JSON, SHA-256, and later GUI/plugin hosting).
+
+- **core/** `Prng` (xoshiro256**, deterministic), `PitchMath` (MIDI/Hz/cents/dB/note
+  names), `Fft`, `Statistics` (weighted median, percentiles, periodicity), `AudioData`
+  (canonical planar float audio).
+- **audio/pitch/** `SincInterpolator` — Kaiser-windowed sinc reader whose kernel
+  stretches when reading faster than 1:1 (anti-aliasing for upward transposition and
+  downsampling). This *is* pitch branch "A — resampling".
+- **audio/envelopes/** `Adsr`.
+- **audio/voices/** `SamplerVoice` — one-shot playback of a `PlaybackSource`.
+- **audio/sampler/** `BaselineSampler` — polyphony, velocity → gain, sustain pedal,
+  voice stealing (released → quietest → oldest, with 5 ms fades into spare "tail"
+  slots), optional naive randomisation (baseline B).
+- **audio/utility/** `TestSignals` — deterministic ground-truth generators.
+- **analysis/** `Analyzer` runs: `AnalysisFrames` (mono mix + 20 ms RMS on a 10 ms hop)
+  → `PitchAnalyzer` (YIN) → `EnvelopeAnalyzer` → `SpectralAnalyzer` (STFT + flux) →
+  `OnsetDetector` → `StereoAnalyzer`. All time series share the hop.
+- **model/** `AnalysisData` (immutable, versioned result), `PlaybackSource`
+  (immutable, zero-padded playback copy of the audio + root).
+- **midi/** `MidiEvent`, `MidiFixtures` (frozen standard sequences + profiles).
+
+### I/O layer (JUCE)
+
+`src/io` and `src/midi/MidiFileIO.cpp`. These sources are compiled into
+`osp_research` for headless tools (linking `osp_juce_headless`, which compiles the
+needed JUCE modules once with console-app settings). Plugin targets will compile the
+same sources against their own JUCE configuration. Reasoning: JUCE modules must be
+compiled with per-target preprocessor settings, so a plugin cannot link a JUCE
+library built for a console app.
+
+### `osp_research`
+
+Renderer and corpus logic as a library so that the CLI and the tests exercise exactly
+the same code paths.
+
+- `SourceAnalysis::loadAndAnalyse` — load + hash + analyse, never throws.
+- `RenderSession::chooseRoot` — override > detected > low-confidence estimate > C4,
+  always labelled. `renderSequence` — block-based render identical to host processing.
+- `RenderMetrics` — safety checks (NaN/Inf, clipping, DC, silence, channel count,
+  sample rate) + summary metrics + isolated-note pitch checks + sample hash.
+- `CorpusIndex` / `CorpusRunner` — scan, hash, analyse, render fixtures, summarise;
+  per-file failure isolation; optional parallel workers.
+- `Benchmark` — per-callback timing of the sampler.
+
+## Data flow
+
+```
+file ──decode──► AudioData ──Analyzer──► AnalysisData ──chooseRoot──► root
+                    │                                                  │
+                    └────────────► PlaybackSource (padded, immutable) ◄┘
+                                          │
+                     MidiSequence ──► BaselineSampler.render() per block ──► AudioData
+                                                                               │
+                                                                 RenderMetrics + WAV
+```
+
+## Thread safety (designing for the plugin now)
+
+| Thread | Allowed | Phase 0 code |
+|---|---|---|
+| Audio | voices, prepared DSP, MIDI handling; **no** alloc/locks/I/O/analysis | `BaselineSampler::noteOn/noteOff/render`, `SamplerVoice`, `Adsr`, `SincInterpolator::computeKernel/apply` |
+| Message/UI | parameters, drag & drop, starting analysis | — (Phase 1) |
+| Analysis worker | decode, analyse, build `PlaybackSource` | `loadAndAnalyse`, `Analyzer`, `PlaybackSource` ctor |
+
+Rules already enforced by the design:
+
+- `BaselineSampler::prepare()` allocates (interpolator tables, voice state); nothing
+  after it does. Voices are a fixed `std::array`; the kernel scratch is inline.
+- `PlaybackSource` is immutable after construction; voices hold a const pointer.
+  For the plugin, a new source will be built off-thread and handed over atomically;
+  the old one must stay alive until no voice references it (voices "finish against
+  the previous model", spec §59). That hand-over is Phase 1 work.
+- `setSource()` is a pointer store; it does not free anything.
+
+## Determinism
+
+- All randomness comes from `osp::Prng`, seeded per note from
+  `deriveSeed (configSeed, noteOnCounter, note)`. Same config + same MIDI → same output.
+- Rendering is sample-accurate and independent of block size (tested: blocks of 32,
+  64, 128, 512 and 1024 samples give bit-identical output).
+- The corpus runner's results do not depend on the number of worker threads.
+- Bit-identity across compilers/platforms is **not** guaranteed (libm differences);
+  golden tests compare robust metrics and treat the stored sample hash as
+  informational.
+
+## Recorded deviations from the suggested layout
+
+- `src/research/` added: the renderer logic is a library so tests share it.
+- `src/presets/` not created yet: nothing to put in it until Phase 1 state/presets.
+- `apps/standalone/`: the standalone app comes from the JUCE plugin target
+  (`juce_add_plugin(... FORMATS AU VST3 Standalone)`), so there is no separate app.
+- Pitch branch A lives in `audio/pitch/` (the resampler is the first pitch engine).
+- `tests/support/` holds shared test helpers.

@@ -1,0 +1,77 @@
+#pragma once
+
+#include <vector>
+
+namespace osp
+{
+
+/**
+    Bandlimited fractional-position reader (Kaiser-windowed sinc).
+
+    This is pitch branch "A — resampling": reading a source at an arbitrary rate.
+    When the read increment (source samples per output sample) exceeds 1 the kernel
+    is stretched so its cutoff follows the new Nyquist limit, which suppresses
+    aliasing when transposing up or downsampling.
+
+    The kernel table is built once in the constructor (off the audio thread). The
+    read functions perform no allocation; they expect the source to be padded with
+    at least maxReach() zeros on both sides so no bounds checks are needed.
+*/
+class SincInterpolator
+{
+public:
+    /**
+        @param zeroCrossings  half-width of the kernel in zero crossings at unity rate
+                              (quality: 8 = draft, 16 = high).
+        @param maxStretch     largest increment for which the kernel is fully stretched.
+                              Larger increments keep the cutoff but reduce the window
+                              width proportionally (graceful degradation, bounded cost).
+    */
+    explicit SincInterpolator (int zeroCrossings = 16, double maxStretch = 16.0);
+
+    int zeroCrossings() const noexcept { return numZeroCrossings; }
+
+    /** Furthest any read reaches away from its read position, in source samples. */
+    int maxReach() const noexcept { return reach; }
+
+    /** How far a read at this increment reaches (<= maxReach()). */
+    int reachFor (double increment) const noexcept;
+
+    /** Per-read kernel state, computed once per output sample and shared by all channels. */
+    struct Kernel
+    {
+        static constexpr int maxTaps = 1100;
+        float weights[maxTaps];
+        int firstIndex = 0;
+        int numTaps = 0;
+    };
+
+    /** Computes kernel weights for reading at `position` with `increment` source samples per output sample. */
+    void computeKernel (double position, double increment, Kernel& kernel) const noexcept;
+
+    /** Applies a computed kernel to one (padded) channel. `data` points at source sample 0. */
+    static float apply (const Kernel& kernel, const float* data) noexcept
+    {
+        const float* p = data + kernel.firstIndex;
+        float sum = 0.0f;
+        for (int i = 0; i < kernel.numTaps; ++i)
+            sum += kernel.weights[i] * p[i];
+        return sum;
+    }
+
+    /** Cutoff relative to the (lower of source/output) Nyquist frequency. */
+    static constexpr double rolloff = 0.96;
+
+private:
+    static float lookup (const std::vector<float>& table, double index) noexcept;
+
+    int numZeroCrossings;
+    double maxStretchFactor;
+    int reach;
+    static constexpr int sincResolution = 512;    // sinc table entries per zero crossing
+    static constexpr int windowResolution = 4096; // window table entries over [0, 1]
+    std::vector<float> sincTable;                 // sinc(u), u in [0, zeroCrossings]
+    std::vector<float> windowTable;               // kaiser(r), r in [0, 1]
+};
+
+} // namespace osp

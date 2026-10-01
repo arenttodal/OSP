@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "status": "ok",
+  "sampleRate": 48000.0,
+  "channels": 2,
+  "frames": 576128,
+  "durationSeconds": 12.0027,
+  "peakDbfs": -15.43,
+  "rmsDbfs": -25.27,
+  "dcOffset": [0.0, 0.0],
+  "nanCount": 0,
+  "infCount": 0,
+  "clippedSamples": 0,
+  "centroidMeanHz": 1093.5,
+  "centroidStdHz": 1073.2,
+  "outputPitchHz": 218.132,
+  "outputPitchConfidence": 0.237,
+  "maxAbsCentsError": 2.3,
+  "notes": [
+    {
+      "timeSeconds": 0.0,
+      "note": 33,
+      "expectedHz": 55.0,
+      "detectedHz": 55.038,
+      "centsError": 1.19,
+      "confidence": 0.9,
+      "evaluated": true
+    },
+    {
+      "timeSeconds": 2.5,
+      "note": 45,
+      "expectedHz": 110.0,
+      "detectedHz": 110.13,
+      "centsError": 2.05,
+      "confidence": 0.99,
+      "evaluated": true
+    },
+    {
+      "timeSeconds": 5.0,
+      "note": 57,
+      "expectedHz": 220.0,
+      "detectedHz": 220.156,
+      "centsError": 1.22,
+      "confidence": 0.988,
+      "evaluated": true
+    },
+    {
+      "timeSeconds": 7.5,
+      "note": 69,
+      "expectedHz": 440.0,
+      "detectedHz": 440.35,
+      "centsError": 1.38,
+      "confidence": 0.955,
+      "evaluated": true
+    },
+    {
+      "timeSeconds": 10.0,
+      "note": 81,
+      "expectedHz": 880.0,
+      "detectedHz": 881.168,
+      "centsError": 2.3,
+      "confidence": 0.939,
+      "evaluated": true
+    }
+  ],
+  "issues": [],
+  "sampleHash": "7c04adfb79f6f46cf23d51f396bb51226c26301e50b1d15a05e9d6b2eccb0fd1",
+  "case": "vowel-register-a",
+  "fixture": "register",
+  "fixtureVersion": 1,
+  "engine": "baseline-a",
+  "seed": 1
+}

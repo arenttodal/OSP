@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "description": "Baseline B: baseline A plus naive, independent per-note randomisation (gain, detune, start offset).",
+  "engine": "B",
+  "sampleRate": 48000,
+  "blockSize": 128,
+  "maxTailSeconds": 15,
+  "seed": 1,
+  "sampler": {
+    "polyphony": 24,
+    "attackSeconds": 0.002,
+    "decaySeconds": 0.0,
+    "sustainLevel": 1.0,
+    "releaseSeconds": 0.25,
+    "velocityRangeDb": 30,
+    "outputGainDb": -9,
+    "interpolationZeroCrossings": 16,
+    "stealFadeSeconds": 0.005
+  },
+  "randomization": {
+    "gainDb": 1.5,
+    "detuneCents": 8,
+    "startOffsetMs": 4
+  }
+}

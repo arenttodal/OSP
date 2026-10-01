@@ -1,0 +1,34 @@
+# Build output
+/build*/
+/out/
+/cmake-build-*/
+compile_commands.json
+.cache/
+
+# IDE / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Research corpus audio is local-only (rights + size). Keep docs/manifests.
+/research/corpus/**/*.wav
+/research/corpus/**/*.WAV
+/research/corpus/**/*.wave
+/research/corpus/**/*.aif
+/research/corpus/**/*.aiff
+/research/corpus/**/*.aifc
+/research/corpus/**/*.AIF
+/research/corpus/**/*.AIFF
+/research/corpus/index.json
+
+# Generated renders and reports (reproducible from the renderer)
+/research/renders/*
+!/research/renders/README.md
+/research/reports/*
+!/research/reports/README.md
+
+# Python
+__pycache__/
+*.pyc
+.venv/
