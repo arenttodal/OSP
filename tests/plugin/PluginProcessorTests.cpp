@@ -381,6 +381,146 @@ TEST_CASE ("plugin: sessions from before the shaping system open CHARACTER fully
     CHECK (valueOf ("character.drive") == Approx (12.0f).margin (0.01)); // settings come back at their defaults
 }
 
+TEST_CASE ("plugin: A/B layers load, blend and recall independently", "[plugin][layers]")
+{
+    TempDir tmp;
+    const auto fileA = writeSource (tmp.dir, "low.wav", testsignals::vowel (midiToHz (45), 2.0, 48000.0, 3));
+    const auto fileB = writeSource (tmp.dir, "high.wav", testsignals::vowel (midiToHz (57), 2.0, 48000.0, 4));
+    auto setValue = [] (OspAudioProcessor& p, const juce::String& id, float value) {
+        auto* param = p.parameters.getParameter (id);
+        REQUIRE (param != nullptr);
+        param->setValueNotifyingHost (param->convertTo0to1 (value));
+    };
+
+    juce::MemoryBlock state;
+    AudioData before;
+    {
+        OspAudioProcessor p;
+        // Edit focus decides where a sample goes.
+        CHECK (p.editLayer() == 0);
+        p.loadFile (fileA);
+        REQUIRE (p.waitForLoads (20000));
+        p.pollLoads();
+        p.setEditLayer (1);
+        p.loadFile (fileB);
+        REQUIRE (p.waitForLoads (20000));
+        p.pollLoads();
+        REQUIRE (p.currentInstrument (0) != nullptr);
+        REQUIRE (p.currentInstrument (1) != nullptr);
+        CHECK (p.currentInstrument (0)->filename == "low.wav");
+        CHECK (p.currentInstrument (1)->filename == "high.wav");
+        CHECK (p.currentInstrument()->filename == "high.wav"); // the edited layer
+        // Each layer keeps its own root: A sounds where it was recorded, so does B.
+        setValue (p, "ab.blend", 0.0f);
+        CHECK (pitchOf (playNote (p, 52, 48000.0, 0.8)) == Approx (midiToHz (52)).epsilon (0.006));
+        setValue (p, "ab.blend", 1.0f);
+        CHECK (pitchOf (playNote (p, 52, 48000.0, 0.8)) == Approx (midiToHz (52)).epsilon (0.006));
+        p.setRootOverride (50.0, 1);   // B is declared a D3: its A3 recording now sounds a fifth higher
+        CHECK (pitchOf (playNote (p, 57, 48000.0, 0.8)) == Approx (midiToHz (64)).epsilon (0.006));
+        p.setRootOverride (std::nullopt, 1);
+
+        setValue (p, "ab.blend", 0.35f);
+        setValue (p, "layerB.sourceMode", 1.0f);
+        setValue (p, "layerB.granular.size", 220.0f);
+        setValue (p, "layerB.granular.tune", 7.0f);
+        setValue (p, "layerA.granular.spread", 55.0f);
+        before = playNote (p, 60, 48000.0, 0.6);
+        p.getStateInformation (state);
+    }
+
+    OspAudioProcessor restored;
+    restored.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+    REQUIRE (restored.waitForLoads (20000));
+    restored.pollLoads();
+    REQUIRE (restored.currentInstrument (0) != nullptr);
+    REQUIRE (restored.currentInstrument (1) != nullptr);
+    CHECK (restored.currentInstrument (0)->filename == "low.wav");
+    CHECK (restored.currentInstrument (1)->filename == "high.wav");
+    CHECK (restored.editLayer() == 1);
+    auto valueOf = [&restored] (const juce::String& id) {
+        auto* param = restored.parameters.getParameter (id);
+        return param->convertFrom0to1 (param->getValue());
+    };
+    CHECK (valueOf ("ab.blend") == Approx (0.35f).margin (1.0e-4));
+    CHECK (valueOf ("layerB.sourceMode") == Approx (1.0f));
+    CHECK (valueOf ("layerA.sourceMode") == Approx (0.0f));
+    CHECK (valueOf ("layerB.granular.size") == Approx (220.0f).margin (0.01));
+    CHECK (valueOf ("layerB.granular.tune") == Approx (7.0f).margin (0.01));
+    CHECK (valueOf ("layerA.granular.spread") == Approx (55.0f).margin (0.01));
+    // Same instrument, same performance: the same audio.
+    const auto after = playNote (restored, 60, 48000.0, 0.6);
+    REQUIRE (after.numFrames() == before.numFrames());
+    double diff = 0.0;
+    for (std::size_t ch = 0; ch < 2; ++ch)
+        for (std::size_t i = 0; i < after.channels[ch].size(); ++i)
+            diff = std::max (diff, static_cast<double> (std::abs (after.channels[ch][i] - before.channels[ch][i])));
+    CHECK (diff < 1.0e-12);
+
+    // Clearing a layer leaves silence where it was.
+    restored.clearLayer (1);
+    restored.pollLoads();
+    CHECK (restored.currentInstrument (1) == nullptr);
+    restored.parameters.getParameter ("ab.blend")->setValueNotifyingHost (1.0f);
+    const auto silent = playNote (restored, 60, 48000.0, 0.3);
+    double peak = 0.0;
+    for (float x : silent.channels[0])
+        peak = std::max (peak, static_cast<double> (std::abs (x)));
+    CHECK (peak < 1.0e-6);
+}
+
+TEST_CASE ("plugin: a layer in Granular mode sustains past its recording", "[plugin][layers]")
+{
+    TempDir tmp;
+    // Half a second, decaying: One Shot (without continuation) is over long before 2 s.
+    auto audio = testsignals::pluck (midiToHz (57), 0.5, 48000.0, 9);
+    const auto file = writeSource (tmp.dir, "short.wav", audio);
+    OspAudioProcessor p;
+    loadAndWait (p, file);
+    p.parameters.getParameter ("sustain")->setValueNotifyingHost (0.0f);   // Recording: no continuation
+    auto tailRms = [&p] {
+        const auto out = playNote (p, 57, 48000.0, 2.5);
+        double e = 0.0;
+        for (std::size_t i = 96000; i < 120000; ++i)
+            e += static_cast<double> (out.channels[0][i]) * out.channels[0][i];
+        return std::sqrt (e / 24000.0);
+    };
+    const double oneShot = tailRms();
+    p.parameters.getParameter ("layerA.sourceMode")->setValueNotifyingHost (1.0f);
+    p.parameters.getParameter ("layerA.granular.position")->setValueNotifyingHost (0.1f);   // near the start, where it is loud
+    const double granular = tailRms();
+    INFO ("rms at 2-2.5 s: one shot " << oneShot << ", granular " << granular);
+    CHECK (oneShot < 1.0e-4);
+    CHECK (granular > 100.0 * std::max (oneShot, 1.0e-6));
+}
+
+TEST_CASE ("plugin: sessions from before the layers recall into layer A", "[plugin][layers]")
+{
+    TempDir tmp;
+    const auto file = writeSource (tmp.dir, "old.wav", testsignals::vowel (midiToHz (50), 2.0, 48000.0, 5));
+    OspAudioProcessor p;
+    loadAndWait (p, file);
+    p.parameters.getParameter ("layerA.sourceMode")->setValueNotifyingHost (1.0f);
+    juce::MemoryBlock state;
+    p.getStateInformation (state);
+    auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
+    REQUIRE (xml != nullptr);
+    auto tree = juce::ValueTree::fromXml (*xml);
+    tree.setProperty ("stateVersion", 3, nullptr);
+    tree.removeChild (tree.getChildWithName ("InstrumentB"), nullptr);
+    juce::MemoryBlock old;
+    juce::AudioProcessor::copyXmlToBinary (*tree.createXml(), old);
+
+    OspAudioProcessor restored;
+    restored.setStateInformation (old.getData(), static_cast<int> (old.getSize()));
+    REQUIRE (restored.waitForLoads (20000));
+    restored.pollLoads();
+    REQUIRE (restored.currentInstrument (0) != nullptr);
+    CHECK (restored.currentInstrument (0)->filename == "old.wav");
+    CHECK (restored.currentInstrument (1) == nullptr);
+    auto* mode = restored.parameters.getParameter ("layerA.sourceMode");
+    CHECK (mode->getValue() == Approx (mode->getDefaultValue()));   // One Shot, as it was made
+}
+
 TEST_CASE ("plugin: presets and portable instruments travel to another computer", "[plugin]")
 {
     TempDir tmp;

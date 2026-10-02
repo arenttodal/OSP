@@ -92,34 +92,47 @@ public:
     bool advancedOpen() const noexcept { return advancedPanelOpen.load(); }
     void setAdvancedOpen (bool open) noexcept { advancedPanelOpen = open; }
 
+    // A/B source layers. Everything below that takes a `layer` acts on the layer being
+    // edited when it is -1 (the A/B tabs choose it).
+    static constexpr int numLayers = 2;
+    int editLayer() const noexcept { return editLayerIndex.load(); }
+    void setEditLayer (int layer) noexcept { editLayerIndex = std::clamp (layer, 0, numLayers - 1); }
+    static juce::String layerName (int layer) { return layer == 1 ? "B" : "A"; }
+    /** The stable parameter ID of a layer setting, e.g. layerParameterId (1, "sourceMode") -> "layerB.sourceMode". */
+    static juce::String layerParameterId (int layer, const juce::String& name) { return "layer" + layerName (layer) + "." + name; }
+
     // Instrument loading (message thread)
-    void loadFile (const juce::File& file);
+    void loadFile (const juce::File& file, int layer = -1);
     /** Several files -> one multi-sample instrument (Phase 7). One file falls back to loadFile. */
-    void loadFiles (const juce::Array<juce::File>& files);
+    void loadFiles (const juce::Array<juce::File>& files, int layer = -1);
     /** Samples inspector correction: pin one file's role/layer and rebuild the set. */
-    void reassignSample (const std::string& filename, SampleRole role, int layer, std::optional<double> rootMidi = std::nullopt);
-    void loadExample();
+    void reassignSample (const std::string& filename, SampleRole role, int velocityLayer, std::optional<double> rootMidi = std::nullopt);
+    void loadExample (int layer = -1);
+    /** Empties a layer (it then contributes silence). */
+    void clearLayer (int layer = -1);
 
     enum class LoadState { empty, loading, ready, failed };
-    LoadState loadState() const noexcept { return state.load(); }
+    LoadState loadState (int layer = -1) const noexcept { return layers[resolve (layer)].state.load(); }
     juce::String statusMessage() const;
     void showMessage (const juce::String& message)
     {
         const std::lock_guard<std::mutex> lock (messageMutex);
         lastMessage = message;
     }
-    /** "Ready", or what is still being prepared in the background ("Building sustain…"). */
+    /** "Ready", or what is still being prepared in the background ("Building sustain…"), for the edited layer. */
     juce::String stageMessage() const;
+    /** Granular settings names for layerParameterId: the source mode, then POS, SIZE, DENS, TUNE, SPREAD. */
+    static const juce::StringArray& granularNames();
 
-    /** Most recently loaded instrument (any non-audio thread). */
-    std::shared_ptr<const LoadedInstrument> currentInstrument() const;
+    /** Most recently loaded instrument of a layer, or nullptr when it is empty (any non-audio thread). */
+    std::shared_ptr<const LoadedInstrument> currentInstrument (int layer = -1) const;
 
     /** Manual root (fractional MIDI) or nullopt for the analysed root. Message thread. */
-    void setRootOverride (std::optional<double> midi);
+    void setRootOverride (std::optional<double> midi, int layer = -1);
     /** Same, as an undoable user action (the editor's root menu). */
-    void changeRootOverride (std::optional<double> midi);
-    std::optional<double> rootOverride() const;
-    double effectiveRootMidi() const;
+    void changeRootOverride (std::optional<double> midi, int layer = -1);
+    std::optional<double> rootOverride (int layer = -1) const;
+    double effectiveRootMidi (int layer = -1) const;
 
     /** Blocks until pending loads have finished (tests, offline hosts). */
     bool waitForLoads (int timeoutMs);
@@ -132,20 +145,50 @@ public:
     juce::UndoManager undoManager;
 
     /** 2: engine C parameters (macros, pitch character, sustain, seed). v1 sessions migrate to neutral settings.
-        3: shaping system v1.0 (popup settings; CHARACTER is a filter, so older sessions open it fully). */
-    static constexpr int stateVersion = 3;
+        3: shaping system v1.0 (popup settings; CHARACTER is a filter, so older sessions open it fully).
+        4: A/B layers (layer B in an InstrumentB tree; older sessions are layer A only). */
+    static constexpr int stateVersion = 4;
 
 private:
+    struct Layer
+    {
+        ModelExchange<LoadedInstrument> exchange;
+        // Audio-thread view of instruments
+        const LoadedInstrument* playing = nullptr;
+        std::array<const LoadedInstrument*, 8> retired {};
+        std::atomic<std::uint64_t> latestLoadId { 0 };   // newest load request; older refinements are skipped
+        std::atomic<LoadState> state { LoadState::empty };
+        bool lastLoadFailed = false;                     // message thread
+        // Root override (message -> audio)
+        std::atomic<double> rootShiftSemitones { 0.0 };
+        std::atomic<bool> hasRootOverride { false };
+        std::atomic<double> rootOverrideMidi { 60.0 };
+        // Undo of sample loads: the latest instrument of every recent load. Message thread.
+        std::map<std::uint64_t, std::shared_ptr<const LoadedInstrument>> latestByLoad;
+        std::uint64_t lastPublishedLoad = 0;
+        float autoPosition = -1.0f;                      // POS set from the analysis (granular), until the user moves it
+        std::uint64_t autoPositionLoad = 0;
+    };
+    struct Finished
+    {
+        int layer = 0;
+        LoadResult result;
+    };
+    std::size_t resolve (int layer) const noexcept { return static_cast<std::size_t> (layer < 0 ? editLayerIndex.load() : std::clamp (layer, 0, numLayers - 1)); }
+
     void timerCallback() override;
-    void enqueueLoad (LoadRequest request);
-    void enqueueRefine (std::shared_ptr<const LoadedInstrument> base, std::shared_ptr<const AudioData> audio);
-    void enqueueSetLoad (SetLoadRequest request);
+    void enqueueLoad (LoadRequest request, int layer);
+    void enqueueRefine (std::shared_ptr<const LoadedInstrument> base, std::shared_ptr<const AudioData> audio, int layer);
+    void enqueueSetLoad (SetLoadRequest request, int layer);
     std::unique_ptr<juce::XmlElement> createStateXml();
     void applyStateXml (const juce::XmlElement& xml);
-    void republish (std::shared_ptr<const LoadedInstrument> instrument);
+    juce::ValueTree instrumentTree (int layer);
+    void recallInstrument (const juce::ValueTree& tree, int layer);
+    void republish (std::shared_ptr<const LoadedInstrument> instrument, int layer);
+    void suggestGranularPosition (int layer, const LoadedInstrument& instrument);
     friend class InstrumentChangeAction;
     friend class RootChangeAction;
-    void pushResult (LoadResult result);
+    void pushResult (LoadResult result, int layer);
     void applyParameters (bool force) noexcept;
 public:
     /** The popup parameter IDs (stable: never rename), in shapingParams order. */
@@ -158,30 +201,19 @@ private:
 
     InstrumentEngine engine;
     EngineSettings engineSettings;
-    ModelExchange<LoadedInstrument> exchange;
-
-    // Audio-thread view of instruments
-    const LoadedInstrument* playing = nullptr;
-    std::array<const LoadedInstrument*, 8> retired {};
+    std::array<Layer, numLayers> layers;
+    std::atomic<int> editLayerIndex { 0 };
 
     // Loader
     SampleStore store;
     juce::ThreadPool loaderPool { 1 };
     std::mutex resultsMutex;               // loader <-> message thread only, never audio
-    std::deque<LoadResult> finishedLoads;
+    std::deque<Finished> finishedLoads;
     std::atomic<int> pendingLoads { 0 };
     std::atomic<std::uint64_t> nextGeneration { 1 };
-    std::atomic<std::uint64_t> latestLoadId { 0 };   // newest load request; older refinements are skipped
-    std::atomic<LoadState> state { LoadState::empty };
-    bool lastLoadFailed = false;           // message thread
     juce::String lastMessage;
     mutable std::mutex messageMutex;       // lastMessage
-    mutable std::mutex modelMutex;         // message-side use of `exchange` (hosts may save state off the message thread)
-
-    // Root override (message -> audio)
-    std::atomic<double> rootShiftSemitones { 0.0 };
-    std::atomic<bool> hasRootOverride { false };
-    std::atomic<double> rootOverrideMidi { 60.0 };
+    mutable std::mutex modelMutex;         // message-side use of the layers' exchanges (hosts may save state off the message thread)
 
     // Cached parameter values (audio thread)
     std::atomic<float>* attackParam = nullptr;
@@ -200,6 +232,15 @@ private:
     std::atomic<float>* sustainParam = nullptr;
     std::atomic<float>* seedParam = nullptr;
     std::atomic<float>* mpeParam = nullptr;
+    // A/B layers: blend, then per layer source mode and POS, SIZE, DENS, TUNE, SPREAD.
+    std::atomic<float>* blendParam = nullptr;
+    struct LayerParams
+    {
+        std::atomic<float>* mode = nullptr;
+        std::array<std::atomic<float>*, 5> granular {};
+        std::array<float, 6> last { -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f };
+    };
+    std::array<LayerParams, numLayers> layerParams;
     // Shaping system v1.0 (the macro popups), in the order of shapingIds().
     static constexpr int numShapingParams = 20;
     std::array<std::atomic<float>*, numShapingParams> shapingParams {};
@@ -216,11 +257,7 @@ private:
     juce::File lastPresetFile;
     std::atomic<float> uiScaleFactor { 1.0f };
     std::atomic<bool> advancedPanelOpen { false };
-    // Undo of sample loads: the latest instrument of every recent load, so undo/redo can
-    // bring back a sample with all its model stages. Message thread.
-    std::map<std::uint64_t, std::shared_ptr<const LoadedInstrument>> latestByLoad;
     std::set<std::uint64_t> userLoads;     // load ids started by the user (undoable), not by recall
-    std::uint64_t lastPublishedLoad = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OspAudioProcessor)
 };
