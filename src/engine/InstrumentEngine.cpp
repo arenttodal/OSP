@@ -298,7 +298,7 @@ NoteShape InstrumentEngine::shapeFor (const InstrumentModel* model, int note, in
                                        : std::clamp (0.25 + 3.2 * model->character.transientTonal, 0.25, 2.0);
         applyDynamics (shape, velocity, dynamics, model->character, config.macros.dynamics * sourceScale, config.dynamicsMode, referenceVelocity);
         performance.perform (shape, note, velocity, static_cast<double> (sampleClock) / sampleRate, eventIndex,
-                             model->performance, model->character, config.macros.life);
+                             model->performance, model->character, config.macros.life, config.shaping);
     }
     const auto* currentModelForMotion = model;
 
