@@ -159,6 +159,7 @@ private:
     double tPosition = 0.0, tStep = 1.0;
     int tRemaining = 0;
     float tAmount = 0.0f, tMix = 0.0f;
+    double tailEndPosition = 0.0; ///< after a graft: where the recording's ending has died away (> 0)
 
     // Reimagined doubling head
     float dAmount = 0.0f, dRamp = 0.0f, dRampStep = 0.0f, dSide = 1.0f;

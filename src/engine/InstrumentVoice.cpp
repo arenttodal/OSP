@@ -67,6 +67,7 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     graftPending = false;
     grafted = false;
     holdForTail = false;
+    tailEndPosition = 0.0;
     jumpsTaken = 0;
     recent.fill (-1);
     recentWrite = 0;
@@ -164,8 +165,23 @@ void InstrumentVoice::release() noexcept
     released = true;
     heldByPedal = false;
 
-    const bool canGraft = releaseGraftEnabled && strategy != ContinuationStrategy::off && cont->hasRelease
-                          && ! cont->graftExits.empty() && position < cont->releaseFrame;
+    bool canGraft = releaseGraftEnabled && strategy != ContinuationStrategy::off && cont->hasRelease
+                    && ! cont->graftExits.empty() && position < cont->releaseFrame;
+    if (canGraft)
+    {
+        // Only when an exit into the ending is close: released early in a long recording
+        // (before its stable region, or far from any exit) the note would otherwise keep
+        // sounding at full level until it got there - seconds, or the rest of the file.
+        const double reach = 0.3 * sampleRate * std::max (currentStep, 1.0e-3);
+        bool nearby = false;
+        for (const auto& exit : cont->graftExits)
+            if (exit.fromFrame >= position + 1.0)
+            {
+                nearby = exit.fromFrame - position <= reach;
+                break;
+            }
+        canGraft = nearby;
+    }
     if (canGraft)
     {
         graftPending = true;
@@ -335,6 +351,10 @@ void InstrumentVoice::beginCrossfade() noexcept
     {
         graftPending = false;
         grafted = true;
+        // The ending is over when its sound is, not at the end of the file (long
+        // recordings can carry seconds of near-silence after it).
+        const double soundEnd = cont->releaseFrame + (cont->tailSeconds + 0.25) * layer->source->sampleRate();
+        tailEndPosition = soundEnd;
     }
     ++jumpsTaken;
 }
@@ -433,6 +453,8 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
         if (! crossfading && hasPending && position >= pending.fromFrame)
             beginCrossfade();
 
+        if (tailEndPosition > 0.0 && position >= tailEndPosition && fadeRemaining == 0)
+            beginFastFade (static_cast<int> (0.05 * sampleRate));
         if (position >= endPosition)
         {
             kill();

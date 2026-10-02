@@ -425,3 +425,47 @@ TEST_CASE ("engine: Reimagined is clearly audible", "[integration][engine]")
     INFO ("level fluctuation: original " << original << " dB, reimagined " << reimagined << " dB");
     CHECK (reimagined > original + 0.5);
 }
+
+TEST_CASE ("engine: releasing early in a long recording stops promptly", "[integration][engine]")
+{
+    // Regression (Mac test): very long samples kept sounding after note-off. A release
+    // before the stable region (or far from any exit into the ending) waited for the
+    // ending at full level - seconds, or the rest of the file.
+    // Like a long bowed violin take: a 10 s swell from -40 dB, a sustain, a 4 s ending.
+    auto audio = testsignals::vowel (220.0, 30.0, 48000.0, 3);
+    for (auto& ch : audio.channels)
+        for (std::size_t i = 0; i < std::min<std::size_t> (ch.size(), 480000); ++i)
+            ch[i] *= static_cast<float> (std::pow (10.0, -2.0 * (1.0 - static_cast<double> (i) / 480000.0)));
+    for (auto& ch : audio.channels) // exponential 4 s ending, down to -60 dB
+        for (std::size_t i = ch.size() - 192000; i < ch.size(); ++i)
+            ch[i] *= static_cast<float> (std::pow (10.0, -3.0 * static_cast<double> (i - (ch.size() - 192000)) / 192000.0));
+    const auto model = instrument::buildComplete (audio, test::analyse (audio), {}, false);
+    const auto& c = model->original.continuation;
+    REQUIRE (c.canSustain);
+    INFO ("region end " << c.sustainEndFrame / 48000.0 << " s, ends while sounding " << model->analysis.envelope.endsWhileSounding << ", tail " << c.tailSeconds);
+    REQUIRE (c.hasRelease);
+    INFO ("stable region from " << c.sustainStartFrame / 48000.0 << " s");
+    REQUIRE (c.sustainStartFrame / 48000.0 > 3.0); // the regression needs exits far from an early release
+    for (double releaseAt : { 1.0, 12.0 })
+    {
+        INFO ("note-off after " << releaseAt << " s");
+        InstrumentEngine engine;
+        EngineSettings settings; // default release 250 ms: long enough to graft
+        engine.prepare (48000.0, 256, settings);
+        engine.setModel (model.get());
+        engine.noteOn (57, 100);
+        std::vector<float> l (256), r (256);
+        float* channels[2] = { l.data(), r.data() };
+        for (int i = 0; i < static_cast<int> (releaseAt * 48000.0 / 256.0); ++i)
+            engine.render (channels, 2, 256);
+        engine.noteOff (57);
+        int blocks = 0;
+        while (engine.activeVoiceCount() > 0 && blocks < 48000 * 30 / 256)
+        {
+            engine.render (channels, 2, 256);
+            ++blocks;
+        }
+        // Release time, or a nearby graft plus the recording's 4 s ending - never more.
+        CHECK (blocks * 256.0 / 48000.0 < (releaseAt < 5.0 ? 1.0 : 5.0));
+    }
+}
