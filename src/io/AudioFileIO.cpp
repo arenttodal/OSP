@@ -28,7 +28,7 @@ namespace
 bool isSupportedAudioExtension (const std::filesystem::path& path)
 {
     const auto ext = lowerExtension (path);
-    return ext == ".wav" || ext == ".wave" || ext == ".aif" || ext == ".aiff" || ext == ".aifc";
+    return ext == ".wav" || ext == ".wave" || ext == ".aif" || ext == ".aiff" || ext == ".aifc" || ext == ".flac";
 }
 
 LoadResult loadAudioFile (const std::filesystem::path& path, const LoadOptions& options)
@@ -44,13 +44,14 @@ LoadResult loadAudioFile (const std::filesystem::path& path, const LoadOptions& 
 
     if (! isSupportedAudioExtension (path))
     {
-        result.error = "unsupported file type '" + path.extension().string() + "' (supported: WAV, AIFF)";
+        result.error = "unsupported file type '" + path.extension().string() + "' (supported: WAV, AIFF, FLAC)";
         return result;
     }
 
     juce::AudioFormatManager formats;
     formats.registerFormat (new juce::WavAudioFormat(), true);
     formats.registerFormat (new juce::AiffAudioFormat(), false);
+    formats.registerFormat (new juce::FlacAudioFormat(), false);
 
     // Detect the format from content, not the extension (.aifc files, mislabelled files).
     std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (toJuceFile (path).createInputStream()));
@@ -150,6 +151,8 @@ bool writeAudioFile (const std::filesystem::path& path, const AudioData& audio, 
     std::unique_ptr<juce::AudioFormat> audioFormat;
     if (ext == ".aif" || ext == ".aiff" || ext == ".aifc")
         audioFormat = std::make_unique<juce::AiffAudioFormat>();
+    else if (ext == ".flac")
+        audioFormat = std::make_unique<juce::FlacAudioFormat>();
     else
         audioFormat = std::make_unique<juce::WavAudioFormat>();
 

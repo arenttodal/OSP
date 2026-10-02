@@ -3,6 +3,7 @@
 #include "core/AudioData.h"
 #include "midi/MidiEvent.h"
 #include "model/AnalysisData.h"
+#include "model/InstrumentModel.h"
 #include "model/PlaybackPreparation.h"
 #include "model/RootChoice.h"
 #include "research/RenderConfig.h"
@@ -32,5 +33,16 @@ struct RenderOutput
 */
 RenderOutput renderSequence (const AudioData& source, double rootMidi, const MidiSequence& sequence,
                              const RenderConfig& config, const PlaybackPreparation& preparation = {});
+
+/**
+    Renders with whichever engine the config selects. Engine C builds its instrument
+    model from the source and analysis first (always start-at-onset and level matched,
+    like the plugin); A and B use `preparation` as given.
+*/
+RenderOutput renderWithEngine (const AudioData& source, const AnalysisData& analysis, double rootMidi, const MidiSequence& sequence,
+                               const RenderConfig& config, const PlaybackPreparation& preparation);
+
+/** Same block loop through the OSP instrument engine (EngineId::instrument). */
+RenderOutput renderInstrument (const InstrumentModel& model, const MidiSequence& sequence, const RenderConfig& config);
 
 } // namespace osp::research

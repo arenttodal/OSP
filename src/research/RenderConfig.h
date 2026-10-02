@@ -1,7 +1,10 @@
 #pragma once
 
 #include "audio/sampler/BaselineSampler.h"
+#include "engine/InstrumentEngine.h"
 #include "model/PlaybackPreparation.h"
+
+#include <juce_core/juce_core.h>
 
 #include <filesystem>
 #include <optional>
@@ -14,7 +17,8 @@ namespace osp::research
 enum class EngineId
 {
     baselineA,  ///< plain resampling sampler
-    baselineB   ///< A + independent per-note randomisation
+    baselineB,  ///< A + independent per-note randomisation
+    instrument  ///< C: the OSP instrument engine (continuation, performance, dynamics, macros)
 };
 
 std::string engineName (EngineId id);
@@ -31,6 +35,8 @@ struct RenderConfig
     double maxTailSeconds = 15.0;     ///< render stops this long after the last event at the latest
     SamplerSettings sampler {};
     PlaybackOptions playback {};      ///< start-at-onset / level normalisation (off = plain baselines)
+    EngineSettings engineSettings {}; ///< engine C only
+    bool anchors = false;             ///< engine C: build register anchors (needed for pitchCharacter = natural)
 
     /** Settings actually used for the engine (B turns randomisation on). */
     SamplerSettings effectiveSamplerSettings() const;
@@ -42,5 +48,8 @@ struct RenderConfig
     newer schemaVersion.
 */
 std::optional<RenderConfig> loadRenderConfig (const std::filesystem::path& path, std::string& error);
+
+/** Applies an "instrument" settings object (engine C) to a config: macros, pitchCharacter, continuation... */
+void applyInstrumentBlock (const juce::var& block, RenderConfig& config);
 
 } // namespace osp::research

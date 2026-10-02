@@ -91,7 +91,7 @@ namespace
                 {
                     auto config = options.config;
                     config.engine = engine;
-                    const auto output = renderSequence (source.audio, record.root.rootMidi, *sequence, config, preparation);
+                    const auto output = renderWithEngine (source.audio, source.analysis, record.root.rootMidi, *sequence, config, preparation);
 
                     MetricsContext context;
                     context.expectedChannels = 2;

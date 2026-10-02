@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "name": "continuation-1",
+  "tab": "Sustain",
+  "title": "Continuation: 60-second holds",
+  "heading": "Can you hear the loop?",
+  "intro": [
+    "Each group is one recording held for 60 seconds on its own note, then released. The four takes continue the sound past the end of the recording in four different ways, in a random order.",
+    "Listen for the moment the recording would have ended and for anything that repeats: a bump, a click, a vibrato or tremolo that cycles identically, a breath that comes back. Skipping through is fine; the middle and the release matter most."
+  ],
+  "scales": [
+    { "key": "loop", "label": "Loop", "low": "obvious repetition", "high": "no loop heard" },
+    { "key": "life", "label": "Life", "low": "frozen, static", "high": "alive like the recording" },
+    { "key": "seams", "label": "Seams", "low": "clicks or bumps", "high": "seamless" }
+  ],
+  "bestLabel": "Best of these",
+  "bestHint": "the hold you would rather play",
+  "corpusRoot": "research/corpus",
+  "seed": 1,
+  "outputSampleRate": 44100,
+  "listeningRmsDbfs": -20,
+  "format": "flac",
+  "trimToCommon": true,
+  "maxSeconds": 70,
+  "sequence": { "notes": [ { "offset": 0, "start": 0.0, "duration": 60.0, "velocity": 100 } ] },
+  "tail": 8,
+  "sources": [
+    { "id": "organ", "label": "Organ (Trampeorgel)", "path": "trampeorgel/Trampeorgel_Bounce_2026-05-15_130536.wav" },
+    { "id": "vocal", "label": "Vocal vowel", "path": "vocals/VOK_ADLIB-St_2025-10-13_100555-4.wav" },
+    { "id": "bowed", "label": "Bowed (nyckelharpa)", "path": "nyckelharpa/Nyckelharpa_Bounce_2026-03-31_203133.wav" },
+    { "id": "tremolo", "label": "Tremolo harmonics", "path": "sus/Sus_Harm_D_Trem.wav" },
+    { "id": "synth", "label": "Synth (analog)", "path": "misc/Analog_Freeze_Freeze_2024-01-25_101950-1.wav" }
+  ],
+  "conditions": [
+    { "id": "A", "label": "single loop (naive)", "engine": "C", "instrument": { "continuation": "naive-loop", "macros": { "life": 0, "motion": 0 } } },
+    { "id": "B", "label": "best loop, matched crossfade", "engine": "C", "instrument": { "continuation": "best-loop", "macros": { "life": 0, "motion": 0 } } },
+    { "id": "C", "label": "multi-loop", "engine": "C", "instrument": { "continuation": "multi-loop", "macros": { "life": 0, "motion": 0 } } },
+    { "id": "D", "label": "multi-loop + movement", "engine": "C", "instrument": { "continuation": "multi-loop-movement", "macros": { "life": 0, "motion": 0.35 } } }
+  ]
+}

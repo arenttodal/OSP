@@ -49,6 +49,10 @@ add_library(osp_dsp STATIC
     src/analysis/spectrum/SpectralAnalyzer.cpp
     src/analysis/spectrum/SpectralEnvelope.cpp
     src/analysis/stereo/StereoAnalyzer.cpp
+    src/analysis/continuation/ContinuationAnalyzer.cpp
+    src/engine/InstrumentVoice.cpp
+    src/engine/InstrumentEngine.cpp
+    src/engine/InstrumentBuilder.cpp
     src/midi/MidiFixtures.cpp
     src/model/RootChoice.cpp
     src/model/PlaybackPreparation.cpp
@@ -87,7 +91,7 @@ target_compile_definitions(osp_juce_headless PUBLIC
     JUCE_STANDALONE_APPLICATION=1
     JUCE_USE_CURL=0
     JUCE_WEB_BROWSER=0
-    JUCE_USE_FLAC=0
+    JUCE_USE_FLAC=1
     JUCE_USE_OGGVORBIS=0
     JUCE_USE_MP3AUDIOFORMAT=0
     JUCE_USE_LAME_AUDIO_FORMAT=0
@@ -112,6 +116,7 @@ add_library(osp_research STATIC
     src/research/SourceAnalysis.cpp
     src/research/TestSignalSet.cpp
     src/research/Bakeoff.cpp
+    src/research/Experiment.cpp
 )
 target_include_directories(osp_research PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(osp_research PUBLIC osp_dsp osp_juce_headless)

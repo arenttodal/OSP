@@ -223,7 +223,7 @@ void OspAudioProcessorEditor::filesDropped (const juce::StringArray& files, int,
 
 void OspAudioProcessorEditor::chooseFile()
 {
-    chooser = std::make_unique<juce::FileChooser> ("Choose a sound", juce::File(), "*.wav;*.wave;*.aif;*.aiff;*.aifc");
+    chooser = std::make_unique<juce::FileChooser> ("Choose a sound", juce::File(), "*.wav;*.wave;*.aif;*.aiff;*.aifc;*.flac");
     chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                           [this] (const juce::FileChooser& fc) {
                               const auto file = fc.getResult();

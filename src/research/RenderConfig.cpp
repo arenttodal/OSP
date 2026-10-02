@@ -14,6 +14,7 @@ std::string engineName (EngineId id)
     {
         case EngineId::baselineA: return "baseline-a";
         case EngineId::baselineB: return "baseline-b";
+        case EngineId::instrument: return "instrument";
     }
     return "unknown";
 }
@@ -26,6 +27,8 @@ std::optional<EngineId> parseEngine (const std::string& text)
         return EngineId::baselineA;
     if (t == "b" || t == "baseline-b" || t == "randomized")
         return EngineId::baselineB;
+    if (t == "c" || t == "instrument" || t == "osp" || t == "engine")
+        return EngineId::instrument;
     return std::nullopt;
 }
 
@@ -34,6 +37,26 @@ SamplerSettings RenderConfig::effectiveSamplerSettings() const
     auto settings = sampler;
     settings.randomization.enabled = engine == EngineId::baselineB;
     return settings;
+}
+
+void applyInstrumentBlock (const juce::var& e, RenderConfig& config)
+{
+    auto& es = config.engineSettings;
+    if (json::has (e, "pitchCharacter"))
+        es.pitchCharacter = json::getString (e, "pitchCharacter") == "natural" ? PitchCharacter::natural : PitchCharacter::tape;
+    if (json::has (e, "continuation"))
+        parseContinuationStrategy (json::getString (e, "continuation"), es.continuation);
+    es.releaseGraft = json::getBool (e, "releaseGraft", es.releaseGraft);
+    config.anchors = json::getBool (e, "anchors", es.pitchCharacter == PitchCharacter::natural);
+    if (json::has (e, "releaseSeconds"))
+        es.adsr.releaseSeconds = json::getDouble (e, "releaseSeconds", es.adsr.releaseSeconds);
+    const auto& m = e["macros"];
+    es.macros.life = json::getDouble (m, "life", es.macros.life);
+    es.macros.dynamics = json::getDouble (m, "dynamics", es.macros.dynamics);
+    es.macros.character = json::getDouble (m, "character", es.macros.character);
+    es.macros.motion = json::getDouble (m, "motion", es.macros.motion);
+    es.macros.space = json::getDouble (m, "space", es.macros.space);
+    es.macros.reimagined = json::getDouble (m, "reimagined", es.macros.reimagined);
 }
 
 std::optional<RenderConfig> loadRenderConfig (const std::filesystem::path& path, std::string& error)
@@ -88,6 +111,13 @@ std::optional<RenderConfig> loadRenderConfig (const std::filesystem::path& path,
     s.randomization.gainDb = json::getDouble (random, "gainDb", s.randomization.gainDb);
     s.randomization.detuneCents = json::getDouble (random, "detuneCents", s.randomization.detuneCents);
     s.randomization.startOffsetMs = json::getDouble (random, "startOffsetMs", s.randomization.startOffsetMs);
+
+    config.engineSettings.adsr = s.adsr;
+    config.engineSettings.polyphony = s.polyphony;
+    config.engineSettings.outputGainDb = s.outputGainDb;
+    config.engineSettings.interpolationZeroCrossings = s.interpolationZeroCrossings;
+    config.engineSettings.seed = s.seed;
+    applyInstrumentBlock (root["instrument"], config);
 
     return config;
 }

@@ -1,0 +1,389 @@
+<title>OSP Listening Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: tabs per experiment; one listening column; each group is a bench row of
+   blind takes with rating scales; a sticky header carries progress and save state. */
+:root {
+  --bg: #eef0ec;
+  --surface: #f8f9f6;
+  --fg: #1c2320;
+  --muted: #5b6862;
+  --line: #d3d9d4;
+  --accent: #2c6b59;      /* tape-deck green: play, selection */
+  --accent-ink: #f4f8f6;
+  --best: #a8761c;        /* brass: the chosen take */
+  --best-soft: #f2e6cc;
+  --warn: #9a3b2b;
+  --font-display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #131715; --surface: #1b201e; --fg: #e3e8e4; --muted: #96a29c; --line: #2b3330;
+    --accent: #6cc1a4; --accent-ink: #0f1513; --best: #d9a84e; --best-soft: #3a2f1a; --warn: #e08a76;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #131715; --surface: #1b201e; --fg: #e3e8e4; --muted: #96a29c; --line: #2b3330;
+  --accent: #6cc1a4; --accent-ink: #0f1513; --best: #d9a84e; --best-soft: #3a2f1a; --warn: #e08a76;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 980px; margin: 0 auto; padding-inline: 16px; padding-block: 0 64px; }
+
+header.top {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--line);
+}
+.top-inner { max-width: 980px; margin: 0 auto; padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+.brand { font-family: var(--font-display); font-weight: 700; font-size: 18px; letter-spacing: -0.01em; }
+.brand span { color: var(--muted); font-weight: 500; }
+.progress { display: flex; align-items: center; gap: 10px; flex: 1 1 220px; min-width: 0; }
+.bar { flex: 1; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+.count { font-family: var(--font-data); font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pill { font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.pill.ok { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); color: var(--accent); }
+.pill.warn { border-color: color-mix(in srgb, var(--warn) 50%, var(--line)); color: var(--warn); }
+button.ghost { font: inherit; font-size: 13px; padding: 5px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer; }
+button.ghost:hover { border-color: var(--accent); }
+button:focus-visible, input:focus-visible + label, .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.intro { padding-block: 28px 8px; display: grid; gap: 10px; max-width: 68ch; }
+.intro h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(26px, 4vw, 34px); line-height: 1.15; margin: 0; text-wrap: balance; letter-spacing: -0.015em; }
+.intro p { margin: 0; color: var(--muted); }
+.legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px 20px; padding-block: 8px 4px; font-size: 13px; color: var(--muted); }
+.legend b { color: var(--fg); font-weight: 600; }
+
+.filters { display: flex; flex-wrap: wrap; gap: 8px; padding-block: 18px 6px; align-items: center; }
+.chip { font: inherit; font-size: 13px; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--fg); cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.filters .sep { width: 1px; height: 22px; background: var(--line); margin-inline: 4px; }
+
+.family { padding-block: 26px 0; }
+.family h2 { font-family: var(--font-display); font-size: 20px; margin: 0 0 4px; letter-spacing: -0.01em; }
+.family .src { margin: 0 0 12px; font-size: 13px; color: var(--muted); }
+.family .src code { font-family: var(--font-data); font-size: 12px; }
+
+.group { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px 16px; margin-block: 10px; }
+.group.done { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.ghead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin-bottom: 10px; }
+.shift { font-family: var(--font-data); font-weight: 500; font-size: 18px; font-variant-numeric: tabular-nums; }
+.notes { font-family: var(--font-data); font-size: 13px; color: var(--muted); }
+.gstate { margin-left: auto; font-size: 12px; color: var(--muted); }
+.group.done .gstate { color: var(--accent); }
+
+.takes { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.take { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px 12px; display: grid; gap: 10px; min-width: 0; background: var(--bg); }
+.take.best { border-color: var(--best); background: color-mix(in srgb, var(--best-soft) 55%, var(--bg)); }
+.take-top { display: flex; align-items: center; gap: 10px; }
+.label { font-family: var(--font-display); font-weight: 700; font-size: 20px; width: 1.2em; }
+.play { flex: none; width: 38px; height: 38px; border-radius: 50%; border: none; background: var(--accent); color: var(--accent-ink); cursor: pointer; display: grid; place-items: center; }
+.play svg { width: 14px; height: 14px; fill: currentColor; }
+.track { flex: 1; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; min-width: 0; }
+.track > i { display: block; height: 100%; width: 0; background: var(--accent); }
+
+.scale { display: grid; grid-template-columns: 84px minmax(0, 1fr); align-items: center; gap: 8px; }
+.scale .name { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.seg { display: grid; grid-template-columns: repeat(5, 1fr); border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label { text-align: center; font-family: var(--font-data); font-size: 13px; padding: 4px 0; cursor: pointer; border-left: 1px solid var(--line); user-select: none; }
+.seg label:first-of-type { border-left: none; }
+.seg input:checked + label { background: var(--accent); color: var(--accent-ink); }
+.bestpick { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.bestpick input { accent-color: var(--best); width: 16px; height: 16px; }
+
+.foot { padding-block: 32px 0; color: var(--muted); font-size: 13px; display: grid; gap: 8px; max-width: 68ch; }
+.copied { color: var(--accent); }
+@media (prefers-reduced-motion: reduce) { .bar > i { transition: none; } }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; padding-block: 18px 0; border-bottom: 1px solid var(--line); }
+.tab { font: inherit; font-size: 14px; padding: 8px 14px; border: 1px solid transparent; border-bottom: none; border-radius: 8px 8px 0 0; background: transparent; color: var(--muted); cursor: pointer; margin-bottom: -1px; }
+.tab[aria-selected="true"] { background: var(--bg); color: var(--fg); border-color: var(--line); font-weight: 600; }
+.tab .tcount { font-family: var(--font-data); font-size: 12px; margin-left: 6px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.gnote { width: 100%; font: inherit; font-size: 13px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--fg); resize: vertical; min-height: 34px; margin-top: 10px; }
+.hint { font-size: 12px; color: var(--muted); }
+.legend .lo { white-space: nowrap; }
+</style>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">OSP <span>listening lab</span></div>
+    <div class="progress"><div class="bar" aria-hidden="true"><i id="bar"></i></div><span class="count" id="count"></span></div>
+    <span class="pill" id="save">Connecting…</span>
+    <button class="ghost" id="copy" type="button">Copy ratings</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <nav class="tabs" role="tablist" aria-label="Experiments" id="tabs"></nav>
+  <section class="intro" id="intro"></section>
+  <nav class="filters" aria-label="Filter groups" id="filters"></nav>
+  <div id="groups"></div>
+  <section class="foot" id="foot">
+    <p>Ratings and notes save as you go. Takes are in a random order that changes per group and are matched in loudness.</p>
+    <p id="copyhelp">If saving is unavailable, use <b>Copy ratings</b> and paste the result into our conversation.</p>
+  </section>
+</main>
+
+<script>
+const DATA = /*OSP_DATA*/null;
+const LETTERS = ["X", "Y", "Z", "W", "V", "U"];
+const STORE_KEY = "osp-listening-lab";
+
+let state = {};
+try { state = JSON.parse(localStorage.getItem(STORE_KEY) || "{}") || {}; } catch (e) { state = {}; }
+let tab = DATA.experiments[0].name;
+try { const t = localStorage.getItem(STORE_KEY + "-tab"); if (DATA.experiments.some(x => x.name === t)) tab = t; } catch (e) {}
+let db = null;
+let filterSection = "all";
+let onlyOpen = false;
+
+const saveEl = document.getElementById("save");
+function setSave(text, kind) { saveEl.textContent = text; saveEl.className = "pill" + (kind ? " " + kind : ""); }
+function slug(id) { return id.replace(/\s+/g, "_").replace(/\+/g, "p").replace(/[^A-Za-z0-9_.~:@-]/g, "-"); }
+function docKey(exp, g) { return slug(exp.name) + "__" + slug(g.id); }
+function current() { return DATA.experiments.find(x => x.name === tab); }
+
+function groupState(exp, g) {
+  const key = docKey(exp, g);
+  if (!state[key]) state[key] = { experiment: exp.name, group: g.id, best: null, clips: {}, note: "" };
+  return state[key];
+}
+function isDone(exp, g) {
+  const s = state[docKey(exp, g)];
+  if (!s) return false;
+  if (exp.best !== false && !s.best) return false;
+  return g.clips.every(id => s.clips[id] && exp.scales.every(sc => s.clips[id][sc.key]));
+}
+
+// ---------- audio: one take plays at a time ----------
+let playing = null;
+const players = new Map();
+function playerFor(id, ext) {
+  if (!players.has(id)) { const a = new Audio("clips/" + id + "." + ext); a.preload = "none"; players.set(id, a); }
+  return players.get(id);
+}
+const PLAY = '<svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 1.5v11l9-5.5z"/></svg>';
+const STOP = '<svg viewBox="0 0 14 14" aria-hidden="true"><rect x="2.5" y="2.5" width="9" height="9" rx="1"/></svg>';
+function stopCurrent() {
+  if (!playing) return;
+  playing.audio.pause(); playing.audio.currentTime = 0;
+  playing.button.innerHTML = PLAY; playing.button.setAttribute("aria-label", "Play " + playing.label);
+  playing.fill.style.width = "0"; playing = null;
+}
+function toggle(id, ext, button, fill, label) {
+  if (playing && playing.id === id) { stopCurrent(); return; }
+  stopCurrent();
+  const audio = playerFor(id, ext);
+  playing = { id, audio, button, fill, label };
+  button.innerHTML = STOP; button.setAttribute("aria-label", "Stop " + label);
+  audio.ontimeupdate = () => { if (playing && playing.id === id && audio.duration) fill.style.width = (100 * audio.currentTime / audio.duration) + "%"; };
+  audio.onended = () => { if (playing && playing.id === id) stopCurrent(); };
+  audio.play().catch(() => stopCurrent());
+}
+
+// ---------- saving ----------
+const pending = new Map();
+function persistLocal() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {} }
+function save(key) {
+  persistLocal();
+  if (!db) return;
+  clearTimeout(pending.get(key));
+  setSave("Saving…");
+  pending.set(key, setTimeout(async () => {
+    pending.delete(key);
+    try {
+      await db.doc("ratings/" + key).set({ ...state[key], updatedAt: new Date().toISOString() });
+      if (pending.size === 0) setSave("Saved", "ok");
+    } catch (e) { setSave("Not saved online, kept in this browser", "warn"); }
+  }, 600));
+}
+
+// ---------- rendering ----------
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+function renderTabs() {
+  const nav = document.getElementById("tabs");
+  nav.innerHTML = "";
+  for (const exp of DATA.experiments) {
+    const b = el("button", "tab");
+    b.type = "button"; b.setAttribute("role", "tab"); b.setAttribute("aria-selected", exp.name === tab ? "true" : "false");
+    b.append(document.createTextNode(exp.tab || exp.title));
+    const done = exp.groups.filter(g => isDone(exp, g)).length;
+    b.append(el("span", "tcount", done + "/" + exp.groups.length));
+    b.addEventListener("click", () => { tab = exp.name; filterSection = "all"; try { localStorage.setItem(STORE_KEY + "-tab", tab); } catch (e) {} render(); });
+    nav.appendChild(b);
+  }
+}
+
+function renderIntro(exp) {
+  const host = document.getElementById("intro");
+  host.innerHTML = "";
+  host.appendChild(el("h1", null, exp.heading || exp.title));
+  for (const p of exp.intro || []) host.appendChild(el("p", null, p));
+  const legend = el("div", "legend");
+  for (const sc of exp.scales) {
+    const d = el("div"); d.append(el("b", null, sc.label + " ")); d.append(document.createTextNode("1 = " + sc.low + ", 5 = " + sc.high)); legend.appendChild(d);
+  }
+  if (exp.best !== false) { const d = el("div"); d.append(el("b", null, "Best ")); d.append(document.createTextNode(exp.bestHint || "the take you would rather play")); legend.appendChild(d); }
+  host.appendChild(legend);
+}
+
+function renderFilters(exp) {
+  const nav = document.getElementById("filters");
+  nav.innerHTML = "";
+  const make = (text, pressed, onClick) => {
+    const b = el("button", "chip", text); b.type = "button";
+    b.setAttribute("aria-pressed", pressed ? "true" : "false"); b.addEventListener("click", onClick); nav.appendChild(b);
+  };
+  if ((exp.sections || []).length > 1) {
+    make("All", filterSection === "all", () => { filterSection = "all"; render(); });
+    for (const sec of exp.sections) make(sec.title, filterSection === sec.id, () => { filterSection = sec.id; render(); });
+    nav.appendChild(el("span", "sep"));
+  }
+  make("Unfinished only", onlyOpen, () => { onlyOpen = !onlyOpen; render(); });
+}
+
+function renderProgress() {
+  let done = 0, total = 0;
+  for (const exp of DATA.experiments) { total += exp.groups.length; done += exp.groups.filter(g => isDone(exp, g)).length; }
+  document.getElementById("count").textContent = done + " / " + total + " groups";
+  document.getElementById("bar").style.width = (total ? 100 * done / total : 0) + "%";
+  document.querySelectorAll(".tab").forEach((b, i) => {
+    const exp = DATA.experiments[i];
+    b.querySelector(".tcount").textContent = exp.groups.filter(g => isDone(exp, g)).length + "/" + exp.groups.length;
+  });
+}
+
+const groupEls = new Map();
+function markGroup(exp, g) {
+  const node = groupEls.get(g.id);
+  if (!node) return;
+  const done = isDone(exp, g);
+  node.classList.toggle("done", done);
+  const s = state[docKey(exp, g)] || {};
+  const rated = g.clips.filter(id => s.clips && s.clips[id] && exp.scales.every(sc => s.clips[id][sc.key])).length;
+  node.querySelector(".gstate").textContent = done ? "Done" : rated + " of " + g.clips.length + " rated" + (s.best ? ", best picked" : "");
+  node.querySelectorAll(".take").forEach(t => t.classList.toggle("best", s.best === t.dataset.clip));
+}
+
+function scaleRow(exp, g, id, sc) {
+  const key = docKey(exp, g);
+  const s = groupState(exp, g);
+  const row = el("div", "scale");
+  const label = el("span", "name", sc.label); label.id = "n-" + id + "-" + sc.key;
+  const seg = el("div", "seg"); seg.setAttribute("role", "radiogroup"); seg.setAttribute("aria-labelledby", label.id);
+  for (let v = 1; v <= 5; v++) {
+    const input = document.createElement("input");
+    input.type = "radio"; input.name = "r-" + id + "-" + sc.key; input.id = "r-" + id + "-" + sc.key + "-" + v; input.value = v;
+    input.checked = (s.clips[id] && s.clips[id][sc.key]) === v;
+    input.addEventListener("change", () => { s.clips[id] = Object.assign({}, s.clips[id], { [sc.key]: v }); save(key); renderProgress(); markGroup(exp, g); });
+    const l = document.createElement("label"); l.htmlFor = input.id; l.textContent = v;
+    seg.append(input, l);
+  }
+  row.append(label, seg);
+  return row;
+}
+
+function renderGroup(exp, g) {
+  const key = docKey(exp, g);
+  const s = groupState(exp, g);
+  const node = el("article", "group");
+  const head = el("div", "ghead");
+  head.append(el("span", "shift", g.label), el("span", "notes", g.note || ""), el("span", "gstate"));
+  node.appendChild(head);
+  const takes = el("div", "takes");
+  g.clips.forEach((id, i) => {
+    const letter = LETTERS[i] || String(i + 1);
+    const take = el("div", "take"); take.dataset.clip = id;
+    const top = el("div", "take-top");
+    const button = el("button", "play"); button.type = "button"; button.innerHTML = PLAY;
+    const labelText = letter + ", " + g.label;
+    button.setAttribute("aria-label", "Play " + labelText);
+    const track = el("div", "track"); const fill = document.createElement("i"); track.appendChild(fill);
+    button.addEventListener("click", () => toggle(id, exp.ext || "wav", button, fill, labelText));
+    top.append(el("span", "label", letter), button, track);
+    take.appendChild(top);
+    for (const sc of exp.scales) take.appendChild(scaleRow(exp, g, id, sc));
+    if (exp.best !== false) {
+      const best = el("label", "bestpick");
+      const radio = document.createElement("input"); radio.type = "radio"; radio.name = "best-" + key; radio.id = "best-" + id;
+      radio.checked = s.best === id;
+      radio.addEventListener("change", () => { s.best = id; save(key); renderProgress(); markGroup(exp, g); });
+      best.append(radio, document.createTextNode(exp.bestLabel || "Best of these"));
+      take.appendChild(best);
+    }
+    takes.appendChild(take);
+  });
+  node.appendChild(takes);
+  const note = el("textarea", "gnote"); note.rows = 1; note.placeholder = "Notes (optional): what did you hear?";
+  note.setAttribute("aria-label", "Notes for " + g.label);
+  note.value = s.note || "";
+  note.addEventListener("input", () => { s.note = note.value; save(key); });
+  node.appendChild(note);
+  groupEls.set(g.id, node);
+  markGroup(exp, g);
+  return node;
+}
+
+function render() {
+  stopCurrent();
+  const exp = current();
+  renderTabs();
+  renderIntro(exp);
+  renderFilters(exp);
+  const host = document.getElementById("groups");
+  host.innerHTML = "";
+  groupEls.clear();
+  const sections = (exp.sections && exp.sections.length) ? exp.sections : [{ id: "_all", title: "" }];
+  for (const sec of sections) {
+    if (filterSection !== "all" && filterSection !== sec.id) continue;
+    const list = exp.groups.filter(g => (sec.id === "_all" || g.section === sec.id) && (!onlyOpen || !isDone(exp, g)));
+    if (!list.length) continue;
+    const section = el("section", "family");
+    if (sec.title) section.appendChild(el("h2", null, sec.title));
+    if (sec.note) { const p = el("p", "src"); p.textContent = sec.note; section.appendChild(p); }
+    for (const g of list) section.appendChild(renderGroup(exp, g));
+    host.appendChild(section);
+  }
+  if (!host.children.length) host.appendChild(el("p", "foot", "Every group in this view is finished."));
+  renderProgress();
+}
+
+// ---------- copy ----------
+document.getElementById("copy").addEventListener("click", async () => {
+  const text = JSON.stringify({ ratings: state }, null, 1);
+  const help = document.getElementById("copyhelp");
+  try { await navigator.clipboard.writeText(text); help.innerHTML = '<span class="copied">Ratings copied.</span> Paste them into our conversation if saving was unavailable.'; }
+  catch (e) { help.textContent = ""; const area = document.createElement("textarea"); area.value = text; area.rows = 6; area.style.width = "100%"; area.readOnly = true; help.appendChild(area); area.select(); }
+});
+
+render();
+
+// ---------- shared store ----------
+(async () => {
+  try { db = window.claude && window.claude.use ? await window.claude.use("db") : null; } catch (e) { db = null; }
+  if (!db) { setSave("Saved in this browser only", "warn"); return; }
+  setSave("Saved", "ok");
+  db.collection("ratings").onSnapshot(snap => {
+    let changed = false;
+    for (const doc of snap.docs) {
+      if (pending.has(doc.id)) continue;
+      const body = doc.data();
+      if (!body || !body.experiment) continue;
+      state[doc.id] = { experiment: body.experiment, group: body.group, best: body.best || null, clips: Object.assign({}, body.clips || {}), note: body.note || "" };
+      changed = true;
+    }
+    if (changed) { persistLocal(); const active = document.activeElement; if (!(active && active.classList && active.classList.contains("gnote"))) render(); else renderProgress(); }
+  }, () => setSave("Not saved online, kept in this browser", "warn"));
+})();
+</script>

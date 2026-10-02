@@ -1,6 +1,7 @@
 // research-renderer: headless analysis / rendering / corpus / benchmark tool.
 // See README.md and docs/testing.md for usage.
 
+#include "analysis/continuation/ContinuationAnalyzer.h"
 #include "core/PitchMath.h"
 #include "io/AnalysisJson.h"
 #include "io/AudioFileIO.h"
@@ -8,6 +9,7 @@
 #include "midi/MidiFileIO.h"
 #include "midi/MidiFixtures.h"
 #include "research/Bakeoff.h"
+#include "research/Experiment.h"
 #include "research/Benchmark.h"
 #include "research/CorpusIndex.h"
 #include "research/CorpusRunner.h"
@@ -17,6 +19,7 @@
 #include "research/SourceAnalysis.h"
 #include "research/TestSignalSet.h"
 
+#include <chrono>
 #include <iostream>
 #include <map>
 #include <set>
@@ -51,9 +54,10 @@ RENDERING
   --source <file> (--midi <file.mid> | --fixture <name>) --output <out.wav>
         [--analysis <report.json>]   use a stored analysis instead of re-analysing (root comes from it)
         [--root <note>]              override root, e.g. A3, F#2, 57, 57.3
-        [--engine A|B]               A = baseline resampler (default), B = randomised baseline
+        [--engine A|B|C]             A = baseline resampler (default), B = randomised baseline, C = OSP engine
         [--config <config.json>]     research/configs/*.json
         [--seed <n>] [--sample-rate <hz>|source] [--block-size <n>]
+        [--continuation <strategy>] [--pitch-character tape|natural]   (engine C)
         [--metrics <metrics.json>]   write render metrics (also printed as a summary)
         [--start file|onset]         start notes at sample 0 (default) or just before the analysed onset
         [--level raw|normalise]      play at recorded level (default) or match levels (max RMS -16 dBFS)
@@ -72,6 +76,7 @@ FIXTURES / TEST DATA
 PITCH BAKE-OFF (Phase 2)
   --bakeoff <plan.json> [--output <dir>]      render blind A/B/C clips + key.json + listening.json
   --bakeoff-score <dir> --ratings <file>      join ratings with the key -> score.md / score.json
+  --experiment <plan.json> [--output <dir>]   blind listening experiment (any engines/settings), see docs/testing.md
 
 BENCHMARK
   --benchmark [--voices 24] [--seconds 20] [--sample-rate 48000] [--block-size 128] [--output-json <f>] [--no-retrigger]
@@ -161,7 +166,7 @@ std::optional<RenderConfig> configFromArgs (const Args& args, std::string& error
         const auto engine = parseEngine (args.get ("--engine"));
         if (! engine)
         {
-            error = "unknown engine '" + args.get ("--engine") + "' (use A or B)";
+            error = "unknown engine '" + args.get ("--engine") + "' (use A, B or C)";
             return std::nullopt;
         }
         config.engine = *engine;
@@ -175,6 +180,7 @@ std::optional<RenderConfig> configFromArgs (const Args& args, std::string& error
             return std::nullopt;
         }
         config.sampler.seed = static_cast<std::uint64_t> (*seed);
+        config.engineSettings.seed = config.sampler.seed;
     }
     if (args.has ("--sample-rate"))
     {
@@ -188,6 +194,25 @@ std::optional<RenderConfig> configFromArgs (const Args& args, std::string& error
             error = "invalid --sample-rate '" + text + "'";
             return std::nullopt;
         }
+    }
+    if (args.has ("--continuation"))
+    {
+        if (! parseContinuationStrategy (args.get ("--continuation"), config.engineSettings.continuation))
+        {
+            error = "invalid --continuation (off, naive-loop, best-loop, multi-loop, multi-loop-movement)";
+            return std::nullopt;
+        }
+    }
+    if (args.has ("--pitch-character"))
+    {
+        const auto pc = args.get ("--pitch-character");
+        if (pc != "tape" && pc != "natural")
+        {
+            error = "invalid --pitch-character (tape or natural)";
+            return std::nullopt;
+        }
+        config.engineSettings.pitchCharacter = pc == "natural" ? PitchCharacter::natural : PitchCharacter::tape;
+        config.anchors = pc == "natural";
     }
     if (args.has ("--start"))
     {
@@ -334,7 +359,7 @@ int commandRender (const Args& args)
         std::cerr << "warning: MIDI sequence contains no note events\n";
 
     const auto preparation = preparePlayback (source.analysis, config->playback);
-    const auto output = renderSequence (source.audio, root.rootMidi, sequence, *config, preparation);
+    const auto output = renderWithEngine (source.audio, source.analysis, root.rootMidi, sequence, *config, preparation);
 
     MetricsContext context;
     context.expectedChannels = 2;
@@ -523,6 +548,57 @@ int main (int argc, char** argv)
                 std::cerr << "warning: " << e << "\n";
             std::cout << summary.clips << " clips in " << summary.groups << " groups -> " << output.string()
                       << " (engine key: " << summary.keyFile.string() << ")\n";
+            return summary.clips > 0 ? exitOk : exitProcessing;
+        }
+        if (args.has ("--continuation-report"))
+        {
+            // One line per file: can it sustain, the stable region, jump quality, release.
+            const fs::path target = args.get ("--continuation-report");
+            std::vector<fs::path> files;
+            if (fs::is_directory (target))
+            {
+                for (const auto& entry : fs::recursive_directory_iterator (target))
+                    if (entry.is_regular_file() && io::isSupportedAudioExtension (entry.path()))
+                        files.push_back (entry.path());
+                std::sort (files.begin(), files.end());
+            }
+            else
+                files.push_back (target);
+            for (const auto& file : files)
+            {
+                auto source = loadAndAnalyse (file);
+                if (! source.ok)
+                {
+                    std::cout << file.filename().string() << ": " << source.error << "\n";
+                    continue;
+                }
+                const auto t0 = std::chrono::steady_clock::now();
+                const auto c = analyseContinuation (source.audio, source.analysis);
+                const double ms = std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - t0).count();
+                const double sr = source.audio.sampleRate;
+                double meanR = 0.0;
+                for (const auto& j : c.jumps)
+                    meanR += j.correlation;
+                if (! c.jumps.empty())
+                    meanR /= static_cast<double> (c.jumps.size());
+                std::cout << file.filename().string() << ": " << (c.canSustain ? "SUSTAIN" : "one-shot") << " (" << c.reason << ")"
+                          << " region " << juce::String (c.sustainStartFrame / sr, 2) << "-" << juce::String (c.sustainEndFrame / sr, 2) << " s"
+                          << ", jumps " << c.jumps.size() << " mean r " << juce::String (meanR, 3)
+                          << ", release " << (c.hasRelease ? "yes tail " + juce::String (c.tailSeconds, 2).toStdString() + " s" : std::string ("no"))
+                          << ", exits " << c.graftExits.size() << ", " << juce::String (ms, 0) << " ms\n";
+            }
+            return exitOk;
+        }
+        if (args.has ("--experiment"))
+        {
+            const fs::path planFile = args.get ("--experiment");
+            const fs::path output = args.get ("--output", "research/experiments/runs/" + planFile.stem().string());
+            const auto summary = runExperiment (planFile, output, [] (const std::string& line) { std::cout << line << std::endl; }, error);
+            if (! error.empty() && summary.clips == 0)
+                return fail (exitInput, error);
+            for (const auto& e : summary.errors)
+                std::cerr << "warning: " << e << "\n";
+            std::cout << summary.clips << " clips in " << summary.groups << " groups -> " << output.string() << "\n";
             return summary.clips > 0 ? exitOk : exitProcessing;
         }
         if (args.has ("--bakeoff-score"))
