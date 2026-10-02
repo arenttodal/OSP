@@ -382,10 +382,7 @@ void InstrumentVoice::updateControl() noexcept
 void InstrumentVoice::readFrame (double pos, double step, float& l, float& r) noexcept
 {
     const auto& src = *layer->source;
-    if (step <= 1.0)
-        sinc->computeKernelUnity (pos, kernel);
-    else
-        sinc->computeKernel (pos, step, kernel);
+    sinc->computeKernelFast (pos, step, kernel);
     l = SincInterpolator::apply (kernel, src.channelData (0));
     r = src.numChannels() > 1 ? SincInterpolator::apply (kernel, src.channelData (1)) : l;
 }
@@ -395,10 +392,7 @@ float InstrumentVoice::readTransient (const PlaybackSource& src, double pos, dou
     // The transient buffers are short and silent at their end; past it they read as zero.
     if (pos < 0.0 || pos >= static_cast<double> (src.numFrames()))
         return 0.0f;
-    if (step <= 1.0)
-        sinc->computeKernelUnity (pos, kernel);
-    else
-        sinc->computeKernel (pos, step, kernel);
+    sinc->computeKernelFast (pos, step, kernel);
     return SincInterpolator::apply (kernel, src.channelData (channel));
 }
 

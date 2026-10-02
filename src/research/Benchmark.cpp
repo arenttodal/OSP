@@ -47,14 +47,14 @@ namespace
             const int held = options.denseRetriggers ? std::max (1, options.voices - 2) : options.voices;
             if (b == 0)
                 for (int v = 0; v < held; ++v)
-                    sampler.noteOn (45 + (v * 7) % 24, 90);
+                    sampler.noteOn (45 + (v * 7) % 24 + options.transposeSemitones, 90);
 
             if (options.denseRetriggers && b > 0 && b % retriggerEvery == 0)
             {
                 if (lastRetrigger >= 0)
-                    sampler.noteOff (lastRetrigger);
+                    sampler.noteOff (lastRetrigger + options.transposeSemitones);
                 retriggerNote = 69 + (retriggerNote - 69 + 5) % 12; // above the held chord's notes
-                sampler.noteOn (retriggerNote, 100);
+                sampler.noteOn (retriggerNote + options.transposeSemitones, 100);
                 lastRetrigger = retriggerNote;
             }
 

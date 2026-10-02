@@ -17,7 +17,10 @@ void InstrumentEngine::prepare (double outputSampleRate, int maximumBlockSize, c
     config.polyphony = std::clamp (config.polyphony, 1, EngineSettings::maxPolyphony);
     sampleRate = outputSampleRate;
     if (! interpolator || interpolator->zeroCrossings() != config.interpolationZeroCrossings)
+    {
         interpolator = std::make_unique<SincInterpolator> (config.interpolationZeroCrossings);
+        interpolator->prepareStretchTables();
+    }
     for (auto& voice : voices)
         voice.prepare (sampleRate, config.adsr, interpolator.get());
     outputGain = static_cast<float> (dbToGain (config.outputGainDb));

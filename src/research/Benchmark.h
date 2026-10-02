@@ -13,6 +13,7 @@ struct BenchmarkOptions
     int blockSize = 128;
     int voices = 24;              ///< polyphony
     double seconds = 20.0;        ///< rendered duration
+    int transposeSemitones = 0;   ///< shifts every note (CPU of upward/downward transposition)
     bool denseRetriggers = true;  ///< voices-2 held notes + a new short note every 50 ms (constant stealing);
                                   ///< false: `voices` held notes only
     SamplerSettings sampler {};

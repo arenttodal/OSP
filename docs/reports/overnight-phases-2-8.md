@@ -108,7 +108,10 @@ The open verdicts are listed in `docs/morning-checklist.md`.
 - MIDI: mod wheel, pressure, CC74, CC 20–25 mapped to the macros, and MPE;
 - interface size and accessibility titles;
 - Windows VST3 built and tested in CI;
-- a polyphase interpolation fast path: engine C is now cheaper than the plain baseline.
+- polyphase interpolation tables for unity and upward reads: engine C now costs about
+  two-thirds of the plain baseline;
+- a plugin test across host sample rates (22.05–192 kHz) and block sizes (1–4096, also
+  varying): bit-identical output, no clicks.
 
 **Written but not run:** `scripts/package-macos.sh` (signing and notarisation need a
 Developer ID).
@@ -126,10 +129,11 @@ Developer ID).
 |---|---|---:|---:|
 | Baseline A | macOS 14 arm64 CI | — | 26 % |
 | Engine C, before the fast path | macOS 14 arm64 CI | 17.1 % | 30.5 % |
-| Engine C, with the fast path | cloud x86 VM (noisy) | 22 % (baseline on the same VM: 31 %) | 41 % |
+| Engine C, with the unity fast path | cloud x86 VM (noisy) | 22 % (baseline on the same VM: 31 %) | 41 % |
+| Engine C, with stretched tables too | cloud x86 VM (noisy) | 10 % (an octave up: 17 %) | 21 % (baseline on the same VM: 32 %) |
 
-The spec's target is 16 voices below 25 % on Apple Silicon. It was met before the fast
-path, which then cut engine C's cost by a further 40 %. Worst-case callbacks on shared
+The spec's target is 16 voices below 25 % on Apple Silicon. It was met before either
+optimisation; together they cut engine C's cost by about half again. Worst-case callbacks on shared
 CI machines spike to several milliseconds, so they need measuring on a real Mac.
 
 ## Known limits
@@ -143,5 +147,5 @@ All of these are recorded in STATUS:
   - Sets have no anchors.
 - **Transients.** Transient/body separation (§19) only helps sources with a broadband
   attack; most of the corpus plucks have little.
-- **CPU.** Upward transposition still uses the per-sample stretched kernel.
+- **CPU.** Reads more than two octaves up still use the per-sample stretched kernel.
 - **UI.** The editor is a working UI, not the designed instrument UI.

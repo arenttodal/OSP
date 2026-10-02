@@ -125,7 +125,7 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [x] UI scaling 80–200 %, accessibility titles on controls
 - [x] MIDI: mod wheel, aftertouch/pressure, CC74, CC 20–25 -> macros; MPE lower zone (bend/pressure/slide per note)
 - [x] Windows VST3: CI builds it and runs every test with MSVC
-- [x] Performance tuning: polyphase fast path (engine C cheaper than the plain baseline)
+- [x] Performance tuning: polyphase tables for unity and stretched reads (semitone grid up to x4); engine C costs about two-thirds of the plain baseline
 - [x] Host robustness matrix (plugin test): 22.05–192 kHz × blocks 1–4096 and host-varied blocks; bit-identical output, finite, click-free, chord ±2 octaves + bend
 - [x] Crash-safe sample management (atomic store copies, analysis cache re-derived when stale, original-path fallback)
 - [x] User guide (docs/user-guide.md)
@@ -157,7 +157,8 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - Score the lab ratings; tune or revert per experiment (keep the simplest winner).
 - Score lab tab "Transients"; if transient preservation loses or ties, switch it off by
   default (simplest wins). Spectral/stochastic continuation only if multi-loop loses.
-- Mip-mapped sources for upward transposition (CPU), real-Mac worst-case callback timing.
+- Real-Mac worst-case callback timing. Reads above x4 (more than about +2 octaves) still
+  evaluate the stretched kernel; mip-mapped sources would cap them if that matters.
 
 ## BLOCKERS
 
@@ -171,9 +172,11 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
   Worst-case callbacks on the shared CI VM spike to several ms; needs measuring on a real Mac.
   Since then engine C reads at or below the original speed through a precomputed
   polyphase table (2048 phases): on the cloud VM 16 held voices went 38 % -> 22 % (the
-  baseline measures 31 % on the same VM), 24 dense voices 63 % -> 41 %. Upward
-  transposition still evaluates the stretched kernel per sample (mip-mapped sources
-  would remove that).
+  baseline measures 31 % on the same VM), 24 dense voices 63 % -> 41 %. Stretched reads
+  (upward transposition) then got polyphase tables too (24 semitone levels up to x4,
+  next level up so the cutoff is never higher; 4.5 MB per engine): 16 held voices
+  22 % -> 10 %, an octave up 38 % -> 17 %, 24 dense voices 41 % -> 21 % (baseline A
+  32 % on the same VM).
 - **CPU**: the windowed-sinc kernel is computed per output sample (two table lookups
   per tap). Measured on a 2.1 GHz Xeon cloud VM: 16 sustained voices ≈ 19–20 % of the
   48 kHz/128 block budget, 24 voices with dense retriggers ≈ 33 %. Transposing up

@@ -81,7 +81,7 @@ PITCH BAKE-OFF (Phase 2)
   --continuation-report <file|dir>            stable region, jumps and release per file
 
 BENCHMARK
-  --benchmark [--engine A|C] [--voices 24] [--seconds 20] [--sample-rate 48000] [--block-size 128] [--output-json <f>] [--no-retrigger]
+  --benchmark [--engine A|C] [--voices 24] [--seconds 20] [--sample-rate 48000] [--block-size 128] [--output-json <f>] [--no-retrigger] [--transpose <semitones>]
 
   --help, --version
 
@@ -482,6 +482,7 @@ int commandBenchmark (const Args& args)
     if (const auto v = parseNumber (args.get ("--block-size", "128")))
         options.blockSize = std::max (1, static_cast<int> (*v));
     options.denseRetriggers = ! args.has ("--no-retrigger");
+    options.transposeSemitones = std::stoi (args.get ("--transpose", "0"));
     if (args.has ("--engine"))
     {
         const auto engine = parseEngine (args.get ("--engine"));

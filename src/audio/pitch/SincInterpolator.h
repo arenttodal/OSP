@@ -61,6 +61,22 @@ public:
     */
     void computeKernelUnity (double position, Kernel& kernel) const noexcept;
 
+    /**
+        Precomputes polyphase tables for stretched kernels (increments 1..maxTableStretch on
+        a semitone grid). Allocates; call off the audio thread. Engine C only.
+    */
+    void prepareStretchTables();
+
+    /**
+        Any increment, as cheaply as possible: computeKernelUnity for increments <= 1, the
+        stretch tables (if prepared) up to 4, otherwise computeKernel. Table kernels use the
+        next stretch up on the semitone grid, so the cutoff is at most 6 % lower than
+        computeKernel's (never higher: no extra aliasing).
+    */
+    void computeKernelFast (double position, double increment, Kernel& kernel) const noexcept;
+
+    static constexpr double maxTableStretch = 4.0;
+
     /** Applies a computed kernel to one (padded) channel. `data` points at source sample 0. */
     static float apply (const Kernel& kernel, const float* data) noexcept
     {
@@ -86,6 +102,15 @@ private:
     std::vector<float> windowTable;               // kaiser(r), r in [0, 1]
     static constexpr int polyphaseResolution = 2048;
     std::vector<float> polyphase;                 // (resolution + 1) rows x (2 * zeroCrossings) taps
+
+    static constexpr int stretchSteps = 24;       // semitone levels above 1 (up to x4)
+    static constexpr int stretchResolution = 1024;
+    struct StretchTable
+    {
+        int reach = 0;                            // taps = 2 * reach
+        std::vector<float> rows;                  // (stretchResolution + 1) rows
+    };
+    std::vector<StretchTable> stretchTables;      // index k: stretch 2^(k / 12), k = 1..stretchSteps
 };
 
 } // namespace osp

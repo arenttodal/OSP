@@ -131,3 +131,47 @@ TEST_CASE ("interpolation: the polyphase fast path matches the exact kernel", "[
     }
     CHECK (worst < 2.0e-4);
 }
+
+TEST_CASE ("interpolation: stretched tables match the exact kernel on their grid and never alias more", "[unit][interpolation]")
+{
+    SincInterpolator sinc (16);
+    sinc.prepareStretchTables();
+    SincInterpolator::Kernel exact, fast;
+    Prng rng (5);
+    double worst = 0.0;
+    for (int k = 1; k <= 24; ++k)
+    {
+        const double stretch = std::pow (2.0, k / 12.0);
+        for (int i = 0; i < 200; ++i)
+        {
+            const double position = 300.0 + rng.uniform (0.0, 50.0);
+            sinc.computeKernel (position, stretch, exact);
+            sinc.computeKernelFast (position, stretch, fast);
+            REQUIRE (exact.firstIndex == fast.firstIndex);
+            REQUIRE (exact.numTaps == fast.numTaps);
+            for (int t = 0; t < exact.numTaps; ++t)
+                worst = std::max (worst, static_cast<double> (std::abs (exact.weights[t] - fast.weights[t])));
+        }
+    }
+    CHECK (worst < 2.0e-4);
+
+    // Between grid points the next level up is used: still no aliasing, and in-band
+    // content is kept. Read with computeKernelFast at increment 1.5.
+    auto readFast = [&] (const PlaybackSource& src, double increment) {
+        double sum = 0.0;
+        double pos = 2000.0;
+        for (int i = 0; i < 4000; ++i, pos += increment)
+        {
+            sinc.computeKernelFast (pos, increment, fast);
+            const double v = SincInterpolator::apply (fast, src.channelData (0));
+            sum += v * v;
+        }
+        return 10.0 * std::log10 (sum / 4000.0 + 1e-30);
+    };
+    const auto high = sineSource (0.37, 20000); // x1.5 = 0.555 cycles/sample: would alias to 0.445
+    const PlaybackSource highSrc (high, 60.0, 2 * sinc.maxReach() + 4);
+    CHECK (readFast (highSrc, 1.5) < -40.0);
+    const auto low = sineSource (0.1, 20000);
+    const PlaybackSource lowSrc (low, 60.0, 2 * sinc.maxReach() + 4);
+    CHECK (readFast (lowSrc, 1.5) == Approx (-3.01).margin (0.1));
+}

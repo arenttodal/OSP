@@ -85,6 +85,66 @@ void SincInterpolator::computeKernelUnity (double position, Kernel& kernel) cons
         kernel.weights[t] = r0[t] + a * (r1[t] - r0[t]);
 }
 
+void SincInterpolator::prepareStretchTables()
+{
+    if (! stretchTables.empty())
+        return;
+    stretchTables.resize (static_cast<std::size_t> (stretchSteps + 1));
+    Kernel scratch;
+    for (int k = 1; k <= stretchSteps; ++k)
+    {
+        const double stretch = std::min (std::pow (2.0, k / 12.0), maxStretchFactor);
+        auto& table = stretchTables[static_cast<std::size_t> (k)];
+        table.reach = reachFor (stretch) - 1; // == ceil (zeroCrossings * stretch)
+        const int taps = 2 * table.reach;
+        if (taps > Kernel::maxTaps)
+            continue;
+        table.rows.assign (static_cast<std::size_t> ((stretchResolution + 1) * taps), 0.0f);
+        for (int p = 0; p < stretchResolution; ++p)
+        {
+            const double frac = static_cast<double> (p) / stretchResolution;
+            computeKernel (static_cast<double> (table.reach) + frac, stretch, scratch); // first tap = 1
+            for (int t = 0; t < taps && t < scratch.numTaps; ++t)
+                table.rows[static_cast<std::size_t> (p * taps + t)] = scratch.weights[t];
+        }
+        for (int t = 1; t < taps; ++t)
+            table.rows[static_cast<std::size_t> (stretchResolution * taps + t)] = table.rows[static_cast<std::size_t> (t - 1)];
+    }
+}
+
+void SincInterpolator::computeKernelFast (double position, double increment, Kernel& kernel) const noexcept
+{
+    if (increment <= 1.0)
+    {
+        computeKernelUnity (position, kernel);
+        return;
+    }
+    if (stretchTables.empty() || increment > maxTableStretch)
+    {
+        computeKernel (position, increment, kernel);
+        return;
+    }
+    // Next semitone level up (a slightly lower cutoff, never a higher one).
+    const auto level = std::clamp (static_cast<int> (std::ceil (12.0 * std::log2 (increment) - 1.0e-9)), 1, stretchSteps);
+    const auto& table = stretchTables[static_cast<std::size_t> (level)];
+    if (table.rows.empty())
+    {
+        computeKernel (position, increment, kernel);
+        return;
+    }
+    const auto base = static_cast<int> (std::floor (position));
+    const double scaled = (position - static_cast<double> (base)) * stretchResolution;
+    const auto row = std::min (static_cast<int> (scaled), stretchResolution - 1);
+    const auto a = static_cast<float> (scaled - static_cast<double> (row));
+    const int taps = 2 * table.reach;
+    kernel.firstIndex = base - table.reach + 1;
+    kernel.numTaps = taps;
+    const float* r0 = table.rows.data() + static_cast<std::size_t> (row * taps);
+    const float* r1 = r0 + taps;
+    for (int t = 0; t < taps; ++t)
+        kernel.weights[t] = r0[t] + a * (r1[t] - r0[t]);
+}
+
 float SincInterpolator::lookup (const std::vector<float>& table, double index) noexcept
 {
     const auto i = static_cast<std::size_t> (index);
