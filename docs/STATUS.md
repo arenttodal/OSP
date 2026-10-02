@@ -143,9 +143,10 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - Pure C++20 DSP/analysis library (`osp_dsp`) independent of JUCE; JUCE used for file
   formats, MIDI files, JSON, SHA-256.
 - Deterministic rendering: bit-identical across runs and across block sizes
-  (32–1024); seed-dependent randomisation in baseline B.
-- 65 Catch2 test cases (unit/integration/regression) + performance smoke + 5 plugin
-  test cases; all green on Linux (GCC 13) and macOS 14 arm64 (Apple Clang 15, CI).
+  (1–4096, also host-varied, at 22.05–192 kHz in the plugin); seed-dependent randomisation in baseline B.
+- 113 Catch2 test cases (unit/integration/regression) + performance smoke + 12 plugin
+  test cases; all green on Linux (GCC 13), macOS 14 arm64 (Apple Clang, CI, auval) and
+  Windows (MSVC, CI).
 - Phase 1 plugin: see checklist above.
 - Synthetic ground-truth generators and a synthetic mini-corpus generator
   (`--generate-test-signals`), including deliberately broken/unsupported files.
@@ -160,6 +161,9 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - Score the lab ratings; tune or revert per experiment (keep the simplest winner).
 - Score lab tab "Transients"; if transient preservation loses or ties, switch it off by
   default (simplest wins). Spectral/stochastic continuation only if multi-loop loses.
+- Candidate experiments: velocity -> transient/body mixing using the separated transient
+  (spec §34 "noise", §1679 "transient/body mixing"); timbre clustering for sets that mix
+  organ stops (waits on morning question 2).
 - Real-Mac worst-case callback timing. Reads above x4 (more than about +2 octaves) still
   evaluate the stretched kernel; mip-mapped sources would cap them if that matters.
 
