@@ -31,6 +31,11 @@ struct NoteShape
     float driftCents = 0.0f;
     float driftBrightnessDb = 0.0f;
     float driftRateHz = 0.12f;
+    float driftPan = 0.0f;             ///< slow stereo movement amplitude (MOTION)
+
+    /** Reimagined: soft saturation drive (0 = clean) and continuation segment scale (<1 = shorter, more granular). */
+    float saturation = 0.0f;
+    float segmentScale = 1.0f;
 
     std::uint64_t seed = 1;            ///< drives the continuation walk and drift
 };

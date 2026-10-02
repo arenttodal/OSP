@@ -83,6 +83,19 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - Known limit: near-sinusoidal sources (some vocals, soft plucks) have no upper harmonics to
   brighten; velocity then acts mainly on the attack. Harmonic generation belongs to Reimagined.
 
+## Milestone checklist — Phase 6: Original <-> Reimagined and the remaining macros
+
+- [x] Multiple pitch branches (Tape/Natural) + continuation depth (segment length) by Reimagined
+- [x] Spectral-envelope transformation: CHARACTER moves the source's own body resonances + tilt
+- [x] Resonance reconstruction: sympathetic resonator bank (source partials + body peaks)
+- [x] Harmonic manipulation: soft saturation towards the Reimagined end
+- [x] MOTION: drift depth/rate, stereo motion, jump rate; nearly inactive on plucks
+- [x] SPACE: width, decorrelation for narrow sources, FDN ambience, loudness trim
+- [x] Macro smoothing (no clicks when automating)
+- [x] Experiment 5 (Reimagined 0/25/50/75/100 %, 4 sources)
+- [ ] Listening verdict (lab tab "Original ↔ Reimagined") — exit: useful sounds across the range
+- [ ] Transient/body separation (spec §19) — not yet; transient shaping is gain-based
+
 ## DONE
 
 - Pure C++20 DSP/analysis library (`osp_dsp`) independent of JUCE; JUCE used for file
@@ -110,6 +123,10 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 
 ## KNOWN ISSUES
 
+- **CPU (engine C)**: about 1.2x the baseline per voice (continuation crossfades, shelves,
+  post stage). Measured on the cloud VM this session: baseline 16 sustained voices 31-33 %
+  (the same VM measured 20 % earlier: noisy host), engine C 38-40 %. CI now benchmarks
+  engine C on macOS arm64; the spec target is 16 voices < 25 % there.
 - **CPU**: the windowed-sinc kernel is computed per output sample (two table lookups
   per tap). Measured on a 2.1 GHz Xeon cloud VM: 16 sustained voices ≈ 19–20 % of the
   48 kHz/128 block budget, 24 voices with dense retriggers ≈ 33 %. Transposing up

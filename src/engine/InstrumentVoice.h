@@ -133,6 +133,8 @@ private:
     double driftLevel = 0.0, driftLevelTarget = 0.0;
     double driftCentsValue = 0.0, driftCentsTarget = 0.0;
     double driftBright = 0.0, driftBrightTarget = 0.0;
+    double driftPanValue = 0.0, driftPanTarget = 0.0;
+    float saturationDrive = 0.0f, saturationNorm = 1.0f;
     double driftCoef = 0.0;
     int driftCountdown = 0;
     float controlGain = 1.0f, controlGainStep = 0.0f;

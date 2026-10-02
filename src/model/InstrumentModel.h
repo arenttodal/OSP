@@ -97,6 +97,11 @@ struct InstrumentModel
     double brightnessShelfHz = 3000.0;
     double bodyShelfHz = 250.0;
 
+    /** Body resonances (spectral-envelope peaks, Hz, strongest first) moved by CHARACTER. */
+    std::vector<double> bodyPeaksHz;
+    /** Sympathetic resonator tuning (source partials + body peaks, Hz) for Reimagined. */
+    std::vector<double> resonanceHz;
+
     PitchLayer original;               ///< offset 0
     std::vector<PitchLayer> anchors;   ///< natural-character register anchors (offset != 0), may be empty
 

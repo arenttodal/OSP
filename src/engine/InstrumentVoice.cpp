@@ -92,6 +92,9 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     driftLevel = driftLevelTarget = 0.0;
     driftCentsValue = driftCentsTarget = 0.0;
     driftBright = driftBrightTarget = 0.0;
+    driftPanValue = driftPanTarget = 0.0;
+    saturationDrive = 1.0f + 4.0f * std::clamp (shape.saturation, 0.0f, 1.0f);
+    saturationNorm = 1.0f / saturationDrive;
     driftCoef = 1.0 - std::exp (-static_cast<double> (controlInterval) * std::max (0.01, static_cast<double> (shape.driftRateHz)) * 2.0 / sampleRate);
     driftCountdown = 0;
     controlCountdown = 0;
@@ -204,8 +207,10 @@ void InstrumentVoice::scheduleNextJump() noexcept
     // Random walk over compatible jumps: prefer good matches, avoid the last few jumps,
     // and vary how long each stretch plays before the next jump.
     const double sr = layer->source->sampleRate();
-    const double minFrom = position + cont->minSegmentFrames;
-    const double lookahead = minFrom + rng.uniform (0.4, 2.5) * sr;
+    // Reimagined / MOTION shorten the stretches between jumps (towards granular continuation).
+    const double scale = std::clamp (static_cast<double> (shape.segmentScale), 0.2, 2.0);
+    const double minFrom = position + cont->minSegmentFrames * std::min (1.0, scale);
+    const double lookahead = minFrom + rng.uniform (0.4, 2.5) * sr * scale;
     auto weightOf = [&] (int index) -> double
     {
         const auto& j = cont->jumps[static_cast<std::size_t> (index)];
@@ -296,7 +301,7 @@ void InstrumentVoice::beginCrossfade() noexcept
 void InstrumentVoice::updateControl() noexcept
 {
     // Drift: slowly wandering targets, smoothed (strategy D / MOTION).
-    const bool drifting = shape.driftLevelDb > 0.0f || shape.driftCents > 0.0f || shape.driftBrightnessDb > 0.0f;
+    const bool drifting = shape.driftLevelDb > 0.0f || shape.driftCents > 0.0f || shape.driftBrightnessDb > 0.0f || shape.driftPan > 0.0f;
     if (drifting)
     {
         if (--driftCountdown <= 0)
@@ -304,12 +309,20 @@ void InstrumentVoice::updateControl() noexcept
             driftLevelTarget = shape.driftLevelDb * rng.bipolar();
             driftCentsTarget = shape.driftCents * rng.bipolar();
             driftBrightTarget = shape.driftBrightnessDb * rng.bipolar();
+            driftPanTarget = shape.driftPan * rng.bipolar();
             const double seconds = rng.uniform (0.5, 1.5) / std::max (0.01, static_cast<double> (shape.driftRateHz));
             driftCountdown = std::max (1, static_cast<int> (seconds * sampleRate / controlInterval));
         }
         driftLevel += (driftLevelTarget - driftLevel) * driftCoef;
         driftCentsValue += (driftCentsTarget - driftCentsValue) * driftCoef;
         driftBright += (driftBrightTarget - driftBright) * driftCoef;
+        driftPanValue += (driftPanTarget - driftPanValue) * driftCoef;
+        if (shape.driftPan > 0.0f)
+        {
+            const float p = std::clamp (shape.pan + static_cast<float> (driftPanValue), -1.0f, 1.0f);
+            panLeft = std::min (1.0f, 1.0f - p);
+            panRight = std::min (1.0f, 1.0f + p);
+        }
     }
 
     settleCents *= settleCoef;
@@ -413,6 +426,12 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
         {
             l = lowL.process (highL.process (l));
             r = lowR.process (highR.process (r));
+        }
+        if (saturationDrive > 1.0f)
+        {
+            // Gentle harmonic generation (Reimagined): unity gain for small signals.
+            l = std::tanh (saturationDrive * l) * saturationNorm;
+            r = std::tanh (saturationDrive * r) * saturationNorm;
         }
 
         controlGain += controlGainStep;

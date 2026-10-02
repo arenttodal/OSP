@@ -4,6 +4,7 @@
 #include "audio/pitch/SincInterpolator.h"
 #include "engine/InstrumentVoice.h"
 #include "engine/PerformanceEngine.h"
+#include "engine/PostProcessor.h"
 #include "model/InstrumentModel.h"
 
 #include <array>
@@ -78,7 +79,11 @@ public:
     void setEnvelope (const AdsrSettings& adsr) noexcept;
     void setOutputGainDb (double db) noexcept;
     void setPitchOffsetSemitones (double semitones) noexcept;
-    void setMacros (const Macros& macros) noexcept { config.macros = macros; }
+    void setMacros (const Macros& macros) noexcept
+    {
+        config.macros = macros;
+        post.setMacros (macros);
+    }
     void setPitchCharacter (PitchCharacter character) noexcept { config.pitchCharacter = character; }
     void setContinuation (ContinuationStrategy strategy) noexcept { config.continuation = strategy; }
     void setSeed (std::uint64_t seed) noexcept { config.seed = seed; }
@@ -133,6 +138,7 @@ private:
     float outputGain = 1.0f;
     double pitchRatio = 1.0;
     PerformanceEngine performance;
+    PostProcessor post;
     std::int64_t sampleClock = 0;   ///< samples rendered since prepare/reset (note times for performance memory)
 };
 

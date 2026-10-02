@@ -45,7 +45,10 @@ jobs:
           OSP_SNAPSHOT_DIR=$PWD/snapshots xvfb-run -a ./build/apps/plugin/osp_plugin_tests "[ui]"
 
       - name: Benchmark
-        run: ./build/apps/research-renderer/research-renderer --benchmark --output-json benchmark-${{ matrix.os }}.json
+        run: |
+          ./build/apps/research-renderer/research-renderer --benchmark --output-json benchmark-${{ matrix.os }}.json
+          ./build/apps/research-renderer/research-renderer --benchmark --engine C --output-json benchmark-engine-c-${{ matrix.os }}.json
+          ./build/apps/research-renderer/research-renderer --benchmark --engine C --voices 16 --no-retrigger --output-json benchmark-engine-c-16-${{ matrix.os }}.json
 
       - name: Validate AU (macOS)
         if: runner.os == 'macOS'

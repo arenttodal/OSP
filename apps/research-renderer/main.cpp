@@ -79,7 +79,7 @@ PITCH BAKE-OFF (Phase 2)
   --experiment <plan.json> [--output <dir>]   blind listening experiment (any engines/settings), see docs/testing.md
 
 BENCHMARK
-  --benchmark [--voices 24] [--seconds 20] [--sample-rate 48000] [--block-size 128] [--output-json <f>] [--no-retrigger]
+  --benchmark [--engine A|C] [--voices 24] [--seconds 20] [--sample-rate 48000] [--block-size 128] [--output-json <f>] [--no-retrigger]
 
   --help, --version
 
@@ -480,10 +480,17 @@ int commandBenchmark (const Args& args)
     if (const auto v = parseNumber (args.get ("--block-size", "128")))
         options.blockSize = std::max (1, static_cast<int> (*v));
     options.denseRetriggers = ! args.has ("--no-retrigger");
+    if (args.has ("--engine"))
+    {
+        const auto engine = parseEngine (args.get ("--engine"));
+        if (! engine || *engine == EngineId::baselineB)
+            return fail (exitUsage, "--benchmark supports --engine A or C");
+        options.instrumentEngine = *engine == EngineId::instrument;
+    }
 
     const auto r = runBenchmark (options);
     std::cout << "benchmark: " << options.voices << " voices, " << options.sampleRate << " Hz, block " << options.blockSize
-              << (options.denseRetriggers ? ", dense retriggers" : "") << "\n"
+              << (options.denseRetriggers ? ", dense retriggers" : "") << (options.instrumentEngine ? ", engine C" : ", baseline A") << "\n"
               << "  rendered " << json::round (r.renderedSeconds, 2) << " s in " << json::round (r.wallSeconds, 3) << " s ("
               << json::round (r.realtimeFactor, 1) << "x realtime)\n"
               << "  block budget " << json::round (r.budgetMicros, 1) << " us; mean " << json::round (r.meanBlockMicros, 1)

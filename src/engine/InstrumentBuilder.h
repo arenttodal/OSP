@@ -47,6 +47,9 @@ namespace instrument
     std::shared_ptr<InstrumentModel> buildComplete (const AudioData& audio, const AnalysisData& analysis,
                                                     const InstrumentBuildOptions& options, bool withAnchors);
 
+    /** Body resonances and resonator tuning for CHARACTER / Reimagined (spec §22, §46). */
+    void findResonances (InstrumentModel& model, const AudioData& audio);
+
     /** Soft source-behaviour memberships from analysis (spec §8). */
     SourceCharacter estimateCharacter (const AnalysisData& analysis, const ContinuationModel* continuation);
 

@@ -37,6 +37,12 @@ from the page. If a tab is new, the takes are blind and in a random order.
    moves brightness by 3.5–6 semitones on harmonic-rich sources and changes the
    attack-to-body ratio by 8–16 dB. The vocal and pluck are nearly pure tones, so
    there velocity changes mostly the attack.
+4. **Original ↔ Reimagined** (Phase 6 exit test): 4 sources each play an arpeggio and a
+   held chord at Reimagined 0, 25, 50, 75 and 100 %. Rate each take on its own. Main
+   question: *is there a useful sound across the whole range, not only at the ends?*
+   Toward Reimagined the instrument adds sympathetic resonance tuned to the source's own
+   partials and body, more granular continuation, more drift, and gentle harmonic
+   saturation above 50 %.
 
 ## Checks in a DAW (need your Mac)
 

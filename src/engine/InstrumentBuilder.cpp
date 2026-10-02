@@ -4,6 +4,7 @@
 #include "core/PitchMath.h"
 #include "engine/InstrumentEngine.h"
 #include "model/RootChoice.h"
+#include "analysis/spectrum/SpectralEnvelope.h"
 
 #include <algorithm>
 #include <cmath>
@@ -79,6 +80,48 @@ DynamicsProfile calibrateDynamics (const SourceCharacter& c, const AnalysisData&
     return d;
 }
 
+void findResonances (InstrumentModel& model, const AudioData& audio)
+{
+    // Body peaks: local maxima of the long-term spectral envelope (100 Hz .. 8 kHz) with
+    // at least 2 dB prominence, a third of an octave apart, strongest first.
+    const auto& a = model.analysis;
+    const double f0 = a.pitch.detected ? a.pitch.fundamentalHz : 0.0;
+    const auto envelope = computeSpectralEnvelope (audio.mixToMono(), audio.sampleRate, std::max (f0, 100.0) * 1.1);
+    struct Peak { double hz, db; };
+    std::vector<Peak> peaks;
+    const auto& db = envelope.db;
+    const int span = static_cast<int> (400.0 / SpectralEnvelope::stepCents); // +/- 4 semitones for prominence
+    for (int i = 1; i + 1 < static_cast<int> (db.size()); ++i)
+    {
+        const double hz = SpectralEnvelope::minHz * std::pow (2.0, i * SpectralEnvelope::stepCents / 1200.0);
+        if (hz < 100.0 || hz > 8000.0 || db[static_cast<std::size_t> (i)] < db[static_cast<std::size_t> (i - 1)] || db[static_cast<std::size_t> (i)] < db[static_cast<std::size_t> (i + 1)])
+            continue;
+        double lowest = db[static_cast<std::size_t> (i)];
+        for (int k = std::max (0, i - span); k < std::min (static_cast<int> (db.size()), i + span); ++k)
+            lowest = std::min (lowest, db[static_cast<std::size_t> (k)]);
+        if (db[static_cast<std::size_t> (i)] - lowest >= 2.0)
+            peaks.push_back ({ hz, db[static_cast<std::size_t> (i)] });
+    }
+    std::sort (peaks.begin(), peaks.end(), [] (const Peak& x, const Peak& y) { return x.db > y.db; });
+    model.bodyPeaksHz.clear();
+    for (const auto& p : peaks)
+    {
+        bool near = false;
+        for (double hz : model.bodyPeaksHz)
+            near = near || std::abs (std::log2 (p.hz / hz)) < 1.0 / 3.0;
+        if (! near && model.bodyPeaksHz.size() < 3)
+            model.bodyPeaksHz.push_back (p.hz);
+    }
+    // Resonators: the source's own first partials (sympathetic strings) plus body peaks.
+    model.resonanceHz.clear();
+    if (f0 > 0.0)
+        for (int k = 1; k <= 4; ++k)
+            model.resonanceHz.push_back (f0 * k);
+    for (double hz : model.bodyPeaksHz)
+        if (model.resonanceHz.size() < 6)
+            model.resonanceHz.push_back (hz);
+}
+
 std::shared_ptr<InstrumentModel> buildProvisional (const AudioData& audio, const AnalysisData& analysis, const InstrumentBuildOptions& options)
 {
     auto model = std::make_shared<InstrumentModel>();
@@ -106,6 +149,7 @@ std::shared_ptr<InstrumentModel> addContinuation (const InstrumentModel& base, c
     auto model = std::make_shared<InstrumentModel> (base);
     model->stage = InstrumentModel::Stage::continued;
     model->original.continuation = analyseContinuation (audio, model->analysis, options.continuation);
+    findResonances (*model, audio);
     model->character = estimateCharacter (model->analysis, &model->original.continuation);
     model->performance = calibratePerformance (model->character, model->analysis);
     model->dynamics = calibrateDynamics (model->character, model->analysis);

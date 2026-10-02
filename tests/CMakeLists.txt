@@ -16,6 +16,7 @@ add_executable(osp_tests
     unit/ContinuationTests.cpp
     unit/PerformanceTests.cpp
     unit/DynamicsTests.cpp
+    unit/PostProcessorTests.cpp
     integration/RenderIntegrationTests.cpp
     integration/CorpusIntegrationTests.cpp
     integration/BakeoffIntegrationTests.cpp

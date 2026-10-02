@@ -16,6 +16,8 @@ struct BenchmarkOptions
     bool denseRetriggers = true;  ///< voices-2 held notes + a new short note every 50 ms (constant stealing);
                                   ///< false: `voices` held notes only
     SamplerSettings sampler {};
+    bool instrumentEngine = false;  ///< engine C (continuation, performance, dynamics, post) instead of baseline A
+    EngineSettings engine {};       ///< engine C settings (default macros)
 };
 
 struct BenchmarkResult
@@ -35,8 +37,8 @@ struct BenchmarkResult
 };
 
 /**
-    Measures the baseline sampler exactly as a host would drive it: one call per
-    block, timing each callback individually (mean, p99, worst).
+    Measures the baseline sampler (or engine C) exactly as a host would drive it: one
+    call per block, timing each callback individually (mean, p99, worst).
 */
 BenchmarkResult runBenchmark (const BenchmarkOptions& options);
 

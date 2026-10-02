@@ -11,7 +11,7 @@ namespace osp
 
 InstrumentEngine::InstrumentEngine() = default;
 
-void InstrumentEngine::prepare (double outputSampleRate, int /*maximumBlockSize*/, const EngineSettings& settings)
+void InstrumentEngine::prepare (double outputSampleRate, int maximumBlockSize, const EngineSettings& settings)
 {
     config = settings;
     config.polyphony = std::clamp (config.polyphony, 1, EngineSettings::maxPolyphony);
@@ -24,6 +24,8 @@ void InstrumentEngine::prepare (double outputSampleRate, int /*maximumBlockSize*
     pedalDown = false;
     noteCounter = 0;
     pitchRatio = 1.0;
+    post.prepare (outputSampleRate, maximumBlockSize);
+    post.setMacros (config.macros);
     resetPerformance();
 }
 
@@ -168,15 +170,24 @@ NoteShape InstrumentEngine::shapeFor (int note, int velocity, std::uint64_t even
                              currentModel->performance, currentModel->character, config.macros.life);
     }
 
+    const double r = std::clamp (config.macros.reimagined, 0.0, 1.0);
+    const double motion = std::clamp (config.macros.motion, 0.0, 1.0);
     if (config.continuation == ContinuationStrategy::multiLoopMovement && currentModel != nullptr)
     {
+        // MOTION: evolution after the onset (spec §11) - mostly for sustained sources.
         const auto& c = currentModel->original.continuation;
-        const double m = std::clamp (config.macros.motion, 0.0, 1.0) / 0.35; // 1 at the default MOTION
+        const double sustained = 1.0 - 0.8 * currentModel->character.transientTonal;
+        const double m = motion / 0.35 * (1.0 + 1.5 * r) * sustained; // 1 at the default MOTION
         shape.driftLevelDb = static_cast<float> (m * std::clamp (0.3 + 0.4 * c.levelFluctuationDb, 0.3, 1.0));
-        shape.driftCents = static_cast<float> (m * std::clamp (1.5 + 0.3 * c.pitchFluctuationCents, 1.5, 5.0));
+        shape.driftCents = static_cast<float> (m * std::clamp (1.5 + 0.3 * c.pitchFluctuationCents, 1.5, 5.0) * (1.0 + 2.0 * std::max (0.0, r - 0.6)));
         shape.driftBrightnessDb = static_cast<float> (m * 0.8);
-        shape.driftRateHz = 0.12f;
+        shape.driftPan = static_cast<float> (0.15 * motion * sustained);
+        shape.driftRateHz = static_cast<float> (0.1 + 0.15 * motion);
     }
+    // Original <-> Reimagined (spec §12): shorter, more varied continuation; harmonic
+    // saturation towards the far end. (Resonance and width live in PostProcessor.)
+    shape.segmentScale = static_cast<float> ((1.0 - 0.7 * r * r) * (1.3 - 0.6 * motion));
+    shape.saturation = static_cast<float> (0.7 * std::clamp ((r - 0.5) / 0.5, 0.0, 1.0));
     return shape;
 }
 
@@ -255,6 +266,7 @@ void InstrumentEngine::reset() noexcept
     pedalDown = false;
     for (auto& voice : voices)
         voice.kill();
+    post.reset();
 }
 
 void InstrumentEngine::render (float* const* output, int numChannels, int numSamples) noexcept
@@ -268,6 +280,8 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
     for (auto& voice : voices)
         voice.render (left, right, numSamples, pitchRatio);
     sampleClock += numSamples;
+    post.setModel (currentModel);
+    post.process (left, right, numSamples);
     for (int ch = 0; ch < std::min (numChannels, 2); ++ch)
         for (int i = 0; i < numSamples; ++i)
             output[ch][i] *= outputGain;
