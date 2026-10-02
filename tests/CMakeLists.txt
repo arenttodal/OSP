@@ -14,6 +14,7 @@ add_executable(osp_tests
     unit/PlaybackPreparationTests.cpp
     unit/PitchEngineTests.cpp
     unit/ContinuationTests.cpp
+    unit/CharacterFilterTests.cpp
     unit/PerformanceTests.cpp
     unit/DynamicsTests.cpp
     unit/PostProcessorTests.cpp
@@ -22,6 +23,7 @@ add_executable(osp_tests
     integration/CorpusIntegrationTests.cpp
     integration/BakeoffIntegrationTests.cpp
     integration/EngineIntegrationTests.cpp
+    integration/ShapingTests.cpp
     regression/GoldenTests.cpp
 )
 target_include_directories(osp_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

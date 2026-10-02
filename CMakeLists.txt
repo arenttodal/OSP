@@ -61,6 +61,9 @@ add_library(osp_dsp STATIC
     src/engine/InstrumentBuilder.cpp
     src/engine/PerformanceEngine.cpp
     src/engine/PostProcessor.cpp
+    src/engine/CharacterFilter.cpp
+    src/engine/MovementBus.cpp
+    src/engine/SpaceReverb.cpp
     src/engine/SampleSetInference.cpp
     src/midi/MidiFixtures.cpp
     src/model/RootChoice.cpp

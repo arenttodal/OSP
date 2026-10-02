@@ -32,6 +32,11 @@ struct NoteShape
     float driftBrightnessDb = 0.0f;
     float driftRateHz = 0.12f;
     float driftPan = 0.0f;             ///< slow stereo movement amplitude (MOTION)
+    float driftToneOctaves = 0.0f;     ///< DRIFT tone: CHARACTER cutoff wander (octaves)
+    /** CHARACTER's response to this note's velocity (DYNAMICS x TONE): cutoff offset and
+        filter-envelope depth scale. */
+    float filterVelocityOctaves = 0.0f;
+    float filterEnvelopeScale = 1.0f;
 
     /** Transient/body separation (spec §19): how much of the attack's high band comes from
         the recording at its original speed instead of the transposed read (0..1), and

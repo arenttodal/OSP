@@ -16,13 +16,18 @@ void InstrumentEngine::prepare (double outputSampleRate, int maximumBlockSize, c
     config = settings;
     config.polyphony = std::clamp (config.polyphony, 1, EngineSettings::maxPolyphony);
     sampleRate = outputSampleRate;
+    liveShaping.shaping = config.shaping;
+    liveShaping.character = config.macros.character;
+    liveShaping.dynamics = config.macros.dynamics;
+    liveShaping.movement = config.macros.motion;
+    liveShaping.seed = config.seed;
     if (! interpolator || interpolator->zeroCrossings() != config.interpolationZeroCrossings)
     {
         interpolator = std::make_unique<SincInterpolator> (config.interpolationZeroCrossings);
         interpolator->prepareStretchTables();
     }
     for (auto& voice : voices)
-        voice.prepare (sampleRate, config.adsr, interpolator.get());
+        voice.prepare (sampleRate, config.adsr, interpolator.get(), &liveShaping);
     outputGain = static_cast<float> (dbToGain (config.outputGainDb));
     pedalDown = false;
     noteCounter = 0;
@@ -33,7 +38,8 @@ void InstrumentEngine::prepare (double outputSampleRate, int maximumBlockSize, c
     // Targets first: prepare() resets the smoothed values to the targets, so the post
     // stage never depends on what was played before (bit-identical recall and bounces).
     post.setMacros (config.macros);
-    post.prepare (outputSampleRate, maximumBlockSize);
+    post.setShaping (config.shaping);
+    post.prepare (outputSampleRate, maximumBlockSize, config.seed);
     resetPerformance();
 }
 
@@ -61,6 +67,9 @@ void InstrumentEngine::resetPerformance() noexcept
     noteCounter = 0;
     sampleClock = 0;
     performance.reset (config.seed);
+    // Tape and drift randomness and reverb tails restart too: a bounce from the same
+    // position repeats exactly.
+    post.reset();
 }
 
 void InstrumentEngine::setEnvelope (const AdsrSettings& adsr) noexcept
@@ -262,8 +271,8 @@ NoteShape InstrumentEngine::shapeFor (const InstrumentModel* model, int note, in
     // Single recordings: velocity 127 plays at the recording's level. Set members: each
     // plays at its recorded level at its loudness-anchored velocity, i.e. the level
     // depends on velocity alone, whichever recording plays.
-    const double velocityDb = setMember ? -config.velocityRangeDb * (referenceVelocity - v) / 127.0
-                                        : -config.velocityRangeDb * (1.0 - v / 127.0);
+    const double range = levelRangeDb();
+    const double velocityDb = setMember ? -range * (referenceVelocity - v) / 127.0 : -range * (1.0 - v / 127.0);
     shape.gain = static_cast<float> (dbToGain (velocityDb));
     shape.brightnessDb += static_cast<float> (registerBrightnessDb);
 
@@ -275,7 +284,7 @@ NoteShape InstrumentEngine::shapeFor (const InstrumentModel* model, int note, in
             // Multi-velocity learning (spec §35): one layer step is this far apart in
             // applyDynamics' intensity, and should change timbre as much as the real
             // recordings do, so a layer played softer approaches the layer below it.
-            const double stepIntensity = currentSet->layerStepDb * 127.0 / std::max (config.velocityRangeDb, 6.0) / 80.0;
+            const double stepIntensity = currentSet->layerStepDb * 127.0 / std::max (levelRangeDb(), 6.0) / 80.0;
             // About 2 dB of shelf per semitone of centroid; full mode applies 0.8 x brightnessDb.
             dynamics.brightnessDb = std::clamp (2.0 * currentSet->layerStepBrightnessSt / (0.8 * stepIntensity), -6.0, 18.0);
             dynamics.attackSoftenMs = std::clamp (-currentSet->layerStepAttackMs / stepIntensity, 0.0, 80.0);
@@ -297,18 +306,20 @@ NoteShape InstrumentEngine::shapeFor (const InstrumentModel* model, int note, in
     const double motion = std::clamp (config.macros.motion, 0.0, 1.0);
     if (config.continuation == ContinuationStrategy::multiLoopMovement && currentModelForMotion != nullptr)
     {
-        // MOTION: evolution after the onset (spec §11) - mostly for sustained sources.
-        const auto& c = currentModelForMotion->original.continuation;
-        const double sustained = 1.0 - 0.8 * currentModelForMotion->character.transientTonal;
-        const double m = motion / 0.35 * (1.0 + 1.5 * r) * sustained; // 1 at the default MOTION
-        // Movement in proportion to the recording's own: a steady organ stays steady
-        // (lab, continuation-1: movement hurt the organ, helped the tremolo).
-        // Towards Reimagined, movement of its own is added even to steady sources.
-        shape.driftLevelDb = static_cast<float> (m * (std::clamp (0.25 * c.levelFluctuationDb, 0.0, 1.0) + 0.5 * r));
-        shape.driftCents = static_cast<float> (m * (std::clamp (0.4 * c.pitchFluctuationCents, 0.0, 5.0) + 2.0 * r) * (1.0 + 2.0 * std::max (0.0, r - 0.6)));
-        shape.driftBrightnessDb = static_cast<float> (m * 0.8 * (std::clamp (c.levelFluctuationDb / 3.0, 0.0, 1.0) + r));
-        shape.driftPan = static_cast<float> (0.15 * motion * sustained);
-        shape.driftRateHz = static_cast<float> (0.1 + 0.15 * motion);
+        // MOVEMENT (shaping system v1.0 §32-34). DRIFT lives in the voices: slow,
+        // smoothed random wander of pitch, CHARACTER position, level and pan, at the
+        // popup's SPEED, PITCH and TONE. TAPE, CHORUS and PULSE are bus effects
+        // (PostProcessor); in those modes the voices only keep Reimagined's own drift.
+        // Plucks move less (they are not sustained long enough to need it).
+        const auto& sh = config.shaping;
+        const double sustained = 1.0 - 0.5 * currentModelForMotion->character.transientTonal;
+        const double m = (sh.movementMode == MovementMode::drift ? motion : 0.0) * sustained;
+        const double rr = 0.5 * r * r * sustained; // Reimagined: instability of its own
+        shape.driftCents = static_cast<float> ((m * shaping::driftPitchCents (sh.movementB) + 12.0 * rr) * (1.0 + 2.0 * std::max (0.0, r - 0.6)));
+        shape.driftToneOctaves = static_cast<float> (m * shaping::driftToneOctaves (sh.movementC) + 0.6 * rr);
+        shape.driftLevelDb = static_cast<float> (1.5 * m + 1.0 * rr);
+        shape.driftPan = static_cast<float> (0.3 * m + 0.2 * rr);
+        shape.driftRateHz = static_cast<float> (sh.movementMode == MovementMode::drift ? shaping::driftSpeedHz (sh.movementA) : 0.15);
     }
     // Original <-> Reimagined (spec §12): shorter, more varied continuation; harmonic
     // saturation towards the far end. (Resonance and width live in PostProcessor.)
@@ -325,6 +336,8 @@ void InstrumentEngine::noteOn (int note, int velocity, int channel) noexcept
         noteOff (note, channel);
         return;
     }
+    // DYNAMICS curve: SOFT reaches expressive levels easily, HARD needs a firm touch.
+    velocity = shaping::curvedVelocity (config.shaping.velocityCurve, velocity);
     const InstrumentModel* model = currentModel;
     if (model == nullptr || ! model->isValid())
         return;
@@ -364,7 +377,7 @@ void InstrumentEngine::noteOn (int note, int velocity, int channel) noexcept
             // their own differences around their layer).
             setMember = true;
             layered = group.layers > 1;
-            referenceVelocity = std::clamp (127.0 - (currentSet->loudestDb - member.layerLoudnessDb) * 127.0 / std::max (config.velocityRangeDb, 6.0),
+            referenceVelocity = std::clamp (127.0 - (currentSet->loudestDb - member.layerLoudnessDb) * 127.0 / std::max (levelRangeDb(), 6.0),
                                             1.0, 127.0);
             if (currentSet->hasRegisterModel)
                 registerDb = std::clamp (1.5 * currentSet->brightnessSlope * (note - group.rootMidi), -8.0, 8.0);
@@ -374,6 +387,15 @@ void InstrumentEngine::noteOn (int note, int velocity, int channel) noexcept
     params.model = model;
     params.shape = shapeFor (model, note, velocity, eventIndex, referenceVelocity, registerDb, setMember, layered);
     params.layer = &model->layerFor (static_cast<double> (note), config.pitchCharacter);
+    // CHARACTER follows touch (DYNAMICS x TONE): harder notes open the filter and get a
+    // deeper filter envelope, softer ones stay darker. Off when velocity is level only.
+    if (config.dynamicsMode != DynamicsMode::gainOnly)
+    {
+        const double coupling = std::clamp (config.macros.dynamics, 0.0, 1.0) * std::clamp (config.shaping.dynamicsTone, 0.0, 1.0);
+        const double vn = std::clamp (velocity, 1, 127) / 127.0; // after the DYNAMICS curve
+        params.shape.filterVelocityOctaves = static_cast<float> (4.0 * coupling * (vn - 0.75));
+        params.shape.filterEnvelopeScale = static_cast<float> (std::clamp (1.0 + coupling * (vn / 0.75 - 1.0), 0.0, 1.6));
+    }
     // Transient/body separation (spec §19): from about a fifth away, the attack's
     // transient keeps its own speed. The separated transient carries its own size, so
     // sources without one are left unchanged.
@@ -458,7 +480,7 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
         const auto ch = static_cast<std::size_t> (mpe ? std::clamp (voice.channel(), 1, 16) : 1);
         const float pressure = channelPressure[ch];
         voice.setExpression (5.0f * pressure, 5.0f * pressure + 10.0f * channelTimbre[ch]);
-        voice.render (left, right, numSamples, pitchRatio * (mpe ? channelBendRatio[ch] : 1.0));
+        voice.render (left, right, numSamples, pitchRatio * (mpe ? channelBendRatio[ch] : 1.0), sampleClock);
     }
     sampleClock += numSamples;
     post.setModel (currentModel);

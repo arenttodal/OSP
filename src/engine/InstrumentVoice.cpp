@@ -17,10 +17,17 @@ namespace
 
 }
 
-void InstrumentVoice::prepare (double outputSampleRate, const AdsrSettings& adsr, const SincInterpolator* interpolator) noexcept
+void InstrumentVoice::prepare (double outputSampleRate, const AdsrSettings& adsr, const SincInterpolator* interpolator,
+                               const ShapingState* shaping) noexcept
 {
     sampleRate = outputSampleRate;
     sinc = interpolator;
+    shapingState = shaping;
+    charFilter.prepare (outputSampleRate);
+    if (shaping == nullptr)
+        charFilter.setParameters (FilterType::off, 1000.0, 0.0, 0.0, 0.0); // a bare voice: no CHARACTER stage
+    // CHARACTER follows the knob within ~10 ms (control rate one-pole).
+    charSmoothing = 1.0 - std::exp (-static_cast<double> (controlInterval) / (0.010 * outputSampleRate));
     adsrSettings = adsr;
     envelope.prepare (outputSampleRate, adsr);
     kill();
@@ -142,6 +149,22 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
         const double bodyStep = std::max (1.0e-3, baseIncrement);
         tPosition = peak - (peak - position) * tStep / bodyStep;
         tRemaining = std::max (1, static_cast<int> (shape.transientPreserveSeconds * sampleRate));
+    }
+
+    // CHARACTER: velocity coupling (DYNAMICS x TONE) and the filter envelope start here.
+    driftTone = driftToneTarget = 0.0;
+    if (shapingState != nullptr)
+    {
+        const auto& s = shapingState->shaping;
+        velocityOctaves = shape.filterVelocityOctaves;
+        envelopeScale = shape.filterEnvelopeScale;
+        filterEnv = 0.0;
+        filterEnvAttacking = true;
+        filterEnvStep = static_cast<double> (controlInterval) / (std::max (0.0005, s.envAttackSeconds) * sampleRate);
+        // Back to the knob's position by the end of DECAY (exponential, ~1 % left).
+        filterEnvDecay = std::exp (-4.6 * static_cast<double> (controlInterval) / (std::max (0.02, s.envDecaySeconds) * sampleRate));
+        charFilter.reset();
+        updateCharacter (true);
     }
 
     highL.reset();
@@ -359,10 +382,38 @@ void InstrumentVoice::beginCrossfade() noexcept
     ++jumpsTaken;
 }
 
+void InstrumentVoice::updateCharacter (bool immediate) noexcept
+{
+    const auto& s = shapingState->shaping;
+    // AD envelope: up over ATTACK, back over DECAY, then it rests at the knob's position.
+    if (! immediate)
+    {
+        if (filterEnvAttacking)
+        {
+            filterEnv += filterEnvStep;
+            if (filterEnv >= 1.0)
+            {
+                filterEnv = 1.0;
+                filterEnvAttacking = false;
+            }
+        }
+        else
+            filterEnv *= filterEnvDecay;
+    }
+    const double target = shaping::cutoffOctaves (s, shapingState->character);
+    charOctaves = immediate ? target : charOctaves + (target - charOctaves) * charSmoothing;
+    const double env = shaping::envelopeOctaves (s.envAmount) * filterEnv * envelopeScale;
+    const double octaves = charOctaves + env + velocityOctaves + driftTone;
+    // TILT: the knob rotates dark <-> bright (+-12 dB), the envelope and velocity lean it.
+    const double tiltDb = (std::clamp (shapingState->character, 0.0, 1.0) - 0.5) * 24.0 + 3.0 * (env + velocityOctaves + driftTone);
+    charFilter.setParameters (s.filterType, std::exp2 (octaves), s.resonance, s.drive, tiltDb);
+}
+
 void InstrumentVoice::updateControl() noexcept
 {
     // Drift: slowly wandering targets, smoothed (strategy D / MOTION).
-    const bool drifting = shape.driftLevelDb > 0.0f || shape.driftCents > 0.0f || shape.driftBrightnessDb > 0.0f || shape.driftPan > 0.0f;
+    const bool drifting = shape.driftLevelDb > 0.0f || shape.driftCents > 0.0f || shape.driftBrightnessDb > 0.0f || shape.driftPan > 0.0f
+                          || shape.driftToneOctaves > 0.0f;
     if (drifting)
     {
         if (--driftCountdown <= 0)
@@ -371,6 +422,7 @@ void InstrumentVoice::updateControl() noexcept
             driftCentsTarget = shape.driftCents * rng.bipolar();
             driftBrightTarget = shape.driftBrightnessDb * rng.bipolar();
             driftPanTarget = shape.driftPan * rng.bipolar();
+            driftToneTarget = shape.driftToneOctaves * rng.bipolar();
             const double seconds = rng.uniform (0.5, 1.5) / std::max (0.01, static_cast<double> (shape.driftRateHz));
             driftCountdown = std::max (1, static_cast<int> (seconds * sampleRate / controlInterval));
         }
@@ -378,6 +430,7 @@ void InstrumentVoice::updateControl() noexcept
         driftCentsValue += (driftCentsTarget - driftCentsValue) * driftCoef;
         driftBright += (driftBrightTarget - driftBright) * driftCoef;
         driftPanValue += (driftPanTarget - driftPanValue) * driftCoef;
+        driftTone += (driftToneTarget - driftTone) * driftCoef;
         if (shape.driftPan > 0.0f)
         {
             const float p = std::clamp (shape.pan + static_cast<float> (driftPanValue), -1.0f, 1.0f);
@@ -386,8 +439,19 @@ void InstrumentVoice::updateControl() noexcept
         }
     }
 
+    if (shapingState != nullptr)
+        updateCharacter (false);
+
     settleCents *= settleCoef;
-    const double cents = shape.pitchCents + settleCents + driftCentsValue;
+    double shared = 0.0;
+    if (shapingState != nullptr && shapingState->shaping.movementMode == MovementMode::drift && shapingState->movement > 0.0)
+    {
+        // DRIFT's shared part: the whole instrument wanders a little together.
+        const auto& s = shapingState->shaping;
+        shared = 0.3 * shapingState->movement * shaping::driftPitchCents (s.movementB)
+                 * shaping::sharedWander (shapingState->seed, static_cast<double> (clock) / sampleRate, shaping::driftSpeedHz (s.movementA));
+    }
+    const double cents = shape.pitchCents + settleCents + driftCentsValue + shared;
     pitchMod = cents != 0.0 ? std::exp2 (cents / 1200.0) : 1.0;
 
     // Expression follows quickly but smoothly (about 10 ms).
@@ -435,14 +499,16 @@ float InstrumentVoice::readTransient (const PlaybackSource& src, double pos, dou
     return SincInterpolator::apply (kernel, src.channelData (channel));
 }
 
-void InstrumentVoice::render (float* left, float* right, int numSamples, double pitchRatio) noexcept
+void InstrumentVoice::render (float* left, float* right, int numSamples, double pitchRatio, std::int64_t clockAtStart) noexcept
 {
+    clock = clockAtStart;
     if (! active)
         return;
     const bool stereoOutput = right != left;
 
     for (int i = 0; i < numSamples; ++i)
     {
+        ++clock;
         if (controlCountdown-- <= 0)
         {
             controlCountdown = controlInterval - 1;
@@ -544,6 +610,7 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
             l = std::tanh (saturationDrive * l) * saturationNorm;
             r = std::tanh (saturationDrive * r) * saturationNorm;
         }
+        charFilter.process (l, r);
 
         controlGain += controlGainStep;
         float g = env * baseGain * std::max (fadeGain, 0.0f) * controlGain * dampingGain * (1.0f + transientExtra) * attackRamp;

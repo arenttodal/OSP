@@ -1,6 +1,9 @@
 #pragma once
 
+#include "engine/MovementBus.h"
 #include "engine/ShelfFilter.h"
+#include "engine/Shaping.h"
+#include "engine/SpaceReverb.h"
 
 #include <array>
 #include <cstdint>
@@ -13,29 +16,29 @@ struct InstrumentModel;
 struct Macros;
 
 /**
-    Global stage after the voices (spec §11, §12, §46):
+    Global stage after the voices (shaping system v1.0 §47):
 
-      CHARACTER  spectral-envelope transformation: the source's own body resonances
-                 move (cut at the original frequency, boost at the shifted one) and
-                 the spectrum tilts: smaller/brighter above 0.5, larger/darker below.
       REIMAGINED a sympathetic resonator bank tuned to the source's partials and body
-                 peaks, re-excited by whatever is played (more and longer towards
-                 Reimagined).
-      SPACE      width (M/S), decorrelation for narrow sources, and a small diffuse
-                 ambience (feedback delay network with damping).
+                 peaks (plus a bank a fifth above towards the far end), re-excited by
+                 whatever is played.
+      MOVEMENT   the bus part of MOVEMENT (MovementBus: drift's shared wander, tape,
+                 chorus, pulse).
+      SPACE      one of four curated ambiences (SpaceReverb) as a send: the macro is the
+                 wet level; changing type crossfades two reverbs over 250 ms.
 
-    Macro values are smoothed and coefficients recomputed at control rate, so moving a
-    macro never clicks. prepare() allocates; everything else is real-time safe.
+    (CHARACTER is a per-voice filter now, see CharacterFilter.) Macro values are
+    smoothed, so moving one never clicks. prepare() allocates; the rest is real-time safe.
 */
 class PostProcessor
 {
 public:
-    void prepare (double sampleRate, int maximumBlockSize);
+    void prepare (double sampleRate, int maximumBlockSize, std::uint64_t seed = 1);
     void reset() noexcept;
 
     /** Pick up the resonances of a newly published model (real-time safe). */
     void setModel (const InstrumentModel* model) noexcept;
     void setMacros (const Macros& macros) noexcept;
+    void setShaping (const Shaping& shaping) noexcept;
 
     void process (float* left, float* right, int numSamples) noexcept;
 
@@ -66,24 +69,16 @@ private:
     int countdown = 0;
 
     // Targets and smoothed values
-    double characterTarget = 0.5, character = 0.5;
-    double spaceTarget = 0.0, space = 0.0;
     double reimaginedTarget = 0.0, reimagined = 0.0;
-    double appliedCharacter = -1.0, appliedSpace = -1.0, appliedReimagined = -1.0;
+    double appliedReimagined = -1.0;
+    double motionTarget = 0.0, spaceTarget = 0.0, space = 0.0, spaceCoef = 0.001;
+    Shaping shaping;
 
     // Model-derived
-    int numPeaks = 0;
-    std::array<double, maxPeaks> peakHz {};
     std::array<double, resonators> resonatorHz {};
     int numResonators = 0;
-    double sourceWidth = 0.5;
     bool modelDirty = true;
     const InstrumentModel* model = nullptr;
-
-    // CHARACTER
-    std::array<Biquad, maxPeaks * 2> characterL, characterR;
-    ShelfFilter tiltHighL, tiltHighR, tiltLowL, tiltLowR;
-    bool characterActive = false;
 
     // Resonators (mono-summed excitation, stereo spread output)
     // First half: the source's partials and body; second half: a fifth above them
@@ -91,24 +86,16 @@ private:
     std::array<Biquad, 2 * resonators> resonatorBank;
     float resonanceMix = 0.0f, remapMix = 0.0f;
 
-    // SPACE
-    float sideGain = 1.0f;
-    float decorrelation = 0.0f;
-    std::array<float, 4> allpassState {};
-    std::array<int, 4> allpassDelay {};
-    std::vector<float> allpassBuffer;
-    std::array<int, 4> allpassOffset {};
-    std::array<int, 4> allpassWrite {};
-    static constexpr int fdnLines = 4;
-    std::vector<float> fdnBuffer;
-    std::array<int, fdnLines> fdnLength {};
-    std::array<int, fdnLines> fdnOffset {};
-    std::array<int, fdnLines> fdnWrite {};
-    std::array<float, fdnLines> fdnLowpass {};
-    float fdnFeedback = 0.0f;
-    float fdnDamping = 0.3f;
-    float reverbMix = 0.0f;
-    float spaceTrim = 1.0f;         // keeps loudness roughly constant as SPACE adds width and ambience
+    // MOVEMENT (bus part)
+    MovementBus movement;
+
+    // SPACE: two reverbs so a type change can crossfade
+    std::array<SpaceReverb, 2> reverbs;
+    int activeReverb = 0;
+    int reverbFade = 0, reverbFadeLength = 1;
+    SpaceType appliedType = SpaceType::plate;
+    double appliedDecay = -1.0;
+    bool spaceIdle = true;
 };
 
 } // namespace osp

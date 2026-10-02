@@ -10,54 +10,37 @@
 namespace osp
 {
 
-void PostProcessor::prepare (double rate, int /*maximumBlockSize*/)
+void PostProcessor::prepare (double rate, int /*maximumBlockSize*/, std::uint64_t seed)
 {
     sampleRate = rate;
-    // Schroeder allpasses for decorrelation (3.1, 4.7, 7.3, 11.3 ms).
-    const double apMs[4] = { 3.1, 4.7, 7.3, 11.3 };
-    int total = 0;
-    for (int i = 0; i < 4; ++i)
-    {
-        allpassDelay[static_cast<std::size_t> (i)] = std::max (1, static_cast<int> (apMs[i] * 0.001 * rate));
-        allpassOffset[static_cast<std::size_t> (i)] = total;
-        total += allpassDelay[static_cast<std::size_t> (i)];
-    }
-    allpassBuffer.assign (static_cast<std::size_t> (total), 0.0f);
-
-    // Feedback delay network (mutually prime-ish lengths).
-    const double fdnMs[fdnLines] = { 29.7, 37.1, 41.1, 53.3 };
-    total = 0;
-    for (int i = 0; i < fdnLines; ++i)
-    {
-        fdnLength[static_cast<std::size_t> (i)] = std::max (1, static_cast<int> (fdnMs[i] * 0.001 * rate));
-        fdnOffset[static_cast<std::size_t> (i)] = total;
-        total += fdnLength[static_cast<std::size_t> (i)];
-    }
-    fdnBuffer.assign (static_cast<std::size_t> (total), 0.0f);
+    movement.prepare (rate, seed);
+    for (auto& r : reverbs)
+        r.prepare (rate);
+    reverbFadeLength = std::max (1, static_cast<int> (0.25 * rate));
+    spaceCoef = 1.0 - std::exp (-1.0 / (0.05 * rate));
     reset();
 }
 
 void PostProcessor::reset() noexcept
 {
-    std::fill (allpassBuffer.begin(), allpassBuffer.end(), 0.0f);
-    std::fill (fdnBuffer.begin(), fdnBuffer.end(), 0.0f);
-    allpassWrite.fill (0);
-    fdnWrite.fill (0);
-    fdnLowpass.fill (0.0f);
-    for (auto* bank : { &characterL, &characterR })
-        for (auto& f : *bank)
-            f.reset();
     for (auto& f : resonatorBank)
         f.reset();
-    tiltHighL.reset();
-    tiltHighR.reset();
-    tiltLowL.reset();
-    tiltLowR.reset();
-    character = characterTarget;
-    space = spaceTarget;
     reimagined = reimaginedTarget;
-    appliedCharacter = appliedSpace = appliedReimagined = -1.0;
+    space = spaceTarget;
+    appliedReimagined = -1.0;
     countdown = 0;
+    movement.setTargets (shaping.movementMode, motionTarget, shaping.movementA, shaping.movementB, shaping.movementC);
+    movement.reset();
+    appliedType = shaping.spaceType;
+    appliedDecay = shaping.spaceDecaySeconds;
+    activeReverb = 0;
+    reverbFade = 0;
+    for (auto& r : reverbs)
+    {
+        r.configure (appliedType, appliedDecay);
+        r.reset();
+    }
+    spaceIdle = space < 1.0e-5;
 }
 
 void PostProcessor::setModel (const InstrumentModel* newModel) noexcept
@@ -65,26 +48,27 @@ void PostProcessor::setModel (const InstrumentModel* newModel) noexcept
     if (newModel == model)
         return;
     model = newModel;
-    numPeaks = 0;
     numResonators = 0;
     if (model != nullptr)
-    {
-        for (double hz : model->bodyPeaksHz)
-            if (numPeaks < maxPeaks)
-                peakHz[static_cast<std::size_t> (numPeaks++)] = hz;
         for (double hz : model->resonanceHz)
             if (numResonators < resonators)
                 resonatorHz[static_cast<std::size_t> (numResonators++)] = hz;
-        sourceWidth = model->analysis.stereo.width;
-    }
     modelDirty = true;
 }
 
 void PostProcessor::setMacros (const Macros& macros) noexcept
 {
-    characterTarget = std::clamp (macros.character, 0.0, 1.0);
-    spaceTarget = std::clamp (macros.space, 0.0, 1.0);
     reimaginedTarget = std::clamp (macros.reimagined, 0.0, 1.0);
+    motionTarget = std::clamp (macros.motion, 0.0, 1.0);
+    // SPACE is a send: perceptual wet level (10 % is a touch, 100 % is drenched).
+    spaceTarget = 1.25 * std::pow (std::clamp (macros.space, 0.0, 1.0), 1.2);
+    movement.setTargets (shaping.movementMode, motionTarget, shaping.movementA, shaping.movementB, shaping.movementC);
+}
+
+void PostProcessor::setShaping (const Shaping& newShaping) noexcept
+{
+    shaping = newShaping;
+    movement.setTargets (shaping.movementMode, motionTarget, shaping.movementA, shaping.movementB, shaping.movementC);
 }
 
 void PostProcessor::peaking (Biquad& f, double rate, double hz, double q, double gainDb) noexcept
@@ -118,43 +102,7 @@ void PostProcessor::bandpass (Biquad& f, double rate, double hz, double t60) noe
 void PostProcessor::updateCoefficients() noexcept
 {
     const double smoothing = 0.06;
-    character += (characterTarget - character) * smoothing;
-    space += (spaceTarget - space) * smoothing;
     reimagined += (reimaginedTarget - reimagined) * smoothing;
-
-    if (modelDirty || std::abs (character - appliedCharacter) > 0.002)
-    {
-        appliedCharacter = character;
-        const double d = (character - 0.5) * 2.0; // -1 larger/darker .. +1 smaller/brighter
-        characterActive = std::abs (d) > 0.01;
-        if (characterActive)
-        {
-            const double shift = std::pow (2.0, d * 5.0 / 12.0); // body resonances move up to a fourth
-            for (int i = 0; i < maxPeaks; ++i)
-            {
-                const bool used = i < numPeaks;
-                const double hz = used ? peakHz[static_cast<std::size_t> (i)] : 1000.0;
-                const double g = used ? 6.0 * std::abs (d) : 0.0;
-                peaking (characterL[static_cast<std::size_t> (2 * i)], sampleRate, hz, 2.0, -g);
-                peaking (characterL[static_cast<std::size_t> (2 * i + 1)], sampleRate, hz * shift, 2.0, g);
-                for (int k = 2 * i; k < 2 * i + 2; ++k)
-                {
-                    // Same coefficients for the right channel; its own state is kept (no clicks).
-                    const auto& src = characterL[static_cast<std::size_t> (k)];
-                    auto& dst = characterR[static_cast<std::size_t> (k)];
-                    dst.b0 = src.b0;
-                    dst.b1 = src.b1;
-                    dst.b2 = src.b2;
-                    dst.a1 = src.a1;
-                    dst.a2 = src.a2;
-                }
-            }
-            tiltHighL.setup (ShelfFilter::Type::high, sampleRate, 2500.0, 5.0 * d);
-            tiltHighR.setup (ShelfFilter::Type::high, sampleRate, 2500.0, 5.0 * d);
-            tiltLowL.setup (ShelfFilter::Type::low, sampleRate, 200.0, -4.0 * d);
-            tiltLowR.setup (ShelfFilter::Type::low, sampleRate, 200.0, -4.0 * d);
-        }
-    }
 
     if (modelDirty || std::abs (reimagined - appliedReimagined) > 0.002)
     {
@@ -171,21 +119,25 @@ void PostProcessor::updateCoefficients() noexcept
         resonanceMix = numResonators > 0 ? static_cast<float> (2.2 * amount / std::sqrt (static_cast<double> (numResonators))) : 0.0f;
         remapMix = static_cast<float> (resonanceMix * 0.7 * std::clamp ((reimagined - 0.5) / 0.5, 0.0, 1.0));
     }
-
-    if (modelDirty || std::abs (space - appliedSpace) > 0.002)
-    {
-        appliedSpace = space;
-        sideGain = static_cast<float> (1.0 + 0.8 * space);
-        // Narrow (mono-ish) sources get synthetic width from decorrelated mid.
-        decorrelation = static_cast<float> (space * std::clamp (1.0 - 4.0 * sourceWidth, 0.0, 1.0) * 0.35);
-        const double t60 = 0.5 + 2.0 * space;
-        const double meanLength = 0.04 * sampleRate;
-        fdnFeedback = static_cast<float> (std::pow (10.0, -3.0 * meanLength / (t60 * sampleRate)));
-        fdnDamping = static_cast<float> (0.25 + 0.3 * (1.0 - space));
-        reverbMix = static_cast<float> (0.3 * std::pow (space, 1.3));
-        spaceTrim = static_cast<float> (1.0 - 0.35 * space);
-    }
     modelDirty = false;
+
+    // SPACE: a new type fades in on the idle reverb; a new decay retunes in place.
+    if (shaping.spaceType != appliedType && reverbFade == 0)
+    {
+        appliedType = shaping.spaceType;
+        appliedDecay = shaping.spaceDecaySeconds;
+        activeReverb = 1 - activeReverb;
+        auto& next = reverbs[static_cast<std::size_t> (activeReverb)];
+        next.configure (appliedType, appliedDecay);
+        next.reset();
+        reverbFade = reverbFadeLength;
+    }
+    else if (std::abs (shaping.spaceDecaySeconds - appliedDecay) > 1.0e-3)
+    {
+        // Gradual: at most 3 % per control tick, so the tail never jumps.
+        appliedDecay += std::clamp (shaping.spaceDecaySeconds - appliedDecay, -0.03 * appliedDecay, 0.03 * appliedDecay);
+        reverbs[static_cast<std::size_t> (activeReverb)].configure (appliedType, appliedDecay);
+    }
 }
 
 void PostProcessor::process (float* left, float* right, int numSamples) noexcept
@@ -199,17 +151,6 @@ void PostProcessor::process (float* left, float* right, int numSamples) noexcept
         }
         float l = left[i];
         float r = right[i];
-
-        if (characterActive)
-        {
-            for (int k = 0; k < 2 * numPeaks; ++k)
-            {
-                l = characterL[static_cast<std::size_t> (k)].process (l);
-                r = characterR[static_cast<std::size_t> (k)].process (r);
-            }
-            l = tiltLowL.process (tiltHighL.process (l));
-            r = tiltLowR.process (tiltHighR.process (r));
-        }
 
         if (resonanceMix > 0.0f)
         {
@@ -230,56 +171,36 @@ void PostProcessor::process (float* left, float* right, int numSamples) noexcept
             r += resonanceMix * (0.25f * even + 0.75f * odd);
         }
 
-        if (space > 0.001)
-        {
-            float mid = 0.5f * (l + r);
-            float side = 0.5f * (l - r) * sideGain;
-            if (decorrelation > 0.0f)
-            {
-                float x = mid;
-                for (int k = 0; k < 4; ++k)
-                {
-                    const auto ks = static_cast<std::size_t> (k);
-                    float* buf = allpassBuffer.data() + allpassOffset[ks];
-                    const float delayed = buf[allpassWrite[ks]];
-                    const float v = x + 0.6f * delayed;
-                    buf[allpassWrite[ks]] = v;
-                    x = delayed - 0.6f * v;
-                    allpassWrite[ks] = (allpassWrite[ks] + 1) % allpassDelay[ks];
-                }
-                side += decorrelation * x;
-            }
-            l = mid + side;
-            r = mid - side;
+        movement.process (l, r);
 
-            if (reverbMix > 0.0f)
+        // SPACE as a send. Idle (no wet level for a while) skips the reverb entirely.
+        space += (spaceTarget - space) * spaceCoef;
+        if (space > 1.0e-5 || reverbFade > 0)
+        {
+            if (spaceIdle)
             {
-                float out[fdnLines];
-                for (int k = 0; k < fdnLines; ++k)
-                {
-                    const auto ks = static_cast<std::size_t> (k);
-                    out[k] = fdnBuffer[static_cast<std::size_t> (fdnOffset[ks] + fdnWrite[ks])];
-                }
-                // Hadamard mixing keeps the network lossless before damping and feedback.
-                const float h0 = 0.5f * (out[0] + out[1] + out[2] + out[3]);
-                const float h1 = 0.5f * (out[0] - out[1] + out[2] - out[3]);
-                const float h2 = 0.5f * (out[0] + out[1] - out[2] - out[3]);
-                const float h3 = 0.5f * (out[0] - out[1] - out[2] + out[3]);
-                const float mixed[fdnLines] = { h0, h1, h2, h3 };
-                const float input = 0.5f * (l + r);
-                for (int k = 0; k < fdnLines; ++k)
-                {
-                    const auto ks = static_cast<std::size_t> (k);
-                    fdnLowpass[ks] += (mixed[k] - fdnLowpass[ks]) * (1.0f - fdnDamping);
-                    fdnBuffer[static_cast<std::size_t> (fdnOffset[ks] + fdnWrite[ks])] = input + fdnFeedback * fdnLowpass[ks];
-                    fdnWrite[ks] = (fdnWrite[ks] + 1) % fdnLength[ks];
-                }
-                l += reverbMix * (out[0] + 0.5f * out[2]);
-                r += reverbMix * (out[1] + 0.5f * out[3]);
+                spaceIdle = false;
+                for (auto& rv : reverbs)
+                    rv.reset();
             }
-            l *= spaceTrim;
-            r *= spaceTrim;
+            float wl, wr;
+            reverbs[static_cast<std::size_t> (activeReverb)].process (l, r, wl, wr);
+            if (reverbFade > 0)
+            {
+                float ol, orr;
+                reverbs[static_cast<std::size_t> (1 - activeReverb)].process (l, r, ol, orr);
+                const float w = static_cast<float> (reverbFade) / static_cast<float> (reverbFadeLength);
+                wl += w * (ol - wl);
+                wr += w * (orr - wr);
+                --reverbFade;
+            }
+            const auto wet = static_cast<float> (space);
+            const auto dry = static_cast<float> (1.0 - 0.2 * std::min (1.0, space));
+            l = dry * l + wet * wl;
+            r = dry * r + wet * wr;
         }
+        else
+            spaceIdle = true;
 
         left[i] = l;
         right[i] = r;

@@ -96,26 +96,97 @@ TEST_CASE ("post: neutral macros pass audio through untouched", "[unit][post]")
     CHECK (test::maxDifference (out, audio) == 0.0);
 }
 
-TEST_CASE ("post: CHARACTER tilts the spectrum both ways", "[unit][post]")
+TEST_CASE ("post: the four SPACE types have their own identity", "[unit][post][space]")
 {
-    auto audio = testsignals::saw (220.0, 1.0, 48000.0, 0.3, 2);
-    const auto model = modelFor (audio);
-    auto run = [&] (double character) {
+    // Impulse responses: decay time (energy -30 dB point), brightness, onset density.
+    struct Measure { double t30, centroid, earlyShare; };
+    auto measure = [] (SpaceType type) {
         PostProcessor post;
         post.prepare (48000.0, 256);
-        post.setModel (model.get());
+        Shaping sh;
+        sh.spaceType = type;
+        sh.spaceDecaySeconds = 2.0;
+        sh.movementMode = MovementMode::pulse; // a bus mode at MOVEMENT 0: passes through
+        post.setShaping (sh);
         Macros m;
-        m.character = character;
-        m.space = 0.0;
+        m.space = 1.0;
         m.reimagined = 0.0;
+        m.motion = 0.0;
         post.setMacros (m);
         post.reset();
-        return centroid (process (post, audio).channels[0], 24000);
+        AudioData x = AudioData::allocate (2, 4 * 48000, 48000.0);
+        x.channels[0][100] = x.channels[1][100] = 1.0f;
+        const auto out = process (post, x);
+        std::vector<float> wet (out.channels[0]);
+        wet[100] = 0.0f; // the dry impulse
+        double total = 0.0;
+        for (float v : wet) total += v * v;
+        double acc = 0.0, t30 = 0.0;
+        for (std::size_t i = 0; i < wet.size(); ++i)
+        {
+            acc += wet[i] * wet[i];
+            if (acc > total * (1.0 - 1.0e-3)) { t30 = static_cast<double> (i) / 48000.0; break; }
+        }
+        const double early = energy (wet, 0, 48000 / 20);
+        return Measure { t30, centroid (wet, 2400), early / total };
     };
-    const double dark = run (0.0), neutral = run (0.5), bright = run (1.0);
-    CHECK (dark < neutral);
-    CHECK (neutral < bright);
-    CHECK (12.0 * std::log2 (bright / dark) > 2.0);
+    const auto room = measure (SpaceType::room), chamber = measure (SpaceType::chamber);
+    const auto plate = measure (SpaceType::plate), spring = measure (SpaceType::spring);
+    INFO ("t30 room " << room.t30 << " chamber " << chamber.t30 << " plate " << plate.t30 << " spring " << spring.t30);
+    INFO ("centroid room " << room.centroid << " chamber " << chamber.centroid << " plate " << plate.centroid << " spring " << spring.centroid);
+    INFO ("early share room " << room.earlyShare << " chamber " << chamber.earlyShare << " plate " << plate.earlyShare << " spring " << spring.earlyShare);
+    CHECK (plate.centroid > room.centroid);         // plate bright, room dark
+    CHECK (room.earlyShare > plate.earlyShare);     // room: present early reflections
+    CHECK (spring.centroid < plate.centroid);       // spring band-limited
+    for (const auto* m : { &room, &chamber, &plate, &spring })
+        CHECK (m->t30 > 0.2);
+}
+
+TEST_CASE ("post: SPACE at zero is bypassed and changing type does not click", "[unit][post][space]")
+{
+    const auto audio = testsignals::vowel (220.0, 3.0, 48000.0, 1);
+    const auto model = modelFor (audio);
+    PostProcessor post;
+    post.prepare (48000.0, 256);
+    post.setModel (model.get());
+    Shaping sh;
+    sh.movementMode = MovementMode::pulse;
+    post.setShaping (sh);
+    Macros m;
+    m.space = 0.0;
+    m.reimagined = 0.0;
+    m.motion = 0.0;
+    post.setMacros (m);
+    post.reset();
+    CHECK (test::maxDifference (process (post, audio), audio) == 0.0);
+
+    m.space = 0.6;
+    post.setMacros (m);
+    AudioData out = audio;
+    // A click is a step right after a switch that is larger than anything the same
+    // signal does on its own: compare the steps just after each type change with the
+    // largest step elsewhere.
+    float steady = 0.0f, atSwitch = 0.0f, prev = 0.0f;
+    const SpaceType order[] = { SpaceType::plate, SpaceType::spring, SpaceType::room, SpaceType::chamber };
+    for (int pos = 0, block = 0; pos < static_cast<int> (out.channels[0].size()); pos += 256, ++block)
+    {
+        sh.spaceType = order[(block / 50) % 4];
+        sh.spaceDecaySeconds = 1.0 + 0.02 * (block % 100);
+        post.setShaping (sh);
+        const int n = std::min (256, static_cast<int> (out.channels[0].size()) - pos);
+        post.process (out.channels[0].data() + pos, out.channels[1].data() + pos, n);
+        const bool nearSwitch = block % 50 < 2 && block >= 50;
+        for (int i = 0; i < n; ++i)
+        {
+            const float wet = out.channels[0][static_cast<std::size_t> (pos + i)] - audio.channels[0][static_cast<std::size_t> (pos + i)];
+            const float step = std::abs (wet - prev);
+            if (block > 4)
+                (nearSwitch ? atSwitch : steady) = std::max (nearSwitch ? atSwitch : steady, step);
+            prev = wet;
+        }
+    }
+    INFO ("largest step after a switch " << atSwitch << ", elsewhere " << steady);
+    CHECK (atSwitch <= steady);
 }
 
 TEST_CASE ("post: SPACE widens a mono source and stays bounded", "[unit][post]")

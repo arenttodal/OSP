@@ -3,7 +3,9 @@
 #include "audio/envelopes/Adsr.h"
 #include "audio/pitch/SincInterpolator.h"
 #include "core/Prng.h"
+#include "engine/CharacterFilter.h"
 #include "engine/NoteShape.h"
+#include "engine/Shaping.h"
 #include "engine/ShelfFilter.h"
 #include "model/ContinuationModel.h"
 #include "model/InstrumentModel.h"
@@ -39,7 +41,9 @@ struct InstrumentVoiceStart
 class InstrumentVoice
 {
 public:
-    void prepare (double outputSampleRate, const AdsrSettings& adsr, const SincInterpolator* interpolator) noexcept;
+    /** `shaping`: the engine's live shaping settings and macro positions (read at control rate). */
+    void prepare (double outputSampleRate, const AdsrSettings& adsr, const SincInterpolator* interpolator,
+                  const ShapingState* shaping = nullptr) noexcept;
     void setEnvelopeSettings (const AdsrSettings& adsr) noexcept;
 
     void start (const InstrumentVoiceStart& params) noexcept;
@@ -48,7 +52,8 @@ public:
     void kill() noexcept;
 
     /** Adds into left/right (right may equal left). pitchRatio: global bend/fine tune. */
-    void render (float* left, float* right, int numSamples, double pitchRatio) noexcept;
+    /** `clockAtStart`: the engine's sample clock at the first sample (shared movement). */
+    void render (float* left, float* right, int numSamples, double pitchRatio, std::int64_t clockAtStart = 0) noexcept;
 
     bool isActive() const noexcept { return active; }
     bool isReleased() const noexcept { return released; }
@@ -165,6 +170,18 @@ private:
     float dAmount = 0.0f, dRamp = 0.0f, dRampStep = 0.0f, dSide = 1.0f;
     double dBase = 0.0, dDepth = 0.0, dPhase = 0.0, dOmega = 0.0;
     int dDelaySamples = 0;
+
+    // CHARACTER: per-voice filter and its AD envelope (control rate)
+    const ShapingState* shapingState = nullptr;
+    std::int64_t clock = 0;
+    CharacterFilter charFilter;
+    double charOctaves = 0.0;      ///< smoothed CHARACTER position (octaves re 1 Hz)
+    double charSmoothing = 1.0;
+    double filterEnv = 0.0, filterEnvStep = 1.0, filterEnvDecay = 0.0;
+    bool filterEnvAttacking = true;
+    double velocityOctaves = 0.0, envelopeScale = 1.0;
+    double driftTone = 0.0, driftToneTarget = 0.0;
+    void updateCharacter (bool immediate) noexcept;
 
     ShelfFilter highL, highR, lowL, lowR;
     bool filtersActive = false;

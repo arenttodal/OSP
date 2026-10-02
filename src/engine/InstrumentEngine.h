@@ -5,6 +5,7 @@
 #include "engine/InstrumentVoice.h"
 #include "engine/PerformanceEngine.h"
 #include "engine/PostProcessor.h"
+#include "engine/Shaping.h"
 #include "model/InstrumentModel.h"
 #include "model/InstrumentSet.h"
 
@@ -19,8 +20,8 @@ namespace osp
 struct Macros
 {
     double life = 0.5;     // lab, performance-1: realistic (50 %) beat identical retriggers on every instrument
-    double dynamics = 0.5;
-    double character = 0.5;  ///< 0.5 = neutral
+    double dynamics = 0.65;
+    double character = 0.9;  ///< CHARACTER: position in the filter range (shaping system v1.0)
     double motion = 0.35;
     double space = 0.2;
     double reimagined = 0.2;
@@ -53,6 +54,7 @@ struct EngineSettings
     bool transientMixing = false;        ///< velocity/LIFE move the separated transient, not the whole attack (experiment 8)
     DynamicsMode dynamicsMode = DynamicsMode::full;
     Macros macros;
+    Shaping shaping;                     ///< what each macro does (popups); see engine/Shaping.h
 };
 
 /**
@@ -99,14 +101,27 @@ public:
     void setEnvelope (const AdsrSettings& adsr) noexcept;
     void setOutputGainDb (double db) noexcept;
     void setPitchOffsetSemitones (double semitones) noexcept;
+    void setShaping (const Shaping& shaping) noexcept
+    {
+        config.shaping = shaping;
+        liveShaping.shaping = shaping;
+        post.setShaping (shaping);
+    }
     void setMacros (const Macros& macros) noexcept
     {
         config.macros = macros;
+        liveShaping.character = macros.character;
+        liveShaping.dynamics = macros.dynamics;
+        liveShaping.movement = macros.motion;
         post.setMacros (macros);
     }
     void setPitchCharacter (PitchCharacter character) noexcept { config.pitchCharacter = character; }
     void setContinuation (ContinuationStrategy strategy) noexcept { config.continuation = strategy; }
-    void setSeed (std::uint64_t seed) noexcept { config.seed = seed; }
+    void setSeed (std::uint64_t seed) noexcept
+    {
+        config.seed = seed;
+        liveShaping.seed = seed;
+    }
     void setVelocityRangeDb (double db) noexcept { config.velocityRangeDb = db; }
     void setDynamicsMode (DynamicsMode mode) noexcept { config.dynamicsMode = mode; }
 
@@ -144,6 +159,10 @@ public:
     const EngineSettings& settings() const noexcept { return config; }
     std::uint64_t noteOnCount() const noexcept { return noteCounter; }
 
+    /** Level range across velocity: the Advanced range scaled by DYNAMICS (0 % -> 15 % of
+        it, the 65 % default -> all of it, 100 % -> about 1.5x). */
+    double levelRangeDb() const noexcept { return config.velocityRangeDb * (0.15 + 1.31 * std::clamp (config.macros.dynamics, 0.0, 1.0)); }
+
     /** For tests: the voice slots (read-only). */
     const InstrumentVoice& voiceAt (int index) const noexcept { return voices[static_cast<std::size_t> (index)]; }
     static constexpr int voiceSlots() noexcept { return totalSlots; }
@@ -173,6 +192,7 @@ private:
 
     EngineSettings config;
     double sampleRate = 48000.0;
+    ShapingState liveShaping;            ///< read by every voice at control rate
     std::unique_ptr<SincInterpolator> interpolator;
     std::array<InstrumentVoice, totalSlots> voices;
     const InstrumentModel* currentModel = nullptr;
