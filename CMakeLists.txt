@@ -14,6 +14,11 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
+if(MSVC)
+    # Sources are UTF-8 (musical symbols in strings); large translation units (JUCE).
+    add_compile_options(/utf-8 /bigobj)
+endif()
+
 if(APPLE)
     # Universal binaries can be enabled later with -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64".
     set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum macOS version")
