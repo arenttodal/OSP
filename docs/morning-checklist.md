@@ -45,6 +45,16 @@ Everything saves as you go and I read it from the page. Headphones help.
    - CC74 sets brightness.
    - CC 20–25 control the six macros.
    - MPE bend range is ±48 semitones.
+6. **Transient preservation is on by default** in the engine. From about a fifth away
+   from the recorded note, the pick, click or strike keeps its real speed. The
+   Transients tab decides whether it stays on: if you hear no improvement, or anything
+   worse, I switch it off, because the simpler engine wins ties.
+7. **Recordings over a minute skip Natural pitch.** Natural keeps four extra copies of
+   the sound, so with long recordings it plays as Tape, and the status line says so.
+   This halves memory for long files.
+8. **Presets and instruments live in `Documents/OSP/Presets` and
+   `Documents/OSP/Instruments`.** They are ordinary files, so you can share them or
+   sync them with Dropbox.
 
 ## 3. Checks on your Mac
 
@@ -78,12 +88,15 @@ Everything saves as you go and I read it from the page. Headphones help.
    *Load example* button, and which ones? Right now it loads a synthetic vowel.
 2. **Your organ recordings mix different stops** (some flute-like, some reedy). Should
    a dropped set be split by timbre as well as pitch (into separate "instruments" or
-   articulations), or is one set per stop what you would do anyway?
+   articulations), or is one set per stop what you would do anyway? Today the louder
+   stops become "velocity layers", so velocity also moves between stops (and the new
+   multi-velocity learning smooths the steps between them). That is wrong if a stop is
+   not a dynamic.
 3. **Names and identity for packaging.** The plugin is currently "OSP" by "OSP"
    (codes `Ospx`/`Osp1`, bundle ids `com.osp.*`). What company or developer name and
    identifiers should the signed installer use, and do you have a Developer ID?
 4. **Windows.** It builds and passes all tests in CI. Ship it with v1, or launch
    Mac-first?
 5. **Next listening round.** After you have rated the lab, should I tune toward your
-   preferences straight away, or first run the next experiments (transient/body
-   separation, a second pitch round with more sources per family)?
+   preferences straight away, or first run the next experiments (a second pitch round
+   with more sources per family, a quieter or louder default for LIFE and SPACE)?
