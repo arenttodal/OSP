@@ -1,4 +1,5 @@
 #include "audio/pitch/SincInterpolator.h"
+#include "core/Prng.h"
 #include "model/PlaybackSource.h"
 
 #include <catch2/catch_approx.hpp>
@@ -110,4 +111,23 @@ TEST_CASE ("interpolation: reads beyond the ends see silence", "[unit][interpola
     const auto after = read (sinc, src, 100.0 + sinc.reachFor (4.0) + 0.5, 4.0, 1);
     CHECK (before[0] == Approx (0.0).margin (1e-6));
     CHECK (after[0] == Approx (0.0).margin (1e-6));
+}
+
+TEST_CASE ("interpolation: the polyphase fast path matches the exact kernel", "[unit][interpolation]")
+{
+    osp::SincInterpolator sinc (16);
+    osp::SincInterpolator::Kernel exact, fast;
+    osp::Prng rng (3);
+    double worst = 0.0;
+    for (int i = 0; i < 2000; ++i)
+    {
+        const double position = 100.0 + rng.uniform (0.0, 50.0);
+        sinc.computeKernel (position, 1.0, exact);
+        sinc.computeKernelUnity (position, fast);
+        REQUIRE (exact.firstIndex == fast.firstIndex);
+        REQUIRE (exact.numTaps == fast.numTaps);
+        for (int t = 0; t < exact.numTaps; ++t)
+            worst = std::max (worst, static_cast<double> (std::abs (exact.weights[t] - fast.weights[t])));
+    }
+    CHECK (worst < 2.0e-4);
 }

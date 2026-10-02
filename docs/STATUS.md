@@ -141,6 +141,11 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
   post stage). macOS 14 arm64 CI runner (48 kHz / 128): engine C 16 held voices **17.1 %**
   mean (spec target < 25 %: met), 24 voices with dense retriggers 30.5 % (baseline A 26 %).
   Worst-case callbacks on the shared CI VM spike to several ms; needs measuring on a real Mac.
+  Since then engine C reads at or below the original speed through a precomputed
+  polyphase table (2048 phases): on the cloud VM 16 held voices went 38 % -> 22 % (the
+  baseline measures 31 % on the same VM), 24 dense voices 63 % -> 41 %. Upward
+  transposition still evaluates the stretched kernel per sample (mip-mapped sources
+  would remove that).
 - **CPU**: the windowed-sinc kernel is computed per output sample (two table lookups
   per tap). Measured on a 2.1 GHz Xeon cloud VM: 16 sustained voices ≈ 19–20 % of the
   48 kHz/128 block budget, 24 voices with dense retriggers ≈ 33 %. Transposing up

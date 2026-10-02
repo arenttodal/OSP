@@ -364,7 +364,10 @@ void InstrumentVoice::updateControl() noexcept
 void InstrumentVoice::readFrame (double pos, double step, float& l, float& r) noexcept
 {
     const auto& src = *layer->source;
-    sinc->computeKernel (pos, step, kernel);
+    if (step <= 1.0)
+        sinc->computeKernelUnity (pos, kernel);
+    else
+        sinc->computeKernel (pos, step, kernel);
     l = SincInterpolator::apply (kernel, src.channelData (0));
     r = src.numChannels() > 1 ? SincInterpolator::apply (kernel, src.channelData (1)) : l;
 }

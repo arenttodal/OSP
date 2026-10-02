@@ -53,6 +53,36 @@ SincInterpolator::SincInterpolator (int zeroCrossings, double maxStretch)
         windowTable[i] = static_cast<float> (besselI0 (kaiserBeta * std::sqrt (1.0 - r * r)) / norm);
     }
     windowTable.back() = 0.0f;
+
+    // Polyphase table for the unstretched kernel: one normalised row per fractional phase.
+    const int taps = 2 * numZeroCrossings;
+    polyphase.resize (static_cast<std::size_t> ((polyphaseResolution + 1) * taps));
+    Kernel scratch;
+    for (int p = 0; p < polyphaseResolution; ++p)
+    {
+        const double frac = static_cast<double> (p) / polyphaseResolution;
+        computeKernel (static_cast<double> (numZeroCrossings) + frac, 1.0, scratch); // base = zc, first = 1
+        for (int t = 0; t < taps; ++t)
+            polyphase[static_cast<std::size_t> (p * taps + t)] = t < scratch.numTaps ? scratch.weights[t] : 0.0f;
+    }
+    // The closing row (fraction 1.0, same first tap) is phase 0 moved one tap later.
+    for (int t = 0; t < taps; ++t)
+        polyphase[static_cast<std::size_t> (polyphaseResolution * taps + t)] = t == 0 ? 0.0f : polyphase[static_cast<std::size_t> (t - 1)];
+}
+
+void SincInterpolator::computeKernelUnity (double position, Kernel& kernel) const noexcept
+{
+    const auto base = static_cast<int> (std::floor (position));
+    const double scaled = (position - static_cast<double> (base)) * polyphaseResolution;
+    const auto row = std::min (static_cast<int> (scaled), polyphaseResolution - 1);
+    const auto a = static_cast<float> (scaled - static_cast<double> (row));
+    const int taps = 2 * numZeroCrossings;
+    kernel.firstIndex = base - numZeroCrossings + 1;
+    kernel.numTaps = taps;
+    const float* r0 = polyphase.data() + static_cast<std::size_t> (row * taps);
+    const float* r1 = r0 + taps;
+    for (int t = 0; t < taps; ++t)
+        kernel.weights[t] = r0[t] + a * (r1[t] - r0[t]);
 }
 
 float SincInterpolator::lookup (const std::vector<float>& table, double index) noexcept

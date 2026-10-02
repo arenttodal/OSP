@@ -52,6 +52,15 @@ public:
     /** Computes kernel weights for reading at `position` with `increment` source samples per output sample. */
     void computeKernel (double position, double increment, Kernel& kernel) const noexcept;
 
+    /**
+        Fast path for increment <= 1 (no stretch): the kernel then depends only on the
+        fractional position, so it is interpolated from a precomputed polyphase table
+        (2048 phases) instead of being evaluated tap by tap. Equivalent to
+        computeKernel (position, 1.0, ...) within table precision. Used by engine C; the
+        baselines keep computeKernel so their golden renders never change.
+    */
+    void computeKernelUnity (double position, Kernel& kernel) const noexcept;
+
     /** Applies a computed kernel to one (padded) channel. `data` points at source sample 0. */
     static float apply (const Kernel& kernel, const float* data) noexcept
     {
@@ -75,6 +84,8 @@ private:
     static constexpr int windowResolution = 4096; // window table entries over [0, 1]
     std::vector<float> sincTable;                 // sinc(u), u in [0, zeroCrossings]
     std::vector<float> windowTable;               // kaiser(r), r in [0, 1]
+    static constexpr int polyphaseResolution = 2048;
+    std::vector<float> polyphase;                 // (resolution + 1) rows x (2 * zeroCrossings) taps
 };
 
 } // namespace osp
