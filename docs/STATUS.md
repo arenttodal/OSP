@@ -110,6 +110,23 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - Known limits: sets mixing different organ stops are grouped by pitch only (timbre clustering
   is not done); register anchors are not built for sets.
 
+## Milestone checklist — Phase 8: commercial polish (what can be done without a Mac/certificates)
+
+- [x] Starting states (Natural, Alive, Floating, Broken, Frozen, Dream, Wide) as host programs + selector
+- [x] Presets (.osppreset) and portable instruments (.ospinstrument: sources + analysis + settings; bit-identical on another machine)
+- [x] Undo/redo: sample loads (incl. sets and stages), root changes; parameters via the APVTS undo manager
+- [x] UI scaling 80–200 %, accessibility titles on controls
+- [x] MIDI: mod wheel, aftertouch/pressure, CC74, CC 20–25 -> macros; MPE lower zone (bend/pressure/slide per note)
+- [x] Windows VST3: CI builds it and runs every test with MSVC
+- [x] Performance tuning: polyphase fast path (engine C cheaper than the plain baseline)
+- [x] Crash-safe sample management (atomic store copies, analysis cache re-derived when stale, original-path fallback)
+- [x] User guide (docs/user-guide.md)
+- [~] Installer/signing/notarisation: `scripts/package-macos.sh` written, **not run** (needs a Developer ID)
+- [ ] Factory example sounds (need legally owned recordings — see morning checklist)
+- [ ] Preset browser beyond file load/save (a list of the user's presets)
+- [ ] Host certification matrix (Logic, Ableton, Reaper, Cubase, Studio One) — needs a Mac
+- [ ] Onboarding beyond the empty-state prompt and "Load example"
+
 ## DONE
 
 - Pure C++20 DSP/analysis library (`osp_dsp`) independent of JUCE; JUCE used for file
@@ -124,12 +141,15 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 
 ## IN PROGRESS
 
-- Phase 2 pitch bake-off: waiting on blind listening ratings for run 1.
+- Listening verdicts for Phases 3–7 (one page: the listening lab, see docs/morning-checklist.md).
+- DAW/host validation on a Mac.
 
 ## NEXT
 
-- Score run 1 and record the engine decision; wire the winner (if not A) as an
-  offline-prepared option behind `ModelExchange`, with A/B renders against baselines A and B.
+- Score the lab ratings; tune or revert per experiment (keep the simplest winner).
+- Transient/body separation (spec §19) as an experiment against the current gain-based
+  transient shaping; spectral/stochastic continuation only if multi-loop loses.
+- Mip-mapped sources for upward transposition (CPU), real-Mac worst-case callback timing.
 
 ## BLOCKERS
 

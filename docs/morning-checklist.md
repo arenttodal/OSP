@@ -1,67 +1,81 @@
 # Morning checklist
 
-These are the things I need from you: listening tests, checks in a DAW, and decisions.
-Items are grouped by phase. The newest items are at the bottom of each section.
+Everything I need from you: listening tests, checks on your Mac, and decisions. The
+summary of the night is in `docs/reports/overnight-phases-2-8.md`.
 
-## Decisions I made overnight (please confirm or overrule)
+## 1. Listening tests (about 45–60 minutes in total)
 
-1. **Pitch bake-off.** A (resampling) stays the default and C (formant compensation) is
-   dropped. B is added as a second option, **Pitch Character: Natural**, built from
-   offline octave anchors. See `docs/reports/pitch-bakeoff-1.md`. Question: should
-   *Natural* become the automatic default for organ-like sustained sources? You chose B
-   on all four organ groups.
+All of them are on one page, **the listening lab**:
+https://claude.ai/artifact/SBtjwht3czzVXQbzpmeWUR.
 
-## Listening tests
+There is one tab per experiment. The takes in each group are blind and in a random
+order. Rate each take (1–5 on three scales), pick a best and, if you like, write a note.
+Everything saves as you go and I read it from the page. Headphones help.
 
-All in one page, **the listening lab**: https://claude.ai/artifact/SBtjwht3czzVXQbzpmeWUR.
-There is one tab per experiment. Ratings and notes save automatically, and I read them
-from the page. If a tab is new, the takes are blind and in a random order.
+| Tab | Phase / exit test | What to listen for | What the measurements predict |
+|---|---|---|---|
+| **Sustain** | 3: 60 s holds without an obvious loop | repeats, bumps, a vibrato cycling identically, the moment the recording ends | single loops repeat strongly (score 0.7–0.9) and multi-loop barely does (0.1–0.2); no clicks found |
+| **Repetition** | 4: repeated notes preferred over identical retriggers | machine-gun attacks vs variation that sounds random | LIFE 50 % ≈ ⅔ of a real player's spread, 80 % ≈ all of it; baseline B varies pitch and level but never tone |
+| **Dynamics** | 5: a crescendo is more than gain | do soft notes sound softly played, loud notes hard? | +3.5–6 semitones of brightness on harmonic sources; on pure-tone sources mostly the attack changes |
+| **Original ↔ Reimagined** | 6: useful sounds across the whole range | rate each of the 5 settings on its own | — |
+| **Multi-sample** | 7: a dropped set is automatically better | low and high notes, repeated notes | the register model is closer to real recordings for plucks and organ |
 
-1. **Sustain** (Phase 3 exit test): 5 sources each held for 60 s and released. The
-   four takes are: a single naive loop, the best single loop, multi-loop, and
-   multi-loop with movement. Main question: *can you hear the loop?* The measurements
-   predict that multi-loop removes audible repetition. Single loops score 0.7–0.9 on my
-   repetition measure, multi-loop 0.1–0.2. No clicks were detected in any take.
-2. **Repetition** (Phase 4 exit test): 4 sources (Tagel, pluck, violin, vocal), each as
-   steady repeats (8 × 0.5 s) and fast repeats (12 × 0.16 s). The four takes are:
-   identical retrigger, baseline B (independent random pitch and level), the
-   performance engine at LIFE 50 %, and at LIFE 80 %. Main question: *does it stop
-   sounding like the same retrigger without sounding random?* Measured per-note spread
-   on the Tagel at LIFE 50 %: 2.1 dB level, 1.0 semitone brightness, 3 cents. Real
-   repeated takes spread 3.5 dB, 1.4 semitones and 3.7 cents, so LIFE 80 % is about
-   the real spread.
-3. **Dynamics** (Phase 5 exit test): 5 expressive sources (violin, sax, vocal,
-   nyckelharpa, pluck), each played at velocities 20 → 127. The four takes are: gain
-   only, gain plus velocity filter, the dynamic model at DYNAMICS 50 %, and at 100 %.
-   Main question: *does the crescendo sound like playing harder?* Measured: the model
-   moves brightness by 3.5–6 semitones on harmonic-rich sources and changes the
-   attack-to-body ratio by 8–16 dB. The vocal and pluck are nearly pure tones, so
-   there velocity changes mostly the attack.
-4. **Original ↔ Reimagined** (Phase 6 exit test): 4 sources each play an arpeggio and a
-   held chord at Reimagined 0, 25, 50, 75 and 100 %. Rate each take on its own. Main
-   question: *is there a useful sound across the whole range, not only at the ends?*
-   Toward Reimagined the instrument adds sympathetic resonance tuned to the source's own
-   partials and body, more granular continuation, more drift, and gentle harmonic
-   saturation above 50 %.
-5. **Multi-sample** (Phase 7 exit test): the plucks set (16 files) and the Tagel set
-   (14 files) each play a phrase across their range plus fast repeats. The three takes
-   are: one file with the plain sampler, one file with the OSP engine, and the whole
-   set combined automatically. Main question: *does dropping the set make a better
-   instrument with no mapping?*
+## 2. Decisions I made overnight (please confirm or overrule)
 
-## Checks in a DAW (need your Mac)
+1. **Pitch bake-off.** A (resampling) stays the default, C (formant compensation) is
+   dropped, and B became **Pitch Character: Natural**.
+   *Question:* should Natural become the automatic default for organ-like sustained
+   sources? You picked B in all four organ groups.
+2. **Release.** When the recording has a natural ending, a Release of 0.2 s or more
+   lets that ending play instead of a fade. Shorter settings fade as before.
+3. **Default macros.** LIFE 35 %, DYNAMICS 50 %, CHARACTER 50 %, MOTION 35 %,
+   SPACE 20 %, Reimagined 20 %. Sustain defaults to *Endless*. Too much, or too little,
+   out of the box?
+4. **Old sessions.** Projects saved with the Phase 1 plugin open with neutral engine
+   settings, so they keep sounding like the plain sampler.
+5. **MIDI mapping.**
+   - Mod wheel opens MOTION.
+   - Pressure adds level and brightness.
+   - CC74 sets brightness.
+   - CC 20–25 control the six macros.
+   - MPE bend range is ±48 semitones.
 
-- Load the AU/VST3 in Logic, Ableton and Reaper. Drop a corpus sample, play, save the
-  project, reopen it, and confirm it sounds identical.
+## 3. Checks on your Mac
 
-## Plugin checks for the new features (need your Mac)
+- [ ] Install the AU/VST3 from CI (Actions → latest run → `osp-macos-14` artifact), or
+  build with `cmake -B build-plugin -G Ninja -DOSP_BUILD_PLUGIN=ON && cmake --build build-plugin`.
+- [ ] **Logic, Ableton, Reaper:**
+  - Drop a sample, play, save, reopen: it should sound identical.
+  - Bounce twice: the two bounces should be identical.
+  - Automate the macros: there should be no clicks.
+- [ ] Drop **several files or a folder** (for example `research/corpus/plucks`). Open
+  **Samples**: do the groups, layers and round robins make sense? Correct one, save,
+  reopen.
+- [ ] **Pitch Character** Tape vs Natural on the organ and the vocal, ±1–2 octaves.
+- [ ] **Sustain** Recording vs Endless: hold a chord for a minute.
+- [ ] **Starting states:** step through all seven while holding a chord.
+- [ ] **☰ menu:**
+  - export an instrument and import it in a fresh project (or on a second machine);
+  - Undo/Redo after loading a second sample;
+  - Interface size 80–200 %.
+- [ ] If you have one, an **MPE controller** (Advanced → MPE): per-note bend, pressure
+  and slide.
+- [ ] **CPU:** 16 held voices at 48 kHz / 128 in your DAW's meter. CI's Apple Silicon
+  runner measured 17 % before the latest optimisation.
 
-- Drop several files, or a folder, onto the plugin. Open **Samples** and check that the
-  pitch groups, velocity layers and round robins make sense, then correct one (role,
-  layer or root). Save, reopen, and it should sound the same.
-- Move the five macros and Original ↔ Reimagined while holding a chord. There should be
-  no clicks, and every position should be usable.
-- Pitch Character Tape vs Natural on an organ or vocal, ±1–2 octaves.
-- Sustain Recording vs Endless, holding notes for a minute.
+## 4. Questions
 
-## Questions
+1. **Factory examples (spec §100).** These need legally owned sounds (vocal, bowed,
+   synth, pluck, a strange texture). May I use files from your corpus for the
+   *Load example* button, and which ones? Right now it loads a synthetic vowel.
+2. **Your organ recordings mix different stops** (some flute-like, some reedy). Should
+   a dropped set be split by timbre as well as pitch (into separate "instruments" or
+   articulations), or is one set per stop what you would do anyway?
+3. **Names and identity for packaging.** The plugin is currently "OSP" by "OSP"
+   (codes `Ospx`/`Osp1`, bundle ids `com.osp.*`). What company or developer name and
+   identifiers should the signed installer use, and do you have a Developer ID?
+4. **Windows.** It builds and passes all tests in CI. Ship it with v1, or launch
+   Mac-first?
+5. **Next listening round.** After you have rated the lab, should I tune toward your
+   preferences straight away, or first run the next experiments (transient/body
+   separation, a second pitch round with more sources per family)?

@@ -79,6 +79,9 @@ adding fields must be documented in `docs/analysis-schema.md`.
 - `apps/research-renderer` — the CLI. `apps/plugin` — JUCE plugin + standalone
   (processor, loader thread, sample store, minimal editor). New instruments reach the
   audio thread only through `ModelExchange`; never share mutable state with it.
+- `src/engine` — the instrument engine ("engine C": continuation, performance, dynamics,
+  macros, sets). Baselines A/B stay in `audio/sampler` unchanged; every listening test
+  compares against them.
 - Tests: Catch2, tags `[unit]`, `[integration]`, `[regression]`.
 
 ## Conventions
