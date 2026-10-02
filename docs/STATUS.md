@@ -126,6 +126,7 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [x] MIDI: mod wheel, aftertouch/pressure, CC74, CC 20–25 -> macros; MPE lower zone (bend/pressure/slide per note)
 - [x] Windows VST3: CI builds it and runs every test with MSVC
 - [x] Performance tuning: polyphase fast path (engine C cheaper than the plain baseline)
+- [x] Host robustness matrix (plugin test): 22.05–192 kHz × blocks 1–4096 and host-varied blocks; bit-identical output, finite, click-free, chord ±2 octaves + bend
 - [x] Crash-safe sample management (atomic store copies, analysis cache re-derived when stale, original-path fallback)
 - [x] User guide (docs/user-guide.md)
 - [~] Installer/signing/notarisation: `scripts/package-macos.sh` written, **not run** (needs a Developer ID)

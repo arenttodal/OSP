@@ -382,6 +382,92 @@ TEST_CASE ("plugin: undo and redo sample loads and root changes", "[plugin]")
 
 // Needs a display (run under xvfb-run on headless Linux). Hidden by default:
 //   OSP_SNAPSHOT_DIR=/tmp xvfb-run ./osp_plugin_tests "[ui]"
+TEST_CASE ("plugin: engine C holds up at every host sample rate and block size", "[plugin]")
+{
+    TempDir tmp;
+    const auto file = writeSource (tmp.dir, "pluck.wav", testsignals::pluck (midiToHz (55), 2.0, 44100.0, 4));
+    const auto vowel = writeSource (tmp.dir, "vowel.wav", testsignals::vowel (midiToHz (57), 3.0, 48000.0, 3));
+
+    // A chord far from the root on both sides, with the default macros (LIFE, SPACE, ...)
+    // and a pitch-bend sweep, rendered with a fixed or a host-like varying block size.
+    auto render = [] (OspAudioProcessor& p, double rate, int maxBlock, bool varying) {
+        p.prepareToPlay (rate, maxBlock);
+        const auto total = static_cast<int> (1.5 * rate);
+        AudioData out = AudioData::allocate (2, total, rate);
+        juce::AudioBuffer<float> buffer (2, maxBlock);
+        juce::Random sizes (7);
+        int pos = 0, block = 0;
+        while (pos < total)
+        {
+            const int n = std::min (total - pos, varying ? 1 + sizes.nextInt (maxBlock) : maxBlock);
+            juce::AudioBuffer<float> view (buffer.getArrayOfWritePointers(), 2, n);
+            view.clear();
+            juce::MidiBuffer midi;
+            if (block == 0)
+                for (int note : { 31, 55, 62, 79, 91 })
+                    midi.addEvent (juce::MidiMessage::noteOn (1, note, static_cast<juce::uint8> (60 + note % 60)), 0);
+            // Sample-accurate events, wherever the block boundaries fall.
+            if (total / 2 >= pos && total / 2 < pos + n)
+                midi.addEvent (juce::MidiMessage::pitchWheel (1, 12000), total / 2 - pos);
+            if (3 * total / 4 >= pos && 3 * total / 4 < pos + n)
+                midi.addEvent (juce::MidiMessage::allNotesOff (1), 3 * total / 4 - pos);
+            p.processBlock (view, midi);
+            for (int ch = 0; ch < 2; ++ch)
+                std::copy (view.getReadPointer (ch), view.getReadPointer (ch) + n, out.channels[static_cast<std::size_t> (ch)].begin() + pos);
+            pos += n;
+            ++block;
+        }
+        return out;
+    };
+
+    for (const auto& source : { file, vowel })
+    {
+        OspAudioProcessor p;
+        loadAndWait (p, source);
+        for (double rate : { 22050.0, 44100.0, 48000.0, 96000.0, 192000.0 })
+        {
+            std::vector<AudioData> fixedRenders;
+            for (int block : { 1, 32, 128, 1024, 4096 })
+            {
+                if (block == 1 && rate > 50000.0)
+                    continue; // slow, and covered at the lower rates
+                const auto out = render (p, rate, block, false);
+                INFO (source.getFileName() << " at " << rate << " Hz, block " << block);
+                bool finite = true;
+                float peak = 0.0f, worstStep = 0.0f;
+                for (const auto& ch : out.channels)
+                    for (std::size_t i = 1; i < ch.size(); ++i)
+                    {
+                        finite = finite && std::isfinite (ch[i]);
+                        peak = std::max (peak, std::abs (ch[i]));
+                        worstStep = std::max (worstStep, std::abs (ch[i] - ch[i - 1]));
+                    }
+                CHECK (finite);
+                CHECK (peak > 0.01f);
+                CHECK (peak < 2.0f);
+                CHECK (worstStep < 0.5f); // no clicks or blow-ups
+                fixedRenders.push_back (out);
+            }
+            // Same output whatever the block size, also when the host varies it.
+            const auto varying = render (p, rate, 512, true);
+            auto maxDiff = [&] (const AudioData& a) {
+                float d = 0.0f;
+                for (std::size_t ch = 0; ch < 2; ++ch)
+                    for (std::size_t i = 0; i < a.channels[ch].size(); ++i)
+                        d = std::max (d, std::abs (a.channels[ch][i] - fixedRenders.front().channels[ch][i]));
+                return d;
+            };
+            INFO (source.getFileName() << " at " << rate << " Hz");
+            for (std::size_t k = 1; k < fixedRenders.size(); ++k)
+            {
+                INFO ("fixed render " << k);
+                CHECK (maxDiff (fixedRenders[k]) <= 0.0f);
+            }
+            CHECK (maxDiff (varying) <= 0.0f);
+        }
+    }
+}
+
 TEST_CASE ("plugin: editor builds, shows the instrument and can be snapshotted", "[.][ui]")
 {
     TempDir tmp;
