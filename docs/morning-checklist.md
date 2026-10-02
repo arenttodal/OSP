@@ -22,6 +22,14 @@ from the page. If a tab is new, the takes are blind and in a random order.
    multi-loop with movement. Main question: *can you hear the loop?* The measurements
    predict that multi-loop removes audible repetition. Single loops score 0.7–0.9 on my
    repetition measure, multi-loop 0.1–0.2. No clicks were detected in any take.
+2. **Repetition** (Phase 4 exit test): 4 sources (Tagel, pluck, violin, vocal), each as
+   steady repeats (8 × 0.5 s) and fast repeats (12 × 0.16 s). The four takes are:
+   identical retrigger, baseline B (independent random pitch and level), the
+   performance engine at LIFE 50 %, and at LIFE 80 %. Main question: *does it stop
+   sounding like the same retrigger without sounding random?* Measured per-note spread
+   on the Tagel at LIFE 50 %: 2.1 dB level, 1.0 semitone brightness, 3 cents. Real
+   repeated takes spread 3.5 dB, 1.4 semitones and 3.7 cents, so LIFE 80 % is about
+   the real spread.
 
 ## Checks in a DAW (need your Mac)
 

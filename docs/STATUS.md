@@ -61,6 +61,18 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [x] InstrumentEngine ("engine C") in the plugin; staged model (playable -> sustain -> anchors)
 - [ ] Listening verdict (lab tab "Sustain") — exit condition: 60 s holds without an obvious loop
 
+## Milestone checklist — Phase 4: performance MVP
+
+- [x] Performance vector (level, brightness, body, transient, micro-pitch + settle, damping, start, stereo)
+- [x] Correlation through latent factors (force, colour, timing) — not independent draws
+- [x] Deterministic variation (seed + event sequence); transport start resets memory in the plugin
+- [x] Performance memory (Ornstein-Uhlenbeck, 4 s)
+- [x] Repetition awareness (alternating attacks, less pitch drift on fast repeats)
+- [x] LIFE macro (0 identical, 0.5 realistic, 1 reinterpreted)
+- [x] Calibration against the corpus' real repeated takes (Tagel, plucks; violin RR set has only 2 takes)
+- [x] Experiment 3 (A identical / B independent / C LIFE 50 % / D LIFE 80 %), steady + fast repeats
+- [ ] Listening verdict (lab tab "Repetition") — exit condition: engine preferred over identical repeats
+
 ## DONE
 
 - Pure C++20 DSP/analysis library (`osp_dsp`) independent of JUCE; JUCE used for file
