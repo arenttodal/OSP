@@ -8,6 +8,7 @@
 #include "io/JsonUtil.h"
 #include "midi/MidiFileIO.h"
 #include "midi/MidiFixtures.h"
+#include "engine/InstrumentBuilder.h"
 #include "research/Bakeoff.h"
 #include "research/Experiment.h"
 #include "research/Benchmark.h"
@@ -596,6 +597,12 @@ int main (int argc, char** argv)
                           << ", jumps " << c.jumps.size() << " mean r " << juce::String (meanR, 3)
                           << ", release " << (c.hasRelease ? "yes tail " + juce::String (c.tailSeconds, 2).toStdString() + " s" : std::string ("no"))
                           << ", exits " << c.graftExits.size() << ", " << juce::String (ms, 0) << " ms\n";
+                const auto ch = instrument::estimateCharacter (source.analysis, &c);
+                std::cout << "    character: transient " << juce::String (ch.transientTonal, 2) << ", sustained "
+                          << juce::String (ch.sustainedHarmonic, 2) << ", expressive " << juce::String (ch.expressiveSustain, 2)
+                          << ", modulation " << juce::String (ch.periodicModulation, 2) << ", noise " << juce::String (ch.noiseComponent, 2)
+                          << "; attack " << juce::String (1000.0 * source.analysis.envelope.attackSeconds, 0) << " ms, decay "
+                          << juce::String (source.analysis.envelope.decaySlopeDbPerSecond, 1) << " dB/s\n";
             }
             return exitOk;
         }

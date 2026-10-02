@@ -30,6 +30,8 @@ struct SetMember
     int layer = 0;           ///< velocity layer within the group (0 = softest)
     int take = 0;            ///< round-robin index within the layer
     double loudnessDb = 0.0; ///< max RMS (dBFS) of the recording, before playback levelling
+    double onsetLoudnessDb = 0.0; ///< loudest 20 ms within the first 0.3 s of playback: what a note's start sounds like
+    double layerLoudnessDb = 0.0; ///< mean onset loudness of its (pitch group, layer): levelling keeps take-to-take differences
     double confidence = 1.0; ///< how sure the inference is about role/layer, 0..1
     bool userAssigned = false;
 };
@@ -63,6 +65,8 @@ struct InstrumentSet
         softer one, averaged over the pitch groups that have several layers. The engine
         uses it to make velocities between layers continuous. */
     bool hasDynamicsModel = false;
+    /** Loudest (group, layer) mean loudness (max RMS, dBFS): layers are levelled against it. */
+    double loudestDb = 0.0;
     double layerStepDb = 0.0;            ///< loudness per layer step
     double layerStepBrightnessSt = 0.0;  ///< spectral centroid per layer step (semitones)
     double layerStepAttackMs = 0.0;      ///< attack time per layer step (negative: harder is faster)

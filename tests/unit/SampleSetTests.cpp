@@ -201,3 +201,38 @@ TEST_CASE ("sample set: velocity layers teach the dynamics between them", "[unit
     CHECK (std::abs (jumpSt) < 0.5 * set.layerStepBrightnessSt);
     CHECK (rangeSt > set.layerStepBrightnessSt); // velocity still spans more than the two recordings
 }
+
+TEST_CASE ("sample set: groups with and without velocity layers play at the same level", "[unit][sampleset]")
+{
+    // Regression (lab, multisample-1 plucks): a single-take group used to play ~8 dB
+    // softer than a layered group at the same velocity.
+    std::vector<Source> sources;
+    sources.push_back (make (48, 0.5, "c3.wav"));
+    sources.push_back (make (60, 0.12, "c4 soft.wav"));
+    sources.push_back (make (60, 0.5, "c4 hard.wav"));
+    const auto set = build (sources);
+    REQUIRE (set.groups.size() == 2);
+    auto level = [&] (int note, int velocity) {
+        InstrumentEngine engine;
+        EngineSettings s;
+        s.macros.life = 0.0;
+        s.macros.space = 0.0;
+        s.macros.reimagined = 0.0;
+        s.macros.motion = 0.0;
+        engine.prepare (48000.0, 256, s);
+        engine.setInstrumentSet (&set);
+        engine.noteOn (note, velocity);
+        AudioData out = AudioData::allocate (2, 24000, 48000.0);
+        for (int pos = 0; pos < 24000; pos += 256)
+        {
+            float* ch[2] = { out.channels[0].data() + pos, out.channels[1].data() + pos };
+            engine.render (ch, 2, std::min (256, 24000 - pos));
+        }
+        return test::analyse (out).envelope.maxRmsDbfs;
+    };
+    for (int velocity : { 70, 90, 127 })
+    {
+        INFO ("velocity " << velocity);
+        CHECK (std::abs (level (48, velocity) - level (60, velocity)) < 2.0);
+    }
+}

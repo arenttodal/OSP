@@ -63,6 +63,24 @@ std::optional<double> dynamicsRankFromName (const std::string& filename)
     return best;
 }
 
+namespace
+{
+    // Levelling uses how a note starts, not the recording's loudest moment: a take that
+    // swells for seconds must not be turned down for a peak the player rarely reaches.
+    double onsetLoudness (const InstrumentModel& model)
+    {
+        const auto& rms = model.analysis.envelope.rmsDb;
+        if (rms.hopSeconds <= 0.0 || rms.values.empty())
+            return model.analysis.envelope.maxRmsDbfs;
+        const auto from = static_cast<std::size_t> (std::max (0.0, model.playback.startSeconds) / rms.hopSeconds);
+        const auto to = std::min (rms.values.size(), from + static_cast<std::size_t> (0.3 / rms.hopSeconds) + 1);
+        double best = -200.0;
+        for (auto i = from; i < to; ++i)
+            best = std::max (best, static_cast<double> (rms.values[i]));
+        return best > -199.0 ? best : model.analysis.envelope.maxRmsDbfs;
+    }
+}
+
 InstrumentSet inferSampleSet (const std::vector<SetInput>& inputs, const std::vector<SetAssignment>& assignments)
 {
     InstrumentSet set;
@@ -74,6 +92,7 @@ InstrumentSet inferSampleSet (const std::vector<SetInput>& inputs, const std::ve
         m.model = in.model;
         m.filename = in.filename;
         m.loudnessDb = in.model->analysis.envelope.maxRmsDbfs;
+        m.onsetLoudnessDb = onsetLoudness (*in.model);
         set.members.push_back (std::move (m));
     }
     if (set.members.empty())
@@ -202,6 +221,23 @@ InstrumentSet inferSampleSet (const std::vector<SetInput>& inputs, const std::ve
         }
     }
 
+    // Levelling reference: each (group, layer) by its mean loudness, so groups and layers
+    // line up while round-robin takes keep their natural differences.
+    set.loudestDb = -200.0;
+    for (auto& m : set.members)
+    {
+        double sum = 0.0;
+        int n = 0;
+        for (const auto& o : set.members)
+            if (o.pitchGroup == m.pitchGroup && o.layer == m.layer && o.role != SampleRole::articulation)
+            {
+                sum += o.onsetLoudnessDb;
+                ++n;
+            }
+        m.layerLoudnessDb = n > 0 ? sum / n : m.onsetLoudnessDb;
+        set.loudestDb = std::max (set.loudestDb, m.layerLoudnessDb);
+    }
+
     // 3. Multi-velocity learning: least-squares slope of each descriptor over the layer
     //    index within every group that has several layers, averaged over those groups.
     {
@@ -219,7 +255,7 @@ InstrumentSet inferSampleSet (const std::vector<SetInput>& inputs, const std::ve
                     continue;
                 const auto& a = m.model->analysis;
                 lx.push_back (m.layer);
-                ldb.push_back (m.loudnessDb);
+                ldb.push_back (m.onsetLoudnessDb);
                 lst.push_back (a.spectral.meanCentroidHz > 0.0 ? 12.0 * std::log2 (a.spectral.meanCentroidHz) : 0.0);
                 lms.push_back (1000.0 * a.envelope.attackSeconds);
             }

@@ -153,10 +153,12 @@ public:
     {
         return shapeFor (currentModel, note, velocity, eventIndex, 100.0, 0.0);
     }
-    /** `layerSpan` > 0: the note plays a velocity layer of a set with a dynamics model;
-        level and dynamics then follow the learned layer differences (spec §35). */
+    /** `setMember`: the model is one recording of a set and `referenceVelocity` is the
+        velocity at which its own recorded loudness belongs (loudness-anchored), so every
+        member plays at the same level for a given velocity. `layered`: its pitch group has
+        velocity layers and the set's learned layer differences shape the dynamics (§35). */
     NoteShape shapeFor (const InstrumentModel* model, int note, int velocity, std::uint64_t eventIndex, double referenceVelocity,
-                        double registerBrightnessDb, double layerSpan = 0.0) noexcept;
+                        double registerBrightnessDb, bool setMember = false, bool layered = false) noexcept;
 
     /** Which member of the current set a note would use (no state change). -1 without a set. */
     int memberFor (int note, int velocity, std::uint64_t eventIndex) const noexcept;

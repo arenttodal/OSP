@@ -254,33 +254,31 @@ void InstrumentEngine::applyDynamics (NoteShape& shape, int velocity, const Dyna
 }
 
 NoteShape InstrumentEngine::shapeFor (const InstrumentModel* model, int note, int velocity, std::uint64_t eventIndex,
-                                     double referenceVelocity, double registerBrightnessDb, double layerSpan) noexcept
+                                     double referenceVelocity, double registerBrightnessDb, bool setMember, bool layered) noexcept
 {
     NoteShape shape;
     shape.seed = Prng::deriveSeed (config.seed, eventIndex, static_cast<std::uint64_t> (note));
     const double v = std::clamp (velocity, 1, 127);
-    // Single recordings: velocity 127 plays at the recording's level. Velocity layers:
-    // each layer is its own level at its nominal velocity; velocity only nudges around it.
-    const double velocityDb = referenceVelocity < 100.0 || referenceVelocity > 100.0
-                                  ? -config.velocityRangeDb * (referenceVelocity - v) / 127.0
-                                  : -config.velocityRangeDb * (1.0 - v / 127.0);
+    // Single recordings: velocity 127 plays at the recording's level. Set members: each
+    // plays at its recorded level at its loudness-anchored velocity, i.e. the level
+    // depends on velocity alone, whichever recording plays.
+    const double velocityDb = setMember ? -config.velocityRangeDb * (referenceVelocity - v) / 127.0
+                                        : -config.velocityRangeDb * (1.0 - v / 127.0);
     shape.gain = static_cast<float> (dbToGain (velocityDb));
     shape.brightnessDb += static_cast<float> (registerBrightnessDb);
 
     if (model != nullptr)
     {
         auto dynamics = model->dynamics;
-        if (layerSpan > 0.0 && currentSet != nullptr && currentSet->hasDynamicsModel)
+        if (layered && currentSet != nullptr && currentSet->hasDynamicsModel && currentSet->layerStepDb > 0.5)
         {
-            // Between two layers, each nudges half-way towards its neighbour, so velocity
-            // changes continuously across the boundary instead of jumping (spec §35).
-            const double toEdge = (v - referenceVelocity) / layerSpan;   // +-0.5 at the boundaries
-            const double sensitivity = std::clamp (config.velocityRangeDb / 30.0, 0.0, 2.0);
-            shape.gain = static_cast<float> (dbToGain (currentSet->layerStepDb * toEdge * sensitivity));
-            const double edgeIntensity = 0.5 * layerSpan / 80.0;      // applyDynamics' intensity at a boundary
+            // Multi-velocity learning (spec §35): one layer step is this far apart in
+            // applyDynamics' intensity, and should change timbre as much as the real
+            // recordings do, so a layer played softer approaches the layer below it.
+            const double stepIntensity = currentSet->layerStepDb * 127.0 / std::max (config.velocityRangeDb, 6.0) / 80.0;
             // About 2 dB of shelf per semitone of centroid; full mode applies 0.8 x brightnessDb.
-            dynamics.brightnessDb = std::clamp (2.0 * currentSet->layerStepBrightnessSt * 0.5 / (0.8 * edgeIntensity), -6.0, 18.0);
-            dynamics.attackSoftenMs = std::clamp (-currentSet->layerStepAttackMs * 0.5 / edgeIntensity, 0.0, 80.0);
+            dynamics.brightnessDb = std::clamp (2.0 * currentSet->layerStepBrightnessSt / (0.8 * stepIntensity), -6.0, 18.0);
+            dynamics.attackSoftenMs = std::clamp (-currentSet->layerStepAttackMs / stepIntensity, 0.0, 80.0);
         }
         applyDynamics (shape, velocity, dynamics, model->character, config.macros.dynamics, config.dynamicsMode, referenceVelocity);
         performance.perform (shape, note, velocity, static_cast<double> (sampleClock) / sampleRate, eventIndex,
@@ -339,7 +337,7 @@ void InstrumentEngine::noteOn (int note, int velocity, int channel) noexcept
     const std::uint64_t eventIndex = noteCounter++;
     double referenceVelocity = 100.0;
     double registerDb = 0.0;
-    double layerSpan = 0.0;
+    bool setMember = false, layered = false;
     if (currentSet != nullptr && currentSet->members.size() > 1)
     {
         const int index = memberFor (note, velocity, eventIndex);
@@ -350,18 +348,20 @@ void InstrumentEngine::noteOn (int note, int velocity, int channel) noexcept
             model = member.model.get();
             const auto key = static_cast<std::size_t> ((member.pitchGroup % 64) * 8 + std::min (member.layer, 7));
             lastTake[key] = static_cast<std::int8_t> (member.take);
-            if (group.layers > 1)
-            {
-                layerSpan = 127.0 / group.layers;
-                referenceVelocity = layerSpan * (member.layer + 0.5);
-            }
+            // Loudness-anchored: the loudest layer belongs at velocity 127, a softer one as
+            // much lower as the velocity range says its level is (round-robin takes keep
+            // their own differences around their layer).
+            setMember = true;
+            layered = group.layers > 1;
+            referenceVelocity = std::clamp (127.0 - (currentSet->loudestDb - member.layerLoudnessDb) * 127.0 / std::max (config.velocityRangeDb, 6.0),
+                                            1.0, 127.0);
             if (currentSet->hasRegisterModel)
                 registerDb = std::clamp (1.5 * currentSet->brightnessSlope * (note - group.rootMidi), -8.0, 8.0);
         }
     }
     InstrumentVoiceStart params;
     params.model = model;
-    params.shape = shapeFor (model, note, velocity, eventIndex, referenceVelocity, registerDb, layerSpan);
+    params.shape = shapeFor (model, note, velocity, eventIndex, referenceVelocity, registerDb, setMember, layered);
     params.layer = &model->layerFor (static_cast<double> (note), config.pitchCharacter);
     // Transient/body separation (spec §19): from about a fifth away, the attack's
     // transient keeps its own speed. The separated transient carries its own size, so

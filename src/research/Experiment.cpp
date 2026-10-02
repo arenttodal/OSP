@@ -356,6 +356,17 @@ std::string registerGroundTruth (const std::vector<std::filesystem::path>& files
             out << " Per layer step: " << juce::String (set.layerStepDb, 1) << " dB, " << juce::String (set.layerStepBrightnessSt, 2)
                 << " st brightness, " << juce::String (set.layerStepAttackMs, 1) << " ms attack.";
         out << "\n";
+        for (const auto& g : set.groups)
+        {
+            out << "  " << midiNoteName (static_cast<int> (std::lround (g.rootMidi))) << " (" << juce::String (g.rootMidi, 2) << "):";
+            for (int id : g.members)
+            {
+                const auto& m = set.members[static_cast<std::size_t> (id)];
+                out << " [" << m.filename << " " << toString (m.role) << " L" << m.layer << " T" << m.take << " "
+                    << juce::String (m.loudnessDb, 1) << " dB c" << juce::String (m.confidence, 1) << "]";
+            }
+            out << "\n";
+        }
     }
     return out.str();
 }
