@@ -110,8 +110,9 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     // own speed while the body is transposed. The transposed copy of that part is
     // subtracted from the main read, so it is swapped, not doubled.
     tAmount = std::clamp (shape.transientPreserve, 0.0f, 1.0f);
+    tMix = dbToLinear (std::clamp (shape.transientMixDb, -24.0f, 12.0f)) - 1.0f;
     tRemaining = 0;
-    if (tAmount > 0.0f && layer->transient != nullptr && currentModel->original.transient != nullptr)
+    if ((tAmount > 0.0f || std::abs (tMix) > 1.0e-4f) && layer->transient != nullptr && currentModel->original.transient != nullptr)
     {
         const auto& orig = *currentModel->original.transient;
         tStep = orig.sampleRate() / sampleRate;
@@ -454,12 +455,14 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
             const auto& native = *currentModel->original.transient;
             const auto& shifted = *layer->transient;
             const bool stereo = native.numChannels() > 1 || shifted.numChannels() > 1;
-            const float nl = readTransient (native, tPosition, tStep, 0);
+            const bool swap = tAmount > 0.0f;
+            const float nl = swap ? readTransient (native, tPosition, tStep, 0) : 0.0f;
             const float sl = readTransient (shifted, bodyPosition, currentStep, 0);
-            const float nr = stereo ? readTransient (native, tPosition, tStep, 1) : nl;
+            const float nr = swap && stereo ? readTransient (native, tPosition, tStep, 1) : nl;
             const float sr = stereo ? readTransient (shifted, bodyPosition, currentStep, 1) : sl;
-            l += tAmount * (nl - sl);
-            r += tAmount * (nr - sr);
+            // Swap (preservation) and level change (mixing) of the transient now playing.
+            l += tAmount * (nl - sl) + tMix * (tAmount * nl + (1.0f - tAmount) * sl);
+            r += tAmount * (nr - sr) + tMix * (tAmount * nr + (1.0f - tAmount) * sr);
             tPosition += tStep;
             --tRemaining;
         }

@@ -366,10 +366,19 @@ void InstrumentEngine::noteOn (int note, int velocity, int channel) noexcept
     // Transient/body separation (spec §19): from about a fifth away, the attack's
     // transient keeps its own speed. The separated transient carries its own size, so
     // sources without one are left unchanged.
-    if (config.transientPreservation && model != nullptr && model->original.transient != nullptr)
+    if (model != nullptr && model->original.transient != nullptr)
     {
         const double shift = static_cast<double> (note) - model->rootMidi;
-        params.shape.transientPreserve = static_cast<float> (std::clamp ((std::abs (shift) - 2.0) / 5.0, 0.0, 1.0));
+        if (config.transientPreservation)
+            params.shape.transientPreserve = static_cast<float> (std::clamp ((std::abs (shift) - 2.0) / 5.0, 0.0, 1.0));
+        // Transient/body mixing: where the recording has a real transient, the attack
+        // emphasis from velocity and LIFE acts on it alone (a harder pick, not a louder
+        // note); sources without one keep the gain-shaped attack.
+        if (config.transientMixing && model->original.transientShare >= 0.02)
+        {
+            params.shape.transientMixDb = 2.0f * params.shape.transientDb;
+            params.shape.transientDb = 0.0f;
+        }
         // Long enough for the transposed copy of the transient (0.55 s of source) to end.
         const double ratio = std::pow (2.0, shift / 12.0);
         params.shape.transientPreserveSeconds = static_cast<float> (std::min (3.0, 0.55 / std::min (1.0, ratio)));

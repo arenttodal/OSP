@@ -32,6 +32,7 @@ namespace
             return;
         layer.transient = makeSource (separation.transient, rootMidi, prep, zeroCrossings);
         layer.transientPeakSeconds = separation.peakSeconds;
+        layer.transientShare = separation.share;
     }
 }
 

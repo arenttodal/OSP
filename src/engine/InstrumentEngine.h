@@ -50,6 +50,7 @@ struct EngineSettings
     ContinuationStrategy continuation = ContinuationStrategy::multiLoopMovement;
     bool releaseGraft = true;
     bool transientPreservation = true;   ///< spec §19 (experiment 7 switches it off for A/B)
+    bool transientMixing = false;        ///< velocity/LIFE move the separated transient, not the whole attack (experiment 8)
     DynamicsMode dynamicsMode = DynamicsMode::full;
     Macros macros;
 };

@@ -158,7 +158,7 @@ private:
     // its transposed copy is read wherever the main read is (also after a jump).
     double tPosition = 0.0, tStep = 1.0;
     int tRemaining = 0;
-    float tAmount = 0.0f;
+    float tAmount = 0.0f, tMix = 0.0f;
 
     ShelfFilter highL, highR, lowL, lowR;
     bool filtersActive = false;

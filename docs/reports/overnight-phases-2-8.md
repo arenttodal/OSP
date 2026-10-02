@@ -79,6 +79,9 @@ The open verdicts are listed in `docs/morning-checklist.md`.
     its transposed copy is removed.
   - A synthetic pick two octaves down stays 4.5 ms long; without this it lasts 16 ms.
   - Lab tab "Transients".
+- **Transient/body mixing (§34), an experiment that is off by default.** Velocity and
+  LIFE can move the separated transient alone: a harder pick rather than a louder
+  attack. Lab tab "Pick & velocity" decides whether it becomes the default.
 
 ## Phase 7 — multi-sample
 

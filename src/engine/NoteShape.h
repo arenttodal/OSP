@@ -38,6 +38,8 @@ struct NoteShape
         for how long. */
     float transientPreserve = 0.0f;
     float transientPreserveSeconds = 0.06f;
+    /** Transient/body mixing (spec §34): level change of the separated transient only, dB. */
+    float transientMixDb = 0.0f;
 
     /** Reimagined: soft saturation drive (0 = clean) and continuation segment scale (<1 = shorter, more granular). */
     float saturation = 0.0f;

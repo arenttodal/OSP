@@ -30,6 +30,7 @@ struct PitchLayer
         silent after ~0.5 s; null before stage 2. */
     std::shared_ptr<const PlaybackSource> transient;
     double transientPeakSeconds = 0.0; ///< where that transient is loudest (from the file start)
+    double transientShare = 0.0;       ///< energy share of the transient in the first 100 ms (0..1)
 };
 
 /**

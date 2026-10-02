@@ -366,3 +366,31 @@ TEST_CASE ("engine: odd sources build every stage and play without failing", "[i
         }
     }
 }
+
+TEST_CASE ("engine: transient mixing makes velocity act on the pick, not the whole note", "[integration][engine]")
+{
+    const auto audio = pickedTone();
+    const auto model = instrument::buildComplete (audio, test::analyse (audio), {}, false);
+    REQUIRE (model->original.transientShare >= 0.02);
+    const int root = static_cast<int> (std::lround (model->rootMidi));
+
+    // Pick energy (first 4 ms) over early body energy (20-60 ms), in dB.
+    auto pickToBody = [&] (bool mixing, int velocity) {
+        research::RenderConfig config;
+        config.engineSettings.macros.life = 0.0;
+        config.engineSettings.macros.space = 0.0;
+        config.engineSettings.macros.reimagined = 0.0;
+        config.engineSettings.macros.dynamics = 1.0;
+        config.engineSettings.transientMixing = mixing;
+        MidiSequence s;
+        s.events.push_back ({ 0.0, MidiEvent::Type::noteOn, root, velocity, 1 });
+        s.events.push_back ({ 0.5, MidiEvent::Type::noteOff, root, 0, 1 });
+        const auto out = research::renderInstrument (*model, s, config).audio;
+        return 20.0 * std::log10 (rmsBetween (out, 0.0, 0.004) / std::max (rmsBetween (out, 0.02, 0.06), 1.0e-9));
+    };
+    // Above the recorded velocity nothing else changes the attack (soft notes also soften it).
+    const double gainSpread = pickToBody (false, 127) - pickToBody (false, 100);
+    const double mixSpread = pickToBody (true, 127) - pickToBody (true, 100);
+    INFO ("pick/body change from velocity 100 to 127: attack gain " << gainSpread << " dB, transient mixing " << mixSpread << " dB");
+    CHECK (mixSpread > gainSpread + 2.0);
+}

@@ -161,9 +161,10 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - Score the lab ratings; tune or revert per experiment (keep the simplest winner).
 - Score lab tab "Transients"; if transient preservation loses or ties, switch it off by
   default (simplest wins). Spectral/stochastic continuation only if multi-loop loses.
-- Candidate experiments: velocity -> transient/body mixing using the separated transient
-  (spec §34 "noise", §1679 "transient/body mixing"); timbre clustering for sets that mix
-  organ stops (waits on morning question 2).
+- Score lab tab "Pick & velocity" (experiment 8, `dynamics-2.json`): `transientMixing`
+  (velocity and LIFE move the separated transient instead of the whole attack's gain,
+  for sources whose transient share >= 2 %) is built but OFF by default until it wins.
+- Timbre clustering for sets that mix organ stops (waits on morning question 2).
 - Real-Mac worst-case callback timing. Reads above x4 (more than about +2 octaves) still
   evaluate the stretched kernel; mip-mapped sources would cap them if that matters.
 
