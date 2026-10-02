@@ -308,3 +308,61 @@ TEST_CASE ("engine: long recordings skip register anchors and Natural plays as T
     const auto b = research::renderInstrument (*model, hold (69, 1.0), natural).audio;
     CHECK (a.channels[0] == b.channels[0]);
 }
+
+TEST_CASE ("engine: odd sources build every stage and play without failing", "[integration][engine]")
+{
+    // Fail beautifully: whatever arrives must become a playable (if plain) instrument.
+    struct Odd
+    {
+        const char* name;
+        AudioData audio;
+    };
+    std::vector<Odd> sources;
+    sources.push_back ({ "silence", testsignals::silence (2.0, 48000.0) });
+    sources.push_back ({ "noise", testsignals::whiteNoise (2.0, 48000.0, 0.3, 4, 2) });
+    sources.push_back ({ "impulse", testsignals::impulse (1.0, 48000.0) });
+    sources.push_back ({ "10 ms tone", testsignals::sine (440.0, 0.01, 48000.0) });
+    sources.push_back ({ "1 sample", AudioData::allocate (1, 1, 48000.0) });
+    sources.push_back ({ "8 kHz voice", testsignals::vowel (220.0, 2.0, 8000.0, 2) });
+    sources.push_back ({ "192 kHz saw", testsignals::saw (110.0, 1.0, 192000.0) });
+    auto dc = AudioData::allocate (2, 48000, 48000.0);
+    for (auto& ch : dc.channels)
+        std::fill (ch.begin(), ch.end(), 0.5f);
+    sources.push_back ({ "DC", dc });
+    auto clipped = testsignals::sine (55.0, 2.0, 48000.0, 4.0); // way over full scale
+    for (auto& x : clipped.channels[0])
+        x = std::clamp (x, -1.0f, 1.0f);
+    sources.push_back ({ "clipped square", clipped });
+    sources.push_back ({ "sub-audio", testsignals::sine (8.0, 3.0, 48000.0) });
+    sources.push_back ({ "ultrasonic", testsignals::sine (21000.0, 1.0, 48000.0) });
+
+    for (const auto& odd : sources)
+    {
+        INFO (odd.name);
+        const auto model = instrument::buildComplete (odd.audio, test::analyse (odd.audio), {}, true);
+        REQUIRE (model != nullptr);
+        for (auto pitch : { PitchCharacter::tape, PitchCharacter::natural })
+        {
+            research::RenderConfig config; // default macros, transient preservation on
+            config.engineSettings.pitchCharacter = pitch;
+            config.maxTailSeconds = 3.0;
+            MidiSequence chord;
+            for (int note : { 36, 60, 84, 100 })
+            {
+                chord.events.push_back ({ 0.0, MidiEvent::Type::noteOn, note, 110, 1 });
+                chord.events.push_back ({ 1.5, MidiEvent::Type::noteOff, note, 0, 1 });
+            }
+            const auto out = research::renderInstrument (*model, chord, config).audio;
+            bool finite = true;
+            float peak = 0.0f;
+            for (const auto& ch : out.channels)
+                for (float x : ch)
+                {
+                    finite = finite && std::isfinite (x);
+                    peak = std::max (peak, std::abs (x));
+                }
+            CHECK (finite);
+            CHECK (peak < 8.0f);
+        }
+    }
+}
