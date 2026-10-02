@@ -234,6 +234,17 @@ void OspAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
 
     keyboardState.processNextMidiBuffer (midi, 0, numSamples, true);
     swapInstrumentIfPending();
+
+    // A bounce or playback from the same position must perform identically (spec §33):
+    // performance memory and the note counter restart whenever the transport starts.
+    if (auto* head = getPlayHead())
+        if (const auto position = head->getPosition())
+        {
+            const bool playing = position->getIsPlaying();
+            if (playing && ! hostWasPlaying)
+                engine.resetPerformance();
+            hostWasPlaying = playing;
+        }
     applyParameters (false);
 
     const int outChannels = std::min (buffer.getNumChannels(), 2);

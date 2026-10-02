@@ -14,6 +14,7 @@ add_executable(osp_tests
     unit/PlaybackPreparationTests.cpp
     unit/PitchEngineTests.cpp
     unit/ContinuationTests.cpp
+    unit/PerformanceTests.cpp
     integration/RenderIntegrationTests.cpp
     integration/CorpusIntegrationTests.cpp
     integration/BakeoffIntegrationTests.cpp

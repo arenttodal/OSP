@@ -93,6 +93,10 @@ struct InstrumentModel
     PerformanceProfile performance;
     DynamicsProfile dynamics;
 
+    /** Where "brightness" and "body" act for this source (shelf corner frequencies, Hz). */
+    double brightnessShelfHz = 3000.0;
+    double bodyShelfHz = 250.0;
+
     PitchLayer original;               ///< offset 0
     std::vector<PitchLayer> anchors;   ///< natural-character register anchors (offset != 0), may be empty
 

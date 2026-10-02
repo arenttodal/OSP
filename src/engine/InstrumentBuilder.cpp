@@ -46,20 +46,22 @@ SourceCharacter estimateCharacter (const AnalysisData& a, const ContinuationMode
 
 PerformanceProfile calibratePerformance (const SourceCharacter& c, const AnalysisData& a)
 {
-    // Hand-tuned starting points (spec §80): transient sources vary mostly in attack,
-    // brightness and decay; sustained sources in pitch settling, brightness and movement.
+    // Spreads at LIFE = 0.5 ("realistic"). Calibrated on the corpus' real repeated takes
+    // (within-pitch standard deviations, docs/reports/performance-1.md): plucks/tagel
+    // vary 3.5-5 dB in level, 1.4-3.6 st in centroid and 3.7-6.5 cents; part of that is
+    // the player's dynamics, so the engine uses roughly half at realistic settings.
     PerformanceProfile p;
     const double t = c.transientTonal;
     const double s = std::max (c.sustainedHarmonic, c.expressiveSustain);
-    p.gainDb = 1.0 + 0.8 * t;
+    p.gainDb = 1.2 + 0.8 * t;
     p.brightnessDb = 1.5 + 1.5 * t + 0.5 * s;
     p.bodyDb = 0.6 + 0.6 * t;
-    p.transientDb = 1.0 + 3.0 * t;
-    p.pitchCents = 2.0 + 3.0 * s + (a.pitch.detected ? std::min (4.0, 0.15 * a.pitch.stabilityCents) : 0.0);
-    p.pitchSettleCents = 4.0 + 10.0 * c.expressiveSustain + 3.0 * t;
-    p.startOffsetMs = 1.0 + 2.0 * (1.0 - t);
-    p.decayDbPerSecond = 3.0 * t;
-    p.pan = 0.04;
+    p.transientDb = 1.0 + 2.5 * t;
+    p.pitchCents = 1.5 + 1.5 * t + 1.0 * s + (a.pitch.detected ? std::min (3.0, 0.1 * a.pitch.stabilityCents) : 0.0);
+    p.pitchSettleCents = 3.0 + 9.0 * c.expressiveSustain + 3.0 * t;
+    p.startOffsetMs = 0.5 + 1.5 * (1.0 - t);
+    p.decayDbPerSecond = 2.0 * t;
+    p.pan = 0.03;
     return p;
 }
 
@@ -87,6 +89,12 @@ std::shared_ptr<InstrumentModel> buildProvisional (const AudioData& audio, const
     model->character = estimateCharacter (analysis, nullptr);
     model->performance = calibratePerformance (model->character, analysis);
     model->dynamics = calibrateDynamics (model->character, analysis);
+    // Brightness acts just above the source's own spectral centre of gravity, body just
+    // above its fundamental, so both are audible on dark and bright sources alike.
+    const double centroid = analysis.spectral.meanCentroidHz > 0.0 ? analysis.spectral.meanCentroidHz : 1500.0;
+    const double f0 = analysis.pitch.detected ? analysis.pitch.fundamentalHz : 150.0;
+    model->brightnessShelfHz = std::clamp (2.0 * centroid, 500.0, 6000.0);
+    model->bodyShelfHz = std::clamp (1.5 * f0, 80.0, 500.0);
     model->original.offsetSemitones = 0.0;
     model->original.source = makeSource (audio, model->rootMidi, model->playback, options.interpolationZeroCrossings);
     model->original.continuation.reason = "not analysed yet";

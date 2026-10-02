@@ -12,8 +12,6 @@ namespace
 {
     float dbToLinear (double db) noexcept { return static_cast<float> (std::pow (10.0, db / 20.0)); }
 
-    constexpr double brightnessShelfHz = 3000.0;
-    constexpr double bodyShelfHz = 250.0;
 }
 
 void InstrumentVoice::prepare (double outputSampleRate, const AdsrSettings& adsr, const SincInterpolator* interpolator) noexcept
@@ -71,7 +69,8 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     transientExtra = dbToLinear (shape.transientDb) - 1.0f;
     transientCoef = static_cast<float> (std::exp (-1.0 / (std::max (0.002f, shape.transientSeconds) * sampleRate)));
     dampingGain = 1.0f;
-    dampingCoef = dbToLinear (-static_cast<double> (shape.dampingDbPerSecond) / sampleRate);
+    // Only extra damping: "less damping than recorded" would mean unbounded growth.
+    dampingCoef = dbToLinear (-std::clamp (static_cast<double> (shape.dampingDbPerSecond), 0.0, 60.0) / sampleRate);
     if (shape.attackSoftenSeconds > 0.0f)
     {
         attackRamp = 0.0f;
@@ -327,10 +326,14 @@ void InstrumentVoice::updateControl() noexcept
         filtersActive = std::abs (bright) > 0.01f || std::abs (body) > 0.01f;
         if (filtersActive)
         {
-            highL.setup (ShelfFilter::Type::high, sampleRate, brightnessShelfHz, bright);
-            highR.setup (ShelfFilter::Type::high, sampleRate, brightnessShelfHz, bright);
-            lowL.setup (ShelfFilter::Type::low, sampleRate, bodyShelfHz, body);
-            lowR.setup (ShelfFilter::Type::low, sampleRate, bodyShelfHz, body);
+            // Shelves follow the note: the source's spectrum moves with transposition.
+            const double ratio = baseIncrement * sampleRate / layer->source->sampleRate();
+            const double brightHz = currentModel->brightnessShelfHz * ratio;
+            const double bodyHz = currentModel->bodyShelfHz * ratio;
+            highL.setup (ShelfFilter::Type::high, sampleRate, brightHz, bright);
+            highR.setup (ShelfFilter::Type::high, sampleRate, brightHz, bright);
+            lowL.setup (ShelfFilter::Type::low, sampleRate, bodyHz, body);
+            lowR.setup (ShelfFilter::Type::low, sampleRate, bodyHz, body);
         }
     }
 }

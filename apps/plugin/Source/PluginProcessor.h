@@ -145,6 +145,7 @@ private:
     std::atomic<float>* seedParam = nullptr;
     float lastAttack = -1.0f, lastRelease = -1.0f, lastGain = -1000.0f, lastVelocityRange = -1.0f;
     double pitchBendSemitones = 0.0;
+    bool hostWasPlaying = false;     // audio thread: transport start resets performance memory
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OspAudioProcessor)
 };

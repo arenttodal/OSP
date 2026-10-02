@@ -53,6 +53,7 @@ add_library(osp_dsp STATIC
     src/engine/InstrumentVoice.cpp
     src/engine/InstrumentEngine.cpp
     src/engine/InstrumentBuilder.cpp
+    src/engine/PerformanceEngine.cpp
     src/midi/MidiFixtures.cpp
     src/model/RootChoice.cpp
     src/model/PlaybackPreparation.cpp

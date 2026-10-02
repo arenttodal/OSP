@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "name": "performance-1",
+  "tab": "Repetition",
+  "title": "Performance: repeated notes",
+  "heading": "Do repeated notes still sound like the same retrigger?",
+  "intro": [
+    "Each group is one recording played as a run of repeated notes on its own pitch, either steady (eight notes, two per second) or fast (twelve notes, about six per second). The takes differ only in how each repetition is performed, in a random order.",
+    "Listen for the machine-gun effect: identical attacks one after another. Then listen for variation that sounds wrong, such as random-sounding pitch or level jumps."
+  ],
+  "scales": [
+    { "key": "alive", "label": "Alive", "low": "identical retriggers", "high": "like a player" },
+    { "key": "natural", "label": "Natural", "low": "random, wrong", "high": "believable" },
+    { "key": "identity", "label": "Identity", "low": "lost the source", "high": "clearly the recording" }
+  ],
+  "bestLabel": "Best of these",
+  "bestHint": "the take you would rather play",
+  "corpusRoot": "research/corpus",
+  "seed": 3,
+  "outputSampleRate": 44100,
+  "listeningRmsDbfs": -20,
+  "format": "flac",
+  "trimToCommon": true,
+  "maxSeconds": 12,
+  "variants": [
+    { "id": "steady", "label": "Steady repeats", "note": "8 notes, 0.5 s apart",
+      "sequence": { "notes": [
+        { "offset": 0, "start": 0.0, "duration": 0.4, "velocity": 90 }, { "offset": 0, "start": 0.5, "duration": 0.4, "velocity": 90 },
+        { "offset": 0, "start": 1.0, "duration": 0.4, "velocity": 90 }, { "offset": 0, "start": 1.5, "duration": 0.4, "velocity": 90 },
+        { "offset": 0, "start": 2.0, "duration": 0.4, "velocity": 90 }, { "offset": 0, "start": 2.5, "duration": 0.4, "velocity": 90 },
+        { "offset": 0, "start": 3.0, "duration": 0.4, "velocity": 90 }, { "offset": 0, "start": 3.5, "duration": 0.9, "velocity": 90 } ] },
+      "tail": 3 },
+    { "id": "fast", "label": "Fast repeats", "note": "12 notes, 0.16 s apart",
+      "sequence": { "notes": [
+        { "offset": 0, "start": 0.00, "duration": 0.12, "velocity": 90 }, { "offset": 0, "start": 0.16, "duration": 0.12, "velocity": 90 },
+        { "offset": 0, "start": 0.32, "duration": 0.12, "velocity": 90 }, { "offset": 0, "start": 0.48, "duration": 0.12, "velocity": 90 },
+        { "offset": 0, "start": 0.64, "duration": 0.12, "velocity": 90 }, { "offset": 0, "start": 0.80, "duration": 0.12, "velocity": 90 },
+        { "offset": 0, "start": 0.96, "duration": 0.12, "velocity": 90 }, { "offset": 0, "start": 1.12, "duration": 0.12, "velocity": 90 },
+        { "offset": 0, "start": 1.28, "duration": 0.12, "velocity": 90 }, { "offset": 0, "start": 1.44, "duration": 0.12, "velocity": 90 },
+        { "offset": 0, "start": 1.60, "duration": 0.12, "velocity": 90 }, { "offset": 0, "start": 1.76, "duration": 0.8, "velocity": 90 } ] },
+      "tail": 3 }
+  ],
+  "sources": [
+    { "id": "tagel", "label": "Tagel (struck)", "path": "tagel-puck/Tagel_Puck_Bounce_2026-06-21_144439-2.wav" },
+    { "id": "pluck", "label": "Pluck", "path": "plucks/Plucks_Bounce_Bounce_2026-06-21_131926-3.wav" },
+    { "id": "violin", "label": "Violin (dry)", "path": "violin/BTS_-_AV1_-_VIOLIN_DRY_-_RR_-_A_01.wav" },
+    { "id": "vocal", "label": "Vocal", "path": "vocals/VOK_ADLIB-St_2025-10-13_100555-1.wav" }
+  ],
+  "conditions": [
+    { "id": "A", "label": "identical retrigger", "engine": "C", "instrument": { "macros": { "life": 0, "motion": 0 }, "continuation": "multi-loop" } },
+    { "id": "B", "label": "independent randomisation (baseline B)", "engine": "B" },
+    { "id": "C", "label": "performance engine, LIFE 50%", "engine": "C", "instrument": { "macros": { "life": 0.5, "motion": 0 }, "continuation": "multi-loop" } },
+    { "id": "D", "label": "performance engine, LIFE 80%", "engine": "C", "instrument": { "macros": { "life": 0.8, "motion": 0 }, "continuation": "multi-loop" } }
+  ]
+}

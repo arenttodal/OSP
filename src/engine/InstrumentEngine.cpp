@@ -24,6 +24,14 @@ void InstrumentEngine::prepare (double outputSampleRate, int /*maximumBlockSize*
     pedalDown = false;
     noteCounter = 0;
     pitchRatio = 1.0;
+    resetPerformance();
+}
+
+void InstrumentEngine::resetPerformance() noexcept
+{
+    noteCounter = 0;
+    sampleClock = 0;
+    performance.reset (config.seed);
 }
 
 void InstrumentEngine::setEnvelope (const AdsrSettings& adsr) noexcept
@@ -121,6 +129,10 @@ NoteShape InstrumentEngine::shapeFor (int note, int velocity, std::uint64_t even
     shape.seed = Prng::deriveSeed (config.seed, eventIndex, static_cast<std::uint64_t> (note));
     const double velocityDb = -config.velocityRangeDb * (1.0 - std::clamp (velocity, 1, 127) / 127.0);
     shape.gain = static_cast<float> (dbToGain (velocityDb));
+
+    if (currentModel != nullptr)
+        performance.perform (shape, note, velocity, static_cast<double> (sampleClock) / sampleRate, eventIndex,
+                             currentModel->performance, currentModel->character, config.macros.life);
 
     if (config.continuation == ContinuationStrategy::multiLoopMovement && currentModel != nullptr)
     {
@@ -221,6 +233,7 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
     float* right = numChannels > 1 ? output[1] : output[0];
     for (auto& voice : voices)
         voice.render (left, right, numSamples, pitchRatio);
+    sampleClock += numSamples;
     for (int ch = 0; ch < std::min (numChannels, 2); ++ch)
         for (int i = 0; i < numSamples; ++i)
             output[ch][i] *= outputGain;

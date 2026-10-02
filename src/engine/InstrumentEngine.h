@@ -3,6 +3,7 @@
 #include "audio/envelopes/Adsr.h"
 #include "audio/pitch/SincInterpolator.h"
 #include "engine/InstrumentVoice.h"
+#include "engine/PerformanceEngine.h"
 #include "model/InstrumentModel.h"
 
 #include <array>
@@ -83,6 +84,9 @@ public:
     void allNotesOff() noexcept;
     void reset() noexcept;
 
+    /** Restarts performance memory and the note counter (host transport start, bounce). */
+    void resetPerformance() noexcept;
+
     void render (float* const* output, int numChannels, int numSamples) noexcept;
 
     int activeVoiceCount() const noexcept;
@@ -114,6 +118,8 @@ private:
     std::uint64_t noteCounter = 0;
     float outputGain = 1.0f;
     double pitchRatio = 1.0;
+    PerformanceEngine performance;
+    std::int64_t sampleClock = 0;   ///< samples rendered since prepare/reset (note times for performance memory)
 };
 
 } // namespace osp
