@@ -468,6 +468,37 @@ TEST_CASE ("plugin: A/B layers load, blend and recall independently", "[plugin][
     CHECK (peak < 1.0e-6);
 }
 
+TEST_CASE ("plugin: clearing a layer while it sounds lets the note finish safely", "[plugin][layers]")
+{
+    TempDir tmp;
+    const auto file = writeSource (tmp.dir, "held.wav", testsignals::vowel (midiToHz (57), 2.0, 48000.0, 6));
+    OspAudioProcessor p;
+    loadAndWait (p, file);
+    p.prepareToPlay (48000.0, 256);
+    juce::AudioBuffer<float> buffer (2, 256);
+    juce::MidiBuffer on;
+    on.addEvent (juce::MidiMessage::noteOn (1, 57, static_cast<juce::uint8> (100)), 0);
+    p.processBlock (buffer, on);
+    p.clearLayer (0);   // published while the note plays: the old instrument stays alive for it
+    p.pollLoads();
+    double peak = 0.0;
+    for (int block = 0; block < 400; ++block)
+    {
+        juce::MidiBuffer midi;
+        if (block == 10)
+            midi.addEvent (juce::MidiMessage::noteOff (1, 57), 0);
+        buffer.clear();
+        p.processBlock (buffer, midi);
+        p.pollLoads();   // garbage collection runs here too
+        if (block > 300)
+            peak = std::max (peak, static_cast<double> (buffer.getMagnitude (0, 256)));
+    }
+    CHECK (std::isfinite (peak));
+    CHECK (peak < 1.0e-4);              // the released note has ended (only the reverb tail, below -80 dB)
+    CHECK (p.currentInstrument (0) == nullptr);
+    CHECK (p.activeVoices.load() == 0);
+}
+
 TEST_CASE ("plugin: a layer in Granular mode sustains past its recording", "[plugin][layers]")
 {
     TempDir tmp;
