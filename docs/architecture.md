@@ -251,7 +251,10 @@ and replaces the read-through (continuation, grafts, doubling, Reimagined grains
 transient swap are off for that voice). It plays Hann-windowed grains (window by
 rotation, no per-sample trig) from a fixed pool of 24, read with cubic interpolation at
 the voice's current step times TUNE, so bends and drift still apply. Grain positions are
-POS ± SPREAD × a quarter of the recording, clamped so reads never leave it. After note-off
+POS ± SPREAD × half the recording, clamped so reads never leave it. For the display the
+engine publishes every playing grain (position, window level × envelope, a random lane)
+into a per-layer snapshot of relaxed atomics after each block; the editor reads it at
+30 Hz and draws the cloud over a cached waveform image. After note-off
 no grain starts and the voice ends when the last grain does (or the release ends). The
 mode is fixed per note (switching never clicks); POS/SIZE/DENS/TUNE/SPREAD are read live.
 

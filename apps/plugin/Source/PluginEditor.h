@@ -22,13 +22,27 @@ public:
     void setLayer (int layer);
     /** Granular mode: mark where grains are taken (POS) and how widely (SPREAD), 0..1. */
     void setGranularView (bool granular, float position, float spread);
+    /** The grains playing right now (from the engine's snapshot), drawn as a moving cloud. */
+    struct GrainDot
+    {
+        float position = 0.0f, level = 0.0f, lane = 0.5f;
+    };
+    void setGrains (const GrainDot* dots, int count);
     void paint (juce::Graphics&) override;
+    void resized() override { cacheDirty = true; }
 
 private:
     std::shared_ptr<const LoadedInstrument> instrument;
     int layer = 0;
     bool granular = false;
     float grainPosition = 0.5f, grainSpread = 0.2f;
+    std::vector<GrainDot> grains;
+    // The waveform, grid and labels change rarely: drawn once into an image, the grains
+    // move over it at the display rate.
+    juce::Image cache;
+    bool cacheDirty = true;
+    void paintStatic (juce::Graphics&);
+    juce::Rectangle<float> plotArea() const;
     bool loading = false;
     bool dragHighlight = false;
 };

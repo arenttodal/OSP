@@ -33,8 +33,9 @@
 
 Switch a layer to **GRANULAR** and it plays a stream of short grains taken from the
 recording instead of playing it through, so notes sustain for as long as you hold them,
-at the pitch you play. Five small controls appear over the waveform (the orange line and
-band show where grains come from):
+at the pitch you play. Five small controls appear over the waveform. The orange line is
+POS, the band is how far SPREAD reaches, and every grain playing right now is a dot that
+glides along the waveform where it reads, swelling and fading with its window:
 
 | Control | What it does |
 |---|---|
@@ -42,7 +43,7 @@ band show where grains come from):
 | **SIZE** | Grain length, 20–400 ms: short is buzzy and smeared, long is smooth and close to the source. |
 | **DENS** | Grains per second, 4–40: low is sparse and pulsing, high is a continuous texture. |
 | **TUNE** | Extra pitch for the grains, ±12 semitones, on top of the note you play. |
-| **SPREAD** | How far around POS grains may come from: low stays on one spot, high is a wide cloud. |
+| **SPREAD** | How far around POS grains may come from: low stays on one spot, 100 % reaches anywhere in the recording. |
 
 After you let go no new grains start; the ones playing finish (under the release time).
 

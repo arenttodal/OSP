@@ -805,8 +805,25 @@ TEST_CASE ("plugin: editor builds, shows the instrument and can be snapshotted",
         p.pollLoads();
         p.parameters.getParameter ("layerB.sourceMode")->setValueNotifyingHost (1.0f);
         p.parameters.getParameter ("ab.blend")->setValueNotifyingHost (0.6f);
+        p.parameters.getParameter ("layerB.granular.spread")->setValueNotifyingHost (0.45f);
+        // Hold a chord so the cloud is visible: the display shows the grains playing now.
+        p.prepareToPlay (48000.0, 512);
+        juce::AudioBuffer<float> audio (2, 512);
+        for (int block = 0; block < 40; ++block)
+        {
+            juce::MidiBuffer midi;
+            if (block == 0)
+                for (int note : { 48, 55, 64 })
+                    midi.addEvent (juce::MidiMessage::noteOn (1, note, static_cast<juce::uint8> (100)), 0);
+            audio.clear();
+            p.processBlock (audio, midi);
+        }
         ospEditor->refreshNow();
+        CHECK (p.grainSnapshot (1).count.load() > 6);   // three notes, several grains each
         snapshot ("osp-editor-layer-b-granular.png");
+        juce::MidiBuffer off;
+        off.addEvent (juce::MidiMessage::allNotesOff (1), 0);
+        p.processBlock (audio, off);
         p.setEditLayer (0);
         ospEditor->refreshNow();
         snapshot ("osp-editor-layer-a.png");

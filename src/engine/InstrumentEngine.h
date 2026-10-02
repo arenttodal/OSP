@@ -10,6 +10,7 @@
 #include "model/InstrumentSet.h"
 
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -121,6 +122,19 @@ public:
         liveGranular[layerIndex (layer)] = params;
     }
     int activeVoiceCount (int layer) const noexcept;
+
+    /**
+        What the granular voices of a layer are doing, for the display: written by the audio
+        thread after every block (relaxed atomics, no locks), read by the UI whenever it
+        likes. A torn read only mixes two consecutive blocks' grains.
+    */
+    struct GrainSnapshot
+    {
+        static constexpr int capacity = 128;
+        std::array<std::atomic<float>, capacity> position {}, level {}, lane {};
+        std::atomic<int> count { 0 };
+    };
+    const GrainSnapshot& grainSnapshot (int layer) const noexcept { return grainSnapshots[layerIndex (layer)]; }
 
     static int requiredSourcePaddingFor (int interpolationZeroCrossings) noexcept
     {
@@ -241,6 +255,8 @@ private:
     std::uint64_t noteCounter = 0;
     float outputGain = 1.0f;
     double pitchRatio = 1.0;
+    std::array<GrainSnapshot, EngineSettings::layers> grainSnapshots;
+    void publishGrains() noexcept;
     std::array<PerformanceEngine, EngineSettings::layers> layerPerformance;   ///< same seed: the layers perform together
     PostProcessor post;
     bool mpe = false;

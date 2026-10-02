@@ -100,6 +100,31 @@ void InstrumentEngine::setPitchOffsetSemitones (double semitones) noexcept
     pitchRatio = semitonesToRatio (semitones);
 }
 
+void InstrumentEngine::publishGrains() noexcept
+{
+    GranularSource::GrainView views[GranularSource::maxGrains];
+    for (int layer = 0; layer < EngineSettings::layers; ++layer)
+    {
+        auto& snapshot = grainSnapshots[static_cast<std::size_t> (layer)];
+        int n = 0;
+        for (const auto& voice : voices)
+        {
+            if (n >= GrainSnapshot::capacity)
+                break;
+            if (! voice.isActive() || voice.layerIndex() != layer || ! voice.isGranular())
+                continue;
+            const int got = voice.collectGrains (views, std::min (GranularSource::maxGrains, GrainSnapshot::capacity - n));
+            for (int i = 0; i < got; ++i, ++n)
+            {
+                snapshot.position[static_cast<std::size_t> (n)].store (views[i].position, std::memory_order_relaxed);
+                snapshot.level[static_cast<std::size_t> (n)].store (views[i].level, std::memory_order_relaxed);
+                snapshot.lane[static_cast<std::size_t> (n)].store (views[i].lane, std::memory_order_relaxed);
+            }
+        }
+        snapshot.count.store (n, std::memory_order_release);
+    }
+}
+
 void InstrumentEngine::setLayerPitchOffsetSemitones (int layer, double semitones) noexcept
 {
     layerPitchRatio[layerIndex (layer)] = semitonesToRatio (semitones);
@@ -577,6 +602,7 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
     const auto main = config.blend <= 0.5 ? (layerModel[0] != nullptr ? 0 : 1) : (layerModel[1] != nullptr ? 1 : 0);
     post.setModel (layerModel[static_cast<std::size_t> (main)]);
     post.process (left, right, numSamples);
+    publishGrains();
     for (int ch = 0; ch < std::min (numChannels, 2); ++ch)
         for (int i = 0; i < numSamples; ++i)
             output[ch][i] *= outputGain;

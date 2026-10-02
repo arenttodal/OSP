@@ -56,11 +56,12 @@ void GranularSource::spawn (double step) noexcept
         return;
     const double span = samples * frameStep * 1.15;   // margin for pitch bends during the grain
 
-    // Where: around POS, spread across up to a quarter of the recording either side, plus
-    // a few milliseconds of jitter so even SPREAD 0 never combs.
+    // Where: scattered around POS - at SPREAD 100 % up to half the recording either side,
+    // so grains can come from anywhere in it - plus a few milliseconds of jitter so even
+    // SPREAD 0 never combs.
     const double srcRate = src->sampleRate();
     const double centre = std::clamp (settings.position, 0.0, 1.0) * frames;
-    const double offset = (std::clamp (settings.spread, 0.0, 1.0) * 0.25 * frames + 0.004 * srcRate) * rng.bipolar();
+    const double offset = (std::clamp (settings.spread, 0.0, 1.0) * 0.5 * frames + 0.004 * srcRate) * rng.bipolar();
     const double start = std::clamp (centre + offset - 0.5 * span, 1.0, std::max (1.0, frames - 3.0 - span));
 
     const auto n = static_cast<int> (samples);
@@ -72,6 +73,7 @@ void GranularSource::spawn (double step) noexcept
     slot->cd = std::cos (w);
     slot->sd = std::sin (w);
     slot->remaining = n;
+    slot->lane = static_cast<float> (rng.nextDouble());
     slot->active = true;
     ++activeGrains;
 }
@@ -116,6 +118,24 @@ void GranularSource::render (float& left, float& right, double step) noexcept
     const auto norm = static_cast<float> (1.0 / std::max (1.0, 0.612 * std::sqrt (overlap)));
     left = l * norm;
     right = r * norm;
+}
+
+int GranularSource::collect (GrainView* out, int max) const noexcept
+{
+    if (src == nullptr || activeGrains == 0)
+        return 0;
+    const double frames = std::max (1.0, static_cast<double> (src->numFrames()));
+    int n = 0;
+    for (const auto& g : grains)
+    {
+        if (! g.active || n >= max)
+            continue;
+        out[n].position = static_cast<float> (std::clamp (g.position / frames, 0.0, 1.0));
+        out[n].level = static_cast<float> (0.5 - 0.5 * g.c);
+        out[n].lane = g.lane;
+        ++n;
+    }
+    return n;
 }
 
 } // namespace osp

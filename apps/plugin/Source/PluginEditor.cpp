@@ -35,6 +35,7 @@ namespace
 void WaveformView::setInstrument (std::shared_ptr<const LoadedInstrument> newInstrument)
 {
     instrument = std::move (newInstrument);
+    cacheDirty = true;
     repaint();
 }
 
@@ -43,6 +44,7 @@ void WaveformView::setLoading (bool isLoading)
     if (loading != isLoading)
     {
         loading = isLoading;
+        cacheDirty = true;
         repaint();
     }
 }
@@ -58,6 +60,7 @@ void WaveformView::setLayer (int newLayer)
     if (layer != newLayer)
     {
         layer = newLayer;
+        cacheDirty = true;
         repaint();
     }
 }
@@ -73,7 +76,80 @@ void WaveformView::setGranularView (bool on, float position, float spread)
     }
 }
 
+juce::Rectangle<float> WaveformView::plotArea() const
+{
+    // Top row: A/B tabs and the blend (children of the editor); bottom row: file and mode.
+    return getLocalBounds().toFloat().reduced (18.0f, 0.0f).withTrimmedTop (44.0f).withTrimmedBottom (30.0f);
+}
+
+void WaveformView::setGrains (const GrainDot* dots, int count)
+{
+    if (count == 0 && grains.empty())
+        return;
+    grains.assign (dots, dots + count);
+    repaint (plotArea().expanded (8.0f).getSmallestIntegerContainer());
+}
+
 void WaveformView::paint (juce::Graphics& g)
+{
+    using namespace palette;
+    const float scale = std::max (1.0f, g.getInternalContext().getPhysicalPixelScaleFactor());
+    const int w = std::max (1, juce::roundToInt (static_cast<float> (getWidth()) * scale));
+    const int h = std::max (1, juce::roundToInt (static_cast<float> (getHeight()) * scale));
+    if (cacheDirty || ! cache.isValid() || cache.getWidth() != w || cache.getHeight() != h)
+    {
+        cache = juce::Image (juce::Image::ARGB, w, h, true);
+        juce::Graphics cg (cache);
+        cg.addTransform (juce::AffineTransform::scale (scale));
+        paintStatic (cg);
+        cacheDirty = false;
+    }
+    g.drawImage (cache, getLocalBounds().toFloat());
+
+    const auto bounds = getLocalBounds().toFloat();
+    const auto plot = plotArea();
+    const bool hasWave = instrument != nullptr && ! instrument->peakMax.empty();
+    if (hasWave && granular && ! loading)
+    {
+        // Where grains may come from: SPREAD as a soft band (half the length either side at
+        // 100 %), POS as a line.
+        const float x = plot.getX() + grainPosition * plot.getWidth();
+        const float half = (grainSpread * 0.5f + 0.004f) * plot.getWidth();
+        const auto band = juce::Rectangle<float> (x - half, plot.getY() - 4.0f, 2.0f * half, plot.getHeight() + 8.0f).getIntersection (plot.expanded (0.0f, 4.0f));
+        g.setColour (accent.withAlpha (0.08f));
+        g.fillRect (band);
+        g.setColour (accent.withAlpha (0.55f));
+        g.drawVerticalLine (juce::roundToInt (x), plot.getY() - 4.0f, plot.getBottom() + 4.0f);
+
+        // The grains playing now: each a read head - a faint line through the waveform where
+        // it reads, and a dot scattered on its own lane, as big and bright as its window.
+        for (const auto& grain : grains)
+        {
+            const float gx = plot.getX() + grain.position * plot.getWidth();
+            const float level = std::clamp (grain.level, 0.0f, 1.0f);
+            g.setColour (accent.withAlpha (0.12f + 0.38f * level));
+            g.drawVerticalLine (juce::roundToInt (gx), plot.getY(), plot.getBottom());
+            // Lanes below the granular controls, so no grain hides behind them.
+            const float top = plot.getY() + 0.42f * plot.getHeight();
+            const float gy = top + grain.lane * (plot.getBottom() - 6.0f - top);
+            const float r = 2.5f + 3.5f * level;
+            g.setColour (display.withAlpha (0.55f + 0.35f * level));   // a dark ring reads on the pale waveform
+            g.fillEllipse (gx - r - 1.5f, gy - r - 1.5f, 2.0f * r + 3.0f, 2.0f * r + 3.0f);
+            g.setColour (accent.withAlpha (0.35f + 0.65f * level));
+            g.fillEllipse (gx - r, gy - r, 2.0f * r, 2.0f * r);
+            g.setColour (juce::Colours::white.withAlpha (0.6f * level));
+            g.fillEllipse (gx - 0.35f * r, gy - 0.35f * r, 0.7f * r, 0.7f * r);
+        }
+    }
+
+    if (dragHighlight)
+    {
+        g.setColour (accent);
+        g.drawRoundedRectangle (bounds.reduced (1.5f), 7.0f, 2.5f);
+    }
+}
+
+void WaveformView::paintStatic (juce::Graphics& g)
 {
     using namespace palette;
     const auto bounds = getLocalBounds().toFloat();
@@ -86,8 +162,7 @@ void WaveformView::paint (juce::Graphics& g)
     g.setColour (juce::Colours::black.withAlpha (0.55f));
     g.drawRoundedRectangle (bounds.reduced (0.5f), 7.0f, 1.0f);
 
-    // Top row: A/B tabs and the blend (children of the editor); bottom row: file and mode.
-    const auto plot = bounds.reduced (18.0f, 0.0f).withTrimmedTop (44.0f).withTrimmedBottom (30.0f);
+    const auto plot = plotArea();
     const bool hasWave = instrument != nullptr && ! instrument->peakMax.empty();
 
     if (hasWave && instrument->durationSeconds > 0.0)
@@ -118,19 +193,6 @@ void WaveformView::paint (juce::Graphics& g)
         g.setColour (displayText);
         g.drawText (juce::String (duration, duration < 10.0 ? 2 : 1) + " s", bounds.reduced (14.0f, 0.0f).withTrimmedTop (28.0f).withHeight (14.0f),
                     juce::Justification::centredRight, false);
-    }
-
-    if (hasWave && granular)
-    {
-        // Where grains come from: SPREAD as a soft band (a quarter of the length either
-        // side at 100 %), POS as a line.
-        const float x = plot.getX() + grainPosition * plot.getWidth();
-        const float half = (grainSpread * 0.25f + 0.004f) * plot.getWidth();
-        const auto band = juce::Rectangle<float> (x - half, plot.getY() - 4.0f, 2.0f * half, plot.getHeight() + 8.0f).getIntersection (plot.expanded (0.0f, 4.0f));
-        g.setColour (accent.withAlpha (0.10f));
-        g.fillRect (band);
-        g.setColour (accent.withAlpha (0.75f));
-        g.drawVerticalLine (juce::roundToInt (x), plot.getY() - 4.0f, plot.getBottom() + 4.0f);
     }
 
     if (hasWave)
@@ -197,11 +259,6 @@ void WaveformView::paint (juce::Graphics& g)
         g.drawText (juce::String::fromUTF8 ("ANALYZING\xe2\x80\xa6"), getLocalBounds(), juce::Justification::centred);
     }
 
-    if (dragHighlight)
-    {
-        g.setColour (accent);
-        g.drawRoundedRectangle (bounds.reduced (1.5f), 7.0f, 2.5f);
-    }
 }
 
 //==============================================================================
@@ -531,7 +588,7 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
         openPopup (advancedPopup);
     refreshInstrumentInfo();
     updateCustomisedDots();
-    startTimerHz (15);
+    startTimerHz (30);   // the granular cloud moves at the display rate
 }
 
 OspAudioProcessorEditor::~OspAudioProcessorEditor()
@@ -1002,6 +1059,19 @@ void OspAudioProcessorEditor::timerCallback()
     if (ospProcessor.editLayer() != shownLayer)
         showLayer (ospProcessor.editLayer());   // e.g. a recalled session
     updateGranularView();
+    {
+        // The grains the edited layer is playing now.
+        const auto& snapshot = ospProcessor.grainSnapshot (shownLayer);
+        const int count = std::clamp (snapshot.count.load (std::memory_order_acquire), 0, InstrumentEngine::GrainSnapshot::capacity);
+        std::array<WaveformView::GrainDot, InstrumentEngine::GrainSnapshot::capacity> dots;
+        for (int i = 0; i < count; ++i)
+        {
+            const auto k = static_cast<std::size_t> (i);
+            dots[k] = { snapshot.position[k].load (std::memory_order_relaxed), snapshot.level[k].load (std::memory_order_relaxed),
+                        snapshot.lane[k].load (std::memory_order_relaxed) };
+        }
+        waveform.setGrains (dots.data(), count);
+    }
     const auto instrument = ospProcessor.currentInstrument();
     const auto generation = instrument != nullptr ? instrument->generation : 0;
     if (generation != shownGeneration || state != shownState)

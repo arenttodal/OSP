@@ -68,6 +68,17 @@ public:
     int layerIndex() const noexcept { return voiceLayer; }
     bool isGranular() const noexcept { return granularMode; }
     int grainCount() const noexcept { return granularMode ? granularSource.grainCount() : 0; }
+    /** Granular voices: the playing grains (display), their level scaled by the envelope. */
+    int collectGrains (GranularSource::GrainView* out, int max) const noexcept
+    {
+        if (! active || ! granularMode)
+            return 0;
+        const int n = granularSource.collect (out, max);
+        const float env = std::clamp (envelope.level() * fadeGain, 0.0f, 1.0f);
+        for (int i = 0; i < n; ++i)
+            out[i].level *= env;
+        return n;
+    }
     int channel() const noexcept { return midiChannel; }
 
     /** Continuous expression (pressure / MPE timbre): extra level (dB) and brightness (dB). Control rate, smoothed. */

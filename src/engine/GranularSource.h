@@ -46,12 +46,22 @@ public:
     /** One output sample. `step`: recording frames per output sample at the note's pitch. */
     void render (float& left, float& right, double step) noexcept;
 
+    /** What a grain is doing, for the display: where it reads (0..1 of the recording), how
+        loud its window is now (0..1) and a stable random lane (0..1) to scatter it vertically. */
+    struct GrainView
+    {
+        float position = 0.0f, level = 0.0f, lane = 0.5f;
+    };
+    /** Writes up to `max` playing grains; returns how many. */
+    int collect (GrainView* out, int max) const noexcept;
+
 private:
     struct Grain
     {
         double position = 0.0, ratio = 1.0;
         double c = 1.0, s = 0.0, cd = 1.0, sd = 0.0;   // Hann window by rotation
         int remaining = 0;
+        float lane = 0.5f;
         bool active = false;
     };
 

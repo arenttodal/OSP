@@ -139,6 +139,9 @@ public:
     /** Message thread: applies finished loads immediately (normally done by a timer). */
     void pollLoads() { timerCallback(); }
 
+    /** The grains a layer is playing now (display; lock-free, any thread). */
+    const InstrumentEngine::GrainSnapshot& grainSnapshot (int layer) const noexcept { return engine.grainSnapshot (layer); }
+
     juce::AudioProcessorValueTreeState parameters;
     juce::MidiKeyboardState keyboardState;
     std::atomic<int> activeVoices { 0 };
