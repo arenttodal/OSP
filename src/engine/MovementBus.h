@@ -68,7 +68,7 @@ private:
     MovementMode mode = MovementMode::drift, previousMode = MovementMode::drift;
     int fadeRemaining = 0, fadeLength = 1;
     double amountTarget = 0.0, amount = 0.0, amountCoef = 0.001;
-    double a = 0.35, b = 0.6, c = 0.4;
+    double a = 0.70, b = 0.6, c = 0.4;
 
     std::vector<float> lineL, lineR;   // shared delay line (tape, drift, chorus read it)
     int write = 0, lineMask = 0;

@@ -8,14 +8,27 @@
 namespace osp::plugin
 {
 
-namespace colours
+namespace
 {
-    const juce::Colour background { 0xff15161a };
-    const juce::Colour panel { 0xff1e2026 };
-    const juce::Colour wave { 0xffd8c7a3 };
-    const juce::Colour text { 0xffe8e6e1 };
-    const juce::Colour dim { 0xff8a8d96 };
-    const juce::Colour accent { 0xffe0a458 };
+    const juce::String dot = juce::String::fromUTF8 ("  \xc2\xb7  ");
+
+    /** A readable time step for the display's grid: 3 to 8 lines over the recording. */
+    double gridStep (double seconds)
+    {
+        for (double step : { 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 15.0, 30.0, 60.0, 120.0 })
+            if (seconds / step <= 8.0)
+                return step;
+        return 300.0;
+    }
+
+    juce::String secondsText (double t, double step)
+    {
+        // "0 s", "0.5 s", "1 s" (no trailing zeros).
+        auto text = juce::String (t, step < 0.5 ? 2 : 1);
+        while (text.containsChar ('.') && (text.endsWithChar ('0') || text.endsWithChar ('.')))
+            text = text.dropLastCharacters (1);
+        return text + " s";
+    }
 }
 
 //==============================================================================
@@ -42,66 +55,113 @@ void WaveformView::setDragHighlight (bool on)
 
 void WaveformView::paint (juce::Graphics& g)
 {
+    using namespace palette;
     const auto bounds = getLocalBounds().toFloat();
-    g.setColour (colours::panel);
-    g.fillRoundedRectangle (bounds, 6.0f);
+    g.setColour (display);
+    g.fillRoundedRectangle (bounds, 7.0f);
+    // Inset: shade under the top edge, a fine dark rim.
+    g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.38f), 0.0f, bounds.getY(),
+                                             juce::Colours::transparentBlack, 0.0f, bounds.getY() + 16.0f, false));
+    g.fillRoundedRectangle (bounds.withHeight (16.0f), 7.0f);
+    g.setColour (juce::Colours::black.withAlpha (0.55f));
+    g.drawRoundedRectangle (bounds.reduced (0.5f), 7.0f, 1.0f);
 
-    if (instrument != nullptr && ! instrument->peakMax.empty())
+    const auto plot = bounds.reduced (18.0f, 0.0f).withTrimmedTop (28.0f).withTrimmedBottom (14.0f);
+    const bool hasWave = instrument != nullptr && ! instrument->peakMax.empty();
+
+    if (hasWave && instrument->durationSeconds > 0.0)
+    {
+        // Time grid with second markers, note information top right.
+        const double duration = instrument->durationSeconds;
+        const double step = gridStep (duration);
+        g.setFont (fonts::make (11.0f));
+        for (double t = 0.0; t < duration - 0.25 * step; t += step)
+        {
+            const float x = plot.getX() + static_cast<float> (t / duration) * plot.getWidth();
+            g.setColour (displayLine);
+            g.drawVerticalLine (juce::roundToInt (x), bounds.getY() + 10.0f, bounds.getBottom() - 10.0f);
+            g.setColour (displayText);
+            g.drawText (secondsText (t, step), juce::Rectangle<float> (x + 5.0f, bounds.getY() + 8.0f, 60.0f, 14.0f),
+                        juce::Justification::centredLeft, false);
+        }
+        juce::Path centre;
+        centre.startNewSubPath (bounds.getX() + 10.0f, plot.getCentreY());
+        centre.lineTo (bounds.getRight() - 10.0f, plot.getCentreY());
+        juce::Path dashed;
+        const float dashes[] = { 2.0f, 4.0f };
+        juce::PathStrokeType (1.0f).createDashedStroke (dashed, centre, dashes, 2);
+        g.setColour (displayLine.withAlpha (0.8f));
+        g.fillPath (dashed);
+
+        const auto& pitch = instrument->analysis.pitch;
+        juce::String note;
+        if (pitch.midiNote >= 0)
+            note << pitch.noteName << juce::String::fromUTF8 (" \xe2\x80\x93 ") << (pitch.centsOffset >= 0 ? "" : "-")
+                 << juce::String (std::abs (static_cast<int> (std::lround (pitch.centsOffset)))) << "c (" << pitch.confidenceLevel << ")";
+        else
+            note = "no pitch";
+        auto info = bounds.reduced (14.0f, 8.0f);
+        g.setColour (displayText);
+        g.drawText (note, info.removeFromTop (14.0f), juce::Justification::centredRight, false);
+        g.drawText (juce::String (duration, duration < 10.0 ? 2 : 1) + " s", info.removeFromTop (14.0f), juce::Justification::centredRight, false);
+    }
+
+    if (hasWave)
     {
         const auto& lo = instrument->peakMin;
         const auto& hi = instrument->peakMax;
-        const float mid = bounds.getCentreY();
+        const float mid = plot.getCentreY();
         float maxAbs = 1.0e-4f; // display is scaled to the recording's own peak so quiet sources stay visible
         for (std::size_t i = 0; i < hi.size(); ++i)
             maxAbs = std::max ({ maxAbs, hi[i], -lo[i] });
-        const float scale = bounds.getHeight() * 0.45f / maxAbs;
-        const int width = getWidth();
-        g.setColour (colours::wave.withAlpha (loading ? 0.3f : 0.85f));
+        const float scale = plot.getHeight() * 0.48f / maxAbs;
+        const int x0 = static_cast<int> (plot.getX()), width = static_cast<int> (plot.getWidth());
+        g.setColour (wave.withAlpha (loading ? 0.25f : 0.92f));
         for (int x = 0; x < width; ++x)
         {
-            const auto b = static_cast<std::size_t> (static_cast<double> (x) / width * static_cast<double> (hi.size()));
-            const float top = mid - hi[std::min (b, hi.size() - 1)] * scale;
-            const float bottom = mid - lo[std::min (b, lo.size() - 1)] * scale;
-            g.drawVerticalLine (x, top, std::max (top + 1.0f, bottom));
+            const auto b = std::min (static_cast<std::size_t> (static_cast<double> (x) / width * static_cast<double> (hi.size())), hi.size() - 1);
+            const float top = mid - hi[b] * scale;
+            const float bottom = mid - lo[b] * scale;
+            g.drawVerticalLine (x0 + x, top, std::max (top + 1.0f, bottom));
+        }
+        if (instrument->startSeconds > 0.0 && instrument->durationSeconds > 0.0)
+        {
+            // Notes start here (analysed onset), not at the beginning of the file.
+            const float x = plot.getX() + static_cast<float> (instrument->startSeconds / instrument->durationSeconds) * plot.getWidth();
+            g.setColour (accent.withAlpha (0.85f));
+            g.drawVerticalLine (juce::roundToInt (x), plot.getY() - 4.0f, plot.getBottom() + 4.0f);
         }
     }
-    if (instrument != nullptr && instrument->startSeconds > 0.0 && instrument->durationSeconds > 0.0)
-    {
-        // Notes start here (analysed onset), not at the beginning of the file.
-        const auto x = static_cast<float> (instrument->startSeconds / instrument->durationSeconds) * bounds.getWidth();
-        g.setColour (colours::accent.withAlpha (0.8f));
-        g.drawVerticalLine (static_cast<int> (x), bounds.getY(), bounds.getBottom());
-    }
 
-    if ((instrument == nullptr || instrument->peakMax.empty()) && ! loading)
+    if (! hasWave && ! loading)
     {
         // First-run guidance (spec §90 onboarding): three steps, no manual needed.
         auto area = getLocalBounds().reduced (12);
         const int lineHeight = 20;
-        auto block = area.withSizeKeepingCentre (area.getWidth(), 34 + 3 * lineHeight + 6);
-        g.setColour (colours::text);
-        g.setFont (juce::FontOptions (28.0f, juce::Font::bold));
+        auto block = area.withSizeKeepingCentre (area.getWidth(), 34 + 3 * lineHeight + 8);
+        g.setColour (housing);
+        g.setFont (fonts::make (26.0f, fonts::Weight::semibold, 0.12f));
         g.drawText ("DROP A SOUND", block.removeFromTop (34), juce::Justification::centred);
-        block.removeFromTop (6);
-        g.setColour (colours::dim);
-        g.setFont (juce::FontOptions (13.0f));
+        block.removeFromTop (8);
+        g.setColour (displayText);
+        g.setFont (fonts::make (13.5f));
         for (const auto* line : { "1  One tonal recording (WAV, AIFF, FLAC) \xe2\x80\x94 or several takes, or a folder",
                                   "2  Play and hold: notes keep going, repeated notes never sound the same",
-                                  "3  Shape it with LIFE, DYNAMICS, CHARACTER, MOTION and SPACE" })
+                                  "3  Shape it with LIFE, DYNAMICS, CHARACTER, MOVEMENT and SPACE \xe2\x80\x94 click a name for more" })
             g.drawText (juce::String::fromUTF8 (line), block.removeFromTop (lineHeight), juce::Justification::centred);
     }
 
     if (loading)
     {
-        g.setColour (colours::text);
-        g.setFont (juce::FontOptions (20.0f, juce::Font::bold));
+        g.setColour (housing);
+        g.setFont (fonts::make (18.0f, fonts::Weight::semibold, 0.14f));
         g.drawText (juce::String::fromUTF8 ("ANALYZING\xe2\x80\xa6"), getLocalBounds(), juce::Justification::centred);
     }
 
     if (dragHighlight)
     {
-        g.setColour (colours::accent);
-        g.drawRoundedRectangle (bounds.reduced (1.5f), 6.0f, 3.0f);
+        g.setColour (accent);
+        g.drawRoundedRectangle (bounds.reduced (1.5f), 7.0f, 2.5f);
     }
 }
 
@@ -115,8 +175,10 @@ SamplesPanel::SamplesPanel (OspAudioProcessor& p) : ospProcessor (p)
 
 void SamplesPanel::paint (juce::Graphics& g)
 {
-    g.setColour (colours::panel);
-    g.fillRoundedRectangle (getLocalBounds().toFloat(), 6.0f);
+    g.setColour (palette::display);
+    g.fillRoundedRectangle (getLocalBounds().toFloat(), 7.0f);
+    g.setColour (juce::Colours::black.withAlpha (0.55f));
+    g.drawRoundedRectangle (getLocalBounds().toFloat().reduced (0.5f), 7.0f, 1.0f);
 }
 
 void SamplesPanel::setInstrument (std::shared_ptr<const LoadedInstrument> instrument)
@@ -141,8 +203,8 @@ void SamplesPanel::setInstrument (std::shared_ptr<const LoadedInstrument> instru
         header->name.setText (juce::String (midiNoteName (static_cast<int> (std::lround (group.rootMidi))))
                                   + (group.layers > 1 ? "   " + juce::String (group.layers) + " velocity layers" : juce::String()),
                               juce::dontSendNotification);
-        header->name.setFont (juce::FontOptions (14.0f, juce::Font::bold));
-        header->name.setColour (juce::Label::textColourId, colours::text);
+        header->name.setFont (fonts::make (14.0f, fonts::Weight::semibold));
+        header->name.setColour (juce::Label::textColourId, palette::housingLight);
         content.addAndMakeVisible (header->name);
         rows.push_back (std::move (header));
         for (int id : group.members)
@@ -150,11 +212,11 @@ void SamplesPanel::setInstrument (std::shared_ptr<const LoadedInstrument> instru
             const auto& member = set.members[static_cast<std::size_t> (id)];
             auto row = std::make_unique<Row>();
             row->name.setText (juce::String::fromUTF8 (member.filename.c_str()), juce::dontSendNotification);
-            row->name.setColour (juce::Label::textColourId, colours::text);
+            row->name.setColour (juce::Label::textColourId, palette::housingLight);
             row->info.setText (member.userAssigned ? juce::String ("set by you")
                                                    : "auto " + juce::String (static_cast<int> (std::lround (member.confidence * 100))) + "%",
                                juce::dontSendNotification);
-            row->info.setColour (juce::Label::textColourId, colours::dim);
+            row->info.setColour (juce::Label::textColourId, palette::displayText);
             row->role.addItemList ({ "Pitch", "Velocity layer", "Round robin", "Articulation" }, 1);
             row->role.setSelectedId (static_cast<int> (member.role) + 1, juce::dontSendNotification);
             for (int l = 1; l <= 4; ++l)
@@ -220,22 +282,108 @@ void SamplesPanel::resized()
 }
 
 //==============================================================================
+void OspKeyboard::drawWhiteNote (int note, juce::Graphics& g, juce::Rectangle<float> area, bool isDown, bool isOver,
+                                 juce::Colour, juce::Colour)
+{
+    using namespace palette;
+    auto top = ivory, bottom = juce::Colour (0xffe6dfd1);
+    if (isDown)
+    {
+        top = juce::Colour (0xfff6d9c6);
+        bottom = juce::Colour (0xfff0c3a6);
+    }
+    else if (isOver)
+        top = top.brighter (0.05f);
+    g.setGradientFill (juce::ColourGradient (top, 0.0f, area.getY(), bottom, 0.0f, area.getBottom(), false));
+    g.fillRect (area);
+    // Key front at the bottom, separator on the right.
+    g.setColour (juce::Colours::black.withAlpha (0.08f));
+    g.fillRect (area.withTop (area.getBottom() - 3.0f));
+    g.setColour (border.withAlpha (0.9f));
+    g.drawVerticalLine (static_cast<int> (area.getRight()), area.getY(), area.getBottom());
+
+    const auto text = getWhiteNoteText (note);
+    if (text.isNotEmpty())
+    {
+        g.setColour (isDown ? accent.darker (0.3f) : textDim);
+        g.setFont (fonts::make (std::min (10.5f, area.getWidth() * 0.62f), fonts::Weight::medium));
+        g.drawText (text, area.withTrimmedLeft (3.0f).withTrimmedBottom (5.0f).removeFromBottom (12.0f), juce::Justification::centredLeft, false);
+    }
+}
+
+void OspKeyboard::drawBlackNote (int, juce::Graphics& g, juce::Rectangle<float> area, bool isDown, bool isOver, juce::Colour)
+{
+    using namespace palette;
+    auto r = area.reduced (0.5f, 0.0f);
+    auto top = isDown ? accent.darker (0.35f) : juce::Colour (0xff3b3c3f);
+    auto bottom = isDown ? accent.darker (0.55f) : juce::Colour (0xff1b1c1e);
+    if (isOver && ! isDown)
+        top = top.brighter (0.15f);
+    g.setGradientFill (juce::ColourGradient (top, 0.0f, r.getY(), bottom, 0.0f, r.getBottom(), false));
+    g.fillRoundedRectangle (r.withTrimmedTop (-3.0f), 2.0f);
+    // A lit bevel near the front edge.
+    const auto front = r.withTop (r.getBottom() - r.getHeight() * 0.12f).reduced (r.getWidth() * 0.12f, 0.0f);
+    g.setColour (juce::Colours::white.withAlpha (isDown ? 0.08f : 0.16f));
+    g.fillRoundedRectangle (front.withTrimmedBottom (2.0f), 1.5f);
+}
+
+juce::String OspKeyboard::getWhiteNoteText (int note)
+{
+    // MIDI 60 = C4, as everywhere else in OSP.
+    return note % 12 == 0 ? "C" + juce::String (note / 12 - 1) : juce::String();
+}
+
+//==============================================================================
+void MenuButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
+{
+    getLookAndFeel().drawButtonBackground (g, *this, findColour (buttonColourId), highlighted, down);
+    const auto c = getLocalBounds().toFloat().getCentre();
+    g.setColour (palette::text);
+    for (int i = -1; i <= 1; ++i)
+        g.fillRoundedRectangle (c.x - 7.0f, c.y + static_cast<float> (i) * 4.5f - 0.75f, 14.0f, 1.5f, 0.75f);
+}
+
+//==============================================================================
+void OspAudioProcessorEditor::OutsideClickWatcher::mouseDown (const juce::MouseEvent& e)
+{
+    auto* c = e.eventComponent;
+    if (editor.popup == nullptr)
+    {
+        editor.closedByLabelPress = -1;
+        return;
+    }
+    if (c == editor.popup.get() || editor.popup->isParentOf (c))
+        return;
+    int pressed = -1;
+    for (int i = 0; i < 5; ++i)
+        if (c == editor.macros[static_cast<std::size_t> (i)].label.get())
+            pressed = i;
+    if (c == &editor.advancedButton)
+        pressed = advancedPopup;
+    editor.closedByLabelPress = pressed == editor.popupIndex ? pressed : -1;
+    editor.closePopup();
+}
+
 OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     : AudioProcessorEditor (p),
       ospProcessor (p),
-      keyboard (p.keyboardState, juce::MidiKeyboardComponent::horizontalKeyboard)
+      keyboard (p.keyboardState)
 {
+    setLookAndFeel (&lookAndFeel);
     addAndMakeVisible (waveform);
 
     for (auto* label : { &rootLabel, &characterLabel, &detailLabel, &statusLabel })
     {
-        label->setColour (juce::Label::textColourId, colours::text);
+        label->setColour (juce::Label::textColourId, palette::text);
+        label->setBorderSize ({ 0, 0, 0, 0 });
         addAndMakeVisible (*label);
     }
-    rootLabel.setFont (juce::FontOptions (34.0f, juce::Font::bold));
-    characterLabel.setFont (juce::FontOptions (15.0f, juce::Font::bold));
-    detailLabel.setColour (juce::Label::textColourId, colours::dim);
-    statusLabel.setColour (juce::Label::textColourId, colours::dim);
+    rootLabel.setFont (fonts::make (46.0f, fonts::Weight::semibold, -0.01f));
+    characterLabel.setFont (fonts::make (16.0f, fonts::Weight::medium, 0.1f));
+    detailLabel.setFont (fonts::make (12.5f));
+    detailLabel.setColour (juce::Label::textColourId, palette::textDim);
+    statusLabel.setFont (fonts::make (12.5f));
+    statusLabel.setColour (juce::Label::textColourId, palette::textDim);
 
     rootBox.addItem ("Root: auto", 1);
     for (int note = 0; note < 128; ++note)
@@ -275,177 +423,268 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     addAndMakeVisible (menuButton);
     setWantsKeyboardFocus (true);
 
-    auto setupKnob = [this] (Knob& knob, const char* id, const char* name, bool large) {
-        knob.slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 70, 18);
-        knob.slider.setColour (juce::Slider::rotarySliderFillColourId, large ? colours::accent : colours::dim);
-        knob.label.setText (juce::String::fromUTF8 (name), juce::dontSendNotification);
-        knob.label.setJustificationType (juce::Justification::centred);
-        knob.label.setColour (juce::Label::textColourId, large ? colours::text : colours::dim);
-        if (large)
-            knob.label.setFont (juce::FontOptions (14.0f, juce::Font::bold));
-        knob.attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (ospProcessor.parameters, id, knob.slider);
-        knob.slider.setTitle (juce::String::fromUTF8 (name));
-        addAndMakeVisible (knob.slider);
-        addAndMakeVisible (knob.label);
-    };
+    // The instrument's primary controls. A name with settings behind it opens its popup.
     const std::array<std::pair<const char*, const char*>, 6> macroInfo { {
         { "life", "LIFE" }, { "dynamics", "DYNAMICS" }, { "character", "CHARACTER" },
-        { "motion", "MOTION" }, { "space", "SPACE" }, { "reimagined", "ORIGINAL \xe2\x86\x94 REIMAGINED" } } };
+        { "motion", "MOVEMENT" }, { "space", "SPACE" }, { "reimagined", "ORIGINAL / REIMAGINED" } } };
+    const std::array<const char*, 5> popupHints { "Life: how performances vary", "Dynamics: velocity curve, envelope, tone",
+                                                  "Character: filter type, range, resonance, drive, envelope",
+                                                  "Movement: drift, tape, chorus or pulse", "Space: room, chamber, plate or spring" };
     for (std::size_t i = 0; i < macros.size(); ++i)
-        setupKnob (macros[i], macroInfo[i].first, macroInfo[i].second, true);
-    const std::array<std::pair<const char*, const char*>, 6> knobInfo { {
-        { "attack", "Attack" }, { "release", "Release" }, { "velocityRange", "Velocity" },
-        { "fineTune", "Fine" }, { "bendRange", "Bend" }, { "gain", "Output" } } };
-    for (std::size_t i = 0; i < knobs.size(); ++i)
-        setupKnob (knobs[i], knobInfo[i].first, knobInfo[i].second, false);
-
-    pitchCharacterBox.addItemList ({ "Tape", "Natural" }, 1);
-    sustainBox.addItemList ({ "Recording", "Endless" }, 1);
-    pitchCharacterBox.setTitle ("Pitch character");
-    sustainBox.setTitle ("Sustain");
-    pitchCharacterAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (ospProcessor.parameters, "pitchCharacter", pitchCharacterBox);
-    sustainAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (ospProcessor.parameters, "sustain", sustainBox);
-    for (auto* label : { &pitchCharacterLabel, &sustainLabel, &presetLabel })
     {
-        label->setColour (juce::Label::textColourId, colours::dim);
-        addAndMakeVisible (*label);
-    }
-    pitchCharacterLabel.setText ("Pitch character", juce::dontSendNotification);
-    sustainLabel.setText ("Sustain", juce::dontSendNotification);
-    presetLabel.setJustificationType (juce::Justification::centredLeft);
-    presetLabel.setFont (juce::FontOptions (12.0f));
-    presetLabel.setTooltip ("The preset last opened or saved (menu: Presets)");
-    // The Advanced panel is closed by default (spec §13): the instrument is the macros.
-    advancedButton.setClickingTogglesState (false);
-    advancedButton.setColour (juce::TextButton::buttonColourId, juce::Colours::transparentBlack);
-    advancedButton.setColour (juce::TextButton::textColourOffId, colours::dim);
-    advancedButton.setTitle ("Advanced settings");
-    advancedButton.onClick = [this] { showAdvanced (! ospProcessor.advancedOpen()); };
-    addAndMakeVisible (advancedButton);
-    addAndMakeVisible (pitchCharacterBox);
-    addAndMakeVisible (sustainBox);
-    reseedButton.setTooltip ("New variation seed: repeated notes vary differently");
-    reseedButton.onClick = [this] {
-        if (auto* seed = ospProcessor.parameters.getParameter ("seed"))
+        auto& knob = macros[i];
+        const bool hasPopup = i < 5;
+        knob.label = std::make_unique<MacroLabel> (macroInfo[i].second, hasPopup, ! hasPopup);
+        knob.label->setInterceptsMouseClicks (hasPopup, false);
+        if (hasPopup)
         {
-            const auto range = ospProcessor.parameters.getParameterRange ("seed");
-            const float next = std::fmod (range.convertFrom0to1 (seed->getValue()), 9999.0f) + 1.0f;
-            seed->setValueNotifyingHost (range.convertTo0to1 (next));
+            knob.label->setTooltip (popupHints[i]);
+            const int index = static_cast<int> (i);
+            knob.label->onClick = [this, index] {
+                if (closedByLabelPress == index)
+                {
+                    closedByLabelPress = -1;
+                    return;
+                }
+                openPopup (index);
+            };
         }
+        addAndMakeVisible (*knob.label);
+
+        knob.slider.setRotaryParameters (OspLookAndFeel::rotaryStart, OspLookAndFeel::rotaryEnd, true);
+        knob.slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 64, 20);
+        knob.attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (ospProcessor.parameters, macroInfo[i].first, knob.slider);
+        if (auto* param = ospProcessor.parameters.getParameter (macroInfo[i].first))
+            knob.slider.setDoubleClickReturnValue (true, param->convertFrom0to1 (param->getDefaultValue())); // resets the amount only
+        knob.slider.setTitle (macroInfo[i].second);
+        addAndMakeVisible (knob.slider);
+    }
+
+    advancedButton.getProperties().set ("caps", true);
+    advancedButton.setTitle ("Advanced settings");
+    advancedButton.setTooltip ("Velocity range, tuning, bend, output, pitch character, sustain, MPE");
+    advancedButton.onClick = [this] {
+        if (closedByLabelPress == advancedPopup)
+        {
+            closedByLabelPress = -1;
+            return;
+        }
+        openPopup (advancedPopup);
     };
-    addAndMakeVisible (reseedButton);
-    mpeToggle.setTooltip ("MPE controllers: per-note pitch bend (+/-48 st), pressure and slide");
-    mpeToggle.setColour (juce::ToggleButton::textColourId, colours::dim);
-    mpeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (ospProcessor.parameters, "mpe", mpeToggle);
-    addAndMakeVisible (mpeToggle);
+    addAndMakeVisible (advancedButton);
 
     keyboard.setAvailableRange (21, 108);
     keyboard.setOctaveForMiddleC (4); // MIDI 60 = C4, as everywhere else in OSP
-    keyboard.setKeyWidth (14.0f);
+    keyboard.setScrollButtonsVisible (false);
+    keyboard.setBlackNoteLengthProportion (0.6f);
+    keyboard.setColour (juce::MidiKeyboardComponent::shadowColourId, juce::Colours::transparentBlack);
+    keyboard.setColour (juce::MidiKeyboardComponent::keySeparatorLineColourId, palette::border);
+    keyboard.setColour (juce::MidiKeyboardComponent::whiteNoteColourId, palette::ivory);
+    keyboard.setColour (juce::MidiKeyboardComponent::blackNoteColourId, palette::ebony);
     addAndMakeVisible (keyboard);
 
+    // Housing grain: a fixed speckle tile (UI only).
+    texture = juce::Image (juce::Image::ARGB, 128, 128, true);
+    juce::Random grain (0x05b);
+    for (int y = 0; y < texture.getHeight(); ++y)
+        for (int x = 0; x < texture.getWidth(); ++x)
+            if (grain.nextFloat() < 0.35f)
+                texture.setPixelAt (x, y, (grain.nextBool() ? juce::Colours::white : juce::Colours::black).withAlpha (0.02f + 0.025f * grain.nextFloat()));
+
+    juce::Desktop::getInstance().addGlobalMouseListener (&outsideClicks);
+
     setResizable (true, true);
-    setResizeLimits (720, 560, 1800, 1200);
-    setSize (920, 680);
+    setResizeLimits (760, 540, 1800, 1200);
+    setSize (900, 620);
     setScaleFactor (ospProcessor.uiScale());
 
-    showAdvanced (ospProcessor.advancedOpen());
+    if (ospProcessor.advancedOpen())
+        openPopup (advancedPopup);
     refreshInstrumentInfo();
+    updateCustomisedDots();
     startTimerHz (15);
-}
-
-void OspAudioProcessorEditor::showAdvanced (bool open)
-{
-    ospProcessor.setAdvancedOpen (open);
-    advancedButton.setButtonText (juce::String::fromUTF8 (open ? "ADVANCED \xe2\x96\xbe" : "ADVANCED \xe2\x96\xb8"));
-    for (auto* c : std::initializer_list<juce::Component*> { &pitchCharacterLabel, &pitchCharacterBox, &sustainLabel, &sustainBox, &reseedButton, &mpeToggle })
-        c->setVisible (open);
-    for (auto& knob : knobs)
-    {
-        knob.label.setVisible (open);
-        knob.slider.setVisible (open);
-    }
-    resized();
 }
 
 OspAudioProcessorEditor::~OspAudioProcessorEditor()
 {
     stopTimer();
+    juce::Desktop::getInstance().removeGlobalMouseListener (&outsideClicks);
+    popup.reset();
+    setLookAndFeel (nullptr);
+}
+
+void OspAudioProcessorEditor::openPopup (int which)
+{
+    const bool keepAdvanced = which == advancedPopup;
+    closePopup();
+    if (which < 0 || which > advancedPopup)
+        return;
+    popup = which == advancedPopup ? createAdvancedPopup (ospProcessor) : createMacroPopup (static_cast<MacroPopup> (which), ospProcessor);
+    popupIndex = which;
+    addAndMakeVisible (*popup);
+    popup->toFront (false);
+    positionPopup();
+    if (which < 5)
+        macros[static_cast<std::size_t> (which)].label->setOpen (true);
+    if (keepAdvanced)
+    {
+        ospProcessor.setAdvancedOpen (true);
+        advancedButton.setToggleState (true, juce::dontSendNotification);
+    }
+    if (isShowing())
+        grabKeyboardFocus(); // Escape closes it
+}
+
+void OspAudioProcessorEditor::closePopup()
+{
+    if (popup == nullptr)
+        return;
+    if (popupIndex >= 0 && popupIndex < 5)
+        macros[static_cast<std::size_t> (popupIndex)].label->setOpen (false);
+    if (popupIndex == advancedPopup)
+    {
+        ospProcessor.setAdvancedOpen (false);
+        advancedButton.setToggleState (false, juce::dontSendNotification);
+    }
+    popup.reset();
+    popupIndex = -1;
+}
+
+void OspAudioProcessorEditor::positionPopup()
+{
+    if (popup == nullptr)
+        return;
+    const auto size = popup->cardSize();
+    const int m = MiniPanel::shadowMargin;
+    const auto anchor = popupIndex < 5 ? macros[static_cast<std::size_t> (popupIndex)].label->getBounds() : advancedButton.getBounds();
+    int x = popupIndex < 5 ? anchor.getCentreX() - size.x / 2 : anchor.getX();
+    int y = anchor.getY() - 6 - size.y;
+    const auto limits = getLocalBounds().reduced (14);
+    x = juce::jlimit (limits.getX(), std::max (limits.getX(), limits.getRight() - size.x), x);
+    y = std::max (limits.getY(), y);
+    popup->setBounds (x - m, y - m, size.x + 2 * m, size.y + 2 * m);
+}
+
+void OspAudioProcessorEditor::updateCustomisedDots()
+{
+    for (int i = 0; i < 5; ++i)
+    {
+        bool customised = false;
+        for (const auto& id : popupParameterIds (static_cast<MacroPopup> (i)))
+            if (auto* param = ospProcessor.parameters.getParameter (id))
+                customised = customised || std::abs (param->getValue() - param->getDefaultValue()) > 1.0e-4f;
+        macros[static_cast<std::size_t> (i)].label->setCustomised (customised);
+    }
 }
 
 void OspAudioProcessorEditor::paint (juce::Graphics& g)
 {
-    g.fillAll (colours::background);
+    using namespace palette;
+    g.fillAll (frame);
+
+    // Housing: rounded chassis, lit from above, a little grain.
+    const auto housingBounds = getLocalBounds().toFloat().reduced (5.0f);
+    juce::Path shell;
+    shell.addRoundedRectangle (housingBounds, 14.0f);
+    juce::DropShadow (juce::Colours::black.withAlpha (0.5f), 10, { 0, 3 }).drawForPath (g, shell);
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xffede5d6), 0.0f, housingBounds.getY(),
+                                             juce::Colour (0xffe1d6c3), 0.0f, housingBounds.getBottom(), false));
+    g.fillPath (shell);
+    if (texture.isValid())
+    {
+        g.setTiledImageFill (texture, 0, 0, 1.0f);
+        g.fillPath (shell);
+    }
+    g.setColour (juce::Colours::white.withAlpha (0.6f));
+    g.drawLine (housingBounds.getX() + 14.0f, housingBounds.getY() + 1.0f, housingBounds.getRight() - 14.0f, housingBounds.getY() + 1.0f, 1.2f);
+    g.setColour (juce::Colours::black.withAlpha (0.25f));
+    g.strokePath (shell, juce::PathStrokeType (1.0f));
+
+    // Divider between the pitch and the description.
+    if (rootLabel.getText().isNotEmpty())
+    {
+        const float x = static_cast<float> (rootLabel.getRight()) + 8.0f;
+        g.setColour (border);
+        g.drawLine (x, static_cast<float> (rootLabel.getY()) + 8.0f, x, static_cast<float> (rootLabel.getBottom()) - 6.0f, 1.0f);
+    }
+
+    // Bezel around the display (a slight recess into the housing).
+    const auto bezel = waveform.getBounds().toFloat().expanded (3.0f);
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xffbfb39c), 0.0f, bezel.getY(), juce::Colour (0xfff4eee4), 0.0f, bezel.getBottom(), false));
+    g.fillRoundedRectangle (bezel, 9.0f);
+
+    // Keyboard bed.
+    const auto bed = keyboard.getBounds().toFloat().expanded (3.0f);
+    g.setColour (juce::Colour (0xff2c2e31));
+    g.fillRoundedRectangle (bed, 5.0f);
+    g.setColour (juce::Colours::white.withAlpha (0.5f));
+    g.drawLine (bed.getX() + 5.0f, bed.getBottom() + 1.0f, bed.getRight() - 5.0f, bed.getBottom() + 1.0f, 1.0f);
+
+    // Status light: orange when ready, dim while empty or loading.
+    const auto state = ospProcessor.loadState();
+    const auto light = juce::Rectangle<float> (static_cast<float> (statusLabel.getX()) - 14.0f, static_cast<float> (statusLabel.getBounds().getCentreY()) - 4.0f, 8.0f, 8.0f);
+    g.setColour (state == OspAudioProcessor::LoadState::ready ? accent : (state == OspAudioProcessor::LoadState::failed ? accent.darker (0.5f) : border));
+    g.fillEllipse (light);
+    g.setColour (juce::Colours::black.withAlpha (0.2f));
+    g.drawEllipse (light, 0.8f);
 }
 
 void OspAudioProcessorEditor::resized()
 {
-    auto area = getLocalBounds().reduced (14);
+    auto area = getLocalBounds().reduced (5).reduced (22, 14);
 
-    auto header = area.removeFromTop (64);
-    auto buttons = header.removeFromRight (220);
-    auto topRow = buttons.removeFromTop (28);
-    menuButton.setBounds (topRow.removeFromRight (34));
-    topRow.removeFromRight (6);
-    loadButton.setBounds (topRow.removeFromRight (80));
-    topRow.removeFromRight (6);
-    exampleButton.setBounds (topRow);
+    // Top: pitch block, description, right-aligned controls (two rows).
+    auto header = area.removeFromTop (62);
     {
-        auto stateArea = header.removeFromRight (150).translated (-10, 0);
-        stateBox.setBounds (stateArea.removeFromTop (28));
-        presetLabel.setBounds (stateArea.removeFromTop (30));
+        auto right = header.removeFromRight (360);
+        auto row1 = right.removeFromTop (26);
+        right.removeFromTop (6);
+        auto row2 = right.removeFromTop (26);
+        menuButton.setBounds (row1.removeFromRight (34));
+        row1.removeFromRight (6);
+        loadButton.setBounds (row1.removeFromRight (84));
+        row1.removeFromRight (6);
+        exampleButton.setBounds (row1.removeFromRight (98));
+        row1.removeFromRight (6);
+        stateBox.setBounds (row1.removeFromRight (128));
+        rootBox.setBounds (row2.removeFromRight (124));
+        row2.removeFromRight (6);
+        samplesButton.setBounds (row2.removeFromRight (98));
     }
-    auto rootRow = buttons.removeFromBottom (28);
-    samplesButton.setBounds (rootRow.removeFromLeft (80));
-    rootRow.removeFromLeft (6);
-    rootBox.setBounds (rootRow);
-    rootLabel.setBounds (header.removeFromLeft (110));
-    characterLabel.setBounds (header.removeFromTop (30));
-    detailLabel.setBounds (header);
+    rootLabel.setBounds (header.removeFromLeft (std::max (64, juce::roundToInt (juce::GlyphArrangement::getStringWidth (rootLabel.getFont(), rootLabel.getText())) + 6)));
+    header.removeFromLeft (18);
+    auto description = header.withSizeKeepingCentre (header.getWidth(), 40);
+    characterLabel.setBounds (description.removeFromTop (22));
+    detailLabel.setBounds (description);
 
-    area.removeFromTop (6);
-    statusLabel.setBounds (area.removeFromBottom (22));
-    keyboard.setBounds (area.removeFromBottom (80));
+    area.removeFromTop (12);
+
+    // Bottom zone: status, keyboard, Advanced.
+    auto status = area.removeFromBottom (20);
+    statusLabel.setBounds (status.withTrimmedLeft (16));
+    area.removeFromBottom (6);
+    keyboard.setBounds (area.removeFromBottom (72).reduced (3, 0));
     keyboard.setKeyWidth (static_cast<float> (keyboard.getWidth()) / 52.0f); // 88 keys = 52 white keys
-    area.removeFromBottom (8);
+    area.removeFromBottom (12);
+    advancedButton.setBounds (area.removeFromBottom (22).withWidth (104));
+    area.removeFromBottom (6);
 
-    // Advanced row (collapsible): small knobs plus pitch character / sustain / reseed.
-    const bool advancedVisible = ospProcessor.advancedOpen();
-    auto advanced = area.removeFromBottom (advancedVisible ? 108 : 18);
-    advancedButton.setBounds (advanced.removeFromTop (18).withWidth (110));
-    auto choices = advanced.removeFromRight (240);
-    auto row1 = choices.removeFromTop (26);
-    pitchCharacterLabel.setBounds (row1.removeFromLeft (110));
-    pitchCharacterBox.setBounds (row1);
-    choices.removeFromTop (6);
-    auto row2 = choices.removeFromTop (26);
-    sustainLabel.setBounds (row2.removeFromLeft (110));
-    sustainBox.setBounds (row2);
-    choices.removeFromTop (6);
-    auto row3 = choices.removeFromTop (24);
-    reseedButton.setBounds (row3.removeFromRight (110));
-    mpeToggle.setBounds (row3.removeFromLeft (80));
-    const int smallWidth = advanced.getWidth() / static_cast<int> (knobs.size());
-    for (auto& knob : knobs)
-    {
-        auto cell = advanced.removeFromLeft (smallWidth);
-        knob.label.setBounds (cell.removeFromTop (16));
-        knob.slider.setBounds (cell);
-    }
-    area.removeFromBottom (10);
-
-    // The instrument's primary controls.
-    auto macroRow = area.removeFromBottom (130);
+    // Macro row.
+    auto macroRow = area.removeFromBottom (150);
     const int macroWidth = macroRow.getWidth() / static_cast<int> (macros.size());
     for (auto& knob : macros)
     {
         auto cell = macroRow.removeFromLeft (macroWidth);
-        knob.label.setBounds (cell.removeFromTop (20));
-        knob.slider.setBounds (cell);
+        // ORIGINAL <-> REIMAGINED may use the margin beside the last cell (its label is not clickable).
+        knob.label->setBounds (cell.removeFromTop (20).expanded (&knob == &macros.back() ? 14 : 0, 0));
+        cell.removeFromTop (2);
+        knob.slider.setBounds (cell.withSizeKeepingCentre (std::min (cell.getWidth(), 108), cell.getHeight()));
     }
-    area.removeFromBottom (8);
-    waveform.setBounds (area);
-    samplesPanel.setBounds (area);
+    area.removeFromBottom (12);
+
+    waveform.setBounds (area.reduced (3, 3));
+    samplesPanel.setBounds (waveform.getBounds());
+    positionPopup();
 }
 
 bool OspAudioProcessorEditor::isInterestedInFileDrag (const juce::StringArray& files)
@@ -479,6 +718,13 @@ void OspAudioProcessorEditor::filesDropped (const juce::StringArray& files, int,
 
 bool OspAudioProcessorEditor::keyPressed (const juce::KeyPress& key)
 {
+    if (key == juce::KeyPress::escapeKey && popup != nullptr)
+    {
+        // Closed asynchronously: the key may have come through one of the popup's children.
+        juce::Component::SafePointer<OspAudioProcessorEditor> safe (this);
+        juce::MessageManager::callAsync ([safe] { if (safe != nullptr) safe->closePopup(); });
+        return true;
+    }
     const bool command = key.getModifiers().isCommandDown();
     if (command && key.getKeyCode() == 'Z')
     {
@@ -631,9 +877,8 @@ void OspAudioProcessorEditor::refreshInstrumentInfo()
     else
         root = "?";
     rootLabel.setText (root, juce::dontSendNotification);
-    characterLabel.setText (juce::String::fromUTF8 (instrument->character.c_str()), juce::dontSendNotification);
+    characterLabel.setText (juce::String::fromUTF8 (instrument->character.c_str()).toUpperCase(), juce::dontSendNotification);
 
-    const auto dot = juce::String::fromUTF8 ("  \xc2\xb7  ");
     juce::String detail = juce::String (instrument->filename) + dot + juce::String (instrument->durationSeconds, 2) + " s";
     if (pitch.midiNote >= 0)
         detail << dot << "detected " << pitch.noteName << " " << (pitch.centsOffset >= 0 ? "+" : "")
@@ -649,10 +894,6 @@ void OspAudioProcessorEditor::timerCallback()
     waveform.setLoading (state == OspAudioProcessor::LoadState::loading);
     if (stateBox.getSelectedId() != ospProcessor.getCurrentProgram() + 1)
         stateBox.setSelectedId (ospProcessor.getCurrentProgram() + 1, juce::dontSendNotification);
-    const auto preset = ospProcessor.currentPresetFile();
-    const auto presetName = preset == juce::File() ? juce::String() : preset.getFileNameWithoutExtension();
-    if (presetLabel.getText() != presetName)
-        presetLabel.setText (presetName, juce::dontSendNotification);
 
     const auto instrument = ospProcessor.currentInstrument();
     const auto generation = instrument != nullptr ? instrument->generation : 0;
@@ -661,7 +902,9 @@ void OspAudioProcessorEditor::timerCallback()
         shownGeneration = generation;
         shownState = state;
         refreshInstrumentInfo();
+        repaint(); // status light
     }
+    updateCustomisedDots();
 
     juce::String status;
     switch (state)
@@ -671,12 +914,15 @@ void OspAudioProcessorEditor::timerCallback()
         case OspAudioProcessor::LoadState::ready: status = ospProcessor.stageMessage(); break;
         case OspAudioProcessor::LoadState::failed: status = "Could not load that file"; break;
     }
-    const auto dot = juce::String::fromUTF8 ("  \xc2\xb7  ");
     status << dot << "voices " << ospProcessor.activeVoices.load();
+    const auto preset = ospProcessor.currentPresetFile();
+    if (preset != juce::File())
+        status << dot << "preset " << preset.getFileNameWithoutExtension();
     const auto message = ospProcessor.statusMessage();
     if (message.isNotEmpty())
         status << dot << message;
-    statusLabel.setText (status, juce::dontSendNotification);
+    if (statusLabel.getText() != status)
+        statusLabel.setText (status, juce::dontSendNotification);
 }
 
 } // namespace osp::plugin

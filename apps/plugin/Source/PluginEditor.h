@@ -1,6 +1,8 @@
 #pragma once
 
+#include "OspLookAndFeel.h"
 #include "PluginProcessor.h"
+#include "ShapingPopups.h"
 
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -8,7 +10,7 @@
 namespace osp::plugin
 {
 
-/** Draws the loaded sample's overview, or the drop prompt. */
+/** Draws the loaded sample's overview in the dark display (time grid, note info), or the drop prompt. */
 class WaveformView final : public juce::Component
 {
 public:
@@ -50,10 +52,32 @@ private:
     std::uint64_t shownGeneration = 0;
 };
 
+/** The on-screen keyboard in the instrument's finish: ivory and ebony keys, labelled octaves. */
+class OspKeyboard final : public juce::MidiKeyboardComponent
+{
+public:
+    explicit OspKeyboard (juce::MidiKeyboardState& keyState) : MidiKeyboardComponent (keyState, horizontalKeyboard) {}
+
+private:
+    void drawWhiteNote (int note, juce::Graphics&, juce::Rectangle<float> area, bool isDown, bool isOver,
+                        juce::Colour lineColour, juce::Colour textColour) override;
+    void drawBlackNote (int note, juce::Graphics&, juce::Rectangle<float> area, bool isDown, bool isOver,
+                        juce::Colour noteFillColour) override;
+    juce::String getWhiteNoteText (int note) override;
+};
+
+/** The menu button: three short rules instead of a glyph. */
+class MenuButton final : public juce::TextButton
+{
+public:
+    void paintButton (juce::Graphics&, bool highlighted, bool down) override;
+};
+
 /**
-    Working interface: drop zone + waveform, detected root (editable), the five macros
-    and Original <-> Reimagined, a compact Advanced row, an on-screen keyboard and
-    status. Functional rather than final; the designed instrument UI comes later.
+    The instrument (UI redesign): a warm housing with the pitch, character and file
+    details on top, the dark waveform display, the five macros and Original <->
+    Reimagined, Advanced, the keyboard and a slim status row. A macro's name opens its
+    popup (one at a time; Escape or a click elsewhere closes it).
 */
 class OspAudioProcessorEditor final : public juce::AudioProcessorEditor,
                                       public juce::FileDragAndDropTarget,
@@ -75,6 +99,12 @@ public:
     /** Pulls the latest processor state into the UI now (normally done by a timer). */
     void refreshNow() { timerCallback(); }
 
+    /** Popups: 0-4 the macros (LIFE..SPACE), 5 Advanced; -1 closes. Public for tests and snapshots. */
+    static constexpr int advancedPopup = 5;
+    void openPopup (int which);
+    void closePopup();
+    int openPopupIndex() const noexcept { return popupIndex; }
+
 private:
     void timerCallback() override;
     void refreshInstrumentInfo();
@@ -82,36 +112,47 @@ private:
     void showMenu();
     void presetOpened();
     void choosePresetFile (bool save, bool instrument);
+    void positionPopup();
+    void updateCustomisedDots();
 
     struct Knob
     {
         juce::Slider slider { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::TextBoxBelow };
-        juce::Label label;
+        std::unique_ptr<MacroLabel> label;
         std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
     };
 
+    /** Closes the open popup when the mouse goes down anywhere outside it. */
+    struct OutsideClickWatcher final : juce::MouseListener
+    {
+        explicit OutsideClickWatcher (OspAudioProcessorEditor& e) : editor (e) {}
+        void mouseDown (const juce::MouseEvent& e) override;
+        OspAudioProcessorEditor& editor;
+    };
+
+    OspLookAndFeel lookAndFeel;
     OspAudioProcessor& ospProcessor;
     WaveformView waveform;
     juce::Label rootLabel, characterLabel, detailLabel, statusLabel;
     juce::ComboBox rootBox;
-    juce::TextButton loadButton { "Load..." }, exampleButton { "Load example" }, reseedButton { "Reseed" }, samplesButton { "Samples" };
+    juce::TextButton loadButton { "Load..." }, exampleButton { "Load example" }, samplesButton { "Samples" };
     SamplesPanel samplesPanel { ospProcessor };
-    juce::TextButton menuButton { juce::String::fromUTF8 ("\xe2\x98\xb0") };
+    MenuButton menuButton;
     juce::ComboBox stateBox;
-    std::array<Knob, 6> macros;      // Life, Dynamics, Character, Motion, Space, Original/Reimagined
-    std::array<Knob, 6> knobs;       // Advanced: attack, release, velocity, fine, bend, output
-    juce::ComboBox pitchCharacterBox, sustainBox;
-    juce::Label pitchCharacterLabel, sustainLabel, presetLabel;
-    juce::TextButton advancedButton;
-    void showAdvanced (bool open);
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> pitchCharacterAttachment, sustainAttachment;
-    juce::ToggleButton mpeToggle { "MPE" };
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> mpeAttachment;
-    juce::MidiKeyboardComponent keyboard;
+    std::array<Knob, 6> macros;      // Life, Dynamics, Character, Movement, Space, Original/Reimagined
+    juce::TextButton advancedButton { "ADVANCED" };
+    OspKeyboard keyboard;
     std::unique_ptr<juce::FileChooser> chooser;
+    juce::TooltipWindow tooltips { this, 700 };
+
+    std::unique_ptr<MiniPanel> popup;
+    int popupIndex = -1;
+    int closedByLabelPress = -1;     // a press on an open popup's own label closes it (and must not reopen it)
+    OutsideClickWatcher outsideClicks { *this };
 
     std::uint64_t shownGeneration = 0;
     OspAudioProcessor::LoadState shownState = OspAudioProcessor::LoadState::empty;
+    juce::Image texture;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OspAudioProcessorEditor)
 };

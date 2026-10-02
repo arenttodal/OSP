@@ -172,8 +172,22 @@ TEST_CASE ("shaping: MOVEMENT is clearly audible in every mode and grows with th
     INFO ("level sd (dB): still " << still.levelDb << ", drift50 " << drift50.levelDb << ", pulse " << pulse.levelDb << "; chorus side/mid " << chorus.side);
     CHECK (still.pitchCents < 0.3);
     CHECK (drift25.pitchCents > 0.8);
-    CHECK (drift50.pitchCents > 1.6 * drift25.pitchCents); // 25 and 50 clearly differ
+    CHECK (drift50.pitchCents > 1.4 * drift25.pitchCents); // 25 and 50 clearly differ (depth grows as amount^0.75)
     CHECK (tape.pitchCents > 2.0);
     CHECK (pulse.levelDb > 2.0);
     CHECK (chorus.side > still.side + 0.01);
+}
+
+TEST_CASE ("shaping: the popup ranges reach their documented ends", "[unit][shaping]")
+{
+    // Sub-1 ranges must not be clamped (DRIFT SPEED 0.01-0.8 Hz, CHORUS WIDTH from 0.2 ms...).
+    CHECK (shaping::driftSpeedHz (0.0) == Catch::Approx (0.01));
+    CHECK (shaping::driftSpeedHz (1.0) == Catch::Approx (0.8));
+    CHECK (shaping::driftSpeedHz (0.5) == Catch::Approx (std::sqrt (0.01 * 0.8)));
+    CHECK (shaping::chorusRateHz (0.0) == Catch::Approx (0.05));
+    CHECK (shaping::chorusRateHz (1.0) == Catch::Approx (3.0));
+    CHECK (shaping::chorusWidthMs (0.0) == Catch::Approx (0.2));
+    CHECK (shaping::chorusWidthMs (1.0) == Catch::Approx (18.0));
+    CHECK (shaping::pulseRateHz (0.0) == Catch::Approx (0.05));
+    CHECK (shaping::pulseRateHz (1.0) == Catch::Approx (10.0));
 }

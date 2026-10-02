@@ -153,8 +153,9 @@ private:
     double driftBright = 0.0, driftBrightTarget = 0.0;
     double driftPanValue = 0.0, driftPanTarget = 0.0;
     float saturationDrive = 0.0f, saturationNorm = 1.0f;
-    double driftCoef = 0.0;
-    int driftCountdown = 0;
+    Prng driftRng;
+    std::array<double, 5> driftFrom {};   // level, cents, brightness, pan, tone at the start of the glide
+    int driftCountdown = 0, driftSegment = 1;
     float controlGain = 1.0f, controlGainStep = 0.0f;
     double pitchMod = 1.0;
     int controlCountdown = 0;

@@ -313,7 +313,8 @@ NoteShape InstrumentEngine::shapeFor (const InstrumentModel* model, int note, in
         // Plucks move less (they are not sustained long enough to need it).
         const auto& sh = config.shaping;
         const double sustained = 1.0 - 0.5 * currentModelForMotion->character.transientTonal;
-        const double m = (sh.movementMode == MovementMode::drift ? motion : 0.0) * sustained;
+        // Depth grows a little faster than the knob at first, so low settings are audible.
+        const double m = (sh.movementMode == MovementMode::drift ? std::pow (std::clamp (motion, 0.0, 1.0), 0.75) : 0.0) * sustained;
         const double rr = 0.5 * r * r * sustained; // Reimagined: instability of its own
         shape.driftCents = static_cast<float> ((m * shaping::driftPitchCents (sh.movementB) + 12.0 * rr) * (1.0 + 2.0 * std::max (0.0, r - 0.6)));
         shape.driftToneOctaves = static_cast<float> (m * shaping::driftToneOctaves (sh.movementC) + 0.6 * rr);

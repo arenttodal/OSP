@@ -126,8 +126,27 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     }
     saturationDrive = 1.0f + 4.0f * std::clamp (shape.saturation, 0.0f, 1.0f);
     saturationNorm = 1.0f / saturationDrive;
-    driftCoef = 1.0 - std::exp (-static_cast<double> (controlInterval) * std::max (0.01, static_cast<double> (shape.driftRateHz)) * 2.0 / sampleRate);
+    // Drift has its own random stream (so it never changes the continuation's choices)
+    // and starts part-way through a glide: like a free-running oscillator, a note does
+    // not begin at the centre of the wander.
+    driftRng.reseed (Prng::deriveSeed (shape.seed, 0x6472696674ull, 0));
+    {
+        auto away = [this] (float depth) {
+            const double magnitude = driftRng.uniform (0.35, 1.0);
+            return static_cast<double> (depth) * (driftRng.nextDouble() < 0.5 ? -magnitude : magnitude);
+        };
+        driftFrom = { away (shape.driftLevelDb), away (shape.driftCents), away (shape.driftBrightnessDb), away (shape.driftPan), away (shape.driftToneOctaves) };
+        // Begin at 0.5x the start offset and glide on from there.
+        for (auto& v : driftFrom)
+            v *= 0.5;
+    }
+    driftLevel = driftFrom[0];
+    driftCentsValue = driftFrom[1];
+    driftBright = driftFrom[2];
+    driftPanValue = driftFrom[3];
+    driftTone = driftFrom[4];
     driftCountdown = 0;
+    driftSegment = 1;
     controlCountdown = 0;
     controlGain = 1.0f;
     controlGainStep = 0.0f;
@@ -152,7 +171,7 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     }
 
     // CHARACTER: velocity coupling (DYNAMICS x TONE) and the filter envelope start here.
-    driftTone = driftToneTarget = 0.0;
+    driftToneTarget = 0.0;   // driftTone starts part-way through its glide (above)
     if (shapingState != nullptr)
     {
         const auto& s = shapingState->shaping;
@@ -418,19 +437,30 @@ void InstrumentVoice::updateControl() noexcept
     {
         if (--driftCountdown <= 0)
         {
-            driftLevelTarget = shape.driftLevelDb * rng.bipolar();
-            driftCentsTarget = shape.driftCents * rng.bipolar();
-            driftBrightTarget = shape.driftBrightnessDb * rng.bipolar();
-            driftPanTarget = shape.driftPan * rng.bipolar();
-            driftToneTarget = shape.driftToneOctaves * rng.bipolar();
-            const double seconds = rng.uniform (0.5, 1.5) / std::max (0.01, static_cast<double> (shape.driftRateHz));
-            driftCountdown = std::max (1, static_cast<int> (seconds * sampleRate / controlInterval));
+            // A new glide from wherever the drift is now to fresh random values: smooth
+            // value noise at about the drift rate, like a free-running analog wander.
+            // Targets keep away from the centre (35-100 % of the depth, either side), so a
+            // glide always goes somewhere audible.
+            driftFrom = { driftLevel, driftCentsValue, driftBright, driftPanValue, driftTone };
+            auto away = [this] (float depth) {
+                const double magnitude = driftRng.uniform (0.35, 1.0);
+                return static_cast<double> (depth) * (driftRng.nextDouble() < 0.5 ? -magnitude : magnitude);
+            };
+            driftLevelTarget = away (shape.driftLevelDb);
+            driftCentsTarget = away (shape.driftCents);
+            driftBrightTarget = away (shape.driftBrightnessDb);
+            driftPanTarget = away (shape.driftPan);
+            driftToneTarget = away (shape.driftToneOctaves);
+            const double seconds = driftRng.uniform (0.6, 1.4) / std::max (0.01, static_cast<double> (shape.driftRateHz));
+            driftCountdown = driftSegment = std::max (1, static_cast<int> (seconds * sampleRate / controlInterval));
         }
-        driftLevel += (driftLevelTarget - driftLevel) * driftCoef;
-        driftCentsValue += (driftCentsTarget - driftCentsValue) * driftCoef;
-        driftBright += (driftBrightTarget - driftBright) * driftCoef;
-        driftPanValue += (driftPanTarget - driftPanValue) * driftCoef;
-        driftTone += (driftToneTarget - driftTone) * driftCoef;
+        const double f = 1.0 - static_cast<double> (driftCountdown) / static_cast<double> (driftSegment);
+        const double glide = f * f * (3.0 - 2.0 * f);
+        driftLevel = driftFrom[0] + (driftLevelTarget - driftFrom[0]) * glide;
+        driftCentsValue = driftFrom[1] + (driftCentsTarget - driftFrom[1]) * glide;
+        driftBright = driftFrom[2] + (driftBrightTarget - driftFrom[2]) * glide;
+        driftPanValue = driftFrom[3] + (driftPanTarget - driftFrom[3]) * glide;
+        driftTone = driftFrom[4] + (driftToneTarget - driftFrom[4]) * glide;
         if (shape.driftPan > 0.0f)
         {
             const float p = std::clamp (shape.pan + static_cast<float> (driftPanValue), -1.0f, 1.0f);

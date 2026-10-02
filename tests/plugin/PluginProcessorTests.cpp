@@ -612,6 +612,20 @@ TEST_CASE ("plugin: editor builds, shows the instrument and can be snapshotted",
     if (auto* ospEditor = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (editor.get()))
         ospEditor->refreshNow();
     snapshot ("osp-editor-loaded.png");
+
+    // Macro popups: one at a time, anchored to the macro, closed on request.
+    if (auto* ospEditor = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (editor.get()))
+    {
+        const char* names[] = { "life", "dynamics", "character", "movement", "space" };
+        for (int i = 0; i < 5; ++i)
+        {
+            ospEditor->openPopup (i);
+            CHECK (ospEditor->openPopupIndex() == i);
+            snapshot (juce::String ("osp-editor-popup-") + names[i] + ".png");
+        }
+        ospEditor->closePopup();
+        CHECK (ospEditor->openPopupIndex() == -1);
+    }
     p.editorBeingDeleted (editor.get());
     editor.reset();
 

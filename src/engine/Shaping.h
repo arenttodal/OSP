@@ -49,7 +49,7 @@ struct Shaping
 
     // MOVEMENT
     MovementMode movementMode = MovementMode::drift;
-    double movementA = 0.35, movementB = 0.6, movementC = 0.4;
+    double movementA = 0.70, movementB = 0.6, movementC = 0.4;   // A 0.7: drift ~0.21 Hz, chorus ~0.9 Hz, pulse ~2 Hz
 
     // SPACE
     SpaceType spaceType = SpaceType::plate;
@@ -77,9 +77,11 @@ struct ShapingState
 
 namespace shaping
 {
+    /** Logarithmic interpolation between two positive values (sub-1 ranges such as 0.01-0.8 Hz included). */
     inline double logLerp (double lo, double hi, double t) noexcept
     {
-        return std::exp2 (std::log2 (std::max (lo, 1.0)) + std::clamp (t, 0.0, 1.0) * (std::log2 (std::max (hi, 1.0)) - std::log2 (std::max (lo, 1.0))));
+        const double a = std::log2 (std::max (lo, 1.0e-9)), b = std::log2 (std::max (hi, 1.0e-9));
+        return std::exp2 (a + std::clamp (t, 0.0, 1.0) * (b - a));
     }
 
     /** CHARACTER position (0..1) -> cutoff in octaves re 1 Hz (log mapping between min and max). */
