@@ -83,7 +83,7 @@ std::shared_ptr<InstrumentModel> buildProvisional (const AudioData& audio, const
     model->stage = InstrumentModel::Stage::provisional;
     model->analysis = analysis;
     model->rootMidi = chooseRoot (&analysis, options.rootOverrideMidi).rootMidi;
-    model->playback = preparePlayback (analysis, options.playback);
+    model->playback = options.preparationOverride ? *options.preparationOverride : preparePlayback (analysis, options.playback);
     model->character = estimateCharacter (analysis, nullptr);
     model->performance = calibratePerformance (model->character, analysis);
     model->dynamics = calibrateDynamics (model->character, analysis);

@@ -78,7 +78,7 @@ void WaveformView::paint (juce::Graphics& g)
         g.drawText ("DROP A SOUND", getLocalBounds().withTrimmedBottom (24), juce::Justification::centred);
         g.setColour (colours::dim);
         g.setFont (juce::FontOptions (14.0f));
-        g.drawText (juce::String::fromUTF8 ("WAV \xc2\xb7 AIFF"), getLocalBounds().withTrimmedTop (40), juce::Justification::centred);
+        g.drawText (juce::String::fromUTF8 ("WAV \xc2\xb7 AIFF \xc2\xb7 FLAC"), getLocalBounds().withTrimmedTop (40), juce::Justification::centred);
     }
 
     if (loading)
@@ -131,22 +131,54 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     addAndMakeVisible (loadButton);
     addAndMakeVisible (exampleButton);
 
+    auto setupKnob = [this] (Knob& knob, const char* id, const char* name, bool large) {
+        knob.slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 70, 18);
+        knob.slider.setColour (juce::Slider::rotarySliderFillColourId, large ? colours::accent : colours::dim);
+        knob.label.setText (juce::String::fromUTF8 (name), juce::dontSendNotification);
+        knob.label.setJustificationType (juce::Justification::centred);
+        knob.label.setColour (juce::Label::textColourId, large ? colours::text : colours::dim);
+        if (large)
+            knob.label.setFont (juce::FontOptions (14.0f, juce::Font::bold));
+        knob.attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (ospProcessor.parameters, id, knob.slider);
+        addAndMakeVisible (knob.slider);
+        addAndMakeVisible (knob.label);
+    };
+    const std::array<std::pair<const char*, const char*>, 6> macroInfo { {
+        { "life", "LIFE" }, { "dynamics", "DYNAMICS" }, { "character", "CHARACTER" },
+        { "motion", "MOTION" }, { "space", "SPACE" }, { "reimagined", "ORIGINAL \xe2\x86\x94 REIMAGINED" } } };
+    for (std::size_t i = 0; i < macros.size(); ++i)
+        setupKnob (macros[i], macroInfo[i].first, macroInfo[i].second, true);
     const std::array<std::pair<const char*, const char*>, 6> knobInfo { {
         { "attack", "Attack" }, { "release", "Release" }, { "velocityRange", "Velocity" },
         { "fineTune", "Fine" }, { "bendRange", "Bend" }, { "gain", "Output" } } };
     for (std::size_t i = 0; i < knobs.size(); ++i)
+        setupKnob (knobs[i], knobInfo[i].first, knobInfo[i].second, false);
+
+    pitchCharacterBox.addItemList ({ "Tape", "Natural" }, 1);
+    sustainBox.addItemList ({ "Recording", "Endless" }, 1);
+    pitchCharacterAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (ospProcessor.parameters, "pitchCharacter", pitchCharacterBox);
+    sustainAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (ospProcessor.parameters, "sustain", sustainBox);
+    for (auto* label : { &pitchCharacterLabel, &sustainLabel, &advancedLabel })
     {
-        auto& knob = knobs[i];
-        knob.slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 70, 18);
-        knob.slider.setColour (juce::Slider::rotarySliderFillColourId, colours::accent);
-        knob.label.setText (knobInfo[i].second, juce::dontSendNotification);
-        knob.label.setJustificationType (juce::Justification::centred);
-        knob.label.setColour (juce::Label::textColourId, colours::dim);
-        knob.attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (ospProcessor.parameters, knobInfo[i].first,
-                                                                                                knob.slider);
-        addAndMakeVisible (knob.slider);
-        addAndMakeVisible (knob.label);
+        label->setColour (juce::Label::textColourId, colours::dim);
+        addAndMakeVisible (*label);
     }
+    pitchCharacterLabel.setText ("Pitch character", juce::dontSendNotification);
+    sustainLabel.setText ("Sustain", juce::dontSendNotification);
+    advancedLabel.setText ("ADVANCED", juce::dontSendNotification);
+    advancedLabel.setFont (juce::FontOptions (11.0f, juce::Font::bold));
+    addAndMakeVisible (pitchCharacterBox);
+    addAndMakeVisible (sustainBox);
+    reseedButton.setTooltip ("New variation seed: repeated notes vary differently");
+    reseedButton.onClick = [this] {
+        if (auto* seed = ospProcessor.parameters.getParameter ("seed"))
+        {
+            const auto range = ospProcessor.parameters.getParameterRange ("seed");
+            const float next = std::fmod (range.convertFrom0to1 (seed->getValue()), 9999.0f) + 1.0f;
+            seed->setValueNotifyingHost (range.convertTo0to1 (next));
+        }
+    };
+    addAndMakeVisible (reseedButton);
 
     keyboard.setAvailableRange (21, 108);
     keyboard.setOctaveForMiddleC (4); // MIDI 60 = C4, as everywhere else in OSP
@@ -154,8 +186,8 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     addAndMakeVisible (keyboard);
 
     setResizable (true, true);
-    setResizeLimits (640, 420, 1800, 1100);
-    setSize (860, 540);
+    setResizeLimits (720, 560, 1800, 1200);
+    setSize (920, 680);
 
     refreshInstrumentInfo();
     startTimerHz (15);
@@ -189,12 +221,36 @@ void OspAudioProcessorEditor::resized()
     keyboard.setBounds (area.removeFromBottom (80));
     keyboard.setKeyWidth (static_cast<float> (keyboard.getWidth()) / 52.0f); // 88 keys = 52 white keys
     area.removeFromBottom (8);
-    auto knobRow = area.removeFromBottom (110);
-    const int knobWidth = knobRow.getWidth() / static_cast<int> (knobs.size());
+
+    // Advanced row: small knobs plus pitch character / sustain / reseed.
+    auto advanced = area.removeFromBottom (106);
+    advancedLabel.setBounds (advanced.removeFromTop (16));
+    auto choices = advanced.removeFromRight (240);
+    auto row1 = choices.removeFromTop (26);
+    pitchCharacterLabel.setBounds (row1.removeFromLeft (110));
+    pitchCharacterBox.setBounds (row1);
+    choices.removeFromTop (6);
+    auto row2 = choices.removeFromTop (26);
+    sustainLabel.setBounds (row2.removeFromLeft (110));
+    sustainBox.setBounds (row2);
+    choices.removeFromTop (6);
+    reseedButton.setBounds (choices.removeFromTop (24).removeFromRight (130));
+    const int smallWidth = advanced.getWidth() / static_cast<int> (knobs.size());
     for (auto& knob : knobs)
     {
-        auto cell = knobRow.removeFromLeft (knobWidth);
-        knob.label.setBounds (cell.removeFromTop (18));
+        auto cell = advanced.removeFromLeft (smallWidth);
+        knob.label.setBounds (cell.removeFromTop (16));
+        knob.slider.setBounds (cell);
+    }
+    area.removeFromBottom (10);
+
+    // The instrument's primary controls.
+    auto macroRow = area.removeFromBottom (130);
+    const int macroWidth = macroRow.getWidth() / static_cast<int> (macros.size());
+    for (auto& knob : macros)
+    {
+        auto cell = macroRow.removeFromLeft (macroWidth);
+        knob.label.setBounds (cell.removeFromTop (20));
         knob.slider.setBounds (cell);
     }
     area.removeFromBottom (8);
@@ -288,7 +344,7 @@ void OspAudioProcessorEditor::timerCallback()
     {
         case OspAudioProcessor::LoadState::empty: status = "No sound loaded"; break;
         case OspAudioProcessor::LoadState::loading: status = juce::String::fromUTF8 ("Understanding pitch\xe2\x80\xa6"); break;
-        case OspAudioProcessor::LoadState::ready: status = "Ready"; break;
+        case OspAudioProcessor::LoadState::ready: status = ospProcessor.stageMessage(); break;
         case OspAudioProcessor::LoadState::failed: status = "Could not load that file"; break;
     }
     const auto dot = juce::String::fromUTF8 ("  \xc2\xb7  ");

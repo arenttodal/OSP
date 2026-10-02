@@ -126,7 +126,7 @@ void InstrumentVoice::release() noexcept
         graftPending = true;
         // The recording's own ending replaces the envelope release unless the release
         // was deliberately set very short (staccato).
-        holdForTail = adsrSettings.releaseSeconds >= 0.3 || adsrSettings.releaseSeconds >= 0.5 * cont->tailSeconds;
+        holdForTail = adsrSettings.releaseSeconds >= 0.2 || adsrSettings.releaseSeconds >= 0.5 * cont->tailSeconds;
         if (! crossfading)
             scheduleGraft();
         if (! holdForTail)

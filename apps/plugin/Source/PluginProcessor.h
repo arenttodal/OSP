@@ -3,7 +3,7 @@
 #include "InstrumentLoader.h"
 #include "LoadedInstrument.h"
 
-#include "audio/sampler/BaselineSampler.h"
+#include "engine/InstrumentEngine.h"
 #include "model/ModelExchange.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -18,12 +18,15 @@ namespace osp::plugin
 {
 
 /**
-    Phase 1 instrument: the baseline sampler (A) inside a plugin.
+    The OSP instrument: InstrumentEngine ("engine C") playing a staged, immutable
+    InstrumentModel, with the five macros, Original <-> Reimagined, Pitch Character and
+    Sustain as host parameters.
 
     Threads:
-      - audio:   processBlock() — MIDI, sampler, instrument hand-over; no allocation/locks/I/O.
+      - audio:   processBlock() — MIDI, engine, instrument hand-over; no allocation/locks/I/O.
       - message: parameters, editor, state, publishing loaded instruments, garbage collection.
-      - loader:  a single background thread that imports, hashes and analyses samples.
+      - loader:  a single background thread that imports, hashes and analyses samples, then
+                 builds the model stages (playable -> sustain -> register anchors).
 */
 class OspAudioProcessor final : public juce::AudioProcessor, private juce::Timer
 {
@@ -63,6 +66,8 @@ public:
     enum class LoadState { empty, loading, ready, failed };
     LoadState loadState() const noexcept { return state.load(); }
     juce::String statusMessage() const;
+    /** "Ready", or what is still being prepared in the background ("Building sustain…"). */
+    juce::String stageMessage() const;
 
     /** Most recently loaded instrument (any non-audio thread). */
     std::shared_ptr<const LoadedInstrument> currentInstrument() const;
@@ -82,19 +87,21 @@ public:
     std::atomic<int> activeVoices { 0 };
     juce::UndoManager undoManager;
 
-    static constexpr int stateVersion = 1;
+    /** 2: engine C parameters (macros, pitch character, sustain, seed). v1 sessions migrate to neutral settings. */
+    static constexpr int stateVersion = 2;
 
 private:
     void timerCallback() override;
     void enqueueLoad (LoadRequest request);
+    void enqueueRefine (std::shared_ptr<const LoadedInstrument> base, std::shared_ptr<const AudioData> audio);
     void applyParameters (bool force) noexcept;
     void handleMidi (const juce::MidiMessage& message) noexcept;
     void swapInstrumentIfPending() noexcept;
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createLayout();
 
-    BaselineSampler sampler;
-    SamplerSettings samplerSettings;
+    InstrumentEngine engine;
+    EngineSettings engineSettings;
     ModelExchange<LoadedInstrument> exchange;
 
     // Audio-thread view of instruments
@@ -108,6 +115,7 @@ private:
     std::deque<LoadResult> finishedLoads;
     std::atomic<int> pendingLoads { 0 };
     std::atomic<std::uint64_t> nextGeneration { 1 };
+    std::atomic<std::uint64_t> latestLoadId { 0 };   // newest load request; older refinements are skipped
     std::atomic<LoadState> state { LoadState::empty };
     bool lastLoadFailed = false;           // message thread
     juce::String lastMessage;
@@ -126,6 +134,15 @@ private:
     std::atomic<float>* velocityRangeParam = nullptr;
     std::atomic<float>* fineTuneParam = nullptr;
     std::atomic<float>* bendRangeParam = nullptr;
+    std::atomic<float>* lifeParam = nullptr;
+    std::atomic<float>* dynamicsParam = nullptr;
+    std::atomic<float>* characterParam = nullptr;
+    std::atomic<float>* motionParam = nullptr;
+    std::atomic<float>* spaceParam = nullptr;
+    std::atomic<float>* reimaginedParam = nullptr;
+    std::atomic<float>* pitchCharacterParam = nullptr;
+    std::atomic<float>* sustainParam = nullptr;
+    std::atomic<float>* seedParam = nullptr;
     float lastAttack = -1.0f, lastRelease = -1.0f, lastGain = -1000.0f, lastVelocityRange = -1.0f;
     double pitchBendSemitones = 0.0;
 

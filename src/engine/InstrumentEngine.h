@@ -29,6 +29,7 @@ struct EngineSettings
 
     int polyphony = 24;
     AdsrSettings adsr { 0.002, 0.0, 1.0, 0.35 };
+    double velocityRangeDb = 30.0;      ///< level range across velocity (DYNAMICS = 0 means volume only)
     double outputGainDb = -9.0;
     int interpolationZeroCrossings = 16;
     double stealFadeSeconds = 0.005;
@@ -71,6 +72,7 @@ public:
     void setPitchCharacter (PitchCharacter character) noexcept { config.pitchCharacter = character; }
     void setContinuation (ContinuationStrategy strategy) noexcept { config.continuation = strategy; }
     void setSeed (std::uint64_t seed) noexcept { config.seed = seed; }
+    void setVelocityRangeDb (double db) noexcept { config.velocityRangeDb = db; }
 
     bool isModelInUse (const InstrumentModel* model) const noexcept;
     void killVoicesUsing (const InstrumentModel* model) noexcept;

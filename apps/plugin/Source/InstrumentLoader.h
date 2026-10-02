@@ -2,6 +2,8 @@
 
 #include "LoadedInstrument.h"
 
+#include "core/AudioData.h"
+
 #include <juce_core/juce_core.h>
 
 #include <memory>
@@ -60,14 +62,21 @@ struct LoadRequest
 struct LoadResult
 {
     std::shared_ptr<const LoadedInstrument> instrument;  ///< null on failure
+    std::shared_ptr<const AudioData> audio;              ///< decoded source, kept for the next model stages
     std::string error;
     std::vector<std::string> warnings;
 };
 
 /**
-    Import + analyse + prepare playback data. Runs on a background thread (allocates,
-    reads files, analyses). Never throws.
+    Stage 1: import + analyse + provisional (playable) model. Runs on a background thread
+    (allocates, reads files, analyses). Never throws.
 */
 LoadResult loadInstrument (const LoadRequest& request, SampleStore& store, std::uint64_t generation);
+
+/**
+    Stages 2 and 3: the same instrument with continuation (stage 2) or register anchors
+    added (stage 3). Background thread; never throws (returns the error instead).
+*/
+LoadResult refineInstrument (const LoadedInstrument& base, std::shared_ptr<const AudioData> audio, std::uint64_t generation);
 
 } // namespace osp::plugin

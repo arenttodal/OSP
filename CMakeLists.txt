@@ -58,6 +58,8 @@ add_library(osp_dsp STATIC
     src/model/PlaybackPreparation.cpp
 )
 target_include_directories(osp_dsp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+# Linked into plugin shared objects (VST3/AU bundles).
+set_target_properties(osp_dsp PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(osp_dsp PRIVATE signalsmith-stretch)
 osp_set_warnings(osp_dsp)
 

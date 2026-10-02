@@ -17,6 +17,7 @@ struct InstrumentBuildOptions
     int interpolationZeroCrossings = 16;
     PlaybackOptions playback { true, 0.03, true };   ///< start at the onset, level matched
     std::optional<double> rootOverrideMidi;
+    std::optional<PlaybackPreparation> preparationOverride; ///< session recall: the exact saved start/gain
     ContinuationOptions continuation;
     std::vector<double> anchorOffsets { -24.0, -12.0, 12.0, 24.0 };
     std::uint64_t seed = 1;

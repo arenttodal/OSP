@@ -24,9 +24,9 @@ private:
 };
 
 /**
-    Phase 1 debug interface: drop zone + waveform, detected root (editable), a few
-    parameters, an on-screen keyboard and play status. Deliberately unstyled; the
-    real instrument UI comes later.
+    Working interface: drop zone + waveform, detected root (editable), the five macros
+    and Original <-> Reimagined, a compact Advanced row, an on-screen keyboard and
+    status. Functional rather than final; the designed instrument UI comes later.
 */
 class OspAudioProcessorEditor final : public juce::AudioProcessorEditor,
                                       public juce::FileDragAndDropTarget,
@@ -63,8 +63,12 @@ private:
     WaveformView waveform;
     juce::Label rootLabel, characterLabel, detailLabel, statusLabel;
     juce::ComboBox rootBox;
-    juce::TextButton loadButton { "Load..." }, exampleButton { "Load example" };
-    std::array<Knob, 6> knobs;
+    juce::TextButton loadButton { "Load..." }, exampleButton { "Load example" }, reseedButton { "Reseed" };
+    std::array<Knob, 6> macros;      // Life, Dynamics, Character, Motion, Space, Original/Reimagined
+    std::array<Knob, 6> knobs;       // Advanced: attack, release, velocity, fine, bend, output
+    juce::ComboBox pitchCharacterBox, sustainBox;
+    juce::Label pitchCharacterLabel, sustainLabel, advancedLabel;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> pitchCharacterAttachment, sustainAttachment;
     juce::MidiKeyboardComponent keyboard;
     std::unique_ptr<juce::FileChooser> chooser;
 

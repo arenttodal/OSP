@@ -119,7 +119,7 @@ NoteShape InstrumentEngine::shapeFor (int note, int velocity, std::uint64_t even
 {
     NoteShape shape;
     shape.seed = Prng::deriveSeed (config.seed, eventIndex, static_cast<std::uint64_t> (note));
-    const double velocityDb = -30.0 * (1.0 - std::clamp (velocity, 1, 127) / 127.0);
+    const double velocityDb = -config.velocityRangeDb * (1.0 - std::clamp (velocity, 1, 127) / 127.0);
     shape.gain = static_cast<float> (dbToGain (velocityDb));
 
     if (config.continuation == ContinuationStrategy::multiLoopMovement && currentModel != nullptr)

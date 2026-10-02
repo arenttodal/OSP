@@ -1,6 +1,6 @@
 # Status
 
-_Last updated: Phase 0 complete; Phase 1 (playable sampler plugin) implemented; Phase 2 pitch bake-off rendered, listening ratings pending._
+_Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in the plugin, listening test pending; overnight run working through Phases 4–8._
 
 ## Milestone checklist — Phase 0: research harness + baseline engine
 
@@ -48,7 +48,18 @@ _Last updated: Phase 0 complete; Phase 1 (playable sampler plugin) implemented; 
 - [x] Blind listening page (`research/bakeoff/listening-page/`), ratings stored with the page
 - [x] Listening ratings collected and scored (`research/bakeoff/pitch-bakeoff-1.ratings.json`)
 - [x] Decision: A default, C rejected, B as "Natural" register anchors (`docs/reports/pitch-bakeoff-1.md`)
-- [ ] Natural pitch branch (offline anchors) in the plugin
+- [x] Natural pitch branch (offline register anchors, stage 3 of the model) in the plugin ("Pitch Character")
+
+## Milestone checklist — Phase 3: continuation MVP
+
+- [x] Sustain-region detection (one-shot for decaying/struck sources)
+- [x] Loop candidates scored on spectrum, level + slope, F0 + slope; aligned by cross-correlation
+- [x] Multi-loop random walk (never repeats immediately), correlation-aware crossfades
+- [x] Movement: slow level / pitch / brightness drift (MOTION)
+- [x] Release grafting into the recording's own ending
+- [x] Experiment 2 (A naive loop / B best loop / C multi-loop / D + movement), 60 s holds, 5 sources
+- [x] InstrumentEngine ("engine C") in the plugin; staged model (playable -> sustain -> anchors)
+- [ ] Listening verdict (lab tab "Sustain") — exit condition: 60 s holds without an obvious loop
 
 ## DONE
 

@@ -20,6 +20,15 @@ namespace ids
     static const juce::String velocityRange = "velocityRange";
     static const juce::String fineTune = "fineTune";
     static const juce::String bendRange = "bendRange";
+    static const juce::String life = "life";
+    static const juce::String dynamics = "dynamics";
+    static const juce::String character = "character";
+    static const juce::String motion = "motion";
+    static const juce::String space = "space";
+    static const juce::String reimagined = "reimagined";
+    static const juce::String pitchCharacter = "pitchCharacter";
+    static const juce::String sustain = "sustain";
+    static const juce::String seed = "seed";
     static const juce::Identifier instrument = "Instrument";
 }
 
@@ -47,6 +56,22 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
     layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::bendRange, 1 }, "Bend Range",
                                                              Range (0.0f, 24.0f, 1.0f), 2.0f,
                                                              juce::AudioParameterFloatAttributes().withLabel ("st")));
+
+    // Musician-facing macros (spec §11, §12), 0..100 %.
+    auto percent = juce::AudioParameterFloatAttributes().withLabel ("%");
+    const Range unit (0.0f, 100.0f, 0.1f);
+    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::life, 2 }, "Life", unit, 35.0f, percent));
+    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::dynamics, 2 }, "Dynamics", unit, 50.0f, percent));
+    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::character, 2 }, "Character", unit, 50.0f, percent));
+    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::motion, 2 }, "Motion", unit, 35.0f, percent));
+    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::space, 2 }, "Space", unit, 20.0f, percent));
+    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::reimagined, 2 }, "Original / Reimagined", unit, 20.0f, percent));
+    // Advanced (spec §13).
+    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { ids::pitchCharacter, 2 }, "Pitch Character",
+                                                              juce::StringArray { "Tape", "Natural" }, 0));
+    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { ids::sustain, 2 }, "Sustain",
+                                                              juce::StringArray { "Recording", "Endless" }, 1));
+    layout.add (std::make_unique<juce::AudioParameterInt> (juce::ParameterID { ids::seed, 2 }, "Variation Seed", 1, 9999, 1));
     return layout;
 }
 
@@ -61,10 +86,19 @@ OspAudioProcessor::OspAudioProcessor()
     velocityRangeParam = parameters.getRawParameterValue (ids::velocityRange);
     fineTuneParam = parameters.getRawParameterValue (ids::fineTune);
     bendRangeParam = parameters.getRawParameterValue (ids::bendRange);
+    lifeParam = parameters.getRawParameterValue (ids::life);
+    dynamicsParam = parameters.getRawParameterValue (ids::dynamics);
+    characterParam = parameters.getRawParameterValue (ids::character);
+    motionParam = parameters.getRawParameterValue (ids::motion);
+    spaceParam = parameters.getRawParameterValue (ids::space);
+    reimaginedParam = parameters.getRawParameterValue (ids::reimagined);
+    pitchCharacterParam = parameters.getRawParameterValue (ids::pitchCharacter);
+    sustainParam = parameters.getRawParameterValue (ids::sustain);
+    seedParam = parameters.getRawParameterValue (ids::seed);
 
-    samplerSettings.polyphony = 24;
-    samplerSettings.outputGainDb = -9.0;
-    sampler.prepare (48000.0, 512, samplerSettings);
+    engineSettings.polyphony = 24;
+    engineSettings.outputGainDb = -9.0;
+    engine.prepare (48000.0, 512, engineSettings);
 
     startTimerHz (20);
 }
@@ -84,8 +118,8 @@ bool OspAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) cons
 void OspAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     // Not the audio thread: allocation is allowed here.
-    sampler.prepare (sampleRate, samplesPerBlock, samplerSettings);
-    sampler.setSource (playing != nullptr ? &playing->playback : nullptr);
+    engine.prepare (sampleRate, samplesPerBlock, engineSettings);
+    engine.setModel (playing != nullptr ? playing->model.get() : nullptr);
     keyboardState.reset();
     pitchBendSemitones = 0.0;
     applyParameters (true);
@@ -102,10 +136,10 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
     const float release = releaseParam->load();
     if (force || changed (attack, lastAttack) || changed (release, lastRelease))
     {
-        AdsrSettings adsr = samplerSettings.adsr;
+        AdsrSettings adsr = engineSettings.adsr;
         adsr.attackSeconds = attack * 0.001;
         adsr.releaseSeconds = release * 0.001;
-        sampler.setEnvelope (adsr);
+        engine.setEnvelope (adsr);
         lastAttack = attack;
         lastRelease = release;
     }
@@ -113,18 +147,30 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
     const float gain = gainParam->load();
     if (force || changed (gain, lastGain))
     {
-        sampler.setOutputGainDb (samplerSettings.outputGainDb + gain);
+        engine.setOutputGainDb (engineSettings.outputGainDb + gain);
         lastGain = gain;
     }
 
     const float velocityRange = velocityRangeParam->load();
     if (force || changed (velocityRange, lastVelocityRange))
     {
-        sampler.setVelocityRangeDb (velocityRange);
+        engine.setVelocityRangeDb (velocityRange);
         lastVelocityRange = velocityRange;
     }
 
-    sampler.setPitchOffsetSemitones (pitchBendSemitones + fineTuneParam->load() / 100.0 + rootShiftSemitones.load());
+    Macros macros;
+    macros.life = lifeParam->load() * 0.01;
+    macros.dynamics = dynamicsParam->load() * 0.01;
+    macros.character = characterParam->load() * 0.01;
+    macros.motion = motionParam->load() * 0.01;
+    macros.space = spaceParam->load() * 0.01;
+    macros.reimagined = reimaginedParam->load() * 0.01;
+    engine.setMacros (macros);
+    engine.setPitchCharacter (pitchCharacterParam->load() >= 0.5f ? PitchCharacter::natural : PitchCharacter::tape);
+    engine.setContinuation (sustainParam->load() >= 0.5f ? ContinuationStrategy::multiLoopMovement : ContinuationStrategy::off);
+    engine.setSeed (static_cast<std::uint64_t> (std::max (1.0f, seedParam->load())));
+
+    engine.setPitchOffsetSemitones (pitchBendSemitones + fineTuneParam->load() / 100.0 + rootShiftSemitones.load());
 }
 
 void OspAudioProcessor::swapInstrumentIfPending() noexcept
@@ -140,13 +186,13 @@ void OspAudioProcessor::swapInstrumentIfPending() noexcept
                 // Too many overlapping swaps: silence the oldest retired instrument.
                 auto oldest = std::min_element (retired.begin(), retired.end(),
                                                 [] (auto* a, auto* b) { return a->generation < b->generation; });
-                sampler.killVoicesUsing (&(*oldest)->playback);
+                engine.killVoicesUsing ((*oldest)->model.get());
                 slot = oldest;
             }
             *slot = playing;
         }
         playing = next;
-        sampler.setSource (&playing->playback);
+        engine.setModel (playing->model.get());
     }
 
     std::uint64_t oldest = playing != nullptr ? playing->generation : 0;
@@ -154,7 +200,7 @@ void OspAudioProcessor::swapInstrumentIfPending() noexcept
     {
         if (r == nullptr)
             continue;
-        if (! sampler.isSourceInUse (&r->playback))
+        if (! engine.isModelInUse (r->model.get()))
             r = nullptr;
         else
             oldest = std::min (oldest, r->generation);
@@ -166,18 +212,18 @@ void OspAudioProcessor::swapInstrumentIfPending() noexcept
 void OspAudioProcessor::handleMidi (const juce::MidiMessage& m) noexcept
 {
     if (m.isNoteOn())
-        sampler.noteOn (m.getNoteNumber(), m.getVelocity());
+        engine.noteOn (m.getNoteNumber(), m.getVelocity());
     else if (m.isNoteOff())
-        sampler.noteOff (m.getNoteNumber());
+        engine.noteOff (m.getNoteNumber());
     else if (m.isSustainPedalOn() || m.isSustainPedalOff())
-        sampler.setSustainPedal (m.isSustainPedalOn());
+        engine.setSustainPedal (m.isSustainPedalOn());
     else if (m.isAllNotesOff() || m.isAllSoundOff())
-        sampler.allNotesOff();
+        engine.allNotesOff();
     else if (m.isPitchWheel())
     {
         const double normalised = (m.getPitchWheelValue() - 8192) / 8192.0;
         pitchBendSemitones = normalised * bendRangeParam->load();
-        sampler.setPitchOffsetSemitones (pitchBendSemitones + fineTuneParam->load() / 100.0 + rootShiftSemitones.load());
+        engine.setPitchOffsetSemitones (pitchBendSemitones + fineTuneParam->load() / 100.0 + rootShiftSemitones.load());
     }
 }
 
@@ -198,7 +244,7 @@ void OspAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
         if (end <= position || outChannels <= 0)
             return;
         float* segment[2] = { channels[0] + position, channels[outChannels > 1 ? 1 : 0] + position };
-        sampler.render (segment, outChannels, end - position);
+        engine.render (segment, outChannels, end - position);
         position = end;
     };
 
@@ -212,7 +258,7 @@ void OspAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
     for (int ch = outChannels; ch < buffer.getNumChannels(); ++ch)
         buffer.clear (ch, 0, numSamples);
 
-    activeVoices.store (sampler.activeVoiceCount(), std::memory_order_relaxed);
+    activeVoices.store (engine.activeVoiceCount(), std::memory_order_relaxed);
 }
 
 //==============================================================================
@@ -223,9 +269,33 @@ void OspAudioProcessor::enqueueLoad (LoadRequest request)
     ++pendingLoads;
     state = LoadState::loading;
     const auto generation = nextGeneration.fetch_add (1);
+    latestLoadId = generation;
     loaderPool.addJob ([this, request = std::move (request), generation] {
         auto result = loadInstrument (request, store, generation);
+        // Queue the next model stage before reporting, so pendingLoads never reads 0 in between.
+        if (result.instrument != nullptr)
+            enqueueRefine (result.instrument, result.audio);
         {
+            const std::lock_guard<std::mutex> lock (resultsMutex);
+            finishedLoads.push_back (std::move (result));
+        }
+        --pendingLoads;
+    });
+}
+
+void OspAudioProcessor::enqueueRefine (std::shared_ptr<const LoadedInstrument> base, std::shared_ptr<const AudioData> audio)
+{
+    if (base == nullptr || base->model == nullptr || base->model->stage == InstrumentModel::Stage::complete)
+        return;
+    ++pendingLoads;
+    loaderPool.addJob ([this, base = std::move (base), audio = std::move (audio)] {
+        // A newer sample was dropped meanwhile: do not spend time on this one.
+        if (base->loadId == latestLoadId.load())
+        {
+            auto result = refineInstrument (*base, audio, nextGeneration.fetch_add (1));
+            if (result.instrument != nullptr)
+                enqueueRefine (result.instrument, result.audio);
+            result.audio.reset();
             const std::lock_guard<std::mutex> lock (resultsMutex);
             finishedLoads.push_back (std::move (result));
         }
@@ -309,11 +379,16 @@ void OspAudioProcessor::timerCallback()
         const std::lock_guard<std::mutex> lock (resultsMutex);
         idle = finishedLoads.empty() && pendingLoads.load() == 0;
     }
+    const auto current = currentInstrument();
     if (idle)
     {
         // A failed load keeps the previous instrument playable; the error is shown as a message.
-        const bool haveInstrument = currentInstrument() != nullptr;
-        state = haveInstrument ? LoadState::ready : (lastLoadFailed ? LoadState::failed : LoadState::empty);
+        state = current != nullptr ? LoadState::ready : (lastLoadFailed ? LoadState::failed : LoadState::empty);
+    }
+    else if (current != nullptr && current->loadId == latestLoadId.load())
+    {
+        // Playable as soon as the first stage is in (spec §62); later stages refine it.
+        state = LoadState::ready;
     }
 
     const std::lock_guard<std::mutex> lock (modelMutex);
@@ -324,6 +399,20 @@ std::shared_ptr<const LoadedInstrument> OspAudioProcessor::currentInstrument() c
 {
     const std::lock_guard<std::mutex> lock (modelMutex);
     return exchange.latestModel();
+}
+
+juce::String OspAudioProcessor::stageMessage() const
+{
+    const auto instrument = currentInstrument();
+    if (instrument == nullptr || instrument->model == nullptr || pendingLoads.load() == 0)
+        return "Ready";
+    switch (instrument->model->stage)
+    {
+        case InstrumentModel::Stage::provisional: return juce::String::fromUTF8 ("Playable \xc2\xb7 building sustain\xe2\x80\xa6");
+        case InstrumentModel::Stage::continued: return juce::String::fromUTF8 ("Playable \xc2\xb7 preparing registers\xe2\x80\xa6");
+        case InstrumentModel::Stage::complete: break;
+    }
+    return "Ready";
 }
 
 juce::String OspAudioProcessor::statusMessage() const
@@ -415,7 +504,25 @@ void OspAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
     auto stateTree = juce::ValueTree::fromXml (*xml);
     const auto instrumentTree = stateTree.getChildWithName (ids::instrument);
     stateTree.removeChild (instrumentTree, nullptr);
+    const int savedVersion = static_cast<int> (stateTree.getProperty ("stateVersion", 1));
     parameters.replaceState (stateTree);
+    if (savedVersion < 2)
+    {
+        // v1 sessions were made with the plain sampler: neutral engine settings keep them
+        // sounding the same (no variation, velocity = volume, no added sustain or space).
+        auto set = [this] (const juce::String& id, float value) {
+            if (auto* p = parameters.getParameter (id))
+                p->setValueNotifyingHost (p->convertTo0to1 (value));
+        };
+        set (ids::life, 0.0f);
+        set (ids::dynamics, 0.0f);
+        set (ids::character, 50.0f);
+        set (ids::motion, 0.0f);
+        set (ids::space, 0.0f);
+        set (ids::reimagined, 0.0f);
+        set (ids::pitchCharacter, 0.0f);
+        set (ids::sustain, 0.0f);
+    }
 
     if (instrumentTree.hasProperty ("rootOverride"))
         setRootOverride (exactValue (instrumentTree["rootOverride"], 60.0));

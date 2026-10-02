@@ -1,7 +1,7 @@
 #include "InstrumentLoader.h"
 
 #include "analysis/Analyzer.h"
-#include "audio/sampler/BaselineSampler.h"
+#include "engine/InstrumentBuilder.h"
 #include "io/AnalysisJson.h"
 #include "io/AudioFileIO.h"
 #include "io/ContentHash.h"
@@ -23,7 +23,7 @@ namespace
     }
 
     constexpr int waveformBuckets = 1024;
-    constexpr int playbackZeroCrossings = 16; // must match the processor's SamplerSettings
+    constexpr int playbackZeroCrossings = 16; // must match the processor's EngineSettings
 }
 
 SampleStore::SampleStore (juce::File directory) : dir (std::move (directory)) {}
@@ -165,6 +165,10 @@ LoadResult loadInstrument (const LoadRequest& request, SampleStore& store, std::
             analysis->warnings.insert (analysis->warnings.begin(), decoded.warnings.begin(), decoded.warnings.end());
             if (store.directory().isDirectory())
                 io::writeAnalysis (toPath (cache), *analysis, error);
+            // Build from exactly what the cache will give back on recall (rounded JSON),
+            // so a reopened session derives the identical model and sounds identical.
+            if (auto roundTripped = io::analysisFromJson (io::analysisToJson (*analysis), error))
+                analysis = std::move (roundTripped);
         }
         instrument->analysis = std::move (*analysis);
 
@@ -187,9 +191,12 @@ LoadResult loadInstrument (const LoadRequest& request, SampleStore& store, std::
             preparation = { request.savedPlayback->startSeconds, request.savedPlayback->gainDb };
         instrument->startSeconds = preparation.startSeconds;
         instrument->playbackGainDb = preparation.gainDb;
-        instrument->playback = PlaybackSource (decoded.audio, root.rootMidi,
-                                               BaselineSampler::requiredSourcePaddingFor (playbackZeroCrossings),
-                                               preparation.startSeconds, preparation.gainDb);
+        InstrumentBuildOptions options;
+        options.interpolationZeroCrossings = playbackZeroCrossings;
+        options.rootOverrideMidi = root.rootMidi;
+        options.preparationOverride = preparation;
+        instrument->model = instrument::buildProvisional (decoded.audio, instrument->analysis, options);
+        instrument->loadId = generation;
         instrument->character = describeCharacter (instrument->analysis);
         instrument->durationSeconds = decoded.audio.durationSeconds();
 
@@ -213,6 +220,7 @@ LoadResult loadInstrument (const LoadRequest& request, SampleStore& store, std::
         }
 
         result.instrument = std::move (instrument);
+        result.audio = std::make_shared<const AudioData> (std::move (decoded.audio));
     }
     catch (const std::exception& e)
     {
@@ -221,6 +229,38 @@ LoadResult loadInstrument (const LoadRequest& request, SampleStore& store, std::
     catch (...)
     {
         result.error = "unexpected error while loading";
+    }
+    return result;
+}
+
+LoadResult refineInstrument (const LoadedInstrument& base, std::shared_ptr<const AudioData> audio, std::uint64_t generation)
+{
+    LoadResult result;
+    try
+    {
+        if (audio == nullptr || base.model == nullptr)
+        {
+            result.error = "nothing to refine";
+            return result;
+        }
+        InstrumentBuildOptions options;
+        options.interpolationZeroCrossings = playbackZeroCrossings;
+        auto instrument = std::make_shared<LoadedInstrument> (base);
+        instrument->generation = generation;
+        if (base.model->stage == InstrumentModel::Stage::provisional)
+            instrument->model = instrument::addContinuation (*base.model, *audio, options);
+        else
+            instrument->model = instrument::addAnchors (*base.model, *audio, options);
+        result.instrument = std::move (instrument);
+        result.audio = std::move (audio);
+    }
+    catch (const std::exception& e)
+    {
+        result.error = std::string ("unexpected error while preparing the instrument: ") + e.what();
+    }
+    catch (...)
+    {
+        result.error = "unexpected error while preparing the instrument";
     }
     return result;
 }
