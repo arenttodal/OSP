@@ -96,6 +96,120 @@ void WaveformView::paint (juce::Graphics& g)
 }
 
 //==============================================================================
+SamplesPanel::SamplesPanel (OspAudioProcessor& p) : ospProcessor (p)
+{
+    viewport.setViewedComponent (&content, false);
+    viewport.setScrollBarsShown (true, false);
+    addAndMakeVisible (viewport);
+}
+
+void SamplesPanel::paint (juce::Graphics& g)
+{
+    g.setColour (colours::panel);
+    g.fillRoundedRectangle (getLocalBounds().toFloat(), 6.0f);
+}
+
+void SamplesPanel::setInstrument (std::shared_ptr<const LoadedInstrument> instrument)
+{
+    if (instrument == nullptr || instrument->set == nullptr)
+    {
+        rows.clear();
+        content.removeAllChildren();
+        shownGeneration = 0;
+        return;
+    }
+    if (instrument->generation == shownGeneration)
+        return;
+    shownGeneration = instrument->generation;
+    rows.clear();
+    content.removeAllChildren();
+    const auto& set = *instrument->set;
+    for (const auto& group : set.groups)
+    {
+        auto header = std::make_unique<Row>();
+        header->isHeader = true;
+        header->name.setText (juce::String (midiNoteName (static_cast<int> (std::lround (group.rootMidi))))
+                                  + (group.layers > 1 ? "   " + juce::String (group.layers) + " velocity layers" : juce::String()),
+                              juce::dontSendNotification);
+        header->name.setFont (juce::FontOptions (14.0f, juce::Font::bold));
+        header->name.setColour (juce::Label::textColourId, colours::text);
+        content.addAndMakeVisible (header->name);
+        rows.push_back (std::move (header));
+        for (int id : group.members)
+        {
+            const auto& member = set.members[static_cast<std::size_t> (id)];
+            auto row = std::make_unique<Row>();
+            row->name.setText (juce::String::fromUTF8 (member.filename.c_str()), juce::dontSendNotification);
+            row->name.setColour (juce::Label::textColourId, colours::text);
+            row->info.setText (member.userAssigned ? juce::String ("set by you")
+                                                   : "auto " + juce::String (static_cast<int> (std::lround (member.confidence * 100))) + "%",
+                               juce::dontSendNotification);
+            row->info.setColour (juce::Label::textColourId, colours::dim);
+            row->role.addItemList ({ "Pitch", "Velocity layer", "Round robin", "Articulation" }, 1);
+            row->role.setSelectedId (static_cast<int> (member.role) + 1, juce::dontSendNotification);
+            for (int l = 1; l <= 4; ++l)
+                row->layer.addItem ("Layer " + juce::String (l), l);
+            row->layer.setSelectedId (std::clamp (member.layer + 1, 1, 4), juce::dontSendNotification);
+            // Root: the detected pitch, or a correction (octave errors on unusual sources).
+            row->root.addItem ("root auto", 1);
+            for (int note = 24; note <= 108; ++note)
+                row->root.addItem ("root " + juce::String (midiNoteName (note)), note + 2);
+            int pinnedRoot = 1;
+            for (const auto& a : instrument->assignments)
+                if (a.filename == member.filename && a.rootMidi)
+                    pinnedRoot = static_cast<int> (std::lround (*a.rootMidi)) + 2;
+            row->root.setSelectedId (pinnedRoot, juce::dontSendNotification);
+            const auto filename = member.filename;
+            auto* rolePtr = &row->role;
+            auto* layerPtr = &row->layer;
+            auto* rootPtr = &row->root;
+            auto apply = [this, filename, rolePtr, layerPtr, rootPtr] {
+                std::optional<double> root;
+                if (rootPtr->getSelectedId() >= 2)
+                    root = static_cast<double> (rootPtr->getSelectedId() - 2);
+                ospProcessor.reassignSample (filename, static_cast<SampleRole> (rolePtr->getSelectedId() - 1), layerPtr->getSelectedId() - 1, root);
+            };
+            row->role.onChange = apply;
+            row->layer.onChange = apply;
+            row->root.onChange = apply;
+            for (juce::Component* c : { static_cast<juce::Component*> (&row->name), static_cast<juce::Component*> (&row->info),
+                                        static_cast<juce::Component*> (&row->role), static_cast<juce::Component*> (&row->layer),
+                                        static_cast<juce::Component*> (&row->root) })
+                content.addAndMakeVisible (c);
+            rows.push_back (std::move (row));
+        }
+    }
+    resized();
+}
+
+void SamplesPanel::resized()
+{
+    viewport.setBounds (getLocalBounds().reduced (8));
+    const int width = viewport.getWidth() - viewport.getScrollBarThickness();
+    int y = 0;
+    for (auto& row : rows)
+    {
+        if (row->isHeader)
+        {
+            row->name.setBounds (0, y + 6, width, 22);
+            y += 30;
+            continue;
+        }
+        auto line = juce::Rectangle<int> (0, y, width, 26);
+        row->layer.setBounds (line.removeFromRight (90));
+        line.removeFromRight (6);
+        row->root.setBounds (line.removeFromRight (100));
+        line.removeFromRight (6);
+        row->role.setBounds (line.removeFromRight (130));
+        line.removeFromRight (6);
+        row->info.setBounds (line.removeFromRight (90));
+        row->name.setBounds (line.withTrimmedLeft (12));
+        y += 30;
+    }
+    content.setSize (width, std::max (y, 10));
+}
+
+//==============================================================================
 OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     : AudioProcessorEditor (p),
       ospProcessor (p),
@@ -130,6 +244,11 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     exampleButton.onClick = [this] { ospProcessor.loadExample(); };
     addAndMakeVisible (loadButton);
     addAndMakeVisible (exampleButton);
+    samplesButton.setClickingTogglesState (true);
+    samplesButton.setTooltip ("How the dropped files were combined (pitch, velocity layers, round robins)");
+    samplesButton.onClick = [this] { samplesPanel.setVisible (samplesButton.getToggleState()); };
+    addAndMakeVisible (samplesButton);
+    addChildComponent (samplesPanel);
 
     auto setupKnob = [this] (Knob& knob, const char* id, const char* name, bool large) {
         knob.slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 70, 18);
@@ -211,7 +330,10 @@ void OspAudioProcessorEditor::resized()
     auto buttons = header.removeFromRight (220);
     loadButton.setBounds (buttons.removeFromTop (28).removeFromRight (100));
     exampleButton.setBounds (loadButton.getBounds().translated (-110, 0).withWidth (100));
-    rootBox.setBounds (buttons.removeFromBottom (28).removeFromRight (210));
+    auto rootRow = buttons.removeFromBottom (28);
+    samplesButton.setBounds (rootRow.removeFromLeft (80));
+    rootRow.removeFromLeft (6);
+    rootBox.setBounds (rootRow);
     rootLabel.setBounds (header.removeFromLeft (110));
     characterLabel.setBounds (header.removeFromTop (30));
     detailLabel.setBounds (header);
@@ -255,12 +377,13 @@ void OspAudioProcessorEditor::resized()
     }
     area.removeFromBottom (8);
     waveform.setBounds (area);
+    samplesPanel.setBounds (area);
 }
 
 bool OspAudioProcessorEditor::isInterestedInFileDrag (const juce::StringArray& files)
 {
     for (const auto& f : files)
-        if (io::isSupportedAudioExtension (std::filesystem::path (f.toStdString())))
+        if (juce::File (f).isDirectory() || io::isSupportedAudioExtension (std::filesystem::path (f.toStdString())))
             return true;
     return false;
 }
@@ -268,23 +391,36 @@ bool OspAudioProcessorEditor::isInterestedInFileDrag (const juce::StringArray& f
 void OspAudioProcessorEditor::filesDropped (const juce::StringArray& files, int, int)
 {
     waveform.setDragHighlight (false);
+    juce::Array<juce::File> audioFiles;
     for (const auto& f : files)
-        if (io::isSupportedAudioExtension (std::filesystem::path (f.toStdString())))
+    {
+        const juce::File file (f);
+        if (file.isDirectory())
         {
-            // Multi-sample sets arrive in a later phase; use the first supported file for now.
-            ospProcessor.loadFile (juce::File (f));
-            return;
+            // A dropped folder is a set: every supported file directly inside it.
+            for (const auto& entry : juce::RangedDirectoryIterator (file, false, "*", juce::File::findFiles))
+                if (io::isSupportedAudioExtension (std::filesystem::path (entry.getFile().getFullPathName().toStdString())))
+                    audioFiles.add (entry.getFile());
         }
+        else if (io::isSupportedAudioExtension (std::filesystem::path (f.toStdString())))
+            audioFiles.add (file);
+    }
+    if (! audioFiles.isEmpty())
+        ospProcessor.loadFiles (audioFiles);
 }
 
 void OspAudioProcessorEditor::chooseFile()
 {
     chooser = std::make_unique<juce::FileChooser> ("Choose a sound", juce::File(), "*.wav;*.wave;*.aif;*.aiff;*.aifc;*.flac");
-    chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+    chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
+                              | juce::FileBrowserComponent::canSelectMultipleItems,
                           [this] (const juce::FileChooser& fc) {
-                              const auto file = fc.getResult();
-                              if (file.existsAsFile())
-                                  ospProcessor.loadFile (file);
+                              juce::Array<juce::File> files;
+                              for (const auto& f : fc.getResults())
+                                  if (f.existsAsFile())
+                                      files.add (f);
+                              if (! files.isEmpty())
+                                  ospProcessor.loadFiles (files);
                           });
 }
 
@@ -292,6 +428,14 @@ void OspAudioProcessorEditor::refreshInstrumentInfo()
 {
     const auto instrument = ospProcessor.currentInstrument();
     waveform.setInstrument (instrument);
+    samplesPanel.setInstrument (instrument);
+    const bool isSet = instrument != nullptr && instrument->set != nullptr;
+    samplesButton.setEnabled (isSet);
+    if (! isSet && samplesButton.getToggleState())
+    {
+        samplesButton.setToggleState (false, juce::dontSendNotification);
+        samplesPanel.setVisible (false);
+    }
 
     const auto overrideMidi = ospProcessor.rootOverride();
     rootBox.setSelectedId (overrideMidi ? static_cast<int> (std::lround (*overrideMidi)) + 2 : 1, juce::dontSendNotification);

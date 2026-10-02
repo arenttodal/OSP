@@ -3,6 +3,7 @@
 #include "analysis/continuation/ContinuationAnalyzer.h"
 #include "core/AudioData.h"
 #include "model/InstrumentModel.h"
+#include "engine/SampleSetInference.h"
 
 #include <cstdint>
 #include <memory>
@@ -46,6 +47,23 @@ namespace instrument
     /** All stages at once (research renderer, tests). */
     std::shared_ptr<InstrumentModel> buildComplete (const AudioData& audio, const AnalysisData& analysis,
                                                     const InstrumentBuildOptions& options, bool withAnchors);
+
+    struct SetSource
+    {
+        const AudioData* audio = nullptr;
+        const AnalysisData* analysis = nullptr;
+        std::string filename;
+    };
+
+    /**
+        Several recordings -> one multi-sample instrument (Phase 7). Every member starts
+        at its own onset but shares ONE playback gain (from the loudest member), so
+        velocity layers keep their natural loudness differences. `withContinuation`
+        adds stage 2 to every member; register anchors are not built for sets (the
+        real recordings are the register).
+    */
+    InstrumentSet buildSet (const std::vector<SetSource>& sources, const InstrumentBuildOptions& options,
+                            const std::vector<SetAssignment>& assignments, bool withContinuation);
 
     /** Body resonances and resonator tuning for CHARACTER / Reimagined (spec §22, §46). */
     void findResonances (InstrumentModel& model, const AudioData& audio);

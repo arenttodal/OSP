@@ -48,6 +48,14 @@ public:
         }
     }
 
+    /** Copy played at a different root (a user's root correction). Off the audio thread. */
+    PlaybackSource withRootMidi (double newRootMidi) const
+    {
+        auto copy = *this;
+        copy.root = newRootMidi;
+        return copy;
+    }
+
     double sampleRate() const noexcept { return sourceSampleRate; }
     double rootMidi() const noexcept { return root; }
     /** Read position (source frames) at which notes start. */

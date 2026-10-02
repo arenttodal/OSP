@@ -1,5 +1,6 @@
 #include "research/Experiment.h"
 
+#include "analysis/Analyzer.h"
 #include "core/Fft.h"
 #include "core/PitchMath.h"
 #include "core/Prng.h"
@@ -20,7 +21,9 @@
 #include <cmath>
 #include <complex>
 #include <map>
+#include <sstream>
 #include <numbers>
+#include <optional>
 
 namespace osp::research
 {
@@ -273,6 +276,72 @@ double discontinuityDb (const AudioData& audio, double fromSeconds, double toSec
     return 10.0 * std::log10 (*peak / median);
 }
 
+std::string registerGroundTruth (const std::vector<std::filesystem::path>& files)
+{
+    std::vector<AnalysedSource> sources;
+    std::vector<std::string> names;
+    for (const auto& f : files)
+    {
+        auto loaded = loadAndAnalyse (f);
+        if (loaded.ok && loaded.analysis.pitch.detected)
+        {
+            names.push_back (f.filename().string());
+            sources.push_back (std::move (loaded));
+        }
+    }
+    // One recording per pitch (the loudest).
+    std::map<int, std::size_t> perPitch;
+    for (std::size_t i = 0; i < sources.size(); ++i)
+    {
+        const int note = sources[i].analysis.pitch.midiNote;
+        if (! perPitch.count (note) || sources[i].analysis.envelope.maxRmsDbfs > sources[perPitch[note]].analysis.envelope.maxRmsDbfs)
+            perPitch[note] = i;
+    }
+    std::ostringstream out;
+    out << "| held-out pitch | real centroid/F0 (st) | nearest-anchor transposition (st) | register model (st) |\n|---|---:|---:|---:|\n";
+    double errNaive = 0.0, errModel = 0.0;
+    int count = 0;
+    auto brightness = [] (const AnalysisData& a) { return 12.0 * std::log2 (a.spectral.meanCentroidHz / a.pitch.fundamentalHz); };
+    for (const auto& [heldNote, heldIndex] : perPitch)
+    {
+        std::vector<instrument::SetSource> inputs;
+        for (const auto& [note, index] : perPitch)
+            if (note != heldNote)
+                inputs.push_back ({ &sources[index].audio, &sources[index].analysis, names[index] });
+        if (inputs.size() < 2)
+            continue;
+        InstrumentBuildOptions options;
+        const auto set = instrument::buildSet (inputs, options, {}, false);
+        RenderConfig config;
+        config.engineSettings.macros.life = 0.0;
+        config.engineSettings.macros.space = 0.0;
+        config.engineSettings.macros.reimagined = 0.0;
+        config.engineSettings.continuation = ContinuationStrategy::off;
+        MidiSequence seq;
+        seq.events.push_back ({ 0.0, MidiEvent::Type::noteOn, heldNote, 100, 1 });
+        seq.events.push_back ({ 1.5, MidiEvent::Type::noteOff, heldNote, 0, 1 });
+        auto withModel = set;
+        auto withoutModel = set;
+        withoutModel.hasRegisterModel = false;
+        const auto a = Analyzer::analyse (renderSet (withoutModel, seq, config).audio);
+        const auto b = Analyzer::analyse (renderSet (withModel, seq, config).audio);
+        if (! a.pitch.detected || ! b.pitch.detected)
+            continue;
+        const double real = brightness (sources[heldIndex].analysis);
+        const double naive = brightness (a);
+        const double model = brightness (b);
+        errNaive += std::abs (naive - real);
+        errModel += std::abs (model - real);
+        ++count;
+        out << "| " << midiNoteName (heldNote) << " | " << juce::String (real, 2) << " | " << juce::String (naive, 2) << " | "
+            << juce::String (model, 2) << " |\n";
+    }
+    if (count > 0)
+        out << "\nMean absolute error: nearest anchor " << juce::String (errNaive / count, 2) << " st, register model "
+            << juce::String (errModel / count, 2) << " st (" << count << " held-out pitches).\n";
+    return out.str();
+}
+
 ExperimentSummary runExperiment (const std::filesystem::path& planFile, const std::filesystem::path& outputDir,
                                  const std::function<void (const std::string&)>& log, std::string& error)
 {
@@ -320,7 +389,13 @@ ExperimentSummary runExperiment (const std::filesystem::path& planFile, const st
 
     for (const auto& s : *p["sources"].getArray())
     {
-        const auto rel = json::getString (s, "path");
+        // A source may be a set: "paths" lists its files; "path" (or the first of
+        // "paths") is the single recording used by conditions without "useSet".
+        std::vector<std::string> setPaths;
+        if (const auto* list = s["paths"].getArray())
+            for (const auto& item : *list)
+                setPaths.push_back (item.toString().toStdString());
+        const auto rel = json::has (s, "path") ? json::getString (s, "path") : (setPaths.empty() ? std::string() : setPaths.front());
         const auto sectionId = json::getString (s, "id", rel);
         const auto path = std::filesystem::path (rel).is_absolute() ? std::filesystem::path (rel) : corpusRoot / rel;
         auto source = loadAndAnalyse (path);
@@ -345,6 +420,27 @@ ExperimentSummary runExperiment (const std::filesystem::path& planFile, const st
 
         // Models are shared by conditions that need the same build (with or without anchors).
         std::map<bool, std::shared_ptr<InstrumentModel>> models;
+        std::vector<AnalysedSource> setSources;
+        std::optional<InstrumentSet> set;
+        auto ensureSet = [&] {
+            if (set)
+                return;
+            for (const auto& item : setPaths)
+            {
+                const auto full = std::filesystem::path (item).is_absolute() ? std::filesystem::path (item) : corpusRoot / item;
+                auto loaded = loadAndAnalyse (full);
+                if (loaded.ok)
+                    setSources.push_back (std::move (loaded));
+                else
+                    summary.errors.push_back (item + ": " + loaded.error);
+            }
+            std::vector<instrument::SetSource> inputs;
+            for (std::size_t i = 0; i < setSources.size(); ++i)
+                inputs.push_back ({ &setSources[i].audio, &setSources[i].analysis, std::filesystem::path (setPaths[i]).filename().string() });
+            InstrumentBuildOptions options;
+            options.seed = seed;
+            set = instrument::buildSet (inputs, options, {}, true);
+        };
 
         for (const auto& variant : variants)
         {
@@ -368,13 +464,20 @@ ExperimentSummary runExperiment (const std::filesystem::path& planFile, const st
                     config.engine = *engine;
                 applyInstrumentBlock (c.settings["instrument"], config);
                 auto spec = variant.sequence;
+                if (s["sequence"].isObject())
+                    spec = parseSequence (s["sequence"]); // per-source phrase (fits that source's range)
                 if (c.settings["sequence"].isObject())
                     spec = parseSequence (c.settings["sequence"]);
                 const auto sequence = makeSequence (spec, root.rootMidi);
 
                 const auto t0 = std::chrono::steady_clock::now();
                 RenderOutput out;
-                if (config.engine == EngineId::instrument)
+                if (config.engine == EngineId::instrument && json::getBool (c.settings, "useSet", false) && ! setPaths.empty())
+                {
+                    ensureSet();
+                    out = renderSet (*set, sequence, config);
+                }
+                else if (config.engine == EngineId::instrument)
                 {
                     auto& model = models[config.anchors];
                     if (! model)

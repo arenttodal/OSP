@@ -96,6 +96,20 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [ ] Listening verdict (lab tab "Original ↔ Reimagined") — exit: useful sounds across the range
 - [ ] Transient/body separation (spec §19) — not yet; transient shaping is gain-based
 
+## Milestone checklist — Phase 7: multi-sample intelligence
+
+- [x] Group import (multi-file drop, folder drop, multi-select chooser; sessions store every member)
+- [x] Pitch clustering (roots within half a semitone)
+- [x] Round-robin inference + engine rotation that never repeats the previous take
+- [x] Velocity inference (dynamics words in names, else loudness gaps >= 4.5 dB); one shared set gain keeps natural level differences
+- [x] Alternate articulations (much shorter/longer takes) kept but not used for ordinary notes
+- [x] Register model (brightness vs pitch, shrunk when few pitches); ground truth: plucks 6.2 -> 4.6 st error, organ 5.2 -> 4.8, tagel 3.0 -> 3.1 (neutral)
+- [x] Samples inspector (role, layer, root corrections; rebuild without re-analysis; recall)
+- [x] Experiment 6 (single file plain / single file engine / whole set)
+- [ ] Listening verdict (lab tab "Multi-sample") — exit: a small related set is automatically better
+- Known limits: sets mixing different organ stops are grouped by pitch only (timbre clustering
+  is not done); register anchors are not built for sets.
+
 ## DONE
 
 - Pure C++20 DSP/analysis library (`osp_dsp`) independent of JUCE; JUCE used for file
@@ -137,6 +151,12 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
   they need measuring on the real Apple Silicon target.
 - YIN range is 30 Hz – 4 kHz. Notes outside it are not judged by render pitch checks;
   very low basses (< 30 Hz fundamentals) will report a wrong/low-confidence root.
+- Very short soft sources (< 0.5 s synthetic vowel) can be pitch-tracked on a harmonic
+  with moderate confidence (0.4 s vowel at C4 -> G5). Longer material is unaffected.
+- The synthetic vowel at A4 (strong 2nd-harmonic formant) is tracked an octave up with
+  confidence 0.46 ("moderate"). Real corpus files were fine (66/80 high confidence), but
+  multi-sample sets inherit any octave error into their pitch grouping; the Samples
+  inspector shows each file's group so it can be corrected.
 - Onset list uses spectral flux with a 3 dB/bin absolute floor: very soft attacks
   (bowed swells) may produce no listed onset (the envelope `onsetSeconds` still exists).
 - Pitch analysis runs at the source rate; 96 kHz sources cost ~2x analysis time.

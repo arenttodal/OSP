@@ -24,6 +24,33 @@ private:
 };
 
 /**
+    Samples inspector (spec §48): the inferred structure of a multi-sample set, one row
+    per file under its pitch group, with role and layer selectors. Changing a selector
+    pins that file's place (a user assignment) and rebuilds the set.
+*/
+class SamplesPanel final : public juce::Component
+{
+public:
+    explicit SamplesPanel (OspAudioProcessor& processor);
+    void setInstrument (std::shared_ptr<const LoadedInstrument> instrument);
+    void paint (juce::Graphics&) override;
+    void resized() override;
+
+private:
+    struct Row
+    {
+        juce::Label name, info;
+        juce::ComboBox role, layer, root;
+        bool isHeader = false;
+    };
+    OspAudioProcessor& ospProcessor;
+    juce::Viewport viewport;
+    juce::Component content;
+    std::vector<std::unique_ptr<Row>> rows;
+    std::uint64_t shownGeneration = 0;
+};
+
+/**
     Working interface: drop zone + waveform, detected root (editable), the five macros
     and Original <-> Reimagined, a compact Advanced row, an on-screen keyboard and
     status. Functional rather than final; the designed instrument UI comes later.
@@ -63,7 +90,8 @@ private:
     WaveformView waveform;
     juce::Label rootLabel, characterLabel, detailLabel, statusLabel;
     juce::ComboBox rootBox;
-    juce::TextButton loadButton { "Load..." }, exampleButton { "Load example" }, reseedButton { "Reseed" };
+    juce::TextButton loadButton { "Load..." }, exampleButton { "Load example" }, reseedButton { "Reseed" }, samplesButton { "Samples" };
+    SamplesPanel samplesPanel { ospProcessor };
     std::array<Knob, 6> macros;      // Life, Dynamics, Character, Motion, Space, Original/Reimagined
     std::array<Knob, 6> knobs;       // Advanced: attack, release, velocity, fine, bend, output
     juce::ComboBox pitchCharacterBox, sustainBox;

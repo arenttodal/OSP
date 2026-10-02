@@ -61,6 +61,10 @@ public:
 
     // Instrument loading (message thread)
     void loadFile (const juce::File& file);
+    /** Several files -> one multi-sample instrument (Phase 7). One file falls back to loadFile. */
+    void loadFiles (const juce::Array<juce::File>& files);
+    /** Samples inspector correction: pin one file's role/layer and rebuild the set. */
+    void reassignSample (const std::string& filename, SampleRole role, int layer, std::optional<double> rootMidi = std::nullopt);
     void loadExample();
 
     enum class LoadState { empty, loading, ready, failed };
@@ -94,6 +98,8 @@ private:
     void timerCallback() override;
     void enqueueLoad (LoadRequest request);
     void enqueueRefine (std::shared_ptr<const LoadedInstrument> base, std::shared_ptr<const AudioData> audio);
+    void enqueueSetLoad (SetLoadRequest request);
+    void pushResult (LoadResult result);
     void applyParameters (bool force) noexcept;
     void handleMidi (const juce::MidiMessage& message) noexcept;
     void swapInstrumentIfPending() noexcept;

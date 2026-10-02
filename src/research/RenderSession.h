@@ -4,6 +4,7 @@
 #include "midi/MidiEvent.h"
 #include "model/AnalysisData.h"
 #include "model/InstrumentModel.h"
+#include "model/InstrumentSet.h"
 #include "model/PlaybackPreparation.h"
 #include "model/RootChoice.h"
 #include "research/RenderConfig.h"
@@ -44,5 +45,8 @@ RenderOutput renderWithEngine (const AudioData& source, const AnalysisData& anal
 
 /** Same block loop through the OSP instrument engine (EngineId::instrument). */
 RenderOutput renderInstrument (const InstrumentModel& model, const MidiSequence& sequence, const RenderConfig& config);
+
+/** A multi-sample instrument through engine C. */
+RenderOutput renderSet (const InstrumentSet& set, const MidiSequence& sequence, const RenderConfig& config);
 
 } // namespace osp::research

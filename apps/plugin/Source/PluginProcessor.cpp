@@ -119,7 +119,10 @@ void OspAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     // Not the audio thread: allocation is allowed here.
     engine.prepare (sampleRate, samplesPerBlock, engineSettings);
-    engine.setModel (playing != nullptr ? playing->model.get() : nullptr);
+    if (playing != nullptr && playing->set != nullptr)
+        engine.setInstrumentSet (playing->set.get());
+    else
+        engine.setModel (playing != nullptr ? playing->model.get() : nullptr);
     keyboardState.reset();
     pitchBendSemitones = 0.0;
     applyParameters (true);
@@ -186,13 +189,19 @@ void OspAudioProcessor::swapInstrumentIfPending() noexcept
                 // Too many overlapping swaps: silence the oldest retired instrument.
                 auto oldest = std::min_element (retired.begin(), retired.end(),
                                                 [] (auto* a, auto* b) { return a->generation < b->generation; });
-                engine.killVoicesUsing ((*oldest)->model.get());
+                if ((*oldest)->set != nullptr)
+                    engine.killVoicesUsing ((*oldest)->set.get());
+                else
+                    engine.killVoicesUsing ((*oldest)->model.get());
                 slot = oldest;
             }
             *slot = playing;
         }
         playing = next;
-        engine.setModel (playing->model.get());
+        if (playing->set != nullptr)
+            engine.setInstrumentSet (playing->set.get());
+        else
+            engine.setModel (playing->model.get());
     }
 
     std::uint64_t oldest = playing != nullptr ? playing->generation : 0;
@@ -200,7 +209,7 @@ void OspAudioProcessor::swapInstrumentIfPending() noexcept
     {
         if (r == nullptr)
             continue;
-        if (! engine.isModelInUse (r->model.get()))
+        if (r->set != nullptr ? ! engine.isSetInUse (r->set.get()) : ! engine.isModelInUse (r->model.get()))
             r = nullptr;
         else
             oldest = std::min (oldest, r->generation);
@@ -240,10 +249,10 @@ void OspAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
     if (auto* head = getPlayHead())
         if (const auto position = head->getPosition())
         {
-            const bool playing = position->getIsPlaying();
-            if (playing && ! hostWasPlaying)
+            const bool transportRunning = position->getIsPlaying();
+            if (transportRunning && ! hostWasPlaying)
                 engine.resetPerformance();
-            hostWasPlaying = playing;
+            hostWasPlaying = transportRunning;
         }
     applyParameters (false);
 
@@ -310,6 +319,57 @@ void OspAudioProcessor::enqueueRefine (std::shared_ptr<const LoadedInstrument> b
             const std::lock_guard<std::mutex> lock (resultsMutex);
             finishedLoads.push_back (std::move (result));
         }
+        --pendingLoads;
+    });
+}
+
+void OspAudioProcessor::pushResult (LoadResult result)
+{
+    const std::lock_guard<std::mutex> lock (resultsMutex);
+    finishedLoads.push_back (std::move (result));
+}
+
+void OspAudioProcessor::enqueueSetLoad (SetLoadRequest request)
+{
+    ++pendingLoads;
+    state = LoadState::loading;
+    const auto generation = nextGeneration.fetch_add (1);
+    latestLoadId = generation;
+    loaderPool.addJob ([this, request = std::move (request), generation] {
+        pushResult (loadInstrumentSet (request, store, generation));
+        --pendingLoads;
+    });
+}
+
+void OspAudioProcessor::loadFiles (const juce::Array<juce::File>& files)
+{
+    if (files.size() == 1)
+    {
+        loadFile (files.getFirst());
+        return;
+    }
+    SetLoadRequest request;
+    for (const auto& f : files)
+    {
+        LoadRequest r;
+        r.file = f;
+        request.files.push_back (std::move (r));
+    }
+    enqueueSetLoad (std::move (request));
+}
+
+void OspAudioProcessor::reassignSample (const std::string& filename, SampleRole role, int layer, std::optional<double> rootMidi)
+{
+    const auto instrument = currentInstrument();
+    if (instrument == nullptr || instrument->set == nullptr)
+        return;
+    auto assignments = instrument->assignments;
+    assignments.erase (std::remove_if (assignments.begin(), assignments.end(), [&] (const SetAssignment& a) { return a.filename == filename; }),
+                       assignments.end());
+    assignments.push_back ({ filename, role, rootMidi, layer });
+    ++pendingLoads;
+    loaderPool.addJob ([this, instrument, assignments, generation = nextGeneration.fetch_add (1)] {
+        pushResult (reassignInstrumentSet (*instrument, assignments, generation));
         --pendingLoads;
     });
 }
@@ -500,6 +560,31 @@ void OspAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
     }
     if (const auto overrideMidi = rootOverride())
         instrumentTree.setProperty ("rootOverride", exactString (*overrideMidi), nullptr);
+    if (const auto instrument = currentInstrument(); instrument != nullptr && instrument->set != nullptr)
+    {
+        // Multi-sample sessions: every member file plus the user's corrections. The set is
+        // re-inferred from the (cached) analyses on recall.
+        juce::ValueTree setTree ("Set");
+        for (const auto& member : instrument->memberFiles)
+        {
+            juce::ValueTree m ("Member");
+            m.setProperty ("contentHash", juce::String (member.contentHash), nullptr);
+            m.setProperty ("filename", juce::String (member.filename), nullptr);
+            m.setProperty ("originalPath", juce::String (member.originalPath), nullptr);
+            setTree.appendChild (m, nullptr);
+        }
+        for (const auto& a : instrument->assignments)
+        {
+            juce::ValueTree t ("Assignment");
+            t.setProperty ("filename", juce::String (a.filename), nullptr);
+            t.setProperty ("role", juce::String (toString (a.role)), nullptr);
+            t.setProperty ("layer", a.layer.value_or (0), nullptr);
+            if (a.rootMidi)
+                t.setProperty ("rootMidi", exactString (*a.rootMidi), nullptr);
+            setTree.appendChild (t, nullptr);
+        }
+        instrumentTree.appendChild (setTree, nullptr);
+    }
     stateTree.appendChild (instrumentTree, nullptr);
 
     if (auto xml = stateTree.createXml())
@@ -539,6 +624,38 @@ void OspAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
         setRootOverride (exactValue (instrumentTree["rootOverride"], 60.0));
     else
         setRootOverride (std::nullopt);
+
+    const auto setTree = instrumentTree.getChildWithName ("Set");
+    if (setTree.isValid() && setTree.getNumChildren() > 0)
+    {
+        SetLoadRequest request;
+        for (const auto& child : setTree)
+        {
+            if (child.hasType ("Member"))
+            {
+                LoadRequest r;
+                r.expectedHash = child["contentHash"].toString().toStdString();
+                r.filename = child["filename"].toString().toStdString();
+                r.originalPath = child["originalPath"].toString().toStdString();
+                request.files.push_back (std::move (r));
+            }
+            else if (child.hasType ("Assignment"))
+            {
+                SetAssignment a;
+                a.filename = child["filename"].toString().toStdString();
+                const auto role = child["role"].toString();
+                a.role = role == "pitch" ? SampleRole::pitchAnchor
+                       : role == "velocity" ? SampleRole::velocityLayer
+                       : role == "articulation" ? SampleRole::articulation : SampleRole::roundRobin;
+                a.layer = static_cast<int> (child["layer"]);
+                if (child.hasProperty ("rootMidi"))
+                    a.rootMidi = exactValue (child["rootMidi"], 60.0);
+                request.assignments.push_back (a);
+            }
+        }
+        enqueueSetLoad (std::move (request));
+        return;
+    }
 
     const auto hash = instrumentTree["contentHash"].toString();
     if (hash.isNotEmpty())

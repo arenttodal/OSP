@@ -77,6 +77,8 @@ PITCH BAKE-OFF (Phase 2)
   --bakeoff <plan.json> [--output <dir>]      render blind A/B/C clips + key.json + listening.json
   --bakeoff-score <dir> --ratings <file>      join ratings with the key -> score.md / score.json
   --experiment <plan.json> [--output <dir>]   blind listening experiment (any engines/settings), see docs/testing.md
+  --register-test <dir>                       multi-pitch ground truth: hide each pitch, rebuild from the rest (spec §70)
+  --continuation-report <file|dir>            stable region, jumps and release per file
 
 BENCHMARK
   --benchmark [--engine A|C] [--voices 24] [--seconds 20] [--sample-rate 48000] [--block-size 128] [--output-json <f>] [--no-retrigger]
@@ -594,6 +596,16 @@ int main (int argc, char** argv)
                           << ", release " << (c.hasRelease ? "yes tail " + juce::String (c.tailSeconds, 2).toStdString() + " s" : std::string ("no"))
                           << ", exits " << c.graftExits.size() << ", " << juce::String (ms, 0) << " ms\n";
             }
+            return exitOk;
+        }
+        if (args.has ("--register-test"))
+        {
+            std::vector<fs::path> files;
+            for (const auto& entry : fs::directory_iterator (args.get ("--register-test")))
+                if (entry.is_regular_file() && io::isSupportedAudioExtension (entry.path()))
+                    files.push_back (entry.path());
+            std::sort (files.begin(), files.end());
+            std::cout << registerGroundTruth (files);
             return exitOk;
         }
         if (args.has ("--experiment"))

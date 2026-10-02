@@ -106,6 +106,17 @@ RenderOutput renderInstrument (const InstrumentModel& model, const MidiSequence&
     return runBlocks (engine, outputRate, blockSize, sequence, config.maxTailSeconds);
 }
 
+RenderOutput renderSet (const InstrumentSet& set, const MidiSequence& sequence, const RenderConfig& config)
+{
+    const auto& primary = *set.members[static_cast<std::size_t> (set.primary)].model;
+    const double outputRate = config.sampleRate > 0.0 ? config.sampleRate : primary.original.source->sampleRate();
+    const int blockSize = std::max (1, config.blockSize);
+    InstrumentEngine engine;
+    engine.prepare (outputRate, blockSize, config.engineSettings);
+    engine.setInstrumentSet (&set);
+    return runBlocks (engine, outputRate, blockSize, sequence, config.maxTailSeconds);
+}
+
 RenderOutput renderWithEngine (const AudioData& source, const AnalysisData& analysis, double rootMidi, const MidiSequence& sequence,
                                const RenderConfig& config, const PlaybackPreparation& preparation)
 {

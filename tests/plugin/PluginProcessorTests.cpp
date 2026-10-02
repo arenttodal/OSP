@@ -217,6 +217,76 @@ TEST_CASE ("plugin: an unpitched sample is still playable", "[plugin]")
     CHECK (peak > 0.01);
 }
 
+TEST_CASE ("plugin: a dropped set becomes one multi-sample instrument and recalls identically", "[plugin]")
+{
+    TempDir tmp;
+    juce::Array<juce::File> files;
+    files.add (writeSource (tmp.dir, "low A2.wav", testsignals::vowel (midiToHz (45), 1.5, 48000.0, 1)));
+    files.add (writeSource (tmp.dir, "mid take1.wav", testsignals::vowel (midiToHz (57), 1.5, 48000.0, 2)));
+    files.add (writeSource (tmp.dir, "mid take2.wav", testsignals::vowel (midiToHz (57), 1.5, 48000.0, 3)));
+    // (a saw: the synthetic vowel at A4 is pitch-tracked on its 2nd harmonic, see STATUS)
+    files.add (writeSource (tmp.dir, "high A4.wav", testsignals::saw (midiToHz (69), 1.5, 48000.0, 0.3, 2)));
+
+    juce::MemoryBlock state;
+    AudioData before;
+    {
+        OspAudioProcessor p;
+        p.loadFiles (files);
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        const auto instrument = p.currentInstrument();
+        REQUIRE (instrument != nullptr);
+        REQUIRE (instrument->set != nullptr);
+        CHECK (instrument->set->groups.size() == 3);
+        CHECK (instrument->memberFiles.size() == 4);
+        // Each register plays from its own recording, in tune.
+        CHECK (pitchOf (playNote (p, 47, 48000.0, 0.8)) == Approx (midiToHz (47)).epsilon (0.006));
+        CHECK (pitchOf (playNote (p, 70, 48000.0, 0.8)) == Approx (midiToHz (70)).epsilon (0.006));
+
+        // A correction from the Samples inspector rebuilds the set.
+        p.reassignSample ("mid take2.wav", SampleRole::velocityLayer, 1);
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        const auto reassigned = p.currentInstrument();
+        REQUIRE (reassigned->set != nullptr);
+        bool found = false;
+        for (const auto& m : reassigned->set->members)
+            if (m.filename == "mid take2.wav")
+            {
+                found = true;
+                CHECK (m.userAssigned);
+                CHECK (m.layer == 1);
+            }
+        CHECK (found);
+
+        // A root correction retunes that file: call the low A2 file "A1" and A2 now plays an octave up.
+        p.reassignSample ("low A2.wav", SampleRole::pitchAnchor, 0, 33.0);
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        CHECK (pitchOf (playNote (p, 33, 48000.0, 0.8)) == Approx (midiToHz (45)).epsilon (0.006));
+        p.reassignSample ("low A2.wav", SampleRole::pitchAnchor, 0, 45.0);
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        before = playNote (p, 60, 48000.0, 0.6);
+        p.getStateInformation (state);
+    }
+
+    OspAudioProcessor restored;
+    restored.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+    REQUIRE (restored.waitForLoads (30000));
+    restored.pollLoads();
+    REQUIRE (restored.currentInstrument() != nullptr);
+    REQUIRE (restored.currentInstrument()->set != nullptr);
+    CHECK (restored.currentInstrument()->assignments.size() == 2);
+    const auto after = playNote (restored, 60, 48000.0, 0.6);
+    REQUIRE (after.numFrames() == before.numFrames());
+    double diff = 0.0;
+    for (std::size_t ch = 0; ch < 2; ++ch)
+        for (std::size_t i = 0; i < after.channels[ch].size(); ++i)
+            diff = std::max (diff, static_cast<double> (std::abs (after.channels[ch][i] - before.channels[ch][i])));
+    CHECK (diff < 1.0e-12);
+}
+
 // Needs a display (run under xvfb-run on headless Linux). Hidden by default:
 //   OSP_SNAPSHOT_DIR=/tmp xvfb-run ./osp_plugin_tests "[ui]"
 TEST_CASE ("plugin: editor builds, shows the instrument and can be snapshotted", "[.][ui]")

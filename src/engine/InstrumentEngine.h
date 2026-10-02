@@ -6,6 +6,7 @@
 #include "engine/PerformanceEngine.h"
 #include "engine/PostProcessor.h"
 #include "model/InstrumentModel.h"
+#include "model/InstrumentSet.h"
 
 #include <array>
 #include <cstdint>
@@ -68,7 +69,24 @@ public:
     void prepare (double outputSampleRate, int maximumBlockSize, const EngineSettings& settings);
 
     /** The model must stay alive while any voice may use it (see isModelInUse). */
-    void setModel (const InstrumentModel* model) noexcept { currentModel = model; }
+    void setModel (const InstrumentModel* model) noexcept
+    {
+        currentModel = model;
+        currentSet = nullptr;
+    }
+
+    /**
+        A multi-sample instrument (Phase 7): notes choose the nearest pitch anchor, the
+        velocity layer and a round-robin take. The set (and every member model) must stay
+        alive while voices may use it (see isSetInUse).
+    */
+    void setInstrumentSet (const InstrumentSet* set) noexcept
+    {
+        currentSet = set;
+        currentModel = set != nullptr && set->isValid() ? set->members[static_cast<std::size_t> (set->primary)].model.get() : nullptr;
+    }
+    bool isSetInUse (const InstrumentSet* set) const noexcept;
+    void killVoicesUsing (const InstrumentSet* set) noexcept;
     const InstrumentModel* model() const noexcept { return currentModel; }
 
     static int requiredSourcePaddingFor (int interpolationZeroCrossings) noexcept
@@ -92,7 +110,7 @@ public:
 
     /** Velocity -> performance intensity (spec §34). Adds onto `shape`. Pure. */
     static void applyDynamics (NoteShape& shape, int velocity, const DynamicsProfile& profile, const SourceCharacter& character,
-                               double dynamicsMacro, DynamicsMode mode) noexcept;
+                               double dynamicsMacro, DynamicsMode mode, double referenceVelocity = 100.0) noexcept;
 
     bool isModelInUse (const InstrumentModel* model) const noexcept;
     void killVoicesUsing (const InstrumentModel* model) noexcept;
@@ -118,7 +136,15 @@ public:
     static constexpr int voiceSlots() noexcept { return totalSlots; }
 
     /** The shape a note would get (pure apart from the performance memory it advances). */
-    NoteShape shapeFor (int note, int velocity, std::uint64_t eventIndex) noexcept;
+    NoteShape shapeFor (int note, int velocity, std::uint64_t eventIndex) noexcept
+    {
+        return shapeFor (currentModel, note, velocity, eventIndex, 100.0, 0.0);
+    }
+    NoteShape shapeFor (const InstrumentModel* model, int note, int velocity, std::uint64_t eventIndex, double referenceVelocity,
+                        double registerBrightnessDb) noexcept;
+
+    /** Which member of the current set a note would use (no state change). -1 without a set. */
+    int memberFor (int note, int velocity, std::uint64_t eventIndex) const noexcept;
 
 private:
     static constexpr int tailSlots = 16;
@@ -133,6 +159,8 @@ private:
     std::unique_ptr<SincInterpolator> interpolator;
     std::array<InstrumentVoice, totalSlots> voices;
     const InstrumentModel* currentModel = nullptr;
+    const InstrumentSet* currentSet = nullptr;
+    std::array<std::int8_t, 512> lastTake {};  ///< last round-robin take per (group, layer)
     bool pedalDown = false;
     std::uint64_t noteCounter = 0;
     float outputGain = 1.0f;

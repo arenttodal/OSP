@@ -179,6 +179,47 @@ std::shared_ptr<InstrumentModel> addAnchors (const InstrumentModel& base, const 
     return model;
 }
 
+InstrumentSet buildSet (const std::vector<SetSource>& sources, const InstrumentBuildOptions& options,
+                        const std::vector<SetAssignment>& assignments, bool withContinuation)
+{
+    // One gain for the whole set: the loudest member reaches the usual target level.
+    double loudest = -200.0, peak = -200.0;
+    for (const auto& s : sources)
+        if (s.analysis != nullptr)
+        {
+            loudest = std::max (loudest, s.analysis->envelope.maxRmsDbfs);
+            peak = std::max (peak, s.analysis->envelope.peakDbfs);
+        }
+    double gainDb = 0.0;
+    if (options.playback.normaliseLevel && loudest > -150.0)
+    {
+        gainDb = std::clamp (options.playback.targetMaxRmsDbfs - loudest, -options.playback.maxCutDb, options.playback.maxBoostDb);
+        gainDb = std::min (gainDb, options.playback.peakCeilingDbfs - peak);
+    }
+
+    std::vector<SetInput> inputs;
+    for (const auto& s : sources)
+    {
+        if (s.audio == nullptr || s.analysis == nullptr || s.audio->isEmpty())
+            continue;
+        auto memberOptions = options;
+        auto onsetOnly = options.playback;
+        onsetOnly.normaliseLevel = false;
+        auto prep = preparePlayback (*s.analysis, onsetOnly);
+        prep.gainDb = gainDb;
+        memberOptions.preparationOverride = prep;
+        for (const auto& a : assignments)
+            if (a.filename == s.filename && a.rootMidi)
+                memberOptions.rootOverrideMidi = *a.rootMidi; // a user's root correction retunes playback
+        auto model = buildProvisional (*s.audio, *s.analysis, memberOptions);
+        if (withContinuation)
+            model = addContinuation (*model, *s.audio, memberOptions);
+        model->stage = InstrumentModel::Stage::complete;
+        inputs.push_back ({ std::move (model), s.filename });
+    }
+    return inferSampleSet (inputs, assignments);
+}
+
 std::shared_ptr<InstrumentModel> buildComplete (const AudioData& audio, const AnalysisData& analysis, const InstrumentBuildOptions& options,
                                                 bool withAnchors)
 {

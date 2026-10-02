@@ -43,10 +43,25 @@ from the page. If a tab is new, the takes are blind and in a random order.
    Toward Reimagined the instrument adds sympathetic resonance tuned to the source's own
    partials and body, more granular continuation, more drift, and gentle harmonic
    saturation above 50 %.
+5. **Multi-sample** (Phase 7 exit test): the plucks set (16 files) and the Tagel set
+   (14 files) each play a phrase across their range plus fast repeats. The three takes
+   are: one file with the plain sampler, one file with the OSP engine, and the whole
+   set combined automatically. Main question: *does dropping the set make a better
+   instrument with no mapping?*
 
 ## Checks in a DAW (need your Mac)
 
 - Load the AU/VST3 in Logic, Ableton and Reaper. Drop a corpus sample, play, save the
   project, reopen it, and confirm it sounds identical.
+
+## Plugin checks for the new features (need your Mac)
+
+- Drop several files, or a folder, onto the plugin. Open **Samples** and check that the
+  pitch groups, velocity layers and round robins make sense, then correct one (role,
+  layer or root). Save, reopen, and it should sound the same.
+- Move the five macros and Original ↔ Reimagined while holding a chord. There should be
+  no clicks, and every position should be usable.
+- Pitch Character Tape vs Natural on an organ or vocal, ±1–2 octaves.
+- Sustain Recording vs Endless, holding notes for a minute.
 
 ## Questions

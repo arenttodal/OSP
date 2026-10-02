@@ -3,6 +3,7 @@
 #include "LoadedInstrument.h"
 
 #include "core/AudioData.h"
+#include "engine/SampleSetInference.h"
 
 #include <juce_core/juce_core.h>
 
@@ -59,6 +60,13 @@ struct LoadRequest
     std::optional<SavedPlayback> savedPlayback;
 };
 
+/** A multi-file drop or a recalled multi-sample session (Phase 7). */
+struct SetLoadRequest
+{
+    std::vector<LoadRequest> files;          ///< one entry per file (file or hash/originalPath/filename)
+    std::vector<SetAssignment> assignments;  ///< user corrections from the Samples inspector
+};
+
 struct LoadResult
 {
     std::shared_ptr<const LoadedInstrument> instrument;  ///< null on failure
@@ -78,5 +86,15 @@ LoadResult loadInstrument (const LoadRequest& request, SampleStore& store, std::
     added (stage 3). Background thread; never throws (returns the error instead).
 */
 LoadResult refineInstrument (const LoadedInstrument& base, std::shared_ptr<const AudioData> audio, std::uint64_t generation);
+
+/**
+    Several files -> one multi-sample instrument: import + analyse every file, infer the
+    set (pitch groups, layers, round robins) and build every member with continuation.
+    Files that fail are skipped with a warning; fails only if no file loads.
+*/
+LoadResult loadInstrumentSet (const SetLoadRequest& request, SampleStore& store, std::uint64_t generation);
+
+/** Re-infers the current set with new user assignments (no re-analysis). */
+LoadResult reassignInstrumentSet (const LoadedInstrument& base, const std::vector<SetAssignment>& assignments, std::uint64_t generation);
 
 } // namespace osp::plugin

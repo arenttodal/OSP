@@ -3,6 +3,8 @@
 #include "core/AudioData.h"
 #include "model/AnalysisData.h"
 #include "model/InstrumentModel.h"
+#include "engine/SampleSetInference.h"
+#include "model/InstrumentSet.h"
 
 #include <memory>
 
@@ -33,7 +35,18 @@ struct LoadedInstrument
     double analysisRootMidi = 60.0;  ///< root the PlaybackSource was built with
     std::string rootOrigin;          ///< "analysis", "analysis-low-confidence", "fallback"
 
-    std::shared_ptr<const InstrumentModel> model;
+    std::shared_ptr<const InstrumentModel> model;   ///< the played model (one file) or the set's primary member
+
+    /** Multi-sample instrument (null for a single file). */
+    std::shared_ptr<const InstrumentSet> set;
+    struct MemberFile
+    {
+        std::string contentHash;
+        std::string filename;
+        std::string originalPath;
+    };
+    std::vector<MemberFile> memberFiles;           ///< identities of set->members, same order
+    std::vector<SetAssignment> assignments;        ///< user corrections the set was built with
     double startSeconds = 0.0;       ///< where notes start reading (analysed onset minus pre-roll)
     double playbackGainDb = 0.0;     ///< non-destructive level match
 

@@ -82,11 +82,25 @@ std::optional<juce::File> SampleStore::import (const juce::File& file, const std
     return target;
 }
 
-LoadResult loadInstrument (const LoadRequest& request, SampleStore& store, std::uint64_t generation)
+namespace
 {
-    LoadResult result;
-    try
+    /** Steps shared by single files and sets: locate, hash, decode, store, analyse. */
+    struct Imported
     {
+        bool ok = false;
+        std::string error;
+        std::vector<std::string> warnings;
+        std::string hash;
+        std::string filename;
+        std::string originalPath;
+        std::string storedPath;
+        AudioData audio;
+        AnalysisData analysis;
+    };
+
+    Imported importAndAnalyse (const LoadRequest& request, SampleStore& store)
+    {
+        Imported result;
         // 1. Locate the audio: store (by hash) first for recall, else the given file.
         juce::File source = request.file;
         std::string hash;
@@ -135,14 +149,12 @@ LoadResult loadInstrument (const LoadRequest& request, SampleStore& store, std::
         if (! stored)
             result.warnings.push_back (error);
 
-        // 4. Analysis: cached if compatible, else analyse and cache.
-        auto instrument = std::make_shared<LoadedInstrument>();
-        instrument->generation = generation;
-        instrument->contentHash = io::contentId (hash);
-        instrument->filename = request.filename.empty() ? request.file.getFileName().toStdString() : request.filename;
-        instrument->originalPath = request.originalPath.empty() ? request.file.getFullPathName().toStdString() : request.originalPath;
-        instrument->storedPath = stored ? stored->getFullPathName().toStdString() : std::string();
+        result.hash = hash;
+        result.filename = request.filename.empty() ? request.file.getFileName().toStdString() : request.filename;
+        result.originalPath = request.originalPath.empty() ? request.file.getFullPathName().toStdString() : request.originalPath;
+        result.storedPath = stored ? stored->getFullPathName().toStdString() : std::string();
 
+        // 4. Analysis: cached if compatible, else analyse and cache.
         const auto cache = store.analysisCacheFor (hash);
         std::optional<AnalysisData> analysis;
         if (cache.existsAsFile())
@@ -154,9 +166,9 @@ LoadResult loadInstrument (const LoadRequest& request, SampleStore& store, std::
         if (! analysis)
         {
             analysis = Analyzer::analyse (decoded.audio);
-            analysis->source.filename = instrument->filename;
-            analysis->source.path = instrument->originalPath;
-            analysis->source.contentHash = instrument->contentHash;
+            analysis->source.filename = result.filename;
+            analysis->source.path = result.originalPath;
+            analysis->source.contentHash = io::contentId (hash);
             analysis->source.format = decoded.info.formatName;
             analysis->source.bitDepth = decoded.info.bitDepth;
             analysis->source.isFloatingPoint = decoded.info.isFloatingPoint;
@@ -170,7 +182,55 @@ LoadResult loadInstrument (const LoadRequest& request, SampleStore& store, std::
             if (auto roundTripped = io::analysisFromJson (io::analysisToJson (*analysis), error))
                 analysis = std::move (roundTripped);
         }
-        instrument->analysis = std::move (*analysis);
+        result.analysis = std::move (*analysis);
+        result.audio = std::move (decoded.audio);
+        result.ok = true;
+        return result;
+    }
+
+    void computeOverview (LoadedInstrument& instrument, const AudioData& audio)
+    {
+        const auto mono = audio.mixToMono();
+        const auto buckets = static_cast<std::size_t> (std::min<std::int64_t> (waveformBuckets, std::max<std::int64_t> (1, audio.numFrames())));
+        instrument.peakMin.assign (buckets, 0.0f);
+        instrument.peakMax.assign (buckets, 0.0f);
+        for (std::size_t b = 0; b < buckets; ++b)
+        {
+            const auto start = b * mono.size() / buckets;
+            const auto end = std::max (start + 1, (b + 1) * mono.size() / buckets);
+            float lo = 0.0f, hi = 0.0f;
+            for (auto i = start; i < end && i < mono.size(); ++i)
+            {
+                lo = std::min (lo, mono[i]);
+                hi = std::max (hi, mono[i]);
+            }
+            instrument.peakMin[b] = lo;
+            instrument.peakMax[b] = hi;
+        }
+        instrument.durationSeconds = audio.durationSeconds();
+    }
+}
+
+LoadResult loadInstrument (const LoadRequest& request, SampleStore& store, std::uint64_t generation)
+{
+    LoadResult result;
+    try
+    {
+        auto imported = importAndAnalyse (request, store);
+        result.warnings = imported.warnings;
+        if (! imported.ok)
+        {
+            result.error = imported.error;
+            return result;
+        }
+        auto instrument = std::make_shared<LoadedInstrument>();
+        instrument->generation = generation;
+        instrument->contentHash = io::contentId (imported.hash);
+        instrument->filename = imported.filename;
+        instrument->originalPath = imported.originalPath;
+        instrument->storedPath = imported.storedPath;
+        instrument->analysis = std::move (imported.analysis);
+        auto& decoded = imported;
 
         // 5. Playback data.
         auto root = chooseRoot (&instrument->analysis, std::nullopt);
@@ -198,26 +258,7 @@ LoadResult loadInstrument (const LoadRequest& request, SampleStore& store, std::
         instrument->model = instrument::buildProvisional (decoded.audio, instrument->analysis, options);
         instrument->loadId = generation;
         instrument->character = describeCharacter (instrument->analysis);
-        instrument->durationSeconds = decoded.audio.durationSeconds();
-
-        // 6. Waveform overview.
-        const auto mono = decoded.audio.mixToMono();
-        const auto buckets = static_cast<std::size_t> (std::min<std::int64_t> (waveformBuckets, std::max<std::int64_t> (1, decoded.audio.numFrames())));
-        instrument->peakMin.assign (buckets, 0.0f);
-        instrument->peakMax.assign (buckets, 0.0f);
-        for (std::size_t b = 0; b < buckets; ++b)
-        {
-            const auto start = b * mono.size() / buckets;
-            const auto end = std::max (start + 1, (b + 1) * mono.size() / buckets);
-            float lo = 0.0f, hi = 0.0f;
-            for (auto i = start; i < end && i < mono.size(); ++i)
-            {
-                lo = std::min (lo, mono[i]);
-                hi = std::max (hi, mono[i]);
-            }
-            instrument->peakMin[b] = lo;
-            instrument->peakMax[b] = hi;
-        }
+        computeOverview (*instrument, decoded.audio);
 
         result.instrument = std::move (instrument);
         result.audio = std::make_shared<const AudioData> (std::move (decoded.audio));
@@ -262,6 +303,114 @@ LoadResult refineInstrument (const LoadedInstrument& base, std::shared_ptr<const
     {
         result.error = "unexpected error while preparing the instrument";
     }
+    return result;
+}
+
+LoadResult loadInstrumentSet (const SetLoadRequest& request, SampleStore& store, std::uint64_t generation)
+{
+    LoadResult result;
+    try
+    {
+        std::vector<Imported> imported;
+        for (const auto& file : request.files)
+        {
+            auto one = importAndAnalyse (file, store);
+            result.warnings.insert (result.warnings.end(), one.warnings.begin(), one.warnings.end());
+            if (one.ok)
+                imported.push_back (std::move (one));
+            else
+                result.warnings.push_back (one.error);
+        }
+        if (imported.empty())
+        {
+            result.error = "none of the files could be loaded";
+            return result;
+        }
+        std::vector<instrument::SetSource> sources;
+        for (const auto& one : imported)
+            sources.push_back ({ &one.audio, &one.analysis, one.filename });
+        InstrumentBuildOptions options;
+        options.interpolationZeroCrossings = playbackZeroCrossings;
+        auto set = std::make_shared<InstrumentSet> (instrument::buildSet (sources, options, request.assignments, true));
+        if (! set->isValid())
+        {
+            result.error = "the files could not be combined into an instrument";
+            return result;
+        }
+
+        auto instrument = std::make_shared<LoadedInstrument>();
+        instrument->generation = generation;
+        instrument->loadId = generation;
+        instrument->assignments = request.assignments;
+        // Member identities in the set's member order (inference keeps input order).
+        for (const auto& member : set->members)
+            for (const auto& one : imported)
+                if (one.filename == member.filename)
+                {
+                    instrument->memberFiles.push_back ({ io::contentId (one.hash), one.filename, one.originalPath });
+                    break;
+                }
+        const auto& primaryMember = set->members[static_cast<std::size_t> (set->primary)];
+        const Imported* primary = &imported.front();
+        for (const auto& one : imported)
+            if (one.filename == primaryMember.filename)
+                primary = &one;
+        instrument->contentHash = io::contentId (primary->hash);
+        instrument->filename = std::to_string (set->members.size()) + " samples";
+        instrument->originalPath = primary->originalPath;
+        instrument->storedPath = primary->storedPath;
+        instrument->analysis = primary->analysis;
+        instrument->analysisRootMidi = primaryMember.model->rootMidi;
+        instrument->rootOrigin = "set";
+        instrument->startSeconds = primaryMember.model->playback.startSeconds;
+        instrument->playbackGainDb = primaryMember.model->playback.gainDb;
+        instrument->model = primaryMember.model;
+        instrument->set = std::move (set);
+        instrument->character = describeCharacter (primary->analysis);
+        computeOverview (*instrument, primary->audio);
+        result.instrument = std::move (instrument);
+    }
+    catch (const std::exception& e)
+    {
+        result.error = std::string ("unexpected error while loading the set: ") + e.what();
+    }
+    catch (...)
+    {
+        result.error = "unexpected error while loading the set";
+    }
+    return result;
+}
+
+LoadResult reassignInstrumentSet (const LoadedInstrument& base, const std::vector<SetAssignment>& assignments, std::uint64_t generation)
+{
+    LoadResult result;
+    if (base.set == nullptr)
+    {
+        result.error = "not a multi-sample instrument";
+        return result;
+    }
+    std::vector<SetInput> inputs;
+    for (const auto& m : base.set->members)
+    {
+        auto model = m.model;
+        for (const auto& a : assignments)
+            if (a.filename == m.filename && a.rootMidi && std::abs (*a.rootMidi - model->rootMidi) > 0.01)
+            {
+                // A root correction retunes playback, not only the grouping.
+                auto retuned = std::make_shared<InstrumentModel> (*model);
+                retuned->rootMidi = *a.rootMidi;
+                retuned->original.source = std::make_shared<const PlaybackSource> (model->original.source->withRootMidi (*a.rootMidi));
+                model = std::move (retuned);
+            }
+        inputs.push_back ({ std::move (model), m.filename });
+    }
+    auto instrument = std::make_shared<LoadedInstrument> (base);
+    instrument->generation = generation;
+    instrument->assignments = assignments;
+    auto set = std::make_shared<InstrumentSet> (inferSampleSet (inputs, assignments));
+    // Keep member identities aligned with the (unchanged) member order.
+    instrument->set = std::move (set);
+    result.instrument = std::move (instrument);
     return result;
 }
 

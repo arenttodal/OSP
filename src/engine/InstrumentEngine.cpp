@@ -31,6 +31,7 @@ void InstrumentEngine::prepare (double outputSampleRate, int maximumBlockSize, c
 
 void InstrumentEngine::resetPerformance() noexcept
 {
+    lastTake.fill (-1);
     noteCounter = 0;
     sampleClock = 0;
     performance.reset (config.seed);
@@ -52,6 +53,76 @@ void InstrumentEngine::setOutputGainDb (double db) noexcept
 void InstrumentEngine::setPitchOffsetSemitones (double semitones) noexcept
 {
     pitchRatio = semitonesToRatio (semitones);
+}
+
+int InstrumentEngine::memberFor (int note, int velocity, std::uint64_t eventIndex) const noexcept
+{
+    if (currentSet == nullptr || currentSet->groups.empty())
+        return -1;
+    // Nearest pitch anchor.
+    const PitchGroup* group = &currentSet->groups.front();
+    int groupIndex = 0;
+    for (int g = 0; g < static_cast<int> (currentSet->groups.size()); ++g)
+        if (std::abs (currentSet->groups[static_cast<std::size_t> (g)].rootMidi - note) < std::abs (group->rootMidi - note))
+        {
+            group = &currentSet->groups[static_cast<std::size_t> (g)];
+            groupIndex = g;
+        }
+    // Velocity layer, then a round-robin take that is never the previous one.
+    const int layer = std::clamp (static_cast<int> (std::clamp (velocity, 1, 127) / 128.0 * group->layers), 0, group->layers - 1);
+    // The requested layer, or the nearest layer that has playable takes.
+    int chosenLayer = -1;
+    for (int id : group->members)
+    {
+        const auto& m = currentSet->members[static_cast<std::size_t> (id)];
+        if (m.role != SampleRole::articulation && (chosenLayer < 0 || std::abs (m.layer - layer) < std::abs (chosenLayer - layer)))
+            chosenLayer = m.layer;
+    }
+    int candidates[64];
+    int count = 0;
+    for (int id : group->members)
+    {
+        const auto& m = currentSet->members[static_cast<std::size_t> (id)];
+        if (m.role != SampleRole::articulation && m.layer == chosenLayer && count < 64)
+            candidates[count++] = id;
+    }
+    if (count == 0)
+        return group->members.front();
+    if (count == 1)
+        return candidates[0];
+    const auto key = static_cast<std::size_t> ((groupIndex % 64) * 8 + std::min (chosenLayer, 7));
+    const int previous = lastTake[key];
+    Prng rng (Prng::deriveSeed (config.seed, eventIndex, static_cast<std::uint64_t> (note) + 0x7272));
+    for (int attempt = 0; attempt < 8; ++attempt)
+    {
+        const int pick = candidates[rng.nextBelow (static_cast<std::uint64_t> (count))];
+        if (currentSet->members[static_cast<std::size_t> (pick)].take != previous)
+            return pick;
+    }
+    return candidates[0];
+}
+
+bool InstrumentEngine::isSetInUse (const InstrumentSet* set) const noexcept
+{
+    if (set == nullptr)
+        return false;
+    for (const auto& voice : voices)
+        if (voice.isActive())
+            for (const auto& m : set->members)
+                if (voice.model() == m.model.get())
+                    return true;
+    return false;
+}
+
+void InstrumentEngine::killVoicesUsing (const InstrumentSet* set) noexcept
+{
+    if (set == nullptr)
+        return;
+    for (auto& voice : voices)
+        if (voice.isActive())
+            for (const auto& m : set->members)
+                if (voice.model() == m.model.get())
+                    voice.kill();
 }
 
 bool InstrumentEngine::isModelInUse (const InstrumentModel* model) const noexcept
@@ -126,7 +197,7 @@ InstrumentVoice* InstrumentEngine::chooseVictim() noexcept
 }
 
 void InstrumentEngine::applyDynamics (NoteShape& shape, int velocity, const DynamicsProfile& p, const SourceCharacter& c,
-                                      double dynamicsMacro, DynamicsMode mode) noexcept
+                                      double dynamicsMacro, DynamicsMode mode, double referenceVelocity) noexcept
 {
     if (mode == DynamicsMode::gainOnly)
         return;
@@ -134,7 +205,7 @@ void InstrumentEngine::applyDynamics (NoteShape& shape, int velocity, const Dyna
     // a wide, reliable range (we can always take bite away); harder is extrapolation and
     // stays narrow.
     const double v = std::clamp (velocity, 1, 127);
-    const double intensity = std::clamp ((v - 100.0) / 80.0, -1.25, 0.35);
+    const double intensity = std::clamp ((v - referenceVelocity) / 80.0, -1.25, 0.35);
     const double k = std::clamp (dynamicsMacro, 0.0, 1.0) / 0.5; // 0.5 = calibrated, 1 = twice
     if (k <= 0.0)
         return;
@@ -156,27 +227,35 @@ void InstrumentEngine::applyDynamics (NoteShape& shape, int velocity, const Dyna
     shape.transientSeconds = static_cast<float> (0.02 + 0.03 * c.transientTonal);
 }
 
-NoteShape InstrumentEngine::shapeFor (int note, int velocity, std::uint64_t eventIndex) noexcept
+NoteShape InstrumentEngine::shapeFor (const InstrumentModel* model, int note, int velocity, std::uint64_t eventIndex,
+                                     double referenceVelocity, double registerBrightnessDb) noexcept
 {
     NoteShape shape;
     shape.seed = Prng::deriveSeed (config.seed, eventIndex, static_cast<std::uint64_t> (note));
-    const double velocityDb = -config.velocityRangeDb * (1.0 - std::clamp (velocity, 1, 127) / 127.0);
+    const double v = std::clamp (velocity, 1, 127);
+    // Single recordings: velocity 127 plays at the recording's level. Velocity layers:
+    // each layer is its own level at its nominal velocity; velocity only nudges around it.
+    const double velocityDb = referenceVelocity < 100.0 || referenceVelocity > 100.0
+                                  ? -config.velocityRangeDb * (referenceVelocity - v) / 127.0
+                                  : -config.velocityRangeDb * (1.0 - v / 127.0);
     shape.gain = static_cast<float> (dbToGain (velocityDb));
+    shape.brightnessDb += static_cast<float> (registerBrightnessDb);
 
-    if (currentModel != nullptr)
+    if (model != nullptr)
     {
-        applyDynamics (shape, velocity, currentModel->dynamics, currentModel->character, config.macros.dynamics, config.dynamicsMode);
+        applyDynamics (shape, velocity, model->dynamics, model->character, config.macros.dynamics, config.dynamicsMode, referenceVelocity);
         performance.perform (shape, note, velocity, static_cast<double> (sampleClock) / sampleRate, eventIndex,
-                             currentModel->performance, currentModel->character, config.macros.life);
+                             model->performance, model->character, config.macros.life);
     }
+    const auto* currentModelForMotion = model;
 
     const double r = std::clamp (config.macros.reimagined, 0.0, 1.0);
     const double motion = std::clamp (config.macros.motion, 0.0, 1.0);
-    if (config.continuation == ContinuationStrategy::multiLoopMovement && currentModel != nullptr)
+    if (config.continuation == ContinuationStrategy::multiLoopMovement && currentModelForMotion != nullptr)
     {
         // MOTION: evolution after the onset (spec §11) - mostly for sustained sources.
-        const auto& c = currentModel->original.continuation;
-        const double sustained = 1.0 - 0.8 * currentModel->character.transientTonal;
+        const auto& c = currentModelForMotion->original.continuation;
+        const double sustained = 1.0 - 0.8 * currentModelForMotion->character.transientTonal;
         const double m = motion / 0.35 * (1.0 + 1.5 * r) * sustained; // 1 at the default MOTION
         shape.driftLevelDb = static_cast<float> (m * std::clamp (0.3 + 0.4 * c.levelFluctuationDb, 0.3, 1.0));
         shape.driftCents = static_cast<float> (m * std::clamp (1.5 + 0.3 * c.pitchFluctuationCents, 1.5, 5.0) * (1.0 + 2.0 * std::max (0.0, r - 0.6)));
@@ -219,9 +298,27 @@ void InstrumentEngine::noteOn (int note, int velocity) noexcept
     }
 
     const std::uint64_t eventIndex = noteCounter++;
+    double referenceVelocity = 100.0;
+    double registerDb = 0.0;
+    if (currentSet != nullptr && currentSet->members.size() > 1)
+    {
+        const int index = memberFor (note, velocity, eventIndex);
+        if (index >= 0)
+        {
+            const auto& member = currentSet->members[static_cast<std::size_t> (index)];
+            const auto& group = currentSet->groups[static_cast<std::size_t> (member.pitchGroup)];
+            model = member.model.get();
+            const auto key = static_cast<std::size_t> ((member.pitchGroup % 64) * 8 + std::min (member.layer, 7));
+            lastTake[key] = static_cast<std::int8_t> (member.take);
+            if (group.layers > 1)
+                referenceVelocity = 127.0 * (member.layer + 0.5) / group.layers;
+            if (currentSet->hasRegisterModel)
+                registerDb = std::clamp (1.5 * currentSet->brightnessSlope * (note - group.rootMidi), -8.0, 8.0);
+        }
+    }
     InstrumentVoiceStart params;
     params.model = model;
-    params.shape = shapeFor (note, velocity, eventIndex);
+    params.shape = shapeFor (model, note, velocity, eventIndex, referenceVelocity, registerDb);
     params.layer = &model->layerFor (static_cast<double> (note), config.pitchCharacter);
     params.note = note;
     params.velocity = velocity;

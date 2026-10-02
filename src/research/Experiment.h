@@ -47,4 +47,12 @@ double repetitionScore (const AudioData& audio, double fromSeconds, double* lagS
 */
 double discontinuityDb (const AudioData& audio, double fromSeconds, double toSeconds, double* atSeconds = nullptr);
 
+/**
+    Multi-pitch ground truth (spec §70): for every pitch in a set of recordings, hide it,
+    build the instrument from the others and render that pitch. The table compares the
+    real recording's brightness (spectral centroid re F0, semitones) with the nearest
+    anchor transposed and with the register model. Markdown.
+*/
+std::string registerGroundTruth (const std::vector<std::filesystem::path>& files);
+
 } // namespace osp::research
