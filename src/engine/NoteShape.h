@@ -41,6 +41,10 @@ struct NoteShape
     /** Transient/body mixing (spec §34): level change of the separated transient only, dB. */
     float transientMixDb = 0.0f;
 
+    /** Reimagined: a second read head just behind the first, gently moving (a living
+        doubling: controlled instability, alternate sustain), mix 0..1. */
+    float doubling = 0.0f;
+
     /** Reimagined: soft saturation drive (0 = clean) and continuation segment scale (<1 = shorter, more granular). */
     float saturation = 0.0f;
     float segmentScale = 1.0f;

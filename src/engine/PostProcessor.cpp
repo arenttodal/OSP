@@ -159,11 +159,17 @@ void PostProcessor::updateCoefficients() noexcept
     if (modelDirty || std::abs (reimagined - appliedReimagined) > 0.002)
     {
         appliedReimagined = reimagined;
-        const double t60 = 0.6 + 3.0 * reimagined;
+        const double t60 = 0.6 + 4.5 * reimagined;
         for (int i = 0; i < numResonators; ++i)
-            bandpass (resonatorBank[static_cast<std::size_t> (i)], sampleRate, resonatorHz[static_cast<std::size_t> (i)], t60);
+        {
+            const auto hz = resonatorHz[static_cast<std::size_t> (i)];
+            bandpass (resonatorBank[static_cast<std::size_t> (i)], sampleRate, hz, t60);
+            bandpass (resonatorBank[static_cast<std::size_t> (i + resonators)], sampleRate, std::min (1.5 * hz, 0.45 * sampleRate), t60);
+        }
+        // Audible from the middle of the range (lab, continuum-1: 0..100 % sounded alike).
         const double amount = std::max (0.0, reimagined - 0.1) / 0.9;
-        resonanceMix = numResonators > 0 ? static_cast<float> (0.9 * amount / std::sqrt (static_cast<double> (numResonators))) : 0.0f;
+        resonanceMix = numResonators > 0 ? static_cast<float> (2.2 * amount / std::sqrt (static_cast<double> (numResonators))) : 0.0f;
+        remapMix = static_cast<float> (resonanceMix * 0.7 * std::clamp ((reimagined - 0.5) / 0.5, 0.0, 1.0));
     }
 
     if (modelDirty || std::abs (space - appliedSpace) > 0.002)
@@ -214,6 +220,12 @@ void PostProcessor::process (float* left, float* right, int numSamples) noexcept
                 const float y = resonatorBank[static_cast<std::size_t> (k)].process (excite);
                 ((k & 1) == 0 ? even : odd) += y;
             }
+            if (remapMix > 0.0f)
+                for (int k = 0; k < numResonators; ++k)
+                {
+                    const float y = remapMix / resonanceMix * resonatorBank[static_cast<std::size_t> (k + resonators)].process (excite);
+                    ((k & 1) == 0 ? odd : even) += y; // the other side: the halo spreads
+                }
             l += resonanceMix * (0.75f * even + 0.25f * odd);
             r += resonanceMix * (0.25f * even + 0.75f * odd);
         }

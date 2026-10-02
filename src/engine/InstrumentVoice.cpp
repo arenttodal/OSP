@@ -1,9 +1,12 @@
 #include "engine/InstrumentVoice.h"
 
+#include "core/Prng.h"
+
 #include "analysis/continuation/ContinuationAnalyzer.h"
 
 #include <algorithm>
 #include <cmath>
+#include <numbers>
 
 namespace osp
 {
@@ -97,6 +100,22 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     driftCentsValue = driftCentsTarget = 0.0;
     driftBright = driftBrightTarget = 0.0;
     driftPanValue = driftPanTarget = 0.0;
+    // The doubling head trails by 12-20 ms and moves slowly (a few cents of chorus); it
+    // fades in after the attack so a pluck never flams.
+    dAmount = std::clamp (shape.doubling, 0.0f, 1.0f);
+    if (dAmount > 0.0f)
+    {
+        Prng dRng (Prng::deriveSeed (shape.seed, 0x646f75626c65ull, 0));
+        const double sr = src.sampleRate();
+        dBase = (0.012 + 0.008 * dRng.nextDouble()) * sr;
+        dDepth = 0.0018 * sr;
+        dPhase = 2.0 * std::numbers::pi * dRng.nextDouble();
+        dOmega = 2.0 * std::numbers::pi * (0.25 + 0.2 * dRng.nextDouble()) / sampleRate;
+        dRamp = 0.0f;
+        dRampStep = 1.0f / static_cast<float> (0.08 * sampleRate);
+        dDelaySamples = static_cast<int> (0.03 * sampleRate);
+        dSide = dRng.nextDouble() < 0.5 ? -1.0f : 1.0f;
+    }
     saturationDrive = 1.0f + 4.0f * std::clamp (shape.saturation, 0.0f, 1.0f);
     saturationNorm = 1.0f / saturationDrive;
     driftCoef = 1.0 - std::exp (-static_cast<double> (controlInterval) * std::max (0.01, static_cast<double> (shape.driftRateHz)) * 2.0 / sampleRate);
@@ -448,6 +467,25 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
             r = r * gOut + r2 * gIn;
             xPosition += currentStep;
             xProgress += currentStep;
+        }
+        if (dAmount > 0.0f)
+        {
+            if (dDelaySamples > 0)
+                --dDelaySamples;
+            else if (dRamp < 1.0f)
+                dRamp = std::min (1.0f, dRamp + dRampStep);
+            if (dRamp > 0.0f)
+            {
+                const double behind = dBase + dDepth * std::sin (dPhase);
+                float l2, r2;
+                readFrame (std::max (0.0, bodyPosition - behind * currentStep), currentStep, l2, r2);
+                const float g = dAmount * dRamp;
+                const float norm = 1.0f / std::sqrt (1.0f + g * g);
+                // Placed a little to one side, so the doubling widens instead of thickening.
+                l = (l + g * (dSide < 0.0f ? 1.0f : 0.6f) * l2) * norm;
+                r = (r + g * (dSide < 0.0f ? 0.6f : 1.0f) * r2) * norm;
+            }
+            dPhase += dOmega;
         }
         position += currentStep;
         if (tRemaining > 0)

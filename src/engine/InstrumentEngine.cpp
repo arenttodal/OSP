@@ -280,7 +280,14 @@ NoteShape InstrumentEngine::shapeFor (const InstrumentModel* model, int note, in
             dynamics.brightnessDb = std::clamp (2.0 * currentSet->layerStepBrightnessSt / (0.8 * stepIntensity), -6.0, 18.0);
             dynamics.attackSoftenMs = std::clamp (-currentSet->layerStepAttackMs / stepIntensity, 0.0, 80.0);
         }
-        applyDynamics (shape, velocity, dynamics, model->character, config.macros.dynamics, config.dynamicsMode, referenceVelocity);
+        // How much velocity reshapes the sound depends on the source (lab, dynamics-1):
+        // sustained bowed/blown sources preferred velocity as level only, plucks the full
+        // model at twice the calibrated strength. Real velocity layers (a set's learned
+        // dynamics) speak for themselves and are not scaled.
+        const double sourceScale = layered && currentSet != nullptr && currentSet->hasDynamicsModel
+                                       ? 1.0
+                                       : std::clamp (0.25 + 3.2 * model->character.transientTonal, 0.25, 2.0);
+        applyDynamics (shape, velocity, dynamics, model->character, config.macros.dynamics * sourceScale, config.dynamicsMode, referenceVelocity);
         performance.perform (shape, note, velocity, static_cast<double> (sampleClock) / sampleRate, eventIndex,
                              model->performance, model->character, config.macros.life);
     }
@@ -294,9 +301,12 @@ NoteShape InstrumentEngine::shapeFor (const InstrumentModel* model, int note, in
         const auto& c = currentModelForMotion->original.continuation;
         const double sustained = 1.0 - 0.8 * currentModelForMotion->character.transientTonal;
         const double m = motion / 0.35 * (1.0 + 1.5 * r) * sustained; // 1 at the default MOTION
-        shape.driftLevelDb = static_cast<float> (m * std::clamp (0.3 + 0.4 * c.levelFluctuationDb, 0.3, 1.0));
-        shape.driftCents = static_cast<float> (m * std::clamp (1.5 + 0.3 * c.pitchFluctuationCents, 1.5, 5.0) * (1.0 + 2.0 * std::max (0.0, r - 0.6)));
-        shape.driftBrightnessDb = static_cast<float> (m * 0.8);
+        // Movement in proportion to the recording's own: a steady organ stays steady
+        // (lab, continuation-1: movement hurt the organ, helped the tremolo).
+        // Towards Reimagined, movement of its own is added even to steady sources.
+        shape.driftLevelDb = static_cast<float> (m * (std::clamp (0.25 * c.levelFluctuationDb, 0.0, 1.0) + 0.5 * r));
+        shape.driftCents = static_cast<float> (m * (std::clamp (0.4 * c.pitchFluctuationCents, 0.0, 5.0) + 2.0 * r) * (1.0 + 2.0 * std::max (0.0, r - 0.6)));
+        shape.driftBrightnessDb = static_cast<float> (m * 0.8 * (std::clamp (c.levelFluctuationDb / 3.0, 0.0, 1.0) + r));
         shape.driftPan = static_cast<float> (0.15 * motion * sustained);
         shape.driftRateHz = static_cast<float> (0.1 + 0.15 * motion);
     }
@@ -304,6 +314,7 @@ NoteShape InstrumentEngine::shapeFor (const InstrumentModel* model, int note, in
     // saturation towards the far end. (Resonance and width live in PostProcessor.)
     shape.segmentScale = static_cast<float> ((1.0 - 0.7 * r * r) * (1.3 - 0.6 * motion));
     shape.saturation = static_cast<float> (0.7 * std::clamp ((r - 0.5) / 0.5, 0.0, 1.0));
+    shape.doubling = static_cast<float> (0.7 * std::clamp ((r - 0.35) / 0.65, 0.0, 1.0));
     return shape;
 }
 

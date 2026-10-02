@@ -86,8 +86,10 @@ private:
     bool characterActive = false;
 
     // Resonators (mono-summed excitation, stereo spread output)
-    std::array<Biquad, resonators> resonatorBank;
-    float resonanceMix = 0.0f;
+    // First half: the source's partials and body; second half: a fifth above them
+    // (harmonic remapping towards the Reimagined end, spec §12).
+    std::array<Biquad, 2 * resonators> resonatorBank;
+    float resonanceMix = 0.0f, remapMix = 0.0f;
 
     // SPACE
     float sideGain = 1.0f;

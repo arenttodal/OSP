@@ -18,7 +18,7 @@ namespace osp
 /** The five musician-facing macros plus the Original <-> Reimagined control (spec §11, §12). 0..1. */
 struct Macros
 {
-    double life = 0.35;
+    double life = 0.5;     // lab, performance-1: realistic (50 %) beat identical retriggers on every instrument
     double dynamics = 0.5;
     double character = 0.5;  ///< 0.5 = neutral
     double motion = 0.35;
@@ -49,7 +49,7 @@ struct EngineSettings
     PitchCharacter pitchCharacter = PitchCharacter::tape;
     ContinuationStrategy continuation = ContinuationStrategy::multiLoopMovement;
     bool releaseGraft = true;
-    bool transientPreservation = true;   ///< spec §19 (experiment 7 switches it off for A/B)
+    bool transientPreservation = false;  ///< spec §19; lost the listening test (lab, transients-1), kept as an option
     bool transientMixing = false;        ///< velocity/LIFE move the separated transient, not the whole attack (experiment 8)
     DynamicsMode dynamicsMode = DynamicsMode::full;
     Macros macros;

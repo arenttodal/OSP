@@ -50,6 +50,26 @@ namespace
         return num / den;
     }
 
+    /** Share of the spectrum's energy above `hz` (48 kHz, 8192-point frame from `from`). */
+    double shareAbove (const std::vector<float>& x, std::size_t from, double hz)
+    {
+        const Fft fft (13);
+        const int n = fft.size();
+        std::vector<std::complex<double>> b (static_cast<std::size_t> (n));
+        for (int i = 0; i < n; ++i)
+            b[static_cast<std::size_t> (i)] = { x[from + static_cast<std::size_t> (i)] * (0.5 - 0.5 * std::cos (2.0 * std::numbers::pi * i / n)), 0.0 };
+        fft.forward (b.data());
+        double above = 0, all = 0;
+        for (int k = 1; k < n / 2; ++k)
+        {
+            const double p = std::norm (b[static_cast<std::size_t> (k)]);
+            all += p;
+            if (k * 48000.0 / n > hz)
+                above += p;
+        }
+        return above / all;
+    }
+
     double energy (const std::vector<float>& x, std::size_t from, std::size_t to)
     {
         double e = 0;
@@ -197,7 +217,7 @@ TEST_CASE ("engine: far Reimagined adds harmonics to a pure tone", "[integration
             float* ch[2] = { l.data() + pos, rr.data() + pos };
             engine.render (ch, 2, std::min (256, 48000 - pos));
         }
-        return centroid (l, 12000);
+        return shareAbove (l, 12000, 400.0); // above the tone and the resonators' fifth (330 Hz)
     };
-    CHECK (render (1.0) > render (0.0) * 1.05);
+    CHECK (render (1.0) > render (0.0) * 2.0);
 }

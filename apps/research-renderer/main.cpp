@@ -596,7 +596,8 @@ int main (int argc, char** argv)
                           << " region " << juce::String (c.sustainStartFrame / sr, 2) << "-" << juce::String (c.sustainEndFrame / sr, 2) << " s"
                           << ", jumps " << c.jumps.size() << " mean r " << juce::String (meanR, 3)
                           << ", release " << (c.hasRelease ? "yes tail " + juce::String (c.tailSeconds, 2).toStdString() + " s" : std::string ("no"))
-                          << ", exits " << c.graftExits.size() << ", " << juce::String (ms, 0) << " ms\n";
+                          << ", exits " << c.graftExits.size() << ", fluctuation " << juce::String (c.levelFluctuationDb, 2) << " dB / "
+                          << juce::String (c.pitchFluctuationCents, 1) << " cents, " << juce::String (ms, 0) << " ms\n";
                 const auto ch = instrument::estimateCharacter (source.analysis, &c);
                 std::cout << "    character: transient " << juce::String (ch.transientTonal, 2) << ", sustained "
                           << juce::String (ch.sustainedHarmonic, 2) << ", expressive " << juce::String (ch.expressiveSustain, 2)

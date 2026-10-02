@@ -43,8 +43,8 @@ namespace
     };
     // Small and musical (spec §101): each changes how the engine treats the sample.
     constexpr StartingState startingStates[] = {
-        { "Natural", 30, 50, 50, 25, 15, 10, 2, 250 },
-        { "Alive", 60, 65, 50, 45, 20, 20, 2, 300 },
+        { "Natural", 45, 50, 50, 25, 15, 10, 2, 250 },
+        { "Alive", 70, 65, 50, 45, 20, 20, 2, 300 },
         { "Floating", 35, 35, 45, 70, 55, 45, 120, 1500 },
         { "Broken", 85, 55, 65, 60, 25, 85, 2, 400 },
         { "Frozen", 10, 30, 50, 5, 35, 30, 250, 2500 },
@@ -81,7 +81,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
     // Musician-facing macros (spec §11, §12), 0..100 %.
     auto percent = juce::AudioParameterFloatAttributes().withLabel ("%");
     const Range unit (0.0f, 100.0f, 0.1f);
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::life, 2 }, "Life", unit, 35.0f, percent));
+    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::life, 2 }, "Life", unit, 50.0f, percent));
     layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::dynamics, 2 }, "Dynamics", unit, 50.0f, percent));
     layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::character, 2 }, "Character", unit, 50.0f, percent));
     layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::motion, 2 }, "Motion", unit, 35.0f, percent));

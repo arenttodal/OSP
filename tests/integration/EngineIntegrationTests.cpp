@@ -394,3 +394,34 @@ TEST_CASE ("engine: transient mixing makes velocity act on the pick, not the who
     INFO ("pick/body change from velocity 100 to 127: attack gain " << gainSpread << " dB, transient mixing " << mixSpread << " dB");
     CHECK (mixSpread > gainSpread + 2.0);
 }
+
+TEST_CASE ("engine: Reimagined is clearly audible", "[integration][engine]")
+{
+    // Lab, continuum-1: 0..100 % sounded alike. Towards Reimagined the sound must move:
+    // the doubling head makes a steady tone beat (level fluctuation over 20 ms frames).
+    Fixture f;
+    auto fluctuation = [&] (double reimagined) {
+        research::RenderConfig config;
+        config.engineSettings.macros.life = 0.0;
+        config.engineSettings.macros.space = 0.0;
+        config.engineSettings.macros.motion = 0.0;
+        config.engineSettings.macros.reimagined = reimagined;
+        const auto out = research::renderInstrument (*f.model, hold (57, 4.0), config).audio;
+        std::vector<double> db;
+        for (std::size_t i = static_cast<std::size_t> (0.5 * out.sampleRate); i + 960 < static_cast<std::size_t> (3.5 * out.sampleRate); i += 960)
+        {
+            double e = 0.0;
+            for (std::size_t j = i; j < i + 960; ++j)
+                e += static_cast<double> (out.channels[0][j]) * out.channels[0][j];
+            db.push_back (10.0 * std::log10 (e / 960.0 + 1e-20));
+        }
+        double mean = 0.0, var = 0.0;
+        for (double v : db) mean += v;
+        mean /= static_cast<double> (db.size());
+        for (double v : db) var += (v - mean) * (v - mean);
+        return std::sqrt (var / static_cast<double> (db.size()));
+    };
+    const double original = fluctuation (0.0), reimagined = fluctuation (1.0);
+    INFO ("level fluctuation: original " << original << " dB, reimagined " << reimagined << " dB");
+    CHECK (reimagined > original + 0.5);
+}

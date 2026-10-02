@@ -160,6 +160,11 @@ private:
     int tRemaining = 0;
     float tAmount = 0.0f, tMix = 0.0f;
 
+    // Reimagined doubling head
+    float dAmount = 0.0f, dRamp = 0.0f, dRampStep = 0.0f, dSide = 1.0f;
+    double dBase = 0.0, dDepth = 0.0, dPhase = 0.0, dOmega = 0.0;
+    int dDelaySamples = 0;
+
     ShelfFilter highL, highR, lowL, lowR;
     bool filtersActive = false;
     float appliedBright = 0.0f, appliedBody = 0.0f;
