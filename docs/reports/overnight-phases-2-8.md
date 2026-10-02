@@ -135,6 +135,7 @@ Developer ID).
 | Engine C, before the fast path | macOS 14 arm64 CI | 17.1 % | 30.5 % |
 | Engine C, with the unity fast path | cloud x86 VM (noisy) | 22 % (baseline on the same VM: 31 %) | 41 % |
 | Engine C, with stretched tables too | cloud x86 VM (noisy) | 10 % (an octave up: 17 %) | 21 % (baseline on the same VM: 32 %) |
+| **Engine C, current** | **macOS 14 arm64 CI** | **4.9 %** (worst block 28 %) | **13.2 %** (baseline A on the same run: 18.7 %) |
 
 The spec's target is 16 voices below 25 % on Apple Silicon. It was met before either
 optimisation; together they cut engine C's cost by about half again. Worst-case callbacks on shared

@@ -178,7 +178,8 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
   (upward transposition) then got polyphase tables too (24 semitone levels up to x4,
   next level up so the cutoff is never higher; 4.5 MB per engine): 16 held voices
   22 % -> 10 %, an octave up 38 % -> 17 %, 24 dense voices 41 % -> 21 % (baseline A
-  32 % on the same VM).
+  32 % on the same VM). macOS 14 arm64 CI after both: 16 held voices **4.9 %** mean
+  (worst 28 %), 24 dense voices 13.2 % (baseline A 18.7 %).
 - **CPU**: the windowed-sinc kernel is computed per output sample (two table lookups
   per tap). Measured on a 2.1 GHz Xeon cloud VM: 16 sustained voices ≈ 19–20 % of the
   48 kHz/128 block budget, 24 voices with dense retriggers ≈ 33 %. Transposing up

@@ -69,8 +69,7 @@ Everything saves as you go and I read it from the page. Headphones help.
 - [ ] If you have one, an **MPE controller** (Advanced → MPE): per-note bend, pressure
   and slide.
 - [ ] **CPU:** 16 held voices at 48 kHz / 128 in your DAW's meter. CI's Apple Silicon
-  runner measured 17 % before the latest two optimisations, which halved the cost
-  again on the cloud machine.
+  runner now measures 4.9 % on average (the target is under 25 %).
 
 ## 4. Questions
 
