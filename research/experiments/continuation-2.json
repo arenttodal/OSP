@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "name": "continuation-2",
+  "tab": "Sustain 2",
+  "title": "Sustain, round 2: movement that follows the recording",
+  "heading": "Can you hear the loop?",
+  "intro": [
+    "Round 2. In round 1 movement hurt the steady organ and helped the tremolo. Movement now follows how much the recording moves by itself. Each group is a long hold with two takes, in a random order: the plain multi-loop and multi-loop with the new movement.",
+    "Listen for whether the movement makes the sustain more alive, or adds a wobble the instrument does not have."
+  ],
+  "scales": [
+    {
+      "key": "loop",
+      "label": "Loop",
+      "low": "obvious repetition",
+      "high": "no loop heard"
+    },
+    {
+      "key": "life",
+      "label": "Life",
+      "low": "frozen, static",
+      "high": "alive like the recording"
+    },
+    {
+      "key": "seams",
+      "label": "Seams",
+      "low": "clicks or bumps",
+      "high": "seamless"
+    }
+  ],
+  "groupLabel": "Hold 60 s, then release",
+  "bestLabel": "Best of these",
+  "bestHint": "the hold you would rather play",
+  "corpusRoot": "research/corpus",
+  "seed": 101,
+  "outputSampleRate": 44100,
+  "listeningRmsDbfs": -20,
+  "format": "flac",
+  "trimToCommon": true,
+  "maxSeconds": 70,
+  "sequence": {
+    "notes": [
+      {
+        "offset": 0,
+        "start": 0.0,
+        "duration": 60.0,
+        "velocity": 100
+      }
+    ]
+  },
+  "tail": 8,
+  "sources": [
+    {
+      "id": "organ",
+      "label": "Organ (Trampeorgel)",
+      "path": "trampeorgel/Trampeorgel_Bounce_2026-05-15_130536.wav"
+    },
+    {
+      "id": "bowed",
+      "label": "Bowed (nyckelharpa)",
+      "path": "nyckelharpa/Nyckelharpa_Bounce_2026-03-31_203133.wav"
+    },
+    {
+      "id": "tremolo",
+      "label": "Tremolo harmonics",
+      "path": "sus/Sus_Harm_D_Trem.wav"
+    },
+    {
+      "id": "synth",
+      "label": "Synth (analog)",
+      "path": "misc/Analog_Freeze_Freeze_2024-01-25_101950-1.wav"
+    }
+  ],
+  "conditions": [
+    {
+      "id": "C",
+      "label": "multi-loop",
+      "engine": "C",
+      "instrument": {
+        "continuation": "multi-loop",
+        "macros": {
+          "life": 0,
+          "motion": 0,
+          "space": 0.0,
+          "reimagined": 0.0,
+          "character": 0.5
+        }
+      }
+    },
+    {
+      "id": "D",
+      "label": "multi-loop + movement",
+      "engine": "C",
+      "instrument": {
+        "continuation": "multi-loop-movement",
+        "macros": {
+          "life": 0,
+          "motion": 0.35,
+          "space": 0.0,
+          "reimagined": 0.0,
+          "character": 0.5
+        }
+      }
+    }
+  ]
+}

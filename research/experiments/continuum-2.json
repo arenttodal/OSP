@@ -1,0 +1,187 @@
+{
+  "schemaVersion": 1,
+  "name": "continuum-2",
+  "tab": "Reimagined 2",
+  "title": "Original \u2194 Reimagined, round 2",
+  "heading": "Is every point between Original and Reimagined useful?",
+  "intro": [
+    "Round 2. In round 1 you could not hear the difference, so the far end now does much more: a slowly moving doubling, stronger sympathetic resonance and a halo a fifth above the sound. Each group is the same phrase at 0, 25, 50, 75 and 100 %, in a random order.",
+    "Rate each take on its own: is it beautiful, is it still recognisably your sound, would you use it?"
+  ],
+  "scales": [
+    {
+      "key": "useful",
+      "label": "Useful",
+      "low": "would not use",
+      "high": "would use"
+    },
+    {
+      "key": "identity",
+      "label": "Identity",
+      "low": "source lost",
+      "high": "clearly my sound"
+    },
+    {
+      "key": "beauty",
+      "label": "Beauty",
+      "low": "unpleasant",
+      "high": "beautiful"
+    }
+  ],
+  "groupLabel": "Arpeggio, then a held chord",
+  "bestLabel": "Favourite",
+  "bestHint": "your favourite setting",
+  "corpusRoot": "research/corpus",
+  "seed": 109,
+  "outputSampleRate": 44100,
+  "listeningRmsDbfs": -20,
+  "format": "flac",
+  "trimToCommon": true,
+  "maxSeconds": 14,
+  "sequence": {
+    "notes": [
+      {
+        "offset": 0,
+        "start": 0.0,
+        "duration": 0.45,
+        "velocity": 96
+      },
+      {
+        "offset": 4,
+        "start": 0.5,
+        "duration": 0.45,
+        "velocity": 96
+      },
+      {
+        "offset": 7,
+        "start": 1.0,
+        "duration": 0.45,
+        "velocity": 96
+      },
+      {
+        "offset": 12,
+        "start": 1.5,
+        "duration": 0.45,
+        "velocity": 96
+      },
+      {
+        "offset": 0,
+        "start": 2.0,
+        "duration": 4.5,
+        "velocity": 88
+      },
+      {
+        "offset": 7,
+        "start": 2.0,
+        "duration": 4.5,
+        "velocity": 88
+      },
+      {
+        "offset": 16,
+        "start": 2.0,
+        "duration": 4.5,
+        "velocity": 88
+      }
+    ]
+  },
+  "tail": 6,
+  "sources": [
+    {
+      "id": "organ",
+      "label": "Organ (Trampeorgel)",
+      "path": "trampeorgel/Trampeorgel_Bounce_2026-05-15_130536.wav"
+    },
+    {
+      "id": "violin",
+      "label": "Violin",
+      "path": "violin/Ga_te_X_Arn_-_Mi_Jord_-__V1_-__Fiolin_1_Freeze_2025-05-31_150855.wav"
+    },
+    {
+      "id": "bowed",
+      "label": "Nyckelharpa",
+      "path": "nyckelharpa/Nyckelharpa_Bounce_2026-03-31_203133.wav"
+    },
+    {
+      "id": "pluck",
+      "label": "Pluck",
+      "path": "plucks/Plucks_Bounce_Bounce_2026-06-21_131926-3.wav"
+    }
+  ],
+  "conditions": [
+    {
+      "id": "R0",
+      "label": "Reimagined 0%",
+      "engine": "C",
+      "instrument": {
+        "macros": {
+          "reimagined": 0.0,
+          "life": 0.35,
+          "motion": 0.35,
+          "space": 0.2,
+          "character": 0.5,
+          "dynamics": 0.5
+        }
+      }
+    },
+    {
+      "id": "R25",
+      "label": "Reimagined 25%",
+      "engine": "C",
+      "instrument": {
+        "macros": {
+          "reimagined": 0.25,
+          "life": 0.35,
+          "motion": 0.35,
+          "space": 0.2,
+          "character": 0.5,
+          "dynamics": 0.5
+        }
+      }
+    },
+    {
+      "id": "R50",
+      "label": "Reimagined 50%",
+      "engine": "C",
+      "instrument": {
+        "macros": {
+          "reimagined": 0.5,
+          "life": 0.35,
+          "motion": 0.35,
+          "space": 0.2,
+          "character": 0.5,
+          "dynamics": 0.5
+        }
+      }
+    },
+    {
+      "id": "R75",
+      "label": "Reimagined 75%",
+      "engine": "C",
+      "instrument": {
+        "macros": {
+          "reimagined": 0.75,
+          "life": 0.35,
+          "motion": 0.35,
+          "space": 0.2,
+          "character": 0.5,
+          "dynamics": 0.5
+        }
+      }
+    },
+    {
+      "id": "R100",
+      "label": "Reimagined 100%",
+      "engine": "C",
+      "instrument": {
+        "macros": {
+          "reimagined": 1.0,
+          "life": 0.35,
+          "motion": 0.35,
+          "space": 0.2,
+          "character": 0.5,
+          "dynamics": 0.5
+        }
+      }
+    }
+  ]
+}

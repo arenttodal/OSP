@@ -1,0 +1,335 @@
+{
+  "schemaVersion": 1,
+  "name": "multisample-2",
+  "tab": "Multi-sample 2",
+  "title": "Multi-sample, round 2: sets levelled by how notes start",
+  "heading": "Does dropping the whole set make a better instrument?",
+  "intro": [
+    "Round 2. In round 1 the plucks set jumped in level between pitch groups (up to 19 dB); that is fixed, and round-robin takes keep their natural differences. Each group is the same phrase from one file and from the whole set, in a random order."
+  ],
+  "scales": [
+    {
+      "key": "real",
+      "label": "Real",
+      "low": "transposed copy",
+      "high": "the real instrument"
+    },
+    {
+      "key": "even",
+      "label": "Even",
+      "low": "jumps between notes",
+      "high": "consistent"
+    },
+    {
+      "key": "beauty",
+      "label": "Beauty",
+      "low": "unpleasant",
+      "high": "want to play"
+    }
+  ],
+  "groupLabel": "Phrase across the range, then fast repeats",
+  "bestLabel": "Best of these",
+  "bestHint": "the instrument you would rather play",
+  "corpusRoot": "research/corpus",
+  "seed": 111,
+  "outputSampleRate": 44100,
+  "listeningRmsDbfs": -20,
+  "format": "flac",
+  "trimToCommon": true,
+  "maxSeconds": 10,
+  "sequence": {
+    "notes": []
+  },
+  "tail": 3,
+  "sources": [
+    {
+      "id": "plucks",
+      "label": "Plucks set (16 files, 3+ pitches)",
+      "path": "plucks/Plucks_Bounce_Bounce_2026-06-21_131926-3.wav",
+      "paths": [
+        "plucks/Plucks_Bounce_Bounce_2026-06-21_131923-1.wav",
+        "plucks/Plucks_Bounce_Bounce_2026-06-21_131923-2.wav",
+        "plucks/Plucks_Bounce_Bounce_2026-06-21_131923-3.wav",
+        "plucks/Plucks_Bounce_Bounce_2026-06-21_131923-4.wav",
+        "plucks/Plucks_Bounce_Bounce_2026-06-21_131923.wav",
+        "plucks/Plucks_Bounce_Bounce_2026-06-21_131925-4.wav",
+        "plucks/Plucks_Bounce_Bounce_2026-06-21_131925-5.wav",
+        "plucks/Plucks_Bounce_Bounce_2026-06-21_131925-6.wav",
+        "plucks/Plucks_Bounce_Bounce_2026-06-21_131926-2.wav",
+        "plucks/Plucks_Bounce_Bounce_2026-06-21_131926-3.wav",
+        "plucks/Plucks_Bounce_Bounce_2026-06-21_131926-4.wav",
+        "plucks/Plucks_Bounce_Bounce_2026-06-21_131926.wav",
+        "plucks/Plucks_Bounce_Bounce_2026-06-21_131927-1.wav",
+        "plucks/Plucks_Bounce_Bounce_2026-06-21_131927-3.wav",
+        "plucks/Plucks_Bounce_Bounce_2026-06-21_131927-4.wav",
+        "plucks/Plucks_Bounce_Bounce_2026-06-21_131927-5.wav"
+      ],
+      "sequence": {
+        "notes": [
+          {
+            "offset": -22,
+            "start": 0.0,
+            "duration": 0.38,
+            "velocity": 90
+          },
+          {
+            "offset": -17,
+            "start": 0.42,
+            "duration": 0.38,
+            "velocity": 90
+          },
+          {
+            "offset": -12,
+            "start": 0.84,
+            "duration": 0.38,
+            "velocity": 90
+          },
+          {
+            "offset": -7,
+            "start": 1.26,
+            "duration": 0.38,
+            "velocity": 90
+          },
+          {
+            "offset": -5,
+            "start": 1.68,
+            "duration": 0.38,
+            "velocity": 90
+          },
+          {
+            "offset": 0,
+            "start": 2.1,
+            "duration": 0.38,
+            "velocity": 90
+          },
+          {
+            "offset": 0,
+            "start": 2.52,
+            "duration": 0.38,
+            "velocity": 90
+          },
+          {
+            "offset": 0,
+            "start": 2.94,
+            "duration": 0.38,
+            "velocity": 90
+          },
+          {
+            "offset": 5,
+            "start": 3.36,
+            "duration": 0.38,
+            "velocity": 90
+          },
+          {
+            "offset": 7,
+            "start": 3.78,
+            "duration": 0.38,
+            "velocity": 90
+          },
+          {
+            "offset": 5,
+            "start": 4.2,
+            "duration": 0.38,
+            "velocity": 90
+          },
+          {
+            "offset": 0,
+            "start": 4.62,
+            "duration": 0.38,
+            "velocity": 90
+          },
+          {
+            "offset": 0,
+            "start": 5.34,
+            "duration": 0.15,
+            "velocity": 100
+          },
+          {
+            "offset": 0,
+            "start": 5.52,
+            "duration": 0.15,
+            "velocity": 100
+          },
+          {
+            "offset": 0,
+            "start": 5.7,
+            "duration": 0.15,
+            "velocity": 100
+          },
+          {
+            "offset": 0,
+            "start": 5.88,
+            "duration": 0.15,
+            "velocity": 100
+          },
+          {
+            "offset": 0,
+            "start": 6.06,
+            "duration": 0.15,
+            "velocity": 100
+          },
+          {
+            "offset": 0,
+            "start": 6.24,
+            "duration": 0.15,
+            "velocity": 100
+          }
+        ]
+      }
+    },
+    {
+      "id": "tagel",
+      "label": "Tagel set (14 files, 3 pitches)",
+      "path": "tagel-puck/Tagel_Puck_Bounce_2026-06-21_144439-2.wav",
+      "paths": [
+        "tagel-puck/Tagel_Puck_Bounce_2026-06-21_144438-1.wav",
+        "tagel-puck/Tagel_Puck_Bounce_2026-06-21_144438-2.wav",
+        "tagel-puck/Tagel_Puck_Bounce_2026-06-21_144438-3.wav",
+        "tagel-puck/Tagel_Puck_Bounce_2026-06-21_144438.wav",
+        "tagel-puck/Tagel_Puck_Bounce_2026-06-21_144439-1.wav",
+        "tagel-puck/Tagel_Puck_Bounce_2026-06-21_144439-2.wav",
+        "tagel-puck/Tagel_Puck_Bounce_2026-06-21_144439-3.wav",
+        "tagel-puck/Tagel_Puck_Bounce_2026-06-21_144439-4.wav",
+        "tagel-puck/Tagel_Puck_Bounce_2026-06-21_144439-5.wav",
+        "tagel-puck/Tagel_Puck_Bounce_2026-06-21_144439-6.wav",
+        "tagel-puck/Tagel_Puck_Bounce_2026-06-21_144439-7.wav",
+        "tagel-puck/Tagel_Puck_Bounce_2026-06-21_144439-8.wav",
+        "tagel-puck/Tagel_Puck_Bounce_2026-06-21_144439.wav",
+        "tagel-puck/Tagel_Puck_Bounce_2026-06-21_144440.wav"
+      ],
+      "sequence": {
+        "notes": [
+          {
+            "offset": -7,
+            "start": 0.0,
+            "duration": 0.38,
+            "velocity": 90
+          },
+          {
+            "offset": -5,
+            "start": 0.42,
+            "duration": 0.38,
+            "velocity": 90
+          },
+          {
+            "offset": -2,
+            "start": 0.84,
+            "duration": 0.38,
+            "velocity": 90
+          },
+          {
+            "offset": 0,
+            "start": 1.26,
+            "duration": 0.38,
+            "velocity": 90
+          },
+          {
+            "offset": 0,
+            "start": 1.68,
+            "duration": 0.38,
+            "velocity": 90
+          },
+          {
+            "offset": 0,
+            "start": 2.1,
+            "duration": 0.38,
+            "velocity": 90
+          },
+          {
+            "offset": 3,
+            "start": 2.52,
+            "duration": 0.38,
+            "velocity": 90
+          },
+          {
+            "offset": 5,
+            "start": 2.94,
+            "duration": 0.38,
+            "velocity": 90
+          },
+          {
+            "offset": 5,
+            "start": 3.36,
+            "duration": 0.38,
+            "velocity": 90
+          },
+          {
+            "offset": 0,
+            "start": 3.78,
+            "duration": 0.38,
+            "velocity": 90
+          },
+          {
+            "offset": -7,
+            "start": 4.2,
+            "duration": 0.38,
+            "velocity": 90
+          },
+          {
+            "offset": 0,
+            "start": 4.92,
+            "duration": 0.15,
+            "velocity": 100
+          },
+          {
+            "offset": 0,
+            "start": 5.1,
+            "duration": 0.15,
+            "velocity": 100
+          },
+          {
+            "offset": 0,
+            "start": 5.28,
+            "duration": 0.15,
+            "velocity": 100
+          },
+          {
+            "offset": 0,
+            "start": 5.46,
+            "duration": 0.15,
+            "velocity": 100
+          },
+          {
+            "offset": 0,
+            "start": 5.64,
+            "duration": 0.15,
+            "velocity": 100
+          },
+          {
+            "offset": 0,
+            "start": 5.82,
+            "duration": 0.15,
+            "velocity": 100
+          }
+        ]
+      }
+    }
+  ],
+  "conditions": [
+    {
+      "id": "B",
+      "label": "single file, OSP engine",
+      "engine": "C",
+      "instrument": {
+        "macros": {
+          "life": 0.35,
+          "space": 0.0,
+          "reimagined": 0.0
+        }
+      }
+    },
+    {
+      "id": "C",
+      "label": "whole set, OSP engine",
+      "engine": "C",
+      "useSet": true,
+      "instrument": {
+        "macros": {
+          "life": 0.35,
+          "space": 0.0,
+          "reimagined": 0.0
+        }
+      }
+    }
+  ]
+}

@@ -59,7 +59,7 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [x] Release grafting into the recording's own ending
 - [x] Experiment 2 (A naive loop / B best loop / C multi-loop / D + movement), 60 s holds, 5 sources
 - [x] InstrumentEngine ("engine C") in the plugin; staged model (playable -> sustain -> anchors)
-- [ ] Listening verdict (lab tab "Sustain") — exit condition: 60 s holds without an obvious loop
+- [x] Listening verdict round 1: loop mostly inaudible (multi-loop 4.0–5.0 on non-vocal sources); movement now follows the source, re-test "Sustain 2"
 
 ## Milestone checklist — Phase 4: performance MVP
 
@@ -71,7 +71,7 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [x] LIFE macro (0 identical, 0.5 realistic, 1 reinterpreted)
 - [x] Calibration against the corpus' real repeated takes (Tagel, plucks; violin RR set has only 2 takes)
 - [x] Experiment 3 (A identical / B independent / C LIFE 50 % / D LIFE 80 %), steady + fast repeats
-- [ ] Listening verdict (lab tab "Repetition") — exit condition: engine preferred over identical repeats
+- [x] Listening verdict round 1: **passed**, LIFE 50/80 % beat identical repeats on every non-vocal source (default now 50 %)
 
 ## Milestone checklist — Phase 5: dynamic synthesis
 
@@ -79,7 +79,7 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [x] velocity -> transient, spectral tilt (high shelf), attack bite (decaying shelf), body, pitch transient, damping, soft attack
 - [x] DYNAMICS macro (0 = velocity is volume only; 0.5 calibrated; 1 = twice)
 - [x] Experiment 4 (A gain / B gain + filter / C model 50 % / D model 100 %), 5 sources
-- [ ] Listening verdict (lab tab "Dynamics") — exit condition: crescendo clearly more than gain
+- [~] Listening verdict round 1: plucks yes (model 100 % best), sustained sources preferred gain only; source-aware strength now, re-test "Dynamics 2"
 - Known limit: near-sinusoidal sources (some vocals, soft plucks) have no upper harmonics to
   brighten; velocity then acts mainly on the attack. Harmonic generation belongs to Reimagined.
 
@@ -93,15 +93,14 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [x] SPACE: width, decorrelation for narrow sources, FDN ambience, loudness trim
 - [x] Macro smoothing (no clicks when automating)
 - [x] Experiment 5 (Reimagined 0/25/50/75/100 %, 4 sources)
-- [ ] Listening verdict (lab tab "Original ↔ Reimagined") — exit: useful sounds across the range
+- [ ] Listening verdict round 1: **failed**, the range was inaudible; far end rebuilt, re-test "Reimagined 2"
 - [x] Transient/body separation (spec §19): offline HPSS of the onset region
   (`analysis/transient`); from about a fifth away the separated transient plays at its own
   speed, aligned on its peak, while its transposed copy is removed from the body.
   Synthetic picked tone two octaves down: pick 16 ms -> 4.5 ms (original 4.5 ms).
-  On by default in engine C (`"transientPreservation"` in render configs).
+  Lab round 1: lost on pluck, bowed and violin, so it is **off by default** (`"transientPreservation"` in render configs).
 - [x] Experiment 7 (`transients-1.json`: pluck, Tagel, nyckelharpa, violin at ±12/±24, off vs on)
-- [ ] Listening verdict (lab tab "Transients"). Most corpus plucks carry little broadband
-  attack (transient share 0.3–2 %, one pluck 15 %), so expect subtle differences.
+- [x] Listening verdict round 1: lost on 3 of 4 sources, off by default
 
 ## Milestone checklist — Phase 7: multi-sample intelligence
 
@@ -114,7 +113,7 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [x] Multi-velocity learning (spec §35): per-layer-step loudness, centroid and attack fitted over groups with several layers; velocities between layers move half-way towards the neighbouring layer, so a layer boundary no longer jumps (synthetic soft/hard pair: 13.4 dB / 12 st step -> 1.9 dB / 1.3 st at the boundary). Corpus: plucks 9.6 dB + 2.0 st per step, Tagel 7.3 dB + 0.9 st, organ 11.7 dB + 4.9 st (its "layers" are mostly different stops). `--register-test` prints it
 - [x] Samples inspector (role, layer, root corrections; rebuild without re-analysis; recall)
 - [x] Experiment 6 (single file plain / single file engine / whole set)
-- [ ] Listening verdict (lab tab "Multi-sample") — exit: a small related set is automatically better
+- [~] Listening verdict round 1: Tagel set **passed** (4.33 vs 2.67), plucks set failed on level jumps, fixed, re-test "Multi-sample 2"
 - Known limits: sets mixing different organ stops are grouped by pitch only (timbre clustering
   is not done); register anchors are not built for sets.
 
@@ -153,17 +152,15 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 
 ## IN PROGRESS
 
-- Listening verdicts for Phases 3–7 (one page: the listening lab, see docs/morning-checklist.md).
+- Lab round 2 (Reimagined 2, Sustain 2, Dynamics 2, Multi-sample 2).
 - DAW/host validation on a Mac.
 
 ## NEXT
 
-- Score the lab ratings; tune or revert per experiment (keep the simplest winner).
-- Score lab tab "Transients"; if transient preservation loses or ties, switch it off by
-  default (simplest wins). Spectral/stochastic continuation only if multi-loop loses.
-- Score lab tab "Pick & velocity" (experiment 8, `dynamics-2.json`): `transientMixing`
-  (velocity and LIFE move the separated transient instead of the whole attack's gain,
-  for sources whose transient share >= 2 %) is built but OFF by default until it wins.
+- Lab round 1 scored and acted on (docs/reports/lab-1.md). Round 2 in the lab: Reimagined 2,
+  Sustain 2, Dynamics 2, Multi-sample 2.
+- Transient preservation and transient mixing: both kept as options, off by default
+  (lab round 1: preservation lost on 3 of 4 sources, mixing split 1–1).
 - Timbre clustering for sets that mix organ stops (waits on morning question 2).
 - Real-Mac worst-case callback timing. Reads above x4 (more than about +2 octaves) still
   evaluate the stretched kernel; mip-mapped sources would cap them if that matters.

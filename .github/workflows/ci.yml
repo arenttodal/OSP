@@ -30,7 +30,8 @@ jobs:
         run: brew install ninja
 
       - name: Configure
-        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DOSP_BUILD_PLUGIN=${{ matrix.plugin }}
+        # macOS builds universal binaries (Apple Silicon + Intel) so the test build runs on any Mac.
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DOSP_BUILD_PLUGIN=${{ matrix.plugin }} ${{ runner.os == 'macOS' && '"-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"' || '' }}
 
       - name: Build
         run: cmake --build build
@@ -57,6 +58,25 @@ jobs:
           cp -R build/apps/plugin/OSP_Plugin_artefacts/Release/AU/OSP.component ~/Library/Audio/Plug-Ins/Components/
           killall -9 AudioComponentRegistrar || true
           auval -v aumu Osp1 Ospx
+
+      - name: Package macOS test build
+        if: runner.os == 'macOS'
+        run: |
+          out=OSP-macOS-test
+          mkdir -p $out
+          art=build/apps/plugin/OSP_Plugin_artefacts/Release
+          cp -R $art/AU/OSP.component $art/VST3/OSP.vst3 $out/
+          if [ -d "$art/Standalone/OSP.app" ]; then cp -R "$art/Standalone/OSP.app" $out/; fi
+          cp packaging/macos-test/install.command packaging/macos-test/README.txt $out/
+          chmod +x $out/install.command
+          lipo -info $out/OSP.component/Contents/MacOS/OSP
+          ditto -c -k --keepParent $out OSP-macOS-test.zip
+
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'macOS'
+        with:
+          name: OSP-macOS-test
+          path: OSP-macOS-test.zip
 
       - uses: actions/upload-artifact@v4
         if: always()

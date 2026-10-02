@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "name": "dynamics-3",
+  "tab": "Dynamics 2",
+  "title": "Dynamics, round 2: velocity shaped by the kind of sound",
+  "heading": "Does a crescendo sound like playing harder, or just turning it up?",
+  "intro": [
+    "Round 2. In round 1 the bowed and blown sources sounded best with velocity as level only, and the pluck with the full dynamic model. The model's strength now follows the source. Each group is six notes from velocity 20 to 127; one take is level only, the other the new default, in a random order.",
+    "Listen for which crescendo sounds like playing harder."
+  ],
+  "scales": [
+    {
+      "key": "dynamic",
+      "label": "Dynamic",
+      "low": "only volume",
+      "high": "played harder"
+    },
+    {
+      "key": "natural",
+      "label": "Natural",
+      "low": "unnatural",
+      "high": "believable"
+    },
+    {
+      "key": "beauty",
+      "label": "Beauty",
+      "low": "unpleasant",
+      "high": "want to play"
+    }
+  ],
+  "groupLabel": "Velocity 20, 40, 60, 80, 100, 127",
+  "bestLabel": "Best of these",
+  "bestHint": "the crescendo you would rather play",
+  "corpusRoot": "research/corpus",
+  "seed": 105,
+  "outputSampleRate": 44100,
+  "listeningRmsDbfs": -20,
+  "format": "flac",
+  "trimToCommon": true,
+  "maxSeconds": 12,
+  "sequence": {
+    "notes": [
+      {
+        "offset": 0,
+        "start": 0.0,
+        "duration": 1.2,
+        "velocity": 20
+      },
+      {
+        "offset": 0,
+        "start": 1.5,
+        "duration": 1.2,
+        "velocity": 40
+      },
+      {
+        "offset": 0,
+        "start": 3.0,
+        "duration": 1.2,
+        "velocity": 60
+      },
+      {
+        "offset": 0,
+        "start": 4.5,
+        "duration": 1.2,
+        "velocity": 80
+      },
+      {
+        "offset": 0,
+        "start": 6.0,
+        "duration": 1.2,
+        "velocity": 100
+      },
+      {
+        "offset": 0,
+        "start": 7.5,
+        "duration": 1.2,
+        "velocity": 127
+      }
+    ]
+  },
+  "tail": 3,
+  "sources": [
+    {
+      "id": "violin",
+      "label": "Violin",
+      "path": "violin/Ga_te_X_Arn_-_Mi_Jord_-__V1_-__Fiolin_1_Freeze_2025-05-31_150855.wav"
+    },
+    {
+      "id": "sax",
+      "label": "Saxophone",
+      "path": "misc/Arent_Second_Take_sax__2024-02-06_220708-3.wav"
+    },
+    {
+      "id": "bowed",
+      "label": "Nyckelharpa",
+      "path": "nyckelharpa/Nyckelharpa_Bounce_2026-03-31_203134.wav"
+    },
+    {
+      "id": "pluck",
+      "label": "Pluck",
+      "path": "plucks/Plucks_Bounce_Bounce_2026-06-21_131925-4.wav"
+    }
+  ],
+  "conditions": [
+    {
+      "id": "A",
+      "label": "gain only",
+      "engine": "C",
+      "instrument": {
+        "dynamicsMode": "gain",
+        "macros": {
+          "life": 0,
+          "motion": 0,
+          "dynamics": 0.5,
+          "space": 0.0,
+          "reimagined": 0.0,
+          "character": 0.5
+        },
+        "continuation": "multi-loop"
+      }
+    },
+    {
+      "id": "C",
+      "label": "source-aware dynamic model (new default)",
+      "engine": "C",
+      "instrument": {
+        "dynamicsMode": "full",
+        "macros": {
+          "life": 0,
+          "motion": 0,
+          "dynamics": 0.5,
+          "space": 0.0,
+          "reimagined": 0.0,
+          "character": 0.5
+        },
+        "continuation": "multi-loop"
+      }
+    }
+  ]
+}

@@ -3,29 +3,19 @@
 Everything I need from you: listening tests, checks on your Mac, and decisions. The
 summary of the night is in `docs/reports/overnight-phases-2-8.md`.
 
-## 1. Listening tests (about 45–60 minutes in total)
+## 1. Listening tests
 
-All of them are on one page, **the listening lab**:
-https://claude.ai/artifact/SBtjwht3czzVXQbzpmeWUR.
+**Round 1 is done**; the results and what changed are in `docs/reports/lab-1.md`.
 
-The clips were rendered before the last refinements of the night (except the
-Transients tab). Transient preservation only changes notes far from the recorded pitch;
-multi-velocity learning only changes the whole-set takes in the Multi-sample tab, and
-only between velocity layers. If the lab sounds good, the current engine will too.
+**Round 2** is on the same page (https://claude.ai/artifact/SBtjwht3czzVXQbzpmeWUR),
+about 20 minutes. Each tab re-tests one change:
 
-There is one tab per experiment. The takes in each group are blind and in a random
-order. Rate each take (1–5 on three scales), pick a best and, if you like, write a note.
-Everything saves as you go and I read it from the page. Headphones help.
-
-| Tab | Phase / exit test | What to listen for | What the measurements predict |
-|---|---|---|---|
-| **Sustain** | 3: 60 s holds without an obvious loop | repeats, bumps, a vibrato cycling identically, the moment the recording ends | single loops repeat strongly (score 0.7–0.9) and multi-loop barely does (0.1–0.2); no clicks found |
-| **Repetition** | 4: repeated notes preferred over identical retriggers | machine-gun attacks vs variation that sounds random | LIFE 50 % ≈ ⅔ of a real player's spread, 80 % ≈ all of it; baseline B varies pitch and level but never tone |
-| **Dynamics** | 5: a crescendo is more than gain | do soft notes sound softly played, loud notes hard? | +3.5–6 semitones of brightness on harmonic sources; on pure-tone sources mostly the attack changes |
-| **Original ↔ Reimagined** | 6: useful sounds across the whole range | rate each of the 5 settings on its own | — |
-| **Multi-sample** | 7: a dropped set is automatically better | low and high notes, repeated notes | the register model is closer to real recordings for plucks and organ |
-| **Pick & velocity** | 5 / §34: velocity changes the pick, not just the loudness | which crescendo sounds like digging in; any detached or clicky attacks | from velocity 100 to 127 the pick rises 17 dB relative to the tone with mixing, against 8 dB now. Off by default until you prefer it |
-| **Transients** | §19: a pluck moved an octave keeps its real pick | the start of each note: real snap, or a thud (down) / chirp (up)? Any doubled or detached attack? | clear on synthetic picks; subtle on most of your plucks, which have little broadband attack. The bowed groups check that nothing gets worse |
+| Tab | What changed since round 1 | Listen for |
+|---|---|---|
+| **Reimagined 2** | the far end now does much more: a slowly moving doubling, stronger resonance, a halo a fifth above | is there now a useful range from 0 to 100 %, and is the source still recognisable at 100 %? |
+| **Sustain 2** | movement follows how much the recording moves by itself | multi-loop with and without movement: more alive, or an unwanted wobble? |
+| **Dynamics 2** | the dynamic model's strength follows the kind of sound | level only vs the new default: which crescendo sounds like playing harder? |
+| **Multi-sample 2** | sets are levelled by how notes start (the plucks set jumped up to 19 dB) | one file vs the whole set |
 
 ## 2. Decisions I made overnight (please confirm or overrule)
 
@@ -35,7 +25,7 @@ Everything saves as you go and I read it from the page. Headphones help.
    sources? You picked B in all four organ groups.
 2. **Release.** When the recording has a natural ending, a Release of 0.2 s or more
    lets that ending play instead of a fade. Shorter settings fade as before.
-3. **Default macros.** LIFE 35 %, DYNAMICS 50 %, CHARACTER 50 %, MOTION 35 %,
+3. **Default macros.** LIFE 50 % (raised after round 1), DYNAMICS 50 %, CHARACTER 50 %, MOTION 35 %,
    SPACE 20 %, Reimagined 20 %. Sustain defaults to *Endless*. Too much, or too little,
    out of the box?
 4. **Old sessions.** Projects saved with the Phase 1 plugin open with neutral engine
@@ -46,10 +36,8 @@ Everything saves as you go and I read it from the page. Headphones help.
    - CC74 sets brightness.
    - CC 20–25 control the six macros.
    - MPE bend range is ±48 semitones.
-6. **Transient preservation is on by default** in the engine. From about a fifth away
-   from the recorded note, the pick, click or strike keeps its real speed. The
-   Transients tab decides whether it stays on: if you hear no improvement, or anything
-   worse, I switch it off, because the simpler engine wins ties.
+6. **Transient preservation is now off by default.** It lost in round 1 on the pluck,
+   bowed and violin. It stays in the code as an option.
 7. **Recordings over a minute skip Natural pitch.** Natural keeps four extra copies of
    the sound, so with long recordings it plays as Tape, and the status line says so.
    This halves memory for long files.
@@ -59,8 +47,10 @@ Everything saves as you go and I read it from the page. Headphones help.
 
 ## 3. Checks on your Mac
 
-- [ ] Install the AU/VST3 from CI (Actions → latest run → `osp-macos-14` artifact), or
-  build with `cmake -B build-plugin -G Ninja -DOSP_BUILD_PLUGIN=ON && cmake --build build-plugin`.
+- [ ] Install the test build: on the latest CI run, download the **OSP-macOS-test**
+  artifact, then unzip it and the `OSP-macOS-test.zip` inside it. Double-click
+  `install.command` (if macOS refuses, right-click → Open). It is a universal build, for
+  Apple Silicon and Intel, and is not signed yet.
 - [ ] **Logic, Ableton, Reaper:**
   - Drop a sample, play, save, reopen: it should sound identical.
   - Bounce twice: the two bounces should be identical.
