@@ -12,6 +12,7 @@
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 namespace osp
 {
@@ -37,7 +38,8 @@ enum class DynamicsMode
 
 struct EngineSettings
 {
-    static constexpr int maxPolyphony = 64;
+    static constexpr int maxPolyphony = 64;   ///< per layer
+    static constexpr int layers = 2;          ///< A/B source layers
 
     int polyphony = 24;
     AdsrSettings adsr { 0.002, 0.0, 1.0, 0.35 };
@@ -55,12 +57,23 @@ struct EngineSettings
     DynamicsMode dynamicsMode = DynamicsMode::full;
     Macros macros;
     Shaping shaping;                     ///< what each macro does (popups); see engine/Shaping.h
+    double blend = 0.0;                  ///< A/B: 0 = only A, 1 = only B (equal-power)
+    std::array<SourceMode, layers> sourceMode { SourceMode::oneShot, SourceMode::oneShot };
+    std::array<GranularParams, layers> granular {};
 };
 
 /**
     The OSP instrument engine ("C — current engine" in every listening test). Plays an
     immutable InstrumentModel with continuation, release grafting and per-note
     performance shapes. Baselines A and B stay in BaselineSampler.
+
+    Two source layers (A/B): each holds its own model or set, root shift and source mode
+    (One Shot reads the recording through; Granular plays grains around POS). Every note
+    starts a voice on each loaded layer; the layers are rendered apart, blended with an
+    equal-power crossfade and then share one post stage (Reimagined resonance, MOVEMENT,
+    SPACE). The per-voice macro stages (LIFE, DYNAMICS, CHARACTER) use the same settings
+    on both layers. With only layer A loaded and the blend at A, output is exactly the
+    single-layer engine's.
 
     Threading: prepare() allocates (call off the audio thread). setModel(), the note
     functions, runtime setters and render() are real-time safe.
@@ -73,10 +86,11 @@ public:
     void prepare (double outputSampleRate, int maximumBlockSize, const EngineSettings& settings);
 
     /** The model must stay alive while any voice may use it (see isModelInUse). */
-    void setModel (const InstrumentModel* model) noexcept
+    void setModel (const InstrumentModel* model, int layer = 0) noexcept
     {
-        currentModel = model;
-        currentSet = nullptr;
+        const auto l = layerIndex (layer);
+        layerModel[l] = model;
+        layerSet[l] = nullptr;
     }
 
     /**
@@ -84,14 +98,29 @@ public:
         velocity layer and a round-robin take. The set (and every member model) must stay
         alive while voices may use it (see isSetInUse).
     */
-    void setInstrumentSet (const InstrumentSet* set) noexcept
+    void setInstrumentSet (const InstrumentSet* set, int layer = 0) noexcept
     {
-        currentSet = set;
-        currentModel = set != nullptr && set->isValid() ? set->members[static_cast<std::size_t> (set->primary)].model.get() : nullptr;
+        const auto l = layerIndex (layer);
+        layerSet[l] = set;
+        layerModel[l] = set != nullptr && set->isValid() ? set->members[static_cast<std::size_t> (set->primary)].model.get() : nullptr;
     }
     bool isSetInUse (const InstrumentSet* set) const noexcept;
     void killVoicesUsing (const InstrumentSet* set) noexcept;
-    const InstrumentModel* model() const noexcept { return currentModel; }
+    const InstrumentModel* model (int layer = 0) const noexcept { return layerModel[layerIndex (layer)]; }
+
+    // A/B layers
+    /** 0 = only A, 1 = only B; equal-power, smoothed over about 20 ms. */
+    void setBlend (double blend) noexcept { config.blend = std::clamp (blend, 0.0, 1.0); }
+    /** A layer's own pitch shift (its root correction), on top of setPitchOffsetSemitones. */
+    void setLayerPitchOffsetSemitones (int layer, double semitones) noexcept;
+    /** The source mode applies to notes started afterwards; granular settings apply live. */
+    void setSourceMode (int layer, SourceMode mode) noexcept { config.sourceMode[layerIndex (layer)] = mode; }
+    void setGranular (int layer, const GranularParams& params) noexcept
+    {
+        config.granular[layerIndex (layer)] = params;
+        liveGranular[layerIndex (layer)] = params;
+    }
+    int activeVoiceCount (int layer) const noexcept;
 
     static int requiredSourcePaddingFor (int interpolationZeroCrossings) noexcept
     {
@@ -170,7 +199,8 @@ public:
     /** The shape a note would get (pure apart from the performance memory it advances). */
     NoteShape shapeFor (int note, int velocity, std::uint64_t eventIndex) noexcept
     {
-        return shapeFor (currentModel, note, velocity, eventIndex, 100.0, 0.0);
+        context = 0;
+        return shapeFor (layerModel[0], note, velocity, eventIndex, 100.0, 0.0);
     }
     /** `setMember`: the model is one recording of a set and `referenceVelocity` is the
         velocity at which its own recorded loudness belongs (loudness-anchored), so every
@@ -179,30 +209,39 @@ public:
     NoteShape shapeFor (const InstrumentModel* model, int note, int velocity, std::uint64_t eventIndex, double referenceVelocity,
                         double registerBrightnessDb, bool setMember = false, bool layered = false) noexcept;
 
-    /** Which member of the current set a note would use (no state change). -1 without a set. */
-    int memberFor (int note, int velocity, std::uint64_t eventIndex) const noexcept;
+    /** Which member of a layer's set a note would use (no state change). -1 without a set. */
+    int memberFor (int note, int velocity, std::uint64_t eventIndex, int layer = 0) const noexcept;
 
 private:
     static constexpr int tailSlots = 16;
-    static constexpr int totalSlots = EngineSettings::maxPolyphony + tailSlots;
+    static constexpr int totalSlots = EngineSettings::layers * EngineSettings::maxPolyphony + tailSlots;
 
+    static std::size_t layerIndex (int layer) noexcept { return static_cast<std::size_t> (std::clamp (layer, 0, EngineSettings::layers - 1)); }
+    void noteOnLayer (int layer, int note, int velocity, int channel, std::uint64_t eventIndex) noexcept;
     InstrumentVoice* findFreeSlot() noexcept;
-    InstrumentVoice* chooseVictim() noexcept;
-    int countSoundingVoices() const noexcept;
+    InstrumentVoice* chooseVictim (int layer) noexcept;
+    int countSoundingVoices (int layer) const noexcept;
 
     EngineSettings config;
     double sampleRate = 48000.0;
     ShapingState liveShaping;            ///< read by every voice at control rate
     std::unique_ptr<SincInterpolator> interpolator;
     std::array<InstrumentVoice, totalSlots> voices;
-    const InstrumentModel* currentModel = nullptr;
-    const InstrumentSet* currentSet = nullptr;
-    std::array<std::int8_t, 512> lastTake {};  ///< last round-robin take per (group, layer)
+    std::array<const InstrumentModel*, EngineSettings::layers> layerModel {};
+    std::array<const InstrumentSet*, EngineSettings::layers> layerSet {};
+    std::array<std::array<std::int8_t, 512>, EngineSettings::layers> layerTake {};  ///< last round-robin take per (group, velocity layer)
+    std::array<double, EngineSettings::layers> layerPitchRatio { 1.0, 1.0 };
+    std::array<GranularParams, EngineSettings::layers> liveGranular {};   ///< read by granular voices
+    std::size_t context = 0;   ///< the layer a note-on is being prepared for
+    // Per-layer render buffers (A/B blend), allocated in prepare().
+    std::array<std::array<std::vector<float>, 2>, EngineSettings::layers> layerBuffer;
+    int bufferSize = 0;
+    double blendNow = 0.0;
     bool pedalDown = false;
     std::uint64_t noteCounter = 0;
     float outputGain = 1.0f;
     double pitchRatio = 1.0;
-    PerformanceEngine performance;
+    std::array<PerformanceEngine, EngineSettings::layers> layerPerformance;   ///< same seed: the layers perform together
     PostProcessor post;
     bool mpe = false;
     std::array<double, 17> channelBendRatio {};   ///< index 1..16

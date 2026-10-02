@@ -1,0 +1,121 @@
+#include "engine/GranularSource.h"
+
+#include <algorithm>
+#include <cmath>
+#include <numbers>
+
+namespace osp
+{
+
+void GranularSource::start (const PlaybackSource& source, const GranularParams& params, double outputSampleRate, std::uint64_t seed) noexcept
+{
+    src = &source;
+    settings = params;
+    sampleRate = outputSampleRate;
+    rng.reseed (Prng::deriveSeed (seed, 0x6772736dull, 0));
+    for (auto& g : grains)
+        g.active = false;
+    activeGrains = 0;
+    countdown = 0;   // the first grain starts with the note
+    spawning = source.numFrames() > 8;
+    stereo = source.numChannels() > 1;
+}
+
+float GranularSource::read (int channel, double pos) const noexcept
+{
+    // 4-point cubic (Hermite); the caller keeps pos inside [1, frames - 3].
+    const auto i = static_cast<std::int64_t> (pos);
+    const float t = static_cast<float> (pos - static_cast<double> (i));
+    const float* x = src->channelData (channel) + i;
+    const float c1 = 0.5f * (x[1] - x[-1]);
+    const float c2 = x[-1] - 2.5f * x[0] + 2.0f * x[1] - 0.5f * x[2];
+    const float c3 = 0.5f * (x[2] - x[-1]) + 1.5f * (x[0] - x[1]);
+    return ((c3 * t + c2) * t + c1) * t + x[0];
+}
+
+void GranularSource::spawn (double step) noexcept
+{
+    Grain* slot = nullptr;
+    for (auto& g : grains)
+        if (! g.active)
+        {
+            slot = &g;
+            break;
+        }
+    if (slot == nullptr)
+        return;   // pool full: CPU stays bounded
+
+    const auto frames = static_cast<double> (src->numFrames());
+    const double ratio = std::exp2 (std::clamp (settings.tuneSemitones, -24.0, 24.0) / 12.0);
+    const double frameStep = std::max (1.0e-4, step * ratio);
+    // Grain length, shortened if the recording is shorter than one grain.
+    double samples = std::clamp (settings.sizeSeconds, 0.005, 1.0) * sampleRate;
+    const double usable = frames - 6.0;
+    samples = std::min (samples, usable / (1.15 * frameStep));
+    if (samples < 16.0)
+        return;
+    const double span = samples * frameStep * 1.15;   // margin for pitch bends during the grain
+
+    // Where: around POS, spread across up to a quarter of the recording either side, plus
+    // a few milliseconds of jitter so even SPREAD 0 never combs.
+    const double srcRate = src->sampleRate();
+    const double centre = std::clamp (settings.position, 0.0, 1.0) * frames;
+    const double offset = (std::clamp (settings.spread, 0.0, 1.0) * 0.25 * frames + 0.004 * srcRate) * rng.bipolar();
+    const double start = std::clamp (centre + offset - 0.5 * span, 1.0, std::max (1.0, frames - 3.0 - span));
+
+    const auto n = static_cast<int> (samples);
+    const double w = 2.0 * std::numbers::pi / static_cast<double> (n);
+    slot->position = start;
+    slot->ratio = ratio;
+    slot->c = 1.0;
+    slot->s = 0.0;
+    slot->cd = std::cos (w);
+    slot->sd = std::sin (w);
+    slot->remaining = n;
+    slot->active = true;
+    ++activeGrains;
+}
+
+void GranularSource::render (float& left, float& right, double step) noexcept
+{
+    left = right = 0.0f;
+    if (src == nullptr)
+        return;
+    if (spawning && --countdown <= 0)
+    {
+        spawn (step);
+        const double interval = sampleRate / std::clamp (settings.density, 1.0, 80.0);
+        countdown = std::max (1, static_cast<int> (interval * rng.uniform (0.8, 1.2)));
+    }
+    if (activeGrains == 0)
+        return;
+
+    const double lastFrame = static_cast<double> (src->numFrames()) - 3.0;
+    float l = 0.0f, r = 0.0f;
+    for (auto& g : grains)
+    {
+        if (! g.active)
+            continue;
+        const auto window = static_cast<float> (0.5 - 0.5 * g.c);
+        const double pos = std::clamp (g.position, 1.0, lastFrame);
+        const float a = read (0, pos);
+        l += window * a;
+        r += window * (stereo ? read (1, pos) : a);
+        g.position += step * g.ratio;
+        const double c = g.c * g.cd - g.s * g.sd;
+        g.s = g.s * g.cd + g.c * g.sd;
+        g.c = c;
+        if (--g.remaining <= 0)
+        {
+            g.active = false;
+            --activeGrains;
+        }
+    }
+    // Overlapping grains add up (incoherently): keep the level near the recording's.
+    const double overlap = std::clamp (settings.density, 1.0, 80.0) * std::clamp (settings.sizeSeconds, 0.005, 1.0);
+    const auto norm = static_cast<float> (1.0 / std::max (1.0, 0.612 * std::sqrt (overlap)));
+    left = l * norm;
+    right = r * norm;
+}
+
+} // namespace osp

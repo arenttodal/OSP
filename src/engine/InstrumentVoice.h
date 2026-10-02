@@ -4,6 +4,7 @@
 #include "audio/pitch/SincInterpolator.h"
 #include "core/Prng.h"
 #include "engine/CharacterFilter.h"
+#include "engine/GranularSource.h"
 #include "engine/NoteShape.h"
 #include "engine/Shaping.h"
 #include "engine/ShelfFilter.h"
@@ -28,6 +29,9 @@ struct InstrumentVoiceStart
     NoteShape shape;
     ContinuationStrategy strategy = ContinuationStrategy::multiLoop;
     bool releaseGraft = true;
+    int layerIndex = 0;                         ///< A/B layer (0 = A, 1 = B)
+    SourceMode sourceMode = SourceMode::oneShot;
+    const GranularParams* granular = nullptr;   ///< live settings of the layer (granular mode)
 };
 
 /**
@@ -61,6 +65,9 @@ public:
     bool isHeldByPedal() const noexcept { return heldByPedal; }
     void setHeldByPedal (bool held) noexcept { heldByPedal = held; }
     int note() const noexcept { return currentNote; }
+    int layerIndex() const noexcept { return voiceLayer; }
+    bool isGranular() const noexcept { return granularMode; }
+    int grainCount() const noexcept { return granularMode ? granularSource.grainCount() : 0; }
     int channel() const noexcept { return midiChannel; }
 
     /** Continuous expression (pressure / MPE timbre): extra level (dB) and brightness (dB). Control rate, smoothed. */
@@ -188,6 +195,12 @@ private:
     float gAmount = 0.0f, gFade = 0.0f, gFadeStep = 0.0f, gNorm = 1.0f, gLowCoef = 1.0f, gLowL = 0.0f, gLowR = 0.0f;
     double gFloor = 0.0, gDensity = 10.0;
     int gCountdown = 0, gDelay = 0;
+
+    // Granular source mode (A/B layers): grains around POS instead of reading through.
+    bool granularMode = false;
+    GranularSource granularSource;
+    const GranularParams* granularLive = nullptr;
+    int voiceLayer = 0;
 
     // CHARACTER: per-voice filter and its AD envelope (control rate)
     const ShapingState* shapingState = nullptr;

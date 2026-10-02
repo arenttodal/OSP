@@ -55,7 +55,11 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     expressionGain = 1.0;
     expressionBright = 0.0;
     shape = params.shape;
-    strategy = cont->canSustain ? params.strategy : ContinuationStrategy::off;
+    voiceLayer = params.layerIndex;
+    granularMode = params.sourceMode == SourceMode::granular && params.granular != nullptr;
+    granularLive = params.granular;
+    // Granular voices never read the recording through: no continuation jumps or grafts.
+    strategy = cont->canSustain && ! granularMode ? params.strategy : ContinuationStrategy::off;
     releaseGraftEnabled = params.releaseGraft;
 
     const auto& src = *layer->source;
@@ -143,6 +147,13 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
         gLowCoef = static_cast<float> (1.0 - std::exp (-2.0 * std::numbers::pi * 6500.0 / sampleRate));
         gLowL = gLowR = 0.0f;
     }
+    if (granularMode)
+    {
+        // The read-through extras (doubling head, Reimagined grains) need a moving read.
+        dAmount = 0.0f;
+        gAmount = 0.0f;
+        granularSource.start (*layer->source, *granularLive, sampleRate, shape.seed);
+    }
     saturationDrive = 1.0f + 4.0f * std::clamp (shape.saturation, 0.0f, 1.0f);
     saturationNorm = 1.0f / saturationDrive;
     // Drift has its own random stream (so it never changes the continuation's choices)
@@ -177,7 +188,7 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     tAmount = std::clamp (shape.transientPreserve, 0.0f, 1.0f);
     tMix = dbToLinear (std::clamp (shape.transientMixDb, -24.0f, 12.0f)) - 1.0f;
     tRemaining = 0;
-    if ((tAmount > 0.0f || std::abs (tMix) > 1.0e-4f) && layer->transient != nullptr && currentModel->original.transient != nullptr)
+    if (! granularMode && (tAmount > 0.0f || std::abs (tMix) > 1.0e-4f) && layer->transient != nullptr && currentModel->original.transient != nullptr)
     {
         const auto& orig = *currentModel->original.transient;
         tStep = orig.sampleRate() / sampleRate;
@@ -225,6 +236,14 @@ void InstrumentVoice::release() noexcept
         return;
     released = true;
     heldByPedal = false;
+
+    if (granularMode)
+    {
+        // No new grains; the playing ones finish under the release envelope.
+        granularSource.stopSpawning();
+        envelope.noteOff();
+        return;
+    }
 
     bool canGraft = releaseGraftEnabled && strategy != ContinuationStrategy::off && cont->hasRelease
                     && ! cont->graftExits.empty() && position < cont->releaseFrame;
@@ -490,6 +509,8 @@ void InstrumentVoice::updateControl() noexcept
 
     if (shapingState != nullptr)
         updateCharacter (false);
+    if (granularMode)
+        granularSource.setParams (*granularLive);
 
     settleCents *= settleCoef;
     double shared = 0.0;
@@ -624,15 +645,26 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
             currentStep = baseIncrement * pitchRatio * pitchMod;
         }
 
-        if (! crossfading && hasPending && position >= pending.fromFrame)
-            beginCrossfade();
-
-        if (tailEndPosition > 0.0 && position >= tailEndPosition && fadeRemaining == 0)
-            beginFastFade (static_cast<int> (0.05 * sampleRate));
-        if (position >= endPosition)
+        if (granularMode)
         {
-            kill();
-            return;
+            if (granularSource.isFinished())
+            {
+                kill();
+                return;
+            }
+        }
+        else
+        {
+            if (! crossfading && hasPending && position >= pending.fromFrame)
+                beginCrossfade();
+
+            if (tailEndPosition > 0.0 && position >= tailEndPosition && fadeRemaining == 0)
+                beginFastFade (static_cast<int> (0.05 * sampleRate));
+            if (position >= endPosition)
+            {
+                kill();
+                return;
+            }
         }
 
         float env = envelope.next();
@@ -652,97 +684,104 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
         }
 
         float l, r;
-        const double bodyPosition = position; // what this sample's main read used
-        readFrame (position, currentStep, l, r);
-        if (crossfading)
+        if (granularMode)
         {
-            float l2, r2, gOut, gIn;
-            readFrame (xPosition, currentStep, l2, r2);
-            crossfadeGains (static_cast<float> (xProgress / xLength), xCorrelation, gOut, gIn);
-            l = l * gOut + l2 * gIn;
-            r = r * gOut + r2 * gIn;
-            xPosition += currentStep;
-            xProgress += currentStep;
+            granularSource.render (l, r, currentStep);
         }
-        if (dAmount > 0.0f)
+        else
         {
-            if (dDelaySamples > 0)
-                --dDelaySamples;
-            else if (dRamp < 1.0f)
-                dRamp = std::min (1.0f, dRamp + dRampStep);
-            if (dRamp > 0.0f)
+            const double bodyPosition = position; // what this sample's main read used
+            readFrame (position, currentStep, l, r);
+            if (crossfading)
             {
-                const double behind = dBase + dDepth * std::sin (dPhase);
-                float l2, r2;
-                readFrame (std::max (0.0, bodyPosition - behind * currentStep), currentStep, l2, r2);
-                const float g = dAmount * dRamp;
-                const float norm = 1.0f / std::sqrt (1.0f + g * g);
-                // Placed a little to one side, so the doubling widens instead of thickening.
-                l = (l + g * (dSide < 0.0f ? 1.0f : 0.6f) * l2) * norm;
-                r = (r + g * (dSide < 0.0f ? 0.6f : 1.0f) * r2) * norm;
+                float l2, r2, gOut, gIn;
+                readFrame (xPosition, currentStep, l2, r2);
+                crossfadeGains (static_cast<float> (xProgress / xLength), xCorrelation, gOut, gIn);
+                l = l * gOut + l2 * gIn;
+                r = r * gOut + r2 * gIn;
+                xPosition += currentStep;
+                xProgress += currentStep;
             }
-            dPhase += dOmega;
-        }
-        position += currentStep;
-        if (tRemaining > 0)
-        {
-            const auto& native = *currentModel->original.transient;
-            const auto& shifted = *layer->transient;
-            const bool stereo = native.numChannels() > 1 || shifted.numChannels() > 1;
-            const bool swap = tAmount > 0.0f;
-            const float nl = swap ? readTransient (native, tPosition, tStep, 0) : 0.0f;
-            const float sl = readTransient (shifted, bodyPosition, currentStep, 0);
-            const float nr = swap && stereo ? readTransient (native, tPosition, tStep, 1) : nl;
-            const float sr = stereo ? readTransient (shifted, bodyPosition, currentStep, 1) : sl;
-            // Swap (preservation) and level change (mixing) of the transient now playing.
-            l += tAmount * (nl - sl) + tMix * (tAmount * nl + (1.0f - tAmount) * sl);
-            r += tAmount * (nr - sr) + tMix * (tAmount * nr + (1.0f - tAmount) * sr);
-            tPosition += tStep;
-            --tRemaining;
-        }
-        if (gAmount > 0.0f)
-        {
-            if (gDelay > 0)
-                --gDelay;
-            else
+            if (dAmount > 0.0f)
             {
-                if (--gCountdown <= 0)
+                if (dDelaySamples > 0)
+                    --dDelaySamples;
+                else if (dRamp < 1.0f)
+                    dRamp = std::min (1.0f, dRamp + dRampStep);
+                if (dRamp > 0.0f)
                 {
-                    spawnGrain();
-                    gCountdown = std::max (1, static_cast<int> (sampleRate / gDensity * grainRng.uniform (0.5, 1.5)));
+                    const double behind = dBase + dDepth * std::sin (dPhase);
+                    float l2, r2;
+                    readFrame (std::max (0.0, bodyPosition - behind * currentStep), currentStep, l2, r2);
+                    const float g = dAmount * dRamp;
+                    const float norm = 1.0f / std::sqrt (1.0f + g * g);
+                    // Placed a little to one side, so the doubling widens instead of thickening.
+                    l = (l + g * (dSide < 0.0f ? 1.0f : 0.6f) * l2) * norm;
+                    r = (r + g * (dSide < 0.0f ? 0.6f : 1.0f) * r2) * norm;
                 }
-                if (gFade < 1.0f)
-                    gFade = std::min (1.0f, gFade + gFadeStep);
+                dPhase += dOmega;
             }
-            float gl = 0.0f, gr = 0.0f;
-            const bool stereoSource = layer->source->numChannels() > 1;
-            for (auto& grain : grains)
+            position += currentStep;
+            if (tRemaining > 0)
             {
-                if (! grain.active)
-                    continue;
-                const auto x = static_cast<float> (grain.phase);
-                const float w = 16.0f * x * x * (1.0f - x) * (1.0f - x);
-                const float sl = readHermite (0, grain.position);
-                const float sr = stereoSource ? readHermite (1, grain.position) : sl;
-                gl += w * sl * grain.left;
-                gr += w * sr * grain.right;
-                grain.position += grain.step;
-                grain.phase += grain.phaseStep;
-                if (grain.phase >= 1.0)
-                    grain.active = false;
+                const auto& native = *currentModel->original.transient;
+                const auto& shifted = *layer->transient;
+                const bool stereo = native.numChannels() > 1 || shifted.numChannels() > 1;
+                const bool swap = tAmount > 0.0f;
+                const float nl = swap ? readTransient (native, tPosition, tStep, 0) : 0.0f;
+                const float sl = readTransient (shifted, bodyPosition, currentStep, 0);
+                const float nr = swap && stereo ? readTransient (native, tPosition, tStep, 1) : nl;
+                const float sr = stereo ? readTransient (shifted, bodyPosition, currentStep, 1) : sl;
+                // Swap (preservation) and level change (mixing) of the transient now playing.
+                l += tAmount * (nl - sl) + tMix * (tAmount * nl + (1.0f - tAmount) * sl);
+                r += tAmount * (nr - sr) + tMix * (tAmount * nr + (1.0f - tAmount) * sr);
+                tPosition += tStep;
+                --tRemaining;
             }
-            gLowL += (gl - gLowL) * gLowCoef;
-            gLowR += (gr - gLowR) * gLowCoef;
-            // Alternate synthetic sustain: towards the far end the grains carry the sustain.
-            const float mix = gAmount * gFade;
-            l = l * (1.0f - 0.55f * mix) + 0.95f * mix * gNorm * gLowL;
-            r = r * (1.0f - 0.55f * mix) + 0.95f * mix * gNorm * gLowR;
-        }
-        if (crossfading && xProgress >= xLength)
-        {
-            crossfading = false;
-            position = xPosition;
-            scheduleNextJump();
+            if (gAmount > 0.0f)
+            {
+                if (gDelay > 0)
+                    --gDelay;
+                else
+                {
+                    if (--gCountdown <= 0)
+                    {
+                        spawnGrain();
+                        gCountdown = std::max (1, static_cast<int> (sampleRate / gDensity * grainRng.uniform (0.5, 1.5)));
+                    }
+                    if (gFade < 1.0f)
+                        gFade = std::min (1.0f, gFade + gFadeStep);
+                }
+                float gl = 0.0f, gr = 0.0f;
+                const bool stereoSource = layer->source->numChannels() > 1;
+                for (auto& grain : grains)
+                {
+                    if (! grain.active)
+                        continue;
+                    const auto x = static_cast<float> (grain.phase);
+                    const float w = 16.0f * x * x * (1.0f - x) * (1.0f - x);
+                    const float sl = readHermite (0, grain.position);
+                    const float sr = stereoSource ? readHermite (1, grain.position) : sl;
+                    gl += w * sl * grain.left;
+                    gr += w * sr * grain.right;
+                    grain.position += grain.step;
+                    grain.phase += grain.phaseStep;
+                    if (grain.phase >= 1.0)
+                        grain.active = false;
+                }
+                gLowL += (gl - gLowL) * gLowCoef;
+                gLowR += (gr - gLowR) * gLowCoef;
+                // Alternate synthetic sustain: towards the far end the grains carry the sustain.
+                const float mix = gAmount * gFade;
+                l = l * (1.0f - 0.55f * mix) + 0.95f * mix * gNorm * gLowL;
+                r = r * (1.0f - 0.55f * mix) + 0.95f * mix * gNorm * gLowR;
+            }
+            if (crossfading && xProgress >= xLength)
+            {
+                crossfading = false;
+                position = xPosition;
+                scheduleNextJump();
+            }
         }
 
         if (filtersActive)
