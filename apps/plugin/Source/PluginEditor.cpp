@@ -298,6 +298,10 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
         }
     };
     addAndMakeVisible (reseedButton);
+    mpeToggle.setTooltip ("MPE controllers: per-note pitch bend (+/-48 st), pressure and slide");
+    mpeToggle.setColour (juce::ToggleButton::textColourId, colours::dim);
+    mpeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (ospProcessor.parameters, "mpe", mpeToggle);
+    addAndMakeVisible (mpeToggle);
 
     keyboard.setAvailableRange (21, 108);
     keyboard.setOctaveForMiddleC (4); // MIDI 60 = C4, as everywhere else in OSP
@@ -356,7 +360,9 @@ void OspAudioProcessorEditor::resized()
     sustainLabel.setBounds (row2.removeFromLeft (110));
     sustainBox.setBounds (row2);
     choices.removeFromTop (6);
-    reseedButton.setBounds (choices.removeFromTop (24).removeFromRight (130));
+    auto row3 = choices.removeFromTop (24);
+    reseedButton.setBounds (row3.removeFromRight (110));
+    mpeToggle.setBounds (row3.removeFromLeft (80));
     const int smallWidth = advanced.getWidth() / static_cast<int> (knobs.size());
     for (auto& knob : knobs)
     {

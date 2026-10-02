@@ -39,7 +39,11 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
 
     cont = &layer->continuation;
     currentNote = params.note;
+    midiChannel = params.channel;
     order = params.startOrder;
+    expressionGainDb = expressionBrightDb = 0.0f;
+    expressionGain = 1.0;
+    expressionBright = 0.0;
     shape = params.shape;
     strategy = cont->canSustain ? params.strategy : ContinuationStrategy::off;
     releaseGraftEnabled = params.releaseGraft;
@@ -329,11 +333,14 @@ void InstrumentVoice::updateControl() noexcept
     const double cents = shape.pitchCents + settleCents + driftCentsValue;
     pitchMod = cents != 0.0 ? std::exp2 (cents / 1200.0) : 1.0;
 
-    const float target = drifting ? dbToLinear (driftLevel) : 1.0f;
+    // Expression follows quickly but smoothly (about 10 ms).
+    expressionGain += (std::pow (10.0, expressionGainDb / 20.0) - expressionGain) * 0.15;
+    expressionBright += (expressionBrightDb - expressionBright) * 0.15;
+    const float target = (drifting ? dbToLinear (driftLevel) : 1.0f) * static_cast<float> (expressionGain);
     controlGainStep = (target - controlGain) / controlInterval;
 
     attackBright *= attackBrightCoef;
-    const float bright = shape.brightnessDb + static_cast<float> (driftBright + attackBright);
+    const float bright = shape.brightnessDb + static_cast<float> (driftBright + attackBright + expressionBright);
     const float body = shape.bodyDb;
     if (std::abs (bright - appliedBright) > 0.02f || std::abs (body - appliedBody) > 0.02f)
     {

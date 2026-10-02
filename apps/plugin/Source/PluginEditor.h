@@ -97,6 +97,8 @@ private:
     juce::ComboBox pitchCharacterBox, sustainBox;
     juce::Label pitchCharacterLabel, sustainLabel, advancedLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> pitchCharacterAttachment, sustainAttachment;
+    juce::ToggleButton mpeToggle { "MPE" };
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> mpeAttachment;
     juce::MidiKeyboardComponent keyboard;
     std::unique_ptr<juce::FileChooser> chooser;
 

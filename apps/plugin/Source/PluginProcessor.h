@@ -149,6 +149,11 @@ private:
     std::atomic<float>* pitchCharacterParam = nullptr;
     std::atomic<float>* sustainParam = nullptr;
     std::atomic<float>* seedParam = nullptr;
+    std::atomic<float>* mpeParam = nullptr;
+    // MIDI-controlled macro values (CC 20-25), used until the host parameter moves again.
+    std::array<float, 6> ccMacro { -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f };
+    std::array<float, 6> lastMacroParam { -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f };
+    float modWheel = 0.0f;
     float lastAttack = -1.0f, lastRelease = -1.0f, lastGain = -1000.0f, lastVelocityRange = -1.0f;
     double pitchBendSemitones = 0.0;
     bool hostWasPlaying = false;     // audio thread: transport start resets performance memory

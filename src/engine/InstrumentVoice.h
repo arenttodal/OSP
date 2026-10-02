@@ -20,6 +20,7 @@ struct InstrumentVoiceStart
     const PitchLayer* layer = nullptr;
     int note = 60;
     int velocity = 100;
+    int channel = 1;          ///< MIDI channel (MPE: one note per channel)
     double increment = 1.0;   ///< layer frames per output sample at the note's pitch
     std::uint64_t startOrder = 0;
     NoteShape shape;
@@ -55,6 +56,14 @@ public:
     bool isHeldByPedal() const noexcept { return heldByPedal; }
     void setHeldByPedal (bool held) noexcept { heldByPedal = held; }
     int note() const noexcept { return currentNote; }
+    int channel() const noexcept { return midiChannel; }
+
+    /** Continuous expression (pressure / MPE timbre): extra level (dB) and brightness (dB). Control rate, smoothed. */
+    void setExpression (float gainDb, float brightnessDb) noexcept
+    {
+        expressionGainDb = gainDb;
+        expressionBrightDb = brightnessDb;
+    }
     std::uint64_t startOrder() const noexcept { return order; }
     const InstrumentModel* model() const noexcept { return currentModel; }
     float currentLevel() const noexcept { return envelope.level() * baseGain * fadeGain; }
@@ -85,7 +94,10 @@ private:
     bool released = false;
     bool heldByPedal = false;
     int currentNote = -1;
+    int midiChannel = 1;
     std::uint64_t order = 0;
+    float expressionGainDb = 0.0f, expressionBrightDb = 0.0f;
+    double expressionGain = 1.0, expressionBright = 0.0;
 
     // Reading
     double position = 0.0;

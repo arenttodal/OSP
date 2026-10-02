@@ -115,8 +115,19 @@ public:
     bool isModelInUse (const InstrumentModel* model) const noexcept;
     void killVoicesUsing (const InstrumentModel* model) noexcept;
 
-    void noteOn (int note, int velocity) noexcept;
-    void noteOff (int note) noexcept;
+    void noteOn (int note, int velocity, int channel = 1) noexcept;
+    void noteOff (int note, int channel = 0) noexcept; ///< channel 0 = any channel
+
+    /**
+        Expression (spec §50, §51). Without MPE, pitch bend stays global (setPitchOffsetSemitones)
+        and pressure / timbre act on every voice. With MPE on, each member channel bends,
+        presses and colours only its own notes.
+    */
+    void setMpe (bool enabled) noexcept { mpe = enabled; }
+    bool isMpe() const noexcept { return mpe; }
+    void setChannelPitchBend (int channel, double semitones) noexcept;
+    void setChannelPressure (int channel, double pressure01) noexcept;
+    void setChannelTimbre (int channel, double timbre01) noexcept;
     void setSustainPedal (bool down) noexcept;
     void allNotesOff() noexcept;
     void reset() noexcept;
@@ -167,6 +178,10 @@ private:
     double pitchRatio = 1.0;
     PerformanceEngine performance;
     PostProcessor post;
+    bool mpe = false;
+    std::array<double, 17> channelBendRatio {};   ///< index 1..16
+    std::array<float, 17> channelPressure {};
+    std::array<float, 17> channelTimbre {};
     std::int64_t sampleClock = 0;   ///< samples rendered since prepare/reset (note times for performance memory)
 };
 

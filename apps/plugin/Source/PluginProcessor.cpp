@@ -29,6 +29,7 @@ namespace ids
     static const juce::String pitchCharacter = "pitchCharacter";
     static const juce::String sustain = "sustain";
     static const juce::String seed = "seed";
+    static const juce::String mpe = "mpe";
     static const juce::Identifier instrument = "Instrument";
 }
 
@@ -72,6 +73,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
     layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { ids::sustain, 2 }, "Sustain",
                                                               juce::StringArray { "Recording", "Endless" }, 1));
     layout.add (std::make_unique<juce::AudioParameterInt> (juce::ParameterID { ids::seed, 2 }, "Variation Seed", 1, 9999, 1));
+    layout.add (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { ids::mpe, 3 }, "MPE", false));
     return layout;
 }
 
@@ -95,6 +97,7 @@ OspAudioProcessor::OspAudioProcessor()
     pitchCharacterParam = parameters.getRawParameterValue (ids::pitchCharacter);
     sustainParam = parameters.getRawParameterValue (ids::sustain);
     seedParam = parameters.getRawParameterValue (ids::seed);
+    mpeParam = parameters.getRawParameterValue (ids::mpe);
 
     engineSettings.polyphony = 24;
     engineSettings.outputGainDb = -9.0;
@@ -161,14 +164,28 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
         lastVelocityRange = velocityRange;
     }
 
+    // Macro = host parameter, unless a MIDI CC (20-25) moved it more recently.
+    std::array<std::atomic<float>*, 6> macroParams { lifeParam, dynamicsParam, characterParam, motionParam, spaceParam, reimaginedParam };
+    std::array<double, 6> values {};
+    for (std::size_t i = 0; i < 6; ++i)
+    {
+        const float p = macroParams[i]->load() * 0.01f;
+        if (changed (p, lastMacroParam[i]))
+        {
+            lastMacroParam[i] = p;
+            ccMacro[i] = -1.0f;
+        }
+        values[i] = ccMacro[i] >= 0.0f ? ccMacro[i] : p;
+    }
     Macros macros;
-    macros.life = lifeParam->load() * 0.01;
-    macros.dynamics = dynamicsParam->load() * 0.01;
-    macros.character = characterParam->load() * 0.01;
-    macros.motion = motionParam->load() * 0.01;
-    macros.space = spaceParam->load() * 0.01;
-    macros.reimagined = reimaginedParam->load() * 0.01;
+    macros.life = values[0];
+    macros.dynamics = values[1];
+    macros.character = values[2];
+    macros.motion = values[3] + modWheel * (1.0 - values[3]); // mod wheel opens MOTION up
+    macros.space = values[4];
+    macros.reimagined = values[5];
     engine.setMacros (macros);
+    engine.setMpe (mpeParam->load() >= 0.5f);
     engine.setPitchCharacter (pitchCharacterParam->load() >= 0.5f ? PitchCharacter::natural : PitchCharacter::tape);
     engine.setContinuation (sustainParam->load() >= 0.5f ? ContinuationStrategy::multiLoopMovement : ContinuationStrategy::off);
     engine.setSeed (static_cast<std::uint64_t> (std::max (1.0f, seedParam->load())));
@@ -220,10 +237,25 @@ void OspAudioProcessor::swapInstrumentIfPending() noexcept
 
 void OspAudioProcessor::handleMidi (const juce::MidiMessage& m) noexcept
 {
+    const int channel = m.getChannel();
+    // MPE (lower zone): channel 1 is the manager channel, 2..16 carry one note each.
+    const bool memberChannel = engine.isMpe() && channel >= 2;
     if (m.isNoteOn())
-        engine.noteOn (m.getNoteNumber(), m.getVelocity());
+        engine.noteOn (m.getNoteNumber(), m.getVelocity(), channel);
     else if (m.isNoteOff())
-        engine.noteOff (m.getNoteNumber());
+        engine.noteOff (m.getNoteNumber(), channel);
+    else if (m.isChannelPressure())
+        engine.setChannelPressure (memberChannel ? channel : 1, m.getChannelPressureValue() / 127.0);
+    else if (m.isAftertouch())
+        engine.setChannelPressure (memberChannel ? channel : 1, m.getAfterTouchValue() / 127.0);
+    else if (m.isController() && m.getControllerNumber() == 74)
+        engine.setChannelTimbre (memberChannel ? channel : 1, m.getControllerValue() / 127.0);
+    else if (m.isController() && m.getControllerNumber() == 1)
+        modWheel = static_cast<float> (m.getControllerValue()) / 127.0f;
+    else if (m.isController() && m.getControllerNumber() >= 20 && m.getControllerNumber() <= 25)
+        ccMacro[static_cast<std::size_t> (m.getControllerNumber() - 20)] = static_cast<float> (m.getControllerValue()) / 127.0f;
+    else if (m.isPitchWheel() && memberChannel)
+        engine.setChannelPitchBend (channel, (m.getPitchWheelValue() - 8192) / 8192.0 * 48.0); // MPE default: +/- 48 st
     else if (m.isSustainPedalOn() || m.isSustainPedalOff())
         engine.setSustainPedal (m.isSustainPedalOn());
     else if (m.isAllNotesOff() || m.isAllSoundOff())

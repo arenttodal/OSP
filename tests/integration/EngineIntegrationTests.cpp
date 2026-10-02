@@ -172,3 +172,31 @@ TEST_CASE ("engine: one-shot sources play once and stop", "[integration][engine]
     CHECK (out.audio.durationSeconds() <= 10.5);
     CHECK (rmsBetween (out.audio, 4.0, 9.0) < 1.0e-6);
 }
+
+TEST_CASE ("engine: MPE bends only the note on its own channel", "[integration][engine]")
+{
+    Fixture f;
+    auto render = [&] (bool mpe, int bendChannel) {
+        InstrumentEngine engine;
+        EngineSettings s;
+        s.macros.life = 0.0;
+        s.macros.space = 0.0;
+        s.macros.reimagined = 0.0;
+        engine.prepare (48000.0, 256, s);
+        engine.setModel (f.model.get());
+        engine.setMpe (mpe);
+        engine.setChannelPitchBend (bendChannel, 2.0);
+        engine.noteOn (57, 100, 2);
+        AudioData out = AudioData::allocate (2, 48000, 48000.0);
+        for (int pos = 0; pos < 48000; pos += 256)
+        {
+            float* ch[2] = { out.channels[0].data() + pos, out.channels[1].data() + pos };
+            engine.render (ch, 2, std::min (256, 48000 - pos));
+        }
+        return test::analyse (out).pitch.fundamentalHz;
+    };
+    const double a3 = 220.0;
+    CHECK (std::abs (1200.0 * std::log2 (render (true, 2) / (a3 * std::pow (2.0, 2.0 / 12.0)))) < 15.0); // its channel bends
+    CHECK (std::abs (1200.0 * std::log2 (render (true, 3) / a3)) < 15.0);                                 // another channel does not
+    CHECK (std::abs (1200.0 * std::log2 (render (false, 2) / a3)) < 15.0);                                // no MPE: channel bends ignored
+}

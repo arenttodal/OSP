@@ -24,9 +24,30 @@ void InstrumentEngine::prepare (double outputSampleRate, int maximumBlockSize, c
     pedalDown = false;
     noteCounter = 0;
     pitchRatio = 1.0;
+    channelBendRatio.fill (1.0);
+    channelPressure.fill (0.0f);
+    channelTimbre.fill (0.0f);
     post.prepare (outputSampleRate, maximumBlockSize);
     post.setMacros (config.macros);
     resetPerformance();
+}
+
+void InstrumentEngine::setChannelPitchBend (int channel, double semitones) noexcept
+{
+    if (channel >= 1 && channel <= 16)
+        channelBendRatio[static_cast<std::size_t> (channel)] = semitonesToRatio (semitones);
+}
+
+void InstrumentEngine::setChannelPressure (int channel, double pressure01) noexcept
+{
+    if (channel >= 1 && channel <= 16)
+        channelPressure[static_cast<std::size_t> (channel)] = static_cast<float> (std::clamp (pressure01, 0.0, 1.0));
+}
+
+void InstrumentEngine::setChannelTimbre (int channel, double timbre01) noexcept
+{
+    if (channel >= 1 && channel <= 16)
+        channelTimbre[static_cast<std::size_t> (channel)] = static_cast<float> (std::clamp (timbre01, 0.0, 1.0)) - 0.5f;
 }
 
 void InstrumentEngine::resetPerformance() noexcept
@@ -270,11 +291,11 @@ NoteShape InstrumentEngine::shapeFor (const InstrumentModel* model, int note, in
     return shape;
 }
 
-void InstrumentEngine::noteOn (int note, int velocity) noexcept
+void InstrumentEngine::noteOn (int note, int velocity, int channel) noexcept
 {
     if (velocity <= 0)
     {
-        noteOff (note);
+        noteOff (note, channel);
         return;
     }
     const InstrumentModel* model = currentModel;
@@ -322,6 +343,7 @@ void InstrumentEngine::noteOn (int note, int velocity) noexcept
     params.layer = &model->layerFor (static_cast<double> (note), config.pitchCharacter);
     params.note = note;
     params.velocity = velocity;
+    params.channel = std::clamp (channel, 1, 16);
     const auto& src = *params.layer->source;
     params.increment = semitonesToRatio (static_cast<double> (note) - src.rootMidi()) * (src.sampleRate() / sampleRate);
     params.startOrder = eventIndex;
@@ -330,10 +352,10 @@ void InstrumentEngine::noteOn (int note, int velocity) noexcept
     slot->start (params);
 }
 
-void InstrumentEngine::noteOff (int note) noexcept
+void InstrumentEngine::noteOff (int note, int channel) noexcept
 {
     for (auto& voice : voices)
-        if (voice.isActive() && ! voice.isReleased() && voice.note() == note)
+        if (voice.isActive() && ! voice.isReleased() && voice.note() == note && (channel == 0 || ! mpe || voice.channel() == channel))
         {
             if (pedalDown)
                 voice.setHeldByPedal (true);
@@ -374,8 +396,17 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
         std::memset (output[ch], 0, sizeof (float) * static_cast<std::size_t> (numSamples));
     float* left = output[0];
     float* right = numChannels > 1 ? output[1] : output[0];
+    // Pressure -> intensity (level + brightness), timbre (CC74 / MPE slide) -> brightness.
+    // Without MPE every voice follows channel 1's expression, which carries the global values.
     for (auto& voice : voices)
-        voice.render (left, right, numSamples, pitchRatio);
+    {
+        if (! voice.isActive())
+            continue;
+        const auto ch = static_cast<std::size_t> (mpe ? std::clamp (voice.channel(), 1, 16) : 1);
+        const float pressure = channelPressure[ch];
+        voice.setExpression (5.0f * pressure, 5.0f * pressure + 10.0f * channelTimbre[ch]);
+        voice.render (left, right, numSamples, pitchRatio * (mpe ? channelBendRatio[ch] : 1.0));
+    }
     sampleClock += numSamples;
     post.setModel (currentModel);
     post.process (left, right, numSamples);
