@@ -254,7 +254,7 @@ void InstrumentEngine::applyDynamics (NoteShape& shape, int velocity, const Dyna
 }
 
 NoteShape InstrumentEngine::shapeFor (const InstrumentModel* model, int note, int velocity, std::uint64_t eventIndex,
-                                     double referenceVelocity, double registerBrightnessDb) noexcept
+                                     double referenceVelocity, double registerBrightnessDb, double layerSpan) noexcept
 {
     NoteShape shape;
     shape.seed = Prng::deriveSeed (config.seed, eventIndex, static_cast<std::uint64_t> (note));
@@ -269,7 +269,20 @@ NoteShape InstrumentEngine::shapeFor (const InstrumentModel* model, int note, in
 
     if (model != nullptr)
     {
-        applyDynamics (shape, velocity, model->dynamics, model->character, config.macros.dynamics, config.dynamicsMode, referenceVelocity);
+        auto dynamics = model->dynamics;
+        if (layerSpan > 0.0 && currentSet != nullptr && currentSet->hasDynamicsModel)
+        {
+            // Between two layers, each nudges half-way towards its neighbour, so velocity
+            // changes continuously across the boundary instead of jumping (spec §35).
+            const double toEdge = (v - referenceVelocity) / layerSpan;   // +-0.5 at the boundaries
+            const double sensitivity = std::clamp (config.velocityRangeDb / 30.0, 0.0, 2.0);
+            shape.gain = static_cast<float> (dbToGain (currentSet->layerStepDb * toEdge * sensitivity));
+            const double edgeIntensity = 0.5 * layerSpan / 80.0;      // applyDynamics' intensity at a boundary
+            // About 2 dB of shelf per semitone of centroid; full mode applies 0.8 x brightnessDb.
+            dynamics.brightnessDb = std::clamp (2.0 * currentSet->layerStepBrightnessSt * 0.5 / (0.8 * edgeIntensity), -6.0, 18.0);
+            dynamics.attackSoftenMs = std::clamp (-currentSet->layerStepAttackMs * 0.5 / edgeIntensity, 0.0, 80.0);
+        }
+        applyDynamics (shape, velocity, dynamics, model->character, config.macros.dynamics, config.dynamicsMode, referenceVelocity);
         performance.perform (shape, note, velocity, static_cast<double> (sampleClock) / sampleRate, eventIndex,
                              model->performance, model->character, config.macros.life);
     }
@@ -326,6 +339,7 @@ void InstrumentEngine::noteOn (int note, int velocity, int channel) noexcept
     const std::uint64_t eventIndex = noteCounter++;
     double referenceVelocity = 100.0;
     double registerDb = 0.0;
+    double layerSpan = 0.0;
     if (currentSet != nullptr && currentSet->members.size() > 1)
     {
         const int index = memberFor (note, velocity, eventIndex);
@@ -337,14 +351,17 @@ void InstrumentEngine::noteOn (int note, int velocity, int channel) noexcept
             const auto key = static_cast<std::size_t> ((member.pitchGroup % 64) * 8 + std::min (member.layer, 7));
             lastTake[key] = static_cast<std::int8_t> (member.take);
             if (group.layers > 1)
-                referenceVelocity = 127.0 * (member.layer + 0.5) / group.layers;
+            {
+                layerSpan = 127.0 / group.layers;
+                referenceVelocity = layerSpan * (member.layer + 0.5);
+            }
             if (currentSet->hasRegisterModel)
                 registerDb = std::clamp (1.5 * currentSet->brightnessSlope * (note - group.rootMidi), -8.0, 8.0);
         }
     }
     InstrumentVoiceStart params;
     params.model = model;
-    params.shape = shapeFor (model, note, velocity, eventIndex, referenceVelocity, registerDb);
+    params.shape = shapeFor (model, note, velocity, eventIndex, referenceVelocity, registerDb, layerSpan);
     params.layer = &model->layerFor (static_cast<double> (note), config.pitchCharacter);
     // Transient/body separation (spec §19): from about a fifth away, the attack's
     // transient keeps its own speed. The separated transient carries its own size, so

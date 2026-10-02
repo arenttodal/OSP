@@ -202,7 +202,57 @@ InstrumentSet inferSampleSet (const std::vector<SetInput>& inputs, const std::ve
         }
     }
 
-    // 3. Register model over pitched groups.
+    // 3. Multi-velocity learning: least-squares slope of each descriptor over the layer
+    //    index within every group that has several layers, averaged over those groups.
+    {
+        double sumDb = 0.0, sumSt = 0.0, sumMs = 0.0;
+        int fitted = 0;
+        for (const auto& group : set.groups)
+        {
+            if (group.layers < 2)
+                continue;
+            std::vector<double> lx, ldb, lst, lms;
+            for (int id : group.members)
+            {
+                const auto& m = set.members[static_cast<std::size_t> (id)];
+                if (m.role == SampleRole::articulation)
+                    continue;
+                const auto& a = m.model->analysis;
+                lx.push_back (m.layer);
+                ldb.push_back (m.loudnessDb);
+                lst.push_back (a.spectral.meanCentroidHz > 0.0 ? 12.0 * std::log2 (a.spectral.meanCentroidHz) : 0.0);
+                lms.push_back (1000.0 * a.envelope.attackSeconds);
+            }
+            auto slope = [&lx] (const std::vector<double>& ys) {
+                const double n = static_cast<double> (lx.size());
+                const double mx = std::accumulate (lx.begin(), lx.end(), 0.0) / n;
+                const double my = std::accumulate (ys.begin(), ys.end(), 0.0) / n;
+                double num = 0.0, den = 0.0;
+                for (std::size_t i = 0; i < lx.size(); ++i)
+                {
+                    num += (lx[i] - mx) * (ys[i] - my);
+                    den += (lx[i] - mx) * (lx[i] - mx);
+                }
+                return den > 0.0 ? num / den : 0.0;
+            };
+            if (lx.size() < 2)
+                continue;
+            sumDb += slope (ldb);
+            sumSt += slope (lst);
+            sumMs += slope (lms);
+            ++fitted;
+        }
+        if (fitted > 0)
+        {
+            // Bounded so one odd recording cannot make the instrument jump.
+            set.hasDynamicsModel = true;
+            set.layerStepDb = std::clamp (sumDb / fitted, 0.0, 24.0);
+            set.layerStepBrightnessSt = std::clamp (sumSt / fitted, -6.0, 12.0);
+            set.layerStepAttackMs = std::clamp (sumMs / fitted, -60.0, 60.0);
+        }
+    }
+
+    // 4. Register model over pitched groups.
     std::vector<double> xs, ys;
     for (const auto& group : set.groups)
     {

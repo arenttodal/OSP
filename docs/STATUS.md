@@ -111,6 +111,7 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [x] Velocity inference (dynamics words in names, else loudness gaps >= 4.5 dB); one shared set gain keeps natural level differences
 - [x] Alternate articulations (much shorter/longer takes) kept but not used for ordinary notes
 - [x] Register model (brightness vs pitch, shrunk when few pitches); ground truth: plucks 6.2 -> 4.6 st error, organ 5.2 -> 4.8, tagel 3.0 -> 3.1 (neutral)
+- [x] Multi-velocity learning (spec §35): per-layer-step loudness, centroid and attack fitted over groups with several layers; velocities between layers move half-way towards the neighbouring layer, so a layer boundary no longer jumps (synthetic soft/hard pair: 13.4 dB / 12 st step -> 1.9 dB / 1.3 st at the boundary). Corpus: plucks 9.6 dB + 2.0 st per step, Tagel 7.3 dB + 0.9 st, organ 11.7 dB + 4.9 st (its "layers" are mostly different stops). `--register-test` prints it
 - [x] Samples inspector (role, layer, root corrections; rebuild without re-analysis; recall)
 - [x] Experiment 6 (single file plain / single file engine / whole set)
 - [ ] Listening verdict (lab tab "Multi-sample") — exit: a small related set is automatically better

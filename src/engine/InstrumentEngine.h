@@ -152,8 +152,10 @@ public:
     {
         return shapeFor (currentModel, note, velocity, eventIndex, 100.0, 0.0);
     }
+    /** `layerSpan` > 0: the note plays a velocity layer of a set with a dynamics model;
+        level and dynamics then follow the learned layer differences (spec §35). */
     NoteShape shapeFor (const InstrumentModel* model, int note, int velocity, std::uint64_t eventIndex, double referenceVelocity,
-                        double registerBrightnessDb) noexcept;
+                        double registerBrightnessDb, double layerSpan = 0.0) noexcept;
 
     /** Which member of the current set a note would use (no state change). -1 without a set. */
     int memberFor (int note, int velocity, std::uint64_t eventIndex) const noexcept;

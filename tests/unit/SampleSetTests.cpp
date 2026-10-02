@@ -146,3 +146,58 @@ TEST_CASE ("sample set: the engine picks the nearest pitch, the velocity layer a
         previous = chosen;
     }
 }
+
+TEST_CASE ("sample set: velocity layers teach the dynamics between them", "[unit][sampleset]")
+{
+    // A soft take (quieter, darker) and a hard take (louder, brighter) of the same note.
+    auto take = [] (double amplitude, double darkness, const std::string& name) {
+        Source s;
+        s.audio = testsignals::saw (midiToHz (55), 1.5, 48000.0, amplitude);
+        float y = 0.0f;
+        const auto a = static_cast<float> (darkness);
+        for (auto& x : s.audio.channels[0])
+            x = y = (1.0f - a) * x + a * y; // one-pole low-pass
+        testsignals::applyFades (s.audio, 0.01, 0.2);
+        s.analysis = test::analyse (s.audio);
+        s.name = name;
+        return s;
+    };
+    std::vector<Source> sources;
+    sources.push_back (take (0.12, 0.9, "g3 soft.wav"));
+    sources.push_back (take (0.5, 0.0, "g3 hard.wav"));
+    const auto set = build (sources);
+    REQUIRE (set.groups.size() == 1);
+    REQUIRE (set.groups.front().layers == 2);
+    REQUIRE (set.hasDynamicsModel);
+    INFO ("step " << set.layerStepDb << " dB, " << set.layerStepBrightnessSt << " st, " << set.layerStepAttackMs << " ms");
+    CHECK (set.layerStepDb > 6.0);
+    CHECK (set.layerStepBrightnessSt > 3.0);
+
+    // Either side of the layer boundary (velocity 63.5) the sound is nearly the same.
+    auto play = [&] (int velocity) {
+        InstrumentEngine engine;
+        EngineSettings s;
+        s.macros.life = 0.0;
+        s.macros.space = 0.0;
+        s.macros.reimagined = 0.0;
+        s.macros.motion = 0.0;
+        engine.prepare (48000.0, 256, s);
+        engine.setInstrumentSet (&set);
+        engine.noteOn (55, velocity);
+        AudioData out = AudioData::allocate (2, 24000, 48000.0);
+        for (int pos = 0; pos < 24000; pos += 256)
+        {
+            float* ch[2] = { out.channels[0].data() + pos, out.channels[1].data() + pos };
+            engine.render (ch, 2, std::min (256, 24000 - pos));
+        }
+        return test::analyse (out);
+    };
+    const auto below = play (63), above = play (64), softest = play (10), hardest = play (127);
+    const double jumpDb = above.envelope.maxRmsDbfs - below.envelope.maxRmsDbfs;
+    const double jumpSt = 12.0 * std::log2 (above.spectral.meanCentroidHz / below.spectral.meanCentroidHz);
+    const double rangeSt = 12.0 * std::log2 (hardest.spectral.meanCentroidHz / softest.spectral.meanCentroidHz);
+    INFO ("boundary jump " << jumpDb << " dB, " << jumpSt << " st; full range " << rangeSt << " st");
+    CHECK (std::abs (jumpDb) < 0.35 * set.layerStepDb);
+    CHECK (std::abs (jumpSt) < 0.5 * set.layerStepBrightnessSt);
+    CHECK (rangeSt > set.layerStepBrightnessSt); // velocity still spans more than the two recordings
+}

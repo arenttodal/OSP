@@ -59,6 +59,14 @@ struct InstrumentSet
     double brightnessSlope = 0.0;      ///< centroid/F0 change in semitones per semitone of pitch
     double brightnessIntercept = 0.0;
 
+    /** Multi-velocity learning (spec §35): how one velocity layer differs from the next
+        softer one, averaged over the pitch groups that have several layers. The engine
+        uses it to make velocities between layers continuous. */
+    bool hasDynamicsModel = false;
+    double layerStepDb = 0.0;            ///< loudness per layer step
+    double layerStepBrightnessSt = 0.0;  ///< spectral centroid per layer step (semitones)
+    double layerStepAttackMs = 0.0;      ///< attack time per layer step (negative: harder is faster)
+
     /** The member that best represents the set (UI, analysis display). */
     int primary = 0;
 

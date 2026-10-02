@@ -339,6 +339,24 @@ std::string registerGroundTruth (const std::vector<std::filesystem::path>& files
     if (count > 0)
         out << "\nMean absolute error: nearest anchor " << juce::String (errNaive / count, 2) << " st, register model "
             << juce::String (errModel / count, 2) << " st (" << count << " held-out pitches).\n";
+
+    // The whole folder as one set: its structure and what its velocity layers teach (spec §35).
+    std::vector<instrument::SetSource> all;
+    for (std::size_t i = 0; i < sources.size(); ++i)
+        all.push_back ({ &sources[i].audio, &sources[i].analysis, names[i] });
+    if (! all.empty())
+    {
+        const auto set = instrument::buildSet (all, {}, {}, false);
+        int layered = 0;
+        for (const auto& g : set.groups)
+            layered += g.layers > 1 ? 1 : 0;
+        out << "\nWhole set: " << set.members.size() << " files, " << set.groups.size() << " pitch groups, " << layered
+            << " with velocity layers.";
+        if (set.hasDynamicsModel)
+            out << " Per layer step: " << juce::String (set.layerStepDb, 1) << " dB, " << juce::String (set.layerStepBrightnessSt, 2)
+                << " st brightness, " << juce::String (set.layerStepAttackMs, 1) << " ms attack.";
+        out << "\n";
+    }
     return out.str();
 }
 

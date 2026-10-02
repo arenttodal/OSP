@@ -90,6 +90,9 @@ The open verdicts are listed in `docs/morning-checklist.md`.
 - **Engine.** Picks the nearest pitch, the velocity layer (with dynamics relative to
   that layer) and a round-robin take that never repeats. Applies a register brightness
   model.
+- **Multi-velocity learning (§35).** Real soft and hard takes teach how loudness,
+  brightness and attack change per layer step. Velocities between layers then move
+  towards the neighbouring layer, so crossing a layer boundary no longer jumps.
 - **Plugin.** Accepts multi-file and folder drops. The Samples inspector edits role,
   layer and root, rebuilding without re-analysis. Sessions recall bit-identically.
 - **Register ground truth** (spec §70): mean error against plain transposition
