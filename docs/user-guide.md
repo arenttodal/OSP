@@ -5,17 +5,46 @@
 ## Getting a sound in
 
 - **Drop one file** (WAV, AIFF or FLAC; mono or stereo; 44.1–96 kHz) onto the window, or
-  use **Load…**. It is playable almost immediately. The status line shows what is still
-  being prepared in the background ("building sustain…", "preparing registers…").
+  use **☰ → Load sample into A…**. It is playable almost immediately. The status line
+  shows what is still being prepared in the background ("building sustain…", "preparing
+  registers…").
 - **Drop several files or a folder** to make one instrument from all of them. OSP sorts
   them into pitches, velocity layers (from words like *pp, mf, ff, soft, hard* in the
-  names, or from clear loudness differences) and round robins. Open **Samples** to see
-  the result and correct any file's role, layer or root note.
-- **Load example** loads a synthetic vowel.
-- The detected root is shown large. If it is wrong (or `?`), choose the right one in the
-  **Root** menu. This is undoable (Cmd/Ctrl+Z).
+  names, or from clear loudness differences) and round robins. **☰ → Samples** shows the
+  result and lets you correct any file's role, layer or root note.
+- **☰ → Load example** loads a synthetic vowel.
+- The detected root is shown large. If it is wrong (or `?`), choose the right one in
+  **☰ → Root**. This is undoable (Cmd/Ctrl+Z).
 - Your files are copied into OSP's own sample library, so projects still open when the
   originals move.
+
+## Two layers: A and B
+
+- The small **A / B** tabs at the top left of the display choose which layer you are
+  editing. Dropping or loading a sound goes into that layer; the other one is untouched.
+  The display, the file name (bottom left), the root and **ONE SHOT / GRANULAR** (bottom
+  right) all belong to the edited layer.
+- The slider at the top right blends them: all the way left only A, the middle both
+  (equal power), all the way right only B. An empty layer is silent.
+- Both layers go through the same LIFE, DYNAMICS, CHARACTER, MOVEMENT, SPACE and
+  ORIGINAL ↔ REIMAGINED. **☰ → Clear layer** empties the edited layer.
+
+## Granular mode
+
+Switch a layer to **GRANULAR** and it plays a stream of short grains taken from the
+recording instead of playing it through, so notes sustain for as long as you hold them,
+at the pitch you play. Five small controls appear over the waveform (the orange line and
+band show where grains come from):
+
+| Control | What it does |
+|---|---|
+| **POS** | Where in the recording grains are taken (starts in the recording's steady part). |
+| **SIZE** | Grain length, 20–400 ms: short is buzzy and smeared, long is smooth and close to the source. |
+| **DENS** | Grains per second, 4–40: low is sparse and pulsing, high is a continuous texture. |
+| **TUNE** | Extra pitch for the grains, ±12 semitones, on top of the note you play. |
+| **SPREAD** | How far around POS grains may come from: low stays on one spot, high is a wide cloud. |
+
+After you let go no new grains start; the ones playing finish (under the release time).
 
 ## The controls
 

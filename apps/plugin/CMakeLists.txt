@@ -41,6 +41,7 @@ target_sources(OSP_Plugin PRIVATE
     Source/PluginEditor.cpp
     Source/OspLookAndFeel.cpp
     Source/ShapingPopups.cpp
+    Source/LayerControls.cpp
     Source/InstrumentLoader.cpp
     ${OSP_IO_SOURCES})
 

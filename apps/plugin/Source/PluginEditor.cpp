@@ -53,6 +53,26 @@ void WaveformView::setDragHighlight (bool on)
     repaint();
 }
 
+void WaveformView::setLayer (int newLayer)
+{
+    if (layer != newLayer)
+    {
+        layer = newLayer;
+        repaint();
+    }
+}
+
+void WaveformView::setGranularView (bool on, float position, float spread)
+{
+    if (on != granular || std::abs (position - grainPosition) > 1.0e-4f || std::abs (spread - grainSpread) > 1.0e-4f)
+    {
+        granular = on;
+        grainPosition = position;
+        grainSpread = spread;
+        repaint();
+    }
+}
+
 void WaveformView::paint (juce::Graphics& g)
 {
     using namespace palette;
@@ -66,7 +86,8 @@ void WaveformView::paint (juce::Graphics& g)
     g.setColour (juce::Colours::black.withAlpha (0.55f));
     g.drawRoundedRectangle (bounds.reduced (0.5f), 7.0f, 1.0f);
 
-    const auto plot = bounds.reduced (18.0f, 0.0f).withTrimmedTop (28.0f).withTrimmedBottom (14.0f);
+    // Top row: A/B tabs and the blend (children of the editor); bottom row: file and mode.
+    const auto plot = bounds.reduced (18.0f, 0.0f).withTrimmedTop (44.0f).withTrimmedBottom (30.0f);
     const bool hasWave = instrument != nullptr && ! instrument->peakMax.empty();
 
     if (hasWave && instrument->durationSeconds > 0.0)
@@ -79,9 +100,9 @@ void WaveformView::paint (juce::Graphics& g)
         {
             const float x = plot.getX() + static_cast<float> (t / duration) * plot.getWidth();
             g.setColour (displayLine);
-            g.drawVerticalLine (juce::roundToInt (x), bounds.getY() + 10.0f, bounds.getBottom() - 10.0f);
+            g.drawVerticalLine (juce::roundToInt (x), bounds.getY() + 28.0f, bounds.getBottom() - 26.0f);
             g.setColour (displayText);
-            g.drawText (secondsText (t, step), juce::Rectangle<float> (x + 5.0f, bounds.getY() + 8.0f, 60.0f, 14.0f),
+            g.drawText (secondsText (t, step), juce::Rectangle<float> (x + 5.0f, bounds.getY() + 28.0f, 60.0f, 14.0f),
                         juce::Justification::centredLeft, false);
         }
         juce::Path centre;
@@ -93,17 +114,23 @@ void WaveformView::paint (juce::Graphics& g)
         g.setColour (displayLine.withAlpha (0.8f));
         g.fillPath (dashed);
 
-        const auto& pitch = instrument->analysis.pitch;
-        juce::String note;
-        if (pitch.midiNote >= 0)
-            note << pitch.noteName << juce::String::fromUTF8 (" \xe2\x80\x93 ") << (pitch.centsOffset >= 0 ? "" : "-")
-                 << juce::String (std::abs (static_cast<int> (std::lround (pitch.centsOffset)))) << "c (" << pitch.confidenceLevel << ")";
-        else
-            note = "no pitch";
-        auto info = bounds.reduced (14.0f, 8.0f);
+        // Length, under the blend.
         g.setColour (displayText);
-        g.drawText (note, info.removeFromTop (14.0f), juce::Justification::centredRight, false);
-        g.drawText (juce::String (duration, duration < 10.0 ? 2 : 1) + " s", info.removeFromTop (14.0f), juce::Justification::centredRight, false);
+        g.drawText (juce::String (duration, duration < 10.0 ? 2 : 1) + " s", bounds.reduced (14.0f, 0.0f).withTrimmedTop (28.0f).withHeight (14.0f),
+                    juce::Justification::centredRight, false);
+    }
+
+    if (hasWave && granular)
+    {
+        // Where grains come from: SPREAD as a soft band (a quarter of the length either
+        // side at 100 %), POS as a line.
+        const float x = plot.getX() + grainPosition * plot.getWidth();
+        const float half = (grainSpread * 0.25f + 0.004f) * plot.getWidth();
+        const auto band = juce::Rectangle<float> (x - half, plot.getY() - 4.0f, 2.0f * half, plot.getHeight() + 8.0f).getIntersection (plot.expanded (0.0f, 4.0f));
+        g.setColour (accent.withAlpha (0.10f));
+        g.fillRect (band);
+        g.setColour (accent.withAlpha (0.75f));
+        g.drawVerticalLine (juce::roundToInt (x), plot.getY() - 4.0f, plot.getBottom() + 4.0f);
     }
 
     if (hasWave)
@@ -131,6 +158,18 @@ void WaveformView::paint (juce::Graphics& g)
             g.setColour (accent.withAlpha (0.85f));
             g.drawVerticalLine (juce::roundToInt (x), plot.getY() - 4.0f, plot.getBottom() + 4.0f);
         }
+    }
+
+    {
+        // The edited layer and its file, bottom left.
+        auto row = bounds.reduced (12.0f, 0.0f).withTrimmedTop (bounds.getHeight() - 24.0f).withHeight (16.0f);
+        g.setColour (housing);
+        g.setFont (fonts::make (11.5f, fonts::Weight::semibold));
+        g.drawText (OspAudioProcessor::layerName (layer), row.removeFromLeft (14.0f), juce::Justification::centredLeft, false);
+        g.setColour (displayText);
+        g.setFont (fonts::make (11.5f));
+        const auto name = instrument != nullptr ? juce::String::fromUTF8 (instrument->filename.c_str()) : juce::String ("No sample loaded");
+        g.drawText (name, row.withWidth (std::min (row.getWidth(), bounds.getWidth() * 0.55f)), juce::Justification::centredLeft, true);
     }
 
     if (! hasWave && ! loading)
@@ -372,42 +411,31 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     setLookAndFeel (&lookAndFeel);
     addAndMakeVisible (waveform);
 
-    for (auto* label : { &rootLabel, &characterLabel, &detailLabel, &statusLabel })
+    for (auto* label : { &rootLabel, &titleLabel, &characterLabel, &detailLabel, &statusLabel })
     {
         label->setColour (juce::Label::textColourId, palette::text);
         label->setBorderSize ({ 0, 0, 0, 0 });
         addAndMakeVisible (*label);
     }
     rootLabel.setFont (fonts::make (46.0f, fonts::Weight::semibold, -0.01f));
-    characterLabel.setFont (fonts::make (16.0f, fonts::Weight::medium, 0.1f));
+    titleLabel.setFont (fonts::make (17.0f, fonts::Weight::semibold, 0.06f));
+    titleLabel.setText ("OSP/2-OSP", juce::dontSendNotification);
+    characterLabel.setFont (fonts::make (11.5f, fonts::Weight::medium, 0.14f));
     detailLabel.setFont (fonts::make (12.5f));
     detailLabel.setColour (juce::Label::textColourId, palette::textDim);
     statusLabel.setFont (fonts::make (12.5f));
     statusLabel.setColour (juce::Label::textColourId, palette::textDim);
 
-    rootBox.addItem ("Root: auto", 1);
-    for (int note = 0; note < 128; ++note)
-        rootBox.addItem ("Root: " + juce::String (midiNoteName (note)), note + 2);
-    rootBox.onChange = [this] {
-        const int id = rootBox.getSelectedId();
-        if (id == 1)
-            ospProcessor.changeRootOverride (std::nullopt);
-        else if (id >= 2)
-            ospProcessor.changeRootOverride (static_cast<double> (id - 2));
-        refreshInstrumentInfo();
-    };
-    rootBox.setTitle ("Root note");
-    addAndMakeVisible (rootBox);
-
-    loadButton.onClick = [this] { chooseFile(); };
-    exampleButton.onClick = [this] { ospProcessor.loadExample(); };
-    addAndMakeVisible (loadButton);
-    addAndMakeVisible (exampleButton);
-    samplesButton.setClickingTogglesState (true);
-    samplesButton.setTooltip ("How the dropped files were combined (pitch, velocity layers, round robins)");
-    samplesButton.onClick = [this] { samplesPanel.setVisible (samplesButton.getToggleState()); };
-    addAndMakeVisible (samplesButton);
     addChildComponent (samplesPanel);
+
+    // A/B layers inside the display: tabs (edit focus), blend, mode switch, granular overlay.
+    layerTabs.setTitle ("Edit layer");
+    layerTabs.onSelect = [this] (int layer) {
+        ospProcessor.setEditLayer (layer);
+        showLayer (layer);
+    };
+    addAndMakeVisible (layerTabs);
+    addAndMakeVisible (blendControl);
 
     // Starting states (spec §101) and the menu (presets, instrument files, undo, size).
     for (int i = 0; i < ospProcessor.getNumPrograms(); ++i)
@@ -498,6 +526,7 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     setSize (900, 620);
     setScaleFactor (ospProcessor.uiScale());
 
+    showLayer (ospProcessor.editLayer());
     if (ospProcessor.advancedOpen())
         openPopup (advancedPopup);
     refreshInstrumentInfo();
@@ -577,6 +606,43 @@ void OspAudioProcessorEditor::updateCustomisedDots()
     }
 }
 
+void OspAudioProcessorEditor::showLayer (int layer)
+{
+    shownLayer = layer;
+    layerTabs.setSelected (layer);
+    waveform.setLayer (layer);
+    if (auto* param = ospProcessor.parameters.getParameter (OspAudioProcessor::layerParameterId (layer, "sourceMode")))
+    {
+        modeSwitch = std::make_unique<SourceModeSwitch> (*param);
+        modeSwitch->setTooltip ("Layer " + OspAudioProcessor::layerName (layer) + ": play the recording through, or as grains");
+        modeSwitch->onChange = [this] (int) { updateGranularView(); };
+        addAndMakeVisible (*modeSwitch);
+    }
+    granularOverlay = std::make_unique<GranularOverlay> (ospProcessor.parameters, layer);
+    addChildComponent (*granularOverlay);
+    samplesShown = false;
+    samplesPanel.setVisible (false);
+    if (popup != nullptr)
+        popup->toFront (false);
+    refreshInstrumentInfo();
+    resized();
+    updateGranularView();
+}
+
+void OspAudioProcessorEditor::updateGranularView()
+{
+    if (shownLayer < 0)
+        return;
+    auto value = [this] (const char* name) {
+        auto* p = ospProcessor.parameters.getParameter (OspAudioProcessor::layerParameterId (shownLayer, name));
+        return p != nullptr ? p->convertFrom0to1 (p->getValue()) : 0.0f;
+    };
+    const bool granular = value ("sourceMode") >= 0.5f;
+    waveform.setGranularView (granular, 0.01f * value ("granular.position"), 0.01f * value ("granular.spread"));
+    if (granularOverlay != nullptr && granularOverlay->isVisible() != granular)
+        granularOverlay->setVisible (granular);
+}
+
 void OspAudioProcessorEditor::paint (juce::Graphics& g)
 {
     using namespace palette;
@@ -633,41 +699,31 @@ void OspAudioProcessorEditor::resized()
 {
     auto area = getLocalBounds().reduced (5).reduced (22, 14);
 
-    // Top: pitch block, description, right-aligned controls (two rows).
+    // Top: pitch, title and description; on the right only the starting state and the menu.
     auto header = area.removeFromTop (62);
     {
-        auto right = header.removeFromRight (360);
-        auto row1 = right.removeFromTop (26);
-        right.removeFromTop (6);
-        auto row2 = right.removeFromTop (26);
-        menuButton.setBounds (row1.removeFromRight (34));
-        row1.removeFromRight (6);
-        loadButton.setBounds (row1.removeFromRight (84));
-        row1.removeFromRight (6);
-        exampleButton.setBounds (row1.removeFromRight (98));
-        row1.removeFromRight (6);
-        stateBox.setBounds (row1.removeFromRight (128));
-        rootBox.setBounds (row2.removeFromRight (124));
-        row2.removeFromRight (6);
-        samplesButton.setBounds (row2.removeFromRight (98));
+        auto right = header.removeFromRight (176).withSizeKeepingCentre (176, 26).translated (0, -8);
+        menuButton.setBounds (right.removeFromRight (34));
+        right.removeFromRight (8);
+        stateBox.setBounds (right);
     }
     rootLabel.setBounds (header.removeFromLeft (std::max (64, juce::roundToInt (juce::GlyphArrangement::getStringWidth (rootLabel.getFont(), rootLabel.getText())) + 6)));
     header.removeFromLeft (18);
-    auto description = header.withSizeKeepingCentre (header.getWidth(), 40);
-    characterLabel.setBounds (description.removeFromTop (22));
+    auto description = header.withSizeKeepingCentre (header.getWidth(), 52);
+    titleLabel.setBounds (description.removeFromTop (22));
+    characterLabel.setBounds (description.removeFromTop (16));
     detailLabel.setBounds (description);
 
     area.removeFromTop (12);
 
-    // Bottom zone: status, keyboard, Advanced.
-    auto status = area.removeFromBottom (20);
-    statusLabel.setBounds (status.withTrimmedLeft (16));
+    // Bottom zone: keyboard, then status (left) and Advanced (right, under the keyboard).
+    auto bottom = area.removeFromBottom (22);
+    advancedButton.setBounds (bottom.removeFromRight (104));
+    statusLabel.setBounds (bottom.withTrimmedLeft (16));
     area.removeFromBottom (6);
     keyboard.setBounds (area.removeFromBottom (72).reduced (3, 0));
     keyboard.setKeyWidth (static_cast<float> (keyboard.getWidth()) / 52.0f); // 88 keys = 52 white keys
-    area.removeFromBottom (12);
-    advancedButton.setBounds (area.removeFromBottom (22).withWidth (104));
-    area.removeFromBottom (6);
+    area.removeFromBottom (14);
 
     // Macro row.
     auto macroRow = area.removeFromBottom (150);
@@ -682,8 +738,19 @@ void OspAudioProcessorEditor::resized()
     }
     area.removeFromBottom (12);
 
+    // The display and the layer controls inside it.
     waveform.setBounds (area.reduced (3, 3));
-    samplesPanel.setBounds (waveform.getBounds());
+    const auto display = waveform.getBounds();
+    layerTabs.setBounds (display.getX() + 12, display.getY() + 8, 42, 16);
+    blendControl.setBounds (display.getRight() - 12 - 132, display.getY() + 7, 132, 18);
+    if (modeSwitch != nullptr)
+        modeSwitch->setBounds (display.getRight() - 12 - 168, display.getBottom() - 24, 168, 16);
+    if (granularOverlay != nullptr)
+    {
+        const auto size = GranularOverlay::preferredSize();
+        granularOverlay->setBounds (display.getCentreX() - size.x / 2, display.getY() + 44, size.x, size.y);
+    }
+    samplesPanel.setBounds (display.withTrimmedTop (28).withTrimmedBottom (28).reduced (4, 0));
     positionPopup();
 }
 
@@ -741,6 +808,43 @@ bool OspAudioProcessorEditor::keyPressed (const juce::KeyPress& key)
 void OspAudioProcessorEditor::showMenu()
 {
     juce::PopupMenu menu;
+
+    // The edited layer's sample (spec: header actions live here).
+    const int layer = ospProcessor.editLayer();
+    const auto layerLetter = OspAudioProcessor::layerName (layer);
+    const auto loaded = ospProcessor.currentInstrument();
+    menu.addSectionHeader ("Layer " + layerLetter);
+    menu.addItem ((loaded != nullptr ? "Replace sample in " : "Load sample into ") + layerLetter + juce::String::fromUTF8 ("\xe2\x80\xa6"), [this] { chooseFile(); });
+    menu.addItem ("Load example into " + layerLetter, [this] { ospProcessor.loadExample(); });
+    menu.addItem ("Clear layer " + layerLetter, loaded != nullptr, false, [this] {
+        ospProcessor.clearLayer();
+        refreshInstrumentInfo();
+    });
+    menu.addItem ("Samples", loaded != nullptr && loaded->set != nullptr, samplesShown, [this] {
+        samplesShown = ! samplesShown;
+        samplesPanel.setVisible (samplesShown);
+    });
+    {
+        juce::PopupMenu root;
+        const auto overrideMidi = ospProcessor.rootOverride();
+        root.addItem ("Auto (detected)", true, ! overrideMidi.has_value(), [this] {
+            ospProcessor.changeRootOverride (std::nullopt);
+            refreshInstrumentInfo();
+        });
+        for (int octave = 0; octave <= 8; ++octave)
+        {
+            juce::PopupMenu notes;
+            for (int note = 12 * (octave + 1); note < 12 * (octave + 2) && note < 128; ++note)
+                notes.addItem (juce::String (midiNoteName (note)), true, overrideMidi && std::lround (*overrideMidi) == note, [this, note] {
+                    ospProcessor.changeRootOverride (static_cast<double> (note));
+                    refreshInstrumentInfo();
+                });
+            root.addSubMenu ("Octave " + juce::String (octave), notes);
+        }
+        menu.addSubMenu ("Root " + layerLetter + (overrideMidi ? ": " + juce::String (midiNoteName (static_cast<int> (std::lround (*overrideMidi)))) : juce::String (": auto")), root,
+                         loaded != nullptr);
+    }
+    menu.addSeparator();
 
     // The user's presets and instruments, by folder (sub-folders become sub-menus).
     auto browse = [this] (const juce::File& folder, const juce::String& extension, bool instrument) {
@@ -850,15 +954,15 @@ void OspAudioProcessorEditor::refreshInstrumentInfo()
     waveform.setInstrument (instrument);
     samplesPanel.setInstrument (instrument);
     const bool isSet = instrument != nullptr && instrument->set != nullptr;
-    samplesButton.setEnabled (isSet);
-    if (! isSet && samplesButton.getToggleState())
+    if (! isSet && samplesShown)
     {
-        samplesButton.setToggleState (false, juce::dontSendNotification);
+        samplesShown = false;
         samplesPanel.setVisible (false);
     }
+    for (int layer = 0; layer < OspAudioProcessor::numLayers; ++layer)
+        layerTabs.setLoaded (layer, ospProcessor.currentInstrument (layer) != nullptr);
 
     const auto overrideMidi = ospProcessor.rootOverride();
-    rootBox.setSelectedId (overrideMidi ? static_cast<int> (std::lround (*overrideMidi)) + 2 : 1, juce::dontSendNotification);
 
     if (instrument == nullptr)
     {
@@ -895,6 +999,9 @@ void OspAudioProcessorEditor::timerCallback()
     if (stateBox.getSelectedId() != ospProcessor.getCurrentProgram() + 1)
         stateBox.setSelectedId (ospProcessor.getCurrentProgram() + 1, juce::dontSendNotification);
 
+    if (ospProcessor.editLayer() != shownLayer)
+        showLayer (ospProcessor.editLayer());   // e.g. a recalled session
+    updateGranularView();
     const auto instrument = ospProcessor.currentInstrument();
     const auto generation = instrument != nullptr ? instrument->generation : 0;
     if (generation != shownGeneration || state != shownState)

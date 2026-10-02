@@ -765,6 +765,20 @@ TEST_CASE ("plugin: editor builds, shows the instrument and can be snapshotted",
         }
         ospEditor->closePopup();
         CHECK (ospEditor->openPopupIndex() == -1);
+
+        // Layer B in Granular mode: tabs, blend, file name, mode switch, overlay.
+        const auto second = writeSource (tmp.dir, "Lydian Cinema.wav", testsignals::vowel (midiToHz (48), 4.0, 48000.0, 8));
+        p.setEditLayer (1);
+        p.loadFile (second);
+        REQUIRE (p.waitForLoads (20000));
+        p.pollLoads();
+        p.parameters.getParameter ("layerB.sourceMode")->setValueNotifyingHost (1.0f);
+        p.parameters.getParameter ("ab.blend")->setValueNotifyingHost (0.6f);
+        ospEditor->refreshNow();
+        snapshot ("osp-editor-layer-b-granular.png");
+        p.setEditLayer (0);
+        ospEditor->refreshNow();
+        snapshot ("osp-editor-layer-a.png");
     }
     p.editorBeingDeleted (editor.get());
     editor.reset();

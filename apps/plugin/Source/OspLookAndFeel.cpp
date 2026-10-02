@@ -168,6 +168,29 @@ void OspLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int widt
     drawKnob (g, r.withSizeKeepingCentre (side, side), angle, startAngle, endAngle, mini, slider.isEnabled());
 }
 
+void OspLookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int width, int height, float sliderPos, float minPos,
+                                       float maxPos, juce::Slider::SliderStyle style, juce::Slider& slider)
+{
+    if (! static_cast<bool> (slider.getProperties()["blend"]))
+    {
+        LookAndFeel_V4::drawLinearSlider (g, x, y, width, height, sliderPos, minPos, maxPos, style, slider);
+        return;
+    }
+    // The A/B blend: a slim track on the dark display, orange towards the thumb, a small cream thumb.
+    const float cy = static_cast<float> (y) + static_cast<float> (height) * 0.5f;
+    const auto track = juce::Rectangle<float> (static_cast<float> (x), cy - 1.5f, static_cast<float> (width), 3.0f);
+    g.setColour (palette::displayLine);
+    g.fillRoundedRectangle (track, 1.5f);
+    g.setColour (palette::accent);
+    g.fillRoundedRectangle (track.withRight (sliderPos), 1.5f);
+    const auto thumb = juce::Rectangle<float> (sliderPos - 5.5f, cy - 5.5f, 11.0f, 11.0f);
+    juce::Path disc;
+    disc.addEllipse (thumb);
+    juce::DropShadow (juce::Colours::black.withAlpha (0.5f), 3, { 0, 1 }).drawForPath (g, disc);
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xfffbf8f2), 0.0f, thumb.getY(), juce::Colour (0xffd4cab8), 0.0f, thumb.getBottom(), false));
+    g.fillPath (disc);
+}
+
 juce::Slider::SliderLayout OspLookAndFeel::getSliderLayout (juce::Slider& slider)
 {
     auto layout = LookAndFeel_V4::getSliderLayout (slider);

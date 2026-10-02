@@ -66,6 +66,8 @@ public:
 
     void setCaption (juce::String newCaption);
     void setFormatter (Formatter newFormatter);
+    /** Light captions for use over the dark display. */
+    void setOnDark (bool dark) { onDark = dark; repaint(); }
 
     void paint (juce::Graphics&) override;
     void resized() override;
@@ -76,6 +78,7 @@ private:
     juce::String caption;
     Formatter formatter;
     bool horizontal;
+    bool onDark = false;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
 };
 

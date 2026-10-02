@@ -1,5 +1,6 @@
 #pragma once
 
+#include "LayerControls.h"
 #include "OspLookAndFeel.h"
 #include "PluginProcessor.h"
 #include "ShapingPopups.h"
@@ -17,10 +18,17 @@ public:
     void setInstrument (std::shared_ptr<const LoadedInstrument> newInstrument);
     void setLoading (bool isLoading);
     void setDragHighlight (bool on);
+    /** The edited layer's letter, shown with the file name at the bottom left. */
+    void setLayer (int layer);
+    /** Granular mode: mark where grains are taken (POS) and how widely (SPREAD), 0..1. */
+    void setGranularView (bool granular, float position, float spread);
     void paint (juce::Graphics&) override;
 
 private:
     std::shared_ptr<const LoadedInstrument> instrument;
+    int layer = 0;
+    bool granular = false;
+    float grainPosition = 0.5f, grainSpread = 0.2f;
     bool loading = false;
     bool dragHighlight = false;
 };
@@ -114,6 +122,9 @@ private:
     void choosePresetFile (bool save, bool instrument);
     void positionPopup();
     void updateCustomisedDots();
+    /** Rebinds the display's layer controls to the edited layer. */
+    void showLayer (int layer);
+    void updateGranularView();
 
     struct Knob
     {
@@ -133,14 +144,19 @@ private:
     OspLookAndFeel lookAndFeel;
     OspAudioProcessor& ospProcessor;
     WaveformView waveform;
-    juce::Label rootLabel, characterLabel, detailLabel, statusLabel;
-    juce::ComboBox rootBox;
-    juce::TextButton loadButton { "Load..." }, exampleButton { "Load example" }, samplesButton { "Samples" };
+    juce::Label rootLabel, titleLabel, characterLabel, detailLabel, statusLabel;
     SamplesPanel samplesPanel { ospProcessor };
+    bool samplesShown = false;
+    // A/B layers, inside the display.
+    LayerTabs layerTabs;
+    BlendControl blendControl { ospProcessor.parameters };
+    std::unique_ptr<SourceModeSwitch> modeSwitch;
+    std::unique_ptr<GranularOverlay> granularOverlay;
+    int shownLayer = -1;
     MenuButton menuButton;
     juce::ComboBox stateBox;
     std::array<Knob, 6> macros;      // Life, Dynamics, Character, Movement, Space, Original/Reimagined
-    juce::TextButton advancedButton { "ADVANCED" };
+    juce::TextButton advancedButton { juce::String::fromUTF8 ("ADVANCED  \xe2\x80\xba") };
     OspKeyboard keyboard;
     std::unique_ptr<juce::FileChooser> chooser;
     juce::TooltipWindow tooltips { this, 700 };

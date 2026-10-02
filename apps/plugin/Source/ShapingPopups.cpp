@@ -223,19 +223,21 @@ void MiniKnob::paint (juce::Graphics& g)
 {
     const auto value = formatter != nullptr ? formatter (slider.getValue()) : juce::String (slider.getValue(), 1);
     auto r = getLocalBounds();
-    g.setColour (palette::textDim);
+    const auto captionColour = onDark ? palette::displayText : palette::textDim;
+    const auto valueColour = onDark ? palette::housing : palette::text;
+    g.setColour (captionColour);
     g.setFont (fonts::label (9.5f));
     if (horizontal)
     {
         g.drawText (caption, r.removeFromLeft (56), juce::Justification::centredLeft, false);
         r.removeFromLeft (r.getHeight() + 6);
-        g.setColour (palette::text);
+        g.setColour (valueColour);
         g.setFont (fonts::make (13.0f, fonts::Weight::medium));
         g.drawText (value, r, juce::Justification::centredLeft, false);
         return;
     }
     g.drawText (caption, r.removeFromTop (12), juce::Justification::centred, false);
-    g.setColour (palette::text);
+    g.setColour (valueColour);
     g.setFont (fonts::make (11.5f, fonts::Weight::medium));
     g.drawText (value, r.removeFromBottom (14), juce::Justification::centred, false);
 }

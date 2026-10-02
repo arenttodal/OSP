@@ -231,6 +231,35 @@ compiles the I/O sources with the plugin's own JUCE settings.
   bend, mod wheel (MOTION), aftertouch / channel pressure (intensity), CC74 (timbre),
   CC 20–25 (macros), MPE lower zone (per-note bend ±48 st, pressure, slide).
 
+## A/B layers and the Granular source mode
+
+`InstrumentEngine` holds two source layers. Each has its own model or set, pitch offset
+(the layer's root correction), round-robin memory, performance engine and source mode;
+every note-on starts one voice per loaded layer (same event index for layer A, a salted
+one for B, so B's randomness is its own while the shared seed keeps the two performers'
+slow state together). Polyphony is counted per layer. Layers render into preallocated
+per-layer buffers and are mixed with an equal-power crossfade (`cos`/`sin` of the blend,
+ramped over 20 ms), then the **shared** post stage (Reimagined resonators and formants,
+MOVEMENT bus, SPACE) runs once. The per-voice stages (LIFE, DYNAMICS, CHARACTER filter,
+drift) are not duplicated per layer as processing chains: they are the same settings
+applied in each voice. With only layer A loaded and the blend at A the output is
+bit-identical to the single-layer engine (the gain is exactly 1), so every golden still
+holds.
+
+Granular is a **source mode**, not an effect: `GranularSource` lives inside the voice
+and replaces the read-through (continuation, grafts, doubling, Reimagined grains and the
+transient swap are off for that voice). It plays Hann-windowed grains (window by
+rotation, no per-sample trig) from a fixed pool of 24, read with cubic interpolation at
+the voice's current step times TUNE, so bends and drift still apply. Grain positions are
+POS ± SPREAD × a quarter of the recording, clamped so reads never leave it. After note-off
+no grain starts and the voice ends when the last grain does (or the release ends). The
+mode is fixed per note (switching never clicks); POS/SIZE/DENS/TUNE/SPREAD are read live.
+
+In the plugin each layer is a `Layer` (model exchange, playing/retired instruments, load
+state, root override, undo history). Loads, root changes and the Samples inspector act on
+the edited layer; state version 4 stores layer A in `Instrument` (so older sessions recall
+into A) and layer B in `InstrumentB`.
+
 ## Recorded deviations from the suggested layout
 
 - `src/research/` added: the renderer logic is a library so tests share it.

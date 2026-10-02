@@ -150,6 +150,16 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [x] Reimagined far end (violin benchmark): granular continuation with octave/fifth/sub-octave remapping and pitch jitter takes over the sustain from ~45 %, wandering formants (spectral evolution) from 40 %
 - [ ] Listening round 3: `research/experiments/reimagined-3.json` (violin)
 
+## Milestone checklist — GUI finalisation, A/B layers, Granular mode MVP
+
+- [x] Header: pitch, title, description; only the starting state and ☰ on the right. Load, Load example, Samples, Root and Clear live in ☰ (context: the edited layer)
+- [x] Display: A/B tabs (top left), equal-power blend (top right), layer + file name (bottom left), ONE SHOT / GRANULAR (bottom right), granular overlay POS SIZE DENS TUNE SPREAD (Granular only), POS line and SPREAD band on the waveform
+- [x] Advanced under the right side of the keyboard
+- [x] Engine: two layers, per-layer model/set/root/mode, blend before the shared post stage; per-voice Granular source (pool of 24 grains, Hann, cubic, seeded); sustain while held, grains finish after note-off
+- [x] Plugin: per-layer loading/recall/undo, stable IDs `ab.blend`, `layerA|B.sourceMode`, `layerA|B.granular.{position,size,density,tune,spread}`; state version 4 (older sessions = layer A, One Shot); POS starts in the analysed sustain
+- [x] Tests: blend, empty layer, granular sustain/pitch/TUNE/level, note-off, polyphony with per-layer modes, block-size independence, per-layer load/recall (bit-identical), clear, old sessions
+- [ ] Listening pass on granular settings (defaults SIZE 150 ms, DENS 14/s, SPREAD 20 %)
+
 ## DONE
 
 - Pure C++20 DSP/analysis library (`osp_dsp`) independent of JUCE; JUCE used for file
@@ -165,7 +175,6 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 
 ## IN PROGRESS
 
-- Two-layer A/B instrument with a per-layer Granular source mode (next milestone).
 - Lab round 3 (Reimagined 3, violin).
 - DAW/host validation on a Mac.
 

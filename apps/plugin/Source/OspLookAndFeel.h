@@ -48,6 +48,8 @@ public:
     void drawRotarySlider (juce::Graphics&, int x, int y, int width, int height, float sliderPos,
                            float startAngle, float endAngle, juce::Slider&) override;
     juce::Label* createSliderTextBox (juce::Slider&) override;
+    void drawLinearSlider (juce::Graphics&, int x, int y, int width, int height, float sliderPos, float minPos, float maxPos,
+                           juce::Slider::SliderStyle, juce::Slider&) override;
     juce::Slider::SliderLayout getSliderLayout (juce::Slider&) override;
 
     void drawButtonBackground (juce::Graphics&, juce::Button&, const juce::Colour& background,
