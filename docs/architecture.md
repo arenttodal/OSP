@@ -1,7 +1,9 @@
 # Architecture
 
-Phase 0 deliberately keeps the system small: a pure-C++ DSP/analysis library, a thin
-JUCE I/O layer, a research library, and a CLI. The future plugin reuses the same DSP.
+Phase 0 deliberately kept the system small: a pure-C++ DSP/analysis library, a thin
+JUCE I/O layer, a research library, and a CLI. Phases 2–8 added the instrument engine
+("engine C", `src/engine/`) on the same foundations; the plugin and the research tools
+play exactly the same code. See "Instrument engine" below.
 
 ```
                    ┌──────────────────────── osp_research (static) ─────────────────────────┐
@@ -162,10 +164,71 @@ compiles the I/O sources with the plugin's own JUCE settings.
   bit-identical even if analysis improves later. Recall looks up the store by hash, falls back to the original path,
   and warns if the content changed.
 
+## Instrument engine (Phases 2–8)
+
+```
+ AudioData + AnalysisData ──InstrumentBuilder (worker thread)──► InstrumentModel (immutable, staged)
+                                                                   stage 1 provisional: PlaybackSource + profiles
+                                                                   stage 2 continued:   ContinuationModel, resonances
+                                                                   stage 3 complete:    register anchors (Natural)
+ several files ──inferSampleSet──► InstrumentSet (members = models; groups, layers, round robins, register model)
+
+ note-on ─► InstrumentEngine (audio thread, no allocation)
+              member choice (set): nearest pitch group -> velocity layer -> round robin (never the previous take)
+              NoteShape = velocity level + applyDynamics (DYNAMICS) + PerformanceEngine (LIFE, memory)
+                          + MOTION drift + Reimagined (segment length, saturation) + register brightness
+          ─► InstrumentVoice: sinc read of the chosen PitchLayer (Tape = original, Natural = nearest anchor)
+                              continuation random walk over jumps, correlation-aware crossfades
+                              release graft into the recording's own ending
+                              shelves (brightness/body), transient, damping, expression (pressure, MPE)
+          ─► PostProcessor: CHARACTER (body resonances moved + tilt), sympathetic resonators (Reimagined),
+                            SPACE (width, decorrelation, FDN ambience)
+```
+
+- **Modules.** `analysis/continuation/` (stable region, jump points, graft exits),
+  `model/ContinuationModel`, `model/InstrumentModel`, `model/InstrumentSet`,
+  `engine/InstrumentBuilder` (stages, sets, calibration, resonances),
+  `engine/InstrumentEngine` + `InstrumentVoice`, `engine/PerformanceEngine`,
+  `engine/PostProcessor`, `engine/SampleSetInference`, `engine/ShelfFilter`.
+  All in `osp_dsp` (pure C++; Signalsmith Stretch is linked privately for anchors).
+- **Why a new engine next to `BaselineSampler`**: baselines A and B must stay exactly as
+  they are (Rule 7, every listening test compares against them; golden renders cover
+  them). Engine C shares the interpolator, ADSR and PRNG.
+- **Real-time safety.** Everything that allocates (analysis, continuation search, anchors,
+  set inference) runs in the builder on a worker thread; the engine, voices and post
+  stage allocate only in `prepare()`. Voices hold raw pointers into immutable models;
+  the plugin keeps retired instruments alive until `isModelInUse` / `isSetInUse` say no
+  voice reads them.
+- **Staging (spec §62).** The plugin publishes each stage as soon as it exists: the
+  instrument is playable after stage 1 (plain sampler behaviour), gains endless sustain
+  with stage 2 and Natural pitch with stage 3. Refinements of a superseded sample are
+  skipped. Sets are built with continuation in one job (no anchors: real recordings
+  are the register).
+- **Determinism.** Note shapes, continuation walks, drift and round-robin choice derive
+  from `deriveSeed (seed, noteCounter, note)`; the performance memory depends only on
+  the event sequence. The plugin restarts performance memory at transport start, so a
+  bounce from the same position repeats exactly. Control-rate state lives per voice
+  and in the post stage, which starts every `prepare()` from the current macro targets
+  (no history), so output is identical across block sizes, and a recalled session is
+  bit-identical to the original (tested for single files, sets and imported packages).
+- **Recall.** A fresh load builds its model from the analysis after a JSON round trip,
+  i.e. exactly what the cache returns on recall; single-file sessions also store the
+  exact playback root/start/gain. Sets store member hashes and user assignments and are
+  re-inferred from the cached analyses.
+- **Plugin parameters** (state v2/v3): the five macros and Original ↔ Reimagined,
+  Pitch Character, Sustain, Variation Seed, MPE, plus the Phase 1 advanced set. v1
+  sessions migrate to neutral settings so they keep sounding like the sampler they
+  were made with. Starting states are host programs. MIDI: velocity, sustain, pitch
+  bend, mod wheel (MOTION), aftertouch / channel pressure (intensity), CC74 (timbre),
+  CC 20–25 (macros), MPE lower zone (per-note bend ±48 st, pressure, slide).
+
 ## Recorded deviations from the suggested layout
 
 - `src/research/` added: the renderer logic is a library so tests share it.
-- `src/presets/` not created yet: nothing to put in it until Phase 1 state/presets.
+- `src/presets/` not created: presets are the plugin's state XML (`.osppreset`) and
+  portable instruments are a zip of state + sources + analyses (`.ospinstrument`),
+  both implemented in the plugin processor; no separate preset model was needed.
+- `src/engine/` added for engine C (the spec's layout has no slot for it).
 - `apps/standalone/`: the standalone app comes from the JUCE plugin target
   (`juce_add_plugin(... FORMATS AU VST3 Standalone)`), so there is no separate app.
 - `RootChoice` (root selection + character description) lives in `src/model` because

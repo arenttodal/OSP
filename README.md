@@ -30,7 +30,7 @@ cmake -B build -DOSP_JUCE_DIR=/path/to/JUCE -DOSP_CATCH2_DIR=/path/to/Catch2
 
 Options: `-DOSP_BUILD_TESTS=OFF`, `-DOSP_BUILD_PLUGIN=ON`.
 
-## The instrument (Phase 1: baseline sampler plugin)
+## The instrument
 
 ```sh
 cmake -B build-plugin -G Ninja -DCMAKE_BUILD_TYPE=Release -DOSP_BUILD_PLUGIN=ON
@@ -42,13 +42,12 @@ Artefacts land in `build-plugin/apps/plugin/OSP_Plugin_artefacts/Release/`: `AU/
 (macOS), `VST3/OSP.vst3` and `Standalone/OSP(.app)`. Copy the AU/VST3 into
 `~/Library/Audio/Plug-Ins/Components` / `.../VST3` (macOS) to use them in a DAW.
 
-Drop a WAV/AIFF onto the window (or use *Load…* / *Load example*), play. The detected
-root is shown and can be overridden; Attack, Release, Velocity range, Fine tune, Bend
-range and Output are automatable. Imported samples are copied (by content hash) into
-`~/Library/Application Support/OSP/Samples` (macOS) or `~/.config/OSP/Samples` (Linux)
-so sessions recall even if the original file moves; set `OSP_SAMPLE_STORE` to override.
-On Linux the plugin build needs the usual JUCE GUI packages (X11, Xrandr, Xinerama,
-Xcursor, freetype, fontconfig, ALSA headers).
+Drop a WAV/AIFF/FLAC (or several files, or a folder) onto the window and play. What the
+controls do, MIDI mapping and file formats: **[docs/user-guide.md](docs/user-guide.md)**.
+Imported samples are copied (by content hash) into `~/Library/Application Support/OSP/Samples`
+(macOS) or `~/.config/OSP/Samples` (Linux) so sessions recall even if the original file
+moves; set `OSP_SAMPLE_STORE` to override. On Linux the plugin build needs the usual JUCE
+GUI packages (X11, Xrandr, Xinerama, Xcursor, freetype, fontconfig, ALSA headers).
 
 ## The research renderer
 
@@ -59,7 +58,7 @@ R=./build/apps/research-renderer/research-renderer
 $R --analyze source.wav
 $R --analyze source.wav --output-analysis report.json
 
-# Render a MIDI file or a standard fixture through baseline A (or B)
+# Render a MIDI file or a standard fixture through baseline A (or B, or C = the OSP engine)
 $R --source source.wav --midi research/midi/melody.mid --output out.wav
 $R --source source.wav --fixture register --output out.wav --metrics out.json
 $R --source source.wav --midi test.mid --analysis report.json --output out.wav   # reuse stored analysis

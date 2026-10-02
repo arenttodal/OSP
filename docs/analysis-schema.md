@@ -126,4 +126,15 @@ floor −120), `centroidHz`, `flux`, `flatness`.
 | `index.json` | `--index`, corpus | `schemaVersion`, `files[] {id, path, filename, extension, sizeBytes, supported, duplicateOf?}` |
 | `summary.json` | corpus | `schemaVersion`, `counts`, `files[]` with per-file status, root and renders |
 | `research/configs/*.json` | hand-written | `schemaVersion`, `engine`, `sampleRate`, `blockSize`, `seed`, `sampler{}`, `randomization{}`, `playback{startAtOnset, normaliseLevel, targetMaxRmsDbfs}` |
-| benchmark JSON | `--benchmark --output-json` | `schemaVersion`, `config`, block timing statistics |
+| benchmark JSON | `--benchmark --output-json` | `schemaVersion`, `config` (incl. `engine`), block timing statistics |
+| `research/configs/*.json` `instrument` block | hand-written | engine C: `macros{life, dynamics, character, motion, space, reimagined}`, `pitchCharacter`, `continuation`, `releaseGraft`, `dynamicsMode`, `velocityRangeDb`, `releaseSeconds`, `anchors` |
+| `research/experiments/*.json` | hand-written | `schemaVersion`, `name`, texts (`tab`, `title`, `heading`, `intro`, `groupLabel`), `scales[]`, `sources[] {id, label, path, paths?, sequence?}`, `sequence` / `variants[]`, `conditions[] {id, label, engine, instrument{}, useSet?, sequence?}`, rendering (`seed`, `outputSampleRate`, `listeningRmsDbfs`, `format`, `trimToCommon`, `maxSeconds`, `tail`) |
+| experiment `key.json` | `--experiment` | `schemaVersion`, `clips[] {id, group, section, variant, source, condition, seconds, renderMs, levelGainDb, repetitionScore, repetitionLagSeconds, seamSpikeDb}` — never shown to listeners |
+| experiment `listening.json` | `--experiment` | texts, `scales`, `sections[]`, `groups[] {id, section, label, note, clips[] (shuffled)}`, `ext` |
+| `*.osppreset` | plugin | the plugin state XML (below) |
+| `*.ospinstrument` | plugin | zip: `manifest.json {schemaVersion 1, format, engineVersion, stateVersion, sources[] {contentHash, filename, stored}}`, `source/<sha256>.<ext>`, `analysis/<sha256>.analysis.json`, `preset.xml` |
+| plugin state (XML) | host session | `stateVersion` (2), `uiScale`, `program`, APVTS parameters, `Instrument {contentHash, filename, originalPath, playbackRootMidi, rootOrigin, startSeconds, playbackGainDb, rootOverride?, Set? {Member{contentHash, filename, originalPath}*, Assignment{filename, role, layer, rootMidi?}*}}` |
+
+The engine's in-memory models (`InstrumentModel`, `ContinuationModel`, `InstrumentSet`)
+are never persisted: they are rebuilt from the cached analysis, deterministically, so
+there is no model file format to migrate.

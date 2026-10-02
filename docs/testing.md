@@ -86,11 +86,44 @@ and renders under `research/renders/`. One failing file never stops the run. Use
 `--generate-test-signals <dir>` creates a synthetic mini-corpus (including a broken
 and an unsupported file) for trying the runner without the private corpus.
 
+## Listening experiments (Phases 2–7)
+
+The principal test is listening (spec §71). `research-renderer --experiment plan.json`
+renders a blind experiment from a plan in `research/experiments/`:
+
+- every source × variant is a **group**; every condition is a **take** (engine A, B or C
+  with any `instrument` settings, a single file or the whole set with `useSet`);
+- takes in a group are trimmed to a common length, faded and RMS-matched (−20 dBFS),
+  written with random names (FLAC), and shuffled per group;
+- `key.json` maps names to conditions and records guard rails: `repetitionScore`
+  (strongest self-similarity of log-band spectra at 0.5–20 s lags — a plain loop scores
+  0.7–0.9, multi-loop continuation 0.1–0.2), `seamSpikeDb` (clicks/seams: loudest 3 ms
+  second-difference window re median), render time, level gain;
+- `listening.json` has only what a listener may see.
+
+`python3 research/listening/build.py <out> <run> [<run>...]` builds the **listening lab**
+page (one tab per run; ratings, a best pick and free-text notes per group, saved to the
+page's database). The lab copies are 320 kbps MP3; the lossless renders stay in the runs.
+
+| Plan | Phase | Question |
+|---|---|---|
+| `research/bakeoff/plan-1.json` (`--bakeoff`) | 2 | which pitch engine (resampling / Signalsmith / formant) |
+| `continuation-1.json` | 3 | can you hear the loop in 60 s holds (naive / best / multi / multi + movement) |
+| `performance-1.json` | 4 | repeated notes: identical / independent random / LIFE 50 % / 80 % |
+| `dynamics-1.json` | 5 | velocity 20→127: gain / gain + filter / model 50 % / 100 % |
+| `continuum-1.json` | 6 | Original ↔ Reimagined at 0/25/50/75/100 % |
+| `multisample-1.json` | 7 | one file vs the whole set |
+
+Other research checks: `--continuation-report <file|dir>` (stable region, jump quality,
+release per file) and `--register-test <dir>` (multi-pitch ground truth, spec §70: hide
+each pitch, rebuild from the rest, compare brightness with the real recording).
+
 ## Benchmarks
 
 ```sh
 ./build/apps/research-renderer/research-renderer --benchmark                       # 24 voices, 48 kHz, 128-sample blocks, dense retriggers
 ./build/apps/research-renderer/research-renderer --benchmark --voices 16 --no-retrigger
+./build/apps/research-renderer/research-renderer --benchmark --engine C --voices 16 --no-retrigger   # the OSP engine
 ```
 
 Each block is timed individually; the report gives mean, p99 and worst callback time
