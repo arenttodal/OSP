@@ -118,6 +118,19 @@ The open verdicts are listed in `docs/morning-checklist.md`.
 - a plugin test across host sample rates (22.05–192 kHz) and block sizes (1–4096, also
   varying): bit-identical output, no clicks.
 
+**Robustness and timing:**
+
+- Odd sources (silence, noise, an impulse, 10 ms and one-sample files, 8 kHz and
+  192 kHz files, DC, a clipped square, sub-audio and ultrasonic tones) build every
+  stage and play a four-octave chord with Tape and Natural, giving finite, bounded
+  output.
+- **Corpus timing (cloud VM).**
+  - Playable 0.2–0.6 s after the drop (stage 1).
+  - Endless sustain ready after 0.5–1.6 s.
+  - Natural pitch ready after 1.2–2.9 s.
+- **Memory.** Recordings over a minute skip Natural's four copies. A five-minute file
+  peaks at 380 MB in the renderer instead of 781 MB.
+
 **Written but not run:** `scripts/package-macos.sh` (signing and notarisation need a
 Developer ID).
 
