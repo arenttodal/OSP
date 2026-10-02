@@ -68,6 +68,8 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     baseGain = shape.gain * static_cast<float> (src.playbackGain());
     transientExtra = dbToLinear (shape.transientDb) - 1.0f;
     transientCoef = static_cast<float> (std::exp (-1.0 / (std::max (0.002f, shape.transientSeconds) * sampleRate)));
+    attackBright = shape.attackBrightnessDb;
+    attackBrightCoef = std::exp (-static_cast<double> (controlInterval) / (std::max (0.002f, 1.5f * shape.transientSeconds) * sampleRate));
     dampingGain = 1.0f;
     // Only extra damping: "less damping than recorded" would mean unbounded growth.
     dampingCoef = dbToLinear (-std::clamp (static_cast<double> (shape.dampingDbPerSecond), 0.0, 60.0) / sampleRate);
@@ -317,7 +319,8 @@ void InstrumentVoice::updateControl() noexcept
     const float target = drifting ? dbToLinear (driftLevel) : 1.0f;
     controlGainStep = (target - controlGain) / controlInterval;
 
-    const float bright = shape.brightnessDb + static_cast<float> (driftBright);
+    attackBright *= attackBrightCoef;
+    const float bright = shape.brightnessDb + static_cast<float> (driftBright + attackBright);
     const float body = shape.bodyDb;
     if (std::abs (bright - appliedBright) > 0.02f || std::abs (body - appliedBody) > 0.02f)
     {

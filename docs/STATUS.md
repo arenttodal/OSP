@@ -73,6 +73,16 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [x] Experiment 3 (A identical / B independent / C LIFE 50 % / D LIFE 80 %), steady + fast repeats
 - [ ] Listening verdict (lab tab "Repetition") — exit condition: engine preferred over identical repeats
 
+## Milestone checklist — Phase 5: dynamic synthesis
+
+- [x] velocity -> intensity (velocity 100 = as recorded; soft range wide, hard range narrow)
+- [x] velocity -> transient, spectral tilt (high shelf), attack bite (decaying shelf), body, pitch transient, damping, soft attack
+- [x] DYNAMICS macro (0 = velocity is volume only; 0.5 calibrated; 1 = twice)
+- [x] Experiment 4 (A gain / B gain + filter / C model 50 % / D model 100 %), 5 sources
+- [ ] Listening verdict (lab tab "Dynamics") — exit condition: crescendo clearly more than gain
+- Known limit: near-sinusoidal sources (some vocals, soft plucks) have no upper harmonics to
+  brighten; velocity then acts mainly on the attack. Harmonic generation belongs to Reimagined.
+
 ## DONE
 
 - Pure C++20 DSP/analysis library (`osp_dsp`) independent of JUCE; JUCE used for file

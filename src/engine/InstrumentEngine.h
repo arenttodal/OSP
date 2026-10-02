@@ -24,6 +24,14 @@ struct Macros
     double reimagined = 0.2;
 };
 
+/** How velocity acts (Phase 5 experiment; the instrument uses full). */
+enum class DynamicsMode
+{
+    gainOnly,     ///< A: velocity = level
+    gainFilter,   ///< B: level + a static brightness tilt (a classic sampler's velocity filter)
+    full          ///< C: dynamic performance model (transient, tilt, attack bite, body, pitch, damping)
+};
+
 struct EngineSettings
 {
     static constexpr int maxPolyphony = 64;
@@ -39,6 +47,7 @@ struct EngineSettings
     PitchCharacter pitchCharacter = PitchCharacter::tape;
     ContinuationStrategy continuation = ContinuationStrategy::multiLoopMovement;
     bool releaseGraft = true;
+    DynamicsMode dynamicsMode = DynamicsMode::full;
     Macros macros;
 };
 
@@ -74,6 +83,11 @@ public:
     void setContinuation (ContinuationStrategy strategy) noexcept { config.continuation = strategy; }
     void setSeed (std::uint64_t seed) noexcept { config.seed = seed; }
     void setVelocityRangeDb (double db) noexcept { config.velocityRangeDb = db; }
+    void setDynamicsMode (DynamicsMode mode) noexcept { config.dynamicsMode = mode; }
+
+    /** Velocity -> performance intensity (spec §34). Adds onto `shape`. Pure. */
+    static void applyDynamics (NoteShape& shape, int velocity, const DynamicsProfile& profile, const SourceCharacter& character,
+                               double dynamicsMacro, DynamicsMode mode) noexcept;
 
     bool isModelInUse (const InstrumentModel* model) const noexcept;
     void killVoicesUsing (const InstrumentModel* model) noexcept;

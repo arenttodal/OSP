@@ -30,6 +30,13 @@ from the page. If a tab is new, the takes are blind and in a random order.
    on the Tagel at LIFE 50 %: 2.1 dB level, 1.0 semitone brightness, 3 cents. Real
    repeated takes spread 3.5 dB, 1.4 semitones and 3.7 cents, so LIFE 80 % is about
    the real spread.
+3. **Dynamics** (Phase 5 exit test): 5 expressive sources (violin, sax, vocal,
+   nyckelharpa, pluck), each played at velocities 20 → 127. The four takes are: gain
+   only, gain plus velocity filter, the dynamic model at DYNAMICS 50 %, and at 100 %.
+   Main question: *does the crescendo sound like playing harder?* Measured: the model
+   moves brightness by 3.5–6 semitones on harmonic-rich sources and changes the
+   attack-to-body ratio by 8–16 dB. The vocal and pluck are nearly pure tones, so
+   there velocity changes mostly the attack.
 
 ## Checks in a DAW (need your Mac)
 

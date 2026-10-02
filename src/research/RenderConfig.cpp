@@ -47,6 +47,13 @@ void applyInstrumentBlock (const juce::var& e, RenderConfig& config)
     if (json::has (e, "continuation"))
         parseContinuationStrategy (json::getString (e, "continuation"), es.continuation);
     es.releaseGraft = json::getBool (e, "releaseGraft", es.releaseGraft);
+    if (json::has (e, "dynamicsMode"))
+    {
+        const auto mode = json::getString (e, "dynamicsMode");
+        es.dynamicsMode = mode == "gain" ? DynamicsMode::gainOnly : (mode == "gain-filter" ? DynamicsMode::gainFilter : DynamicsMode::full);
+    }
+    if (json::has (e, "velocityRangeDb"))
+        es.velocityRangeDb = json::getDouble (e, "velocityRangeDb", es.velocityRangeDb);
     config.anchors = json::getBool (e, "anchors", es.pitchCharacter == PitchCharacter::natural);
     if (json::has (e, "releaseSeconds"))
         es.adsr.releaseSeconds = json::getDouble (e, "releaseSeconds", es.adsr.releaseSeconds);

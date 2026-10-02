@@ -118,6 +118,8 @@ private:
     NoteShape shape;
     float baseGain = 1.0f;
     float transientExtra = 0.0f;   // decays to 0
+    double attackBright = 0.0;     // dB, decays to 0 (control rate)
+    double attackBrightCoef = 1.0;
     float transientCoef = 1.0f;
     float dampingGain = 1.0f;
     float dampingCoef = 1.0f;

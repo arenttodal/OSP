@@ -123,6 +123,37 @@ InstrumentVoice* InstrumentEngine::chooseVictim() noexcept
     return best;
 }
 
+void InstrumentEngine::applyDynamics (NoteShape& shape, int velocity, const DynamicsProfile& p, const SourceCharacter& c,
+                                      double dynamicsMacro, DynamicsMode mode) noexcept
+{
+    if (mode == DynamicsMode::gainOnly)
+        return;
+    // Intensity relative to the recording: velocity 100 plays it as recorded. Softer is
+    // a wide, reliable range (we can always take bite away); harder is extrapolation and
+    // stays narrow.
+    const double v = std::clamp (velocity, 1, 127);
+    const double intensity = std::clamp ((v - 100.0) / 80.0, -1.25, 0.35);
+    const double k = std::clamp (dynamicsMacro, 0.0, 1.0) / 0.5; // 0.5 = calibrated, 1 = twice
+    if (k <= 0.0)
+        return;
+
+    if (mode == DynamicsMode::gainFilter)
+    {
+        shape.brightnessDb += static_cast<float> (k * p.brightnessDb * intensity);
+        return;
+    }
+
+    const double soft = std::max (0.0, -intensity);
+    shape.brightnessDb += static_cast<float> (k * p.brightnessDb * 0.8 * intensity);
+    shape.attackBrightnessDb += static_cast<float> (k * p.brightnessDb * 0.6 * intensity * (0.4 + 0.6 * c.transientTonal));
+    shape.transientDb += static_cast<float> (k * p.transientDb * intensity);
+    shape.bodyDb += static_cast<float> (k * p.bodyDb * 0.5 * intensity);
+    shape.attackSoftenSeconds += static_cast<float> (k * 0.001 * p.attackSoftenMs * soft);
+    shape.pitchSettleCents += k * p.pitchTransientCents * std::max (0.0, intensity + 0.3) / 0.65;
+    shape.dampingDbPerSecond += static_cast<float> (k * p.dampingDbPerSecond * soft);
+    shape.transientSeconds = static_cast<float> (0.02 + 0.03 * c.transientTonal);
+}
+
 NoteShape InstrumentEngine::shapeFor (int note, int velocity, std::uint64_t eventIndex) noexcept
 {
     NoteShape shape;
@@ -131,8 +162,11 @@ NoteShape InstrumentEngine::shapeFor (int note, int velocity, std::uint64_t even
     shape.gain = static_cast<float> (dbToGain (velocityDb));
 
     if (currentModel != nullptr)
+    {
+        applyDynamics (shape, velocity, currentModel->dynamics, currentModel->character, config.macros.dynamics, config.dynamicsMode);
         performance.perform (shape, note, velocity, static_cast<double> (sampleClock) / sampleRate, eventIndex,
                              currentModel->performance, currentModel->character, config.macros.life);
+    }
 
     if (config.continuation == ContinuationStrategy::multiLoopMovement && currentModel != nullptr)
     {

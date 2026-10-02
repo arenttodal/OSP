@@ -20,6 +20,7 @@ struct NoteShape
     float bodyDb = 0.0f;               ///< low shelf (~250 Hz)
     float transientDb = 0.0f;          ///< extra level at the onset, decaying
     float transientSeconds = 0.03f;
+    float attackBrightnessDb = 0.0f;   ///< extra high shelf at the onset (excitation noise/bite), decaying with the transient
     float attackSoftenSeconds = 0.0f;  ///< extra linear fade-in (soft playing)
     float dampingDbPerSecond = 0.0f;   ///< extra decay (transient sources)
     float pan = 0.0f;                  ///< -1..1, small values only
