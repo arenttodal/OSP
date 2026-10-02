@@ -72,6 +72,13 @@ The open verdicts are listed in `docs/morning-checklist.md`.
   - Reimagined gives shorter, more granular continuation, plus saturation above 50 %;
   - MOTION drives drift and stereo movement, and does almost nothing on plucks.
 - **Exit test.** Lab tab "Original ↔ Reimagined" (five points on the continuum).
+- **Transient/body separation (§19).**
+  - Offline HPSS (median filtering) separates each layer's onset into body and
+    transient.
+  - Far from the root, the transient plays at its own speed, lined up on its peak, and
+    its transposed copy is removed.
+  - A synthetic pick two octaves down stays 4.5 ms long; without this it lasts 16 ms.
+  - Lab tab "Transients".
 
 ## Phase 7 — multi-sample
 
@@ -134,7 +141,7 @@ All of these are recorded in STATUS:
 - **Sets.**
   - Pitch groups ignore timbre (mixed organ stops).
   - Sets have no anchors.
-- **Spec gaps.** Transient/body separation (§19) is not implemented; transient shaping is
-  gain-based.
+- **Transients.** Transient/body separation (§19) only helps sources with a broadband
+  attack; most of the corpus plucks have little.
 - **CPU.** Upward transposition still uses the per-sample stretched kernel.
 - **UI.** The editor is a working UI, not the designed instrument UI.

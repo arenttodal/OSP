@@ -26,6 +26,10 @@ struct PitchLayer
     double offsetSemitones = 0.0;   ///< transposition baked into this layer's audio
     std::shared_ptr<const PlaybackSource> source; ///< rootMidi already includes the offset; shared between model stages
     ContinuationModel continuation; ///< jump points aligned for this layer's audio
+    /** Broadband part of this layer's attack on the same frame grid as `source` (spec §19),
+        silent after ~0.5 s; null before stage 2. */
+    std::shared_ptr<const PlaybackSource> transient;
+    double transientPeakSeconds = 0.0; ///< where that transient is loudest (from the file start)
 };
 
 /**

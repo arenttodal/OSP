@@ -113,6 +113,7 @@ page's database). The lab copies are 320 kbps MP3; the lossless renders stay in 
 | `dynamics-1.json` | 5 | velocity 20→127: gain / gain + filter / model 50 % / 100 % |
 | `continuum-1.json` | 6 | Original ↔ Reimagined at 0/25/50/75/100 % |
 | `multisample-1.json` | 7 | one file vs the whole set |
+| `transients-1.json` | 6 (§19) | attacks at ±12/±24: transposed vs transient preservation |
 
 Other research checks: `--continuation-report <file|dir>` (stable region, jump quality,
 release per file) and `--register-test <dir>` (multi-pitch ground truth, spec §70: hide

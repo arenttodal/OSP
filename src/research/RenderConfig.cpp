@@ -47,6 +47,7 @@ void applyInstrumentBlock (const juce::var& e, RenderConfig& config)
     if (json::has (e, "continuation"))
         parseContinuationStrategy (json::getString (e, "continuation"), es.continuation);
     es.releaseGraft = json::getBool (e, "releaseGraft", es.releaseGraft);
+    es.transientPreservation = json::getBool (e, "transientPreservation", es.transientPreservation);
     if (json::has (e, "dynamicsMode"))
     {
         const auto mode = json::getString (e, "dynamicsMode");

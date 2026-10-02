@@ -49,6 +49,7 @@ struct EngineSettings
     PitchCharacter pitchCharacter = PitchCharacter::tape;
     ContinuationStrategy continuation = ContinuationStrategy::multiLoopMovement;
     bool releaseGraft = true;
+    bool transientPreservation = true;   ///< spec §19 (experiment 7 switches it off for A/B)
     DynamicsMode dynamicsMode = DynamicsMode::full;
     Macros macros;
 };

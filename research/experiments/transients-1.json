@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "name": "transients-1",
+  "tab": "Transients",
+  "title": "Transients: attacks moved far from the recorded pitch",
+  "heading": "Does the attack still sound like the instrument when you play far from the recorded note?",
+  "intro": [
+    "Each group is one recording played as a short phrase one and two octaves away from its own note. The two takes differ only in how the first fraction of a second of each note is made, in a random order. The plucked groups are the real test; the bowed groups check that nothing gets worse.",
+    "Listen to the start of each note: the pick, the click, the strike. Does it keep its real size and snap, or does it turn into a dull thud (down) or a tiny chirp (up)? Then listen for anything unnatural, such as a doubled or detached attack."
+  ],
+  "scales": [
+    {
+      "key": "attack",
+      "label": "Attack",
+      "low": "smeared / toy-like",
+      "high": "real pick or strike"
+    },
+    {
+      "key": "natural",
+      "label": "Natural",
+      "low": "unnatural",
+      "high": "believable"
+    },
+    {
+      "key": "beauty",
+      "label": "Beauty",
+      "low": "unpleasant",
+      "high": "want to play"
+    }
+  ],
+  "groupLabel": "Notes at \u221224, \u221212, +12, +24 semitones",
+  "bestLabel": "Best of these",
+  "bestHint": "the attacks you would rather play",
+  "corpusRoot": "research/corpus",
+  "seed": 19,
+  "outputSampleRate": 44100,
+  "listeningRmsDbfs": -20,
+  "format": "flac",
+  "trimToCommon": true,
+  "maxSeconds": 10,
+  "sequence": {
+    "notes": [
+      {
+        "offset": -24,
+        "start": 0.0,
+        "duration": 0.9,
+        "velocity": 100
+      },
+      {
+        "offset": -24,
+        "start": 1.0,
+        "duration": 0.9,
+        "velocity": 100
+      },
+      {
+        "offset": -12,
+        "start": 2.0,
+        "duration": 0.9,
+        "velocity": 100
+      },
+      {
+        "offset": -12,
+        "start": 3.0,
+        "duration": 0.9,
+        "velocity": 100
+      },
+      {
+        "offset": 12,
+        "start": 4.0,
+        "duration": 0.9,
+        "velocity": 100
+      },
+      {
+        "offset": 12,
+        "start": 5.0,
+        "duration": 0.9,
+        "velocity": 100
+      },
+      {
+        "offset": 24,
+        "start": 6.0,
+        "duration": 0.9,
+        "velocity": 100
+      },
+      {
+        "offset": 24,
+        "start": 7.0,
+        "duration": 0.9,
+        "velocity": 100
+      }
+    ]
+  },
+  "tail": 2,
+  "sources": [
+    {
+      "id": "pluck",
+      "label": "Pluck",
+      "path": "plucks/Plucks_Bounce_Bounce_2026-06-21_131923.wav"
+    },
+    {
+      "id": "tagel",
+      "label": "Tagel",
+      "path": "tagel-puck/Tagel_Puck_Bounce_2026-06-21_144439-3.wav"
+    },
+    {
+      "id": "bowed",
+      "label": "Nyckelharpa",
+      "path": "nyckelharpa/Nyckelharpa_Bounce_2026-03-31_203134.wav"
+    },
+    {
+      "id": "violin",
+      "label": "Violin",
+      "path": "violin/BTS_-_AV1_-_VIOLIN_DRY_-_RR_-_A_01.wav"
+    }
+  ],
+  "conditions": [
+    {
+      "id": "A",
+      "label": "transposed attack",
+      "engine": "C",
+      "instrument": {
+        "dynamicsMode": "full",
+        "transientPreservation": false,
+        "macros": {
+          "life": 0,
+          "motion": 0,
+          "dynamics": 0.5,
+          "space": 0.0,
+          "reimagined": 0.0,
+          "character": 0.5
+        },
+        "continuation": "multi-loop"
+      }
+    },
+    {
+      "id": "B",
+      "label": "transient preservation",
+      "engine": "C",
+      "instrument": {
+        "dynamicsMode": "full",
+        "transientPreservation": true,
+        "macros": {
+          "life": 0,
+          "motion": 0,
+          "dynamics": 0.5,
+          "space": 0.0,
+          "reimagined": 0.0,
+          "character": 0.5
+        },
+        "continuation": "multi-loop"
+      }
+    }
+  ]
+}

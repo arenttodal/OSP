@@ -106,6 +106,24 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     controlGainStep = 0.0f;
     pitchMod = 1.0;
 
+    // Transient/body separation (spec §19): the attack's broadband part is played at its
+    // own speed while the body is transposed. The transposed copy of that part is
+    // subtracted from the main read, so it is swapped, not doubled.
+    tAmount = std::clamp (shape.transientPreserve, 0.0f, 1.0f);
+    tRemaining = 0;
+    if (tAmount > 0.0f && layer->transient != nullptr && currentModel->original.transient != nullptr)
+    {
+        const auto& orig = *currentModel->original.transient;
+        tStep = orig.sampleRate() / sampleRate;
+        // Both reads reach the transient's peak at the same moment, so the swapped
+        // transient lands exactly on the body's onset instead of before or after it.
+        tBodyPosition = position;
+        const double peak = currentModel->original.transientPeakSeconds * orig.sampleRate();
+        const double bodyStep = std::max (1.0e-3, baseIncrement);
+        tPosition = peak - (peak - position) * tStep / bodyStep;
+        tRemaining = std::max (1, static_cast<int> (shape.transientPreserveSeconds * sampleRate));
+    }
+
     highL.reset();
     highR.reset();
     lowL.reset();
@@ -372,6 +390,18 @@ void InstrumentVoice::readFrame (double pos, double step, float& l, float& r) no
     r = src.numChannels() > 1 ? SincInterpolator::apply (kernel, src.channelData (1)) : l;
 }
 
+float InstrumentVoice::readTransient (const PlaybackSource& src, double pos, double step, int channel) noexcept
+{
+    // The transient buffers are short and silent at their end; past it they read as zero.
+    if (pos < 0.0 || pos >= static_cast<double> (src.numFrames()))
+        return 0.0f;
+    if (step <= 1.0)
+        sinc->computeKernelUnity (pos, kernel);
+    else
+        sinc->computeKernel (pos, step, kernel);
+    return SincInterpolator::apply (kernel, src.channelData (channel));
+}
+
 void InstrumentVoice::render (float* left, float* right, int numSamples, double pitchRatio) noexcept
 {
     if (! active)
@@ -425,6 +455,21 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
             xProgress += currentStep;
         }
         position += currentStep;
+        if (tRemaining > 0)
+        {
+            const auto& native = *currentModel->original.transient;
+            const auto& shifted = *layer->transient;
+            const bool stereo = native.numChannels() > 1 || shifted.numChannels() > 1;
+            const float nl = readTransient (native, tPosition, tStep, 0);
+            const float sl = readTransient (shifted, tBodyPosition, currentStep, 0);
+            const float nr = stereo ? readTransient (native, tPosition, tStep, 1) : nl;
+            const float sr = stereo ? readTransient (shifted, tBodyPosition, currentStep, 1) : sl;
+            l += tAmount * (nl - sl);
+            r += tAmount * (nr - sr);
+            tPosition += tStep;
+            tBodyPosition += currentStep;
+            --tRemaining;
+        }
         if (crossfading && xProgress >= xLength)
         {
             crossfading = false;

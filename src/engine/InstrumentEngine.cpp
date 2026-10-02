@@ -343,6 +343,17 @@ void InstrumentEngine::noteOn (int note, int velocity, int channel) noexcept
     params.model = model;
     params.shape = shapeFor (model, note, velocity, eventIndex, referenceVelocity, registerDb);
     params.layer = &model->layerFor (static_cast<double> (note), config.pitchCharacter);
+    // Transient/body separation (spec §19): from about a fifth away, the attack's
+    // transient keeps its own speed. The separated transient carries its own size, so
+    // sources without one are left unchanged.
+    if (config.transientPreservation && model != nullptr && model->original.transient != nullptr)
+    {
+        const double shift = static_cast<double> (note) - model->rootMidi;
+        params.shape.transientPreserve = static_cast<float> (std::clamp ((std::abs (shift) - 2.0) / 5.0, 0.0, 1.0));
+        // Long enough for the transposed copy of the transient (0.55 s of source) to end.
+        const double ratio = std::pow (2.0, shift / 12.0);
+        params.shape.transientPreserveSeconds = static_cast<float> (std::min (3.0, 0.55 / std::min (1.0, ratio)));
+    }
     params.note = note;
     params.velocity = velocity;
     params.channel = std::clamp (channel, 1, 16);

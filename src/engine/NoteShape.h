@@ -33,6 +33,12 @@ struct NoteShape
     float driftRateHz = 0.12f;
     float driftPan = 0.0f;             ///< slow stereo movement amplitude (MOTION)
 
+    /** Transient/body separation (spec §19): how much of the attack's high band comes from
+        the recording at its original speed instead of the transposed read (0..1), and
+        for how long. */
+    float transientPreserve = 0.0f;
+    float transientPreserveSeconds = 0.06f;
+
     /** Reimagined: soft saturation drive (0 = clean) and continuation segment scale (<1 = shorter, more granular). */
     float saturation = 0.0f;
     float segmentScale = 1.0f;

@@ -180,6 +180,7 @@ compiles the I/O sources with the plugin's own JUCE settings.
           ─► InstrumentVoice: sinc read of the chosen PitchLayer (Tape = original, Natural = nearest anchor)
                               continuation random walk over jumps, correlation-aware crossfades
                               release graft into the recording's own ending
+                              transient swap: separated onset transient at its own speed (spec §19)
                               shelves (brightness/body), transient, damping, expression (pressure, MPE)
           ─► PostProcessor: CHARACTER (body resonances moved + tilt), sympathetic resonators (Reimagined),
                             SPACE (width, decorrelation, FDN ambience)
@@ -189,11 +190,19 @@ compiles the I/O sources with the plugin's own JUCE settings.
   `model/ContinuationModel`, `model/InstrumentModel`, `model/InstrumentSet`,
   `engine/InstrumentBuilder` (stages, sets, calibration, resonances),
   `engine/InstrumentEngine` + `InstrumentVoice`, `engine/PerformanceEngine`,
-  `engine/PostProcessor`, `engine/SampleSetInference`, `engine/ShelfFilter`.
+  `engine/PostProcessor`, `engine/SampleSetInference`, `engine/ShelfFilter`,
+  `analysis/transient/` (onset HPSS, spec §19).
   All in `osp_dsp` (pure C++; Signalsmith Stretch is linked privately for anchors).
 - **Why a new engine next to `BaselineSampler`**: baselines A and B must stay exactly as
   they are (Rule 7, every listening test compares against them; golden renders cover
   them). Engine C shares the interpolator, ADSR and PRNG.
+- **Transient/body separation (spec §19).** Stage 2 runs HPSS-style median filtering
+  over the first half second of every pitch layer and keeps the broadband part as a
+  short `PlaybackSource` on the layer's own frame grid. A note far from the root adds
+  `transient(read at its own speed) − transient(read at the body's speed)`, both aligned
+  on the transient's peak. Playback stays a pair of linear reads (no audio-thread
+  analysis), sources without a transient are unaffected, and the swap is exact where
+  nothing is transposed.
 - **Real-time safety.** Everything that allocates (analysis, continuation search, anchors,
   set inference) runs in the builder on a worker thread; the engine, voices and post
   stage allocate only in `prepare()`. Voices hold raw pointers into immutable models;

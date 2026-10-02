@@ -55,6 +55,7 @@ add_library(osp_dsp STATIC
     src/analysis/spectrum/SpectralEnvelope.cpp
     src/analysis/stereo/StereoAnalyzer.cpp
     src/analysis/continuation/ContinuationAnalyzer.cpp
+    src/analysis/transient/TransientSeparation.cpp
     src/engine/InstrumentVoice.cpp
     src/engine/InstrumentEngine.cpp
     src/engine/InstrumentBuilder.cpp

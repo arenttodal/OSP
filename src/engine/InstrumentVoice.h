@@ -81,6 +81,7 @@ private:
     void beginCrossfade() noexcept;
     void updateControl() noexcept;
     void readFrame (double pos, double step, float& l, float& r) noexcept;
+    float readTransient (const PlaybackSource& src, double pos, double step, int channel) noexcept;
 
     const SincInterpolator* sinc = nullptr;
     const InstrumentModel* currentModel = nullptr;
@@ -152,6 +153,12 @@ private:
     float controlGain = 1.0f, controlGainStep = 0.0f;
     double pitchMod = 1.0;
     int controlCountdown = 0;
+
+    // Transient preservation: the attack's transient read at its own speed (tPosition)
+    // and at the body's speed (tBodyPosition, follows the main read until a jump).
+    double tPosition = 0.0, tBodyPosition = 0.0, tStep = 1.0;
+    int tRemaining = 0;
+    float tAmount = 0.0f;
 
     ShelfFilter highL, highR, lowL, lowR;
     bool filtersActive = false;

@@ -1,3 +1,4 @@
+#include "analysis/transient/TransientSeparation.h"
 #include "audio/utility/TestSignals.h"
 #include "engine/InstrumentBuilder.h"
 #include "engine/InstrumentEngine.h"
@@ -7,6 +8,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cmath>
 
 using namespace osp;
@@ -199,4 +201,94 @@ TEST_CASE ("engine: MPE bends only the note on its own channel", "[integration][
     CHECK (std::abs (1200.0 * std::log2 (render (true, 2) / (a3 * std::pow (2.0, 2.0 / 12.0)))) < 15.0); // its channel bends
     CHECK (std::abs (1200.0 * std::log2 (render (true, 3) / a3)) < 15.0);                                 // another channel does not
     CHECK (std::abs (1200.0 * std::log2 (render (false, 2) / a3)) < 15.0);                                // no MPE: channel bends ignored
+}
+
+namespace
+{
+    // A decaying 220 Hz tone with a 4 ms noise "pick" at its start.
+    AudioData pickedTone()
+    {
+        const double sr = 48000.0;
+        auto audio = testsignals::sine (220.0, 2.0, sr, 0.5);
+        const auto noise = testsignals::whiteNoise (0.004, sr, 0.6, 11);
+        for (std::size_t i = 0; i < audio.channels[0].size(); ++i)
+        {
+            audio.channels[0][i] *= static_cast<float> (std::exp (-2.0 * static_cast<double> (i) / sr));
+            if (i < noise.channels[0].size())
+                audio.channels[0][i] += noise.channels[0][i];
+        }
+        return audio;
+    }
+
+    // How long the attack's high band stays within 20 dB of its peak (seconds).
+    double clickSeconds (const AudioData& audio)
+    {
+        std::vector<double> e;
+        const int hop = static_cast<int> (audio.sampleRate / 2000.0); // 0.5 ms
+        double acc = 0.0, prev = 0.0;
+        for (std::size_t i = 0; i < std::min<std::size_t> (audio.channels[0].size(), static_cast<std::size_t> (0.2 * audio.sampleRate)); ++i)
+        {
+            const double x = audio.channels[0][i];
+            acc += (x - prev) * (x - prev);
+            prev = x;
+            if ((i + 1) % static_cast<std::size_t> (hop) == 0)
+            {
+                e.push_back (acc);
+                acc = 0.0;
+            }
+        }
+        const double peak = *std::max_element (e.begin(), e.end());
+        int count = 0;
+        for (double v : e)
+            count += v > 0.01 * peak ? 1 : 0;
+        return count * 0.0005;
+    }
+}
+
+TEST_CASE ("transient separation: the pick is transient, the tone is body", "[unit][engine]")
+{
+    const auto audio = pickedTone();
+    const auto separation = separateOnsetTransient (audio, 0.0);
+    REQUIRE_FALSE (separation.transient.isEmpty());
+    CHECK (separation.share > 0.02);
+    // The transient holds the pick; 50 ms later, after the pick, it is close to silent.
+    double pick = 0.0, later = 0.0, tone = 0.0;
+    for (std::size_t i = 0; i < 192; ++i)
+        pick += std::pow (separation.transient.channels[0][i], 2.0);
+    for (std::size_t i = 2400; i < 4800; ++i)
+    {
+        later += std::pow (separation.transient.channels[0][i], 2.0);
+        tone += std::pow (audio.channels[0][i], 2.0);
+    }
+    CHECK (later < 0.05 * tone);
+    CHECK (pick / 192.0 > 10.0 * later / 2400.0);
+    // A steady tone has (almost) no transient.
+    const auto steady = separateOnsetTransient (testsignals::sine (220.0, 2.0, 48000.0, 0.5), 0.0);
+    CHECK (steady.share < 0.01);
+}
+
+TEST_CASE ("engine: transient preservation keeps a transposed pick short", "[integration][engine]")
+{
+    const auto audio = pickedTone();
+    const auto model = instrument::buildComplete (audio, test::analyse (audio), {}, false);
+    REQUIRE (model->original.transient != nullptr);
+
+    auto render = [&] (bool preserve, int note) {
+        research::RenderConfig config;
+        config.engineSettings.macros.life = 0.0;
+        config.engineSettings.macros.space = 0.0;
+        config.engineSettings.macros.reimagined = 0.0;
+        config.engineSettings.transientPreservation = preserve;
+        return research::renderInstrument (*model, hold (note, 1.0), config).audio;
+    };
+    const double original = clickSeconds (audio);
+    const int root = static_cast<int> (std::lround (model->rootMidi));
+    const double offDown = clickSeconds (render (false, root - 24));
+    const double onDown = clickSeconds (render (true, root - 24));
+    INFO ("pick: original " << original << " s, two octaves down " << offDown << " s -> " << onDown << " s");
+    CHECK (offDown > 2.0 * original);
+    CHECK (onDown < 0.5 * offDown);
+    // Near the root nothing changes.
+    const auto a = render (false, root + 1), b = render (true, root + 1);
+    CHECK (a.channels[0] == b.channels[0]);
 }

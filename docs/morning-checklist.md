@@ -19,6 +19,7 @@ Everything saves as you go and I read it from the page. Headphones help.
 | **Dynamics** | 5: a crescendo is more than gain | do soft notes sound softly played, loud notes hard? | +3.5–6 semitones of brightness on harmonic sources; on pure-tone sources mostly the attack changes |
 | **Original ↔ Reimagined** | 6: useful sounds across the whole range | rate each of the 5 settings on its own | — |
 | **Multi-sample** | 7: a dropped set is automatically better | low and high notes, repeated notes | the register model is closer to real recordings for plucks and organ |
+| **Transients** | §19: a pluck moved an octave keeps its real pick | the start of each note: real snap, or a thud (down) / chirp (up)? Any doubled or detached attack? | clear on synthetic picks; subtle on most of your plucks, which have little broadband attack. The bowed groups check that nothing gets worse |
 
 ## 2. Decisions I made overnight (please confirm or overrule)
 

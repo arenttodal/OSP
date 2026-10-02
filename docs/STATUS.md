@@ -94,7 +94,14 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [x] Macro smoothing (no clicks when automating)
 - [x] Experiment 5 (Reimagined 0/25/50/75/100 %, 4 sources)
 - [ ] Listening verdict (lab tab "Original ↔ Reimagined") — exit: useful sounds across the range
-- [ ] Transient/body separation (spec §19) — not yet; transient shaping is gain-based
+- [x] Transient/body separation (spec §19): offline HPSS of the onset region
+  (`analysis/transient`); from about a fifth away the separated transient plays at its own
+  speed, aligned on its peak, while its transposed copy is removed from the body.
+  Synthetic picked tone two octaves down: pick 16 ms -> 4.5 ms (original 4.5 ms).
+  On by default in engine C (`"transientPreservation"` in render configs).
+- [x] Experiment 7 (`transients-1.json`: pluck, Tagel, nyckelharpa, violin at ±12/±24, off vs on)
+- [ ] Listening verdict (lab tab "Transients"). Most corpus plucks carry little broadband
+  attack (transient share 0.3–2 %, one pluck 15 %), so expect subtle differences.
 
 ## Milestone checklist — Phase 7: multi-sample intelligence
 
@@ -147,8 +154,8 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 ## NEXT
 
 - Score the lab ratings; tune or revert per experiment (keep the simplest winner).
-- Transient/body separation (spec §19) as an experiment against the current gain-based
-  transient shaping; spectral/stochastic continuation only if multi-loop loses.
+- Score lab tab "Transients"; if transient preservation loses or ties, switch it off by
+  default (simplest wins). Spectral/stochastic continuation only if multi-loop loses.
 - Mip-mapped sources for upward transposition (CPU), real-Mac worst-case callback timing.
 
 ## BLOCKERS
