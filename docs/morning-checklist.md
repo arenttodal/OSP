@@ -70,6 +70,9 @@ Everything saves as you go and I read it from the page. Headphones help.
 - [ ] **Pitch Character** Tape vs Natural on the organ and the vocal, ±1–2 octaves.
 - [ ] **Sustain** Recording vs Endless: hold a chord for a minute.
 - [ ] **Starting states:** step through all seven while holding a chord.
+- [ ] **Advanced panel:** it is now closed by default (spec §13: the macros are the
+  instrument). Open it with *ADVANCED ▸* under the macros. Is that the right default for
+  you?
 - [ ] **☰ menu:**
   - export an instrument and import it in a fresh project (or on a second machine);
   - Undo/Redo after loading a second sample;

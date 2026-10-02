@@ -124,6 +124,7 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [x] Presets (.osppreset) and portable instruments (.ospinstrument: sources + analysis + settings; bit-identical on another machine)
 - [x] Undo/redo: sample loads (incl. sets and stages), root changes; parameters via the APVTS undo manager
 - [x] UI scaling 80–200 %, accessibility titles on controls
+- [x] Primary screen per spec §10/§13: preset name shown; Advanced panel collapsible, closed by default, remembered per session
 - [x] MIDI: mod wheel, aftertouch/pressure, CC74, CC 20–25 -> macros; MPE lower zone (bend/pressure/slide per note)
 - [x] Windows VST3: CI builds it and runs every test with MSVC
 - [x] Performance tuning: polyphase tables for unity and stretched reads (semitone grid up to x4); engine C costs about two-thirds of the plain baseline

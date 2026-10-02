@@ -29,7 +29,9 @@
 | **ORIGINAL ↔ REIMAGINED** | How far the instrument moves away from the recording: sympathetic resonance tuned to your sound, more fluid sustain, more movement, and at the far end gentle harmonic saturation. |
 | Starting state | Natural, Alive, Floating, Broken, Frozen, Dream, Wide: macro settings that keep your sound. |
 
-**Advanced:** Attack, Release (a release of 0.2 s or more lets the recording's own
+The name of the last preset you opened or saved appears under the starting state.
+
+**Advanced** (click *ADVANCED ▸* under the macros; it stays open with the project): Attack, Release (a release of 0.2 s or more lets the recording's own
 ending play when you let go), Velocity range, Fine tune, Bend range, Output, **Pitch
 character** (*Tape*: classic resampling, faster and brighter going up; *Natural*: keeps
 the recording's speed and movement in other registers), **Sustain** (*Recording*: notes

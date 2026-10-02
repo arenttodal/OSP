@@ -530,6 +530,20 @@ TEST_CASE ("plugin: editor builds, shows the instrument and can be snapshotted",
         ospEditor->refreshNow();
     snapshot ("osp-editor-loaded.png");
     p.editorBeingDeleted (editor.get());
+    editor.reset();
+
+    // The Advanced panel opens on request and stays open with the session.
+    p.setAdvancedOpen (true);
+    juce::MemoryBlock state;
+    p.getStateInformation (state);
+    OspAudioProcessor reopened;
+    reopened.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+    CHECK (reopened.advancedOpen());
+    editor.reset (p.createEditorIfNeeded());
+    if (auto* ospEditor = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (editor.get()))
+        ospEditor->refreshNow();
+    snapshot ("osp-editor-advanced.png");
+    p.editorBeingDeleted (editor.get());
 }
 
 int main (int argc, char* argv[])

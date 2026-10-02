@@ -101,7 +101,9 @@ private:
     std::array<Knob, 6> macros;      // Life, Dynamics, Character, Motion, Space, Original/Reimagined
     std::array<Knob, 6> knobs;       // Advanced: attack, release, velocity, fine, bend, output
     juce::ComboBox pitchCharacterBox, sustainBox;
-    juce::Label pitchCharacterLabel, sustainLabel, advancedLabel;
+    juce::Label pitchCharacterLabel, sustainLabel, presetLabel;
+    juce::TextButton advancedButton;
+    void showAdvanced (bool open);
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> pitchCharacterAttachment, sustainAttachment;
     juce::ToggleButton mpeToggle { "MPE" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> mpeAttachment;

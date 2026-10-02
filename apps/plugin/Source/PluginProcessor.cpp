@@ -686,6 +686,7 @@ std::unique_ptr<juce::XmlElement> OspAudioProcessor::createStateXml()
     auto stateTree = parameters.copyState();
     stateTree.setProperty ("stateVersion", stateVersion, nullptr);
     stateTree.setProperty ("uiScale", uiScaleFactor.load(), nullptr);
+    stateTree.setProperty ("advancedOpen", advancedPanelOpen.load(), nullptr);
     stateTree.setProperty ("program", currentProgram, nullptr);
 
     stateTree.removeChild (stateTree.getChildWithName (ids::instrument), nullptr);
@@ -743,6 +744,7 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml)
 {
     auto stateTree = juce::ValueTree::fromXml (xml);
     uiScaleFactor = std::clamp (static_cast<float> (stateTree.getProperty ("uiScale", 1.0f)), 0.8f, 2.0f);
+    advancedPanelOpen = static_cast<bool> (stateTree.getProperty ("advancedOpen", false));
     currentProgram = static_cast<int> (stateTree.getProperty ("program", 0));
     const auto instrumentTree = stateTree.getChildWithName (ids::instrument);
     stateTree.removeChild (instrumentTree, nullptr);

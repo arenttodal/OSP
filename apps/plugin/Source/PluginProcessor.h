@@ -88,6 +88,9 @@ public:
     /** Editor zoom (80..200 %), stored with the session. */
     float uiScale() const noexcept { return uiScaleFactor.load(); }
     void setUiScale (float scale) noexcept { uiScaleFactor = std::clamp (scale, 0.8f, 2.0f); }
+    /** Whether the Advanced panel is open (closed by default: spec §13), stored with the session. */
+    bool advancedOpen() const noexcept { return advancedPanelOpen.load(); }
+    void setAdvancedOpen (bool open) noexcept { advancedPanelOpen = open; }
 
     // Instrument loading (message thread)
     void loadFile (const juce::File& file);
@@ -202,6 +205,7 @@ private:
     int currentProgram = 0;
     juce::File lastPresetFile;
     std::atomic<float> uiScaleFactor { 1.0f };
+    std::atomic<bool> advancedPanelOpen { false };
     // Undo of sample loads: the latest instrument of every recent load, so undo/redo can
     // bring back a sample with all its model stages. Message thread.
     std::map<std::uint64_t, std::shared_ptr<const LoadedInstrument>> latestByLoad;

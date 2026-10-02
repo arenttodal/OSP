@@ -305,15 +305,23 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     sustainBox.setTitle ("Sustain");
     pitchCharacterAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (ospProcessor.parameters, "pitchCharacter", pitchCharacterBox);
     sustainAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (ospProcessor.parameters, "sustain", sustainBox);
-    for (auto* label : { &pitchCharacterLabel, &sustainLabel, &advancedLabel })
+    for (auto* label : { &pitchCharacterLabel, &sustainLabel, &presetLabel })
     {
         label->setColour (juce::Label::textColourId, colours::dim);
         addAndMakeVisible (*label);
     }
     pitchCharacterLabel.setText ("Pitch character", juce::dontSendNotification);
     sustainLabel.setText ("Sustain", juce::dontSendNotification);
-    advancedLabel.setText ("ADVANCED", juce::dontSendNotification);
-    advancedLabel.setFont (juce::FontOptions (11.0f, juce::Font::bold));
+    presetLabel.setJustificationType (juce::Justification::centredLeft);
+    presetLabel.setFont (juce::FontOptions (12.0f));
+    presetLabel.setTooltip ("The preset last opened or saved (menu: Presets)");
+    // The Advanced panel is closed by default (spec §13): the instrument is the macros.
+    advancedButton.setClickingTogglesState (false);
+    advancedButton.setColour (juce::TextButton::buttonColourId, juce::Colours::transparentBlack);
+    advancedButton.setColour (juce::TextButton::textColourOffId, colours::dim);
+    advancedButton.setTitle ("Advanced settings");
+    advancedButton.onClick = [this] { showAdvanced (! ospProcessor.advancedOpen()); };
+    addAndMakeVisible (advancedButton);
     addAndMakeVisible (pitchCharacterBox);
     addAndMakeVisible (sustainBox);
     reseedButton.setTooltip ("New variation seed: repeated notes vary differently");
@@ -341,8 +349,23 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     setSize (920, 680);
     setScaleFactor (ospProcessor.uiScale());
 
+    showAdvanced (ospProcessor.advancedOpen());
     refreshInstrumentInfo();
     startTimerHz (15);
+}
+
+void OspAudioProcessorEditor::showAdvanced (bool open)
+{
+    ospProcessor.setAdvancedOpen (open);
+    advancedButton.setButtonText (juce::String::fromUTF8 (open ? "ADVANCED \xe2\x96\xbe" : "ADVANCED \xe2\x96\xb8"));
+    for (auto* c : std::initializer_list<juce::Component*> { &pitchCharacterLabel, &pitchCharacterBox, &sustainLabel, &sustainBox, &reseedButton, &mpeToggle })
+        c->setVisible (open);
+    for (auto& knob : knobs)
+    {
+        knob.label.setVisible (open);
+        knob.slider.setVisible (open);
+    }
+    resized();
 }
 
 OspAudioProcessorEditor::~OspAudioProcessorEditor()
@@ -367,7 +390,11 @@ void OspAudioProcessorEditor::resized()
     loadButton.setBounds (topRow.removeFromRight (80));
     topRow.removeFromRight (6);
     exampleButton.setBounds (topRow);
-    stateBox.setBounds (header.removeFromRight (150).removeFromTop (28).translated (-10, 0));
+    {
+        auto stateArea = header.removeFromRight (150).translated (-10, 0);
+        stateBox.setBounds (stateArea.removeFromTop (28));
+        presetLabel.setBounds (stateArea.removeFromTop (30));
+    }
     auto rootRow = buttons.removeFromBottom (28);
     samplesButton.setBounds (rootRow.removeFromLeft (80));
     rootRow.removeFromLeft (6);
@@ -382,9 +409,10 @@ void OspAudioProcessorEditor::resized()
     keyboard.setKeyWidth (static_cast<float> (keyboard.getWidth()) / 52.0f); // 88 keys = 52 white keys
     area.removeFromBottom (8);
 
-    // Advanced row: small knobs plus pitch character / sustain / reseed.
-    auto advanced = area.removeFromBottom (106);
-    advancedLabel.setBounds (advanced.removeFromTop (16));
+    // Advanced row (collapsible): small knobs plus pitch character / sustain / reseed.
+    const bool advancedVisible = ospProcessor.advancedOpen();
+    auto advanced = area.removeFromBottom (advancedVisible ? 108 : 18);
+    advancedButton.setBounds (advanced.removeFromTop (18).withWidth (110));
     auto choices = advanced.removeFromRight (240);
     auto row1 = choices.removeFromTop (26);
     pitchCharacterLabel.setBounds (row1.removeFromLeft (110));
@@ -621,6 +649,10 @@ void OspAudioProcessorEditor::timerCallback()
     waveform.setLoading (state == OspAudioProcessor::LoadState::loading);
     if (stateBox.getSelectedId() != ospProcessor.getCurrentProgram() + 1)
         stateBox.setSelectedId (ospProcessor.getCurrentProgram() + 1, juce::dontSendNotification);
+    const auto preset = ospProcessor.currentPresetFile();
+    const auto presetName = preset == juce::File() ? juce::String() : preset.getFileNameWithoutExtension();
+    if (presetLabel.getText() != presetName)
+        presetLabel.setText (presetName, juce::dontSendNotification);
 
     const auto instrument = ospProcessor.currentInstrument();
     const auto generation = instrument != nullptr ? instrument->generation : 0;
