@@ -31,6 +31,27 @@ namespace ids
     static const juce::String sustain = "sustain";
     static const juce::String seed = "seed";
     static const juce::String mpe = "mpe";
+    // Shaping system v1.0: what each macro does (popups). Never rename these IDs.
+    static const juce::String lifeMode = "life.mode";
+    static const juce::String lifePitch = "life.pitch";
+    static const juce::String lifeTone = "life.tone";
+    static const juce::String lifeAttack = "life.attack";
+    static const juce::String dynamicsCurve = "dynamics.curve";
+    static const juce::String dynamicsTone = "dynamics.tone";
+    static const juce::String characterType = "character.type";
+    static const juce::String characterMin = "character.min";
+    static const juce::String characterMax = "character.max";
+    static const juce::String characterResonance = "character.resonance";
+    static const juce::String characterDrive = "character.drive";
+    static const juce::String characterEnvAmount = "character.envAmount";
+    static const juce::String characterEnvAttack = "character.envAttack";
+    static const juce::String characterEnvDecay = "character.envDecay";
+    static const juce::String movementMode = "movement.mode";
+    static const juce::String movementA = "movement.paramA";
+    static const juce::String movementB = "movement.paramB";
+    static const juce::String movementC = "movement.paramC";
+    static const juce::String spaceType = "space.type";
+    static const juce::String spaceDecay = "space.decay";
     static const juce::Identifier instrument = "Instrument";
 }
 
@@ -43,13 +64,14 @@ namespace
     };
     // Small and musical (spec §101): each changes how the engine treats the sample.
     constexpr StartingState startingStates[] = {
-        { "Natural", 45, 50, 50, 25, 15, 10, 2, 250 },
-        { "Alive", 70, 65, 50, 45, 20, 20, 2, 300 },
-        { "Floating", 35, 35, 45, 70, 55, 45, 120, 1500 },
-        { "Broken", 85, 55, 65, 60, 25, 85, 2, 400 },
-        { "Frozen", 10, 30, 50, 5, 35, 30, 250, 2500 },
-        { "Dream", 40, 40, 35, 60, 75, 65, 300, 3000 },
-        { "Wide", 40, 50, 50, 50, 70, 30, 10, 800 },
+        // CHARACTER is the filter position now (100 = fully open).
+        { "Natural", 45, 65, 90, 12, 10, 10, 2, 700 },
+        { "Alive", 70, 70, 95, 30, 15, 20, 2, 500 },
+        { "Floating", 35, 45, 70, 55, 45, 45, 120, 2500 },
+        { "Broken", 85, 60, 80, 50, 20, 85, 2, 600 },
+        { "Frozen", 10, 40, 75, 5, 30, 30, 250, 3000 },
+        { "Dream", 40, 45, 60, 45, 60, 65, 300, 4000 },
+        { "Wide", 40, 60, 90, 40, 55, 30, 10, 1200 },
     };
 }
 
@@ -63,11 +85,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
 
     Range attackRange (0.0f, 2000.0f, 0.1f);
     attackRange.setSkewForCentre (50.0f);
-    Range releaseRange (5.0f, 5000.0f, 0.1f);
-    releaseRange.setSkewForCentre (300.0f);
+    Range releaseRange (20.0f, 15000.0f, 0.1f);
+    releaseRange.setSkewForCentre (700.0f);
 
     layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::attack, 1 }, "Attack", attackRange, 2.0f, ms));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::release, 1 }, "Release", releaseRange, 250.0f, ms));
+    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::release, 1 }, "Release", releaseRange, 700.0f, ms));
     layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::gain, 1 }, "Output", Range (-36.0f, 12.0f, 0.1f), 0.0f, db));
     layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::velocityRange, 1 }, "Velocity Range",
                                                              Range (0.0f, 48.0f, 0.1f), 30.0f, db));
@@ -82,10 +104,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
     auto percent = juce::AudioParameterFloatAttributes().withLabel ("%");
     const Range unit (0.0f, 100.0f, 0.1f);
     layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::life, 2 }, "Life", unit, 50.0f, percent));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::dynamics, 2 }, "Dynamics", unit, 50.0f, percent));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::character, 2 }, "Character", unit, 50.0f, percent));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::motion, 2 }, "Motion", unit, 35.0f, percent));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::space, 2 }, "Space", unit, 20.0f, percent));
+    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::dynamics, 2 }, "Dynamics", unit, 65.0f, percent));
+    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::character, 2 }, "Character", unit, 90.0f, percent));
+    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::motion, 2 }, "Movement", unit, 12.0f, percent));
+    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::space, 2 }, "Space", unit, 10.0f, percent));
     layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::reimagined, 2 }, "Original / Reimagined", unit, 20.0f, percent));
     // Advanced (spec §13).
     layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { ids::pitchCharacter, 2 }, "Pitch Character",
@@ -94,6 +116,43 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
                                                               juce::StringArray { "Recording", "Endless" }, 1));
     layout.add (std::make_unique<juce::AudioParameterInt> (juce::ParameterID { ids::seed, 2 }, "Variation Seed", 1, 9999, 1));
     layout.add (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { ids::mpe, 3 }, "MPE", false));
+
+    // Shaping system v1.0 (version hint 4): the popups behind the macros.
+    const Shaping d;
+    auto hz = juce::AudioParameterFloatAttributes().withLabel ("Hz");
+    auto cents = juce::AudioParameterFloatAttributes().withLabel ("cents");
+    auto seconds = juce::AudioParameterFloatAttributes().withLabel ("s");
+    auto choice = [&layout] (const juce::String& id, const juce::String& name, juce::StringArray items, int def) {
+        layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { id, 4 }, name, items, def));
+    };
+    auto number = [&layout] (const juce::String& id, const juce::String& name, Range range, float def, juce::AudioParameterFloatAttributes attr) {
+        layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { id, 4 }, name, range, def, attr));
+    };
+    auto skewed = [] (float lo, float hi, float centre) {
+        Range r (lo, hi, 0.0f);
+        r.setSkewForCentre (centre);
+        return r;
+    };
+    choice (ids::lifeMode, "Life Mode", { "Natural", "Loose", "Fray" }, 0);
+    number (ids::lifePitch, "Life Pitch", skewed (0.0f, 15.0f, 4.0f), static_cast<float> (d.lifePitchCents), cents);
+    number (ids::lifeTone, "Life Tone", unit, static_cast<float> (100.0 * d.lifeTone), percent);
+    number (ids::lifeAttack, "Life Attack", unit, static_cast<float> (100.0 * d.lifeAttack), percent);
+    choice (ids::dynamicsCurve, "Dynamics Curve", { "Soft", "Linear", "Hard" }, 1);
+    number (ids::dynamicsTone, "Dynamics Tone", unit, static_cast<float> (100.0 * d.dynamicsTone), percent);
+    choice (ids::characterType, "Character Filter", { "LP24", "LP12", "HP12", "BP12", "Tilt" }, 0);
+    number (ids::characterMin, "Character Min", skewed (20.0f, 20000.0f, 632.0f), static_cast<float> (d.filterMinHz), hz);
+    number (ids::characterMax, "Character Max", skewed (20.0f, 20000.0f, 632.0f), static_cast<float> (d.filterMaxHz), hz);
+    number (ids::characterResonance, "Character Resonance", Range (0.0f, 90.0f, 0.0f), static_cast<float> (100.0 * d.resonance), percent);
+    number (ids::characterDrive, "Character Drive", unit, static_cast<float> (100.0 * d.drive), percent);
+    number (ids::characterEnvAmount, "Character Envelope", Range (-100.0f, 100.0f, 0.0f), static_cast<float> (100.0 * d.envAmount), percent);
+    number (ids::characterEnvAttack, "Character Env Attack", skewed (0.0f, 2000.0f, 60.0f), static_cast<float> (1000.0 * d.envAttackSeconds), ms);
+    number (ids::characterEnvDecay, "Character Env Decay", skewed (20.0f, 12000.0f, 700.0f), static_cast<float> (1000.0 * d.envDecaySeconds), ms);
+    choice (ids::movementMode, "Movement Mode", { "Drift", "Tape", "Chorus", "Pulse" }, 0);
+    number (ids::movementA, "Movement A", unit, static_cast<float> (100.0 * d.movementA), percent);
+    number (ids::movementB, "Movement B", unit, static_cast<float> (100.0 * d.movementB), percent);
+    number (ids::movementC, "Movement C", unit, static_cast<float> (100.0 * d.movementC), percent);
+    choice (ids::spaceType, "Space Type", { "Room", "Chamber", "Plate", "Spring" }, 2);
+    number (ids::spaceDecay, "Space Decay", skewed (0.2f, 8.0f, 1.8f), static_cast<float> (d.spaceDecaySeconds), seconds);
     return layout;
 }
 
@@ -170,6 +229,9 @@ OspAudioProcessor::OspAudioProcessor()
     sustainParam = parameters.getRawParameterValue (ids::sustain);
     seedParam = parameters.getRawParameterValue (ids::seed);
     mpeParam = parameters.getRawParameterValue (ids::mpe);
+    for (int i = 0; i < numShapingParams; ++i)
+        shapingParams[static_cast<std::size_t> (i)] = parameters.getRawParameterValue (shapingIds()[i]);
+    lastShaping.fill (-1.0e9f);
 
     engineSettings.polyphony = 24;
     engineSettings.outputGainDb = -9.0;
@@ -239,6 +301,22 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
         lastVelocityRange = velocityRange;
     }
 
+    bool shapingChanged = force;
+    for (std::size_t i = 0; i < shapingParams.size(); ++i)
+    {
+        const float v = shapingParams[i]->load();
+        if (changed (v, lastShaping[i]))
+        {
+            lastShaping[i] = v;
+            shapingChanged = true;
+        }
+    }
+    if (shapingChanged)
+    {
+        engineSettings.shaping = shapingFromParameters();
+        engine.setShaping (engineSettings.shaping);
+    }
+
     // Macro = host parameter, unless a MIDI CC (20-25) moved it more recently.
     std::array<std::atomic<float>*, 6> macroParams { lifeParam, dynamicsParam, characterParam, motionParam, spaceParam, reimaginedParam };
     std::array<double, 6> values {};
@@ -267,6 +345,48 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
     engine.setSeed (static_cast<std::uint64_t> (std::max (1.0f, seedParam->load())));
 
     engine.setPitchOffsetSemitones (pitchBendSemitones + fineTuneParam->load() / 100.0 + rootShiftSemitones.load());
+}
+
+const juce::StringArray& OspAudioProcessor::shapingIds()
+{
+    static const juce::StringArray list {
+        ids::lifeMode, ids::lifePitch, ids::lifeTone, ids::lifeAttack,
+        ids::dynamicsCurve, ids::dynamicsTone,
+        ids::characterType, ids::characterMin, ids::characterMax, ids::characterResonance, ids::characterDrive,
+        ids::characterEnvAmount, ids::characterEnvAttack, ids::characterEnvDecay,
+        ids::movementMode, ids::movementA, ids::movementB, ids::movementC,
+        ids::spaceType, ids::spaceDecay,
+    };
+    jassert (list.size() == numShapingParams);
+    return list;
+}
+
+Shaping OspAudioProcessor::shapingFromParameters() const noexcept
+{
+    auto v = [this] (int i) { return static_cast<double> (shapingParams[static_cast<std::size_t> (i)]->load()); };
+    auto index = [&v] (int i, int count) { return std::clamp (static_cast<int> (std::lround (v (i))), 0, count - 1); };
+    Shaping s;
+    s.lifeMode = static_cast<LifeMode> (index (0, 3));
+    s.lifePitchCents = v (1);
+    s.lifeTone = 0.01 * v (2);
+    s.lifeAttack = 0.01 * v (3);
+    s.velocityCurve = static_cast<VelocityCurve> (index (4, 3));
+    s.dynamicsTone = 0.01 * v (5);
+    s.filterType = static_cast<FilterType> (index (6, 5));   // LP24..Tilt; `off` is not offered
+    s.filterMinHz = v (7);
+    s.filterMaxHz = v (8);
+    s.resonance = 0.01 * v (9);
+    s.drive = 0.01 * v (10);
+    s.envAmount = 0.01 * v (11);
+    s.envAttackSeconds = 0.001 * v (12);
+    s.envDecaySeconds = 0.001 * v (13);
+    s.movementMode = static_cast<MovementMode> (index (14, 4));
+    s.movementA = 0.01 * v (15);
+    s.movementB = 0.01 * v (16);
+    s.movementC = 0.01 * v (17);
+    s.spaceType = static_cast<SpaceType> (index (18, 4));
+    s.spaceDecaySeconds = v (19);
+    return s;
 }
 
 void OspAudioProcessor::swapInstrumentIfPending() noexcept
@@ -766,6 +886,30 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml)
         set (ids::reimagined, 0.0f);
         set (ids::pitchCharacter, 0.0f);
         set (ids::sustain, 0.0f);
+    }
+    if (savedVersion < 3)
+    {
+        // Before v3 CHARACTER was a tone tilt (neutral at 50); it is now the filter's
+        // position, so older sessions open it fully. Their popup settings are the defaults.
+        for (const auto& id : shapingIds())
+            if (auto* p = parameters.getParameter (id))
+                p->setValueNotifyingHost (p->getDefaultValue());
+        if (auto* p = parameters.getParameter (ids::character))
+            p->setValueNotifyingHost (1.0f);
+        if (savedVersion < 2)
+        {
+            // ...and the plain-sampler sessions get a clean open filter (no drive, resonance,
+            // envelope or velocity colour), as close to v1's sound as the filter allows.
+            auto set = [this] (const juce::String& id, float value) {
+                if (auto* p = parameters.getParameter (id))
+                    p->setValueNotifyingHost (p->convertTo0to1 (value));
+            };
+            set (ids::characterDrive, 0.0f);
+            set (ids::characterResonance, 0.0f);
+            set (ids::characterEnvAmount, 0.0f);
+            set (ids::dynamicsTone, 0.0f);
+            set (ids::characterMax, 20000.0f);
+        }
     }
 
     if (instrumentTree.hasProperty ("rootOverride"))

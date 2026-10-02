@@ -131,8 +131,9 @@ public:
     std::atomic<int> activeVoices { 0 };
     juce::UndoManager undoManager;
 
-    /** 2: engine C parameters (macros, pitch character, sustain, seed). v1 sessions migrate to neutral settings. */
-    static constexpr int stateVersion = 2;
+    /** 2: engine C parameters (macros, pitch character, sustain, seed). v1 sessions migrate to neutral settings.
+        3: shaping system v1.0 (popup settings; CHARACTER is a filter, so older sessions open it fully). */
+    static constexpr int stateVersion = 3;
 
 private:
     void timerCallback() override;
@@ -146,6 +147,10 @@ private:
     friend class RootChangeAction;
     void pushResult (LoadResult result);
     void applyParameters (bool force) noexcept;
+public:
+    /** The popup parameter IDs (stable: never rename), in shapingParams order. */
+    static const juce::StringArray& shapingIds();
+private:
     void handleMidi (const juce::MidiMessage& message) noexcept;
     void swapInstrumentIfPending() noexcept;
 
@@ -195,6 +200,11 @@ private:
     std::atomic<float>* sustainParam = nullptr;
     std::atomic<float>* seedParam = nullptr;
     std::atomic<float>* mpeParam = nullptr;
+    // Shaping system v1.0 (the macro popups), in the order of shapingIds().
+    static constexpr int numShapingParams = 20;
+    std::array<std::atomic<float>*, numShapingParams> shapingParams {};
+    std::array<float, numShapingParams> lastShaping {};
+    Shaping shapingFromParameters() const noexcept;
     // MIDI-controlled macro values (CC 20-25), used until the host parameter moves again.
     std::array<float, 6> ccMacro { -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f };
     std::array<float, 6> lastMacroParam { -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f };

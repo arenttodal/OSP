@@ -294,8 +294,91 @@ TEST_CASE ("plugin: starting states set the macros and keep the sound", "[plugin
     CHECK (p.getProgramName (0) == "Natural");
     p.setCurrentProgram (5); // Dream
     CHECK (p.getCurrentProgram() == 5);
-    CHECK (p.parameters.getParameter ("space")->convertFrom0to1 (p.parameters.getParameter ("space")->getValue()) == Approx (75.0f));
-    CHECK (p.parameters.getParameter ("release")->convertFrom0to1 (p.parameters.getParameter ("release")->getValue()) == Approx (3000.0f).margin (0.5));
+    CHECK (p.parameters.getParameter ("space")->convertFrom0to1 (p.parameters.getParameter ("space")->getValue()) == Approx (60.0f));
+    CHECK (p.parameters.getParameter ("release")->convertFrom0to1 (p.parameters.getParameter ("release")->getValue()) == Approx (4000.0f).margin (0.5));
+}
+
+TEST_CASE ("plugin: shaping settings are parameters that persist and shape the sound", "[plugin]")
+{
+    TempDir tmp;
+    const auto file = writeSource (tmp.dir, "bright.wav", testsignals::saw (midiToHz (48), 2.0, 48000.0));
+    auto setValue = [] (OspAudioProcessor& p, const juce::String& id, float value) {
+        auto* param = p.parameters.getParameter (id);
+        REQUIRE (param != nullptr);
+        param->setValueNotifyingHost (param->convertTo0to1 (value));
+    };
+    auto valueOf = [] (OspAudioProcessor& p, const juce::String& id) {
+        auto* param = p.parameters.getParameter (id);
+        return param->convertFrom0to1 (param->getValue());
+    };
+    auto highShare = [] (const AudioData& a) {
+        // Energy in the first difference relative to the signal: a brightness proxy.
+        double e = 0.0, d = 0.0;
+        for (std::size_t i = 1; i < a.channels[0].size(); ++i)
+        {
+            e += a.channels[0][i] * a.channels[0][i];
+            const double dx = a.channels[0][i] - a.channels[0][i - 1];
+            d += dx * dx;
+        }
+        return d / std::max (1.0e-12, e);
+    };
+
+    // Every stable ID exists.
+    OspAudioProcessor p;
+    for (const auto& id : OspAudioProcessor::shapingIds())
+        CHECK (p.parameters.getParameter (id) != nullptr);
+
+    loadAndWait (p, file);
+    const auto open = playNote (p, 48, 48000.0, 0.6);
+    setValue (p, "character", 20.0f);   // the filter closes
+    const auto closed = playNote (p, 48, 48000.0, 0.6);
+    CHECK (highShare (closed) < 0.5 * highShare (open));
+
+    setValue (p, "character.type", 2.0f);   // HP12
+    setValue (p, "space.type", 3.0f);       // Spring
+    setValue (p, "space.decay", 3.3f);
+    setValue (p, "movement.mode", 1.0f);    // Tape
+    setValue (p, "life.mode", 2.0f);        // Fray
+    juce::MemoryBlock state;
+    p.getStateInformation (state);
+
+    OspAudioProcessor restored;
+    restored.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+    REQUIRE (restored.waitForLoads (20000));
+    restored.pollLoads();
+    CHECK (valueOf (restored, "character") == Approx (20.0f).margin (0.05));
+    CHECK (valueOf (restored, "character.type") == Approx (2.0f));
+    CHECK (valueOf (restored, "space.type") == Approx (3.0f));
+    CHECK (valueOf (restored, "space.decay") == Approx (3.3f).margin (0.01));
+    CHECK (valueOf (restored, "movement.mode") == Approx (1.0f));
+    CHECK (valueOf (restored, "life.mode") == Approx (2.0f));
+}
+
+TEST_CASE ("plugin: sessions from before the shaping system open CHARACTER fully", "[plugin]")
+{
+    OspAudioProcessor p;
+    juce::MemoryBlock state;
+    p.getStateInformation (state);
+    auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
+    REQUIRE (xml != nullptr);
+    auto tree = juce::ValueTree::fromXml (*xml);
+    tree.setProperty ("stateVersion", 2, nullptr);
+    for (auto child : tree)
+        if (child["id"].toString() == "character")
+            child.setProperty ("value", 50.0f, nullptr);
+        else if (child["id"].toString() == "character.drive")
+            child.setProperty ("value", 77.0f, nullptr);
+    juce::MemoryBlock old;
+    juce::AudioProcessor::copyXmlToBinary (*tree.createXml(), old);
+
+    OspAudioProcessor restored;
+    restored.setStateInformation (old.getData(), static_cast<int> (old.getSize()));
+    auto valueOf = [&restored] (const juce::String& id) {
+        auto* param = restored.parameters.getParameter (id);
+        return param->convertFrom0to1 (param->getValue());
+    };
+    CHECK (valueOf ("character") == Approx (100.0f));
+    CHECK (valueOf ("character.drive") == Approx (12.0f).margin (0.01)); // settings come back at their defaults
 }
 
 TEST_CASE ("plugin: presets and portable instruments travel to another computer", "[plugin]")
