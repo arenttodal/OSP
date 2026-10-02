@@ -287,6 +287,99 @@ TEST_CASE ("plugin: a dropped set becomes one multi-sample instrument and recall
     CHECK (diff < 1.0e-12);
 }
 
+TEST_CASE ("plugin: starting states set the macros and keep the sound", "[plugin]")
+{
+    OspAudioProcessor p;
+    REQUIRE (p.getNumPrograms() == 7);
+    CHECK (p.getProgramName (0) == "Natural");
+    p.setCurrentProgram (5); // Dream
+    CHECK (p.getCurrentProgram() == 5);
+    CHECK (p.parameters.getParameter ("space")->convertFrom0to1 (p.parameters.getParameter ("space")->getValue()) == Approx (75.0f));
+    CHECK (p.parameters.getParameter ("release")->convertFrom0to1 (p.parameters.getParameter ("release")->getValue()) == Approx (3000.0f).margin (0.5));
+}
+
+TEST_CASE ("plugin: presets and portable instruments travel to another computer", "[plugin]")
+{
+    TempDir tmp;
+    const auto file = writeSource (tmp.dir, "travel.wav", testsignals::vowel (midiToHz (55), 2.0, 48000.0, 7));
+    const auto preset = tmp.dir.getChildFile ("mine.osppreset");
+    const auto package = tmp.dir.getChildFile ("mine.ospinstrument");
+    AudioData before;
+    {
+        OspAudioProcessor p;
+        loadAndWait (p, file);
+        p.parameters.getParameter ("life")->setValueNotifyingHost (0.0f);
+        p.parameters.getParameter ("character")->setValueNotifyingHost (0.8f);
+        before = playNote (p, 60, 48000.0, 0.6);
+        REQUIRE (p.savePreset (preset));
+        juce::String error;
+        REQUIRE (p.exportInstrument (package, error));
+    }
+    {
+        // Preset on the same machine.
+        OspAudioProcessor p;
+        REQUIRE (p.loadPreset (preset));
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        CHECK (p.parameters.getParameter ("character")->getValue() == Approx (0.8f));
+    }
+    // "Another computer": a fresh, empty sample store and no original file.
+    REQUIRE (file.deleteFile());
+    const auto otherStore = tmp.dir.getChildFile ("other-store");
+    const juce::String previousStore (std::getenv ("OSP_SAMPLE_STORE"));
+#if JUCE_WINDOWS
+    _putenv_s ("OSP_SAMPLE_STORE", otherStore.getFullPathName().toRawUTF8());
+#else
+    setenv ("OSP_SAMPLE_STORE", otherStore.getFullPathName().toRawUTF8(), 1);
+#endif
+    {
+        OspAudioProcessor p;
+        juce::String error;
+        REQUIRE (p.importInstrument (package, error));
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        REQUIRE (p.currentInstrument() != nullptr);
+        CHECK (p.currentInstrument()->filename == "travel.wav");
+        const auto after = playNote (p, 60, 48000.0, 0.6);
+        REQUIRE (after.numFrames() == before.numFrames());
+        double diff = 0.0;
+        for (std::size_t ch = 0; ch < 2; ++ch)
+            for (std::size_t i = 0; i < after.channels[ch].size(); ++i)
+                diff = std::max (diff, static_cast<double> (std::abs (after.channels[ch][i] - before.channels[ch][i])));
+        CHECK (diff < 1.0e-12); // the same instrument, bit for bit
+    }
+#if JUCE_WINDOWS
+    _putenv_s ("OSP_SAMPLE_STORE", previousStore.toRawUTF8());
+#else
+    setenv ("OSP_SAMPLE_STORE", previousStore.toRawUTF8(), 1);
+#endif
+}
+
+TEST_CASE ("plugin: undo and redo sample loads and root changes", "[plugin]")
+{
+    TempDir tmp;
+    const auto first = writeSource (tmp.dir, "first.wav", testsignals::vowel (midiToHz (57), 1.5, 48000.0, 1));
+    const auto second = writeSource (tmp.dir, "second.wav", testsignals::saw (midiToHz (50), 1.5, 48000.0));
+    OspAudioProcessor p;
+    loadAndWait (p, first);
+    loadAndWait (p, second);
+    REQUIRE (p.currentInstrument()->filename == "second.wav");
+    REQUIRE (p.undoManager.canUndo());
+    p.undoManager.undo();
+    p.pollLoads();
+    CHECK (p.currentInstrument()->filename == "first.wav");
+    p.undoManager.redo();
+    p.pollLoads();
+    CHECK (p.currentInstrument()->filename == "second.wav");
+
+    p.changeRootOverride (62.0);
+    CHECK (p.rootOverride().value_or (-1.0) == Approx (62.0));
+    p.undoManager.undo();
+    CHECK_FALSE (p.rootOverride().has_value());
+    p.undoManager.redo();
+    CHECK (p.rootOverride().value_or (-1.0) == Approx (62.0));
+}
+
 // Needs a display (run under xvfb-run on headless Linux). Hidden by default:
 //   OSP_SNAPSHOT_DIR=/tmp xvfb-run ./osp_plugin_tests "[ui]"
 TEST_CASE ("plugin: editor builds, shows the instrument and can be snapshotted", "[.][ui]")

@@ -65,6 +65,7 @@ public:
 
     void paint (juce::Graphics&) override;
     void resized() override;
+    bool keyPressed (const juce::KeyPress& key) override;
 
     bool isInterestedInFileDrag (const juce::StringArray& files) override;
     void fileDragEnter (const juce::StringArray&, int, int) override { waveform.setDragHighlight (true); }
@@ -78,6 +79,8 @@ private:
     void timerCallback() override;
     void refreshInstrumentInfo();
     void chooseFile();
+    void showMenu();
+    void choosePresetFile (bool save, bool instrument);
 
     struct Knob
     {
@@ -92,6 +95,8 @@ private:
     juce::ComboBox rootBox;
     juce::TextButton loadButton { "Load..." }, exampleButton { "Load example" }, reseedButton { "Reseed" }, samplesButton { "Samples" };
     SamplesPanel samplesPanel { ospProcessor };
+    juce::TextButton menuButton { juce::String::fromUTF8 ("\xe2\x98\xb0") };
+    juce::ComboBox stateBox;
     std::array<Knob, 6> macros;      // Life, Dynamics, Character, Motion, Space, Original/Reimagined
     std::array<Knob, 6> knobs;       // Advanced: attack, release, velocity, fine, bend, output
     juce::ComboBox pitchCharacterBox, sustainBox;

@@ -6,6 +6,7 @@
 #include "core/PitchMath.h"
 #include "io/AudioFileIO.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 
@@ -31,6 +32,25 @@ namespace ids
     static const juce::String seed = "seed";
     static const juce::String mpe = "mpe";
     static const juce::Identifier instrument = "Instrument";
+}
+
+namespace
+{
+    struct StartingState
+    {
+        const char* name;
+        float life, dynamics, character, motion, space, reimagined, attackMs, releaseMs;
+    };
+    // Small and musical (spec §101): each changes how the engine treats the sample.
+    constexpr StartingState startingStates[] = {
+        { "Natural", 30, 50, 50, 25, 15, 10, 2, 250 },
+        { "Alive", 60, 65, 50, 45, 20, 20, 2, 300 },
+        { "Floating", 35, 35, 45, 70, 55, 45, 120, 1500 },
+        { "Broken", 85, 55, 65, 60, 25, 85, 2, 400 },
+        { "Frozen", 10, 30, 50, 5, 35, 30, 250, 2500 },
+        { "Dream", 40, 40, 35, 60, 75, 65, 300, 3000 },
+        { "Wide", 40, 50, 50, 50, 70, 30, 10, 800 },
+    };
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLayout()
@@ -76,6 +96,58 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
     layout.add (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { ids::mpe, 3 }, "MPE", false));
     return layout;
 }
+
+//==============================================================================
+// Undo / redo actions (spec §56)
+
+class InstrumentChangeAction final : public juce::UndoableAction
+{
+public:
+    InstrumentChangeAction (OspAudioProcessor& p, std::uint64_t before, std::uint64_t after) : processor (p), beforeLoad (before), afterLoad (after) {}
+    bool perform() override
+    {
+        if (first)
+        {
+            first = false; // the load itself already published it
+            return true;
+        }
+        return show (afterLoad);
+    }
+    bool undo() override { return show (beforeLoad); }
+
+private:
+    bool show (std::uint64_t loadId)
+    {
+        const auto it = processor.latestByLoad.find (loadId);
+        if (it == processor.latestByLoad.end())
+            return false;
+        processor.republish (it->second);
+        return true;
+    }
+    OspAudioProcessor& processor;
+    std::uint64_t beforeLoad, afterLoad;
+    bool first = true;
+};
+
+class RootChangeAction final : public juce::UndoableAction
+{
+public:
+    RootChangeAction (OspAudioProcessor& p, std::optional<double> before, std::optional<double> after) : processor (p), from (before), to (after) {}
+    bool perform() override
+    {
+        processor.setRootOverride (to);
+        return true;
+    }
+    bool undo() override
+    {
+        processor.setRootOverride (from);
+        return true;
+    }
+
+private:
+    OspAudioProcessor& processor;
+    std::optional<double> from, to;
+};
 
 OspAudioProcessor::OspAudioProcessor()
     : AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
@@ -391,6 +463,7 @@ void OspAudioProcessor::loadFiles (const juce::Array<juce::File>& files)
         r.file = f;
         request.files.push_back (std::move (r));
     }
+    userLoads.insert (nextGeneration.load());
     enqueueSetLoad (std::move (request));
 }
 
@@ -414,6 +487,7 @@ void OspAudioProcessor::loadFile (const juce::File& file)
 {
     LoadRequest request;
     request.file = file;
+    userLoads.insert (nextGeneration.load());
     enqueueLoad (std::move (request));
 }
 
@@ -463,6 +537,21 @@ void OspAudioProcessor::timerCallback()
             {
                 exchange.publish (result.instrument);
                 published = true;
+                const auto loadId = result.instrument->loadId;
+                latestByLoad[loadId] = result.instrument;
+                if (loadId != lastPublishedLoad)
+                {
+                    // A new sample (not a later stage of the same one): undoable if the user asked for it.
+                    if (userLoads.count (loadId) > 0 && lastPublishedLoad != 0)
+                    {
+                        undoManager.beginNewTransaction ("Load sample");
+                        undoManager.perform (new InstrumentChangeAction (*this, lastPublishedLoad, loadId));
+                    }
+                    lastPublishedLoad = loadId;
+                }
+                // Keep undo history bounded (the instruments hold audio).
+                while (latestByLoad.size() > 8)
+                    latestByLoad.erase (latestByLoad.begin());
             }
             if (! result.warnings.empty())
                 message = juce::String (result.warnings.front());
@@ -579,8 +668,16 @@ namespace
 
 void OspAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
+    if (const auto xml = createStateXml())
+        copyXmlToBinary (*xml, destData);
+}
+
+std::unique_ptr<juce::XmlElement> OspAudioProcessor::createStateXml()
+{
     auto stateTree = parameters.copyState();
     stateTree.setProperty ("stateVersion", stateVersion, nullptr);
+    stateTree.setProperty ("uiScale", uiScaleFactor.load(), nullptr);
+    stateTree.setProperty ("program", currentProgram, nullptr);
 
     stateTree.removeChild (stateTree.getChildWithName (ids::instrument), nullptr);
     juce::ValueTree instrumentTree (ids::instrument);
@@ -622,9 +719,7 @@ void OspAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
         instrumentTree.appendChild (setTree, nullptr);
     }
     stateTree.appendChild (instrumentTree, nullptr);
-
-    if (auto xml = stateTree.createXml())
-        copyXmlToBinary (*xml, destData);
+    return stateTree.createXml();
 }
 
 void OspAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
@@ -632,8 +727,14 @@ void OspAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
     const auto xml = getXmlFromBinary (data, sizeInBytes);
     if (xml == nullptr || ! xml->hasTagName (parameters.state.getType()))
         return;
+    applyStateXml (*xml);
+}
 
-    auto stateTree = juce::ValueTree::fromXml (*xml);
+void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml)
+{
+    auto stateTree = juce::ValueTree::fromXml (xml);
+    uiScaleFactor = std::clamp (static_cast<float> (stateTree.getProperty ("uiScale", 1.0f)), 0.8f, 2.0f);
+    currentProgram = static_cast<int> (stateTree.getProperty ("program", 0));
     const auto instrumentTree = stateTree.getChildWithName (ids::instrument);
     stateTree.removeChild (instrumentTree, nullptr);
     const int savedVersion = static_cast<int> (stateTree.getProperty ("stateVersion", 1));
@@ -711,6 +812,175 @@ void OspAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
         }
         enqueueLoad (std::move (request));
     }
+}
+
+int OspAudioProcessor::getNumPrograms()
+{
+    return static_cast<int> (std::size (startingStates));
+}
+
+const juce::String OspAudioProcessor::getProgramName (int index)
+{
+    return index >= 0 && index < getNumPrograms() ? juce::String (startingStates[index].name) : juce::String();
+}
+
+void OspAudioProcessor::setCurrentProgram (int index)
+{
+    if (index < 0 || index >= getNumPrograms())
+        return;
+    currentProgram = index;
+    const auto& s = startingStates[index];
+    auto set = [this] (const juce::String& id, float value) {
+        if (auto* p = parameters.getParameter (id))
+            p->setValueNotifyingHost (p->convertTo0to1 (value));
+    };
+    set (ids::life, s.life);
+    set (ids::dynamics, s.dynamics);
+    set (ids::character, s.character);
+    set (ids::motion, s.motion);
+    set (ids::space, s.space);
+    set (ids::reimagined, s.reimagined);
+    set (ids::attack, s.attackMs);
+    set (ids::release, s.releaseMs);
+}
+
+//==============================================================================
+// Undo / redo of sample loads and root changes (spec §56)
+
+void OspAudioProcessor::changeRootOverride (std::optional<double> midi)
+{
+    undoManager.beginNewTransaction ("Root");
+    undoManager.perform (new RootChangeAction (*this, rootOverride(), midi));
+}
+
+void OspAudioProcessor::republish (std::shared_ptr<const LoadedInstrument> instrument)
+{
+    if (instrument == nullptr)
+        return;
+    // A copy with a fresh generation keeps ModelExchange's ordering intact; the models
+    // and audio are shared, nothing is rebuilt.
+    auto copy = std::make_shared<LoadedInstrument> (*instrument);
+    copy->generation = nextGeneration.fetch_add (1);
+    {
+        const std::lock_guard<std::mutex> lock (modelMutex);
+        exchange.publish (copy);
+    }
+    lastPublishedLoad = copy->loadId;
+    setRootOverride (rootOverride());
+}
+
+//==============================================================================
+// Presets and portable instruments
+
+bool OspAudioProcessor::savePreset (const juce::File& file)
+{
+    const auto xml = createStateXml();
+    return xml != nullptr && xml->writeTo (file);
+}
+
+bool OspAudioProcessor::loadPreset (const juce::File& file)
+{
+    const auto xml = juce::XmlDocument::parse (file);
+    if (xml == nullptr || ! xml->hasTagName (parameters.state.getType()))
+        return false;
+    applyStateXml (*xml);
+    return true;
+}
+
+bool OspAudioProcessor::exportInstrument (const juce::File& file, juce::String& error)
+{
+    const auto instrument = currentInstrument();
+    if (instrument == nullptr)
+    {
+        error = "nothing to export: load a sound first";
+        return false;
+    }
+    std::vector<LoadedInstrument::MemberFile> members = instrument->memberFiles;
+    if (members.empty())
+        members.push_back ({ instrument->contentHash, instrument->filename, instrument->originalPath });
+
+    juce::ZipFile::Builder zip;
+    auto manifest = std::make_unique<juce::DynamicObject>();
+    manifest->setProperty ("schemaVersion", 1);
+    manifest->setProperty ("format", "OSP portable instrument");
+    manifest->setProperty ("engineVersion", JucePlugin_VersionString);
+    manifest->setProperty ("stateVersion", stateVersion);
+    juce::Array<juce::var> files;
+    for (const auto& m : members)
+    {
+        const auto hash = juce::String (m.contentHash).fromFirstOccurrenceOf ("sha256:", false, false);
+        const auto stored = store.find (hash.toStdString());
+        if (! stored)
+        {
+            error = "the sample " + juce::String (m.filename) + " is missing from the sample store";
+            return false;
+        }
+        zip.addFile (*stored, 0, "source/" + stored->getFileName());
+        const auto analysis = store.analysisCacheFor (hash.toStdString());
+        if (analysis.existsAsFile())
+            zip.addFile (analysis, 9, "analysis/" + analysis.getFileName());
+        auto entry = std::make_unique<juce::DynamicObject>();
+        entry->setProperty ("contentHash", juce::String (m.contentHash));
+        entry->setProperty ("filename", juce::String (m.filename));
+        entry->setProperty ("stored", "source/" + stored->getFileName());
+        files.add (juce::var (entry.release()));
+    }
+    manifest->setProperty ("sources", files);
+    const auto manifestText = juce::JSON::toString (juce::var (manifest.release()));
+    zip.addEntry (new juce::MemoryInputStream (manifestText.toRawUTF8(), manifestText.getNumBytesAsUTF8(), true), 9, "manifest.json",
+                  juce::Time::getCurrentTime());
+    const auto xml = createStateXml();
+    const auto preset = xml->toString();
+    zip.addEntry (new juce::MemoryInputStream (preset.toRawUTF8(), preset.getNumBytesAsUTF8(), true), 9, "preset.xml", juce::Time::getCurrentTime());
+
+    file.deleteFile();
+    juce::FileOutputStream out (file);
+    if (! out.openedOk() || ! zip.writeToStream (out, nullptr))
+    {
+        error = "cannot write " + file.getFullPathName();
+        return false;
+    }
+    return true;
+}
+
+bool OspAudioProcessor::importInstrument (const juce::File& file, juce::String& error)
+{
+    juce::ZipFile zip (file);
+    if (zip.getNumEntries() == 0 || zip.getEntry ("preset.xml") == nullptr)
+    {
+        error = file.getFileName() + " is not an OSP instrument";
+        return false;
+    }
+    // Sources and analyses go into the managed store under their hash names; the preset
+    // then recalls them from the store exactly like a reopened session.
+    store.directory().createDirectory();
+    for (int i = 0; i < zip.getNumEntries(); ++i)
+    {
+        const auto* entry = zip.getEntry (i);
+        const auto name = entry->filename;
+        if (! name.startsWith ("source/") && ! name.startsWith ("analysis/"))
+            continue;
+        const auto target = store.directory().getChildFile (name.fromFirstOccurrenceOf ("/", false, false));
+        if (target.existsAsFile() || target.getFileName().isEmpty() || target.getFileName().contains (".."))
+            continue;
+        std::unique_ptr<juce::InputStream> in (zip.createStreamForEntry (i));
+        juce::FileOutputStream out (target);
+        if (in == nullptr || ! out.openedOk())
+        {
+            error = "cannot extract " + name;
+            return false;
+        }
+        out.writeFromInputStream (*in, -1);
+    }
+    std::unique_ptr<juce::InputStream> presetStream (zip.createStreamForEntry (*zip.getEntry ("preset.xml")));
+    const auto xml = presetStream != nullptr ? juce::XmlDocument::parse (presetStream->readEntireStreamAsString()) : nullptr;
+    if (xml == nullptr || ! xml->hasTagName (parameters.state.getType()))
+    {
+        error = "the instrument's settings are unreadable";
+        return false;
+    }
+    applyStateXml (*xml);
+    return true;
 }
 
 juce::AudioProcessorEditor* OspAudioProcessor::createEditor()

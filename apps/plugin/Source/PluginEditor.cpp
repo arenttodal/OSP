@@ -233,11 +233,12 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     rootBox.onChange = [this] {
         const int id = rootBox.getSelectedId();
         if (id == 1)
-            ospProcessor.setRootOverride (std::nullopt);
+            ospProcessor.changeRootOverride (std::nullopt);
         else if (id >= 2)
-            ospProcessor.setRootOverride (static_cast<double> (id - 2));
+            ospProcessor.changeRootOverride (static_cast<double> (id - 2));
         refreshInstrumentInfo();
     };
+    rootBox.setTitle ("Root note");
     addAndMakeVisible (rootBox);
 
     loadButton.onClick = [this] { chooseFile(); };
@@ -250,6 +251,20 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     addAndMakeVisible (samplesButton);
     addChildComponent (samplesPanel);
 
+    // Starting states (spec §101) and the menu (presets, instrument files, undo, size).
+    for (int i = 0; i < ospProcessor.getNumPrograms(); ++i)
+        stateBox.addItem (ospProcessor.getProgramName (i), i + 1);
+    stateBox.setSelectedId (ospProcessor.getCurrentProgram() + 1, juce::dontSendNotification);
+    stateBox.setTitle ("Starting state");
+    stateBox.setTooltip ("Starting states change how the instrument behaves; your sound stays");
+    stateBox.onChange = [this] { ospProcessor.setCurrentProgram (stateBox.getSelectedId() - 1); };
+    addAndMakeVisible (stateBox);
+    menuButton.setTitle ("Menu");
+    menuButton.setTooltip ("Presets, instrument files, undo, size");
+    menuButton.onClick = [this] { showMenu(); };
+    addAndMakeVisible (menuButton);
+    setWantsKeyboardFocus (true);
+
     auto setupKnob = [this] (Knob& knob, const char* id, const char* name, bool large) {
         knob.slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 70, 18);
         knob.slider.setColour (juce::Slider::rotarySliderFillColourId, large ? colours::accent : colours::dim);
@@ -259,6 +274,7 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
         if (large)
             knob.label.setFont (juce::FontOptions (14.0f, juce::Font::bold));
         knob.attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (ospProcessor.parameters, id, knob.slider);
+        knob.slider.setTitle (juce::String::fromUTF8 (name));
         addAndMakeVisible (knob.slider);
         addAndMakeVisible (knob.label);
     };
@@ -275,6 +291,8 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
 
     pitchCharacterBox.addItemList ({ "Tape", "Natural" }, 1);
     sustainBox.addItemList ({ "Recording", "Endless" }, 1);
+    pitchCharacterBox.setTitle ("Pitch character");
+    sustainBox.setTitle ("Sustain");
     pitchCharacterAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (ospProcessor.parameters, "pitchCharacter", pitchCharacterBox);
     sustainAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (ospProcessor.parameters, "sustain", sustainBox);
     for (auto* label : { &pitchCharacterLabel, &sustainLabel, &advancedLabel })
@@ -311,6 +329,7 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     setResizable (true, true);
     setResizeLimits (720, 560, 1800, 1200);
     setSize (920, 680);
+    setScaleFactor (ospProcessor.uiScale());
 
     refreshInstrumentInfo();
     startTimerHz (15);
@@ -332,8 +351,13 @@ void OspAudioProcessorEditor::resized()
 
     auto header = area.removeFromTop (64);
     auto buttons = header.removeFromRight (220);
-    loadButton.setBounds (buttons.removeFromTop (28).removeFromRight (100));
-    exampleButton.setBounds (loadButton.getBounds().translated (-110, 0).withWidth (100));
+    auto topRow = buttons.removeFromTop (28);
+    menuButton.setBounds (topRow.removeFromRight (34));
+    topRow.removeFromRight (6);
+    loadButton.setBounds (topRow.removeFromRight (80));
+    topRow.removeFromRight (6);
+    exampleButton.setBounds (topRow);
+    stateBox.setBounds (header.removeFromRight (150).removeFromTop (28).translated (-10, 0));
     auto rootRow = buttons.removeFromBottom (28);
     samplesButton.setBounds (rootRow.removeFromLeft (80));
     rootRow.removeFromLeft (6);
@@ -415,6 +439,70 @@ void OspAudioProcessorEditor::filesDropped (const juce::StringArray& files, int,
         ospProcessor.loadFiles (audioFiles);
 }
 
+bool OspAudioProcessorEditor::keyPressed (const juce::KeyPress& key)
+{
+    const bool command = key.getModifiers().isCommandDown();
+    if (command && key.getKeyCode() == 'Z')
+    {
+        if (key.getModifiers().isShiftDown())
+            ospProcessor.undoManager.redo();
+        else
+            ospProcessor.undoManager.undo();
+        refreshInstrumentInfo();
+        return true;
+    }
+    return false;
+}
+
+void OspAudioProcessorEditor::showMenu()
+{
+    juce::PopupMenu menu;
+    menu.addItem ("Save preset...", [this] { choosePresetFile (true, false); });
+    menu.addItem ("Load preset...", [this] { choosePresetFile (false, false); });
+    menu.addSeparator();
+    menu.addItem ("Export instrument...", ospProcessor.currentInstrument() != nullptr, false, [this] { choosePresetFile (true, true); });
+    menu.addItem ("Import instrument...", [this] { choosePresetFile (false, true); });
+    menu.addSeparator();
+    menu.addItem ("Undo " + ospProcessor.undoManager.getUndoDescription(), ospProcessor.undoManager.canUndo(), false,
+                  [this] { ospProcessor.undoManager.undo(); refreshInstrumentInfo(); });
+    menu.addItem ("Redo " + ospProcessor.undoManager.getRedoDescription(), ospProcessor.undoManager.canRedo(), false,
+                  [this] { ospProcessor.undoManager.redo(); refreshInstrumentInfo(); });
+    juce::PopupMenu size;
+    for (int percent : { 80, 100, 125, 150, 200 })
+        size.addItem (juce::String (percent) + " %", true, std::abs (ospProcessor.uiScale() * 100.0f - static_cast<float> (percent)) < 1.0f,
+                      [this, percent] {
+                          ospProcessor.setUiScale (static_cast<float> (percent) / 100.0f);
+                          setScaleFactor (ospProcessor.uiScale());
+                      });
+    menu.addSubMenu ("Interface size", size);
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (menuButton));
+}
+
+void OspAudioProcessorEditor::choosePresetFile (bool save, bool instrument)
+{
+    const juce::String pattern = juce::String ("*") + (instrument ? OspAudioProcessor::instrumentExtension : OspAudioProcessor::presetExtension);
+    chooser = std::make_unique<juce::FileChooser> (save ? (instrument ? "Export instrument" : "Save preset") : (instrument ? "Import instrument" : "Load preset"),
+                                                   juce::File::getSpecialLocation (juce::File::userDocumentsDirectory), pattern);
+    const auto browserFlags = (save ? juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting
+                                    : juce::FileBrowserComponent::openMode)
+                              | juce::FileBrowserComponent::canSelectFiles;
+    chooser->launchAsync (browserFlags, [this, save, instrument] (const juce::FileChooser& fc) {
+        auto file = fc.getResult();
+        if (file == juce::File())
+            return;
+        const auto extension = instrument ? OspAudioProcessor::instrumentExtension : OspAudioProcessor::presetExtension;
+        if (save && file.getFileExtension() != extension)
+            file = file.withFileExtension (extension);
+        juce::String error;
+        bool ok = false;
+        if (instrument)
+            ok = save ? ospProcessor.exportInstrument (file, error) : ospProcessor.importInstrument (file, error);
+        else
+            ok = save ? ospProcessor.savePreset (file) : ospProcessor.loadPreset (file);
+        ospProcessor.showMessage (ok ? (save ? "Saved " : "Opened ") + file.getFileName() : (error.isEmpty() ? "Could not open " + file.getFileName() : error));
+    });
+}
+
 void OspAudioProcessorEditor::chooseFile()
 {
     chooser = std::make_unique<juce::FileChooser> ("Choose a sound", juce::File(), "*.wav;*.wave;*.aif;*.aiff;*.aifc;*.flac");
@@ -479,6 +567,8 @@ void OspAudioProcessorEditor::timerCallback()
 {
     const auto state = ospProcessor.loadState();
     waveform.setLoading (state == OspAudioProcessor::LoadState::loading);
+    if (stateBox.getSelectedId() != ospProcessor.getCurrentProgram() + 1)
+        stateBox.setSelectedId (ospProcessor.getCurrentProgram() + 1, juce::dontSendNotification);
 
     const auto instrument = ospProcessor.currentInstrument();
     const auto generation = instrument != nullptr ? instrument->generation : 0;

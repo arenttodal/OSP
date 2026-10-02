@@ -9,10 +9,13 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_audio_utils/juce_audio_utils.h>
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <deque>
+#include <map>
 #include <mutex>
+#include <set>
 
 namespace osp::plugin
 {
@@ -50,14 +53,28 @@ public:
     bool isMidiEffect() const override { return false; }
     double getTailLengthSeconds() const override { return 0.5; }
 
-    int getNumPrograms() override { return 1; }
-    int getCurrentProgram() override { return 0; }
-    void setCurrentProgram (int) override {}
-    const juce::String getProgramName (int) override { return {}; }
+    // Factory starting states (spec §101): macro settings, the sample is kept.
+    int getNumPrograms() override;
+    int getCurrentProgram() override { return currentProgram; }
+    void setCurrentProgram (int index) override;
+    const juce::String getProgramName (int index) override;
     void changeProgramName (int, const juce::String&) override {}
 
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
+
+    // Presets and portable instruments (spec §52, §54). Message thread.
+    bool savePreset (const juce::File& file);
+    bool loadPreset (const juce::File& file);
+    /** One file with the sources, their analysis and the settings: opens on any computer. */
+    bool exportInstrument (const juce::File& file, juce::String& error);
+    bool importInstrument (const juce::File& file, juce::String& error);
+    static constexpr const char* instrumentExtension = ".ospinstrument";
+    static constexpr const char* presetExtension = ".osppreset";
+
+    /** Editor zoom (80..200 %), stored with the session. */
+    float uiScale() const noexcept { return uiScaleFactor.load(); }
+    void setUiScale (float scale) noexcept { uiScaleFactor = std::clamp (scale, 0.8f, 2.0f); }
 
     // Instrument loading (message thread)
     void loadFile (const juce::File& file);
@@ -70,6 +87,11 @@ public:
     enum class LoadState { empty, loading, ready, failed };
     LoadState loadState() const noexcept { return state.load(); }
     juce::String statusMessage() const;
+    void showMessage (const juce::String& message)
+    {
+        const std::lock_guard<std::mutex> lock (messageMutex);
+        lastMessage = message;
+    }
     /** "Ready", or what is still being prepared in the background ("Building sustain…"). */
     juce::String stageMessage() const;
 
@@ -78,6 +100,8 @@ public:
 
     /** Manual root (fractional MIDI) or nullopt for the analysed root. Message thread. */
     void setRootOverride (std::optional<double> midi);
+    /** Same, as an undoable user action (the editor's root menu). */
+    void changeRootOverride (std::optional<double> midi);
     std::optional<double> rootOverride() const;
     double effectiveRootMidi() const;
 
@@ -99,6 +123,11 @@ private:
     void enqueueLoad (LoadRequest request);
     void enqueueRefine (std::shared_ptr<const LoadedInstrument> base, std::shared_ptr<const AudioData> audio);
     void enqueueSetLoad (SetLoadRequest request);
+    std::unique_ptr<juce::XmlElement> createStateXml();
+    void applyStateXml (const juce::XmlElement& xml);
+    void republish (std::shared_ptr<const LoadedInstrument> instrument);
+    friend class InstrumentChangeAction;
+    friend class RootChangeAction;
     void pushResult (LoadResult result);
     void applyParameters (bool force) noexcept;
     void handleMidi (const juce::MidiMessage& message) noexcept;
@@ -157,6 +186,13 @@ private:
     float lastAttack = -1.0f, lastRelease = -1.0f, lastGain = -1000.0f, lastVelocityRange = -1.0f;
     double pitchBendSemitones = 0.0;
     bool hostWasPlaying = false;     // audio thread: transport start resets performance memory
+    int currentProgram = 0;
+    std::atomic<float> uiScaleFactor { 1.0f };
+    // Undo of sample loads: the latest instrument of every recent load, so undo/redo can
+    // bring back a sample with all its model stages. Message thread.
+    std::map<std::uint64_t, std::shared_ptr<const LoadedInstrument>> latestByLoad;
+    std::set<std::uint64_t> userLoads;     // load ids started by the user (undoable), not by recall
+    std::uint64_t lastPublishedLoad = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OspAudioProcessor)
 };
