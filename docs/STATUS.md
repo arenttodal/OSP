@@ -127,6 +127,7 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [x] Windows VST3: CI builds it and runs every test with MSVC
 - [x] Performance tuning: polyphase tables for unity and stretched reads (semitone grid up to x4); engine C costs about two-thirds of the plain baseline
 - [x] Host robustness matrix (plugin test): 22.05–192 kHz × blocks 1–4096 and host-varied blocks; bit-identical output, finite, click-free, chord ±2 octaves + bend
+- [x] Memory (spec §65): recordings over 60 s skip register anchors (Natural plays as Tape, the status line says so). A 5-minute stereo file peaks at 380 MB in the renderer instead of 781 MB; files over 10 minutes are truncated with a warning
 - [x] Crash-safe sample management (atomic store copies, analysis cache re-derived when stale, original-path fallback)
 - [x] User guide (docs/user-guide.md)
 - [~] Installer/signing/notarisation: `scripts/package-macos.sh` written, **not run** (needs a Developer ID)

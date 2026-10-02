@@ -600,8 +600,17 @@ std::shared_ptr<const LoadedInstrument> OspAudioProcessor::currentInstrument() c
 juce::String OspAudioProcessor::stageMessage() const
 {
     const auto instrument = currentInstrument();
-    if (instrument == nullptr || instrument->model == nullptr || pendingLoads.load() == 0)
+    if (instrument == nullptr || instrument->model == nullptr)
         return "Ready";
+    if (pendingLoads.load() == 0)
+    {
+        // Natural pitch needs register anchors, which long recordings skip (memory).
+        const bool natural = pitchCharacterParam->load() >= 0.5f;
+        if (natural && instrument->set == nullptr && instrument->model->stage == InstrumentModel::Stage::complete
+            && instrument->model->anchors.empty())
+            return juce::String::fromUTF8 ("Ready \xc2\xb7 Natural pitch needs a recording under a minute: playing as Tape");
+        return "Ready";
+    }
     switch (instrument->model->stage)
     {
         case InstrumentModel::Stage::provisional: return juce::String::fromUTF8 ("Playable \xc2\xb7 building sustain\xe2\x80\xa6");

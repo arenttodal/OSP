@@ -173,6 +173,8 @@ std::shared_ptr<InstrumentModel> addAnchors (const InstrumentModel& base, const 
     auto model = std::make_shared<InstrumentModel> (base);
     model->stage = InstrumentModel::Stage::complete;
     model->anchors.clear();
+    if (audio.durationSeconds() > options.anchorMaxSeconds)
+        return model;
     const double rootHz = midiToHz (model->rootMidi);
     for (const double offset : options.anchorOffsets)
     {

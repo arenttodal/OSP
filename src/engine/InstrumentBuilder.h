@@ -21,6 +21,9 @@ struct InstrumentBuildOptions
     std::optional<PlaybackPreparation> preparationOverride; ///< session recall: the exact saved start/gain
     ContinuationOptions continuation;
     std::vector<double> anchorOffsets { -24.0, -12.0, 12.0, 24.0 };
+    /** Register anchors are full-length copies of the source (four of them), so longer
+        recordings skip them and Natural plays as Tape (memory, spec §65). */
+    double anchorMaxSeconds = 60.0;
     std::uint64_t seed = 1;
 };
 

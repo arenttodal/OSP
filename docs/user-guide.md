@@ -63,6 +63,8 @@ loop), **MPE**, and **Reseed** (a new variation pattern for LIFE and MOTION).
 
 ## When a sound is unusual
 
+Recordings longer than a minute play with Tape pitch even when Natural is selected (Natural keeps four extra copies of the sound); the status line says so. Files longer than ten minutes are shortened to their first ten minutes.
+
 OSP never refuses a file it can read. With no clear pitch, the root shows `?`; choose
 one. Very short, noisy or decaying sounds play as they are (plucks ring out naturally
 instead of being held artificially).

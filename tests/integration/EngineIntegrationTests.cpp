@@ -292,3 +292,19 @@ TEST_CASE ("engine: transient preservation keeps a transposed pick short", "[int
     const auto a = render (false, root + 1), b = render (true, root + 1);
     CHECK (a.channels[0] == b.channels[0]);
 }
+
+TEST_CASE ("engine: long recordings skip register anchors and Natural plays as Tape", "[integration][engine]")
+{
+    const auto audio = testsignals::vowel (220.0, 3.0, 48000.0, 3);
+    InstrumentBuildOptions options;
+    options.anchorMaxSeconds = 2.0; // stands in for a recording over a minute
+    const auto model = instrument::buildComplete (audio, test::analyse (audio), options, true);
+    CHECK (model->stage == InstrumentModel::Stage::complete);
+    CHECK (model->anchors.empty());
+
+    research::RenderConfig tape, natural;
+    natural.engineSettings.pitchCharacter = PitchCharacter::natural;
+    const auto a = research::renderInstrument (*model, hold (69, 1.0), tape).audio;
+    const auto b = research::renderInstrument (*model, hold (69, 1.0), natural).audio;
+    CHECK (a.channels[0] == b.channels[0]);
+}
