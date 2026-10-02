@@ -13,7 +13,15 @@ Items are grouped by phase. The newest items are at the bottom of each section.
 
 ## Listening tests
 
-- (added as each phase produces renders)
+All in one page, **the listening lab**: https://claude.ai/artifact/SBtjwht3czzVXQbzpmeWUR.
+There is one tab per experiment. Ratings and notes save automatically, and I read them
+from the page. If a tab is new, the takes are blind and in a random order.
+
+1. **Sustain** (Phase 3 exit test): 5 sources each held for 60 s and released. The
+   four takes are: a single naive loop, the best single loop, multi-loop, and
+   multi-loop with movement. Main question: *can you hear the loop?* The measurements
+   predict that multi-loop removes audible repetition. Single loops score 0.7–0.9 on my
+   repetition measure, multi-loop 0.1–0.2. No clicks were detected in any take.
 
 ## Checks in a DAW (need your Mac)
 

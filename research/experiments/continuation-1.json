@@ -13,6 +13,7 @@
     { "key": "life", "label": "Life", "low": "frozen, static", "high": "alive like the recording" },
     { "key": "seams", "label": "Seams", "low": "clicks or bumps", "high": "seamless" }
   ],
+  "groupLabel": "Hold 60 s, then release",
   "bestLabel": "Best of these",
   "bestHint": "the hold you would rather play",
   "corpusRoot": "research/corpus",

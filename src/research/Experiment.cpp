@@ -450,7 +450,7 @@ ExperimentSummary runExperiment (const std::filesystem::path& planFile, const st
             auto group = json::object();
             json::set (group, "id", json::str (groupId));
             json::set (group, "section", json::str (sectionId));
-            json::set (group, "label", json::str (variant.label.empty() ? json::getString (s, "label", sectionId) : variant.label));
+            json::set (group, "label", json::str (variant.label.empty() ? json::getString (p, "groupLabel", json::getString (s, "label", sectionId)) : variant.label));
             json::set (group, "note", json::str (variant.note));
             auto clipIds = json::array();
             for (const auto& id : ids)
