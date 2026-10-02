@@ -27,8 +27,10 @@ void InstrumentEngine::prepare (double outputSampleRate, int maximumBlockSize, c
     channelBendRatio.fill (1.0);
     channelPressure.fill (0.0f);
     channelTimbre.fill (0.0f);
-    post.prepare (outputSampleRate, maximumBlockSize);
+    // Targets first: prepare() resets the smoothed values to the targets, so the post
+    // stage never depends on what was played before (bit-identical recall and bounces).
     post.setMacros (config.macros);
+    post.prepare (outputSampleRate, maximumBlockSize);
     resetPerformance();
 }
 

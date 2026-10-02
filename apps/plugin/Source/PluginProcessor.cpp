@@ -120,7 +120,10 @@ bool OspAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) cons
 
 void OspAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // Not the audio thread: allocation is allowed here.
+    // Not the audio thread: allocation is allowed here. Start from the current macro
+    // values so smoothing never begins from a previous session's state.
+    lastMacroParam.fill (-1.0f);
+    applyParameters (true);
     engine.prepare (sampleRate, samplesPerBlock, engineSettings);
     if (playing != nullptr && playing->set != nullptr)
         engine.setInstrumentSet (playing->set.get());
@@ -185,6 +188,7 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
     macros.space = values[4];
     macros.reimagined = values[5];
     engine.setMacros (macros);
+    engineSettings.macros = macros;
     engine.setMpe (mpeParam->load() >= 0.5f);
     engine.setPitchCharacter (pitchCharacterParam->load() >= 0.5f ? PitchCharacter::natural : PitchCharacter::tape);
     engine.setContinuation (sustainParam->load() >= 0.5f ? ContinuationStrategy::multiLoopMovement : ContinuationStrategy::off);
