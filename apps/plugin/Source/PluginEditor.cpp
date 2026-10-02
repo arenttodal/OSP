@@ -3,6 +3,8 @@
 #include "core/PitchMath.h"
 #include "io/AudioFileIO.h"
 
+#include <map>
+
 namespace osp::plugin
 {
 
@@ -73,12 +75,20 @@ void WaveformView::paint (juce::Graphics& g)
 
     if ((instrument == nullptr || instrument->peakMax.empty()) && ! loading)
     {
+        // First-run guidance (spec §90 onboarding): three steps, no manual needed.
+        auto area = getLocalBounds().reduced (12);
+        const int lineHeight = 20;
+        auto block = area.withSizeKeepingCentre (area.getWidth(), 34 + 3 * lineHeight + 6);
         g.setColour (colours::text);
         g.setFont (juce::FontOptions (28.0f, juce::Font::bold));
-        g.drawText ("DROP A SOUND", getLocalBounds().withTrimmedBottom (24), juce::Justification::centred);
+        g.drawText ("DROP A SOUND", block.removeFromTop (34), juce::Justification::centred);
+        block.removeFromTop (6);
         g.setColour (colours::dim);
-        g.setFont (juce::FontOptions (14.0f));
-        g.drawText (juce::String::fromUTF8 ("WAV \xc2\xb7 AIFF \xc2\xb7 FLAC"), getLocalBounds().withTrimmedTop (40), juce::Justification::centred);
+        g.setFont (juce::FontOptions (13.0f));
+        for (const auto* line : { "1  One tonal recording (WAV, AIFF, FLAC) \xe2\x80\x94 or several takes, or a folder",
+                                  "2  Play and hold: notes keep going, repeated notes never sound the same",
+                                  "3  Shape it with LIFE, DYNAMICS, CHARACTER, MOTION and SPACE" })
+            g.drawText (juce::String::fromUTF8 (line), block.removeFromTop (lineHeight), juce::Justification::centred);
     }
 
     if (loading)
@@ -457,11 +467,44 @@ bool OspAudioProcessorEditor::keyPressed (const juce::KeyPress& key)
 void OspAudioProcessorEditor::showMenu()
 {
     juce::PopupMenu menu;
+
+    // The user's presets and instruments, by folder (sub-folders become sub-menus).
+    auto browse = [this] (const juce::File& folder, const juce::String& extension, bool instrument) {
+        juce::PopupMenu list;
+        std::map<juce::String, juce::PopupMenu> subFolders;
+        const auto current = ospProcessor.currentPresetFile();
+        for (const auto& file : OspAudioProcessor::findFiles (folder, extension))
+        {
+            const auto parent = file.getParentDirectory();
+            auto& target = parent == folder ? list : subFolders[parent.getRelativePathFrom (folder)];
+            target.addItem (file.getFileNameWithoutExtension(), true, ! instrument && file == current, [this, file, instrument] {
+                juce::String error;
+                const bool ok = instrument ? ospProcessor.importInstrument (file, error) : ospProcessor.loadPreset (file);
+                ospProcessor.showMessage (ok ? "Opened " + file.getFileNameWithoutExtension() : (error.isEmpty() ? "Could not open " + file.getFileName() : error));
+                refreshInstrumentInfo();
+            });
+        }
+        for (auto& [name, sub] : subFolders)
+            list.addSubMenu (name, sub);
+        if (list.getNumItems() == 0)
+            list.addItem (instrument ? "No instruments yet" : "No presets yet", false, false, [] {});
+        list.addSeparator();
+        list.addItem ("Show folder", [folder] {
+            folder.createDirectory();
+            folder.revealToUser();
+        });
+        return list;
+    };
+
+    menu.addSubMenu ("Presets", browse (OspAudioProcessor::presetFolder(), OspAudioProcessor::presetExtension, false));
+    menu.addItem ("Previous preset", [this] { if (ospProcessor.stepPreset (-1)) presetOpened(); });
+    menu.addItem ("Next preset", [this] { if (ospProcessor.stepPreset (1)) presetOpened(); });
     menu.addItem ("Save preset...", [this] { choosePresetFile (true, false); });
-    menu.addItem ("Load preset...", [this] { choosePresetFile (false, false); });
+    menu.addItem ("Open preset file...", [this] { choosePresetFile (false, false); });
     menu.addSeparator();
+    menu.addSubMenu ("Instruments", browse (OspAudioProcessor::instrumentFolder(), OspAudioProcessor::instrumentExtension, true));
     menu.addItem ("Export instrument...", ospProcessor.currentInstrument() != nullptr, false, [this] { choosePresetFile (true, true); });
-    menu.addItem ("Import instrument...", [this] { choosePresetFile (false, true); });
+    menu.addItem ("Open instrument file...", [this] { choosePresetFile (false, true); });
     menu.addSeparator();
     menu.addItem ("Undo " + ospProcessor.undoManager.getUndoDescription(), ospProcessor.undoManager.canUndo(), false,
                   [this] { ospProcessor.undoManager.undo(); refreshInstrumentInfo(); });
@@ -481,8 +524,10 @@ void OspAudioProcessorEditor::showMenu()
 void OspAudioProcessorEditor::choosePresetFile (bool save, bool instrument)
 {
     const juce::String pattern = juce::String ("*") + (instrument ? OspAudioProcessor::instrumentExtension : OspAudioProcessor::presetExtension);
+    auto folder = instrument ? OspAudioProcessor::instrumentFolder() : OspAudioProcessor::presetFolder();
+    folder.createDirectory();
     chooser = std::make_unique<juce::FileChooser> (save ? (instrument ? "Export instrument" : "Save preset") : (instrument ? "Import instrument" : "Load preset"),
-                                                   juce::File::getSpecialLocation (juce::File::userDocumentsDirectory), pattern);
+                                                   folder, pattern);
     const auto browserFlags = (save ? juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting
                                     : juce::FileBrowserComponent::openMode)
                               | juce::FileBrowserComponent::canSelectFiles;
@@ -500,7 +545,14 @@ void OspAudioProcessorEditor::choosePresetFile (bool save, bool instrument)
         else
             ok = save ? ospProcessor.savePreset (file) : ospProcessor.loadPreset (file);
         ospProcessor.showMessage (ok ? (save ? "Saved " : "Opened ") + file.getFileName() : (error.isEmpty() ? "Could not open " + file.getFileName() : error));
+        refreshInstrumentInfo();
     });
+}
+
+void OspAudioProcessorEditor::presetOpened()
+{
+    ospProcessor.showMessage ("Preset: " + ospProcessor.currentPresetFile().getFileNameWithoutExtension());
+    refreshInstrumentInfo();
 }
 
 void OspAudioProcessorEditor::chooseFile()

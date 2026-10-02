@@ -107,6 +107,8 @@ The open verdicts are listed in `docs/morning-checklist.md`.
 - undo/redo for loads and root changes;
 - MIDI: mod wheel, pressure, CC74, CC 20–25 mapped to the macros, and MPE;
 - interface size and accessibility titles;
+- a preset browser (☰ → Presets, with sub-folders and previous/next) and a three-step
+  empty state;
 - Windows VST3 built and tested in CI;
 - polyphase interpolation tables for unity and upward reads: engine C now costs about
   two-thirds of the plain baseline;
@@ -118,10 +120,9 @@ Developer ID).
 
 **Not done:**
 
-- factory example sounds (they need legally owned recordings);
-- a preset browser list;
-- host certification (needs a Mac);
-- onboarding beyond the empty-state prompt.
+- factory example sounds for onboarding (they need legally owned recordings, see the
+  questions);
+- host certification (needs a Mac).
 
 ## CPU (48 kHz, 128-sample blocks)
 

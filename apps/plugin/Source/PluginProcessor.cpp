@@ -875,7 +875,11 @@ void OspAudioProcessor::republish (std::shared_ptr<const LoadedInstrument> instr
 bool OspAudioProcessor::savePreset (const juce::File& file)
 {
     const auto xml = createStateXml();
-    return xml != nullptr && xml->writeTo (file);
+    file.getParentDirectory().createDirectory();
+    if (xml == nullptr || ! xml->writeTo (file))
+        return false;
+    lastPresetFile = file;
+    return true;
 }
 
 bool OspAudioProcessor::loadPreset (const juce::File& file)
@@ -884,7 +888,43 @@ bool OspAudioProcessor::loadPreset (const juce::File& file)
     if (xml == nullptr || ! xml->hasTagName (parameters.state.getType()))
         return false;
     applyStateXml (*xml);
+    lastPresetFile = file;
     return true;
+}
+
+juce::File OspAudioProcessor::presetFolder()
+{
+    return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("OSP/Presets");
+}
+
+juce::File OspAudioProcessor::instrumentFolder()
+{
+    return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("OSP/Instruments");
+}
+
+juce::Array<juce::File> OspAudioProcessor::findFiles (const juce::File& folder, const juce::String& extension)
+{
+    juce::Array<juce::File> files;
+    if (folder.isDirectory())
+        for (const auto& entry : juce::RangedDirectoryIterator (folder, true, "*" + extension, juce::File::findFiles))
+            if (! entry.isHidden())
+                files.add (entry.getFile());
+    std::sort (files.begin(), files.end(), [&folder] (const juce::File& a, const juce::File& b) {
+        return a.getRelativePathFrom (folder).compareNatural (b.getRelativePathFrom (folder)) < 0;
+    });
+    return files;
+}
+
+bool OspAudioProcessor::stepPreset (int delta, const juce::File& root)
+{
+    const auto folder = lastPresetFile.existsAsFile() && ! lastPresetFile.isAChildOf (root) ? lastPresetFile.getParentDirectory() : root;
+    const auto files = findFiles (folder, presetExtension);
+    if (files.isEmpty())
+        return false;
+    const int current = files.indexOf (lastPresetFile);
+    const int count = files.size();
+    const int next = current < 0 ? (delta >= 0 ? 0 : count - 1) : ((current + delta) % count + count) % count;
+    return loadPreset (files[next]);
 }
 
 bool OspAudioProcessor::exportInstrument (const juce::File& file, juce::String& error)

@@ -53,9 +53,12 @@ loop), **MPE**, and **Reseed** (a new variation pattern for LIFE and MOTION).
 
 - Projects remember everything: the sample(s), corrections, settings and the exact
   playback. They reopen identically and render bounces identically.
-- **☰ → Save preset / Load preset**: settings plus which sample(s) (`.osppreset`).
+- **☰ → Presets**: settings plus which sample(s) (`.osppreset`). Presets live in
+  `Documents/OSP/Presets` as ordinary files: make sub-folders there to organise them,
+  and they appear as sub-menus. **Previous / Next preset** step through them.
 - **☰ → Export instrument**: one `.ospinstrument` file with the recordings, their
-  analysis and the settings. Import it on another computer and it sounds the same.
+  analysis and the settings, saved in `Documents/OSP/Instruments` by default. Import it
+  on another computer and it sounds the same. **☰ → Instruments** lists that folder.
 - **☰ → Interface size**: 80–200 %.
 
 ## When a sound is unusual

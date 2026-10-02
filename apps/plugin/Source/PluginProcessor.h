@@ -72,6 +72,19 @@ public:
     static constexpr const char* instrumentExtension = ".ospinstrument";
     static constexpr const char* presetExtension = ".osppreset";
 
+    // Preset browser (spec §90). Presets live as plain files in Documents/OSP/Presets
+    // (instruments in Documents/OSP/Instruments), so they can be shared, synced or
+    // organised in sub-folders with the computer's own tools.
+    static juce::File presetFolder();
+    static juce::File instrumentFolder();
+    /** Every file with this extension under `folder` (sub-folders included), sorted by path. */
+    static juce::Array<juce::File> findFiles (const juce::File& folder, const juce::String& extension);
+    /** The preset last loaded or saved (empty if none): the browser marks and steps from it. */
+    juce::File currentPresetFile() const { return lastPresetFile; }
+    /** Loads the previous (-1) or next (+1) preset under `root` (default: the preset
+        folder; a preset opened from elsewhere steps through its own folder), wrapping around. */
+    bool stepPreset (int delta, const juce::File& root = presetFolder());
+
     /** Editor zoom (80..200 %), stored with the session. */
     float uiScale() const noexcept { return uiScaleFactor.load(); }
     void setUiScale (float scale) noexcept { uiScaleFactor = std::clamp (scale, 0.8f, 2.0f); }
@@ -187,6 +200,7 @@ private:
     double pitchBendSemitones = 0.0;
     bool hostWasPlaying = false;     // audio thread: transport start resets performance memory
     int currentProgram = 0;
+    juce::File lastPresetFile;
     std::atomic<float> uiScaleFactor { 1.0f };
     // Undo of sample loads: the latest instrument of every recent load, so undo/redo can
     // bring back a sample with all its model stages. Message thread.

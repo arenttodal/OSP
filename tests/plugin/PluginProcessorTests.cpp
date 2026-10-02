@@ -468,6 +468,42 @@ TEST_CASE ("plugin: engine C holds up at every host sample rate and block size",
     }
 }
 
+TEST_CASE ("plugin: the preset browser lists, opens and steps through presets", "[plugin]")
+{
+    TempDir tmp;
+    const auto folder = tmp.dir.getChildFile ("Presets");
+    OspAudioProcessor p;
+    auto* life = p.parameters.getParameter ("life");
+    REQUIRE (life != nullptr);
+    for (int i : { 2, 10, 1 })
+    {
+        life->setValueNotifyingHost (static_cast<float> (i) / 20.0f);
+        REQUIRE (p.savePreset (folder.getChildFile (i == 10 ? "Pads/Preset " + juce::String (i) : "Preset " + juce::String (i))
+                                   .withFileExtension (OspAudioProcessor::presetExtension)));
+    }
+    folder.getChildFile ("notes.txt").replaceWithText ("not a preset");
+
+    // Natural order, sub-folders included, other files ignored.
+    const auto files = OspAudioProcessor::findFiles (folder, OspAudioProcessor::presetExtension);
+    REQUIRE (files.size() == 3);
+    CHECK (files[0].getFileNameWithoutExtension() == "Preset 10"); // "Pads/..." sorts first
+    CHECK (files[1].getFileNameWithoutExtension() == "Preset 1");
+    CHECK (files[2].getFileNameWithoutExtension() == "Preset 2");
+
+    // Stepping follows the same order (sub-folders included), wraps around, and recalls settings.
+    REQUIRE (p.loadPreset (files[1]));
+    CHECK (life->getValue() == Approx (0.05f));
+    REQUIRE (p.stepPreset (1, folder));
+    CHECK (p.currentPresetFile().getFileNameWithoutExtension() == "Preset 2");
+    CHECK (life->getValue() == Approx (0.1f));
+    REQUIRE (p.stepPreset (1, folder));
+    CHECK (p.currentPresetFile().getFileNameWithoutExtension() == "Preset 10");
+    CHECK (life->getValue() == Approx (0.5f));
+    REQUIRE (p.stepPreset (-1, folder));
+    CHECK (p.currentPresetFile().getFileNameWithoutExtension() == "Preset 2");
+    CHECK_FALSE (p.loadPreset (folder.getChildFile ("notes.txt")));
+}
+
 TEST_CASE ("plugin: editor builds, shows the instrument and can be snapshotted", "[.][ui]")
 {
     TempDir tmp;

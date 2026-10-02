@@ -131,9 +131,9 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [x] User guide (docs/user-guide.md)
 - [~] Installer/signing/notarisation: `scripts/package-macos.sh` written, **not run** (needs a Developer ID)
 - [ ] Factory example sounds (need legally owned recordings — see morning checklist)
-- [ ] Preset browser beyond file load/save (a list of the user's presets)
+- [x] Preset browser: ☰ → Presets / Instruments list `Documents/OSP/{Presets,Instruments}` (sub-folders = sub-menus), previous/next preset, Show folder
 - [ ] Host certification matrix (Logic, Ableton, Reaper, Cubase, Studio One) — needs a Mac
-- [ ] Onboarding beyond the empty-state prompt and "Load example"
+- [x] Onboarding: three-step empty state (drop, play and hold, shape) + "Load example"; real example sounds still pending (§100)
 
 ## DONE
 

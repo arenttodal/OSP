@@ -80,6 +80,7 @@ private:
     void refreshInstrumentInfo();
     void chooseFile();
     void showMenu();
+    void presetOpened();
     void choosePresetFile (bool save, bool instrument);
 
     struct Knob

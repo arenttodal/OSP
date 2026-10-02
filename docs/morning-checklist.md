@@ -58,7 +58,9 @@ Everything saves as you go and I read it from the page. Headphones help.
 - [ ] **☰ menu:**
   - export an instrument and import it in a fresh project (or on a second machine);
   - Undo/Redo after loading a second sample;
-  - Interface size 80–200 %.
+  - Interface size 80–200 %;
+  - **Presets**: save two or three, make a sub-folder in `Documents/OSP/Presets`, then
+    browse them with ☰ → Presets and Previous/Next preset.
 - [ ] If you have one, an **MPE controller** (Advanced → MPE): per-note bend, pressure
   and slide.
 - [ ] **CPU:** 16 held voices at 48 kHz / 128 in your DAW's meter. CI's Apple Silicon
