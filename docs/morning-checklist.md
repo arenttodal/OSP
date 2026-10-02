@@ -8,9 +8,10 @@ summary of the night is in `docs/reports/overnight-phases-2-8.md`.
 All of them are on one page, **the listening lab**:
 https://claude.ai/artifact/SBtjwht3czzVXQbzpmeWUR.
 
-The clips were rendered before the last refinements of the night: transient
-preservation (except in the Transients tab), multi-velocity learning and the CPU
-work. None of these changes notes played at the recorded pitch.
+The clips were rendered before the last refinements of the night (except the
+Transients tab). Transient preservation only changes notes far from the recorded pitch;
+multi-velocity learning only changes the whole-set takes in the Multi-sample tab, and
+only between velocity layers. If the lab sounds good, the current engine will too.
 
 There is one tab per experiment. The takes in each group are blind and in a random
 order. Rate each take (1–5 on three scales), pick a best and, if you like, write a note.
