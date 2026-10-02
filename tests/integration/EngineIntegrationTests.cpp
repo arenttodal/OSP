@@ -426,6 +426,49 @@ TEST_CASE ("engine: Reimagined is clearly audible", "[integration][engine]")
     CHECK (reimagined > original + 0.5);
 }
 
+TEST_CASE ("engine: the Reimagined far end remaps harmonics with grains", "[integration][engine]")
+{
+    // A pure 330 Hz tone has nothing an octave below or above. Towards the far end the
+    // granular continuation adds octave-down and octave-up grains; below ~45 % it does not.
+    auto audio = testsignals::sine (330.0, 6.0, 48000.0, 0.4, 1);
+    testsignals::applyFades (audio, 0.01, 0.3);
+    const auto model = instrument::buildComplete (audio, test::analyse (audio), {}, false);
+    auto bandDb = [&] (double reimagined, double hz) {
+        research::RenderConfig config;
+        config.engineSettings.macros.life = 0.0;
+        config.engineSettings.macros.space = 0.0;
+        config.engineSettings.macros.motion = 0.0;
+        config.engineSettings.macros.reimagined = reimagined;
+        config.engineSettings.shaping = Shaping::neutral();
+        MidiSequence s;
+        s.events.push_back ({ 0.0, MidiEvent::Type::noteOn, 64, 100, 1 });
+        s.events.push_back ({ 4.0, MidiEvent::Type::noteOff, 64, 0, 1 });
+        const auto out = research::renderInstrument (*model, s, config).audio;
+        // Goertzel power at hz over 1.5..3.5 s, relative to the whole signal.
+        const auto a = static_cast<std::size_t> (1.5 * out.sampleRate), b = static_cast<std::size_t> (3.5 * out.sampleRate);
+        const double w = 2.0 * std::cos (2.0 * 3.141592653589793 * hz / out.sampleRate);
+        double s1 = 0.0, s2 = 0.0, total = 0.0;
+        for (std::size_t i = a; i < b; ++i)
+        {
+            const double x = out.channels[0][i];
+            const double s0 = x + w * s1 - s2;
+            s2 = s1;
+            s1 = s0;
+            total += x * x;
+        }
+        const double power = (s1 * s1 + s2 * s2 - w * s1 * s2) / static_cast<double> (b - a);
+        return 10.0 * std::log10 (power / total + 1e-30);
+    };
+    // The note plays at the source's pitch (E4 = 329.6 Hz).
+    const double f0 = 329.63;
+    const double subOriginal = bandDb (0.0, 0.5 * f0), subMiddle = bandDb (0.3, 0.5 * f0), subFar = bandDb (1.0, 0.5 * f0);
+    const double octOriginal = bandDb (0.0, 2.0 * f0), octFar = bandDb (1.0, 2.0 * f0);
+    INFO ("sub-octave " << subOriginal << " / " << subMiddle << " / " << subFar << " dB; octave " << octOriginal << " / " << octFar << " dB");
+    CHECK (subFar > subOriginal + 15.0);
+    CHECK (std::abs (subMiddle - subOriginal) < 3.0);
+    CHECK (octFar > octOriginal + 10.0);
+}
+
 TEST_CASE ("engine: releasing early in a long recording stops promptly", "[integration][engine]")
 {
     // Regression (Mac test): very long samples kept sounding after note-off. A release

@@ -132,3 +132,24 @@ Each block is timed individually; the report gives mean, p99 and worst callback 
 as a percentage of the block budget (2.67 ms at 48 kHz/128). Target (spec §64): mean
 below ~25 % for 16 sustained voices on Apple Silicon, with margin on the worst case.
 Worst-case numbers on shared CI/cloud machines include scheduler noise.
+
+### Shaping settings in experiments
+
+An `instrument` block (in a config or an experiment condition) may carry a `shaping`
+block with the plugin's popup settings; anything left out keeps its default, and
+`"preset": "neutral"` starts from a transparent setting (filter off, no velocity colour):
+
+```json
+"instrument": {
+  "attackSeconds": 0.005, "releaseSeconds": 0.7,
+  "shaping": {
+    "life": { "mode": "natural|loose|fray", "pitchCents": 4, "tone": 0.3, "attack": 0.25 },
+    "dynamics": { "curve": "soft|linear|hard", "tone": 0.35 },
+    "character": { "type": "lp24|lp12|hp12|bp12|tilt|off", "minHz": 450, "maxHz": 18000,
+                   "resonance": 0.1, "drive": 0.12, "envAmount": 0.1,
+                   "envAttackSeconds": 0.005, "envDecaySeconds": 0.7 },
+    "movement": { "mode": "drift|tape|chorus|pulse", "a": 0.7, "b": 0.6, "c": 0.4 },
+    "space": { "type": "room|chamber|plate|spring", "decaySeconds": 1.8 }
+  }
+}
+```

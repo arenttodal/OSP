@@ -20,7 +20,8 @@ struct Macros;
 
       REIMAGINED a sympathetic resonator bank tuned to the source's partials and body
                  peaks (plus a bank a fifth above towards the far end), re-excited by
-                 whatever is played.
+                 whatever is played; towards the far end two formant peaks wander
+                 slowly (spectral evolution: the instrument's vowel keeps changing).
       MOVEMENT   the bus part of MOVEMENT (MovementBus: drift's shared wander, tape,
                  chorus, pulse).
       SPACE      one of four curated ambiences (SpaceReverb) as a send: the macro is the
@@ -85,6 +86,13 @@ private:
     // (harmonic remapping towards the Reimagined end, spec §12).
     std::array<Biquad, 2 * resonators> resonatorBank;
     float resonanceMix = 0.0f, remapMix = 0.0f;
+
+    // Spectral evolution: two wandering formant peaks per channel (Reimagined far end).
+    std::array<Biquad, 4> formants;
+    double morph = 0.0;
+    bool morphActive = false;
+    std::uint64_t morphSeed = 1;
+    std::int64_t clock = 0;
 
     // MOVEMENT (bus part)
     MovementBus movement;

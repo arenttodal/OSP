@@ -3,6 +3,7 @@
 #include "io/JsonUtil.h"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 
 namespace osp::research
@@ -39,6 +40,51 @@ SamplerSettings RenderConfig::effectiveSamplerSettings() const
     return settings;
 }
 
+namespace
+{
+    template <typename Enum, std::size_t N>
+    Enum parseName (const juce::var& obj, const char* key, const std::array<const char*, N>& names, Enum fallback)
+    {
+        const auto text = json::getString (obj, key);
+        for (std::size_t i = 0; i < N; ++i)
+            if (text == names[i])
+                return static_cast<Enum> (i);
+        return fallback;
+    }
+
+    /** The shaping system's settings (the plugin's popups); see docs/testing.md. */
+    void applyShapingBlock (const juce::var& b, Shaping& s)
+    {
+        if (json::getString (b, "preset") == "neutral")
+            s = Shaping::neutral();
+        const auto& life = b["life"];
+        s.lifeMode = parseName (life, "mode", std::array { "natural", "loose", "fray" }, s.lifeMode);
+        s.lifePitchCents = json::getDouble (life, "pitchCents", s.lifePitchCents);
+        s.lifeTone = json::getDouble (life, "tone", s.lifeTone);
+        s.lifeAttack = json::getDouble (life, "attack", s.lifeAttack);
+        const auto& dynamics = b["dynamics"];
+        s.velocityCurve = parseName (dynamics, "curve", std::array { "soft", "linear", "hard" }, s.velocityCurve);
+        s.dynamicsTone = json::getDouble (dynamics, "tone", s.dynamicsTone);
+        const auto& character = b["character"];
+        s.filterType = parseName (character, "type", std::array { "lp24", "lp12", "hp12", "bp12", "tilt", "off" }, s.filterType);
+        s.filterMinHz = json::getDouble (character, "minHz", s.filterMinHz);
+        s.filterMaxHz = json::getDouble (character, "maxHz", s.filterMaxHz);
+        s.resonance = json::getDouble (character, "resonance", s.resonance);
+        s.drive = json::getDouble (character, "drive", s.drive);
+        s.envAmount = json::getDouble (character, "envAmount", s.envAmount);
+        s.envAttackSeconds = json::getDouble (character, "envAttackSeconds", s.envAttackSeconds);
+        s.envDecaySeconds = json::getDouble (character, "envDecaySeconds", s.envDecaySeconds);
+        const auto& movement = b["movement"];
+        s.movementMode = parseName (movement, "mode", std::array { "drift", "tape", "chorus", "pulse" }, s.movementMode);
+        s.movementA = json::getDouble (movement, "a", s.movementA);
+        s.movementB = json::getDouble (movement, "b", s.movementB);
+        s.movementC = json::getDouble (movement, "c", s.movementC);
+        const auto& space = b["space"];
+        s.spaceType = parseName (space, "type", std::array { "room", "chamber", "plate", "spring" }, s.spaceType);
+        s.spaceDecaySeconds = json::getDouble (space, "decaySeconds", s.spaceDecaySeconds);
+    }
+}
+
 void applyInstrumentBlock (const juce::var& e, RenderConfig& config)
 {
     auto& es = config.engineSettings;
@@ -59,6 +105,10 @@ void applyInstrumentBlock (const juce::var& e, RenderConfig& config)
     config.anchors = json::getBool (e, "anchors", es.pitchCharacter == PitchCharacter::natural);
     if (json::has (e, "releaseSeconds"))
         es.adsr.releaseSeconds = json::getDouble (e, "releaseSeconds", es.adsr.releaseSeconds);
+    if (json::has (e, "attackSeconds"))
+        es.adsr.attackSeconds = json::getDouble (e, "attackSeconds", es.adsr.attackSeconds);
+    if (json::has (e, "shaping"))
+        applyShapingBlock (e["shaping"], es.shaping);
     const auto& m = e["macros"];
     es.macros.life = json::getDouble (m, "life", es.macros.life);
     es.macros.dynamics = json::getDouble (m, "dynamics", es.macros.dynamics);

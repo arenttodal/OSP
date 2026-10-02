@@ -5,6 +5,7 @@
 #include "support/TestHelpers.h"
 
 #include <catch2/catch_approx.hpp>
+#include <fstream>
 #include <catch2/catch_test_macros.hpp>
 
 using Catch::Approx;
@@ -107,4 +108,47 @@ TEST_CASE ("JSON: committed research configs parse", "[unit][json]")
         INFO (error);
         CHECK (config.has_value());
     }
+}
+
+TEST_CASE ("JSON: an instrument block can set the shaping (popup) settings", "[unit][json]")
+{
+    test::TempDir dir;
+    const std::string text = R"({ "schemaVersion": 1, "engine": "C", "instrument": {
+        "attackSeconds": 0.12,
+        "shaping": {
+            "life": { "mode": "fray", "pitchCents": 9 },
+            "dynamics": { "curve": "hard", "tone": 0.5 },
+            "character": { "type": "bp12", "minHz": 3000, "maxHz": 200, "resonance": 0.6 },
+            "movement": { "mode": "chorus", "a": 0.2 },
+            "space": { "type": "spring", "decaySeconds": 2.5 } } } })";
+    std::string error;
+    {
+        std::ofstream out (dir / "s.json");
+        out << text;
+    }
+    const auto config = research::loadRenderConfig (dir / "s.json", error);
+    REQUIRE (config);
+    const auto& s = config->engineSettings.shaping;
+    CHECK (config->engineSettings.adsr.attackSeconds == Approx (0.12));
+    CHECK (s.lifeMode == LifeMode::fray);
+    CHECK (s.lifePitchCents == Approx (9.0));
+    CHECK (s.lifeTone == Approx (Shaping().lifeTone)); // unspecified: default
+    CHECK (s.velocityCurve == VelocityCurve::hard);
+    CHECK (s.dynamicsTone == Approx (0.5));
+    CHECK (s.filterType == FilterType::bp12);
+    CHECK (s.filterMinHz == Approx (3000.0));
+    CHECK (s.filterMaxHz == Approx (200.0));
+    CHECK (s.resonance == Approx (0.6));
+    CHECK (s.movementMode == MovementMode::chorus);
+    CHECK (s.movementA == Approx (0.2));
+    CHECK (s.spaceType == SpaceType::spring);
+    CHECK (s.spaceDecaySeconds == Approx (2.5));
+
+    {
+        std::ofstream out (dir / "n.json");
+        out << R"({ "schemaVersion": 1, "instrument": { "shaping": { "preset": "neutral" } } })";
+    }
+    const auto neutral = research::loadRenderConfig (dir / "n.json", error);
+    REQUIRE (neutral);
+    CHECK (neutral->engineSettings.shaping.filterType == FilterType::off);
 }

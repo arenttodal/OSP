@@ -327,6 +327,8 @@ NoteShape InstrumentEngine::shapeFor (const InstrumentModel* model, int note, in
     shape.segmentScale = static_cast<float> ((1.0 - 0.7 * r * r) * (1.3 - 0.6 * motion));
     shape.saturation = static_cast<float> (0.7 * std::clamp ((r - 0.5) / 0.5, 0.0, 1.0));
     shape.doubling = static_cast<float> (0.7 * std::clamp ((r - 0.35) / 0.65, 0.0, 1.0));
+    // Far end: granular continuation with harmonic remapping takes over the sustain.
+    shape.granular = static_cast<float> (std::pow (std::clamp ((r - 0.45) / 0.55, 0.0, 1.0), 1.2));
     return shape;
 }
 

@@ -172,6 +172,23 @@ private:
     double dBase = 0.0, dDepth = 0.0, dPhase = 0.0, dOmega = 0.0;
     int dDelaySamples = 0;
 
+    // Reimagined granular continuation: a small pool of windowed grains read from what the
+    // note has already played (so they never run ahead of the recording or the attack).
+    struct Grain
+    {
+        double position = 0.0, step = 1.0, phase = 0.0, phaseStep = 0.0;
+        float left = 0.0f, right = 0.0f;
+        bool active = false;
+    };
+    static constexpr int maxGrains = 8;
+    void spawnGrain() noexcept;
+    float readHermite (int channel, double pos) const noexcept;
+    std::array<Grain, maxGrains> grains {};
+    Prng grainRng;
+    float gAmount = 0.0f, gFade = 0.0f, gFadeStep = 0.0f, gNorm = 1.0f, gLowCoef = 1.0f, gLowL = 0.0f, gLowR = 0.0f;
+    double gFloor = 0.0, gDensity = 10.0;
+    int gCountdown = 0, gDelay = 0;
+
     // CHARACTER: per-voice filter and its AD envelope (control rate)
     const ShapingState* shapingState = nullptr;
     std::int64_t clock = 0;

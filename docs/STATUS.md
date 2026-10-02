@@ -137,6 +137,19 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [ ] Host certification matrix (Logic, Ableton, Reaper, Cubase, Studio One) — needs a Mac
 - [x] Onboarding: three-step empty state (drop, play and hold, shape) + "Load example"; real example sounds still pending (§100)
 
+## Milestone checklist — Shaping system v1.0 (five-macro popups) and UI redesign
+
+- [x] FX-01 popup framework: a macro's name opens its mini panel (one at a time, Escape / outside click closes, hover underline, dot when customised, double-click resets)
+- [x] FX-02 CHARACTER: per-voice LP24 ladder, LP12, HP12, BP12, Tilt; MIN/MAX (reversible), RES, DRIVE, AD envelope (ENV/ATTACK/DECAY)
+- [x] FX-03 DYNAMICS: velocity curve, attack, release (20 ms–15 s), TONE couples velocity into CHARACTER
+- [x] FX-04..07 MOVEMENT: DRIFT (per voice + shared wander), TAPE, CHORUS, PULSE; 25 % and 50 % clearly differ (test)
+- [x] FX-08 SPACE: ROOM, CHAMBER, PLATE, SPRING with DECAY; type changes crossfade
+- [x] FX-09 LIFE: NATURAL / LOOSE / FRAY, PITCH / TONE / ATTACK spreads, repeat guard
+- [x] FX-10 stable parameter IDs (`life.*`, `dynamics.*`, `character.*`, `movement.*`, `space.*`), state version 3 with migration, preset/session recall test, experiment `shaping` block
+- [x] UI redesign: housing, header, charcoal display with time grid, cream knobs, ivory keyboard, status light; Barlow embedded (SIL OFL)
+- [x] Reimagined far end (violin benchmark): granular continuation with octave/fifth/sub-octave remapping and pitch jitter takes over the sustain from ~45 %, wandering formants (spectral evolution) from 40 %
+- [ ] Listening round 3: `research/experiments/reimagined-3.json` (violin)
+
 ## DONE
 
 - Pure C++20 DSP/analysis library (`osp_dsp`) independent of JUCE; JUCE used for file
@@ -152,7 +165,8 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 
 ## IN PROGRESS
 
-- Lab round 2 (Reimagined 2, Sustain 2, Dynamics 2, Multi-sample 2).
+- Two-layer A/B instrument with a per-layer Granular source mode (next milestone).
+- Lab round 3 (Reimagined 3, violin).
 - DAW/host validation on a Mac.
 
 ## NEXT

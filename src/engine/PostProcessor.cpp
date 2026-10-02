@@ -1,6 +1,7 @@
 #include "engine/PostProcessor.h"
 
 #include "engine/InstrumentEngine.h"
+#include "engine/Shaping.h"
 #include "model/InstrumentModel.h"
 
 #include <algorithm>
@@ -13,6 +14,7 @@ namespace osp
 void PostProcessor::prepare (double rate, int /*maximumBlockSize*/, std::uint64_t seed)
 {
     sampleRate = rate;
+    morphSeed = seed;
     movement.prepare (rate, seed);
     for (auto& r : reverbs)
         r.prepare (rate);
@@ -25,6 +27,10 @@ void PostProcessor::reset() noexcept
 {
     for (auto& f : resonatorBank)
         f.reset();
+    for (auto& f : formants)
+        f.reset();
+    clock = 0;
+    morphActive = false;
     reimagined = reimaginedTarget;
     space = spaceTarget;
     appliedReimagined = -1.0;
@@ -121,6 +127,31 @@ void PostProcessor::updateCoefficients() noexcept
     }
     modelDirty = false;
 
+    // Spectral evolution: formants around vowel regions (F1 350-900 Hz, F2 1.1-2.6 kHz)
+    // wander independently at a few seconds per move; depth grows past 40 % Reimagined.
+    morph = std::clamp ((reimagined - 0.4) / 0.6, 0.0, 1.0);
+    if (morph > 1.0e-4)
+    {
+        if (! morphActive)
+            for (auto& f : formants)
+                f.reset();
+        morphActive = true;
+        const double t = static_cast<double> (clock) / sampleRate;
+        const double w1 = 0.5 + 0.5 * shaping::sharedWander (morphSeed ^ 0x6631ull, t, 0.11);
+        const double w2 = 0.5 + 0.5 * shaping::sharedWander (morphSeed ^ 0x6632ull, t, 0.07);
+        const double f1 = shaping::logLerp (350.0, 900.0, w1);
+        const double f2 = shaping::logLerp (1100.0, 2600.0, w2);
+        const double gainDb = 10.0 * std::pow (morph, 0.8);
+        peaking (formants[0], sampleRate, f1, 2.8, gainDb);
+        peaking (formants[1], sampleRate, f2, 3.5, 0.8 * gainDb);
+        formants[2].b0 = formants[0].b0; formants[2].b1 = formants[0].b1; formants[2].b2 = formants[0].b2;
+        formants[2].a1 = formants[0].a1; formants[2].a2 = formants[0].a2;
+        formants[3].b0 = formants[1].b0; formants[3].b1 = formants[1].b1; formants[3].b2 = formants[1].b2;
+        formants[3].a1 = formants[1].a1; formants[3].a2 = formants[1].a2;
+    }
+    else
+        morphActive = false;
+
     // SPACE: a new type fades in on the idle reverb; a new decay retunes in place.
     if (shaping.spaceType != appliedType && reverbFade == 0)
     {
@@ -170,6 +201,15 @@ void PostProcessor::process (float* left, float* right, int numSamples) noexcept
             l += resonanceMix * (0.75f * even + 0.25f * odd);
             r += resonanceMix * (0.25f * even + 0.75f * odd);
         }
+
+        if (morphActive)
+        {
+            // Peaks only (no cut), so the level rises a little: compensate gently.
+            const auto trim = static_cast<float> (1.0 / (1.0 + 0.9 * morph));
+            l = formants[1].process (formants[0].process (l)) * trim;
+            r = formants[3].process (formants[2].process (r)) * trim;
+        }
+        ++clock;
 
         movement.process (l, r);
 

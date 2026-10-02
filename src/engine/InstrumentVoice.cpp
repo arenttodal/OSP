@@ -124,6 +124,25 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
         dDelaySamples = static_cast<int> (0.03 * sampleRate);
         dSide = dRng.nextDouble() < 0.5 ? -1.0f : 1.0f;
     }
+    // Granular continuation (Reimagined far end): grains start once there is history to
+    // draw from and fade in after the attack, which stays the recording's own.
+    gAmount = std::clamp (shape.granular, 0.0f, 1.0f);
+    for (auto& grain : grains)
+        grain.active = false;
+    if (gAmount > 0.0f)
+    {
+        grainRng.reseed (Prng::deriveSeed (shape.seed, 0x6772616eull, 0));
+        gFloor = position;
+        gDensity = 14.0 + 26.0 * gAmount;                               // grains per second
+        const double overlap = gDensity * 0.095;                         // mean grain length 95 ms
+        gNorm = static_cast<float> (1.0 / (0.637 * std::sqrt (std::max (1.0, overlap))));
+        gDelay = static_cast<int> (0.12 * sampleRate);
+        gCountdown = 0;
+        gFade = 0.0f;
+        gFadeStep = static_cast<float> (1.0 / (0.35 * sampleRate));
+        gLowCoef = static_cast<float> (1.0 - std::exp (-2.0 * std::numbers::pi * 6500.0 / sampleRate));
+        gLowL = gLowR = 0.0f;
+    }
     saturationDrive = 1.0f + 4.0f * std::clamp (shape.saturation, 0.0f, 1.0f);
     saturationNorm = 1.0f / saturationDrive;
     // Drift has its own random stream (so it never changes the continuation's choices)
@@ -529,6 +548,65 @@ float InstrumentVoice::readTransient (const PlaybackSource& src, double pos, dou
     return SincInterpolator::apply (kernel, src.channelData (channel));
 }
 
+float InstrumentVoice::readHermite (int channel, double pos) const noexcept
+{
+    // Cheap 4-point read for grains (their bus is darkened, so no band-limiting needed).
+    const auto& src = *layer->source;
+    const auto last = static_cast<double> (std::max<std::int64_t> (2, src.numFrames() - 3));
+    pos = std::clamp (pos, 1.0, last);
+    const auto i = static_cast<std::int64_t> (pos);
+    const float t = static_cast<float> (pos - static_cast<double> (i));
+    const float* x = src.channelData (channel) + i;
+    const float c0 = x[0], c1 = 0.5f * (x[1] - x[-1]);
+    const float c2 = x[-1] - 2.5f * x[0] + 2.0f * x[1] - 0.5f * x[2];
+    const float c3 = 0.5f * (x[2] - x[-1]) + 1.5f * (x[0] - x[1]);
+    return ((c3 * t + c2) * t + c1) * t + c0;
+}
+
+void InstrumentVoice::spawnGrain() noexcept
+{
+    Grain* slot = nullptr;
+    for (auto& grain : grains)
+        if (! grain.active)
+        {
+            slot = &grain;
+            break;
+        }
+    if (slot == nullptr)
+        return;
+
+    const double g = gAmount;
+    // Harmonic remapping: some grains an octave up, a fifth up or an octave down.
+    const double pick = grainRng.nextDouble();
+    double ratio = 1.0;
+    if (pick < 0.22 * g)
+        ratio = 2.0;
+    else if (pick < 0.38 * g)
+        ratio = 1.5;
+    else if (pick < 0.48 * g)
+        ratio = 0.5;
+    // Controlled instability: every grain slightly off, more towards the far end.
+    const double cents = (6.0 + 22.0 * g) * grainRng.bipolar();
+    const double step = currentStep * ratio * std::exp2 (cents / 1200.0);
+    const double seconds = grainRng.uniform (0.05, 0.14);
+    const double outSamples = seconds * sampleRate;
+    const double span = outSamples * step;
+    // Read from what the note has already played: end at or before the current position.
+    const double srcRate = layer->source->sampleRate();
+    const double history = position - gFloor - span;
+    if (history < 0.01 * srcRate)
+        return;
+    const double back = grainRng.nextDouble() * std::min (history, (0.08 + 0.7 * g) * srcRate);
+    slot->position = position - span - back;
+    slot->step = step;
+    slot->phase = 0.0;
+    slot->phaseStep = 1.0 / outSamples;
+    const float pan = static_cast<float> (0.7 * g * grainRng.bipolar());
+    slot->left = std::min (1.0f, 1.0f - pan);
+    slot->right = std::min (1.0f, 1.0f + pan);
+    slot->active = true;
+}
+
 void InstrumentVoice::render (float* left, float* right, int numSamples, double pitchRatio, std::int64_t clockAtStart) noexcept
 {
     clock = clockAtStart;
@@ -621,6 +699,44 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
             r += tAmount * (nr - sr) + tMix * (tAmount * nr + (1.0f - tAmount) * sr);
             tPosition += tStep;
             --tRemaining;
+        }
+        if (gAmount > 0.0f)
+        {
+            if (gDelay > 0)
+                --gDelay;
+            else
+            {
+                if (--gCountdown <= 0)
+                {
+                    spawnGrain();
+                    gCountdown = std::max (1, static_cast<int> (sampleRate / gDensity * grainRng.uniform (0.5, 1.5)));
+                }
+                if (gFade < 1.0f)
+                    gFade = std::min (1.0f, gFade + gFadeStep);
+            }
+            float gl = 0.0f, gr = 0.0f;
+            const bool stereoSource = layer->source->numChannels() > 1;
+            for (auto& grain : grains)
+            {
+                if (! grain.active)
+                    continue;
+                const auto x = static_cast<float> (grain.phase);
+                const float w = 16.0f * x * x * (1.0f - x) * (1.0f - x);
+                const float sl = readHermite (0, grain.position);
+                const float sr = stereoSource ? readHermite (1, grain.position) : sl;
+                gl += w * sl * grain.left;
+                gr += w * sr * grain.right;
+                grain.position += grain.step;
+                grain.phase += grain.phaseStep;
+                if (grain.phase >= 1.0)
+                    grain.active = false;
+            }
+            gLowL += (gl - gLowL) * gLowCoef;
+            gLowR += (gr - gLowR) * gLowCoef;
+            // Alternate synthetic sustain: towards the far end the grains carry the sustain.
+            const float mix = gAmount * gFade;
+            l = l * (1.0f - 0.55f * mix) + 0.95f * mix * gNorm * gLowL;
+            r = r * (1.0f - 0.55f * mix) + 0.95f * mix * gNorm * gLowR;
         }
         if (crossfading && xProgress >= xLength)
         {
