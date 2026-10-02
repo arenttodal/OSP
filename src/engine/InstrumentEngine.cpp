@@ -10,7 +10,7 @@
 namespace osp
 {
 
-InstrumentEngine::InstrumentEngine() = default;
+InstrumentEngine::InstrumentEngine() : voices (static_cast<std::size_t> (totalSlots)) {}
 
 void InstrumentEngine::prepare (double outputSampleRate, int maximumBlockSize, const EngineSettings& settings)
 {

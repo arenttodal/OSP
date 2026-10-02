@@ -41,20 +41,20 @@ private:
         // Smoothed random walk: a new target every `period` samples, one-pole towards it.
         double value = 0.0, target = 0.0, coef = 0.001;
         int countdown = 0, period = 1;
-        double next (Prng& rng) noexcept
+        double next (Prng& random) noexcept
         {
             if (--countdown <= 0)
             {
                 countdown = period;
-                target = rng.bipolar();
+                target = random.bipolar();
             }
             value += (target - value) * coef;
             return value;
         }
-        void setRate (double hz, double sampleRate) noexcept
+        void setRate (double hz, double rate) noexcept
         {
-            period = std::max (1, static_cast<int> (sampleRate / std::max (0.01, hz)));
-            coef = 1.0 - std::exp (-2.0 * 3.14159265358979 * std::max (0.01, hz) / sampleRate);
+            period = std::max (1, static_cast<int> (rate / std::max (0.01, hz)));
+            coef = 1.0 - std::exp (-2.0 * 3.14159265358979 * std::max (0.01, hz) / rate);
         }
     };
 

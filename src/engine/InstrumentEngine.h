@@ -226,7 +226,7 @@ private:
     double sampleRate = 48000.0;
     ShapingState liveShaping;            ///< read by every voice at control rate
     std::unique_ptr<SincInterpolator> interpolator;
-    std::array<InstrumentVoice, totalSlots> voices;
+    std::vector<InstrumentVoice> voices;   ///< totalSlots, allocated once in the constructor (too big for a stack: ~1 MB)
     std::array<const InstrumentModel*, EngineSettings::layers> layerModel {};
     std::array<const InstrumentSet*, EngineSettings::layers> layerSet {};
     std::array<std::array<std::int8_t, 512>, EngineSettings::layers> layerTake {};  ///< last round-robin take per (group, velocity layer)
