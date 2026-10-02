@@ -154,9 +154,9 @@ private:
     double pitchMod = 1.0;
     int controlCountdown = 0;
 
-    // Transient preservation: the attack's transient read at its own speed (tPosition)
-    // and at the body's speed (tBodyPosition, follows the main read until a jump).
-    double tPosition = 0.0, tBodyPosition = 0.0, tStep = 1.0;
+    // Transient preservation: the attack's transient read at its own speed (tPosition);
+    // its transposed copy is read wherever the main read is (also after a jump).
+    double tPosition = 0.0, tStep = 1.0;
     int tRemaining = 0;
     float tAmount = 0.0f;
 

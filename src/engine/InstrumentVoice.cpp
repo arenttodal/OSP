@@ -117,7 +117,6 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
         tStep = orig.sampleRate() / sampleRate;
         // Both reads reach the transient's peak at the same moment, so the swapped
         // transient lands exactly on the body's onset instead of before or after it.
-        tBodyPosition = position;
         const double peak = currentModel->original.transientPeakSeconds * orig.sampleRate();
         const double bodyStep = std::max (1.0e-3, baseIncrement);
         tPosition = peak - (peak - position) * tStep / bodyStep;
@@ -437,6 +436,7 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
         }
 
         float l, r;
+        const double bodyPosition = position; // what this sample's main read used
         readFrame (position, currentStep, l, r);
         if (crossfading)
         {
@@ -455,13 +455,12 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
             const auto& shifted = *layer->transient;
             const bool stereo = native.numChannels() > 1 || shifted.numChannels() > 1;
             const float nl = readTransient (native, tPosition, tStep, 0);
-            const float sl = readTransient (shifted, tBodyPosition, currentStep, 0);
+            const float sl = readTransient (shifted, bodyPosition, currentStep, 0);
             const float nr = stereo ? readTransient (native, tPosition, tStep, 1) : nl;
-            const float sr = stereo ? readTransient (shifted, tBodyPosition, currentStep, 1) : sl;
+            const float sr = stereo ? readTransient (shifted, bodyPosition, currentStep, 1) : sl;
             l += tAmount * (nl - sl);
             r += tAmount * (nr - sr);
             tPosition += tStep;
-            tBodyPosition += currentStep;
             --tRemaining;
         }
         if (crossfading && xProgress >= xLength)
