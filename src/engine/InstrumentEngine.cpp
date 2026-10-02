@@ -122,6 +122,20 @@ void InstrumentEngine::publishGrains() noexcept
             }
         }
         snapshot.count.store (n, std::memory_order_release);
+
+        int heads = 0;
+        for (const auto& voice : voices)
+        {
+            float where = 0.0f, level = 0.0f;
+            if (heads >= GrainSnapshot::playheadCapacity)
+                break;
+            if (voice.layerIndex() != layer || ! voice.playhead (where, level))
+                continue;
+            snapshot.playheadPosition[static_cast<std::size_t> (heads)].store (where, std::memory_order_relaxed);
+            snapshot.playheadLevel[static_cast<std::size_t> (heads)].store (level, std::memory_order_relaxed);
+            ++heads;
+        }
+        snapshot.playheads.store (heads, std::memory_order_release);
     }
 }
 

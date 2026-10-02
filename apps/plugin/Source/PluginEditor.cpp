@@ -90,6 +90,14 @@ void WaveformView::setGrains (const GrainDot* dots, int count)
     repaint (plotArea().expanded (8.0f).getSmallestIntegerContainer());
 }
 
+void WaveformView::setPlayheads (const GrainDot* heads, int count)
+{
+    if (count == 0 && playheads.empty())
+        return;
+    playheads.assign (heads, heads + count);
+    repaint (plotArea().expanded (8.0f).getSmallestIntegerContainer());
+}
+
 void WaveformView::paint (juce::Graphics& g)
 {
     using namespace palette;
@@ -139,6 +147,24 @@ void WaveformView::paint (juce::Graphics& g)
             g.fillEllipse (gx - r, gy - r, 2.0f * r, 2.0f * r);
             g.setColour (juce::Colours::white.withAlpha (0.6f * level));
             g.fillEllipse (gx - 0.35f * r, gy - 0.35f * r, 0.7f * r, 0.7f * r);
+        }
+    }
+
+    if (hasWave && ! loading)
+    {
+        // One Shot: a read head per playing note, following the recording (and jumping
+        // where the sustain loops or the release joins the ending). Brightness = the note's level.
+        for (const auto& head : playheads)
+        {
+            const float x = plot.getX() + head.position * plot.getWidth();
+            const float level = 0.25f + 0.75f * std::clamp (head.level, 0.0f, 1.0f);
+            g.setColour (accent.withAlpha (0.18f * level));
+            g.fillRect (juce::Rectangle<float> (x - 3.0f, plot.getY() - 4.0f, 6.0f, plot.getHeight() + 8.0f));
+            g.setColour (accent.withAlpha (0.95f * level));
+            g.fillRect (juce::Rectangle<float> (x - 0.75f, plot.getY() - 4.0f, 1.5f, plot.getHeight() + 8.0f));
+            juce::Path cap;
+            cap.addTriangle (x - 4.0f, plot.getY() - 9.0f, x + 4.0f, plot.getY() - 9.0f, x, plot.getY() - 3.0f);
+            g.fillPath (cap);
         }
     }
 
@@ -1071,6 +1097,13 @@ void OspAudioProcessorEditor::timerCallback()
                         snapshot.lane[k].load (std::memory_order_relaxed) };
         }
         waveform.setGrains (dots.data(), count);
+        const int heads = std::clamp (snapshot.playheads.load (std::memory_order_acquire), 0, InstrumentEngine::GrainSnapshot::playheadCapacity);
+        for (int i = 0; i < heads; ++i)
+        {
+            const auto k = static_cast<std::size_t> (i);
+            dots[k] = { snapshot.playheadPosition[k].load (std::memory_order_relaxed), snapshot.playheadLevel[k].load (std::memory_order_relaxed), 0.5f };
+        }
+        waveform.setPlayheads (dots.data(), heads);
     }
     const auto instrument = ospProcessor.currentInstrument();
     const auto generation = instrument != nullptr ? instrument->generation : 0;

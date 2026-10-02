@@ -24,6 +24,9 @@
   editing. Dropping or loading a sound goes into that layer; the other one is untouched.
   The display, the file name (bottom left), the root and **ONE SHOT / GRANULAR** (bottom
   right) all belong to the edited layer.
+- While you play, an orange read head per note follows the recording in the display (in
+  ONE SHOT); you see it jump back where the sustain continues and forward where the
+  release joins the recording's ending.
 - The slider at the top right blends them: all the way left only A, the middle both
   (equal power), all the way right only B. An empty layer is silent.
 - Both layers go through the same LIFE, DYNAMICS, CHARACTER, MOVEMENT, SPACE and

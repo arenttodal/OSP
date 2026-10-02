@@ -68,6 +68,17 @@ public:
     int layerIndex() const noexcept { return voiceLayer; }
     bool isGranular() const noexcept { return granularMode; }
     int grainCount() const noexcept { return granularMode ? granularSource.grainCount() : 0; }
+    /** One Shot voices: where the read head is (0..1 of the recording) and how loud the
+        note is now (envelope, 0..1), for the display. False for granular or idle voices. */
+    bool playhead (float& where, float& level) const noexcept
+    {
+        if (! active || granularMode || layer == nullptr || layer->source == nullptr)
+            return false;
+        const auto frames = static_cast<double> (std::max<std::int64_t> (1, layer->source->numFrames()));
+        where = static_cast<float> (std::clamp (position / frames, 0.0, 1.0));
+        level = std::clamp (envelope.level() * fadeGain, 0.0f, 1.0f);
+        return true;
+    }
     /** Granular voices: the playing grains (display), their level scaled by the envelope. */
     int collectGrains (GranularSource::GrainView* out, int max) const noexcept
     {

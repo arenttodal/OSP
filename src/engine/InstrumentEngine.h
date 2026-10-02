@@ -124,7 +124,7 @@ public:
     int activeVoiceCount (int layer) const noexcept;
 
     /**
-        What the granular voices of a layer are doing, for the display: written by the audio
+        What the voices of a layer are doing, for the display (grains, One Shot read heads): written by the audio
         thread after every block (relaxed atomics, no locks), read by the UI whenever it
         likes. A torn read only mixes two consecutive blocks' grains.
     */
@@ -133,6 +133,10 @@ public:
         static constexpr int capacity = 128;
         std::array<std::atomic<float>, capacity> position {}, level {}, lane {};
         std::atomic<int> count { 0 };
+        // One Shot notes: one read head per playing voice.
+        static constexpr int playheadCapacity = 64;
+        std::array<std::atomic<float>, playheadCapacity> playheadPosition {}, playheadLevel {};
+        std::atomic<int> playheads { 0 };
     };
     const GrainSnapshot& grainSnapshot (int layer) const noexcept { return grainSnapshots[layerIndex (layer)]; }
 

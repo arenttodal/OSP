@@ -28,6 +28,8 @@ public:
         float position = 0.0f, level = 0.0f, lane = 0.5f;
     };
     void setGrains (const GrainDot* dots, int count);
+    /** One Shot notes playing now: a read head each (position 0..1, level 0..1). */
+    void setPlayheads (const GrainDot* heads, int count);
     void paint (juce::Graphics&) override;
     void resized() override { cacheDirty = true; }
 
@@ -36,7 +38,7 @@ private:
     int layer = 0;
     bool granular = false;
     float grainPosition = 0.5f, grainSpread = 0.2f;
-    std::vector<GrainDot> grains;
+    std::vector<GrainDot> grains, playheads;
     // The waveform, grid and labels change rarely: drawn once into an image, the grains
     // move over it at the display rate.
     juce::Image cache;

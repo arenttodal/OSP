@@ -825,8 +825,30 @@ TEST_CASE ("plugin: editor builds, shows the instrument and can be snapshotted",
         off.addEvent (juce::MidiMessage::allNotesOff (1), 0);
         p.processBlock (audio, off);
         p.setEditLayer (0);
+        p.parameters.getParameter ("ab.blend")->setValueNotifyingHost (0.0f);
+        // One Shot: a read head per playing note, following the recording.
+        for (int block = 0; block < 120; ++block)
+        {
+            juce::MidiBuffer midi;
+            if (block == 0)
+                midi.addEvent (juce::MidiMessage::noteOn (1, 57, static_cast<juce::uint8> (100)), 0);
+            if (block == 50)
+                midi.addEvent (juce::MidiMessage::noteOn (1, 64, static_cast<juce::uint8> (90)), 0);
+            audio.clear();
+            p.processBlock (audio, midi);
+        }
         ospEditor->refreshNow();
+        const auto& heads = p.grainSnapshot (0);
+        REQUIRE (heads.playheads.load() == 2);
+        // The first note has played longer, so its read head is further along the recording.
+        const float earlier = std::max (heads.playheadPosition[0].load(), heads.playheadPosition[1].load());
+        const float later = std::min (heads.playheadPosition[0].load(), heads.playheadPosition[1].load());
+        CHECK (earlier > later);
+        CHECK (later > 0.0f);
         snapshot ("osp-editor-layer-a.png");
+        juce::MidiBuffer stop;
+        stop.addEvent (juce::MidiMessage::allNotesOff (1), 0);
+        p.processBlock (audio, stop);
     }
     p.editorBeingDeleted (editor.get());
     editor.reset();
