@@ -75,10 +75,43 @@ namespace
         s.envAttackSeconds = json::getDouble (character, "envAttackSeconds", s.envAttackSeconds);
         s.envDecaySeconds = json::getDouble (character, "envDecaySeconds", s.envDecaySeconds);
         const auto& movement = b["movement"];
-        s.movementMode = parseName (movement, "mode", std::array { "drift", "tape", "chorus", "pulse" }, s.movementMode);
-        s.movementA = json::getDouble (movement, "a", s.movementA);
-        s.movementB = json::getDouble (movement, "b", s.movementB);
-        s.movementC = json::getDouble (movement, "c", s.movementC);
+        s.movementMode = parseName (movement, "mode", std::array { "drift", "tape", "chorus", "pulse", "shaper" }, s.movementMode);
+        // Each mode's own settings ("drift": {"speed", "pitch", "tone"}, ...).
+        const auto& drift = movement["drift"];
+        s.driftSpeed = json::getDouble (drift, "speed", s.driftSpeed);
+        s.driftPitch = json::getDouble (drift, "pitch", s.driftPitch);
+        s.driftTone = json::getDouble (drift, "tone", s.driftTone);
+        const auto& tape = movement["tape"];
+        s.tapeWow = json::getDouble (tape, "wow", s.tapeWow);
+        s.tapeFlutter = json::getDouble (tape, "flutter", s.tapeFlutter);
+        s.tapeWear = json::getDouble (tape, "wear", s.tapeWear);
+        const auto& chorus = movement["chorus"];
+        s.chorusRate = json::getDouble (chorus, "rate", s.chorusRate);
+        s.chorusWidth = json::getDouble (chorus, "width", s.chorusWidth);
+        s.chorusStereo = json::getDouble (chorus, "stereo", s.chorusStereo);
+        const auto& pulse = movement["pulse"];
+        s.pulseRate = json::getDouble (pulse, "rate", s.pulseRate);
+        s.pulseShape = json::getDouble (pulse, "shape", s.pulseShape);
+        s.pulseStereo = json::getDouble (pulse, "stereo", s.pulseStereo);
+        const auto& shaper = movement["shaper"];
+        s.shaper.pattern = json::getInt (shaper, "pattern", s.shaper.pattern);
+        s.shaper.rate = parseName (shaper, "rate", std::array { "1/4", "1/8", "1/8T", "1/16", "1/16T", "1/32" }, s.shaper.rate);
+        s.shaper.target = parseName (shaper, "target", std::array { "vol", "filter", "both" }, s.shaper.target);
+        s.shaper.smooth = json::getDouble (shaper, "smooth", s.shaper.smooth);
+        // Older experiment files: generic "a"/"b"/"c" mean the selected mode's three settings.
+        if (json::has (movement, "a") || json::has (movement, "b") || json::has (movement, "c"))
+        {
+            double* slots[3] = { &s.driftSpeed, &s.driftPitch, &s.driftTone };
+            if (s.movementMode == MovementMode::tape)
+                slots[0] = &s.tapeWow, slots[1] = &s.tapeFlutter, slots[2] = &s.tapeWear;
+            else if (s.movementMode == MovementMode::chorus)
+                slots[0] = &s.chorusRate, slots[1] = &s.chorusWidth, slots[2] = &s.chorusStereo;
+            else if (s.movementMode == MovementMode::pulse)
+                slots[0] = &s.pulseRate, slots[1] = &s.pulseShape, slots[2] = &s.pulseStereo;
+            const char* keys[3] = { "a", "b", "c" };
+            for (int i = 0; i < 3; ++i)
+                *slots[i] = json::getDouble (movement, keys[i], *slots[i]);
+        }
         const auto& space = b["space"];
         s.spaceType = parseName (space, "type", std::array { "room", "chamber", "plate", "spring" }, s.spaceType);
         s.spaceDecaySeconds = json::getDouble (space, "decaySeconds", s.spaceDecaySeconds);

@@ -140,7 +140,7 @@ TEST_CASE ("JSON: an instrument block can set the shaping (popup) settings", "[u
     CHECK (s.filterMaxHz == Approx (200.0));
     CHECK (s.resonance == Approx (0.6));
     CHECK (s.movementMode == MovementMode::chorus);
-    CHECK (s.movementA == Approx (0.2));
+    CHECK (s.chorusRate == Approx (0.2));   // generic "a" = the selected mode's first setting
     CHECK (s.spaceType == SpaceType::spring);
     CHECK (s.spaceDecaySeconds == Approx (2.5));
 

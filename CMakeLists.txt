@@ -65,6 +65,7 @@ add_library(osp_dsp STATIC
     src/engine/MovementBus.cpp
     src/engine/SpaceReverb.cpp
     src/engine/GranularSource.cpp
+    src/engine/RhythmicShaper.cpp
     src/engine/SampleSetInference.cpp
     src/midi/MidiFixtures.cpp
     src/model/RootChoice.cpp

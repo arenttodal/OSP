@@ -126,6 +126,12 @@ TEST_CASE ("shaping: MOVEMENT is clearly audible in every mode and grows with th
         auto c = quiet();
         c.engineSettings.shaping = Shaping::neutral();
         c.engineSettings.shaping.movementMode = mode;
+        // Settings a musician would use to hear each mode (the defaults are gentler).
+        c.engineSettings.shaping.driftPitch = 0.6;
+        c.engineSettings.shaping.driftTone = 0.4;
+        c.engineSettings.shaping.tapeWow = 0.7;
+        c.engineSettings.shaping.tapeFlutter = 0.6;
+        c.engineSettings.shaping.tapeWear = 0.4;
         c.engineSettings.macros.motion = amount;
         const auto out = play (*model, c, 100, 5.0, 64);
         // Pitch from zero-crossing intervals (left), level and side over 20 ms frames.

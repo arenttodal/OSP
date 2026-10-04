@@ -529,8 +529,8 @@ void InstrumentVoice::updateControl() noexcept
     {
         // DRIFT's shared part: the whole instrument wanders a little together.
         const auto& s = shapingState->shaping;
-        shared = 0.3 * shapingState->movement * shaping::driftPitchCents (s.movementB)
-                 * shaping::sharedWander (shapingState->seed, static_cast<double> (clock) / sampleRate, shaping::driftSpeedHz (s.movementA));
+        shared = 0.3 * shapingState->movement * shaping::driftPitchCents (s.driftPitch)
+                 * shaping::sharedWander (shapingState->seed, static_cast<double> (clock) / sampleRate, shaping::driftSpeedHz (s.driftSpeed));
     }
     const double cents = shape.pitchCents + settleCents + driftCentsValue + shared;
     pitchMod = cents != 0.0 ? std::exp2 (cents / 1200.0) : 1.0;

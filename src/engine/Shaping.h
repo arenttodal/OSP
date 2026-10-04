@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/Prng.h"
+#include "engine/RhythmicShaper.h"
 
 #include <algorithm>
 #include <cmath>
@@ -14,15 +15,16 @@ namespace osp
     big knob says how much, these say how. Plain data, copied to the engine whenever a
     setting changes (real-time safe). Defaults are the instrument's starting state.
 
-    Generic movement parameters A/B/C are 0..1 and mean different things per mode
-    (DRIFT speed/pitch/tone, TAPE wow/flutter/wear, CHORUS rate/width/stereo,
-    PULSE rate/shape/stereo); the mapping functions below give their musical ranges.
+    MOVEMENT (v2) keeps every mode's own settings (0..1), so switching modes and back
+    restores them: DRIFT speed/pitch/tone, TAPE wow/flutter/wear, CHORUS rate/width/stereo,
+    PULSE rate/shape/stereo, SHAPER pattern/rate/target/smooth. The mapping functions
+    below give their musical ranges.
 */
 
 enum class LifeMode { natural, loose, fray };
 enum class VelocityCurve { soft, linear, hard };
 enum class FilterType { lp24, lp12, hp12, bp12, tilt, off };   ///< off: research/tests only, not offered to musicians
-enum class MovementMode { drift, tape, chorus, pulse };
+enum class MovementMode { drift, tape, chorus, pulse, shaper };
 enum class SpaceType { room, chamber, plate, spring };
 
 struct Shaping
@@ -47,9 +49,13 @@ struct Shaping
     double envAttackSeconds = 0.005;
     double envDecaySeconds = 0.7;
 
-    // MOVEMENT
+    // MOVEMENT (each mode keeps its own settings)
     MovementMode movementMode = MovementMode::drift;
-    double movementA = 0.70, movementB = 0.6, movementC = 0.4;   // A 0.7: drift ~0.21 Hz, chorus ~0.9 Hz, pulse ~2 Hz
+    double driftSpeed = 0.70, driftPitch = 0.25, driftTone = 0.4;      ///< ~0.21 Hz, 5 cents, gentle tone
+    double tapeWow = 0.5, tapeFlutter = 0.35, tapeWear = 0.35;
+    double chorusRate = 0.45, chorusWidth = 0.6, chorusStereo = 0.6;   ///< ~0.32 Hz, ~3 ms
+    double pulseRate = 0.55, pulseShape = 0.3, pulseStereo = 0.3;      ///< ~0.9 Hz
+    ShaperParams shaper;                                                ///< THREE, 1/16, BOTH, smooth 0.3
 
     // SPACE
     SpaceType spaceType = SpaceType::plate;
@@ -126,6 +132,8 @@ namespace shaping
     inline double chorusRateHz (double a) noexcept { return logLerp (0.05, 3.0, a); }
     inline double chorusWidthMs (double b) noexcept { return logLerp (0.2, 18.0, b); }
     inline double pulseRateHz (double a) noexcept { return logLerp (0.05, 10.0, a); }
+    inline double tapeWowHz (double a) noexcept { return logLerp (0.1, 1.0, a); }
+    inline double tapeFlutterHz (double b) noexcept { return 3.0 + 9.0 * std::clamp (b, 0.0, 1.0); }
 
     /** SPACE decay range per type (seconds). */
     inline void decayRange (SpaceType type, double& lo, double& hi) noexcept

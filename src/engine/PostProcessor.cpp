@@ -35,7 +35,7 @@ void PostProcessor::reset() noexcept
     space = spaceTarget;
     appliedReimagined = -1.0;
     countdown = 0;
-    movement.setTargets (shaping.movementMode, motionTarget, shaping.movementA, shaping.movementB, shaping.movementC);
+    movement.setTargets (shaping, motionTarget);
     movement.reset();
     appliedType = shaping.spaceType;
     appliedDecay = shaping.spaceDecaySeconds;
@@ -68,13 +68,13 @@ void PostProcessor::setMacros (const Macros& macros) noexcept
     motionTarget = std::clamp (macros.motion, 0.0, 1.0);
     // SPACE is a send: perceptual wet level (10 % is a touch, 100 % is drenched).
     spaceTarget = 1.25 * std::pow (std::clamp (macros.space, 0.0, 1.0), 1.2);
-    movement.setTargets (shaping.movementMode, motionTarget, shaping.movementA, shaping.movementB, shaping.movementC);
+    movement.setTargets (shaping, motionTarget);
 }
 
 void PostProcessor::setShaping (const Shaping& newShaping) noexcept
 {
     shaping = newShaping;
-    movement.setTargets (shaping.movementMode, motionTarget, shaping.movementA, shaping.movementB, shaping.movementC);
+    movement.setTargets (shaping, motionTarget);
 }
 
 void PostProcessor::peaking (Biquad& f, double rate, double hz, double q, double gainDb) noexcept

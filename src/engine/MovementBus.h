@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/Prng.h"
+#include "engine/RhythmicShaper.h"
 #include "engine/Shaping.h"
 
 #include <algorithm>
@@ -20,7 +21,9 @@ namespace osp
               (3-12 Hz) and wear (level instability, bandwidth movement, saturation).
       CHORUS  a modest bucket-brigade-style chorus: two modulated taps, darkened wet
               path, stereo phase offset.
-      PULSE   amplitude/stereo modulation, sine to rounded square.
+      PULSE   amplitude/stereo modulation, sine to rounded square (free-running).
+      SHAPER  host-synchronised rhythmic patterns on volume and/or a light low-pass
+              (RhythmicShaper).
 
     The amount is smoothed (~50 ms); switching mode crossfades the two over 60 ms. All
     randomness comes from a seeded Prng advanced per sample, so renders are identical
@@ -32,8 +35,16 @@ public:
     void prepare (double sampleRate, std::uint64_t seed);
     void reset() noexcept;
 
-    void setTargets (MovementMode mode, double amount, double a, double b, double c) noexcept;
+    /** The movement settings (every mode's own) and the MOVEMENT amount. */
+    void setTargets (const Shaping& settings, double amount) noexcept;
     void process (float& left, float& right) noexcept;
+
+    // SHAPER's clock (fed once per block / on note-ons by the engine).
+    void setTiming (const HostTiming& timing) noexcept { shaper.setTiming (timing); }
+    void noteStarted() noexcept { shaper.noteStarted(); }
+    void setVoicesActive (bool active) noexcept { shaper.setVoicesActive (active); }
+    /** SHAPER's pattern position (0..1) for the display, -1 when idle or not in SHAPER. */
+    float shaperPhase() const noexcept { return mode == MovementMode::shaper ? shaper.displayPhase() : -1.0f; }
 
 private:
     struct Noise
@@ -68,7 +79,8 @@ private:
     MovementMode mode = MovementMode::drift, previousMode = MovementMode::drift;
     int fadeRemaining = 0, fadeLength = 1;
     double amountTarget = 0.0, amount = 0.0, amountCoef = 0.001;
-    double a = 0.70, b = 0.6, c = 0.4;
+    Shaping settings;
+    RhythmicShaper shaper;
 
     std::vector<float> lineL, lineR;   // shared delay line (tape, drift, chorus read it)
     int write = 0, lineMask = 0;

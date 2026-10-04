@@ -163,6 +163,10 @@ public:
         post.setMacros (macros);
     }
     void setPitchCharacter (PitchCharacter character) noexcept { config.pitchCharacter = character; }
+    /** The host's musical time at the start of the next block (MOVEMENT's SHAPER syncs to it). */
+    void setHostTiming (const HostTiming& timing) noexcept { post.setTiming (timing); }
+    /** SHAPER's pattern position (0..1) for the display; -1 when it is not running. */
+    float shaperPhase() const noexcept { return post.shaperPhase(); }
     void setContinuation (ContinuationStrategy strategy) noexcept { config.continuation = strategy; }
     void setSeed (std::uint64_t seed) noexcept
     {

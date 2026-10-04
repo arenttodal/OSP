@@ -31,6 +31,7 @@ void MovementBus::prepare (double rate, std::uint64_t seed)
     lineMask = size - 1;
     fadeLength = std::max (1, static_cast<int> (0.06 * rate));
     amountCoef = 1.0 - std::exp (-1.0 / (0.05 * rate));
+    shaper.prepare (rate);
     reset();
 }
 
@@ -51,21 +52,22 @@ void MovementBus::reset() noexcept
     amount = amountTarget;
     fadeRemaining = 0;
     previousMode = mode;
+    shaper.reset();
 }
 
-void MovementBus::setTargets (MovementMode newMode, double newAmount, double pa, double pb, double pc) noexcept
+void MovementBus::setTargets (const Shaping& newSettings, double newAmount) noexcept
 {
-    if (newMode != mode)
+    if (newSettings.movementMode != mode)
     {
+        // Each mode keeps its own settings; the switch crossfades the two outputs (60 ms).
         previousMode = mode;
-        mode = newMode;
+        mode = newSettings.movementMode;
         fadeRemaining = fadeLength;
     }
+    settings = newSettings;
     amountTarget = std::clamp (newAmount, 0.0, 1.0);
-    a = std::clamp (pa, 0.0, 1.0);
-    b = std::clamp (pb, 0.0, 1.0);
-    c = std::clamp (pc, 0.0, 1.0);
-    driftNoise.setRate (std::max (0.05, shaping::driftSpeedHz (a)), sampleRate);
+    driftNoise.setRate (std::max (0.05, shaping::driftSpeedHz (settings.driftSpeed)), sampleRate);
+    shaper.setParams (settings.shaper);
 }
 
 float MovementBus::readLine (const std::vector<float>& line, double delaySamples) const noexcept
@@ -100,11 +102,14 @@ void MovementBus::render (MovementMode m, float inL, float inR, float& outL, flo
         case MovementMode::tape:
         {
             // Wow: a slow, slightly irregular transport (sine plus wander); flutter: a
-            // faster, rougher capstan wobble. Depths in ms of delay modulation.
-            const double wowRate = 0.25 + 0.45 * a;
+            // faster, rougher capstan wobble. Depths in ms of delay modulation. One
+            // transport for both channels: a chord wobbles together, the image stays put.
+            const double a = std::clamp (settings.tapeWow, 0.0, 1.0), b = std::clamp (settings.tapeFlutter, 0.0, 1.0);
+            const double c = std::clamp (settings.tapeWear, 0.0, 1.0);
+            const double wowRate = shaping::tapeWowHz (a);
             wowPhase += twoPi * wowRate / sampleRate;
             const double wow = 0.7 * std::sin (wowPhase) + 0.5 * wowNoise.next (rng);
-            const double flutterRate = 3.0 + 9.0 * b;
+            const double flutterRate = shaping::tapeFlutterHz (b);
             flutterPhase += twoPi * flutterRate / sampleRate;
             const double flutter = std::sin (flutterPhase) * (0.7 + 0.3 * flutterNoise.next (rng));
             const double delayMs = baseDelayMs + x * (2.6 * a * wow + 0.12 * b * flutter);
@@ -131,8 +136,9 @@ void MovementBus::render (MovementMode m, float inL, float inR, float& outL, flo
         }
         case MovementMode::chorus:
         {
-            const double rate = shaping::chorusRateHz (a);
-            const double width = shaping::chorusWidthMs (b);
+            const double rate = shaping::chorusRateHz (settings.chorusRate);
+            const double width = shaping::chorusWidthMs (settings.chorusWidth);
+            const double c = std::clamp (settings.chorusStereo, 0.0, 1.0);
             chorusPhase += twoPi * rate / sampleRate;
             const double offset = std::numbers::pi * c; // STEREO: the taps drift apart
             const double dl = (1.2 + 0.5 * width * (1.0 + std::sin (chorusPhase))) * msToSamples;
@@ -153,14 +159,23 @@ void MovementBus::render (MovementMode m, float inL, float inR, float& outL, flo
         }
         case MovementMode::pulse:
         {
-            const double rate = shaping::pulseRateHz (a);
+            const double rate = shaping::pulseRateHz (settings.pulseRate);
+            const double c = std::clamp (settings.pulseStereo, 0.0, 1.0);
             pulsePhase += twoPi * rate / sampleRate;
-            const double kk = 1.0 + 7.0 * b; // SHAPE: sine -> rounded square
+            const double kk = 1.0 + 7.0 * std::clamp (settings.pulseShape, 0.0, 1.0); // SHAPE: sine -> rounded square
             const double norm = std::tanh (kk);
             const double yl = std::tanh (kk * std::sin (pulsePhase)) / norm;
             const double yr = std::tanh (kk * std::sin (pulsePhase + std::numbers::pi * c)) / norm;
             outL = inL * static_cast<float> (1.0 - x * 0.5 * (1.0 - yl));
             outR = inR * static_cast<float> (1.0 - x * 0.5 * (1.0 - yr));
+            return;
+        }
+        case MovementMode::shaper:
+        {
+            outL = inL;
+            outR = inR;
+            if (x > 1.0e-5 || amountTarget > 0.0)
+                shaper.process (outL, outR, x);   // MOVEMENT is the depth; at zero, an exact bypass
             return;
         }
     }
@@ -173,6 +188,7 @@ void MovementBus::process (float& left, float& right) noexcept
     lineL[static_cast<std::size_t> (write)] = left;
     lineR[static_cast<std::size_t> (write)] = right;
     amount += (amountTarget - amount) * amountCoef;
+    shaper.tick();
 
     float l, r;
     render (mode, left, right, l, r);

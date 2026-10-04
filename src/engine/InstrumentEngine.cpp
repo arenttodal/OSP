@@ -407,11 +407,11 @@ NoteShape InstrumentEngine::shapeFor (const InstrumentModel* model, int note, in
         // Depth grows a little faster than the knob at first, so low settings are audible.
         const double m = (sh.movementMode == MovementMode::drift ? std::pow (std::clamp (motion, 0.0, 1.0), 0.75) : 0.0) * sustained;
         const double rr = 0.5 * r * r * sustained; // Reimagined: instability of its own
-        shape.driftCents = static_cast<float> ((m * shaping::driftPitchCents (sh.movementB) + 12.0 * rr) * (1.0 + 2.0 * std::max (0.0, r - 0.6)));
-        shape.driftToneOctaves = static_cast<float> (m * shaping::driftToneOctaves (sh.movementC) + 0.6 * rr);
+        shape.driftCents = static_cast<float> ((m * shaping::driftPitchCents (sh.driftPitch) + 12.0 * rr) * (1.0 + 2.0 * std::max (0.0, r - 0.6)));
+        shape.driftToneOctaves = static_cast<float> (m * shaping::driftToneOctaves (sh.driftTone) + 0.6 * rr);
         shape.driftLevelDb = static_cast<float> (1.5 * m + 1.0 * rr);
         shape.driftPan = static_cast<float> (0.3 * m + 0.2 * rr);
-        shape.driftRateHz = static_cast<float> (sh.movementMode == MovementMode::drift ? shaping::driftSpeedHz (sh.movementA) : 0.15);
+        shape.driftRateHz = static_cast<float> (sh.movementMode == MovementMode::drift ? shaping::driftSpeedHz (sh.driftSpeed) : 0.15);
     }
     // Original <-> Reimagined (spec §12): shorter, more varied continuation; harmonic
     // saturation towards the far end. (Resonance and width live in PostProcessor.)
@@ -440,6 +440,7 @@ void InstrumentEngine::noteOn (int note, int velocity, int channel) noexcept
     // One event for both layers (same note order and performance memory); layer B
     // draws its own randomness from a salted index.
     const std::uint64_t eventIndex = noteCounter++;
+    post.noteStarted();   // without a running transport SHAPER starts its pattern here
     for (int layer = 0; layer < EngineSettings::layers; ++layer)
         noteOnLayer (layer, note, velocity, channel, layer == 0 ? eventIndex : (eventIndex ^ 0x4c61796572420000ull));
 }
@@ -644,6 +645,7 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
     // The shared post stage's resonances follow the louder layer.
     const auto main = config.blend <= 0.5 ? (layerModel[0] != nullptr ? 0 : 1) : (layerModel[1] != nullptr ? 1 : 0);
     post.setModel (layerModel[static_cast<std::size_t> (main)]);
+    post.setVoicesActive (activeVoiceCount() > 0);
     post.process (left, right, numSamples);
     publishGrains();
     for (int ch = 0; ch < std::min (numChannels, 2); ++ch)

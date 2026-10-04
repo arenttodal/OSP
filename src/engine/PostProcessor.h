@@ -43,6 +43,12 @@ public:
 
     void process (float* left, float* right, int numSamples) noexcept;
 
+    // MOVEMENT's SHAPER clock and display.
+    void setTiming (const HostTiming& timing) noexcept { movement.setTiming (timing); }
+    void noteStarted() noexcept { movement.noteStarted(); }
+    void setVoicesActive (bool active) noexcept { movement.setVoicesActive (active); }
+    float shaperPhase() const noexcept { return movement.shaperPhase(); }
+
     static constexpr int maxPeaks = 3;
     static constexpr int resonators = 6;
 
