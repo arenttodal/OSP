@@ -468,22 +468,31 @@ void MenuButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
 //==============================================================================
 void OspAudioProcessorEditor::OutsideClickWatcher::mouseDown (const juce::MouseEvent& e)
 {
-    auto* c = e.eventComponent;
-    if (editor.popup == nullptr)
+    editor.mouseDownAnywhere (e.eventComponent);
+}
+
+void OspAudioProcessorEditor::mouseDownAnywhere (juce::Component* c)
+{
+    if (popup == nullptr)
     {
-        editor.closedByLabelPress = -1;
+        closedByLabelPress = -1;
         return;
     }
-    if (c == editor.popup.get() || editor.popup->isParentOf (c))
+    if (c == nullptr || c == popup.get() || popup->isParentOf (c))
+        return;
+    // Only clicks inside this editor close the popup. The global listener also hears clicks in
+    // other JUCE windows - above all the popup's own menus (PATTERN, RATE): closing the popup
+    // there would delete the control whose menu item is being chosen, before its choice arrives.
+    if (c != this && ! isParentOf (c))
         return;
     int pressed = -1;
     for (int i = 0; i < 5; ++i)
-        if (c == editor.macros[static_cast<std::size_t> (i)].label.get())
+        if (c == macros[static_cast<std::size_t> (i)].label.get())
             pressed = i;
-    if (c == &editor.advancedButton)
+    if (c == &advancedButton)
         pressed = advancedPopup;
-    editor.closedByLabelPress = pressed == editor.popupIndex ? pressed : -1;
-    editor.closePopup();
+    closedByLabelPress = pressed == popupIndex ? pressed : -1;
+    closePopup();
 }
 
 OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
@@ -980,7 +989,7 @@ void OspAudioProcessorEditor::showMenu()
                           setScaleFactor (ospProcessor.uiScale());
                       });
     menu.addSubMenu ("Interface size", size);
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (menuButton));
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (menuButton).withDeletionCheck (*this));
 }
 
 void OspAudioProcessorEditor::choosePresetFile (bool save, bool instrument)

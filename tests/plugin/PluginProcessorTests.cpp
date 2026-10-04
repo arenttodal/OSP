@@ -915,6 +915,19 @@ TEST_CASE ("plugin: editor builds, shows the instrument and can be snapshotted",
         p.parameters.getParameter ("movement.mode")->setValueNotifyingHost (1.0f);
         ospEditor->openPopup (3);
         snapshot ("osp-editor-popup-shaper.png");
+        // A press in another window - the PATTERN or RATE menu - must not close the popup:
+        // closing it deleted the selector whose menu choice was still to arrive (a host crash).
+        {
+            juce::Component menuWindow;
+            ospEditor->mouseDownAnywhere (&menuWindow);
+            CHECK (ospEditor->openPopupIndex() == 3);
+            ospEditor->mouseDownAnywhere (nullptr);
+            CHECK (ospEditor->openPopupIndex() == 3);
+            // A press elsewhere in the editor still closes it.
+            ospEditor->mouseDownAnywhere (ospEditor);
+            CHECK (ospEditor->openPopupIndex() == -1);
+            ospEditor->openPopup (3);
+        }
         p.parameters.getParameter ("movement.mode")->setValueNotifyingHost (0.0f);
         ospEditor->closePopup();
         CHECK (ospEditor->openPopupIndex() == -1);

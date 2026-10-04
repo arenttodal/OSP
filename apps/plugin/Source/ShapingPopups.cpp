@@ -387,8 +387,13 @@ namespace
             juce::PopupMenu menu;
             const auto values = parameter.getAllValueStrings();
             for (int i = 0; i < values.size(); ++i)
-                menu.addItem (values[i], true, i == index, [this, i] { choose (i); });
-            menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMinimumWidth (getWidth()));
+            {
+                // The choice arrives later, from the message loop: by then this selector may be
+                // gone (popup closed, mode changed), so never call into it unchecked.
+                juce::Component::SafePointer<ValueSelector> safe (this);
+                menu.addItem (values[i], true, i == index, [safe, i] { if (safe != nullptr) safe->choose (i); });
+            }
+            menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMinimumWidth (getWidth()).withDeletionCheck (*this));
         }
         void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails& wheel) override
         {

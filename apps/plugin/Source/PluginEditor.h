@@ -128,6 +128,9 @@ public:
     void openPopup (int which);
     void closePopup();
     int openPopupIndex() const noexcept { return popupIndex; }
+    /** A mouse press anywhere on the desktop (from the global listener): a press elsewhere in
+        this editor closes the open popup. Public for tests. */
+    void mouseDownAnywhere (juce::Component* clicked);
 
 private:
     void timerCallback() override;
