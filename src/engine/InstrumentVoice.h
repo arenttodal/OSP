@@ -235,6 +235,8 @@ private:
     double velocityOctaves = 0.0, envelopeScale = 1.0;
     double driftTone = 0.0, driftToneTarget = 0.0;
     void updateCharacter (bool immediate) noexcept;
+    /** The layer's live grain settings with this note's LIFE variation applied. */
+    GranularParams notesGranular() const noexcept;
 
     ShelfFilter highL, highR, lowL, lowR;
     bool filtersActive = false;

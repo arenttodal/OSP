@@ -225,3 +225,46 @@ TEST_CASE ("granular: polyphonic, each layer has its own mode, block-size indepe
         diff = std::max (diff, static_cast<double> (std::abs (out[i] - other[i])));
     CHECK (diff == 0.0);
 }
+
+TEST_CASE ("granular: LIFE makes every note a different cloud", "[integration][layers][granular]")
+{
+    const auto model = sineModel (220.0, 2.0);
+    // Where each of eight repeated notes takes its grains (mean read position, SPREAD 0).
+    auto positions = [&] (double life) {
+        auto s = quietSettings();
+        s.macros.life = life;
+        s.sourceMode[0] = SourceMode::granular;
+        s.granular[0].spread = 0.0;
+        s.granular[0].position = 0.5;
+        Rig rig (s);
+        rig.engine.setModel (model.get(), 0);
+        rig.engine.setGranular (0, s.granular[0]);
+        std::vector<double> means;
+        std::vector<float> out;
+        for (int n = 0; n < 8; ++n)
+        {
+            rig.engine.noteOn (57, 100, 1);
+            rig.run (0.25, out);
+            const auto& snap = rig.engine.grainSnapshot (0);
+            const int count = snap.count.load();
+            double sum = 0.0;
+            for (int i = 0; i < count; ++i)
+                sum += snap.position[static_cast<std::size_t> (i)].load();
+            means.push_back (count > 0 ? sum / count : -1.0);
+            rig.engine.noteOff (57, 1);
+            rig.run (0.5, out);
+        }
+        return means;
+    };
+    auto spreadOf = [] (const std::vector<double>& v) {
+        const auto [lo, hi] = std::minmax_element (v.begin(), v.end());
+        return *hi - *lo;
+    };
+    const auto still = positions (0.0), alive = positions (0.5), wild = positions (1.0);
+    for (double m : still)
+        REQUIRE (m >= 0.0);
+    INFO ("range of read positions across notes: LIFE 0 " << spreadOf (still) << ", 50 % " << spreadOf (alive) << ", 100 % " << spreadOf (wild));
+    CHECK (spreadOf (still) < 0.03);              // the same place every time
+    CHECK (spreadOf (alive) > 0.08);              // clearly different places per note
+    CHECK (spreadOf (wild) > spreadOf (alive));   // and more so at 100 %
+}

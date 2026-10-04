@@ -50,6 +50,12 @@ glides along the waveform where it reads, swelling and fading with its window:
 
 After you let go no new grains start; the ones playing finish (under the release time).
 
+LIFE works here too: every note takes its grains from its own spot near POS, with its own
+grain size, density, spread and a few cents of pitch, so repeated notes sound like
+different clouds of the same sound (none at 0 %, clearly different at 50 %). In the LIFE
+popup, PITCH sets the pitch differences, TONE the spread and density differences, ATTACK
+the size differences; LOOSE varies more and FRAY sometimes jumps far across the recording.
+
 ## The controls
 
 | Control | What it does |

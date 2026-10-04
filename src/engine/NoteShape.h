@@ -53,6 +53,14 @@ struct NoteShape
         octave/fifth remapping and pitch jitter) mixed over the sustain, 0..1. */
     float granular = 0.0f;
 
+    /** LIFE in Granular mode: this note's own variation of the layer's grain settings
+        (offsets and ratios around POS, SIZE, DENS, SPREAD and TUNE; neutral = no change). */
+    float grainPositionOffset = 0.0f;   ///< added to POS (fraction of the recording)
+    float grainSizeRatio = 1.0f;        ///< SIZE x
+    float grainDensityRatio = 1.0f;     ///< DENS x
+    float grainSpreadOffset = 0.0f;     ///< added to SPREAD (0..1)
+    float grainTuneCents = 0.0f;        ///< added to TUNE
+
     /** Reimagined: soft saturation drive (0 = clean) and continuation segment scale (<1 = shorter, more granular). */
     float saturation = 0.0f;
     float segmentScale = 1.0f;

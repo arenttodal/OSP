@@ -236,6 +236,7 @@ private:
 
     static std::size_t layerIndex (int layer) noexcept { return static_cast<std::size_t> (std::clamp (layer, 0, EngineSettings::layers - 1)); }
     void noteOnLayer (int layer, int note, int velocity, int channel, std::uint64_t eventIndex) noexcept;
+    void granularLife (NoteShape& shape, int note, std::uint64_t eventIndex) const noexcept;
     InstrumentVoice* findFreeSlot() noexcept;
     InstrumentVoice* chooseVictim (int layer) noexcept;
     int countSoundingVoices (int layer) const noexcept;

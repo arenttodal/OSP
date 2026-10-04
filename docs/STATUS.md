@@ -159,6 +159,11 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [x] Plugin: per-layer loading/recall/undo, stable IDs `ab.blend`, `layerA|B.sourceMode`, `layerA|B.granular.{position,size,density,tune,spread}`; state version 4 (older sessions = layer A, One Shot); POS starts in the analysed sustain
 - [x] Tests: blend, empty layer, granular sustain/pitch/TUNE/level, note-off, polyphony with per-layer modes, block-size independence, per-layer load/recall (bit-identical), clear, old sessions
 - [ ] Listening pass on granular settings (defaults SIZE 150 ms, DENS 14/s, SPREAD 20 %)
+- [x] Display: live grain cloud (Granular) and One Shot read heads, lock-free from the audio thread
+
+## Next edition (stacked for one build; the user is collecting test notes)
+
+- [x] LIFE in Granular: per-note POS/SIZE/DENS/SPREAD/TUNE variation (test: repeated notes, LIFE 0 vs 50 vs 100 %)
 
 ## DONE
 

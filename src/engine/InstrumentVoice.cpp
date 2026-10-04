@@ -152,7 +152,7 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
         // The read-through extras (doubling head, Reimagined grains) need a moving read.
         dAmount = 0.0f;
         gAmount = 0.0f;
-        granularSource.start (*layer->source, *granularLive, sampleRate, shape.seed);
+        granularSource.start (*layer->source, notesGranular(), sampleRate, shape.seed);
     }
     saturationDrive = 1.0f + 4.0f * std::clamp (shape.saturation, 0.0f, 1.0f);
     saturationNorm = 1.0f / saturationDrive;
@@ -466,6 +466,17 @@ void InstrumentVoice::updateCharacter (bool immediate) noexcept
     charFilter.setParameters (s.filterType, std::exp2 (octaves), s.resonance, s.drive, tiltDb);
 }
 
+GranularParams InstrumentVoice::notesGranular() const noexcept
+{
+    GranularParams p = *granularLive;
+    p.position = std::clamp (p.position + static_cast<double> (shape.grainPositionOffset), 0.0, 1.0);
+    p.sizeSeconds = std::clamp (p.sizeSeconds * static_cast<double> (shape.grainSizeRatio), 0.01, 0.6);
+    p.density = std::clamp (p.density * static_cast<double> (shape.grainDensityRatio), 2.0, 60.0);
+    p.spread = std::clamp (p.spread + static_cast<double> (shape.grainSpreadOffset), 0.0, 1.0);
+    p.tuneSemitones += static_cast<double> (shape.grainTuneCents) / 100.0;
+    return p;
+}
+
 void InstrumentVoice::updateControl() noexcept
 {
     // Drift: slowly wandering targets, smoothed (strategy D / MOTION).
@@ -510,7 +521,7 @@ void InstrumentVoice::updateControl() noexcept
     if (shapingState != nullptr)
         updateCharacter (false);
     if (granularMode)
-        granularSource.setParams (*granularLive);
+        granularSource.setParams (notesGranular());
 
     settleCents *= settleCoef;
     double shared = 0.0;

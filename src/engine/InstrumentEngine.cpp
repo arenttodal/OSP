@@ -139,6 +139,33 @@ void InstrumentEngine::publishGrains() noexcept
     }
 }
 
+void InstrumentEngine::granularLife (NoteShape& shape, int note, std::uint64_t eventIndex) const noexcept
+{
+    // LIFE in Granular mode: every note takes its grains from its own place in the
+    // recording, with its own grain size, density, spread and a small pitch offset, so
+    // repeated notes sound like different clouds of the same sound. 50 % is clearly
+    // audible but related; 100 % twice as far. The popup's PITCH sets the pitch offset,
+    // TONE the spread and density variation, ATTACK the size variation; LOOSE varies
+    // more, FRAY now and then jumps far across the recording.
+    const double life = std::clamp (config.macros.life, 0.0, 1.0);
+    if (life <= 0.0)
+        return;
+    const auto& s = config.shaping;
+    const double mode = s.lifeMode == LifeMode::loose ? 1.5 : (s.lifeMode == LifeMode::fray ? 1.2 : 1.0);
+    const double scale = life / 0.5 * mode;
+    const double tone = std::max (0.0, s.lifeTone) / 0.3, attack = std::max (0.0, s.lifeAttack) / 0.25;
+    Prng rng (Prng::deriveSeed (config.seed, eventIndex, static_cast<std::uint64_t> (note) + 0x67726c66ull));
+    auto g = [&rng] { return std::clamp (rng.gaussian(), -2.5, 2.5); };
+    double position = 0.06 * scale * g();
+    if (s.lifeMode == LifeMode::fray && rng.nextDouble() < std::min (0.5, 0.25 * scale))
+        position += rng.bipolar() * 0.3;   // a frayed note: grains from somewhere else entirely
+    shape.grainPositionOffset = static_cast<float> (position);
+    shape.grainSizeRatio = static_cast<float> (std::exp2 (0.45 * scale * attack * g()));
+    shape.grainDensityRatio = static_cast<float> (std::exp2 (0.35 * scale * tone * g()));
+    shape.grainSpreadOffset = static_cast<float> (0.08 * scale * tone * g());
+    shape.grainTuneCents = static_cast<float> (1.5 * std::max (0.0, s.lifePitchCents) * scale * g());
+}
+
 void InstrumentEngine::setLayerPitchOffsetSemitones (int layer, double semitones) noexcept
 {
     layerPitchRatio[layerIndex (layer)] = semitonesToRatio (semitones);
@@ -508,6 +535,8 @@ void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int
     params.layerIndex = layerNumber;
     params.sourceMode = config.sourceMode[context];
     params.granular = &liveGranular[context];
+    if (params.sourceMode == SourceMode::granular)
+        granularLife (params.shape, note, eventIndex);
     slot->start (params);
 }
 
