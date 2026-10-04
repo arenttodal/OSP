@@ -263,6 +263,27 @@ state, root override, undo history). Loads, root changes and the Samples inspect
 the edited layer; state version 4 stores layer A in `Instrument` (so older sessions recall
 into A) and layer B in `InstrumentB`.
 
+## MOVEMENT v2 and SHAPER
+
+MOVEMENT runs on the blended instrument (after the A/B blend and the per-voice stages,
+before SPACE) in `MovementBus`; DRIFT's per-note part stays in the voices. Each mode keeps
+its own settings in `Shaping` (stable IDs `movement.<mode>.<setting>`); switching modes
+crossfades the two outputs for 60 ms. The main knob keeps its original ID `motion`.
+
+`RhythmicShaper` (SHAPER) evaluates one of 12 compiled-in 16-step patterns (start/end value
+and a shape per step; SMOOTH rounds the shapes and widens the hand-over between steps) at
+a phase taken from the host: the plugin builds one `HostTiming` per block (playing, BPM,
+PPQ, time signature) and the shaper advances PPQ per sample from it, so step edges land on
+the right sample at any buffer size and every block re-anchors to the host (loops, jumps,
+bounces). With the transport stopped a local clock starts on the first note-on (signalled
+by the engine at the exact sample) and stops after 1.5 s without voices. Depth = the
+MOVEMENT macro: VOL scales the dip; FILTER closes its own LP12 (TPT SVF, Q ~0.77, log
+cutoff 18 kHz .. 380 Hz with a 0.8 exponent on depth); BOTH uses the full filter range and
+0.55 of the volume dip. 2 ms one-pole ramps make every edge click-free, pattern and rate
+changes crossfade for 30 ms, target changes for 40 ms, and zero depth is an exact bypass.
+The UI reads the shaper's phase through an atomic (`InstrumentEngine::shaperPhase`); the
+pattern strip draws with the same pure `RhythmicShaper::evaluate` as the DSP.
+
 ## Recorded deviations from the suggested layout
 
 - `src/research/` added: the renderer logic is a library so tests share it.

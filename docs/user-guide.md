@@ -77,6 +77,41 @@ the recording's speed and movement in other registers), **Sustain** (*Recording*
 end when the recording ends; *Endless*: hold as long as you like without an obvious
 loop), **MPE**, and **Reseed** (a new variation pattern for LIFE and MOTION).
 
+## MOVEMENT modes
+
+The big knob is how much movement; click MOVEMENT for what kind. Every mode keeps its own
+settings, so you can switch back and forth.
+
+| Mode | Settings | What you hear |
+|---|---|---|
+| **DRIFT** | SPEED, PITCH, TONE | Slow, organic instability of pitch and brightness (the default) |
+| **TAPE** | WOW, FLUTTER, WEAR | The whole instrument through an imperfect tape transport |
+| **CHORUS** | RATE, WIDTH, STEREO | Vintage bucket-brigade dimension |
+| **PULSE** | RATE, SHAPE, STEREO | Free-running tremolo / auto-pan, sine to rounded square |
+| **SHAPER** | PATTERN, RATE, TARGET, SMOOTH | A held chord becomes rhythm, locked to your DAW's tempo |
+
+**SHAPER**: pick a pattern, a note value (1/4 to 1/32, with triplets), what it shapes - VOL
+(volume), FILTER (a soft low-pass) or BOTH (darker and a little quieter on the closed steps,
+rather than off) - and SMOOTH (crisp edges to flowing). MOVEMENT is the depth: 25 % is a
+subtle articulation, 50 % clearly rhythmic, 100 % the full pattern. The strip shows the
+pattern and where it is. It follows your DAW's bars exactly (any start position, loops,
+bounces); with the transport stopped it starts with the first note you play.
+
+| Pattern | Character |
+|---|---|
+| PULSE | A decaying articulation on every step, beats a little stronger |
+| OFFBEAT | Low on the beat, opening on the "and" |
+| BREATH | Two slow, rounded swells per bar; never closes far |
+| THREE | An accent every three steps against the bar (3 over 4) |
+| FIVE | Groups of five against the bar |
+| EUCLID 3 | Three events spread evenly over the bar, quiet between |
+| EUCLID 5 | Five events spread over the bar |
+| CASCADE | Each beat a little lower than the last |
+| RISE | Pulses that grow through the bar, then drop |
+| BROKEN | Deliberate, uneven syncopation |
+| SCATTER | Mostly open, with a few sparse dips |
+| MACHINE | Fast and precise, down to silence |
+
 ## MIDI
 
 | Message | Effect |

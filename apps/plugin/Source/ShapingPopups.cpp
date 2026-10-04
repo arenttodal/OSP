@@ -343,45 +343,289 @@ namespace
 
     MiniKnob::Formatter percentOf() { return [] (double v) { return format::percent (v); }; }
 
-    /** MOVEMENT's three generic settings mean different things per mode (spec §32-38). */
-    void relabelMovement (int mode, MiniKnob& a, MiniKnob& b, MiniKnob& c)
+    /** A stepped choice shown as its value (PATTERN, RATE): click for the list, arrows or the
+        mouse wheel to step. Bound to a choice parameter. */
+    class ValueSelector final : public juce::Component
     {
-        switch (static_cast<MovementMode> (mode))
+    public:
+        ValueSelector (juce::RangedAudioParameter& p, juce::String captionText)
+            : parameter (p), caption (std::move (captionText)),
+              attachment (p, [this] (float v) {
+                  index = juce::roundToInt (v);
+                  repaint();
+              })
         {
-            case MovementMode::drift:
-                a.setCaption ("SPEED");
-                a.setFormatter ([] (double v) { return format::hertz (shaping::driftSpeedHz (v * 0.01)); });
-                b.setCaption ("PITCH");
-                b.setFormatter ([] (double v) { return juce::String (shaping::driftPitchCents (v * 0.01), 1) + " c"; });
-                c.setCaption ("TONE");
-                c.setFormatter (percentOf());
-                break;
-            case MovementMode::tape:
-                a.setCaption ("WOW");
-                a.setFormatter (percentOf());
-                b.setCaption ("FLUTTER");
-                b.setFormatter (percentOf());
-                c.setCaption ("WEAR");
-                c.setFormatter (percentOf());
-                break;
-            case MovementMode::chorus:
-                a.setCaption ("RATE");
-                a.setFormatter ([] (double v) { return format::hertz (shaping::chorusRateHz (v * 0.01)); });
-                b.setCaption ("WIDTH");
-                b.setFormatter ([] (double v) { return format::milliseconds (shaping::chorusWidthMs (v * 0.01)); });
-                c.setCaption ("STEREO");
-                c.setFormatter (percentOf());
-                break;
-            case MovementMode::pulse:
-                a.setCaption ("RATE");
-                a.setFormatter ([] (double v) { return format::hertz (shaping::pulseRateHz (v * 0.01)); });
-                b.setCaption ("SHAPE");
-                b.setFormatter (percentOf());
-                c.setCaption ("STEREO");
-                c.setFormatter (percentOf());
-                break;
+            attachment.sendInitialUpdate();
+            setWantsKeyboardFocus (true);
+            setMouseCursor (juce::MouseCursor::PointingHandCursor);
+            setTitle (caption);
         }
-    }
+
+        void paint (juce::Graphics& g) override
+        {
+            auto r = getLocalBounds();
+            g.setColour (palette::textDim);
+            g.setFont (fonts::label (9.5f));
+            g.drawText (caption, r.removeFromTop (12), juce::Justification::centred, false);
+            const auto box = r.reduced (2, 1).toFloat();
+            g.setColour (palette::surface.withAlpha (hasKeyboardFocus (false) || isMouseOver() ? 0.75f : 0.45f));
+            g.fillRoundedRectangle (box, 3.0f);
+            g.setColour (palette::border);
+            g.drawRoundedRectangle (box, 3.0f, 1.0f);
+            g.setColour (palette::text);
+            g.setFont (fonts::make (11.0f, fonts::Weight::semibold, 0.04f));
+            g.drawText (parameter.getAllValueStrings()[index], box, juce::Justification::centred, false);
+        }
+        void mouseEnter (const juce::MouseEvent&) override { repaint(); }
+        void mouseExit (const juce::MouseEvent&) override { repaint(); }
+        void focusGained (FocusChangeType) override { repaint(); }
+        void focusLost (FocusChangeType) override { repaint(); }
+        void mouseUp (const juce::MouseEvent& e) override
+        {
+            if (! getLocalBounds().contains (e.getPosition()))
+                return;
+            juce::PopupMenu menu;
+            const auto values = parameter.getAllValueStrings();
+            for (int i = 0; i < values.size(); ++i)
+                menu.addItem (values[i], true, i == index, [this, i] { choose (i); });
+            menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMinimumWidth (getWidth()));
+        }
+        void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails& wheel) override
+        {
+            if (std::abs (wheel.deltaY) > 0.0f)
+                step (wheel.deltaY > 0.0f ? -1 : 1);
+        }
+        bool keyPressed (const juce::KeyPress& key) override
+        {
+            if (key.isKeyCode (juce::KeyPress::rightKey) || key.isKeyCode (juce::KeyPress::downKey))
+                return step (1), true;
+            if (key.isKeyCode (juce::KeyPress::leftKey) || key.isKeyCode (juce::KeyPress::upKey))
+                return step (-1), true;
+            return false;
+        }
+
+    private:
+        void step (int delta) { choose (juce::jlimit (0, parameter.getAllValueStrings().size() - 1, index + delta)); }
+        void choose (int i)
+        {
+            if (i != index)
+                attachment.setValueAsCompleteGesture (static_cast<float> (i));
+        }
+        juce::RangedAudioParameter& parameter;
+        juce::String caption;
+        int index = 0;
+        juce::ParameterAttachment attachment;
+    };
+
+    /** SHAPER's pattern at a glance: the curve the sound follows (with the current SMOOTH),
+        sixteen step cells, and a thin playhead read from the DSP's own phase. */
+    class PatternStrip final : public juce::Component
+    {
+    public:
+        PatternStrip (OspAudioProcessor& p) : processor (p)
+        {
+            pattern = p.parameters.getRawParameterValue ("movement.shaper.pattern");
+            smooth = p.parameters.getRawParameterValue ("movement.shaper.smooth");
+        }
+        /** From the popup's timer: repaints when the playhead or the pattern moved. */
+        void refresh()
+        {
+            const float phase = processor.shaperPhase();
+            const int p = juce::roundToInt (pattern->load());
+            const float s = smooth->load();
+            if (std::abs (phase - shownPhase) > 1.0e-4f || p != shownPattern || std::abs (s - shownSmooth) > 1.0e-3f)
+            {
+                shownPhase = phase;
+                shownPattern = p;
+                shownSmooth = s;
+                repaint();
+            }
+        }
+        void paint (juce::Graphics& g) override
+        {
+            const auto r = getLocalBounds().toFloat().reduced (0.5f);
+            g.setColour (palette::display);
+            g.fillRoundedRectangle (r, 4.0f);
+            const auto plot = r.reduced (4.0f, 4.0f);
+            const float cell = plot.getWidth() / RhythmicShaper::steps;
+            const int current = shownPhase >= 0.0f ? std::min (RhythmicShaper::steps - 1, static_cast<int> (shownPhase * RhythmicShaper::steps)) : -1;
+            for (int i = 0; i < RhythmicShaper::steps; ++i)
+            {
+                const auto c = juce::Rectangle<float> (plot.getX() + i * cell, plot.getY(), cell, plot.getHeight());
+                if (i == current)
+                {
+                    g.setColour (palette::housing.withAlpha (0.10f));
+                    g.fillRect (c);
+                }
+                if (i > 0)
+                {
+                    g.setColour (palette::displayLine.withAlpha (i % 4 == 0 ? 1.0f : 0.5f));
+                    g.drawVerticalLine (juce::roundToInt (c.getX()), plot.getY(), plot.getBottom());
+                }
+            }
+            // The curve itself (what the sound follows), filled.
+            juce::Path curve;
+            const int points = 160;
+            curve.startNewSubPath (plot.getX(), plot.getBottom());
+            for (int i = 0; i <= points; ++i)
+            {
+                const double x = static_cast<double> (i) / points;
+                const float v = RhythmicShaper::evaluate (shownPattern, std::min (x, 0.99999), 0.01 * shownSmooth);
+                curve.lineTo (plot.getX() + static_cast<float> (x) * plot.getWidth(), plot.getBottom() - v * plot.getHeight());
+            }
+            curve.lineTo (plot.getRight(), plot.getBottom());
+            curve.closeSubPath();
+            g.setColour (palette::wave.withAlpha (0.75f));
+            g.fillPath (curve);
+            if (shownPhase >= 0.0f)
+            {
+                const float x = plot.getX() + shownPhase * plot.getWidth();
+                g.setColour (palette::accent);
+                g.fillRect (juce::Rectangle<float> (x - 0.75f, r.getY() + 1.0f, 1.5f, r.getHeight() - 2.0f));
+            }
+        }
+
+    private:
+        OspAudioProcessor& processor;
+        std::atomic<float>* pattern = nullptr;
+        std::atomic<float>* smooth = nullptr;
+        float shownPhase = -1.0f, shownSmooth = 30.0f;
+        int shownPattern = 3;
+    };
+
+    /** MOVEMENT (v2): the mode, then that mode's own settings - three knobs, or for SHAPER the
+        pattern strip, PATTERN, RATE, TARGET and SMOOTH. Switching modes keeps every mode's values. */
+    class MovementPopup final : public MiniPanel, private juce::Timer
+    {
+    public:
+        explicit MovementPopup (OspAudioProcessor& p) : MiniPanel ("MOVEMENT MODE"), processor (p)
+        {
+            modes = std::make_unique<SegmentedControl> (*p.parameters.getParameter ("movement.mode"),
+                                                         juce::StringArray { "DRIFT", "TAPE", "CHORUS", "PULSE", "SHAPER" });
+            modes->onChange = [this] (int mode) {
+                build (mode);
+                if (onSizeChanged != nullptr)
+                    onSizeChanged();
+            };
+            addAndMakeVisible (*modes);
+            build (modes->selected());
+            startTimerHz (30);
+        }
+
+        juce::Point<int> cardSize() const override
+        {
+            if (shaperMode)
+                return { 236, 8 + 18 + 20 + 8 + 34 + 6 + 32 + 4 + 32 + 4 + 34 + 4 };
+            return { 236, 8 + 18 + 20 + 8 + 57 + 6 };
+        }
+
+    private:
+        void timerCallback() override
+        {
+            if (strip != nullptr)
+                strip->refresh();
+        }
+
+        void build (int mode)
+        {
+            knobs.clear();
+            strip.reset();
+            patternSelector.reset();
+            rateSelector.reset();
+            target.reset();
+            shaperMode = mode == static_cast<int> (MovementMode::shaper);
+            auto& state = processor.parameters;
+            auto knob = [&] (const char* id, const char* caption, MiniKnob::Formatter f, bool horizontal = false) {
+                knobs.push_back (std::make_unique<MiniKnob> (state, id, caption, std::move (f), horizontal));
+                addAndMakeVisible (*knobs.back());
+            };
+            const auto percent = [] (double v) { return format::percent (v); };
+            switch (static_cast<MovementMode> (mode))
+            {
+                case MovementMode::drift:
+                    knob ("movement.drift.speed", "SPEED", [] (double v) { return format::hertz (shaping::driftSpeedHz (v * 0.01)); });
+                    knob ("movement.drift.pitch", "PITCH", [] (double v) { return juce::String (shaping::driftPitchCents (v * 0.01), 1) + " c"; });
+                    knob ("movement.drift.tone", "TONE", percent);
+                    break;
+                case MovementMode::tape:
+                    knob ("movement.tape.wow", "WOW", [] (double v) { return format::hertz (shaping::tapeWowHz (v * 0.01)); });
+                    knob ("movement.tape.flutter", "FLUTTER", [] (double v) { return format::hertz (shaping::tapeFlutterHz (v * 0.01)); });
+                    knob ("movement.tape.wear", "WEAR", percent);
+                    break;
+                case MovementMode::chorus:
+                    knob ("movement.chorus.rate", "RATE", [] (double v) { return format::hertz (shaping::chorusRateHz (v * 0.01)); });
+                    knob ("movement.chorus.width", "WIDTH", [] (double v) { return format::milliseconds (shaping::chorusWidthMs (v * 0.01)); });
+                    knob ("movement.chorus.stereo", "STEREO", percent);
+                    break;
+                case MovementMode::pulse:
+                    knob ("movement.pulse.rate", "RATE", [] (double v) { return format::hertz (shaping::pulseRateHz (v * 0.01)); });
+                    knob ("movement.pulse.shape", "SHAPE", percent);
+                    knob ("movement.pulse.stereo", "STEREO", percent);
+                    break;
+                case MovementMode::shaper:
+                    strip = std::make_unique<PatternStrip> (processor);
+                    addAndMakeVisible (*strip);
+                    patternSelector = std::make_unique<ValueSelector> (*state.getParameter ("movement.shaper.pattern"), "PATTERN");
+                    rateSelector = std::make_unique<ValueSelector> (*state.getParameter ("movement.shaper.rate"), "RATE");
+                    addAndMakeVisible (*patternSelector);
+                    addAndMakeVisible (*rateSelector);
+                    target = std::make_unique<SegmentedControl> (*state.getParameter ("movement.shaper.target"), juce::StringArray { "VOL", "FILTER", "BOTH" });
+                    target->setTooltip ("What the pattern shapes: the volume, a low-pass filter, or both");
+                    addAndMakeVisible (*target);
+                    knob ("movement.shaper.smooth", "SMOOTH", percent, true);
+                    strip->refresh();
+                    break;
+            }
+            resized();
+        }
+
+        void layoutContent (juce::Rectangle<int> area) override
+        {
+            modes->setBounds (area.removeFromTop (20));
+            area.removeFromTop (8);
+            if (! shaperMode)
+            {
+                auto row = area.removeFromTop (57);
+                const int cell = row.getWidth() / std::max (1, static_cast<int> (knobs.size()));
+                for (auto& k : knobs)
+                    k->setBounds (row.removeFromLeft (cell));
+                return;
+            }
+            if (strip != nullptr)
+                strip->setBounds (area.removeFromTop (34));
+            area.removeFromTop (6);
+            auto row = area.removeFromTop (32);
+            const int half = row.getWidth() / 2;
+            if (patternSelector != nullptr)
+                patternSelector->setBounds (row.removeFromLeft (half).reduced (2, 0));
+            if (rateSelector != nullptr)
+                rateSelector->setBounds (row.reduced (2, 0));
+            area.removeFromTop (4);
+            if (target != nullptr)
+                target->setBounds (area.removeFromTop (32).withTrimmedTop (12).reduced (2, 0));
+            area.removeFromTop (4);
+            if (! knobs.empty())
+                knobs.front()->setBounds (area.removeFromTop (34).withSizeKeepingCentre (150, 34));
+        }
+
+        void paint (juce::Graphics& g) override
+        {
+            MiniPanel::paint (g);
+            if (shaperMode && target != nullptr)
+            {
+                g.setColour (palette::textDim);
+                g.setFont (fonts::label (9.5f));
+                g.drawText ("TARGET", target->getBounds().withY (target->getY() - 12).withHeight (12), juce::Justification::centred, false);
+            }
+        }
+
+        OspAudioProcessor& processor;
+        std::unique_ptr<SegmentedControl> modes, target;
+        std::vector<std::unique_ptr<MiniKnob>> knobs;
+        std::unique_ptr<PatternStrip> strip;
+        std::unique_ptr<ValueSelector> patternSelector, rateSelector;
+        bool shaperMode = false;
+    };
 
     juce::String parameterText (juce::RangedAudioParameter* p)
     {
@@ -488,7 +732,12 @@ const juce::StringArray& popupParameterIds (MacroPopup macro)
     static const juce::StringArray dynamics { "dynamics.curve", "attack", "release", "dynamics.tone" };
     static const juce::StringArray character { "character.type", "character.min", "character.max", "character.resonance",
                                                "character.drive", "character.envAmount", "character.envAttack", "character.envDecay" };
-    static const juce::StringArray movement { "movement.mode", "movement.paramA", "movement.paramB", "movement.paramC" };
+    static const juce::StringArray movement { "movement.mode", "movement.drift.speed", "movement.drift.pitch", "movement.drift.tone",
+                                              "movement.tape.wow", "movement.tape.flutter", "movement.tape.wear",
+                                              "movement.chorus.rate", "movement.chorus.width", "movement.chorus.stereo",
+                                              "movement.pulse.rate", "movement.pulse.shape", "movement.pulse.stereo",
+                                              "movement.shaper.pattern", "movement.shaper.rate", "movement.shaper.target",
+                                              "movement.shaper.smooth" };
     static const juce::StringArray space { "space.type", "space.decay" };
     switch (macro)
     {
@@ -539,16 +788,7 @@ std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, OspAudioProcessor
             return popup;
         }
         case MacroPopup::movement:
-        {
-            auto popup = std::make_unique<ShapingPopup> ("MOVEMENT MODE", state);
-            auto& modes = popup->selector ("movement.mode", { "DRIFT", "TAPE", "CHORUS", "PULSE" });
-            auto& a = popup->knob (0, "movement.paramA", "A", percentOf());
-            auto& b = popup->knob (0, "movement.paramB", "B", percentOf());
-            auto& c = popup->knob (0, "movement.paramC", "C", percentOf());
-            modes.onChange = [&a, &b, &c] (int mode) { relabelMovement (mode, a, b, c); };
-            relabelMovement (modes.selected(), a, b, c);
-            return popup;
-        }
+            return std::make_unique<MovementPopup> (processor);
         case MacroPopup::space:
             break;
     }

@@ -148,8 +148,18 @@ block with the plugin's popup settings; anything left out keeps its default, and
     "character": { "type": "lp24|lp12|hp12|bp12|tilt|off", "minHz": 450, "maxHz": 18000,
                    "resonance": 0.1, "drive": 0.12, "envAmount": 0.1,
                    "envAttackSeconds": 0.005, "envDecaySeconds": 0.7 },
-    "movement": { "mode": "drift|tape|chorus|pulse", "a": 0.7, "b": 0.6, "c": 0.4 },
+    "movement": { "mode": "drift|tape|chorus|pulse|shaper",
+                  "drift": { "speed": 0.7, "pitch": 0.25, "tone": 0.4 },
+                  "tape": { "wow": 0.5, "flutter": 0.35, "wear": 0.35 },
+                  "chorus": { "rate": 0.45, "width": 0.6, "stereo": 0.6 },
+                  "pulse": { "rate": 0.55, "shape": 0.3, "stereo": 0.3 },
+                  "shaper": { "pattern": 3, "rate": "1/4|1/8|1/8T|1/16|1/16T|1/32",
+                              "target": "vol|filter|both", "smooth": 0.3 } },
     "space": { "type": "room|chamber|plate|spring", "decaySeconds": 1.8 }
   }
 }
 ```
+
+Older files may still give `"movement": { "a", "b", "c" }`: those are the selected mode's
+three settings. Research renders have no host transport, so SHAPER uses its stopped-transport
+clock (120 BPM, the pattern starts with the first note).

@@ -101,6 +101,9 @@ public:
     void resized() override;
     bool hitTest (int x, int y) override { return card().contains (x, y); }
 
+    /** Called when the card's preferred size changes (e.g. another MOVEMENT mode). */
+    std::function<void()> onSizeChanged;
+
 protected:
     virtual void layoutContent (juce::Rectangle<int> area) = 0;
     juce::String title;

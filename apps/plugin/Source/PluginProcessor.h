@@ -139,6 +139,8 @@ public:
     /** Message thread: applies finished loads immediately (normally done by a timer). */
     void pollLoads() { timerCallback(); }
 
+    /** SHAPER's pattern position (0..1) for the display, -1 when it is not running (any thread). */
+    float shaperPhase() const noexcept { return engine.shaperPhase(); }
     /** The grains a layer is playing now (display; lock-free, any thread). */
     const InstrumentEngine::GrainSnapshot& grainSnapshot (int layer) const noexcept { return engine.grainSnapshot (layer); }
 
@@ -149,8 +151,9 @@ public:
 
     /** 2: engine C parameters (macros, pitch character, sustain, seed). v1 sessions migrate to neutral settings.
         3: shaping system v1.0 (popup settings; CHARACTER is a filter, so older sessions open it fully).
-        4: A/B layers (layer B in an InstrumentB tree; older sessions are layer A only). */
-    static constexpr int stateVersion = 4;
+        4: A/B layers (layer B in an InstrumentB tree; older sessions are layer A only).
+        5: MOVEMENT v2 (every mode keeps its own settings; the shared knobs migrate to the selected mode). */
+    static constexpr int stateVersion = 5;
 
 private:
     struct Layer
@@ -245,7 +248,7 @@ private:
     };
     std::array<LayerParams, numLayers> layerParams;
     // Shaping system v1.0 (the macro popups), in the order of shapingIds().
-    static constexpr int numShapingParams = 20;
+    static constexpr int numShapingParams = 33;
     std::array<std::atomic<float>*, numShapingParams> shapingParams {};
     std::array<float, numShapingParams> lastShaping {};
     Shaping shapingFromParameters() const noexcept;

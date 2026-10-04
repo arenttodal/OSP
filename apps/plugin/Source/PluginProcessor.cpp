@@ -47,9 +47,23 @@ namespace ids
     static const juce::String characterEnvAttack = "character.envAttack";
     static const juce::String characterEnvDecay = "character.envDecay";
     static const juce::String movementMode = "movement.mode";
-    static const juce::String movementA = "movement.paramA";
-    static const juce::String movementB = "movement.paramB";
-    static const juce::String movementC = "movement.paramC";
+    // MOVEMENT v2: every mode's own settings (the old generic movement.paramA/B/C migrate in).
+    static const juce::String driftSpeed = "movement.drift.speed";
+    static const juce::String driftPitch = "movement.drift.pitch";
+    static const juce::String driftTone = "movement.drift.tone";
+    static const juce::String tapeWow = "movement.tape.wow";
+    static const juce::String tapeFlutter = "movement.tape.flutter";
+    static const juce::String tapeWear = "movement.tape.wear";
+    static const juce::String chorusRate = "movement.chorus.rate";
+    static const juce::String chorusWidth = "movement.chorus.width";
+    static const juce::String chorusStereo = "movement.chorus.stereo";
+    static const juce::String pulseRate = "movement.pulse.rate";
+    static const juce::String pulseShape = "movement.pulse.shape";
+    static const juce::String pulseStereo = "movement.pulse.stereo";
+    static const juce::String shaperPattern = "movement.shaper.pattern";
+    static const juce::String shaperRate = "movement.shaper.rate";
+    static const juce::String shaperTarget = "movement.shaper.target";
+    static const juce::String shaperSmooth = "movement.shaper.smooth";
     static const juce::String spaceType = "space.type";
     static const juce::String spaceDecay = "space.decay";
     // A/B layers (stable: never rename). Per layer: layerA.sourceMode, layerA.granular.position, ...
@@ -150,12 +164,37 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
     number (ids::characterEnvAmount, "Character Envelope", Range (-100.0f, 100.0f, 0.0f), static_cast<float> (100.0 * d.envAmount), percent);
     number (ids::characterEnvAttack, "Character Env Attack", skewed (0.0f, 2000.0f, 60.0f), static_cast<float> (1000.0 * d.envAttackSeconds), ms);
     number (ids::characterEnvDecay, "Character Env Decay", skewed (20.0f, 12000.0f, 700.0f), static_cast<float> (1000.0 * d.envDecaySeconds), ms);
-    choice (ids::movementMode, "Movement Mode", { "Drift", "Tape", "Chorus", "Pulse" }, 0);
-    number (ids::movementA, "Movement A", unit, static_cast<float> (100.0 * d.movementA), percent);
-    number (ids::movementB, "Movement B", unit, static_cast<float> (100.0 * d.movementB), percent);
-    number (ids::movementC, "Movement C", unit, static_cast<float> (100.0 * d.movementC), percent);
+    choice (ids::movementMode, "Movement Mode", { "Drift", "Tape", "Chorus", "Pulse", "Shaper" }, 0);
     choice (ids::spaceType, "Space Type", { "Room", "Chamber", "Plate", "Spring" }, 2);
     number (ids::spaceDecay, "Space Decay", skewed (0.2f, 8.0f, 1.8f), static_cast<float> (d.spaceDecaySeconds), seconds);
+
+    // MOVEMENT v2 (version hint 6): every mode's own settings.
+    auto movementNumber = [&layout, &unit, &percent] (const juce::String& id, const juce::String& name, double value) {
+        layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { id, 6 }, name, unit, static_cast<float> (100.0 * value), percent));
+    };
+    movementNumber (ids::driftSpeed, "Drift Speed", d.driftSpeed);
+    movementNumber (ids::driftPitch, "Drift Pitch", d.driftPitch);
+    movementNumber (ids::driftTone, "Drift Tone", d.driftTone);
+    movementNumber (ids::tapeWow, "Tape Wow", d.tapeWow);
+    movementNumber (ids::tapeFlutter, "Tape Flutter", d.tapeFlutter);
+    movementNumber (ids::tapeWear, "Tape Wear", d.tapeWear);
+    movementNumber (ids::chorusRate, "Chorus Rate", d.chorusRate);
+    movementNumber (ids::chorusWidth, "Chorus Width", d.chorusWidth);
+    movementNumber (ids::chorusStereo, "Chorus Stereo", d.chorusStereo);
+    movementNumber (ids::pulseRate, "Pulse Rate", d.pulseRate);
+    movementNumber (ids::pulseShape, "Pulse Shape", d.pulseShape);
+    movementNumber (ids::pulseStereo, "Pulse Stereo", d.pulseStereo);
+    {
+        juce::StringArray patterns;
+        for (int i = 0; i < RhythmicShaper::patternCount; ++i)
+            patterns.add (RhythmicShaper::patternName (i));
+        layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { ids::shaperPattern, 6 }, "Shaper Pattern", patterns, d.shaper.pattern));
+        layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { ids::shaperRate, 6 }, "Shaper Rate",
+                                                                  juce::StringArray { "1/4", "1/8", "1/8T", "1/16", "1/16T", "1/32" }, static_cast<int> (d.shaper.rate)));
+        layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { ids::shaperTarget, 6 }, "Shaper Target",
+                                                                  juce::StringArray { "Vol", "Filter", "Both" }, static_cast<int> (d.shaper.target)));
+        movementNumber (ids::shaperSmooth, "Shaper Smooth", d.shaper.smooth);
+    }
 
     // A/B layers (version hint 5): the blend, then each layer's source mode and GRANULAR settings.
     layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::blend, 5 }, "A/B Blend", Range (0.0f, 1.0f, 0.0f), 0.0f,
@@ -425,8 +464,11 @@ const juce::StringArray& OspAudioProcessor::shapingIds()
         ids::dynamicsCurve, ids::dynamicsTone,
         ids::characterType, ids::characterMin, ids::characterMax, ids::characterResonance, ids::characterDrive,
         ids::characterEnvAmount, ids::characterEnvAttack, ids::characterEnvDecay,
-        ids::movementMode, ids::movementA, ids::movementB, ids::movementC,
+        ids::movementMode,
         ids::spaceType, ids::spaceDecay,
+        ids::driftSpeed, ids::driftPitch, ids::driftTone, ids::tapeWow, ids::tapeFlutter, ids::tapeWear,
+        ids::chorusRate, ids::chorusWidth, ids::chorusStereo, ids::pulseRate, ids::pulseShape, ids::pulseStereo,
+        ids::shaperPattern, ids::shaperRate, ids::shaperTarget, ids::shaperSmooth,
     };
     jassert (list.size() == numShapingParams);
     return list;
@@ -451,12 +493,25 @@ Shaping OspAudioProcessor::shapingFromParameters() const noexcept
     s.envAmount = 0.01 * v (11);
     s.envAttackSeconds = 0.001 * v (12);
     s.envDecaySeconds = 0.001 * v (13);
-    s.movementMode = static_cast<MovementMode> (index (14, 4));
-    s.movementA = 0.01 * v (15);
-    s.movementB = 0.01 * v (16);
-    s.movementC = 0.01 * v (17);
-    s.spaceType = static_cast<SpaceType> (index (18, 4));
-    s.spaceDecaySeconds = v (19);
+    s.movementMode = static_cast<MovementMode> (index (14, 5));
+    s.spaceType = static_cast<SpaceType> (index (15, 4));
+    s.spaceDecaySeconds = v (16);
+    s.driftSpeed = 0.01 * v (17);
+    s.driftPitch = 0.01 * v (18);
+    s.driftTone = 0.01 * v (19);
+    s.tapeWow = 0.01 * v (20);
+    s.tapeFlutter = 0.01 * v (21);
+    s.tapeWear = 0.01 * v (22);
+    s.chorusRate = 0.01 * v (23);
+    s.chorusWidth = 0.01 * v (24);
+    s.chorusStereo = 0.01 * v (25);
+    s.pulseRate = 0.01 * v (26);
+    s.pulseShape = 0.01 * v (27);
+    s.pulseStereo = 0.01 * v (28);
+    s.shaper.pattern = index (29, RhythmicShaper::patternCount);
+    s.shaper.rate = static_cast<ShaperRate> (index (30, 6));
+    s.shaper.target = static_cast<ShaperTarget> (index (31, 3));
+    s.shaper.smooth = 0.01 * v (32);
     return s;
 }
 
@@ -550,14 +605,30 @@ void OspAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
 
     // A bounce or playback from the same position must perform identically (spec §33):
     // performance memory and the note counter restart whenever the transport starts.
+    // One canonical musical-time snapshot per block (MOVEMENT's SHAPER syncs to it).
+    HostTiming timing;
     if (auto* head = getPlayHead())
         if (const auto position = head->getPosition())
         {
+            timing.playing = position->getIsPlaying();
+            if (const auto ppq = position->getPpqPosition())
+            {
+                timing.valid = true;
+                timing.ppq = *ppq;
+            }
+            if (const auto bpm = position->getBpm())
+                timing.bpm = *bpm;
+            if (const auto signature = position->getTimeSignature())
+            {
+                timing.numerator = signature->numerator;
+                timing.denominator = signature->denominator;
+            }
             const bool transportRunning = position->getIsPlaying();
             if (transportRunning && ! hostWasPlaying)
                 engine.resetPerformance();
             hostWasPlaying = transportRunning;
         }
+    engine.setHostTiming (timing);
     applyParameters (false);
 
     const int outChannels = std::min (buffer.getNumChannels(), 2);
@@ -1025,6 +1096,17 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml)
     stateTree.removeChild (treeA, nullptr);
     stateTree.removeChild (treeB, nullptr);
     const int savedVersion = static_cast<int> (stateTree.getProperty ("stateVersion", 1));
+    // Before MOVEMENT v2 the three movement knobs were shared by every mode.
+    std::array<std::optional<float>, 3> genericMovement;
+    int savedMovementMode = 0;
+    for (const auto& child : stateTree)
+    {
+        const auto id = child["id"].toString();
+        if (id == "movement.paramA" || id == "movement.paramB" || id == "movement.paramC")
+            genericMovement[static_cast<std::size_t> (id.getLastCharacter() - 'A')] = static_cast<float> (child["value"]);
+        else if (id == ids::movementMode)
+            savedMovementMode = static_cast<int> (child["value"]);
+    }
     parameters.replaceState (stateTree);
     if (savedVersion < 2)
     {
@@ -1068,6 +1150,29 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml)
         }
     }
 
+    if (savedVersion < 5)
+    {
+        // MOVEMENT v2: the shared knobs belonged to the mode that was selected; every other
+        // mode starts from its defaults. (Versions before 3 had no movement settings.)
+        for (const auto* id : { &ids::driftSpeed, &ids::driftPitch, &ids::driftTone, &ids::tapeWow, &ids::tapeFlutter, &ids::tapeWear,
+                                &ids::chorusRate, &ids::chorusWidth, &ids::chorusStereo, &ids::pulseRate, &ids::pulseShape, &ids::pulseStereo,
+                                &ids::shaperPattern, &ids::shaperRate, &ids::shaperTarget, &ids::shaperSmooth })
+            if (auto* p = parameters.getParameter (*id))
+                p->setValueNotifyingHost (p->getDefaultValue());
+        if (savedVersion >= 3)
+        {
+            static const std::array<std::array<const juce::String*, 3>, 4> slots { {
+                { &ids::driftSpeed, &ids::driftPitch, &ids::driftTone },
+                { &ids::tapeWow, &ids::tapeFlutter, &ids::tapeWear },
+                { &ids::chorusRate, &ids::chorusWidth, &ids::chorusStereo },
+                { &ids::pulseRate, &ids::pulseShape, &ids::pulseStereo } } };
+            const auto& target = slots[static_cast<std::size_t> (std::clamp (savedMovementMode, 0, 3))];
+            for (std::size_t i = 0; i < 3; ++i)
+                if (genericMovement[i].has_value())
+                    if (auto* p = parameters.getParameter (*target[i]))
+                        p->setValueNotifyingHost (p->convertTo0to1 (*genericMovement[i]));
+        }
+    }
     if (savedVersion < 4)
     {
         // Before the A/B layers: the session is layer A, heard alone, in One Shot.

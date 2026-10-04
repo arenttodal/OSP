@@ -164,6 +164,8 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 ## Next edition (stacked for one build; the user is collecting test notes)
 
 - [x] LIFE in Granular: per-note POS/SIZE/DENS/SPREAD/TUNE variation (test: repeated notes, LIFE 0 vs 50 vs 100 %)
+- [x] MOVEMENT v2: five modes with their own settings (state version 5 migrates the old shared knobs), host timing snapshot, SHAPER (12 patterns, 6 rates, VOL/FILTER/BOTH, SMOOTH), popup with pattern strip and live playhead; tests: sync from PPQ 0/4/16/37.5, block-size independence, bypass, targets, smooth, click-free changes, stopped transport, no drift over 10 min, recall/migration, host play head through processBlock
+- [ ] MOVEMENT v2 listening pass (MV-12): patterns on the corpus (organ, nyckelharpa, vocal, synth, granular, A/B); remove or retune any that sound gimmicky
 
 ## DONE
 

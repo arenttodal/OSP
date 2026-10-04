@@ -633,6 +633,7 @@ void OspAudioProcessorEditor::openPopup (int which)
         return;
     popup = which == advancedPopup ? createAdvancedPopup (ospProcessor) : createMacroPopup (static_cast<MacroPopup> (which), ospProcessor);
     popupIndex = which;
+    popup->onSizeChanged = [this] { positionPopup(); };
     addAndMakeVisible (*popup);
     popup->toFront (false);
     positionPopup();

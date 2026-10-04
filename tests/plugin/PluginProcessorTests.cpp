@@ -354,6 +354,123 @@ TEST_CASE ("plugin: shaping settings are parameters that persist and shape the s
     CHECK (valueOf (restored, "life.mode") == Approx (2.0f));
 }
 
+namespace
+{
+    /** A host transport for tests: playing from a PPQ position at a tempo. */
+    struct TestPlayHead final : juce::AudioPlayHead
+    {
+        double ppq = 0.0, bpm = 120.0;
+        bool playing = true;
+        juce::Optional<PositionInfo> getPosition() const override
+        {
+            PositionInfo info;
+            info.setIsPlaying (playing);
+            info.setPpqPosition (ppq);
+            info.setBpm (bpm);
+            info.setTimeSignature (TimeSignature { 4, 4 });
+            return info;
+        }
+    };
+}
+
+TEST_CASE ("plugin: MOVEMENT modes keep their own settings, recall and migrate", "[plugin][movement]")
+{
+    auto setValue = [] (OspAudioProcessor& p, const juce::String& id, float value) {
+        auto* param = p.parameters.getParameter (id);
+        REQUIRE (param != nullptr);
+        param->setValueNotifyingHost (param->convertTo0to1 (value));
+    };
+    auto valueOf = [] (OspAudioProcessor& p, const juce::String& id) {
+        auto* param = p.parameters.getParameter (id);
+        return param->convertFrom0to1 (param->getValue());
+    };
+    OspAudioProcessor p;
+    for (const auto* id : { "movement.drift.speed", "movement.drift.pitch", "movement.drift.tone", "movement.tape.wow", "movement.tape.flutter",
+                            "movement.tape.wear", "movement.chorus.rate", "movement.chorus.width", "movement.chorus.stereo", "movement.pulse.rate",
+                            "movement.pulse.shape", "movement.pulse.stereo", "movement.shaper.pattern", "movement.shaper.rate",
+                            "movement.shaper.target", "movement.shaper.smooth" })
+        CHECK (p.parameters.getParameter (id) != nullptr);
+    CHECK (p.parameters.getParameter ("movement.paramA") == nullptr);
+
+    // TAPE set up, then SHAPER, then back: TAPE's values are still there.
+    setValue (p, "movement.mode", 1.0f);
+    setValue (p, "movement.tape.wow", 20.0f);
+    setValue (p, "movement.tape.flutter", 13.0f);
+    setValue (p, "movement.tape.wear", 32.0f);
+    setValue (p, "movement.mode", 4.0f);
+    setValue (p, "movement.shaper.pattern", 2.0f);   // BREATH
+    setValue (p, "movement.shaper.rate", 1.0f);      // 1/8
+    setValue (p, "movement.shaper.target", 1.0f);    // FILTER
+    setValue (p, "movement.shaper.smooth", 64.0f);
+    setValue (p, "motion", 55.0f);
+    juce::MemoryBlock state;
+    p.getStateInformation (state);
+
+    OspAudioProcessor restored;
+    restored.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+    CHECK (valueOf (restored, "movement.mode") == Approx (4.0f));
+    CHECK (valueOf (restored, "motion") == Approx (55.0f).margin (0.05));
+    CHECK (valueOf (restored, "movement.tape.wow") == Approx (20.0f).margin (0.05));
+    CHECK (valueOf (restored, "movement.tape.flutter") == Approx (13.0f).margin (0.05));
+    CHECK (valueOf (restored, "movement.tape.wear") == Approx (32.0f).margin (0.05));
+    CHECK (valueOf (restored, "movement.shaper.pattern") == Approx (2.0f));
+    CHECK (valueOf (restored, "movement.shaper.rate") == Approx (1.0f));
+    CHECK (valueOf (restored, "movement.shaper.target") == Approx (1.0f));
+    CHECK (valueOf (restored, "movement.shaper.smooth") == Approx (64.0f).margin (0.05));
+
+    // A session from before MOVEMENT v2: the shared knobs belonged to the selected mode (CHORUS).
+    auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
+    auto tree = juce::ValueTree::fromXml (*xml);
+    tree.setProperty ("stateVersion", 4, nullptr);
+    for (auto child : tree)
+        if (child["id"].toString() == "movement.mode")
+            child.setProperty ("value", 2.0f, nullptr);
+    for (auto [id, value] : { std::pair { "movement.paramA", 81.0f }, { "movement.paramB", 22.0f }, { "movement.paramC", 47.0f } })
+    {
+        juce::ValueTree old ("PARAM");
+        old.setProperty ("id", id, nullptr);
+        old.setProperty ("value", value, nullptr);
+        tree.appendChild (old, nullptr);
+    }
+    juce::MemoryBlock oldState;
+    juce::AudioProcessor::copyXmlToBinary (*tree.createXml(), oldState);
+    OspAudioProcessor migrated;
+    migrated.setStateInformation (oldState.getData(), static_cast<int> (oldState.getSize()));
+    CHECK (valueOf (migrated, "movement.mode") == Approx (2.0f));
+    CHECK (valueOf (migrated, "movement.chorus.rate") == Approx (81.0f).margin (0.05));
+    CHECK (valueOf (migrated, "movement.chorus.width") == Approx (22.0f).margin (0.05));
+    CHECK (valueOf (migrated, "movement.chorus.stereo") == Approx (47.0f).margin (0.05));
+    auto* tapeWow = migrated.parameters.getParameter ("movement.tape.wow");
+    CHECK (tapeWow->getValue() == Approx (tapeWow->getDefaultValue()));   // other modes: defaults
+}
+
+TEST_CASE ("plugin: SHAPER follows the host's transport", "[plugin][movement]")
+{
+    TempDir tmp;
+    const auto file = writeSource (tmp.dir, "pad.wav", testsignals::vowel (midiToHz (57), 4.0, 48000.0, 2));
+    OspAudioProcessor p;
+    loadAndWait (p, file);
+    p.parameters.getParameter ("movement.mode")->setValueNotifyingHost (1.0f);   // SHAPER (last choice)
+    p.parameters.getParameter ("motion")->setValueNotifyingHost (0.6f);
+    TestPlayHead head;
+    head.ppq = 37.5;
+    p.setPlayHead (&head);
+    p.prepareToPlay (48000.0, 480);
+    juce::AudioBuffer<float> buffer (2, 480);
+    juce::MidiBuffer midi;
+    midi.addEvent (juce::MidiMessage::noteOn (1, 57, static_cast<juce::uint8> (100)), 0);
+    p.processBlock (buffer, midi);
+    // 1/16: a cycle is 4 quarters; the block's last sample is at 37.5 + 479 / 24000 quarters.
+    const double ppqAtEnd = 37.5 + 479.0 * 120.0 / (60.0 * 48000.0);
+    CHECK (p.shaperPhase() == Approx (ppqAtEnd / 4.0 - std::floor (ppqAtEnd / 4.0)).margin (1.0e-5));
+    // The host jumps (a loop back to bar 1): the pattern follows at the next block.
+    head.ppq = 0.0;
+    juce::MidiBuffer none;
+    p.processBlock (buffer, none);
+    CHECK (p.shaperPhase() == Approx (479.0 * 120.0 / (60.0 * 48000.0) / 4.0).margin (1.0e-5));
+    p.setPlayHead (nullptr);
+}
+
 TEST_CASE ("plugin: sessions from before the shaping system open CHARACTER fully", "[plugin]")
 {
     OspAudioProcessor p;
@@ -794,6 +911,11 @@ TEST_CASE ("plugin: editor builds, shows the instrument and can be snapshotted",
             CHECK (ospEditor->openPopupIndex() == i);
             snapshot (juce::String ("osp-editor-popup-") + names[i] + ".png");
         }
+        // MOVEMENT in SHAPER mode: pattern strip, PATTERN, RATE, TARGET, SMOOTH.
+        p.parameters.getParameter ("movement.mode")->setValueNotifyingHost (1.0f);
+        ospEditor->openPopup (3);
+        snapshot ("osp-editor-popup-shaper.png");
+        p.parameters.getParameter ("movement.mode")->setValueNotifyingHost (0.0f);
         ospEditor->closePopup();
         CHECK (ospEditor->openPopupIndex() == -1);
 
@@ -819,7 +941,7 @@ TEST_CASE ("plugin: editor builds, shows the instrument and can be snapshotted",
             p.processBlock (audio, midi);
         }
         ospEditor->refreshNow();
-        CHECK (p.grainSnapshot (1).count.load() > 6);   // three notes, several grains each
+        CHECK (p.grainSnapshot (1).count.load() > 2);   // three notes, grains on each (LIFE varies their density)
         snapshot ("osp-editor-layer-b-granular.png");
         juce::MidiBuffer off;
         off.addEvent (juce::MidiMessage::allNotesOff (1), 0);
