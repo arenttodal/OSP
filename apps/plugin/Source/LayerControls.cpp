@@ -20,6 +20,8 @@ void LayerTabs::setSelected (int layer)
 
 void LayerTabs::setLoaded (int layer, bool isLoaded)
 {
+    if (layer < 0 || layer > 1)
+        return;
     if (loaded[static_cast<std::size_t> (layer & 1)] != isLoaded)
     {
         loaded[static_cast<std::size_t> (layer & 1)] = isLoaded;

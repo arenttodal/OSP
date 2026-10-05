@@ -1,5 +1,7 @@
 #include "engine/GranularSource.h"
 
+#include "engine/LevelContour.h"
+
 #include <algorithm>
 #include <cmath>
 #include <numbers>
@@ -7,9 +9,12 @@
 namespace osp
 {
 
-void GranularSource::start (const PlaybackSource& source, const GranularParams& params, double outputSampleRate, std::uint64_t seed) noexcept
+void GranularSource::start (const PlaybackSource& source, const GranularParams& params, double outputSampleRate, std::uint64_t seed,
+                            const EnvelopeAnalysis* envelope, double durationSeconds) noexcept
 {
     src = &source;
+    contour = envelope;
+    contourSeconds = durationSeconds;
     settings = params;
     sampleRate = outputSampleRate;
     rng.reseed (Prng::deriveSeed (seed, 0x6772736dull, 0));
@@ -66,7 +71,12 @@ void GranularSource::spawn (double step) noexcept
 
     const auto n = static_cast<int> (samples);
     const double w = 2.0 * std::numbers::pi / static_cast<double> (n);
-    slot->position = start;
+    // REVERSE: the same stretch of the recording, read from its end back to its start.
+    slot->direction = settings.reverse ? -1.0 : 1.0;
+    slot->position = settings.reverse ? start + samples * frameStep : start;
+    slot->gain = 1.0f;
+    if (! settings.follow && contour != nullptr)
+        slot->gain = static_cast<float> (std::pow (10.0, levelContour::boostDb (*contour, contourSeconds, (start + 0.5 * samples * frameStep) / frames) / 20.0));
     slot->ratio = ratio;
     slot->c = 1.0;
     slot->s = 0.0;
@@ -98,12 +108,12 @@ void GranularSource::render (float& left, float& right, double step) noexcept
     {
         if (! g.active)
             continue;
-        const auto window = static_cast<float> (0.5 - 0.5 * g.c);
+        const auto window = static_cast<float> (0.5 - 0.5 * g.c) * g.gain;
         const double pos = std::clamp (g.position, 1.0, lastFrame);
         const float a = read (0, pos);
         l += window * a;
         r += window * (stereo ? read (1, pos) : a);
-        g.position += step * g.ratio;
+        g.position += g.direction * step * g.ratio;
         const double c = g.c * g.cd - g.s * g.sd;
         g.s = g.s * g.cd + g.c * g.sd;
         g.c = c;

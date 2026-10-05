@@ -117,17 +117,23 @@ TEST_CASE ("layers: the A/B blend crossfades two samples with equal power", "[in
     CHECK (bh / b1 == Approx (0.5).margin (0.03));
 }
 
-TEST_CASE ("layers: an empty layer is silence, and one layer alone matches the single-layer engine", "[integration][layers]")
+TEST_CASE ("layers: one loaded layer plays alone whatever the blend (never half of an A/B mix)", "[integration][layers]")
 {
     const auto a = sineModel (220.0);
-    auto s = quietSettings();
-    s.blend = 1.0;   // only B, which is empty
-    Rig rig (s);
-    rig.engine.setModel (a.get(), 0);
-    rig.engine.noteOn (57, 100, 1);
-    std::vector<float> out;
-    rig.run (0.5, out);
-    CHECK (rms (out, 0, out.size()) < 1.0e-6);
+    auto level = [&] (double blend) {
+        auto s = quietSettings();
+        s.blend = blend;   // B is empty
+        Rig rig (s);
+        rig.engine.setModel (a.get(), 0);
+        rig.engine.noteOn (57, 100, 1);
+        std::vector<float> out;
+        rig.run (0.5, out);
+        return rms (out, 0, out.size());
+    };
+    const double alone = level (0.0);
+    CHECK (alone > 0.01);
+    CHECK (level (1.0) == alone);
+    CHECK (level (0.5) == alone);
 }
 
 TEST_CASE ("granular: a held note sustains indefinitely at the played pitch", "[integration][layers][granular]")

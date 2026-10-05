@@ -94,10 +94,10 @@ public:
 
     // A/B source layers. Everything below that takes a `layer` acts on the layer being
     // edited when it is -1 (the A/B tabs choose it).
-    static constexpr int numLayers = 2;
+    static constexpr int numLayers = EngineSettings::layers;   ///< A, B, C (the instrument uses 1-3 of them)
     int editLayer() const noexcept { return editLayerIndex.load(); }
     void setEditLayer (int layer) noexcept { editLayerIndex = std::clamp (layer, 0, numLayers - 1); }
-    static juce::String layerName (int layer) { return layer == 1 ? "B" : "A"; }
+    static juce::String layerName (int layer) { return layer == 2 ? "C" : (layer == 1 ? "B" : "A"); }
     /** The stable parameter ID of a layer setting, e.g. layerParameterId (1, "sourceMode") -> "layerB.sourceMode". */
     static juce::String layerParameterId (int layer, const juce::String& name) { return "layer" + layerName (layer) + "." + name; }
 
@@ -111,6 +111,27 @@ public:
     /** Empties a layer (it then contributes silence). */
     void clearLayer (int layer = -1);
 
+    // Adaptive layers (message thread). A layer is occupied while it holds or loads a sound;
+    // the instrument shows one card per occupied layer, and they are kept contiguous
+    // (A, A+B, A+B+C) by removeLayer.
+    bool isLayerOccupied (int layer) const;
+    int occupiedLayerCount() const;
+    /** The first slot without a sound, or -1 when all three hold one. */
+    int firstFreeLayer() const;
+    /** Each file becomes a new layer (from `firstLayer` if it is free, then the free slots),
+        with neutral layer controls, and is made audible in the mix. Files beyond the third
+        layer are reported, not loaded. Returns how many were loaded. */
+    int addLayers (const juce::Array<juce::File>& files, int firstLayer = -1);
+    /** Removes a layer's sound; the layers above move down (complete state: sound, root,
+        mode, granular and layer controls). Not while sounds are loading. Restorable once. */
+    bool removeLayer (int layer);
+    bool canRestoreRemovedLayer() const;
+    bool restoreRemovedLayer();
+    /** Neutral layer controls and granular settings, automatic root. */
+    void resetLayerControls (int layer);
+    void setParameterValue (const juce::String& id, float value);
+    float parameterValue (const juce::String& id) const;
+
     enum class LoadState { empty, loading, ready, failed };
     LoadState loadState (int layer = -1) const noexcept { return layers[resolve (layer)].state.load(); }
     juce::String statusMessage() const;
@@ -123,6 +144,8 @@ public:
     juce::String stageMessage() const;
     /** Granular settings names for layerParameterId: the source mode, then POS, SIZE, DENS, TUNE, SPREAD. */
     static const juce::StringArray& granularNames();
+    /** Layer control names for layerParameterId: start, tune, pan, level, link, reverse, loop, follow. */
+    static const juce::StringArray& layerControlNames();
 
     /** Most recently loaded instrument of a layer, or nullptr when it is empty (any non-audio thread). */
     std::shared_ptr<const LoadedInstrument> currentInstrument (int layer = -1) const;
@@ -152,8 +175,10 @@ public:
     /** 2: engine C parameters (macros, pitch character, sustain, seed). v1 sessions migrate to neutral settings.
         3: shaping system v1.0 (popup settings; CHARACTER is a filter, so older sessions open it fully).
         4: A/B layers (layer B in an InstrumentB tree; older sessions are layer A only).
-        5: MOVEMENT v2 (every mode keeps its own settings; the shared knobs migrate to the selected mode). */
-    static constexpr int stateVersion = 5;
+        5: MOVEMENT v2 (every mode keeps its own settings; the shared knobs migrate to the selected mode).
+        6: adaptive 1-3 layers (InstrumentC tree, layer controls, three-layer mix, ADSR decay/sustain;
+           the global Sustain becomes every layer's LOOP). */
+    static constexpr int stateVersion = 6;
 
 private:
     struct Layer
@@ -195,6 +220,24 @@ private:
     friend class InstrumentChangeAction;
     friend class RootChangeAction;
     void pushResult (LoadResult result, int layer);
+    /** Everything that makes a layer what it is (moves with it when layers are compacted). */
+    struct LayerSnapshot
+    {
+        std::shared_ptr<const LoadedInstrument> instrument;
+        std::optional<double> rootOverride;
+        juce::NamedValueSet values;   ///< granular + layer control parameters by name
+        std::map<std::uint64_t, std::shared_ptr<const LoadedInstrument>> latestByLoad;
+        std::uint64_t lastPublishedLoad = 0;
+    };
+    LayerSnapshot captureLayer (int layer) const;
+    void applyLayer (int layer, const LayerSnapshot& snapshot);
+    void makeLayerAudible (int layer);
+    struct RemovedLayer
+    {
+        int index = 0;
+        LayerSnapshot snapshot;
+    };
+    std::unique_ptr<RemovedLayer> removedLayer;
     void applyParameters (bool force) noexcept;
 public:
     /** The popup parameter IDs (stable: never rename), in shapingParams order. */
@@ -245,7 +288,14 @@ private:
         std::atomic<float>* mode = nullptr;
         std::array<std::atomic<float>*, 5> granular {};
         std::array<float, 6> last { -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f };
+        std::array<std::atomic<float>*, 8> controls {};   ///< in layerControlNames() order
+        std::array<float, 8> lastControls { -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f };
     };
+    std::atomic<float>* mixXParam = nullptr;
+    std::atomic<float>* mixYParam = nullptr;
+    std::atomic<float>* decayParam = nullptr;
+    std::atomic<float>* sustainLevelParam = nullptr;
+    float lastDecay = -1.0f, lastSustainLevel = -1.0f;
     std::array<LayerParams, numLayers> layerParams;
     // Shaping system v1.0 (the macro popups), in the order of shapingIds().
     static constexpr int numShapingParams = 33;

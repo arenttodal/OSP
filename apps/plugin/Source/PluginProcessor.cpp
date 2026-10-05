@@ -1,4 +1,5 @@
 #include "PluginProcessor.h"
+#include "ValueFormat.h"
 
 #include "PluginEditor.h"
 
@@ -70,6 +71,12 @@ namespace ids
     static const juce::String blend = "ab.blend";
     static const juce::Identifier instrument = "Instrument";
     static const juce::Identifier instrumentB = "InstrumentB";
+    static const juce::Identifier instrumentC = "InstrumentC";
+    // Adaptive 1-3 layers (version hint 7): the three-layer mix position and the envelope's D and S.
+    static const juce::String mixX = "mix.x";
+    static const juce::String mixY = "mix.y";
+    static const juce::String decay = "decay";
+    static const juce::String sustainLevel = "sustainLevel";
 }
 
 namespace
@@ -205,7 +212,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
     for (int layer = 0; layer < numLayers; ++layer)
     {
         const auto name = "Layer " + layerName (layer) + " ";
-        auto id = [layer] (const char* n) { return juce::ParameterID { layerParameterId (layer, n), 5 }; };
+        // Layer C arrived with the adaptive layers (version hint 7); A and B keep theirs.
+        auto id = [layer] (const char* n) { return juce::ParameterID { layerParameterId (layer, n), layer < 2 ? 5 : 7 }; };
         layout.add (std::make_unique<juce::AudioParameterChoice> (id ("sourceMode"), name + "Source Mode", juce::StringArray { "One Shot", "Granular" }, 0));
         layout.add (std::make_unique<juce::AudioParameterFloat> (id ("granular.position"), name + "Grain Position", unit, static_cast<float> (100.0 * g.position), percent));
         layout.add (std::make_unique<juce::AudioParameterFloat> (id ("granular.size"), name + "Grain Size", skewed (20.0f, 400.0f, 120.0f), static_cast<float> (1000.0 * g.sizeSeconds), ms));
@@ -215,7 +223,46 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
                                                                  juce::AudioParameterFloatAttributes().withLabel ("st")));
         layout.add (std::make_unique<juce::AudioParameterFloat> (id ("granular.spread"), name + "Grain Spread", unit, static_cast<float> (100.0 * g.spread), percent));
     }
+
+    // Adaptive 1-3 layers (version hint 7): every layer's START, TUNE, PAN, LEVEL and its
+    // source modifiers; the three-layer mix; the envelope's decay and sustain.
+    const LayerSettings defaults;
+    for (int layer = 0; layer < numLayers; ++layer)
+    {
+        const auto name = "Layer " + layerName (layer) + " ";
+        auto id = [layer] (const char* n) { return juce::ParameterID { layerParameterId (layer, n), 7 }; };
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id ("start"), name + "Start", unit, 0.0f, percent));
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id ("tune"), name + "Tune", Range (-24.0f, 24.0f, 0.01f), 0.0f,
+                                                                 juce::AudioParameterFloatAttributes().withLabel ("st")
+                                                                     .withStringFromValueFunction ([] (float v, int) { return format::semitones (v); })));
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id ("pan"), name + "Pan", Range (-100.0f, 100.0f, 0.1f), 0.0f,
+                                                                 juce::AudioParameterFloatAttributes()
+                                                                     .withStringFromValueFunction ([] (float v, int) { return format::pan (v); })
+                                                                     .withValueFromStringFunction ([] (const juce::String& t) { return format::panFromText (t); })));
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id ("level"), name + "Level",
+                                                                 Range (static_cast<float> (LayerSettings::minLevelDb), 6.0f, 0.1f), 0.0f,
+                                                                 juce::AudioParameterFloatAttributes().withLabel ("dB")
+                                                                     .withStringFromValueFunction ([] (float v, int) { return format::levelDb (v); })));
+        layout.add (std::make_unique<juce::AudioParameterBool> (id ("link"), name + "Link", false));
+        layout.add (std::make_unique<juce::AudioParameterBool> (id ("reverse"), name + "Reverse", defaults.reverse));
+        layout.add (std::make_unique<juce::AudioParameterBool> (id ("loop"), name + "Loop", defaults.loop));
+        layout.add (std::make_unique<juce::AudioParameterBool> (id ("follow"), name + "Follow", defaults.follow));
+    }
+    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::mixX, 7 }, "Mix X", Range (0.0f, 1.0f, 0.0f), 0.5f));
+    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::mixY, 7 }, "Mix Y", Range (0.0f, 1.0f, 0.0f), 1.0f / 3.0f));
+    {
+        Range decayRange (1.0f, 20000.0f, 0.1f);
+        decayRange.setSkewForCentre (600.0f);
+        layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::decay, 7 }, "Decay", decayRange, 600.0f, ms));
+        layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::sustainLevel, 7 }, "Sustain Level", unit, 100.0f, percent));
+    }
     return layout;
+}
+
+const juce::StringArray& OspAudioProcessor::layerControlNames()
+{
+    static const juce::StringArray names { "start", "tune", "pan", "level", "link", "reverse", "loop", "follow" };
+    return names;
 }
 
 //==============================================================================
@@ -304,7 +351,13 @@ OspAudioProcessor::OspAudioProcessor()
         lp.mode = parameters.getRawParameterValue (layerParameterId (layer, granularNames()[0]));
         for (int i = 0; i < 5; ++i)
             lp.granular[static_cast<std::size_t> (i)] = parameters.getRawParameterValue (layerParameterId (layer, granularNames()[i + 1]));
+        for (int i = 0; i < layerControlNames().size(); ++i)
+            lp.controls[static_cast<std::size_t> (i)] = parameters.getRawParameterValue (layerParameterId (layer, layerControlNames()[i]));
     }
+    mixXParam = parameters.getRawParameterValue (ids::mixX);
+    mixYParam = parameters.getRawParameterValue (ids::mixY);
+    decayParam = parameters.getRawParameterValue (ids::decay);
+    sustainLevelParam = parameters.getRawParameterValue (ids::sustainLevel);
 
     engineSettings.polyphony = 24;
     engineSettings.outputGainDb = -9.0;
@@ -354,14 +407,22 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
 {
     const float attack = attackParam->load();
     const float release = releaseParam->load();
-    if (force || changed (attack, lastAttack) || changed (release, lastRelease))
+    const float decay = decayParam->load();
+    const float sustainLevel = sustainLevelParam->load();
+    if (force || changed (attack, lastAttack) || changed (release, lastRelease) || changed (decay, lastDecay) || changed (sustainLevel, lastSustainLevel))
     {
+        // The instrument's one amplitude envelope (every layer's voices share it).
         AdsrSettings adsr = engineSettings.adsr;
         adsr.attackSeconds = attack * 0.001;
+        adsr.decaySeconds = decay * 0.001;
+        adsr.sustainLevel = 0.01 * sustainLevel;
         adsr.releaseSeconds = release * 0.001;
+        engineSettings.adsr = adsr;
         engine.setEnvelope (adsr);
         lastAttack = attack;
         lastRelease = release;
+        lastDecay = decay;
+        lastSustainLevel = sustainLevel;
     }
 
     const float gain = gainParam->load();
@@ -423,14 +484,34 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
 
     engine.setPitchOffsetSemitones (pitchBendSemitones + fineTuneParam->load() / 100.0);
 
-    // A/B layers: blend, root corrections, source modes and granular settings.
+    // Layers: the mix, root corrections, layer controls, source modes and granular settings.
     // Also kept in engineSettings: prepare() must start from the current values, never ramp to them.
     engineSettings.blend = blendParam->load();
     engine.setBlend (engineSettings.blend);
+    engineSettings.mixX = mixXParam->load();
+    engineSettings.mixY = mixYParam->load();
+    engine.setMixPosition (engineSettings.mixX, engineSettings.mixY);
     for (int layer = 0; layer < numLayers; ++layer)
     {
         auto& lp = layerParams[static_cast<std::size_t> (layer)];
         engine.setLayerPitchOffsetSemitones (layer, layers[static_cast<std::size_t> (layer)].rootShiftSemitones.load());
+        std::array<float, 8> controls {};
+        for (std::size_t i = 0; i < controls.size(); ++i)
+            controls[i] = lp.controls[i]->load();
+        if (force || controls != lp.lastControls)
+        {
+            lp.lastControls = controls;
+            LayerSettings ls;
+            ls.start = 0.01 * controls[0];
+            ls.tuneSemitones = controls[1];
+            ls.pan = 0.01 * controls[2];
+            ls.levelDb = controls[3];
+            ls.reverse = controls[5] >= 0.5f;
+            ls.loop = controls[6] >= 0.5f;
+            ls.follow = controls[7] >= 0.5f;
+            engineSettings.layer[static_cast<std::size_t> (layer)] = ls;
+            engine.setLayerSettings (layer, ls);
+        }
         std::array<float, 6> now { lp.mode->load(), lp.granular[0]->load(), lp.granular[1]->load(), lp.granular[2]->load(),
                                    lp.granular[3]->load(), lp.granular[4]->load() };
         if (force || now != lp.last)
@@ -789,6 +870,173 @@ void OspAudioProcessor::clearLayer (int layer)
     setRootOverride (std::nullopt, static_cast<int> (index));
 }
 
+//==============================================================================
+// Adaptive layers: which slots hold a sound, adding and removing layers
+
+bool OspAudioProcessor::isLayerOccupied (int layer) const
+{
+    const auto index = static_cast<std::size_t> (std::clamp (layer, 0, numLayers - 1));
+    return layers[index].state.load() == LoadState::loading || currentInstrument (static_cast<int> (index)) != nullptr;
+}
+
+int OspAudioProcessor::occupiedLayerCount() const
+{
+    int count = 0;
+    for (int layer = 0; layer < numLayers; ++layer)
+        count += isLayerOccupied (layer) ? 1 : 0;
+    return count;
+}
+
+int OspAudioProcessor::firstFreeLayer() const
+{
+    for (int layer = 0; layer < numLayers; ++layer)
+        if (! isLayerOccupied (layer))
+            return layer;
+    return -1;
+}
+
+void OspAudioProcessor::setParameterValue (const juce::String& id, float value)
+{
+    if (auto* p = parameters.getParameter (id))
+        p->setValueNotifyingHost (p->convertTo0to1 (value));
+}
+
+float OspAudioProcessor::parameterValue (const juce::String& id) const
+{
+    if (auto* p = parameters.getParameter (id))
+        return p->convertFrom0to1 (p->getValue());
+    return 0.0f;
+}
+
+void OspAudioProcessor::makeLayerAudible (int layer)
+{
+    // A layer the musician just added is heard: two layers meet in the middle of the
+    // blend, three at the centre of the triangle.
+    const int count = occupiedLayerCount();
+    if (count == 2 && layer >= 1)
+        setParameterValue (ids::blend, 0.5f);
+    else if (count == 3)
+    {
+        setParameterValue (ids::mixX, 0.5f);
+        setParameterValue (ids::mixY, 1.0f / 3.0f);
+    }
+}
+
+int OspAudioProcessor::addLayers (const juce::Array<juce::File>& files, int firstLayer)
+{
+    int loaded = 0;
+    for (const auto& file : files)
+    {
+        const int layer = firstLayer >= 0 && loaded == 0 && ! isLayerOccupied (firstLayer) ? firstLayer : firstFreeLayer();
+        if (layer < 0)
+            break;
+        resetLayerControls (layer);
+        loadFile (file, layer);
+        makeLayerAudible (layer);
+        ++loaded;
+    }
+    if (loaded < files.size())
+        showMessage (juce::String (files.size()) + " sounds dropped: OSP plays up to three, so " + juce::String (files.size() - loaded)
+                     + (files.size() - loaded == 1 ? " was" : " were") + " left out. Drop a folder to make one multi-sample layer.");
+    return loaded;
+}
+
+void OspAudioProcessor::resetLayerControls (int layer)
+{
+    for (const auto& name : granularNames())
+        if (auto* p = parameters.getParameter (layerParameterId (layer, name)))
+            p->setValueNotifyingHost (p->getDefaultValue());
+    for (const auto& name : layerControlNames())
+        if (auto* p = parameters.getParameter (layerParameterId (layer, name)))
+            p->setValueNotifyingHost (p->getDefaultValue());
+    setRootOverride (std::nullopt, layer);
+}
+
+OspAudioProcessor::LayerSnapshot OspAudioProcessor::captureLayer (int layer) const
+{
+    LayerSnapshot snapshot;
+    snapshot.instrument = currentInstrument (layer);
+    snapshot.rootOverride = rootOverride (layer);
+    for (const auto* names : { &granularNames(), &layerControlNames() })
+        for (const auto& name : *names)
+            snapshot.values.set (name, parameterValue (layerParameterId (layer, name)));
+    const auto& slot = layers[static_cast<std::size_t> (layer)];
+    snapshot.latestByLoad = slot.latestByLoad;
+    snapshot.lastPublishedLoad = slot.lastPublishedLoad;
+    return snapshot;
+}
+
+void OspAudioProcessor::applyLayer (int layer, const LayerSnapshot& snapshot)
+{
+    auto& slot = layers[static_cast<std::size_t> (layer)];
+    for (const auto* names : { &granularNames(), &layerControlNames() })
+        for (const auto& name : *names)
+            setParameterValue (layerParameterId (layer, name), snapshot.values.getWithDefault (name, parameterValue (layerParameterId (layer, name))));
+    if (snapshot.instrument == nullptr)
+    {
+        clearLayer (layer);
+        return;
+    }
+    slot.latestByLoad = snapshot.latestByLoad;
+    slot.latestLoadId = snapshot.instrument->loadId;
+    slot.autoPositionLoad = snapshot.instrument->loadId;   // POS was already chosen
+    setRootOverride (snapshot.rootOverride, layer);
+    republish (snapshot.instrument, layer);
+    slot.lastPublishedLoad = snapshot.lastPublishedLoad;
+    slot.lastLoadFailed = false;
+    slot.state = LoadState::ready;
+}
+
+bool OspAudioProcessor::removeLayer (int layer)
+{
+    if (layer < 0 || layer >= numLayers || pendingLoads.load() > 0 || ! isLayerOccupied (layer))
+        return false;
+    std::array<LayerSnapshot, numLayers> before;
+    for (int l = 0; l < numLayers; ++l)
+        before[static_cast<std::size_t> (l)] = captureLayer (l);
+    removedLayer = std::make_unique<RemovedLayer>();
+    removedLayer->index = layer;
+    removedLayer->snapshot = before[static_cast<std::size_t> (layer)];
+    // Compact: the layers above move down, so the instrument is always A, A+B or A+B+C.
+    int last = layer;
+    for (int l = layer + 1; l < numLayers; ++l)
+        if (before[static_cast<std::size_t> (l)].instrument != nullptr)
+        {
+            applyLayer (last, before[static_cast<std::size_t> (l)]);
+            last = l;
+        }
+    clearLayer (last);
+    resetLayerControls (last);
+    if (last != layer)
+        undoManager.clearUndoHistory();   // load undo steps name slots that have moved
+    if (editLayer() >= occupiedLayerCount())
+        setEditLayer (std::max (0, occupiedLayerCount() - 1));
+    showMessage ("Removed layer " + layerName (layer) + juce::String::fromUTF8 (" Â· Restore it from the menu"));
+    return true;
+}
+
+bool OspAudioProcessor::canRestoreRemovedLayer() const
+{
+    return removedLayer != nullptr && removedLayer->snapshot.instrument != nullptr && firstFreeLayer() >= 0 && pendingLoads.load() == 0;
+}
+
+bool OspAudioProcessor::restoreRemovedLayer()
+{
+    if (! canRestoreRemovedLayer())
+        return false;
+    const int count = occupiedLayerCount();
+    const int index = std::clamp (removedLayer->index, 0, count);
+    // Make room: the layers from `index` up move one slot up again.
+    for (int l = count - 1; l >= index; --l)
+        applyLayer (l + 1, captureLayer (l));
+    applyLayer (index, removedLayer->snapshot);
+    if (index < count)
+        undoManager.clearUndoHistory();
+    removedLayer.reset();
+    setEditLayer (index);
+    return true;
+}
+
 bool OspAudioProcessor::waitForLoads (int timeoutMs)
 {
     const auto deadline = juce::Time::getMillisecondCounter() + static_cast<juce::uint32> (timeoutMs);
@@ -1033,7 +1281,7 @@ std::unique_ptr<juce::XmlElement> OspAudioProcessor::createStateXml()
 juce::ValueTree OspAudioProcessor::instrumentTree (int layer)
 {
     // Layer A keeps the original "Instrument" tree, so older sessions recall into A.
-    juce::ValueTree tree (layer == 0 ? ids::instrument : ids::instrumentB);
+    juce::ValueTree tree (layer == 0 ? ids::instrument : (layer == 1 ? ids::instrumentB : ids::instrumentC));
     const auto instrument = currentInstrument (layer);
     if (instrument != nullptr)
     {
@@ -1091,10 +1339,11 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml)
     advancedPanelOpen = static_cast<bool> (stateTree.getProperty ("advancedOpen", false));
     currentProgram = static_cast<int> (stateTree.getProperty ("program", 0));
     setEditLayer (static_cast<int> (stateTree.getProperty ("editLayer", 0)));
-    const auto treeA = stateTree.getChildWithName (ids::instrument);
-    const auto treeB = stateTree.getChildWithName (ids::instrumentB);
-    stateTree.removeChild (treeA, nullptr);
-    stateTree.removeChild (treeB, nullptr);
+    const std::array<juce::ValueTree, numLayers> layerTrees { stateTree.getChildWithName (ids::instrument),
+                                                              stateTree.getChildWithName (ids::instrumentB),
+                                                              stateTree.getChildWithName (ids::instrumentC) };
+    for (const auto& tree : layerTrees)
+        stateTree.removeChild (tree, nullptr);
     const int savedVersion = static_cast<int> (stateTree.getProperty ("stateVersion", 1));
     // Before MOVEMENT v2 the three movement knobs were shared by every mode.
     std::array<std::optional<float>, 3> genericMovement;
@@ -1186,11 +1435,45 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml)
                 reset (layerParameterId (layer, name));
     }
 
-    recallInstrument (treeA, 0);
-    if (treeB.isValid() && (treeB.hasProperty ("contentHash") || treeB.getChildWithName ("Set").isValid()))
-        recallInstrument (treeB, 1);
-    else if (currentInstrument (1) != nullptr)
-        clearLayer (1);   // the recalled instrument has no layer B
+    if (savedVersion < 6)
+    {
+        // Before the adaptive layers: no layer C, no layer controls (neutral: START 0,
+        // TUNE 0, centre, 0 dB, forwards, FOLLOW on), the envelope was attack-release only.
+        // The global Sustain becomes every layer's LOOP, and Sustain itself goes back to
+        // Endless so the two can never disagree.
+        auto reset = [this] (const juce::String& id) {
+            if (auto* p = parameters.getParameter (id))
+                p->setValueNotifyingHost (p->getDefaultValue());
+        };
+        const bool endless = parameters.getParameter (ids::sustain)->getValue() >= 0.5f;
+        for (const auto& name : granularNames())
+            reset (layerParameterId (2, name));
+        for (int layer = 0; layer < numLayers; ++layer)
+            for (const auto& name : layerControlNames())
+                reset (layerParameterId (layer, name));
+        for (int layer = 0; layer < numLayers; ++layer)
+            if (auto* loop = parameters.getParameter (layerParameterId (layer, "loop")))
+                loop->setValueNotifyingHost (endless ? 1.0f : 0.0f);
+        if (auto* sustain = parameters.getParameter (ids::sustain))
+            sustain->setValueNotifyingHost (1.0f);
+        for (const auto* id : { &ids::mixX, &ids::mixY, &ids::decay, &ids::sustainLevel })
+            reset (*id);
+    }
+
+    for (int layer = 0; layer < numLayers; ++layer)
+    {
+        const auto& tree = layerTrees[static_cast<std::size_t> (layer)];
+        if (tree.isValid() && (tree.hasProperty ("contentHash") || tree.getChildWithName ("Set").isValid()))
+            recallInstrument (tree, layer);
+        else
+        {
+            if (tree.isValid())
+                recallInstrument (tree, layer);   // a root override without a sample (older sessions)
+            if (currentInstrument (layer) != nullptr)
+                clearLayer (layer);   // the recalled instrument has no such layer
+        }
+    }
+    removedLayer.reset();
 }
 
 void OspAudioProcessor::recallInstrument (const juce::ValueTree& tree, int layer)

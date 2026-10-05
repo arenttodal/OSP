@@ -3,6 +3,7 @@
 #include "core/Prng.h"
 
 #include "analysis/continuation/ContinuationAnalyzer.h"
+#include "engine/LevelContour.h"
 
 #include <algorithm>
 #include <cmath>
@@ -61,12 +62,38 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     // Granular voices never read the recording through: no continuation jumps or grafts.
     strategy = cont->canSustain && ! granularMode ? params.strategy : ContinuationStrategy::off;
     releaseGraftEnabled = params.releaseGraft;
+    // REVERSE reads from the end of the sound back to its start: no continuation walk or
+    // graft (they are made for reading forwards); with LOOP the best loop, mirrored.
+    direction = params.reverse && ! granularMode ? -1.0 : 1.0;
+    reverseLoop = direction < 0.0 && strategy != ContinuationStrategy::off && cont->bestLoop >= 0;
+    if (direction < 0.0)
+    {
+        strategy = ContinuationStrategy::off;
+        releaseGraftEnabled = false;
+    }
+    followContour = params.follow;
+    followGain = 1.0f;
+    followGainStep = 0.0f;
 
     const auto& src = *layer->source;
     baseIncrement = params.increment;
     currentStep = baseIncrement;
-    position = src.startFrame() + std::max (0.0, shape.startOffsetSeconds) * src.sampleRate();
-    endPosition = static_cast<double> (src.numFrames()) + static_cast<double> (sinc->maxReach());
+    const double frames = static_cast<double> (src.numFrames());
+    const double startFraction = std::clamp (params.startFraction, 0.0, 1.0);
+    if (direction > 0.0)
+    {
+        // START moves through what follows the onset (0 = the analysed start).
+        position = src.startFrame() + startFraction * std::max (0.0, frames - src.startFrame())
+                   + std::max (0.0, shape.startOffsetSeconds) * src.sampleRate();
+    }
+    else
+    {
+        // Backwards from where the sound ends (trailing silence skipped).
+        const double trailing = std::max (0.0, currentModel->analysis.envelope.trailingSilenceSeconds) * src.sampleRate();
+        const double soundEnd = std::clamp (frames - trailing, std::min (frames - 1.0, src.startFrame() + 1.0), frames - 1.0);
+        position = soundEnd - startFraction * std::max (0.0, soundEnd - src.startFrame());
+    }
+    endPosition = frames + static_cast<double> (sinc->maxReach());
 
     released = false;
     heldByPedal = false;
@@ -92,10 +119,12 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     dampingGain = 1.0f;
     // Only extra damping: "less damping than recorded" would mean unbounded growth.
     dampingCoef = dbToLinear (-std::clamp (static_cast<double> (shape.dampingDbPerSecond), 0.0, 60.0) / sampleRate);
-    if (shape.attackSoftenSeconds > 0.0f)
+    // A note that starts inside the sound (START, REVERSE) fades in over a few ms: no click.
+    const float softenSeconds = std::max (shape.attackSoftenSeconds, startFraction > 1.0e-6 || direction < 0.0 ? 0.003f : 0.0f);
+    if (softenSeconds > 0.0f)
     {
         attackRamp = 0.0f;
-        attackRampStep = 1.0f / static_cast<float> (shape.attackSoftenSeconds * sampleRate);
+        attackRampStep = 1.0f / static_cast<float> (softenSeconds * sampleRate);
     }
     else
     {
@@ -147,13 +176,15 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
         gLowCoef = static_cast<float> (1.0 - std::exp (-2.0 * std::numbers::pi * 6500.0 / sampleRate));
         gLowL = gLowR = 0.0f;
     }
-    if (granularMode)
+    if (granularMode || direction < 0.0)
     {
-        // The read-through extras (doubling head, Reimagined grains) need a moving read.
+        // The read-through extras (doubling head, Reimagined grains) need a forward read.
         dAmount = 0.0f;
         gAmount = 0.0f;
-        granularSource.start (*layer->source, notesGranular(), sampleRate, shape.seed);
     }
+    if (granularMode)
+        granularSource.start (*layer->source, notesGranular(), sampleRate, shape.seed, &currentModel->analysis.envelope,
+                              currentModel->analysis.source.durationSeconds);
     saturationDrive = 1.0f + 4.0f * std::clamp (shape.saturation, 0.0f, 1.0f);
     saturationNorm = 1.0f / saturationDrive;
     // Drift has its own random stream (so it never changes the continuation's choices)
@@ -188,7 +219,10 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     tAmount = std::clamp (shape.transientPreserve, 0.0f, 1.0f);
     tMix = dbToLinear (std::clamp (shape.transientMixDb, -24.0f, 12.0f)) - 1.0f;
     tRemaining = 0;
-    if (! granularMode && (tAmount > 0.0f || std::abs (tMix) > 1.0e-4f) && layer->transient != nullptr && currentModel->original.transient != nullptr)
+    if (direction < 0.0)
+        tAmount = tMix = 0.0f;   // the transient is at the other end
+    if (! granularMode && direction > 0.0 && (tAmount > 0.0f || std::abs (tMix) > 1.0e-4f) && layer->transient != nullptr
+        && currentModel->original.transient != nullptr)
     {
         const auto& orig = *currentModel->original.transient;
         tStep = orig.sampleRate() / sampleRate;
@@ -308,6 +342,16 @@ void InstrumentVoice::scheduleNextJump() noexcept
     if (graftPending)
     {
         scheduleGraft();
+        return;
+    }
+    if (reverseLoop)
+    {
+        // The best loop read backwards: arriving at its start, carry on from its end.
+        const auto& j = cont->jumps[static_cast<std::size_t> (cont->bestLoop)];
+        pending = j;
+        pending.fromFrame = j.toFrame;
+        pending.toFrame = j.fromFrame;
+        hasPending = position > pending.fromFrame;
         return;
     }
     if (strategy == ContinuationStrategy::off || grafted)
@@ -541,6 +585,16 @@ void InstrumentVoice::updateControl() noexcept
     const float target = (drifting ? dbToLinear (driftLevel) : 1.0f) * static_cast<float> (expressionGain);
     controlGainStep = (target - controlGain) / controlInterval;
 
+    if (! followContour && ! granularMode)
+    {
+        // FOLLOW off: the contour's lift where the read is now, glided over this control period.
+        const double frames = std::max (1.0, static_cast<double> (layer->source->numFrames()));
+        const auto target = static_cast<float> (std::pow (10.0, levelContour::boostDb (currentModel->analysis.envelope,
+                                                                                        currentModel->analysis.source.durationSeconds,
+                                                                                        position / frames) / 20.0));
+        followGainStep = (target - followGain) / controlInterval;
+    }
+
     attackBright *= attackBrightCoef;
     const float bright = shape.brightnessDb + static_cast<float> (driftBright + attackBright + expressionBright);
     const float body = shape.bodyDb;
@@ -666,12 +720,12 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
         }
         else
         {
-            if (! crossfading && hasPending && position >= pending.fromFrame)
+            if (! crossfading && hasPending && (direction > 0.0 ? position >= pending.fromFrame : position <= pending.fromFrame))
                 beginCrossfade();
 
             if (tailEndPosition > 0.0 && position >= tailEndPosition && fadeRemaining == 0)
                 beginFastFade (static_cast<int> (0.05 * sampleRate));
-            if (position >= endPosition)
+            if (direction > 0.0 ? position >= endPosition : position <= 0.0)
             {
                 kill();
                 return;
@@ -710,7 +764,7 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
                 crossfadeGains (static_cast<float> (xProgress / xLength), xCorrelation, gOut, gIn);
                 l = l * gOut + l2 * gIn;
                 r = r * gOut + r2 * gIn;
-                xPosition += currentStep;
+                xPosition += direction * currentStep;
                 xProgress += currentStep;
             }
             if (dAmount > 0.0f)
@@ -732,7 +786,7 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
                 }
                 dPhase += dOmega;
             }
-            position += currentStep;
+            position += direction * currentStep;
             if (tRemaining > 0)
             {
                 const auto& native = *currentModel->original.transient;
@@ -810,6 +864,11 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
 
         controlGain += controlGainStep;
         float g = env * baseGain * std::max (fadeGain, 0.0f) * controlGain * dampingGain * (1.0f + transientExtra) * attackRamp;
+        if (! followContour)
+        {
+            followGain += followGainStep;
+            g *= followGain;
+        }
         transientExtra *= transientCoef;
         dampingGain *= dampingCoef;
         if (attackRamp < 1.0f)

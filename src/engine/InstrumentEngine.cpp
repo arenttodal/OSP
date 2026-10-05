@@ -31,12 +31,20 @@ void InstrumentEngine::prepare (double outputSampleRate, int maximumBlockSize, c
         voice.prepare (sampleRate, config.adsr, interpolator.get(), &liveShaping);
     outputGain = static_cast<float> (dbToGain (config.outputGainDb));
     bufferSize = std::max (16, maximumBlockSize);
-    for (auto& layerChannels : layerBuffer)
-        for (auto& b : layerChannels)
+    for (std::size_t l = 0; l < slots.size(); ++l)
+    {
+        auto& slot = slots[l];
+        for (auto& b : slot.buffer)
             b.assign (static_cast<std::size_t> (bufferSize), 0.0f);
-    liveGranular = config.granular;
+        slot.rootRatio = 1.0;
+        slot.tuneRatio = semitonesToRatio (config.layer[l].tuneSemitones);
+        slot.pitchRatio = slot.rootRatio * slot.tuneRatio;
+        slot.primed = false;
+        refreshLiveGranular (l);
+    }
     blendNow = config.blend;
-    layerPitchRatio.fill (1.0);
+    mixXNow = config.mixX;
+    mixYNow = config.mixY;
     pedalDown = false;
     noteCounter = 0;
     pitchRatio = 1.0;
@@ -71,12 +79,13 @@ void InstrumentEngine::setChannelTimbre (int channel, double timbre01) noexcept
 
 void InstrumentEngine::resetPerformance() noexcept
 {
-    for (auto& takes : layerTake)
-        takes.fill (-1);
     noteCounter = 0;
     sampleClock = 0;
-    for (auto& p : layerPerformance)
-        p.reset (config.seed);
+    for (auto& slot : slots)
+    {
+        slot.take.fill (-1);
+        slot.performance.reset (config.seed);
+    }
     // Tape and drift randomness and reverb tails restart too: a bounce from the same
     // position repeats exactly.
     post.reset();
@@ -105,7 +114,7 @@ void InstrumentEngine::publishGrains() noexcept
     GranularSource::GrainView views[GranularSource::maxGrains];
     for (int layer = 0; layer < EngineSettings::layers; ++layer)
     {
-        auto& snapshot = grainSnapshots[static_cast<std::size_t> (layer)];
+        auto& snapshot = slots[static_cast<std::size_t> (layer)].grains;
         int n = 0;
         for (const auto& voice : voices)
         {
@@ -168,21 +177,126 @@ void InstrumentEngine::granularLife (NoteShape& shape, int note, std::uint64_t e
 
 void InstrumentEngine::setLayerPitchOffsetSemitones (int layer, double semitones) noexcept
 {
-    layerPitchRatio[layerIndex (layer)] = semitonesToRatio (semitones);
+    auto& slot = slots[layerIndex (layer)];
+    slot.rootRatio = semitonesToRatio (semitones);
+    slot.pitchRatio = slot.rootRatio * slot.tuneRatio;
+}
+
+void InstrumentEngine::setLayerSettings (int layer, const LayerSettings& settings) noexcept
+{
+    const auto l = layerIndex (layer);
+    config.layer[l] = settings;
+    auto& slot = slots[l];
+    slot.tuneRatio = semitonesToRatio (std::clamp (settings.tuneSemitones, -48.0, 48.0));
+    slot.pitchRatio = slot.rootRatio * slot.tuneRatio;
+    refreshLiveGranular (l);
+}
+
+void InstrumentEngine::refreshLiveGranular (std::size_t l) noexcept
+{
+    // Granular reads START as an offset of POS, and the layer's REVERSE and FOLLOW.
+    auto g = config.granular[l];
+    const auto& layer = config.layer[l];
+    g.position = std::clamp (g.position + layer.start, 0.0, 1.0);
+    g.reverse = layer.reverse;
+    g.follow = layer.follow;
+    slots[l].liveGranular = g;
+}
+
+std::array<double, 3> InstrumentEngine::triangleShares (double x, double y) noexcept
+{
+    // Corners: A (0, 0), B (0.5, 1), C (1, 0). Outside the triangle the nearest shares are
+    // used (negative ones clipped, the rest renormalised).
+    x = std::clamp (x, 0.0, 1.0);
+    y = std::clamp (y, 0.0, 1.0);
+    std::array<double, 3> share { 1.0 - x - 0.5 * y, y, x - 0.5 * y };
+    double total = 0.0;
+    for (auto& v : share)
+    {
+        v = std::max (0.0, v);
+        total += v;
+    }
+    if (total <= 1.0e-12)
+        return { 1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0 };
+    for (auto& v : share)
+        v /= total;
+    return share;
+}
+
+LayerMixWeights InstrumentEngine::mixWeights (const std::array<bool, 3>& occupied, double blend, double x, double y) noexcept
+{
+    LayerMixWeights w;
+    int count = 0;
+    std::array<int, 3> which {};
+    for (int l = 0; l < 3; ++l)
+        if (occupied[static_cast<std::size_t> (l)])
+            which[static_cast<std::size_t> (count++)] = l;
+    if (count == 1)
+        w.gain[static_cast<std::size_t> (which[0])] = 1.0;
+    else if (count == 2)
+    {
+        // The A/B blend (equal power): exactly the two-layer engine's crossfade.
+        const double b = std::clamp (blend, 0.0, 1.0);
+        w.gain[static_cast<std::size_t> (which[0])] = std::cos (0.5 * std::numbers::pi * b);
+        w.gain[static_cast<std::size_t> (which[1])] = std::sin (0.5 * std::numbers::pi * b);
+    }
+    else if (count == 3)
+    {
+        // Constant power: the shares are powers, so all three at the centre add up like one.
+        const auto share = triangleShares (x, y);
+        for (std::size_t l = 0; l < 3; ++l)
+            w.gain[l] = std::sqrt (share[l]);
+    }
+    return w;
+}
+
+std::array<bool, 3> InstrumentEngine::occupiedLayers() const noexcept
+{
+    std::array<bool, 3> occupied {};
+    for (int l = 0; l < EngineSettings::layers; ++l)
+        occupied[static_cast<std::size_t> (l)] = isLayerOccupied (l);
+    return occupied;
+}
+
+int InstrumentEngine::occupiedLayerCount() const noexcept
+{
+    int count = 0;
+    for (int l = 0; l < EngineSettings::layers; ++l)
+        count += isLayerOccupied (l) ? 1 : 0;
+    return count;
+}
+
+int InstrumentEngine::musicalVoiceCount() const noexcept
+{
+    // The voices of one note-on share their start order, whichever layers they play.
+    std::array<std::uint64_t, totalSlots> seen;
+    int count = 0;
+    for (const auto& voice : voices)
+    {
+        if (! voice.isActive() || voice.isFading())
+            continue;
+        bool known = false;
+        for (int i = 0; i < count && ! known; ++i)
+            known = seen[static_cast<std::size_t> (i)] == voice.startOrder();
+        if (! known)
+            seen[static_cast<std::size_t> (count++)] = voice.startOrder();
+    }
+    return count;
 }
 
 int InstrumentEngine::memberFor (int note, int velocity, std::uint64_t eventIndex, int layerNumber) const noexcept
 {
     const auto which = layerIndex (layerNumber);
-    if (layerSet[which] == nullptr || layerSet[which]->groups.empty())
+    const auto* set = slots[which].set;
+    if (set == nullptr || set->groups.empty())
         return -1;
     // Nearest pitch anchor.
-    const PitchGroup* group = &layerSet[which]->groups.front();
+    const PitchGroup* group = &set->groups.front();
     int groupIndex = 0;
-    for (int g = 0; g < static_cast<int> (layerSet[which]->groups.size()); ++g)
-        if (std::abs (layerSet[which]->groups[static_cast<std::size_t> (g)].rootMidi - note) < std::abs (group->rootMidi - note))
+    for (int g = 0; g < static_cast<int> (set->groups.size()); ++g)
+        if (std::abs (set->groups[static_cast<std::size_t> (g)].rootMidi - note) < std::abs (group->rootMidi - note))
         {
-            group = &layerSet[which]->groups[static_cast<std::size_t> (g)];
+            group = &set->groups[static_cast<std::size_t> (g)];
             groupIndex = g;
         }
     // Velocity layer, then a round-robin take that is never the previous one.
@@ -191,7 +305,7 @@ int InstrumentEngine::memberFor (int note, int velocity, std::uint64_t eventInde
     int chosenLayer = -1;
     for (int id : group->members)
     {
-        const auto& m = layerSet[which]->members[static_cast<std::size_t> (id)];
+        const auto& m = set->members[static_cast<std::size_t> (id)];
         if (m.role != SampleRole::articulation && (chosenLayer < 0 || std::abs (m.layer - layer) < std::abs (chosenLayer - layer)))
             chosenLayer = m.layer;
     }
@@ -199,7 +313,7 @@ int InstrumentEngine::memberFor (int note, int velocity, std::uint64_t eventInde
     int count = 0;
     for (int id : group->members)
     {
-        const auto& m = layerSet[which]->members[static_cast<std::size_t> (id)];
+        const auto& m = set->members[static_cast<std::size_t> (id)];
         if (m.role != SampleRole::articulation && m.layer == chosenLayer && count < 64)
             candidates[count++] = id;
     }
@@ -208,12 +322,12 @@ int InstrumentEngine::memberFor (int note, int velocity, std::uint64_t eventInde
     if (count == 1)
         return candidates[0];
     const auto key = static_cast<std::size_t> ((groupIndex % 64) * 8 + std::min (chosenLayer, 7));
-    const int previous = layerTake[which][key];
+    const int previous = slots[which].take[key];
     Prng rng (Prng::deriveSeed (config.seed, eventIndex, static_cast<std::uint64_t> (note) + 0x7272));
     for (int attempt = 0; attempt < 8; ++attempt)
     {
         const int pick = candidates[rng.nextBelow (static_cast<std::uint64_t> (count))];
-        if (layerSet[which]->members[static_cast<std::size_t> (pick)].take != previous)
+        if (set->members[static_cast<std::size_t> (pick)].take != previous)
             return pick;
     }
     return candidates[0];
@@ -370,32 +484,35 @@ NoteShape InstrumentEngine::shapeFor (const InstrumentModel* model, int note, in
     if (model != nullptr)
     {
         auto dynamics = model->dynamics;
-        if (layered && layerSet[context] != nullptr && layerSet[context]->hasDynamicsModel && layerSet[context]->layerStepDb > 0.5)
+        const auto* set = slots[context].set;
+        if (layered && set != nullptr && set->hasDynamicsModel && set->layerStepDb > 0.5)
         {
             // Multi-velocity learning (spec §35): one layer step is this far apart in
             // applyDynamics' intensity, and should change timbre as much as the real
             // recordings do, so a layer played softer approaches the layer below it.
-            const double stepIntensity = layerSet[context]->layerStepDb * 127.0 / std::max (levelRangeDb(), 6.0) / 80.0;
+            const double stepIntensity = set->layerStepDb * 127.0 / std::max (levelRangeDb(), 6.0) / 80.0;
             // About 2 dB of shelf per semitone of centroid; full mode applies 0.8 x brightnessDb.
-            dynamics.brightnessDb = std::clamp (2.0 * layerSet[context]->layerStepBrightnessSt / (0.8 * stepIntensity), -6.0, 18.0);
-            dynamics.attackSoftenMs = std::clamp (-layerSet[context]->layerStepAttackMs / stepIntensity, 0.0, 80.0);
+            dynamics.brightnessDb = std::clamp (2.0 * set->layerStepBrightnessSt / (0.8 * stepIntensity), -6.0, 18.0);
+            dynamics.attackSoftenMs = std::clamp (-set->layerStepAttackMs / stepIntensity, 0.0, 80.0);
         }
         // How much velocity reshapes the sound depends on the source (lab, dynamics-1):
         // sustained bowed/blown sources preferred velocity as level only, plucks the full
         // model at twice the calibrated strength. Real velocity layers (a set's learned
         // dynamics) speak for themselves and are not scaled.
-        const double sourceScale = layered && layerSet[context] != nullptr && layerSet[context]->hasDynamicsModel
+        const double sourceScale = layered && set != nullptr && set->hasDynamicsModel
                                        ? 1.0
                                        : std::clamp (0.25 + 3.2 * model->character.transientTonal, 0.25, 2.0);
         applyDynamics (shape, velocity, dynamics, model->character, config.macros.dynamics * sourceScale, config.dynamicsMode, referenceVelocity);
-        layerPerformance[context].perform (shape, note, velocity, static_cast<double> (sampleClock) / sampleRate, eventIndex,
+        slots[context].performance.perform (shape, note, velocity, static_cast<double> (sampleClock) / sampleRate, eventIndex,
                              model->performance, model->character, config.macros.life, config.shaping);
     }
     const auto* modelForMotion = model;
 
     const double r = std::clamp (config.macros.reimagined, 0.0, 1.0);
     const double motion = std::clamp (config.macros.motion, 0.0, 1.0);
-    if (config.continuation == ContinuationStrategy::multiLoopMovement && modelForMotion != nullptr)
+    // (As before the adaptive layers, a sound played once - LOOP off, or Sustain "Recording" -
+    // keeps its own pitch and tone: no per-voice wander.)
+    if (config.continuation == ContinuationStrategy::multiLoopMovement && config.layer[context].loop && modelForMotion != nullptr)
     {
         // MOVEMENT (shaping system v1.0 §32-34). DRIFT lives in the voices: slow,
         // smoothed random wander of pitch, CHARACTER position, level and pan, at the
@@ -432,23 +549,22 @@ void InstrumentEngine::noteOn (int note, int velocity, int channel) noexcept
     }
     // DYNAMICS curve: SOFT reaches expressive levels easily, HARD needs a firm touch.
     velocity = shaping::curvedVelocity (config.shaping.velocityCurve, velocity);
-    bool any = false;
-    for (const auto* m : layerModel)
-        any = any || (m != nullptr && m->isValid());
-    if (! any)
+    if (occupiedLayerCount() == 0)
         return;
-    // One event for both layers (same note order and performance memory); layer B
-    // draws its own randomness from a salted index.
+    // One event for every layer (same note order and performance memory); layers B and C
+    // draw their own randomness from a salted index.
     const std::uint64_t eventIndex = noteCounter++;
     post.noteStarted();   // without a running transport SHAPER starts its pattern here
+    static constexpr std::array<std::uint64_t, 3> salt { 0, 0x4c61796572420000ull, 0x4c61796572430000ull };
     for (int layer = 0; layer < EngineSettings::layers; ++layer)
-        noteOnLayer (layer, note, velocity, channel, layer == 0 ? eventIndex : (eventIndex ^ 0x4c61796572420000ull));
+        noteOnLayer (layer, note, velocity, channel, eventIndex ^ salt[static_cast<std::size_t> (layer)]);
 }
 
 void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int channel, std::uint64_t eventIndex) noexcept
 {
     context = layerIndex (layerNumber);
-    const InstrumentModel* model = layerModel[context];
+    const InstrumentModel* model = slots[context].model;
+    const auto* set = slots[context].set;
     if (model == nullptr || ! model->isValid())
         return;
 
@@ -471,25 +587,25 @@ void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int
     double referenceVelocity = 100.0;
     double registerDb = 0.0;
     bool setMember = false, layered = false;
-    if (layerSet[context] != nullptr && layerSet[context]->members.size() > 1)
+    if (set != nullptr && set->members.size() > 1)
     {
         const int index = memberFor (note, velocity, eventIndex, layerNumber);
         if (index >= 0)
         {
-            const auto& member = layerSet[context]->members[static_cast<std::size_t> (index)];
-            const auto& group = layerSet[context]->groups[static_cast<std::size_t> (member.pitchGroup)];
+            const auto& member = set->members[static_cast<std::size_t> (index)];
+            const auto& group = set->groups[static_cast<std::size_t> (member.pitchGroup)];
             model = member.model.get();
             const auto key = static_cast<std::size_t> ((member.pitchGroup % 64) * 8 + std::min (member.layer, 7));
-            layerTake[context][key] = static_cast<std::int8_t> (member.take);
+            slots[context].take[key] = static_cast<std::int8_t> (member.take);
             // Loudness-anchored: the loudest layer belongs at velocity 127, a softer one as
             // much lower as the velocity range says its level is (round-robin takes keep
             // their own differences around their layer).
             setMember = true;
             layered = group.layers > 1;
-            referenceVelocity = std::clamp (127.0 - (layerSet[context]->loudestDb - member.layerLoudnessDb) * 127.0 / std::max (levelRangeDb(), 6.0),
+            referenceVelocity = std::clamp (127.0 - (set->loudestDb - member.layerLoudnessDb) * 127.0 / std::max (levelRangeDb(), 6.0),
                                             1.0, 127.0);
-            if (layerSet[context]->hasRegisterModel)
-                registerDb = std::clamp (1.5 * layerSet[context]->brightnessSlope * (note - group.rootMidi), -8.0, 8.0);
+            if (set->hasRegisterModel)
+                registerDb = std::clamp (1.5 * set->brightnessSlope * (note - group.rootMidi), -8.0, 8.0);
         }
     }
     InstrumentVoiceStart params;
@@ -531,11 +647,16 @@ void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int
     const auto& src = *params.layer->source;
     params.increment = semitonesToRatio (static_cast<double> (note) - src.rootMidi()) * (src.sampleRate() / sampleRate);
     params.startOrder = noteCounter - 1;   // both layers' voices of a note share their age
-    params.strategy = config.continuation;
+    const auto& layerSettings = config.layer[context];
+    // LOOP off: the layer plays its recording once (Sustain in Advanced still applies to all).
+    params.strategy = layerSettings.loop ? config.continuation : ContinuationStrategy::off;
     params.releaseGraft = config.releaseGraft;
     params.layerIndex = layerNumber;
     params.sourceMode = config.sourceMode[context];
-    params.granular = &liveGranular[context];
+    params.granular = &slots[context].liveGranular;
+    params.startFraction = layerSettings.start;
+    params.reverse = layerSettings.reverse;
+    params.follow = layerSettings.follow;
     if (params.sourceMode == SourceMode::granular)
         granularLife (params.shape, note, eventIndex);
     slot->start (params);
@@ -574,6 +695,8 @@ void InstrumentEngine::reset() noexcept
     pedalDown = false;
     for (auto& voice : voices)
         voice.kill();
+    for (auto& slot : slots)
+        slot.primed = false;
     post.reset();
 }
 
@@ -596,55 +719,102 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
         voice.setExpression (5.0f * pressure, 5.0f * pressure + 10.0f * channelTimbre[ch]);
     }
 
-    // Each layer renders apart, then the equal-power A/B blend (smoothed, about 20 ms).
+    // Each layer renders apart, then the mix: its weight (one layer alone, two by the
+    // equal-power blend, three by the triangle; the controls smoothed over about 20 ms)
+    // times LEVEL and PAN. Gains glide from block to block; a sudden change (a layer loaded
+    // or emptied, a LEVEL jump) takes at least 10 ms.
     const double blendStep = 1.0 / (0.02 * sampleRate);
+    const auto maxGainStep = static_cast<float> (1.0 / (0.01 * sampleRate));
     const bool mono = left == right;
+    const auto occupied = occupiedLayers();
+    auto towards = [] (double now, double target, double step) {
+        return target > now ? std::min (target, now + step) : std::max (target, now - step);
+    };
     for (int done = 0; done < numSamples;)
     {
         const int n = std::min (bufferSize, numSamples - done);
-        const double blendFrom = blendNow;
-        const double blendTo = config.blend > blendNow ? std::min (config.blend, blendNow + blendStep * n)
-                                                       : std::max (config.blend, blendNow - blendStep * n);
-        blendNow = blendTo;
+        blendNow = towards (blendNow, config.blend, blendStep * n);
+        mixXNow = towards (mixXNow, config.mixX, blendStep * n);
+        mixYNow = towards (mixYNow, config.mixY, blendStep * n);
+        const auto weights = mixWeights (occupied, blendNow, mixXNow, mixYNow);
         for (int layer = 0; layer < EngineSettings::layers; ++layer)
         {
-            auto& bl = layerBuffer[static_cast<std::size_t> (layer)][0];
-            auto& br = layerBuffer[static_cast<std::size_t> (layer)][1];
+            auto& slot = slots[static_cast<std::size_t> (layer)];
+            const auto& settings = config.layer[static_cast<std::size_t> (layer)];
+            const double level = settings.levelDb <= LayerSettings::minLevelDb ? 0.0 : dbToGain (std::min (settings.levelDb, 12.0));
+            const double pan = std::clamp (settings.pan, -1.0, 1.0);
+            const double weight = weights.gain[static_cast<std::size_t> (layer)] * level;
+            const float targetLeft = static_cast<float> (weight * (pan > 0.0 ? 1.0 - pan : 1.0));
+            const float targetRight = static_cast<float> (weight * (pan < 0.0 ? 1.0 + pan : 1.0));
+
             bool sounding = false;
+            for (const auto& voice : voices)
+                if (voice.isActive() && voice.layerIndex() == layer)
+                {
+                    sounding = true;
+                    break;
+                }
+            if (! sounding || ! slot.primed)
+            {
+                // Nothing to click: the gains may jump.
+                slot.gainLeft = targetLeft;
+                slot.gainRight = targetRight;
+                slot.primed = true;
+                if (! sounding)
+                    continue;
+            }
+            const float l0 = slot.gainLeft, r0 = slot.gainRight;
+            const float limit = maxGainStep * static_cast<float> (n);
+            const float l1 = std::clamp (targetLeft, l0 - limit, l0 + limit);
+            const float r1 = std::clamp (targetRight, r0 - limit, r0 + limit);
+            slot.gainLeft = l1;
+            slot.gainRight = r1;
+
+            if (l0 == 0.0f && l1 == 0.0f && r0 == 0.0f && r1 == 0.0f)
+            {
+                // A silent layer is not rendered: held notes wait for it to come back,
+                // released ones end, and an emptied layer's notes all end.
+                for (auto& voice : voices)
+                    if (voice.isActive() && voice.layerIndex() == layer && (voice.isReleased() || ! occupied[static_cast<std::size_t> (layer)]))
+                        voice.kill();
+                continue;
+            }
+
+            auto& bl = slot.buffer[0];
+            auto& br = slot.buffer[1];
+            std::fill_n (bl.begin(), n, 0.0f);
+            std::fill_n (br.begin(), n, 0.0f);
             for (auto& voice : voices)
             {
                 if (! voice.isActive() || voice.layerIndex() != layer)
                     continue;
-                if (! sounding)
-                {
-                    std::fill_n (bl.begin(), n, 0.0f);
-                    std::fill_n (br.begin(), n, 0.0f);
-                    sounding = true;
-                }
                 const auto ch = static_cast<std::size_t> (mpe ? std::clamp (voice.channel(), 1, 16) : 1);
-                voice.render (bl.data(), mono ? bl.data() : br.data(), n, pitchRatio * layerPitchRatio[static_cast<std::size_t> (layer)] * (mpe ? channelBendRatio[ch] : 1.0),
+                voice.render (bl.data(), mono ? bl.data() : br.data(), n, pitchRatio * slot.pitchRatio * (mpe ? channelBendRatio[ch] : 1.0),
                               sampleClock + done);
             }
-            if (! sounding)
-                continue;
-            auto gainAt = [layer] (double b) {
-                return static_cast<float> (layer == 0 ? std::cos (0.5 * std::numbers::pi * b) : std::sin (0.5 * std::numbers::pi * b));
-            };
-            const float g0 = gainAt (blendFrom), g1 = gainAt (blendTo);
             for (int i = 0; i < n; ++i)
             {
-                const float g = g0 == g1 ? g0 : g0 + (g1 - g0) * static_cast<float> (i + 1) / static_cast<float> (n);
-                left[done + i] += bl[static_cast<std::size_t> (i)] * g;
+                const float gl = l0 == l1 ? l0 : l0 + (l1 - l0) * static_cast<float> (i + 1) / static_cast<float> (n);
+                left[done + i] += bl[static_cast<std::size_t> (i)] * gl;
                 if (! mono)
-                    right[done + i] += br[static_cast<std::size_t> (i)] * g;
+                {
+                    const float gr = r0 == r1 ? r0 : r0 + (r1 - r0) * static_cast<float> (i + 1) / static_cast<float> (n);
+                    right[done + i] += br[static_cast<std::size_t> (i)] * gr;
+                }
             }
         }
         done += n;
     }
     sampleClock += numSamples;
-    // The shared post stage's resonances follow the louder layer.
-    const auto main = config.blend <= 0.5 ? (layerModel[0] != nullptr ? 0 : 1) : (layerModel[1] != nullptr ? 1 : 0);
-    post.setModel (layerModel[static_cast<std::size_t> (main)]);
+    // The shared post stage's resonances follow the loudest layer (the first of equals).
+    {
+        const auto weights = mixWeights (occupied, config.blend, config.mixX, config.mixY);
+        int main = -1;
+        for (int l = 0; l < EngineSettings::layers; ++l)
+            if (occupied[static_cast<std::size_t> (l)] && (main < 0 || weights.gain[static_cast<std::size_t> (l)] > weights.gain[static_cast<std::size_t> (main)] + 1.0e-9))
+                main = l;
+        post.setModel (main >= 0 ? slots[static_cast<std::size_t> (main)].model : nullptr);
+    }
     post.setVoicesActive (activeVoiceCount() > 0);
     post.process (left, right, numSamples);
     publishGrains();

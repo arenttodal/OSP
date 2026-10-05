@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/Prng.h"
+#include "model/AnalysisData.h"
 #include "model/PlaybackSource.h"
 
 #include <array>
@@ -20,6 +21,8 @@ struct GranularParams
     double density = 14.0;        ///< grains per second, 4..40
     double tuneSemitones = 0.0;   ///< grain pitch on top of the played note, -12..12
     double spread = 0.2;          ///< 0..1: how far around POS grains are taken
+    bool reverse = false;         ///< layer REVERSE: every grain reads backwards
+    bool follow = true;           ///< layer FOLLOW off: grains from quiet parts are lifted (levelContour)
 };
 
 /**
@@ -37,7 +40,9 @@ class GranularSource
 public:
     static constexpr int maxGrains = 24;
 
-    void start (const PlaybackSource& source, const GranularParams& params, double outputSampleRate, std::uint64_t seed) noexcept;
+    /** `envelope` / `durationSeconds`: the recording's loudness contour (FOLLOW off), may be null. */
+    void start (const PlaybackSource& source, const GranularParams& params, double outputSampleRate, std::uint64_t seed,
+                const EnvelopeAnalysis* envelope = nullptr, double durationSeconds = 0.0) noexcept;
     void setParams (const GranularParams& params) noexcept { settings = params; }
     void stopSpawning() noexcept { spawning = false; }
     bool isFinished() const noexcept { return ! spawning && activeGrains == 0; }
@@ -60,6 +65,8 @@ private:
     {
         double position = 0.0, ratio = 1.0;
         double c = 1.0, s = 0.0, cd = 1.0, sd = 0.0;   // Hann window by rotation
+        double direction = 1.0;                       // -1: REVERSE
+        float gain = 1.0f;                            // FOLLOW off: lift from the loudness contour
         int remaining = 0;
         float lane = 0.5f;
         bool active = false;
@@ -69,6 +76,8 @@ private:
     float read (int channel, double pos) const noexcept;
 
     const PlaybackSource* src = nullptr;
+    const EnvelopeAnalysis* contour = nullptr;
+    double contourSeconds = 0.0;
     GranularParams settings;
     double sampleRate = 48000.0;
     Prng rng;

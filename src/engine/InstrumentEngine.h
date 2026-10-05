@@ -37,10 +37,34 @@ enum class DynamicsMode
     full          ///< C: dynamic performance model (transient, tilt, attack bite, body, pitch, damping)
 };
 
+/**
+    A source layer's own controls (adaptive 1-3 layer redesign): START, TUNE, PAN, LEVEL
+    and the source modifiers REVERSE, LOOP and FOLLOW. LINK lives in the plugin (it moves
+    the other linked layers' controls). Real-time safe to change.
+*/
+struct LayerSettings
+{
+    static constexpr double minLevelDb = -48.0;   ///< LEVEL at (or below) this is silence
+
+    double start = 0.0;           ///< START 0..1: One Shot starts this far into the sound; Granular adds it to POS
+    double tuneSemitones = 0.0;   ///< TUNE, on top of the root correction (-24..24)
+    double pan = 0.0;             ///< PAN -1 (left) .. 1 (right), a balance (centre leaves the layer untouched)
+    double levelDb = 0.0;         ///< LEVEL trim before the mix (-48 = silent .. +6)
+    bool reverse = false;         ///< REVERSE: One Shot reads backwards, grains read backwards
+    bool loop = true;             ///< LOOP (One Shot): sustain by the recording's own loops; off: play it once
+    bool follow = true;           ///< FOLLOW: keep the recording's own loudness contour (off: flatten it)
+};
+
+/** How loud each layer is in the mix (before its LEVEL and PAN). */
+struct LayerMixWeights
+{
+    std::array<double, 3> gain {};
+};
+
 struct EngineSettings
 {
     static constexpr int maxPolyphony = 64;   ///< per layer
-    static constexpr int layers = 2;          ///< A/B source layers
+    static constexpr int layers = 3;          ///< source layers A, B, C (adaptive: 1-3 are used)
 
     int polyphony = 24;
     AdsrSettings adsr { 0.002, 0.0, 1.0, 0.35 };
@@ -58,9 +82,11 @@ struct EngineSettings
     DynamicsMode dynamicsMode = DynamicsMode::full;
     Macros macros;
     Shaping shaping;                     ///< what each macro does (popups); see engine/Shaping.h
-    double blend = 0.0;                  ///< A/B: 0 = only A, 1 = only B (equal-power)
-    std::array<SourceMode, layers> sourceMode { SourceMode::oneShot, SourceMode::oneShot };
+    double blend = 0.0;                  ///< two layers: 0 = only the first, 1 = only the second (equal-power)
+    double mixX = 0.5, mixY = 1.0 / 3.0; ///< three layers: position in the A (left) / B (top) / C (right) triangle
+    std::array<SourceMode, layers> sourceMode { SourceMode::oneShot, SourceMode::oneShot, SourceMode::oneShot };
     std::array<GranularParams, layers> granular {};
+    std::array<LayerSettings, layers> layer {};
 };
 
 /**
@@ -68,13 +94,20 @@ struct EngineSettings
     immutable InstrumentModel with continuation, release grafting and per-note
     performance shapes. Baselines A and B stay in BaselineSampler.
 
-    Two source layers (A/B): each holds its own model or set, root shift and source mode
-    (One Shot reads the recording through; Granular plays grains around POS). Every note
-    starts a voice on each loaded layer; the layers are rendered apart, blended with an
-    equal-power crossfade and then share one post stage (Reimagined resonance, MOVEMENT,
-    SPACE). The per-voice macro stages (LIFE, DYNAMICS, CHARACTER) use the same settings
-    on both layers. With only layer A loaded and the blend at A, output is exactly the
-    single-layer engine's.
+    Up to three source layers (A, B, C; adaptive: the instrument grows with the sounds it
+    is given). Each holds its own model or set, root shift, source mode (One Shot reads the
+    recording through; Granular plays grains around POS) and layer controls (START, TUNE,
+    PAN, LEVEL, REVERSE, LOOP, FOLLOW). Every note starts a voice on each loaded layer; the
+    layers are rendered apart, weighted by the mix (mixWeights: one layer plays alone, two
+    crossfade with the equal-power blend, three by their place in a triangle, constant
+    power), trimmed and panned, and then share ONE post stage (Reimagined resonance,
+    MOVEMENT, SPACE). The per-voice macro stages (LIFE, DYNAMICS, CHARACTER) use the same
+    settings on every layer. With one layer and neutral layer controls the output is
+    exactly the single-layer engine's.
+
+    A layer whose mix gain is zero is not rendered: its held notes wait (and continue when
+    the layer is faded back in), released ones end, and a layer that was emptied ends all
+    its notes once it has faded out.
 
     Threading: prepare() allocates (call off the audio thread). setModel(), the note
     functions, runtime setters and render() are real-time safe.
@@ -89,9 +122,9 @@ public:
     /** The model must stay alive while any voice may use it (see isModelInUse). */
     void setModel (const InstrumentModel* model, int layer = 0) noexcept
     {
-        const auto l = layerIndex (layer);
-        layerModel[l] = model;
-        layerSet[l] = nullptr;
+        auto& slot = slots[layerIndex (layer)];
+        slot.model = model;
+        slot.set = nullptr;
     }
 
     /**
@@ -101,27 +134,55 @@ public:
     */
     void setInstrumentSet (const InstrumentSet* set, int layer = 0) noexcept
     {
-        const auto l = layerIndex (layer);
-        layerSet[l] = set;
-        layerModel[l] = set != nullptr && set->isValid() ? set->members[static_cast<std::size_t> (set->primary)].model.get() : nullptr;
+        auto& slot = slots[layerIndex (layer)];
+        slot.set = set;
+        slot.model = set != nullptr && set->isValid() ? set->members[static_cast<std::size_t> (set->primary)].model.get() : nullptr;
     }
     bool isSetInUse (const InstrumentSet* set) const noexcept;
     void killVoicesUsing (const InstrumentSet* set) noexcept;
-    const InstrumentModel* model (int layer = 0) const noexcept { return layerModel[layerIndex (layer)]; }
+    const InstrumentModel* model (int layer = 0) const noexcept { return slots[layerIndex (layer)].model; }
+    /** Layers holding a playable sound. */
+    bool isLayerOccupied (int layer) const noexcept
+    {
+        const auto* m = slots[layerIndex (layer)].model;
+        return m != nullptr && m->isValid();
+    }
+    int occupiedLayerCount() const noexcept;
 
-    // A/B layers
-    /** 0 = only A, 1 = only B; equal-power, smoothed over about 20 ms. */
+    // Source layers and their mix
+    /** Two layers: 0 = only the first, 1 = only the second; equal-power, smoothed over about 20 ms. */
     void setBlend (double blend) noexcept { config.blend = std::clamp (blend, 0.0, 1.0); }
-    /** A layer's own pitch shift (its root correction), on top of setPitchOffsetSemitones. */
+    /** Three layers: the position in the mix triangle (x 0..1 left to right, y 0..1 bottom to top). */
+    void setMixPosition (double x, double y) noexcept
+    {
+        config.mixX = std::clamp (x, 0.0, 1.0);
+        config.mixY = std::clamp (y, 0.0, 1.0);
+    }
+    /**
+        The mix gain of every layer (pure): one occupied layer plays at unity; two crossfade
+        with the equal-power `blend` (cos/sin); three take their barycentric share of the
+        triangle position (A bottom left, B top, C bottom right) as power (sqrt), so the
+        total power stays constant wherever the position is. Unoccupied layers get 0.
+    */
+    static LayerMixWeights mixWeights (const std::array<bool, 3>& occupied, double blend, double x, double y) noexcept;
+    /** Barycentric (A, B, C) shares of a triangle position (pure; clamped into the triangle). */
+    static std::array<double, 3> triangleShares (double x, double y) noexcept;
+
+    /** A layer's own pitch shift (its root correction), on top of setPitchOffsetSemitones and TUNE. */
     void setLayerPitchOffsetSemitones (int layer, double semitones) noexcept;
+    /** START, TUNE, PAN, LEVEL and the modifiers. START, REVERSE and LOOP apply to notes
+        started afterwards (Granular: live); TUNE, PAN, LEVEL and FOLLOW apply live. */
+    void setLayerSettings (int layer, const LayerSettings& settings) noexcept;
     /** The source mode applies to notes started afterwards; granular settings apply live. */
     void setSourceMode (int layer, SourceMode mode) noexcept { config.sourceMode[layerIndex (layer)] = mode; }
     void setGranular (int layer, const GranularParams& params) noexcept
     {
         config.granular[layerIndex (layer)] = params;
-        liveGranular[layerIndex (layer)] = params;
+        refreshLiveGranular (layerIndex (layer));
     }
     int activeVoiceCount (int layer) const noexcept;
+    /** Played notes (a note sounding on three layers counts once): what a musician calls voices. */
+    int musicalVoiceCount() const noexcept;
 
     /**
         What the voices of a layer are doing, for the display (grains, One Shot read heads): written by the audio
@@ -138,7 +199,7 @@ public:
         std::array<std::atomic<float>, playheadCapacity> playheadPosition {}, playheadLevel {};
         std::atomic<int> playheads { 0 };
     };
-    const GrainSnapshot& grainSnapshot (int layer) const noexcept { return grainSnapshots[layerIndex (layer)]; }
+    const GrainSnapshot& grainSnapshot (int layer) const noexcept { return slots[layerIndex (layer)].grains; }
 
     static int requiredSourcePaddingFor (int interpolationZeroCrossings) noexcept
     {
@@ -222,7 +283,7 @@ public:
     NoteShape shapeFor (int note, int velocity, std::uint64_t eventIndex) noexcept
     {
         context = 0;
-        return shapeFor (layerModel[0], note, velocity, eventIndex, 100.0, 0.0);
+        return shapeFor (slots[0].model, note, velocity, eventIndex, 100.0, 0.0);
     }
     /** `setMember`: the model is one recording of a set and `referenceVelocity` is the
         velocity at which its own recorded loudness belongs (loudness-anchored), so every
@@ -238,35 +299,45 @@ private:
     static constexpr int tailSlots = 16;
     static constexpr int totalSlots = EngineSettings::layers * EngineSettings::maxPolyphony + tailSlots;
 
+    /** Everything one source layer owns at run time (the engine-side EngineSlot). */
+    struct Slot
+    {
+        const InstrumentModel* model = nullptr;
+        const InstrumentSet* set = nullptr;
+        std::array<std::int8_t, 512> take {};   ///< last round-robin take per (group, velocity layer)
+        double rootRatio = 1.0, tuneRatio = 1.0;
+        double pitchRatio = 1.0;                ///< root correction x TUNE
+        GranularParams liveGranular;            ///< read by granular voices (START, REVERSE, FOLLOW applied)
+        std::array<std::vector<float>, 2> buffer;   ///< render buffer, allocated in prepare()
+        PerformanceEngine performance;          ///< same seed on every layer: they perform together
+        GrainSnapshot grains;
+        float gainLeft = 0.0f, gainRight = 0.0f;   ///< mix x LEVEL x PAN applied at the end of the last block
+        bool primed = false;                    ///< gains valid (false after prepare/reset: no ramp from 0)
+    };
+
     static std::size_t layerIndex (int layer) noexcept { return static_cast<std::size_t> (std::clamp (layer, 0, EngineSettings::layers - 1)); }
     void noteOnLayer (int layer, int note, int velocity, int channel, std::uint64_t eventIndex) noexcept;
     void granularLife (NoteShape& shape, int note, std::uint64_t eventIndex) const noexcept;
+    void refreshLiveGranular (std::size_t layer) noexcept;
     InstrumentVoice* findFreeSlot() noexcept;
     InstrumentVoice* chooseVictim (int layer) noexcept;
     int countSoundingVoices (int layer) const noexcept;
+    std::array<bool, 3> occupiedLayers() const noexcept;
 
     EngineSettings config;
     double sampleRate = 48000.0;
     ShapingState liveShaping;            ///< read by every voice at control rate
     std::unique_ptr<SincInterpolator> interpolator;
-    std::vector<InstrumentVoice> voices;   ///< totalSlots, allocated once in the constructor (too big for a stack: ~1 MB)
-    std::array<const InstrumentModel*, EngineSettings::layers> layerModel {};
-    std::array<const InstrumentSet*, EngineSettings::layers> layerSet {};
-    std::array<std::array<std::int8_t, 512>, EngineSettings::layers> layerTake {};  ///< last round-robin take per (group, velocity layer)
-    std::array<double, EngineSettings::layers> layerPitchRatio { 1.0, 1.0 };
-    std::array<GranularParams, EngineSettings::layers> liveGranular {};   ///< read by granular voices
+    std::vector<InstrumentVoice> voices;   ///< totalSlots, allocated once in the constructor (too big for a stack: ~1.5 MB)
+    std::array<Slot, EngineSettings::layers> slots;
     std::size_t context = 0;   ///< the layer a note-on is being prepared for
-    // Per-layer render buffers (A/B blend), allocated in prepare().
-    std::array<std::array<std::vector<float>, 2>, EngineSettings::layers> layerBuffer;
     int bufferSize = 0;
-    double blendNow = 0.0;
+    double blendNow = 0.0, mixXNow = 0.5, mixYNow = 1.0 / 3.0;   ///< smoothed mix controls
     bool pedalDown = false;
     std::uint64_t noteCounter = 0;
     float outputGain = 1.0f;
     double pitchRatio = 1.0;
-    std::array<GrainSnapshot, EngineSettings::layers> grainSnapshots;
     void publishGrains() noexcept;
-    std::array<PerformanceEngine, EngineSettings::layers> layerPerformance;   ///< same seed: the layers perform together
     PostProcessor post;
     bool mpe = false;
     std::array<double, 17> channelBendRatio {};   ///< index 1..16

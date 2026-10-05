@@ -573,16 +573,24 @@ TEST_CASE ("plugin: A/B layers load, blend and recall independently", "[plugin][
             diff = std::max (diff, static_cast<double> (std::abs (after.channels[ch][i] - before.channels[ch][i])));
     CHECK (diff < 1.0e-12);
 
-    // Clearing a layer leaves silence where it was.
+    // Clearing a layer: the one that is left plays alone, wherever the blend is (one
+    // sound is a whole instrument, never half of an A/B mix).
     restored.clearLayer (1);
     restored.pollLoads();
     CHECK (restored.currentInstrument (1) == nullptr);
+    CHECK (restored.occupiedLayerCount() == 1);
     restored.parameters.getParameter ("ab.blend")->setValueNotifyingHost (1.0f);
-    const auto silent = playNote (restored, 60, 48000.0, 0.3);
-    double peak = 0.0;
-    for (float x : silent.channels[0])
-        peak = std::max (peak, static_cast<double> (std::abs (x)));
-    CHECK (peak < 1.0e-6);
+    const auto alone = playNote (restored, 60, 48000.0, 0.3);
+    restored.parameters.getParameter ("ab.blend")->setValueNotifyingHost (0.0f);
+    const auto aloneAtA = playNote (restored, 60, 48000.0, 0.3);
+    double peak = 0.0, difference = 0.0;
+    for (std::size_t i = 0; i < alone.channels[0].size(); ++i)
+    {
+        peak = std::max (peak, static_cast<double> (std::abs (alone.channels[0][i])));
+        difference = std::max (difference, static_cast<double> (std::abs (alone.channels[0][i] - aloneAtA.channels[0][i])));
+    }
+    CHECK (peak > 0.01);
+    CHECK (difference < 1.0e-6);
 }
 
 TEST_CASE ("plugin: clearing a layer while it sounds lets the note finish safely", "[plugin][layers]")
@@ -1017,4 +1025,221 @@ int main (int argc, char* argv[])
     const int result = Catch::Session().run (argc, argv);
     store.deleteRecursively();
     return result;
+}
+
+//==============================================================================
+// Adaptive 1-3 layers
+
+namespace
+{
+    double bin (const AudioData& audio, double hz, double from, double to)
+    {
+        const auto& x = audio.channels[0];
+        const auto a = static_cast<std::size_t> (from * audio.sampleRate), b = static_cast<std::size_t> (to * audio.sampleRate);
+        const double w = 2.0 * std::cos (2.0 * juce::MathConstants<double>::pi * hz / audio.sampleRate);
+        double s1 = 0.0, s2 = 0.0;
+        for (std::size_t i = a; i < b; ++i)
+        {
+            const double s0 = x[i] + w * s1 - s2;
+            s2 = s1;
+            s1 = s0;
+        }
+        return (s1 * s1 + s2 * s2 - w * s1 * s2) / static_cast<double> (b - a);
+    }
+
+    float valueOf (OspAudioProcessor& p, const juce::String& id) { return p.parameterValue (id); }
+}
+
+TEST_CASE ("plugin: three dropped sounds become layers A, B, C, all heard, recalled with their controls", "[plugin][adaptive]")
+{
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "low.wav", testsignals::vowel (midiToHz (57), 2.5, 48000.0, 3));
+    const auto b = writeSource (tmp.dir, "mid.wav", testsignals::vowel (midiToHz (61), 2.5, 48000.0, 5));
+    const auto c = writeSource (tmp.dir, "high.wav", testsignals::vowel (midiToHz (64), 2.5, 48000.0, 7));
+    OspAudioProcessor p;
+    CHECK (p.occupiedLayerCount() == 0);
+    CHECK (p.addLayers ({ a, b, c }) == 3);
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    CHECK (p.occupiedLayerCount() == 3);
+    CHECK (p.firstFreeLayer() == -1);
+    CHECK (juce::String (p.currentInstrument (2)->filename) == "high.wav");
+    // The newest layer is audible: the triangle sits at its centre.
+    CHECK (valueOf (p, "mix.x") == Approx (0.5f));
+    CHECK (valueOf (p, "mix.y") == Approx (1.0f / 3.0f));
+
+    // Every layer sounds on the same note (each keeps its own root: A3, C#4, E4 recordings
+    // all play A3 on key 57, so separate them with TUNE).
+    p.setParameterValue ("layerB.tune", 4.0f);
+    p.setParameterValue ("layerC.tune", 7.0f);
+    const auto out = playNote (p, 57, 48000.0, 1.2);
+    const double ea = bin (out, midiToHz (57), 0.3, 1.1), eb = bin (out, midiToHz (61), 0.3, 1.1), ec = bin (out, midiToHz (64), 0.3, 1.1);
+    INFO ("A " << ea << " B " << eb << " C " << ec);
+    CHECK (ea > 1.0e-6);
+    CHECK (eb > 1.0e-6);
+    CHECK (ec > 1.0e-6);
+
+    // Layer controls and the mix are part of the session.
+    p.setParameterValue ("layerC.level", -6.0f);
+    p.setParameterValue ("layerC.pan", -40.0f);
+    p.setParameterValue ("layerB.reverse", 1.0f);
+    p.setParameterValue ("layerA.follow", 0.0f);
+    p.setParameterValue ("layerC.sourceMode", 1.0f);
+    p.setParameterValue ("mix.x", 0.8f);
+    p.setParameterValue ("decay", 900.0f);
+    p.setParameterValue ("sustainLevel", 60.0f);
+    juce::MemoryBlock state;
+    p.getStateInformation (state);
+    OspAudioProcessor restored;
+    restored.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+    REQUIRE (restored.waitForLoads (30000));
+    restored.pollLoads();
+    CHECK (restored.occupiedLayerCount() == 3);
+    CHECK (juce::String (restored.currentInstrument (2)->filename) == "high.wav");
+    CHECK (valueOf (restored, "layerC.level") == Approx (-6.0f));
+    CHECK (valueOf (restored, "layerC.pan") == Approx (-40.0f));
+    CHECK (valueOf (restored, "layerB.reverse") == Approx (1.0f));
+    CHECK (valueOf (restored, "layerA.follow") == Approx (0.0f));
+    CHECK (valueOf (restored, "layerC.sourceMode") == Approx (1.0f));
+    CHECK (valueOf (restored, "layerB.tune") == Approx (4.0f));
+    CHECK (valueOf (restored, "mix.x") == Approx (0.8f));
+    CHECK (valueOf (restored, "decay") == Approx (900.0f).margin (0.1));
+    CHECK (valueOf (restored, "sustainLevel") == Approx (60.0f));
+    // Same session, same sound.
+    const auto x = playNote (p, 60, 48000.0, 0.8), y = playNote (restored, 60, 48000.0, 0.8);
+    double diff = 0.0;
+    for (std::size_t i = 0; i < x.channels[0].size(); ++i)
+        diff = std::max (diff, static_cast<double> (std::abs (x.channels[0][i] - y.channels[0][i])));
+    CHECK (diff < 1.0e-6);
+}
+
+TEST_CASE ("plugin: removing a layer compacts the others with their whole state; it can be restored", "[plugin][adaptive]")
+{
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "one.wav", testsignals::vowel (midiToHz (57), 2.0, 48000.0, 3));
+    const auto b = writeSource (tmp.dir, "two.wav", testsignals::vowel (midiToHz (60), 2.0, 48000.0, 4));
+    const auto c = writeSource (tmp.dir, "three.wav", testsignals::vowel (midiToHz (64), 2.0, 48000.0, 5));
+    OspAudioProcessor p;
+    p.addLayers ({ a, b, c });
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    p.setParameterValue ("layerC.tune", -5.0f);
+    p.setParameterValue ("layerC.granular.spread", 70.0f);
+    p.setParameterValue ("layerC.sourceMode", 1.0f);
+    p.setParameterValue ("layerB.level", -9.0f);
+    p.setRootOverride (64.0, 2);
+
+    // Remove B while a note sounds: C becomes B, the note finishes safely.
+    p.prepareToPlay (48000.0, 256);
+    juce::AudioBuffer<float> buffer (2, 256);
+    juce::MidiBuffer on;
+    on.addEvent (juce::MidiMessage::noteOn (1, 60, static_cast<juce::uint8> (100)), 0);
+    p.processBlock (buffer, on);
+    REQUIRE (p.removeLayer (1));
+    p.pollLoads();
+    for (int i = 0; i < 100; ++i)
+    {
+        juce::MidiBuffer none;
+        p.processBlock (buffer, none);
+        for (int ch = 0; ch < 2; ++ch)
+            for (int s = 0; s < buffer.getNumSamples(); ++s)
+                REQUIRE (std::isfinite (buffer.getSample (ch, s)));
+    }
+    CHECK (p.occupiedLayerCount() == 2);
+    CHECK (juce::String (p.currentInstrument (1)->filename) == "three.wav");
+    CHECK (p.currentInstrument (2) == nullptr);
+    CHECK (valueOf (p, "layerB.tune") == Approx (-5.0f));
+    CHECK (valueOf (p, "layerB.granular.spread") == Approx (70.0f));
+    CHECK (valueOf (p, "layerB.sourceMode") == Approx (1.0f));
+    CHECK (valueOf (p, "layerB.level") == Approx (0.0f));   // C's level, not B's
+    REQUIRE (p.rootOverride (1).has_value());
+    CHECK (*p.rootOverride (1) == Approx (64.0));
+    CHECK_FALSE (p.rootOverride (2).has_value());
+    CHECK (valueOf (p, "layerC.sourceMode") == Approx (0.0f));   // the freed slot is neutral
+
+    // Restore: back in its place, the others move up again.
+    REQUIRE (p.canRestoreRemovedLayer());
+    REQUIRE (p.restoreRemovedLayer());
+    p.pollLoads();
+    CHECK (p.occupiedLayerCount() == 3);
+    CHECK (juce::String (p.currentInstrument (1)->filename) == "two.wav");
+    CHECK (juce::String (p.currentInstrument (2)->filename) == "three.wav");
+    CHECK (valueOf (p, "layerB.level") == Approx (-9.0f));
+    CHECK (valueOf (p, "layerC.tune") == Approx (-5.0f));
+    CHECK_FALSE (p.canRestoreRemovedLayer());
+
+    // Removing the last layer of one leaves an empty instrument.
+    REQUIRE (p.removeLayer (2));
+    REQUIRE (p.removeLayer (1));
+    REQUIRE (p.removeLayer (0));
+    p.pollLoads();
+    CHECK (p.occupiedLayerCount() == 0);
+    const auto quiet = playNote (p, 60, 48000.0, 0.2);
+    for (float v : quiet.channels[0])
+        REQUIRE (v == 0.0f);
+}
+
+TEST_CASE ("plugin: more than three dropped sounds load three and say so", "[plugin][adaptive]")
+{
+    TempDir tmp;
+    juce::Array<juce::File> files;
+    for (int i = 0; i < 5; ++i)
+        files.add (writeSource (tmp.dir, "s" + juce::String (i) + ".wav", testsignals::vowel (midiToHz (55 + i), 1.0, 48000.0, static_cast<std::uint64_t> (i + 1))));
+    OspAudioProcessor p;
+    CHECK (p.addLayers (files) == 3);
+    CHECK (p.statusMessage().contains ("left out"));
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    CHECK (p.occupiedLayerCount() == 3);
+    CHECK (p.addLayers ({ files[4] }) == 0);   // full: replace a layer instead
+}
+
+TEST_CASE ("plugin: sessions from before the adaptive layers open as they were (v5 migration)", "[plugin][adaptive]")
+{
+    TempDir tmp;
+    const auto file = writeSource (tmp.dir, "old.wav", testsignals::vowel (midiToHz (57), 2.0, 48000.0, 3));
+    OspAudioProcessor original;
+    loadAndWait (original, file);
+    original.setParameterValue ("sustain", 0.0f);   // "Recording": the old global sustain off
+    juce::MemoryBlock state;
+    original.getStateInformation (state);
+    auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
+    auto tree = juce::ValueTree::fromXml (*xml);
+    tree.setProperty ("stateVersion", 5, nullptr);
+    // A v5 session knows nothing of the new parameters or of layer C.
+    for (int i = tree.getNumChildren(); --i >= 0;)
+    {
+        const auto id = tree.getChild (i)["id"].toString();
+        if (id.startsWith ("layerC.") || id == "mix.x" || id == "mix.y" || id == "decay" || id == "sustainLevel"
+            || OspAudioProcessor::layerControlNames().contains (id.fromFirstOccurrenceOf (".", false, false)))
+            tree.removeChild (i, nullptr);
+    }
+    tree.removeChild (tree.getChildWithName ("InstrumentC"), nullptr);
+    juce::MemoryBlock old;
+    juce::AudioProcessor::copyXmlToBinary (*tree.createXml(), old);
+
+    // Opened in an instance whose new controls were moved: they return to neutral.
+    OspAudioProcessor p;
+    p.setParameterValue ("layerA.level", -20.0f);
+    p.setParameterValue ("layerA.tune", 5.0f);
+    p.setParameterValue ("layerC.sourceMode", 1.0f);
+    p.setParameterValue ("sustainLevel", 10.0f);
+    p.setStateInformation (old.getData(), static_cast<int> (old.getSize()));
+    REQUIRE (p.waitForLoads (20000));
+    p.pollLoads();
+    CHECK (p.occupiedLayerCount() == 1);
+    CHECK (valueOf (p, "layerA.level") == Approx (0.0f));
+    CHECK (valueOf (p, "layerA.tune") == Approx (0.0f));
+    CHECK (valueOf (p, "layerC.sourceMode") == Approx (0.0f));
+    CHECK (valueOf (p, "sustainLevel") == Approx (100.0f));
+    // The old global "Recording" sustain is now every layer's LOOP off; Sustain is back to Endless.
+    for (const char* id : { "layerA.loop", "layerB.loop", "layerC.loop" })
+        CHECK (valueOf (p, id) == Approx (0.0f));
+    CHECK (valueOf (p, "sustain") == Approx (1.0f));
+    // ...and it plays exactly like the original (Recording sustain, one layer).
+    const auto x = playNote (original, 57, 48000.0, 2.5), y = playNote (p, 57, 48000.0, 2.5);
+    double diff = 0.0;
+    for (std::size_t i = 0; i < x.channels[0].size(); ++i)
+        diff = std::max (diff, static_cast<double> (std::abs (x.channels[0][i] - y.channels[0][i])));
+    CHECK (diff < 1.0e-6);
 }

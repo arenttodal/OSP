@@ -25,6 +25,7 @@ add_executable(osp_tests
     integration/EngineIntegrationTests.cpp
     integration/ShapingTests.cpp
     integration/LayerTests.cpp
+    integration/EngineSlotTests.cpp
     integration/ShaperTests.cpp
     regression/GoldenTests.cpp
 )

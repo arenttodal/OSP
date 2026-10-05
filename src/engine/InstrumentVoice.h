@@ -32,6 +32,10 @@ struct InstrumentVoiceStart
     int layerIndex = 0;                         ///< A/B layer (0 = A, 1 = B)
     SourceMode sourceMode = SourceMode::oneShot;
     const GranularParams* granular = nullptr;   ///< live settings of the layer (granular mode)
+    // Source modifiers of the layer (One Shot; Granular takes them from `granular`).
+    double startFraction = 0.0;   ///< START: 0..1 of the recording after its onset (from the end when reversed)
+    bool reverse = false;         ///< REVERSE: read backwards (LOOP then loops the best loop, mirrored)
+    bool follow = true;           ///< FOLLOW off: flatten the recording's loudness contour
 };
 
 /**
@@ -135,6 +139,10 @@ private:
     double expressionGain = 1.0, expressionBright = 0.0;
 
     // Reading
+    double direction = 1.0;          ///< -1: REVERSE
+    bool reverseLoop = false;        ///< REVERSE + LOOP: the best loop, read backwards
+    bool followContour = true;       ///< FOLLOW (false: followGain lifts quiet parts)
+    float followGain = 1.0f, followGainStep = 0.0f;
     double position = 0.0;
     double baseIncrement = 1.0;
     double currentStep = 1.0;
