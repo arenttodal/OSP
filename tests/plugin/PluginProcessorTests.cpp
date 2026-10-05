@@ -1561,3 +1561,37 @@ TEST_CASE ("plugin: a sound replaced while it plays finishes, a bad file never s
         energy += static_cast<double> (v) * v;
     CHECK (energy > 0.0);
 }
+
+TEST_CASE ("plugin: an instance closed while its sounds are still loading shuts down cleanly", "[plugin][adaptive]")
+{
+    // A host can close a plugin at any moment, also while the loader is still refining
+    // a sound (each stage queues the next). The destructor must wait for that chain to
+    // end: a stage that reports after the instance is gone writes into freed memory.
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "a.wav", testsignals::vowel (midiToHz (57), 3.0, 48000.0, 3));
+    const auto b = writeSource (tmp.dir, "b.wav", testsignals::vowel (midiToHz (61), 3.0, 48000.0, 5));
+    const auto c = writeSource (tmp.dir, "c.wav", testsignals::vowel (midiToHz (64), 3.0, 48000.0, 7));
+    juce::MemoryBlock state;
+    {
+        OspAudioProcessor p;
+        p.addLayers ({ a, b, c });
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        p.getStateInformation (state);
+    }
+    // Closed at different points of the load: immediately, mid-analysis, between stages.
+    for (int waitMs : { 0, 5, 40, 150, 400 })
+    {
+        {
+            OspAudioProcessor p;
+            p.addLayers ({ a, b, c });
+            juce::Thread::sleep (waitMs);
+        }
+        {
+            OspAudioProcessor p;
+            p.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+            juce::Thread::sleep (waitMs);
+        }
+    }
+    SUCCEED ("every instance closed without touching freed memory");
+}

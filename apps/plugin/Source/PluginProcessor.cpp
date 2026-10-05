@@ -372,7 +372,13 @@ OspAudioProcessor::OspAudioProcessor()
 OspAudioProcessor::~OspAudioProcessor()
 {
     stopTimer();
-    loaderPool.removeAllJobs (true, 10000);
+    // A running load stage queues the next one, and a stage can outlast any fixed timeout
+    // (a long file, a slow machine): stop new stages first, then wait until the pool is
+    // really empty. A job must never outlive the members it reports into.
+    closing = true;
+    while (! loaderPool.removeAllJobs (true, 10000) || loaderPool.getNumJobs() > 0)
+    {
+    }
 }
 
 bool OspAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
@@ -781,12 +787,12 @@ void OspAudioProcessor::enqueueLoad (LoadRequest request, int layer)
 
 void OspAudioProcessor::enqueueRefine (std::shared_ptr<const LoadedInstrument> base, std::shared_ptr<const AudioData> audio, int layer)
 {
-    if (base == nullptr || base->model == nullptr || base->model->stage == InstrumentModel::Stage::complete)
+    if (closing.load() || base == nullptr || base->model == nullptr || base->model->stage == InstrumentModel::Stage::complete)
         return;
     ++pendingLoads;
     loaderPool.addJob ([this, base = std::move (base), audio = std::move (audio), layer] {
         // A newer sample was dropped into this layer meanwhile: do not spend time on this one.
-        if (base->loadId == layers[static_cast<std::size_t> (layer)].latestLoadId.load())
+        if (! closing.load() && base->loadId == layers[static_cast<std::size_t> (layer)].latestLoadId.load())
         {
             auto result = refineInstrument (*base, audio, nextGeneration.fetch_add (1));
             if (result.instrument != nullptr)

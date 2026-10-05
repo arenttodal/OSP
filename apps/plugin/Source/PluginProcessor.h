@@ -303,6 +303,7 @@ private:
     std::mutex resultsMutex;               // loader <-> message thread only, never audio
     std::deque<Finished> finishedLoads;
     std::atomic<int> pendingLoads { 0 };
+    std::atomic<bool> closing { false };   // set by the destructor: no further load stages
     std::atomic<std::uint64_t> nextGeneration { 1 };
     juce::String lastMessage;
     mutable std::mutex messageMutex;       // lastMessage
