@@ -211,7 +211,7 @@ were rendered to raw float files and are compared bit-for-bit after Stage 1.
   the editor no longer repaints knobs, the envelope graph or the mix band every tick, and
   favourites are read from disk once.
 - Sanitizers: the core suite and the plugin tests built with AddressSanitizer +
-  UndefinedBehaviorSanitizer (see the final report for the result).
+  UndefinedBehaviorSanitizer (results in the Stage 24 report below).
 
 ## Stage 24 — final acceptance and report
 
@@ -290,10 +290,44 @@ were rendered to raw float files and are compared bit-for-bit after Stage 1.
   buffer matrix). The CI build runs `auval` on macOS. Needs a pass in Ableton / Logic.
 
 ### Performance
-CPU_TABLE_PLACEHOLDER
+Engine only (`InstrumentEngine::render`), Release build, 48 kHz, 128-sample blocks,
+16 held notes, default macros (LIFE, MOVEMENT, SPACE, Reimagined on), every layer
+audible; one core of a shared virtual Xeon @ 2.1 GHz, best of three 20 s runs:
+
+| Layers | Modes | CPU of one core |
+|---|---|---|
+| 1 | One Shot | 30.0 % |
+| 1 | Granular | 15.2 % |
+| 2 | One Shot + One Shot | 58.0 % |
+| 2 | One Shot + Granular | 43.3 % |
+| 2 | Granular + Granular | 29.1 % |
+| 3 | One Shot × 3 | 87.9 % |
+| 3 | One Shot + Granular × 2 | 56.4 % |
+| 3 | Granular × 3 | 42.1 % |
+
+- Cost grows linearly with audible layers (~1.9 % per held note per One Shot layer,
+  ~0.9 % per Granular layer, on this core); the shared post-processing is paid once.
+- **Worst case is three One Shot layers, not Granular**: the band-limited sinc reads
+  cost more than 24 short grains. Three Granular layers cost less than two One Shot ones.
+- A layer at LEVEL −48 dB (or with no share in the mix) is not rendered at all.
+- This server core is slow; a current desktop or Apple-silicon core is typically 2–3×
+  faster. Sixteen held notes on three One Shot layers is still the case to watch.
+- UI: popups repaint at 30 Hz only while open and only when their picture changes; the
+  waveform's static part is cached; the editor no longer repaints its knobs, envelope or
+  mix band on every timer tick.
 
 ### Sanitizers
-SANITIZER_PLACEHOLDER
+- Core suite (`osp_tests`, 161 cases, 2.2 M assertions) and plugin suite (29 headless
+  cases + the two `[ui]` editor tests under Xvfb) built with `-fsanitize=address,undefined`:
+  clean.
+- Found and fixed on the way: **use-after-free when an instance closes while a sound is
+  still loading**. The loader refines a sound in stages, each queueing the next; the
+  destructor waited at most 10 s and a running stage could queue another, so a stage
+  could report into the destroyed processor. A `closing` flag now stops new stages and
+  the destructor drains the pool until it is empty. A regression test closes instances
+  at several points of a three-layer load and of a session recall (it reproduces the
+  error under ASan without the fix). A host closing the plugin mid-load could have
+  crashed the same way, so this matters outside the tests too.
 
 ### Known issues
 - No listening pass yet: the mix law, FOLLOW's lift and the START fade are set by ear on
