@@ -76,3 +76,39 @@ TEST_CASE ("ADSR: retrigger continues from the current level (no click)", "[unit
     CHECK (after > before);
     CHECK (after - before < 0.011f);
 }
+
+TEST_CASE ("ADSR: changing the sustain level while a note is held glides there (no step)", "[unit][adsr]")
+{
+    const double rate = 48000.0;
+    AdsrSettings s;
+    s.attackSeconds = 0.001;
+    s.decaySeconds = 0.05;
+    s.sustainLevel = 0.8;
+    s.releaseSeconds = 0.2;
+    Adsr env;
+    env.prepare (rate, s);
+    env.noteOn();
+    for (int i = 0; i < 24000; ++i)
+        env.next();
+    REQUIRE (env.stage() == Adsr::Stage::sustain);
+    CHECK (env.level() == Approx (0.8f));
+    // Unchanged it stays exactly at the level.
+    CHECK (env.next() == 0.8f);
+    s.sustainLevel = 0.2;
+    env.prepare (rate, s);
+    float previous = env.level(), largestStep = 0.0f;
+    for (int i = 0; i < 4800; ++i)
+    {
+        const float v = env.next();
+        largestStep = std::max (largestStep, std::abs (v - previous));
+        previous = v;
+    }
+    CHECK (largestStep < 0.01f);                 // 0.6 spread over ~10 ms, never a jump
+    CHECK (env.level() == Approx (0.2f).margin (1.0e-4));
+    // Down to zero while held: the note ends.
+    s.sustainLevel = 0.0;
+    env.prepare (rate, s);
+    for (int i = 0; i < 4800; ++i)
+        env.next();
+    CHECK_FALSE (env.isActive());
+}

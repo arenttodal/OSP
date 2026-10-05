@@ -134,3 +134,18 @@ were rendered to raw float files and are compared bit-for-bit after Stage 1.
   that popup for the envelope).
 - Tests: UI test (Xvfb) for 0/1/2/3 cards, drop targets (drop / replace X / add X), drag
   preview, compaction, smallest and largest window sizes; snapshots of every state.
+
+## Stages 8–9 — source modifiers, the instrument's envelope
+
+- LINK (plugin, message thread): `applyLinkedDelta` — a user gesture on a linked layer's
+  START / TUNE / PAN / LEVEL moves every other linked, occupied layer's same control by the
+  same delta (clamped); automation never propagates; only those four controls link.
+- REVERSE / LOOP / FOLLOW: see Stages 1–3 (voice + granular); LOOP is shown suppressed in
+  Granular (granular sustains by itself; the engine ignores LOOP there).
+- ADSR: `attack`, `decay`, `sustainLevel`, `release` drive the one envelope every voice of
+  every layer uses (shared instrument envelope; per-voice as before, so note stealing and
+  release grafts keep working). A sustain level changed during a held note now glides there
+  over ~10 ms (no step); unchanged, the value stays exactly the level (baselines and goldens
+  unchanged). S = 0 turns any layer, One Shot or Granular, into a pluck that ends while held.
+- Tests: live sustain change, decay → sustain ratio through the engine for One Shot and
+  Granular layers, Granular START offset and FOLLOW lift, LINK deltas / clamping / scope.

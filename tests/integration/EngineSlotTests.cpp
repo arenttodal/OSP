@@ -452,3 +452,73 @@ TEST_CASE ("three layers in all eight One Shot / Granular combinations: playable
             REQUIRE (std::isfinite (v));
     }
 }
+
+TEST_CASE ("the instrument's envelope: decay to sustain shapes every layer, S = 0 ends notes", "[integration][layers][adsr]")
+{
+    auto vowel = testsignals::vowel (220.0, 2.0, rate, 3);
+    const auto model = instrument::buildComplete (vowel, test::analyse (vowel), {}, false);
+    auto render = [&] (double sustain, SourceMode modeB) {
+        auto s = quietSettings();
+        s.adsr.decaySeconds = 0.3;
+        s.adsr.sustainLevel = sustain;
+        s.blend = 0.5;
+        s.sourceMode[1] = modeB;
+        Rig rig (s);
+        rig.engine.setModel (model.get(), 0);
+        rig.engine.setModel (model.get(), 1);
+        rig.engine.setGranular (1, s.granular[1]);
+        rig.engine.noteOn (57, 100, 1);
+        std::vector<float> out;
+        rig.run (2.0, out);
+        return std::pair { out, rig.engine.activeVoiceCount() };
+    };
+    for (auto mode : { SourceMode::oneShot, SourceMode::granular })
+    {
+        const auto [full, voicesFull] = render (1.0, mode);
+        const auto [half, voicesHalf] = render (0.5, mode);
+        const auto [none, voicesNone] = render (0.0, mode);
+        INFO ("B " << (mode == SourceMode::granular ? "granular" : "one shot"));
+        // After the decay the held note sits at the sustain level (amplitude ratio).
+        CHECK (rms (half, at (1.0), at (1.8)) / rms (full, at (1.0), at (1.8)) == Approx (0.5).margin (0.06));
+        CHECK (voicesFull == 2);
+        CHECK (voicesHalf == 2);
+        CHECK (voicesNone == 0);   // a pluck: it has ended although the key is held
+        CHECK (rms (none, at (1.0), at (1.8)) == 0.0);
+    }
+}
+
+TEST_CASE ("Granular layer modifiers: START moves the grains, FOLLOW off lifts quiet parts", "[integration][layers][granular]")
+{
+    const auto fading = decayingModel (330.0, 2.0);
+    auto run = [&] (double start, bool follow, double position) {
+        auto s = quietSettings();
+        s.sourceMode[0] = SourceMode::granular;
+        s.granular[0].position = position;
+        s.granular[0].spread = 0.0;
+        s.layer[0].start = start;
+        s.layer[0].follow = follow;
+        Rig rig (s);
+        rig.engine.setModel (fading.get(), 0);
+        rig.engine.setGranular (0, s.granular[0]);
+        rig.engine.noteOn (64, 100, 1);
+        std::vector<float> out;
+        rig.run (0.6, out);
+        const auto& snap = rig.engine.grainSnapshot (0);
+        double sum = 0.0;
+        const int count = snap.count.load();
+        for (int i = 0; i < count; ++i)
+            sum += snap.position[static_cast<std::size_t> (i)].load();
+        return std::pair { count > 0 ? sum / count : -1.0, rms (out, at (0.2), at (0.6)) };
+    };
+    const auto [atPos, levelPos] = run (0.0, true, 0.2);
+    const auto [shifted, levelShifted] = run (0.5, true, 0.2);
+    CHECK (atPos == Approx (0.2).margin (0.06));
+    CHECK (shifted == Approx (0.7).margin (0.06));   // START adds to POS
+    // FOLLOW off: grains from the quiet end are lifted towards the loudest part's level.
+    const auto [tail, quiet] = run (0.0, true, 0.85);
+    const auto [tailLifted, lifted] = run (0.0, false, 0.85);
+    CHECK (lifted > 4.0 * quiet);
+    CHECK (levelPos > 0.0);
+    CHECK (levelShifted > 0.0);
+    CHECK (tail == Approx (tailLifted).margin (1.0e-6));
+}

@@ -1347,3 +1347,39 @@ TEST_CASE ("plugin: the editor adapts to one, two and three sounds; drops replac
     }
     p.editorBeingDeleted (editor.get());
 }
+
+TEST_CASE ("plugin: LINK moves the other linked layers by the same amount, keeping their relationship", "[plugin][adaptive]")
+{
+    TempDir tmp;
+    juce::Array<juce::File> files;
+    for (int i = 0; i < 3; ++i)
+        files.add (writeSource (tmp.dir, "l" + juce::String (i) + ".wav", testsignals::vowel (midiToHz (57 + i), 1.0, 48000.0, static_cast<std::uint64_t> (i + 2))));
+    OspAudioProcessor p;
+    p.addLayers (files);
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    p.setParameterValue ("layerA.level", -3.0f);
+    p.setParameterValue ("layerB.level", -7.0f);
+    p.setParameterValue ("layerC.level", -1.0f);
+    p.setParameterValue ("layerA.link", 1.0f);
+    p.setParameterValue ("layerB.link", 1.0f);   // C is not linked
+
+    // The musician turns A down by 2 dB: B follows by 2 dB, C stays.
+    p.setParameterValue ("layerA.level", -5.0f);
+    p.applyLinkedDelta (0, "level", -2.0f);
+    CHECK (valueOf (p, "layerB.level") == Approx (-9.0f).margin (0.05));
+    CHECK (valueOf (p, "layerC.level") == Approx (-1.0f).margin (0.05));
+    // Other controls too, clamped at their ends.
+    p.setParameterValue ("layerB.tune", 20.0f);
+    p.applyLinkedDelta (0, "tune", 7.0f);
+    CHECK (valueOf (p, "layerB.tune") == Approx (24.0f));
+    p.applyLinkedDelta (0, "pan", -30.0f);
+    CHECK (valueOf (p, "layerB.pan") == Approx (-30.0f));
+    // An unlinked layer's changes move nobody.
+    p.applyLinkedDelta (2, "level", 4.0f);
+    CHECK (valueOf (p, "layerA.level") == Approx (-5.0f).margin (0.05));
+    CHECK (valueOf (p, "layerB.level") == Approx (-9.0f).margin (0.05));
+    // Only START, TUNE, PAN and LEVEL link.
+    p.applyLinkedDelta (0, "sourceMode", 1.0f);
+    CHECK (valueOf (p, "layerB.sourceMode") == Approx (0.0f));
+}

@@ -48,6 +48,7 @@ private:
     double attackIncrement = 1.0;
     double decayCoefficient = 0.0;
     double releaseCoefficient = 0.0;
+    double sustainGlide = 1.0;   ///< a sustain level changed while held is reached over ~10 ms (no step)
 };
 
 } // namespace osp

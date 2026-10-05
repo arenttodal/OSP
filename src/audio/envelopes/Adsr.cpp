@@ -29,6 +29,7 @@ void Adsr::prepare (double newSampleRate, const AdsrSettings& newSettings) noexc
     attackIncrement = attackSamples >= 1.0 ? 1.0 / attackSamples : 1.0;
     decayCoefficient = coefficientFor60dB (settings.decaySeconds, sampleRate);
     releaseCoefficient = coefficientFor60dB (std::max (settings.releaseSeconds, 0.001), sampleRate);
+    sustainGlide = 1.0 - std::exp (-1.0 / (0.01 * sampleRate));
 }
 
 void Adsr::noteOn() noexcept
@@ -75,9 +76,16 @@ float Adsr::next() noexcept
             break;
 
         case Stage::sustain:
-            value = settings.sustainLevel;
+            // Held: the sustain level, gliding there when it is changed during the note
+            // (unchanged, the value stays exactly the level).
+            value += (settings.sustainLevel - value) * sustainGlide;
+            if (std::abs (value - settings.sustainLevel) < decaySettleDistance)
+                value = settings.sustainLevel;
             if (value <= 0.0)
+            {
+                value = 0.0;
                 currentStage = Stage::idle;
+            }
             break;
 
         case Stage::release:
