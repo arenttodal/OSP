@@ -220,6 +220,15 @@ void SourceDisplay::setBottomInset (int pixels)
     }
 }
 
+void SourceDisplay::setOverlayBand (int pixels)
+{
+    if (overlayBand != pixels)
+    {
+        overlayBand = pixels;
+        repaint();
+    }
+}
+
 juce::Rectangle<float> SourceDisplay::plotArea() const
 {
     return getLocalBounds().toFloat().reduced (10.0f, 0.0f).withTrimmedTop (20.0f).withTrimmedBottom (10.0f + static_cast<float> (bottomInset));
@@ -292,6 +301,14 @@ void SourceDisplay::paint (juce::Graphics& g)
             g.setColour (accent.withAlpha (0.95f * level));
             g.fillRect (juce::Rectangle<float> (x - 0.75f, plot.getY(), 1.5f, plot.getHeight()));
         }
+    }
+    if (overlayBand > 0)
+    {
+        // The granular controls float here: the waveform shows through, quietened.
+        const auto band = getLocalBounds().toFloat().removeFromBottom (static_cast<float> (overlayBand));
+        g.setGradientFill (juce::ColourGradient (graphite.withAlpha (0.0f), 0.0f, band.getY() - 10.0f, graphite.withAlpha (0.82f), 0.0f,
+                                                 band.getY() + 12.0f, false));
+        g.fillRect (band.withTop (band.getY() - 10.0f));
     }
     if (dropLabel.isNotEmpty())
     {
@@ -528,7 +545,7 @@ LayerKnob::LayerKnob (OspAudioProcessor& p, int layer, const juce::String& contr
         dial->setDoubleClickReturnValue (true, parameter->convertFrom0to1 (parameter->getDefaultValue()));
         dial->setTooltip (parameter->getName (64) + (control == "tune" ? juce::String (" (Alt-drag: fine)") : juce::String()));
     }
-    dial->onValueChange = [this] { repaint(); };
+    dial->onValueChange = [this] { repaint(); };   // also when automation or LINK moves it (the attachment moves the dial)
     addAndMakeVisible (*dial);
 }
 
@@ -827,8 +844,6 @@ void EngineCard::refresh()
         dots[k] = { snapshot.playheadPosition[k].load (std::memory_order_relaxed), snapshot.playheadLevel[k].load (std::memory_order_relaxed), 0.5f };
     }
     sourceDisplay.setPlayheads (dots.data(), heads);
-    for (auto& k : knobs)
-        k->repaint();
 }
 
 void EngineCard::paint (juce::Graphics& g)
@@ -932,9 +947,13 @@ void EngineCard::resized()
         k->setBounds (knobRow.removeFromLeft (w).withSizeKeepingCentre (std::min (w, hero ? 120 : 92), knobRow.getHeight()));
     }
 
-    // Granular: POS SIZE DENS TUNE SPREAD along the bottom of the display.
+    // Granular: POS SIZE DENS TUNE SPREAD along the bottom of the display - below the
+    // waveform when there is room, floating over it when the display is short.
     const int strip = hero ? 62 : (triple ? 54 : 58);
-    sourceDisplay.setBottomInset (granularKnobs[0]->isVisible() ? strip - 4 : 0);
+    const bool granular = granularKnobs[0]->isVisible();
+    const bool roomy = sourceDisplay.getHeight() >= 2 * strip + 40;
+    sourceDisplay.setBottomInset (granular && roomy ? strip - 4 : 0);
+    sourceDisplay.setOverlayBand (granular && ! roomy ? strip : 0);
     auto g = sourceDisplay.getBounds().removeFromBottom (strip).reduced (triple ? 4 : 10, 4);
     const int gw = g.getWidth() / 5;
     for (auto& k : granularKnobs)

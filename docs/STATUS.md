@@ -168,6 +168,19 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [x] Fix: choosing a SHAPER PATTERN or RATE from its menu crashed the host (Ableton Live 12). The outside-click watcher closed the popup on the menu click and deleted the selector before its choice arrived; now only presses inside the editor close a popup, and menus never call into a deleted control
 - [ ] MOVEMENT v2 listening pass (MV-12): patterns on the corpus (organ, nyckelharpa, vocal, synth, granular, A/B); remove or retune any that sound gimmicky
 
+## Milestone: GUI redesign, macro visualisations, adaptive 1–3 layers (see docs/redesign-notes.md)
+
+- [x] Stage 0: audit, rollback tag (local), reference renders of engine C
+- [x] Stages 1–3: three engine slots, layer C, START/TUNE/PAN/LEVEL, REVERSE/LOOP/FOLLOW, mixWeights (unity / equal-power A/B / constant-power triangle), silent layers not rendered, musical voice count; single and A/B renders bit-identical to before
+- [x] Stages 4–6: EngineCard (Hero/Dual/Triple), adaptive layout 0/1/2/3, drag & drop (ADD LAYER preview, REPLACE X, loose files one layer each, folder one multi-sample layer, max three, the rest reported)
+- [x] Stage 7: new visual system (palette, Inter with tabular figures, graphite displays, spectral waveforms, layer identities), header (preset bar, favourites, volume, menu), mix band, macros + amp envelope, keyboard and wheels, Advanced slimmed
+- [x] Stages 8–9: LINK, REVERSE, LOOP, FOLLOW; the instrument's ADSR (decay/sustain added; live sustain glide)
+- [x] Stages 10–15: popup shell; SPACE, CHARACTER, MOVEMENT, LIFE, DYNAMICS visualisations from the DSP's own formulas
+- [x] Stage 16: state v6 + migration (v5 single and A/B sessions bit-identical; old Sustain -> LOOP)
+- [x] Stages 17–19, 21–23: polish at min/max sizes, all 8 One Shot/Granular combinations, modifier regression under automation, automation of every new control, edge cases (replace/remove while playing, bad file among good ones, too-short sources); ASan/UBSan runs
+- [ ] Stage 20: DAW testing (Logic AU, Ableton AU/VST3, Reaper VST3) — needs the user's Mac
+- [ ] Listening pass: FOLLOW-off lift, REVERSE + LOOP, the three-layer mix law, default LEVEL 0 dB
+
 ## DONE
 
 - Pure C++20 DSP/analysis library (`osp_dsp`) independent of JUCE; JUCE used for file

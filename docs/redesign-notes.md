@@ -186,3 +186,29 @@ were rendered to raw float files and are compared bit-for-bit after Stage 1.
   towards hard notes (TONE × DYNAMICS), the last 16 played velocities as dots (lock-free
   ring written by the audio thread). Controls: CURVE, RANGE, TONE.
 - UI test snapshots every SPACE type and MOVEMENT mode.
+
+## Stages 16–23 — migration, polish, regression, automation, UI performance, edge cases
+
+- Migration tests: a v5 single-layer session with the old "Recording" sustain and a v5 A/B
+  session with its blend open bit-identically (into an instance that had three layers and
+  moved controls: C is cleared, everything new returns to neutral); v6 three-layer
+  sessions recall every layer control, the mix and the envelope.
+- Polish: at the minimum size (900 × 720) three Granular layers still show their
+  waveforms (the granular controls float on a translucent band when a display is short);
+  the lower sections scale a little with the window height, never with the layer count.
+- Regression: all eight One Shot / Granular combinations of three layers (playable,
+  block-size independent, release to silence); every modifier on three layers while the
+  triangle mix sweeps, the sustain level moves and a LEVEL jumps from silent to +6 dB
+  (finite, the largest sample step < 0.35 × peak, all voices end after release).
+- Automation (plugin): 22 controls automated at random across their full ranges every
+  2.7 ms for 4 s with notes held, plus a MOVEMENT mode switch: finite, largest step 0.16 ×
+  peak (a click would be ~1×).
+- Edge cases: replacing a sound while its note plays (the note finishes on the old one,
+  the root returns to automatic); a broken file among good ones (its layer fails and
+  stays empty, the others load and play); 3 ms / 20 ms / 80 ms sources in every mode,
+  forwards and reversed, with START and FOLLOW off; removing layers while notes sound.
+- UI performance: popups repaint only while open and only when their picture changed;
+  the editor no longer repaints knobs, the envelope graph or the mix band every tick, and
+  favourites are read from disk once.
+- Sanitizers: the core suite and the plugin tests built with AddressSanitizer +
+  UndefinedBehaviorSanitizer (see the final report for the result).

@@ -1149,22 +1149,33 @@ namespace
     juce::File favouritesFile() { return OspAudioProcessor::presetFolder().getChildFile ("Favourites.txt"); }
 }
 
+const juce::StringArray& OspAudioProcessor::favourites() const
+{
+    // Read once (the header asks often); written through on every change.
+    if (! favouritesLoaded)
+    {
+        favouriteNames = juce::StringArray::fromLines (favouritesFile().loadFileAsString());
+        favouriteNames.removeEmptyStrings();
+        favouritesLoaded = true;
+    }
+    return favouriteNames;
+}
+
 bool OspAudioProcessor::isFavourite() const
 {
-    const auto lines = juce::StringArray::fromLines (favouritesFile().loadFileAsString());
-    return lines.contains (presetDisplayName());
+    return favourites().contains (presetDisplayName());
 }
 
 void OspAudioProcessor::toggleFavourite()
 {
     // Favourites are plain names in a text file beside the presets (shareable, editable).
-    auto lines = juce::StringArray::fromLines (favouritesFile().loadFileAsString());
-    lines.removeEmptyStrings();
+    auto lines = favourites();
     const auto name = presetDisplayName();
     if (lines.contains (name))
         lines.removeString (name);
     else
         lines.add (name);
+    favouriteNames = lines;
     favouritesFile().getParentDirectory().createDirectory();
     favouritesFile().replaceWithText (lines.joinIntoString ("\n") + "\n");
 }

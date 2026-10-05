@@ -188,6 +188,7 @@ private:
     SamplesPanel samplesPanel { ospProcessor };
     bool samplesShown = false;
     std::array<bool, OspAudioProcessor::numLayers> shownOccupied {};
+    std::array<float, 6> shownValues {};   ///< mix x/y and ADSR last drawn
     int shownCount = -1;
     bool dragging = false;
     DropTarget dragTarget;

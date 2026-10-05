@@ -209,6 +209,11 @@ public:
     void openPresetEntry (const PresetEntry& entry);
     bool isFavourite() const;
     void toggleFavourite();
+private:
+    const juce::StringArray& favourites() const;
+    mutable juce::StringArray favouriteNames;
+    mutable bool favouritesLoaded = false;
+public:
     juce::UndoManager undoManager;
 
     /** 2: engine C parameters (macros, pitch character, sustain, seed). v1 sessions migrate to neutral settings.

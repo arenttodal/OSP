@@ -60,6 +60,8 @@ public:
     void setDropLabel (const juce::String& label);
     /** Room kept free at the bottom (the granular strip sits there). */
     void setBottomInset (int pixels);
+    /** A short display: the granular strip floats over the waveform on a translucent band of this height. */
+    void setOverlayBand (int pixels);
 
     void paint (juce::Graphics&) override;
     void resized() override { cacheDirty = true; }
@@ -78,7 +80,7 @@ private:
     View view;
     std::vector<Dot> grains, heads;
     juce::String dropLabel;
-    int bottomInset = 0;
+    int bottomInset = 0, overlayBand = 0;
     juce::Image cache;
     bool cacheDirty = true;
 };

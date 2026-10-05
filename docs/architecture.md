@@ -231,20 +231,41 @@ compiles the I/O sources with the plugin's own JUCE settings.
   bend, mod wheel (MOTION), aftertouch / channel pressure (intensity), CC74 (timbre),
   CC 20–25 (macros), MPE lower zone (per-note bend ±48 st, pressure, slide).
 
-## A/B layers and the Granular source mode
+## Adaptive layers (1–3) and the Granular source mode
 
-`InstrumentEngine` holds two source layers. Each has its own model or set, pitch offset
-(the layer's root correction), round-robin memory, performance engine and source mode;
-every note-on starts one voice per loaded layer (same event index for layer A, a salted
-one for B, so B's randomness is its own while the shared seed keeps the two performers'
-slow state together). Polyphony is counted per layer. Layers render into preallocated
-per-layer buffers and are mixed with an equal-power crossfade (`cos`/`sin` of the blend,
-ramped over 20 ms), then the **shared** post stage (Reimagined resonators and formants,
-MOVEMENT bus, SPACE) runs once. The per-voice stages (LIFE, DYNAMICS, CHARACTER filter,
-drift) are not duplicated per layer as processing chains: they are the same settings
-applied in each voice. With only layer A loaded and the blend at A the output is
-bit-identical to the single-layer engine (the gain is exactly 1), so every golden still
-holds.
+`InstrumentEngine` holds three source layers (A, B, C) in a fixed `std::array<Slot, 3>`:
+model or set, root-correction × TUNE pitch ratio, round-robin memory, performance engine,
+live granular settings (START added to POS, REVERSE, FOLLOW), render buffers, the grain
+snapshot and the gains applied last block. Every note-on starts one voice per occupied
+layer (same event index for A, salted ones for B and C, so each layer's randomness is its
+own while the shared seed keeps the performers' slow state together); polyphony is counted
+per layer, the musical voice count per note-on. A layer's `LayerSettings` (START, TUNE,
+PAN, LEVEL, REVERSE, LOOP, FOLLOW) act in its voices (START/REVERSE/LOOP/FOLLOW) or at its
+mix gain (TUNE via the pitch ratio, PAN and LEVEL).
+
+The mix is one pure function, `mixWeights (occupied, blend, x, y)`: one occupied layer
+plays at unity (wherever the controls are — a single sound is never half of a mix); two
+use the equal-power A/B blend (`cos`/`sin`, exactly the old two-layer law, so A/B sessions
+are bit-identical); three take their barycentric share of a triangle position as power
+(`sqrt`), so the total power is constant. The controls are smoothed over ~20 ms; each
+layer's L/R gain (weight × LEVEL × PAN balance) glides block to block and no jump is
+faster than 10 ms. A layer whose gain stays at zero for a block is not rendered (CPU):
+its held voices wait, released ones and those of an emptied layer end. Then the
+**shared** post stage (Reimagined resonators and formants, MOVEMENT bus, SPACE) runs once
+— there are no per-layer macro chains; the per-voice stages (LIFE, DYNAMICS, CHARACTER
+filter, drift, the ADSR) are the same settings in every voice.
+
+Source modifiers in the voice: START offsets the read (from the end when reversed) with a
+3 ms fade-in; REVERSE reads backwards with no continuation walk or graft (made for forward
+reading) — with LOOP the best loop mirrored; LOOP off plays the recording once (and, as the
+old "Recording" sustain did, without per-voice drift); FOLLOW off multiplies by a lift taken
+from the analysis' 20 ms RMS series (`levelContour::boostDb`: towards the loudest level, at
+most +24 dB, none near the noise floor), glided per control period. Granular applies
+REVERSE and FOLLOW per grain.
+
+The ADSR is the instrument's one envelope (`attack`, `decay`, `sustainLevel`, `release`);
+every voice runs it, so note stealing and release grafts keep working. A sustain level
+changed during a held note glides there over ~10 ms.
 
 Granular is a **source mode**, not an effect: `GranularSource` lives inside the voice
 and replaces the read-through (continuation, grafts, doubling, Reimagined grains and the
@@ -259,13 +280,30 @@ no grain starts and the voice ends when the last grain does (or the release ends
 mode is fixed per note (switching never clicks); POS/SIZE/DENS/TUNE/SPREAD are read live.
 
 In the plugin each layer is a `Layer` (model exchange, playing/retired instruments, load
-state, root override, undo history). Loads, root changes and the Samples inspector act on
-the edited layer; state version 4 stores layer A in `Instrument` (so older sessions recall
-into A) and layer B in `InstrumentB`.
+state, root override, undo history). A layer is *occupied* while it holds or loads a sound;
+the editor derives its layout from that alone (0: a drop zone, 1–3: equal `EngineCard`s in
+Hero / Dual / Triple density) and never stores geometry. `addLayers` fills free slots (one
+file each, extra files reported), `removeLayer` compacts (the complete state of the layers
+above moves down: sound, root, mode, granular and layer controls) so occupied slots stay
+contiguous; one removal can be restored. LINK is a message-thread behaviour
+(`applyLinkedDelta`): a user gesture on one linked layer's START/TUNE/PAN/LEVEL moves the
+other linked layers by the same amount. State v6 stores A in `Instrument`, B in
+`InstrumentB` and C in `InstrumentC`; older sessions migrate (see `applyStateXml`).
+Existing automation IDs (`layerA.*`, `layerB.*`, `ab.blend`) are kept; layer C and the
+new controls follow the same scheme (`layerC.*`, `layerX.start/tune/pan/level/link/
+reverse/loop/follow`, `mix.x`, `mix.y`, `decay`, `sustainLevel`).
+
+The macro popups draw their pictures from the DSP's own pure functions and parameters
+(`mixWeights`, `triangleShares`, `SpaceReverb::portrait`, the CharacterFilter response
+designs, `shaping::*`, `RhythmicShaper::evaluate`, the shaper's atomic phase) and from data
+prepared off the audio thread (each sound's waveform peaks, RMS and centroid series and an
+averaged log-frequency spectrum computed by the loader). Their timers run only while a
+popup is open; the audio thread only publishes atomics (grains, read heads, shaper phase,
+the last 16 velocities).
 
 ## MOVEMENT v2 and SHAPER
 
-MOVEMENT runs on the blended instrument (after the A/B blend and the per-voice stages,
+MOVEMENT runs on the mixed instrument (after the layer mix and the per-voice stages,
 before SPACE) in `MovementBus`; DRIFT's per-note part stays in the voices. Each mode keeps
 its own settings in `Shaping` (stable IDs `movement.<mode>.<setting>`); switching modes
 crossfades the two outputs for 60 ms. The main knob keeps its original ID `motion`.

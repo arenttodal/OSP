@@ -64,6 +64,7 @@ namespace
         }
         void run (double seconds, std::vector<float>& outL, std::vector<float>* outR = nullptr, int block = 256)
         {
+            block = std::min (block, static_cast<int> (l.size()));   // never more than the buffers hold
             const auto total = static_cast<int> (seconds * rate);
             for (int done = 0; done < total; done += block)
             {
@@ -521,4 +522,101 @@ TEST_CASE ("Granular layer modifiers: START moves the grains, FOLLOW off lifts q
     CHECK (levelPos > 0.0);
     CHECK (levelShifted > 0.0);
     CHECK (tail == Approx (tailLifted).margin (1.0e-6));
+}
+
+TEST_CASE ("modifiers on three layers under mix and envelope automation: finite, smooth, released cleanly", "[integration][layers][regression]")
+{
+    auto vowel = testsignals::vowel (220.0, 2.0, rate, 3);
+    const auto sustained = instrument::buildComplete (vowel, test::analyse (vowel), {}, false);
+    const auto fading = decayingModel (330.0, 1.5);
+    for (int variant = 0; variant < 4; ++variant)
+    {
+        auto s = quietSettings();
+        s.macros.motion = 0.5;
+        s.macros.space = 0.4;
+        auto layer = [] (double start, double tune, double pan, double level, bool reverse, bool loop, bool follow) {
+            LayerSettings ls;
+            ls.start = start;
+            ls.tuneSemitones = tune;
+            ls.pan = pan;
+            ls.levelDb = level;
+            ls.reverse = reverse;
+            ls.loop = loop;
+            ls.follow = follow;
+            return ls;
+        };
+        s.layer[0] = layer (0.2, 0.0, -0.5, -3.0, (variant & 1) != 0, true, variant < 2);
+        s.layer[1] = layer (0.0, 7.0, 0.5, -6.0, (variant & 2) != 0, false, false);
+        s.layer[2] = layer (0.5, -12.0, 0.0, 0.0, true, true, true);
+        s.sourceMode[1] = variant >= 2 ? SourceMode::granular : SourceMode::oneShot;
+        s.sourceMode[2] = SourceMode::granular;
+        Rig rig (s, 128);
+        rig.engine.setModel (sustained.get(), 0);
+        rig.engine.setModel (fading.get(), 1);
+        rig.engine.setModel (sustained.get(), 2);
+        for (int l = 0; l < 3; ++l)
+            rig.engine.setGranular (l, s.granular[static_cast<std::size_t> (l)]);
+        rig.engine.noteOn (57, 110, 1);
+        rig.engine.noteOn (64, 70, 1);
+        std::vector<float> out;
+        float largest = 0.0f, peak = 0.0f;
+        for (int block = 0; block < 600; ++block)
+        {
+            // The mix sweeps around the triangle, the envelope's sustain moves, a layer's LEVEL jumps.
+            rig.engine.setMixPosition (0.5 + 0.5 * std::sin (block * 0.02), 0.5 + 0.5 * std::cos (block * 0.03));
+            auto adsr = s.adsr;
+            adsr.decaySeconds = 0.2;
+            adsr.sustainLevel = 0.5 + 0.5 * std::sin (block * 0.05);
+            rig.engine.setEnvelope (adsr);
+            if (block % 97 == 0)
+            {
+                auto third = s.layer[2];
+                third.levelDb = (block / 97) % 2 == 0 ? LayerSettings::minLevelDb : 6.0;
+                rig.engine.setLayerSettings (2, third);
+            }
+            const auto before = out.size();
+            rig.run (128.0 / rate, out, nullptr, 128);
+            for (auto i = std::max<std::size_t> (1, before); i < out.size(); ++i)
+            {
+                REQUIRE (std::isfinite (out[i]));
+                largest = std::max (largest, std::abs (out[i] - out[i - 1]));
+                peak = std::max (peak, std::abs (out[i]));
+            }
+        }
+        INFO ("variant " << variant << ": peak " << peak << ", largest step " << largest);
+        CHECK (peak > 1.0e-3f);
+        CHECK (largest < 0.35f * peak);
+        rig.engine.allNotesOff();
+        rig.run (3.0, out, nullptr, 128);
+        CHECK (rig.engine.activeVoiceCount() == 0);
+    }
+}
+
+TEST_CASE ("a recording too short for grains plays safely in every mode", "[integration][layers][granular]")
+{
+    for (double seconds : { 0.003, 0.02, 0.08 })
+    {
+        auto audio = testsignals::sine (440.0, seconds, rate, 0.4, 1);
+        const auto tiny = instrument::buildComplete (audio, test::analyse (audio), {}, false);
+        for (auto mode : { SourceMode::oneShot, SourceMode::granular })
+            for (bool reverse : { false, true })
+            {
+                auto s = quietSettings();
+                s.sourceMode[0] = mode;
+                s.layer[0].reverse = reverse;
+                s.layer[0].follow = false;
+                s.layer[0].start = 0.5;
+                Rig rig (s);
+                rig.engine.setModel (tiny.get(), 0);
+                rig.engine.setGranular (0, s.granular[0]);
+                rig.engine.noteOn (69, 100, 1);
+                std::vector<float> out;
+                rig.run (0.5, out);
+                rig.engine.noteOff (69);
+                rig.run (0.5, out);
+                for (float v : out)
+                    REQUIRE (std::isfinite (v));
+                CHECK (rig.engine.activeVoiceCount() == 0);
+            }
+    }
 }

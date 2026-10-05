@@ -1062,7 +1062,10 @@ void OspAudioProcessorEditor::resized()
     statusLabel.setBounds (bottom.withTrimmedLeft (4));
     area.removeFromBottom (8);
 
-    auto keys = area.removeFromBottom (80);
+    // The lower sections breathe a little with the window's height (never with the number of
+    // layers: they stay put when sounds are added or removed).
+    const int lowerHeight = juce::jlimit (136, 172, juce::roundToInt (getHeight() * 0.195f));
+    auto keys = area.removeFromBottom (juce::jlimit (68, 92, juce::roundToInt (getHeight() * 0.098f)));
     pitchWheel.setBounds (keys.removeFromLeft (30));
     keys.removeFromLeft (4);
     modWheel.setBounds (keys.removeFromLeft (30));
@@ -1072,7 +1075,7 @@ void OspAudioProcessorEditor::resized()
     area.removeFromBottom (12);
 
     // Macros and envelope.
-    lowerPanel = area.removeFromBottom (160);
+    lowerPanel = area.removeFromBottom (lowerHeight);
     {
         auto inner = lowerPanel.reduced (18, 12);
         envelope.setBounds (inner.removeFromRight (juce::roundToInt (inner.getWidth() * 0.34f)));
@@ -1091,7 +1094,7 @@ void OspAudioProcessorEditor::resized()
     area.removeFromBottom (12);
 
     // The mix band (fixed height), then the sources take the rest.
-    mixSection.setBounds (area.removeFromBottom (64));
+    mixSection.setBounds (area.removeFromBottom (60));
     area.removeFromBottom (12);
     sourceArea = area;
     layoutSources (false);
@@ -1151,9 +1154,23 @@ void OspAudioProcessorEditor::timerCallback()
         else
             samplesPanel.setInstrument (instrument, ospProcessor.editLayer());
     }
-    if (shownCount == 3)
-        mixSection.repaint();
-    envelope.repaint (envelope.graphBounds());
+    // Pictures that follow parameters repaint only when those moved.
+    {
+        const std::array<float, 6> now { ospProcessor.parameterValue ("mix.x"), ospProcessor.parameterValue ("mix.y"),
+                                         ospProcessor.parameterValue ("attack"), ospProcessor.parameterValue ("decay"),
+                                         ospProcessor.parameterValue ("sustainLevel"), ospProcessor.parameterValue ("release") };
+        auto moved = [&] (std::size_t from, std::size_t to) {
+            for (auto i = from; i < to; ++i)
+                if (std::abs (now[i] - shownValues[i]) > 1.0e-6f)
+                    return true;
+            return false;
+        };
+        if (shownCount == 3 && moved (0, 2))
+            mixSection.repaint();
+        if (moved (2, 6))
+            envelope.repaint (envelope.graphBounds());
+        shownValues = now;
+    }
     updateCustomisedDots();
     updateStatus();
 }

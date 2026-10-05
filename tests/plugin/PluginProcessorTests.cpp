@@ -1348,6 +1348,10 @@ TEST_CASE ("plugin: the editor adapts to one, two and three sounds; drops replac
     CHECK (ui->dropTargetAt (centre) == "replace B");
     ui->previewDrag (false);
     snapshot ("osp-adaptive-3.png");
+    // The smallest window still fits three full cards.
+    editor->setSize (900, 720);
+    snapshot ("osp-adaptive-3-small.png");
+    editor->setSize (1060, 820);
 
     // Removing B: C moves into its place, two cards again.
     REQUIRE (p.removeLayer (1));
@@ -1400,4 +1404,160 @@ TEST_CASE ("plugin: LINK moves the other linked layers by the same amount, keepi
     // Only START, TUNE, PAN and LEVEL link.
     p.applyLinkedDelta (0, "sourceMode", 1.0f);
     CHECK (valueOf (p, "layerB.sourceMode") == Approx (0.0f));
+}
+
+TEST_CASE ("plugin: an A/B session from before the adaptive layers opens as two layers with its blend", "[plugin][adaptive]")
+{
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "first.wav", testsignals::vowel (midiToHz (57), 2.0, 48000.0, 3));
+    const auto b = writeSource (tmp.dir, "second.wav", testsignals::vowel (midiToHz (60), 2.0, 48000.0, 4));
+    OspAudioProcessor original;
+    original.loadFile (a, 0);
+    original.loadFile (b, 1);
+    REQUIRE (original.waitForLoads (30000));
+    original.pollLoads();
+    original.setParameterValue ("ab.blend", 0.35f);
+    original.setParameterValue ("layerB.sourceMode", 1.0f);
+    juce::MemoryBlock state;
+    original.getStateInformation (state);
+    auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
+    auto tree = juce::ValueTree::fromXml (*xml);
+    tree.setProperty ("stateVersion", 5, nullptr);
+    for (int i = tree.getNumChildren(); --i >= 0;)
+    {
+        const auto id = tree.getChild (i)["id"].toString();
+        if (id.startsWith ("layerC.") || id == "mix.x" || id == "mix.y" || id == "decay" || id == "sustainLevel"
+            || OspAudioProcessor::layerControlNames().contains (id.fromFirstOccurrenceOf (".", false, false)))
+            tree.removeChild (i, nullptr);
+    }
+    tree.removeChild (tree.getChildWithName ("InstrumentC"), nullptr);
+    juce::MemoryBlock old;
+    juce::AudioProcessor::copyXmlToBinary (*tree.createXml(), old);
+
+    // Opened where a three-layer instrument was playing: C goes, A and B come back as they were.
+    const auto c = writeSource (tmp.dir, "third.wav", testsignals::vowel (midiToHz (64), 2.0, 48000.0, 5));
+    OspAudioProcessor p;
+    p.addLayers ({ c, c, c });
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    p.setStateInformation (old.getData(), static_cast<int> (old.getSize()));
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    CHECK (p.occupiedLayerCount() == 2);
+    CHECK (juce::String (p.currentInstrument (0)->filename) == "first.wav");
+    CHECK (juce::String (p.currentInstrument (1)->filename) == "second.wav");
+    CHECK (p.currentInstrument (2) == nullptr);
+    CHECK (valueOf (p, "ab.blend") == Approx (0.35f));
+    CHECK (valueOf (p, "layerB.sourceMode") == Approx (1.0f));
+    CHECK (valueOf (p, "layerC.sourceMode") == Approx (0.0f));
+    // Same sound as the session it came from.
+    const auto x = playNote (original, 57, 48000.0, 1.0), y = playNote (p, 57, 48000.0, 1.0);
+    double diff = 0.0;
+    for (std::size_t i = 0; i < x.channels[0].size(); ++i)
+        diff = std::max (diff, static_cast<double> (std::abs (x.channels[0][i] - y.channels[0][i])));
+    CHECK (diff < 1.0e-6);
+}
+
+TEST_CASE ("plugin: automating every new control while notes play stays smooth and finite", "[plugin][adaptive]")
+{
+    TempDir tmp;
+    juce::Array<juce::File> files;
+    for (int i = 0; i < 3; ++i)
+        files.add (writeSource (tmp.dir, "auto" + juce::String (i) + ".wav", testsignals::vowel (midiToHz (55 + 2 * i), 2.0, 48000.0, static_cast<std::uint64_t> (i + 9))));
+    OspAudioProcessor p;
+    p.addLayers (files);
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    p.setParameterValue ("layerB.sourceMode", 1.0f);
+    p.prepareToPlay (48000.0, 128);
+    juce::AudioBuffer<float> buffer (2, 128);
+    juce::MidiBuffer on;
+    on.addEvent (juce::MidiMessage::noteOn (1, 57, static_cast<juce::uint8> (100)), 0);
+    on.addEvent (juce::MidiMessage::noteOn (1, 64, static_cast<juce::uint8> (90)), 0);
+    juce::Random random (17);
+    const char* automated[] = { "mix.x", "mix.y", "layerA.level", "layerB.level", "layerC.level", "layerA.pan", "layerB.pan", "layerC.pan",
+                                "layerA.tune", "layerC.start", "layerB.granular.position", "layerB.granular.spread", "attack", "decay",
+                                "sustainLevel", "release", "life", "character", "motion", "space", "reimagined", "movement.shaper.pattern" };
+    float previous = 0.0f, largestStep = 0.0f, peak = 0.0f;
+    for (int block = 0; block < 1500; ++block)
+    {
+        // A host automating everything at once, every block (about 2.7 ms), across the full ranges.
+        if (block > 100)
+            for (const auto* id : automated)
+                if (random.nextFloat() < 0.15f)
+                    if (auto* param = p.parameters.getParameter (id))
+                        param->setValueNotifyingHost (random.nextFloat());
+        if (block == 600)
+            p.setParameterValue ("movement.mode", 4.0f);
+        buffer.clear();
+        juce::MidiBuffer midi;
+        p.processBlock (buffer, block == 0 ? on : midi);
+        for (int i = 0; i < buffer.getNumSamples(); ++i)
+        {
+            const float v = buffer.getSample (0, i);
+            REQUIRE (std::isfinite (v));
+            peak = std::max (peak, std::abs (v));
+            if (block > 100 && p.parameterValue ("layerA.tune") > -100.0f)
+                largestStep = std::max (largestStep, std::abs (v - previous));
+            previous = v;
+        }
+    }
+    INFO ("peak " << peak << ", largest sample step " << largestStep);
+    CHECK (peak > 0.0f);
+    CHECK (peak < 4.0f);
+    // No zipper or click: the largest sample-to-sample step stays a fraction of the level.
+    CHECK (largestStep < 0.35f * peak);
+}
+
+TEST_CASE ("plugin: a sound replaced while it plays finishes, a bad file never stops the others", "[plugin][adaptive]")
+{
+    TempDir tmp;
+    const auto good = writeSource (tmp.dir, "good.wav", testsignals::vowel (midiToHz (57), 2.0, 48000.0, 3));
+    const auto other = writeSource (tmp.dir, "other.wav", testsignals::vowel (midiToHz (60), 2.0, 48000.0, 4));
+    const auto broken = tmp.dir.getChildFile ("broken.wav");
+    broken.replaceWithText ("RIFF this is not audio at all");
+    const auto tiny = writeSource (tmp.dir, "tiny.wav", testsignals::sine (440.0, 0.02, 48000.0, 0.4, 1));
+
+    OspAudioProcessor p;
+    p.addLayers ({ good, broken, tiny });
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    CHECK (p.currentInstrument (0) != nullptr);
+    CHECK (p.loadState (1) == OspAudioProcessor::LoadState::failed);
+    CHECK_FALSE (p.isLayerOccupied (1));
+    // The tiny sound, played as grains: no crash, no NaN.
+    if (p.currentInstrument (2) != nullptr)
+        p.setParameterValue ("layerC.sourceMode", 1.0f);
+
+    p.prepareToPlay (48000.0, 256);
+    juce::AudioBuffer<float> buffer (2, 256);
+    juce::MidiBuffer on;
+    on.addEvent (juce::MidiMessage::noteOn (1, 57, static_cast<juce::uint8> (100)), 0);
+    p.processBlock (buffer, on);
+    // Replace A while its note sounds: the note goes on with the old sound, safely.
+    p.replaceLayer ({ other }, 0);
+    for (int block = 0; block < 400; ++block)
+    {
+        if (block == 50)
+            p.pollLoads();
+        if (block == 100)
+        {
+            REQUIRE (p.waitForLoads (30000));
+            p.pollLoads();
+        }
+        juce::MidiBuffer none;
+        p.processBlock (buffer, none);
+        for (int i = 0; i < buffer.getNumSamples(); ++i)
+            REQUIRE (std::isfinite (buffer.getSample (0, i)));
+    }
+    CHECK (juce::String (p.currentInstrument (0)->filename) == "other.wav");
+    CHECK_FALSE (p.rootOverride (0).has_value());
+    juce::MidiBuffer off;
+    off.addEvent (juce::MidiMessage::allNotesOff (1), 0);
+    p.processBlock (buffer, off);
+    const auto out = playNote (p, 60, 48000.0, 0.5);
+    double energy = 0.0;
+    for (float v : out.channels[0])
+        energy += static_cast<double> (v) * v;
+    CHECK (energy > 0.0);
 }
