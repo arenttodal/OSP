@@ -125,6 +125,11 @@ public:
     /** Removes a layer's sound; the layers above move down (complete state: sound, root,
         mode, granular and layer controls). Not while sounds are loading. Restorable once. */
     bool removeLayer (int layer);
+    /** A new sound for an occupied layer: its root goes back to automatic, its controls stay
+        (several files make one multi-sample sound). Voices already playing finish on the old one. */
+    void replaceLayer (const juce::Array<juce::File>& files, int layer);
+    /** Several files as ONE new multi-sample layer (a dropped folder). Returns the slot, -1 when full. */
+    int addLayerSet (const juce::Array<juce::File>& files);
     bool canRestoreRemovedLayer() const;
     bool restoreRemovedLayer();
     /** Neutral layer controls and granular settings, automatic root. */
@@ -169,7 +174,35 @@ public:
 
     juce::AudioProcessorValueTreeState parameters;
     juce::MidiKeyboardState keyboardState;
-    std::atomic<int> activeVoices { 0 };
+    std::atomic<int> activeVoices { 0 };     ///< played notes sounding (a note on three layers counts once)
+
+    /** The on-screen wheels (message thread -> audio thread): pitch -1..1 (springs back), mod 0..1. */
+    void setScreenPitchWheel (float value) noexcept { screenPitch = std::clamp (value, -1.0f, 1.0f); }
+    void setScreenModWheel (float value) noexcept { screenMod = std::clamp (value, 0.0f, 1.0f); }
+
+    /**
+        LINK: a user change of one layer's START, TUNE, PAN or LEVEL (`control`) by `delta`
+        moves every other linked layer's same control by the same amount (clamped), so
+        their relationship is kept. Nothing happens unless `layer` itself is linked.
+        Message thread (a UI gesture; automation is never propagated).
+    */
+    void applyLinkedDelta (int layer, const juce::String& control, float delta);
+    bool isLayerLinked (int layer) const { return parameterValue (layerParameterId (layer, "link")) >= 0.5f; }
+
+    // Header preset navigation (spec: previous / name / favourite / next): the factory
+    // starting states first, then the user's preset files.
+    juce::String presetDisplayName() const;
+    void stepPresetList (int delta);
+    struct PresetEntry
+    {
+        juce::String name;
+        int program = -1;         ///< a starting state, or -1
+        juce::File file;          ///< a preset file
+    };
+    std::vector<PresetEntry> presetList() const;
+    void openPresetEntry (const PresetEntry& entry);
+    bool isFavourite() const;
+    void toggleFavourite();
     juce::UndoManager undoManager;
 
     /** 2: engine C parameters (macros, pitch character, sustain, seed). v1 sessions migrate to neutral settings.
@@ -306,6 +339,9 @@ private:
     std::array<float, 6> ccMacro { -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f };
     std::array<float, 6> lastMacroParam { -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f };
     float modWheel = 0.0f;
+    std::atomic<float> screenPitch { 0.0f }, screenMod { 0.0f };
+    float lastScreenPitch = 0.0f, lastScreenMod = 0.0f;
+    bool presetIsProgram = true;   ///< the header shows the starting state until a preset file is opened
     float lastAttack = -1.0f, lastRelease = -1.0f, lastGain = -1000.0f, lastVelocityRange = -1.0f;
     double pitchBendSemitones = 0.0;
     bool hostWasPlaying = false;     // audio thread: transport start resets performance memory

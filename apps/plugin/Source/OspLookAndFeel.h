@@ -5,38 +5,82 @@
 namespace osp::plugin
 {
 
-/** The instrument's palette (UI redesign: warm housing, charcoal display, one orange accent). */
+/**
+    The instrument's palette (adaptive-layer redesign: "neutral instrument, colourful
+    sound"). Warm natural neutrals for the housing and controls; colour only where it
+    means something: the live coral accent, the layers' identities and the spectral
+    colours of the sound itself (amber -> coral -> rose -> lavender -> mineral blue).
+*/
 namespace palette
 {
-    const juce::Colour frame { 0xff26292c };        ///< around the housing
-    const juce::Colour housing { 0xffe7ddcc };      ///< chassis
-    const juce::Colour housingLight { 0xfff1eadd }; ///< raised controls, popups
-    const juce::Colour surface { 0xffd9cdb3 };      ///< control surfaces, value boxes
-    const juce::Colour border { 0xffb8ab92 };
-    const juce::Colour display { 0xff1f2326 };      ///< waveform well
-    const juce::Colour displayLine { 0xff343a40 };
-    const juce::Colour displayText { 0xff8f9396 };
-    const juce::Colour wave { 0xffdccdb1 };
-    const juce::Colour accent { 0xfff26722 };       ///< active states and indicators only
-    const juce::Colour text { 0xff2b2b2b };
-    const juce::Colour textDim { 0xff6f685d };
-    const juce::Colour ivory { 0xfff7f3ea };        ///< white keys
-    const juce::Colour ebony { 0xff2a2b2d };        ///< black keys
+    // Surfaces
+    const juce::Colour housing { 0xfff2f0ea };      ///< main housing
+    const juce::Colour raised { 0xfff8f7f3 };       ///< cards, buttons, popups
+    const juce::Colour recessed { 0xffe8e6df };     ///< tracks, wells on the housing
+    const juce::Colour hairline { 0xffd5d1c8 };
+    const juce::Colour text { 0xff272622 };
+    const juce::Colour textDim { 0xff77746d };
+    const juce::Colour graphite { 0xff34332f };     ///< the sound displays (colour reads as light on it)
+    const juce::Colour accent { 0xffe1774f };       ///< live position, focus, active state: small areas only
+
+    // The sound's spectral colours (usually at reduced opacity).
+    const juce::Colour amber { 0xffd79a43 };
+    const juce::Colour gold { 0xffdab66d };
+    const juce::Colour coral { 0xffd47a62 };
+    const juce::Colour rose { 0xffc48791 };
+    const juce::Colour lavender { 0xffaaa0bb };
+    const juce::Colour mineral { 0xff829cac };
+    const juce::Colour sage { 0xff8fa898 };         ///< layer C's neutral bridge
+
+    // Names the older components use, mapped onto the new system.
+    const juce::Colour frame { 0xffe7e4dc };
+    const juce::Colour housingLight = raised;
+    const juce::Colour surface = recessed;
+    const juce::Colour border = hairline;
+    const juce::Colour display = graphite;
+    const juce::Colour displayLine { 0xff4a4844 };
+    const juce::Colour displayText { 0xffa29e95 };
+    const juce::Colour wave { 0xffded7c8 };
+    const juce::Colour ivory { 0xfffbfaf6 };        ///< white keys: warm white
+    const juce::Colour ebony { 0xff3b3a36 };        ///< black keys: soft graphite
+
+    /** A layer's identity: A warm (amber/coral), B cool (lavender/blue-grey), C a quiet sage. */
+    inline juce::Colour layer (int index)
+    {
+        switch (index)
+        {
+            case 1: return juce::Colour (0xff8f9bb4);
+            case 2: return juce::Colour (0xff86a596);
+            default: break;
+        }
+        return juce::Colour (0xffd9895a);
+    }
+
+    /** The spectral gradient at t (0 = warm/low .. 1 = cool/high). */
+    inline juce::Colour spectrum (float t)
+    {
+        static const juce::Colour stops[] = { amber, gold, coral, rose, lavender, mineral };
+        const float x = juce::jlimit (0.0f, 1.0f, t) * 5.0f;
+        const int i = juce::jmin (4, static_cast<int> (x));
+        return stops[i].interpolatedWith (stops[i + 1], x - static_cast<float> (i));
+    }
 }
 
-/** Barlow (SIL OFL, embedded) so the instrument reads the same on every computer. */
+/** Inter (SIL OFL, embedded, tabular figures by default) so the instrument reads the same everywhere. */
 namespace fonts
 {
     enum class Weight { regular, medium, semibold };
     juce::Font make (float height, Weight weight = Weight::regular, float tracking = 0.0f);
-    /** Uppercase labels: medium weight, a little letter-spacing. */
-    inline juce::Font label (float height) { return make (height, Weight::medium, 0.08f); }
+    /** Uppercase labels: medium weight, a little letter-spacing (not too much). */
+    inline juce::Font label (float height) { return make (height, Weight::medium, 0.05f); }
 }
 
 /**
-    LookAndFeel of the redesigned instrument: rounded hardware-card buttons and combo
-    boxes, cream knobs with a dot scale and an orange indicator, value boxes, light popup
-    menus. Sliders flagged with the "mini" property draw the compact popup knob.
+    LookAndFeel of the instrument: flat raised buttons with a hairline and a restrained
+    contact shadow, neutral knobs with a charcoal indicator and a thin value arc in the
+    layer's (or the global accent) colour, light popup menus. Slider properties:
+    "mini" (compact knob, no scale), "arc" (ARGB of the value arc), "bipolar" (the arc
+    starts at the centre).
 */
 class OspLookAndFeel final : public juce::LookAndFeel_V4
 {
@@ -69,7 +113,7 @@ public:
 
     /** The knob itself (also used where no Slider exists, e.g. snapshots). */
     static void drawKnob (juce::Graphics&, juce::Rectangle<float> bounds, float angle, float startAngle,
-                          float endAngle, bool mini, bool enabled);
+                          float endAngle, bool mini, bool enabled, juce::Colour arc = palette::accent, bool bipolar = false);
     /** A rounded raised card (buttons, popups, value boxes). */
     static void drawCard (juce::Graphics&, juce::Rectangle<float> bounds, float radius, bool pressed, bool hover);
 

@@ -651,21 +651,16 @@ namespace
                 knobs.push_back (std::make_unique<MiniKnob> (state, id, caption, std::move (f)));
                 addAndMakeVisible (*knobs.back());
             };
-            auto* velocity = state.getParameter ("velocityRange");
+            // OUTPUT is the header's VOLUME, sustain each layer's LOOP, the velocity range
+            // DYNAMICS' RANGE: Advanced keeps what a musician rarely needs.
             auto* fine = state.getParameter ("fineTune");
             auto* bend = state.getParameter ("bendRange");
-            auto* gain = state.getParameter ("gain");
-            add ("velocityRange", "VELOCITY", [velocity] (double) { return parameterText (velocity); });
             add ("fineTune", "FINE", [fine] (double) { return parameterText (fine); });
             add ("bendRange", "BEND", [bend] (double v) { juce::ignoreUnused (bend); return juce::String (juce::roundToInt (v)) + " st"; });
-            add ("gain", "OUTPUT", [gain] (double) { return parameterText (gain); });
 
             pitch = std::make_unique<SegmentedControl> (*state.getParameter ("pitchCharacter"), juce::StringArray { "TAPE", "NATURAL" });
-            sustain = std::make_unique<SegmentedControl> (*state.getParameter ("sustain"), juce::StringArray { "RECORDING", "ENDLESS" });
             pitch->setTooltip ("Pitch character: tape-like resampling or natural (formants kept)");
-            sustain->setTooltip ("Sustain: the recording's own length, or endless continuation");
             addAndMakeVisible (*pitch);
-            addAndMakeVisible (*sustain);
 
             mpe.setTooltip ("MPE controllers: per-note pitch bend (+/-48 st), pressure and slide");
             mpeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (state, "mpe", mpe);
@@ -683,15 +678,14 @@ namespace
             addAndMakeVisible (reseed);
         }
 
-        juce::Point<int> cardSize() const override { return { 332, 8 + 18 + knobRowHeight + 8 + 12 + segmentHeight + 8 + 24 + 8 }; }
+        juce::Point<int> cardSize() const override { return { 300, 8 + 18 + knobRowHeight + 8 + 12 + segmentHeight + 8 + 24 + 8 }; }
 
         void paint (juce::Graphics& g) override
         {
             MiniPanel::paint (g);
             g.setColour (palette::textDim);
             g.setFont (fonts::label (9.5f));
-            g.drawText ("PITCH", pitchCaption, juce::Justification::centredLeft, false);
-            g.drawText ("SUSTAIN", sustainCaption, juce::Justification::centredLeft, false);
+            g.drawText ("PITCH CHARACTER", pitchCaption, juce::Justification::centredLeft, false);
             if (auto* seed = processor.parameters.getParameter ("seed"))
                 g.drawText ("SEED " + seed->getCurrentValueAsText(), seedCaption, juce::Justification::centredRight, false);
         }
@@ -700,19 +694,13 @@ namespace
         void layoutContent (juce::Rectangle<int> area) override
         {
             auto row = area.removeFromTop (knobRowHeight);
-            const int cell = row.getWidth() / static_cast<int> (knobs.size());
+            const int cell = row.getWidth() / 4;
+            row.removeFromLeft (cell / 2);
             for (auto& k : knobs)
-                k->setBounds (row.removeFromLeft (cell));
+                k->setBounds (row.removeFromLeft (cell).expanded (cell / 4, 0));
             area.removeFromTop (8);
-            auto captions = area.removeFromTop (12);
-            auto choices = area.removeFromTop (segmentHeight);
-            const int half = (choices.getWidth() - 10) / 2;
-            pitchCaption = captions.removeFromLeft (half);
-            pitch->setBounds (choices.removeFromLeft (half));
-            choices.removeFromLeft (10);
-            captions.removeFromLeft (10);
-            sustainCaption = captions;
-            sustain->setBounds (choices);
+            pitchCaption = area.removeFromTop (12);
+            pitch->setBounds (area.removeFromTop (segmentHeight));
             area.removeFromTop (8);
             auto last = area.removeFromTop (24);
             mpe.setBounds (last.removeFromLeft (80));
@@ -723,18 +711,18 @@ namespace
 
         OspAudioProcessor& processor;
         std::vector<std::unique_ptr<MiniKnob>> knobs;
-        std::unique_ptr<SegmentedControl> pitch, sustain;
+        std::unique_ptr<SegmentedControl> pitch;
         juce::ToggleButton mpe { "MPE" };
         std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> mpeAttachment;
         juce::TextButton reseed { "Reseed" };
-        juce::Rectangle<int> pitchCaption, sustainCaption, seedCaption;
+        juce::Rectangle<int> pitchCaption, seedCaption;
     };
 }
 
 const juce::StringArray& popupParameterIds (MacroPopup macro)
 {
     static const juce::StringArray life { "life.mode", "life.pitch", "life.tone", "life.attack" };
-    static const juce::StringArray dynamics { "dynamics.curve", "attack", "release", "dynamics.tone" };
+    static const juce::StringArray dynamics { "dynamics.curve", "velocityRange", "dynamics.tone" };
     static const juce::StringArray character { "character.type", "character.min", "character.max", "character.resonance",
                                                "character.drive", "character.envAmount", "character.envAttack", "character.envDecay" };
     static const juce::StringArray movement { "movement.mode", "movement.drift.speed", "movement.drift.pitch", "movement.drift.tone",
@@ -772,10 +760,10 @@ std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, OspAudioProcessor
         }
         case MacroPopup::dynamics:
         {
+            // ATTACK and RELEASE are the instrument's envelope now (beside the macros).
             auto popup = std::make_unique<ShapingPopup> ("VELOCITY CURVE", state);
             popup->selector ("dynamics.curve", { "SOFT", "LINEAR", "HARD" });
-            popup->knob (0, "attack", "ATTACK", ms);
-            popup->knob (0, "release", "RELEASE", ms);
+            popup->knob (0, "velocityRange", "RANGE", [] (double v) { return juce::String (v, 0) + " dB"; });
             popup->knob (0, "dynamics.tone", "TONE", percentOf());
             return popup;
         }

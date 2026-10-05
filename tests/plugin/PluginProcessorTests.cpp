@@ -1243,3 +1243,107 @@ TEST_CASE ("plugin: sessions from before the adaptive layers open as they were (
         diff = std::max (diff, static_cast<double> (std::abs (x.channels[0][i] - y.channels[0][i])));
     CHECK (diff < 1.0e-6);
 }
+
+TEST_CASE ("plugin: the editor adapts to one, two and three sounds; drops replace or add", "[.][ui]")
+{
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "Glass Resonance.wav", testsignals::vowel (midiToHz (48), 3.0, 48000.0, 3));
+    const auto b = writeSource (tmp.dir, "Evolving Texture.wav", testsignals::vowel (midiToHz (55), 3.5, 48000.0, 8));
+    const auto c = writeSource (tmp.dir, "Warm Harmonics.wav", testsignals::pluck (midiToHz (52), 2.5, 48000.0, 5));
+    OspAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (editor.get());
+    REQUIRE (ui != nullptr);
+    auto snapshot = [&] (const juce::String& name) {
+        if (const char* dir = std::getenv ("OSP_SNAPSHOT_DIR"))
+        {
+            const auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f);
+            juce::FileOutputStream out (juce::File (dir).getChildFile (name));
+            out.setPosition (0);
+            out.truncate();
+            juce::PNGImageFormat().writeImageToStream (image, out);
+        }
+    };
+    auto settle = [&] {
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        ui->refreshNow();
+    };
+    const auto centre = editor->getLocalBounds().getCentre().withY (200);
+    const auto left = juce::Point<int> (editor->getWidth() / 5, 200), right = juce::Point<int> (editor->getWidth() * 4 / 5, 200);
+
+    // Nothing loaded: one drop zone, no empty cards.
+    ui->refreshNow();
+    CHECK (ui->visibleCardCount() == 0);
+    CHECK (ui->dropTargetAt (centre) == "drop");
+    snapshot ("osp-adaptive-0.png");
+
+    // One sound: one full-width card.
+    p.addLayers ({ a });
+    settle();
+    CHECK (ui->visibleCardCount() == 1);
+    CHECK (ui->dropTargetAt (left) == "replace A");
+    CHECK (ui->dropTargetAt (right) == "replace A");
+    snapshot ("osp-adaptive-1.png");
+    // Dragging another sound over it: room for a second layer opens beside it.
+    ui->previewDrag (true, right);
+    CHECK (ui->dropTargetAt (right) == "add B");
+    CHECK (ui->dropTargetAt (left) == "replace A");
+    snapshot ("osp-adaptive-1-drag.png");
+    ui->previewDrag (false);
+    CHECK (ui->dropTargetAt (right) == "replace A");
+
+    // Two: equal cards and the A/B blend (B Granular).
+    p.addLayers ({ b });
+    settle();
+    p.setParameterValue ("layerB.sourceMode", 1.0f);
+    p.setParameterValue ("layerA.level", -3.0f);
+    p.setParameterValue ("layerB.level", -3.0f);
+    p.prepareToPlay (48000.0, 512);
+    juce::AudioBuffer<float> audio (2, 512);
+    for (int block = 0; block < 40; ++block)
+    {
+        juce::MidiBuffer midi;
+        if (block == 0)
+            for (int note : { 48, 55 })
+                midi.addEvent (juce::MidiMessage::noteOn (1, note, static_cast<juce::uint8> (100)), 0);
+        audio.clear();
+        p.processBlock (audio, midi);
+    }
+    ui->refreshNow();
+    CHECK (ui->visibleCardCount() == 2);
+    CHECK (ui->dropTargetAt (left) == "replace A");
+    CHECK (ui->dropTargetAt (right) == "replace B");
+    snapshot ("osp-adaptive-2.png");
+    juce::MidiBuffer off;
+    off.addEvent (juce::MidiMessage::allNotesOff (1), 0);
+    p.processBlock (audio, off);
+
+    // Three: three cards, the mix triangle; a drop can only replace.
+    p.addLayers ({ c });
+    settle();
+    p.setParameterValue ("layerC.sourceMode", 1.0f);
+    ui->refreshNow();
+    CHECK (ui->visibleCardCount() == 3);
+    ui->previewDrag (true, right);
+    CHECK (ui->dropTargetAt (right) == "replace C");
+    CHECK (ui->dropTargetAt (centre) == "replace B");
+    ui->previewDrag (false);
+    snapshot ("osp-adaptive-3.png");
+
+    // Removing B: C moves into its place, two cards again.
+    REQUIRE (p.removeLayer (1));
+    p.pollLoads();
+    ui->refreshNow();
+    CHECK (ui->visibleCardCount() == 2);
+    CHECK (juce::String (p.currentInstrument (1)->filename) == "Warm Harmonics.wav");
+
+    // Every window size keeps the layout usable (smallest and largest).
+    for (auto size : { juce::Point<int> (900, 720), juce::Point<int> (1800, 1300) })
+    {
+        editor->setSize (size.x, size.y);
+        ui->refreshNow();
+        CHECK (ui->visibleCardCount() == 2);
+    }
+    p.editorBeingDeleted (editor.get());
+}

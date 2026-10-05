@@ -95,3 +95,42 @@ were rendered to raw float files and are compared bit-for-bit after Stage 1.
   layer controls; not while loading), `restoreRemovedLayer` (one step). Removal does not
   go through the UndoManager (APVTS flushes parameter changes into it later, which would
   corrupt redo); undo history is cleared when slots move.
+
+## Stages 4–7 — EngineCard, adaptive layout, drag & drop, main redesign
+
+- Typeface: Inter (SIL OFL, embedded) with its tabular figures made the default digits
+  (values no longer jitter as they change); Barlow removed.
+- Palette (`OspLookAndFeel.h`): housing #F2F0EA, raised #F8F7F3, recessed #E8E6DF, text
+  #272622 / #77746D, hairline #D5D1C8, graphite #34332F for every sound display, accent
+  #E1774F for live position / focus / active marks; spectral amber → gold → coral → rose →
+  lavender → mineral; layer identities A warm coral-amber, B blue-grey lavender, C sage.
+  Knobs: neutral bodies, charcoal indicator, a thin value arc in the layer's (or the
+  accent) colour; flat raised buttons with a hairline and a 1 px contact shadow.
+- `EngineCard` (one class for A/B/C; Hero / Dual / Triple): header (letter badge in the
+  layer colour when edited, root, file, mode selector, ⋮ menu); `SourceDisplay` (waveform
+  coloured per moment by its spectral centroid leaning to the layer colour, loudness ghost,
+  time grid, START marker and skipped region, loop bracket, read heads, POS/SPREAD and
+  grains, drop label); START TUNE PAN LEVEL (TUNE snaps to semitones, Alt-drag fine);
+  LINK REVERSE LOOP FOLLOW (LOOP suppressed in Granular); POS SIZE DENS TUNE SPREAD over
+  the display in Granular. Unfocused cards: waveform saturation × 0.55.
+- Adaptive source area: 0 → full-width DROP A SOUND (Browse / Load example); 1 → one
+  full-width card; 2 → two equal cards; 3 → three. Layout is derived from occupancy (state),
+  never stored. New layers fade in, cards glide (180–200 ms, `ComponentAnimator`).
+- Drag & drop: while a sound is dragged and there is room, the next layout is previewed
+  with an ADD LAYER target beside the cards; a card shows REPLACE X; with three, only
+  replace. Loose files = one layer each (up to three, the rest reported); a folder = one
+  multi-sample layer. Replacing resets the root to automatic and keeps the layer's controls.
+- Mix band (fixed height): ORIGINAL ↔ REIMAGINED always; + A/B blend (track in the two
+  layers' colours) for two layers; + mix triangle with power-share readout for three.
+- Header: OSP/2-OSP + "ONE SOURCE / TWO LAYER / THREE LAYER INSTRUMENT", preset bar
+  (‹ name ♡ ›: starting states then the user's presets; favourites in
+  Presets/Favourites.txt), VOLUME (the former Output), ⋮ menu (add layer, the edited
+  layer's replace / example / root / samples / remove, restore removed layer, presets,
+  instruments, undo, size, Advanced).
+- Lower panel: the five macros + AMP ENVELOPE (graph with draggable points, A D S R).
+  Keyboard: warm white / soft graphite keys, coral-tinted held notes; PITCH and MOD wheels.
+- Advanced keeps Fine, Bend, Pitch Character, MPE, Seed. Output → header VOLUME;
+  Sustain → each layer's LOOP; velocity range → DYNAMICS popup RANGE (Attack/Release left
+  that popup for the envelope).
+- Tests: UI test (Xvfb) for 0/1/2/3 cards, drop targets (drop / replace X / add X), drag
+  preview, compaction, smallest and largest window sizes; snapshots of every state.

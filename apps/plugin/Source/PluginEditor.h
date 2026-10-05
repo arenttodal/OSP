@@ -1,6 +1,7 @@
 #pragma once
 
-#include "LayerControls.h"
+#include "EngineCard.h"
+#include "MainSections.h"
 #include "OspLookAndFeel.h"
 #include "PluginProcessor.h"
 #include "ShapingPopups.h"
@@ -11,44 +12,6 @@
 namespace osp::plugin
 {
 
-/** Draws the loaded sample's overview in the dark display (time grid, note info), or the drop prompt. */
-class WaveformView final : public juce::Component
-{
-public:
-    void setInstrument (std::shared_ptr<const LoadedInstrument> newInstrument);
-    void setLoading (bool isLoading);
-    void setDragHighlight (bool on);
-    /** The edited layer's letter, shown with the file name at the bottom left. */
-    void setLayer (int layer);
-    /** Granular mode: mark where grains are taken (POS) and how widely (SPREAD), 0..1. */
-    void setGranularView (bool granular, float position, float spread);
-    /** The grains playing right now (from the engine's snapshot), drawn as a moving cloud. */
-    struct GrainDot
-    {
-        float position = 0.0f, level = 0.0f, lane = 0.5f;
-    };
-    void setGrains (const GrainDot* dots, int count);
-    /** One Shot notes playing now: a read head each (position 0..1, level 0..1). */
-    void setPlayheads (const GrainDot* heads, int count);
-    void paint (juce::Graphics&) override;
-    void resized() override { cacheDirty = true; }
-
-private:
-    std::shared_ptr<const LoadedInstrument> instrument;
-    int layer = 0;
-    bool granular = false;
-    float grainPosition = 0.5f, grainSpread = 0.2f;
-    std::vector<GrainDot> grains, playheads;
-    // The waveform, grid and labels change rarely: drawn once into an image, the grains
-    // move over it at the display rate.
-    juce::Image cache;
-    bool cacheDirty = true;
-    void paintStatic (juce::Graphics&);
-    juce::Rectangle<float> plotArea() const;
-    bool loading = false;
-    bool dragHighlight = false;
-};
-
 /**
     Samples inspector (spec §48): the inferred structure of a multi-sample set, one row
     per file under its pitch group, with role and layer selectors. Changing a selector
@@ -58,7 +21,7 @@ class SamplesPanel final : public juce::Component
 {
 public:
     explicit SamplesPanel (OspAudioProcessor& processor);
-    void setInstrument (std::shared_ptr<const LoadedInstrument> instrument);
+    void setInstrument (std::shared_ptr<const LoadedInstrument> instrument, int layer);
     void paint (juce::Graphics&) override;
     void resized() override;
 
@@ -76,7 +39,7 @@ private:
     std::uint64_t shownGeneration = 0;
 };
 
-/** The on-screen keyboard in the instrument's finish: ivory and ebony keys, labelled octaves. */
+/** The on-screen keyboard: warm white keys, soft graphite black keys, a quiet coral for held notes. */
 class OspKeyboard final : public juce::MidiKeyboardComponent
 {
 public:
@@ -90,18 +53,42 @@ private:
     juce::String getWhiteNoteText (int note) override;
 };
 
-/** The menu button: three short rules instead of a glyph. */
-class MenuButton final : public juce::TextButton
+/** The empty instrument: one full-width invitation to drop a sound (no empty A/B halves). */
+class DropZone final : public juce::Component
 {
 public:
-    void paintButton (juce::Graphics&, bool highlighted, bool down) override;
+    DropZone();
+    std::function<void()> onBrowse, onExample;
+    void setHighlight (bool on);
+    void paint (juce::Graphics&) override;
+    void resized() override;
+
+private:
+    juce::TextButton browse { juce::String::fromUTF8 ("Browse\xe2\x80\xa6") }, example { "Load example" };
+    bool highlight = false;
+};
+
+/** While a sound is dragged over the instrument (fewer than three layers): where a new layer would go. */
+class AddLayerTarget final : public juce::Component
+{
+public:
+    void setLetter (const juce::String& letter);
+    void setHighlight (bool on);
+    void paint (juce::Graphics&) override;
+
+private:
+    juce::String letter = "B";
+    bool highlight = false;
 };
 
 /**
-    The instrument (UI redesign): a warm housing with the pitch, character and file
-    details on top, the dark waveform display, the five macros and Original <->
-    Reimagined, Advanced, the keyboard and a slim status row. A macro's name opens its
-    popup (one at a time; Escape or a click elsewhere closes it).
+    The instrument (adaptive 1-3 layer redesign). From the top: header (identity, preset,
+    volume, menu); the source area, which is the only part that changes with the number of
+    sounds (none: a drop zone; one: a full-width card; two or three: equal cards); the mix
+    band (ORIGINAL <-> REIMAGINED, plus the A/B blend or the mix triangle); the five macros
+    and the amplitude envelope; the keyboard with its wheels; Advanced at the bottom right.
+    A macro's name opens its popup (one at a time; Escape, a click elsewhere or its name
+    again closes it).
 */
 class OspAudioProcessorEditor final : public juce::AudioProcessorEditor,
                                       public juce::FileDragAndDropTarget,
@@ -116,12 +103,14 @@ public:
     bool keyPressed (const juce::KeyPress& key) override;
 
     bool isInterestedInFileDrag (const juce::StringArray& files) override;
-    void fileDragEnter (const juce::StringArray&, int, int) override { waveform.setDragHighlight (true); }
-    void fileDragExit (const juce::StringArray&) override { waveform.setDragHighlight (false); }
-    void filesDropped (const juce::StringArray& files, int, int) override;
+    void fileDragEnter (const juce::StringArray& files, int x, int y) override;
+    void fileDragMove (const juce::StringArray& files, int x, int y) override;
+    void fileDragExit (const juce::StringArray&) override;
+    void filesDropped (const juce::StringArray& files, int x, int y) override;
 
-    /** Pulls the latest processor state into the UI now (normally done by a timer). */
-    void refreshNow() { timerCallback(); }
+    /** Pulls the latest processor state into the UI now (normally done by a timer) and
+        finishes any layout transition at once (tests, snapshots). */
+    void refreshNow();
 
     /** Popups: 0-4 the macros (LIFE..SPACE), 5 Advanced; -1 closes. Public for tests and snapshots. */
     static constexpr int advancedPopup = 5;
@@ -132,22 +121,37 @@ public:
         this editor closes the open popup. Public for tests. */
     void mouseDownAnywhere (juce::Component* clicked);
 
+    /** For tests and snapshots: how many layer cards the source area shows, and what a drop
+        at (x, y) would do ("drop", "replace A", "add B", or empty). */
+    int visibleCardCount() const;
+    juce::String dropTargetAt (juce::Point<int> where) const;
+    /** For tests: the source area's cards and drop-time layout (as during a drag). */
+    void previewDrag (bool dragging, juce::Point<int> where = {});
+
 private:
     void timerCallback() override;
-    void refreshInstrumentInfo();
-    void chooseFile();
+    void layoutSources (bool animate);
+    void updateFocus();
     void showMenu();
-    void presetOpened();
+    void showLayerMenu (int layer, juce::Component& target);
+    void addLayerSection (juce::PopupMenu& menu, int layer, bool header);
+    void chooseFile (int layer, bool addAsNewLayer);
     void choosePresetFile (bool save, bool instrument);
     void positionPopup();
     void updateCustomisedDots();
-    /** Rebinds the display's layer controls to the edited layer. */
-    void showLayer (int layer);
-    void updateGranularView();
+    void updateStatus();
+
+    struct DropTarget
+    {
+        enum class Kind { none, empty, replace, add } kind = Kind::none;
+        int layer = -1;
+    };
+    DropTarget targetAt (juce::Point<int> where) const;
+    void showDropTarget (const DropTarget& target);
 
     struct Knob
     {
-        juce::Slider slider { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::TextBoxBelow };
+        juce::Slider slider { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::NoTextBox };
         std::unique_ptr<MacroLabel> label;
         std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
     };
@@ -160,23 +164,46 @@ private:
         OspAudioProcessorEditor& editor;
     };
 
+    struct HeaderMenuButton final : juce::Button
+    {
+        HeaderMenuButton() : juce::Button ("Menu") {}
+        void paintButton (juce::Graphics&, bool highlighted, bool down) override;
+    };
+
     OspLookAndFeel lookAndFeel;
     OspAudioProcessor& ospProcessor;
-    WaveformView waveform;
-    juce::Label rootLabel, titleLabel, characterLabel, detailLabel, statusLabel;
+
+    // Header
+    PresetBar presetBar { ospProcessor };
+    juce::Slider volume { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::NoTextBox };
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> volumeAttachment;
+    HeaderMenuButton menuButton;
+    juce::Rectangle<int> headerArea, logoArea, volumeCaption;
+
+    // Sources
+    juce::Rectangle<int> sourceArea;
+    std::array<std::unique_ptr<EngineCard>, OspAudioProcessor::numLayers> cards;
+    DropZone dropZone;
+    AddLayerTarget addTarget;
     SamplesPanel samplesPanel { ospProcessor };
     bool samplesShown = false;
-    // A/B layers, inside the display.
-    LayerTabs layerTabs;
-    BlendControl blendControl { ospProcessor.parameters };
-    std::unique_ptr<SourceModeSwitch> modeSwitch;
-    std::unique_ptr<GranularOverlay> granularOverlay;
-    int shownLayer = -1;
-    MenuButton menuButton;
-    juce::ComboBox stateBox;
-    std::array<Knob, 6> macros;      // Life, Dynamics, Character, Movement, Space, Original/Reimagined
-    juce::TextButton advancedButton { juce::String::fromUTF8 ("ADVANCED  \xe2\x80\xba") };
+    std::array<bool, OspAudioProcessor::numLayers> shownOccupied {};
+    int shownCount = -1;
+    bool dragging = false;
+    DropTarget dragTarget;
+
+    // Mix, macros, envelope
+    MixSection mixSection { ospProcessor };
+    juce::Rectangle<int> lowerPanel;
+    std::array<Knob, 5> macros;      // LIFE, DYNAMICS, CHARACTER, MOVEMENT, SPACE
+    EnvelopePanel envelope { ospProcessor.parameters };
+
+    // Keyboard row
+    Wheel pitchWheel, modWheel;
     OspKeyboard keyboard;
+    juce::Label statusLabel;
+    juce::TextButton advancedButton { juce::String::fromUTF8 ("Advanced  \xe2\x80\xba") };
+
     std::unique_ptr<juce::FileChooser> chooser;
     juce::TooltipWindow tooltips { this, 700 };
 
@@ -184,10 +211,6 @@ private:
     int popupIndex = -1;
     int closedByLabelPress = -1;     // a press on an open popup's own label closes it (and must not reopen it)
     OutsideClickWatcher outsideClicks { *this };
-
-    std::uint64_t shownGeneration = 0;
-    OspAudioProcessor::LoadState shownState = OspAudioProcessor::LoadState::empty;
-    juce::Image texture;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OspAudioProcessorEditor)
 };

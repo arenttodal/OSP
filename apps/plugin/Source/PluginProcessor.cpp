@@ -231,7 +231,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
     {
         const auto name = "Layer " + layerName (layer) + " ";
         auto id = [layer] (const char* n) { return juce::ParameterID { layerParameterId (layer, n), 7 }; };
-        layout.add (std::make_unique<juce::AudioParameterFloat> (id ("start"), name + "Start", unit, 0.0f, percent));
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id ("start"), name + "Start", unit, 0.0f,
+                                                                 juce::AudioParameterFloatAttributes().withLabel ("%")
+                                                                     .withStringFromValueFunction ([] (float v, int) { return juce::String (juce::roundToInt (v)) + " %"; })));
         layout.add (std::make_unique<juce::AudioParameterFloat> (id ("tune"), name + "Tune", Range (-24.0f, 24.0f, 0.01f), 0.0f,
                                                                  juce::AudioParameterFloatAttributes().withLabel ("st")
                                                                      .withStringFromValueFunction ([] (float v, int) { return format::semitones (v); })));
@@ -239,8 +241,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
                                                                  juce::AudioParameterFloatAttributes()
                                                                      .withStringFromValueFunction ([] (float v, int) { return format::pan (v); })
                                                                      .withValueFromStringFunction ([] (const juce::String& t) { return format::panFromText (t); })));
-        layout.add (std::make_unique<juce::AudioParameterFloat> (id ("level"), name + "Level",
-                                                                 Range (static_cast<float> (LayerSettings::minLevelDb), 6.0f, 0.1f), 0.0f,
+        Range levelRange (static_cast<float> (LayerSettings::minLevelDb), 6.0f, 0.1f);
+        levelRange.setSkewForCentre (-12.0f);   // the knob's travel goes to the useful range
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id ("level"), name + "Level", levelRange, 0.0f,
                                                                  juce::AudioParameterFloatAttributes().withLabel ("dB")
                                                                      .withStringFromValueFunction ([] (float v, int) { return format::levelDb (v); })));
         layout.add (std::make_unique<juce::AudioParameterBool> (id ("link"), name + "Link", false));
@@ -710,6 +713,20 @@ void OspAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
             hostWasPlaying = transportRunning;
         }
     engine.setHostTiming (timing);
+    {
+        // The on-screen wheels act like the controller's.
+        const float pitch = screenPitch.load(), mod = screenMod.load();
+        if (pitch != lastScreenPitch)
+        {
+            lastScreenPitch = pitch;
+            handleMidi (juce::MidiMessage::pitchWheel (1, juce::jlimit (0, 16383, 8192 + juce::roundToInt (pitch * 8191.0f))));
+        }
+        if (mod != lastScreenMod)
+        {
+            lastScreenMod = mod;
+            handleMidi (juce::MidiMessage::controllerEvent (1, 1, juce::jlimit (0, 127, juce::roundToInt (mod * 127.0f))));
+        }
+    }
     applyParameters (false);
 
     const int outChannels = std::min (buffer.getNumChannels(), 2);
@@ -734,7 +751,7 @@ void OspAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
     for (int ch = outChannels; ch < buffer.getNumChannels(); ++ch)
         buffer.clear (ch, 0, numSamples);
 
-    activeVoices.store (engine.activeVoiceCount(), std::memory_order_relaxed);
+    activeVoices.store (engine.musicalVoiceCount(), std::memory_order_relaxed);
 }
 
 //==============================================================================
@@ -941,6 +958,26 @@ int OspAudioProcessor::addLayers (const juce::Array<juce::File>& files, int firs
     return loaded;
 }
 
+void OspAudioProcessor::replaceLayer (const juce::Array<juce::File>& files, int layer)
+{
+    if (files.isEmpty())
+        return;
+    const int index = static_cast<int> (resolve (layer));
+    setRootOverride (std::nullopt, index);
+    loadFiles (files, index);
+}
+
+int OspAudioProcessor::addLayerSet (const juce::Array<juce::File>& files)
+{
+    const int layer = firstFreeLayer();
+    if (layer < 0 || files.isEmpty())
+        return -1;
+    resetLayerControls (layer);
+    loadFiles (files, layer);
+    makeLayerAudible (layer);
+    return layer;
+}
+
 void OspAudioProcessor::resetLayerControls (int layer)
 {
     for (const auto& name : granularNames())
@@ -1035,6 +1072,96 @@ bool OspAudioProcessor::restoreRemovedLayer()
     removedLayer.reset();
     setEditLayer (index);
     return true;
+}
+
+void OspAudioProcessor::applyLinkedDelta (int layer, const juce::String& control, float delta)
+{
+    if (delta == 0.0f || ! isLayerLinked (layer) || ! layerControlNames().contains (control))
+        return;
+    for (int other = 0; other < numLayers; ++other)
+    {
+        if (other == layer || ! isLayerOccupied (other) || ! isLayerLinked (other))
+            continue;
+        if (auto* p = parameters.getParameter (layerParameterId (other, control)))
+        {
+            const auto range = p->getNormalisableRange();
+            const float next = range.snapToLegalValue (std::clamp (p->convertFrom0to1 (p->getValue()) + delta, range.start, range.end));
+            p->beginChangeGesture();
+            p->setValueNotifyingHost (p->convertTo0to1 (next));
+            p->endChangeGesture();
+        }
+    }
+}
+
+//==============================================================================
+// Header preset navigation
+
+std::vector<OspAudioProcessor::PresetEntry> OspAudioProcessor::presetList() const
+{
+    std::vector<PresetEntry> list;
+    for (int i = 0; i < static_cast<int> (std::size (startingStates)); ++i)
+        list.push_back ({ startingStates[i].name, i, {} });
+    for (const auto& file : findFiles (presetFolder(), presetExtension))
+        list.push_back ({ file.getFileNameWithoutExtension(), -1, file });
+    return list;
+}
+
+juce::String OspAudioProcessor::presetDisplayName() const
+{
+    if (! presetIsProgram && lastPresetFile != juce::File())
+        return lastPresetFile.getFileNameWithoutExtension();
+    return startingStates[std::clamp (currentProgram, 0, static_cast<int> (std::size (startingStates)) - 1)].name;
+}
+
+void OspAudioProcessor::openPresetEntry (const PresetEntry& entry)
+{
+    if (entry.program >= 0)
+    {
+        setCurrentProgram (entry.program);
+        presetIsProgram = true;
+    }
+    else if (loadPreset (entry.file))
+        presetIsProgram = false;
+}
+
+void OspAudioProcessor::stepPresetList (int delta)
+{
+    const auto list = presetList();
+    if (list.empty())
+        return;
+    int current = -1;
+    for (int i = 0; i < static_cast<int> (list.size()); ++i)
+        if ((presetIsProgram && list[static_cast<std::size_t> (i)].program == currentProgram)
+            || (! presetIsProgram && list[static_cast<std::size_t> (i)].file == lastPresetFile))
+            current = i;
+    const int count = static_cast<int> (list.size());
+    const int next = current < 0 ? 0 : ((current + delta) % count + count) % count;
+    openPresetEntry (list[static_cast<std::size_t> (next)]);
+}
+
+namespace
+{
+    juce::File favouritesFile() { return OspAudioProcessor::presetFolder().getChildFile ("Favourites.txt"); }
+}
+
+bool OspAudioProcessor::isFavourite() const
+{
+    const auto lines = juce::StringArray::fromLines (favouritesFile().loadFileAsString());
+    return lines.contains (presetDisplayName());
+}
+
+void OspAudioProcessor::toggleFavourite()
+{
+    // Favourites are plain names in a text file beside the presets (shareable, editable).
+    auto lines = juce::StringArray::fromLines (favouritesFile().loadFileAsString());
+    lines.removeEmptyStrings();
+    const auto name = presetDisplayName();
+    if (lines.contains (name))
+        lines.removeString (name);
+    else
+        lines.add (name);
+    favouritesFile().getParentDirectory().createDirectory();
+    favouritesFile().replaceWithText (lines.joinIntoString ("\n") + "\n");
 }
 
 bool OspAudioProcessor::waitForLoads (int timeoutMs)
@@ -1550,6 +1677,7 @@ void OspAudioProcessor::setCurrentProgram (int index)
     if (index < 0 || index >= getNumPrograms())
         return;
     currentProgram = index;
+    presetIsProgram = true;
     const auto& s = startingStates[index];
     auto set = [this] (const juce::String& id, float value) {
         if (auto* p = parameters.getParameter (id))
@@ -1612,6 +1740,7 @@ bool OspAudioProcessor::loadPreset (const juce::File& file)
         return false;
     applyStateXml (*xml);
     lastPresetFile = file;
+    presetIsProgram = false;
     return true;
 }
 

@@ -27,21 +27,23 @@ juce_add_plugin(OSP_Plugin
     AU_MAIN_TYPE kAudioUnitType_MusicDevice
     MICROPHONE_PERMISSION_ENABLED FALSE)
 
-# Embedded typeface (Barlow, SIL Open Font License: Resources/fonts/OFL.txt).
+# Embedded typeface (Inter, SIL Open Font License: Resources/fonts/Inter-OFL.txt), with
+# tabular figures as its default digits (values line up as they change).
 juce_add_binary_data(OSP_PluginData
     HEADER_NAME BinaryData.h
     NAMESPACE BinaryData
     SOURCES
-        Resources/fonts/Barlow-Regular.ttf
-        Resources/fonts/Barlow-Medium.ttf
-        Resources/fonts/Barlow-SemiBold.ttf)
+        Resources/fonts/Inter-Regular.ttf
+        Resources/fonts/Inter-Medium.ttf
+        Resources/fonts/Inter-SemiBold.ttf)
 
 target_sources(OSP_Plugin PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
     Source/OspLookAndFeel.cpp
     Source/ShapingPopups.cpp
-    Source/LayerControls.cpp
+    Source/EngineCard.cpp
+    Source/MainSections.cpp
     Source/InstrumentLoader.cpp
     ${OSP_IO_SOURCES})
 
