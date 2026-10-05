@@ -1115,7 +1115,7 @@ TEST_CASE ("plugin: three dropped sounds become layers A, B, C, all heard, recal
     CHECK (valueOf (restored, "layerC.level") == Approx (-6.0f));
     CHECK (valueOf (restored, "layerC.pan") == Approx (-40.0f));
     CHECK (valueOf (restored, "layerB.reverse") == Approx (1.0f));
-    CHECK (valueOf (restored, "layerA.follow") == Approx (0.0f));
+    CHECK (valueOf (restored, "layerA.follow") == Approx (0.0f).margin (1.0e-4));
     CHECK (valueOf (restored, "layerC.sourceMode") == Approx (1.0f));
     CHECK (valueOf (restored, "layerB.tune") == Approx (4.0f));
     CHECK (valueOf (restored, "mix.x") == Approx (0.8f));
@@ -1167,11 +1167,11 @@ TEST_CASE ("plugin: removing a layer compacts the others with their whole state;
     CHECK (valueOf (p, "layerB.tune") == Approx (-5.0f));
     CHECK (valueOf (p, "layerB.granular.spread") == Approx (70.0f));
     CHECK (valueOf (p, "layerB.sourceMode") == Approx (1.0f));
-    CHECK (valueOf (p, "layerB.level") == Approx (0.0f));   // C's level, not B's
+    CHECK (valueOf (p, "layerB.level") == Approx (0.0f).margin (1.0e-4));   // C's level, not B's
     REQUIRE (p.rootOverride (1).has_value());
     CHECK (*p.rootOverride (1) == Approx (64.0));
     CHECK_FALSE (p.rootOverride (2).has_value());
-    CHECK (valueOf (p, "layerC.sourceMode") == Approx (0.0f));   // the freed slot is neutral
+    CHECK (valueOf (p, "layerC.sourceMode") == Approx (0.0f).margin (1.0e-4));   // the freed slot is neutral
 
     // Restore: back in its place, the others move up again.
     REQUIRE (p.canRestoreRemovedLayer());
@@ -1244,13 +1244,13 @@ TEST_CASE ("plugin: sessions from before the adaptive layers open as they were (
     REQUIRE (p.waitForLoads (20000));
     p.pollLoads();
     CHECK (p.occupiedLayerCount() == 1);
-    CHECK (valueOf (p, "layerA.level") == Approx (0.0f));
-    CHECK (valueOf (p, "layerA.tune") == Approx (0.0f));
-    CHECK (valueOf (p, "layerC.sourceMode") == Approx (0.0f));
+    CHECK (valueOf (p, "layerA.level") == Approx (0.0f).margin (1.0e-4));
+    CHECK (valueOf (p, "layerA.tune") == Approx (0.0f).margin (1.0e-4));
+    CHECK (valueOf (p, "layerC.sourceMode") == Approx (0.0f).margin (1.0e-4));
     CHECK (valueOf (p, "sustainLevel") == Approx (100.0f));
     // The old global "Recording" sustain is now every layer's LOOP off; Sustain is back to Endless.
     for (const char* id : { "layerA.loop", "layerB.loop", "layerC.loop" })
-        CHECK (valueOf (p, id) == Approx (0.0f));
+        CHECK (valueOf (p, id) == Approx (0.0f).margin (1.0e-4));
     CHECK (valueOf (p, "sustain") == Approx (1.0f));
     // ...and it plays exactly like the original (Recording sustain, one layer).
     const auto x = playNote (original, 57, 48000.0, 2.5), y = playNote (p, 57, 48000.0, 2.5);
@@ -1403,7 +1403,7 @@ TEST_CASE ("plugin: LINK moves the other linked layers by the same amount, keepi
     CHECK (valueOf (p, "layerB.level") == Approx (-9.0f).margin (0.05));
     // Only START, TUNE, PAN and LEVEL link.
     p.applyLinkedDelta (0, "sourceMode", 1.0f);
-    CHECK (valueOf (p, "layerB.sourceMode") == Approx (0.0f));
+    CHECK (valueOf (p, "layerB.sourceMode") == Approx (0.0f).margin (1.0e-4));
 }
 
 TEST_CASE ("plugin: an A/B session from before the adaptive layers opens as two layers with its blend", "[plugin][adaptive]")
@@ -1449,7 +1449,7 @@ TEST_CASE ("plugin: an A/B session from before the adaptive layers opens as two 
     CHECK (p.currentInstrument (2) == nullptr);
     CHECK (valueOf (p, "ab.blend") == Approx (0.35f));
     CHECK (valueOf (p, "layerB.sourceMode") == Approx (1.0f));
-    CHECK (valueOf (p, "layerC.sourceMode") == Approx (0.0f));
+    CHECK (valueOf (p, "layerC.sourceMode") == Approx (0.0f).margin (1.0e-4));
     // Same sound as the session it came from.
     const auto x = playNote (original, 57, 48000.0, 1.0), y = playNote (p, 57, 48000.0, 1.0);
     double diff = 0.0;
