@@ -212,3 +212,97 @@ were rendered to raw float files and are compared bit-for-bit after Stage 1.
   favourites are read from disk once.
 - Sanitizers: the core suite and the plugin tests built with AddressSanitizer +
   UndefinedBehaviorSanitizer (see the final report for the result).
+
+## Stage 24 — final acceptance and report
+
+### Architecture
+- **Engine slots.** `InstrumentEngine` owns a fixed `std::array<Slot, 3>`; nothing about
+  a slot is allocated after `prepare()`. A slot is occupied when it has a model (or set);
+  the layout, the mix law and the voice allocation all follow occupancy, never a stored
+  "layer count".
+- **Routing 1 / 2 / 3.** Every note-on starts one voice per occupied, audible slot (the
+  same event index, salted per slot for determinism). Each slot renders into its own
+  buffer, is weighted (`mixWeights`), scaled by LEVEL and balanced by PAN, summed, then
+  goes through the one shared PostProcessor (Reimagined → MOVEMENT bus → SPACE) and VOLUME.
+- **Mixer.** One layer: unity. Two: equal-power `cos`/`sin` of the A/B blend between the
+  two occupied slots (whichever they are). Three: barycentric shares of the triangle
+  position taken as power, so total power stays constant (centre ≈ −4.8 dB each; an edge
+  midpoint equals the two-layer middle). Gains glide per sample, never faster than 10 ms
+  for a full jump.
+- **State.** stateVersion 6 adds the `InstrumentC` tree; parameters gained `layerC.*`,
+  per-layer `start/tune/pan/level/link/reverse/loop/follow`, `mix.x`, `mix.y`, `decay`,
+  `sustainLevel`. Sessions older than v6 are migrated on load (below).
+- **UI layout model.** The source area is derived from occupancy every time it changes:
+  0 → drop zone, 1 → Hero card, 2 → two Dual cards, 3 → three Triple cards. One
+  `EngineCard` class serves A, B and C; density changes sizes and arrangement, never what
+  is there. The mix band, macro row, envelope and keyboard keep their place and height
+  whatever the layer count.
+
+### DSP
+- **Source modes.** One Shot (band-limited read with continuation loops and release graft)
+  and Granular (24 Hann grains around POS), per layer, freely combined.
+- **Per-layer processing.** START (offset into the recording with a 3 ms fade-in; added to
+  POS in Granular), TUNE (± 24 st), PAN, LEVEL (−48 dB = silent, not rendered), REVERSE
+  (reads backwards; a mirrored loop when LOOP is on), LOOP (sustain by continuation; off =
+  the recording plays out once, no per-voice drift, as the old "Recording" sustain),
+  FOLLOW (on = the recording's own loudness contour; off = that contour flattened, at most
+  +24 dB, never lifting the noise floor). LINK moves linked layers' START/TUNE/PAN/LEVEL by
+  the same user delta (UI only; automation never propagates).
+- **ADSR.** `attack`, `decay`, `sustainLevel`, `release` shape every voice of every layer.
+  A sustain change during a held note glides over ~10 ms.
+- **Macro routing.** Unchanged: LIFE, DYNAMICS, CHARACTER and DRIFT per voice on every
+  layer; Reimagined, MOVEMENT (TAPE/CHORUS/PULSE/SHAPER) and SPACE once on the sum.
+- **Movement / Shaper.** As in MOVEMENT v2, on the summed signal, host-synced; the earlier
+  host crash fix (pattern/rate menu) is kept and covered by a UI regression test.
+- **Blend normalisation.** Equal power for two layers, power-share for three; one layer is
+  always unity regardless of the blend or triangle position.
+
+### UI
+- **Four adaptive states.** Empty (drop a sound / Browse / Load example), one layer
+  (Hero), two (Dual, A/B blend in the mix band), three (Triple, mix triangle with share
+  readout). Transitions glide (180–200 ms); dragging a file previews the next layout.
+- **EngineCard.** Header (letter, root, file, mode selector, menu), the sound display,
+  START TUNE PAN LEVEL, LINK REVERSE LOOP FOLLOW; Granular puts POS SIZE DENS TUNE SPREAD
+  over the display (on a translucent band when the display is short).
+- **Palette.** Warm housing, graphite displays, one coral accent for live/focus marks,
+  layer identities A coral-amber, B blue-grey lavender, C sage; spectral colours from
+  amber to mineral. Typeface Inter with tabular figures.
+- **Waveform.** Each moment coloured by its spectral centroid (leaning to the layer
+  colour), loudness ghost, time grid, START and skipped region, loop bracket, read heads,
+  POS/SPREAD and live grains. Static part cached; overlays at 30 Hz.
+- **Macro popups.** A shared shell (title, one-line subtitle, close, one at a time, Escape
+  or an outside click closes) with a live graphite visualisation per macro: SPACE
+  (reflections and dB tail), CHARACTER (filter response over the layer's spectrum),
+  MOVEMENT (one picture per mode, SHAPER at the host phase), LIFE (contour cloud),
+  DYNAMICS (velocity curve with the last 16 velocities).
+- **Header / keyboard.** Preset bar (‹ name ♡ ›), VOLUME, the menu; the keyboard with
+  PITCH and MOD wheels; AMP ENVELOPE with draggable points beside the macros.
+
+### Compatibility
+- **Old state.** v1–v5 sessions load: layer controls neutral, C empty, mix centred,
+  sustain 100 %, the old global Sustain becomes every layer's LOOP. A v5 single-layer
+  session and a v5 A/B session render bit-identically to before (tested).
+- **Automation IDs.** No existing ID was renamed or removed; `layerA.*`, `layerB.*` and
+  `ab.blend` keep their IDs, so existing automation still reads. New IDs carry version
+  hint 7. Sustain and Output stay as parameters (Output is the header's VOLUME).
+- **DAW testing.** Not possible here (Linux container, no host). Covered instead by the
+  headless plugin tests (state round trips, migration, automation stress, sample-rate /
+  buffer matrix). The CI build runs `auval` on macOS. Needs a pass in Ableton / Logic.
+
+### Performance
+CPU_TABLE_PLACEHOLDER
+
+### Sanitizers
+SANITIZER_PLACEHOLDER
+
+### Known issues
+- No listening pass yet: the mix law, FOLLOW's lift and the START fade are set by ear on
+  test material only.
+- Two of the seven Stage 0 reference renders differ, inaudibly and for documented reasons
+  (blend set before the first block; a silent layer no longer rendered).
+- Removing a layer clears the undo history (slots move); "Restore removed layer" brings
+  back the last one only.
+- CHARACTER's per-note sweep is not animated in its popup (the envelope's peak is drawn
+  as a ghost instead).
+- Macros stay enabled when no sound is loaded.
+- Three One Shot layers with 16 held notes is the heaviest case (see Performance).
