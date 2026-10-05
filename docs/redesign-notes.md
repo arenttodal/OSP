@@ -149,3 +149,40 @@ were rendered to raw float files and are compared bit-for-bit after Stage 1.
   unchanged). S = 0 turns any layer, One Shot or Granular, into a pluck that ends while held.
 - Tests: live sustain change, decay → sustain ratio through the engine for One Shot and
   Granular layers, Granular START offset and FOLLOW lift, LINK deltas / clamping / scope.
+
+## Stages 10–15 — popup framework and the five macro visualisations
+
+- Shell (`MiniPanel`, ShapingPopups): raised #F3F1EA card, hairline, a short soft shadow;
+  title + a one-line question as subtitle; close button (closed asynchronously); one
+  popup at a time; closes on Escape, a click elsewhere in the editor or its own name;
+  opens with a 110 ms fade and 4 px settle; never resizes the window. Mode tabs
+  (`SegmentedControl`): the chosen one sits in with accent text and rim.
+- `Visual` base: graphite well (the same deep graphite as the sound displays — the spec's
+  #E9E7E0 light recess was tried against the references, where colour has to read as
+  light; the graphite wells match the approved images), repaints at 30 Hz only while open
+  and only when its picture moves or its parameters changed, fades 140 ms between kinds.
+- SPACE (built first, the benchmark): transient at 0, early reflections at the type's real
+  times and levels (`SpaceReverb::portrait`), the dense tail drawn in dB (straight to
+  −60 dB at DECAY), filled in at the diffusers' rate, wider for wider types, rippled for
+  SPRING; colour from amber through rose to mineral, losing saturation towards silence,
+  faster for darker (more damped) types; −60 dB marker; SPACE's amount sets the tail's
+  strength. Cached per (type, decay, amount, size). Controls: TYPE, DECAY only.
+- CHARACTER: log-frequency response (20 Hz–20 kHz, −36..+15 dB) of the CharacterFilter
+  designs (ladder with its resonance feedback and compensation, SVF LP/HP/BP with their Q
+  laws, TILT shelves), cutoff where CHARACTER puts it between MIN and MAX, the envelope's
+  peak as a dashed ghost, the edited layer's own average spectrum (computed on the loader
+  thread: 48 Hann frames, 96 log bins, `LoadedInstrument::spectrumDb`) faintly in spectral
+  colours. Controls: MIN MAX RES, then smaller DRIVE ENV ATTACK DECAY.
+- MOVEMENT: DRIFT — the voices' shared value noise (`shaping::sharedWander`) at SPEED for
+  pitch and tone; TAPE — wow (0.7 sin + wander) and flutter at their Hz, WEAR roughness;
+  CHORUS — the two taps' phase-offset sines (STEREO separates them, WIDTH their depth);
+  PULSE — the bus' gain curve tanh(k sin)/tanh(k) at MOVEMENT's depth; SHAPER — the pattern
+  contour with SMOOTH, step grid and the DSP's own host-synced phase (`shaperPhase`).
+- LIFE: a cloud of seven contours of the same note; LIFE (× mode) spreads them in height
+  (PITCH), onset (ATTACK), body and colour (TONE); FRAY strays one; the strongest is the
+  newest note's and it changes with every note played.
+- DYNAMICS: level against velocity through the curve and the effective range (Advanced
+  range × DYNAMICS as `levelRangeDb`), the linear response dashed, a brightness halo
+  towards hard notes (TONE × DYNAMICS), the last 16 played velocities as dots (lock-free
+  ring written by the audio thread). Controls: CURVE, RANGE, TONE.
+- UI test snapshots every SPACE type and MOVEMENT mode.

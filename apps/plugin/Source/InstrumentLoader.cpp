@@ -1,6 +1,7 @@
 #include "InstrumentLoader.h"
 
 #include "analysis/Analyzer.h"
+#include "core/Fft.h"
 #include "engine/InstrumentBuilder.h"
 #include "io/AnalysisJson.h"
 #include "io/AudioFileIO.h"
@@ -208,6 +209,48 @@ namespace
             instrument.peakMax[b] = hi;
         }
         instrument.durationSeconds = audio.durationSeconds();
+
+        // The sound's average spectrum on a log frequency axis (CHARACTER's display): up to
+        // 48 Hann frames of 4096 across the recording, power-averaged, peak at 0 dB.
+        instrument.spectrumDb.assign (LoadedInstrument::spectrumBins, -90.0f);
+        const int order = 12, size = 1 << order;
+        if (static_cast<std::int64_t> (mono.size()) >= size && audio.sampleRate > 0.0)
+        {
+            const Fft fft (order);
+            std::vector<std::complex<double>> frame (static_cast<std::size_t> (size));
+            std::vector<double> power (static_cast<std::size_t> (size / 2), 0.0);
+            const auto frames = std::min<std::size_t> (48, mono.size() / static_cast<std::size_t> (size / 2));
+            const auto span = mono.size() - static_cast<std::size_t> (size);
+            for (std::size_t f = 0; f < frames; ++f)
+            {
+                const auto start = frames > 1 ? f * span / (frames - 1) : 0;
+                for (int i = 0; i < size; ++i)
+                {
+                    const double w = 0.5 - 0.5 * std::cos (2.0 * 3.141592653589793 * i / size);
+                    frame[static_cast<std::size_t> (i)] = { w * mono[start + static_cast<std::size_t> (i)], 0.0 };
+                }
+                fft.forward (frame.data());
+                for (std::size_t k = 0; k < power.size(); ++k)
+                    power[k] += std::norm (frame[k]);
+            }
+            double peak = 1.0e-30;
+            std::vector<double> bins (LoadedInstrument::spectrumBins, 0.0);
+            for (int b = 0; b < LoadedInstrument::spectrumBins; ++b)
+            {
+                // Bin b covers 20 Hz * 1000^(b/bins) .. the next one.
+                const double lo = 20.0 * std::pow (1000.0, static_cast<double> (b) / LoadedInstrument::spectrumBins);
+                const double hi = 20.0 * std::pow (1000.0, static_cast<double> (b + 1) / LoadedInstrument::spectrumBins);
+                const auto k0 = static_cast<std::size_t> (std::clamp (lo * size / audio.sampleRate, 1.0, static_cast<double> (power.size() - 1)));
+                const auto k1 = static_cast<std::size_t> (std::clamp (hi * size / audio.sampleRate, static_cast<double> (k0 + 1), static_cast<double> (power.size())));
+                double sum = 0.0;
+                for (auto k = k0; k < k1; ++k)
+                    sum = std::max (sum, power[k]);
+                bins[static_cast<std::size_t> (b)] = sum;
+                peak = std::max (peak, sum);
+            }
+            for (int b = 0; b < LoadedInstrument::spectrumBins; ++b)
+                instrument.spectrumDb[static_cast<std::size_t> (b)] = static_cast<float> (std::max (-90.0, 10.0 * std::log10 (std::max (1.0e-30, bins[static_cast<std::size_t> (b)] / peak))));
+        }
     }
 }
 

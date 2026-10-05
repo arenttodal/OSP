@@ -895,6 +895,8 @@ TEST_CASE ("plugin: editor builds, shows the instrument and can be snapshotted",
     auto snapshot = [&] (const juce::String& name) {
         if (const char* dir = std::getenv ("OSP_SNAPSHOT_DIR"))
         {
+            if (auto* settled = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (editor.get()))
+                settled->refreshNow();   // transitions finish (popups fade in, cards glide)
             const auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f);
             juce::FileOutputStream out (juce::File (dir).getChildFile (name));
             out.setPosition (0);
@@ -918,6 +920,20 @@ TEST_CASE ("plugin: editor builds, shows the instrument and can be snapshotted",
             ospEditor->openPopup (i);
             CHECK (ospEditor->openPopupIndex() == i);
             snapshot (juce::String ("osp-editor-popup-") + names[i] + ".png");
+        }
+        // Every SPACE type and MOVEMENT mode draws its own picture.
+        for (int type = 0; type < 4; ++type)
+        {
+            p.parameters.getParameter ("space.type")->setValueNotifyingHost (static_cast<float> (type) / 3.0f);
+            ospEditor->openPopup (4);
+            snapshot ("osp-popup-space-" + juce::String (type) + ".png");
+        }
+        p.parameters.getParameter ("space.type")->setValueNotifyingHost (p.parameters.getParameter ("space.type")->getDefaultValue());
+        for (int mode = 0; mode < 4; ++mode)
+        {
+            p.parameters.getParameter ("movement.mode")->setValueNotifyingHost (static_cast<float> (mode) / 4.0f);
+            ospEditor->openPopup (3);
+            snapshot ("osp-popup-movement-" + juce::String (mode) + ".png");
         }
         // MOVEMENT in SHAPER mode: pattern strip, PATTERN, RATE, TARGET, SMOOTH.
         p.parameters.getParameter ("movement.mode")->setValueNotifyingHost (1.0f);
@@ -1176,7 +1192,7 @@ TEST_CASE ("plugin: removing a layer compacts the others with their whole state;
     CHECK (p.occupiedLayerCount() == 0);
     const auto quiet = playNote (p, 60, 48000.0, 0.2);
     for (float v : quiet.channels[0])
-        REQUIRE (v == 0.0f);
+        REQUIRE_FALSE (std::abs (v) > 0.0f);
 }
 
 TEST_CASE ("plugin: more than three dropped sounds load three and say so", "[plugin][adaptive]")
@@ -1257,6 +1273,8 @@ TEST_CASE ("plugin: the editor adapts to one, two and three sounds; drops replac
     auto snapshot = [&] (const juce::String& name) {
         if (const char* dir = std::getenv ("OSP_SNAPSHOT_DIR"))
         {
+            if (auto* settled = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (editor.get()))
+                settled->refreshNow();   // transitions finish (popups fade in, cards glide)
             const auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f);
             juce::FileOutputStream out (juce::File (dir).getChildFile (name));
             out.setPosition (0);

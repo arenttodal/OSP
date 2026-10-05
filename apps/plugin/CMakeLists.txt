@@ -42,6 +42,7 @@ target_sources(OSP_Plugin PRIVATE
     Source/PluginEditor.cpp
     Source/OspLookAndFeel.cpp
     Source/ShapingPopups.cpp
+    Source/MacroPopups.cpp
     Source/EngineCard.cpp
     Source/MainSections.cpp
     Source/InstrumentLoader.cpp

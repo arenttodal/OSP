@@ -456,9 +456,19 @@ void OspAudioProcessorEditor::openPopup (int which)
     popup = which == advancedPopup ? createAdvancedPopup (ospProcessor) : createMacroPopup (static_cast<MacroPopup> (which), ospProcessor);
     popupIndex = which;
     popup->onSizeChanged = [this] { positionPopup(); };
+    juce::Component::SafePointer<OspAudioProcessorEditor> safe (this);
+    // The close button lives on the popup: close it after the click has been handled.
+    popup->onClose = [safe] { juce::MessageManager::callAsync ([safe] { if (safe != nullptr) safe->closePopup(); }); };
     addAndMakeVisible (*popup);
     popup->toFront (false);
     positionPopup();
+    {
+        // Opening: a short fade and a 4 px settle (110 ms), nothing more.
+        const auto final = popup->getBounds();
+        popup->setBounds (final.translated (0, 4));
+        popup->setAlpha (0.0f);
+        juce::Desktop::getInstance().getAnimator().animateComponent (popup.get(), final, 1.0f, 110, false, 1.0, 0.0);
+    }
     if (which < 5)
         macros[static_cast<std::size_t> (which)].label->setOpen (true);
     if (keepAdvanced)
@@ -481,6 +491,7 @@ void OspAudioProcessorEditor::closePopup()
         ospProcessor.setAdvancedOpen (false);
         advancedButton.setToggleState (false, juce::dontSendNotification);
     }
+    juce::Desktop::getInstance().getAnimator().cancelAnimation (popup.get(), false);
     popup.reset();
     popupIndex = -1;
 }
@@ -489,6 +500,8 @@ void OspAudioProcessorEditor::positionPopup()
 {
     if (popup == nullptr)
         return;
+    juce::Desktop::getInstance().getAnimator().cancelAnimation (popup.get(), false);
+    popup->setAlpha (1.0f);
     const auto size = popup->cardSize();
     const int m = MiniPanel::shadowMargin;
     const auto anchor = popupIndex < 5 ? macros[static_cast<std::size_t> (popupIndex)].label->getBounds() : advancedButton.getBounds();
@@ -595,6 +608,11 @@ void OspAudioProcessorEditor::layoutSources (bool animate)
 void OspAudioProcessorEditor::refreshNow()
 {
     timerCallback();
+    if (popup != nullptr)
+    {
+        juce::Desktop::getInstance().getAnimator().cancelAnimation (popup.get(), true);
+        popup->setAlpha (1.0f);
+    }
     for (auto& card : cards)
     {
         juce::Desktop::getInstance().getAnimator().cancelAnimation (card.get(), true);

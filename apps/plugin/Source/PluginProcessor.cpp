@@ -652,7 +652,12 @@ void OspAudioProcessor::handleMidi (const juce::MidiMessage& m) noexcept
     // MPE (lower zone): channel 1 is the manager channel, 2..16 carry one note each.
     const bool memberChannel = engine.isMpe() && channel >= 2;
     if (m.isNoteOn())
+    {
         engine.noteOn (m.getNoteNumber(), m.getVelocity(), channel);
+        const int count = velocityCount.load (std::memory_order_relaxed);
+        recentVelocity[static_cast<std::size_t> (count % velocityHistory)].store (m.getVelocity(), std::memory_order_relaxed);
+        velocityCount.store (count + 1, std::memory_order_release);
+    }
     else if (m.isNoteOff())
         engine.noteOff (m.getNoteNumber(), channel);
     else if (m.isChannelPressure())
@@ -716,12 +721,12 @@ void OspAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
     {
         // The on-screen wheels act like the controller's.
         const float pitch = screenPitch.load(), mod = screenMod.load();
-        if (pitch != lastScreenPitch)
+        if (changed (pitch, lastScreenPitch))
         {
             lastScreenPitch = pitch;
             handleMidi (juce::MidiMessage::pitchWheel (1, juce::jlimit (0, 16383, 8192 + juce::roundToInt (pitch * 8191.0f))));
         }
-        if (mod != lastScreenMod)
+        if (changed (mod, lastScreenMod))
         {
             lastScreenMod = mod;
             handleMidi (juce::MidiMessage::controllerEvent (1, 1, juce::jlimit (0, 127, juce::roundToInt (mod * 127.0f))));
@@ -1076,7 +1081,7 @@ bool OspAudioProcessor::restoreRemovedLayer()
 
 void OspAudioProcessor::applyLinkedDelta (int layer, const juce::String& control, float delta)
 {
-    if (delta == 0.0f || ! isLayerLinked (layer) || ! layerControlNames().contains (control))
+    if (std::abs (delta) < 1.0e-9f || ! isLayerLinked (layer) || ! layerControlNames().contains (control))
         return;
     for (int other = 0; other < numLayers; ++other)
     {

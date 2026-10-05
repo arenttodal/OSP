@@ -54,6 +54,9 @@ struct LoadedInstrument
     std::vector<float> peakMin;
     std::vector<float> peakMax;
     double durationSeconds = 0.0;
+    /** Average spectrum, dB re its peak, on log-spaced bins from 20 Hz to 20 kHz (display). */
+    static constexpr int spectrumBins = 96;
+    std::vector<float> spectrumDb;
 
     /** Short descriptor line for the UI, e.g. "SUSTAINED · TONAL". */
     std::string character;

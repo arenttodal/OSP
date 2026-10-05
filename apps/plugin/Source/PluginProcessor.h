@@ -176,6 +176,12 @@ public:
     juce::MidiKeyboardState keyboardState;
     std::atomic<int> activeVoices { 0 };     ///< played notes sounding (a note on three layers counts once)
 
+    /** The last played velocities (newest at `velocityCount - 1`, a ring of 16) and how many
+        notes have been played: written by the audio thread, read by the popups (lock-free). */
+    static constexpr int velocityHistory = 16;
+    std::array<std::atomic<int>, velocityHistory> recentVelocity {};
+    std::atomic<int> velocityCount { 0 };
+
     /** The on-screen wheels (message thread -> audio thread): pitch -1..1 (springs back), mod 0..1. */
     void setScreenPitchWheel (float value) noexcept { screenPitch = std::clamp (value, -1.0f, 1.0f); }
     void setScreenModWheel (float value) noexcept { screenMod = std::clamp (value, 0.0f, 1.0f); }

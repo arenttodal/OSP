@@ -96,6 +96,30 @@ void SpaceReverb::reset() noexcept
     modPhase = 0.0;
 }
 
+SpaceReverb::Portrait SpaceReverb::portrait (SpaceType t) noexcept
+{
+    Portrait p;
+    if (t == SpaceType::spring)
+    {
+        p.spring = true;
+        p.erMs = { 33.0, 41.0, 66.0, 82.0, 99.0, 123.0, 132.0, 164.0 };
+        p.erLevel = 0.7f;
+        p.damping = 0.3f;
+        p.width = 0.3f;
+        p.diffusionMs = 6.0;
+        return p;
+    }
+    const TypeDesign& d = t == SpaceType::room ? room : (t == SpaceType::chamber ? chamber : plate);
+    p.preMs = d.preMs;
+    for (std::size_t i = 0; i < p.erMs.size(); ++i)
+        p.erMs[i] = d.erMs[i];
+    p.erLevel = d.erLevel;
+    p.damping = d.damping;
+    p.width = d.width;
+    p.diffusionMs = d.diffMs[3];
+    return p;
+}
+
 void SpaceReverb::configure (SpaceType newType, double decaySeconds) noexcept
 {
     type = newType;

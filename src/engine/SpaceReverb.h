@@ -26,6 +26,20 @@ namespace osp
 class SpaceReverb
 {
 public:
+    /** What a type is made of, for the SPACE display (pure, no state): pre-delay, early
+        reflections (ms after the pre-delay, level), in-loop damping, width, diffusion. */
+    struct Portrait
+    {
+        double preMs = 0.0;
+        std::array<double, 8> erMs {};
+        float erLevel = 0.0f;
+        float damping = 0.0f;
+        float width = 1.0f;
+        double diffusionMs = 0.0;   ///< the diffusers' longest delay: how fast the tail fills in
+        bool spring = false;        ///< spring: echoes every ~33 / 41 ms, dispersed into chirps
+    };
+    static Portrait portrait (SpaceType type) noexcept;
+
     void prepare (double sampleRate);
     void reset() noexcept;
     void configure (SpaceType type, double decaySeconds) noexcept;
