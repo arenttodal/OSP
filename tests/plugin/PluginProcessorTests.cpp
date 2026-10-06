@@ -340,6 +340,20 @@ TEST_CASE ("plugin: shaping settings are parameters that persist and shape the s
     setValue (p, "space.decay", 3.3f);
     setValue (p, "movement.mode", 1.0f);    // Tape
     setValue (p, "life.mode", 2.0f);        // Fray
+    // LIFE's round robins and character (version hint 10): endless and AUTO by default.
+    CHECK (valueOf (p, "life.takes") == Approx (0.0f));
+    CHECK (valueOf (p, "life.character") == Approx (0.0f));
+    setValue (p, "life.takes", 3.0f);       // 4 takes
+    setValue (p, "life.takeOrder", 1.0f);   // Random
+    setValue (p, "life.character", 1.0f);   // Pluck
+    setValue (p, "life.takesSeed", 7.0f);
+    {
+        const auto played = playNote (p, 48, 48000.0, 0.3);
+        float peak = 0.0f;
+        for (float x : played.channels[0])
+            peak = std::max (peak, std::abs (x));
+        CHECK (peak > 0.001f);
+    }
     juce::MemoryBlock state;
     p.getStateInformation (state);
 
@@ -353,6 +367,10 @@ TEST_CASE ("plugin: shaping settings are parameters that persist and shape the s
     CHECK (valueOf (restored, "space.decay") == Approx (3.3f).margin (0.01));
     CHECK (valueOf (restored, "movement.mode") == Approx (1.0f));
     CHECK (valueOf (restored, "life.mode") == Approx (2.0f));
+    CHECK (valueOf (restored, "life.takes") == Approx (3.0f));
+    CHECK (valueOf (restored, "life.takeOrder") == Approx (1.0f));
+    CHECK (valueOf (restored, "life.character") == Approx (1.0f));
+    CHECK (valueOf (restored, "life.takesSeed") == Approx (7.0f));
 }
 
 namespace
@@ -1899,6 +1917,12 @@ TEST_CASE ("plugin: canonical screenshots for visual review", "[.][canonical]")
     // The popups over the two-layer instrument.
     ui->openPopup (0);
     shot ("08-life-popup.png");
+    p.setParameterValue ("life.takes", 3.0f);   // 4 takes (round robins), PLUCK
+    p.setParameterValue ("life.character", 1.0f);
+    ui->openPopup (0);
+    shot ("08b-life-takes.png");
+    p.setParameterValue ("life.takes", 0.0f);
+    p.setParameterValue ("life.character", 0.0f);
     ui->openPopup (1);
     shot ("09-dynamics-popup.png");
     ui->openPopup (2);

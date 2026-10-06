@@ -3,6 +3,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <vector>
 
@@ -241,4 +242,150 @@ TEST_CASE ("performance: the repeat guard keeps repeated notes apart", "[unit][p
     CHECK (engine.guardedRepeats() > 20);
     CHECK (near < 20);             // under 5 % (about 60 % without the guard): it keeps the best of nine draws
     CHECK (closest > 0.1);
+}
+
+namespace
+{
+    Shaping withTakes (int count, LifeTakeOrder order = LifeTakeOrder::cycle, std::uint32_t reroll = 0)
+    {
+        Shaping s;
+        s.lifeTakes = count;
+        s.lifeTakeOrder = order;
+        s.lifeTakesSeed = reroll;
+        return s;
+    }
+
+    /** The audible part of a play: level, brightness, transient, pitch, start. */
+    std::vector<double> heard (const NoteShape& s)
+    {
+        return { 20.0 * std::log10 (s.gain), s.brightnessDb, s.transientDb, s.pitchCents + s.pitchSettleCents, 1000.0 * s.startOffsetSeconds };
+    }
+
+    double apart (const NoteShape& a, const NoteShape& b)
+    {
+        const auto x = heard (a), y = heard (b);
+        double sum = 0.0;
+        for (std::size_t i = 0; i < x.size(); ++i)
+            sum += (x[i] - y[i]) * (x[i] - y[i]);
+        return std::sqrt (sum);
+    }
+}
+
+TEST_CASE ("performance: TAKES cycle through a fixed set of takes per note", "[unit][performance]")
+{
+    // Very fast repeats: the player's drift barely moves, so a take sounds (almost) the
+    // same each time it returns and clearly different from the other takes.
+    PerformanceEngine engine;
+    engine.reset (11);
+    const auto settings = withTakes (4);
+    PerformanceProfile profile;
+    SourceCharacter character;
+    std::vector<NoteShape> plays;
+    for (int i = 0; i < 16; ++i)
+    {
+        NoteShape shape;
+        engine.perform (shape, 62, 100, i * 0.002, static_cast<std::uint64_t> (i), profile, character, 0.5, settings);
+        CHECK (engine.lastTakePlayed() == i % 4);
+        plays.push_back (shape);
+    }
+    double same = 0.0, different = 1.0e9;
+    for (int i = 5; i < 16; ++i)   // (the first play is not a fast repeat: its pitch drift is not halved)
+        same = std::max (same, apart (plays[static_cast<std::size_t> (i)], plays[static_cast<std::size_t> (i - 4)]));
+    for (int a = 4; a < 8; ++a)
+        for (int b = a + 1; b < 8; ++b)
+            different = std::min (different, apart (plays[static_cast<std::size_t> (a)], plays[static_cast<std::size_t> (b)]));
+    INFO ("same take " << same << ", closest other take " << different);
+    CHECK (different > 4.0 * same);
+    CHECK (different > 0.5);
+
+    // Every note keeps its own takes and its own place in the cycle.
+    NoteShape other;
+    engine.perform (other, 70, 100, 1.0, 16, profile, character, 0.5, settings);
+    CHECK (engine.lastTakePlayed() == 0);
+}
+
+TEST_CASE ("performance: RANDOM takes never repeat the last take", "[unit][performance]")
+{
+    PerformanceEngine engine;
+    engine.reset (5);
+    const auto settings = withTakes (3, LifeTakeOrder::random);
+    PerformanceProfile profile;
+    SourceCharacter character;
+    int last = -1;
+    std::array<int, 3> used {};
+    for (int i = 0; i < 300; ++i)
+    {
+        NoteShape shape;
+        engine.perform (shape, 60, 100, i * 0.2, static_cast<std::uint64_t> (i), profile, character, 0.5, settings);
+        const int take = engine.lastTakePlayed();
+        REQUIRE (take >= 0);
+        REQUIRE (take < 3);
+        CHECK (take != last);
+        ++used[static_cast<std::size_t> (take)];
+        last = take;
+    }
+    for (int n : used)
+        CHECK (n > 70);
+}
+
+TEST_CASE ("performance: TAKES are deterministic, re-rollable and spread around the recording", "[unit][performance]")
+{
+    const auto a = perform (0.3, 64, 0.5, 9, 60, withTakes (8));
+    const auto b = perform (0.3, 64, 0.5, 9, 60, withTakes (8));
+    const auto rerolled = perform (0.3, 64, 0.5, 9, 60, withTakes (8, LifeTakeOrder::cycle, 1));
+    bool differs = false;
+    for (std::size_t i = 0; i < a.shapes.size(); ++i)
+    {
+        CHECK (a.shapes[i].gain == b.shapes[i].gain);
+        CHECK (a.shapes[i].pitchCents == b.shapes[i].pitchCents);
+        differs = differs || a.shapes[i].gain != rerolled.shapes[i].gain;
+    }
+    CHECK (differs);   // NEW TAKES: a different set
+
+    // The takes centre on the recording: over whole cycles, the static pitch averages out
+    // apart from the player's drift (fast notes: the drift is nearly constant).
+    const auto fastRun = perform (0.001, 16, 0.5, 9, 60, withTakes (16));
+    const auto pitch = field (fastRun, [] (const NoteShape& s) { return s.pitchCents; });
+    double mean = 0.0;
+    for (double x : pitch) mean += x;
+    mean /= static_cast<double> (pitch.size());
+    const auto endless = perform (0.001, 400, 0.5, 9, 60);
+    CHECK (sd (pitch) > 0.5 * sd (field (endless, [] (const NoteShape& s) { return s.pitchCents; })));
+    CHECK (std::abs (mean) < 0.6 * sd (pitch) + 0.5);
+
+    // One take (or zero) is endless: the same performances as before TAKES existed.
+    const auto plain = perform (0.3, 64, 0.5, 9, 60);
+    const auto one = perform (0.3, 64, 0.5, 9, 60, withTakes (1));
+    for (std::size_t i = 0; i < plain.shapes.size(); ++i)
+        CHECK (plain.shapes[i].gain == one.shapes[i].gain);
+}
+
+TEST_CASE ("performance: CHARACTER carries the generator's priors", "[unit][performance]")
+{
+    auto gainDb = [] (const NoteShape& s) { return 20.0 * std::log10 (s.gain); };
+    auto bright = [] (const NoteShape& s) { return s.brightnessDb; };
+    auto settle = [] (const NoteShape& s) { return s.pitchSettleCents; };
+    auto pitch = [] (const NoteShape& s) { return s.pitchCents; };
+    Shaping pluck, synth, drum;
+    pluck.lifeCharacter = LifeCharacter::pluck;
+    synth.lifeCharacter = LifeCharacter::synth;
+    drum.lifeCharacter = LifeCharacter::drum;
+    const auto p = perform (3.0, 800, 0.5, 7, 60, pluck);
+    const auto s = perform (3.0, 800, 0.5, 7, 60, synth);
+    const auto d = perform (3.0, 800, 0.5, 7, 60, drum);
+    // PLUCK: harder plucks are louder and brighter (prior 0.6); level spread ~0.7 dB.
+    CHECK (correlation (field (p, gainDb), field (p, bright)) > 0.4);
+    CHECK (sd (field (p, gainDb)) > 0.45);
+    CHECK (sd (field (p, gainDb)) < 1.0);
+    // SYNTH: no attack pitch drift, but oscillator detune.
+    for (double x : field (s, settle))
+        CHECK (x == 0.0);
+    CHECK (sd (field (s, pitch)) > 1.5);
+    // DRUM (trained kick/snare): no pitch at all, harder hits slightly darker.
+    for (const auto& shape : d.shapes)
+    {
+        CHECK (shape.pitchCents == 0.0);
+        CHECK (shape.pitchSettleCents == 0.0);
+    }
+    CHECK (correlation (field (d, gainDb), field (d, bright)) < 0.0);
 }

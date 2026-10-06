@@ -39,6 +39,10 @@ namespace ids
     static const juce::String lifePitch = "life.pitch";
     static const juce::String lifeTone = "life.tone";
     static const juce::String lifeAttack = "life.attack";
+    static const juce::String lifeCharacter = "life.character";   // version hint 10
+    static const juce::String lifeTakes = "life.takes";
+    static const juce::String lifeTakeOrder = "life.takeOrder";
+    static const juce::String lifeTakesSeed = "life.takesSeed";
     static const juce::String dynamicsCurve = "dynamics.curve";
     static const juce::String dynamicsTone = "dynamics.tone";
     static const juce::String characterType = "character.type";
@@ -260,6 +264,19 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
     // The layers' Original <-> Reimagined thumbs move together (keeping their offsets) while
     // linked; a UI behaviour, stored with the session (version hint 9).
     layout.add (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { "reimaginedLink", 9 }, "Reimagined Link", true));
+    // LIFE's round robins and variation character (version hint 10). The defaults (AUTO,
+    // endless takes) are LIFE as it was, so older sessions sound the same.
+    {
+        juce::StringArray takes { juce::String::fromUTF8 ("\xe2\x88\x9e") };
+        for (int n = 2; n <= PerformanceEngine::maxTakes; ++n)
+            takes.add (juce::String (n));
+        layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { ids::lifeCharacter, 10 }, "Life Character",
+                                                                  juce::StringArray { "Auto", "Pluck", "Synth", "Drum" }, 0));
+        layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { ids::lifeTakes, 10 }, "Life Takes", takes, 0));
+        layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { ids::lifeTakeOrder, 10 }, "Life Take Order",
+                                                                  juce::StringArray { "Cycle", "Random" }, 0));
+        layout.add (std::make_unique<juce::AudioParameterInt> (juce::ParameterID { ids::lifeTakesSeed, 10 }, "Life Takes Variation", 0, 999, 0));
+    }
     layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::mixX, 7 }, "Mix X", Range (0.0f, 1.0f, 0.0f), 0.5f));
     layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::mixY, 7 }, "Mix Y", Range (0.0f, 1.0f, 0.0f), 1.0f / 3.0f));
     {
@@ -588,6 +605,7 @@ const juce::StringArray& OspAudioProcessor::shapingIds()
         ids::driftSpeed, ids::driftPitch, ids::driftTone, ids::tapeWow, ids::tapeFlutter, ids::tapeWear,
         ids::chorusRate, ids::chorusWidth, ids::chorusStereo, ids::pulseRate, ids::pulseShape, ids::pulseStereo,
         ids::shaperPattern, ids::shaperRate, ids::shaperTarget, ids::shaperSmooth,
+        ids::lifeCharacter, ids::lifeTakes, ids::lifeTakeOrder, ids::lifeTakesSeed,
     };
     jassert (list.size() == numShapingParams);
     return list;
@@ -631,6 +649,11 @@ Shaping OspAudioProcessor::shapingFromParameters() const noexcept
     s.shaper.rate = static_cast<ShaperRate> (index (30, 6));
     s.shaper.target = static_cast<ShaperTarget> (index (31, 3));
     s.shaper.smooth = 0.01 * v (32);
+    s.lifeCharacter = static_cast<LifeCharacter> (index (33, 4));
+    const int takes = index (34, PerformanceEngine::maxTakes);
+    s.lifeTakes = takes == 0 ? 0 : takes + 1;   // endless, 2, 3 .. 16
+    s.lifeTakeOrder = static_cast<LifeTakeOrder> (index (35, 2));
+    s.lifeTakesSeed = static_cast<std::uint32_t> (std::max (0L, std::lround (v (36))));
     return s;
 }
 

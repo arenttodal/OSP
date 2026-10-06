@@ -33,6 +33,18 @@ namespace osp
     A repeat guard keeps a repeated note from sounding like either of its last two
     plays, so neither near-identical repeats nor an A-B-A-B loop can appear.
 
+    CHARACTER sets the spreads and how the outputs move together: AUTO is the
+    calibration above (from the sample's own analysis); PLUCK, SYNTH and DRUM carry the
+    round-robin generator's priors and trained models (rr-variation-model/2).
+
+    TAKES (round robins): with 2..16 takes each note keeps that many fixed performances
+    instead of inventing a new one every time. A note's takes are spread evenly (one
+    stratum of the distribution per take, each axis independently shuffled, re-centred
+    so the takes average to the recording) and are recomputed from the seed at note-on,
+    so they cost no memory. A repeated note steps to its next take (CYCLE) or to any
+    other take (RANDOM), never the same one twice in a row. The player's slow drift and
+    DYNAMICS still apply on top, as they would to a sampled round-robin set.
+
     Deterministic: the state depends only on the seed and the sequence of note events
     (times, notes, velocities). Real-time safe: no allocation.
 */
@@ -63,8 +75,19 @@ public:
     /** Time constant of the player's slow state drift (seconds). */
     static constexpr double memorySeconds = 4.0;
 
+    /** Most takes a note can keep. */
+    static constexpr int maxTakes = 16;
+    /** The take the last note played (-1 with endless takes; tests, diagnostics). */
+    int lastTakePlayed() const noexcept { return lastPlayedTake; }
+
 private:
     void advance (double timeSeconds, double memory) noexcept;
+
+    /** A take's latent and independent values: force, colour, timing, then one per output. */
+    static constexpr int takeDimensions = 12;
+    std::uint64_t takePoolSeed (std::uint32_t reroll) const noexcept;
+    static void takeValues (std::uint64_t poolSeed, int note, int take, int count, double (&z)[takeDimensions]) noexcept;
+    int chooseTake (int note, int count, LifeTakeOrder order, std::uint64_t eventIndex) noexcept;
 
     /** A note's independent part, in units of the calibrated spreads. */
     struct Variation
@@ -86,6 +109,9 @@ private:
     std::array<Variation, 2> previous {};
     int previousCount = 0;
     int guarded = 0;
+    // TAKES: the take each note played last (0xff: none yet).
+    std::array<std::uint8_t, 128> lastTake {};
+    int lastPlayedTake = -1;
 };
 
 } // namespace osp

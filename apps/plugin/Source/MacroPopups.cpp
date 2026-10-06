@@ -718,6 +718,7 @@ namespace
                 transition();
             shownMode = mode;
             return watch.differs ({ static_cast<double> (mode), value (s, "life"), value (s, "life.pitch"), value (s, "life.tone"), value (s, "life.attack"),
+                                    value (s, "life.takes"), value (s, "life.takesSeed"), value (s, "life.character"),
                                     static_cast<double> (processor.velocityCount.load()) });
         }
 
@@ -730,11 +731,20 @@ namespace
             const double modeScale = mode == LifeMode::loose ? 1.5 : (mode == LifeMode::fray ? 1.2 : 1.0);
             const double pitch = value (s, "life.pitch") / 15.0, tone = 0.01 * value (s, "life.tone"), attack = 0.01 * value (s, "life.attack");
             const auto notes = static_cast<std::uint64_t> (processor.velocityCount.load());
-            const int contours = 7;
-            for (int c = contours - 1; c >= 0; --c)
+            // TAKES: the note's fixed set of takes, all drawn, the one playing now strong;
+            // endless: the last few performances, a new one with every note.
+            const int takeIndex = juce::roundToInt (value (s, "life.takes"));
+            const int takes = takeIndex > 0 ? takeIndex + 1 : 0;
+            const auto reroll = static_cast<std::uint64_t> (std::max (0, juce::roundToInt (value (s, "life.takesSeed"))));
+            const int contours = takes > 0 ? takes : 7;
+            const int playing = takes > 0 ? static_cast<int> (notes % static_cast<std::uint64_t> (takes)) : 0;
+            for (int order = contours - 1; order >= 0; --order)
             {
-                const bool current = c == 0;
-                Prng rng (Prng::deriveSeed (0x6c696665ull, notes + static_cast<std::uint64_t> (c), static_cast<std::uint64_t> (c)));
+                // Draw the playing take last (on top).
+                const int c = takes > 0 ? (playing + 1 + order) % takes : order;
+                const bool current = takes > 0 ? c == playing : c == 0;
+                Prng rng (takes > 0 ? Prng::deriveSeed (0x74616b65ull + reroll, static_cast<std::uint64_t> (takes), static_cast<std::uint64_t> (c))
+                                    : Prng::deriveSeed (0x6c696665ull, notes + static_cast<std::uint64_t> (c), static_cast<std::uint64_t> (c)));
                 auto gauss = [&rng] { return std::clamp (rng.gaussian(), -2.2, 2.2); };
                 const double spread = life * modeScale;
                 // Pitch: height; attack: how the onset rises; tone: colour; and a little of
@@ -780,13 +790,15 @@ namespace
                 else
                 {
                     const auto colour = lavender.interpolatedWith (mineral, static_cast<float> (colourAt)).withMultipliedSaturation (0.6f);
-                    g.setColour (colour.withAlpha (0.22f + 0.06f * static_cast<float> (contours - c)));
+                    const float alpha = takes > 0 ? 0.42f : 0.22f + 0.06f * static_cast<float> (contours - c);
+                    g.setColour (colour.withAlpha (alpha));
                     g.strokePath (contour, juce::PathStrokeType (1.1f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
                 }
             }
             g.setColour (displayText.withAlpha (0.8f));
             g.setFont (type::annotation (9.0f));
-            g.drawText (life < 0.01 ? "EVERY NOTE THE SAME" : "LIFE " + juce::String (juce::roundToInt (100.0 * life)) + " %",
+            const auto lifeText = life < 0.01 ? juce::String ("EVERY NOTE THE SAME") : "LIFE " + juce::String (juce::roundToInt (100.0 * life)) + " %";
+            g.drawText (takes > 0 && life >= 0.01 ? juce::String (takes) + " TAKES " + juce::String::fromUTF8 ("\xc2\xb7 ") + lifeText : lifeText,
                         area.withHeight (11.0f), juce::Justification::centredRight, false);
         }
 
@@ -1099,6 +1111,136 @@ namespace
         std::vector<std::unique_ptr<ValueSelector>> selectors;
         bool shaperMode = false;
     };
+
+    //==========================================================================
+    /** NEW TAKES: re-rolls every note's takes (a new, equally spread set). */
+    class NewTakesButton final : public juce::Component, public juce::SettableTooltipClient
+    {
+    public:
+        explicit NewTakesButton (juce::RangedAudioParameter& p) : parameter (p)
+        {
+            setMouseCursor (juce::MouseCursor::PointingHandCursor);
+            setWantsKeyboardFocus (true);
+            setTitle ("New takes");
+            setTooltip ("New takes: roll a new set of takes for every note");
+        }
+
+        void paint (juce::Graphics& g) override
+        {
+            auto r = getLocalBounds().toFloat();
+            const float h = r.getHeight();
+            const float alpha = isEnabled() ? 1.0f : 0.4f;
+            g.setColour (design::colour::textSecondary.withMultipliedAlpha (alpha));
+            g.setFont (fonts::make (0.27f * h, fonts::Weight::regular, 0.05f));
+            g.drawText ("NEW", r.removeFromTop (0.36f * h), juce::Justification::centred, false);
+            const auto box = r.reduced (1.0f, 1.0f);
+            const bool hot = isEnabled() && (isMouseOver() || hasKeyboardFocus (false));
+            design::draw::button (g, box, 0.2f * box.getHeight(), pressed, hot, design::colour::accent);
+            icons::draw (g, icons::Kind::loop, box.withSizeKeepingCentre (0.6f * box.getHeight(), 0.6f * box.getHeight()),
+                         design::colour::text.withAlpha (0.75f * alpha), 1.2f);
+        }
+
+        void mouseEnter (const juce::MouseEvent&) override { repaint(); }
+        void mouseExit (const juce::MouseEvent&) override { repaint(); }
+        void mouseDown (const juce::MouseEvent&) override { pressed = true; repaint(); }
+        void mouseUp (const juce::MouseEvent& e) override
+        {
+            pressed = false;
+            repaint();
+            if (getLocalBounds().contains (e.getPosition()))
+                reroll();
+        }
+        bool keyPressed (const juce::KeyPress& key) override
+        {
+            if (key.isKeyCode (juce::KeyPress::returnKey) || key.isKeyCode (juce::KeyPress::spaceKey))
+                return reroll(), true;
+            return false;
+        }
+
+    private:
+        void reroll()
+        {
+            const auto& range = parameter.getNormalisableRange();
+            const float now = parameter.convertFrom0to1 (parameter.getValue());
+            const float next = now + 1.0f > range.end ? range.start : now + 1.0f;
+            parameter.beginChangeGesture();
+            parameter.setValueNotifyingHost (parameter.convertTo0to1 (next));
+            parameter.endChangeGesture();
+        }
+
+        juce::RangedAudioParameter& parameter;
+        bool pressed = false;
+    };
+
+    /** LIFE: the mode beside the title, the cloud of performances, then how it varies
+        (CHARACTER) and whether each note keeps a fixed set of TAKES (round robins: how
+        many, in which ORDER, NEW for another set), then PITCH, TONE and ATTACK. */
+    class LifePanel final : public MacroPanel
+    {
+    public:
+        explicit LifePanel (OspAudioProcessor& p) : MacroPanel (p, "LIFE", 268, 66)
+        {
+            mode ("life.mode", "Natural: subtle; Loose: wider; Fray: now and then a note strays");
+            setVisual (std::make_unique<LifeVisual> (p));
+            auto& state = p.parameters;
+            const std::pair<const char*, const char*> keys[] = {
+                { "life.character", "Character: how performances vary. Auto reads the sample; Pluck, Synth and Drum use round-robin models" },
+                { "life.takes", "Takes: endless (every note new) or a fixed set of round robins per note" },
+                { "life.takeOrder", "Order: cycle through the takes, or pick at random (never the same twice in a row)" } };
+            const char* captions[] = { "CHARACTER", "TAKES", "ORDER" };
+            for (int i = 0; i < 3; ++i)
+            {
+                selectors.push_back (std::make_unique<ValueSelector> (*state.getParameter (keys[i].first), captions[i]));
+                selectors.back()->setTooltip (keys[i].second);
+                addAndMakeVisible (*selectors.back());
+            }
+            newTakes = std::make_unique<NewTakesButton> (*state.getParameter ("life.takesSeed"));
+            addAndMakeVisible (*newTakes);
+            // ORDER and NEW only matter with a fixed set of takes.
+            selectors[1]->onChange = [this] (int) { updateTakes(); };
+            updateTakes();
+            const auto percent = [] (double v) { return format::percent (v) + " %"; };
+            knob (false, "life.pitch", "PITCH", [] (double v) { return juce::String (v, 1) + " c"; });
+            knob (false, "life.tone", "TONE", percent);
+            knob (false, "life.attack", "ATTACK", percent);
+        }
+
+        static constexpr int selectorHeight = 34;
+
+        juce::Point<int> cardSize() const override
+        {
+            return { panelWidth, headerTop + visualHeight + gap + selectorHeight + 6 + cellHeight + bottom };
+        }
+
+    private:
+        void updateTakes()
+        {
+            const bool fixed = selectors[1]->selected() > 0;
+            selectors[2]->setEnabled (fixed);
+            selectors[2]->setAlpha (fixed ? 1.0f : 0.45f);
+            newTakes->setEnabled (fixed);
+        }
+
+        void layoutContent (juce::Rectangle<int> area) override
+        {
+            layoutHeader();
+            visual->setBounds (area.removeFromTop (visualHeight));
+            area.removeFromTop (gap);
+            auto row = area.removeFromTop (selectorHeight);
+            // CHARACTER gets the widest key; NEW is a small square-ish key.
+            const int newWidth = 34;
+            newTakes->setBounds (row.removeFromRight (newWidth).reduced (2, 0));
+            const int unit = row.getWidth() / 10;
+            selectors[0]->setBounds (row.removeFromLeft (4 * unit).reduced (2, 0));
+            selectors[1]->setBounds (row.removeFromLeft (3 * unit).reduced (2, 0));
+            selectors[2]->setBounds (row.reduced (2, 0));
+            area.removeFromTop (6);
+            layoutRow (primaryRow, area.removeFromTop (cellHeight));
+        }
+
+        std::vector<std::unique_ptr<ValueSelector>> selectors;
+        std::unique_ptr<NewTakesButton> newTakes;
+    };
 }
 
 std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, OspAudioProcessor& processor)
@@ -1110,13 +1252,7 @@ std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, OspAudioProcessor
     {
         case MacroPopup::life:
         {
-            auto popup = std::make_unique<MacroPanel> (processor, "LIFE", 232, 70);
-            popup->mode ("life.mode", "Natural: subtle; Loose: wider; Fray: now and then a note strays");
-            popup->setVisual (std::make_unique<LifeVisual> (processor));
-            popup->knob (false, "life.pitch", "PITCH", [] (double v) { return juce::String (v, 1) + " c"; });
-            popup->knob (false, "life.tone", "TONE", percent);
-            popup->knob (false, "life.attack", "ATTACK", percent);
-            return popup;
+            return std::make_unique<LifePanel> (processor);
         }
         case MacroPopup::dynamics:
         {

@@ -85,11 +85,22 @@ different clouds of the same sound (none at 0 %, clearly different at 50 %). In 
 popup, PITCH sets the pitch differences, TONE the spread and density differences, ATTACK
 the size differences; LOOSE varies more and FRAY sometimes jumps far across the recording.
 
+### Round robins (LIFE → TAKES)
+
+With TAKES at ∞ every note is a new performance. Set TAKES to 2–16 and each note keeps
+that many fixed takes instead, like a sampled round-robin set: a repeated note steps to
+its next take (ORDER: CYCLE) or to any other one (RANDOM), never the same take twice in
+a row. The takes are spread evenly and average out to your recording, so none drifts
+off-pitch. LIFE sets how far apart they are, CHARACTER how they differ (a PLUCK's harder
+takes are louder, brighter and start a touch sharp; a DRUM's have no pitch). **NEW** rolls
+a fresh set. DYNAMICS and the player's slow drift still apply on top, as they would to a
+real round-robin set.
+
 ## The controls
 
 | Control | What it does |
 |---|---|
-| **LIFE** | How differently each note is performed. 0 = the identical recording every time; around 50 % = a believable player (calibrated on real repeated takes); 100 % = freer, related reinterpretations. Repeated fast notes alternate naturally. |
+| **LIFE** | How differently each note is performed. 0 = the identical recording every time; around 50 % = a believable player (calibrated on real repeated takes); 100 % = freer, related reinterpretations. Repeated fast notes alternate naturally. Popup: NATURAL / LOOSE / FRAY; CHARACTER (AUTO reads the sample; PLUCK, SYNTH, DRUM use round-robin models); TAKES (see below); PITCH, TONE, ATTACK. |
 | **DYNAMICS** | What velocity does besides volume. 0 = volume only. Higher = soft notes darker and gentler, hard notes brighter with more bite and a slightly sharp start. |
 | **CHARACTER** | The tonal shape: where the filter sits between its MIN and MAX (popup: type, resonance, drive, envelope). |
 | **MOVEMENT** | How the sound changes over time (popup: DRIFT, TAPE, CHORUS, PULSE, SHAPER). The mod wheel opens it further. |

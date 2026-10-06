@@ -175,7 +175,8 @@ compiles the I/O sources with the plugin's own JUCE settings.
 
  note-on ─► InstrumentEngine (audio thread, no allocation)
               member choice (set): nearest pitch group -> velocity layer -> round robin (never the previous take)
-              NoteShape = velocity level + applyDynamics (DYNAMICS) + PerformanceEngine (LIFE, memory)
+              NoteShape = velocity level + applyDynamics (DYNAMICS) + PerformanceEngine (LIFE, memory;
+                          CHARACTER loadings/spreads; TAKES: fixed stratified takes per note, recomputed from the seed)
                           + MOTION drift + Reimagined (segment length, saturation) + register brightness
           ─► InstrumentVoice: sinc read of the chosen PitchLayer (Tape = original, Natural = nearest anchor)
                               continuation random walk over jumps, correlation-aware crossfades

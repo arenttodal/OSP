@@ -22,6 +22,10 @@ namespace osp
 */
 
 enum class LifeMode { natural, loose, fray };
+/** LIFE's variation character: AUTO is OSP's own calibration from the sample's analysis;
+    PLUCK, SYNTH and DRUM are the round-robin generator's priors and trained models. */
+enum class LifeCharacter { automatic, pluck, synth, drum };
+enum class LifeTakeOrder { cycle, random };
 enum class VelocityCurve { soft, linear, hard };
 enum class FilterType { lp24, lp12, hp12, bp12, tilt, off };   ///< off: research/tests only, not offered to musicians
 enum class MovementMode { drift, tape, chorus, pulse, shaper };
@@ -34,6 +38,12 @@ struct Shaping
     double lifePitchCents = 4.0;   ///< 0..15: largest micro-pitch difference between performances
     double lifeTone = 0.30;        ///< 0..1: spectral/colour variation
     double lifeAttack = 0.25;      ///< 0..1: onset/transient variation
+    LifeCharacter lifeCharacter = LifeCharacter::automatic;
+    /** TAKES: 0 = endless (every play is new); 2..16 = each note keeps that many fixed
+        takes (round robins) and steps through them in `lifeTakeOrder`. */
+    int lifeTakes = 0;
+    LifeTakeOrder lifeTakeOrder = LifeTakeOrder::cycle;
+    std::uint32_t lifeTakesSeed = 0;   ///< NEW TAKES: re-roll counter for the take pools
 
     // DYNAMICS (attack and release live in the amplitude envelope)
     VelocityCurve velocityCurve = VelocityCurve::linear;
