@@ -184,6 +184,7 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [x] SHAPER DEPTH (= the MOVEMENT macro, also in the SHAPER popup): patterns span their full range, 100 % on VOL gates to silence, 10 % is subtle; MACHINE is now an on/off gate
 - [x] Large MIX popup for three layers (click the small triangle or MIX); macro value bubble readable (light on graphite, whole percent)
 - [x] Per-layer Original <-> Reimagined (engine: LayerSettings::reimagined, shared resonance weighted by the mix; plugin: layerB/C.reimagined, A keeps `reimagined`; state v7 migration)
+- [x] Pixel-accurate visual pass against the approved references (design/README.md): layout in the reference's 1448 x 1086 coordinates scaled uniformly; design tokens (Design.h, palette.md); knobs, cards, waveform renderer, mix band, macros, envelope, wheels, keyboard and every popup rebuilt; canonical render + overlay/diff harness; final comparison in design/final-review/ (mean difference main 33.7 -> 17.6, SPACE popup 49 -> 20.9)
 - [ ] Stage 20: DAW testing (Logic AU, Ableton AU/VST3, Reaper VST3) — needs the user's Mac
 - [ ] Listening pass: FOLLOW-off lift, REVERSE + LOOP, the three-layer mix law, default LEVEL 0 dB
 
