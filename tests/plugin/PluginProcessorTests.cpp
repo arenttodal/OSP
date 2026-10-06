@@ -1743,3 +1743,119 @@ TEST_CASE ("plugin: Mono plays one note with legato and glide; sessions without 
     CHECK (valueOf (r, "voiceMode") == Approx (1.0f));
     CHECK (valueOf (r, "glide") == Approx (300.0f).margin (0.5f));
 }
+
+// Visual QA (design/README.md): the canonical scenes at the reference size, 1448 x 1086,
+// for overlay against design/reference/. Hidden; scripts/visual-review.sh runs it:
+//   OSP_SNAPSHOT_DIR=design/current xvfb-run ./osp_plugin_tests "[canonical]"
+// OSP_CANONICAL_A / OSP_CANONICAL_B may name the reference composition's own recordings
+// (otherwise a sustained vowel and a struck, ringing tone stand in for them).
+TEST_CASE ("plugin: canonical screenshots for visual review", "[.][canonical]")
+{
+    const char* dir = std::getenv ("OSP_SNAPSHOT_DIR");
+    if (dir == nullptr)
+        return;
+    TempDir tmp;
+    auto source = [&] (const char* env, const juce::String& name, const AudioData& fallback) {
+        if (const char* path = std::getenv (env); path != nullptr && juce::File (path).existsAsFile())
+            return juce::File (path);
+        return writeSource (tmp.dir, name, fallback);
+    };
+    const auto a = source ("OSP_CANONICAL_A", "MMZT_one_shot_sailboat_C.wav", testsignals::vowel (midiToHz (60), 2.1, 48000.0, 3));
+    const auto b = source ("OSP_CANONICAL_B", "MMZT_one_shot_reverb_kalimba_C.wav", testsignals::pluck (midiToHz (60), 3.4, 48000.0, 5));
+    const auto c = source ("OSP_CANONICAL_C", "Warm Harmonics.wav", testsignals::pluck (midiToHz (52), 2.5, 48000.0, 9));
+
+    OspAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (editor.get());
+    REQUIRE (ui != nullptr);
+    editor->setSize (1448, 1086);
+    auto shot = [&] (const juce::String& name) {
+        ui->refreshNow();
+        const auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f);
+        juce::FileOutputStream out (juce::File (dir).getChildFile (name));
+        out.setPosition (0);
+        out.truncate();
+        juce::PNGImageFormat().writeImageToStream (image, out);
+    };
+    auto settle = [&] {
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        ui->refreshNow();
+    };
+    auto set = [&] (const char* id, float value) { p.setParameterValue (id, value); };
+    // The reference composition's settings (main-2-layer.png).
+    set ("life", 50.0f);
+    set ("dynamics", 22.0f);
+    set ("character", 78.0f);
+    set ("motion", 72.0f);
+    set ("space", 40.0f);
+    set ("reimagined", 18.0f);
+    set ("attack", 2.0f);
+    set ("decay", 600.0f);
+    set ("sustainLevel", 100.0f);
+    set ("release", 700.0f);
+    set ("layerA.start", 1.0f);
+    set ("layerA.reverse", 1.0f);
+    set ("layerB.loop", 0.0f);
+
+    shot ("01-empty.png");
+    p.addLayers ({ a });
+    settle();
+    shot ("02-one-oneshot.png");
+    set ("layerA.sourceMode", 1.0f);
+    shot ("03-one-granular.png");
+    set ("layerA.sourceMode", 0.0f);
+    p.addLayers ({ b });
+    settle();
+    set ("ab.blend", 0.44f);
+    shot ("04-two-oneshot.png");
+    set ("layerB.sourceMode", 1.0f);
+    // Notes playing: read heads in A, grains in B.
+    p.prepareToPlay (48000.0, 512);
+    juce::AudioBuffer<float> audio (2, 512);
+    for (int block = 0; block < 60; ++block)
+    {
+        juce::MidiBuffer midi;
+        if (block % 8 == 0 && block < 56)
+            midi.addEvent (juce::MidiMessage::noteOn (1, 60 + (block / 8) * 2, static_cast<juce::uint8> (100)), 0);
+        audio.clear();
+        p.processBlock (audio, midi);
+    }
+    shot ("05-two-mixed.png");
+    shot ("main-2-layer.png");
+    // The popups over the two-layer instrument.
+    ui->openPopup (0);
+    shot ("08-life-popup.png");
+    ui->openPopup (1);
+    shot ("09-dynamics-popup.png");
+    ui->openPopup (2);
+    shot ("10-character-popup.png");
+    const char* movement[] = { "11-movement-drift.png", "12-movement-tape.png", "13-movement-chorus.png", "14-movement-pulse.png", "15-movement-shaper.png" };
+    for (int mode = 0; mode < 5; ++mode)
+    {
+        p.parameters.getParameter ("movement.mode")->setValueNotifyingHost (static_cast<float> (mode) / 4.0f);
+        ui->openPopup (3);
+        shot (movement[mode]);
+    }
+    const char* space[] = { "16-space-room.png", "17-space-chamber.png", "18-space-plate.png", "19-space-spring.png" };
+    for (int type = 0; type < 4; ++type)
+    {
+        p.parameters.getParameter ("space.type")->setValueNotifyingHost (static_cast<float> (type) / 3.0f);
+        ui->openPopup (4);
+        shot (space[type]);
+    }
+    p.parameters.getParameter ("space.type")->setValueNotifyingHost (0.0f);
+    ui->openPopup (4);
+    shot ("popup-space.png");
+    ui->closePopup();
+    juce::MidiBuffer off;
+    off.addEvent (juce::MidiMessage::allNotesOff (1), 0);
+    p.processBlock (audio, off);
+    set ("layerA.sourceMode", 1.0f);
+    shot ("06-two-granular.png");
+    set ("layerA.sourceMode", 0.0f);
+    p.addLayers ({ c });
+    settle();
+    shot ("07-three.png");
+    p.editorBeingDeleted (editor.get());
+}

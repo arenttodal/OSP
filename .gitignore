@@ -34,3 +34,7 @@ compile_commands.json
 __pycache__/
 *.pyc
 .venv/
+
+# Visual QA renders (scripts/visual-review.sh); design/final-review is committed
+/design/current/
+/design/review/
