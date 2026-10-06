@@ -195,8 +195,7 @@ private:
 
     // Header
     PresetBar presetBar { ospProcessor };
-    juce::Slider volume { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::NoTextBox };
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> volumeAttachment;
+    VolumeSlider volume { ospProcessor.parameters };
     HeaderMenuButton menuButton;
     juce::Rectangle<int> headerArea, logoArea, volumeCaption;
 

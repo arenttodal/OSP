@@ -100,17 +100,19 @@ namespace layout
     const juce::Point<float> logo { 51.0f, 79.0f };            ///< baseline of OSP/2-OSP
     const R logoSubtitle { 51.0f, 88.0f, 300.0f, 14.0f };
     const R presetBar { 501.0f, 45.0f, 446.0f, 48.0f };
-    const R volume { 1263.0f, 29.0f, 70.0f, 70.0f };
-    const R volumeLabel { 1258.0f, 99.0f, 80.0f, 16.0f };
+    /** Master volume: a thin utility slider (VOLUME and its value above the track). */
+    const R volume { 1150.0f, 47.0f, 194.0f, 44.0f };
     const R menu { 1366.0f, 50.0f, 28.0f, 36.0f };
 
-    // Sources: two cards side by side; one or three share the same band.
-    const R sources { 35.0f, 127.0f, 1379.0f, 463.0f };
+    // Sources: two cards side by side; three share the same band. One source has no mix
+    // band below it: its card takes part of that room, the rest is air above the macros.
+    const R sources { 35.0f, 127.0f, 1379.0f, 459.0f };
+    const R sourcesAlone { 35.0f, 127.0f, 1379.0f, 525.0f };
     constexpr float cardGap = 13.0f;
     constexpr float cardRadius = 16.0f;
 
-    // Mix band
-    const R mixBand { 35.0f, 604.0f, 1378.0f, 83.0f };
+    // Mix band (two or three layers: the A/B blend or the mix triangle), with air either side.
+    const R mixBand { 35.0f, 605.0f, 1378.0f, 72.0f };
     constexpr float panelRadius = 13.0f;
 
     // Macros and envelope

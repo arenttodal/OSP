@@ -260,6 +260,8 @@ int OspLookAndFeel::getSliderThumbRadius (juce::Slider& slider)
 {
     if (static_cast<bool> (slider.getProperties()["blend"]))
         return 13;
+    if (static_cast<bool> (slider.getProperties()["volume"]))
+        return 7;   // VolumeSlider::thumbRadius: its track runs between the thumb's extremes
     return LookAndFeel_V4::getSliderThumbRadius (slider);
 }
 

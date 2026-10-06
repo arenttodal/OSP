@@ -133,7 +133,7 @@ floor −120), `centroidHz`, `flux`, `flatness`.
 | experiment `listening.json` | `--experiment` | texts, `scales`, `sections[]`, `groups[] {id, section, label, note, clips[] (shuffled)}`, `ext` |
 | `*.osppreset` | plugin | the plugin state XML (below) |
 | `*.ospinstrument` | plugin | zip: `manifest.json {schemaVersion 1, format, engineVersion, stateVersion, sources[] {contentHash, filename, stored}}`, `source/<sha256>.<ext>`, `analysis/<sha256>.analysis.json`, `preset.xml` |
-| plugin state (XML) | host session | `stateVersion` (2), `uiScale`, `program`, APVTS parameters, `Instrument {contentHash, filename, originalPath, playbackRootMidi, rootOrigin, startSeconds, playbackGainDb, rootOverride?, Set? {Member{contentHash, filename, originalPath}*, Assignment{filename, role, layer, rootMidi?}*}}` |
+| plugin state (XML) | host session | `stateVersion` (8; 8 adds `reimaginedRouting` "perLayer" / "legacyGlobal", absent = legacy), `uiScale`, `program`, APVTS parameters, `Instrument {contentHash, filename, originalPath, playbackRootMidi, rootOrigin, startSeconds, playbackGainDb, rootOverride?, Set? {Member{contentHash, filename, originalPath}*, Assignment{filename, role, layer, rootMidi?}*}}` |
 
 The engine's in-memory models (`InstrumentModel`, `ContinuationModel`, `InstrumentSet`)
 are never persisted: they are rebuilt from the cached analysis, deterministically, so

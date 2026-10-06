@@ -102,6 +102,7 @@ private:
     juce::RangedAudioParameter* parameter = nullptr;
     juce::String caption;
     bool compact = false;
+    bool creative = false;   ///< REIMAGINED: the same knob, a coral arc and a small coral light by its name
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
 };
 
@@ -193,7 +194,7 @@ private:
         MenuDots() : juce::Button ("Layer menu") {}
         void paintButton (juce::Graphics&, bool highlighted, bool down) override;
     } menuButton;
-    std::array<std::unique_ptr<LayerKnob>, 4> knobs;
+    std::array<std::unique_ptr<LayerKnob>, 5> knobs;   ///< START TUNE PAN LEVEL REIMAGINED
     std::array<std::unique_ptr<ModifierButton>, 4> modifiers;
     std::array<std::unique_ptr<MiniKnob>, 5> granularKnobs;
     juce::Rectangle<int> badgeArea, textArea, dividerArea;

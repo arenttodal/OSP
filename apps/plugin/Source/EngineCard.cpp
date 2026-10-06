@@ -707,20 +707,22 @@ private:
 };
 
 LayerKnob::LayerKnob (OspAudioProcessor& p, int layer, const juce::String& control, const juce::String& c)
-    : processor (p), caption (c)
+    : processor (p), caption (c), creative (control == "reimagined")
 {
-    parameter = processor.parameters.getParameter (OspAudioProcessor::layerParameterId (layer, control));
+    // REIMAGINED keeps its shipped IDs: A's is the instrument's `reimagined`.
+    const auto id = creative ? OspAudioProcessor::reimaginedParameterId (layer) : OspAudioProcessor::layerParameterId (layer, control);
+    parameter = processor.parameters.getParameter (id);
     dial = std::make_unique<Dial> (processor, layer, control, control == "tune");
     dial->setRotaryParameters (OspLookAndFeel::rotaryStart, OspLookAndFeel::rotaryEnd, true);
-    dial->getProperties().set ("arc", static_cast<juce::int64> (palette::layer (layer).getARGB()));
+    dial->getProperties().set ("arc", static_cast<juce::int64> ((creative ? palette::accent : palette::layer (layer)).getARGB()));
     dial->getProperties().set ("bipolar", control == "tune" || control == "pan");
     dial->setTitle ("Layer " + OspAudioProcessor::layerName (layer) + " " + caption);
-    attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (processor.parameters,
-                                                                                           OspAudioProcessor::layerParameterId (layer, control), *dial);
+    attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (processor.parameters, id, *dial);
     if (parameter != nullptr)
     {
         dial->setDoubleClickReturnValue (true, parameter->convertFrom0to1 (parameter->getDefaultValue()));
-        dial->setTooltip (parameter->getName (64) + (control == "tune" ? juce::String (" (Alt-drag: fine)") : juce::String()));
+        dial->setTooltip (creative ? juce::String ("Reimagined: how far this source moves from its original character")
+                                   : parameter->getName (64) + (control == "tune" ? juce::String (" (Alt-drag: fine)") : juce::String()));
     }
     dial->onValueChange = [this] { repaint(); };   // also when automation or LINK moves it (the attachment moves the dial)
     addAndMakeVisible (*dial);
@@ -736,8 +738,9 @@ void LayerKnob::setCompact (bool c)
     }
 }
 
-// Reference geometry (layer knob, 110 x 125): caption centred 13 px from the top, the dial
-// (92 px with its ticks) centred at 61, the value centred at 112.
+// Reference geometry (layer knob, 110 x 125; the five-knob row draws it at 87 %): caption
+// centred 13 px from the top, the dial (92 px with its ticks) centred at 61, the value
+// centred at 112.
 void LayerKnob::resized()
 {
     const float k = static_cast<float> (getHeight()) / 125.0f;
@@ -748,9 +751,20 @@ void LayerKnob::paint (juce::Graphics& g)
 {
     const float k = static_cast<float> (getHeight()) / 125.0f;
     const auto w = static_cast<float> (getWidth());
-    g.setColour (design::colour::text.withAlpha (0.9f));
-    g.setFont (type::controlLabel (k));
-    g.drawText (caption, juce::Rectangle<float> (0.0f, 2.0f * k, w, 22.0f * k), juce::Justification::centred, false);
+    g.setColour (design::colour::text.withAlpha (creative ? 0.97f : 0.9f));
+    // REIMAGINED: a touch tighter so it sits in the row like the short names.
+    const auto labelFont = creative ? fonts::make (14.5f * k, fonts::Weight::medium, 0.02f) : type::controlLabel (k);
+    g.setFont (labelFont);
+    const auto labelArea = juce::Rectangle<float> (0.0f, 2.0f * k, w, 22.0f * k);
+    g.drawText (caption, labelArea, juce::Justification::centred, false);
+    if (creative)
+    {
+        // A small coral light after the name, like the macros' (the more creative control).
+        const float textWidth = juce::GlyphArrangement::getStringWidth (labelFont, caption);
+        const juce::Point<float> c (0.5f * w + 0.5f * textWidth + 6.0f * k, labelArea.getCentreY());
+        if (c.x + 3.0f * k < w)
+            design::draw::led (g, c, 5.0f * k, palette::accent, 0.3f);
+    }
     g.setColour (design::colour::text.withAlpha (0.9f));
     g.setFont (type::controlValue (k));
     const auto value = parameter != nullptr ? parameter->getCurrentValueAsText() : juce::String();
@@ -882,7 +896,8 @@ EngineCard::EngineCard (OspAudioProcessor& p, int layer) : processor (p), layerI
     };
     addAndMakeVisible (menuButton);
 
-    const std::array<std::pair<const char*, const char*>, 4> controls { { { "start", "START" }, { "tune", "TUNE" }, { "pan", "PAN" }, { "level", "LEVEL" } } };
+    const std::array<std::pair<const char*, const char*>, 5> controls { { { "start", "START" }, { "tune", "TUNE" }, { "pan", "PAN" }, { "level", "LEVEL" },
+                                                                         { "reimagined", "REIMAGINED" } } };
     for (std::size_t i = 0; i < knobs.size(); ++i)
     {
         knobs[i] = std::make_unique<LayerKnob> (processor, layer, controls[i].first, controls[i].second);
@@ -896,7 +911,7 @@ EngineCard::EngineCard (OspAudioProcessor& p, int layer) : processor (p), layerI
             modifiers[i] = std::make_unique<ModifierButton> (*param, mods[i].second, palette::accent);
             addAndMakeVisible (*modifiers[i]);
         }
-    modifiers[0]->setTooltip ("Link: START, TUNE, PAN and LEVEL move together with the other linked layers");
+    modifiers[0]->setTooltip ("Link: START, TUNE, PAN, LEVEL and REIMAGINED move together with the other linked layers");
     modifiers[1]->setTooltip ("Reverse: play the recording (or the grains) backwards");
     modifiers[2]->setTooltip ("Loop: sustain a held note with the recording's own loops (off: play it once)");
     modifiers[3]->setTooltip ("Follow: keep the recording's own loudness contour (off: hold it level, like a sustained tone)");
@@ -1117,8 +1132,11 @@ void EngineCard::paint (juce::Graphics& g)
 void EngineCard::resized()
 {
     // Reference geometry: the two-layer card is 683 x 463 px. One layer stretches it
-    // across the band, three narrow it and put the modifiers in a row under the knobs.
+    // across the band (and, without a mix band, a little taller), three narrow it and put
+    // the modifiers in a row under the knobs. Everything below the display hangs from
+    // the card's foot, so a taller card gives its height to the display.
     const auto w = static_cast<float> (getWidth());
+    const auto h = static_cast<float> (getHeight());
     const bool triple = density == EngineLayoutDensity::triple;
     auto at = [] (juce::Rectangle<float> r) { return r.getSmallestIntegerContainer(); };
 
@@ -1130,40 +1148,41 @@ void EngineCard::resized()
         mode->setBounds (at ({ w - 62.0f - modeWidth, 12.0f, modeWidth, 41.0f }));
     textArea = at ({ 117.0f, 14.0f, w - 62.0f - modeWidth - 12.0f - 117.0f, 36.0f });
 
-    const float wellHeight = triple ? 196.0f : 257.0f;
+    const float wellHeight = h - (triple ? 267.0f : 206.0f);
     sourceDisplay.setBounds (at ({ 16.0f, 63.0f, w - 32.0f, wellHeight }));
+
+    // START TUNE PAN LEVEL REIMAGINED: one family at 87 % of the four-knob size, on one
+    // pitch, with a little more room at the row's ends than between neighbours.
+    auto row = [this, &at] (float left, float right, float cellWidth, float cellHeight, float centreY, bool compactKnobs) {
+        const float pitch = (right - left) / (static_cast<float> (knobs.size() - 1) + 2.0f * 0.62f);
+        for (std::size_t i = 0; i < knobs.size(); ++i)
+        {
+            knobs[i]->setCompact (compactKnobs);
+            const float cx = left + (0.62f + static_cast<float> (i)) * pitch;
+            knobs[i]->setBounds (at (juce::Rectangle<float> (std::min (cellWidth, pitch + 6.0f), cellHeight).withCentre ({ cx, centreY })));
+        }
+    };
 
     if (! triple)
     {
-        // Knobs at the reference's spacing (121 px), the 2 x 2 modifiers at the right edge.
+        // The 2 x 2 modifiers at the right edge, behind a hairline; the knobs left of it.
         const float right = w - 16.0f;
         const float buttonsX = right - 144.0f;
-        const std::array<float, 4> dual { 75.0f, 196.0f, 317.0f, 438.0f };
-        const float span = buttonsX - 70.0f;   // the room left of the divider
-        for (std::size_t i = 0; i < knobs.size(); ++i)
-        {
-            knobs[i]->setCompact (false);
-            const float cx = density == EngineLayoutDensity::hero ? 75.0f + static_cast<float> (i) * (span - 75.0f) / 3.6f : dual[i];
-            knobs[i]->setBounds (at (juce::Rectangle<float> (110.0f, 125.0f).withCentre ({ cx, 392.5f })));
-        }
-        dividerArea = at ({ buttonsX - 13.0f, 340.0f, 1.0f, 101.0f });
+        const float buttonsY = h - 123.0f;
+        row (16.0f, buttonsX - 13.0f, 0.87f * 110.0f, 0.87f * 125.0f, buttonsY + 50.5f, false);
+        dividerArea = at ({ buttonsX - 13.0f, buttonsY, 1.0f, 101.0f });
         const std::array<juce::Rectangle<float>, 4> cells { { { 0.0f, 0.0f, 66.0f, 45.0f }, { 77.0f, 0.0f, 67.0f, 45.0f },
                                                                 { 0.0f, 55.0f, 66.0f, 46.0f }, { 77.0f, 55.0f, 67.0f, 46.0f } } };
         for (std::size_t i = 0; i < modifiers.size(); ++i)
-            modifiers[i]->setBounds (at (cells[i].translated (buttonsX, 340.0f)));
+            modifiers[i]->setBounds (at (cells[i].translated (buttonsX, buttonsY)));
     }
     else
     {
-        const float cell = (w - 32.0f) / 4.0f;
-        for (std::size_t i = 0; i < knobs.size(); ++i)
-        {
-            knobs[i]->setCompact (true);
-            knobs[i]->setBounds (at (juce::Rectangle<float> (100.0f, 113.0f).withCentre ({ 16.0f + (static_cast<float> (i) + 0.5f) * cell, 324.0f })));
-        }
+        row (16.0f, w - 16.0f, 0.87f * 100.0f, 0.87f * 113.0f, h - 136.0f, true);
         dividerArea = {};
         const float gap = 9.0f, bw = (w - 32.0f - 3.0f * gap) / 4.0f;
         for (std::size_t i = 0; i < modifiers.size(); ++i)
-            modifiers[i]->setBounds (at ({ 16.0f + static_cast<float> (i) * (bw + gap), 397.0f, bw, 45.0f }));
+            modifiers[i]->setBounds (at ({ 16.0f + static_cast<float> (i) * (bw + gap), h - 66.0f, bw, 45.0f }));
     }
 
     // Granular: POS SIZE DENS TUNE SPREAD fade in over the display's foot while the pointer

@@ -1438,8 +1438,8 @@ TEST_CASE ("plugin: the editor adapts to one, two and three sounds; drops replac
         p.setParameterValue ("mix.x", 0.5f);
         p.setParameterValue ("mix.y", 1.0f / 3.0f);
     }
-    // Original <-> Reimagined: linked by default, a drag moves every layer's thumb by the
-    // same amount (offsets kept); unlinked, only the dragged one.
+    // REIMAGINED is in every card (the central Original <-> Reimagined track is gone); with
+    // LINK on two layers a change of one moves the other by the same amount.
     {
         ui->closePopup();
         ui->refreshNow();
@@ -1455,35 +1455,32 @@ TEST_CASE ("plugin: the editor adapts to one, two and three sounds; drops replac
             }
             return nullptr;
         };
-        auto* track = find (*editor, "Original / Reimagined");
-        REQUIRE (track != nullptr);
-        CHECK (find (*editor, "Link Reimagined") != nullptr);
-        CHECK (valueOf (p, "reimaginedLink") >= 0.5f);
+        CHECK (find (*editor, "Original / Reimagined") == nullptr);
+        CHECK (find (*editor, "Link Reimagined") == nullptr);
+        auto* dialA = dynamic_cast<juce::Slider*> (find (*editor, "Layer A REIMAGINED"));
+        auto* dialB = dynamic_cast<juce::Slider*> (find (*editor, "Layer B REIMAGINED"));
+        REQUIRE (dialA != nullptr);
+        REQUIRE (dialB != nullptr);
+        REQUIRE (find (*editor, "Layer C REIMAGINED") != nullptr);
         p.setParameterValue ("reimagined", 20.0f);
-        p.setParameterValue ("layerB.reimagined", 60.0f);
+        p.setParameterValue ("layerB.reimagined", 50.0f);
         p.setParameterValue ("layerC.reimagined", 40.0f);
-        auto xAt = [track] (float v) { return 11.0f + (static_cast<float> (track->getWidth()) - 22.0f) * v / 100.0f; };
-        auto drag = [track] (float fromX, float toX) {
-            auto source = juce::Desktop::getInstance().getMainMouseSource();
-            const auto now = juce::Time::getCurrentTime();
-            const float y = 0.5f * static_cast<float> (track->getHeight());
-            const juce::Point<float> from (fromX, y), to (toX, y);
-            const juce::MouseEvent down (source, from, juce::ModifierKeys(), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, track, track, now, from, now, 1, false);
-            const juce::MouseEvent move (source, to, juce::ModifierKeys(), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, track, track, now, from, now, 1, true);
-            track->mouseDown (down);
-            track->mouseDrag (move);
-            track->mouseUp (move);
-        };
-        drag (xAt (60.0f), xAt (70.0f));
-        CHECK (valueOf (p, "layerB.reimagined") == Approx (70.0f).margin (0.6));
+        CHECK (dialA->getValue() == Approx (20.0));
+        p.setParameterValue ("layerA.link", 1.0f);
+        p.setParameterValue ("layerB.link", 1.0f);
+        // A musician's turn of A (a gesture): B follows by the same amount, C (unlinked) stays.
+        auto source = juce::Desktop::getInstance().getMainMouseSource();
+        const auto now = juce::Time::getCurrentTime();
+        const auto centre = dialA->getLocalBounds().getCentre().toFloat();
+        const juce::MouseEvent down (source, centre, juce::ModifierKeys(), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, dialA, dialA, now, centre, now, 1, false);
+        dialA->mouseDown (down);
+        dialA->setValue (30.0, juce::sendNotificationSync);
+        dialA->mouseUp (down);
         CHECK (valueOf (p, "reimagined") == Approx (30.0f).margin (0.6));
-        CHECK (valueOf (p, "layerC.reimagined") == Approx (50.0f).margin (0.6));
-        p.setParameterValue ("reimaginedLink", 0.0f);
-        drag (xAt (30.0f), xAt (10.0f));
-        CHECK (valueOf (p, "reimagined") == Approx (10.0f).margin (0.6));
-        CHECK (valueOf (p, "layerB.reimagined") == Approx (70.0f).margin (0.6));
-        CHECK (valueOf (p, "layerC.reimagined") == Approx (50.0f).margin (0.6));
-        p.setParameterValue ("reimaginedLink", 1.0f);
+        CHECK (valueOf (p, "layerB.reimagined") == Approx (60.0f).margin (0.6));
+        CHECK (valueOf (p, "layerC.reimagined") == Approx (40.0f).margin (0.6));
+        p.setParameterValue ("layerA.link", 0.0f);
+        p.setParameterValue ("layerB.link", 0.0f);
     }
     // The smallest window still fits three full cards.
     editor->setSize (900, 720);
@@ -1970,6 +1967,46 @@ TEST_CASE ("plugin: canonical screenshots for visual review", "[.][canonical]")
     ui->closePopup();
     p.clearAllSamples();
     shot ("22-cleared.png");
+
+    // Per-layer REIMAGINED (new patches) and older patches shown through the new cards.
+    p.initPatch();
+    p.addLayers ({ a, b });
+    settle();
+    set ("reimagined", 0.0f);
+    set ("layerB.reimagined", 100.0f);
+    shot ("25-new-a0-b100.png");
+    p.addLayers ({ c });
+    settle();
+    set ("reimagined", 20.0f);
+    set ("layerB.reimagined", 50.0f);
+    set ("layerC.reimagined", 90.0f);
+    shot ("26-new-a20-b50-c90.png");
+    auto openAsOlder = [&] (int layers, float amount) {
+        OspAudioProcessor maker;
+        juce::Array<juce::File> files;
+        for (int i = 0; i < layers; ++i)
+            files.add (i == 0 ? a : b);
+        maker.addLayers (files);
+        REQUIRE (maker.waitForLoads (30000));
+        maker.pollLoads();
+        for (int l = 0; l < layers; ++l)
+            maker.setParameterValue (OspAudioProcessor::reimaginedParameterId (l), amount);
+        juce::MemoryBlock state;
+        maker.getStateInformation (state);
+        auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
+        REQUIRE (xml != nullptr);
+        xml->removeAttribute ("reimaginedRouting");
+        xml->setAttribute ("stateVersion", 7);
+        juce::AudioProcessor::copyXmlToBinary (*xml, state);
+        p.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+        settle();
+    };
+    openAsOlder (1, 63.0f);
+    shot ("27-old-1-layer.png");
+    CHECK_FALSE (p.isReimaginedPerLayer());   // shown, not converted
+    openAsOlder (2, 63.0f);
+    shot ("28-old-2-layer.png");
+    CHECK_FALSE (p.isReimaginedPerLayer());
     p.editorBeingDeleted (editor.get());
 }
 
@@ -2487,4 +2524,30 @@ TEST_CASE ("plugin: per-layer REIMAGINED - each layer's amount changes only that
     CHECK (difference (render (0.0f, 100.0f, false, true), render (50.0f, 100.0f, false, true)) < 1.0e-6);
     // Both heard: B at 100 % changes the result, A at 0 % stays the recording.
     CHECK (difference (render (0.0f, 0.0f, false, false), render (0.0f, 100.0f, false, false)) > 1.0e-2);
+}
+
+TEST_CASE ("plugin: master volume keeps its gain law as a slider", "[plugin][reimagined-migration]")
+{
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "a.wav", testsignals::vowel (midiToHz (57), 1.5, 48000.0, 3));
+    OspAudioProcessor p;
+    loadAndWait (p, a);
+    p.setParameterValue ("life", 0.0f);
+    auto rms = [] (const AudioData& x) {
+        double e = 0.0;
+        for (float v : x.channels[0])
+            e += static_cast<double> (v) * v;
+        return std::sqrt (e / static_cast<double> (x.channels[0].size()));
+    };
+    p.setParameterValue ("gain", 0.0f);
+    const double reference = rms (playNote (p, 57, 48000.0, 0.8));
+    REQUIRE (reference > 1.0e-4);
+    // The same parameter value gives the same output as ever: level follows dB exactly.
+    for (float db : { -36.0f, -24.0f, -12.0f, -6.0f, 0.0f, 12.0f })
+    {
+        p.setParameterValue ("gain", db);
+        const double level = rms (playNote (p, 57, 48000.0, 0.8));
+        INFO (db << " dB");
+        CHECK (20.0 * std::log10 (level / reference) == Approx (db).margin (0.01));
+    }
 }

@@ -43,53 +43,24 @@ private:
 };
 
 /**
-    ORIGINAL <-> REIMAGINED per layer: one thin track with a thumb for every loaded layer
-    (A's is the instrument's `reimagined`), each with its layer's colour at its centre.
-    Drag the nearest thumb; double-click one to return it to the default.
+    The master volume in the header: VOLUME and the value above a hairline track with a
+    small cream thumb - a utility, quieter than any sound control. Bound to the `gain`
+    parameter (its range, default and dB mapping unchanged); double-click returns to 0 dB.
 */
-class ReimaginedTrack final : public juce::Component, public juce::SettableTooltipClient
+class VolumeSlider final : public juce::Slider
 {
 public:
-    explicit ReimaginedTrack (OspAudioProcessor& processor);
-    void setLayers (const std::array<bool, 3>& occupied);
-    /** The track's ends in this component (the thumbs' centres travel between them). */
-    juce::Range<float> travel() const;
+    explicit VolumeSlider (juce::AudioProcessorValueTreeState& state);
     void paint (juce::Graphics&) override;
-    void mouseDown (const juce::MouseEvent&) override;
-    void mouseDrag (const juce::MouseEvent&) override;
-    void mouseUp (const juce::MouseEvent&) override;
-    void mouseDoubleClick (const juce::MouseEvent&) override;
-
-    /** Linked: dragging one thumb moves every shown thumb by the same amount (their
-        differences kept, clamped at the ends); a double-click resets them all. */
-    bool isLinked() const;
+    static constexpr int thumbRadius = 7;
 
 private:
-    int thumbAt (float x) const;
-    float xFor (int layer) const;
-    OspAudioProcessor& processor;
-    std::array<std::unique_ptr<juce::ParameterAttachment>, 3> attachments;
-    std::array<float, 3> values { 20.0f, 20.0f, 20.0f };
-    std::array<float, 3> dragStart {};
-    std::array<bool, 3> shown { true, false, false };
-    std::array<bool, 3> moving {};
-    int dragging = -1;
-};
-
-/** The small link toggle beside ORIGINAL <-> REIMAGINED (two or three layers). */
-class ReimaginedLinkButton final : public juce::Button
-{
-public:
-    explicit ReimaginedLinkButton (juce::AudioProcessorValueTreeState& state);
-    void paintButton (juce::Graphics&, bool highlighted, bool down) override;
-
-private:
-    juce::AudioProcessorValueTreeState::ButtonAttachment attachment;
+    juce::AudioProcessorValueTreeState::SliderAttachment attachment;
 };
 
 /**
-    The band between the sources and the macros. Its height never changes: one layer shows
-    only ORIGINAL <-> REIMAGINED; two add the A/B blend; three the mix triangle.
+    The band between the sources and the macros: with two layers the A/B blend, with three
+    the mix triangle; a single source has no band (each layer's REIMAGINED is in its card).
 */
 class MixSection final : public juce::Component
 {
@@ -110,12 +81,10 @@ private:
     OspAudioProcessor& processor;
     int count = 0;
     std::array<int, 3> slots { 0, 1, 2 };
-    ReimaginedTrack reimagined;
-    ReimaginedLinkButton linkButton;
     juce::Slider blend { juce::Slider::LinearHorizontal, juce::Slider::NoTextBox };
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> blendAttachment;
     TriangleMix triangle;
-    juce::Rectangle<int> reimaginedRow, blendRow, captionArea;
+    juce::Rectangle<int> blendRow, captionArea;
 };
 
 /** The large three-layer mix (opened from the mix band's triangle or MIX). */

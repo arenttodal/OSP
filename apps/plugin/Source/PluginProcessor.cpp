@@ -140,7 +140,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
     layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::space, 2 }, "Space", unit, 10.0f, percent));
     // Original <-> Reimagined: layer A's REIMAGINED (and, in sessions from before the layers,
     // the instrument's one amount; the ID never changes). New patches start at the Original end.
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::reimagined, 2 }, "A Reimagined", unit, 0.0f, percent));
+    const auto reimaginedText = juce::AudioParameterFloatAttributes().withLabel ("%").withStringFromValueFunction ([] (float v, int) {
+        return juce::String (juce::roundToInt (v)) + " %";
+    });
+    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::reimagined, 2 }, "A Reimagined", unit, 0.0f, reimaginedText));
     // Advanced (spec §13).
     layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { ids::pitchCharacter, 2 }, "Pitch Character",
                                                               juce::StringArray { "Tape", "Natural" }, 0));
@@ -261,7 +264,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
         // Per-layer Original <-> Reimagined (version hint 8): A's is the instrument's `reimagined`.
         if (layer > 0)
             layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { reimaginedParameterId (layer), 8 }, layerName (layer) + " Reimagined",
-                                                                     unit, 0.0f, percent));
+                                                                     unit, 0.0f, reimaginedText));
     }
     // The layers' Original <-> Reimagined thumbs move together (keeping their offsets) while
     // linked; a UI behaviour, stored with the session (version hint 9).

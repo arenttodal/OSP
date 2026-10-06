@@ -183,8 +183,11 @@ compiles the I/O sources with the plugin's own JUCE settings.
                               release graft into the recording's own ending
                               transient swap: separated onset transient at its own speed (spec §19)
                               shelves (brightness/body), transient, damping, expression (pressure, MPE)
-          ─► PostProcessor: CHARACTER (body resonances moved + tilt), sympathetic resonators (Reimagined),
-                            SPACE (width, decorrelation, FDN ambience)
+          ─► per layer: ReimaginedStage (per-layer routing only; resonators + formants on the layer's own signal)
+          ─► mix: weight x LEVEL x PAN per layer, summed
+          ─► PostProcessor: ReimaginedStage (legacy routing only, at the layers' power-weighted amount),
+                            MOVEMENT bus, SPACE
+          ─► output gain (VOLUME)
 ```
 
 - **Modules.** `analysis/continuation/` (stable region, jump points, graft exits),
@@ -262,7 +265,38 @@ Reimagined grains, its own drift); the shared post stage (resonator bank, width,
 takes the layers' amounts weighted by their power in the mix (only when a layer has its own).
 In the plugin layer A's amount is the original `reimagined` parameter; B and C have
 `layerB.reimagined` / `layerC.reimagined` (state v7: older sessions give them A's amount).
-`reimaginedLink` (default on) is UI behaviour only: the thumbs move together, keeping offsets.
+`reimaginedLink` is kept in the state for old sessions but no longer used (the central
+track is gone; REIMAGINED is a knob in each card and follows the layer LINK).
+
+**Reimagined routing (state v8).** Reimagined has a per-voice part (continuation segments,
+saturation, doubling, grains, drift), always per layer, and a bus part, `ReimaginedStage`
+(one implementation: resonator bank tuned to the source, a bank a fifth above, two wandering
+formants). `EngineSettings::reimaginedRouting` says where the bus part runs:
+
+- `legacyGlobal` - the engine default and every session, preset or starting state saved
+  before per-layer routing: ONE stage in PostProcessor after the mix at the layers'
+  power-weighted amount, exactly as before (reference renders in
+  `tests/audio/reimagined-before/` stay sample-identical). The layers' stages never run.
+  `Reimagined(A + B)` is not `Reimagined(A) + Reimagined(B)` (shared resonators excited by
+  the mix, one formant path), which is why old patches cannot simply be re-routed.
+- `perLayer` - new patches: each layer slot runs its own `ReimaginedStage` on its own
+  rendered signal before LEVEL, PAN and the mix (own resonances from its own model, own
+  formant path); PostProcessor's stage is held at 0. A stage at 0 % is skipped; above 0 it
+  runs every sample, also between notes (tails ring out, output stays block-size
+  independent). Cost: about 1-2 % of a core per active layer at 48 kHz.
+
+The resulting chain per note: SOURCE -> One Shot / Granular -> START / TUNE -> per-voice
+LIFE, DYNAMICS, CHARACTER filter, Reimagined per-voice part, drift, ADSR -> (per layer)
+REIMAGINED stage -> LEVEL / PAN -> mix -> MOVEMENT bus -> SPACE -> VOLUME. LIFE and the
+other macros are unchanged and stay shared (their per-voice stages were already per voice).
+
+The plugin stores `reimaginedRouting` ("perLayer" / "legacyGlobal"); a state without it
+(stateVersion < 8) is legacy. `OspAudioProcessor::convertLegacyReimaginedToPerLayer()` is the
+only switch from legacy: a gesture on one of the three REIMAGINED parameters (the knob, its
+double-click reset, LINK following it, a host's control surface); never loading, opening the
+editor, attachments or automation playback (which sends no gestures). The amounts are kept.
+Fresh instances, INIT and Reset settings are per layer with every REIMAGINED at 0 %; the
+factory starting states set legacy (they were made with the shared stage).
 
 Kept slots: "Clear all samples" and user starting states (`.ospstate`, settings + slot count,
 no audio) keep empty A/B/C slots. The session stores `keptSlots`; the editor shows a card per

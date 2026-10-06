@@ -34,7 +34,8 @@ OSP grows with what you give it, up to three sounds (layers **A**, **B**, **C**)
   it. All layers stay visible and playable.
 
 Every layer plays every note you play, through the same LIFE, DYNAMICS, CHARACTER,
-MOVEMENT, SPACE, ORIGINAL ↔ REIMAGINED and envelope: one instrument, not three.
+MOVEMENT, SPACE and envelope: one instrument, not three. Only how far each source departs
+from itself is its own: every card has its own **REIMAGINED**.
 
 ### A layer's card
 
@@ -45,7 +46,8 @@ MOVEMENT, SPACE, ORIGINAL ↔ REIMAGINED and envelope: one instrument, not three
 | **TUNE** | The layer's own transposition, ±24 semitones (whole steps; Alt/Option-drag for fine). |
 | **PAN** | The layer's place left–right. |
 | **LEVEL** | The layer's level, from silent to +6 dB. |
-| **LINK** (chain) | Linked layers move together: turning one linked layer's START, TUNE, PAN or LEVEL moves the others by the same amount, so their relationship stays. |
+| **REIMAGINED** (coral light) | How far this source moves away from its original character: sympathetic resonance tuned to the sound, more fluid sustain, more movement, wandering formants and at the far end gentle harmonic saturation. 0 % is the recording itself; double-click returns there. A can stay almost untouched while B is fully reimagined. |
+| **LINK** (chain) | Linked layers move together: turning one linked layer's START, TUNE, PAN, LEVEL or REIMAGINED moves the others by the same amount, so their relationship stays. |
 | **REVERSE** | Play backwards (Granular: every grain backwards). With LOOP on, a held note keeps going backwards the way a forward note sustains. Reimagined acts on a reversed layer exactly as on a forward one. |
 | **LOOP** | One Shot: hold a note and it continues on the recording's own loops (off: it plays once and ends). Granular sustains by itself, so LOOP rests there. |
 | **FOLLOW** | On: the recording's own loudness contour. Off: its fades are lifted (up to 24 dB) so a decaying sound plays on like a held tone; the envelope then shapes it. |
@@ -55,11 +57,21 @@ jump back where the sustain continues and forward where the release joins the en
 
 ### Mixing the layers
 
-The band under the cards: **ORIGINAL ↔ REIMAGINED** always; with two layers the **A / B
-blend** above it (left only A, middle both at equal power, right only B); with three a small
-**triangle**: drag the dot towards A, B or C (double-click: all three equal), or click the
+The band under the cards (two or three layers; a single source needs none): with two
+layers the **A / B blend** (left only A, middle both at equal power, right only B); with
+three a small **triangle**: drag the dot towards A, B or C (double-click: all three equal), or click the
 triangle or MIX for the **large mix** - the same triangle at popup size for fine placement,
 with each layer's sound and share. The numbers beside it say how much of each you hear. The mix keeps the total level steady wherever it is.
+
+### Patches from before per-layer REIMAGINED
+
+Projects, presets and starting states made with an earlier version open and sound exactly
+as they did: each card's REIMAGINED shows the amount the patch had, and the patch keeps
+the way it was processed then (one shared Reimagined stage after the mix). Saving it again
+keeps that. The first time you turn a layer's REIMAGINED, the patch switches to
+independent per-layer processing (the knobs do not move; from then on each layer's amount
+shapes only that layer). Host automation of the old Reimagined parameter keeps working: it
+is A's REIMAGINED.
 
 ## Granular mode
 
@@ -105,9 +117,8 @@ real round-robin set.
 | **CHARACTER** | The tonal shape: where the filter sits between its MIN and MAX (popup: type, resonance, drive, envelope). |
 | **MOVEMENT** | How the sound changes over time (popup: DRIFT, TAPE, CHORUS, PULSE, SHAPER). The mod wheel opens it further. |
 | **SPACE** | The room: how much of it you hear (popup: ROOM, CHAMBER, PLATE, SPRING and DECAY). |
-| **ORIGINAL ↔ REIMAGINED** | How far the instrument moves away from the recording: sympathetic resonance tuned to your sound, more fluid sustain, more movement, and at the far end gentle harmonic saturation. |
 | **AMP ENVELOPE** (A D S R) | The instrument's one envelope, for every layer: a short attack and decay with low sustain makes a pluck, a slow attack a swell, full sustain a held tone. Drag the points or turn the knobs. A release of 0.2 s or more lets the recording's own ending play when you let go. |
-| **VOLUME** (top right) | The instrument's output level. |
+| **VOLUME** (top right) | The instrument's output level: drag the thin slider, double-click for 0 dB. |
 | Preset (top) | ‹ › step through the starting states (Natural, Alive, Floating, Broken, Frozen, Dream, Wide, and your own: settings that keep your sounds) and your presets; click the name for the list, ♡ marks a favourite. At the top of the list: **INIT** (an empty patch: no sounds, every setting at its default), **Reset settings** (defaults, the sounds stay) and **Save starting state…** (every setting and the number of slots, no audio; it appears under Starting states and applies to whatever sounds are loaded, keeping empty slots for the rest). |
 | Clear all samples (⋮ menu) | Removes every sound but keeps the A/B/C slots and every setting: drop new sounds into the empty cards and they play with the same layer controls, blend or mix and macros. |
 
@@ -175,7 +186,7 @@ bounces); with the transport stopped it starts with the first note you play.
 | Mod wheel (CC 1) | opens MOTION |
 | Channel pressure / aftertouch | intensity: louder and brighter while pressing |
 | CC 74 | brightness (MPE "slide") |
-| CC 20–25 | LIFE, DYNAMICS, CHARACTER, MOTION, SPACE, REIMAGINED |
+| CC 20–25 | LIFE, DYNAMICS, CHARACTER, MOTION, SPACE, A's REIMAGINED |
 | MPE (lower zone, toggle in Advanced) | per-note bend (±48 semitones), pressure and slide |
 
 ## Saving and sharing

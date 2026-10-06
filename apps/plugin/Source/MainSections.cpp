@@ -1,4 +1,5 @@
 #include "MainSections.h"
+#include "ValueFormat.h"
 
 #include "Design.h"
 #include "EngineCard.h"
@@ -132,181 +133,59 @@ void TriangleMix::paint (juce::Graphics& g)
 }
 
 //==============================================================================
-ReimaginedTrack::ReimaginedTrack (OspAudioProcessor& p) : processor (p)
+VolumeSlider::VolumeSlider (juce::AudioProcessorValueTreeState& state)
+    : juce::Slider (juce::Slider::LinearHorizontal, juce::Slider::NoTextBox),
+      attachment (state, "gain", *this)
 {
-    for (int l = 0; l < 3; ++l)
-        if (auto* param = processor.parameters.getParameter (OspAudioProcessor::reimaginedParameterId (l)))
-        {
-            attachments[static_cast<std::size_t> (l)] = std::make_unique<juce::ParameterAttachment> (*param, [this, l] (float v) {
-                values[static_cast<std::size_t> (l)] = v;
-                repaint();
-            });
-            attachments[static_cast<std::size_t> (l)]->sendInitialUpdate();
-        }
-    setTooltip ("Original <-> Reimagined, for each layer: from the recording as it is to a transformed version of it");
-    setTitle ("Original / Reimagined");
-}
-
-void ReimaginedTrack::setLayers (const std::array<bool, 3>& occupied)
-{
-    shown = occupied;
-    if (! shown[0] && ! shown[1] && ! shown[2])
-        shown[0] = true;   // with no sound, the instrument's own amount
-    repaint();
-}
-
-juce::Range<float> ReimaginedTrack::travel() const
-{
-    return { 11.0f, static_cast<float> (getWidth()) - 11.0f };
-}
-
-float ReimaginedTrack::xFor (int layer) const
-{
-    const auto t = travel();
-    return t.getStart() + t.getLength() * 0.01f * values[static_cast<std::size_t> (layer)];
-}
-
-int ReimaginedTrack::thumbAt (float x) const
-{
-    // The nearest thumb; on a tie the edited layer's.
-    int best = -1;
-    float distance = 1.0e9f;
-    for (int l = 0; l < 3; ++l)
-        if (shown[static_cast<std::size_t> (l)])
-        {
-            const float d = std::abs (xFor (l) - x) - (l == processor.editLayer() ? 0.5f : 0.0f);
-            if (d < distance)
-            {
-                distance = d;
-                best = l;
-            }
-        }
-    return best;
-}
-
-bool ReimaginedTrack::isLinked() const
-{
-    auto* link = processor.parameters.getRawParameterValue ("reimaginedLink");
-    return link == nullptr || link->load() >= 0.5f;
-}
-
-void ReimaginedTrack::mouseDown (const juce::MouseEvent& e)
-{
-    dragging = thumbAt (e.position.x);
-    if (dragging < 0)
-        return;
-    const bool linked = isLinked();
-    for (int l = 0; l < 3; ++l)
-    {
-        const auto i = static_cast<std::size_t> (l);
-        moving[i] = attachments[i] != nullptr && shown[i] && (l == dragging || linked);
-        dragStart[i] = values[i];
-        if (moving[i])
-            attachments[i]->beginGesture();
-    }
-    mouseDrag (e);
-}
-
-void ReimaginedTrack::mouseDrag (const juce::MouseEvent& e)
-{
-    if (dragging < 0)
-        return;
-    const auto t = travel();
-    const float v = 100.0f * std::clamp ((e.position.x - t.getStart()) / t.getLength(), 0.0f, 1.0f);
-    // The others follow by the same amount from where the drag began (offsets come back
-    // when the drag returns from an end).
-    const float delta = v - dragStart[static_cast<std::size_t> (dragging)];
-    for (int l = 0; l < 3; ++l)
-    {
-        const auto i = static_cast<std::size_t> (l);
-        if (moving[i])
-            attachments[i]->setValueAsPartOfGesture (l == dragging ? v : std::clamp (dragStart[i] + delta, 0.0f, 100.0f));
-    }
-}
-
-void ReimaginedTrack::mouseUp (const juce::MouseEvent&)
-{
-    for (std::size_t i = 0; i < 3; ++i)
-        if (moving[i])
-            attachments[i]->endGesture();
-    moving = {};
-    dragging = -1;
-}
-
-void ReimaginedTrack::mouseDoubleClick (const juce::MouseEvent& e)
-{
-    const int hit = thumbAt (e.position.x);
-    if (hit < 0)
-        return;
-    const bool linked = isLinked();
-    for (int l = 0; l < 3; ++l)
-        if (shown[static_cast<std::size_t> (l)] && (l == hit || linked))
-            if (auto* param = processor.parameters.getParameter (OspAudioProcessor::reimaginedParameterId (l)))
-                attachments[static_cast<std::size_t> (l)]->setValueAsCompleteGesture (param->convertFrom0to1 (param->getDefaultValue()));
-}
-
-//==============================================================================
-ReimaginedLinkButton::ReimaginedLinkButton (juce::AudioProcessorValueTreeState& state)
-    : juce::Button ("Link Reimagined"), attachment (state, "reimaginedLink", *this)
-{
-    setClickingTogglesState (true);
-    setTitle ("Link Reimagined");
-    setTooltip ("Link: the layers' Original <-> Reimagined move together");
+    getProperties().set ("volume", true);
+    setTitle ("Volume");
+    setTooltip ("Master volume");
+    setDoubleClickReturnValue (true, 0.0);
     setMouseCursor (juce::MouseCursor::PointingHandCursor);
+    setVelocityBasedMode (false);
 }
 
-void ReimaginedLinkButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
+void VolumeSlider::paint (juce::Graphics& g)
 {
-    // A tiny key with the link icon: lit in the accent while linked, quiet when not.
     using namespace design;
-    const auto r = getLocalBounds().toFloat().reduced (1.0f);
-    const bool on = getToggleState();
-    draw::button (g, r, 0.25f * r.getHeight(), on, highlighted || down, colour::accent);
-    icons::draw (g, icons::Kind::link, r.reduced (0.22f * r.getHeight()), on ? colour::accent.darker (0.15f).withAlpha (0.95f) : colour::text.withAlpha (0.6f),
-                 std::max (1.0f, 0.05f * r.getHeight()));
-}
+    const auto bounds = getLocalBounds().toFloat();
+    const bool hot = isMouseOverOrDragging();
 
-void ReimaginedTrack::paint (juce::Graphics& g)
-{
-    using namespace design;
-    const auto t = travel();
-    const float cy = 0.5f * static_cast<float> (getHeight());
-    // A fine recessed groove, warm at the Original end, neutral towards Reimagined.
-    const auto track = juce::Rectangle<float> (t.getStart(), cy - 1.5f, t.getLength(), 3.0f);
-    g.setGradientFill (juce::ColourGradient (juce::Colour (0xffa08672), track.getX(), 0.0f, juce::Colour (0xffaaa49b), track.getRight(), 0.0f, false));
-    g.fillRoundedRectangle (track, 1.5f);
-    g.setColour (juce::Colours::black.withAlpha (0.18f));
-    g.fillRect (track.reduced (1.0f, 0.0f).withHeight (1.0f));
-    g.setColour (juce::Colours::white.withAlpha (0.6f));
-    g.fillRect (track.reduced (1.5f, 0.0f).withY (track.getBottom() + 0.2f).withHeight (0.8f));
-    // Thumbs: the edited layer's on top.
-    std::array<int, 3> order { 0, 1, 2 };
-    std::stable_partition (order.begin(), order.end(), [this] (int l) { return l != processor.editLayer(); });
-    for (int l : order)
-    {
-        if (! shown[static_cast<std::size_t> (l)])
-            continue;
-        const juce::Point<float> c (xFor (l), cy);
-        // A small tactile thumb; the layer's light (A coral, B blue) the one accent on it.
-        const auto disc = juce::Rectangle<float> (20.0f, 20.0f).withCentre (c);
-        juce::Path shape;
-        shape.addEllipse (disc);
-        juce::DropShadow (juce::Colour (0x4a302418), 4, { 0, 2 }).drawForPath (g, shape);
-        juce::DropShadow (juce::Colour (0x22302418), 1, { 0, 1 }).drawForPath (g, shape);
-        g.setGradientFill (juce::ColourGradient (juce::Colour (0xfffdfaf5), c.x - 5.0f, disc.getY(), juce::Colour (0xffd5ccbe), c.x + 5.0f, disc.getBottom(), false));
-        g.fillPath (shape);
-        g.setColour (juce::Colour (0xffb2a796));
-        g.strokePath (shape, juce::PathStrokeType (0.8f));
-        draw::led (g, c, 8.0f, colour::identity (l).thumb, 0.0f);
-    }
+    // VOLUME on the left, the value on the right (tabular figures), above the track.
+    const auto caption = bounds.withHeight (18.0f).reduced (static_cast<float> (thumbRadius) - 1.0f, 0.0f);   // aligned with the track's ends
+    g.setFont (fonts::make (12.0f, fonts::Weight::medium, 0.12f));
+    g.setColour (colour::textSecondary.withAlpha (hot ? 1.0f : 0.9f));
+    g.drawText ("VOLUME", caption, juce::Justification::centredLeft, false);
+    g.setFont (fonts::make (12.5f, fonts::Weight::regular, 0.0f).withExtraKerningFactor (0.0f));
+    g.setColour (colour::text.withAlpha (hot ? 0.9f : 0.72f));
+    g.drawText (format::levelDb (getValue()), caption, juce::Justification::centredRight, false);
+
+    // A hairline recessed track: a dark line with a light lip under it; the part up to the
+    // thumb a little warmer (barely an indication).
+    const float cy = bounds.getBottom() - 11.0f;
+    const float left = static_cast<float> (thumbRadius), right = bounds.getWidth() - static_cast<float> (thumbRadius);
+    const float x = static_cast<float> (getPositionOfValue (getValue()));
+    g.setColour (juce::Colour (0xffbdb2a2));
+    g.fillRoundedRectangle (juce::Rectangle<float> (left, cy - 0.75f, right - left, 1.5f), 0.75f);
+    g.setColour (juce::Colours::white.withAlpha (0.55f));
+    g.fillRect (juce::Rectangle<float> (left + 1.0f, cy + 0.9f, right - left - 2.0f, 0.7f));
+    g.setColour (colour::accent.interpolatedWith (juce::Colour (0xff8f7f6c), 0.45f).withAlpha (0.8f));
+    g.fillRoundedRectangle (juce::Rectangle<float> (left, cy - 0.75f, std::max (0.0f, x - left), 1.5f), 0.75f);
+
+    // The thumb: a small cream cap with a fine rim and a contact shadow, kin to the knobs.
+    const auto disc = juce::Rectangle<float> (12.0f, 12.0f).withCentre ({ x, cy });
+    juce::Path shape;
+    shape.addEllipse (disc);
+    juce::DropShadow (juce::Colour (0x40302418), 3, { 0, 1 }).drawForPath (g, shape);
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xfffefbf6), x, disc.getY(), juce::Colour (0xffd8cfc2), x, disc.getBottom(), false));
+    g.fillPath (shape);
+    g.setColour (juce::Colour (hot ? 0xff9c8f7c : 0xffb0a593));
+    g.strokePath (shape, juce::PathStrokeType (0.8f));
 }
 
 //==============================================================================
-MixSection::MixSection (OspAudioProcessor& p) : processor (p), reimagined (p), linkButton (p.parameters), triangle (p.parameters)
+MixSection::MixSection (OspAudioProcessor& p) : processor (p), triangle (p.parameters)
 {
-    addAndMakeVisible (reimagined);
-    addChildComponent (linkButton);
-
     blend.getProperties().set ("blend", true);
     blend.setTitle ("Layer blend");
     blend.setTooltip ("Blend between the two layers (equal power: the middle is not quieter)");
@@ -334,8 +213,6 @@ void MixSection::setLayers (const std::array<bool, 3>& occupied)
     for (int l = 0; l < 3; ++l)
         if (occupied[static_cast<std::size_t> (l)])
             which[static_cast<std::size_t> (n++)] = l;
-    reimagined.setLayers (occupied);
-    linkButton.setVisible (n >= 2);
     if (n == count && which == slots)
         return;
     count = n;
@@ -350,31 +227,21 @@ void MixSection::setLayers (const std::array<bool, 3>& occupied)
 
 void MixSection::resized()
 {
-    // Reference geometry (band 1378 x 83): caption at the left; the tracks run from 470 to
-    // 1120 with their letters and words either side; two rows when two layers blend.
-    captionArea = juce::Rectangle<int> (24, 8, 330, 67);
-    const bool twoRows = count == 2;
-    const int blendY = 26, reimaginedY = twoRows ? 59 : 41;
-    blend.setBounds (470 - 16, blendY - 18, 650 + 32, 36);
-    reimagined.setBounds (470 - 11, reimaginedY - 13, 650 + 22, 26);
-    blendRow = twoRows ? juce::Rectangle<int> (380, blendY - 12, 870, 24) : juce::Rectangle<int>();
-    reimaginedRow = juce::Rectangle<int> (330, reimaginedY - 10, 950, 20);
-    linkButton.setBounds (1286, reimaginedY - 12, 24, 24);   // right of REIMAGINED
+    // Band 1378 x 72: the caption at the left; the blend track from 470 to 1120 with the
+    // layers' letters either side, on the band's centre line.
+    const int cy = getHeight() / 2;
+    captionArea = juce::Rectangle<int> (24, 4, 330, getHeight() - 8);
+    blend.setBounds (470 - 16, cy - 18, 650 + 32, 36);
+    blendRow = count == 2 ? juce::Rectangle<int> (380, cy - 12, 870, 24) : juce::Rectangle<int>();
     if (count == 3)
-        triangle.setBounds (28, 4, 84, 75);
+        triangle.setBounds (28, cy - 33, 74, 66);
 }
 
 void MixSection::paint (juce::Graphics& g)
 {
     using namespace design;
     draw::raised (g, getLocalBounds().toFloat(), layout::panelRadius, colour::panelTop, colour::panelBottom);
-
-    // ORIGINAL ... REIMAGINED either side of the track (always: it is global).
-    g.setFont (type::trackWord());
-    g.setColour (colour::textSecondary);
-    const float ry = static_cast<float> (reimaginedRow.getCentreY());
-    g.drawText ("ORIGINAL", juce::Rectangle<float> (240.0f, ry - 10.0f, 200.0f, 20.0f), juce::Justification::centredRight, false);
-    g.drawText ("REIMAGINED", juce::Rectangle<float> (1152.0f, ry - 10.0f, 200.0f, 20.0f), juce::Justification::centredLeft, false);
+    const float cy = 0.5f * static_cast<float> (getHeight());
 
     if (count == 2)
     {
@@ -385,7 +252,7 @@ void MixSection::paint (juce::Graphics& g)
         g.drawText (OspAudioProcessor::layerName (slots[1]), juce::Rectangle<float> (1137.0f, by - 12.0f, 40.0f, 24.0f), juce::Justification::centred, false);
         g.setFont (type::sectionTitle());
         g.drawText (OspAudioProcessor::layerName (slots[0]) + " / " + OspAudioProcessor::layerName (slots[1]) + " BLEND",
-                    juce::Rectangle<float> (33.0f, 22.0f, 330.0f, 36.0f), juce::Justification::centredLeft, false);
+                    juce::Rectangle<float> (33.0f, cy - 18.0f, 330.0f, 36.0f), juce::Justification::centredLeft, false);
     }
     if (count == 3)
     {
@@ -393,15 +260,15 @@ void MixSection::paint (juce::Graphics& g)
         const auto share = InstrumentEngine::triangleShares (processor.parameterValue ("mix.x"), processor.parameterValue ("mix.y"));
         g.setFont (type::sectionTitle());
         g.setColour (colour::text.withAlpha (0.85f));
-        g.drawText ("MIX", juce::Rectangle<float> (126.0f, 10.0f, 200.0f, 34.0f), juce::Justification::centredLeft, false);
+        g.drawText ("MIX", juce::Rectangle<float> (122.0f, cy - 30.0f, 200.0f, 34.0f), juce::Justification::centredLeft, false);
         g.setFont (fonts::make (15.0f, fonts::Weight::medium));
-        float x = 126.0f;
+        float x = 122.0f;
         for (std::size_t i = 0; i < 3; ++i)
         {
             const auto part = OspAudioProcessor::layerName (static_cast<int> (i)) + " " + juce::String (juce::roundToInt (100.0 * share[i]));
             const float w = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), part) + 14.0f;
             g.setColour (colour::identity (static_cast<int> (i)).badgeBottom.brighter (0.15f));
-            g.drawText (part, juce::Rectangle<float> (x, 44.0f, w, 22.0f), juce::Justification::centredLeft, false);
+            g.drawText (part, juce::Rectangle<float> (x, cy + 4.0f, w, 22.0f), juce::Justification::centredLeft, false);
             x += w;
         }
     }

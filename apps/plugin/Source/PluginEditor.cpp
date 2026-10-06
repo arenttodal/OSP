@@ -347,14 +347,6 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     presetBar.onChange = [this] { updateStatus(); timerCallback(); };
     presetBar.onSaveStartingState = [this] { saveStartingState(); };
     content.addAndMakeVisible (presetBar);
-    volume.setRotaryParameters (OspLookAndFeel::rotaryStart, OspLookAndFeel::rotaryEnd, true);
-    volume.getProperties().set ("noTicks", true);
-    volume.setTitle ("Volume");
-    volume.setTooltip ("Master volume");
-    volume.setPopupDisplayEnabled (true, true, &content);
-    volume.setColour (juce::TooltipWindow::textColourId, palette::valueBubbleText);   // the value bubble's text
-    volumeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (ospProcessor.parameters, "gain", volume);
-    volume.setDoubleClickReturnValue (true, 0.0);
     content.addAndMakeVisible (volume);
     menuButton.setTooltip ("Sounds, presets, instruments, undo, size");
     menuButton.onClick = [this] { showMenu(); };
@@ -625,9 +617,13 @@ void OspAudioProcessorEditor::layoutSources (bool animate)
     // the cards make space and the new layer's place says ADD LAYER.
     const bool showAdd = dragging && count >= 1 && count < OspAudioProcessor::numLayers;
     const int columns = count + (showAdd ? 1 : 0);
+    const auto density = columns <= 1 ? EngineLayoutDensity::hero : (columns == 2 ? EngineLayoutDensity::dual : EngineLayoutDensity::triple);
+    // One source: no mix band, the card a little taller and the rest air above the macros.
+    // (While a second sound is dragged in, the two-card layout is previewed.)
+    sourceArea = (columns <= 1 ? design::layout::sourcesAlone : design::layout::sources).getSmallestIntegerContainer();
+    mixSection.setVisible (count >= 2);
     dropZone.setVisible (count == 0);
     dropZone.setBounds (sourceArea);
-    const auto density = columns <= 1 ? EngineLayoutDensity::hero : (columns == 2 ? EngineLayoutDensity::dual : EngineLayoutDensity::triple);
     const int gap = 12;
     const int width = columns > 0 ? (sourceArea.getWidth() - gap * (columns - 1)) / columns : sourceArea.getWidth();
     auto column = [&] (int i) { return juce::Rectangle<int> (sourceArea.getX() + i * (width + gap), sourceArea.getY(), width, sourceArea.getHeight()); };
@@ -1118,9 +1114,6 @@ void OspAudioProcessorEditor::paintInstrument (juce::Graphics& g)
         g.setColour (colour::textSecondary);
         g.drawText (kind, layout::logoSubtitle, juce::Justification::centredLeft, false);
     }
-    g.setColour (colour::text.withAlpha (0.9f));
-    g.setFont (fonts::make (13.0f, fonts::Weight::semibold, 0.06f));
-    g.drawText ("VOLUME", layout::volumeLabel, juce::Justification::centred, false);
 
     // The keyboard's frame: a quiet rim, the keys set into it.
     {
