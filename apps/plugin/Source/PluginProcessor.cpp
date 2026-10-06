@@ -32,6 +32,8 @@ namespace ids
     static const juce::String sustain = "sustain";
     static const juce::String seed = "seed";
     static const juce::String mpe = "mpe";
+    static const juce::String voiceMode = "voiceMode";   // Poly / Mono (version hint 8)
+    static const juce::String glide = "glide";
     // Shaping system v1.0: what each macro does (popups). Never rename these IDs.
     static const juce::String lifeMode = "life.mode";
     static const juce::String lifePitch = "life.pitch";
@@ -259,6 +261,14 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
         layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::decay, 7 }, "Decay", decayRange, 600.0f, ms));
         layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::sustainLevel, 7 }, "Sustain Level", unit, 100.0f, percent));
     }
+    // Mono with legato and glide (basses and leads), version hint 8.
+    layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { ids::voiceMode, 8 }, "Voice Mode",
+                                                              juce::StringArray { "Poly", "Mono" }, 0));
+    {
+        Range glideRange (0.0f, 3000.0f, 0.1f);
+        glideRange.setSkewForCentre (250.0f);
+        layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::glide, 8 }, "Glide", glideRange, 0.0f, ms));
+    }
     return layout;
 }
 
@@ -361,6 +371,8 @@ OspAudioProcessor::OspAudioProcessor()
     mixYParam = parameters.getRawParameterValue (ids::mixY);
     decayParam = parameters.getRawParameterValue (ids::decay);
     sustainLevelParam = parameters.getRawParameterValue (ids::sustainLevel);
+    voiceModeParam = parameters.getRawParameterValue (ids::voiceMode);
+    glideParam = parameters.getRawParameterValue (ids::glide);
 
     engineSettings.polyphony = 24;
     engineSettings.outputGainDb = -9.0;
@@ -487,6 +499,10 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
     engine.setMacros (macros);
     engineSettings.macros = macros;
     engine.setMpe (mpeParam->load() >= 0.5f);
+    engineSettings.mono = voiceModeParam->load() >= 0.5f;
+    engineSettings.glideSeconds = glideParam->load() / 1000.0;
+    engine.setMono (engineSettings.mono);
+    engine.setGlideSeconds (engineSettings.glideSeconds);
     engine.setPitchCharacter (pitchCharacterParam->load() >= 0.5f ? PitchCharacter::natural : PitchCharacter::tape);
     engine.setContinuation (sustainParam->load() >= 0.5f ? ContinuationStrategy::multiLoopMovement : ContinuationStrategy::off);
     engine.setSeed (static_cast<std::uint64_t> (std::max (1.0f, seedParam->load())));
@@ -1505,7 +1521,17 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml)
         else if (id == ids::movementMode)
             savedMovementMode = static_cast<int> (child["value"]);
     }
+    juce::StringArray savedIds;
+    for (const auto& child : stateTree)
+        if (child.hasProperty ("id"))
+            savedIds.add (child["id"].toString());
     parameters.replaceState (stateTree);
+    // A parameter the session does not contain (it is older than the parameter) starts from
+    // its default: APVTS would otherwise keep whatever this instance had (e.g. Mono).
+    for (auto* parameter : getParameters())
+        if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*> (parameter))
+            if (! savedIds.contains (ranged->getParameterID()))
+                ranged->setValueNotifyingHost (ranged->getDefaultValue());
     if (savedVersion < 2)
     {
         // v1 sessions were made with the plain sampler: neutral engine settings keep them

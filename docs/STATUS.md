@@ -179,6 +179,8 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [x] Stage 16: state v6 + migration (v5 single and A/B sessions bit-identical; old Sustain -> LOOP)
 - [x] Stages 17–19, 21–23: polish at min/max sizes, all 8 One Shot/Granular combinations, modifier regression under automation, automation of every new control, edge cases (replace/remove while playing, bad file among good ones, too-short sources); ASan/UBSan runs
 - [x] Stage 24: acceptance — full core and plugin suites (incl. UI) clean under ASan/UBSan after fixing a use-after-free when an instance closes mid-load; CPU measured for 1/2/3 layers; final report in docs/redesign-notes.md
+- [x] REVERSE keeps Reimagined (doubling head, grains and continuation walk run backwards)
+- [x] Mono / Poly with legato and GLIDE (Advanced; `voiceMode`, `glide`, version hint 8); sessions without a parameter open with its default
 - [ ] Stage 20: DAW testing (Logic AU, Ableton AU/VST3, Reaper VST3) — needs the user's Mac
 - [ ] Listening pass: FOLLOW-off lift, REVERSE + LOOP, the three-layer mix law, default LEVEL 0 dB
 

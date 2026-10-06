@@ -55,6 +55,11 @@ public:
     void setEnvelopeSettings (const AdsrSettings& adsr) noexcept;
 
     void start (const InstrumentVoiceStart& params) noexcept;
+    /** Mono legato: the note becomes `newNote` without restarting; its pitch slides from
+        where it is to the new note over `seconds` (0: at once). */
+    void glideTo (int newNote, double seconds) noexcept;
+    /** Mono glide into a fresh note: it starts at `fromNote`'s pitch and slides to its own. */
+    void glideFrom (int fromNote, double seconds) noexcept;
     void release() noexcept;
     void beginFastFade (int fadeSamples) noexcept;
     void kill() noexcept;
@@ -145,6 +150,10 @@ private:
     double position = 0.0;
     double baseIncrement = 1.0;
     double currentStep = 1.0;
+    // Mono glide: pitch offset (octaves) moving linearly to 0, per control period.
+    double glideOctaves = 0.0, glideStep = 0.0;
+    bool gliding = false;
+    void setGlideTime (double seconds) noexcept;
     double endPosition = 0.0;
 
     // Continuation

@@ -340,6 +340,8 @@ private:
     std::atomic<float>* mixYParam = nullptr;
     std::atomic<float>* decayParam = nullptr;
     std::atomic<float>* sustainLevelParam = nullptr;
+    std::atomic<float>* voiceModeParam = nullptr;
+    std::atomic<float>* glideParam = nullptr;
     float lastDecay = -1.0f, lastSustainLevel = -1.0f;
     std::array<LayerParams, numLayers> layerParams;
     // Shaping system v1.0 (the macro popups), in the order of shapingIds().

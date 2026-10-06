@@ -104,6 +104,10 @@ performances, the touch response) with its few controls. Escape, a click elsewhe
 name again closes it.
 
 **Advanced** (bottom right; it stays open with the project): Fine tune, Bend range,
+**Voices** (*Poly*, or *Mono* for basses and leads: one note at a time, the newest key
+wins, a key played while another is held changes the note's pitch without restarting it
+(legato) and releasing it returns to the key still held; **GLIDE** sets how long the pitch
+slides between notes, also from the last note into a fresh one; 0 = instant),
 **Pitch character** (*Tape*: classic resampling, faster and brighter going up; *Natural*:
 keeps the recording's speed and movement in other registers), **MPE**, and **Reseed** (a
 new variation pattern for LIFE and MOVEMENT). Velocity range is DYNAMICS' **RANGE**; the

@@ -1595,3 +1595,78 @@ TEST_CASE ("plugin: an instance closed while its sounds are still loading shuts 
     }
     SUCCEED ("every instance closed without touching freed memory");
 }
+
+TEST_CASE ("plugin: Mono plays one note with legato and glide; sessions without it open in Poly", "[plugin][mono]")
+{
+    TempDir tmp;
+    const auto file = writeSource (tmp.dir, "bass.wav", testsignals::vowel (midiToHz (45), 3.0, 48000.0, 3));
+    OspAudioProcessor p;
+    loadAndWait (p, file);
+    p.setParameterValue ("voiceMode", 1.0f);
+    p.setParameterValue ("glide", 120.0f);
+    CHECK (valueOf (p, "glide") == Approx (120.0f).margin (0.5f));
+    p.prepareToPlay (48000.0, 256);
+    juce::AudioBuffer<float> buffer (2, 256);
+    auto block = [&] (std::initializer_list<juce::MidiMessage> events) {
+        juce::MidiBuffer midi;
+        for (const auto& e : events)
+            midi.addEvent (e, 0);
+        buffer.clear();
+        p.processBlock (buffer, midi);
+        for (int ch = 0; ch < 2; ++ch)
+            for (int i = 0; i < buffer.getNumSamples(); ++i)
+                REQUIRE (std::isfinite (buffer.getSample (ch, i)));
+    };
+    block ({ juce::MidiMessage::noteOn (1, 45, static_cast<juce::uint8> (100)) });
+    for (int i = 0; i < 20; ++i)
+        block ({});
+    block ({ juce::MidiMessage::noteOn (1, 52, static_cast<juce::uint8> (100)), juce::MidiMessage::noteOn (1, 57, static_cast<juce::uint8> (100)) });
+    for (int i = 0; i < 20; ++i)
+        block ({});
+    CHECK (p.activeVoices.load() == 1);   // three keys held, one note sounding
+    block ({ juce::MidiMessage::noteOff (1, 57), juce::MidiMessage::noteOff (1, 52), juce::MidiMessage::noteOff (1, 45) });
+    for (int i = 0; i < 200; ++i)
+        block ({});
+    CHECK (p.activeVoices.load() == 0);
+
+    // Poly (the default) plays the chord.
+    p.setParameterValue ("voiceMode", 0.0f);
+    block ({ juce::MidiMessage::noteOn (1, 45, static_cast<juce::uint8> (100)), juce::MidiMessage::noteOn (1, 52, static_cast<juce::uint8> (100)) });
+    block ({});
+    CHECK (p.activeVoices.load() == 2);
+    block ({ juce::MidiMessage::allNotesOff (1) });
+
+    // A session saved before Mono existed (no voiceMode / glide) opens in Poly with no
+    // glide, even in an instance that was set to Mono.
+    juce::MemoryBlock state;
+    p.getStateInformation (state);
+    auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
+    REQUIRE (xml != nullptr);
+    for (auto* child = xml->getFirstChildElement(); child != nullptr;)
+    {
+        auto* next = child->getNextElement();
+        if (child->getStringAttribute ("id") == "voiceMode" || child->getStringAttribute ("id") == "glide")
+            xml->removeChildElement (child, true);
+        child = next;
+    }
+    juce::MemoryBlock older;
+    juce::AudioProcessor::copyXmlToBinary (*xml, older);
+    OspAudioProcessor q;
+    q.setParameterValue ("voiceMode", 1.0f);
+    q.setParameterValue ("glide", 800.0f);
+    q.setStateInformation (older.getData(), static_cast<int> (older.getSize()));
+    REQUIRE (q.waitForLoads (20000));
+    q.pollLoads();
+    CHECK (valueOf (q, "voiceMode") == Approx (0.0f).margin (1.0e-4));
+    CHECK (valueOf (q, "glide") == Approx (0.0f).margin (1.0e-3));
+    // ...and a session saved in Mono recalls it.
+    p.setParameterValue ("voiceMode", 1.0f);
+    p.setParameterValue ("glide", 300.0f);
+    p.getStateInformation (state);
+    OspAudioProcessor r;
+    r.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+    REQUIRE (r.waitForLoads (20000));
+    r.pollLoads();
+    CHECK (valueOf (r, "voiceMode") == Approx (1.0f));
+    CHECK (valueOf (r, "glide") == Approx (300.0f).margin (0.5f));
+}

@@ -361,7 +361,7 @@ namespace
     class AdvancedPopup final : public MiniPanel
     {
     public:
-        explicit AdvancedPopup (OspAudioProcessor& p) : MiniPanel ("ADVANCED", "TUNING, BEND, PITCH, MPE"), processor (p)
+        explicit AdvancedPopup (OspAudioProcessor& p) : MiniPanel ("ADVANCED", "TUNING, BEND, VOICES, PITCH, MPE"), processor (p)
         {
             auto& state = processor.parameters;
             auto add = [this, &state] (const char* id, const char* caption, MiniKnob::Formatter f) {
@@ -373,6 +373,16 @@ namespace
             auto* fine = state.getParameter ("fineTune");
             add ("fineTune", "FINE", [fine] (double) { return parameterText (fine); });
             add ("bendRange", "BEND", [] (double v) { return juce::String (juce::roundToInt (v)) + " st"; });
+            add ("glide", "GLIDE", [] (double ms) { return ms < 0.5 ? juce::String ("Off") : format::milliseconds (ms); });
+            glide = knobs.back().get();
+
+            // Mono: one note at a time, legato (no restart while a key is held), last key
+            // wins, GLIDE slides between notes. For basses and leads.
+            voices = std::make_unique<SegmentedControl> (*state.getParameter ("voiceMode"), juce::StringArray { "POLY", "MONO" });
+            voices->setTooltip ("Mono: one note at a time; a key played while another is held slides to it (legato) over GLIDE");
+            voices->onChange = [this] (int) { updateGlide(); };
+            addAndMakeVisible (*voices);
+            updateGlide();
 
             pitch = std::make_unique<SegmentedControl> (*state.getParameter ("pitchCharacter"), juce::StringArray { "TAPE", "NATURAL" });
             pitch->setTooltip ("Pitch character: tape-like resampling or natural (formants kept)");
@@ -394,13 +404,14 @@ namespace
             addAndMakeVisible (reseed);
         }
 
-        juce::Point<int> cardSize() const override { return { 300, 10 + headerHeight() + 6 + 58 + 8 + 12 + 24 + 10 + 26 + 12 }; }
+        juce::Point<int> cardSize() const override { return { 300, 10 + headerHeight() + 6 + 58 + 8 + 12 + 24 + 8 + 12 + 24 + 10 + 26 + 12 }; }
 
         void paint (juce::Graphics& g) override
         {
             MiniPanel::paint (g);
             g.setColour (palette::textDim);
             g.setFont (fonts::label (9.5f));
+            g.drawText ("VOICES", voicesCaption, juce::Justification::centredLeft, false);
             g.drawText ("PITCH CHARACTER", pitchCaption, juce::Justification::centredLeft, false);
             if (auto* seed = processor.parameters.getParameter ("seed"))
                 g.drawText ("SEED " + seed->getCurrentValueAsText(), seedCaption, juce::Justification::centredRight, false);
@@ -410,10 +421,12 @@ namespace
         void layoutContent (juce::Rectangle<int> area) override
         {
             auto row = area.removeFromTop (58);
-            const int cell = row.getWidth() / 4;
-            row.removeFromLeft (cell / 2);
+            const int cell = row.getWidth() / static_cast<int> (knobs.size());
             for (auto& k : knobs)
-                k->setBounds (row.removeFromLeft (cell).expanded (cell / 4, 0));
+                k->setBounds (row.removeFromLeft (cell));
+            area.removeFromTop (8);
+            voicesCaption = area.removeFromTop (12);
+            voices->setBounds (area.removeFromTop (24));
             area.removeFromTop (8);
             pitchCaption = area.removeFromTop (12);
             pitch->setBounds (area.removeFromTop (24));
@@ -425,13 +438,21 @@ namespace
             seedCaption = last;
         }
 
+        /** GLIDE only acts in Mono: dimmed (still adjustable) in Poly. */
+        void updateGlide()
+        {
+            if (glide != nullptr && voices != nullptr)
+                glide->setAlpha (voices->selected() == 1 ? 1.0f : 0.45f);
+        }
+
         OspAudioProcessor& processor;
         std::vector<std::unique_ptr<MiniKnob>> knobs;
-        std::unique_ptr<SegmentedControl> pitch;
+        MiniKnob* glide = nullptr;
+        std::unique_ptr<SegmentedControl> voices, pitch;
         juce::ToggleButton mpe { "MPE" };
         std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> mpeAttachment;
         juce::TextButton reseed { "Reseed" };
-        juce::Rectangle<int> pitchCaption, seedCaption;
+        juce::Rectangle<int> voicesCaption, pitchCaption, seedCaption;
     };
 }
 

@@ -47,6 +47,9 @@ void InstrumentEngine::prepare (double outputSampleRate, int maximumBlockSize, c
     mixYNow = config.mixY;
     pedalDown = false;
     noteCounter = 0;
+    clearHeldKeys();
+    lastMonoNote = -1;
+    config.glideSeconds = std::clamp (config.glideSeconds, 0.0, 10.0);
     pitchRatio = 1.0;
     channelBendRatio.fill (1.0);
     channelPressure.fill (0.0f);
@@ -553,11 +556,85 @@ void InstrumentEngine::noteOn (int note, int velocity, int channel) noexcept
         return;
     // One event for every layer (same note order and performance memory); layers B and C
     // draw their own randomness from a salted index.
+    if (config.mono)
+        monoNoteOn (note, velocity, channel);
+    else
+        startNote (note, velocity, channel);
+}
+
+void InstrumentEngine::startNote (int note, int velocity, int channel) noexcept
+{
     const std::uint64_t eventIndex = noteCounter++;
     post.noteStarted();   // without a running transport SHAPER starts its pattern here
     static constexpr std::array<std::uint64_t, 3> salt { 0, 0x4c61796572420000ull, 0x4c61796572430000ull };
     for (int layer = 0; layer < EngineSettings::layers; ++layer)
         noteOnLayer (layer, note, velocity, channel, eventIndex ^ salt[static_cast<std::size_t> (layer)]);
+}
+
+void InstrumentEngine::monoNoteOn (int note, int velocity, int channel) noexcept
+{
+    // The key goes on top of the held stack (once).
+    int kept = 0;
+    for (int i = 0; i < heldCount; ++i)
+        if (heldKeys[static_cast<std::size_t> (i)] != note)
+            heldKeys[static_cast<std::size_t> (kept++)] = heldKeys[static_cast<std::size_t> (i)];
+    heldCount = kept;
+    if (heldCount == maxHeldKeys)
+    {
+        std::move (heldKeys.begin() + 1, heldKeys.end(), heldKeys.begin());
+        --heldCount;
+    }
+    heldKeys[static_cast<std::size_t> (heldCount++)] = note;
+
+    // Legato: a note is held (or kept by the pedal) - it changes pitch, nothing restarts.
+    bool legato = false;
+    if (monoNote >= 0)
+        for (auto& voice : voices)
+            if (voice.isActive() && ! voice.isReleased() && ! voice.isFading() && voice.note() == monoNote)
+            {
+                voice.glideTo (note, config.glideSeconds);
+                legato = true;
+            }
+    if (! legato)
+    {
+        // A fresh note: whatever still sounds (a release tail) gets out of the way quickly.
+        const auto fade = std::max (1, static_cast<int> (config.stealFadeSeconds * sampleRate));
+        for (auto& voice : voices)
+            if (voice.isActive() && ! voice.isFading())
+                voice.beginFastFade (fade);
+        startNote (note, velocity, channel);
+        if (lastMonoNote >= 0 && lastMonoNote != note)
+            for (auto& voice : voices)
+                if (voice.isActive() && ! voice.isFading() && voice.startOrder() == noteCounter - 1)
+                    voice.glideFrom (lastMonoNote, config.glideSeconds);
+    }
+    monoNote = lastMonoNote = note;
+}
+
+void InstrumentEngine::monoNoteOff (int note, int channel) noexcept
+{
+    int kept = 0;
+    for (int i = 0; i < heldCount; ++i)
+        if (heldKeys[static_cast<std::size_t> (i)] != note)
+            heldKeys[static_cast<std::size_t> (kept++)] = heldKeys[static_cast<std::size_t> (i)];
+    heldCount = kept;
+    if (note != monoNote)
+    {
+        releaseNote (note, channel);   // e.g. a note started before switching to mono
+        return;
+    }
+    if (heldCount > 0)
+    {
+        // Back to the newest key still held, legato.
+        const int previous = heldKeys[static_cast<std::size_t> (heldCount - 1)];
+        for (auto& voice : voices)
+            if (voice.isActive() && ! voice.isReleased() && ! voice.isFading() && voice.note() == monoNote)
+                voice.glideTo (previous, config.glideSeconds);
+        monoNote = lastMonoNote = previous;
+        return;
+    }
+    releaseNote (note, channel);
+    monoNote = -1;
 }
 
 void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int channel, std::uint64_t eventIndex) noexcept
@@ -664,6 +741,14 @@ void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int
 
 void InstrumentEngine::noteOff (int note, int channel) noexcept
 {
+    if (config.mono)
+        monoNoteOff (note, channel);
+    else
+        releaseNote (note, channel);
+}
+
+void InstrumentEngine::releaseNote (int note, int channel) noexcept
+{
     for (auto& voice : voices)
         if (voice.isActive() && ! voice.isReleased() && voice.note() == note && (channel == 0 || ! mpe || voice.channel() == channel))
         {
@@ -686,6 +771,7 @@ void InstrumentEngine::setSustainPedal (bool down) noexcept
 void InstrumentEngine::allNotesOff() noexcept
 {
     pedalDown = false;
+    clearHeldKeys();
     for (auto& voice : voices)
         voice.release();
 }
@@ -693,6 +779,8 @@ void InstrumentEngine::allNotesOff() noexcept
 void InstrumentEngine::reset() noexcept
 {
     pedalDown = false;
+    clearHeldKeys();
+    lastMonoNote = -1;
     for (auto& voice : voices)
         voice.kill();
     for (auto& slot : slots)

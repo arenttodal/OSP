@@ -75,6 +75,8 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     const auto& src = *layer->source;
     baseIncrement = params.increment;
     currentStep = baseIncrement;
+    glideOctaves = glideStep = 0.0;
+    gliding = false;
     const double frames = static_cast<double> (src.numFrames());
     const double startFraction = std::clamp (params.startFraction, 0.0, 1.0);
     if (direction > 0.0)
@@ -307,6 +309,39 @@ void InstrumentVoice::release() noexcept
         return;
     }
     envelope.noteOff();
+}
+
+void InstrumentVoice::glideTo (int newNote, double seconds) noexcept
+{
+    if (! active || newNote == currentNote)
+        return;
+    const double octaves = static_cast<double> (newNote - currentNote) / 12.0;
+    baseIncrement *= std::exp2 (octaves);
+    glideOctaves -= octaves;   // the pitch stays where it is, then slides
+    currentNote = newNote;
+    setGlideTime (seconds);
+    controlCountdown = 0;   // the new pitch takes effect on the next sample
+}
+
+void InstrumentVoice::glideFrom (int fromNote, double seconds) noexcept
+{
+    if (! active || fromNote == currentNote)
+        return;
+    glideOctaves = static_cast<double> (fromNote - currentNote) / 12.0;
+    setGlideTime (seconds);
+}
+
+void InstrumentVoice::setGlideTime (double seconds) noexcept
+{
+    const double periods = seconds * sampleRate / controlInterval;
+    if (periods < 1.0)
+    {
+        glideOctaves = 0.0;
+        gliding = false;
+        return;
+    }
+    glideStep = std::abs (glideOctaves) / periods;
+    gliding = glideStep > 0.0;
 }
 
 void InstrumentVoice::beginFastFade (int fadeSamples) noexcept
@@ -718,6 +753,20 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
             controlCountdown = controlInterval - 1;
             updateControl();
             currentStep = baseIncrement * pitchRatio * pitchMod;
+            if (gliding)
+            {
+                // Linear in pitch, constant time: every interval takes GLIDE to cross.
+                if (std::abs (glideOctaves) <= glideStep)
+                {
+                    glideOctaves = 0.0;
+                    gliding = false;
+                }
+                else
+                {
+                    glideOctaves -= std::copysign (glideStep, glideOctaves);
+                    currentStep *= std::exp2 (glideOctaves);
+                }
+            }
         }
 
         if (granularMode)

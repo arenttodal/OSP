@@ -87,6 +87,10 @@ struct EngineSettings
     std::array<SourceMode, layers> sourceMode { SourceMode::oneShot, SourceMode::oneShot, SourceMode::oneShot };
     std::array<GranularParams, layers> granular {};
     std::array<LayerSettings, layers> layer {};
+    /** Mono: one note at a time, newest key wins; a key played while another is held
+        changes the sounding note's pitch (legato, no restart), sliding over glideSeconds. */
+    bool mono = false;
+    double glideSeconds = 0.0;
 };
 
 /**
@@ -236,6 +240,16 @@ public:
     }
     void setVelocityRangeDb (double db) noexcept { config.velocityRangeDb = db; }
     void setDynamicsMode (DynamicsMode mode) noexcept { config.dynamicsMode = mode; }
+    /** Poly / mono (legato, last note priority). Switching forgets the held keys; notes
+        already sounding finish normally. */
+    void setMono (bool mono) noexcept
+    {
+        if (mono != config.mono)
+            clearHeldKeys();
+        config.mono = mono;
+    }
+    bool isMono() const noexcept { return config.mono; }
+    void setGlideSeconds (double seconds) noexcept { config.glideSeconds = std::clamp (seconds, 0.0, 10.0); }
 
     /** Velocity -> performance intensity (spec §34). Adds onto `shape`. Pure. */
     static void applyDynamics (NoteShape& shape, int velocity, const DynamicsProfile& profile, const SourceCharacter& character,
@@ -320,6 +334,15 @@ private:
     void granularLife (NoteShape& shape, int note, std::uint64_t eventIndex) const noexcept;
     void refreshLiveGranular (std::size_t layer) noexcept;
     InstrumentVoice* findFreeSlot() noexcept;
+    void startNote (int note, int velocity, int channel) noexcept;   // every layer's voice of one note
+    void monoNoteOn (int note, int velocity, int channel) noexcept;
+    void monoNoteOff (int note, int channel) noexcept;
+    void releaseNote (int note, int channel) noexcept;
+    void clearHeldKeys() noexcept
+    {
+        heldCount = 0;
+        monoNote = -1;
+    }
     InstrumentVoice* chooseVictim (int layer) noexcept;
     int countSoundingVoices (int layer) const noexcept;
     std::array<bool, 3> occupiedLayers() const noexcept;
@@ -334,6 +357,12 @@ private:
     int bufferSize = 0;
     double blendNow = 0.0, mixXNow = 0.5, mixYNow = 1.0 / 3.0;   ///< smoothed mix controls
     bool pedalDown = false;
+    // Mono: the keys held, oldest first (the newest sounds), and the sounding note.
+    static constexpr int maxHeldKeys = 32;
+    std::array<int, maxHeldKeys> heldKeys {};
+    int heldCount = 0;
+    int monoNote = -1;       ///< the note the mono voices play (-1: none held)
+    int lastMonoNote = -1;   ///< the last note played in mono (a fresh note glides from it)
     std::uint64_t noteCounter = 0;
     float outputGain = 1.0f;
     double pitchRatio = 1.0;

@@ -660,3 +660,124 @@ TEST_CASE ("REVERSE keeps Reimagined: its doubling, grains and continuation walk
     for (float v : reverse1)
         REQUIRE (std::isfinite (v));
 }
+
+namespace
+{
+    /** Frequency from rising zero crossings in [a, b) (a clean sine). */
+    double pitchHz (const std::vector<float>& x, std::size_t a, std::size_t b)
+    {
+        double first = -1.0, last = -1.0;
+        int crossings = 0;
+        for (std::size_t i = a + 1; i < b; ++i)
+            if (x[i - 1] <= 0.0f && x[i] > 0.0f)
+            {
+                const double t = static_cast<double> (i - 1) + x[i - 1] / (x[i - 1] - x[i]);
+                if (first < 0.0)
+                    first = t;
+                last = t;
+                ++crossings;
+            }
+        return crossings > 1 ? (crossings - 1) * rate / (last - first) : 0.0;
+    }
+}
+
+TEST_CASE ("mono: one note at a time, legato changes pitch without restarting, last note priority", "[integration][mono]")
+{
+    const auto model = sineModel (220.0, 4.0);   // root A3 = MIDI 57
+    auto s = quietSettings();
+    s.mono = true;
+    Rig rig (s);
+    rig.engine.setModel (model.get(), 0);
+    rig.engine.setModel (model.get(), 1);   // two layers: both follow the one mono note
+    std::vector<float> out;
+    rig.engine.noteOn (57, 100, 1);
+    rig.run (0.5, out);
+    CHECK (pitchHz (out, at (0.3), at (0.5)) == Approx (220.0).epsilon (0.01));
+    const auto notesBefore = rig.engine.noteOnCount();
+
+    rig.engine.noteOn (64, 100, 1);   // legato: same note, new pitch
+    rig.run (0.5, out);
+    CHECK (rig.engine.noteOnCount() == notesBefore);
+    CHECK (rig.engine.musicalVoiceCount() == 1);
+    CHECK (rig.engine.activeVoiceCount() == 2);
+    CHECK (pitchHz (out, at (0.6), at (1.0)) == Approx (midiToHz (64)).epsilon (0.01));
+    // No restart: the level carries straight through the change (no new attack, no gap).
+    CHECK (rms (out, at (0.49), at (0.5)) == Approx (rms (out, at (0.5), at (0.51))).epsilon (0.1));
+
+    rig.engine.noteOn (60, 100, 1);   // newest key wins
+    rig.run (0.3, out);
+    CHECK (pitchHz (out, at (1.1), at (1.3)) == Approx (midiToHz (60)).epsilon (0.01));
+    rig.engine.noteOff (60, 1);       // back to the newest key still held
+    rig.run (0.3, out);
+    CHECK (pitchHz (out, at (1.4), at (1.6)) == Approx (midiToHz (64)).epsilon (0.01));
+    rig.engine.noteOff (57, 1);       // releasing a key underneath changes nothing
+    rig.run (0.3, out);
+    CHECK (pitchHz (out, at (1.7), at (1.9)) == Approx (midiToHz (64)).epsilon (0.01));
+    rig.engine.noteOff (64, 1);       // the last key: the note releases
+    rig.run (0.5, out);
+    CHECK (rig.engine.activeVoiceCount() == 0);
+    CHECK (rms (out, at (2.2), at (2.4)) < 1.0e-4);
+}
+
+TEST_CASE ("mono glide: pitch slides over GLIDE, legato and from the last note; zero is instant", "[integration][mono]")
+{
+    const auto model = sineModel (220.0, 4.0);
+    auto play = [&] (double glide, bool legato, int block) {
+        auto s = quietSettings();
+        s.mono = true;
+        s.glideSeconds = glide;
+        Rig rig (s, block);
+        rig.engine.setModel (model.get(), 0);
+        std::vector<float> out;
+        rig.engine.noteOn (57, 100, 1);
+        rig.run (0.5, out, nullptr, block);
+        if (! legato)
+        {
+            rig.engine.noteOff (57, 1);
+            rig.run (0.1, out, nullptr, block);
+        }
+        rig.engine.noteOn (69, 100, 1);   // an octave up
+        rig.run (1.0, out, nullptr, block);
+        return out;
+    };
+    for (bool legato : { true, false })
+    {
+        INFO ("legato " << legato);
+        const auto t0 = legato ? 0.5 : 0.6;   // when the new key went down
+        const auto slide = play (0.4, legato, 256);
+        // Linear in pitch over 0.4 s: a quarter of the way (3 semitones) at 0.1 s, half at 0.2 s.
+        CHECK (pitchHz (slide, at (t0 + 0.09), at (t0 + 0.11)) == Approx (220.0 * std::exp2 (0.25)).epsilon (0.03));
+        CHECK (pitchHz (slide, at (t0 + 0.19), at (t0 + 0.21)) == Approx (220.0 * std::exp2 (0.5)).epsilon (0.03));
+        CHECK (pitchHz (slide, at (t0 + 0.5), at (t0 + 0.8)) == Approx (440.0).epsilon (0.01));
+        CHECK (slide == play (0.4, legato, 37));   // block-size independent
+        const auto instant = play (0.0, legato, 256);
+        CHECK (pitchHz (instant, at (t0 + 0.01), at (t0 + 0.05)) == Approx (440.0).epsilon (0.01));
+    }
+}
+
+TEST_CASE ("mono and poly: switching keeps sounding notes sane; poly is untouched by the mono code", "[integration][mono]")
+{
+    const auto model = sineModel (220.0, 4.0);
+    auto s = quietSettings();
+    Rig rig (s);
+    rig.engine.setModel (model.get(), 0);
+    std::vector<float> out;
+    rig.engine.noteOn (57, 100, 1);
+    rig.engine.noteOn (64, 100, 1);
+    rig.run (0.2, out);
+    CHECK (rig.engine.musicalVoiceCount() == 2);   // poly: a chord
+    rig.engine.setMono (true);                      // mid-chord
+    rig.engine.noteOn (67, 100, 1);                 // fresh mono note: the chord gets out of the way
+    rig.run (0.2, out);
+    CHECK (rig.engine.musicalVoiceCount() == 1);
+    rig.engine.noteOff (57, 1);
+    rig.engine.noteOff (64, 1);
+    rig.run (0.2, out);
+    CHECK (rig.engine.activeVoiceCount() == 1);     // 67 still held
+    rig.engine.setMono (false);
+    rig.engine.noteOff (67, 1);                     // released by note, as poly does
+    rig.run (0.5, out);
+    CHECK (rig.engine.activeVoiceCount() == 0);
+    for (float v : out)
+        REQUIRE (std::isfinite (v));
+}
