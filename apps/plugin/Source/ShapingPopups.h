@@ -71,6 +71,8 @@ public:
     void setOnDark (bool dark) { onDark = dark; repaint(); }
     /** Secondary controls: smaller type. */
     void setSmall (bool small) { compact = small; resized(); repaint(); }
+    /** The popups' cell (SPACE's DECAY): caption, a ticked knob, the value in a box. */
+    void setBoxed (bool shouldBeBoxed);
 
     void paint (juce::Graphics&) override;
     void resized() override;
@@ -81,7 +83,8 @@ private:
     juce::String caption;
     Formatter formatter;
     bool horizontal;
-    bool onDark = false, compact = false;
+    bool onDark = false, compact = false, boxed = false;
+    juce::Rectangle<float> valueBox() const;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
 };
 
@@ -120,12 +123,16 @@ class MiniPanel : public juce::Component
 public:
     MiniPanel (juce::String title, juce::String subtitle = {});
 
-    static constexpr int shadowMargin = 14;
-    /** Preferred size of the card (without the shadow margin). */
+    static constexpr int shadowMargin = 44;
+    /** Preferred size of the card (without the shadow margin), in the popup's own units. */
     virtual juce::Point<int> cardSize() const = 0;
+    /** The popup's drawing unit: 1 draws the shell at the reference's size (the macro
+        popups); smaller panels laid out at a smaller unit are scaled up by the editor
+        (1 / unit) so every popup's shell and type read alike. */
+    virtual float unit() const { return 1.0f; }
     juce::Rectangle<int> card() const { return getLocalBounds().reduced (shadowMargin); }
-    /** Height of the title block inside the card. */
-    int headerHeight() const noexcept { return subtitle.isEmpty() ? 26 : 40; }
+    /** Height of the title block inside the card (where the content starts). */
+    int headerHeight() const noexcept { return juce::roundToInt (91.0f * unit()); }
 
     void paint (juce::Graphics&) override;
     void resized() override;

@@ -1806,6 +1806,7 @@ TEST_CASE ("plugin: canonical screenshots for visual review", "[.][canonical]")
     set ("life.pitch", 65.0f);
     set ("character.resonance", 35.0f);
     set ("space.decay", 3.2f);
+    p.setScreenModWheel (0.44f);
 
     shot ("01-empty.png");
     p.addLayers ({ a });
@@ -1831,6 +1832,9 @@ TEST_CASE ("plugin: canonical screenshots for visual review", "[.][canonical]")
         juce::MidiBuffer midi;
         if (block % 8 == 0 && block < 56)
             midi.addEvent (juce::MidiMessage::noteOn (1, 60 + (block / 8) * 2, static_cast<juce::uint8> (100)), 0);
+        if (block == 59)   // released (the reference shows no held keys); still sounding
+            for (int n = 0; n < 7; ++n)
+                midi.addEvent (juce::MidiMessage::noteOff (1, 60 + n * 2), 0);
         audio.clear();
         p.processBlock (audio, midi);
     }
@@ -1870,6 +1874,11 @@ TEST_CASE ("plugin: canonical screenshots for visual review", "[.][canonical]")
     p.addLayers ({ c });
     settle();
     shot ("07-three.png");
+    ui->openPopup (osp::plugin::OspAudioProcessorEditor::mixPopup);
+    shot ("20-mix-popup.png");
+    ui->openPopup (osp::plugin::OspAudioProcessorEditor::advancedPopup);
+    shot ("21-advanced-popup.png");
+    ui->closePopup();
     p.editorBeingDeleted (editor.get());
 }
 

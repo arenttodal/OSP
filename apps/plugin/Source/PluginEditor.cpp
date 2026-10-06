@@ -548,17 +548,31 @@ void OspAudioProcessorEditor::positionPopup()
         return;
     juce::Desktop::getInstance().getAnimator().cancelAnimation (popup.get(), false);
     popup->setAlpha (1.0f);
-    const auto size = popup->cardSize();
-    const int m = MiniPanel::shadowMargin;
-    const auto anchor = popupIndex < 5 ? macros[static_cast<std::size_t> (popupIndex)].label->getBounds()
-                                       : (popupIndex == mixPopup ? mixSection.getBounds() : advancedButton.getBounds());
-    int x = popupIndex < 5 ? anchor.getCentreX() - size.x / 2
-                           : (popupIndex == mixPopup ? anchor.getX() + 8 : anchor.getRight() - size.x);
-    int y = anchor.getY() - 6 - size.y;
-    const auto limits = content.getLocalBounds().reduced (14);
+    // A panel laid out at a smaller unit is scaled up so every popup's shell reads alike.
+    const float scale = 1.0f / popup->unit();
+    const auto size = (popup->cardSize().toFloat() * scale);
+    const float m = static_cast<float> (MiniPanel::shadowMargin) * scale;
+    float x = 0.0f, y = 0.0f;
+    if (popupIndex < 5 || popupIndex == mixPopup)
+    {
+        // The macro popups (and the large MIX) sit where the reference's SPACE does:
+        // centred, 236 px down, taller ones growing upwards from the same foot.
+        x = 0.5f * design::width - 0.5f * size.x;
+        y = std::min (design::layout::popupTop, design::layout::popupFoot - size.y);
+    }
+    else
+    {
+        const auto anchor = advancedButton.getBounds().toFloat();
+        x = anchor.getRight() - size.x;
+        y = anchor.getY() - 8.0f - size.y;
+    }
+    const auto limits = content.getLocalBounds().toFloat().reduced (14.0f);
     x = juce::jlimit (limits.getX(), std::max (limits.getX(), limits.getRight() - size.x), x);
     y = std::max (limits.getY(), y);
-    popup->setBounds (x - m, y - m, size.x + 2 * m, size.y + 2 * m);
+    popup->setTransform (juce::AffineTransform::scale (scale));
+    const auto card = popup->cardSize();
+    popup->setBounds (juce::roundToInt ((x - m) / scale), juce::roundToInt ((y - m) / scale),
+                      card.x + 2 * MiniPanel::shadowMargin, card.y + 2 * MiniPanel::shadowMargin);
 }
 
 void OspAudioProcessorEditor::updateCustomisedDots()
@@ -1189,6 +1203,7 @@ void OspAudioProcessorEditor::timerCallback()
             card->refresh();
     updateFocus();
     presetBar.refresh();
+    modWheel.setValue (ospProcessor.screenModWheel());
     if (samplesShown)
     {
         const auto instrument = ospProcessor.currentInstrument (ospProcessor.editLayer());

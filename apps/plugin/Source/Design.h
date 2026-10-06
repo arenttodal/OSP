@@ -117,14 +117,17 @@ namespace layout
     const R macroPanel { 35.0f, 702.0f, 1378.0f, 196.0f };
 
     // Keyboard row and footer
-    const R pitchWheel { 42.0f, 905.0f, 36.0f, 88.0f };
-    const R modWheel { 93.0f, 905.0f, 36.0f, 88.0f };
+    const R pitchWheel { 42.0f, 913.0f, 36.0f, 88.0f };
+    const R modWheel { 93.0f, 913.0f, 36.0f, 88.0f };
     const R keyboard { 148.0f, 913.0f, 1262.0f, 101.0f };
     const R status { 48.0f, 1038.0f, 600.0f, 24.0f };
     const R advanced { 1253.0f, 1025.0f, 160.0f, 40.0f };
 
-    // Popups float centred over the instrument at the reference's place.
+    // Popups float centred over the instrument at the reference's place (SPACE: 607 x 610
+    // at (420, 236)); taller ones grow upwards from the same foot.
     constexpr float popupTop = 236.0f;
+    constexpr float popupWidth = 607.0f;
+    constexpr float popupFoot = 846.0f;
 }
 
 //==============================================================================
@@ -149,6 +152,10 @@ namespace draw
         bool bipolar = false;
         bool ticks = true;
         int tickCount = 9;
+        float tickRadius = 1.37f;                      ///< tick circle, in body radii
+        float arcRadius = 1.13f;                       ///< track and value arc, in body radii
+        juce::Colour pointer = colour::knobPointer;    ///< popups: the accent
+        float pointerFrom = 0.36f, pointerTo = 0.8f;   ///< in body radii
         float startAngle = -2.356f, endAngle = 2.356f;
         bool enabled = true;
     };

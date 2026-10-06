@@ -123,14 +123,14 @@ void knob (juce::Graphics& g, juce::Point<float> c, float r, float position, con
         for (int i = 0; i < style.tickCount; ++i)
         {
             const float a = style.startAngle + (style.endAngle - style.startAngle) * static_cast<float> (i) / static_cast<float> (style.tickCount - 1);
-            const auto p = at (1.37f * r, a);
+            const auto p = at (style.tickRadius * r, a);
             const float d = std::max (1.6f, 0.07f * r);
             g.setColour (tick.withAlpha (style.enabled ? 0.85f : 0.35f));
             g.fillEllipse (p.x - 0.5f * d, p.y - 0.5f * d, d, d);
         }
 
     // Track and value arc, hugging the rim.
-    const float arcRadius = 1.13f * r, arcWidth = std::max (2.4f, 0.12f * r);
+    const float arcRadius = style.arcRadius * r, arcWidth = std::max (2.4f, 0.12f * r);
     {
         // The track: a soft grey ring, shaded on its inner edge.
         juce::Path track;
@@ -175,8 +175,8 @@ void knob (juce::Graphics& g, juce::Point<float> c, float r, float position, con
     g.fillEllipse (cap.reduced (0.08f * r).withTrimmedBottom (0.7f * r));
 
     // Pointer: a dark groove from near the centre to the cap's edge.
-    const auto p0 = at (0.36f * r, angle), p1 = at (0.8f * r, angle);
-    g.setColour (knobPointer.withAlpha (style.enabled ? 1.0f : 0.4f));
+    const auto p0 = at (style.pointerFrom * r, angle), p1 = at (style.pointerTo * r, angle);
+    g.setColour (style.pointer.withAlpha (style.enabled ? 1.0f : 0.4f));
     g.drawLine ({ p0, p1 }, std::max (2.2f, 0.11f * r));
 }
 

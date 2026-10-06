@@ -161,9 +161,12 @@ public:
     void mouseDown (const juce::MouseEvent&) override;
     void mouseDrag (const juce::MouseEvent&) override;
     void mouseUp (const juce::MouseEvent&) override;
+    /** Shows a value set elsewhere (the processor's mod wheel); ignored while dragged. */
+    void setValue (float newValue);
 
 private:
     juce::Rectangle<float> slot() const;
+    bool dragging = false;
     juce::String caption;
     bool springBack;
     std::function<void (float)> onMove;

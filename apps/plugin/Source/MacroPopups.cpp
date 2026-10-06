@@ -1,6 +1,7 @@
 // The five macro popups (redesign §2): each one explains its DSP with a picture drawn
 // from the same formulas and parameters the sound uses, plus a few compact controls.
 #include "EngineCard.h"
+#include "Design.h"
 #include "ShapingPopups.h"
 
 #include "core/Prng.h"
@@ -52,17 +53,30 @@ namespace
 
         void paint (juce::Graphics& g) override
         {
+            // The reference's display (SPACE: 558 x 261): a deep slate well, rounded 9 px,
+            // shaded under its top edge, a faint light line along its foot.
             const auto r = getLocalBounds().toFloat();
-            g.setColour (palette::graphite);
-            g.fillRoundedRectangle (r, 7.0f);
-            g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.2f), 0.0f, r.getY(), juce::Colours::transparentBlack, 0.0f,
-                                                     r.getY() + 9.0f, false));
-            g.fillRoundedRectangle (r.withHeight (10.0f), 7.0f);
+            g.setGradientFill (juce::ColourGradient (juce::Colour (0xff1f2626), 0.0f, r.getY(), juce::Colour (0xff1a1e1f), 0.0f, r.getBottom(), false));
+            g.fillRoundedRectangle (r, 9.0f);
+            g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.35f), 0.0f, r.getY(), juce::Colours::transparentBlack, 0.0f,
+                                                     r.getY() + 10.0f, false));
+            g.fillRoundedRectangle (r.withHeight (12.0f), 9.0f);
             {
                 juce::Graphics::ScopedSaveState state (g);
                 g.reduceClipRegion (getLocalBounds().reduced (1));
-                paintVisual (g, r.reduced (12.0f, 9.0f));
+                if (native())
+                    paintVisual (g, r);
+                else
+                {
+                    // Pictures designed for the smaller display draw at their own scale.
+                    const float k = visualScale;
+                    g.addTransform (juce::AffineTransform::scale (k));
+                    const auto v = juce::Rectangle<float> (r.getWidth() / k, r.getHeight() / k);
+                    paintVisual (g, v.reduced (12.0f, 9.0f));
+                }
             }
+            g.setColour (juce::Colour (0xff0b0e10));
+            g.drawRoundedRectangle (r.reduced (0.5f), 9.0f, 1.0f);
             if (fade > 0.0f && previous.isValid())
             {
                 g.setOpacity (fade);
@@ -70,8 +84,12 @@ namespace
             }
         }
 
+        static constexpr float visualScale = 1.6f;
+
     protected:
         virtual void paintVisual (juce::Graphics&, juce::Rectangle<float> plot) = 0;
+        /** Draws at the display's full size (otherwise scaled by visualScale). */
+        virtual bool native() const { return false; }
         /** A moving picture (drawn again every tick). */
         virtual bool animates() const { return false; }
         /** True when what the picture shows has changed (parameters checked every tick). */
@@ -148,147 +166,176 @@ namespace
                 cache = juce::Image (juce::Image::ARGB, std::max (1, w), std::max (1, h), true);
                 juce::Graphics cg (cache);
                 cg.addTransform (juce::AffineTransform::scale (scale));
-                draw (cg, plot);
+                draw (cg, plot);   // native: the display's full bounds
                 cacheValid = true;
             }
             g.drawImage (cache, getLocalBounds().toFloat());
         }
 
-        void draw (juce::Graphics& g, juce::Rectangle<float> plot)
+        bool native() const override { return true; }
+
+        /** The reference's picture (SPACE, ROOM, 3.2 s): seconds along a faint grid; the
+            sound's early reflections as glowing amber strokes; the dense tail as a cloud of
+            particles narrowing to nothing at the right edge (-75 dB, 1.25 x DECAY) while its
+            colour cools from amber through white to mineral blue. Times, counts and spread
+            come from the type's design (SpaceReverb::portrait) and DECAY. */
+        void draw (juce::Graphics& g, juce::Rectangle<float> bounds)
         {
-            using namespace palette;
             const auto type = static_cast<SpaceType> (std::clamp (juce::roundToInt (value (state, "space.type")), 0, 3));
             double lo = 0.2, hi = 8.0;
             shaping::decayRange (type, lo, hi);
             const double decay = std::clamp (static_cast<double> (value (state, "space.decay")), lo, hi);
-            const double amount = 0.5 + 0.5 * std::clamp (static_cast<double> (value (state, "space")) * 0.01, 0.0, 1.0);
+            const double amount = 0.85 + 0.15 * std::clamp (static_cast<double> (value (state, "space")) * 0.01, 0.0, 1.0);
             const auto portrait = SpaceReverb::portrait (type);
-            const double span = std::max (0.6, decay * 1.15);
-            auto plotArea = plot.withTrimmedBottom (12.0f);
-            const float mid = plotArea.getCentreY(), half = plotArea.getHeight() * 0.46f;
-            auto xAt = [&] (double t) { return plotArea.getX() + static_cast<float> (t / span) * plotArea.getWidth(); };
+            const double span = decay * 1.25;
+            const float W = bounds.getWidth(), H = bounds.getHeight();
+            const auto plot = juce::Rectangle<float>::leftTopRightBottom (bounds.getX() + 0.048f * W, bounds.getY() + 0.084f * H,
+                                                                          bounds.getRight() - 0.045f * W, bounds.getY() + 0.893f * H);
+            const float mid = plot.getCentreY(), half = 0.5f * plot.getHeight();
+            auto xAt = [&] (double t) { return plot.getX() + static_cast<float> (t / span) * plot.getWidth(); };
 
-            // Time axis.
-            {
-                double step = 0.25;
-                for (double s : { 0.1, 0.25, 0.5, 1.0, 2.0 })
-                    if (span / s <= 6.0)
-                    {
-                        step = s;
-                        break;
-                    }
-                g.setFont (fonts::make (9.0f));
-                for (double t = 0.0; t <= span + 1.0e-6; t += step)
+            // Grid: five rows, a line every second (or the step that fits) and four between.
+            double step = 2.0;
+            for (double c : { 0.1, 0.25, 0.5, 1.0, 2.0 })
+                if (span / c <= 6.0)
                 {
-                    const float x = xAt (t);
-                    g.setColour (displayLine.withAlpha (0.45f));
-                    g.drawVerticalLine (juce::roundToInt (x), plotArea.getY(), plotArea.getBottom());
-                    g.setColour (displayText.withAlpha (0.75f));
-                    g.drawText (secondsLabel (t), juce::Rectangle<float> (x + 2.0f, plot.getBottom() - 11.0f, 40.0f, 11.0f), juce::Justification::centredLeft, false);
+                    step = c;
+                    break;
                 }
+            for (int i = 0; i <= 5; ++i)
+            {
+                g.setColour (juce::Colours::white.withAlpha (0.045f));
+                g.fillRect (juce::Rectangle<float> (plot.getX(), plot.getY() + plot.getHeight() * static_cast<float> (i) / 5.0f - 0.5f, plot.getWidth(), 1.0f));
             }
+            for (int i = 0; static_cast<double> (i) * step * 0.25 <= span + 1.0e-6; ++i)
+            {
+                const float x = xAt (static_cast<double> (i) * step * 0.25);
+                g.setColour (juce::Colours::white.withAlpha (i % 4 == 0 ? 0.075f : 0.04f));
+                g.fillRect (juce::Rectangle<float> (x - 0.5f, plot.getY(), 1.0f, plot.getHeight()));
+            }
+            g.setFont (fonts::make (15.5f, fonts::Weight::medium, 0.02f));
+            g.setColour (juce::Colour (0xffa3a8a6));
+            for (double t = 0.0; t <= span + 1.0e-6; t += step)
+                g.drawText (secondsLabel (t), juce::Rectangle<float> (xAt (t) - 30.0f, bounds.getY() + 0.92f * H, 60.0f, 0.06f * H), juce::Justification::centred, false);
 
-            // The tail: -60 dB at DECAY, built up as the diffusers fill in; warmth fades into
-            // cool mineral and loses saturation towards silence. Spring tails ripple.
-            // Drawn in decibels (as the ear hears a tail): it falls in a straight line to
-            // nothing at -60 dB, i.e. at DECAY.
+            // The tail's envelope (linear in dB: a straight fall to the floor at the edge),
+            // building up as the diffusers fill in; springs ripple.
             const double onset = 0.001 * portrait.preMs;
-            const double build = std::max (0.004, 0.003 * portrait.diffusionMs * (type == SpaceType::chamber ? 4.0 : 2.0));
+            const double build = std::max (0.01, 0.006 * portrait.diffusionMs * (type == SpaceType::chamber ? 4.0 : 2.0)) * span / 4.0;
             auto tail = [&] (double t) {
                 if (t <= onset)
                     return 0.0;
-                double a = std::max (0.0, 1.0 - t / decay) * (1.0 - std::exp (-(t - onset) / build)) * amount;
+                // Drawn compressed (as the ear hears a tail): a fast early fall slowing towards the floor.
+                double a = std::pow (std::max (0.0, 1.0 - t / span), 1.4) * (1.0 - std::exp (-(t - onset) / build)) * amount;
                 if (portrait.spring)
-                    a *= 0.75 + 0.25 * std::sin (twoPi * t / 0.037);
+                    a *= 0.8 + 0.2 * std::sin (twoPi * t / (0.012 * span));
                 return a;
             };
-            const int count = type == SpaceType::plate ? 4200 : (type == SpaceType::chamber ? 3600 : (type == SpaceType::room ? 2600 : 3000));
-            const double spread = 0.55 + 0.45 * portrait.width;
+            // Warmth dissipating: amber, peach, white, then mineral blue; damped types cool sooner.
+            auto tint = [&] (double t) {
+                const float p = static_cast<float> (std::pow (std::clamp (t / span, 0.0, 1.0), 1.0 - 0.45 * portrait.damping));
+                static const juce::Colour stops[] = { juce::Colour (0xffff8a2c), juce::Colour (0xffffa24c), juce::Colour (0xffffc68e),
+                                                      juce::Colour (0xfff3ddc4), juce::Colour (0xffe6e6e4), juce::Colour (0xffc4cfd8), juce::Colour (0xff8fa4b8) };
+                static const float at[] = { 0.0f, 0.1f, 0.25f, 0.45f, 0.65f, 0.82f, 1.0f };
+                for (int i = 1; i < 7; ++i)
+                    if (p <= at[i])
+                        return stops[i - 1].interpolatedWith (stops[i], (p - at[i - 1]) / (at[i] - at[i - 1]));
+                return stops[6];
+            };
+            const double spread = 0.8 + 0.2 * portrait.width;
+
+            // The centre's glow: the tail's energy along its axis.
+            for (int pass = 0; pass < 3; ++pass)
+            {
+                const float width = pass == 0 ? 9.0f : (pass == 1 ? 3.5f : 1.3f);
+                const float alpha = pass == 0 ? 0.05f : (pass == 1 ? 0.16f : 0.55f);
+                const int segments = 96;
+                for (int i = 0; i < segments; ++i)
+                {
+                    const double t0 = span * i / segments, t1 = span * (i + 1) / segments;
+                    const float a = static_cast<float> (std::min (1.0, 1.4 * tail (0.5 * (t0 + t1)) + (i < 3 ? 0.6 : 0.0)));
+                    g.setColour (tint (t0).withAlpha (alpha * a));
+                    g.fillRect (juce::Rectangle<float> (xAt (t0), mid - 0.5f * width, xAt (t1) - xAt (t0) + 0.3f, width));
+                }
+            }
+
+            // The cloud.
+            // A warm haze where the tail is young and dense.
+            {
+                const float xh = xAt (onset + 0.16 * span);
+                juce::ColourGradient haze (juce::Colour (0xffffa45a).withAlpha (0.1f), xh, mid, juce::Colour (0xffffa45a).withAlpha (0.0f), xh + 0.22f * W, mid, true);
+                g.setGradientFill (haze);
+                g.fillEllipse (juce::Rectangle<float> (0.44f * W, 0.6f * H).withCentre ({ xh, mid }));
+            }
+            const int count = type == SpaceType::plate ? 17000 : (type == SpaceType::chamber ? 15000 : (type == SpaceType::room ? 13000 : 13500));
             Prng rng (Prng::deriveSeed (0x7370616365ull, static_cast<std::uint64_t> (type), 0));
             for (int i = 0; i < count; ++i)
             {
-                const double t = onset + (span - onset) * std::pow (rng.nextDouble(), 1.7);
+                const double t = onset + (span - onset) * std::pow (rng.nextDouble(), 1.12);
                 const double a = tail (t);
-                if (a < 1.0e-3)
+                // Thinner where the tail is quiet (no bright bead along the axis at its end).
+                if (a < 2.0e-3 || rng.nextDouble() > 0.25 + 1.5 * a)
                     continue;
-                // Plate: dense and smooth (close to its envelope); the others scatter more.
-                const double scatter = type == SpaceType::plate ? 0.55 + 0.45 * rng.nextDouble() : std::clamp (std::abs (rng.gaussian()) * 0.6, 0.0, 1.0);
-                const float y = mid + static_cast<float> ((rng.nextDouble() < 0.5 ? -1.0 : 1.0) * scatter * a * spread) * half;
-                // Warmth dissipating: the colour moves on faster the darker the type damps.
-                const float progress = static_cast<float> (std::pow (std::min (1.0, t / decay), 1.0 - 0.5 * portrait.damping));
-                const float env = static_cast<float> (std::max (0.0, 1.0 - t / decay));
-                auto colour = spectrum (0.04f + 0.96f * progress).withMultipliedSaturation (0.3f + 0.7f * env);
-                const float size = 0.9f + 1.6f * static_cast<float> (a) * static_cast<float> (rng.nextDouble());
-                g.setColour (colour.withAlpha (std::clamp (0.1f + 0.55f * static_cast<float> (a), 0.0f, 0.8f)));
+                // Plates are smooth (close to their envelope), the others scatter around the axis.
+                // Plates fill their envelope evenly; the others gather around the axis.
+                double r = 2.0;
+                for (int tries = 0; tries < 4 && r > 1.0; ++tries)   // no hard edge: draw again past it
+                    r = std::abs (rng.gaussian()) * (type == SpaceType::plate ? 0.6 : 0.45);
+                if (r > 1.0)
+                    continue;
+                const float y = mid + static_cast<float> ((rng.nextDouble() < 0.5 ? -1.0 : 1.0) * r * a * spread) * half * 0.98f;
+                const float near = 1.0f - static_cast<float> (r);
+                const float size = 1.0f + (0.9f + 1.2f * near) * static_cast<float> (rng.nextDouble()) * (0.65f + 0.6f * static_cast<float> (a));
+                const float alpha = std::clamp ((0.3f + 0.65f * static_cast<float> (rng.nextDouble())) * (0.5f + 0.5f * near) * (0.6f + 0.6f * static_cast<float> (a)), 0.0f, 0.95f);
+                g.setColour (tint (t).withAlpha (alpha));
                 g.fillEllipse (xAt (t) - 0.5f * size, y - 0.5f * size, size, size);
             }
-            // Its envelope, thinly.
-            juce::Path outline;
-            for (int i = 0; i <= 160; ++i)
-            {
-                const double t = span * i / 160.0;
-                const float y = mid - static_cast<float> (tail (t) * spread) * half;
-                if (i == 0)
-                    outline.startNewSubPath (xAt (t), y);
-                else
-                    outline.lineTo (xAt (t), y);
-            }
-            g.setColour (raised.withAlpha (0.28f));
-            g.strokePath (outline, juce::PathStrokeType (1.0f));
 
-            // Early reflections at the type's own times (springs: dispersed echoes).
-            for (std::size_t i = 0; i < portrait.erMs.size(); ++i)
+            // Early reflections: discrete amber strokes over the first tenth of the picture,
+            // as many as the type has (springs: dispersed, chirping echoes; plates: few).
+            const double early = span * (type == SpaceType::plate ? 0.05 : (type == SpaceType::chamber ? 0.12 : 0.095));
+            const int strokes = type == SpaceType::plate ? 6 : 6 + static_cast<int> (portrait.erMs.size()) / 2;
+            Prng er (Prng::deriveSeed (0x6561726c79ull, static_cast<std::uint64_t> (type), 0));
+            for (int i = 0; i < strokes; ++i)
             {
-                const double t = onset + 0.001 * portrait.erMs[i];
-                const float level = portrait.erLevel * (portrait.spring ? std::pow (0.72f, static_cast<float> (i)) : 1.0f / (1.0f + 0.35f * static_cast<float> (i)));
-                if (level < 0.02f || t > span)
-                    continue;
-                const float x = xAt (t), extent = half * std::min (0.95f, 1.2f * level) * static_cast<float> (amount);
-                const auto colour = gold.interpolatedWith (coral, static_cast<float> (i) / 8.0f);
+                const double u = static_cast<double> (i) / static_cast<double> (strokes - 1);
+                const double t = onset + early * (0.02 + 0.98 * u) * (0.8 + 0.4 * er.nextDouble());
+                const double level = std::clamp ((1.0 - 0.45 * u) * (0.45 + 0.55 * er.nextDouble()) * (0.9 + 0.3 * portrait.erLevel), 0.15, 1.0);
+                const float x = xAt (t), extent = half * static_cast<float> (level) * 0.97f;
+                const auto colour = juce::Colour (0xffffa851).interpolatedWith (juce::Colour (0xfff07224), static_cast<float> (u));
                 if (portrait.spring)
                 {
                     juce::Path chirp;
-                    for (int k = 0; k <= 24; ++k)
+                    for (int k = 0; k <= 30; ++k)
                     {
-                        const float u = static_cast<float> (k) / 24.0f;
-                        const float px = x + (u - 0.5f) * 10.0f;
-                        const float py = mid - extent * std::sin (u * 9.0f + u * u * 14.0f) * (1.0f - std::abs (u - 0.5f) * 2.0f);
+                        const float v = static_cast<float> (k) / 30.0f;
+                        const float py = mid - extent + 2.0f * extent * v;
+                        const float px = x + 3.5f * std::sin (v * 18.0f + v * v * 20.0f) * (1.0f - std::abs (v - 0.5f) * 2.0f);
                         if (k == 0)
                             chirp.startNewSubPath (px, py);
                         else
                             chirp.lineTo (px, py);
                     }
-                    g.setColour (colour.withAlpha (0.85f));
+                    g.setColour (colour.withAlpha (0.25f));
+                    g.strokePath (chirp, juce::PathStrokeType (3.5f));
+                    g.setColour (colour.withAlpha (0.9f));
                     g.strokePath (chirp, juce::PathStrokeType (1.2f));
+                    continue;
                 }
-                else
-                {
-                    g.setColour (colour.withAlpha (0.85f));
-                    g.drawLine (x, mid - extent, x, mid + extent, 1.4f);
-                }
+                juce::ColourGradient body (colour.withAlpha (0.0f), x, mid - extent, colour.withAlpha (0.0f), x, mid + extent, false);
+                body.addColour (0.12, colour.withAlpha (0.8f));
+                body.addColour (0.5, colour.brighter (0.3f));
+                body.addColour (0.88, colour.withAlpha (0.8f));
+                g.setGradientFill (body);
+                g.fillRect (juce::Rectangle<float> (x - 1.2f, mid - extent, 2.4f, 2.0f * extent));
+                g.setColour (colour.withAlpha (0.08f));
+                g.fillRect (juce::Rectangle<float> (x - 3.5f, mid - 0.8f * extent, 7.0f, 1.6f * extent));
             }
-
-            // The sound itself: a bright transient at zero.
-            const float x0 = xAt (0.0);
-            g.setColour (amber.withAlpha (0.25f));
-            g.fillRect (juce::Rectangle<float> (x0, mid - half * 0.95f, 5.0f, half * 1.9f));
-            g.setColour (amber.brighter (0.4f));
-            g.drawLine (x0 + 1.0f, mid - half * 0.95f, x0 + 1.0f, mid + half * 0.95f, 2.0f);
-
-            // Where it has died away (-60 dB).
-            const float xd = xAt (decay);
-            juce::Path marker;
-            marker.startNewSubPath (xd, plotArea.getY());
-            marker.lineTo (xd, plotArea.getBottom());
-            juce::Path dashed;
-            const float dashes[] = { 2.0f, 3.0f };
-            juce::PathStrokeType (1.0f).createDashedStroke (dashed, marker, dashes, 2);
-            g.setColour (displayText.withAlpha (0.6f));
-            g.fillPath (dashed);
-            g.setFont (fonts::make (9.0f, fonts::Weight::medium, 0.08f));
-            g.drawText ("-60 dB", juce::Rectangle<float> (xd - 46.0f, plotArea.getY(), 42.0f, 11.0f), juce::Justification::centredRight, false);
-            g.setColour (displayText.withAlpha (0.8f));
-            g.drawText ("EARLY", juce::Rectangle<float> (xAt (onset + 0.004) - 2.0f, plotArea.getY(), 50.0f, 11.0f), juce::Justification::centredLeft, false);
+            // The sound itself, arriving: a warm bloom at zero.
+            const float x0 = xAt (onset);
+            juce::ColourGradient bloom (juce::Colour (0xffff9a3c).withAlpha (0.35f), x0, mid, juce::Colour (0xffff9a3c).withAlpha (0.0f), x0 + 0.06f * W, mid, true);
+            g.setGradientFill (bloom);
+            g.fillEllipse (juce::Rectangle<float> (0.12f * W, 0.5f * H).withCentre ({ x0, mid }));
         }
 
         juce::AudioProcessorValueTreeState& state;
@@ -846,8 +893,8 @@ namespace
     class MacroPanel : public MiniPanel
     {
     public:
-        MacroPanel (OspAudioProcessor& p, juce::String popupTitle, juce::String question, int width = 360)
-            : MiniPanel (std::move (popupTitle), std::move (question)), processor (p), panelWidth (width)
+        MacroPanel (OspAudioProcessor& p, juce::String popupTitle, juce::String question)
+            : MiniPanel (std::move (popupTitle), std::move (question)), processor (p), panelWidth (juce::roundToInt (design::layout::popupWidth))
         {
         }
 
@@ -867,39 +914,43 @@ namespace
         {
             auto k = std::make_unique<MiniKnob> (processor.parameters, id, caption, std::move (f), horizontal);
             k->setSmall (secondary);
+            k->setBoxed (true);
             addAndMakeVisible (*k);
             (secondary ? secondaryRow : primaryRow).push_back (k.get());
             knobs.push_back (std::move (k));
             return *knobs.back();
         }
 
+        // The reference's SPACE popup, in its own pixels: tabs 43 high, the display 558 x 261,
+        // then rows of knob cells (DECAY's: 160 high), 26 below.
+        static constexpr int tabsTop = 1, tabsHeight = 43, tabsGap = 13, visualGap = 15;
+        static constexpr int cellHeight = 160, secondaryCellHeight = 132, rowGap = 4;
+
         juce::Point<int> cardSize() const override
         {
-            int h = 10 + headerHeight() + 6 + (modeTabs != nullptr ? 24 + 8 : 0) + visualHeight + 8 + primaryHeight() + 10;
+            int h = headerHeight() + (modeTabs != nullptr ? tabsTop + tabsHeight + tabsGap : 0) + visualHeight + visualGap + cellHeight + 26;
             if (! secondaryRow.empty())
-                h += 2 + 44;
+                h += rowGap + secondaryCellHeight;
             return { panelWidth, h };
         }
 
     protected:
-        /** One control (SPACE's DECAY) sits on a single line; several are a row of knobs. */
-        int primaryHeight() const { return primaryRow.size() == 1 ? 36 : 54; }
-
         void layoutContent (juce::Rectangle<int> area) override
         {
             if (modeTabs != nullptr)
             {
-                modeTabs->setBounds (area.removeFromTop (24));
-                area.removeFromTop (8);
+                area.removeFromTop (tabsTop);
+                modeTabs->setBounds (area.removeFromTop (tabsHeight).withTrimmedRight (-1));
+                area.removeFromTop (tabsGap);
             }
             if (visual != nullptr)
                 visual->setBounds (area.removeFromTop (visualHeight));
-            area.removeFromTop (8);
-            layoutRow (primaryRow, area.removeFromTop (primaryHeight()));
+            area.removeFromTop (visualGap);
+            layoutRow (primaryRow, area.removeFromTop (cellHeight));
             if (! secondaryRow.empty())
             {
-                area.removeFromTop (2);
-                layoutRow (secondaryRow, area.removeFromTop (44));
+                area.removeFromTop (rowGap);
+                layoutRow (secondaryRow, area.removeFromTop (secondaryCellHeight));
             }
         }
 
@@ -907,12 +958,7 @@ namespace
         {
             if (row.empty())
                 return;
-            if (row.size() == 1)
-            {
-                row.front()->setBounds (line.withSizeKeepingCentre (std::min (line.getWidth(), 170), line.getHeight()));
-                return;
-            }
-            const int cell = std::min (line.getWidth() / static_cast<int> (row.size()), 84);
+            const int cell = std::min (line.getWidth() / static_cast<int> (row.size()), 139);
             line = line.withSizeKeepingCentre (cell * static_cast<int> (row.size()), line.getHeight());
             for (auto* k : row)
                 k->setBounds (line.removeFromLeft (cell));
@@ -920,7 +966,7 @@ namespace
 
         OspAudioProcessor& processor;
         int panelWidth;
-        int visualHeight = 116;
+        int visualHeight = 261;
         std::unique_ptr<SegmentedControl> modeTabs;
         std::unique_ptr<Visual> visual;
         std::vector<std::unique_ptr<MiniKnob>> knobs;
@@ -933,7 +979,7 @@ namespace
     class MovementPanel final : public MacroPanel
     {
     public:
-        explicit MovementPanel (OspAudioProcessor& p) : MacroPanel (p, "MOVEMENT", "HOW THE SOUND CHANGES THROUGH TIME", 370)
+        explicit MovementPanel (OspAudioProcessor& p) : MacroPanel (p, "MOVEMENT", "RHYTHM, DRIFT & MODULATION")
         {
             auto& t = tabs ("movement.mode", { "DRIFT", "TAPE", "CHORUS", "PULSE", "SHAPER" }, "Movement: drift, tape, chorus, pulse or rhythmic shaper");
             t.onChange = [this] (int mode) {
@@ -942,14 +988,16 @@ namespace
                     onSizeChanged();
             };
             setVisual (std::make_unique<MovementVisual> (p));
-            visualHeight = 104;
             build (t.selected());
         }
 
+        /** SHAPER: PATTERN, RATE and TARGET on one line above its two knobs. */
+        static constexpr int selectorHeight = 66, selectorGap = 8;
+
         juce::Point<int> cardSize() const override
         {
-            const int controls = shaperMode ? 32 + 6 + 36 + 6 + 32 : 54;
-            return { panelWidth, 10 + headerHeight() + 6 + 24 + 8 + visualHeight + 8 + controls + 10 };
+            const int controls = shaperMode ? selectorHeight + selectorGap + cellHeight : cellHeight;
+            return { panelWidth, headerHeight() + tabsTop + tabsHeight + tabsGap + visualHeight + visualGap + controls + 26 };
         }
 
     private:
@@ -995,8 +1043,8 @@ namespace
                     addAndMakeVisible (*target);
                     // DEPTH is the MOVEMENT macro itself (one control, two places): 100 % takes
                     // the pattern's lowest point to closed - on VOL, silence - 10 % only breathes.
-                    knob (false, "motion", "DEPTH", percent, true);
-                    knob (false, "movement.shaper.smooth", "SMOOTH", percent, true);
+                    knob (false, "motion", "DEPTH", percent);
+                    knob (false, "movement.shaper.smooth", "SMOOTH", percent);
                     break;
             }
             resized();
@@ -1004,30 +1052,25 @@ namespace
 
         void layoutContent (juce::Rectangle<int> area) override
         {
-            modeTabs->setBounds (area.removeFromTop (24));
-            area.removeFromTop (8);
+            area.removeFromTop (tabsTop);
+            modeTabs->setBounds (area.removeFromTop (tabsHeight).withTrimmedRight (-1));
+            area.removeFromTop (tabsGap);
             visual->setBounds (area.removeFromTop (visualHeight));
-            area.removeFromTop (8);
-            if (! shaperMode)
+            area.removeFromTop (visualGap);
+            if (shaperMode)
             {
-                layoutRow (primaryRow, area.removeFromTop (54));
-                return;
+                auto row = area.removeFromTop (selectorHeight);
+                const int third = row.getWidth() / 3;
+                if (patternSelector != nullptr)
+                    patternSelector->setBounds (row.removeFromLeft (third).reduced (8, 0));
+                if (rateSelector != nullptr)
+                    rateSelector->setBounds (row.removeFromLeft (third).reduced (8, 0));
+                targetCaption = row.reduced (8, 0).removeFromTop (juce::roundToInt (0.36f * static_cast<float> (selectorHeight)));
+                if (target != nullptr)
+                    target->setBounds (row.reduced (8, 0).withTrimmedTop (targetCaption.getHeight()).reduced (0, 1));
+                area.removeFromTop (selectorGap);
             }
-            auto row = area.removeFromTop (32);
-            const int half = row.getWidth() / 2;
-            if (patternSelector != nullptr)
-                patternSelector->setBounds (row.removeFromLeft (half).reduced (2, 0));
-            if (rateSelector != nullptr)
-                rateSelector->setBounds (row.reduced (2, 0));
-            area.removeFromTop (6);
-            targetCaption = area.removeFromTop (12);
-            if (target != nullptr)
-                target->setBounds (area.removeFromTop (24).reduced (2, 0));
-            area.removeFromTop (6);
-            auto last = area.removeFromTop (32);
-            const int each = last.getWidth() / std::max (1, static_cast<int> (knobs.size()));
-            for (auto& k : knobs)
-                k->setBounds (last.removeFromLeft (each).withSizeKeepingCentre (std::min (each, 170), 32));
+            layoutRow (primaryRow, area.removeFromTop (cellHeight));
         }
 
         void paint (juce::Graphics& g) override
@@ -1035,8 +1078,8 @@ namespace
             MiniPanel::paint (g);
             if (shaperMode)
             {
-                g.setColour (palette::textDim);
-                g.setFont (fonts::label (9.5f));
+                g.setColour (design::colour::text);
+                g.setFont (fonts::make (0.27f * static_cast<float> (selectorHeight), fonts::Weight::bold, 0.03f));
                 g.drawText ("TARGET", targetCaption, juce::Justification::centred, false);
             }
         }
@@ -1057,7 +1100,7 @@ std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, OspAudioProcessor
     {
         case MacroPopup::life:
         {
-            auto popup = std::make_unique<MacroPanel> (processor, "LIFE", "HOW DIFFERENTLY EACH NOTE IS PERFORMED");
+            auto popup = std::make_unique<MacroPanel> (processor, "LIFE", "HOW EACH NOTE IS PERFORMED");
             popup->tabs ("life.mode", { "NATURAL", "LOOSE", "FRAY" }, "Natural: subtle; Loose: wider; Fray: now and then a note strays");
             popup->setVisual (std::make_unique<LifeVisual> (processor));
             popup->knob (false, "life.pitch", "PITCH", [] (double v) { return juce::String (v, 1) + " c"; });
@@ -1068,7 +1111,7 @@ std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, OspAudioProcessor
         case MacroPopup::dynamics:
         {
             // ATTACK and RELEASE are the instrument's envelope (beside the macros).
-            auto popup = std::make_unique<MacroPanel> (processor, "DYNAMICS", "HOW TOUCH CHANGES THE SOUND");
+            auto popup = std::make_unique<MacroPanel> (processor, "DYNAMICS", "TOUCH & RESPONSE");
             popup->tabs ("dynamics.curve", { "SOFT", "LINEAR", "HARD" }, "Velocity curve: soft reaches loud easily, hard needs a firm touch");
             popup->setVisual (std::make_unique<DynamicsVisual> (processor));
             popup->knob (false, "velocityRange", "RANGE", [] (double v) { return juce::String (v, 0) + " dB"; });
@@ -1077,7 +1120,7 @@ std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, OspAudioProcessor
         }
         case MacroPopup::character:
         {
-            auto popup = std::make_unique<MacroPanel> (processor, "CHARACTER", "THE TONAL SHAPE IMPOSED ON THE SOUND", 380);
+            auto popup = std::make_unique<MacroPanel> (processor, "CHARACTER", "SOUND SHAPING");
             popup->tabs ("character.type", { "LP24", "LP12", "HP12", "BP12", "TILT" }, "Filter type");
             popup->setVisual (std::make_unique<CharacterVisual> (processor));
             popup->knob (false, "character.min", "MIN", [] (double v) { return format::hertz (v); });
@@ -1095,7 +1138,7 @@ std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, OspAudioProcessor
             break;
     }
 
-    auto popup = std::make_unique<MacroPanel> (processor, "SPACE", "THE ROOM THE SOUND PLAYS IN");
+    auto popup = std::make_unique<MacroPanel> (processor, "SPACE", "REVERB & AMBIENCE");
     auto& types = popup->tabs ("space.type", { "ROOM", "CHAMBER", "PLATE", "SPRING" }, "Room, chamber, plate or spring");
     popup->setVisual (std::make_unique<SpaceVisual> (state));
     auto* typeParam = state.getParameter ("space.type");
@@ -1105,7 +1148,7 @@ std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, OspAudioProcessor
         if (typeParam != nullptr)
             shaping::decayRange (static_cast<SpaceType> (juce::roundToInt (typeParam->convertFrom0to1 (typeParam->getValue()))), lo, hi);
         return juce::String (std::clamp (v, lo, hi), 1) + " s";
-    }, true);
+    });
     types.onChange = [&decay] (int) { decay.repaint(); };
     return popup;
 }

@@ -188,6 +188,7 @@ public:
     /** The on-screen wheels (message thread -> audio thread): pitch -1..1 (springs back), mod 0..1. */
     void setScreenPitchWheel (float value) noexcept { screenPitch = std::clamp (value, -1.0f, 1.0f); }
     void setScreenModWheel (float value) noexcept { screenMod = std::clamp (value, 0.0f, 1.0f); }
+    float screenModWheel() const noexcept { return screenMod.load(); }
 
     /**
         LINK: a user change of one layer's START, TUNE, PAN or LEVEL (`control`) by `delta`

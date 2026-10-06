@@ -191,6 +191,20 @@ void OspLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int widt
     style.enabled = slider.isEnabled();
     const auto r = juce::Rectangle<float> (static_cast<float> (x), static_cast<float> (y), static_cast<float> (width), static_cast<float> (height));
     const float side = std::min (r.getWidth(), r.getHeight());
+    if (static_cast<bool> (props["popup"]))
+    {
+        // The popups' knob (SPACE's DECAY): eleven ticks close around a ring arc, the
+        // pointer in the accent on the cap.
+        style.ticks = true;
+        style.tickCount = 11;
+        style.tickRadius = 1.29f;
+        style.arcRadius = 1.06f;
+        style.pointer = design::colour::accent;
+        style.pointerFrom = 0.46f;
+        style.pointerTo = 0.77f;
+        design::draw::knob (g, r.getCentre(), 0.5f * side / 1.36f, sliderPos, style);
+        return;
+    }
     const float body = 0.5f * side / (style.ticks ? 1.42f : 1.2f);
     design::draw::knob (g, r.getCentre(), body, sliderPos, style);
 }

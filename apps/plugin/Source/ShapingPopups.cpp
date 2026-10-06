@@ -116,33 +116,51 @@ void SegmentedControl::mouseDown (const juce::MouseEvent& e)
 
 void SegmentedControl::paint (juce::Graphics& g)
 {
-    using namespace palette;
-    const auto r = getLocalBounds().toFloat().reduced (0.5f);
+    // The reference's tab bar (SPACE: 559 x 43): one raised strip with hairline dividers;
+    // the chosen segment is a coral key standing a pixel proud of it, its text in cream.
+    using namespace design;
+    const auto r = getLocalBounds().toFloat().reduced (0.5f, 1.0f);
+    const float h = r.getHeight();
     const int count = std::max (1, items.size());
     const float w = r.getWidth() / static_cast<float> (count);
-    OspLookAndFeel::drawCard (g, r, 5.0f, false, false);
-    g.setFont (fonts::make (count > 4 ? 10.0f : 10.5f, fonts::Weight::medium, 0.06f));
+    const float radius = std::max (3.0f, 0.13f * h);
+    {
+        juce::Path strip;
+        strip.addRoundedRectangle (r, radius);
+        juce::DropShadow (juce::Colour (0x22302418), 3, { 0, 1 }).drawForPath (g, strip);
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xffeee7da), 0.0f, r.getY(), juce::Colour (0xffdcd3c4), 0.0f, r.getBottom(), false));
+        g.fillPath (strip);
+        g.setColour (juce::Colour (0xffc4bbad));
+        g.strokePath (strip, juce::PathStrokeType (1.0f));
+        g.setColour (juce::Colours::white.withAlpha (0.55f));
+        g.drawHorizontalLine (juce::roundToInt (r.getY() + 1.0f), r.getX() + radius, r.getRight() - radius);
+    }
+    g.setFont (fonts::make (juce::jlimit (9.0f, 17.5f, (count > 4 ? 0.37f : 0.4f) * h), fonts::Weight::medium, 0.03f));
     for (int i = 0; i < count; ++i)
     {
-        auto cell = juce::Rectangle<float> (r.getX() + w * static_cast<float> (i), r.getY(), w, r.getHeight());
+        auto cell = juce::Rectangle<float> (r.getX() + w * static_cast<float> (i), r.getY(), w, h);
+        if (i > 0 && i != index && i != index + 1)
+        {
+            g.setColour (juce::Colour (0xffb5ac9f));
+            g.drawVerticalLine (juce::roundToInt (cell.getX()), cell.getY() + 1.0f, cell.getBottom() - 1.0f);
+        }
         if (i == index)
         {
-            // Chosen: set into the panel, the accent in its text and rim.
-            const auto inset = cell.reduced (2.0f);
-            g.setColour (recessed.interpolatedWith (accent, 0.1f));
-            g.fillRoundedRectangle (inset, 4.0f);
-            g.setColour (accent.withAlpha (0.55f));
-            g.drawRoundedRectangle (inset, 4.0f, 1.0f);
-            g.setColour (accent.darker (0.2f));
+            const auto key = cell.expanded (0.5f, 1.0f);
+            juce::Path shape;
+            shape.addRoundedRectangle (key, radius);
+            juce::DropShadow (juce::Colour (0x40a0300a), 4, { 0, 1 }).drawForPath (g, shape);
+            g.setGradientFill (juce::ColourGradient (colour::accentTop.brighter (0.06f), 0.0f, key.getY(), colour::accentBottom, 0.0f, key.getBottom(), false));
+            g.fillPath (shape);
+            g.setColour (juce::Colour (0xffffd9c4).withAlpha (0.8f));
+            g.drawHorizontalLine (juce::roundToInt (key.getY() + 1.0f), key.getX() + radius, key.getRight() - radius);
+            g.setColour (juce::Colour (0xff9e3312).withAlpha (0.6f));
+            g.strokePath (shape, juce::PathStrokeType (1.0f));
+            g.setColour (juce::Colour (0xfffff4ea));
         }
         else
         {
-            if (i > 0 && i != index + 1)
-            {
-                g.setColour (hairline);
-                g.drawLine (cell.getX(), cell.getY() + 5.0f, cell.getX(), cell.getBottom() - 5.0f, 1.0f);
-            }
-            g.setColour (text.withAlpha (0.72f));
+            g.setColour (colour::text.withAlpha (0.86f));
         }
         g.drawText (items[i], cell, juce::Justification::centred, false);
     }
@@ -181,10 +199,33 @@ void MiniKnob::setFormatter (Formatter f)
 
 // Proportions from the reference's envelope knobs (100 x 87): caption on top, the knob at
 // 48 % of the height, its value underneath. Horizontal: caption, knob, value in a row.
+void MiniKnob::setBoxed (bool shouldBeBoxed)
+{
+    boxed = shouldBeBoxed;
+    slider.getProperties().set ("popup", boxed);
+    resized();
+    repaint();
+}
+
+juce::Rectangle<float> MiniKnob::valueBox() const
+{
+    // SPACE's DECAY cell (160 high): its value in a recessed box 99 x 31 under the knob.
+    const auto r = getLocalBounds().toFloat();
+    const float h = r.getHeight();
+    return juce::Rectangle<float> (0.62f * h, 0.194f * h).withCentre ({ r.getCentreX(), r.getY() + 0.9125f * h });
+}
+
 void MiniKnob::resized()
 {
     const auto r = getLocalBounds().toFloat();
     const float h = r.getHeight();
+    if (boxed)
+    {
+        // Caption on top, the knob (body radius 0.2625 h) centred at 46 %, the value box.
+        const float side = 2.0f * 1.36f * 0.2625f * h;
+        slider.setBounds (juce::Rectangle<float> (side, side).withCentre ({ r.getCentreX(), r.getY() + 0.4625f * h }).getSmallestIntegerContainer());
+        return;
+    }
     if (horizontal)
     {
         const float side = h;
@@ -202,6 +243,24 @@ void MiniKnob::paint (juce::Graphics& g)
     const float h = r.getHeight();
     const auto captionColour = onDark ? design::colour::wellText.brighter (0.3f) : design::colour::text;
     const auto valueColour = onDark ? juce::Colour (0xfff2eee6) : design::colour::text;
+    if (boxed)
+    {
+        g.setColour (design::colour::text);
+        g.setFont (fonts::make (0.115f * h, fonts::Weight::bold, 0.03f));
+        g.drawText (caption, juce::Rectangle<float> (r.getX() - 20.0f, r.getY() - 0.01f * h, r.getWidth() + 40.0f, 0.15f * h), juce::Justification::centred, false);
+        const auto box = valueBox();
+        const float radius = 0.17f * box.getHeight();
+        g.setColour (juce::Colours::white.withAlpha (0.5f));
+        g.drawRoundedRectangle (box.translated (0.0f, 1.0f), radius, 1.0f);
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xffd9cebf), 0.0f, box.getY(), juce::Colour (0xffe3d9cd), 0.0f, box.getY() + 0.4f * box.getHeight(), false));
+        g.fillRoundedRectangle (box, radius);
+        g.setColour (juce::Colour (0xffbcb1a3));
+        g.drawRoundedRectangle (box.reduced (0.5f), radius, 1.0f);
+        g.setColour (design::colour::text);
+        g.setFont (fonts::make (0.13f * h, fonts::Weight::bold));
+        g.drawText (value, box.translated (0.0f, 0.5f), juce::Justification::centred, false);
+        return;
+    }
     if (horizontal)
     {
         g.setColour (onDark ? captionColour : design::colour::textSecondary.darker (0.2f));
@@ -236,16 +295,18 @@ ValueSelector::ValueSelector (juce::RangedAudioParameter& p, juce::String captio
 
 void ValueSelector::paint (juce::Graphics& g)
 {
-    auto r = getLocalBounds();
-    g.setColour (palette::textDim);
-    g.setFont (fonts::label (9.5f));
-    g.drawText (caption, r.removeFromTop (12), juce::Justification::centred, false);
-    const auto box = r.reduced (2, 1).toFloat();
-    OspLookAndFeel::drawCard (g, box, 5.0f, false, hasKeyboardFocus (false) || isMouseOver());
-    g.setColour (palette::text);
-    g.setFont (fonts::make (12.0f, fonts::Weight::semibold, 0.04f));
-    auto text = box.reduced (8.0f, 0.0f);
-    icons::draw (g, icons::Kind::chevronDown, text.removeFromRight (10.0f), palette::text.withAlpha (0.6f), 1.3f);
+    // Caption above (a third of the height), the value on a raised key with its chevron.
+    auto r = getLocalBounds().toFloat();
+    const float h = r.getHeight();
+    g.setColour (design::colour::text);
+    g.setFont (fonts::make (0.27f * h, fonts::Weight::bold, 0.03f));
+    g.drawText (caption, r.removeFromTop (0.36f * h), juce::Justification::centred, false);
+    const auto box = r.reduced (1.0f, 1.0f);
+    design::draw::button (g, box, 0.14f * box.getHeight(), false, hasKeyboardFocus (false) || isMouseOver(), design::colour::accent);
+    g.setColour (design::colour::text);
+    g.setFont (fonts::make (0.43f * box.getHeight(), fonts::Weight::semibold, 0.02f));
+    auto text = box.reduced (0.35f * box.getHeight(), 0.0f);
+    icons::draw (g, icons::Kind::chevronDown, text.removeFromRight (0.3f * box.getHeight()), design::colour::text.withAlpha (0.65f), 1.6f);
     g.drawText (parameter.getAllValueStrings()[index], text, juce::Justification::centred, false);
 }
 
@@ -302,7 +363,8 @@ MiniPanel::MiniPanel (juce::String t, juce::String s) : title (std::move (t)), s
 juce::Rectangle<float> MiniPanel::closeButton() const
 {
     const auto c = card().toFloat();
-    return { c.getRight() - 34.0f, c.getY() + 10.0f, 22.0f, 22.0f };
+    const float u = unit();
+    return juce::Rectangle<float> (30.0f * u, 30.0f * u).withCentre ({ c.getRight() - 33.5f * u, c.getY() + 35.0f * u });
 }
 
 void MiniPanel::mouseUp (const juce::MouseEvent& e)
@@ -313,42 +375,51 @@ void MiniPanel::mouseUp (const juce::MouseEvent& e)
 
 void MiniPanel::paint (juce::Graphics& g)
 {
-    using namespace palette;
+    // The reference's SPACE popup (607 x 610): a light raised card floating well above the
+    // instrument (a broad soft shadow and a tight contact one), lit along its top edge;
+    // the title in bold capitals, a widely tracked subtitle, a thin close cross.
+    using namespace design;
+    const float u = unit();
     const auto r = card().toFloat();
     juce::Path shape;
-    shape.addRoundedRectangle (r, 10.0f);
-    // Floats a little above the instrument: a soft, short shadow (no glass, no glow).
-    juce::DropShadow (juce::Colour (0x261e1c18), 12, { 0, 4 }).drawForPath (g, shape);
-    g.setColour (juce::Colour (0xfff3f1ea));
+    shape.addRoundedRectangle (r, 12.0f * u);
+    juce::DropShadow (juce::Colour (0x5a281c10), juce::roundToInt (32.0f * u), { 3, juce::roundToInt (12.0f * u) }).drawForPath (g, shape);
+    juce::DropShadow (juce::Colour (0x3a281c10), juce::roundToInt (4.0f * u), { 0, 1 }).drawForPath (g, shape);
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xfff6f2ea), 0.0f, r.getY(), juce::Colour (0xffe5dccf), 0.0f, r.getBottom(), false));
     g.fillPath (shape);
-    g.setColour (hairline);
+    g.setColour (juce::Colour (0xffc9bfb1).withAlpha (0.8f));
     g.strokePath (shape, juce::PathStrokeType (1.0f));
+    g.setColour (juce::Colours::white.withAlpha (0.9f));
+    g.drawHorizontalLine (juce::roundToInt (r.getY() + 1.0f), r.getX() + 12.0f * u, r.getRight() - 12.0f * u);
 
-    auto header = card().reduced (16, 10).removeFromTop (headerHeight()).toFloat();
-    g.setColour (text);
-    g.setFont (fonts::make (15.0f, fonts::Weight::semibold, 0.08f));
-    g.drawText (title, header.removeFromTop (20.0f), juce::Justification::centredLeft, false);
+    const float x = r.getX() + 27.5f * u;
+    g.setColour (colour::text);
+    g.setFont (fonts::make (36.5f * u, fonts::Weight::bold, 0.0f));
+    g.drawText (title, juce::Rectangle<float> (x, r.getY() + 13.0f * u, r.getWidth() - 100.0f * u, 46.0f * u), juce::Justification::centredLeft, false);
     if (subtitle.isNotEmpty())
     {
-        g.setColour (textDim);
-        g.setFont (fonts::make (9.5f, fonts::Weight::medium, 0.22f));
-        g.drawText (subtitle, header.removeFromTop (14.0f), juce::Justification::centredLeft, false);
+        g.setColour (colour::textSecondary);
+        g.setFont (fonts::make (16.5f * u, fonts::Weight::medium, 0.3f));
+        g.drawText (subtitle, juce::Rectangle<float> (x + 1.0f * u, r.getY() + 54.0f * u, r.getWidth() - 60.0f * u, 22.0f * u), juce::Justification::centredLeft, false);
     }
-    const auto x = closeButton();
-    if (isMouseOver() && x.contains (getMouseXYRelative().toFloat()))
+    const auto box = closeButton();
+    if (isMouseOver() && box.contains (getMouseXYRelative().toFloat()))
     {
-        g.setColour (recessed);
-        g.fillRoundedRectangle (x, 5.0f);
+        g.setColour (juce::Colour (0x18000000));
+        g.fillRoundedRectangle (box, 6.0f * u);
     }
-    g.setColour (text.withAlpha (0.75f));
-    const auto cross = x.reduced (6.5f);
-    g.drawLine (cross.getX(), cross.getY(), cross.getRight(), cross.getBottom(), 1.4f);
-    g.drawLine (cross.getRight(), cross.getY(), cross.getX(), cross.getBottom(), 1.4f);
+    g.setColour (colour::text.withAlpha (0.9f));
+    const auto cross = juce::Rectangle<float> (17.0f * u, 17.0f * u).withCentre (box.getCentre());
+    g.drawLine (cross.getX(), cross.getY(), cross.getRight(), cross.getBottom(), 2.0f * u);
+    g.drawLine (cross.getRight(), cross.getY(), cross.getX(), cross.getBottom(), 2.0f * u);
 }
 
 void MiniPanel::resized()
 {
-    layoutContent (card().reduced (16, 10).withTrimmedTop (headerHeight() + 6));
+    const float u = unit();
+    auto area = card().toFloat();
+    area = area.withTrimmedLeft (25.0f * u).withTrimmedRight (23.0f * u).withTrimmedTop (91.0f * u).withTrimmedBottom (26.0f * u);
+    layoutContent (area.toNearestInt());
 }
 
 //==============================================================================
@@ -366,11 +437,12 @@ namespace
     class AdvancedPopup final : public MiniPanel
     {
     public:
-        explicit AdvancedPopup (OspAudioProcessor& p) : MiniPanel ("ADVANCED", "TUNING, BEND, VOICES, PITCH, MPE"), processor (p)
+        explicit AdvancedPopup (OspAudioProcessor& p) : MiniPanel ("ADVANCED", "TUNING, VOICES & PITCH"), processor (p)
         {
             auto& state = processor.parameters;
             auto add = [this, &state] (const char* id, const char* caption, MiniKnob::Formatter f) {
                 knobs.push_back (std::make_unique<MiniKnob> (state, id, caption, std::move (f)));
+                knobs.back()->setBoxed (true);
                 addAndMakeVisible (*knobs.back());
             };
             // OUTPUT is the header's VOLUME, sustain each layer's LOOP, the velocity range
@@ -409,7 +481,9 @@ namespace
             addAndMakeVisible (reseed);
         }
 
-        juce::Point<int> cardSize() const override { return { 300, 10 + headerHeight() + 6 + 58 + 8 + 12 + 24 + 8 + 12 + 24 + 10 + 26 + 12 }; }
+        // Laid out at 0.69 of the reference's unit; the editor scales it up to match the macro popups.
+        float unit() const override { return 0.69f; }
+        juce::Point<int> cardSize() const override { return { 300, headerHeight() + knobRow + 8 + 12 + 24 + 8 + 12 + 24 + 10 + 26 + juce::roundToInt (26.0f * unit()) }; }
 
         void paint (juce::Graphics& g) override
         {
@@ -425,7 +499,7 @@ namespace
     private:
         void layoutContent (juce::Rectangle<int> area) override
         {
-            auto row = area.removeFromTop (58);
+            auto row = area.removeFromTop (knobRow);
             const int cell = row.getWidth() / static_cast<int> (knobs.size());
             for (auto& k : knobs)
                 k->setBounds (row.removeFromLeft (cell));
@@ -442,6 +516,8 @@ namespace
             last.removeFromRight (8);
             seedCaption = last;
         }
+
+        static constexpr int knobRow = 104;   ///< the popups' boxed knob cells, at this panel's unit
 
         /** GLIDE only acts in Mono: dimmed (still adjustable) in Poly. */
         void updateGlide()
