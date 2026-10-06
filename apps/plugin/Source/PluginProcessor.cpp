@@ -257,6 +257,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
             layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { reimaginedParameterId (layer), 8 }, name + "Reimagined",
                                                                      unit, 20.0f, percent));
     }
+    // The layers' Original <-> Reimagined thumbs move together (keeping their offsets) while
+    // linked; a UI behaviour, stored with the session (version hint 9).
+    layout.add (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { "reimaginedLink", 9 }, "Reimagined Link", true));
     layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::mixX, 7 }, "Mix X", Range (0.0f, 1.0f, 0.0f), 0.5f));
     layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::mixY, 7 }, "Mix Y", Range (0.0f, 1.0f, 0.0f), 1.0f / 3.0f));
     {

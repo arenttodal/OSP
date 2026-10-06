@@ -60,14 +60,31 @@ public:
     void mouseUp (const juce::MouseEvent&) override;
     void mouseDoubleClick (const juce::MouseEvent&) override;
 
+    /** Linked: dragging one thumb moves every shown thumb by the same amount (their
+        differences kept, clamped at the ends); a double-click resets them all. */
+    bool isLinked() const;
+
 private:
     int thumbAt (float x) const;
     float xFor (int layer) const;
     OspAudioProcessor& processor;
     std::array<std::unique_ptr<juce::ParameterAttachment>, 3> attachments;
     std::array<float, 3> values { 20.0f, 20.0f, 20.0f };
+    std::array<float, 3> dragStart {};
     std::array<bool, 3> shown { true, false, false };
+    std::array<bool, 3> moving {};
     int dragging = -1;
+};
+
+/** The small link toggle beside ORIGINAL <-> REIMAGINED (two or three layers). */
+class ReimaginedLinkButton final : public juce::Button
+{
+public:
+    explicit ReimaginedLinkButton (juce::AudioProcessorValueTreeState& state);
+    void paintButton (juce::Graphics&, bool highlighted, bool down) override;
+
+private:
+    juce::AudioProcessorValueTreeState::ButtonAttachment attachment;
 };
 
 /**
@@ -94,6 +111,7 @@ private:
     int count = 0;
     std::array<int, 3> slots { 0, 1, 2 };
     ReimaginedTrack reimagined;
+    ReimaginedLinkButton linkButton;
     juce::Slider blend { juce::Slider::LinearHorizontal, juce::Slider::NoTextBox };
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> blendAttachment;
     TriangleMix triangle;

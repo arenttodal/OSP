@@ -1419,6 +1419,53 @@ TEST_CASE ("plugin: the editor adapts to one, two and three sounds; drops replac
         p.setParameterValue ("mix.x", 0.5f);
         p.setParameterValue ("mix.y", 1.0f / 3.0f);
     }
+    // Original <-> Reimagined: linked by default, a drag moves every layer's thumb by the
+    // same amount (offsets kept); unlinked, only the dragged one.
+    {
+        ui->closePopup();
+        ui->refreshNow();
+        std::function<juce::Component* (juce::Component&, const juce::String&)> find = [&] (juce::Component& parent, const juce::String& title) -> juce::Component* {
+            for (auto* child : parent.getChildren())
+            {
+                if (! child->isVisible())
+                    continue;
+                if (child->getTitle() == title)
+                    return child;
+                if (auto* found = find (*child, title))
+                    return found;
+            }
+            return nullptr;
+        };
+        auto* track = find (*editor, "Original / Reimagined");
+        REQUIRE (track != nullptr);
+        CHECK (find (*editor, "Link Reimagined") != nullptr);
+        CHECK (valueOf (p, "reimaginedLink") >= 0.5f);
+        p.setParameterValue ("reimagined", 20.0f);
+        p.setParameterValue ("layerB.reimagined", 60.0f);
+        p.setParameterValue ("layerC.reimagined", 40.0f);
+        auto xAt = [track] (float v) { return 11.0f + (static_cast<float> (track->getWidth()) - 22.0f) * v / 100.0f; };
+        auto drag = [track] (float fromX, float toX) {
+            auto source = juce::Desktop::getInstance().getMainMouseSource();
+            const auto now = juce::Time::getCurrentTime();
+            const float y = 0.5f * static_cast<float> (track->getHeight());
+            const juce::Point<float> a (fromX, y), b (toX, y);
+            const juce::MouseEvent down (source, a, juce::ModifierKeys(), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, track, track, now, a, now, 1, false);
+            const juce::MouseEvent move (source, b, juce::ModifierKeys(), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, track, track, now, a, now, 1, true);
+            track->mouseDown (down);
+            track->mouseDrag (move);
+            track->mouseUp (move);
+        };
+        drag (xAt (60.0f), xAt (70.0f));
+        CHECK (valueOf (p, "layerB.reimagined") == Approx (70.0f).margin (0.6));
+        CHECK (valueOf (p, "reimagined") == Approx (30.0f).margin (0.6));
+        CHECK (valueOf (p, "layerC.reimagined") == Approx (50.0f).margin (0.6));
+        p.setParameterValue ("reimaginedLink", 0.0f);
+        drag (xAt (30.0f), xAt (10.0f));
+        CHECK (valueOf (p, "reimagined") == Approx (10.0f).margin (0.6));
+        CHECK (valueOf (p, "layerB.reimagined") == Approx (70.0f).margin (0.6));
+        CHECK (valueOf (p, "layerC.reimagined") == Approx (50.0f).margin (0.6));
+        p.setParameterValue ("reimaginedLink", 1.0f);
+    }
     // The smallest window still fits three full cards.
     editor->setSize (900, 720);
     snapshot ("osp-adaptive-3-small.png");

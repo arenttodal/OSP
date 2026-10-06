@@ -184,13 +184,26 @@ int ReimaginedTrack::thumbAt (float x) const
     return best;
 }
 
+bool ReimaginedTrack::isLinked() const
+{
+    auto* link = processor.parameters.getRawParameterValue ("reimaginedLink");
+    return link == nullptr || link->load() >= 0.5f;
+}
+
 void ReimaginedTrack::mouseDown (const juce::MouseEvent& e)
 {
     dragging = thumbAt (e.position.x);
     if (dragging < 0)
         return;
-    auto& a = *attachments[static_cast<std::size_t> (dragging)];
-    a.beginGesture();
+    const bool linked = isLinked();
+    for (int l = 0; l < 3; ++l)
+    {
+        const auto i = static_cast<std::size_t> (l);
+        moving[i] = attachments[i] != nullptr && shown[i] && (l == dragging || linked);
+        dragStart[i] = values[i];
+        if (moving[i])
+            attachments[i]->beginGesture();
+    }
     mouseDrag (e);
 }
 
@@ -200,23 +213,57 @@ void ReimaginedTrack::mouseDrag (const juce::MouseEvent& e)
         return;
     const auto t = travel();
     const float v = 100.0f * std::clamp ((e.position.x - t.getStart()) / t.getLength(), 0.0f, 1.0f);
-    attachments[static_cast<std::size_t> (dragging)]->setValueAsPartOfGesture (v);
+    // The others follow by the same amount from where the drag began (offsets come back
+    // when the drag returns from an end).
+    const float delta = v - dragStart[static_cast<std::size_t> (dragging)];
+    for (int l = 0; l < 3; ++l)
+    {
+        const auto i = static_cast<std::size_t> (l);
+        if (moving[i])
+            attachments[i]->setValueAsPartOfGesture (l == dragging ? v : std::clamp (dragStart[i] + delta, 0.0f, 100.0f));
+    }
 }
 
 void ReimaginedTrack::mouseUp (const juce::MouseEvent&)
 {
-    if (dragging >= 0)
-        attachments[static_cast<std::size_t> (dragging)]->endGesture();
+    for (std::size_t i = 0; i < 3; ++i)
+        if (moving[i])
+            attachments[i]->endGesture();
+    moving = {};
     dragging = -1;
 }
 
 void ReimaginedTrack::mouseDoubleClick (const juce::MouseEvent& e)
 {
-    const int l = thumbAt (e.position.x);
-    if (l < 0)
+    const int hit = thumbAt (e.position.x);
+    if (hit < 0)
         return;
-    if (auto* param = processor.parameters.getParameter (OspAudioProcessor::reimaginedParameterId (l)))
-        attachments[static_cast<std::size_t> (l)]->setValueAsCompleteGesture (param->convertFrom0to1 (param->getDefaultValue()));
+    const bool linked = isLinked();
+    for (int l = 0; l < 3; ++l)
+        if (shown[static_cast<std::size_t> (l)] && (l == hit || linked))
+            if (auto* param = processor.parameters.getParameter (OspAudioProcessor::reimaginedParameterId (l)))
+                attachments[static_cast<std::size_t> (l)]->setValueAsCompleteGesture (param->convertFrom0to1 (param->getDefaultValue()));
+}
+
+//==============================================================================
+ReimaginedLinkButton::ReimaginedLinkButton (juce::AudioProcessorValueTreeState& state)
+    : juce::Button ("Link Reimagined"), attachment (state, "reimaginedLink", *this)
+{
+    setClickingTogglesState (true);
+    setTitle ("Link Reimagined");
+    setTooltip ("Link: the layers' Original <-> Reimagined move together");
+    setMouseCursor (juce::MouseCursor::PointingHandCursor);
+}
+
+void ReimaginedLinkButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
+{
+    // A tiny key with the link icon: lit in the accent while linked, quiet when not.
+    using namespace design;
+    const auto r = getLocalBounds().toFloat().reduced (1.0f);
+    const bool on = getToggleState();
+    draw::button (g, r, 0.25f * r.getHeight(), on, highlighted || down, colour::accent);
+    icons::draw (g, icons::Kind::link, r.reduced (0.24f * r.getHeight()), on ? colour::accent.darker (0.15f) : colour::text.withAlpha (0.45f),
+                 0.075f * r.getHeight());
 }
 
 void ReimaginedTrack::paint (juce::Graphics& g)
@@ -251,9 +298,10 @@ void ReimaginedTrack::paint (juce::Graphics& g)
 }
 
 //==============================================================================
-MixSection::MixSection (OspAudioProcessor& p) : processor (p), reimagined (p), triangle (p.parameters)
+MixSection::MixSection (OspAudioProcessor& p) : processor (p), reimagined (p), linkButton (p.parameters), triangle (p.parameters)
 {
     addAndMakeVisible (reimagined);
+    addChildComponent (linkButton);
 
     blend.getProperties().set ("blend", true);
     blend.setTitle ("Layer blend");
@@ -283,6 +331,7 @@ void MixSection::setLayers (const std::array<bool, 3>& occupied)
         if (occupied[static_cast<std::size_t> (l)])
             which[static_cast<std::size_t> (n++)] = l;
     reimagined.setLayers (occupied);
+    linkButton.setVisible (n >= 2);
     if (n == count && which == slots)
         return;
     count = n;
@@ -306,6 +355,7 @@ void MixSection::resized()
     reimagined.setBounds (470 - 11, reimaginedY - 13, 650 + 22, 26);
     blendRow = twoRows ? juce::Rectangle<int> (380, blendY - 12, 870, 24) : juce::Rectangle<int>();
     reimaginedRow = juce::Rectangle<int> (330, reimaginedY - 10, 950, 20);
+    linkButton.setBounds (1286, reimaginedY - 12, 24, 24);   // right of REIMAGINED
     if (count == 3)
         triangle.setBounds (28, 4, 84, 75);
 }
