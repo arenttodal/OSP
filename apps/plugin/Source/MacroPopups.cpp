@@ -188,7 +188,9 @@ namespace
             const double decay = std::clamp (static_cast<double> (value (state, "space.decay")), lo, hi);
             const double amount = 0.85 + 0.15 * std::clamp (static_cast<double> (value (state, "space")) * 0.01, 0.0, 1.0);
             const auto portrait = SpaceReverb::portrait (type);
-            const double span = decay * 1.25;
+            // A fixed time axis for the type (its longest DECAY fills it); DECAY sets how far
+            // the tail reaches along it, so turning the knob lengthens or shortens the tail.
+            const double span = hi * 1.25, tailEnd = decay * 1.25;   // drawn to -75 dB
             const float W = bounds.getWidth(), H = bounds.getHeight();
             // Sizes follow the display (the popover's is small): strokes, dots and counts.
             const float k = juce::jlimit (0.3f, 1.0f, H / 261.0f), dot = std::sqrt (k);
@@ -224,19 +226,19 @@ namespace
             // The tail's envelope (linear in dB: a straight fall to the floor at the edge),
             // building up as the diffusers fill in; springs ripple.
             const double onset = 0.001 * portrait.preMs;
-            const double build = std::max (0.01, 0.006 * portrait.diffusionMs * (type == SpaceType::chamber ? 4.0 : 2.0)) * span / 4.0;
+            const double build = std::min (0.15 * tailEnd, std::max (0.01, 0.006 * portrait.diffusionMs * (type == SpaceType::chamber ? 4.0 : 2.0)) * span / 4.0);
             auto tail = [&] (double t) {
                 if (t <= onset)
                     return 0.0;
                 // Drawn compressed (as the ear hears a tail): a fast early fall slowing towards the floor.
-                double a = std::pow (std::max (0.0, 1.0 - t / span), 1.4) * (1.0 - std::exp (-(t - onset) / build)) * amount;
+                double a = std::pow (std::max (0.0, 1.0 - t / tailEnd), 1.4) * (1.0 - std::exp (-(t - onset) / build)) * amount;
                 if (portrait.spring)
-                    a *= 0.8 + 0.2 * std::sin (twoPi * t / (0.012 * span));
+                    a *= 0.8 + 0.2 * std::sin (twoPi * t / (0.03 * std::max (0.3, tailEnd)));
                 return a;
             };
             // Warmth dissipating: amber, peach, white, then mineral blue; damped types cool sooner.
             auto tint = [&] (double t) {
-                const float p = static_cast<float> (std::pow (std::clamp (t / span, 0.0, 1.0), 1.0 - 0.45 * portrait.damping));
+                const float p = static_cast<float> (std::pow (std::clamp (t / tailEnd, 0.0, 1.0), 1.0 - 0.45 * portrait.damping));
                 static const juce::Colour stops[] = { juce::Colour (0xffff8a2c), juce::Colour (0xffffa24c), juce::Colour (0xffffc68e),
                                                       juce::Colour (0xfff3ddc4), juce::Colour (0xffe6e6e4), juce::Colour (0xffc4cfd8), juce::Colour (0xff8fa4b8) };
                 static const float at[] = { 0.0f, 0.1f, 0.25f, 0.45f, 0.65f, 0.82f, 1.0f };
@@ -255,7 +257,7 @@ namespace
                 const int segments = 96;
                 for (int i = 0; i < segments; ++i)
                 {
-                    const double t0 = span * i / segments, t1 = span * (i + 1) / segments;
+                    const double t0 = tailEnd * i / segments, t1 = tailEnd * (i + 1) / segments;
                     const float a = static_cast<float> (std::min (1.0, 1.4 * tail (0.5 * (t0 + t1)) + (i < 3 ? 0.6 : 0.0)));
                     g.setColour (tint (t0).withAlpha (alpha * a));
                     g.fillRect (juce::Rectangle<float> (xAt (t0), mid - 0.5f * width, xAt (t1) - xAt (t0) + 0.3f, width));
@@ -265,17 +267,18 @@ namespace
             // The cloud.
             // A warm haze where the tail is young and dense.
             {
-                const float xh = xAt (onset + 0.16 * span);
+                const float xh = xAt (onset + 0.16 * std::min (tailEnd, 0.6 * span));
                 juce::ColourGradient haze (juce::Colour (0xffffa45a).withAlpha (0.06f), xh, mid, juce::Colour (0xffffa45a).withAlpha (0.0f), xh + 0.22f * W, mid, true);
                 g.setGradientFill (haze);
                 g.fillEllipse (juce::Rectangle<float> (0.44f * W, 0.6f * H).withCentre ({ xh, mid }));
             }
             const int count = juce::roundToInt ((type == SpaceType::plate ? 17000 : (type == SpaceType::chamber ? 15000 : (type == SpaceType::room ? 13000 : 13500)))
-                                                * juce::jlimit (0.15f, 1.0f, (W * H) / (558.0f * 261.0f)) * 1.6f);
+                                                * juce::jlimit (0.15f, 1.0f, (W * H) / (558.0f * 261.0f)) * 1.6f
+                                                * static_cast<float> (0.2 + 0.8 * tailEnd / span));   // the same density, short or long
             Prng rng (Prng::deriveSeed (0x7370616365ull, static_cast<std::uint64_t> (type), 0));
             for (int i = 0; i < count; ++i)
             {
-                const double t = onset + (span - onset) * std::pow (rng.nextDouble(), 1.12);
+                const double t = onset + (tailEnd - onset) * std::pow (rng.nextDouble(), 1.12);
                 const double a = tail (t);
                 // Thinner where the tail is quiet (no bright bead along the axis at its end).
                 if (a < 2.0e-3 || rng.nextDouble() > 0.25 + 1.5 * a)
@@ -297,7 +300,7 @@ namespace
 
             // Early reflections: discrete amber strokes over the first tenth of the picture,
             // as many as the type has (springs: dispersed, chirping echoes; plates: few).
-            const double early = span * (type == SpaceType::plate ? 0.05 : (type == SpaceType::chamber ? 0.12 : 0.095));
+            const double early = std::min (0.45 * tailEnd, span * (type == SpaceType::plate ? 0.05 : (type == SpaceType::chamber ? 0.12 : 0.095)));
             const int strokes = type == SpaceType::plate ? 6 : 6 + static_cast<int> (portrait.erMs.size()) / 2;
             Prng er (Prng::deriveSeed (0x6561726c79ull, static_cast<std::uint64_t> (type), 0));
             for (int i = 0; i < strokes; ++i)

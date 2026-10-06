@@ -1920,6 +1920,14 @@ TEST_CASE ("plugin: canonical screenshots for visual review", "[.][canonical]")
     p.parameters.getParameter ("space.type")->setValueNotifyingHost (0.0f);
     ui->openPopup (4);
     shot ("popup-space.png");
+    // DECAY lengthens and shortens the tail on a fixed time axis.
+    for (const auto& [seconds, name] : { std::pair<float, const char*> { 0.4f, "23-space-decay-short.png" }, { 2.4f, "24-space-decay-long.png" } })
+    {
+        set ("space.decay", seconds);
+        ui->openPopup (4);
+        shot (name);
+    }
+    set ("space.decay", 3.2f);
     ui->closePopup();
     juce::MidiBuffer off;
     off.addEvent (juce::MidiMessage::allNotesOff (1), 0);
