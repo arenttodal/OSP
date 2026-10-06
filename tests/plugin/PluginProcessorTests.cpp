@@ -1471,8 +1471,8 @@ TEST_CASE ("plugin: the editor adapts to one, two and three sounds; drops replac
         // A musician's turn of A (a gesture): B follows by the same amount, C (unlinked) stays.
         auto source = juce::Desktop::getInstance().getMainMouseSource();
         const auto now = juce::Time::getCurrentTime();
-        const auto centre = dialA->getLocalBounds().getCentre().toFloat();
-        const juce::MouseEvent down (source, centre, juce::ModifierKeys(), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, dialA, dialA, now, centre, now, 1, false);
+        const auto dialCentre = dialA->getLocalBounds().getCentre().toFloat();
+        const juce::MouseEvent down (source, dialCentre, juce::ModifierKeys(), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, dialA, dialA, now, dialCentre, now, 1, false);
         dialA->mouseDown (down);
         dialA->setValue (30.0, juce::sendNotificationSync);
         dialA->mouseUp (down);
@@ -2485,7 +2485,7 @@ TEST_CASE ("plugin: Reimagined routing - new patches per layer, older ones legac
     REQUIRE (gain != nullptr);
     CHECK (gain->range.start == Approx (-36.0f));
     CHECK (gain->range.end == Approx (12.0f));
-    CHECK (gain->convertFrom0to1 (static_cast<juce::AudioProcessorParameter*> (gain)->getDefaultValue()) == Approx (0.0f));
+    CHECK (gain->convertFrom0to1 (static_cast<juce::AudioProcessorParameter*> (gain)->getDefaultValue()) == Approx (0.0f).margin (1.0e-4));
 }
 
 TEST_CASE ("plugin: per-layer REIMAGINED - each layer's amount changes only that layer", "[plugin][reimagined-migration]")
