@@ -48,11 +48,25 @@ namespace icons
             }
             case Kind::loop:
             {
-                // The reference's sustain symbol: a ring open at the top with a stem.
-                const float radius = s * 0.3f;
-                p.addCentredArc (c.x, c.y + 0.02f * s, radius, radius, 0.0f, 0.62f, 2.0f * 3.14159265f - 0.62f, true);
-                g.strokePath (p, line);
-                g.drawLine (c.x, c.y - 0.36f * s, c.x, c.y - 0.06f * s, stroke);
+                // Two curved arrows chasing each other round a circle: a loop, not a reload.
+                const float radius = s * 0.27f;
+                const float pi = 3.14159265f;
+                for (float from : { -0.35f * pi, 0.65f * pi })
+                {
+                    const float to = from + 0.72f * pi;
+                    juce::Path arc;
+                    arc.addCentredArc (c.x, c.y, radius, radius, 0.0f, from, to, true);
+                    g.strokePath (arc, line);
+                    // The arrowhead at the arc's end, along its direction of travel (clockwise).
+                    const juce::Point<float> tip (c.x + radius * std::sin (to), c.y - radius * std::cos (to));
+                    const juce::Point<float> along (std::cos (to), std::sin (to)), out (std::sin (to), -std::cos (to));
+                    const float head = s * 0.13f;
+                    juce::Path arrow;
+                    arrow.startNewSubPath (tip - along * head + out * (0.75f * head));
+                    arrow.lineTo (tip);
+                    arrow.lineTo (tip - along * head - out * (0.75f * head));
+                    g.strokePath (arrow, line);
+                }
                 return;
             }
             case Kind::follow:
@@ -135,8 +149,10 @@ namespace
     const WaveTones& waveTones (int layer)
     {
         static const std::array<WaveTones, 3> tones { {
-            { juce::Colour (0xff8a4119), juce::Colour (0xffd9853b), juce::Colour (0xfff2b465), juce::Colour (0xffffdfaf), juce::Colour (0xfffff2da), juce::Colour (0xffff8f4a) },
-            { juce::Colour (0xff2c3f57), juce::Colour (0xff6b81a4), juce::Colour (0xffa9b9d8), juce::Colour (0xffe1e8f6), juce::Colour (0xffffffff), juce::Colour (0xffd2bdd8) },
+            // A: deep brown -> burnt amber -> amber -> warm sand -> a restrained pale highlight.
+            { juce::Colour (0xff5e2b12), juce::Colour (0xffb8682c), juce::Colour (0xffe09a52), juce::Colour (0xffeec899), juce::Colour (0xfff7e6cc), juce::Colour (0xffe8873f) },
+            // B: deep graphite -> mineral blue -> blue-grey -> muted lavender-grey -> pale cool.
+            { juce::Colour (0xff27313d), juce::Colour (0xff587390), juce::Colour (0xff92a6bd), juce::Colour (0xffc6c7d8), juce::Colour (0xffe8edf4), juce::Colour (0xffb9b4cc) },
             { juce::Colour (0xff36513f), juce::Colour (0xff6b9577), juce::Colour (0xffa4c8aa), juce::Colour (0xffdcecd9), juce::Colour (0xfff6fff3), juce::Colour (0xffc9e0a8) },
         } };
         return tones[static_cast<std::size_t> (juce::jlimit (0, 2, layer))];
@@ -319,18 +335,14 @@ void SourceDisplay::paint (juce::Graphics& g)
     }
     if (hasWave)
     {
-        // One Shot read heads: glowing accent bars, as bright as the note is loud.
+        // One Shot read heads (the earlier, slim treatment): a fine accent line where each
+        // playing note reads, as bright as it is loud; no glow.
         for (const auto& head : heads)
         {
             const float x = plot.getX() + head.position * plot.getWidth();
-            const float level = 0.35f + 0.65f * std::clamp (head.level, 0.0f, 1.0f);
-            const auto bar = juce::Rectangle<float> (x - 3.0f, inner.getY() + 34.0f, 6.0f, inner.getHeight() - 54.0f);
-            g.setColour (juce::Colour (0xffff6a2a).withAlpha (0.22f * level));
-            g.fillRect (bar.expanded (3.0f, 0.0f));
-            g.setColour (juce::Colour (0xfff2662b).withAlpha (0.95f * level));
-            g.fillRect (bar);
-            g.setColour (juce::Colour (0xffffb27a).withAlpha (0.9f * level));
-            g.fillRect (bar.withSizeKeepingCentre (1.6f, bar.getHeight()));
+            const float level = 0.3f + 0.7f * std::clamp (head.level, 0.0f, 1.0f);
+            g.setColour (juce::Colour (0xfff07a3c).withAlpha (0.95f * level));
+            g.fillRect (juce::Rectangle<float> (x - 0.6f, plot.getY(), 1.2f, plot.getHeight()));
         }
     }
     if (overlayBand > 0)
@@ -354,7 +366,7 @@ void SourceDisplay::paint (juce::Graphics& g)
         g.setColour (accent);
         g.fillPath (dashed);
         g.setColour (raised);
-        g.setFont (fonts::make (15.0f, fonts::Weight::semibold, 0.08f));
+        g.setFont (fonts::make (15.0f, fonts::Weight::medium, 0.08f));
         g.drawText (dropLabel, r, juce::Justification::centred, false);
     }
 }
@@ -438,11 +450,6 @@ void SourceDisplay::paintStatic (juce::Graphics& g)
     // Display scale: amplitude compressed (power 0.6) so quiet detail and tails read, as in
     // the reference; the ghost envelope uses a 45 dB range.
     auto shape = [maxAbs, half] (float a) { return half * std::pow (std::clamp (std::abs (a) / maxAbs, 0.0f, 1.0f), 0.85f) * (a < 0.0f ? -1.0f : 1.0f); };
-    auto shapeDb = [maxAbs, half] (float a) {
-        const float x = std::clamp (std::abs (a) / maxAbs, 0.0f, 1.0f);
-        const float db = 20.0f * std::log10 (std::max (x, 1.0e-6f));
-        return half * (0.5f * std::clamp ((db + 36.0f) / 36.0f, 0.0f, 1.0f) + 0.5f * std::pow (x, 0.6f));
-    };
 
     // Columns at the cache's own resolution (two per logical pixel on a 2x display).
     const float scale = std::max (1.0f, std::abs (g.getInternalContext().getPhysicalPixelScaleFactor()));
@@ -483,106 +490,87 @@ void SourceDisplay::paintStatic (juce::Graphics& g)
         cols[static_cast<std::size_t> (c)] = col;
     }
 
-    // The ghost: the sound's envelope, smoothed and held a little, as a translucent outline
-    // a size larger than the waveform (it runs on into the decay).
-    {
-        std::vector<float> env (static_cast<std::size_t> (columns));
-        float held = 0.0f;
-        // Held with a 0.3 s release: it hugs the body and tapers off into the decay.
-        const float release = std::exp (-static_cast<float> (duration) / static_cast<float> (columns) / 0.3f);
-        for (int c = 0; c < columns; ++c)
-        {
-            const auto& col = cols[static_cast<std::size_t> (c)];
-            held = std::max (std::max (col.hi, -col.lo) * 0.7f + col.rms * 0.9f, held * release);
-            env[static_cast<std::size_t> (c)] = held;
-        }
-        // Smooth both ways (no steps).
-        for (int pass = 0; pass < 3; ++pass)
-        {
-            float acc = env.front();
-            for (auto& v : env)
-                v = acc = acc + (v - acc) * 0.06f;
-            acc = env.back();
-            for (auto it = env.rbegin(); it != env.rend(); ++it)
-                *it = acc = acc + (*it - acc) * 0.06f;
-        }
-        juce::Path ghost;
-        ghost.startNewSubPath (plot.getX(), mid);
-        for (int c = 0; c < columns; c += 2)
-            ghost.lineTo (plot.getX() + static_cast<float> (c) * colWidth, mid - 1.08f * shapeDb (env[static_cast<std::size_t> (c)]));
-        for (int c = columns - 1; c >= 0; c -= 2)
-            ghost.lineTo (plot.getX() + static_cast<float> (c) * colWidth, mid + 1.08f * shapeDb (env[static_cast<std::size_t> (c)]));
-        ghost.closeSubPath();
-        g.setColour (tones.pale.withAlpha (0.055f));
-        g.fillPath (ghost);
-        g.setColour (tones.pale.withAlpha (0.22f));
-        g.strokePath (ghost, juce::PathStrokeType (1.0f, juce::PathStrokeType::curved));
-    }
-
-    // The body, column by column: spiky outer peaks in the deep tone, the body in its own
-    // colour (brighter moments lighter), a pale core at the level of the signal's RMS.
+    // The waveform, column by column, in four layers that stay inside its own outline (no
+    // halo, no light outside it): (1) the true peak silhouette, crisp and irregular, in a
+    // dark saturated tone; (2) the dense body from the column's own peaks; (3) the energy
+    // (RMS) inside it, lighter; (4) a spine following the energy, lightest; then sparse thin
+    // filaments where the analysis finds onsets. Brighter moments lean lighter and cooler,
+    // louder ones fuller; positive and negative sides use their own peaks.
+    const auto& flux = instrument->peakFlux;
+    const bool haveFlux = flux.size() == hi.size();
     auto toneAt = [&tones] (float b, float t) {
         // t: 0 outer .. 1 core; b: brightness 0 dull .. 1 bright.
-        const auto edge = tones.deep.interpolatedWith (tones.body, 0.35f + 0.5f * b);
-        const auto body = tones.body.interpolatedWith (tones.light, 0.3f + 0.6f * b);
-        const auto core = tones.pale.interpolatedWith (tones.core, b);
+        const auto edge = tones.deep.interpolatedWith (tones.body, 0.25f + 0.35f * b);
+        const auto body = tones.body.interpolatedWith (tones.light, 0.15f + 0.55f * b);
+        const auto core = tones.light.interpolatedWith (tones.pale, 0.55f + 0.45f * b);
         return t < 0.5f ? edge.interpolatedWith (body, 2.0f * t) : body.interpolatedWith (core, 2.0f * t - 1.0f);
     };
+    const float tint = focused ? 1.0f : 0.82f;
+    Scatter detail { 0x2545f491u };
     for (int c = 0; c < columns; ++c)
     {
         const auto& col = cols[static_cast<std::size_t> (c)];
-        const float x = plot.getX() + static_cast<float> (c) * colWidth;
-        const float top = mid - shape (col.hi), bottom = mid - shape (col.lo);
-        const float r = std::min (shape (col.rms) * 0.8f, 0.5f * (bottom - top));
-        const float coreR = 0.3f * r;
-        const float tint = focused ? 1.0f : 0.8f;
-        // Outer peaks fade towards their tips (dark amber); body; a pale core.
-        // One smooth vertical gradient per column: dark, translucent tips -> the body's
-        // colour at the RMS level -> a pale core glowing at the centre.
-        const float extent = std::max (std::max (mid - top, bottom - mid), 1.0f);
-        const auto tip = toneAt (col.bright, 0.22f).withAlpha (0.5f * tint);
-        juce::ColourGradient fill (tip, 0.0f, mid - extent, tip, 0.0f, mid + extent, false);
-        const double rel = std::clamp (static_cast<double> (r / extent), 0.05, 0.95);
-        const double relCore = std::clamp (static_cast<double> (coreR / extent), 0.02, rel - 0.01);
-        fill.addColour (0.5 - 0.5 * rel, toneAt (col.bright, 0.45f).withAlpha (0.8f * tint));
-        fill.addColour (0.5 - 0.5 * relCore, toneAt (col.bright, 0.85f).withAlpha (0.88f * tint));
-        fill.addColour (0.5, toneAt (col.bright, 1.0f).withAlpha (0.95f * tint));
-        fill.addColour (0.5 + 0.5 * relCore, toneAt (col.bright, 0.85f).withAlpha (0.88f * tint));
-        fill.addColour (0.5 + 0.5 * rel, toneAt (col.bright, 0.45f).withAlpha (0.8f * tint));
-        g.setGradientFill (fill);
-        g.fillRect (juce::Rectangle<float> (x, top, colWidth, std::max (colWidth, bottom - top)));
-    }
-
-    // Particles: fine dust around the body out to the envelope (texture, never noise).
-    {
-        Scatter rng;
-        for (int c = 0; c < columns; ++c)
+        const auto first = static_cast<std::size_t> (static_cast<double> (c) / columns * static_cast<double> (hi.size()));
+        const auto last = std::max (first + 1, std::min (hi.size(), static_cast<std::size_t> (static_cast<double> (c + 1) / columns * static_cast<double> (hi.size()))));
+        float trueLo = 0.0f, trueHi = 0.0f, onset = 0.0f;
+        for (auto i = first; i < last; ++i)
         {
-            const auto& col = cols[static_cast<std::size_t> (c)];
-            const float amp = std::max (col.hi, -col.lo) / maxAbs;
-            const float chance = (view.granular ? 0.6f : 0.75f) * std::sqrt (amp) + 0.04f;
-            if (rng.next() > chance)
-                continue;
-            const float side = rng.next() < 0.5f ? -1.0f : 1.0f;
-            const float reach = (0.35f + 1.0f * rng.next()) * std::max (shape (std::max (col.hi, -col.lo)), 0.6f * shapeDb (col.rms)) + 2.0f;
-            const float y = mid + side * std::min (half * 1.05f, reach);
-            const float x = plot.getX() + static_cast<float> (c) * colWidth;
-            const float d = 0.8f + 1.1f * rng.next();
-            g.setColour (toneAt (col.bright, 0.8f).withAlpha (0.25f + 0.5f * rng.next()));
-            g.fillEllipse (x - 0.5f * d, y - 0.5f * d, d, d);
+            trueLo = std::min (trueLo, lo[i]);
+            trueHi = std::max (trueHi, hi[i]);
+            if (haveFlux)
+                onset = std::max (onset, flux[i]);
         }
-    }
-
-    // The centre line, glowing, the whole way along.
-    {
-        const float end = plot.getRight();
-        g.setGradientFill (juce::ColourGradient (tones.light.withAlpha (0.0f), 0.0f, mid - 3.0f, tones.light.withAlpha (0.0f), 0.0f, mid + 3.0f, false));
-        juce::ColourGradient glow (tones.light.withAlpha (0.0f), 0.0f, mid - 3.5f, tones.light.withAlpha (0.0f), 0.0f, mid + 3.5f, false);
-        glow.addColour (0.5, tones.light.withAlpha (0.35f));
-        g.setGradientFill (glow);
-        g.fillRect (juce::Rectangle<float> (plot.getX() - 8.0f, mid - 3.5f, end - plot.getX() + 8.0f, 7.0f));
-        g.setColour (tones.core.withAlpha (0.9f));
-        g.fillRect (juce::Rectangle<float> (plot.getX() - 8.0f, mid - 0.6f, end - plot.getX() + 8.0f, 1.2f));
+        const float x = plot.getX() + static_cast<float> (c) * colWidth;
+        const float level = std::clamp (col.rms / maxAbs, 0.0f, 1.0f);
+        const float fullness = 0.75f + 0.25f * std::sqrt (level);
+        // (1) The outer silhouette: the true extremes.
+        const float outTop = mid - shape (trueHi), outBottom = mid - shape (trueLo);
+        g.setColour (toneAt (col.bright, 0.05f).withAlpha (0.5f * tint));
+        g.fillRect (juce::Rectangle<float> (x, outTop, colWidth, std::max (colWidth * 0.6f, outBottom - outTop)));
+        // (2) The body: the column's own peaks (texture, not an envelope) drawn in towards the
+        // energy, so the silhouette stays visible around it.
+        const float span = std::max (col.hi - col.lo, 1.0e-6f);
+        const float up = std::clamp (col.hi / span, 0.25f, 0.75f);
+        const float bodyHi = 0.62f * col.hi + 0.38f * (2.0f * up * 1.3f * col.rms);
+        const float bodyLo = 0.62f * col.lo - 0.38f * (2.0f * (1.0f - up) * 1.3f * col.rms);
+        const float bodyTop = mid - shape (bodyHi), bodyBottom = mid - shape (bodyLo);
+        {
+            juce::ColourGradient fill (toneAt (col.bright, 0.28f).withAlpha (0.78f * tint * fullness), 0.0f, bodyTop,
+                                       toneAt (col.bright, 0.28f).withAlpha (0.78f * tint * fullness), 0.0f, bodyBottom, false);
+            fill.addColour (0.5, toneAt (col.bright, 0.5f).withAlpha (0.9f * tint * fullness));
+            g.setGradientFill (fill);
+            g.fillRect (juce::Rectangle<float> (x, bodyTop, colWidth, std::max (colWidth * 0.6f, bodyBottom - bodyTop)));
+        }
+        // (3) The energy: RMS, shared between the sides as the peaks are; lighter.
+        const float energy = std::min (shape (col.rms * 1.5f), 0.8f * 0.5f * (bodyBottom - bodyTop));
+        const float eTop = mid - 2.0f * up * energy, eBottom = mid + 2.0f * (1.0f - up) * energy;
+        if (eBottom - eTop > 0.4f)
+        {
+            juce::ColourGradient fill (toneAt (col.bright, 0.62f).withAlpha (0.8f * tint), 0.0f, eTop,
+                                       toneAt (col.bright, 0.62f).withAlpha (0.8f * tint), 0.0f, eBottom, false);
+            fill.addColour (0.5, toneAt (col.bright, 0.86f).withAlpha (0.92f * tint));
+            g.setGradientFill (fill);
+            g.fillRect (juce::Rectangle<float> (x, eTop, colWidth, eBottom - eTop));
+        }
+        // (4) The spine: the densest energy, following its level (it thins to nothing in
+        // silence; it is not a line across the display).
+        const float spine = 0.4f * energy;
+        if (spine > 0.35f)
+        {
+            g.setColour (toneAt (col.bright, 1.0f).withAlpha ((0.6f + 0.3f * level) * tint));
+            g.fillRect (juce::Rectangle<float> (x, mid - 2.0f * up * spine, colWidth, 2.0f * spine));
+        }
+        // Detail: thin filaments to the true peak at onsets (and, sparsely, where the peaks
+        // stand well above the energy), from the analysis - not decoration.
+        const float crest = std::max (trueHi, -trueLo) / std::max (col.rms, 1.0e-6f);
+        const float chance = 0.45f * onset * onset * onset + (crest > 6.0f ? 0.012f : 0.0f);
+        if (detail.next() < chance)
+        {
+            const float side = detail.next() < up ? -1.0f : 1.0f;
+            const float reach = side < 0.0f ? mid - outTop : outBottom - mid;
+            g.setColour (toneAt (col.bright, 0.9f).withAlpha ((0.22f + 0.4f * onset) * tint));
+            g.fillRect (juce::Rectangle<float> (x, side < 0.0f ? mid - reach : mid, std::max (0.5f, colWidth * 0.8f), reach));
+        }
     }
 
     // The loop region (One Shot + LOOP): a slim bracket along the bottom.
@@ -608,16 +596,13 @@ void SourceDisplay::paintStatic (juce::Graphics& g)
             g.fillRect (juce::Rectangle<float> (x, plot.getY(), plot.getRight() - x, plot.getHeight()));
         else if (x > plot.getX() + 1.0f)
             g.fillRect (juce::Rectangle<float> (plot.getX(), plot.getY(), x - plot.getX(), plot.getHeight()));
-        const float top = bounds.getY() + 16.0f, foot = bounds.getBottom() - 9.0f;
-        g.setColour (colour::accent.withAlpha (0.35f));
-        g.fillRect (juce::Rectangle<float> (x - 2.0f, top, 4.0f, foot - top));
-        g.setColour (juce::Colour (0xffff7a32));
-        g.fillRect (juce::Rectangle<float> (x - 0.75f, top, 1.5f, foot - top));
-        juce::Path flag;
+        // A fine accent line with a small cap (the earlier, slim treatment): no glow, no handle.
+        g.setColour (colour::accent.withAlpha (0.95f));
+        g.fillRect (juce::Rectangle<float> (x - 0.6f, plot.getY() - 2.0f, 1.2f, plot.getHeight() + 4.0f));
+        juce::Path cap;
         const float d = view.reverse ? -1.0f : 1.0f;
-        flag.addTriangle (x, top - 1.0f, x + d * 10.0f, top + 4.5f, x, top + 10.0f);
-        g.fillPath (flag);
-        g.fillEllipse (x - 3.5f, foot - 3.5f, 7.0f, 7.0f);
+        cap.addTriangle (x, plot.getY() - 8.0f, x + d * 6.5f, plot.getY() - 5.0f, x, plot.getY() - 2.0f);
+        g.fillPath (cap);
     }
 }
 
@@ -726,10 +711,11 @@ void LayerKnob::paint (juce::Graphics& g)
 {
     const float k = static_cast<float> (getHeight()) / 125.0f;
     const auto w = static_cast<float> (getWidth());
-    g.setColour (design::colour::text);
-    g.setFont (fonts::make (15.5f * k, fonts::Weight::semibold, 0.02f));
+    g.setColour (design::colour::text.withAlpha (0.9f));
+    g.setFont (type::controlLabel (k));
     g.drawText (caption, juce::Rectangle<float> (0.0f, 2.0f * k, w, 22.0f * k), juce::Justification::centred, false);
-    g.setFont (fonts::make (18.5f * k, fonts::Weight::semibold));
+    g.setColour (design::colour::text.withAlpha (0.9f));
+    g.setFont (type::controlValue (k));
     const auto value = parameter != nullptr ? parameter->getCurrentValueAsText() : juce::String();
     g.drawText (value, juce::Rectangle<float> (0.0f, 100.0f * k, w, 24.0f * k), juce::Justification::centred, false);
 }
@@ -815,10 +801,11 @@ void ModeSelector::paint (juce::Graphics& g)
     const auto r = getLocalBounds().toFloat().reduced (1.0f);
     const float k = r.getHeight() / 39.0f;
     design::draw::button (g, r, 7.0f * k, false, isMouseOver(), design::colour::accent);
-    g.setColour (design::colour::text);
-    g.setFont (fonts::make (17.5f * k, fonts::Weight::regular));
+    // Quiet: the waveform is the hero, the mode only a property of it.
+    g.setColour (design::colour::text.withAlpha (0.95f));
+    g.setFont (type::sourceMode (k));
     auto text = r.withTrimmedLeft (17.0f * k).withTrimmedRight (14.0f * k);
-    icons::draw (g, icons::Kind::chevronDown, text.removeFromRight (16.0f * k).withSizeKeepingCentre (18.0f * k, 18.0f * k), design::colour::text, 1.9f * k);
+    icons::draw (g, icons::Kind::chevronDown, text.removeFromRight (16.0f * k).withSizeKeepingCentre (16.0f * k, 16.0f * k), design::colour::text.withAlpha (0.55f), 1.5f * k);
     g.drawText (current == 1 ? "Granular" : "One Shot", text, juce::Justification::centredLeft, false);
 }
 
@@ -1062,22 +1049,23 @@ void EngineCard::paint (juce::Graphics& g)
         g.setColour (juce::Colours::white.withAlpha (0.35f));
         g.strokePath (shape, juce::PathStrokeType (1.0f), juce::AffineTransform::translation (0.0f, 0.5f));
         g.setColour (juce::Colour (0xfffff6ec));
-        g.setFont (fonts::make (30.0f, fonts::Weight::medium));
+        g.setFont (fonts::make (29.0f, fonts::Weight::regular));
         g.drawText (OspAudioProcessor::layerName (layerIndex), badge.translated (0.0f, 0.5f), juce::Justification::centred, false);
     }
     draw::led (g, ledCentre, 12.0f, id.led, 1.0f);
     auto row = textArea.toFloat();
     if (rootText.isNotEmpty())
     {
-        const auto rootFont = fonts::make (24.0f, fonts::Weight::bold);
+        const auto rootFont = type::sourceRoot();
         g.setFont (rootFont);
-        g.setColour (colour::text);
+        g.setColour (colour::text.withAlpha (0.92f));
         const float w = juce::GlyphArrangement::getStringWidth (rootFont, rootText);
         g.drawText (rootText, row.removeFromLeft (w + 2.0f), juce::Justification::centredLeft, false);
         row.removeFromLeft (17.0f);
     }
-    g.setColour (colour::text);
-    g.setFont (fonts::make (16.5f, fonts::Weight::regular));
+    // Metadata: quieter than the root and the controls.
+    g.setColour (colour::textSecondary);
+    g.setFont (type::sourceFilename());
     g.drawText (fileText, row, juce::Justification::centredLeft, true);
 
     // Hairline between the knobs and the modifiers.

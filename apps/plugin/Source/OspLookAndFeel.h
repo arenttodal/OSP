@@ -71,10 +71,38 @@ namespace palette
 namespace fonts
 {
     /** Inter weights, and Outfit (displayBold / displayLight) for the OSP/2-OSP identity. */
-    enum class Weight { regular, medium, semibold, bold, extrabold, displayBold, displayLight };
+    enum class Weight { light, regular, medium, semibold, bold, extrabold, displayBold, displayLight };
     juce::Font make (float height, Weight weight = Weight::regular, float tracking = 0.0f);
-    /** Uppercase labels: medium weight, a little letter-spacing (not too much). */
-    inline juce::Font label (float height) { return make (height, Weight::medium, 0.05f); }
+    /** Uppercase labels: a little letter-spacing (not too much), regular weight. */
+    inline juce::Font label (float height) { return make (height, Weight::regular, 0.06f); }
+}
+
+/**
+    The instrument's type roles (reference px; `k` scales a component's own size). Every
+    piece of text takes one: hierarchy comes from size, tracking and the three text tones
+    (design::colour::text / textSecondary / textMicro), not from bold. Inter Regular and
+    Medium carry almost everything; Light for larger quiet labels.
+*/
+namespace type
+{
+    using fonts::Weight;
+    inline juce::Font preset (float k = 1.0f) { return fonts::make (22.0f * k, Weight::regular, 0.01f); }
+    inline juce::Font sourceRoot() { return fonts::make (22.0f, Weight::medium); }
+    inline juce::Font sourceFilename() { return fonts::make (15.0f, Weight::regular, 0.01f); }
+    inline juce::Font sourceMode (float k = 1.0f) { return fonts::make (16.5f * k, Weight::regular, 0.02f); }
+    inline juce::Font controlLabel (float k = 1.0f) { return fonts::make (14.5f * k, Weight::medium, 0.05f); }
+    inline juce::Font controlValue (float k = 1.0f) { return fonts::make (17.0f * k, Weight::medium, 0.0f); }
+    inline juce::Font macroLabel (float height) { return fonts::make (height, Weight::semibold, 0.04f); }
+    inline juce::Font panelHeader() { return fonts::make (16.0f, Weight::semibold, 0.05f); }
+    inline juce::Font sectionTitle() { return fonts::make (23.5f, Weight::semibold, 0.05f); }   ///< A / B BLEND, MIX
+    inline juce::Font trackWord() { return fonts::make (14.0f, Weight::medium, 0.11f); }     ///< ORIGINAL, REIMAGINED
+    inline juce::Font micro (float height = 15.5f) { return fonts::make (height, Weight::regular, 0.01f); }
+    inline juce::Font button (float height) { return fonts::make (height, Weight::medium, 0.02f); }
+    inline juce::Font popupTitle (float height = 13.0f) { return fonts::make (height, Weight::regular, 0.12f); }
+    inline juce::Font popupMode (float height) { return fonts::make (height, Weight::regular, 0.06f); }
+    inline juce::Font popupLabel (float height) { return fonts::make (height, height < 12.0f ? Weight::medium : Weight::regular, 0.05f); }
+    inline juce::Font popupValue (float height) { return fonts::make (height, Weight::medium, 0.0f); }
+    inline juce::Font annotation (float height) { return fonts::make (height, height < 11.0f ? Weight::regular : Weight::light, 0.04f); }
 }
 
 /**

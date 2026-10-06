@@ -310,12 +310,12 @@ namespace
                 if (portrait.spring)
                 {
                     juce::Path chirp;
-                    for (int k = 0; k <= 30; ++k)
+                    for (int n = 0; n <= 30; ++n)
                     {
-                        const float v = static_cast<float> (k) / 30.0f;
+                        const float v = static_cast<float> (n) / 30.0f;
                         const float py = mid - extent + 2.0f * extent * v;
                         const float px = x + 3.5f * dot * std::sin (v * 18.0f + v * v * 20.0f) * (1.0f - std::abs (v - 0.5f) * 2.0f);
-                        if (k == 0)
+                        if (n == 0)
                             chirp.startNewSubPath (px, py);
                         else
                             chirp.lineTo (px, py);
@@ -496,7 +496,7 @@ namespace
             g.setColour (accent);
             g.drawEllipse (mx - 4.0f, my - 4.0f, 8.0f, 8.0f, 1.5f);
             g.setColour (raised.withAlpha (0.9f));
-            g.setFont (fonts::make (10.0f, fonts::Weight::medium));
+            g.setFont (type::annotation (10.0f));
             const auto text = type == FilterType::tilt ? juce::String (tilt, 1) + " dB" : format::hertz (fc);
             const bool leftOf = mx > area.getRight() - 60.0f;
             g.drawText (text, juce::Rectangle<float> (leftOf ? mx - 62.0f : mx + 8.0f, std::max (area.getY(), my - 18.0f), 54.0f, 12.0f),
@@ -551,7 +551,7 @@ namespace
         void caption (juce::Graphics& g, juce::Rectangle<float> area, const juce::String& text, juce::Colour colour, float y) const
         {
             g.setColour (colour);
-            g.setFont (fonts::make (9.0f, fonts::Weight::medium, 0.08f));
+            g.setFont (type::annotation (9.0f));
             g.drawText (text, juce::Rectangle<float> (area.getX(), y, 120.0f, 11.0f), juce::Justification::centredLeft, false);
         }
 
@@ -782,7 +782,7 @@ namespace
                 }
             }
             g.setColour (displayText.withAlpha (0.8f));
-            g.setFont (fonts::make (9.0f, fonts::Weight::medium, 0.08f));
+            g.setFont (type::annotation (9.0f));
             g.drawText (life < 0.01 ? "EVERY NOTE THE SAME" : "LIFE " + juce::String (juce::roundToInt (100.0 * life)) + " %",
                         area.withHeight (11.0f), juce::Justification::centredRight, false);
         }

@@ -8,13 +8,15 @@ reference's own recordings, `MMZT_one_shot_sailboat_C.wav` and
 
 | Reference | Folder | Mean difference (0-255) |
 |---|---|---|
-| `main-2-layer.png` | `main-2-layer/` | 17.6 (from 33.7 before the pass) |
-| `popup-space.png` | `popup-space/` | 20.9 (from 49.0) |
+| `main-2-layer.png` | `main-2-layer/` | 17.3 (from 33.7 before the pass) |
+| `popup-space.png` | `popup-space/` | 39.4 - see below: the macro popups are compact popovers now |
 
 Each folder has `reference.png`, `implementation.png`, `overlay-50.png` (half each: an
 edge that doubles is out of place) and `diff.png` (amplified difference).
 `matrix-1.png` / `matrix-2.png` show the whole screenshot matrix (`01-empty` ...
-`21-advanced-popup`) at one third size.
+`22-cleared`) at one third size; `typography-crops.png` compares the reference, the build
+before the typography revision and the revision for the header, source header, source
+controls, macro row, ADSR, mix band and Advanced.
 
 ## Matching
 
@@ -24,6 +26,23 @@ edge that doubles is out of place) and `diff.png` (amplified difference).
 - Knobs, buttons, badges, LEDs, the A/B blend and the per-layer Reimagined thumbs, the
   waveform family (A warm amber, B cool mineral), the SPACE popup's shell, tabs, display
   and DECAY cell follow the reference's measured colours and proportions.
+
+## Revisions after the first final review
+
+- **Macro popups are compact popovers again** (the user's correction): one at a time,
+  unfolding directly above the clicked macro (230-270 x 180-215 px), no close button and
+  no backdrop. `popup-space.png` (a large centred panel) is therefore no longer the target
+  for position and size; the popovers keep its material, tabs and knob family.
+- **Waveform**: no halo, glow band, ghost envelope or particles outside the waveform; four
+  layers inside it (true peak silhouette, body, RMS energy, a spine following the energy)
+  plus onset filaments from the analysis (`peakFlux`). One Shot read heads and START are
+  the earlier slim 1.2 px accent lines.
+- **LOOP** is two chasing circular arrows (the ring-and-stem read as a power/ON symbol).
+- **Typography**: central type roles (`type::` in OspLookAndFeel.h); about 20-30 % less
+  ink than before for labels and values (bold -> semibold/medium, semibold -> medium),
+  metadata (file names, mode, ADSR letters) quieter still; Inter Light added for larger
+  quiet labels. Measured against the reference PNG itself the old build carried about
+  the same ink as the mockup; the revision follows the requested lighter direction.
 
 ## Known differences (deliberate)
 

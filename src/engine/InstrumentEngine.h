@@ -162,9 +162,9 @@ public:
     /** Two layers: 0 = only the first, 1 = only the second; equal-power, smoothed over about 20 ms. */
     void setBlend (double blend) noexcept { config.blend = std::clamp (blend, 0.0, 1.0); }
     /** Slots kept for the mix while their sound is missing (the plugin's "clear all samples"):
-        the first `slots` layers count as present when the mix law is chosen, so a refilled
+        the first `count` layers count as present when the mix law is chosen, so a refilled
         layer plays at the share it had (an empty one is silent). 0 = only loaded layers. */
-    void setMixSlots (int slots) noexcept { config.mixSlots = std::clamp (slots, 0, EngineSettings::layers); }
+    void setMixSlots (int count) noexcept { config.mixSlots = std::clamp (count, 0, EngineSettings::layers); }
     /** Three layers: the position in the mix triangle (x 0..1 left to right, y 0..1 bottom to top). */
     void setMixPosition (double x, double y) noexcept
     {

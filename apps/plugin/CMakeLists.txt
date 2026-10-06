@@ -34,6 +34,7 @@ juce_add_binary_data(OSP_PluginData
     HEADER_NAME BinaryData.h
     NAMESPACE BinaryData
     SOURCES
+        Resources/fonts/Inter-Light.ttf
         Resources/fonts/Inter-Regular.ttf
         Resources/fonts/Inter-Medium.ttf
         Resources/fonts/Inter-SemiBold.ttf

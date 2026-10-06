@@ -123,7 +123,7 @@ void TriangleMix::paint (juce::Graphics& g)
     g.setColour (accent);
     g.fillEllipse (node.x - 2.0f * k, node.y - 2.0f * k, 4.0f * k, 4.0f * k);
 
-    g.setFont (fonts::make (10.0f * std::sqrt (k), fonts::Weight::semibold));
+    g.setFont (fonts::make (10.0f * std::sqrt (k), fonts::Weight::medium));
     g.setColour (textDim);
     const float t = 8.0f * std::sqrt (k), gap = 2.0f * k;
     g.drawText ("A", juce::Rectangle<float> (c[0].x - t - gap, c[0].y - t * 0.5f, t, t + 2.0f), juce::Justification::centredRight, false);
@@ -366,8 +366,8 @@ void MixSection::paint (juce::Graphics& g)
     draw::raised (g, getLocalBounds().toFloat(), layout::panelRadius, colour::panelTop, colour::panelBottom);
 
     // ORIGINAL ... REIMAGINED either side of the track (always: it is global).
-    g.setFont (fonts::make (14.5f, fonts::Weight::semibold, 0.11f));
-    g.setColour (colour::textSecondary.darker (0.25f));
+    g.setFont (type::trackWord());
+    g.setColour (colour::textSecondary);
     const float ry = static_cast<float> (reimaginedRow.getCentreY());
     g.drawText ("ORIGINAL", juce::Rectangle<float> (240.0f, ry - 10.0f, 200.0f, 20.0f), juce::Justification::centredRight, false);
     g.drawText ("REIMAGINED", juce::Rectangle<float> (1152.0f, ry - 10.0f, 200.0f, 20.0f), juce::Justification::centredLeft, false);
@@ -375,11 +375,11 @@ void MixSection::paint (juce::Graphics& g)
     if (count == 2)
     {
         const float by = static_cast<float> (blendRow.getCentreY());
-        g.setFont (fonts::make (19.0f, fonts::Weight::bold));
-        g.setColour (colour::text);
+        g.setFont (fonts::make (18.0f, fonts::Weight::medium));
+        g.setColour (colour::text.withAlpha (0.85f));
         g.drawText (OspAudioProcessor::layerName (slots[0]), juce::Rectangle<float> (412.0f, by - 12.0f, 40.0f, 24.0f), juce::Justification::centred, false);
         g.drawText (OspAudioProcessor::layerName (slots[1]), juce::Rectangle<float> (1137.0f, by - 12.0f, 40.0f, 24.0f), juce::Justification::centred, false);
-        g.setFont (fonts::make (24.5f, fonts::Weight::bold, 0.06f));
+        g.setFont (type::sectionTitle());
         g.drawText (OspAudioProcessor::layerName (slots[0]) + " / " + OspAudioProcessor::layerName (slots[1]) + " BLEND",
                     juce::Rectangle<float> (33.0f, 22.0f, 330.0f, 36.0f), juce::Justification::centredLeft, false);
     }
@@ -387,10 +387,10 @@ void MixSection::paint (juce::Graphics& g)
     {
         // How much of each is heard (power shares, adding up to 100).
         const auto share = InstrumentEngine::triangleShares (processor.parameterValue ("mix.x"), processor.parameterValue ("mix.y"));
-        g.setFont (fonts::make (26.0f, fonts::Weight::bold, 0.06f));
-        g.setColour (colour::text);
+        g.setFont (type::sectionTitle());
+        g.setColour (colour::text.withAlpha (0.85f));
         g.drawText ("MIX", juce::Rectangle<float> (126.0f, 10.0f, 200.0f, 34.0f), juce::Justification::centredLeft, false);
-        g.setFont (fonts::make (16.0f, fonts::Weight::semibold));
+        g.setFont (fonts::make (15.0f, fonts::Weight::medium));
         float x = 126.0f;
         for (std::size_t i = 0; i < 3; ++i)
         {
@@ -440,11 +440,11 @@ namespace
                 g.setColour (colour);
                 g.fillRoundedRectangle (badge, 3.5f);
                 g.setColour (juce::Colours::white);
-                g.setFont (fonts::make (10.5f, fonts::Weight::semibold));
+                g.setFont (fonts::make (10.5f, fonts::Weight::medium));
                 g.drawText (OspAudioProcessor::layerName (l), badge, juce::Justification::centred, false);
                 row.removeFromLeft (8.0f);
                 const auto percent = juce::String (juce::roundToInt (100.0 * share[static_cast<std::size_t> (l)])) + " %";
-                g.setFont (fonts::make (12.0f, fonts::Weight::semibold));
+                g.setFont (fonts::make (12.0f, fonts::Weight::medium));
                 g.setColour (colour.darker (0.3f));
                 g.drawText (percent, row.removeFromRight (48.0f), juce::Justification::centredRight, false);
                 // How much of the row the share fills: a thin bar under the name.
@@ -617,15 +617,15 @@ void PresetBar::paint (juce::Graphics& g)
             g.fillRoundedRectangle (b.reduced (3.0f * k), 6.0f * k);
         }
         icons::draw (g, part == Part::previous ? icons::Kind::chevronLeft : icons::Kind::chevronRight,
-                     b.withSizeKeepingCentre (26.0f * k, 26.0f * k), colour::text, 2.3f * k);
+                     b.withSizeKeepingCentre (24.0f * k, 24.0f * k), colour::text.withAlpha (0.6f), 1.8f * k);
         g.setColour (colour::divider);
         g.fillRect (juce::Rectangle<float> (part == Part::previous ? b.getRight() : b.getX(), r.getY() + 8.0f * k, 1.0f, r.getHeight() - 16.0f * k));
     }
     const auto heart = partBounds (Part::favourite);
     icons::draw (g, favourite ? icons::Kind::heartFilled : icons::Kind::heart, heart.withSizeKeepingCentre (26.0f * k, 26.0f * k),
-                 favourite || hover == Part::favourite ? colour::accent : colour::text, 2.0f * k);
+                 favourite || hover == Part::favourite ? colour::accent : colour::text.withAlpha (0.6f), 1.7f * k);
     g.setColour (hover == Part::name ? juce::Colours::black : colour::text);
-    g.setFont (fonts::make (23.0f * k, fonts::Weight::medium));
+    g.setFont (type::preset (k));
     g.drawText (name, r.withTrimmedLeft (60.0f * k + 46.0f * k).withTrimmedRight (56.0f * k + 46.0f * k), juce::Justification::centred, true);
 }
 
@@ -686,8 +686,8 @@ void EnvelopePanel::resized()
 void EnvelopePanel::paint (juce::Graphics& g)
 {
     using namespace design;
-    g.setColour (colour::text);
-    g.setFont (fonts::make (16.5f, fonts::Weight::bold, 0.03f));
+    g.setColour (colour::text.withAlpha (0.9f));
+    g.setFont (type::panelHeader());
     g.drawText ("AMP ENVELOPE", juce::Rectangle<float> (16.0f, 1.0f, 300.0f, 22.0f), juce::Justification::centredLeft, false);
 
     const auto well = graph.toFloat();
@@ -901,8 +901,8 @@ void Wheel::paint (juce::Graphics& g)
         g.setColour (juce::Colours::white.withAlpha (springBack ? 0.22f : 0.1f));
         g.fillRect (lit.withHeight (1.0f).reduced (1.5f, 0.0f));
     }
-    g.setColour (colour::text);
-    g.setFont (fonts::make (13.5f, fonts::Weight::bold, 0.03f));
+    g.setColour (colour::text.withAlpha (0.8f));
+    g.setFont (fonts::make (12.5f, fonts::Weight::medium, 0.06f));
     g.drawText (caption, juce::Rectangle<float> (-12.0f, 88.0f, static_cast<float> (getWidth()) + 24.0f, 18.0f), juce::Justification::centred, false);
 }
 

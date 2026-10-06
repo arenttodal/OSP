@@ -72,11 +72,11 @@ void MacroLabel::mouseUp (const juce::MouseEvent& e)
 
 void MacroLabel::paint (juce::Graphics& g)
 {
-    // Reference: a bold, dark name (about 16 px at the canonical size); its settings in use
-    // are an accent dot after it.
+    // The macro's name, restrained (medium, slightly tracked); its settings in use are an
+    // accent dot after it.
     const bool hover = opensPopup && isMouseOver();
     auto r = getLocalBounds().toFloat();
-    const auto font = fonts::make (0.75f * r.getHeight(), fonts::Weight::bold, 0.04f);
+    const auto font = type::macroLabel (0.7f * r.getHeight());
     g.setFont (font);
     g.setColour (hover || open ? juce::Colours::black : design::colour::text);
     const float w = juce::GlyphArrangement::getStringWidth (font, text);
@@ -135,7 +135,7 @@ void SegmentedControl::paint (juce::Graphics& g)
         g.setColour (juce::Colours::white.withAlpha (0.55f));
         g.drawHorizontalLine (juce::roundToInt (r.getY() + 1.0f), r.getX() + radius, r.getRight() - radius);
     }
-    g.setFont (fonts::make (juce::jlimit (9.0f, 17.5f, (count > 4 ? 0.37f : 0.4f) * h), fonts::Weight::medium, 0.03f));
+    g.setFont (type::popupMode (juce::jlimit (9.0f, 17.5f, (count > 4 ? 0.37f : 0.42f) * h)));
     for (int i = 0; i < count; ++i)
     {
         auto cell = juce::Rectangle<float> (r.getX() + w * static_cast<float> (i), r.getY(), w, h);
@@ -245,8 +245,8 @@ void MiniKnob::paint (juce::Graphics& g)
     const auto valueColour = onDark ? juce::Colour (0xfff2eee6) : design::colour::text;
     if (boxed)
     {
-        g.setColour (design::colour::text);
-        g.setFont (fonts::make (0.115f * h, fonts::Weight::bold, 0.03f));
+        g.setColour (design::colour::text.withAlpha (0.85f));
+        g.setFont (type::popupLabel (0.115f * h));
         g.drawText (caption, juce::Rectangle<float> (r.getX() - 20.0f, r.getY() - 0.01f * h, r.getWidth() + 40.0f, 0.15f * h), juce::Justification::centred, false);
         const auto box = valueBox();
         const float radius = 0.17f * box.getHeight();
@@ -257,25 +257,26 @@ void MiniKnob::paint (juce::Graphics& g)
         g.setColour (juce::Colour (0xffbcb1a3));
         g.drawRoundedRectangle (box.reduced (0.5f), radius, 1.0f);
         g.setColour (design::colour::text);
-        g.setFont (fonts::make (0.13f * h, fonts::Weight::bold));
+        g.setFont (type::popupValue (0.13f * h));
         g.drawText (value, box.translated (0.0f, 0.5f), juce::Justification::centred, false);
         return;
     }
     if (horizontal)
     {
         g.setColour (onDark ? captionColour : design::colour::textSecondary.darker (0.2f));
-        g.setFont (fonts::make (0.42f * h, fonts::Weight::semibold, 0.08f));
+        g.setFont (type::popupLabel (0.42f * h));
         g.drawText (caption, r.withRight (static_cast<float> (slider.getX()) - 0.25f * h), juce::Justification::centredRight, false);
         g.setColour (valueColour);
-        g.setFont (fonts::make (0.5f * h, fonts::Weight::semibold));
+        g.setFont (type::popupValue (0.5f * h));
         g.drawText (value, r.withLeft (static_cast<float> (slider.getRight()) + 0.25f * h), juce::Justification::centredLeft, false);
         return;
     }
-    g.setColour (captionColour);
-    g.setFont (fonts::make (std::max (9.0f, (compact ? 0.14f : 0.155f) * h), fonts::Weight::bold, 0.04f));
+    // Small knob cells (envelope, popovers): a light caption, the value a step stronger.
+    g.setColour (onDark ? captionColour : design::colour::text.withAlpha (0.78f));
+    g.setFont (type::popupLabel (std::max (9.0f, (compact ? 0.14f : 0.155f) * h)));
     g.drawText (caption, juce::Rectangle<float> (r.getX(), r.getY(), r.getWidth(), 0.2f * h), juce::Justification::centred, false);
-    g.setColour (valueColour);
-    g.setFont (fonts::make (std::max (9.5f, (compact ? 0.17f : 0.19f) * h), fonts::Weight::bold));
+    g.setColour (onDark ? valueColour : design::colour::text.withAlpha (0.96f));
+    g.setFont (type::popupValue (std::max (9.5f, (compact ? 0.17f : 0.19f) * h)));
     g.drawText (value, juce::Rectangle<float> (r.getX(), r.getY() + 0.78f * h, r.getWidth(), 0.22f * h), juce::Justification::centred, false);
 }
 
@@ -310,7 +311,7 @@ void ValueSelector::paint (juce::Graphics& g)
         icons::draw (g, icons::Kind::chevronDown, r.removeFromRight (0.5f * h).withSizeKeepingCentre (0.42f * h, 0.42f * h), colour, 1.2f);
         r.removeFromRight (3.0f);
         g.setColour (colour);
-        g.setFont (fonts::make (0.55f * h, fonts::Weight::regular, 0.06f));
+        g.setFont (type::popupMode (0.55f * h));
         g.drawText (valueText.toUpperCase(), r, juce::Justification::centredRight, true);
         return;
     }
@@ -324,7 +325,7 @@ void ValueSelector::paint (juce::Graphics& g)
     const auto box = r.reduced (1.0f, 1.0f);
     design::draw::button (g, box, 0.2f * box.getHeight(), false, hasKeyboardFocus (false) || isMouseOver(), design::colour::accent);
     g.setColour (design::colour::text.withAlpha (0.9f));
-    g.setFont (fonts::make (0.5f * box.getHeight(), fonts::Weight::medium, 0.04f));
+    g.setFont (type::popupValue (0.46f * box.getHeight()));
     auto text = box.reduced (0.3f * box.getHeight(), 0.0f);
     icons::draw (g, icons::Kind::chevronDown, text.removeFromRight (0.32f * box.getHeight()), design::colour::text.withAlpha (0.5f), 1.2f);
     g.drawText (valueText.toUpperCase(), text, juce::Justification::centred, false);
@@ -415,8 +416,8 @@ void MiniPanel::paint (juce::Graphics& g)
         g.strokePath (shape, juce::PathStrokeType (1.0f));
         g.setColour (juce::Colours::white.withAlpha (0.85f));
         g.drawHorizontalLine (juce::roundToInt (r.getY() + 1.0f), r.getX() + 14.0f, r.getRight() - 14.0f);
-        g.setColour (colour::text.withAlpha (0.82f));
-        g.setFont (fonts::make (13.0f, fonts::Weight::medium, 0.09f));
+        g.setColour (colour::text.withAlpha (0.8f));
+        g.setFont (type::popupTitle (13.0f));
         g.drawText (title, juce::Rectangle<float> (r.getX() + 13.0f, r.getY() + 7.0f, r.getWidth() * 0.5f, 20.0f), juce::Justification::centredLeft, false);
         return;
     }
@@ -432,12 +433,12 @@ void MiniPanel::paint (juce::Graphics& g)
 
     const float x = r.getX() + 27.5f * u;
     g.setColour (colour::text);
-    g.setFont (fonts::make (36.5f * u, fonts::Weight::bold, 0.0f));
+    g.setFont (fonts::make (34.0f * u, fonts::Weight::medium, 0.0f));
     g.drawText (title, juce::Rectangle<float> (x, r.getY() + 13.0f * u, r.getWidth() - 100.0f * u, 46.0f * u), juce::Justification::centredLeft, false);
     if (subtitle.isNotEmpty())
     {
         g.setColour (colour::textSecondary);
-        g.setFont (fonts::make (16.5f * u, fonts::Weight::medium, 0.3f));
+        g.setFont (fonts::make (16.0f * u, fonts::Weight::regular, 0.3f));
         g.drawText (subtitle, juce::Rectangle<float> (x + 1.0f * u, r.getY() + 54.0f * u, r.getWidth() - 60.0f * u, 22.0f * u), juce::Justification::centredLeft, false);
     }
     const auto box = closeButton();

@@ -56,7 +56,7 @@ void SamplesPanel::setInstrument (std::shared_ptr<const LoadedInstrument> instru
         header->name.setText (juce::String (midiNoteName (static_cast<int> (std::lround (group.rootMidi))))
                                   + (group.layers > 1 ? "   " + juce::String (group.layers) + " velocity layers" : juce::String()),
                               juce::dontSendNotification);
-        header->name.setFont (fonts::make (14.0f, fonts::Weight::semibold));
+        header->name.setFont (fonts::make (14.0f, fonts::Weight::medium));
         header->name.setColour (juce::Label::textColourId, palette::housingLight);
         content.addAndMakeVisible (header->name);
         rows.push_back (std::move (header));
@@ -160,7 +160,7 @@ void OspKeyboard::drawWhiteNote (int note, juce::Graphics& g, juce::Rectangle<fl
     if (label.isNotEmpty())
     {
         g.setColour (colour::textSecondary);
-        g.setFont (fonts::make (std::min (14.0f, area.getWidth() * 0.62f), fonts::Weight::medium));
+        g.setFont (fonts::make (std::min (14.0f, area.getWidth() * 0.62f), fonts::Weight::regular, 0.04f));
         g.drawText (label, area.withTrimmedLeft (0.25f * area.getWidth()).withTrimmedBottom (7.0f).removeFromBottom (16.0f), juce::Justification::centredLeft, false);
     }
 }
@@ -240,7 +240,7 @@ void DropZone::paint (juce::Graphics& g)
 
     auto text = getLocalBounds().toFloat().withSizeKeepingCentre (r.getWidth(), 90.0f).translated (0.0f, -22.0f);
     g.setColour (text.isEmpty() ? palette::text : palette::text);
-    g.setFont (fonts::make (24.0f, fonts::Weight::semibold, 0.12f));
+    g.setFont (fonts::make (24.0f, fonts::Weight::regular, 0.14f));
     g.drawText ("DROP A SOUND", text.removeFromTop (36.0f), juce::Justification::centred, false);
     g.setColour (textDim);
     g.setFont (fonts::make (13.5f));
@@ -284,7 +284,7 @@ void AddLayerTarget::paint (juce::Graphics& g)
     const auto centre = r.withSizeKeepingCentre (r.getWidth(), 60.0f);
     icons::draw (g, icons::Kind::plus, centre.withHeight (28.0f).withSizeKeepingCentre (28.0f, 28.0f), highlight ? accent : textDim, 1.8f);
     g.setColour (highlight ? palette::text : textDim);
-    g.setFont (fonts::make (14.0f, fonts::Weight::semibold, 0.1f));
+    g.setFont (fonts::make (14.0f, fonts::Weight::medium, 0.1f));
     g.drawText ("ADD LAYER " + letter, centre.withTrimmedTop (34.0f), juce::Justification::centredTop, false);
 }
 
@@ -442,7 +442,7 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     keyboard.setColour (juce::MidiKeyboardComponent::blackNoteColourId, palette::ebony);
     content.addAndMakeVisible (keyboard);
 
-    statusLabel.setFont (fonts::make (17.5f));
+    statusLabel.setFont (type::micro (16.0f));
     statusLabel.setColour (juce::Label::textColourId, design::colour::textMicro.darker (0.15f));
     statusLabel.setBorderSize ({ 0, 0, 0, 0 });
     content.addAndMakeVisible (statusLabel);
@@ -1114,12 +1114,12 @@ void OspAudioProcessorEditor::paintInstrument (juce::Graphics& g)
         rest.draw (g);
         const int count = std::max (0, shownCount);
         const char* kind = count <= 1 ? "ONE SOURCE INSTRUMENT" : (count == 2 ? "TWO LAYER INSTRUMENT" : "THREE LAYER INSTRUMENT");
-        g.setFont (fonts::make (13.0f, fonts::Weight::medium, 0.52f));
+        g.setFont (fonts::make (13.0f, fonts::Weight::regular, 0.52f));
         g.setColour (colour::textSecondary);
         g.drawText (kind, layout::logoSubtitle, juce::Justification::centredLeft, false);
     }
-    g.setColour (colour::text);
-    g.setFont (fonts::make (13.5f, fonts::Weight::bold, 0.04f));
+    g.setColour (colour::text.withAlpha (0.9f));
+    g.setFont (fonts::make (13.0f, fonts::Weight::semibold, 0.06f));
     g.drawText ("VOLUME", layout::volumeLabel, juce::Justification::centred, false);
 
     // The keyboard's frame: a quiet rim, the keys set into it.
@@ -1140,8 +1140,8 @@ void OspAudioProcessorEditor::paintInstrument (juce::Graphics& g)
         draw::raised (g, r, layout::panelRadius, colour::panelTop, colour::panelBottom);
         g.setColour (colour::divider);
         g.fillRect (juce::Rectangle<float> (889.0f, 715.0f, 1.0f, 170.0f));
-        g.setColour (colour::text);
-        g.setFont (fonts::make (16.5f, fonts::Weight::bold, 0.03f));
+        g.setColour (colour::text.withAlpha (0.9f));
+        g.setFont (type::panelHeader());
         g.drawText ("MACROS", juce::Rectangle<float> (59.0f, 710.0f, 200.0f, 22.0f), juce::Justification::centredLeft, false);
         // Under each macro a small light: lit when the macro's own settings are in use.
         for (std::size_t i = 0; i < macros.size(); ++i)

@@ -57,6 +57,7 @@ struct LoadedInstrument
     std::vector<float> peakMax;
     std::vector<float> peakRms;
     std::vector<float> peakBright;
+    std::vector<float> peakFlux;     ///< onset strength 0..1: the rise of the level against the few ms before
     double durationSeconds = 0.0;
     /** Average spectrum, dB re its peak, on log-spaced bins from 20 Hz to 20 kHz (display). */
     static constexpr int spectrumBins = 96;

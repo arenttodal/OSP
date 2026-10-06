@@ -1448,9 +1448,9 @@ TEST_CASE ("plugin: the editor adapts to one, two and three sounds; drops replac
             auto source = juce::Desktop::getInstance().getMainMouseSource();
             const auto now = juce::Time::getCurrentTime();
             const float y = 0.5f * static_cast<float> (track->getHeight());
-            const juce::Point<float> a (fromX, y), b (toX, y);
-            const juce::MouseEvent down (source, a, juce::ModifierKeys(), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, track, track, now, a, now, 1, false);
-            const juce::MouseEvent move (source, b, juce::ModifierKeys(), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, track, track, now, a, now, 1, true);
+            const juce::Point<float> from (fromX, y), to (toX, y);
+            const juce::MouseEvent down (source, from, juce::ModifierKeys(), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, track, track, now, from, now, 1, false);
+            const juce::MouseEvent move (source, to, juce::ModifierKeys(), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, track, track, now, from, now, 1, true);
             track->mouseDown (down);
             track->mouseDrag (move);
             track->mouseUp (move);
@@ -1887,6 +1887,15 @@ TEST_CASE ("plugin: canonical screenshots for visual review", "[.][canonical]")
     }
     shot ("05-two-mixed.png");
     shot ("main-2-layer.png");
+    {
+        // As on a Retina display (type and strokes at twice the pixels), for review.
+        ui->refreshNow();
+        const auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 2.0f);
+        juce::FileOutputStream out (juce::File (dir).getChildFile ("main-2-layer@2x.png"));
+        out.setPosition (0);
+        out.truncate();
+        juce::PNGImageFormat().writeImageToStream (image, out);
+    }
     // The popups over the two-layer instrument.
     ui->openPopup (0);
     shot ("08-life-popup.png");

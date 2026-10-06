@@ -13,6 +13,7 @@ namespace fonts
     {
         juce::Typeface::Ptr typeface (Weight weight)
         {
+            static const juce::Typeface::Ptr light = juce::Typeface::createSystemTypefaceFor (BinaryData::InterLight_ttf, BinaryData::InterLight_ttfSize);
             static const juce::Typeface::Ptr regular = juce::Typeface::createSystemTypefaceFor (BinaryData::InterRegular_ttf, BinaryData::InterRegular_ttfSize);
             static const juce::Typeface::Ptr medium = juce::Typeface::createSystemTypefaceFor (BinaryData::InterMedium_ttf, BinaryData::InterMedium_ttfSize);
             static const juce::Typeface::Ptr semibold = juce::Typeface::createSystemTypefaceFor (BinaryData::InterSemiBold_ttf, BinaryData::InterSemiBold_ttfSize);
@@ -22,6 +23,7 @@ namespace fonts
             static const juce::Typeface::Ptr displayLight = juce::Typeface::createSystemTypefaceFor (BinaryData::OutfitExtraLight_ttf, BinaryData::OutfitExtraLight_ttfSize);
             switch (weight)
             {
+                case Weight::light: return light;
                 case Weight::medium: return medium;
                 case Weight::semibold: return semibold;
                 case Weight::bold: return bold;
@@ -270,7 +272,7 @@ juce::Slider::SliderLayout OspLookAndFeel::getSliderLayout (juce::Slider& slider
 juce::Label* OspLookAndFeel::createSliderTextBox (juce::Slider& slider)
 {
     auto* label = LookAndFeel_V4::createSliderTextBox (slider);
-    label->setFont (fonts::make (13.0f, fonts::Weight::medium, 0.02f));
+    label->setFont (fonts::make (13.0f, fonts::Weight::regular, 0.02f));
     label->setColour (juce::Label::textColourId, palette::text);
     label->setColour (juce::Label::backgroundColourId, juce::Colours::transparentBlack);
     label->setColour (juce::Label::outlineColourId, juce::Colours::transparentBlack);
@@ -303,12 +305,13 @@ juce::Font OspLookAndFeel::getTextButtonFont (juce::TextButton& button, int butt
 {
     if (static_cast<bool> (button.getProperties()["caps"]))
         return fonts::label (11.0f);
-    return fonts::make (std::min (20.0f, static_cast<float> (buttonHeight) * 0.48f), fonts::Weight::bold, 0.01f);
+    return type::button (std::min (19.0f, static_cast<float> (buttonHeight) * 0.46f));
 }
 
 void OspLookAndFeel::drawButtonText (juce::Graphics& g, juce::TextButton& button, bool, bool)
 {
-    const auto colour = design::colour::text;
+    // Secondary navigation (Advanced, Browse...): regular, a little subdued.
+    const auto colour = design::colour::text.withAlpha (0.85f);
     g.setColour (colour.withMultipliedAlpha (button.isEnabled() ? 1.0f : 0.4f));
     g.setFont (getTextButtonFont (button, button.getHeight()));
     g.drawText (button.getButtonText(), button.getLocalBounds().reduced (4, 0), juce::Justification::centred, false);
@@ -350,7 +353,7 @@ void OspLookAndFeel::drawComboBox (juce::Graphics& g, int width, int height, boo
 
 juce::Font OspLookAndFeel::getComboBoxFont (juce::ComboBox&)
 {
-    return fonts::make (13.5f, fonts::Weight::medium, 0.01f);
+    return fonts::make (13.5f, fonts::Weight::regular, 0.01f);
 }
 
 void OspLookAndFeel::positionComboBoxText (juce::ComboBox& box, juce::Label& label)

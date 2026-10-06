@@ -226,6 +226,27 @@ namespace
                                            ? static_cast<float> (std::clamp ((std::log2 (std::max (ratio, 1.0e-6)) - std::log2 (0.02)) / (std::log2 (0.6) - std::log2 (0.02)), 0.0, 1.0))
                                            : 0.0f;
         }
+        // Onsets (the display's transient detail): how far the level just here (the loudest
+        // bucket of ~3 ms, longer than a low note's period) rises above the ~12 ms before it,
+        // in dB: 0 at no rise, 1 at 18 dB or more.
+        instrument.peakFlux.assign (buckets, 0.0f);
+        {
+            const double bucketSeconds = audio.durationSeconds() / static_cast<double> (buckets);
+            auto span = [bucketSeconds] (double seconds) { return static_cast<std::size_t> (std::clamp (seconds / std::max (bucketSeconds, 1.0e-9), 1.0, 256.0)); };
+            const auto here = span (0.003), before = span (0.012);
+            std::vector<double> db (buckets);
+            for (std::size_t b = 0; b < buckets; ++b)
+                db[b] = 20.0 * std::log10 (std::max (1.0e-6, static_cast<double> (instrument.peakRms[b])));
+            for (std::size_t b = here + 1; b < buckets; ++b)
+            {
+                double now = -120.0, earlier = -120.0;
+                for (std::size_t k = 0; k < here; ++k)
+                    now = std::max (now, db[b - k]);
+                for (std::size_t k = here; k < here + before && k <= b; ++k)
+                    earlier = std::max (earlier, db[b - k]);
+                instrument.peakFlux[b] = static_cast<float> (std::clamp ((now - earlier) / 18.0, 0.0, 1.0));
+            }
+        }
         instrument.durationSeconds = audio.durationSeconds();
 
         // The sound's average spectrum on a log frequency axis (CHARACTER's display): up to

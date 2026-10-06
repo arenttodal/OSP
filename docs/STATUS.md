@@ -187,6 +187,7 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [x] Pixel-accurate visual pass against the approved references (design/README.md): layout in the reference's 1448 x 1086 coordinates scaled uniformly; design tokens (Design.h, palette.md); knobs, cards, waveform renderer, mix band, macros, envelope, wheels, keyboard and every popup rebuilt; canonical render + overlay/diff harness; final comparison in design/final-review/ (mean difference main 33.7 -> 17.6, SPACE popup 49 -> 20.9)
 - [x] Compact macro popovers again (anchored above each macro, one at a time, no close button or backdrop)
 - [x] Reimagined thumbs linked by default (`reimaginedLink`, small link key); INIT, Reset settings and user starting states (`.ospstate`, settings + slots); Clear all samples keeps slots and settings (`keptSlots`, engine mix slots)
+- [x] Final visual revision: waveform without halo (layered peaks/body/RMS/spine + onset detail from `peakFlux`), slim read heads and START, LOOP as circular arrows, lighter central typography (`type::` roles, Inter Light)
 - [ ] Stage 20: DAW testing (Logic AU, Ableton AU/VST3, Reaper VST3) — needs the user's Mac
 - [ ] Listening pass: FOLLOW-off lift, REVERSE + LOOP, the three-layer mix law, default LEVEL 0 dB
 
