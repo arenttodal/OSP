@@ -46,7 +46,7 @@ MOVEMENT, SPACE, ORIGINAL ↔ REIMAGINED and envelope: one instrument, not three
 | **PAN** | The layer's place left–right. |
 | **LEVEL** | The layer's level, from silent to +6 dB. |
 | **LINK** (chain) | Linked layers move together: turning one linked layer's START, TUNE, PAN or LEVEL moves the others by the same amount, so their relationship stays. |
-| **REVERSE** | Play backwards (Granular: every grain backwards). With LOOP on, a held note keeps going on the recording's best loop, backwards. |
+| **REVERSE** | Play backwards (Granular: every grain backwards). With LOOP on, a held note keeps going backwards the way a forward note sustains. Reimagined acts on a reversed layer exactly as on a forward one. |
 | **LOOP** | One Shot: hold a note and it continues on the recording's own loops (off: it plays once and ends). Granular sustains by itself, so LOOP rests there. |
 | **FOLLOW** | On: the recording's own loudness contour. Off: its fades are lifted (up to 24 dB) so a decaying sound plays on like a held tone; the envelope then shapes it. |
 

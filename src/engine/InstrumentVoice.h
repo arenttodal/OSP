@@ -140,7 +140,6 @@ private:
 
     // Reading
     double direction = 1.0;          ///< -1: REVERSE
-    bool reverseLoop = false;        ///< REVERSE + LOOP: the best loop, read backwards
     bool followContour = true;       ///< FOLLOW (false: followGain lifts quiet parts)
     float followGain = 1.0f, followGainStep = 0.0f;
     double position = 0.0;
@@ -206,7 +205,7 @@ private:
 
     // Reimagined doubling head
     float dAmount = 0.0f, dRamp = 0.0f, dRampStep = 0.0f, dSide = 1.0f;
-    double dBase = 0.0, dDepth = 0.0, dPhase = 0.0, dOmega = 0.0;
+    double dBase = 0.0, dDepth = 0.0, dPhase = 0.0, dOmega = 0.0, dEnd = 0.0;
     int dDelaySamples = 0;
 
     // Reimagined granular continuation: a small pool of windowed grains read from what the

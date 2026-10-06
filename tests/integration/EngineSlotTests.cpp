@@ -620,3 +620,43 @@ TEST_CASE ("a recording too short for grains plays safely in every mode", "[inte
             }
     }
 }
+
+TEST_CASE ("REVERSE keeps Reimagined: its doubling, grains and continuation walk play backwards too", "[integration][layers]")
+{
+    // Reimagined's own per-note sound (a doubling read head, grains of what the note has
+    // played with octave and fifth remapping, a shorter continuation walk) used to switch
+    // off on a reversed layer, leaving plain reversed playback under the shared resonance.
+    auto vowel = testsignals::vowel (220.0, 2.0, rate, 3);
+    const auto sustained = instrument::buildComplete (vowel, test::analyse (vowel), {}, false);
+    REQUIRE (sustained->original.continuation.canSustain);
+    auto render = [&] (bool reverse, double reimagined, int block) {
+        auto s = quietSettings();
+        s.macros.reimagined = reimagined;
+        s.layer[0].reverse = reverse;
+        Rig rig (s, block);
+        rig.engine.setModel (sustained.get(), 0);
+        rig.engine.noteOn (57, 100, 1);
+        std::vector<float> out;
+        rig.run (4.0, out, nullptr, block);
+        return out;
+    };
+    // The grains' fifths land at 330 Hz, between the vowel's harmonics (220, 440 Hz), where
+    // neither the recording nor the shared resonance (tuned to its partials) puts energy.
+    auto fifths = [&] (const std::vector<float>& x) {
+        return goertzel (x, at (1.0), at (3.0), 330.0) / goertzel (x, at (1.0), at (3.0), 220.0);
+    };
+    const auto forward0 = render (false, 0.0, 256), forward1 = render (false, 1.0, 256);
+    const auto reverse0 = render (true, 0.0, 256), reverse1 = render (true, 1.0, 256);
+    INFO ("fifths: forward " << fifths (forward0) << " -> " << fifths (forward1) << ", reverse " << fifths (reverse0)
+                             << " -> " << fifths (reverse1));
+    CHECK (fifths (forward1) > 3.0 * fifths (forward0));
+    CHECK (fifths (reverse1) > 3.0 * fifths (reverse0));
+    CHECK (fifths (reverse1) > 0.5 * fifths (forward1));
+    // ...at the same overall level as forwards.
+    CHECK (rms (reverse1, at (1.0), at (3.0)) == Approx (rms (forward1, at (1.0), at (3.0))).epsilon (0.25));
+    // A reversed note at the far end still sustains while held and is block-size independent.
+    CHECK (rms (reverse1, at (3.0), at (4.0)) > 0.3 * rms (reverse1, at (0.5), at (1.0)));
+    CHECK (reverse1 == render (true, 1.0, 37));
+    for (float v : reverse1)
+        REQUIRE (std::isfinite (v));
+}

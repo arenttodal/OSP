@@ -62,15 +62,12 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     // Granular voices never read the recording through: no continuation jumps or grafts.
     strategy = cont->canSustain && ! granularMode ? params.strategy : ContinuationStrategy::off;
     releaseGraftEnabled = params.releaseGraft;
-    // REVERSE reads from the end of the sound back to its start: no continuation walk or
-    // graft (they are made for reading forwards); with LOOP the best loop, mirrored.
+    // REVERSE reads from the end of the sound back to its start. The continuation walk
+    // takes the same jumps mirrored (scheduleNextJump); the release graft does not apply
+    // (the recording's ending is where a reversed note begins).
     direction = params.reverse && ! granularMode ? -1.0 : 1.0;
-    reverseLoop = direction < 0.0 && strategy != ContinuationStrategy::off && cont->bestLoop >= 0;
     if (direction < 0.0)
-    {
-        strategy = ContinuationStrategy::off;
         releaseGraftEnabled = false;
-    }
     followContour = params.follow;
     followGain = 1.0f;
     followGainStep = 0.0f;
@@ -156,6 +153,7 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
         dRampStep = 1.0f / static_cast<float> (0.08 * sampleRate);
         dDelaySamples = static_cast<int> (0.03 * sampleRate);
         dSide = dRng.nextDouble() < 0.5 ? -1.0f : 1.0f;
+        dEnd = static_cast<double> (src.numFrames() - 1);
     }
     // Granular continuation (Reimagined far end): grains start once there is history to
     // draw from and fade in after the attack, which stays the recording's own.
@@ -176,9 +174,9 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
         gLowCoef = static_cast<float> (1.0 - std::exp (-2.0 * std::numbers::pi * 6500.0 / sampleRate));
         gLowL = gLowR = 0.0f;
     }
-    if (granularMode || direction < 0.0)
+    if (granularMode)
     {
-        // The read-through extras (doubling head, Reimagined grains) need a forward read.
+        // The read-through extras (doubling head, Reimagined grains) follow a read head.
         dAmount = 0.0f;
         gAmount = 0.0f;
     }
@@ -344,33 +342,41 @@ void InstrumentVoice::scheduleNextJump() noexcept
         scheduleGraft();
         return;
     }
-    if (reverseLoop)
-    {
-        // The best loop read backwards: arriving at its start, carry on from its end.
-        const auto& j = cont->jumps[static_cast<std::size_t> (cont->bestLoop)];
-        pending = j;
-        pending.fromFrame = j.toFrame;
-        pending.toFrame = j.fromFrame;
-        hasPending = position > pending.fromFrame;
-        return;
-    }
     if (strategy == ContinuationStrategy::off || grafted)
         return;
+
+    // REVERSE takes every jump mirrored: a jump matches the windows [from, from + crossfade)
+    // and [to, to + crossfade), so read backwards it leaves at the end of the `to` window and
+    // lands at the end of the `from` window, crossfading over the same matched audio.
+    const bool forwards = direction > 0.0;
+    auto oriented = [forwards] (const ContinuationJump& j) {
+        if (forwards)
+            return j;
+        auto m = j;
+        m.fromFrame = j.toFrame + j.crossfadeFrames;
+        m.toFrame = j.fromFrame + j.crossfadeFrames;
+        return m;
+    };
+    // Still ahead of the read head (in the direction of play)?
+    auto ahead = [this, forwards] (double frame) { return forwards ? position < frame : position > frame; };
 
     switch (strategy)
     {
         case ContinuationStrategy::naiveLoop:
-            if (position < cont->naiveLoop.fromFrame)
+        {
+            const auto j = oriented (cont->naiveLoop);
+            if (ahead (j.fromFrame))
             {
-                pending = cont->naiveLoop;
+                pending = j;
                 hasPending = true;
             }
             return;
+        }
         case ContinuationStrategy::bestLoop:
             if (cont->bestLoop >= 0)
             {
-                const auto& j = cont->jumps[static_cast<std::size_t> (cont->bestLoop)];
-                if (position < j.fromFrame)
+                const auto j = oriented (cont->jumps[static_cast<std::size_t> (cont->bestLoop)]);
+                if (ahead (j.fromFrame))
                 {
                     pending = j;
                     pendingIndex = cont->bestLoop;
@@ -390,18 +396,20 @@ void InstrumentVoice::scheduleNextJump() noexcept
     const double sr = layer->source->sampleRate();
     // Reimagined / MOTION shorten the stretches between jumps (towards granular continuation).
     const double scale = std::clamp (static_cast<double> (shape.segmentScale), 0.2, 2.0);
-    const double minFrom = position + cont->minSegmentFrames * std::min (1.0, scale);
-    const double lookahead = minFrom + rng.uniform (0.4, 2.5) * sr * scale;
+    const double minFrom = forwards ? position + cont->minSegmentFrames * std::min (1.0, scale)
+                                    : position - cont->minSegmentFrames * std::min (1.0, scale);
+    const double reach = rng.uniform (0.4, 2.5) * sr * scale;
+    const double lookahead = forwards ? minFrom + reach : minFrom - reach;
     auto weightOf = [&] (int index) -> double
     {
-        const auto& j = cont->jumps[static_cast<std::size_t> (index)];
-        if (j.fromFrame < minFrom)
+        const double from = oriented (cont->jumps[static_cast<std::size_t> (index)]).fromFrame;
+        if (forwards ? from < minFrom : from > minFrom)
             return 0.0;
-        double w = 0.05 + static_cast<double> (j.score);
+        double w = 0.05 + static_cast<double> (cont->jumps[static_cast<std::size_t> (index)].score);
         for (int r : recent)
             if (r == index)
                 w *= 0.1;
-        if (j.fromFrame > lookahead)
+        if (forwards ? from > lookahead : from < lookahead)
             w *= 0.15;
         return w;
     };
@@ -426,13 +434,13 @@ void InstrumentVoice::scheduleNextJump() noexcept
         if (chosen < 0)
             chosen = count - 1;
     }
-    else if (cont->backstop >= 0 && cont->jumps[static_cast<std::size_t> (cont->backstop)].fromFrame > position)
+    else if (cont->backstop >= 0 && ahead (oriented (cont->jumps[static_cast<std::size_t> (cont->backstop)]).fromFrame))
     {
         chosen = cont->backstop;
     }
     if (chosen >= 0)
     {
-        pending = cont->jumps[static_cast<std::size_t> (chosen)];
+        pending = oriented (cont->jumps[static_cast<std::size_t> (chosen)]);
         pendingIndex = chosen;
         hasPending = true;
     }
@@ -677,14 +685,16 @@ void InstrumentVoice::spawnGrain() noexcept
     const double seconds = grainRng.uniform (0.05, 0.14);
     const double outSamples = seconds * sampleRate;
     const double span = outSamples * step;
-    // Read from what the note has already played: end at or before the current position.
+    // Read from what the note has already played: end at or before the current position
+    // (REVERSE: what it has played lies after it in the file, and grains play backwards too).
     const double srcRate = layer->source->sampleRate();
-    const double history = position - gFloor - span;
+    const bool forwards = direction > 0.0;
+    const double history = forwards ? position - gFloor - span : gFloor - position - span;
     if (history < 0.01 * srcRate)
         return;
     const double back = grainRng.nextDouble() * std::min (history, (0.08 + 0.7 * g) * srcRate);
-    slot->position = position - span - back;
-    slot->step = step;
+    slot->position = forwards ? position - span - back : position + span + back;
+    slot->step = forwards ? step : -step;
     slot->phase = 0.0;
     slot->phaseStep = 1.0 / outSamples;
     const float pan = static_cast<float> (0.7 * g * grainRng.bipolar());
@@ -777,7 +787,10 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
                 {
                     const double behind = dBase + dDepth * std::sin (dPhase);
                     float l2, r2;
-                    readFrame (std::max (0.0, bodyPosition - behind * currentStep), currentStep, l2, r2);
+                    // Behind = what was just played: earlier in the file, or later when reversed.
+                    const double doubled = direction > 0.0 ? std::max (0.0, bodyPosition - behind * currentStep)
+                                                           : std::min (dEnd, bodyPosition + behind * currentStep);
+                    readFrame (doubled, currentStep, l2, r2);
                     const float g = dAmount * dRamp;
                     const float norm = 1.0f / std::sqrt (1.0f + g * g);
                     // Placed a little to one side, so the doubling widens instead of thickening.

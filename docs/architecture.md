@@ -256,8 +256,13 @@ its held voices wait, released ones and those of an emptied layer end. Then the
 filter, drift, the ADSR) are the same settings in every voice.
 
 Source modifiers in the voice: START offsets the read (from the end when reversed) with a
-3 ms fade-in; REVERSE reads backwards with no continuation walk or graft (made for forward
-reading) — with LOOP the best loop mirrored; LOOP off plays the recording once (and, as the
+3 ms fade-in; REVERSE reads backwards and so does everything that follows the read head:
+the continuation walk takes every jump mirrored (it leaves at the end of the jump's `to`
+window and lands at the end of its `from` window, so the crossfade covers the same matched
+audio), Reimagined's doubling head trails at a later frame and its grains come from what
+the note has already played (later in the file) and play backwards; only the release graft
+and the transient swap stay off (the recording's ending is where a reversed note begins);
+LOOP off plays the recording once (and, as the
 old "Recording" sustain did, without per-voice drift); FOLLOW off multiplies by a lift taken
 from the analysis' 20 ms RMS series (`levelContour::boostDb`: towards the loudest level, at
 most +24 dB, none near the noise floor), glided per control period. Granular applies
