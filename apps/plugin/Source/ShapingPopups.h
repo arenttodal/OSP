@@ -90,10 +90,14 @@ private:
 
 /** A stepped choice shown as its value (PATTERN, RATE): click for the list, arrows or the
     mouse wheel to step. Bound to a choice parameter. */
-class ValueSelector final : public juce::Component
+class ValueSelector final : public juce::Component, public juce::SettableTooltipClient
 {
 public:
     ValueSelector (juce::RangedAudioParameter& parameter, juce::String caption);
+    /** Text only (a popover's mode beside its title): no key, quiet type, a small chevron. */
+    void setPlain (bool shouldBePlain) { plain = shouldBePlain; repaint(); }
+    int selected() const noexcept { return index; }
+    std::function<void (int)> onChange;
     void paint (juce::Graphics&) override;
     void mouseEnter (const juce::MouseEvent&) override { repaint(); }
     void mouseExit (const juce::MouseEvent&) override { repaint(); }
@@ -109,6 +113,7 @@ private:
     juce::RangedAudioParameter& parameter;
     juce::String caption;
     int index = 0;
+    bool plain = false;
     juce::ParameterAttachment attachment;
 };
 
@@ -126,6 +131,9 @@ public:
     static constexpr int shadowMargin = 44;
     /** Preferred size of the card (without the shadow margin), in the popup's own units. */
     virtual juce::Point<int> cardSize() const = 0;
+    /** A macro popover: a small raised card unfolding above its macro, no close button
+        (a click elsewhere, Escape or the macro's name closes it). */
+    virtual bool compact() const { return false; }
     /** The popup's drawing unit: 1 draws the shell at the reference's size (the macro
         popups); smaller panels laid out at a smaller unit are scaled up by the editor
         (1 / unit) so every popup's shell and type read alike. */

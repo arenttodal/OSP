@@ -509,9 +509,9 @@ void OspAudioProcessorEditor::openPopup (int which)
     popup->toFront (false);
     positionPopup();
     {
-        // Opening: a short fade and a 4 px settle (110 ms), nothing more.
+        // Opening: a short fade and a 3 px settle (110 ms), nothing more.
         const auto final = popup->getBounds();
-        popup->setBounds (final.translated (0, 4));
+        popup->setBounds (final.translated (0, 3));
         popup->setAlpha (0.0f);
         juce::Desktop::getInstance().getAnimator().animateComponent (popup.get(), final, 1.0f, 110, false, 1.0, 0.0);
     }
@@ -553,10 +553,17 @@ void OspAudioProcessorEditor::positionPopup()
     const auto size = (popup->cardSize().toFloat() * scale);
     const float m = static_cast<float> (MiniPanel::shadowMargin) * scale;
     float x = 0.0f, y = 0.0f;
-    if (popupIndex < 5 || popupIndex == mixPopup)
+    if (popupIndex < 5)
     {
-        // The macro popups (and the large MIX) sit where the reference's SPACE does:
-        // centred, 236 px down, taller ones growing upwards from the same foot.
+        // A macro's popover unfolds directly above its name: centred on it, its foot 10 px
+        // above, kept inside the instrument at the edges (LIFE, SPACE).
+        const auto anchor = macros[static_cast<std::size_t> (popupIndex)].label->getBounds().toFloat();
+        x = anchor.getCentreX() - 0.5f * size.x;
+        y = anchor.getY() - 10.0f - size.y;
+    }
+    else if (popupIndex == mixPopup)
+    {
+        // The large MIX sits where the macro panels are, centred over the instrument.
         x = 0.5f * design::width - 0.5f * size.x;
         y = std::min (design::layout::popupTop, design::layout::popupFoot - size.y);
     }

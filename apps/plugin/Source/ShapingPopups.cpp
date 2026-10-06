@@ -272,10 +272,10 @@ void MiniKnob::paint (juce::Graphics& g)
         return;
     }
     g.setColour (captionColour);
-    g.setFont (fonts::make ((compact ? 0.14f : 0.155f) * h, fonts::Weight::bold, 0.04f));
+    g.setFont (fonts::make (std::max (9.0f, (compact ? 0.14f : 0.155f) * h), fonts::Weight::bold, 0.04f));
     g.drawText (caption, juce::Rectangle<float> (r.getX(), r.getY(), r.getWidth(), 0.2f * h), juce::Justification::centred, false);
     g.setColour (valueColour);
-    g.setFont (fonts::make ((compact ? 0.17f : 0.19f) * h, fonts::Weight::bold));
+    g.setFont (fonts::make (std::max (9.5f, (compact ? 0.17f : 0.19f) * h), fonts::Weight::bold));
     g.drawText (value, juce::Rectangle<float> (r.getX(), r.getY() + 0.78f * h, r.getWidth(), 0.22f * h), juce::Justification::centred, false);
 }
 
@@ -283,8 +283,12 @@ void MiniKnob::paint (juce::Graphics& g)
 ValueSelector::ValueSelector (juce::RangedAudioParameter& p, juce::String captionText)
     : parameter (p), caption (std::move (captionText)),
       attachment (p, [this] (float v) {
-          index = juce::roundToInt (v);
+          const int now = juce::roundToInt (v);
+          const bool moved = now != index;
+          index = now;
           repaint();
+          if (moved && onChange != nullptr)
+              onChange (index);
       })
 {
     attachment.sendInitialUpdate();
@@ -295,19 +299,35 @@ ValueSelector::ValueSelector (juce::RangedAudioParameter& p, juce::String captio
 
 void ValueSelector::paint (juce::Graphics& g)
 {
-    // Caption above (a third of the height), the value on a raised key with its chevron.
     auto r = getLocalBounds().toFloat();
     const float h = r.getHeight();
-    g.setColour (design::colour::text);
-    g.setFont (fonts::make (0.27f * h, fonts::Weight::bold, 0.03f));
-    g.drawText (caption, r.removeFromTop (0.36f * h), juce::Justification::centred, false);
+    const auto valueText = parameter.getAllValueStrings()[index];
+    if (plain)
+    {
+        // A popover's mode, right-aligned beside its title: quiet type and a small chevron.
+        const bool hot = isMouseOver() || hasKeyboardFocus (false);
+        const auto colour = design::colour::text.withAlpha (hot ? 0.85f : 0.55f);
+        icons::draw (g, icons::Kind::chevronDown, r.removeFromRight (0.5f * h).withSizeKeepingCentre (0.42f * h, 0.42f * h), colour, 1.2f);
+        r.removeFromRight (3.0f);
+        g.setColour (colour);
+        g.setFont (fonts::make (0.55f * h, fonts::Weight::regular, 0.06f));
+        g.drawText (valueText.toUpperCase(), r, juce::Justification::centredRight, true);
+        return;
+    }
+    // Caption above (a third of the height) when there is one, the value on a raised key.
+    if (caption.isNotEmpty())
+    {
+        g.setColour (design::colour::textSecondary);
+        g.setFont (fonts::make (0.27f * h, fonts::Weight::regular, 0.05f));
+        g.drawText (caption, r.removeFromTop (0.36f * h), juce::Justification::centred, false);
+    }
     const auto box = r.reduced (1.0f, 1.0f);
-    design::draw::button (g, box, 0.14f * box.getHeight(), false, hasKeyboardFocus (false) || isMouseOver(), design::colour::accent);
-    g.setColour (design::colour::text);
-    g.setFont (fonts::make (0.43f * box.getHeight(), fonts::Weight::semibold, 0.02f));
-    auto text = box.reduced (0.35f * box.getHeight(), 0.0f);
-    icons::draw (g, icons::Kind::chevronDown, text.removeFromRight (0.3f * box.getHeight()), design::colour::text.withAlpha (0.65f), 1.6f);
-    g.drawText (parameter.getAllValueStrings()[index], text, juce::Justification::centred, false);
+    design::draw::button (g, box, 0.2f * box.getHeight(), false, hasKeyboardFocus (false) || isMouseOver(), design::colour::accent);
+    g.setColour (design::colour::text.withAlpha (0.9f));
+    g.setFont (fonts::make (0.5f * box.getHeight(), fonts::Weight::medium, 0.04f));
+    auto text = box.reduced (0.3f * box.getHeight(), 0.0f);
+    icons::draw (g, icons::Kind::chevronDown, text.removeFromRight (0.32f * box.getHeight()), design::colour::text.withAlpha (0.5f), 1.2f);
+    g.drawText (valueText.toUpperCase(), text, juce::Justification::centred, false);
 }
 
 void ValueSelector::mouseUp (const juce::MouseEvent& e)
@@ -369,7 +389,7 @@ juce::Rectangle<float> MiniPanel::closeButton() const
 
 void MiniPanel::mouseUp (const juce::MouseEvent& e)
 {
-    if (closeButton().contains (e.position) && onClose != nullptr)
+    if (! compact() && closeButton().contains (e.position) && onClose != nullptr)
         onClose();
 }
 
@@ -382,6 +402,24 @@ void MiniPanel::paint (juce::Graphics& g)
     const float u = unit();
     const auto r = card().toFloat();
     juce::Path shape;
+    if (compact())
+    {
+        // A small raised extension of the macro beneath it: warm cream, a hairline edge, a
+        // short soft shadow (no window chrome, no backdrop).
+        shape.addRoundedRectangle (r, 14.0f);
+        juce::DropShadow (juce::Colour (0x1e1e1a16), 16, { 0, 5 }).drawForPath (g, shape);
+        juce::DropShadow (juce::Colour (0x161e1a16), 2, { 0, 1 }).drawForPath (g, shape);
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xfff8f4ec), 0.0f, r.getY(), juce::Colour (0xffeee7db), 0.0f, r.getBottom(), false));
+        g.fillPath (shape);
+        g.setColour (juce::Colour (0xffd3cabc));
+        g.strokePath (shape, juce::PathStrokeType (1.0f));
+        g.setColour (juce::Colours::white.withAlpha (0.85f));
+        g.drawHorizontalLine (juce::roundToInt (r.getY() + 1.0f), r.getX() + 14.0f, r.getRight() - 14.0f);
+        g.setColour (colour::text.withAlpha (0.82f));
+        g.setFont (fonts::make (13.0f, fonts::Weight::medium, 0.09f));
+        g.drawText (title, juce::Rectangle<float> (r.getX() + 13.0f, r.getY() + 7.0f, r.getWidth() * 0.5f, 20.0f), juce::Justification::centredLeft, false);
+        return;
+    }
     shape.addRoundedRectangle (r, 12.0f * u);
     juce::DropShadow (juce::Colour (0x5a281c10), juce::roundToInt (32.0f * u), { 3, juce::roundToInt (12.0f * u) }).drawForPath (g, shape);
     juce::DropShadow (juce::Colour (0x3a281c10), juce::roundToInt (4.0f * u), { 0, 1 }).drawForPath (g, shape);
@@ -418,6 +456,11 @@ void MiniPanel::resized()
 {
     const float u = unit();
     auto area = card().toFloat();
+    if (compact())
+    {
+        layoutContent (area.withTrimmedLeft (12.0f).withTrimmedRight (12.0f).withTrimmedTop (32.0f).withTrimmedBottom (10.0f).toNearestInt());
+        return;
+    }
     area = area.withTrimmedLeft (25.0f * u).withTrimmedRight (23.0f * u).withTrimmedTop (91.0f * u).withTrimmedBottom (26.0f * u);
     layoutContent (area.toNearestInt());
 }

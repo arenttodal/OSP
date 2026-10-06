@@ -57,10 +57,10 @@ namespace
             // shaded under its top edge, a faint light line along its foot.
             const auto r = getLocalBounds().toFloat();
             g.setGradientFill (juce::ColourGradient (juce::Colour (0xff1f2626), 0.0f, r.getY(), juce::Colour (0xff1a1e1f), 0.0f, r.getBottom(), false));
-            g.fillRoundedRectangle (r, 9.0f);
-            g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.35f), 0.0f, r.getY(), juce::Colours::transparentBlack, 0.0f,
-                                                     r.getY() + 10.0f, false));
-            g.fillRoundedRectangle (r.withHeight (12.0f), 9.0f);
+            g.fillRoundedRectangle (r, radius);
+            g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.3f), 0.0f, r.getY(), juce::Colours::transparentBlack, 0.0f,
+                                                     r.getY() + 6.0f, false));
+            g.fillRoundedRectangle (r.withHeight (8.0f), radius);
             {
                 juce::Graphics::ScopedSaveState state (g);
                 g.reduceClipRegion (getLocalBounds().reduced (1));
@@ -72,11 +72,11 @@ namespace
                     const float k = visualScale;
                     g.addTransform (juce::AffineTransform::scale (k));
                     const auto v = juce::Rectangle<float> (r.getWidth() / k, r.getHeight() / k);
-                    paintVisual (g, v.reduced (12.0f, 9.0f));
+                    paintVisual (g, v.reduced (8.0f, 6.0f));
                 }
             }
             g.setColour (juce::Colour (0xff0b0e10));
-            g.drawRoundedRectangle (r.reduced (0.5f), 9.0f, 1.0f);
+            g.drawRoundedRectangle (r.reduced (0.5f), radius, 1.0f);
             if (fade > 0.0f && previous.isValid())
             {
                 g.setOpacity (fade);
@@ -84,7 +84,8 @@ namespace
             }
         }
 
-        static constexpr float visualScale = 1.6f;
+        // Pictures designed for a larger display draw at this scale in the popovers.
+        static constexpr float visualScale = 0.9f, radius = 6.0f;
 
     protected:
         virtual void paintVisual (juce::Graphics&, juce::Rectangle<float> plot) = 0;
@@ -189,8 +190,10 @@ namespace
             const auto portrait = SpaceReverb::portrait (type);
             const double span = decay * 1.25;
             const float W = bounds.getWidth(), H = bounds.getHeight();
-            const auto plot = juce::Rectangle<float>::leftTopRightBottom (bounds.getX() + 0.048f * W, bounds.getY() + 0.084f * H,
-                                                                          bounds.getRight() - 0.045f * W, bounds.getY() + 0.893f * H);
+            // Sizes follow the display (the popover's is small): strokes, dots and counts.
+            const float k = juce::jlimit (0.3f, 1.0f, H / 261.0f), dot = std::sqrt (k);
+            const auto plot = juce::Rectangle<float>::leftTopRightBottom (bounds.getX() + 14.0f, bounds.getY() + 5.0f,
+                                                                          bounds.getRight() - 12.0f, bounds.getBottom() - 14.0f);
             const float mid = plot.getCentreY(), half = 0.5f * plot.getHeight();
             auto xAt = [&] (double t) { return plot.getX() + static_cast<float> (t / span) * plot.getWidth(); };
 
@@ -202,10 +205,10 @@ namespace
                     step = c;
                     break;
                 }
-            for (int i = 0; i <= 5; ++i)
+            for (int i = 0; i <= 4; ++i)
             {
                 g.setColour (juce::Colours::white.withAlpha (0.045f));
-                g.fillRect (juce::Rectangle<float> (plot.getX(), plot.getY() + plot.getHeight() * static_cast<float> (i) / 5.0f - 0.5f, plot.getWidth(), 1.0f));
+                g.fillRect (juce::Rectangle<float> (plot.getX(), plot.getY() + plot.getHeight() * static_cast<float> (i) / 4.0f - 0.5f, plot.getWidth(), 1.0f));
             }
             for (int i = 0; static_cast<double> (i) * step * 0.25 <= span + 1.0e-6; ++i)
             {
@@ -213,10 +216,10 @@ namespace
                 g.setColour (juce::Colours::white.withAlpha (i % 4 == 0 ? 0.075f : 0.04f));
                 g.fillRect (juce::Rectangle<float> (x - 0.5f, plot.getY(), 1.0f, plot.getHeight()));
             }
-            g.setFont (fonts::make (15.5f, fonts::Weight::medium, 0.02f));
-            g.setColour (juce::Colour (0xffa3a8a6));
+            g.setFont (fonts::make (9.0f, fonts::Weight::regular, 0.02f));
+            g.setColour (juce::Colour (0xff9aa09e).withAlpha (0.8f));
             for (double t = 0.0; t <= span + 1.0e-6; t += step)
-                g.drawText (secondsLabel (t), juce::Rectangle<float> (xAt (t) - 30.0f, bounds.getY() + 0.92f * H, 60.0f, 0.06f * H), juce::Justification::centred, false);
+                g.drawText (secondsLabel (t), juce::Rectangle<float> (xAt (t) - 20.0f, bounds.getBottom() - 13.0f, 40.0f, 12.0f), juce::Justification::centred, false);
 
             // The tail's envelope (linear in dB: a straight fall to the floor at the edge),
             // building up as the diffusers fill in; springs ripple.
@@ -247,7 +250,7 @@ namespace
             // The centre's glow: the tail's energy along its axis.
             for (int pass = 0; pass < 3; ++pass)
             {
-                const float width = pass == 0 ? 9.0f : (pass == 1 ? 3.5f : 1.3f);
+                const float width = (pass == 0 ? 9.0f : (pass == 1 ? 3.5f : 1.3f)) * dot;
                 const float alpha = pass == 0 ? 0.05f : (pass == 1 ? 0.16f : 0.55f);
                 const int segments = 96;
                 for (int i = 0; i < segments; ++i)
@@ -263,11 +266,12 @@ namespace
             // A warm haze where the tail is young and dense.
             {
                 const float xh = xAt (onset + 0.16 * span);
-                juce::ColourGradient haze (juce::Colour (0xffffa45a).withAlpha (0.1f), xh, mid, juce::Colour (0xffffa45a).withAlpha (0.0f), xh + 0.22f * W, mid, true);
+                juce::ColourGradient haze (juce::Colour (0xffffa45a).withAlpha (0.06f), xh, mid, juce::Colour (0xffffa45a).withAlpha (0.0f), xh + 0.22f * W, mid, true);
                 g.setGradientFill (haze);
                 g.fillEllipse (juce::Rectangle<float> (0.44f * W, 0.6f * H).withCentre ({ xh, mid }));
             }
-            const int count = type == SpaceType::plate ? 17000 : (type == SpaceType::chamber ? 15000 : (type == SpaceType::room ? 13000 : 13500));
+            const int count = juce::roundToInt ((type == SpaceType::plate ? 17000 : (type == SpaceType::chamber ? 15000 : (type == SpaceType::room ? 13000 : 13500)))
+                                                * juce::jlimit (0.15f, 1.0f, (W * H) / (558.0f * 261.0f)) * 1.6f);
             Prng rng (Prng::deriveSeed (0x7370616365ull, static_cast<std::uint64_t> (type), 0));
             for (int i = 0; i < count; ++i)
             {
@@ -285,7 +289,7 @@ namespace
                     continue;
                 const float y = mid + static_cast<float> ((rng.nextDouble() < 0.5 ? -1.0 : 1.0) * r * a * spread) * half * 0.98f;
                 const float near = 1.0f - static_cast<float> (r);
-                const float size = 1.0f + (0.9f + 1.2f * near) * static_cast<float> (rng.nextDouble()) * (0.65f + 0.6f * static_cast<float> (a));
+                const float size = dot * (1.0f + (0.9f + 1.2f * near) * static_cast<float> (rng.nextDouble()) * (0.65f + 0.6f * static_cast<float> (a)));
                 const float alpha = std::clamp ((0.3f + 0.65f * static_cast<float> (rng.nextDouble())) * (0.5f + 0.5f * near) * (0.6f + 0.6f * static_cast<float> (a)), 0.0f, 0.95f);
                 g.setColour (tint (t).withAlpha (alpha));
                 g.fillEllipse (xAt (t) - 0.5f * size, y - 0.5f * size, size, size);
@@ -310,16 +314,16 @@ namespace
                     {
                         const float v = static_cast<float> (k) / 30.0f;
                         const float py = mid - extent + 2.0f * extent * v;
-                        const float px = x + 3.5f * std::sin (v * 18.0f + v * v * 20.0f) * (1.0f - std::abs (v - 0.5f) * 2.0f);
+                        const float px = x + 3.5f * dot * std::sin (v * 18.0f + v * v * 20.0f) * (1.0f - std::abs (v - 0.5f) * 2.0f);
                         if (k == 0)
                             chirp.startNewSubPath (px, py);
                         else
                             chirp.lineTo (px, py);
                     }
                     g.setColour (colour.withAlpha (0.25f));
-                    g.strokePath (chirp, juce::PathStrokeType (3.5f));
+                    g.strokePath (chirp, juce::PathStrokeType (3.5f * dot));
                     g.setColour (colour.withAlpha (0.9f));
-                    g.strokePath (chirp, juce::PathStrokeType (1.2f));
+                    g.strokePath (chirp, juce::PathStrokeType (1.2f * dot));
                     continue;
                 }
                 juce::ColourGradient body (colour.withAlpha (0.0f), x, mid - extent, colour.withAlpha (0.0f), x, mid + extent, false);
@@ -327,9 +331,9 @@ namespace
                 body.addColour (0.5, colour.brighter (0.3f));
                 body.addColour (0.88, colour.withAlpha (0.8f));
                 g.setGradientFill (body);
-                g.fillRect (juce::Rectangle<float> (x - 1.2f, mid - extent, 2.4f, 2.0f * extent));
+                g.fillRect (juce::Rectangle<float> (x - 1.2f * dot, mid - extent, 2.4f * dot, 2.0f * extent));
                 g.setColour (colour.withAlpha (0.08f));
-                g.fillRect (juce::Rectangle<float> (x - 3.5f, mid - 0.8f * extent, 7.0f, 1.6f * extent));
+                g.fillRect (juce::Rectangle<float> (x - 3.5f * dot, mid - 0.8f * extent, 7.0f * dot, 1.6f * extent));
             }
             // The sound itself, arriving: a warm bloom at zero.
             const float x0 = xAt (onset);
@@ -893,11 +897,25 @@ namespace
     class MacroPanel : public MiniPanel
     {
     public:
-        MacroPanel (OspAudioProcessor& p, juce::String popupTitle, juce::String question)
-            : MiniPanel (std::move (popupTitle), std::move (question)), processor (p), panelWidth (juce::roundToInt (design::layout::popupWidth))
+        /** A compact popover (230-270 x 170-210 reference px) that unfolds above its macro:
+            a small title with the mode as a quiet selector beside it, the visualisation as
+            the largest element, then small knobs. */
+        MacroPanel (OspAudioProcessor& p, juce::String popupTitle, int width, int displayHeight)
+            : MiniPanel (std::move (popupTitle)), processor (p), panelWidth (width), visualHeight (displayHeight)
         {
         }
 
+        bool compact() const override { return true; }
+
+        ValueSelector& mode (const char* id, juce::String tooltip)
+        {
+            modeSelector = std::make_unique<ValueSelector> (*processor.parameters.getParameter (id), juce::String());
+            modeSelector->setPlain (true);
+            modeSelector->setTooltip (tooltip);
+            addAndMakeVisible (*modeSelector);
+            return *modeSelector;
+        }
+        /** SPACE also shows its types as a row of tabs under the display. */
         SegmentedControl& tabs (const char* id, juce::StringArray items, juce::String tooltip)
         {
             modeTabs = std::make_unique<SegmentedControl> (*processor.parameters.getParameter (id), std::move (items));
@@ -910,46 +928,51 @@ namespace
             visual = std::move (v);
             addAndMakeVisible (*visual);
         }
-        MiniKnob& knob (bool secondary, const char* id, const char* caption, MiniKnob::Formatter f, bool horizontal = false)
+        MiniKnob& knob (bool secondary, const char* id, const char* caption, MiniKnob::Formatter f)
         {
-            auto k = std::make_unique<MiniKnob> (processor.parameters, id, caption, std::move (f), horizontal);
+            auto k = std::make_unique<MiniKnob> (processor.parameters, id, caption, std::move (f));
             k->setSmall (secondary);
-            k->setBoxed (true);
             addAndMakeVisible (*k);
             (secondary ? secondaryRow : primaryRow).push_back (k.get());
             knobs.push_back (std::move (k));
             return *knobs.back();
         }
 
-        // The reference's SPACE popup, in its own pixels: tabs 43 high, the display 558 x 261,
-        // then rows of knob cells (DECAY's: 160 high), 26 below.
-        static constexpr int tabsTop = 1, tabsHeight = 43, tabsGap = 13, visualGap = 15;
-        static constexpr int cellHeight = 160, secondaryCellHeight = 132, rowGap = 4;
+        static constexpr int headerTop = 32, gap = 8, tabsHeight = 21, cellHeight = 58, secondaryCellHeight = 46, bottom = 10;
 
         juce::Point<int> cardSize() const override
         {
-            int h = headerHeight() + (modeTabs != nullptr ? tabsTop + tabsHeight + tabsGap : 0) + visualHeight + visualGap + cellHeight + 26;
+            int h = headerTop + visualHeight + gap + (modeTabs != nullptr ? tabsHeight + 6 : 0) + cellHeight + bottom;
             if (! secondaryRow.empty())
-                h += rowGap + secondaryCellHeight;
+                h += 2 + secondaryCellHeight;
             return { panelWidth, h };
         }
 
     protected:
+        void layoutHeader()
+        {
+            if (modeSelector != nullptr)
+            {
+                const auto c = card();
+                modeSelector->setBounds (c.getRight() - 12 - 120, c.getY() + 7, 120, 20);
+            }
+        }
+
         void layoutContent (juce::Rectangle<int> area) override
         {
-            if (modeTabs != nullptr)
-            {
-                area.removeFromTop (tabsTop);
-                modeTabs->setBounds (area.removeFromTop (tabsHeight).withTrimmedRight (-1));
-                area.removeFromTop (tabsGap);
-            }
+            layoutHeader();
             if (visual != nullptr)
                 visual->setBounds (area.removeFromTop (visualHeight));
-            area.removeFromTop (visualGap);
+            area.removeFromTop (gap);
+            if (modeTabs != nullptr)
+            {
+                modeTabs->setBounds (area.removeFromTop (tabsHeight));
+                area.removeFromTop (6);
+            }
             layoutRow (primaryRow, area.removeFromTop (cellHeight));
             if (! secondaryRow.empty())
             {
-                area.removeFromTop (rowGap);
+                area.removeFromTop (2);
                 layoutRow (secondaryRow, area.removeFromTop (secondaryCellHeight));
             }
         }
@@ -958,7 +981,7 @@ namespace
         {
             if (row.empty())
                 return;
-            const int cell = std::min (line.getWidth() / static_cast<int> (row.size()), 139);
+            const int cell = std::min (line.getWidth() / static_cast<int> (row.size()), 80);
             line = line.withSizeKeepingCentre (cell * static_cast<int> (row.size()), line.getHeight());
             for (auto* k : row)
                 k->setBounds (line.removeFromLeft (cell));
@@ -966,7 +989,8 @@ namespace
 
         OspAudioProcessor& processor;
         int panelWidth;
-        int visualHeight = 261;
+        int visualHeight;
+        std::unique_ptr<ValueSelector> modeSelector;
         std::unique_ptr<SegmentedControl> modeTabs;
         std::unique_ptr<Visual> visual;
         std::vector<std::unique_ptr<MiniKnob>> knobs;
@@ -975,43 +999,40 @@ namespace
 
     //==========================================================================
     /** MOVEMENT: the mode, its picture, then that mode's own controls (SHAPER: PATTERN, RATE,
-        TARGET, SMOOTH). Switching modes keeps every mode's values. */
+        TARGET on one line, then DEPTH and SMOOTH). Switching modes keeps every mode's values. */
     class MovementPanel final : public MacroPanel
     {
     public:
-        explicit MovementPanel (OspAudioProcessor& p) : MacroPanel (p, "MOVEMENT", "RHYTHM, DRIFT & MODULATION")
+        explicit MovementPanel (OspAudioProcessor& p) : MacroPanel (p, "MOVEMENT", 270, 62)
         {
-            auto& t = tabs ("movement.mode", { "DRIFT", "TAPE", "CHORUS", "PULSE", "SHAPER" }, "Movement: drift, tape, chorus, pulse or rhythmic shaper");
-            t.onChange = [this] (int mode) {
-                build (mode);
+            auto& m = mode ("movement.mode", "Movement: drift, tape, chorus, pulse or rhythmic shaper");
+            m.onChange = [this] (int newMode) {
+                build (newMode);
                 if (onSizeChanged != nullptr)
                     onSizeChanged();
             };
             setVisual (std::make_unique<MovementVisual> (p));
-            build (t.selected());
+            build (m.selected());
         }
 
-        /** SHAPER: PATTERN, RATE and TARGET on one line above its two knobs. */
-        static constexpr int selectorHeight = 66, selectorGap = 8;
+        static constexpr int selectorHeight = 22;
 
         juce::Point<int> cardSize() const override
         {
-            const int controls = shaperMode ? selectorHeight + selectorGap + cellHeight : cellHeight;
-            return { panelWidth, headerHeight() + tabsTop + tabsHeight + tabsGap + visualHeight + visualGap + controls + 26 };
+            const int controls = shaperMode ? selectorHeight + 6 + cellHeight : cellHeight;
+            return { panelWidth, headerTop + visualHeight + gap + controls + bottom };
         }
 
     private:
-        void build (int mode)
+        void build (int newMode)
         {
             knobs.clear();
             primaryRow.clear();
-            patternSelector.reset();
-            rateSelector.reset();
-            target.reset();
-            shaperMode = mode == static_cast<int> (MovementMode::shaper);
+            selectors.clear();
+            shaperMode = newMode == static_cast<int> (MovementMode::shaper);
             auto& state = processor.parameters;
             const auto percent = [] (double v) { return format::percent (v) + " %"; };
-            switch (static_cast<MovementMode> (mode))
+            switch (static_cast<MovementMode> (newMode))
             {
                 case MovementMode::drift:
                     knob (false, "movement.drift.speed", "SPEED", [] (double v) { return format::hertz (shaping::driftSpeedHz (v * 0.01)); });
@@ -1034,59 +1055,45 @@ namespace
                     knob (false, "movement.pulse.stereo", "STEREO", percent);
                     break;
                 case MovementMode::shaper:
-                    patternSelector = std::make_unique<ValueSelector> (*state.getParameter ("movement.shaper.pattern"), "PATTERN");
-                    rateSelector = std::make_unique<ValueSelector> (*state.getParameter ("movement.shaper.rate"), "RATE");
-                    addAndMakeVisible (*patternSelector);
-                    addAndMakeVisible (*rateSelector);
-                    target = std::make_unique<SegmentedControl> (*state.getParameter ("movement.shaper.target"), juce::StringArray { "VOL", "FILTER", "BOTH" });
-                    target->setTooltip ("What the pattern shapes: the volume, a low-pass filter, or both");
-                    addAndMakeVisible (*target);
+                {
+                    // PATTERN, RATE and TARGET as three quiet value keys (their names in tooltips).
+                    const std::pair<const char*, const char*> keys[] = {
+                        { "movement.shaper.pattern", "Pattern" },
+                        { "movement.shaper.rate", "Rate (synced to the host tempo)" },
+                        { "movement.shaper.target", "What the pattern shapes: the volume, a low-pass filter, or both" } };
+                    for (const auto& [id, tip] : keys)
+                    {
+                        selectors.push_back (std::make_unique<ValueSelector> (*state.getParameter (id), juce::String()));
+                        selectors.back()->setTooltip (tip);
+                        addAndMakeVisible (*selectors.back());
+                    }
                     // DEPTH is the MOVEMENT macro itself (one control, two places): 100 % takes
                     // the pattern's lowest point to closed - on VOL, silence - 10 % only breathes.
                     knob (false, "motion", "DEPTH", percent);
                     knob (false, "movement.shaper.smooth", "SMOOTH", percent);
                     break;
+                }
             }
             resized();
         }
 
         void layoutContent (juce::Rectangle<int> area) override
         {
-            area.removeFromTop (tabsTop);
-            modeTabs->setBounds (area.removeFromTop (tabsHeight).withTrimmedRight (-1));
-            area.removeFromTop (tabsGap);
+            layoutHeader();
             visual->setBounds (area.removeFromTop (visualHeight));
-            area.removeFromTop (visualGap);
+            area.removeFromTop (gap);
             if (shaperMode)
             {
                 auto row = area.removeFromTop (selectorHeight);
                 const int third = row.getWidth() / 3;
-                if (patternSelector != nullptr)
-                    patternSelector->setBounds (row.removeFromLeft (third).reduced (8, 0));
-                if (rateSelector != nullptr)
-                    rateSelector->setBounds (row.removeFromLeft (third).reduced (8, 0));
-                targetCaption = row.reduced (8, 0).removeFromTop (juce::roundToInt (0.36f * static_cast<float> (selectorHeight)));
-                if (target != nullptr)
-                    target->setBounds (row.reduced (8, 0).withTrimmedTop (targetCaption.getHeight()).reduced (0, 1));
-                area.removeFromTop (selectorGap);
+                for (auto& selector : selectors)
+                    selector->setBounds (row.removeFromLeft (third).reduced (3, 0));
+                area.removeFromTop (6);
             }
             layoutRow (primaryRow, area.removeFromTop (cellHeight));
         }
 
-        void paint (juce::Graphics& g) override
-        {
-            MiniPanel::paint (g);
-            if (shaperMode)
-            {
-                g.setColour (design::colour::text);
-                g.setFont (fonts::make (0.27f * static_cast<float> (selectorHeight), fonts::Weight::bold, 0.03f));
-                g.drawText ("TARGET", targetCaption, juce::Justification::centred, false);
-            }
-        }
-
-        std::unique_ptr<SegmentedControl> target;
-        std::unique_ptr<ValueSelector> patternSelector, rateSelector;
-        juce::Rectangle<int> targetCaption;
+        std::vector<std::unique_ptr<ValueSelector>> selectors;
         bool shaperMode = false;
     };
 }
@@ -1100,8 +1107,8 @@ std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, OspAudioProcessor
     {
         case MacroPopup::life:
         {
-            auto popup = std::make_unique<MacroPanel> (processor, "LIFE", "HOW EACH NOTE IS PERFORMED");
-            popup->tabs ("life.mode", { "NATURAL", "LOOSE", "FRAY" }, "Natural: subtle; Loose: wider; Fray: now and then a note strays");
+            auto popup = std::make_unique<MacroPanel> (processor, "LIFE", 232, 70);
+            popup->mode ("life.mode", "Natural: subtle; Loose: wider; Fray: now and then a note strays");
             popup->setVisual (std::make_unique<LifeVisual> (processor));
             popup->knob (false, "life.pitch", "PITCH", [] (double v) { return juce::String (v, 1) + " c"; });
             popup->knob (false, "life.tone", "TONE", percent);
@@ -1111,8 +1118,8 @@ std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, OspAudioProcessor
         case MacroPopup::dynamics:
         {
             // ATTACK and RELEASE are the instrument's envelope (beside the macros).
-            auto popup = std::make_unique<MacroPanel> (processor, "DYNAMICS", "TOUCH & RESPONSE");
-            popup->tabs ("dynamics.curve", { "SOFT", "LINEAR", "HARD" }, "Velocity curve: soft reaches loud easily, hard needs a firm touch");
+            auto popup = std::make_unique<MacroPanel> (processor, "DYNAMICS", 232, 70);
+            popup->mode ("dynamics.curve", "Velocity curve: soft reaches loud easily, hard needs a firm touch");
             popup->setVisual (std::make_unique<DynamicsVisual> (processor));
             popup->knob (false, "velocityRange", "RANGE", [] (double v) { return juce::String (v, 0) + " dB"; });
             popup->knob (false, "dynamics.tone", "TONE", percent);
@@ -1120,8 +1127,8 @@ std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, OspAudioProcessor
         }
         case MacroPopup::character:
         {
-            auto popup = std::make_unique<MacroPanel> (processor, "CHARACTER", "SOUND SHAPING");
-            popup->tabs ("character.type", { "LP24", "LP12", "HP12", "BP12", "TILT" }, "Filter type");
+            auto popup = std::make_unique<MacroPanel> (processor, "CHARACTER", 262, 58);
+            popup->mode ("character.type", "Filter type");
             popup->setVisual (std::make_unique<CharacterVisual> (processor));
             popup->knob (false, "character.min", "MIN", [] (double v) { return format::hertz (v); });
             popup->knob (false, "character.max", "MAX", [] (double v) { return format::hertz (v); });
@@ -1138,7 +1145,8 @@ std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, OspAudioProcessor
             break;
     }
 
-    auto popup = std::make_unique<MacroPanel> (processor, "SPACE", "REVERB & AMBIENCE");
+    auto popup = std::make_unique<MacroPanel> (processor, "SPACE", 252, 64);
+    popup->mode ("space.type", "Room, chamber, plate or spring");
     auto& types = popup->tabs ("space.type", { "ROOM", "CHAMBER", "PLATE", "SPRING" }, "Room, chamber, plate or spring");
     popup->setVisual (std::make_unique<SpaceVisual> (state));
     auto* typeParam = state.getParameter ("space.type");
