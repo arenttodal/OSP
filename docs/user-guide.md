@@ -126,20 +126,22 @@ settings, so you can switch back and forth.
 | **TAPE** | WOW, FLUTTER, WEAR | The whole instrument through an imperfect tape transport |
 | **CHORUS** | RATE, WIDTH, STEREO | Vintage bucket-brigade dimension |
 | **PULSE** | RATE, SHAPE, STEREO | Free-running tremolo / auto-pan, sine to rounded square |
-| **SHAPER** | PATTERN, RATE, TARGET, SMOOTH | A held chord becomes rhythm, locked to your DAW's tempo |
+| **SHAPER** | PATTERN, RATE, TARGET, DEPTH, SMOOTH | A held chord becomes rhythm, locked to your DAW's tempo |
 
 **SHAPER**: pick a pattern, a note value (1/4 to 1/32, with triplets), what it shapes - VOL
 (volume), FILTER (a soft low-pass) or BOTH (darker and a little quieter on the closed steps,
-rather than off) - and SMOOTH (crisp edges to flowing). MOVEMENT is the depth: 25 % is a
-subtle articulation, 50 % clearly rhythmic, 100 % the full pattern. The strip shows the
-pattern and where it is. It follows your DAW's bars exactly (any start position, loops,
+rather than off) - DEPTH and SMOOTH (crisp edges to flowing). DEPTH is the MOVEMENT knob
+itself (turning either turns both): how far the level travels. At 100 % every pattern's
+lowest point closes completely - on VOL that is silence, a gate - and at 10 % the level only
+dips by a tenth, an almost sustained rhythm. The strip shows the pattern faintly, what DEPTH
+makes of it in front, and where it is. It follows your DAW's bars exactly (any start position, loops,
 bounces); with the transport stopped it starts with the first note you play.
 
 | Pattern | Character |
 |---|---|
 | PULSE | A decaying articulation on every step, beats a little stronger |
 | OFFBEAT | Low on the beat, opening on the "and" |
-| BREATH | Two slow, rounded swells per bar; never closes far |
+| BREATH | Two slow, rounded swells per bar |
 | THREE | An accent every three steps against the bar (3 over 4) |
 | FIVE | Groups of five against the bar |
 | EUCLID 3 | Three events spread evenly over the bar, quiet between |
@@ -148,7 +150,7 @@ bounces); with the transport stopped it starts with the first note you play.
 | RISE | Pulses that grow through the bar, then drop |
 | BROKEN | Deliberate, uneven syncopation |
 | SCATTER | Mostly open, with a few sparse dips |
-| MACHINE | Fast and precise, down to silence |
+| MACHINE | A precise on/off gate on sixteenths (x.xx.xx.x.xx.x.x) |
 
 ## MIDI
 

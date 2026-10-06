@@ -588,6 +588,10 @@ namespace
                     // playhead (host-synchronised) with the step it is in.
                     const int pattern = juce::roundToInt (value (s, "movement.shaper.pattern"));
                     const double smooth = 0.01 * value (s, "movement.shaper.smooth");
+                    // DEPTH (the MOVEMENT macro): how far the level travels - the pattern's
+                    // full range as a ghost, what DEPTH makes of it in front.
+                    const float depth = static_cast<float> (std::clamp (0.01 * value (s, "motion"), 0.0, 1.0));
+                    const auto span = RhythmicShaper::span (pattern, smooth);
                     const float phase = processor.shaperPhase();
                     const float cell = area.getWidth() / RhythmicShaper::steps;
                     const int current = phase >= 0.0f ? std::min (RhythmicShaper::steps - 1, static_cast<int> (phase * RhythmicShaper::steps)) : -1;
@@ -605,16 +609,24 @@ namespace
                             g.drawVerticalLine (juce::roundToInt (c.getX()), area.getY(), area.getBottom());
                         }
                     }
-                    juce::Path contour;
+                    juce::Path contour, ghost;
                     contour.startNewSubPath (area.getX(), area.getBottom());
                     for (int i = 0; i <= 240; ++i)
                     {
                         const double x = static_cast<double> (i) / 240.0;
-                        const float v = RhythmicShaper::evaluate (pattern, std::min (x, 0.99999), smooth);
-                        contour.lineTo (area.getX() + static_cast<float> (x) * area.getWidth(), area.getBottom() - v * area.getHeight());
+                        const float v = RhythmicShaper::evaluate (pattern, std::min (x, 0.99999), smooth, span);
+                        const float px = area.getX() + static_cast<float> (x) * area.getWidth();
+                        const float level = 1.0f - depth * (1.0f - v);
+                        contour.lineTo (px, area.getBottom() - level * area.getHeight());
+                        if (i == 0)
+                            ghost.startNewSubPath (px, area.getBottom() - v * area.getHeight());
+                        else
+                            ghost.lineTo (px, area.getBottom() - v * area.getHeight());
                     }
                     contour.lineTo (area.getRight(), area.getBottom());
                     contour.closeSubPath();
+                    g.setColour (coral.withAlpha (0.28f));
+                    g.strokePath (ghost, juce::PathStrokeType (1.0f));
                     g.setGradientFill (juce::ColourGradient (coral.withAlpha (0.65f), 0.0f, area.getY(), amber.withAlpha (0.2f), 0.0f, area.getBottom(), false));
                     g.fillPath (contour);
                     g.setColour (coral.brighter (0.3f));
@@ -981,6 +993,9 @@ namespace
                     target = std::make_unique<SegmentedControl> (*state.getParameter ("movement.shaper.target"), juce::StringArray { "VOL", "FILTER", "BOTH" });
                     target->setTooltip ("What the pattern shapes: the volume, a low-pass filter, or both");
                     addAndMakeVisible (*target);
+                    // DEPTH is the MOVEMENT macro itself (one control, two places): 100 % takes
+                    // the pattern's lowest point to closed - on VOL, silence - 10 % only breathes.
+                    knob (false, "motion", "DEPTH", percent, true);
                     knob (false, "movement.shaper.smooth", "SMOOTH", percent, true);
                     break;
             }
@@ -1009,8 +1024,10 @@ namespace
             if (target != nullptr)
                 target->setBounds (area.removeFromTop (24).reduced (2, 0));
             area.removeFromTop (6);
-            if (! knobs.empty())
-                knobs.front()->setBounds (area.removeFromTop (32).withSizeKeepingCentre (170, 32));
+            auto last = area.removeFromTop (32);
+            const int each = last.getWidth() / std::max (1, static_cast<int> (knobs.size()));
+            for (auto& k : knobs)
+                k->setBounds (last.removeFromLeft (each).withSizeKeepingCentre (std::min (each, 170), 32));
         }
 
         void paint (juce::Graphics& g) override

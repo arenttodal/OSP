@@ -29,7 +29,9 @@ struct ShaperParams
       instrument has been silent for a while.
     - Each step has a start and end value and a shape (hold, down, up, dip, pulse, soft);
       SMOOTH rounds the shapes and widens the hand-over into the next step.
-    - The MOVEMENT macro is the depth. VOL dips the level, FILTER closes a gentle LP12
+    - The MOVEMENT macro is the depth (DEPTH in the popup is the same control): 100 % takes
+      the pattern's lowest point to closed - VOL gates to silence - and 10 % only lets the
+      level breathe by 10 %. VOL dips the level, FILTER closes a gentle LP12
       (log cutoff 18 kHz .. 380 Hz), BOTH closes the filter fully but dips the level less,
       so closed steps are darker and quieter rather than off.
     - Never clicks: 2 ms anti-click ramps, 30 ms crossfades for pattern and rate changes,
@@ -46,7 +48,17 @@ public:
     static const char* rateName (ShaperRate rate) noexcept;
     /** A step's length in quarter notes (1/16 = 0.25, 1/8T = 1/3 ...). */
     static double stepQuarterNotes (ShaperRate rate) noexcept;
-    /** The pattern's modulation (0 closed .. 1 open) at a phase 0..1 of its cycle. Pure. */
+    /** The lowest and highest value a pattern's curve reaches at a SMOOTH setting. */
+    struct Span
+    {
+        float low = 0.0f, high = 1.0f;
+    };
+    static Span span (int pattern, double smooth) noexcept;
+    /** The pattern's modulation (0 closed .. 1 open) at a phase 0..1 of its cycle, stretched
+        over its span so its lowest point is 0 and its highest 1 (at full depth the lowest
+        point closes completely). Pure. */
+    static float evaluate (int pattern, double phase, double smooth, Span span) noexcept;
+    /** The same, finding the span itself (remembered per thread for the last pattern). */
     static float evaluate (int pattern, double phase, double smooth) noexcept;
 
     void prepare (double sampleRate) noexcept;
@@ -66,10 +78,13 @@ public:
     float displayPhase() const noexcept { return running ? static_cast<float> (phase) : -1.0f; }
 
 private:
+    /** The pattern as designed (its floors included), before it is stretched. */
+    static float raw (int pattern, double phase, double smooth) noexcept;
     double cyclePhase (double quarterNotes, ShaperRate rate) const noexcept;
 
     double sampleRate = 48000.0;
     ShaperParams params, previous;
+    Span currentSpan, previousSpan;
     int fadeRemaining = 0, fadeLength = 1;
 
     // Clock

@@ -62,9 +62,10 @@ namespace
         // 11 SCATTER: mostly open, with a few sparse dips and one lift.
         { H (0.85f), H (0.85f), H (0.85f), I (0.85f, 0.3f), H (0.85f), H (0.85f), P (0.85f, 1.0f), H (0.85f),
           H (0.85f), I (0.85f, 0.25f), H (0.85f), H (0.85f), H (0.85f), I (0.85f, 0.4f), H (0.85f), H (0.85f) },
-        // 12 MACHINE: precise, fast, down to silence.
-        { D (1.0f, 0.0f), D (0.7f, 0.0f), D (1.0f, 0.0f), D (0.7f, 0.0f), D (1.0f, 0.0f), D (0.7f, 0.0f), D (1.0f, 0.0f), D (0.7f, 0.0f),
-          D (1.0f, 0.0f), D (0.7f, 0.0f), D (1.0f, 0.0f), D (0.7f, 0.0f), D (1.0f, 0.0f), D (0.7f, 0.0f), D (1.0f, 0.0f), D (0.7f, 0.0f) },
+        // 12 MACHINE: a precise on/off gate, down to silence (x.xx.xx.x.xx.x.x). Once every
+        // pattern spans its full range, decaying hits to silence are PULSE; this is the gate.
+        { H (1.0f), H (0.0f), H (1.0f), H (1.0f), H (0.0f), H (1.0f), H (1.0f), H (0.0f),
+          H (1.0f), H (0.0f), H (1.0f), H (1.0f), H (0.0f), H (1.0f), H (0.0f), H (1.0f) },
     } };
 
     constexpr const char* names[RhythmicShaper::patternCount] = {
@@ -132,7 +133,7 @@ double RhythmicShaper::stepQuarterNotes (ShaperRate rate) noexcept
     return 0.25;
 }
 
-float RhythmicShaper::evaluate (int pattern, double cycle, double smooth) noexcept
+float RhythmicShaper::raw (int pattern, double cycle, double smooth) noexcept
 {
     const auto& p = library[static_cast<std::size_t> (std::clamp (pattern, 0, patternCount - 1))];
     smooth = std::clamp (smooth, 0.0, 1.0);
@@ -153,6 +154,45 @@ float RhythmicShaper::evaluate (int pattern, double cycle, double smooth) noexce
     return static_cast<float> (std::clamp (v, 0.0, 1.0));
 }
 
+RhythmicShaper::Span RhythmicShaper::span (int pattern, double smooth) noexcept
+{
+    // Where the curve really goes at this SMOOTH (the hand-over can turn a fall around
+    // before it reaches its step's end value). Sampled, so it can only be narrower than
+    // the truth; evaluate() clamps, so the lowest point still lands exactly on 0.
+    Span s { 1.0f, 0.0f };
+    constexpr int points = steps * 16;
+    for (int i = 0; i < points; ++i)
+    {
+        const float v = raw (pattern, (i + 0.5) / points, smooth);
+        s.low = std::min (s.low, v);
+        s.high = std::max (s.high, v);
+    }
+    if (s.high - s.low < 1.0e-3f)
+        s = { 0.0f, 1.0f };   // a flat pattern stays as it is
+    return s;
+}
+
+float RhythmicShaper::evaluate (int pattern, double cycle, double smooth, Span s) noexcept
+{
+    const double v = (raw (pattern, cycle, smooth) - s.low) / static_cast<double> (s.high - s.low);
+    return static_cast<float> (std::clamp (v, 0.0, 1.0));
+}
+
+float RhythmicShaper::evaluate (int pattern, double cycle, double smooth) noexcept
+{
+    // One remembered span per thread (displays and tests call this point by point).
+    thread_local int lastPattern = -1;
+    thread_local double lastSmooth = -1.0;
+    thread_local Span lastSpan;
+    if (pattern != lastPattern || std::abs (smooth - lastSmooth) > 1.0e-12)
+    {
+        lastSpan = span (pattern, smooth);
+        lastPattern = pattern;
+        lastSmooth = smooth;
+    }
+    return evaluate (pattern, cycle, smooth, lastSpan);
+}
+
 void RhythmicShaper::prepare (double rate) noexcept
 {
     sampleRate = rate;
@@ -167,6 +207,7 @@ void RhythmicShaper::prepare (double rate) noexcept
 void RhythmicShaper::reset() noexcept
 {
     previous = params;
+    currentSpan = previousSpan = span (params.pattern, params.smooth);
     fadeRemaining = 0;
     hostPpq = localPpq = ppqNow = 0.0;
     usingHost = localRunning = pendingStart = running = false;
@@ -189,8 +230,13 @@ void RhythmicShaper::setParams (const ShaperParams& p) noexcept
         previous = params;
         fadeRemaining = fadeLength;
     }
+    const bool reshaped = p.pattern != params.pattern || std::abs (p.smooth - params.smooth) > 1.0e-9;
+    if (fadeRemaining == fadeLength)
+        previousSpan = currentSpan;
     params = p;
     params.pattern = std::clamp (p.pattern, 0, patternCount - 1);
+    if (reshaped)
+        currentSpan = span (params.pattern, params.smooth);   // bounded, no allocation; only on a change
 }
 
 void RhythmicShaper::setTiming (const HostTiming& timing) noexcept
@@ -256,10 +302,10 @@ void RhythmicShaper::process (float& left, float& right, double amount) noexcept
     double shape = 1.0;
     if (running)
     {
-        shape = evaluate (params.pattern, phase, params.smooth);
+        shape = evaluate (params.pattern, phase, params.smooth, currentSpan);
         if (fadeRemaining > 0)
         {
-            const double old = evaluate (previous.pattern, cyclePhase (ppqNow, previous.rate), previous.smooth);
+            const double old = evaluate (previous.pattern, cyclePhase (ppqNow, previous.rate), previous.smooth, previousSpan);
             shape = lerp (shape, old, static_cast<double> (fadeRemaining) / fadeLength);
             --fadeRemaining;
         }
