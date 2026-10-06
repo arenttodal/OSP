@@ -50,9 +50,13 @@ struct LoadedInstrument
     double startSeconds = 0.0;       ///< where notes start reading (analysed onset minus pre-roll)
     double playbackGainDb = 0.0;     ///< non-destructive level match
 
-    /** Waveform overview: min/max per bucket of the mono mix. */
+    /** Waveform overview: min/max per bucket of the mono mix, its RMS, and a brightness
+        descriptor (0 dark .. 1 bright: how fast the signal moves against its level), for the
+        display's body and colour. Computed on the loader thread, never while painting. */
     std::vector<float> peakMin;
     std::vector<float> peakMax;
+    std::vector<float> peakRms;
+    std::vector<float> peakBright;
     double durationSeconds = 0.0;
     /** Average spectrum, dB re its peak, on log-spaced bins from 20 Hz to 20 kHz (display). */
     static constexpr int spectrumBins = 96;

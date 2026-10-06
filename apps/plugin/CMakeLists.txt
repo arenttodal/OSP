@@ -27,20 +27,26 @@ juce_add_plugin(OSP_Plugin
     AU_MAIN_TYPE kAudioUnitType_MusicDevice
     MICROPHONE_PERMISSION_ENABLED FALSE)
 
-# Embedded typeface (Inter, SIL Open Font License: Resources/fonts/Inter-OFL.txt), with
-# tabular figures as its default digits (values line up as they change).
+# Embedded typefaces (SIL Open Font License: Resources/fonts/*-OFL.txt): Inter for the
+# interface, with tabular figures as its default digits (values line up as they change), and
+# Outfit for the OSP/2-OSP identity.
 juce_add_binary_data(OSP_PluginData
     HEADER_NAME BinaryData.h
     NAMESPACE BinaryData
     SOURCES
         Resources/fonts/Inter-Regular.ttf
         Resources/fonts/Inter-Medium.ttf
-        Resources/fonts/Inter-SemiBold.ttf)
+        Resources/fonts/Inter-SemiBold.ttf
+        Resources/fonts/Inter-Bold.ttf
+        Resources/fonts/Inter-ExtraBold.ttf
+        Resources/fonts/Outfit-ExtraBold.ttf
+        Resources/fonts/Outfit-ExtraLight.ttf)
 
 target_sources(OSP_Plugin PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
     Source/OspLookAndFeel.cpp
+    Source/Design.cpp
     Source/ShapingPopups.cpp
     Source/MacroPopups.cpp
     Source/EngineCard.cpp

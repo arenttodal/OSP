@@ -23,7 +23,7 @@ namespace
         return std::filesystem::path (f.getFullPathName().toStdString());
     }
 
-    constexpr int waveformBuckets = 1024;
+    constexpr int waveformBuckets = 8192;   // under a period per bucket: peaks keep their texture
     constexpr int playbackZeroCrossings = 16; // must match the processor's EngineSettings
 }
 
@@ -195,18 +195,36 @@ namespace
         const auto buckets = static_cast<std::size_t> (std::min<std::int64_t> (waveformBuckets, std::max<std::int64_t> (1, audio.numFrames())));
         instrument.peakMin.assign (buckets, 0.0f);
         instrument.peakMax.assign (buckets, 0.0f);
+        instrument.peakRms.assign (buckets, 0.0f);
+        instrument.peakBright.assign (buckets, 0.0f);
         for (std::size_t b = 0; b < buckets; ++b)
         {
             const auto start = b * mono.size() / buckets;
             const auto end = std::max (start + 1, (b + 1) * mono.size() / buckets);
             float lo = 0.0f, hi = 0.0f;
-            for (auto i = start; i < end && i < mono.size(); ++i)
+            double energy = 0.0, motion = 0.0;
+            std::size_t n = 0;
+            for (auto i = start; i < end && i < mono.size(); ++i, ++n)
             {
                 lo = std::min (lo, mono[i]);
                 hi = std::max (hi, mono[i]);
+                energy += static_cast<double> (mono[i]) * mono[i];
+                if (i > 0)
+                {
+                    const double d = static_cast<double> (mono[i]) - mono[i - 1];
+                    motion += d * d;
+                }
             }
             instrument.peakMin[b] = lo;
             instrument.peakMax[b] = hi;
+            const double rms = std::sqrt (energy / static_cast<double> (std::max<std::size_t> (1, n)));
+            instrument.peakRms[b] = static_cast<float> (rms);
+            // Brightness: the first difference's RMS against the signal's (about 2 pi f / sr
+            // for a sine), on a log scale from dull (0.02) to bright (0.6).
+            const double ratio = std::sqrt (motion / std::max (energy, 1.0e-20));
+            instrument.peakBright[b] = rms > 1.0e-5
+                                           ? static_cast<float> (std::clamp ((std::log2 (std::max (ratio, 1.0e-6)) - std::log2 (0.02)) / (std::log2 (0.6) - std::log2 (0.02)), 0.0, 1.0))
+                                           : 0.0f;
         }
         instrument.durationSeconds = audio.durationSeconds();
 

@@ -138,40 +138,57 @@ void SamplesPanel::resized()
 void OspKeyboard::drawWhiteNote (int note, juce::Graphics& g, juce::Rectangle<float> area, bool isDown, bool isOver,
                                  juce::Colour, juce::Colour)
 {
-    using namespace palette;
-    auto face = ivory;
+    using namespace design;
+    // Warm white keys with a rounded front, a hairline between them; a held key only warms.
+    const auto key = area.withTrimmedRight (1.0f);
+    juce::Path shape;
+    shape.addRoundedRectangle (key.getX(), key.getY() - 4.0f, key.getWidth(), key.getHeight() + 4.0f, 3.5f, 3.5f, false, false, true, true);
+    auto top = colour::whiteKeyTop, bottom = colour::whiteKeyBottom;
     if (isDown)
-        face = ivory.interpolatedWith (accent, 0.32f);
+    {
+        top = top.interpolatedWith (colour::accent, 0.12f);
+        bottom = bottom.interpolatedWith (colour::accent, 0.16f);
+    }
     else if (isOver)
-        face = ivory.darker (0.03f);
-    g.setColour (face);
-    g.fillRect (area);
-    // A soft shade at the key's front and a hairline between keys.
-    g.setGradientFill (juce::ColourGradient (juce::Colours::transparentBlack, 0.0f, area.getBottom() - 10.0f,
-                                             juce::Colour (0x101e1c18), 0.0f, area.getBottom(), false));
-    g.fillRect (area.withTop (area.getBottom() - 10.0f));
-    g.setColour (hairline);
-    g.drawVerticalLine (static_cast<int> (area.getRight()), area.getY(), area.getBottom());
+        top = top.darker (0.02f);
+    g.setGradientFill (juce::ColourGradient (top, 0.0f, key.getY(), bottom, 0.0f, key.getBottom(), false));
+    g.fillPath (shape);
+    g.setColour (colour::keyLine);
+    g.fillRect (juce::Rectangle<float> (area.getRight() - 1.0f, area.getY(), 1.0f, area.getHeight()));
 
     const auto label = getWhiteNoteText (note);
     if (label.isNotEmpty())
     {
-        g.setColour (isDown ? accent.darker (0.4f) : textDim.withAlpha (0.8f));
-        g.setFont (fonts::make (std::min (9.5f, area.getWidth() * 0.55f), fonts::Weight::medium));
-        g.drawText (label, area.withTrimmedLeft (2.0f).withTrimmedBottom (4.0f).removeFromBottom (11.0f), juce::Justification::centredLeft, false);
+        g.setColour (colour::textSecondary);
+        g.setFont (fonts::make (std::min (14.0f, area.getWidth() * 0.62f), fonts::Weight::medium));
+        g.drawText (label, area.withTrimmedLeft (0.25f * area.getWidth()).withTrimmedBottom (7.0f).removeFromBottom (16.0f), juce::Justification::centredLeft, false);
     }
 }
 
 void OspKeyboard::drawBlackNote (int, juce::Graphics& g, juce::Rectangle<float> area, bool isDown, bool isOver, juce::Colour)
 {
-    using namespace palette;
-    auto r = area.reduced (0.6f, 0.0f);
-    auto face = isDown ? ebony.interpolatedWith (accent, 0.55f) : (isOver ? ebony.brighter (0.15f) : ebony);
-    g.setColour (face);
-    g.fillRoundedRectangle (r.withTrimmedTop (-3.0f), 2.0f);
-    // A faint lit front edge.
-    g.setColour (juce::Colours::white.withAlpha (isDown ? 0.06f : 0.1f));
-    g.fillRoundedRectangle (r.withTop (r.getBottom() - r.getHeight() * 0.1f).reduced (r.getWidth() * 0.14f, 1.0f), 1.5f);
+    using namespace design;
+    const auto r = area.reduced (0.8f, 0.0f).withTrimmedTop (-4.0f);
+    juce::Path shape;
+    shape.addRoundedRectangle (r.getX(), r.getY(), r.getWidth(), r.getHeight(), 2.5f, 2.5f, false, false, true, true);
+    juce::DropShadow (juce::Colour (0x55000000), 3, { 1, 2 }).drawForPath (g, shape);
+    auto top = colour::blackKeyTop, bottom = colour::blackKeyBottom;
+    if (isDown)
+    {
+        top = top.interpolatedWith (colour::accent, 0.2f);
+        bottom = bottom.interpolatedWith (colour::accent, 0.14f);
+    }
+    else if (isOver)
+        top = top.brighter (0.15f);
+    g.setGradientFill (juce::ColourGradient (bottom, r.getX(), 0.0f, bottom, r.getRight(), 0.0f, false));
+    g.fillPath (shape);
+    // A rounded body: lighter down the middle, a lit front bevel.
+    juce::ColourGradient body (top.withAlpha (0.0f), r.getX(), 0.0f, top.withAlpha (0.0f), r.getRight(), 0.0f, false);
+    body.addColour (0.45, top);
+    g.setGradientFill (body);
+    g.fillRoundedRectangle (r.reduced (1.5f, 0.0f).withTrimmedBottom (0.12f * r.getHeight()), 2.0f);
+    g.setColour (juce::Colours::white.withAlpha (0.16f));
+    g.fillRoundedRectangle (r.withTop (r.getBottom() - 0.12f * r.getHeight()).reduced (1.5f, 1.0f), 1.5f);
 }
 
 juce::String OspKeyboard::getWhiteNoteText (int note)
@@ -274,12 +291,16 @@ void AddLayerTarget::paint (juce::Graphics& g)
 //==============================================================================
 void OspAudioProcessorEditor::HeaderMenuButton::paintButton (juce::Graphics& g, bool highlighted, bool)
 {
+    const auto r = getLocalBounds().toFloat();
     if (highlighted)
     {
-        g.setColour (palette::recessed);
-        g.fillRoundedRectangle (getLocalBounds().toFloat(), 6.0f);
+        g.setColour (design::colour::text.withAlpha (0.06f));
+        g.fillRoundedRectangle (r, 6.0f);
     }
-    icons::draw (g, icons::Kind::dots, getLocalBounds().toFloat().reduced (5.0f), palette::text);
+    // Three round dots, 11 px apart (reference).
+    g.setColour (design::colour::text);
+    for (int i = -1; i <= 1; ++i)
+        g.fillEllipse (juce::Rectangle<float> (6.0f, 6.0f).withCentre (r.getCentre().translated (0.0f, 11.0f * static_cast<float> (i))));
 }
 
 void OspAudioProcessorEditor::OutsideClickWatcher::mouseDown (const juce::MouseEvent& e)
@@ -324,19 +345,19 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
 
     // Header: the preset, the master volume and the menu (utilities live there).
     presetBar.onChange = [this] { updateStatus(); };
-    addAndMakeVisible (presetBar);
+    content.addAndMakeVisible (presetBar);
     volume.setRotaryParameters (OspLookAndFeel::rotaryStart, OspLookAndFeel::rotaryEnd, true);
-    volume.getProperties().set ("mini", true);
+    volume.getProperties().set ("noTicks", true);
     volume.setTitle ("Volume");
     volume.setTooltip ("Master volume");
-    volume.setPopupDisplayEnabled (true, true, this);
+    volume.setPopupDisplayEnabled (true, true, &content);
     volume.setColour (juce::TooltipWindow::textColourId, palette::valueBubbleText);   // the value bubble's text
     volumeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (ospProcessor.parameters, "gain", volume);
     volume.setDoubleClickReturnValue (true, 0.0);
-    addAndMakeVisible (volume);
+    content.addAndMakeVisible (volume);
     menuButton.setTooltip ("Sounds, presets, instruments, undo, size");
     menuButton.onClick = [this] { showMenu(); };
-    addAndMakeVisible (menuButton);
+    content.addAndMakeVisible (menuButton);
     setWantsKeyboardFocus (true);
 
     // Sources: one card per layer slot (only occupied ones show), the drop zone, the add target.
@@ -352,16 +373,16 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
             }
         };
         card->onMenu = [this] (int l, juce::Component& target) { showLayerMenu (l, target); };
-        addChildComponent (*card);
+        content.addChildComponent (*card);
     }
     dropZone.onBrowse = [this] { chooseFile (0, true); };
     dropZone.onExample = [this] {
         ospProcessor.resetLayerControls (0);
         ospProcessor.loadExample (0);
     };
-    addChildComponent (dropZone);
-    addChildComponent (addTarget);
-    addChildComponent (samplesPanel);
+    content.addChildComponent (dropZone);
+    content.addChildComponent (addTarget);
+    content.addChildComponent (samplesPanel);
 
     mixSection.onOpenMix = [this] {
         if (closedByLabelPress == mixPopup)
@@ -371,7 +392,7 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
         }
         openPopup (mixPopup);
     };
-    addAndMakeVisible (mixSection);
+    content.addAndMakeVisible (mixSection);
 
     // The five macros: a name with settings behind it (click: its popup) over its knob.
     const std::array<std::pair<const char*, const char*>, 5> macroInfo { {
@@ -393,9 +414,9 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
             }
             openPopup (index);
         };
-        addAndMakeVisible (*knob.label);
+        content.addAndMakeVisible (*knob.label);
         knob.slider.setRotaryParameters (OspLookAndFeel::rotaryStart, OspLookAndFeel::rotaryEnd, true);
-        knob.slider.setPopupDisplayEnabled (true, true, this);
+        knob.slider.setPopupDisplayEnabled (true, true, &content);
         knob.slider.setColour (juce::TooltipWindow::textColourId, palette::valueBubbleText);   // light on the graphite bubble
         knob.attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (ospProcessor.parameters, macroInfo[i].first, knob.slider);
         if (auto* param = ospProcessor.parameters.getParameter (macroInfo[i].first))
@@ -404,12 +425,12 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
         // The value bubble: whole percent ("63 %"), set after the attachment (which installs the parameter's own text).
         knob.slider.textFromValueFunction = [] (double v) { return juce::String (juce::roundToInt (v)) + " %"; };
         knob.slider.updateText();
-        addAndMakeVisible (knob.slider);
+        content.addAndMakeVisible (knob.slider);
     }
-    addAndMakeVisible (envelope);
+    content.addAndMakeVisible (envelope);
 
-    addAndMakeVisible (pitchWheel);
-    addAndMakeVisible (modWheel);
+    content.addAndMakeVisible (pitchWheel);
+    content.addAndMakeVisible (modWheel);
     keyboard.setAvailableRange (21, 108);
     keyboard.setOctaveForMiddleC (4); // MIDI 60 = C4, as everywhere else in OSP
     keyboard.setScrollButtonsVisible (false);
@@ -418,12 +439,12 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     keyboard.setColour (juce::MidiKeyboardComponent::keySeparatorLineColourId, palette::hairline);
     keyboard.setColour (juce::MidiKeyboardComponent::whiteNoteColourId, palette::ivory);
     keyboard.setColour (juce::MidiKeyboardComponent::blackNoteColourId, palette::ebony);
-    addAndMakeVisible (keyboard);
+    content.addAndMakeVisible (keyboard);
 
-    statusLabel.setFont (fonts::make (12.0f));
-    statusLabel.setColour (juce::Label::textColourId, palette::textDim);
+    statusLabel.setFont (fonts::make (17.5f));
+    statusLabel.setColour (juce::Label::textColourId, design::colour::textMicro.darker (0.15f));
     statusLabel.setBorderSize ({ 0, 0, 0, 0 });
-    addAndMakeVisible (statusLabel);
+    content.addAndMakeVisible (statusLabel);
     advancedButton.setTitle ("Advanced settings");
     advancedButton.setTooltip ("Tuning, bend range, pitch character, MPE, variation seed");
     advancedButton.onClick = [this] {
@@ -434,13 +455,20 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
         }
         openPopup (advancedPopup);
     };
-    addAndMakeVisible (advancedButton);
+    content.addAndMakeVisible (advancedButton);
 
     juce::Desktop::getInstance().addGlobalMouseListener (&outsideClicks);
 
+    // The instrument is laid out once at the reference size (design::width x height) and
+    // scaled as a whole: proportions never drift between sizes.
+    content.onPaint = [this] (juce::Graphics& g) { paintInstrument (g); };
+    addAndMakeVisible (content);
+    layoutInstrument();
     setResizable (true, true);
-    setResizeLimits (900, 720, 1800, 1300);
-    setSize (1060, 820);
+    setResizeLimits (869, 652, 1810, 1358);
+    if (auto* constrainer = getConstrainer())
+        constrainer->setFixedAspectRatio (static_cast<double> (design::width / design::height));
+    setSize (1086, 815);
     setScaleFactor (ospProcessor.uiScale());
 
     if (ospProcessor.advancedOpen())
@@ -477,7 +505,7 @@ void OspAudioProcessorEditor::openPopup (int which)
     juce::Component::SafePointer<OspAudioProcessorEditor> safe (this);
     // The close button lives on the popup: close it after the click has been handled.
     popup->onClose = [safe] { juce::MessageManager::callAsync ([safe] { if (safe != nullptr) safe->closePopup(); }); };
-    addAndMakeVisible (*popup);
+    content.addAndMakeVisible (*popup);
     popup->toFront (false);
     positionPopup();
     {
@@ -527,7 +555,7 @@ void OspAudioProcessorEditor::positionPopup()
     int x = popupIndex < 5 ? anchor.getCentreX() - size.x / 2
                            : (popupIndex == mixPopup ? anchor.getX() + 8 : anchor.getRight() - size.x);
     int y = anchor.getY() - 6 - size.y;
-    const auto limits = getLocalBounds().reduced (14);
+    const auto limits = content.getLocalBounds().reduced (14);
     x = juce::jlimit (limits.getX(), std::max (limits.getX(), limits.getRight() - size.x), x);
     y = std::max (limits.getY(), y);
     popup->setBounds (x - m, y - m, size.x + 2 * m, size.y + 2 * m);
@@ -696,7 +724,7 @@ OspAudioProcessorEditor::DropTarget OspAudioProcessorEditor::targetAt (juce::Poi
 
 juce::String OspAudioProcessorEditor::dropTargetAt (juce::Point<int> where) const
 {
-    const auto target = targetAt (where);
+    const auto target = targetAt (toInstrument (where));
     switch (target.kind)
     {
         case DropTarget::Kind::empty: return "drop";
@@ -722,7 +750,7 @@ void OspAudioProcessorEditor::previewDrag (bool on, juce::Point<int> where)
 {
     dragging = on;
     layoutSources (false);
-    showDropTarget (on ? targetAt (where) : DropTarget {});
+    showDropTarget (on ? targetAt (toInstrument (where)) : DropTarget {});
 }
 
 bool OspAudioProcessorEditor::isInterestedInFileDrag (const juce::StringArray& files)
@@ -737,12 +765,12 @@ void OspAudioProcessorEditor::fileDragEnter (const juce::StringArray&, int x, in
 {
     dragging = true;
     layoutSources (true);
-    showDropTarget (targetAt ({ x, y }));
+    showDropTarget (targetAt (toInstrument ({ x, y })));
 }
 
 void OspAudioProcessorEditor::fileDragMove (const juce::StringArray&, int x, int y)
 {
-    const auto target = targetAt ({ x, y });
+    const auto target = targetAt (toInstrument ({ x, y }));
     if (target.kind != dragTarget.kind || target.layer != dragTarget.layer)
         showDropTarget (target);
 }
@@ -756,7 +784,7 @@ void OspAudioProcessorEditor::fileDragExit (const juce::StringArray&)
 
 void OspAudioProcessorEditor::filesDropped (const juce::StringArray& files, int x, int y)
 {
-    const auto target = targetAt ({ x, y });
+    const auto target = targetAt (toInstrument ({ x, y }));
     dragging = false;
     showDropTarget ({});
 
@@ -1010,117 +1038,113 @@ bool OspAudioProcessorEditor::keyPressed (const juce::KeyPress& key)
 
 void OspAudioProcessorEditor::paint (juce::Graphics& g)
 {
-    using namespace palette;
-    g.fillAll (housing);
+    // Around the instrument when the window's shape differs from the reference's.
+    g.fillAll (design::colour::backdropTop);
+}
+
+void OspAudioProcessorEditor::paintInstrument (juce::Graphics& g)
+{
+    using namespace design;
+    draw::housing (g, content.getLocalBounds().toFloat());
 
     // Identity: OSP/2-OSP and what kind of instrument it is now.
     {
-        auto r = logoArea.toFloat();
-        auto top = r.removeFromTop (r.getHeight() * 0.66f);
-        const auto bold = fonts::make (28.0f, fonts::Weight::semibold, -0.01f);
-        const auto light = fonts::make (28.0f, fonts::Weight::regular, -0.01f);
-        g.setFont (bold);
-        g.setColour (text);
-        const float w = juce::GlyphArrangement::getStringWidth (bold, "OSP");
-        g.drawText ("OSP", top.removeFromLeft (w + 1.0f), juce::Justification::bottomLeft, false);
-        g.setFont (light);
-        g.setColour (textDim);
-        g.drawText ("/2-OSP", top, juce::Justification::bottomLeft, false);
+        const auto bold = fonts::make (60.0f, fonts::Weight::displayBold).withHorizontalScale (1.07f);
+        const auto light = fonts::make (60.0f, fonts::Weight::displayLight).withHorizontalScale (1.07f);
+        juce::GlyphArrangement osp, rest;
+        osp.addLineOfText (bold, "OSP", layout::logo.x, layout::logo.y);
+        const float w = osp.getBoundingBox (0, -1, true).getRight() - layout::logo.x + 1.0f;
+        rest.addLineOfText (light, "/2-OSP", layout::logo.x + w, layout::logo.y);
+        g.setColour (colour::text);
+        osp.draw (g);
+        // The slash a shade lighter, as in the identity.
+        rest.draw (g);
         const int count = std::max (0, shownCount);
         const char* kind = count <= 1 ? "ONE SOURCE INSTRUMENT" : (count == 2 ? "TWO LAYER INSTRUMENT" : "THREE LAYER INSTRUMENT");
-        g.setFont (fonts::make (9.5f, fonts::Weight::medium, 0.28f));
-        g.drawText (kind, r.withTrimmedTop (3.0f), juce::Justification::topLeft, false);
+        g.setFont (fonts::make (13.0f, fonts::Weight::medium, 0.52f));
+        g.setColour (colour::textSecondary);
+        g.drawText (kind, layout::logoSubtitle, juce::Justification::centredLeft, false);
     }
-    g.setColour (textDim);
-    g.setFont (fonts::label (9.5f));
-    g.drawText ("VOLUME", volumeCaption, juce::Justification::centred, false);
+    g.setColour (colour::text);
+    g.setFont (fonts::make (13.5f, fonts::Weight::bold, 0.04f));
+    g.drawText ("VOLUME", layout::volumeLabel, juce::Justification::centred, false);
+
+    // The keyboard's frame: a quiet rim, the keys set into it.
+    {
+        const auto bed = layout::keyboard.expanded (2.0f);
+        juce::Path frame;
+        frame.addRoundedRectangle (bed, 6.0f);
+        juce::DropShadow (juce::Colour (0x22302418), 3, { 0, 1 }).drawForPath (g, frame);
+        g.setColour (juce::Colour (0xffd9d0c3));
+        g.fillPath (frame);
+        g.setColour (juce::Colour (0xffc4bbad));
+        g.strokePath (frame, juce::PathStrokeType (1.0f));
+    }
 
     // The macros and the envelope share one panel.
     {
-        const auto r = lowerPanel.toFloat().reduced (1.0f);
-        juce::Path shape;
-        shape.addRoundedRectangle (r, 10.0f);
-        juce::DropShadow (juce::Colour (0x141e1c18), 3, { 0, 1 }).drawForPath (g, shape);
-        g.setColour (raised);
-        g.fillPath (shape);
-        g.setColour (hairline);
-        g.strokePath (shape, juce::PathStrokeType (1.0f));
-        const float divider = static_cast<float> (envelope.getX()) - 18.0f;
-        g.drawVerticalLine (juce::roundToInt (divider), r.getY() + 14.0f, r.getBottom() - 14.0f);
-        g.setColour (text);
-        g.setFont (fonts::label (11.5f));
-        g.drawText ("MACROS", lowerPanel.reduced (18, 12).removeFromTop (16).toFloat(), juce::Justification::centredLeft, false);
-    }
-
-    // The keyboard's bed.
-    {
-        const auto bed = keyboard.getBounds().toFloat().expanded (2.0f);
-        g.setColour (hairline);
-        g.fillRoundedRectangle (bed, 4.0f);
+        const auto r = layout::macroPanel;
+        draw::raised (g, r, layout::panelRadius, colour::panelTop, colour::panelBottom);
+        g.setColour (colour::divider);
+        g.fillRect (juce::Rectangle<float> (889.0f, 715.0f, 1.0f, 170.0f));
+        g.setColour (colour::text);
+        g.setFont (fonts::make (16.5f, fonts::Weight::bold, 0.03f));
+        g.drawText ("MACROS", juce::Rectangle<float> (59.0f, 710.0f, 200.0f, 22.0f), juce::Justification::centredLeft, false);
+        // Under each macro a small light: lit when the macro's own settings are in use.
+        for (std::size_t i = 0; i < macros.size(); ++i)
+        {
+            const auto knob = macros[i].slider.getBounds().toFloat();
+            const bool lit = macros[i].label != nullptr && macros[i].label->isCustomised();
+            draw::led (g, { knob.getCentreX(), 877.0f }, 9.0f, lit ? juce::Colour (0xffff9a45) : juce::Colour (0xffc4521a), lit ? 1.0f : 0.15f);
+        }
     }
 }
 
 void OspAudioProcessorEditor::resized()
 {
-    auto area = getLocalBounds().reduced (18, 14);
+    const float k = std::min (static_cast<float> (getWidth()) / design::width, static_cast<float> (getHeight()) / design::height);
+    const float x = 0.5f * (static_cast<float> (getWidth()) - design::width * k);
+    const float y = 0.5f * (static_cast<float> (getHeight()) - design::height * k);
+    content.setBounds (0, 0, static_cast<int> (design::width), static_cast<int> (design::height));
+    content.setTransform (juce::AffineTransform::scale (k).translated (x, y));
+}
 
-    // Header: identity left, preset in the middle, volume and menu right.
-    headerArea = area.removeFromTop (54);
+juce::Point<int> OspAudioProcessorEditor::toInstrument (juce::Point<int> editorPoint) const
+{
+    return content.getLocalPoint (this, editorPoint);
+}
+
+void OspAudioProcessorEditor::layoutInstrument()
+{
+    using namespace design;
+    auto at = [] (juce::Rectangle<float> r) { return r.getSmallestIntegerContainer(); };
+
+    // Header: identity left (painted), preset in the middle, volume and menu right.
+    presetBar.setBounds (at (layout::presetBar));
+    volume.setBounds (at (layout::volume));
+    menuButton.setBounds (at (layout::menu));
+
+    // The macros: name, knob and its light, at the reference's places.
+    static constexpr std::array<float, 5> centres { 139.0f, 302.0f, 466.0f, 634.0f, 797.0f };
+    for (std::size_t i = 0; i < macros.size(); ++i)
     {
-        auto header = headerArea;
-        logoArea = header.removeFromLeft (260).withSizeKeepingCentre (260, 46);
-        menuButton.setBounds (header.removeFromRight (32).withSizeKeepingCentre (32, 32));
-        header.removeFromRight (10);
-        auto vol = header.removeFromRight (60);
-        volume.setBounds (vol.withHeight (40).withSizeKeepingCentre (40, 40).withY (vol.getY()));
-        volumeCaption = vol.withTop (volume.getBottom() + 1).withHeight (12);
-        presetBar.setBounds (headerArea.withSizeKeepingCentre (std::min (340, headerArea.getWidth() - 2 * 300), 36));
+        auto& knob = macros[i];
+        knob.label->setBounds (at (juce::Rectangle<float> (150.0f, 22.0f).withCentre ({ centres[i], 743.0f })));
+        knob.slider.setBounds (at (juce::Rectangle<float> (132.0f, 132.0f).withCentre ({ centres[i], 812.0f })));
     }
-    area.removeFromTop (12);
+    envelope.setBounds (at (juce::Rectangle<float> (899.0f, 708.0f, 506.0f, 186.0f)));
 
-    // Bottom: status left, Advanced right (under the keyboard's right end).
-    auto bottom = area.removeFromBottom (26);
-    advancedButton.setBounds (bottom.removeFromRight (124));
-    statusLabel.setBounds (bottom.withTrimmedLeft (4));
-    area.removeFromBottom (8);
+    // Keyboard row and footer.
+    pitchWheel.setBounds (at (layout::pitchWheel.withHeight (115.0f)));
+    modWheel.setBounds (at (layout::modWheel.withHeight (115.0f)));
+    keyboard.setBounds (at (layout::keyboard));
+    keyboard.setKeyWidth (layout::keyboard.getWidth() / 52.0f);   // 88 keys = 52 white keys
+    statusLabel.setBounds (at (layout::status));
+    advancedButton.setBounds (at (layout::advanced));
 
-    // The lower sections breathe a little with the window's height (never with the number of
-    // layers: they stay put when sounds are added or removed).
-    const int lowerHeight = juce::jlimit (136, 172, juce::roundToInt (getHeight() * 0.195f));
-    auto keys = area.removeFromBottom (juce::jlimit (68, 92, juce::roundToInt (getHeight() * 0.098f)));
-    pitchWheel.setBounds (keys.removeFromLeft (30));
-    keys.removeFromLeft (4);
-    modWheel.setBounds (keys.removeFromLeft (30));
-    keys.removeFromLeft (10);
-    keyboard.setBounds (keys.reduced (2, 2));
-    keyboard.setKeyWidth (static_cast<float> (keyboard.getWidth()) / 52.0f); // 88 keys = 52 white keys
-    area.removeFromBottom (12);
-
-    // Macros and envelope.
-    lowerPanel = area.removeFromBottom (lowerHeight);
-    {
-        auto inner = lowerPanel.reduced (18, 12);
-        envelope.setBounds (inner.removeFromRight (juce::roundToInt (inner.getWidth() * 0.34f)));
-        inner.removeFromRight (36);
-        inner.removeFromTop (18);
-        const int cell = inner.getWidth() / static_cast<int> (macros.size());
-        for (auto& knob : macros)
-        {
-            auto c = inner.removeFromLeft (cell);
-            knob.label->setBounds (c.removeFromTop (20));
-            c.removeFromTop (2);
-            const int side = std::min ({ c.getWidth() - 8, c.getHeight() - 4, 96 });
-            knob.slider.setBounds (c.withSizeKeepingCentre (side, side).withY (c.getY()));
-        }
-    }
-    area.removeFromBottom (12);
-
-    // The mix band (fixed height), then the sources take the rest.
-    mixSection.setBounds (area.removeFromBottom (60));
-    area.removeFromBottom (12);
-    sourceArea = area;
+    mixSection.setBounds (at (layout::mixBand));
+    sourceArea = at (layout::sources);
     layoutSources (false);
-    positionPopup();
 }
 
 void OspAudioProcessorEditor::updateStatus()
@@ -1158,7 +1182,7 @@ void OspAudioProcessorEditor::timerCallback()
     {
         const bool animate = shownCount >= 1 && count >= 1;
         layoutSources (animate);
-        repaint (logoArea);
+        content.repaint (juce::Rectangle<int> (40, 30, 420, 80));
     }
     for (auto& card : cards)
         if (card->isVisible())

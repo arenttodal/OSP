@@ -1757,7 +1757,12 @@ TEST_CASE ("plugin: canonical screenshots for visual review", "[.][canonical]")
     TempDir tmp;
     auto source = [&] (const char* env, const juce::String& name, const AudioData& fallback) {
         if (const char* path = std::getenv (env); path != nullptr && juce::File (path).existsAsFile())
-            return juce::File (path);
+        {
+            // Under the reference's own file name (uploads can carry a prefix).
+            const auto copy = tmp.dir.getChildFile (name);
+            juce::File (path).copyFileTo (copy);
+            return copy;
+        }
         return writeSource (tmp.dir, name, fallback);
     };
     const auto a = source ("OSP_CANONICAL_A", "MMZT_one_shot_sailboat_C.wav", testsignals::vowel (midiToHz (60), 2.1, 48000.0, 3));
@@ -1797,6 +1802,10 @@ TEST_CASE ("plugin: canonical screenshots for visual review", "[.][canonical]")
     set ("layerA.start", 1.0f);
     set ("layerA.reverse", 1.0f);
     set ("layerB.loop", 0.0f);
+    // LIFE, CHARACTER and SPACE have their own settings in use (their dots and lights).
+    set ("life.pitch", 65.0f);
+    set ("character.resonance", 35.0f);
+    set ("space.decay", 3.2f);
 
     shot ("01-empty.png");
     p.addLayers ({ a });
@@ -1808,8 +1817,12 @@ TEST_CASE ("plugin: canonical screenshots for visual review", "[.][canonical]")
     p.addLayers ({ b });
     settle();
     set ("ab.blend", 0.44f);
+    set ("layerA.start", 1.0f);
+    set ("layerB.reimagined", 90.0f);
     shot ("04-two-oneshot.png");
     set ("layerB.sourceMode", 1.0f);
+    set ("layerB.granular.position", 23.0f);
+    set ("layerB.granular.spread", 21.0f);
     // Notes playing: read heads in A, grains in B.
     p.prepareToPlay (48000.0, 512);
     juce::AudioBuffer<float> audio (2, 512);

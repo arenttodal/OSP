@@ -25,6 +25,7 @@ public:
 
     std::function<void()> onClick;
     void setCustomised (bool customised);
+    bool isCustomised() const noexcept { return customised; }
     void setOpen (bool open);
 
     void paint (juce::Graphics&) override;

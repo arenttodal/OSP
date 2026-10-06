@@ -1,5 +1,7 @@
 #include "EngineCard.h"
 
+#include "Design.h"
+
 #include "core/PitchMath.h"
 
 #include <cmath>
@@ -36,25 +38,21 @@ namespace icons
             case Kind::reverse:
             {
                 // Playback, backwards: two heads pointing left.
-                for (float dx : { -0.18f, 0.12f })
+                for (float dx : { -0.15f, 0.15f })
                 {
                     juce::Path t;
-                    t.addTriangle (c.x + (dx - 0.14f) * s, c.y, c.x + (dx + 0.14f) * s, c.y - 0.2f * s, c.x + (dx + 0.14f) * s, c.y + 0.2f * s);
-                    g.strokePath (t, juce::PathStrokeType (stroke, juce::PathStrokeType::mitered, juce::PathStrokeType::rounded));
+                    t.addTriangle (c.x + (dx - 0.16f) * s, c.y, c.x + (dx + 0.16f) * s, c.y - 0.24f * s, c.x + (dx + 0.16f) * s, c.y + 0.24f * s);
+                    g.strokePath (t, juce::PathStrokeType (stroke, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
                 }
                 return;
             }
             case Kind::loop:
             {
-                const float radius = s * 0.28f;
-                p.addCentredArc (c.x, c.y, radius, radius, 0.0f, 0.5f, 5.6f, true);
+                // The reference's sustain symbol: a ring open at the top with a stem.
+                const float radius = s * 0.3f;
+                p.addCentredArc (c.x, c.y + 0.02f * s, radius, radius, 0.0f, 0.62f, 2.0f * 3.14159265f - 0.62f, true);
                 g.strokePath (p, line);
-                const auto tip = c + juce::Point<float> (std::sin (0.5f), -std::cos (0.5f)) * radius;
-                juce::Path head;
-                head.startNewSubPath (tip.x - s * 0.13f, tip.y - s * 0.07f);
-                head.lineTo (tip.x, tip.y);
-                head.lineTo (tip.x - s * 0.02f, tip.y + s * 0.14f);
-                g.strokePath (head, line);
+                g.drawLine (c.x, c.y - 0.36f * s, c.x, c.y - 0.06f * s, stroke);
                 return;
             }
             case Kind::follow:
@@ -125,16 +123,37 @@ namespace
         return text + " s";
     }
 
-    /** A time series' value at t seconds (linear), or `fallback` when it is empty. */
-    double seriesAt (const TimeSeries& series, double seconds, double fallback)
+}
+
+namespace
+{
+    /** A layer's waveform tones, darkest to lightest (A amber / earth, B mineral / slate, C sage). */
+    struct WaveTones
     {
-        if (series.values.empty() || series.hopSeconds <= 0.0)
-            return fallback;
-        const double x = std::clamp (seconds / series.hopSeconds, 0.0, static_cast<double> (series.values.size() - 1));
-        const auto i = static_cast<std::size_t> (x);
-        const auto j = std::min (i + 1, series.values.size() - 1);
-        return series.values[i] + (series.values[j] - series.values[i]) * (x - static_cast<double> (i));
+        juce::Colour deep, body, light, pale, core, accent;
+    };
+    const WaveTones& waveTones (int layer)
+    {
+        static const std::array<WaveTones, 3> tones { {
+            { juce::Colour (0xff8a4119), juce::Colour (0xffd9853b), juce::Colour (0xfff2b465), juce::Colour (0xffffdfaf), juce::Colour (0xfffff2da), juce::Colour (0xffff8f4a) },
+            { juce::Colour (0xff2c3f57), juce::Colour (0xff6b81a4), juce::Colour (0xffa9b9d8), juce::Colour (0xffe1e8f6), juce::Colour (0xffffffff), juce::Colour (0xffd2bdd8) },
+            { juce::Colour (0xff36513f), juce::Colour (0xff6b9577), juce::Colour (0xffa4c8aa), juce::Colour (0xffdcecd9), juce::Colour (0xfff6fff3), juce::Colour (0xffc9e0a8) },
+        } };
+        return tones[static_cast<std::size_t> (juce::jlimit (0, 2, layer))];
     }
+
+    /** A small deterministic generator for the display's particles (the same picture every time). */
+    struct Scatter
+    {
+        std::uint32_t state = 0x9e3779b9u;
+        float next() noexcept
+        {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            return static_cast<float> (state & 0xffffffu) / 16777216.0f;
+        }
+    };
 }
 
 //==============================================================================
@@ -231,7 +250,8 @@ void SourceDisplay::setOverlayBand (int pixels)
 
 juce::Rectangle<float> SourceDisplay::plotArea() const
 {
-    return getLocalBounds().toFloat().reduced (10.0f, 0.0f).withTrimmedTop (20.0f).withTrimmedBottom (10.0f + static_cast<float> (bottomInset));
+    // Reference: time labels in a 20 px strip at the top; t = 0 sits 26 px in from the left.
+    return getLocalBounds().toFloat().withTrimmedLeft (26.0f).withTrimmedRight (13.0f).withTrimmedTop (22.0f).withTrimmedBottom (12.0f + static_cast<float> (bottomInset));
 }
 
 double SourceDisplay::startSeconds() const
@@ -264,51 +284,62 @@ void SourceDisplay::paint (juce::Graphics& g)
 
     const auto plot = plotArea();
     const bool hasWave = instrument != nullptr && ! instrument->peakMax.empty() && ! loading;
-    const auto identity = palette::layer (layer);
+    const auto& tones = waveTones (layer);
+    const auto inner = getLocalBounds().toFloat().reduced (2.0f);
     if (hasWave && view.granular)
     {
-        // Where grains may come from (SPREAD, half the length either side at 100 %) and POS.
+        // Where grains may come from (SPREAD, half the length either side at 100 %), as a
+        // translucent pane over the waveform; POS a fine bright line with a flare at the centre.
         const float x = plot.getX() + view.position * plot.getWidth();
-        const float half = (view.spread * 0.5f + 0.004f) * plot.getWidth();
-        g.setColour (identity.withAlpha (0.10f));
-        g.fillRect (juce::Rectangle<float> (x - half, plot.getY(), 2.0f * half, plot.getHeight()).getIntersection (plot));
-        g.setColour (identity.withAlpha (0.75f));
-        g.drawVerticalLine (juce::roundToInt (x), plot.getY(), plot.getBottom());
-        // The grains playing now: a faint read line and a dot on its own lane each.
+        const float halfWidth = (view.spread * 0.5f + 0.004f) * plot.getWidth();
+        const auto pane = juce::Rectangle<float> (x - halfWidth, inner.getY() + 28.0f, 2.0f * halfWidth, inner.getHeight() - 46.0f).getIntersection (inner);
+        g.setColour (tones.light.withAlpha (0.09f));
+        g.fillRect (pane);
+        g.setColour (tones.light.withAlpha (0.18f));
+        g.fillRect (pane.withWidth (1.0f));
+        g.fillRect (pane.withLeft (pane.getRight() - 1.0f));
+        g.setColour (tones.light.withAlpha (0.65f));
+        g.fillRect (juce::Rectangle<float> (x - 0.6f, pane.getY(), 1.2f, pane.getHeight()));
+        const float mid = plot.getCentreY();
+        juce::ColourGradient flare (tones.core.withAlpha (0.9f), x, mid, tones.core.withAlpha (0.0f), x + 9.0f, mid, true);
+        g.setGradientFill (flare);
+        g.fillEllipse (x - 9.0f, mid - 9.0f, 18.0f, 18.0f);
+        // The grains playing now: small bright motes on their lanes, a faint read line each.
         for (const auto& grain : grains)
         {
             const float gx = plot.getX() + grain.position * plot.getWidth();
             const float level = std::clamp (grain.level, 0.0f, 1.0f);
-            g.setColour (identity.brighter (0.4f).withAlpha (0.08f + 0.3f * level));
-            g.drawVerticalLine (juce::roundToInt (gx), plot.getY(), plot.getBottom());
+            g.setColour (tones.light.withAlpha (0.05f + 0.18f * level));
+            g.fillRect (juce::Rectangle<float> (gx - 0.5f, pane.getY(), 1.0f, pane.getHeight()));
             const float gy = plot.getY() + 6.0f + grain.lane * (plot.getHeight() - 12.0f);
-            const float r = 1.8f + 3.0f * level;
-            g.setColour (graphite.withAlpha (0.6f));
-            g.fillEllipse (gx - r - 1.2f, gy - r - 1.2f, 2.0f * r + 2.4f, 2.0f * r + 2.4f);
-            g.setColour (identity.brighter (0.5f).withAlpha (0.4f + 0.6f * level));
+            const float r = 0.8f + 1.0f * level;
+            g.setColour (tones.core.withAlpha (0.3f + 0.5f * level));
             g.fillEllipse (gx - r, gy - r, 2.0f * r, 2.0f * r);
         }
     }
     if (hasWave)
     {
-        // One Shot read heads: where every playing note reads now, as bright as it is loud.
+        // One Shot read heads: glowing accent bars, as bright as the note is loud.
         for (const auto& head : heads)
         {
             const float x = plot.getX() + head.position * plot.getWidth();
-            const float level = 0.3f + 0.7f * std::clamp (head.level, 0.0f, 1.0f);
-            g.setColour (accent.withAlpha (0.16f * level));
-            g.fillRect (juce::Rectangle<float> (x - 3.0f, plot.getY(), 6.0f, plot.getHeight()));
-            g.setColour (accent.withAlpha (0.95f * level));
-            g.fillRect (juce::Rectangle<float> (x - 0.75f, plot.getY(), 1.5f, plot.getHeight()));
+            const float level = 0.35f + 0.65f * std::clamp (head.level, 0.0f, 1.0f);
+            const auto bar = juce::Rectangle<float> (x - 3.0f, inner.getY() + 34.0f, 6.0f, inner.getHeight() - 54.0f);
+            g.setColour (juce::Colour (0xffff6a2a).withAlpha (0.22f * level));
+            g.fillRect (bar.expanded (3.0f, 0.0f));
+            g.setColour (juce::Colour (0xfff2662b).withAlpha (0.95f * level));
+            g.fillRect (bar);
+            g.setColour (juce::Colour (0xffffb27a).withAlpha (0.9f * level));
+            g.fillRect (bar.withSizeKeepingCentre (1.6f, bar.getHeight()));
         }
     }
     if (overlayBand > 0)
     {
         // The granular controls float here: the waveform shows through, quietened.
-        const auto band = getLocalBounds().toFloat().removeFromBottom (static_cast<float> (overlayBand));
-        g.setGradientFill (juce::ColourGradient (graphite.withAlpha (0.0f), 0.0f, band.getY() - 10.0f, graphite.withAlpha (0.82f), 0.0f,
-                                                 band.getY() + 12.0f, false));
-        g.fillRect (band.withTop (band.getY() - 10.0f));
+        const auto band = inner.withTop (inner.getBottom() - static_cast<float> (overlayBand));
+        const auto shade = design::colour::wellA;
+        g.setGradientFill (juce::ColourGradient (shade.withAlpha (0.0f), 0.0f, band.getY() - 12.0f, shade.withAlpha (0.88f), 0.0f, band.getY() + 14.0f, false));
+        g.fillRect (band.withTop (band.getY() - 12.0f));
     }
     if (dropLabel.isNotEmpty())
     {
@@ -330,14 +361,9 @@ void SourceDisplay::paint (juce::Graphics& g)
 
 void SourceDisplay::paintStatic (juce::Graphics& g)
 {
-    using namespace palette;
+    using namespace design;
     const auto bounds = getLocalBounds().toFloat();
-    g.setColour (graphite);
-    g.fillRoundedRectangle (bounds, 8.0f);
-    // Recessed: a faint shade under the top edge.
-    g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.22f), 0.0f, bounds.getY(),
-                                             juce::Colours::transparentBlack, 0.0f, bounds.getY() + 10.0f, false));
-    g.fillRoundedRectangle (bounds.withHeight (12.0f), 8.0f);
+    draw::well (g, bounds.reduced (0.5f), 9.0f, layer == 1 ? colour::wellB : colour::wellA);
 
     const auto plot = plotArea();
     const bool hasWave = instrument != nullptr && ! instrument->peakMax.empty();
@@ -345,95 +371,203 @@ void SourceDisplay::paintStatic (juce::Graphics& g)
     {
         if (loading)
         {
-            g.setColour (displayText);
-            g.setFont (fonts::make (13.0f, fonts::Weight::medium, 0.1f));
+            g.setColour (colour::wellText);
+            g.setFont (fonts::make (14.0f, fonts::Weight::medium, 0.12f));
             g.drawText (juce::String::fromUTF8 ("ANALYZING\xe2\x80\xa6"), bounds, juce::Justification::centred, false);
         }
         return;
     }
 
     const double duration = std::max (1.0e-3, instrument->durationSeconds);
-    // Quiet time grid.
+    const float mid = plot.getCentreY();
+    // Quiet grid: a line at every labelled time, a fainter one between; four rows.
     {
         const double step = gridStep (duration);
-        g.setFont (fonts::make (9.5f));
-        for (double t = step; t < duration - 0.25 * step; t += step)
+        const auto inner = bounds.reduced (2.0f);
+        for (int row = 1; row < 4; ++row)
+        {
+            g.setColour (colour::wellGrid.withAlpha (0.45f));
+            g.fillRect (juce::Rectangle<float> (inner.getX(), inner.getY() + inner.getHeight() * static_cast<float> (row) / 4.0f, inner.getWidth(), 1.0f));
+        }
+        g.setFont (fonts::make (14.5f, fonts::Weight::regular, 0.02f));
+        for (double t = 0.5 * step; t < duration + step; t += 0.5 * step)
         {
             const float x = plot.getX() + static_cast<float> (t / duration) * plot.getWidth();
-            g.setColour (displayLine.withAlpha (0.55f));
-            g.drawVerticalLine (juce::roundToInt (x), plot.getY(), plot.getBottom());
-            if (getWidth() > 240)
+            if (x > inner.getRight() - 2.0f)
+                break;
+            const bool labelFits = x < inner.getRight() - 30.0f;
+            const bool major = std::abs (std::fmod (t + 1.0e-9, step)) < 1.0e-6;
+            g.setColour (colour::wellGrid.withAlpha (major ? 0.95f : 0.45f));
+            g.fillRect (juce::Rectangle<float> (x, inner.getY(), 1.0f, inner.getHeight()));
+            if (major && labelFits && getWidth() > 240)
             {
-                g.setColour (displayText.withAlpha (0.6f));
-                g.drawText (secondsText (t, step), juce::Rectangle<float> (x + 3.0f, bounds.getY() + 4.0f, 50.0f, 12.0f),
-                            juce::Justification::centredLeft, false);
+                g.setColour (colour::wellText);
+                g.drawText (secondsText (t, step), juce::Rectangle<float> (x - 40.0f, bounds.getY() + 5.0f, 80.0f, 18.0f), juce::Justification::centred, false);
             }
         }
-        g.setColour (displayLine.withAlpha (0.8f));
-        g.drawHorizontalLine (juce::roundToInt (plot.getCentreY()), plot.getX(), plot.getRight());
     }
 
-    const auto identity = palette::layer (layer);
+    const auto& tones = waveTones (layer);
     const auto& lo = instrument->peakMin;
     const auto& hi = instrument->peakMax;
-    const float mid = plot.getCentreY();
+    const auto& rms = instrument->peakRms;
+    const auto& bright = instrument->peakBright;
+    const bool haveRms = rms.size() == hi.size() && bright.size() == hi.size();
     float maxAbs = 1.0e-4f;   // scaled to the recording's own peak so quiet sources stay visible
     for (std::size_t i = 0; i < hi.size(); ++i)
         maxAbs = std::max ({ maxAbs, hi[i], -lo[i] });
-    const float yScale = plot.getHeight() * 0.47f / maxAbs;
-    const int x0 = static_cast<int> (plot.getX()), width = static_cast<int> (plot.getWidth());
+    const float half = plot.getHeight() * 0.47f;
+    // Display scale: amplitude compressed (power 0.6) so quiet detail and tails read, as in
+    // the reference; the ghost envelope uses a 45 dB range.
+    auto shape = [maxAbs, half] (float a) { return half * std::pow (std::clamp (std::abs (a) / maxAbs, 0.0f, 1.0f), 0.85f) * (a < 0.0f ? -1.0f : 1.0f); };
+    auto shapeDb = [maxAbs, half] (float a) {
+        const float x = std::clamp (std::abs (a) / maxAbs, 0.0f, 1.0f);
+        const float db = 20.0f * std::log10 (std::max (x, 1.0e-6f));
+        return half * (0.5f * std::clamp ((db + 36.0f) / 36.0f, 0.0f, 1.0f) + 0.5f * std::pow (x, 0.6f));
+    };
 
-    // The loudness contour as a faint ghost behind the waveform.
-    const auto& envelope = instrument->analysis.envelope;
-    if (! envelope.rmsDb.values.empty())
+    // Columns at the cache's own resolution (two per logical pixel on a 2x display).
+    const float scale = std::max (1.0f, std::abs (g.getInternalContext().getPhysicalPixelScaleFactor()));
+    const int columns = std::max (1, juce::roundToInt (plot.getWidth() * scale));
+    const float colWidth = plot.getWidth() / static_cast<float> (columns);
+    struct Column
     {
+        float lo = 0.0f, hi = 0.0f, rms = 0.0f, bright = 0.0f;
+    };
+    std::vector<Column> cols (static_cast<std::size_t> (columns));
+    Scatter pick { 0x51ed270bu };
+    for (int c = 0; c < columns; ++c)
+    {
+        const auto first = static_cast<std::size_t> (static_cast<double> (c) / columns * static_cast<double> (hi.size()));
+        const auto last = std::max (first + 1, std::min (hi.size(), static_cast<std::size_t> (static_cast<double> (c + 1) / columns * static_cast<double> (hi.size()))));
+        Column col;
+        double energy = 0.0, b = 0.0;
+        // The peaks of the bucket at the column's centre (a short window, shorter than a
+        // period: the waveform keeps its texture instead of a flat envelope), and the
+        // column's true extremes for the outline.
+        // (A deterministic jitter of where in the column: a steady tone does not alias into combs.)
+        const auto centre = std::min (hi.size() - 1, first + static_cast<std::size_t> (pick.next() * static_cast<float> (last - first)));
+        col.lo = 0.65f * lo[centre];
+        col.hi = 0.65f * hi[centre];
+        for (auto i = first; i < last; ++i)
+        {
+            col.lo = std::min (col.lo, 0.35f * lo[i] + 0.65f * lo[centre]);
+            col.hi = std::max (col.hi, 0.35f * hi[i] + 0.65f * hi[centre]);
+            if (haveRms)
+            {
+                energy += static_cast<double> (rms[i]) * rms[i];
+                b += bright[i];
+            }
+        }
+        const auto n = static_cast<double> (last - first);
+        col.rms = haveRms ? static_cast<float> (std::sqrt (energy / n)) : 0.35f * std::max (col.hi, -col.lo);
+        col.bright = haveRms ? static_cast<float> (b / n) : 0.5f;
+        cols[static_cast<std::size_t> (c)] = col;
+    }
+
+    // The ghost: the sound's envelope, smoothed and held a little, as a translucent outline
+    // a size larger than the waveform (it runs on into the decay).
+    {
+        std::vector<float> env (static_cast<std::size_t> (columns));
+        float held = 0.0f;
+        // Held with a 0.3 s release: it hugs the body and tapers off into the decay.
+        const float release = std::exp (-static_cast<float> (duration) / static_cast<float> (columns) / 0.3f);
+        for (int c = 0; c < columns; ++c)
+        {
+            const auto& col = cols[static_cast<std::size_t> (c)];
+            held = std::max (std::max (col.hi, -col.lo) * 0.7f + col.rms * 0.9f, held * release);
+            env[static_cast<std::size_t> (c)] = held;
+        }
+        // Smooth both ways (no steps).
+        for (int pass = 0; pass < 3; ++pass)
+        {
+            float acc = env.front();
+            for (auto& v : env)
+                v = acc = acc + (v - acc) * 0.06f;
+            acc = env.back();
+            for (auto it = env.rbegin(); it != env.rend(); ++it)
+                *it = acc = acc + (*it - acc) * 0.06f;
+        }
         juce::Path ghost;
-        const float peakDb = static_cast<float> (envelope.maxRmsDbfs);
-        const float ghostScale = plot.getHeight() * 0.47f;
         ghost.startNewSubPath (plot.getX(), mid);
-        for (int x = 0; x <= width; x += 3)
-        {
-            const double t = static_cast<double> (x) / width * duration;
-            const float a = std::pow (10.0f, (static_cast<float> (seriesAt (envelope.rmsDb, t, -120.0)) - peakDb) / 20.0f);
-            ghost.lineTo (plot.getX() + static_cast<float> (x), mid - a * ghostScale);
-        }
-        for (int x = width; x >= 0; x -= 3)
-        {
-            const double t = static_cast<double> (x) / width * duration;
-            const float a = std::pow (10.0f, (static_cast<float> (seriesAt (envelope.rmsDb, t, -120.0)) - peakDb) / 20.0f);
-            ghost.lineTo (plot.getX() + static_cast<float> (x), mid + a * ghostScale);
-        }
+        for (int c = 0; c < columns; c += 2)
+            ghost.lineTo (plot.getX() + static_cast<float> (c) * colWidth, mid - 1.08f * shapeDb (env[static_cast<std::size_t> (c)]));
+        for (int c = columns - 1; c >= 0; c -= 2)
+            ghost.lineTo (plot.getX() + static_cast<float> (c) * colWidth, mid + 1.08f * shapeDb (env[static_cast<std::size_t> (c)]));
         ghost.closeSubPath();
-        g.setColour (identity.withAlpha (0.10f));
+        g.setColour (tones.pale.withAlpha (0.055f));
         g.fillPath (ghost);
-        g.setColour (identity.withAlpha (0.22f));
-        g.strokePath (ghost, juce::PathStrokeType (0.8f));
+        g.setColour (tones.pale.withAlpha (0.22f));
+        g.strokePath (ghost, juce::PathStrokeType (1.0f, juce::PathStrokeType::curved));
     }
 
-    // The waveform in its spectral colours: each moment coloured by its brightness
-    // (spectral centroid, 200 Hz .. 6 kHz: warm .. cool), leaning to the layer's identity.
-    const auto& centroid = instrument->analysis.spectral.centroidHz;
-    const float lowLog = std::log2 (200.0f), highLog = std::log2 (6000.0f);
-    for (int x = 0; x < width; ++x)
+    // The body, column by column: spiky outer peaks in the deep tone, the body in its own
+    // colour (brighter moments lighter), a pale core at the level of the signal's RMS.
+    auto toneAt = [&tones] (float b, float t) {
+        // t: 0 outer .. 1 core; b: brightness 0 dull .. 1 bright.
+        const auto edge = tones.deep.interpolatedWith (tones.body, 0.35f + 0.5f * b);
+        const auto body = tones.body.interpolatedWith (tones.light, 0.3f + 0.6f * b);
+        const auto core = tones.pale.interpolatedWith (tones.core, b);
+        return t < 0.5f ? edge.interpolatedWith (body, 2.0f * t) : body.interpolatedWith (core, 2.0f * t - 1.0f);
+    };
+    for (int c = 0; c < columns; ++c)
     {
-        const auto b = std::min (static_cast<std::size_t> (static_cast<double> (x) / width * static_cast<double> (hi.size())), hi.size() - 1);
-        const float top = mid - hi[b] * yScale;
-        const float bottom = mid - lo[b] * yScale;
-        const double t = static_cast<double> (x) / width * duration;
-        const float hz = static_cast<float> (seriesAt (centroid, t, 800.0));
-        const float s = (std::log2 (std::max (hz, 20.0f)) - lowLog) / (highLog - lowLog);
-        auto colour = spectrum (s).interpolatedWith (identity, 0.3f);
-        if (! focused)
-            colour = colour.withMultipliedSaturation (0.55f);
-        g.setColour (colour.withAlpha (0.55f));
-        g.drawVerticalLine (x0 + x, top, std::max (top + 1.0f, bottom));
-        // A brighter core: colour as light under frosted glass.
-        const float core = 0.45f * (bottom - top);
-        g.setColour (colour.brighter (0.35f).withAlpha (0.85f));
-        g.drawVerticalLine (x0 + x, mid - 0.5f * core + (top + bottom - 2.0f * mid) * 0.5f, mid + 0.5f * core + (top + bottom - 2.0f * mid) * 0.5f);
+        const auto& col = cols[static_cast<std::size_t> (c)];
+        const float x = plot.getX() + static_cast<float> (c) * colWidth;
+        const float top = mid - shape (col.hi), bottom = mid - shape (col.lo);
+        const float r = std::min (shape (col.rms) * 0.8f, 0.5f * (bottom - top));
+        const float coreR = 0.3f * r;
+        const float tint = focused ? 1.0f : 0.8f;
+        // Outer peaks fade towards their tips (dark amber); body; a pale core.
+        // One smooth vertical gradient per column: dark, translucent tips -> the body's
+        // colour at the RMS level -> a pale core glowing at the centre.
+        const float extent = std::max (std::max (mid - top, bottom - mid), 1.0f);
+        const auto tip = toneAt (col.bright, 0.22f).withAlpha (0.5f * tint);
+        juce::ColourGradient fill (tip, 0.0f, mid - extent, tip, 0.0f, mid + extent, false);
+        const double rel = std::clamp (static_cast<double> (r / extent), 0.05, 0.95);
+        const double relCore = std::clamp (static_cast<double> (coreR / extent), 0.02, rel - 0.01);
+        fill.addColour (0.5 - 0.5 * rel, toneAt (col.bright, 0.45f).withAlpha (0.8f * tint));
+        fill.addColour (0.5 - 0.5 * relCore, toneAt (col.bright, 0.85f).withAlpha (0.88f * tint));
+        fill.addColour (0.5, toneAt (col.bright, 1.0f).withAlpha (0.95f * tint));
+        fill.addColour (0.5 + 0.5 * relCore, toneAt (col.bright, 0.85f).withAlpha (0.88f * tint));
+        fill.addColour (0.5 + 0.5 * rel, toneAt (col.bright, 0.45f).withAlpha (0.8f * tint));
+        g.setGradientFill (fill);
+        g.fillRect (juce::Rectangle<float> (x, top, colWidth, std::max (colWidth, bottom - top)));
     }
 
-    // The loop region (One Shot + LOOP): a slim bracket under the waveform.
+    // Particles: fine dust around the body out to the envelope (texture, never noise).
+    {
+        Scatter rng;
+        for (int c = 0; c < columns; ++c)
+        {
+            const auto& col = cols[static_cast<std::size_t> (c)];
+            const float amp = std::max (col.hi, -col.lo) / maxAbs;
+            const float chance = (view.granular ? 0.6f : 0.75f) * std::sqrt (amp) + 0.04f;
+            if (rng.next() > chance)
+                continue;
+            const float side = rng.next() < 0.5f ? -1.0f : 1.0f;
+            const float reach = (0.35f + 1.0f * rng.next()) * std::max (shape (std::max (col.hi, -col.lo)), 0.6f * shapeDb (col.rms)) + 2.0f;
+            const float y = mid + side * std::min (half * 1.05f, reach);
+            const float x = plot.getX() + static_cast<float> (c) * colWidth;
+            const float d = 0.8f + 1.1f * rng.next();
+            g.setColour (toneAt (col.bright, 0.8f).withAlpha (0.25f + 0.5f * rng.next()));
+            g.fillEllipse (x - 0.5f * d, y - 0.5f * d, d, d);
+        }
+    }
+
+    // The centre line, glowing, the whole way along.
+    {
+        const float end = plot.getRight();
+        g.setGradientFill (juce::ColourGradient (tones.light.withAlpha (0.0f), 0.0f, mid - 3.0f, tones.light.withAlpha (0.0f), 0.0f, mid + 3.0f, false));
+        juce::ColourGradient glow (tones.light.withAlpha (0.0f), 0.0f, mid - 3.5f, tones.light.withAlpha (0.0f), 0.0f, mid + 3.5f, false);
+        glow.addColour (0.5, tones.light.withAlpha (0.35f));
+        g.setGradientFill (glow);
+        g.fillRect (juce::Rectangle<float> (plot.getX() - 8.0f, mid - 3.5f, end - plot.getX() + 8.0f, 7.0f));
+        g.setColour (tones.core.withAlpha (0.9f));
+        g.fillRect (juce::Rectangle<float> (plot.getX() - 8.0f, mid - 0.6f, end - plot.getX() + 8.0f, 1.2f));
+    }
+
+    // The loop region (One Shot + LOOP): a slim bracket along the bottom.
     if (! view.granular && view.loop && instrument->model != nullptr && instrument->model->original.continuation.canSustain
         && instrument->model->original.source != nullptr)
     {
@@ -441,28 +575,31 @@ void SourceDisplay::paintStatic (juce::Graphics& g)
         const double frames = std::max<double> (1.0, static_cast<double> (instrument->model->original.source->numFrames()));
         const float a = plot.getX() + static_cast<float> (cont.sustainStartFrame / frames) * plot.getWidth();
         const float b = plot.getX() + static_cast<float> (cont.sustainEndFrame / frames) * plot.getWidth();
-        const float y = plot.getBottom() + 4.0f;
-        g.setColour (displayText.withAlpha (0.7f));
-        g.drawLine (a, y, b, y, 1.0f);
-        g.drawLine (a, y - 3.0f, a, y + 1.0f, 1.0f);
-        g.drawLine (b, y - 3.0f, b, y + 1.0f, 1.0f);
+        const float y = bounds.getBottom() - 9.0f;
+        g.setColour (colour::wellText.withAlpha (0.8f));
+        g.fillRect (juce::Rectangle<float> (a, y, b - a, 1.2f));
+        g.fillRect (juce::Rectangle<float> (b - 1.0f, y - 4.0f, 1.2f, 4.0f));
     }
 
-    // START: where notes begin (forwards: before it is skipped; REVERSE: from it back).
+    // START: a fine accent line from a small flag at the top to a dot at the foot.
     if (! view.granular)
     {
         const float x = plot.getX() + static_cast<float> (startSeconds() / duration) * plot.getWidth();
-        g.setColour (graphite.withAlpha (0.5f));
+        g.setColour (juce::Colour (0x8c000000));
         if (view.reverse)
             g.fillRect (juce::Rectangle<float> (x, plot.getY(), plot.getRight() - x, plot.getHeight()));
-        else
+        else if (x > plot.getX() + 1.0f)
             g.fillRect (juce::Rectangle<float> (plot.getX(), plot.getY(), x - plot.getX(), plot.getHeight()));
-        g.setColour (accent.withAlpha (0.9f));
-        g.drawVerticalLine (juce::roundToInt (x), plot.getY() - 2.0f, plot.getBottom() + 2.0f);
-        juce::Path cap;
+        const float top = bounds.getY() + 16.0f, foot = bounds.getBottom() - 9.0f;
+        g.setColour (colour::accent.withAlpha (0.35f));
+        g.fillRect (juce::Rectangle<float> (x - 2.0f, top, 4.0f, foot - top));
+        g.setColour (juce::Colour (0xffff7a32));
+        g.fillRect (juce::Rectangle<float> (x - 0.75f, top, 1.5f, foot - top));
+        juce::Path flag;
         const float d = view.reverse ? -1.0f : 1.0f;
-        cap.addTriangle (x, plot.getY() - 6.0f, x + d * 6.0f, plot.getY() - 3.0f, x, plot.getY());
-        g.fillPath (cap);
+        flag.addTriangle (x, top - 1.0f, x + d * 10.0f, top + 4.5f, x, top + 10.0f);
+        g.fillPath (flag);
+        g.fillEllipse (x - 3.5f, foot - 3.5f, 7.0f, 7.0f);
     }
 }
 
@@ -559,25 +696,24 @@ void LayerKnob::setCompact (bool c)
     }
 }
 
+// Reference geometry (layer knob, 110 x 125): caption centred 13 px from the top, the dial
+// (92 px with its ticks) centred at 61, the value centred at 112.
 void LayerKnob::resized()
 {
-    auto r = getLocalBounds();
-    r.removeFromTop (compact ? 14 : 16);
-    r.removeFromBottom (compact ? 15 : 17);
-    const int side = std::min (r.getWidth(), r.getHeight());
-    dial->setBounds (r.withSizeKeepingCentre (side, side));
+    const float k = static_cast<float> (getHeight()) / 125.0f;
+    dial->setBounds (juce::Rectangle<float> (92.0f * k, 92.0f * k).withCentre ({ 0.5f * static_cast<float> (getWidth()), 61.0f * k }).getSmallestIntegerContainer());
 }
 
 void LayerKnob::paint (juce::Graphics& g)
 {
-    auto r = getLocalBounds();
-    g.setColour (palette::textDim);
-    g.setFont (fonts::label (compact ? 10.0f : 10.5f));
-    g.drawText (caption, r.removeFromTop (compact ? 14 : 16), juce::Justification::centred, false);
-    g.setColour (palette::text);
-    g.setFont (fonts::make (compact ? 12.0f : 13.0f, fonts::Weight::medium));
+    const float k = static_cast<float> (getHeight()) / 125.0f;
+    const auto w = static_cast<float> (getWidth());
+    g.setColour (design::colour::text);
+    g.setFont (fonts::make (15.5f * k, fonts::Weight::semibold, 0.02f));
+    g.drawText (caption, juce::Rectangle<float> (0.0f, 2.0f * k, w, 22.0f * k), juce::Justification::centred, false);
+    g.setFont (fonts::make (18.5f * k, fonts::Weight::semibold));
     const auto value = parameter != nullptr ? parameter->getCurrentValueAsText() : juce::String();
-    g.drawText (value, r.removeFromBottom (compact ? 15 : 17), juce::Justification::centred, false);
+    g.drawText (value, juce::Rectangle<float> (0.0f, 100.0f * k, w, 24.0f * k), juce::Justification::centred, false);
 }
 
 //==============================================================================
@@ -614,21 +750,14 @@ void ModifierButton::mouseUp (const juce::MouseEvent& e)
 
 void ModifierButton::paint (juce::Graphics& g)
 {
-    const auto r = getLocalBounds().toFloat().reduced (1.0f);
-    // On: sunk into the card with the accent in the icon and a fine rim (colour as a mark,
-    // not a surface); off: a raised key.
+    const auto r = getLocalBounds().toFloat().reduced (1.5f);
+    // A refined instrument key: raised and neutral when off; on, a soft accent fill with a
+    // fine accent rim and the icon in the accent.
     const bool active = on && ! suppressed;
-    if (active)
-    {
-        g.setColour (palette::recessed.interpolatedWith (onColour, 0.12f));
-        g.fillRoundedRectangle (r, 5.0f);
-        g.setColour (onColour.withAlpha (0.55f));
-        g.drawRoundedRectangle (r.reduced (0.5f), 5.0f, 1.0f);
-    }
-    else
-        OspLookAndFeel::drawCard (g, r, 5.0f, false, isMouseOver() && ! suppressed);
-    const auto colour = active ? onColour.darker (0.15f) : palette::text.withAlpha (suppressed ? 0.25f : 0.7f);
-    icons::draw (g, icon, r.withSizeKeepingCentre (std::min (r.getHeight() - 8.0f, 22.0f), std::min (r.getHeight() - 8.0f, 22.0f)), colour, 1.5f);
+    design::draw::button (g, r, 0.16f * r.getHeight(), active, isMouseOver() && ! suppressed, onColour);
+    const auto colour = active ? onColour.darker (0.1f) : design::colour::text.withAlpha (suppressed ? 0.25f : 0.92f);
+    const float icon = 0.62f * r.getHeight();
+    icons::draw (g, this->icon, r.withSizeKeepingCentre (icon, icon), colour, std::max (1.8f, 0.058f * r.getHeight()));
 }
 
 //==============================================================================
@@ -664,24 +793,31 @@ void ModeSelector::mouseUp (const juce::MouseEvent& e)
 
 void ModeSelector::paint (juce::Graphics& g)
 {
-    const auto r = getLocalBounds().toFloat().reduced (0.5f);
-    OspLookAndFeel::drawCard (g, r, 5.0f, false, isMouseOver());
-    g.setColour (palette::text);
-    g.setFont (fonts::make (12.5f, fonts::Weight::medium));
-    auto text = r.reduced (10.0f, 0.0f);
-    icons::draw (g, icons::Kind::chevronDown, text.removeFromRight (12.0f), palette::text.withAlpha (0.7f), 1.4f);
+    // A compact source property (157 x 41 in the reference): raised face, name, chevron.
+    const auto r = getLocalBounds().toFloat().reduced (1.0f);
+    const float k = r.getHeight() / 39.0f;
+    design::draw::button (g, r, 7.0f * k, false, isMouseOver(), design::colour::accent);
+    g.setColour (design::colour::text);
+    g.setFont (fonts::make (17.5f * k, fonts::Weight::regular));
+    auto text = r.withTrimmedLeft (17.0f * k).withTrimmedRight (14.0f * k);
+    icons::draw (g, icons::Kind::chevronDown, text.removeFromRight (16.0f * k).withSizeKeepingCentre (18.0f * k, 18.0f * k), design::colour::text, 1.9f * k);
     g.drawText (current == 1 ? "Granular" : "One Shot", text, juce::Justification::centredLeft, false);
 }
 
 //==============================================================================
 void EngineCard::MenuDots::paintButton (juce::Graphics& g, bool highlighted, bool)
 {
+    const auto r = getLocalBounds().toFloat();
     if (highlighted)
     {
-        g.setColour (palette::recessed);
-        g.fillRoundedRectangle (getLocalBounds().toFloat(), 5.0f);
+        g.setColour (design::colour::text.withAlpha (0.06f));
+        g.fillRoundedRectangle (r, 6.0f);
     }
-    icons::draw (g, icons::Kind::dots, getLocalBounds().toFloat().reduced (4.0f), palette::text.withAlpha (0.8f));
+    // Three round dots, 10 px apart (reference).
+    const float d = 5.0f * r.getHeight() / 36.0f, gap = 10.0f * r.getHeight() / 36.0f;
+    g.setColour (design::colour::text);
+    for (int i = -1; i <= 1; ++i)
+        g.fillEllipse (juce::Rectangle<float> (d, d).withCentre (r.getCentre().translated (0.0f, static_cast<float> (i) * gap)));
 }
 
 EngineCard::EngineCard (OspAudioProcessor& p, int layer) : processor (p), layerIndex (layer)
@@ -781,11 +917,55 @@ void EngineCard::setFocused (bool f)
     }
 }
 
+void EngineCard::mouseMove (const juce::MouseEvent& e)
+{
+    // Granular controls come up while the pointer is over the display (or one of them).
+    const auto where = e.getEventRelativeTo (this).getPosition();
+    showGranularControls (sourceDisplay.getBounds().contains (where));
+}
+
+void EngineCard::mouseExit (const juce::MouseEvent& e)
+{
+    const auto where = e.getEventRelativeTo (this).getPosition();
+    if (! getLocalBounds().contains (where))
+        showGranularControls (false);
+}
+
+void EngineCard::showGranularControls (bool show)
+{
+    const bool granular = mode != nullptr && mode->mode() == 1;
+    bool dragging = false;
+    for (auto& k : granularKnobs)
+        dragging = dragging || k->slider.isMouseButtonDown();
+    const bool visible = granular && (show || dragging);
+    if (visible == granularShown)
+        return;
+    granularShown = visible;
+    auto& animator = juce::Desktop::getInstance().getAnimator();
+    for (auto& k : granularKnobs)
+    {
+        if (visible)
+        {
+            k->setAlpha (0.0f);
+            k->setVisible (true);
+            animator.fadeIn (k.get(), 140);
+        }
+        else
+            animator.fadeOut (k.get(), 160);
+    }
+    sourceDisplay.setOverlayBand (visible ? 80 : 0);
+}
+
 void EngineCard::updateMode()
 {
     const bool granular = mode != nullptr && mode->mode() == 1;
-    for (auto& k : granularKnobs)
-        k->setVisible (granular);
+    if (! granular)
+    {
+        granularShown = false;
+        for (auto& k : granularKnobs)
+            k->setVisible (false);
+        sourceDisplay.setOverlayBand (0);
+    }
     if (modifiers[2] != nullptr)
         modifiers[2]->setSuppressed (granular, "Granular sustains by itself");
     resized();
@@ -803,7 +983,7 @@ void EngineCard::refresh()
         sourceDisplay.setInstrument (instrument);
         sourceDisplay.setLoading (loading);
         fileText = instrument != nullptr ? juce::String::fromUTF8 (instrument->filename.c_str()) : juce::String (loading ? "Loading" : "");
-        repaint (header);
+        repaint();
     }
     // Root: the correction if there is one, else the detected note.
     juce::String root;
@@ -814,7 +994,7 @@ void EngineCard::refresh()
     if (root != rootText)
     {
         rootText = root;
-        repaint (header);
+        repaint();
     }
 
     auto value = [this] (const char* name) { return processor.parameterValue (OspAudioProcessor::layerParameterId (layerIndex, name)); };
@@ -848,116 +1028,110 @@ void EngineCard::refresh()
 
 void EngineCard::paint (juce::Graphics& g)
 {
-    using namespace palette;
-    const auto r = getLocalBounds().toFloat().reduced (1.0f);
-    juce::Path shape;
-    shape.addRoundedRectangle (r, 10.0f);
-    juce::DropShadow (juce::Colour (0x141e1c18), 3, { 0, 1 }).drawForPath (g, shape);
-    g.setColour (raised);
-    g.fillPath (shape);
-    g.setColour (hairline);
-    g.strokePath (shape, juce::PathStrokeType (1.0f));
+    using namespace design;
+    const auto bounds = getLocalBounds().toFloat();
+    draw::raised (g, bounds, layout::cardRadius, colour::cardTop, colour::cardBottom);
 
-    // Header: the layer's letter (its colour when edited, quieter otherwise), root, file.
-    auto row = header.toFloat();
-    const auto badge = row.removeFromLeft (row.getHeight()).reduced (1.0f);
-    const auto identity = palette::layer (layerIndex);
-    g.setColour (focused ? identity : identity.withMultipliedSaturation (0.45f).interpolatedWith (raised, 0.35f));
-    g.fillRoundedRectangle (badge, 5.0f);
-    g.setColour (raised);
-    g.setFont (fonts::make (badge.getHeight() * 0.62f, fonts::Weight::semibold));
-    g.drawText (OspAudioProcessor::layerName (layerIndex), badge, juce::Justification::centred, false);
-    row.removeFromLeft (10.0f);
+    // Header: the layer's badge, its light, the root and the file.
+    const auto& id = colour::identity (layerIndex);
+    {
+        const auto badge = badgeArea.toFloat();
+        juce::Path shape;
+        shape.addRoundedRectangle (badge, 6.0f);
+        juce::DropShadow (juce::Colour (0x40302418), 4, { 0, 2 }).drawForPath (g, shape);
+        g.setGradientFill (juce::ColourGradient (id.badgeTop, 0.0f, badge.getY(), id.badgeBottom, 0.0f, badge.getBottom(), false));
+        g.fillPath (shape);
+        g.setColour (juce::Colours::white.withAlpha (0.35f));
+        g.strokePath (shape, juce::PathStrokeType (1.0f), juce::AffineTransform::translation (0.0f, 0.5f));
+        g.setColour (juce::Colour (0xfffff6ec));
+        g.setFont (fonts::make (30.0f, fonts::Weight::medium));
+        g.drawText (OspAudioProcessor::layerName (layerIndex), badge.translated (0.0f, 0.5f), juce::Justification::centred, false);
+    }
+    draw::led (g, ledCentre, 12.0f, id.led, 1.0f);
+    auto row = textArea.toFloat();
     if (rootText.isNotEmpty())
     {
-        g.setColour (text);
-        const auto rootFont = fonts::make (density == EngineLayoutDensity::triple ? 15.0f : 17.0f, fonts::Weight::semibold);
+        const auto rootFont = fonts::make (24.0f, fonts::Weight::bold);
         g.setFont (rootFont);
-        const float w = juce::GlyphArrangement::getStringWidth (rootFont, rootText) + 4.0f;
-        g.drawText (rootText, row.removeFromLeft (w), juce::Justification::centredLeft, false);
-        row.removeFromLeft (8.0f);
+        g.setColour (colour::text);
+        const float w = juce::GlyphArrangement::getStringWidth (rootFont, rootText);
+        g.drawText (rootText, row.removeFromLeft (w + 2.0f), juce::Justification::centredLeft, false);
+        row.removeFromLeft (17.0f);
     }
-    g.setColour (textDim);
-    g.setFont (fonts::make (density == EngineLayoutDensity::triple ? 12.0f : 13.0f, fonts::Weight::medium));
+    g.setColour (colour::text);
+    g.setFont (fonts::make (16.5f, fonts::Weight::regular));
     g.drawText (fileText, row, juce::Justification::centredLeft, true);
 
-    // Hairline between the knobs and the modifiers (Hero / Dual).
-    if (density != EngineLayoutDensity::triple && modifiers[0] != nullptr)
+    // Hairline between the knobs and the modifiers.
+    if (! dividerArea.isEmpty())
     {
-        const float x = static_cast<float> (modifiers[0]->getX()) - 9.0f;
-        g.setColour (hairline);
-        g.drawVerticalLine (juce::roundToInt (x), static_cast<float> (modifiers[0]->getY()) + 2.0f, static_cast<float> (modifiers[3]->getBottom()) - 2.0f);
+        g.setColour (colour::divider);
+        g.fillRect (dividerArea.toFloat());
     }
 }
 
 void EngineCard::resized()
 {
+    // Reference geometry: the two-layer card is 683 x 463 px. One layer stretches it
+    // across the band, three narrow it and put the modifiers in a row under the knobs.
+    const auto w = static_cast<float> (getWidth());
     const bool triple = density == EngineLayoutDensity::triple;
-    const bool hero = density == EngineLayoutDensity::hero;
-    auto area = getLocalBounds().reduced (hero ? 16 : 12, 12);
+    auto at = [] (juce::Rectangle<float> r) { return r.getSmallestIntegerContainer(); };
 
-    // Header: letter, root and file on the left; mode and menu on the right.
-    header = area.removeFromTop (26);
+    badgeArea = at ({ 21.0f, 10.0f, 47.0f, 43.0f });
+    ledCentre = { 94.0f, 31.5f };
+    menuButton.setBounds (at ({ w - 51.0f, 14.0f, 30.0f, 36.0f }));
+    const float modeWidth = triple ? 128.0f : 157.0f;
+    if (mode != nullptr)
+        mode->setBounds (at ({ w - 62.0f - modeWidth, 12.0f, modeWidth, 41.0f }));
+    textArea = at ({ 117.0f, 14.0f, w - 62.0f - modeWidth - 12.0f - 117.0f, 36.0f });
+
+    const float wellHeight = triple ? 196.0f : 257.0f;
+    sourceDisplay.setBounds (at ({ 16.0f, 63.0f, w - 32.0f, wellHeight }));
+
+    if (! triple)
     {
-        auto right = header;
-        menuButton.setBounds (right.removeFromRight (24));
-        right.removeFromRight (6);
-        if (mode != nullptr)
-            mode->setBounds (right.removeFromRight (triple ? 96 : 108).reduced (0, 1));
-        header = header.withTrimmedRight (header.getRight() - (mode != nullptr ? mode->getX() - 8 : right.getRight()));
-    }
-    area.removeFromTop (10);
-
-    // Controls at the bottom: Hero / Dual one row (knobs, then a 2x2 of modifiers);
-    // Triple a row of knobs and a row of modifiers.
-    const int knobHeight = hero ? 86 : (triple ? 72 : 80);
-    const int modifierRow = triple ? 30 : 0;
-    auto controls = area.removeFromBottom (knobHeight + modifierRow + (triple ? 6 : 0));
-    area.removeFromBottom (10);
-    sourceDisplay.setBounds (area);
-
-    juce::Rectangle<int> knobRow;
-    if (triple)
-    {
-        auto mods = controls.removeFromBottom (modifierRow);
-        controls.removeFromBottom (6);
-        knobRow = controls;
-        const int w = (mods.getWidth() - 3 * 6) / 4;
-        for (auto& m : modifiers)
+        // Knobs at the reference's spacing (121 px), the 2 x 2 modifiers at the right edge.
+        const float right = w - 16.0f;
+        const float buttonsX = right - 144.0f;
+        const std::array<float, 4> dual { 75.0f, 196.0f, 317.0f, 438.0f };
+        const float span = buttonsX - 70.0f;   // the room left of the divider
+        for (std::size_t i = 0; i < knobs.size(); ++i)
         {
-            m->setBounds (mods.removeFromLeft (w));
-            mods.removeFromLeft (6);
+            knobs[i]->setCompact (false);
+            const float cx = density == EngineLayoutDensity::hero ? 75.0f + static_cast<float> (i) * (span - 75.0f) / 3.6f : dual[i];
+            knobs[i]->setBounds (at (juce::Rectangle<float> (110.0f, 125.0f).withCentre ({ cx, 392.5f })));
         }
+        dividerArea = at ({ buttonsX - 13.0f, 340.0f, 1.0f, 101.0f });
+        const std::array<juce::Rectangle<float>, 4> cells { { { 0.0f, 0.0f, 66.0f, 45.0f }, { 77.0f, 0.0f, 67.0f, 45.0f },
+                                                                { 0.0f, 55.0f, 66.0f, 46.0f }, { 77.0f, 55.0f, 67.0f, 46.0f } } };
+        for (std::size_t i = 0; i < modifiers.size(); ++i)
+            modifiers[i]->setBounds (at (cells[i].translated (buttonsX, 340.0f)));
     }
     else
     {
-        const int cell = hero ? 56 : 46, gap = 6;
-        auto grid = controls.removeFromRight (2 * cell + gap);
-        grid = grid.withSizeKeepingCentre (grid.getWidth(), std::min (grid.getHeight(), 2 * (hero ? 34 : 30) + gap));
-        const int h = (grid.getHeight() - gap) / 2;
-        for (int i = 0; i < 4; ++i)
-            modifiers[static_cast<std::size_t> (i)]->setBounds (grid.getX() + (i % 2) * (cell + gap), grid.getY() + (i / 2) * (h + gap), cell, h);
-        controls.removeFromRight (18);
-        knobRow = controls;
-    }
-    const int w = knobRow.getWidth() / 4;
-    for (auto& k : knobs)
-    {
-        k->setCompact (! hero);
-        k->setBounds (knobRow.removeFromLeft (w).withSizeKeepingCentre (std::min (w, hero ? 120 : 92), knobRow.getHeight()));
+        const float cell = (w - 32.0f) / 4.0f;
+        for (std::size_t i = 0; i < knobs.size(); ++i)
+        {
+            knobs[i]->setCompact (true);
+            knobs[i]->setBounds (at (juce::Rectangle<float> (100.0f, 113.0f).withCentre ({ 16.0f + (static_cast<float> (i) + 0.5f) * cell, 324.0f })));
+        }
+        dividerArea = {};
+        const float gap = 9.0f, bw = (w - 32.0f - 3.0f * gap) / 4.0f;
+        for (std::size_t i = 0; i < modifiers.size(); ++i)
+            modifiers[i]->setBounds (at ({ 16.0f + static_cast<float> (i) * (bw + gap), 397.0f, bw, 45.0f }));
     }
 
-    // Granular: POS SIZE DENS TUNE SPREAD along the bottom of the display - below the
-    // waveform when there is room, floating over it when the display is short.
-    const int strip = hero ? 62 : (triple ? 54 : 58);
-    const bool granular = granularKnobs[0]->isVisible();
-    const bool roomy = sourceDisplay.getHeight() >= 2 * strip + 40;
-    sourceDisplay.setBottomInset (granular && roomy ? strip - 4 : 0);
-    sourceDisplay.setOverlayBand (granular && ! roomy ? strip : 0);
-    auto g = sourceDisplay.getBounds().removeFromBottom (strip).reduced (triple ? 4 : 10, 4);
-    const int gw = g.getWidth() / 5;
-    for (auto& k : granularKnobs)
-        k->setBounds (g.removeFromLeft (gw).withSizeKeepingCentre (std::min (gw, 76), g.getHeight()));
+    // Granular: POS SIZE DENS TUNE SPREAD fade in over the display's foot while the pointer
+    // is over it (the display alone otherwise, as in the reference).
+    const auto display = sourceDisplay.getBounds().toFloat();
+    const float strip = 74.0f;
+    const auto band = display.withTop (display.getBottom() - strip).reduced (12.0f, 6.0f);
+    const float gw = band.getWidth() / 5.0f;
+    for (std::size_t i = 0; i < granularKnobs.size(); ++i)
+        granularKnobs[i]->setBounds (at ({ band.getX() + static_cast<float> (i) * gw, band.getY(), gw, band.getHeight() }));
+    sourceDisplay.setBottomInset (0);
+    sourceDisplay.setOverlayBand (granularShown ? 80 : 0);
 }
 
 } // namespace osp::plugin

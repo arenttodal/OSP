@@ -1,5 +1,7 @@
 #include "ShapingPopups.h"
 
+#include "Design.h"
+
 #include "EngineCard.h"
 
 #include "engine/Shaping.h"
@@ -70,19 +72,18 @@ void MacroLabel::mouseUp (const juce::MouseEvent& e)
 
 void MacroLabel::paint (juce::Graphics& g)
 {
+    // Reference: a bold, dark name (about 16 px at the canonical size); its settings in use
+    // are an accent dot after it.
     const bool hover = opensPopup && isMouseOver();
-    const auto font = fonts::make (12.5f, fonts::Weight::medium, 0.04f);
-    g.setFont (font);
-    g.setColour (hover || open ? juce::Colours::black : palette::text);
     auto r = getLocalBounds().toFloat();
+    const auto font = fonts::make (0.75f * r.getHeight(), fonts::Weight::bold, 0.04f);
+    g.setFont (font);
+    g.setColour (hover || open ? juce::Colours::black : design::colour::text);
     const float w = juce::GlyphArrangement::getStringWidth (font, text);
     const auto textArea = juce::Rectangle<float> (r.getCentreX() - w * 0.5f, r.getY(), w + 2.0f, r.getHeight());
     g.drawText (text, textArea, juce::Justification::centredLeft, false);
     if (customised)
-    {
-        g.setColour (palette::accent);
-        g.fillEllipse (textArea.getRight() + 3.0f, r.getCentreY() - 2.0f, 4.0f, 4.0f);
-    }
+        design::draw::led (g, { textArea.getRight() + 0.42f * r.getHeight(), r.getCentreY() }, 0.3f * r.getHeight(), juce::Colour (0xffff8a3c), 0.6f);
     if (hover || open)
     {
         g.setColour (open ? palette::accent : palette::text.withAlpha (0.5f));
@@ -178,41 +179,45 @@ void MiniKnob::setFormatter (Formatter f)
     repaint();
 }
 
+// Proportions from the reference's envelope knobs (100 x 87): caption on top, the knob at
+// 48 % of the height, its value underneath. Horizontal: caption, knob, value in a row.
 void MiniKnob::resized()
 {
-    auto r = getLocalBounds();
+    const auto r = getLocalBounds().toFloat();
+    const float h = r.getHeight();
     if (horizontal)
     {
-        r.removeFromLeft (56);
-        slider.setBounds (r.removeFromLeft (r.getHeight()).reduced (1));
+        const float side = h;
+        slider.setBounds (juce::Rectangle<float> (side, side).withCentre ({ r.getX() + 0.5f * r.getWidth() - 0.05f * r.getWidth(), r.getCentreY() }).getSmallestIntegerContainer());
         return;
     }
-    r.removeFromTop (compact ? 11 : 12);
-    r.removeFromBottom (compact ? 13 : 14);
-    slider.setBounds (r.withSizeKeepingCentre (r.getHeight(), r.getHeight()));
+    const float side = (compact ? 0.5f : 0.55f) * h;
+    slider.setBounds (juce::Rectangle<float> (side, side).withCentre ({ r.getCentreX(), r.getY() + 0.48f * h }).getSmallestIntegerContainer());
 }
 
 void MiniKnob::paint (juce::Graphics& g)
 {
     const auto value = formatter != nullptr ? formatter (slider.getValue()) : juce::String (slider.getValue(), 1);
-    auto r = getLocalBounds();
-    const auto captionColour = onDark ? palette::displayText : palette::textDim;
-    const auto valueColour = onDark ? palette::raised : palette::text;
-    g.setColour (captionColour);
-    g.setFont (fonts::label (compact ? 9.0f : 9.5f));
+    const auto r = getLocalBounds().toFloat();
+    const float h = r.getHeight();
+    const auto captionColour = onDark ? design::colour::wellText.brighter (0.3f) : design::colour::text;
+    const auto valueColour = onDark ? juce::Colour (0xfff2eee6) : design::colour::text;
     if (horizontal)
     {
-        g.drawText (caption, r.removeFromLeft (56), juce::Justification::centredLeft, false);
-        r.removeFromLeft (r.getHeight() + 6);
+        g.setColour (onDark ? captionColour : design::colour::textSecondary.darker (0.2f));
+        g.setFont (fonts::make (0.42f * h, fonts::Weight::semibold, 0.08f));
+        g.drawText (caption, r.withRight (static_cast<float> (slider.getX()) - 0.25f * h), juce::Justification::centredRight, false);
         g.setColour (valueColour);
-        g.setFont (fonts::make (13.0f, fonts::Weight::medium));
-        g.drawText (value, r, juce::Justification::centredLeft, false);
+        g.setFont (fonts::make (0.5f * h, fonts::Weight::semibold));
+        g.drawText (value, r.withLeft (static_cast<float> (slider.getRight()) + 0.25f * h), juce::Justification::centredLeft, false);
         return;
     }
-    g.drawText (caption, r.removeFromTop (compact ? 11 : 12), juce::Justification::centred, false);
+    g.setColour (captionColour);
+    g.setFont (fonts::make ((compact ? 0.14f : 0.155f) * h, fonts::Weight::bold, 0.04f));
+    g.drawText (caption, juce::Rectangle<float> (r.getX(), r.getY(), r.getWidth(), 0.2f * h), juce::Justification::centred, false);
     g.setColour (valueColour);
-    g.setFont (fonts::make (compact ? 10.5f : 11.5f, fonts::Weight::medium));
-    g.drawText (value, r.removeFromBottom (compact ? 13 : 14), juce::Justification::centred, false);
+    g.setFont (fonts::make ((compact ? 0.17f : 0.19f) * h, fonts::Weight::bold));
+    g.drawText (value, juce::Rectangle<float> (r.getX(), r.getY() + 0.78f * h, r.getWidth(), 0.22f * h), juce::Justification::centred, false);
 }
 
 //==============================================================================

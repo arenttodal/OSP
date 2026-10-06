@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Design.h"
 #include "EngineCard.h"
 #include "MainSections.h"
 #include "OspLookAndFeel.h"
@@ -131,6 +132,11 @@ public:
 
 private:
     void timerCallback() override;
+    /** Places everything in reference coordinates (once: the whole layout scales). */
+    void layoutInstrument();
+    void paintInstrument (juce::Graphics&);
+    /** Editor coordinates (drag and drop, tests) to the instrument's reference coordinates. */
+    juce::Point<int> toInstrument (juce::Point<int> editorPoint) const;
     void layoutSources (bool animate);
     void updateFocus();
     void showMenu();
@@ -173,6 +179,18 @@ private:
 
     OspLookAndFeel lookAndFeel;
     OspAudioProcessor& ospProcessor;
+
+    /** The instrument at the reference size, scaled to the window as one piece. Declared
+        before every child so it outlives them. */
+    struct Content final : juce::Component
+    {
+        std::function<void (juce::Graphics&)> onPaint;
+        void paint (juce::Graphics& g) override
+        {
+            if (onPaint != nullptr)
+                onPaint (g);
+        }
+    } content;
 
     // Header
     PresetBar presetBar { ospProcessor };

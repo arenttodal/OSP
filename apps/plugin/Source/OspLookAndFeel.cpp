@@ -1,5 +1,7 @@
 #include "OspLookAndFeel.h"
 
+#include "Design.h"
+
 #include "BinaryData.h"
 
 namespace osp::plugin
@@ -14,10 +16,18 @@ namespace fonts
             static const juce::Typeface::Ptr regular = juce::Typeface::createSystemTypefaceFor (BinaryData::InterRegular_ttf, BinaryData::InterRegular_ttfSize);
             static const juce::Typeface::Ptr medium = juce::Typeface::createSystemTypefaceFor (BinaryData::InterMedium_ttf, BinaryData::InterMedium_ttfSize);
             static const juce::Typeface::Ptr semibold = juce::Typeface::createSystemTypefaceFor (BinaryData::InterSemiBold_ttf, BinaryData::InterSemiBold_ttfSize);
+            static const juce::Typeface::Ptr bold = juce::Typeface::createSystemTypefaceFor (BinaryData::InterBold_ttf, BinaryData::InterBold_ttfSize);
+            static const juce::Typeface::Ptr extrabold = juce::Typeface::createSystemTypefaceFor (BinaryData::InterExtraBold_ttf, BinaryData::InterExtraBold_ttfSize);
+            static const juce::Typeface::Ptr displayBold = juce::Typeface::createSystemTypefaceFor (BinaryData::OutfitExtraBold_ttf, BinaryData::OutfitExtraBold_ttfSize);
+            static const juce::Typeface::Ptr displayLight = juce::Typeface::createSystemTypefaceFor (BinaryData::OutfitExtraLight_ttf, BinaryData::OutfitExtraLight_ttfSize);
             switch (weight)
             {
                 case Weight::medium: return medium;
                 case Weight::semibold: return semibold;
+                case Weight::bold: return bold;
+                case Weight::extrabold: return extrabold;
+                case Weight::displayBold: return displayBold;
+                case Weight::displayLight: return displayLight;
                 case Weight::regular: break;
             }
             return regular;
@@ -168,13 +178,21 @@ void OspLookAndFeel::drawKnob (juce::Graphics& g, juce::Rectangle<float> bounds,
 void OspLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int width, int height, float sliderPos,
                                        float startAngle, float endAngle, juce::Slider& slider)
 {
+    // Every knob is the one instrument knob (design::draw::knob), sized to its bounds: with
+    // ticks the body leaves room for them; "mini" knobs (envelope, popups) have none.
     const auto& props = slider.getProperties();
     const bool mini = static_cast<bool> (props["mini"]);
-    const auto arc = props.contains ("arc") ? juce::Colour (static_cast<juce::uint32> (static_cast<juce::int64> (props["arc"]))) : palette::accent;
-    const float angle = startAngle + sliderPos * (endAngle - startAngle);
+    design::draw::KnobStyle style;
+    style.arc = props.contains ("arc") ? juce::Colour (static_cast<juce::uint32> (static_cast<juce::int64> (props["arc"]))) : design::colour::accent;
+    style.bipolar = static_cast<bool> (props["bipolar"]);
+    style.ticks = ! mini && ! static_cast<bool> (props["noTicks"]);
+    style.startAngle = startAngle;
+    style.endAngle = endAngle;
+    style.enabled = slider.isEnabled();
     const auto r = juce::Rectangle<float> (static_cast<float> (x), static_cast<float> (y), static_cast<float> (width), static_cast<float> (height));
     const float side = std::min (r.getWidth(), r.getHeight());
-    drawKnob (g, r.withSizeKeepingCentre (side, side), angle, startAngle, endAngle, mini, slider.isEnabled(), arc, static_cast<bool> (props["bipolar"]));
+    const float body = 0.5f * side / (style.ticks ? 1.42f : 1.2f);
+    design::draw::knob (g, r.getCentre(), body, sliderPos, style);
 }
 
 void OspLookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int width, int height, float sliderPos, float minPos,
@@ -185,38 +203,46 @@ void OspLookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int widt
         LookAndFeel_V4::drawLinearSlider (g, x, y, width, height, sliderPos, minPos, maxPos, style, slider);
         return;
     }
-    // Slim mix sliders: a neutral track (or the two layers' colours meeting at the thumb), a
-    // small raised thumb with a coloured centre.
+    // The A/B blend (reference): a 9 px track in the two layers' colours meeting in a dusky
+    // middle, slightly recessed; a knob-like thumb with a dark centre.
     const auto& props = slider.getProperties();
+    auto colourOf = [&props] (const char* key, juce::Colour fallback) {
+        return props.contains (key) ? juce::Colour (static_cast<juce::uint32> (static_cast<juce::int64> (props[key]))) : fallback;
+    };
+    const auto left = colourOf ("leftColour", design::colour::accent), right = colourOf ("rightColour", juce::Colour (0xff6da7cc));
     const float cy = static_cast<float> (y) + static_cast<float> (height) * 0.5f;
-    const float thickness = props.contains ("thin") ? 2.0f : 4.0f;
-    const auto track = juce::Rectangle<float> (static_cast<float> (x), cy - 0.5f * thickness, static_cast<float> (width), thickness);
-    g.setColour (palette::recessed.darker (0.06f));
-    g.fillRoundedRectangle (track, 0.5f * thickness);
-    const auto left = props.contains ("leftColour") ? juce::Colour (static_cast<juce::uint32> (static_cast<juce::int64> (props["leftColour"]))) : palette::accent;
-    const auto right = props.contains ("rightColour") ? juce::Colour (static_cast<juce::uint32> (static_cast<juce::int64> (props["rightColour"]))) : juce::Colours::transparentBlack;
-    if (! right.isTransparent())
-    {
-        // Two layers: their colours meet along the track; the thumb alone says where.
-        g.setGradientFill (juce::ColourGradient (left.withAlpha (0.9f), track.getX(), 0.0f, right.withAlpha (0.9f), track.getRight(), 0.0f, false));
-        g.fillRoundedRectangle (track, 0.5f * thickness);
-    }
-    else
-    {
-        g.setColour (left.withAlpha (0.85f));
-        g.fillRoundedRectangle (track.withRight (sliderPos), 0.5f * thickness);
-    }
-    const float size = props.contains ("thin") ? 12.0f : 16.0f;
-    const auto thumb = juce::Rectangle<float> (sliderPos - 0.5f * size, cy - 0.5f * size, size, size);
-    juce::Path disc;
-    disc.addEllipse (thumb);
-    juce::DropShadow (juce::Colour (0x331e1c18), 3, { 0, 1 }).drawForPath (g, disc);
-    g.setColour (palette::raised);
-    g.fillPath (disc);
-    g.setColour (palette::hairline.darker (0.1f));
-    g.strokePath (disc, juce::PathStrokeType (0.8f));
-    g.setColour (props.contains ("thin") ? palette::accent : palette::text.withAlpha (0.8f));
-    g.fillEllipse (thumb.withSizeKeepingCentre (size * 0.3f, size * 0.3f));
+    const auto track = juce::Rectangle<float> (static_cast<float> (x), cy - 4.5f, static_cast<float> (width), 9.0f);
+    juce::ColourGradient fill (left.brighter (0.15f), track.getX(), 0.0f, right.brighter (0.1f), track.getRight(), 0.0f, false);
+    fill.addColour (0.5, left.interpolatedWith (right, 0.5f).withMultipliedBrightness (0.62f).withMultipliedSaturation (0.7f));
+    g.setGradientFill (fill);
+    g.fillRoundedRectangle (track, 4.5f);
+    // Recessed: shade along the top, light along the bottom.
+    g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.25f), 0.0f, track.getY(), juce::Colours::black.withAlpha (0.0f), 0.0f, track.getCentreY(), false));
+    g.fillRoundedRectangle (track, 4.5f);
+    g.setColour (juce::Colours::white.withAlpha (0.45f));
+    g.fillRect (track.reduced (4.0f, 0.0f).withY (track.getBottom() + 0.5f).withHeight (0.8f));
+
+    const juce::Point<float> c (sliderPos, cy);
+    const auto disc = juce::Rectangle<float> (32.0f, 32.0f).withCentre (c);
+    juce::Path shape;
+    shape.addEllipse (disc);
+    juce::DropShadow (juce::Colour (0x55302418), 6, { 0, 2 }).drawForPath (g, shape);
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xfffefbf6), c.x - 8.0f, disc.getY(), juce::Colour (0xffcfc5b6), c.x + 8.0f, disc.getBottom(), false));
+    g.fillPath (shape);
+    g.setColour (juce::Colour (0xffb3a796));
+    g.strokePath (shape, juce::PathStrokeType (1.0f));
+    const auto inner = disc.reduced (4.0f);
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xfff7f2ea), c.x, inner.getY(), juce::Colour (0xffe6ddd0), c.x, inner.getBottom(), false));
+    g.fillEllipse (inner);
+    g.setColour (juce::Colour (0xff2a2622));
+    g.fillEllipse (juce::Rectangle<float> (8.0f, 8.0f).withCentre (c));
+}
+
+int OspLookAndFeel::getSliderThumbRadius (juce::Slider& slider)
+{
+    if (static_cast<bool> (slider.getProperties()["blend"]))
+        return 16;
+    return LookAndFeel_V4::getSliderThumbRadius (slider);
 }
 
 juce::Slider::SliderLayout OspLookAndFeel::getSliderLayout (juce::Slider& slider)
@@ -254,20 +280,21 @@ void OspLookAndFeel::drawLabel (juce::Graphics& g, juce::Label& label)
 void OspLookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& button, const juce::Colour&,
                                            bool highlighted, bool down)
 {
+    // The instrument's raised key (Advanced, Browse, Reseed...): pressed or on, accent-rimmed.
     const auto r = button.getLocalBounds().toFloat().reduced (1.0f, 1.5f);
-    drawCard (g, r, 4.0f, down || button.getToggleState(), highlighted);
+    design::draw::button (g, r, std::min (9.0f, 0.22f * r.getHeight()), down || button.getToggleState(), highlighted, design::colour::accent);
 }
 
 juce::Font OspLookAndFeel::getTextButtonFont (juce::TextButton& button, int buttonHeight)
 {
     if (static_cast<bool> (button.getProperties()["caps"]))
         return fonts::label (11.0f);
-    return fonts::make (std::min (13.5f, static_cast<float> (buttonHeight) * 0.55f), fonts::Weight::medium, 0.01f);
+    return fonts::make (std::min (20.0f, static_cast<float> (buttonHeight) * 0.48f), fonts::Weight::bold, 0.01f);
 }
 
 void OspLookAndFeel::drawButtonText (juce::Graphics& g, juce::TextButton& button, bool, bool)
 {
-    const auto colour = button.findColour (button.getToggleState() ? juce::TextButton::textColourOnId : juce::TextButton::textColourOffId);
+    const auto colour = design::colour::text;
     g.setColour (colour.withMultipliedAlpha (button.isEnabled() ? 1.0f : 0.4f));
     g.setFont (getTextButtonFont (button, button.getHeight()));
     g.drawText (button.getButtonText(), button.getLocalBounds().reduced (4, 0), juce::Justification::centred, false);

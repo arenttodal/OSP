@@ -170,9 +170,14 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
     void mouseDown (const juce::MouseEvent&) override;
+    void mouseMove (const juce::MouseEvent&) override;
+    void mouseExit (const juce::MouseEvent&) override;
+    /** Shows / hides the granular controls over the display (they fade). */
+    void showGranularControls (bool show);
 
 private:
     void updateMode();
+    bool granularShown = false;
 
     OspAudioProcessor& processor;
     const int layerIndex;
@@ -191,7 +196,8 @@ private:
     std::array<std::unique_ptr<LayerKnob>, 4> knobs;
     std::array<std::unique_ptr<ModifierButton>, 4> modifiers;
     std::array<std::unique_ptr<MiniKnob>, 5> granularKnobs;
-    juce::Rectangle<int> header;
+    juce::Rectangle<int> badgeArea, textArea, dividerArea;
+    juce::Point<float> ledCentre;
     juce::String rootText, fileText;
 };
 

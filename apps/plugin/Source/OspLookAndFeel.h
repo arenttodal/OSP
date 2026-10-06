@@ -70,7 +70,8 @@ namespace palette
 /** Inter (SIL OFL, embedded, tabular figures by default) so the instrument reads the same everywhere. */
 namespace fonts
 {
-    enum class Weight { regular, medium, semibold };
+    /** Inter weights, and Outfit (displayBold / displayLight) for the OSP/2-OSP identity. */
+    enum class Weight { regular, medium, semibold, bold, extrabold, displayBold, displayLight };
     juce::Font make (float height, Weight weight = Weight::regular, float tracking = 0.0f);
     /** Uppercase labels: medium weight, a little letter-spacing (not too much). */
     inline juce::Font label (float height) { return make (height, Weight::medium, 0.05f); }
@@ -96,6 +97,7 @@ public:
     void drawLinearSlider (juce::Graphics&, int x, int y, int width, int height, float sliderPos, float minPos, float maxPos,
                            juce::Slider::SliderStyle, juce::Slider&) override;
     juce::Slider::SliderLayout getSliderLayout (juce::Slider&) override;
+    int getSliderThumbRadius (juce::Slider&) override;
 
     void drawButtonBackground (juce::Graphics&, juce::Button&, const juce::Colour& background,
                                bool highlighted, bool down) override;

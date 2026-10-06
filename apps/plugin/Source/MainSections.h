@@ -43,6 +43,34 @@ private:
 };
 
 /**
+    ORIGINAL <-> REIMAGINED per layer: one thin track with a thumb for every loaded layer
+    (A's is the instrument's `reimagined`), each with its layer's colour at its centre.
+    Drag the nearest thumb; double-click one to return it to the default.
+*/
+class ReimaginedTrack final : public juce::Component, public juce::SettableTooltipClient
+{
+public:
+    explicit ReimaginedTrack (OspAudioProcessor& processor);
+    void setLayers (const std::array<bool, 3>& occupied);
+    /** The track's ends in this component (the thumbs' centres travel between them). */
+    juce::Range<float> travel() const;
+    void paint (juce::Graphics&) override;
+    void mouseDown (const juce::MouseEvent&) override;
+    void mouseDrag (const juce::MouseEvent&) override;
+    void mouseUp (const juce::MouseEvent&) override;
+    void mouseDoubleClick (const juce::MouseEvent&) override;
+
+private:
+    int thumbAt (float x) const;
+    float xFor (int layer) const;
+    OspAudioProcessor& processor;
+    std::array<std::unique_ptr<juce::ParameterAttachment>, 3> attachments;
+    std::array<float, 3> values { 20.0f, 20.0f, 20.0f };
+    std::array<bool, 3> shown { true, false, false };
+    int dragging = -1;
+};
+
+/**
     The band between the sources and the macros. Its height never changes: one layer shows
     only ORIGINAL <-> REIMAGINED; two add the A/B blend; three the mix triangle.
 */
@@ -65,9 +93,9 @@ private:
     OspAudioProcessor& processor;
     int count = 0;
     std::array<int, 3> slots { 0, 1, 2 };
-    juce::Slider reimagined { juce::Slider::LinearHorizontal, juce::Slider::NoTextBox };
+    ReimaginedTrack reimagined;
     juce::Slider blend { juce::Slider::LinearHorizontal, juce::Slider::NoTextBox };
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> reimaginedAttachment, blendAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> blendAttachment;
     TriangleMix triangle;
     juce::Rectangle<int> reimaginedRow, blendRow, captionArea;
 };
