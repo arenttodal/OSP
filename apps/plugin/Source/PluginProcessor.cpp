@@ -252,6 +252,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
         layout.add (std::make_unique<juce::AudioParameterBool> (id ("reverse"), name + "Reverse", defaults.reverse));
         layout.add (std::make_unique<juce::AudioParameterBool> (id ("loop"), name + "Loop", defaults.loop));
         layout.add (std::make_unique<juce::AudioParameterBool> (id ("follow"), name + "Follow", defaults.follow));
+        // Per-layer Original <-> Reimagined (version hint 8): A's is the instrument's `reimagined`.
+        if (layer > 0)
+            layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { reimaginedParameterId (layer), 8 }, name + "Reimagined",
+                                                                     unit, 20.0f, percent));
     }
     layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::mixX, 7 }, "Mix X", Range (0.0f, 1.0f, 0.0f), 0.5f));
     layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::mixY, 7 }, "Mix Y", Range (0.0f, 1.0f, 0.0f), 1.0f / 3.0f));
@@ -366,6 +370,8 @@ OspAudioProcessor::OspAudioProcessor()
             lp.granular[static_cast<std::size_t> (i)] = parameters.getRawParameterValue (layerParameterId (layer, granularNames()[i + 1]));
         for (int i = 0; i < layerControlNames().size(); ++i)
             lp.controls[static_cast<std::size_t> (i)] = parameters.getRawParameterValue (layerParameterId (layer, layerControlNames()[i]));
+        if (layer > 0)
+            lp.reimagined = parameters.getRawParameterValue (reimaginedParameterId (layer));
     }
     mixXParam = parameters.getRawParameterValue (ids::mixX);
     mixYParam = parameters.getRawParameterValue (ids::mixY);
@@ -523,9 +529,11 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
         std::array<float, 8> controls {};
         for (std::size_t i = 0; i < controls.size(); ++i)
             controls[i] = lp.controls[i]->load();
-        if (force || controls != lp.lastControls)
+        const float ownReimagined = lp.reimagined != nullptr ? lp.reimagined->load() : -1.0f;
+        if (force || controls != lp.lastControls || ! juce::exactlyEqual (ownReimagined, lp.lastReimagined))
         {
             lp.lastControls = controls;
+            lp.lastReimagined = ownReimagined;
             LayerSettings ls;
             ls.start = 0.01 * controls[0];
             ls.tuneSemitones = controls[1];
@@ -534,6 +542,7 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
             ls.reverse = controls[5] >= 0.5f;
             ls.loop = controls[6] >= 0.5f;
             ls.follow = controls[7] >= 0.5f;
+            ls.reimagined = ownReimagined < 0.0f ? -1.0 : 0.01 * ownReimagined;   // A follows the instrument's amount
             engineSettings.layer[static_cast<std::size_t> (layer)] = ls;
             engine.setLayerSettings (layer, ls);
         }
@@ -957,6 +966,8 @@ void OspAudioProcessor::makeLayerAudible (int layer)
     // A layer the musician just added is heard: two layers meet in the middle of the
     // blend, three at the centre of the triangle.
     const int count = occupiedLayerCount();
+    if (layer >= 1)   // it starts as Reimagined as the instrument (A) is
+        setParameterValue (reimaginedParameterId (layer), parameterValue (reimaginedParameterId (0)));
     if (count == 2 && layer >= 1)
         setParameterValue (ids::blend, 0.5f);
     else if (count == 3)
@@ -1013,6 +1024,8 @@ void OspAudioProcessor::resetLayerControls (int layer)
     for (const auto& name : layerControlNames())
         if (auto* p = parameters.getParameter (layerParameterId (layer, name)))
             p->setValueNotifyingHost (p->getDefaultValue());
+    if (layer > 0)   // a free slot's Reimagined returns to the instrument's (A's)
+        setParameterValue (reimaginedParameterId (layer), parameterValue (reimaginedParameterId (0)));
     setRootOverride (std::nullopt, layer);
 }
 
@@ -1024,6 +1037,7 @@ OspAudioProcessor::LayerSnapshot OspAudioProcessor::captureLayer (int layer) con
     for (const auto* names : { &granularNames(), &layerControlNames() })
         for (const auto& name : *names)
             snapshot.values.set (name, parameterValue (layerParameterId (layer, name)));
+    snapshot.values.set ("reimagined", parameterValue (reimaginedParameterId (layer)));
     const auto& slot = layers[static_cast<std::size_t> (layer)];
     snapshot.latestByLoad = slot.latestByLoad;
     snapshot.lastPublishedLoad = slot.lastPublishedLoad;
@@ -1036,6 +1050,7 @@ void OspAudioProcessor::applyLayer (int layer, const LayerSnapshot& snapshot)
     for (const auto* names : { &granularNames(), &layerControlNames() })
         for (const auto& name : *names)
             setParameterValue (layerParameterId (layer, name), snapshot.values.getWithDefault (name, parameterValue (layerParameterId (layer, name))));
+    setParameterValue (reimaginedParameterId (layer), snapshot.values.getWithDefault ("reimagined", parameterValue (reimaginedParameterId (layer))));
     if (snapshot.instrument == nullptr)
     {
         clearLayer (layer);
@@ -1633,6 +1648,14 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml)
             sustain->setValueNotifyingHost (1.0f);
         for (const auto* id : { &ids::mixX, &ids::mixY, &ids::decay, &ids::sustainLevel })
             reset (*id);
+    }
+
+    if (savedVersion < 7)
+    {
+        // Before per-layer Reimagined there was one amount: every layer keeps it.
+        const float amount = parameterValue (reimaginedParameterId (0));
+        for (int layer = 1; layer < numLayers; ++layer)
+            setParameterValue (reimaginedParameterId (layer), amount);
     }
 
     for (int layer = 0; layer < numLayers; ++layer)

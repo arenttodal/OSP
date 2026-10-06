@@ -255,6 +255,13 @@ its held voices wait, released ones and those of an emptied layer end. Then the
 — there are no per-layer macro chains; the per-voice stages (LIFE, DYNAMICS, CHARACTER
 filter, drift, the ADSR) are the same settings in every voice.
 
+Original <-> Reimagined per layer: `LayerSettings::reimagined` (below 0 = the instrument's
+`Macros::reimagined`) shapes that layer's notes (continuation segments, saturation, doubling,
+Reimagined grains, its own drift); the shared post stage (resonator bank, width, formants)
+takes the layers' amounts weighted by their power in the mix (only when a layer has its own).
+In the plugin layer A's amount is the original `reimagined` parameter; B and C have
+`layerB.reimagined` / `layerC.reimagined` (state v7: older sessions give them A's amount).
+
 Source modifiers in the voice: START offsets the read (from the end when reversed) with a
 3 ms fade-in; REVERSE reads backwards and so does everything that follows the read head:
 the continuation walk takes every jump mirrored (it leaves at the end of the jump's `to`

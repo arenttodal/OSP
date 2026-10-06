@@ -781,3 +781,28 @@ TEST_CASE ("mono and poly: switching keeps sounding notes sane; poly is untouche
     for (float v : out)
         REQUIRE (std::isfinite (v));
 }
+
+TEST_CASE ("per-layer Reimagined: each layer's notes take their own amount; unset follows the instrument", "[integration][layers]")
+{
+    auto vowel = testsignals::vowel (220.0, 2.0, rate, 3);
+    const auto sustained = instrument::buildComplete (vowel, test::analyse (vowel), {}, false);
+    auto render = [&] (double macro, double own) {
+        auto s = quietSettings();
+        s.macros.reimagined = macro;
+        s.layer[0].reimagined = own;
+        Rig rig (s);
+        rig.engine.setModel (sustained.get(), 0);
+        rig.engine.noteOn (57, 100, 1);
+        std::vector<float> out;
+        rig.run (3.0, out);
+        return out;
+    };
+    auto fifths = [&] (const std::vector<float>& x) {
+        return goertzel (x, at (1.0), at (3.0), 330.0) / goertzel (x, at (1.0), at (3.0), 220.0);
+    };
+    // Unset (-1) is exactly the instrument's amount.
+    CHECK (render (1.0, -1.0) == render (1.0, 1.0));
+    // The layer's own amount wins over the instrument's, both ways.
+    CHECK (fifths (render (0.0, 1.0)) > 100.0 * fifths (render (0.0, 0.0)));
+    CHECK (fifths (render (1.0, 0.0)) < 0.01 * fifths (render (1.0, 1.0)));
+}

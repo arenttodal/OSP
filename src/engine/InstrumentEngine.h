@@ -53,6 +53,10 @@ struct LayerSettings
     bool reverse = false;         ///< REVERSE: One Shot reads backwards, grains read backwards
     bool loop = true;             ///< LOOP (One Shot): sustain by the recording's own loops; off: play it once
     bool follow = true;           ///< FOLLOW: keep the recording's own loudness contour (off: flatten it)
+    /** This layer's Original <-> Reimagined (0..1); below 0 it follows the instrument's
+        (Macros::reimagined). Per voice it shapes the layer's notes; the shared resonance
+        stage gets the layers' amounts weighted by how loud each is in the mix. */
+    double reimagined = -1.0;
 };
 
 /** How loud each layer is in the mix (before its LEVEL and PAN). */
@@ -226,6 +230,12 @@ public:
         liveShaping.dynamics = macros.dynamics;
         liveShaping.movement = macros.motion;
         post.setMacros (macros);
+    }
+    /** A layer's Original <-> Reimagined: its own, or the instrument's. */
+    double layerReimagined (int layer) const noexcept
+    {
+        const double own = config.layer[static_cast<std::size_t> (layerIndex (layer))].reimagined;
+        return own < 0.0 ? config.macros.reimagined : own;
     }
     void setPitchCharacter (PitchCharacter character) noexcept { config.pitchCharacter = character; }
     /** The host's musical time at the start of the next block (MOVEMENT's SHAPER syncs to it). */

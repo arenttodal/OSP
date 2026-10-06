@@ -511,7 +511,7 @@ NoteShape InstrumentEngine::shapeFor (const InstrumentModel* model, int note, in
     }
     const auto* modelForMotion = model;
 
-    const double r = std::clamp (config.macros.reimagined, 0.0, 1.0);
+    const double r = std::clamp (layerReimagined (context), 0.0, 1.0);
     const double motion = std::clamp (config.macros.motion, 0.0, 1.0);
     // (As before the adaptive layers, a sound played once - LOOP off, or Sustain "Recording" -
     // keeps its own pitch and tone: no per-voice wander.)
@@ -825,6 +825,24 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
         mixXNow = towards (mixXNow, config.mixX, blendStep * n);
         mixYNow = towards (mixYNow, config.mixY, blendStep * n);
         const auto weights = mixWeights (occupied, blendNow, mixXNow, mixYNow);
+        {
+            // Per-layer Reimagined: the shared resonance stage follows the layers' amounts,
+            // weighted by how much of each is heard (power). Untouched when every layer
+            // follows the instrument's amount.
+            double sum = 0.0, weighted = 0.0;
+            bool own = false;
+            for (std::size_t l = 0; l < weights.gain.size(); ++l)
+            {
+                own = own || config.layer[l].reimagined >= 0.0;
+                const double levelDb = config.layer[l].levelDb;
+                const double level = levelDb <= LayerSettings::minLevelDb ? 0.0 : dbToGain (std::min (levelDb, 12.0));
+                const double power = weights.gain[l] * weights.gain[l] * level * level;
+                sum += power;
+                weighted += power * std::clamp (layerReimagined (static_cast<int> (l)), 0.0, 1.0);
+            }
+            if (own && sum > 1.0e-12)
+                post.setReimagined (weighted / sum);
+        }
         for (int layer = 0; layer < EngineSettings::layers; ++layer)
         {
             auto& slot = slots[static_cast<std::size_t> (layer)];

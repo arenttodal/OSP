@@ -100,6 +100,9 @@ public:
     static juce::String layerName (int layer) { return layer == 2 ? "C" : (layer == 1 ? "B" : "A"); }
     /** The stable parameter ID of a layer setting, e.g. layerParameterId (1, "sourceMode") -> "layerB.sourceMode". */
     static juce::String layerParameterId (int layer, const juce::String& name) { return "layer" + layerName (layer) + "." + name; }
+    /** A layer's Original <-> Reimagined: A's is the instrument's `reimagined` (the ID older
+        sessions and automation know); B and C have their own. */
+    static juce::String reimaginedParameterId (int layer) { return layer <= 0 ? juce::String ("reimagined") : layerParameterId (layer, "reimagined"); }
 
     // Instrument loading (message thread)
     void loadFile (const juce::File& file, int layer = -1);
@@ -222,7 +225,7 @@ public:
         5: MOVEMENT v2 (every mode keeps its own settings; the shared knobs migrate to the selected mode).
         6: adaptive 1-3 layers (InstrumentC tree, layer controls, three-layer mix, ADSR decay/sustain;
            the global Sustain becomes every layer's LOOP). */
-    static constexpr int stateVersion = 6;
+    static constexpr int stateVersion = 7;
 
 private:
     struct Layer
@@ -335,6 +338,8 @@ private:
         std::array<float, 6> last { -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f };
         std::array<std::atomic<float>*, 8> controls {};   ///< in layerControlNames() order
         std::array<float, 8> lastControls { -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f };
+        std::atomic<float>* reimagined = nullptr;   ///< B and C (A follows the instrument's)
+        float lastReimagined = -1.0e9f;
     };
     std::atomic<float>* mixXParam = nullptr;
     std::atomic<float>* mixYParam = nullptr;

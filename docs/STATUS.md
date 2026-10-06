@@ -183,6 +183,7 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [x] Mono / Poly with legato and GLIDE (Advanced; `voiceMode`, `glide`, version hint 8); sessions without a parameter open with its default
 - [x] SHAPER DEPTH (= the MOVEMENT macro, also in the SHAPER popup): patterns span their full range, 100 % on VOL gates to silence, 10 % is subtle; MACHINE is now an on/off gate
 - [x] Large MIX popup for three layers (click the small triangle or MIX); macro value bubble readable (light on graphite, whole percent)
+- [x] Per-layer Original <-> Reimagined (engine: LayerSettings::reimagined, shared resonance weighted by the mix; plugin: layerB/C.reimagined, A keeps `reimagined`; state v7 migration)
 - [ ] Stage 20: DAW testing (Logic AU, Ableton AU/VST3, Reaper VST3) — needs the user's Mac
 - [ ] Listening pass: FOLLOW-off lift, REVERSE + LOOP, the three-layer mix law, default LEVEL 0 dB
 

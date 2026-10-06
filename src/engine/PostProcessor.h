@@ -38,6 +38,8 @@ public:
 
     /** Pick up the resonances of a newly published model (real-time safe). */
     void setModel (const InstrumentModel* model) noexcept;
+    /** Overrides the Reimagined amount set by setMacros (per-layer amounts, mixed). */
+    void setReimagined (double amount) noexcept { reimaginedTarget = amount < 0.0 ? 0.0 : (amount > 1.0 ? 1.0 : amount); }
     void setMacros (const Macros& macros) noexcept;
     void setShaping (const Shaping& shaping) noexcept;
 

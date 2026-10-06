@@ -1859,3 +1859,61 @@ TEST_CASE ("plugin: canonical screenshots for visual review", "[.][canonical]")
     shot ("07-three.png");
     p.editorBeingDeleted (editor.get());
 }
+
+TEST_CASE ("plugin: per-layer Reimagined - each layer its own, older sessions give every layer the one amount", "[plugin][adaptive]")
+{
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "a.wav", testsignals::vowel (midiToHz (57), 2.0, 48000.0, 3));
+    const auto b = writeSource (tmp.dir, "b.wav", testsignals::vowel (midiToHz (61), 2.0, 48000.0, 5));
+    const auto c = writeSource (tmp.dir, "c.wav", testsignals::vowel (midiToHz (64), 2.0, 48000.0, 7));
+    OspAudioProcessor p;
+    p.setParameterValue ("reimagined", 35.0f);
+    CHECK (p.addLayers ({ a, b, c }) == 3);
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    // A new layer starts as Reimagined as the instrument is.
+    CHECK (valueOf (p, "layerB.reimagined") == Approx (35.0f));
+    CHECK (valueOf (p, "layerC.reimagined") == Approx (35.0f));
+    p.setParameterValue ("layerB.reimagined", 80.0f);
+    p.setParameterValue ("layerC.reimagined", 5.0f);
+    // Removing B: C (with its own amount) moves into B's place.
+    REQUIRE (p.removeLayer (1));
+    p.pollLoads();
+    CHECK (valueOf (p, "layerB.reimagined") == Approx (5.0f));
+    CHECK (valueOf (p, "reimagined") == Approx (35.0f));
+    REQUIRE (p.restoreRemovedLayer());
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    CHECK (valueOf (p, "layerB.reimagined") == Approx (80.0f));
+    CHECK (valueOf (p, "layerC.reimagined") == Approx (5.0f));
+
+    // Recall.
+    juce::MemoryBlock state;
+    p.getStateInformation (state);
+    OspAudioProcessor q;
+    q.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+    REQUIRE (q.waitForLoads (30000));
+    q.pollLoads();
+    CHECK (valueOf (q, "layerB.reimagined") == Approx (80.0f));
+
+    // A session from before (stateVersion 6, one amount): every layer keeps it.
+    auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
+    REQUIRE (xml != nullptr);
+    xml->setAttribute ("stateVersion", 6);
+    for (auto* child = xml->getFirstChildElement(); child != nullptr;)
+    {
+        auto* next = child->getNextElement();
+        const auto id = child->getStringAttribute ("id");
+        if (id == "layerB.reimagined" || id == "layerC.reimagined")
+            xml->removeChildElement (child, true);
+        child = next;
+    }
+    juce::MemoryBlock older;
+    juce::AudioProcessor::copyXmlToBinary (*xml, older);
+    OspAudioProcessor r;
+    r.setStateInformation (older.getData(), static_cast<int> (older.getSize()));
+    REQUIRE (r.waitForLoads (30000));
+    r.pollLoads();
+    CHECK (valueOf (r, "layerB.reimagined") == Approx (35.0f));
+    CHECK (valueOf (r, "layerC.reimagined") == Approx (35.0f));
+}
