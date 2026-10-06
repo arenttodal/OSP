@@ -450,6 +450,11 @@ void SourceDisplay::paintStatic (juce::Graphics& g)
     // Display scale: amplitude compressed (power 0.6) so quiet detail and tails read, as in
     // the reference; the ghost envelope uses a 45 dB range.
     auto shape = [maxAbs, half] (float a) { return half * std::pow (std::clamp (std::abs (a) / maxAbs, 0.0f, 1.0f), 0.85f) * (a < 0.0f ? -1.0f : 1.0f); };
+    auto shapeDb = [maxAbs, half] (float a) {
+        const float x = std::clamp (std::abs (a) / maxAbs, 0.0f, 1.0f);
+        const float db = 20.0f * std::log10 (std::max (x, 1.0e-6f));
+        return half * (0.5f * std::clamp ((db + 36.0f) / 36.0f, 0.0f, 1.0f) + 0.5f * std::pow (x, 0.6f));
+    };
 
     // Columns at the cache's own resolution (two per logical pixel on a 2x display).
     const float scale = std::max (1.0f, std::abs (g.getInternalContext().getPhysicalPixelScaleFactor()));
@@ -571,6 +576,30 @@ void SourceDisplay::paintStatic (juce::Graphics& g)
             g.setColour (toneAt (col.bright, 0.9f).withAlpha ((0.22f + 0.4f * onset) * tint));
             g.fillRect (juce::Rectangle<float> (x, side < 0.0f ? mid - reach : mid, std::max (0.5f, colWidth * 0.8f), reach));
         }
+    }
+
+    // Particles (as in the earlier build): fine dust around the body out to its envelope,
+    // as many and as far out as the sound is loud there (texture, never noise).
+    {
+        Scatter rng;
+        for (int c = 0; c < columns; ++c)
+            for (int n = 0; n < 2; ++n)
+            {
+                const auto& col = cols[static_cast<std::size_t> (c)];
+                const float amp = std::max (col.hi, -col.lo) / maxAbs;
+                const float chance = (view.granular ? 0.45f : 0.55f) * std::sqrt (amp) + 0.03f;
+                if (rng.next() > chance)
+                    continue;
+                const float side = rng.next() < 0.5f ? -1.0f : 1.0f;
+                // Mostly just outside the body, thinning out towards the sound's envelope.
+                const float body = std::max (shape (std::max (col.hi, -col.lo)), 0.6f * shapeDb (col.rms));
+                const float reach = body * (0.9f + 0.85f * std::pow (rng.next(), 1.4f)) + 1.5f + 8.0f * rng.next() * std::sqrt (amp);
+                const float y = mid + side * std::min (half * 1.05f, reach);
+                const float x = plot.getX() + static_cast<float> (c) * colWidth;
+                const float d = 0.9f + 1.2f * rng.next();
+                g.setColour (toneAt (col.bright, 0.9f).withAlpha ((0.3f + 0.55f * rng.next()) * tint));
+                g.fillEllipse (x - 0.5f * d, y - 0.5f * d, d, d);
+            }
     }
 
     // The loop region (One Shot + LOOP): a slim bracket along the bottom.
