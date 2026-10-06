@@ -86,7 +86,8 @@ if(OSP_BUILD_TESTS)
         Source
         $<TARGET_PROPERTY:OSP_Plugin,INCLUDE_DIRECTORIES>)
     target_compile_definitions(osp_plugin_tests PRIVATE
-        $<TARGET_PROPERTY:OSP_Plugin,COMPILE_DEFINITIONS>)
+        $<TARGET_PROPERTY:OSP_Plugin,COMPILE_DEFINITIONS>
+        OSP_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
     target_link_libraries(osp_plugin_tests PRIVATE OSP_Plugin osp_dsp Catch2::Catch2)
     add_test(NAME plugin COMMAND osp_plugin_tests)
 endif()

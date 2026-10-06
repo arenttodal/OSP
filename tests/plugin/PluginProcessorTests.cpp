@@ -18,6 +18,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cstdlib>
+#include <cstring>
 
 using Catch::Approx;
 using namespace osp;
@@ -2167,4 +2168,196 @@ TEST_CASE ("plugin: INIT, Reset settings and saved starting states", "[plugin][a
     p.pollLoads();
     CHECK (p.parameterValue ("layerB.pan") == Approx (30.0f));
     CHECK (p.parameterValue ("ab.blend") == Approx (0.8f));
+}
+
+//==============================================================================
+// Reimagined migration (per-layer REIMAGINED): sessions saved before it must sound exactly
+// as they did. tests/audio/reimagined-before/ holds the reference made by the build before
+// the migration (exact sample hash plus level, peak and brightness per scene). Each scene
+// is set up, saved and reopened the way an older session is (no routing in its state),
+// then rendered. On the reference platform the hash must match; elsewhere the signal
+// metrics must (floating-point results differ slightly between compilers).
+//   OSP_UPDATE_REIMAGINED_REFERENCE=1  rewrite the references (only before the migration)
+//   OSP_REIMAGINED_WAV_DIR=<dir>       also write each render as a 32-bit float WAV (null tests)
+namespace
+{
+    struct ReimaginedScene
+    {
+        const char* name;
+        int layers;                                        // 1..3: vowel A3, pluck E2, vowel E4
+        std::vector<std::pair<const char*, float>> values; // parameter values (plain)
+        bool automate = false;                             // `reimagined` swept 0 -> 100 % while playing
+    };
+
+    std::vector<ReimaginedScene> reimaginedScenes()
+    {
+        using V = std::vector<std::pair<const char*, float>>;
+        auto one = [] (float amount) { return V { { "reimagined", amount } }; };
+        return {
+            { "one-0", 1, one (0.0f) },
+            { "one-25", 1, one (25.0f) },
+            { "one-50", 1, one (50.0f) },
+            { "one-75", 1, one (75.0f) },
+            { "one-100", 1, one (100.0f) },
+            { "one-granular-75", 1, V { { "reimagined", 75.0f }, { "layerA.sourceMode", 1.0f } } },
+            { "two-50", 2, V { { "reimagined", 50.0f }, { "layerB.reimagined", 50.0f }, { "ab.blend", 0.5f } } },
+            { "two-20-80-blend-0.85", 2, V { { "reimagined", 20.0f }, { "layerB.reimagined", 80.0f }, { "ab.blend", 0.85f } } },
+            { "two-mixed-modes-60", 2, V { { "reimagined", 60.0f }, { "layerB.reimagined", 60.0f }, { "layerB.sourceMode", 1.0f }, { "ab.blend", 0.4f } } },
+            { "two-shaped-60", 2, V { { "reimagined", 60.0f }, { "layerB.reimagined", 60.0f }, { "ab.blend", 0.3f }, { "character", 45.0f },
+                                      { "movement.mode", 1.0f }, { "motion", 60.0f }, { "space", 55.0f }, { "space.type", 2.0f } } },
+            { "three-0-50-100", 3, V { { "reimagined", 0.0f }, { "layerB.reimagined", 50.0f }, { "layerC.reimagined", 100.0f },
+                                       { "layerC.level", -3.0f }, { "layerB.pan", -40.0f } } },
+            { "one-automated", 1, one (0.0f), true },
+        };
+    }
+
+    struct SceneResult
+    {
+        juce::String hash;
+        double rmsDb = -200.0, peakDb = -200.0, brightness = 0.0;
+        AudioData audio;
+    };
+
+    SceneResult renderScene (const ReimaginedScene& scene, const juce::File& dir)
+    {
+        const std::array<juce::File, 3> files { writeSource (dir, "a-vowel.wav", testsignals::vowel (midiToHz (57), 2.5, 48000.0, 3)),
+                                                writeSource (dir, "b-pluck.wav", testsignals::pluck (midiToHz (40), 2.5, 48000.0, 8, 0.7, 1)),
+                                                writeSource (dir, "c-vowel.wav", testsignals::vowel (midiToHz (64), 2.5, 48000.0, 7)) };
+        // The scene as a musician made it...
+        juce::MemoryBlock state;
+        {
+            OspAudioProcessor p;
+            juce::Array<juce::File> sources;
+            for (int i = 0; i < scene.layers; ++i)
+                sources.add (files[static_cast<std::size_t> (i)]);
+            if (scene.layers == 1)
+                p.loadFile (sources[0]);
+            else
+                p.addLayers (sources);
+            REQUIRE (p.waitForLoads (30000));
+            p.pollLoads();
+            for (const auto& [id, value] : scene.values)
+                p.setParameterValue (id, value);
+            p.getStateInformation (state);
+        }
+        // ...saved by a build that knew nothing about routing...
+        if (auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize())))
+        {
+            xml->removeAttribute ("reimaginedRouting");
+            state.reset();
+            juce::AudioProcessor::copyXmlToBinary (*xml, state);
+        }
+        // ...and reopened.
+        OspAudioProcessor q;
+        q.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+        REQUIRE (q.waitForLoads (30000));
+        q.pollLoads();
+
+        const double rate = 48000.0;
+        const int block = 256, total = static_cast<int> (2.4 * rate);
+        q.prepareToPlay (rate, block);
+        SceneResult result;
+        result.audio = AudioData::allocate (2, total, rate);
+        juce::AudioBuffer<float> buffer (2, block);
+        const int notes[] = { 57, 61, 64 };
+        for (int pos = 0; pos < total; pos += block)
+        {
+            juce::MidiBuffer midi;
+            for (int k = 0; k < 3; ++k)
+            {
+                const int on = static_cast<int> ((0.25 * k) * rate);
+                if (on >= pos && on < pos + block)
+                    midi.addEvent (juce::MidiMessage::noteOn (1, notes[k], static_cast<juce::uint8> (90 + 10 * k)), on - pos);
+            }
+            const int off = static_cast<int> (1.4 * rate);
+            if (off >= pos && off < pos + block)
+                midi.addEvent (juce::MidiMessage::allNotesOff (1), off - pos);
+            if (scene.automate)   // host automation of the old global parameter, block by block
+                if (auto* r = q.parameters.getParameter ("reimagined"))
+                    r->setValueNotifyingHost (std::min (1.0f, static_cast<float> (pos) / static_cast<float> (1.6 * rate)));
+            buffer.clear();
+            q.processBlock (buffer, midi);
+            const int n = std::min (block, total - pos);
+            for (int ch = 0; ch < 2; ++ch)
+                std::copy (buffer.getReadPointer (ch), buffer.getReadPointer (ch) + n, result.audio.channels[static_cast<std::size_t> (ch)].begin() + pos);
+        }
+
+        std::uint64_t h = 1469598103934665603ull;
+        double sum = 0.0, diff = 0.0, peak = 0.0;
+        for (const auto& channel : result.audio.channels)
+        {
+            float previous = 0.0f;
+            for (float x : channel)
+            {
+                std::uint32_t bits;
+                std::memcpy (&bits, &x, sizeof bits);
+                for (int b = 0; b < 4; ++b)
+                    h = (h ^ ((bits >> (8 * b)) & 0xffu)) * 1099511628211ull;
+                sum += static_cast<double> (x) * x;
+                diff += static_cast<double> (x - previous) * (x - previous);
+                peak = std::max (peak, static_cast<double> (std::abs (x)));
+                previous = x;
+            }
+        }
+        const double count = 2.0 * total;
+        result.hash = juce::String::toHexString (static_cast<juce::int64> (h));
+        result.rmsDb = 10.0 * std::log10 (std::max (1.0e-20, sum / count));
+        result.peakDb = 20.0 * std::log10 (std::max (1.0e-10, peak));
+        result.brightness = std::sqrt (diff / std::max (1.0e-20, sum));
+        return result;
+    }
+
+    juce::File reimaginedReferenceDir()
+    {
+        return juce::File (OSP_SOURCE_DIR).getChildFile ("tests/audio/reimagined-before");
+    }
+}
+
+TEST_CASE ("plugin: sessions from before per-layer Reimagined render as they did", "[plugin][reimagined-migration]")
+{
+    const bool update = juce::SystemStats::getEnvironmentVariable ("OSP_UPDATE_REIMAGINED_REFERENCE", {}) == "1";
+    const auto wavDir = juce::SystemStats::getEnvironmentVariable ("OSP_REIMAGINED_WAV_DIR", {});
+    int identical = 0, scenes = 0;
+    for (const auto& scene : reimaginedScenes())
+    {
+        DYNAMIC_SECTION (scene.name)
+        {
+            TempDir tmp;
+            const auto result = renderScene (scene, tmp.dir);
+            const auto file = reimaginedReferenceDir().getChildFile (juce::String (scene.name) + ".json");
+            if (wavDir.isNotEmpty())
+            {
+                std::string error;
+                const auto wav = juce::File (wavDir).getChildFile (juce::String (scene.name) + ".wav");
+                CHECK (io::writeAudioFile (std::filesystem::path (wav.getFullPathName().toStdString()), result.audio, io::SampleFormat::float32, error));
+            }
+            if (update)
+            {
+                auto* o = new juce::DynamicObject();
+                o->setProperty ("schemaVersion", 1);
+                o->setProperty ("scene", scene.name);
+                o->setProperty ("sampleHash", result.hash);
+                o->setProperty ("rmsDb", result.rmsDb);
+                o->setProperty ("peakDb", result.peakDb);
+                o->setProperty ("brightness", result.brightness);
+                file.getParentDirectory().createDirectory();
+                REQUIRE (file.replaceWithText (juce::JSON::toString (juce::var (o))));
+                continue;
+            }
+            const auto reference = juce::JSON::parse (file);
+            INFO ("missing reference " << file.getFullPathName());
+            REQUIRE (reference.isObject());
+            ++scenes;
+            const bool same = reference["sampleHash"].toString() == result.hash;
+            identical += same ? 1 : 0;
+            INFO (scene.name << ": rms " << result.rmsDb << " dB, peak " << result.peakDb << " dB, brightness " << result.brightness);
+            CHECK (result.rmsDb == Approx (static_cast<double> (reference["rmsDb"])).margin (0.02));
+            CHECK (result.peakDb == Approx (static_cast<double> (reference["peakDb"])).margin (0.05));
+            CHECK (result.brightness == Approx (static_cast<double> (reference["brightness"])).epsilon (0.005));
+            if (! same)
+                WARN (scene.name << ": not bit-identical to the reference (expected only off the reference platform)");
+        }
+    }
+    (void) identical;
+    (void) scenes;
 }
