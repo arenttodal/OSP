@@ -307,6 +307,8 @@ void OspAudioProcessorEditor::mouseDownAnywhere (juce::Component* c)
             pressed = i;
     if (c == &advancedButton)
         pressed = advancedPopup;
+    if (mixSection.isMixOpener (c))
+        pressed = mixPopup;
     closedByLabelPress = pressed == popupIndex ? pressed : -1;
     closePopup();
 }
@@ -361,6 +363,14 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     addChildComponent (addTarget);
     addChildComponent (samplesPanel);
 
+    mixSection.onOpenMix = [this] {
+        if (closedByLabelPress == mixPopup)
+        {
+            closedByLabelPress = -1;   // that press closed it
+            return;
+        }
+        openPopup (mixPopup);
+    };
     addAndMakeVisible (mixSection);
 
     // The five macros: a name with settings behind it (click: its popup) over its knob.
@@ -456,9 +466,12 @@ void OspAudioProcessorEditor::openPopup (int which)
 {
     const bool keepAdvanced = which == advancedPopup;
     closePopup();
-    if (which < 0 || which > advancedPopup)
+    if (which < 0 || which > mixPopup)
         return;
-    popup = which == advancedPopup ? createAdvancedPopup (ospProcessor) : createMacroPopup (static_cast<MacroPopup> (which), ospProcessor);
+    if (which == mixPopup)
+        popup = createMixPopup (ospProcessor);
+    else
+        popup = which == advancedPopup ? createAdvancedPopup (ospProcessor) : createMacroPopup (static_cast<MacroPopup> (which), ospProcessor);
     popupIndex = which;
     popup->onSizeChanged = [this] { positionPopup(); };
     juce::Component::SafePointer<OspAudioProcessorEditor> safe (this);
@@ -509,8 +522,10 @@ void OspAudioProcessorEditor::positionPopup()
     popup->setAlpha (1.0f);
     const auto size = popup->cardSize();
     const int m = MiniPanel::shadowMargin;
-    const auto anchor = popupIndex < 5 ? macros[static_cast<std::size_t> (popupIndex)].label->getBounds() : advancedButton.getBounds();
-    int x = popupIndex < 5 ? anchor.getCentreX() - size.x / 2 : anchor.getRight() - size.x;
+    const auto anchor = popupIndex < 5 ? macros[static_cast<std::size_t> (popupIndex)].label->getBounds()
+                                       : (popupIndex == mixPopup ? mixSection.getBounds() : advancedButton.getBounds());
+    int x = popupIndex < 5 ? anchor.getCentreX() - size.x / 2
+                           : (popupIndex == mixPopup ? anchor.getX() + 8 : anchor.getRight() - size.x);
     int y = anchor.getY() - 6 - size.y;
     const auto limits = getLocalBounds().reduced (14);
     x = juce::jlimit (limits.getX(), std::max (limits.getX(), limits.getRight() - size.x), x);
@@ -607,6 +622,8 @@ void OspAudioProcessorEditor::layoutSources (bool animate)
         addTarget.setLetter (OspAudioProcessor::layerName (ospProcessor.firstFreeLayer()));
     }
     mixSection.setLayers (occupied);
+    if (popupIndex == mixPopup && mixSection.layerCount() < 3)
+        closePopup();   // the large mix belongs to three layers
     updateFocus();
 }
 

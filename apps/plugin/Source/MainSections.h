@@ -23,6 +23,9 @@ class TriangleMix final : public juce::Component, public juce::SettableTooltipCl
 {
 public:
     explicit TriangleMix (juce::AudioProcessorValueTreeState& state);
+    /** When set, a click (no drag) calls this instead of moving the point (the small
+        triangle opens the large one); dragging still moves it. */
+    std::function<void()> onClick;
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
     void mouseDrag (const juce::MouseEvent&) override;
@@ -36,7 +39,7 @@ private:
     void moveTo (juce::Point<float> where);
     float x = 0.5f, y = 1.0f / 3.0f;
     juce::ParameterAttachment xAttachment, yAttachment;
-    bool dragging = false;
+    bool dragging = false, pressed = false;
 };
 
 /**
@@ -49,8 +52,14 @@ public:
     explicit MixSection (OspAudioProcessor& processor);
     /** Which slots hold a sound (the blend's ends take their letters and colours). */
     void setLayers (const std::array<bool, 3>& occupied);
+    int layerCount() const noexcept { return count; }
+    /** Three layers: a click on the triangle or on MIX opens the large mix popup. */
+    std::function<void()> onOpenMix;
+    /** Whether a press on `c` is a press on the MIX opener (the editor's outside-click logic). */
+    bool isMixOpener (const juce::Component* c) const noexcept { return count == 3 && (c == this || c == &triangle); }
     void paint (juce::Graphics&) override;
     void resized() override;
+    void mouseUp (const juce::MouseEvent&) override;
 
 private:
     OspAudioProcessor& processor;
@@ -62,6 +71,9 @@ private:
     TriangleMix triangle;
     juce::Rectangle<int> reimaginedRow, blendRow, captionArea;
 };
+
+/** The large three-layer mix (opened from the mix band's triangle or MIX). */
+std::unique_ptr<MiniPanel> createMixPopup (OspAudioProcessor& processor);
 
 /** ‹  PRESET NAME  ♡  › : the factory starting states, then the user's presets. */
 class PresetBar final : public juce::Component

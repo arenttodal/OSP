@@ -23,7 +23,9 @@ TriangleMix::TriangleMix (juce::AudioProcessorValueTreeState& state)
 
 std::array<juce::Point<float>, 3> TriangleMix::corners() const
 {
-    auto r = getLocalBounds().toFloat().reduced (9.0f, 7.0f);
+    // Room for the corner letters, which grow with the triangle.
+    auto r = getLocalBounds().toFloat().reduced (std::max (9.0f, 0.075f * static_cast<float> (getWidth())),
+                                                  std::max (7.0f, 0.06f * static_cast<float> (getHeight())));
     const float w = std::min (r.getWidth(), r.getHeight() / 0.866f);
     const float h = w * 0.866f;
     r = r.withSizeKeepingCentre (w, h);
@@ -43,6 +45,9 @@ void TriangleMix::moveTo (juce::Point<float> where)
 
 void TriangleMix::mouseDown (const juce::MouseEvent& e)
 {
+    pressed = true;
+    if (onClick != nullptr)
+        return;   // a click opens; only a drag moves
     dragging = true;
     xAttachment.beginGesture();
     yAttachment.beginGesture();
@@ -51,14 +56,25 @@ void TriangleMix::mouseDown (const juce::MouseEvent& e)
 
 void TriangleMix::mouseDrag (const juce::MouseEvent& e)
 {
+    if (! dragging && pressed && onClick != nullptr && e.getDistanceFromDragStart() > 3)
+    {
+        dragging = true;
+        xAttachment.beginGesture();
+        yAttachment.beginGesture();
+    }
     if (dragging)
         moveTo (e.position);
 }
 
-void TriangleMix::mouseUp (const juce::MouseEvent&)
+void TriangleMix::mouseUp (const juce::MouseEvent& e)
 {
+    const bool wasPressed = std::exchange (pressed, false);
     if (! dragging)
+    {
+        if (wasPressed && onClick != nullptr && ! e.mouseWasDraggedSinceMouseDown() && e.getNumberOfClicks() < 2)
+            onClick();
         return;
+    }
     dragging = false;
     xAttachment.endGesture();
     yAttachment.endGesture();
@@ -81,6 +97,8 @@ void TriangleMix::paint (juce::Graphics& g)
     g.setColour (hairline.darker (0.08f));
     g.strokePath (shape, juce::PathStrokeType (1.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
+    // Everything grows with the triangle (64 px in the mix band, ~300 px in its popup).
+    const float k = std::clamp ((c[2].x - c[0].x) / 46.0f, 1.0f, 2.4f);
     const auto share = InstrumentEngine::triangleShares (x, y);
     const auto node = juce::Point<float> (c[0].x + x * (c[2].x - c[0].x), c[0].y - y * (c[0].y - c[1].y));
     // Threads to the corners, as strong as each layer's share; the node takes their colours.
@@ -88,27 +106,28 @@ void TriangleMix::paint (juce::Graphics& g)
     for (std::size_t i = 0; i < 3; ++i)
     {
         g.setColour (layer (static_cast<int> (i)).withAlpha (0.15f + 0.7f * static_cast<float> (share[i])));
-        g.drawLine ({ node, c[i] }, 1.2f);
+        g.drawLine ({ node, c[i] }, 1.2f * std::sqrt (k));
         g.setColour (layer (static_cast<int> (i)));
-        g.fillEllipse (c[i].x - 2.5f, c[i].y - 2.5f, 5.0f, 5.0f);
+        g.fillEllipse (c[i].x - 2.5f * k, c[i].y - 2.5f * k, 5.0f * k, 5.0f * k);
     }
     mix = layer (0).interpolatedWith (layer (1), static_cast<float> (share[1] / std::max (1.0e-6, share[0] + share[1])));
     mix = mix.interpolatedWith (layer (2), static_cast<float> (share[2]));
     juce::Path disc;
-    disc.addEllipse (node.x - 6.0f, node.y - 6.0f, 12.0f, 12.0f);
+    disc.addEllipse (node.x - 6.0f * k, node.y - 6.0f * k, 12.0f * k, 12.0f * k);
     juce::DropShadow (juce::Colour (0x331e1c18), 3, { 0, 1 }).drawForPath (g, disc);
     g.setColour (raised);
     g.fillPath (disc);
     g.setColour (mix);
     g.strokePath (disc, juce::PathStrokeType (1.4f));
     g.setColour (accent);
-    g.fillEllipse (node.x - 2.0f, node.y - 2.0f, 4.0f, 4.0f);
+    g.fillEllipse (node.x - 2.0f * k, node.y - 2.0f * k, 4.0f * k, 4.0f * k);
 
-    g.setFont (fonts::make (10.0f, fonts::Weight::semibold));
+    g.setFont (fonts::make (10.0f * std::sqrt (k), fonts::Weight::semibold));
     g.setColour (textDim);
-    g.drawText ("A", juce::Rectangle<float> (c[0].x - 9.0f, c[0].y - 4.0f, 8.0f, 10.0f), juce::Justification::centredRight, false);
-    g.drawText ("B", juce::Rectangle<float> (c[1].x - 4.0f, c[1].y - 8.0f, 8.0f, 8.0f).translated (7.0f, 2.0f), juce::Justification::centredLeft, false);
-    g.drawText ("C", juce::Rectangle<float> (c[2].x + 2.0f, c[2].y - 4.0f, 8.0f, 10.0f), juce::Justification::centredLeft, false);
+    const float t = 8.0f * std::sqrt (k), gap = 2.0f * k;
+    g.drawText ("A", juce::Rectangle<float> (c[0].x - t - gap, c[0].y - t * 0.5f, t, t + 2.0f), juce::Justification::centredRight, false);
+    g.drawText ("B", juce::Rectangle<float> (c[1].x + gap + 2.0f, c[1].y - t * 0.75f, t, t), juce::Justification::centredLeft, false);
+    g.drawText ("C", juce::Rectangle<float> (c[2].x + gap, c[2].y - t * 0.5f, t, t + 2.0f), juce::Justification::centredLeft, false);
 }
 
 //==============================================================================
@@ -130,7 +149,18 @@ MixSection::MixSection (OspAudioProcessor& p) : processor (p), triangle (p.param
     blendAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (processor.parameters, "ab.blend", blend);
     blend.setDoubleClickReturnValue (true, 0.5);
     addChildComponent (blend);
+    triangle.onClick = [this] {
+        if (onOpenMix != nullptr)
+            onOpenMix();
+    };
+    triangle.setTooltip ("Three-layer mix: click for the large mix, or drag here");
     addChildComponent (triangle);
+}
+
+void MixSection::mouseUp (const juce::MouseEvent& e)
+{
+    if (count == 3 && captionArea.contains (e.getPosition()) && ! e.mouseWasDraggedSinceMouseDown() && onOpenMix != nullptr)
+        onOpenMix();
 }
 
 void MixSection::setLayers (const std::array<bool, 3>& occupied)
@@ -225,6 +255,97 @@ void MixSection::paint (juce::Graphics& g)
             g.drawText (part, line.removeFromLeft (w), juce::Justification::topLeft, false);
         }
     }
+}
+
+//==============================================================================
+namespace
+{
+    /** The large mix: the same triangle at popup size for fine placement, with what each
+        corner is and how much of it is heard. */
+    class MixPopup final : public MiniPanel, private juce::Timer
+    {
+    public:
+        explicit MixPopup (OspAudioProcessor& p)
+            : MiniPanel ("MIX", "HOW MUCH OF EACH LAYER YOU HEAR"), processor (p), triangle (p.parameters)
+        {
+            triangle.setTooltip ("Drag between A, B and C (double-click: all three equal)");
+            addAndMakeVisible (triangle);
+            for (int l = 0; l < 3; ++l)
+                if (auto instrument = processor.currentInstrument (l))
+                    names[static_cast<std::size_t> (l)] = juce::String (instrument->filename);
+            startTimerHz (20);
+        }
+
+        juce::Point<int> cardSize() const override { return { 340, 10 + headerHeight() + 8 + 250 + 10 + 3 * 20 + 14 }; }
+
+        void paint (juce::Graphics& g) override
+        {
+            MiniPanel::paint (g);
+            using namespace palette;
+            const auto share = shares();
+            auto rows = readout.toFloat();
+            for (int l = 0; l < 3; ++l)
+            {
+                auto row = rows.removeFromTop (20.0f);
+                const auto colour = layer (l);
+                auto badge = row.removeFromLeft (16.0f).withSizeKeepingCentre (16.0f, 16.0f);
+                g.setColour (colour);
+                g.fillRoundedRectangle (badge, 3.5f);
+                g.setColour (juce::Colours::white);
+                g.setFont (fonts::make (10.5f, fonts::Weight::semibold));
+                g.drawText (OspAudioProcessor::layerName (l), badge, juce::Justification::centred, false);
+                row.removeFromLeft (8.0f);
+                const auto percent = juce::String (juce::roundToInt (100.0 * share[static_cast<std::size_t> (l)])) + " %";
+                g.setFont (fonts::make (12.0f, fonts::Weight::semibold));
+                g.setColour (colour.darker (0.3f));
+                g.drawText (percent, row.removeFromRight (48.0f), juce::Justification::centredRight, false);
+                // How much of the row the share fills: a thin bar under the name.
+                const auto bar = row.withTrimmedRight (10.0f).removeFromBottom (3.0f);
+                g.setColour (recessed);
+                g.fillRoundedRectangle (bar, 1.5f);
+                g.setColour (colour.withAlpha (0.8f));
+                g.fillRoundedRectangle (bar.withWidth (bar.getWidth() * static_cast<float> (share[static_cast<std::size_t> (l)])), 1.5f);
+                g.setFont (fonts::make (11.5f));
+                g.setColour (text);
+                g.drawText (names[static_cast<std::size_t> (l)], row.withTrimmedRight (10.0f).withTrimmedBottom (4.0f), juce::Justification::centredLeft, true);
+            }
+        }
+
+    private:
+        std::array<double, 3> shares() const
+        {
+            return InstrumentEngine::triangleShares (processor.parameterValue ("mix.x"), processor.parameterValue ("mix.y"));
+        }
+
+        void timerCallback() override
+        {
+            const auto now = shares();
+            if (now != shown)
+            {
+                shown = now;
+                repaint (readout);
+            }
+        }
+
+        void layoutContent (juce::Rectangle<int> area) override
+        {
+            area.removeFromTop (8);
+            triangle.setBounds (area.removeFromTop (250).reduced (24, 0));
+            area.removeFromTop (10);
+            readout = area.removeFromTop (3 * 20).reduced (4, 0);
+        }
+
+        OspAudioProcessor& processor;
+        TriangleMix triangle;
+        std::array<juce::String, 3> names;
+        std::array<double, 3> shown {};
+        juce::Rectangle<int> readout;
+    };
+}
+
+std::unique_ptr<MiniPanel> createMixPopup (OspAudioProcessor& processor)
+{
+    return std::make_unique<MixPopup> (processor);
 }
 
 //==============================================================================

@@ -57,8 +57,9 @@ jump back where the sustain continues and forward where the release joins the en
 
 The band under the cards: **ORIGINAL ↔ REIMAGINED** always; with two layers the **A / B
 blend** above it (left only A, middle both at equal power, right only B); with three a small
-**triangle**: drag the dot towards A, B or C (double-click: all three equal). The numbers
-beside it say how much of each you hear. The mix keeps the total level steady wherever it is.
+**triangle**: drag the dot towards A, B or C (double-click: all three equal), or click the
+triangle or MIX for the **large mix** - the same triangle at popup size for fine placement,
+with each layer's sound and share. The numbers beside it say how much of each you hear. The mix keeps the total level steady wherever it is.
 
 ## Granular mode
 

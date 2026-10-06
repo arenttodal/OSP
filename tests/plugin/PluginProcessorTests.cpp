@@ -9,6 +9,7 @@
 #include "analysis/Analyzer.h"
 #include "audio/utility/TestSignals.h"
 #include "core/PitchMath.h"
+#include "engine/InstrumentEngine.h"
 #include "io/AudioFileIO.h"
 
 #define CATCH_CONFIG_RUNNER
@@ -1375,16 +1376,61 @@ TEST_CASE ("plugin: the editor adapts to one, two and three sounds; drops replac
     CHECK (ui->dropTargetAt (centre) == "replace B");
     ui->previewDrag (false);
     snapshot ("osp-adaptive-3.png");
+
+    // A click on the small triangle opens the large mix (and does not move the point);
+    // in the popup the triangle places the mix directly.
+    {
+        std::function<void (juce::Component&, std::vector<juce::Component*>&)> collect = [&] (juce::Component& parent, std::vector<juce::Component*>& found) {
+            for (auto* child : parent.getChildren())
+            {
+                if (! child->isVisible())
+                    continue;   // (headless: nothing is on screen, so visibility down the tree)
+                if (child->getTitle() == "Layer mix")
+                    found.push_back (child);
+                collect (*child, found);
+            }
+        };
+        auto click = [] (juce::Component& target, juce::Point<float> at) {
+            auto source = juce::Desktop::getInstance().getMainMouseSource();
+            const auto now = juce::Time::getCurrentTime();
+            const juce::MouseEvent e (source, at, juce::ModifierKeys(), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, &target, &target, now, at, now, 1, false);
+            target.mouseDown (e);
+            target.mouseUp (e);
+        };
+        std::vector<juce::Component*> triangles;
+        collect (*editor, triangles);
+        REQUIRE (triangles.size() == 1);
+        const float x0 = p.parameterValue ("mix.x"), y0 = p.parameterValue ("mix.y");
+        click (*triangles.front(), triangles.front()->getLocalBounds().toFloat().getBottomLeft() + juce::Point<float> (12.0f, -9.0f));
+        CHECK (ui->openPopupIndex() == osp::plugin::OspAudioProcessorEditor::mixPopup);
+        CHECK (p.parameterValue ("mix.x") == Approx (x0));
+        CHECK (p.parameterValue ("mix.y") == Approx (y0));
+        snapshot ("osp-adaptive-3-mix.png");
+        triangles.clear();
+        collect (*editor, triangles);
+        REQUIRE (triangles.size() == 2);
+        auto* large = triangles.back()->getWidth() > triangles.front()->getWidth() ? triangles.back() : triangles.front();
+        CHECK (large->getWidth() > 200);
+        // Pressing near corner C puts most of the mix on C.
+        click (*large, large->getLocalBounds().toFloat().getBottomRight() + juce::Point<float> (-40.0f, -26.0f));
+        const auto share = InstrumentEngine::triangleShares (p.parameterValue ("mix.x"), p.parameterValue ("mix.y"));
+        CHECK (share[2] > 0.6);
+        snapshot ("osp-adaptive-3-mix-c.png");
+        p.setParameterValue ("mix.x", 0.5f);
+        p.setParameterValue ("mix.y", 1.0f / 3.0f);
+    }
     // The smallest window still fits three full cards.
     editor->setSize (900, 720);
     snapshot ("osp-adaptive-3-small.png");
     editor->setSize (1060, 820);
 
-    // Removing B: C moves into its place, two cards again.
+    // Removing B: C moves into its place, two cards again (and the large mix closes).
+    ui->openPopup (osp::plugin::OspAudioProcessorEditor::mixPopup);
     REQUIRE (p.removeLayer (1));
     p.pollLoads();
     ui->refreshNow();
     CHECK (ui->visibleCardCount() == 2);
+    CHECK (ui->openPopupIndex() == -1);
     CHECK (juce::String (p.currentInstrument (1)->filename) == "Warm Harmonics.wav");
 
     // Every window size keeps the layout usable (smallest and largest).
