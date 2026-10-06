@@ -31,7 +31,7 @@ namespace osp::plugin
       - loader:  a single background thread that imports, hashes and analyses samples, then
                  builds the model stages (playable -> sustain -> register anchors).
 */
-class OspAudioProcessor final : public juce::AudioProcessor, private juce::Timer
+class OspAudioProcessor final : public juce::AudioProcessor, private juce::Timer, private juce::AudioProcessorParameter::Listener
 {
 public:
     OspAudioProcessor();
@@ -247,10 +247,35 @@ public:
         4: A/B layers (layer B in an InstrumentB tree; older sessions are layer A only).
         5: MOVEMENT v2 (every mode keeps its own settings; the shared knobs migrate to the selected mode).
         6: adaptive 1-3 layers (InstrumentC tree, layer controls, three-layer mix, ADSR decay/sustain;
-           the global Sustain becomes every layer's LOOP). */
-    static constexpr int stateVersion = 7;
+           the global Sustain becomes every layer's LOOP).
+        7: per-layer Reimagined amounts (B and C start from A's).
+        8: Reimagined routing (`reimaginedRouting`: "perLayer" or "legacyGlobal"); a state
+           without it was made before per-layer routing and keeps the legacy shared stage. */
+    static constexpr int stateVersion = 8;
+
+    /**
+        Reimagined routing (see osp::ReimaginedRouting). New patches (a fresh instance,
+        INIT, Reset settings) are per-layer; sessions, presets and starting states saved
+        before it, and the factory starting states, keep the legacy shared stage - they
+        sound exactly as they did, and saving them again keeps it.
+    */
+    bool isReimaginedPerLayer() const noexcept { return perLayerReimagined.load(); }
+    /**
+        The one place a patch leaves the legacy routing: the musician edits a layer's
+        REIMAGINED (a gesture on `reimagined`, `layerB.reimagined` or `layerC.reimagined`).
+        Every layer keeps the amount it has (older sessions already gave every layer the
+        one amount), so the knobs do not move; from then on each layer's amount shapes only
+        that layer, and host automation of `reimagined` is A's REIMAGINED. Never called for
+        opening, showing, inspecting or automating a patch. No-op when already per-layer.
+    */
+    void convertLegacyReimaginedToPerLayer();
 
 private:
+    void parameterValueChanged (int, float) override {}
+    void parameterGestureChanged (int parameterIndex, bool gestureIsStarting) override;
+    std::atomic<bool> perLayerReimagined { true };
+    std::array<juce::AudioProcessorParameter*, 3> reimaginedParameters {};
+
     struct Layer
     {
         ModelExchange<LoadedInstrument> exchange;

@@ -2361,3 +2361,130 @@ TEST_CASE ("plugin: sessions from before per-layer Reimagined render as they did
     (void) identical;
     (void) scenes;
 }
+
+TEST_CASE ("plugin: Reimagined routing - new patches per layer, older ones legacy until a layer's REIMAGINED is edited", "[plugin][reimagined-migration]")
+{
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "a.wav", testsignals::vowel (midiToHz (57), 2.0, 48000.0, 3));
+    const auto b = writeSource (tmp.dir, "b.wav", testsignals::pluck (midiToHz (40), 2.0, 48000.0, 8, 0.7, 1));
+    auto reopen = [] (const juce::MemoryBlock& state, bool asOlderSession) {
+        juce::MemoryBlock copy (state);
+        if (asOlderSession)
+            if (auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize())))
+            {
+                xml->removeAttribute ("reimaginedRouting");
+                xml->setAttribute ("stateVersion", 7);
+                copy.reset();
+                juce::AudioProcessor::copyXmlToBinary (*xml, copy);
+            }
+        auto q = std::make_unique<OspAudioProcessor>();
+        q->setStateInformation (copy.getData(), static_cast<int> (copy.getSize()));
+        REQUIRE (q->waitForLoads (30000));
+        q->pollLoads();
+        return q;
+    };
+
+    // A new patch: per layer, every REIMAGINED at the Original end.
+    OspAudioProcessor p;
+    CHECK (p.isReimaginedPerLayer());
+    for (int layer = 0; layer < 3; ++layer)
+        CHECK (valueOf (p, OspAudioProcessor::reimaginedParameterId (layer)) == Approx (0.0f));
+    CHECK (p.parameters.getParameter ("reimagined") != nullptr);   // the old ID stays (automation, presets)
+    CHECK (p.addLayers ({ a, b }) == 2);
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    p.setParameterValue ("reimagined", 20.0f);
+    p.setParameterValue ("layerB.reimagined", 90.0f);
+    juce::MemoryBlock state;
+    p.getStateInformation (state);
+    {
+        // Saved and reopened: still per layer, each layer its own amount.
+        auto q = reopen (state, false);
+        CHECK (q->isReimaginedPerLayer());
+        CHECK (valueOf (*q, "reimagined") == Approx (20.0f));
+        CHECK (valueOf (*q, "layerB.reimagined") == Approx (90.0f));
+    }
+
+    // An older session: legacy routing, its amounts shown as they are.
+    auto old = reopen (state, true);
+    CHECK_FALSE (old->isReimaginedPerLayer());
+    CHECK (valueOf (*old, "reimagined") == Approx (20.0f));
+    CHECK (valueOf (*old, "layerB.reimagined") == Approx (90.0f));
+    // Automation playback (no gesture) and a parameter change from the host never convert it...
+    auto* aReimagined = old->parameters.getParameter ("reimagined");
+    REQUIRE (aReimagined != nullptr);
+    aReimagined->setValueNotifyingHost (0.4f);
+    CHECK_FALSE (old->isReimaginedPerLayer());
+    playNote (*old, 57, 48000.0, 0.2);
+    CHECK_FALSE (old->isReimaginedPerLayer());
+    // ...and saving it untouched keeps it legacy.
+    juce::MemoryBlock resaved;
+    old->getStateInformation (resaved);
+    CHECK_FALSE (reopen (resaved, false)->isReimaginedPerLayer());
+
+    // The musician turns B's REIMAGINED: the patch becomes per layer, nothing else moves.
+    auto* bReimagined = old->parameters.getParameter ("layerB.reimagined");
+    REQUIRE (bReimagined != nullptr);
+    bReimagined->beginChangeGesture();
+    CHECK (old->isReimaginedPerLayer());
+    CHECK (valueOf (*old, "reimagined") == Approx (40.0f));
+    CHECK (valueOf (*old, "layerB.reimagined") == Approx (90.0f));
+    bReimagined->setValueNotifyingHost (bReimagined->convertTo0to1 (60.0f));
+    bReimagined->endChangeGesture();
+    CHECK (valueOf (*old, "reimagined") == Approx (40.0f));
+    old->getStateInformation (resaved);
+    CHECK (reopen (resaved, false)->isReimaginedPerLayer());
+
+    // The factory starting states were made with the shared stage; INIT is a new patch.
+    p.setCurrentProgram (5);
+    CHECK_FALSE (p.isReimaginedPerLayer());
+    p.initPatch();
+    CHECK (p.isReimaginedPerLayer());
+    for (int layer = 0; layer < 3; ++layer)
+        CHECK (valueOf (p, OspAudioProcessor::reimaginedParameterId (layer)) == Approx (0.0f));
+
+    // Master volume: the same parameter, range and default as before the slider.
+    auto* gain = dynamic_cast<juce::AudioParameterFloat*> (p.parameters.getParameter ("gain"));
+    REQUIRE (gain != nullptr);
+    CHECK (gain->range.start == Approx (-36.0f));
+    CHECK (gain->range.end == Approx (12.0f));
+    CHECK (gain->convertFrom0to1 (static_cast<juce::AudioProcessorParameter*> (gain)->getDefaultValue()) == Approx (0.0f));
+}
+
+TEST_CASE ("plugin: per-layer REIMAGINED - each layer's amount changes only that layer", "[plugin][reimagined-migration]")
+{
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "a.wav", testsignals::vowel (midiToHz (57), 2.0, 48000.0, 3));
+    const auto b = writeSource (tmp.dir, "b.wav", testsignals::vowel (midiToHz (64), 2.0, 48000.0, 7));
+    OspAudioProcessor p;
+    CHECK (p.addLayers ({ a, b }) == 2);
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    for (const char* id : { "life", "space", "motion" })
+        p.setParameterValue (id, 0.0f);
+    auto render = [&p] (float amountA, float amountB, bool soloA, bool soloB) {
+        p.setParameterValue ("reimagined", amountA);
+        p.setParameterValue ("layerB.reimagined", amountB);
+        p.setParameterValue ("layerA.level", soloB ? -48.0f : 0.0f);
+        p.setParameterValue ("layerB.level", soloA ? -48.0f : 0.0f);
+        return playNote (p, 57, 48000.0, 1.5);
+    };
+    auto difference = [] (const AudioData& x, const AudioData& y) {
+        double d = 0.0, peak = 0.0;
+        for (std::size_t ch = 0; ch < 2; ++ch)
+            for (std::size_t i = 0; i < x.channels[ch].size(); ++i)
+            {
+                d = std::max (d, static_cast<double> (std::abs (x.channels[ch][i] - y.channels[ch][i])));
+                peak = std::max (peak, static_cast<double> (std::abs (x.channels[ch][i])));
+            }
+        return d / std::max (1.0e-9, peak);
+    };
+    // A heard alone sounds the same whatever B's REIMAGINED is (A 0 / B 0 vs A 0 / B 100).
+    const auto aWithB0 = render (0.0f, 0.0f, true, false);
+    const auto aWithB100 = render (0.0f, 100.0f, true, false);
+    CHECK (difference (aWithB0, aWithB100) < 1.0e-6);
+    // ...and B alone the same whatever A's is (A 50 / B 100 vs A 0 / B 100).
+    CHECK (difference (render (0.0f, 100.0f, false, true), render (50.0f, 100.0f, false, true)) < 1.0e-6);
+    // Both heard: B at 100 % changes the result, A at 0 % stays the recording.
+    CHECK (difference (render (0.0f, 0.0f, false, false), render (0.0f, 100.0f, false, false)) > 1.0e-2);
+}

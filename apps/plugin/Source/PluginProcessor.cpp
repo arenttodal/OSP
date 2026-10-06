@@ -138,7 +138,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
     layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::character, 2 }, "Character", unit, 90.0f, percent));
     layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::motion, 2 }, "Movement", unit, 12.0f, percent));
     layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::space, 2 }, "Space", unit, 10.0f, percent));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::reimagined, 2 }, "Original / Reimagined", unit, 20.0f, percent));
+    // Original <-> Reimagined: layer A's REIMAGINED (and, in sessions from before the layers,
+    // the instrument's one amount; the ID never changes). New patches start at the Original end.
+    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::reimagined, 2 }, "A Reimagined", unit, 0.0f, percent));
     // Advanced (spec §13).
     layout.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { ids::pitchCharacter, 2 }, "Pitch Character",
                                                               juce::StringArray { "Tape", "Natural" }, 0));
@@ -258,8 +260,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
         layout.add (std::make_unique<juce::AudioParameterBool> (id ("follow"), name + "Follow", defaults.follow));
         // Per-layer Original <-> Reimagined (version hint 8): A's is the instrument's `reimagined`.
         if (layer > 0)
-            layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { reimaginedParameterId (layer), 8 }, name + "Reimagined",
-                                                                     unit, 20.0f, percent));
+            layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { reimaginedParameterId (layer), 8 }, layerName (layer) + " Reimagined",
+                                                                     unit, 0.0f, percent));
     }
     // The layers' Original <-> Reimagined thumbs move together (keeping their offsets) while
     // linked; a UI behaviour, stored with the session (version hint 9).
@@ -393,6 +395,12 @@ OspAudioProcessor::OspAudioProcessor()
         if (layer > 0)
             lp.reimagined = parameters.getRawParameterValue (reimaginedParameterId (layer));
     }
+    for (int layer = 0; layer < numLayers; ++layer)
+        if (auto* p = parameters.getParameter (reimaginedParameterId (layer)))
+        {
+            reimaginedParameters[static_cast<std::size_t> (layer)] = p;
+            p->addListener (this);
+        }
     mixXParam = parameters.getRawParameterValue (ids::mixX);
     mixYParam = parameters.getRawParameterValue (ids::mixY);
     decayParam = parameters.getRawParameterValue (ids::decay);
@@ -410,6 +418,9 @@ OspAudioProcessor::OspAudioProcessor()
 OspAudioProcessor::~OspAudioProcessor()
 {
     stopTimer();
+    for (auto* p : reimaginedParameters)
+        if (p != nullptr)
+            p->removeListener (this);
     // A running load stage queues the next one, and a stage can outlast any fixed timeout
     // (a long file, a slow machine): stop new stages first, then wait until the pool is
     // really empty. A job must never outlive the members it reports into.
@@ -470,6 +481,13 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
         lastRelease = release;
         lastDecay = decay;
         lastSustainLevel = sustainLevel;
+    }
+
+    const auto routing = perLayerReimagined.load() ? ReimaginedRouting::perLayer : ReimaginedRouting::legacyGlobal;
+    if (force || routing != engineSettings.reimaginedRouting)
+    {
+        engineSettings.reimaginedRouting = routing;
+        engine.setReimaginedRouting (routing);
     }
 
     const float gain = gainParam->load();
@@ -1187,15 +1205,35 @@ bool OspAudioProcessor::restoreRemovedLayer()
     return true;
 }
 
+void OspAudioProcessor::convertLegacyReimaginedToPerLayer()
+{
+    // The amounts stay as they are (each layer already has its own; sessions from before
+    // the layers gave every layer the one amount on load), so nothing on screen moves.
+    perLayerReimagined = true;
+}
+
+void OspAudioProcessor::parameterGestureChanged (int parameterIndex, bool gestureIsStarting)
+{
+    // A musician's edit of a layer's REIMAGINED (knob, double-click reset, wheel, LINK
+    // following it, a host's control surface) - never automation playback, which sends no
+    // gestures. Only that makes a legacy patch per-layer.
+    if (! gestureIsStarting || perLayerReimagined.load())
+        return;
+    for (auto* p : reimaginedParameters)
+        if (p != nullptr && p->getParameterIndex() == parameterIndex)
+            convertLegacyReimaginedToPerLayer();
+}
+
 void OspAudioProcessor::applyLinkedDelta (int layer, const juce::String& control, float delta)
 {
-    if (std::abs (delta) < 1.0e-9f || ! isLayerLinked (layer) || ! layerControlNames().contains (control))
+    const bool reimaginedControl = control == "reimagined";
+    if (std::abs (delta) < 1.0e-9f || ! isLayerLinked (layer) || ! (reimaginedControl || layerControlNames().contains (control)))
         return;
     for (int other = 0; other < numLayers; ++other)
     {
         if (other == layer || ! isLayerOccupied (other) || ! isLayerLinked (other))
             continue;
-        if (auto* p = parameters.getParameter (layerParameterId (other, control)))
+        if (auto* p = parameters.getParameter (reimaginedControl ? reimaginedParameterId (other) : layerParameterId (other, control)))
         {
             const auto range = p->getNormalisableRange();
             const float next = range.snapToLegalValue (std::clamp (p->convertFrom0to1 (p->getValue()) + delta, range.start, range.end));
@@ -1528,6 +1566,7 @@ std::unique_ptr<juce::XmlElement> OspAudioProcessor::createStateXml()
 
     stateTree.setProperty ("editLayer", editLayer(), nullptr);
     stateTree.setProperty ("keptSlots", keptSlotCount.load(), nullptr);
+    stateTree.setProperty ("reimaginedRouting", perLayerReimagined.load() ? "perLayer" : "legacyGlobal", nullptr);
     for (int layer = 0; layer < numLayers; ++layer)
     {
         const auto tree = instrumentTree (layer);
@@ -1608,6 +1647,9 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml, bool setting
     for (const auto& tree : layerTrees)
         stateTree.removeChild (tree, nullptr);
     const int savedVersion = static_cast<int> (stateTree.getProperty ("stateVersion", 1));
+    // Made before per-layer Reimagined (no routing saved): the legacy shared stage, exactly.
+    perLayerReimagined = savedVersion >= 8 && stateTree.getProperty ("reimaginedRouting", "legacyGlobal").toString() == "perLayer";
+    stateTree.removeProperty ("reimaginedRouting", nullptr);
     // Before MOVEMENT v2 the three movement knobs were shared by every mode.
     std::array<std::optional<float>, 3> genericMovement;
     int savedMovementMode = 0;
@@ -1847,6 +1889,8 @@ void OspAudioProcessor::setCurrentProgram (int index)
     set (ids::motion, s.motion);
     set (ids::space, s.space);
     set (ids::reimagined, s.reimagined);
+    // The factory starting states were made with the shared Reimagined stage: they keep it.
+    perLayerReimagined = false;
     set (ids::attack, s.attackMs);
     set (ids::release, s.releaseMs);
 }
@@ -1909,6 +1953,7 @@ void OspAudioProcessor::resetSettings()
     for (auto* parameter : getParameters())
         if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*> (parameter))
             ranged->setValueNotifyingHost (ranged->getDefaultValue());
+    perLayerReimagined = true;   // a new patch
     // The sounds still loaded are heard: two meet in the middle of the blend, three at the
     // centre of the triangle, and every layer starts as Reimagined as A.
     const int slots = slotCount();

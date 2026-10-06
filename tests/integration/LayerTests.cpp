@@ -274,3 +274,119 @@ TEST_CASE ("granular: LIFE makes every note a different cloud", "[integration][l
     CHECK (spreadOf (alive) > 0.08);              // clearly different places per note
     CHECK (spreadOf (wild) > spreadOf (alive));   // and more so at 100 %
 }
+
+namespace
+{
+    std::shared_ptr<InstrumentModel> vowelModel (double hz, std::uint64_t seed)
+    {
+        const auto audio = testsignals::vowel (hz, 2.0, rate, seed);
+        return instrument::buildComplete (audio, test::analyse (audio), {}, false);
+    }
+
+    /** Two layers playing one note, both channels interleaved (L then R per sample). */
+    std::vector<float> renderTwoLayers (const EngineSettings& s, const InstrumentModel& a, const InstrumentModel& b, int block = 256, double seconds = 2.5)
+    {
+        InstrumentEngine engine;
+        engine.prepare (rate, block, s);
+        engine.setModel (&a, 0);
+        engine.setModel (&b, 1);
+        engine.noteOn (57, 100, 1);
+        std::vector<float> l (static_cast<std::size_t> (block)), r (static_cast<std::size_t> (block)), out;
+        const auto total = static_cast<int> (seconds * rate);
+        const auto release = static_cast<int> (1.0 * rate);
+        for (int done = 0; done < total;)
+        {
+            if (done == release)
+                engine.noteOff (57, 1);
+            // Blocks split at the release, so it lands on the same sample for every block size.
+            const int n = std::min ({ block, total - done, done < release ? release - done : block });
+            float* ch[2] = { l.data(), r.data() };
+            engine.render (ch, 2, n);
+            for (int i = 0; i < n; ++i)
+            {
+                out.push_back (l[static_cast<std::size_t> (i)]);
+                out.push_back (r[static_cast<std::size_t> (i)]);
+            }
+            done += n;
+        }
+        return out;
+    }
+
+    double maxDifference (const std::vector<float>& x, const std::vector<float>& y)
+    {
+        double d = 0.0;
+        for (std::size_t i = 0; i < std::min (x.size(), y.size()); ++i)
+            d = std::max (d, static_cast<double> (std::abs (x[i] - y[i])));
+        return d;
+    }
+}
+
+TEST_CASE ("reimagined routing: per layer, each layer's amount shapes only that layer", "[integration][layers][reimagined]")
+{
+    const auto a = vowelModel (220.0, 3), b = vowelModel (330.0, 5);
+    auto settings = [] (ReimaginedRouting routing, double amountA, double amountB) {
+        auto s = quietSettings();
+        s.reimaginedRouting = routing;
+        s.blend = 0.5;
+        s.layer[0].reimagined = amountA;
+        s.layer[1].reimagined = amountB;
+        return s;
+    };
+    auto solo = [] (EngineSettings s, int muted) {
+        s.layer[static_cast<std::size_t> (muted)].levelDb = LayerSettings::minLevelDb;
+        return s;
+    };
+    for (const auto routing : { ReimaginedRouting::perLayer, ReimaginedRouting::legacyGlobal })
+    {
+        const auto s = settings (routing, 0.0, 1.0);
+        const auto both = renderTwoLayers (s, *a, *b);
+        const auto onlyA = renderTwoLayers (solo (s, 1), *a, *b);
+        const auto onlyB = renderTwoLayers (solo (s, 0), *a, *b);
+        std::vector<float> sum (both.size());
+        double peak = 0.0;
+        for (std::size_t i = 0; i < sum.size(); ++i)
+        {
+            sum[i] = onlyA[i] + onlyB[i];
+            peak = std::max (peak, static_cast<double> (std::abs (both[i])));
+        }
+        const double d = maxDifference (both, sum);
+        INFO ((routing == ReimaginedRouting::perLayer ? "per layer" : "legacy") << ": |both - (A + B)| " << d << " of peak " << peak);
+        if (routing == ReimaginedRouting::perLayer)
+            CHECK (d < 1.0e-5 * peak);   // A stays itself, B is fully reimagined: they simply add up
+        else
+            CHECK (d > 1.0e-3 * peak);   // legacy: one shared stage at the mixed amount colours A too
+    }
+}
+
+TEST_CASE ("reimagined routing: at 0 % per layer and legacy are the same; per layer is block-size independent", "[integration][layers][reimagined]")
+{
+    const auto a = vowelModel (220.0, 3), b = vowelModel (330.0, 5);
+    auto s = quietSettings();
+    s.blend = 0.4;
+    s.layer[0].reimagined = 0.0;
+    s.layer[1].reimagined = 0.0;
+    const auto legacy = renderTwoLayers (s, *a, *b);
+    s.reimaginedRouting = ReimaginedRouting::perLayer;
+    CHECK (maxDifference (legacy, renderTwoLayers (s, *a, *b)) == 0.0);
+
+    // Amounts above 0: the layers' stages run every sample, whatever the host's blocks,
+    // and their resonators ring on after the notes end.
+    s.layer[0].reimagined = 0.7;
+    s.layer[1].reimagined = 0.3;
+    s.macros.space = 0.0;
+    const auto big = renderTwoLayers (s, *a, *b, 512);
+    const auto small = renderTwoLayers (s, *a, *b, 37);
+    CHECK (maxDifference (big, small) == 0.0);
+    double tail = 0.0, dryTail = 0.0;
+    s.layer[0].reimagined = 0.0;
+    s.layer[1].reimagined = 0.0;
+    const auto dry = renderTwoLayers (s, *a, *b, 512);
+    const auto from = static_cast<std::size_t> (2 * 1.6 * rate);
+    for (std::size_t i = from; i < big.size(); ++i)
+    {
+        tail += static_cast<double> (big[i]) * big[i];
+        dryTail += static_cast<double> (dry[i]) * dry[i];
+    }
+    INFO ("energy after the release: reimagined " << tail << ", original " << dryTail);
+    CHECK (tail > 4.0 * dryTail);
+}

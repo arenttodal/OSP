@@ -58,8 +58,48 @@ void InstrumentEngine::prepare (double outputSampleRate, int maximumBlockSize, c
     // stage never depends on what was played before (bit-identical recall and bounces).
     post.setMacros (config.macros);
     post.setShaping (config.shaping);
+    if (config.reimaginedRouting == ReimaginedRouting::perLayer)
+        post.setReimagined (0.0);
     post.prepare (outputSampleRate, maximumBlockSize, config.seed);
+    for (std::size_t l = 0; l < slots.size(); ++l)   // each layer's formants wander their own way
+        slots[l].reimagined.prepare (outputSampleRate, Prng::deriveSeed (config.seed, 0x7265696dull, l));
     resetPerformance();
+}
+
+void InstrumentEngine::resetLayerStages() noexcept
+{
+    const bool perLayer = config.reimaginedRouting == ReimaginedRouting::perLayer;
+    for (std::size_t l = 0; l < slots.size(); ++l)
+    {
+        auto& slot = slots[l];
+        slot.reimagined.setAmount (perLayer ? std::clamp (layerReimagined (static_cast<int> (l)), 0.0, 1.0) : 0.0);
+        slot.reimagined.setModel (slot.model);
+        slot.reimagined.reset();
+        slot.reimaginedCountdown = 0;
+    }
+}
+
+void InstrumentEngine::runLayerStage (Slot& slot, float* left, float* right, int numSamples, bool mono) noexcept
+{
+    auto& stage = slot.reimagined;
+    for (int i = 0; i < numSamples; ++i)
+    {
+        if (slot.reimaginedCountdown-- <= 0)
+        {
+            slot.reimaginedCountdown = ReimaginedStage::controlInterval - 1;
+            stage.update();
+        }
+        float l = left[i];
+        float r = mono ? l : right[i];
+        stage.process (l, r);
+        if (mono)
+            left[i] = 0.5f * (l + r);
+        else
+        {
+            left[i] = l;
+            right[i] = r;
+        }
+    }
 }
 
 void InstrumentEngine::setChannelPitchBend (int channel, double semitones) noexcept
@@ -92,6 +132,7 @@ void InstrumentEngine::resetPerformance() noexcept
     // Tape and drift randomness and reverb tails restart too: a bounce from the same
     // position repeats exactly.
     post.reset();
+    resetLayerStages();
 }
 
 void InstrumentEngine::setEnvelope (const AdsrSettings& adsr) noexcept
@@ -786,6 +827,7 @@ void InstrumentEngine::reset() noexcept
     for (auto& slot : slots)
         slot.primed = false;
     post.reset();
+    resetLayerStages();
 }
 
 void InstrumentEngine::render (float* const* output, int numChannels, int numSamples) noexcept
@@ -829,8 +871,14 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
         mixXNow = towards (mixXNow, config.mixX, blendStep * n);
         mixYNow = towards (mixYNow, config.mixY, blendStep * n);
         const auto weights = mixWeights (mixLayers, blendNow, mixXNow, mixYNow);
+        const bool perLayer = config.reimaginedRouting == ReimaginedRouting::perLayer;
+        if (perLayer)
         {
-            // Per-layer Reimagined: the shared resonance stage follows the layers' amounts,
+            post.setReimagined (0.0);   // each layer's own stage, below
+        }
+        else
+        {
+            // Legacy routing: the shared resonance stage follows the layers' amounts,
             // weighted by how much of each is heard (power). Untouched when every layer
             // follows the instrument's amount.
             double sum = 0.0, weighted = 0.0;
@@ -857,6 +905,18 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
             const float targetLeft = static_cast<float> (weight * (pan > 0.0 ? 1.0 - pan : 1.0));
             const float targetRight = static_cast<float> (weight * (pan < 0.0 ? 1.0 + pan : 1.0));
 
+            // Per-layer routing: this layer's own Reimagined stage, on its signal before
+            // LEVEL, PAN and the mix. While its amount is above 0 it runs every sample (also
+            // between notes, so the resonators ring out and its state never depends on how
+            // the host splits blocks); at 0 it is skipped.
+            bool layerStage = false;
+            if (perLayer)
+            {
+                slot.reimagined.setModel (slot.model);
+                slot.reimagined.setAmount (std::clamp (layerReimagined (layer), 0.0, 1.0));
+                layerStage = slot.reimagined.active();
+            }
+
             bool sounding = false;
             for (const auto& voice : voices)
                 if (voice.isActive() && voice.layerIndex() == layer)
@@ -864,13 +924,13 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
                     sounding = true;
                     break;
                 }
-            if (! sounding || ! slot.primed)
+            if ((! sounding && ! layerStage) || ! slot.primed)
             {
                 // Nothing to click: the gains may jump.
                 slot.gainLeft = targetLeft;
                 slot.gainRight = targetRight;
                 slot.primed = true;
-                if (! sounding)
+                if (! sounding && ! layerStage)
                     continue;
             }
             const float l0 = slot.gainLeft, r0 = slot.gainRight;
@@ -887,6 +947,13 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
                 for (auto& voice : voices)
                     if (voice.isActive() && voice.layerIndex() == layer && (voice.isReleased() || ! occupied[static_cast<std::size_t> (layer)]))
                         voice.kill();
+                if (layerStage)
+                {
+                    // Unheard, but its stage keeps time (and rings down) on silence.
+                    std::fill_n (slot.buffer[0].begin(), n, 0.0f);
+                    std::fill_n (slot.buffer[1].begin(), n, 0.0f);
+                    runLayerStage (slot, slot.buffer[0].data(), slot.buffer[1].data(), n, mono);
+                }
                 continue;
             }
 
@@ -902,6 +969,8 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
                 voice.render (bl.data(), mono ? bl.data() : br.data(), n, pitchRatio * slot.pitchRatio * (mpe ? channelBendRatio[ch] : 1.0),
                               sampleClock + done);
             }
+            if (layerStage)
+                runLayerStage (slot, bl.data(), br.data(), n, mono);
             for (int i = 0; i < n; ++i)
             {
                 const float gl = l0 == l1 ? l0 : l0 + (l1 - l0) * static_cast<float> (i + 1) / static_cast<float> (n);

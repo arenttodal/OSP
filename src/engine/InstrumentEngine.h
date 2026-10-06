@@ -59,6 +59,21 @@ struct LayerSettings
     double reimagined = -1.0;
 };
 
+/**
+    Where Reimagined's bus stage (ReimaginedStage: resonators and wandering formants)
+    sits. The per-voice part (continuation, saturation, doubling, grains, drift) follows
+    each layer's own amount in both.
+*/
+enum class ReimaginedRouting
+{
+    /** One shared stage after the mix, at the layers' power-weighted amount: every session
+        made before per-layer routing (they must keep sounding exactly as they did). */
+    legacyGlobal,
+    /** Each layer its own stage on its own signal, before LEVEL, PAN and the mix: one
+        source can stay itself while another is reimagined. New patches. */
+    perLayer
+};
+
 /** How loud each layer is in the mix (before its LEVEL and PAN). */
 struct LayerMixWeights
 {
@@ -96,6 +111,7 @@ struct EngineSettings
         changes the sounding note's pitch (legato, no restart), sliding over glideSeconds. */
     bool mono = false;
     double glideSeconds = 0.0;
+    ReimaginedRouting reimaginedRouting = ReimaginedRouting::legacyGlobal;
 };
 
 /**
@@ -235,7 +251,20 @@ public:
         liveShaping.dynamics = macros.dynamics;
         liveShaping.movement = macros.motion;
         post.setMacros (macros);
+        if (config.reimaginedRouting == ReimaginedRouting::perLayer)
+            post.setReimagined (0.0);   // the layers' own stages do it
     }
+    /** Switching glides: the shared stage fades out (or in) as the layers' stages fade in
+        (or out), each over its own smoothing. */
+    void setReimaginedRouting (ReimaginedRouting routing) noexcept
+    {
+        config.reimaginedRouting = routing;
+        if (routing == ReimaginedRouting::perLayer)
+            post.setReimagined (0.0);
+        else
+            post.setReimagined (config.macros.reimagined);
+    }
+    ReimaginedRouting reimaginedRouting() const noexcept { return config.reimaginedRouting; }
     /** A layer's Original <-> Reimagined: its own, or the instrument's. */
     double layerReimagined (int layer) const noexcept
     {
@@ -342,6 +371,8 @@ private:
         GrainSnapshot grains;
         float gainLeft = 0.0f, gainRight = 0.0f;   ///< mix x LEVEL x PAN applied at the end of the last block
         bool primed = false;                    ///< gains valid (false after prepare/reset: no ramp from 0)
+        ReimaginedStage reimagined;             ///< per-layer routing: this layer's own bus stage
+        int reimaginedCountdown = 0;
     };
 
     static std::size_t layerIndex (int layer) noexcept { return static_cast<std::size_t> (std::clamp (layer, 0, EngineSettings::layers - 1)); }
@@ -359,6 +390,8 @@ private:
         monoNote = -1;
     }
     InstrumentVoice* chooseVictim (int layer) noexcept;
+    void resetLayerStages() noexcept;
+    void runLayerStage (Slot& slot, float* left, float* right, int numSamples, bool mono) noexcept;
     int countSoundingVoices (int layer) const noexcept;
     std::array<bool, 3> occupiedLayers() const noexcept;
 
