@@ -75,7 +75,7 @@ namespace colour
     const juce::Colour knobCapBottom { 0xffd9d0c2 };
     const juce::Colour knobRim { 0xffb9ad9b };
     const juce::Colour knobTrack { 0xffcfc6b8 };
-    const juce::Colour knobPointer { 0xff1f1d1b };
+    const juce::Colour knobPointer { 0xff141210 };
     const juce::Colour tick { 0xff4a4640 };
     const juce::Colour buttonTop { 0xfff8f4ec };
     const juce::Colour buttonBottom { 0xffe9e3d8 };

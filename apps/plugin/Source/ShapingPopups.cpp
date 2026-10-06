@@ -78,7 +78,7 @@ void MacroLabel::paint (juce::Graphics& g)
     auto r = getLocalBounds().toFloat();
     const auto font = type::macroLabel (0.7f * r.getHeight());
     g.setFont (font);
-    g.setColour (hover || open ? juce::Colours::black : design::colour::text);
+    g.setColour (hover || open ? juce::Colours::black : design::colour::text.withAlpha (0.88f));
     const float w = juce::GlyphArrangement::getStringWidth (font, text);
     const auto textArea = juce::Rectangle<float> (r.getCentreX() - w * 0.5f, r.getY(), w + 2.0f, r.getHeight());
     g.drawText (text, textArea, juce::Justification::centredLeft, false);
@@ -272,10 +272,10 @@ void MiniKnob::paint (juce::Graphics& g)
         return;
     }
     // Small knob cells (envelope, popovers): a light caption, the value a step stronger.
-    g.setColour (onDark ? captionColour : design::colour::text.withAlpha (0.78f));
+    g.setColour (onDark ? captionColour : design::colour::text.withAlpha (0.62f));
     g.setFont (type::popupLabel (std::max (9.0f, (compact ? 0.14f : 0.155f) * h)));
     g.drawText (caption, juce::Rectangle<float> (r.getX(), r.getY(), r.getWidth(), 0.2f * h), juce::Justification::centred, false);
-    g.setColour (onDark ? valueColour : design::colour::text.withAlpha (0.96f));
+    g.setColour (onDark ? valueColour : design::colour::text.withAlpha (0.82f));
     g.setFont (type::popupValue (std::max (9.5f, (compact ? 0.17f : 0.19f) * h)));
     g.drawText (value, juce::Rectangle<float> (r.getX(), r.getY() + 0.78f * h, r.getWidth(), 0.22f * h), juce::Justification::centred, false);
 }

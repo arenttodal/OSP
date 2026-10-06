@@ -92,7 +92,7 @@ namespace type
     inline juce::Font sourceMode (float k = 1.0f) { return fonts::make (16.5f * k, Weight::regular, 0.02f); }
     inline juce::Font controlLabel (float k = 1.0f) { return fonts::make (14.5f * k, Weight::medium, 0.05f); }
     inline juce::Font controlValue (float k = 1.0f) { return fonts::make (17.0f * k, Weight::medium, 0.0f); }
-    inline juce::Font macroLabel (float height) { return fonts::make (height, Weight::semibold, 0.04f); }
+    inline juce::Font macroLabel (float height) { return fonts::make (height, Weight::medium, 0.05f); }
     inline juce::Font panelHeader() { return fonts::make (16.0f, Weight::semibold, 0.05f); }
     inline juce::Font sectionTitle() { return fonts::make (23.5f, Weight::semibold, 0.05f); }   ///< A / B BLEND, MIX
     inline juce::Font trackWord() { return fonts::make (14.0f, Weight::medium, 0.11f); }     ///< ORIGINAL, REIMAGINED

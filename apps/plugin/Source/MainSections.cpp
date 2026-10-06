@@ -262,8 +262,8 @@ void ReimaginedLinkButton::paintButton (juce::Graphics& g, bool highlighted, boo
     const auto r = getLocalBounds().toFloat().reduced (1.0f);
     const bool on = getToggleState();
     draw::button (g, r, 0.25f * r.getHeight(), on, highlighted || down, colour::accent);
-    icons::draw (g, icons::Kind::link, r.reduced (0.24f * r.getHeight()), on ? colour::accent.darker (0.15f) : colour::text.withAlpha (0.45f),
-                 0.075f * r.getHeight());
+    icons::draw (g, icons::Kind::link, r.reduced (0.22f * r.getHeight()), on ? colour::accent.darker (0.15f).withAlpha (0.95f) : colour::text.withAlpha (0.6f),
+                 std::max (1.0f, 0.05f * r.getHeight()));
 }
 
 void ReimaginedTrack::paint (juce::Graphics& g)
@@ -271,12 +271,14 @@ void ReimaginedTrack::paint (juce::Graphics& g)
     using namespace design;
     const auto t = travel();
     const float cy = 0.5f * static_cast<float> (getHeight());
-    // A fine track: warm at the Original end, neutral towards Reimagined.
+    // A fine recessed groove, warm at the Original end, neutral towards Reimagined.
     const auto track = juce::Rectangle<float> (t.getStart(), cy - 1.5f, t.getLength(), 3.0f);
-    g.setGradientFill (juce::ColourGradient (juce::Colour (0xff8e6a52), track.getX(), 0.0f, juce::Colour (0xff9f9a92), track.getRight(), 0.0f, false));
-    g.fillRoundedRectangle (track, 1.25f);
-    g.setColour (juce::Colours::white.withAlpha (0.5f));
-    g.fillRect (track.withY (track.getBottom()).withHeight (0.8f));
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xffa08672), track.getX(), 0.0f, juce::Colour (0xffaaa49b), track.getRight(), 0.0f, false));
+    g.fillRoundedRectangle (track, 1.5f);
+    g.setColour (juce::Colours::black.withAlpha (0.18f));
+    g.fillRect (track.reduced (1.0f, 0.0f).withHeight (1.0f));
+    g.setColour (juce::Colours::white.withAlpha (0.6f));
+    g.fillRect (track.reduced (1.5f, 0.0f).withY (track.getBottom() + 0.2f).withHeight (0.8f));
     // Thumbs: the edited layer's on top.
     std::array<int, 3> order { 0, 1, 2 };
     std::stable_partition (order.begin(), order.end(), [this] (int l) { return l != processor.editLayer(); });
@@ -285,15 +287,17 @@ void ReimaginedTrack::paint (juce::Graphics& g)
         if (! shown[static_cast<std::size_t> (l)])
             continue;
         const juce::Point<float> c (xFor (l), cy);
-        const auto disc = juce::Rectangle<float> (22.0f, 22.0f).withCentre (c);
+        // A small tactile thumb; the layer's light (A coral, B blue) the one accent on it.
+        const auto disc = juce::Rectangle<float> (20.0f, 20.0f).withCentre (c);
         juce::Path shape;
         shape.addEllipse (disc);
-        juce::DropShadow (juce::Colour (0x50302418), 4, { 0, 2 }).drawForPath (g, shape);
-        g.setGradientFill (juce::ColourGradient (juce::Colour (0xfffdfaf5), c.x - 5.0f, disc.getY(), juce::Colour (0xffd8cfc1), c.x + 5.0f, disc.getBottom(), false));
+        juce::DropShadow (juce::Colour (0x4a302418), 4, { 0, 2 }).drawForPath (g, shape);
+        juce::DropShadow (juce::Colour (0x22302418), 1, { 0, 1 }).drawForPath (g, shape);
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xfffdfaf5), c.x - 5.0f, disc.getY(), juce::Colour (0xffd5ccbe), c.x + 5.0f, disc.getBottom(), false));
         g.fillPath (shape);
-        g.setColour (juce::Colour (0xffbcb1a1));
+        g.setColour (juce::Colour (0xffb2a796));
         g.strokePath (shape, juce::PathStrokeType (0.8f));
-        draw::led (g, c, 10.0f, colour::identity (l).thumb, 0.0f);
+        draw::led (g, c, 8.0f, colour::identity (l).thumb, 0.0f);
     }
 }
 

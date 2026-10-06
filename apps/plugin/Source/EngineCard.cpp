@@ -24,25 +24,30 @@ namespace icons
         {
             case Kind::link:
             {
-                // Two chain links on a diagonal.
-                const float w = s * 0.46f, h = s * 0.26f;
+                // Two thin interlocking links on a diagonal, open inside (links read heavier
+                // than lines: drawn a touch finer than the others).
+                const float w = s * 0.44f, h = s * 0.22f;
                 juce::Path a, b;
                 a.addRoundedRectangle (-w * 0.5f, -h * 0.5f, w, h, h * 0.5f);
                 b = a;
-                a.applyTransform (juce::AffineTransform::translation (-s * 0.15f, 0.0f).rotated (-0.785f).translated (c.x, c.y));
-                b.applyTransform (juce::AffineTransform::translation (s * 0.15f, 0.0f).rotated (-0.785f).translated (c.x, c.y));
-                g.strokePath (a, line);
-                g.strokePath (b, line);
+                a.applyTransform (juce::AffineTransform::translation (-s * 0.14f, 0.0f).rotated (-0.785f).translated (c.x, c.y));
+                b.applyTransform (juce::AffineTransform::translation (s * 0.14f, 0.0f).rotated (-0.785f).translated (c.x, c.y));
+                const juce::PathStrokeType fine (stroke * 0.9f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
+                g.strokePath (a, fine);
+                g.strokePath (b, fine);
                 return;
             }
             case Kind::reverse:
             {
-                // Playback, backwards: two heads pointing left.
-                for (float dx : { -0.15f, 0.15f })
+                // Playback, backwards: two thin open chevrons pointing left (not an undo arrow,
+                // not solid play triangles).
+                for (float dx : { -0.11f, 0.11f })
                 {
                     juce::Path t;
-                    t.addTriangle (c.x + (dx - 0.16f) * s, c.y, c.x + (dx + 0.16f) * s, c.y - 0.24f * s, c.x + (dx + 0.16f) * s, c.y + 0.24f * s);
-                    g.strokePath (t, juce::PathStrokeType (stroke, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+                    t.startNewSubPath (c.x + (dx + 0.12f) * s, c.y - 0.22f * s);
+                    t.lineTo (c.x + (dx - 0.12f) * s, c.y);
+                    t.lineTo (c.x + (dx + 0.12f) * s, c.y + 0.22f * s);
+                    g.strokePath (t, line);
                 }
                 return;
             }
@@ -71,11 +76,14 @@ namespace icons
             }
             case Kind::follow:
             {
-                // An amplitude contour: a quick rise, a long fall.
-                p.startNewSubPath (r.getX() + 0.12f * s, r.getY() + 0.72f * s);
-                p.quadraticTo (r.getX() + 0.24f * s, r.getY() + 0.22f * s, r.getX() + 0.36f * s, r.getY() + 0.26f * s);
-                p.cubicTo (r.getX() + 0.52f * s, r.getY() + 0.3f * s, r.getX() + 0.62f * s, r.getY() + 0.66f * s, r.getX() + 0.88f * s, r.getY() + 0.72f * s);
-                g.strokePath (p, line);
+                // An amplitude contour, a quick rise and a long fall, over a faint baseline (a
+                // single line reads lighter than the others: drawn a touch stronger).
+                p.startNewSubPath (r.getX() + 0.14f * s, r.getY() + 0.7f * s);
+                p.quadraticTo (r.getX() + 0.25f * s, r.getY() + 0.24f * s, r.getX() + 0.37f * s, r.getY() + 0.28f * s);
+                p.cubicTo (r.getX() + 0.52f * s, r.getY() + 0.32f * s, r.getX() + 0.62f * s, r.getY() + 0.64f * s, r.getX() + 0.86f * s, r.getY() + 0.7f * s);
+                g.strokePath (p, juce::PathStrokeType (stroke * 1.12f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+                g.setColour (colour.withMultipliedAlpha (0.35f));
+                g.drawLine (r.getX() + 0.14f * s, r.getY() + 0.76f * s, r.getX() + 0.86f * s, r.getY() + 0.76f * s, stroke * 0.7f);
                 return;
             }
             case Kind::dots:
@@ -784,13 +792,14 @@ void ModifierButton::mouseUp (const juce::MouseEvent& e)
 void ModifierButton::paint (juce::Graphics& g)
 {
     const auto r = getLocalBounds().toFloat().reduced (1.5f);
-    // A refined instrument key: raised and neutral when off; on, a soft accent fill with a
-    // fine accent rim and the icon in the accent.
+    // One state rule for all four: off, a neutral raised key with a soft graphite icon at
+    // about 60 %; on, the key pressed in with a fine accent rim and the icon in the accent.
+    // Thin strokes (about 1.3 px at the reference size), crisp at any scale.
     const bool active = on && ! suppressed;
     design::draw::button (g, r, 0.16f * r.getHeight(), active, isMouseOver() && ! suppressed, onColour);
-    const auto colour = active ? onColour.darker (0.1f) : design::colour::text.withAlpha (suppressed ? 0.25f : 0.92f);
-    const float icon = 0.62f * r.getHeight();
-    icons::draw (g, this->icon, r.withSizeKeepingCentre (icon, icon), colour, std::max (1.8f, 0.058f * r.getHeight()));
+    const auto colour = active ? onColour.darker (0.15f).withAlpha (0.95f) : design::colour::text.withAlpha (suppressed ? 0.22f : 0.6f);
+    const float icon = 0.6f * r.getHeight();
+    icons::draw (g, this->icon, r.withSizeKeepingCentre (icon, icon), colour, std::max (1.0f, 0.03f * r.getHeight()));
 }
 
 //==============================================================================

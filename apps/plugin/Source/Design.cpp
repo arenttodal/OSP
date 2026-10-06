@@ -73,11 +73,19 @@ void well (juce::Graphics& g, juce::Rectangle<float> r, float radius, juce::Colo
     juce::Graphics::ScopedSaveState state (g);
     g.reduceClipRegion (shape);
     // Recessed: an inner shadow under the top edge, a faint reflection near the bottom.
-    g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.45f), 0.0f, r.getY(), juce::Colours::black.withAlpha (0.0f), 0.0f, r.getY() + 10.0f, false));
-    g.fillRect (r.withHeight (10.0f));
-    g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.0f), 0.0f, r.getBottom() - 16.0f, juce::Colours::white.withAlpha (0.035f), 0.0f, r.getBottom(), false));
-    g.fillRect (r.withTop (r.getBottom() - 16.0f));
-    g.setColour (colour::wellRim.withAlpha (0.9f));
+    // A touch deeper: the shade under the top edge reaches a little further, the sides
+    // darken faintly, the lower lip catches a little more light; a clean dark edge.
+    g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.55f), 0.0f, r.getY(), juce::Colours::black.withAlpha (0.0f), 0.0f, r.getY() + 13.0f, false));
+    g.fillRect (r.withHeight (13.0f));
+    g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.18f), r.getX(), 0.0f, juce::Colours::black.withAlpha (0.0f), r.getX() + 7.0f, 0.0f, false));
+    g.fillRect (r.withWidth (7.0f));
+    g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.12f), r.getRight(), 0.0f, juce::Colours::black.withAlpha (0.0f), r.getRight() - 6.0f, 0.0f, false));
+    g.fillRect (r.withLeft (r.getRight() - 6.0f));
+    g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.0f), 0.0f, r.getBottom() - 14.0f, juce::Colours::white.withAlpha (0.05f), 0.0f, r.getBottom(), false));
+    g.fillRect (r.withTop (r.getBottom() - 14.0f));
+    g.setColour (juce::Colours::white.withAlpha (0.06f));
+    g.fillRect (r.reduced (radius, 0.0f).withTop (r.getBottom() - 2.0f).withHeight (1.0f));
+    g.setColour (colour::wellRim);
     g.strokePath (shape, juce::PathStrokeType (1.2f));
 }
 
@@ -89,14 +97,18 @@ void button (juce::Graphics& g, juce::Rectangle<float> r, float radius, bool act
     juce::DropShadow (juce::Colour (0x24302418), 3, { 0, 1 }).drawForPath (g, shape);
     if (active)
     {
-        // On: a warm, barely tinted face with an accent rim (colour marks the state, it does
-        // not fill the key).
-        g.setGradientFill (juce::ColourGradient (juce::Colour (0xfffbefe5), 0.0f, r.getY(), juce::Colour (0xfff3ddcd), 0.0f, r.getBottom(), false));
+        // On: pressed in - a slightly deeper warm face, a soft shade under its top edge and a
+        // fine accent rim (the state is a small accent, never a coloured block).
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xfff1e3d6), 0.0f, r.getY(), juce::Colour (0xfff6ebe1), 0.0f, r.getBottom(), false));
         g.fillPath (shape);
-        g.setColour (activeColour.withAlpha (0.18f));
-        g.strokePath (shape, juce::PathStrokeType (3.0f));
-        g.setColour (activeColour.withAlpha (0.95f));
-        g.strokePath (shape, juce::PathStrokeType (1.5f));
+        {
+            juce::Graphics::ScopedSaveState state (g);
+            g.reduceClipRegion (shape);
+            g.setGradientFill (juce::ColourGradient (juce::Colour (0x22502a10), 0.0f, r.getY(), juce::Colour (0x00502a10), 0.0f, r.getY() + 0.3f * r.getHeight(), false));
+            g.fillRect (r);
+        }
+        g.setColour (activeColour.withAlpha (0.7f));
+        g.strokePath (shape, juce::PathStrokeType (1.0f));
         return;
     }
     g.setGradientFill (juce::ColourGradient (hover ? buttonTop.brighter (0.2f) : buttonTop, 0.0f, r.getY(), buttonBottom, 0.0f, r.getBottom(), false));
@@ -158,14 +170,16 @@ void knob (juce::Graphics& g, juce::Point<float> c, float r, float position, con
     {
         juce::Path disc;
         disc.addEllipse (body);
+        // Seated, not floating: a slightly firmer contact shadow close under the body.
         juce::DropShadow (juce::Colour (0x46302418), juce::roundToInt (0.22f * r) + 2, { 0, juce::roundToInt (0.09f * r) + 1 }).drawForPath (g, disc);
+        juce::DropShadow (juce::Colour (0x26302418), juce::roundToInt (0.06f * r) + 1, { 0, 1 }).drawForPath (g, disc);
     }
     g.setGradientFill (juce::ColourGradient (juce::Colour (0xfffdfaf4), c.x - 0.7f * r, c.y - 0.8f * r, knobRim, c.x + 0.6f * r, c.y + 0.9f * r, false));
     g.fillEllipse (body);
     const float capR = 0.88f * r;
     const auto cap = juce::Rectangle<float> (2.0f * capR, 2.0f * capR).withCentre (c);
     // The groove between rim and cap.
-    g.setColour (juce::Colour (0x40665a48));
+    g.setColour (juce::Colour (0x58665a48));   // a crisper rim
     g.drawEllipse (cap.expanded (0.6f), std::max (0.8f, 0.03f * r));
     juce::ColourGradient capFill (knobCapTop, c.x - 0.35f * r, c.y - 0.55f * r, knobCapBottom, c.x + 0.5f * r, c.y + 0.85f * r, true);
     g.setGradientFill (capFill);
@@ -177,7 +191,8 @@ void knob (juce::Graphics& g, juce::Point<float> c, float r, float position, con
     // Pointer: a dark groove from near the centre to the cap's edge.
     const auto p0 = at (style.pointerFrom * r, angle), p1 = at (style.pointerTo * r, angle);
     g.setColour (style.pointer.withAlpha (style.enabled ? 1.0f : 0.4f));
-    g.drawLine ({ p0, p1 }, std::max (2.2f, 0.11f * r));
+    // Engraved rather than painted: a finer, darker mark.
+    g.drawLine ({ p0, p1 }, std::max (1.8f, 0.085f * r));
 }
 
 void led (juce::Graphics& g, juce::Point<float> centre, float diameter, juce::Colour c, float glow)

@@ -219,45 +219,47 @@ void OspLookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int widt
         LookAndFeel_V4::drawLinearSlider (g, x, y, width, height, sliderPos, minPos, maxPos, style, slider);
         return;
     }
-    // The A/B blend (reference): a 9 px track in the two layers' colours meeting in a dusky
-    // middle, slightly recessed; a knob-like thumb with a dark centre.
+    // The A/B blend: a thin recessed groove carrying only a hint of the two layers' colours
+    // (meeting in a dusky middle); a small knob-like thumb with a dark centre.
     const auto& props = slider.getProperties();
     auto colourOf = [&props] (const char* key, juce::Colour fallback) {
         return props.contains (key) ? juce::Colour (static_cast<juce::uint32> (static_cast<juce::int64> (props[key]))) : fallback;
     };
     const auto left = colourOf ("leftColour", design::colour::accent), right = colourOf ("rightColour", juce::Colour (0xff6da7cc));
     const float cy = static_cast<float> (y) + static_cast<float> (height) * 0.5f;
-    const auto track = juce::Rectangle<float> (static_cast<float> (x), cy - 4.5f, static_cast<float> (width), 9.0f);
-    juce::ColourGradient fill (left.brighter (0.15f), track.getX(), 0.0f, right.brighter (0.1f), track.getRight(), 0.0f, false);
-    fill.addColour (0.5, left.interpolatedWith (right, 0.5f).withMultipliedBrightness (0.62f).withMultipliedSaturation (0.7f));
+    const auto track = juce::Rectangle<float> (static_cast<float> (x), cy - 3.0f, static_cast<float> (width), 6.0f);
+    const auto groove = juce::Colour (0xffcfc5b6);
+    juce::ColourGradient fill (left.interpolatedWith (groove, 0.35f), track.getX(), 0.0f, right.interpolatedWith (groove, 0.35f), track.getRight(), 0.0f, false);
+    fill.addColour (0.5, left.interpolatedWith (right, 0.5f).interpolatedWith (groove, 0.45f).withMultipliedBrightness (0.8f));
     g.setGradientFill (fill);
-    g.fillRoundedRectangle (track, 4.5f);
-    // Recessed: shade along the top, light along the bottom.
-    g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.25f), 0.0f, track.getY(), juce::Colours::black.withAlpha (0.0f), 0.0f, track.getCentreY(), false));
-    g.fillRoundedRectangle (track, 4.5f);
-    g.setColour (juce::Colours::white.withAlpha (0.45f));
-    g.fillRect (track.reduced (4.0f, 0.0f).withY (track.getBottom() + 0.5f).withHeight (0.8f));
+    g.fillRoundedRectangle (track, 3.0f);
+    // Recessed: shade along the top, light along the bottom lip.
+    g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.3f), 0.0f, track.getY(), juce::Colours::black.withAlpha (0.0f), 0.0f, track.getCentreY() + 1.0f, false));
+    g.fillRoundedRectangle (track, 3.0f);
+    g.setColour (juce::Colours::white.withAlpha (0.6f));
+    g.fillRect (track.reduced (3.0f, 0.0f).withY (track.getBottom() + 0.5f).withHeight (0.8f));
 
     const juce::Point<float> c (sliderPos, cy);
-    const auto disc = juce::Rectangle<float> (32.0f, 32.0f).withCentre (c);
+    const auto disc = juce::Rectangle<float> (26.0f, 26.0f).withCentre (c);
     juce::Path shape;
     shape.addEllipse (disc);
-    juce::DropShadow (juce::Colour (0x55302418), 6, { 0, 2 }).drawForPath (g, shape);
-    g.setGradientFill (juce::ColourGradient (juce::Colour (0xfffefbf6), c.x - 8.0f, disc.getY(), juce::Colour (0xffcfc5b6), c.x + 8.0f, disc.getBottom(), false));
+    juce::DropShadow (juce::Colour (0x4a302418), 5, { 0, 2 }).drawForPath (g, shape);
+    juce::DropShadow (juce::Colour (0x22302418), 1, { 0, 1 }).drawForPath (g, shape);
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xfffefbf6), c.x - 7.0f, disc.getY(), juce::Colour (0xffcfc5b6), c.x + 7.0f, disc.getBottom(), false));
     g.fillPath (shape);
-    g.setColour (juce::Colour (0xffb3a796));
-    g.strokePath (shape, juce::PathStrokeType (1.0f));
-    const auto inner = disc.reduced (4.0f);
-    g.setGradientFill (juce::ColourGradient (juce::Colour (0xfff7f2ea), c.x, inner.getY(), juce::Colour (0xffe6ddd0), c.x, inner.getBottom(), false));
+    g.setColour (juce::Colour (0xffaea290));
+    g.strokePath (shape, juce::PathStrokeType (0.9f));
+    const auto inner = disc.reduced (3.5f);
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xfff8f3eb), c.x, inner.getY(), juce::Colour (0xffe5dccf), c.x, inner.getBottom(), false));
     g.fillEllipse (inner);
-    g.setColour (juce::Colour (0xff2a2622));
-    g.fillEllipse (juce::Rectangle<float> (8.0f, 8.0f).withCentre (c));
+    g.setColour (juce::Colour (0xff221f1c));
+    g.fillEllipse (juce::Rectangle<float> (6.0f, 6.0f).withCentre (c));
 }
 
 int OspLookAndFeel::getSliderThumbRadius (juce::Slider& slider)
 {
     if (static_cast<bool> (slider.getProperties()["blend"]))
-        return 16;
+        return 13;
     return LookAndFeel_V4::getSliderThumbRadius (slider);
 }
 
