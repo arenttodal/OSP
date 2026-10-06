@@ -1,6 +1,7 @@
 #pragma once
 
 #include "engine/MovementBus.h"
+#include "engine/ReimaginedStage.h"
 #include "engine/ShelfFilter.h"
 #include "engine/Shaping.h"
 #include "engine/SpaceReverb.h"
@@ -18,10 +19,10 @@ struct Macros;
 /**
     Global stage after the voices (shaping system v1.0 §47):
 
-      REIMAGINED a sympathetic resonator bank tuned to the source's partials and body
-                 peaks (plus a bank a fifth above towards the far end), re-excited by
-                 whatever is played; towards the far end two formant peaks wander
-                 slowly (spectral evolution: the instrument's vowel keeps changing).
+      REIMAGINED the shared ReimaginedStage (resonators and wandering formants), fed
+                 the layers' power-weighted amount - legacy routing; with per-layer
+                 routing every layer has its own stage before the mix and this one is
+                 set to 0.
       MOVEMENT   the bus part of MOVEMENT (MovementBus: drift's shared wander, tape,
                  chorus, pulse).
       SPACE      one of four curated ambiences (SpaceReverb) as a send: the macro is the
@@ -39,7 +40,7 @@ public:
     /** Pick up the resonances of a newly published model (real-time safe). */
     void setModel (const InstrumentModel* model) noexcept;
     /** Overrides the Reimagined amount set by setMacros (per-layer amounts, mixed). */
-    void setReimagined (double amount) noexcept { reimaginedTarget = amount < 0.0 ? 0.0 : (amount > 1.0 ? 1.0 : amount); }
+    void setReimagined (double amount) noexcept { reimaginedStage.setAmount (amount); }
     void setMacros (const Macros& macros) noexcept;
     void setShaping (const Shaping& shaping) noexcept;
 
@@ -52,55 +53,19 @@ public:
     float shaperPhase() const noexcept { return movement.shaperPhase(); }
 
     static constexpr int maxPeaks = 3;
-    static constexpr int resonators = 6;
 
 private:
-    struct Biquad
-    {
-        float b0 = 1, b1 = 0, b2 = 0, a1 = 0, a2 = 0;
-        float s1 = 0, s2 = 0;
-        float process (float x) noexcept
-        {
-            const float y = b0 * x + s1;
-            s1 = b1 * x - a1 * y + s2;
-            s2 = b2 * x - a2 * y;
-            return y;
-        }
-        void reset() noexcept { s1 = s2 = 0; }
-    };
-
     void updateCoefficients() noexcept;
-    static void peaking (Biquad& f, double sampleRate, double hz, double q, double gainDb) noexcept;
-    static void bandpass (Biquad& f, double sampleRate, double hz, double t60Seconds) noexcept;
 
     double sampleRate = 48000.0;
     static constexpr int controlInterval = 32;
     int countdown = 0;
 
     // Targets and smoothed values
-    double reimaginedTarget = 0.0, reimagined = 0.0;
-    double appliedReimagined = -1.0;
     double motionTarget = 0.0, spaceTarget = 0.0, space = 0.0, spaceCoef = 0.001;
     Shaping shaping;
 
-    // Model-derived
-    std::array<double, resonators> resonatorHz {};
-    int numResonators = 0;
-    bool modelDirty = true;
-    const InstrumentModel* model = nullptr;
-
-    // Resonators (mono-summed excitation, stereo spread output)
-    // First half: the source's partials and body; second half: a fifth above them
-    // (harmonic remapping towards the Reimagined end, spec §12).
-    std::array<Biquad, 2 * resonators> resonatorBank;
-    float resonanceMix = 0.0f, remapMix = 0.0f;
-
-    // Spectral evolution: two wandering formant peaks per channel (Reimagined far end).
-    std::array<Biquad, 4> formants;
-    double morph = 0.0;
-    bool morphActive = false;
-    std::uint64_t morphSeed = 1;
-    std::int64_t clock = 0;
+    ReimaginedStage reimaginedStage;
 
     // MOVEMENT (bus part)
     MovementBus movement;
