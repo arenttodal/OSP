@@ -1005,6 +1005,33 @@ TEST_CASE ("plugin: editor builds, shows the instrument and can be snapshotted",
         CHECK (earlier > later);
         CHECK (later > 0.0f);
         snapshot ("osp-editor-layer-a.png");
+        // Turning a macro shows its value in a graphite bubble with light text.
+        {
+            std::function<juce::Slider* (juce::Component&)> findMacro = [&] (juce::Component& c) -> juce::Slider* {
+                for (auto* child : c.getChildren())
+                {
+                    if (auto* slider = dynamic_cast<juce::Slider*> (child); slider != nullptr && slider->getTitle() == "LIFE")
+                        return slider;
+                    if (auto* found = findMacro (*child))
+                        return found;
+                }
+                return nullptr;
+            };
+            auto* macro = findMacro (*editor);
+            REQUIRE (macro != nullptr);
+            {
+                const auto bubbleText = macro->findColour (juce::TooltipWindow::textColourId, true);
+                const auto bubbleBack = editor->findColour (juce::BubbleComponent::backgroundColourId, true);
+                CHECK (std::abs (bubbleText.getPerceivedBrightness() - bubbleBack.getPerceivedBrightness()) > 0.5f);
+                auto source = juce::Desktop::getInstance().getMainMouseSource();
+                const auto centre = macro->getLocalBounds().getCentre().toFloat();
+                const juce::MouseEvent press (source, centre, juce::ModifierKeys(), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, macro, macro,
+                                              juce::Time::getCurrentTime(), centre, juce::Time::getCurrentTime(), 1, false);
+                macro->mouseDown (press);
+                snapshot ("osp-editor-value-bubble.png");
+                macro->mouseUp (press);
+            }
+        }
         juce::MidiBuffer stop;
         stop.addEvent (juce::MidiMessage::allNotesOff (1), 0);
         p.processBlock (audio, stop);

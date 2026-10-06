@@ -72,6 +72,10 @@ OspLookAndFeel::OspLookAndFeel()
     setColour (juce::TooltipWindow::backgroundColourId, housingLight);
     setColour (juce::TooltipWindow::textColourId, text);
     setColour (juce::TooltipWindow::outlineColourId, border);
+    // The value shown while a knob turns: a small graphite bubble (its text colour is set
+    // on each knob that shows one - JUCE reads it from the knob, see valueBubbleText).
+    setColour (juce::BubbleComponent::backgroundColourId, graphite);
+    setColour (juce::BubbleComponent::outlineColourId, graphite.darker (0.4f));
     setColour (juce::ScrollBar::thumbColourId, displayText);
 }
 

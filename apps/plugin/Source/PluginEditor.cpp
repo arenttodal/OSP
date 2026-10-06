@@ -328,6 +328,7 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     volume.setTitle ("Volume");
     volume.setTooltip ("Master volume");
     volume.setPopupDisplayEnabled (true, true, this);
+    volume.setColour (juce::TooltipWindow::textColourId, palette::valueBubbleText);   // the value bubble's text
     volumeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (ospProcessor.parameters, "gain", volume);
     volume.setDoubleClickReturnValue (true, 0.0);
     addAndMakeVisible (volume);
@@ -385,10 +386,14 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
         addAndMakeVisible (*knob.label);
         knob.slider.setRotaryParameters (OspLookAndFeel::rotaryStart, OspLookAndFeel::rotaryEnd, true);
         knob.slider.setPopupDisplayEnabled (true, true, this);
+        knob.slider.setColour (juce::TooltipWindow::textColourId, palette::valueBubbleText);   // light on the graphite bubble
         knob.attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (ospProcessor.parameters, macroInfo[i].first, knob.slider);
         if (auto* param = ospProcessor.parameters.getParameter (macroInfo[i].first))
             knob.slider.setDoubleClickReturnValue (true, param->convertFrom0to1 (param->getDefaultValue())); // resets the amount only
         knob.slider.setTitle (macroInfo[i].second);
+        // The value bubble: whole percent ("63 %"), set after the attachment (which installs the parameter's own text).
+        knob.slider.textFromValueFunction = [] (double v) { return juce::String (juce::roundToInt (v)) + " %"; };
+        knob.slider.updateText();
         addAndMakeVisible (knob.slider);
     }
     addAndMakeVisible (envelope);

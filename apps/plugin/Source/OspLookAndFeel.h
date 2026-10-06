@@ -40,6 +40,7 @@ namespace palette
     const juce::Colour display = graphite;
     const juce::Colour displayLine { 0xff4a4844 };
     const juce::Colour displayText { 0xffa29e95 };
+    const juce::Colour valueBubbleText { 0xfff4f1ea };   ///< the value shown on a turning knob (on graphite)
     const juce::Colour wave { 0xffded7c8 };
     const juce::Colour ivory { 0xfffbfaf6 };        ///< white keys: warm white
     const juce::Colour ebony { 0xff3b3a36 };        ///< black keys: soft graphite
