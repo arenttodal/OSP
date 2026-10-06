@@ -344,7 +344,8 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     setLookAndFeel (&lookAndFeel);
 
     // Header: the preset, the master volume and the menu (utilities live there).
-    presetBar.onChange = [this] { updateStatus(); };
+    presetBar.onChange = [this] { updateStatus(); timerCallback(); };
+    presetBar.onSaveStartingState = [this] { saveStartingState(); };
     content.addAndMakeVisible (presetBar);
     volume.setRotaryParameters (OspLookAndFeel::rotaryStart, OspLookAndFeel::rotaryEnd, true);
     volume.getProperties().set ("noTicks", true);
@@ -609,9 +610,11 @@ void OspAudioProcessorEditor::layoutSources (bool animate)
 {
     std::array<bool, OspAudioProcessor::numLayers> occupied {};
     int count = 0;
+    // A card per slot: the layers with sounds and the empty slots kept for new ones.
+    const int slots = ospProcessor.slotCount();
     for (int l = 0; l < OspAudioProcessor::numLayers; ++l)
     {
-        occupied[static_cast<std::size_t> (l)] = ospProcessor.isLayerOccupied (l);
+        occupied[static_cast<std::size_t> (l)] = l < slots;
         count += occupied[static_cast<std::size_t> (l)] ? 1 : 0;
     }
     const bool countChanged = count != shownCount;
@@ -668,7 +671,7 @@ void OspAudioProcessorEditor::layoutSources (bool animate)
     if (showAdd)
     {
         addTarget.setBounds (column (col));
-        addTarget.setLetter (OspAudioProcessor::layerName (ospProcessor.firstFreeLayer()));
+        addTarget.setLetter (OspAudioProcessor::layerName (count));
     }
     mixSection.setLayers (occupied);
     if (popupIndex == mixPopup && mixSection.layerCount() < 3)
@@ -727,7 +730,7 @@ OspAudioProcessorEditor::DropTarget OspAudioProcessorEditor::targetAt (juce::Poi
     if (addTarget.isVisible() && addTarget.getBounds().contains (where))
     {
         target.kind = DropTarget::Kind::add;
-        target.layer = ospProcessor.firstFreeLayer();
+        target.layer = shownCount;   // a new slot after the ones shown
         return target;
     }
     for (int l = 0; l < OspAudioProcessor::numLayers; ++l)
@@ -761,7 +764,7 @@ void OspAudioProcessorEditor::showDropTarget (const DropTarget& target)
     dragTarget = target;
     for (int l = 0; l < OspAudioProcessor::numLayers; ++l)
         cards[static_cast<std::size_t> (l)]->display().setDropLabel (target.kind == DropTarget::Kind::replace && target.layer == l
-                                                                         ? "REPLACE " + OspAudioProcessor::layerName (l)
+                                                                         ? (ospProcessor.isKeptEmptySlot (l) ? "DROP INTO " : "REPLACE ") + OspAudioProcessor::layerName (l)
                                                                          : juce::String());
     addTarget.setHighlight (target.kind == DropTarget::Kind::add);
     dropZone.setHighlight (dragging && target.kind == DropTarget::Kind::empty);
@@ -831,8 +834,8 @@ void OspAudioProcessorEditor::filesDropped (const juce::StringArray& files, int 
                 ospProcessor.setEditLayer (std::max (0, ospProcessor.addLayerSet (folder)));
             if (! loose.isEmpty())
             {
-                const int first = ospProcessor.firstFreeLayer();
-                if (ospProcessor.addLayers (loose) > 0 && folder.isEmpty())
+                const int first = target.kind == DropTarget::Kind::add ? target.layer : ospProcessor.firstFreeLayer();
+                if (ospProcessor.addLayers (loose, first) > 0 && folder.isEmpty())
                     ospProcessor.setEditLayer (std::max (0, first));
             }
             break;
@@ -896,7 +899,8 @@ void OspAudioProcessorEditor::addLayerSection (juce::PopupMenu& menu, int layer,
     juce::PopupMenu confirm;
     confirm.addItem ("Remove " + (loaded != nullptr ? juce::String::fromUTF8 (loaded->filename.c_str()) : "layer " + letter),
                      [safe, layer] { if (safe != nullptr) safe->ospProcessor.removeLayer (layer), safe->timerCallback(); });
-    menu.addSubMenu ("Remove layer " + letter, confirm, ospProcessor.isLayerOccupied (layer) && ospProcessor.loadState (layer) != OspAudioProcessor::LoadState::loading);
+    menu.addSubMenu ("Remove layer " + letter, confirm, (ospProcessor.isLayerOccupied (layer) || ospProcessor.isKeptEmptySlot (layer))
+                                                            && ospProcessor.loadState (layer) != OspAudioProcessor::LoadState::loading);
 }
 
 void OspAudioProcessorEditor::showLayerMenu (int layer, juce::Component& target)
@@ -920,8 +924,17 @@ void OspAudioProcessorEditor::showMenu()
         menu.addItem ("Load example", [safe] { if (safe != nullptr) { safe->ospProcessor.resetLayerControls (0); safe->ospProcessor.loadExample (0); } });
     if (ospProcessor.canRestoreRemovedLayer())
         menu.addItem ("Restore removed layer", [safe] { if (safe != nullptr) safe->ospProcessor.restoreRemovedLayer(), safe->timerCallback(); });
-    if (count > 0)
+    if (ospProcessor.slotCount() > 0)
         addLayerSection (menu, ospProcessor.editLayer(), true);
+    {
+        // Every sound out, every setting and slot kept (a sub-menu asks once more).
+        juce::PopupMenu confirm;
+        confirm.addItem ("Clear all samples (settings are kept)", [safe] {
+            if (safe != nullptr)
+                safe->ospProcessor.clearAllSamples(), safe->timerCallback();
+        });
+        menu.addSubMenu ("Clear all samples", confirm, count > 0);
+    }
     menu.addSeparator();
 
     // The user's presets and instruments, by folder (sub-folders become sub-menus).
@@ -978,6 +991,25 @@ void OspAudioProcessorEditor::showMenu()
     menu.addSubMenu ("Interface size", size);
     menu.addItem ("Advanced settings", [safe] { if (safe != nullptr) safe->openPopup (advancedPopup); });
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (menuButton).withDeletionCheck (*this));
+}
+
+void OspAudioProcessorEditor::saveStartingState()
+{
+    auto folder = OspAudioProcessor::startingStateFolder();
+    folder.createDirectory();
+    chooser = std::make_unique<juce::FileChooser> ("Save starting state", folder, juce::String ("*") + OspAudioProcessor::startingStateExtension);
+    chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting | juce::FileBrowserComponent::canSelectFiles,
+                          [this] (const juce::FileChooser& fc) {
+                              auto file = fc.getResult();
+                              if (file == juce::File())
+                                  return;
+                              if (file.getFileExtension() != OspAudioProcessor::startingStateExtension)
+                                  file = file.withFileExtension (OspAudioProcessor::startingStateExtension);
+                              const bool ok = ospProcessor.saveStartingState (file);
+                              ospProcessor.showMessage (ok ? "Saved starting state " + file.getFileNameWithoutExtension() : "Could not save " + file.getFileName());
+                              presetBar.refresh();
+                              timerCallback();
+                          });
 }
 
 void OspAudioProcessorEditor::choosePresetFile (bool save, bool instrument)
@@ -1195,7 +1227,7 @@ void OspAudioProcessorEditor::timerCallback()
     int count = 0;
     for (int l = 0; l < OspAudioProcessor::numLayers; ++l)
     {
-        const bool occupied = ospProcessor.isLayerOccupied (l);
+        const bool occupied = l < ospProcessor.slotCount();
         changed = changed || occupied != shownOccupied[static_cast<std::size_t> (l)];
         count += occupied ? 1 : 0;
     }

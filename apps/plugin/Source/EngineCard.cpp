@@ -375,6 +375,24 @@ void SourceDisplay::paintStatic (juce::Graphics& g)
             g.setFont (fonts::make (14.0f, fonts::Weight::medium, 0.12f));
             g.drawText (juce::String::fromUTF8 ("ANALYZING\xe2\x80\xa6"), bounds, juce::Justification::centred, false);
         }
+        else
+        {
+            // An empty slot (clear all samples, a starting state): where its sound goes.
+            const auto hint = bounds.reduced (16.0f, 14.0f);
+            juce::Path outline, dashed;
+            outline.addRoundedRectangle (hint, 7.0f);
+            const float dashes[] = { 4.0f, 4.0f };
+            juce::PathStrokeType (1.0f).createDashedStroke (dashed, outline, dashes, 2);
+            g.setColour (colour::wellText.withAlpha (0.35f));
+            g.fillPath (dashed);
+            g.setColour (colour::wellText);
+            g.setFont (fonts::make (16.0f, fonts::Weight::regular, 0.12f));
+            g.drawText ("DROP A SOUND", hint.withTrimmedBottom (0.5f * hint.getHeight() - 4.0f).withTrimmedTop (0.5f * hint.getHeight() - 24.0f),
+                        juce::Justification::centred, false);
+            g.setColour (colour::wellText.withAlpha (0.6f));
+            g.setFont (fonts::make (13.0f, fonts::Weight::regular, 0.04f));
+            g.drawText ("its settings are kept", hint.withTrimmedTop (0.5f * hint.getHeight() + 4.0f).withHeight (16.0f), juce::Justification::centred, false);
+        }
         return;
     }
 
@@ -982,7 +1000,7 @@ void EngineCard::refresh()
         shownLoading = loading;
         sourceDisplay.setInstrument (instrument);
         sourceDisplay.setLoading (loading);
-        fileText = instrument != nullptr ? juce::String::fromUTF8 (instrument->filename.c_str()) : juce::String (loading ? "Loading" : "");
+        fileText = instrument != nullptr ? juce::String::fromUTF8 (instrument->filename.c_str()) : juce::String (loading ? "Loading" : "Empty slot");
         repaint();
     }
     // Root: the correction if there is one, else the detected note.

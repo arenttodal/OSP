@@ -261,6 +261,14 @@ Reimagined grains, its own drift); the shared post stage (resonator bank, width,
 takes the layers' amounts weighted by their power in the mix (only when a layer has its own).
 In the plugin layer A's amount is the original `reimagined` parameter; B and C have
 `layerB.reimagined` / `layerC.reimagined` (state v7: older sessions give them A's amount).
+`reimaginedLink` (default on) is UI behaviour only: the thumbs move together, keeping offsets.
+
+Kept slots: "Clear all samples" and user starting states (`.ospstate`, settings + slot count,
+no audio) keep empty A/B/C slots. The session stores `keptSlots`; the editor shows a card per
+slot (`slotCount()` = the highest layer with a sound or the kept slots, whichever is more), a
+sound added or dropped into a kept slot keeps its layer controls, and the engine's mix law
+counts kept slots (`InstrumentEngine::setMixSlots`), so a refilled layer plays at the share it
+had (empty slots are silent and take no part in the per-layer Reimagined weighting).
 
 Source modifiers in the voice: START offsets the read (from the end when reversed) with a
 3 ms fade-in; REVERSE reads backwards and so does everything that follows the read head:

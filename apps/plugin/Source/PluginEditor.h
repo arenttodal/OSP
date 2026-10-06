@@ -144,6 +144,7 @@ private:
     void addLayerSection (juce::PopupMenu& menu, int layer, bool header);
     void chooseFile (int layer, bool addAsNewLayer);
     void choosePresetFile (bool save, bool instrument);
+    void saveStartingState();
     void positionPopup();
     void updateCustomisedDots();
     void updateStatus();

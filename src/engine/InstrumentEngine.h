@@ -88,6 +88,7 @@ struct EngineSettings
     Shaping shaping;                     ///< what each macro does (popups); see engine/Shaping.h
     double blend = 0.0;                  ///< two layers: 0 = only the first, 1 = only the second (equal-power)
     double mixX = 0.5, mixY = 1.0 / 3.0; ///< three layers: position in the A (left) / B (top) / C (right) triangle
+    int mixSlots = 0;                    ///< layers that count for the mix law even without a sound (setMixSlots)
     std::array<SourceMode, layers> sourceMode { SourceMode::oneShot, SourceMode::oneShot, SourceMode::oneShot };
     std::array<GranularParams, layers> granular {};
     std::array<LayerSettings, layers> layer {};
@@ -160,6 +161,10 @@ public:
     // Source layers and their mix
     /** Two layers: 0 = only the first, 1 = only the second; equal-power, smoothed over about 20 ms. */
     void setBlend (double blend) noexcept { config.blend = std::clamp (blend, 0.0, 1.0); }
+    /** Slots kept for the mix while their sound is missing (the plugin's "clear all samples"):
+        the first `slots` layers count as present when the mix law is chosen, so a refilled
+        layer plays at the share it had (an empty one is silent). 0 = only loaded layers. */
+    void setMixSlots (int slots) noexcept { config.mixSlots = std::clamp (slots, 0, EngineSettings::layers); }
     /** Three layers: the position in the mix triangle (x 0..1 left to right, y 0..1 bottom to top). */
     void setMixPosition (double x, double y) noexcept
     {

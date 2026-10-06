@@ -127,6 +127,7 @@ class PresetBar final : public juce::Component
 public:
     explicit PresetBar (OspAudioProcessor& processor);
     std::function<void()> onChange;   ///< a preset or starting state was opened
+    std::function<void()> onSaveStartingState;   ///< "Save starting state..." (the editor asks for a name)
     void refresh();
     void paint (juce::Graphics&) override;
     void mouseUp (const juce::MouseEvent&) override;

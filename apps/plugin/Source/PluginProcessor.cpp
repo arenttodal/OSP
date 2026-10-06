@@ -525,6 +525,7 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
     engineSettings.mixX = mixXParam->load();
     engineSettings.mixY = mixYParam->load();
     engine.setMixPosition (engineSettings.mixX, engineSettings.mixY);
+    engine.setMixSlots (keptSlotCount.load());
     for (int layer = 0; layer < numLayers; ++layer)
     {
         auto& lp = layerParams[static_cast<std::size_t> (layer)];
@@ -988,9 +989,13 @@ int OspAudioProcessor::addLayers (const juce::Array<juce::File>& files, int firs
         const int layer = firstLayer >= 0 && loaded == 0 && ! isLayerOccupied (firstLayer) ? firstLayer : firstFreeLayer();
         if (layer < 0)
             break;
-        resetLayerControls (layer);
+        // A kept slot (clear all samples, a starting state) keeps its settings for its new sound.
+        const bool kept = layer < keptSlotCount.load();
+        if (! kept)
+            resetLayerControls (layer);
         loadFile (file, layer);
-        makeLayerAudible (layer);
+        if (! kept)
+            makeLayerAudible (layer);
         ++loaded;
     }
     if (loaded < files.size())
@@ -1013,9 +1018,12 @@ int OspAudioProcessor::addLayerSet (const juce::Array<juce::File>& files)
     const int layer = firstFreeLayer();
     if (layer < 0 || files.isEmpty())
         return -1;
-    resetLayerControls (layer);
+    const bool kept = layer < keptSlotCount.load();
+    if (! kept)
+        resetLayerControls (layer);
     loadFiles (files, layer);
-    makeLayerAudible (layer);
+    if (! kept)
+        makeLayerAudible (layer);
     return layer;
 }
 
@@ -1071,30 +1079,65 @@ void OspAudioProcessor::applyLayer (int layer, const LayerSnapshot& snapshot)
 
 bool OspAudioProcessor::removeLayer (int layer)
 {
-    if (layer < 0 || layer >= numLayers || pendingLoads.load() > 0 || ! isLayerOccupied (layer))
+    const bool keptEmpty = isKeptEmptySlot (layer);
+    if (layer < 0 || layer >= numLayers || pendingLoads.load() > 0 || ! (isLayerOccupied (layer) || keptEmpty))
         return false;
+    const int slots = slotCount();
     std::array<LayerSnapshot, numLayers> before;
     for (int l = 0; l < numLayers; ++l)
         before[static_cast<std::size_t> (l)] = captureLayer (l);
-    removedLayer = std::make_unique<RemovedLayer>();
-    removedLayer->index = layer;
-    removedLayer->snapshot = before[static_cast<std::size_t> (layer)];
+    if (! keptEmpty)
+    {
+        removedLayer = std::make_unique<RemovedLayer>();
+        removedLayer->index = layer;
+        removedLayer->snapshot = before[static_cast<std::size_t> (layer)];
+    }
     // Compact: the layers above move down, so the instrument is always A, A+B or A+B+C.
+    // Kept slots move with their settings even without a sound.
     int last = layer;
     for (int l = layer + 1; l < numLayers; ++l)
-        if (before[static_cast<std::size_t> (l)].instrument != nullptr)
+        if (before[static_cast<std::size_t> (l)].instrument != nullptr || l < slots)
         {
             applyLayer (last, before[static_cast<std::size_t> (l)]);
             last = l;
         }
     clearLayer (last);
     resetLayerControls (last);
+    if (layer < keptSlotCount.load())
+        keptSlotCount = keptSlotCount.load() - 1;
     if (last != layer)
         undoManager.clearUndoHistory();   // load undo steps name slots that have moved
-    if (editLayer() >= occupiedLayerCount())
-        setEditLayer (std::max (0, occupiedLayerCount() - 1));
-    showMessage ("Removed layer " + layerName (layer) + juce::String::fromUTF8 (" Â· Restore it from the menu"));
+    if (editLayer() >= std::max (1, slotCount()))
+        setEditLayer (std::max (0, slotCount() - 1));
+    showMessage (keptEmpty ? "Removed slot " + layerName (layer)
+                           : "Removed layer " + layerName (layer) + juce::String::fromUTF8 (" \xc2\xb7 Restore it from the menu"));
     return true;
+}
+
+int OspAudioProcessor::slotCount() const
+{
+    int highest = 0;
+    for (int l = 0; l < numLayers; ++l)
+        if (isLayerOccupied (l))
+            highest = l + 1;
+    return std::max (highest, keptSlotCount.load());
+}
+
+void OspAudioProcessor::clearAllSamples()
+{
+    if (pendingLoads.load() > 0)
+        return;
+    const int slots = slotCount();
+    if (slots == 0)
+        return;
+    keptSlotCount = slots;
+    for (int l = 0; l < numLayers; ++l)
+        if (isLayerOccupied (l))
+            clearLayer (l);
+    removedLayer.reset();
+    undoManager.clearUndoHistory();
+    showMessage ("Samples cleared: drop new sounds into " + juce::String (slots == 1 ? "A" : (slots == 2 ? "A and B" : "A, B and C"))
+                 + juce::String::fromUTF8 (" \xe2\x80\x94 every setting is kept"));
 }
 
 bool OspAudioProcessor::canRestoreRemovedLayer() const
@@ -1112,6 +1155,8 @@ bool OspAudioProcessor::restoreRemovedLayer()
     for (int l = count - 1; l >= index; --l)
         applyLayer (l + 1, captureLayer (l));
     applyLayer (index, removedLayer->snapshot);
+    if (keptSlotCount.load() > 0)
+        setKeptSlots (keptSlotCount.load() + 1);
     if (index < count)
         undoManager.clearUndoHistory();
     removedLayer.reset();
@@ -1145,9 +1190,11 @@ std::vector<OspAudioProcessor::PresetEntry> OspAudioProcessor::presetList() cons
 {
     std::vector<PresetEntry> list;
     for (int i = 0; i < static_cast<int> (std::size (startingStates)); ++i)
-        list.push_back ({ startingStates[i].name, i, {} });
+        list.push_back ({ startingStates[i].name, i, {}, true });
+    for (const auto& file : findFiles (startingStateFolder(), startingStateExtension))
+        list.push_back ({ file.getFileNameWithoutExtension(), -1, file, true });
     for (const auto& file : findFiles (presetFolder(), presetExtension))
-        list.push_back ({ file.getFileNameWithoutExtension(), -1, file });
+        list.push_back ({ file.getFileNameWithoutExtension(), -1, file, false });
     return list;
 }
 
@@ -1155,6 +1202,8 @@ juce::String OspAudioProcessor::presetDisplayName() const
 {
     if (! presetIsProgram && lastPresetFile != juce::File())
         return lastPresetFile.getFileNameWithoutExtension();
+    if (! presetIsProgram && presetNameOverride.isNotEmpty())
+        return presetNameOverride;
     return startingStates[std::clamp (currentProgram, 0, static_cast<int> (std::size (startingStates)) - 1)].name;
 }
 
@@ -1165,6 +1214,8 @@ void OspAudioProcessor::openPresetEntry (const PresetEntry& entry)
         setCurrentProgram (entry.program);
         presetIsProgram = true;
     }
+    else if (entry.startingState)
+        loadStartingState (entry.file);
     else if (loadPreset (entry.file))
         presetIsProgram = false;
 }
@@ -1177,7 +1228,8 @@ void OspAudioProcessor::stepPresetList (int delta)
     int current = -1;
     for (int i = 0; i < static_cast<int> (list.size()); ++i)
         if ((presetIsProgram && list[static_cast<std::size_t> (i)].program == currentProgram)
-            || (! presetIsProgram && list[static_cast<std::size_t> (i)].file == lastPresetFile))
+            || (! presetIsProgram && list[static_cast<std::size_t> (i)].file != juce::File()
+                && (list[static_cast<std::size_t> (i)].file == lastPresetFile || list[static_cast<std::size_t> (i)].file == lastStartingStateFile)))
             current = i;
     const int count = static_cast<int> (list.size());
     const int next = current < 0 ? 0 : ((current + delta) % count + count) % count;
@@ -1452,6 +1504,7 @@ std::unique_ptr<juce::XmlElement> OspAudioProcessor::createStateXml()
     stateTree.setProperty ("program", currentProgram, nullptr);
 
     stateTree.setProperty ("editLayer", editLayer(), nullptr);
+    stateTree.setProperty ("keptSlots", keptSlotCount.load(), nullptr);
     for (int layer = 0; layer < numLayers; ++layer)
     {
         const auto tree = instrumentTree (layer);
@@ -1515,13 +1568,17 @@ void OspAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
     applyStateXml (*xml);
 }
 
-void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml)
+void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml, bool settingsOnly)
 {
     auto stateTree = juce::ValueTree::fromXml (xml);
-    uiScaleFactor = std::clamp (static_cast<float> (stateTree.getProperty ("uiScale", 1.0f)), 0.8f, 2.0f);
-    advancedPanelOpen = static_cast<bool> (stateTree.getProperty ("advancedOpen", false));
-    currentProgram = static_cast<int> (stateTree.getProperty ("program", 0));
-    setEditLayer (static_cast<int> (stateTree.getProperty ("editLayer", 0)));
+    if (! settingsOnly)
+    {
+        uiScaleFactor = std::clamp (static_cast<float> (stateTree.getProperty ("uiScale", 1.0f)), 0.8f, 2.0f);
+        advancedPanelOpen = static_cast<bool> (stateTree.getProperty ("advancedOpen", false));
+        currentProgram = static_cast<int> (stateTree.getProperty ("program", 0));
+        setEditLayer (static_cast<int> (stateTree.getProperty ("editLayer", 0)));
+    }
+    setKeptSlots (static_cast<int> (stateTree.getProperty ("keptSlots", 0)));
     const std::array<juce::ValueTree, numLayers> layerTrees { stateTree.getChildWithName (ids::instrument),
                                                               stateTree.getChildWithName (ids::instrumentB),
                                                               stateTree.getChildWithName (ids::instrumentC) };
@@ -1661,6 +1718,8 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml)
             setParameterValue (reimaginedParameterId (layer), amount);
     }
 
+    if (settingsOnly)
+        return;
     for (int layer = 0; layer < numLayers; ++layer)
     {
         const auto& tree = layerTrees[static_cast<std::size_t> (layer)];
@@ -1752,6 +1811,8 @@ void OspAudioProcessor::setCurrentProgram (int index)
         return;
     currentProgram = index;
     presetIsProgram = true;
+    presetNameOverride.clear();
+    lastStartingStateFile = juce::File();
     const auto& s = startingStates[index];
     auto set = [this] (const juce::String& id, float value) {
         if (auto* p = parameters.getParameter (id))
@@ -1814,8 +1875,86 @@ bool OspAudioProcessor::loadPreset (const juce::File& file)
         return false;
     applyStateXml (*xml);
     lastPresetFile = file;
+    lastStartingStateFile = juce::File();
+    presetNameOverride.clear();
     presetIsProgram = false;
     return true;
+}
+
+void OspAudioProcessor::resetSettings()
+{
+    for (auto* parameter : getParameters())
+        if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*> (parameter))
+            ranged->setValueNotifyingHost (ranged->getDefaultValue());
+    // The sounds still loaded are heard: two meet in the middle of the blend, three at the
+    // centre of the triangle, and every layer starts as Reimagined as A.
+    const int slots = slotCount();
+    if (slots >= 2)
+        makeLayerAudible (slots - 1);
+    for (int layer = 0; layer < numLayers; ++layer)
+        setRootOverride (std::nullopt, layer);
+    presetNameOverride = "Reset";
+    presetIsProgram = false;
+    lastPresetFile = juce::File();
+    lastStartingStateFile = juce::File();
+}
+
+void OspAudioProcessor::initPatch()
+{
+    if (pendingLoads.load() > 0)
+        return;
+    for (int layer = 0; layer < numLayers; ++layer)
+        if (isLayerOccupied (layer))
+            clearLayer (layer);
+    keptSlotCount = 0;
+    removedLayer.reset();
+    undoManager.clearUndoHistory();
+    setEditLayer (0);
+    resetSettings();
+    presetNameOverride = "INIT";
+}
+
+bool OspAudioProcessor::saveStartingState (const juce::File& file)
+{
+    auto xml = createStateXml();
+    if (xml == nullptr)
+        return false;
+    // Settings only: no sounds (their trees), no window state; the slots it was made with.
+    for (const auto* id : { &ids::instrument, &ids::instrumentB, &ids::instrumentC })
+        if (auto* child = xml->getChildByName (juce::Identifier (*id).toString()))
+            xml->removeChildElement (child, true);
+    for (const auto* property : { "uiScale", "advancedOpen", "editLayer", "program" })
+        xml->removeAttribute (property);
+    xml->setAttribute ("keptSlots", slotCount());
+    xml->setAttribute ("startingState", 1);
+    file.getParentDirectory().createDirectory();
+    if (! xml->writeTo (file))
+        return false;
+    presetNameOverride = file.getFileNameWithoutExtension();
+    presetIsProgram = false;
+    lastPresetFile = juce::File();
+    lastStartingStateFile = file;
+    return true;
+}
+
+bool OspAudioProcessor::loadStartingState (const juce::File& file)
+{
+    const auto xml = juce::XmlDocument::parse (file);
+    if (xml == nullptr || ! xml->hasTagName (parameters.state.getType()))
+        return false;
+    // Settings and the state's slots (empty ones wait for sounds); the sounds already here
+    // keep playing - more sounds than the state had slots all stay (slotCount).
+    applyStateXml (*xml, true);
+    presetNameOverride = file.getFileNameWithoutExtension();
+    presetIsProgram = false;
+    lastPresetFile = juce::File();
+    lastStartingStateFile = file;
+    return true;
+}
+
+juce::File OspAudioProcessor::startingStateFolder()
+{
+    return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("OSP/Starting States");
 }
 
 juce::File OspAudioProcessor::presetFolder()

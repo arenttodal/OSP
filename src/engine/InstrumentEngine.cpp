@@ -815,6 +815,10 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
     const auto maxGainStep = static_cast<float> (1.0 / (0.01 * sampleRate));
     const bool mono = left == right;
     const auto occupied = occupiedLayers();
+    // The mix law counts kept slots too (an empty one gets a share but plays nothing).
+    auto mixLayers = occupied;
+    for (int l = 0; l < std::min (config.mixSlots, EngineSettings::layers); ++l)
+        mixLayers[static_cast<std::size_t> (l)] = true;
     auto towards = [] (double now, double target, double step) {
         return target > now ? std::min (target, now + step) : std::max (target, now - step);
     };
@@ -824,7 +828,7 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
         blendNow = towards (blendNow, config.blend, blendStep * n);
         mixXNow = towards (mixXNow, config.mixX, blendStep * n);
         mixYNow = towards (mixYNow, config.mixY, blendStep * n);
-        const auto weights = mixWeights (occupied, blendNow, mixXNow, mixYNow);
+        const auto weights = mixWeights (mixLayers, blendNow, mixXNow, mixYNow);
         {
             // Per-layer Reimagined: the shared resonance stage follows the layers' amounts,
             // weighted by how much of each is heard (power). Untouched when every layer
@@ -836,7 +840,7 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
                 own = own || config.layer[l].reimagined >= 0.0;
                 const double levelDb = config.layer[l].levelDb;
                 const double level = levelDb <= LayerSettings::minLevelDb ? 0.0 : dbToGain (std::min (levelDb, 12.0));
-                const double power = weights.gain[l] * weights.gain[l] * level * level;
+                const double power = occupied[l] ? weights.gain[l] * weights.gain[l] * level * level : 0.0;   // a kept, empty slot is not heard
                 sum += power;
                 weighted += power * std::clamp (layerReimagined (static_cast<int> (l)), 0.0, 1.0);
             }
@@ -914,7 +918,7 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
     sampleClock += numSamples;
     // The shared post stage's resonances follow the loudest layer (the first of equals).
     {
-        const auto weights = mixWeights (occupied, config.blend, config.mixX, config.mixY);
+        const auto weights = mixWeights (mixLayers, config.blend, config.mixX, config.mixY);
         int main = -1;
         for (int l = 0; l < EngineSettings::layers; ++l)
             if (occupied[static_cast<std::size_t> (l)] && (main < 0 || weights.gain[static_cast<std::size_t> (l)] > weights.gain[static_cast<std::size_t> (main)] + 1.0e-9))

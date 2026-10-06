@@ -554,24 +554,43 @@ void PresetBar::mouseUp (const juce::MouseEvent& e)
             const auto list = processor.presetList();
             const auto current = processor.presetDisplayName();
             juce::Component::SafePointer<PresetBar> safe (this);
+            auto opened = [safe] {
+                if (safe == nullptr)
+                    return;
+                safe->refresh();
+                if (safe->onChange != nullptr)
+                    safe->onChange();
+            };
+            // Starting states (settings only, the sounds stay): INIT empties the patch, Reset
+            // returns every setting to its default, then the built-in and the saved ones.
             menu.addSectionHeader ("Starting states");
+            menu.addItem ("INIT", true, current == "INIT", [safe, opened] { if (safe != nullptr) safe->processor.initPatch(), opened(); });
+            menu.addItem ("Reset settings", true, false, [safe, opened] { if (safe != nullptr) safe->processor.resetSettings(), opened(); });
+            menu.addSeparator();
             bool presetsHeader = false;
             for (const auto& entry : list)
             {
-                if (entry.program < 0 && ! presetsHeader)
+                if (! entry.startingState && ! presetsHeader)
                 {
+                    menu.addItem (juce::String::fromUTF8 ("Save starting state\xe2\x80\xa6"), [safe] {
+                        if (safe != nullptr && safe->onSaveStartingState != nullptr)
+                            safe->onSaveStartingState();
+                    });
                     menu.addSectionHeader ("Presets");
                     presetsHeader = true;
                 }
-                menu.addItem (entry.name, true, entry.name == current, [safe, entry] {
+                menu.addItem (entry.name, true, entry.name == current, [safe, entry, opened] {
                     if (safe == nullptr)
                         return;
                     safe->processor.openPresetEntry (entry);
-                    safe->refresh();
-                    if (safe->onChange != nullptr)
-                        safe->onChange();
+                    opened();
                 });
             }
+            if (! presetsHeader)
+                menu.addItem (juce::String::fromUTF8 ("Save starting state\xe2\x80\xa6"), [safe] {
+                    if (safe != nullptr && safe->onSaveStartingState != nullptr)
+                        safe->onSaveStartingState();
+                });
             menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withDeletionCheck (*this));
             return;
         }

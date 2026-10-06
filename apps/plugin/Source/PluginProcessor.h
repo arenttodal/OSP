@@ -135,6 +135,17 @@ public:
     int addLayerSet (const juce::Array<juce::File>& files);
     bool canRestoreRemovedLayer() const;
     bool restoreRemovedLayer();
+    /** How many cards the instrument shows: every layer up to the highest one with a sound,
+        or the slots kept by clearAllSamples / a starting state, whichever is more. */
+    int slotCount() const;
+    /** True for a slot that is shown but holds no sound (waiting for a drop). */
+    bool isKeptEmptySlot (int layer) const { return layer >= 0 && layer < slotCount() && ! isLayerOccupied (layer); }
+    /** Removes every sound but keeps the A/B/C slots and every setting (layer controls, blends,
+        macros, popups): new sounds dropped into the slots play with the same settings. */
+    void clearAllSamples();
+    /** The slots kept without sounds (stored with the session; 0 = none). */
+    int keptSlots() const noexcept { return keptSlotCount.load(); }
+    void setKeptSlots (int slots) noexcept { keptSlotCount = std::clamp (slots, 0, numLayers); }
     /** Neutral layer controls and granular settings, automatic root. */
     void resetLayerControls (int layer);
     void setParameterValue (const juce::String& id, float value);
@@ -207,8 +218,19 @@ public:
     {
         juce::String name;
         int program = -1;         ///< a starting state, or -1
-        juce::File file;          ///< a preset file
+        juce::File file;          ///< a preset file, or a user starting state (startingState)
+        bool startingState = false;
     };
+    /** INIT: an empty patch - no sounds, no kept slots, every setting at its default. */
+    void initPatch();
+    /** Every setting to its default; the sounds stay (two or three meet in the middle of the mix). */
+    void resetSettings();
+    /** A user starting state: every setting and the slot count, no audio. Opening one applies
+        the settings to the sounds already loaded (and keeps empty slots for the rest). */
+    bool saveStartingState (const juce::File& file);
+    bool loadStartingState (const juce::File& file);
+    static juce::File startingStateFolder();
+    static constexpr const char* startingStateExtension = ".ospstate";
     std::vector<PresetEntry> presetList() const;
     void openPresetEntry (const PresetEntry& entry);
     bool isFavourite() const;
@@ -260,7 +282,8 @@ private:
     void enqueueRefine (std::shared_ptr<const LoadedInstrument> base, std::shared_ptr<const AudioData> audio, int layer);
     void enqueueSetLoad (SetLoadRequest request, int layer);
     std::unique_ptr<juce::XmlElement> createStateXml();
-    void applyStateXml (const juce::XmlElement& xml);
+    /** `settingsOnly`: parameters (with migrations) and kept slots; sounds and UI state untouched. */
+    void applyStateXml (const juce::XmlElement& xml, bool settingsOnly = false);
     juce::ValueTree instrumentTree (int layer);
     void recallInstrument (const juce::ValueTree& tree, int layer);
     void republish (std::shared_ptr<const LoadedInstrument> instrument, int layer);
@@ -286,6 +309,7 @@ private:
         LayerSnapshot snapshot;
     };
     std::unique_ptr<RemovedLayer> removedLayer;
+    std::atomic<int> keptSlotCount { 0 };   ///< message thread writes, the audio thread reads (engine mix slots)
     void applyParameters (bool force) noexcept;
 public:
     /** The popup parameter IDs (stable: never rename), in shapingParams order. */
@@ -367,6 +391,8 @@ private:
     bool hostWasPlaying = false;     // audio thread: transport start resets performance memory
     int currentProgram = 0;
     juce::File lastPresetFile;
+    juce::File lastStartingStateFile;
+    juce::String presetNameOverride;   ///< INIT, Reset or a user starting state while it is the last one opened
     std::atomic<float> uiScaleFactor { 1.0f };
     std::atomic<bool> advancedPanelOpen { false };
     std::set<std::uint64_t> userLoads;     // load ids started by the user (undoable), not by recall

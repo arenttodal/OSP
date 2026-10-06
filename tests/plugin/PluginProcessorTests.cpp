@@ -1926,6 +1926,8 @@ TEST_CASE ("plugin: canonical screenshots for visual review", "[.][canonical]")
     ui->openPopup (osp::plugin::OspAudioProcessorEditor::advancedPopup);
     shot ("21-advanced-popup.png");
     ui->closePopup();
+    p.clearAllSamples();
+    shot ("22-cleared.png");
     p.editorBeingDeleted (editor.get());
 }
 
@@ -1985,4 +1987,143 @@ TEST_CASE ("plugin: per-layer Reimagined - each layer its own, older sessions gi
     r.pollLoads();
     CHECK (valueOf (r, "layerB.reimagined") == Approx (35.0f));
     CHECK (valueOf (r, "layerC.reimagined") == Approx (35.0f));
+}
+
+TEST_CASE ("plugin: clear all samples keeps the slots and every setting; new sounds take them over", "[plugin][adaptive]")
+{
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "a.wav", testsignals::vowel (midiToHz (57), 2.0, 48000.0, 3));
+    const auto b = writeSource (tmp.dir, "b.wav", testsignals::vowel (midiToHz (61), 2.0, 48000.0, 5));
+    const auto c = writeSource (tmp.dir, "c.wav", testsignals::vowel (midiToHz (64), 2.0, 48000.0, 7));
+    OspAudioProcessor p;
+    CHECK (p.addLayers ({ a, b, c }) == 3);
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    p.setParameterValue ("mix.x", 0.2f);
+    p.setParameterValue ("mix.y", 0.1f);
+    p.setParameterValue ("layerB.tune", 7.0f);
+    p.setParameterValue ("layerC.pan", -40.0f);
+    p.setParameterValue ("life", 77.0f);
+
+    p.clearAllSamples();
+    CHECK (p.occupiedLayerCount() == 0);
+    CHECK (p.slotCount() == 3);
+    CHECK (p.isKeptEmptySlot (1));
+    CHECK (p.parameterValue ("mix.x") == Approx (0.2f));
+    CHECK (p.parameterValue ("layerB.tune") == Approx (7.0f));
+    CHECK (p.parameterValue ("layerC.pan") == Approx (-40.0f));
+    CHECK (p.parameterValue ("life") == Approx (77.0f));
+
+    // A drop on B's empty card (a replace) and a plain add (into A) keep the slots' settings.
+    p.replaceLayer ({ c }, 1);
+    CHECK (p.addLayers ({ a }) == 1);
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    CHECK (p.isLayerOccupied (0));
+    CHECK (p.isLayerOccupied (1));
+    CHECK (! p.isLayerOccupied (2));
+    CHECK (p.slotCount() == 3);
+    CHECK (p.parameterValue ("layerB.tune") == Approx (7.0f));
+    CHECK (p.parameterValue ("mix.x") == Approx (0.2f));
+
+    // The kept slots survive a session round trip; removing the empty one closes it.
+    juce::MemoryBlock state;
+    p.getStateInformation (state);
+    OspAudioProcessor restored;
+    restored.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+    REQUIRE (restored.waitForLoads (30000));
+    restored.pollLoads();
+    CHECK (restored.slotCount() == 3);
+    CHECK (restored.keptSlots() == 3);
+    REQUIRE (p.removeLayer (2));
+    CHECK (p.slotCount() == 2);
+}
+
+TEST_CASE ("plugin: kept slots keep the mix law - a refilled layer plays at its share", "[plugin][adaptive]")
+{
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "a.wav", testsignals::vowel (midiToHz (57), 2.0, 48000.0, 3));
+    auto render = [] (OspAudioProcessor& p) {
+        p.prepareToPlay (48000.0, 512);
+        juce::AudioBuffer<float> audio (2, 512);
+        double energy = 0.0;
+        for (int block = 0; block < 40; ++block)
+        {
+            juce::MidiBuffer midi;
+            if (block == 0)
+                midi.addEvent (juce::MidiMessage::noteOn (1, 57, static_cast<juce::uint8> (100)), 0);
+            audio.clear();
+            p.processBlock (audio, midi);
+            for (int ch = 0; ch < 2; ++ch)
+                for (int i = 0; i < 512; ++i)
+                    energy += static_cast<double> (audio.getSample (ch, i)) * audio.getSample (ch, i);
+        }
+        return energy;
+    };
+    std::array<double, 2> energy {};
+    for (int kept = 0; kept < 2; ++kept)
+    {
+        OspAudioProcessor p;
+        p.setParameterValue ("life", 0.0f);
+        CHECK (p.addLayers ({ a }) == 1);
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        if (kept == 1)
+            p.setKeptSlots (3);   // A alone in three slots: its third of the triangle (centre)
+        energy[static_cast<std::size_t> (kept)] = render (p);
+    }
+    REQUIRE (energy[0] > 0.0);
+    CHECK (energy[1] / energy[0] == Approx (1.0 / 3.0).margin (0.03));
+}
+
+TEST_CASE ("plugin: INIT, Reset settings and saved starting states", "[plugin][adaptive]")
+{
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "a.wav", testsignals::vowel (midiToHz (57), 2.0, 48000.0, 3));
+    const auto b = writeSource (tmp.dir, "b.wav", testsignals::vowel (midiToHz (61), 2.0, 48000.0, 5));
+    OspAudioProcessor p;
+    CHECK (p.addLayers ({ a, b }) == 2);
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    p.setParameterValue ("life", 81.0f);
+    p.setParameterValue ("space.decay", 4.0f);
+    p.setParameterValue ("layerB.pan", 30.0f);
+    p.setParameterValue ("ab.blend", 0.8f);
+
+    // A starting state: settings and slots, no audio.
+    const auto file = tmp.dir.getChildFile ("Mine.ospstate");
+    REQUIRE (p.saveStartingState (file));
+    const auto xml = juce::XmlDocument::parse (file);
+    REQUIRE (xml != nullptr);
+    CHECK (xml->getChildByName ("Instrument") == nullptr);
+    CHECK (xml->getChildByName ("InstrumentB") == nullptr);
+    CHECK (xml->getIntAttribute ("keptSlots") == 2);
+
+    // Reset settings: defaults, the sounds stay and still meet in the middle.
+    p.resetSettings();
+    CHECK (p.occupiedLayerCount() == 2);
+    CHECK (p.parameterValue ("life") == Approx (p.parameters.getParameter ("life")->convertFrom0to1 (p.parameters.getParameter ("life")->getDefaultValue())));
+    CHECK (p.parameterValue ("ab.blend") == Approx (0.5f));
+    CHECK (p.presetDisplayName() == "Reset");
+
+    // INIT: nothing at all.
+    p.initPatch();
+    CHECK (p.occupiedLayerCount() == 0);
+    CHECK (p.slotCount() == 0);
+    CHECK (p.presetDisplayName() == "INIT");
+
+    // Opening the state brings back its settings and two empty slots waiting for sounds.
+    REQUIRE (p.loadStartingState (file));
+    CHECK (p.occupiedLayerCount() == 0);
+    CHECK (p.slotCount() == 2);
+    CHECK (p.parameterValue ("life") == Approx (81.0f));
+    CHECK (p.parameterValue ("space.decay") == Approx (4.0f));
+    CHECK (p.parameterValue ("layerB.pan") == Approx (30.0f));
+    CHECK (p.parameterValue ("ab.blend") == Approx (0.8f));
+    CHECK (p.presetDisplayName() == "Mine");
+    CHECK (p.addLayers ({ a, b }) == 2);
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    CHECK (p.parameterValue ("layerB.pan") == Approx (30.0f));
+    CHECK (p.parameterValue ("ab.blend") == Approx (0.8f));
 }
