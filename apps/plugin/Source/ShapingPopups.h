@@ -108,6 +108,12 @@ public:
     void setAccent (juce::Colour colour) { accent = colour; hasAccent = true; repaint(); }
     int selected() const noexcept { return index; }
     std::function<void (int)> onChange;
+    /** Shown instead of the value while it returns text (SHAPER: CUSTOM); no item is ticked then. */
+    std::function<juce::String()> textOverride;
+    /** Appended to the list (SHAPER: CUSTOM and the saved patterns). */
+    std::function<void (juce::PopupMenu&)> extraItems;
+    /** Every pick from the list or the arrows, even of the current value (SHAPER leaves CUSTOM). */
+    std::function<void (int)> onPick;
     void paint (juce::Graphics&) override;
     void mouseEnter (const juce::MouseEvent&) override { repaint(); }
     void mouseExit (const juce::MouseEvent&) override { repaint(); }
@@ -171,7 +177,7 @@ protected:
 };
 
 /** Which macro a popup belongs to (the order of the macro row). */
-enum class MacroPopup { life, dynamics, character, movement, space };
+enum class MacroPopup { life, dynamics, character, movement, space, echo };
 
 /** The parameters behind a macro's popup (the "customised" dot compares them to their defaults). */
 const juce::StringArray& popupParameterIds (MacroPopup macro);

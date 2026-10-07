@@ -323,7 +323,8 @@ void ValueSelector::paint (juce::Graphics& g)
 {
     auto r = getLocalBounds().toFloat();
     const float h = r.getHeight();
-    const auto valueText = parameter.getAllValueStrings()[index];
+    const auto override = textOverride != nullptr ? textOverride() : juce::String();
+    const auto valueText = override.isNotEmpty() ? override : parameter.getAllValueStrings()[index];
     if (plain)
     {
         // A popover's mode, right-aligned beside its title: quiet type and a small chevron.
@@ -359,13 +360,16 @@ void ValueSelector::mouseUp (const juce::MouseEvent& e)
         return;
     juce::PopupMenu menu;
     const auto values = parameter.getAllValueStrings();
+    const bool overridden = textOverride != nullptr && textOverride().isNotEmpty();
     for (int i = 0; i < values.size(); ++i)
     {
         // The choice arrives later, from the message loop: by then this selector may be
         // gone (popup closed, mode changed), so never call into it unchecked.
         juce::Component::SafePointer<ValueSelector> safe (this);
-        menu.addItem (values[i], true, i == index, [safe, i] { if (safe != nullptr) safe->choose (i); });
+        menu.addItem (values[i], true, i == index && ! overridden, [safe, i] { if (safe != nullptr) safe->choose (i); });
     }
+    if (extraItems != nullptr)
+        extraItems (menu);
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMinimumWidth (getWidth()).withDeletionCheck (*this));
 }
 
@@ -391,6 +395,8 @@ void ValueSelector::step (int delta)
 
 void ValueSelector::choose (int i)
 {
+    if (onPick != nullptr)
+        onPick (i);
     if (i != index)
         attachment.setValueAsCompleteGesture (static_cast<float> (i));
 }
@@ -614,14 +620,18 @@ const juce::StringArray& popupParameterIds (MacroPopup macro)
                                               "movement.chorus.rate", "movement.chorus.width", "movement.chorus.stereo",
                                               "movement.pulse.rate", "movement.pulse.shape", "movement.pulse.stereo",
                                               "movement.shaper.pattern", "movement.shaper.rate", "movement.shaper.target",
-                                              "movement.shaper.smooth" };
-    static const juce::StringArray space { "space.type", "space.decay" };
+                                              "movement.shaper.smooth", "movement.shaper.custom" };
+    static const juce::StringArray space { "space.type", "space.decay", "space.preDelay", "space.size", "space.damping",
+                                           "space.modulation", "space.width", "space.lowCut", "space.highCut" };
+    static const juce::StringArray echo { "echo.type", "echo.sync", "echo.division", "echo.time", "echo.feedback",
+                                          "echo.tone", "echo.age", "echo.stereo" };
     switch (macro)
     {
         case MacroPopup::life: return life;
         case MacroPopup::dynamics: return dynamics;
         case MacroPopup::character: return character;
         case MacroPopup::movement: return movement;
+        case MacroPopup::echo: return echo;
         case MacroPopup::space: break;
     }
     return space;

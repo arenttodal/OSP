@@ -142,7 +142,8 @@ real round-robin set.
 | **DYNAMICS** | What velocity does besides volume. 0 = volume only. Higher = soft notes darker and gentler, hard notes brighter with more bite and a slightly sharp start. |
 | **CHARACTER** | The tonal shape: where the filter sits between its MIN and MAX (popup: type, resonance, drive, envelope). |
 | **MOVEMENT** | How the sound changes over time (popup: DRIFT, TAPE, CHORUS, PULSE, SHAPER). The mod wheel opens it further. |
-| **SPACE** | The room: how much of it you hear (popup: ROOM, CHAMBER, PLATE, SPRING and DECAY). |
+| **ECHO** | Repeats of the sound, in parallel with SPACE: how loud they are (0 = off). Popup: TAPE or BBD, FREE / SYNC, MONO / PING-PONG / WIDE, TIME, FEEDBACK, TONE, AGE (see below). |
+| **SPACE** | The room: how much of it you hear. Popup: ROOM, HALL, PLATE, SPRING; PRE-DELAY, SIZE, DECAY, DAMP, MOD, WIDTH and the room's EQ (LOW CUT, HIGH CUT; drag the two handles on the picture). |
 | **AMP ENVELOPE** (A D S R) | The instrument's one envelope, for every layer: a short attack and decay with low sustain makes a pluck, a slow attack a swell, full sustain a held tone. Drag the points or turn the knobs. A release of 0.2 s or more lets the recording's own ending play when you let go. |
 | **VOLUME** (top right) | The instrument's output level: drag the thin slider, double-click for 0 dB. |
 | Preset (top) | ‹ › step through the starting states (Natural, Alive, Floating, Broken, Frozen, Dream, Wide, and your own: settings that keep your sounds) and your presets; click the name for the list, ♡ marks a favourite. At the top of the list: **INIT** (an empty patch: no sounds, every setting at its default), **Reset settings** (defaults, the sounds stay) and **Save starting state…** (every setting and the number of slots, no audio; it appears under Starting states and applies to whatever sounds are loaded, keeping empty slots for the rest). |
@@ -202,6 +203,39 @@ bounces); with the transport stopped it starts with the first note you play.
 | SCATTER | Mostly open, with a few sparse dips |
 | MACHINE | A precise on/off gate on sixteenths (x.xx.xx.x.xx.x.x) |
 
+## SPACE and ECHO
+
+| SPACE type | Character |
+|---|---|
+| **ROOM** | A real small room: its early reflections are a furnished room's walls, then a short, dense tail |
+| **HALL** | A concert hall after the Berlin halls for orchestra: a gap, strong reflections from the sides, then a long, warm tail that keeps moving |
+| **PLATE** | A steel plate: dense at once, bright, wide, the most motion |
+| **SPRING** | A spring tank: its chirp and drip, narrow |
+
+PRE-DELAY is the gap before the room answers, SIZE the room's dimensions, DECAY how long it
+rings, DAMP how much sooner the highs die than the mids (0 = bright, 100 % = dark), MOD how
+much the tail moves (0 = still, 100 % = lush), WIDTH mono to the room's full width. The EQ
+filters what goes into the room (LOW CUT keeps the bass dry and clear, HIGH CUT darkens the
+room): drag its corners on the picture, or use the two small knobs; double-click a corner to
+reset it.
+
+**ECHO** runs in parallel with SPACE (each hears the dry sound). **TAPE** is a tape echo: each
+repeat a little darker and warmer, AGE adds wow and flutter, high FEEDBACK runs away into warm
+saturation; moving TIME bends the repeats' pitch like changing tape speed. **BBD** is a
+bucket-brigade pedal: longer times are darker, the repeats grainier, AGE adds its slow chorus.
+SYNC sets TIME as a note value (1/16 to a bar, dotted and triplet) on your DAW's tempo; FREE in
+ms. PING-PONG alternates the repeats left and right, WIDE plays two heads a little apart.
+
+## SHAPER: your own pattern
+
+Choose **CUSTOM** at the end of PATTERN's list (or just click on the pattern: editing any
+pattern makes it CUSTOM, starting from it). Click or drag on the display to set each step;
+right-click a step to change its shape. The **magnifier** (top right of the display) opens the
+large editor: **STEP** sets each step's level with the chosen brush (HOLD, FALL, RISE, PULSE,
+DIP, SOFT), **DRAW** paints a free line; **COPY ▾** starts from any pattern, **CLEAR** empties it,
+**SAVE…** keeps it under Documents/OSP/Shaper Patterns and **LOAD ▾** (or PATTERN → SAVED) brings
+it back. Every edit is one undo step; the pattern is saved with the project and presets.
+
 ## MIDI
 
 | Message | Effect |
@@ -212,7 +246,7 @@ bounces); with the transport stopped it starts with the first note you play.
 | Mod wheel (CC 1) | opens MOTION |
 | Channel pressure / aftertouch | intensity: louder and brighter while pressing |
 | CC 74 | brightness (MPE "slide") |
-| CC 20–25 | LIFE, DYNAMICS, CHARACTER, MOTION, SPACE, A's REIMAGINED |
+| CC 20–26 | LIFE, DYNAMICS, CHARACTER, MOTION, SPACE, A's REIMAGINED, ECHO |
 | MPE (lower zone, toggle in Advanced) | per-note bend (±48 semitones), pressure and slide |
 
 ## Saving and sharing

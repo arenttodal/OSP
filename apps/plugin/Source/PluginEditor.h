@@ -113,10 +113,15 @@ public:
         finishes any layout transition at once (tests, snapshots). */
     void refreshNow();
 
-    /** Popups: 0-4 the macros (LIFE..SPACE), 5 Advanced; -1 closes. Public for tests and snapshots. */
+    /** Popups: 0-4 the macros (LIFE..SPACE), 5 Advanced, 10 ECHO; -1 closes. Public for tests and snapshots. */
     static constexpr int advancedPopup = 5;
     static constexpr int mixPopup = 6;   ///< the large three-layer mix
     static constexpr int reimaginedPopup = 7;   ///< 7, 8, 9: layer A's, B's, C's REIMAGINED modes
+    static constexpr int echoPopup = 10;   ///< the sixth macro (it came after the others' numbers)
+    static constexpr int lastPopup = echoPopup;
+    /** The macro (index into the macro row's data order: LIFE..SPACE, ECHO) a popup belongs to, or -1. */
+    static int macroOfPopup (int popup) noexcept { return popup >= 0 && popup < 5 ? popup : (popup == echoPopup ? 5 : -1); }
+    static int popupOfMacro (int macro) noexcept { return macro < 5 ? macro : echoPopup; }
     void openPopup (int which);
     void closePopup();
     int openPopupIndex() const noexcept { return popupIndex; }
@@ -216,7 +221,7 @@ private:
     // Mix, macros, envelope
     HeaderMix headerMix { ospProcessor };   ///< MIX in the header (two or three layers)
     juce::Rectangle<int> lowerPanel;
-    std::array<Knob, 5> macros;      // LIFE, DYNAMICS, CHARACTER, MOVEMENT, SPACE
+    std::array<Knob, 6> macros;      // LIFE, DYNAMICS, CHARACTER, MOVEMENT, SPACE, ECHO (ECHO sits before SPACE on screen)
     EnvelopePanel envelope { ospProcessor.parameters };
 
     // Keyboard row

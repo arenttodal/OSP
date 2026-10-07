@@ -73,6 +73,24 @@ namespace ids
     static const juce::String shaperSmooth = "movement.shaper.smooth";
     static const juce::String spaceType = "space.type";
     static const juce::String spaceDecay = "space.decay";
+    // SPACE v2, ECHO and SHAPER CUSTOM (version hint 12).
+    static const juce::String spacePreDelay = "space.preDelay";
+    static const juce::String spaceSize = "space.size";
+    static const juce::String spaceDamping = "space.damping";
+    static const juce::String spaceModulation = "space.modulation";
+    static const juce::String spaceWidth = "space.width";
+    static const juce::String spaceLowCut = "space.lowCut";
+    static const juce::String spaceHighCut = "space.highCut";
+    static const juce::String echo = "echo";
+    static const juce::String echoType = "echo.type";
+    static const juce::String echoSync = "echo.sync";
+    static const juce::String echoDivision = "echo.division";
+    static const juce::String echoTime = "echo.time";
+    static const juce::String echoFeedback = "echo.feedback";
+    static const juce::String echoTone = "echo.tone";
+    static const juce::String echoAge = "echo.age";
+    static const juce::String echoStereo = "echo.stereo";
+    static const juce::String shaperCustom = "movement.shaper.custom";
     // A/B layers (stable: never rename). Per layer: layerA.sourceMode, layerA.granular.position, ...
     static const juce::String blend = "ab.blend";
     static const juce::Identifier instrument = "Instrument";
@@ -183,7 +201,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
     number (ids::characterEnvAttack, "Character Env Attack", skewed (0.0f, 2000.0f, 60.0f), static_cast<float> (1000.0 * d.envAttackSeconds), ms);
     number (ids::characterEnvDecay, "Character Env Decay", skewed (20.0f, 12000.0f, 700.0f), static_cast<float> (1000.0 * d.envDecaySeconds), ms);
     choice (ids::movementMode, "Movement Mode", { "Drift", "Tape", "Chorus", "Pulse", "Shaper" }, 0);
-    choice (ids::spaceType, "Space Type", { "Room", "Chamber", "Plate", "Spring" }, 2);
+    choice (ids::spaceType, "Space Type", { "Room", "Hall", "Plate", "Spring" }, 2);   // HALL took CHAMBER's place (v12)
     number (ids::spaceDecay, "Space Decay", skewed (0.2f, 8.0f, 1.8f), static_cast<float> (d.spaceDecaySeconds), seconds);
 
     // MOVEMENT v2 (version hint 6): every mode's own settings.
@@ -333,6 +351,43 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
         glideRange.setSkewForCentre (250.0f);
         layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::glide, 8 }, "Glide", glideRange, 0.0f, ms));
     }
+    {
+        // SPACE v2, ECHO and SHAPER CUSTOM (version hint 12).
+        auto id12 = [] (const juce::String& id) { return juce::ParameterID { id, 12 }; };
+        auto skewedRange = [] (float lo, float hi, float centre) {
+            Range r (lo, hi, 0.0f);
+            r.setSkewForCentre (centre);
+            return r;
+        };
+        auto hz12 = juce::AudioParameterFloatAttributes().withLabel ("Hz");
+        auto ms12 = juce::AudioParameterFloatAttributes().withLabel ("ms");
+        const Shaping d12;
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id12 (ids::spacePreDelay), "Space Pre-Delay", skewedRange (0.0f, 250.0f, 40.0f),
+                                                                 static_cast<float> (d12.spacePreDelayMs), ms12));
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id12 (ids::spaceSize), "Space Size", unit, static_cast<float> (100.0 * d12.spaceSize), percent));
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id12 (ids::spaceDamping), "Space Damping", unit, static_cast<float> (100.0 * d12.spaceDamping), percent));
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id12 (ids::spaceModulation), "Space Modulation", unit, static_cast<float> (100.0 * d12.spaceModulation), percent));
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id12 (ids::spaceWidth), "Space Width", unit, static_cast<float> (100.0 * d12.spaceWidth), percent));
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id12 (ids::spaceLowCut), "Space Low Cut", skewedRange (20.0f, 2000.0f, 200.0f),
+                                                                 static_cast<float> (d12.spaceLowCutHz), hz12));
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id12 (ids::spaceHighCut), "Space High Cut", skewedRange (1000.0f, 20000.0f, 5000.0f),
+                                                                 static_cast<float> (d12.spaceHighCutHz), hz12));
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id12 (ids::echo), "Echo", unit, 0.0f, percent));
+        layout.add (std::make_unique<juce::AudioParameterChoice> (id12 (ids::echoType), "Echo Type", juce::StringArray { "Tape", "BBD" }, static_cast<int> (d12.echoType)));
+        layout.add (std::make_unique<juce::AudioParameterBool> (id12 (ids::echoSync), "Echo Sync", d12.echoSync));
+        juce::StringArray divisions;
+        for (int i = 0; i < shaping::echoDivisionCount; ++i)
+            divisions.add (shaping::echoDivisionName (i));
+        layout.add (std::make_unique<juce::AudioParameterChoice> (id12 (ids::echoDivision), "Echo Division", divisions, d12.echoDivision));
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id12 (ids::echoTime), "Echo Time", skewedRange (20.0f, 1500.0f, 300.0f),
+                                                                 static_cast<float> (d12.echoTimeMs), ms12));
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id12 (ids::echoFeedback), "Echo Feedback", unit, static_cast<float> (100.0 * d12.echoFeedback), percent));
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id12 (ids::echoTone), "Echo Tone", unit, static_cast<float> (100.0 * d12.echoTone), percent));
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id12 (ids::echoAge), "Echo Age", unit, static_cast<float> (100.0 * d12.echoAge), percent));
+        layout.add (std::make_unique<juce::AudioParameterChoice> (id12 (ids::echoStereo), "Echo Stereo", juce::StringArray { "Mono", "Ping-Pong", "Wide" },
+                                                                  static_cast<int> (d12.echoStereo)));
+        layout.add (std::make_unique<juce::AudioParameterBool> (id12 (ids::shaperCustom), "Shaper Custom", false));
+    }
     return layout;
 }
 
@@ -425,6 +480,9 @@ OspAudioProcessor::OspAudioProcessor()
     motionParam = parameters.getRawParameterValue (ids::motion);
     spaceParam = parameters.getRawParameterValue (ids::space);
     reimaginedParam = parameters.getRawParameterValue (ids::reimagined);
+    echoParam = parameters.getRawParameterValue (ids::echo);
+    customPattern = RhythmicShaper::patternSteps (ShaperParams().pattern);   // CUSTOM starts as THREE
+    publishCustomPattern();
     pitchCharacterParam = parameters.getRawParameterValue (ids::pitchCharacter);
     sustainParam = parameters.getRawParameterValue (ids::sustain);
     seedParam = parameters.getRawParameterValue (ids::seed);
@@ -563,6 +621,11 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
     }
 
     bool shapingChanged = force;
+    if (const auto generation = customGeneration.load (std::memory_order_acquire); generation != appliedCustomGeneration)
+    {
+        appliedCustomGeneration = generation;
+        shapingChanged = true;
+    }
     for (std::size_t i = 0; i < shapingParams.size(); ++i)
     {
         const float v = shapingParams[i]->load();
@@ -579,9 +642,9 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
     }
 
     // Macro = host parameter, unless a MIDI CC (20-25) moved it more recently.
-    std::array<std::atomic<float>*, 6> macroParams { lifeParam, dynamicsParam, characterParam, motionParam, spaceParam, reimaginedParam };
-    std::array<double, 6> values {};
-    for (std::size_t i = 0; i < 6; ++i)
+    std::array<std::atomic<float>*, 7> macroParams { lifeParam, dynamicsParam, characterParam, motionParam, spaceParam, reimaginedParam, echoParam };
+    std::array<double, 7> values {};
+    for (std::size_t i = 0; i < values.size(); ++i)
     {
         const float p = macroParams[i]->load() * 0.01f;
         if (changed (p, lastMacroParam[i]))
@@ -598,6 +661,7 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
     macros.motion = values[3] + modWheel * (1.0 - values[3]); // mod wheel opens MOTION up
     macros.space = values[4];
     macros.reimagined = values[5];
+    macros.echo = values[6];
     engine.setMacros (macros);
     engineSettings.macros = macros;
     engine.setMpe (mpeParam->load() >= 0.5f);
@@ -694,6 +758,9 @@ const juce::StringArray& OspAudioProcessor::shapingIds()
         ids::chorusRate, ids::chorusWidth, ids::chorusStereo, ids::pulseRate, ids::pulseShape, ids::pulseStereo,
         ids::shaperPattern, ids::shaperRate, ids::shaperTarget, ids::shaperSmooth,
         ids::lifeCharacter, ids::lifeTakes, ids::lifeTakeOrder, ids::lifeTakesSeed,
+        ids::spacePreDelay, ids::spaceSize, ids::spaceDamping, ids::spaceModulation, ids::spaceWidth, ids::spaceLowCut, ids::spaceHighCut,
+        ids::echoType, ids::echoSync, ids::echoDivision, ids::echoTime, ids::echoFeedback, ids::echoTone, ids::echoAge, ids::echoStereo,
+        ids::shaperCustom,
     };
     jassert (list.size() == numShapingParams);
     return list;
@@ -742,7 +809,180 @@ Shaping OspAudioProcessor::shapingFromParameters() const noexcept
     s.lifeTakes = takes == 0 ? 0 : takes + 1;   // endless, 2, 3 .. 16
     s.lifeTakeOrder = static_cast<LifeTakeOrder> (index (35, 2));
     s.lifeTakesSeed = static_cast<std::uint32_t> (std::max (0L, std::lround (v (36))));
+    s.spacePreDelayMs = v (37);
+    s.spaceSize = 0.01 * v (38);
+    s.spaceDamping = 0.01 * v (39);
+    s.spaceModulation = 0.01 * v (40);
+    s.spaceWidth = 0.01 * v (41);
+    s.spaceLowCutHz = v (42);
+    s.spaceHighCutHz = v (43);
+    s.echoType = static_cast<EchoType> (index (44, 2));
+    s.echoSync = v (45) >= 0.5;
+    s.echoDivision = index (46, shaping::echoDivisionCount);
+    s.echoTimeMs = v (47);
+    s.echoFeedback = 0.01 * v (48);
+    s.echoTone = 0.01 * v (49);
+    s.echoAge = 0.01 * v (50);
+    s.echoStereo = static_cast<EchoStereo> (index (51, 3));
+    s.shaper.custom = v (52) >= 0.5;
+    for (std::size_t i = 0; i < s.shaper.customSteps.size(); ++i)
+    {
+        auto& step = s.shaper.customSteps[i];
+        step.start = customStepValues[3 * i].load (std::memory_order_relaxed);
+        step.end = customStepValues[3 * i + 1].load (std::memory_order_relaxed);
+        step.shape = static_cast<StepShape> (std::clamp (static_cast<int> (customStepValues[3 * i + 2].load (std::memory_order_relaxed)), 0, 5));
+    }
     return s;
+}
+
+//==============================================================================
+// SHAPER CUSTOM
+namespace
+{
+    constexpr const char* stepShapeNames[] = { "hold", "fall", "rise", "dip", "pulse", "soft" };
+
+    class CustomPatternAction final : public juce::UndoableAction
+    {
+    public:
+        CustomPatternAction (OspAudioProcessor& p, const ShaperPattern& before, const ShaperPattern& after) : processor (p), from (before), to (after) {}
+        bool perform() override
+        {
+            processor.setShaperCustomPattern (to, false);
+            return true;
+        }
+        bool undo() override
+        {
+            processor.setShaperCustomPattern (from, false);
+            return true;
+        }
+
+    private:
+        OspAudioProcessor& processor;
+        ShaperPattern from, to;
+    };
+}
+
+ShaperPattern OspAudioProcessor::shaperCustomPattern() const
+{
+    const juce::ScopedLock lock (customLock);
+    return customPattern;
+}
+
+void OspAudioProcessor::setShaperCustomPattern (const ShaperPattern& pattern, bool undoable)
+{
+    const auto before = shaperCustomPattern();
+    if (before == pattern)
+        return;
+    if (undoable)
+    {
+        undoManager.perform (new CustomPatternAction (*this, before, pattern));
+        return;
+    }
+    {
+        const juce::ScopedLock lock (customLock);
+        customPattern = pattern;
+    }
+    publishCustomPattern();
+}
+
+void OspAudioProcessor::publishCustomPattern() noexcept
+{
+    ShaperPattern copy;
+    {
+        const juce::ScopedLock lock (customLock);
+        copy = customPattern;
+    }
+    for (std::size_t i = 0; i < copy.size(); ++i)
+    {
+        customStepValues[3 * i].store (std::clamp (copy[i].start, 0.0f, 1.0f), std::memory_order_relaxed);
+        customStepValues[3 * i + 1].store (std::clamp (copy[i].end, 0.0f, 1.0f), std::memory_order_relaxed);
+        customStepValues[3 * i + 2].store (static_cast<float> (copy[i].shape), std::memory_order_relaxed);
+    }
+    customGeneration.fetch_add (1, std::memory_order_release);
+}
+
+juce::String OspAudioProcessor::encodeShaperPattern (const ShaperPattern& pattern)
+{
+    // "v1:" then 16 steps "start,end,shape" separated by ';' (shape by name: stable).
+    juce::StringArray steps;
+    for (const auto& step : pattern)
+        steps.add (juce::String (step.start, 4) + "," + juce::String (step.end, 4) + "," + stepShapeNames[static_cast<int> (step.shape)]);
+    return "v1:" + steps.joinIntoString (";");
+}
+
+std::optional<ShaperPattern> OspAudioProcessor::decodeShaperPattern (const juce::String& text)
+{
+    if (! text.startsWith ("v1:"))
+        return std::nullopt;
+    const auto steps = juce::StringArray::fromTokens (text.substring (3), ";", "");
+    if (steps.size() != RhythmicShaper::steps)
+        return std::nullopt;
+    ShaperPattern pattern;
+    for (int i = 0; i < steps.size(); ++i)
+    {
+        const auto parts = juce::StringArray::fromTokens (steps[i], ",", "");
+        if (parts.size() != 3)
+            return std::nullopt;
+        auto& step = pattern[static_cast<std::size_t> (i)];
+        step.start = std::clamp (parts[0].getFloatValue(), 0.0f, 1.0f);
+        step.end = std::clamp (parts[1].getFloatValue(), 0.0f, 1.0f);
+        step.shape = StepShape::hold;
+        for (int k = 0; k < 6; ++k)
+            if (parts[2].trim() == stepShapeNames[k])
+                step.shape = static_cast<StepShape> (k);
+    }
+    return pattern;
+}
+
+juce::File OspAudioProcessor::shaperPatternFolder()
+{
+    return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("OSP/Shaper Patterns");
+}
+
+juce::Array<juce::File> OspAudioProcessor::savedShaperPatterns()
+{
+    auto files = shaperPatternFolder().findChildFiles (juce::File::findFiles, false, juce::String ("*") + shaperPatternExtension);
+    std::sort (files.begin(), files.end(), [] (const juce::File& a, const juce::File& b) {
+        return a.getFileNameWithoutExtension().compareNatural (b.getFileNameWithoutExtension()) < 0;
+    });
+    return files;
+}
+
+bool OspAudioProcessor::writeShaperPatternFile (const juce::File& file, const ShaperPattern& pattern)
+{
+    auto* object = new juce::DynamicObject();
+    object->setProperty ("schemaVersion", 1);
+    object->setProperty ("kind", "osp.shaperPattern");
+    object->setProperty ("name", file.getFileNameWithoutExtension());
+    juce::Array<juce::var> steps;
+    for (const auto& step : pattern)
+        steps.add (juce::Array<juce::var> { step.start, step.end, juce::String (stepShapeNames[static_cast<int> (step.shape)]) });
+    object->setProperty ("steps", steps);
+    file.getParentDirectory().createDirectory();
+    return file.replaceWithText (juce::JSON::toString (juce::var (object)));
+}
+
+std::optional<ShaperPattern> OspAudioProcessor::readShaperPatternFile (const juce::File& file)
+{
+    const auto json = juce::JSON::parse (file.loadFileAsString());
+    const auto* steps = json["steps"].getArray();
+    if (static_cast<int> (json["schemaVersion"]) < 1 || steps == nullptr || steps->size() != RhythmicShaper::steps)
+        return std::nullopt;
+    ShaperPattern pattern;
+    for (int i = 0; i < steps->size(); ++i)
+    {
+        const auto& item = (*steps)[i];
+        if (! item.isArray() || item.size() != 3)
+            return std::nullopt;
+        auto& step = pattern[static_cast<std::size_t> (i)];
+        step.start = std::clamp (static_cast<float> (item[0]), 0.0f, 1.0f);
+        step.end = std::clamp (static_cast<float> (item[1]), 0.0f, 1.0f);
+        step.shape = StepShape::hold;
+        for (int k = 0; k < 6; ++k)
+            if (item[2].toString() == stepShapeNames[k])
+                step.shape = static_cast<StepShape> (k);
+    }
+    return pattern;
 }
 
 void OspAudioProcessor::swapInstrumentIfPending() noexcept
@@ -814,7 +1054,7 @@ void OspAudioProcessor::handleMidi (const juce::MidiMessage& m) noexcept
         engine.setChannelTimbre (memberChannel ? channel : 1, m.getControllerValue() / 127.0);
     else if (m.isController() && m.getControllerNumber() == 1)
         modWheel = static_cast<float> (m.getControllerValue()) / 127.0f;
-    else if (m.isController() && m.getControllerNumber() >= 20 && m.getControllerNumber() <= 25)
+    else if (m.isController() && m.getControllerNumber() >= 20 && m.getControllerNumber() <= 26)
         ccMacro[static_cast<std::size_t> (m.getControllerNumber() - 20)] = static_cast<float> (m.getControllerValue()) / 127.0f;
     else if (m.isPitchWheel() && memberChannel)
         engine.setChannelPitchBend (channel, (m.getPitchWheelValue() - 8192) / 8192.0 * 48.0); // MPE default: +/- 48 st
@@ -852,7 +1092,10 @@ void OspAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
                 timing.ppq = *ppq;
             }
             if (const auto bpm = position->getBpm())
+            {
                 timing.bpm = *bpm;
+                hostBpm.store (static_cast<float> (*bpm), std::memory_order_relaxed);
+            }
             if (const auto signature = position->getTimeSignature())
             {
                 timing.numerator = signature->numerator;
@@ -1672,6 +1915,7 @@ std::unique_ptr<juce::XmlElement> OspAudioProcessor::createStateXml()
     stateTree.setProperty ("editLayer", editLayer(), nullptr);
     stateTree.setProperty ("keptSlots", keptSlotCount.load(), nullptr);
     stateTree.setProperty ("reimaginedRouting", perLayerReimagined.load() ? "perLayer" : "legacyGlobal", nullptr);
+    stateTree.setProperty ("shaperCustom", encodeShaperPattern (shaperCustomPattern()), nullptr);
     for (int layer = 0; layer < numLayers; ++layer)
     {
         const auto tree = instrumentTree (layer);
@@ -1755,6 +1999,9 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml, bool setting
     // Made before per-layer Reimagined (no routing saved): the legacy shared stage, exactly.
     perLayerReimagined = savedVersion >= 8 && stateTree.getProperty ("reimaginedRouting", "legacyGlobal").toString() == "perLayer";
     stateTree.removeProperty ("reimaginedRouting", nullptr);
+    // SHAPER CUSTOM: the session's own steps, or (older sessions) CUSTOM's starting point.
+    setShaperCustomPattern (decodeShaperPattern (stateTree["shaperCustom"].toString()).value_or (RhythmicShaper::patternSteps (ShaperParams().pattern)), false);
+    stateTree.removeProperty ("shaperCustom", nullptr);
     // Before MOVEMENT v2 the three movement knobs were shared by every mode.
     std::array<std::optional<float>, 3> genericMovement;
     int savedMovementMode = 0;
@@ -1896,6 +2143,15 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml, bool setting
             for (const auto& name : reimaginedModeNames())
                 if (auto* p = parameters.getParameter (reimaginedModeParameterId (layer, name)))
                     p->setValueNotifyingHost (p->getDefaultValue());
+    }
+
+    if (savedVersion < 10)
+    {
+        // Before SPACE v2 the rooms had no EQ: open it, so nothing is filtered that never
+        // was (CHAMBER opens as HALL, which took its place). ECHO did not exist: off.
+        setParameterValue (ids::spaceLowCut, 20.0f);
+        setParameterValue (ids::spaceHighCut, 20000.0f);
+        setParameterValue (ids::echo, 0.0f);
     }
 
     if (settingsOnly)

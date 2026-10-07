@@ -324,7 +324,8 @@ formants). `EngineSettings::reimaginedRouting` says where the bus part runs:
 
 The resulting chain per note: SOURCE -> One Shot / Granular -> START / TUNE -> per-voice
 LIFE, DYNAMICS, CHARACTER filter, Reimagined per-voice part, drift, ADSR -> (per layer)
-REIMAGINED stage -> LEVEL / PAN -> mix -> MOVEMENT bus -> SPACE -> VOLUME. LIFE and the
+REIMAGINED stage -> LEVEL / PAN -> mix -> MOVEMENT bus -> SPACE and ECHO (parallel sends, see
+below) -> VOLUME. LIFE and the
 other macros are unchanged and stay shared (their per-voice stages were already per voice).
 
 The plugin stores `reimaginedRouting` ("perLayer" / "legacyGlobal"); a state without it
@@ -427,3 +428,29 @@ pattern strip draws with the same pure `RhythmicShaper::evaluate` as the DSP.
   the renderer and the plugin must agree on it.
 - Pitch branch A lives in `audio/pitch/` (the resampler is the first pitch engine).
 - `tests/support/` holds shared test helpers.
+
+
+## SPACE v2 and ECHO (state 10)
+
+`PostProcessor` sends the post-MOVEMENT signal to two effects in parallel, each with its own
+macro as the send level: `SpaceReverb` (SPACE) and `EchoDelay` (ECHO). Neither feeds the other.
+
+- `SpaceReverb::Settings` splits into structural settings (type, size: the network's lengths)
+  and tuning (decay, pre-delay, damping, modulation, width, EQ). A structural change
+  crossfades to the second, freshly configured instance (250 ms; a moving SIZE waits until it
+  rests); tuning changes `tune()` the playing one in place. ROOM, HALL and PLATE share one
+  late network (stereo input diffusion, 8 lines with an allpass each, cubic moving reads,
+  two-band decay); ROOM's early reflections come from a shoebox's image sources, HALL's from a
+  designed lateral pattern; SPRING keeps its dispersive tank.
+- `EchoDelay` is a tape or BBD delay (see the class comment); it sleeps like the reverb once
+  its line is empty below -120 dBFS.
+- Both are real-time safe (prepare() allocates) and deterministic (seeded wander).
+
+SHAPER CUSTOM: `ShaperParams::custom` / `customSteps` carry the musician's 16 steps (the same
+`ShaperStep` form as the library). The plugin keeps them on the message thread
+(`OspAudioProcessor::setShaperCustomPattern`, undoable), publishes them as 48 atomics plus a
+generation counter, and the audio thread re-reads them when the generation moves; the state
+stores them as `shaperCustom` ("v1:" + 16 x "start,end,shape"). Saved pattern files are JSON
+(`schemaVersion` 1, `kind` "osp.shaperPattern", `steps` [[start, end, shape]...]).
+
+Report and measurements: `docs/reports/space-echo-shaper.md`.

@@ -155,10 +155,17 @@ block with the plugin's popup settings; anything left out keeps its default, and
                   "pulse": { "rate": 0.55, "shape": 0.3, "stereo": 0.3 },
                   "shaper": { "pattern": 3, "rate": "1/4|1/8|1/8T|1/16|1/16T|1/32",
                               "target": "vol|filter|both", "smooth": 0.3 } },
-    "space": { "type": "room|chamber|plate|spring", "decaySeconds": 1.8 }
+    "space": { "type": "room|hall|plate|spring", "decaySeconds": 1.8, "preDelayMs": 8, "size": 0.5,
+               "damping": 0.4, "modulation": 0.4, "width": 1.0, "lowCutHz": 100, "highCutHz": 12000 },
+    "echo": { "type": "tape|bbd", "sync": true, "division": 5, "timeMs": 375, "feedback": 0.45,
+              "tone": 0.5, "age": 0.35, "stereo": "mono|pingpong|wide" }
   }
 }
 ```
+
+`"chamber"` (SPACE v1) is read as `"hall"`, which took its place. The ECHO macro is
+`"macros": { "echo": 0.0 }` (0 = off). `division` indexes 1/16, 1/8T, 1/16D, 1/8, 1/4T, 1/8D,
+1/4, 1/2T, 1/4D, 1/2, 1/2D, 1/1.
 
 Older files may still give `"movement": { "a", "b", "c" }`: those are the selected mode's
 three settings. Research renders have no host transport, so SHAPER uses its stopped-transport

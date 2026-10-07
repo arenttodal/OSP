@@ -113,8 +113,29 @@ namespace
                 *slots[i] = json::getDouble (movement, keys[i], *slots[i]);
         }
         const auto& space = b["space"];
-        s.spaceType = parseName (space, "type", std::array { "room", "chamber", "plate", "spring" }, s.spaceType);
+        // "chamber" (SPACE v1) is read as HALL, which took its place.
+        if (json::getString (space, "type") == "chamber")
+            s.spaceType = SpaceType::hall;
+        else
+            s.spaceType = parseName (space, "type", std::array { "room", "hall", "plate", "spring" }, s.spaceType);
         s.spaceDecaySeconds = json::getDouble (space, "decaySeconds", s.spaceDecaySeconds);
+        s.spacePreDelayMs = json::getDouble (space, "preDelayMs", s.spacePreDelayMs);
+        s.spaceSize = json::getDouble (space, "size", s.spaceSize);
+        s.spaceDamping = json::getDouble (space, "damping", s.spaceDamping);
+        s.spaceModulation = json::getDouble (space, "modulation", s.spaceModulation);
+        s.spaceWidth = json::getDouble (space, "width", s.spaceWidth);
+        s.spaceLowCutHz = json::getDouble (space, "lowCutHz", s.spaceLowCutHz);
+        s.spaceHighCutHz = json::getDouble (space, "highCutHz", s.spaceHighCutHz);
+        const auto& echo = b["echo"];
+        s.echoType = parseName (echo, "type", std::array { "tape", "bbd" }, s.echoType);
+        if (json::has (echo, "sync"))
+            s.echoSync = static_cast<bool> (echo["sync"]);
+        s.echoDivision = static_cast<int> (json::getDouble (echo, "division", s.echoDivision));
+        s.echoTimeMs = json::getDouble (echo, "timeMs", s.echoTimeMs);
+        s.echoFeedback = json::getDouble (echo, "feedback", s.echoFeedback);
+        s.echoTone = json::getDouble (echo, "tone", s.echoTone);
+        s.echoAge = json::getDouble (echo, "age", s.echoAge);
+        s.echoStereo = parseName (echo, "stereo", std::array { "mono", "pingpong", "wide" }, s.echoStereo);
     }
 }
 
@@ -148,6 +169,7 @@ void applyInstrumentBlock (const juce::var& e, RenderConfig& config)
     es.macros.character = json::getDouble (m, "character", es.macros.character);
     es.macros.motion = json::getDouble (m, "motion", es.macros.motion);
     es.macros.space = json::getDouble (m, "space", es.macros.space);
+    es.macros.echo = json::getDouble (m, "echo", es.macros.echo);
     es.macros.reimagined = json::getDouble (m, "reimagined", es.macros.reimagined);
 }
 

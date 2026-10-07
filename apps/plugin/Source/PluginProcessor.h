@@ -15,6 +15,7 @@
 #include <deque>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <set>
 
 namespace osp::plugin
@@ -187,6 +188,11 @@ public:
 
     /** SHAPER's pattern position (0..1) for the display, -1 when it is not running (any thread). */
     float shaperPhase() const noexcept { return engine.shaperPhase(); }
+    /** SHAPER's large pattern editor was last open (the popover reopens that way). */
+    bool shaperEditorLarge() const noexcept { return shaperLarge.load(); }
+    void setShaperEditorLarge (bool large) noexcept { shaperLarge = large; }
+    /** The host's tempo (120 until a host tells), for ECHO's synced times in the display. */
+    float hostTempo() const noexcept { return hostBpm.load (std::memory_order_relaxed); }
     /** The grains a layer is playing now (display; lock-free, any thread). */
     const InstrumentEngine::GrainSnapshot& grainSnapshot (int layer) const noexcept { return engine.grainSnapshot (layer); }
 
@@ -255,7 +261,24 @@ public:
         7: per-layer Reimagined amounts (B and C start from A's).
         8: Reimagined routing (`reimaginedRouting`: "perLayer" or "legacyGlobal"); a state
            without it was made before per-layer routing and keeps the legacy shared stage. */
-    static constexpr int stateVersion = 9;   ///< 9: REIMAGINED modes (older sessions open as KALEIDOSCOPE)
+    /** 9: REIMAGINED modes (older sessions open as KALEIDOSCOPE).
+        10: SPACE v2 (HALL in CHAMBER's place; older sessions open the new EQ fully, so the
+            room is not filtered where it never was), ECHO (off in older sessions) and the
+            SHAPER's CUSTOM pattern (`shaperCustom`). */
+    static constexpr int stateVersion = 10;
+
+    /** SHAPER CUSTOM: the musician's 16 steps (message thread). Kept in the session and
+        presets; setting it is undoable (one gesture = one transaction, see UndoManager). */
+    ShaperPattern shaperCustomPattern() const;
+    void setShaperCustomPattern (const ShaperPattern& pattern, bool undoable = true);
+    static juce::String encodeShaperPattern (const ShaperPattern& pattern);
+    static std::optional<ShaperPattern> decodeShaperPattern (const juce::String& text);
+    /** Saved SHAPER patterns (Documents/OSP/Shaper Patterns, *.ospshaper JSON, schemaVersion 1). */
+    static constexpr const char* shaperPatternExtension = ".ospshaper";
+    static juce::File shaperPatternFolder();
+    static juce::Array<juce::File> savedShaperPatterns();
+    static bool writeShaperPatternFile (const juce::File& file, const ShaperPattern& pattern);
+    static std::optional<ShaperPattern> readShaperPatternFile (const juce::File& file);
 
     /**
         Reimagined routing (see osp::ReimaginedRouting). New patches (a fresh instance,
@@ -380,6 +403,7 @@ private:
     std::atomic<float>* motionParam = nullptr;
     std::atomic<float>* spaceParam = nullptr;
     std::atomic<float>* reimaginedParam = nullptr;
+    std::atomic<float>* echoParam = nullptr;
     std::atomic<float>* pitchCharacterParam = nullptr;
     std::atomic<float>* sustainParam = nullptr;
     std::atomic<float>* seedParam = nullptr;
@@ -407,13 +431,23 @@ private:
     float lastDecay = -1.0f, lastSustainLevel = -1.0f;
     std::array<LayerParams, numLayers> layerParams;
     // Shaping system v1.0 (the macro popups), in the order of shapingIds().
-    static constexpr int numShapingParams = 37;
+    static constexpr int numShapingParams = 53;
     std::array<std::atomic<float>*, numShapingParams> shapingParams {};
     std::array<float, numShapingParams> lastShaping {};
     Shaping shapingFromParameters() const noexcept;
-    // MIDI-controlled macro values (CC 20-25), used until the host parameter moves again.
-    std::array<float, 6> ccMacro { -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f };
-    std::array<float, 6> lastMacroParam { -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f };
+    // MIDI-controlled macro values (CC 20-26; ECHO is 26), used until the host parameter moves again.
+    std::array<float, 7> ccMacro { -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f };
+    std::array<float, 7> lastMacroParam { -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f };
+    // SHAPER CUSTOM: the message thread writes the steps as atomics, then bumps the
+    // generation; the audio thread re-reads them when the generation moves.
+    std::array<std::atomic<float>, 48> customStepValues {};
+    std::atomic<std::uint32_t> customGeneration { 1 };
+    std::atomic<float> hostBpm { 120.0f };
+    std::atomic<bool> shaperLarge { false };
+    std::uint32_t appliedCustomGeneration = 0;
+    ShaperPattern customPattern {};   ///< message thread's copy
+    mutable juce::CriticalSection customLock;
+    void publishCustomPattern() noexcept;
     float modWheel = 0.0f;
     std::atomic<float> screenPitch { 0.0f }, screenMod { 0.0f };
     float lastScreenPitch = 0.0f, lastScreenMod = 0.0f;

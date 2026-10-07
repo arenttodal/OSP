@@ -29,7 +29,12 @@ enum class LifeTakeOrder { cycle, random };
 enum class VelocityCurve { soft, linear, hard };
 enum class FilterType { lp24, lp12, hp12, bp12, tilt, off };   ///< off: research/tests only, not offered to musicians
 enum class MovementMode { drift, tape, chorus, pulse, shaper };
-enum class SpaceType { room, chamber, plate, spring };
+/** SPACE's rooms. HALL took CHAMBER's place (index 1) in SPACE v2. */
+enum class SpaceType { room, hall, plate, spring };
+/** ECHO's machines: a tape echo and a bucket-brigade (BBD) delay. */
+enum class EchoType { tape, bbd };
+/** ECHO's stereo picture: one voice in the centre, repeats alternating left and right, or two offset heads. */
+enum class EchoStereo { mono, pingPong, wide };
 
 struct Shaping
 {
@@ -67,9 +72,26 @@ struct Shaping
     double pulseRate = 0.55, pulseShape = 0.3, pulseStereo = 0.3;      ///< ~0.9 Hz
     ShaperParams shaper;                                                ///< THREE, 1/16, BOTH, smooth 0.3
 
-    // SPACE
+    // SPACE (v2: the room's shape and its EQ besides TYPE and DECAY)
     SpaceType spaceType = SpaceType::plate;
     double spaceDecaySeconds = 1.8;
+    double spacePreDelayMs = 8.0;     ///< 0..250 ms before the room answers
+    double spaceSize = 0.5;           ///< 0..1: the room's dimensions (0.5 = the type's own)
+    double spaceDamping = 0.4;        ///< 0..1: how much faster the highs die than the mids
+    double spaceModulation = 0.4;     ///< 0..1: the tail's slow motion (0: still, 1: lush)
+    double spaceWidth = 1.0;          ///< 0..1: mono .. the type's full width
+    double spaceLowCutHz = 100.0;     ///< the reverb's input EQ: 20 Hz = open
+    double spaceHighCutHz = 12000.0;  ///< 20 kHz = open
+
+    // ECHO (a send in parallel with SPACE; the ECHO macro is its level)
+    EchoType echoType = EchoType::tape;
+    bool echoSync = true;
+    int echoDivision = 5;             ///< index into shaping::echoDivisionQuarters (5 = 1/8 dotted)
+    double echoTimeMs = 375.0;        ///< free time (sync off), 20..1500 ms
+    double echoFeedback = 0.45;       ///< 0..1 (1 runs away gently into saturation)
+    double echoTone = 0.5;            ///< 0 dark .. 1 bright
+    double echoAge = 0.35;            ///< 0..1: wow / flutter (TAPE) or clock noise and chorus (BBD), and wear
+    EchoStereo echoStereo = EchoStereo::pingPong;
 
     /** A transparent setting for research renders and tests that study other stages. */
     static Shaping neutral()
@@ -158,11 +180,27 @@ namespace shaping
         hi = 5.0;
         switch (type)
         {
-            case SpaceType::room:    lo = 0.2; hi = 2.5; break;
-            case SpaceType::chamber: lo = 0.5; hi = 5.0; break;
-            case SpaceType::plate:   lo = 0.7; hi = 8.0; break;
-            case SpaceType::spring:  lo = 0.4; hi = 5.0; break;
+            case SpaceType::room:   lo = 0.2; hi = 3.0; break;
+            case SpaceType::hall:   lo = 0.8; hi = 8.0; break;
+            case SpaceType::plate:  lo = 0.5; hi = 8.0; break;
+            case SpaceType::spring: lo = 0.4; hi = 5.0; break;
         }
+    }
+
+    /** SPACE SIZE (0..1) -> the factor on the room's dimensions (0.5 = 1, about 0.6x .. 1.6x). */
+    inline double spaceSizeFactor (double size) noexcept { return std::exp2 (1.4 * (std::clamp (size, 0.0, 1.0) - 0.5)); }
+
+    /** ECHO's synced lengths: 1/16, 1/8T, 1/16D, 1/8, 1/4T, 1/8D, 1/4, 1/2T, 1/4D, 1/2, 1/2D, 1 bar. */
+    constexpr int echoDivisionCount = 12;
+    inline double echoDivisionQuarters (int index) noexcept
+    {
+        constexpr double q[echoDivisionCount] = { 0.25, 1.0 / 3.0, 0.375, 0.5, 2.0 / 3.0, 0.75, 1.0, 4.0 / 3.0, 1.5, 2.0, 3.0, 4.0 };
+        return q[std::clamp (index, 0, echoDivisionCount - 1)];
+    }
+    inline const char* echoDivisionName (int index) noexcept
+    {
+        constexpr const char* n[echoDivisionCount] = { "1/16", "1/8T", "1/16D", "1/8", "1/4T", "1/8D", "1/4", "1/2T", "1/4D", "1/2", "1/2D", "1/1" };
+        return n[std::clamp (index, 0, echoDivisionCount - 1)];
     }
 }
 

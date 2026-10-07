@@ -6,6 +6,7 @@
 #include "research/Experiment.h"
 #include "support/TestHelpers.h"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
@@ -13,6 +14,7 @@
 #include <numbers>
 
 using namespace osp;
+using Catch::Approx;
 
 namespace
 {
@@ -130,15 +132,15 @@ TEST_CASE ("post: the four SPACE types have their own identity", "[unit][post][s
         const double early = energy (wet, 0, 48000 / 20);
         return Measure { t30, centroid (wet, 2400), early / total };
     };
-    const auto room = measure (SpaceType::room), chamber = measure (SpaceType::chamber);
+    const auto room = measure (SpaceType::room), hall = measure (SpaceType::hall);
     const auto plate = measure (SpaceType::plate), spring = measure (SpaceType::spring);
-    INFO ("t30 room " << room.t30 << " chamber " << chamber.t30 << " plate " << plate.t30 << " spring " << spring.t30);
-    INFO ("centroid room " << room.centroid << " chamber " << chamber.centroid << " plate " << plate.centroid << " spring " << spring.centroid);
-    INFO ("early share room " << room.earlyShare << " chamber " << chamber.earlyShare << " plate " << plate.earlyShare << " spring " << spring.earlyShare);
+    INFO ("t30 room " << room.t30 << " hall " << hall.t30 << " plate " << plate.t30 << " spring " << spring.t30);
+    INFO ("centroid room " << room.centroid << " hall " << hall.centroid << " plate " << plate.centroid << " spring " << spring.centroid);
+    INFO ("early share room " << room.earlyShare << " hall " << hall.earlyShare << " plate " << plate.earlyShare << " spring " << spring.earlyShare);
     CHECK (plate.centroid > room.centroid);         // plate bright, room dark
     CHECK (room.earlyShare > plate.earlyShare);     // room: present early reflections
     CHECK (spring.centroid < plate.centroid);       // spring band-limited
-    for (const auto* m : { &room, &chamber, &plate, &spring })
+    for (const auto* m : { &room, &hall, &plate, &spring })
         CHECK (m->t30 > 0.2);
 }
 
@@ -167,7 +169,7 @@ TEST_CASE ("post: SPACE at zero is bypassed and changing type does not click", "
     // signal does on its own: compare the steps just after each type change with the
     // largest step elsewhere.
     float steady = 0.0f, atSwitch = 0.0f, prev = 0.0f;
-    const SpaceType order[] = { SpaceType::plate, SpaceType::spring, SpaceType::room, SpaceType::chamber };
+    const SpaceType order[] = { SpaceType::plate, SpaceType::spring, SpaceType::room, SpaceType::hall };
     for (int pos = 0, block = 0; pos < static_cast<int> (out.channels[0].size()); pos += 256, ++block)
     {
         sh.spaceType = order[(block / 50) % 4];
@@ -345,4 +347,356 @@ TEST_CASE ("engine: far Reimagined adds harmonics to a pure tone", "[integration
         return shareAbove (l, 12000, 400.0); // above the tone and the resonators' fifth (330 Hz)
     };
     CHECK (render (1.0) > render (0.0) * 2.0);
+}
+
+TEST_CASE ("post: SPACE level per type (measurement)", "[.][space-level]")
+{
+    for (int t = 0; t < 4; ++t)
+    {
+        PostProcessor post;
+        post.prepare (48000.0, 256);
+        Shaping sh;
+        sh.spaceType = static_cast<SpaceType> (t);
+        sh.spaceDecaySeconds = 2.0;
+        sh.movementMode = MovementMode::pulse;
+        post.setShaping (sh);
+        Macros m;
+        m.space = 0.5;
+        m.reimagined = 0.0;
+        m.motion = 0.0;
+        post.setMacros (m);
+        post.reset();
+        // Pink-ish noise burst 0.5 s, then 4 s of tail.
+        AudioData x = AudioData::allocate (2, 5 * 48000, 48000.0);
+        Prng rng (7);
+        float b = 0.0f;
+        for (int i = 0; i < 24000; ++i)
+        {
+            b = 0.97f * b + 0.03f * static_cast<float> (rng.bipolar());
+            x.channels[0][static_cast<std::size_t> (i)] = x.channels[1][static_cast<std::size_t> (i)] = 4.0f * b;
+        }
+        const auto out = process (post, x);
+        double wet = 0, dry = 0;
+        for (std::size_t i = 0; i < out.channels[0].size(); ++i)
+        {
+            const double w0 = out.channels[0][i] - 0.9 * x.channels[0][i], w1 = out.channels[1][i] - 0.9 * x.channels[1][i];
+            wet += w0 * w0 + w1 * w1;
+            dry += 2.0 * x.channels[0][i] * x.channels[0][i];
+        }
+        std::printf ("type %d wet/dry %.2f dB\n", t, 10.0 * std::log10 (wet / dry));
+    }
+}
+
+TEST_CASE ("post: SPACE and ECHO impulse responses (measurement)", "[.][space-ir]")
+{
+    // Raw float32 stereo-interleaved impulse responses for offline analysis (OSP_SPACE_DIR).
+    const char* dir = std::getenv ("OSP_SPACE_DIR");
+    if (dir == nullptr)
+        return;
+    auto render = [dir] (const char* name, Shaping sh, Macros m, double seconds) {
+        PostProcessor post;
+        post.prepare (48000.0, 256);
+        sh.movementMode = MovementMode::pulse;
+        post.setShaping (sh);
+        m.reimagined = 0.0;
+        m.motion = 0.0;
+        post.setMacros (m);
+        post.reset();
+        AudioData x = AudioData::allocate (2, static_cast<int> (seconds * 48000), 48000.0);
+        x.channels[0][100] = x.channels[1][100] = 1.0f;
+        auto out = process (post, x);
+        out.channels[0][100] = out.channels[1][100] = 0.0f;   // the dry impulse
+        std::vector<float> inter;
+        for (std::size_t i = 0; i < out.channels[0].size(); ++i)
+        {
+            inter.push_back (out.channels[0][i]);
+            inter.push_back (out.channels[1][i]);
+        }
+        const auto path = std::string (dir) + "/" + name + ".f32";
+        if (auto* f = std::fopen (path.c_str(), "wb"))
+        {
+            std::fwrite (inter.data(), sizeof (float), inter.size(), f);
+            std::fclose (f);
+        }
+    };
+    const char* names[] = { "room", "hall", "plate", "spring" };
+    for (int t = 0; t < 4; ++t)
+    {
+        Shaping sh;
+        sh.spaceType = static_cast<SpaceType> (t);
+        sh.spaceDecaySeconds = t == 0 ? 1.0 : 2.2;
+        sh.spaceLowCutHz = 20.0;
+        sh.spaceHighCutHz = 20000.0;
+        Macros m;
+        m.space = 1.0;
+        m.echo = 0.0;
+        render (names[t], sh, m, 6.0);
+    }
+    for (int t = 0; t < 2; ++t)
+    {
+        Shaping sh;
+        sh.echoType = static_cast<EchoType> (t);
+        sh.echoSync = false;
+        sh.echoTimeMs = 300.0;
+        sh.echoFeedback = 0.6;
+        Macros m;
+        m.space = 0.0;
+        m.echo = 1.0;
+        render (t == 0 ? "echo-tape" : "echo-bbd", sh, m, 4.0);
+    }
+}
+
+namespace
+{
+    PostProcessor makePost (const Shaping& sh, double space, double echo)
+    {
+        PostProcessor post;
+        post.prepare (48000.0, 256);
+        Shaping s = sh;
+        s.movementMode = MovementMode::pulse;   // a bus mode at MOVEMENT 0: passes through
+        post.setShaping (s);
+        Macros m;
+        m.space = space;
+        m.echo = echo;
+        m.reimagined = 0.0;
+        m.motion = 0.0;
+        post.setMacros (m);
+        post.reset();
+        return post;
+    }
+
+    AudioData impulse (double seconds)
+    {
+        AudioData x = AudioData::allocate (2, static_cast<int> (seconds * 48000), 48000.0);
+        x.channels[0][100] = x.channels[1][100] = 1.0f;
+        return x;
+    }
+
+    /** Energy-decay (Schroeder) time from -5 to -25 dB, scaled to 60 dB. */
+    double decayTime (const std::vector<float>& x)
+    {
+        std::vector<double> e (x.size() + 1, 0.0);
+        for (std::size_t i = x.size(); i-- > 0;)
+            e[i] = e[i + 1] + static_cast<double> (x[i]) * x[i];
+        std::size_t a = 0, b = 0;
+        for (std::size_t i = 0; i < x.size(); ++i)
+        {
+            const double db = 10.0 * std::log10 (e[i] / e[0] + 1.0e-30);
+            if (a == 0 && db < -5.0) a = i;
+            if (db < -25.0) { b = i; break; }
+        }
+        return 3.0 * static_cast<double> (b - a) / 48000.0;
+    }
+}
+
+TEST_CASE ("space v2: every type decays as DECAY says and stays bounded at the extremes", "[unit][post][space]")
+{
+    for (int t = 0; t < 3; ++t)
+    {
+        Shaping sh;
+        sh.spaceType = static_cast<SpaceType> (t);
+        sh.spaceDecaySeconds = 2.0;
+        sh.spaceLowCutHz = 20.0;
+        sh.spaceHighCutHz = 20000.0;
+        auto post = makePost (sh, 1.0, 0.0);
+        auto out = process (post, impulse (7.0));
+        out.channels[0][100] = 0.0f;
+        const double rt = decayTime (out.channels[0]);
+        INFO ("type " << t << " RT " << rt);
+        CHECK (rt > 1.4);
+        CHECK (rt < 2.8);
+    }
+    // Every type at its most: longest decay, biggest, most modulated, darkest - finite and bounded.
+    for (int t = 0; t < 4; ++t)
+    {
+        Shaping sh;
+        sh.spaceType = static_cast<SpaceType> (t);
+        sh.spaceDecaySeconds = 8.0;
+        sh.spaceSize = 1.0;
+        sh.spaceModulation = 1.0;
+        sh.spaceDamping = 0.0;
+        sh.spacePreDelayMs = 250.0;
+        auto post = makePost (sh, 1.0, 0.0);
+        AudioData x = AudioData::allocate (2, 10 * 48000, 48000.0);
+        Prng rng (3);
+        for (int i = 0; i < 48000; ++i)
+            x.channels[0][static_cast<std::size_t> (i)] = x.channels[1][static_cast<std::size_t> (i)] = 0.5f * static_cast<float> (rng.bipolar());
+        const auto out = process (post, x);
+        float peak = 0.0f;
+        bool finite = true;
+        for (const auto& ch : out.channels)
+            for (float v : ch)
+            {
+                finite = finite && std::isfinite (v);
+                peak = std::max (peak, std::abs (v));
+            }
+        INFO ("type " << t << " peak " << peak);
+        CHECK (finite);
+        CHECK (peak < 4.0f);
+    }
+}
+
+TEST_CASE ("space v2: HALL holds its bass longer, the EQ removes what it cuts, PRE-DELAY moves the onset", "[unit][post][space]")
+{
+    auto band = [] (const std::vector<float>& x, double lo, double hi) {
+        // A crude band split: one-pole low-pass at hi minus one-pole at lo, energy over the tail.
+        std::vector<float> y (x.size());
+        float a = 0.0f, b = 0.0f;
+        const float ka = static_cast<float> (1.0 - std::exp (-2.0 * std::numbers::pi * hi / 48000.0));
+        const float kb = static_cast<float> (1.0 - std::exp (-2.0 * std::numbers::pi * lo / 48000.0));
+        for (std::size_t i = 0; i < x.size(); ++i)
+        {
+            a += (x[i] - a) * ka;
+            b += (x[i] - b) * kb;
+            y[i] = a - b;
+        }
+        return y;
+    };
+    Shaping hall;
+    hall.spaceType = SpaceType::hall;
+    hall.spaceDecaySeconds = 2.2;
+    hall.spaceLowCutHz = 20.0;
+    hall.spaceHighCutHz = 20000.0;
+    auto post = makePost (hall, 1.0, 0.0);
+    auto open = process (post, impulse (7.0));
+    open.channels[0][100] = 0.0f;
+    const double low = decayTime (band (open.channels[0], 60.0, 250.0)), high = decayTime (band (open.channels[0], 4000.0, 12000.0));
+    INFO ("hall RT low " << low << " high " << high);
+    CHECK (low > high * 1.3);   // warm: the bass outlasts the air
+
+    hall.spaceLowCutHz = 600.0;
+    auto cutPost = makePost (hall, 1.0, 0.0);
+    auto cut = process (cutPost, impulse (7.0));
+    cut.channels[0][100] = 0.0f;
+    auto spectrumEnergy = [] (const std::vector<float>& x, double lo, double hi) {
+        const Fft fft (16);
+        const int n = fft.size();
+        std::vector<std::complex<double>> b (static_cast<std::size_t> (n));
+        for (int i = 0; i < n && static_cast<std::size_t> (i) < x.size(); ++i)
+            b[static_cast<std::size_t> (i)] = { x[static_cast<std::size_t> (i)], 0.0 };
+        fft.forward (b.data());
+        double e = 0.0;
+        for (int k = 1; k < n / 2; ++k)
+            if (const double hz = k * 48000.0 / n; hz >= lo && hz <= hi)
+                e += std::norm (b[static_cast<std::size_t> (k)]);
+        return e;
+    };
+    // LOW CUT at 600 Hz takes the bass out of the room (12 dB/oct: ~ -25 dB around 100 Hz).
+    CHECK (spectrumEnergy (cut.channels[0], 40.0, 150.0) < 0.02 * spectrumEnergy (open.channels[0], 40.0, 150.0));
+    CHECK (spectrumEnergy (cut.channels[0], 2000.0, 6000.0) > 0.7 * spectrumEnergy (open.channels[0], 2000.0, 6000.0));
+
+    auto onset = [] (const std::vector<float>& x) {
+        for (std::size_t i = 101; i < x.size(); ++i)
+            if (std::abs (x[i]) > 1.0e-4f)
+                return static_cast<double> (i - 100) / 48.0;   // ms
+        return -1.0;
+    };
+    hall.spaceLowCutHz = 20.0;
+    hall.spacePreDelayMs = 0.0;
+    auto a = makePost (hall, 1.0, 0.0);
+    hall.spacePreDelayMs = 100.0;
+    auto b = makePost (hall, 1.0, 0.0);
+    auto x0 = process (a, impulse (1.0)), x1 = process (b, impulse (1.0));
+    x0.channels[0][100] = x1.channels[0][100] = 0.0f;
+    INFO ("onsets " << onset (x0.channels[0]) << " / " << onset (x1.channels[0]) << " ms");
+    CHECK (onset (x1.channels[0]) - onset (x0.channels[0]) == Approx (100.0).margin (2.0));
+}
+
+TEST_CASE ("echo: repeats at TIME, each quieter by FEEDBACK; PING-PONG alternates sides", "[unit][post][echo]")
+{
+    for (int type = 0; type < 2; ++type)
+    {
+        Shaping sh;
+        sh.echoType = static_cast<EchoType> (type);
+        sh.echoSync = false;
+        sh.echoTimeMs = 250.0;
+        sh.echoFeedback = 0.5;
+        sh.echoAge = 0.0;
+        sh.echoStereo = EchoStereo::pingPong;
+        auto post = makePost (sh, 0.0, 1.0);
+        auto out = process (post, impulse (2.0));
+        auto peakNear = [&] (int channel, double seconds) {
+            const auto c = static_cast<std::size_t> (100 + seconds * 48000.0);
+            float p = 0.0f;
+            for (std::size_t i = c - 600; i < c + 600; ++i)
+                p = std::max (p, std::abs (out.channels[static_cast<std::size_t> (channel)][i]));
+            return p;
+        };
+        INFO ("type " << type);
+        // First repeat on the left, the second on the right, the third left again.
+        CHECK (peakNear (0, 0.25) > 4.0f * peakNear (1, 0.25));
+        CHECK (peakNear (1, 0.5) > 4.0f * peakNear (0, 0.5));
+        CHECK (peakNear (0, 0.75) > 4.0f * peakNear (1, 0.75));
+        // ... each quieter than the one before it.
+        CHECK (peakNear (1, 0.5) < peakNear (0, 0.25));
+        CHECK (peakNear (0, 0.75) < peakNear (1, 0.5));
+    }
+}
+
+TEST_CASE ("echo: FEEDBACK 100 % runs away into saturation, never into overload; off is exactly dry", "[unit][post][echo]")
+{
+    Shaping sh;
+    sh.echoSync = false;
+    sh.echoTimeMs = 120.0;
+    sh.echoFeedback = 1.0;
+    sh.echoAge = 1.0;
+    for (int type = 0; type < 2; ++type)
+    {
+        sh.echoType = static_cast<EchoType> (type);
+        auto post = makePost (sh, 0.0, 1.0);
+        AudioData x = AudioData::allocate (2, 12 * 48000, 48000.0);
+        Prng rng (9);
+        for (int i = 0; i < 24000; ++i)
+            x.channels[0][static_cast<std::size_t> (i)] = x.channels[1][static_cast<std::size_t> (i)] = 0.8f * static_cast<float> (rng.bipolar());
+        const auto out = process (post, x);
+        float peak = 0.0f;
+        for (const auto& ch : out.channels)
+            for (float v : ch)
+            {
+                REQUIRE (std::isfinite (v));
+                peak = std::max (peak, std::abs (v));
+            }
+        INFO ("type " << type << " peak " << peak);
+        CHECK (peak < 3.0f);
+    }
+    // ECHO at 0: the post stage is exactly what it was without it.
+    Shaping plain;
+    auto withEcho = makePost (plain, 0.3, 0.0);
+    const auto audio = testsignals::vowel (220.0, 1.0, 48000.0, 1);
+    const auto a = process (withEcho, audio);
+    auto again = makePost (plain, 0.3, 0.0);
+    CHECK (test::maxDifference (a, process (again, audio)) == 0.0);
+}
+
+TEST_CASE ("echo: synced TIME follows the tempo", "[unit][post][echo]")
+{
+    EchoDelay::Settings s;
+    s.sync = true;
+    s.division = 5;   // 1/8 dotted
+    CHECK (EchoDelay::timeSeconds (s, 120.0) == Approx (0.375));
+    CHECK (EchoDelay::timeSeconds (s, 90.0) == Approx (0.5));
+    s.division = 11;   // a bar at 40 bpm is longer than the line: capped
+    CHECK (EchoDelay::timeSeconds (s, 40.0) == Approx (EchoDelay::maxSeconds));
+    s.sync = false;
+    s.timeMs = 333.0;
+    CHECK (EchoDelay::timeSeconds (s, 120.0) == Approx (0.333));
+}
+
+TEST_CASE ("shaper: CUSTOM plays the musician's steps", "[unit][shaper]")
+{
+    ShaperParams p;
+    p.custom = true;
+    for (auto& st : p.customSteps)
+        st = { 1.0f, 1.0f, StepShape::hold };
+    p.customSteps[4] = { 0.0f, 0.0f, StepShape::hold };   // one closed step (the fifth)
+    p.smooth = 0.0;
+    CHECK (RhythmicShaper::evaluate (p, 0.5 / 16.0) == Approx (1.0f));
+    CHECK (RhythmicShaper::evaluate (p, 4.5 / 16.0) == Approx (0.0f).margin (1.0e-6));
+    // The library pattern a CUSTOM pattern starts from plays exactly like the pattern.
+    ShaperParams lib;
+    ShaperParams copy = lib;
+    copy.custom = true;
+    copy.customSteps = RhythmicShaper::patternSteps (lib.pattern);
+    for (int i = 0; i < 64; ++i)
+        CHECK (RhythmicShaper::evaluate (copy, i / 64.0) == Approx (RhythmicShaper::evaluate (lib, i / 64.0)));
 }

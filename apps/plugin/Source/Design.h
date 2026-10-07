@@ -55,18 +55,19 @@ namespace colour
     const juce::Colour accentBottom { 0xffd3461a };
     const juce::Colour accentSoft { 0xfff2c8b0 };      ///< an active modifier's fill
 
-    /** The five macros' identities, one natural mineral palette at about the same lightness
+    /** The six macros' identities, one natural mineral palette at about the same lightness
         (CIE L* 56-58): LIFE rust, DYNAMICS ochre, CHARACTER moss, MOVEMENT mineral blue,
-        SPACE muted mauve. They mark only the macro's thin value arc, its small light, and
-        the accents of its popover; panels, text and values stay neutral. */
-    enum class Macro { life, dynamics, character, movement, space };
+        SPACE muted mauve, ECHO verdigris (the patina of an old tape machine's copper).
+        They mark only the macro's thin value arc, its small light, and the accents of its
+        popover; panels, text and values stay neutral. */
+    enum class Macro { life, dynamics, character, movement, space, echo };
     inline juce::Colour macro (Macro m)
     {
-        static const std::array<juce::Colour, 5> colours { juce::Colour (0xffbe7552), juce::Colour (0xffb5843a), juce::Colour (0xff7b8d69),
-                                                           juce::Colour (0xff73899c), juce::Colour (0xff96839d) };
+        static const std::array<juce::Colour, 6> colours { juce::Colour (0xffbe7552), juce::Colour (0xffb5843a), juce::Colour (0xff7b8d69),
+                                                           juce::Colour (0xff73899c), juce::Colour (0xff96839d), juce::Colour (0xff5c9490) };
         return colours[static_cast<std::size_t> (m)];
     }
-    inline juce::Colour macro (int index) { return macro (static_cast<Macro> (juce::jlimit (0, 4, index))); }
+    inline juce::Colour macro (int index) { return macro (static_cast<Macro> (juce::jlimit (0, 5, index))); }
     /** The same identity lifted for lines on the graphite displays (equal weight on dark). */
     inline juce::Colour macroOnDark (Macro m) { return macro (m).withMultipliedBrightness (1.32f).withMultipliedSaturation (1.08f); }
 
@@ -136,6 +137,8 @@ namespace layout
 
     // Macros and envelope
     const R macroPanel { 35.0f, 702.0f, 1378.0f, 196.0f };
+    /** Where the envelope's half of the macro panel starts (six macros left of it). */
+    constexpr float envelopeX = 955.0f;
 
     // Keyboard row and footer
     const R pitchWheel { 42.0f, 913.0f, 36.0f, 88.0f };

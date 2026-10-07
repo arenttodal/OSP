@@ -1,5 +1,6 @@
 #pragma once
 
+#include "engine/EchoDelay.h"
 #include "engine/MovementBus.h"
 #include "engine/ReimaginedStage.h"
 #include "engine/ShelfFilter.h"
@@ -25,8 +26,10 @@ struct Macros;
                  set to 0.
       MOVEMENT   the bus part of MOVEMENT (MovementBus: drift's shared wander, tape,
                  chorus, pulse).
-      SPACE      one of four curated ambiences (SpaceReverb) as a send: the macro is the
-                 wet level; changing type crossfades two reverbs over 250 ms.
+      ECHO       a tape or bucket-brigade delay (EchoDelay) as a send in parallel with
+                 SPACE: the ECHO macro is its level; it hears the dry sound only.
+      SPACE      one of four rooms (SpaceReverb) as a send: the macro is the wet level;
+                 changing type or size crossfades two reverbs over 250 ms.
 
     (CHARACTER is a per-voice filter now, see CharacterFilter.) Macro values are
     smoothed, so moving one never clicks. prepare() allocates; the rest is real-time safe.
@@ -46,8 +49,8 @@ public:
 
     void process (float* left, float* right, int numSamples) noexcept;
 
-    // MOVEMENT's SHAPER clock and display.
-    void setTiming (const HostTiming& timing) noexcept { movement.setTiming (timing); }
+    // MOVEMENT's SHAPER clock and display (the host tempo also times ECHO).
+    void setTiming (const HostTiming& timing) noexcept;
     void noteStarted() noexcept { movement.noteStarted(); }
     void setVoicesActive (bool active) noexcept { movement.setVoicesActive (active); }
     float shaperPhase() const noexcept { return movement.shaperPhase(); }
@@ -74,13 +77,19 @@ private:
     std::array<SpaceReverb, 2> reverbs;
     int activeReverb = 0;
     int reverbFade = 0, reverbFadeLength = 1;
-    SpaceType appliedType = SpaceType::plate;
-    double appliedDecay = -1.0;
+    SpaceReverb::Settings appliedSpace;
+    double lastWantedSize = 0.5;
+    int sizeSettled = 0;
     bool spaceIdle = true;
     // Asleep: nothing has come in and the tail has been below -120 dBFS for a quarter
     // second, so the reverb is not run (its clock still moves); the first sound wakes it.
     bool reverbAsleep = false;
     int quietRun = 0, sleepAfter = 12000;
+
+    // ECHO
+    EchoDelay echo;
+    double echoTarget = 0.0, echoLevel = 0.0;
+    bool echoIdle = true, echoAsleep = false;
 };
 
 } // namespace osp

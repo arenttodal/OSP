@@ -783,13 +783,15 @@ std::array<juce::Point<float>, 3> EnvelopePanel::handles() const
 }
 
 // Reference geometry (panel 506 x 186 from 899, 708): the title, a 482 x 70 display, then
-// A D S R as small knobs centred at 71, 191, 314 and 437.
+// A D S R as small knobs centred at 71, 191, 314 and 437 - kept in proportion now that the
+// panel gave room to the sixth macro (450 wide).
 void EnvelopePanel::resized()
 {
-    graph = juce::Rectangle<int> (12, 26, 482, 70);
-    static constexpr std::array<int, 4> centres { 71, 191, 314, 437 };
+    const int w = getWidth();
+    graph = juce::Rectangle<int> (12, 26, w - 24, 70);
+    static constexpr std::array<float, 4> shares { 71.0f / 506.0f, 191.0f / 506.0f, 314.0f / 506.0f, 437.0f / 506.0f };
     for (std::size_t i = 0; i < knobs.size(); ++i)
-        knobs[i]->setBounds (juce::Rectangle<int> (100, 87).withCentre ({ centres[i], 141 }));
+        knobs[i]->setBounds (juce::Rectangle<int> (std::min (100, w / 5), 87).withCentre ({ juce::roundToInt (shares[i] * static_cast<float> (w)), 141 }));
 }
 
 void EnvelopePanel::paint (juce::Graphics& g)

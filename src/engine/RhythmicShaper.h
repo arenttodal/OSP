@@ -11,12 +11,26 @@ namespace osp
 enum class ShaperRate { quarter, eighth, eighthTriplet, sixteenth, sixteenthTriplet, thirtySecond };
 enum class ShaperTarget { volume, filter, both };
 
+/** A step's curve: hold its value, fall (a struck, decaying hit), rise, dip and come
+    back, pulse up and back, or a rounded move from start to end. */
+enum class StepShape : std::uint8_t { hold, down, up, dip, pulse, soft };
+
+struct ShaperStep
+{
+    float start = 1.0f, end = 1.0f;   ///< 0 closed .. 1 open
+    StepShape shape = StepShape::hold;
+    bool operator== (const ShaperStep&) const = default;
+};
+using ShaperPattern = std::array<ShaperStep, 16>;
+
 struct ShaperParams
 {
     int pattern = 3;                              ///< THREE
     ShaperRate rate = ShaperRate::sixteenth;
     ShaperTarget target = ShaperTarget::both;
     double smooth = 0.3;                          ///< 0 = crisp edges .. 1 = flowing
+    bool custom = false;                          ///< play `customSteps` instead of the library pattern
+    ShaperPattern customSteps {};                 ///< CUSTOM (the musician's own; empty = all open)
 };
 
 /**
@@ -37,7 +51,8 @@ struct ShaperParams
     - Never clicks: 2 ms anti-click ramps, 30 ms crossfades for pattern and rate changes,
       40 ms for target changes. At zero depth it is an exact bypass.
 
-    Patterns are immutable compiled-in data; prepare() is the only non-real-time call.
+    The library patterns are immutable compiled-in data; CUSTOM is the musician's own 16
+    steps, carried in the parameters. prepare() is the only non-real-time call.
 */
 class RhythmicShaper
 {
@@ -54,12 +69,20 @@ public:
         float low = 0.0f, high = 1.0f;
     };
     static Span span (int pattern, double smooth) noexcept;
+    static Span span (const ShaperPattern& steps, double smooth) noexcept;
+    /** A library pattern's steps (the starting point of a CUSTOM pattern). */
+    static ShaperPattern patternSteps (int pattern) noexcept;
+    /** The steps `params` plays (the library pattern or CUSTOM). */
+    static ShaperPattern stepsOf (const ShaperParams& params) noexcept;
     /** The pattern's modulation (0 closed .. 1 open) at a phase 0..1 of its cycle, stretched
         over its span so its lowest point is 0 and its highest 1 (at full depth the lowest
         point closes completely). Pure. */
     static float evaluate (int pattern, double phase, double smooth, Span span) noexcept;
     /** The same, finding the span itself (remembered per thread for the last pattern). */
     static float evaluate (int pattern, double phase, double smooth) noexcept;
+    static float evaluate (const ShaperPattern& steps, double phase, double smooth, Span span) noexcept;
+    /** What `params` plays at a phase (the display): library or CUSTOM, its own span. */
+    static float evaluate (const ShaperParams& params, double phase) noexcept;
 
     void prepare (double sampleRate) noexcept;
     void reset() noexcept;
@@ -79,11 +102,12 @@ public:
 
 private:
     /** The pattern as designed (its floors included), before it is stretched. */
-    static float raw (int pattern, double phase, double smooth) noexcept;
+    static float raw (const ShaperPattern& steps, double phase, double smooth) noexcept;
     double cyclePhase (double quarterNotes, ShaperRate rate) const noexcept;
 
     double sampleRate = 48000.0;
     ShaperParams params, previous;
+    ShaperPattern playing {}, previousSteps {};
     Span currentSpan, previousSpan;
     int fadeRemaining = 0, fadeLength = 1;
 

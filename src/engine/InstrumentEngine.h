@@ -29,6 +29,7 @@ struct Macros
     double motion = 0.35;
     double space = 0.2;
     double reimagined = 0.2;
+    double echo = 0.0;       ///< ECHO: the delay's send level (0 = off, as before it existed)
 };
 
 /** How velocity acts (Phase 5 experiment; the instrument uses full). */

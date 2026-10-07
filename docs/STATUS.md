@@ -196,6 +196,25 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [ ] Stage 20: DAW testing (Logic AU, Ableton AU/VST3, Reaper VST3) — needs the user's Mac
 - [ ] Listening pass: FOLLOW-off lift, REVERSE + LOOP, the three-layer mix law, default LEVEL 0 dB
 
+## Milestone: SPACE v2, ECHO, SHAPER CUSTOM (state 10, parameters v12; docs/reports/space-echo-shaper.md)
+
+- [x] SPACE v2 engine: stereo diffusion, 8-line FDN with an allpass per line, cubic moving
+      reads (sine + seeded wander), two-band decay; ROOM from shoebox image sources, HALL
+      (Berlin halls: gap, lateral reflections, bass ratio 1.2) in CHAMBER's place, PLATE with
+      an instant onset, SPRING kept. Smoother tails than v1 on every type (measured), levels
+      matched (-6.9..-7.5 dB at 50 %).
+- [x] SPACE controls: PRE-DELAY, SIZE, DECAY, DAMP, MOD, WIDTH, LOW CUT, HIGH CUT; the EQ drawn
+      over the tail with draggable corners; the picture uses the real reflection patterns.
+- [x] ECHO: sixth macro (verdigris, between MOVEMENT and SPACE, CC 26), TAPE and BBD delays in
+      parallel with SPACE, FREE / SYNC (1/16..1 bar, dotted, triplet), MONO / PING-PONG / WIDE,
+      TIME, FEEDBACK, TONE, AGE; popover picture of the repeats; sleeps in silence. The amp
+      envelope narrowed to 450 px for it.
+- [x] SHAPER CUSTOM: 16 editable steps (STEP brushes HOLD/FALL/RISE/PULSE/DIP/SOFT, DRAW, right
+      click cycles a shape), the magnifier's large editor (COPY, CLEAR, SAVE, LOAD), saved
+      patterns (*.ospshaper JSON), undo per gesture, saved with sessions and presets.
+- [x] Migration: older sessions open HALL for CHAMBER, the EQ fully open, ECHO off, CUSTOM = THREE.
+- [ ] Listening round: HALL vs old CHAMBER, PLATE v2 vs v1, ECHO TAPE / BBD on the fixtures.
+
 ## DONE
 
 - Pure C++20 DSP/analysis library (`osp_dsp`) independent of JUCE; JUCE used for file

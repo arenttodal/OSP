@@ -323,9 +323,9 @@ void OspAudioProcessorEditor::mouseDownAnywhere (juce::Component* c)
     if (c != this && ! isParentOf (c))
         return;
     int pressed = -1;
-    for (int i = 0; i < 5; ++i)
+    for (int i = 0; i < static_cast<int> (macros.size()); ++i)
         if (c == macros[static_cast<std::size_t> (i)].label.get())
-            pressed = i;
+            pressed = popupOfMacro (i);
     if (c == &advancedButton)
         pressed = advancedPopup;
     if (headerMix.isMixOpener (c))
@@ -403,12 +403,12 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     };
     content.addChildComponent (headerMix);
 
-    // The five macros: a name with settings behind it (click: its popup) over its knob.
-    const std::array<std::pair<const char*, const char*>, 5> macroInfo { {
-        { "life", "LIFE" }, { "dynamics", "DYNAMICS" }, { "character", "CHARACTER" }, { "motion", "MOVEMENT" }, { "space", "SPACE" } } };
-    const std::array<const char*, 5> popupHints { "Life: how differently each note is performed", "Dynamics: how touch changes the sound",
+    // The six macros: a name with settings behind it (click: its popup) over its knob.
+    const std::array<std::pair<const char*, const char*>, 6> macroInfo { {
+        { "life", "LIFE" }, { "dynamics", "DYNAMICS" }, { "character", "CHARACTER" }, { "motion", "MOVEMENT" }, { "space", "SPACE" }, { "echo", "ECHO" } } };
+    const std::array<const char*, 6> popupHints { "Life: how differently each note is performed", "Dynamics: how touch changes the sound",
                                                   "Character: the tonal shape (filter)", "Movement: how the sound changes through time",
-                                                  "Space: the room it plays in" };
+                                                  "Space: the room it plays in", "Echo: repeats of the sound, from a tape echo or a bucket-brigade delay" };
     for (std::size_t i = 0; i < macros.size(); ++i)
     {
         auto& knob = macros[i];
@@ -418,7 +418,7 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
         knob.slider.getProperties().set ("arc", static_cast<juce::int64> (design::colour::macro (static_cast<int> (i)).getARGB()));
         knob.slider.getProperties().set ("thinArc", 2.4);
         knob.label->setTooltip (popupHints[i]);
-        const int index = static_cast<int> (i);
+        const int index = popupOfMacro (static_cast<int> (i));
         knob.label->onClick = [this, index] {
             if (closedByLabelPress == index)
             {
@@ -507,16 +507,19 @@ void OspAudioProcessorEditor::openPopup (int which)
 {
     const bool keepAdvanced = which == advancedPopup;
     closePopup();
-    if (which < 0 || which >= reimaginedPopup + OspAudioProcessor::numLayers)
+    if (which < 0 || (which >= reimaginedPopup + OspAudioProcessor::numLayers && which != echoPopup))
         return;
-    if (which >= reimaginedPopup && ! cards[static_cast<std::size_t> (which - reimaginedPopup)]->isVisible())
+    const bool reimagined = which >= reimaginedPopup && which < reimaginedPopup + OspAudioProcessor::numLayers;
+    if (reimagined && ! cards[static_cast<std::size_t> (which - reimaginedPopup)]->isVisible())
         return;
-    if (which >= reimaginedPopup)
+    if (reimagined)
         popup = createReimaginedPopup (ospProcessor, which - reimaginedPopup);
     else if (which == mixPopup)
         popup = createMixPopup (ospProcessor);
+    else if (which == advancedPopup)
+        popup = createAdvancedPopup (ospProcessor);
     else
-        popup = which == advancedPopup ? createAdvancedPopup (ospProcessor) : createMacroPopup (static_cast<MacroPopup> (which), ospProcessor);
+        popup = createMacroPopup (static_cast<MacroPopup> (macroOfPopup (which)), ospProcessor);
     popupIndex = which;
     popup->onSizeChanged = [this] { positionPopup(); };
     juce::Component::SafePointer<OspAudioProcessorEditor> safe (this);
@@ -532,9 +535,9 @@ void OspAudioProcessorEditor::openPopup (int which)
         popup->setAlpha (0.0f);
         juce::Desktop::getInstance().getAnimator().animateComponent (popup.get(), final, 1.0f, 110, false, 1.0, 0.0);
     }
-    if (which < 5)
-        macros[static_cast<std::size_t> (which)].label->setOpen (true);
-    if (which >= reimaginedPopup)
+    if (const int m = macroOfPopup (which); m >= 0)
+        macros[static_cast<std::size_t> (m)].label->setOpen (true);
+    if (reimagined)
         cards[static_cast<std::size_t> (which - reimaginedPopup)]->setReimaginedOpen (true);
     if (keepAdvanced)
     {
@@ -549,9 +552,9 @@ void OspAudioProcessorEditor::closePopup()
 {
     if (popup == nullptr)
         return;
-    if (popupIndex >= 0 && popupIndex < 5)
-        macros[static_cast<std::size_t> (popupIndex)].label->setOpen (false);
-    if (popupIndex >= reimaginedPopup)
+    if (const int m = macroOfPopup (popupIndex); m >= 0)
+        macros[static_cast<std::size_t> (m)].label->setOpen (false);
+    if (popupIndex >= reimaginedPopup && popupIndex < reimaginedPopup + OspAudioProcessor::numLayers)
         cards[static_cast<std::size_t> (popupIndex - reimaginedPopup)]->setReimaginedOpen (false);
     if (popupIndex == advancedPopup)
     {
@@ -574,15 +577,15 @@ void OspAudioProcessorEditor::positionPopup()
     const auto size = (popup->cardSize().toFloat() * scale);
     const float m = static_cast<float> (MiniPanel::shadowMargin) * scale;
     float x = 0.0f, y = 0.0f;
-    if (popupIndex < 5)
+    if (const int macro = macroOfPopup (popupIndex); macro >= 0)
     {
         // A macro's popover unfolds directly above its name: centred on it, its foot 10 px
         // above, kept inside the instrument at the edges (LIFE, SPACE).
-        const auto anchor = macros[static_cast<std::size_t> (popupIndex)].label->getBounds().toFloat();
+        const auto anchor = macros[static_cast<std::size_t> (macro)].label->getBounds().toFloat();
         x = anchor.getCentreX() - 0.5f * size.x;
         y = anchor.getY() - 10.0f - size.y;
     }
-    else if (popupIndex >= reimaginedPopup)
+    else if (popupIndex >= reimaginedPopup && popupIndex < reimaginedPopup + OspAudioProcessor::numLayers)
     {
         // A layer's REIMAGINED popover unfolds above that card's REIMAGINED name.
         const auto& card = *cards[static_cast<std::size_t> (popupIndex - reimaginedPopup)];
@@ -614,7 +617,7 @@ void OspAudioProcessorEditor::positionPopup()
 
 void OspAudioProcessorEditor::updateCustomisedDots()
 {
-    for (int i = 0; i < 5; ++i)
+    for (int i = 0; i < static_cast<int> (macros.size()); ++i)
     {
         bool customised = false;
         for (const auto& id : popupParameterIds (static_cast<MacroPopup> (i)))
@@ -1169,7 +1172,7 @@ void OspAudioProcessorEditor::paintInstrument (juce::Graphics& g)
         const auto r = layout::macroPanel;
         draw::raised (g, r, layout::panelRadius, colour::panelTop, colour::panelBottom);
         g.setColour (colour::divider);
-        g.fillRect (juce::Rectangle<float> (889.0f, 715.0f, 1.0f, 170.0f));
+        g.fillRect (juce::Rectangle<float> (layout::envelopeX - 10.0f, 715.0f, 1.0f, 170.0f));
         g.setColour (colour::text.withAlpha (0.9f));
         g.setFont (type::panelHeader());
         g.drawText ("MACROS", juce::Rectangle<float> (59.0f, 710.0f, 200.0f, 22.0f), juce::Justification::centredLeft, false);
@@ -1209,14 +1212,15 @@ void OspAudioProcessorEditor::layoutInstrument()
     menuButton.setBounds (at (layout::menu));
 
     // The macros: name, knob and its light, at the reference's places.
-    static constexpr std::array<float, 5> centres { 139.0f, 302.0f, 466.0f, 634.0f, 797.0f };
+    // Six across the narrower macro side (data order LIFE..SPACE, ECHO; ECHO sits before SPACE).
+    static constexpr std::array<float, 6> centres { 128.0f, 274.0f, 420.0f, 566.0f, 858.0f, 712.0f };
     for (std::size_t i = 0; i < macros.size(); ++i)
     {
         auto& knob = macros[i];
         knob.label->setBounds (at (juce::Rectangle<float> (150.0f, 22.0f).withCentre ({ centres[i], 743.0f })));
         knob.slider.setBounds (at (juce::Rectangle<float> (132.0f, 132.0f).withCentre ({ centres[i], 812.0f })));
     }
-    envelope.setBounds (at (juce::Rectangle<float> (899.0f, 708.0f, 506.0f, 186.0f)));
+    envelope.setBounds (at (juce::Rectangle<float> (layout::envelopeX, 708.0f, 1405.0f - layout::envelopeX, 186.0f)));
 
     // Keyboard row and footer.
     pitchWheel.setBounds (at (layout::pitchWheel.withHeight (115.0f)));

@@ -1268,6 +1268,9 @@ TEST_CASE ("plugin: sessions from before the adaptive layers open as they were (
     OspAudioProcessor original;
     loadAndWait (original, file);
     original.setParameterValue ("sustain", 0.0f);   // "Recording": the old global sustain off
+    // Sessions before SPACE v2 had no reverb EQ: they open with it open (the v10 migration).
+    original.setParameterValue ("space.lowCut", 20.0f);
+    original.setParameterValue ("space.highCut", 20000.0f);
     juce::MemoryBlock state;
     original.getStateInformation (state);
     auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
@@ -1564,6 +1567,8 @@ TEST_CASE ("plugin: an A/B session from before the adaptive layers opens as two 
     original.pollLoads();
     original.setParameterValue ("ab.blend", 0.35f);
     original.setParameterValue ("layerB.sourceMode", 1.0f);
+    original.setParameterValue ("space.lowCut", 20.0f);   // as the v10 migration opens it
+    original.setParameterValue ("space.highCut", 20000.0f);
     juce::MemoryBlock state;
     original.getStateInformation (state);
     auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
@@ -1959,7 +1964,35 @@ TEST_CASE ("plugin: canonical screenshots for visual review", "[.][canonical]")
         ui->openPopup (3);
         shot (movement[mode]);
     }
-    const char* space[] = { "16-space-room.png", "17-space-chamber.png", "18-space-plate.png", "19-space-spring.png" };
+    // SHAPER CUSTOM: the small editor with the musician's steps, then the large editor.
+    p.setParameterValue ("movement.shaper.custom", 1.0f);
+    {
+        auto steps = RhythmicShaper::patternSteps (5);
+        steps[3] = { 0.9f, 0.9f, StepShape::hold };
+        steps[10] = { 0.2f, 1.0f, StepShape::up };
+        p.setShaperCustomPattern (steps, false);
+    }
+    ui->openPopup (3);
+    shot ("15b-shaper-custom.png");
+    p.setShaperEditorLarge (true);
+    ui->openPopup (3);
+    shot ("15c-shaper-large.png");
+    p.setShaperEditorLarge (false);
+    p.setParameterValue ("movement.shaper.custom", 0.0f);
+    // ECHO (the sixth macro): tape, ping-pong, synced; then BBD wide and free.
+    set ("echo", 40.0f);
+    ui->openPopup (osp::plugin::OspAudioProcessorEditor::echoPopup);
+    shot ("26-echo-tape.png");
+    set ("echo.type", 1.0f);
+    set ("echo.stereo", 2.0f);
+    set ("echo.sync", 0.0f);
+    set ("echo.age", 70.0f);
+    ui->openPopup (osp::plugin::OspAudioProcessorEditor::echoPopup);
+    shot ("27-echo-bbd.png");
+    for (const char* id : { "echo", "echo.type", "echo.stereo", "echo.sync", "echo.age" })
+        if (auto* param = p.parameters.getParameter (id))
+            param->setValueNotifyingHost (param->getDefaultValue());
+    const char* space[] = { "16-space-room.png", "17-space-hall.png", "18-space-plate.png", "19-space-spring.png" };
     for (int type = 0; type < 4; ++type)
     {
         p.parameters.getParameter ("space.type")->setValueNotifyingHost (static_cast<float> (type) / 3.0f);
@@ -2237,7 +2270,9 @@ TEST_CASE ("plugin: INIT, Reset settings and saved starting states", "[plugin][a
 //==============================================================================
 // Reimagined migration (per-layer REIMAGINED): sessions saved before it must sound exactly
 // as they did. tests/audio/reimagined-before/ holds the reference made by the build before
-// the migration (exact sample hash plus level, peak and brightness per scene). Each scene
+// the migration (exact sample hash plus level, peak and brightness per scene). The scenes
+// include SPACE, so the references were regenerated once for SPACE v2 (state 10), the
+// REIMAGINED code unchanged. Each scene
 // is set up, saved and reopened the way an older session is (no routing in its state),
 // then rendered. On the reference platform the hash must match; elsewhere the signal
 // metrics must (floating-point results differ slightly between compilers).
@@ -2836,6 +2871,9 @@ TEST_CASE ("plugin: CPU profile", "[.][cpu-profile]")
         { "16 notes, MOVEMENT shaper", 1, 16, 0, 48000.0, 128, { { "movement.mode", 4.0f } } },
         { "16 notes, SPACE 0", 1, 16, 0, 48000.0, 128, { { "space", 0.0f } } },
         { "16 notes, SPACE 100", 1, 16, 0, 48000.0, 128, { { "space", 100.0f } } },
+        { "16 notes, SPACE 100 HALL", 1, 16, 0, 48000.0, 128, { { "space", 100.0f }, { "space.type", 1.0f } } },
+        { "16 notes, ECHO 50 TAPE", 1, 16, 0, 48000.0, 128, { { "echo", 50.0f } } },
+        { "16 notes, ECHO 50 BBD", 1, 16, 0, 48000.0, 128, { { "echo", 50.0f }, { "echo.type", 1.0f } } },
         { "16 notes, Natural pitch", 1, 16, 0, 48000.0, 128, { { "pitchCharacter", 1.0f } } },
         { "16 notes, REIMAGINED 50", 1, 16, 0, 48000.0, 128, { { "reimagined", 50.0f } } },
         { "16 notes, REIMAGINED 100", 1, 16, 0, 48000.0, 128, { { "reimagined", 100.0f } } },
@@ -3003,4 +3041,90 @@ TEST_CASE ("plugin: null renders", "[.][null-audio]")
             const auto name = "space-" + std::to_string (type) + "-" + std::to_string (static_cast<int> (space)) + ".wav";
             REQUIRE (io::writeAudioFile (std::filesystem::path (dir) / name, out, io::SampleFormat::float32, error));
         }
+}
+
+TEST_CASE ("plugin: SPACE v2, ECHO and SHAPER CUSTOM are saved and recalled; older sessions open the EQ, ECHO stays off", "[plugin][space]")
+{
+    OspAudioProcessor p;
+    p.setParameterValue ("echo", 35.0f);
+    p.setParameterValue ("echo.type", 1.0f);
+    p.setParameterValue ("echo.stereo", 2.0f);
+    p.setParameterValue ("space.size", 80.0f);
+    p.setParameterValue ("space.lowCut", 300.0f);
+    p.setParameterValue ("space.type", 1.0f);   // HALL
+    p.setParameterValue ("movement.shaper.custom", 1.0f);
+    auto steps = RhythmicShaper::patternSteps (9);
+    steps[2] = { 0.3f, 0.8f, StepShape::up };
+    steps[7] = { 0.6f, 0.6f, StepShape::hold };
+    p.setShaperCustomPattern (steps, false);
+    juce::MemoryBlock state;
+    p.getStateInformation (state);
+
+    OspAudioProcessor q;
+    q.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+    CHECK (valueOf (q, "echo") == Approx (35.0f));
+    CHECK (valueOf (q, "echo.type") == Approx (1.0f));
+    CHECK (valueOf (q, "echo.stereo") == Approx (2.0f));
+    CHECK (valueOf (q, "space.size") == Approx (80.0f));
+    CHECK (valueOf (q, "space.lowCut") == Approx (300.0f).epsilon (1.0e-3));
+    CHECK (valueOf (q, "space.type") == Approx (1.0f));
+    CHECK (valueOf (q, "movement.shaper.custom") == Approx (1.0f));
+    const auto recalled = q.shaperCustomPattern();
+    for (std::size_t i = 0; i < steps.size(); ++i)
+    {
+        CHECK (recalled[i].start == Approx (steps[i].start).margin (1.0e-4));
+        CHECK (recalled[i].end == Approx (steps[i].end).margin (1.0e-4));
+        CHECK (recalled[i].shape == steps[i].shape);
+    }
+    // The pattern's text form reads back exactly, and nonsense is refused.
+    CHECK (OspAudioProcessor::decodeShaperPattern (OspAudioProcessor::encodeShaperPattern (steps)).has_value());
+    CHECK (! OspAudioProcessor::decodeShaperPattern ("v1:1,1,hold").has_value());
+    CHECK (! OspAudioProcessor::decodeShaperPattern ("garbage").has_value());
+
+    // A session from before SPACE v2 (state 9): no new parameters, no pattern.
+    auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
+    auto tree = juce::ValueTree::fromXml (*xml);
+    tree.setProperty ("stateVersion", 9, nullptr);
+    tree.removeProperty ("shaperCustom", nullptr);
+    for (int i = tree.getNumChildren(); --i >= 0;)
+    {
+        const auto id = tree.getChild (i)["id"].toString();
+        if (id.startsWith ("echo") || id == "space.preDelay" || id == "space.size" || id == "space.damping" || id == "space.modulation"
+            || id == "space.width" || id == "space.lowCut" || id == "space.highCut" || id == "movement.shaper.custom")
+            tree.removeChild (i, nullptr);
+    }
+    juce::MemoryBlock old;
+    juce::AudioProcessor::copyXmlToBinary (*tree.createXml(), old);
+    OspAudioProcessor r;
+    r.setParameterValue ("echo", 80.0f);   // moved in this instance: the session must not inherit it
+    r.setStateInformation (old.getData(), static_cast<int> (old.getSize()));
+    CHECK (valueOf (r, "echo") == Approx (0.0f).margin (1.0e-4));
+    CHECK (valueOf (r, "space.lowCut") == Approx (20.0f).margin (0.01));
+    CHECK (valueOf (r, "space.highCut") == Approx (20000.0f).margin (1.0));
+    CHECK (valueOf (r, "space.type") == Approx (1.0f));   // CHAMBER's index: HALL now
+    CHECK (valueOf (r, "movement.shaper.custom") == Approx (0.0f).margin (1.0e-4));
+    CHECK (r.shaperCustomPattern() == RhythmicShaper::patternSteps (ShaperParams().pattern));
+}
+
+TEST_CASE ("plugin: saved SHAPER patterns read back; a CUSTOM edit is one undo step", "[plugin][shaper]")
+{
+    TempDir tmp;
+    auto steps = RhythmicShaper::patternSteps (2);
+    steps[0] = { 0.0f, 1.0f, StepShape::soft };
+    const auto file = tmp.dir.getChildFile (juce::String ("mine") + OspAudioProcessor::shaperPatternExtension);
+    REQUIRE (OspAudioProcessor::writeShaperPatternFile (file, steps));
+    const auto back = OspAudioProcessor::readShaperPatternFile (file);
+    REQUIRE (back.has_value());
+    CHECK (*back == steps);
+    CHECK (! OspAudioProcessor::readShaperPatternFile (tmp.dir.getChildFile ("missing.ospshaper")).has_value());
+
+    OspAudioProcessor p;
+    const auto before = p.shaperCustomPattern();
+    p.undoManager.beginNewTransaction();
+    p.setShaperCustomPattern (steps);
+    CHECK (p.shaperCustomPattern() == steps);
+    p.undoManager.undo();
+    CHECK (p.shaperCustomPattern() == before);
+    p.undoManager.redo();
+    CHECK (p.shaperCustomPattern() == steps);
 }
