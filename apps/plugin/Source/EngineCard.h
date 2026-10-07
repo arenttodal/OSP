@@ -66,11 +66,19 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override { cacheDirty = true; }
 
-    /** Where the recording is drawn (0..1 of it maps across this). */
+    /** Where the recording is drawn: the time window() maps across this. */
     juce::Rectangle<float> plotArea() const;
+
+    /** The part of the recording shown (seconds into the file): from where notes start
+        reading (the analysed onset) to where the sound ends (its trailing silence left
+        out) plus a short margin, so the sound always fills the display. */
+    juce::Range<double> window() const;
 
 private:
     void paintStatic (juce::Graphics&);
+    /** x of a time in the file (seconds), and of a fraction of the whole file (0..1). */
+    float xAtSeconds (double seconds, juce::Rectangle<float> plot) const;
+    float xAtFraction (double fraction, juce::Rectangle<float> plot) const;
     /** Seconds after the start of the file where a note starts reading (START applied). */
     double startSeconds() const;
 

@@ -278,6 +278,32 @@ juce::Rectangle<float> SourceDisplay::plotArea() const
     return getLocalBounds().toFloat().withTrimmedLeft (26.0f).withTrimmedRight (13.0f).withTrimmedTop (22.0f).withTrimmedBottom (12.0f + static_cast<float> (bottomInset));
 }
 
+juce::Range<double> SourceDisplay::window() const
+{
+    if (instrument == nullptr || instrument->durationSeconds <= 0.0)
+        return { 0.0, 1.0 };
+    const double duration = instrument->durationSeconds;
+    const double soundEnd = std::clamp (duration - instrument->analysis.envelope.trailingSilenceSeconds, 0.0, duration);
+    const double begin = std::clamp (instrument->startSeconds, 0.0, soundEnd);
+    // A little air after the last audible moment, so the fade-out reads as an ending.
+    const double end = std::min (duration, soundEnd + std::max (0.02, 0.03 * (soundEnd - begin)));
+    if (end - begin < 0.02)
+        return { 0.0, duration };   // (almost) nothing audible: show the whole file
+    return { begin, end };
+}
+
+float SourceDisplay::xAtSeconds (double seconds, juce::Rectangle<float> plot) const
+{
+    const auto w = window();
+    return plot.getX() + static_cast<float> ((seconds - w.getStart()) / std::max (1.0e-6, w.getLength())) * plot.getWidth();
+}
+
+float SourceDisplay::xAtFraction (double fraction, juce::Rectangle<float> plot) const
+{
+    const double duration = instrument != nullptr ? instrument->durationSeconds : 1.0;
+    return std::clamp (xAtSeconds (fraction * duration, plot), plot.getX(), plot.getRight());
+}
+
 double SourceDisplay::startSeconds() const
 {
     if (instrument == nullptr || instrument->durationSeconds <= 0.0)
@@ -314,9 +340,10 @@ void SourceDisplay::paint (juce::Graphics& g)
     {
         // Where grains may come from (SPREAD, half the length either side at 100 %), as a
         // translucent pane over the waveform; POS a fine bright line with a flare at the centre.
-        const float x = plot.getX() + view.position * plot.getWidth();
-        const float halfWidth = (view.spread * 0.5f + 0.004f) * plot.getWidth();
-        const auto pane = juce::Rectangle<float> (x - halfWidth, inner.getY() + 28.0f, 2.0f * halfWidth, inner.getHeight() - 46.0f).getIntersection (inner);
+        const float x = xAtFraction (view.position, plot);
+        const float left = xAtFraction (view.position - (view.spread * 0.5f + 0.004f), plot);
+        const float right = xAtFraction (view.position + (view.spread * 0.5f + 0.004f), plot);
+        const auto pane = juce::Rectangle<float> (left, inner.getY() + 28.0f, right - left, inner.getHeight() - 46.0f).getIntersection (inner);
         g.setColour (tones.light.withAlpha (0.09f));
         g.fillRect (pane);
         g.setColour (tones.light.withAlpha (0.18f));
@@ -331,7 +358,7 @@ void SourceDisplay::paint (juce::Graphics& g)
         // The grains playing now: small bright motes on their lanes, a faint read line each.
         for (const auto& grain : grains)
         {
-            const float gx = plot.getX() + grain.position * plot.getWidth();
+            const float gx = xAtFraction (grain.position, plot);
             const float level = std::clamp (grain.level, 0.0f, 1.0f);
             g.setColour (tones.light.withAlpha (0.05f + 0.18f * level));
             g.fillRect (juce::Rectangle<float> (gx - 0.5f, pane.getY(), 1.0f, pane.getHeight()));
@@ -347,7 +374,7 @@ void SourceDisplay::paint (juce::Graphics& g)
         // playing note reads, as bright as it is loud; no glow.
         for (const auto& head : heads)
         {
-            const float x = plot.getX() + head.position * plot.getWidth();
+            const float x = xAtFraction (head.position, plot);
             const float level = 0.3f + 0.7f * std::clamp (head.level, 0.0f, 1.0f);
             g.setColour (juce::Colour (0xfff07a3c).withAlpha (0.95f * level));
             g.fillRect (juce::Rectangle<float> (x - 0.6f, plot.getY(), 1.2f, plot.getHeight()));
@@ -417,10 +444,12 @@ void SourceDisplay::paintStatic (juce::Graphics& g)
     }
 
     const double duration = std::max (1.0e-3, instrument->durationSeconds);
+    const auto shown = window();
     const float mid = plot.getCentreY();
-    // Quiet grid: a line at every labelled time, a fainter one between; four rows.
+    // Quiet grid: a line at every labelled time (true times in the file), a fainter one
+    // between; four rows.
     {
-        const double step = gridStep (duration);
+        const double step = gridStep (shown.getLength());
         const auto inner = bounds.reduced (2.0f);
         for (int row = 1; row < 4; ++row)
         {
@@ -428,9 +457,13 @@ void SourceDisplay::paintStatic (juce::Graphics& g)
             g.fillRect (juce::Rectangle<float> (inner.getX(), inner.getY() + inner.getHeight() * static_cast<float> (row) / 4.0f, inner.getWidth(), 1.0f));
         }
         g.setFont (fonts::make (14.5f, fonts::Weight::regular, 0.02f));
-        for (double t = 0.5 * step; t < duration + step; t += 0.5 * step)
+        for (double t = 0.5 * step * std::ceil (shown.getStart() / (0.5 * step) + 1.0e-9); t < shown.getEnd() + step; t += 0.5 * step)
         {
-            const float x = plot.getX() + static_cast<float> (t / duration) * plot.getWidth();
+            if (t <= 1.0e-9)
+                continue;
+            const float x = xAtSeconds (t, plot);
+            if (x < inner.getX() + 2.0f)
+                continue;
             if (x > inner.getRight() - 2.0f)
                 break;
             const bool labelFits = x < inner.getRight() - 30.0f;
@@ -473,11 +506,18 @@ void SourceDisplay::paintStatic (juce::Graphics& g)
         float lo = 0.0f, hi = 0.0f, rms = 0.0f, bright = 0.0f;
     };
     std::vector<Column> cols (static_cast<std::size_t> (columns));
+    // The peak buckets under column c: the shown window's share of the whole file.
+    auto bucketRange = [&hi, &shown, duration, columns] (int c) {
+        const double size = static_cast<double> (hi.size());
+        auto at = [&] (int k) { return (shown.getStart() + shown.getLength() * k / columns) / duration * size; };
+        const auto first = std::min (hi.size() - 1, static_cast<std::size_t> (std::max (0.0, at (c))));
+        const auto last = std::max (first + 1, std::min (hi.size(), static_cast<std::size_t> (std::max (0.0, at (c + 1)))));
+        return std::pair<std::size_t, std::size_t> { first, last };
+    };
     Scatter pick { 0x51ed270bu };
     for (int c = 0; c < columns; ++c)
     {
-        const auto first = static_cast<std::size_t> (static_cast<double> (c) / columns * static_cast<double> (hi.size()));
-        const auto last = std::max (first + 1, std::min (hi.size(), static_cast<std::size_t> (static_cast<double> (c + 1) / columns * static_cast<double> (hi.size()))));
+        const auto [first, last] = bucketRange (c);
         Column col;
         double energy = 0.0, b = 0.0;
         // The peaks of the bucket at the column's centre (a short window, shorter than a
@@ -523,8 +563,7 @@ void SourceDisplay::paintStatic (juce::Graphics& g)
     for (int c = 0; c < columns; ++c)
     {
         const auto& col = cols[static_cast<std::size_t> (c)];
-        const auto first = static_cast<std::size_t> (static_cast<double> (c) / columns * static_cast<double> (hi.size()));
-        const auto last = std::max (first + 1, std::min (hi.size(), static_cast<std::size_t> (static_cast<double> (c + 1) / columns * static_cast<double> (hi.size()))));
+        const auto [first, last] = bucketRange (c);
         float trueLo = 0.0f, trueHi = 0.0f, onset = 0.0f;
         for (auto i = first; i < last; ++i)
         {
@@ -616,8 +655,8 @@ void SourceDisplay::paintStatic (juce::Graphics& g)
     {
         const auto& cont = instrument->model->original.continuation;
         const double frames = std::max<double> (1.0, static_cast<double> (instrument->model->original.source->numFrames()));
-        const float a = plot.getX() + static_cast<float> (cont.sustainStartFrame / frames) * plot.getWidth();
-        const float b = plot.getX() + static_cast<float> (cont.sustainEndFrame / frames) * plot.getWidth();
+        const float a = xAtFraction (cont.sustainStartFrame / frames, plot);
+        const float b = xAtFraction (cont.sustainEndFrame / frames, plot);
         const float y = bounds.getBottom() - 9.0f;
         g.setColour (colour::wellText.withAlpha (0.8f));
         g.fillRect (juce::Rectangle<float> (a, y, b - a, 1.2f));
@@ -627,7 +666,7 @@ void SourceDisplay::paintStatic (juce::Graphics& g)
     // START: a fine accent line from a small flag at the top to a dot at the foot.
     if (! view.granular)
     {
-        const float x = plot.getX() + static_cast<float> (startSeconds() / duration) * plot.getWidth();
+        const float x = std::clamp (xAtSeconds (startSeconds(), plot), plot.getX(), plot.getRight());
         g.setColour (juce::Colour (0x8c000000));
         if (view.reverse)
             g.fillRect (juce::Rectangle<float> (x, plot.getY(), plot.getRight() - x, plot.getHeight()));
