@@ -1896,6 +1896,16 @@ TEST_CASE ("plugin: canonical screenshots for visual review", "[.][canonical]")
         set ("reimagined", static_cast<float> (amount));
         shot ("29-reimagined-" + juce::String (amount) + ".png");
     }
+    // The REIMAGINED popover of layer A in each mode (75 %), anchored above its name.
+    set ("reimagined", 75.0f);
+    for (int mode = 0; mode < 5; ++mode)
+    {
+        set ("layerA.reimagined.mode", static_cast<float> (mode));
+        ui->openPopup (osp::plugin::OspAudioProcessorEditor::reimaginedPopup);
+        shot ("30-reimagined-" + juce::String (reimagined::modeName (reimagined::modeFromIndex (mode))).replace (" ", "-").toLowerCase() + ".png");
+        ui->closePopup();
+    }
+    set ("layerA.reimagined.mode", 0.0f);
     set ("reimagined", 18.0f);
     set ("layerB.sourceMode", 1.0f);
     set ("layerB.granular.position", 23.0f);
@@ -2615,4 +2625,171 @@ TEST_CASE ("plugin: MIX - a third layer joins an A/B mix at 0 and removing it ke
     q.pollLoads();
     CHECK (valueOf (q, "mix.x") == Approx (0.5f));
     CHECK (valueOf (q, "mix.y") == Approx (1.0f / 3.0f));
+}
+
+TEST_CASE ("plugin: REIMAGINED modes - stable IDs, every mode's settings saved per layer, older sessions as KALEIDOSCOPE", "[plugin][reimagined-modes]")
+{
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "a.wav", testsignals::vowel (midiToHz (57), 2.0, 48000.0, 3));
+    const auto b = writeSource (tmp.dir, "b.wav", testsignals::pluck (midiToHz (48), 2.0, 48000.0, 8, 0.7, 1));
+    OspAudioProcessor p;
+    // Every layer has the mode and all fifteen settings, under stable IDs (version hint 11).
+    for (int layer = 0; layer < 3; ++layer)
+        for (const auto& name : OspAudioProcessor::reimaginedModeNames())
+        {
+            const auto id = OspAudioProcessor::reimaginedModeParameterId (layer, name);
+            INFO (id);
+            auto* param = p.parameters.getParameter (id);
+            REQUIRE (param != nullptr);
+            CHECK (param->getVersionHint() == 11);
+        }
+    CHECK (OspAudioProcessor::reimaginedModeParameterId (1, "tapeFrame.age") == "layerB.reimagined.tapeFrame.age");
+    // Defaults: KALEIDOSCOPE at neutral FOCUS / SPREAD, and the spec's starting points.
+    CHECK (valueOf (p, "layerA.reimagined.mode") == Approx (0.0f));
+    CHECK (valueOf (p, "layerA.reimagined.kaleidoscope.focus") == Approx (50.0f));
+    CHECK (valueOf (p, "layerA.reimagined.kaleidoscope.spread") == Approx (50.0f));
+    CHECK (valueOf (p, "layerA.reimagined.tapeFrame.age") == Approx (35.0f));
+    CHECK (valueOf (p, "layerA.reimagined.tapeFrame.stability") == Approx (25.0f));
+    CHECK (valueOf (p, "layerA.reimagined.tapeFrame.frame") == Approx (1.0f));      // CLASSIC
+    CHECK (valueOf (p, "layerA.reimagined.toybox.motion") == Approx (30.0f));
+    CHECK (valueOf (p, "layerA.reimagined.toybox.digital") == Approx (40.0f));
+    CHECK (valueOf (p, "layerA.reimagined.toybox.play") == Approx (1.0f));          // TURN
+    CHECK (valueOf (p, "layerA.reimagined.mosaic.detail") == Approx (60.0f));
+    CHECK (valueOf (p, "layerA.reimagined.mosaic.motion") == Approx (45.0f));
+    CHECK (valueOf (p, "layerA.reimagined.mosaic.model") == Approx (1.0f));         // TEXTURED
+    CHECK (valueOf (p, "layerA.reimagined.mirage.clock") == Approx (45.0f));
+    CHECK (valueOf (p, "layerA.reimagined.mirage.filter") == Approx (50.0f));
+    CHECK (valueOf (p, "layerA.reimagined.mirage.tone") == Approx (0.0f));          // DARK
+
+    REQUIRE (p.addLayers ({ a, b }) == 2);
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    p.setParameterValue ("reimagined", 70.0f);
+    p.setParameterValue ("layerB.reimagined", 60.0f);
+    // A plays TAPE FRAME, B MOSAIC; settings of modes not playing are kept too.
+    p.setParameterValue ("layerA.reimagined.mode", 1.0f);
+    p.setParameterValue ("layerA.reimagined.tapeFrame.age", 80.0f);
+    p.setParameterValue ("layerA.reimagined.toybox.digital", 90.0f);
+    p.setParameterValue ("layerB.reimagined.mode", 3.0f);
+    p.setParameterValue ("layerB.reimagined.mosaic.model", 0.0f);
+    p.setParameterValue ("layerB.reimagined.kaleidoscope.focus", 20.0f);
+    juce::MemoryBlock state;
+    p.getStateInformation (state);
+    {
+        OspAudioProcessor q;
+        q.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+        REQUIRE (q.waitForLoads (30000));
+        q.pollLoads();
+        CHECK (valueOf (q, "layerA.reimagined.mode") == Approx (1.0f));
+        CHECK (valueOf (q, "layerA.reimagined.tapeFrame.age") == Approx (80.0f));
+        CHECK (valueOf (q, "layerA.reimagined.toybox.digital") == Approx (90.0f));
+        CHECK (valueOf (q, "layerB.reimagined.mode") == Approx (3.0f));
+        CHECK (valueOf (q, "layerB.reimagined.mosaic.model") == Approx (0.0f));
+        CHECK (valueOf (q, "layerB.reimagined.kaleidoscope.focus") == Approx (20.0f));
+        CHECK (valueOf (q, "layerC.reimagined.mode") == Approx (0.0f));
+        // Both modes play (and stay bounded) after recall.
+        const auto out = playNote (q, 57, 48000.0, 1.0);
+        double peak = 0.0;
+        for (const auto& ch : out.channels)
+            for (float x : ch)
+            {
+                CHECK (std::isfinite (x));
+                peak = std::max (peak, static_cast<double> (std::abs (x)));
+            }
+        CHECK (peak > 1.0e-3);
+        CHECK (peak < 2.0);
+    }
+    // A session from before the modes (state 8, no mode parameters) opens as KALEIDOSCOPE,
+    // whatever this instance had, with every mode's settings at their defaults.
+    if (auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize())))
+    {
+        for (int i = xml->getNumChildElements(); --i >= 0;)
+            if (xml->getChildElement (i)->getStringAttribute ("id").contains ("reimagined."))
+                xml->removeChildElement (xml->getChildElement (i), true);
+        xml->setAttribute ("stateVersion", 8);
+        juce::MemoryBlock older;
+        juce::AudioProcessor::copyXmlToBinary (*xml, older);
+        p.setStateInformation (older.getData(), static_cast<int> (older.getSize()));
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        for (int layer = 0; layer < 3; ++layer)
+        {
+            CHECK (valueOf (p, OspAudioProcessor::reimaginedModeParameterId (layer, "mode")) == Approx (0.0f));
+            CHECK (valueOf (p, OspAudioProcessor::reimaginedModeParameterId (layer, "kaleidoscope.focus")) == Approx (50.0f));
+            CHECK (valueOf (p, OspAudioProcessor::reimaginedModeParameterId (layer, "tapeFrame.age")) == Approx (35.0f));
+        }
+        CHECK (valueOf (p, "reimagined") == Approx (70.0f));   // the amounts are the session's
+        CHECK (valueOf (p, "layerB.reimagined") == Approx (60.0f));
+    }
+}
+
+TEST_CASE ("plugin: REIMAGINED modes - a mode edit converts a legacy patch, automation never does", "[plugin][reimagined-modes]")
+{
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "a.wav", testsignals::vowel (midiToHz (57), 2.0, 48000.0, 3));
+    OspAudioProcessor p;
+    p.setCurrentProgram (5);   // a factory starting state: legacy routing
+    REQUIRE_FALSE (p.isReimaginedPerLayer());
+    REQUIRE (p.addLayers ({ a }) == 1);
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    auto* mode = p.parameters.getParameter ("layerA.reimagined.mode");
+    REQUIRE (mode != nullptr);
+    // Host automation of the mode (no gesture), notes playing through the switches: no
+    // conversion, no crash, every block finite.
+    for (int m = 0; m < 5; ++m)
+    {
+        mode->setValueNotifyingHost (mode->convertTo0to1 (static_cast<float> (m)));
+        const auto out = playNote (p, 57 + m, 48000.0, 0.3, 128);
+        for (const auto& ch : out.channels)
+            for (float x : ch)
+                REQUIRE (std::isfinite (x));
+    }
+    CHECK_FALSE (p.isReimaginedPerLayer());
+    // The musician picks a mode (or turns a mode's setting): per layer from now on.
+    auto* age = p.parameters.getParameter ("layerA.reimagined.tapeFrame.age");
+    REQUIRE (age != nullptr);
+    age->beginChangeGesture();
+    age->setValueNotifyingHost (0.7f);
+    age->endChangeGesture();
+    CHECK (p.isReimaginedPerLayer());
+}
+
+TEST_CASE ("plugin: REIMAGINED popover - its name opens it above the card, a second click closes it", "[plugin][reimagined-modes][ui]")
+{
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "a.wav", testsignals::vowel (midiToHz (57), 2.0, 48000.0, 3));
+    const auto b = writeSource (tmp.dir, "b.wav", testsignals::pluck (midiToHz (48), 2.0, 48000.0, 8, 0.7, 1));
+    OspAudioProcessor p;
+    REQUIRE (p.addLayers ({ a, b }) == 2);
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (editor.get());
+    REQUIRE (ui != nullptr);
+    editor->setSize (1448, 1086);
+    ui->refreshNow();
+    using Editor = osp::plugin::OspAudioProcessorEditor;
+    for (int layer = 0; layer < 2; ++layer)
+    {
+        ui->openPopup (Editor::reimaginedPopup + layer);
+        ui->refreshNow();
+        CHECK (ui->openPopupIndex() == Editor::reimaginedPopup + layer);
+        ui->closePopup();
+        CHECK (ui->openPopupIndex() == -1);
+    }
+    // Layer C has no card: its popover does not open.
+    ui->openPopup (Editor::reimaginedPopup + 2);
+    CHECK (ui->openPopupIndex() == -1);
+    // Switching modes inside the popover keeps every mode's own values.
+    ui->openPopup (Editor::reimaginedPopup);
+    p.setParameterValue ("layerA.reimagined.tapeFrame.stability", 77.0f);
+    p.setParameterValue ("layerA.reimagined.mode", 1.0f);
+    ui->refreshNow();
+    p.setParameterValue ("layerA.reimagined.mode", 3.0f);
+    ui->refreshNow();
+    p.setParameterValue ("layerA.reimagined.mode", 1.0f);
+    ui->refreshNow();
+    CHECK (valueOf (p, "layerA.reimagined.tapeFrame.stability") == Approx (77.0f));
+    CHECK (ui->openPopupIndex() == Editor::reimaginedPopup);
 }

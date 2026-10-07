@@ -484,6 +484,22 @@ TEST_CASE ("reimagined modes: CPU", "[.][reimagined-cpu]")
         { "Granular + TAPE FRAME", { ReimaginedMode::tapeFrame }, 1, true },
         { "Granular + KALEIDOSCOPE", { ReimaginedMode::kaleidoscope }, 1, true },
     };
+    {
+        const auto& a = *vowel->reimagined;
+        std::size_t analysisBytes = sizeof (ReimaginedAnalysis) + a.tape.splices.capacity() * sizeof (ReimaginedAnalysis::TapeSplice)
+                                    + a.mosaic.frames.capacity() * sizeof (ReimaginedAnalysis::MosaicFrame);
+        std::cout << "memory: voice " << sizeof (InstrumentVoice) << " B (engines inline: tape " << sizeof (TapeFrameEngine) << ", toybox "
+                  << sizeof (ToyboxEngine) << ", mosaic " << sizeof (MosaicEngine) << ", mirage " << sizeof (MirageEngine) << "), "
+                  << InstrumentEngine::voiceSlots() << " voice slots; analysis per recording " << analysisBytes << " B ("
+                  << a.tape.splices.size() << " splices, " << a.mosaic.frames.size() << " frames)\n";
+        auto audio = testsignals::vowel (midiToHz (57), 3.0, 48000.0, 3);
+        const auto analysis = test::analyse (audio);
+        const auto base = instrument::buildComplete (audio, analysis, {}, false);
+        const auto t0 = std::chrono::steady_clock::now();
+        for (int i = 0; i < 5; ++i)
+            (void) analyseReimagined (audio, analysis, base->original.continuation, base->original.source->startFrame());
+        std::cout << "analysis time (3 s recording): " << 1000.0 * std::chrono::duration<double> (std::chrono::steady_clock::now() - t0).count() / 5.0 << " ms\n";
+    }
     for (const auto& c : cases)
     {
         auto s = settingsFor (ReimaginedMode::kaleidoscope, 1.0);

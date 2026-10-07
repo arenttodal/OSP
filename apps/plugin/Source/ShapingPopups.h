@@ -177,6 +177,8 @@ enum class MacroPopup { life, dynamics, character, movement, space };
 const juce::StringArray& popupParameterIds (MacroPopup macro);
 /** The macro popups (MacroPopups.cpp): each with its own visualisation of what it does. */
 std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, OspAudioProcessor& processor);
+/** REIMAGINED (one per layer): the mode, its picture and its own two or three settings. */
+std::unique_ptr<MiniPanel> createReimaginedPopup (OspAudioProcessor& processor, int layer);
 /** Advanced (spec §13): tuning, bend, pitch character, MPE, reseed. */
 std::unique_ptr<MiniPanel> createAdvancedPopup (OspAudioProcessor& processor);
 

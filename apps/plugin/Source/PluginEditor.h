@@ -116,6 +116,7 @@ public:
     /** Popups: 0-4 the macros (LIFE..SPACE), 5 Advanced; -1 closes. Public for tests and snapshots. */
     static constexpr int advancedPopup = 5;
     static constexpr int mixPopup = 6;   ///< the large three-layer mix
+    static constexpr int reimaginedPopup = 7;   ///< 7, 8, 9: layer A's, B's, C's REIMAGINED modes
     void openPopup (int which);
     void closePopup();
     int openPopupIndex() const noexcept { return popupIndex; }

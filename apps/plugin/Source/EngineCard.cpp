@@ -761,7 +761,7 @@ LayerKnob::LayerKnob (OspAudioProcessor& p, int layer, const juce::String& contr
     if (parameter != nullptr)
     {
         dial->setDoubleClickReturnValue (true, parameter->convertFrom0to1 (parameter->getDefaultValue()));
-        dial->setTooltip (creative ? juce::String ("Reimagined: how far this source moves from its original character")
+        dial->setTooltip (creative ? juce::String ("Transform this source using the selected Reimagined engine.\nClick the label to choose a mode.")
                                    : parameter->getName (64) + (control == "tune" ? juce::String (" (Alt-drag: fine)") : juce::String()));
     }
     dial->onValueChange = [this] { repaint(); };   // also when automation or LINK moves it (the attachment moves the dial)
@@ -787,18 +787,76 @@ void LayerKnob::resized()
     dial->setBounds (juce::Rectangle<float> (92.0f * k, 92.0f * k).withCentre ({ 0.5f * static_cast<float> (getWidth()), 61.0f * k }).getSmallestIntegerContainer());
 }
 
+juce::Font LayerKnob::labelFont() const
+{
+    const float k = static_cast<float> (getHeight()) / 125.0f;
+    // REIMAGINED: a touch tighter so it sits in the row like the short names.
+    return creative ? fonts::make (14.5f * k, fonts::Weight::medium, 0.02f) : type::controlLabel (k);
+}
+
+juce::Rectangle<float> LayerKnob::labelBounds() const
+{
+    const float k = static_cast<float> (getHeight()) / 125.0f;
+    const float textWidth = juce::GlyphArrangement::getStringWidth (labelFont(), caption);
+    return juce::Rectangle<float> (0.5f * (static_cast<float> (getWidth()) - textWidth) - 2.0f * k, 2.0f * k, textWidth + 14.0f * k, 22.0f * k);
+}
+
+void LayerKnob::setLabelOpen (bool open)
+{
+    if (labelOpen != open)
+    {
+        labelOpen = open;
+        repaint();
+    }
+}
+
+void LayerKnob::mouseMove (const juce::MouseEvent& e)
+{
+    const bool over = creative && labelBounds().contains (e.position);
+    if (over != labelHover)
+    {
+        labelHover = over;
+        setMouseCursor (over ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+        repaint();
+    }
+}
+
+void LayerKnob::mouseExit (const juce::MouseEvent&)
+{
+    if (labelHover)
+    {
+        labelHover = false;
+        setMouseCursor (juce::MouseCursor::NormalCursor);
+        repaint();
+    }
+}
+
+void LayerKnob::mouseUp (const juce::MouseEvent& e)
+{
+    if (creative && labelBounds().contains (e.position) && ! e.mouseWasDraggedSinceMouseDown() && onLabelClick != nullptr)
+        onLabelClick();
+}
+
 void LayerKnob::paint (juce::Graphics& g)
 {
     const float k = static_cast<float> (getHeight()) / 125.0f;
     const auto w = static_cast<float> (getWidth());
-    g.setColour (design::colour::text.withAlpha (creative ? 0.97f : 0.9f));
-    // REIMAGINED: a touch tighter so it sits in the row like the short names.
-    const auto labelFont = creative ? fonts::make (14.5f * k, fonts::Weight::medium, 0.02f) : type::controlLabel (k);
-    g.setFont (labelFont);
+    // REIMAGINED's name opens its modes: hover darkens and underlines it, open keeps the line.
+    g.setColour (creative && (labelHover || labelOpen) ? juce::Colours::black : design::colour::text.withAlpha (creative ? 0.97f : 0.9f));
+    const auto font = labelFont();
+    g.setFont (font);
     const auto labelArea = juce::Rectangle<float> (0.0f, 2.0f * k, w, 22.0f * k);
     g.drawText (caption, labelArea, juce::Justification::centred, false);
+    if (creative && (labelHover || labelOpen))
+    {
+        const float textWidth = juce::GlyphArrangement::getStringWidth (font, caption);
+        const float amount = parameter != nullptr ? parameter->getValue() : 0.0f;
+        g.setColour (labelOpen ? design::colour::reimagined (amount) : palette::text.withAlpha (0.5f));
+        g.fillRect (0.5f * (w - textWidth), labelArea.getCentreY() + 0.5f * font.getHeight() + 1.0f * k, textWidth, 1.2f);
+    }
     if (creative)
     {
+        const auto labelFont = font;
         // A small light after the name carrying the whole spectral continuum (rust at its
         // top left through moss and blue to mauve), like the arc at full travel.
         const float textWidth = juce::GlyphArrangement::getStringWidth (labelFont, caption);
@@ -955,6 +1013,10 @@ EngineCard::EngineCard (OspAudioProcessor& p, int layer) : processor (p), layerI
         knobs[i] = std::make_unique<LayerKnob> (processor, layer, controls[i].first, controls[i].second);
         addAndMakeVisible (*knobs[i]);
     }
+    knobs[4]->onLabelClick = [this] {
+        if (onReimagined != nullptr)
+            onReimagined (layerIndex);
+    };
     const std::array<std::pair<const char*, icons::Kind>, 4> mods { { { "link", icons::Kind::link }, { "reverse", icons::Kind::reverse },
                                                                        { "loop", icons::Kind::loop }, { "follow", icons::Kind::follow } } };
     for (std::size_t i = 0; i < modifiers.size(); ++i)
@@ -994,6 +1056,17 @@ EngineCard::EngineCard (OspAudioProcessor& p, int layer) : processor (p), layerI
     addMouseListener (this, true);
     updateMode();
     refresh();
+}
+
+juce::Rectangle<int> EngineCard::reimaginedLabelBounds() const
+{
+    const auto& k = *knobs[4];
+    return k.labelBounds().translated (static_cast<float> (k.getX()), static_cast<float> (k.getY())).getSmallestIntegerContainer();
+}
+
+void EngineCard::setReimaginedOpen (bool open)
+{
+    knobs[4]->setLabelOpen (open);
 }
 
 EngineCard::~EngineCard()

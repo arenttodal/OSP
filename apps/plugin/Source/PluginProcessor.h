@@ -103,6 +103,10 @@ public:
     /** A layer's Original <-> Reimagined: A's is the instrument's `reimagined` (the ID older
         sessions and automation know); B and C have their own. */
     static juce::String reimaginedParameterId (int layer) { return layer <= 0 ? juce::String ("reimagined") : layerParameterId (layer, "reimagined"); }
+    /** REIMAGINED modes (version hint 11): a layer's mode and every mode's own settings,
+        "layerA.reimagined.mode", "layerA.reimagined.tapeFrame.age", ... in this order. */
+    static const juce::StringArray& reimaginedModeNames();
+    static juce::String reimaginedModeParameterId (int layer, const juce::String& name) { return layerParameterId (layer, "reimagined." + name); }
 
     // Instrument loading (message thread)
     void loadFile (const juce::File& file, int layer = -1);
@@ -251,7 +255,7 @@ public:
         7: per-layer Reimagined amounts (B and C start from A's).
         8: Reimagined routing (`reimaginedRouting`: "perLayer" or "legacyGlobal"); a state
            without it was made before per-layer routing and keeps the legacy shared stage. */
-    static constexpr int stateVersion = 8;
+    static constexpr int stateVersion = 9;   ///< 9: REIMAGINED modes (older sessions open as KALEIDOSCOPE)
 
     /**
         Reimagined routing (see osp::ReimaginedRouting). New patches (a fresh instance,
@@ -274,7 +278,8 @@ private:
     void parameterValueChanged (int, float) override {}
     void parameterGestureChanged (int parameterIndex, bool gestureIsStarting) override;
     std::atomic<bool> perLayerReimagined { true };
-    std::array<juce::AudioProcessorParameter*, 3> reimaginedParameters {};
+    /** Every layer's REIMAGINED amount, mode and mode setting: a gesture on any converts a legacy patch. */
+    std::vector<juce::AudioProcessorParameter*> reimaginedParameters;
 
     struct Layer
     {
@@ -390,6 +395,8 @@ private:
         std::array<float, 8> lastControls { -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f };
         std::atomic<float>* reimagined = nullptr;   ///< B and C (A follows the instrument's)
         float lastReimagined = -1.0e9f;
+        std::array<std::atomic<float>*, 15> modes {};   ///< in reimaginedModeNames() order
+        std::array<float, 15> lastModes {};
     };
     std::atomic<float>* mixXParam = nullptr;
     std::atomic<float>* mixYParam = nullptr;

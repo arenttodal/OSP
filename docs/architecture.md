@@ -235,6 +235,43 @@ compiles the I/O sources with the plugin's own JUCE settings.
   bend, mod wheel (MOTION), aftertouch / channel pressure (intensity), CC74 (timbre),
   CC 20–25 (macros), MPE lower zone (per-note bend ±48 st, pressure, slide).
 
+## REIMAGINED modes
+
+Each layer's REIMAGINED has a mode (`ReimaginedSettings` in `LayerSettings`): KALEIDOSCOPE,
+TAPE FRAME, TOYBOX, MOSAIC, MIRAGE. Report: `docs/reports/reimagined-modes.md`.
+
+```
+ stage 2 (worker): analyseReimagined -> ReimaginedAnalysis (immutable, in the model)
+                   TAPE FRAME splice map from the continuation's matched jumps (no audio copy)
+                   MOSAIC 16-32 harmonic frames: 48 partials, inharmonicity, 6 residual bands
+ note-on: the layer's mode (and amount > 0) picks the voice's engine; the voice keeps it
+ voice:   KALEIDOSCOPE   native read path + shapeFor's per-voice part (unchanged)
+          other modes    renderMode(): ReimaginedVoiceEngine::render (n <= 32) between the
+                         voice's control updates, then the same envelope, shelves, CHARACTER,
+                         level and pan
+ layer:   ReimaginedStage only for KALEIDOSCOPE layers (others fade it out)
+```
+
+- **One contract** (`engine/ReimaginedEngine.h`): `prepare / start / release / control /
+  stepFactor / wantsDryRead / render / finished`. TAPE FRAME, TOYBOX and MIRAGE read the
+  recording themselves; MOSAIC takes the voice's plain read (`dry`) while it crossfades
+  into its reconstruction, and stops asking for it once it has taken over. In Granular
+  mode the grains are the engines' input.
+- **Why KALEIDOSCOPE stays the voice's own path.** It is the algorithm every older patch
+  was made with; moving it behind the interface would risk a sonic change for no gain.
+  Its amount mapping moved unchanged into `KaleidoscopeEngine.h` (null-tested sample for
+  sample); FOCUS and SPREAD are exactly neutral at 0.5.
+- **Preallocated.** One instance of each engine lives inline in every voice (~7.8 KB of
+  its 16.6 KB); `start()` returns false when the mode's analysis is missing or failed and
+  the note plays the recording. A note at 0 % gets no engine at all (exact original path).
+- **Switching** applies to new notes; sounding notes keep their engine. Sub-settings and
+  the amount are read live at control rate from the slot's `ReimaginedLive`.
+- **Plugin.** Per layer, version hint 11: `layerX.reimagined.mode` and
+  `layerX.reimagined.<mode>.<setting>` (15 per layer). State 9; older states load
+  KALEIDOSCOPE at its defaults. A gesture on any of them converts a legacy-routed patch
+  to per-layer routing, like the amounts. The popover (`ReimaginedPanel`, MacroPopups.cpp)
+  opens from the card's REIMAGINED name (editor popup 7 + layer).
+
 ## Adaptive layers (1–3) and the Granular source mode
 
 `InstrumentEngine` holds three source layers (A, B, C) in a fixed `std::array<Slot, 3>`:

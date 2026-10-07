@@ -266,6 +266,41 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
             layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { reimaginedParameterId (layer), 8 }, layerName (layer) + " Reimagined",
                                                                      unit, 0.0f, reimaginedText));
     }
+    // REIMAGINED modes (version hint 11): every layer's mode and each mode's own settings,
+    // all remembered while another mode plays. The defaults are KALEIDOSCOPE at neutral
+    // FOCUS / SPREAD: the Reimagined every older session was made with.
+    {
+        const ReimaginedSettings rd;
+        const auto percentText = juce::AudioParameterFloatAttributes().withLabel ("%").withStringFromValueFunction ([] (float v, int) {
+            return juce::String (juce::roundToInt (v)) + " %";
+        });
+        for (int layer = 0; layer < numLayers; ++layer)
+        {
+            const auto prefix = layerName (layer) + " ";
+            auto id = [layer] (const char* n) { return juce::ParameterID { reimaginedModeParameterId (layer, n), 11 }; };
+            auto modeNumber = [&] (const char* n, const juce::String& name, double value) {
+                layout.add (std::make_unique<juce::AudioParameterFloat> (id (n), prefix + name, unit, static_cast<float> (100.0 * value), percentText));
+            };
+            auto modeChoice = [&] (const char* n, const juce::String& name, const juce::StringArray& options, int value) {
+                layout.add (std::make_unique<juce::AudioParameterChoice> (id (n), prefix + name, options, value));
+            };
+            modeChoice ("mode", "Reimagined Mode", juce::StringArray { "Kaleidoscope", "Tape Frame", "Toybox", "Mosaic", "Mirage" }, 0);
+            modeNumber ("kaleidoscope.focus", "Kaleidoscope Focus", rd.kaleidoscope.focus);
+            modeNumber ("kaleidoscope.spread", "Kaleidoscope Spread", rd.kaleidoscope.spread);
+            modeNumber ("tapeFrame.age", "Tape Frame Age", rd.tapeFrame.age);
+            modeNumber ("tapeFrame.stability", "Tape Frame Stability", rd.tapeFrame.stability);
+            modeChoice ("tapeFrame.frame", "Tape Frame Length", juce::StringArray { "Short", "Classic", "Long" }, static_cast<int> (rd.tapeFrame.frame));
+            modeNumber ("toybox.motion", "Toybox Motion", rd.toybox.motion);
+            modeNumber ("toybox.digital", "Toybox Digital", rd.toybox.digital);
+            modeChoice ("toybox.play", "Toybox Play", juce::StringArray { "Fwd", "Turn", "Chaos" }, static_cast<int> (rd.toybox.play));
+            modeNumber ("mosaic.detail", "Mosaic Detail", rd.mosaic.detail);
+            modeNumber ("mosaic.motion", "Mosaic Motion", rd.mosaic.motion);
+            modeChoice ("mosaic.model", "Mosaic Model", juce::StringArray { "Pure", "Textured" }, static_cast<int> (rd.mosaic.model));
+            modeNumber ("mirage.clock", "Mirage Clock", rd.mirage.clock);
+            modeNumber ("mirage.filter", "Mirage Filter", rd.mirage.filter);
+            modeChoice ("mirage.tone", "Mirage Tone", juce::StringArray { "Dark", "Open" }, static_cast<int> (rd.mirage.tone));
+        }
+    }
     // The layers' Original <-> Reimagined thumbs move together (keeping their offsets) while
     // linked; a UI behaviour, stored with the session (version hint 9).
     layout.add (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { "reimaginedLink", 9 }, "Reimagined Link", true));
@@ -304,6 +339,17 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
 const juce::StringArray& OspAudioProcessor::layerControlNames()
 {
     static const juce::StringArray names { "start", "tune", "pan", "level", "link", "reverse", "loop", "follow" };
+    return names;
+}
+
+const juce::StringArray& OspAudioProcessor::reimaginedModeNames()
+{
+    static const juce::StringArray names { "mode",
+                                           "kaleidoscope.focus", "kaleidoscope.spread",
+                                           "tapeFrame.age", "tapeFrame.stability", "tapeFrame.frame",
+                                           "toybox.motion", "toybox.digital", "toybox.play",
+                                           "mosaic.detail", "mosaic.motion", "mosaic.model",
+                                           "mirage.clock", "mirage.filter", "mirage.tone" };
     return names;
 }
 
@@ -397,13 +443,22 @@ OspAudioProcessor::OspAudioProcessor()
             lp.controls[static_cast<std::size_t> (i)] = parameters.getRawParameterValue (layerParameterId (layer, layerControlNames()[i]));
         if (layer > 0)
             lp.reimagined = parameters.getRawParameterValue (reimaginedParameterId (layer));
+        for (int i = 0; i < reimaginedModeNames().size(); ++i)
+            lp.modes[static_cast<std::size_t> (i)] = parameters.getRawParameterValue (reimaginedModeParameterId (layer, reimaginedModeNames()[i]));
+        lp.lastModes.fill (-1.0e9f);
     }
     for (int layer = 0; layer < numLayers; ++layer)
-        if (auto* p = parameters.getParameter (reimaginedParameterId (layer)))
-        {
-            reimaginedParameters[static_cast<std::size_t> (layer)] = p;
-            p->addListener (this);
-        }
+    {
+        juce::StringArray ids { reimaginedParameterId (layer) };
+        for (const auto& name : reimaginedModeNames())
+            ids.add (reimaginedModeParameterId (layer, name));
+        for (const auto& pid : ids)
+            if (auto* p = parameters.getParameter (pid))
+            {
+                reimaginedParameters.push_back (p);
+                p->addListener (this);
+            }
+    }
     mixXParam = parameters.getRawParameterValue (ids::mixX);
     mixYParam = parameters.getRawParameterValue (ids::mixY);
     decayParam = parameters.getRawParameterValue (ids::decay);
@@ -572,10 +627,14 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
         for (std::size_t i = 0; i < controls.size(); ++i)
             controls[i] = lp.controls[i]->load();
         const float ownReimagined = lp.reimagined != nullptr ? lp.reimagined->load() : -1.0f;
-        if (force || controls != lp.lastControls || ! juce::exactlyEqual (ownReimagined, lp.lastReimagined))
+        std::array<float, 15> modes {};
+        for (std::size_t i = 0; i < modes.size(); ++i)
+            modes[i] = lp.modes[i]->load();
+        if (force || controls != lp.lastControls || ! juce::exactlyEqual (ownReimagined, lp.lastReimagined) || modes != lp.lastModes)
         {
             lp.lastControls = controls;
             lp.lastReimagined = ownReimagined;
+            lp.lastModes = modes;
             LayerSettings ls;
             ls.start = 0.01 * controls[0];
             ls.tuneSemitones = controls[1];
@@ -585,6 +644,14 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
             ls.loop = controls[6] >= 0.5f;
             ls.follow = controls[7] >= 0.5f;
             ls.reimagined = ownReimagined < 0.0f ? -1.0 : 0.01 * ownReimagined;   // A follows the instrument's amount
+            auto& rs = ls.reimaginedSettings;
+            auto pick = [&modes] (std::size_t i) { return static_cast<int> (std::lround (modes[i])); };
+            rs.mode = reimagined::modeFromIndex (pick (0));
+            rs.kaleidoscope = { 0.01 * modes[1], 0.01 * modes[2] };
+            rs.tapeFrame = { 0.01 * modes[3], 0.01 * modes[4], static_cast<TapeFrameLength> (std::clamp (pick (5), 0, 2)) };
+            rs.toybox = { 0.01 * modes[6], 0.01 * modes[7], static_cast<ToyboxPlay> (std::clamp (pick (8), 0, 2)) };
+            rs.mosaic = { 0.01 * modes[9], 0.01 * modes[10], static_cast<MosaicModel> (std::clamp (pick (11), 0, 1)) };
+            rs.mirage = { 0.01 * modes[12], 0.01 * modes[13], static_cast<MirageTone> (std::clamp (pick (14), 0, 1)) };
             engineSettings.layer[static_cast<std::size_t> (layer)] = ls;
             engine.setLayerSettings (layer, ls);
         }
@@ -1092,6 +1159,9 @@ void OspAudioProcessor::resetLayerControls (int layer)
             p->setValueNotifyingHost (p->getDefaultValue());
     if (layer > 0)   // a free slot's Reimagined returns to the instrument's (A's)
         setParameterValue (reimaginedParameterId (layer), parameterValue (reimaginedParameterId (0)));
+    for (const auto& name : reimaginedModeNames())   // and its mode to KALEIDOSCOPE
+        if (auto* p = parameters.getParameter (reimaginedModeParameterId (layer, name)))
+            p->setValueNotifyingHost (p->getDefaultValue());
     setRootOverride (std::nullopt, layer);
 }
 
@@ -1104,6 +1174,8 @@ OspAudioProcessor::LayerSnapshot OspAudioProcessor::captureLayer (int layer) con
         for (const auto& name : *names)
             snapshot.values.set (name, parameterValue (layerParameterId (layer, name)));
     snapshot.values.set ("reimagined", parameterValue (reimaginedParameterId (layer)));
+    for (const auto& name : reimaginedModeNames())
+        snapshot.values.set ("reimagined." + name, parameterValue (reimaginedModeParameterId (layer, name)));
     const auto& slot = layers[static_cast<std::size_t> (layer)];
     snapshot.latestByLoad = slot.latestByLoad;
     snapshot.lastPublishedLoad = slot.lastPublishedLoad;
@@ -1117,6 +1189,9 @@ void OspAudioProcessor::applyLayer (int layer, const LayerSnapshot& snapshot)
         for (const auto& name : *names)
             setParameterValue (layerParameterId (layer, name), snapshot.values.getWithDefault (name, parameterValue (layerParameterId (layer, name))));
     setParameterValue (reimaginedParameterId (layer), snapshot.values.getWithDefault ("reimagined", parameterValue (reimaginedParameterId (layer))));
+    for (const auto& name : reimaginedModeNames())
+        setParameterValue (reimaginedModeParameterId (layer, name),
+                           snapshot.values.getWithDefault ("reimagined." + name, parameterValue (reimaginedModeParameterId (layer, name))));
     if (snapshot.instrument == nullptr)
     {
         clearLayer (layer);
@@ -1811,6 +1886,16 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml, bool setting
         const float amount = parameterValue (reimaginedParameterId (0));
         for (int layer = 1; layer < numLayers; ++layer)
             setParameterValue (reimaginedParameterId (layer), amount);
+    }
+
+    if (savedVersion < 9)
+    {
+        // Before the REIMAGINED modes every layer played KALEIDOSCOPE (the one algorithm) at
+        // its neutral FOCUS / SPREAD, and every other mode starts from its defaults.
+        for (int layer = 0; layer < numLayers; ++layer)
+            for (const auto& name : reimaginedModeNames())
+                if (auto* p = parameters.getParameter (reimaginedModeParameterId (layer, name)))
+                    p->setValueNotifyingHost (p->getDefaultValue());
     }
 
     if (settingsOnly)

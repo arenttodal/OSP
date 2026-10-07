@@ -94,6 +94,11 @@ namespace
             identity = design::colour::macroOnDark (m);
             repaint();
         }
+        void setIdentityColour (juce::Colour c)
+        {
+            identity = c;
+            repaint();
+        }
 
     protected:
         juce::Colour identity { 0xffe8692a };
@@ -958,6 +963,12 @@ namespace
               identity (macro), accent (design::colour::macro (macro))
         {
         }
+        /** A popover without a macro identity of its own (REIMAGINED: the aurora at its amount). */
+        MacroPanel (OspAudioProcessor& p, juce::String popupTitle, int width, int displayHeight, juce::Colour colour)
+            : MiniPanel (std::move (popupTitle)), processor (p), panelWidth (width), visualHeight (displayHeight),
+              identity (design::colour::Macro::life), accent (colour), ownColour (true)
+        {
+        }
 
         bool compact() const override { return true; }
 
@@ -982,7 +993,10 @@ namespace
         void setVisual (std::unique_ptr<Visual> v)
         {
             visual = std::move (v);
-            visual->setIdentity (identity);
+            if (ownColour)
+                visual->setIdentityColour (accent.brighter (0.2f));
+            else
+                visual->setIdentity (identity);
             addAndMakeVisible (*visual);
         }
         MiniKnob& knob (bool secondary, const char* id, const char* caption, MiniKnob::Formatter f)
@@ -1050,6 +1064,7 @@ namespace
         int visualHeight;
         design::colour::Macro identity;
         juce::Colour accent;   ///< the macro's identity (its knobs' arcs, the chosen mode)
+        bool ownColour = false;
         std::unique_ptr<ValueSelector> modeSelector;
         std::unique_ptr<SegmentedControl> modeTabs;
         std::unique_ptr<Visual> visual;
@@ -1286,6 +1301,590 @@ namespace
         std::vector<std::unique_ptr<ValueSelector>> selectors;
         std::unique_ptr<NewTakesButton> newTakes;
     };
+
+    //==========================================================================
+    // REIMAGINED: each mode's own picture of what it does to this layer's recording, drawn
+    // from the recording's analysis (tape, harmonic frames), its waveform overview and the
+    // live settings, in the aurora palette biased per mode.
+    class ReimaginedVisual final : public Visual
+    {
+    public:
+        ReimaginedVisual (OspAudioProcessor& p, int l) : processor (p), layer (l) {}
+
+        void modeChanged() { transition(); }
+
+    private:
+        bool native() const override { return true; }
+        bool animates() const override { return true; }   // stability, travel and the heads move
+
+        float number (const char* name) const
+        {
+            if (auto* p = processor.parameters.getParameter (OspAudioProcessor::reimaginedModeParameterId (layer, name)))
+                return p->getValue();   // 0..100 % as 0..1
+            return 0.5f;
+        }
+        int choice (const char* name) const
+        {
+            if (auto* p = processor.parameters.getParameter (OspAudioProcessor::reimaginedModeParameterId (layer, name)))
+                return juce::roundToInt (p->convertFrom0to1 (p->getValue()));
+            return 0;
+        }
+        float amount() const
+        {
+            if (auto* p = processor.parameters.getParameter (OspAudioProcessor::reimaginedParameterId (layer)))
+                return p->getValue();
+            return 0.0f;
+        }
+        static double now() { return juce::Time::getMillisecondCounterHiRes() * 0.001; }
+        static juce::Colour aurora (float t) { return design::colour::reimagined (juce::jlimit (0.0f, 1.0f, t)); }
+
+        /** The recording's loudness over its length (0..1), sampled at `n` points. */
+        std::vector<float> envelope (const LoadedInstrument* inst, int n) const
+        {
+            std::vector<float> out (static_cast<std::size_t> (n), 0.0f);
+            if (inst == nullptr || inst->peakRms.empty())
+            {
+                for (int i = 0; i < n; ++i)
+                {
+                    const float x = static_cast<float> (i) / static_cast<float> (n - 1);
+                    out[static_cast<std::size_t> (i)] = std::min (1.0f, 12.0f * x) * (0.75f + 0.25f * std::cos (6.0f * x));
+                }
+                return out;
+            }
+            const auto& rms = inst->peakRms;
+            float peak = 1.0e-6f;
+            for (float v : rms)
+                peak = std::max (peak, v);
+            for (int i = 0; i < n; ++i)
+            {
+                const auto at = static_cast<std::size_t> (std::min<double> (rms.size() - 1, static_cast<double> (i) / (n - 1) * (rms.size() - 1)));
+                out[static_cast<std::size_t> (i)] = rms[at] / peak;
+            }
+            return out;
+        }
+
+        void status (juce::Graphics& g, juce::Rectangle<float> r, const juce::String& text) const
+        {
+            g.setColour (juce::Colours::white.withAlpha (0.55f));
+            g.setFont (fonts::make (8.5f, fonts::Weight::regular, 0.08f));
+            g.drawText (text, r.reduced (8.0f, 5.0f), juce::Justification::topLeft, false);
+        }
+
+        void paintVisual (juce::Graphics& g, juce::Rectangle<float> r) override
+        {
+            const auto inst = processor.currentInstrument (layer);
+            const auto* model = inst != nullptr ? inst->model.get() : nullptr;
+            const auto* analysis = model != nullptr ? model->reimagined.get() : nullptr;
+            const auto plot = r.reduced (10.0f, 8.0f);
+            switch (reimagined::modeFromIndex (choice ("mode")))
+            {
+                case ReimaginedMode::kaleidoscope: kaleidoscope (g, plot, inst.get()); break;
+                case ReimaginedMode::tapeFrame:
+                    tapeFrame (g, plot, inst.get(), analysis);
+                    if (model != nullptr && analysis == nullptr)
+                        status (g, r, juce::String::fromUTF8 ("ANALYZING\xe2\x80\xa6"));
+                    else if (analysis != nullptr && ! analysis->tape.ready)
+                        status (g, r, "PLAYS THE RECORDING");
+                    break;
+                case ReimaginedMode::toybox: toybox (g, plot, inst.get()); break;
+                case ReimaginedMode::mosaic:
+                    mosaic (g, plot, inst.get(), analysis);
+                    if (model != nullptr && analysis == nullptr)
+                        status (g, r, juce::String::fromUTF8 ("ANALYZING\xe2\x80\xa6"));
+                    else if (analysis != nullptr && ! analysis->mosaic.ready)
+                        status (g, r, "NO STABLE PITCH: PLAYS THE RECORDING");
+                    break;
+                case ReimaginedMode::mirage: mirage (g, plot, analysis); break;
+            }
+        }
+
+        // KALEIDOSCOPE: one source form refracting into related traces. They overlap at low
+        // amounts and part at high ones; FOCUS bends their shape away from the source, SPREAD
+        // sets how many there are and how far apart.
+        void kaleidoscope (juce::Graphics& g, juce::Rectangle<float> r, const LoadedInstrument* inst) const
+        {
+            const float a = amount(), focus = number ("kaleidoscope.focus"), spread = number ("kaleidoscope.spread");
+            constexpr int n = 120;
+            // The source's form, smoothed (a refraction of its shape, not of every grain).
+            const auto raw = envelope (inst, n);
+            std::vector<float> env (raw.size());
+            for (int i = 0; i < n; ++i)
+            {
+                float sum = 0.0f;
+                int count = 0;
+                for (int j = std::max (0, i - 4); j <= std::min (n - 1, i + 4); ++j, ++count)
+                    sum += raw[static_cast<std::size_t> (j)];
+                env[static_cast<std::size_t> (i)] = sum / static_cast<float> (count);
+            }
+            const int traces = 3 + juce::roundToInt (2.0f * spread);
+            const float h = 0.34f * r.getHeight();
+            const float centreY = r.getCentreY() + 0.16f * r.getHeight();   // the form sits low, refracting upwards
+            const float abstract = a * (0.25f + 0.75f * focus);
+            const auto t = static_cast<float> (now());
+            for (int k = traces - 1; k >= 0; --k)
+            {
+                const float o = static_cast<float> (k) - 0.5f * static_cast<float> (traces - 1);
+                const float rel = traces > 1 ? o / (0.5f * static_cast<float> (traces - 1)) : 0.0f;   // -1..1
+                const float shift = rel * a * (0.3f + 0.7f * spread) * 0.3f * r.getHeight();
+                juce::Path line;
+                for (int i = 0; i < n; ++i)
+                {
+                    const float x = static_cast<float> (i) / (n - 1);
+                    const float ripple = std::sin (x * (7.0f + 3.0f * static_cast<float> (k)) + 0.5f * t + static_cast<float> (k)) * 0.5f + 0.5f;
+                    const float v = env[static_cast<std::size_t> (i)] * (1.0f - 0.45f * abstract) + 0.45f * abstract * ripple * env[static_cast<std::size_t> (i)];
+                    const juce::Point<float> pt (r.getX() + x * r.getWidth(), centreY + shift - v * h);
+                    if (i == 0)
+                        line.startNewSubPath (pt);
+                    else
+                        line.lineTo (pt);
+                }
+                const bool centre = std::abs (rel) < 0.01f;
+                const float hue = 0.5f + 0.5f * rel * (0.12f + 0.88f * a);
+                g.setColour (aurora (hue).withAlpha (centre ? 0.95f : 0.3f + 0.45f * a));
+                g.strokePath (line, juce::PathStrokeType (centre ? 1.6f : 1.2f, juce::PathStrokeType::curved));
+            }
+            // The source itself, faintly mirrored below: what every trace refracts.
+            juce::Path base;
+            for (int i = 0; i < n; ++i)
+            {
+                const float x = r.getX() + static_cast<float> (i) / (n - 1) * r.getWidth();
+                const float y = centreY + 0.4f * h * env[static_cast<std::size_t> (i)];
+                i == 0 ? base.startNewSubPath (x, y) : base.lineTo (x, y);
+            }
+            g.setColour (juce::Colours::white.withAlpha (0.12f));
+            g.strokePath (base, juce::PathStrokeType (1.0f));
+        }
+
+        // TAPE FRAME: the finite frame of tape. FRAME sets its length, AGE darkens and softens
+        // what comes late, STABILITY moves the trace, the amount brings in faint ghost passes.
+        void tapeFrame (juce::Graphics& g, juce::Rectangle<float> r, const LoadedInstrument* inst, const ReimaginedAnalysis* analysis) const
+        {
+            const float a = amount(), age = number ("tapeFrame.age"), stab = number ("tapeFrame.stability");
+            const auto frame = static_cast<TapeFrameLength> (juce::jlimit (0, 2, choice ("tapeFrame.frame")));
+            const double frameSec = reimagined::frameSeconds (frame);
+            const double mech = 0.3 * reimagined::ramp (a, 0.0, 0.3) + 0.7 * reimagined::ramp (a, 0.3, 0.85);
+            const auto ghost = static_cast<float> (reimagined::ramp (a, 0.55, 0.95));
+            const float runout = static_cast<float> (reimagined::ramp (a, 0.25, 0.6));
+            const float x0 = r.getX() + 4.0f;
+            const float width = (r.getWidth() - 8.0f) * static_cast<float> (frameSec / 11.4);
+            const float h = 0.4f * r.getHeight();
+            const auto t = static_cast<float> (now());
+            // The tape's loudness along its length (the analysis), else the recording's.
+            constexpr int n = 110;
+            std::vector<float> e (static_cast<std::size_t> (n));
+            if (analysis != nullptr && analysis->tape.ready && analysis->tape.lengthFrames > 0.0)
+            {
+                const double seconds = analysis->tape.lengthFrames / std::max (1.0, analysis->tape.sampleRate);
+                for (int i = 0; i < n; ++i)
+                {
+                    const double at = frameSec * i / (n - 1) / seconds * ReimaginedAnalysis::TapeFrame::overviewSize;
+                    e[static_cast<std::size_t> (i)] = at < ReimaginedAnalysis::TapeFrame::overviewSize ? analysis->tape.energy[static_cast<std::size_t> (at)] : 0.0f;
+                }
+            }
+            else
+                e = envelope (inst, n);
+            auto band = [&] (float dx, float dy, float wobble) {
+                juce::Path top;
+                for (int i = 0; i < n; ++i)
+                {
+                    const float u = static_cast<float> (i) / (n - 1);
+                    const float fade = 1.0f - runout * juce::jlimit (0.0f, 1.0f, (u - 0.92f) / 0.08f);
+                    const float y = r.getCentreY() + dy + wobble * std::sin (6.2832f * (u * 3.0f + 0.6f * t)) - e[static_cast<std::size_t> (i)] * h * fade;
+                    const float x = x0 + dx + u * width;
+                    i == 0 ? top.startNewSubPath (x, y) : top.lineTo (x, y);
+                }
+                return top;
+            };
+            const float wobble = static_cast<float> (2.5 * mech * (0.1 + 0.9 * stab));
+            for (int k = 1; k >= 0; --k)
+                if (ghost > 0.01f)
+                {
+                    g.setColour (aurora (0.82f).withAlpha (0.55f * ghost));
+                    g.strokePath (band (6.0f + 5.0f * static_cast<float> (k), k == 0 ? -2.0f : 2.0f, 1.4f * wobble), juce::PathStrokeType (1.0f));
+                }
+            auto main = band (0.0f, 0.0f, wobble);
+            juce::Path fill (main);
+            fill.lineTo (x0 + width, r.getCentreY());
+            fill.lineTo (x0, r.getCentreY());
+            fill.closeSubPath();
+            // Warm at the start, darker and softer late on as AGE grows.
+            juce::ColourGradient warm (aurora (0.06f).withAlpha (0.6f), x0, 0.0f, aurora (0.2f).withAlpha (0.6f * (1.0f - 0.7f * age)), x0 + width, 0.0f, false);
+            g.setGradientFill (warm);
+            g.fillPath (fill);
+            juce::ColourGradient edge (aurora (0.1f), x0, 0.0f, aurora (0.18f).withAlpha (1.0f - 0.65f * age), x0 + width, 0.0f, false);
+            g.setGradientFill (edge);
+            g.strokePath (main, juce::PathStrokeType (1.0f + 0.8f * age));
+            // The tape: its head (the recording's start) and where it ends.
+            g.setColour (juce::Colours::white.withAlpha (0.55f));
+            g.fillRect (x0 - 1.0f, r.getCentreY() - h - 2.0f, 1.2f, h + 6.0f);
+            g.setColour (juce::Colours::white.withAlpha (0.18f));
+            g.drawHorizontalLine (juce::roundToInt (r.getCentreY()), x0, x0 + width);
+            const float end = x0 + width;
+            for (float y = r.getCentreY() - h; y < r.getCentreY() + 4.0f; y += 4.0f)
+                g.drawVerticalLine (juce::roundToInt (end), y, y + 2.0f);
+            g.setColour (juce::Colours::white.withAlpha (0.4f));
+            g.setFont (fonts::make (8.5f, fonts::Weight::regular, 0.06f));
+            g.drawText (juce::String (frameSec, 1) + " s", juce::Rectangle<float> (end - 40.0f, r.getBottom() - 12.0f, 40.0f, 12.0f), juce::Justification::centredRight, false);
+        }
+
+        // TOYBOX: the recording as a low-resolution memory (DIGITAL: fewer, coarser steps) and
+        // the head's path through it (PLAY: forward, turning, irregular; MOTION: how often).
+        void toybox (juce::Graphics& g, juce::Rectangle<float> r, const LoadedInstrument* inst) const
+        {
+            const float a = amount(), motionSetting = number ("toybox.motion"), digital = number ("toybox.digital");
+            const int play = choice ("toybox.play");
+            const auto early = static_cast<float> (reimagined::ramp (a, 0.0, 0.3));
+            const float dig = juce::jlimit (0.0f, 1.0f, (0.25f + 0.75f * digital) * (0.6f * early + 0.4f * static_cast<float> (reimagined::ramp (a, 0.3, 1.0))));
+            const int blocks = juce::roundToInt (72.0f - 56.0f * dig);
+            const float levels = 28.0f - 22.0f * dig;
+            const auto env = envelope (inst, blocks);
+            const float h = 0.36f * r.getHeight();
+            const float bw = r.getWidth() / static_cast<float> (blocks);
+            const float mid = r.getCentreY() - 6.0f;
+            for (int i = 0; i < blocks; ++i)
+            {
+                const float v = std::round (env[static_cast<std::size_t> (i)] * levels) / levels;
+                const float x = r.getX() + static_cast<float> (i) * bw;
+                const float u = static_cast<float> (i) / static_cast<float> (blocks);
+                g.setColour (aurora (0.05f + 0.45f * u).withAlpha (0.75f));
+                g.fillRect (x + 0.5f, mid - v * h, std::max (1.0f, bw - 1.0f), 2.0f * v * h);
+            }
+            // The head's path, under the memory.
+            const auto motion = static_cast<float> (motionSetting * reimagined::ramp (a, 0.25, 0.75));
+            const float y0 = r.getBottom() - 9.0f;
+            const float leg = r.getWidth() * (0.4f - 0.33f * motion);
+            juce::Path path;
+            std::vector<float> turns;
+            float x = r.getX(), dir = 1.0f;
+            path.startNewSubPath (x, y0);
+            Prng rng (0x746f79ull + static_cast<std::uint64_t> (layer));
+            int row = 0;
+            while (x < r.getRight() && path.getLength() < 6.0f * r.getWidth())
+            {
+                if (play == 0 || motion < 1.0e-3f)
+                {
+                    x = r.getRight();
+                    path.lineTo (x, y0);
+                    break;
+                }
+                float len = leg * (dir > 0.0f ? 1.3f : 1.0f);
+                if (play == 2)
+                    len = leg * static_cast<float> (rng.uniform (0.4, 1.6));
+                x = juce::jlimit (r.getX(), r.getRight(), x + dir * len);
+                const float y = y0 - 3.0f * static_cast<float> (row & 1);
+                path.lineTo (x, y);
+                turns.push_back (x);
+                ++row;
+                if (play == 2 && rng.nextDouble() < 0.25)
+                    x = juce::jlimit (r.getX(), r.getRight(), x + leg * static_cast<float> (rng.uniform (0.3, 0.8)));   // skip ahead
+                else
+                    dir = -dir;
+                path.lineTo (x, y0 - 3.0f * static_cast<float> (row & 1));
+            }
+            g.setColour (aurora (0.5f).withAlpha (0.85f));
+            g.strokePath (path, juce::PathStrokeType (1.1f));
+            g.setColour (juce::Colours::white.withAlpha (0.45f));
+            for (float tx : turns)
+                g.fillRect (tx - 0.5f, y0 - 6.0f, 1.0f, 7.0f);
+            // A small light running along the path.
+            const auto length = path.getLength();
+            if (length > 1.0f)
+            {
+                const auto at = path.getPointAlongPath (std::fmod (static_cast<float> (now()) * 45.0f, length));
+                g.setColour (aurora (0.35f));
+                g.fillEllipse (juce::Rectangle<float> (4.0f, 4.0f).withCentre (at));
+            }
+        }
+
+        // MOSAIC: the partials of the harmonic frame being played (DETAIL: how many), moving
+        // through the recording's frames (MOTION), the residual noise as a cloud (MODEL), the
+        // source's waveform behind it at low amounts.
+        void mosaic (juce::Graphics& g, juce::Rectangle<float> r, const LoadedInstrument* inst, const ReimaginedAnalysis* analysis) const
+        {
+            const float a = amount(), detail = number ("mosaic.detail"), motion = number ("mosaic.motion");
+            const bool textured = choice ("mosaic.model") == 1;
+            const int count = juce::roundToInt (8.0f + 40.0f * detail);
+            const auto* m = analysis != nullptr && analysis->mosaic.ready ? &analysis->mosaic : nullptr;
+            // The source behind, fading as the reconstruction takes over.
+            if (a < 0.99f)
+            {
+                const auto env = envelope (inst, 100);
+                juce::Path wave;
+                for (int i = 0; i < 100; ++i)
+                {
+                    const float x = r.getX() + static_cast<float> (i) / 99.0f * r.getWidth();
+                    const float y = r.getCentreY() - 0.35f * r.getHeight() * env[static_cast<std::size_t> (i)];
+                    i == 0 ? wave.startNewSubPath (x, y) : wave.lineTo (x, y);
+                }
+                g.setColour (juce::Colours::white.withAlpha (0.35f * (1.0f - a)));
+                g.strokePath (wave, juce::PathStrokeType (1.0f));
+            }
+            // Travel through the frames, as the engine does (a ping-pong over the body).
+            double pos = 0.0;
+            int frames = 1;
+            if (m != nullptr)
+            {
+                frames = static_cast<int> (m->frames.size());
+                const double travel = motion * (0.4 + 0.6 * reimagined::ramp (a, 0.55, 0.85));
+                const double span = std::max (1.0, static_cast<double> (frames - 1 - m->bodyFrame));
+                const double phase = std::fmod (now() * 3.0, 2.0 * span);
+                const double wander = m->bodyFrame + (phase <= span ? phase : 2.0 * span - phase);
+                pos = m->stableFrame + (wander - m->stableFrame) * travel;
+            }
+            auto partial = [&] (int h) -> float {
+                if (m == nullptr)
+                    return 0.6f / static_cast<float> (h);
+                const int last = frames - 1;
+                const int i = juce::jlimit (0, std::max (0, last - 1), static_cast<int> (pos));
+                const auto f = static_cast<float> (pos - i);
+                const auto& a0 = m->frames[static_cast<std::size_t> (i)].partial;
+                const auto& a1 = m->frames[static_cast<std::size_t> (std::min (i + 1, last))].partial;
+                return a0[static_cast<std::size_t> (h - 1)] * (1.0f - f) + a1[static_cast<std::size_t> (h - 1)] * f;
+            };
+            float peak = 1.0e-9f;
+            for (int hh = 1; hh <= count; ++hh)
+                peak = std::max (peak, partial (hh));
+            // The residual: a quiet cloud above the partials (TEXTURED keeps it).
+            const float cloud = (textured ? 1.0f : 0.2f) * (m != nullptr ? std::min (1.0f, 0.3f + 3.0f * static_cast<float> (m->residualShare)) : 0.5f);
+            Prng dots (0x6d6f73ull);
+            const float drift = static_cast<float> (std::fmod (now() * 4.0, 1000.0));
+            g.setColour (aurora (0.9f).withAlpha (0.28f * cloud * (0.4f + 0.6f * a)));
+            for (int i = 0; i < juce::roundToInt (140.0f * cloud); ++i)
+            {
+                const float x = r.getX() + std::fmod (static_cast<float> (dots.nextDouble()) * r.getWidth() + drift * static_cast<float> (dots.uniform (0.2, 1.0)), r.getWidth());
+                const float y = r.getY() + static_cast<float> (dots.nextDouble()) * 0.55f * r.getHeight();
+                g.fillRect (x, y, 1.2f, 1.2f);
+            }
+            const float slot = r.getWidth() / static_cast<float> (count);
+            for (int hh = 1; hh <= count; ++hh)
+            {
+                const float db = 20.0f * std::log10 (std::max (1.0e-9f, partial (hh) / peak));
+                const float v = juce::jlimit (0.0f, 1.0f, 1.0f + db / 60.0f);
+                const float x = r.getX() + (static_cast<float> (hh) - 0.5f) * slot;
+                const float top = r.getBottom() - 6.0f - v * 0.82f * (r.getHeight() - 6.0f);
+                g.setColour (aurora (0.62f + 0.38f * static_cast<float> (hh) / static_cast<float> (count)).withAlpha (0.35f + 0.6f * a));
+                g.fillRect (x - 0.3f * slot, top, std::max (1.0f, 0.6f * slot), r.getBottom() - 6.0f - top);
+            }
+            // The frames, with where the spectrum is now.
+            g.setColour (juce::Colours::white.withAlpha (0.25f));
+            for (int k = 0; k < frames; ++k)
+                g.fillRect (r.getX() + r.getWidth() * static_cast<float> (k) / std::max (1, frames - 1) - 0.5f, r.getBottom() - 3.0f, 1.0f, 3.0f);
+            if (m != nullptr)
+            {
+                g.setColour (aurora (0.75f));
+                g.fillEllipse (juce::Rectangle<float> (4.0f, 4.0f).withCentre ({ r.getX() + r.getWidth() * static_cast<float> (pos / std::max (1, frames - 1)), r.getBottom() - 1.5f }));
+            }
+        }
+
+        // MIRAGE: a cycle of the sound held at the sample clock (CLOCK: coarser; the clock is
+        // slower for low notes, at the left, than for high ones), under the low-pass's response
+        // (FILTER: lower and more resonant, TONE: darker or more open).
+        void mirage (juce::Graphics& g, juce::Rectangle<float> r, const ReimaginedAnalysis* analysis) const
+        {
+            const float a = amount(), clockSetting = number ("mirage.clock"), filter = number ("mirage.filter");
+            const bool open = choice ("mirage.tone") == 1;
+            const float clock = (0.3f + 0.7f * clockSetting) * (0.65f * static_cast<float> (reimagined::ramp (a, 0.0, 0.35)) + 0.35f * static_cast<float> (reimagined::ramp (a, 0.35, 1.0)));
+            std::array<float, 8> harmonics { 1.0f, 0.5f, 0.33f, 0.25f, 0.2f, 0.16f, 0.14f, 0.12f };
+            if (analysis != nullptr && analysis->mosaic.ready)
+            {
+                const auto& f = analysis->mosaic.frames[static_cast<std::size_t> (analysis->mosaic.stableFrame)];
+                const float p0 = std::max (1.0e-9f, f.partial[0]);
+                for (std::size_t h = 0; h < harmonics.size(); ++h)
+                    harmonics[h] = f.partial[h] / p0;
+            }
+            auto wave = [&] (float u) {
+                float v = 0.0f, norm = 0.0f;
+                for (std::size_t h = 0; h < harmonics.size(); ++h)
+                {
+                    v += harmonics[h] * std::sin (6.2832f * static_cast<float> (h + 1) * u * 2.5f);
+                    norm += std::abs (harmonics[h]);
+                }
+                return v / std::max (1.0e-6f, norm);
+            };
+            const float h = 0.36f * r.getHeight();
+            const float mid = r.getCentreY() - 4.0f;
+            juce::Path smooth, held;
+            for (int i = 0; i <= 160; ++i)
+            {
+                const float u = static_cast<float> (i) / 160.0f;
+                const float x = r.getX() + u * r.getWidth(), y = mid - h * wave (u);
+                i == 0 ? smooth.startNewSubPath (x, y) : smooth.lineTo (x, y);
+            }
+            g.setColour (juce::Colours::white.withAlpha (0.14f));
+            g.strokePath (smooth, juce::PathStrokeType (1.0f));
+            // Zero-order hold: wide steps at the left (a low note's slow clock), finer at the right.
+            float x = r.getX();
+            held.startNewSubPath (x, mid - h * wave (0.0f));
+            while (x < r.getRight())
+            {
+                const float u = (x - r.getX()) / r.getWidth();
+                const float stepWidth = (1.5f + 13.0f * clock) * (1.7f - 1.3f * u);
+                const float v = mid - h * wave (u);
+                const float next = std::min (r.getRight(), x + stepWidth);
+                held.lineTo (x, v);
+                held.lineTo (next, v);
+                x = next;
+            }
+            g.setColour (aurora (0.8f).brighter (0.3f).withAlpha (0.9f));
+            g.strokePath (held, juce::PathStrokeType (1.1f));
+            // The filter's response: a dark silhouette with its resonance in rust and amber.
+            const float body = static_cast<float> (reimagined::ramp (a, 0.15, 0.7));
+            const float cutoff = juce::jlimit (0.12f, 0.95f, 0.95f - body * (0.55f + 0.25f * filter - (open ? 0.22f : 0.0f)));
+            const float res = body * (0.1f + 0.55f * filter);
+            juce::Path response;
+            const float base = r.getBottom();
+            for (int i = 0; i <= 100; ++i)
+            {
+                const float u = static_cast<float> (i) / 100.0f;
+                const float ratio = std::pow (2.0f, 8.0f * (u - cutoff));   // octaves around the cutoff
+                const float mag = 1.0f / std::sqrt (1.0f + std::pow (ratio, 8.0f)) * (1.0f + 2.5f * res * std::exp (-std::pow ((u - cutoff) * 14.0f, 2.0f)));
+                const float y = base - 0.8f * r.getHeight() * juce::jlimit (0.0f, 1.25f, mag) * 0.75f;
+                const float px = r.getX() + u * r.getWidth();
+                i == 0 ? response.startNewSubPath (px, y) : response.lineTo (px, y);
+            }
+            juce::Path area (response);
+            area.lineTo (r.getRight(), base);
+            area.lineTo (r.getX(), base);
+            area.closeSubPath();
+            g.setColour (juce::Colour (0xff10161c).withAlpha (open ? 0.25f : 0.4f));
+            g.fillPath (area);
+            juce::ColourGradient rust (aurora (0.0f), r.getX(), 0.0f, aurora (0.18f), r.getRight(), 0.0f, false);
+            g.setGradientFill (rust);
+            g.strokePath (response, juce::PathStrokeType (1.4f));
+        }
+
+        OspAudioProcessor& processor;
+        int layer;
+    };
+
+    /** REIMAGINED: the mode beside the title, its picture, then that mode's own two or three
+        settings (continuous ones as small knobs in the aurora at the layer's amount, stepped
+        ones as text selectors). Switching modes keeps every mode's values. */
+    class ReimaginedPanel final : public MacroPanel, private juce::Timer
+    {
+    public:
+        ReimaginedPanel (OspAudioProcessor& p, int l)
+            : MacroPanel (p, "REIMAGINED", 270, 80, design::colour::reimagined (amountOf (p, l))), layer (l)
+        {
+            const auto modeId = OspAudioProcessor::reimaginedModeParameterId (l, "mode");
+            auto& m = mode (modeId.toRawUTF8(), "Reimagined mode: the way this source is reinterpreted");
+            m.onChange = [this] (int newMode) {
+                build (newMode);
+                if (picture != nullptr)
+                    picture->modeChanged();
+            };
+            auto v = std::make_unique<ReimaginedVisual> (p, l);
+            picture = v.get();
+            setVisual (std::move (v));
+            build (m.selected());
+            startTimerHz (10);
+        }
+        ~ReimaginedPanel() override { stopTimer(); }
+
+        juce::Point<int> cardSize() const override { return { panelWidth, headerTop + visualHeight + gap + cellHeight + bottom }; }
+
+    private:
+        static float amountOf (OspAudioProcessor& p, int l)
+        {
+            auto* param = p.parameters.getParameter (OspAudioProcessor::reimaginedParameterId (l));
+            return param != nullptr ? param->getValue() : 0.0f;
+        }
+
+        void timerCallback() override
+        {
+            // The sub-settings' arcs follow the aurora at the layer's REIMAGINED amount.
+            const auto colour = design::colour::reimagined (amountOf (processor, layer));
+            if (colour == accent)
+                return;
+            accent = colour;
+            for (auto& k : knobs)
+                k->setArcColour (accent);
+            if (modeSelector != nullptr)
+                modeSelector->setAccent (accent);
+        }
+
+        void build (int newMode)
+        {
+            knobs.clear();
+            primaryRow.clear();
+            selectors.clear();
+            cells.clear();
+            const auto percent = [] (double v) { return format::percent (v) + " %"; };
+            auto addKnob = [&] (const char* name, const char* caption) {
+                const auto pid = OspAudioProcessor::reimaginedModeParameterId (layer, name);
+                cells.push_back (&knob (false, pid.toRawUTF8(), caption, percent));
+            };
+            auto addChoice = [&] (const char* name, const char* caption, const char* tip) {
+                auto* param = processor.parameters.getParameter (OspAudioProcessor::reimaginedModeParameterId (layer, name));
+                if (param == nullptr)
+                    return;
+                selectors.push_back (std::make_unique<ValueSelector> (*param, caption));
+                selectors.back()->setTooltip (tip);
+                addAndMakeVisible (*selectors.back());
+                cells.push_back (selectors.back().get());
+            };
+            switch (reimagined::modeFromIndex (newMode))
+            {
+                case ReimaginedMode::kaleidoscope:
+                    addKnob ("kaleidoscope.focus", "FOCUS");
+                    addKnob ("kaleidoscope.spread", "SPREAD");
+                    break;
+                case ReimaginedMode::tapeFrame:
+                    addKnob ("tapeFrame.age", "AGE");
+                    addKnob ("tapeFrame.stability", "STABILITY");
+                    addChoice ("tapeFrame.frame", "FRAME", "How much tape: short, classic or long");
+                    break;
+                case ReimaginedMode::toybox:
+                    addKnob ("toybox.motion", "MOTION");
+                    addKnob ("toybox.digital", "DIGITAL");
+                    addChoice ("toybox.play", "PLAY", "Forward, turning back and forth, or irregular");
+                    break;
+                case ReimaginedMode::mosaic:
+                    addKnob ("mosaic.detail", "DETAIL");
+                    addKnob ("mosaic.motion", "MOTION");
+                    addChoice ("mosaic.model", "MODEL", "Pure: mostly harmonic; Textured: keeps the breath and noise");
+                    break;
+                case ReimaginedMode::mirage:
+                    addKnob ("mirage.clock", "CLOCK");
+                    addKnob ("mirage.filter", "FILTER");
+                    addChoice ("mirage.tone", "TONE", "Dark or open filter");
+                    break;
+            }
+            for (auto& k : knobs)
+                k->setArcColour (accent);
+            resized();
+        }
+
+        void layoutContent (juce::Rectangle<int> area) override
+        {
+            layoutHeader();
+            visual->setBounds (area.removeFromTop (visualHeight));
+            area.removeFromTop (gap);
+            auto row = area.removeFromTop (cellHeight);
+            if (cells.empty())
+                return;
+            const int cell = std::min (row.getWidth() / static_cast<int> (cells.size()), 84);
+            row = row.withSizeKeepingCentre (cell * static_cast<int> (cells.size()), row.getHeight());
+            for (auto* c : cells)
+            {
+                auto slot = row.removeFromLeft (cell);
+                if (dynamic_cast<ValueSelector*> (c) != nullptr)
+                    c->setBounds (slot.withSizeKeepingCentre (cell - 6, 36));
+                else
+                    c->setBounds (slot);
+            }
+        }
+
+        int layer;
+        ReimaginedVisual* picture = nullptr;
+        std::vector<std::unique_ptr<ValueSelector>> selectors;
+        std::vector<juce::Component*> cells;
+    };
+}
+
+std::unique_ptr<MiniPanel> createReimaginedPopup (OspAudioProcessor& processor, int layer)
+{
+    return std::make_unique<ReimaginedPanel> (processor, layer);
 }
 
 std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, OspAudioProcessor& processor)

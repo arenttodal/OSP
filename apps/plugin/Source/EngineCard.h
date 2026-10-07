@@ -102,6 +102,15 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
 
+    /** REIMAGINED: its name is the door to the mode popover (hover darkens and underlines it). */
+    std::function<void()> onLabelClick;
+    void setLabelOpen (bool open);
+    /** Where the name is drawn (this component's coordinates). */
+    juce::Rectangle<float> labelBounds() const;
+    void mouseMove (const juce::MouseEvent&) override;
+    void mouseExit (const juce::MouseEvent&) override;
+    void mouseUp (const juce::MouseEvent&) override;
+
     class Dial;
     std::unique_ptr<Dial> dial;
 
@@ -111,6 +120,8 @@ private:
     juce::String caption;
     bool compact = false;
     bool creative = false;   ///< REIMAGINED: the same knob, a coral arc and a small coral light by its name
+    bool labelHover = false, labelOpen = false;
+    juce::Font labelFont() const;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
 };
 
@@ -175,6 +186,12 @@ public:
 
     std::function<void (int)> onFocus;                 ///< the card was clicked
     std::function<void (int, juce::Component&)> onMenu; ///< its menu button
+    std::function<void (int)> onReimagined;            ///< its REIMAGINED name (the mode popover)
+    /** The REIMAGINED name, in this card's coordinates (the popover's anchor). */
+    juce::Rectangle<int> reimaginedLabelBounds() const;
+    /** Whether the REIMAGINED name is the door of a component (a click on it toggles the popover). */
+    bool isReimaginedLabel (const juce::Component* c) const noexcept { return c != nullptr && c == knobs[4].get(); }
+    void setReimaginedOpen (bool open);
 
     void paint (juce::Graphics&) override;
     void resized() override;

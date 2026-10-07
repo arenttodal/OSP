@@ -330,6 +330,14 @@ void OspAudioProcessorEditor::mouseDownAnywhere (juce::Component* c)
         pressed = advancedPopup;
     if (headerMix.isMixOpener (c))
         pressed = mixPopup;
+    for (int l = 0; l < OspAudioProcessor::numLayers; ++l)
+        if (cards[static_cast<std::size_t> (l)]->isReimaginedLabel (c))
+        {
+            const auto& card = *cards[static_cast<std::size_t> (l)];
+            const auto at = card.getLocalPoint (nullptr, juce::Desktop::getMousePosition());
+            if (card.reimaginedLabelBounds().contains (at))
+                pressed = reimaginedPopup + l;
+        }
     closedByLabelPress = pressed == popupIndex ? pressed : -1;
     closePopup();
 }
@@ -366,6 +374,14 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
             }
         };
         card->onMenu = [this] (int l, juce::Component& target) { showLayerMenu (l, target); };
+        card->onReimagined = [this] (int l) {
+            if (closedByLabelPress == reimaginedPopup + l)
+            {
+                closedByLabelPress = -1;   // that press closed it
+                return;
+            }
+            openPopup (reimaginedPopup + l);
+        };
         content.addChildComponent (*card);
     }
     dropZone.onBrowse = [this] { chooseFile (0, true); };
@@ -491,9 +507,13 @@ void OspAudioProcessorEditor::openPopup (int which)
 {
     const bool keepAdvanced = which == advancedPopup;
     closePopup();
-    if (which < 0 || which > mixPopup)
+    if (which < 0 || which >= reimaginedPopup + OspAudioProcessor::numLayers)
         return;
-    if (which == mixPopup)
+    if (which >= reimaginedPopup && ! cards[static_cast<std::size_t> (which - reimaginedPopup)]->isVisible())
+        return;
+    if (which >= reimaginedPopup)
+        popup = createReimaginedPopup (ospProcessor, which - reimaginedPopup);
+    else if (which == mixPopup)
         popup = createMixPopup (ospProcessor);
     else
         popup = which == advancedPopup ? createAdvancedPopup (ospProcessor) : createMacroPopup (static_cast<MacroPopup> (which), ospProcessor);
@@ -514,6 +534,8 @@ void OspAudioProcessorEditor::openPopup (int which)
     }
     if (which < 5)
         macros[static_cast<std::size_t> (which)].label->setOpen (true);
+    if (which >= reimaginedPopup)
+        cards[static_cast<std::size_t> (which - reimaginedPopup)]->setReimaginedOpen (true);
     if (keepAdvanced)
     {
         ospProcessor.setAdvancedOpen (true);
@@ -529,6 +551,8 @@ void OspAudioProcessorEditor::closePopup()
         return;
     if (popupIndex >= 0 && popupIndex < 5)
         macros[static_cast<std::size_t> (popupIndex)].label->setOpen (false);
+    if (popupIndex >= reimaginedPopup)
+        cards[static_cast<std::size_t> (popupIndex - reimaginedPopup)]->setReimaginedOpen (false);
     if (popupIndex == advancedPopup)
     {
         ospProcessor.setAdvancedOpen (false);
@@ -555,6 +579,14 @@ void OspAudioProcessorEditor::positionPopup()
         // A macro's popover unfolds directly above its name: centred on it, its foot 10 px
         // above, kept inside the instrument at the edges (LIFE, SPACE).
         const auto anchor = macros[static_cast<std::size_t> (popupIndex)].label->getBounds().toFloat();
+        x = anchor.getCentreX() - 0.5f * size.x;
+        y = anchor.getY() - 10.0f - size.y;
+    }
+    else if (popupIndex >= reimaginedPopup)
+    {
+        // A layer's REIMAGINED popover unfolds above that card's REIMAGINED name.
+        const auto& card = *cards[static_cast<std::size_t> (popupIndex - reimaginedPopup)];
+        const auto anchor = content.getLocalArea (&card, card.reimaginedLabelBounds()).toFloat();
         x = anchor.getCentreX() - 0.5f * size.x;
         y = anchor.getY() - 10.0f - size.y;
     }
@@ -673,6 +705,10 @@ void OspAudioProcessorEditor::layoutSources (bool animate)
     headerMix.setLayers (occupied);
     if (popupIndex == mixPopup && headerMix.layerCount() < 3)
         closePopup();   // the large mix belongs to three layers
+    if (popupIndex >= reimaginedPopup && ! cards[static_cast<std::size_t> (popupIndex - reimaginedPopup)]->isVisible())
+        closePopup();   // its layer is gone
+    else if (popupIndex >= reimaginedPopup)
+        positionPopup();   // its card moved
     updateFocus();
 }
 

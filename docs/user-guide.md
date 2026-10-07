@@ -46,7 +46,7 @@ from itself is its own: every card has its own **REIMAGINED**.
 | **TUNE** | The layer's own transposition, ±24 semitones (whole steps; Alt/Option-drag for fine). |
 | **PAN** | The layer's place left–right. |
 | **LEVEL** | The layer's level, from silent to +6 dB. |
-| **REIMAGINED** (spectral arc) | How far this source moves away from its original character: sympathetic resonance tuned to the sound, more fluid sustain, more movement, wandering formants and at the far end gentle harmonic saturation. 0 % is the recording itself; double-click returns there. A can stay almost untouched while B is fully reimagined. |
+| **REIMAGINED** (spectral arc) | How far this source travels into its REIMAGINED mode (below). 0 % is the recording itself; double-click returns there. A can stay almost untouched while B is fully reimagined. Click the **REIMAGINED** name to choose the mode. |
 | **LINK** (chain) | Linked layers move together: turning one linked layer's START, TUNE, PAN, LEVEL or REIMAGINED moves the others by the same amount, so their relationship stays. |
 | **REVERSE** | Play backwards (Granular: every grain backwards). With LOOP on, a held note keeps going backwards the way a forward note sustains. Reimagined acts on a reversed layer exactly as on a forward one. |
 | **LOOP** | One Shot: hold a note and it continues on the recording's own loops (off: it plays once and ends). Granular sustains by itself, so LOOP rests there. |
@@ -66,6 +66,27 @@ you hover or drag, a small readout shows each layer's share; double-click for eq
 With three layers, click **MIX** for the large mix. The mix keeps the total level steady
 wherever it is.
 
+### REIMAGINED modes
+
+Click a card's **REIMAGINED** name: a small popover opens above it with the layer's mode
+at the top right (click it for the list), a picture of what the mode does to this sound,
+and the mode's own two or three settings. Each layer has its own mode (A can be TAPE
+FRAME while B is MOSAIC); every mode remembers its settings when you switch away and back.
+The knob on the card says how far into the mode the layer goes.
+
+| Mode | What it makes of the recording | Settings |
+|---|---|---|
+| **KALEIDOSCOPE** | Refraction: richer versions of the sound itself - sympathetic resonance tuned to it, a more fluid sustain, a moving doubling, wandering formants, at the far end grains and gentle saturation. The original Reimagined. | **FOCUS** recognisable ↔ abstract; **SPREAD** width and variation (50 % / 50 % is the sound every earlier patch had) |
+| **TAPE FRAME** | Mechanical memory: the sound laid onto a finite piece of tape and played by tape speed - low notes slower, darker and longer, high notes quicker and brighter; each note a slightly different pass; at high amounts faint ghost passes and the tape running out at its end (lower amounts rewind it, quieter each time). | **AGE** bandwidth, saturation, wear; **STABILITY** wow, flutter, pass-to-pass variation; **FRAME** SHORT / CLASSIC / LONG (about 3.6 / 7.6 / 11.4 s of tape at the root) |
+| **TOYBOX** | Primitive digital mutation: a small, clever digital memory (low rate, few bits) whose head can turn back and forth through the sound, modulated by its own envelope, with short memory fragments. | **MOTION** turning and self-modulation; **DIGITAL** rate, resolution, bandwidth; **PLAY** FWD / TURN / CHAOS |
+| **MOSAIC** | Harmonic reconstruction: the sound rebuilt from its harmonic fingerprint (partials plus its breath and noise), at any pitch, travelling through the recording's own evolution. | **DETAIL** how many partials and how much fine detail; **MOTION** a stable snapshot ↔ the recording's movement; **MODEL** PURE / TEXTURED |
+| **MIRAGE** | Early-digital weight: the sample clock follows the note (low notes grainy and dark, high notes sharp), into a driven resonant 4-pole low-pass. | **CLOCK** old-digital intensity; **FILTER** the filter's character, resonance and drive; **TONE** DARK / OPEN |
+
+A mode change applies to the notes you play next; notes already sounding finish the way
+they started. MOSAIC needs a pitched sound: on noise or unpitched material it plays the
+recording (the popover says so). Right after loading, TAPE FRAME and MOSAIC may show
+**ANALYZING…** for a moment and play the recording until their data is ready.
+
 ## Patches from before per-layer REIMAGINED
 
 Projects, presets and starting states made with an earlier version open and sound exactly
@@ -74,7 +95,9 @@ the way it was processed then (one shared Reimagined stage after the mix). Savin
 keeps that. The first time you turn a layer's REIMAGINED, the patch switches to
 independent per-layer processing (the knobs do not move; from then on each layer's amount
 shapes only that layer). Host automation of the old Reimagined parameter keeps working: it
-is A's REIMAGINED.
+is A's REIMAGINED. Patches from before the REIMAGINED modes open as KALEIDOSCOPE, exactly
+as they sounded; choosing a mode or changing a mode setting also switches a patch to
+per-layer processing.
 
 ## Granular mode
 
