@@ -213,7 +213,7 @@ private:
     DropTarget dragTarget;
 
     // Mix, macros, envelope
-    MixSection mixSection { ospProcessor };
+    HeaderMix headerMix { ospProcessor };   ///< MIX in the header (two or three layers)
     juce::Rectangle<int> lowerPanel;
     std::array<Knob, 5> macros;      // LIFE, DYNAMICS, CHARACTER, MOVEMENT, SPACE
     EnvelopePanel envelope { ospProcessor.parameters };

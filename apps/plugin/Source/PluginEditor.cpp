@@ -328,7 +328,7 @@ void OspAudioProcessorEditor::mouseDownAnywhere (juce::Component* c)
             pressed = i;
     if (c == &advancedButton)
         pressed = advancedPopup;
-    if (mixSection.isMixOpener (c))
+    if (headerMix.isMixOpener (c))
         pressed = mixPopup;
     closedByLabelPress = pressed == popupIndex ? pressed : -1;
     closePopup();
@@ -377,7 +377,7 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     content.addChildComponent (addTarget);
     content.addChildComponent (samplesPanel);
 
-    mixSection.onOpenMix = [this] {
+    headerMix.onOpenMix = [this] {
         if (closedByLabelPress == mixPopup)
         {
             closedByLabelPress = -1;   // that press closed it
@@ -385,7 +385,7 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
         }
         openPopup (mixPopup);
     };
-    content.addAndMakeVisible (mixSection);
+    content.addChildComponent (headerMix);
 
     // The five macros: a name with settings behind it (click: its popup) over its knob.
     const std::array<std::pair<const char*, const char*>, 5> macroInfo { {
@@ -560,9 +560,10 @@ void OspAudioProcessorEditor::positionPopup()
     }
     else if (popupIndex == mixPopup)
     {
-        // The large MIX sits where the macro panels are, centred over the instrument.
-        x = 0.5f * design::width - 0.5f * size.x;
-        y = std::min (design::layout::popupTop, design::layout::popupFoot - size.y);
+        // The large MIX unfolds under the header's MIX.
+        const auto anchor = headerMix.getBounds().toFloat();
+        x = anchor.getCentreX() - 0.5f * size.x;
+        y = anchor.getBottom() + 4.0f;
     }
     else
     {
@@ -622,10 +623,6 @@ void OspAudioProcessorEditor::layoutSources (bool animate)
     const bool showAdd = dragging && count >= 1 && count < OspAudioProcessor::numLayers;
     const int columns = count + (showAdd ? 1 : 0);
     const auto density = columns <= 1 ? EngineLayoutDensity::hero : (columns == 2 ? EngineLayoutDensity::dual : EngineLayoutDensity::triple);
-    // One source: no mix band, the card a little taller and the rest air above the macros.
-    // (While a second sound is dragged in, the two-card layout is previewed.)
-    sourceArea = (columns <= 1 ? design::layout::sourcesAlone : design::layout::sources).getSmallestIntegerContainer();
-    mixSection.setVisible (count >= 2);
     dropZone.setVisible (count == 0);
     dropZone.setBounds (sourceArea);
     const int gap = 12;
@@ -673,8 +670,8 @@ void OspAudioProcessorEditor::layoutSources (bool animate)
         addTarget.setBounds (column (col));
         addTarget.setLetter (OspAudioProcessor::layerName (count));
     }
-    mixSection.setLayers (occupied);
-    if (popupIndex == mixPopup && mixSection.layerCount() < 3)
+    headerMix.setLayers (occupied);
+    if (popupIndex == mixPopup && headerMix.layerCount() < 3)
         closePopup();   // the large mix belongs to three layers
     updateFocus();
 }
@@ -1193,7 +1190,7 @@ void OspAudioProcessorEditor::layoutInstrument()
     statusLabel.setBounds (at (layout::status));
     advancedButton.setBounds (at (layout::advanced));
 
-    mixSection.setBounds (at (layout::mixBand));
+    headerMix.setBounds (at (layout::headerMix));
     sourceArea = at (layout::sources);
     layoutSources (false);
 }
@@ -1263,8 +1260,6 @@ void OspAudioProcessorEditor::timerCallback()
                     return true;
             return false;
         };
-        if (shownCount == 3 && moved (0, 2))
-            mixSection.repaint();
         if (moved (2, 6))
             envelope.repaint (envelope.graphBounds());
         shownValues = now;

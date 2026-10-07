@@ -1396,8 +1396,9 @@ TEST_CASE ("plugin: the editor adapts to one, two and three sounds; drops replac
     ui->previewDrag (false);
     snapshot ("osp-adaptive-3.png");
 
-    // A click on the small triangle opens the large mix (and does not move the point);
-    // in the popup the triangle places the mix directly.
+    // The header's MIX is a triangle with three layers (A bottom left, B bottom right, C on
+    // top); a click on its caption opens the large mix (and does not move the point); in
+    // the popup the triangle places the mix directly.
     {
         std::function<void (juce::Component&, std::vector<juce::Component*>&)> collect = [&] (juce::Component& parent, std::vector<juce::Component*>& found) {
             for (auto* child : parent.getChildren())
@@ -1419,8 +1420,13 @@ TEST_CASE ("plugin: the editor adapts to one, two and three sounds; drops replac
         std::vector<juce::Component*> triangles;
         collect (*editor, triangles);
         REQUIRE (triangles.size() == 1);
+        auto* header = dynamic_cast<osp::plugin::HeaderMix*> (triangles.front());
+        REQUIRE (header != nullptr);
+        CHECK (header->layerCount() == 3);
+        const auto corner = header->corners();
+        CHECK (corner[2].y < corner[0].y - 30.0f);   // C above the A-B base
         const float x0 = p.parameterValue ("mix.x"), y0 = p.parameterValue ("mix.y");
-        click (*triangles.front(), triangles.front()->getLocalBounds().toFloat().getBottomLeft() + juce::Point<float> (12.0f, -9.0f));
+        click (*header, corner[2] + juce::Point<float> (0.0f, -9.0f));   // MIX, above C
         CHECK (ui->openPopupIndex() == osp::plugin::OspAudioProcessorEditor::mixPopup);
         CHECK (p.parameterValue ("mix.x") == Approx (x0));
         CHECK (p.parameterValue ("mix.y") == Approx (y0));
@@ -1430,8 +1436,8 @@ TEST_CASE ("plugin: the editor adapts to one, two and three sounds; drops replac
         REQUIRE (triangles.size() == 2);
         auto* large = triangles.back()->getWidth() > triangles.front()->getWidth() ? triangles.back() : triangles.front();
         CHECK (large->getWidth() > 200);
-        // Pressing near corner C puts most of the mix on C.
-        click (*large, large->getLocalBounds().toFloat().getBottomRight() + juce::Point<float> (-40.0f, -26.0f));
+        // Pressing near corner C (the top) puts most of the mix on C.
+        click (*large, juce::Point<float> (0.5f * static_cast<float> (large->getWidth()), 34.0f));
         const auto share = InstrumentEngine::triangleShares (p.parameterValue ("mix.x"), p.parameterValue ("mix.y"));
         CHECK (share[2] > 0.6);
         snapshot ("osp-adaptive-3-mix-c.png");
@@ -1884,6 +1890,13 @@ TEST_CASE ("plugin: canonical screenshots for visual review", "[.][canonical]")
     set ("layerA.start", 1.0f);
     set ("layerB.reimagined", 90.0f);
     shot ("04-two-oneshot.png");
+    // REIMAGINED's spectral arc on one layer at 0 / 20 / 50 / 75 / 100 % (a comparison board).
+    for (const int amount : { 0, 20, 50, 75, 100 })
+    {
+        set ("reimagined", static_cast<float> (amount));
+        shot ("29-reimagined-" + juce::String (amount) + ".png");
+    }
+    set ("reimagined", 18.0f);
     set ("layerB.sourceMode", 1.0f);
     set ("layerB.granular.position", 23.0f);
     set ("layerB.granular.spread", 21.0f);
@@ -2550,4 +2563,47 @@ TEST_CASE ("plugin: master volume keeps its gain law as a slider", "[plugin][rei
         INFO (db << " dB");
         CHECK (20.0 * std::log10 (level / reference) == Approx (db).margin (0.01));
     }
+}
+
+TEST_CASE ("plugin: MIX - a third layer joins an A/B mix at 0 and removing it keeps the A/B balance", "[plugin][adaptive]")
+{
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "a.wav", testsignals::vowel (midiToHz (57), 1.5, 48000.0, 3));
+    const auto b = writeSource (tmp.dir, "b.wav", testsignals::vowel (midiToHz (61), 1.5, 48000.0, 5));
+    const auto c = writeSource (tmp.dir, "c.wav", testsignals::vowel (midiToHz (64), 1.5, 48000.0, 7));
+    OspAudioProcessor p;
+    CHECK (p.addLayers ({ a, b }) == 2);
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    p.setParameterValue ("ab.blend", 0.6f);
+    const auto two = InstrumentEngine::mixWeights ({ true, true, false }, p.parameterValue ("ab.blend"), 0.5, 1.0 / 3.0);
+
+    // Adding C: the same A and B gains, C silent until the node moves towards it.
+    CHECK (p.addLayers ({ c }) == 1);
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    const auto three = InstrumentEngine::mixWeights ({ true, true, true }, 0.0, p.parameterValue ("mix.x"), p.parameterValue ("mix.y"));
+    CHECK (three.gain[0] == Approx (two.gain[0]).margin (1.0e-5));
+    CHECK (three.gain[1] == Approx (two.gain[1]).margin (1.0e-5));
+    CHECK (three.gain[2] == Approx (0.0).margin (1.0e-3));
+
+    // A 20 / B 30 / C 50, then C removed: A 40 / B 60.
+    p.setParameterValue ("mix.x", static_cast<float> (0.5 + 0.5 * 0.3));
+    p.setParameterValue ("mix.y", 0.3f);
+    const auto shares = InstrumentEngine::triangleShares (p.parameterValue ("mix.x"), p.parameterValue ("mix.y"));
+    REQUIRE (shares[0] == Approx (0.2).margin (1.0e-4));
+    REQUIRE (shares[2] == Approx (0.5).margin (1.0e-4));
+    REQUIRE (p.removeLayer (2));
+    p.pollLoads();
+    const auto after = InstrumentEngine::mixWeights ({ true, true, false }, p.parameterValue ("ab.blend"), 0.5, 1.0 / 3.0);
+    CHECK (after.gain[0] * after.gain[0] == Approx (0.4).margin (1.0e-3));
+    CHECK (after.gain[1] * after.gain[1] == Approx (0.6).margin (1.0e-3));
+
+    // Three dropped together still meet in the middle (everything heard at once).
+    OspAudioProcessor q;
+    CHECK (q.addLayers ({ a, b, c }) == 3);
+    REQUIRE (q.waitForLoads (30000));
+    q.pollLoads();
+    CHECK (valueOf (q, "mix.x") == Approx (0.5f));
+    CHECK (valueOf (q, "mix.y") == Approx (1.0f / 3.0f));
 }

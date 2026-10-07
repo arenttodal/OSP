@@ -1009,15 +1009,24 @@ float OspAudioProcessor::parameterValue (const juce::String& id) const
     return 0.0f;
 }
 
-void OspAudioProcessor::makeLayerAudible (int layer)
+void OspAudioProcessor::makeLayerAudible (int layer, bool keepMix)
 {
-    // A layer the musician just added is heard: two layers meet in the middle of the
-    // blend, three at the centre of the triangle.
+    // A layer the musician just added: two layers meet in the middle of the blend. A third
+    // added to an A/B pair joins at 0 - the triangle's point sits on its A-B edge where the
+    // blend was, so nothing changes until the node moves towards C (the header's line
+    // unfolds into that triangle). Three dropped together (or a reset) meet at the centre.
     const int count = occupiedLayerCount();
     if (layer >= 1)   // it starts as Reimagined as the instrument (A) is
         setParameterValue (reimaginedParameterId (layer), parameterValue (reimaginedParameterId (0)));
     if (count == 2 && layer >= 1)
         setParameterValue (ids::blend, 0.5f);
+    else if (count == 3 && keepMix)
+    {
+        const double s = std::sin (0.5 * juce::MathConstants<double>::pi * std::clamp (static_cast<double> (parameterValue (ids::blend)), 0.0, 1.0));
+        const double shareB = s * s;   // equal-power blend -> B's power share
+        setParameterValue (ids::mixX, static_cast<float> (0.5 * shareB));   // C = x - y/2 = 0
+        setParameterValue (ids::mixY, static_cast<float> (shareB));
+    }
     else if (count == 3)
     {
         setParameterValue (ids::mixX, 0.5f);
@@ -1028,6 +1037,7 @@ void OspAudioProcessor::makeLayerAudible (int layer)
 int OspAudioProcessor::addLayers (const juce::Array<juce::File>& files, int firstLayer)
 {
     int loaded = 0;
+    const bool pairBefore = occupiedLayerCount() >= 2;   // an A/B mix the musician has already set
     for (const auto& file : files)
     {
         const int layer = firstLayer >= 0 && loaded == 0 && ! isLayerOccupied (firstLayer) ? firstLayer : firstFreeLayer();
@@ -1039,7 +1049,7 @@ int OspAudioProcessor::addLayers (const juce::Array<juce::File>& files, int firs
             resetLayerControls (layer);
         loadFile (file, layer);
         if (! kept)
-            makeLayerAudible (layer);
+            makeLayerAudible (layer, pairBefore);
         ++loaded;
     }
     if (loaded < files.size())
@@ -1063,11 +1073,12 @@ int OspAudioProcessor::addLayerSet (const juce::Array<juce::File>& files)
     if (layer < 0 || files.isEmpty())
         return -1;
     const bool kept = layer < keptSlotCount.load();
+    const bool pairBefore = occupiedLayerCount() >= 2;
     if (! kept)
         resetLayerControls (layer);
     loadFiles (files, layer);
     if (! kept)
-        makeLayerAudible (layer);
+        makeLayerAudible (layer, pairBefore);
     return layer;
 }
 
@@ -1127,6 +1138,20 @@ bool OspAudioProcessor::removeLayer (int layer)
     if (layer < 0 || layer >= numLayers || pendingLoads.load() > 0 || ! (isLayerOccupied (layer) || keptEmpty))
         return false;
     const int slots = slotCount();
+    // Three -> two: the two that stay keep their balance (their shares, renormalised, as
+    // the equal-power blend), never a reset to the middle.
+    std::optional<float> projectedBlend;
+    if (slots == 3)
+    {
+        const auto share = InstrumentEngine::triangleShares (parameterValue (ids::mixX), parameterValue (ids::mixY));
+        std::array<double, 2> remaining {};
+        int n = 0;
+        for (int l = 0; l < 3; ++l)
+            if (l != layer)
+                remaining[static_cast<std::size_t> (n++)] = share[static_cast<std::size_t> (l)];
+        const double total = remaining[0] + remaining[1];
+        projectedBlend = total > 1.0e-9 ? static_cast<float> (std::asin (std::sqrt (remaining[1] / total)) * 2.0 / juce::MathConstants<double>::pi) : 0.5f;
+    }
     std::array<LayerSnapshot, numLayers> before;
     for (int l = 0; l < numLayers; ++l)
         before[static_cast<std::size_t> (l)] = captureLayer (l);
@@ -1149,6 +1174,8 @@ bool OspAudioProcessor::removeLayer (int layer)
     resetLayerControls (last);
     if (layer < keptSlotCount.load())
         keptSlotCount = keptSlotCount.load() - 1;
+    if (projectedBlend)
+        setParameterValue (ids::blend, *projectedBlend);
     if (last != layer)
         undoManager.clearUndoHistory();   // load undo steps name slots that have moved
     if (editLayer() >= std::max (1, slotCount()))

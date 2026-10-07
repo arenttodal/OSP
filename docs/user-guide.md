@@ -46,7 +46,7 @@ from itself is its own: every card has its own **REIMAGINED**.
 | **TUNE** | The layer's own transposition, ±24 semitones (whole steps; Alt/Option-drag for fine). |
 | **PAN** | The layer's place left–right. |
 | **LEVEL** | The layer's level, from silent to +6 dB. |
-| **REIMAGINED** (coral light) | How far this source moves away from its original character: sympathetic resonance tuned to the sound, more fluid sustain, more movement, wandering formants and at the far end gentle harmonic saturation. 0 % is the recording itself; double-click returns there. A can stay almost untouched while B is fully reimagined. |
+| **REIMAGINED** (spectral arc) | How far this source moves away from its original character: sympathetic resonance tuned to the sound, more fluid sustain, more movement, wandering formants and at the far end gentle harmonic saturation. 0 % is the recording itself; double-click returns there. A can stay almost untouched while B is fully reimagined. |
 | **LINK** (chain) | Linked layers move together: turning one linked layer's START, TUNE, PAN, LEVEL or REIMAGINED moves the others by the same amount, so their relationship stays. |
 | **REVERSE** | Play backwards (Granular: every grain backwards). With LOOP on, a held note keeps going backwards the way a forward note sustains. Reimagined acts on a reversed layer exactly as on a forward one. |
 | **LOOP** | One Shot: hold a note and it continues on the recording's own loops (off: it plays once and ends). Granular sustains by itself, so LOOP rests there. |
@@ -57,13 +57,16 @@ jump back where the sustain continues and forward where the release joins the en
 
 ### Mixing the layers
 
-The band under the cards (two or three layers; a single source needs none): with two
-layers the **A / B blend** (left only A, middle both at equal power, right only B); with
-three a small **triangle**: drag the dot towards A, B or C (double-click: all three equal), or click the
-triangle or MIX for the **large mix** - the same triangle at popup size for fine placement,
-with each layer's sound and share. The numbers beside it say how much of each you hear. The mix keeps the total level steady wherever it is.
+**MIX** sits in the header between the preset and VOLUME, and grows with the instrument:
+nothing with one sound; with two a small line **A ─●─ B** (drag the node; the middle is
+both at equal power); with three the line unfolds upwards into a triangle with **C** on
+top (A bottom left, B bottom right). Adding C keeps the A/B balance you had - C joins at 0
+until you move the node towards it; removing a layer keeps the other two's balance. While
+you hover or drag, a small readout shows each layer's share; double-click for equal shares.
+With three layers, click **MIX** for the large mix. The mix keeps the total level steady
+wherever it is.
 
-### Patches from before per-layer REIMAGINED
+## Patches from before per-layer REIMAGINED
 
 Projects, presets and starting states made with an earlier version open and sound exactly
 as they did: each card's REIMAGINED shows the amount the patch had, and the patch keeps

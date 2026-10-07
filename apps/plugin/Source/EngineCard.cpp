@@ -754,6 +754,7 @@ LayerKnob::LayerKnob (OspAudioProcessor& p, int layer, const juce::String& contr
     dial = std::make_unique<Dial> (processor, layer, control, control == "tune");
     dial->setRotaryParameters (OspLookAndFeel::rotaryStart, OspLookAndFeel::rotaryEnd, true);
     dial->getProperties().set ("arc", static_cast<juce::int64> ((creative ? palette::accent : palette::layer (layer)).getARGB()));
+    dial->getProperties().set ("spectral", creative);   // REIMAGINED: the spectral continuum, the same on every layer
     dial->getProperties().set ("bipolar", control == "tune" || control == "pan");
     dial->setTitle ("Layer " + OspAudioProcessor::layerName (layer) + " " + caption);
     attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (processor.parameters, id, *dial);

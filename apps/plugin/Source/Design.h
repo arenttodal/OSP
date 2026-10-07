@@ -70,6 +70,11 @@ namespace colour
     /** The same identity lifted for lines on the graphite displays (equal weight on dark). */
     inline juce::Colour macroOnDark (Macro m) { return macro (m).withMultipliedBrightness (1.32f).withMultipliedSaturation (1.08f); }
 
+    /** REIMAGINED's identity: a restrained spectral continuum along its travel (0..1),
+        rust -> amber -> muted gold -> moss -> mineral teal -> dusty blue -> mauve,
+        interpolated in OKLab (no neon steps). The same on every layer. */
+    juce::Colour reimagined (float position);
+
     // Layer identities: A warm amber/terracotta, B cool slate-blue, C a quiet sage.
     struct Identity
     {
@@ -115,19 +120,18 @@ namespace layout
     const juce::Point<float> logo { 51.0f, 79.0f };            ///< baseline of OSP/2-OSP
     const R logoSubtitle { 51.0f, 88.0f, 300.0f, 14.0f };
     const R presetBar { 501.0f, 45.0f, 446.0f, 48.0f };
+    /** MIX between the preset and VOLUME (two or three layers; nothing for one). */
+    const R headerMix { 966.0f, 23.0f, 164.0f, 88.0f };
     /** Master volume: a thin utility slider (VOLUME and its value above the track). */
     const R volume { 1150.0f, 47.0f, 194.0f, 44.0f };
     const R menu { 1366.0f, 50.0f, 28.0f, 36.0f };
 
-    // Sources: two cards side by side; three share the same band. One source has no mix
-    // band below it: its card takes part of that room, the rest is air above the macros.
-    const R sources { 35.0f, 127.0f, 1379.0f, 459.0f };
-    const R sourcesAlone { 35.0f, 127.0f, 1379.0f, 525.0f };
+    // Sources: one, two or three cards across the band (the mix lives in the header, so
+    // the cards take most of the old mix band's room; the rest is air above the macros).
+    const R sources { 35.0f, 127.0f, 1379.0f, 525.0f };
     constexpr float cardGap = 13.0f;
     constexpr float cardRadius = 16.0f;
 
-    // Mix band (two or three layers: the A/B blend or the mix triangle), with air either side.
-    const R mixBand { 35.0f, 605.0f, 1378.0f, 72.0f };
     constexpr float panelRadius = 13.0f;
 
     // Macros and envelope
@@ -174,6 +178,8 @@ namespace draw
         juce::Colour pointer = colour::knobPointer;    ///< popups: the accent
         float pointerFrom = 0.36f, pointerTo = 0.8f;   ///< in body radii
         float arcWidth = 0.0f;                         ///< > 0: a thin ring of this width (macros), flat colour
+        bool spectral = false;                         ///< REIMAGINED: the value arc travels the spectral continuum
+        float spectralLift = 1.0f;                     ///< hover: a few percent brighter
         float startAngle = -2.356f, endAngle = 2.356f;
         bool enabled = true;
     };

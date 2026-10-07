@@ -191,6 +191,11 @@ void OspLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int widt
     style.startAngle = startAngle;
     style.endAngle = endAngle;
     style.enabled = slider.isEnabled();
+    if (static_cast<bool> (props["spectral"]))
+    {
+        style.spectral = true;
+        style.spectralLift = slider.isMouseOverOrDragging() ? 1.06f : 1.0f;
+    }
     if (props.contains ("thinArc"))
     {
         // A macro: its identity colour on a thin ring (90 %, a touch more on hover).

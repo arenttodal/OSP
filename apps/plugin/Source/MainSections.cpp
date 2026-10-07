@@ -12,6 +12,60 @@ namespace osp::plugin
 {
 
 //==============================================================================
+namespace mixgeometry
+{
+    std::array<double, 3> shares (double mixX, double mixY) { return InstrumentEngine::triangleShares (mixX, mixY); }
+
+    juce::Point<float> stateFromShares (const std::array<double, 3>& share)
+    {
+        // triangleShares: A = 1 - x - y/2, B = y, C = x - y/2.
+        return { static_cast<float> (share[2] + 0.5 * share[1]), static_cast<float> (share[1]) };
+    }
+
+    juce::Point<float> pointFor (const std::array<double, 3>& share, const std::array<juce::Point<float>, 3>& c)
+    {
+        return { static_cast<float> (share[0] * c[0].x + share[1] * c[1].x + share[2] * c[2].x),
+                 static_cast<float> (share[0] * c[0].y + share[1] * c[1].y + share[2] * c[2].y) };
+    }
+
+    std::array<double, 3> sharesAt (juce::Point<float> p, const std::array<juce::Point<float>, 3>& c)
+    {
+        // Barycentric coordinates; outside the triangle the negative ones are clipped and
+        // the rest renormalised (as the engine does: the map is affine, so it agrees).
+        const auto v0 = c[1] - c[0], v1 = c[2] - c[0], v2 = p - c[0];
+        const double d00 = v0.x * v0.x + v0.y * v0.y, d01 = v0.x * v1.x + v0.y * v1.y, d11 = v1.x * v1.x + v1.y * v1.y;
+        const double d20 = v2.x * v0.x + v2.y * v0.y, d21 = v2.x * v1.x + v2.y * v1.y;
+        const double den = d00 * d11 - d01 * d01;
+        if (std::abs (den) < 1.0e-9)
+            return { 1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0 };
+        std::array<double, 3> w { 0.0, (d11 * d20 - d01 * d21) / den, (d00 * d21 - d01 * d20) / den };
+        w[0] = 1.0 - w[1] - w[2];
+        double total = 0.0;
+        for (auto& v : w)
+        {
+            v = std::max (0.0, v);
+            total += v;
+        }
+        if (total <= 1.0e-12)
+            return { 1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0 };
+        for (auto& v : w)
+            v /= total;
+        return w;
+    }
+
+    double blendShare (double blend)
+    {
+        const double s = std::sin (0.5 * juce::MathConstants<double>::pi * std::clamp (blend, 0.0, 1.0));
+        return s * s;
+    }
+
+    double blendForShare (double shareB)
+    {
+        return std::asin (std::sqrt (std::clamp (shareB, 0.0, 1.0))) * 2.0 / juce::MathConstants<double>::pi;
+    }
+}
+
+//==============================================================================
 TriangleMix::TriangleMix (juce::AudioProcessorValueTreeState& state)
     : xAttachment (*state.getParameter ("mix.x"), [this] (float v) { x = v; repaint(); }),
       yAttachment (*state.getParameter ("mix.y"), [this] (float v) { y = v; repaint(); })
@@ -31,18 +85,17 @@ std::array<juce::Point<float>, 3> TriangleMix::corners() const
     const float w = std::min (r.getWidth(), r.getHeight() / 0.866f);
     const float h = w * 0.866f;
     r = r.withSizeKeepingCentre (w, h);
-    return { juce::Point<float> (r.getX(), r.getBottom()), juce::Point<float> (r.getCentreX(), r.getY()),
-             juce::Point<float> (r.getRight(), r.getBottom()) };
+    // A bottom left, B bottom right, C on top (the header's MIX, at popup size).
+    return { juce::Point<float> (r.getX(), r.getBottom()), juce::Point<float> (r.getRight(), r.getBottom()),
+             juce::Point<float> (r.getCentreX(), r.getY()) };
 }
 
 void TriangleMix::moveTo (juce::Point<float> where)
 {
-    const auto c = corners();
-    const float w = c[2].x - c[0].x, h = c[0].y - c[1].y;
     // Into the triangle (the same clipping the engine applies), then back to x/y.
-    const auto share = InstrumentEngine::triangleShares ((where.x - c[0].x) / std::max (1.0f, w), (c[0].y - where.y) / std::max (1.0f, h));
-    xAttachment.setValueAsPartOfGesture (static_cast<float> (0.5 * share[1] + share[2]));
-    yAttachment.setValueAsPartOfGesture (static_cast<float> (share[1]));
+    const auto state = mixgeometry::stateFromShares (mixgeometry::sharesAt (where, corners()));
+    xAttachment.setValueAsPartOfGesture (state.x);
+    yAttachment.setValueAsPartOfGesture (state.y);
 }
 
 void TriangleMix::mouseDown (const juce::MouseEvent& e)
@@ -100,9 +153,9 @@ void TriangleMix::paint (juce::Graphics& g)
     g.strokePath (shape, juce::PathStrokeType (1.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
     // Everything grows with the triangle (64 px in the mix band, ~300 px in its popup).
-    const float k = std::clamp ((c[2].x - c[0].x) / 46.0f, 1.0f, 2.4f);
-    const auto share = InstrumentEngine::triangleShares (x, y);
-    const auto node = juce::Point<float> (c[0].x + x * (c[2].x - c[0].x), c[0].y - y * (c[0].y - c[1].y));
+    const float k = std::clamp ((c[1].x - c[0].x) / 46.0f, 1.0f, 2.4f);
+    const auto share = mixgeometry::shares (x, y);
+    const auto node = mixgeometry::pointFor (share, c);
     // Threads to the corners, as strong as each layer's share; the node takes their colours.
     juce::Colour mix = layer (0).withAlpha (0.0f);
     for (std::size_t i = 0; i < 3; ++i)
@@ -128,8 +181,8 @@ void TriangleMix::paint (juce::Graphics& g)
     g.setColour (textDim);
     const float t = 8.0f * std::sqrt (k), gap = 2.0f * k;
     g.drawText ("A", juce::Rectangle<float> (c[0].x - t - gap, c[0].y - t * 0.5f, t, t + 2.0f), juce::Justification::centredRight, false);
-    g.drawText ("B", juce::Rectangle<float> (c[1].x + gap + 2.0f, c[1].y - t * 0.75f, t, t), juce::Justification::centredLeft, false);
-    g.drawText ("C", juce::Rectangle<float> (c[2].x + gap, c[2].y - t * 0.5f, t, t + 2.0f), juce::Justification::centredLeft, false);
+    g.drawText ("B", juce::Rectangle<float> (c[1].x + gap, c[1].y - t * 0.5f, t, t + 2.0f), juce::Justification::centredLeft, false);
+    g.drawText ("C", juce::Rectangle<float> (c[2].x + gap + 2.0f, c[2].y - t * 0.75f, t, t), juce::Justification::centredLeft, false);
 }
 
 //==============================================================================
@@ -184,29 +237,23 @@ void VolumeSlider::paint (juce::Graphics& g)
 }
 
 //==============================================================================
-MixSection::MixSection (OspAudioProcessor& p) : processor (p), triangle (p.parameters)
+HeaderMix::HeaderMix (OspAudioProcessor& p)
+    : processor (p),
+      blendAttachment (*p.parameters.getParameter ("ab.blend"), [this] (float v) { blend = v; repaint(); }),
+      xAttachment (*p.parameters.getParameter ("mix.x"), [this] (float v) { mixX = v; repaint(); }),
+      yAttachment (*p.parameters.getParameter ("mix.y"), [this] (float v) { mixY = v; repaint(); })
 {
-    blend.getProperties().set ("blend", true);
-    blend.setTitle ("Layer blend");
-    blend.setTooltip ("Blend between the two layers (equal power: the middle is not quieter)");
-    blendAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (processor.parameters, "ab.blend", blend);
-    blend.setDoubleClickReturnValue (true, 0.5);
-    addChildComponent (blend);
-    triangle.onClick = [this] {
-        if (onOpenMix != nullptr)
-            onOpenMix();
-    };
-    triangle.setTooltip ("Three-layer mix: click for the large mix, or drag here");
-    addChildComponent (triangle);
+    blendAttachment.sendInitialUpdate();
+    xAttachment.sendInitialUpdate();
+    yAttachment.sendInitialUpdate();
+    setTitle ("Layer mix");
+    setTooltip ("Mix: drag between the layers (double-click: equal)");
+    setMouseCursor (juce::MouseCursor::PointingHandCursor);
+    setAlpha (0.0f);
+    setVisible (false);
 }
 
-void MixSection::mouseUp (const juce::MouseEvent& e)
-{
-    if (count == 3 && captionArea.contains (e.getPosition()) && ! e.mouseWasDraggedSinceMouseDown() && onOpenMix != nullptr)
-        onOpenMix();
-}
-
-void MixSection::setLayers (const std::array<bool, 3>& occupied)
+void HeaderMix::setLayers (const std::array<bool, 3>& occupied)
 {
     int n = 0;
     std::array<int, 3> which { 0, 1, 2 };
@@ -215,62 +262,253 @@ void MixSection::setLayers (const std::array<bool, 3>& occupied)
             which[static_cast<std::size_t> (n++)] = l;
     if (n == count && which == slots)
         return;
+    const int before = count;
     count = n;
     slots = which;
-    blend.getProperties().set ("leftColour", static_cast<juce::int64> (design::colour::identity (slots[0]).thumb.getARGB()));
-    blend.getProperties().set ("rightColour", static_cast<juce::int64> (design::colour::identity (slots[1]).thumb.getARGB()));
-    blend.setVisible (count == 2);
-    triangle.setVisible (count == 3);
-    resized();
+    // One source: nothing to mix. Two: the line fades in (from one) or folds down (from
+    // three). Three: the line unfolds into the triangle. 200 ms, no overshoot.
+    opacityTarget = count >= 2 ? 1.0f : 0.0f;
+    morphTarget = count >= 3 ? 1.0f : 0.0f;
+    if (before <= 1 && count >= 2)
+        morph = morphTarget;   // appears in its form, it does not unfold from nothing
+    if (count >= 2)
+        setVisible (true);
+    if (! isShowing())
+        finishAnimations();
+    startTimerHz (60);
     repaint();
 }
 
-void MixSection::resized()
+void HeaderMix::finishAnimations()
 {
-    // Band 1378 x 72: the caption at the left; the blend track from 470 to 1120 with the
-    // layers' letters either side, on the band's centre line.
-    const int cy = getHeight() / 2;
-    captionArea = juce::Rectangle<int> (24, 4, 330, getHeight() - 8);
-    blend.setBounds (470 - 16, cy - 18, 650 + 32, 36);
-    blendRow = count == 2 ? juce::Rectangle<int> (380, cy - 12, 870, 24) : juce::Rectangle<int>();
-    if (count == 3)
-        triangle.setBounds (28, cy - 33, 74, 66);
+    morph = morphTarget;
+    opacity = opacityTarget;
+    readout = readoutTarget;
+    setAlpha (opacity);
+    setVisible (opacity > 0.0f);
+    stopTimer();
+    repaint();
 }
 
-void MixSection::paint (juce::Graphics& g)
+void HeaderMix::timerCallback()
+{
+    const float step = 1.0f / (0.2f * 60.0f);
+    auto towards = [step] (float& v, float target, float rate = 1.0f) {
+        v = target > v ? std::min (target, v + step * rate) : std::max (target, v - step * rate);
+    };
+    if (readoutTarget <= 0.0f && readout > 0.0f && juce::Time::getMillisecondCounter() < readoutHoldUntil)
+        ;   // the readout lingers a moment after an interaction
+    else
+        towards (readout, readoutTarget, readoutTarget > 0.0f ? 1.5f : 0.6f);
+    towards (morph, morphTarget);
+    towards (opacity, opacityTarget);
+    setAlpha (opacity);
+    if (opacity <= 0.0f && opacityTarget <= 0.0f)
+        setVisible (false);
+    repaint();
+    if (juce::exactlyEqual (morph, morphTarget) && juce::exactlyEqual (opacity, opacityTarget) && juce::exactlyEqual (readout, readoutTarget))
+        stopTimer();
+}
+
+std::array<juce::Point<float>, 3> HeaderMix::corners() const
+{
+    // A and B never move; C rises from the middle of the line as the triangle unfolds
+    // (smoothstep, no overshoot).
+    const float cx = 0.5f * static_cast<float> (getWidth());
+    const float t = morph * morph * (3.0f - 2.0f * morph);
+    return { juce::Point<float> (cx - halfBase, baseY), juce::Point<float> (cx + halfBase, baseY),
+             juce::Point<float> (cx, baseY - apexHeight * t) };
+}
+
+std::array<double, 3> HeaderMix::shownShares() const
+{
+    if (count >= 3)
+        return mixgeometry::shares (mixX, mixY);
+    const double b = mixgeometry::blendShare (blend);
+    return { 1.0 - b, b, 0.0 };
+}
+
+juce::Point<float> HeaderMix::nodePosition() const
+{
+    // Along the line the node sits at B's power share (so the triangle's base agrees with
+    // it); in the triangle at the shares' point; in between, the one blends into the other.
+    const auto c = corners();
+    const auto b = static_cast<float> (mixgeometry::blendShare (blend));
+    const auto onLine = c[0] + (c[1] - c[0]) * b;
+    const auto inTriangle = mixgeometry::pointFor (mixgeometry::shares (mixX, mixY), c);
+    if (count >= 3 && morph >= 1.0f)
+        return inTriangle;
+    if (count < 3 && morph <= 0.0f)
+        return onLine;
+    return onLine + (inTriangle - onLine) * morph;
+}
+
+juce::Rectangle<float> HeaderMix::captionArea() const
+{
+    // Above the line, rising with C to clear the apex and its letter.
+    const auto c = corners();
+    const float top = c[2].y - 24.0f + 4.0f * morph;
+    return { 0.5f * static_cast<float> (getWidth()) - 22.0f, top, 44.0f, 13.0f };
+}
+
+bool HeaderMix::hitTest (int x, int y)
+{
+    if (count < 2)
+        return false;
+    const auto c = corners();
+    const auto box = juce::Rectangle<float> (c[0], c[1]).getUnion (juce::Rectangle<float> (c[2], c[2])).expanded (12.0f, 9.0f);
+    const juce::Point<float> p (static_cast<float> (x), static_cast<float> (y));
+    return box.contains (p) || (count == 3 && captionArea().expanded (4.0f).contains (p));
+}
+
+void HeaderMix::showReadout (bool on)
+{
+    readoutTarget = on ? 1.0f : 0.0f;
+    if (! on)
+        readoutHoldUntil = juce::Time::getMillisecondCounter() + 700;
+    startTimerHz (60);
+}
+
+void HeaderMix::mouseEnter (const juce::MouseEvent&)
+{
+    hovering = true;
+    showReadout (true);
+}
+
+void HeaderMix::mouseExit (const juce::MouseEvent&)
+{
+    hovering = false;
+    if (! dragging)
+        showReadout (false);
+}
+
+void HeaderMix::dragTo (juce::Point<float> where)
+{
+    const auto c = corners();
+    if (count >= 3)
+    {
+        const auto state = mixgeometry::stateFromShares (mixgeometry::sharesAt (where, c));
+        xAttachment.setValueAsPartOfGesture (state.x);
+        yAttachment.setValueAsPartOfGesture (state.y);
+    }
+    else
+    {
+        // Horizontal only: B's share is how far along A -> B the node is.
+        const float f = std::clamp ((where.x - c[0].x) / std::max (1.0f, c[1].x - c[0].x), 0.0f, 1.0f);
+        blendAttachment.setValueAsPartOfGesture (static_cast<float> (mixgeometry::blendForShare (f)));
+    }
+}
+
+void HeaderMix::mouseDown (const juce::MouseEvent& e)
+{
+    pressedCaption = count == 3 && captionArea().expanded (4.0f).contains (e.position);
+    if (pressedCaption)
+        return;
+    dragging = true;
+    if (count >= 3)
+    {
+        xAttachment.beginGesture();
+        yAttachment.beginGesture();
+    }
+    else
+        blendAttachment.beginGesture();
+    showReadout (true);
+    dragTo (e.position);
+}
+
+void HeaderMix::mouseDrag (const juce::MouseEvent& e)
+{
+    if (dragging)
+        dragTo (e.position);
+}
+
+void HeaderMix::mouseUp (const juce::MouseEvent& e)
+{
+    if (std::exchange (pressedCaption, false))
+    {
+        if (! e.mouseWasDraggedSinceMouseDown() && onOpenMix != nullptr)
+            onOpenMix();
+        return;
+    }
+    if (! std::exchange (dragging, false))
+        return;
+    if (count >= 3)
+    {
+        xAttachment.endGesture();
+        yAttachment.endGesture();
+    }
+    else
+        blendAttachment.endGesture();
+    if (! hovering)
+        showReadout (false);
+}
+
+void HeaderMix::mouseDoubleClick (const juce::MouseEvent&)
+{
+    // Equal shares: the middle of the line, the centre of the triangle.
+    if (count >= 3)
+    {
+        xAttachment.setValueAsCompleteGesture (0.5f);
+        yAttachment.setValueAsCompleteGesture (1.0f / 3.0f);
+    }
+    else if (count == 2)
+        blendAttachment.setValueAsCompleteGesture (0.5f);
+}
+
+void HeaderMix::paint (juce::Graphics& g)
 {
     using namespace design;
-    draw::raised (g, getLocalBounds().toFloat(), layout::panelRadius, colour::panelTop, colour::panelBottom);
-    const float cy = 0.5f * static_cast<float> (getHeight());
-
-    if (count == 2)
+    if (count < 2 && opacity <= 0.0f)
+        return;
+    const auto c = corners();
+    const auto line = colour::text.withAlpha (0.5f);
+    // Hairline geometry: the base always, the sides drawn in as C arrives.
+    g.setColour (line);
+    g.drawLine ({ c[0], c[1] }, 1.2f);
+    if (morph > 0.0f)
     {
-        const float by = static_cast<float> (blendRow.getCentreY());
-        g.setFont (fonts::make (18.0f, fonts::Weight::medium));
-        g.setColour (colour::text.withAlpha (0.85f));
-        g.drawText (OspAudioProcessor::layerName (slots[0]), juce::Rectangle<float> (412.0f, by - 12.0f, 40.0f, 24.0f), juce::Justification::centred, false);
-        g.drawText (OspAudioProcessor::layerName (slots[1]), juce::Rectangle<float> (1137.0f, by - 12.0f, 40.0f, 24.0f), juce::Justification::centred, false);
-        g.setFont (type::sectionTitle());
-        g.drawText (OspAudioProcessor::layerName (slots[0]) + " / " + OspAudioProcessor::layerName (slots[1]) + " BLEND",
-                    juce::Rectangle<float> (33.0f, cy - 18.0f, 330.0f, 36.0f), juce::Justification::centredLeft, false);
+        g.setColour (line.withMultipliedAlpha (morph));
+        g.drawLine ({ c[0], c[2] }, 1.0f);
+        g.drawLine ({ c[1], c[2] }, 1.0f);
     }
-    if (count == 3)
+    // MIX above it all (quiet micro caption; with three a click opens the large mix).
+    g.setFont (fonts::make (11.0f, fonts::Weight::medium, 0.14f));
+    g.setColour (colour::textSecondary.withAlpha (count == 3 && isMouseOver() ? 1.0f : 0.85f));
+    g.drawText ("MIX", captionArea(), juce::Justification::centred, false);
+
+    // The layers' letters at the corners, a breath of each identity in them.
+    g.setFont (fonts::make (11.0f, fonts::Weight::regular, 0.04f));
+    auto letter = [&] (int index, juce::Rectangle<float> r, juce::Justification j, float alpha) {
+        const int l = slots[static_cast<std::size_t> (index)];
+        g.setColour (colour::textSecondary.interpolatedWith (colour::identity (l).badgeBottom, 0.35f).withMultipliedAlpha (alpha));
+        g.drawText (OspAudioProcessor::layerName (l), r, j, false);
+    };
+    letter (0, { c[0].x - 16.0f, c[0].y - 7.0f, 12.0f, 14.0f }, juce::Justification::centredRight, 1.0f);
+    letter (1, { c[1].x + 4.0f, c[1].y - 7.0f, 12.0f, 14.0f }, juce::Justification::centredLeft, 1.0f);
+    if (morph > 0.0f)
+        letter (2, { c[2].x + 5.0f, c[2].y - 4.0f, 12.0f, 12.0f }, juce::Justification::centredLeft, morph);
+
+    // The node: a small cream cap with a fine dark rim and a contact shadow.
+    const auto node = nodePosition();
+    juce::Path disc;
+    disc.addEllipse (juce::Rectangle<float> (8.0f, 8.0f).withCentre (node));
+    juce::DropShadow (juce::Colour (0x40302418), 2, { 0, 1 }).drawForPath (g, disc);
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xfffefbf6), node.x, node.y - 4.0f, juce::Colour (0xffdcd3c6), node.x, node.y + 4.0f, false));
+    g.fillPath (disc);
+    g.setColour (colour::text.withAlpha (0.75f));
+    g.strokePath (disc, juce::PathStrokeType (0.9f));
+
+    // While hovered or dragged: each layer's share, small and tabular, under the line.
+    if (readout > 0.0f)
     {
-        // How much of each is heard (power shares, adding up to 100).
-        const auto share = InstrumentEngine::triangleShares (processor.parameterValue ("mix.x"), processor.parameterValue ("mix.y"));
-        g.setFont (type::sectionTitle());
-        g.setColour (colour::text.withAlpha (0.85f));
-        g.drawText ("MIX", juce::Rectangle<float> (122.0f, cy - 30.0f, 200.0f, 34.0f), juce::Justification::centredLeft, false);
-        g.setFont (fonts::make (15.0f, fonts::Weight::medium));
-        float x = 122.0f;
-        for (std::size_t i = 0; i < 3; ++i)
-        {
-            const auto part = OspAudioProcessor::layerName (static_cast<int> (i)) + " " + juce::String (juce::roundToInt (100.0 * share[i]));
-            const float w = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), part) + 14.0f;
-            g.setColour (colour::identity (static_cast<int> (i)).badgeBottom.brighter (0.15f));
-            g.drawText (part, juce::Rectangle<float> (x, cy + 4.0f, w, 22.0f), juce::Justification::centredLeft, false);
-            x += w;
-        }
+        const auto share = shownShares();
+        juce::String text;
+        for (int i = 0; i < std::min (count, 3); ++i)
+            text << (i > 0 ? "   " : "") << OspAudioProcessor::layerName (slots[static_cast<std::size_t> (i)]) << " "
+                 << juce::roundToInt (100.0 * share[static_cast<std::size_t> (i)]);
+        g.setFont (fonts::make (10.5f, fonts::Weight::regular, 0.02f));
+        g.setColour (colour::textSecondary.withAlpha (0.9f * readout));
+        g.drawText (text, juce::Rectangle<float> (0.0f, baseY + 8.0f, static_cast<float> (getWidth()), 13.0f), juce::Justification::centred, false);
     }
 }
 

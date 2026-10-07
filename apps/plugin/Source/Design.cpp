@@ -123,6 +123,75 @@ void button (juce::Graphics& g, juce::Rectangle<float> r, float radius, bool act
     g.strokePath (shape, juce::PathStrokeType (1.0f));
 }
 
+} // namespace osp::plugin::design::draw
+
+namespace osp::plugin::design::colour
+{
+namespace
+{
+    struct Lab
+    {
+        float l, a, b;
+    };
+    float toLinear (float c) { return c <= 0.04045f ? c / 12.92f : std::pow ((c + 0.055f) / 1.055f, 2.4f); }
+    float toGamma (float c) { return c <= 0.0031308f ? 12.92f * c : 1.055f * std::pow (c, 1.0f / 2.4f) - 0.055f; }
+    Lab toOklab (juce::Colour c)
+    {
+        const float r = toLinear (c.getFloatRed()), g = toLinear (c.getFloatGreen()), b = toLinear (c.getFloatBlue());
+        const float l = std::cbrt (0.4122214708f * r + 0.5363325363f * g + 0.0514459929f * b);
+        const float m = std::cbrt (0.2119034982f * r + 0.6806995451f * g + 0.1073969566f * b);
+        const float s = std::cbrt (0.0883024619f * r + 0.2817188376f * g + 0.6299787005f * b);
+        return { 0.2104542553f * l + 0.7936177850f * m - 0.0040720468f * s, 1.9779984951f * l - 2.4285922050f * m + 0.4505937099f * s,
+                 0.0259040371f * l + 0.7827717662f * m - 0.8086757660f * s };
+    }
+    juce::Colour fromOklab (Lab c)
+    {
+        const float l = c.l + 0.3963377774f * c.a + 0.2158037573f * c.b;
+        const float m = c.l - 0.1055613458f * c.a - 0.0638541728f * c.b;
+        const float s = c.l - 0.0894841775f * c.a - 1.2914855480f * c.b;
+        const float l3 = l * l * l, m3 = m * m * m, s3 = s * s * s;
+        auto channel = [] (float v) { return static_cast<juce::uint8> (juce::roundToInt (255.0f * juce::jlimit (0.0f, 1.0f, toGamma (v)))); };
+        return juce::Colour (channel (4.0767416621f * l3 - 3.3077115913f * m3 + 0.2309699292f * s3),
+                             channel (-1.2684380046f * l3 + 2.6097574011f * m3 - 0.3413193965f * s3),
+                             channel (-0.0041960863f * l3 - 0.7034186147f * m3 + 1.7076147010f * s3));
+    }
+}
+
+juce::Colour reimagined (float position)
+{
+    // Built once: 256 steps of the continuum (paint just looks them up).
+    static const std::array<juce::Colour, 256> table = [] {
+        struct Stop
+        {
+            float at;
+            juce::Colour colour;
+        };
+        static const Stop stops[] = { { 0.0f, juce::Colour (0xffb96e55) }, { 0.18f, juce::Colour (0xffcf994e) }, { 0.35f, juce::Colour (0xffbfaa5a) },
+                                      { 0.5f, juce::Colour (0xff7f9270) }, { 0.65f, juce::Colour (0xff668f8a) }, { 0.82f, juce::Colour (0xff748b9d) },
+                                      { 1.0f, juce::Colour (0xff948399) } };
+        std::array<juce::Colour, 256> t;
+        for (std::size_t i = 0; i < t.size(); ++i)
+        {
+            const float x = static_cast<float> (i) / static_cast<float> (t.size() - 1);
+            std::size_t k = 1;
+            while (k + 1 < std::size (stops) && x > stops[k].at)
+                ++k;
+            const auto& a = stops[k - 1];
+            const auto& b = stops[k];
+            const float u = juce::jlimit (0.0f, 1.0f, (x - a.at) / (b.at - a.at));
+            const auto la = toOklab (a.colour), lb = toOklab (b.colour);
+            t[i] = fromOklab ({ la.l + u * (lb.l - la.l), la.a + u * (lb.a - la.a), la.b + u * (lb.b - la.b) });
+        }
+        return t;
+    }();
+    const auto index = static_cast<std::size_t> (juce::roundToInt (juce::jlimit (0.0f, 1.0f, position) * 255.0f));
+    return table[index];
+}
+} // namespace osp::plugin::design::colour
+
+namespace osp::plugin::design::draw
+{
+
 void knob (juce::Graphics& g, juce::Point<float> c, float r, float position, const KnobStyle& style)
 {
     using namespace colour;
@@ -155,7 +224,26 @@ void knob (juce::Graphics& g, juce::Point<float> c, float r, float position, con
         lit.addCentredArc (c.x, c.y, arcRadius + 0.3f * arcWidth, arcRadius + 0.3f * arcWidth, 0.0f, style.startAngle, style.endAngle, true);
         g.strokePath (lit, juce::PathStrokeType (0.35f * arcWidth));
         const float from = style.bipolar ? 0.5f * (style.startAngle + style.endAngle) : style.startAngle;
-        if (std::abs (angle - from) > 0.01f && style.enabled)
+        if (style.spectral && style.enabled)
+        {
+            // REIMAGINED: the arc grows from the rust origin through the continuum only as
+            // far as the value (never the whole spectrum at once); at 0 a small rust tick.
+            const float span = style.endAngle - style.startAngle;
+            const float reach = std::max (position, 0.018f);
+            const int segments = std::max (2, juce::roundToInt (96.0f * reach));
+            const float overlap = 0.35f * span * reach / static_cast<float> (segments);
+            for (int i = 0; i < segments; ++i)
+            {
+                const float t0 = reach * static_cast<float> (i) / static_cast<float> (segments);
+                const float t1 = reach * static_cast<float> (i + 1) / static_cast<float> (segments);
+                juce::Path piece;
+                piece.addCentredArc (c.x, c.y, arcRadius, arcRadius, 0.0f, style.startAngle + t0 * span, std::min (style.startAngle + t1 * span + overlap, style.startAngle + reach * span), true);
+                const bool end = i == 0 || i == segments - 1;
+                g.setColour (colour::reimagined (0.5f * (t0 + t1)).withMultipliedBrightness (style.spectralLift));
+                g.strokePath (piece, juce::PathStrokeType (arcWidth, juce::PathStrokeType::curved, end ? juce::PathStrokeType::rounded : juce::PathStrokeType::butt));
+            }
+        }
+        else if (std::abs (angle - from) > 0.01f && style.enabled)
         {
             // The value arc deepens towards where it starts and is brightest at the value.
             juce::Path value;

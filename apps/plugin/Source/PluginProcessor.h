@@ -327,7 +327,7 @@ private:
     };
     LayerSnapshot captureLayer (int layer) const;
     void applyLayer (int layer, const LayerSnapshot& snapshot);
-    void makeLayerAudible (int layer);
+    void makeLayerAudible (int layer, bool keepMix = false);
     struct RemovedLayer
     {
         int index = 0;
