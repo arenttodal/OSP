@@ -230,6 +230,13 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 
 ## KNOWN ISSUES
 
+- **CPU audit (docs/reports/cpu-deep-dive.md)**: default patch 16 notes 12 % of a VM core (≈ 3–6 % on
+  Apple Silicon); +24 st 4.6x, three layers 2.8x, KALEIDOSCOPE 100 % 2.4x. Hot spots: sinc reads 43 %,
+  per-voice LP24 ladder 23 %, SPACE's per-sample `std::sin`. The editor repaints whole waveform displays
+  through live DropShadows at 30 fps while playing (44 ms per display per frame on the VM): the largest
+  CPU user overall. Ranked fixes (background cache + dirty strips, bit-exact audio items, SIMD sinc,
+  mip-mapped sources) are listed there; none implemented yet.
+
 - **CPU (engine C)**: about 1.2x the baseline per voice (continuation crossfades, shelves,
   post stage). macOS 14 arm64 CI runner (48 kHz / 128): engine C 16 held voices **17.1 %**
   mean (spec target < 25 %: met), 24 voices with dense retriggers 30.5 % (baseline A 26 %).

@@ -3,6 +3,7 @@
 // root override, session state recall (including from the managed sample store after
 // the original file disappears), and bad files.
 
+#include "EngineCard.h"
 #include "PluginEditor.h"
 #include "PluginProcessor.h"
 
@@ -17,8 +18,11 @@
 #include <catch2/catch_session.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
+#include <typeinfo>
 
 using Catch::Approx;
 using namespace osp;
@@ -2792,4 +2796,159 @@ TEST_CASE ("plugin: REIMAGINED popover - its name opens it above the card, a sec
     ui->refreshNow();
     CHECK (valueOf (p, "layerA.reimagined.tapeFrame.stability") == Approx (77.0f));
     CHECK (ui->openPopupIndex() == Editor::reimaginedPopup);
+}
+
+// CPU profile (hidden): the plugin's own processBlock at 48 kHz / 128 samples, a new patch's
+// settings, held notes, with one thing changed at a time. % of one core in real time.
+//   ./osp_plugin_tests "[cpu-profile]"
+TEST_CASE ("plugin: CPU profile", "[.][cpu-profile]")
+{
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "a.wav", testsignals::vowel (midiToHz (57), 3.0, 48000.0, 3));
+    const auto b = writeSource (tmp.dir, "b.wav", testsignals::pluck (midiToHz (48), 3.0, 48000.0, 8, 0.7, 1));
+    const auto c = writeSource (tmp.dir, "c.wav", testsignals::vowel (midiToHz (64), 3.0, 48000.0, 5));
+    struct Case
+    {
+        juce::String name;
+        int layers = 1, notes = 16, transpose = 0;
+        double rate = 48000.0;
+        int block = 128;
+        std::vector<std::pair<juce::String, float>> set;
+    };
+    const std::vector<Case> cases {
+        { "idle (sound loaded, nothing playing)", 1, 0 },
+        { "1 note", 1, 1 },
+        { "8 notes", 1, 8 },
+        { "16 notes (reference)", 1, 16 },
+        { "24 notes", 1, 24 },
+        { "16 notes, block 32", 1, 16, 0, 48000.0, 32 },
+        { "16 notes, block 1024", 1, 16, 0, 48000.0, 1024 },
+        { "16 notes, 96 kHz", 1, 16, 0, 96000.0 },
+        { "16 notes, +24 st", 1, 16, 24 },
+        { "16 notes, -24 st", 1, 16, -24 },
+        { "16 notes, LIFE 0", 1, 16, 0, 48000.0, 128, { { "life", 0.0f } } },
+        { "16 notes, DYNAMICS 0", 1, 16, 0, 48000.0, 128, { { "dynamics", 0.0f } } },
+        { "16 notes, CHARACTER Tilt", 1, 16, 0, 48000.0, 128, { { "character.type", 4.0f } } },
+        { "16 notes, CHARACTER LP12", 1, 16, 0, 48000.0, 128, { { "character.type", 1.0f } } },
+        { "16 notes, MOVEMENT 0", 1, 16, 0, 48000.0, 128, { { "motion", 0.0f } } },
+        { "16 notes, MOVEMENT chorus", 1, 16, 0, 48000.0, 128, { { "movement.mode", 2.0f } } },
+        { "16 notes, MOVEMENT tape", 1, 16, 0, 48000.0, 128, { { "movement.mode", 1.0f } } },
+        { "16 notes, MOVEMENT shaper", 1, 16, 0, 48000.0, 128, { { "movement.mode", 4.0f } } },
+        { "16 notes, SPACE 0", 1, 16, 0, 48000.0, 128, { { "space", 0.0f } } },
+        { "16 notes, SPACE 100", 1, 16, 0, 48000.0, 128, { { "space", 100.0f } } },
+        { "16 notes, Natural pitch", 1, 16, 0, 48000.0, 128, { { "pitchCharacter", 1.0f } } },
+        { "16 notes, REIMAGINED 50", 1, 16, 0, 48000.0, 128, { { "reimagined", 50.0f } } },
+        { "16 notes, REIMAGINED 100", 1, 16, 0, 48000.0, 128, { { "reimagined", 100.0f } } },
+        { "16 notes, TAPE FRAME 100", 1, 16, 0, 48000.0, 128, { { "reimagined", 100.0f }, { "layerA.reimagined.mode", 1.0f } } },
+        { "16 notes, MOSAIC 100", 1, 16, 0, 48000.0, 128, { { "reimagined", 100.0f }, { "layerA.reimagined.mode", 3.0f } } },
+        { "16 notes, Granular", 1, 16, 0, 48000.0, 128, { { "layerA.sourceMode", 1.0f } } },
+        { "16 notes, 2 layers", 2, 16 },
+        { "16 notes, 3 layers", 3, 16 },
+        { "16 notes, 3 layers, REIMAGINED 100", 3, 16, 0, 48000.0, 128,
+          { { "reimagined", 100.0f }, { "layerB.reimagined", 100.0f }, { "layerC.reimagined", 100.0f } } },
+    };
+    const juce::String only (std::getenv ("OSP_CPU_CASE") != nullptr ? std::getenv ("OSP_CPU_CASE") : "");
+    const double seconds = std::getenv ("OSP_CPU_SECONDS") != nullptr ? std::atof (std::getenv ("OSP_CPU_SECONDS")) : 4.0;
+    for (const auto& cs : cases)
+    {
+        if (only.isNotEmpty() && cs.name != only)
+            continue;
+        OspAudioProcessor p;
+        std::vector<juce::File> files { a, b, c };
+        files.resize (static_cast<std::size_t> (cs.layers));
+        REQUIRE (p.addLayers (juce::Array<juce::File> (files.data(), static_cast<int> (files.size()))) == cs.layers);
+        REQUIRE (p.waitForLoads (60000));
+        p.pollLoads();
+        for (const auto& [id, value] : cs.set)
+            p.setParameterValue (id, value);
+        p.prepareToPlay (cs.rate, cs.block);
+        juce::AudioBuffer<float> buffer (2, cs.block);
+        juce::MidiBuffer midi;
+        for (int n = 0; n < cs.notes; ++n)
+            midi.addEvent (juce::MidiMessage::noteOn (1, 45 + (n * 7) % 24 + cs.transpose, static_cast<juce::uint8> (90)), 0);
+        const int blocks = static_cast<int> (seconds * cs.rate / cs.block);
+        double worst = 0.0, total = 0.0;
+        for (int i = 0; i < blocks; ++i)
+        {
+            buffer.clear();
+            const auto t0 = std::chrono::steady_clock::now();
+            p.processBlock (buffer, midi);
+            const double us = std::chrono::duration<double, std::micro> (std::chrono::steady_clock::now() - t0).count();
+            midi.clear();
+            if (i > 10)
+            {
+                total += us;
+                worst = std::max (worst, us);
+            }
+        }
+        const double budget = 1.0e6 * cs.block / cs.rate;
+        const double mean = total / (blocks - 11);
+        std::cout << cs.name << ": " << juce::String (100.0 * mean / budget, 1) << " % mean, worst block " << juce::String (100.0 * worst / budget, 0)
+                  << " % (" << p.activeVoices.load() << " voices)\n";
+    }
+}
+
+// UI paint cost (hidden): how long each part of the editor takes to paint, at 1x and 2x.
+//   xvfb-run ./osp_plugin_tests "[ui-cpu]"
+TEST_CASE ("plugin: UI paint cost", "[.][ui-cpu]")
+{
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "a.wav", testsignals::vowel (midiToHz (57), 3.0, 48000.0, 3));
+    const auto b = writeSource (tmp.dir, "b.wav", testsignals::pluck (midiToHz (48), 3.0, 48000.0, 8, 0.7, 1));
+    OspAudioProcessor p;
+    REQUIRE (p.addLayers ({ a, b }) == 2);
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (editor.get());
+    REQUIRE (ui != nullptr);
+    editor->setSize (1448, 1086);
+    ui->refreshNow();
+    auto timeOf = [] (juce::Component& c, float scale) {
+        (void) c.createComponentSnapshot (c.getLocalBounds(), true, scale);   // warm caches
+        const int runs = 20;
+        const auto t0 = std::chrono::steady_clock::now();
+        for (int i = 0; i < runs; ++i)
+            (void) c.createComponentSnapshot (c.getLocalBounds(), true, scale);
+        return std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - t0).count() / runs;
+    };
+    for (float scale : { 1.0f, 2.0f })
+    {
+        std::cout << "scale " << scale << ": whole editor " << juce::String (timeOf (*editor, scale), 2) << " ms\n";
+        std::function<void (juce::Component&, int)> walk = [&] (juce::Component& c, int depth) {
+            for (auto* child : c.getChildren())
+            {
+                if (! child->isVisible() || child->getWidth() * child->getHeight() < 2000)
+                    continue;
+                const double ms = timeOf (*child, scale);
+                if (ms > 0.15)
+                    std::cout << juce::String::repeatedString ("  ", depth) << child->getName() << " [" << typeid (*child).name() << "] "
+                              << child->getWidth() << "x" << child->getHeight() << ": " << juce::String (ms, 2) << " ms\n";
+                if (depth < 2)
+                    walk (*child, depth + 1);
+            }
+        };
+        walk (*editor, 1);
+        // What a frame really costs: the region one moving element dirties, painted through
+        // every component under it (the editor repaints that rectangle, parents included).
+        auto region = [&] (const char* what, juce::Rectangle<int> r) {
+            (void) editor->createComponentSnapshot (r, true, scale);
+            const auto t0 = std::chrono::steady_clock::now();
+            for (int i = 0; i < 20; ++i)
+                (void) editor->createComponentSnapshot (r, true, scale);
+            std::cout << "  frame region " << what << " " << r.toString() << ": "
+                      << juce::String (std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - t0).count() / 20.0, 2) << " ms\n";
+        };
+        for (auto* child : editor->getChildren())
+            for (auto* card : child->getChildren())
+                if (auto* engineCard = dynamic_cast<osp::plugin::EngineCard*> (card); engineCard != nullptr && engineCard->isVisible())
+                {
+                    auto& display = engineCard->display();
+                    region ("waveform display", editor->getLocalArea (&display, display.getLocalBounds()));
+                    region ("one read head (2 px)", editor->getLocalArea (&display, display.getLocalBounds().withWidth (3)));
+                    break;
+                }
+        region ("one macro knob", { 100, 750, 140, 140 });
+        region ("keyboard", { 140, 900, 1270, 110 });
+    }
 }
