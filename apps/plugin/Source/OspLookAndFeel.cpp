@@ -191,6 +191,12 @@ void OspLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int widt
     style.startAngle = startAngle;
     style.endAngle = endAngle;
     style.enabled = slider.isEnabled();
+    if (props.contains ("thinArc"))
+    {
+        // A macro: its identity colour on a thin ring (90 %, a touch more on hover).
+        style.arcWidth = static_cast<float> (props["thinArc"]);
+        style.arc = slider.isMouseOverOrDragging() ? style.arc.withMultipliedBrightness (1.07f) : style.arc.withAlpha (0.9f);
+    }
     const auto r = juce::Rectangle<float> (static_cast<float> (x), static_cast<float> (y), static_cast<float> (width), static_cast<float> (height));
     const float side = std::min (r.getWidth(), r.getHeight());
     if (static_cast<bool> (props["popup"]))
@@ -201,7 +207,7 @@ void OspLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int widt
         style.tickCount = 11;
         style.tickRadius = 1.29f;
         style.arcRadius = 1.06f;
-        style.pointer = design::colour::accent;
+        style.pointer = props.contains ("arc") ? style.arc : design::colour::accent;
         style.pointerFrom = 0.46f;
         style.pointerTo = 0.77f;
         design::draw::knob (g, r.getCentre(), 0.5f * side / 1.36f, sliderPos, style);

@@ -397,6 +397,10 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     {
         auto& knob = macros[i];
         knob.label = std::make_unique<MacroLabel> (macroInfo[i].second, true, false);
+        knob.label->setAccent (design::colour::macro (static_cast<int> (i)));
+        // The macro's identity colour on a thin value ring (the knob itself stays neutral).
+        knob.slider.getProperties().set ("arc", static_cast<juce::int64> (design::colour::macro (static_cast<int> (i)).getARGB()));
+        knob.slider.getProperties().set ("thinArc", 2.4);
         knob.label->setTooltip (popupHints[i]);
         const int index = static_cast<int> (i);
         knob.label->onClick = [this, index] {
@@ -1141,7 +1145,8 @@ void OspAudioProcessorEditor::paintInstrument (juce::Graphics& g)
         {
             const auto knob = macros[i].slider.getBounds().toFloat();
             const bool lit = macros[i].label != nullptr && macros[i].label->isCustomised();
-            draw::led (g, { knob.getCentreX(), 877.0f }, 9.0f, lit ? juce::Colour (0xffff9a45) : juce::Colour (0xffc4521a), lit ? 1.0f : 0.15f);
+            const auto identity = colour::macro (static_cast<int> (i));
+            draw::led (g, { knob.getCentreX(), 877.0f }, 9.0f, lit ? identity.withMultipliedBrightness (1.2f) : identity.interpolatedWith (colour::panelBottom, 0.35f), lit ? 0.8f : 0.0f);
         }
     }
 }

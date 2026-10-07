@@ -83,10 +83,10 @@ void MacroLabel::paint (juce::Graphics& g)
     const auto textArea = juce::Rectangle<float> (r.getCentreX() - w * 0.5f, r.getY(), w + 2.0f, r.getHeight());
     g.drawText (text, textArea, juce::Justification::centredLeft, false);
     if (customised)
-        design::draw::led (g, { textArea.getRight() + 0.42f * r.getHeight(), r.getCentreY() }, 0.3f * r.getHeight(), juce::Colour (0xffff8a3c), 0.6f);
+        design::draw::led (g, { textArea.getRight() + 0.42f * r.getHeight(), r.getCentreY() }, 0.3f * r.getHeight(), accent.withMultipliedBrightness (1.15f), 0.5f);
     if (hover || open)
     {
-        g.setColour (open ? palette::accent : palette::text.withAlpha (0.5f));
+        g.setColour (open ? accent : palette::text.withAlpha (0.5f));
         g.fillRect (textArea.getX(), r.getCentreY() + font.getHeight() * 0.5f + 1.0f, w, 1.2f);
     }
 }
@@ -149,6 +149,20 @@ void SegmentedControl::paint (juce::Graphics& g)
             const auto key = cell.expanded (0.5f, 1.0f);
             juce::Path shape;
             shape.addRoundedRectangle (key, radius);
+            if (! accent.isTransparent())
+            {
+                // A macro's popover: a pale key of its colour, pressed in, its text in the colour.
+                const auto cream = juce::Colour (0xfff6f0e6);
+                g.setGradientFill (juce::ColourGradient (accent.interpolatedWith (cream, 0.84f), 0.0f, key.getY(), accent.interpolatedWith (cream, 0.74f), 0.0f, key.getBottom(), false));
+                g.fillPath (shape);
+                g.setColour (juce::Colours::black.withAlpha (0.1f));
+                g.drawHorizontalLine (juce::roundToInt (key.getY() + 1.0f), key.getX() + radius, key.getRight() - radius);
+                g.setColour (accent.withAlpha (0.55f));
+                g.strokePath (shape, juce::PathStrokeType (1.0f));
+                g.setColour (accent.darker (0.45f));
+            }
+            else
+            {
             juce::DropShadow (juce::Colour (0x40a0300a), 4, { 0, 1 }).drawForPath (g, shape);
             g.setGradientFill (juce::ColourGradient (colour::accentTop.brighter (0.06f), 0.0f, key.getY(), colour::accentBottom, 0.0f, key.getBottom(), false));
             g.fillPath (shape);
@@ -157,6 +171,7 @@ void SegmentedControl::paint (juce::Graphics& g)
             g.setColour (juce::Colour (0xff9e3312).withAlpha (0.6f));
             g.strokePath (shape, juce::PathStrokeType (1.0f));
             g.setColour (juce::Colour (0xfffff4ea));
+            }
         }
         else
         {
@@ -199,6 +214,12 @@ void MiniKnob::setFormatter (Formatter f)
 
 // Proportions from the reference's envelope knobs (100 x 87): caption on top, the knob at
 // 48 % of the height, its value underneath. Horizontal: caption, knob, value in a row.
+void MiniKnob::setArcColour (juce::Colour colour)
+{
+    slider.getProperties().set ("arc", static_cast<juce::int64> (colour.getARGB()));
+    slider.repaint();
+}
+
 void MiniKnob::setBoxed (bool shouldBeBoxed)
 {
     boxed = shouldBeBoxed;
@@ -307,7 +328,8 @@ void ValueSelector::paint (juce::Graphics& g)
     {
         // A popover's mode, right-aligned beside its title: quiet type and a small chevron.
         const bool hot = isMouseOver() || hasKeyboardFocus (false);
-        const auto colour = design::colour::text.withAlpha (hot ? 0.85f : 0.55f);
+        const auto base = hasAccent ? accent.darker (0.3f) : design::colour::text;
+        const auto colour = base.withAlpha (hot ? 0.95f : (hasAccent ? 0.85f : 0.55f));
         icons::draw (g, icons::Kind::chevronDown, r.removeFromRight (0.5f * h).withSizeKeepingCentre (0.42f * h, 0.42f * h), colour, 1.2f);
         r.removeFromRight (3.0f);
         g.setColour (colour);

@@ -87,7 +87,16 @@ namespace
         // Pictures designed for a larger display draw at this scale in the popovers.
         static constexpr float visualScale = 0.9f, radius = 6.0f;
 
+        /** The macro's identity: its picture's main line, node and highlight (lifted for the
+            graphite well); everything else stays as it was. */
+        void setIdentity (design::colour::Macro m)
+        {
+            identity = design::colour::macroOnDark (m);
+            repaint();
+        }
+
     protected:
+        juce::Colour identity { 0xffe8692a };
         virtual void paintVisual (juce::Graphics&, juce::Rectangle<float> plot) = 0;
         /** Draws at the display's full size (otherwise scaled by visualScale). */
         virtual bool native() const { return false; }
@@ -239,8 +248,9 @@ namespace
             // Warmth dissipating: amber, peach, white, then mineral blue; damped types cool sooner.
             auto tint = [&] (double t) {
                 const float p = static_cast<float> (std::pow (std::clamp (t / tailEnd, 0.0, 1.0), 1.0 - 0.45 * portrait.damping));
-                static const juce::Colour stops[] = { juce::Colour (0xffff8a2c), juce::Colour (0xffffa24c), juce::Colour (0xffffc68e),
-                                                      juce::Colour (0xfff3ddc4), juce::Colour (0xffe6e6e4), juce::Colour (0xffc4cfd8), juce::Colour (0xff8fa4b8) };
+                // Warm onset, rose, SPACE's mauve, then a cool blue-grey.
+                static const juce::Colour stops[] = { juce::Colour (0xffff8a2c), juce::Colour (0xffffa24c), juce::Colour (0xfff5bfa0),
+                                                      juce::Colour (0xffe9c8cf), juce::Colour (0xffcdbbd2), juce::Colour (0xffb2aac4), juce::Colour (0xff8fa4b8) };
                 static const float at[] = { 0.0f, 0.1f, 0.25f, 0.45f, 0.65f, 0.82f, 1.0f };
                 for (int i = 1; i < 7; ++i)
                     if (p <= at[i])
@@ -296,6 +306,30 @@ namespace
                 const float alpha = std::clamp ((0.3f + 0.65f * static_cast<float> (rng.nextDouble())) * (0.5f + 0.5f * near) * (0.6f + 0.6f * static_cast<float> (a)), 0.0f, 0.95f);
                 g.setColour (tint (t).withAlpha (alpha));
                 g.fillEllipse (xAt (t) - 0.5f * size, y - 0.5f * size, size, size);
+            }
+
+            // The tail's envelope, its outline in SPACE's mauve (the cloud keeps its colours).
+            {
+                juce::Path upper, lower;
+                const int steps = 120;
+                for (int i = 0; i <= steps; ++i)
+                {
+                    const double t = onset + (tailEnd - onset) * i / steps;
+                    const float x = xAt (t), e = half * static_cast<float> (std::min (1.0, tail (t))) * 0.98f;
+                    if (i == 0)
+                    {
+                        upper.startNewSubPath (x, mid - e);
+                        lower.startNewSubPath (x, mid + e);
+                    }
+                    else
+                    {
+                        upper.lineTo (x, mid - e);
+                        lower.lineTo (x, mid + e);
+                    }
+                }
+                g.setColour (identity.withAlpha (0.75f));
+                g.strokePath (upper, juce::PathStrokeType (1.1f * dot, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+                g.strokePath (lower, juce::PathStrokeType (1.1f * dot, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
             }
 
             // Early reflections: discrete amber strokes over the first tenth of the picture,
@@ -486,9 +520,10 @@ namespace
             under.lineTo (area.getRight(), area.getBottom());
             under.lineTo (area.getX(), area.getBottom());
             under.closeSubPath();
-            g.setColour (amber.withAlpha (0.08f));
+            // The processing curve in CHARACTER's moss (the source's spectrum stays its own).
+            g.setColour (identity.withAlpha (0.1f));
             g.fillPath (under);
-            g.setColour (amber.brighter (0.2f));
+            g.setColour (identity);
             g.strokePath (response, juce::PathStrokeType (1.8f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
             // Cutoff (TILT: the pivot) and its value.
@@ -496,7 +531,7 @@ namespace
             const float mx = xAt (markerHz), my = yAt (responseDb (type, markerHz, fc, resonance, tilt));
             g.setColour (raised);
             g.fillEllipse (mx - 4.0f, my - 4.0f, 8.0f, 8.0f);
-            g.setColour (accent);
+            g.setColour (identity);
             g.drawEllipse (mx - 4.0f, my - 4.0f, 8.0f, 8.0f, 1.5f);
             g.setColour (raised.withAlpha (0.9f));
             g.setFont (type::annotation (10.0f));
@@ -566,6 +601,8 @@ namespace
             const double amount = std::clamp (0.01 * value (s, "motion"), 0.0, 1.0);
             const float depth = static_cast<float> (0.25 + 0.75 * amount);   // the knob's amount, still visible at 0
             const float mid = area.getCentreY(), half = area.getHeight() * 0.42f;
+            // MOVEMENT's mineral blue for the movement itself; secondary lines a quiet stone.
+            const auto stone = juce::Colour (0xffaaa49a);
             g.setColour (displayLine);
             if (mode != MovementMode::shaper)
                 g.drawHorizontalLine (juce::roundToInt (mid), area.getX(), area.getRight());
@@ -579,11 +616,11 @@ namespace
                     const double pitch = std::sqrt (std::clamp (0.01 * value (s, "movement.drift.pitch"), 0.02, 1.0));
                     const double tone = std::sqrt (std::clamp (0.01 * value (s, "movement.drift.tone"), 0.02, 1.0));
                     const double window = std::clamp (6.0 / rate, 6.0, 60.0);
-                    trace (g, area, window, [rate] (double t) { return shaping::sharedWander (11, t, rate * 1.3) * 0.6; }, mineral.withAlpha (0.45f), 1.0f, mid, half * depth);
-                    trace (g, area, window, [rate, tone] (double t) { return tone * shaping::sharedWander (7, t, rate * 0.8); }, lavender.withAlpha (0.75f), 1.4f, mid, half * depth);
-                    trace (g, area, window, [rate, pitch] (double t) { return pitch * shaping::sharedWander (3, t, rate); }, amber, 2.0f, mid, half * depth);
-                    caption (g, area, "PITCH", amber, area.getY());
-                    caption (g, area, "TONE", lavender, area.getY() + 11.0f);
+                    trace (g, area, window, [rate] (double t) { return shaping::sharedWander (11, t, rate * 1.3) * 0.6; }, stone.withAlpha (0.35f), 1.0f, mid, half * depth);
+                    trace (g, area, window, [rate, tone] (double t) { return tone * shaping::sharedWander (7, t, rate * 0.8); }, stone.withAlpha (0.7f), 1.4f, mid, half * depth);
+                    trace (g, area, window, [rate, pitch] (double t) { return pitch * shaping::sharedWander (3, t, rate); }, identity, 2.0f, mid, half * depth);
+                    caption (g, area, "PITCH", identity, area.getY());
+                    caption (g, area, "TONE", stone, area.getY() + 11.0f);
                     break;
                 }
                 case MovementMode::tape:
@@ -594,11 +631,11 @@ namespace
                     const double wowHz = shaping::tapeWowHz (a), flutterHz = shaping::tapeFlutterHz (b);
                     auto rough = [wear] (double t) { return wear * 0.25 * shaping::sharedWander (19, t, 9.0); };
                     trace (g, area, 4.0, [wowHz, a, rough] (double t) { return (0.7 * std::sin (twoPi * wowHz * t) + 0.5 * shaping::sharedWander (5, t, 0.3)) * (0.3 + 0.7 * a) * 0.8 + rough (t); },
-                           coral, 2.0f, area.getY() + area.getHeight() * 0.3f, area.getHeight() * 0.24f * depth);
+                           identity, 2.0f, area.getY() + area.getHeight() * 0.3f, area.getHeight() * 0.24f * depth);
                     trace (g, area, 1.0, [flutterHz, b, rough] (double t) { return std::sin (twoPi * flutterHz * t) * (0.7 + 0.3 * shaping::sharedWander (9, t, 4.0)) * (0.2 + 0.8 * b) + rough (t); },
-                           mineral, 1.2f, area.getY() + area.getHeight() * 0.76f, area.getHeight() * 0.18f * depth);
-                    caption (g, area, "WOW  " + format::hertz (wowHz), coral, area.getY());
-                    caption (g, area, "FLUTTER  " + format::hertz (flutterHz), mineral, area.getY() + area.getHeight() * 0.5f);
+                           stone, 1.2f, area.getY() + area.getHeight() * 0.76f, area.getHeight() * 0.18f * depth);
+                    caption (g, area, "WOW  " + format::hertz (wowHz), identity, area.getY());
+                    caption (g, area, "FLUTTER  " + format::hertz (flutterHz), stone, area.getY() + area.getHeight() * 0.5f);
                     break;
                 }
                 case MovementMode::chorus:
@@ -609,10 +646,10 @@ namespace
                     const double stereo = 0.01 * value (s, "movement.chorus.stereo");
                     const double window = 2.5 / rate;
                     const float extent = half * static_cast<float> (0.25 + 0.75 * width) * depth;
-                    trace (g, area, window, [rate, stereo] (double t) { return std::sin (twoPi * rate * t + std::numbers::pi * stereo); }, lavender, 1.6f, mid, extent);
-                    trace (g, area, window, [rate] (double t) { return std::sin (twoPi * rate * t); }, coral, 1.8f, mid, extent);
-                    caption (g, area, "L", coral, area.getY());
-                    caption (g, area, "R", lavender, area.getY() + 11.0f);
+                    trace (g, area, window, [rate, stereo] (double t) { return std::sin (twoPi * rate * t + std::numbers::pi * stereo); }, stone, 1.6f, mid, extent);
+                    trace (g, area, window, [rate] (double t) { return std::sin (twoPi * rate * t); }, identity, 1.8f, mid, extent);
+                    caption (g, area, "L", identity, area.getY());
+                    caption (g, area, "R", stone, area.getY() + 11.0f);
                     break;
                 }
                 case MovementMode::pulse:
@@ -631,9 +668,9 @@ namespace
                         return [=] (double t) { return 2.0 * gain (twoPi * rate * t + offset) - 1.0; };
                     };
                     if (stereo > 0.02)
-                        trace (g, area, window, toTrace (std::numbers::pi * stereo), lavender.withAlpha (0.7f), 1.3f, bottom - 0.5f * height, 0.5f * height);
-                    trace (g, area, window, toTrace (0.0), coral, 2.0f, bottom - 0.5f * height, 0.5f * height);
-                    caption (g, area, format::hertz (rate), coral, area.getY());
+                        trace (g, area, window, toTrace (std::numbers::pi * stereo), stone.withAlpha (0.7f), 1.3f, bottom - 0.5f * height, 0.5f * height);
+                    trace (g, area, window, toTrace (0.0), identity, 2.0f, bottom - 0.5f * height, 0.5f * height);
+                    caption (g, area, format::hertz (rate), identity, area.getY());
                     break;
                 }
                 case MovementMode::shaper:
@@ -654,7 +691,7 @@ namespace
                         const auto c = juce::Rectangle<float> (area.getX() + static_cast<float> (i) * cell, area.getY(), cell, area.getHeight());
                         if (i == current)
                         {
-                            g.setColour (accent.withAlpha (0.12f));
+                            g.setColour (identity.withAlpha (0.14f));
                             g.fillRect (c);
                         }
                         if (i > 0)
@@ -679,16 +716,16 @@ namespace
                     }
                     contour.lineTo (area.getRight(), area.getBottom());
                     contour.closeSubPath();
-                    g.setColour (coral.withAlpha (0.28f));
+                    g.setColour (identity.withAlpha (0.3f));
                     g.strokePath (ghost, juce::PathStrokeType (1.0f));
-                    g.setGradientFill (juce::ColourGradient (coral.withAlpha (0.65f), 0.0f, area.getY(), amber.withAlpha (0.2f), 0.0f, area.getBottom(), false));
+                    g.setGradientFill (juce::ColourGradient (identity.withAlpha (0.6f), 0.0f, area.getY(), identity.withAlpha (0.12f), 0.0f, area.getBottom(), false));
                     g.fillPath (contour);
-                    g.setColour (coral.brighter (0.3f));
+                    g.setColour (identity.brighter (0.15f));
                     g.strokePath (contour, juce::PathStrokeType (1.2f));
                     if (phase >= 0.0f)
                     {
                         const float x = area.getX() + phase * area.getWidth();
-                        g.setColour (accent);
+                        g.setColour (accent);   // the live playhead keeps the instrument's coral
                         g.fillRect (juce::Rectangle<float> (x - 0.75f, area.getY(), 1.5f, area.getHeight()));
                     }
                     break;
@@ -781,7 +818,8 @@ namespace
                     fill.lineTo (area.getRight(), base);
                     fill.lineTo (area.getX(), base);
                     fill.closeSubPath();
-                    const auto colour = spectrum (static_cast<float> (colourAt) * 0.6f);
+                    // The performance now in LIFE's rust (TONE still moves its shade a little).
+                    const auto colour = identity.withMultipliedBrightness (0.92f + 0.22f * static_cast<float> (colourAt));
                     g.setGradientFill (juce::ColourGradient (colour.withAlpha (0.3f), 0.0f, base - height, colour.withAlpha (0.02f), 0.0f, base, false));
                     g.fillPath (fill);
                     g.setColour (colour.brighter (0.2f));
@@ -789,7 +827,7 @@ namespace
                 }
                 else
                 {
-                    const auto colour = lavender.interpolatedWith (mineral, static_cast<float> (colourAt)).withMultipliedSaturation (0.6f);
+                    const auto colour = lavender.interpolatedWith (mineral, static_cast<float> (colourAt)).withMultipliedSaturation (0.35f);
                     const float alpha = takes > 0 ? 0.42f : 0.22f + 0.06f * static_cast<float> (contours - c);
                     g.setColour (colour.withAlpha (alpha));
                     g.strokePath (contour, juce::PathStrokeType (1.1f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
@@ -885,9 +923,9 @@ namespace
             fill.lineTo (area.getRight(), area.getBottom());
             fill.lineTo (area.getX(), area.getBottom());
             fill.closeSubPath();
-            g.setGradientFill (juce::ColourGradient (coral.withAlpha (0.22f), 0.0f, area.getY(), mineral.withAlpha (0.04f), 0.0f, area.getBottom(), false));
+            g.setGradientFill (juce::ColourGradient (identity.withAlpha (0.2f), 0.0f, area.getY(), identity.withAlpha (0.02f), 0.0f, area.getBottom(), false));
             g.fillPath (fill);
-            g.setColour (coral.brighter (0.25f));
+            g.setColour (identity);
             g.strokePath (response, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
             // The notes just played, newest brightest.
@@ -915,8 +953,9 @@ namespace
         /** A compact popover (230-270 x 170-210 reference px) that unfolds above its macro:
             a small title with the mode as a quiet selector beside it, the visualisation as
             the largest element, then small knobs. */
-        MacroPanel (OspAudioProcessor& p, juce::String popupTitle, int width, int displayHeight)
-            : MiniPanel (std::move (popupTitle)), processor (p), panelWidth (width), visualHeight (displayHeight)
+        MacroPanel (OspAudioProcessor& p, juce::String popupTitle, int width, int displayHeight, design::colour::Macro macro)
+            : MiniPanel (std::move (popupTitle)), processor (p), panelWidth (width), visualHeight (displayHeight),
+              identity (macro), accent (design::colour::macro (macro))
         {
         }
 
@@ -926,6 +965,7 @@ namespace
         {
             modeSelector = std::make_unique<ValueSelector> (*processor.parameters.getParameter (id), juce::String());
             modeSelector->setPlain (true);
+            modeSelector->setAccent (accent);
             modeSelector->setTooltip (tooltip);
             addAndMakeVisible (*modeSelector);
             return *modeSelector;
@@ -934,6 +974,7 @@ namespace
         SegmentedControl& tabs (const char* id, juce::StringArray items, juce::String tooltip)
         {
             modeTabs = std::make_unique<SegmentedControl> (*processor.parameters.getParameter (id), std::move (items));
+            modeTabs->setAccent (accent);
             modeTabs->setTooltip (tooltip);
             addAndMakeVisible (*modeTabs);
             return *modeTabs;
@@ -941,12 +982,14 @@ namespace
         void setVisual (std::unique_ptr<Visual> v)
         {
             visual = std::move (v);
+            visual->setIdentity (identity);
             addAndMakeVisible (*visual);
         }
         MiniKnob& knob (bool secondary, const char* id, const char* caption, MiniKnob::Formatter f)
         {
             auto k = std::make_unique<MiniKnob> (processor.parameters, id, caption, std::move (f));
             k->setSmall (secondary);
+            k->setArcColour (accent);
             addAndMakeVisible (*k);
             (secondary ? secondaryRow : primaryRow).push_back (k.get());
             knobs.push_back (std::move (k));
@@ -1005,6 +1048,8 @@ namespace
         OspAudioProcessor& processor;
         int panelWidth;
         int visualHeight;
+        design::colour::Macro identity;
+        juce::Colour accent;   ///< the macro's identity (its knobs' arcs, the chosen mode)
         std::unique_ptr<ValueSelector> modeSelector;
         std::unique_ptr<SegmentedControl> modeTabs;
         std::unique_ptr<Visual> visual;
@@ -1018,7 +1063,7 @@ namespace
     class MovementPanel final : public MacroPanel
     {
     public:
-        explicit MovementPanel (OspAudioProcessor& p) : MacroPanel (p, "MOVEMENT", 270, 62)
+        explicit MovementPanel (OspAudioProcessor& p) : MacroPanel (p, "MOVEMENT", 270, 62, design::colour::Macro::movement)
         {
             auto& m = mode ("movement.mode", "Movement: drift, tape, chorus, pulse or rhythmic shaper");
             m.onChange = [this] (int newMode) {
@@ -1135,7 +1180,7 @@ namespace
             g.drawText ("NEW", r.removeFromTop (0.36f * h), juce::Justification::centred, false);
             const auto box = r.reduced (1.0f, 1.0f);
             const bool hot = isEnabled() && (isMouseOver() || hasKeyboardFocus (false));
-            design::draw::button (g, box, 0.2f * box.getHeight(), pressed, hot, design::colour::accent);
+            design::draw::button (g, box, 0.2f * box.getHeight(), pressed, hot, design::colour::macro (design::colour::Macro::life));
             icons::draw (g, icons::Kind::loop, box.withSizeKeepingCentre (0.6f * box.getHeight(), 0.6f * box.getHeight()),
                          design::colour::text.withAlpha (0.75f * alpha), 1.2f);
         }
@@ -1178,7 +1223,7 @@ namespace
     class LifePanel final : public MacroPanel
     {
     public:
-        explicit LifePanel (OspAudioProcessor& p) : MacroPanel (p, "LIFE", 268, 66)
+        explicit LifePanel (OspAudioProcessor& p) : MacroPanel (p, "LIFE", 268, 66, design::colour::Macro::life)
         {
             mode ("life.mode", "Natural: subtle; Loose: wider; Fray: now and then a note strays");
             setVisual (std::make_unique<LifeVisual> (p));
@@ -1257,7 +1302,7 @@ std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, OspAudioProcessor
         case MacroPopup::dynamics:
         {
             // ATTACK and RELEASE are the instrument's envelope (beside the macros).
-            auto popup = std::make_unique<MacroPanel> (processor, "DYNAMICS", 232, 70);
+            auto popup = std::make_unique<MacroPanel> (processor, "DYNAMICS", 232, 70, design::colour::Macro::dynamics);
             popup->mode ("dynamics.curve", "Velocity curve: soft reaches loud easily, hard needs a firm touch");
             popup->setVisual (std::make_unique<DynamicsVisual> (processor));
             popup->knob (false, "velocityRange", "RANGE", [] (double v) { return juce::String (v, 0) + " dB"; });
@@ -1266,7 +1311,7 @@ std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, OspAudioProcessor
         }
         case MacroPopup::character:
         {
-            auto popup = std::make_unique<MacroPanel> (processor, "CHARACTER", 262, 58);
+            auto popup = std::make_unique<MacroPanel> (processor, "CHARACTER", 262, 58, design::colour::Macro::character);
             popup->mode ("character.type", "Filter type");
             popup->setVisual (std::make_unique<CharacterVisual> (processor));
             popup->knob (false, "character.min", "MIN", [] (double v) { return format::hertz (v); });
@@ -1284,7 +1329,7 @@ std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, OspAudioProcessor
             break;
     }
 
-    auto popup = std::make_unique<MacroPanel> (processor, "SPACE", 252, 64);
+    auto popup = std::make_unique<MacroPanel> (processor, "SPACE", 252, 64, design::colour::Macro::space);
     popup->mode ("space.type", "Room, chamber, plate or spring");
     auto& types = popup->tabs ("space.type", { "ROOM", "CHAMBER", "PLATE", "SPRING" }, "Room, chamber, plate or spring");
     popup->setVisual (std::make_unique<SpaceVisual> (state));

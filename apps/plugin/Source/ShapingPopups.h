@@ -24,6 +24,8 @@ public:
     MacroLabel (juce::String text, bool opensPopup, bool twoWay = false);
 
     std::function<void()> onClick;
+    /** The macro's identity colour (its small light and the open underline). */
+    void setAccent (juce::Colour colour) { accent = colour; repaint(); }
     void setCustomised (bool customised);
     bool isCustomised() const noexcept { return customised; }
     void setOpen (bool open);
@@ -37,6 +39,7 @@ private:
     juce::String text;
     bool opensPopup, twoWay;
     bool customised = false, open = false;
+    juce::Colour accent { 0xffe8692a };
 };
 
 /** A row of mutually exclusive choices bound to a choice parameter (the chosen one sits in, its text in the accent). */
@@ -47,12 +50,15 @@ public:
 
     std::function<void (int)> onChange;
     int selected() const noexcept { return index; }
+    /** A macro popover's identity: the chosen segment becomes a pale key of it, its text in it. */
+    void setAccent (juce::Colour colour) { accent = colour; repaint(); }
 
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
 
 private:
     juce::StringArray items;
+    juce::Colour accent;   ///< transparent: the instrument's coral key
     int index = 0;
     juce::ParameterAttachment attachment;
 };
@@ -73,6 +79,8 @@ public:
     void setSmall (bool small) { compact = small; resized(); repaint(); }
     /** The popups' cell (SPACE's DECAY): caption, a ticked knob, the value in a box. */
     void setBoxed (bool shouldBeBoxed);
+    /** The value arc (and a boxed knob's pointer) in this colour: its macro's identity. */
+    void setArcColour (juce::Colour colour);
 
     void paint (juce::Graphics&) override;
     void resized() override;
@@ -96,6 +104,8 @@ public:
     ValueSelector (juce::RangedAudioParameter& parameter, juce::String caption);
     /** Text only (a popover's mode beside its title): no key, quiet type, a small chevron. */
     void setPlain (bool shouldBePlain) { plain = shouldBePlain; repaint(); }
+    /** A macro popover's identity: the plain mode's text leans to it. */
+    void setAccent (juce::Colour colour) { accent = colour; hasAccent = true; repaint(); }
     int selected() const noexcept { return index; }
     std::function<void (int)> onChange;
     void paint (juce::Graphics&) override;
@@ -113,7 +123,8 @@ private:
     juce::RangedAudioParameter& parameter;
     juce::String caption;
     int index = 0;
-    bool plain = false;
+    bool plain = false, hasAccent = false;
+    juce::Colour accent;
     juce::ParameterAttachment attachment;
 };
 

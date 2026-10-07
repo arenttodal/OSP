@@ -142,7 +142,8 @@ void knob (juce::Graphics& g, juce::Point<float> c, float r, float position, con
         }
 
     // Track and value arc, hugging the rim.
-    const float arcRadius = style.arcRadius * r, arcWidth = std::max (2.4f, 0.12f * r);
+    const bool thin = style.arcWidth > 0.0f;
+    const float arcRadius = style.arcRadius * r, arcWidth = thin ? style.arcWidth : std::max (2.4f, 0.12f * r);
     {
         // The track: a soft grey ring, shaded on its inner edge.
         juce::Path track;
@@ -160,7 +161,10 @@ void knob (juce::Graphics& g, juce::Point<float> c, float r, float position, con
             juce::Path value;
             value.addCentredArc (c.x, c.y, arcRadius, arcRadius, 0.0f, std::min (from, angle), std::max (from, angle), true);
             const auto p0 = at (arcRadius, from), p1 = at (arcRadius, angle);
-            g.setGradientFill (juce::ColourGradient (style.arc.darker (0.55f), p0.x, p0.y, style.arc.brighter (0.12f), p1.x, p1.y, false));
+            if (thin)   // the macro identity: one flat, slightly translucent colour, no glow
+                g.setColour (style.arc);
+            else
+                g.setGradientFill (juce::ColourGradient (style.arc.darker (0.55f), p0.x, p0.y, style.arc.brighter (0.12f), p1.x, p1.y, false));
             g.strokePath (value, juce::PathStrokeType (arcWidth, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         }
     }
