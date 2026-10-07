@@ -189,6 +189,60 @@ TEST_CASE ("post: SPACE at zero is bypassed and changing type does not click", "
     CHECK (atSwitch <= steady);
 }
 
+TEST_CASE ("post: SPACE sleeps through silence and wakes without a trace", "[unit][post][space]")
+{
+    // A note, a long silence, a second note. With exact silence the reverb goes to sleep
+    // once its tail is below -120 dBFS; fed 1e-20 instead (inaudible, but not silence) it
+    // never sleeps. Both must sound the same: the sleep is only a CPU saving, and the
+    // modulation phase has to carry on through it.
+    const auto note = testsignals::vowel (220.0, 0.5, 48000.0, 1);   // stereo
+    const std::size_t gap = 10 * 48000, len = note.numFrames();
+    auto make = [&] (float filler) {
+        AudioData a = note;
+        for (std::size_t c = 0; c < a.channels.size(); ++c)
+        {
+            a.channels[c].resize (len + gap + len, filler);
+            std::copy (note.channels[c].begin(), note.channels[c].end(), a.channels[c].begin() + static_cast<std::ptrdiff_t> (len + gap));
+        }
+        return a;
+    };
+    const auto model = modelFor (note);
+    auto run = [&] (const AudioData& in) {
+        PostProcessor post;
+        post.prepare (48000.0, 256);
+        post.setModel (model.get());
+        Shaping sh;
+        sh.spaceType = SpaceType::room;
+        sh.spaceDecaySeconds = 1.0;
+        post.setShaping (sh);
+        Macros m;
+        m.space = 0.6;
+        m.reimagined = 0.0;
+        m.motion = 0.0;
+        post.setMacros (m);
+        post.reset();
+        return process (post, in);
+    };
+    const auto silent = make (0.0f), awake = make (1.0e-20f);
+    const auto a = run (silent), b = run (awake);
+
+    // Asleep: the last seconds of the gap are exact silence.
+    CHECK (energy (a.channels[0], len + gap - 2 * 48000, len + gap) == 0.0);
+    // Awake again at once: the second note has its room around it ...
+    const auto onset = len + gap;
+    double wetSecond = 0.0;
+    for (std::size_t i = onset; i < onset + len; ++i)
+        wetSecond = std::max (wetSecond, static_cast<double> (std::abs (a.channels[0][i] - silent.channels[0][i])));
+    CHECK (wetSecond > 1.0e-3);
+    // ... and it is the same room the never-sleeping reverb gives (differences far below hearing).
+    double diff = 0.0;
+    for (std::size_t c = 0; c < a.channels.size(); ++c)
+        for (std::size_t i = onset; i < a.channels[c].size(); ++i)
+            diff = std::max (diff, static_cast<double> (std::abs (a.channels[c][i] - b.channels[c][i])));
+    INFO ("largest difference after waking " << diff);
+    CHECK (diff < 1.0e-5);
+}
+
 TEST_CASE ("post: SPACE widens a mono source and stays bounded", "[unit][post]")
 {
     const auto audio = testsignals::vowel (220.0, 2.0, 48000.0, 1, 0.5, 1);

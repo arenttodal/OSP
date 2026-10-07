@@ -234,8 +234,10 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
   Apple Silicon); +24 st 4.6x, three layers 2.8x, KALEIDOSCOPE 100 % 2.4x. Hot spots: sinc reads 43 %,
   per-voice LP24 ladder 23 %, SPACE's per-sample `std::sin`. The editor repaints whole waveform displays
   through live DropShadows at 30 fps while playing (44 ms per display per frame on the VM): the largest
-  CPU user overall. Ranked fixes (background cache + dirty strips, bit-exact audio items, SIMD sinc,
-  mip-mapped sources) are listed there; none implemented yet.
+  CPU user overall. Ranked fixes are listed there. **Done:** cached shadow masks + dirty-strip
+  repaints (editor 331 → 38 ms full paint, a playing display ≈ 2 ms per head instead of 44 ms),
+  SPACE phasor modulation + reverb sleep in silence + control-rate caching (idle 1.0 → 0.15 %,
+  reference −5 % instructions; output within −132 dBFS). Open: SIMD sinc, mip-mapped sources.
 
 - **CPU (engine C)**: about 1.2x the baseline per voice (continuation crossfades, shelves,
   post stage). macOS 14 arm64 CI runner (48 kHz / 128): engine C 16 held voices **17.1 %**

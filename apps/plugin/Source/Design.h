@@ -153,6 +153,28 @@ namespace layout
 
 //==============================================================================
 /** Drawing shared by every section: one material system, not per-component styling. */
+/**
+    juce::DropShadow, with its blur computed once. juce::DropShadow::drawForPath renders the
+    path into an alpha mask, box-blurs it and fills it with the colour - on every paint, also
+    for the small regions a moving element dirties (the housing's 26 px shadow alone covers
+    the whole instrument). This keeps the blurred mask, keyed by the path's exact outline,
+    its sub-pixel phase, the radius and the offset, and repeats only the final fill: the
+    same pixels, without the blur. Message thread only (the cache is not shared).
+*/
+class CachedShadow
+{
+public:
+    CachedShadow (juce::Colour c, int r, juce::Point<int> o) noexcept : colour (c), radius (r), offset (o) {}
+    void drawForPath (juce::Graphics&, const juce::Path&) const;
+    /** Masks held (tests, diagnostics). */
+    static int cachedMaskCount();
+
+private:
+    juce::Colour colour;
+    int radius;
+    juce::Point<int> offset;
+};
+
 namespace draw
 {
     /** The housing: the instrument's body on its surround, with a broad quiet shadow. */

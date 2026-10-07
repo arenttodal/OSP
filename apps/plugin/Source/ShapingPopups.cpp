@@ -127,7 +127,7 @@ void SegmentedControl::paint (juce::Graphics& g)
     {
         juce::Path strip;
         strip.addRoundedRectangle (r, radius);
-        juce::DropShadow (juce::Colour (0x22302418), 3, { 0, 1 }).drawForPath (g, strip);
+        design::CachedShadow (juce::Colour (0x22302418), 3, { 0, 1 }).drawForPath (g, strip);
         g.setGradientFill (juce::ColourGradient (juce::Colour (0xffeee7da), 0.0f, r.getY(), juce::Colour (0xffdcd3c4), 0.0f, r.getBottom(), false));
         g.fillPath (strip);
         g.setColour (juce::Colour (0xffc4bbad));
@@ -163,7 +163,7 @@ void SegmentedControl::paint (juce::Graphics& g)
             }
             else
             {
-            juce::DropShadow (juce::Colour (0x40a0300a), 4, { 0, 1 }).drawForPath (g, shape);
+            design::CachedShadow (juce::Colour (0x40a0300a), 4, { 0, 1 }).drawForPath (g, shape);
             g.setGradientFill (juce::ColourGradient (colour::accentTop.brighter (0.06f), 0.0f, key.getY(), colour::accentBottom, 0.0f, key.getBottom(), false));
             g.fillPath (shape);
             g.setColour (juce::Colour (0xffffd9c4).withAlpha (0.8f));
@@ -430,8 +430,8 @@ void MiniPanel::paint (juce::Graphics& g)
         // A small raised extension of the macro beneath it: warm cream, a hairline edge, a
         // short soft shadow (no window chrome, no backdrop).
         shape.addRoundedRectangle (r, 14.0f);
-        juce::DropShadow (juce::Colour (0x1e1e1a16), 16, { 0, 5 }).drawForPath (g, shape);
-        juce::DropShadow (juce::Colour (0x161e1a16), 2, { 0, 1 }).drawForPath (g, shape);
+        design::CachedShadow (juce::Colour (0x1e1e1a16), 16, { 0, 5 }).drawForPath (g, shape);
+        design::CachedShadow (juce::Colour (0x161e1a16), 2, { 0, 1 }).drawForPath (g, shape);
         g.setGradientFill (juce::ColourGradient (juce::Colour (0xfff8f4ec), 0.0f, r.getY(), juce::Colour (0xffeee7db), 0.0f, r.getBottom(), false));
         g.fillPath (shape);
         g.setColour (juce::Colour (0xffd3cabc));
@@ -444,8 +444,8 @@ void MiniPanel::paint (juce::Graphics& g)
         return;
     }
     shape.addRoundedRectangle (r, 12.0f * u);
-    juce::DropShadow (juce::Colour (0x5a281c10), juce::roundToInt (32.0f * u), { 3, juce::roundToInt (12.0f * u) }).drawForPath (g, shape);
-    juce::DropShadow (juce::Colour (0x3a281c10), juce::roundToInt (4.0f * u), { 0, 1 }).drawForPath (g, shape);
+    design::CachedShadow (juce::Colour (0x5a281c10), juce::roundToInt (32.0f * u), { 3, juce::roundToInt (12.0f * u) }).drawForPath (g, shape);
+    design::CachedShadow (juce::Colour (0x3a281c10), juce::roundToInt (4.0f * u), { 0, 1 }).drawForPath (g, shape);
     g.setGradientFill (juce::ColourGradient (juce::Colour (0xfff6f2ea), 0.0f, r.getY(), juce::Colour (0xffe5dccf), 0.0f, r.getBottom(), false));
     g.fillPath (shape);
     g.setColour (juce::Colour (0xffc9bfb1).withAlpha (0.8f));

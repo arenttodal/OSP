@@ -258,6 +258,8 @@ private:
     std::int64_t clock = 0;
     CharacterFilter charFilter;
     double charOctaves = 0.0;      ///< smoothed CHARACTER position (octaves re 1 Hz)
+    double rangeMinHz = -1.0, rangeMaxHz = -1.0;          ///< CHARACTER range the cached octaves below belong to
+    double rangeLoOctaves = 0.0, rangeHiOctaves = 0.0;
     double charSmoothing = 1.0;
     double filterEnv = 0.0, filterEnvStep = 1.0, filterEnvDecay = 0.0;
     bool filterEnvAttacking = true;

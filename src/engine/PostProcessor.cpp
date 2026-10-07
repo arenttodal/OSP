@@ -20,6 +20,7 @@ void PostProcessor::prepare (double rate, int /*maximumBlockSize*/, std::uint64_
         r.prepare (rate);
     reverbFadeLength = std::max (1, static_cast<int> (0.25 * rate));
     spaceCoef = 1.0 - std::exp (-1.0 / (0.05 * rate));
+    sleepAfter = std::max (1, static_cast<int> (0.25 * rate));
     reset();
 }
 
@@ -34,6 +35,8 @@ void PostProcessor::reset() noexcept
     appliedDecay = shaping.spaceDecaySeconds;
     activeReverb = 0;
     reverbFade = 0;
+    reverbAsleep = false;
+    quietRun = 0;
     for (auto& r : reverbs)
     {
         r.configure (appliedType, appliedDecay);
@@ -111,8 +114,26 @@ void PostProcessor::process (float* left, float* right, int numSamples) noexcept
                 for (auto& rv : reverbs)
                     rv.reset();
             }
+            const bool silentIn = l == 0.0f && r == 0.0f;
+            if (reverbAsleep && (! silentIn || reverbFade > 0))
+            {
+                reverbAsleep = false;
+                quietRun = 0;
+            }
+            if (reverbAsleep)
+            {
+                // Silence in, a tail below -120 dBFS: the output is silence.
+                reverbs[static_cast<std::size_t> (activeReverb)].skip();
+                left[i] = l;
+                right[i] = r;
+                continue;
+            }
             float wl, wr;
             reverbs[static_cast<std::size_t> (activeReverb)].process (l, r, wl, wr);
+            if (silentIn && reverbFade == 0 && std::abs (wl) < 1.0e-6f && std::abs (wr) < 1.0e-6f)
+                reverbAsleep = ++quietRun >= sleepAfter;
+            else
+                quietRun = 0;
             if (reverbFade > 0)
             {
                 float ol, orr;

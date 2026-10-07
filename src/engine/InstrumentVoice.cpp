@@ -553,7 +553,15 @@ void InstrumentVoice::updateCharacter (bool immediate) noexcept
         else
             filterEnv *= filterEnvDecay;
     }
-    const double target = shaping::cutoffOctaves (s, shapingState->character);
+    // The range ends rarely move; their log2 is taken only when they do.
+    if (s.filterMinHz != rangeMinHz || s.filterMaxHz != rangeMaxHz)
+    {
+        rangeMinHz = s.filterMinHz;
+        rangeMaxHz = s.filterMaxHz;
+        rangeLoOctaves = shaping::rangeOctaves (rangeMinHz);
+        rangeHiOctaves = shaping::rangeOctaves (rangeMaxHz);
+    }
+    const double target = shaping::cutoffOctaves (rangeLoOctaves, rangeHiOctaves, shapingState->character);
     charOctaves = immediate ? target : charOctaves + (target - charOctaves) * charSmoothing;
     const double env = shaping::envelopeOctaves (s.envAmount) * filterEnv * envelopeScale;
     const double octaves = charOctaves + env + velocityOctaves + driftTone;

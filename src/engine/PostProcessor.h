@@ -77,6 +77,10 @@ private:
     SpaceType appliedType = SpaceType::plate;
     double appliedDecay = -1.0;
     bool spaceIdle = true;
+    // Asleep: nothing has come in and the tail has been below -120 dBFS for a quarter
+    // second, so the reverb is not run (its clock still moves); the first sound wakes it.
+    bool reverbAsleep = false;
+    int quietRun = 0, sleepAfter = 12000;
 };
 
 } // namespace osp

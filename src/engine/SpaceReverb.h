@@ -3,6 +3,7 @@
 #include "engine/Shaping.h"
 
 #include <array>
+#include <numbers>
 #include <vector>
 
 namespace osp
@@ -45,6 +46,9 @@ public:
     void configure (SpaceType type, double decaySeconds) noexcept;
     /** Wet output only. */
     void process (float inL, float inR, float& outL, float& outR) noexcept;
+    /** One sample of silence the caller does not need processed (the reverb is asleep):
+        only the modulation's clock moves on, so the tail resumes exactly in phase. */
+    void skip() noexcept { modPhase += 2.0 * std::numbers::pi * modRate / sampleRate; modResync = 0; }
 
 private:
     static constexpr int lines = 8;
@@ -82,6 +86,13 @@ private:
     int preDelay = 0;
     float modDepth = 0.0f;
     double modPhase = 0.0, modRate = 0.5;
+    // The modulation's sine from a rotating phasor (one rotation per sample instead of a
+    // std::sin per line), re-synchronised to std::sin / std::cos of the phase every
+    // modResyncInterval samples so it never drifts (error ~1e-13 of the depth).
+    static constexpr int modResyncInterval = 256;
+    double modSin = 0.0, modCos = 1.0, stepSin = 0.0, stepCos = 1.0;
+    int modResync = 0;
+    std::array<double, lines> lineSin {}, lineCos {};   ///< the lines' fixed phase offsets (0.785 i)
     float width = 1.0f;
     float lowL = 0.0f, lowR = 0.0f, highStateL = 0.0f, highStateR = 0.0f;
     float toneLow = 0.5f, toneHigh = 0.02f;

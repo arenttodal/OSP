@@ -2816,16 +2816,16 @@ TEST_CASE ("plugin: CPU profile", "[.][cpu-profile]")
         std::vector<std::pair<juce::String, float>> set;
     };
     const std::vector<Case> cases {
-        { "idle (sound loaded, nothing playing)", 1, 0 },
-        { "1 note", 1, 1 },
-        { "8 notes", 1, 8 },
-        { "16 notes (reference)", 1, 16 },
-        { "24 notes", 1, 24 },
-        { "16 notes, block 32", 1, 16, 0, 48000.0, 32 },
-        { "16 notes, block 1024", 1, 16, 0, 48000.0, 1024 },
-        { "16 notes, 96 kHz", 1, 16, 0, 96000.0 },
-        { "16 notes, +24 st", 1, 16, 24 },
-        { "16 notes, -24 st", 1, 16, -24 },
+        { "idle (sound loaded, nothing playing)", 1, 0, 0, 48000.0, 128, {} },
+        { "1 note", 1, 1, 0, 48000.0, 128, {} },
+        { "8 notes", 1, 8, 0, 48000.0, 128, {} },
+        { "16 notes (reference)", 1, 16, 0, 48000.0, 128, {} },
+        { "24 notes", 1, 24, 0, 48000.0, 128, {} },
+        { "16 notes, block 32", 1, 16, 0, 48000.0, 32, {} },
+        { "16 notes, block 1024", 1, 16, 0, 48000.0, 1024, {} },
+        { "16 notes, 96 kHz", 1, 16, 0, 96000.0, 128, {} },
+        { "16 notes, +24 st", 1, 16, 24, 48000.0, 128, {} },
+        { "16 notes, -24 st", 1, 16, -24, 48000.0, 128, {} },
         { "16 notes, LIFE 0", 1, 16, 0, 48000.0, 128, { { "life", 0.0f } } },
         { "16 notes, DYNAMICS 0", 1, 16, 0, 48000.0, 128, { { "dynamics", 0.0f } } },
         { "16 notes, CHARACTER Tilt", 1, 16, 0, 48000.0, 128, { { "character.type", 4.0f } } },
@@ -2842,8 +2842,8 @@ TEST_CASE ("plugin: CPU profile", "[.][cpu-profile]")
         { "16 notes, TAPE FRAME 100", 1, 16, 0, 48000.0, 128, { { "reimagined", 100.0f }, { "layerA.reimagined.mode", 1.0f } } },
         { "16 notes, MOSAIC 100", 1, 16, 0, 48000.0, 128, { { "reimagined", 100.0f }, { "layerA.reimagined.mode", 3.0f } } },
         { "16 notes, Granular", 1, 16, 0, 48000.0, 128, { { "layerA.sourceMode", 1.0f } } },
-        { "16 notes, 2 layers", 2, 16 },
-        { "16 notes, 3 layers", 3, 16 },
+        { "16 notes, 2 layers", 2, 16, 0, 48000.0, 128, {} },
+        { "16 notes, 3 layers", 3, 16, 0, 48000.0, 128, {} },
         { "16 notes, 3 layers, REIMAGINED 100", 3, 16, 0, 48000.0, 128,
           { { "reimagined", 100.0f }, { "layerB.reimagined", 100.0f }, { "layerC.reimagined", 100.0f } } },
     };
@@ -2951,4 +2951,56 @@ TEST_CASE ("plugin: UI paint cost", "[.][ui-cpu]")
         region ("one macro knob", { 100, 750, 140, 140 });
         region ("keyboard", { 140, 900, 1270, 110 });
     }
+}
+
+// Null renders (hidden): every SPACE type through a phrase with a long silence in it
+// (note, 3 s of nothing, notes again), written as float WAVs for before/after comparisons
+// of optimisations that must not change the sound.
+//   OSP_NULL_DIR=<dir> ./osp_plugin_tests "[null-audio]"
+TEST_CASE ("plugin: null renders", "[.][null-audio]")
+{
+    const char* dir = std::getenv ("OSP_NULL_DIR");
+    if (dir == nullptr)
+        return;
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "a.wav", testsignals::vowel (midiToHz (57), 2.0, 48000.0, 3));
+    for (int type = 0; type < 4; ++type)
+        for (const float space : { 20.0f, 100.0f })
+        {
+            OspAudioProcessor p;
+            REQUIRE (p.addLayers ({ a }) == 1);
+            REQUIRE (p.waitForLoads (30000));
+            p.pollLoads();
+            p.setParameterValue ("space.type", static_cast<float> (type));
+            p.setParameterValue ("space", space);
+            p.setParameterValue ("movement.mode", static_cast<float> (type));   // a bus mode too
+            p.prepareToPlay (48000.0, 256);
+            const int total = static_cast<int> (9.0 * 48000.0);
+            AudioData out = AudioData::allocate (2, total, 48000.0);
+            juce::AudioBuffer<float> buffer (2, 256);
+            for (int pos = 0; pos < total; pos += 256)
+            {
+                juce::MidiBuffer midi;
+                const double t = pos / 48000.0;
+                if (pos == 0)
+                    midi.addEvent (juce::MidiMessage::noteOn (1, 57, static_cast<juce::uint8> (100)), 0);
+                if (t >= 1.0 && t < 1.0 + 256.0 / 48000.0)
+                    midi.addEvent (juce::MidiMessage::noteOff (1, 57), 0);
+                if (t >= 5.0 && t < 5.0 + 256.0 / 48000.0)
+                {
+                    midi.addEvent (juce::MidiMessage::noteOn (1, 60, static_cast<juce::uint8> (90)), 0);
+                    midi.addEvent (juce::MidiMessage::noteOn (1, 64, static_cast<juce::uint8> (80)), 0);
+                }
+                if (t >= 6.5 && t < 6.5 + 256.0 / 48000.0)
+                    midi.addEvent (juce::MidiMessage::allNotesOff (1), 0);
+                buffer.clear();
+                p.processBlock (buffer, midi);
+                const int n = std::min (256, total - pos);
+                for (int ch = 0; ch < 2; ++ch)
+                    std::copy (buffer.getReadPointer (ch), buffer.getReadPointer (ch) + n, out.channels[static_cast<std::size_t> (ch)].begin() + pos);
+            }
+            std::string error;
+            const auto name = "space-" + std::to_string (type) + "-" + std::to_string (static_cast<int> (space)) + ".wav";
+            REQUIRE (io::writeAudioFile (std::filesystem::path (dir) / name, out, io::SampleFormat::float32, error));
+        }
 }

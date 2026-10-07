@@ -106,9 +106,55 @@ per voice, on an Apple Silicon Mac at 48 kHz:
   their static artwork and repaint only what moved, typically under 1–2 ms per frame; OSP
   repaints whole displays through live-rendered shadows.
 
+## Done so far (A1–A6, B1, B2, B4)
+
+Measured on the same VM, same harnesses, before → after.
+
+| What | Before | After |
+|---|---|---|
+| Whole editor paint, 1× / 2× | 331 / 733 ms | **38 / 415 ms** |
+| One waveform display, one frame while playing (1×) | 44 ms (whole display) | **≈ 2 ms per read head** (two 4 px strips) |
+| One macro knob moving, 1× / 2× | 6.8 / 18.7 ms | **1.7 / 5.3 ms** |
+| The whole keyboard, 1× | 27 ms | **2.6 ms** (and JUCE already repaints only the key that changed) |
+| Audio, idle (sound loaded, nothing playing) | 1.0 % | **0.15 %** |
+| Audio, 16 notes (reference), instructions per second of audio (callgrind) | 999 M | **946 M (−5.3 %)** |
+
+- **A1 + A5 (shadows).** Nearly all of the background's cost was `juce::DropShadow`, which blurs
+  a fresh mask on every paint. `design::CachedShadow` keeps each blurred mask, keyed by the
+  path's exact shape and sub-pixel position, and only draws it. The pixels are the ones
+  `DropShadow` makes. With that, a separate cached background image was not worth its memory.
+  34 of the 42 canonical screenshots are pixel-identical. The other 8 differ by the same amount
+  between two runs of one build: they are popovers animated by the clock.
+- **A2 (dirty strips).** The source display repaints each read head's old and new 4 px strip, and
+  the grains' horizontal span, instead of the whole display.
+- **A3 (opaque) not done.** The displays and the keyboard sit in rounded wells drawn by their
+  parents. With the shadows cached, the parents' share of a strip repaint is small.
+- **A4 (keyboard).** JUCE's `MidiKeyboardComponent` already repaints only changed keys; the
+  shadow cache made each key cheap.
+- **A6.** The REIMAGINED popover's MIRAGE picture is still. It is now redrawn only when its
+  settings or analysis change; the other modes still animate.
+- **B1.** SPACE's modulation comes from a rotating phasor that is re-synced to `std::sin`/`cos`
+  every 256 samples. The output differs from before by ≤ 2.5e-7 (−132 dBFS). Every `std::sin` is
+  gone from the profile.
+- **B2.** After 0.25 s of exact digital silence in, with the tail below 1e-6 (−120 dBFS), the
+  reverb sleeps: the output is the (silent) input and only the modulation phase advances. Any
+  input or a type crossfade wakes it. After waking it matches a reverb that never slept within
+  1.4e-7 (test `post: SPACE sleeps through silence and wakes without a trace`).
+- **B4.** The CHARACTER filter recomputes `tan`, the resonance `pow`s and the drive `pow`s only
+  when their own input changed. The voice takes the CHARACTER range's `log2` only when the range
+  moves. This is bit-exact: the 18 REIMAGINED reference scenes null to the same 7e-9 as SPACE
+  alone.
+- **Still open, found on the way.** The sinc kernel's stretch-level choice takes a `log2` per
+  output sample, about 1.7 % of the reference. It could be cached per control period
+  (bit-exact).
+- **2× editor on Linux.** The remaining 2× cost is the scaled draw of the cached masks in JUCE's
+  software renderer (the 36 black-key shadows alone take ~85 ms of a full keyboard repaint). On
+  macOS and Windows the platform renderer draws these images. Making them cheaper here would
+  need a re-rendered (sharper) mask, so they are kept identical.
+
 ## 4. Every way to save, ranked
 
-The quality column says exactly what changes for the listener or viewer. "Bit-exact" means the
+✓ = done (see above). The quality column says exactly what changes for the listener or viewer. "Bit-exact" means the
 output is sample-identical to now: goldens, the 18 REIMAGINED reference scenes and session
 recall stay identical.
 
@@ -116,12 +162,12 @@ recall stay identical.
 
 | # | Change | Saving | Quality | Drawbacks |
 |---|---|---|---|---|
-| A1 | **Cache the static background**: the housing, its two DropShadows, the panels and each card's raised body, rendered once into images at the display's pixel scale; repaint them only on resize, scale or layout changes | the ~250 ms full paint becomes a blit; the per-frame region cost drops by most of 44 → a few ms | identical pixels | memory: one ARGB image of the window (≈ 6 MB at 2×); rebuild on scale or layout change |
-| A2 | **Repaint only what moved**: each read head's old and new 3 px strip (and the grains' pane in Granular) instead of the whole display | 44 ms → ~3 ms per frame here (measured), and less with A1 | identical | slightly more bookkeeping in `SourceDisplay` |
+| A1 ✓ | **Cache the static background**: the housing, its two DropShadows, the panels and each card's raised body, rendered once into images at the display's pixel scale; repaint them only on resize, scale or layout changes | the ~250 ms full paint becomes a blit; the per-frame region cost drops by most of 44 → a few ms | identical pixels | memory: one ARGB image of the window (≈ 6 MB at 2×); rebuild on scale or layout change |
+| A2 ✓ | **Repaint only what moved**: each read head's old and new 3 px strip (and the grains' pane in Granular) instead of the whole display | 44 ms → ~3 ms per frame here (measured), and less with A1 | identical | slightly more bookkeeping in `SourceDisplay` |
 | A3 | `setOpaque (true)` where a component really covers its area (the displays inside their well, the keyboard bed), so JUCE stops repainting the parents behind them | further cuts every frame | identical, if the opaque parts are drawn by the component itself (the well's corners) | needs care at the rounded corners |
-| A4 | Keyboard: cache the key bed and keys; repaint only the keys whose state changed | 27–124 ms → under 1 ms per note change | identical | |
-| A5 | Pre-render `DropShadow`s (buttons, knobs, cards) once per size instead of blurring on every paint | knobs and buttons repaint several times faster | identical | a small image per size |
-| A6 | Popover pictures (REIMAGINED's always animate at 30 fps): animate only while something moves; draw at 20–30 fps | only while a popover is open | same look | |
+| A4 ✓ | Keyboard: cache the key bed and keys; repaint only the keys whose state changed | 27–124 ms → under 1 ms per note change | identical | |
+| A5 ✓ | Pre-render `DropShadow`s (buttons, knobs, cards) once per size instead of blurring on every paint | knobs and buttons repaint several times faster | identical | a small image per size |
+| A6 ✓ | Popover pictures (REIMAGINED's always animate at 30 fps): animate only while something moves; draw at 20–30 fps | only while a popover is open | same look | |
 | A7 | Optional: a GPU renderer (`juce::OpenGLContext`) | moves compositing off the CPU | same | OpenGL is deprecated on macOS; text rendering differs slightly; some hosts have trouble with GL views. Only after A1–A5. |
 
 A1 + A2 together should make the editor's cost while playing a small fraction of today's. Nothing
@@ -131,10 +177,10 @@ looks different.
 
 | # | Change | Saving (of the audio work) | Notes |
 |---|---|---|---|
-| B1 | **SPACE's modulation from a rotating phasor** (or a small sine table) instead of `std::sin` per line per sample | ~4–5 % of the total | Bit-exact with a table of the same values per sample; or sub-1e-7 differences with a phasor (inaudible; then not bit-exact). |
-| B2 | **Reverb and MOVEMENT tail gate**: when the input has been silent and the tail has decayed below −120 dBFS, skip SPACE and the bus until sound returns | idle 1 % → ~0 %, and every silent instance in a big session | Differences only below −120 dBFS (formally not bit-exact; inaudible). |
+| B1 ✓ | **SPACE's modulation from a rotating phasor** (or a small sine table) instead of `std::sin` per line per sample | ~4–5 % of the total | Bit-exact with a table of the same values per sample; or sub-1e-7 differences with a phasor (inaudible; then not bit-exact). |
+| B2 ✓ | **Reverb and MOVEMENT tail gate**: when the input has been silent and the tail has decayed below −120 dBFS, skip SPACE and the bus until sound returns | idle 1 % → ~0 %, and every silent instance in a big session | Differences only below −120 dBFS (formally not bit-exact; inaudible). |
 | B3 | **Mono fast path**: a voice whose source is mono and nothing has widened it yet runs the shelves and the CHARACTER ladder once, not twice | up to ~15 % on mono sources | Bit-exact. Rarely helps: 76 of 79 of your recordings are true stereo. |
-| B4 | Control-rate work only when inputs move: pitch ratio, shelf and ladder coefficients recomputed only when their inputs changed beyond a hair | ~2–4 % | Bit-exact when the skip threshold is "exactly equal". |
+| B4 ✓ | Control-rate work only when inputs move: pitch ratio, shelf and ladder coefficients recomputed only when their inputs changed beyond a hair | ~2–4 % | Bit-exact when the skip threshold is "exactly equal". |
 | B5 | Natural pitch character: build the register anchors only when Natural is selected (or on first use) | faster loads; saves four full-length copies of every sample in memory | A short moment of plain-Tape pitch when switching to Natural the first time. |
 
 ### C. Audio: inaudible numerical changes (not bit-exact)

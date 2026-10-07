@@ -228,20 +228,44 @@ void SourceDisplay::setView (const View& v)
     }
 }
 
+// Moving marks repaint only where they were and where they are now (thin strips), not the
+// whole display: everything under them is drawn again only inside those strips.
 void SourceDisplay::setGrains (const Dot* dots, int count)
 {
     if (count == 0 && grains.empty())
         return;
+    const auto plot = plotArea();
+    float lo = plot.getRight(), hi = plot.getX();
+    auto cover = [&] (const std::vector<Dot>& marks) {
+        for (const auto& d : marks)
+        {
+            const float x = xAtFraction (d.position, plot);
+            lo = std::min (lo, x);
+            hi = std::max (hi, x);
+        }
+    };
+    cover (grains);
     grains.assign (dots, dots + count);
-    repaint();
+    cover (grains);
+    if (hi >= lo)
+        repaint (juce::Rectangle<float> (lo - 4.0f, 0.0f, hi - lo + 8.0f, static_cast<float> (getHeight())).getSmallestIntegerContainer());
 }
 
 void SourceDisplay::setPlayheads (const Dot* dots, int count)
 {
     if (count == 0 && heads.empty())
         return;
+    const auto plot = plotArea();
+    auto strips = [&] (const std::vector<Dot>& marks) {
+        for (const auto& d : marks)
+        {
+            const float x = xAtFraction (d.position, plot);
+            repaint (juce::Rectangle<float> (x - 2.0f, plot.getY() - 1.0f, 4.0f, plot.getHeight() + 2.0f).getSmallestIntegerContainer());
+        }
+    };
+    strips (heads);
     heads.assign (dots, dots + count);
-    repaint();
+    strips (heads);
 }
 
 void SourceDisplay::setDropLabel (const juce::String& label)
@@ -1221,7 +1245,7 @@ void EngineCard::paint (juce::Graphics& g)
         const auto badge = badgeArea.toFloat();
         juce::Path shape;
         shape.addRoundedRectangle (badge, 6.0f);
-        juce::DropShadow (juce::Colour (0x40302418), 4, { 0, 2 }).drawForPath (g, shape);
+        design::CachedShadow (juce::Colour (0x40302418), 4, { 0, 2 }).drawForPath (g, shape);
         g.setGradientFill (juce::ColourGradient (id.badgeTop, 0.0f, badge.getY(), id.badgeBottom, 0.0f, badge.getBottom(), false));
         g.fillPath (shape);
         g.setColour (juce::Colours::white.withAlpha (0.35f));

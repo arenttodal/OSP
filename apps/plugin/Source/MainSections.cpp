@@ -169,7 +169,7 @@ void TriangleMix::paint (juce::Graphics& g)
     mix = mix.interpolatedWith (layer (2), static_cast<float> (share[2]));
     juce::Path disc;
     disc.addEllipse (node.x - 6.0f * k, node.y - 6.0f * k, 12.0f * k, 12.0f * k);
-    juce::DropShadow (juce::Colour (0x331e1c18), 3, { 0, 1 }).drawForPath (g, disc);
+    design::CachedShadow (juce::Colour (0x331e1c18), 3, { 0, 1 }).drawForPath (g, disc);
     g.setColour (raised);
     g.fillPath (disc);
     g.setColour (mix);
@@ -229,7 +229,7 @@ void VolumeSlider::paint (juce::Graphics& g)
     const auto disc = juce::Rectangle<float> (12.0f, 12.0f).withCentre ({ x, cy });
     juce::Path shape;
     shape.addEllipse (disc);
-    juce::DropShadow (juce::Colour (0x40302418), 3, { 0, 1 }).drawForPath (g, shape);
+    design::CachedShadow (juce::Colour (0x40302418), 3, { 0, 1 }).drawForPath (g, shape);
     g.setGradientFill (juce::ColourGradient (juce::Colour (0xfffefbf6), x, disc.getY(), juce::Colour (0xffd8cfc2), x, disc.getBottom(), false));
     g.fillPath (shape);
     g.setColour (juce::Colour (hot ? 0xff9c8f7c : 0xffb0a593));
@@ -492,7 +492,7 @@ void HeaderMix::paint (juce::Graphics& g)
     const auto node = nodePosition();
     juce::Path disc;
     disc.addEllipse (juce::Rectangle<float> (8.0f, 8.0f).withCentre (node));
-    juce::DropShadow (juce::Colour (0x40302418), 2, { 0, 1 }).drawForPath (g, disc);
+    design::CachedShadow (juce::Colour (0x40302418), 2, { 0, 1 }).drawForPath (g, disc);
     g.setGradientFill (juce::ColourGradient (juce::Colour (0xfffefbf6), node.x, node.y - 4.0f, juce::Colour (0xffdcd3c6), node.x, node.y + 4.0f, false));
     g.fillPath (disc);
     g.setColour (colour::text.withAlpha (0.75f));

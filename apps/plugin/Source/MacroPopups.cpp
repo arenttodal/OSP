@@ -1315,7 +1315,16 @@ namespace
 
     private:
         bool native() const override { return true; }
-        bool animates() const override { return true; }   // stability, travel and the heads move
+        // Stability, travel and the heads move; MIRAGE's picture is still, so it is drawn
+        // again only when what it shows changes (the popover otherwise repaints at 30 fps).
+        bool animates() const override { return reimagined::modeFromIndex (choice ("mode")) != ReimaginedMode::mirage; }
+        bool changed() override
+        {
+            const auto inst = processor.currentInstrument (layer);
+            const auto* analysis = inst != nullptr && inst->model != nullptr ? inst->model->reimagined.get() : nullptr;
+            return watch.differs ({ static_cast<double> (choice ("mode")), amount(), number ("mirage.clock"), number ("mirage.filter"),
+                                    static_cast<double> (choice ("mirage.tone")), static_cast<double> (reinterpret_cast<std::uintptr_t> (analysis)) });
+        }
 
         float number (const char* name) const
         {
@@ -1755,6 +1764,7 @@ namespace
 
         OspAudioProcessor& processor;
         int layer;
+        Watch watch;
     };
 
     /** REIMAGINED: the mode beside the title, its picture, then that mode's own two or three

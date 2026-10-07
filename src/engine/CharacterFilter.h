@@ -54,6 +54,9 @@ private:
     float g = 0.5f, kSvf = 1.4f, a1 = 0.0f, a2 = 0.0f, a3 = 0.0f;
     // Drive (shared)
     float driveGain = 1.0f, driveBias = 0.0f, driveOut = 1.0f;
+    // Inputs the coefficients above were last computed from (-1: never).
+    double lastCutoff = -1.0, lastResonance = -1.0, lastDrive = -1.0, gw = 0.0;
+    FilterType lastType = FilterType::lp24;
     // TILT
     ShelfFilter tiltLowL, tiltLowR, tiltHighL, tiltHighR;
     float appliedTilt = 1.0e9f;

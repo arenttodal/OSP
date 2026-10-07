@@ -171,7 +171,7 @@ void OspKeyboard::drawBlackNote (int, juce::Graphics& g, juce::Rectangle<float> 
     const auto r = area.reduced (0.8f, 0.0f).withTrimmedTop (-4.0f);
     juce::Path shape;
     shape.addRoundedRectangle (r.getX(), r.getY(), r.getWidth(), r.getHeight(), 2.5f, 2.5f, false, false, true, true);
-    juce::DropShadow (juce::Colour (0x55000000), 3, { 1, 2 }).drawForPath (g, shape);
+    design::CachedShadow (juce::Colour (0x55000000), 3, { 1, 2 }).drawForPath (g, shape);
     auto top = colour::blackKeyTop, bottom = colour::blackKeyBottom;
     if (isDown)
     {
@@ -1157,7 +1157,7 @@ void OspAudioProcessorEditor::paintInstrument (juce::Graphics& g)
         const auto bed = layout::keyboard.expanded (2.0f);
         juce::Path frame;
         frame.addRoundedRectangle (bed, 6.0f);
-        juce::DropShadow (juce::Colour (0x22302418), 3, { 0, 1 }).drawForPath (g, frame);
+        design::CachedShadow (juce::Colour (0x22302418), 3, { 0, 1 }).drawForPath (g, frame);
         g.setColour (juce::Colour (0xffd9d0c3));
         g.fillPath (frame);
         g.setColour (juce::Colour (0xffc4bbad));

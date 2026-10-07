@@ -94,6 +94,12 @@ void SpaceReverb::reset() noexcept
     springStateB.fill (0.0f);
     lowL = lowR = highStateL = highStateR = springLow = springHigh = 0.0f;
     modPhase = 0.0;
+    modResync = 0;
+    for (int i = 0; i < lines; ++i)
+    {
+        lineSin[static_cast<std::size_t> (i)] = std::sin (0.785 * i);
+        lineCos[static_cast<std::size_t> (i)] = std::cos (0.785 * i);
+    }
 }
 
 SpaceReverb::Portrait SpaceReverb::portrait (SpaceType t) noexcept
@@ -168,6 +174,10 @@ void SpaceReverb::configure (SpaceType newType, double decaySeconds) noexcept
     width = d.width;
     modDepth = static_cast<float> (d.modSamples48k * rate / 48000.0);
     modRate = d.modRateHz;
+    const double stepPhase = 2.0 * std::numbers::pi * modRate / sampleRate;
+    stepSin = std::sin (stepPhase);
+    stepCos = std::cos (stepPhase);
+    modResync = 0;
     outputGain = d.outputGain;
 }
 
@@ -228,11 +238,30 @@ void SpaceReverb::process (float inL, float inR, float& outL, float& outR) noexc
 
         float o[lines];
         modPhase += 2.0 * std::numbers::pi * modRate / sampleRate;
+        if (modDepth > 0.0f)
+        {
+            if (--modResync <= 0)
+            {
+                modResync = modResyncInterval;
+                modSin = std::sin (modPhase);
+                modCos = std::cos (modPhase);
+            }
+            else
+            {
+                const double s1 = modSin * stepCos + modCos * stepSin;
+                modCos = modCos * stepCos - modSin * stepSin;
+                modSin = s1;
+            }
+        }
+        else
+            modResync = 0;
         for (int i = 0; i < lines; ++i)
         {
-            // Gentle, out-of-phase modulation keeps tails from ringing metallically.
-            const double m = modDepth > 0.0f ? modDepth * (1.0 + std::sin (modPhase + 0.785 * i)) : 0.0;
-            o[i] = fdn[static_cast<std::size_t> (i)].tapFrac (fdnLength[static_cast<std::size_t> (i)] + m);
+            // Gentle, out-of-phase modulation keeps tails from ringing metallically:
+            // sin (phase + 0.785 i), from the phasor.
+            const auto is = static_cast<std::size_t> (i);
+            const double m = modDepth > 0.0f ? modDepth * (1.0 + (modSin * lineCos[is] + modCos * lineSin[is])) : 0.0;
+            o[i] = fdn[is].tapFrac (fdnLength[is] + m);
         }
         // Fast Walsh-Hadamard transform: lossless 8x8 mixing.
         float h[lines];

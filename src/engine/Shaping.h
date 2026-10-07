@@ -101,11 +101,17 @@ namespace shaping
     }
 
     /** CHARACTER position (0..1) -> cutoff in octaves re 1 Hz (log mapping between min and max). */
+    inline double rangeOctaves (double hz) noexcept { return std::log2 (std::clamp (hz, 20.0, 20000.0)); }
+
+    /** The same mapping from range ends already in octaves (callers that cache them per control period). */
+    inline double cutoffOctaves (double loOctaves, double hiOctaves, double character) noexcept
+    {
+        return loOctaves + std::clamp (character, 0.0, 1.0) * (hiOctaves - loOctaves);
+    }
+
     inline double cutoffOctaves (const Shaping& s, double character) noexcept
     {
-        const double lo = std::log2 (std::clamp (s.filterMinHz, 20.0, 20000.0));
-        const double hi = std::log2 (std::clamp (s.filterMaxHz, 20.0, 20000.0));
-        return lo + std::clamp (character, 0.0, 1.0) * (hi - lo);
+        return cutoffOctaves (rangeOctaves (s.filterMinHz), rangeOctaves (s.filterMaxHz), character);
     }
 
     /** Velocity after the DYNAMICS curve (1..127). */

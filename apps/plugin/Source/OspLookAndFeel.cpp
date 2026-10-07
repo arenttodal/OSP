@@ -108,7 +108,7 @@ void OspLookAndFeel::drawCard (juce::Graphics& g, juce::Rectangle<float> r, floa
     juce::Path shape;
     shape.addRoundedRectangle (r, radius);
     if (! pressed)
-        juce::DropShadow (juce::Colour (0x141e1c18), 2, { 0, 1 }).drawForPath (g, shape);
+        design::CachedShadow (juce::Colour (0x141e1c18), 2, { 0, 1 }).drawForPath (g, shape);
     g.setColour (pressed ? recessed : (hover ? raised.brighter (0.4f) : raised));
     g.fillPath (shape);
     if (pressed)
@@ -163,7 +163,7 @@ void OspLookAndFeel::drawKnob (juce::Graphics& g, juce::Rectangle<float> bounds,
     // Body: warm light grey, lit from above, a soft contact shadow.
     juce::Path disc;
     disc.addEllipse (centre.x - body, centre.y - body, 2.0f * body, 2.0f * body);
-    juce::DropShadow (juce::Colour (0x261e1c18), mini ? 3 : 5, { 0, mini ? 1 : 2 }).drawForPath (g, disc);
+    design::CachedShadow (juce::Colour (0x261e1c18), mini ? 3 : 5, { 0, mini ? 1 : 2 }).drawForPath (g, disc);
     g.setGradientFill (juce::ColourGradient (juce::Colour (0xfffdfcf9), centre.x, centre.y - body,
                                              juce::Colour (0xffe6e2d9), centre.x, centre.y + body, false));
     g.fillPath (disc);
@@ -254,8 +254,8 @@ void OspLookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int widt
     const auto disc = juce::Rectangle<float> (26.0f, 26.0f).withCentre (c);
     juce::Path shape;
     shape.addEllipse (disc);
-    juce::DropShadow (juce::Colour (0x4a302418), 5, { 0, 2 }).drawForPath (g, shape);
-    juce::DropShadow (juce::Colour (0x22302418), 1, { 0, 1 }).drawForPath (g, shape);
+    design::CachedShadow (juce::Colour (0x4a302418), 5, { 0, 2 }).drawForPath (g, shape);
+    design::CachedShadow (juce::Colour (0x22302418), 1, { 0, 1 }).drawForPath (g, shape);
     g.setGradientFill (juce::ColourGradient (juce::Colour (0xfffefbf6), c.x - 7.0f, disc.getY(), juce::Colour (0xffcfc5b6), c.x + 7.0f, disc.getBottom(), false));
     g.fillPath (shape);
     g.setColour (juce::Colour (0xffaea290));

@@ -22,6 +22,7 @@ void CharacterFilter::prepare (double rate) noexcept
 {
     sampleRate = rate;
     fadeLength = std::max (1, static_cast<int> (0.04 * rate));
+    lastCutoff = lastResonance = lastDrive = -1.0;   // the rate changed: recompute everything
     reset();
 }
 
@@ -55,26 +56,44 @@ void CharacterFilter::setParameters (FilterType type, double cutoffHz, double re
     // Ladder: TPT one-pole coefficient; feedback below self-oscillation (k < 4). The
     // passband loses 1/(1+k) at DC; half of it is given back, so resonance thins the
     // bass a little (as on the hardware) without jumping in level.
-    const double gw = std::tan (std::numbers::pi * fc / sampleRate);
-    G = static_cast<float> (gw / (1.0 + gw));
-    k = static_cast<float> (3.8 * std::pow (res, 0.85));
-    comp = 1.0f + 0.5f * k;
+    // This runs every control period per voice, but resonance, drive and often the cutoff
+    // hold still: each transcendental is recomputed only when its own input changed, from
+    // the same expressions, so the coefficients are bit-identical to recomputing them.
+    if (fc != lastCutoff || res != lastResonance || current != lastType)
+    {
+        if (fc != lastCutoff)
+            gw = std::tan (std::numbers::pi * fc / sampleRate);
+        G = static_cast<float> (gw / (1.0 + gw));
+        if (res != lastResonance)
+            k = static_cast<float> (3.8 * std::pow (res, 0.85));
+        comp = 1.0f + 0.5f * k;
 
-    // SVF: Q from 0.55 (soft) upwards; HP and BP stay tamer.
-    const double qMax = current == FilterType::lp12 ? 8.0 : 3.5;
-    const double q = 0.55 + std::pow (res / 0.9, 1.6) * (qMax - 0.55);
-    g = static_cast<float> (gw);
-    kSvf = static_cast<float> (1.0 / q);
-    a1 = 1.0f / (1.0f + g * (g + kSvf));
-    a2 = g * a1;
-    a3 = g * a2;
+        // SVF: Q from 0.55 (soft) upwards; HP and BP stay tamer.
+        if (res != lastResonance || current != lastType)
+        {
+            const double qMax = current == FilterType::lp12 ? 8.0 : 3.5;
+            const double q = 0.55 + std::pow (res / 0.9, 1.6) * (qMax - 0.55);
+            kSvf = static_cast<float> (1.0 / q);
+        }
+        g = static_cast<float> (gw);
+        a1 = 1.0f / (1.0f + g * (g + kSvf));
+        a2 = g * a1;
+        a3 = g * a2;
+        lastCutoff = fc;
+        lastResonance = res;
+        lastType = current;
+    }
 
     // Drive: up to +20 dB into the saturator, slightly asymmetric (even harmonics), and
     // most of the gain taken back afterwards so turning DRIVE adds colour, not level.
     const double d = std::clamp (drive, 0.0, 1.0);
-    driveGain = static_cast<float> (std::pow (10.0, (2.0 + 18.0 * d * d) / 20.0) * 0.5);
-    driveBias = static_cast<float> (0.25 * d);
-    driveOut = static_cast<float> (1.0 / std::pow (driveGain, 0.85));
+    if (d != lastDrive)
+    {
+        driveGain = static_cast<float> (std::pow (10.0, (2.0 + 18.0 * d * d) / 20.0) * 0.5);
+        driveBias = static_cast<float> (0.25 * d);
+        driveOut = static_cast<float> (1.0 / std::pow (driveGain, 0.85));
+        lastDrive = d;
+    }
 
     const auto tilt = static_cast<float> (std::clamp (tiltDb, -15.0, 15.0));
     if ((current == FilterType::tilt || previous == FilterType::tilt) && std::abs (tilt - appliedTilt) > 0.02f)

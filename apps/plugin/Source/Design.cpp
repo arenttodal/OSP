@@ -1,5 +1,99 @@
 #include "Design.h"
 
+#include <cstring>
+#include <unordered_map>
+
+namespace osp::plugin::design
+{
+
+namespace
+{
+    struct ShadowMask
+    {
+        juce::Image image;
+        juce::Rectangle<int> area;   ///< relative to the path's integer origin
+    };
+
+    std::unordered_map<std::uint64_t, ShadowMask>& shadowMasks()
+    {
+        static std::unordered_map<std::uint64_t, ShadowMask> masks;
+        return masks;
+    }
+
+    void mix (std::uint64_t& h, std::uint64_t v) noexcept
+    {
+        h ^= v + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+    }
+
+    void mix (std::uint64_t& h, float v) noexcept
+    {
+        std::uint32_t bits = 0;
+        std::memcpy (&bits, &v, sizeof (bits));
+        mix (h, static_cast<std::uint64_t> (bits));
+    }
+}
+
+int CachedShadow::cachedMaskCount()
+{
+    return static_cast<int> (shadowMasks().size());
+}
+
+void CachedShadow::drawForPath (juce::Graphics& g, const juce::Path& path) const
+{
+    // Exactly juce::DropShadow::drawForPath's mask, for the whole area (not just the clip:
+    // that is what makes it reusable), on the path's own integer grid.
+    const auto bounds = path.getBounds().getSmallestIntegerContainer();
+    const auto origin = bounds.getPosition();
+    std::uint64_t key = 0x5348414430ull;
+    mix (key, static_cast<std::uint64_t> (radius));
+    mix (key, static_cast<std::uint64_t> (static_cast<std::uint32_t> (offset.x)) << 32 | static_cast<std::uint32_t> (offset.y));
+    mix (key, static_cast<std::uint64_t> (path.isUsingNonZeroWinding()));
+    for (juce::Path::Iterator it (path); it.next();)
+    {
+        mix (key, static_cast<std::uint64_t> (it.elementType));
+        const float ox = static_cast<float> (origin.x), oy = static_cast<float> (origin.y);
+        mix (key, it.x1 - ox);
+        mix (key, it.y1 - oy);
+        if (it.elementType == juce::Path::Iterator::quadraticTo || it.elementType == juce::Path::Iterator::cubicTo)
+        {
+            mix (key, it.x2 - ox);
+            mix (key, it.y2 - oy);
+        }
+        if (it.elementType == juce::Path::Iterator::cubicTo)
+        {
+            mix (key, it.x3 - ox);
+            mix (key, it.y3 - oy);
+        }
+    }
+    auto& masks = shadowMasks();
+    auto found = masks.find (key);
+    if (found == masks.end())
+    {
+        if (masks.size() > 256)   // animations make new shapes: keep the cache bounded
+            masks.clear();
+        ShadowMask mask;
+        mask.area = (bounds.withPosition (0, 0) + offset).expanded (radius + 1);
+        if (mask.area.getWidth() <= 2 || mask.area.getHeight() <= 2)
+            return;
+        mask.image = juce::Image (juce::Image::SingleChannel, mask.area.getWidth(), mask.area.getHeight(), true,
+                                  *g.getInternalContext().getPreferredImageTypeForTemporaryImages());
+        mask.image.setBackupEnabled (false);
+        {
+            juce::Graphics g2 (mask.image);
+            g2.setColour (juce::Colours::white);
+            g2.fillPath (path, juce::AffineTransform::translation (static_cast<float> (offset.x - mask.area.getX() - origin.x),
+                                                                   static_cast<float> (offset.y - mask.area.getY() - origin.y)));
+        }
+        mask.image.getPixelData()->applySingleChannelBoxBlurEffect (radius);
+        found = masks.emplace (key, std::move (mask)).first;
+    }
+    const auto& mask = found->second;
+    g.setColour (colour);
+    g.drawImageAt (mask.image, origin.x + mask.area.getX(), origin.y + mask.area.getY(), true);
+}
+
+}
+
 namespace osp::plugin::design::draw
 {
 
@@ -14,8 +108,8 @@ void housing (juce::Graphics& g, juce::Rectangle<float> bounds)
     juce::Path body;
     body.addRoundedRectangle (r, layout::housingRadius);
     // One broad, quiet shadow (a physical object resting on the surface), then a close one.
-    juce::DropShadow (juce::Colour (0x2a3a2a1c), 26, { 0, 10 }).drawForPath (g, body);
-    juce::DropShadow (juce::Colour (0x22302418), 4, { 0, 2 }).drawForPath (g, body);
+    CachedShadow (juce::Colour (0x2a3a2a1c), 26, { 0, 10 }).drawForPath (g, body);
+    CachedShadow (juce::Colour (0x22302418), 4, { 0, 2 }).drawForPath (g, body);
     // Powder-coated body: barely brighter at the top, warmer at the foot.
     g.setGradientFill (juce::ColourGradient (housingTop, 0.0f, r.getY(), housingBottom, 0.0f, r.getBottom(), false));
     g.fillPath (body);
@@ -39,8 +133,8 @@ void raised (juce::Graphics& g, juce::Rectangle<float> r, float radius, juce::Co
     shape.addRoundedRectangle (r, radius);
     if (shadow > 0.0f)
     {
-        juce::DropShadow (juce::Colour (0x1e3a2a1c).withMultipliedAlpha (shadow), juce::roundToInt (9.0f * shadow), { 0, juce::roundToInt (3.0f * shadow) }).drawForPath (g, shape);
-        juce::DropShadow (juce::Colour (0x1c302418).withMultipliedAlpha (shadow), 2, { 0, 1 }).drawForPath (g, shape);
+        CachedShadow (juce::Colour (0x1e3a2a1c).withMultipliedAlpha (shadow), juce::roundToInt (9.0f * shadow), { 0, juce::roundToInt (3.0f * shadow) }).drawForPath (g, shape);
+        CachedShadow (juce::Colour (0x1c302418).withMultipliedAlpha (shadow), 2, { 0, 1 }).drawForPath (g, shape);
     }
     g.setGradientFill (juce::ColourGradient (top, 0.0f, r.getY(), bottom, 0.0f, r.getBottom(), false));
     g.fillPath (shape);
@@ -94,7 +188,7 @@ void button (juce::Graphics& g, juce::Rectangle<float> r, float radius, bool act
     using namespace colour;
     juce::Path shape;
     shape.addRoundedRectangle (r, radius);
-    juce::DropShadow (juce::Colour (0x24302418), 3, { 0, 1 }).drawForPath (g, shape);
+    CachedShadow (juce::Colour (0x24302418), 3, { 0, 1 }).drawForPath (g, shape);
     if (active)
     {
         // On: pressed in - a slightly deeper warm face, a soft shade under its top edge and a
@@ -263,8 +357,8 @@ void knob (juce::Graphics& g, juce::Point<float> c, float r, float position, con
         juce::Path disc;
         disc.addEllipse (body);
         // Seated, not floating: a slightly firmer contact shadow close under the body.
-        juce::DropShadow (juce::Colour (0x46302418), juce::roundToInt (0.22f * r) + 2, { 0, juce::roundToInt (0.09f * r) + 1 }).drawForPath (g, disc);
-        juce::DropShadow (juce::Colour (0x26302418), juce::roundToInt (0.06f * r) + 1, { 0, 1 }).drawForPath (g, disc);
+        CachedShadow (juce::Colour (0x46302418), juce::roundToInt (0.22f * r) + 2, { 0, juce::roundToInt (0.09f * r) + 1 }).drawForPath (g, disc);
+        CachedShadow (juce::Colour (0x26302418), juce::roundToInt (0.06f * r) + 1, { 0, 1 }).drawForPath (g, disc);
     }
     g.setGradientFill (juce::ColourGradient (juce::Colour (0xfffdfaf4), c.x - 0.7f * r, c.y - 0.8f * r, knobRim, c.x + 0.6f * r, c.y + 0.9f * r, false));
     g.fillEllipse (body);
