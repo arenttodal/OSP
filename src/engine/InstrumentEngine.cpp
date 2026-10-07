@@ -1,6 +1,7 @@
 #include "engine/InstrumentEngine.h"
 
 #include "core/PitchMath.h"
+#include "engine/KaleidoscopeEngine.h"
 
 #include <algorithm>
 #include <cmath>
@@ -72,11 +73,21 @@ void InstrumentEngine::resetLayerStages() noexcept
     for (std::size_t l = 0; l < slots.size(); ++l)
     {
         auto& slot = slots[l];
-        slot.reimagined.setAmount (perLayer ? std::clamp (layerReimagined (static_cast<int> (l)), 0.0, 1.0) : 0.0);
+        slot.reimagined.setAmount (perLayer ? kaleidoscopeAmount (l) : 0.0);
+        const auto& k = config.layer[l].reimaginedSettings.kaleidoscope;
+        slot.reimagined.setShape (perLayer ? k.focus : 0.5, perLayer ? k.spread : 0.5);
         slot.reimagined.setModel (slot.model);
         slot.reimagined.reset();
         slot.reimaginedCountdown = 0;
+        refreshReimagined (l);
     }
+}
+
+void InstrumentEngine::refreshReimagined (std::size_t layer) noexcept
+{
+    auto& live = slots[layer].reimaginedLive;
+    live.amount = std::clamp (layerReimagined (static_cast<int> (layer)), 0.0, 1.0);
+    live.settings = config.layer[layer].reimaginedSettings;
 }
 
 void InstrumentEngine::runLayerStage (Slot& slot, float* left, float* right, int numSamples, bool mono) noexcept
@@ -552,7 +563,9 @@ NoteShape InstrumentEngine::shapeFor (const InstrumentModel* model, int note, in
     }
     const auto* modelForMotion = model;
 
-    const double r = std::clamp (layerReimagined (context), 0.0, 1.0);
+    // KALEIDOSCOPE's per-voice part (the other modes play through their own engines).
+    const double r = kaleidoscopeAmount (context);
+    const auto& kaleidoscopeParams = config.layer[context].reimaginedSettings.kaleidoscope;
     const double motion = std::clamp (config.macros.motion, 0.0, 1.0);
     // (As before the adaptive layers, a sound played once - LOOP off, or Sustain "Recording" -
     // keeps its own pitch and tone: no per-voice wander.)
@@ -571,16 +584,12 @@ NoteShape InstrumentEngine::shapeFor (const InstrumentModel* model, int note, in
         shape.driftCents = static_cast<float> ((m * shaping::driftPitchCents (sh.driftPitch) + 12.0 * rr) * (1.0 + 2.0 * std::max (0.0, r - 0.6)));
         shape.driftToneOctaves = static_cast<float> (m * shaping::driftToneOctaves (sh.driftTone) + 0.6 * rr);
         shape.driftLevelDb = static_cast<float> (1.5 * m + 1.0 * rr);
-        shape.driftPan = static_cast<float> (0.3 * m + 0.2 * rr);
+        shape.driftPan = static_cast<float> (0.3 * m + 0.2 * rr * static_cast<double> (kaleidoscope::width (kaleidoscopeParams.spread)));
         shape.driftRateHz = static_cast<float> (sh.movementMode == MovementMode::drift ? shaping::driftSpeedHz (sh.driftSpeed) : 0.15);
     }
-    // Original <-> Reimagined (spec §12): shorter, more varied continuation; harmonic
-    // saturation towards the far end. (Resonance and width live in PostProcessor.)
-    shape.segmentScale = static_cast<float> ((1.0 - 0.7 * r * r) * (1.3 - 0.6 * motion));
-    shape.saturation = static_cast<float> (0.7 * std::clamp ((r - 0.5) / 0.5, 0.0, 1.0));
-    shape.doubling = static_cast<float> (0.7 * std::clamp ((r - 0.35) / 0.65, 0.0, 1.0));
-    // Far end: granular continuation with harmonic remapping takes over the sustain.
-    shape.granular = static_cast<float> (std::pow (std::clamp ((r - 0.45) / 0.55, 0.0, 1.0), 1.2));
+    // Original <-> Reimagined (spec §12), KALEIDOSCOPE: shorter, more varied continuation,
+    // saturation, doubling, granular continuation. (Resonance and width: ReimaginedStage.)
+    kaleidoscope::shapeNote (shape, r, motion, kaleidoscopeParams);
     return shape;
 }
 
@@ -730,6 +739,15 @@ void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int
     params.model = model;
     params.shape = shapeFor (model, note, velocity, eventIndex, referenceVelocity, registerDb, setMember, layered);
     params.layer = &model->layerFor (static_cast<double> (note), config.pitchCharacter);
+    // REIMAGINED modes other than KALEIDOSCOPE make their own pitch from the recording
+    // itself (they are their own pitch character).
+    refreshReimagined (context);
+    params.reimagined = &slots[context].reimaginedLive;
+    if (const auto mode = config.layer[context].reimaginedSettings.mode; mode != ReimaginedMode::kaleidoscope && params.reimagined->amount > 0.0)
+    {
+        params.layer = &model->original;
+        params.reimaginedMode = mode;
+    }
     // CHARACTER follows touch (DYNAMICS x TONE): harder notes open the filter and get a
     // deeper filter envelope, softer ones stay darker. Off when velocity is level only.
     if (config.dynamicsMode != DynamicsMode::gainOnly)
@@ -890,7 +908,7 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
                 const double level = levelDb <= LayerSettings::minLevelDb ? 0.0 : dbToGain (std::min (levelDb, 12.0));
                 const double power = occupied[l] ? weights.gain[l] * weights.gain[l] * level * level : 0.0;   // a kept, empty slot is not heard
                 sum += power;
-                weighted += power * std::clamp (layerReimagined (static_cast<int> (l)), 0.0, 1.0);
+                weighted += power * kaleidoscopeAmount (l);   // another mode adds nothing to the shared stage
             }
             if (own && sum > 1.0e-12)
                 post.setReimagined (weighted / sum);
@@ -910,10 +928,14 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
             // between notes, so the resonators ring out and its state never depends on how
             // the host splits blocks); at 0 it is skipped.
             bool layerStage = false;
+            refreshReimagined (static_cast<std::size_t> (layer));
             if (perLayer)
             {
+                // KALEIDOSCOPE's stage; another mode fades it out (its tail rings down).
+                const auto& k = settings.reimaginedSettings.kaleidoscope;
                 slot.reimagined.setModel (slot.model);
-                slot.reimagined.setAmount (std::clamp (layerReimagined (layer), 0.0, 1.0));
+                slot.reimagined.setAmount (kaleidoscopeAmount (static_cast<std::size_t> (layer)));
+                slot.reimagined.setShape (k.focus, k.spread);
                 layerStage = slot.reimagined.active();
             }
 

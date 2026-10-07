@@ -4,6 +4,7 @@
 #include "model/ContinuationModel.h"
 #include "model/PlaybackPreparation.h"
 #include "model/PlaybackSource.h"
+#include "model/ReimaginedAnalysis.h"
 
 #include <cmath>
 #include <memory>
@@ -106,6 +107,10 @@ struct InstrumentModel
     std::vector<double> bodyPeaksHz;
     /** Sympathetic resonator tuning (source partials + body peaks, Hz) for Reimagined. */
     std::vector<double> resonanceHz;
+
+    /** REIMAGINED's TAPE FRAME and MOSAIC data (stage 2 on; null before: those modes then
+        play the plain recording). Shared, immutable. */
+    std::shared_ptr<const ReimaginedAnalysis> reimagined;
 
     PitchLayer original;               ///< offset 0
     std::vector<PitchLayer> anchors;   ///< natural-character register anchors (offset != 0), may be empty

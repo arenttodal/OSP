@@ -32,6 +32,8 @@ public:
     /** Pick up the resonances of a newly published model. */
     void setModel (const InstrumentModel* model) noexcept;
     void setAmount (double amount) noexcept { target = amount < 0.0 ? 0.0 : (amount > 1.0 ? 1.0 : amount); }
+    /** KALEIDOSCOPE FOCUS and SPREAD (0.5 / 0.5: the original stage, bit for bit). */
+    void setShape (double newFocus, double newSpread) noexcept;
     double amount() const noexcept { return target; }
 
     /** Control-rate update (the owner calls it every controlInterval samples). */
@@ -54,8 +56,8 @@ public:
                     const float y = remapMix / resonanceMix * bank[static_cast<std::size_t> (k + resonators)].process (excite);
                     ((k & 1) == 0 ? odd : even) += y; // the other side: the halo spreads
                 }
-            left += resonanceMix * (0.75f * even + 0.25f * odd);
-            right += resonanceMix * (0.25f * even + 0.75f * odd);
+            left += resonanceMix * (nearSide * even + farSide * odd);
+            right += resonanceMix * (farSide * even + nearSide * odd);
         }
 
         if (morphActive)
@@ -96,6 +98,8 @@ private:
 
     double sampleRate = 48000.0;
     double target = 0.0, smoothed = 0.0, applied = -1.0;
+    double focus = 0.5;
+    float nearSide = 0.75f, farSide = 0.25f;   ///< resonators' left / right split (SPREAD)
 
     std::array<double, resonators> resonatorHz {};
     int numResonators = 0;

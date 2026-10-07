@@ -1,5 +1,6 @@
 #include "engine/ReimaginedStage.h"
 
+#include "engine/KaleidoscopeEngine.h"
 #include "engine/Shaping.h"
 #include "model/InstrumentModel.h"
 
@@ -40,6 +41,18 @@ void ReimaginedStage::setModel (const InstrumentModel* newModel) noexcept
             if (numResonators < resonators)
                 resonatorHz[static_cast<std::size_t> (numResonators++)] = hz;
     modelDirty = true;
+}
+
+void ReimaginedStage::setShape (double newFocus, double newSpread) noexcept
+{
+    if (newFocus != focus)
+    {
+        focus = newFocus;
+        applied = -1.0;   // the fifth-above bank follows FOCUS
+    }
+    const float w = kaleidoscope::width (newSpread);
+    nearSide = w == 1.0f ? 0.75f : std::min (1.0f, 0.5f + 0.25f * w);
+    farSide = w == 1.0f ? 0.25f : std::max (0.0f, 0.5f - 0.25f * w);
 }
 
 void ReimaginedStage::peaking (Biquad& f, double rate, double hz, double q, double gainDb) noexcept
@@ -88,13 +101,13 @@ void ReimaginedStage::update() noexcept
         // Audible from the middle of the range (lab, continuum-1: 0..100 % sounded alike).
         const double amountNow = std::max (0.0, smoothed - 0.1) / 0.9;
         resonanceMix = numResonators > 0 ? static_cast<float> (2.2 * amountNow / std::sqrt (static_cast<double> (numResonators))) : 0.0f;
-        remapMix = static_cast<float> (resonanceMix * 0.7 * std::clamp ((smoothed - 0.5) / 0.5, 0.0, 1.0));
+        remapMix = static_cast<float> (resonanceMix * 0.7 * std::clamp ((kaleidoscope::abstraction (smoothed, focus) - 0.5) / 0.5, 0.0, 1.0));
     }
     modelDirty = false;
 
     // Spectral evolution: formants around vowel regions (F1 350-900 Hz, F2 1.1-2.6 kHz)
     // wander independently at a few seconds per move; depth grows past 40 % Reimagined.
-    morph = std::clamp ((smoothed - 0.4) / 0.6, 0.0, 1.0);
+    morph = std::clamp ((kaleidoscope::abstraction (smoothed, focus) - 0.4) / 0.6, 0.0, 1.0);
     if (morph > 1.0e-4)
     {
         if (! morphActive)

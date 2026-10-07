@@ -55,6 +55,7 @@ add_library(osp_dsp STATIC
     src/analysis/spectrum/SpectralEnvelope.cpp
     src/analysis/stereo/StereoAnalyzer.cpp
     src/analysis/continuation/ContinuationAnalyzer.cpp
+    src/analysis/reimagined/ReimaginedAnalyzer.cpp
     src/analysis/transient/TransientSeparation.cpp
     src/engine/InstrumentVoice.cpp
     src/engine/InstrumentEngine.cpp
@@ -62,6 +63,10 @@ add_library(osp_dsp STATIC
     src/engine/PerformanceEngine.cpp
     src/engine/PostProcessor.cpp
     src/engine/ReimaginedStage.cpp
+    src/engine/TapeFrameEngine.cpp
+    src/engine/ToyboxEngine.cpp
+    src/engine/MosaicEngine.cpp
+    src/engine/MirageEngine.cpp
     src/engine/CharacterFilter.cpp
     src/engine/MovementBus.cpp
     src/engine/SpaceReverb.cpp

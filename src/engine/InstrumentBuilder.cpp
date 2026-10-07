@@ -1,5 +1,6 @@
 #include "engine/InstrumentBuilder.h"
 
+#include "analysis/reimagined/ReimaginedAnalyzer.h"
 #include "analysis/transient/TransientSeparation.h"
 
 #include "audio/pitch/OfflinePitchShifter.h"
@@ -166,6 +167,8 @@ std::shared_ptr<InstrumentModel> addContinuation (const InstrumentModel& base, c
     model->character = estimateCharacter (model->analysis, &model->original.continuation);
     model->performance = calibratePerformance (model->character, model->analysis);
     model->dynamics = calibrateDynamics (model->character, model->analysis);
+    model->reimagined = std::make_shared<const ReimaginedAnalysis> (
+        analyseReimagined (audio, model->analysis, model->original.continuation, model->original.source->startFrame()));
     return model;
 }
 

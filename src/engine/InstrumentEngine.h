@@ -5,6 +5,8 @@
 #include "engine/InstrumentVoice.h"
 #include "engine/PerformanceEngine.h"
 #include "engine/PostProcessor.h"
+#include "engine/ReimaginedEngine.h"
+#include "engine/ReimaginedModes.h"
 #include "engine/Shaping.h"
 #include "model/InstrumentModel.h"
 #include "model/InstrumentSet.h"
@@ -57,6 +59,9 @@ struct LayerSettings
         (Macros::reimagined). Per voice it shapes the layer's notes; the shared resonance
         stage gets the layers' amounts weighted by how loud each is in the mix. */
     double reimagined = -1.0;
+    /** REIMAGINED mode and every mode's settings. A new mode applies to notes started
+        afterwards (sounding notes keep theirs); the settings apply live. */
+    ReimaginedSettings reimaginedSettings;
 };
 
 /**
@@ -371,8 +376,9 @@ private:
         GrainSnapshot grains;
         float gainLeft = 0.0f, gainRight = 0.0f;   ///< mix x LEVEL x PAN applied at the end of the last block
         bool primed = false;                    ///< gains valid (false after prepare/reset: no ramp from 0)
-        ReimaginedStage reimagined;             ///< per-layer routing: this layer's own bus stage
+        ReimaginedStage reimagined;             ///< per-layer routing: this layer's own bus stage (KALEIDOSCOPE)
         int reimaginedCountdown = 0;
+        ReimaginedLive reimaginedLive;          ///< what this layer's mode-engine voices read (refreshed every block)
     };
 
     static std::size_t layerIndex (int layer) noexcept { return static_cast<std::size_t> (std::clamp (layer, 0, EngineSettings::layers - 1)); }
@@ -391,6 +397,14 @@ private:
     }
     InstrumentVoice* chooseVictim (int layer) noexcept;
     void resetLayerStages() noexcept;
+    /** The layer's live REIMAGINED amount and settings for its voices, and its stage's share. */
+    void refreshReimagined (std::size_t layer) noexcept;
+    /** The layer's amount as KALEIDOSCOPE uses it (0 while the layer plays another mode). */
+    double kaleidoscopeAmount (std::size_t layer) const noexcept
+    {
+        return config.layer[layer].reimaginedSettings.mode == ReimaginedMode::kaleidoscope
+                   ? std::clamp (layerReimagined (static_cast<int> (layer)), 0.0, 1.0) : 0.0;
+    }
     void runLayerStage (Slot& slot, float* left, float* right, int numSamples, bool mono) noexcept;
     int countSoundingVoices (int layer) const noexcept;
     std::array<bool, 3> occupiedLayers() const noexcept;

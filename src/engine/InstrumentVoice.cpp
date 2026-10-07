@@ -31,6 +31,10 @@ void InstrumentVoice::prepare (double outputSampleRate, const AdsrSettings& adsr
     charSmoothing = 1.0 - std::exp (-static_cast<double> (controlInterval) / (0.010 * outputSampleRate));
     adsrSettings = adsr;
     envelope.prepare (outputSampleRate, adsr);
+    tapeFrameEngine.prepare (outputSampleRate);
+    toyboxEngine.prepare (outputSampleRate);
+    mosaicEngine.prepare (outputSampleRate);
+    mirageEngine.prepare (outputSampleRate);
     kill();
 }
 
@@ -155,6 +159,8 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
         dRampStep = 1.0f / static_cast<float> (0.08 * sampleRate);
         dDelaySamples = static_cast<int> (0.03 * sampleRate);
         dSide = dRng.nextDouble() < 0.5 ? -1.0f : 1.0f;
+        // SPREAD: the quieter side of the doubling (0.6 is the original width).
+        dNear = shape.spread == 1.0f ? 0.6f : std::clamp (1.0f - 0.4f * shape.spread, 0.0f, 1.0f);
         dEnd = static_cast<double> (src.numFrames() - 1);
     }
     // Granular continuation (Reimagined far end): grains start once there is history to
@@ -262,6 +268,7 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     envelope.noteOn();
 
     scheduleNextJump();
+    startModeEngine (params);
 }
 
 void InstrumentVoice::release() noexcept
@@ -270,6 +277,8 @@ void InstrumentVoice::release() noexcept
         return;
     released = true;
     heldByPedal = false;
+    if (modeEngine != nullptr)
+        modeEngine->release();
 
     if (granularMode)
     {
@@ -634,7 +643,7 @@ void InstrumentVoice::updateControl() noexcept
         const double frames = std::max (1.0, static_cast<double> (layer->source->numFrames()));
         const auto target = static_cast<float> (std::pow (10.0, levelContour::boostDb (currentModel->analysis.envelope,
                                                                                         currentModel->analysis.source.durationSeconds,
-                                                                                        position / frames) / 20.0));
+                                                                                        readPosition() / frames) / 20.0));
         followGainStep = (target - followGain) / controlInterval;
     }
 
@@ -732,7 +741,7 @@ void InstrumentVoice::spawnGrain() noexcept
     slot->step = forwards ? step : -step;
     slot->phase = 0.0;
     slot->phaseStep = 1.0 / outSamples;
-    const float pan = static_cast<float> (0.7 * g * grainRng.bipolar());
+    const float pan = std::clamp (static_cast<float> (0.7 * g * static_cast<double> (shape.spread) * grainRng.bipolar()), -1.0f, 1.0f);
     slot->left = std::min (1.0f, 1.0f - pan);
     slot->right = std::min (1.0f, 1.0f + pan);
     slot->active = true;
@@ -743,6 +752,11 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
     clock = clockAtStart;
     if (! active)
         return;
+    if (modeEngine != nullptr)
+    {
+        renderMode (left, right, numSamples, pitchRatio);
+        return;
+    }
     const bool stereoOutput = right != left;
 
     for (int i = 0; i < numSamples; ++i)
@@ -843,8 +857,8 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
                     const float g = dAmount * dRamp;
                     const float norm = 1.0f / std::sqrt (1.0f + g * g);
                     // Placed a little to one side, so the doubling widens instead of thickening.
-                    l = (l + g * (dSide < 0.0f ? 1.0f : 0.6f) * l2) * norm;
-                    r = (r + g * (dSide < 0.0f ? 0.6f : 1.0f) * r2) * norm;
+                    l = (l + g * (dSide < 0.0f ? 1.0f : dNear) * l2) * norm;
+                    r = (r + g * (dSide < 0.0f ? dNear : 1.0f) * r2) * norm;
                 }
                 dPhase += dOmega;
             }
@@ -944,6 +958,203 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
         else
         {
             left[i] += 0.5f * (l + r) * g;
+        }
+    }
+}
+
+void InstrumentVoice::startModeEngine (const InstrumentVoiceStart& params) noexcept
+{
+    modeEngine = nullptr;
+    modeLive = params.reimagined;
+    playingMode = params.reimaginedMode;
+    dryEnded = false;
+    modeCountdown = 0;
+    // A note started at 0 % plays the recording exactly (no engine at all).
+    if (playingMode == ReimaginedMode::kaleidoscope || modeLive == nullptr || ! (modeLive->amount > 0.0))
+        return;
+    ReimaginedVoiceEngine* engine = nullptr;
+    switch (playingMode)
+    {
+        case ReimaginedMode::tapeFrame: engine = &tapeFrameEngine; break;
+        case ReimaginedMode::toybox:    engine = &toyboxEngine; break;
+        case ReimaginedMode::mosaic:    engine = &mosaicEngine; break;
+        case ReimaginedMode::mirage:    engine = &mirageEngine; break;
+        case ReimaginedMode::kaleidoscope: return;
+    }
+    ReimaginedNote note;
+    note.model = currentModel;
+    note.source = layer->source.get();
+    note.analysis = currentModel->reimagined.get();
+    note.sinc = sinc;
+    note.kernel = &kernel;
+    note.outputRate = sampleRate;
+    note.startFrame = position;
+    note.rootStep = layer->source->sampleRate() / sampleRate * std::exp2 ((layer->source->rootMidi() - currentModel->rootMidi) / 12.0);
+    note.reverse = direction < 0.0;
+    note.granular = granularMode;
+    note.velocity = std::clamp (params.velocity, 1, 127) / 127.0;
+    note.note = params.note;
+    note.seed = shape.seed;
+    ReimaginedControl control;
+    control.amount = modeLive->amount;
+    control.settings = &modeLive->settings;
+    control.step = currentStep;
+    if (! engine->start (note, control))
+        return;   // its analysis is not ready: the recording plays as it is
+    modeEngine = engine;
+    if (! granularMode && ! engine->wantsDryRead())
+    {
+        // The engine reads the recording itself: no continuation walk, no graft.
+        strategy = ContinuationStrategy::off;
+        hasPending = false;
+        graftPending = false;
+        releaseGraftEnabled = false;
+        tRemaining = 0;
+    }
+}
+
+void InstrumentVoice::renderMode (float* left, float* right, int numSamples, double pitchRatio) noexcept
+{
+    const bool stereoOutput = right != left;
+    for (int done = 0; done < numSamples;)
+    {
+        if (modeCountdown <= 0)
+        {
+            modeCountdown = controlInterval;
+            updateControl();
+            currentStep = baseIncrement * pitchRatio * pitchMod;
+            if (gliding)
+            {
+                if (std::abs (glideOctaves) <= glideStep)
+                {
+                    glideOctaves = 0.0;
+                    gliding = false;
+                }
+                else
+                {
+                    glideOctaves -= std::copysign (glideStep, glideOctaves);
+                    currentStep *= std::exp2 (glideOctaves);
+                }
+            }
+            ReimaginedControl control;
+            control.amount = modeLive->amount;
+            control.settings = &modeLive->settings;
+            control.step = currentStep;
+            modeEngine->control (control);
+            modeStep = currentStep * modeEngine->stepFactor();
+        }
+        const int n = std::min (modeCountdown, numSamples - done);
+        const bool dry = ! granularMode && modeEngine->wantsDryRead();
+
+        // The engine's input: the grains, the plain read of the recording, or nothing.
+        if (granularMode)
+        {
+            for (int k = 0; k < n; ++k)
+            {
+                if (granularSource.isFinished())
+                {
+                    kill();
+                    return;
+                }
+                granularSource.render (dryL[static_cast<std::size_t> (k)], dryR[static_cast<std::size_t> (k)], modeStep);
+            }
+        }
+        else if (dry)
+        {
+            for (int k = 0; k < n; ++k)
+            {
+                float l = 0.0f, r = 0.0f;
+                if (! dryEnded)
+                {
+                    if (! crossfading && hasPending && (direction > 0.0 ? position >= pending.fromFrame : position <= pending.fromFrame))
+                        beginCrossfade();
+                    if ((tailEndPosition > 0.0 && position >= tailEndPosition) || (direction > 0.0 ? position >= endPosition : position <= 0.0))
+                        dryEnded = true;
+                }
+                if (! dryEnded)
+                {
+                    readFrame (position, modeStep, l, r);
+                    if (crossfading)
+                    {
+                        float l2, r2, gOut, gIn;
+                        readFrame (xPosition, modeStep, l2, r2);
+                        crossfadeGains (static_cast<float> (xProgress / xLength), xCorrelation, gOut, gIn);
+                        l = l * gOut + l2 * gIn;
+                        r = r * gOut + r2 * gIn;
+                        xPosition += direction * modeStep;
+                        xProgress += modeStep;
+                    }
+                    position += direction * modeStep;
+                    if (crossfading && xProgress >= xLength)
+                    {
+                        crossfading = false;
+                        position = xPosition;
+                        scheduleNextJump();
+                    }
+                }
+                dryL[static_cast<std::size_t> (k)] = l;
+                dryR[static_cast<std::size_t> (k)] = r;
+            }
+        }
+        else
+        {
+            std::fill_n (dryL.begin(), n, 0.0f);
+            std::fill_n (dryR.begin(), n, 0.0f);
+        }
+        modeEngine->render (dryL.data(), dryR.data(), wetL.data(), wetR.data(), n);
+
+        // Everything around the engine, as on every note: envelope, shelves, CHARACTER, level, pan.
+        for (int k = 0; k < n; ++k)
+        {
+            ++clock;
+            const float env = envelope.next();
+            if (! envelope.isActive())
+            {
+                kill();
+                return;
+            }
+            if (fadeRemaining > 0)
+            {
+                fadeGain -= fadeStep;
+                if (--fadeRemaining == 0)
+                {
+                    kill();
+                    return;
+                }
+            }
+            float l = wetL[static_cast<std::size_t> (k)], r = wetR[static_cast<std::size_t> (k)];
+            if (filtersActive)
+            {
+                l = lowL.process (highL.process (l));
+                r = lowR.process (highR.process (r));
+            }
+            charFilter.process (l, r);
+            controlGain += controlGainStep;
+            float g = env * baseGain * std::max (fadeGain, 0.0f) * controlGain * dampingGain * (1.0f + transientExtra) * attackRamp;
+            if (! followContour)
+            {
+                followGain += followGainStep;
+                g *= followGain;
+            }
+            transientExtra *= transientCoef;
+            dampingGain *= dampingCoef;
+            if (attackRamp < 1.0f)
+                attackRamp = std::min (1.0f, attackRamp + attackRampStep);
+            const int at = done + k;
+            if (stereoOutput)
+            {
+                left[at] += l * g * panLeft;
+                right[at] += r * g * panRight;
+            }
+            else
+                left[at] += 0.5f * (l + r) * g;
+        }
+        modeCountdown -= n;
+        done += n;
+        if (modeEngine->finished() && (! dry || dryEnded))
+        {
+            kill();
+            return;
         }
     }
 }

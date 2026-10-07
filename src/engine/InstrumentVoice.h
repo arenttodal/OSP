@@ -5,8 +5,13 @@
 #include "core/Prng.h"
 #include "engine/CharacterFilter.h"
 #include "engine/GranularSource.h"
+#include "engine/MirageEngine.h"
+#include "engine/MosaicEngine.h"
 #include "engine/NoteShape.h"
+#include "engine/ReimaginedEngine.h"
 #include "engine/Shaping.h"
+#include "engine/TapeFrameEngine.h"
+#include "engine/ToyboxEngine.h"
 #include "engine/ShelfFilter.h"
 #include "model/ContinuationModel.h"
 #include "model/InstrumentModel.h"
@@ -36,6 +41,11 @@ struct InstrumentVoiceStart
     double startFraction = 0.0;   ///< START: 0..1 of the recording after its onset (from the end when reversed)
     bool reverse = false;         ///< REVERSE: read backwards (LOOP then loops the best loop, mirrored)
     bool follow = true;           ///< FOLLOW off: flatten the recording's loudness contour
+    /** REIMAGINED mode of the layer when the note starts (KALEIDOSCOPE: the voice's own
+        path, shaped by `shape`). Another mode with an amount above 0 plays through its
+        engine, reading the layer's live amount and settings from `reimagined`. */
+    ReimaginedMode reimaginedMode = ReimaginedMode::kaleidoscope;
+    const ReimaginedLive* reimagined = nullptr;
 };
 
 /**
@@ -84,7 +94,8 @@ public:
         if (! active || granularMode || layer == nullptr || layer->source == nullptr)
             return false;
         const auto frames = static_cast<double> (std::max<std::int64_t> (1, layer->source->numFrames()));
-        where = static_cast<float> (std::clamp (position / frames, 0.0, 1.0));
+        const double read = modeEngine != nullptr && modeEngine->sourcePosition() >= 0.0 ? modeEngine->sourcePosition() : position;
+        where = static_cast<float> (std::clamp (read / frames, 0.0, 1.0));
         level = std::clamp (envelope.level() * fadeGain, 0.0f, 1.0f);
         return true;
     }
@@ -114,6 +125,8 @@ public:
     /** Diagnostics for tests: how many continuation jumps / grafts this note made. */
     int jumpCount() const noexcept { return jumpsTaken; }
     bool hasGrafted() const noexcept { return grafted; }
+    /** The REIMAGINED mode this note plays through (KALEIDOSCOPE: the voice's own path). */
+    ReimaginedMode reimaginedMode() const noexcept { return modeEngine != nullptr ? playingMode : ReimaginedMode::kaleidoscope; }
 
 private:
     static constexpr int controlInterval = 32;
@@ -264,6 +277,28 @@ private:
     float fadeStep = 0.0f;
 
     SincInterpolator::Kernel kernel;
+
+    // REIMAGINED modes other than KALEIDOSCOPE: one engine of each kind, preallocated; a
+    // note plays through the one its layer's mode named when it started.
+    void startModeEngine (const InstrumentVoiceStart& params) noexcept;
+    /** Where the recording is being read (a mode engine's own read, else the voice's). */
+    double readPosition() const noexcept
+    {
+        return modeEngine != nullptr && modeEngine->sourcePosition() >= 0.0 ? modeEngine->sourcePosition() : position;
+    }
+    void renderMode (float* left, float* right, int numSamples, double pitchRatio) noexcept;
+    TapeFrameEngine tapeFrameEngine;
+    ToyboxEngine toyboxEngine;
+    MosaicEngine mosaicEngine;
+    MirageEngine mirageEngine;
+    ReimaginedVoiceEngine* modeEngine = nullptr;
+    ReimaginedMode playingMode = ReimaginedMode::kaleidoscope;
+    const ReimaginedLive* modeLive = nullptr;
+    int modeCountdown = 0;
+    double modeStep = 1.0;
+    bool dryEnded = false;
+    float dNear = 0.6f;            ///< doubling head's quieter side (SPREAD; 0.6 = the original width)
+    std::array<float, controlInterval> dryL {}, dryR {}, wetL {}, wetR {};
 };
 
 } // namespace osp

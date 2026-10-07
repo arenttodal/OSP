@@ -27,6 +27,7 @@ add_executable(osp_tests
     integration/LayerTests.cpp
     integration/EngineSlotTests.cpp
     integration/ShaperTests.cpp
+    integration/ReimaginedModesTests.cpp
     regression/GoldenTests.cpp
 )
 target_include_directories(osp_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

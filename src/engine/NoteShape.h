@@ -49,6 +49,9 @@ struct NoteShape
     /** Reimagined: a second read head just behind the first, gently moving (a living
         doubling: controlled instability, alternate sustain), mix 0..1. */
     float doubling = 0.0f;
+    /** KALEIDOSCOPE SPREAD: width of the doubling head, the grains' pan and the drift's
+        stereo movement (1 = the original width). */
+    float spread = 1.0f;
     /** Reimagined far end: granular continuation (grains of what the note has played, with
         octave/fifth remapping and pitch jitter) mixed over the sustain, 0..1. */
     float granular = 0.0f;
