@@ -2237,6 +2237,7 @@ namespace
         int layers;                                        // 1..3: vowel A3, pluck E2, vowel E4
         std::vector<std::pair<const char*, float>> values; // parameter values (plain)
         bool automate = false;                             // `reimagined` swept 0 -> 100 % while playing
+        bool perLayer = false;                             // a new (per-layer routing) patch, saved as it is
     };
 
     std::vector<ReimaginedScene> reimaginedScenes()
@@ -2258,6 +2259,14 @@ namespace
             { "three-0-50-100", 3, V { { "reimagined", 0.0f }, { "layerB.reimagined", 50.0f }, { "layerC.reimagined", 100.0f },
                                        { "layerC.level", -3.0f }, { "layerB.pan", -40.0f } } },
             { "one-automated", 1, one (0.0f), true },
+            // Per-layer patches (KALEIDOSCOPE, the Reimagined every patch had before the modes).
+            { "perlayer-one-25", 1, one (25.0f), false, true },
+            { "perlayer-one-50", 1, one (50.0f), false, true },
+            { "perlayer-one-75", 1, one (75.0f), false, true },
+            { "perlayer-one-100", 1, one (100.0f), false, true },
+            { "perlayer-two-30-80", 2, V { { "reimagined", 30.0f }, { "layerB.reimagined", 80.0f }, { "ab.blend", 0.5f } }, false, true },
+            { "perlayer-three-granular-60", 3, V { { "reimagined", 60.0f }, { "layerB.reimagined", 60.0f }, { "layerC.reimagined", 60.0f },
+                                                   { "layerB.sourceMode", 1.0f }, { "space", 30.0f } }, false, true },
         };
     }
 
@@ -2290,8 +2299,8 @@ namespace
                 p.setParameterValue (id, value);
             p.getStateInformation (state);
         }
-        // ...saved by a build that knew nothing about routing...
-        if (auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize())))
+        // ...saved by a build that knew nothing about routing (per-layer patches: as saved)...
+        if (auto xml = scene.perLayer ? nullptr : juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize())))
         {
             xml->removeAttribute ("reimaginedRouting");
             state.reset();

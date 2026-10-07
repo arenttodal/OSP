@@ -799,11 +799,23 @@ void LayerKnob::paint (juce::Graphics& g)
     g.drawText (caption, labelArea, juce::Justification::centred, false);
     if (creative)
     {
-        // A small coral light after the name, like the macros' (the more creative control).
+        // A small light after the name carrying the whole spectral continuum (rust at its
+        // top left through moss and blue to mauve), like the arc at full travel.
         const float textWidth = juce::GlyphArrangement::getStringWidth (labelFont, caption);
         const juce::Point<float> c (0.5f * w + 0.5f * textWidth + 6.0f * k, labelArea.getCentreY());
         if (c.x + 3.0f * k < w)
-            design::draw::led (g, c, 5.0f * k, palette::accent, 0.3f);
+        {
+            const float d = 5.6f * k;
+            const auto dot = juce::Rectangle<float> (d, d).withCentre (c);
+            juce::ColourGradient spectrum (design::colour::reimagined (0.0f), dot.getX(), dot.getY(), design::colour::reimagined (1.0f), dot.getRight(),
+                                           dot.getBottom(), false);
+            for (const float at : { 0.25f, 0.5f, 0.75f })
+                spectrum.addColour (at, design::colour::reimagined (at));
+            g.setGradientFill (spectrum);
+            g.fillEllipse (dot);
+            g.setColour (juce::Colours::white.withAlpha (0.35f));   // the small lit cap every light has
+            g.fillEllipse (dot.reduced (0.32f * d).translated (-0.12f * d, -0.14f * d));
+        }
     }
     g.setColour (design::colour::text.withAlpha (0.9f));
     g.setFont (type::controlValue (k));
