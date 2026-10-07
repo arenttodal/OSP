@@ -313,30 +313,6 @@ namespace
                 g.fillEllipse (xAt (t) - 0.5f * size, y - 0.5f * size, size, size);
             }
 
-            // The tail's envelope, its outline in SPACE's mauve (the cloud keeps its colours).
-            {
-                juce::Path upper, lower;
-                const int steps = 120;
-                for (int i = 0; i <= steps; ++i)
-                {
-                    const double t = onset + (tailEnd - onset) * i / steps;
-                    const float x = xAt (t), e = half * static_cast<float> (std::min (1.0, tail (t))) * 0.98f;
-                    if (i == 0)
-                    {
-                        upper.startNewSubPath (x, mid - e);
-                        lower.startNewSubPath (x, mid + e);
-                    }
-                    else
-                    {
-                        upper.lineTo (x, mid - e);
-                        lower.lineTo (x, mid + e);
-                    }
-                }
-                g.setColour (identity.withAlpha (0.75f));
-                g.strokePath (upper, juce::PathStrokeType (1.1f * dot, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-                g.strokePath (lower, juce::PathStrokeType (1.1f * dot, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-            }
-
             // Early reflections: discrete amber strokes over the first tenth of the picture,
             // as many as the type has (springs: dispersed, chirping echoes; plates: few).
             const double early = std::min (0.45 * tailEnd, span * (type == SpaceType::plate ? 0.05 : (type == SpaceType::chamber ? 0.12 : 0.095)));
