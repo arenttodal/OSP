@@ -7,7 +7,11 @@ cd "$(dirname "$0")/../.."
 source packaging/pipeline.conf
 
 generator=()
-command -v ninja > /dev/null && generator=(-G Ninja)
+case "$(uname -s)" in
+    # Windows: Visual Studio, 64-bit (a ninja on the PATH may drive MinGW, which cannot build JUCE).
+    MINGW* | MSYS* | CYGWIN*) generator=(-A x64) ;;
+    *) if command -v ninja > /dev/null; then generator=(-G Ninja); fi ;;
+esac
 mac=()
 if [ "$(uname -s)" = Darwin ]; then
     mac=("-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64" "-DCMAKE_OSX_DEPLOYMENT_TARGET=${MACOS_MIN:-11.0}")
