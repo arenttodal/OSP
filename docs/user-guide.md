@@ -41,6 +41,7 @@ from itself is its own: every card has its own **REIMAGINED**.
 
 | Control | What it does |
 |---|---|
+| **M / S** (beside the letter) | MUTE silences the layer; SOLO hears only the soloed layers (several can be soloed; Alt/Option-click S to solo this one alone). A layer that is not heard is veiled (MUTED / NOT SOLOED); its held notes wait and come back with it. Saved with the project; a new sound in a slot starts unmuted. |
 | **ONE SHOT / GRANULAR** | Play the recording through, or as a cloud of grains (below). |
 | **START** | Where notes begin: further into the sound (One Shot), or added to POS (Granular). The orange marker shows it. |
 | **TUNE** | The layer's own transposition, ±24 semitones (whole steps; Alt/Option-drag for fine). |
@@ -60,8 +61,9 @@ jump back where the sustain continues and forward where the release joins the en
 **MIX** sits in the header between the preset and VOLUME, and grows with the instrument:
 nothing with one sound; with two a small line **A ─●─ B** (drag the node; the middle is
 both at equal power); with three the line unfolds upwards into a triangle with **C** on
-top (A bottom left, B bottom right). Adding C keeps the A/B balance you had - C joins at 0
-until you move the node towards it; removing a layer keeps the other two's balance. While
+top (A bottom left, B bottom right). Adding C makes it heard at once - it takes a third of
+the mix while A and B keep the balance you had (a centred pair puts all three in the middle);
+removing a layer keeps the other two's balance. While
 you hover or drag, a small readout shows each layer's share; double-click for equal shares.
 With three layers, click **MIX** for the large mix. The mix keeps the total level steady
 wherever it is.

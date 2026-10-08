@@ -56,6 +56,9 @@ struct LayerSettings
     bool reverse = false;         ///< REVERSE: One Shot reads backwards, grains read backwards
     bool loop = true;             ///< LOOP (One Shot): sustain by the recording's own loops; off: play it once
     bool follow = true;           ///< FOLLOW: keep the recording's own loudness contour (off: flatten it)
+    /** Heard in the mix (MUTE / SOLO). An unheard layer ramps to silence; its held notes
+        wait for it to come back, released ones end (as at LEVEL -48). */
+    bool audible = true;
     /** This layer's Original <-> Reimagined (0..1); below 0 it follows the instrument's
         (Macros::reimagined). Per voice it shapes the layer's notes; the shared resonance
         stage gets the layers' amounts weighted by how loud each is in the mix. */

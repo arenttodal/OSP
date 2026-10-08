@@ -906,6 +906,58 @@ void LayerKnob::paint (juce::Graphics& g)
 }
 
 //==============================================================================
+//==============================================================================
+LayerStateButton::LayerStateButton (OspAudioProcessor& p, int l, bool isSolo)
+    : processor (p), layer (l), solo (isSolo),
+      attachment (*p.parameters.getParameter (OspAudioProcessor::layerParameterId (l, isSolo ? "solo" : "mute")), [this] (float v) {
+          on = v >= 0.5f;
+          repaint();
+      })
+{
+    attachment.sendInitialUpdate();
+    const auto name = OspAudioProcessor::layerName (layer);
+    setTooltip (solo ? "Solo layer " + name + ": hear only the soloed layers (alt-click: this one alone)" : "Mute layer " + name);
+    setTitle (solo ? "Solo " + name : "Mute " + name);
+    setMouseCursor (juce::MouseCursor::PointingHandCursor);
+}
+
+void LayerStateButton::paint (juce::Graphics& g)
+{
+    using namespace design;
+    const auto r = getLocalBounds().toFloat().reduced (1.0f);
+    const bool hot = isMouseOver();
+    const auto& id = colour::identity (layer);
+    if (on)
+    {
+        // SOLO glows in the layer's own colour, MUTE is a dark, pressed key.
+        const auto fill = solo ? id.led : juce::Colour (0xff4a4f52);
+        g.setColour (fill.darker (0.25f));
+        g.fillRoundedRectangle (r, 4.0f);
+        g.setGradientFill (juce::ColourGradient (fill.brighter (0.1f), 0.0f, r.getY(), fill.darker (0.1f), 0.0f, r.getBottom(), false));
+        g.fillRoundedRectangle (r.reduced (0.5f), 3.5f);
+        g.setColour (solo ? juce::Colour (0xff2b2622) : juce::Colour (0xfff3eee6));
+    }
+    else
+    {
+        design::draw::button (g, r, 4.0f, false, hot, colour::accent);
+        g.setColour (colour::text.withAlpha (hot ? 0.85f : 0.55f));
+    }
+    g.setFont (fonts::make (0.62f * r.getHeight(), fonts::Weight::medium, 0.02f));
+    g.drawText (solo ? "S" : "M", r.translated (0.0f, 0.5f), juce::Justification::centred, false);
+}
+
+void LayerStateButton::mouseUp (const juce::MouseEvent& e)
+{
+    if (! getLocalBounds().contains (e.getPosition()))
+        return;
+    if (solo && e.mods.isAltDown())
+    {
+        processor.soloOnly (layer);
+        return;
+    }
+    attachment.setValueAsCompleteGesture (on ? 0.0f : 1.0f);
+}
+
 ModifierButton::ModifierButton (juce::RangedAudioParameter& p, icons::Kind i, juce::Colour c)
     : icon (i), onColour (c),
       attachment (p, [this] (float v) {
@@ -1011,10 +1063,13 @@ void EngineCard::MenuDots::paintButton (juce::Graphics& g, bool highlighted, boo
         g.fillEllipse (juce::Rectangle<float> (d, d).withCentre (r.getCentre().translated (0.0f, static_cast<float> (i) * gap)));
 }
 
-EngineCard::EngineCard (OspAudioProcessor& p, int layer) : processor (p), layerIndex (layer)
+EngineCard::EngineCard (OspAudioProcessor& p, int layer)
+    : processor (p), layerIndex (layer), muteButton (p, layer, false), soloButton (p, layer, true)
 {
     sourceDisplay.setLayer (layer);
     addAndMakeVisible (sourceDisplay);
+    addAndMakeVisible (muteButton);
+    addAndMakeVisible (soloButton);
 
     if (auto* param = processor.parameters.getParameter (OspAudioProcessor::layerParameterId (layer, "sourceMode")))
     {
@@ -1204,6 +1259,13 @@ void EngineCard::refresh()
         repaint();
     }
 
+    // A layer that is not heard (muted, or another layer soloed) dims its display.
+    if (const bool heard = processor.isLayerHeard (layerIndex); heard != shownHeard)
+    {
+        shownHeard = heard;
+        repaint (sourceDisplay.getBounds());
+    }
+
     auto value = [this] (const char* name) { return processor.parameterValue (OspAudioProcessor::layerParameterId (layerIndex, name)); };
     SourceDisplay::View view;
     view.granular = value ("sourceMode") >= 0.5f;
@@ -1254,7 +1316,6 @@ void EngineCard::paint (juce::Graphics& g)
         g.setFont (fonts::make (29.0f, fonts::Weight::regular));
         g.drawText (OspAudioProcessor::layerName (layerIndex), badge.translated (0.0f, 0.5f), juce::Justification::centred, false);
     }
-    draw::led (g, ledCentre, 12.0f, id.led, 1.0f);
     auto row = textArea.toFloat();
     if (rootText.isNotEmpty())
     {
@@ -1278,6 +1339,20 @@ void EngineCard::paint (juce::Graphics& g)
     }
 }
 
+void EngineCard::paintOverChildren (juce::Graphics& g)
+{
+    // Not heard (muted, or another layer soloed): a graphite veil over the display.
+    if (! shownHeard)
+    {
+        g.setColour (juce::Colour (0xff15191a).withAlpha (0.62f));
+        g.fillRoundedRectangle (sourceDisplay.getBounds().toFloat(), 9.0f);
+        g.setColour (juce::Colour (0xffd9dcd8).withAlpha (0.55f));
+        g.setFont (fonts::make (13.0f, fonts::Weight::medium, 0.12f));
+        g.drawText (processor.parameterValue (OspAudioProcessor::layerParameterId (layerIndex, "mute")) >= 0.5f ? "MUTED" : "NOT SOLOED",
+                    sourceDisplay.getBounds().toFloat().removeFromBottom (28.0f), juce::Justification::centred, false);
+    }
+}
+
 void EngineCard::resized()
 {
     // Reference geometry: the two-layer card is 683 x 463 px. One layer stretches it
@@ -1290,7 +1365,9 @@ void EngineCard::resized()
     auto at = [] (juce::Rectangle<float> r) { return r.getSmallestIntegerContainer(); };
 
     badgeArea = at ({ 21.0f, 10.0f, 47.0f, 43.0f });
-    ledCentre = { 94.0f, 31.5f };
+    // MUTE above SOLO beside the badge (where the layer's light was).
+    muteButton.setBounds (at ({ 77.0f, 10.0f, 27.0f, 21.0f }));
+    soloButton.setBounds (at ({ 77.0f, 32.0f, 27.0f, 21.0f }));
     menuButton.setBounds (at ({ w - 51.0f, 14.0f, 30.0f, 36.0f }));
     const float modeWidth = triple ? 128.0f : 157.0f;
     if (mode != nullptr)

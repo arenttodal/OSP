@@ -905,7 +905,7 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
             {
                 own = own || config.layer[l].reimagined >= 0.0;
                 const double levelDb = config.layer[l].levelDb;
-                const double level = levelDb <= LayerSettings::minLevelDb ? 0.0 : dbToGain (std::min (levelDb, 12.0));
+                const double level = levelDb <= LayerSettings::minLevelDb || ! config.layer[l].audible ? 0.0 : dbToGain (std::min (levelDb, 12.0));
                 const double power = occupied[l] ? weights.gain[l] * weights.gain[l] * level * level : 0.0;   // a kept, empty slot is not heard
                 sum += power;
                 weighted += power * kaleidoscopeAmount (l);   // another mode adds nothing to the shared stage
@@ -917,7 +917,7 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
         {
             auto& slot = slots[static_cast<std::size_t> (layer)];
             const auto& settings = config.layer[static_cast<std::size_t> (layer)];
-            const double level = settings.levelDb <= LayerSettings::minLevelDb ? 0.0 : dbToGain (std::min (settings.levelDb, 12.0));
+            const double level = settings.levelDb <= LayerSettings::minLevelDb || ! settings.audible ? 0.0 : dbToGain (std::min (settings.levelDb, 12.0));
             const double pan = std::clamp (settings.pan, -1.0, 1.0);
             const double weight = weights.gain[static_cast<std::size_t> (layer)] * level;
             const float targetLeft = static_cast<float> (weight * (pan > 0.0 ? 1.0 - pan : 1.0));

@@ -214,6 +214,10 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       patterns (*.ospshaper JSON), undo per gesture, saved with sessions and presets.
 - [x] Migration: older sessions open HALL for CHAMBER, the EQ fully open, ECHO off, CUSTOM = THREE.
 - [ ] Listening round: HALL vs old CHAMBER, PLATE v2 vs v1, ECHO TAPE / BBD on the fixtures.
+- [x] A third layer is heard at once (C 1/3 of the mix, A and B keep their balance; was: joins at 0).
+- [x] MUTE / SOLO per layer (`layerX.mute`, `layerX.solo`, version hint 13): small M / S keys
+      beside the layer letter (replacing its light); solo wins, alt-click solos one alone, an
+      unheard layer is veiled; emptied slots drop their solo; saved, moved with the layer.
 
 ## DONE
 

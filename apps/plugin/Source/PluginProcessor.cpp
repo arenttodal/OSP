@@ -351,6 +351,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
         glideRange.setSkewForCentre (250.0f);
         layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::glide, 8 }, "Glide", glideRange, 0.0f, ms));
     }
+    // MUTE and SOLO per layer (version hint 13).
+    for (int layer = 0; layer < numLayers; ++layer)
+    {
+        const auto name = "Layer " + layerName (layer) + " ";
+        layout.add (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { layerParameterId (layer, "mute"), 13 }, name + "Mute", false));
+        layout.add (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { layerParameterId (layer, "solo"), 13 }, name + "Solo", false));
+    }
     {
         // SPACE v2, ECHO and SHAPER CUSTOM (version hint 12).
         auto id12 = [] (const juce::String& id) { return juce::ParameterID { id, 12 }; };
@@ -389,6 +396,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
         layout.add (std::make_unique<juce::AudioParameterBool> (id12 (ids::shaperCustom), "Shaper Custom", false));
     }
     return layout;
+}
+
+const juce::StringArray& OspAudioProcessor::layerStateNames()
+{
+    static const juce::StringArray names { "mute", "solo" };
+    return names;
 }
 
 const juce::StringArray& OspAudioProcessor::layerControlNames()
@@ -499,6 +512,8 @@ OspAudioProcessor::OspAudioProcessor()
             lp.granular[static_cast<std::size_t> (i)] = parameters.getRawParameterValue (layerParameterId (layer, granularNames()[i + 1]));
         for (int i = 0; i < layerControlNames().size(); ++i)
             lp.controls[static_cast<std::size_t> (i)] = parameters.getRawParameterValue (layerParameterId (layer, layerControlNames()[i]));
+        lp.mute = parameters.getRawParameterValue (layerParameterId (layer, "mute"));
+        lp.solo = parameters.getRawParameterValue (layerParameterId (layer, "solo"));
         if (layer > 0)
             lp.reimagined = parameters.getRawParameterValue (reimaginedParameterId (layer));
         for (int i = 0; i < reimaginedModeNames().size(); ++i)
@@ -683,9 +698,14 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
     engineSettings.mixY = mixYParam->load();
     engine.setMixPosition (engineSettings.mixX, engineSettings.mixY);
     engine.setMixSlots (keptSlotCount.load());
+    // SOLO wins: with any layer soloed only the soloed ones are heard; else MUTE decides.
+    bool anySolo = false;
+    for (const auto& lp : layerParams)
+        anySolo = anySolo || lp.solo->load() >= 0.5f;
     for (int layer = 0; layer < numLayers; ++layer)
     {
         auto& lp = layerParams[static_cast<std::size_t> (layer)];
+        const bool audible = anySolo ? lp.solo->load() >= 0.5f : lp.mute->load() < 0.5f;
         engine.setLayerPitchOffsetSemitones (layer, layers[static_cast<std::size_t> (layer)].rootShiftSemitones.load());
         std::array<float, 8> controls {};
         for (std::size_t i = 0; i < controls.size(); ++i)
@@ -694,9 +714,11 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
         std::array<float, 15> modes {};
         for (std::size_t i = 0; i < modes.size(); ++i)
             modes[i] = lp.modes[i]->load();
-        if (force || controls != lp.lastControls || ! juce::exactlyEqual (ownReimagined, lp.lastReimagined) || modes != lp.lastModes)
+        if (force || controls != lp.lastControls || ! juce::exactlyEqual (ownReimagined, lp.lastReimagined) || modes != lp.lastModes
+            || audible != lp.lastAudible)
         {
             lp.lastControls = controls;
+            lp.lastAudible = audible;
             lp.lastReimagined = ownReimagined;
             lp.lastModes = modes;
             LayerSettings ls;
@@ -707,6 +729,7 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
             ls.reverse = controls[5] >= 0.5f;
             ls.loop = controls[6] >= 0.5f;
             ls.follow = controls[7] >= 0.5f;
+            ls.audible = audible;
             ls.reimagined = ownReimagined < 0.0f ? -1.0 : 0.01 * ownReimagined;   // A follows the instrument's amount
             auto& rs = ls.reimaginedSettings;
             auto pick = [&modes] (std::size_t i) { return static_cast<int> (std::lround (modes[i])); };
@@ -1279,6 +1302,10 @@ void OspAudioProcessor::clearLayer (int layer)
     target.lastLoadFailed = false;
     target.state = LoadState::empty;
     setRootOverride (std::nullopt, static_cast<int> (index));
+    // An empty slot is neither muted nor soloed (a solo left on it would silence the others).
+    for (const auto& name : layerStateNames())
+        if (auto* p = parameters.getParameter (layerParameterId (static_cast<int> (index), name)))
+            p->setValueNotifyingHost (p->getDefaultValue());
 }
 
 //==============================================================================
@@ -1321,10 +1348,10 @@ float OspAudioProcessor::parameterValue (const juce::String& id) const
 
 void OspAudioProcessor::makeLayerAudible (int layer, bool keepMix)
 {
-    // A layer the musician just added: two layers meet in the middle of the blend. A third
-    // added to an A/B pair joins at 0 - the triangle's point sits on its A-B edge where the
-    // blend was, so nothing changes until the node moves towards C (the header's line
-    // unfolds into that triangle). Three dropped together (or a reset) meet at the centre.
+    // A layer the musician just added is heard at once: two layers meet in the middle of the
+    // blend. A third added to an A/B pair takes a third of the mix while A and B keep the
+    // balance they had (a centred pair: all three at the centre). Three dropped together (or
+    // a reset) meet at the centre.
     const int count = occupiedLayerCount();
     if (layer >= 1)   // it starts as Reimagined as the instrument (A) is
         setParameterValue (reimaginedParameterId (layer), parameterValue (reimaginedParameterId (0)));
@@ -1334,14 +1361,35 @@ void OspAudioProcessor::makeLayerAudible (int layer, bool keepMix)
     {
         const double s = std::sin (0.5 * juce::MathConstants<double>::pi * std::clamp (static_cast<double> (parameterValue (ids::blend)), 0.0, 1.0));
         const double shareB = s * s;   // equal-power blend -> B's power share
-        setParameterValue (ids::mixX, static_cast<float> (0.5 * shareB));   // C = x - y/2 = 0
-        setParameterValue (ids::mixY, static_cast<float> (shareB));
+        // Shares A = 1 - x - y/2, B = y, C = x - y/2: C 1/3, A and B 2/3 in their old ratio.
+        const double b = 2.0 / 3.0 * shareB;
+        setParameterValue (ids::mixX, static_cast<float> (1.0 / 3.0 + 0.5 * b));
+        setParameterValue (ids::mixY, static_cast<float> (b));
     }
     else if (count == 3)
     {
         setParameterValue (ids::mixX, 0.5f);
         setParameterValue (ids::mixY, 1.0f / 3.0f);
     }
+}
+
+bool OspAudioProcessor::isLayerHeard (int layer) const
+{
+    bool anySolo = false;
+    for (int l = 0; l < numLayers; ++l)
+        anySolo = anySolo || parameterValue (layerParameterId (l, "solo")) >= 0.5f;
+    return anySolo ? parameterValue (layerParameterId (layer, "solo")) >= 0.5f : parameterValue (layerParameterId (layer, "mute")) < 0.5f;
+}
+
+void OspAudioProcessor::soloOnly (int layer)
+{
+    for (int l = 0; l < numLayers; ++l)
+        if (auto* p = parameters.getParameter (layerParameterId (l, "solo")))
+        {
+            p->beginChangeGesture();
+            p->setValueNotifyingHost (l == layer ? 1.0f : 0.0f);
+            p->endChangeGesture();
+        }
 }
 
 int OspAudioProcessor::addLayers (const juce::Array<juce::File>& files, int firstLayer)
@@ -1394,6 +1442,9 @@ int OspAudioProcessor::addLayerSet (const juce::Array<juce::File>& files)
 
 void OspAudioProcessor::resetLayerControls (int layer)
 {
+    for (const auto& name : layerStateNames())   // a new sound is heard: not muted, not soloed
+        if (auto* p = parameters.getParameter (layerParameterId (layer, name)))
+            p->setValueNotifyingHost (p->getDefaultValue());
     for (const auto& name : granularNames())
         if (auto* p = parameters.getParameter (layerParameterId (layer, name)))
             p->setValueNotifyingHost (p->getDefaultValue());
@@ -1413,7 +1464,7 @@ OspAudioProcessor::LayerSnapshot OspAudioProcessor::captureLayer (int layer) con
     LayerSnapshot snapshot;
     snapshot.instrument = currentInstrument (layer);
     snapshot.rootOverride = rootOverride (layer);
-    for (const auto* names : { &granularNames(), &layerControlNames() })
+    for (const auto* names : { &granularNames(), &layerControlNames(), &layerStateNames() })
         for (const auto& name : *names)
             snapshot.values.set (name, parameterValue (layerParameterId (layer, name)));
     snapshot.values.set ("reimagined", parameterValue (reimaginedParameterId (layer)));
@@ -1428,7 +1479,7 @@ OspAudioProcessor::LayerSnapshot OspAudioProcessor::captureLayer (int layer) con
 void OspAudioProcessor::applyLayer (int layer, const LayerSnapshot& snapshot)
 {
     auto& slot = layers[static_cast<std::size_t> (layer)];
-    for (const auto* names : { &granularNames(), &layerControlNames() })
+    for (const auto* names : { &granularNames(), &layerControlNames(), &layerStateNames() })
         for (const auto& name : *names)
             setParameterValue (layerParameterId (layer, name), snapshot.values.getWithDefault (name, parameterValue (layerParameterId (layer, name))));
     setParameterValue (reimaginedParameterId (layer), snapshot.values.getWithDefault ("reimagined", parameterValue (reimaginedParameterId (layer))));

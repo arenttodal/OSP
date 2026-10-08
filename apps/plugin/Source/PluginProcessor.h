@@ -170,6 +170,12 @@ public:
     static const juce::StringArray& granularNames();
     /** Layer control names for layerParameterId: start, tune, pan, level, link, reverse, loop, follow. */
     static const juce::StringArray& layerControlNames();
+    /** MUTE and SOLO ("layerA.mute", "layerA.solo"): kept apart from the controls (LINK never shares them). */
+    static const juce::StringArray& layerStateNames();
+    /** Heard in the mix: SOLO wins (only soloed layers are heard), else MUTE decides. */
+    bool isLayerHeard (int layer) const;
+    /** SOLO this layer alone (alt-click on S). */
+    void soloOnly (int layer);
 
     /** Most recently loaded instrument of a layer, or nullptr when it is empty (any non-audio thread). */
     std::shared_ptr<const LoadedInstrument> currentInstrument (int layer = -1) const;
@@ -421,6 +427,9 @@ private:
         float lastReimagined = -1.0e9f;
         std::array<std::atomic<float>*, 15> modes {};   ///< in reimaginedModeNames() order
         std::array<float, 15> lastModes {};
+        std::atomic<float>* mute = nullptr;
+        std::atomic<float>* solo = nullptr;
+        bool lastAudible = true;
     };
     std::atomic<float>* mixXParam = nullptr;
     std::atomic<float>* mixYParam = nullptr;

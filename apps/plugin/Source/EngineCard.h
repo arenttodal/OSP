@@ -145,6 +145,25 @@ private:
     juce::ParameterAttachment attachment;
 };
 
+/** A layer's MUTE or SOLO: a small key beside its badge, bound to its bool parameter.
+    SOLO lights in the layer's colour, MUTE in graphite; alt-click on SOLO solos it alone. */
+class LayerStateButton final : public juce::Component, public juce::SettableTooltipClient
+{
+public:
+    LayerStateButton (OspAudioProcessor& processor, int layer, bool solo);
+    bool isOn() const noexcept { return on; }
+    void paint (juce::Graphics&) override;
+    void mouseUp (const juce::MouseEvent&) override;
+    void mouseEnter (const juce::MouseEvent&) override { repaint(); }
+    void mouseExit (const juce::MouseEvent&) override { repaint(); }
+
+private:
+    OspAudioProcessor& processor;
+    int layer;
+    bool solo, on = false;
+    juce::ParameterAttachment attachment;
+};
+
 /** ONE SHOT / GRANULAR as a compact selector with a menu. */
 class ModeSelector final : public juce::Component, public juce::SettableTooltipClient
 {
@@ -194,6 +213,7 @@ public:
     void setReimaginedOpen (bool open);
 
     void paint (juce::Graphics&) override;
+    void paintOverChildren (juce::Graphics&) override;
     void resized() override;
     void mouseDown (const juce::MouseEvent&) override;
     void mouseMove (const juce::MouseEvent&) override;
@@ -221,9 +241,10 @@ private:
     } menuButton;
     std::array<std::unique_ptr<LayerKnob>, 5> knobs;   ///< START TUNE PAN LEVEL REIMAGINED
     std::array<std::unique_ptr<ModifierButton>, 4> modifiers;
+    LayerStateButton muteButton, soloButton;
+    bool shownHeard = true;
     std::array<std::unique_ptr<MiniKnob>, 5> granularKnobs;
     juce::Rectangle<int> badgeArea, textArea, dividerArea;
-    juce::Point<float> ledCentre;
     juce::String rootText, fileText;
 };
 

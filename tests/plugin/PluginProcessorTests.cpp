@@ -1115,6 +1115,19 @@ namespace
     }
 
     float valueOf (OspAudioProcessor& p, const juce::String& id) { return p.parameterValue (id); }
+
+    double levelOf (const AudioData& audio)
+    {
+        double e = 0.0;
+        std::size_t n = 0;
+        for (const auto& ch : audio.channels)
+            for (float v : ch)
+            {
+                e += static_cast<double> (v) * v;
+                ++n;
+            }
+        return n > 0 ? std::sqrt (e / static_cast<double> (n)) : 0.0;
+    }
 }
 
 TEST_CASE ("plugin: three dropped sounds become layers A, B, C, all heard, recalled with their controls", "[plugin][adaptive]")
@@ -2020,6 +2033,12 @@ TEST_CASE ("plugin: canonical screenshots for visual review", "[.][canonical]")
     p.addLayers ({ c });
     settle();
     shot ("07-three.png");
+    // MUTE / SOLO: B soloed, C muted (A and C dimmed: not heard).
+    set ("layerB.solo", 1.0f);
+    set ("layerC.mute", 1.0f);
+    shot ("07b-three-solo-mute.png");
+    set ("layerB.solo", 0.0f);
+    set ("layerC.mute", 0.0f);
     ui->openPopup (osp::plugin::OspAudioProcessorEditor::mixPopup);
     shot ("20-mix-popup.png");
     ui->openPopup (osp::plugin::OspAudioProcessorEditor::advancedPopup);
@@ -2623,7 +2642,7 @@ TEST_CASE ("plugin: master volume keeps its gain law as a slider", "[plugin][rei
     }
 }
 
-TEST_CASE ("plugin: MIX - a third layer joins an A/B mix at 0 and removing it keeps the A/B balance", "[plugin][adaptive]")
+TEST_CASE ("plugin: MIX - a third layer is heard at once, A and B keep their balance, removing it restores the A/B mix", "[plugin][adaptive]")
 {
     TempDir tmp;
     const auto a = writeSource (tmp.dir, "a.wav", testsignals::vowel (midiToHz (57), 1.5, 48000.0, 3));
@@ -2636,14 +2655,31 @@ TEST_CASE ("plugin: MIX - a third layer joins an A/B mix at 0 and removing it ke
     p.setParameterValue ("ab.blend", 0.6f);
     const auto two = InstrumentEngine::mixWeights ({ true, true, false }, p.parameterValue ("ab.blend"), 0.5, 1.0 / 3.0);
 
-    // Adding C: the same A and B gains, C silent until the node moves towards it.
+    // Adding C: it takes a third of the mix at once; A and B keep their balance in the rest.
     CHECK (p.addLayers ({ c }) == 1);
     REQUIRE (p.waitForLoads (30000));
     p.pollLoads();
     const auto three = InstrumentEngine::mixWeights ({ true, true, true }, 0.0, p.parameterValue ("mix.x"), p.parameterValue ("mix.y"));
-    CHECK (three.gain[0] == Approx (two.gain[0]).margin (1.0e-5));
-    CHECK (three.gain[1] == Approx (two.gain[1]).margin (1.0e-5));
-    CHECK (three.gain[2] == Approx (0.0).margin (1.0e-3));
+    CHECK (three.gain[2] * three.gain[2] == Approx (1.0 / 3.0).margin (1.0e-3));
+    CHECK (three.gain[0] * three.gain[0] == Approx (2.0 / 3.0 * two.gain[0] * two.gain[0]).margin (1.0e-3));
+    CHECK (three.gain[1] * three.gain[1] == Approx (2.0 / 3.0 * two.gain[1] * two.gain[1]).margin (1.0e-3));
+    {
+        // ... and it plays: layer C's own pitch is in what comes out.
+        const auto out = playNote (p, 57, 48000.0, 0.8);
+        CHECK (levelOf (out) > 0.0);
+    }
+    // A centred pair (blend 50 %) puts all three at the centre.
+    {
+        OspAudioProcessor r;
+        CHECK (r.addLayers ({ a, b }) == 2);
+        REQUIRE (r.waitForLoads (30000));
+        r.pollLoads();
+        CHECK (r.addLayers ({ c }) == 1);
+        REQUIRE (r.waitForLoads (30000));
+        r.pollLoads();
+        CHECK (valueOf (r, "mix.x") == Approx (0.5f).margin (1.0e-4));
+        CHECK (valueOf (r, "mix.y") == Approx (1.0f / 3.0f).margin (1.0e-4));
+    }
 
     // A 20 / B 30 / C 50, then C removed: A 40 / B 60.
     p.setParameterValue ("mix.x", static_cast<float> (0.5 + 0.5 * 0.3));
@@ -3127,4 +3163,50 @@ TEST_CASE ("plugin: saved SHAPER patterns read back; a CUSTOM edit is one undo s
     CHECK (p.shaperCustomPattern() == before);
     p.undoManager.redo();
     CHECK (p.shaperCustomPattern() == steps);
+}
+
+
+TEST_CASE ("plugin: MUTE and SOLO - solo wins, mute silences, both recall; an emptied layer drops its solo", "[plugin][adaptive]")
+{
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "a.wav", testsignals::vowel (midiToHz (57), 1.5, 48000.0, 3));
+    const auto b = writeSource (tmp.dir, "b.wav", testsignals::vowel (midiToHz (64), 1.5, 48000.0, 5));
+    OspAudioProcessor p;
+    CHECK (p.addLayers ({ a, b }) == 2);
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    const double both = levelOf (playNote (p, 57, 48000.0, 0.8));
+    REQUIRE (both > 0.0);
+    CHECK (p.isLayerHeard (0));
+    CHECK (p.isLayerHeard (1));
+
+    p.setParameterValue ("layerB.mute", 1.0f);
+    CHECK (! p.isLayerHeard (1));
+    const double onlyA = levelOf (playNote (p, 57, 48000.0, 0.8));
+    CHECK (onlyA < both);
+    CHECK (onlyA > 0.0);
+
+    // SOLO B: B is heard though muted? No - solo decides: only soloed layers are heard.
+    p.setParameterValue ("layerB.mute", 0.0f);
+    p.setParameterValue ("layerB.solo", 1.0f);
+    CHECK (! p.isLayerHeard (0));
+    CHECK (p.isLayerHeard (1));
+    p.setParameterValue ("layerA.mute", 1.0f);
+    p.soloOnly (0);   // alt-click on A's S: A alone, even though it is muted
+    CHECK (p.isLayerHeard (0));
+    CHECK (! p.isLayerHeard (1));
+
+    // Saved and recalled with the session.
+    juce::MemoryBlock state;
+    p.getStateInformation (state);
+    OspAudioProcessor q;
+    q.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+    CHECK (valueOf (q, "layerA.solo") == Approx (1.0f));
+    CHECK (valueOf (q, "layerA.mute") == Approx (1.0f));
+    CHECK (valueOf (q, "layerB.solo") == Approx (0.0f).margin (1.0e-4));
+
+    // Removing the soloed layer: the others are heard again.
+    p.clearLayer (0);
+    CHECK (valueOf (p, "layerA.solo") == Approx (0.0f).margin (1.0e-4));
+    CHECK (p.isLayerHeard (1));
 }
