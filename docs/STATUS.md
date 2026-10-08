@@ -139,7 +139,7 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 
 ## Milestone checklist — Shaping system v1.0 (five-macro popups) and UI redesign
 
-- [x] FX-01 popup framework: a macro's name opens its mini panel (one at a time, Escape / outside click closes, hover underline, dot when customised, double-click resets)
+- [x] FX-01 popup framework: a macro's name opens its mini panel (one at a time, Escape / outside click closes, hover underline, LED under the knob when customised, double-click resets)
 - [x] FX-02 CHARACTER: per-voice LP24 ladder, LP12, HP12, BP12, Tilt; MIN/MAX (reversible), RES, DRIVE, AD envelope (ENV/ATTACK/DECAY)
 - [x] FX-03 DYNAMICS: velocity curve, attack, release (20 ms–15 s), TONE couples velocity into CHARACTER
 - [x] FX-04..07 MOVEMENT: DRIFT (per voice + shared wander), TAPE, CHORUS, PULSE; 25 % and 50 % clearly differ (test)
@@ -218,6 +218,15 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [x] MUTE / SOLO per layer (`layerX.mute`, `layerX.solo`, version hint 13): small M / S keys
       beside the layer letter (replacing its light); solo wins, alt-click solos one alone, an
       unheard layer is veiled; emptied slots drop their solo; saved, moved with the layer.
+- [x] LOOP and REVERSE in every REIMAGINED mode (`ReimaginedNote::loop`): LOOP on sustains a
+      held note, forwards or reversed; LOOP off plays the recording once and ends. TAPE FRAME
+      no longer runs out by amount while LOOP is on (each pass wears a little, floored), LOOP
+      off reads the recording straight through, and reversed notes start at the end (they
+      started at position 0 and ended at once). TOYBOX's walk drifts the way the note plays
+      (it drifted forwards on reversed notes) and plays through and ends with LOOP off; MOSAIC
+      and MIRAGE hold only with LOOP on; MOSAIC reversed and held ping-pongs the body.
+      Regression test per mode (`LOOP and REVERSE are respected by every mode`).
+- [x] The dot after a customised macro's name is gone; the LED under the knob says it.
 
 ## DONE
 

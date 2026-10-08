@@ -16,7 +16,8 @@ namespace osp::plugin
 /**
     A macro's name above its knob. When the macro has settings, the name is the door to
     them (shaping system v1.0 §5): hover darkens it and underlines it, a click opens the
-    popup, and a dot after the name says the settings differ from the defaults.
+    popup. Whether the settings differ from the defaults is kept here (isCustomised) for
+    the LED the editor draws under the knob.
 */
 class MacroLabel final : public juce::Component, public juce::SettableTooltipClient
 {

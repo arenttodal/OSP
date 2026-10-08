@@ -45,8 +45,9 @@ bool MirageEngine::start (const ReimaginedNote& n, const ReimaginedControl& c) n
         const auto& cont = n.model->original.continuation;
         const auto frames = static_cast<double> (src.numFrames());
         soundEnd = std::clamp (frames - std::max (0.0, n.model->analysis.envelope.trailingSilenceSeconds) * sr, src.startFrame() + 1.0, frames);
-        // Fixed loop points over the stable body, as on the machines this remembers.
-        loops = cont.canSustain && cont.sustainEndFrame - cont.sustainStartFrame > 0.08 * sr;
+        // Fixed loop points over the stable body, as on the machines this remembers (LOOP
+        // on); LOOP off plays the recording once.
+        loops = n.loop && cont.canSustain && cont.sustainEndFrame - cont.sustainStartFrame > 0.08 * sr;
         if (loops && cont.bestLoop >= 0)
         {
             const auto& j = cont.jumps[static_cast<std::size_t> (cont.bestLoop)];

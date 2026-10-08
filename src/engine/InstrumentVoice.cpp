@@ -999,6 +999,7 @@ void InstrumentVoice::startModeEngine (const InstrumentVoiceStart& params) noexc
     note.startFrame = position;
     note.rootStep = layer->source->sampleRate() / sampleRate * std::exp2 ((layer->source->rootMidi() - currentModel->rootMidi) / 12.0);
     note.reverse = direction < 0.0;
+    note.loop = params.strategy != ContinuationStrategy::off;   // the layer's LOOP (and Sustain)
     note.granular = granularMode;
     note.velocity = std::clamp (params.velocity, 1, 127) / 127.0;
     note.note = params.note;

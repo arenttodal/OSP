@@ -529,3 +529,121 @@ TEST_CASE ("reimagined modes: CPU", "[.][reimagined-cpu]")
         std::cout << c.name << ": " << 100.0 * seconds / 4.0 << " % of one core (" << engine->musicalVoiceCount() << " voices)\n";
     }
 }
+
+TEST_CASE ("reimagined modes: LOOP and REVERSE matrix (measurement)", "[.][loop-reverse]")
+{
+    // LOOP: a 2 s vowel held for 6 s - sound after the recording's end means it sustains.
+    // REVERSE: a vowel that decays (loud start): forward the start is louder, reversed the end.
+    const auto sustained = vowelModel (48000.0, 2.0);
+    auto decaying = testsignals::vowel (midiToHz (57), 2.0, 48000.0, 3);
+    for (auto& ch : decaying.channels)
+        for (std::size_t i = 0; i < ch.size(); ++i)
+            ch[i] *= static_cast<float> (std::exp (-2.2 * static_cast<double> (i) / 48000.0));
+    testsignals::applyFades (decaying, 0.01, 0.05);
+    const auto decayModel = instrument::buildComplete (decaying, test::analyse (decaying), {}, false);
+    const char* names[] = { "KALEIDOSCOPE", "TAPE FRAME", "TOYBOX", "MOSAIC", "MIRAGE" };
+    for (std::size_t m = 0; m < allModes.size(); ++m)
+        for (double amount : { 0.0, 0.5, 1.0 })
+        {
+            auto s = settingsFor (allModes[m], amount);
+            s.adsr.releaseSeconds = 0.05;
+            double tail[3] {};
+            for (int loop = 0; loop < 3; ++loop)
+            {
+                s.layer[0].loop = loop >= 1;
+                s.layer[0].reverse = loop == 2;
+                const auto out = play ({ sustained.get() }, s, { { 0.0, 57, 100 }, { 6.0, 57, 0 } }, 6.5);
+                tail[loop] = out.rms (static_cast<std::size_t> (3.0 * 48000), static_cast<std::size_t> (5.5 * 48000)) / std::max (1.0e-9, out.rms (0, 48000));
+            }
+            double ratio[2] {};
+            for (int rev = 0; rev < 2; ++rev)
+            {
+                s.layer[0].loop = false;
+                s.layer[0].reverse = rev == 1;
+                const auto out = play ({ decayModel.get() }, s, { { 0.0, 57, 100 }, { 2.4, 57, 0 } }, 2.6);
+                ratio[rev] = out.rms (static_cast<std::size_t> (0.05 * 48000), static_cast<std::size_t> (0.5 * 48000))
+                             / std::max (1.0e-9, out.rms (static_cast<std::size_t> (1.3 * 48000), static_cast<std::size_t> (1.8 * 48000)));
+            }
+            std::printf ("%-13s %3.0f%%  tail loop off %.3f on %.3f rev+on %.3f   start/late fwd %.2f rev %.2f\n", names[m], 100.0 * amount, tail[0], tail[1], tail[2], ratio[0], ratio[1]);
+        }
+}
+
+TEST_CASE ("reimagined modes: KALEIDOSCOPE LOOP on a decaying body (measurement)", "[.][loop-kaleido]")
+{
+    for (double decay : { 0.3, 0.8, 1.5 })
+    {
+        auto audio = testsignals::vowel (midiToHz (57), 3.0, 48000.0, 3);
+        for (auto& ch : audio.channels)
+            for (std::size_t i = 0; i < ch.size(); ++i)
+                ch[i] *= static_cast<float> (std::exp (-decay * static_cast<double> (i) / 48000.0));
+        testsignals::applyFades (audio, 0.005, 0.2);
+        const auto model = instrument::buildComplete (audio, test::analyse (audio), {}, false);
+        std::printf ("decay %.1f canSustain %d jumps %zu sustain %.2f..%.2f s\n", decay, model->original.continuation.canSustain ? 1 : 0,
+                     model->original.continuation.jumps.size(), model->original.continuation.sustainStartFrame / 48000.0,
+                     model->original.continuation.sustainEndFrame / 48000.0);
+        for (double amount : { 0.0, 0.25, 0.5, 0.75, 1.0 })
+        {
+            auto s = settingsFor (ReimaginedMode::kaleidoscope, amount);
+            s.adsr.releaseSeconds = 0.05;
+            s.layer[0].loop = true;
+            const auto out = play ({ model.get() }, s, { { 0.0, 57, 100 }, { 8.0, 57, 0 } }, 8.5);
+            std::printf ("   %3.0f%%  rms 0-1 s %.4f  3.5-4.5 %.4f  6-7.5 %.4f\n", 100.0 * amount, out.rms (0, 48000), out.rms (168000, 216000), out.rms (288000, 360000));
+        }
+    }
+}
+
+TEST_CASE ("reimagined modes: LOOP and REVERSE are respected by every mode", "[integration][reimagined-modes][regression]")
+{
+    // LOOP on: a held note sustains (forwards and reversed); LOOP off: it plays the
+    // recording once and ends, even with the key held. REVERSE: a sound that decays is
+    // heard swelling instead (its energy comes later).
+    const auto sustained = vowelModel (48000.0, 2.0);
+    auto decaying = testsignals::vowel (midiToHz (57), 1.2, 48000.0, 3);
+    for (auto& ch : decaying.channels)
+        for (std::size_t i = 0; i < ch.size(); ++i)
+            ch[i] *= static_cast<float> (std::exp (-3.5 * static_cast<double> (i) / 48000.0));
+    testsignals::applyFades (decaying, 0.01, 0.05);
+    const auto decayModel = instrument::buildComplete (decaying, test::analyse (decaying), {}, false);
+
+    auto centre = [] (const Render& out) {
+        double weighted = 0.0, total = 0.0;
+        for (std::size_t i = 0; i < out.l.size(); ++i)
+        {
+            const double e = 0.5 * (static_cast<double> (out.l[i]) * out.l[i] + static_cast<double> (out.r[i]) * out.r[i]);
+            weighted += e * static_cast<double> (i) / 48000.0;
+            total += e;
+        }
+        return weighted / std::max (1.0e-30, total);
+    };
+    // (Every mode in full; TAPE FRAME's wear and TOYBOX's walk also change with amount.)
+    for (const auto mode : allModes)
+        for (double amount : { 0.55, 1.0 })
+        {
+            if (amount < 1.0 && mode != ReimaginedMode::tapeFrame && mode != ReimaginedMode::toybox)
+                continue;
+            CAPTURE (static_cast<int> (mode), amount);
+            auto s = settingsFor (mode, amount);
+            s.adsr.releaseSeconds = 0.05;
+            for (int variant = 0; variant < 3; ++variant)
+            {
+                CAPTURE (variant);
+                s.layer[0].loop = variant >= 1;
+                s.layer[0].reverse = variant == 2;
+                const auto out = play ({ sustained.get() }, s, { { 0.0, 57, 100 }, { 6.5, 57, 0 } }, 6.6);
+                const double first = out.rms (0, 24000);
+                REQUIRE (first > 1.0e-3);
+                if (variant == 0)
+                    CHECK (out.rms (static_cast<std::size_t> (5.6 * 48000), static_cast<std::size_t> (6.4 * 48000)) < 0.01 * first);
+                else
+                    CHECK (out.rms (static_cast<std::size_t> (3.0 * 48000), static_cast<std::size_t> (6.4 * 48000)) > 0.3 * first);
+            }
+            double centres[2] {};
+            for (int rev = 0; rev < 2; ++rev)
+            {
+                s.layer[0].loop = false;
+                s.layer[0].reverse = rev == 1;
+                centres[rev] = centre (play ({ decayModel.get() }, s, { { 0.0, 57, 100 }, { 3.5, 57, 0 } }, 3.6));
+            }
+            CHECK (centres[1] > centres[0] + 0.25);
+        }
+}

@@ -18,9 +18,11 @@ namespace osp
     do; a gentle filter after the DAC leaves some of its sparkle.
 
     The memory is read by a head that can turn: FWD plays through (looping a sustaining
-    body), TURN swings back and forth over a region that walks slowly through the sound
+    body while LOOP is on), TURN swings back and forth over a region that walks slowly through the sound
     (click-free U-turns), CHAOS picks irregular legs, skips and jumps, still on the
-    recording's own pitch. MOTION sets how often it turns and how much the sound's own
+    recording's own pitch. The walk drifts the way the note plays (REVERSE: backwards); with
+    LOOP on it stays in the body while held, with LOOP off it walks on to the end and stops.
+    MOTION sets how often it turns and how much the sound's own
     envelope modulates its playback rate and level (self-modulation instead of an LFO).
     Two memory taps a few tens of ms behind the head recirculate fragments of what was
     just played (bounded: no feedback loop).
@@ -74,7 +76,12 @@ private:
     double pendingLeg = 1.0;
     float lastValue = 0.0f, lastSlope = 0.0f;
     double regionStart = 0.0, regionEnd = 0.0, soundEnd = 0.0, legEnd = 0.0, legLength = 0.0;
-    bool sustains = false;
+    bool sustains = false;   ///< LOOP on and a stable body: the head stays in it while held
+    double noteDir = 1.0;    ///< the way the note plays (REVERSE: backwards); its legs are longer
+    /** Where legs may reach: the body while it sustains; otherwise on to the sound's end
+        (forwards) or back through the attack to the start (REVERSE), where the note ends. */
+    double lowBound() const noexcept { return noteDir < 0.0 && ! sustains ? 0.0 : regionStart; }
+    double highBound() const noexcept { return sustains ? regionEnd : soundEnd; }
     ToyboxPlay play = ToyboxPlay::forward;
     double motion = 0.0, step = 1.0, factor = 1.0;
 

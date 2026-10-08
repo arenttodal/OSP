@@ -72,8 +72,8 @@ void MacroLabel::mouseUp (const juce::MouseEvent& e)
 
 void MacroLabel::paint (juce::Graphics& g)
 {
-    // The macro's name, restrained (medium, slightly tracked); its settings in use are an
-    // accent dot after it.
+    // The macro's name, restrained (medium, slightly tracked). Settings in use are shown
+    // once, by the LED under the knob (the editor draws it), not again beside the name.
     const bool hover = opensPopup && isMouseOver();
     auto r = getLocalBounds().toFloat();
     const auto font = type::macroLabel (0.7f * r.getHeight());
@@ -82,8 +82,6 @@ void MacroLabel::paint (juce::Graphics& g)
     const float w = juce::GlyphArrangement::getStringWidth (font, text);
     const auto textArea = juce::Rectangle<float> (r.getCentreX() - w * 0.5f, r.getY(), w + 2.0f, r.getHeight());
     g.drawText (text, textArea, juce::Justification::centredLeft, false);
-    if (customised)
-        design::draw::led (g, { textArea.getRight() + 0.42f * r.getHeight(), r.getCentreY() }, 0.3f * r.getHeight(), accent.withMultipliedBrightness (1.15f), 0.5f);
     if (hover || open)
     {
         g.setColour (open ? accent : palette::text.withAlpha (0.5f));

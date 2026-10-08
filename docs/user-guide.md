@@ -79,10 +79,16 @@ The knob on the card says how far into the mode the layer goes.
 | Mode | What it makes of the recording | Settings |
 |---|---|---|
 | **KALEIDOSCOPE** | Refraction: richer versions of the sound itself - sympathetic resonance tuned to it, a more fluid sustain, a moving doubling, wandering formants, at the far end grains and gentle saturation. The original Reimagined. | **FOCUS** recognisable ↔ abstract; **SPREAD** width and variation (50 % / 50 % is the sound every earlier patch had) |
-| **TAPE FRAME** | Mechanical memory: the sound laid onto a finite piece of tape and played by tape speed - low notes slower, darker and longer, high notes quicker and brighter; each note a slightly different pass; at high amounts faint ghost passes and the tape running out at its end (lower amounts rewind it, quieter each time). | **AGE** bandwidth, saturation, wear; **STABILITY** wow, flutter, pass-to-pass variation; **FRAME** SHORT / CLASSIC / LONG (about 3.6 / 7.6 / 11.4 s of tape at the root) |
+| **TAPE FRAME** | Mechanical memory: the sound laid onto a finite piece of tape and played by tape speed - low notes slower, darker and longer, high notes quicker and brighter; each note a slightly different pass; at high amounts faint ghost passes. With LOOP on a held note rewinds the tape for another pass (a little more worn each time, never gone); with LOOP off it plays once, to the recording's end. | **AGE** bandwidth, saturation, wear; **STABILITY** wow, flutter, pass-to-pass variation; **FRAME** SHORT / CLASSIC / LONG (about 3.6 / 7.6 / 11.4 s of tape at the root) |
 | **TOYBOX** | Primitive digital mutation: a small, clever digital memory (low rate, few bits) whose head can turn back and forth through the sound, modulated by its own envelope, with short memory fragments. | **MOTION** turning and self-modulation; **DIGITAL** rate, resolution, bandwidth; **PLAY** FWD / TURN / CHAOS |
 | **MOSAIC** | Harmonic reconstruction: the sound rebuilt from its harmonic fingerprint (partials plus its breath and noise), at any pitch, travelling through the recording's own evolution. | **DETAIL** how many partials and how much fine detail; **MOTION** a stable snapshot ↔ the recording's movement; **MODEL** PURE / TEXTURED |
 | **MIRAGE** | Early-digital weight: the sample clock follows the note (low notes grainy and dark, high notes sharp), into a driven resonant 4-pole low-pass. | **CLOCK** old-digital intensity; **FILTER** the filter's character, resonance and drive; **TONE** DARK / OPEN |
+
+Every mode follows the layer's **LOOP** and **REVERSE**: with LOOP on a held note
+sustains (also reversed: it never runs back into the attack), with LOOP off it plays the
+recording once and ends - TOYBOX's turning head walks through the sound and stops at its
+end. A sound with nothing stable to hold (a decaying pluck or bell) cannot sustain in any
+mode, as in the original.
 
 A mode change applies to the notes you play next; notes already sounding finish the way
 they started. MOSAIC needs a pitched sound: on noise or unpitched material it plays the

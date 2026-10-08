@@ -3,6 +3,7 @@
 #include "core/Prng.h"
 #include "engine/ReimaginedEngine.h"
 
+#include <algorithm>
 #include <array>
 
 namespace osp
@@ -16,8 +17,11 @@ namespace osp
     note plays the same tape), or a coherent window of a long recording. A note runs the
     tape at the speed its pitch asks for: low notes play slower, darker and longer, high
     notes quicker and brighter. The tape is FRAME long (SHORT / CLASSIC / LONG, in tape
-    seconds at the root); towards the far end it runs out like a tape-replay keyboard
-    (lower amounts rewind it to the body instead, quieter each pass).
+    seconds at the root). LOOP on: near the far end the tape is rewound to the body for
+    another pass while the key is held, a little more worn each pass (more at higher
+    amounts, down to a floor), so a held note sustains. LOOP off: the recording runs once,
+    to its own end, as on a tape-replay keyboard. REVERSE plays the tape backwards; held,
+    it rewinds at the body's start, so it never reaches the attack.
 
     Each note is a slightly different pass (seeded by the note's own seed: speed, start,
     wow and flutter phase, tone, gain). AGE narrows the bandwidth (following tape speed),
@@ -25,7 +29,7 @@ namespace osp
     pass-to-pass variation. High amounts add two faint ghost passes just behind, each a
     little slower or faster and older.
 
-    Amount: 0-25 % a light tape identity; 25-60 % the frame takes over (run-out begins);
+    Amount: 0-25 % a light tape identity; 25-60 % the frame takes over (passes wear);
     60-85 % mechanics and ghosts; 85-100 % the whole tape instrument.
 */
 class TapeFrameEngine final : public ReimaginedVoiceEngine
@@ -49,6 +53,10 @@ private:
     void seek (Head& head, double t) const noexcept;
     void readTape (Head& head, double step, bool sinc, float& l, float& r) noexcept;
     double tapeEnd() const noexcept;
+    /** The next pass's level: each rewind wears the tape a little (more at higher amounts),
+        down to a floor, so a held note keeps sounding. */
+    double nextPassGain() const noexcept { return std::max (minPassGain, passGain * (1.0 - 0.15 * runout)); }
+    static constexpr double minPassGain = 0.5;
 
     ReimaginedNote note;
     const ReimaginedAnalysis::TapeFrame* tape = nullptr;
@@ -60,9 +68,12 @@ private:
     Head main, rewind;
     bool rewinding = false;
     double rewindProgress = 0.0, rewindLength = 1.0;
-    double passGain = 1.0;          ///< each rewound pass is quieter (run-out)
-    double runout = 0.0;            ///< how far the tape runs out at its end (0: rewinds at full level)
-    double frameLength = 0.0, fadeLength = 1.0;
+    double passGain = 1.0;          ///< each rewound pass is a little quieter (wear)
+    double runout = 0.0;            ///< how much each pass wears (0: rewinds at full level)
+    double frameLength = 0.0;
+    // LOOP off: the recording read straight through once (no spliced tape, no rewinds).
+    bool straight = false;
+    double straightOrigin = 0.0, straightEnd = 0.0;
     float level = 1.0f, levelStep = 0.0f;
     bool done = false;
 

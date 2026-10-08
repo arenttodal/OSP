@@ -30,6 +30,9 @@ struct ReimaginedNote
     double startFrame = 0.0;     ///< where the read begins (START applied)
     double rootStep = 1.0;       ///< source frames per output sample at the recording's own pitch
     bool reverse = false;
+    /** LOOP: a held note sustains (on loops, a rewound tape, a held spectrum); off: it plays
+        the recording once and ends, whichever way it reads. */
+    bool loop = true;
     bool granular = false;       ///< the layer plays grains: the engine transforms them instead of reading
     double velocity = 0.8;       ///< 0..1, after the DYNAMICS curve
     int note = 60;

@@ -30,7 +30,7 @@ void TapeFrameEngine::seek (Head& head, double t) const noexcept
 
 double TapeFrameEngine::tapeEnd() const noexcept
 {
-    return std::min (tape->lengthFrames, frameLength);
+    return straight ? straightEnd : std::min (tape->lengthFrames, frameLength);
 }
 
 bool TapeFrameEngine::start (const ReimaginedNote& n, const ReimaginedControl& c) noexcept
@@ -76,13 +76,24 @@ bool TapeFrameEngine::start (const ReimaginedNote& n, const ReimaginedControl& c
     {
         const double sr = n.source->sampleRate();
         frameLength = reimagined::frameSeconds (p.frame) * sr;
-        fadeLength = 0.35 * sr;
         rewindLength = 0.12 * sr;
         direction = n.reverse ? -1.0 : 1.0;
-        // START moves along the tape as it moves through the recording.
-        const double into = std::max (0.0, n.startFrame - n.source->startFrame());
+        // LOOP off: once through the recording itself (its own length, its own ending),
+        // forwards or backwards; LOOP on: the spliced tape, passing again while held.
+        straight = ! n.loop;
+        straightOrigin = tape->splices.front().sourceFrame;
+        const double frames = static_cast<double> (n.source->numFrames());
+        const double trailing = std::max (0.0, n.model->analysis.envelope.trailingSilenceSeconds) * sr;
+        const double soundEnd = std::clamp (frames - trailing, n.source->startFrame() + 1.0, frames);
+        straightEnd = std::max (2.0, std::clamp (soundEnd, straightOrigin + 2.0, frames) - straightOrigin);
+        // START moves along the tape as it moves through the recording: forwards from the
+        // recording's start, backwards from its end (where the voice starts a reversed note).
         const double end = tapeEnd();
-        const double t = direction > 0.0 ? std::min (into + startShift * sr, 0.9 * end) : std::max (0.0, end - 1.0 - into);
+        double t = 0.0;
+        if (direction > 0.0)
+            t = std::min (std::max (0.0, n.startFrame - n.source->startFrame()) + startShift * sr, 0.9 * end);
+        else
+            t = std::max (0.1 * end, end - 1.0 - std::max (0.0, soundEnd - n.startFrame) - startShift * sr);
         seek (main, t);
         main.gain = 1.0f;
         for (std::size_t g = 0; g < ghosts.size(); ++g)
@@ -149,6 +160,24 @@ void TapeFrameEngine::readTape (Head& head, double readStep, bool sinc, float& l
     while (i > 0 && head.t < sp[i].frameStart)
         --i;
     const auto frames = static_cast<double> (note.source->numFrames());
+    if (straight)
+    {
+        // The recording itself, no splices.
+        const double pos = straightOrigin + head.t;
+        if (head.t < 0.0 || pos >= static_cast<double> (note.source->numFrames()))
+        {
+            l = r = 0.0f;
+            return;
+        }
+        if (sinc)
+            reimagined::readSinc (note, pos, readStep, l, r);
+        else
+        {
+            l = reimagined::readHermite (*note.source, 0, pos);
+            r = note.source->numChannels() > 1 ? reimagined::readHermite (*note.source, 1, pos) : l;
+        }
+        return;
+    }
     auto read = [&] (const ReimaginedAnalysis::TapeSplice& s, float& a, float& b) {
         const double pos = s.sourceFrame + (head.t - s.frameStart);
         if (pos < 0.0 || pos >= frames)
@@ -204,40 +233,40 @@ void TapeFrameEngine::render (const float* dryL, const float* dryR, float* outL,
         }
         else
         {
-            // Where the tape runs out: quieter towards the end (all the way at full amount),
-            // or rewound to the body for another, quieter pass.
-            const double fadeFrom = end - fadeLength;
-            const double towardsEnd = direction > 0.0 ? std::clamp ((main.t - fadeFrom) / fadeLength, 0.0, 1.0)
-                                                      : std::clamp ((fadeLength - main.t) / fadeLength, 0.0, 1.0);
-            const double passOut = passGain < 0.003 ? 1.0 : runout;
-            const auto mainLevel = static_cast<float> (passGain * (1.0 - passOut * towardsEnd));
+            // LOOP on: near the end of the frame (in the direction of play) the tape is
+            // rewound to the body for another pass, a little more worn each time (more at
+            // higher amounts, floored), and the note sustains while held. Backwards, the body's
+            // start is where it rewinds (to the frame's end), so a reversed note never reaches
+            // its attack while held. LOOP off: once through, to the recording's own end.
+            const auto mainLevel = static_cast<float> (passGain);
             readTape (main, readStep, true, l, r);
             l *= mainLevel;
             r *= mainLevel;
-            if (! rewinding && direction > 0.0 && passOut < 0.999 && main.t >= end - rewindLength)
+            const bool nearTurn = direction > 0.0 ? main.t >= end - rewindLength : main.t <= tape->bodyFrame + rewindLength;
+            if (! straight && ! rewinding && nearTurn)
             {
                 rewinding = true;
                 rewindProgress = 0.0;
-                seek (rewind, tape->bodyFrame);
+                seek (rewind, direction > 0.0 ? tape->bodyFrame : end - 1.0);
             }
             if (rewinding)
             {
                 float l2, r2, gOut, gIn;
                 readTape (rewind, readStep, true, l2, r2);
-                const auto nextGain = static_cast<float> (passGain * (1.0 - runout));
+                const auto nextGain = static_cast<float> (nextPassGain());
                 crossfadeGains (static_cast<float> (rewindProgress / rewindLength), 0.0f, gOut, gIn);
                 l = l * gOut + l2 * nextGain * gIn;
                 r = r * gOut + r2 * nextGain * gIn;
-                rewind.t += readStep;
+                rewind.t += direction * readStep;
                 rewindProgress += readStep;
                 if (rewindProgress >= rewindLength)
                 {
                     rewinding = false;
                     main = rewind;
-                    passGain *= 1.0 - runout;
+                    passGain = nextPassGain();
                     for (std::size_t g = 0; g < ghosts.size(); ++g)
                     {
-                        seek (ghosts[g], main.t - ghostDelay[g] * srcRate);
+                        seek (ghosts[g], main.t - direction * ghostDelay[g] * srcRate);
                         ghosts[g].gain = 0.0f;
                     }
                 }
@@ -287,6 +316,8 @@ double TapeFrameEngine::sourcePosition() const noexcept
 {
     if (tape == nullptr || note.granular || done)
         return -1.0;
+    if (straight)
+        return straightOrigin + main.t;
     const auto& s = tape->splices[std::min (main.splice, tape->splices.size() - 1)];
     return s.sourceFrame + (main.t - s.frameStart);
 }

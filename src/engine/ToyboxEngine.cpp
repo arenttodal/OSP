@@ -45,7 +45,7 @@ bool ToyboxEngine::start (const ReimaginedNote& n, const ReimaginedControl& c) n
         const auto& cont = n.model->original.continuation;
         const auto frames = static_cast<double> (src.numFrames());
         soundEnd = std::clamp (frames - std::max (0.0, n.model->analysis.envelope.trailingSilenceSeconds) * sr, src.startFrame() + 1.0, frames);
-        sustains = cont.canSustain && cont.sustainEndFrame - cont.sustainStartFrame > 0.08 * sr;
+        sustains = n.loop && cont.canSustain && cont.sustainEndFrame - cont.sustainStartFrame > 0.08 * sr;
         if (sustains)
         {
             regionStart = cont.sustainStartFrame;
@@ -53,11 +53,12 @@ bool ToyboxEngine::start (const ReimaginedNote& n, const ReimaginedControl& c) n
         }
         else
         {
-            // Nothing stable: turn over what follows the attack (it still decays, slowly).
+            // Nothing stable (or LOOP off): turn over what follows the attack, on to the end.
             regionStart = std::min (soundEnd - 1.0, src.startFrame() + (n.model->analysis.envelope.attackSeconds + 0.05) * sr);
             regionEnd = soundEnd;
         }
-        heads[0] = { n.startFrame, n.reverse ? -1.0 : 1.0 };
+        noteDir = n.reverse ? -1.0 : 1.0;
+        heads[0] = { n.startFrame, noteDir };
         heads[1] = heads[0];
     }
     control (c);
@@ -169,19 +170,23 @@ void ToyboxEngine::reverseNow (bool atExtremum) noexcept
         fadeStep = 1.0 / (0.006 * rate);
     }
     turnPending = false;
-    const double leg = legLength * pendingLeg * (h.dir > 0.0 && play != ToyboxPlay::chaos ? 1.3 : 1.0);
-    legEnd = std::clamp (h.pos + h.dir * leg, regionStart, sustains ? regionEnd : soundEnd);
+    // Legs the way the note plays are longer, so the region walks with it: slowly while the
+    // body sustains, briskly with LOOP off (about half speed: the note plays through and ends).
+    const double along = sustains ? (play != ToyboxPlay::chaos ? 1.3 : 1.0) : 2.5;
+    const double leg = legLength * pendingLeg * (h.dir == noteDir ? along : 1.0);
+    legEnd = std::clamp (h.pos + h.dir * leg, lowBound(), highBound());
 }
 
 void ToyboxEngine::planLeg() noexcept
 {
     auto& h = heads[0];
     const double srcRate = note.source->sampleRate();
-    // The walk reached the end of the body: a sustaining sound starts the body again.
-    if (sustains && h.dir > 0.0 && h.pos >= regionEnd - 1.0)
+    // The walk reached the far end of the body: a sustaining sound starts the body again
+    // (backwards: from its end).
+    if (sustains && h.dir == noteDir && (noteDir > 0.0 ? h.pos >= regionEnd - 1.0 : h.pos <= regionStart + 1.0))
     {
-        turn (regionStart + 0.01 * srcRate, 1.0, 0.02);
-        legEnd = heads[0].pos + legLength;
+        turn (noteDir > 0.0 ? regionStart + 0.01 * srcRate : regionEnd - 0.01 * srcRate, noteDir, 0.02);
+        legEnd = heads[0].pos + noteDir * legLength;
         return;
     }
     if (play == ToyboxPlay::chaos)
@@ -192,16 +197,20 @@ void ToyboxEngine::planLeg() noexcept
         const double scale = rng.uniform (0.4, 1.6);
         if (pick < 0.15 && regionEnd - regionStart > 2.0 * legLength)
         {
-            turn (rng.uniform (regionStart, regionEnd - legLength), rng.nextDouble() < 0.5 ? -1.0 : 1.0, 0.012);
-            legEnd = std::clamp (heads[0].pos + heads[0].dir * legLength * scale, regionStart, sustains ? regionEnd : soundEnd);
+            // Held, anywhere in the body; LOOP off, only onwards (the way the note plays).
+            double from = regionStart, to = regionEnd - legLength;
+            if (! sustains)
+                (noteDir > 0.0 ? from : to) = std::clamp (h.pos, from, to);
+            turn (rng.uniform (from, to), rng.nextDouble() < 0.5 ? -1.0 : 1.0, 0.012);
+            legEnd = std::clamp (heads[0].pos + heads[0].dir * legLength * scale, lowBound(), highBound());
         }
         else if (pick < 0.75)
             requestTurn (scale);
         else
-            legEnd = std::clamp (h.pos + h.dir * legLength * scale, regionStart, sustains ? regionEnd : soundEnd);
+            legEnd = std::clamp (h.pos + h.dir * legLength * scale, lowBound(), highBound());
     }
     else
-        requestTurn (1.0);   // a pendulum whose region walks slowly through the sound (forward legs are longer)
+        requestTurn (1.0);   // a pendulum whose region walks slowly through the sound (legs the note's way are longer)
 }
 
 void ToyboxEngine::render (const float* dryL, const float* dryR, float* outL, float* outR, int n) noexcept
@@ -291,11 +300,12 @@ void ToyboxEngine::render (const float* dryL, const float* dryR, float* outL, fl
         }
         else if (motion > 1.0e-3 && play != ToyboxPlay::forward)
         {
-            const bool inRegion = h.pos >= regionStart && h.pos <= regionEnd;
-            if (inRegion && fade >= 1.0 && (h.dir > 0.0 ? h.pos >= legEnd : h.pos <= legEnd))
+            // (Not gated on being inside the region: a fast head can step past its edge.)
+            const bool inRegion = h.pos >= lowBound() && h.pos <= highBound();
+            if (fade >= 1.0 && (h.dir > 0.0 ? h.pos >= legEnd : h.pos <= legEnd))
                 planLeg();
-            else if (! inRegion && h.dir < 0.0 && h.pos < regionStart && fade >= 1.0)
-                requestTurn (1.0);   // never back into the attack
+            else if (! inRegion && h.dir != noteDir && fade >= 1.0)
+                requestTurn (1.0);   // never back into the attack (REVERSE: never forward out of the body)
         }
         else if (sustains && fade >= 1.0)
         {
@@ -305,8 +315,11 @@ void ToyboxEngine::render (const float* dryL, const float* dryR, float* outL, fl
             else if (h.dir < 0.0 && h.pos <= regionStart)
                 turn (regionEnd - (regionStart - h.pos), -1.0, 0.02);
         }
-        if (h.dir > 0.0 ? h.pos >= soundEnd : h.pos <= 0.0)
+        // The note ends where it plays to (a swing against it turns at its legEnd instead).
+        if (h.dir == noteDir && (noteDir > 0.0 ? h.pos >= soundEnd : h.pos <= 0.0))
             done = true;
+        else if (h.pos >= soundEnd + 0.05 * note.source->sampleRate() || h.pos <= -0.05 * note.source->sampleRate())
+            done = true;   // (never wanders off the recording for long)
     }
 }
 

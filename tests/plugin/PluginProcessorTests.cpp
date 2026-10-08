@@ -3210,3 +3210,38 @@ TEST_CASE ("plugin: MUTE and SOLO - solo wins, mute silences, both recall; an em
     CHECK (valueOf (p, "layerA.solo") == Approx (0.0f).margin (1.0e-4));
     CHECK (p.isLayerHeard (1));
 }
+
+TEST_CASE ("plugin: LOOP and REVERSE with REIMAGINED (measurement)", "[.][loop-reverse-plugin]")
+{
+    TempDir tmp;
+    const auto file = writeSource (tmp.dir, "vowel.wav", testsignals::vowel (midiToHz (57), 2.0, 48000.0, 3));
+    auto rmsOf = [] (const AudioData& x, double from, double to) {
+        double e = 0.0;
+        const auto a = static_cast<std::size_t> (from * 48000), b = std::min (x.channels[0].size(), static_cast<std::size_t> (to * 48000));
+        for (std::size_t i = a; i < b; ++i)
+            e += 0.5 * (x.channels[0][i] * x.channels[0][i] + x.channels[1][i] * x.channels[1][i]);
+        return std::sqrt (e / std::max<std::size_t> (1, b - a));
+    };
+    for (int mode = 0; mode < 5; ++mode)
+        for (float amount : { 0.0f, 50.0f, 100.0f })
+            for (int fresh = 0; fresh < 2; ++fresh)
+            {
+                OspAudioProcessor p;
+                if (fresh == 1)
+                    p.initPatch();
+                loadAndWait (p, file);
+                p.setParameterValue ("space", 0.0f);
+                p.setParameterValue ("release", 50.0f);
+                p.setParameterValue ("reimagined", amount);
+                p.setParameterValue ("layerA.reimagined.mode", static_cast<float> (mode));
+                double tail[2] {};
+                for (int loop = 0; loop < 2; ++loop)
+                {
+                    p.setParameterValue ("layerA.loop", static_cast<float> (loop));
+                    const auto out = playNote (p, 57, 48000.0, 6.0);
+                    tail[loop] = rmsOf (out, 3.0, 5.5) / std::max (1.0e-9, rmsOf (out, 0.0, 1.0));
+                }
+                std::printf ("mode %d %3.0f%% %s routing %s: tail loop off %.3f on %.3f\n", mode, amount, fresh ? "init  " : "legacy",
+                             p.isReimaginedPerLayer() ? "perLayer" : "legacy", tail[0], tail[1]);
+            }
+}

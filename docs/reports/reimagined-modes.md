@@ -117,9 +117,11 @@ ramps), never linearly. At 0 % no engine runs, so the note is exactly the origin
 - **Playback.**
   - **Tape speed.** It is the note's pitch, so low notes are slower, longer and darker.
   - **The read.** Sinc reads with correlation-aware splice crossfades.
-  - **The end of the frame.** FRAME is 3.6 / 7.6 / 11.4 s of tape at the root. Towards
-    its end the frame runs out, or is rewound to the body at lower amounts, each pass
-    quieter.
+  - **The end of the frame.** FRAME is 3.6 / 7.6 / 11.4 s of tape at the root. With LOOP
+    on, near its end the tape is rewound to the body for another pass, each pass a little
+    more worn (more at higher amounts, floored at -6 dB), so a held note sustains. With
+    LOOP off the recording is read straight through once, to its own end. Reversed, the
+    tape plays backwards from its end and, held, rewinds at the body's start.
   - **Each pass.** Every note is a different pass, seeded by the note's own (LIFE) seed:
     speed, start, wow and flutter phase, tone and gain.
   - **AGE.** A bandwidth (two poles) that follows tape speed and touch and wears slowly,
@@ -130,7 +132,7 @@ ramps), never linearly. At 0 % no engine runs, so the note is exactly the origin
   - **Granular.** It ages and moves the grains.
 - **Amount curves.**
   - Identity first: 35 % of it by 25 %, all of it by 60 %.
-  - Run-out from 25 to 60 %.
+  - Pass wear from 25 to 60 % (up to -1.4 dB per pass).
   - Mechanics 30–85 %.
   - Ghosts 55–95 %.
 
@@ -314,12 +316,15 @@ real time:
   continue old engine"). One effect: a note started at 0 % stays the plain recording if
   the amount is raised while it is held. The KALEIDOSCOPE bus stage fades rather than
   crossfades.
-- **TAPE FRAME ends notes at the end of the frame.** From about 60 % at full run-out, a
-  held note ends when its tape does, sooner for high notes. This is intended, like a
-  tape-replay keyboard; lower amounts rewind instead.
-- **TOYBOX and MIRAGE reverse.** They play REVERSE backwards from the end without the
-  continuation's mirrored walk. MOSAIC reverses its frame order; TAPE FRAME plays its tape
-  backwards.
+- **LOOP and REVERSE (revised).** Every mode follows the layer's LOOP: on, a held note
+  sustains (TAPE FRAME rewinds, TOYBOX and MIRAGE stay in the body, MOSAIC holds its
+  spectrum); off, it plays the recording once and ends. Earlier, TAPE FRAME ran out by
+  amount whatever LOOP said, and the other modes sustained even with LOOP off. Reversed,
+  TAPE FRAME starts at the end (it used to start at position 0 and end at once), TOYBOX's
+  walk drifts backwards (it used to drift forwards), and MOSAIC held ping-pongs the body.
+  TOYBOX and MIRAGE still reverse without the continuation's mirrored walk. With LOOP off
+  TOYBOX's turning head walks through at about half speed, so its note lasts about twice
+  the recording.
 - **Very high sample rates.** At 192 kHz TOYBOX's far memory tap comes a little closer
   (bounded history).
 - **Mirage's filter.** It is the CHARACTER ladder at a separate setting, so the LP24

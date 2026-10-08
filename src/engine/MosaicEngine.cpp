@@ -124,26 +124,34 @@ void MosaicEngine::control (const ReimaginedControl& c) noexcept
 
     // Where in the recording's evolution the spectrum is: the attack as recorded, then
     // MOTION between one stable frame and travelling the body (ping-pong when it sustains).
+    // LOOP on holds a sustaining sound; LOOP off lets it run its course and end. REVERSE
+    // runs the evolution backwards: held, it ping-pongs the body once it gets there (never
+    // reaching the attack); not held, it ends on the attack.
+    const bool holds = mosaic->sustains && note.loop;
     const double travel = std::clamp (p.motion, 0.0, 1.0) * (0.4 + 0.6 * ramp (amount, 0.55, 0.85));
     const double natural = naturalFrame (seconds);
     double target = natural;
-    if (! note.reverse && natural >= mosaic->bodyFrame)
+    const bool inBody = note.reverse ? holds && natural <= mosaic->bodyFrame : natural >= mosaic->bodyFrame;
+    if (inBody)
     {
         const double body = mosaic->bodyFrame, span = last - body;
         double wander = body;
         if (span > 0.0)
         {
-            const double d = (seconds - frames[static_cast<std::size_t> (mosaic->bodyFrame)].seconds)
-                             / std::max (1.0e-3, (frames.back().seconds - frames[static_cast<std::size_t> (mosaic->bodyFrame)].seconds) / span);
+            const double bodySeconds = frames[static_cast<std::size_t> (mosaic->bodyFrame)].seconds;
+            // Time in the body: forwards from when the recording reaches it, backwards from
+            // when the reversed evolution does.
+            const double inside = note.reverse ? seconds - (frames.back().seconds - bodySeconds) : seconds - bodySeconds;
+            const double d = inside / std::max (1.0e-3, (frames.back().seconds - bodySeconds) / span);
             const double phase = std::fmod (std::max (0.0, d), 2.0 * span);
-            wander = mosaic->sustains ? body + (phase <= span ? phase : 2.0 * span - phase) : std::min (natural, static_cast<double> (last));
+            wander = holds ? body + (phase <= span ? phase : 2.0 * span - phase) : std::min (natural, static_cast<double> (last));
         }
         target = mosaic->stableFrame + (wander - mosaic->stableFrame) * travel;
     }
     position += (target - position) * 0.03;
 
     // A sound that decays keeps decaying (its loudness follows the recording in time,
-    // whatever spectrum it is on); one that sustains holds.
+    // whatever spectrum it is on); one that sustains holds while LOOP is on.
     auto levelAt = [&] (double pos) {
         pos = std::clamp (pos, 0.0, static_cast<double> (last));
         const int i = std::min (static_cast<int> (pos), std::max (0, last - 1));
@@ -151,7 +159,7 @@ void MosaicEngine::control (const ReimaginedControl& c) noexcept
         return (1.0 - f) * frames[static_cast<std::size_t> (i)].level + f * frames[static_cast<std::size_t> (std::min (i + 1, last))].level;
     };
     double levelGain = 1.0, tail = 1.0;
-    if (! mosaic->sustains)
+    if (! holds)
     {
         const double over = seconds - frames.back().seconds;
         tail = over > 0.0 ? std::max (0.0, 1.0 - over / 0.3) : 1.0;
@@ -208,14 +216,14 @@ void MosaicEngine::control (const ReimaginedControl& c) noexcept
     const double residual = (textured ? 1.0 : 0.12) * (0.8 + 0.5 * note.velocity);
     // A sustaining sound breathes on the spectrum it holds; a decaying one keeps the noise
     // it had at that moment of the recording (an attack's burst stays at the attack).
-    const double noiseAt = mosaic->sustains ? position : std::clamp (natural, 0.0, static_cast<double> (last));
+    const double noiseAt = holds ? position : std::clamp (natural, 0.0, static_cast<double> (last));
     const int n0 = std::min (static_cast<int> (noiseAt), std::max (0, last - 1));
     const double nf = noiseAt - n0;
     for (int b = 0; b < bands; ++b)
     {
         const auto bi = static_cast<std::size_t> (b);
         const double v = (1.0 - nf) * frames[static_cast<std::size_t> (n0)].residual[bi] + nf * frames[static_cast<std::size_t> (std::min (n0 + 1, last))].residual[bi];
-        noiseStep[bi] = (static_cast<float> (v * residual * (mosaic->sustains ? levelGain : tail)) * noiseNorm[bi] - noiseLevel[bi]) / 32.0f;
+        noiseStep[bi] = (static_cast<float> (v * residual * (holds ? levelGain : tail)) * noiseNorm[bi] - noiseLevel[bi]) / 32.0f;
     }
 }
 
