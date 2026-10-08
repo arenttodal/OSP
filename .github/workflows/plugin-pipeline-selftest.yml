@@ -1,0 +1,51 @@
+name: Plugin pipeline self-test
+
+# Checks the reusable kit in plugin-pipeline/ on real machines: makes a plug-in from the
+# starter and runs the pipeline's own build, test, pack and validate steps on it. Only when
+# the kit changes (it costs macOS minutes).
+on:
+  push:
+    paths:
+      - 'plugin-pipeline/**'
+      - '.github/workflows/plugin-pipeline-selftest.yml'
+  workflow_dispatch:
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, windows-2022]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tools (macOS)
+        if: runner.os == 'macOS'
+        run: command -v ninja > /dev/null || brew install ninja
+
+      - name: New plug-in from the starter
+        run: |
+          bash plugin-pipeline/new-plugin.sh "Pipeline Check" --dir "$RUNNER_TEMP/PipelineCheck" \
+            --manufacturer Ospx --code Pchk --company OSP --bundle-prefix com.osp
+          cd "$RUNNER_TEMP/PipelineCheck"
+          git add -A && git -c user.name=ci -c user.email=ci@example.invalid commit -qm "Starter"
+
+      - name: Build, test, pack, validate (packaging/ci/build-local.sh)
+        working-directory: ${{ runner.temp }}/PipelineCheck
+        run: bash packaging/ci/build-local.sh
+
+      - name: Contents
+        working-directory: ${{ runner.temp }}/PipelineCheck
+        run: |
+          ls -la dist
+          if [ "$RUNNER_OS" = macOS ]; then unzip -l dist/Pipeline-Check-macOS.zip; fi
+          if [ "$RUNNER_OS" = Windows ]; then 7z l dist/Pipeline-Check-Windows.zip; fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-check-${{ runner.os }}
+          path: ${{ runner.temp }}/PipelineCheck/dist/Pipeline-Check-*.zip

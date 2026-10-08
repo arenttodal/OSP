@@ -1,0 +1,131 @@
+name: Plugin build
+
+# Builds, tests and packs the plug-in on every push. Each run's page has the downloads
+# (macOS: universal AU / VST3 / app with a one-click installer; Windows: VST3). With
+# LATEST_LINK=1 the newest build of each branch is also at a fixed link. Settings live in
+# packaging/pipeline.conf.
+
+on:
+  push:
+    branches: ['**']   # not tags: the fixed links move their own "test-*" tags
+  pull_request:
+  workflow_dispatch:
+
+# A newer push to the same branch cancels the build it replaces.
+concurrency:
+  group: plugin-build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write   # only used for the fixed-link pre-release (LATEST_LINK=1)
+
+jobs:
+  settings:
+    runs-on: ubuntu-latest
+    outputs:
+      windows: ${{ steps.read.outputs.windows }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: read
+        run: |
+          source packaging/pipeline.conf
+          echo "windows=${WINDOWS:-1}" >> "$GITHUB_OUTPUT"
+
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Tools
+        run: command -v ninja > /dev/null || brew install ninja
+
+      - name: Configure
+        # Universal (Apple Silicon + Intel), so the download runs on any Mac.
+        run: |
+          source packaging/pipeline.conf
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64" \
+            "-DCMAKE_OSX_DEPLOYMENT_TARGET=${MACOS_MIN:-11.0}" \
+            $CMAKE_ARGS
+
+      - name: Build
+        run: |
+          source packaging/pipeline.conf
+          cmake --build build ${BUILD_TARGET:+--target "$BUILD_TARGET"}
+
+      - name: Test
+        run: |
+          source packaging/pipeline.conf
+          if [ "${RUN_TESTS:-1}" = 1 ]; then ctest --test-dir build --output-on-failure --no-tests=ignore; fi
+
+      - name: Package
+        run: bash packaging/ci/package.sh
+
+      - name: Validate (auval, optional pluginval)
+        run: bash packaging/ci/validate-macos.sh
+
+      - uses: actions/upload-artifact@v4
+        id: upload
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: ${{ env.ARCHIVE }}
+
+      - name: Download link
+        run: |
+          echo "### macOS download" >> "$GITHUB_STEP_SUMMARY"
+          echo "[$ARTIFACT_NAME](${{ steps.upload.outputs.artifact-url }})" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fixed link
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash packaging/ci/latest-link.sh
+
+  windows:
+    needs: settings
+    if: needs.settings.outputs.windows == '1'
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure
+        run: |
+          source packaging/pipeline.conf
+          cmake -B build -G "Visual Studio 17 2022" -A x64 $CMAKE_ARGS
+
+      - name: Build
+        run: |
+          source packaging/pipeline.conf
+          cmake --build build --config Release --parallel ${BUILD_TARGET:+--target "$BUILD_TARGET"}
+
+      - name: Test
+        run: |
+          source packaging/pipeline.conf
+          if [ "${RUN_TESTS:-1}" = 1 ]; then ctest --test-dir build -C Release --output-on-failure --no-tests=ignore; fi
+
+      - name: Package
+        run: bash packaging/ci/package.sh
+
+      - uses: actions/upload-artifact@v4
+        id: upload
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: ${{ env.ARCHIVE }}
+
+      - name: Download link
+        run: |
+          echo "### Windows download" >> "$GITHUB_STEP_SUMMARY"
+          echo "[$ARTIFACT_NAME](${{ steps.upload.outputs.artifact-url }})" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fixed link
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash packaging/ci/latest-link.sh

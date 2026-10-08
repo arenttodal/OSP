@@ -227,6 +227,9 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       and MIRAGE hold only with LOOP on; MOSAIC reversed and held ping-pongs the body.
       Regression test per mode (`LOOP and REVERSE are respected by every mode`).
 - [x] The dot after a customised macro's name is gone; the LED under the knob says it.
+- [x] `plugin-pipeline/`: the build-and-download pipeline as a reusable kit for other JUCE
+      plug-ins (`adopt.sh` for an existing repo, `new-plugin.sh` + starter for a new one, a fixed
+      download link per branch); self-tested on macOS and Windows by its own workflow.
 
 ## DONE
 
