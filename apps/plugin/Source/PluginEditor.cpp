@@ -405,8 +405,9 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
 
     // The six macros: a name with settings behind it (click: its popup) over its knob.
     const std::array<std::pair<const char*, const char*>, 6> macroInfo { {
-        { "life", "LIFE" }, { "dynamics", "DYNAMICS" }, { "character", "CHARACTER" }, { "motion", "MOVEMENT" }, { "space", "SPACE" }, { "echo", "ECHO" } } };
-    const std::array<const char*, 6> popupHints { "Life: how differently each note is performed", "Dynamics: how touch changes the sound",
+        { "life", "LIFE" }, { "drive", "DRIVE" }, { "character", "CHARACTER" }, { "motion", "MOVEMENT" }, { "space", "SPACE" }, { "echo", "ECHO" } } };
+    const std::array<const char*, 6> popupHints { "Life: how differently each note is performed",
+                                                  "Drive: saturation, from a little warmth to beautiful breakup (tube, tape or crunch)",
                                                   "Character: the tonal shape (filter)", "Movement: how the sound changes through time",
                                                   "Space: the room it plays in", "Echo: repeats of the sound, from a tape echo or a bucket-brigade delay" };
     for (std::size_t i = 0; i < macros.size(); ++i)
@@ -459,7 +460,7 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     statusLabel.setBorderSize ({ 0, 0, 0, 0 });
     content.addAndMakeVisible (statusLabel);
     advancedButton.setTitle ("Advanced settings");
-    advancedButton.setTooltip ("Tuning, bend range, pitch character, MPE, variation seed");
+    advancedButton.setTooltip ("Tuning, bend range, voices, pitch character, dynamics (how touch changes the sound), MPE, variation seed");
     advancedButton.onClick = [this] {
         if (closedByLabelPress == advancedPopup)
         {

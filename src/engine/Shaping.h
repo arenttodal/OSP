@@ -31,6 +31,9 @@ enum class FilterType { lp24, lp12, hp12, bp12, tilt, off };   ///< off: researc
 enum class MovementMode { drift, tape, chorus, pulse, shaper };
 /** SPACE's rooms. HALL took CHAMBER's place (index 1) in SPACE v2. */
 enum class SpaceType { room, hall, plate, spring };
+/** DRIVE's three circuits (a shared saturation stage before SPACE and ECHO). */
+enum class DriveMode { tube, tape, crunch };
+
 /** ECHO's machines: a tape echo and a bucket-brigade (BBD) delay. */
 enum class EchoType { tape, bbd };
 /** ECHO's stereo picture: one voice in the centre, repeats alternating left and right, or two offset heads. */
@@ -92,6 +95,11 @@ struct Shaping
     double echoTone = 0.5;            ///< 0 dark .. 1 bright
     double echoAge = 0.35;            ///< 0..1: wow / flutter (TAPE) or clock noise and chorus (BBD), and wear
     EchoStereo echoStereo = EchoStereo::pingPong;
+
+    // DRIVE (the DRIVE macro is its amount; 0 % = not in the signal path)
+    DriveMode driveMode = DriveMode::tube;
+    double driveTone = 0.5;           ///< 0 darker, softer harmonics .. 1 more open, present
+    double driveBody = 0.5;           ///< 0 lean, clearer attack .. 1 denser, rounder, more sustain
 
     /** A transparent setting for research renders and tests that study other stages. */
     static Shaping neutral()

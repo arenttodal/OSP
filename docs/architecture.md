@@ -186,7 +186,7 @@ compiles the I/O sources with the plugin's own JUCE settings.
           ─► per layer: ReimaginedStage (per-layer routing only; resonators + formants on the layer's own signal)
           ─► mix: weight x LEVEL x PAN per layer, summed
           ─► PostProcessor: ReimaginedStage (legacy routing only, at the layers' power-weighted amount),
-                            MOVEMENT bus, SPACE
+                            DRIVE (bypassed at 0 %), MOVEMENT bus, SPACE and ECHO (parallel sends)
           ─► output gain (VOLUME)
 ```
 
@@ -324,8 +324,8 @@ formants). `EngineSettings::reimaginedRouting` says where the bus part runs:
 
 The resulting chain per note: SOURCE -> One Shot / Granular -> START / TUNE -> per-voice
 LIFE, DYNAMICS, CHARACTER filter, Reimagined per-voice part, drift, ADSR -> (per layer)
-REIMAGINED stage -> LEVEL / PAN -> mix -> MOVEMENT bus -> SPACE and ECHO (parallel sends, see
-below) -> VOLUME. LIFE and the
+REIMAGINED stage -> LEVEL / PAN -> mix -> DRIVE -> MOVEMENT bus -> SPACE and ECHO (parallel
+sends, see below) -> VOLUME. LIFE and the
 other macros are unchanged and stay shared (their per-voice stages were already per voice).
 
 The plugin stores `reimaginedRouting` ("perLayer" / "legacyGlobal"); a state without it
@@ -454,3 +454,17 @@ stores them as `shaperCustom` ("v1:" + 16 x "start,end,shape"). Saved pattern fi
 (`schemaVersion` 1, `kind` "osp.shaperPattern", `steps` [[start, end, shape]...]).
 
 Report and measurements: `docs/reports/space-echo-shaper.md`.
+
+## DRIVE (parameters v14)
+
+`DriveProcessor` is one new stage in `PostProcessor`, right after the legacy shared
+REIMAGINED stage and before the MOVEMENT bus (so MOVEMENT, ECHO and SPACE hear the driven
+sound). It is shared (the mixed instrument, once), not per layer or voice. At DRIVE 0 it is
+not in the signal path (`process` returns at once), so sessions without DRIVE render
+bit-identically; it engages and releases with a 10 ms fade and crossfades its circuits over
+50 ms. Its nonlinear core runs 4x (2x from 88.2 kHz) through minimum-phase polyphase IIR
+half-bands designed in `prepare()` (no latency is reported; it has about a sample of group
+delay at mid frequencies), between exactly inverse first-order emphasis shelves. Output
+compensation is a static, measured table per circuit and BODY. The DYNAMICS macro's
+parameters (`dynamics`, `dynamics.curve`, `dynamics.tone`, `velocityRange`) and DSP are
+unchanged; only their controls moved to Advanced. Report: `docs/reports/drive.md`.

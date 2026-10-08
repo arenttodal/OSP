@@ -1,5 +1,6 @@
 #pragma once
 
+#include "engine/DriveProcessor.h"
 #include "engine/EchoDelay.h"
 #include "engine/MovementBus.h"
 #include "engine/ReimaginedStage.h"
@@ -24,6 +25,9 @@ struct Macros;
                  the layers' power-weighted amount - legacy routing; with per-layer
                  routing every layer has its own stage before the mix and this one is
                  set to 0.
+      DRIVE      the shared saturation (DriveProcessor: TUBE, TAPE, CRUNCH) on the mixed
+                 instrument; out of the signal path entirely at 0 %. Before MOVEMENT, ECHO
+                 and SPACE, so the modulation, the repeats and the room hear the driven sound.
       MOVEMENT   the bus part of MOVEMENT (MovementBus: drift's shared wander, tape,
                  chorus, pulse).
       ECHO       a tape or bucket-brigade delay (EchoDelay) as a send in parallel with
@@ -39,6 +43,8 @@ class PostProcessor
 public:
     void prepare (double sampleRate, int maximumBlockSize, std::uint64_t seed = 1);
     void reset() noexcept;
+
+    bool driveActive() const noexcept { return drive.active(); }
 
     /** Pick up the resonances of a newly published model (real-time safe). */
     void setModel (const InstrumentModel* model) noexcept;
@@ -85,6 +91,10 @@ private:
     // second, so the reverb is not run (its clock still moves); the first sound wakes it.
     bool reverbAsleep = false;
     int quietRun = 0, sleepAfter = 12000;
+
+    // DRIVE
+    DriveProcessor drive;
+    double driveAmount = 0.0;
 
     // ECHO
     EchoDelay echo;

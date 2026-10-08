@@ -507,7 +507,7 @@ namespace
     class AdvancedPopup final : public MiniPanel
     {
     public:
-        explicit AdvancedPopup (OspAudioProcessor& p) : MiniPanel ("ADVANCED", "TUNING, VOICES & PITCH"), processor (p)
+        explicit AdvancedPopup (OspAudioProcessor& p) : MiniPanel ("ADVANCED", "TUNING, VOICES & DYNAMICS"), processor (p)
         {
             auto& state = processor.parameters;
             auto add = [this, &state] (const char* id, const char* caption, MiniKnob::Formatter f) {
@@ -515,8 +515,9 @@ namespace
                 knobs.back()->setBoxed (true);
                 addAndMakeVisible (*knobs.back());
             };
-            // OUTPUT is the header's VOLUME, sustain each layer's LOOP, the velocity range
-            // DYNAMICS' RANGE: Advanced keeps what a musician rarely needs.
+            // OUTPUT is the header's VOLUME, sustain each layer's LOOP: Advanced keeps what a
+            // musician rarely needs, and DYNAMICS (how touch changes the sound) since DRIVE took
+            // its place on the panel.
             auto* fine = state.getParameter ("fineTune");
             add ("fineTune", "FINE", [fine] (double) { return parameterText (fine); });
             add ("bendRange", "BEND", [] (double v) { return juce::String (juce::roundToInt (v)) + " st"; });
@@ -549,11 +550,28 @@ namespace
                 }
             };
             addAndMakeVisible (reseed);
+
+            // DYNAMICS: the same parameters as ever (its amount, curve, range and tone).
+            curve = std::make_unique<SegmentedControl> (*state.getParameter ("dynamics.curve"), juce::StringArray { "SOFT", "LINEAR", "HARD" });
+            curve->setTooltip ("Velocity curve: soft reaches loud easily, hard needs a firm touch");
+            addAndMakeVisible (*curve);
+            auto addDynamics = [this, &state] (const char* id, const char* caption, MiniKnob::Formatter f) {
+                dynamicsKnobs.push_back (std::make_unique<MiniKnob> (state, id, caption, std::move (f)));
+                dynamicsKnobs.back()->setBoxed (true);
+                addAndMakeVisible (*dynamicsKnobs.back());
+            };
+            auto percent = [] (double v) { return format::percent (v) + " %"; };
+            addDynamics ("dynamics", "AMOUNT", percent);
+            addDynamics ("velocityRange", "RANGE", [] (double v) { return juce::String (v, 0) + " dB"; });
+            addDynamics ("dynamics.tone", "TONE", percent);
         }
 
         // Laid out at 0.69 of the reference's unit; the editor scales it up to match the macro popups.
         float unit() const override { return 0.69f; }
-        juce::Point<int> cardSize() const override { return { 300, headerHeight() + knobRow + 8 + 12 + 24 + 8 + 12 + 24 + 10 + 26 + juce::roundToInt (26.0f * unit()) }; }
+        juce::Point<int> cardSize() const override
+        {
+            return { 300, headerHeight() + knobRow + 8 + 12 + 24 + 8 + 12 + 24 + 10 + 12 + 24 + 6 + knobRow + 10 + 26 + juce::roundToInt (26.0f * unit()) };
+        }
 
         void paint (juce::Graphics& g) override
         {
@@ -562,6 +580,7 @@ namespace
             g.setFont (fonts::label (9.5f));
             g.drawText ("VOICES", voicesCaption, juce::Justification::centredLeft, false);
             g.drawText ("PITCH CHARACTER", pitchCaption, juce::Justification::centredLeft, false);
+            g.drawText ("DYNAMICS", dynamicsCaption, juce::Justification::centredLeft, false);
             if (auto* seed = processor.parameters.getParameter ("seed"))
                 g.drawText ("SEED " + seed->getCurrentValueAsText(), seedCaption, juce::Justification::centredRight, false);
         }
@@ -579,6 +598,14 @@ namespace
             area.removeFromTop (8);
             pitchCaption = area.removeFromTop (12);
             pitch->setBounds (area.removeFromTop (24));
+            area.removeFromTop (10);
+            dynamicsCaption = area.removeFromTop (12);
+            curve->setBounds (area.removeFromTop (24));
+            area.removeFromTop (6);
+            auto dynamicsRow = area.removeFromTop (knobRow);
+            const int dynamicsCell = dynamicsRow.getWidth() / static_cast<int> (dynamicsKnobs.size());
+            for (auto& k : dynamicsKnobs)
+                k->setBounds (dynamicsRow.removeFromLeft (dynamicsCell));
             area.removeFromTop (10);
             auto last = area.removeFromTop (26);
             mpe.setBounds (last.removeFromLeft (80));
@@ -599,18 +626,19 @@ namespace
         OspAudioProcessor& processor;
         std::vector<std::unique_ptr<MiniKnob>> knobs;
         MiniKnob* glide = nullptr;
-        std::unique_ptr<SegmentedControl> voices, pitch;
+        std::unique_ptr<SegmentedControl> voices, pitch, curve;
+        std::vector<std::unique_ptr<MiniKnob>> dynamicsKnobs;
         juce::ToggleButton mpe { "MPE" };
         std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> mpeAttachment;
         juce::TextButton reseed { "Reseed" };
-        juce::Rectangle<int> voicesCaption, pitchCaption, seedCaption;
+        juce::Rectangle<int> voicesCaption, pitchCaption, dynamicsCaption, seedCaption;
     };
 }
 
 const juce::StringArray& popupParameterIds (MacroPopup macro)
 {
     static const juce::StringArray life { "life.mode", "life.pitch", "life.tone", "life.attack" };
-    static const juce::StringArray dynamics { "dynamics.curve", "velocityRange", "dynamics.tone" };
+    static const juce::StringArray drive { "drive.mode", "drive.tone", "drive.body" };
     static const juce::StringArray character { "character.type", "character.min", "character.max", "character.resonance",
                                                "character.drive", "character.envAmount", "character.envAttack", "character.envDecay" };
     static const juce::StringArray movement { "movement.mode", "movement.drift.speed", "movement.drift.pitch", "movement.drift.tone",
@@ -626,7 +654,7 @@ const juce::StringArray& popupParameterIds (MacroPopup macro)
     switch (macro)
     {
         case MacroPopup::life: return life;
-        case MacroPopup::dynamics: return dynamics;
+        case MacroPopup::drive: return drive;
         case MacroPopup::character: return character;
         case MacroPopup::movement: return movement;
         case MacroPopup::echo: return echo;

@@ -19,6 +19,7 @@ void PostProcessor::prepare (double rate, int /*maximumBlockSize*/, std::uint64_
     for (auto& r : reverbs)
         r.prepare (rate);
     echo.prepare (rate);
+    drive.prepare (rate);
     reverbFadeLength = std::max (1, static_cast<int> (0.25 * rate));
     spaceCoef = 1.0 - std::exp (-1.0 / (0.05 * rate));
     sleepAfter = std::max (1, static_cast<int> (0.25 * rate));
@@ -48,6 +49,7 @@ void PostProcessor::reset() noexcept
     echo.setSettings (EchoDelay::Settings::from (shaping));
     echo.reset();
     echoIdle = echoLevel < 1.0e-5;
+    drive.reset();
     echoAsleep = false;
 }
 
@@ -65,6 +67,8 @@ void PostProcessor::setMacros (const Macros& macros) noexcept
     // ECHO is a send too: 50 % sits the repeats just under the dry sound, 100 % level with it.
     echoTarget = std::pow (std::clamp (macros.echo, 0.0, 1.0), 1.4);
     movement.setTargets (shaping, motionTarget);
+    driveAmount = std::clamp (macros.drive, 0.0, 1.0);
+    drive.setSettings (DriveProcessor::Settings::from (shaping, driveAmount));
 }
 
 void PostProcessor::setShaping (const Shaping& newShaping) noexcept
@@ -72,6 +76,7 @@ void PostProcessor::setShaping (const Shaping& newShaping) noexcept
     shaping = newShaping;
     movement.setTargets (shaping, motionTarget);
     echo.setSettings (EchoDelay::Settings::from (shaping));
+    drive.setSettings (DriveProcessor::Settings::from (shaping, driveAmount));
 }
 
 void PostProcessor::setTiming (const HostTiming& timing) noexcept
@@ -137,6 +142,8 @@ void PostProcessor::process (float* left, float* right, int numSamples) noexcept
         float r = right[i];
 
         reimaginedStage.process (l, r);
+
+        drive.process (l, r);   // returns at once (untouched) while DRIVE is 0
 
         movement.process (l, r);
 

@@ -227,6 +227,14 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       and MIRAGE hold only with LOOP on; MOSAIC reversed and held ping-pongs the body.
       Regression test per mode (`LOOP and REVERSE are respected by every mode`).
 - [x] The dot after a customised macro's name is gone; the LED under the knob says it.
+- [x] DRIVE (parameters v14; docs/reports/drive.md): the DYNAMICS macro's position is DRIVE now
+      (ochre), a shared TUBE / TAPE / CRUNCH saturation before MOVEMENT, ECHO and SPACE (4x
+      minimum-phase IIR oversampling, no latency, measured static compensation, TONE / BODY,
+      live transfer-curve popover). DYNAMICS works and is saved exactly as before, in Advanced.
+      Sessions from before DRIVE render bit-identically (nine-scene null test against the old
+      build). Tuned by measurement; listening round on the corpus still to do.
+- [ ] DRIVE listening round: corpus sources at 10-20 / 40-60 / 100 %, blind TUBE / TAPE /
+      CRUNCH at 65 %, level-matched.
 - [x] `plugin-pipeline/`: the build-and-download pipeline as a reusable kit for other JUCE
       plug-ins (`adopt.sh` for an existing repo, `new-plugin.sh` + starter for a new one, a fixed
       download link per branch); self-tested on macOS and Windows by its own workflow.

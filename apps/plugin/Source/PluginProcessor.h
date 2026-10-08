@@ -410,6 +410,7 @@ private:
     std::atomic<float>* spaceParam = nullptr;
     std::atomic<float>* reimaginedParam = nullptr;
     std::atomic<float>* echoParam = nullptr;
+    std::atomic<float>* driveParam = nullptr;
     std::atomic<float>* pitchCharacterParam = nullptr;
     std::atomic<float>* sustainParam = nullptr;
     std::atomic<float>* seedParam = nullptr;
@@ -440,13 +441,13 @@ private:
     float lastDecay = -1.0f, lastSustainLevel = -1.0f;
     std::array<LayerParams, numLayers> layerParams;
     // Shaping system v1.0 (the macro popups), in the order of shapingIds().
-    static constexpr int numShapingParams = 53;
+    static constexpr int numShapingParams = 56;
     std::array<std::atomic<float>*, numShapingParams> shapingParams {};
     std::array<float, numShapingParams> lastShaping {};
     Shaping shapingFromParameters() const noexcept;
     // MIDI-controlled macro values (CC 20-26; ECHO is 26), used until the host parameter moves again.
-    std::array<float, 7> ccMacro { -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f };
-    std::array<float, 7> lastMacroParam { -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f };
+    std::array<float, 8> ccMacro { -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f };
+    std::array<float, 8> lastMacroParam { -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f };
     // SHAPER CUSTOM: the message thread writes the steps as atomics, then bumps the
     // generation; the audio thread re-reads them when the generation moves.
     std::array<std::atomic<float>, 48> customStepValues {};

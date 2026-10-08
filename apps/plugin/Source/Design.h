@@ -56,11 +56,12 @@ namespace colour
     const juce::Colour accentSoft { 0xfff2c8b0 };      ///< an active modifier's fill
 
     /** The six macros' identities, one natural mineral palette at about the same lightness
-        (CIE L* 56-58): LIFE rust, DYNAMICS ochre, CHARACTER moss, MOVEMENT mineral blue,
-        SPACE muted mauve, ECHO verdigris (the patina of an old tape machine's copper).
-        They mark only the macro's thin value arc, its small light, and the accents of its
-        popover; panels, text and values stay neutral. */
-    enum class Macro { life, dynamics, character, movement, space, echo };
+        (CIE L* 56-58): LIFE rust, DRIVE ochre (the place and colour DYNAMICS had before it
+        moved into Advanced), CHARACTER moss, MOVEMENT mineral blue, SPACE muted mauve, ECHO
+        verdigris (the patina of an old tape machine's copper). They mark only the macro's
+        thin value arc, its small light, and the accents of its popover; panels, text and
+        values stay neutral. */
+    enum class Macro { life, drive, character, movement, space, echo };
     inline juce::Colour macro (Macro m)
     {
         static const std::array<juce::Colour, 6> colours { juce::Colour (0xffbe7552), juce::Colour (0xffb5843a), juce::Colour (0xff7b8d69),

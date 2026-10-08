@@ -938,13 +938,23 @@ TEST_CASE ("plugin: editor builds, shows the instrument and can be snapshotted",
     // Macro popups: one at a time, anchored to the macro, closed on request.
     if (auto* ospEditor = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (editor.get()))
     {
-        const char* names[] = { "life", "dynamics", "character", "movement", "space" };
+        const char* names[] = { "life", "drive", "character", "movement", "space" };
         for (int i = 0; i < 5; ++i)
         {
             ospEditor->openPopup (i);
             CHECK (ospEditor->openPopupIndex() == i);
             snapshot (juce::String ("osp-editor-popup-") + names[i] + ".png");
         }
+        // DRIVE's picture is each circuit's own curve (here driven at 70 %).
+        p.parameters.getParameter ("drive")->setValueNotifyingHost (0.7f);
+        for (int mode = 0; mode < 3; ++mode)
+        {
+            p.parameters.getParameter ("drive.mode")->setValueNotifyingHost (static_cast<float> (mode) / 2.0f);
+            ospEditor->openPopup (1);
+            snapshot ("osp-popup-drive-" + juce::String (mode) + ".png");
+        }
+        p.parameters.getParameter ("drive")->setValueNotifyingHost (0.0f);
+        p.parameters.getParameter ("drive.mode")->setValueNotifyingHost (0.0f);
         // Every SPACE type and MOVEMENT mode draws its own picture.
         for (int type = 0; type < 4; ++type)
         {
@@ -2920,12 +2930,27 @@ TEST_CASE ("plugin: CPU profile", "[.][cpu-profile]")
         { "16 notes, 3 layers", 3, 16, 0, 48000.0, 128, {} },
         { "16 notes, 3 layers, REIMAGINED 100", 3, 16, 0, 48000.0, 128,
           { { "reimagined", 100.0f }, { "layerB.reimagined", 100.0f }, { "layerC.reimagined", 100.0f } } },
+        { "16 notes, DRIVE 70 TUBE", 1, 16, 0, 48000.0, 128, { { "drive", 70.0f } } },
+        { "16 notes, DRIVE 70 TAPE", 1, 16, 0, 48000.0, 128, { { "drive", 70.0f }, { "drive.mode", 1.0f } } },
+        { "16 notes, DRIVE 70 CRUNCH", 1, 16, 0, 48000.0, 128, { { "drive", 70.0f }, { "drive.mode", 2.0f } } },
+        { "16 notes, 3 layers granular + REIMAGINED + DRIVE + MOVEMENT + SPACE", 3, 16, 0, 48000.0, 128,
+          { { "layerA.sourceMode", 1.0f }, { "layerB.sourceMode", 1.0f }, { "layerC.sourceMode", 1.0f },
+            { "reimagined", 100.0f }, { "layerB.reimagined", 100.0f }, { "layerC.reimagined", 100.0f },
+            { "drive", 70.0f }, { "motion", 60.0f }, { "movement.mode", 2.0f }, { "space", 60.0f } } },
     };
+    // DRIVE (spec): every rate and block size, TUBE at 70 %; the same without DRIVE beside it.
+    auto withDrive = cases;
+    for (double rate : { 44100.0, 48000.0, 96000.0 })
+        for (int block : { 64, 128, 256, 512 })
+            for (float drive : { 0.0f, 70.0f })
+                withDrive.push_back ({ "16 notes, DRIVE " + juce::String (juce::roundToInt (drive)) + ", " + juce::String (rate / 1000.0, 1) + " kHz, block "
+                                           + juce::String (block),
+                                       1, 16, 0, rate, block, { { "drive", drive } } });
     const juce::String only (std::getenv ("OSP_CPU_CASE") != nullptr ? std::getenv ("OSP_CPU_CASE") : "");
     const double seconds = std::getenv ("OSP_CPU_SECONDS") != nullptr ? std::atof (std::getenv ("OSP_CPU_SECONDS")) : 4.0;
-    for (const auto& cs : cases)
+    for (const auto& cs : withDrive)
     {
-        if (only.isNotEmpty() && cs.name != only)
+        if (only.isNotEmpty() && ! cs.name.startsWith (only))
             continue;
         OspAudioProcessor p;
         std::vector<juce::File> files { a, b, c };
@@ -3244,4 +3269,277 @@ TEST_CASE ("plugin: LOOP and REVERSE with REIMAGINED (measurement)", "[.][loop-r
                 std::printf ("mode %d %3.0f%% %s routing %s: tail loop off %.3f on %.3f\n", mode, amount, fresh ? "init  " : "legacy",
                              p.isReimaginedPerLayer() ? "perLayer" : "legacy", tail[0], tail[1]);
             }
+}
+
+// DRIVE-00 / DRIVE-10: presets made before DRIVE must sound exactly the same after it.
+// Run once with the build from before DRIVE (OSP_DRIVE_BASELINE=write) and again with the
+// new build (=compare), the same OSP_DRIVE_BASELINE_DIR: the old build's saved states are
+// loaded by the new one, rendered, and compared sample by sample with the old renders.
+TEST_CASE ("plugin: sessions from before DRIVE render identically (baseline)", "[.][drive-baseline]")
+{
+    const auto* modeText = std::getenv ("OSP_DRIVE_BASELINE");
+    const auto* dirText = std::getenv ("OSP_DRIVE_BASELINE_DIR");
+    if (modeText == nullptr || dirText == nullptr)
+    {
+        WARN ("set OSP_DRIVE_BASELINE=write|compare and OSP_DRIVE_BASELINE_DIR");
+        return;
+    }
+    const bool write = std::strcmp (modeText, "write") == 0;
+    const juce::File dir (dirText);
+    dir.createDirectory();
+    const auto vowelFile = dir.getChildFile ("vowel.wav"), sawFile = dir.getChildFile ("saw.wav"), pluckFile = dir.getChildFile ("pluck.wav");
+    if (write)
+    {
+        writeSource (dir, "vowel.wav", testsignals::vowel (midiToHz (57), 2.5, 48000.0, 3));
+        writeSource (dir, "saw.wav", testsignals::saw (midiToHz (48), 2.0, 48000.0));
+        writeSource (dir, "pluck.wav", testsignals::pluck (midiToHz (60), 2.0, 48000.0, 5));
+    }
+
+    struct Scene
+    {
+        const char* name;
+        std::function<void (OspAudioProcessor&)> setup;
+        bool automateDynamics = false;
+    };
+    const std::vector<Scene> scenes {
+        { "one-shot", [&] (OspAudioProcessor& p) { loadAndWait (p, vowelFile); } },
+        { "granular", [&] (OspAudioProcessor& p) {
+              loadAndWait (p, vowelFile);
+              p.setParameterValue ("layerA.sourceMode", 1.0f);
+          } },
+        { "two-layer", [&] (OspAudioProcessor& p) {
+              loadAndWait (p, vowelFile);
+              p.loadFile (sawFile, 1);
+              REQUIRE (p.waitForLoads (20000));
+              p.pollLoads();
+              p.setParameterValue ("ab.blend", 0.4f);
+          } },
+        { "three-layer", [&] (OspAudioProcessor& p) {
+              loadAndWait (p, vowelFile);
+              for (int layer : { 1, 2 })
+              {
+                  p.loadFile (layer == 1 ? sawFile : pluckFile, layer);
+                  REQUIRE (p.waitForLoads (20000));
+                  p.pollLoads();
+              }
+          } },
+        { "reimagined", [&] (OspAudioProcessor& p) {
+              loadAndWait (p, vowelFile);
+              p.setParameterValue ("reimagined", 90.0f);
+              p.setParameterValue ("layerA.reimagined.mode", 1.0f);   // TAPE FRAME
+          } },
+        { "dynamics-automation", [&] (OspAudioProcessor& p) {
+              loadAndWait (p, pluckFile);
+              p.setParameterValue ("dynamics.curve", 2.0f);
+          },
+          true },
+        { "character-drive", [&] (OspAudioProcessor& p) {
+              loadAndWait (p, sawFile);
+              p.setParameterValue ("character.drive", 80.0f);
+              p.setParameterValue ("character.resonance", 40.0f);
+          } },
+        { "shaper", [&] (OspAudioProcessor& p) {
+              loadAndWait (p, vowelFile);
+              p.setParameterValue ("movement.mode", 4.0f);
+              p.setParameterValue ("motion", 80.0f);
+          } },
+        { "space-echo", [&] (OspAudioProcessor& p) {
+              loadAndWait (p, pluckFile);
+              p.setParameterValue ("space", 60.0f);
+              p.setParameterValue ("echo", 50.0f);
+          } },
+    };
+
+    auto render = [] (OspAudioProcessor& p, bool automate) {
+        constexpr double rate = 48000.0;
+        constexpr int block = 256;
+        p.prepareToPlay (rate, block);
+        const int total = static_cast<int> (4.0 * rate);
+        std::vector<float> out;
+        out.reserve (static_cast<std::size_t> (2 * total));
+        juce::AudioBuffer<float> buffer (2, block);
+        for (int pos = 0; pos < total; pos += block)
+        {
+            juce::MidiBuffer midi;
+            if (pos == 0)
+                for (int note : { 48, 52, 55 })
+                    midi.addEvent (juce::MidiMessage::noteOn (1, note, static_cast<juce::uint8> (60 + note % 7 * 9)), 0);
+            if (pos == static_cast<int> (1.0 * rate) / block * block)
+                midi.addEvent (juce::MidiMessage::noteOn (1, 60, static_cast<juce::uint8> (120)), 0);
+            if (pos == static_cast<int> (2.5 * rate) / block * block)
+                midi.addEvent (juce::MidiMessage::allNotesOff (1), 0);
+            if (automate)   // DYNAMICS moved by the host while notes play
+                p.setParameterValue ("dynamics", static_cast<float> (100.0 * (0.5 + 0.5 * std::sin (pos / rate * 3.0))));
+            buffer.clear();
+            p.processBlock (buffer, midi);
+            for (int i = 0; i < block && pos + i < total; ++i)
+            {
+                out.push_back (buffer.getSample (0, i));
+                out.push_back (buffer.getSample (1, i));
+            }
+        }
+        return out;
+    };
+
+    for (const auto& scene : scenes)
+    {
+        CAPTURE (scene.name);
+        const auto audioFile = dir.getChildFile (juce::String (scene.name) + ".f32");
+        const auto stateFile = dir.getChildFile (juce::String (scene.name) + ".state");
+        if (write)
+        {
+            OspAudioProcessor p;
+            scene.setup (p);
+            juce::MemoryBlock state;
+            p.getStateInformation (state);
+            REQUIRE (stateFile.replaceWithData (state.getData(), state.getSize()));
+            OspAudioProcessor fresh;   // render from the saved state, exactly as compare will
+            fresh.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+            REQUIRE (fresh.waitForLoads (20000));
+            fresh.pollLoads();
+            const auto audio = render (fresh, scene.automateDynamics);
+            REQUIRE (audioFile.replaceWithData (audio.data(), audio.size() * sizeof (float)));
+            std::printf ("wrote %s (%zu samples)\n", scene.name, audio.size() / 2);
+            continue;
+        }
+        juce::MemoryBlock state, reference;
+        REQUIRE (stateFile.loadFileAsData (state));
+        REQUIRE (audioFile.loadFileAsData (reference));
+        OspAudioProcessor p;
+        p.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+        REQUIRE (p.waitForLoads (20000));
+        p.pollLoads();
+        const auto audio = render (p, scene.automateDynamics);
+        const auto* ref = static_cast<const float*> (reference.getData());
+        REQUIRE (reference.getSize() == audio.size() * sizeof (float));
+        double worst = 0.0, peak = 0.0;
+        for (std::size_t i = 0; i < audio.size(); ++i)
+        {
+            worst = std::max (worst, static_cast<double> (std::abs (audio[i] - ref[i])));
+            peak = std::max (peak, static_cast<double> (std::abs (ref[i])));
+        }
+        std::printf ("%-20s peak %.4f  largest difference %.3g\n", scene.name, peak, worst);
+        CHECK (peak > 1.0e-3);
+        CHECK (worst <= 0.0);   // bit-identical: DRIVE at 0 % is not in the signal path
+    }
+}
+
+TEST_CASE ("plugin: DRIVE is saved and recalled; older sessions open it off; DYNAMICS keeps its IDs and its sound", "[plugin][drive]")
+{
+    // DYNAMICS' parameters are unchanged (IDs, defaults): host automation of old sessions still lands.
+    {
+        OspAudioProcessor fresh;
+        for (const char* id : { "dynamics", "dynamics.curve", "dynamics.tone", "velocityRange" })
+            REQUIRE (fresh.parameters.getParameter (id) != nullptr);
+        CHECK (valueOf (fresh, "dynamics") == Approx (65.0f));
+        CHECK (valueOf (fresh, "dynamics.curve") == Approx (1.0f));
+        CHECK (valueOf (fresh, "drive") == Approx (0.0f));          // new patches start clean
+        CHECK (valueOf (fresh, "drive.mode") == Approx (0.0f));     // TUBE
+        CHECK (valueOf (fresh, "drive.tone") == Approx (50.0f));
+        CHECK (valueOf (fresh, "drive.body") == Approx (50.0f));
+    }
+
+    OspAudioProcessor p;
+    p.setParameterValue ("drive", 60.0f);
+    p.setParameterValue ("drive.mode", 2.0f);
+    p.setParameterValue ("drive.tone", 30.0f);
+    p.setParameterValue ("drive.body", 80.0f);
+    p.setParameterValue ("dynamics", 40.0f);
+    juce::MemoryBlock state;
+    p.getStateInformation (state);
+    OspAudioProcessor q;
+    q.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+    CHECK (valueOf (q, "drive") == Approx (60.0f));
+    CHECK (valueOf (q, "drive.mode") == Approx (2.0f));
+    CHECK (valueOf (q, "drive.tone") == Approx (30.0f));
+    CHECK (valueOf (q, "drive.body") == Approx (80.0f));
+    CHECK (valueOf (q, "dynamics") == Approx (40.0f));
+
+    // A session from before DRIVE: no drive.* at all. It opens with DRIVE off (bypassed), even in
+    // an instance where DRIVE had been turned up, and its DYNAMICS as it was saved.
+    auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
+    auto tree = juce::ValueTree::fromXml (*xml);
+    for (int i = tree.getNumChildren(); --i >= 0;)
+        if (tree.getChild (i)["id"].toString().startsWith ("drive"))
+            tree.removeChild (i, nullptr);
+    juce::MemoryBlock old;
+    juce::AudioProcessor::copyXmlToBinary (*tree.createXml(), old);
+    OspAudioProcessor r;
+    r.setParameterValue ("drive", 90.0f);
+    r.setParameterValue ("drive.mode", 1.0f);
+    r.setStateInformation (old.getData(), static_cast<int> (old.getSize()));
+    CHECK (valueOf (r, "drive") == Approx (0.0f).margin (1.0e-4));
+    CHECK (valueOf (r, "drive.mode") == Approx (0.0f).margin (1.0e-4));
+    CHECK (valueOf (r, "drive.body") == Approx (50.0f));
+    CHECK (valueOf (r, "dynamics") == Approx (40.0f));
+}
+
+TEST_CASE ("plugin: DRIVE changes the sound (and CC 27 moves it); at 0 it is untouched; DYNAMICS still acts", "[plugin][drive]")
+{
+    TempDir tmp;
+    const auto file = writeSource (tmp.dir, "vowel.wav", testsignals::vowel (midiToHz (57), 2.0, 48000.0, 3));
+    auto render = [] (OspAudioProcessor& p, int velocity, int cc27 = -1) {
+        p.prepareToPlay (48000.0, 256);
+        std::vector<float> out;
+        juce::AudioBuffer<float> buffer (2, 256);
+        for (int pos = 0; pos < 48000; pos += 256)
+        {
+            juce::MidiBuffer midi;
+            if (pos == 0)
+            {
+                if (cc27 >= 0)
+                    midi.addEvent (juce::MidiMessage::controllerEvent (1, 27, cc27), 0);
+                for (int note : { 48, 52, 55, 60 })
+                    midi.addEvent (juce::MidiMessage::noteOn (1, note, static_cast<juce::uint8> (velocity)), 0);
+            }
+            buffer.clear();
+            p.processBlock (buffer, midi);
+            out.insert (out.end(), buffer.getReadPointer (0), buffer.getReadPointer (0) + 256);
+        }
+        return out;
+    };
+    auto difference = [] (const std::vector<float>& x, const std::vector<float>& y) {
+        double d = 0.0, e = 0.0;
+        for (std::size_t i = 0; i < x.size(); ++i)
+        {
+            d += (x[i] - y[i]) * (x[i] - y[i]);
+            e += x[i] * x[i];
+        }
+        return std::sqrt (d / std::max (e, 1.0e-12));
+    };
+    OspAudioProcessor p;
+    loadAndWait (p, file);
+    p.setParameterValue ("space", 0.0f);
+    const auto clean = render (p, 100);
+    CHECK (difference (clean, render (p, 100)) == Approx (0.0).margin (1.0e-9));   // deterministic, untouched at 0
+    for (int mode = 0; mode < 3; ++mode)
+    {
+        CAPTURE (mode);
+        p.setParameterValue ("drive.mode", static_cast<float> (mode));
+        p.setParameterValue ("drive", 80.0f);
+        const auto driven = render (p, 100);
+        CHECK (difference (clean, driven) > 0.05);
+        float peak = 0.0f;
+        bool finite = true;
+        for (float v : driven)
+        {
+            finite = finite && std::isfinite (v);
+            peak = std::max (peak, std::abs (v));
+        }
+        CHECK (finite);
+        CHECK (peak < 1.5f);
+        p.setParameterValue ("drive", 0.0f);
+    }
+    p.setParameterValue ("drive.mode", 0.0f);
+    // CC 27 is DRIVE's (CC 21 stays DYNAMICS').
+    CHECK (difference (clean, render (p, 100, 100)) > 0.05);
+    OspAudioProcessor fresh;
+    loadAndWait (fresh, file);
+    fresh.setParameterValue ("space", 0.0f);
+    CHECK (difference (clean, render (fresh, 100)) == Approx (0.0).margin (1.0e-9));
+    // DYNAMICS (in Advanced now) still shapes a soft note.
+    fresh.setParameterValue ("dynamics", 0.0f);
+    const auto flat = render (fresh, 30);
+    fresh.setParameterValue ("dynamics", 100.0f);
+    CHECK (difference (flat, render (fresh, 30)) > 0.05);
 }

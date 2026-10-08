@@ -136,6 +136,10 @@ namespace
         s.echoTone = json::getDouble (echo, "tone", s.echoTone);
         s.echoAge = json::getDouble (echo, "age", s.echoAge);
         s.echoStereo = parseName (echo, "stereo", std::array { "mono", "pingpong", "wide" }, s.echoStereo);
+        const auto& drive = b["drive"];
+        s.driveMode = parseName (drive, "mode", std::array { "tube", "tape", "crunch" }, s.driveMode);
+        s.driveTone = json::getDouble (drive, "tone", s.driveTone);
+        s.driveBody = json::getDouble (drive, "body", s.driveBody);
     }
 }
 
@@ -170,6 +174,7 @@ void applyInstrumentBlock (const juce::var& e, RenderConfig& config)
     es.macros.motion = json::getDouble (m, "motion", es.macros.motion);
     es.macros.space = json::getDouble (m, "space", es.macros.space);
     es.macros.echo = json::getDouble (m, "echo", es.macros.echo);
+    es.macros.drive = json::getDouble (m, "drive", es.macros.drive);
     es.macros.reimagined = json::getDouble (m, "reimagined", es.macros.reimagined);
 }
 

@@ -91,6 +91,12 @@ namespace ids
     static const juce::String echoAge = "echo.age";
     static const juce::String echoStereo = "echo.stereo";
     static const juce::String shaperCustom = "movement.shaper.custom";
+    // DRIVE (version hint 14): the macro that took DYNAMICS' place on the panel. DYNAMICS keeps
+    // its own IDs (and lives in Advanced now); never reuse one for the other.
+    static const juce::String drive = "drive";
+    static const juce::String driveMode = "drive.mode";
+    static const juce::String driveTone = "drive.tone";
+    static const juce::String driveBody = "drive.body";
     // A/B layers (stable: never rename). Per layer: layerA.sourceMode, layerA.granular.position, ...
     static const juce::String blend = "ab.blend";
     static const juce::Identifier instrument = "Instrument";
@@ -395,6 +401,16 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
                                                                   static_cast<int> (d12.echoStereo)));
         layout.add (std::make_unique<juce::AudioParameterBool> (id12 (ids::shaperCustom), "Shaper Custom", false));
     }
+    {
+        // DRIVE (version hint 14). 0 % = bypassed: sessions from before it sound exactly the same.
+        auto id14 = [] (const juce::String& id) { return juce::ParameterID { id, 14 }; };
+        const Shaping d14;
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id14 (ids::drive), "Drive", unit, 0.0f, percent));
+        layout.add (std::make_unique<juce::AudioParameterChoice> (id14 (ids::driveMode), "Drive Mode", juce::StringArray { "Tube", "Tape", "Crunch" },
+                                                                  static_cast<int> (d14.driveMode)));
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id14 (ids::driveTone), "Drive Tone", unit, static_cast<float> (100.0 * d14.driveTone), percent));
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id14 (ids::driveBody), "Drive Body", unit, static_cast<float> (100.0 * d14.driveBody), percent));
+    }
     return layout;
 }
 
@@ -494,6 +510,7 @@ OspAudioProcessor::OspAudioProcessor()
     spaceParam = parameters.getRawParameterValue (ids::space);
     reimaginedParam = parameters.getRawParameterValue (ids::reimagined);
     echoParam = parameters.getRawParameterValue (ids::echo);
+    driveParam = parameters.getRawParameterValue (ids::drive);
     customPattern = RhythmicShaper::patternSteps (ShaperParams().pattern);   // CUSTOM starts as THREE
     publishCustomPattern();
     pitchCharacterParam = parameters.getRawParameterValue (ids::pitchCharacter);
@@ -657,8 +674,8 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
     }
 
     // Macro = host parameter, unless a MIDI CC (20-25) moved it more recently.
-    std::array<std::atomic<float>*, 7> macroParams { lifeParam, dynamicsParam, characterParam, motionParam, spaceParam, reimaginedParam, echoParam };
-    std::array<double, 7> values {};
+    std::array<std::atomic<float>*, 8> macroParams { lifeParam, dynamicsParam, characterParam, motionParam, spaceParam, reimaginedParam, echoParam, driveParam };
+    std::array<double, 8> values {};
     for (std::size_t i = 0; i < values.size(); ++i)
     {
         const float p = macroParams[i]->load() * 0.01f;
@@ -677,6 +694,7 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
     macros.space = values[4];
     macros.reimagined = values[5];
     macros.echo = values[6];
+    macros.drive = values[7];
     engine.setMacros (macros);
     engineSettings.macros = macros;
     engine.setMpe (mpeParam->load() >= 0.5f);
@@ -784,6 +802,7 @@ const juce::StringArray& OspAudioProcessor::shapingIds()
         ids::spacePreDelay, ids::spaceSize, ids::spaceDamping, ids::spaceModulation, ids::spaceWidth, ids::spaceLowCut, ids::spaceHighCut,
         ids::echoType, ids::echoSync, ids::echoDivision, ids::echoTime, ids::echoFeedback, ids::echoTone, ids::echoAge, ids::echoStereo,
         ids::shaperCustom,
+        ids::driveMode, ids::driveTone, ids::driveBody,
     };
     jassert (list.size() == numShapingParams);
     return list;
@@ -848,6 +867,9 @@ Shaping OspAudioProcessor::shapingFromParameters() const noexcept
     s.echoAge = 0.01 * v (50);
     s.echoStereo = static_cast<EchoStereo> (index (51, 3));
     s.shaper.custom = v (52) >= 0.5;
+    s.driveMode = static_cast<DriveMode> (index (53, 3));
+    s.driveTone = 0.01 * v (54);
+    s.driveBody = 0.01 * v (55);
     for (std::size_t i = 0; i < s.shaper.customSteps.size(); ++i)
     {
         auto& step = s.shaper.customSteps[i];
@@ -1077,8 +1099,8 @@ void OspAudioProcessor::handleMidi (const juce::MidiMessage& m) noexcept
         engine.setChannelTimbre (memberChannel ? channel : 1, m.getControllerValue() / 127.0);
     else if (m.isController() && m.getControllerNumber() == 1)
         modWheel = static_cast<float> (m.getControllerValue()) / 127.0f;
-    else if (m.isController() && m.getControllerNumber() >= 20 && m.getControllerNumber() <= 26)
-        ccMacro[static_cast<std::size_t> (m.getControllerNumber() - 20)] = static_cast<float> (m.getControllerValue()) / 127.0f;
+    else if (m.isController() && m.getControllerNumber() >= 20 && m.getControllerNumber() <= 27)
+        ccMacro[static_cast<std::size_t> (m.getControllerNumber() - 20)] = static_cast<float> (m.getControllerValue()) / 127.0f;   // 27: DRIVE
     else if (m.isPitchWheel() && memberChannel)
         engine.setChannelPitchBend (channel, (m.getPitchWheelValue() - 8192) / 8192.0 * 48.0); // MPE default: +/- 48 st
     else if (m.isSustainPedalOn() || m.isSustainPedalOff())

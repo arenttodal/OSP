@@ -247,9 +247,9 @@ is to start from `new-plugin.sh` and move the `Source/` files in.
 |---|---|
 | `new-plugin.sh`, instrument and effect | Built and tested on Linux with JUCE 8.0.9; all starter checks pass |
 | `adopt.sh` | Run on OSP's CMake layout: found `OSP_Plugin` and turned on `OSP_BUILD_PLUGIN` |
-| `package.sh` | Packaging run on Linux |
-| macOS steps (universal build, ditto, auval, install.command) | Adapted from OSP's CI, which builds and installs this way on every push. The ad-hoc `codesign` and reading the AU codes with PlistBuddy are new, and run for the first time on the first push |
-| Windows `install.bat`, pluginval, the fixed link | Written but not yet run: they run for the first time on the first push of a repository using them |
+| macOS: universal build, tests, ad-hoc signing, packaging, `auval` | Pass on GitHub's macOS 14 runners: OSP's `plugin-pipeline-selftest` workflow builds a starter plugin through `build-local.sh` whenever the kit changes |
+| Windows: Visual Studio x64 build, tests, packaging (`7z`, `Install.bat` with CRLF) | Pass on GitHub's Windows runners (same self-test) |
+| `Install.command` on a Mac, `Install.bat` on a PC, pluginval, the fixed link | Not run yet. The installers run when you double-click them; pluginval (off by default) and the fixed link run on the first push of a repository using the pipeline |
 ````
 
 ### `plugin-pipeline/adopt.sh`

@@ -178,7 +178,7 @@ protected:
 };
 
 /** Which macro a popup belongs to (the order of the macro row). */
-enum class MacroPopup { life, dynamics, character, movement, space, echo };
+enum class MacroPopup { life, drive, character, movement, space, echo };
 
 /** The parameters behind a macro's popup (the "customised" dot compares them to their defaults). */
 const juce::StringArray& popupParameterIds (MacroPopup macro);

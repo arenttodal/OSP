@@ -33,8 +33,8 @@ OSP grows with what you give it, up to three sounds (layers **A**, **B**, **C**)
 - Click a card to make it the **edited** layer (its letter is in colour); the menu acts on
   it. All layers stay visible and playable.
 
-Every layer plays every note you play, through the same LIFE, DYNAMICS, CHARACTER,
-MOVEMENT, SPACE and envelope: one instrument, not three. Only how far each source departs
+Every layer plays every note you play, through the same LIFE, DRIVE, CHARACTER,
+MOVEMENT, ECHO, SPACE, dynamics and envelope: one instrument, not three. Only how far each source departs
 from itself is its own: every card has its own **REIMAGINED**.
 
 ### A layer's card
@@ -139,7 +139,7 @@ its next take (ORDER: CYCLE) or to any other one (RANDOM), never the same take t
 a row. The takes are spread evenly and average out to your recording, so none drifts
 off-pitch. LIFE sets how far apart they are, CHARACTER how they differ (a PLUCK's harder
 takes are louder, brighter and start a touch sharp; a DRUM's have no pitch). **NEW** rolls
-a fresh set. DYNAMICS and the player's slow drift still apply on top, as they would to a
+a fresh set. Dynamics (Advanced) and the player's slow drift still apply on top, as they would to a
 real round-robin set.
 
 ## The controls
@@ -147,7 +147,7 @@ real round-robin set.
 | Control | What it does |
 |---|---|
 | **LIFE** | How differently each note is performed. 0 = the identical recording every time; around 50 % = a believable player (calibrated on real repeated takes); 100 % = freer, related reinterpretations. Repeated fast notes alternate naturally. Popup: NATURAL / LOOSE / FRAY; CHARACTER (AUTO reads the sample; PLUCK, SYNTH, DRUM use round-robin models); TAKES (see below); PITCH, TONE, ATTACK. |
-| **DYNAMICS** | What velocity does besides volume. 0 = volume only. Higher = soft notes darker and gentler, hard notes brighter with more bite and a slightly sharp start. |
+| **DRIVE** | Saturation of the whole instrument (all layers together, before ECHO and SPACE): 0 = clean (off), 10-25 % a little harmonic richness, 25-50 % warmth and density, 50-75 % clear saturation with gentle compression, 75-100 % crunchy, still playable breakup. Popup: TUBE / TAPE / CRUNCH, TONE, BODY (see below). |
 | **CHARACTER** | The tonal shape: where the filter sits between its MIN and MAX (popup: type, resonance, drive, envelope). |
 | **MOVEMENT** | How the sound changes over time (popup: DRIFT, TAPE, CHORUS, PULSE, SHAPER). The mod wheel opens it further. |
 | **ECHO** | Repeats of the sound, in parallel with SPACE: how loud they are (0 = off). Popup: TAPE or BBD, FREE / SYNC, MONO / PING-PONG / WIDE, TIME, FEEDBACK, TONE, AGE (see below). |
@@ -159,7 +159,7 @@ real round-robin set.
 
 Click a macro's name for its popup: each one shows what it does (the reverb's tail, the
 filter's curve over your sound's spectrum, the movement over time, a cloud of possible
-performances, the touch response) with its few controls. Escape, a click elsewhere or the
+performances, the drive's curve) with its few controls. Escape, a click elsewhere or the
 name again closes it.
 
 **Advanced** (bottom right; it stays open with the project): Fine tune, Bend range,
@@ -168,9 +168,16 @@ wins, a key played while another is held changes the note's pitch without restar
 (legato) and releasing it returns to the key still held; **GLIDE** sets how long the pitch
 slides between notes, also from the last note into a fresh one; 0 = instant),
 **Pitch character** (*Tape*: classic resampling, faster and brighter going up; *Natural*:
-keeps the recording's speed and movement in other registers), **MPE**, and **Reseed** (a
-new variation pattern for LIFE and MOVEMENT). Velocity range is DYNAMICS' **RANGE**; the
-old Sustain switch is each layer's **LOOP**; Output is **VOLUME**.
+keeps the recording's speed and movement in other registers), **Dynamics**, **MPE**, and
+**Reseed** (a new variation pattern for LIFE and MOVEMENT). The old Sustain switch is each
+layer's **LOOP**; Output is **VOLUME**.
+
+**Dynamics** (in Advanced since DRIVE took its place on the panel; it works exactly as
+before, and sessions keep their settings): **AMOUNT** is what velocity does besides volume
+(0 = volume only; higher = soft notes darker and gentler, hard notes brighter with more bite
+and a slightly sharp start); the curve **SOFT / LINEAR / HARD** (soft reaches loud easily,
+hard needs a firm touch); **RANGE**, the velocity's level range in dB; **TONE**, how much
+velocity moves CHARACTER's filter.
 
 The pitch and mod wheels beside the keyboard act like a controller's.
 
@@ -211,6 +218,25 @@ bounces); with the transport stopped it starts with the first note you play.
 | SCATTER | Mostly open, with a few sparse dips |
 | MACHINE | A precise on/off gate on sixteenths (x.xx.xx.x.xx.x.x) |
 
+## DRIVE
+
+The big knob is how hard the instrument is driven; click DRIVE for the circuit. The picture
+is the circuit's curve at your settings: input across, output up, the straight dashed line
+the clean sound. The more the curve bends, the more the peaks are rounded into harmonics.
+
+| Circuit | What it is |
+|---|---|
+| **TUBE** (default) | Two tube-like stages: warmth and even harmonics first, rounded breakup as you push it. The low end has its own gentle stage, so a bass note never muddies the chord above it. |
+| **TAPE** | Smooth, dense, compressed: a tape's saturation, highs softened first and transients rounded a little more than the sustain (the dashed curve shows a transient being driven harder). No hiss, no wow: that is MOVEMENT's TAPE. |
+| **CRUNCH** | An old console or preamp overloaded: tighter bass, forward mids, rawer and more articulate; for old synths, electric pianos, organs and plucked strings. |
+
+**TONE** darkens (softer, warmer harmonics) or opens (clearer, more present) the saturation
+without filtering the clean sound. **BODY** goes from lean (clearer attack, a little of the
+clean sound kept, less compression) to dense (thicker, rounder, more sustain). DRIVE is
+level-matched: turning it up adds density and harmonics, about +1 dB at 100 %, not a jump in
+volume. It reacts to how hot it is fed, like real hardware: a quiet single note is driven
+less than a full chord.
+
 ## SPACE and ECHO
 
 | SPACE type | Character |
@@ -248,13 +274,13 @@ it back. Every edit is one undo step; the pattern is saved with the project and 
 
 | Message | Effect |
 |---|---|
-| Note on/off, velocity | play (velocity → level and, with DYNAMICS, performance) |
+| Note on/off, velocity | play (velocity → level and, with Dynamics, performance) |
 | Sustain pedal (CC 64) | hold |
 | Pitch bend | ± Bend range |
 | Mod wheel (CC 1) | opens MOTION |
 | Channel pressure / aftertouch | intensity: louder and brighter while pressing |
 | CC 74 | brightness (MPE "slide") |
-| CC 20–26 | LIFE, DYNAMICS, CHARACTER, MOTION, SPACE, A's REIMAGINED, ECHO |
+| CC 20–27 | LIFE, Dynamics (amount), CHARACTER, MOTION, SPACE, A's REIMAGINED, ECHO, DRIVE |
 | MPE (lower zone, toggle in Advanced) | per-note bend (±48 semitones), pressure and slide |
 
 ## Saving and sharing

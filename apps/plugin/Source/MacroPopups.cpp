@@ -8,6 +8,7 @@
 #include "engine/InstrumentEngine.h"
 #include "engine/RhythmicShaper.h"
 #include "engine/Shaping.h"
+#include "engine/DriveProcessor.h"
 #include "engine/EchoDelay.h"
 #include "engine/SpaceReverb.h"
 
@@ -1450,101 +1451,114 @@ namespace
     //==========================================================================
     // DYNAMICS: touch -> level, through the velocity curve and RANGE (scaled by the macro as
     // the engine does), a brightness halo where TONE opens the sound, and the notes just played.
-    class DynamicsVisual final : public Visual
+    /** DRIVE: the circuit's transfer curve at its settings (DriveProcessor::transfer, the
+        DSP's own shaping functions): input across, output up, a faint clean diagonal behind.
+        As DRIVE rises the curve bends and its peaks flatten; TUBE leans (its asymmetry),
+        CRUNCH folds harder, TAPE rounds - and, as a stage with memory has no single curve,
+        TAPE also shows (faintly, dashed) how a transient is driven harder. */
+    class DriveVisual final : public Visual, public juce::SettableTooltipClient
     {
     public:
-        explicit DynamicsVisual (OspAudioProcessor& p) : processor (p) {}
+        explicit DriveVisual (juce::AudioProcessorValueTreeState& s) : state (s)
+        {
+            setTooltip ("Input across, output up: the straight line is the clean sound, the curve the circuit at these settings");
+        }
 
     private:
+        bool native() const override { return true; }
         bool changed() override
         {
-            auto& s = processor.parameters;
-            return watch.differs ({ value (s, "dynamics.curve"), value (s, "velocityRange"), value (s, "dynamics.tone"), value (s, "dynamics"),
-                                    static_cast<double> (processor.velocityCount.load()) });
+            const int mode = juce::roundToInt (value (state, "drive.mode"));
+            if (mode != lastMode)
+            {
+                if (lastMode >= 0)
+                    transition();   // a new circuit: fade from the old picture
+                lastMode = mode;
+            }
+            return watch.differs ({ value (state, "drive"), static_cast<double> (mode), value (state, "drive.tone"), value (state, "drive.body") });
         }
 
-        void paintVisual (juce::Graphics& g, juce::Rectangle<float> plot) override
+        void paintVisual (juce::Graphics& g, juce::Rectangle<float> r) override
         {
             using namespace palette;
-            auto& s = processor.parameters;
-            const auto curve = static_cast<VelocityCurve> (std::clamp (juce::roundToInt (value (s, "dynamics.curve")), 0, 2));
-            const double macro = std::clamp (0.01 * value (s, "dynamics"), 0.0, 1.0);
-            const double range = value (s, "velocityRange") * (0.15 + 1.31 * macro);   // as InstrumentEngine::levelRangeDb
-            const double tone = 0.01 * value (s, "dynamics.tone") * macro;
-            auto area = plot.withTrimmedBottom (11.0f).withTrimmedLeft (22.0f);
-            constexpr double floorDb = -48.0;
-            auto xAt = [&] (double v) { return area.getX() + static_cast<float> ((v - 1.0) / 126.0) * area.getWidth(); };
-            auto yAt = [&] (double db) { return area.getY() + static_cast<float> (std::clamp (db, floorDb, 0.0) / floorDb) * area.getHeight(); };
-            auto levelDb = [&] (int v) { return -range * (1.0 - shaping::curvedVelocity (curve, v) / 127.0); };
+            DriveProcessor::Settings settings;
+            settings.amount = std::clamp (0.01 * value (state, "drive"), 0.0, 1.0);
+            settings.mode = static_cast<DriveMode> (std::clamp (juce::roundToInt (value (state, "drive.mode")), 0, 2));
+            settings.tone = 0.01 * value (state, "drive.tone");
+            settings.body = 0.01 * value (state, "drive.body");
 
-            g.setFont (fonts::make (9.0f));
-            for (double db : { 0.0, -24.0, -48.0 })
-            {
-                g.setColour (displayLine.withAlpha (0.6f));
-                g.drawHorizontalLine (juce::roundToInt (yAt (db)), area.getX(), area.getRight());
-                g.setColour (displayText.withAlpha (0.75f));
-                g.drawText (juce::String (juce::roundToInt (db)), juce::Rectangle<float> (plot.getX(), yAt (db) - 5.0f, 20.0f, 10.0f), juce::Justification::centredLeft, false);
-            }
-            g.setColour (displayText.withAlpha (0.8f));
-            g.drawText ("SOFT", juce::Rectangle<float> (area.getX(), plot.getBottom() - 10.0f, 40.0f, 10.0f), juce::Justification::centredLeft, false);
-            g.drawText ("HARD", juce::Rectangle<float> (area.getRight() - 40.0f, plot.getBottom() - 10.0f, 40.0f, 10.0f), juce::Justification::centredRight, false);
+            // The whole well: input +-1.8 x the reference level (program peaks), output +-1.3
+            // (a saturated output lives in the smaller range: its bend reads better).
+            constexpr double range = 1.8, outRange = 1.3;
+            const auto plot = r.reduced (18.0f, 9.0f);
+            auto xAt = [&] (double v) { return plot.getCentreX() + static_cast<float> (v / range) * 0.5f * plot.getWidth(); };
+            auto yAt = [&] (double v) { return plot.getCentreY() - static_cast<float> (std::clamp (v, -outRange, outRange) / outRange) * 0.5f * plot.getHeight(); };
 
-            // The neutral (linear) response, faintly.
-            juce::Path neutral, response;
-            for (int v = 1; v <= 127; ++v)
+            g.setColour (displayLine.withAlpha (0.45f));
+            g.drawHorizontalLine (juce::roundToInt (plot.getCentreY()), plot.getX(), plot.getRight());
+            g.drawVerticalLine (juce::roundToInt (plot.getCentreX()), plot.getY(), plot.getBottom());
+            for (double level : { -1.0, 1.0 })   // the reference level (program peaks)
             {
-                const auto x = xAt (v);
-                const float yn = yAt (-range * (1.0 - v / 127.0)), yc = yAt (levelDb (v));
-                if (v == 1)
-                {
-                    neutral.startNewSubPath (x, yn);
-                    response.startNewSubPath (x, yc);
-                }
-                else
-                {
-                    neutral.lineTo (x, yn);
-                    response.lineTo (x, yc);
-                }
+                g.setColour (displayLine.withAlpha (0.22f));
+                g.drawVerticalLine (juce::roundToInt (xAt (level)), plot.getY(), plot.getBottom());
+                g.drawHorizontalLine (juce::roundToInt (yAt (level)), plot.getX(), plot.getRight());
             }
+            g.setFont (fonts::make (8.5f));
+            g.setColour (displayText.withAlpha (0.7f));
+            g.drawText ("IN", juce::Rectangle<float> (plot.getRight() + 2.0f, plot.getCentreY() - 6.0f, 20.0f, 12.0f), juce::Justification::centredLeft, false);
+            g.drawText ("OUT", juce::Rectangle<float> (plot.getCentreX() + 3.0f, plot.getY() - 1.0f, 24.0f, 10.0f), juce::Justification::centredLeft, false);
+
+            // The clean response, faint and dashed.
+            juce::Path clean;
+            clean.startNewSubPath (xAt (-range), yAt (-range));
+            clean.lineTo (xAt (range), yAt (range));
             juce::Path dashed;
             const float dashes[] = { 3.0f, 3.0f };
-            juce::PathStrokeType (1.0f).createDashedStroke (dashed, neutral, dashes, 2);
-            g.setColour (displayText.withAlpha (0.5f));
+            juce::PathStrokeType (1.0f).createDashedStroke (dashed, clean, dashes, 2);
+            g.setColour (displayText.withAlpha (0.4f));
             g.fillPath (dashed);
 
-            // Brightness: TONE opens harder notes - a halo growing towards the hard end.
-            if (tone > 0.01)
-                for (int v = 64; v <= 127; v += 3)
+            auto curve = [&] (double push) {
+                juce::Path p;
+                constexpr int steps = 90;
+                for (int i = 0; i <= steps; ++i)
                 {
-                    const float strength = static_cast<float> (tone * std::pow ((v - 64) / 63.0, 1.5));
-                    const float r = 3.0f + 14.0f * strength;
-                    g.setColour (amber.withAlpha (0.08f * strength + 0.02f));
-                    g.fillEllipse (xAt (v) - r, yAt (levelDb (v)) - r, 2.0f * r, 2.0f * r);
+                    const double x = -range + 2.0 * range * i / steps;
+                    const auto px = xAt (x), py = yAt (DriveProcessor::transfer (settings, x, push));
+                    if (i == 0)
+                        p.startNewSubPath (px, py);
+                    else
+                        p.lineTo (px, py);
                 }
-            juce::Path fill (response);
-            fill.lineTo (area.getRight(), area.getBottom());
-            fill.lineTo (area.getX(), area.getBottom());
-            fill.closeSubPath();
-            g.setGradientFill (juce::ColourGradient (identity.withAlpha (0.2f), 0.0f, area.getY(), identity.withAlpha (0.02f), 0.0f, area.getBottom(), false));
-            g.fillPath (fill);
-            g.setColour (identity);
-            g.strokePath (response, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-
-            // The notes just played, newest brightest.
-            const int count = processor.velocityCount.load (std::memory_order_acquire);
-            const int shown = std::min (count, OspAudioProcessor::velocityHistory);
-            for (int i = 0; i < shown; ++i)
+                return p;
+            };
+            const auto main = curve (0.0);
             {
-                const int index = count - 1 - i;
-                const int v = processor.recentVelocity[static_cast<std::size_t> (index % OspAudioProcessor::velocityHistory)].load (std::memory_order_relaxed);
-                const float age = static_cast<float> (i) / static_cast<float> (OspAudioProcessor::velocityHistory);
-                g.setColour (raised.withAlpha (0.85f * (1.0f - age)));
-                g.fillEllipse (xAt (v) - 3.0f, yAt (levelDb (v)) - 3.0f, 6.0f, 6.0f);
+                juce::Graphics::ScopedSaveState clip (g);
+                g.reduceClipRegion (plot.expanded (1.0f).toNearestInt());
+                if (settings.mode == DriveMode::tape && settings.amount > 0.0)
+                {
+                    juce::Path transient;
+                    juce::PathStrokeType (1.0f).createDashedStroke (transient, curve (1.5), dashes, 2);
+                    g.setColour (identity.withAlpha (0.45f));
+                    g.fillPath (transient);
+                }
+                g.setColour (identity.withAlpha (0.18f));
+                g.strokePath (main, juce::PathStrokeType (4.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+                g.setColour (identity);
+                g.strokePath (main, juce::PathStrokeType (1.8f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            }
+            if (settings.amount <= 0.0)
+            {
+                g.setColour (displayText.withAlpha (0.75f));
+                g.drawText ("CLEAN", plot.withTrimmedTop (plot.getHeight() * 0.62f).withTrimmedLeft (plot.getWidth() * 0.5f),
+                            juce::Justification::centred, false);
             }
         }
 
-        OspAudioProcessor& processor;
+        juce::AudioProcessorValueTreeState& state;
         Watch watch;
+        int lastMode = -1;
     };
 
     //==========================================================================
@@ -2707,14 +2721,14 @@ std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, OspAudioProcessor
         {
             return std::make_unique<LifePanel> (processor);
         }
-        case MacroPopup::dynamics:
+        case MacroPopup::drive:
         {
-            // ATTACK and RELEASE are the instrument's envelope (beside the macros).
-            auto popup = std::make_unique<MacroPanel> (processor, "DYNAMICS", 232, 70, design::colour::Macro::dynamics);
-            popup->mode ("dynamics.curve", "Velocity curve: soft reaches loud easily, hard needs a firm touch");
-            popup->setVisual (std::make_unique<DynamicsVisual> (processor));
-            popup->knob (false, "velocityRange", "RANGE", [] (double v) { return juce::String (v, 0) + " dB"; });
-            popup->knob (false, "dynamics.tone", "TONE", percent);
+            // The DRIVE macro is the amount; the popover chooses the circuit and voices it.
+            auto popup = std::make_unique<MacroPanel> (processor, "DRIVE", 232, 84, design::colour::Macro::drive);
+            popup->mode ("drive.mode", "Tube: rich, rounded breakup. Tape: smooth, dense, compressed. Crunch: rawer, forward, articulate.");
+            popup->setVisual (std::make_unique<DriveVisual> (state));
+            popup->knob (false, "drive.tone", "TONE", percent);   // darker, softer harmonics .. more open
+            popup->knob (false, "drive.body", "BODY", percent);   // lean, clear attack .. dense, round, sustained
             return popup;
         }
         case MacroPopup::character:
