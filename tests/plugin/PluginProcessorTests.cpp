@@ -4709,10 +4709,11 @@ TEST_CASE ("plugin: MODULATION bay, drag and drop, rings, routing list, window s
     REQUIRE (editor != nullptr);
     editor->refreshNow();
     auto snapshot = [&] (const juce::String& name) {
+        // Always drawn (the rings are counted as they are painted); written when asked for.
+        editor->refreshNow();
+        const auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f);
         if (const char* dir = std::getenv ("OSP_SNAPSHOT_DIR"))
         {
-            editor->refreshNow();
-            const auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f);
             juce::FileOutputStream out (juce::File (dir).getChildFile (name));
             out.setPosition (0);
             out.truncate();
