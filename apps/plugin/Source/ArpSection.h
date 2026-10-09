@@ -7,6 +7,9 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include <array>
+#include <vector>
+
 namespace osp::plugin
 {
 
@@ -68,12 +71,14 @@ private:
 };
 
 /**
-    The arpeggiator's inline editor, between the macros and the keyboard when open (the
-    approved mockup): ARPEGGIATOR and a collapse button; a 16-step display, numbered, each
-    step a bar as high as its note (the step sounding lit and marked, from the audio thread's
-    own scheduler; while nothing is held, the pattern's shape on a C major chord); then
-    PATTERN and RATE as drop-down boxes and GATE, OCTAVES and SWING as the instrument's small
-    knobs. No power switch: the light by the keyboard is the only one.
+    The arpeggiator's inline editor, between the macros and the keyboard when open: ARPEGGIATOR
+    and a collapse button; a 16-step display, numbered, each step a bar as high as its note (the
+    step sounding lit and marked, from the audio thread's own scheduler; while nothing is held,
+    the pattern on a C major chord). Then PATTERN as a small picture of the style (after Live's
+    Arpeggiator: the notes of a four-note chord joined over twelve steps) with the list of every
+    style beside it, RATE as a knob over the divisions from slowest to fastest, OCTAVES as four
+    stacked keys, and GATE and SWING as the instrument's small knobs. No power switch: the light
+    by the keyboard is the only one.
 */
 class ArpInlinePanel final : public juce::Component
 {
@@ -92,36 +97,60 @@ public:
     void mouseMove (const juce::MouseEvent&) override;
     void mouseExit (const juce::MouseEvent&) override;
     void mouseDown (const juce::MouseEvent&) override;
+    void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
 
-    juce::PopupMenu patternMenu() const;
-    juce::PopupMenu rateMenu() const;
-    void showPatternMenu();
-    void showRateMenu();
+    /** The styles in the list's order (musical families, not the parameter's saved order). */
+    static const std::array<int, arp::patternCount>& listOrder();
+    /** RATE's divisions from slowest to fastest, as parameter choice indices. */
+    static const std::vector<int>& rateOrder();
+    /** The pattern as the list shows it ("Up", "Pinky Up/Down", ...). */
+    static juce::String patternLabel (int pattern);
+
+    /** One host gesture each, as a click does. */
+    void choosePattern (int pattern);
+    void chooseOctaves (int octaves);
+
     /** Places of the parts (tests, snapshots). */
     juce::Rectangle<float> displayArea() const { return steps; }
-    juce::Rectangle<float> patternArea() const { return patternBox; }
-    juce::Rectangle<float> rateArea() const { return rateBox; }
+    juce::Rectangle<float> patternFieldArea() const { return field; }
+    juce::Rectangle<float> patternListArea() const { return list; }
+    /** A style's row in the list, or empty while it is scrolled out of view. */
+    juce::Rectangle<float> patternRowArea (int pattern) const;
+    juce::Rectangle<float> octaveKeyArea (int octaves) const;
     juce::Rectangle<float> collapseArea() const { return collapse; }
+    MiniKnob& rateKnob() noexcept { return rate; }
+    int firstVisibleRow() const noexcept { return firstRow; }
+    /** The style the picture shows: the one under the pointer in the list, else the chosen one. */
+    int fieldPattern() const noexcept { return fieldShown; }
     /** The column lit as sounding (-1: none), as last drawn. */
     int litColumn() const noexcept { return shown.current; }
 
-    /** The pattern as the drop-down shows it ("Up", "Up/Down", ...). */
-    static juce::String patternLabel (int pattern);
+    static constexpr int visibleRows = 6;
 
 private:
     void paintSteps (juce::Graphics&);
-    void paintBox (juce::Graphics&, juce::Rectangle<float> box, const juce::String& text, bool hot);
+    void paintField (juce::Graphics&);
+    void paintList (juce::Graphics&);
+    void paintOctaves (juce::Graphics&);
     void updatePreview();
+    void updateField();
+    void scrollTo (int first);
+    void revealSelected();
+    int rowAt (juce::Point<float> p) const;
 
     OspAudioProcessor& ospProcessor;
-    juce::ParameterAttachment enabledAttachment, patternAttachment, rateAttachment;
-    MiniKnob gate, octaves, swing;
+    juce::ParameterAttachment enabledAttachment, patternAttachment, octavesAttachment;
+    MiniKnob rate, gate, swing;
     bool enabled = false;
-    int pattern = 0, rate = 1, octaveCount = 1;
+    int pattern = 0, octaveCount = 1;
     OspAudioProcessor::ArpView shown;
-    Arpeggiator::Display preview;   ///< the pattern's shape on a C major chord, while nothing is held
-    juce::Rectangle<float> title, collapse, numbers, steps, patternLabelArea, patternBox, rateLabelArea, rateBox;
-    int hover = 0;   ///< 1 pattern, 2 rate, 3 collapse
+    Arpeggiator::Display preview;   ///< the pattern on a C major chord, while nothing is held
+    Arpeggiator::Display fieldSteps; ///< the picture: the style on C E G B, one octave
+    int fieldShown = -1;
+    juce::Rectangle<float> title, collapse, numbers, steps, patternCaption, field, list, octaveCaption, octaveKeys;
+    int firstRow = 0, hoverRow = -1;
+    float wheelPending = 0.0f;
+    int hover = 0;   ///< 3 collapse, 10 + n octave key n
 };
 
 } // namespace osp::plugin

@@ -98,10 +98,10 @@ public:
         session like the window's zoom), independent of arp.enabled and never seen by audio. */
     bool arpEditorExpanded() const noexcept { return arpEditorOpen.load(); }
     void setArpEditorExpanded (bool open) noexcept { arpEditorOpen = open; }
-    /** Whether the modulation bay is open (the editor wider by it): a view setting only,
-        stored with the session; modulation runs the same either way. */
-    bool modBayExpanded() const noexcept { return modBayOpen.load(); }
-    void setModBayExpanded (bool open) noexcept { modBayOpen = open; }
+    /** Which editor the envelope panel shows (0 AMP, 1 ENV 1, 2 ENV 2, 3 LFO 1, 4 LFO 2): a
+        view setting only, stored with the session; every source runs whichever is shown. */
+    int modPanelTab() const noexcept { return modTab.load(); }
+    void setModPanelTab (int tab) noexcept { modTab = std::clamp (tab, 0, 4); }
 
     // MODULATION: parameter IDs, the destinations' names (registry order), the editable
     // curves (0, 1: LFO 1/2 CUSTOM; 2, 3: ENV 1/2 one-shot), routes by slot, the display.
@@ -560,7 +560,7 @@ private:
     std::atomic<float> uiScaleFactor { 1.0f };
     std::atomic<bool> advancedPanelOpen { false };
     std::atomic<bool> arpEditorOpen { false };
-    std::atomic<bool> modBayOpen { false };
+    std::atomic<int> modTab { 0 };
     std::set<std::uint64_t> userLoads;     // load ids started by the user (undoable), not by recall
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OspAudioProcessor)

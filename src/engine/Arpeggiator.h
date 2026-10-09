@@ -8,14 +8,28 @@
 namespace osp
 {
 
+/** The order is the parameter's choice order (saved in sessions): never reorder, append only.
+    The styles from DOWN/UP on follow Ableton Live's Arpeggiator. */
 enum class ArpPattern
 {
     up = 0,
     down,
-    upDown,
+    upDown,           ///< C E G E: the top and bottom once
     played,
     random,
-    chord
+    chord,
+    downUp,           ///< G E C E
+    upAndDown,        ///< C E G G E C: the top and bottom twice
+    downAndUp,        ///< G E C C E G
+    converge,         ///< from the outside in: C B E G
+    diverge,          ///< from the inside out: G E B C
+    convergeDiverge,  ///< in, then out again: C B E G E B
+    pinkyUp,          ///< the top note after each note going up: C B E B G B
+    pinkyUpDown,      ///< the same going up and down: C B E B G B E B
+    thumbUp,          ///< the bottom note before each note going up: C E C G C B
+    thumbUpDown,      ///< the same going up and down: C E C G C B C G
+    randomOther,      ///< every note once in a random order, then a new order
+    randomOnce        ///< one random order, repeated
 };
 
 /** The order is the parameter's choice order (saved in sessions): never reorder. */
@@ -35,7 +49,7 @@ enum class ArpRate
 
 namespace arp
 {
-    constexpr int patternCount = 6;
+    constexpr int patternCount = 18;
     constexpr int rateCount = 10;
     constexpr double minGate = 0.10, maxGate = 1.50;
     constexpr double maxSwing = 1.0;   ///< 100 %: every second step half a step late (a dotted feel)
@@ -43,7 +57,7 @@ namespace arp
 
     /** One step, in quarter notes. */
     double rateQuarters (ArpRate rate) noexcept;
-    const char* patternName (ArpPattern pattern) noexcept;   ///< "UP", "UP/DOWN", ...
+    const char* patternName (ArpPattern pattern) noexcept;   ///< "UP", "UP/DOWN", "PINKY UP", ...
     const char* rateName (ArpRate rate) noexcept;            ///< "1/8", "1/8D", "1/8T", ...
 }
 
@@ -62,8 +76,8 @@ namespace arp
     Every generated note gets its own note-off (the gate) from a scheduler; note-offs come before
     note-ons at the same sample. The voice engine knows notes by pitch, so a pitch that is still
     sounding (gate above 100 %) is ended right before it is played again; nothing is ever left
-    hanging. RANDOM is reproducible: its choices come from osp::Prng, seeded from the stored
-    variation seed and a phrase counter that restarts with the host's transport.
+    hanging. The random styles are reproducible: their choices come from osp::Prng, seeded from
+    the stored variation seed and a phrase counter that restarts with the host's transport.
 
     The held-note tracker always runs, also while the arpeggiator is off, so switching it on
     or off mid-performance hands the notes over cleanly (§ transitions in beginBlock). While it
@@ -99,7 +113,7 @@ public:
     };
 
     static constexpr int maxHeld = 64;
-    static constexpr int maxSequence = 2 * maxHeld * arp::maxOctaves;   // UP/DOWN goes both ways
+    static constexpr int maxSequence = 4 * maxHeld * arp::maxOctaves;   // PINKY / THUMB UP/DOWN: both ways, every note twice
     static constexpr int maxEvents = 2048;
     static constexpr int displaySteps = 16;
 
@@ -167,6 +181,8 @@ private:
     void ensureSequence() const noexcept;
     int stepNotes (std::int64_t step, int previousIndex, std::array<Step, maxHeld>& out, int& index) const noexcept;
     int pickRandom (std::int64_t step, int previousIndex, int length) const noexcept;
+    /** RANDOM OTHER / RANDOM ONCE: the note at `position` of the cycle's shuffled order. */
+    int pickShuffled (std::int64_t cycle, int position, int length) const noexcept;
 
     // time
     double stepSamples() const noexcept;

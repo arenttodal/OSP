@@ -294,6 +294,73 @@ TEST_CASE ("arp: UP, DOWN, UP/DOWN, PLAYED and CHORD patterns", "[unit][arp]")
     CHECK (run (ArpPattern::up, { 0, 127 }, 3, 2) == std::vector<int> { 0, 127, 12 });   // octave by octave
 }
 
+TEST_CASE ("arp: the Live styles (DOWN/UP .. THUMB UP/DOWN) walk the held notes as named", "[unit][arp]")
+{
+    // C E G B held in any order: 60 64 67 71.
+    const std::vector<int> chord { 67, 60, 71, 64 };
+    using V = std::vector<int>;
+    CHECK (run (ArpPattern::downUp, chord, 8) == V { 71, 67, 64, 60, 64, 67, 71, 67 });
+    CHECK (run (ArpPattern::upAndDown, chord, 10) == V { 60, 64, 67, 71, 71, 67, 64, 60, 60, 64 });
+    CHECK (run (ArpPattern::downAndUp, chord, 10) == V { 71, 67, 64, 60, 60, 64, 67, 71, 71, 67 });
+    CHECK (run (ArpPattern::converge, chord, 6) == V { 60, 71, 64, 67, 60, 71 });
+    CHECK (run (ArpPattern::diverge, chord, 6) == V { 67, 64, 71, 60, 67, 64 });
+    CHECK (run (ArpPattern::convergeDiverge, chord, 8) == V { 60, 71, 64, 67, 64, 71, 60, 71 });
+    CHECK (run (ArpPattern::pinkyUp, chord, 8) == V { 60, 71, 64, 71, 67, 71, 60, 71 });
+    CHECK (run (ArpPattern::pinkyUpDown, chord, 10) == V { 60, 71, 64, 71, 67, 71, 64, 71, 60, 71 });
+    CHECK (run (ArpPattern::thumbUp, chord, 8) == V { 60, 64, 60, 67, 60, 71, 60, 64 });
+    CHECK (run (ArpPattern::thumbUpDown, chord, 10) == V { 60, 64, 60, 67, 60, 71, 60, 67, 60, 64 });
+    CHECK (run (ArpPattern::converge, { 60, 64, 67 }, 4) == V { 60, 67, 64, 60 });
+    // Over two octaves the walk spans both: the top is B an octave up.
+    CHECK (run (ArpPattern::pinkyUp, { 60, 64 }, 6, 2) == V { 60, 76, 64, 76, 72, 76 });
+    CHECK (run (ArpPattern::downUp, { 60, 64 }, 6, 2) == V { 76, 72, 64, 60, 64, 72 });
+
+    // Few notes: every style still plays (one note repeats; two never stall).
+    for (int p = 0; p < arp::patternCount; ++p)
+    {
+        const auto pattern = static_cast<ArpPattern> (p);
+        if (pattern == ArpPattern::chord)
+            continue;
+        CAPTURE (arp::patternName (pattern));
+        CHECK (run (pattern, { 62 }, 4) == V { 62, 62, 62, 62 });
+        const auto two = run (pattern, { 62, 69 }, 8);
+        REQUIRE (two.size() == 8);
+        CHECK (std::count (two.begin(), two.end(), 62) >= 2);
+        CHECK (std::count (two.begin(), two.end(), 69) >= 2);
+        CHECK (std::string (arp::patternName (pattern)).size() > 1);
+    }
+}
+
+TEST_CASE ("arp: RANDOM OTHER plays every note once per round, RANDOM ONCE repeats one order", "[unit][arp]")
+{
+    const std::vector<int> notes { 60, 62, 64, 65, 67 };
+    const auto other = run (ArpPattern::randomOther, notes, 40, 1, 5);
+    REQUIRE (other.size() == 40);
+    CHECK (other == run (ArpPattern::randomOther, notes, 40, 1, 5));   // reproducible
+    CHECK (other != run (ArpPattern::randomOther, notes, 40, 1, 6));
+    bool changes = false;
+    for (std::size_t round = 0; round < 8; ++round)
+    {
+        std::vector<int> r (other.begin() + static_cast<std::ptrdiff_t> (5 * round), other.begin() + static_cast<std::ptrdiff_t> (5 * round + 5));
+        CHECK (std::is_permutation (r.begin(), r.end(), notes.begin()));
+        if (round > 0 && ! std::equal (r.begin(), r.end(), other.begin()))
+            changes = true;
+    }
+    CHECK (changes);
+    for (std::size_t i = 1; i < other.size(); ++i)
+        CHECK (other[i] != other[i - 1]);   // never twice in a row, not even across the seam
+    const auto two = run (ArpPattern::randomOther, { 60, 72 }, 8);
+    for (std::size_t i = 1; i < two.size(); ++i)
+        CHECK (two[i] != two[i - 1]);
+
+    const auto once = run (ArpPattern::randomOnce, notes, 20, 1, 5);
+    REQUIRE (once.size() == 20);
+    CHECK (std::is_permutation (once.begin(), once.begin() + 5, notes.begin()));
+    for (std::size_t i = 5; i < once.size(); ++i)
+        CHECK (once[i] == once[i - 5]);
+    CHECK (once == run (ArpPattern::randomOnce, notes, 20, 1, 5));
+    CHECK (once != run (ArpPattern::randomOnce, notes, 20, 1, 7));
+}
+
 TEST_CASE ("arp: 0, 1, 2, 3, 4, 7, 10, 16, 64 and more notes", "[unit][arp]")
 {
     for (int count : { 0, 1, 2, 3, 4, 7, 10, 16, 64, 70 })

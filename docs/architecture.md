@@ -501,10 +501,15 @@ global LFOs (host PPQ when playing) and hands the post chain `base + modulation`
 each voice keeps a `VoiceState` (its poly LFOs and envelopes) and adds its offsets where each
 setting is used (gain ramped, ADSR times at note-on / note-off). With no active route
 `render()` is the unchanged single-block path, so sessions from before are bit-identical.
-A per-voice source never reaches a shared stage (no aggregation rule yet). GUI: the bay
-(`ModulationBay`) widens the editor's reference canvas to the right without moving the
-instrument; `ModulationOverlay` draws rings on modulated controls (found by their `paramId`
-property) and takes the drops. The bay's visibility is a view setting (`modOpen`). Headless:
+A per-voice source never reaches a shared stage (no aggregation rule yet). GUI (refined; the first
+version's window-widening bay was removed so the plugin keeps its size): `ModulationPanel`
+turns the AMP envelope's panel into a five-tab editor (AMP, ENV 1/2, LFO 1/2; one shown at a
+time; the tab is a view setting `modTab`), whose tabs are also the drag handles; compact
+popovers hold the routes (`ModRoutesPopup`) and a large curve editor (`ModCurvePopup`).
+`ModulationOverlay` is the reusable two-layer halo: it finds modulated controls by their
+`paramId` property, sizes each ring from the knob's own reach (overridable per slider with
+`haloGap` / `haloAvoid`), edits depth without touching the base, and takes the drops. One
+selection (source, route) lives in the editor and drives tabs, popover and halos. Headless:
 the `"modulation"` block of render configs. Report: `docs/reports/modulation.md`.
 
 ## PER-LAYER EQ (parameters v18)

@@ -24,8 +24,10 @@ true }, "bell": { "frequencyHz": 3200, "gainDb": -4, "q": 2 } } }` (layer A).
 Modulation: `[unit][mod]` (shapes, phase drift and block-size independence, host sync, ONE
 SHOT, envelope stages, route rules, no-route null, per-voice independence), `[plugin][mod]`
 (parameters, routes, recall, older sessions, curves and undo; every source with the ARP,
-Granular and three layers), `[ui][mod-ui]` (the bay, the window, drag and drop, rings, the
-routing list; screenshots mod-01..11 with `OSP_SNAPSHOT_DIR`) and the hidden `[mod-cpu]`
+Granular and three layers), `[ui][mod-ui]` (the tabbed panel, the window keeping its size, the RATE
+menu, tab drags, polarity, halos (geometry, hover readout, depth through zero, several sources),
+the routes and curve popovers, scales and recall; screenshots modui-01..15 with
+`OSP_SNAPSHOT_DIR`) and the hidden `[mod-cpu]`
 measurement (16 routes against none).
 
 The arpeggiator: `[unit][arp]` (core: patterns, sample-exact host-grid timing over 60/90/120/174 BPM
@@ -37,7 +39,7 @@ mode/routing and effect, REVERSE/LOOP/Granular/layers, lifecycle, the stage's CP
 `OSP_ARP_BASELINE=write` with the old build, `=compare` with the new, same
 `OSP_ARP_BASELINE_DIR`) and `[arp-ui]` (the keyboard control, the inline editor and the
 window resizing; screenshots with `OSP_SNAPSHOT_DIR`, under xvfb-run). A render config may
-carry `"arp": { "enabled": true, "pattern": "up|down|updown|played|random|chord", "rate":
+carry `"arp": { "enabled": true, "pattern": "up|down|updown|played|random|chord|downup|up&down|down&up|converge|diverge|con&diverge|pinkyup|pinkyupdown|thumbup|thumbupdown|randomother|randomonce", "rate":
 "1/16", "gate": 0.75, "octaves": 2, "swing": 0.15, "bpm": 110, "transport": true }`: the fixture's notes are
 arpeggiated as the plugin does it, for engines A, B and C alike (`transport` false: no host,
 free running).

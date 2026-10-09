@@ -285,10 +285,10 @@ it shows the pattern's shape.
 
 | Setting | What it does |
 |---|---|
-| **PATTERN** (click the name) | UP, DOWN, UP/DOWN (without repeating the top and bottom), PLAYED (the order you pressed the keys), RANDOM (never the same note twice in a row; the same every time the song plays from its start), CHORD (the whole chord on every step) |
-| **RATE** | 1/4, 1/8, 1/16, 1/32, dotted (D) and triplet (T) |
+| **PATTERN** (pick from the list; the picture beside it shows the style, and pointing at a name previews it) | UP, DOWN, UP/DOWN and DOWN/UP (the top and bottom once), UP & DOWN and DOWN & UP (the top and bottom twice), CONVERGE (from the outside in), DIVERGE (from the inside out), CON & DIVERGE, PINKY UP and PINKY UP/DOWN (the top note between the others), THUMB UP and THUMB UP/DOWN (the bottom note between the others), PLAYED (the order you pressed the keys), CHORD (the whole chord on every step), RANDOM (never the same note twice in a row), RANDOM OTHER (every note once, then a new order), RANDOM ONCE (one random order, repeated). The random styles are the same every time the song plays from its start |
+| **RATE** | a knob from the slowest step to the fastest: 1/4D, 1/4, 1/8D, 1/4T, 1/8, 1/16D, 1/8T, 1/16, 1/16T, 1/32 (D dotted, T triplet) |
 | **GATE** | how long each note sounds, 10–150 % of a step; above 100 % notes overlap (legato); double-click for 75 % |
-| **OCTAVES** | 1–4: the pattern repeats an octave higher each time round (CHORD climbs an octave per step) |
+| **OCTAVES** (the four stacked keys) | 1–4: the pattern spans that many octaves (CHORD climbs an octave per step) |
 | **SWING** | 0–100 %: every second step plays later, up to half a step (100 % feels dotted); 0 % is straight |
 
 With the host playing, the steps sit on its beat grid. A chord played between steps starts on
@@ -303,33 +303,39 @@ they did. **Advanced** is the card under ARP.
 
 ## MODULATION
 
-**MOD ›** (beside Advanced, under the ARP card) opens the modulation bay on the right of the
-instrument: the window gets wider, nothing in the instrument moves. **MOD ‹** closes it
-again; modulation keeps playing either way. A small orange light on MOD means the sound has
-modulation in use.
+Modulation lives in the envelope panel beside the macros. Its small tabs are **AMP** (the
+volume envelope), **ENV 1**, **ENV 2**, **LFO 1** and **LFO 2**; one is shown at a time. **MOD**
+(beside Advanced) jumps between AMP and the last source you looked at. A small dot after a
+tab's name means that source is in use, and a small orange light on MOD means the sound has
+modulation.
 
 There are four sources:
 
 - **LFO 1, LFO 2**: a repeating movement. SHAPE (sine, triangle, ramp up, ramp down, pulse,
-  random, or CUSTOM: your own curve), RATE in Hz or SYNC to the song (1/32 to 8 bars, dotted
-  and triplet), PHASE, BIPOLAR (swings both ways around the setting) or UNIPOLAR (only adds),
-  FREE (keeps running) / RETRIG (starts over when you start playing) / ONE SHOT (one cycle,
-  then holds), GLOBAL (one movement for the whole instrument) or POLY (each note its own).
+  random, or CUSTOM: your own curve), MODE (FREE keeps running, RETRIG starts over when you
+  play, ONE SHOT runs one cycle and holds), RATE, PHASE, and VOICES (GLOBAL: one movement for
+  the whole instrument; POLY: each note its own). Click the word **RATE** to choose **Sync**
+  (1/32 to 8 bars, dotted and triplet, following the song) or **Hz**. The tag in the graph's
+  corner (± BIPOLAR / + UNIPOLAR) says whether it swings both ways around the setting or only
+  adds; click it, or right-click the graph or the tab, to change it.
 - **ENV 1, ENV 2**: a shape every note plays: ATTACK, DECAY, SUSTAIN, RELEASE and CURVE, or a
   ONE SHOT curve over LENGTH. Each note (also every ARP note) has its own.
 
-To use one, **drag its tab** (the small socket) **onto a knob** and let go: the controls it
-can reach light up while you drag. Rest on CHARACTER for a moment and its settings open, so you
-can drop onto RES. Or use **+ ADD** under ROUTING and pick the source and the destination.
+To use one, **drag its tab onto a knob** and let go. The controls it can reach light up while
+you drag. Rest on CHARACTER for a moment and its settings open, so you can drop onto RES. Or
+click **+ ROUTE** (top right of the panel) and pick a destination under **+ ADD**.
 
-A modulated knob gets a thin ring in the source's colour: the range it moves through and a dot
-where it is now. Drag the ring up or down for more or less (below zero turns the movement
-around); right-click it to remove a route. The ROUTING list shows every route with its depth
-(drag the bar; double-click for 0), a light to bypass it and × to remove it; clicking a row
-shows its knob.
+A modulated knob gets a **halo**, an arc just outside it in the source's colour. It shows the
+range the knob moves through and a dot where it is now. Point at it to see the route, its
+depth and the range. **Drag the halo** (or the knob with **Option**) up or down for more or
+less; below zero turns the movement around, and the knob's own setting never changes.
+Right-click the halo to select, bypass, zero or remove the route. When several sources move one
+knob, the selected one is drawn bold and the others as thin arcs outside.
 
-The display shows the selected source as it really moves. For CUSTOM and ONE SHOT, drag the
-points, double-click to add or remove one, drag a line to bend it; RESET starts over.
+**N ROUTES** opens the source's routes: each with its depth (drag the bar; double-click for 0),
+a light to bypass it and × to remove it. The corner mark beside it opens a large curve editor.
+For CUSTOM and ONE SHOT, drag the points, double-click to add or remove one, drag a line to
+bend it; RESET starts over.
 
 Envelopes and POLY LFOs belong to single notes, so they can move a layer's level, pan, tune,
 REIMAGINED, the granular controls, the filter and the amp envelope, but not the macros (which

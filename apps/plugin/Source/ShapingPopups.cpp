@@ -198,6 +198,49 @@ MiniKnob::MiniKnob (juce::AudioProcessorValueTreeState& state, const juce::Strin
     addAndMakeVisible (slider);
 }
 
+void MiniKnob::setChoiceOrder (juce::RangedAudioParameter& p, std::vector<int> order, juce::UndoManager* undo)
+{
+    jassert (! order.empty());
+    attachment.reset();
+    choiceOrder = std::move (order);
+    auto positionOf = [this] (int index) {
+        const auto it = std::find (choiceOrder.begin(), choiceOrder.end(), index);
+        return it == choiceOrder.end() ? 0 : static_cast<int> (std::distance (choiceOrder.begin(), it));
+    };
+    slider.setRange (0.0, static_cast<double> (choiceOrder.size() - 1), 1.0);
+    slider.setDoubleClickReturnValue (true, static_cast<double> (positionOf (juce::roundToInt (p.convertFrom0to1 (p.getDefaultValue())))));
+    orderedAttachment = std::make_unique<juce::ParameterAttachment> (p, [this, positionOf] (float v) {
+        slider.setValue (static_cast<double> (positionOf (juce::roundToInt (v))), juce::dontSendNotification);
+        repaint();
+    }, undo);
+    // A drag is one host gesture; a wheel step or a double-click is one on its own.
+    slider.onDragStart = [this] {
+        orderedGesture = true;
+        orderedAttachment->beginGesture();
+    };
+    slider.onDragEnd = [this] {
+        orderedGesture = false;
+        orderedAttachment->endGesture();
+    };
+    slider.onValueChange = [this] {
+        const auto index = static_cast<float> (choiceShown());
+        if (orderedGesture)
+            orderedAttachment->setValueAsPartOfGesture (index);
+        else
+            orderedAttachment->setValueAsCompleteGesture (index);
+        repaint();
+    };
+    orderedAttachment->sendInitialUpdate();
+}
+
+int MiniKnob::choiceShown() const
+{
+    if (choiceOrder.empty())
+        return juce::roundToInt (slider.getValue());
+    const int position = juce::jlimit (0, static_cast<int> (choiceOrder.size()) - 1, juce::roundToInt (slider.getValue()));
+    return choiceOrder[static_cast<std::size_t> (position)];
+}
+
 void MiniKnob::setCaption (juce::String c)
 {
     caption = std::move (c);
@@ -292,12 +335,56 @@ void MiniKnob::paint (juce::Graphics& g)
         return;
     }
     // Small knob cells (envelope, popovers): a light caption, the value a step stronger.
-    g.setColour (onDark ? captionColour : design::colour::text.withAlpha (0.62f));
-    g.setFont (type::popupLabel (std::max (9.0f, (compact ? 0.14f : 0.155f) * h)));
+    g.setColour (onDark ? captionColour : design::colour::text.withAlpha (captionHover ? 0.95f : 0.62f));
+    const auto captionFont = type::popupLabel (std::max (9.0f, (compact ? 0.14f : 0.155f) * h));
+    g.setFont (captionFont);
     g.drawText (caption, juce::Rectangle<float> (r.getX(), r.getY(), r.getWidth(), 0.2f * h), juce::Justification::centred, false);
+    if (onCaptionClick != nullptr)
+    {
+        // A small chevron after the caption: it opens a choice.
+        const float tw = juce::GlyphArrangement::getStringWidth (captionFont, caption);
+        const float x = r.getCentreX() + 0.5f * tw + 6.0f, y = r.getY() + 0.1f * h;
+        juce::Path p;
+        p.startNewSubPath (x - 3.0f, y - 1.5f);
+        p.lineTo (x, y + 1.5f);
+        p.lineTo (x + 3.0f, y - 1.5f);
+        g.strokePath (p, juce::PathStrokeType (1.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    }
     g.setColour (onDark ? valueColour : design::colour::text.withAlpha (0.82f));
     g.setFont (type::popupValue (std::max (9.5f, (compact ? 0.17f : 0.19f) * h)));
     g.drawText (value, juce::Rectangle<float> (r.getX(), r.getY() + 0.78f * h, r.getWidth(), 0.22f * h), juce::Justification::centred, false);
+}
+
+juce::Rectangle<float> MiniKnob::captionArea() const
+{
+    const auto r = getLocalBounds().toFloat();
+    return { r.getX(), r.getY(), r.getWidth(), 0.22f * r.getHeight() };
+}
+
+void MiniKnob::mouseUp (const juce::MouseEvent& e)
+{
+    if (onCaptionClick != nullptr && captionArea().contains (e.position) && ! e.mouseWasDraggedSinceMouseDown())
+        onCaptionClick();
+}
+
+void MiniKnob::mouseMove (const juce::MouseEvent& e)
+{
+    const bool now = onCaptionClick != nullptr && captionArea().contains (e.position);
+    if (now != captionHover)
+    {
+        captionHover = now;
+        setMouseCursor (now ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+        repaint();
+    }
+}
+
+void MiniKnob::mouseExit (const juce::MouseEvent&)
+{
+    if (captionHover)
+    {
+        captionHover = false;
+        repaint();
+    }
 }
 
 //==============================================================================

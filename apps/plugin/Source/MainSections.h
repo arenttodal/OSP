@@ -172,6 +172,8 @@ public:
     void mouseUp (const juce::MouseEvent&) override;
 
     juce::Rectangle<int> graphBounds() const { return graph; }
+    /** Draw the "AMP ENVELOPE" title (off when a tab row above names it). */
+    void setShowsTitle (bool shows) { showsTitle = shows; repaint(); }
 
 private:
     struct Shape
@@ -185,6 +187,7 @@ private:
     juce::AudioProcessorValueTreeState& state;
     std::array<std::unique_ptr<MiniKnob>, 4> knobs;
     juce::Rectangle<int> graph;
+    bool showsTitle = true;
     int dragHandle = -1;
 };
 

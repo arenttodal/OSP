@@ -608,7 +608,12 @@ const juce::StringArray& OspAudioProcessor::modDestinationNames()
 const juce::StringArray& OspAudioProcessor::arpPatternNames()
 {
     // Choice order is saved in sessions: never reorder (append only).
-    static const juce::StringArray names { "UP", "DOWN", "UP/DOWN", "PLAYED", "RANDOM", "CHORD" };
+    static const juce::StringArray names = [] {
+        juce::StringArray n;
+        for (int i = 0; i < arp::patternCount; ++i)
+            n.add (arp::patternName (static_cast<ArpPattern> (i)));
+        return n;
+    }();
     return names;
 }
 
@@ -2578,7 +2583,7 @@ std::unique_ptr<juce::XmlElement> OspAudioProcessor::createStateXml()
     stateTree.setProperty ("uiScale", uiScaleFactor.load(), nullptr);
     stateTree.setProperty ("advancedOpen", advancedPanelOpen.load(), nullptr);
     stateTree.setProperty ("arpExpanded", arpEditorOpen.load(), nullptr);   // UI only, never audio
-    stateTree.setProperty ("modOpen", modBayOpen.load(), nullptr);         // UI only, never audio
+    stateTree.setProperty ("modTab", modTab.load(), nullptr);              // UI only, never audio
     stateTree.setProperty ("program", currentProgram, nullptr);
 
     stateTree.setProperty ("editLayer", editLayer(), nullptr);
@@ -2664,7 +2669,7 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml, bool setting
         uiScaleFactor = std::clamp (static_cast<float> (stateTree.getProperty ("uiScale", 1.0f)), 0.8f, 2.0f);
         advancedPanelOpen = static_cast<bool> (stateTree.getProperty ("advancedOpen", false));
         arpEditorOpen = static_cast<bool> (stateTree.getProperty ("arpExpanded", false));
-        modBayOpen = static_cast<bool> (stateTree.getProperty ("modOpen", false));
+        modTab = std::clamp (static_cast<int> (stateTree.getProperty ("modTab", 0)), 0, 4);
         currentProgram = static_cast<int> (stateTree.getProperty ("program", 0));
         setEditLayer (static_cast<int> (stateTree.getProperty ("editLayer", 0)));
     }

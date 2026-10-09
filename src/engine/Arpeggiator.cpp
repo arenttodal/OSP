@@ -45,6 +45,18 @@ const char* arp::patternName (ArpPattern pattern) noexcept
         case ArpPattern::played: return "PLAYED";
         case ArpPattern::random: return "RANDOM";
         case ArpPattern::chord: return "CHORD";
+        case ArpPattern::downUp: return "DOWN/UP";
+        case ArpPattern::upAndDown: return "UP & DOWN";
+        case ArpPattern::downAndUp: return "DOWN & UP";
+        case ArpPattern::converge: return "CONVERGE";
+        case ArpPattern::diverge: return "DIVERGE";
+        case ArpPattern::convergeDiverge: return "CON & DIVERGE";
+        case ArpPattern::pinkyUp: return "PINKY UP";
+        case ArpPattern::pinkyUpDown: return "PINKY UP/DOWN";
+        case ArpPattern::thumbUp: return "THUMB UP";
+        case ArpPattern::thumbUpDown: return "THUMB UP/DOWN";
+        case ArpPattern::randomOther: return "RANDOM OTHER";
+        case ArpPattern::randomOnce: return "RANDOM ONCE";
     }
     return "UP";
 }
@@ -327,27 +339,112 @@ void Arpeggiator::ensureSequence() const noexcept
     std::stable_sort (sortedIndex.begin(), sortedIndex.begin() + sortedCount,
                       [this] (int a, int b) { return heldNotes[static_cast<std::size_t> (a)].note < heldNotes[static_cast<std::size_t> (b)].note; });
 
-    sequenceLength = 0;
-    auto add = [this] (const Held& h, int octave) {
-        const int n = h.note + 12 * octave;
-        if (n <= 127 && sequenceLength < maxSequence)
-            sequence[static_cast<std::size_t> (sequenceLength++)] = { static_cast<std::uint8_t> (n), h.velocity, h.channel };
-    };
+    // The notes in order (ascending, or as played) over OCTAVES; each style is a walk over them.
+    std::array<Step, maxHeld * arp::maxOctaves> base {};
+    int n = 0;
     const int octaves = settings.pattern == ArpPattern::chord ? 1 : settings.octaves;
     for (int octave = 0; octave < octaves; ++octave)
         for (int i = 0; i < sortedCount; ++i)
-            add (settings.pattern == ArpPattern::played ? heldNotes[static_cast<std::size_t> (i)]
-                                                        : heldNotes[static_cast<std::size_t> (sortedIndex[static_cast<std::size_t> (i)])],
-                 octave);
+        {
+            const auto& h = settings.pattern == ArpPattern::played ? heldNotes[static_cast<std::size_t> (i)]
+                                                                   : heldNotes[static_cast<std::size_t> (sortedIndex[static_cast<std::size_t> (i)])];
+            const int note = h.note + 12 * octave;
+            if (note <= 127)
+                base[static_cast<std::size_t> (n++)] = { static_cast<std::uint8_t> (note), h.velocity, h.channel };
+        }
 
-    if (settings.pattern == ArpPattern::down)
-        std::reverse (sequence.begin(), sequence.begin() + sequenceLength);
-    else if (settings.pattern == ArpPattern::upDown && sequenceLength > 2)
+    sequenceLength = 0;
+    auto push = [this] (const Step& s) {
+        if (sequenceLength < maxSequence)
+            sequence[static_cast<std::size_t> (sequenceLength++)] = s;
+    };
+    auto at = [&base] (int i) -> const Step& { return base[static_cast<std::size_t> (i)]; };
+    auto up = [&] (int from, int to) { for (int i = from; i <= to; ++i) push (at (i)); };
+    auto down = [&] (int from, int to) { for (int i = from; i >= to; --i) push (at (i)); };
+    // Outside in: lowest, highest, second lowest, second highest, ...
+    auto outsideIn = [n] (int k) { return k % 2 == 0 ? k / 2 : n - 1 - k / 2; };
+    // A walk up a range and back without repeating its ends: 0 1 2 1 | 0 1 2 1 ...
+    auto upDownOf = [] (int k, int length) { return k < length ? k : 2 * length - 2 - k; };
+    auto upDownLength = [] (int length) { return length > 2 ? 2 * length - 2 : length; };
+    switch (settings.pattern)
     {
-        // Up, then back down without repeating the top or the bottom: C E G E | C E G E ...
-        const int up = sequenceLength;
-        for (int i = up - 2; i >= 1 && sequenceLength < maxSequence; --i)
-            sequence[static_cast<std::size_t> (sequenceLength++)] = sequence[static_cast<std::size_t> (i)];
+        case ArpPattern::up:
+        case ArpPattern::played:
+        case ArpPattern::random:
+        case ArpPattern::chord:
+        case ArpPattern::randomOther:
+        case ArpPattern::randomOnce:
+            up (0, n - 1);
+            break;
+        case ArpPattern::down:
+            down (n - 1, 0);
+            break;
+        case ArpPattern::upDown:
+            up (0, n - 1);
+            down (n - 2, 1);
+            break;
+        case ArpPattern::downUp:
+            down (n - 1, 0);
+            up (1, n - 2);
+            break;
+        case ArpPattern::upAndDown:
+            up (0, n - 1);
+            if (n > 1)
+                down (n - 1, 0);
+            break;
+        case ArpPattern::downAndUp:
+            down (n - 1, 0);
+            if (n > 1)
+                up (0, n - 1);
+            break;
+        case ArpPattern::converge:
+            for (int k = 0; k < n; ++k)
+                push (at (outsideIn (k)));
+            break;
+        case ArpPattern::diverge:
+            for (int k = n - 1; k >= 0; --k)
+                push (at (outsideIn (k)));
+            break;
+        case ArpPattern::convergeDiverge:
+            for (int k = 0; k < upDownLength (n); ++k)
+                push (at (outsideIn (upDownOf (k, n))));
+            break;
+        case ArpPattern::pinkyUp:
+        case ArpPattern::pinkyUpDown:
+        {
+            if (n < 2)
+            {
+                up (0, n - 1);
+                break;
+            }
+            // The notes below the top, each followed by the top ("the little finger").
+            const int below = n - 1;
+            const int length = settings.pattern == ArpPattern::pinkyUp ? below : upDownLength (below);
+            for (int k = 0; k < length; ++k)
+            {
+                push (at (settings.pattern == ArpPattern::pinkyUp ? k : upDownOf (k, below)));
+                push (at (n - 1));
+            }
+            break;
+        }
+        case ArpPattern::thumbUp:
+        case ArpPattern::thumbUpDown:
+        {
+            if (n < 2)
+            {
+                up (0, n - 1);
+                break;
+            }
+            // The bottom ("the thumb"), each time before one of the notes above it.
+            const int above = n - 1;
+            const int length = settings.pattern == ArpPattern::thumbUp ? above : upDownLength (above);
+            for (int k = 0; k < length; ++k)
+            {
+                push (at (0));
+                push (at (1 + (settings.pattern == ArpPattern::thumbUp ? k : upDownOf (k, above))));
+            }
+            break;
+        }
     }
 }
 
@@ -361,6 +458,38 @@ int Arpeggiator::pickRandom (std::int64_t step, int previous, int length) const 
     // Any note but the one just played, all equally likely.
     const int pick = static_cast<int> (prng.nextBelow (static_cast<std::uint64_t> (length - 1)));
     return pick >= previous ? pick + 1 : pick;
+}
+
+int Arpeggiator::pickShuffled (std::int64_t cycle, int position, int length) const noexcept
+{
+    if (length <= 1)
+        return 0;
+    if (length == 2)
+    {
+        // Two notes in turns (a new order would repeat one at the seam), from a random start.
+        Prng prng (Prng::deriveSeed (phraseSeed, 0x53687566, 2));
+        return static_cast<int> ((static_cast<std::uint64_t> (position) + static_cast<std::uint64_t> (cycle) * 2 + prng.nextBelow (2)) % 2);
+    }
+    // A Fisher-Yates shuffle per cycle, from the phrase's seed: the same bounce, the same order.
+    auto order = [this, length] (std::int64_t c, std::array<std::int16_t, maxSequence>& out) {
+        for (int i = 0; i < length; ++i)
+            out[static_cast<std::size_t> (i)] = static_cast<std::int16_t> (i);
+        Prng prng (Prng::deriveSeed (Prng::deriveSeed (phraseSeed, 0x53687566, static_cast<std::uint64_t> (length)), static_cast<std::uint64_t> (c)));
+        for (int i = length - 1; i > 0; --i)
+            std::swap (out[static_cast<std::size_t> (i)], out[static_cast<std::size_t> (prng.nextBelow (static_cast<std::uint64_t> (i + 1)))]);
+    };
+    std::array<std::int16_t, maxSequence> now;
+    order (cycle, now);
+    if (cycle > 0)
+    {
+        // No note twice in a row across the seam: a new order never starts with the last one's
+        // last note (only the first two places swap, so the last place never changes).
+        std::array<std::int16_t, maxSequence> before;
+        order (cycle - 1, before);
+        if (now[0] == before[static_cast<std::size_t> (length - 1)])
+            std::swap (now[0], now[1]);
+    }
+    return now[static_cast<std::size_t> (position)];
 }
 
 int Arpeggiator::stepNotes (std::int64_t step, int previous, std::array<Step, maxHeld>& out, int& index) const noexcept
@@ -387,8 +516,12 @@ int Arpeggiator::stepNotes (std::int64_t step, int previous, std::array<Step, ma
         index = octave;
         return count;
     }
-    index = settings.pattern == ArpPattern::random ? pickRandom (step, previous, sequenceLength)
-                                                   : static_cast<int> (step % sequenceLength);
+    if (settings.pattern == ArpPattern::random)
+        index = pickRandom (step, previous, sequenceLength);
+    else if (settings.pattern == ArpPattern::randomOther || settings.pattern == ArpPattern::randomOnce)
+        index = pickShuffled (settings.pattern == ArpPattern::randomOnce ? 0 : step / sequenceLength, static_cast<int> (step % sequenceLength), sequenceLength);
+    else
+        index = static_cast<int> (step % sequenceLength);
     out[0] = sequence[static_cast<std::size_t> (index)];
     return 1;
 }

@@ -781,6 +781,7 @@ LayerKnob::LayerKnob (OspAudioProcessor& p, int layer, const juce::String& contr
     dial->getProperties().set ("spectral", creative);   // REIMAGINED: the spectral continuum, the same on every layer
     dial->getProperties().set ("bipolar", control == "tune" || control == "pan");
     dial->getProperties().set ("paramId", id);   // a modulation drop target
+    dial->getProperties().set ("haloGap", 2.0);  // its caption sits close above: a nearer halo
     dial->setTitle ("Layer " + OspAudioProcessor::layerName (layer) + " " + caption);
     attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (processor.parameters, id, *dial);
     if (parameter != nullptr)
@@ -810,6 +811,12 @@ void LayerKnob::resized()
 {
     const float k = static_cast<float> (getHeight()) / 125.0f;
     dial->setBounds (juce::Rectangle<float> (92.0f * k, 92.0f * k).withCentre ({ 0.5f * static_cast<float> (getWidth()), 61.0f * k }).getSmallestIntegerContainer());
+    // The caption sits close above the dial: a modulation halo breaks around its text
+    // (in the dial's coordinates) rather than crossing it.
+    const auto font = labelFont();
+    const float textWidth = juce::GlyphArrangement::getStringWidth (font, caption) + (creative ? 12.0f * k : 0.0f);
+    const auto text = juce::Rectangle<float> (textWidth, font.getHeight()).withCentre ({ 0.5f * static_cast<float> (getWidth()), 13.0f * k });
+    dial->getProperties().set ("haloAvoid", text.translated (-static_cast<float> (dial->getX()), -static_cast<float> (dial->getY())).toString());
 }
 
 juce::Font LayerKnob::labelFont() const

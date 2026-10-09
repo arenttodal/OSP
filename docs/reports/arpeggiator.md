@@ -129,10 +129,21 @@ from the text alone):
     the page are a lighter orange, and steps to come are tan. All of it comes from the audio
     thread's scheduler. While nothing is held, the strip shows the pattern's shape on a C
     major chord, faint;
-  - **PATTERN** and **RATE** as drop-down boxes: Up, Down, Up/Down, Played, Random, Chord;
-    the rates are grouped STRAIGHT / DOTTED / TRIPLET;
-  - **GATE**, **OCTAVES** and **SWING** as the instrument's small knobs (the envelope's),
-    with orange arcs and their values.
+  - **PATTERN** (revised; after Live's Arpeggiator). It has two parts:
+    - A small picture of the style: the notes of a four-note chord (C E G B) as dots joined
+      over twelve steps, drawn by the same scheduler. CHORD shows columns. The style under the
+      pointer in the list previews there, in tan.
+    - A list of all 18 styles beside it: six rows in view, a slim scroll track, the wheel
+      scrolls. The chosen style is tinted and stays in view when automation or a preset
+      changes it. The list is grouped: the straight walks, then converge / diverge, the finger
+      patterns, Played, Chord, and the random styles.
+  - **RATE** (revised) is a knob that walks the divisions from slowest to fastest: 1/4D, 1/4,
+    1/8D, 1/4T, 1/8, 1/16D, 1/8T, 1/16, 1/16T, 1/32. The parameter keeps its saved choice
+    order, and only the knob maps its position onto it (`MiniKnob::setChoiceOrder`).
+  - **OCTAVES** (revised) is four stacked keys, 1 on top to 4 at the bottom; the one chosen
+    is lit.
+  - **GATE** and **SWING** are the instrument's small knobs (the envelope's), with orange arcs
+    and their values.
   - Everything is dimmed while ARP is off.
 - **Layout.** When the editor shows, the keyboard row and footer move down by 187 reference px.
   The instrument (housing included) grows by the same, the window grows by that height times its
@@ -149,7 +160,7 @@ from the text alone):
 | ID | Type | Default |
 |---|---|---|
 | `arp.enabled` | bool | off |
-| `arp.pattern` | choice UP, DOWN, UP/DOWN, PLAYED, RANDOM, CHORD | UP |
+| `arp.pattern` | choice UP, DOWN, UP/DOWN, PLAYED, RANDOM, CHORD, then (appended) DOWN/UP, UP & DOWN, DOWN & UP, CONVERGE, DIVERGE, CON & DIVERGE, PINKY UP, PINKY UP/DOWN, THUMB UP, THUMB UP/DOWN, RANDOM OTHER, RANDOM ONCE | UP |
 | `arp.rate` | choice 1/4 … 1/16T (above) | 1/8 |
 | `arp.gate` | 10–150 % | 75 % |
 | `arp.octaves` | 1–4 | 1 |
@@ -205,9 +216,47 @@ contain no `arpExpanded`, so the editor opens hidden.
       the engine's cost for many voices transposed far up; "16 notes, +24 st" already measures
       78 % without the arpeggiator.
 
+## 6b. The Live styles (added later)
+
+Twelve styles from Ableton Live's Arpeggiator were added. They are appended to `arp.pattern`, so
+saved sessions keep their pattern: the value is stored by index and the first six did not move.
+Each style is a walk over the held notes sorted by pitch and spread over OCTAVES, the same list
+UP walks. Below, C E G B are the notes held.
+
+| Style | Walk | Notes |
+|---|---|---|
+| DOWN/UP | G E C E | the mirror of UP/DOWN; the ends once |
+| UP & DOWN | C E G B B G E C | the ends twice |
+| DOWN & UP | B G E C C E G B | |
+| CONVERGE | C B E G | from the outside in |
+| DIVERGE | G E B C | from the inside out |
+| CON & DIVERGE | C B E G E B | in, then out again, the ends once |
+| PINKY UP | C B E B G B | the top after each note going up |
+| PINKY UP/DOWN | C B E B G B E B | the same, going up and down |
+| THUMB UP | C E C G C B | the bottom before each note going up |
+| THUMB UP/DOWN | C E C G C B C G | the same, going up and down |
+| RANDOM OTHER | every note once, in a random order, then a new order | never the same note twice in a row, not even where one order meets the next |
+| RANDOM ONCE | one random order, repeated | a new order with each new phrase |
+
+- **Determinism.** The random orders are Fisher–Yates shuffles from `osp::Prng`, seeded from the
+  phrase seed (the stored variation seed and the phrase counter). A bounce is therefore the same
+  every time, as for RANDOM.
+- **Few notes.** With one note every style repeats it. With two, each style alternates them or
+  walks them as named; RANDOM OTHER takes them in turns from a random start.
+- **Not added.** Live's Play Order and Chord Trigger are the existing PLAYED and CHORD. Live's
+  options around the styles (Hold, Offset, Repeats, Retrigger, Transpose, Velocity decay) are
+  not part of this change.
+- **Automation lanes.** A host stores a choice parameter's automation as 0–1, and that span now
+  covers 18 choices instead of 6. Automation of PATTERN recorded with an older build would
+  therefore pick other styles. Sessions and presets are not affected, because they store the
+  index.
+
 ## 7. Tests
 
-- **Unit** (`[unit][arp]`, 17 cases): rates and names; all patterns and octaves; 0–70 notes;
+- **Unit** (`[unit][arp]`, 19 cases): rates and names; all patterns and octaves (the Live
+  styles walk C E G B as in §6b, over two octaves, with one and two notes; RANDOM OTHER plays
+  each note once per round with no repeat at the seam, and RANDOM ONCE repeats one order, both
+  reproducible from the seed); 0–70 notes;
   velocities; free-running timing and gate; the host-grid matrix; entering the grid; loops,
   jumps, tempo changes, transport stop and start, no host; gate above 100 %; pedal; panic;
   hand-overs; the stress test; RANDOM determinism and restart; the display; determinism of a
@@ -243,7 +292,5 @@ contain no `arpExpanded`, so the editor opens hidden.
 - **Switching off with the pedal down:** keys that only the pedal held are not restarted directly.
 - **More than 64 held notes:** the extra notes are ignored while ARP is on.
 - **No mockups:** layout, sizes and the exact amber are my choices from the text; see §4.
-- **Mouse interaction** (hover, menus, octave clicks, gate drags) was exercised through the code
-  paths the tests call, not with real mouse events. The menu screenshots are drawn by the
-  editor's look and feel item by item, because a menu window cannot open on the test display
-  server.
+- **Mouse interaction** (hover, the pattern list, octave keys, RATE and GATE drags) was
+  exercised through the code paths the tests call, not with real mouse events.

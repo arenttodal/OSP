@@ -787,19 +787,22 @@ std::array<juce::Point<float>, 3> EnvelopePanel::handles() const
 // panel gave room to the sixth macro (450 wide).
 void EnvelopePanel::resized()
 {
-    const int w = getWidth();
-    graph = juce::Rectangle<int> (12, 26, w - 24, 70);
+    const int w = getWidth(), h = getHeight();
+    graph = juce::Rectangle<int> (12, 26, w - 24, std::max (40, h - 116));   // 70 in the 186 panel; taller panels give it the room
     static constexpr std::array<float, 4> shares { 71.0f / 506.0f, 191.0f / 506.0f, 314.0f / 506.0f, 437.0f / 506.0f };
     for (std::size_t i = 0; i < knobs.size(); ++i)
-        knobs[i]->setBounds (juce::Rectangle<int> (std::min (100, w / 5), 87).withCentre ({ juce::roundToInt (shares[i] * static_cast<float> (w)), 141 }));
+        knobs[i]->setBounds (juce::Rectangle<int> (std::min (100, w / 5), 87).withCentre ({ juce::roundToInt (shares[i] * static_cast<float> (w)), h - 45 }));
 }
 
 void EnvelopePanel::paint (juce::Graphics& g)
 {
     using namespace design;
-    g.setColour (colour::text.withAlpha (0.9f));
-    g.setFont (type::panelHeader());
-    g.drawText ("AMP ENVELOPE", juce::Rectangle<float> (16.0f, 1.0f, 300.0f, 22.0f), juce::Justification::centredLeft, false);
+    if (showsTitle)
+    {
+        g.setColour (colour::text.withAlpha (0.9f));
+        g.setFont (type::panelHeader());
+        g.drawText ("AMP ENVELOPE", juce::Rectangle<float> (16.0f, 1.0f, 300.0f, 22.0f), juce::Justification::centredLeft, false);
+    }
 
     const auto well = graph.toFloat();
     draw::well (g, well, 8.0f, colour::wellA);

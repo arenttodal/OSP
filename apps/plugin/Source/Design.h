@@ -123,7 +123,7 @@ namespace layout
     constexpr float housingRadius = 26.0f;
 
     // Header
-    const juce::Point<float> logo { 51.0f, 79.0f };            ///< baseline of OSP/2-OSP
+    const juce::Point<float> logo { 51.0f, 79.0f };            ///< baseline of ANDOR/2-OSP
     const R logoSubtitle { 51.0f, 88.0f, 300.0f, 14.0f };
     const R presetBar { 501.0f, 45.0f, 446.0f, 48.0f };
     /** MIX between the preset and VOLUME (two or three layers; nothing for one). */
@@ -141,7 +141,9 @@ namespace layout
     constexpr float panelRadius = 13.0f;
 
     // Macros and envelope
-    const R macroPanel { 35.0f, 702.0f, 1378.0f, 196.0f };
+    /** Grown 20 px upwards (into the air under the sources) when the macros' names moved up
+        to clear their modulation halos: the knobs stay where they were. */
+    const R macroPanel { 35.0f, 682.0f, 1378.0f, 216.0f };
     /** Where the envelope's half of the macro panel starts (six macros left of it). */
     constexpr float envelopeX = 955.0f;
 
@@ -155,18 +157,10 @@ namespace layout
         pattern and rate) and the Advanced card under it. */
     const R arpControl { 1308.0f, 913.0f, 105.0f, 64.0f };
     /** Under the arpeggiator's card, side by side at its height of 31: Advanced (its popup)
-        and MOD (the modulation bay). */
+        and MOD (the envelope panel's modulation editors). */
     const R advanced { 1308.0f, 983.0f, 55.0f, 31.0f };
     const R modButton { 1366.0f, 983.0f, 47.0f, 31.0f };
 
-    /** The modulation bay: an expansion module bolted to the right of the instrument. When
-        it is open the instrument is this much wider (the housing grows; nothing in the
-        instrument moves); its face starts after a seam in the housing. */
-    constexpr float modWidth = 440.0f;
-    constexpr float modSeam = 1430.0f;
-    constexpr float modBayX = 1440.0f;
-    constexpr float modBayTop = 35.0f;
-    constexpr float modBayBottomMargin = 30.0f;   ///< from the instrument's foot
 
     /** The arpeggiator's inline editor, between the macros and the keyboard when open: the
         keyboard row moves down by arpShift and the instrument grows by as much. */

@@ -61,7 +61,10 @@ void ArpControl::refresh()
 {
     const int pattern = juce::jlimit (0, arp::patternCount - 1, juce::roundToInt (ospProcessor.parameterValue ("arp.pattern")));
     const int rate = juce::jlimit (0, arp::rateCount - 1, juce::roundToInt (ospProcessor.parameterValue ("arp.rate")));
-    const auto text = OspAudioProcessor::arpPatternNames()[pattern] + "  " + middleDot + "  " + OspAudioProcessor::arpRateNames()[rate];
+    // The inset is small: the longer styles in short (the list and the host show them whole).
+    static const juce::StringArray shortNames { "UP", "DOWN", "UP/DOWN", "PLAYED", "RANDOM", "CHORD", "DN/UP", "UP&DN", "DN&UP", "CONV",
+                                                "DIV", "CON/DIV", "PINKY", "PINKY UD", "THUMB", "THUMB UD", "RND OTH", "RND 1" };
+    const auto text = shortNames[pattern] + "  " + middleDot + "  " + OspAudioProcessor::arpRateNames()[rate];
     if (text != status)
     {
         status = text;
@@ -126,7 +129,7 @@ void ArpControl::paint (juce::Graphics& g)
     g.drawRoundedRectangle (inset.reduced (0.5f), 6.0f, 1.0f);
     g.setFont (fonts::make (12.5f, fonts::Weight::medium, 0.04f));
     g.setColour (enabled ? colour::textSecondary : colour::textMicro);
-    g.drawText (status, inset, juce::Justification::centred, false);
+    g.drawFittedText (status, inset.getSmallestIntegerContainer(), juce::Justification::centred, 1, 0.8f);
 }
 
 void ArpControl::mouseMove (const juce::MouseEvent& e)
@@ -214,9 +217,50 @@ void AdvancedCardButton::paintButton (juce::Graphics& g, bool highlighted, bool 
 //==============================================================================
 // The inline editor
 
+namespace
+{
+    /** Reference geometry of the list (panel coordinates). */
+    constexpr float listRowHeight = 106.0f / static_cast<float> (ArpInlinePanel::visibleRows);
+}
+
+const std::array<int, arp::patternCount>& ArpInlinePanel::listOrder()
+{
+    // Families together, as in Live: the straight walks, the inward and outward ones, the
+    // finger patterns, then the order played, the chord and the random styles.
+    using P = ArpPattern;
+    static const std::array<int, arp::patternCount> order = [] {
+        std::array<int, arp::patternCount> o {};
+        const P styles[] { P::up, P::down, P::upDown, P::downUp, P::upAndDown, P::downAndUp, P::converge, P::diverge, P::convergeDiverge,
+                           P::pinkyUp, P::pinkyUpDown, P::thumbUp, P::thumbUpDown, P::played, P::chord, P::random, P::randomOther, P::randomOnce };
+        static_assert (sizeof (styles) / sizeof (styles[0]) == static_cast<std::size_t> (arp::patternCount));
+        for (std::size_t i = 0; i < o.size(); ++i)
+            o[i] = static_cast<int> (styles[i]);
+        return o;
+    }();
+    return order;
+}
+
+const std::vector<int>& ArpInlinePanel::rateOrder()
+{
+    // Slowest to fastest (a step's length: 1.5, 1, 0.75, 0.67, 0.5, 0.375, 0.33, 0.25, 0.17,
+    // 0.125 quarter notes). The parameter keeps its saved order; only the knob walks this one.
+    static const std::vector<int> order = [] {
+        std::vector<int> o;
+        for (int i = 0; i < arp::rateCount; ++i)
+            o.push_back (i);
+        std::stable_sort (o.begin(), o.end(), [] (int x, int y) {
+            return arp::rateQuarters (static_cast<ArpRate> (x)) > arp::rateQuarters (static_cast<ArpRate> (y));
+        });
+        return o;
+    }();
+    return order;
+}
+
 juce::String ArpInlinePanel::patternLabel (int index)
 {
-    static const juce::StringArray labels { "Up", "Down", "Up/Down", "Played", "Random", "Chord" };
+    static const juce::StringArray labels { "Up", "Down", "Up/Down", "Played", "Random", "Chord", "Down/Up", "Up & Down", "Down & Up",
+                                            "Converge", "Diverge", "Con & Diverge", "Pinky Up", "Pinky Up/Down", "Thumb Up",
+                                            "Thumb Up/Down", "Random Other", "Random Once" };
     return labels[juce::jlimit (0, labels.size() - 1, index)];
 }
 
@@ -229,33 +273,33 @@ ArpInlinePanel::ArpInlinePanel (OspAudioProcessor& p)
       patternAttachment (parameter (p, "arp.pattern"), [this] (float v) {
           pattern = juce::jlimit (0, arp::patternCount - 1, juce::roundToInt (v));
           updatePreview();
+          revealSelected();
           repaint();
       }, &p.undoManager),
-      rateAttachment (parameter (p, "arp.rate"), [this] (float v) {
-          rate = juce::jlimit (0, arp::rateCount - 1, juce::roundToInt (v));
+      octavesAttachment (parameter (p, "arp.octaves"), [this] (float v) {
+          octaveCount = juce::jlimit (arp::minOctaves, arp::maxOctaves, juce::roundToInt (v));
+          updatePreview();
           repaint();
       }, &p.undoManager),
+      rate (p.parameters, "arp.rate", "RATE", [] (double v) {
+          const auto& order = rateOrder();
+          const int position = juce::jlimit (0, static_cast<int> (order.size()) - 1, juce::roundToInt (v));
+          return OspAudioProcessor::arpRateNames()[order[static_cast<std::size_t> (position)]];
+      }),
       gate (p.parameters, "arp.gate", "GATE", [] (double v) { return juce::String (juce::roundToInt (v)) + " %"; }),
-      octaves (p.parameters, "arp.octaves", "OCTAVES", [] (double v) { return juce::String (juce::roundToInt (v)); }),
       swing (p.parameters, "arp.swing", "SWING", [] (double v) { return juce::String (juce::roundToInt (v)) + " %"; })
 {
     setTitle ("Arpeggiator settings");
-    for (auto* knob : { &gate, &octaves, &swing })
+    rate.setChoiceOrder (parameter (p, "arp.rate"), rateOrder(), &p.undoManager);
+    rate.slider.setTooltip ("Step length, from 1/4 dotted (slowest) to 1/32 (fastest)");
+    for (auto* knob : { &rate, &gate, &swing })
     {
         knob->setArcColour (design::colour::accent);
         addAndMakeVisible (*knob);
     }
-    // The preview follows OCTAVES too.
-    octaves.slider.onValueChange = [this] {
-        octaveCount = juce::jlimit (arp::minOctaves, arp::maxOctaves, juce::roundToInt (octaves.slider.getValue()));
-        updatePreview();
-        octaves.repaint();
-        repaint (steps.getSmallestIntegerContainer().expanded (2));
-    };
-    octaveCount = juce::jlimit (arp::minOctaves, arp::maxOctaves, juce::roundToInt (octaves.slider.getValue()));
     enabledAttachment.sendInitialUpdate();
     patternAttachment.sendInitialUpdate();
-    rateAttachment.sendInitialUpdate();
+    octavesAttachment.sendInitialUpdate();
     shown.current = -1;
     updatePreview();
 }
@@ -264,8 +308,8 @@ ArpInlinePanel::~ArpInlinePanel() = default;
 
 void ArpInlinePanel::updatePreview()
 {
-    // While nothing is held the display shows the pattern's shape on a C major chord: the
-    // same scheduler, run here on its own (no audio, no host).
+    // While nothing is held the display shows the pattern on a C major chord: the same
+    // scheduler, run here on its own (no audio, no host).
     Arpeggiator demo;
     demo.prepare (48000.0);
     Arpeggiator::Settings s;
@@ -277,6 +321,28 @@ void ArpInlinePanel::updatePreview()
     for (int note : { 60, 64, 67 })
         demo.noteOn (0, note, 100, 1);
     demo.display (preview);
+    updateField();
+}
+
+void ArpInlinePanel::updateField()
+{
+    // The picture: the style itself on four notes over one octave, so every shape reads.
+    const int want = hoverRow >= 0 ? listOrder()[static_cast<std::size_t> (hoverRow)] : pattern;
+    if (want == fieldShown)
+        return;
+    fieldShown = want;
+    Arpeggiator demo;
+    demo.prepare (48000.0);
+    Arpeggiator::Settings s;
+    s.enabled = true;
+    s.pattern = static_cast<ArpPattern> (want);
+    s.octaves = 1;
+    HostTiming none;
+    demo.beginBlock (s, none, 1);
+    for (int note : { 60, 64, 67, 71 })
+        demo.noteOn (0, note, 100, 1);
+    demo.display (fieldSteps);
+    repaint (field.getSmallestIntegerContainer().expanded (2));
 }
 
 void ArpInlinePanel::refresh()
@@ -291,23 +357,84 @@ void ArpInlinePanel::refresh()
 
 void ArpInlinePanel::resized()
 {
-    // Panel coordinates (reference px, panel 1378 x 177), from the mockup: the title and the
-    // collapse button on the top row; the numbered steps over the left half; PATTERN and
-    // RATE boxes, then GATE, OCTAVES and SWING knobs, captions level with the step numbers.
+    // Panel coordinates (reference px, panel 1378 x 177): the title and the collapse button on
+    // the top row; the numbered steps on the left; PATTERN's picture (level with the steps) and
+    // its list; then RATE, the OCTAVES keys, GATE and SWING, captions level with each other.
     const auto r = getLocalBounds().toFloat();
     title = { 26.0f, 14.0f, 300.0f, 26.0f };
     collapse = juce::Rectangle<float> (30.0f, 30.0f).withCentre ({ r.getRight() - 34.0f, 28.0f });
-    numbers = { 57.0f, 50.0f, 720.0f, 18.0f };
-    steps = { 57.0f, 72.0f, 720.0f, 84.0f };
-    patternLabelArea = { 802.0f, 60.0f, 118.0f, 18.0f };
-    patternBox = { 802.0f, 86.0f, 118.0f, 38.0f };
-    rateLabelArea = { 936.0f, 60.0f, 98.0f, 18.0f };
-    rateBox = { 936.0f, 86.0f, 98.0f, 38.0f };
-    // The envelope's knob cells (caption, knob, value), a little larger.
+    numbers = { 57.0f, 50.0f, 480.0f, 18.0f };
+    steps = { 57.0f, 72.0f, 480.0f, 84.0f };
+    patternCaption = { 562.0f, 50.0f, 150.0f, 18.0f };
+    field = { 562.0f, 72.0f, 150.0f, 84.0f };
+    list = { 722.0f, 50.0f, 156.0f, 106.0f };
     const float knobTop = 58.0f, knobH = 94.0f, knobW = 100.0f;
-    gate.setBounds (juce::Rectangle<float> (knobW, knobH).withCentre ({ 1080.0f, knobTop + 0.5f * knobH }).getSmallestIntegerContainer());
-    octaves.setBounds (juce::Rectangle<float> (knobW, knobH).withCentre ({ 1183.0f, knobTop + 0.5f * knobH }).getSmallestIntegerContainer());
-    swing.setBounds (juce::Rectangle<float> (knobW, knobH).withCentre ({ 1290.0f, knobTop + 0.5f * knobH }).getSmallestIntegerContainer());
+    rate.setBounds (juce::Rectangle<float> (knobW, knobH).withCentre ({ 940.0f, knobTop + 0.5f * knobH }).getSmallestIntegerContainer());
+    octaveCaption = { 995.0f, knobTop, 80.0f, 0.22f * knobH };
+    octaveKeys = { 1012.0f, knobTop + 0.22f * knobH + 2.0f, 46.0f, 156.0f - (knobTop + 0.22f * knobH + 2.0f) };
+    gate.setBounds (juce::Rectangle<float> (knobW, knobH).withCentre ({ 1140.0f, knobTop + 0.5f * knobH }).getSmallestIntegerContainer());
+    swing.setBounds (juce::Rectangle<float> (knobW, knobH).withCentre ({ 1255.0f, knobTop + 0.5f * knobH }).getSmallestIntegerContainer());
+    revealSelected();
+}
+
+juce::Rectangle<float> ArpInlinePanel::octaveKeyArea (int octaves) const
+{
+    // 1 on top to 4 at the bottom, read like a list.
+    const int i = juce::jlimit (arp::minOctaves, arp::maxOctaves, octaves) - arp::minOctaves;
+    constexpr float gap = 2.5f;
+    const float h = (octaveKeys.getHeight() - 3.0f * gap) / 4.0f;
+    return { octaveKeys.getX(), octaveKeys.getY() + static_cast<float> (i) * (h + gap), octaveKeys.getWidth(), h };
+}
+
+juce::Rectangle<float> ArpInlinePanel::patternRowArea (int which) const
+{
+    const auto& order = listOrder();
+    const auto it = std::find (order.begin(), order.end(), which);
+    if (it == order.end())
+        return {};
+    const int row = static_cast<int> (std::distance (order.begin(), it)) - firstRow;
+    if (row < 0 || row >= visibleRows)
+        return {};
+    return { list.getX(), list.getY() + listRowHeight * static_cast<float> (row), list.getWidth() - 8.0f, listRowHeight };
+}
+
+int ArpInlinePanel::rowAt (juce::Point<float> p) const
+{
+    if (! list.contains (p) || p.x > list.getRight() - 8.0f)
+        return -1;
+    const int row = firstRow + static_cast<int> ((p.y - list.getY()) / listRowHeight);
+    return row >= 0 && row < arp::patternCount ? row : -1;
+}
+
+void ArpInlinePanel::scrollTo (int first)
+{
+    const int next = juce::jlimit (0, arp::patternCount - visibleRows, first);
+    if (next != firstRow)
+    {
+        firstRow = next;
+        repaint (list.getSmallestIntegerContainer().expanded (2));
+    }
+}
+
+void ArpInlinePanel::revealSelected()
+{
+    // The chosen style stays in view (it may change from automation or a preset).
+    const auto& order = listOrder();
+    const int row = static_cast<int> (std::distance (order.begin(), std::find (order.begin(), order.end(), pattern)));
+    if (row < firstRow)
+        scrollTo (row);
+    else if (row >= firstRow + visibleRows)
+        scrollTo (row - visibleRows + 1);
+}
+
+void ArpInlinePanel::choosePattern (int which)
+{
+    patternAttachment.setValueAsCompleteGesture (static_cast<float> (juce::jlimit (0, arp::patternCount - 1, which)));
+}
+
+void ArpInlinePanel::chooseOctaves (int octaves)
+{
+    octavesAttachment.setValueAsCompleteGesture (static_cast<float> (juce::jlimit (arp::minOctaves, arp::maxOctaves, octaves)));
 }
 
 void ArpInlinePanel::paint (juce::Graphics& g)
@@ -332,24 +459,133 @@ void ArpInlinePanel::paint (juce::Graphics& g)
     }
 
     paintSteps (g);
+    paintField (g);
+    paintList (g);
+    paintOctaves (g);
+}
 
+namespace
+{
+    /** The shallow recess the step strip and the picture share. */
+    void recess (juce::Graphics& g, juce::Rectangle<float> area)
+    {
+        using namespace design;
+        g.setColour (juce::Colours::white.withAlpha (0.5f));
+        g.drawRoundedRectangle (area.translated (0.0f, 1.0f), 5.0f, 1.0f);
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xffe2d9cc), 0.0f, area.getY(), juce::Colour (0xffebe4d9), 0.0f, area.getBottom(), false));
+        g.fillRoundedRectangle (area, 5.0f);
+        g.setColour (colour::hairline.darker (0.08f));
+        g.drawRoundedRectangle (area.reduced (0.5f), 5.0f, 1.0f);
+    }
+}
+
+void ArpInlinePanel::paintField (juce::Graphics& g)
+{
+    using namespace design;
     const float dim = enabled ? 1.0f : 0.55f;
     g.setFont (type::popupLabel (13.0f));
     g.setColour (colour::text.withAlpha (0.62f * dim));
-    g.drawText ("PATTERN", patternLabelArea, juce::Justification::centredLeft, false);
-    g.drawText ("RATE", rateLabelArea, juce::Justification::centredLeft, false);
-    paintBox (g, patternBox, patternLabel (pattern), hover == 1);
-    paintBox (g, rateBox, OspAudioProcessor::arpRateNames()[rate], hover == 2);
+    g.drawText ("PATTERN", patternCaption, juce::Justification::centredLeft, false);
+    recess (g, field);
+
+    // Four faint lines, one per note of the chord (C E G B), and twelve steps across.
+    constexpr int columns = 12;
+    const auto inner = field.reduced (10.0f, 11.0f);
+    const float cw = inner.getWidth() / static_cast<float> (columns - 1);
+    const std::array<int, 4> notes { 60, 64, 67, 71 };
+    auto yOf = [&inner] (int note) { return inner.getBottom() - inner.getHeight() * static_cast<float> (note - 60) / 11.0f; };
+    g.setColour (colour::hairline.darker (0.02f).withAlpha (0.7f));
+    for (int n : notes)
+        g.fillRect (juce::Rectangle<float> (inner.getX() - 4.0f, yOf (n) - 0.5f, inner.getWidth() + 8.0f, 1.0f));
+
+    const auto ink = (fieldShown == pattern ? colour::accent : stepTan).withMultipliedAlpha (dim);
+    const bool chord = fieldShown == static_cast<int> (ArpPattern::chord);
+    juce::Path line;
+    bool started = false;   // (a path holding only its first point still reads as empty)
+    for (int c = 0; c < columns; ++c)
+    {
+        const int low = fieldSteps.low[static_cast<std::size_t> (c)], high = fieldSteps.high[static_cast<std::size_t> (c)];
+        if (low < 0)
+            continue;
+        const float x = inner.getX() + cw * static_cast<float> (c);
+        if (chord)
+        {
+            // Every note at once: a column of dots, joined.
+            g.setColour (ink.withAlpha (0.45f * dim));
+            g.fillRect (juce::Rectangle<float> (x - 1.0f, yOf (high), 2.0f, yOf (low) - yOf (high)));
+            g.setColour (ink);
+            for (int n : notes)
+                g.fillEllipse (juce::Rectangle<float> (6.0f, 6.0f).withCentre ({ x, yOf (n) }));
+            continue;
+        }
+        const juce::Point<float> at (x, yOf (high));
+        if (! started)
+            line.startNewSubPath (at);
+        else
+            line.lineTo (at);
+        started = true;
+    }
+    if (started && ! chord)
+    {
+        g.setColour (ink.withAlpha (0.55f * dim));
+        g.strokePath (line, juce::PathStrokeType (1.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        g.setColour (ink);
+        for (int c = 0; c < columns; ++c)
+            if (fieldSteps.high[static_cast<std::size_t> (c)] >= 0)
+                g.fillEllipse (juce::Rectangle<float> (6.5f, 6.5f).withCentre ({ inner.getX() + cw * static_cast<float> (c), yOf (fieldSteps.high[static_cast<std::size_t> (c)]) }));
+    }
 }
 
-void ArpInlinePanel::paintBox (juce::Graphics& g, juce::Rectangle<float> box, const juce::String& text, bool hot)
+void ArpInlinePanel::paintList (juce::Graphics& g)
 {
     using namespace design;
-    draw::button (g, box, 7.0f, false, hot, colour::accent);
-    g.setFont (type::controlValue (0.92f));
-    g.setColour (colour::text.withAlpha (enabled ? 0.92f : 0.55f));
-    g.drawText (text, box.withTrimmedLeft (14.0f).withTrimmedRight (26.0f), juce::Justification::centredLeft, false);
-    chevron (g, { box.getRight() - 16.0f, box.getCentreY() }, 4.0f, 2.6f, false, colour::textSecondary.withAlpha (enabled ? 1.0f : 0.6f), 1.4f);
+    const float dim = enabled ? 1.0f : 0.55f;
+    const auto& order = listOrder();
+    g.setFont (type::popupLabel (13.0f));
+    for (int row = firstRow; row < firstRow + visibleRows && row < arp::patternCount; ++row)
+    {
+        const int which = order[static_cast<std::size_t> (row)];
+        const auto area = patternRowArea (which);
+        const bool chosen = which == pattern;
+        if (chosen)
+        {
+            g.setColour (colour::accent.withAlpha (0.16f + 0.06f * dim));
+            g.fillRoundedRectangle (area.reduced (0.0f, 1.0f), 5.0f);
+        }
+        else if (row == hoverRow)
+        {
+            g.setColour (colour::text.withAlpha (0.06f));
+            g.fillRoundedRectangle (area.reduced (0.0f, 1.0f), 5.0f);
+        }
+        g.setColour (colour::text.withAlpha ((chosen ? 0.95f : (row == hoverRow ? 0.85f : 0.66f)) * dim));
+        g.drawText (patternLabel (which), area.withTrimmedLeft (10.0f), juce::Justification::centredLeft, false);
+    }
+    // A slim scroll track: where the six rows sit in the eighteen.
+    const auto track = juce::Rectangle<float> (list.getRight() - 4.0f, list.getY() + 2.0f, 3.0f, list.getHeight() - 4.0f);
+    g.setColour (colour::hairline.withAlpha (0.8f));
+    g.fillRoundedRectangle (track, 1.5f);
+    const float share = static_cast<float> (visibleRows) / static_cast<float> (arp::patternCount);
+    const float top = static_cast<float> (firstRow) / static_cast<float> (arp::patternCount);
+    g.setColour (colour::textSecondary.withAlpha (0.55f * dim));
+    g.fillRoundedRectangle (track.withY (track.getY() + top * track.getHeight()).withHeight (share * track.getHeight()), 1.5f);
+}
+
+void ArpInlinePanel::paintOctaves (juce::Graphics& g)
+{
+    using namespace design;
+    const float dim = enabled ? 1.0f : 0.55f;
+    g.setFont (type::popupLabel (13.0f));
+    g.setColour (colour::text.withAlpha (0.62f * dim));
+    g.drawText ("OCTAVES", octaveCaption, juce::Justification::centred, false);
+    for (int o = arp::minOctaves; o <= arp::maxOctaves; ++o)
+    {
+        const auto key = octaveKeyArea (o);
+        const bool on = o == octaveCount;
+        draw::button (g, key, 5.0f, on, hover == 10 + o, colour::accent);
+        g.setFont (type::controlValue (0.86f));
+        g.setColour (on ? colour::accent.darker (0.35f).withMultipliedAlpha (dim) : colour::text.withAlpha (0.78f * dim));
+        g.drawText (juce::String (o), key, juce::Justification::centred, false);
+    }
 }
 
 void ArpInlinePanel::paintSteps (juce::Graphics& g)
@@ -386,14 +622,10 @@ void ArpInlinePanel::paintSteps (juce::Graphics& g)
     }
 
     // The strip: a shallow recess, one cell per step.
-    g.setColour (juce::Colours::white.withAlpha (0.5f));
-    g.drawRoundedRectangle (steps.translated (0.0f, 1.0f), 5.0f, 1.0f);
-    g.setGradientFill (juce::ColourGradient (juce::Colour (0xffe2d9cc), 0.0f, steps.getY(), juce::Colour (0xffebe4d9), 0.0f, steps.getBottom(), false));
-    g.fillRoundedRectangle (steps, 5.0f);
+    recess (g, steps);
     g.setColour (colour::hairline.darker (0.08f));
     for (int c = 1; c < columns; ++c)
         g.fillRect (juce::Rectangle<float> (1.0f, steps.getHeight() - 2.0f).withPosition (steps.getX() + cw * static_cast<float> (c), steps.getY() + 1.0f));
-    g.drawRoundedRectangle (steps.reduced (0.5f), 5.0f, 1.0f);
 
     // Each step a bar as high as its note (a chord: its top note) in the range shown.
     const auto inner = steps.reduced (0.0f, 4.0f);
@@ -405,7 +637,7 @@ void ArpInlinePanel::paintSteps (juce::Graphics& g)
         const float t = hi > lo ? static_cast<float> (h - lo) / static_cast<float> (hi - lo) : 0.5f;
         const float barH = inner.getHeight() * (0.3f + 0.7f * t);
         const auto cell = juce::Rectangle<float> (steps.getX() + cw * static_cast<float> (c), inner.getY(), cw, inner.getHeight());
-        const auto bar = juce::Rectangle<float> (cell.getX() + 4.0f, inner.getBottom() - barH, cw - 8.0f, barH);
+        const auto bar = juce::Rectangle<float> (cell.getX() + 3.0f, inner.getBottom() - barH, cw - 6.0f, barH);
         juce::Colour fill = stepTan;
         if (live)
             fill = c == current ? colour::accent : (c < current ? stepOrange.withAlpha (0.8f) : stepTan);
@@ -433,83 +665,64 @@ void ArpInlinePanel::paintSteps (juce::Graphics& g)
 void ArpInlinePanel::mouseMove (const juce::MouseEvent& e)
 {
     int now = 0;
-    if (patternBox.contains (e.position))
-        now = 1;
-    else if (rateBox.contains (e.position))
-        now = 2;
-    else if (collapse.contains (e.position))
+    if (collapse.contains (e.position))
         now = 3;
-    if (now != hover)
+    for (int o = arp::minOctaves; o <= arp::maxOctaves; ++o)
+        if (octaveKeyArea (o).contains (e.position))
+            now = 10 + o;
+    const int row = rowAt (e.position);
+    if (now != hover || row != hoverRow)
     {
         hover = now;
-        setMouseCursor (hover != 0 ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
-        repaint();
+        hoverRow = row;
+        setMouseCursor (hover != 0 || hoverRow >= 0 ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+        updateField();   // the picture previews the style under the pointer
+        repaint (list.getUnion (octaveKeys).getUnion (collapse).getSmallestIntegerContainer().expanded (3));
     }
 }
 
 void ArpInlinePanel::mouseExit (const juce::MouseEvent&)
 {
-    if (hover != 0)
+    if (hover != 0 || hoverRow >= 0)
     {
         hover = 0;
+        hoverRow = -1;
+        updateField();
         repaint();
     }
 }
 
 void ArpInlinePanel::mouseDown (const juce::MouseEvent& e)
 {
-    if (patternBox.contains (e.position))
-        showPatternMenu();
-    else if (rateBox.contains (e.position))
-        showRateMenu();
-    else if (collapse.contains (e.position) && onCollapse != nullptr)
+    if (const int row = rowAt (e.position); row >= 0)
+    {
+        choosePattern (listOrder()[static_cast<std::size_t> (row)]);
+        return;
+    }
+    for (int o = arp::minOctaves; o <= arp::maxOctaves; ++o)
+        if (octaveKeyArea (o).contains (e.position))
+        {
+            chooseOctaves (o);
+            return;
+        }
+    if (collapse.contains (e.position) && onCollapse != nullptr)
         onCollapse();
 }
 
-juce::PopupMenu ArpInlinePanel::patternMenu() const
+void ArpInlinePanel::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel)
 {
-    juce::PopupMenu menu;
-    for (int i = 0; i < arp::patternCount; ++i)
-        menu.addItem (i + 1, patternLabel (i), true, i == pattern);
-    return menu;
-}
-
-juce::PopupMenu ArpInlinePanel::rateMenu() const
-{
-    juce::PopupMenu menu;
-    const auto& names = OspAudioProcessor::arpRateNames();
-    auto section = [&] (const char* header, std::initializer_list<ArpRate> rates) {
-        menu.addSectionHeader (header);
-        for (auto r : rates)
-        {
-            const int i = static_cast<int> (r);
-            menu.addItem (i + 1, names[i], true, i == rate);
-        }
-    };
-    section ("STRAIGHT", { ArpRate::quarter, ArpRate::eighth, ArpRate::sixteenth, ArpRate::thirtySecond });
-    section ("DOTTED", { ArpRate::quarterDotted, ArpRate::eighthDotted, ArpRate::sixteenthDotted });
-    section ("TRIPLET", { ArpRate::quarterTriplet, ArpRate::eighthTriplet, ArpRate::sixteenthTriplet });
-    return menu;
-}
-
-void ArpInlinePanel::showPatternMenu()
-{
-    juce::Component::SafePointer<ArpInlinePanel> safe (this);
-    patternMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (patternBox.getSmallestIntegerContainer())).withDeletionCheck (*this),
-                                 [safe] (int chosen) {
-                                     if (safe != nullptr && chosen > 0)
-                                         safe->patternAttachment.setValueAsCompleteGesture (static_cast<float> (chosen - 1));
-                                 });
-}
-
-void ArpInlinePanel::showRateMenu()
-{
-    juce::Component::SafePointer<ArpInlinePanel> safe (this);
-    rateMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (rateBox.getSmallestIntegerContainer())).withDeletionCheck (*this),
-                              [safe] (int chosen) {
-                                  if (safe != nullptr && chosen > 0)
-                                      safe->rateAttachment.setValueAsCompleteGesture (static_cast<float> (chosen - 1));
-                              });
+    if (! list.contains (e.position))
+        return;
+    // One row per notch (trackpads add up their small deltas).
+    wheelPending -= wheel.deltaY * 6.0f;
+    const int rows = static_cast<int> (wheelPending);
+    if (rows != 0)
+    {
+        wheelPending -= static_cast<float> (rows);
+        scrollTo (firstRow + rows);
+        hoverRow = rowAt (e.position);
+        updateField();
+    }
 }
 
 } // namespace osp::plugin

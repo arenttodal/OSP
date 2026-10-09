@@ -329,7 +329,9 @@ std::optional<RenderConfig> loadRenderConfig (const std::filesystem::path& path,
         auto& arpSettings = config.arp.settings;
         arpSettings.enabled = json::getBool (a, "enabled", true);
         const auto pattern = juce::String (json::getString (a, "pattern", "up")).toLowerCase().removeCharacters ("/ _-");
-        static const char* patterns[] { "up", "down", "updown", "played", "random", "chord" };
+        static const char* patterns[] { "up", "down", "updown", "played", "random", "chord", "downup", "up&down", "down&up", "converge",
+                                        "diverge", "con&diverge", "pinkyup", "pinkyupdown", "thumbup", "thumbupdown", "randomother", "randomonce" };
+        static_assert (sizeof (patterns) / sizeof (patterns[0]) == static_cast<std::size_t> (arp::patternCount));
         for (int i = 0; i < arp::patternCount; ++i)
             if (pattern == patterns[i])
                 arpSettings.pattern = static_cast<ArpPattern> (i);

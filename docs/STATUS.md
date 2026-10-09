@@ -256,11 +256,8 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       RETRIGGER / ONE SHOT, GLOBAL / POLY) and per-voice ENV 1/2 (ADSR + curve, or a ONE SHOT
       curve); a destination registry (48 entries with the EQ's) (macros, layer level / pan / fine tune /
       REIMAGINED, granular POS / DENS / SIZE / SPREAD, CHARACTER cutoff / resonance, amp ADSR);
-      16 automatable route slots, undo, recall; no route = bit-identical to before. The bay:
-      MOD beside Advanced widens the window (the instrument never moves), source tabs with
-      drag sockets, the live curve display and editor, the routing list with + ADD; drag onto
-      any control (hover opens CHARACTER's popover); rings with the swept range and the live
-      value on modulated knobs, draggable for depth. Headless via the `"modulation"` block.
+      16 automatable route slots, undo, recall; no route = bit-identical to before. The first GUI
+      (a bay that widened the window) was replaced by the refinement below. Headless via the `"modulation"` block.
 - [x] PER-LAYER EQ (parameters v18; docs/reports/eq.md): five bands per layer (HP / LP 12 or
       24 dB/oct, low and high shelf, bell; SVF sections, glided, crossfaded switches, zero
       latency) after the layer's voices and REIMAGINED stage, before LEVEL / PAN; off by
@@ -270,9 +267,22 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       time. Bell frequency / gain and shelf gains are modulation destinations (global LFOs).
       Headless via the `"eq"` block.
 - [ ] PER-LAYER EQ: compare against the Option 3 reference (not received); DAW checks.
-- [ ] MODULATION: refine the bay against the approved mockup (not received); host checks
-      (Logic, Ableton, REAPER, AudioPluginHost window widening); a global envelope mode needs
-      a gate-aggregation rule before ENV may reach the macros.
+- [x] MODULATION UI refinement (docs/reports/modulation.md, "The modulation panel and halos"):
+      the bay is gone and the window keeps its size. The AMP envelope's panel has five minimal
+      tabs (AMP, ENV 1/2, LFO 1/2) that are also drag handles; compact one-row editors; one RATE
+      knob with a Sync / Hz caption menu; polarity in a context menu; a routes popover and a
+      large curve editor; MOD toggles AMP / last source; one selection state. Two-layer halos
+      outside each knob's reach with hover guide, endpoint handle, tooltip (route, depth, base,
+      range), direct depth drag through zero (also Option-drag on the knob), a context menu and
+      subdued secondary routes; macro labels raised clear of them.
+- [x] ARP panel revision (docs/reports/arpeggiator.md §4, §6b): PATTERN as a picture of the
+      style plus a list of all 18 styles; twelve Live styles appended to `arp.pattern` (DOWN/UP,
+      UP & DOWN, DOWN & UP, CONVERGE, DIVERGE, CON & DIVERGE, PINKY UP(/DOWN), THUMB UP(/DOWN),
+      RANDOM OTHER, RANDOM ONCE; seeded, older sessions unchanged); RATE as a knob from slowest
+      to fastest; OCTAVES as four stacked keys. The header reads ANDOR/2-OSP.
+- [ ] MODULATION: compare the panel and halo against the mockups (not received); host checks
+      (Logic, Ableton, REAPER, AudioPluginHost); a global envelope mode needs a
+      gate-aggregation rule before ENV may reach the macros.
 - [x] `plugin-pipeline/`: the build-and-download pipeline as a reusable kit for other JUCE
       plug-ins (`adopt.sh` for an existing repo, `new-plugin.sh` + starter for a new one, a fixed
       download link per branch); self-tested on macOS and Windows by its own workflow.

@@ -450,7 +450,7 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
         knob.slider.updateText();
         content.addAndMakeVisible (knob.slider);
     }
-    content.addAndMakeVisible (envelope);
+    content.addAndMakeVisible (modPanel);
 
     content.addAndMakeVisible (pitchWheel);
     content.addAndMakeVisible (modWheel);
@@ -487,20 +487,36 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     arpButton.setExpanded (arpShown);
     arpPanel.setVisible (arpShown);
 
-    // MODULATION: the bay on the right (MOD beside Advanced opens it), the rings on the
-    // modulated controls, and a source dragged from the bay onto a control.
+    // MODULATION: the envelope panel's tabs (AMP, ENV 1, ENV 2, LFO 1, LFO 2) hold the
+    // sources' editors; a source's tab dragged onto a control makes a route; the halos on the
+    // modulated controls show and edit them. MOD (beside Advanced) brings the panel's last
+    // modulation source forward (or AMP back).
     modButton.setTitle ("Modulation");
-    modButton.setTooltip ("Modulation: LFOs and envelopes, dragged onto the controls they move");
-    modButton.onClick = [this] { setModExpanded (! modShown); };
+    modButton.setTooltip ("Modulation: show the LFOs and envelopes in the envelope panel (drag a tab onto a knob)");
+    modButton.setChevron (0);
+    modButton.onClick = [this] { modPanel.showTab (modPanel.tab() == 0 ? lastModTab : 0); };
     content.addAndMakeVisible (modButton);
-    modBay.onDragMove = [this] (int source, juce::Point<int> screen) { dragModulation (source, content.getLocalPoint (nullptr, screen).toFloat()); };
-    modBay.onDragEnd = [this] (int source, juce::Point<int> screen) { dropModulation (source, content.getLocalPoint (nullptr, screen).toFloat()); };
-    modBay.onRouteSelected = [this] (mod::Dest dest) { modOverlay.setHighlight (dest); };
-    content.addChildComponent (modBay);
-    modShown = ospProcessor.modBayExpanded();
-    modBay.setVisible (modShown);
-    modButton.setToggleState (modShown, juce::dontSendNotification);
-    modButton.setChevron (modShown ? -1 : 1);
+    modPanel.onDragMove = [this] (int source, juce::Point<int> screen) { dragModulation (source, content.getLocalPoint (nullptr, screen).toFloat()); };
+    modPanel.onDragEnd = [this] (int source, juce::Point<int> screen) { dropModulation (source, content.getLocalPoint (nullptr, screen).toFloat()); };
+    modPanel.onShowRoutes = [this] (int source) { openModulationPopup (routesPopup, source); };
+    modPanel.onExpandCurve = [this] (int source) { openModulationPopup (curvePopup, source); };
+    modPanel.onTabChanged = [this] (int tab) {
+        ospProcessor.setModPanelTab (tab);
+        modButton.setToggleState (tab != 0, juce::dontSendNotification);
+        if (tab != 0)
+            lastModTab = tab;
+        const int source = modui::sourceOfTab (tab);
+        // The panel's source is the selection's source (its route stays chosen if it is that source's).
+        int slot = -1;
+        for (const auto& r : ospProcessor.modulationRoutes())
+            if (r.slot == modSelSlot && mod::sourceIndex (r.route.source) == source)
+                slot = modSelSlot;
+        selectModulation (source, slot);
+    };
+    modOverlay.onSelect = [this] (int source, int slot) { selectModulation (source, slot); };
+    modOverlay.onShowRoutes = [this] (int source) { openModulationPopup (routesPopup, source); };
+    modPanel.showTab (ospProcessor.modPanelTab());
+    modButton.setToggleState (modPanel.tab() != 0, juce::dontSendNotification);
     content.addAndMakeVisible (modOverlay);   // last: above everything (popups bring it back up)
 
     juce::Desktop::getInstance().addGlobalMouseListener (&outsideClicks);
@@ -512,7 +528,9 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     layoutInstrument();
     setResizable (true, true);
     applyWindowShape (false);
-    setSize (juce::roundToInt (shownScale * instrumentWidth()), juce::roundToInt (shownScale * instrumentHeight()));
+    // The default size (1086 wide), not a scale measured before the window had any size.
+    constexpr float defaultScale = 1086.0f / design::width;
+    setSize (juce::roundToInt (defaultScale * design::width), juce::roundToInt (defaultScale * instrumentHeight()));
     setScaleFactor (ospProcessor.uiScale());
 
     if (ospProcessor.advancedOpen())
@@ -538,7 +556,7 @@ void OspAudioProcessorEditor::openPopup (int which)
 {
     const bool keepAdvanced = which == advancedPopup;
     closePopup();
-    if (which < 0 || (which >= reimaginedPopup + OspAudioProcessor::numLayers && which != echoPopup))
+    if (which < 0 || which > lastPopup || (which >= reimaginedPopup + OspAudioProcessor::numLayers && which < echoPopup))
         return;
     const bool reimagined = which >= reimaginedPopup && which < reimaginedPopup + OspAudioProcessor::numLayers;
     if (reimagined && ! cards[static_cast<std::size_t> (which - reimaginedPopup)]->isVisible())
@@ -549,6 +567,15 @@ void OspAudioProcessorEditor::openPopup (int which)
         popup = createMixPopup (ospProcessor);
     else if (which == advancedPopup)
         popup = createAdvancedPopup (ospProcessor);
+    else if (which == routesPopup)
+    {
+        auto routes = std::make_unique<ModRoutesPopup> (ospProcessor, popupSource);
+        routes->onSelectRoute = [this] (int slot) { selectModulation (popupSource, slot); };
+        routes->setSelectedSlot (modSelSlot);
+        popup = std::move (routes);
+    }
+    else if (which == curvePopup)
+        popup = std::make_unique<ModCurvePopup> (ospProcessor, popupSource);
     else
         popup = createMacroPopup (static_cast<MacroPopup> (macroOfPopup (which)), ospProcessor);
     popupIndex = which;
@@ -624,6 +651,13 @@ void OspAudioProcessorEditor::positionPopup()
         const auto anchor = content.getLocalArea (&card, card.reimaginedLabelBounds()).toFloat();
         x = anchor.getCentreX() - 0.5f * size.x;
         y = anchor.getY() - 10.0f - size.y;
+    }
+    else if (popupIndex == routesPopup || popupIndex == curvePopup)
+    {
+        // The modulation popovers unfold above the envelope panel, at its right.
+        const auto anchor = modPanel.getBounds().toFloat();
+        x = anchor.getRight() - size.x + 10.0f;
+        y = anchor.getY() - 6.0f - size.y;
     }
     else if (popupIndex == mixPopup)
     {
@@ -1169,12 +1203,12 @@ void OspAudioProcessorEditor::paintInstrument (juce::Graphics& g)
     using namespace design;
     draw::housing (g, content.getLocalBounds().toFloat());
 
-    // Identity: OSP/2-OSP and what kind of instrument it is now.
+    // Identity: ANDOR/2-OSP and what kind of instrument it is now.
     {
         const auto bold = fonts::make (60.0f, fonts::Weight::displayBold).withHorizontalScale (1.07f);
         const auto light = fonts::make (60.0f, fonts::Weight::displayLight).withHorizontalScale (1.07f);
         juce::GlyphArrangement osp, rest;
-        osp.addLineOfText (bold, "OSP", layout::logo.x, layout::logo.y);
+        osp.addLineOfText (bold, "ANDOR", layout::logo.x, layout::logo.y);
         const float w = osp.getBoundingBox (0, -1, true).getRight() - layout::logo.x + 1.0f;
         rest.addLineOfText (light, "/2-OSP", layout::logo.x + w, layout::logo.y);
         g.setColour (colour::text);
@@ -1200,27 +1234,16 @@ void OspAudioProcessorEditor::paintInstrument (juce::Graphics& g)
         g.strokePath (frame, juce::PathStrokeType (1.0f));
     }
 
-    // The modulation bay's seam: a fine groove in the housing between the two modules.
-    if (modShown)
-    {
-        const float top = layout::housing.getY() + 14.0f, bottom = content.getHeight() - (height - layout::housing.getBottom()) - 14.0f;
-        g.setColour (colour::housingRim.withAlpha (0.9f));
-        g.fillRect (juce::Rectangle<float> (layout::modSeam - 1.0f, top, 1.0f, bottom - top));
-        g.setColour (juce::Colours::white.withAlpha (0.55f));
-        g.fillRect (juce::Rectangle<float> (layout::modSeam, top, 1.0f, bottom - top));
-        g.setGradientFill (juce::ColourGradient (juce::Colour (0x14302418), layout::modSeam + 1.0f, 0.0f, juce::Colour (0x00302418), layout::modSeam + 7.0f, 0.0f, false));
-        g.fillRect (juce::Rectangle<float> (layout::modSeam + 1.0f, top, 6.0f, bottom - top));
-    }
-
     // The macros and the envelope share one panel.
     {
         const auto r = layout::macroPanel;
         draw::raised (g, r, layout::panelRadius, colour::panelTop, colour::panelBottom);
         g.setColour (colour::divider);
-        g.fillRect (juce::Rectangle<float> (layout::envelopeX - 10.0f, 715.0f, 1.0f, 170.0f));
+        g.fillRect (juce::Rectangle<float> (layout::envelopeX - 10.0f, 695.0f, 1.0f, 190.0f));
         g.setColour (colour::text.withAlpha (0.9f));
         g.setFont (type::panelHeader());
-        g.drawText ("MACROS", juce::Rectangle<float> (59.0f, 710.0f, 200.0f, 22.0f), juce::Justification::centredLeft, false);
+        // The title on the panel's own first line (the names moved up to clear the halos).
+        g.drawText ("MACROS", juce::Rectangle<float> (59.0f, 688.0f, 200.0f, 24.0f), juce::Justification::centredLeft, false);
         // Under each macro a small light: lit when the macro's own settings are in use.
         for (std::size_t i = 0; i < macros.size(); ++i)
         {
@@ -1236,11 +1259,10 @@ void OspAudioProcessorEditor::resized()
 {
     // Scaled uniformly to fit: if a host keeps the old window shape (it refused the resize),
     // the instrument still shows whole, with a margin, never cut off.
-    const float w = instrumentWidth(), h = instrumentHeight();
+    const float w = design::width, h = instrumentHeight();
     const float k = std::min (static_cast<float> (getWidth()) / w, static_cast<float> (getHeight()) / h);
     const float x = 0.5f * (static_cast<float> (getWidth()) - w * k);
     const float y = 0.5f * (static_cast<float> (getHeight()) - h * k);
-    shownScale = k;
     content.setBounds (0, 0, static_cast<int> (w), static_cast<int> (h));
     content.setTransform (juce::AffineTransform::scale (k).translated (x, y));
     modOverlay.setBounds (content.getLocalBounds());
@@ -1271,41 +1293,39 @@ void OspAudioProcessorEditor::setArpExpanded (bool open)
 
 void OspAudioProcessorEditor::applyWindowShape (bool resizeWindow)
 {
-    // The window keeps the instrument's proportions at the same scale: the arpeggiator's
-    // editor adds height, the modulation bay width, and the instrument itself never resizes.
-    const float w = instrumentWidth(), h = instrumentHeight();
-    constexpr float smallest = 869.0f / design::width, largest = 1810.0f / design::width;
-    setResizeLimits (juce::roundToInt (smallest * w), juce::roundToInt (smallest * h), juce::roundToInt (largest * w), juce::roundToInt (largest * h));
+    // The window keeps the instrument's proportions: the same width range as always, the
+    // height following the instrument (taller with the arpeggiator's editor shown).
+    const float h = instrumentHeight();
+    setResizeLimits (869, juce::roundToInt (869.0f * h / design::width), 1810, juce::roundToInt (1810.0f * h / design::width));
     if (auto* windowShape = getConstrainer())
-        windowShape->setFixedAspectRatio (static_cast<double> (w / h));
+        windowShape->setFixedAspectRatio (static_cast<double> (design::width / h));
     if (resizeWindow)
     {
-        const float k = juce::jlimit (smallest, largest, shownScale);
-        const int newWidth = juce::roundToInt (k * w), newHeight = juce::roundToInt (k * h);
-        if (newWidth != getWidth() || newHeight != getHeight())
-            setSize (newWidth, newHeight);
+        const int newHeight = juce::roundToInt (static_cast<float> (getWidth()) * h / design::width);
+        if (newHeight != getHeight())
+            setSize (getWidth(), newHeight);
         else
             resized();
     }
 }
 
-void OspAudioProcessorEditor::setModExpanded (bool open)
+void OspAudioProcessorEditor::selectModulation (int source, int slot)
 {
-    ospProcessor.setModBayExpanded (open);
-    if (open == modShown)
-        return;
-    modShown = open;
-    modButton.setToggleState (open, juce::dontSendNotification);
-    modButton.setChevron (open ? -1 : 1);   // it opens to the right, closes back to the left
-    modBay.setVisible (open);
-    if (open)
-        modBay.refresh();
-    else
-        modOverlay.setHighlight (mod::Dest::none);
-    layoutInstrument();
-    applyWindowShape (true);
-    positionPopup();
-    content.repaint();
+    // The one selection: the panel shows the source (when it shows a source at all), the
+    // halos emphasise its routes (the chosen one most), an open routes popover marks the row.
+    modSelSource = source;
+    modSelSlot = slot;
+    if (source >= 0 && modPanel.tab() != 0 && modPanel.selectedSource() != source)
+        modPanel.showTab (modui::tabOfSource (source));
+    modOverlay.setSelection (modSelSource, modSelSlot);
+    if (auto* routes = dynamic_cast<ModRoutesPopup*> (popup.get()))
+        routes->setSelectedSlot (modSelSlot);
+}
+
+void OspAudioProcessorEditor::openModulationPopup (int which, int source)
+{
+    popupSource = juce::jlimit (0, 3, source);
+    openPopup (which);
 }
 
 void OspAudioProcessorEditor::dragModulation (int source, juce::Point<float> where)
@@ -1366,8 +1386,8 @@ int OspAudioProcessorEditor::dropModulation (int source, juce::Point<float> wher
             slot = ospProcessor.addModulationRoute (from, dest, 50.0f);
             if (slot >= 0)
             {
-                modBay.refresh();
-                modBay.selectRoute (slot);
+                modPanel.refresh();
+                selectModulation (source, slot);
             }
         }
     }
@@ -1392,10 +1412,12 @@ void OspAudioProcessorEditor::layoutInstrument()
     for (std::size_t i = 0; i < macros.size(); ++i)
     {
         auto& knob = macros[i];
-        knob.label->setBounds (at (juce::Rectangle<float> (150.0f, 22.0f).withCentre ({ centres[i], 743.0f })));
+        // The name stands clear above the knob's modulation halo (it sat at 743 before the halo).
+        knob.label->setBounds (at (juce::Rectangle<float> (150.0f, 22.0f).withCentre ({ centres[i], 725.0f })));
         knob.slider.setBounds (at (juce::Rectangle<float> (132.0f, 132.0f).withCentre ({ centres[i], 812.0f })));
     }
-    envelope.setBounds (at (juce::Rectangle<float> (layout::envelopeX, 708.0f, 1405.0f - layout::envelopeX, 186.0f)));
+    // The envelope panel's tab row on the macros' title line; its display takes the extra height.
+    modPanel.setBounds (at (juce::Rectangle<float> (layout::envelopeX, 688.0f, 1405.0f - layout::envelopeX, 206.0f)));
 
     // The arpeggiator's editor (when shown) takes the keyboard row's place; the row and the
     // footer move down by its height.
@@ -1413,9 +1435,6 @@ void OspAudioProcessorEditor::layoutInstrument()
     advancedButton.setBounds (low (layout::advanced));
     modButton.setBounds (low (layout::modButton));
 
-    // The modulation bay: its own rectangle right of the seam, the instrument's full height.
-    modBay.setBounds (at ({ layout::modBayX, layout::modBayTop, design::width + layout::modWidth - 35.0f - layout::modBayX,
-                            instrumentHeight() - layout::modBayTop - layout::modBayBottomMargin }));
     modOverlay.setBounds (content.getLocalBounds());
 
     headerMix.setBounds (at (layout::headerMix));
@@ -1489,7 +1508,7 @@ void OspAudioProcessorEditor::timerCallback()
             return false;
         };
         if (moved (2, 6))
-            envelope.repaint (envelope.graphBounds());
+            modPanel.ampEnvelope().repaint (modPanel.ampEnvelope().graphBounds());
         shownValues = now;
     }
     updateCustomisedDots();
@@ -1502,12 +1521,12 @@ void OspAudioProcessorEditor::timerCallback()
     if (arpShown)
         arpPanel.refresh();
     // Modulation: the bay (a recalled session may open or close it), the rings, MOD's light.
-    if (ospProcessor.modBayExpanded() != modShown)
-        setModExpanded (ospProcessor.modBayExpanded());
-    if (modShown)
-        modBay.refresh();
-    modOverlay.setSelectedSource (modShown ? modBay.selectedSource() : -1);
+    if (ospProcessor.modPanelTab() != modPanel.tab())
+        modPanel.showTab (ospProcessor.modPanelTab());   // a recalled session
+    modPanel.refresh();
     modOverlay.refresh();
+    if (popup != nullptr)
+        popup->refreshContent();
     bool anyActive = false;
     for (const auto& route : ospProcessor.modulationRoutes())
         anyActive = anyActive || route.state == mod::RouteState::active;

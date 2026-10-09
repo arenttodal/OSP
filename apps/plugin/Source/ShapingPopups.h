@@ -82,19 +82,38 @@ public:
     void setBoxed (bool shouldBeBoxed);
     /** The value arc (and a boxed knob's pointer) in this colour: its macro's identity. */
     void setArcColour (juce::Colour colour);
+    /** A choice parameter walked in another order than its choices' (ARP RATE: slowest to
+        fastest, while the parameter keeps its saved order). The knob's value is then the
+        position in `order`, whose entries are the parameter's choice indices; the formatter
+        receives the position. */
+    void setChoiceOrder (juce::RangedAudioParameter& parameter, std::vector<int> order, juce::UndoManager* undo);
+    /** With a choice order: the parameter's choice index the knob shows. */
+    int choiceShown() const;
 
     void paint (juce::Graphics&) override;
     void resized() override;
+    void mouseUp (const juce::MouseEvent&) override;
+    void mouseMove (const juce::MouseEvent&) override;
+    void mouseExit (const juce::MouseEvent&) override;
+
+    /** The caption as a door (RATE: Sync or Hz): a click on it calls this; it then shows a
+        small chevron and a pointer, and brightens on hover. */
+    std::function<void()> onCaptionClick;
+    juce::Rectangle<float> captionArea() const;
 
     juce::Slider slider { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::NoTextBox };
 
 private:
+    bool captionHover = false;
     juce::String caption;
     Formatter formatter;
     bool horizontal;
     bool onDark = false, compact = false, boxed = false;
     juce::Rectangle<float> valueBox() const;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
+    std::vector<int> choiceOrder;
+    std::unique_ptr<juce::ParameterAttachment> orderedAttachment;
+    bool orderedGesture = false;
 };
 
 /** A stepped choice shown as its value (PATTERN, RATE): click for the list, arrows or the
@@ -165,6 +184,9 @@ public:
     bool hitTest (int x, int y) override { return card().contains (x, y); }
     void mouseUp (const juce::MouseEvent&) override;
     void mouseMove (const juce::MouseEvent&) override { repaint (closeButton().getSmallestIntegerContainer().expanded (2)); }
+
+    /** Follows the processor (the editor's timer, while open). */
+    virtual void refreshContent() {}
 
     /** Called when the card's preferred size changes (e.g. another MOVEMENT mode). */
     std::function<void()> onSizeChanged;

@@ -3824,7 +3824,10 @@ TEST_CASE ("plugin: ARP parameters, recall; older sessions open with it off; the
     CHECK (arpValue (fresh, "arp.gate") == Approx (75.0f));
     CHECK (arpValue (fresh, "arp.octaves") == Approx (1.0f));
     CHECK (arpValue (fresh, "arp.swing") == Approx (0.0f));   // straight
-    CHECK (OspAudioProcessor::arpPatternNames().joinIntoString (",") == "UP,DOWN,UP/DOWN,PLAYED,RANDOM,CHORD");
+    // Saved by index: the first six keep their places, the Live styles come after them.
+    CHECK (OspAudioProcessor::arpPatternNames().joinIntoString (",")
+           == "UP,DOWN,UP/DOWN,PLAYED,RANDOM,CHORD,DOWN/UP,UP & DOWN,DOWN & UP,CONVERGE,DIVERGE,CON & DIVERGE,PINKY UP,PINKY UP/DOWN,"
+              "THUMB UP,THUMB UP/DOWN,RANDOM OTHER,RANDOM ONCE");
     CHECK (OspAudioProcessor::arpRateNames().joinIntoString (",") == "1/4,1/8,1/16,1/32,1/4D,1/8D,1/16D,1/4T,1/8T,1/16T");
     CHECK_FALSE (fresh.arpEditorExpanded());
     // The expanded state is not a parameter: hosts cannot automate it, presets do not carry it as one.
@@ -4367,54 +4370,70 @@ TEST_CASE ("plugin: ARP keyboard control and inline editor", "[.][arp-ui]")
     editor->arpControl().toggleEnabled();
     play (true);
 
-    // The menus: every pattern; the rates in three groups.
-    CHECK (editor->arpInlinePanel().patternMenu().getNumItems() == 6);
-    CHECK (editor->arpInlinePanel().rateMenu().getNumItems() == 13);   // 10 rates + 3 group headers
-    if (const char* dir = std::getenv ("OSP_SNAPSHOT_DIR"))
-        for (int which = 0; which < 2; ++which)
+    // PATTERN: a picture and a list of every style (each once); a row picks it, one gesture.
+    auto& panel = editor->arpInlinePanel();
+    {
+        auto order = osp::plugin::ArpInlinePanel::listOrder();
+        std::sort (order.begin(), order.end());
+        for (int i = 0; i < osp::arp::patternCount; ++i)
+            CHECK (order[static_cast<std::size_t> (i)] == i);
+    }
+    CHECK (panel.patternRowArea (0).getHeight() > 0.0f);   // UP is in view at first
+    CHECK (panel.fieldPattern() == 0);
+    const int pinkyUp = static_cast<int> (osp::ArpPattern::pinkyUp);
+    panel.choosePattern (pinkyUp);
+    CHECK (juce::roundToInt (p.parameterValue ("arp.pattern")) == pinkyUp);
+    CHECK (panel.patternRowArea (pinkyUp).getHeight() > 0.0f);   // scrolled into view
+    CHECK (panel.firstVisibleRow() > 0);
+    CHECK (panel.fieldPattern() == pinkyUp);
+    editor->refreshNow();
+    CHECK (editor->arpControl().statusText().contains ("PINKY"));
+    snapshot ("arp-05-pattern-list.png");
+    p.setParameterValue ("arp.pattern", static_cast<float> (osp::ArpPattern::up));   // automation: back in view
+    editor->refreshNow();
+    CHECK (panel.patternRowArea (0).getHeight() > 0.0f);
+
+    // RATE: one knob from the slowest division to the fastest; the parameter keeps its order.
+    {
+        const auto& order = osp::plugin::ArpInlinePanel::rateOrder();
+        REQUIRE (order.size() == static_cast<std::size_t> (osp::arp::rateCount));
+        for (std::size_t i = 1; i < order.size(); ++i)
+            CHECK (osp::arp::rateQuarters (static_cast<osp::ArpRate> (order[i])) < osp::arp::rateQuarters (static_cast<osp::ArpRate> (order[i - 1])));
+        auto& knob = panel.rateKnob();
+        knob.slider.setValue (0.0, juce::sendNotificationSync);
+        CHECK (juce::roundToInt (p.parameterValue ("arp.rate")) == static_cast<int> (osp::ArpRate::quarterDotted));
+        knob.slider.setValue (static_cast<double> (osp::arp::rateCount - 1), juce::sendNotificationSync);
+        CHECK (juce::roundToInt (p.parameterValue ("arp.rate")) == static_cast<int> (osp::ArpRate::thirtySecond));
+        p.setParameterValue ("arp.rate", static_cast<float> (osp::ArpRate::eighth));
+        CHECK (knob.choiceShown() == static_cast<int> (osp::ArpRate::eighth));
+        CHECK (juce::roundToInt (knob.slider.getValue()) == 4);   // 1/4D 1/4 1/8D 1/4T [1/8]
+    }
+
+    // OCTAVES: four stacked keys, 1 on top.
+    for (int o = 1; o < 4; ++o)
+        CHECK (panel.octaveKeyArea (o).getBottom() < panel.octaveKeyArea (o + 1).getY());
+    panel.chooseOctaves (3);
+    CHECK (juce::roundToInt (p.parameterValue ("arp.octaves")) == 3);
+    panel.chooseOctaves (1);
+    CHECK (juce::roundToInt (p.parameterValue ("arp.octaves")) == 1);
+
+    // Nothing overlaps: steps | picture | list | RATE | OCTAVES | GATE | SWING, inside the panel.
+    {
+        const auto local = panel.getLocalBounds().toFloat();
+        const auto knobArea = [&panel] (juce::Component& part) { return panel.getLocalArea (&part, part.getLocalBounds()).toFloat(); };
+        std::vector<juce::Rectangle<float>> parts { panel.displayArea(), panel.patternFieldArea(), panel.patternListArea(),
+                                                    knobArea (panel.rateKnob()), panel.octaveKeyArea (1).getUnion (panel.octaveKeyArea (4)) };
+        for (auto* child : panel.getChildren())
+            if (child != &panel.rateKnob())
+                parts.push_back (knobArea (*child));
+        for (std::size_t i = 0; i < parts.size(); ++i)
         {
-            // The menus drawn by the editor's own look and feel, item by item, as JUCE draws
-            // them in their window (a menu window cannot open under the test display server).
-            const auto menu = which == 0 ? editor->arpInlinePanel().patternMenu() : editor->arpInlinePanel().rateMenu();
-            auto& laf = editor->getLookAndFeel();
-            struct Row
-            {
-                juce::String text;
-                bool header = false, ticked = false;
-                int height = 0;
-            };
-            std::vector<Row> rows;
-            int menuWidth = 120, menuHeight = 8;
-            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
-            {
-                const auto& item = it.getItem();
-                int w = 0, h = 0;
-                laf.getIdealPopupMenuItemSize (item.text, false, -1, w, h);
-                if (item.isSectionHeader)
-                    h = std::max (h, 26);
-                rows.push_back ({ item.text, item.isSectionHeader, item.isTicked, h });
-                menuWidth = std::max (menuWidth, w + 40);
-                menuHeight += h;
-            }
-            juce::Image image (juce::Image::ARGB, menuWidth, menuHeight + 8, true);
-            juce::Graphics g (image);
-            laf.drawPopupMenuBackground (g, menuWidth, menuHeight + 8);
-            int y = 8;
-            for (const auto& row : rows)
-            {
-                const juce::Rectangle<int> area (0, y, menuWidth, row.height);
-                if (row.header)
-                    laf.drawPopupMenuSectionHeader (g, area, row.text);
-                else
-                    laf.drawPopupMenuItem (g, area, false, true, false, row.ticked, false, row.text, {}, nullptr, nullptr);
-                y += row.height;
-            }
-            juce::FileOutputStream out (juce::File (dir).getChildFile (which == 0 ? "arp-05-pattern-menu.png" : "arp-06-rate-menu.png"));
-            out.setPosition (0);
-            out.truncate();
-            juce::PNGImageFormat().writeImageToStream (image, out);
+            CHECK (local.contains (parts[i]));
+            for (std::size_t j = i + 1; j < parts.size(); ++j)
+                CHECK_FALSE (parts[i].reduced (1.0f).intersects (parts[j].reduced (1.0f)));
         }
-    for (int pattern : { 2, 4, 5 })
+    }
+    for (int pattern : { 2, 4, 5, 9, 13, 16 })
     {
         p.setParameterValue ("arp.pattern", static_cast<float> (pattern));
         p.setParameterValue ("arp.octaves", 2.0f);
@@ -4690,26 +4709,28 @@ TEST_CASE ("plugin: MODULATION with the ARP, every source, Granular and three la
     CHECK (p.activeVoices.load() == 0);
 }
 
-// MODULATION bay (needs a display: xvfb-run): the window widens by the bay and nothing in the
-// instrument moves; ENV / LFO editors; a source dragged onto a control becomes a route (a
-// per-voice source on a shared stage is refused; resting on CHARACTER opens its popover so
-// RES can be reached); the rings; the routing list; ARP and MOD open together; the screenshots
-// for review (OSP_SNAPSHOT_DIR): mod-01 .. mod-11.
-TEST_CASE ("plugin: MODULATION bay, drag and drop, rings, routing list, window shape", "[.][ui][mod-ui]")
+// MODULATION UI (needs a display: xvfb-run): the envelope panel's five tabs (AMP, ENV 1,
+// ENV 2, LFO 1, LFO 2) in the AMP envelope's place, the window and the instrument unchanged;
+// RATE's Sync / Hz menu, polarity in the source menu; a tab dragged onto CHARACTER makes a
+// route; the halo (clear of the knob and of its name; hover guide, handle and readout; its
+// drag edits only the selected route's depth, through zero, never the base value); several
+// routes on one control; the routes popover and the curve popover; MOD; scales. Screenshots
+// for review (OSP_SNAPSHOT_DIR): modui-01 .. modui-15.
+TEST_CASE ("plugin: MODULATION panel tabs and halos", "[.][ui][mod-ui]")
 {
     namespace mod = osp::mod;
+    namespace modui = osp::plugin::modui;
+    using Editor = osp::plugin::OspAudioProcessorEditor;
     TempDir tmp;
     const auto a = writeSource (tmp.dir, "Vowel A3.wav", testsignals::vowel (midiToHz (57), 3.0, 48000.0, 3));
-    const auto b = writeSource (tmp.dir, "Saw C3.wav", testsignals::saw (midiToHz (48), 2.0, 48000.0));
-    const auto c = writeSource (tmp.dir, "Pluck C4.wav", testsignals::pluck (midiToHz (60), 2.0, 48000.0, 5));
     OspAudioProcessor p;
     loadAndWait (p, a);
     std::unique_ptr<juce::AudioProcessorEditor> base (p.createEditorIfNeeded());
-    auto* editor = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (base.get());
+    auto* editor = dynamic_cast<Editor*> (base.get());
     REQUIRE (editor != nullptr);
     editor->refreshNow();
     auto snapshot = [&] (const juce::String& name) {
-        // Always drawn (the rings are counted as they are painted); written when asked for.
+        // Always drawn (the halos are counted as they are painted); written when asked for.
         editor->refreshNow();
         const auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f);
         if (const char* dir = std::getenv ("OSP_SNAPSHOT_DIR"))
@@ -4719,6 +4740,55 @@ TEST_CASE ("plugin: MODULATION bay, drag and drop, rings, routing list, window s
             out.truncate();
             juce::PNGImageFormat().writeImageToStream (image, out);
         }
+    };
+    auto writeMenu = [&] (const juce::PopupMenu& menu, const juce::String& name) {
+        // A menu drawn by the editor's look and feel item by item (no menu window under xvfb).
+        const char* dir = std::getenv ("OSP_SNAPSHOT_DIR");
+        if (dir == nullptr)
+            return;
+        auto& laf = editor->getLookAndFeel();
+        struct Row { juce::String text; bool header = false, ticked = false; int height = 0; };
+        std::vector<Row> rows;
+        int menuWidth = 120, menuHeight = 8;
+        for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+        {
+            const auto& item = it.getItem();
+            int w = 0, h = 0;
+            laf.getIdealPopupMenuItemSize (item.text, item.isSeparator, -1, w, h);
+            if (item.isSectionHeader)
+                h = std::max (h, 26);
+            rows.push_back ({ item.text, item.isSectionHeader, item.isTicked, h });
+            menuWidth = std::max (menuWidth, w + 40);
+            menuHeight += h;
+        }
+        juce::Image image (juce::Image::ARGB, menuWidth, menuHeight + 8, true);
+        juce::Graphics g (image);
+        laf.drawPopupMenuBackground (g, menuWidth, menuHeight + 8);
+        int y = 8;
+        for (const auto& row : rows)
+        {
+            const juce::Rectangle<int> area (0, y, menuWidth, row.height);
+            if (row.header)
+                laf.drawPopupMenuSectionHeader (g, area, row.text);
+            else if (row.text.isEmpty())
+                laf.drawPopupMenuItem (g, area, true, true, false, false, false, {}, {}, nullptr, nullptr);
+            else
+                laf.drawPopupMenuItem (g, area, false, true, false, row.ticked, false, row.text, {}, nullptr, nullptr);
+            y += row.height;
+        }
+        juce::FileOutputStream out (juce::File (dir).getChildFile (name));
+        out.setPosition (0);
+        out.truncate();
+        juce::PNGImageFormat().writeImageToStream (image, out);
+    };
+    auto runItem = [] (const juce::PopupMenu& menu, const juce::String& text) {
+        for (juce::PopupMenu::MenuItemIterator it (menu, true); it.next();)
+            if (it.getItem().text == text && it.getItem().action != nullptr)
+            {
+                it.getItem().action();
+                return true;
+            }
+        return false;
     };
     auto play = [&] (int blocks) {
         p.prepareToPlay (48000.0, 512);
@@ -4733,129 +4803,249 @@ TEST_CASE ("plugin: MODULATION bay, drag and drop, rings, routing list, window s
             p.processBlock (buffer, midi);
         }
     };
-    // A control (by parameter ID) and its centre in the instrument's coordinates.
+    auto mouse = [] (juce::Component& c, juce::Point<float> at, juce::Point<float> down, bool dragged, juce::ModifierKeys mods = {}) {
+        auto source = juce::Desktop::getInstance().getMainMouseSource();
+        const auto now = juce::Time::getCurrentTime();
+        return juce::MouseEvent (source, at, mods, juce::MouseInputSource::defaultPressure, 0.0f, 0.0f, 0.0f, 0.0f, &c, &c, now, down, now, 1, dragged);
+    };
     auto& instrument = *editor->modulationOverlay().getParentComponent();
+    auto& panel = editor->modulationPanel();
+    auto& overlay = editor->modulationOverlay();
     std::function<juce::Slider* (juce::Component&, const juce::String&)> find = [&] (juce::Component& parent, const juce::String& id) -> juce::Slider* {
         for (auto* child : parent.getChildren())
         {
             if (! child->isVisible())
                 continue;
-            if (auto* s = dynamic_cast<juce::Slider*> (child); s != nullptr && s->getProperties()["paramId"].toString() == id)
-                return s;
+            if (auto* sl = dynamic_cast<juce::Slider*> (child); sl != nullptr && sl->getProperties()["paramId"].toString() == id)
+                return sl;
             if (auto* found = find (*child, id))
                 return found;
         }
         return nullptr;
     };
     auto centreOf = [&] (const juce::String& id) {
-        auto* s = find (instrument, id);
-        REQUIRE (s != nullptr);
-        return instrument.getLocalArea (s, s->getLocalBounds()).toFloat().getCentre();
+        auto* sl = find (instrument, id);
+        REQUIRE (sl != nullptr);
+        return instrument.getLocalArea (sl, sl->getLocalBounds()).toFloat().getCentre();
     };
+    auto routeDest = [&] (int slot) { return juce::roundToInt (p.parameterValue (OspAudioProcessor::modRouteId (slot, "dest"))); };
+    auto routeDepth = [&] (int slot) { return p.parameterValue (OspAudioProcessor::modRouteId (slot, "depth")); };
 
+    // 1-2. The original window and AMP: no bay, the panel in the AMP envelope's place.
     const int width = editor->getWidth(), height = editor->getHeight();
+    CHECK (width == 1086);
     const float scale = static_cast<float> (width) / osp::plugin::design::width;
-    CHECK_FALSE (editor->isModExpanded());
-    CHECK_FALSE (editor->modulationBay().isVisible());
-    snapshot ("mod-01-closed.png");
+    CHECK (panel.tab() == 0);
+    CHECK (panel.ampEnvelope().isVisible());
+    CHECK (panel.getX() == juce::roundToInt (osp::plugin::design::layout::envelopeX));
+    CHECK (panel.getWidth() == juce::roundToInt (1405.0f - osp::plugin::design::layout::envelopeX));
+    CHECK (panel.getHeight() == 206);   // the panel grew 20 px into the air above the macros (the title line)
+    CHECK (panel.getBottom() <= juce::roundToInt (osp::plugin::design::layout::macroPanel.getBottom()));
+    const auto characterAt = centreOf ("character");
+    snapshot ("modui-01-default-amp.png");
 
-    // Open: wider by the bay, the same height, the instrument where it was.
-    const auto arpBefore = editor->arpControl().getBounds();
-    const auto keysBefore = centreOf ("character");
-    editor->setModExpanded (true);
-    CHECK (p.modBayExpanded());
-    CHECK (editor->modulationBay().isVisible());
-    CHECK (std::abs (editor->getWidth() - (width + osp::plugin::design::layout::modWidth * scale)) <= 1.5f);
-    CHECK (editor->getHeight() == height);
-    CHECK (editor->arpControl().getBounds() == arpBefore);
-    CHECK (centreOf ("character") == keysBefore);
-    CHECK (editor->modulationBay().getX() > juce::roundToInt (osp::plugin::design::width) - 20);
+    // 3. LFO 1: its display and controls in the same place; the LFO keeps running.
+    p.setParameterValue (OspAudioProcessor::modLfoId (0, "rate"), 2.0f);
+    play (10);
+    const float phaseBefore = p.modulationView().lfoPhase[0];
+    panel.showTab (3);
+    CHECK (panel.selectedSource() == 0);
+    CHECK_FALSE (panel.ampEnvelope().isVisible());
+    CHECK (panel.curveView().isVisible());
+    CHECK (panel.page (0).isVisible());
+    CHECK (p.modPanelTab() == 3);
+    CHECK (editor->getWidth() == width);
+    CHECK (centreOf ("character") == characterAt);
+    play (3);
+    CHECK (p.modulationView().lfoPhase[0] != Approx (phaseBefore).margin (1.0e-6));   // switching the tab reset nothing
+    snapshot ("modui-02-lfo1.png");
+    panel.showTab (1);
+    CHECK (panel.selectedSource() == 2);
+    snapshot ("modui-03-env1.png");
+
+    // 4. RATE: its caption's menu chooses Sync or Hz; one knob shows either.
+    panel.showTab (3);
+    auto& page = panel.page (0);
+    const auto rate = page.rateMenu();
+    writeMenu (rate, "modui-04-rate-menu.png");
+    CHECK (runItem (rate, "Sync"));
+    editor->refreshNow();
+    CHECK (p.parameterValue (OspAudioProcessor::modLfoId (0, "sync")) > 0.5f);
+    CHECK (page.divisionKnob()->isVisible());
+    CHECK_FALSE (page.rateKnob()->isVisible());
+    CHECK (runItem (page.rateMenu(), "Hz"));
+    editor->refreshNow();
+    CHECK (p.parameterValue (OspAudioProcessor::modLfoId (0, "sync")) < 0.5f);
+    CHECK (page.rateKnob()->isVisible());
+    CHECK (page.rateKnob()->onCaptionClick != nullptr);
+
+    // 6. A tab dragged past the threshold onto CHARACTER makes a route (a short wiggle does not).
+    const auto tabAt = panel.tabArea (3).getCentre();
+    const auto toPanel = [&] (juce::Point<float> instrumentPoint) { return panel.getLocalPoint (&instrument, instrumentPoint); };
+    panel.tabMouseDown (mouse (panel, tabAt, tabAt, false));
+    panel.tabMouseDrag (mouse (panel, tabAt + juce::Point<float> (2.0f, 1.0f), tabAt, true));
+    panel.tabMouseUp (mouse (panel, tabAt + juce::Point<float> (2.0f, 1.0f), tabAt, true));
+    CHECK (p.modulationRoutes().empty());
+    CHECK (panel.tab() == 3);
+    panel.tabMouseDown (mouse (panel, tabAt, tabAt, false));
+    panel.tabMouseDrag (mouse (panel, toPanel (characterAt), tabAt, true));
+    snapshot ("modui-05-dragging.png");
+    panel.tabMouseUp (mouse (panel, toPanel (characterAt), tabAt, true));
+    REQUIRE (p.modulationRoutes().size() == 1);
+    const int lfoSlot = p.modulationRoutes()[0].slot;
+    CHECK (routeDest (lfoSlot) == static_cast<int> (mod::Dest::character));
+    CHECK (editor->selectedModulationRoute() == lfoSlot);
+
+    // 5. Polarity in the source menu; the routes stay.
+    const auto menu = panel.sourceMenu (0);
+    writeMenu (menu, "modui-06-polarity-menu.png");
+    CHECK (runItem (menu, "Unipolar"));
+    CHECK (p.parameterValue (OspAudioProcessor::modLfoId (0, "polarity")) > 0.5f);
+    CHECK (runItem (panel.sourceMenu (0), "Bipolar"));
+    CHECK (p.parameterValue (OspAudioProcessor::modLfoId (0, "polarity")) < 0.5f);
+    CHECK (p.modulationRoutes().size() == 1);
+
+    // The halo: well outside the knob's own marks, clear of its name.
     play (20);
-    snapshot ("mod-02-open-lfo1.png");
-    editor->modulationBay().selectSource (2);
-    snapshot ("mod-03-env1.png");
-    editor->modulationBay().selectSource (0);
-    p.setParameterValue (OspAudioProcessor::modLfoId (0, "shape"), static_cast<float> (mod::LfoShape::custom));
-    auto curve = mod::defaultLfoCurve();
-    curve.add ({ 0.3f, 0.95f, 0.4f });
-    curve.add ({ 0.7f, 0.1f, -0.5f });
-    p.setModulationCurve (0, curve);
-    snapshot ("mod-04-custom-curve.png");
-
-    // Drag LFO 1 onto CHARACTER: while dragging the controls it can reach show rings.
-    editor->dragModulation (0, centreOf ("character"));
-    CHECK (editor->modulationOverlay().ringCount() == 0);   // counted when drawn
-    snapshot ("mod-05-dragging.png");
-    CHECK (editor->modulationOverlay().ringCount() > 3);
-    const int slot = editor->dropModulation (0, centreOf ("character"));
-    REQUIRE (slot >= 0);
-    CHECK (juce::roundToInt (p.parameterValue (OspAudioProcessor::modRouteId (slot, "dest"))) == static_cast<int> (mod::Dest::character));
-    CHECK (editor->modulationBay().routeRowCount() == 1);
-    CHECK (editor->modulationBay().selectedRoute() == slot);
-    // ENV 1 is per note: on CHARACTER it becomes the per-voice cutoff; on LIFE (a shared stage) nothing.
-    CHECK (editor->dropModulation (2, centreOf ("life")) == -1);
-    const int cutoff = editor->dropModulation (2, centreOf ("character"));
-    REQUIRE (cutoff >= 0);
-    CHECK (juce::roundToInt (p.parameterValue (OspAudioProcessor::modRouteId (cutoff, "dest"))) == static_cast<int> (mod::Dest::cutoff));
-    play (30);
-    snapshot ("mod-06-modulated-macro.png");
-    CHECK (editor->modulationOverlay().ringCount() >= 1);
-    CHECK (editor->modulationButton().hasIndicator());
-
-    // Resting on CHARACTER opens its popover; RES inside it takes the drop.
-    editor->closePopup();
-    editor->dragModulation (1, centreOf ("character"));
-    juce::Thread::sleep (600);
-    editor->dragModulation (1, centreOf ("character"));
-    CHECK (editor->openPopupIndex() == 2);
-    editor->refreshNow();
-    const int res = editor->dropModulation (1, centreOf ("character.resonance"));
-    REQUIRE (res >= 0);
-    CHECK (juce::roundToInt (p.parameterValue (OspAudioProcessor::modRouteId (res, "dest"))) == static_cast<int> (mod::Dest::resonance));
-    editor->closePopup();
-
-    // More routes by dropping onto the layer's controls; the list shows them all.
-    CHECK (editor->dropModulation (1, centreOf (OspAudioProcessor::layerParameterId (0, "pan"))) >= 0);
-    CHECK (editor->dropModulation (3, centreOf (OspAudioProcessor::reimaginedParameterId (0))) >= 0);
-    CHECK (editor->dropModulation (0, centreOf ("release")) >= 0);
-    p.setParameterValue (OspAudioProcessor::modRouteId (cutoff, "enabled"), 0.0f);   // one bypassed
-    editor->refreshNow();
-    CHECK (editor->modulationBay().routeRowCount() == 6);
-    CHECK (editor->modulationBay().addMenu().getNumItems() == 4);
-    play (30);
-    snapshot ("mod-07-routing-list.png");
-
-    // ARP and MOD open together: wider and taller, nothing overlapping.
-    editor->setArpExpanded (true);
-    CHECK (std::abs (editor->getHeight() - (height + osp::plugin::design::layout::arpShift * scale)) <= 1.5f);
-    CHECK (std::abs (editor->getWidth() - (width + osp::plugin::design::layout::modWidth * scale)) <= 1.5f);
-    CHECK (editor->modulationBay().getBottom() > editor->arpControl().getBottom());
-    CHECK_FALSE (editor->modulationBay().getBounds().intersects (editor->arpInlinePanel().getBounds()));
-    snapshot ("mod-08-arp-and-mod.png");
-    editor->setArpExpanded (false);
-    CHECK (editor->getHeight() == height);
-    snapshot ("mod-09-layers-1.png");
-    for (const auto& file : { b, c })
+    snapshot ("modui-07-halo-idle.png");
+    const float radius = overlay.haloRadius ("character");
+    auto* characterKnob = find (instrument, "character");
+    REQUIRE (characterKnob != nullptr);
+    const float knobHalf = 0.5f * static_cast<float> (characterKnob->getWidth());
+    CHECK (radius > 0.96f * knobHalf);   // past the tick ring (the old ring sat at 0.88)
+    // Every macro's name is above where its halo would be.
     {
-        p.addLayers (juce::Array<juce::File> { file });
-        REQUIRE (p.waitForLoads (30000));
-        p.pollLoads();
-        snapshot (file == b ? "mod-10-layers-2.png" : "mod-11-layers-3.png");
+        for (auto* child : instrument.getChildren())
+            if (auto* l = dynamic_cast<osp::plugin::MacroLabel*> (child))
+            {
+                const float labelBottom = static_cast<float> (l->getBottom());
+                CHECK (labelBottom < characterAt.y - radius - 4.0f);
+            }
     }
 
-    // Closed: the original window; modulation still runs; recalled with the session.
-    editor->setModExpanded (false);
-    CHECK (editor->getWidth() == width);
-    CHECK (editor->getHeight() == height);
+    // 7. Hover: the guide, the handle, the readout.
+    const auto ring = overlay.haloCentre ("character") + juce::Point<float> (0.0f, -radius);
+    CHECK (overlay.hitTest (juce::roundToInt (ring.x), juce::roundToInt (ring.y)));
+    CHECK_FALSE (overlay.hitTest (juce::roundToInt (characterAt.x), juce::roundToInt (characterAt.y)));   // the knob itself stays the knob's
+    overlay.mouseMove (mouse (overlay, ring, ring, false));
+    CHECK (overlay.isHovering());
+    const auto readout = overlay.haloReadout ("character");
+    REQUIRE (readout.size() >= 4);
+    CHECK (readout[0].contains ("LFO 1"));
+    CHECK (readout[1].contains ("+50%"));
+    CHECK (readout[2].startsWith ("Base"));
+    CHECK (readout[3].startsWith ("Range"));
+    snapshot ("modui-08-halo-hover.png");
+
+    // 8. Dragging the ring: the depth only (up deepens, down through zero); never the base.
+    const float baseCharacter = p.parameterValue ("character");
+    overlay.mouseDown (mouse (overlay, ring, ring, false));
+    CHECK (overlay.isEditing());
+    overlay.mouseDrag (mouse (overlay, ring + juce::Point<float> (0.0f, -40.0f), ring, true));
+    snapshot ("modui-09-halo-editing.png");
+    CHECK (routeDepth (lfoSlot) == Approx (70.0f).margin (0.6f));
+    overlay.mouseDrag (mouse (overlay, ring + juce::Point<float> (0.0f, 180.0f), ring, true));
+    CHECK (routeDepth (lfoSlot) == Approx (-40.0f).margin (0.6f));
+    overlay.mouseUp (mouse (overlay, ring + juce::Point<float> (0.0f, 180.0f), ring, true));
+    CHECK_FALSE (overlay.isEditing());
+    CHECK (p.parameterValue ("character") == Approx (baseCharacter));
+    // 10. Negative: the readout says so and the range goes below the base.
+    editor->refreshNow();
+    CHECK (overlay.haloReadout ("character")[1].contains ("-40%"));
+
+    // 9. ENV 1 on the same macro (per note: the cutoff), each edited alone.
+    const int envSlot = editor->dropModulation (2, characterAt);
+    REQUIRE (envSlot >= 0);
+    CHECK (routeDest (envSlot) == static_cast<int> (mod::Dest::cutoff));
+    editor->selectModulation (0, lfoSlot);
+    editor->refreshNow();
+    CHECK (overlay.haloRoute ("character") == lfoSlot);
+    editor->selectModulation (2, -1);
+    editor->refreshNow();
+    CHECK (overlay.haloRoute ("character") == envSlot);
+    const float lfoDepth = routeDepth (lfoSlot), envDepth = routeDepth (envSlot);
+    overlay.mouseDown (mouse (overlay, ring, ring, false));
+    overlay.mouseDrag (mouse (overlay, ring + juce::Point<float> (0.0f, -20.0f), ring, true));
+    overlay.mouseUp (mouse (overlay, ring + juce::Point<float> (0.0f, -20.0f), ring, true));
+    CHECK (routeDepth (envSlot) == Approx (envDepth + 10.0f).margin (0.6f));
+    CHECK (routeDepth (lfoSlot) == Approx (lfoDepth));
+    // More routes, for the picture: LFO 2 on CHARACTER too, LFO 1 on SPACE and PAN.
+    CHECK (editor->dropModulation (1, characterAt) >= 0);
+    CHECK (editor->dropModulation (0, centreOf ("space")) >= 0);
+    CHECK (editor->dropModulation (0, centreOf (OspAudioProcessor::layerParameterId (0, "pan"))) >= 0);
+    editor->selectModulation (0, lfoSlot);
+    play (20);
+    snapshot ("modui-10-multiple-routes.png");
+
+    // The routes popover (the route count), selecting a route there selects it everywhere.
+    panel.showTab (3);
+    editor->refreshNow();
+    CHECK (! panel.routesArea().isEmpty());
+    editor->openModulationPopup (Editor::routesPopup, 0);
+    REQUIRE (editor->openPopupIndex() == Editor::routesPopup);
+    auto* routes = dynamic_cast<osp::plugin::ModRoutesPopup*> (editor->openPopupPanel());
+    REQUIRE (routes != nullptr);
+    CHECK (routes->rowCount() == 3);
+    CHECK (routes->addMenu().getNumItems() == 6);
+    routes->onSelectRoute (lfoSlot);
+    CHECK (editor->selectedModulationRoute() == lfoSlot);
+    snapshot ("modui-11-routes-popover.png");
+    editor->closePopup();
+
+    // The curve popover: a CUSTOM shape gets the expand key and the larger editor.
+    p.setParameterValue (OspAudioProcessor::modLfoId (0, "shape"), static_cast<float> (mod::LfoShape::custom));
+    editor->refreshNow();
+    CHECK (! panel.expandArea().isEmpty());
+    editor->openModulationPopup (Editor::curvePopup, 0);
+    REQUIRE (editor->openPopupIndex() == Editor::curvePopup);
+    snapshot ("modui-12-curve-popover.png");
+    editor->closePopup();
+
+    // 11. Tabs in quick succession: nothing resets, every route stays.
+    const auto routeCount = p.modulationRoutes().size();
+    for (int i = 0; i < 40; ++i)
+    {
+        panel.showTab (i % modui::tabCount);
+        play (1);
+    }
+    CHECK (p.modulationRoutes().size() == routeCount);
+
+    // MOD: back to AMP and to the last source.
+    panel.showTab (4);
+    editor->modulationButton().onClick();
+    CHECK (panel.tab() == 0);
+    editor->modulationButton().onClick();
+    CHECK (panel.tab() == 4);
     CHECK (editor->modulationButton().hasIndicator());
-    editor->setModExpanded (true);
+
+    // ARP open with the panel: the window grows down only; nothing overlaps.
+    panel.showTab (3);
+    editor->setArpExpanded (true);
+    CHECK (editor->getWidth() == width);
+    CHECK (std::abs (editor->getHeight() - (height + osp::plugin::design::layout::arpShift * scale)) <= 1.5f);
+    CHECK_FALSE (panel.getBounds().intersects (editor->arpInlinePanel().getBounds()));
+    snapshot ("modui-13-arp-and-panel.png");
+    editor->setArpExpanded (false);
+
+    // 14. The smallest and largest window: the same layout, scaled.
+    for (const int w : { 869, 1810 })
+    {
+        editor->setSize (w, juce::roundToInt (static_cast<float> (w) * static_cast<float> (height) / static_cast<float> (width)));
+        editor->refreshNow();
+        CHECK (centreOf ("character") == characterAt);   // instrument coordinates never move
+        CHECK (overlay.haloRadius ("character") == Approx (radius));
+        snapshot (w < 1000 ? "modui-14-smallest.png" : "modui-15-largest.png");
+    }
+    editor->setSize (width, height);
+
+    // The shown tab is saved with the session (a view setting).
     base.reset();
     juce::MemoryBlock state;
     p.getStateInformation (state);
     OspAudioProcessor recalled;
     recalled.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
-    CHECK (recalled.modBayExpanded());
-    CHECK (recalled.modulationRoutes().size() == 6);
+    CHECK (recalled.modPanelTab() == 3);
+    CHECK (recalled.modulationRoutes().size() == routeCount);
 }
 
 // MODULATION's cost (measurement, hidden): three layers (A Granular), REIMAGINED on every
@@ -5183,10 +5373,10 @@ TEST_CASE ("plugin: EQ editor over the waveform", "[.][ui][eq-ui]")
     CHECK (cardC->eqEditorComponent()->getBounds() == cardC->display().getBounds());
     snapshot ("eq-06-open-c.png");
 
-    // ARP and MOD with an EQ open: the cards stay where they are.
+    // ARP and the modulation tabs with an EQ open: the cards stay where they are.
     const auto cardCBounds = cardC->getBounds();
     editor->setArpExpanded (true);
-    editor->setModExpanded (true);
+    editor->modulationPanel().showTab (3);
     CHECK (cardC->getBounds() == cardCBounds);
     CHECK (cardC->eqEditorComponent()->getBounds() == cardC->display().getBounds());
     snapshot ("eq-07-arp-mod.png");
@@ -5208,7 +5398,7 @@ TEST_CASE ("plugin: EQ editor over the waveform", "[.][ui][eq-ui]")
     snapshot ("eq-08-modulated.png");
 
     // Resting on A's EQ key while dragging opens A's EQ.
-    editor->setModExpanded (false);
+    editor->modulationPanel().showTab (0);
     editor->setArpExpanded (false);
     const auto key = instrument.getLocalArea (&cardA->eqToggle(), cardA->eqToggle().getLocalBounds()).toFloat().getCentre();
     editor->dragModulation (1, key);

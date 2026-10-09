@@ -4,7 +4,7 @@
 #include "Design.h"
 #include "EngineCard.h"
 #include "MainSections.h"
-#include "ModulationBay.h"
+#include "ModulationPanel.h"
 #include "OspLookAndFeel.h"
 #include "PluginProcessor.h"
 #include "ShapingPopups.h"
@@ -120,11 +120,16 @@ public:
     static constexpr int mixPopup = 6;   ///< the large three-layer mix
     static constexpr int reimaginedPopup = 7;   ///< 7, 8, 9: layer A's, B's, C's REIMAGINED modes
     static constexpr int echoPopup = 10;   ///< the sixth macro (it came after the others' numbers)
-    static constexpr int lastPopup = echoPopup;
+    static constexpr int routesPopup = 11; ///< a modulation source's routes (the panel's route count)
+    static constexpr int curvePopup = 12;  ///< the larger curve editor (CUSTOM LFO, ONE SHOT envelope)
+    static constexpr int lastPopup = curvePopup;
     /** The macro (index into the macro row's data order: LIFE..SPACE, ECHO) a popup belongs to, or -1. */
     static int macroOfPopup (int popup) noexcept { return popup >= 0 && popup < 5 ? popup : (popup == echoPopup ? 5 : -1); }
     static int popupOfMacro (int macro) noexcept { return macro < 5 ? macro : echoPopup; }
     void openPopup (int which);
+    /** The routes or curve popover of a modulation source (0 LFO 1 .. 3 ENV 2). */
+    void openModulationPopup (int which, int source);
+    MiniPanel* openPopupPanel() noexcept { return popup.get(); }
     void closePopup();
     int openPopupIndex() const noexcept { return popupIndex; }
     /** A mouse press anywhere on the desktop (from the global listener): a press elsewhere in
@@ -145,18 +150,17 @@ public:
     bool isArpExpanded() const noexcept { return arpShown; }
     /** The instrument's height in reference pixels (taller while the arpeggiator's editor shows). */
     float instrumentHeight() const noexcept { return design::height + (arpShown ? design::layout::arpShift : 0.0f); }
-    /** Its width (wider by the modulation bay while that is open). */
-    float instrumentWidth() const noexcept { return design::width + (modShown ? design::layout::modWidth : 0.0f); }
     ArpInlinePanel& arpInlinePanel() noexcept { return arpPanel; }
     ArpControl& arpControl() noexcept { return arpButton; }
 
-    /** Opens or closes the modulation bay on the right: the window grows by the bay's width
-        (its height stays) and nothing in the instrument moves. A view setting only (saved
-        with the session): modulation runs the same either way. */
-    void setModExpanded (bool open);
-    bool isModExpanded() const noexcept { return modShown; }
-    ModulationBay& modulationBay() noexcept { return modBay; }
+    /** The envelope panel (AMP, ENV 1, ENV 2, LFO 1, LFO 2) and the halos. */
+    ModulationPanel& modulationPanel() noexcept { return modPanel; }
     ModulationOverlay& modulationOverlay() noexcept { return modOverlay; }
+    /** The one modulation selection (the panel's source, the chosen route; -1: none): the
+        halos, the panel and the routes popover follow it. */
+    void selectModulation (int source, int slot);
+    int selectedModulationSource() const noexcept { return modSelSource; }
+    int selectedModulationRoute() const noexcept { return modSelSlot; }
     AdvancedCardButton& modulationButton() noexcept { return modButton; }
     /** A source tab dragged to / released at a point (instrument coordinates): what the
         bay's drag does (tests drive it directly). Returns the route's slot on release, or -1. */
@@ -249,7 +253,7 @@ private:
     HeaderMix headerMix { ospProcessor };   ///< MIX in the header (two or three layers)
     juce::Rectangle<int> lowerPanel;
     std::array<Knob, 6> macros;      // LIFE, DYNAMICS, CHARACTER, MOVEMENT, SPACE, ECHO (ECHO sits before SPACE on screen)
-    EnvelopePanel envelope { ospProcessor.parameters };
+    ModulationPanel modPanel { ospProcessor };   ///< the AMP envelope's place, with the modulation editors
 
     // Keyboard row
     Wheel pitchWheel, modWheel;
@@ -260,12 +264,12 @@ private:
     ArpInlinePanel arpPanel { ospProcessor };
     bool arpShown = false;
     AdvancedCardButton modButton { "MOD" };
-    ModulationBay modBay { ospProcessor };
     ModulationOverlay modOverlay { ospProcessor, content };
-    bool modShown = false;
+    int modSelSource = -1, modSelSlot = -1;
+    int lastModTab = 3;                  ///< the source tab MOD returns to (LFO 1 at first)
+    int popupSource = 0;                 ///< the modulation popovers' source
     int hoverMacro = -1;                 ///< a dragged source resting on a macro (opens its popover)
     juce::uint32 hoverSince = 0;
-    float shownScale = 1086.0f / design::width;   ///< window pixels per reference pixel, as last laid out
     void applyWindowShape (bool resizeWindow);
 
     std::unique_ptr<juce::FileChooser> chooser;
