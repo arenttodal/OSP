@@ -3543,3 +3543,187 @@ TEST_CASE ("plugin: DRIVE changes the sound (and CC 27 moves it); at 0 it is unt
     fresh.setParameterValue ("dynamics", 100.0f);
     CHECK (difference (flat, render (fresh, 30)) > 0.05);
 }
+
+// ARP-0 / ARP release blocker: with the arpeggiator off, the instrument must be exactly the
+// instrument it was. Run once with the build from before the arpeggiator
+// (OSP_ARP_BASELINE=write) and again with the new one (=compare), the same OSP_ARP_BASELINE_DIR:
+// the old build's states are loaded by the new one, played with the same MIDI (held notes,
+// sustain pedal, pitch bend, mod wheel, pressure, repeated pitches, All Notes Off), with and
+// without a running transport, and compared sample by sample.
+TEST_CASE ("plugin: with ARP off sessions and MIDI render identically (baseline)", "[.][arp-baseline]")
+{
+    const auto* modeText = std::getenv ("OSP_ARP_BASELINE");
+    const auto* dirText = std::getenv ("OSP_ARP_BASELINE_DIR");
+    if (modeText == nullptr || dirText == nullptr)
+    {
+        WARN ("set OSP_ARP_BASELINE=write|compare and OSP_ARP_BASELINE_DIR");
+        return;
+    }
+    const bool write = std::strcmp (modeText, "write") == 0;
+    const juce::File dir (dirText);
+    dir.createDirectory();
+    const auto vowelFile = dir.getChildFile ("vowel.wav"), sawFile = dir.getChildFile ("saw.wav"), pluckFile = dir.getChildFile ("pluck.wav");
+    if (write)
+    {
+        writeSource (dir, "vowel.wav", testsignals::vowel (midiToHz (57), 2.5, 48000.0, 3));
+        writeSource (dir, "saw.wav", testsignals::saw (midiToHz (48), 2.0, 48000.0));
+        writeSource (dir, "pluck.wav", testsignals::pluck (midiToHz (60), 2.0, 48000.0, 5));
+    }
+
+    struct Scene
+    {
+        const char* name;
+        std::function<void (OspAudioProcessor&)> setup;
+        bool transport = false;
+    };
+    std::vector<Scene> scenes {
+        { "one-shot", [&] (OspAudioProcessor& p) { loadAndWait (p, vowelFile); } },
+        { "transport", [&] (OspAudioProcessor& p) {
+              loadAndWait (p, vowelFile);
+              p.setParameterValue ("movement.mode", 4.0f);   // SHAPER follows the host
+              p.setParameterValue ("motion", 70.0f);
+          },
+          true },
+        { "reverse", [&] (OspAudioProcessor& p) {
+              loadAndWait (p, pluckFile);
+              p.setParameterValue ("layerA.reverse", 1.0f);
+          } },
+        { "granular", [&] (OspAudioProcessor& p) {
+              loadAndWait (p, vowelFile);
+              p.setParameterValue ("layerA.sourceMode", 1.0f);
+          } },
+        { "mono-glide", [&] (OspAudioProcessor& p) {
+              loadAndWait (p, sawFile);
+              p.setParameterValue ("voiceMode", 1.0f);
+              p.setParameterValue ("glide", 120.0f);
+          } },
+        { "two-layer", [&] (OspAudioProcessor& p) {
+              loadAndWait (p, vowelFile);
+              p.loadFile (sawFile, 1);
+              REQUIRE (p.waitForLoads (20000));
+              p.pollLoads();
+          } },
+        { "three-layer", [&] (OspAudioProcessor& p) {
+              loadAndWait (p, vowelFile);
+              for (int layer : { 1, 2 })
+              {
+                  p.loadFile (layer == 1 ? sawFile : pluckFile, layer);
+                  REQUIRE (p.waitForLoads (20000));
+                  p.pollLoads();
+              }
+          } },
+        { "fx", [&] (OspAudioProcessor& p) {
+              loadAndWait (p, pluckFile);
+              p.setParameterValue ("life", 80.0f);
+              p.setParameterValue ("drive", 60.0f);
+              p.setParameterValue ("character", 70.0f);
+              p.setParameterValue ("motion", 60.0f);
+              p.setParameterValue ("space", 60.0f);
+              p.setParameterValue ("echo", 50.0f);
+          } },
+    };
+    for (int mode = 0; mode < 5; ++mode)
+    {
+        static const char* names[] { "kaleidoscope", "tape-frame", "toybox", "mosaic", "mirage" };
+        scenes.push_back ({ names[mode], [&, mode] (OspAudioProcessor& p) {
+                               loadAndWait (p, vowelFile);
+                               p.setParameterValue ("reimagined", 80.0f);
+                               p.setParameterValue ("layerA.reimagined.mode", static_cast<float> (mode));
+                           } });
+    }
+
+    auto render = [] (OspAudioProcessor& p, bool transport) {
+        constexpr double rate = 48000.0;
+        constexpr int block = 256;
+        TestPlayHead head;
+        head.bpm = 120.0;
+        if (transport)
+            p.setPlayHead (&head);
+        p.prepareToPlay (rate, block);
+        const int total = static_cast<int> (5.0 * rate);
+        std::vector<float> out;
+        out.reserve (static_cast<std::size_t> (2 * total));
+        juce::AudioBuffer<float> buffer (2, block);
+        auto at = [] (double seconds) { return static_cast<int> (seconds * rate); };
+        for (int pos = 0; pos < total; pos += block)
+        {
+            juce::MidiBuffer midi;
+            auto add = [&] (double seconds, const juce::MidiMessage& m) {
+                const int t = at (seconds);
+                if (t >= pos && t < pos + block)
+                    midi.addEvent (m, t - pos);
+            };
+            add (0.0, juce::MidiMessage::noteOn (1, 48, static_cast<juce::uint8> (70)));
+            add (0.01, juce::MidiMessage::noteOn (1, 52, static_cast<juce::uint8> (90)));
+            add (0.02, juce::MidiMessage::noteOn (1, 55, static_cast<juce::uint8> (110)));
+            add (0.3, juce::MidiMessage::controllerEvent (1, 1, 90));                  // mod wheel
+            add (0.5, juce::MidiMessage::pitchWheel (1, 8192 + 3000));
+            add (0.7, juce::MidiMessage::channelPressureChange (1, 80));
+            add (0.8, juce::MidiMessage::controllerEvent (1, 64, 127));                // sustain down
+            add (0.9, juce::MidiMessage::noteOff (1, 52));                             // held by the pedal
+            add (1.0, juce::MidiMessage::noteOn (1, 60, static_cast<juce::uint8> (120)));
+            add (1.2, juce::MidiMessage::noteOn (1, 60, static_cast<juce::uint8> (64))); // same pitch again
+            add (1.3, juce::MidiMessage::noteOff (1, 60));
+            add (1.5, juce::MidiMessage::pitchWheel (1, 8192));
+            add (1.6, juce::MidiMessage::controllerEvent (1, 64, 0));                  // sustain up
+            add (1.8, juce::MidiMessage::noteOff (1, 48));
+            add (2.0, juce::MidiMessage::noteOn (1, 64, static_cast<juce::uint8> (100)));
+            add (2.0, juce::MidiMessage::noteOff (1, 55));                             // same timestamp
+            add (2.6, juce::MidiMessage::allNotesOff (1));
+            add (3.0, juce::MidiMessage::noteOn (1, 57, static_cast<juce::uint8> (100)));
+            add (3.4, juce::MidiMessage::noteOff (1, 57));
+            buffer.clear();
+            p.processBlock (buffer, midi);
+            head.ppq += block * head.bpm / (60.0 * rate);
+            for (int i = 0; i < block && pos + i < total; ++i)
+            {
+                out.push_back (buffer.getSample (0, i));
+                out.push_back (buffer.getSample (1, i));
+            }
+        }
+        p.setPlayHead (nullptr);
+        return out;
+    };
+
+    for (const auto& scene : scenes)
+    {
+        CAPTURE (scene.name);
+        const auto audioFile = dir.getChildFile (juce::String (scene.name) + ".f32");
+        const auto stateFile = dir.getChildFile (juce::String (scene.name) + ".state");
+        if (write)
+        {
+            OspAudioProcessor p;
+            scene.setup (p);
+            juce::MemoryBlock state;
+            p.getStateInformation (state);
+            REQUIRE (stateFile.replaceWithData (state.getData(), state.getSize()));
+            OspAudioProcessor fresh;
+            fresh.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+            REQUIRE (fresh.waitForLoads (20000));
+            fresh.pollLoads();
+            const auto audio = render (fresh, scene.transport);
+            REQUIRE (audioFile.replaceWithData (audio.data(), audio.size() * sizeof (float)));
+            std::printf ("wrote %s (%zu samples)\n", scene.name, audio.size() / 2);
+            continue;
+        }
+        juce::MemoryBlock state, reference;
+        REQUIRE (stateFile.loadFileAsData (state));
+        REQUIRE (audioFile.loadFileAsData (reference));
+        OspAudioProcessor p;
+        p.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+        REQUIRE (p.waitForLoads (20000));
+        p.pollLoads();
+        const auto audio = render (p, scene.transport);
+        const auto* ref = static_cast<const float*> (reference.getData());
+        REQUIRE (reference.getSize() == audio.size() * sizeof (float));
+        double worst = 0.0, peak = 0.0;
+        for (std::size_t i = 0; i < audio.size(); ++i)
+        {
+            worst = std::max (worst, static_cast<double> (std::abs (audio[i] - ref[i])));
+            peak = std::max (peak, static_cast<double> (std::abs (ref[i])));
+        }
+        std::printf ("%-14s peak %.4f  largest difference %.3g\n", scene.name, peak, worst);
+        CHECK (peak > 1.0e-3);
+        CHECK (worst <= 0.0);   // bit-identical: the arpeggiator off is not in the MIDI path
+    }
+}
