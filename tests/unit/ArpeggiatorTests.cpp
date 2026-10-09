@@ -6,6 +6,8 @@
 
 #include "core/Prng.h"
 #include "engine/Arpeggiator.h"
+#include "research/RenderConfig.h"
+#include "research/RenderSession.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -13,6 +15,8 @@
 #include <array>
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
+#include <fstream>
 #include <functional>
 #include <map>
 #include <string>
@@ -790,4 +794,52 @@ TEST_CASE ("arp: the same performance gives the same events every time", "[unit]
         CHECK (a[i].note == b[i].note);
         CHECK (a[i].kind == b[i].kind);
     }
+}
+
+TEST_CASE ("arp: research renders arpeggiate headless from a config's arp block", "[unit][arp]")
+{
+    const auto dir = std::filesystem::temp_directory_path() / "osp-arp-config-test";
+    std::filesystem::create_directories (dir);
+    const auto file = dir / "arp.json";
+    {
+        std::ofstream out (file);
+        out << R"({ "schemaVersion": 1, "engine": "C", "sampleRate": 48000, "blockSize": 256,
+                    "arp": { "pattern": "up/down", "rate": "1/16", "gate": 0.5, "octaves": 2, "bpm": 90 } })";
+    }
+    std::string error;
+    const auto config = research::loadRenderConfig (file, error);
+    std::filesystem::remove_all (dir);
+    REQUIRE (config.has_value());
+    CHECK (config->arp.settings.enabled);
+    CHECK (config->arp.settings.pattern == ArpPattern::upDown);
+    CHECK (config->arp.settings.rate == ArpRate::sixteenth);
+    CHECK (config->arp.settings.gate == 0.5);
+    CHECK (config->arp.settings.octaves == 2);
+    CHECK (config->arp.bpm == 90.0);
+
+    MidiSequence chord;
+    chord.name = "chord";
+    for (int note : { 60, 64, 67 })
+        chord.events.push_back ({ 0.0, MidiEvent::Type::noteOn, note, 100, 1 });
+    for (int note : { 60, 64, 67 })
+        chord.events.push_back ({ 2.0, MidiEvent::Type::noteOff, note, 0, 1 });
+    const auto a = research::arpeggiate (chord, *config, 48000.0);
+    const auto b = research::arpeggiate (chord, *config, 48000.0);
+    std::vector<int> notes;
+    for (const auto& e : a.events)
+        if (e.type == MidiEvent::Type::noteOn)
+            notes.push_back (e.note);
+    // 1/16 at 90 BPM: a step every 1/6 s, 12 steps in 2 s; UP/DOWN over two octaves.
+    REQUIRE (notes.size() == 12);
+    CHECK (std::vector<int> (notes.begin(), notes.begin() + 10) == std::vector<int> { 60, 64, 67, 72, 76, 79, 76, 72, 67, 64 });
+    int ons = 0, offs = 0;
+    for (const auto& e : a.events)
+        (e.type == MidiEvent::Type::noteOn ? ons : offs) += 1;
+    CHECK (ons == offs);   // every note ends
+    REQUIRE (a.events.size() == b.events.size());
+    for (std::size_t i = 0; i < a.events.size(); ++i)
+        CHECK (a.events[i].timeSeconds == b.events[i].timeSeconds);
+    // Off: the sequence is played as written.
+    research::RenderConfig plain;
+    CHECK (research::arpeggiate (chord, plain, 48000.0).events.size() == chord.events.size());
 }

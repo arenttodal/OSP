@@ -3,6 +3,7 @@
 #include "InstrumentLoader.h"
 #include "LoadedInstrument.h"
 
+#include "engine/Arpeggiator.h"
 #include "engine/InstrumentEngine.h"
 #include "model/ModelExchange.h"
 
@@ -92,6 +93,22 @@ public:
     /** Whether the Advanced panel is open (closed by default: spec §13), stored with the session. */
     bool advancedOpen() const noexcept { return advancedPanelOpen.load(); }
     void setAdvancedOpen (bool open) noexcept { advancedPanelOpen = open; }
+    /** Whether the arpeggiator's inline editor is shown: a view setting only (stored with the
+        session like the window's zoom), independent of arp.enabled and never seen by audio. */
+    bool arpEditorExpanded() const noexcept { return arpEditorOpen.load(); }
+    void setArpEditorExpanded (bool open) noexcept { arpEditorOpen = open; }
+
+    /** The arpeggiator's choices, in parameter order (never reorder: sessions store indices). */
+    static const juce::StringArray& arpPatternNames();
+    static const juce::StringArray& arpRateNames();
+    /** What the arpeggiator's 16-step display shows (lock-free snapshot, any thread). */
+    struct ArpView
+    {
+        std::array<int, Arpeggiator::displaySteps> low {}, high {};   ///< -1: no note
+        int current = -1;
+        bool active = false;
+    };
+    ArpView arpView() const noexcept;
 
     // A/B source layers. Everything below that takes a `layer` acts on the layer being
     // edited when it is -1 (the A/B tabs choose it).
@@ -376,11 +393,20 @@ public:
 private:
     void handleMidi (const juce::MidiMessage& message) noexcept;
     void swapInstrumentIfPending() noexcept;
+    /** The arpeggiator stage: from the block's incoming MIDI to the notes the engine plays
+        (the incoming buffer itself while it is off, otherwise its own preallocated one). */
+    const juce::MidiBuffer& runArpeggiator (const juce::MidiBuffer& midi, int numSamples, const HostTiming& timing) noexcept;
+    void publishArpDisplay() noexcept;
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createLayout();
 
     InstrumentEngine engine;
     EngineSettings engineSettings;
+    Arpeggiator arpeggiator;
+    juce::MidiBuffer arpMidi;   ///< preallocated in prepareToPlay
+    std::array<std::atomic<int>, Arpeggiator::displaySteps> arpDisplayLow {}, arpDisplayHigh {};
+    std::atomic<int> arpDisplayCurrent { -1 };
+    std::atomic<bool> arpDisplayActive { false };
     std::array<Layer, numLayers> layers;
     std::atomic<int> editLayerIndex { 0 };
 
@@ -411,6 +437,11 @@ private:
     std::atomic<float>* reimaginedParam = nullptr;
     std::atomic<float>* echoParam = nullptr;
     std::atomic<float>* driveParam = nullptr;
+    std::atomic<float>* arpEnabledParam = nullptr;
+    std::atomic<float>* arpPatternParam = nullptr;
+    std::atomic<float>* arpRateParam = nullptr;
+    std::atomic<float>* arpGateParam = nullptr;
+    std::atomic<float>* arpOctavesParam = nullptr;
     std::atomic<float>* pitchCharacterParam = nullptr;
     std::atomic<float>* sustainParam = nullptr;
     std::atomic<float>* seedParam = nullptr;
@@ -471,6 +502,7 @@ private:
     juce::String presetNameOverride;   ///< INIT, Reset or a user starting state while it is the last one opened
     std::atomic<float> uiScaleFactor { 1.0f };
     std::atomic<bool> advancedPanelOpen { false };
+    std::atomic<bool> arpEditorOpen { false };
     std::set<std::uint64_t> userLoads;     // load ids started by the user (undoable), not by recall
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OspAudioProcessor)

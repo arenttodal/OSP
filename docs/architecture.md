@@ -468,3 +468,22 @@ delay at mid frequencies), between exactly inverse first-order emphasis shelves.
 compensation is a static, measured table per circuit and BODY. The DYNAMICS macro's
 parameters (`dynamics`, `dynamics.curve`, `dynamics.tone`, `velocityRange`) and DSP are
 unchanged; only their controls moved to Advanced. Report: `docs/reports/drive.md`.
+
+## ARPEGGIATOR (parameters v15)
+
+`engine/Arpeggiator` (pure C++) is a note-event stage in front of `InstrumentEngine`, not
+part of it: the plugin's `processBlock` merges the screen keyboard, then
+`runArpeggiator` gives note on/off, CC 64 and All Notes Off to it and lets everything else
+pass at its sample; its events go into a `MidiBuffer` preallocated in `prepareToPlay`, and
+the existing sample-accurate render loop plays the result. One arpeggiator for the
+instrument (no per-layer copies), no DSP changed. While it is off it only follows the held
+notes (for a clean hand-over when switched on) and the engine plays the MIDI exactly as it
+arrived, so sessions from before it are bit-identical (13-scene null test). Timing: the
+host's PPQ grid while it plays (resync on loops/jumps, no catch-up), free running at the last
+tempo when stopped. Every generated note gets a scheduled note-off; because the engine
+releases all voices of a pitch together, a pitch still sounding is ended right before it is
+played again. RANDOM uses `osp::Prng` (variation seed + a phrase counter restarted with the
+transport). The editor reads a 16-step display snapshot through atomics; its inline panel is a
+view setting (`arpExpanded` on the state tree), never a parameter. Headless:
+`research::arpeggiate` and the `"arp"` block of render configs. Report:
+`docs/reports/arpeggiator.md`.

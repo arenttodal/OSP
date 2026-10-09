@@ -49,4 +49,12 @@ RenderOutput renderInstrument (const InstrumentModel& model, const MidiSequence&
 /** A multi-sample instrument through engine C. */
 RenderOutput renderSet (const InstrumentSet& set, const MidiSequence& sequence, const RenderConfig& config);
 
+/**
+    The notes the arpeggiator makes from `sequence` (config.arp), as the plugin plays them:
+    block by block at the config's rate and block size, with a host transport running from
+    bar 1 at config.arp.bpm (or none). Note events and the pedal are replaced by its own;
+    All Notes Off stays. Returns the sequence unchanged while the arpeggiator is off.
+*/
+MidiSequence arpeggiate (const MidiSequence& sequence, const RenderConfig& config, double outputRate);
+
 } // namespace osp::research

@@ -52,6 +52,7 @@ target_sources(OSP_Plugin PRIVATE
     Source/MacroPopups.cpp
     Source/EngineCard.cpp
     Source/MainSections.cpp
+    Source/ArpSection.cpp
     Source/InstrumentLoader.cpp
     ${OSP_IO_SOURCES})
 

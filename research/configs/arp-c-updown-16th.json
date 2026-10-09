@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "description": "Engine C behind the arpeggiator: UP/DOWN, 1/16, gate 75 %, two octaves, a host playing at 110 BPM from bar 1. Render the same fixture with baseline-a/-b plus the same \"arp\" block for the A/B comparison.",
+  "engine": "C",
+  "sampleRate": 48000,
+  "blockSize": 128,
+  "seed": 1,
+  "arp": { "enabled": true, "pattern": "up/down", "rate": "1/16", "gate": 0.75, "octaves": 2, "bpm": 110, "transport": true }
+}

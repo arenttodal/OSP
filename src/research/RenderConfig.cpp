@@ -238,6 +238,27 @@ std::optional<RenderConfig> loadRenderConfig (const std::filesystem::path& path,
     config.engineSettings.seed = s.seed;
     applyInstrumentBlock (root["instrument"], config);
 
+    // The arpeggiator (optional): "arp": { "enabled": true, "pattern": "up", "rate": "1/8", ... }
+    if (json::has (root, "arp"))
+    {
+        const auto& a = root["arp"];
+        auto& arpSettings = config.arp.settings;
+        arpSettings.enabled = json::getBool (a, "enabled", true);
+        const auto pattern = juce::String (json::getString (a, "pattern", "up")).toLowerCase().removeCharacters ("/ _-");
+        static const char* patterns[] { "up", "down", "updown", "played", "random", "chord" };
+        for (int i = 0; i < arp::patternCount; ++i)
+            if (pattern == patterns[i])
+                arpSettings.pattern = static_cast<ArpPattern> (i);
+        const auto rate = juce::String (json::getString (a, "rate", "1/8")).toUpperCase();
+        for (int i = 0; i < arp::rateCount; ++i)
+            if (rate == juce::String (arp::rateName (static_cast<ArpRate> (i))))
+                arpSettings.rate = static_cast<ArpRate> (i);
+        arpSettings.gate = std::clamp (json::getDouble (a, "gate", arpSettings.gate), arp::minGate, arp::maxGate);
+        arpSettings.octaves = std::clamp (json::getInt (a, "octaves", arpSettings.octaves), arp::minOctaves, arp::maxOctaves);
+        config.arp.bpm = std::clamp (json::getDouble (a, "bpm", config.arp.bpm), 20.0, 400.0);
+        config.arp.transport = json::getBool (a, "transport", config.arp.transport);
+    }
+
     return config;
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "audio/sampler/BaselineSampler.h"
+#include "engine/Arpeggiator.h"
 #include "engine/InstrumentEngine.h"
 #include "model/PlaybackPreparation.h"
 
@@ -37,6 +38,14 @@ struct RenderConfig
     PlaybackOptions playback {};      ///< start-at-onset / level normalisation (off = plain baselines)
     EngineSettings engineSettings {}; ///< engine C only
     bool anchors = false;             ///< engine C: build register anchors (needed for pitchCharacter = natural)
+
+    /** The arpeggiator ahead of the engine (off: the MIDI is played as written). */
+    struct Arp
+    {
+        Arpeggiator::Settings settings {};
+        double bpm = 120.0;
+        bool transport = true;   ///< a host playing from bar 1 (a bounce); false: no host, free running
+    } arp;
 
     /** Settings actually used for the engine (B turns randomisation on). */
     SamplerSettings effectiveSamplerSettings() const;

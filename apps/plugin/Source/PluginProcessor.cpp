@@ -97,6 +97,12 @@ namespace ids
     static const juce::String driveMode = "drive.mode";
     static const juce::String driveTone = "drive.tone";
     static const juce::String driveBody = "drive.body";
+    // ARPEGGIATOR (version hint 15): note events ahead of the voice engine. Off by default.
+    static const juce::String arpEnabled = "arp.enabled";
+    static const juce::String arpPattern = "arp.pattern";
+    static const juce::String arpRate = "arp.rate";
+    static const juce::String arpGate = "arp.gate";
+    static const juce::String arpOctaves = "arp.octaves";
     // A/B layers (stable: never rename). Per layer: layerA.sourceMode, layerA.granular.position, ...
     static const juce::String blend = "ab.blend";
     static const juce::Identifier instrument = "Instrument";
@@ -411,7 +417,36 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
         layout.add (std::make_unique<juce::AudioParameterFloat> (id14 (ids::driveTone), "Drive Tone", unit, static_cast<float> (100.0 * d14.driveTone), percent));
         layout.add (std::make_unique<juce::AudioParameterFloat> (id14 (ids::driveBody), "Drive Body", unit, static_cast<float> (100.0 * d14.driveBody), percent));
     }
+    {
+        // ARPEGGIATOR (version hint 15). Off: the MIDI stream is not touched, so sessions from
+        // before it (which open with it off) play exactly as they did.
+        auto id15 = [] (const juce::String& id) { return juce::ParameterID { id, 15 }; };
+        layout.add (std::make_unique<juce::AudioParameterBool> (id15 (ids::arpEnabled), "Arp", false));
+        layout.add (std::make_unique<juce::AudioParameterChoice> (id15 (ids::arpPattern), "Arp Pattern", arpPatternNames(), 0));
+        layout.add (std::make_unique<juce::AudioParameterChoice> (id15 (ids::arpRate), "Arp Rate", arpRateNames(), 1));
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id15 (ids::arpGate), "Arp Gate", juce::NormalisableRange<float> (10.0f, 150.0f, 1.0f), 75.0f,
+                                                                 percent));
+        layout.add (std::make_unique<juce::AudioParameterInt> (id15 (ids::arpOctaves), "Arp Octaves", 1, 4, 1));
+    }
     return layout;
+}
+
+const juce::StringArray& OspAudioProcessor::arpPatternNames()
+{
+    // Choice order is saved in sessions: never reorder (append only).
+    static const juce::StringArray names { "UP", "DOWN", "UP/DOWN", "PLAYED", "RANDOM", "CHORD" };
+    return names;
+}
+
+const juce::StringArray& OspAudioProcessor::arpRateNames()
+{
+    static const juce::StringArray names = [] {
+        juce::StringArray n;
+        for (int i = 0; i < arp::rateCount; ++i)
+            n.add (arp::rateName (static_cast<ArpRate> (i)));
+        return n;
+    }();
+    return names;
 }
 
 const juce::StringArray& OspAudioProcessor::layerStateNames()
@@ -511,6 +546,11 @@ OspAudioProcessor::OspAudioProcessor()
     reimaginedParam = parameters.getRawParameterValue (ids::reimagined);
     echoParam = parameters.getRawParameterValue (ids::echo);
     driveParam = parameters.getRawParameterValue (ids::drive);
+    arpEnabledParam = parameters.getRawParameterValue (ids::arpEnabled);
+    arpPatternParam = parameters.getRawParameterValue (ids::arpPattern);
+    arpRateParam = parameters.getRawParameterValue (ids::arpRate);
+    arpGateParam = parameters.getRawParameterValue (ids::arpGate);
+    arpOctavesParam = parameters.getRawParameterValue (ids::arpOctaves);
     customPattern = RhythmicShaper::patternSteps (ShaperParams().pattern);   // CUSTOM starts as THREE
     publishCustomPattern();
     pitchCharacterParam = parameters.getRawParameterValue (ids::pitchCharacter);
@@ -601,6 +641,10 @@ void OspAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     }
     keyboardState.reset();
     pitchBendSemitones = 0.0;
+    // The arpeggiator's merged MIDI: room for any realistic block, so the audio thread
+    // never grows it (MidiBuffer stores 4 bytes of header plus the message per event).
+    arpeggiator.prepare (sampleRate);
+    arpMidi.ensureSize (static_cast<std::size_t> (Arpeggiator::maxEvents + 4096) * 16);
     applyParameters (true);
 }
 
@@ -1148,7 +1192,10 @@ void OspAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
             }
             const bool transportRunning = position->getIsPlaying();
             if (transportRunning && ! hostWasPlaying)
+            {
                 engine.resetPerformance();
+                arpeggiator.restartPattern();   // and the arpeggiator's pattern and RANDOM choices
+            }
             hostWasPlaying = transportRunning;
         }
     engine.setHostTiming (timing);
@@ -1167,6 +1214,7 @@ void OspAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
         }
     }
     applyParameters (false);
+    const auto& notes = runArpeggiator (midi, numSamples, timing);
 
     const int outChannels = std::min (buffer.getNumChannels(), 2);
     auto* const* channels = buffer.getArrayOfWritePointers();
@@ -1180,7 +1228,7 @@ void OspAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
         position = end;
     };
 
-    for (const auto metadata : midi)
+    for (const auto metadata : notes)
     {
         renderTo (std::clamp (metadata.samplePosition, 0, numSamples));
         handleMidi (metadata.getMessage());
@@ -1191,6 +1239,99 @@ void OspAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
         buffer.clear (ch, 0, numSamples);
 
     activeVoices.store (engine.musicalVoiceCount(), std::memory_order_relaxed);
+}
+
+const juce::MidiBuffer& OspAudioProcessor::runArpeggiator (const juce::MidiBuffer& midi, int numSamples, const HostTiming& timing) noexcept
+{
+    Arpeggiator::Settings settings;
+    settings.enabled = arpEnabledParam->load() >= 0.5f;
+    settings.pattern = static_cast<ArpPattern> (std::clamp (juce::roundToInt (arpPatternParam->load()), 0, arp::patternCount - 1));
+    settings.rate = static_cast<ArpRate> (std::clamp (juce::roundToInt (arpRateParam->load()), 0, arp::rateCount - 1));
+    settings.gate = arpGateParam->load() / 100.0;
+    settings.octaves = std::clamp (juce::roundToInt (arpOctavesParam->load()), arp::minOctaves, arp::maxOctaves);
+    arpeggiator.setSeed (static_cast<std::uint64_t> (std::max (1.0f, seedParam->load())));
+    arpeggiator.beginBlock (settings, timing, numSamples);
+
+    auto feed = [this, numSamples] (const juce::MidiMessage& m, int samplePosition) {
+        const int offset = std::clamp (samplePosition, 0, std::max (0, numSamples - 1));
+        if (m.isNoteOn())
+            arpeggiator.noteOn (offset, m.getNoteNumber(), m.getVelocity(), m.getChannel());
+        else if (m.isNoteOff())
+            arpeggiator.noteOff (offset, m.getNoteNumber(), m.getChannel());
+        else if (m.isSustainPedalOn() || m.isSustainPedalOff())
+            arpeggiator.sustainPedal (offset, m.isSustainPedalOn());
+        else if (m.isAllNotesOff() || m.isAllSoundOff())
+            arpeggiator.allNotesOff (offset);
+        else
+            return false;
+        return true;
+    };
+
+    const bool owns = arpeggiator.isEnabled();
+    if (! owns && arpeggiator.numEvents() == 0 && arpeggiator.soundingCount() == 0)
+    {
+        // Off: the held notes are only followed (to hand them over if it is switched on);
+        // the MIDI the engine plays is exactly what arrived.
+        for (const auto metadata : midi)
+            feed (metadata.getMessage(), metadata.samplePosition);
+        arpeggiator.endBlock();
+        publishArpDisplay();
+        return midi;
+    }
+
+    // On (or handing back): note events and the pedal go to the arpeggiator, everything
+    // else (bends, wheels, pressure, CCs, All Notes Off) passes through at its sample.
+    arpMidi.clear();
+    for (const auto metadata : midi)
+    {
+        const auto m = metadata.getMessage();
+        const bool noteEvent = feed (m, metadata.samplePosition);
+        const bool consumed = owns && noteEvent && ! (m.isAllNotesOff() || m.isAllSoundOff());
+        if (! consumed)
+            arpMidi.addEvent (m, metadata.samplePosition);
+    }
+    arpeggiator.endBlock();
+    for (int i = 0; i < arpeggiator.numEvents(); ++i)
+    {
+        const auto& e = arpeggiator.event (i);
+        switch (e.kind)
+        {
+            case Arpeggiator::Event::Kind::noteOn: arpMidi.addEvent (juce::MidiMessage::noteOn (e.channel, e.note, e.velocity), e.offset); break;
+            case Arpeggiator::Event::Kind::noteOff: arpMidi.addEvent (juce::MidiMessage::noteOff (e.channel, e.note), e.offset); break;
+            case Arpeggiator::Event::Kind::sustainOn: arpMidi.addEvent (juce::MidiMessage::controllerEvent (e.channel, 64, 127), e.offset); break;
+            case Arpeggiator::Event::Kind::sustainOff: arpMidi.addEvent (juce::MidiMessage::controllerEvent (e.channel, 64, 0), e.offset); break;
+        }
+    }
+    // The engine plays arpMidi; the host's buffer is left as it came (the plugin sends no MIDI
+    // out), and arpMidi keeps its own preallocated storage.
+    publishArpDisplay();
+    return arpMidi;
+}
+
+void OspAudioProcessor::publishArpDisplay() noexcept
+{
+    Arpeggiator::Display display;
+    arpeggiator.display (display);
+    for (int i = 0; i < Arpeggiator::displaySteps; ++i)
+    {
+        arpDisplayLow[static_cast<std::size_t> (i)].store (display.low[static_cast<std::size_t> (i)], std::memory_order_relaxed);
+        arpDisplayHigh[static_cast<std::size_t> (i)].store (display.high[static_cast<std::size_t> (i)], std::memory_order_relaxed);
+    }
+    arpDisplayCurrent.store (display.current, std::memory_order_relaxed);
+    arpDisplayActive.store (display.active, std::memory_order_release);
+}
+
+OspAudioProcessor::ArpView OspAudioProcessor::arpView() const noexcept
+{
+    ArpView view;
+    view.active = arpDisplayActive.load (std::memory_order_acquire);
+    view.current = arpDisplayCurrent.load (std::memory_order_relaxed);
+    for (int i = 0; i < Arpeggiator::displaySteps; ++i)
+    {
+        view.low[static_cast<std::size_t> (i)] = arpDisplayLow[static_cast<std::size_t> (i)].load (std::memory_order_relaxed);
+        view.high[static_cast<std::size_t> (i)] = arpDisplayHigh[static_cast<std::size_t> (i)].load (std::memory_order_relaxed);
+    }
+    return view;
 }
 
 //==============================================================================
@@ -1983,6 +2124,7 @@ std::unique_ptr<juce::XmlElement> OspAudioProcessor::createStateXml()
     stateTree.setProperty ("stateVersion", stateVersion, nullptr);
     stateTree.setProperty ("uiScale", uiScaleFactor.load(), nullptr);
     stateTree.setProperty ("advancedOpen", advancedPanelOpen.load(), nullptr);
+    stateTree.setProperty ("arpExpanded", arpEditorOpen.load(), nullptr);   // UI only, never audio
     stateTree.setProperty ("program", currentProgram, nullptr);
 
     stateTree.setProperty ("editLayer", editLayer(), nullptr);
@@ -2059,6 +2201,7 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml, bool setting
     {
         uiScaleFactor = std::clamp (static_cast<float> (stateTree.getProperty ("uiScale", 1.0f)), 0.8f, 2.0f);
         advancedPanelOpen = static_cast<bool> (stateTree.getProperty ("advancedOpen", false));
+        arpEditorOpen = static_cast<bool> (stateTree.getProperty ("arpExpanded", false));
         currentProgram = static_cast<int> (stateTree.getProperty ("program", 0));
         setEditLayer (static_cast<int> (stateTree.getProperty ("editLayer", 0)));
     }
@@ -2435,7 +2578,7 @@ bool OspAudioProcessor::saveStartingState (const juce::File& file)
     for (const auto* id : { &ids::instrument, &ids::instrumentB, &ids::instrumentC })
         if (auto* child = xml->getChildByName (juce::Identifier (*id).toString()))
             xml->removeChildElement (child, true);
-    for (const auto* property : { "uiScale", "advancedOpen", "editLayer", "program" })
+    for (const auto* property : { "uiScale", "advancedOpen", "arpExpanded", "editLayer", "program" })
         xml->removeAttribute (property);
     xml->setAttribute ("keptSlots", slotCount());
     xml->setAttribute ("startingState", 1);

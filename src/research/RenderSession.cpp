@@ -82,12 +82,77 @@ namespace
     }
 }
 
-RenderOutput renderSequence (const AudioData& source, double rootMidi, const MidiSequence& sequence,
+MidiSequence arpeggiate (const MidiSequence& sequence, const RenderConfig& config, double outputRate)
+{
+    if (! config.arp.settings.enabled)
+        return sequence;
+    const int blockSize = std::max (1, config.blockSize);
+    Arpeggiator arp;
+    arp.setSeed (config.engineSettings.seed);
+    arp.prepare (outputRate);
+    HostTiming timing;
+    timing.valid = timing.playing = config.arp.transport;
+    timing.bpm = config.arp.bpm;
+    // Long enough after the last event for the last gate (up to 150 % of a dotted quarter).
+    const auto end = static_cast<std::int64_t> (std::llround ((sequence.endTimeSeconds() + 2.25 * 60.0 / config.arp.bpm + 0.01) * outputRate));
+    MidiSequence out;
+    out.name = sequence.name;
+    std::size_t next = 0;
+    for (std::int64_t position = 0; position < end; position += blockSize)
+    {
+        const int n = static_cast<int> (std::min<std::int64_t> (blockSize, end - position));
+        arp.beginBlock (config.arp.settings, timing, n);
+        while (next < sequence.events.size())
+        {
+            const auto& e = sequence.events[next];
+            const auto at = std::max<std::int64_t> (position, std::llround (e.timeSeconds * outputRate));
+            if (at >= position + n)
+                break;
+            const int offset = static_cast<int> (at - position);
+            switch (e.type)
+            {
+                case MidiEvent::Type::noteOn: arp.noteOn (offset, e.note, e.value, e.channel); break;
+                case MidiEvent::Type::noteOff: arp.noteOff (offset, e.note, e.channel); break;
+                case MidiEvent::Type::sustainPedal: arp.sustainPedal (offset, e.value >= 64); break;
+                case MidiEvent::Type::allNotesOff:
+                    arp.allNotesOff (offset);
+                    out.events.push_back (e);
+                    break;
+            }
+            ++next;
+        }
+        arp.endBlock();
+        for (int i = 0; i < arp.numEvents(); ++i)
+        {
+            const auto& g = arp.event (i);
+            MidiEvent m;
+            m.timeSeconds = static_cast<double> (position + g.offset) / outputRate;
+            m.note = g.note;
+            m.channel = g.channel;
+            switch (g.kind)
+            {
+                case Arpeggiator::Event::Kind::noteOn: m.type = MidiEvent::Type::noteOn; m.value = g.velocity; break;
+                case Arpeggiator::Event::Kind::noteOff: m.type = MidiEvent::Type::noteOff; m.value = 0; break;
+                case Arpeggiator::Event::Kind::sustainOn: m.type = MidiEvent::Type::sustainPedal; m.value = 127; break;
+                case Arpeggiator::Event::Kind::sustainOff: m.type = MidiEvent::Type::sustainPedal; m.value = 0; break;
+            }
+            out.events.push_back (m);
+        }
+        timing.ppq += n * config.arp.bpm / (60.0 * outputRate);
+    }
+    // Already in time order within each block; equal times keep the arpeggiator's order
+    // (note-offs before note-ons).
+    std::stable_sort (out.events.begin(), out.events.end(), [] (const MidiEvent& a, const MidiEvent& b) { return a.timeSeconds < b.timeSeconds; });
+    return out;
+}
+
+RenderOutput renderSequence (const AudioData& source, double rootMidi, const MidiSequence& input,
                              const RenderConfig& config, const PlaybackPreparation& preparation)
 {
     const double outputRate = config.sampleRate > 0.0 ? config.sampleRate : source.sampleRate;
     const int blockSize = std::max (1, config.blockSize);
 
+    const auto sequence = arpeggiate (input, config, outputRate);
     BaselineSampler sampler;
     sampler.prepare (outputRate, blockSize, config.effectiveSamplerSettings());
     const PlaybackSource playback (source, rootMidi, sampler.requiredSourcePadding(), preparation.startSeconds,
@@ -103,7 +168,7 @@ RenderOutput renderInstrument (const InstrumentModel& model, const MidiSequence&
     InstrumentEngine engine;
     engine.prepare (outputRate, blockSize, config.engineSettings);
     engine.setModel (&model);
-    return runBlocks (engine, outputRate, blockSize, sequence, config.maxTailSeconds);
+    return runBlocks (engine, outputRate, blockSize, arpeggiate (sequence, config, outputRate), config.maxTailSeconds);
 }
 
 RenderOutput renderSet (const InstrumentSet& set, const MidiSequence& sequence, const RenderConfig& config)
@@ -114,7 +179,7 @@ RenderOutput renderSet (const InstrumentSet& set, const MidiSequence& sequence, 
     InstrumentEngine engine;
     engine.prepare (outputRate, blockSize, config.engineSettings);
     engine.setInstrumentSet (&set);
-    return runBlocks (engine, outputRate, blockSize, sequence, config.maxTailSeconds);
+    return runBlocks (engine, outputRate, blockSize, arpeggiate (sequence, config, outputRate), config.maxTailSeconds);
 }
 
 RenderOutput renderWithEngine (const AudioData& source, const AnalysisData& analysis, double rootMidi, const MidiSequence& sequence,

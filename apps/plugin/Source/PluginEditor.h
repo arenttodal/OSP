@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ArpSection.h"
 #include "Design.h"
 #include "EngineCard.h"
 #include "MainSections.h"
@@ -136,6 +137,16 @@ public:
     /** For tests: the source area's cards and drop-time layout (as during a drag). */
     void previewDrag (bool dragging, juce::Point<int> where = {});
 
+    /** Shows or hides the arpeggiator's inline editor: the keyboard moves down by the
+        editor's height and the window grows by as much (its width stays). A view setting
+        only (saved with the session), never a parameter, never heard. */
+    void setArpExpanded (bool open);
+    bool isArpExpanded() const noexcept { return arpShown; }
+    /** The instrument's height in reference pixels (taller while the arpeggiator's editor shows). */
+    float instrumentHeight() const noexcept { return design::height + (arpShown ? design::layout::arpShift : 0.0f); }
+    ArpInlinePanel& arpInlinePanel() noexcept { return arpPanel; }
+    ArpControl& arpControl() noexcept { return arpButton; }
+
 private:
     void timerCallback() override;
     /** Places everything in reference coordinates (once: the whole layout scales). */
@@ -228,7 +239,11 @@ private:
     Wheel pitchWheel, modWheel;
     OspKeyboard keyboard;
     juce::Label statusLabel;
-    juce::TextButton advancedButton { juce::String::fromUTF8 ("Advanced  \xe2\x80\xba") };
+    SmallLinkButton advancedButton { juce::String::fromUTF8 ("ADVANCED  \xe2\x80\xba") };
+    ArpControl arpButton { ospProcessor };
+    ArpInlinePanel arpPanel { ospProcessor };
+    bool arpShown = false;
+    void applyWindowShape (bool resizeWindow);
 
     std::unique_ptr<juce::FileChooser> chooser;
     juce::TooltipWindow tooltips { this, 700 };

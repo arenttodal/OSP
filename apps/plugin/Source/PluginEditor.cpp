@@ -470,6 +470,12 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
         openPopup (advancedPopup);
     };
     content.addAndMakeVisible (advancedButton);
+    arpButton.onToggleEditor = [this] { setArpExpanded (! arpShown); };
+    content.addAndMakeVisible (arpButton);
+    content.addChildComponent (arpPanel);
+    arpShown = ospProcessor.arpEditorExpanded();
+    arpButton.setExpanded (arpShown);
+    arpPanel.setVisible (arpShown);
 
     juce::Desktop::getInstance().addGlobalMouseListener (&outsideClicks);
 
@@ -479,10 +485,8 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     addAndMakeVisible (content);
     layoutInstrument();
     setResizable (true, true);
-    setResizeLimits (869, 652, 1810, 1358);
-    if (auto* constrainer = getConstrainer())
-        constrainer->setFixedAspectRatio (static_cast<double> (design::width / design::height));
-    setSize (1086, 815);
+    applyWindowShape (false);
+    setSize (1086, juce::roundToInt (1086.0f * instrumentHeight() / design::width));
     setScaleFactor (ospProcessor.uiScale());
 
     if (ospProcessor.advancedOpen())
@@ -1158,7 +1162,7 @@ void OspAudioProcessorEditor::paintInstrument (juce::Graphics& g)
 
     // The keyboard's frame: a quiet rim, the keys set into it.
     {
-        const auto bed = layout::keyboard.expanded (2.0f);
+        const auto bed = layout::keyboard.translated (0.0f, arpShown ? layout::arpShift : 0.0f).expanded (2.0f);
         juce::Path frame;
         frame.addRoundedRectangle (bed, 6.0f);
         design::CachedShadow (juce::Colour (0x22302418), 3, { 0, 1 }).drawForPath (g, frame);
@@ -1190,16 +1194,55 @@ void OspAudioProcessorEditor::paintInstrument (juce::Graphics& g)
 
 void OspAudioProcessorEditor::resized()
 {
-    const float k = std::min (static_cast<float> (getWidth()) / design::width, static_cast<float> (getHeight()) / design::height);
+    // Scaled uniformly to fit: if a host keeps the old window shape (it refused the resize),
+    // the instrument still shows whole, with a margin, never cut off.
+    const float h = instrumentHeight();
+    const float k = std::min (static_cast<float> (getWidth()) / design::width, static_cast<float> (getHeight()) / h);
     const float x = 0.5f * (static_cast<float> (getWidth()) - design::width * k);
-    const float y = 0.5f * (static_cast<float> (getHeight()) - design::height * k);
-    content.setBounds (0, 0, static_cast<int> (design::width), static_cast<int> (design::height));
+    const float y = 0.5f * (static_cast<float> (getHeight()) - h * k);
+    content.setBounds (0, 0, static_cast<int> (design::width), static_cast<int> (h));
     content.setTransform (juce::AffineTransform::scale (k).translated (x, y));
 }
 
 juce::Point<int> OspAudioProcessorEditor::toInstrument (juce::Point<int> editorPoint) const
 {
     return content.getLocalPoint (this, editorPoint);
+}
+
+void OspAudioProcessorEditor::setArpExpanded (bool open)
+{
+    ospProcessor.setArpEditorExpanded (open);
+    if (open == arpShown)
+        return;
+    arpShown = open;
+    arpButton.setExpanded (open);
+    arpPanel.setVisible (open);
+    if (open)
+        arpPanel.refresh();
+    // At once: a host-driven window resize animated frame by frame flickers or lags in
+    // several hosts, so the window takes its new height in one step and the layout follows.
+    layoutInstrument();
+    applyWindowShape (true);
+    positionPopup();
+    content.repaint();
+}
+
+void OspAudioProcessorEditor::applyWindowShape (bool resizeWindow)
+{
+    // The window keeps the instrument's proportions: the same width range as always, the
+    // height following the instrument (taller with the arpeggiator's editor shown).
+    const float h = instrumentHeight();
+    setResizeLimits (869, juce::roundToInt (869.0f * h / design::width), 1810, juce::roundToInt (1810.0f * h / design::width));
+    if (auto* windowShape = getConstrainer())
+        windowShape->setFixedAspectRatio (static_cast<double> (design::width / h));
+    if (resizeWindow)
+    {
+        const int height = juce::roundToInt (static_cast<float> (getWidth()) * h / design::width);
+        if (height != getHeight())
+            setSize (getWidth(), height);
+        else
+            resized();
+    }
 }
 
 void OspAudioProcessorEditor::layoutInstrument()
@@ -1223,13 +1266,20 @@ void OspAudioProcessorEditor::layoutInstrument()
     }
     envelope.setBounds (at (juce::Rectangle<float> (layout::envelopeX, 708.0f, 1405.0f - layout::envelopeX, 186.0f)));
 
+    // The arpeggiator's editor (when shown) takes the keyboard row's place; the row and the
+    // footer move down by its height.
+    arpPanel.setBounds (at (layout::arpPanel));
+    const float shift = arpShown ? layout::arpShift : 0.0f;
+    auto low = [&] (juce::Rectangle<float> r) { return at (r.translated (0.0f, shift)); };
+
     // Keyboard row and footer.
-    pitchWheel.setBounds (at (layout::pitchWheel.withHeight (115.0f)));
-    modWheel.setBounds (at (layout::modWheel.withHeight (115.0f)));
-    keyboard.setBounds (at (layout::keyboard));
+    pitchWheel.setBounds (low (layout::pitchWheel.withHeight (115.0f)));
+    modWheel.setBounds (low (layout::modWheel.withHeight (115.0f)));
+    keyboard.setBounds (low (layout::keyboard));
     keyboard.setKeyWidth (layout::keyboard.getWidth() / 52.0f);   // 88 keys = 52 white keys
-    statusLabel.setBounds (at (layout::status));
-    advancedButton.setBounds (at (layout::advanced));
+    statusLabel.setBounds (low (layout::status));
+    arpButton.setBounds (low (layout::arpControl));
+    advancedButton.setBounds (low (layout::advanced));
 
     headerMix.setBounds (at (layout::headerMix));
     sourceArea = at (layout::sources);
@@ -1307,6 +1357,13 @@ void OspAudioProcessorEditor::timerCallback()
     }
     updateCustomisedDots();
     updateStatus();
+    // The arpeggiator: its state by the keyboard, its step display, and the editor shown or
+    // hidden when a recalled session says so.
+    if (ospProcessor.arpEditorExpanded() != arpShown)
+        setArpExpanded (ospProcessor.arpEditorExpanded());
+    arpButton.refresh();
+    if (arpShown)
+        arpPanel.refresh();
 }
 
 } // namespace osp::plugin

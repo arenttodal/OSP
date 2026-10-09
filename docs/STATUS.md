@@ -235,6 +235,16 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       build). Tuned by measurement; listening round on the corpus still to do.
 - [ ] DRIVE listening round: corpus sources at 10-20 / 40-60 / 100 %, blind TUBE / TAPE /
       CRUNCH at 65 %, level-matched.
+- [x] ARPEGGIATOR (parameters v15; docs/reports/arpeggiator.md): one note-event stage ahead of
+      the voice engine (`engine/Arpeggiator`): UP, DOWN, UP/DOWN, PLAYED, RANDOM (seeded),
+      CHORD; 1/4..1/32 with dotted and triplet; gate 10-150 %; 1-4 octaves; the host's grid to
+      the sample (600-case timing matrix exact), free running when stopped; scheduled
+      note-offs, pedal, panic, safe on/off hand-overs (stress-tested: no stuck notes). A light,
+      the state and a chevron by the keyboard; an inline editor (16-step display bound to the
+      scheduler) that grows the window; ADVANCED became a small link. ARP off: sessions from
+      before render bit-identically (13-scene null test). Headless via the `"arp"` config block.
+- [ ] ARPEGGIATOR in hosts (Logic, Ableton, Reaper): window resizing, automation, bounces,
+      loops; MPE with the arpeggiator; a listening pass on the gate and pattern defaults.
 - [x] `plugin-pipeline/`: the build-and-download pipeline as a reusable kit for other JUCE
       plug-ins (`adopt.sh` for an existing repo, `new-plugin.sh` + starter for a new one, a fixed
       download link per branch); self-tested on macOS and Windows by its own workflow.

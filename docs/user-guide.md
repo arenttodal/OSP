@@ -162,7 +162,7 @@ filter's curve over your sound's spectrum, the movement over time, a cloud of po
 performances, the drive's curve) with its few controls. Escape, a click elsewhere or the
 name again closes it.
 
-**Advanced** (bottom right; it stays open with the project): Fine tune, Bend range,
+**Advanced** (ADVANCED ›, bottom right under the arpeggiator; it stays open with the project): Fine tune, Bend range,
 **Voices** (*Poly*, or *Mono* for basses and leads: one note at a time, the newest key
 wins, a key played while another is held changes the note's pitch without restarting it
 (legato) and releasing it returns to the key still held; **GLIDE** sets how long the pitch
@@ -236,6 +236,38 @@ clean sound kept, less compression) to dense (thicker, rounder, more sustain). D
 level-matched: turning it up adds density and harmonics, about +1 dB at 100 %, not a jump in
 volume. It reacts to how hot it is fed, like real hardware: a quiet single note is driven
 less than a full chord.
+
+## ARPEGGIATOR
+
+Next to the keyboard, at its right end: a small light, the arpeggiator's state ("ARP / UP · 1/8")
+and an arrow.
+
+- **The light** switches the arpeggiator on and off (amber when on).
+- **The arrow** shows or hides its settings, which open between the macros and the keyboard. The
+  window grows by that much and shrinks back when you hide them. Showing the settings does not
+  switch it on, and switching it on does not show them.
+
+Hold a chord: it plays as a stepped pattern, each note with the velocity you played it with,
+through every layer and effect exactly as if you were playing the notes yourself. The display
+shows sixteen steps: the one sounding lit, the ones to come as they will play. With nothing held,
+it shows the pattern's shape.
+
+| Setting | What it does |
+|---|---|
+| **PATTERN** (click the name) | UP, DOWN, UP/DOWN (without repeating the top and bottom), PLAYED (the order you pressed the keys), RANDOM (never the same note twice in a row; the same every time the song plays from its start), CHORD (the whole chord on every step) |
+| **RATE** | 1/4, 1/8, 1/16, 1/32, dotted (D) and triplet (T) |
+| **GATE** | how long each note sounds, 10–150 % of a step; above 100 % notes overlap (legato); double-click for 75 % |
+| **OCTAVES** | 1–4: the pattern repeats an octave higher each time round (CHORD climbs an octave per step) |
+
+With the host playing, the steps sit on its beat grid. A chord played between steps starts on
+the next one, and loops and jumps stay on the grid. With the host stopped (or in the standalone
+app), the arpeggiator runs at the host's last tempo (120 BPM if it never said), and the first
+note sounds at once.
+
+The **sustain pedal** keeps released keys in the pattern. **All Notes Off** stops everything.
+Pitch bend, the mod wheel and pressure work as usual. The settings are automatable and saved
+with the project. Projects from before the arpeggiator open with it off and sound exactly as
+they did. **Advanced** is the small ADVANCED › under the arpeggiator's state.
 
 ## SPACE and ECHO
 

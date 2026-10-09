@@ -104,7 +104,8 @@ void housing (juce::Graphics& g, juce::Rectangle<float> bounds)
     g.setGradientFill (juce::ColourGradient (backdropTop, bounds.getX(), bounds.getY(), backdropBottom, bounds.getRight(), bounds.getBottom(), false));
     g.fillRect (bounds);
 
-    const auto r = layout::housing;
+    // The body grows with the instrument (the arpeggiator's editor adds height below the macros).
+    const auto r = layout::housing.withBottom (bounds.getBottom() - (height - layout::housing.getBottom()));
     juce::Path body;
     body.addRoundedRectangle (r, layout::housingRadius);
     // One broad, quiet shadow (a physical object resting on the surface), then a close one.

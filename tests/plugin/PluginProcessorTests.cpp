@@ -2937,6 +2937,15 @@ TEST_CASE ("plugin: CPU profile", "[.][cpu-profile]")
           { { "layerA.sourceMode", 1.0f }, { "layerB.sourceMode", 1.0f }, { "layerC.sourceMode", 1.0f },
             { "reimagined", 100.0f }, { "layerB.reimagined", 100.0f }, { "layerC.reimagined", 100.0f },
             { "drive", 70.0f }, { "motion", 60.0f }, { "movement.mode", 2.0f }, { "space", 60.0f } } },
+        { "16 notes, ARP 1/16 UP", 1, 16, 0, 48000.0, 128, { { "arp.enabled", 1.0f }, { "arp.rate", 2.0f } } },
+        { "4 notes, ARP 1/16 CHORD 2 octaves", 1, 4, 0, 48000.0, 128,
+          { { "arp.enabled", 1.0f }, { "arp.rate", 2.0f }, { "arp.pattern", 5.0f }, { "arp.octaves", 2.0f } } },
+        // A stress case: 16-note chords up to three octaves above the keys (the cost is the
+        // engine's voices transposed far up, as "16 notes, +24 st" shows; the ARP stage is ~0).
+        { "16 notes, ARP 1/32 CHORD 4 octaves gate 150 %", 1, 16, 0, 48000.0, 128,
+          { { "arp.enabled", 1.0f }, { "arp.rate", 3.0f }, { "arp.pattern", 5.0f }, { "arp.octaves", 4.0f }, { "arp.gate", 150.0f } } },
+        { "16 notes, 3 layers, ARP 1/16 RANDOM 3 octaves", 3, 16, 0, 48000.0, 128,
+          { { "arp.enabled", 1.0f }, { "arp.rate", 2.0f }, { "arp.pattern", 4.0f }, { "arp.octaves", 3.0f } } },
     };
     // DRIVE (spec): every rate and block size, TUBE at 70 %; the same without DRIVE beside it.
     auto withDrive = cases;
@@ -3726,4 +3735,712 @@ TEST_CASE ("plugin: with ARP off sessions and MIDI render identically (baseline)
         CHECK (peak > 1.0e-3);
         CHECK (worst <= 0.0);   // bit-identical: the arpeggiator off is not in the MIDI path
     }
+}
+
+// ---------------------------------------------------------------------------------------------
+// ARPEGGIATOR in the plugin: parameters and state, the note stream the engine plays, the host's
+// transport, every mode and effect behind it, the lifecycle, and its cost.
+
+namespace
+{
+    float arpValue (OspAudioProcessor& p, const juce::String& id)
+    {
+        auto* parameter = p.parameters.getParameter (id);
+        REQUIRE (parameter != nullptr);
+        return parameter->convertFrom0to1 (parameter->getValue());
+    }
+
+    struct ArpRun
+    {
+        std::vector<float> audio;   ///< interleaved stereo
+        int noteOns = 0;            ///< note-ons the engine received
+        double peak = 0.0, playPeak = 0.0;
+        bool finite = true;
+    };
+
+    /** Renders `seconds`, `events` adds MIDI per block (block start, block size). */
+    ArpRun renderArp (OspAudioProcessor& p, double rate, int block, double seconds,
+                      const std::function<void (int, int, juce::MidiBuffer&)>& events, TestPlayHead* head = nullptr, double playUntil = 1.0e9,
+                      bool prepare = true)
+    {
+        p.setPlayHead (head);
+        if (prepare)
+            p.prepareToPlay (rate, block);
+        ArpRun run;
+        const int startCount = p.velocityCount.load();
+        const auto total = static_cast<int> (seconds * rate);
+        juce::AudioBuffer<float> buffer (2, block);
+        for (int pos = 0; pos < total; pos += block)
+        {
+            const int n = std::min (block, total - pos);
+            juce::AudioBuffer<float> view (buffer.getArrayOfWritePointers(), 2, n);
+            juce::MidiBuffer midi;
+            if (events)
+                events (pos, n, midi);
+            view.clear();
+            p.processBlock (view, midi);
+            for (int i = 0; i < n; ++i)
+                for (int ch = 0; ch < 2; ++ch)
+                {
+                    const float v = view.getSample (ch, i);
+                    run.finite = run.finite && std::isfinite (v);
+                    run.peak = std::max (run.peak, static_cast<double> (std::abs (v)));
+                    if (pos + i < playUntil * rate)
+                        run.playPeak = std::max (run.playPeak, static_cast<double> (std::abs (v)));
+                    run.audio.push_back (v);
+                }
+            if (head != nullptr)
+                head->ppq += n * head->bpm / (60.0 * rate);
+        }
+        p.setPlayHead (nullptr);
+        run.noteOns = p.velocityCount.load() - startCount;
+        return run;
+    }
+
+    /** Adds `m` if `seconds` falls in the block. */
+    void at (juce::MidiBuffer& midi, int pos, int n, double rate, double seconds, const juce::MidiMessage& m)
+    {
+        const auto t = static_cast<int> (seconds * rate);
+        if (t >= pos && t < pos + n)
+            midi.addEvent (m, t - pos);
+    }
+
+    void arpOn (OspAudioProcessor& p, int pattern = 0, int rate = 1, float gate = 75.0f, int octaves = 1)
+    {
+        p.setParameterValue ("arp.enabled", 1.0f);
+        p.setParameterValue ("arp.pattern", static_cast<float> (pattern));
+        p.setParameterValue ("arp.rate", static_cast<float> (rate));
+        p.setParameterValue ("arp.gate", gate);
+        p.setParameterValue ("arp.octaves", static_cast<float> (octaves));
+    }
+}
+
+TEST_CASE ("plugin: ARP parameters, recall; older sessions open with it off; the inline editor is a view setting", "[plugin][arp]")
+{
+    OspAudioProcessor fresh;
+    CHECK (arpValue (fresh, "arp.enabled") == Approx (0.0f));
+    CHECK (arpValue (fresh, "arp.pattern") == Approx (0.0f));   // UP
+    CHECK (arpValue (fresh, "arp.rate") == Approx (1.0f));      // 1/8
+    CHECK (arpValue (fresh, "arp.gate") == Approx (75.0f));
+    CHECK (arpValue (fresh, "arp.octaves") == Approx (1.0f));
+    CHECK (OspAudioProcessor::arpPatternNames().joinIntoString (",") == "UP,DOWN,UP/DOWN,PLAYED,RANDOM,CHORD");
+    CHECK (OspAudioProcessor::arpRateNames().joinIntoString (",") == "1/4,1/8,1/16,1/32,1/4D,1/8D,1/16D,1/4T,1/8T,1/16T");
+    CHECK_FALSE (fresh.arpEditorExpanded());
+    // The expanded state is not a parameter: hosts cannot automate it, presets do not carry it as one.
+    for (auto* parameter : fresh.getParameters())
+        if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*> (parameter))
+            CHECK_FALSE (ranged->getParameterID().containsIgnoreCase ("expand"));
+
+    OspAudioProcessor p;
+    arpOn (p, 4, 8, 130.0f, 3);
+    p.setArpEditorExpanded (true);
+    juce::MemoryBlock state;
+    p.getStateInformation (state);
+    OspAudioProcessor q;
+    q.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+    CHECK (arpValue (q, "arp.enabled") == Approx (1.0f));
+    CHECK (arpValue (q, "arp.pattern") == Approx (4.0f));
+    CHECK (arpValue (q, "arp.rate") == Approx (8.0f));
+    CHECK (arpValue (q, "arp.gate") == Approx (130.0f));
+    CHECK (arpValue (q, "arp.octaves") == Approx (3.0f));
+    CHECK (q.arpEditorExpanded());
+
+    // A session from before the arpeggiator (no arp.* at all, no arpExpanded) opens with it off,
+    // even in an instance where it was on.
+    auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
+    REQUIRE (xml != nullptr);
+    for (auto* child = xml->getFirstChildElement(); child != nullptr;)
+    {
+        auto* next = child->getNextElement();
+        if (child->getStringAttribute ("id").startsWith ("arp."))
+            xml->removeChildElement (child, true);
+        child = next;
+    }
+    xml->removeAttribute ("arpExpanded");
+    juce::MemoryBlock old;
+    juce::AudioProcessor::copyXmlToBinary (*xml, old);
+    q.setStateInformation (old.getData(), static_cast<int> (old.getSize()));
+    CHECK (arpValue (q, "arp.enabled") == Approx (0.0f));
+    CHECK (arpValue (q, "arp.pattern") == Approx (0.0f));
+    CHECK (arpValue (q, "arp.rate") == Approx (1.0f));
+    CHECK (arpValue (q, "arp.gate") == Approx (75.0f));
+    CHECK (arpValue (q, "arp.octaves") == Approx (1.0f));
+    CHECK_FALSE (q.arpEditorExpanded());
+
+    // Expanding the editor changes nothing in the sound, with ARP on or off.
+    TempDir tmp;
+    const auto file = writeSource (tmp.dir, "pluck.wav", testsignals::pluck (midiToHz (60), 2.0, 48000.0, 5));
+    for (bool enabled : { false, true })
+    {
+        std::array<std::vector<float>, 2> renders;
+        for (int expanded = 0; expanded < 2; ++expanded)
+        {
+            OspAudioProcessor r;
+            loadAndWait (r, file);
+            if (enabled)
+                arpOn (r);
+            r.setArpEditorExpanded (expanded == 1);
+            renders[static_cast<std::size_t> (expanded)] = renderArp (r, 48000.0, 256, 1.5, [] (int pos, int n, juce::MidiBuffer& m) {
+                                                               at (m, pos, n, 48000.0, 0.0, juce::MidiMessage::noteOn (1, 60, static_cast<juce::uint8> (90)));
+                                                               at (m, pos, n, 48000.0, 0.0, juce::MidiMessage::noteOn (1, 64, static_cast<juce::uint8> (90)));
+                                                               at (m, pos, n, 48000.0, 0.8, juce::MidiMessage::allNotesOff (1));
+                                                           }).audio;
+        }
+        CHECK (renders[0] == renders[1]);
+    }
+}
+
+TEST_CASE ("plugin: ARP plays held notes as steps with their velocities; the screen keyboard, wheels and pedal", "[plugin][arp]")
+{
+    TempDir tmp;
+    const auto file = writeSource (tmp.dir, "pluck.wav", testsignals::pluck (midiToHz (60), 2.0, 48000.0, 5));
+    {
+        OspAudioProcessor p;
+        loadAndWait (p, file);
+        arpOn (p);   // UP, 1/8, no host: 120 BPM, a step every 12000 samples
+        const auto run = renderArp (p, 48000.0, 256, 1.0, [] (int pos, int n, juce::MidiBuffer& m) {
+            at (m, pos, n, 48000.0, 0.0, juce::MidiMessage::noteOn (1, 67, static_cast<juce::uint8> (120)));
+            at (m, pos, n, 48000.0, 0.0, juce::MidiMessage::noteOn (1, 60, static_cast<juce::uint8> (40)));
+            at (m, pos, n, 48000.0, 0.0, juce::MidiMessage::noteOn (1, 64, static_cast<juce::uint8> (80)));
+        });
+        CHECK (run.noteOns == 4);   // steps at 0, 0.25, 0.5, 0.75 s
+        const int count = p.velocityCount.load();
+        std::vector<int> last;
+        for (int i = count - 4; i < count; ++i)
+            last.push_back (p.recentVelocity[static_cast<std::size_t> (i % OspAudioProcessor::velocityHistory)].load());
+        CHECK (last == std::vector<int> { 40, 80, 120, 40 });   // C E G C, each with its own velocity
+        CHECK (run.playPeak > 1.0e-3);
+        const auto view = p.arpView();
+        CHECK (view.active);
+        CHECK (view.current == 3);
+        CHECK (view.low[0] == 60);
+        CHECK (view.low[1] == 64);
+        CHECK (view.low[2] == 67);
+    }
+    {
+        // The on-screen keyboard plays through the arpeggiator like a controller.
+        OspAudioProcessor p;
+        loadAndWait (p, file);
+        arpOn (p);
+        p.prepareToPlay (48000.0, 256);
+        p.keyboardState.noteOn (1, 60, 0.8f);
+        const auto run = renderArp (p, 48000.0, 256, 1.0, {}, nullptr, 1.0e9, false);
+        CHECK (run.noteOns == 4);
+        p.keyboardState.noteOff (1, 60, 0.0f);
+        const auto after = renderArp (p, 48000.0, 256, 1.0, {}, nullptr, 1.0e9, false);
+        CHECK (after.noteOns == 0);
+    }
+    {
+        // Pitch bend passes by the arpeggiator: the stepped notes bend.
+        auto pitchWith = [&] (int bend) {
+            OspAudioProcessor p;
+            loadAndWait (p, file);
+            p.setParameterValue ("space", 0.0f);
+            arpOn (p, 0, 0, 150.0f);   // 1/4, legato
+            const auto run = renderArp (p, 48000.0, 256, 1.5, [bend] (int pos, int n, juce::MidiBuffer& m) {
+                at (m, pos, n, 48000.0, 0.0, juce::MidiMessage::pitchWheel (1, bend));
+                at (m, pos, n, 48000.0, 0.0, juce::MidiMessage::noteOn (1, 60, static_cast<juce::uint8> (100)));
+            });
+            AudioData audio = AudioData::allocate (1, static_cast<int> (run.audio.size() / 2), 48000.0);
+            for (std::size_t i = 0; i < run.audio.size() / 2; ++i)
+                audio.channels[0][i] = run.audio[2 * i];
+            return pitchOf (audio);
+        };
+        const double plain = pitchWith (8192), bent = pitchWith (16383);
+        REQUIRE (plain > 0.0);
+        CHECK (12.0 * std::log2 (bent / plain) == Approx (arpValue (*std::make_unique<OspAudioProcessor>(), "bendRange")).margin (0.3));
+    }
+    {
+        // The sustain pedal keeps released keys in the pattern; releasing it stops the pattern.
+        OspAudioProcessor p;
+        loadAndWait (p, file);
+        arpOn (p);
+        const auto run = renderArp (p, 48000.0, 256, 3.0, [] (int pos, int n, juce::MidiBuffer& m) {
+            at (m, pos, n, 48000.0, 0.0, juce::MidiMessage::noteOn (1, 60, static_cast<juce::uint8> (100)));
+            at (m, pos, n, 48000.0, 0.1, juce::MidiMessage::controllerEvent (1, 64, 127));
+            at (m, pos, n, 48000.0, 0.2, juce::MidiMessage::noteOff (1, 60));
+            at (m, pos, n, 48000.0, 1.1, juce::MidiMessage::controllerEvent (1, 64, 0));
+        });
+        CHECK (run.noteOns == 5);   // 0, 0.25 .. 1.0 s; nothing after the pedal
+        CHECK (p.activeVoices.load() == 0);
+    }
+}
+
+TEST_CASE ("plugin: ARP on the host's grid; a bounce plays the same notes every time", "[plugin][arp]")
+{
+    TempDir tmp;
+    const auto file = writeSource (tmp.dir, "pluck.wav", testsignals::pluck (midiToHz (60), 2.0, 48000.0, 5));
+    {
+        OspAudioProcessor p;
+        loadAndWait (p, file);
+        arpOn (p, 0, 2);   // 1/16 at 120: every 6000 samples
+        TestPlayHead head;
+        head.ppq = 0.0;
+        // Pressed at 0.01 s, after the downbeat: the first step waits for 0.125 s (sample 6000).
+        std::vector<int> onsPerBlock;
+        int previous = p.velocityCount.load();
+        renderArp (p, 48000.0, 480, 1.0, [&] (int pos, int n, juce::MidiBuffer& m) {
+            onsPerBlock.push_back (p.velocityCount.load() - previous);
+            previous = p.velocityCount.load();
+            at (m, pos, n, 48000.0, 0.01, juce::MidiMessage::noteOn (1, 60, static_cast<juce::uint8> (100)));
+            at (m, pos, n, 48000.0, 0.01, juce::MidiMessage::noteOn (1, 67, static_cast<juce::uint8> (100)));
+        }, &head);
+        // Each entry counted the block before it: entry b + 1 is block b.
+        onsPerBlock.push_back (p.velocityCount.load() - previous);
+        onsPerBlock.erase (onsPerBlock.begin());
+        // A step lands in every 12.5th block of 480 samples: blocks 12, 25, 37, 50, ...
+        std::vector<int> blocks;
+        for (std::size_t b = 0; b < onsPerBlock.size(); ++b)
+            for (int k = 0; k < onsPerBlock[b]; ++k)
+                blocks.push_back (static_cast<int> (b));
+        std::vector<int> expected;
+        for (int step = 1; step * 6000 < 48000; ++step)
+            expected.push_back (step * 6000 / 480);
+        CHECK (blocks == expected);
+    }
+    // RANDOM: the same bounce in two instances, one of which played freely before.
+    auto bounce = [&] (bool playFirst) {
+        OspAudioProcessor p;
+        loadAndWait (p, file);
+        p.setParameterValue ("space", 0.0f);
+        arpOn (p, 4, 2);
+        if (playFirst)
+            renderArp (p, 48000.0, 256, 2.0, [] (int pos, int n, juce::MidiBuffer& m) {
+                at (m, pos, n, 48000.0, 0.0, juce::MidiMessage::noteOn (1, 50, static_cast<juce::uint8> (100)));
+                at (m, pos, n, 48000.0, 0.0, juce::MidiMessage::noteOn (1, 55, static_cast<juce::uint8> (100)));
+                at (m, pos, n, 48000.0, 1.0, juce::MidiMessage::allNotesOff (1));
+            });
+        TestPlayHead head;
+        std::vector<int> played;
+        renderArp (p, 48000.0, 256, 2.0, [&] (int pos, int n, juce::MidiBuffer& m) {
+            const auto view = p.arpView();
+            if (view.active && view.current >= 0)
+            {
+                const int step = view.low[static_cast<std::size_t> (view.current)] * 100 + view.current;   // the note and its column
+                if (played.empty() || played.back() != step)
+                    played.push_back (step);
+            }
+            for (int note : { 60, 62, 64, 67, 69 })
+                at (m, pos, n, 48000.0, 0.0, juce::MidiMessage::noteOn (1, note, static_cast<juce::uint8> (100)));
+        }, &head);
+        return played;
+    };
+    const auto first = bounce (false), second = bounce (true);
+    CHECK (first.size() >= 14);
+    CHECK (first == second);
+}
+
+TEST_CASE ("plugin: ARP with every REIMAGINED mode and routing and every effect: plays, finite, every note ends", "[plugin][arp]")
+{
+    TempDir tmp;
+    const auto vowel = writeSource (tmp.dir, "vowel.wav", testsignals::vowel (midiToHz (57), 2.0, 48000.0, 3));
+    struct Scene
+    {
+        juce::String name;
+        bool init = false;   ///< a new patch (per-layer REIMAGINED); otherwise the legacy global routing
+        std::vector<std::pair<juce::String, float>> set;
+    };
+    std::vector<Scene> scenes;
+    static const char* modes[] { "KALEIDOSCOPE", "TAPE FRAME", "TOYBOX", "MOSAIC", "MIRAGE" };
+    for (int mode = 0; mode < 5; ++mode)
+        for (bool init : { false, true })
+            scenes.push_back ({ juce::String (modes[mode]) + (init ? "" : " (legacy global)"), init,
+                                { { "reimagined", 85.0f }, { "layerA.reimagined.mode", static_cast<float> (mode) } } });
+    scenes.push_back ({ "LIFE", true, { { "life", 100.0f } } });
+    for (int drive = 0; drive < 3; ++drive)
+        scenes.push_back ({ "DRIVE " + juce::String (drive), true, { { "drive", 80.0f }, { "drive.mode", static_cast<float> (drive) } } });
+    scenes.push_back ({ "DYNAMICS", true, { { "dynamics", 100.0f }, { "dynamics.curve", 2.0f } } });
+    scenes.push_back ({ "CHARACTER", true, { { "character", 85.0f }, { "character.resonance", 60.0f }, { "character.drive", 60.0f } } });
+    for (int movement = 0; movement < 5; ++movement)
+        scenes.push_back ({ "MOVEMENT " + juce::String (movement), true, { { "motion", 85.0f }, { "movement.mode", static_cast<float> (movement) } } });
+    scenes.push_back ({ "SPACE", true, { { "space", 80.0f } } });
+    scenes.push_back ({ "ECHO", true, { { "echo", 60.0f } } });
+    for (const auto& scene : scenes)
+        for (int pattern : { 0, 4, 5 })
+        {
+            CAPTURE (scene.name, pattern);
+            OspAudioProcessor p;
+            if (scene.init)
+                p.initPatch();
+            loadAndWait (p, vowel);
+            p.setParameterValue ("release", 60.0f);
+            for (const auto& [id, value] : scene.set)
+                p.setParameterValue (id, value);
+            arpOn (p, pattern, 2, 140.0f, 3);
+            const auto run = renderArp (p, 48000.0, 256, 2.0, [] (int pos, int n, juce::MidiBuffer& m) {
+                for (int note : { 48, 55, 60, 64 })
+                    at (m, pos, n, 48000.0, 0.0, juce::MidiMessage::noteOn (1, note, static_cast<juce::uint8> (90)));
+                for (int note : { 48, 55, 60, 64 })
+                    at (m, pos, n, 48000.0, 1.0, juce::MidiMessage::noteOff (1, note));
+            }, nullptr, 1.0);
+            CHECK (run.finite);
+            CHECK (run.playPeak > 1.0e-3);
+            CHECK (run.peak < 4.0);
+            CHECK (run.noteOns >= 8);
+            // Everything ends: no voice is left keyed after the pattern stops and the tails fade.
+            renderArp (p, 48000.0, 256, 6.0, {});
+            CHECK (p.activeVoices.load() == 0);
+        }
+}
+
+TEST_CASE ("plugin: ARP with REVERSE, LOOP, Granular and 1-3 layers", "[plugin][arp]")
+{
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "a.wav", testsignals::vowel (midiToHz (57), 2.0, 48000.0, 3));
+    const auto b = writeSource (tmp.dir, "b.wav", testsignals::saw (midiToHz (48), 2.0, 48000.0));
+    const auto c = writeSource (tmp.dir, "c.wav", testsignals::pluck (midiToHz (60), 2.0, 48000.0, 5));
+    for (int layers = 1; layers <= 3; ++layers)
+        for (int reverse = 0; reverse < 2; ++reverse)
+            for (int loop = 0; loop < 2; ++loop)
+                for (int granular = 0; granular < 2; ++granular)
+                {
+                    CAPTURE (layers, reverse, loop, granular);
+                    OspAudioProcessor p;
+                    std::vector<juce::File> files { a, b, c };
+                    files.resize (static_cast<std::size_t> (layers));
+                    REQUIRE (p.addLayers (juce::Array<juce::File> (files.data(), layers)) == layers);
+                    REQUIRE (p.waitForLoads (30000));
+                    p.pollLoads();
+                    p.setParameterValue ("release", 60.0f);
+                    for (const char* layer : { "layerA", "layerB", "layerC" })
+                    {
+                        p.setParameterValue (juce::String (layer) + ".reverse", static_cast<float> (reverse));
+                        p.setParameterValue (juce::String (layer) + ".loop", static_cast<float> (loop));
+                        p.setParameterValue (juce::String (layer) + ".sourceMode", static_cast<float> (granular));
+                    }
+                    arpOn (p, 2, 7, 100.0f, 2);   // UP/DOWN, 1/4T
+                    const auto run = renderArp (p, 48000.0, 128, 2.0, [] (int pos, int n, juce::MidiBuffer& m) {
+                        for (int note : { 52, 57, 61 })
+                            at (m, pos, n, 48000.0, 0.0, juce::MidiMessage::noteOn (1, note, static_cast<juce::uint8> (100)));
+                        at (m, pos, n, 48000.0, 1.2, juce::MidiMessage::allNotesOff (1));
+                    }, nullptr, 1.2);
+                    CHECK (run.finite);
+                    CHECK (run.playPeak > 1.0e-3);
+                    CHECK (run.peak < 4.0);
+                    renderArp (p, 48000.0, 128, 5.0, {});
+                    CHECK (p.activeVoices.load() == 0);
+                }
+}
+
+TEST_CASE ("plugin: ARP lifecycle - switching mid-chord, pedal, panic, sample-rate changes, recall, Mono, odd blocks", "[plugin][arp]")
+{
+    TempDir tmp;
+    const auto file = writeSource (tmp.dir, "pluck.wav", testsignals::pluck (midiToHz (60), 2.0, 48000.0, 5));
+    auto settle = [] (OspAudioProcessor& p, double rate = 48000.0) {
+        renderArp (p, rate, 256, 5.0, [] (int pos, int, juce::MidiBuffer& m) {
+            if (pos == 0)
+                m.addEvent (juce::MidiMessage::controllerEvent (1, 64, 0), 0);
+        });
+        return p.activeVoices.load();
+    };
+    SECTION ("switched on and off every few blocks while a chord and the pedal are held")
+    {
+        OspAudioProcessor p;
+        loadAndWait (p, file);
+        p.setParameterValue ("release", 60.0f);
+        arpOn (p, 5, 3, 150.0f, 2);
+        int block = 0;
+        const auto run = renderArp (p, 48000.0, 64, 4.0, [&] (int pos, int n, juce::MidiBuffer& m) {
+            for (int note : { 60, 64, 67 })
+                at (m, pos, n, 48000.0, 0.0, juce::MidiMessage::noteOn (1, note, static_cast<juce::uint8> (100)));
+            at (m, pos, n, 48000.0, 0.5, juce::MidiMessage::controllerEvent (1, 64, 127));
+            at (m, pos, n, 48000.0, 1.0, juce::MidiMessage::noteOff (1, 64));
+            at (m, pos, n, 48000.0, 2.5, juce::MidiMessage::controllerEvent (1, 64, 0));
+            if (++block % 37 == 0)
+                p.setParameterValue ("arp.enabled", arpValue (p, "arp.enabled") > 0.5f ? 0.0f : 1.0f);
+        });
+        CHECK (run.finite);
+        // Let go of the keys: nothing is left sounding, whichever state the switch ended in.
+        renderArp (p, 48000.0, 64, 0.1, [] (int pos, int, juce::MidiBuffer& m) {
+            if (pos == 0)
+                for (int note : { 60, 67 })
+                    m.addEvent (juce::MidiMessage::noteOff (1, note), 0);
+        });
+        CHECK (settle (p) == 0);
+    }
+    SECTION ("All Notes Off stops the pattern at once")
+    {
+        OspAudioProcessor p;
+        loadAndWait (p, file);
+        p.setParameterValue ("release", 60.0f);
+        arpOn (p, 0, 3);
+        renderArp (p, 48000.0, 256, 1.0, [] (int pos, int n, juce::MidiBuffer& m) {
+            for (int note : { 60, 64 })
+                at (m, pos, n, 48000.0, 0.0, juce::MidiMessage::noteOn (1, note, static_cast<juce::uint8> (100)));
+            at (m, pos, n, 48000.0, 0.5, juce::MidiMessage::allNotesOff (1));
+        });
+        const auto after = renderArp (p, 48000.0, 256, 2.0, {});
+        CHECK (after.noteOns == 0);
+        CHECK (p.activeVoices.load() == 0);
+        CHECK_FALSE (p.arpView().active);
+    }
+    SECTION ("the host changes the sample rate mid-performance; a session is recalled while notes are held")
+    {
+        OspAudioProcessor p;
+        loadAndWait (p, file);
+        p.setParameterValue ("release", 60.0f);
+        arpOn (p, 1, 2);
+        renderArp (p, 44100.0, 512, 1.0, [] (int pos, int, juce::MidiBuffer& m) {
+            if (pos == 0)
+                m.addEvent (juce::MidiMessage::noteOn (1, 60, static_cast<juce::uint8> (100)), 0);
+        });
+        // prepareToPlay at a new rate (inside renderArp): the arpeggiator starts clean.
+        const auto run = renderArp (p, 96000.0, 512, 1.0, {});
+        CHECK (run.noteOns == 0);
+        CHECK (settle (p, 96000.0) == 0);
+        juce::MemoryBlock state;
+        p.getStateInformation (state);
+        renderArp (p, 48000.0, 256, 0.5, [] (int pos, int, juce::MidiBuffer& m) {
+            if (pos == 0)
+                m.addEvent (juce::MidiMessage::noteOn (1, 62, static_cast<juce::uint8> (100)), 0);
+        });
+        p.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+        REQUIRE (p.waitForLoads (20000));
+        p.pollLoads();
+        renderArp (p, 48000.0, 256, 0.5, [] (int pos, int, juce::MidiBuffer& m) {
+            if (pos == 0)
+                m.addEvent (juce::MidiMessage::noteOff (1, 62), 0);
+        });
+        CHECK (settle (p) == 0);
+    }
+    SECTION ("Mono with glide follows the pattern legato")
+    {
+        OspAudioProcessor p;
+        loadAndWait (p, file);
+        p.setParameterValue ("release", 60.0f);
+        p.setParameterValue ("voiceMode", 1.0f);
+        p.setParameterValue ("glide", 40.0f);
+        arpOn (p, 2, 2, 120.0f, 2);
+        const auto run = renderArp (p, 48000.0, 256, 1.0, [] (int pos, int n, juce::MidiBuffer& m) {
+            for (int note : { 48, 52, 55 })
+                at (m, pos, n, 48000.0, 0.0, juce::MidiMessage::noteOn (1, note, static_cast<juce::uint8> (100)));
+            for (int note : { 48, 52, 55 })
+                at (m, pos, n, 48000.0, 0.8, juce::MidiMessage::noteOff (1, note));
+        });
+        CHECK (run.finite);
+        CHECK (run.noteOns >= 6);
+        CHECK (p.activeVoices.load() <= 1);
+        CHECK (settle (p) == 0);
+    }
+    SECTION ("blocks of 1 and 4096 samples, and empty blocks")
+    {
+        for (int block : { 1, 4096 })
+        {
+            OspAudioProcessor p;
+            loadAndWait (p, file);
+            p.setParameterValue ("release", 60.0f);
+            arpOn (p, 0, 3);
+            const auto run = renderArp (p, 48000.0, block, 0.5, [] (int pos, int n, juce::MidiBuffer& m) {
+                at (m, pos, n, 48000.0, 0.0, juce::MidiMessage::noteOn (1, 60, static_cast<juce::uint8> (100)));
+                at (m, pos, n, 48000.0, 0.0, juce::MidiMessage::noteOn (1, 64, static_cast<juce::uint8> (100)));
+            });
+            CHECK (run.noteOns == 8);   // 1/32 at 120 BPM: every 3000 samples
+            juce::AudioBuffer<float> empty (2, 0);
+            juce::MidiBuffer none;
+            p.processBlock (empty, none);
+            renderArp (p, 48000.0, block, 0.1, [] (int pos, int, juce::MidiBuffer& m) {
+                if (pos == 0)
+                    m.addEvent (juce::MidiMessage::allNotesOff (1), 0);
+            });
+            CHECK (settle (p) == 0);
+        }
+    }
+}
+
+TEST_CASE ("plugin: ARP costs next to nothing on the audio thread", "[plugin][arp]")
+{
+    // No sound loaded: the block is the MIDI path alone (the arpeggiator at its busiest, 1/32
+    // CHORD over four octaves with 16 notes held), against the same with ARP off.
+    auto timeIt = [] (bool enabled) {
+        OspAudioProcessor p;
+        if (enabled)
+            arpOn (p, 5, 3, 150.0f, 4);
+        p.prepareToPlay (48000.0, 128);
+        juce::AudioBuffer<float> buffer (2, 128);
+        double total = 0.0;
+        const int blocks = 48000 * 4 / 128;
+        for (int i = 0; i < blocks; ++i)
+        {
+            juce::MidiBuffer midi;
+            if (i == 0)
+                for (int n = 0; n < 16; ++n)
+                    midi.addEvent (juce::MidiMessage::noteOn (1, 40 + n * 2, static_cast<juce::uint8> (90)), 0);
+            buffer.clear();
+            const auto t0 = std::chrono::steady_clock::now();
+            p.processBlock (buffer, midi);
+            total += std::chrono::duration<double, std::micro> (std::chrono::steady_clock::now() - t0).count();
+        }
+        return total / blocks;
+    };
+    const double off = timeIt (false), on = timeIt (true);
+    const double budget = 1.0e6 * 128 / 48000.0;
+    std::printf ("ARP stage: off %.2f us, on %.2f us per 128-sample block (%.3f %% of real time)\n", off, on, 100.0 * (on - off) / budget);
+    CHECK (on - off < 0.02 * budget);   // well under 2 % of one core
+}
+
+// ARP GUI (hidden, needs a display: xvfb-run): the control by the keyboard, the inline editor,
+// the window growing and shrinking by the editor's height, and the screenshots for review
+// (OSP_SNAPSHOT_DIR): 01 closed and off, 02 closed and on, 03 open and playing, 04 open and
+// off, the PATTERN and RATE menus, and the open editor with one, two and three sounds.
+TEST_CASE ("plugin: ARP keyboard control and inline editor", "[.][arp-ui]")
+{
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "Vowel A3.wav", testsignals::vowel (midiToHz (57), 3.0, 48000.0, 3));
+    const auto b = writeSource (tmp.dir, "Saw C3.wav", testsignals::saw (midiToHz (48), 2.0, 48000.0));
+    const auto c = writeSource (tmp.dir, "Pluck C4.wav", testsignals::pluck (midiToHz (60), 2.0, 48000.0, 5));
+    OspAudioProcessor p;
+    loadAndWait (p, a);
+    std::unique_ptr<juce::AudioProcessorEditor> base (p.createEditorIfNeeded());
+    auto* editor = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (base.get());
+    REQUIRE (editor != nullptr);
+    editor->refreshNow();
+    auto snapshot = [&] (const juce::String& name) {
+        if (const char* dir = std::getenv ("OSP_SNAPSHOT_DIR"))
+        {
+            editor->refreshNow();
+            const auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f);
+            juce::FileOutputStream out (juce::File (dir).getChildFile (name));
+            out.setPosition (0);
+            out.truncate();
+            juce::PNGImageFormat().writeImageToStream (image, out);
+        }
+    };
+    auto play = [&] (bool hold) {
+        // A few blocks with a chord held: the scheduler's step display has something to show.
+        p.prepareToPlay (48000.0, 512);
+        juce::AudioBuffer<float> buffer (2, 512);
+        for (int i = 0; i < 60; ++i)
+        {
+            juce::MidiBuffer midi;
+            if (i == 0 && hold)
+                for (int note : { 57, 60, 64, 69 })
+                    midi.addEvent (juce::MidiMessage::noteOn (1, note, static_cast<juce::uint8> (100)), 0);
+            buffer.clear();
+            p.processBlock (buffer, midi);
+        }
+    };
+
+    const int width = editor->getWidth(), height = editor->getHeight();
+    CHECK_FALSE (editor->isArpExpanded());
+    CHECK_FALSE (editor->arpInlinePanel().isVisible());
+    CHECK (editor->arpControl().statusText().contains ("UP"));
+    CHECK (editor->arpControl().statusText().contains ("1/8"));
+    snapshot ("arp-01-closed-off.png");
+
+    // The light switches the arpeggiator, nothing else.
+    editor->arpControl().toggleEnabled();
+    CHECK (p.parameterValue ("arp.enabled") > 0.5f);
+    CHECK_FALSE (editor->isArpExpanded());
+    CHECK (editor->getHeight() == height);
+    snapshot ("arp-02-closed-on.png");
+
+    // The chevron shows the editor, nothing else: the window grows by its height, keeps its width.
+    const auto keyboardBefore = editor->arpControl().getBounds();
+    editor->arpControl().onToggleEditor();
+    CHECK (editor->isArpExpanded());
+    CHECK (p.arpEditorExpanded());
+    CHECK (p.parameterValue ("arp.enabled") > 0.5f);
+    CHECK (editor->arpInlinePanel().isVisible());
+    CHECK (editor->getWidth() == width);
+    const float scale = static_cast<float> (width) / osp::plugin::design::width;
+    CHECK (std::abs (editor->getHeight() - (height + osp::plugin::design::layout::arpShift * scale)) <= 1.5f);
+    CHECK (editor->arpControl().getBounds().getY() == keyboardBefore.getY() + juce::roundToInt (osp::plugin::design::layout::arpShift));
+    // No dead space: the panel sits between the macros and the keyboard row.
+    CHECK (editor->arpInlinePanel().getBottom() < editor->arpControl().getY());
+    play (true);
+    editor->refreshNow();
+    CHECK (p.arpView().active);
+    CHECK (editor->arpInlinePanel().litColumn() == p.arpView().current);
+    CHECK (editor->arpInlinePanel().litColumn() >= 0);
+    snapshot ("arp-03-open-playing.png");
+
+    // Off with the editor open: the editor stays, the light goes out.
+    editor->arpControl().toggleEnabled();
+    CHECK (p.parameterValue ("arp.enabled") < 0.5f);
+    CHECK (editor->isArpExpanded());
+    play (false);
+    snapshot ("arp-04-open-off.png");
+    editor->arpControl().toggleEnabled();
+    play (true);
+
+    // The menus: every pattern; the rates in three groups.
+    CHECK (editor->arpInlinePanel().patternMenu().getNumItems() == 6);
+    CHECK (editor->arpInlinePanel().rateMenu().getNumItems() == 13);   // 10 rates + 3 group headers
+    if (const char* dir = std::getenv ("OSP_SNAPSHOT_DIR"))
+        for (int which = 0; which < 2; ++which)
+        {
+            // The menus drawn by the editor's own look and feel, item by item, as JUCE draws
+            // them in their window (a menu window cannot open under the test display server).
+            const auto menu = which == 0 ? editor->arpInlinePanel().patternMenu() : editor->arpInlinePanel().rateMenu();
+            auto& laf = editor->getLookAndFeel();
+            struct Row
+            {
+                juce::String text;
+                bool header = false, ticked = false;
+                int height = 0;
+            };
+            std::vector<Row> rows;
+            int width = 120, height = 8;
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+            {
+                const auto& item = it.getItem();
+                int w = 0, h = 0;
+                laf.getIdealPopupMenuItemSize (item.text, false, -1, w, h);
+                if (item.isSectionHeader)
+                    h = std::max (h, 26);
+                rows.push_back ({ item.text, item.isSectionHeader, item.isTicked, h });
+                width = std::max (width, w + 40);
+                height += h;
+            }
+            juce::Image image (juce::Image::ARGB, width, height + 8, true);
+            juce::Graphics g (image);
+            laf.drawPopupMenuBackground (g, width, height + 8);
+            int y = 8;
+            for (const auto& row : rows)
+            {
+                const juce::Rectangle<int> area (0, y, width, row.height);
+                if (row.header)
+                    laf.drawPopupMenuSectionHeader (g, area, row.text);
+                else
+                    laf.drawPopupMenuItem (g, area, false, true, false, row.ticked, false, row.text, {}, nullptr, nullptr);
+                y += row.height;
+            }
+            juce::FileOutputStream out (juce::File (dir).getChildFile (which == 0 ? "arp-05-pattern-menu.png" : "arp-06-rate-menu.png"));
+            out.setPosition (0);
+            out.truncate();
+            juce::PNGImageFormat().writeImageToStream (image, out);
+        }
+    for (int pattern : { 2, 4, 5 })
+    {
+        p.setParameterValue ("arp.pattern", static_cast<float> (pattern));
+        p.setParameterValue ("arp.octaves", 2.0f);
+        play (true);
+        snapshot ("arp-07-pattern-" + juce::String (pattern) + ".png");
+    }
+    snapshot ("arp-08-layers-1.png");
+    for (const auto& file : { b, c })
+    {
+        p.addLayers (juce::Array<juce::File> { file });
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        snapshot (file == b ? "arp-08-layers-2.png" : "arp-08-layers-3.png");
+    }
+
+    // Saved with the session; a new editor opens it the way it was.
+    base.reset();
+    std::unique_ptr<juce::AudioProcessorEditor> again (p.createEditorIfNeeded());
+    auto* reopened = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (again.get());
+    REQUIRE (reopened != nullptr);
+    CHECK (reopened->isArpExpanded());
+    CHECK (std::abs (reopened->getHeight() - (height + osp::plugin::design::layout::arpShift * scale)) <= 1.5f);
+    // Hidden again: back to the original window, nothing left over.
+    reopened->arpControl().onToggleEditor();
+    CHECK_FALSE (reopened->isArpExpanded());
+    CHECK (reopened->getHeight() == height);
+    CHECK (reopened->getWidth() == width);
+    CHECK_FALSE (reopened->arpInlinePanel().isVisible());
+    // The Advanced popover still opens from the small ADVANCED link.
+    reopened->openPopup (osp::plugin::OspAudioProcessorEditor::advancedPopup);
+    CHECK (reopened->openPopupIndex() == osp::plugin::OspAudioProcessorEditor::advancedPopup);
+    reopened->closePopup();
 }

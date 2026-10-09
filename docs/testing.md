@@ -13,6 +13,20 @@ ctest --test-dir build --output-on-failure      # everything
 | `performance-smoke` | `research-renderer --benchmark --seconds 3` must run |
 | `plugin` (with `-DOSP_BUILD_PLUGIN=ON`) | the real `AudioProcessor`, headless: load → analysis → chromatic playback through `processBlock`, host sample-rate changes, root override, session save/recall after the original file is deleted (bit-identical audio), bad files keeping the previous instrument, unpitched sources |
 
+The arpeggiator: `[unit][arp]` (core: patterns, sample-exact host-grid timing over 60/90/120/174 BPM
+x 44.1/48/96 kHz x 32..512 blocks x all rates, free running, loops/jumps/tempo changes, gate,
+pedal, panic, hand-overs, a stuck-note stress test, RANDOM determinism, the research `"arp"`
+config) and `[plugin][arp]` (parameters and recall, playback, the transport, every REIMAGINED
+mode/routing and effect, REVERSE/LOOP/Granular/layers, lifecycle, the stage's CPU). Hidden:
+`[arp-baseline]` (ARP off renders sessions from the build before it bit-identically:
+`OSP_ARP_BASELINE=write` with the old build, `=compare` with the new, same
+`OSP_ARP_BASELINE_DIR`) and `[arp-ui]` (the keyboard control, the inline editor and the
+window resizing; screenshots with `OSP_SNAPSHOT_DIR`, under xvfb-run). A render config may
+carry `"arp": { "enabled": true, "pattern": "up|down|updown|played|random|chord", "rate":
+"1/16", "gate": 0.75, "octaves": 2, "bpm": 110, "transport": true }`: the fixture's notes are
+arpeggiated as the plugin does it, for engines A, B and C alike (`transport` false: no host,
+free running).
+
 The editor has a hidden snapshot test (needs a display):
 `OSP_SNAPSHOT_DIR=/tmp xvfb-run ./build-plugin/apps/plugin/osp_plugin_tests "[ui]"`
 writes `osp-editor-empty.png` / `osp-editor-loaded.png`.

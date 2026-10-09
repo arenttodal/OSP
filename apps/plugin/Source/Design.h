@@ -55,6 +55,10 @@ namespace colour
     const juce::Colour accentBottom { 0xffd3461a };
     const juce::Colour accentSoft { 0xfff2c8b0 };      ///< an active modifier's fill
 
+    /** The arpeggiator's restrained amber (its light, its steps): not a macro colour. */
+    const juce::Colour arp { 0xffc98f3e };
+    const juce::Colour arpOnDark { 0xffe9b45f };
+
     /** The six macros' identities, one natural mineral palette at about the same lightness
         (CIE L* 56-58): LIFE rust, DRIVE ochre (the place and colour DYNAMICS had before it
         moved into Advanced), CHARACTER moss, MOVEMENT mineral blue, SPACE muted mauve, ECHO
@@ -146,7 +150,15 @@ namespace layout
     const R modWheel { 93.0f, 913.0f, 36.0f, 88.0f };
     const R keyboard { 148.0f, 913.0f, 1262.0f, 101.0f };
     const R status { 48.0f, 1038.0f, 600.0f, 24.0f };
-    const R advanced { 1253.0f, 1025.0f, 160.0f, 40.0f };
+    /** By the keyboard, at its right end: the arpeggiator's light, its state, the chevron
+        that opens its editor; ADVANCED (small) below it. */
+    const R arpControl { 1090.0f, 1022.0f, 320.0f, 26.0f };
+    const R advanced { 1250.0f, 1050.0f, 160.0f, 18.0f };
+
+    /** The arpeggiator's inline editor, between the macros and the keyboard when open: the
+        keyboard row moves down by arpShift and the instrument grows by as much. */
+    const R arpPanel { 35.0f, 913.0f, 1378.0f, 112.0f };
+    constexpr float arpShift = 127.0f;
 
     // Popups float centred over the instrument at the reference's place (SPACE: 607 x 610
     // at (420, 236)); taller ones grow upwards from the same foot.
