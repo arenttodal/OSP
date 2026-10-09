@@ -20,6 +20,8 @@ add_executable(osp_tests
     unit/PostProcessorTests.cpp
     unit/DriveProcessorTests.cpp
     unit/ArpeggiatorTests.cpp
+    unit/ModulationTests.cpp
+    unit/LayerEqTests.cpp
     unit/SampleSetTests.cpp
     integration/RenderIntegrationTests.cpp
     integration/CorpusIntegrationTests.cpp

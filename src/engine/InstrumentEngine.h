@@ -3,6 +3,8 @@
 #include "audio/envelopes/Adsr.h"
 #include "audio/pitch/SincInterpolator.h"
 #include "engine/InstrumentVoice.h"
+#include "engine/LayerEq.h"
+#include "engine/Modulation.h"
 #include "engine/PerformanceEngine.h"
 #include "engine/PostProcessor.h"
 #include "engine/ReimaginedEngine.h"
@@ -67,6 +69,9 @@ struct LayerSettings
     /** REIMAGINED mode and every mode's settings. A new mode applies to notes started
         afterwards (sounding notes keep theirs); the settings apply live. */
     ReimaginedSettings reimaginedSettings;
+    /** The layer's own EQ, after its voices (and its REIMAGINED stage), before LEVEL and PAN.
+        Off by default: the layer untouched. */
+    eq::Settings eq;
 };
 
 /**
@@ -212,6 +217,8 @@ public:
     /** START, TUNE, PAN, LEVEL and the modifiers. START, REVERSE and LOOP apply to notes
         started afterwards (Granular: live); TUNE, PAN, LEVEL and FOLLOW apply live. */
     void setLayerSettings (int layer, const LayerSettings& settings) noexcept;
+    /** A layer's EQ alone (the rest of its settings unchanged). */
+    void setLayerEq (int layer, const eq::Settings& settings) noexcept { config.layer[layerIndex (layer)].eq = settings; }
     /** The source mode applies to notes started afterwards; granular settings apply live. */
     void setSourceMode (int layer, SourceMode mode) noexcept { config.sourceMode[layerIndex (layer)] = mode; }
     void setGranular (int layer, const GranularParams& params) noexcept
@@ -278,12 +285,34 @@ public:
     /** A layer's Original <-> Reimagined: its own, or the instrument's. */
     double layerReimagined (int layer) const noexcept
     {
-        const double own = config.layer[static_cast<std::size_t> (layerIndex (layer))].reimagined;
-        return own < 0.0 ? config.macros.reimagined : own;
+        const auto l = static_cast<std::size_t> (layerIndex (layer));
+        const double own = config.layer[l].reimagined;
+        return (own < 0.0 ? config.macros.reimagined : own) + modReimaginedOffset[l];
     }
     void setPitchCharacter (PitchCharacter character) noexcept { config.pitchCharacter = character; }
     /** The host's musical time at the start of the next block (MOVEMENT's SHAPER syncs to it). */
-    void setHostTiming (const HostTiming& timing) noexcept { post.setTiming (timing); }
+    void setHostTiming (const HostTiming& timing) noexcept
+    {
+        post.setTiming (timing);
+        modRuntime.setTiming (timing);
+    }
+
+    /** The modulation system's settings (sources and routes). Real-time safe (a plain copy
+        and a compile into flat lists); call when they changed. With no active route the
+        engine renders exactly as without modulation. */
+    void setModulation (const mod::Settings& settings) noexcept;
+    const mod::Runtime& modulation() const noexcept { return modRuntime; }
+    /** What the modulation display shows: the global LFOs, and the newest sounding voice's
+        poly LFOs and envelopes (lock-free, any thread). */
+    struct ModView
+    {
+        std::array<float, mod::sourceCount> value {};
+        std::array<float, 2> lfoPhase {};
+        std::array<float, 2> envTime {};      ///< seconds into the envelope's stage (a one-shot curve: since the note started)
+        std::array<int, 2> envStage {};       ///< mod::EnvState::Stage
+        bool voice = false;                   ///< a voice is sounding (poly sources shown from it)
+    };
+    ModView modulationView() const noexcept;
     /** SHAPER's pattern position (0..1) for the display; -1 when it is not running. */
     float shaperPhase() const noexcept { return post.shaperPhase(); }
     void setContinuation (ContinuationStrategy strategy) noexcept { config.continuation = strategy; }
@@ -384,7 +413,10 @@ private:
         ReimaginedStage reimagined;             ///< per-layer routing: this layer's own bus stage (KALEIDOSCOPE)
         int reimaginedCountdown = 0;
         ReimaginedLive reimaginedLive;          ///< what this layer's mode-engine voices read (refreshed every block)
+        eq::Processor eq;                       ///< the layer's EQ (LayerSettings::eq, plus modulation)
     };
+    /** The layer's EQ as heard: its settings with the global LFOs' routes added. */
+    eq::Settings effectiveEq (std::size_t layer) const noexcept;
 
     static std::size_t layerIndex (int layer) noexcept { return static_cast<std::size_t> (std::clamp (layer, 0, EngineSettings::layers - 1)); }
     void noteOnLayer (int layer, int note, int velocity, int channel, std::uint64_t eventIndex) noexcept;
@@ -405,6 +437,9 @@ private:
     /** The layer's live REIMAGINED amount and settings for its voices, and its stage's share. */
     void refreshReimagined (std::size_t layer) noexcept;
     /** The layer's amount as KALEIDOSCOPE uses it (0 while the layer plays another mode). */
+    /** Global modulation on the shared stages and the layers' REIMAGINED (control rate). */
+    void applyGlobalModulation (int samples) noexcept;
+    void publishModulation() noexcept;
     double kaleidoscopeAmount (std::size_t layer) const noexcept
     {
         return config.layer[layer].reimaginedSettings.mode == ReimaginedMode::kaleidoscope
@@ -422,6 +457,17 @@ private:
     std::array<Slot, EngineSettings::layers> slots;
     std::size_t context = 0;   ///< the layer a note-on is being prepared for
     int bufferSize = 0;
+
+    mod::Runtime modRuntime;
+    std::array<double, 3> modReimaginedOffset {};   ///< global LFOs on each layer's REIMAGINED
+    double modLifeOffset = 0.0;
+    std::array<std::array<double, 4>, 3> modEqOffset {};   ///< per layer: bell octaves, bell dB, low shelf dB, high shelf dB
+    bool modGlobalApplied = false;
+    std::array<std::atomic<float>, mod::sourceCount> modViewValue {};
+    std::array<std::atomic<float>, 2> modViewPhase {}, modViewEnvTime {};
+    std::array<std::atomic<int>, 2> modViewEnvStage {};
+    std::atomic<bool> modViewVoice { false };
+    void renderBlock (float* const* output, int numChannels, int numSamples) noexcept;
     double blendNow = 0.0, mixXNow = 0.5, mixYNow = 1.0 / 3.0;   ///< smoothed mix controls
     bool pedalDown = false;
     // Mono: the keys held, oldest first (the newest sounds), and the sounding note.

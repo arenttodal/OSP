@@ -238,6 +238,90 @@ std::optional<RenderConfig> loadRenderConfig (const std::filesystem::path& path,
     config.engineSettings.seed = s.seed;
     applyInstrumentBlock (root["instrument"], config);
 
+    // Modulation (optional, engine C): "modulation": { "lfo1": { "shape": "sine", "rateHz": 2, ... },
+    // "env1": { "attack": 0.01, ... }, "routes": [ { "source": "lfo1", "dest": "cutoff", "depth": 0.5 } ] }
+    if (json::has (root, "modulation"))
+    {
+        const auto& m = root["modulation"];
+        auto& ms = config.modulation;
+        ms.seed = config.engineSettings.seed;
+        static const char* shapes[] { "sine", "triangle", "rampup", "rampdown", "pulse", "random", "custom" };
+        for (int i = 0; i < 2; ++i)
+        {
+            const auto& l = m[juce::Identifier ("lfo" + juce::String (i + 1))];
+            auto& lfo = ms.lfo[static_cast<std::size_t> (i)];
+            const auto shape = juce::String (json::getString (l, "shape", "sine")).toLowerCase().removeCharacters (" _-");
+            for (int k = 0; k < mod::lfoShapeCount; ++k)
+                if (shape == shapes[k])
+                    lfo.shape = static_cast<mod::LfoShape> (k);
+            lfo.rateHz = std::clamp (json::getDouble (l, "rateHz", lfo.rateHz), 0.01, 30.0);
+            lfo.sync = json::getBool (l, "sync", lfo.sync);
+            const auto division = juce::String (json::getString (l, "division", "1/4"));
+            for (int k = 0; k < mod::syncDivisionCount; ++k)
+                if (division == mod::syncName (k))
+                    lfo.division = k;
+            lfo.phase = std::clamp (json::getDouble (l, "phase", lfo.phase), 0.0, 1.0);
+            lfo.bipolar = json::getBool (l, "bipolar", lfo.bipolar);
+            const auto mode = juce::String (json::getString (l, "mode", "free")).toLowerCase();
+            lfo.mode = mode == "retrigger" ? mod::LfoMode::retrigger : (mode == "oneshot" || mode == "one shot" ? mod::LfoMode::oneShot : mod::LfoMode::free);
+            lfo.scope = juce::String (json::getString (l, "scope", "global")).toLowerCase() == "poly" ? mod::Scope::poly : mod::Scope::global;
+            const auto& e = m[juce::Identifier ("env" + juce::String (i + 1))];
+            auto& env = ms.env[static_cast<std::size_t> (i)];
+            env.oneShotCurve = json::getBool (e, "oneShot", env.oneShotCurve);
+            env.attackSeconds = std::max (0.0, json::getDouble (e, "attack", env.attackSeconds));
+            env.decaySeconds = std::max (0.0, json::getDouble (e, "decay", env.decaySeconds));
+            env.sustain = std::clamp (json::getDouble (e, "sustain", env.sustain), 0.0, 1.0);
+            env.releaseSeconds = std::max (0.0, json::getDouble (e, "release", env.releaseSeconds));
+            env.curve = std::clamp (json::getDouble (e, "curve", env.curve), -1.0, 1.0);
+            env.lengthSeconds = std::max (0.01, json::getDouble (e, "length", env.lengthSeconds));
+        }
+        if (const auto* routes = m["routes"].getArray())
+        {
+            int r = 0;
+            for (const auto& route : *routes)
+            {
+                if (r >= mod::maxRoutes)
+                    break;
+                auto& out = ms.routes[static_cast<std::size_t> (r++)];
+                const auto source = juce::String (json::getString (route, "source", "")).toLowerCase().removeCharacters (" ");
+                for (int k = 1; k <= mod::sourceCount; ++k)
+                    if (source == juce::String (mod::sourceName (static_cast<mod::Source> (k))).toLowerCase().removeCharacters (" "))
+                        out.source = static_cast<mod::Source> (k);
+                const auto dest = json::getString (route, "dest", "");
+                for (int k = 1; k < mod::destCount; ++k)
+                    if (dest == mod::destInfo (static_cast<mod::Dest> (k)).id)
+                        out.dest = static_cast<mod::Dest> (k);
+                out.depth = std::clamp (json::getDouble (route, "depth", 0.0), -1.0, 1.0);
+                out.enabled = json::getBool (route, "enabled", true);
+            }
+        }
+    }
+
+    // Layer A's EQ (optional, engine C): "eq": { "enabled": true, "bands": { "hp": { "frequencyHz": 90,
+    // "steep": false }, "bell": { "frequencyHz": 3200, "gainDb": -4, "q": 2 }, ... } }; a band
+    // listed is on unless it says "enabled": false. Band names: hp, lowShelf, bell, highShelf, lp.
+    if (json::has (root, "eq"))
+    {
+        const auto& e = root["eq"];
+        auto& eqs = config.engineSettings.layer[0].eq;
+        eqs.enabled = json::getBool (e, "enabled", true);
+        static const char* names[] { "hp", "lowShelf", "bell", "highShelf", "lp" };
+        const auto& bands = e["bands"];
+        for (int b = 0; b < eq::bandCount; ++b)
+        {
+            if (! json::has (bands, names[b]))
+                continue;
+            const auto& band = bands[juce::Identifier (names[b])];
+            auto& out = eqs.bands[static_cast<std::size_t> (b)];
+            const auto range = eq::frequencyRange (static_cast<eq::Band> (b));
+            out.enabled = json::getBool (band, "enabled", true);
+            out.frequencyHz = std::clamp (json::getDouble (band, "frequencyHz", out.frequencyHz), range.minHz, range.maxHz);
+            out.gainDb = std::clamp (json::getDouble (band, "gainDb", out.gainDb), -eq::maxGainDb, eq::maxGainDb);
+            out.q = std::clamp (json::getDouble (band, "q", out.q), eq::minBellQ, eq::maxBellQ);
+            out.steep = json::getBool (band, "steep", out.steep);
+        }
+    }
+
     // The arpeggiator (optional): "arp": { "enabled": true, "pattern": "up", "rate": "1/8", ... }
     if (json::has (root, "arp"))
     {
@@ -255,6 +339,7 @@ std::optional<RenderConfig> loadRenderConfig (const std::filesystem::path& path,
                 arpSettings.rate = static_cast<ArpRate> (i);
         arpSettings.gate = std::clamp (json::getDouble (a, "gate", arpSettings.gate), arp::minGate, arp::maxGate);
         arpSettings.octaves = std::clamp (json::getInt (a, "octaves", arpSettings.octaves), arp::minOctaves, arp::maxOctaves);
+        arpSettings.swing = std::clamp (json::getDouble (a, "swing", arpSettings.swing), 0.0, arp::maxSwing);
         config.arp.bpm = std::clamp (json::getDouble (a, "bpm", config.arp.bpm), 20.0, 400.0);
         config.arp.transport = json::getBool (a, "transport", config.arp.transport);
     }

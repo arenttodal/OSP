@@ -332,3 +332,28 @@ real time:
 - **DAW tests** (Logic, Ableton, Reaper: load, save, automation, offline bounce, source
   replacement) still need a Mac (Stage 20). CPU on Apple Silicon is to be measured there;
   earlier ratios suggest about 3–5 times lower than this container.
+
+
+## Granular layers (follow-up)
+
+Measured (`[.][granular-reimagined]`, a held A3 vowel, 100 % against 0 %, level of the
+difference relative to the dry note): One Shot 0.7 / 0.9 / 3.2 / 2.0 / 2.4 dB for
+KALEIDOSCOPE / TAPE FRAME / TOYBOX / MOSAIC / MIRAGE, but Granular only -3.1 / -5.2 / -3.1 /
+2.0 / 3.0 dB: three modes did little on grains. Why: KALEIDOSCOPE's doubling and granular
+continuation follow a read head, so granular voices switched them off (only saturation and the
+resonance stage were left); TAPE FRAME's spliced tape pass and TOYBOX's turning heads read the
+file themselves, so on grains only their colouring (wow, age, ghosts; digital character,
+echoes) remained.
+
+Now the travelling modes steer the grains (`ReimaginedVoiceEngine::grainPositionOffset`,
+control rate): TAPE FRAME's tape head moves POS through a FRAME at the note's tape speed with
+its wow and flutter, rewinds in 0.12 s and passes again while held (LOOP off: it stays at the
+end); TOYBOX's head carries POS through a leg (1.2 s at MOTION 0, shorter with MOTION) - FORWARD
+loops it, TURN turns at its ends, CHAOS jumps (its own seeded stream). KALEIDOSCOPE doubles
+with a second grain stream (seeded per note, 12-20 ms behind POS, about 7 cents of slow
+chorus, to one side, faded in after the attack) and its granular continuation becomes scatter
+(+45 % SPREAD, +50 % density at full). After: -0.3..+3 dB for every mode on grains (Granular
+1.3 / 1.0 / 2.9 / 2.0 / 3.0 dB). One Shot notes and Granular at 0 % are bit-identical to before
+(null tests); Granular patches with REIMAGINED above 0 sound different by design. Regression
+test: `[plugin][reimagined-granular]` (every mode, forwards and reversed: clearly heard,
+finite, deterministic).

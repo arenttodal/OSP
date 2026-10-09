@@ -182,11 +182,16 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
         gLowCoef = static_cast<float> (1.0 - std::exp (-2.0 * std::numbers::pi * 6500.0 / sampleRate));
         gLowL = gLowR = 0.0f;
     }
+    grainDoubling = false;
+    gScatter = 0.0f;
+    modeEngine = nullptr;   // the previous note's engine must not steer this note's first grains
     if (granularMode)
     {
-        // The read-through extras (doubling head, Reimagined grains) follow a read head.
-        dAmount = 0.0f;
+        // The read-through extras need a read head; on grains KALEIDOSCOPE doubles with a
+        // second grain stream and scatters (set up below, once the mode engine is known).
+        gScatter = gAmount;
         gAmount = 0.0f;
+        dGrainBehind = dAmount > 0.0f ? dBase / std::max (1.0, static_cast<double> (src.numFrames())) : 0.0;
     }
     if (granularMode)
         granularSource.start (*layer->source, notesGranular(), sampleRate, shape.seed, &currentModel->analysis.envelope,
@@ -263,12 +268,39 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     appliedBright = appliedBody = 1.0e9f; // force coefficient update
     filtersActive = false;
 
-    envelope.prepare (sampleRate, adsrSettings);
+    clearModulation();
+    modPanApplied = false;
+    noteAdsr = adsrSettings;
+    if (modRuntime != nullptr && modRuntime->compiled.anyVoiceDest)
+    {
+        // The amp envelope's times are taken as the note starts (a running stage is never
+        // re-timed); SUSTAIN follows while held, RELEASE is taken at note-off.
+        updateModulation (false);
+        const auto& rt = *modRuntime;
+        noteAdsr.attackSeconds = adsrSettings.attackSeconds * std::exp2 (modState.offset (rt, mod::Dest::ampAttack));
+        noteAdsr.decaySeconds = adsrSettings.decaySeconds * std::exp2 (modState.offset (rt, mod::Dest::ampDecay));
+        noteAdsr.sustainLevel = std::clamp (adsrSettings.sustainLevel + modSustain, 0.0, 1.0);
+        appliedSustain = noteAdsr.sustainLevel;
+    }
+    envelope.prepare (sampleRate, noteAdsr);
     envelope.reset();
     envelope.noteOn();
 
     scheduleNextJump();
     startModeEngine (params);
+    if (granularMode)
+    {
+        if (modeEngine != nullptr)
+        {
+            // Another mode transforms the grains: KALEIDOSCOPE's own extras stay out.
+            dAmount = 0.0f;
+            gScatter = 0.0f;
+        }
+        grainDoubling = dAmount > 0.0f;
+        if (grainDoubling)
+            doubleSource.start (*layer->source, doubledGranular(), sampleRate, Prng::deriveSeed (shape.seed, 0x6772646dull, 0),
+                                &currentModel->analysis.envelope, currentModel->analysis.source.durationSeconds);
+    }
 }
 
 void InstrumentVoice::release() noexcept
@@ -277,6 +309,17 @@ void InstrumentVoice::release() noexcept
         return;
     released = true;
     heldByPedal = false;
+    if (modStarted)
+    {
+        modState.release();
+        if (modRuntime != nullptr && modRuntime->compiled.has (mod::Dest::ampRelease))
+        {
+            auto a = noteAdsr;
+            a.sustainLevel = appliedSustain >= 0.0 ? appliedSustain : a.sustainLevel;
+            a.releaseSeconds = adsrSettings.releaseSeconds * std::exp2 (modState.offset (*modRuntime, mod::Dest::ampRelease));
+            envelope.prepare (sampleRate, a);
+        }
+    }
     if (modeEngine != nullptr)
         modeEngine->release();
 
@@ -284,6 +327,7 @@ void InstrumentVoice::release() noexcept
     {
         // No new grains; the playing ones finish under the release envelope.
         granularSource.stopSpawning();
+        doubleSource.stopSpawning();
         envelope.noteOff();
         return;
     }
@@ -564,16 +608,41 @@ void InstrumentVoice::updateCharacter (bool immediate) noexcept
     const double target = shaping::cutoffOctaves (rangeLoOctaves, rangeHiOctaves, shapingState->character);
     charOctaves = immediate ? target : charOctaves + (target - charOctaves) * charSmoothing;
     const double env = shaping::envelopeOctaves (s.envAmount) * filterEnv * envelopeScale;
-    const double octaves = charOctaves + env + velocityOctaves + driftTone;
+    const double octaves = charOctaves + env + velocityOctaves + driftTone + modCutoff;
     // TILT: the knob rotates dark <-> bright (+-12 dB), the envelope and velocity lean it.
     const double tiltDb = (std::clamp (shapingState->character, 0.0, 1.0) - 0.5) * 24.0 + 3.0 * (env + velocityOctaves + driftTone);
-    charFilter.setParameters (s.filterType, std::exp2 (octaves), s.resonance, s.drive, tiltDb);
+    const double resonance = modResonance != 0.0 ? std::clamp (s.resonance + modResonance, 0.0, 1.0) : s.resonance;
+    charFilter.setParameters (s.filterType, std::exp2 (octaves), resonance, s.drive, tiltDb);
+}
+
+GranularParams InstrumentVoice::doubledGranular() const noexcept
+{
+    GranularParams p = notesGranular();
+    // Behind = what was just played: earlier in the recording, or later when reversed.
+    p.position = std::clamp (p.position + (p.reverse ? dGrainBehind : -dGrainBehind), 0.0, 1.0);
+    return p;
 }
 
 GranularParams InstrumentVoice::notesGranular() const noexcept
 {
     GranularParams p = *granularLive;
-    p.position = std::clamp (p.position + static_cast<double> (shape.grainPositionOffset), 0.0, 1.0);
+    double offset = static_cast<double> (shape.grainPositionOffset);
+    if (modeEngine != nullptr)
+        offset += modeEngine->grainPositionOffset();   // TAPE FRAME's tape, TOYBOX's heads
+    if (modStarted)
+    {
+        offset += modGrainPosition;
+        p.spread += modGrainSpread;
+        p.sizeSeconds *= std::exp2 (modGrainSize);
+        p.density *= std::exp2 (modGrainDensity);
+    }
+    if (gScatter > 0.0f)
+    {
+        // KALEIDOSCOPE's far end: grains from further around POS, a denser cloud.
+        p.spread += 0.45 * static_cast<double> (gScatter);
+        p.density *= 1.0 + 0.5 * static_cast<double> (gScatter);
+    }
+    p.position = std::clamp (p.position + offset, 0.0, 1.0);
     p.sizeSeconds = std::clamp (p.sizeSeconds * static_cast<double> (shape.grainSizeRatio), 0.01, 0.6);
     p.density = std::clamp (p.density * static_cast<double> (shape.grainDensityRatio), 2.0, 60.0);
     p.spread = std::clamp (p.spread + static_cast<double> (shape.grainSpreadOffset), 0.0, 1.0);
@@ -581,8 +650,82 @@ GranularParams InstrumentVoice::notesGranular() const noexcept
     return p;
 }
 
+void InstrumentVoice::clearModulation() noexcept
+{
+    modStarted = false;
+    modCents = modLevelDb = modPan = modReimagined = 0.0f;
+    modCutoff = modResonance = modSustain = 0.0;
+    modGrainPosition = modGrainSpread = modGrainSize = modGrainDensity = 0.0;
+    appliedSustain = -1.0;
+}
+
+void InstrumentVoice::updateModulation (bool advance) noexcept
+{
+    if (modRuntime == nullptr || ! modRuntime->compiled.anyVoiceDest)
+    {
+        if (modStarted)
+        {
+            // The last route to a voice destination went: back to the plain settings.
+            const bool sustainMoved = appliedSustain >= 0.0;
+            clearModulation();
+            if (sustainMoved)
+                envelope.prepare (sampleRate, noteAdsr);
+        }
+        return;
+    }
+    const auto& rt = *modRuntime;
+    if (! modStarted)
+    {
+        modState.start (rt);   // routes added while the note sounds: its sources start now
+        if (released)
+            modState.release();
+        modStarted = true;
+    }
+    else if (advance)
+        modState.advance (rt, static_cast<double> (controlInterval) / sampleRate);
+
+    const int layerOffset = std::clamp (voiceLayer, 0, 2);
+    auto layerDest = [layerOffset] (mod::Dest a) { return static_cast<mod::Dest> (static_cast<int> (a) + layerOffset); };
+    modCents = static_cast<float> (modState.offset (rt, layerDest (mod::Dest::fineTuneA)));
+    modLevelDb = static_cast<float> (modState.offset (rt, layerDest (mod::Dest::levelA)));
+    modPan = static_cast<float> (modState.offset (rt, layerDest (mod::Dest::panA)));
+    modCutoff = modState.offset (rt, mod::Dest::cutoff);
+    modResonance = modState.offset (rt, mod::Dest::resonance);
+    modGrainPosition = modState.offset (rt, layerDest (mod::Dest::grainPositionA));
+    modGrainSpread = modState.offset (rt, layerDest (mod::Dest::grainSpreadA));
+    modGrainSize = modState.offset (rt, layerDest (mod::Dest::grainSizeA));
+    modGrainDensity = modState.offset (rt, layerDest (mod::Dest::grainDensityA));
+    modSustain = modState.offset (rt, mod::Dest::ampSustain);
+    {
+        // REIMAGINED: the engine already adds the global LFOs to the layer's amount (its
+        // shared stage hears them too); a voice adds its own sources on top.
+        const auto d = layerDest (mod::Dest::reimaginedA);
+        const auto i = static_cast<std::size_t> (d);
+        double own = 0.0;
+        for (int k = 0; k < rt.compiled.termCount[i]; ++k)
+        {
+            const auto& term = rt.compiled.terms[i][static_cast<std::size_t> (k)];
+            if (mod::isPolySource (rt.settings, static_cast<mod::Source> (term.source + 1)))
+                own += static_cast<double> (term.depth) * modState.values[term.source];
+        }
+        modReimagined = static_cast<float> (mod::destInfo (d).span * own);
+    }
+    if (rt.compiled.has (mod::Dest::ampSustain))
+    {
+        const double sustain = std::clamp (adsrSettings.sustainLevel + modSustain, 0.0, 1.0);
+        if (std::abs (sustain - appliedSustain) > 1.0e-4)
+        {
+            auto a = noteAdsr;
+            a.sustainLevel = sustain;
+            envelope.prepare (sampleRate, a);   // the envelope glides to a new sustain (no step)
+            appliedSustain = sustain;
+        }
+    }
+}
+
 void InstrumentVoice::updateControl() noexcept
 {
+    updateModulation (true);
     // Drift: slowly wandering targets, smoothed (strategy D / MOTION).
     const bool drifting = shape.driftLevelDb > 0.0f || shape.driftCents > 0.0f || shape.driftBrightnessDb > 0.0f || shape.driftPan > 0.0f
                           || shape.driftToneOctaves > 0.0f;
@@ -622,10 +765,23 @@ void InstrumentVoice::updateControl() noexcept
         }
     }
 
+    if (modPan != 0.0f || modPanApplied)
+    {
+        // PAN modulation on top of the note's own place (and its drift).
+        const float drifted = shape.driftPan > 0.0f ? static_cast<float> (driftPanValue) : 0.0f;
+        const float p = std::clamp (shape.pan + drifted + modPan, -1.0f, 1.0f);
+        panLeft = std::min (1.0f, 1.0f - p);
+        panRight = std::min (1.0f, 1.0f + p);
+        modPanApplied = modPan != 0.0f;
+    }
     if (shapingState != nullptr)
         updateCharacter (false);
     if (granularMode)
+    {
         granularSource.setParams (notesGranular());
+        if (grainDoubling)
+            doubleSource.setParams (doubledGranular());
+    }
 
     settleCents *= settleCoef;
     double shared = 0.0;
@@ -636,14 +792,16 @@ void InstrumentVoice::updateControl() noexcept
         shared = 0.3 * shapingState->movement * shaping::driftPitchCents (s.driftPitch)
                  * shaping::sharedWander (shapingState->seed, static_cast<double> (clock) / sampleRate, shaping::driftSpeedHz (s.driftSpeed));
     }
-    const double cents = shape.pitchCents + settleCents + driftCentsValue + shared;
+    const double cents = shape.pitchCents + settleCents + driftCentsValue + shared + static_cast<double> (modCents);
     pitchMod = cents != 0.0 ? std::exp2 (cents / 1200.0) : 1.0;
 
     // Expression follows quickly but smoothly (about 10 ms).
     expressionGain += (std::pow (10.0, expressionGainDb / 20.0) - expressionGain) * 0.15;
     expressionBright += (expressionBrightDb - expressionBright) * 0.15;
-    const float target = (drifting ? dbToLinear (driftLevel) : 1.0f) * static_cast<float> (expressionGain);
-    controlGainStep = (target - controlGain) / controlInterval;
+    float gainTarget = (drifting ? dbToLinear (driftLevel) : 1.0f) * static_cast<float> (expressionGain);
+    if (modLevelDb != 0.0f)
+        gainTarget *= dbToLinear (static_cast<double> (modLevelDb));
+    controlGainStep = (gainTarget - controlGain) / controlInterval;
 
     if (! followContour && ! granularMode)
     {
@@ -833,6 +991,22 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
         if (granularMode)
         {
             granularSource.render (l, r, currentStep);
+            if (grainDoubling)
+            {
+                // The doubling cloud: a few cents of slow chorus, faded in after the attack,
+                // a little to one side (as on a read-through note).
+                if (dDelaySamples > 0)
+                    --dDelaySamples;
+                else if (dRamp < 1.0f)
+                    dRamp = std::min (1.0f, dRamp + dRampStep);
+                float l2 = 0.0f, r2 = 0.0f;
+                doubleSource.render (l2, r2, currentStep * (1.0 + 0.004 * std::sin (dPhase)));
+                const float g = dAmount * dRamp;
+                const float norm = 1.0f / std::sqrt (1.0f + g * g);
+                l = (l + g * (dSide < 0.0f ? 1.0f : dNear) * l2) * norm;
+                r = (r + g * (dSide < 0.0f ? dNear : 1.0f) * r2) * norm;
+                dPhase += dOmega;
+            }
         }
         else
         {
@@ -1005,7 +1179,7 @@ void InstrumentVoice::startModeEngine (const InstrumentVoiceStart& params) noexc
     note.note = params.note;
     note.seed = shape.seed;
     ReimaginedControl control;
-    control.amount = modeLive->amount;
+    control.amount = modReimagined != 0.0f ? std::clamp (modeLive->amount + static_cast<double> (modReimagined), 0.0, 1.0) : modeLive->amount;
     control.settings = &modeLive->settings;
     control.step = currentStep;
     if (! engine->start (note, control))
@@ -1046,7 +1220,7 @@ void InstrumentVoice::renderMode (float* left, float* right, int numSamples, dou
                 }
             }
             ReimaginedControl control;
-            control.amount = modeLive->amount;
+            control.amount = modReimagined != 0.0f ? std::clamp (modeLive->amount + static_cast<double> (modReimagined), 0.0, 1.0) : modeLive->amount;
             control.settings = &modeLive->settings;
             control.step = currentStep;
             modeEngine->control (control);

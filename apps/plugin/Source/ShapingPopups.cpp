@@ -184,6 +184,7 @@ MiniKnob::MiniKnob (juce::AudioProcessorValueTreeState& state, const juce::Strin
     : caption (std::move (c)), formatter (std::move (f)), horizontal (h)
 {
     slider.getProperties().set ("mini", true);
+    slider.getProperties().set ("paramId", id);   // a modulation drop target (by its parameter)
     slider.setRotaryParameters (OspLookAndFeel::rotaryStart, OspLookAndFeel::rotaryEnd, true);
     slider.setTitle (caption);
     attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (state, id, slider);

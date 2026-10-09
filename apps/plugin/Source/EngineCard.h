@@ -1,5 +1,6 @@
 #pragma once
 
+#include "EqEditor.h"
 #include "OspLookAndFeel.h"
 #include "PluginProcessor.h"
 #include "ShapingPopups.h"
@@ -212,6 +213,13 @@ public:
     bool isReimaginedLabel (const juce::Component* c) const noexcept { return c != nullptr && c == knobs[4].get(); }
     void setReimaginedOpen (bool open);
 
+    /** The layer's EQ over its waveform (a view setting: the EQ keeps playing either way). */
+    std::function<void (int, bool)> onEqToggle;        ///< its EQ button (the editor keeps one open at a time)
+    void setEqOpen (bool open);
+    bool isEqOpen() const noexcept { return eqEditor != nullptr; }
+    EqEditor* eqEditorComponent() noexcept { return eqEditor.get(); }
+    EqButton& eqToggle() noexcept { return eqButton; }
+
     void paint (juce::Graphics&) override;
     void paintOverChildren (juce::Graphics&) override;
     void resized() override;
@@ -244,6 +252,8 @@ private:
     LayerStateButton muteButton, soloButton;
     bool shownHeard = true;
     std::array<std::unique_ptr<MiniKnob>, 5> granularKnobs;
+    EqButton eqButton { layerIndex };
+    std::unique_ptr<EqEditor> eqEditor;
     juce::Rectangle<int> badgeArea, textArea, dividerArea;
     juce::String rootText, fileText;
 };

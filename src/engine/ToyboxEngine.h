@@ -39,6 +39,7 @@ public:
     double stepFactor() const noexcept override { return factor; }
     void render (const float* dryL, const float* dryR, float* outL, float* outR, int n) noexcept override;
     double sourcePosition() const noexcept override { return note.granular || done ? -1.0 : heads[0].pos; }
+    double grainPositionOffset() const noexcept override { return grainOffset; }
     bool finished() const noexcept override { return done; }
 
 private:
@@ -84,6 +85,11 @@ private:
     double highBound() const noexcept { return sustains ? regionEnd : soundEnd; }
     ToyboxPlay play = ToyboxPlay::forward;
     double motion = 0.0, step = 1.0, factor = 1.0;
+
+    // Granular notes: a head (seconds around POS) the grains follow - the memory looping a
+    // leg (FORWARD), turning at its ends (TURN) or jumping within it (CHAOS).
+    double grainHead = 0.0, grainDir = 1.0, grainDuration = 1.0, grainOffset = 0.0;
+    void moveGrainHead() noexcept;
 
     // Memory taps: where the head was (one entry per control period).
     static constexpr int historySize = 512;

@@ -41,6 +41,7 @@ public:
     double stepFactor() const noexcept override { return factor; }
     void render (const float* dryL, const float* dryR, float* outL, float* outR, int n) noexcept override;
     double sourcePosition() const noexcept override;
+    double grainPositionOffset() const noexcept override { return grainOffset; }
     bool finished() const noexcept override { return done; }
 
 private:
@@ -91,6 +92,10 @@ private:
     double step = 1.0;
 
     // AGE
+    // Granular notes: a tape head (seconds into the frame) that the grains follow, rewound
+    // at the frame's end while the key is held.
+    double grainHead = 0.0, grainRewind = 0.0, grainDuration = 1.0, grainOffset = 0.0;
+
     std::array<reimagined::OnePole, 4> lowpass;   ///< two poles per channel
     std::array<reimagined::OnePole, 2> ghostTone;
     float drive = 1.0f, compression = 0.0f, envelope = 0.0f, envAttack = 0.0f, envRelease = 0.0f;

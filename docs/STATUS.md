@@ -243,8 +243,36 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       the state and a chevron by the keyboard; an inline editor (16-step display bound to the
       scheduler) that grows the window; ADVANCED became a small link. ARP off: sessions from
       before render bit-identically (13-scene null test). Headless via the `"arp"` config block.
+- [x] ARPEGGIATOR to the approved mockups: ARP and Advanced cards right of the keyboard, the
+      inline editor with numbered step bars, Pattern / Rate boxes and GATE / OCTAVES / SWING
+      knobs; SWING (`arp.swing`, hint 16, default straight) on the grid and free running.
+- [x] REIMAGINED on Granular layers: KALEIDOSCOPE doubles the grain cloud and scatters it,
+      TAPE FRAME's tape head and TOYBOX's turning heads steer POS (docs/reports/reimagined-modes.md,
+      "Granular layers"). One Shot and Granular at 0 % unchanged (null tests).
 - [ ] ARPEGGIATOR in hosts (Logic, Ableton, Reaper): window resizing, automation, bounces,
       loops; MPE with the arpeggiator; a listening pass on the gate and pattern defaults.
+- [x] MODULATION (parameters v17; docs/reports/modulation.md): LFO 1/2 (7 shapes incl. a
+      CUSTOM breakpoint curve, Hz or host-synced 1/32..8 bars with D/T, phase, polarity, FREE /
+      RETRIGGER / ONE SHOT, GLOBAL / POLY) and per-voice ENV 1/2 (ADSR + curve, or a ONE SHOT
+      curve); a destination registry (48 entries with the EQ's) (macros, layer level / pan / fine tune /
+      REIMAGINED, granular POS / DENS / SIZE / SPREAD, CHARACTER cutoff / resonance, amp ADSR);
+      16 automatable route slots, undo, recall; no route = bit-identical to before. The bay:
+      MOD beside Advanced widens the window (the instrument never moves), source tabs with
+      drag sockets, the live curve display and editor, the routing list with + ADD; drag onto
+      any control (hover opens CHARACTER's popover); rings with the swept range and the live
+      value on modulated knobs, draggable for depth. Headless via the `"modulation"` block.
+- [x] PER-LAYER EQ (parameters v18; docs/reports/eq.md): five bands per layer (HP / LP 12 or
+      24 dB/oct, low and high shelf, bell; SVF sections, glided, crossfaded switches, zero
+      latency) after the layer's voices and REIMAGINED stage, before LEVEL / PAN; off by
+      default and out of the path when off (older sessions bit-identical). The editor opens
+      over the waveform from an EQ key in the card's header: quiet markers that become bands
+      when dragged, the exact response curve, a typed / dragged band inspector, one editor at a
+      time. Bell frequency / gain and shelf gains are modulation destinations (global LFOs).
+      Headless via the `"eq"` block.
+- [ ] PER-LAYER EQ: compare against the Option 3 reference (not received); DAW checks.
+- [ ] MODULATION: refine the bay against the approved mockup (not received); host checks
+      (Logic, Ableton, REAPER, AudioPluginHost window widening); a global envelope mode needs
+      a gate-aggregation rule before ENV may reach the macros.
 - [x] `plugin-pipeline/`: the build-and-download pipeline as a reusable kit for other JUCE
       plug-ins (`adopt.sh` for an existing repo, `new-plugin.sh` + starter for a new one, a fixed
       download link per branch); self-tested on macOS and Windows by its own workflow.

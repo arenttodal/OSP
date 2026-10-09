@@ -80,6 +80,11 @@ public:
     /** n <= 32 samples of the source signal. `dry`: the plain read (when wanted) or the
         grains (Granular), else silence. */
     virtual void render (const float* dryL, const float* dryR, float* outL, float* outR, int n) noexcept = 0;
+    /** Granular notes: how far the mode moves where the grains are taken, as a signed
+        fraction of the recording added to the layer's POS (control rate). The modes that
+        travel through the recording (TAPE FRAME's tape, TOYBOX's turning heads) steer the
+        grains instead of reading the file themselves. */
+    virtual double grainPositionOffset() const noexcept { return 0.0; }
     /** Where it reads the recording now (source frames), for the display; < 0: nowhere. */
     virtual double sourcePosition() const noexcept { return -1.0; }
     /** The note has nothing left to play (the voice ends it). */

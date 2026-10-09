@@ -61,6 +61,10 @@ bool ToyboxEngine::start (const ReimaginedNote& n, const ReimaginedControl& c) n
         heads[0] = { n.startFrame, noteDir };
         heads[1] = heads[0];
     }
+    grainHead = 0.0;
+    grainDir = n.reverse ? -1.0 : 1.0;
+    grainOffset = 0.0;
+    grainDuration = std::max (0.05, static_cast<double> (n.source->numFrames()) / n.source->sampleRate());
     control (c);
     amount = std::clamp (c.amount, 0.0, 1.0);
     if (! n.granular)
@@ -103,12 +107,44 @@ void ToyboxEngine::control (const ReimaginedControl& c) noexcept
     factor = std::exp2 (22.0 * selfMod * dev / 1200.0);
     gainMod = static_cast<float> (1.0 + 0.3 * selfMod * dev);
 
+    if (note.granular)
+        moveGrainHead();
     if (! note.granular)
     {
         history[static_cast<std::size_t> (historyWrite)] = heads[0].pos;
         historyWrite = (historyWrite + 1) % historySize;
         historyCount = std::min (historyCount + 1, historySize);
     }
+}
+
+void ToyboxEngine::moveGrainHead() noexcept
+{
+    // The grains' head travels at the toy's own (self-modulated) speed through a leg around
+    // POS; short legs at high MOTION, the way the One Shot heads turn the recording over.
+    const double dt = 32.0 / rate;
+    const double leg = std::min (0.8 * grainDuration, 1.2 * std::exp2 (-4.0 * motion));
+    const double half = 0.5 * leg;
+    grainHead += grainDir * dt * factor;
+    if (grainHead > half || grainHead < -half)
+    {
+        switch (play)
+        {
+            case ToyboxPlay::forward:   // the memory loops the leg
+                grainHead -= grainDir * leg;
+                break;
+            case ToyboxPlay::turn:      // it turns at the leg's end
+                grainHead = std::clamp (grainHead, -half, half);
+                grainDir = -grainDir;
+                break;
+            case ToyboxPlay::chaos:     // it jumps somewhere else in the leg
+                grainHead = rng.uniform (-half, half);
+                if (rng.nextDouble() < 0.4)
+                    grainDir = -grainDir;
+                break;
+        }
+    }
+    const double takeover = ramp (amount, 0.2, 0.6);
+    grainOffset = takeover * grainHead / grainDuration;
 }
 
 float ToyboxEngine::boxAt (int channel, std::int64_t k) const noexcept

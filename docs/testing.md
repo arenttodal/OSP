@@ -13,6 +13,21 @@ ctest --test-dir build --output-on-failure      # everything
 | `performance-smoke` | `research-renderer --benchmark --seconds 3` must run |
 | `plugin` (with `-DOSP_BUILD_PLUGIN=ON`) | the real `AudioProcessor`, headless: load → analysis → chromatic playback through `processBlock`, host sample-rate changes, root override, session save/recall after the original file is deleted (bit-identical audio), bad files keeping the previous instrument, unpitched sources |
 
+The layer EQ: `[unit][eq]` (drawn response = measured response at 44.1-96 kHz, null when off,
+extremes and automation finite, click-free switching, per-layer isolation and modulation in the
+engine), `[plugin][eq]` (defaults, IDs, isolation by solo, recall, older sessions, automation at
+four rates), `[ui][eq-ui]` (the editor in the waveform, activation by drag, typing, one at a time,
+ARP + MOD, modulation drops; screenshots eq-01..09) and the hidden `[eq-cpu]` measurement. A
+render config may carry `"eq": { "enabled": true, "bands": { "hp": { "frequencyHz": 90, "steep":
+true }, "bell": { "frequencyHz": 3200, "gainDb": -4, "q": 2 } } }` (layer A).
+
+Modulation: `[unit][mod]` (shapes, phase drift and block-size independence, host sync, ONE
+SHOT, envelope stages, route rules, no-route null, per-voice independence), `[plugin][mod]`
+(parameters, routes, recall, older sessions, curves and undo; every source with the ARP,
+Granular and three layers), `[ui][mod-ui]` (the bay, the window, drag and drop, rings, the
+routing list; screenshots mod-01..11 with `OSP_SNAPSHOT_DIR`) and the hidden `[mod-cpu]`
+measurement (16 routes against none).
+
 The arpeggiator: `[unit][arp]` (core: patterns, sample-exact host-grid timing over 60/90/120/174 BPM
 x 44.1/48/96 kHz x 32..512 blocks x all rates, free running, loops/jumps/tempo changes, gate,
 pedal, panic, hand-overs, a stuck-note stress test, RANDOM determinism, the research `"arp"`
@@ -23,7 +38,7 @@ mode/routing and effect, REVERSE/LOOP/Granular/layers, lifecycle, the stage's CP
 `OSP_ARP_BASELINE_DIR`) and `[arp-ui]` (the keyboard control, the inline editor and the
 window resizing; screenshots with `OSP_SNAPSHOT_DIR`, under xvfb-run). A render config may
 carry `"arp": { "enabled": true, "pattern": "up|down|updown|played|random|chord", "rate":
-"1/16", "gate": 0.75, "octaves": 2, "bpm": 110, "transport": true }`: the fixture's notes are
+"1/16", "gate": 0.75, "octaves": 2, "swing": 0.15, "bpm": 110, "transport": true }`: the fixture's notes are
 arpeggiated as the plugin does it, for engines A, B and C alike (`transport` false: no host,
 free running).
 

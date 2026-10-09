@@ -56,6 +56,28 @@ from itself is its own: every card has its own **REIMAGINED**.
 While you play, an orange read head per note follows the recording (One Shot); you see it
 jump back where the sustain continues and forward where the release joins the ending.
 
+### A layer's EQ
+
+**EQ** in a card's header opens that layer's equaliser over its waveform (the card stays as it
+is; **EQ** again, or ×, closes it). Each layer has its own, so one sound can lose its rumble
+while another gets brighter. A small light on EQ means the layer's EQ is on.
+
+At first the graph is almost empty: five quiet rings on the middle line, from left to right
+**HP** (high pass: removes the lows below it), **LOW SHELF**, **BELL**, **HIGH SHELF** and **LP**
+(low pass: removes the highs above it). Drag a ring and that band starts working (the first one
+also switches the EQ on): across for its frequency, up or down for boost or cut (HP and LP only
+move across). The mouse wheel over a band sets how wide it is (Q) — for HP and LP, how steep
+(12 or 24 dB per octave). Double-click a band to put its boost back to 0 (HP and LP: their
+frequency back). The values in the top row can be dragged, or double-clicked to type
+(`3.2k`, `-4`, `2`); next to them, the band's own switch and a reset. The power symbol at the top
+left switches the whole EQ off and on without losing the settings.
+
+The curve is exactly what you hear. The EQ works the same for One Shot, Granular, reversed and
+REIMAGINED sounds and for ARP notes, and comes after the layer's REIMAGINED, before its LEVEL and
+PAN. Closing the editor leaves the EQ playing. Sounds from before have it off and sound exactly
+as they did. With MOD open, an LFO can be dragged onto the bell's frequency or gain or a shelf's
+gain.
+
 ### Mixing the layers
 
 **MIX** sits in the header between the preset and VOLUME, and grows with the instrument:
@@ -125,6 +147,14 @@ glides along the waveform where it reads, swelling and fading with its window:
 
 After you let go no new grains start; the ones playing finish (under the release time).
 
+REIMAGINED works on grains too, each mode in its own way: KALEIDOSCOPE doubles the cloud
+(a second stream of grains a little behind POS, a few cents apart, to one side) and, further
+up, scatters the grains wider and denser; TAPE FRAME moves POS like a tape head through a
+FRAME of the recording, rewinding and passing again while you hold the key (with its wow,
+flutter, age and ghosts on the grains); TOYBOX's heads carry POS around (FORWARD loops a
+short leg, TURN turns at its ends, CHAOS jumps), with its digital character and echoes;
+MOSAIC and MIRAGE rebuild the grains' spectrum.
+
 LIFE works here too: every note takes its grains from its own spot near POS, with its own
 grain size, density, spread and a few cents of pitch, so repeated notes sound like
 different clouds of the same sound (none at 0 %, clearly different at 50 %). In the LIFE
@@ -162,7 +192,7 @@ filter's curve over your sound's spectrum, the movement over time, a cloud of po
 performances, the drive's curve) with its few controls. Escape, a click elsewhere or the
 name again closes it.
 
-**Advanced** (ADVANCED ›, bottom right under the arpeggiator; it stays open with the project): Fine tune, Bend range,
+**Advanced** (the card under ARP, right of the keyboard; it stays open with the project): Fine tune, Bend range,
 **Voices** (*Poly*, or *Mono* for basses and leads: one note at a time, the newest key
 wins, a key played while another is held changes the note's pitch without restarting it
 (legato) and releasing it returns to the key still held; **GLIDE** sets how long the pitch
@@ -239,13 +269,14 @@ less than a full chord.
 
 ## ARPEGGIATOR
 
-Next to the keyboard, at its right end: a small light, the arpeggiator's state ("ARP / UP · 1/8")
-and an arrow.
+To the right of the keyboard: the ARP card (a light, ARP, an arrow, and the pattern and rate
+below) and Advanced under it.
 
-- **The light** switches the arpeggiator on and off (amber when on).
-- **The arrow** shows or hides its settings, which open between the macros and the keyboard. The
-  window grows by that much and shrinks back when you hide them. Showing the settings does not
-  switch it on, and switching it on does not show them.
+- **The light** switches the arpeggiator on and off (orange when on).
+- **Anywhere else on the card** shows or hides its settings, which open between the macros and
+  the keyboard; the round button at the panel's top right hides them too. The window grows by
+  that much and shrinks back when you hide them. Showing the settings does not switch it on,
+  and switching it on does not show them.
 
 Hold a chord: it plays as a stepped pattern, each note with the velocity you played it with,
 through every layer and effect exactly as if you were playing the notes yourself. The display
@@ -258,6 +289,7 @@ it shows the pattern's shape.
 | **RATE** | 1/4, 1/8, 1/16, 1/32, dotted (D) and triplet (T) |
 | **GATE** | how long each note sounds, 10–150 % of a step; above 100 % notes overlap (legato); double-click for 75 % |
 | **OCTAVES** | 1–4: the pattern repeats an octave higher each time round (CHORD climbs an octave per step) |
+| **SWING** | 0–100 %: every second step plays later, up to half a step (100 % feels dotted); 0 % is straight |
 
 With the host playing, the steps sit on its beat grid. A chord played between steps starts on
 the next one, and loops and jumps stay on the grid. With the host stopped (or in the standalone
@@ -267,7 +299,43 @@ note sounds at once.
 The **sustain pedal** keeps released keys in the pattern. **All Notes Off** stops everything.
 Pitch bend, the mod wheel and pressure work as usual. The settings are automatable and saved
 with the project. Projects from before the arpeggiator open with it off and sound exactly as
-they did. **Advanced** is the small ADVANCED › under the arpeggiator's state.
+they did. **Advanced** is the card under ARP.
+
+## MODULATION
+
+**MOD ›** (beside Advanced, under the ARP card) opens the modulation bay on the right of the
+instrument: the window gets wider, nothing in the instrument moves. **MOD ‹** closes it
+again; modulation keeps playing either way. A small orange light on MOD means the sound has
+modulation in use.
+
+There are four sources:
+
+- **LFO 1, LFO 2**: a repeating movement. SHAPE (sine, triangle, ramp up, ramp down, pulse,
+  random, or CUSTOM: your own curve), RATE in Hz or SYNC to the song (1/32 to 8 bars, dotted
+  and triplet), PHASE, BIPOLAR (swings both ways around the setting) or UNIPOLAR (only adds),
+  FREE (keeps running) / RETRIG (starts over when you start playing) / ONE SHOT (one cycle,
+  then holds), GLOBAL (one movement for the whole instrument) or POLY (each note its own).
+- **ENV 1, ENV 2**: a shape every note plays: ATTACK, DECAY, SUSTAIN, RELEASE and CURVE, or a
+  ONE SHOT curve over LENGTH. Each note (also every ARP note) has its own.
+
+To use one, **drag its tab** (the small socket) **onto a knob** and let go: the controls it
+can reach light up while you drag. Rest on CHARACTER for a moment and its settings open, so you
+can drop onto RES. Or use **+ ADD** under ROUTING and pick the source and the destination.
+
+A modulated knob gets a thin ring in the source's colour: the range it moves through and a dot
+where it is now. Drag the ring up or down for more or less (below zero turns the movement
+around); right-click it to remove a route. The ROUTING list shows every route with its depth
+(drag the bar; double-click for 0), a light to bypass it and × to remove it; clicking a row
+shows its knob.
+
+The display shows the selected source as it really moves. For CUSTOM and ONE SHOT, drag the
+points, double-click to add or remove one, drag a line to bend it; RESET starts over.
+
+Envelopes and POLY LFOs belong to single notes, so they can move a layer's level, pan, tune,
+REIMAGINED, the granular controls, the filter and the amp envelope, but not the macros (which
+are shared by all notes); dropped on CHARACTER they move the filter of each note instead.
+Everything is saved with the preset and the project, and can be automated. Sounds from before
+have no modulation and sound exactly as they did.
 
 ## SPACE and ECHO
 

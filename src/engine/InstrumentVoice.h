@@ -5,6 +5,7 @@
 #include "core/Prng.h"
 #include "engine/CharacterFilter.h"
 #include "engine/GranularSource.h"
+#include "engine/Modulation.h"
 #include "engine/MirageEngine.h"
 #include "engine/MosaicEngine.h"
 #include "engine/NoteShape.h"
@@ -85,6 +86,10 @@ public:
     void setHeldByPedal (bool held) noexcept { heldByPedal = held; }
     int note() const noexcept { return currentNote; }
     int layerIndex() const noexcept { return voiceLayer; }
+    /** The engine's modulation (routes, global LFOs); this voice runs its own poly sources. */
+    void setModulation (const mod::Runtime* runtime) noexcept { modRuntime = runtime; }
+    const mod::VoiceState& modulationState() const noexcept { return modState; }
+    bool modulationRunning() const noexcept { return modStarted; }
     bool isGranular() const noexcept { return granularMode; }
     int grainCount() const noexcept { return granularMode ? granularSource.grainCount() : 0; }
     /** One Shot voices: where the read head is (0..1 of the recording) and how loud the
@@ -251,7 +256,30 @@ private:
     bool granularMode = false;
     GranularSource granularSource;
     const GranularParams* granularLive = nullptr;
+    // KALEIDOSCOPE on a granular layer: its doubling is a second grain stream a little
+    // behind POS, detuned by a few cents of chorus and placed to one side; its granular
+    // continuation scatters the grains wider and denser.
+    GranularSource doubleSource;
+    bool grainDoubling = false;
+    float gScatter = 0.0f;
+    double dGrainBehind = 0.0;   ///< fraction of the recording the doubling's grains trail by
+    GranularParams doubledGranular() const noexcept;
     int voiceLayer = 0;
+
+    // Modulation (control rate): this voice's poly LFOs and envelopes, and this period's
+    // offsets on what the voice reads. All zero (and unused) without routes to voice
+    // destinations, so an unmodulated voice computes exactly what it did before.
+    const mod::Runtime* modRuntime = nullptr;
+    mod::VoiceState modState;
+    bool modStarted = false, modPanApplied = false;
+    float modCents = 0.0f, modLevelDb = 0.0f, modPan = 0.0f, modReimagined = 0.0f;
+    double modCutoff = 0.0, modResonance = 0.0, modSustain = 0.0;
+    double modGrainPosition = 0.0, modGrainSpread = 0.0, modGrainSize = 0.0, modGrainDensity = 0.0;
+    AdsrSettings noteAdsr {};   ///< the envelope as this note took it (ATTACK, DECAY at note-on)
+    double appliedSustain = -1.0;
+    /** Starts, advances (or stops) the voice's modulation and gathers its offsets. */
+    void updateModulation (bool advance) noexcept;
+    void clearModulation() noexcept;
 
     // CHARACTER: per-voice filter and its AD envelope (control rate)
     const ShapingState* shapingState = nullptr;

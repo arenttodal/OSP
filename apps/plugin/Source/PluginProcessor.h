@@ -17,6 +17,7 @@
 #include <map>
 #include <mutex>
 #include <optional>
+#include <vector>
 #include <set>
 
 namespace osp::plugin
@@ -97,6 +98,44 @@ public:
         session like the window's zoom), independent of arp.enabled and never seen by audio. */
     bool arpEditorExpanded() const noexcept { return arpEditorOpen.load(); }
     void setArpEditorExpanded (bool open) noexcept { arpEditorOpen = open; }
+    /** Whether the modulation bay is open (the editor wider by it): a view setting only,
+        stored with the session; modulation runs the same either way. */
+    bool modBayExpanded() const noexcept { return modBayOpen.load(); }
+    void setModBayExpanded (bool open) noexcept { modBayOpen = open; }
+
+    // MODULATION: parameter IDs, the destinations' names (registry order), the editable
+    // curves (0, 1: LFO 1/2 CUSTOM; 2, 3: ENV 1/2 one-shot), routes by slot, the display.
+    static juce::String modLfoId (int lfo, const juce::String& name);
+    static juce::String modEnvId (int env, const juce::String& name);
+    static juce::String modRouteId (int route, const juce::String& name);
+    static const juce::StringArray& modDestinationNames();
+    mod::Curve modulationCurve (int index) const;
+    void setModulationCurve (int index, const mod::Curve& curve, bool undoable = true);
+    static juce::String encodeModulationCurves (const std::array<mod::Curve, 4>& curves);
+    static std::optional<std::array<mod::Curve, 4>> decodeModulationCurves (const juce::String& text);
+    /** A route from `source` to `dest` in the first free slot (or the slot already joining
+        them); returns the slot, or -1 when all 16 are taken. One undo step. */
+    int addModulationRoute (mod::Source source, mod::Dest dest, float depthPercent);
+    void removeModulationRoute (int slot);
+    struct ModRouteInfo
+    {
+        int slot = -1;
+        mod::Route route;
+        mod::RouteState state = mod::RouteState::empty;
+    };
+    std::vector<ModRouteInfo> modulationRoutes() const;
+
+    // EQ (version hint 18): each layer's five bands, `layerA.eq.*`. Off by default (older
+    // sessions open with it off and sound as they did).
+    static const juce::StringArray& eqParameterNames();   ///< enabled, hp.enabled, hp.frequency, ... in order
+    static juce::String eqParameterId (int layer, const juce::String& name) { return layerParameterId (layer, "eq." + name); }
+    static const char* eqBandKey (eq::Band band) noexcept;   ///< "hp", "lowShelf", "bell", "highShelf", "lp"
+    /** The layer's EQ as its parameters set it now (message thread: the editor's display). */
+    eq::Settings layerEqSettings (int layer) const;
+    /** Whether `source` may drive `dest` with the sources' current scopes (a per-voice
+        source never reaches a shared stage). */
+    bool canModulate (mod::Source source, mod::Dest dest) const;
+    InstrumentEngine::ModView modulationView() const noexcept { return engine.modulationView(); }
 
     /** The arpeggiator's choices, in parameter order (never reorder: sessions store indices). */
     static const juce::StringArray& arpPatternNames();
@@ -442,6 +481,21 @@ private:
     std::atomic<float>* arpRateParam = nullptr;
     std::atomic<float>* arpGateParam = nullptr;
     std::atomic<float>* arpOctavesParam = nullptr;
+    std::atomic<float>* arpSwingParam = nullptr;
+    // MODULATION's parameters, its curves (message thread, customLock) and their tables
+    // for the audio thread (atomics + generation, as SHAPER CUSTOM's steps).
+    std::array<std::array<std::atomic<float>*, 8>, 2> modLfoParams {};
+    std::array<std::array<std::atomic<float>*, 7>, 2> modEnvParams {};
+    std::array<std::array<std::atomic<float>*, 4>, mod::maxRoutes> modRouteParams {};
+    static constexpr int numModValues = 2 * 8 + 2 * 7 + mod::maxRoutes * 4;
+    std::array<float, numModValues> lastModValues {};
+    mod::Settings modSettings;   ///< the audio thread's working copy (built in place, never allocated)
+    std::array<mod::Curve, 4> modCurves {};
+    std::array<std::atomic<float>, 4 * mod::curvePoints> modCurveValues {};
+    std::atomic<std::uint32_t> modCurveGeneration { 1 };
+    std::uint32_t appliedModCurveGeneration = 0;
+    void publishModulationCurves() noexcept;
+    void applyModulation (bool force) noexcept;
     std::atomic<float>* pitchCharacterParam = nullptr;
     std::atomic<float>* sustainParam = nullptr;
     std::atomic<float>* seedParam = nullptr;
@@ -462,6 +516,9 @@ private:
         std::atomic<float>* mute = nullptr;
         std::atomic<float>* solo = nullptr;
         bool lastAudible = true;
+        std::array<std::atomic<float>*, 19> eq {};   ///< in eqParameterNames() order
+        std::array<float, 19> lastEq {};
+        eq::Settings eqSettings;
     };
     std::atomic<float>* mixXParam = nullptr;
     std::atomic<float>* mixYParam = nullptr;
@@ -503,6 +560,7 @@ private:
     std::atomic<float> uiScaleFactor { 1.0f };
     std::atomic<bool> advancedPanelOpen { false };
     std::atomic<bool> arpEditorOpen { false };
+    std::atomic<bool> modBayOpen { false };
     std::set<std::uint64_t> userLoads;     // load ids started by the user (undoable), not by recall
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OspAudioProcessor)

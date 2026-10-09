@@ -4,6 +4,7 @@
 #include "Design.h"
 #include "EngineCard.h"
 #include "MainSections.h"
+#include "ModulationBay.h"
 #include "OspLookAndFeel.h"
 #include "PluginProcessor.h"
 #include "ShapingPopups.h"
@@ -144,8 +145,23 @@ public:
     bool isArpExpanded() const noexcept { return arpShown; }
     /** The instrument's height in reference pixels (taller while the arpeggiator's editor shows). */
     float instrumentHeight() const noexcept { return design::height + (arpShown ? design::layout::arpShift : 0.0f); }
+    /** Its width (wider by the modulation bay while that is open). */
+    float instrumentWidth() const noexcept { return design::width + (modShown ? design::layout::modWidth : 0.0f); }
     ArpInlinePanel& arpInlinePanel() noexcept { return arpPanel; }
     ArpControl& arpControl() noexcept { return arpButton; }
+
+    /** Opens or closes the modulation bay on the right: the window grows by the bay's width
+        (its height stays) and nothing in the instrument moves. A view setting only (saved
+        with the session): modulation runs the same either way. */
+    void setModExpanded (bool open);
+    bool isModExpanded() const noexcept { return modShown; }
+    ModulationBay& modulationBay() noexcept { return modBay; }
+    ModulationOverlay& modulationOverlay() noexcept { return modOverlay; }
+    AdvancedCardButton& modulationButton() noexcept { return modButton; }
+    /** A source tab dragged to / released at a point (instrument coordinates): what the
+        bay's drag does (tests drive it directly). Returns the route's slot on release, or -1. */
+    void dragModulation (int source, juce::Point<float> where);
+    int dropModulation (int source, juce::Point<float> where);
 
 private:
     void timerCallback() override;
@@ -239,10 +255,17 @@ private:
     Wheel pitchWheel, modWheel;
     OspKeyboard keyboard;
     juce::Label statusLabel;
-    SmallLinkButton advancedButton { juce::String::fromUTF8 ("ADVANCED  \xe2\x80\xba") };
+    AdvancedCardButton advancedButton { "Advanced" };
     ArpControl arpButton { ospProcessor };
     ArpInlinePanel arpPanel { ospProcessor };
     bool arpShown = false;
+    AdvancedCardButton modButton { "MOD" };
+    ModulationBay modBay { ospProcessor };
+    ModulationOverlay modOverlay { ospProcessor, content };
+    bool modShown = false;
+    int hoverMacro = -1;                 ///< a dragged source resting on a macro (opens its popover)
+    juce::uint32 hoverSince = 0;
+    float shownScale = 1086.0f / design::width;   ///< window pixels per reference pixel, as last laid out
     void applyWindowShape (bool resizeWindow);
 
     std::unique_ptr<juce::FileChooser> chooser;

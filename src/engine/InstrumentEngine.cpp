@@ -29,7 +29,10 @@ void InstrumentEngine::prepare (double outputSampleRate, int maximumBlockSize, c
         interpolator->prepareStretchTables();
     }
     for (auto& voice : voices)
+    {
         voice.prepare (sampleRate, config.adsr, interpolator.get(), &liveShaping);
+        voice.setModulation (&modRuntime);
+    }
     outputGain = static_cast<float> (dbToGain (config.outputGainDb));
     bufferSize = std::max (16, maximumBlockSize);
     for (std::size_t l = 0; l < slots.size(); ++l)
@@ -64,6 +67,8 @@ void InstrumentEngine::prepare (double outputSampleRate, int maximumBlockSize, c
     post.prepare (outputSampleRate, maximumBlockSize, config.seed);
     for (std::size_t l = 0; l < slots.size(); ++l)   // each layer's formants wander their own way
         slots[l].reimagined.prepare (outputSampleRate, Prng::deriveSeed (config.seed, 0x7265696dull, l));
+    for (auto& slot : slots)
+        slot.eq.prepare (outputSampleRate);
     resetPerformance();
 }
 
@@ -88,6 +93,26 @@ void InstrumentEngine::refreshReimagined (std::size_t layer) noexcept
     auto& live = slots[layer].reimaginedLive;
     live.amount = std::clamp (layerReimagined (static_cast<int> (layer)), 0.0, 1.0);
     live.settings = config.layer[layer].reimaginedSettings;
+}
+
+eq::Settings InstrumentEngine::effectiveEq (std::size_t layer) const noexcept
+{
+    // The stored settings, plus the global LFOs' routes (EQ is a stage of the whole layer:
+    // a per-voice source has no single value here). A route moves a band, never switches it.
+    auto s = config.layer[layer].eq;
+    const auto& o = modEqOffset[layer];
+    if (o[0] != 0.0 || o[1] != 0.0 || o[2] != 0.0 || o[3] != 0.0)
+    {
+        auto& bell = s.bands[static_cast<std::size_t> (eq::Band::bell)];
+        const auto range = eq::frequencyRange (eq::Band::bell);
+        bell.frequencyHz = std::clamp (bell.frequencyHz * std::exp2 (o[0]), range.minHz, range.maxHz);
+        bell.gainDb = std::clamp (bell.gainDb + o[1], -eq::maxGainDb, eq::maxGainDb);
+        auto& low = s.bands[static_cast<std::size_t> (eq::Band::lowShelf)];
+        low.gainDb = std::clamp (low.gainDb + o[2], -eq::maxGainDb, eq::maxGainDb);
+        auto& high = s.bands[static_cast<std::size_t> (eq::Band::highShelf)];
+        high.gainDb = std::clamp (high.gainDb + o[3], -eq::maxGainDb, eq::maxGainDb);
+    }
+    return s;
 }
 
 void InstrumentEngine::runLayerStage (Slot& slot, float* left, float* right, int numSamples, bool mono) noexcept
@@ -211,7 +236,7 @@ void InstrumentEngine::granularLife (NoteShape& shape, int note, std::uint64_t e
     // audible but related; 100 % twice as far. The popup's PITCH sets the pitch offset,
     // TONE the spread and density variation, ATTACK the size variation; LOOSE varies
     // more, FRAY now and then jumps far across the recording.
-    const double life = std::clamp (config.macros.life, 0.0, 1.0);
+    const double life = std::clamp (config.macros.life + modLifeOffset, 0.0, 1.0);
     if (life <= 0.0)
         return;
     const auto& s = config.shaping;
@@ -559,7 +584,7 @@ NoteShape InstrumentEngine::shapeFor (const InstrumentModel* model, int note, in
                                        : std::clamp (0.25 + 3.2 * model->character.transientTonal, 0.25, 2.0);
         applyDynamics (shape, velocity, dynamics, model->character, config.macros.dynamics * sourceScale, config.dynamicsMode, referenceVelocity);
         slots[context].performance.perform (shape, note, velocity, static_cast<double> (sampleClock) / sampleRate, eventIndex,
-                             model->performance, model->character, config.macros.life, config.shaping);
+                             model->performance, model->character, std::clamp (config.macros.life + modLifeOffset, 0.0, 1.0), config.shaping);
     }
     const auto* modelForMotion = model;
 
@@ -600,6 +625,7 @@ void InstrumentEngine::noteOn (int note, int velocity, int channel) noexcept
         noteOff (note, channel);
         return;
     }
+    modRuntime.noteStarted();
     // DYNAMICS curve: SOFT reaches expressive levels easily, HARD needs a firm touch.
     velocity = shaping::curvedVelocity (config.shaping.velocityCurve, velocity);
     if (occupiedLayerCount() == 0)
@@ -800,6 +826,7 @@ void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int
 
 void InstrumentEngine::noteOff (int note, int channel) noexcept
 {
+    modRuntime.noteEnded();
     if (config.mono)
         monoNoteOff (note, channel);
     else
@@ -829,6 +856,7 @@ void InstrumentEngine::setSustainPedal (bool down) noexcept
 
 void InstrumentEngine::allNotesOff() noexcept
 {
+    modRuntime.heldNotes = 0;
     pedalDown = false;
     clearHeldKeys();
     for (auto& voice : voices)
@@ -843,15 +871,130 @@ void InstrumentEngine::reset() noexcept
     for (auto& voice : voices)
         voice.kill();
     for (auto& slot : slots)
+    {
         slot.primed = false;
+        slot.eq.reset();
+    }
     post.reset();
     resetLayerStages();
+}
+
+void InstrumentEngine::setModulation (const mod::Settings& settings) noexcept
+{
+    modRuntime.setSettings (settings);
+    if (! modRuntime.compiled.anyGlobalDest && modGlobalApplied)
+    {
+        // The last route to a shared stage went: the stages go back to the stored values.
+        modReimaginedOffset.fill (0.0);
+        modLifeOffset = 0.0;
+        for (auto& o : modEqOffset)
+            o.fill (0.0);
+        modGlobalApplied = false;
+        setMacros (config.macros);
+        for (std::size_t l = 0; l < slots.size(); ++l)
+            refreshReimagined (l);
+    }
+}
+
+void InstrumentEngine::applyGlobalModulation (int samples) noexcept
+{
+    modRuntime.advanceGlobal (samples, sampleRate);
+    if (! modRuntime.compiled.anyGlobalDest)
+        return;
+    // Effective values next to the stored ones (config.macros never changes here).
+    const auto& c = modRuntime.compiled;
+    const auto& v = modRuntime.globalValue;
+    auto offset = [&c, &v] (mod::Dest d) { return c.has (d) ? mod::destInfo (d).span * c.sum (d, v) : 0.0; };
+    Macros m = config.macros;
+    modLifeOffset = offset (mod::Dest::life);
+    m.drive = std::clamp (m.drive + offset (mod::Dest::drive), 0.0, 1.0);
+    m.character = std::clamp (m.character + offset (mod::Dest::character), 0.0, 1.0);
+    m.motion = std::clamp (m.motion + offset (mod::Dest::movement), 0.0, 1.0);
+    m.space = std::clamp (m.space + offset (mod::Dest::space), 0.0, 1.0);
+    liveShaping.character = m.character;
+    liveShaping.movement = m.motion;
+    post.setMacros (m);
+    if (config.reimaginedRouting == ReimaginedRouting::perLayer)
+        post.setReimagined (0.0);
+    for (std::size_t l = 0; l < modReimaginedOffset.size(); ++l)
+    {
+        auto layerDest = [l] (mod::Dest a) { return static_cast<mod::Dest> (static_cast<int> (a) + static_cast<int> (l)); };
+        modReimaginedOffset[l] = offset (layerDest (mod::Dest::reimaginedA));
+        refreshReimagined (l);
+        modEqOffset[l] = { offset (layerDest (mod::Dest::eqBellFrequencyA)), offset (layerDest (mod::Dest::eqBellGainA)),
+                           offset (layerDest (mod::Dest::eqLowShelfGainA)), offset (layerDest (mod::Dest::eqHighShelfGainA)) };
+    }
+    modGlobalApplied = true;
+}
+
+void InstrumentEngine::publishModulation() noexcept
+{
+    // The global LFOs, and the newest sounding voice's own sources.
+    const InstrumentVoice* newest = nullptr;
+    for (const auto& voice : voices)
+        if (voice.isActive() && voice.modulationRunning() && (newest == nullptr || voice.startOrder() > newest->startOrder()))
+            newest = &voice;
+    for (std::size_t i = 0; i < 2; ++i)
+    {
+        const bool poly = modRuntime.settings.lfo[i].scope == mod::Scope::poly;
+        const auto& lfo = poly && newest != nullptr ? newest->modulationState().lfo[i] : modRuntime.globalLfo[i];
+        modViewPhase[i].store (static_cast<float> (lfo.phase), std::memory_order_relaxed);
+        modViewValue[i].store (static_cast<float> (lfo.value), std::memory_order_relaxed);
+        const auto* env = newest != nullptr ? &newest->modulationState().env[i] : nullptr;
+        modViewValue[2 + i].store (env != nullptr ? static_cast<float> (env->level) : 0.0f, std::memory_order_relaxed);
+        // A one-shot curve runs on its own clock (time since the note), an ADSR per stage.
+        const double envTime = env == nullptr ? 0.0 : (modRuntime.settings.env[i].oneShotCurve ? env->elapsed : env->t);
+        modViewEnvTime[i].store (static_cast<float> (envTime), std::memory_order_relaxed);
+        modViewEnvStage[i].store (env != nullptr ? static_cast<int> (env->stage) : 0, std::memory_order_relaxed);
+    }
+    modViewVoice.store (newest != nullptr, std::memory_order_release);
+}
+
+InstrumentEngine::ModView InstrumentEngine::modulationView() const noexcept
+{
+    ModView view;
+    view.voice = modViewVoice.load (std::memory_order_acquire);
+    for (std::size_t i = 0; i < 2; ++i)
+    {
+        view.lfoPhase[i] = modViewPhase[i].load (std::memory_order_relaxed);
+        view.envTime[i] = modViewEnvTime[i].load (std::memory_order_relaxed);
+        view.envStage[i] = modViewEnvStage[i].load (std::memory_order_relaxed);
+    }
+    for (std::size_t i = 0; i < view.value.size(); ++i)
+        view.value[i] = modViewValue[i].load (std::memory_order_relaxed);
+    return view;
 }
 
 void InstrumentEngine::render (float* const* output, int numChannels, int numSamples) noexcept
 {
     if (numChannels <= 0 || numSamples <= 0)
         return;
+    if (! modRuntime.compiled.any)
+    {
+        // No route: the global LFOs only keep time (for the display); the sound is untouched.
+        modRuntime.advanceGlobal (numSamples, sampleRate);
+        renderBlock (output, numChannels, numSamples);
+        publishModulation();
+        return;
+    }
+    // Modulated: the shared stages and the layers' amounts follow at control rate (32
+    // samples), so a rhythmic LFO keeps its edges whatever block size the host uses.
+    std::array<float*, 16> chunk {};
+    const int channels = std::min (numChannels, static_cast<int> (chunk.size()));
+    for (int done = 0; done < numSamples;)
+    {
+        const int n = std::min (32, numSamples - done);
+        for (int ch = 0; ch < channels; ++ch)
+            chunk[static_cast<std::size_t> (ch)] = output[ch] + done;
+        applyGlobalModulation (n);
+        renderBlock (chunk.data(), channels, n);
+        done += n;
+    }
+    publishModulation();
+}
+
+void InstrumentEngine::renderBlock (float* const* output, int numChannels, int numSamples) noexcept
+{
     for (int ch = 0; ch < numChannels; ++ch)
         std::memset (output[ch], 0, sizeof (float) * static_cast<std::size_t> (numSamples));
     float* left = output[0];
@@ -946,13 +1089,17 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
                     sounding = true;
                     break;
                 }
-            if ((! sounding && ! layerStage) || ! slot.primed)
+            // The layer's EQ: engaged, it filters the layer (and rings out after its last note).
+            slot.eq.setTarget (effectiveEq (static_cast<std::size_t> (layer)));
+            const bool eqOn = slot.eq.active();
+            const bool eqTail = eqOn && ! sounding && slot.eq.ringing();
+            if ((! sounding && ! layerStage && ! eqTail) || ! slot.primed)
             {
                 // Nothing to click: the gains may jump.
                 slot.gainLeft = targetLeft;
                 slot.gainRight = targetRight;
                 slot.primed = true;
-                if (! sounding && ! layerStage)
+                if (! sounding && ! layerStage && ! eqTail)
                     continue;
             }
             const float l0 = slot.gainLeft, r0 = slot.gainRight;
@@ -976,6 +1123,8 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
                     std::fill_n (slot.buffer[1].begin(), n, 0.0f);
                     runLayerStage (slot, slot.buffer[0].data(), slot.buffer[1].data(), n, mono);
                 }
+                if (eqOn && slot.eq.ringing())
+                    slot.eq.reset();   // unheard: no stale tail when it comes back (it fades in)
                 continue;
             }
 
@@ -993,6 +1142,8 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
             }
             if (layerStage)
                 runLayerStage (slot, bl.data(), br.data(), n, mono);
+            if (eqOn)
+                slot.eq.process (bl.data(), br.data(), n, mono);
             for (int i = 0; i < n; ++i)
             {
                 const float gl = l0 == l1 ? l0 : l0 + (l1 - l0) * static_cast<float> (i + 1) / static_cast<float> (n);

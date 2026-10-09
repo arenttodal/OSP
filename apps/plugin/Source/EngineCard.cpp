@@ -780,6 +780,7 @@ LayerKnob::LayerKnob (OspAudioProcessor& p, int layer, const juce::String& contr
     dial->getProperties().set ("arc", static_cast<juce::int64> ((creative ? palette::accent : palette::layer (layer)).getARGB()));
     dial->getProperties().set ("spectral", creative);   // REIMAGINED: the spectral continuum, the same on every layer
     dial->getProperties().set ("bipolar", control == "tune" || control == "pan");
+    dial->getProperties().set ("paramId", id);   // a modulation drop target
     dial->setTitle ("Layer " + OspAudioProcessor::layerName (layer) + " " + caption);
     attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (processor.parameters, id, *dial);
     if (parameter != nullptr)
@@ -1078,6 +1079,13 @@ EngineCard::EngineCard (OspAudioProcessor& p, int layer)
         mode->onChange = [this] (int) { updateMode(); };
         addAndMakeVisible (*mode);
     }
+    eqButton.onClick = [this] {
+        if (onEqToggle != nullptr)
+            onEqToggle (layerIndex, ! isEqOpen());
+        else
+            setEqOpen (! isEqOpen());
+    };
+    addAndMakeVisible (eqButton);
     menuButton.setTooltip ("Replace, root, remove...");
     menuButton.onClick = [this] {
         if (onMenu != nullptr)
@@ -1199,7 +1207,7 @@ void EngineCard::showGranularControls (bool show)
     bool dragging = false;
     for (auto& k : granularKnobs)
         dragging = dragging || k->slider.isMouseButtonDown();
-    const bool visible = granular && (show || dragging);
+    const bool visible = granular && (show || dragging) && ! isEqOpen();   // the EQ's editor covers the display
     if (visible == granularShown)
         return;
     granularShown = visible;
@@ -1233,8 +1241,39 @@ void EngineCard::updateMode()
     resized();
 }
 
+void EngineCard::setEqOpen (bool open)
+{
+    if (open == isEqOpen())
+        return;
+    eqButton.setToggleState (open, juce::dontSendNotification);
+    if (! open)
+    {
+        eqEditor.reset();
+        return;
+    }
+    showGranularControls (false);
+    eqEditor = std::make_unique<EqEditor> (processor, layerIndex);
+    eqEditor->onClose = [this] {
+        juce::Component::SafePointer<EngineCard> safe (this);
+        juce::MessageManager::callAsync ([safe] {
+            if (safe != nullptr)
+            {
+                if (safe->onEqToggle != nullptr)
+                    safe->onEqToggle (safe->layerIndex, false);
+                else
+                    safe->setEqOpen (false);
+            }
+        });
+    };
+    addAndMakeVisible (*eqEditor);
+    eqEditor->setBounds (sourceDisplay.getBounds());
+}
+
 void EngineCard::refresh()
 {
+    eqButton.setActive (processor.layerEqSettings (layerIndex).audible());
+    if (eqEditor != nullptr)
+        eqEditor->refresh();
     const auto instrument = processor.currentInstrument (layerIndex);
     const bool loading = processor.loadState (layerIndex) == OspAudioProcessor::LoadState::loading;
     const auto generation = instrument != nullptr ? instrument->generation : 0;
@@ -1372,10 +1411,15 @@ void EngineCard::resized()
     const float modeWidth = triple ? 128.0f : 157.0f;
     if (mode != nullptr)
         mode->setBounds (at ({ w - 62.0f - modeWidth, 12.0f, modeWidth, 41.0f }));
-    textArea = at ({ 117.0f, 14.0f, w - 62.0f - modeWidth - 12.0f - 117.0f, 36.0f });
+    // EQ: a small key left of the mode (the name gives it the room).
+    const float eqWidth = triple ? 38.0f : 46.0f;
+    eqButton.setBounds (at ({ w - 62.0f - modeWidth - 8.0f - eqWidth, 16.0f, eqWidth, 33.0f }));
+    textArea = at ({ 117.0f, 14.0f, w - 62.0f - modeWidth - 12.0f - eqWidth - 8.0f - 117.0f, 36.0f });
 
     const float wellHeight = h - (triple ? 267.0f : 206.0f);
     sourceDisplay.setBounds (at ({ 16.0f, 63.0f, w - 32.0f, wellHeight }));
+    if (eqEditor != nullptr)
+        eqEditor->setBounds (sourceDisplay.getBounds());   // exactly the display's place
 
     // START TUNE PAN LEVEL REIMAGINED: one family at 87 % of the four-knob size, on one
     // pitch, with a little more room at the row's ends than between neighbours.

@@ -105,7 +105,9 @@ void housing (juce::Graphics& g, juce::Rectangle<float> bounds)
     g.fillRect (bounds);
 
     // The body grows with the instrument (the arpeggiator's editor adds height below the macros).
-    const auto r = layout::housing.withBottom (bounds.getBottom() - (height - layout::housing.getBottom()));
+    // ... and the modulation bay adds width on the right: the same margins to the edges.
+    const auto r = layout::housing.withBottom (bounds.getBottom() - (height - layout::housing.getBottom()))
+                       .withRight (bounds.getRight() - (width - layout::housing.getRight()));
     juce::Path body;
     body.addRoundedRectangle (r, layout::housingRadius);
     // One broad, quiet shadow (a physical object resting on the surface), then a close one.

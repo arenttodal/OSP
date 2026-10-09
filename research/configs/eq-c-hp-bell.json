@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "description": "Engine C with layer A's EQ: a 24 dB/oct high pass at 90 Hz and a bell at 3.2 kHz, -4 dB, Q 2 (the spec's rumble and harshness scenarios), headless.",
+  "engine": "C",
+  "sampleRate": 48000,
+  "blockSize": 128,
+  "seed": 1,
+  "eq": {
+    "enabled": true,
+    "bands": {
+      "hp": { "frequencyHz": 90, "steep": true },
+      "bell": { "frequencyHz": 3200, "gainDb": -4, "q": 2 }
+    }
+  }
+}

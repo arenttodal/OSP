@@ -843,3 +843,40 @@ TEST_CASE ("arp: research renders arpeggiate headless from a config's arp block"
     research::RenderConfig plain;
     CHECK (research::arpeggiate (chord, plain, 48000.0).events.size() == chord.events.size());
 }
+
+TEST_CASE ("arp: SWING delays every second step by up to half a step, on the grid and free running", "[unit][arp]")
+{
+    for (double swing : { 0.0, 0.15, 0.5, 1.0 })
+        for (int block : { 32, 256, 512 })
+            for (bool host : { false, true })
+                for (int r : { 1, 2, 8 })   // 1/8, 1/16, 1/8T
+                {
+                    CAPTURE (swing, block, host, r);
+                    Harness h (48000.0, block);
+                    h.settings.rate = static_cast<ArpRate> (r);
+                    h.settings.swing = swing;
+                    h.settings.gate = 0.4;
+                    h.transport = { host, host, 120.0, 0.0 };
+                    const double step = arp::rateQuarters (h.settings.rate) * 24000.0;
+                    h.run (static_cast<std::int64_t> (step * 12 - 10), { on (0, 60), on (0, 64), on (0, 67) });
+                    const auto ons = h.ons();
+                    REQUIRE (ons.size() == 12);
+                    for (std::size_t k = 0; k < ons.size(); ++k)
+                    {
+                        const double late = k % 2 == 1 ? swing * 0.5 * step : 0.0;
+                        CHECK (ons[k].time == static_cast<std::int64_t> (std::ceil (static_cast<double> (k) * step + late - 1.0e-6)));
+                    }
+                    CHECK (offsBeforeOns (h.out));
+                    CHECK (h.onNotes()[3] == 60);   // the pattern itself is unchanged
+                }
+    // On the host's grid the swing sits on the beat, whenever the chord was pressed.
+    Harness h (48000.0, 128);
+    h.settings.swing = 0.5;
+    h.transport = { true, true, 120.0, 0.0 };
+    h.run (12000 * 6, { on (13000, 60) });   // pressed after step 1's boundary: first step is grid step 2 (on the beat)
+    const auto ons = h.ons();
+    REQUIRE (ons.size() >= 3);
+    CHECK (ons[0].time == 24000);
+    CHECK (ons[1].time == 36000 + 3000);
+    CHECK (ons[2].time == 48000);
+}

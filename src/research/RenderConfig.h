@@ -3,6 +3,7 @@
 #include "audio/sampler/BaselineSampler.h"
 #include "engine/Arpeggiator.h"
 #include "engine/InstrumentEngine.h"
+#include "engine/Modulation.h"
 #include "model/PlaybackPreparation.h"
 
 #include <juce_core/juce_core.h>
@@ -38,6 +39,9 @@ struct RenderConfig
     PlaybackOptions playback {};      ///< start-at-onset / level normalisation (off = plain baselines)
     EngineSettings engineSettings {}; ///< engine C only
     bool anchors = false;             ///< engine C: build register anchors (needed for pitchCharacter = natural)
+
+    /** Engine C's modulation (LFOs, envelopes, routes); no routes = none. */
+    mod::Settings modulation {};
 
     /** The arpeggiator ahead of the engine (off: the MIDI is played as written). */
     struct Arp

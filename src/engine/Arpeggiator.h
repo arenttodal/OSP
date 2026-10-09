@@ -38,6 +38,7 @@ namespace arp
     constexpr int patternCount = 6;
     constexpr int rateCount = 10;
     constexpr double minGate = 0.10, maxGate = 1.50;
+    constexpr double maxSwing = 1.0;   ///< 100 %: every second step half a step late (a dotted feel)
     constexpr int minOctaves = 1, maxOctaves = 4;
 
     /** One step, in quarter notes. */
@@ -79,6 +80,7 @@ public:
         ArpPattern pattern = ArpPattern::up;
         ArpRate rate = ArpRate::eighth;
         double gate = 0.75;   ///< of a step, 0.10 .. 1.50
+        double swing = 0.0;   ///< 0 .. 1: every second step later by up to half a step
         int octaves = 1;      ///< 1 .. 4
     };
 
@@ -168,6 +170,8 @@ private:
 
     // time
     double stepSamples() const noexcept;
+    /** How late a step with this index plays (odd steps, by SWING), in samples. */
+    double swingDelay (std::int64_t index) const noexcept;
     double samplesPerQuarter() const noexcept { return sampleRate * 60.0 / bpm; }
     std::int64_t nextStepTime() const noexcept;
     void syncGridTo (int offset) noexcept;
@@ -203,7 +207,7 @@ private:
     bool hadSync = false;
     std::int64_t gridIndex = 0;    ///< the last fired (or skipped) boundary, in steps of gridQuarters
     double gridQuarters = 0.5;
-    double lastStepExact = 0.0;    ///< absolute sample time of the last step (free running)
+    double lastStepExact = 0.0;    ///< absolute sample time of the last step on the straight grid (before SWING)
     double phraseStartExact = 0.0;
 
     // the phrase

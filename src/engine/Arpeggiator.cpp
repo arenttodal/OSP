@@ -116,6 +116,7 @@ void Arpeggiator::beginBlock (const Settings& s, const HostTiming& timing, int n
     Settings next = s;
     next.gate = std::clamp (std::isfinite (next.gate) ? next.gate : 0.75, arp::minGate, arp::maxGate);
     next.octaves = std::clamp (next.octaves, arp::minOctaves, arp::maxOctaves);
+    next.swing = std::clamp (std::isfinite (next.swing) ? next.swing : 0.0, 0.0, arp::maxSwing);
     if (next.pattern != settings.pattern || next.octaves != settings.octaves)
         sequenceDirty = true;
     const bool wantEnabled = next.enabled;
@@ -409,6 +410,14 @@ void Arpeggiator::syncGridTo (int offset) noexcept
     gridIndex = static_cast<std::int64_t> (std::floor (after / gridQuarters));
 }
 
+double Arpeggiator::swingDelay (std::int64_t index) const noexcept
+{
+    // SWING delays the off-beat steps: on the host's grid the odd grid positions (so the
+    // swing sits on the beat whenever the phrase began), free running the odd steps.
+    const bool odd = (index % 2 + 2) % 2 == 1;
+    return odd ? settings.swing * 0.5 * stepSamples() : 0.0;
+}
+
 std::int64_t Arpeggiator::nextStepTime() const noexcept
 {
     if (! running)
@@ -417,12 +426,12 @@ std::int64_t Arpeggiator::nextStepTime() const noexcept
     if (synced)
     {
         const double boundary = static_cast<double> (gridIndex + 1) * gridQuarters;
-        const double offset = std::ceil ((boundary - ppqStart) * samplesPerQuarter() - timeEpsilon);
+        const double offset = std::ceil ((boundary - ppqStart) * samplesPerQuarter() + swingDelay (gridIndex + 1) - timeEpsilon);
         if (offset > static_cast<double> (blockSize) + 1.0)
             return blockStart + blockSize + 1;   // not in this block
         return std::max (now, blockStart + static_cast<std::int64_t> (offset));
     }
-    const double exact = stepCount == 0 ? phraseStartExact : lastStepExact + stepSamples();
+    const double exact = (stepCount == 0 ? phraseStartExact : lastStepExact + stepSamples()) + swingDelay (stepCount);
     return std::max (now, static_cast<std::int64_t> (std::ceil (exact - timeEpsilon)));
 }
 
@@ -482,15 +491,17 @@ void Arpeggiator::fireStep (std::int64_t time) noexcept
     if (synced)
     {
         const double spq = samplesPerQuarter();
-        const auto latest = static_cast<std::int64_t> (std::floor ((ppqStart + (cursor + timeEpsilon) / spq) / gridQuarters));
+        const auto latest = static_cast<std::int64_t> (std::floor ((ppqStart + (cursor - swingDelay (gridIndex + 1) + timeEpsilon) / spq) / gridQuarters));
+        const double delay = swingDelay (gridIndex + 1);
         gridIndex = std::max (gridIndex + 1, latest);
-        lastStepExact = static_cast<double> (time);
+        lastStepExact = static_cast<double> (time) - delay;   // on the straight grid
     }
     else
     {
+        const double delay = swingDelay (stepCount);
         double exact = stepCount == 0 ? phraseStartExact : lastStepExact + stepSamples();
-        if (exact < static_cast<double> (time) - 1.0)
-            exact = static_cast<double> (time);
+        if (exact + delay < static_cast<double> (time) - 1.0)
+            exact = static_cast<double> (time) - delay;
         lastStepExact = exact;
     }
 

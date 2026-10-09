@@ -2,6 +2,7 @@
 
 #include "Design.h"
 #include "PluginProcessor.h"
+#include "ShapingPopups.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -10,10 +11,11 @@ namespace osp::plugin
 {
 
 /**
-    The arpeggiator's control by the keyboard: a power light (switches arp.enabled, nothing
-    else), its state as text ("ARP / UP · 1/8", subdued while it is off) and a chevron that
-    shows or hides the inline editor (a view setting, nothing else). Two separate things on
-    purpose: the editor can be open while the arpeggiator is off and the other way round.
+    The arpeggiator's card beside the keyboard (the approved mockup): a power light, ARP and a
+    chevron on top, the pattern and rate ("UP · 1/8") in a small inset below. The light
+    switches arp.enabled and nothing else; anywhere else on the card shows or hides the inline
+    editor (a view setting) and nothing else. The editor can be open while the arpeggiator is
+    off and the other way round.
 */
 class ArpControl final : public juce::Component, public juce::SettableTooltipClient
 {
@@ -34,6 +36,7 @@ public:
 
     juce::Rectangle<float> lightArea() const;
     juce::Rectangle<float> chevronArea() const;
+    /** The inset's text, "UP · 1/8". */
     juce::String statusText() const { return status; }
     bool isOn() const noexcept { return enabled; }
 
@@ -42,30 +45,44 @@ private:
     juce::ParameterAttachment enabledAttachment;
     bool enabled = false, expanded = false;
     juce::String status;
-    int hover = 0;   ///< 1 the light, 2 the chevron
+    int hover = 0;   ///< 1 the light, 2 the rest of the card
 };
 
-/** A small text link (ADVANCED ›): quiet until hovered or open. */
-class SmallLinkButton final : public juce::Button
+/** "Advanced" and "MOD ›" as raised half cards under the arpeggiator's, pressed in while
+    open. The type shrinks a little to fit the half width (never below 12 px); the chevron
+    goes when it does not fit. */
+class AdvancedCardButton final : public juce::Button
 {
 public:
-    explicit SmallLinkButton (const juce::String& caption);
+    explicit AdvancedCardButton (const juce::String& caption);
+    /** The chevron's direction: 1 right, -1 left, 0 none. */
+    void setChevron (int direction) { chevron = direction; repaint(); }
+    /** A small light: the patch has active modulation (MOD), never a switch. */
+    void setIndicator (bool on) { if (indicator != on) { indicator = on; repaint(); } }
+    bool hasIndicator() const noexcept { return indicator; }
     void paintButton (juce::Graphics&, bool highlighted, bool down) override;
+
+private:
+    int chevron = 1;
+    bool indicator = false;
 };
 
 /**
-    The arpeggiator's inline editor (between the macros and the keyboard when open): the title,
-    a 16-step display of the pattern (the step sounding lit, the steps to come as they will
-    play, from the audio thread's own scheduler), PATTERN (plain text: a click opens the
-    menu), RATE (a selector), GATE and OCTAVES. One restrained amber; everything else is the
-    instrument's own material. It has no power switch of its own: the light by the keyboard
-    is the only one.
+    The arpeggiator's inline editor, between the macros and the keyboard when open (the
+    approved mockup): ARPEGGIATOR and a collapse button; a 16-step display, numbered, each
+    step a bar as high as its note (the step sounding lit and marked, from the audio thread's
+    own scheduler; while nothing is held, the pattern's shape on a C major chord); then
+    PATTERN and RATE as drop-down boxes and GATE, OCTAVES and SWING as the instrument's small
+    knobs. No power switch: the light by the keyboard is the only one.
 */
 class ArpInlinePanel final : public juce::Component
 {
 public:
     explicit ArpInlinePanel (OspAudioProcessor& processor);
     ~ArpInlinePanel() override;
+
+    /** The collapse button (top right): hides the editor (a view setting). */
+    std::function<void()> onCollapse;
 
     /** Pulls the scheduler's step display and the parameters (editor timer, ~30 Hz). */
     void refresh();
@@ -81,34 +98,30 @@ public:
     void showPatternMenu();
     void showRateMenu();
     /** Places of the parts (tests, snapshots). */
-    juce::Rectangle<float> displayArea() const { return well; }
-    juce::Rectangle<float> patternArea() const { return patternValue; }
-    juce::Rectangle<float> rateArea() const { return rateValue; }
-    juce::Rectangle<float> octaveCell (int octave) const;
+    juce::Rectangle<float> displayArea() const { return steps; }
+    juce::Rectangle<float> patternArea() const { return patternBox; }
+    juce::Rectangle<float> rateArea() const { return rateBox; }
+    juce::Rectangle<float> collapseArea() const { return collapse; }
     /** The column lit as sounding (-1: none), as last drawn. */
     int litColumn() const noexcept { return shown.current; }
 
+    /** The pattern as the drop-down shows it ("Up", "Up/Down", ...). */
+    static juce::String patternLabel (int pattern);
+
 private:
-    struct GateSlider final : juce::Slider
-    {
-        GateSlider();
-        void paint (juce::Graphics&) override;
-        bool dimmed = false;
-    };
-    void paintDisplay (juce::Graphics&);
-    void paintControls (juce::Graphics&);
+    void paintSteps (juce::Graphics&);
+    void paintBox (juce::Graphics&, juce::Rectangle<float> box, const juce::String& text, bool hot);
     void updatePreview();
 
     OspAudioProcessor& ospProcessor;
-    juce::ParameterAttachment enabledAttachment, patternAttachment, rateAttachment, octavesAttachment;
-    GateSlider gate;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> gateAttachment;
+    juce::ParameterAttachment enabledAttachment, patternAttachment, rateAttachment;
+    MiniKnob gate, octaves, swing;
     bool enabled = false;
-    int pattern = 0, rate = 1, octaves = 1;
+    int pattern = 0, rate = 1, octaveCount = 1;
     OspAudioProcessor::ArpView shown;
     Arpeggiator::Display preview;   ///< the pattern's shape on a C major chord, while nothing is held
-    juce::Rectangle<float> title, well, patternLabel, patternValue, rateLabel, rateValue, gateLabel, gateValue, octavesLabel, octavesRow;
-    int hover = 0;   ///< 1 pattern, 2 rate, 10 + n octave n
+    juce::Rectangle<float> title, collapse, numbers, steps, patternLabelArea, patternBox, rateLabelArea, rateBox;
+    int hover = 0;   ///< 1 pattern, 2 rate, 3 collapse
 };
 
 } // namespace osp::plugin

@@ -87,7 +87,8 @@ host MIDI + screen keyboard ─► keyboardState merge ─► Arpeggiator (src/e
 | Patterns | UP; DOWN; UP/DOWN (no repeated ends: C E G E C E…); PLAYED (press order); RANDOM; CHORD (all held notes each step) |
 | Octaves | 1–4, octave by octave (C E G, C' E' G', …). Copies above MIDI 127 are left out (never wrapped or clamped onto 127). CHORD climbs one octave per step over the octaves its lowest note can reach |
 | Rates | 1/4, 1/8, 1/16, 1/32; 1/4D, 1/8D, 1/16D; 1/4T, 1/8T, 1/16T (choice order is saved: never reorder) |
-| Gate | 10–150 % of a step; 100 % is marked on the slider. Above 100 % different pitches overlap (legato) |
+| Gate | 10–150 % of a step. Above 100 % different pitches overlap (legato) |
+| Swing | 0–100 % (`arp.swing`, version hint 16, default 0 = straight): every second step plays later by up to half a step (100 % = a dotted feel). On the host's grid the odd grid positions swing, so the swing sits on the beat wherever the chord began; free running, the odd steps of the phrase. Gate lengths stay those of a straight step |
 | Velocity | each step plays its note's own velocity; a note pressed again takes its new velocity |
 | RANDOM | `osp::Prng`, seeded from the variation seed and a phrase counter that restarts when the host's transport starts (bounces repeat). Never the same note twice in a row (with 2+ notes). Counter-based, so the display shows the real upcoming choices |
 | Host playing | steps on the host's PPQ grid (multiples of the step), placed to the sample. A note pressed between steps waits for the next one; a note on the grid sample plays on it |
@@ -105,41 +106,43 @@ host MIDI + screen keyboard ─► keyboardState merge ─► Arpeggiator (src/e
 
 ## 4. GUI
 
-No mockups were supplied, so the layout below is my reading of the written spec. It is not a
-match to a design.
+Laid out after the approved mockups (supplied after the first version, which had been built
+from the text alone):
 
-- **By the keyboard** (footer, right, aligned to the keyboard's end):
-  - a power light (amber when on, an unlit lens when off): it switches `arp.enabled` and nothing else;
-  - the state as text, "ARP / UP · 1/8", subdued while off;
-  - a chevron (down when hidden, up when shown): it shows or hides the editor and nothing else.
-  - Below it, small, **ADVANCED ›**. It replaces the large Advanced button and opens the same popover.
-- **Inline editor** (`ArpInlinePanel`): a raised panel like the macro panel, between the macros
-  and the keyboard row. It contains:
-  - "ARPEGGIATOR", with no power switch of its own;
-  - the 16-step display in a dark well, with beats marked. The step sounding is lit amber
-    with a glow, played steps are dimmer and the steps to come fainter. All of it is driven by the
-    audio thread's scheduler. While nothing is held, the display shows the pattern's shape on a C
+- **Beside the keyboard**, right of its last key and level with it, two cards. The keyboard
+  is 1150 reference px wide instead of 1262 to make room, and still shows all 88 keys, C1–C8.
+  - **The ARP card:**
+    - a power light: an orange ring when on, a grey lens when off. It switches
+      `arp.enabled` and nothing else;
+    - **ARP**;
+    - a chevron: down when the editor is hidden, up when it is shown;
+    - below them, in a small inset, the pattern and rate ("UP · 1/8").
+    - A click anywhere on the card except the light shows or hides the editor, and nothing else.
+  - **Advanced ›**: a raised card under it, pressed in while Advanced is open, with the same
+    popover as before.
+- **Inline editor** (`ArpInlinePanel`): a raised panel like the macro panel, between the
+  macros and the keyboard row, 177 px high. It contains:
+  - **ARPEGGIATOR**, with no power toggle (by your choice), and a round collapse button
+    at the top right;
+  - **16 numbered steps.** Each step is a bar as high as its note (a chord: its top note).
+    The step sounding is orange and marked with a dot under the strip. Steps played earlier on
+    the page are a lighter orange, and steps to come are tan. All of it comes from the audio
+    thread's scheduler. While nothing is held, the strip shows the pattern's shape on a C
     major chord, faint;
-  - PATTERN as plain text (it lifts on hover; a click opens a menu; no chevron);
-  - RATE as a selector, with a menu grouped STRAIGHT / DOTTED / TRIPLET;
-  - GATE as a compact slider with its value; double-click resets it to 75 %;
-  - OCTAVES as 1 2 3 4 segments.
-  - One restrained amber (`#C98F3E`, on dark `#E9B45F`). There is no new macro colour, and
-    everything is dimmed while ARP is off.
-- **Layout.** When the editor shows, the keyboard row and footer move down by 127 reference px.
+  - **PATTERN** and **RATE** as drop-down boxes: Up, Down, Up/Down, Played, Random, Chord;
+    the rates are grouped STRAIGHT / DOTTED / TRIPLET;
+  - **GATE**, **OCTAVES** and **SWING** as the instrument's small knobs (the envelope's),
+    with orange arcs and their values.
+  - Everything is dimmed while ARP is off.
+- **Layout.** When the editor shows, the keyboard row and footer move down by 187 reference px.
   The instrument (housing included) grows by the same, the window grows by that height times its
   scale, and its width is unchanged. When hidden, the window returns to its previous size. The
   resize limits and aspect ratio follow. **Resize fallback:** if a host keeps the old window
   size, the whole instrument is scaled to fit with a margin and nothing is cut off.
-- **Animation:** none. The window takes its new height in one step. Host-driven window resizes
-  animated frame by frame lag or flicker in several hosts, and I could not test any host, so I
-  took the spec's "instant" option.
+- **Animation:** none. The window takes its new height in one step, because host-driven resizes
+  animated frame by frame lag or flicker in several hosts and I could not test any host.
 - **`arpEditorExpanded`** is a view property (`arpExpanded` on the state tree, like
-  `advancedOpen`). It is not a parameter and is never read by audio. Starting states do not
-  carry it, and a session reopens the editor shown or hidden as it was.
-
-Screenshots (from `[.][arp-ui]`): 01 closed/off, 02 closed/on, 03 open/playing, 04 open/off,
-05 PATTERN menu, 06 RATE menu, 07 UP/DOWN, RANDOM and CHORD, 08 one, two and three sounds.
+  `advancedOpen`). It is not a parameter and is never read by audio.
 
 ## 5. Parameters and compatibility
 
@@ -150,8 +153,9 @@ Screenshots (from `[.][arp-ui]`): 01 closed/off, 02 closed/on, 03 open/playing, 
 | `arp.rate` | choice 1/4 … 1/16T (above) | 1/8 |
 | `arp.gate` | 10–150 % | 75 % |
 | `arp.octaves` | 1–4 | 1 |
+| `arp.swing` | 0–100 % (version hint 16) | 0 % |
 
-All have version hint 15 and are automatable. Old sessions contain no `arp.*`, so the
+All are automatable: SWING has version hint 16, the others 15. Old sessions contain no `arp.*`, so the
 arpeggiator opens off with defaults, even in an instance where it was on (tested). They also
 contain no `arpExpanded`, so the editor opens hidden.
 

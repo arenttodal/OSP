@@ -72,6 +72,11 @@ bool TapeFrameEngine::start (const ReimaginedNote& n, const ReimaginedControl& c
     level = 1.0f;
     levelStep = 0.0f;
 
+    grainHead = startShift;
+    grainRewind = 0.0;
+    grainOffset = 0.0;
+    grainDuration = std::max (0.05, static_cast<double> (n.source->numFrames()) / n.source->sampleRate());
+    direction = n.reverse ? -1.0 : 1.0;
     if (tape != nullptr && ! n.granular)
     {
         const double sr = n.source->sampleRate();
@@ -145,6 +150,33 @@ void TapeFrameEngine::control (const ReimaginedControl& c) noexcept
         f.setCutoff (0.55 * cutoff, rate);
     drive = static_cast<float> (1.0 + 3.5 * age);
     compression = static_cast<float> (1.5 * age);
+
+    if (note.granular)
+    {
+        // Granular: the grains follow a tape head through a FRAME of the recording around POS,
+        // at the note's tape speed (low notes scan slower) with the wow and flutter; at the
+        // frame's end the tape rewinds (a fast scan back, heard through the grains) and
+        // passes again while the key is held (LOOP off: it stays at the frame's end).
+        const double frame = std::min (0.9 * grainDuration, reimagined::frameSeconds (p.frame) * (1.0 - 0.5 * ramp (amount, 0.6, 1.0)));
+        const double rewindSeconds = 0.12;
+        if (grainRewind > 0.0)
+        {
+            grainHead = std::max (0.0, grainHead - dt * frame / rewindSeconds);
+            grainRewind = std::max (0.0, grainRewind - dt);
+        }
+        else
+        {
+            grainHead += dt * std::clamp (speed, 0.25, 4.0) * factor;
+            if (grainHead >= frame)
+            {
+                if (note.loop)
+                    grainRewind = rewindSeconds;
+                grainHead = frame;
+            }
+        }
+        const double takeover = ramp (amount, 0.1, 0.55);
+        grainOffset = direction * takeover * (grainHead - 0.5 * frame) / grainDuration;
+    }
 
     const auto g1 = static_cast<float> (0.2 * ghost), g2 = static_cast<float> (0.11 * ghost);
     ghostLevel = { g1, g2 };

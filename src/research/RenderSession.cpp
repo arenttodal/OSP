@@ -168,6 +168,7 @@ RenderOutput renderInstrument (const InstrumentModel& model, const MidiSequence&
     InstrumentEngine engine;
     engine.prepare (outputRate, blockSize, config.engineSettings);
     engine.setModel (&model);
+    engine.setModulation (config.modulation);
     return runBlocks (engine, outputRate, blockSize, arpeggiate (sequence, config, outputRate), config.maxTailSeconds);
 }
 
@@ -179,6 +180,7 @@ RenderOutput renderSet (const InstrumentSet& set, const MidiSequence& sequence, 
     InstrumentEngine engine;
     engine.prepare (outputRate, blockSize, config.engineSettings);
     engine.setInstrumentSet (&set);
+    engine.setModulation (config.modulation);
     return runBlocks (engine, outputRate, blockSize, arpeggiate (sequence, config, outputRate), config.maxTailSeconds);
 }
 

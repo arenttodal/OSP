@@ -487,3 +487,33 @@ transport). The editor reads a 16-step display snapshot through atomics; its inl
 view setting (`arpExpanded` on the state tree), never a parameter. Headless:
 `research::arpeggiate` and the `"arp"` block of render configs. Report:
 `docs/reports/arpeggiator.md`.
+
+## MODULATION (parameters v17)
+
+`engine/Modulation` (pure C++) is a control layer next to the DSP, not inside it: two LFOs
+and two per-voice envelopes, a destination registry (`mod::destInfo`: owner, domain, span,
+update policy; append-only) and 16 routes compiled into flat per-destination term lists.
+The plugin turns its `mod.*` parameters (16 fixed route slots: automatable, saved, undoable)
+and the custom curves (state tree `modCurves`, published to the audio thread through atomics
+plus a generation counter) into one plain `mod::Settings` value on change. The engine never
+writes a stored parameter: with a route active, `render()` runs in 32-sample chunks, moves the
+global LFOs (host PPQ when playing) and hands the post chain `base + modulation` for the macros;
+each voice keeps a `VoiceState` (its poly LFOs and envelopes) and adds its offsets where each
+setting is used (gain ramped, ADSR times at note-on / note-off). With no active route
+`render()` is the unchanged single-block path, so sessions from before are bit-identical.
+A per-voice source never reaches a shared stage (no aggregation rule yet). GUI: the bay
+(`ModulationBay`) widens the editor's reference canvas to the right without moving the
+instrument; `ModulationOverlay` draws rings on modulated controls (found by their `paramId`
+property) and takes the drops. The bay's visibility is a view setting (`modOpen`). Headless:
+the `"modulation"` block of render configs. Report: `docs/reports/modulation.md`.
+
+## PER-LAYER EQ (parameters v18)
+
+`engine/LayerEq` (pure C++): five state-variable sections per layer, one processor per layer in
+`InstrumentEngine::Slot`, run on the layer's summed buffer after its voices and its own
+REIMAGINED stage and before the mix weight, LEVEL and PAN (the same place under legacy
+REIMAGINED routing, whose shared stage then hears the equalised layers). Its settings live in
+`LayerSettings::eq` (the plugin's `layerX.eq.*`, the research `"eq"` block); the engine adds
+the global LFOs' EQ routes (`effectiveEq`) every 32-sample control chunk, and the processor
+glides to them. Off, it is not in the path (bit-identical). The editor (`EqEditor`) draws
+`eq::responseDb`, the exact response of the running sections. Report: `docs/reports/eq.md`.

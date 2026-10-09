@@ -103,6 +103,7 @@ namespace ids
     static const juce::String arpRate = "arp.rate";
     static const juce::String arpGate = "arp.gate";
     static const juce::String arpOctaves = "arp.octaves";
+    static const juce::String arpSwing = "arp.swing";   // version hint 16
     // A/B layers (stable: never rename). Per layer: layerA.sourceMode, layerA.granular.position, ...
     static const juce::String blend = "ab.blend";
     static const juce::Identifier instrument = "Instrument";
@@ -427,8 +428,181 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
         layout.add (std::make_unique<juce::AudioParameterFloat> (id15 (ids::arpGate), "Arp Gate", juce::NormalisableRange<float> (10.0f, 150.0f, 1.0f), 75.0f,
                                                                  percent));
         layout.add (std::make_unique<juce::AudioParameterInt> (id15 (ids::arpOctaves), "Arp Octaves", 1, 4, 1));
+        // SWING came after (hint 16); 0 % is straight, as every session before it played.
+        layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::arpSwing, 16 }, "Arp Swing",
+                                                                 juce::NormalisableRange<float> (0.0f, 100.0f, 1.0f), 0.0f, percent));
+    }
+    {
+        // MODULATION (version hint 17): two LFOs, two envelopes and 16 route slots. A route
+        // slot is a stable set of parameters (automatable depth, recalled with the session);
+        // sessions from before it have every slot empty, so nothing moves.
+        auto id17 = [] (const juce::String& id) { return juce::ParameterID { id, 17 }; };
+        const juce::StringArray shapes { "Sine", "Triangle", "Ramp Up", "Ramp Down", "Pulse", "Random", "Custom" };
+        juce::StringArray divisions;
+        for (int i = 0; i < mod::syncDivisionCount; ++i)
+            divisions.add (mod::syncName (i));
+        for (int i = 0; i < 2; ++i)
+        {
+            const auto n = "LFO " + juce::String (i + 1) + " ";
+            layout.add (std::make_unique<juce::AudioParameterChoice> (id17 (modLfoId (i, "shape")), n + "Shape", shapes, 0));
+            layout.add (std::make_unique<juce::AudioParameterFloat> (id17 (modLfoId (i, "rate")), n + "Rate", skewed (0.01f, 30.0f, 1.5f), 1.0f, hz));
+            layout.add (std::make_unique<juce::AudioParameterBool> (id17 (modLfoId (i, "sync")), n + "Sync", false));
+            layout.add (std::make_unique<juce::AudioParameterChoice> (id17 (modLfoId (i, "division")), n + "Division", divisions, 3));
+            layout.add (std::make_unique<juce::AudioParameterFloat> (id17 (modLfoId (i, "phase")), n + "Phase", juce::NormalisableRange<float> (0.0f, 100.0f, 0.1f), 0.0f, percent));
+            layout.add (std::make_unique<juce::AudioParameterChoice> (id17 (modLfoId (i, "polarity")), n + "Polarity", juce::StringArray { "Bipolar", "Unipolar" }, 0));
+            layout.add (std::make_unique<juce::AudioParameterChoice> (id17 (modLfoId (i, "mode")), n + "Mode", juce::StringArray { "Free", "Retrigger", "One Shot" }, 0));
+            layout.add (std::make_unique<juce::AudioParameterChoice> (id17 (modLfoId (i, "scope")), n + "Scope", juce::StringArray { "Global", "Poly" }, 0));
+        }
+        for (int i = 0; i < 2; ++i)
+        {
+            const auto n = "ENV " + juce::String (i + 1) + " ";
+            layout.add (std::make_unique<juce::AudioParameterChoice> (id17 (modEnvId (i, "mode")), n + "Mode", juce::StringArray { "ADSR", "One Shot" }, 0));
+            layout.add (std::make_unique<juce::AudioParameterFloat> (id17 (modEnvId (i, "attack")), n + "Attack", skewed (0.0f, 10000.0f, 400.0f), 10.0f, ms));
+            layout.add (std::make_unique<juce::AudioParameterFloat> (id17 (modEnvId (i, "decay")), n + "Decay", skewed (1.0f, 10000.0f, 600.0f), 300.0f, ms));
+            layout.add (std::make_unique<juce::AudioParameterFloat> (id17 (modEnvId (i, "sustain")), n + "Sustain", juce::NormalisableRange<float> (0.0f, 100.0f, 0.1f), 60.0f, percent));
+            layout.add (std::make_unique<juce::AudioParameterFloat> (id17 (modEnvId (i, "release")), n + "Release", skewed (1.0f, 10000.0f, 600.0f), 400.0f, ms));
+            layout.add (std::make_unique<juce::AudioParameterFloat> (id17 (modEnvId (i, "curve")), n + "Curve", juce::NormalisableRange<float> (-100.0f, 100.0f, 0.1f), 0.0f, percent));
+            layout.add (std::make_unique<juce::AudioParameterFloat> (id17 (modEnvId (i, "length")), n + "Length", skewed (10.0f, 20000.0f, 1000.0f), 1000.0f, ms));
+        }
+        juce::StringArray sources { "None" };
+        for (int i = 1; i <= mod::sourceCount; ++i)
+            sources.add (mod::sourceName (static_cast<mod::Source> (i)));
+        for (int r = 0; r < mod::maxRoutes; ++r)
+        {
+            const auto n = "Mod " + juce::String (r + 1) + " ";
+            layout.add (std::make_unique<juce::AudioParameterChoice> (id17 (modRouteId (r, "source")), n + "Source", sources, 0));
+            layout.add (std::make_unique<juce::AudioParameterChoice> (id17 (modRouteId (r, "dest")), n + "Destination", modDestinationNames(), 0));
+            layout.add (std::make_unique<juce::AudioParameterFloat> (id17 (modRouteId (r, "depth")), n + "Depth", juce::NormalisableRange<float> (-100.0f, 100.0f, 0.1f), 0.0f, percent));
+            layout.add (std::make_unique<juce::AudioParameterBool> (id17 (modRouteId (r, "enabled")), n + "On", true));
+        }
+    }
+    {
+        // EQ (version hint 18): each layer's five bands. Every band and the EQ itself off by
+        // default: sessions from before open with the layers untouched.
+        auto id18 = [] (const juce::String& id) { return juce::ParameterID { id, 18 }; };
+        auto logRange = [] (float lo, float hi) {
+            return juce::NormalisableRange<float> (
+                lo, hi, [] (float start, float end, float x) { return start * std::pow (end / start, x); },
+                [] (float start, float end, float v) { return std::log (v / start) / std::log (end / start); },
+                [] (float start, float end, float v) { return juce::jlimit (start, end, v); });
+        };
+        const auto frequency = juce::AudioParameterFloatAttributes().withLabel ("Hz").withStringFromValueFunction ([] (float v, int) {
+            return v >= 1000.0f ? juce::String (v / 1000.0f, v >= 10000.0f ? 1 : 2) + " kHz" : juce::String (juce::roundToInt (v)) + " Hz";
+        });
+        const auto gain = juce::AudioParameterFloatAttributes().withLabel ("dB").withStringFromValueFunction ([] (float v, int) {
+            return (v > 0.04f ? "+" : "") + juce::String (v, 1) + " dB";
+        });
+        const auto qText = juce::AudioParameterFloatAttributes().withStringFromValueFunction ([] (float v, int) { return juce::String (v, 2); });
+        const juce::StringArray slopes { "12 dB/oct", "24 dB/oct" };
+        for (int layer = 0; layer < numLayers; ++layer)
+        {
+            const auto n = "Layer " + layerName (layer) + " EQ ";
+            auto id = [layer, &id18] (const char* name) { return id18 (eqParameterId (layer, name)); };
+            layout.add (std::make_unique<juce::AudioParameterBool> (id ("enabled"), n + "On", false));
+            for (int b = 0; b < eq::bandCount; ++b)
+            {
+                const auto band = static_cast<eq::Band> (b);
+                const juce::String key = eqBandKey (band);
+                const auto range = eq::frequencyRange (band);
+                const auto bn = n + juce::String (eq::bandName (band)).toLowerCase() + " ";
+                layout.add (std::make_unique<juce::AudioParameterBool> (id18 (eqParameterId (layer, key + ".enabled")), bn + "On", false));
+                layout.add (std::make_unique<juce::AudioParameterFloat> (id18 (eqParameterId (layer, key + ".frequency")), bn + "Frequency",
+                                                                         logRange (static_cast<float> (range.minHz), static_cast<float> (range.maxHz)),
+                                                                         static_cast<float> (range.defaultHz), frequency));
+                if (eq::hasGain (band))
+                {
+                    layout.add (std::make_unique<juce::AudioParameterFloat> (id18 (eqParameterId (layer, key + ".gain")), bn + "Gain",
+                                                                             juce::NormalisableRange<float> (-18.0f, 18.0f, 0.01f), 0.0f, gain));
+                    const bool bell = band == eq::Band::bell;
+                    auto qRange = logRange (static_cast<float> (bell ? eq::minBellQ : eq::minShelfQ), static_cast<float> (bell ? eq::maxBellQ : eq::maxShelfQ));
+                    layout.add (std::make_unique<juce::AudioParameterFloat> (id18 (eqParameterId (layer, key + ".q")), bn + "Q", qRange, bell ? 1.0f : 0.707f, qText));
+                }
+                else
+                    layout.add (std::make_unique<juce::AudioParameterChoice> (id18 (eqParameterId (layer, key + ".slope")), bn + "Slope", slopes, 0));
+            }
+        }
     }
     return layout;
+}
+
+const juce::StringArray& OspAudioProcessor::eqParameterNames()
+{
+    static const juce::StringArray names = [] {
+        juce::StringArray list { "enabled" };
+        for (int b = 0; b < eq::bandCount; ++b)
+        {
+            const auto band = static_cast<eq::Band> (b);
+            const juce::String key = eqBandKey (band);
+            list.add (key + ".enabled");
+            list.add (key + ".frequency");
+            if (eq::hasGain (band))
+            {
+                list.add (key + ".gain");
+                list.add (key + ".q");
+            }
+            else
+                list.add (key + ".slope");
+        }
+        return list;
+    }();
+    return names;
+}
+
+const char* OspAudioProcessor::eqBandKey (eq::Band band) noexcept
+{
+    static const char* keys[] { "hp", "lowShelf", "bell", "highShelf", "lp" };
+    return keys[std::clamp (static_cast<int> (band), 0, eq::bandCount - 1)];
+}
+
+namespace
+{
+    /** The EQ's settings from its parameter values (eqParameterNames() order). */
+    eq::Settings eqFromValues (const std::array<float, 19>& v)
+    {
+        eq::Settings s;
+        s.enabled = v[0] >= 0.5f;
+        std::size_t i = 1;
+        for (int b = 0; b < eq::bandCount; ++b)
+        {
+            auto& band = s.bands[static_cast<std::size_t> (b)];
+            band.enabled = v[i++] >= 0.5f;
+            band.frequencyHz = v[i++];
+            if (eq::hasGain (static_cast<eq::Band> (b)))
+            {
+                band.gainDb = v[i++];
+                band.q = v[i++];
+            }
+            else
+                band.steep = v[i++] >= 0.5f;
+        }
+        return s;
+    }
+}
+
+eq::Settings OspAudioProcessor::layerEqSettings (int layer) const
+{
+    std::array<float, 19> v {};
+    const auto& names = eqParameterNames();
+    for (int i = 0; i < names.size(); ++i)
+        v[static_cast<std::size_t> (i)] = parameterValue (eqParameterId (layer, names[i]));
+    return eqFromValues (v);
+}
+
+juce::String OspAudioProcessor::modLfoId (int lfo, const juce::String& name) { return "mod.lfo" + juce::String (lfo + 1) + "." + name; }
+juce::String OspAudioProcessor::modEnvId (int env, const juce::String& name) { return "mod.env" + juce::String (env + 1) + "." + name; }
+juce::String OspAudioProcessor::modRouteId (int route, const juce::String& name) { return "mod.route" + juce::String (route + 1) + "." + name; }
+
+const juce::StringArray& OspAudioProcessor::modDestinationNames()
+{
+    // The registry's order (append only: sessions store the index).
+    static const juce::StringArray names = [] {
+        juce::StringArray n;
+        n.add ("None");
+        for (int d = 1; d < mod::destCount; ++d)
+            n.add (mod::destInfo (static_cast<mod::Dest> (d)).name);
+        return n;
+    }();
+    return names;
 }
 
 const juce::StringArray& OspAudioProcessor::arpPatternNames()
@@ -551,6 +725,29 @@ OspAudioProcessor::OspAudioProcessor()
     arpRateParam = parameters.getRawParameterValue (ids::arpRate);
     arpGateParam = parameters.getRawParameterValue (ids::arpGate);
     arpOctavesParam = parameters.getRawParameterValue (ids::arpOctaves);
+    arpSwingParam = parameters.getRawParameterValue (ids::arpSwing);
+    for (int i = 0; i < 2; ++i)
+    {
+        auto& l = modLfoParams[static_cast<std::size_t> (i)];
+        const char* names[] { "shape", "rate", "sync", "division", "phase", "polarity", "mode", "scope" };
+        for (std::size_t k = 0; k < l.size(); ++k)
+            l[k] = parameters.getRawParameterValue (modLfoId (i, names[k]));
+        auto& e = modEnvParams[static_cast<std::size_t> (i)];
+        const char* envNames[] { "mode", "attack", "decay", "sustain", "release", "curve", "length" };
+        for (std::size_t k = 0; k < e.size(); ++k)
+            e[k] = parameters.getRawParameterValue (modEnvId (i, envNames[k]));
+    }
+    for (int r = 0; r < mod::maxRoutes; ++r)
+    {
+        auto& rp = modRouteParams[static_cast<std::size_t> (r)];
+        const char* names[] { "source", "dest", "depth", "enabled" };
+        for (std::size_t k = 0; k < rp.size(); ++k)
+            rp[k] = parameters.getRawParameterValue (modRouteId (r, names[k]));
+    }
+    for (int c = 0; c < 4; ++c)
+        modCurves[static_cast<std::size_t> (c)] = c < 2 ? mod::defaultLfoCurve() : mod::defaultEnvCurve();
+    publishModulationCurves();
+    lastModValues.fill (-1.0e9f);
     customPattern = RhythmicShaper::patternSteps (ShaperParams().pattern);   // CUSTOM starts as THREE
     publishCustomPattern();
     pitchCharacterParam = parameters.getRawParameterValue (ids::pitchCharacter);
@@ -576,6 +773,10 @@ OspAudioProcessor::OspAudioProcessor()
         for (int i = 0; i < reimaginedModeNames().size(); ++i)
             lp.modes[static_cast<std::size_t> (i)] = parameters.getRawParameterValue (reimaginedModeParameterId (layer, reimaginedModeNames()[i]));
         lp.lastModes.fill (-1.0e9f);
+        jassert (eqParameterNames().size() == static_cast<int> (lp.eq.size()));
+        for (int i = 0; i < eqParameterNames().size(); ++i)
+            lp.eq[static_cast<std::size_t> (i)] = parameters.getRawParameterValue (eqParameterId (layer, eqParameterNames()[i]));
+        lp.lastEq.fill (-1.0e9f);
     }
     for (int layer = 0; layer < numLayers; ++layer)
     {
@@ -768,6 +969,19 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
     {
         auto& lp = layerParams[static_cast<std::size_t> (layer)];
         const bool audible = anySolo ? lp.solo->load() >= 0.5f : lp.mute->load() < 0.5f;
+        {
+            // The layer's EQ (before the rest of its settings, which carry it).
+            std::array<float, 19> values {};
+            for (std::size_t i = 0; i < values.size(); ++i)
+                values[i] = lp.eq[i]->load();
+            if (force || values != lp.lastEq)
+            {
+                lp.lastEq = values;
+                lp.eqSettings = eqFromValues (values);
+                engineSettings.layer[static_cast<std::size_t> (layer)].eq = lp.eqSettings;
+                engine.setLayerEq (layer, lp.eqSettings);
+            }
+        }
         engine.setLayerPitchOffsetSemitones (layer, layers[static_cast<std::size_t> (layer)].rootShiftSemitones.load());
         std::array<float, 8> controls {};
         for (std::size_t i = 0; i < controls.size(); ++i)
@@ -792,6 +1006,7 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
             ls.loop = controls[6] >= 0.5f;
             ls.follow = controls[7] >= 0.5f;
             ls.audible = audible;
+            ls.eq = lp.eqSettings;
             ls.reimagined = ownReimagined < 0.0f ? -1.0 : 0.01 * ownReimagined;   // A follows the instrument's amount
             auto& rs = ls.reimaginedSettings;
             auto pick = [&modes] (std::size_t i) { return static_cast<int> (std::lround (modes[i])); };
@@ -822,6 +1037,73 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
             engine.setGranular (layer, g);
         }
     }
+    applyModulation (force);
+}
+
+void OspAudioProcessor::applyModulation (bool force) noexcept
+{
+    // The modulation settings change rarely: they are gathered and compiled only when a
+    // value or a curve moved (a plain copy into the engine, no allocation).
+    std::array<float, numModValues> now {};
+    std::size_t k = 0;
+    for (const auto& l : modLfoParams)
+        for (auto* p : l)
+            now[k++] = p->load();
+    for (const auto& e : modEnvParams)
+        for (auto* p : e)
+            now[k++] = p->load();
+    for (const auto& r : modRouteParams)
+        for (auto* p : r)
+            now[k++] = p->load();
+    const auto generation = modCurveGeneration.load (std::memory_order_acquire);
+    const auto seed = static_cast<std::uint64_t> (std::max (1.0f, seedParam->load()));
+    if (! force && now == lastModValues && generation == appliedModCurveGeneration && seed == modSettings.seed)
+        return;
+    lastModValues = now;
+    auto& s = modSettings;
+    s.seed = seed;
+    for (std::size_t i = 0; i < 2; ++i)
+    {
+        const auto& l = modLfoParams[i];
+        auto& lfo = s.lfo[i];
+        lfo.shape = static_cast<mod::LfoShape> (std::clamp (juce::roundToInt (l[0]->load()), 0, mod::lfoShapeCount - 1));
+        lfo.rateHz = l[1]->load();
+        lfo.sync = l[2]->load() >= 0.5f;
+        lfo.division = std::clamp (juce::roundToInt (l[3]->load()), 0, mod::syncDivisionCount - 1);
+        lfo.phase = 0.01 * l[4]->load();
+        lfo.bipolar = l[5]->load() < 0.5f;
+        lfo.mode = static_cast<mod::LfoMode> (std::clamp (juce::roundToInt (l[6]->load()), 0, 2));
+        lfo.scope = l[7]->load() >= 0.5f ? mod::Scope::poly : mod::Scope::global;
+        const auto& e = modEnvParams[i];
+        auto& env = s.env[i];
+        env.oneShotCurve = e[0]->load() >= 0.5f;
+        env.attackSeconds = 0.001 * e[1]->load();
+        env.decaySeconds = 0.001 * e[2]->load();
+        env.sustain = 0.01 * e[3]->load();
+        env.releaseSeconds = 0.001 * e[4]->load();
+        env.curve = 0.01 * e[5]->load();
+        env.lengthSeconds = 0.001 * e[6]->load();
+    }
+    for (std::size_t r = 0; r < s.routes.size(); ++r)
+    {
+        const auto& rp = modRouteParams[r];
+        auto& route = s.routes[r];
+        route.source = static_cast<mod::Source> (std::clamp (juce::roundToInt (rp[0]->load()), 0, mod::sourceCount));
+        route.dest = static_cast<mod::Dest> (std::clamp (juce::roundToInt (rp[1]->load()), 0, mod::destCount - 1));
+        route.depth = 0.01 * rp[2]->load();
+        route.enabled = rp[3]->load() >= 0.5f;
+    }
+    if (generation != appliedModCurveGeneration || force)
+    {
+        appliedModCurveGeneration = generation;
+        for (std::size_t c = 0; c < 4; ++c)
+        {
+            auto& table = c < 2 ? s.lfoCurve[c] : s.envCurve[c - 2];
+            for (std::size_t i = 0; i < table.size(); ++i)
+                table[i] = modCurveValues[c * mod::curvePoints + i].load (std::memory_order_relaxed);
+        }
+    }
+    engine.setModulation (s);
 }
 
 const juce::StringArray& OspAudioProcessor::granularNames()
@@ -949,6 +1231,176 @@ namespace
         OspAudioProcessor& processor;
         ShaperPattern from, to;
     };
+}
+
+namespace
+{
+    class ModCurveAction final : public juce::UndoableAction
+    {
+    public:
+        ModCurveAction (OspAudioProcessor& p, int i, const mod::Curve& before, const mod::Curve& after) : processor (p), index (i), from (before), to (after) {}
+        bool perform() override
+        {
+            processor.setModulationCurve (index, to, false);
+            return true;
+        }
+        bool undo() override
+        {
+            processor.setModulationCurve (index, from, false);
+            return true;
+        }
+
+    private:
+        OspAudioProcessor& processor;
+        int index;
+        mod::Curve from, to;
+    };
+}
+
+mod::Curve OspAudioProcessor::modulationCurve (int index) const
+{
+    const juce::ScopedLock lock (customLock);
+    return modCurves[static_cast<std::size_t> (std::clamp (index, 0, 3))];
+}
+
+void OspAudioProcessor::setModulationCurve (int index, const mod::Curve& curve, bool undoable)
+{
+    index = std::clamp (index, 0, 3);
+    auto next = curve;
+    next.normalise();
+    const auto before = modulationCurve (index);
+    if (before == next)
+        return;
+    if (undoable)
+    {
+        undoManager.perform (new ModCurveAction (*this, index, before, next));
+        return;
+    }
+    {
+        const juce::ScopedLock lock (customLock);
+        modCurves[static_cast<std::size_t> (index)] = next;
+    }
+    publishModulationCurves();
+}
+
+void OspAudioProcessor::publishModulationCurves() noexcept
+{
+    std::array<mod::Curve, 4> copy;
+    {
+        const juce::ScopedLock lock (customLock);
+        copy = modCurves;
+    }
+    for (std::size_t c = 0; c < copy.size(); ++c)
+    {
+        const auto table = mod::compileCurve (copy[c]);
+        for (std::size_t i = 0; i < table.size(); ++i)
+            modCurveValues[c * mod::curvePoints + i].store (table[i], std::memory_order_relaxed);
+    }
+    modCurveGeneration.fetch_add (1, std::memory_order_release);
+}
+
+juce::String OspAudioProcessor::encodeModulationCurves (const std::array<mod::Curve, 4>& curves)
+{
+    // "c1:" then four curves separated by '|', each its points "x,y,tension" separated by ';'.
+    juce::StringArray parts;
+    for (const auto& c : curves)
+    {
+        juce::StringArray points;
+        for (int i = 0; i < c.count; ++i)
+        {
+            const auto& p = c.points[static_cast<std::size_t> (i)];
+            points.add (juce::String (p.x, 4) + "," + juce::String (p.y, 4) + "," + juce::String (p.tension, 4));
+        }
+        parts.add (points.joinIntoString (";"));
+    }
+    return "c1:" + parts.joinIntoString ("|");
+}
+
+std::optional<std::array<mod::Curve, 4>> OspAudioProcessor::decodeModulationCurves (const juce::String& text)
+{
+    if (! text.startsWith ("c1:"))
+        return std::nullopt;
+    const auto parts = juce::StringArray::fromTokens (text.substring (3), "|", "");
+    if (parts.size() != 4)
+        return std::nullopt;
+    std::array<mod::Curve, 4> curves;
+    for (int c = 0; c < 4; ++c)
+    {
+        const auto points = juce::StringArray::fromTokens (parts[c], ";", "");
+        auto& curve = curves[static_cast<std::size_t> (c)];
+        curve.count = 0;
+        for (const auto& point : points)
+        {
+            const auto v = juce::StringArray::fromTokens (point, ",", "");
+            if (v.size() != 3 || curve.count >= mod::maxCurvePoints)
+                return std::nullopt;
+            curve.points[static_cast<std::size_t> (curve.count++)] = { v[0].getFloatValue(), v[1].getFloatValue(), v[2].getFloatValue() };
+        }
+        curve.normalise();
+    }
+    return curves;
+}
+
+int OspAudioProcessor::addModulationRoute (mod::Source source, mod::Dest dest, float depthPercent)
+{
+    // The first empty slot (or the slot already joining these two: its depth is set).
+    int slot = -1;
+    for (int r = 0; r < mod::maxRoutes && slot < 0; ++r)
+        if (juce::roundToInt (parameterValue (modRouteId (r, "source"))) == static_cast<int> (source)
+            && juce::roundToInt (parameterValue (modRouteId (r, "dest"))) == static_cast<int> (dest))
+            slot = r;
+    for (int r = 0; r < mod::maxRoutes && slot < 0; ++r)
+        if (juce::roundToInt (parameterValue (modRouteId (r, "source"))) == 0)
+            slot = r;
+    if (slot < 0)
+        return -1;
+    undoManager.beginNewTransaction ("Add modulation");
+    setParameterValue (modRouteId (slot, "source"), static_cast<float> (source));
+    setParameterValue (modRouteId (slot, "dest"), static_cast<float> (dest));
+    setParameterValue (modRouteId (slot, "depth"), depthPercent);
+    setParameterValue (modRouteId (slot, "enabled"), 1.0f);
+    return slot;
+}
+
+void OspAudioProcessor::removeModulationRoute (int slot)
+{
+    if (slot < 0 || slot >= mod::maxRoutes)
+        return;
+    undoManager.beginNewTransaction ("Remove modulation");
+    setParameterValue (modRouteId (slot, "source"), 0.0f);
+    setParameterValue (modRouteId (slot, "dest"), 0.0f);
+    setParameterValue (modRouteId (slot, "depth"), 0.0f);
+    setParameterValue (modRouteId (slot, "enabled"), 1.0f);
+}
+
+bool OspAudioProcessor::canModulate (mod::Source source, mod::Dest dest) const
+{
+    mod::Settings probe;   // only the scope rule needs the sources' settings
+    for (int i = 0; i < 2; ++i)
+        probe.lfo[static_cast<std::size_t> (i)].scope = parameterValue (modLfoId (i, "scope")) >= 0.5f ? mod::Scope::poly : mod::Scope::global;
+    return mod::compatible (probe, source, dest);
+}
+
+std::vector<OspAudioProcessor::ModRouteInfo> OspAudioProcessor::modulationRoutes() const
+{
+    std::vector<ModRouteInfo> list;
+    mod::Settings probe;   // only the scope rule needs the sources' settings
+    for (int i = 0; i < 2; ++i)
+        probe.lfo[static_cast<std::size_t> (i)].scope = parameterValue (modLfoId (i, "scope")) >= 0.5f ? mod::Scope::poly : mod::Scope::global;
+    for (int r = 0; r < mod::maxRoutes; ++r)
+    {
+        ModRouteInfo info;
+        info.slot = r;
+        info.route.source = static_cast<mod::Source> (juce::roundToInt (parameterValue (modRouteId (r, "source"))));
+        info.route.dest = static_cast<mod::Dest> (juce::roundToInt (parameterValue (modRouteId (r, "dest"))));
+        info.route.depth = 0.01 * parameterValue (modRouteId (r, "depth"));
+        info.route.enabled = parameterValue (modRouteId (r, "enabled")) >= 0.5f;
+        if (info.route.source == mod::Source::none)
+            continue;
+        info.state = mod::routeState (probe, info.route);
+        list.push_back (info);
+    }
+    return list;
 }
 
 ShaperPattern OspAudioProcessor::shaperCustomPattern() const
@@ -1249,6 +1701,7 @@ const juce::MidiBuffer& OspAudioProcessor::runArpeggiator (const juce::MidiBuffe
     settings.rate = static_cast<ArpRate> (std::clamp (juce::roundToInt (arpRateParam->load()), 0, arp::rateCount - 1));
     settings.gate = arpGateParam->load() / 100.0;
     settings.octaves = std::clamp (juce::roundToInt (arpOctavesParam->load()), arp::minOctaves, arp::maxOctaves);
+    settings.swing = arpSwingParam->load() / 100.0;
     arpeggiator.setSeed (static_cast<std::uint64_t> (std::max (1.0f, seedParam->load())));
     arpeggiator.beginBlock (settings, timing, numSamples);
 
@@ -2125,12 +2578,21 @@ std::unique_ptr<juce::XmlElement> OspAudioProcessor::createStateXml()
     stateTree.setProperty ("uiScale", uiScaleFactor.load(), nullptr);
     stateTree.setProperty ("advancedOpen", advancedPanelOpen.load(), nullptr);
     stateTree.setProperty ("arpExpanded", arpEditorOpen.load(), nullptr);   // UI only, never audio
+    stateTree.setProperty ("modOpen", modBayOpen.load(), nullptr);         // UI only, never audio
     stateTree.setProperty ("program", currentProgram, nullptr);
 
     stateTree.setProperty ("editLayer", editLayer(), nullptr);
     stateTree.setProperty ("keptSlots", keptSlotCount.load(), nullptr);
     stateTree.setProperty ("reimaginedRouting", perLayerReimagined.load() ? "perLayer" : "legacyGlobal", nullptr);
     stateTree.setProperty ("shaperCustom", encodeShaperPattern (shaperCustomPattern()), nullptr);
+    {
+        std::array<mod::Curve, 4> curves;
+        {
+            const juce::ScopedLock lock (customLock);
+            curves = modCurves;
+        }
+        stateTree.setProperty ("modCurves", encodeModulationCurves (curves), nullptr);
+    }
     for (int layer = 0; layer < numLayers; ++layer)
     {
         const auto tree = instrumentTree (layer);
@@ -2202,6 +2664,7 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml, bool setting
         uiScaleFactor = std::clamp (static_cast<float> (stateTree.getProperty ("uiScale", 1.0f)), 0.8f, 2.0f);
         advancedPanelOpen = static_cast<bool> (stateTree.getProperty ("advancedOpen", false));
         arpEditorOpen = static_cast<bool> (stateTree.getProperty ("arpExpanded", false));
+        modBayOpen = static_cast<bool> (stateTree.getProperty ("modOpen", false));
         currentProgram = static_cast<int> (stateTree.getProperty ("program", 0));
         setEditLayer (static_cast<int> (stateTree.getProperty ("editLayer", 0)));
     }
@@ -2218,6 +2681,18 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml, bool setting
     // SHAPER CUSTOM: the session's own steps, or (older sessions) CUSTOM's starting point.
     setShaperCustomPattern (decodeShaperPattern (stateTree["shaperCustom"].toString()).value_or (RhythmicShaper::patternSteps (ShaperParams().pattern)), false);
     stateTree.removeProperty ("shaperCustom", nullptr);
+    // MODULATION's curves: the session's own, or (older sessions) the defaults.
+    {
+        auto curves = decodeModulationCurves (stateTree["modCurves"].toString());
+        if (! curves)
+            curves = std::array<mod::Curve, 4> { mod::defaultLfoCurve(), mod::defaultLfoCurve(), mod::defaultEnvCurve(), mod::defaultEnvCurve() };
+        {
+            const juce::ScopedLock lock (customLock);
+            modCurves = *curves;
+        }
+        publishModulationCurves();
+        stateTree.removeProperty ("modCurves", nullptr);
+    }
     // Before MOVEMENT v2 the three movement knobs were shared by every mode.
     std::array<std::optional<float>, 3> genericMovement;
     int savedMovementMode = 0;

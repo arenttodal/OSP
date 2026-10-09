@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "description": "Engine C with LFO 1 (sine, 2 Hz) on the CHARACTER cutoff and ENV 1 on layer A's level: the modulation system headless.",
+  "engine": "C",
+  "sampleRate": 48000,
+  "blockSize": 128,
+  "seed": 1,
+  "instrument": { "shaping": { "character": { "type": "lp24" } }, "macros": { "character": 0.5 } },
+  "modulation": {
+    "lfo1": { "shape": "sine", "rateHz": 2.0 },
+    "env1": { "attack": 0.3, "decay": 0.5, "sustain": 0.4, "release": 0.4 },
+    "routes": [ { "source": "lfo1", "dest": "cutoff", "depth": 0.5 }, { "source": "env1", "dest": "levelA", "depth": 0.25 } ]
+  }
+}

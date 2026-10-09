@@ -53,6 +53,8 @@ target_sources(OSP_Plugin PRIVATE
     Source/EngineCard.cpp
     Source/MainSections.cpp
     Source/ArpSection.cpp
+    Source/ModulationBay.cpp
+    Source/EqEditor.cpp
     Source/InstrumentLoader.cpp
     ${OSP_IO_SOURCES})
 

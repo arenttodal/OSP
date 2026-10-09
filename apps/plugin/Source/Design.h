@@ -148,17 +148,30 @@ namespace layout
     // Keyboard row and footer
     const R pitchWheel { 42.0f, 913.0f, 36.0f, 88.0f };
     const R modWheel { 93.0f, 913.0f, 36.0f, 88.0f };
-    const R keyboard { 148.0f, 913.0f, 1262.0f, 101.0f };
+    /** The keyboard ends where the arpeggiator's card column begins (the approved mockup). */
+    const R keyboard { 148.0f, 913.0f, 1150.0f, 101.0f };
     const R status { 48.0f, 1038.0f, 600.0f, 24.0f };
-    /** By the keyboard, at its right end: the arpeggiator's light, its state, the chevron
-        that opens its editor; ADVANCED (small) below it. */
-    const R arpControl { 1090.0f, 1022.0f, 320.0f, 26.0f };
-    const R advanced { 1250.0f, 1050.0f, 160.0f, 18.0f };
+    /** Right of the keyboard, level with it: the arpeggiator's card (light, ARP, chevron,
+        pattern and rate) and the Advanced card under it. */
+    const R arpControl { 1308.0f, 913.0f, 105.0f, 64.0f };
+    /** Under the arpeggiator's card, side by side at its height of 31: Advanced (its popup)
+        and MOD (the modulation bay). */
+    const R advanced { 1308.0f, 983.0f, 55.0f, 31.0f };
+    const R modButton { 1366.0f, 983.0f, 47.0f, 31.0f };
+
+    /** The modulation bay: an expansion module bolted to the right of the instrument. When
+        it is open the instrument is this much wider (the housing grows; nothing in the
+        instrument moves); its face starts after a seam in the housing. */
+    constexpr float modWidth = 440.0f;
+    constexpr float modSeam = 1430.0f;
+    constexpr float modBayX = 1440.0f;
+    constexpr float modBayTop = 35.0f;
+    constexpr float modBayBottomMargin = 30.0f;   ///< from the instrument's foot
 
     /** The arpeggiator's inline editor, between the macros and the keyboard when open: the
         keyboard row moves down by arpShift and the instrument grows by as much. */
-    const R arpPanel { 35.0f, 913.0f, 1378.0f, 112.0f };
-    constexpr float arpShift = 127.0f;
+    const R arpPanel { 35.0f, 908.0f, 1378.0f, 177.0f };
+    constexpr float arpShift = 187.0f;
 
     // Popups float centred over the instrument at the reference's place (SPACE: 607 x 610
     // at (420, 236)); taller ones grow upwards from the same foot.

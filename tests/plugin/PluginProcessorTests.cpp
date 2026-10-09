@@ -3823,6 +3823,7 @@ TEST_CASE ("plugin: ARP parameters, recall; older sessions open with it off; the
     CHECK (arpValue (fresh, "arp.rate") == Approx (1.0f));      // 1/8
     CHECK (arpValue (fresh, "arp.gate") == Approx (75.0f));
     CHECK (arpValue (fresh, "arp.octaves") == Approx (1.0f));
+    CHECK (arpValue (fresh, "arp.swing") == Approx (0.0f));   // straight
     CHECK (OspAudioProcessor::arpPatternNames().joinIntoString (",") == "UP,DOWN,UP/DOWN,PLAYED,RANDOM,CHORD");
     CHECK (OspAudioProcessor::arpRateNames().joinIntoString (",") == "1/4,1/8,1/16,1/32,1/4D,1/8D,1/16D,1/4T,1/8T,1/16T");
     CHECK_FALSE (fresh.arpEditorExpanded());
@@ -3833,6 +3834,7 @@ TEST_CASE ("plugin: ARP parameters, recall; older sessions open with it off; the
 
     OspAudioProcessor p;
     arpOn (p, 4, 8, 130.0f, 3);
+    p.setParameterValue ("arp.swing", 40.0f);
     p.setArpEditorExpanded (true);
     juce::MemoryBlock state;
     p.getStateInformation (state);
@@ -3843,6 +3845,7 @@ TEST_CASE ("plugin: ARP parameters, recall; older sessions open with it off; the
     CHECK (arpValue (q, "arp.rate") == Approx (8.0f));
     CHECK (arpValue (q, "arp.gate") == Approx (130.0f));
     CHECK (arpValue (q, "arp.octaves") == Approx (3.0f));
+    CHECK (arpValue (q, "arp.swing") == Approx (40.0f));
     CHECK (q.arpEditorExpanded());
 
     // A session from before the arpeggiator (no arp.* at all, no arpExpanded) opens with it off,
@@ -3865,6 +3868,7 @@ TEST_CASE ("plugin: ARP parameters, recall; older sessions open with it off; the
     CHECK (arpValue (q, "arp.rate") == Approx (1.0f));
     CHECK (arpValue (q, "arp.gate") == Approx (75.0f));
     CHECK (arpValue (q, "arp.octaves") == Approx (1.0f));
+    CHECK (arpValue (q, "arp.swing") == Approx (0.0f));
     CHECK_FALSE (q.arpEditorExpanded());
 
     // Expanding the editor changes nothing in the sound, with ARP on or off.
@@ -4380,7 +4384,7 @@ TEST_CASE ("plugin: ARP keyboard control and inline editor", "[.][arp-ui]")
                 int height = 0;
             };
             std::vector<Row> rows;
-            int width = 120, height = 8;
+            int menuWidth = 120, menuHeight = 8;
             for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
             {
                 const auto& item = it.getItem();
@@ -4389,16 +4393,16 @@ TEST_CASE ("plugin: ARP keyboard control and inline editor", "[.][arp-ui]")
                 if (item.isSectionHeader)
                     h = std::max (h, 26);
                 rows.push_back ({ item.text, item.isSectionHeader, item.isTicked, h });
-                width = std::max (width, w + 40);
-                height += h;
+                menuWidth = std::max (menuWidth, w + 40);
+                menuHeight += h;
             }
-            juce::Image image (juce::Image::ARGB, width, height + 8, true);
+            juce::Image image (juce::Image::ARGB, menuWidth, menuHeight + 8, true);
             juce::Graphics g (image);
-            laf.drawPopupMenuBackground (g, width, height + 8);
+            laf.drawPopupMenuBackground (g, menuWidth, menuHeight + 8);
             int y = 8;
             for (const auto& row : rows)
             {
-                const juce::Rectangle<int> area (0, y, width, row.height);
+                const juce::Rectangle<int> area (0, y, menuWidth, row.height);
                 if (row.header)
                     laf.drawPopupMenuSectionHeader (g, area, row.text);
                 else
@@ -4443,4 +4447,818 @@ TEST_CASE ("plugin: ARP keyboard control and inline editor", "[.][arp-ui]")
     reopened->openPopup (osp::plugin::OspAudioProcessorEditor::advancedPopup);
     CHECK (reopened->openPopupIndex() == osp::plugin::OspAudioProcessorEditor::advancedPopup);
     reopened->closePopup();
+}
+
+// REIMAGINED in Granular mode (measurement, hidden): how much each mode changes a held note
+// at 100 % against 0 %, in One Shot and in Granular - the difference's level relative to the
+// dry note, and the change in brightness (spectral centroid).
+TEST_CASE ("plugin: REIMAGINED strength in One Shot vs Granular (measurement)", "[.][granular-reimagined]")
+{
+    TempDir tmp;
+    const auto file = writeSource (tmp.dir, "vowel.wav", testsignals::vowel (midiToHz (57), 3.0, 48000.0, 3));
+    auto centroid = [] (const AudioData& x) {
+        // Zero-crossing rate as a cheap brightness proxy (Hz).
+        int crossings = 0;
+        const auto& c = x.channels[0];
+        for (std::size_t i = 1; i < c.size(); ++i)
+            crossings += (c[i - 1] < 0.0f) != (c[i] < 0.0f) ? 1 : 0;
+        return 0.5 * crossings / (static_cast<double> (c.size()) / x.sampleRate);
+    };
+    static const char* modes[] { "KALEIDOSCOPE", "TAPE FRAME", "TOYBOX", "MOSAIC", "MIRAGE" };
+    for (int source = 0; source < 2; ++source)
+        for (int mode = 0; mode < 5; ++mode)
+        {
+            std::array<AudioData, 2> out;
+            for (int wet = 0; wet < 2; ++wet)
+            {
+                OspAudioProcessor p;
+                p.initPatch();
+                loadAndWait (p, file);
+                p.setParameterValue ("space", 0.0f);
+                p.setParameterValue ("layerA.sourceMode", static_cast<float> (source));
+                p.setParameterValue ("layerA.reimagined.mode", static_cast<float> (mode));
+                p.setParameterValue ("reimagined", wet == 1 ? 100.0f : 0.0f);
+                out[static_cast<std::size_t> (wet)] = playNote (p, 57, 48000.0, 3.0);
+            }
+            double diff = 0.0, dry = 0.0;
+            const auto& a = out[0].channels[0];
+            const auto& b = out[1].channels[0];
+            for (std::size_t i = 0; i < a.size(); ++i)
+            {
+                diff += (b[i] - a[i]) * (b[i] - a[i]);
+                dry += a[i] * a[i];
+            }
+            std::printf ("%-9s %-13s difference %6.1f dB   brightness %5.0f -> %5.0f Hz\n", source == 0 ? "One Shot" : "Granular", modes[mode],
+                         10.0 * std::log10 (diff / std::max (dry, 1.0e-12)), centroid (out[0]), centroid (out[1]));
+        }
+}
+
+TEST_CASE ("plugin: every REIMAGINED mode transforms a Granular layer, deterministically", "[plugin][reimagined-granular]")
+{
+    TempDir tmp;
+    const auto file = writeSource (tmp.dir, "vowel.wav", testsignals::vowel (midiToHz (57), 3.0, 48000.0, 3));
+    for (int mode = 0; mode < 5; ++mode)
+        for (int reverse = 0; reverse < 2; ++reverse)
+        {
+            CAPTURE (mode, reverse);
+            auto render = [&] (float amount) {
+                OspAudioProcessor p;
+                p.initPatch();
+                loadAndWait (p, file);
+                p.setParameterValue ("space", 0.0f);
+                p.setParameterValue ("layerA.sourceMode", 1.0f);
+                p.setParameterValue ("layerA.reverse", static_cast<float> (reverse));
+                p.setParameterValue ("layerA.reimagined.mode", static_cast<float> (mode));
+                p.setParameterValue ("reimagined", amount);
+                return playNote (p, 57, 48000.0, 2.0);
+            };
+            const auto dry = render (0.0f), wet = render (100.0f), again = render (100.0f);
+            double diff = 0.0, energy = 0.0;
+            bool finite = true;
+            for (std::size_t i = 0; i < dry.channels[0].size(); ++i)
+            {
+                const double d = wet.channels[0][i] - dry.channels[0][i];
+                diff += d * d;
+                energy += dry.channels[0][i] * dry.channels[0][i];
+                finite = finite && std::isfinite (wet.channels[0][i]) && std::isfinite (wet.channels[1][i]);
+            }
+            CHECK (finite);
+            // At 100 % the mode is clearly heard on grains (One Shot measures -0.3..+3 dB here).
+            CHECK (10.0 * std::log10 (diff / energy) > -1.5);
+            CHECK (wet.channels[0] == again.channels[0]);   // the same note plays the same grains
+        }
+}
+
+// ---------------------------------------------------------------------------------------------
+// MODULATION in the plugin: parameters (stable route slots), recall, older sessions, routes
+// heard and removed, the scope rule, curves with undo, ARP notes triggering the envelopes.
+
+namespace
+{
+    std::vector<float> renderChord (OspAudioProcessor& p, double seconds = 1.5)
+    {
+        p.prepareToPlay (48000.0, 256);
+        std::vector<float> out;
+        juce::AudioBuffer<float> buffer (2, 256);
+        const int total = static_cast<int> (seconds * 48000.0);
+        for (int pos = 0; pos < total; pos += 256)
+        {
+            juce::MidiBuffer midi;
+            if (pos == 0)
+                for (int note : { 57, 61, 64 })
+                    midi.addEvent (juce::MidiMessage::noteOn (1, note, static_cast<juce::uint8> (100)), 0);
+            buffer.clear();
+            p.processBlock (buffer, midi);
+            for (int i = 0; i < 256; ++i)
+                out.push_back (buffer.getSample (0, i));
+        }
+        return out;
+    }
+}
+
+TEST_CASE ("plugin: MODULATION parameters, routes, recall, older sessions, curves", "[plugin][mod]")
+{
+    TempDir tmp;
+    const auto file = writeSource (tmp.dir, "vowel.wav", testsignals::vowel (midiToHz (57), 2.0, 48000.0, 3));
+    {
+        OspAudioProcessor fresh;
+        CHECK (fresh.modulationRoutes().empty());
+        for (int r = 0; r < mod::maxRoutes; ++r)
+            REQUIRE (fresh.parameters.getParameter (OspAudioProcessor::modRouteId (r, "depth")) != nullptr);
+        CHECK (OspAudioProcessor::modDestinationNames().size() == mod::destCount);
+    }
+    auto make = [&] {
+        auto p = std::make_unique<OspAudioProcessor>();
+        p->initPatch();
+        loadAndWait (*p, file);
+        p->setParameterValue ("space", 0.0f);
+        p->setParameterValue ("character.type", 1.0f);   // a low-pass to move
+        p->setParameterValue ("character", 50.0f);
+        return p;
+    };
+    const auto plain = renderChord (*make());
+
+    auto p = make();
+    CHECK (p->addModulationRoute (mod::Source::lfo1, mod::Dest::cutoff, 60.0f) == 0);
+    CHECK (p->addModulationRoute (mod::Source::lfo1, mod::Dest::cutoff, 40.0f) == 0);   // the same pair: its depth
+    CHECK (arpValue (*p, OspAudioProcessor::modRouteId (0, "depth")) == Approx (40.0f));
+    p->setParameterValue (OspAudioProcessor::modLfoId (0, "rate"), 3.0f);
+    const auto moved = renderChord (*p);
+    CHECK (moved != plain);
+    const auto routes = p->modulationRoutes();
+    REQUIRE (routes.size() == 1);
+    CHECK (routes[0].state == mod::RouteState::active);
+
+    // A per-voice envelope on a shared stage is refused (and silent).
+    CHECK (p->addModulationRoute (mod::Source::env1, mod::Dest::drive, 100.0f) == 1);
+    CHECK (p->modulationRoutes()[1].state == mod::RouteState::scope);
+
+    // Recall: routes, depths and sources come back.
+    juce::MemoryBlock state;
+    auto curve = mod::defaultLfoCurve();
+    curve.add ({ 0.25f, 0.9f, 0.3f });
+    p->setModulationCurve (0, curve);
+    p->getStateInformation (state);
+    OspAudioProcessor q;
+    q.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+    CHECK (q.modulationRoutes().size() == 2);
+    CHECK (arpValue (q, OspAudioProcessor::modLfoId (0, "rate")) == Approx (3.0f).margin (0.01f));
+    CHECK (q.modulationCurve (0) == p->modulationCurve (0));
+    // Undo of a curve edit.
+    p->undoManager.undo();
+    CHECK (p->modulationCurve (0) == mod::defaultLfoCurve());
+
+    // Removing the routes gives the plain sound back exactly (a fresh instance: LIFE's
+    // performance memory moves on with every chord played).
+    p->removeModulationRoute (0);
+    p->removeModulationRoute (1);
+    CHECK (p->modulationRoutes().empty());
+    {
+        auto r = make();
+        r->addModulationRoute (mod::Source::lfo1, mod::Dest::cutoff, 60.0f);
+        r->removeModulationRoute (0);
+        CHECK (renderChord (*r) == plain);
+    }
+
+    // Every slot taken: the 17th route is refused.
+    for (int r = 0; r < mod::maxRoutes; ++r)
+        CHECK (p->addModulationRoute (mod::Source::lfo2, static_cast<mod::Dest> (static_cast<int> (mod::Dest::levelA) + r), 10.0f + r) >= 0);
+    CHECK (p->addModulationRoute (mod::Source::env2, mod::Dest::ampSustain, 10.0f) == -1);
+
+    // An older session (no mod.* at all, no curves) opens with no modulation.
+    auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
+    REQUIRE (xml != nullptr);
+    for (auto* child = xml->getFirstChildElement(); child != nullptr;)
+    {
+        auto* next = child->getNextElement();
+        if (child->getStringAttribute ("id").startsWith ("mod."))
+            xml->removeChildElement (child, true);
+        child = next;
+    }
+    xml->removeAttribute ("modCurves");
+    juce::MemoryBlock old;
+    juce::AudioProcessor::copyXmlToBinary (*xml, old);
+    p->setStateInformation (old.getData(), static_cast<int> (old.getSize()));
+    CHECK (p->modulationRoutes().empty());
+    CHECK (p->modulationCurve (0) == mod::defaultLfoCurve());
+}
+
+TEST_CASE ("plugin: MODULATION with the ARP, every source, Granular and three layers: heard, finite, every note ends", "[plugin][mod]")
+{
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "a.wav", testsignals::vowel (midiToHz (57), 2.0, 48000.0, 3));
+    const auto b = writeSource (tmp.dir, "b.wav", testsignals::saw (midiToHz (48), 2.0, 48000.0));
+    const auto c = writeSource (tmp.dir, "c.wav", testsignals::pluck (midiToHz (60), 2.0, 48000.0, 5));
+    OspAudioProcessor p;
+    p.initPatch();
+    REQUIRE (p.addLayers ({ a, b, c }) == 3);
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    p.setParameterValue ("release", 60.0f);
+    p.setParameterValue ("layerA.sourceMode", 1.0f);
+    p.setParameterValue ("layerC.reimagined", 60.0f);
+    p.setParameterValue (OspAudioProcessor::modLfoId (1, "scope"), 1.0f);   // LFO 2 per voice
+    p.setParameterValue (OspAudioProcessor::modLfoId (0, "sync"), 1.0f);
+    p.setParameterValue (OspAudioProcessor::modEnvId (0, "attack"), 5.0f);
+    p.setParameterValue (OspAudioProcessor::modEnvId (0, "decay"), 80.0f);
+    p.setParameterValue (OspAudioProcessor::modEnvId (0, "sustain"), 0.0f);
+    CHECK (p.addModulationRoute (mod::Source::lfo1, mod::Dest::grainPositionA, 60.0f) >= 0);   // Scenario F
+    CHECK (p.addModulationRoute (mod::Source::lfo2, mod::Dest::panB, -50.0f) >= 0);
+    CHECK (p.addModulationRoute (mod::Source::env1, mod::Dest::reimaginedC, 80.0f) >= 0);
+    CHECK (p.addModulationRoute (mod::Source::env1, mod::Dest::cutoff, 50.0f) >= 0);
+    CHECK (p.addModulationRoute (mod::Source::lfo1, mod::Dest::space, 30.0f) >= 0);
+    CHECK (p.addModulationRoute (mod::Source::env2, mod::Dest::ampSustain, -40.0f) >= 0);
+    arpOn (p, 0, 2, 60.0f, 2);
+    TestPlayHead head;
+    std::vector<int> stages;
+    const auto run = renderArp (p, 48000.0, 256, 2.0, [&] (int pos, int n, juce::MidiBuffer& m) {
+        stages.push_back (p.modulationView().envStage[0]);
+        for (int note : { 57, 60, 64 })
+            at (m, pos, n, 48000.0, 0.0, juce::MidiMessage::noteOn (1, note, static_cast<juce::uint8> (100)));
+        for (int note : { 57, 60, 64 })
+            at (m, pos, n, 48000.0, 1.4, juce::MidiMessage::noteOff (1, note));
+    }, &head, 1.4);
+    CHECK (run.finite);
+    CHECK (run.playPeak > 1.0e-3);
+    CHECK (run.peak < 4.0);
+    // ENV 1 restarts with every ARP note: its attack stage is seen again and again.
+    int attacks = 0;
+    for (std::size_t i = 1; i < stages.size(); ++i)
+        attacks += stages[i] == static_cast<int> (mod::EnvState::Stage::attack) && stages[i - 1] != stages[i] ? 1 : 0;
+    CHECK (attacks >= 5);
+    renderArp (p, 48000.0, 256, 5.0, {});
+    CHECK (p.activeVoices.load() == 0);
+}
+
+// MODULATION bay (needs a display: xvfb-run): the window widens by the bay and nothing in the
+// instrument moves; ENV / LFO editors; a source dragged onto a control becomes a route (a
+// per-voice source on a shared stage is refused; resting on CHARACTER opens its popover so
+// RES can be reached); the rings; the routing list; ARP and MOD open together; the screenshots
+// for review (OSP_SNAPSHOT_DIR): mod-01 .. mod-11.
+TEST_CASE ("plugin: MODULATION bay, drag and drop, rings, routing list, window shape", "[.][ui][mod-ui]")
+{
+    namespace mod = osp::mod;
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "Vowel A3.wav", testsignals::vowel (midiToHz (57), 3.0, 48000.0, 3));
+    const auto b = writeSource (tmp.dir, "Saw C3.wav", testsignals::saw (midiToHz (48), 2.0, 48000.0));
+    const auto c = writeSource (tmp.dir, "Pluck C4.wav", testsignals::pluck (midiToHz (60), 2.0, 48000.0, 5));
+    OspAudioProcessor p;
+    loadAndWait (p, a);
+    std::unique_ptr<juce::AudioProcessorEditor> base (p.createEditorIfNeeded());
+    auto* editor = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (base.get());
+    REQUIRE (editor != nullptr);
+    editor->refreshNow();
+    auto snapshot = [&] (const juce::String& name) {
+        if (const char* dir = std::getenv ("OSP_SNAPSHOT_DIR"))
+        {
+            editor->refreshNow();
+            const auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f);
+            juce::FileOutputStream out (juce::File (dir).getChildFile (name));
+            out.setPosition (0);
+            out.truncate();
+            juce::PNGImageFormat().writeImageToStream (image, out);
+        }
+    };
+    auto play = [&] (int blocks) {
+        p.prepareToPlay (48000.0, 512);
+        juce::AudioBuffer<float> buffer (2, 512);
+        for (int i = 0; i < blocks; ++i)
+        {
+            juce::MidiBuffer midi;
+            if (i == 0)
+                for (int note : { 57, 64 })
+                    midi.addEvent (juce::MidiMessage::noteOn (1, note, static_cast<juce::uint8> (100)), 0);
+            buffer.clear();
+            p.processBlock (buffer, midi);
+        }
+    };
+    // A control (by parameter ID) and its centre in the instrument's coordinates.
+    auto& instrument = *editor->modulationOverlay().getParentComponent();
+    std::function<juce::Slider* (juce::Component&, const juce::String&)> find = [&] (juce::Component& parent, const juce::String& id) -> juce::Slider* {
+        for (auto* child : parent.getChildren())
+        {
+            if (! child->isVisible())
+                continue;
+            if (auto* s = dynamic_cast<juce::Slider*> (child); s != nullptr && s->getProperties()["paramId"].toString() == id)
+                return s;
+            if (auto* found = find (*child, id))
+                return found;
+        }
+        return nullptr;
+    };
+    auto centreOf = [&] (const juce::String& id) {
+        auto* s = find (instrument, id);
+        REQUIRE (s != nullptr);
+        return instrument.getLocalArea (s, s->getLocalBounds()).toFloat().getCentre();
+    };
+
+    const int width = editor->getWidth(), height = editor->getHeight();
+    const float scale = static_cast<float> (width) / osp::plugin::design::width;
+    CHECK_FALSE (editor->isModExpanded());
+    CHECK_FALSE (editor->modulationBay().isVisible());
+    snapshot ("mod-01-closed.png");
+
+    // Open: wider by the bay, the same height, the instrument where it was.
+    const auto arpBefore = editor->arpControl().getBounds();
+    const auto keysBefore = centreOf ("character");
+    editor->setModExpanded (true);
+    CHECK (p.modBayExpanded());
+    CHECK (editor->modulationBay().isVisible());
+    CHECK (std::abs (editor->getWidth() - (width + osp::plugin::design::layout::modWidth * scale)) <= 1.5f);
+    CHECK (editor->getHeight() == height);
+    CHECK (editor->arpControl().getBounds() == arpBefore);
+    CHECK (centreOf ("character") == keysBefore);
+    CHECK (editor->modulationBay().getX() > juce::roundToInt (osp::plugin::design::width) - 20);
+    play (20);
+    snapshot ("mod-02-open-lfo1.png");
+    editor->modulationBay().selectSource (2);
+    snapshot ("mod-03-env1.png");
+    editor->modulationBay().selectSource (0);
+    p.setParameterValue (OspAudioProcessor::modLfoId (0, "shape"), static_cast<float> (mod::LfoShape::custom));
+    auto curve = mod::defaultLfoCurve();
+    curve.add ({ 0.3f, 0.95f, 0.4f });
+    curve.add ({ 0.7f, 0.1f, -0.5f });
+    p.setModulationCurve (0, curve);
+    snapshot ("mod-04-custom-curve.png");
+
+    // Drag LFO 1 onto CHARACTER: while dragging the controls it can reach show rings.
+    editor->dragModulation (0, centreOf ("character"));
+    CHECK (editor->modulationOverlay().ringCount() == 0);   // counted when drawn
+    snapshot ("mod-05-dragging.png");
+    CHECK (editor->modulationOverlay().ringCount() > 3);
+    const int slot = editor->dropModulation (0, centreOf ("character"));
+    REQUIRE (slot >= 0);
+    CHECK (juce::roundToInt (p.parameterValue (OspAudioProcessor::modRouteId (slot, "dest"))) == static_cast<int> (mod::Dest::character));
+    CHECK (editor->modulationBay().routeRowCount() == 1);
+    CHECK (editor->modulationBay().selectedRoute() == slot);
+    // ENV 1 is per note: on CHARACTER it becomes the per-voice cutoff; on LIFE (a shared stage) nothing.
+    CHECK (editor->dropModulation (2, centreOf ("life")) == -1);
+    const int cutoff = editor->dropModulation (2, centreOf ("character"));
+    REQUIRE (cutoff >= 0);
+    CHECK (juce::roundToInt (p.parameterValue (OspAudioProcessor::modRouteId (cutoff, "dest"))) == static_cast<int> (mod::Dest::cutoff));
+    play (30);
+    snapshot ("mod-06-modulated-macro.png");
+    CHECK (editor->modulationOverlay().ringCount() >= 1);
+    CHECK (editor->modulationButton().hasIndicator());
+
+    // Resting on CHARACTER opens its popover; RES inside it takes the drop.
+    editor->closePopup();
+    editor->dragModulation (1, centreOf ("character"));
+    juce::Thread::sleep (600);
+    editor->dragModulation (1, centreOf ("character"));
+    CHECK (editor->openPopupIndex() == 2);
+    editor->refreshNow();
+    const int res = editor->dropModulation (1, centreOf ("character.resonance"));
+    REQUIRE (res >= 0);
+    CHECK (juce::roundToInt (p.parameterValue (OspAudioProcessor::modRouteId (res, "dest"))) == static_cast<int> (mod::Dest::resonance));
+    editor->closePopup();
+
+    // More routes by dropping onto the layer's controls; the list shows them all.
+    CHECK (editor->dropModulation (1, centreOf (OspAudioProcessor::layerParameterId (0, "pan"))) >= 0);
+    CHECK (editor->dropModulation (3, centreOf (OspAudioProcessor::reimaginedParameterId (0))) >= 0);
+    CHECK (editor->dropModulation (0, centreOf ("release")) >= 0);
+    p.setParameterValue (OspAudioProcessor::modRouteId (cutoff, "enabled"), 0.0f);   // one bypassed
+    editor->refreshNow();
+    CHECK (editor->modulationBay().routeRowCount() == 6);
+    CHECK (editor->modulationBay().addMenu().getNumItems() == 4);
+    play (30);
+    snapshot ("mod-07-routing-list.png");
+
+    // ARP and MOD open together: wider and taller, nothing overlapping.
+    editor->setArpExpanded (true);
+    CHECK (std::abs (editor->getHeight() - (height + osp::plugin::design::layout::arpShift * scale)) <= 1.5f);
+    CHECK (std::abs (editor->getWidth() - (width + osp::plugin::design::layout::modWidth * scale)) <= 1.5f);
+    CHECK (editor->modulationBay().getBottom() > editor->arpControl().getBottom());
+    CHECK_FALSE (editor->modulationBay().getBounds().intersects (editor->arpInlinePanel().getBounds()));
+    snapshot ("mod-08-arp-and-mod.png");
+    editor->setArpExpanded (false);
+    CHECK (editor->getHeight() == height);
+    snapshot ("mod-09-layers-1.png");
+    for (const auto& file : { b, c })
+    {
+        p.addLayers (juce::Array<juce::File> { file });
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        snapshot (file == b ? "mod-10-layers-2.png" : "mod-11-layers-3.png");
+    }
+
+    // Closed: the original window; modulation still runs; recalled with the session.
+    editor->setModExpanded (false);
+    CHECK (editor->getWidth() == width);
+    CHECK (editor->getHeight() == height);
+    CHECK (editor->modulationButton().hasIndicator());
+    editor->setModExpanded (true);
+    base.reset();
+    juce::MemoryBlock state;
+    p.getStateInformation (state);
+    OspAudioProcessor recalled;
+    recalled.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+    CHECK (recalled.modBayExpanded());
+    CHECK (recalled.modulationRoutes().size() == 6);
+}
+
+// MODULATION's cost (measurement, hidden): three layers (A Granular), REIMAGINED on every
+// layer, the ARP running, an 8-note chord, all four sources and all 16 routes, against the
+// same patch with no route.
+TEST_CASE ("plugin: MODULATION stress - 16 routes, three layers, Granular, ARP (CPU)", "[.][mod-cpu]")
+{
+    namespace mod = osp::mod;
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "a.wav", testsignals::vowel (midiToHz (57), 3.0, 48000.0, 3));
+    const auto b = writeSource (tmp.dir, "b.wav", testsignals::saw (midiToHz (48), 2.0, 48000.0));
+    const auto c = writeSource (tmp.dir, "c.wav", testsignals::pluck (midiToHz (60), 2.0, 48000.0, 5));
+    auto timeIt = [&] (bool routes) {
+        OspAudioProcessor p;
+        loadAndWait (p, a);
+        p.addLayers (juce::Array<juce::File> { b, c });
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        p.parameters.getParameter ("layerA.sourceMode")->setValueNotifyingHost (1.0f);
+        for (int l = 0; l < 3; ++l)
+            p.setParameterValue (OspAudioProcessor::reimaginedParameterId (l), 60.0f);
+        p.setParameterValue ("space", 50.0f);
+        p.setParameterValue ("motion", 40.0f);
+        arpOn (p, 0, 2, 90.0f, 2);
+        if (routes)
+        {
+            p.setParameterValue (OspAudioProcessor::modLfoId (1, "scope"), 1.0f);   // LFO 2 per voice
+            const std::array<std::pair<mod::Source, mod::Dest>, 16> list { {
+                { mod::Source::lfo1, mod::Dest::character }, { mod::Source::lfo1, mod::Dest::space }, { mod::Source::lfo1, mod::Dest::movement },
+                { mod::Source::lfo1, mod::Dest::grainPositionA }, { mod::Source::lfo2, mod::Dest::panB }, { mod::Source::lfo2, mod::Dest::panC },
+                { mod::Source::lfo2, mod::Dest::fineTuneA }, { mod::Source::lfo2, mod::Dest::grainSizeA }, { mod::Source::env1, mod::Dest::cutoff },
+                { mod::Source::env1, mod::Dest::reimaginedA }, { mod::Source::env1, mod::Dest::reimaginedB }, { mod::Source::env1, mod::Dest::levelC },
+                { mod::Source::env2, mod::Dest::resonance }, { mod::Source::env2, mod::Dest::reimaginedC }, { mod::Source::env2, mod::Dest::grainDensityA },
+                { mod::Source::env2, mod::Dest::ampSustain } } };
+            for (const auto& [source, dest] : list)
+                REQUIRE (p.addModulationRoute (source, dest, 40.0f) >= 0);
+        }
+        p.prepareToPlay (48000.0, 256);
+        juce::AudioBuffer<float> buffer (2, 256);
+        double total = 0.0;
+        const int blocks = 48000 * 6 / 256;
+        for (int i = 0; i < blocks; ++i)
+        {
+            juce::MidiBuffer midi;
+            if (i == 0)
+                for (int n : { 45, 48, 52, 55, 57, 60, 64, 67 })
+                    midi.addEvent (juce::MidiMessage::noteOn (1, n, static_cast<juce::uint8> (100)), 0);
+            buffer.clear();
+            const auto t0 = std::chrono::steady_clock::now();
+            p.processBlock (buffer, midi);
+            total += std::chrono::duration<double, std::micro> (std::chrono::steady_clock::now() - t0).count();
+            for (int ch = 0; ch < 2; ++ch)
+                for (int s = 0; s < buffer.getNumSamples(); ++s)
+                    REQUIRE (std::isfinite (buffer.getSample (ch, s)));
+        }
+        return total / blocks;
+    };
+    const double without = timeIt (false), with = timeIt (true);
+    const double budget = 1.0e6 * 256 / 48000.0;
+    std::printf ("MODULATION stress: no routes %.1f us, 16 routes %.1f us per 256-sample block (%.2f %% -> %.2f %% of real time)\n",
+                 without, with, 100.0 * without / budget, 100.0 * with / budget);
+    CHECK (with < 1.5 * without + 0.02 * budget);
+}
+
+// EQ (per layer): off by default (older sessions untouched), recalled, layer-isolated (a
+// layer's EQ never reaches another layer), safe under rapid automation at every sample rate.
+TEST_CASE ("plugin: EQ per layer - default off, recall, isolation, automation", "[plugin][eq]")
+{
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "a.wav", testsignals::saw (midiToHz (57), 2.0, 48000.0));
+    const auto b = writeSource (tmp.dir, "b.wav", testsignals::saw (midiToHz (48), 2.0, 48000.0));
+    const auto c = writeSource (tmp.dir, "c.wav", testsignals::pluck (midiToHz (60), 2.0, 48000.0, 5));
+    {
+        OspAudioProcessor fresh;
+        for (int l = 0; l < OspAudioProcessor::numLayers; ++l)
+        {
+            const auto s = fresh.layerEqSettings (l);
+            CHECK_FALSE (s.enabled);
+            for (const auto& band : s.bands)
+                CHECK_FALSE (band.enabled);
+        }
+        CHECK (OspAudioProcessor::eqParameterNames().size() == 19);
+        CHECK (fresh.parameters.getParameter ("layerB.eq.bell.frequency") != nullptr);
+        CHECK (fresh.parameters.getParameter ("layerC.eq.lp.slope") != nullptr);
+    }
+
+    // Three layers; `setup` sets the EQ and the solos, then one note renders.
+    auto render = [&] (const std::function<void (OspAudioProcessor&)>& setup) {
+        OspAudioProcessor p;
+        loadAndWait (p, a);
+        p.addLayers (juce::Array<juce::File> { b, c });
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        p.setParameterValue ("life", 0.0f);
+        setup (p);
+        return playNote (p, 57, 48000.0, 1.0);
+    };
+    auto lowPass = [] (OspAudioProcessor& p, int layer) {
+        p.setParameterValue (OspAudioProcessor::eqParameterId (layer, "enabled"), 1.0f);
+        p.setParameterValue (OspAudioProcessor::eqParameterId (layer, "lp.enabled"), 1.0f);
+        p.setParameterValue (OspAudioProcessor::eqParameterId (layer, "lp.frequency"), 600.0f);
+        p.setParameterValue (OspAudioProcessor::eqParameterId (layer, "lp.slope"), 1.0f);
+    };
+    // On, with every band off: the same sound.
+    const auto plain = render ([] (OspAudioProcessor&) {});
+    CHECK (render ([] (OspAudioProcessor& p) { p.setParameterValue ("layerA.eq.enabled", 1.0f); }).channels == plain.channels);
+    CHECK (render ([&] (OspAudioProcessor& p) { lowPass (p, 0); }).channels != plain.channels);
+    // B alone (soloed): A's EQ changes nothing, B's does.
+    const auto soloB = [] (OspAudioProcessor& p) { p.setParameterValue ("layerB.solo", 1.0f); };
+    const auto bAlone = render (soloB);
+    CHECK (render ([&] (OspAudioProcessor& p) { soloB (p); lowPass (p, 0); lowPass (p, 2); }).channels == bAlone.channels);
+    CHECK (render ([&] (OspAudioProcessor& p) { soloB (p); lowPass (p, 1); }).channels != bAlone.channels);
+
+    // Recall: the EQ comes back from the session; a session without EQ (older) opens with it off.
+    {
+        OspAudioProcessor p;
+        lowPass (p, 1);
+        p.setParameterValue ("layerB.eq.bell.enabled", 1.0f);
+        p.setParameterValue ("layerB.eq.bell.gain", -4.0f);
+        p.setParameterValue ("layerB.eq.bell.q", 2.0f);
+        juce::MemoryBlock state;
+        p.getStateInformation (state);
+        OspAudioProcessor recalled;
+        recalled.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+        const auto s = recalled.layerEqSettings (1);
+        CHECK (s.enabled);
+        CHECK (s.bands[static_cast<std::size_t> (eq::Band::lowPass)].steep);
+        CHECK (s.bands[static_cast<std::size_t> (eq::Band::bell)].gainDb == Approx (-4.0).margin (0.01));
+        CHECK (s.bands[static_cast<std::size_t> (eq::Band::bell)].q == Approx (2.0).margin (0.01));
+        // Strip every EQ value from the saved state: what an older session looks like.
+        auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
+        REQUIRE (xml != nullptr);
+        std::vector<juce::XmlElement*> eqParams;
+        for (auto* e : xml->getChildIterator())
+            if (e->getStringAttribute ("id").contains (".eq."))
+                eqParams.push_back (e);
+        CHECK (eqParams.size() == 57);
+        for (auto* e : eqParams)
+            xml->removeChildElement (e, true);
+        juce::MemoryBlock older;
+        juce::AudioProcessor::copyXmlToBinary (*xml, older);
+        OspAudioProcessor old;
+        old.setStateInformation (older.getData(), static_cast<int> (older.getSize()));
+        for (int l = 0; l < OspAudioProcessor::numLayers; ++l)
+            CHECK_FALSE (old.layerEqSettings (l).audible());
+    }
+
+    // Rapid automation of every band at four sample rates: finite, never blowing up.
+    for (double rate : { 44100.0, 48000.0, 88200.0, 96000.0 })
+    {
+        OspAudioProcessor p;
+        loadAndWait (p, a);
+        p.prepareToPlay (rate, 128);
+        juce::AudioBuffer<float> buffer (2, 128);
+        osp::Prng rng (osp::Prng::deriveSeed (3, 0, 0));
+        float peak = 0.0f;
+        bool finite = true;
+        for (int block = 0; block < static_cast<int> (rate / 128.0); ++block)
+        {
+            for (const auto& name : OspAudioProcessor::eqParameterNames())
+                if (auto* param = p.parameters.getParameter (OspAudioProcessor::eqParameterId (0, name)))
+                    param->setValueNotifyingHost (name.contains ("enabled") ? (rng.nextDouble() > 0.2 ? 1.0f : 0.0f) : static_cast<float> (rng.nextDouble()));
+            juce::MidiBuffer midi;
+            if (block % 40 == 0)
+                midi.addEvent (juce::MidiMessage::noteOn (1, 45 + block % 24, static_cast<juce::uint8> (110)), 0);
+            buffer.clear();
+            p.processBlock (buffer, midi);
+            for (int ch = 0; ch < 2; ++ch)
+                for (int i = 0; i < buffer.getNumSamples(); ++i)
+                {
+                    finite = finite && std::isfinite (buffer.getSample (ch, i));
+                    peak = std::max (peak, std::abs (buffer.getSample (ch, i)));
+                }
+        }
+        CHECK (finite);
+        CHECK (peak < 8.0f);
+    }
+}
+
+namespace
+{
+    juce::MouseEvent mouseAt (juce::Component& c, juce::Point<float> at, juce::Point<float> down, bool dragged, int clicks = 1,
+                              juce::ModifierKeys mods = juce::ModifierKeys())
+    {
+        auto source = juce::Desktop::getInstance().getMainMouseSource();
+        const auto now = juce::Time::getCurrentTime();
+        return juce::MouseEvent (source, at, mods, juce::MouseInputSource::defaultPressure, 0.0f, 0.0f, 0.0f, 0.0f, &c, &c, now, down, now, clicks, dragged);
+    }
+}
+
+// EQ GUI (needs a display: xvfb-run): the EQ key in each card, the editor inside the
+// waveform (nothing moves), progressive band activation by dragging a marker, typed values,
+// the EQ's switch, one editor at a time, ARP and MOD together, modulation onto a band's value,
+// hover-to-open while dragging. Screenshots for review (OSP_SNAPSHOT_DIR): eq-01 .. eq-09.
+TEST_CASE ("plugin: EQ editor over the waveform", "[.][ui][eq-ui]")
+{
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "Vowel A3.wav", testsignals::vowel (midiToHz (57), 3.0, 48000.0, 3));
+    const auto b = writeSource (tmp.dir, "Saw C3.wav", testsignals::saw (midiToHz (48), 2.0, 48000.0));
+    const auto c = writeSource (tmp.dir, "Pluck C4.wav", testsignals::pluck (midiToHz (60), 2.0, 48000.0, 5));
+    OspAudioProcessor p;
+    loadAndWait (p, a);
+    std::unique_ptr<juce::AudioProcessorEditor> base (p.createEditorIfNeeded());
+    auto* editor = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (base.get());
+    REQUIRE (editor != nullptr);
+    editor->refreshNow();
+    auto snapshot = [&] (const juce::String& name) {
+        if (const char* dir = std::getenv ("OSP_SNAPSHOT_DIR"))
+        {
+            editor->refreshNow();
+            const auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f);
+            juce::FileOutputStream out (juce::File (dir).getChildFile (name));
+            out.setPosition (0);
+            out.truncate();
+            juce::PNGImageFormat().writeImageToStream (image, out);
+        }
+    };
+    auto& instrument = *editor->modulationOverlay().getParentComponent();
+    std::function<osp::plugin::EngineCard* (juce::Component&, int)> cardOf = [&] (juce::Component& parent, int layer) -> osp::plugin::EngineCard* {
+        for (auto* child : parent.getChildren())
+            if (auto* card = dynamic_cast<osp::plugin::EngineCard*> (child); card != nullptr && card->layer() == layer)
+                return card;
+        return nullptr;
+    };
+    std::function<osp::plugin::EqValueField* (juce::Component&, const juce::String&)> field = [&] (juce::Component& parent, const juce::String& id) -> osp::plugin::EqValueField* {
+        for (auto* child : parent.getChildren())
+        {
+            if (auto* f = dynamic_cast<osp::plugin::EqValueField*> (child); f != nullptr && f->getProperties()["paramId"].toString() == id)
+                return f;
+            if (auto* found = field (*child, id))
+                return found;
+        }
+        return nullptr;
+    };
+    auto* cardA = cardOf (instrument, 0);
+    REQUIRE (cardA != nullptr);
+    const int width = editor->getWidth(), height = editor->getHeight();
+    const auto cardBounds = cardA->getBounds();
+    const auto displayBounds = cardA->display().getBounds();
+    CHECK (cardA->eqToggle().isVisible());
+    CHECK_FALSE (cardA->eqToggle().isActive());
+    snapshot ("eq-01-closed.png");
+
+    // Open: inside the waveform's place; nothing moves; the EQ is not switched on by opening.
+    cardA->onEqToggle (0, true);
+    REQUIRE (cardA->isEqOpen());
+    auto* eqA = cardA->eqEditorComponent();
+    CHECK (eqA->getBounds() == displayBounds);
+    CHECK (cardA->getBounds() == cardBounds);
+    CHECK (editor->getWidth() == width);
+    CHECK (editor->getHeight() == height);
+    CHECK_FALSE (p.layerEqSettings (0).enabled);
+    snapshot ("eq-02-open-empty.png");
+
+    // Dragging the BELL marker uses it: on (and the EQ with it), frequency and gain follow.
+    auto drag = [&] (int band, juce::Point<float> by) {
+        const auto from = eqA->nodePosition (band);
+        eqA->mouseDown (mouseAt (*eqA, from, from, false));
+        eqA->mouseDrag (mouseAt (*eqA, from + by, from, true));
+        eqA->mouseUp (mouseAt (*eqA, from + by, from, true));
+        eqA->refresh();
+    };
+    drag (2, { 80.0f, -40.0f });
+    auto s = p.layerEqSettings (0);
+    CHECK (s.enabled);
+    CHECK (s.bands[2].enabled);
+    CHECK (s.bands[2].frequencyHz > 1100.0);
+    CHECK (s.bands[2].gainDb > 2.0);
+    CHECK (eqA->selectedBand() == 2);
+    // HP: across only (its height is not a gain); to about 90 Hz.
+    const auto hp = eqA->nodePosition (0);
+    drag (0, { eqA->xForHz (90.0) - hp.x, -50.0f });
+    s = p.layerEqSettings (0);
+    CHECK (s.bands[0].enabled);
+    CHECK (s.bands[0].frequencyHz == Approx (90.0).epsilon (0.05));
+    // Typed values (the band inspector): 3.2 kHz, -4 dB, Q 2.
+    eqA->selectBand (2);
+    auto* frequency = field (*eqA, "layerA.eq.bell.frequency");
+    auto* gain = field (*eqA, "layerA.eq.bell.gain");
+    auto* q = field (*eqA, "layerA.eq.bell.q");
+    REQUIRE (frequency != nullptr);
+    REQUIRE (gain != nullptr);
+    REQUIRE (q != nullptr);
+    frequency->commitTyping ("3.2k");
+    gain->commitTyping ("-4");
+    q->commitTyping ("2");
+    s = p.layerEqSettings (0);
+    CHECK (s.bands[2].frequencyHz == Approx (3200.0).epsilon (0.01));
+    CHECK (s.bands[2].gainDb == Approx (-4.0).margin (0.05));
+    CHECK (s.bands[2].q == Approx (2.0).epsilon (0.02));
+    CHECK (eq::responseDb (s, 3200.0, 48000.0) == Approx (-4.0).margin (0.3));   // with the HP far below
+    // A low shelf by drag, for the picture.
+    drag (1, { 20.0f, -30.0f });
+    eqA->selectBand (2);
+    editor->refreshNow();
+    CHECK (cardA->eqToggle().isActive());
+    snapshot ("eq-03-bands.png");
+
+    // The EQ's own switch: off keeps the bands (and the editor), on again.
+    const auto power = eqA->powerArea().getCentre();
+    eqA->mouseDown (mouseAt (*eqA, power, power, false));
+    CHECK_FALSE (p.layerEqSettings (0).enabled);
+    CHECK (p.layerEqSettings (0).bands[2].enabled);
+    snapshot ("eq-04-switched-off.png");
+    eqA->mouseDown (mouseAt (*eqA, power, power, false));
+    CHECK (p.layerEqSettings (0).enabled);
+
+    // Two and three layers: one editor open at a time; A's EQ keeps playing.
+    p.addLayers (juce::Array<juce::File> { b, c });
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    editor->refreshNow();
+    auto* cardB = cardOf (instrument, 1);
+    auto* cardC = cardOf (instrument, 2);
+    REQUIRE (cardB != nullptr);
+    REQUIRE (cardC != nullptr);
+    cardB->onEqToggle (1, true);
+    CHECK (cardB->isEqOpen());
+    CHECK_FALSE (cardA->isEqOpen());
+    CHECK (p.layerEqSettings (0).audible());
+    snapshot ("eq-05-open-b.png");
+    cardC->onEqToggle (2, true);
+    CHECK (cardC->isEqOpen());
+    CHECK_FALSE (cardB->isEqOpen());
+    CHECK (cardC->eqEditorComponent()->getBounds() == cardC->display().getBounds());
+    snapshot ("eq-06-open-c.png");
+
+    // ARP and MOD with an EQ open: the cards stay where they are.
+    const auto cardCBounds = cardC->getBounds();
+    editor->setArpExpanded (true);
+    editor->setModExpanded (true);
+    CHECK (cardC->getBounds() == cardCBounds);
+    CHECK (cardC->eqEditorComponent()->getBounds() == cardC->display().getBounds());
+    snapshot ("eq-07-arp-mod.png");
+
+    // LFO 1 onto C's bell frequency (the EQ's value), heard and drawn.
+    cardC->eqEditorComponent()->selectBand (2);
+    editor->refreshNow();
+    auto* bellC = field (*cardC->eqEditorComponent(), "layerC.eq.bell.frequency");
+    REQUIRE (bellC != nullptr);
+    const auto bellAt = instrument.getLocalArea (bellC, bellC->getLocalBounds()).toFloat().getCentre();
+    const int slot = editor->dropModulation (0, bellAt);
+    REQUIRE (slot >= 0);
+    CHECK (juce::roundToInt (p.parameterValue (OspAudioProcessor::modRouteId (slot, "dest"))) == static_cast<int> (osp::mod::Dest::eqBellFrequencyC));
+    CHECK (editor->dropModulation (2, bellAt) == -1);   // a per-note envelope cannot drive a layer's EQ
+    p.setParameterValue ("layerC.eq.enabled", 1.0f);
+    p.setParameterValue ("layerC.eq.bell.enabled", 1.0f);
+    p.setParameterValue ("layerC.eq.bell.gain", 9.0f);
+    playNote (p, 60, 48000.0, 0.5);
+    snapshot ("eq-08-modulated.png");
+
+    // Resting on A's EQ key while dragging opens A's EQ.
+    editor->setModExpanded (false);
+    editor->setArpExpanded (false);
+    const auto key = instrument.getLocalArea (&cardA->eqToggle(), cardA->eqToggle().getLocalBounds()).toFloat().getCentre();
+    editor->dragModulation (1, key);
+    juce::Thread::sleep (600);
+    editor->dragModulation (1, key);
+    CHECK (cardA->isEqOpen());
+    editor->dropModulation (1, key);
+    snapshot ("eq-09-hover-opened.png");
+    cardA->onEqToggle (0, false);
+    CHECK_FALSE (cardA->isEqOpen());
+    CHECK (p.layerEqSettings (0).audible());   // closing never switches it off
+}
+
+// EQ's cost (measurement, hidden): three layers, every band of every layer's EQ on (24 dB
+// slopes), an 8-note chord, against the same with the EQs off.
+TEST_CASE ("plugin: EQ cost - all bands on three layers (CPU)", "[.][eq-cpu]")
+{
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "a.wav", testsignals::vowel (midiToHz (57), 3.0, 48000.0, 3));
+    const auto b = writeSource (tmp.dir, "b.wav", testsignals::saw (midiToHz (48), 2.0, 48000.0));
+    const auto c = writeSource (tmp.dir, "c.wav", testsignals::pluck (midiToHz (60), 2.0, 48000.0, 5));
+    auto timeIt = [&] (bool on) {
+        OspAudioProcessor p;
+        loadAndWait (p, a);
+        p.addLayers (juce::Array<juce::File> { b, c });
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        if (on)
+            for (int l = 0; l < 3; ++l)
+                for (const auto& name : OspAudioProcessor::eqParameterNames())
+                    if (name.endsWith ("enabled") || name.endsWith ("slope"))
+                        p.setParameterValue (OspAudioProcessor::eqParameterId (l, name), 1.0f);
+        p.prepareToPlay (48000.0, 256);
+        juce::AudioBuffer<float> buffer (2, 256);
+        double total = 0.0;
+        const int blocks = 48000 * 6 / 256;
+        for (int i = 0; i < blocks; ++i)
+        {
+            juce::MidiBuffer midi;
+            if (i == 0)
+                for (int n : { 45, 48, 52, 55, 57, 60, 64, 67 })
+                    midi.addEvent (juce::MidiMessage::noteOn (1, n, static_cast<juce::uint8> (100)), 0);
+            buffer.clear();
+            const auto t0 = std::chrono::steady_clock::now();
+            p.processBlock (buffer, midi);
+            total += std::chrono::duration<double, std::micro> (std::chrono::steady_clock::now() - t0).count();
+        }
+        return total / blocks;
+    };
+    const double off = timeIt (false), on = timeIt (true);
+    const double budget = 1.0e6 * 256 / 48000.0;
+    std::printf ("EQ: off %.1f us, all bands on three layers %.1f us per 256-sample block (+%.2f %% of real time)\n", off, on, 100.0 * (on - off) / budget);
+    CHECK (on - off < 0.03 * budget);
 }
