@@ -285,7 +285,8 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
   (1–4096, also host-varied, at 22.05–192 kHz in the plugin); seed-dependent randomisation in baseline B.
 - 113 Catch2 test cases (unit/integration/regression) + performance smoke + 12 plugin
   test cases; all green on Linux (GCC 13), macOS 14 arm64 (Apple Clang, CI, auval) and
-  Windows (MSVC, CI).
+  Windows (MSVC). CI now runs macOS only (the target; saves hours of runner time): Linux
+  (incl. the xvfb `[ui]` snapshot tests) is checked locally, Windows on demand.
 - Phase 1 plugin: see checklist above.
 - Synthetic ground-truth generators and a synthetic mini-corpus generator
   (`--generate-test-signals`), including deliberately broken/unsupported files.

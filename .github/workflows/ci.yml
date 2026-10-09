@@ -10,10 +10,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # macOS only (the target platform; Linux and Windows runs were dropped to save CI
+        # time). The Linux steps below stay for a local or on-demand Linux job.
         include:
           - os: macos-14          # Apple Silicon: primary target
-            plugin: ON
-          - os: ubuntu-24.04
             plugin: ON
     runs-on: ${{ matrix.os }}
     steps:
@@ -89,24 +89,3 @@ jobs:
             build/apps/plugin/OSP_Plugin_artefacts/Release/VST3/
           if-no-files-found: ignore
 
-  windows:
-    # Windows VST3 (spec §90): build the plugin and run every test suite with MSVC.
-    runs-on: windows-2022
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Configure
-        run: cmake -B build -G "Visual Studio 17 2022" -A x64 -DOSP_BUILD_PLUGIN=ON
-
-      - name: Build
-        run: cmake --build build --config Release --parallel
-
-      - name: Test
-        run: ctest --test-dir build -C Release --output-on-failure
-
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: osp-windows
-          path: build/apps/plugin/OSP_Plugin_artefacts/Release/VST3/
-          if-no-files-found: ignore

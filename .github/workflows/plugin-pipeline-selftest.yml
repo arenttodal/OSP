@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-14, windows-2022]
+        os: [macos-14]   # macOS only (saves CI time; the kit's Windows path is unchanged)
     runs-on: ${{ matrix.os }}
     defaults:
       run:
