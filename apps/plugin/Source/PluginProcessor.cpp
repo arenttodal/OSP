@@ -9,6 +9,8 @@
 #include "io/ContentHash.h"
 
 #include <algorithm>
+#include <map>
+#include <set>
 #include <cstdio>
 #include <cstdlib>
 
@@ -2577,6 +2579,7 @@ void OspAudioProcessor::openPresetEntry (const PresetEntry& entry)
 {
     if (entry.program >= 0)
     {
+        rememberPreviousState ("Before " + entry.name);
         setCurrentProgram (entry.program);
         presetIsProgram = true;
     }
@@ -3313,6 +3316,7 @@ bool OspAudioProcessor::loadPreset (const juce::File& file)
     const auto xml = juce::XmlDocument::parse (file);
     if (xml == nullptr || ! xml->hasTagName (parameters.state.getType()))
         return false;
+    rememberPreviousState ("Before " + file.getFileNameWithoutExtension());
     applyStateXml (*xml);
     lastPresetFile = file;
     lastStartingStateFile = juce::File();
@@ -3388,6 +3392,7 @@ bool OspAudioProcessor::loadStartingState (const juce::File& file)
         return false;
     // Settings and the state's slots (empty ones wait for sounds); the sounds already here
     // keep playing - more sounds than the state had slots all stay (slotCount).
+    rememberPreviousState ("Before " + file.getFileNameWithoutExtension());
     applyStateXml (*xml, true);
     presetNameOverride = file.getFileNameWithoutExtension();
     presetIsProgram = false;
@@ -3436,7 +3441,7 @@ bool OspAudioProcessor::stepPreset (int delta, const juce::File& root)
     return loadPreset (files[next]);
 }
 
-bool OspAudioProcessor::exportInstrument (const juce::File& file, juce::String& error)
+bool OspAudioProcessor::exportInstrument (const juce::File& file, juce::String& error, const ExportOptions& options)
 {
     std::vector<LoadedInstrument::MemberFile> members;
     for (int layer = 0; layer < numLayers; ++layer)
@@ -3453,15 +3458,66 @@ bool OspAudioProcessor::exportInstrument (const juce::File& file, juce::String& 
         return false;
     }
 
+    // Every sound's rights, from the Library (unknown when it has no record).
+    auto rights = std::make_shared<std::map<std::string, std::string>>();
+    {
+        std::vector<std::string> hashes;
+        for (const auto& m : members)
+            hashes.push_back (m.contentHash);
+        libraryHub->runAndWait ([rights, hashes] (library::Catalog& c) {
+            for (const auto& h : hashes)
+                (*rights)[h] = c.provenanceOf (h);
+        });
+    }
+    auto rightsOf = [&rights] (const std::string& hash) {
+        const auto it = rights->find (hash);
+        return it != rights->end() ? it->second : std::string ("unknown");
+    };
+    if (options.forDistribution)
+    {
+        juce::StringArray unknown;
+        std::vector<std::string> unknownHashes;
+        for (const auto& m : members)
+            if (rightsOf (m.contentHash) == "unknown")
+            {
+                unknown.addIfNotAlreadyThere (juce::String (m.filename));
+                unknownHashes.push_back (m.contentHash);
+            }
+        if (! unknown.isEmpty() && ! options.confirmUnknownRights)
+        {
+            error = "these sounds have no known rights: " + unknown.joinIntoString (", ") + ". Confirm that you may share them to export";
+            return false;
+        }
+        // The user's confirmation is recorded (only then does unknown become cleared).
+        for (const auto& h : unknownHashes)
+            (*rights)[h] = "cleared";
+        if (! unknownHashes.empty())
+            libraryHub->post ([unknownHashes] (library::Catalog& c) {
+                for (const auto& h : unknownHashes)
+                    c.setProvenance (h, "cleared");
+            });
+    }
+
     juce::ZipFile::Builder zip;
     auto manifest = std::make_unique<juce::DynamicObject>();
-    manifest->setProperty ("schemaVersion", 1);
+    manifest->setProperty ("schemaVersion", 2);
     manifest->setProperty ("format", "OSP portable instrument");
     manifest->setProperty ("engineVersion", JucePlugin_VersionString);
     manifest->setProperty ("stateVersion", stateVersion);
+    manifest->setProperty ("name", options.name.isNotEmpty() ? options.name : file.getFileNameWithoutExtension());
+    manifest->setProperty ("category", options.category);
+    manifest->setProperty ("notes", options.notes);
+    manifest->setProperty ("creator", options.creator);
+    juce::Array<juce::var> tags;
+    for (const auto& t : options.tags)
+        tags.add (t);
+    manifest->setProperty ("tags", tags);
     juce::Array<juce::var> files;
+    std::set<std::string> packed;
     for (const auto& m : members)
     {
+        if (! packed.insert (m.contentHash).second)
+            continue;   // the same sound on two layers: once
         const auto hash = juce::String (m.contentHash).fromFirstOccurrenceOf ("sha256:", false, false);
         const auto stored = store.find (hash.toStdString());
         if (! stored)
@@ -3477,6 +3533,9 @@ bool OspAudioProcessor::exportInstrument (const juce::File& file, juce::String& 
         entry->setProperty ("contentHash", juce::String (m.contentHash));
         entry->setProperty ("filename", juce::String (m.filename));
         entry->setProperty ("stored", "source/" + stored->getFileName());
+        entry->setProperty ("sha256", hash);
+        entry->setProperty ("bytes", stored->getSize());
+        entry->setProperty ("provenance", juce::String (rightsOf (m.contentHash)));
         files.add (juce::var (entry.release()));
     }
     manifest->setProperty ("sources", files);
@@ -3487,10 +3546,30 @@ bool OspAudioProcessor::exportInstrument (const juce::File& file, juce::String& 
     const auto preset = xml->toString();
     zip.addEntry (new juce::MemoryInputStream (preset.toRawUTF8(), preset.getNumBytesAsUTF8(), true), 9, "preset.xml", juce::Time::getCurrentTime());
 
-    file.deleteFile();
-    juce::FileOutputStream out (file);
-    if (! out.openedOk() || ! zip.writeToStream (out, nullptr))
+    // Written beside the target and moved into place: an existing file is replaced only by a
+    // complete package, and the package is read back before that.
+    const auto temp = file.getSiblingFile (file.getFileName() + ".partial");
     {
+        juce::FileOutputStream out (temp);
+        if (! out.openedOk() || ! (out.setPosition (0) && out.truncate().wasOk()) || ! zip.writeToStream (out, nullptr))
+        {
+            temp.deleteFile();
+            error = "cannot write " + file.getFullPathName();
+            return false;
+        }
+    }
+    {
+        juce::ZipFile check (temp);
+        if (check.getEntry ("preset.xml") == nullptr || check.getEntry ("manifest.json") == nullptr || check.getNumEntries() < 2 + static_cast<int> (packed.size()))
+        {
+            temp.deleteFile();
+            error = "the package could not be verified after writing";
+            return false;
+        }
+    }
+    if (! temp.moveFileTo (file))
+    {
+        temp.deleteFile();
         error = "cannot write " + file.getFullPathName();
         return false;
     }
@@ -3504,6 +3583,31 @@ bool OspAudioProcessor::importInstrument (const juce::File& file, juce::String& 
     {
         error = file.getFileName() + " is not an OSP instrument";
         return false;
+    }
+    // The manifest (if any) is checked before anything is written: a newer format is refused,
+    // and manifest 2 names every sound with its size (a truncated package changes nothing).
+    if (const auto* manifestEntry = zip.getEntry ("manifest.json"))
+    {
+        std::unique_ptr<juce::InputStream> in (zip.createStreamForEntry (*manifestEntry));
+        const auto manifest = in != nullptr ? juce::JSON::parse (in->readEntireStreamAsString()) : juce::var();
+        const int version = static_cast<int> (manifest.getProperty ("schemaVersion", 1));
+        if (version > 2)
+        {
+            error = file.getFileName() + " was made by a newer version of the plugin";
+            return false;
+        }
+        if (const auto* sources = manifest.getProperty ("sources", juce::var()).getArray(); sources != nullptr && version >= 2)
+            for (const auto& source : *sources)
+            {
+                const auto stored = source.getProperty ("stored", "").toString();
+                const auto* entry = zip.getEntry (stored);
+                const auto bytes = static_cast<juce::int64> (source.getProperty ("bytes", -1));
+                if (entry == nullptr || (bytes >= 0 && entry->uncompressedSize != bytes))
+                {
+                    error = "the package is incomplete: " + source.getProperty ("filename", stored).toString() + " is missing or damaged";
+                    return false;
+                }
+            }
     }
     // Sources and analyses go into the managed store under their hash names; the preset
     // then recalls them from the store exactly like a reopened session.
@@ -3558,8 +3662,151 @@ bool OspAudioProcessor::importInstrument (const juce::File& file, juce::String& 
         error = "the instrument's settings are unreadable";
         return false;
     }
+    rememberPreviousState ("Before " + file.getFileNameWithoutExtension());
     applyStateXml (*xml);
     return true;
+}
+
+void OspAudioProcessor::rememberPreviousState (const juce::String& what)
+{
+    previousState = createStateXml();
+    previousStateLabel = what;
+}
+
+bool OspAudioProcessor::restorePreviousState()
+{
+    if (previousState == nullptr)
+        return false;
+    // A swap: restoring again brings back what was just replaced.
+    auto restore = std::move (previousState);
+    rememberPreviousState ("Before restoring");
+    applyStateXml (*restore);
+    lastPresetFile = juce::File();
+    lastStartingStateFile = juce::File();
+    presetNameOverride = "Restored";
+    presetIsProgram = false;
+    return true;
+}
+
+juce::File OspAudioProcessor::libraryTrashFolder()
+{
+    return juce::File (juce::String (library::Catalog::defaultFile().parent_path().string())).getChildFile ("Trash");
+}
+
+std::optional<juce::File> OspAudioProcessor::renamePresetFile (const juce::File& file, const juce::String& newName, juce::String& error)
+{
+    const auto clean = juce::File::createLegalFileName (newName.trim());
+    if (! file.existsAsFile() || clean.isEmpty())
+    {
+        error = clean.isEmpty() ? "a name is needed" : file.getFileName() + " is not there any more";
+        return std::nullopt;
+    }
+    const auto target = file.getSiblingFile (clean + file.getFileExtension());
+    if (target.exists() && target != file)
+    {
+        error = "there is already a " + target.getFileName();
+        return std::nullopt;
+    }
+    if (! file.moveFileTo (target))
+    {
+        error = "cannot rename " + file.getFileName();
+        return std::nullopt;
+    }
+    libraryHub->post ([from = file.getFullPathName().toStdString(), to = target.getFullPathName().toStdString(), name = clean.toStdString()] (library::Catalog& c) {
+        if (const auto id = c.presetWithFile (from))
+            c.movePreset (*id, to, name);
+    });
+    if (lastPresetFile == file)
+        lastPresetFile = target;
+    if (lastStartingStateFile == file)
+        lastStartingStateFile = target;
+    return target;
+}
+
+std::optional<juce::File> OspAudioProcessor::duplicatePresetFile (const juce::File& file, juce::String& error)
+{
+    const auto xml = juce::XmlDocument::parse (file);
+    if (xml == nullptr || ! xml->hasTagName (parameters.state.getType()))
+    {
+        error = file.getFileName() + " is not a preset";
+        return std::nullopt;
+    }
+    const auto copy = file.getParentDirectory().getNonexistentChildFile (file.getFileNameWithoutExtension() + " copy", file.getFileExtension(), false);
+    if (! file.copyFileTo (copy))
+    {
+        error = "cannot copy " + file.getFileName();
+        return std::nullopt;
+    }
+    const bool isTemplate = file.hasFileExtension (startingStateExtension);
+    libraryHub->presetSaved (copy, isTemplate ? library::AssetType::templateState : library::AssetType::preset, soundHashesInState (*xml),
+                             static_cast<int> (xml->getIntAttribute ("keptSlots", 1)), stateVersion);
+    return copy;
+}
+
+std::optional<juce::File> OspAudioProcessor::trashPresetFile (const juce::File& file, juce::String& error)
+{
+    if (! file.existsAsFile())
+    {
+        error = file.getFileName() + " is not there any more";
+        return std::nullopt;
+    }
+    const auto trash = libraryTrashFolder();
+    trash.createDirectory();
+    const auto stamp = juce::Time::getCurrentTime().formatted ("%Y-%m-%d %H%M%S");
+    const auto target = trash.getNonexistentChildFile (stamp + " " + file.getFileNameWithoutExtension(), file.getFileExtension(), false);
+    if (! file.moveFileTo (target))
+    {
+        error = "cannot move " + file.getFileName() + " to the Library's trash";
+        return std::nullopt;
+    }
+    // The record remembers where it was (restore puts it back), and leaves the results.
+    const auto from = file.getFullPathName().toStdString(), to = target.getFullPathName().toStdString();
+    libraryHub->runAndWait ([from, to] (library::Catalog& c) {
+        if (const auto id = c.presetWithFile (from))
+        {
+            c.movePreset (*id, to, "", from);
+            c.trash (*id);
+        }
+    });
+    if (lastPresetFile == file)
+        lastPresetFile = juce::File();
+    return target;
+}
+
+std::optional<juce::File> OspAudioProcessor::restorePresetFile (const juce::File& trashed, juce::String& error)
+{
+    if (! trashed.existsAsFile())
+    {
+        error = trashed.getFileName() + " is not in the trash any more";
+        return std::nullopt;
+    }
+    auto from = std::make_shared<std::string>();
+    auto id = std::make_shared<std::string>();
+    libraryHub->runAndWait ([from, id, path = trashed.getFullPathName().toStdString()] (library::Catalog& c) {
+        if (const auto found = c.presetWithFile (path, true))
+        {
+            *id = *found;
+            *from = c.trashedFrom (*found);
+        }
+    });
+    // Back where it came from (or beside it, if that name is taken now); without a record, into
+    // the presets folder under its own name.
+    auto original = from->empty() ? presetFolder().getChildFile (trashed.getFileName().fromFirstOccurrenceOf (" ", false, false).fromFirstOccurrenceOf (" ", false, false))
+                                  : juce::File (juce::String (*from));
+    if (original.exists())
+        original = original.getParentDirectory().getNonexistentChildFile (original.getFileNameWithoutExtension() + " (restored)", original.getFileExtension(), false);
+    original.getParentDirectory().createDirectory();
+    if (! trashed.moveFileTo (original))
+    {
+        error = "cannot restore " + trashed.getFileName();
+        return std::nullopt;
+    }
+    if (! id->empty())
+        libraryHub->post ([assetId = *id, to = original.getFullPathName().toStdString()] (library::Catalog& c) {
+            c.movePreset (assetId, to, "");
+            c.restore (assetId);
+        });
+    return original;
 }
 
 juce::AudioProcessorEditor* OspAudioProcessor::createEditor()

@@ -864,6 +864,227 @@ TEST_CASE ("plugin: library - every loaded sound and saved preset or template is
     CHECK (c->useCount (ids[0]) == 1);
 }
 
+// Library Stage 3: presets and templates.
+namespace
+{
+    juce::var readManifest (const juce::File& package)
+    {
+        juce::ZipFile zip (package);
+        const auto* entry = zip.getEntry ("manifest.json");
+        if (entry == nullptr)
+            return {};
+        std::unique_ptr<juce::InputStream> in (zip.createStreamForEntry (*entry));
+        return juce::JSON::parse (in->readEntireStreamAsString());
+    }
+}
+
+TEST_CASE ("plugin: library presets - portable manifest 2, distribution rights, incomplete and newer packages", "[plugin][library]")
+{
+    TempDir tmp;
+    const auto file = writeSource (tmp.dir, "Field Bell.wav", testsignals::pluck (midiToHz (72), 1.0, 48000.0, 3));
+    OspAudioProcessor p;
+    loadAndWait (p, file);
+    REQUIRE (p.currentInstrument() != nullptr);
+    REQUIRE (p.libraryService().waitUntilIdle (10000));
+    const auto hash = p.currentInstrument()->contentHash;
+
+    // A personal export: everything inside, with checksums and rights.
+    const auto mine = tmp.dir.getChildFile ("Bell.ospinstrument");
+    juce::String error;
+    OspAudioProcessor::ExportOptions personal;
+    personal.name = "Bell";
+    personal.tags = { "bell", "pluck" };
+    REQUIRE (p.exportInstrument (mine, error, personal));
+    CHECK_FALSE (mine.getSiblingFile ("Bell.ospinstrument.partial").exists());
+    const auto manifest = readManifest (mine);
+    CHECK (static_cast<int> (manifest["schemaVersion"]) == 2);
+    CHECK (manifest["name"].toString() == "Bell");
+    CHECK (manifest["tags"].size() == 2);
+    REQUIRE (manifest["sources"].size() == 1);
+    const auto source = manifest["sources"][0];
+    CHECK (source["contentHash"].toString() == juce::String (hash));
+    CHECK ("sha256:" + source["sha256"].toString() == juce::String (hash));
+    CHECK (static_cast<juce::int64> (source["bytes"]) > 1000);
+    CHECK (source["provenance"].toString() == "unknown");   // a dropped file: nobody said whose it is
+
+    // For distribution: unknown rights are refused, named, until the user confirms them.
+    const auto shared = tmp.dir.getChildFile ("Bell for sharing.ospinstrument");
+    OspAudioProcessor::ExportOptions distribution;
+    distribution.forDistribution = true;
+    CHECK_FALSE (p.exportInstrument (shared, error, distribution));
+    CHECK (error.contains ("Field Bell.wav"));
+    CHECK_FALSE (shared.exists());
+    distribution.confirmUnknownRights = true;
+    REQUIRE (p.exportInstrument (shared, error, distribution));
+    CHECK (readManifest (shared)["sources"][0]["provenance"].toString() == "cleared");
+    REQUIRE (p.libraryService().waitUntilIdle (10000));
+    {
+        std::string e;
+        auto c = osp::library::Catalog::open (osp::library::Catalog::defaultFile(), e);
+        REQUIRE (c != nullptr);
+        CHECK (c->provenanceOf (hash) == "cleared");   // recorded: the next export does not ask
+    }
+    distribution.confirmUnknownRights = false;
+    CHECK (p.exportInstrument (shared, error, distribution));
+
+    // An incomplete package (a sound's size does not match its manifest) changes nothing.
+    p.setParameterValue ("character", 33.0f);
+    {
+        juce::ZipFile original (mine);
+        juce::ZipFile::Builder broken;
+        for (int i = 0; i < original.getNumEntries(); ++i)
+        {
+            const auto* entry = original.getEntry (i);
+            std::unique_ptr<juce::InputStream> in (original.createStreamForEntry (i));
+            juce::MemoryBlock data;
+            in->readIntoMemoryBlock (data);
+            if (entry->filename.startsWith ("source/"))
+                data.setSize (data.getSize() / 2);   // cut short
+            broken.addEntry (new juce::MemoryInputStream (data, true), 0, entry->filename, juce::Time::getCurrentTime());
+        }
+        const auto damaged = tmp.dir.getChildFile ("Cut.ospinstrument");
+        juce::FileOutputStream out (damaged);
+        REQUIRE (broken.writeToStream (out, nullptr));
+        out.flush();
+        juce::String importError;
+        OspAudioProcessor q;
+        q.setParameterValue ("character", 33.0f);
+        CHECK_FALSE (q.importInstrument (damaged, importError));
+        CHECK (importError.contains ("incomplete"));
+        CHECK (q.parameterValue ("character") == Approx (33.0f));
+        CHECK_FALSE (q.canRestorePreviousState());
+    }
+    // A package from a newer build is refused.
+    {
+        juce::ZipFile::Builder newer;
+        const juce::String text = "{\"schemaVersion\": 3, \"sources\": []}";
+        newer.addEntry (new juce::MemoryInputStream (text.toRawUTF8(), text.getNumBytesAsUTF8(), true), 9, "manifest.json", juce::Time::getCurrentTime());
+        juce::MemoryBlock stateBlock;
+        p.getStateInformation (stateBlock);
+        const auto presetXml = juce::AudioProcessor::getXmlFromBinary (stateBlock.getData(), static_cast<int> (stateBlock.getSize()))->toString();
+        newer.addEntry (new juce::MemoryInputStream (presetXml.toRawUTF8(), presetXml.getNumBytesAsUTF8(), true), 9, "preset.xml", juce::Time::getCurrentTime());
+        const auto future = tmp.dir.getChildFile ("Future.ospinstrument");
+        juce::FileOutputStream out (future);
+        REQUIRE (newer.writeToStream (out, nullptr));
+        out.flush();
+        juce::String importError;
+        CHECK_FALSE (p.importInstrument (future, importError));
+        CHECK (importError.contains ("newer"));
+    }
+    // The personal package still imports into a fresh instance and plays the sound.
+    {
+        OspAudioProcessor q;
+        juce::String importError;
+        REQUIRE (q.importInstrument (mine, importError));
+        REQUIRE (q.waitForLoads (30000));
+        q.pollLoads();
+        REQUIRE (q.currentInstrument() != nullptr);
+        CHECK (q.currentInstrument()->contentHash == hash);
+    }
+}
+
+TEST_CASE ("plugin: library presets - loading one is recoverable; factory content stays read-only", "[plugin][library]")
+{
+    TempDir tmp;
+    const auto presetFile = tmp.dir.getChildFile ("Dark.osppreset");
+    OspAudioProcessor p;
+    p.setParameterValue ("character", 20.0f);
+    REQUIRE (p.savePreset (presetFile));
+    p.setParameterValue ("character", 70.0f);
+    CHECK_FALSE (p.canRestorePreviousState());
+    REQUIRE (p.loadPreset (presetFile));
+    CHECK (p.parameterValue ("character") == Approx (20.0f));
+    REQUIRE (p.canRestorePreviousState());
+    CHECK (p.previousStateDescription() == "Before Dark");
+    REQUIRE (p.restorePreviousState());
+    CHECK (p.parameterValue ("character") == Approx (70.0f));
+    REQUIRE (p.restorePreviousState());   // a swap: back to the preset
+    CHECK (p.parameterValue ("character") == Approx (20.0f));
+
+    // A template load and a factory starting state are recoverable too.
+    const auto templateFile = tmp.dir.getChildFile ("Bright.ospstate");
+    p.setParameterValue ("character", 90.0f);
+    REQUIRE (p.saveStartingState (templateFile));
+    p.setParameterValue ("character", 55.0f);
+    REQUIRE (p.loadStartingState (templateFile));
+    CHECK (p.parameterValue ("character") == Approx (90.0f));
+    REQUIRE (p.restorePreviousState());
+    CHECK (p.parameterValue ("character") == Approx (55.0f));
+    const auto list = p.presetList();
+    const auto factory = std::find_if (list.begin(), list.end(), [] (const auto& e) { return e.program >= 0; });
+    REQUIRE (factory != list.end());
+    const auto factoryCount = std::count_if (list.begin(), list.end(), [] (const auto& e) { return e.program >= 0; });
+    p.openPresetEntry (*factory);
+    REQUIRE (p.canRestorePreviousState());
+    // Editing it and saving makes a user copy; the factory list is unchanged.
+    p.setParameterValue ("character", 12.0f);
+    const auto userCopy = tmp.dir.getChildFile ("My Natural.ospstate");
+    REQUIRE (p.saveStartingState (userCopy));
+    const auto after = p.presetList();
+    CHECK (std::count_if (after.begin(), after.end(), [] (const auto& e) { return e.program >= 0; }) == factoryCount);
+    REQUIRE (p.libraryService().waitUntilIdle (10000));
+    std::string e;
+    auto c = osp::library::Catalog::open (osp::library::Catalog::defaultFile(), e);
+    REQUIRE (c != nullptr);
+    const auto id = c->presetWithFile (userCopy.getFullPathName().toStdString());
+    REQUIRE (id.has_value());
+    CHECK (c->asset (*id)->origin == osp::library::Origin::user);
+    CHECK (c->asset (*id)->type == osp::library::AssetType::templateState);
+}
+
+TEST_CASE ("plugin: library presets - rename, duplicate, trash and restore keep the records", "[plugin][library]")
+{
+    TempDir tmp;
+    const auto folder = tmp.dir.getChildFile ("Presets");
+    folder.createDirectory();
+    const auto file = folder.getChildFile ("Warm.osppreset");
+    OspAudioProcessor p;
+    REQUIRE (p.savePreset (file));
+    REQUIRE (p.libraryService().waitUntilIdle (10000));
+    std::string e;
+    auto c = osp::library::Catalog::open (osp::library::Catalog::defaultFile(), e);
+    REQUIRE (c != nullptr);
+    const auto id = c->presetWithFile (file.getFullPathName().toStdString());
+    REQUIRE (id.has_value());
+
+    juce::String error;
+    const auto renamed = p.renamePresetFile (file, "Warmer", error);
+    REQUIRE (renamed.has_value());
+    CHECK (renamed->getFileName() == "Warmer.osppreset");
+    CHECK_FALSE (file.exists());
+    REQUIRE (p.libraryService().waitUntilIdle (10000));
+    CHECK (c->presetWithFile (renamed->getFullPathName().toStdString()) == id);
+    CHECK (c->asset (*id)->name == "Warmer");
+    CHECK_FALSE (p.renamePresetFile (*renamed, "", error).has_value());
+
+    const auto copy = p.duplicatePresetFile (*renamed, error);
+    REQUIRE (copy.has_value());
+    CHECK (copy->getFileName() == "Warmer copy.osppreset");
+    REQUIRE (p.libraryService().waitUntilIdle (10000));
+    const auto copyId = c->presetWithFile (copy->getFullPathName().toStdString());
+    REQUIRE (copyId.has_value());
+    CHECK (*copyId != *id);
+
+    // Deleting is recoverable: the file goes to the Library's trash, the record is hidden.
+    const auto trashed = p.trashPresetFile (*renamed, error);
+    REQUIRE (trashed.has_value());
+    CHECK_FALSE (renamed->exists());
+    CHECK (trashed->existsAsFile());
+    CHECK (trashed->isAChildOf (OspAudioProcessor::libraryTrashFolder()));
+    CHECK (c->asset (*id)->trashed);
+    osp::library::SearchQuery q;
+    q.text = "warmer";
+    CHECK (c->search (q).size() == 1);   // only the copy
+    const auto back = p.restorePresetFile (*trashed, error);
+    REQUIRE (back.has_value());
+    CHECK (*back == *renamed);   // where it came from
+    CHECK_FALSE (trashed->exists());
+    REQUIRE (p.libraryService().waitUntilIdle (10000));
+    CHECK_FALSE (c->asset (*id)->trashed);
+    CHECK (c->presetWithFile (back->getFullPathName().toStdString()) == id);
+    CHECK (c->search (q).size() == 2);
+}
+
 TEST_CASE ("plugin: a portable instrument is untrusted - nothing lands outside the store, damaged sounds are refused", "[plugin][security]")
 {
     TempDir tmp;

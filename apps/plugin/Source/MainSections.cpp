@@ -670,6 +670,14 @@ void PresetBar::mouseUp (const juce::MouseEvent& e)
                 if (safe->onChange != nullptr)
                     safe->onChange();
             };
+            // Loading replaced the whole patch: the one before it is a click away.
+            if (processor.canRestorePreviousState())
+            {
+                const auto what = processor.previousStateDescription().fromFirstOccurrenceOf ("Before ", false, false);
+                const auto label = what.isEmpty() || what == "restoring" ? juce::String ("Back to the previous patch") : "Back to the patch before " + what;
+                menu.addItem (label, [safe, opened] { if (safe != nullptr) safe->processor.restorePreviousState(), opened(); });
+                menu.addSeparator();
+            }
             // Starting states (settings only, the sounds stay): INIT empties the patch, Reset
             // returns every setting to its default, then the built-in and the saved ones.
             menu.addSectionHeader ("Starting states");

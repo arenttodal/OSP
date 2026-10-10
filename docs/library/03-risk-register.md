@@ -12,5 +12,5 @@
 | R-08 | Stages needing hardware or accounts cannot be verified here (iPhone, TestFlight, signing, notarization, DAWs) | High (schedule) | Build and unit-test what can be; mark the rest Blocked in the matrix with the exact user action | Open |
 | R-09 | System SQLite differs between macOS versions (FTS5 availability) | Medium | Check FTS5 at startup; fall back to LIKE search; tested in CI on macOS | Mitigated: macOS 14 SDK SQLite has FTS5 (CI run 99); older macOS still to check on hardware |
 | R-10 | Sample Forge is JavaScript: nothing links directly | Low | Port the small slicer algorithm with its tests (01-sample-forge-audit.md) | Accepted |
-| R-11 | The approved Library mockups were not attached | Medium | Follow the existing ANDOR/OSP visual system; refine against the mockups when they arrive | Open (user) |
+| R-11 | The approved Library mockups were not attached | Medium | Received: docs/library/mockups.md maps each panel to a view and stage | Closed |
 | R-12 | Scope: a 13-stage plan cannot be finished in one sitting | High | Each stage is gated and committed; the matrix says what is verified, never more | Open |

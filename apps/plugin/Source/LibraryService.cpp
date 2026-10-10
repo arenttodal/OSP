@@ -47,6 +47,21 @@ void LibraryService::post (std::function<void (library::Catalog&)> task)
     });
 }
 
+bool LibraryService::runAndWait (std::function<void (library::Catalog&)> task, int milliseconds)
+{
+    auto done = std::make_shared<juce::WaitableEvent>();
+    auto ran = std::make_shared<std::atomic<bool>> (false);
+    pool.addJob ([this, task = std::move (task), done, ran] {
+        if (auto* c = catalog())
+        {
+            task (*c);
+            ran->store (true);
+        }
+        done->signal();
+    });
+    return done->wait (milliseconds) && ran->load();
+}
+
 bool LibraryService::waitUntilIdle (int milliseconds)
 {
     const auto until = juce::Time::getMillisecondCounter() + static_cast<juce::uint32> (milliseconds);

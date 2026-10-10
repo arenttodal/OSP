@@ -1,4 +1,4 @@
-# Library catalog schema (version 1)
+# Library catalog schema (version 2)
 
 SQLite, WAL. File: `~/Library/Application Support/OSP/Library/catalog.db` (macOS;
 `<user app data>/OSP/Library/catalog.db` elsewhere; `OSP_LIBRARY_DIR` overrides for tests).
@@ -9,7 +9,7 @@ Audio is never stored in the database.
 | `meta` | key, value | `schema_version`, creation time, last integrity check |
 | `assets` | id (UUID), type (`sound`/`preset`/`template`), origin, name, created, modified, favourite, notes, category, trashed_at | every asset |
 | `sounds` | asset_id, content_hash, managed (0/1), format, sample_rate, channels, bit_depth, frames, duration, file_size, root_midi, provenance, parent_asset, slice_start, slice_end, operations | sound details; derived slices point at their parent |
-| `presets` | asset_id, file (relative to its root), root (`user`/`factory`/`pack`), state_version, layers (source count) | preset and template files |
+| `presets` | asset_id, file (relative to its root), root (`user`/`factory`/`pack`), state_version, layers (source count), trashed_from (v2) | preset and template files; a trashed file remembers where it came from |
 | `preset_sounds` | preset_id, content_hash | what a preset needs (cleanup safety) |
 | `collections` | id, name, created | user collections |
 | `collection_items` | collection_id, asset_id | membership |
@@ -25,3 +25,15 @@ Audio is never stored in the database.
 
 Integrity: `PRAGMA integrity_check` on open after an unclean shutdown; foreign keys on; every
 multi-row change in one transaction.
+
+## Migrations
+
+| From | To | Change |
+|---|---|---|
+| - | 1 | the tables above |
+| 1 | 2 | `presets.trashed_from` (where a preset sent to the Library's trash came from) |
+
+Each step runs in one transaction on open; a catalog newer than the build is refused and left
+untouched. Tested: a version 1 catalog (made by hand) opens as version 2 with its records.
+The search index carries its own version (`meta.fts_version`, 2: keyed by asset rowid) and is
+rebuilt from the tables when it differs.

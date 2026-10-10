@@ -351,6 +351,14 @@ bool Catalog::migrate()
         if (! s.run() || ! t.commit())
             return false;
     }
+    if (version() < 2)
+    {
+        // 2: a trashed preset file remembers where it came from.
+        Transaction t (db);
+        if (! t.ok() || ! exec ("ALTER TABLE presets ADD COLUMN trashed_from TEXT NOT NULL DEFAULT ''")
+            || ! exec ("UPDATE meta SET value = '2' WHERE key = 'schema_version'") || ! t.commit())
+            return false;
+    }
     // Full-text search when this SQLite has FTS5; plain LIKE matching otherwise (R-09).
     fts = exec (ftsV1);
     if (fts)
@@ -533,10 +541,11 @@ std::optional<std::string> Catalog::addPreset (const Asset& a, const PresetInfo&
     return id;
 }
 
-std::optional<std::string> Catalog::presetWithFile (const std::string& file) const
+std::optional<std::string> Catalog::presetWithFile (const std::string& file, bool includeTrashed) const
 {
-    Statement s (db, "SELECT p.asset_id FROM presets p JOIN assets a ON a.id = p.asset_id WHERE p.file = ?1 AND a.trashed_at IS NULL ORDER BY a.created LIMIT 1");
-    s.bind (1, file);
+    Statement s (db, "SELECT p.asset_id FROM presets p JOIN assets a ON a.id = p.asset_id WHERE p.file = ?1 AND (?2 = 1 OR a.trashed_at IS NULL) "
+                     "ORDER BY a.created LIMIT 1");
+    s.bind (1, file).bind (2, includeTrashed ? 1 : 0);
     if (s.step() != SQLITE_ROW)
         return std::nullopt;
     return s.text (0);
@@ -569,6 +578,52 @@ std::optional<std::string> Catalog::savePreset (const Asset& a, const PresetInfo
     if (! t.commit())
         return std::nullopt;
     return existing;
+}
+
+bool Catalog::movePreset (const std::string& id, const std::string& newFile, const std::string& newName, const std::string& from)
+{
+    Transaction t (db);
+    if (! t.ok())
+        return false;
+    Statement p (db, "UPDATE presets SET file = ?1, trashed_from = ?2 WHERE asset_id = ?3");
+    p.bind (1, newFile).bind (2, from).bind (3, id);
+    if (! p.run() || sqlite3_changes (db) != 1)
+        return false;
+    if (! newName.empty())
+    {
+        Statement a (db, "UPDATE assets SET name = ?1, modified = ?2 WHERE id = ?3");
+        a.bind (1, newName).bind (2, now()).bind (3, id);
+        if (! a.run())
+            return false;
+    }
+    reindex (id);
+    return t.commit();
+}
+
+std::string Catalog::trashedFrom (const std::string& id) const
+{
+    Statement s (db, "SELECT trashed_from FROM presets WHERE asset_id = ?1");
+    s.bind (1, id);
+    return s.step() == SQLITE_ROW ? s.text (0) : std::string();
+}
+
+std::string Catalog::provenanceOf (const std::string& contentHash) const
+{
+    Statement s (db, "SELECT provenance FROM sounds s JOIN assets a ON a.id = s.asset_id WHERE s.content_hash = ?1 AND a.trashed_at IS NULL");
+    s.bind (1, contentHash);
+    std::string best = "unknown";
+    auto rank = [] (const std::string& p) { return p == "cleared" ? 5 : p == "original" ? 4 : p == "user" ? 3 : p == "licensed" ? 2 : 0; };
+    while (s.step() == SQLITE_ROW)
+        if (rank (s.text (0)) > rank (best))
+            best = s.text (0);
+    return best;
+}
+
+bool Catalog::setProvenance (const std::string& contentHash, const std::string& provenance)
+{
+    Statement s (db, "UPDATE sounds SET provenance = ?1 WHERE content_hash = ?2");
+    s.bind (1, provenance).bind (2, contentHash);
+    return s.run();
 }
 
 std::optional<Asset> Catalog::asset (const std::string& id) const

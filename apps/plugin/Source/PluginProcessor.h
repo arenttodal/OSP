@@ -77,8 +77,35 @@ public:
     bool savePreset (const juce::File& file);
     bool loadPreset (const juce::File& file);
     /** One file with the sources, their analysis and the settings: opens on any computer. */
-    bool exportInstrument (const juce::File& file, juce::String& error);
+    /** A portable instrument (.ospinstrument, manifest 2): the settings, every sound it plays
+        with its checksum and rights, and Library metadata. For distribution, every sound's
+        rights must be known: sounds of unknown origin are listed in `error` and refused until
+        the user confirms them (`confirmUnknownRights`, recorded as "cleared"). */
+    struct ExportOptions
+    {
+        bool forDistribution = false;
+        bool confirmUnknownRights = false;
+        juce::String name, category, notes, creator;
+        juce::StringArray tags;
+    };
+    bool exportInstrument (const juce::File& file, juce::String& error, const ExportOptions& options);
+    bool exportInstrument (const juce::File& file, juce::String& error) { return exportInstrument (file, error, {}); }
     bool importInstrument (const juce::File& file, juce::String& error);
+
+    /** Loading a preset, template or instrument replaces the whole patch (and clears undo):
+        the patch as it was is kept, and one call brings it back. */
+    bool canRestorePreviousState() const noexcept { return previousState != nullptr; }
+    juce::String previousStateDescription() const { return previousStateLabel; }
+    bool restorePreviousState();
+
+    /** Preset and template files in the Library: renamed (the record follows), duplicated,
+        sent to the Library's trash (recoverable) and restored. Factory content is never a file
+        and cannot be changed; editing it and saving makes a user copy. */
+    std::optional<juce::File> renamePresetFile (const juce::File& file, const juce::String& newName, juce::String& error);
+    std::optional<juce::File> duplicatePresetFile (const juce::File& file, juce::String& error);
+    std::optional<juce::File> trashPresetFile (const juce::File& file, juce::String& error);
+    std::optional<juce::File> restorePresetFile (const juce::File& trashed, juce::String& error);
+    static juce::File libraryTrashFolder();
     static constexpr const char* instrumentExtension = ".ospinstrument";
     static constexpr const char* presetExtension = ".osppreset";
 
@@ -489,6 +516,9 @@ private:
     // Loader
     SampleStore store;
     std::unique_ptr<LibraryService> libraryHub;   ///< the catalog (background thread; never the audio thread)
+    std::unique_ptr<juce::XmlElement> previousState;   ///< the patch before the last preset / template / instrument load
+    juce::String previousStateLabel;
+    void rememberPreviousState (const juce::String& what);
     juce::ThreadPool loaderPool { 1 };
     std::mutex resultsMutex;               // loader <-> message thread only, never audio
     std::deque<Finished> finishedLoads;

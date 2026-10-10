@@ -36,6 +36,11 @@ public:
 
     /** Runs `task` on the Library thread with the catalog (skipped when it cannot be opened). */
     void post (std::function<void (library::Catalog&)> task);
+    /** Runs `task` on the Library thread and waits for it (a user action that needs the
+        answer: an export's rights check). False when the catalog is unavailable or it took
+        longer than `milliseconds` (the task may then still run later: it must own what it
+        touches, e.g. through a shared_ptr). Never from the audio thread. */
+    bool runAndWait (std::function<void (library::Catalog&)> task, int milliseconds = 5000);
     /** Waits until the queued work is done (tests, shutdown). */
     bool waitUntilIdle (int milliseconds);
     /** Why the catalog is not available ("" when it is or has not been tried). */

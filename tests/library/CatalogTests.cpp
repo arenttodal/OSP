@@ -527,3 +527,66 @@ TEST_CASE ("library: a writer killed mid-write leaves a sound catalog", "[unit][
     // And the catalog takes new writes.
     CHECK (c->addSound (named ("after the crash"), soundOf ("sha256:after")).has_value());
 }
+
+TEST_CASE ("library: a version 1 catalog migrates to version 2 and keeps everything", "[unit][library]")
+{
+    TempLibrary tmp;
+    std::string id;
+    {
+        auto c = openOrFail (tmp.file());
+        Asset p = named ("Old Preset");
+        p.type = AssetType::preset;
+        id = *c->addPreset (p, PresetInfo { "/presets/Old.osppreset", "user", 10, 1, { "sha256:x" } });
+    }
+    // Back to what a version 1 build wrote (no trashed_from column, version 1).
+    {
+        sqlite3* raw = nullptr;
+        REQUIRE (sqlite3_open (tmp.file().string().c_str(), &raw) == SQLITE_OK);
+        REQUIRE (sqlite3_exec (raw, "ALTER TABLE presets DROP COLUMN trashed_from; UPDATE meta SET value = '1' WHERE key = 'schema_version';", nullptr, nullptr, nullptr)
+                 == SQLITE_OK);
+        sqlite3_close (raw);
+    }
+    auto c = openOrFail (tmp.file());
+    CHECK (c->version() == 2);
+    REQUIRE (c->preset (id).has_value());
+    CHECK (c->preset (id)->soundHashes == std::vector<std::string> { "sha256:x" });
+    CHECK (c->trashedFrom (id).empty());
+    REQUIRE (c->movePreset (id, "/trash/Old.osppreset", "", "/presets/Old.osppreset"));
+    CHECK (c->trashedFrom (id) == "/presets/Old.osppreset");
+    CHECK (c->presetWithFile ("/trash/Old.osppreset") == id);
+}
+
+TEST_CASE ("library: distribution rights - unknown never becomes cleared by itself", "[unit][library]")
+{
+    TempLibrary tmp;
+    auto c = openOrFail (tmp.file());
+    auto unknown = soundOf ("sha256:u");
+    unknown.provenance = "unknown";
+    c->addSound (named ("Found on a drive"), unknown);
+    CHECK (c->provenanceOf ("sha256:u") == "unknown");
+    CHECK (c->provenanceOf ("sha256:never-seen") == "unknown");
+    // A second record of the same content, recorded as the user's own: the better one counts.
+    auto mine = soundOf ("sha256:u");
+    mine.provenance = "original";
+    c->addSound (named ("My recording"), mine);
+    CHECK (c->provenanceOf ("sha256:u") == "original");
+    REQUIRE (c->setProvenance ("sha256:u", "cleared"));   // the user's confirmation
+    CHECK (c->provenanceOf ("sha256:u") == "cleared");
+}
+
+TEST_CASE ("library: a renamed or moved preset keeps its identity", "[unit][library]")
+{
+    TempLibrary tmp;
+    auto c = openOrFail (tmp.file());
+    Asset p = named ("Warm");
+    p.type = AssetType::preset;
+    const auto id = *c->addPreset (p, PresetInfo { "/p/Warm.osppreset", "user", 10, 1, {} });
+    REQUIRE (c->movePreset (id, "/p/Warmer.osppreset", "Warmer"));
+    CHECK (c->asset (id)->name == "Warmer");
+    CHECK (c->presetWithFile ("/p/Warmer.osppreset") == id);
+    CHECK_FALSE (c->presetWithFile ("/p/Warm.osppreset").has_value());
+    SearchQuery q;
+    q.text = "warmer";
+    CHECK (c->search (q).size() == 1);
+    CHECK_FALSE (c->movePreset ("no-such-id", "/x", "x"));
+}

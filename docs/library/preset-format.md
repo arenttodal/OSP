@@ -37,6 +37,10 @@ Import rules (untrusted input): entry names are single plain names inside `sourc
 `analysis/`; each source's bytes must hash to its name; files are written as `.partial` and
 renamed; nothing outside the store is written; a damaged package changes nothing.
 
+Writing: the package is written beside the target as `.partial`, read back (its entries
+counted) and only then moved into place, so an existing file is replaced only by a complete
+package.
+
 Distribution export: every source must be `original`, `user`, `licensed` or `cleared`;
 `unknown` sources are listed and need the user's confirmation, which is recorded as `cleared`
 by the user (a workflow safeguard, not a legal judgement).

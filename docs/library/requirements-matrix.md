@@ -28,18 +28,18 @@ Verified. Blocked rows name what is missing.
 | S2-06 | Indexed external files stay in place | 2 | scanning | unit | Not Started |  |  |
 | S2-07 | Multiple plugin instances share the catalog safely | 2 | Catalog (WAL, one connection each); LibraryService (one thread per instance) | [unit][library]: 4 threads x 60, 3 processes x 80, 4 importers | Tested | all writes land, integrity ok |  |
 | S2-08 | Integrity: duplicates, interrupted copy, corrupt audio, missing, read-only, disk full | 2 | importSound, Catalog | [unit][library][import] | In Progress | duplicates, interrupted, damaged, empty, missing, unsupported tested | read-only skipped here (tests run as root); disk full not simulated; crash during a transaction relies on SQLite WAL |
-| S3-01 | Complete (portable) preset: manifest, state, audio, metadata, integrity | 3 | presets | round trip on a clean store | Not Started |  | existing .ospinstrument is the base |
-| S3-02 | Template: state without audio or private paths | 3 | templates | unit | Not Started |  |  |
-| S3-03 | Save / Save As / Save Template / Duplicate / Rename / Delete / Export | 3 | presets + GUI | unit + ui | Not Started |  |  |
-| S3-04 | Loading a preset or template is recoverable (previous-state snapshot) | 3 | processor | unit | Not Started |  |  |
-| S3-05 | Factory read-only; edits save as user copies | 3 | presets | unit | Not Started |  |  |
-| S3-06 | Audio provenance and distribution-rights check on export | 3 | presets | unit | Not Started |  |  |
+| S3-01 | Complete (portable) preset: manifest, state, audio, metadata, integrity | 3 | exportInstrument / importInstrument (manifest 2) | [plugin][library], existing travel test | Tested | sha256 + bytes + provenance per sound; written as .partial, read back, moved; incomplete and newer packages refused with nothing changed; bit-identical on a clean store (existing test) |  |
+| S3-02 | Template: state without audio or private paths | 3 | saveStartingState (.ospstate) | [plugin][library] | Tested | no contentHash / originalPath / file name in the file |  |
+| S3-03 | Save / Save As / Save Template / Duplicate / Rename / Delete / Export | 3 | savePreset, saveStartingState, rename/duplicate/trash/restorePresetFile, exportInstrument | [plugin][library] | Implemented | processor operations tested; records follow | the browser's buttons and save dialog: Stage 5 |
+| S3-04 | Loading a preset or template is recoverable (previous-state snapshot) | 3 | rememberPreviousState / restorePreviousState; preset menu item | [plugin][library] | Tested | preset, template, factory state and instrument loads; restoring is a swap |  |
+| S3-05 | Factory read-only; edits save as user copies | 3 | factory starting states are built in (never files) | [plugin][library] | Tested | edited and saved: a user template; the factory list unchanged | factory presets with sounds (packs): Stage 10 |
+| S3-06 | Audio provenance and distribution-rights check on export | 3 | ExportOptions.forDistribution; Catalog::provenanceOf / setProvenance | [unit][library], [plugin][library] | Tested | unknown refused with the names; confirmation recorded as cleared; unknown never becomes cleared by itself |  |
 | S4-01 | Every loaded sound in history (added, last used, count, slot) | 4 | HistoryService | unit | Not Started |  |  |
 | S4-02 | Sound metadata extraction | 4 | import | unit | Not Started |  |  |
 | S4-03 | Independent preview engine (play, stop, gain, pitch) | 4 | src/library/preview | unit + plugin | Not Started |  |  |
 | S4-04 | Load into A/B/C / first empty, never overwrite A silently | 4 | processor | unit | Not Started |  |  |
 | S4-05 | Three-slot audition tray and commit | 4 | preview + GUI | ui | Not Started |  |  |
-| S5-01 | Library overlay: search, type nav, origin filters, collections, results, detail, actions | 5 | LibraryOverlay | ui | Not Started |  | mockups not received (R-11) |
+| S5-01 | Library overlay: search, type nav, origin filters, collections, results, detail, actions | 5 | LibraryOverlay | ui | Not Started |  | layout per docs/library/mockups.md |
 | S5-02 | Views A-K working, no placeholder controls | 5 | GUI | ui | Not Started |  |  |
 | S5-03 | Keyboard, focus, scaling, accessibility labels | 5 | GUI | ui | Not Started |  |  |
 | S6-01 | Filename / folder / audio-derived tags, separate from user tags | 6 | analysis | unit | Not Started |  |  |

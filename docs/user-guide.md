@@ -445,6 +445,15 @@ it back. Every edit is one undo step; the pattern is saved with the project and 
   on another computer and it sounds the same. **☰ → Instruments** lists that folder.
 - **☰ → Interface size**: 80–200 %.
 
+Loading a preset, a starting state or an instrument file replaces the whole patch. If that was
+a mistake, the preset menu's first item, **Back to the patch before ...**, brings the previous
+one back (and choosing it again returns to the one you loaded).
+
+An instrument file (`.ospinstrument`) now also carries each sound's checksum and size, so a
+damaged or incomplete file is refused before anything changes. When you export one to share,
+any sound whose rights are unknown (a file you dropped in, for example) is named, and the
+export asks you to confirm you may share it; that answer is remembered.
+
 ## When a sound is unusual
 
 Recordings longer than a minute play with Tape pitch even when Natural is selected (Natural keeps four extra copies of the sound); the status line says so. Files longer than ten minutes are shortened to their first ten minutes.

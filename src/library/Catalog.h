@@ -128,7 +128,7 @@ struct SearchQuery
 class Catalog
 {
 public:
-    static constexpr int schemaVersion = 1;
+    static constexpr int schemaVersion = 2;   ///< 2: presets.trashed_from (where a trashed preset file came from)
 
     /** Opens (creating and migrating as needed) the catalog at `file`. nullptr and `error` on
         failure (the file is never deleted or replaced). */
@@ -159,7 +159,17 @@ public:
     /** A preset or template file saved (again): its record updated in place (same identity,
         new name, version, sounds), or a new one. */
     std::optional<std::string> savePreset (const Asset& asset, const PresetInfo& info);
-    std::optional<std::string> presetWithFile (const std::string& file) const;
+    std::optional<std::string> presetWithFile (const std::string& file, bool includeTrashed = false) const;
+    /** A preset or template file moved (renamed, sent to the trash, restored): its record
+        follows. `trashedFrom`: the place it came from (restoring puts it back there). */
+    bool movePreset (const std::string& id, const std::string& newFile, const std::string& newName, const std::string& trashedFrom = {});
+    std::string trashedFrom (const std::string& id) const;
+
+    /** Distribution rights of a content: the best any of its records holds ("cleared",
+        "original", "user", "licensed"), else "unknown". Unknown never becomes cleared by
+        itself: only setProvenance does that (a user's confirmation). */
+    std::string provenanceOf (const std::string& contentHash) const;
+    bool setProvenance (const std::string& contentHash, const std::string& provenance);
     std::optional<Asset> asset (const std::string& id) const;
     std::optional<SoundInfo> sound (const std::string& id) const;
     std::optional<PresetInfo> preset (const std::string& id) const;
