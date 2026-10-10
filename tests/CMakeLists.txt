@@ -25,6 +25,7 @@ add_executable(osp_tests
     unit/SampleSetTests.cpp
     library/CatalogTests.cpp
     library/ImportTests.cpp
+    library/PreviewTests.cpp
     integration/RenderIntegrationTests.cpp
     integration/CorpusIntegrationTests.cpp
     integration/BakeoffIntegrationTests.cpp

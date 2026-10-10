@@ -65,6 +65,7 @@ struct Asset
     std::string category;
     std::string notes;
     bool favourite = false;
+    int rating = 0;               ///< 0 (none) .. 5 stars (catalog 3)
     std::int64_t created = 0;     ///< seconds since 1970 (UTC)
     std::int64_t modified = 0;
     bool trashed = false;
@@ -118,17 +119,29 @@ struct SearchQuery
     std::optional<Origin> origin;
     std::vector<std::string> tags;           ///< every one must be on the asset
     std::string collection;                  ///< collection id
+    std::string category;                    ///< exact (a sound's category is its Type)
+    std::optional<double> minSeconds, maxSeconds;   ///< sounds: length bounds
     bool favouritesOnly = false;
+    bool recentOnly = false;                 ///< only assets with a history entry
     bool includeTrashed = false;
-    enum class Sort : std::uint8_t { name, recentlyUsed, added } sort = Sort::name;
+    bool trashedOnly = false;                ///< the Library's trash
+    enum class Sort : std::uint8_t { name, recentlyUsed, added, rating, length } sort = Sort::name;
     int limit = 200;
     int offset = 0;
+};
+
+struct Collection
+{
+    std::string id, name;
+    int count = 0;                ///< assets in it (not trashed)
 };
 
 class Catalog
 {
 public:
-    static constexpr int schemaVersion = 2;   ///< 2: presets.trashed_from (where a trashed preset file came from)
+    /** 2: presets.trashed_from (where a trashed preset file came from).
+        3: assets.rating (0-5 stars). */
+    static constexpr int schemaVersion = 3;
 
     /** Opens (creating and migrating as needed) the catalog at `file`. nullptr and `error` on
         failure (the file is never deleted or replaced). */
@@ -180,9 +193,21 @@ public:
     bool setFavourite (const std::string& id, bool favourite);
     bool setNotes (const std::string& id, const std::string& notes);
     bool setCategory (const std::string& id, const std::string& category);
+    bool setRating (const std::string& id, int stars);
+    /** A sound's root note (fractional MIDI), or none (the analysis decides). */
+    bool setRootMidi (const std::string& id, std::optional<double> midi);
     /** Recoverable removal: hidden from results until restored. */
     bool trash (const std::string& id);
     bool restore (const std::string& id);
+    /** Removes a trashed record for good (its tags, history and collection places with it).
+        Only a trashed record: anything else is refused. Files are never touched here. */
+    bool purge (const std::string& id);
+    /** A sound record that is not trashed holds this content. */
+    bool contentInLibrary (const std::string& contentHash) const;
+    /** When it was last used (loaded, imported), 0 if never. */
+    std::int64_t lastUsed (const std::string& id) const;
+    /** A preset's size: its sounds' bytes (each content once). */
+    std::int64_t presetBytes (const std::string& id) const;
 
     // Tags and collections ------------------------------------------------------
     bool addTag (const std::string& id, const std::string& tag, TagSource source = TagSource::user, double confidence = 1.0);
@@ -192,6 +217,12 @@ public:
     std::optional<std::string> createCollection (const std::string& name);
     bool addToCollection (const std::string& collectionId, const std::string& assetId);
     bool removeFromCollection (const std::string& collectionId, const std::string& assetId);
+    bool renameCollection (const std::string& collectionId, const std::string& name);
+    /** The collection goes; its assets stay. */
+    bool deleteCollection (const std::string& collectionId);
+    /** Every collection with how many (not trashed) assets of `type` it holds (any type when empty), by name. */
+    std::vector<Collection> collections (std::optional<AssetType> type = {}) const;
+    std::vector<Collection> collectionsOf (const std::string& assetId) const;
 
     // History -----------------------------------------------------------------
     bool recordUse (const std::string& id, const std::string& action, int layer = -1);
@@ -205,12 +236,19 @@ public:
 
     // Search ------------------------------------------------------------------
     std::vector<Asset> search (const SearchQuery& query) const;
+    /** How many assets match (limit and offset ignored). */
+    int count (const SearchQuery& query) const;
+    /** Every category in use among `type`'s assets, with counts (not trashed), by name. */
+    std::vector<std::pair<std::string, int>> categoryCounts (AssetType type) const;
 
 private:
     explicit Catalog (sqlite3* db);
     bool migrate();
     bool exec (const char* sql);
     void reindex (const std::string& id);
+    /** The FROM / WHERE part of a search (and its bound values), shared by search and count. */
+    struct Filter;
+    Filter filterFor (const SearchQuery& query) const;
     std::optional<std::string> addAsset (const Asset& asset);
 
     sqlite3* db = nullptr;

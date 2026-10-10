@@ -74,6 +74,17 @@ bool LibraryService::waitUntilIdle (int milliseconds)
     return true;
 }
 
+void LibraryService::deliver()
+{
+    std::vector<std::function<void()>> ready;
+    {
+        const std::lock_guard<std::mutex> lock (finishedMutex);
+        ready.swap (finished);
+    }
+    for (auto& f : ready)
+        f();
+}
+
 juce::String LibraryService::unavailableReason() const
 {
     const juce::ScopedLock lock (reasonLock);

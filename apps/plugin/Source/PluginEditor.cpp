@@ -356,6 +356,7 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     // Header: the preset, the master volume and the menu (utilities live there).
     presetBar.onChange = [this] { updateStatus(); timerCallback(); };
     presetBar.onSaveStartingState = [this] { saveStartingState(); };
+    presetBar.onOpenLibrary = [this] { openLibrary(); };
     content.addAndMakeVisible (presetBar);
     content.addAndMakeVisible (volume);
     menuButton.setTooltip ("Sounds, presets, instruments, undo, size");
@@ -543,7 +544,51 @@ OspAudioProcessorEditor::~OspAudioProcessorEditor()
     for (auto& card : cards)
         juce::Desktop::getInstance().getAnimator().cancelAnimation (card.get(), false);
     popup.reset();
+    libraryPanel.reset();
     setLookAndFeel (nullptr);
+}
+
+void OspAudioProcessorEditor::openLibrary (LibraryPanel::View view)
+{
+    closePopup();
+    if (libraryPanel == nullptr)
+    {
+        libraryPanel = std::make_unique<LibraryPanel> (ospProcessor);
+        juce::Component::SafePointer<OspAudioProcessorEditor> safe (this);
+        // Closed after the click or key that asked for it has finished with the window.
+        libraryPanel->onClose = [safe] { juce::MessageManager::callAsync ([safe] { if (safe != nullptr) safe->closeLibrary(); }); };
+        libraryPanel->onPatchChanged = [safe] {
+            if (safe != nullptr)
+            {
+                safe->presetBar.refresh();
+                safe->updateStatus();
+                safe->timerCallback();
+            }
+        };
+        content.addAndMakeVisible (*libraryPanel);
+    }
+    placeLibrary();
+    libraryPanel->setView (view);
+    libraryPanel->toFront (true);
+}
+
+void OspAudioProcessorEditor::closeLibrary()
+{
+    if (libraryPanel == nullptr)
+        return;
+    libraryPanel.reset();
+    presetBar.refresh();
+    grabKeyboardFocus();
+}
+
+void OspAudioProcessorEditor::placeLibrary()
+{
+    if (libraryPanel == nullptr)
+        return;
+    // Over everything from the housing's top to just above the keyboard row, which stays
+    // visible and playable (it auditions while the tray's Keys switch is on).
+    const float keyboardTop = design::layout::keyboard.getY() + (arpShown ? design::layout::arpShift : 0.0f);
+    libraryPanel->setBounds (juce::Rectangle<float> (31.0f, 23.0f, 1386.0f, keyboardTop - 9.0f - 23.0f).getSmallestIntegerContainer());
 }
 
 //==============================================================================
@@ -1067,6 +1112,7 @@ void OspAudioProcessorEditor::showMenu()
         });
         return list;
     };
+    menu.addItem (juce::String::fromUTF8 ("Libraryâ¦"), [safe] { if (safe != nullptr) safe->openLibrary(); });
     menu.addSubMenu ("Presets", browse (OspAudioProcessor::presetFolder(), OspAudioProcessor::presetExtension, false));
     menu.addItem ("Save preset...", [safe] { if (safe != nullptr) safe->choosePresetFile (true, false); });
     menu.addItem ("Open preset file...", [safe] { if (safe != nullptr) safe->choosePresetFile (false, false); });
@@ -1175,6 +1221,14 @@ bool OspAudioProcessorEditor::keyPressed (const juce::KeyPress& key)
         return true;
     }
     const bool command = key.getModifiers().isCommandDown();
+    if (command && (key.getKeyCode() == 'L' || key.getKeyCode() == 'l'))
+    {
+        if (libraryPanel != nullptr)
+            closeLibrary();
+        else
+            openLibrary();
+        return true;
+    }
     if (command && key.getKeyCode() == 'Z')
     {
         if (key.getModifiers().isShiftDown())
@@ -1284,6 +1338,7 @@ void OspAudioProcessorEditor::setArpExpanded (bool open)
     layoutInstrument();
     applyWindowShape (true);
     positionPopup();
+    placeLibrary();
     content.repaint();
 }
 

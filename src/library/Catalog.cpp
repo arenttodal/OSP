@@ -359,6 +359,14 @@ bool Catalog::migrate()
             || ! exec ("UPDATE meta SET value = '2' WHERE key = 'schema_version'") || ! t.commit())
             return false;
     }
+    if (version() < 3)
+    {
+        // 3: a star rating (presets, templates and sounds).
+        Transaction t (db);
+        if (! t.ok() || ! exec ("ALTER TABLE assets ADD COLUMN rating INTEGER NOT NULL DEFAULT 0")
+            || ! exec ("UPDATE meta SET value = '3' WHERE key = 'schema_version'") || ! t.commit())
+            return false;
+    }
     // Full-text search when this SQLite has FTS5; plain LIKE matching otherwise (R-09).
     fts = exec (ftsV1);
     if (fts)
@@ -410,9 +418,9 @@ std::optional<std::string> Catalog::addAsset (const Asset& a)
     const auto raw = id.text (0);
     const auto uuid = raw.substr (0, 8) + "-" + raw.substr (8, 4) + "-" + raw.substr (12, 4) + "-" + raw.substr (16, 4) + "-" + raw.substr (20);
     const auto t = a.created > 0 ? a.created : now();
-    Statement s (db, "INSERT INTO assets (id, type, origin, name, category, notes, favourite, created, modified) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8)");
+    Statement s (db, "INSERT INTO assets (id, type, origin, name, category, notes, favourite, created, modified, rating) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8, ?9)");
     s.bind (1, uuid).bind (2, std::string (toString (a.type))).bind (3, std::string (toString (a.origin))).bind (4, a.name).bind (5, a.category).bind (6, a.notes)
-        .bind (7, a.favourite ? 1 : 0).bind (8, t);
+        .bind (7, a.favourite ? 1 : 0).bind (8, t).bind (9, std::clamp (a.rating, 0, 5));
     if (! s.run())
     {
         error = sqlite3_errmsg (db);
@@ -628,7 +636,7 @@ bool Catalog::setProvenance (const std::string& contentHash, const std::string& 
 
 std::optional<Asset> Catalog::asset (const std::string& id) const
 {
-    Statement s (db, "SELECT id, type, origin, name, category, notes, favourite, created, modified, trashed_at FROM assets WHERE id = ?1");
+    Statement s (db, "SELECT id, type, origin, name, category, notes, favourite, created, modified, trashed_at, rating FROM assets WHERE id = ?1");
     s.bind (1, id);
     if (s.step() != SQLITE_ROW)
         return std::nullopt;
@@ -643,6 +651,7 @@ std::optional<Asset> Catalog::asset (const std::string& id) const
     a.created = s.integer (7);
     a.modified = s.integer (8);
     a.trashed = ! s.isNull (9);
+    a.rating = static_cast<int> (s.integer (10));
     return a;
 }
 
@@ -760,6 +769,66 @@ bool Catalog::restore (const std::string& id)
     return s.run() && sqlite3_changes (db) == 1;
 }
 
+bool Catalog::purge (const std::string& id)
+{
+    Transaction t (db);
+    if (! t.ok())
+        return false;
+    if (fts)
+    {
+        Statement drop (db, "DELETE FROM assets_fts WHERE rowid = (SELECT rowid FROM assets WHERE id = ?1 AND trashed_at IS NOT NULL)");
+        drop.bind (1, id);
+        if (! drop.run())
+            return false;
+    }
+    // Sounds, presets, tags, history and collection places go with it (ON DELETE CASCADE).
+    Statement s (db, "DELETE FROM assets WHERE id = ?1 AND trashed_at IS NOT NULL");
+    s.bind (1, id);
+    if (! s.run() || sqlite3_changes (db) != 1)
+        return false;
+    return t.commit();
+}
+
+bool Catalog::setRating (const std::string& id, int stars)
+{
+    Statement s (db, "UPDATE assets SET rating = ?1, modified = ?2 WHERE id = ?3");
+    s.bind (1, std::clamp (stars, 0, 5)).bind (2, now()).bind (3, id);
+    return s.run() && sqlite3_changes (db) == 1;
+}
+
+bool Catalog::setRootMidi (const std::string& id, std::optional<double> midi)
+{
+    Statement s (db, "UPDATE sounds SET root_midi = ?1 WHERE asset_id = ?2");
+    if (midi)
+        s.bind (1, std::clamp (*midi, 0.0, 127.0));
+    else
+        s.bindNull (1);
+    s.bind (2, id);
+    return s.run() && sqlite3_changes (db) == 1;
+}
+
+bool Catalog::contentInLibrary (const std::string& contentHash) const
+{
+    Statement s (db, "SELECT 1 FROM sounds s JOIN assets a ON a.id = s.asset_id WHERE s.content_hash = ?1 AND a.trashed_at IS NULL LIMIT 1");
+    s.bind (1, contentHash);
+    return s.step() == SQLITE_ROW;
+}
+
+std::int64_t Catalog::lastUsed (const std::string& id) const
+{
+    Statement s (db, "SELECT coalesce(max(at), 0) FROM history WHERE asset_id = ?1");
+    s.bind (1, id);
+    return s.step() == SQLITE_ROW ? s.integer (0) : 0;
+}
+
+std::int64_t Catalog::presetBytes (const std::string& id) const
+{
+    Statement s (db, "SELECT coalesce(sum(size), 0) FROM (SELECT ps.content_hash, max(so.file_size) AS size FROM preset_sounds ps "
+                     "JOIN sounds so ON so.content_hash = ps.content_hash WHERE ps.preset_id = ?1 GROUP BY ps.content_hash)");
+    s.bind (1, id);
+    return s.step() == SQLITE_ROW ? s.integer (0) : 0;
+}
+
 //==============================================================================
 
 bool Catalog::addTag (const std::string& id, const std::string& tagName, TagSource source, double confidence)
@@ -846,6 +915,65 @@ bool Catalog::removeFromCollection (const std::string& collectionId, const std::
     return true;
 }
 
+bool Catalog::renameCollection (const std::string& collectionId, const std::string& name)
+{
+    if (name.empty())
+        return false;
+    std::vector<std::string> members;
+    {
+        Statement m (db, "SELECT asset_id FROM collection_items WHERE collection_id = ?1");
+        m.bind (1, collectionId);
+        while (m.step() == SQLITE_ROW)
+            members.push_back (m.text (0));
+    }
+    Statement s (db, "UPDATE collections SET name = ?1 WHERE id = ?2");
+    s.bind (1, name).bind (2, collectionId);
+    if (! s.run() || sqlite3_changes (db) != 1)
+        return false;
+    for (const auto& id : members)   // collection names are searchable
+        reindex (id);
+    return true;
+}
+
+bool Catalog::deleteCollection (const std::string& collectionId)
+{
+    std::vector<std::string> members;
+    {
+        Statement m (db, "SELECT asset_id FROM collection_items WHERE collection_id = ?1");
+        m.bind (1, collectionId);
+        while (m.step() == SQLITE_ROW)
+            members.push_back (m.text (0));
+    }
+    Statement s (db, "DELETE FROM collections WHERE id = ?1");
+    s.bind (1, collectionId);
+    if (! s.run() || sqlite3_changes (db) != 1)
+        return false;
+    for (const auto& id : members)
+        reindex (id);
+    return true;
+}
+
+std::vector<Collection> Catalog::collections (std::optional<AssetType> type) const
+{
+    std::vector<Collection> list;
+    Statement s (db, "SELECT c.id, c.name, (SELECT count(*) FROM collection_items ci JOIN assets a ON a.id = ci.asset_id "
+                     "WHERE ci.collection_id = c.id AND a.trashed_at IS NULL AND (?1 = '' OR a.type = ?1)) FROM collections c ORDER BY c.name COLLATE NOCASE");
+    s.bind (1, type ? std::string (toString (*type)) : std::string());
+    while (s.step() == SQLITE_ROW)
+        list.push_back ({ s.text (0), s.text (1), static_cast<int> (s.integer (2)) });
+    return list;
+}
+
+std::vector<Collection> Catalog::collectionsOf (const std::string& assetId) const
+{
+    std::vector<Collection> list;
+    Statement s (db, "SELECT c.id, c.name FROM collections c JOIN collection_items ci ON ci.collection_id = c.id WHERE ci.asset_id = ?1 ORDER BY c.name COLLATE NOCASE");
+    s.bind (1, assetId);
+    while (s.step() == SQLITE_ROW)
+        list.push_back ({ s.text (0), s.text (1), 0 });
+    return list;
+}
+
 //==============================================================================
 
 bool Catalog::recordUse (const std::string& id, const std::string& action, int layer)
@@ -914,17 +1042,29 @@ void Catalog::reindex (const std::string& id)
     s.run();
 }
 
-std::vector<Asset> Catalog::search (const SearchQuery& q) const
+struct Catalog::Filter
 {
-    std::string sql = "SELECT a.id FROM assets a";
+    std::string sql;      ///< "FROM ... WHERE ..."
+    std::string words;    ///< ?1
+    bool useFts = false;
+};
+
+Catalog::Filter Catalog::filterFor (const SearchQuery& q) const
+{
+    Filter f;
+    f.sql = "FROM assets a";
     std::vector<std::string> where;
-    const auto words = ftsQuery (q.text);
-    const bool useFts = fts && ! words.empty();
-    if (useFts)
-        sql += " JOIN assets_fts f ON f.rowid = a.rowid";
-    if (! q.includeTrashed)
+    f.words = ftsQuery (q.text);
+    f.useFts = fts && ! f.words.empty();
+    if (! f.useFts)
+        f.words = q.text;
+    if (f.useFts)
+        f.sql += " JOIN assets_fts f ON f.rowid = a.rowid";
+    if (q.trashedOnly)
+        where.push_back ("a.trashed_at IS NOT NULL");
+    else if (! q.includeTrashed)
         where.push_back ("a.trashed_at IS NULL");
-    if (useFts)
+    if (f.useFts)
         where.push_back ("assets_fts MATCH ?1");
     else if (! q.text.empty())
         where.push_back ("(a.name LIKE '%' || ?1 || '%' OR a.notes LIKE '%' || ?1 || '%')");
@@ -934,17 +1074,56 @@ std::vector<Asset> Catalog::search (const SearchQuery& q) const
         where.push_back ("a.origin = ?3");
     if (q.favouritesOnly)
         where.push_back ("a.favourite = 1");
+    if (q.recentOnly)
+        where.push_back ("EXISTS (SELECT 1 FROM history h WHERE h.asset_id = a.id)");
     if (! q.collection.empty())
         where.push_back ("EXISTS (SELECT 1 FROM collection_items ci WHERE ci.asset_id = a.id AND ci.collection_id = ?4)");
+    if (! q.category.empty())
+        where.push_back ("a.category = ?7 COLLATE NOCASE");
+    if (q.minSeconds)
+        where.push_back ("EXISTS (SELECT 1 FROM sounds so WHERE so.asset_id = a.id AND so.duration >= ?8)");
+    if (q.maxSeconds)
+        where.push_back ("EXISTS (SELECT 1 FROM sounds so WHERE so.asset_id = a.id AND so.duration <= ?9)");
     for (std::size_t i = 0; i < q.tags.size() && i < 8; ++i)
         where.push_back ("EXISTS (SELECT 1 FROM asset_tags at JOIN tags t ON t.id = at.tag_id WHERE at.asset_id = a.id AND at.rejected = 0 AND t.name = ?"
                          + std::to_string (10 + i) + ")");
     for (std::size_t i = 0; i < where.size(); ++i)
-        sql += (i == 0 ? " WHERE " : " AND ") + where[i];
+        f.sql += (i == 0 ? " WHERE " : " AND ") + where[i];
+    return f;
+}
+
+namespace
+{
+    template <typename Bindable>
+    void bindFilter (Bindable& s, const SearchQuery& q, const std::string& words)
+    {
+        s.bind (1, words);
+        if (q.type)
+            s.bind (2, std::string (toString (*q.type)));
+        if (q.origin)
+            s.bind (3, std::string (toString (*q.origin)));
+        s.bind (4, q.collection).bind (7, q.category);
+        if (q.minSeconds)
+            s.bind (8, *q.minSeconds);
+        if (q.maxSeconds)
+            s.bind (9, *q.maxSeconds);
+        for (std::size_t i = 0; i < q.tags.size() && i < 8; ++i)
+            s.bind (static_cast<int> (10 + i), lower (q.tags[i]));
+    }
+}
+
+std::vector<Asset> Catalog::search (const SearchQuery& q) const
+{
+    const auto f = filterFor (q);
+    std::string sql = "SELECT a.id " + f.sql;
     switch (q.sort)
     {
         case SearchQuery::Sort::name: sql += " ORDER BY a.name COLLATE NOCASE, a.id"; break;
         case SearchQuery::Sort::added: sql += " ORDER BY a.created DESC, a.id"; break;
+        case SearchQuery::Sort::rating: sql += " ORDER BY a.rating DESC, a.name COLLATE NOCASE, a.id"; break;
+        case SearchQuery::Sort::length:
+            sql += " ORDER BY coalesce((SELECT duration FROM sounds WHERE asset_id = a.id), 0), a.name COLLATE NOCASE, a.id";
+            break;
         case SearchQuery::Sort::recentlyUsed:
             sql += " ORDER BY coalesce((SELECT max(at) FROM history WHERE asset_id = a.id), 0) DESC, a.name COLLATE NOCASE";
             break;
@@ -957,14 +1136,8 @@ std::vector<Asset> Catalog::search (const SearchQuery& q) const
         error = sqlite3_errmsg (db);
         return out;
     }
-    s.bind (1, useFts ? words : q.text);
-    if (q.type)
-        s.bind (2, std::string (toString (*q.type)));
-    if (q.origin)
-        s.bind (3, std::string (toString (*q.origin)));
-    s.bind (4, q.collection).bind (5, q.limit).bind (6, q.offset);
-    for (std::size_t i = 0; i < q.tags.size() && i < 8; ++i)
-        s.bind (static_cast<int> (10 + i), lower (q.tags[i]));
+    bindFilter (s, q, f.words);
+    s.bind (5, q.limit).bind (6, q.offset);
     std::vector<std::string> ids;
     while (s.step() == SQLITE_ROW)
         ids.push_back (s.text (0));
@@ -972,6 +1145,31 @@ std::vector<Asset> Catalog::search (const SearchQuery& q) const
         if (auto a = asset (id))
             out.push_back (*a);
     return out;
+}
+
+int Catalog::count (const SearchQuery& q) const
+{
+    const auto f = filterFor (q);
+    const std::string sql = "SELECT count(*) " + f.sql;
+    Statement s (db, sql.c_str());
+    if (! s)
+    {
+        error = sqlite3_errmsg (db);
+        return 0;
+    }
+    bindFilter (s, q, f.words);
+    return s.step() == SQLITE_ROW ? static_cast<int> (s.integer (0)) : 0;
+}
+
+std::vector<std::pair<std::string, int>> Catalog::categoryCounts (AssetType type) const
+{
+    std::vector<std::pair<std::string, int>> list;
+    Statement s (db, "SELECT category, count(*) FROM assets WHERE type = ?1 AND trashed_at IS NULL AND category <> '' GROUP BY category COLLATE NOCASE "
+                     "ORDER BY category COLLATE NOCASE");
+    s.bind (1, std::string (toString (type)));
+    while (s.step() == SQLITE_ROW)
+        list.emplace_back (s.text (0), static_cast<int> (s.integer (1)));
+    return list;
 }
 
 } // namespace osp::library

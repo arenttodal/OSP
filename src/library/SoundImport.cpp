@@ -224,4 +224,118 @@ Resolution resolveSound (const Catalog& catalog, const std::filesystem::path& st
     return r;
 }
 
+namespace
+{
+    /** A stored audio file's content hash ("sha256:<hex>"), or empty for anything else. */
+    std::string storedContent (const std::filesystem::directory_entry& entry)
+    {
+        std::error_code ec;
+        if (! entry.is_regular_file (ec))
+            return {};
+        const auto name = entry.path().filename().string();
+        if (name.find (".partial") != std::string::npos || name.find (".analysis.json") != std::string::npos)
+            return {};
+        const auto dot = name.find ('.');
+        const auto stem = name.substr (0, dot);
+        if (stem.size() != 64 || stem.find_first_not_of ("0123456789abcdef") != std::string::npos)
+            return {};
+        return "sha256:" + stem;
+    }
+}
+
+StorageUsage storageUsage (const Catalog& catalog, const std::filesystem::path& storeDir)
+{
+    StorageUsage usage;
+    std::error_code ec;
+    for (const auto& entry : std::filesystem::directory_iterator (storeDir, ec))
+    {
+        const auto content = storedContent (entry);
+        if (content.empty())
+            continue;
+        const auto size = static_cast<std::int64_t> (entry.file_size (ec));
+        ++usage.files;
+        usage.bytes += size;
+        if (catalog.contentInLibrary (content) || catalog.contentNeeded (content))
+        {
+            ++usage.library;
+            usage.libraryBytes += size;
+        }
+        else if (! catalog.soundsWithContent (content).empty())
+        {
+            ++usage.trashOnly;
+            usage.trashOnlyBytes += size;
+        }
+        else
+        {
+            ++usage.untracked;
+            usage.untrackedBytes += size;
+        }
+    }
+    return usage;
+}
+
+TrashEmptied emptyTrash (Catalog& catalog, const std::filesystem::path& storeDir, const std::vector<std::string>& inUse,
+                         const std::function<bool (const std::filesystem::path&)>& moveAway)
+{
+    TrashEmptied result;
+    SearchQuery trashed;
+    trashed.trashedOnly = true;
+    trashed.limit = 1000000;
+    std::vector<std::string> contents;
+    for (const auto& asset : catalog.search (trashed))
+    {
+        if (asset.type == AssetType::sound)
+        {
+            if (const auto info = catalog.sound (asset.id))
+                contents.push_back (info->contentHash);
+        }
+        else if (const auto preset = catalog.preset (asset.id))
+        {
+            // A trashed preset file sits in the Library's trash folder: moved away with its record.
+            std::error_code ec;
+            const std::filesystem::path file (preset->file);
+            if (std::filesystem::is_regular_file (file, ec))
+            {
+                const auto size = static_cast<std::int64_t> (std::filesystem::file_size (file, ec));
+                if (! moveAway (file))
+                {
+                    result.failed.push_back (file.string());
+                    continue;   // the record stays with its file
+                }
+                ++result.files;
+                result.bytes += size;
+            }
+        }
+        if (catalog.purge (asset.id))
+            ++result.records;
+    }
+    std::sort (contents.begin(), contents.end());
+    contents.erase (std::unique (contents.begin(), contents.end()), contents.end());
+    for (const auto& content : contents)
+    {
+        // Kept while anything holds it: another record (in or out of the trash), a preset, an
+        // open instance.
+        if (! catalog.soundsWithContent (content).empty() || catalog.contentNeeded (content)
+            || std::find (inUse.begin(), inUse.end(), content) != inUse.end())
+            continue;
+        const auto hex = hexOf (content);
+        const auto stored = findStored (storeDir, hex);
+        if (! stored)
+            continue;
+        std::error_code ec;
+        const auto size = static_cast<std::int64_t> (std::filesystem::file_size (*stored, ec));
+        if (! moveAway (*stored))
+        {
+            result.failed.push_back (stored->string());
+            continue;
+        }
+        ++result.files;
+        result.bytes += size;
+        const auto analysis = storeDir / (hex + ".analysis.json");
+        if (std::filesystem::is_regular_file (analysis, ec))
+            std::filesystem::remove (analysis, ec);   // derived data, made again when needed
+    }
+    return result;
+}
+
 } // namespace osp::library

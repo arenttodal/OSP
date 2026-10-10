@@ -34,14 +34,15 @@ Verified. Blocked rows name what is missing.
 | S3-04 | Loading a preset or template is recoverable (previous-state snapshot) | 3 | rememberPreviousState / restorePreviousState; preset menu item | [plugin][library] | Tested | preset, template, factory state and instrument loads; restoring is a swap |  |
 | S3-05 | Factory read-only; edits save as user copies | 3 | factory starting states are built in (never files) | [plugin][library] | Tested | edited and saved: a user template; the factory list unchanged | factory presets with sounds (packs): Stage 10 |
 | S3-06 | Audio provenance and distribution-rights check on export | 3 | ExportOptions.forDistribution; Catalog::provenanceOf / setProvenance | [unit][library], [plugin][library] | Tested | unknown refused with the names; confirmation recorded as cleared; unknown never becomes cleared by itself |  |
-| S4-01 | Every loaded sound in history (added, last used, count, slot) | 4 | HistoryService | unit | Not Started |  |  |
-| S4-02 | Sound metadata extraction | 4 | import | unit | Not Started |  |  |
-| S4-03 | Independent preview engine (play, stop, gain, pitch) | 4 | src/library/preview | unit + plugin | Not Started |  |  |
-| S4-04 | Load into A/B/C / first empty, never overwrite A silently | 4 | processor | unit | Not Started |  |  |
-| S4-05 | Three-slot audition tray and commit | 4 | preview + GUI | ui | Not Started |  |  |
-| S5-01 | Library overlay: search, type nav, origin filters, collections, results, detail, actions | 5 | LibraryOverlay | ui | Not Started |  | layout per docs/library/mockups.md |
-| S5-02 | Views A-K working, no placeholder controls | 5 | GUI | ui | Not Started |  |  |
-| S5-03 | Keyboard, focus, scaling, accessibility labels | 5 | GUI | ui | Not Started |  |  |
+| S4-01 | Every loaded sound in history (added, last used, count, slot) | 4 | LibraryService::soundLoaded, Catalog::recent/lastUsed/useCount | [plugin][library], [plugin][audition] | Tested | Library loads find the sound's own record (no duplicates) |  |
+| S4-02 | Sound metadata extraction | 4 | readAudioFileInfo, importSound, makePreviewSound (root) | [import], [preview] | Tested | name, duration, rate, channels, bit depth, size, format, root (catalog or estimate), locations, added, last used |  |
+| S4-03 | Independent preview engine (play, stop, gain, pitch) | 4 | library::PreviewEngine, plugin::Audition | [preview] 7, [plugin][audition] 2 | Tested | no allocation in render (counted); host rate respected; -1 dBFS ceiling; 8 voices | heard in a DAW: Blocked (user) |
+| S4-04 | Load into A/B/C / first empty, never overwrite A silently | 4 | Audition::loadIntoLayer, loadLibrarySounds; LibraryPanel asks when full | [plugin][audition], [library-ui] | Tested | full: a choice sheet, A untouched |  |
+| S4-05 | Three-slot audition tray and commit | 4 | Audition::setSlot/play/commit, LibraryPanel::Tray | [plugin][audition], [library-ui] | Tested | drag/click into slots, play one/all, keys, commit all-or-nothing, recoverable | heard in a DAW: Blocked (user) |
+| S4-06 | Storage usage and cleanup, nothing referenced deleted | 4 | storageUsage, emptyTrash | [import] | Tested | moves to the system Trash; presets, other records and playing sounds keep their copies | DAW projects not open cannot be seen (documented) |
+| S5-01 | Library overlay: search, type nav, origin filters, collections, results, detail, actions | 5 | LibraryPanel | [library-ui] | Tested | docs/library/gui.md; snapshots | looked at on a Mac: Blocked (user) |
+| S5-02 | Views A-K working, no placeholder controls | 5 | LibraryPanel views A-E, J, K | [library-ui] | Partial | F-I come with Stages 6-8, L is Stage 9 (not shown, no placeholders) |  |
+| S5-03 | Keyboard, focus, scaling, accessibility labels | 5 | LibraryPanel | [library-ui] | Tested | titles on every control, row names, shortcuts, 80-200 % bounds check | VoiceOver on a Mac: Blocked (user) |
 | S6-01 | Filename / folder / audio-derived tags, separate from user tags | 6 | analysis | unit | Not Started |  |  |
 | S6-02 | User-selected folder scanning: recursive, include/exclude, pause/resume/cancel, incremental | 6 | scanning | unit + perf | Not Started |  |  |
 | S6-03 | One-shot classification (5 classes), evaluated on a labelled set | 6 | analysis | eval report | Not Started |  |  |

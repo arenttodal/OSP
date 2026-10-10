@@ -7,6 +7,7 @@
 
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -41,6 +42,23 @@ public:
         longer than `milliseconds` (the task may then still run later: it must own what it
         touches, e.g. through a shared_ptr). Never from the audio thread. */
     bool runAndWait (std::function<void (library::Catalog&)> task, int milliseconds = 5000);
+    /** Runs `task` on the Library thread, then `done` with its result on the message thread
+        (at the next deliver(): the processor's timer). The Library window's queries and
+        edits go this way, so a busy catalog never stalls the editor. Without a catalog,
+        `done` gets a default result. */
+    template <typename Result>
+    void request (std::function<Result (library::Catalog&)> task, std::function<void (Result)> done)
+    {
+        pool.addJob ([this, task = std::move (task), done = std::move (done)] {
+            auto* c = catalog();
+            auto result = c != nullptr ? task (*c) : Result {};
+            const std::lock_guard<std::mutex> lock (finishedMutex);
+            finished.push_back ([done, result = std::move (result)] { if (done != nullptr) done (result); });
+        });
+    }
+    /** Message thread: runs the finished requests' callbacks. */
+    void deliver();
+
     /** Waits until the queued work is done (tests, shutdown). */
     bool waitUntilIdle (int milliseconds);
     /** Why the catalog is not available ("" when it is or has not been tried). */
@@ -55,6 +73,8 @@ private:
     bool opened = false;
     mutable juce::CriticalSection reasonLock;
     juce::String reason;
+    std::mutex finishedMutex;
+    std::vector<std::function<void()>> finished;
 };
 
 } // namespace osp::plugin

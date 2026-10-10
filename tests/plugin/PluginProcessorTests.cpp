@@ -13,6 +13,7 @@
 #include "engine/InstrumentEngine.h"
 #include "io/AudioFileIO.h"
 #include "library/Catalog.h"
+#include "library/SoundImport.h"
 
 #define CATCH_CONFIG_RUNNER
 #include <catch2/catch_approx.hpp>
@@ -1085,6 +1086,501 @@ TEST_CASE ("plugin: library presets - rename, duplicate, trash and restore keep 
     CHECK (c->search (q).size() == 2);
 }
 
+// Library Stage 4: hearing sounds without changing the patch, and loading them.
+namespace
+{
+    /** Runs `blocks` blocks through processBlock (MIDI from `midiAt`), returns the output RMS. */
+    double runBlocks (OspAudioProcessor& p, int blocks, const std::function<void (juce::MidiBuffer&, int)>& midiAt = {})
+    {
+        juce::AudioBuffer<float> buffer (2, 256);
+        double sum = 0.0;
+        for (int b = 0; b < blocks; ++b)
+        {
+            juce::MidiBuffer midi;
+            if (midiAt != nullptr)
+                midiAt (midi, b);
+            buffer.clear();
+            p.processBlock (buffer, midi);
+            for (int i = 0; i < 256; ++i)
+                sum += static_cast<double> (buffer.getSample (0, i)) * buffer.getSample (0, i);
+        }
+        return std::sqrt (sum / (blocks * 256.0));
+    }
+
+    juce::MemoryBlock stateOf (OspAudioProcessor& p)
+    {
+        juce::MemoryBlock m;
+        p.getStateInformation (m);
+        return m;
+    }
+
+    void settle (OspAudioProcessor& p)
+    {
+        REQUIRE (p.audition().waitUntilIdle (30000));
+        p.pollLoads();   // the timer: delivers what the background finished
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+    }
+}
+
+TEST_CASE ("plugin: library audition - three sounds heard without changing the patch; a combination committed, recoverably", "[plugin][library][audition]")
+{
+    TempDir tmp;
+    const auto fileA = writeSource (tmp.dir, "Soft Keys C4.wav", testsignals::vowel (midiToHz (60), 1.0, 48000.0, 3));
+    const auto fileB = writeSource (tmp.dir, "Low Drone A2.wav", testsignals::vowel (midiToHz (45), 1.0, 48000.0, 4));
+    const auto fileC = writeSource (tmp.dir, "Glass E5.wav", testsignals::pluck (midiToHz (76), 1.0, 48000.0, 5));
+    const auto fileGone = writeSource (tmp.dir, "Gone.wav", testsignals::pluck (midiToHz (50), 0.5, 48000.0, 6));
+
+    OspAudioProcessor p;
+    p.prepareToPlay (48000.0, 256);
+    loadAndWait (p, fileA);
+    REQUIRE (p.currentInstrument (0) != nullptr);
+    const auto hashA = p.currentInstrument (0)->contentHash;
+    REQUIRE (p.libraryService().waitUntilIdle (10000));
+
+    // B, C and a sound that will go missing come into the Library through the import.
+    std::string idB, idC, idGone, hashB, hashC;
+    std::filesystem::path goneStored;
+    {
+        std::string e;
+        auto c = osp::library::Catalog::open (osp::library::Catalog::defaultFile(), e);
+        REQUIRE (c != nullptr);
+        const auto storeDir = std::filesystem::path (plugin::SampleStore::defaultDirectory().getFullPathName().toStdString());
+        auto import = [&] (const juce::File& f) {
+            osp::library::ImportRequest r;
+            r.file = f.getFullPathName().toStdString();
+            const auto result = osp::library::importSound (*c, storeDir, r);
+            INFO (result.error);
+            REQUIRE (result.ok);
+            return result;
+        };
+        const auto b = import (fileB), cc = import (fileC), gone = import (fileGone);
+        idB = b.assetId;
+        idC = cc.assetId;
+        idGone = gone.assetId;
+        hashB = b.contentHash;
+        hashC = cc.contentHash;
+        goneStored = gone.stored;
+    }
+
+    const auto before = stateOf (p);
+    const auto undoSteps = p.undoManager.getUndoDescriptions().size();
+    auto& audition = p.audition();
+    audition.setSlot (0, idB);
+    audition.setSlot (1, idC);
+    settle (p);
+    REQUIRE (audition.slot (0).sound != nullptr);
+    REQUIRE (audition.slot (1).sound != nullptr);
+    CHECK (audition.slot (0).name == "Low Drone A2");
+    CHECK (audition.slot (1).name == "Glass E5");
+    CHECK_FALSE (audition.trayEmpty());
+    CHECK (audition.slot (0).sound->rootKnown);
+    CHECK (audition.slot (0).sound->rootMidi == Approx (45.0).margin (0.5));
+
+    // Heard: the instrument plays nothing (no notes), the preview does.
+    CHECK (runBlocks (p, 8) < 1.0e-6);
+    audition.play (0b011u);
+    CHECK (runBlocks (p, 40) > 0.01);
+    // ... and the patch is exactly as it was: no parameter, no layer, no undo step.
+    CHECK (stateOf (p) == before);
+    CHECK_FALSE (p.canRestorePreviousState());
+    CHECK (p.undoManager.getUndoDescriptions().size() == undoSteps);
+    CHECK (p.currentInstrument (0)->contentHash == hashA);
+    CHECK_FALSE (p.isLayerOccupied (1));
+
+    // On the keys: notes go to the preview, never to the instrument; off again, the instrument plays.
+    audition.stop();
+    runBlocks (p, 20);
+    p.setPreviewKeys (true, 0b001u);
+    const double keyed = runBlocks (p, 30, [] (juce::MidiBuffer& m, int b) {
+        if (b == 0)
+            m.addEvent (juce::MidiMessage::noteOn (1, 57, static_cast<juce::uint8> (100)), 0);
+    });
+    CHECK (keyed > 0.01);
+    CHECK (p.activeVoices.load() == 0);
+    runBlocks (p, 2, [] (juce::MidiBuffer& m, int b) {
+        if (b == 0)
+            m.addEvent (juce::MidiMessage::noteOff (1, 57), 0);
+    });
+    p.setPreviewKeys (false, 0u);
+    runBlocks (p, 30, [] (juce::MidiBuffer& m, int b) {
+        if (b == 0)
+            m.addEvent (juce::MidiMessage::noteOn (1, 60, static_cast<juce::uint8> (100)), 0);
+    });
+    CHECK (p.activeVoices.load() == 1);
+    runBlocks (p, 2, [] (juce::MidiBuffer& m, int b) {
+        if (b == 0)
+            m.addEvent (juce::MidiMessage::noteOff (1, 60), 0);
+    });
+    CHECK (stateOf (p) == before);
+
+    // A tray slot whose sound cannot be found: the commit changes nothing and says why.
+    audition.setSlot (2, idGone);
+    settle (p);
+    std::filesystem::remove (goneStored);
+    REQUIRE (fileGone.deleteFile());
+    bool called = false, ok = true;
+    juce::String message;
+    audition.commit ([&] (bool success, const juce::String& text) {
+        called = true;
+        ok = success;
+        message = text;
+    });
+    settle (p);
+    REQUIRE (called);
+    CHECK_FALSE (ok);
+    CHECK (message.contains ("Nothing was changed"));
+    CHECK (message.contains ("Gone"));
+    CHECK (stateOf (p) == before);
+
+    // Load combination: A's slot to layer A (its controls kept), C's to layer B.
+    audition.clearSlot (2);
+    p.setParameterValue (OspAudioProcessor::layerParameterId (0, "tune"), 3.0f);
+    called = false;
+    audition.commit ([&] (bool success, const juce::String& text) {
+        called = true;
+        ok = success;
+        message = text;
+    });
+    settle (p);
+    REQUIRE (called);
+    INFO (message.toStdString());
+    CHECK (ok);
+    REQUIRE (p.currentInstrument (0) != nullptr);
+    REQUIRE (p.currentInstrument (1) != nullptr);
+    CHECK (p.currentInstrument (0)->contentHash == hashB);
+    CHECK (p.currentInstrument (1)->contentHash == hashC);
+    // The cards show the sounds' own names and places, not the managed copies'.
+    CHECK (p.currentInstrument (0)->filename == "Low Drone A2.wav");
+    CHECK (p.currentInstrument (1)->originalPath == fileC.getFullPathName().toStdString());
+    CHECK (p.parameterValue (OspAudioProcessor::layerParameterId (0, "tune")) == Approx (3.0f));
+    CHECK_FALSE (p.isLayerOccupied (2));
+    REQUIRE (p.canRestorePreviousState());
+    CHECK (p.previousStateDescription().contains ("Low Drone A2"));
+    REQUIRE (p.libraryService().waitUntilIdle (10000));
+    {
+        std::string e;
+        auto c = osp::library::Catalog::open (osp::library::Catalog::defaultFile(), e);
+        const auto recent = c->recent (3, osp::library::AssetType::sound);
+        REQUIRE (recent.size() >= 2);
+        CHECK ((recent[0].assetId == idB || recent[0].assetId == idC));
+        CHECK (c->useCount (idC) == 1);
+        CHECK (c->soundsWithContent (hashC).size() == 1);   // the load found its record, made no second
+    }
+
+    // Recoverable: back to the patch with A alone.
+    REQUIRE (p.restorePreviousState());
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    REQUIRE (p.currentInstrument (0) != nullptr);
+    CHECK (p.currentInstrument (0)->contentHash == hashA);
+    CHECK_FALSE (p.isLayerOccupied (1));
+
+    // One sound into a chosen layer.
+    called = false;
+    audition.loadIntoLayer (idC, 2, [&] (bool success, const juce::String&) {
+        called = true;
+        ok = success;
+    });
+    settle (p);
+    REQUIRE (called);
+    CHECK (ok);
+    REQUIRE (p.currentInstrument (2) != nullptr);
+    CHECK (p.currentInstrument (2)->contentHash == hashC);
+    CHECK (p.currentInstrument (0)->contentHash == hashA);
+}
+
+TEST_CASE ("plugin: library audition - the preview gain is the user's, not the patch's", "[plugin][library][audition]")
+{
+    {
+        OspAudioProcessor p;
+        CHECK (p.audition().gainDb() == Approx (osp::library::PreviewEngine::defaultGainDb));
+        p.audition().setGainDb (-12.0f);
+    }
+    OspAudioProcessor p;
+    CHECK (p.audition().gainDb() == Approx (-12.0f));
+    juce::MemoryBlock m;
+    p.getStateInformation (m);
+    CHECK_FALSE (m.toString().contains ("previewGain"));
+    p.audition().setGainDb (osp::library::PreviewEngine::defaultGainDb);
+}
+
+// Library Stage 5: the Library window through the real editor.
+namespace
+{
+    template <typename T>
+    T* findTitled (juce::Component& root, const juce::String& title)
+    {
+        for (auto* child : root.getChildren())
+        {
+            if (auto* t = dynamic_cast<T*> (child); t != nullptr && child->getTitle() == title)
+                return t;
+            if (auto* found = findTitled<T> (*child, title))
+                return found;
+        }
+        return nullptr;
+    }
+    int rowNamed (osp::plugin::LibraryPanel& panel, const juce::String& name)
+    {
+        for (int i = 0; i < panel.rowCount(); ++i)
+            if (panel.row (i).name == name)
+                return i;
+        return -1;
+    }
+    /** Points an environment variable elsewhere for one test, then back. */
+    struct ScopedEnvironment
+    {
+        ScopedEnvironment (const char* n, const juce::String& value) : name (n), previous (std::getenv (n))
+        {
+            set (value);
+        }
+        ~ScopedEnvironment() { set (previous); }
+        void set (const juce::String& value) const
+        {
+#if JUCE_WINDOWS
+            _putenv_s (name, value.toRawUTF8());
+#else
+            if (value.isEmpty())
+                unsetenv (name);
+            else
+                setenv (name, value.toRawUTF8(), 1);
+#endif
+        }
+        const char* name;
+        juce::String previous;
+    };
+
+    int sideCount (osp::plugin::LibraryPanel& panel, const juce::String& key)
+    {
+        for (const auto& item : panel.sidebarItems())
+            if (item.key == key)
+                return item.count;
+        return -2;
+    }
+}
+
+TEST_CASE ("plugin: Library window - presets, templates and sounds; search, scopes, loads, the tray, sheets, scales", "[plugin][library][library-ui]")
+{
+    using Panel = osp::plugin::LibraryPanel;
+    TempDir tmp;
+    // A Library and Documents/OSP of its own: the counts below are this test's only.
+    const ScopedEnvironment library ("OSP_LIBRARY_DIR", tmp.dir.getChildFile ("library").getFullPathName());
+    const ScopedEnvironment documents ("OSP_DOCUMENTS_DIR", tmp.dir.getChildFile ("documents").getFullPathName());
+    const auto fileA = writeSource (tmp.dir, "Choir Ah A3.wav", testsignals::vowel (midiToHz (57), 1.2, 48000.0, 3));
+    const auto fileB = writeSource (tmp.dir, "Glass Pluck E4.wav", testsignals::pluck (midiToHz (64), 0.8, 48000.0, 4));
+    const auto fileC = writeSource (tmp.dir, "Low Drone A2.wav", testsignals::vowel (midiToHz (45), 6.0, 48000.0, 5));
+
+    OspAudioProcessor p;
+    p.prepareToPlay (48000.0, 256);
+    loadAndWait (p, fileA);
+    const auto presetFile = OspAudioProcessor::presetFolder().getChildFile ("Warm Hymn.osppreset");
+    OspAudioProcessor::presetFolder().createDirectory();
+    OspAudioProcessor::startingStateFolder().createDirectory();
+    p.setParameterValue ("character", 64.0f);
+    REQUIRE (p.savePreset (presetFile));
+    REQUIRE (p.saveStartingState (OspAudioProcessor::startingStateFolder().getChildFile ("Floating Settings.ospstate")));
+    REQUIRE (p.libraryService().waitUntilIdle (10000));
+    std::string idB, idC;
+    {
+        std::string e;
+        auto c = osp::library::Catalog::open (osp::library::Catalog::defaultFile(), e);
+        REQUIRE (c != nullptr);
+        const auto storeDir = std::filesystem::path (plugin::SampleStore::defaultDirectory().getFullPathName().toStdString());
+        for (const auto* f : { &fileB, &fileC })
+        {
+            osp::library::ImportRequest r;
+            r.file = f->getFullPathName().toStdString();
+            const auto result = osp::library::importSound (*c, storeDir, r);
+            REQUIRE (result.ok);
+            (f == &fileB ? idB : idC) = result.assetId;
+        }
+        REQUIRE (c->setCategory (idB, "Pluck"));
+    }
+
+    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (editor.get());
+    REQUIRE (ui != nullptr);
+    editor->setSize (1448, 1086);
+    ui->refreshNow();
+    auto snapshot = [&] (const juce::String& name) {
+        if (const char* dir = std::getenv ("OSP_SNAPSHOT_DIR"))
+        {
+            ui->refreshNow();
+            const auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f);
+            juce::FileOutputStream out (juce::File (dir).getChildFile (name));
+            out.setPosition (0);
+            out.truncate();
+            juce::PNGImageFormat().writeImageToStream (image, out);
+        }
+    };
+
+    ui->openLibrary();
+    auto* panel = ui->libraryWindow();
+    REQUIRE (panel != nullptr);
+    REQUIRE (panel->settle());
+
+    // Presets (view A): the saved preset, counted in the sidebar; search narrows; scopes filter.
+    CHECK (panel->currentView() == Panel::View::presets);
+    REQUIRE (rowNamed (*panel, "Warm Hymn") >= 0);
+    CHECK (sideCount (*panel, "all") == 1);
+    CHECK (sideCount (*panel, "user") == 1);
+    CHECK (sideCount (*panel, "trash") == 0);
+    CHECK (sideCount (*panel, "category:Keys") == 0);
+    panel->setSearchText ("zzz");
+    REQUIRE (panel->settle());
+    CHECK (panel->rowCount() == 0);
+    panel->setSearchText ("warm hy");
+    REQUIRE (panel->settle());
+    CHECK (panel->rowCount() == 1);
+    panel->setSearchText ({});
+    panel->selectScope ("favourites");
+    REQUIRE (panel->settle());
+    CHECK (panel->rowCount() == 0);
+    panel->selectScope ("all");
+    REQUIRE (panel->settle());
+    panel->selectRow (rowNamed (*panel, "Warm Hymn"));
+    snapshot ("library-presets.png");
+    // Loading it (double-click / Return / Load): the patch comes back, recoverably.
+    p.setParameterValue ("character", 20.0f);
+    panel->loadSelected();
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    CHECK (p.parameterValue ("character") == Approx (64.0f));
+    CHECK (p.canRestorePreviousState());
+    CHECK (panel->statusText().contains ("Loaded Warm Hymn"));
+
+    // Templates (view B): the built-in starting states (read only) and the saved one.
+    panel->setView (Panel::View::templates);
+    REQUIRE (panel->settle());
+    const int natural = rowNamed (*panel, "Natural");
+    REQUIRE (natural >= 0);
+    CHECK (panel->row (natural).isBuiltIn());
+    REQUIRE (rowNamed (*panel, "Floating Settings") >= 0);
+    CHECK (sideCount (*panel, "all") == panel->rowCount());
+    panel->selectRow (rowNamed (*panel, "Floating Settings"));
+    snapshot ("library-templates.png");
+
+    // Sounds (view C): every sound, the inspector, the preview and the tray.
+    panel->setView (Panel::View::sounds);
+    REQUIRE (panel->settle());
+    CHECK (panel->rowCount() == 3);
+    CHECK (sideCount (*panel, "category:Pluck") == 1);
+    panel->selectScope ("category:Pluck");
+    REQUIRE (panel->settle());
+    REQUIRE (panel->rowCount() == 1);
+    CHECK (panel->row (0).name == "Glass Pluck E4");
+    panel->selectScope ("all");
+    REQUIRE (panel->settle());
+    const auto before = stateOf (p);
+    panel->selectRow (rowNamed (*panel, "Glass Pluck E4"));
+    REQUIRE (panel->settle());
+    const auto& browser = p.audition().slot (osp::library::PreviewEngine::browserSlot);
+    CHECK (browser.assetId == idB);
+    REQUIRE (browser.sound != nullptr);
+    panel->previewSelected();
+    CHECK (runBlocks (p, 20) > 0.005);
+    panel->addSelectedToTray (1);
+    panel->selectRow (rowNamed (*panel, "Low Drone A2"));
+    panel->addSelectedToTray (2);
+    REQUIRE (panel->settle());
+    CHECK (stateOf (p) == before);   // browsing and auditioning change nothing
+    CHECK (p.audition().slot (1).name == "Glass Pluck E4");
+    CHECK (p.audition().slot (2).name == "Low Drone A2");
+    snapshot ("library-sounds.png");   // the rows ask for their waveform overviews
+    REQUIRE (panel->settle());
+    snapshot ("library-sounds.png");
+    panel->commitTray();
+    REQUIRE (panel->settle());
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    REQUIRE (p.currentInstrument (1) != nullptr);
+    REQUIRE (p.currentInstrument (2) != nullptr);
+    CHECK (p.currentInstrument (1)->filename == "Glass Pluck E4.wav");
+    CHECK (p.currentInstrument (2)->filename == "Low Drone A2.wav");
+    CHECK (panel->statusText().contains ("Loaded"));
+    // All three layers hold a sound: loading asks which to replace (A never silently).
+    const auto hashA = p.currentInstrument (0)->contentHash;
+    panel->selectRow (rowNamed (*panel, "Low Drone A2"));
+    panel->loadSelected();
+    CHECK (panel->openSheetName() == "choice");
+    CHECK (p.currentInstrument (0)->contentHash == hashA);
+    snapshot ("library-choose-layer.png");
+    CHECK (panel->keyPressed (juce::KeyPress (juce::KeyPress::escapeKey)));
+    CHECK (panel->openSheetName().isEmpty());
+
+    // The trash: a sound sent there is listed there and comes back.
+    {
+        std::string e;
+        auto c = osp::library::Catalog::open (osp::library::Catalog::defaultFile(), e);
+        REQUIRE (c->trash (idC));
+    }
+    panel->selectScope ("trash");
+    REQUIRE (panel->settle());
+    REQUIRE (panel->rowCount() == 1);
+    panel->selectRow (0);
+    panel->loadSelected();   // in the trash: Restore
+    REQUIRE (panel->settle());
+    CHECK (panel->rowCount() == 0);
+    CHECK (sideCount (*panel, "all") == 3);
+
+    // Save (view E): a template from the window.
+    panel->setView (Panel::View::presets);
+    panel->openSaveSheet();
+    REQUIRE (panel->openSheetName() == "save");
+    auto* name = findTitled<juce::TextEditor> (*panel->sheet(), "Name");
+    REQUIRE (name != nullptr);
+    name->setText ("Library Made", false);
+    snapshot ("library-save.png");
+    auto* save = findTitled<juce::Button> (*panel->sheet(), "Save to Library");
+    REQUIRE (save != nullptr);
+    save->onClick();
+    REQUIRE (panel->settle());
+    CHECK (OspAudioProcessor::presetFolder().getChildFile ("Library Made.osppreset").existsAsFile());
+    CHECK (rowNamed (*panel, "Library Made") >= 0);
+    // Saving the same name again asks first; the old one would go to the trash.
+    panel->openSaveSheet();
+    findTitled<juce::TextEditor> (*panel->sheet(), "Name")->setText ("Library Made", false);
+    findTitled<juce::Button> (*panel->sheet(), "Save to Library")->onClick();
+    CHECK (panel->openSheetName() == "choice");
+    panel->closeSheet();
+
+    // Settings (view J) and missing sounds (view K).
+    panel->openSettingsSheet();
+    REQUIRE (panel->settle());
+    CHECK (panel->openSheetName() == "settings");
+    snapshot ("library-settings.png");
+    panel->closeSheet();
+    panel->openMissingSheet();
+    REQUIRE (panel->settle());
+    CHECK (panel->openSheetName() == "missing");
+    panel->closeSheet();
+
+    // Every supported scale: nothing outside the window.
+    panel->setView (Panel::View::sounds);
+    REQUIRE (panel->settle());
+    for (const float scale : { 0.8f, 1.0f, 1.5f, 2.0f })
+    {
+        editor->setSize (juce::roundToInt (1448.0f * scale), juce::roundToInt (1086.0f * scale));
+        ui->refreshNow();
+        for (auto* child : panel->getChildren())
+            if (child->isVisible())
+            {
+                INFO (child->getTitle() << " " << child->getBounds().toString() << " at " << scale);
+                CHECK (panel->getLocalBounds().contains (child->getBounds()));
+            }
+    }
+    editor->setSize (1448, 1086);
+
+    // Cmd/Ctrl+L toggles it; closing stops the preview and gives the keys back.
+    p.setPreviewKeys (true, 1u);
+    ui->closeLibrary();
+    CHECK (ui->libraryWindow() == nullptr);
+    CHECK_FALSE (p.previewKeys());
+    CHECK (ui->keyPressed (juce::KeyPress ('l', juce::ModifierKeys::commandModifier, 0)));
+    CHECK (ui->libraryWindow() != nullptr);
+    ui->closeLibrary();
+}
+
 TEST_CASE ("plugin: a portable instrument is untrusted - nothing lands outside the store, damaged sounds are refused", "[plugin][security]")
 {
     TempDir tmp;
@@ -1546,10 +2042,19 @@ int main (int argc, char* argv[])
     setenv ("OSP_LIBRARY_DIR", library.getFullPathName().toRawUTF8(), 1);
 #endif
 
+    // ... and isolated Documents/OSP folders (presets, starting states, instruments).
+    const auto documents = store.getSiblingFile (store.getFileName() + "-documents");
+#if JUCE_WINDOWS
+    _putenv_s ("OSP_DOCUMENTS_DIR", documents.getFullPathName().toRawUTF8());
+#else
+    setenv ("OSP_DOCUMENTS_DIR", documents.getFullPathName().toRawUTF8(), 1);
+#endif
+
     juce::ScopedJuceInitialiser_GUI juceInit;
     const int result = Catch::Session().run (argc, argv);
     store.deleteRecursively();
     library.deleteRecursively();
+    documents.deleteRecursively();
     return result;
 }
 

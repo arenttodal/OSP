@@ -3,6 +3,7 @@
 #include "ArpSection.h"
 #include "Design.h"
 #include "EngineCard.h"
+#include "LibraryPanel.h"
 #include "MainSections.h"
 #include "ModulationPanel.h"
 #include "OspLookAndFeel.h"
@@ -170,6 +171,12 @@ public:
     void dragModulation (int source, juce::Point<float> where);
     int dropModulation (int source, juce::Point<float> where);
 
+    /** The Library window over the instrument's upper part (the keyboard stays below it and
+        plays the audition). Opened from the preset menu, the main menu or Cmd/Ctrl+L. */
+    void openLibrary (LibraryPanel::View view = LibraryPanel::View::presets);
+    void closeLibrary();
+    LibraryPanel* libraryWindow() noexcept { return libraryPanel.get(); }
+
 private:
     void timerCallback() override;
     /** Places everything in reference coordinates (once: the whole layout scales). */
@@ -278,6 +285,8 @@ private:
     juce::TooltipWindow tooltips { this, 700 };
 
     std::unique_ptr<MiniPanel> popup;
+    std::unique_ptr<LibraryPanel> libraryPanel;
+    void placeLibrary();
     int popupIndex = -1;
     int closedByLabelPress = -1;     // a press on an open popup's own label closes it (and must not reopen it)
     OutsideClickWatcher outsideClicks { *this };

@@ -95,8 +95,11 @@ osp_set_warnings(osp_dsp)
 # ---------------------------------------------------------------------------
 add_library(osp_library STATIC
     src/library/Catalog.cpp
+    src/library/PreviewEngine.cpp
 )
 target_include_directories(osp_library PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+# The preview's root estimate uses the analysis (pure C++); osp_dsp never links the Library.
+target_link_libraries(osp_library PUBLIC osp_dsp)
 set_target_properties(osp_library PROPERTIES POSITION_INDEPENDENT_CODE ON)
 if(APPLE)
     # The SDK's own libsqlite3 (universal, always present); never a Homebrew copy, which is

@@ -299,12 +299,18 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       rules, each refusal explained; removing a route removes its depth routes in one undo step.
       Halo vs knob drop targets, a chooser where arcs lie together, drag tooltips, a quiet
       effective-depth accent, readout, amount editing. Headless `"routeDepth"` routes.
-- [ ] LIBRARY SYSTEM (queued spec, 13 stages; docs/library/): Stage 0 done - baseline audit,
-      Sample Forge audit (a JavaScript web app: its onset slicer is worth porting), the saved
-      state contract, risk register, decisions, requirements matrix; `.ospinstrument` import
-      hardened (path traversal, hash check). Next: Stage 1 architecture and the storage /
-      preset round-trip prototype. Stages 9 and 12 (iPhone, signing) need the user's Apple
-      account and hardware.
+- [ ] LIBRARY SYSTEM (queued spec, 13 stages; docs/library/): Stages 0-5 done.
+      0 audit, risk register, decisions; `.ospinstrument` import hardened.
+      1 SQLite catalog (WAL, FTS5, migrations; now version 3: ratings).
+      2 import transaction and resolver; every load and save recorded; cross-process safety.
+      3 portable manifest 2, rights check, recoverable loads, preset file operations.
+      4 preview engine (`src/library/PreviewEngine`, real-time safe, tested allocation-free),
+        audition (browser preview, A/B/C tray, keyboard audition, Load combination, load into
+        a layer, all recoverable), storage usage and emptying the trash into the system Trash.
+      5 the Library window (presets, templates, sounds, inspector, tray, save, settings,
+        missing sounds; docs/library/gui.md).
+      Next: Stage 6 tagging and one-shot discovery (scan folders). Stages 9 and 12 (iPhone,
+      signing) need the user's Apple account and hardware; DAW checks need a Mac.
 - [ ] MODULATION: compare the panel and halo against the mockups (not received); host checks
       (Logic, Ableton, REAPER, AudioPluginHost); a global envelope mode needs a
       gate-aggregation rule before ENV may reach the macros.

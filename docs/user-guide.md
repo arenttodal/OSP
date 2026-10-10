@@ -454,6 +454,44 @@ damaged or incomplete file is refused before anything changes. When you export o
 any sound whose rights are unknown (a file you dropped in, for example) is named, and the
 export asks you to confirm you may share it; that answer is remembered.
 
+## The Library
+
+Every sound you load, every preset and template you save, in one window. Open it from the
+preset name's menu (**Open Library…**), from **⋮ → Library…**, or with **Cmd/Ctrl+L**. It
+covers the instrument down to the keyboard; the keyboard stays below it. **×**, Escape or
+Cmd/Ctrl+L close it.
+
+- **Presets, Templates, Sounds** at the top. On the left: All, Factory, User, Packs,
+  Favorites, Recent, Trash; your collections (**+** makes one); the categories or sound
+  types, each with how many it holds. Type in the search field to narrow it.
+- **Presets** are complete instruments with their sounds. **Templates** are settings only,
+  ready for your own sounds; the built-in starting states (Natural, Alive, …) are there,
+  read only. Double-click (or **Load**) to open one. **Back to previous patch** at the
+  bottom undoes it.
+- **Sounds**: every sound you have loaded is kept here automatically. Click one to see it in
+  the inspector on the right: its waveform (click it, ▶, or press Space to hear it), Type,
+  root note, collections, tags, notes and details. **Load to A / B / C** puts it in that
+  layer; **Load to First Empty** in the first free one (when all three are full, it asks
+  which to replace).
+- **Audition**: drag up to three sounds into **A**, **B** and **C** at the bottom (or click
+  an empty slot to take the selected sound). Click a slot to hear it, ▶ to hear all three
+  together. Switch **Keys play the audition** to play them on the keyboard, pitched. None of
+  this changes your patch. **Load to Instrument** puts them in A, B and C at once (layers
+  keep their settings); **Back to previous patch** undoes it.
+- **Save…** (top right) saves the patch as a preset (with its sounds) or a template
+  (settings only), with a category, tags and a description. Tick **Include audio as
+  portable copy** to also write an `.ospinstrument` you can share. An existing name is
+  never overwritten silently: the old one goes to the Library's trash.
+- Stars rate, the heart marks a favourite (the same as the header's heart). Right-click
+  anything for more: rename, duplicate, export, category, rating, move to the trash.
+  Nothing is deleted at once: the **Trash** keeps it until you restore it or empty the
+  trash.
+- **⋯ → Library settings**: the preview level (yours, not the patch's), how much space the
+  kept sounds take, and **Empty Library trash** (it asks first; files go to the computer's
+  Trash, so even that can be undone). **⋯ → Missing sounds** lists sounds whose files can
+  no longer be found; **Locate…** points the Library to the file (checked by its contents,
+  not its name).
+
 ## When a sound is unusual
 
 Recordings longer than a minute play with Tape pitch even when Natural is selected (Natural keeps four extra copies of the sound); the status line says so. Files longer than ten minutes are shortened to their first ten minutes.

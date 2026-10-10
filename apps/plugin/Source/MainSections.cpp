@@ -670,6 +670,14 @@ void PresetBar::mouseUp (const juce::MouseEvent& e)
                 if (safe->onChange != nullptr)
                     safe->onChange();
             };
+            if (onOpenLibrary != nullptr)
+            {
+                menu.addItem (juce::String::fromUTF8 ("Open Libraryâ¦"), [safe] {
+                    if (safe != nullptr && safe->onOpenLibrary != nullptr)
+                        safe->onOpenLibrary();
+                });
+                menu.addSeparator();
+            }
             // Loading replaced the whole patch: the one before it is a click away.
             if (processor.canRestorePreviousState())
             {

@@ -2,7 +2,7 @@
 
 `mockups/library-mockups.png`: the user's ten-panel reference for the Library GUI (Stage 5
 onward). The existing ANDOR/OSP visual system stays authoritative; these fix layout and
-content.
+content. Built: panels 2, 3, 4, 5 and 10 (docs/library/gui.md); 6-8 come with Stages 6-8.
 
 | Panel | View | What it fixes | Stage |
 |---|---|---|---|

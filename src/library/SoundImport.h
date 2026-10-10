@@ -5,6 +5,7 @@
 #include <atomic>
 #include <chrono>
 #include <filesystem>
+#include <functional>
 #include <optional>
 #include <string>
 #include <vector>
@@ -66,6 +67,35 @@ struct Resolution
     std::vector<std::filesystem::path> missing; ///< known places that are gone or hold other bytes
 };
 Resolution resolveSound (const Catalog& catalog, const std::filesystem::path& storeDir, const std::string& contentHash);
+
+/** What the managed store holds (Library settings: storage). */
+struct StorageUsage
+{
+    int files = 0;
+    std::int64_t bytes = 0;
+    int library = 0;               ///< a Library sound holds it, or a preset needs it
+    std::int64_t libraryBytes = 0;
+    int trashOnly = 0;             ///< only sounds in the Library's trash hold it
+    std::int64_t trashOnlyBytes = 0;
+    int untracked = 0;             ///< no record (loaded before the Library existed): kept, projects may use it
+    std::int64_t untrackedBytes = 0;
+};
+StorageUsage storageUsage (const Catalog& catalog, const std::filesystem::path& storeDir);
+
+struct TrashEmptied
+{
+    int records = 0;               ///< sound and preset records removed for good
+    int files = 0;                 ///< files moved away (stored copies, trashed preset files)
+    std::int64_t bytes = 0;
+    std::vector<std::string> failed;   ///< what could not be moved (left as it was)
+};
+/** Empties the Library's trash. Every trashed sound and preset record is removed for good; a
+    trashed preset's file and a stored copy that nothing else holds (no other sound record, no
+    preset, nothing in `inUse` - what open instances play) are handed to `moveAway` (the
+    system Trash, so even this stays recoverable). A copy something still holds is kept.
+    Background thread. */
+TrashEmptied emptyTrash (Catalog& catalog, const std::filesystem::path& storeDir, const std::vector<std::string>& inUse,
+                         const std::function<bool (const std::filesystem::path&)>& moveAway);
 
 /** "sha256:<hex>" -> "<hex>" (and plain hex unchanged). */
 std::string hexOf (const std::string& contentHash);

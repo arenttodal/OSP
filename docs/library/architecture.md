@@ -46,6 +46,13 @@ apps/plugin/Source/Library*  (GUI: overlay, browser views, inspector, audition t
 src/library/preview          (the preview voices, fed by the plugin's audio callback; Stage 4)
 ```
 
+As built (Stages 1-5): `src/library/Catalog` (assets, sounds, presets, tags, collections,
+history, locations, search, counts), `src/library/SoundImport` (import transaction,
+resolver, storage usage, emptying the trash), `src/library/PreviewEngine` (the preview
+voices); in the plugin, `LibraryService` (the catalog thread, `post` / `request` /
+`deliver`), `Audition` (preview decoding, the tray, Library loads) and `LibraryPanel` (the
+window, docs/library/gui.md).
+
 Rules (CLAUDE.md 1, 3, 6): the catalog never runs on the audio thread and is not linked by
 the engine (`osp_dsp`); sounds reach the engine only through the existing loader and
 `ModelExchange`. The Library service does not depend on GUI widgets.
@@ -55,8 +62,10 @@ the engine (`osp_dsp`); sounds reach the engine only through the existing loader
 - **Message thread**: GUI; it calls Library operations that return immediately with a job, or
   short reads (a page of search results) that touch only the catalog.
 - **Library worker** (one `juce::ThreadPool` per process, low priority): imports, hashing,
-  decoding, analysis, scanning, inbox. Results return to the message thread
-  (`MessageManager::callAsync`).
+  decoding, analysis, scanning, inbox. As built: one catalog thread per plugin instance
+  (`LibraryService`) and one preview-decoding thread (`Audition`); results return to the
+  message thread through a queue the timers drain (`deliver()`), so they also arrive in
+  headless tests.
 - **Audio thread**: never touches the Library. The preview engine reads only prepared
   buffers handed over by atomic pointer swap (like `ModelExchange`).
 - **Database**: one connection per thread, WAL, `busy_timeout` 5 s, short transactions;

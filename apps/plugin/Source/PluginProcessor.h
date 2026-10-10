@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Audition.h"
 #include "InstrumentLoader.h"
 #include "LibraryService.h"
 #include "LoadedInstrument.h"
@@ -74,6 +75,21 @@ public:
     static std::vector<std::string> soundHashesInState (const juce::XmlElement& state);
     /** The Library catalog's door (loads and saves are recorded through it). */
     LibraryService& libraryService() noexcept { return *libraryHub; }
+    /** Hearing Library sounds without changing the patch (the browser's preview, the audition
+        tray), and loading them (Library Stage 4). */
+    Audition& audition() noexcept { return *auditionHub; }
+    /** While on, the keyboard (on screen and MIDI) plays the preview's slots in `slotMask`
+        instead of the instrument (the instrument's notes stop when it turns on). */
+    void setPreviewKeys (bool on, unsigned slotMask) noexcept
+    {
+        previewKeysMask.store (slotMask, std::memory_order_relaxed);
+        previewKeysOn.store (on, std::memory_order_release);
+    }
+    bool previewKeys() const noexcept { return previewKeysOn.load (std::memory_order_relaxed); }
+    /** Library loads: each (layer, file) into its layer - an occupied layer keeps its controls,
+        an empty one is added to the mix - as one recoverable step ("Back to the patch before
+        `label`"). Message thread. */
+    bool loadLibrarySounds (const std::vector<Audition::LayerLoad>& sounds, const juce::String& label);
     bool savePreset (const juce::File& file);
     bool loadPreset (const juce::File& file);
     /** One file with the sources, their analysis and the settings: opens on any computer. */
@@ -371,6 +387,13 @@ public:
     void openPresetEntry (const PresetEntry& entry);
     bool isFavourite() const;
     void toggleFavourite();
+    /** A preset or starting state's favourite mark by name (the header's heart and the Library's). */
+    bool isFavouriteName (const juce::String& name) const;
+    void setFavouriteName (const juce::String& name, bool favourite);
+    /** The content hashes the layers play now (the Library never moves these away). */
+    std::vector<std::string> soundsInUse() const;
+    /** The built-in starting states' names (the Library lists them as factory templates). */
+    static juce::StringArray factoryStartingStates();
 private:
     const juce::StringArray& favourites() const;
     mutable juce::StringArray favouriteNames;
@@ -495,6 +518,7 @@ public:
     static const juce::StringArray& shapingIds();
 private:
     void handleMidi (const juce::MidiMessage& message) noexcept;
+    void routePreviewKeys (juce::MidiBuffer& midi) noexcept;
     void swapInstrumentIfPending() noexcept;
     /** The arpeggiator stage: from the block's incoming MIDI to the notes the engine plays
         (the incoming buffer itself while it is off, otherwise its own preallocated one). */
@@ -516,6 +540,12 @@ private:
     // Loader
     SampleStore store;
     std::unique_ptr<LibraryService> libraryHub;   ///< the catalog (background thread; never the audio thread)
+    library::PreviewEngine preview;               ///< the Library's audition path (rendered after the instrument, dry)
+    std::unique_ptr<Audition> auditionHub;        ///< feeds `preview` (background decoding)
+    std::atomic<bool> previewKeysOn { false };
+    std::atomic<unsigned> previewKeysMask { 0 };
+    bool previewKeysActive = false;               ///< audio thread
+    juce::MidiBuffer previewMidi;                 ///< preallocated in prepareToPlay
     std::unique_ptr<juce::XmlElement> previousState;   ///< the patch before the last preset / template / instrument load
     juce::String previousStateLabel;
     void rememberPreviousState (const juce::String& what);

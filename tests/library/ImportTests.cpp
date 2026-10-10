@@ -271,3 +271,66 @@ TEST_CASE ("library resolver: store first, then where it was seen by its bytes, 
     CHECK_FALSE (found.file.has_value());
     CHECK (found.missing.size() == 1);
 }
+
+TEST_CASE ("library storage: usage by what holds it; emptying the trash moves away only what nothing holds", "[unit][library][import]")
+{
+    Fixture f;
+    const auto keep = importSound (*f.catalog, f.store, Fixture::request (f.wav ("keep.wav", 110.0)));
+    const auto drop = importSound (*f.catalog, f.store, Fixture::request (f.wav ("drop.wav", 220.0)));
+    const auto needed = importSound (*f.catalog, f.store, Fixture::request (f.wav ("needed.wav", 330.0)));
+    const auto playing = importSound (*f.catalog, f.store, Fixture::request (f.wav ("playing.wav", 440.0)));
+    REQUIRE ((keep.ok && drop.ok && needed.ok && playing.ok));
+    // A stored copy without any record (loaded before the Library existed): never touched.
+    const auto loose = f.wav ("loose.wav", 550.0);
+    const auto looseHex = *io::sha256OfFile (loose);
+    std::filesystem::copy_file (loose, f.store / (looseHex + ".wav"));
+    std::ofstream (f.store / (hexOf (drop.contentHash) + ".analysis.json")) << "{}";
+
+    Asset preset;
+    preset.type = AssetType::preset;
+    preset.name = "Uses needed";
+    REQUIRE (f.catalog->addPreset (preset, PresetInfo { "/p/n.osppreset", "user", 10, 1, { needed.contentHash } }));
+
+    for (const auto* r : { &drop, &needed, &playing })
+        REQUIRE (f.catalog->trash (r->assetId));
+    auto usage = storageUsage (*f.catalog, f.store);
+    CHECK (usage.files == 5);
+    CHECK (usage.library == 2);     // keep, and needed (a preset needs it)
+    CHECK (usage.trashOnly == 2);   // drop, playing
+    CHECK (usage.untracked == 1);
+    CHECK (usage.bytes == usage.libraryBytes + usage.trashOnlyBytes + usage.untrackedBytes);
+
+    std::vector<std::filesystem::path> moved;
+    const auto away = f.dir / "system-trash";
+    std::filesystem::create_directories (away);
+    const auto result = emptyTrash (*f.catalog, f.store, { playing.contentHash }, [&] (const std::filesystem::path& p) {
+        moved.push_back (p);
+        std::error_code ec;
+        std::filesystem::rename (p, away / p.filename(), ec);
+        return ! ec;
+    });
+    CHECK (result.records == 3);
+    REQUIRE (result.files == 1);
+    CHECK (moved.front() == drop.stored);
+    CHECK (std::filesystem::exists (away / drop.stored.filename()));   // recoverable
+    CHECK_FALSE (std::filesystem::exists (f.store / (hexOf (drop.contentHash) + ".analysis.json")));
+    CHECK (std::filesystem::exists (needed.stored));    // a preset needs it
+    CHECK (std::filesystem::exists (playing.stored));   // an open instance plays it
+    CHECK (std::filesystem::exists (keep.stored));
+    CHECK (std::filesystem::exists (f.store / (looseHex + ".wav")));
+    CHECK_FALSE (f.catalog->asset (drop.assetId).has_value());
+    CHECK (f.catalog->asset (keep.assetId).has_value());
+    usage = storageUsage (*f.catalog, f.store);
+    CHECK (usage.files == 4);
+    CHECK (usage.trashOnly == 0);
+    CHECK (usage.untracked == 2);   // playing has no record now, but stays
+    CHECK (f.catalog->integrityCheck() == "ok");
+
+    // A file that cannot be moved stays, and says so.
+    const auto again = importSound (*f.catalog, f.store, Fixture::request (f.wav ("again.wav", 660.0)));
+    REQUIRE (f.catalog->trash (again.assetId));
+    const auto refused = emptyTrash (*f.catalog, f.store, {}, [] (const std::filesystem::path&) { return false; });
+    CHECK (refused.files == 0);
+    CHECK (refused.failed.size() == 1);
+    CHECK (std::filesystem::exists (again.stored));
+}

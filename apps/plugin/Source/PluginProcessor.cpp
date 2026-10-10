@@ -753,6 +753,10 @@ OspAudioProcessor::OspAudioProcessor()
             rp[k] = parameters.getRawParameterValue (modRouteId (r, names[k]));
     }
     libraryHub = std::make_unique<LibraryService> (store.directory());
+    auditionHub = std::make_unique<Audition> (preview, *libraryHub, store.directory(),
+                                              [this] (const std::vector<Audition::LayerLoad>& sounds, const juce::String& label) {
+                                                  return loadLibrarySounds (sounds, label);
+                                              });
     parameters.state.addListener (this);   // META-MODULATION's links (ModLinks)
     refreshModLinks();
     for (int c = 0; c < 4; ++c)
@@ -819,6 +823,7 @@ OspAudioProcessor::~OspAudioProcessor()
 {
     stopTimer();
     parameters.state.removeListener (this);
+    auditionHub.reset();  // its decoding finishes first; it posts to the catalog thread
     libraryHub.reset();   // finishes the queued catalog work (short jobs)
     for (auto* p : reimaginedParameters)
         if (p != nullptr)
@@ -859,6 +864,9 @@ void OspAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     // never grows it (MidiBuffer stores 4 bytes of header plus the message per event).
     arpeggiator.prepare (sampleRate);
     arpMidi.ensureSize (static_cast<std::size_t> (Arpeggiator::maxEvents + 4096) * 16);
+    previewMidi.ensureSize (4096 * 16);
+    preview.prepare (sampleRate);
+    previewKeysActive = false;
     applyParameters (true);
 }
 
@@ -1903,6 +1911,38 @@ void OspAudioProcessor::handleMidi (const juce::MidiMessage& m) noexcept
     }
 }
 
+void OspAudioProcessor::routePreviewKeys (juce::MidiBuffer& midi) noexcept
+{
+    // Audio thread. While the Library auditions on the keyboard, notes go to the preview and
+    // the instrument sees everything else; switching over stops the side that loses the keys.
+    const bool on = previewKeysOn.load (std::memory_order_acquire);
+    if (on == previewKeysActive && ! on)
+        return;
+    previewMidi.clear();
+    if (on != previewKeysActive)
+    {
+        if (on)   // the instrument's (and the arpeggiator's) held notes end
+            previewMidi.addEvent (juce::MidiMessage::allNotesOff (1), 0);
+        else
+            preview.allNotesOff();
+        previewKeysActive = on;
+    }
+    if (! on)
+        return;
+    const auto mask = previewKeysMask.load (std::memory_order_relaxed);
+    for (const auto m : midi)
+    {
+        const auto status = m.numBytes >= 3 ? (m.data[0] & 0xf0) : 0;
+        if (status == 0x90 && m.data[2] > 0)
+            preview.noteOn (m.data[1], static_cast<float> (m.data[2]) / 127.0f, mask);
+        else if (status == 0x80 || (status == 0x90 && m.data[2] == 0))
+            preview.noteOff (m.data[1]);
+        else
+            previewMidi.addEvent (m.data, m.numBytes, m.samplePosition);
+    }
+    midi.swapWith (previewMidi);
+}
+
 void OspAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
 {
     juce::ScopedNoDenormals noDenormals;
@@ -1910,6 +1950,7 @@ void OspAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
 
     keyboardState.processNextMidiBuffer (midi, 0, numSamples, true);
     swapInstrumentIfPending();
+    routePreviewKeys (midi);
 
     // A bounce or playback from the same position must perform identically (spec §33):
     // performance memory and the note counter restart whenever the transport starts.
@@ -1978,6 +2019,9 @@ void OspAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
         handleMidi (metadata.getMessage());
     }
     renderTo (numSamples);
+    // The Library's preview: after the instrument and its effects (dry), into the same output.
+    if (outChannels > 0)
+        preview.render (channels, outChannels, numSamples);
 
     for (int ch = outChannels; ch < buffer.getNumChannels(); ++ch)
         buffer.clear (ch, 0, numSamples);
@@ -2629,16 +2673,50 @@ bool OspAudioProcessor::isFavourite() const
 
 void OspAudioProcessor::toggleFavourite()
 {
+    const auto name = presetDisplayName();
+    setFavouriteName (name, ! isFavouriteName (name));
+}
+
+bool OspAudioProcessor::isFavouriteName (const juce::String& name) const
+{
+    return favourites().contains (name);
+}
+
+void OspAudioProcessor::setFavouriteName (const juce::String& name, bool favourite)
+{
     // Favourites are plain names in a text file beside the presets (shareable, editable).
     auto lines = favourites();
-    const auto name = presetDisplayName();
-    if (lines.contains (name))
-        lines.removeString (name);
-    else
+    if (favourite == lines.contains (name))
+        return;
+    if (favourite)
         lines.add (name);
+    else
+        lines.removeString (name);
     favouriteNames = lines;
     favouritesFile().getParentDirectory().createDirectory();
     favouritesFile().replaceWithText (lines.joinIntoString ("\n") + "\n");
+}
+
+juce::StringArray OspAudioProcessor::factoryStartingStates()
+{
+    juce::StringArray names;
+    for (const auto& state : startingStates)
+        names.add (state.name);
+    return names;
+}
+
+std::vector<std::string> OspAudioProcessor::soundsInUse() const
+{
+    std::vector<std::string> hashes;
+    for (int layer = 0; layer < numLayers; ++layer)
+        if (const auto instrument = currentInstrument (layer))
+        {
+            if (! instrument->contentHash.empty())
+                hashes.push_back (instrument->contentHash);
+            for (const auto& member : instrument->memberFiles)
+                hashes.push_back (member.contentHash);
+        }
+    return hashes;
 }
 
 bool OspAudioProcessor::waitForLoads (int timeoutMs)
@@ -2684,6 +2762,11 @@ void OspAudioProcessor::timerCallback()
         const std::lock_guard<std::mutex> lock (resultsMutex);
         results.swap (finishedLoads);
     }
+    preview.collectGarbage();
+    if (auditionHub != nullptr)
+        auditionHub->deliver();
+    if (libraryHub != nullptr)
+        libraryHub->deliver();
 
     std::array<bool, numLayers> published {};
     std::array<bool, numLayers> touched {};
@@ -3401,19 +3484,31 @@ bool OspAudioProcessor::loadStartingState (const juce::File& file)
     return true;
 }
 
+namespace
+{
+    /** Documents/OSP: the user's presets, starting states and instruments (OSP_DOCUMENTS_DIR
+        overrides it, so tests never touch a real user's folders). */
+    juce::File documentsRoot()
+    {
+        if (const char* dir = std::getenv ("OSP_DOCUMENTS_DIR"); dir != nullptr && *dir != 0)
+            return juce::File (juce::String::fromUTF8 (dir));
+        return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("OSP");
+    }
+}
+
 juce::File OspAudioProcessor::startingStateFolder()
 {
-    return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("OSP/Starting States");
+    return documentsRoot().getChildFile ("Starting States");
 }
 
 juce::File OspAudioProcessor::presetFolder()
 {
-    return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("OSP/Presets");
+    return documentsRoot().getChildFile ("Presets");
 }
 
 juce::File OspAudioProcessor::instrumentFolder()
 {
-    return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("OSP/Instruments");
+    return documentsRoot().getChildFile ("Instruments");
 }
 
 juce::Array<juce::File> OspAudioProcessor::findFiles (const juce::File& folder, const juce::String& extension)
@@ -3664,6 +3759,35 @@ bool OspAudioProcessor::importInstrument (const juce::File& file, juce::String& 
     }
     rememberPreviousState ("Before " + file.getFileNameWithoutExtension());
     applyStateXml (*xml);
+    return true;
+}
+
+bool OspAudioProcessor::loadLibrarySounds (const std::vector<Audition::LayerLoad>& sounds, const juce::String& label)
+{
+    if (sounds.empty())
+        return false;
+    for (const auto& s : sounds)
+        if (s.layer < 0 || s.layer >= numLayers || ! s.file.existsAsFile())
+            return false;
+    rememberPreviousState (label);
+    const bool pairBefore = occupiedLayerCount() >= 2;
+    for (const auto& s : sounds)
+    {
+        LoadRequest request;
+        request.file = s.file;
+        request.filename = s.filename.toStdString();
+        request.originalPath = s.originalPath.toStdString();
+        // An occupied layer keeps its controls (a new sound: its own root); a new layer starts
+        // neutral and is heard in the mix, as a dropped sound would be.
+        const bool added = ! isLayerOccupied (s.layer) && s.layer >= keptSlotCount.load();
+        setRootOverride (s.rootMidi, s.layer);   // the root the Library knows, else the analysis
+        if (added)
+            resetLayerControls (s.layer);
+        userLoads.insert (nextGeneration.load());
+        enqueueLoad (std::move (request), s.layer);
+        if (added)
+            makeLayerAudible (s.layer, pairBefore);
+    }
     return true;
 }
 

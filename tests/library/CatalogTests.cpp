@@ -528,7 +528,7 @@ TEST_CASE ("library: a writer killed mid-write leaves a sound catalog", "[unit][
     CHECK (c->addSound (named ("after the crash"), soundOf ("sha256:after")).has_value());
 }
 
-TEST_CASE ("library: a version 1 catalog migrates to version 2 and keeps everything", "[unit][library]")
+TEST_CASE ("library: a version 1 catalog migrates to the current version and keeps everything", "[unit][library]")
 {
     TempLibrary tmp;
     std::string id;
@@ -538,16 +538,18 @@ TEST_CASE ("library: a version 1 catalog migrates to version 2 and keeps everyth
         p.type = AssetType::preset;
         id = *c->addPreset (p, PresetInfo { "/presets/Old.osppreset", "user", 10, 1, { "sha256:x" } });
     }
-    // Back to what a version 1 build wrote (no trashed_from column, version 1).
+    // Back to what a version 1 build wrote (no trashed_from or rating column, version 1).
     {
         sqlite3* raw = nullptr;
         REQUIRE (sqlite3_open (tmp.file().string().c_str(), &raw) == SQLITE_OK);
-        REQUIRE (sqlite3_exec (raw, "ALTER TABLE presets DROP COLUMN trashed_from; UPDATE meta SET value = '1' WHERE key = 'schema_version';", nullptr, nullptr, nullptr)
+        REQUIRE (sqlite3_exec (raw, "ALTER TABLE presets DROP COLUMN trashed_from; ALTER TABLE assets DROP COLUMN rating; "
+                                    "UPDATE meta SET value = '1' WHERE key = 'schema_version';", nullptr, nullptr, nullptr)
                  == SQLITE_OK);
         sqlite3_close (raw);
     }
     auto c = openOrFail (tmp.file());
-    CHECK (c->version() == 2);
+    CHECK (c->version() == Catalog::schemaVersion);
+    CHECK (c->asset (id)->rating == 0);
     REQUIRE (c->preset (id).has_value());
     CHECK (c->preset (id)->soundHashes == std::vector<std::string> { "sha256:x" });
     CHECK (c->trashedFrom (id).empty());
@@ -589,4 +591,100 @@ TEST_CASE ("library: a renamed or moved preset keeps its identity", "[unit][libr
     q.text = "warmer";
     CHECK (c->search (q).size() == 1);
     CHECK_FALSE (c->movePreset ("no-such-id", "/x", "x"));
+}
+
+TEST_CASE ("library: catalog 3 - ratings, roots, categories, collections, lengths, counts and purging the trash", "[unit][library]")
+{
+    TempLibrary tmp;
+    auto c = openOrFail (tmp.file());
+    auto sound = [&] (const std::string& name, const std::string& hash, double seconds, const std::string& type) {
+        auto info = soundOf (hash);
+        info.durationSeconds = seconds;
+        info.fileSize = static_cast<std::int64_t> (seconds * 288000.0);
+        auto a = named (name);
+        a.category = type;
+        return *c->addSound (a, info);
+    };
+    const auto kick = sound ("Kick", "sha256:k", 0.4, "Percussion");
+    const auto pad = sound ("Warm Pad", "sha256:p", 8.0, "Pad");
+    const auto keys = sound ("Felt Keys", "sha256:e", 2.5, "Keys");
+    sound ("Glass Pad", "sha256:g", 6.0, "Pad");
+
+    REQUIRE (c->setRating (pad, 4));
+    REQUIRE (c->setRating (keys, 9));   // clamped
+    CHECK (c->asset (pad)->rating == 4);
+    CHECK (c->asset (keys)->rating == 5);
+    SearchQuery byRating;
+    byRating.sort = SearchQuery::Sort::rating;
+    CHECK (c->search (byRating).front().id == keys);
+
+    REQUIRE (c->setRootMidi (keys, 60.5));
+    CHECK (c->sound (keys)->rootMidi == 60.5);
+    REQUIRE (c->setRootMidi (keys, std::nullopt));
+    CHECK_FALSE (c->sound (keys)->rootMidi.has_value());
+
+    const auto counts = c->categoryCounts (AssetType::sound);
+    REQUIRE (counts.size() == 3);
+    CHECK (counts[1] == std::pair<std::string, int> { "Pad", 2 });
+    SearchQuery pads;
+    pads.category = "pad";
+    CHECK (c->count (pads) == 2);
+    SearchQuery shortOnes;
+    shortOnes.maxSeconds = 3.0;
+    shortOnes.sort = SearchQuery::Sort::length;
+    const auto shorts = c->search (shortOnes);
+    REQUIRE (shorts.size() == 2);
+    CHECK (shorts[0].id == kick);
+    shortOnes.minSeconds = 1.0;
+    CHECK (c->count (shortOnes) == 1);
+    SearchQuery text;
+    text.text = "pad";
+    text.limit = 1;
+    CHECK (c->count (text) == 2);   // limit is for pages, not counts
+    CHECK (c->search (text).size() == 1);
+
+    const auto drums = *c->createCollection ("Drums");
+    REQUIRE (c->addToCollection (drums, kick));
+    REQUIRE (c->renameCollection (drums, "Field Drums"));
+    SearchQuery field;
+    field.text = "field";
+    CHECK (c->search (field).size() == 1);   // collection names are searchable
+    auto all = c->collections();
+    REQUIRE (all.size() == 1);
+    CHECK (all[0].name == "Field Drums");
+    CHECK (all[0].count == 1);
+    CHECK (c->collections (AssetType::preset)[0].count == 0);
+    CHECK (c->collectionsOf (kick).size() == 1);
+
+    // Preset size: its sounds' bytes, each content once.
+    Asset preset = named ("Kit");
+    preset.type = AssetType::preset;
+    const auto kit = *c->addPreset (preset, PresetInfo { "/p/Kit.osppreset", "user", 10, 2, { "sha256:k", "sha256:p" } });
+    CHECK (c->presetBytes (kit) == static_cast<std::int64_t> (0.4 * 288000.0) + static_cast<std::int64_t> (8.0 * 288000.0));
+
+    // Recent: only what has a history.
+    REQUIRE (c->recordUse (pad, "loaded", 0));
+    SearchQuery recent;
+    recent.recentOnly = true;
+    recent.type = AssetType::sound;
+    CHECK (c->count (recent) == 1);
+    CHECK (c->lastUsed (pad) > 0);
+    CHECK (c->lastUsed (kick) == 0);
+
+    // The trash: only a trashed record can be purged, and then it is gone for good.
+    CHECK_FALSE (c->purge (kick));
+    REQUIRE (c->trash (kick));
+    SearchQuery trash;
+    trash.trashedOnly = true;
+    CHECK (c->count (trash) == 1);
+    CHECK_FALSE (c->contentInLibrary ("sha256:k"));
+    CHECK (c->contentInLibrary ("sha256:p"));
+    REQUIRE (c->purge (kick));
+    CHECK_FALSE (c->asset (kick).has_value());
+    CHECK_FALSE (c->sound (kick).has_value());
+    CHECK (c->count (trash) == 0);
+    CHECK (c->collections()[0].count == 0);
+    CHECK (c->integrityCheck() == "ok");
+    REQUIRE (c->deleteCollection (drums));
+    CHECK (c->collections().empty());
 }
