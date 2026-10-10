@@ -702,6 +702,62 @@ TEST_CASE ("plugin: sessions from before the layers recall into layer A", "[plug
     CHECK (mode->getValue() == Approx (mode->getDefaultValue()));   // One Shot, as it was made
 }
 
+TEST_CASE ("plugin: a portable instrument is untrusted - nothing lands outside the store, damaged sounds are refused", "[plugin][security]")
+{
+    TempDir tmp;
+    const auto store = tmp.dir.getChildFile ("store");
+    const juce::String previousStore (std::getenv ("OSP_SAMPLE_STORE"));
+#if JUCE_WINDOWS
+    _putenv_s ("OSP_SAMPLE_STORE", store.getFullPathName().toRawUTF8());
+#else
+    setenv ("OSP_SAMPLE_STORE", store.getFullPathName().toRawUTF8(), 1);
+#endif
+    const auto presetFile = tmp.dir.getChildFile ("settings.osppreset");
+    {
+        OspAudioProcessor p;
+        REQUIRE (p.savePreset (presetFile));
+    }
+    auto package = [&] (const juce::String& name, const std::vector<std::pair<juce::String, juce::String>>& entries) {
+        juce::ZipFile::Builder zip;
+        zip.addFile (presetFile, 9, "preset.xml");
+        for (const auto& [path, text] : entries)
+            zip.addEntry (new juce::MemoryInputStream (text.toRawUTF8(), text.getNumBytesAsUTF8(), true), 9, path, juce::Time::getCurrentTime());
+        const auto file = tmp.dir.getChildFile (name);
+        juce::FileOutputStream out (file);
+        REQUIRE (zip.writeToStream (out, nullptr));
+        return file;
+    };
+    // Path traversal: "..", nested folders and hidden names are skipped.
+    {
+        const auto evil = package ("evil.ospinstrument", { { "source/../escaped.wav", "x" }, { "analysis/../../escaped2.json", "{}" },
+                                                           { "source/sub/nested.wav", "x" }, { "source/.hidden", "x" } });
+        OspAudioProcessor p;
+        juce::String error;
+        p.importInstrument (evil, error);
+        CHECK_FALSE (tmp.dir.getChildFile ("escaped.wav").exists());
+        CHECK_FALSE (tmp.dir.getChildFile ("escaped2.json").exists());
+        CHECK_FALSE (tmp.dir.getParentDirectory().getChildFile ("escaped2.json").exists());
+        CHECK_FALSE (store.getChildFile ("sub").exists());
+        CHECK_FALSE (store.getChildFile (".hidden").exists());
+    }
+    // A sound whose bytes do not match its hash name is refused, and nothing is left behind.
+    {
+        const juce::String fakeHash ("0000000000000000000000000000000000000000000000000000000000000000");
+        const auto damaged = package ("damaged.ospinstrument", { { "source/" + fakeHash + ".wav", "not that sound" } });
+        OspAudioProcessor p;
+        juce::String error;
+        CHECK_FALSE (p.importInstrument (damaged, error));
+        CHECK (error.contains ("damaged"));
+        CHECK_FALSE (store.getChildFile (fakeHash + ".wav").exists());
+        CHECK_FALSE (store.getChildFile (fakeHash + ".wav.partial").exists());
+    }
+#if JUCE_WINDOWS
+    _putenv_s ("OSP_SAMPLE_STORE", previousStore.toRawUTF8());
+#else
+    setenv ("OSP_SAMPLE_STORE", previousStore.toRawUTF8(), 1);
+#endif
+}
+
 TEST_CASE ("plugin: presets and portable instruments travel to another computer", "[plugin]")
 {
     TempDir tmp;

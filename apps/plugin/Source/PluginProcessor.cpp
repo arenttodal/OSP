@@ -6,6 +6,7 @@
 #include "audio/utility/TestSignals.h"
 #include "core/PitchMath.h"
 #include "io/AudioFileIO.h"
+#include "io/ContentHash.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -3489,17 +3490,42 @@ bool OspAudioProcessor::importInstrument (const juce::File& file, juce::String& 
         const auto name = entry->filename;
         if (! name.startsWith ("source/") && ! name.startsWith ("analysis/"))
             continue;
-        const auto target = store.directory().getChildFile (name.fromFirstOccurrenceOf ("/", false, false));
-        if (target.existsAsFile() || target.getFileName().isEmpty() || target.getFileName().contains (".."))
+        // A package is untrusted: an entry is one plain file name inside its folder (no
+        // "..", no further folders, no absolute path), so nothing lands outside the store.
+        const auto leaf = name.fromFirstOccurrenceOf ("/", false, false);
+        if (leaf.isEmpty() || leaf.containsAnyOf ("/\\:") || leaf.contains ("..") || leaf.startsWithChar ('.'))
+            continue;
+        const auto target = store.directory().getChildFile (leaf);
+        if (target.getParentDirectory() != store.directory() || target.existsAsFile())
             continue;
         std::unique_ptr<juce::InputStream> in (zip.createStreamForEntry (i));
-        juce::FileOutputStream out (target);
-        if (in == nullptr || ! out.openedOk())
+        const auto temp = target.getSiblingFile (target.getFileName() + ".partial");
         {
+            juce::FileOutputStream out (temp);
+            if (in == nullptr || ! out.openedOk())
+            {
+                error = "cannot extract " + name;
+                return false;
+            }
+            out.writeFromInputStream (*in, -1);
+        }
+        // A sound is stored under its content hash: its bytes must match its name.
+        if (name.startsWith ("source/"))
+        {
+            const auto hash = io::sha256OfFile (temp.getFullPathName().toStdString());
+            if (! hash || juce::String (*hash) != target.getFileNameWithoutExtension())
+            {
+                temp.deleteFile();
+                error = "the package's sound " + leaf + " is damaged (its content does not match its name)";
+                return false;
+            }
+        }
+        if (! temp.moveFileTo (target))
+        {
+            temp.deleteFile();
             error = "cannot extract " + name;
             return false;
         }
-        out.writeFromInputStream (*in, -1);
     }
     std::unique_ptr<juce::InputStream> presetStream (zip.createStreamForEntry (*zip.getEntry ("preset.xml")));
     const auto xml = presetStream != nullptr ? juce::XmlDocument::parse (presetStream->readEntireStreamAsString()) : nullptr;
