@@ -9,25 +9,25 @@ Verified. Blocked rows name what is missing.
 | NF-02 | Existing presets and DAW recall keep working | all | PluginProcessor applyStateXml | [plugin] state tests | Verified (headless) | ctest | No DAW tested |
 | NF-03 | Plugin identifiers unchanged | all | apps/plugin/CMakeLists.txt | 00-baseline-audit.md | Verified | Ospx / Osp1 / com.osp.instrument |  |
 | NF-04 | Works offline, no account, no server | all | - | design review | In Progress |  |  |
-| NF-05 | No file / database / hashing / decoding on the audio thread | all | src/library (no audio entry) | review + link test | Not Started |  |  |
+| NF-05 | No file / database / hashing / decoding on the audio thread | all | osp_library is not linked by osp_dsp; no audio-thread entry | review | In Progress | CMake: osp_dsp has no osp_library | preview engine (Stage 4) to be reviewed |
 | NF-06 | User content exportable; documented formats | 2,3,10 | docs/library/*-format.md | round-trip tests | Not Started |  |  |
 | NF-07 | Never delete or overwrite user audio/presets without a recoverable operation | 2-10 | trash / soft delete | tests | Not Started |  |  |
 | S0-01 | Repository and Sample Forge audit | 0 | docs/library/00, 01 | - | Verified | this folder |  |
 | S0-02 | Existing state contract documented | 0 | 02-existing-state-contract.md | - | Verified |  |  |
 | S0-03 | Risk register | 0 | 03-risk-register.md | - | Verified |  |  |
 | S0-04 | Untrusted .ospinstrument import is safe | 0 | PluginProcessor::importInstrument | [plugin][security] | Verified | test passes | R-01 |
-| S1-01 | Three asset types (preset, template, sound), origin separate from type | 1 | src/library/core | unit | Not Started |  |  |
-| S1-02 | Stable asset IDs; content hash; locations separate from identity | 1 | src/library/core | unit | Not Started |  |  |
-| S1-03 | Operation contracts (inputs, outputs, errors, threading) | 1 | docs/library/architecture.md | - | Not Started |  |  |
-| S1-04 | Versioned schemas (database, preset, template, backup, analysis, inbox) | 1 | docs/library/schema.md | migration tests | Not Started |  |  |
-| S2-01 | SQLite catalog with migrations and integrity check | 2 | src/library/storage | unit | Not Started |  |  |
-| S2-02 | Full-text search (FTS5, fallback) | 2 | src/library/search | unit + 10k perf | Not Started |  |  |
-| S2-03 | Content-addressed managed audio, deduplication | 2 | SampleStore + catalog | unit | Not Started |  |  |
-| S2-04 | Recoverable import transaction | 2 | src/library/import | interruption tests | Not Started |  |  |
-| S2-05 | File resolution order; no name-only substitution | 2 | FileResolver | unit | Not Started |  |  |
+| S1-01 | Three asset types (preset, template, sound), origin separate from type | 1 | src/library/Catalog.h (AssetType, Origin) | [unit][library] | Tested | 8 cases pass |  |
+| S1-02 | Stable asset IDs; content hash; locations separate from identity | 1 | Catalog (UUID ids, sounds.content_hash, source_locations) | [unit][library] | Tested | one content / several records; rename keeps identity |  |
+| S1-03 | Operation contracts (inputs, outputs, errors, threading) | 1 | docs/library/architecture.md | - | Implemented | documented | each operation's tests land with its stage |
+| S1-04 | Versioned schemas (database, preset, template, backup, analysis, inbox) | 1 | schema.md, preset-format.md, template-format.md; Catalog::migrate | [unit][library] (newer schema refused untouched, index rebuilt) | Tested | catalog v1; portable manifest v2 specified | manifest v2 written in Stage 3 |
+| S2-01 | SQLite catalog with migrations and integrity check | 2 | src/library/Catalog.* | [unit][library] | Tested | WAL, busy timeout, integrity_check | recovery after an unclean shutdown: Stage 2 |
+| S2-02 | Full-text search (FTS5, fallback) | 2 | Catalog::search | [unit][library] | In Progress | prefix words, filters, sort, query syntax neutralised | 10k / 50k timing: Stage 2 |
+| S2-03 | Content-addressed managed audio, deduplication | 2 | SoundImport (the existing store layout) | [unit][library][import] | Tested | one stored copy per content; one record per (content, path); 4 instances x 6 files -> 6 copies, 6 records |  |
+| S2-04 | Recoverable import transaction | 2 | importSound | [unit][library][import] | Tested | .partial never a sound, cleared by age; cancel publishes nothing; copy hash-verified before rename | catalog-side `import_jobs` resume: with the Inbox (Stage 7) |
+| S2-05 | File resolution order; no name-only substitution | 2 | resolveSound | [unit][library][import] | Tested | store -> seen places by hash; a same-name different recording is missing | pack content and user relink: Stages 5 and 10 |
 | S2-06 | Indexed external files stay in place | 2 | scanning | unit | Not Started |  |  |
-| S2-07 | Multiple plugin instances share the catalog safely | 2 | storage | contention test | Not Started |  |  |
-| S2-08 | Integrity: duplicates, interrupted copy, corrupt audio, missing, read-only, disk full | 2 | storage/import | unit | Not Started |  |  |
+| S2-07 | Multiple plugin instances share the catalog safely | 2 | Catalog (WAL, one connection each) | [unit][library] 4 x 60 concurrent writes | Tested | no failure, integrity ok | across processes: Stage 2 |
+| S2-08 | Integrity: duplicates, interrupted copy, corrupt audio, missing, read-only, disk full | 2 | importSound, Catalog | [unit][library][import] | In Progress | duplicates, interrupted, damaged, empty, missing, unsupported tested | read-only skipped here (tests run as root); disk full not simulated; crash during a transaction relies on SQLite WAL |
 | S3-01 | Complete (portable) preset: manifest, state, audio, metadata, integrity | 3 | presets | round trip on a clean store | Not Started |  | existing .ospinstrument is the base |
 | S3-02 | Template: state without audio or private paths | 3 | templates | unit | Not Started |  |  |
 | S3-03 | Save / Save As / Save Template / Duplicate / Rename / Delete / Export | 3 | presets + GUI | unit + ui | Not Started |  |  |
@@ -60,3 +60,4 @@ Verified. Blocked rows name what is missing.
 | S11-02 | DAW testing in representative hosts | 11 | - | manual | Blocked |  | no DAW in this environment |
 | S12-01 | Signed, notarized installer | 12 | release | clean Mac | Blocked |  | needs Apple Developer certificates |
 | S12-02 | User documentation | 12 | docs | - | Not Started |  |  |
+| S1-05 | The catalog is never needed to recall a preset or project | 1 | D-02 | [plugin][library] | Tested | preset recalls its sound with the catalog deleted |  |

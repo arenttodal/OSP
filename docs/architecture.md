@@ -536,3 +536,13 @@ REIMAGINED routing, whose shared stage then hears the equalised layers). Its set
 the global LFOs' EQ routes (`effectiveEq`) every 32-sample control chunk, and the processor
 glides to them. Off, it is not in the path (bit-identical). The editor (`EqEditor`) draws
 `eq::responseDb`, the exact response of the running sections. Report: `docs/reports/eq.md`.
+
+## LIBRARY (in progress; docs/library/)
+
+The Library indexes sounds, presets and templates in one local SQLite catalog
+(`src/library`, `osp_library`: pure C++ on the system SQLite, WAL, shared by every instance).
+It is an index plus user metadata, never the store of record for audio: the content-addressed
+sample store keeps the sounds and presets refer to them by hash, so a project recalls without
+the catalog (decision D-02). `osp_dsp` never links it, and nothing of it runs on the audio
+thread. Architecture, contracts, schema and formats: `docs/library/architecture.md`,
+`schema.md`, `preset-format.md`, `template-format.md`; progress in `requirements-matrix.md`.

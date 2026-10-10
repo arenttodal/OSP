@@ -23,6 +23,8 @@ add_executable(osp_tests
     unit/ModulationTests.cpp
     unit/LayerEqTests.cpp
     unit/SampleSetTests.cpp
+    library/CatalogTests.cpp
+    library/ImportTests.cpp
     integration/RenderIntegrationTests.cpp
     integration/CorpusIntegrationTests.cpp
     integration/BakeoffIntegrationTests.cpp

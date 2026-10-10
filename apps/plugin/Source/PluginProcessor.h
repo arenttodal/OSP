@@ -68,6 +68,9 @@ public:
     void setStateInformation (const void* data, int sizeInBytes) override;
 
     // Presets and portable instruments (spec §52, §54). Message thread.
+    /** The sounds a saved state (session, preset) needs: every layer's and set member's
+        content hash ("sha256:<hex>"), sorted, without repeats. A template has none. */
+    static std::vector<std::string> soundHashesInState (const juce::XmlElement& state);
     bool savePreset (const juce::File& file);
     bool loadPreset (const juce::File& file);
     /** One file with the sources, their analysis and the settings: opens on any computer. */

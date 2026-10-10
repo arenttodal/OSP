@@ -38,6 +38,11 @@ struct LoadResult
 /** True for .wav/.wave/.aif/.aiff/.aifc (case-insensitive). */
 bool isSupportedAudioExtension (const std::filesystem::path& path);
 
+/** The file's format, rate, channels and length from its header only (nothing decoded): the
+    Library reads it for every import and scan. False with `error` when it is not audio OSP
+    can read. */
+bool readAudioFileInfo (const std::filesystem::path& path, AudioFileInfo& info, std::string& error);
+
 /**
     Decodes a WAV or AIFF file (PCM 8/16/24/32-bit, 32-bit float; AIFF-C sowt/fl32)
     into planar float. Never modifies the file. Never throws: failures (missing,

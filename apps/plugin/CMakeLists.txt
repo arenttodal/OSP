@@ -73,6 +73,7 @@ target_compile_definitions(OSP_Plugin PUBLIC
 target_link_libraries(OSP_Plugin
     PRIVATE
         osp_dsp
+        osp_library
         OSP_PluginData
         juce::juce_audio_utils
         juce::juce_audio_formats
@@ -91,6 +92,6 @@ if(OSP_BUILD_TESTS)
     target_compile_definitions(osp_plugin_tests PRIVATE
         $<TARGET_PROPERTY:OSP_Plugin,COMPILE_DEFINITIONS>
         OSP_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
-    target_link_libraries(osp_plugin_tests PRIVATE OSP_Plugin osp_dsp Catch2::Catch2)
+    target_link_libraries(osp_plugin_tests PRIVATE OSP_Plugin osp_dsp osp_library Catch2::Catch2)
     add_test(NAME plugin COMMAND osp_plugin_tests)
 endif()

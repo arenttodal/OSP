@@ -31,6 +31,43 @@ bool isSupportedAudioExtension (const std::filesystem::path& path)
     return ext == ".wav" || ext == ".wave" || ext == ".aif" || ext == ".aiff" || ext == ".aifc" || ext == ".flac";
 }
 
+bool readAudioFileInfo (const std::filesystem::path& path, AudioFileInfo& info, std::string& error)
+{
+    std::error_code ec;
+    if (! std::filesystem::is_regular_file (path, ec))
+    {
+        error = "file not found: " + path.string();
+        return false;
+    }
+    if (! isSupportedAudioExtension (path))
+    {
+        error = "unsupported file type '" + path.extension().string() + "' (supported: WAV, AIFF, FLAC)";
+        return false;
+    }
+    juce::AudioFormatManager formats;
+    formats.registerFormat (new juce::WavAudioFormat(), true);
+    formats.registerFormat (new juce::AiffAudioFormat(), false);
+    formats.registerFormat (new juce::FlacAudioFormat(), false);
+    std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (toJuceFile (path).createInputStream()));
+    if (reader == nullptr)
+    {
+        error = "could not read " + path.filename().string() + " (damaged, or an encoding OSP does not read)";
+        return false;
+    }
+    info.formatName = reader->getFormatName().contains ("AIFF") ? "AIFF" : (reader->getFormatName().contains ("FLAC") ? "FLAC" : "WAV");
+    info.bitDepth = static_cast<int> (reader->bitsPerSample);
+    info.isFloatingPoint = reader->usesFloatingPointData;
+    info.sampleRate = reader->sampleRate;
+    info.channels = static_cast<int> (reader->numChannels);
+    info.frames = reader->lengthInSamples;
+    if (! (info.sampleRate >= 1000.0 && info.sampleRate <= 768000.0) || info.channels < 1 || info.frames <= 0)
+    {
+        error = path.filename().string() + " holds no playable audio";
+        return false;
+    }
+    return true;
+}
+
 LoadResult loadAudioFile (const std::filesystem::path& path, const LoadOptions& options)
 {
     LoadResult result;

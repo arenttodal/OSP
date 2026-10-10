@@ -3275,6 +3275,24 @@ void OspAudioProcessor::republish (std::shared_ptr<const LoadedInstrument> instr
 //==============================================================================
 // Presets and portable instruments
 
+std::vector<std::string> OspAudioProcessor::soundHashesInState (const juce::XmlElement& state)
+{
+    std::vector<std::string> hashes;
+    for (const auto* id : { &ids::instrument, &ids::instrumentB, &ids::instrumentC })
+        if (const auto* layer = state.getChildByName (juce::Identifier (*id).toString()))
+        {
+            if (const auto hash = layer->getStringAttribute ("contentHash"); hash.isNotEmpty())
+                hashes.push_back (hash.toStdString());
+            if (const auto* set = layer->getChildByName ("Set"))
+                for (const auto* member : set->getChildWithTagNameIterator ("Member"))
+                    if (const auto hash = member->getStringAttribute ("contentHash"); hash.isNotEmpty())
+                        hashes.push_back (hash.toStdString());
+        }
+    std::sort (hashes.begin(), hashes.end());
+    hashes.erase (std::unique (hashes.begin(), hashes.end()), hashes.end());
+    return hashes;
+}
+
 bool OspAudioProcessor::savePreset (const juce::File& file)
 {
     const auto xml = createStateXml();

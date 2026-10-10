@@ -89,6 +89,26 @@ target_link_libraries(osp_dsp PRIVATE signalsmith-stretch)
 osp_set_warnings(osp_dsp)
 
 # ---------------------------------------------------------------------------
+# The Library (docs/library): the catalog of sounds, presets and templates. Pure C++ on the
+# system SQLite (macOS SDK, libsqlite3 elsewhere; decision D-03). Never linked by osp_dsp:
+# the engine and the audio thread do not see it.
+# ---------------------------------------------------------------------------
+add_library(osp_library STATIC
+    src/library/Catalog.cpp
+)
+target_include_directories(osp_library PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+set_target_properties(osp_library PROPERTIES POSITION_INDEPENDENT_CODE ON)
+if(APPLE)
+    # The SDK's own libsqlite3 (universal, always present); never a Homebrew copy, which is
+    # built for one architecture only.
+    target_link_libraries(osp_library PUBLIC sqlite3)
+else()
+    find_package(SQLite3 REQUIRED)
+    target_link_libraries(osp_library PUBLIC SQLite::SQLite3)
+endif()
+osp_set_warnings(osp_library)
+
+# ---------------------------------------------------------------------------
 # JUCE-backed I/O (audio decoding, MIDI files, JSON, hashing) and the research
 # library (render sessions, metrics, corpus runner, benchmark).
 #
@@ -103,6 +123,7 @@ set(OSP_IO_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/io/AnalysisJson.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/io/JsonUtil.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/midi/MidiFileIO.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/library/SoundImport.cpp
 )
 
 add_library(osp_juce_headless STATIC)
@@ -146,7 +167,7 @@ add_library(osp_research STATIC
     src/research/Experiment.cpp
 )
 target_include_directories(osp_research PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(osp_research PUBLIC osp_dsp osp_juce_headless)
+target_link_libraries(osp_research PUBLIC osp_dsp osp_library osp_juce_headless)
 target_compile_definitions(osp_research PUBLIC OSP_VERSION_STRING="${PROJECT_VERSION}")
 osp_set_warnings(osp_research)
 

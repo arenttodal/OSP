@@ -12,6 +12,7 @@
 #include "core/PitchMath.h"
 #include "engine/InstrumentEngine.h"
 #include "io/AudioFileIO.h"
+#include "library/Catalog.h"
 
 #define CATCH_CONFIG_RUNNER
 #include <catch2/catch_approx.hpp>
@@ -700,6 +701,101 @@ TEST_CASE ("plugin: sessions from before the layers recall into layer A", "[plug
     CHECK (restored.currentInstrument (1) == nullptr);
     auto* mode = restored.parameters.getParameter ("layerA.sourceMode");
     CHECK (mode->getValue() == Approx (mode->getDefaultValue()));   // One Shot, as it was made
+}
+
+// Library Stage 1 prototype: the catalog indexes what the instrument saves (a sound, a preset
+// and its sounds, a template without any) and is never needed to recall it.
+TEST_CASE ("plugin: library prototype - catalog round trip of a sound, a preset and a template; recall never needs it", "[plugin][library]")
+{
+    TempDir tmp;
+    const auto libraryDir = tmp.dir.getChildFile ("library");
+    const juce::String previousLibrary (std::getenv ("OSP_LIBRARY_DIR"));
+#if JUCE_WINDOWS
+    _putenv_s ("OSP_LIBRARY_DIR", libraryDir.getFullPathName().toRawUTF8());
+#else
+    setenv ("OSP_LIBRARY_DIR", libraryDir.getFullPathName().toRawUTF8(), 1);
+#endif
+    const auto file = writeSource (tmp.dir, "Warm Bass C2.wav", testsignals::vowel (midiToHz (36), 1.5, 48000.0, 4));
+    const auto presetFile = tmp.dir.getChildFile ("Warm.osppreset");
+    const auto templateFile = tmp.dir.getChildFile ("Warm Settings.ospstate");
+    std::string hash;
+    {
+        OspAudioProcessor p;
+        loadAndWait (p, file);
+        REQUIRE (p.currentInstrument() != nullptr);
+        hash = p.currentInstrument()->contentHash;
+        p.setParameterValue ("character", 70.0f);
+        REQUIRE (p.savePreset (presetFile));
+        REQUIRE (p.saveStartingState (templateFile));
+    }
+    const auto presetXml = juce::XmlDocument::parse (presetFile);
+    const auto templateXml = juce::XmlDocument::parse (templateFile);
+    REQUIRE (presetXml != nullptr);
+    REQUIRE (templateXml != nullptr);
+    CHECK (OspAudioProcessor::soundHashesInState (*presetXml) == std::vector<std::string> { hash });
+    CHECK (OspAudioProcessor::soundHashesInState (*templateXml).empty());
+    // A template carries no sound and no path to a private recording.
+    const auto templateText = templateFile.loadFileAsString();
+    CHECK_FALSE (templateText.contains ("contentHash"));
+    CHECK_FALSE (templateText.contains ("originalPath"));
+    CHECK_FALSE (templateText.contains ("Warm Bass C2"));
+
+    std::string soundId, presetId, templateId;
+    {
+        std::string error;
+        auto catalog = osp::library::Catalog::open (osp::library::Catalog::defaultFile(), error);
+        INFO (error);
+        REQUIRE (catalog != nullptr);
+        CHECK (catalog->defaultFile().string().find (libraryDir.getFullPathName().toStdString()) == 0);
+        osp::library::Asset sound;
+        sound.name = "Warm Bass C2";
+        osp::library::SoundInfo info;
+        info.contentHash = hash;
+        info.format = "wav";
+        soundId = catalog->addSound (sound, info).value_or ("");
+        osp::library::Asset preset;
+        preset.type = osp::library::AssetType::preset;
+        preset.name = "Warm";
+        presetId = catalog->addPreset (preset, { presetFile.getFileName().toStdString(), "user", 10, 1, OspAudioProcessor::soundHashesInState (*presetXml) })
+                       .value_or ("");
+        osp::library::Asset settings;
+        settings.type = osp::library::AssetType::templateState;
+        settings.name = "Warm Settings";
+        templateId = catalog->addPreset (settings, { templateFile.getFileName().toStdString(), "user", 10, 1, {} }).value_or ("");
+        REQUIRE_FALSE (soundId.empty());
+        REQUIRE_FALSE (presetId.empty());
+        REQUIRE_FALSE (templateId.empty());
+        REQUIRE (catalog->recordUse (soundId, "loaded", 0));
+    }
+    {
+        std::string error;
+        auto catalog = osp::library::Catalog::open (osp::library::Catalog::defaultFile(), error);
+        REQUIRE (catalog != nullptr);
+        CHECK (catalog->contentNeeded (hash));
+        CHECK (catalog->preset (presetId)->soundHashes == std::vector<std::string> { hash });
+        CHECK (catalog->preset (templateId)->soundHashes.empty());
+        CHECK (catalog->asset (templateId)->type == osp::library::AssetType::templateState);
+        CHECK (catalog->recent (5, osp::library::AssetType::sound).front().assetId == soundId);
+    }
+    // The catalog is an index: without it the preset still brings its sound back.
+    REQUIRE (libraryDir.deleteRecursively());
+    {
+        OspAudioProcessor p;
+        REQUIRE (p.loadPreset (presetFile));
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        REQUIRE (p.currentInstrument() != nullptr);
+        CHECK (p.currentInstrument()->contentHash == hash);
+        CHECK (p.parameterValue ("character") == Approx (70.0f));
+    }
+#if JUCE_WINDOWS
+    _putenv_s ("OSP_LIBRARY_DIR", previousLibrary.toRawUTF8());
+#else
+    if (previousLibrary.isEmpty())
+        unsetenv ("OSP_LIBRARY_DIR");
+    else
+        setenv ("OSP_LIBRARY_DIR", previousLibrary.toRawUTF8(), 1);
+#endif
 }
 
 TEST_CASE ("plugin: a portable instrument is untrusted - nothing lands outside the store, damaged sounds are refused", "[plugin][security]")

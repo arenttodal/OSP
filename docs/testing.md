@@ -36,6 +36,12 @@ chooser; screenshots meta-01..11), `[unit][mod][regression]`
 (the global LFO after ONE SHOT, without voices, across transport changes and repeated keys) and the hidden `[mod-cpu]`
 measurement (16 routes against none).
 
+The Library (docs/library): `[unit][library]` (the catalog: schema and reopen, identities,
+search with filters and sorting, inferred vs user tags, history, locations, a newer catalog
+left untouched, the search index rebuilt, four instances writing at once), `[plugin][library]`
+(a sound, a preset and a template indexed; recall without the catalog) and
+`[plugin][security]` (untrusted `.ospinstrument` packages).
+
 The arpeggiator: `[unit][arp]` (core: patterns, sample-exact host-grid timing over 60/90/120/174 BPM
 x 44.1/48/96 kHz x 32..512 blocks x all rates, free running, loops/jumps/tempo changes, gate,
 pedal, panic, hand-overs, a stuck-note stress test, RANDOM determinism, the research `"arp"`
