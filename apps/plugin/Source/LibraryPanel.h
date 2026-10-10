@@ -136,6 +136,16 @@ public:
     /** Stage 7: one pass over the Inbox folders (in the background). */
     void reconcileInbox();
     std::vector<int> selectedRows() const;
+    /** Stage 10: a pack (`.osppack`) checked, shown, then installed when the user agrees. */
+    void installPack (const juce::File& file);
+    /** Stage 10: the installed packs, with Remove. */
+    void openPacksSheet();
+    /** Stage 10: the whole Library into `folder` (a new `.ospbackup` folder). */
+    void exportBackup (const juce::File& folder, bool includeExternal);
+    /** Stage 10: a backup checked, shown, then merged in (asks how conflicts are decided). */
+    void restoreBackup (const juce::File& folder);
+    /** Stage 10: a collection as a pack (asks about sounds of unknown rights). */
+    void exportCollectionAsPack (const std::string& collectionId, const juce::String& name, const juce::File& out, bool confirmRights = false);
     /** The sheet showing now (empty: none) - "save", "settings", "missing", "prompt", "choice",
         "scan", "trim". */
     juce::String openSheetName() const;
@@ -160,6 +170,7 @@ public:
     class CandidateInspector;
     class ScanSheet;
     class TrimSheet;
+    class PacksSheet;
     class Detail;
     class Inspector;
     class Tray;
@@ -170,6 +181,7 @@ private:
     friend class CandidateInspector;
     friend class ScanSheet;
     friend class TrimSheet;
+    friend class PacksSheet;
     friend class Results;
     friend class Detail;
     friend class Inspector;

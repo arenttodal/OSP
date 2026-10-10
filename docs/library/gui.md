@@ -33,6 +33,9 @@ instrument's own materials, colours and type roles (`design::`, `type::`).
 | - | H Inbox | The same list for the Inbox folders' arrivals, newest first, with their state (Arriving…, Ready, Importing…, In Library, Cannot read, Missing) and reason (docs/library/inbox.md). Inbox folders are chosen in Library settings |
 | - | I Trim and slice | Waveform with zoom and scroll, cursor, slice regions with draggable edges and names; Suggest trim, Find slices (sensitivity), Split at cursor, Merge with next, Remove slice, Rename…, ▶ Slice, Reset; the slice list (include boxes); peak to −1 dB and zero-crossing options; **Save as New Sound / Save N Slices to Library** (docs/library/slicing.md) |
 
+| - | Packs (Stage 10) | **⋯ → Packs…**: installed packs (name, version, creator, id, factory), Install pack…, Remove pack (asks first). **⋯ → Install pack…** checks a `.osppack` and shows its name, version, creator, contents and licence before installing (Install / Update / Cancel). A collection's right-click: **Export as pack…** (asks before sharing sounds of unknown rights). docs/library/packs.md |
+| - | Backup (Stage 10) | **⋯ → Back up the Library…** (a name; Library only or including external files) and **⋯ → Restore a backup…** (shows what it holds; Keep mine / Newer wins / Cancel). Library settings shows the analysis cache and the preview cache, with Forget unused analysis and Clear preview cache. docs/library/backup.md |
+
 L (Mobile Capture) belongs to Stage 9 and is not in the window. There is no placeholder
 for it ("no placeholder buttons, no disconnected screens").
 
@@ -102,6 +105,12 @@ copied in by hand).
   unchanged; a slice into C.
 - Snapshots: `library-scan.png`, `library-scanned.png`, `library-inbox.png`,
   `library-trim.png`, `library-slices.png`, `library-settings-inbox.png`.
+
+`[plugin][library][library-packs]`: export a collection as a pack and back up a Library on
+one machine; install the pack (with its confirmation) and restore the backup (Keep mine) on
+another; the restored preset plays from the new store; a factory pack installed at startup.
+Snapshots: `library-pack-install.png`, `library-packs.png`, `library-restore.png`,
+`library-settings-caches.png`.
 
 `OSP_SNAPSHOT_DIR=<dir>` writes `library-presets.png`, `library-templates.png`,
 `library-sounds.png`, `library-choose-layer.png`, `library-save.png` and

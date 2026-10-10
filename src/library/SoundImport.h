@@ -57,6 +57,12 @@ struct ImportResult
     bool contentAlreadyStored = false; ///< the bytes were in the store already (no second copy)
 };
 
+/** Puts `file`'s bytes (SHA-256 `sha256Hex`) in the store under their hash: a copy checked
+    against the hash, then published by an atomic rename. An existing copy is returned as it
+    is (`alreadyStored`). */
+std::optional<std::filesystem::path> storeContent (const std::filesystem::path& storeDir, const std::filesystem::path& file, const std::string& sha256Hex,
+                                                   std::string& why, const std::atomic<bool>* cancel = nullptr, bool* alreadyStored = nullptr);
+
 /** The stored file for a content (any extension), or nothing. A `.partial` file never counts. */
 std::optional<std::filesystem::path> findStored (const std::filesystem::path& storeDir, const std::string& sha256Hex);
 

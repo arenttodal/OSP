@@ -9,9 +9,9 @@ Verified. Blocked rows name what is missing.
 | NF-02 | Existing presets and DAW recall keep working | all | PluginProcessor applyStateXml | [plugin] state tests | Verified (headless) | ctest | No DAW tested |
 | NF-03 | Plugin identifiers unchanged | all | apps/plugin/CMakeLists.txt | 00-baseline-audit.md | Verified | Ospx / Osp1 / com.osp.instrument |  |
 | NF-04 | Works offline, no account, no server | all | - | design review | In Progress |  |  |
-| NF-05 | No file / database / hashing / decoding on the audio thread | all | osp_library is not linked by osp_dsp; no audio-thread entry | review | In Progress | CMake: osp_dsp has no osp_library | preview engine (Stage 4) to be reviewed |
-| NF-06 | User content exportable; documented formats | 2,3,10 | docs/library/*-format.md | round-trip tests | Not Started |  |  |
-| NF-07 | Never delete or overwrite user audio/presets without a recoverable operation | 2-10 | trash / soft delete | tests | Not Started |  |  |
+| NF-05 | No file / database / hashing / decoding on the audio thread | all | osp_library is not linked by osp_dsp; the preview engine renders prepared buffers only; scans and imports on their own threads | [preview] allocation test; [plugin][qa] (bit-identical output while a scan and imports run) | Tested | allocation-free preview render; processBlock mean 174 us idle vs 183 us during a 1,000-file scan (VM) | measured on a Mac host still to do |
+| NF-06 | User content exportable; documented formats | 2,3,10 | preset-format.md, template-format.md, packs.md, backup.md | round-trip tests | Tested | portable instruments, packs and backups round-trip to another Library (tests) |  |
+| NF-07 | Never delete or overwrite user audio/presets without a recoverable operation | 2-10 | trash, system Trash, "(restored)" copies | [library] trash/restore, emptyTrash, restore conflicts | Tested | every removal goes through a trash; a restore never overwrites a different file (it writes beside, or trashes the older when the newer wins) |  |
 | S0-01 | Repository and Sample Forge audit | 0 | docs/library/00, 01 | - | Verified | this folder |  |
 | S0-02 | Existing state contract documented | 0 | 02-existing-state-contract.md | - | Verified |  |  |
 | S0-03 | Risk register | 0 | 03-risk-register.md | - | Verified |  |  |
@@ -54,11 +54,11 @@ Verified. Blocked rows name what is missing.
 | S8-03 | Derived assets with provenance | 8 | saveDerivedSound, Catalog::setDerivation/derivedFrom | [unit][library][slicer], [plugin][library-capture] | Tested | parent id, start/end, operations JSON, analysis version; identical audio keeps provenance; slices load into C | - |
 | S9-01 | iOS capture app (record, review, trim, export, history, settings) | 9 | mobile/AndorCapture | XCTest + device | Blocked |  | needs Xcode, a device, an Apple Developer account |
 | S9-02 | Phone-to-instrument end to end on real hardware | 9 | - | manual | Blocked |  | needs iPhone + Mac |
-| S10-01 | Factory and third-party packs, validated, no path traversal, no code | 10 | packs | unit + fuzz | Not Started |  |  |
-| S10-02 | Library backup (consistent snapshot) and restore on a clean machine | 10 | backup | clean-store test | Not Started |  |  |
-| S10-03 | Storage usage and safe cleanup | 10 | backup | unit | Not Started |  |  |
-| S11-01 | Full-system QA, stress, security, performance baselines | 11 | tests | suites | Not Started |  |  |
-| S11-02 | DAW testing in representative hosts | 11 | - | manual | Blocked |  | no DAW in this environment |
+| S10-01 | Factory and third-party packs, validated, no path traversal, no code | 10 | src/library/Packs, Archive; Packs sheet | [unit][library][packs] (+[security]); [plugin][library-packs] | Tested | install, update keeping user edits, downgrade refused, removal, export with rights check, factory packs apart from user data; hostile archives (traversal, links, duplicates, lying sizes, bad manifests, checksums, dependencies) refused whole | no factory content ships yet (D-20); zip archives up to 4 GB |
+| S10-02 | Library backup (consistent snapshot) and restore on a clean machine | 10 | src/library/Backup; ⋯ menu | [unit][library][backup]; [plugin][library-packs] | Tested | VACUUM INTO snapshot taken while another connection writes; restore on another machine keeps identities, rewrites folders, finds sounds in the store; second restore doubles nothing; conflicts kept or newer-wins; damaged and hostile backups refused | a real second Mac not used |
+| S10-03 | Storage usage and safe cleanup | 10 | storageUsage, Catalog::cacheUsage / forgetUnusedAnalysis, Audition preview cache; Library settings | [unit][library][backup] (cache); emptyTrash tests | Tested | managed copies by holder, analysis cache and unused part, preview cache (memory only); every action recoverable or re-creatable | untracked copies (from before the Library) are never offered for deletion: projects may use them |
+| S11-01 | Full-system QA, stress, security, performance baselines | 11 | docs/library/qa.md | [unit][library][qa], [plugin][library][qa], [.][library-qa-perf], [.][render-dump] | Tested | renders byte-identical to the pre-Library baseline 1537f7e (3 scenes); stress and security cases pass; numbers measured on the cloud VM | usability sessions with people, full disk on a real volume, read-only folders (tests run as root) |
+| S11-02 | DAW testing in representative hosts | 11 | docs/library/qa.md (checklist) | manual | Blocked |  | no Mac or DAW here; CI runs auval on every build |
 | S12-01 | Signed, notarized installer | 12 | release | clean Mac | Blocked |  | needs Apple Developer certificates |
 | S12-02 | User documentation | 12 | docs | - | Not Started |  |  |
 | S1-05 | The catalog is never needed to recall a preset or project | 1 | D-02 | [plugin][library] | Tested | preset recalls its sound with the catalog deleted |  |

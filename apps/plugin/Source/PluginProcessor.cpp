@@ -1,6 +1,7 @@
 #include "PluginProcessor.h"
 #include "ValueFormat.h"
 
+#include "LibraryPlaces.h"
 #include "PluginEditor.h"
 
 #include "audio/utility/TestSignals.h"
@@ -767,6 +768,11 @@ OspAudioProcessor::OspAudioProcessor()
             paths.emplace_back (f.toStdString());
         libraryHub->postBackground ([paths] (library::Catalog& c) { library::reconcileInbox (c, paths, juce::Time::currentTimeMillis()); });
     }
+    // Factory packs shipped with the plugin, when new or newer (user content is never touched).
+    if (const auto factory = factoryPackSource(); factory.isDirectory())
+        libraryHub->postBackground ([folder = std::filesystem::path (factory.getFullPathName().toStdString()), places = packPlaces()] (library::Catalog& c) {
+            library::installFactoryPacks (c, folder, places);
+        });
     parameters.state.addListener (this);   // META-MODULATION's links (ModLinks)
     refreshModLinks();
     for (int c = 0; c < 4; ++c)

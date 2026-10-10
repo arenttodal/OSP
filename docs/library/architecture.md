@@ -62,6 +62,15 @@ for scans and the Inbox (`postBackground` / `requestBackground`, `scanControl`,
 `scanProgress`), and `LibraryCapture.cpp` holds the candidate inspector, the scan sheet and
 the trim editor (docs/library/classification.md, inbox.md, slicing.md).
 
+As built (Stage 10): `src/library/Archive` (untrusted archives and paths, text cleaning,
+versions), `src/library/Packs` (pack manifest, install, update, removal, export, factory
+packs) and `src/library/Backup` (snapshot backup, merge restore), JUCE-backed for zip and
+JSON. In the catalog: version 5 (pack ids and keys), `snapshotTo`, `mergeFrom`, the cache
+usage. In the plugin: `LibraryPlaces` (where this installation keeps each thing),
+`LibraryPacks.cpp` (the window's pack and backup actions); the processor installs new
+factory packs at startup (docs/library/packs.md, backup.md). Stage 11's evidence:
+docs/library/qa.md.
+
 Rules (CLAUDE.md 1, 3, 6): the catalog never runs on the audio thread and is not linked by
 the engine (`osp_dsp`); sounds reach the engine only through the existing loader and
 `ModelExchange`. The Library service does not depend on GUI widgets.
@@ -113,9 +122,9 @@ and collections, never a sound a project needs (D-02).
 
 | What | Where | Version |
 |---|---|---|
-| Catalog schema | `meta.schema_version` | 4 (migrations in `Catalog::migrate`) |
+| Catalog schema | `meta.schema_version` | 5 (migrations in `Catalog::migrate`) |
 | Preset / template | the state XML's `stateVersion` | 10 (unchanged) |
 | Portable preset | `.ospinstrument` `manifest.json` `schemaVersion` | 1 -> 2 (adds metadata, provenance, checksums; 1 still reads) |
-| Library backup | `.ospbackup` manifest | 1 |
+| Library backup | `.ospbackup` folder's `manifest.json` | 1 |
 | Analysis | `audio_analysis.version` | `classifierVersion` 1 |
 | Inbox state | `inbox_items` (catalog v4) | with the catalog schema |

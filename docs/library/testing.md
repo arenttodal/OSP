@@ -13,6 +13,11 @@
 | `[unit][library][slicer]` | `DiscoveryTests.cpp`, `ScanInboxTests.cpp` | Sample Forge's slicer tests at three rates, sustained notes, trim, fades, stereo, gain, a quiet take, reverse; saved slices with provenance (docs/library/slicing.md) |
 | `[unit][library][scan]` | `tests/library/ScanInboxTests.cpp` | patterns; fast index then deep analysis; incremental rescans; corrections and removals that stick; set aside; removed and excluded files; offline roots; import evidence; pause, resume, cancel, skip long |
 | `[unit][library][inbox]` | same | the Inbox states: slow copy, iCloud placeholder, temporary names, duplicates, renames, missing, offline folder, crash mid-import, unreadable files; classification and evidence on import (docs/library/inbox.md) |
+| `[unit][library][packs]` (+`[security]`) | `tests/library/PackBackupTests.cpp` | pack format checks; export, install, update keeping user edits, downgrade, removal; hostile archives made byte by byte; factory packs (docs/library/packs.md) |
+| `[unit][library][backup]` (+`[security]`) | same | backup and restore on another machine, repeated restore, conflicts, a snapshot under concurrent writes, external files, cancel, damaged and hostile backups, the analysis cache (docs/library/backup.md) |
+| `[unit][library][qa]` (+`[security]`) | `tests/library/QaTests.cpp` | Unicode and long names, thousands of tags, short / huge / corrupt / unsupported audio, links never followed, repeated cancellation, damaged catalog records, an unwritable store (docs/library/qa.md) |
+| `[plugin][library-packs]`, `[plugin][library][qa]` | `tests/plugin/PluginProcessorTests.cpp` | packs and backup through the window; bit-identical output while scanning; several instances; rapid preset switching |
+| `[.][library-qa-perf]`, `[.][render-dump]` | same, `tests/plugin/RenderRegression.inc` | measured performance; renders for the before/after comparison with the pre-Library baseline |
 | `[plugin][library-capture]` | `tests/plugin/PluginProcessorTests.cpp` | the window's scan, review, Inbox and trim/slice flows end to end (docs/library/gui.md) |
 | `[.][library-corpus]`, `[.][library-scan-perf]` | `DiscoveryTests.cpp`, `ScanInboxTests.cpp` | the research corpus classified for a person to judge; scanning 1,000 / 10,000 / 50,000 files |
 

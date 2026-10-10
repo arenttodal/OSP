@@ -98,6 +98,8 @@ InboxPass reconcileInbox (Catalog& catalog, const std::vector<std::filesystem::p
             for (std::filesystem::recursive_directory_iterator it (folderPath, options, ec), end; it != end && ! ec; it.increment (ec))
             {
                 const auto leaf = it->path().filename().string();
+                if (it->is_symlink (ec))
+                    continue;   // never followed
                 if (it->is_directory (ec) && ! leaf.empty() && leaf[0] == '.')
                 {
                     it.disable_recursion_pending();
@@ -109,7 +111,7 @@ InboxPass reconcileInbox (Catalog& catalog, const std::vector<std::filesystem::p
         }
         else
             for (std::filesystem::directory_iterator it (folderPath, options, ec), end; it != end && ! ec; it.increment (ec))
-                if (it->is_regular_file (ec))
+                if (! it->is_symlink (ec) && it->is_regular_file (ec))
                     consider (it->path());
 
         for (const auto& [path, placeholderOnly] : present)

@@ -546,6 +546,7 @@ TEST_CASE ("library: a version 1 catalog migrates to the current version and kee
                                     "ALTER TABLE scan_files DROP COLUMN rejected; ALTER TABLE scan_files DROP COLUMN duration; ALTER TABLE scan_files DROP COLUMN sample_rate; "
                                     "ALTER TABLE scan_files DROP COLUMN channels; ALTER TABLE scan_files DROP COLUMN format; ALTER TABLE scan_files DROP COLUMN error; "
                                     "DROP TABLE classification_overrides; DROP TABLE inbox_items; "
+                                    "DROP INDEX assets_pack; ALTER TABLE assets DROP COLUMN pack_id; ALTER TABLE assets DROP COLUMN pack_key; "
                                     "UPDATE meta SET value = '1' WHERE key = 'schema_version';", nullptr, nullptr, nullptr)
                  == SQLITE_OK);
         sqlite3_close (raw);

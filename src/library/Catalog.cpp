@@ -395,6 +395,17 @@ bool Catalog::migrate()
             || ! exec ("UPDATE meta SET value = '4' WHERE key = 'schema_version'") || ! t.commit())
             return false;
     }
+    if (version() < 5)
+    {
+        // 5: which pack an asset came with and its key there (updates keep identities).
+        Transaction t (db);
+        if (! t.ok()
+            || ! exec ("ALTER TABLE assets ADD COLUMN pack_id TEXT NOT NULL DEFAULT ''; "
+                       "ALTER TABLE assets ADD COLUMN pack_key TEXT NOT NULL DEFAULT ''; "
+                       "CREATE INDEX IF NOT EXISTS assets_pack ON assets (pack_id, pack_key);")
+            || ! exec ("UPDATE meta SET value = '5' WHERE key = 'schema_version'") || ! t.commit())
+            return false;
+    }
     // Full-text search when this SQLite has FTS5; plain LIKE matching otherwise (R-09).
     fts = exec (ftsV1);
     if (fts)
@@ -402,7 +413,7 @@ bool Catalog::migrate()
         // The index's own version: its rows are keyed by the assets' rowids (an update is one
         // keyed delete and insert, never a scan). Any other version is rebuilt.
         Statement indexVersion (db, "SELECT value FROM meta WHERE key = 'fts_version'");
-        const bool indexCurrent = indexVersion.step() == SQLITE_ROW && indexVersion.text (0) == "2";
+        const bool indexCurrent = indexVersion.step() == SQLITE_ROW && indexVersion.text (0) == "3";
         Statement count (db, "SELECT (SELECT count(*) FROM assets) - (SELECT count(*) FROM assets_fts)");
         if (! indexCurrent || (count && count.step() == SQLITE_ROW && count.integer (0) != 0))
         {
@@ -414,7 +425,7 @@ bool Catalog::migrate()
                 ids.push_back (all.text (0));
             for (const auto& id : ids)
                 reindex (id);
-            exec ("INSERT OR REPLACE INTO meta (key, value) VALUES ('fts_version', '2')");
+            exec ("INSERT OR REPLACE INTO meta (key, value) VALUES ('fts_version', '3')");
         }
     }
     error.clear();
@@ -664,11 +675,12 @@ bool Catalog::setProvenance (const std::string& contentHash, const std::string& 
 
 std::optional<Asset> Catalog::asset (const std::string& id) const
 {
-    Statement s (db, "SELECT id, type, origin, name, category, notes, favourite, created, modified, trashed_at, rating FROM assets WHERE id = ?1");
+    Statement s (db, "SELECT id, type, origin, name, category, notes, favourite, created, modified, trashed_at, rating, pack_id FROM assets WHERE id = ?1");
     s.bind (1, id);
     if (s.step() != SQLITE_ROW)
         return std::nullopt;
     Asset a;
+    a.packId = s.text (11);
     a.id = s.text (0);
     a.type = assetTypeFrom (s.text (1)).value_or (AssetType::sound);
     a.origin = originFrom (s.text (2)).value_or (Origin::user);
@@ -1065,7 +1077,7 @@ void Catalog::reindex (const std::string& id)
                      "coalesce((SELECT group_concat(c.name, ' ') FROM collection_items ci JOIN collections c ON c.id = ci.collection_id WHERE ci.asset_id = a.id), ''), "
                      "a.notes, "
                      "coalesce((SELECT group_concat(sl.path, ' ') FROM sounds so JOIN source_locations sl ON sl.content_hash = so.content_hash WHERE so.asset_id = a.id), ''), "
-                     "coalesce((SELECT p.root FROM presets p WHERE p.asset_id = a.id), '') "
+                     "coalesce((SELECT k.name FROM packs k WHERE k.id = a.pack_id), (SELECT p.root FROM presets p WHERE p.asset_id = a.id), '') "
                      "FROM assets a WHERE a.id = ?1");
     s.bind (1, id);
     s.run();
@@ -1490,6 +1502,322 @@ std::vector<std::pair<std::string, int>> Catalog::categoryCounts (AssetType type
     while (s.step() == SQLITE_ROW)
         list.emplace_back (s.text (0), static_cast<int> (s.integer (1)));
     return list;
+}
+
+//==============================================================================
+// Packs
+
+bool Catalog::putPack (const PackRecord& p)
+{
+    Statement s (db, "INSERT INTO packs (id, name, version, creator, manifest, installed) VALUES (?1, ?2, ?3, ?4, ?5, ?6) "
+                     "ON CONFLICT (id) DO UPDATE SET name = excluded.name, version = excluded.version, creator = excluded.creator, "
+                     "manifest = excluded.manifest, installed = excluded.installed");
+    s.bind (1, p.id).bind (2, p.name).bind (3, p.version).bind (4, p.creator).bind (5, p.manifest).bind (6, p.installed > 0 ? p.installed : now());
+    return s.run();
+}
+
+std::optional<Catalog::PackRecord> Catalog::pack (const std::string& id) const
+{
+    Statement s (db, "SELECT id, name, version, creator, manifest, installed FROM packs WHERE id = ?1");
+    s.bind (1, id);
+    if (s.step() != SQLITE_ROW)
+        return std::nullopt;
+    return PackRecord { s.text (0), s.text (1), s.text (2), s.text (3), s.text (4), s.integer (5) };
+}
+
+std::vector<Catalog::PackRecord> Catalog::packs() const
+{
+    std::vector<PackRecord> list;
+    Statement s (db, "SELECT id, name, version, creator, manifest, installed FROM packs ORDER BY name COLLATE NOCASE");
+    while (s.step() == SQLITE_ROW)
+        list.push_back ({ s.text (0), s.text (1), s.text (2), s.text (3), s.text (4), s.integer (5) });
+    return list;
+}
+
+bool Catalog::removePackRecord (const std::string& id)
+{
+    Statement s (db, "DELETE FROM packs WHERE id = ?1");
+    s.bind (1, id);
+    return s.run();
+}
+
+bool Catalog::setPackKey (const std::string& assetId, const std::string& packId, const std::string& key)
+{
+    Statement s (db, "UPDATE assets SET pack_id = ?1, pack_key = ?2 WHERE id = ?3");
+    s.bind (1, packId).bind (2, key).bind (3, assetId);
+    if (! s.run() || sqlite3_changes (db) != 1)
+        return false;
+    reindex (assetId);
+    return true;
+}
+
+std::optional<std::string> Catalog::assetForPackKey (const std::string& packId, const std::string& key) const
+{
+    Statement s (db, "SELECT id FROM assets WHERE pack_id = ?1 AND pack_key = ?2 ORDER BY created LIMIT 1");
+    s.bind (1, packId).bind (2, key);
+    if (s.step() != SQLITE_ROW)
+        return std::nullopt;
+    return s.text (0);
+}
+
+std::vector<std::pair<std::string, std::string>> Catalog::packAssets (const std::string& packId) const
+{
+    std::vector<std::pair<std::string, std::string>> list;
+    Statement s (db, "SELECT id, pack_key FROM assets WHERE pack_id = ?1 ORDER BY pack_key");
+    s.bind (1, packId);
+    while (s.step() == SQLITE_ROW)
+        list.emplace_back (s.text (0), s.text (1));
+    return list;
+}
+
+bool Catalog::replaceSoundContent (const std::string& id, const SoundInfo& info, const std::string& place)
+{
+    Transaction t (db);
+    if (! t.ok())
+        return false;
+    Statement s (db, "UPDATE sounds SET content_hash = ?1, managed = ?2, format = ?3, sample_rate = ?4, channels = ?5, bit_depth = ?6, frames = ?7, "
+                     "duration = ?8, file_size = ?9, provenance = ?10 WHERE asset_id = ?11");
+    s.bind (1, info.contentHash).bind (2, info.managed ? 1 : 0).bind (3, info.format).bind (4, info.sampleRate).bind (5, info.channels).bind (6, info.bitDepth)
+        .bind (7, info.frames).bind (8, info.durationSeconds).bind (9, info.fileSize).bind (10, info.provenance.empty() ? std::string ("unknown") : info.provenance)
+        .bind (11, id);
+    Statement where (db, "INSERT INTO source_locations (content_hash, path, kind, last_seen, available) VALUES (?1, ?2, 'original', ?3, 1) "
+                         "ON CONFLICT (content_hash, path) DO UPDATE SET last_seen = excluded.last_seen, available = 1");
+    where.bind (1, info.contentHash).bind (2, place).bind (3, now());
+    Statement touched (db, "UPDATE assets SET modified = ?1 WHERE id = ?2");
+    touched.bind (1, now()).bind (2, id);
+    if (! s.run() || sqlite3_changes (db) != 1 || ! where.run() || ! touched.run())
+        return false;
+    reindex (id);
+    return t.commit();
+}
+
+bool Catalog::updatePreset (const std::string& id, const std::string& name, const PresetInfo& info)
+{
+    Transaction t (db);
+    if (! t.ok())
+        return false;
+    Statement asset (db, "UPDATE assets SET name = ?1, modified = ?2 WHERE id = ?3");
+    asset.bind (1, name).bind (2, now()).bind (3, id);
+    Statement preset (db, "UPDATE presets SET file = ?1, root = ?2, state_version = ?3, layers = ?4 WHERE asset_id = ?5");
+    preset.bind (1, info.file).bind (2, info.root).bind (3, info.stateVersion).bind (4, info.layers).bind (5, id);
+    Statement clear (db, "DELETE FROM preset_sounds WHERE preset_id = ?1");
+    clear.bind (1, id);
+    if (! asset.run() || sqlite3_changes (db) != 1 || ! preset.run() || ! clear.run())
+        return false;
+    for (const auto& hash : info.soundHashes)
+    {
+        Statement d (db, "INSERT OR IGNORE INTO preset_sounds (preset_id, content_hash) VALUES (?1, ?2)");
+        d.bind (1, id).bind (2, hash);
+        if (! d.run())
+            return false;
+    }
+    reindex (id);
+    return t.commit();
+}
+
+std::vector<std::pair<std::string, std::string>> Catalog::presetFiles() const
+{
+    std::vector<std::pair<std::string, std::string>> list;
+    Statement s (db, "SELECT asset_id, file FROM presets ORDER BY asset_id");
+    while (s.step() == SQLITE_ROW)
+        list.emplace_back (s.text (0), s.text (1));
+    return list;
+}
+
+std::vector<std::string> Catalog::neededContent() const
+{
+    std::vector<std::string> hashes;
+    Statement s (db, "SELECT content_hash FROM sounds UNION SELECT content_hash FROM preset_sounds ORDER BY 1");
+    while (s.step() == SQLITE_ROW)
+        hashes.push_back (s.text (0));
+    return hashes;
+}
+
+//==============================================================================
+// Backup and restore
+
+bool Catalog::snapshotTo (const std::filesystem::path& file)
+{
+    std::error_code ec;
+    std::filesystem::remove (file, ec);   // VACUUM INTO refuses an existing file
+    Statement s (db, "VACUUM INTO ?1");
+    s.bind (1, file.string());
+    if (! s.run())
+    {
+        error = sqlite3_errmsg (db);
+        return false;
+    }
+    return true;
+}
+
+std::optional<Catalog::MergeReport> Catalog::mergeFrom (const std::filesystem::path& other, bool newerWins,
+                                                         const std::vector<std::pair<std::string, std::string>>& movedPrefixes)
+{
+    {
+        Statement attach (db, "ATTACH DATABASE ?1 AS b");
+        attach.bind (1, other.string());
+        if (! attach.run())
+        {
+            error = sqlite3_errmsg (db);
+            return std::nullopt;
+        }
+    }
+    struct Detach
+    {
+        Catalog& c;
+        ~Detach() { c.exec ("DETACH DATABASE b"); }
+    } detach { *this };
+
+    MergeReport report;
+    {
+        Statement v (db, "SELECT value FROM b.meta WHERE key = 'schema_version'");
+        if (v.step() != SQLITE_ROW || std::atoi (v.text (0).c_str()) != schemaVersion)
+        {
+            error = "the backup's catalog is not at this version (open it first so it is migrated)";
+            return std::nullopt;
+        }
+    }
+    Transaction t (db);
+    if (! t.ok())
+    {
+        error = sqlite3_errmsg (db);
+        return std::nullopt;
+    }
+    auto ids = [this] (const char* sql) {
+        std::vector<std::string> list;
+        Statement s (db, sql);
+        while (s.step() == SQLITE_ROW)
+            list.push_back (s.text (0));
+        return list;
+    };
+    report.addedIds = ids ("SELECT id FROM b.assets WHERE id NOT IN (SELECT id FROM main.assets) ORDER BY id");
+    const auto both = ids ("SELECT x.id FROM b.assets x JOIN main.assets m ON m.id = x.id ORDER BY x.id");
+    const auto newer = ids ("SELECT x.id FROM b.assets x JOIN main.assets m ON m.id = x.id WHERE x.modified > m.modified ORDER BY x.id");
+    for (const auto& id : both)
+    {
+        const bool takeBackup = newerWins && std::find (newer.begin(), newer.end(), id) != newer.end();
+        (takeBackup ? report.updatedIds : report.keptIds).push_back (id);
+    }
+    constexpr const char* assetColumns = "id, type, origin, name, category, notes, favourite, created, modified, trashed_at, rating, pack_id, pack_key";
+    const std::string insertAssets = std::string ("INSERT INTO main.assets (") + assetColumns + ") SELECT " + assetColumns
+                                   + " FROM b.assets WHERE id NOT IN (SELECT id FROM main.assets)";
+    constexpr const char* soundColumns = "asset_id, content_hash, managed, format, sample_rate, channels, bit_depth, frames, duration, file_size, root_midi, "
+                                         "provenance, parent_asset, slice_start, slice_end, operations";
+    const std::string insertSounds = std::string ("INSERT OR IGNORE INTO main.sounds (") + soundColumns + ") SELECT " + soundColumns
+                                   + " FROM b.sounds WHERE asset_id IN (SELECT id FROM main.assets)";
+    if (! exec (insertAssets.c_str()) || ! exec (insertSounds.c_str())
+        || ! exec ("INSERT OR IGNORE INTO main.presets (asset_id, file, root, state_version, layers, trashed_from) "
+                   "SELECT asset_id, file, root, state_version, layers, trashed_from FROM b.presets WHERE asset_id IN (SELECT id FROM main.assets)")
+        || ! exec ("INSERT OR IGNORE INTO main.preset_sounds (preset_id, content_hash) SELECT preset_id, content_hash FROM b.preset_sounds "
+                   "WHERE preset_id IN (SELECT id FROM main.assets)"))
+    {
+        error = sqlite3_errmsg (db);
+        return std::nullopt;
+    }
+    // A record in both that is newer in the backup (newerWins): the backup's fields.
+    for (const auto& id : report.updatedIds)
+    {
+        Statement a (db, "UPDATE main.assets SET (name, category, notes, favourite, modified, trashed_at, rating) = "
+                         "(SELECT name, category, notes, favourite, modified, trashed_at, rating FROM b.assets WHERE id = ?1) WHERE id = ?1");
+        a.bind (1, id);
+        Statement p (db, "UPDATE main.presets SET (file, state_version, layers) = (SELECT file, state_version, layers FROM b.presets WHERE asset_id = ?1) "
+                         "WHERE asset_id = ?1 AND EXISTS (SELECT 1 FROM b.presets WHERE asset_id = ?1)");
+        p.bind (1, id);
+        Statement r (db, "UPDATE main.sounds SET root_midi = (SELECT root_midi FROM b.sounds WHERE asset_id = ?1) "
+                         "WHERE asset_id = ?1 AND EXISTS (SELECT 1 FROM b.sounds WHERE asset_id = ?1)");
+        r.bind (1, id);
+        if (! a.run() || ! p.run() || ! r.run())
+            return std::nullopt;
+    }
+    // Another machine's folders: presets that were in them are where this one keeps them.
+    for (const auto& [from, to] : movedPrefixes)
+    {
+        if (from.empty() || from == to)
+            continue;
+        Statement m (db, "UPDATE main.presets SET file = ?2 || substr(file, length(?1) + 1) WHERE substr(file, 1, length(?1)) = ?1 "
+                         "AND asset_id IN (SELECT id FROM b.assets)");
+        m.bind (1, from).bind (2, to);
+        if (! m.run())
+            return std::nullopt;
+    }
+    auto changes = [this] (const char* sql, int& counter) {
+        if (! exec (sql))
+            return false;
+        counter += sqlite3_changes (db);
+        return true;
+    };
+    int ignored = 0;
+    if (! changes ("INSERT OR IGNORE INTO main.collections (id, name, created) SELECT id, name, created FROM b.collections", report.collections)
+        || ! changes ("INSERT OR IGNORE INTO main.collection_items (collection_id, asset_id) SELECT collection_id, asset_id FROM b.collection_items "
+                      "WHERE asset_id IN (SELECT id FROM main.assets) AND collection_id IN (SELECT id FROM main.collections)",
+                      report.collectionItems)
+        || ! changes ("INSERT OR IGNORE INTO main.tags (name) SELECT name FROM b.tags", report.tags)
+        || ! changes ("INSERT OR IGNORE INTO main.asset_tags (asset_id, tag_id, source, confidence, rejected) "
+                      "SELECT x.asset_id, m.id, x.source, x.confidence, x.rejected FROM b.asset_tags x JOIN b.tags bt ON bt.id = x.tag_id "
+                      "JOIN main.tags m ON m.name = bt.name WHERE x.asset_id IN (SELECT id FROM main.assets)",
+                      ignored)
+        || ! changes ("INSERT INTO main.history (asset_id, at, action, layer) SELECT x.asset_id, x.at, x.action, x.layer FROM b.history x "
+                      "WHERE x.asset_id IN (SELECT id FROM main.assets) AND NOT EXISTS (SELECT 1 FROM main.history h "
+                      "WHERE h.asset_id = x.asset_id AND h.at = x.at AND h.action = x.action)",
+                      report.history)
+        || ! changes ("INSERT OR IGNORE INTO main.source_locations (content_hash, path, kind, last_seen, available) "
+                      "SELECT content_hash, path, kind, last_seen, available FROM b.source_locations",
+                      ignored)
+        || ! changes ("INSERT OR IGNORE INTO main.audio_analysis (content_hash, version, classification, features) "
+                      "SELECT content_hash, version, classification, features FROM b.audio_analysis",
+                      ignored)
+        || ! changes ("INSERT OR IGNORE INTO main.classification_overrides (content_hash, classification, updated) "
+                      "SELECT content_hash, classification, updated FROM b.classification_overrides",
+                      ignored)
+        || ! changes ("INSERT OR IGNORE INTO main.packs (id, name, version, creator, manifest, installed) "
+                      "SELECT id, name, version, creator, manifest, installed FROM b.packs",
+                      report.packs))
+    {
+        error = sqlite3_errmsg (db);
+        return std::nullopt;
+    }
+    for (const auto* list : { &report.addedIds, &report.updatedIds })
+        for (const auto& id : *list)
+            reindex (id);
+    if (! t.commit())
+    {
+        error = sqlite3_errmsg (db);
+        return std::nullopt;
+    }
+    report.added = static_cast<int> (report.addedIds.size());
+    report.kept = static_cast<int> (report.keptIds.size());
+    report.updated = static_cast<int> (report.updatedIds.size());
+    return report;
+}
+
+//==============================================================================
+// Caches
+
+namespace
+{
+    constexpr const char* unusedAnalysis = "content_hash NOT IN (SELECT content_hash FROM sounds) AND content_hash NOT IN (SELECT content_hash FROM preset_sounds) "
+                                           "AND content_hash NOT IN (SELECT content_hash FROM scan_files WHERE content_hash IS NOT NULL) "
+                                           "AND content_hash NOT IN (SELECT content_hash FROM inbox_items)";
+}
+
+Catalog::CacheUsage Catalog::cacheUsage() const
+{
+    CacheUsage u;
+    Statement all (db, "SELECT count(*), coalesce(sum(length(features) + length(classification) + length(content_hash)), 0) FROM audio_analysis");
+    if (all.step() == SQLITE_ROW)
+        u.analysisRows = static_cast<int> (all.integer (0)), u.analysisBytes = all.integer (1);
+    const std::string sql = std::string ("SELECT count(*), coalesce(sum(length(features) + length(classification) + length(content_hash)), 0) FROM audio_analysis WHERE ")
+                          + unusedAnalysis;
+    Statement unused (db, sql.c_str());
+    if (unused.step() == SQLITE_ROW)
+        u.unusedAnalysisRows = static_cast<int> (unused.integer (0)), u.unusedAnalysisBytes = unused.integer (1);
+    return u;
+}
+
+int Catalog::forgetUnusedAnalysis()
+{
+    const std::string sql = std::string ("DELETE FROM audio_analysis WHERE ") + unusedAnalysis;
+    return exec (sql.c_str()) ? sqlite3_changes (db) : 0;
 }
 
 } // namespace osp::library

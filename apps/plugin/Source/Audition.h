@@ -121,6 +121,11 @@ public:
         tells when it is there). */
     static constexpr int overviewBins = 48;
     const std::vector<float>* overview (const std::string& assetId);
+    /** The preview cache (row overviews in memory; nothing is cached on disk): its size, and
+        clearing it (they are made again when seen). */
+    std::size_t overviewCount() const noexcept { return overviews.size(); }
+    std::size_t overviewBytes() const noexcept { return overviews.size() * (overviewBins * sizeof (float) + 64); }
+    void clearOverviews();
 
     /** Runs what the background threads finished (a sound ready, a load resolved): the
         processor's timer calls it on the message thread. */

@@ -1774,6 +1774,198 @@ TEST_CASE ("plugin: Library capture - scan a folder, review candidates, the Inbo
     panel->closeSheet();
 }
 
+TEST_CASE ("plugin: Library packs and backup - export a pack and a backup on one machine, install and restore on another", "[plugin][library][library-packs]")
+{
+    TempDir tmp;
+    const auto exported = tmp.dir.getChildFile ("Warm.osppack");
+    const auto backup = tmp.dir.getChildFile ("Library.ospbackup");
+    std::string soundId, presetId;
+    auto snapshotOf = [] (juce::AudioProcessorEditor& editor, const juce::String& name) {
+        if (const char* dir = std::getenv ("OSP_SNAPSHOT_DIR"))
+        {
+            const auto image = editor.createComponentSnapshot (editor.getLocalBounds(), true, 1.0f);
+            juce::FileOutputStream out (juce::File (dir).getChildFile (name));
+            out.setPosition (0);
+            out.truncate();
+            juce::PNGImageFormat().writeImageToStream (image, out);
+        }
+    };
+    auto click = [] (osp::plugin::LibraryPanel& panel, const juce::String& title) {
+        REQUIRE (panel.sheet() != nullptr);
+        auto* b = findTitled<juce::TextButton> (*panel.sheet(), title);
+        REQUIRE (b != nullptr);
+        b->onClick();
+    };
+    // Machine A: a sound, a preset that uses it, a collection, then a pack and a backup.
+    {
+        const ScopedEnvironment library ("OSP_LIBRARY_DIR", tmp.dir.getChildFile ("a/library").getFullPathName());
+        const ScopedEnvironment documents ("OSP_DOCUMENTS_DIR", tmp.dir.getChildFile ("a/documents").getFullPathName());
+        const ScopedEnvironment store ("OSP_SAMPLE_STORE", tmp.dir.getChildFile ("a/store").getFullPathName());
+        const auto file = writeSource (tmp.dir, "Glass Bell C5.wav", testsignals::pluck (midiToHz (72), 0.8, 48000.0, 6));
+        OspAudioProcessor p;
+        p.prepareToPlay (48000.0, 256);
+        loadAndWait (p, file);
+        OspAudioProcessor::presetFolder().createDirectory();
+        REQUIRE (p.savePreset (OspAudioProcessor::presetFolder().getChildFile ("Bell Song.osppreset")));
+        REQUIRE (p.libraryService().waitUntilIdle (10000));
+        std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+        auto* ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (editor.get());
+        REQUIRE (ui != nullptr);
+        editor->setSize (1448, 1086);
+        ui->openLibrary();
+        auto* panel = ui->libraryWindow();
+        REQUIRE (panel != nullptr);
+        REQUIRE (panel->settle());
+        std::string collection;
+        p.libraryService().runAndWait ([&] (osp::library::Catalog& c) {
+            osp::library::SearchQuery q;
+            q.text = "glass bell";
+            q.type = osp::library::AssetType::sound;
+            soundId = c.search (q).at (0).id;
+            q.text = "bell song";
+            q.type = osp::library::AssetType::preset;
+            presetId = c.search (q).at (0).id;
+            collection = *c.createCollection ("Bells");
+            c.addToCollection (collection, soundId);
+            c.addToCollection (collection, presetId);
+            c.setFavourite (soundId, true);
+        });
+        panel->exportCollectionAsPack (collection, "Bells", exported);
+        REQUIRE (panel->settle (30000));
+        // A sound loaded from a drive has no known rights: the window asks before sharing it.
+        REQUIRE (panel->openSheetName() == "choice");
+        click (*panel, "I may share them");
+        REQUIRE (panel->settle (30000));
+        INFO (panel->statusText());
+        REQUIRE (exported.existsAsFile());
+        CHECK (panel->statusText().contains ("Saved the pack"));
+        panel->exportBackup (backup, false);
+        REQUIRE (panel->settle (30000));
+        INFO (panel->statusText());
+        REQUIRE (backup.getChildFile ("manifest.json").existsAsFile());
+        CHECK (panel->statusText().contains ("Backed up"));
+        ui->closeLibrary();
+    }
+    // Machine B: nothing yet. The pack, then the backup.
+    {
+        const ScopedEnvironment library ("OSP_LIBRARY_DIR", tmp.dir.getChildFile ("b/library").getFullPathName());
+        const ScopedEnvironment documents ("OSP_DOCUMENTS_DIR", tmp.dir.getChildFile ("b/documents").getFullPathName());
+        const ScopedEnvironment store ("OSP_SAMPLE_STORE", tmp.dir.getChildFile ("b/store").getFullPathName());
+        OspAudioProcessor q;
+        q.prepareToPlay (48000.0, 256);
+        std::unique_ptr<juce::AudioProcessorEditor> editor (q.createEditorIfNeeded());
+        auto* ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (editor.get());
+        REQUIRE (ui != nullptr);
+        editor->setSize (1448, 1086);
+        ui->openLibrary();
+        auto* panel = ui->libraryWindow();
+        REQUIRE (panel != nullptr);
+        REQUIRE (panel->settle());
+        panel->installPack (exported);
+        REQUIRE (panel->settle (30000));
+        REQUIRE (panel->openSheetName() == "choice");   // shown before anything changes
+        snapshotOf (*editor, "library-pack-install.png");
+        click (*panel, "Install");
+        REQUIRE (panel->settle (30000));
+        INFO (panel->statusText());
+        CHECK (panel->statusText().contains ("Installed Bells"));
+        CHECK (panel->statusText().contains ("1 sound, 1 preset"));
+        panel->setView (osp::plugin::LibraryPanel::View::sounds);
+        panel->selectScope ("packs");
+        REQUIRE (panel->settle());
+        CHECK (panel->rowCount() == 1);
+        CHECK (panel->row (0).origin == osp::library::Origin::pack);
+        panel->openPacksSheet();
+        REQUIRE (panel->settle());
+        CHECK (panel->openSheetName() == "packs");
+        auto* packList = findTitled<juce::ListBox> (*panel->sheet(), "Installed packs");
+        REQUIRE (packList != nullptr);
+        CHECK (packList->getListBoxModel()->getNumRows() == 1);
+        snapshotOf (*editor, "library-packs.png");
+        panel->closeSheet();
+        // The backup: shown, asked, merged; identities kept.
+        panel->restoreBackup (backup);
+        REQUIRE (panel->settle (30000));
+        REQUIRE (panel->openSheetName() == "choice");
+        snapshotOf (*editor, "library-restore.png");
+        click (*panel, "Keep mine");
+        REQUIRE (panel->settle (60000));
+        INFO (panel->statusText());
+        CHECK (panel->statusText().contains ("Restored"));
+        bool favourite = false, presetThere = false;
+        juce::String presetFile;
+        q.libraryService().runAndWait ([&] (osp::library::Catalog& c) {
+            favourite = c.asset (soundId) && c.asset (soundId)->favourite;
+            if (const auto info = c.preset (presetId))
+                presetThere = true, presetFile = juce::String (info->file);
+        });
+        CHECK (favourite);
+        CHECK (presetThere);
+        CHECK (juce::File (presetFile) == OspAudioProcessor::presetFolder().getChildFile ("Bell Song.osppreset"));
+        CHECK (juce::File (presetFile).existsAsFile());
+        // The restored preset opens and finds its sound in this machine's store.
+        CHECK (q.loadPreset (juce::File (presetFile)));
+        REQUIRE (q.waitForLoads (30000));
+        q.pollLoads();
+        REQUIRE (q.currentInstrument (0) != nullptr);
+        CHECK (q.currentInstrument (0)->filename.starts_with ("Glass Bell"));
+        panel->openSettingsSheet();
+        REQUIRE (panel->settle());
+        snapshotOf (*editor, "library-settings-caches.png");
+        panel->closeSheet();
+        ui->closeLibrary();
+    }
+    // Machine C: a factory pack shipped with the plugin installs at startup, apart from user data.
+    {
+        const ScopedEnvironment library ("OSP_LIBRARY_DIR", tmp.dir.getChildFile ("c/library").getFullPathName());
+        const ScopedEnvironment documents ("OSP_DOCUMENTS_DIR", tmp.dir.getChildFile ("c/documents").getFullPathName());
+        const ScopedEnvironment store ("OSP_SAMPLE_STORE", tmp.dir.getChildFile ("c/store").getFullPathName());
+        const auto factory = tmp.dir.getChildFile ("Resources/Factory");
+        REQUIRE (factory.createDirectory());
+        // The exported pack, made a factory pack (its manifest says so).
+        {
+            juce::ZipFile source (exported);
+            juce::ZipFile::Builder builder;
+            for (int i = 0; i < source.getNumEntries(); ++i)
+            {
+                const auto name = source.getEntry (i)->filename;
+                std::unique_ptr<juce::InputStream> in (source.createStreamForEntry (i));
+                auto text = name == "manifest.json" ? in->readEntireStreamAsString() : juce::String();
+                if (name == "manifest.json")
+                {
+                    auto json = juce::JSON::parse (text);
+                    json.getDynamicObject()->setProperty ("factory", true);
+                    json.getDynamicObject()->setProperty ("id", "osp.factory.bells");
+                    const auto changed = juce::JSON::toString (json);
+                    builder.addEntry (new juce::MemoryInputStream (changed.toRawUTF8(), changed.getNumBytesAsUTF8(), true), 9, name, juce::Time());
+                }
+                else
+                {
+                    juce::MemoryBlock block;
+                    in->readIntoMemoryBlock (block);
+                    builder.addEntry (new juce::MemoryInputStream (block, true), 0, name, juce::Time());
+                }
+            }
+            juce::FileOutputStream out (factory.getChildFile ("bells.osppack"));
+            REQUIRE (builder.writeToStream (out, nullptr));
+        }
+        const ScopedEnvironment shipped ("OSP_FACTORY_PACKS_DIR", factory.getFullPathName());
+        OspAudioProcessor r;
+        REQUIRE (r.libraryService().waitUntilIdle (30000));
+        int factorySounds = 0;
+        bool installed = false;
+        r.libraryService().runAndWait ([&] (osp::library::Catalog& c) {
+            osp::library::SearchQuery q;
+            q.origin = osp::library::Origin::factory;
+            factorySounds = c.count (q);
+            installed = c.pack ("osp.factory.bells").has_value();
+        });
+        CHECK (installed);
+        CHECK (factorySounds == 2);   // the sound and the preset, as factory content
+        CHECK (juce::File (juce::String (osp::library::Catalog::defaultFile().parent_path().string())).getChildFile ("Factory/osp.factory.bells/Presets").isDirectory());
+    }
+}
+
 TEST_CASE ("plugin: a portable instrument is untrusted - nothing lands outside the store, damaged sounds are refused", "[plugin][security]")
 {
     TempDir tmp;
@@ -7461,3 +7653,266 @@ TEST_CASE ("plugin: EQ cost - all bands on three layers (CPU)", "[.][eq-cpu]")
     std::printf ("EQ: off %.1f us, all bands on three layers %.1f us per 256-sample block (+%.2f %% of real time)\n", off, on, 100.0 * (on - off) / budget);
     CHECK (on - off < 0.03 * budget);
 }
+
+namespace
+{
+    /** Renders `seconds` of a fixed chord (the same blocks and events every time). */
+    std::vector<float> renderQaChord (OspAudioProcessor& p, double seconds, const std::function<void (int block)>& everyBlock = {})
+    {
+        const int block = 256;
+        const int total = static_cast<int> (seconds * 48000.0);
+        juce::AudioBuffer<float> buffer (2, block);
+        std::vector<float> out;
+        for (int pos = 0, n = 0; pos < total; pos += block, ++n)
+        {
+            juce::MidiBuffer midi;
+            if (pos == 0)
+                for (const int note : { 48, 60, 64, 67 })
+                    midi.addEvent (juce::MidiMessage::noteOn (1, note, static_cast<juce::uint8> (96)), 0);
+            buffer.clear();
+            p.processBlock (buffer, midi);
+            for (int i = 0; i < block; ++i)
+                for (int ch = 0; ch < 2; ++ch)
+                    out.push_back (buffer.getSample (ch, i));
+            if (everyBlock)
+                everyBlock (n);
+        }
+        return out;
+    }
+}
+
+TEST_CASE ("plugin: Library QA - browsing, scanning and importing never change the instrument's sound", "[plugin][library][qa]")
+{
+    TempDir tmp;
+    const ScopedEnvironment library ("OSP_LIBRARY_DIR", tmp.dir.getChildFile ("library").getFullPathName());
+    const ScopedEnvironment documents ("OSP_DOCUMENTS_DIR", tmp.dir.getChildFile ("documents").getFullPathName());
+    const auto file = writeSource (tmp.dir, "Steady Pluck C4.wav", testsignals::pluck (261.6256, 1.2, 48000.0, 21));
+    const auto folder = tmp.dir.getChildFile ("Many");
+    REQUIRE (folder.createDirectory());
+    for (int i = 0; i < 300; ++i)
+        writeSource (folder, "hit " + juce::String (i) + ".wav", labelled::kick (48000.0, 0.3 + 0.002 * i));
+    auto quiet = [&] {
+        OspAudioProcessor p;
+        p.prepareToPlay (48000.0, 256);
+        loadAndWait (p, file);
+        REQUIRE (p.libraryService().waitUntilIdle (20000));
+        return renderQaChord (p, 2.0);
+    }();
+    // The same, with the Library window open, a scan of 300 files and imports running.
+    OspAudioProcessor p;
+    p.prepareToPlay (48000.0, 256);
+    loadAndWait (p, file);
+    REQUIRE (p.libraryService().waitUntilIdle (20000));
+    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (editor.get());
+    REQUIRE (ui != nullptr);
+    editor->setSize (1448, 1086);
+    ui->openLibrary();
+    auto* panel = ui->libraryWindow();
+    REQUIRE (panel != nullptr);
+    panel->setView (osp::plugin::LibraryPanel::View::sounds);
+    panel->scanFolder (folder);
+    const auto busy = renderQaChord (p, 2.0, [&] (int block) {
+        if (block % 8 == 0)
+        {
+            p.libraryService().deliver();   // the window's answers arrive meanwhile
+            p.audition().deliver();
+        }
+        if (block == 40)
+            panel->selectScope ("scanned");
+    });
+    CHECK ((p.libraryService().backgroundBusy() || panel->settle (60000)));
+    REQUIRE (quiet.size() == busy.size());
+    CHECK (std::memcmp (quiet.data(), busy.data(), quiet.size() * sizeof (float)) == 0);   // bit for bit
+    float peak = 0.0f;
+    for (const float v : busy)
+        peak = std::max (peak, std::abs (v));
+    CHECK (peak > 0.01f);
+    REQUIRE (panel->settle (60000));
+    ui->closeLibrary();
+}
+
+TEST_CASE ("plugin: Library QA - several instances load, save and browse one Library at once", "[plugin][library][qa]")
+{
+    TempDir tmp;
+    const ScopedEnvironment library ("OSP_LIBRARY_DIR", tmp.dir.getChildFile ("library").getFullPathName());
+    const ScopedEnvironment documents ("OSP_DOCUMENTS_DIR", tmp.dir.getChildFile ("documents").getFullPathName());
+    std::vector<std::unique_ptr<OspAudioProcessor>> instances;
+    std::vector<juce::File> files;
+    for (int i = 0; i < 3; ++i)
+    {
+        files.push_back (writeSource (tmp.dir, "Voice " + juce::String (i) + ".wav", testsignals::vowel (180.0 + 40.0 * i, 0.8, 48000.0, static_cast<std::uint64_t> (30 + i))));
+        instances.push_back (std::make_unique<OspAudioProcessor>());
+        instances.back()->prepareToPlay (48000.0, 256);
+    }
+    for (int i = 0; i < 3; ++i)
+        instances[static_cast<std::size_t> (i)]->loadFile (files[static_cast<std::size_t> (i)]);   // at the same time
+    OspAudioProcessor::presetFolder().createDirectory();
+    for (int i = 0; i < 3; ++i)
+    {
+        auto& p = *instances[static_cast<std::size_t> (i)];
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        REQUIRE (p.savePreset (OspAudioProcessor::presetFolder().getChildFile ("Instance " + juce::String (i) + ".osppreset")));
+    }
+    for (auto& p : instances)
+        REQUIRE (p->libraryService().waitUntilIdle (20000));
+    int sounds = 0, presets = 0;
+    std::string integrity;
+    instances[0]->libraryService().runAndWait ([&] (osp::library::Catalog& c) {
+        osp::library::SearchQuery q;
+        q.type = osp::library::AssetType::sound;
+        sounds = c.count (q);
+        q.type = osp::library::AssetType::preset;
+        presets = c.count (q);
+        integrity = c.integrityCheck();
+    });
+    CHECK (sounds == 3);
+    CHECK (presets == 3);
+    CHECK (integrity == "ok");
+}
+
+TEST_CASE ("plugin: Library QA - presets switched rapidly while playing end on the last one, finite", "[plugin][library][qa]")
+{
+    TempDir tmp;
+    const ScopedEnvironment library ("OSP_LIBRARY_DIR", tmp.dir.getChildFile ("library").getFullPathName());
+    const ScopedEnvironment documents ("OSP_DOCUMENTS_DIR", tmp.dir.getChildFile ("documents").getFullPathName());
+    OspAudioProcessor p;
+    p.prepareToPlay (48000.0, 256);
+    loadAndWait (p, writeSource (tmp.dir, "Keys C4.wav", testsignals::pluck (261.6256, 1.0, 48000.0, 41)));
+    OspAudioProcessor::presetFolder().createDirectory();
+    std::vector<juce::File> presets;
+    for (int i = 0; i < 4; ++i)
+    {
+        p.setParameterValue ("character", 10.0f + 20.0f * i);
+        presets.push_back (OspAudioProcessor::presetFolder().getChildFile ("Switch " + juce::String (i) + ".osppreset"));
+        REQUIRE (p.savePreset (presets.back()));
+    }
+    bool finite = true;
+    renderQaChord (p, 3.0, [&] (int block) {
+        if (block % 3 == 0)
+            REQUIRE (p.loadPreset (presets[static_cast<std::size_t> ((block / 3) % 4)]));
+        p.pollLoads();
+    });
+    juce::AudioBuffer<float> buffer (2, 256);
+    for (int b = 0; b < 40; ++b)
+    {
+        juce::MidiBuffer midi;
+        buffer.clear();
+        p.processBlock (buffer, midi);
+        p.pollLoads();
+        for (int ch = 0; ch < 2; ++ch)
+            for (int i = 0; i < 256; ++i)
+                finite = finite && std::isfinite (buffer.getSample (ch, i));
+    }
+    CHECK (finite);
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    const int last = ((static_cast<int> (3.0 * 48000.0 / 256.0) - 1) / 3) % 4;   // the last block that loaded one
+    CHECK (p.parameterValue ("character") == Approx (10.0f + 20.0f * static_cast<float> (last)));
+}
+
+TEST_CASE ("plugin: Library QA - measured: search, recent, preview start and the audio thread while scanning", "[.][library-qa-perf]")
+{
+    TempDir tmp;
+    const ScopedEnvironment library ("OSP_LIBRARY_DIR", tmp.dir.getChildFile ("library").getFullPathName());
+    const ScopedEnvironment documents ("OSP_DOCUMENTS_DIR", tmp.dir.getChildFile ("documents").getFullPathName());
+    OspAudioProcessor p;
+    p.prepareToPlay (48000.0, 256);
+    loadAndWait (p, writeSource (tmp.dir, "Bench C4.wav", testsignals::pluck (261.6256, 1.2, 48000.0, 51)));
+    // 10,000 sounds in the catalog.
+    p.libraryService().runAndWait ([] (osp::library::Catalog& c) {
+        for (int i = 0; i < 10000; ++i)
+        {
+            osp::library::Asset a;
+            a.name = "Bench sound " + std::to_string (i) + (i % 10 == 0 ? " bass" : "");
+            osp::library::SoundInfo s;
+            s.contentHash = "sha256:bench" + std::to_string (i);
+            const auto id = c.addSound (a, s);
+            if (id && i % 50 == 0)
+                c.recordUse (*id, "loaded");
+        }
+    }, 600000);
+    auto timeMs = [&] (std::function<void (osp::library::Catalog&)> f, int repeats) {
+        double total = 0.0;
+        for (int r = 0; r < repeats; ++r)
+            p.libraryService().runAndWait ([&] (osp::library::Catalog& c) {
+                const auto t0 = std::chrono::steady_clock::now();
+                f (c);
+                total += std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - t0).count();
+            });
+        return total / repeats;
+    };
+    const double search = timeMs ([] (osp::library::Catalog& c) {
+        osp::library::SearchQuery q;
+        q.text = "bass";
+        q.limit = 500;
+        c.search (q);
+    }, 20);
+    const double recent = timeMs ([] (osp::library::Catalog& c) { c.recent (50); }, 20);
+    // Preview start: from selecting a sound to its preview being ready to play.
+    const auto previewFile = writeSource (tmp.dir, "Preview A3.wav", testsignals::vowel (220.0, 2.0, 48000.0, 52));
+    double previewMs = 0.0;
+    for (int r = 0; r < 5; ++r)
+    {
+        p.audition().stop();
+        const auto t0 = std::chrono::steady_clock::now();
+        p.audition().cueFile (previewFile);
+        while (p.audition().slot (osp::library::PreviewEngine::browserSlot).sound == nullptr)
+        {
+            p.audition().deliver();
+            juce::Thread::sleep (1);
+        }
+        previewMs += std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - t0).count();
+        p.audition().cueFile (tmp.dir.getChildFile ("Bench C4.wav"));   // something else, so the next cue starts again
+        p.audition().waitUntilIdle (5000);
+        p.audition().deliver();
+    }
+    previewMs /= 5.0;
+    // The audio thread: processBlock with nothing else going on, then during a 1,000-file scan.
+    const auto folder = tmp.dir.getChildFile ("ScanMe");
+    REQUIRE (folder.createDirectory());
+    for (int i = 0; i < 1000; ++i)
+        writeSource (folder, "f" + juce::String (i) + ".wav", testsignals::impulse (0.05, 48000.0, 0.002, 0.3 + 0.0005 * i));
+    auto blockTimes = [&] (int blocks) {
+        juce::AudioBuffer<float> buffer (2, 256);
+        std::vector<double> us;
+        for (int b = 0; b < blocks; ++b)
+        {
+            juce::MidiBuffer midi;
+            if (b % 200 == 0)
+                for (const int note : { 48, 55, 60, 64, 67, 72 })
+                    midi.addEvent (juce::MidiMessage::noteOn (1, note, static_cast<juce::uint8> (100)), 0);
+            buffer.clear();
+            const auto t0 = std::chrono::steady_clock::now();
+            p.processBlock (buffer, midi);
+            us.push_back (std::chrono::duration<double, std::micro> (std::chrono::steady_clock::now() - t0).count());
+        }
+        std::sort (us.begin(), us.end());
+        double mean = 0.0;
+        for (const double v : us)
+            mean += v;
+        return std::array<double, 3> { mean / static_cast<double> (us.size()), us[us.size() * 99 / 100], us.back() };
+    };
+    const auto idle = blockTimes (2000);
+    std::atomic<bool> scanning { true };
+    p.libraryService().postBackground ([path = folder.getFullPathName().toStdString(), &scanning, &p] (osp::library::Catalog& c) {
+        const auto id = c.addScanRoot (path);
+        osp::library::ScanSettings settings;
+        osp::library::scanFolder (c, *c.scanRoot (*id), settings, p.libraryService().scanControl(), p.libraryService().scanProgress());
+        scanning = false;
+    });
+    juce::Thread::sleep (50);
+    const auto during = blockTimes (2000);
+    const bool scanStillRunning = scanning.load();
+    REQUIRE (p.libraryService().waitUntilIdle (300000));
+    const double budget = 1.0e6 * 256.0 / 48000.0;
+    std::printf ("Library QA (this machine): search \"bass\" over 10,000 sounds %.2f ms; recent 50 %.2f ms; preview ready %.1f ms after selecting\n", search, recent,
+                 previewMs);
+    std::printf ("processBlock (256 samples, 6 notes): idle mean %.1f us, p99 %.1f us, max %.1f us; during a 1,000-file scan%s mean %.1f us, p99 %.1f us, max %.1f us "
+                 "(budget %.0f us)\n",
+                 idle[0], idle[1], idle[2], scanStillRunning ? " (still running at the end)" : "", during[0], during[1], during[2], budget);
+    CHECK (search < 50.0);
+}
+
+#include "RenderRegression.inc"

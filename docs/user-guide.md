@@ -546,6 +546,42 @@ Right-click a sound (or anything in Scanned or the Inbox) → **Trim / Slice…*
   - A recording from Scanned or the Inbox is added to the Library too, so its slices have
     their original.
 
+### Packs
+
+A pack (`.osppack`) brings sounds, presets and templates in one go.
+
+- **⋯ → Install pack…** shows what is in it, who made it and its licence before anything
+  changes.
+- The pack's content is listed under **Packs**. Your own content is never touched.
+- **Updating** a pack (installing a newer version) keeps your favourites, ratings, tags and
+  notes on its sounds.
+- **⋯ → Packs…** lists what is installed. **Remove pack** sends its presets to the
+  computer's Trash and its sounds to the Library's trash. Presets of your own that use one
+  of its sounds keep working.
+- **Making a pack**: right-click one of your collections → **Export as pack…**. Sounds
+  whose rights are unknown (found on a drive) are named first, and you confirm that you may
+  share them.
+
+### Backing up and moving to another computer
+
+- **⋯ → Back up the Library…** writes one folder (`… .ospbackup`) holding everything:
+  - your sounds' managed copies;
+  - presets and templates;
+  - tags, collections, favourites, ratings, notes and history;
+  - installed packs and your Library settings.
+
+  It is safe while the plugin is open in other projects. Choose whether to include sounds
+  that live outside the Library (indexed in place).
+- **⋯ → Restore a backup…** adds what is missing to the Library on this computer. A new
+  computer is fine. Before anything changes it asks what to do when something is in both:
+  - **Keep mine** leaves yours as it is;
+  - **Newer wins** takes whichever was changed more recently.
+
+  Nothing is lost. A preset that differs from one already here is saved beside it as
+  "(restored)". Presets find their sounds again even though the folders differ.
+- **⋯ → Library settings** also shows the analysis and preview caches, with safe ways to
+  clear them: they are made again when needed.
+
 ## When a sound is unusual
 
 Recordings longer than a minute play with Tape pitch even when Natural is selected (Natural keeps four extra copies of the sound); the status line says so. Files longer than ten minutes are shortened to their first ten minutes.

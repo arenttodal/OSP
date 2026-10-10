@@ -443,6 +443,16 @@ public:
                             safe->edit ([id, text] (library::Catalog& c) { return c.renameCollection (id, text.toStdString()); });
                     });
             });
+            menu.addItem (juce::String::fromUTF8 ("Export as pack\xe2\x80\xa6"), [safe, id, name] {
+                if (safe == nullptr)
+                    return;
+                safe->chooser = std::make_unique<juce::FileChooser> ("Export " + name + " as a pack",
+                                                                     juce::File::getSpecialLocation (juce::File::userDesktopDirectory).getChildFile (name + ".osppack"), "*.osppack");
+                safe->chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting, [safe, id, name] (const juce::FileChooser& fc) {
+                    if (safe != nullptr && fc.getResult() != juce::File())
+                        safe->exportCollectionAsPack (id, name, fc.getResult().withFileExtension ("osppack"));
+                });
+            });
             menu.addItem ("Delete collection (its sounds stay)", [safe, id] {
                 if (safe != nullptr)
                 {
@@ -537,7 +547,7 @@ public:
                            : panel.scopeKey == "scanned"         ? juce::String::fromUTF8 ("Nothing scanned yet. Scan folder\xe2\x80\xa6 (\xe2\x8b\xaf) finds the sounds already on your drives.")
                            : panel.scopeKey == "set-aside"       ? juce::String ("Nothing set aside.")
                            : panel.view == View::sounds          ? juce::String ("No sounds here yet. Every sound you load into the instrument is kept here.")
-                           : panel.view == View::presets         ? juce::String ("No presets here yet. Save one with Save\xe2\x80\xa6 (top right).")
+                           : panel.view == View::presets         ? juce::String::fromUTF8 ("No presets here yet. Save one with Save\xe2\x80\xa6 (top right).")
                                                                  : juce::String ("No templates here yet."),
                            juce::dontSendNotification);
     }
@@ -1447,6 +1457,43 @@ LibraryPanel::LibraryPanel (OspAudioProcessor& p) : processor (p)
         menu.addSeparator();
         menu.addItem (juce::String::fromUTF8 ("Scan folder\xe2\x80\xa6"), [safe] { if (safe != nullptr) safe->openScanSheet(); });
         menu.addItem (juce::String::fromUTF8 ("Inbox folders\xe2\x80\xa6"), [safe] { if (safe != nullptr) safe->openSettingsSheet(); });
+        menu.addSeparator();
+        menu.addItem (juce::String::fromUTF8 ("Install pack\xe2\x80\xa6"), [safe] {
+            if (safe == nullptr)
+                return;
+            safe->chooser = std::make_unique<juce::FileChooser> ("Install a pack", juce::File::getSpecialLocation (juce::File::userHomeDirectory).getChildFile ("Downloads"), "*.osppack");
+            safe->chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe] (const juce::FileChooser& fc) {
+                if (safe != nullptr && fc.getResult().existsAsFile())
+                    safe->installPack (fc.getResult());
+            });
+        });
+        menu.addItem (juce::String::fromUTF8 ("Packs\xe2\x80\xa6"), [safe] { if (safe != nullptr) safe->openPacksSheet(); });
+        menu.addSeparator();
+        menu.addItem (juce::String::fromUTF8 ("Back up the Library\xe2\x80\xa6"), [safe] {
+            if (safe == nullptr)
+                return;
+            const auto name = "OSP Library " + juce::Time::getCurrentTime().formatted ("%Y-%m-%d") + ".ospbackup";
+            safe->chooser = std::make_unique<juce::FileChooser> ("Back up the Library", juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile (name));
+            safe->chooser->launchAsync (juce::FileBrowserComponent::saveMode, [safe] (const juce::FileChooser& fc) {
+                if (safe == nullptr || fc.getResult() == juce::File())
+                    return;
+                const auto target = fc.getResult();
+                safe->choose ("Include sounds that live outside the Library (indexed in place)? They are copied into the backup.",
+                              { "Library only", "Include them", "Cancel" }, [safe, target] (int choice) {
+                                  if (safe != nullptr && choice >= 0 && choice < 2)
+                                      safe->exportBackup (target, choice == 1);
+                              });
+            });
+        });
+        menu.addItem (juce::String::fromUTF8 ("Restore a backup\xe2\x80\xa6"), [safe] {
+            if (safe == nullptr)
+                return;
+            safe->chooser = std::make_unique<juce::FileChooser> ("Restore a Library backup", juce::File::getSpecialLocation (juce::File::userDocumentsDirectory), "*.ospbackup");
+            safe->chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories, [safe] (const juce::FileChooser& fc) {
+                if (safe != nullptr && fc.getResult().isDirectory())
+                    safe->restoreBackup (fc.getResult());
+            });
+        });
         menu.addSeparator();
         menu.addItem ("Show presets folder", [] { OspAudioProcessor::presetFolder().createDirectory(); OspAudioProcessor::presetFolder().revealToUser(); });
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&menuButton));
@@ -2559,7 +2606,7 @@ namespace
     class SettingsSheet final : public LibraryPanel::Sheet
     {
     public:
-        SettingsSheet (LibraryPanel& p, OspAudioProcessor& proc) : Sheet (p, "Library settings", { 640, 590 }), processor (proc)
+        SettingsSheet (LibraryPanel& p, OspAudioProcessor& proc) : Sheet (p, "Library settings", { 680, 650 }), processor (proc)
         {
             level.setSliderStyle (juce::Slider::LinearHorizontal);
             level.setTextBoxStyle (juce::Slider::TextBoxRight, false, 70, 24);
@@ -2585,7 +2632,23 @@ namespace
                 fillInboxFolders();
                 panel.setStatus ("No longer watched (what came in from it stays in the Library)");
             };
-            for (auto* c : std::initializer_list<juce::Component*> { &level, &emptyTrash, &showStore, &showLibrary, &inboxFolders, &addInbox, &removeInbox, &close })
+            forgetAnalysis.setTitle ("Forget analyses nothing uses");
+            forgetAnalysis.onClick = [this] {
+                juce::Component::SafePointer<SettingsSheet> safe (this);
+                processor.libraryService().request<int> ([] (library::Catalog& c) { return c.forgetUnusedAnalysis(); }, [safe] (int n) {
+                    if (safe == nullptr)
+                        return;
+                    safe->panel.setStatus ("Forgot " + juce::String (n) + " analyses (they are made again if a sound needs them)");
+                    safe->measure();
+                });
+            };
+            clearPreviews.setTitle ("Clear the preview cache");
+            clearPreviews.onClick = [this] {
+                processor.audition().clearOverviews();
+                repaint();
+            };
+            for (auto* c : std::initializer_list<juce::Component*> { &level, &emptyTrash, &showStore, &showLibrary, &forgetAnalysis, &clearPreviews, &inboxFolders, &addInbox,
+                                                                     &removeInbox, &close })
                 addAndMakeVisible (c);
             fillInboxFolders();
             measure();
@@ -2594,13 +2657,14 @@ namespace
         {
             juce::Component::SafePointer<SettingsSheet> safe (this);
             const auto storeDir = std::filesystem::path (SampleStore::defaultDirectory().getFullPathName().toStdString());
-            processor.libraryService().request<std::pair<library::StorageUsage, std::string>> (
-                [storeDir] (library::Catalog& c) { return std::make_pair (library::storageUsage (c, storeDir), c.integrityCheck()); },
-                [safe] (std::pair<library::StorageUsage, std::string> answer) {
+            processor.libraryService().request<std::tuple<library::StorageUsage, std::string, library::Catalog::CacheUsage>> (
+                [storeDir] (library::Catalog& c) { return std::make_tuple (library::storageUsage (c, storeDir), c.integrityCheck(), c.cacheUsage()); },
+                [safe] (std::tuple<library::StorageUsage, std::string, library::Catalog::CacheUsage> answer) {
                     if (safe == nullptr)
                         return;
-                    safe->usage = answer.first;
-                    safe->integrity = juce::String (answer.second);
+                    safe->usage = std::get<0> (answer);
+                    safe->integrity = juce::String (std::get<1> (answer));
+                    safe->cache = std::get<2> (answer);
                     safe->measured = true;
                     safe->emptyTrash.setEnabled (true);
                     safe->repaint();
@@ -2634,6 +2698,9 @@ namespace
                            + bytesText (usage.trashOnlyBytes) + "), from before the Library " + juce::String (usage.untracked) + " (" + bytesText (usage.untrackedBytes) + ")");
                 lines.add ("Every sound you load keeps a copy here, so projects and presets open when the original moves.");
                 lines.add ("Catalog check: " + integrity);
+                lines.add ("Analysis cache: " + juce::String (cache.analysisRows) + " (" + bytesText (cache.analysisBytes) + "), " + juce::String (cache.unusedAnalysisRows)
+                           + " no longer used (" + bytesText (cache.unusedAnalysisBytes) + ").   Preview cache: " + juce::String (static_cast<int> (processor.audition().overviewCount()))
+                           + " waveforms in memory (" + bytesText (static_cast<std::int64_t> (processor.audition().overviewBytes())) + "), none on disk");
             }
             for (int i = 0; i < lines.size(); ++i)
                 g.drawFittedText (lines[i], r.getX(), storageTop + 20 + i * 22, r.getWidth(), 22, juce::Justification::centredLeft, 1);
@@ -2649,14 +2716,19 @@ namespace
             level.setBounds (r.removeFromTop (30).withWidth (360));
             r.removeFromTop (24);
             storageTop = r.getY();
-            r.removeFromTop (20 + 4 * 22 + 12);
+            r.removeFromTop (20 + 5 * 22 + 12);
             auto row = r.removeFromTop (36);
             emptyTrash.setBounds (row.removeFromLeft (220));
             row.removeFromLeft (8);
             showStore.setBounds (row.removeFromLeft (170));
             row.removeFromLeft (8);
             showLibrary.setBounds (row.removeFromLeft (170));
-            r.removeFromTop (8 + 54 + 30);
+            r.removeFromTop (8 + 54);
+            auto cacheRow = r.removeFromTop (32);
+            forgetAnalysis.setBounds (cacheRow.removeFromLeft (220));
+            cacheRow.removeFromLeft (8);
+            clearPreviews.setBounds (cacheRow.removeFromLeft (170));
+            r.removeFromTop (30);
             auto inboxRow = r.removeFromTop (32);
             removeInbox.setBounds (inboxRow.removeFromRight (150));
             inboxRow.removeFromRight (8);
@@ -2729,6 +2801,8 @@ namespace
         juce::TextButton emptyTrash { juce::String::fromUTF8 ("Empty Library trash\xe2\x80\xa6") }, showStore { "Show sample store" }, showLibrary { "Show Library folder" };
         juce::TextButton close { "Done" };
         juce::ComboBox inboxFolders;
+        juce::TextButton forgetAnalysis { "Forget unused analysis" }, clearPreviews { "Clear preview cache" };
+        library::Catalog::CacheUsage cache;
         juce::TextButton addInbox { juce::String::fromUTF8 ("Add folder\xe2\x80\xa6") }, removeInbox { "Stop watching" };
         std::unique_ptr<juce::FileChooser> chooser;
         library::StorageUsage usage;

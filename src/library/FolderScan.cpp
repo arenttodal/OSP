@@ -221,6 +221,9 @@ ScanSummary scanFolder (Catalog& catalog, const ScanRoot& root, const ScanSettin
         {
             if (stopHere (control))
                 break;
+            // A link is never followed (it may lead anywhere: outside the folder, round in a loop).
+            if (it->is_symlink (ec))
+                continue;
             if (it->is_directory (ec) && hidden (std::filesystem::path (it->path().filename())))
             {
                 it.disable_recursion_pending();
@@ -235,7 +238,7 @@ ScanSummary scanFolder (Catalog& catalog, const ScanRoot& root, const ScanSettin
         {
             if (stopHere (control))
                 break;
-            if (it->is_regular_file (ec))
+            if (! it->is_symlink (ec) && it->is_regular_file (ec))
                 visit (it->path());
         }
     flush();

@@ -299,10 +299,10 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       rules, each refusal explained; removing a route removes its depth routes in one undo step.
       Halo vs knob drop targets, a chooser where arcs lie together, drag tooltips, a quiet
       effective-depth accent, readout, amount editing. Headless `"routeDepth"` routes.
-- [ ] LIBRARY SYSTEM (queued spec, 13 stages; docs/library/): Stages 0-8 done.
+- [ ] LIBRARY SYSTEM (queued spec, 13 stages; docs/library/): Stages 0-8, 10 and 11 done.
       0 audit, risk register, decisions; `.ospinstrument` import hardened.
-      1 SQLite catalog (WAL, FTS5, migrations; now version 4: scan candidates, the Inbox,
-        classification overrides).
+      1 SQLite catalog (WAL, FTS5, migrations; now version 5: scan candidates, the Inbox,
+        classification overrides, pack ids).
       2 import transaction and resolver; every load and save recorded; cross-process safety.
       3 portable manifest 2, rights check, recoverable loads, preset file operations.
       4 preview engine (`src/library/PreviewEngine`, real-time safe, tested allocation-free),
@@ -323,9 +323,18 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       8 trim and slice editor (Sample Forge's slicer ported, 20 s slices), conservative trim,
         fades, optional gain, stereo kept; each slice a new sound with its provenance; the
         original untouched (docs/library/slicing.md).
-      Next: Stage 9 (iPhone capture) needs the user's Apple account and hardware, like
-      Stage 12 (signing); Stage 10 packs and Stage 11 backup can go first. The classifier
-      wants real labelled recordings; DAW checks need a Mac.
+      10 packs (`.osppack`: checked whole before anything changes, updates keep identities
+        and the user's edits, removal recoverable, export from a collection with the rights
+        question, factory packs apart from user data; none shipped yet) and the Library
+        backup (`.ospbackup` folder: VACUUM INTO snapshot; restore merges with Keep mine /
+        Newer wins, never overwrites a file); storage and cache cleanup
+        (docs/library/packs.md, backup.md).
+      11 QA (docs/library/qa.md): renders byte-identical to the pre-Library baseline 1537f7e;
+        output bit-identical while scanning; stress and security suites; measured search
+        4.3 ms / 10,000, preview ready 47 ms, processBlock unchanged under a scan. Not done:
+        DAW hosts and usability sessions (need the user's Mac and people).
+      Next: Stage 9 (iPhone capture) and Stage 12 (signing) need the user's Apple account
+      and hardware; DAW checks need a Mac.
 - [ ] MODULATION: compare the panel and halo against the mockups (not received); host checks
       (Logic, Ableton, REAPER, AudioPluginHost); a global envelope mode needs a
       gate-aggregation rule before ENV may reach the macros.

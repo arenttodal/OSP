@@ -390,6 +390,8 @@ public:
     /** A preset or starting state's favourite mark by name (the header's heart and the Library's). */
     bool isFavouriteName (const juce::String& name) const;
     void setFavouriteName (const juce::String& name, bool favourite);
+    /** Favourites.txt changed on disk (a restored backup): read again on next use. */
+    void reloadFavourites() { favouritesLoaded = false; }
     /** The content hashes the layers play now (the Library never moves these away). */
     std::vector<std::string> soundsInUse() const;
     /** The built-in starting states' names (the Library lists them as factory templates). */

@@ -76,6 +76,53 @@ int clearInterruptedImports (const std::filesystem::path& storeDir, std::chrono:
     return removed;
 }
 
+std::optional<std::filesystem::path> storeContent (const std::filesystem::path& storeDir, const std::filesystem::path& file, const std::string& hex, std::string& why,
+                                                   const std::atomic<bool>* cancel, bool* alreadyStored)
+{
+    if (alreadyStored != nullptr)
+        *alreadyStored = false;
+    if (auto existing = findStored (storeDir, hex))
+    {
+        if (alreadyStored != nullptr)
+            *alreadyStored = true;
+        return existing;
+    }
+    std::error_code ec;
+    std::filesystem::create_directories (storeDir, ec);
+    const auto target = storeDir / (hex + lowerExtension (file));
+    const auto temp = partialName (target);
+    std::filesystem::copy_file (file, temp, std::filesystem::copy_options::overwrite_existing, ec);
+    if (ec)
+    {
+        std::filesystem::remove (temp, ec);
+        why = "cannot copy " + file.filename().string() + " into the Library (disk full or no permission?)";
+        return std::nullopt;
+    }
+    const auto copied = io::sha256OfFile (temp);
+    if (! copied || *copied != hex || cancelled (cancel))
+    {
+        std::filesystem::remove (temp, ec);
+        why = cancelled (cancel) ? "cancelled" : "the copy of " + file.filename().string() + " did not match the original (the drive may be failing)";
+        return std::nullopt;
+    }
+    if (auto raced = findStored (storeDir, hex))
+    {
+        // Another instance published the same bytes meanwhile: keep its copy.
+        std::filesystem::remove (temp, ec);
+        if (alreadyStored != nullptr)
+            *alreadyStored = true;
+        return raced;
+    }
+    std::filesystem::rename (temp, target, ec);
+    if (ec)
+    {
+        std::filesystem::remove (temp, ec);
+        why = "cannot store " + file.filename().string() + " in the Library";
+        return std::nullopt;
+    }
+    return target;
+}
+
 ImportResult importSound (Catalog& catalog, const std::filesystem::path& storeDir, const ImportRequest& request, const std::atomic<bool>* cancel)
 {
     ImportResult result;
@@ -120,48 +167,17 @@ ImportResult importSound (Catalog& catalog, const std::filesystem::path& storeDi
         return result;
     }
     // 3. The managed copy: one per content, published by an atomic rename after checking it.
-    if (auto existing = findStored (storeDir, *hash))
     {
-        result.stored = *existing;
-        result.contentAlreadyStored = true;
-    }
-    else
-    {
-        std::filesystem::create_directories (storeDir, ec);
-        const auto target = storeDir / (*hash + lowerExtension (request.file));
-        const auto temp = partialName (target);
-        std::filesystem::copy_file (request.file, temp, std::filesystem::copy_options::overwrite_existing, ec);
-        if (ec)
+        std::string why;
+        bool already = false;
+        const auto stored = storeContent (storeDir, request.file, *hash, why, cancel, &already);
+        if (! stored)
         {
-            std::filesystem::remove (temp, ec);
-            result.error = "cannot copy " + request.file.filename().string() + " into the Library (disk full or no permission?)";
+            result.error = why;
             return result;
         }
-        const auto copied = io::sha256OfFile (temp);
-        if (! copied || *copied != *hash || cancelled (cancel))
-        {
-            std::filesystem::remove (temp, ec);
-            result.error = cancelled (cancel) ? "cancelled" : "the copy of " + request.file.filename().string() + " did not match the original (the drive may be failing)";
-            return result;
-        }
-        if (auto raced = findStored (storeDir, *hash))
-        {
-            // Another instance published the same bytes meanwhile: keep its copy.
-            std::filesystem::remove (temp, ec);
-            result.stored = *raced;
-            result.contentAlreadyStored = true;
-        }
-        else
-        {
-            std::filesystem::rename (temp, target, ec);
-            if (ec)
-            {
-                std::filesystem::remove (temp, ec);
-                result.error = "cannot store " + request.file.filename().string() + " in the Library";
-                return result;
-            }
-            result.stored = target;
-        }
+        result.stored = *stored;
+        result.contentAlreadyStored = already;
     }
     // 4. The record (after the copy is in place; a copy without a record is harmless and is
     //    found again by the next import of the same bytes).

@@ -132,6 +132,9 @@ set(OSP_IO_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/library/SoundImport.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/library/FolderScan.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/library/Inbox.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/library/Archive.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/library/Packs.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/library/Backup.cpp
 )
 
 add_library(osp_juce_headless STATIC)

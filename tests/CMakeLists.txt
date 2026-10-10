@@ -28,6 +28,8 @@ add_executable(osp_tests
     library/PreviewTests.cpp
     library/DiscoveryTests.cpp
     library/ScanInboxTests.cpp
+    library/PackBackupTests.cpp
+    library/QaTests.cpp
     integration/RenderIntegrationTests.cpp
     integration/CorpusIntegrationTests.cpp
     integration/BakeoffIntegrationTests.cpp

@@ -318,6 +318,12 @@ void Audition::cue (const std::string& assetId)
     prepare (library::PreviewEngine::browserSlot, assetId, std::nullopt, false);
 }
 
+void Audition::clearOverviews()
+{
+    overviews.clear();
+    changed();
+}
+
 const std::vector<float>* Audition::overview (const std::string& assetId)
 {
     if (const auto it = overviews.find (assetId); it != overviews.end())

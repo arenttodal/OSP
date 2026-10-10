@@ -60,6 +60,7 @@ enum class TagSource : std::uint8_t
 struct Asset
 {
     std::string id;               ///< stable identity (assigned by the catalog)
+    std::string packId;           ///< the pack it came with (catalog 5), or empty
     AssetType type = AssetType::sound;
     Origin origin = Origin::user;
     std::string name;             ///< display name
@@ -179,7 +180,7 @@ public:
         3: assets.rating (0-5 stars).
         4: scan_files details (rejected, duration, rate, channels, format, error), classification
            overrides, inbox_items. */
-    static constexpr int schemaVersion = 4;
+    static constexpr int schemaVersion = 5;
 
     /** Opens (creating and migrating as needed) the catalog at `file`. nullptr and `error` on
         failure (the file is never deleted or replaced). */
@@ -317,6 +318,59 @@ public:
     std::optional<InboxItem> inboxItem (const std::string& path) const;
     std::vector<InboxItem> inboxItems (const std::string& folder = {}) const;
     bool removeInboxItem (const std::string& path);
+
+    // Packs (Stage 10) ----------------------------------------------------------
+    struct PackRecord
+    {
+        std::string id, name, version, creator, manifest;   ///< manifest: the pack's JSON as installed
+        std::int64_t installed = 0;
+    };
+    bool putPack (const PackRecord& pack);
+    std::optional<PackRecord> pack (const std::string& id) const;
+    std::vector<PackRecord> packs() const;
+    bool removePackRecord (const std::string& id);
+    /** A pack's asset: which pack and its item's stable key in the pack (the manifest's uid), so
+        an update finds the same record (its identity, and the user's favourite, tags, rating). */
+    bool setPackKey (const std::string& assetId, const std::string& packId, const std::string& key);
+    std::optional<std::string> assetForPackKey (const std::string& packId, const std::string& key) const;
+    /** Every asset of a pack (trashed ones too), with its key. */
+    std::vector<std::pair<std::string, std::string>> packAssets (const std::string& packId) const;
+    /** A sound record's audio replaced (a pack update): same identity, new content and details. */
+    bool replaceSoundContent (const std::string& id, const SoundInfo& info, const std::string& place);
+    /** A preset or template record's file and details replaced (a pack update). */
+    bool updatePreset (const std::string& id, const std::string& name, const PresetInfo& info);
+    /** Every preset and template record's file (trashed ones too), by id. */
+    std::vector<std::pair<std::string, std::string>> presetFiles() const;
+    /** Every content a record or a preset needs (trashed records too: their restore needs it). */
+    std::vector<std::string> neededContent() const;
+
+    // Backup and restore (Stage 10) ----------------------------------------------
+    /** A consistent copy of the whole catalog (VACUUM INTO), safe while others write. */
+    bool snapshotTo (const std::filesystem::path& file);
+    /** Restore by merging another catalog (a backup's snapshot) into this one, in one
+        transaction. Records keep their identities. A record in both: kept as it is here
+        (keepExisting), or the more recently modified one wins (newerWins). Preset paths
+        starting with a `from` prefix are moved to its `to` prefix (another machine's folders).
+        Scan and Inbox state are this machine's and are not merged. */
+    struct MergeReport
+    {
+        int added = 0, kept = 0, updated = 0;
+        int tags = 0, collections = 0, collectionItems = 0, history = 0, packs = 0;
+        std::vector<std::string> addedIds, keptIds, updatedIds;
+    };
+    std::optional<MergeReport> mergeFrom (const std::filesystem::path& other, bool newerWins,
+                                          const std::vector<std::pair<std::string, std::string>>& movedPrefixes);
+
+    // Caches (Stage 10) ----------------------------------------------------------
+    struct CacheUsage
+    {
+        int analysisRows = 0, unusedAnalysisRows = 0;
+        std::int64_t analysisBytes = 0, unusedAnalysisBytes = 0;
+    };
+    CacheUsage cacheUsage() const;
+    /** Analyses of content nothing refers to any more (no record, scan or Inbox item): they can
+        always be made again. Returns how many went. */
+    int forgetUnusedAnalysis();
 
     // Derived sounds (Stage 8) ----------------------------------------------------
     /** Records where a sound came from: a slice or trim of `parentId` (seconds), the

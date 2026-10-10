@@ -65,6 +65,18 @@ bool readAudioFileInfo (const std::filesystem::path& path, AudioFileInfo& info, 
         error = path.filename().string() + " holds no playable audio";
         return false;
     }
+    // Uncompressed audio whose header promises more than the file holds: cut short (damaged,
+    // or a copy or download still arriving). Read, it would play only part of itself.
+    if (info.formatName != "FLAC")
+    {
+        const auto bytesPerFrame = static_cast<std::uintmax_t> (info.channels) * static_cast<std::uintmax_t> ((info.bitDepth + 7) / 8);
+        const auto size = std::filesystem::file_size (path, ec);
+        if (! ec && bytesPerFrame > 0 && static_cast<std::uintmax_t> (info.frames) * bytesPerFrame > size)
+        {
+            error = path.filename().string() + " is shorter than its header says (damaged, or still being copied)";
+            return false;
+        }
+    }
     return true;
 }
 
