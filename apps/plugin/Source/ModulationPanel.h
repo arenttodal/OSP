@@ -33,6 +33,9 @@ namespace modui
     std::vector<mod::Dest> destinationsShownBy (const juce::String& parameterId);
     /** The control's parameter ID for a destination (where to show its halo), or empty. */
     juce::String parameterFor (mod::Dest dest);
+    /** A route's name: "ENV 1 → CHARACTER CUTOFF"; a depth route's "LFO 1 → DEPTH OF ENV 1 → ..."
+        (withSource false: without its own source). */
+    juce::String routeTitle (const OspAudioProcessor& processor, const OspAudioProcessor::ModRouteInfo& info, bool withSource = true);
     /** The panel's tabs: 0 AMP, 1 ENV 1, 2 ENV 2, 3 LFO 1, 4 LFO 2; their sources (-1 AMP). */
     constexpr int tabCount = 5;
     int sourceOfTab (int tab) noexcept;
@@ -251,6 +254,7 @@ private:
         juce::Rectangle<float> removeArea() const;
         ModRoutesPopup& owner;
         OspAudioProcessor::ModRouteInfo info;
+        juce::String title;
         ModDepthBar depth;
     };
     void rebuild();
@@ -331,6 +335,39 @@ public:
     void showNotice (const juce::String& text);
     juce::String currentNotice() const;
 
+    /** META-MODULATION. What a point is over (root coordinates): a halo's route - its ring
+        band, the route's depth - several routes where their arcs lie together (a chooser),
+        or the control itself (its value). */
+    struct HaloHit
+    {
+        int target = -1;          ///< the control (index among the collected targets)
+        juce::String parameterId;
+        int slot = -1;            ///< the route whose depth the ring stands for
+        std::vector<int> routes;  ///< more than one route there: ask which
+        bool body = false;        ///< the control itself
+        bool halo() const noexcept { return slot >= 0 || ! routes.empty(); }
+    };
+    HaloHit hitAt (juce::Point<float> where) const;
+    /** A source dropped there: on a halo it modulates that route's depth (a chooser when the
+        arcs lie together), on the control its value; never one for the other. The route's
+        slot (made or selected), -1 when nothing was made (refused, or the chooser is open). */
+    int drop (int source, juce::Point<float> where);
+    /** `source` (0..4) on the depth of the route in `slot`, through the processor's one path. */
+    int assignDepth (int source, int slot);
+    /** A halo's right-click: the route, its depth, MODULATE THIS DEPTH (every source the rules
+        allow), EXISTING DEPTH MODULATION, Remove Depth Modulation. */
+    juce::PopupMenu depthMenu (int slot);
+    /** Which route's depth (arcs lying together). */
+    juce::PopupMenu depthChooser (int source, const std::vector<int>& slots);
+    /** The depth routes of a route. */
+    std::vector<const OspAudioProcessor::ModRouteInfo*> depthRoutesOf (int slot) const;
+    /** A route's depth now (moved by its depth routes, as the engine takes it) and the range
+        its depth routes can take it through; base depth when none. */
+    double effectiveDepth (int slot) const;
+    juce::Range<double> effectiveDepthRange (int slot) const;
+    /** While a source is dragged: what a drop there would make (or why not). */
+    juce::String dragTip() const;
+
     void paint (juce::Graphics&) override;
     bool hitTest (int x, int y) override;
     void mouseMove (const juce::MouseEvent&) override;
@@ -356,6 +393,8 @@ private:
     {
         float lo = 0.0f, hi = 0.0f, base = 0.0f, handle = 0.0f, now = 0.0f;
         bool nowKnown = false;
+        float effective = 0.0f;   ///< where the depth routes take the handle now
+        int metaSource = -1;      ///< the first depth route's source (its accent), -1: none
     };
     void collect (juce::Component& c);
     float positionOf (const Target& t, double offset, mod::Dest dest) const;
@@ -363,6 +402,14 @@ private:
     const OspAudioProcessor::ModRouteInfo* emphasised (const Target& t) const;
     Sweep sweepOf (const Target& t, const OspAudioProcessor::ModRouteInfo& route) const;
     int targetAt (juce::Point<float> p, bool includeBody, bool anyControl = false) const;
+    const OspAudioProcessor::ModRouteInfo* routeInSlot (int slot) const;
+    /** A source's value now as a destination hears it (a shared stage: the global envelope). */
+    double valueNow (int source, mod::Dest dest, bool& known) const;
+    juce::Range<double> sourceRange (int source) const;
+    /** The depth route being edited on this control's halo (the selection), or nullptr. */
+    const OspAudioProcessor::ModRouteInfo* selectedDepthRoute (const Target& t) const;
+    juce::Rectangle<float> dragTipArea() const;
+    void paintDragTarget (juce::Graphics&, const Target& t, int index, const HaloHit& hit);
     juce::String notice;
     juce::uint32 noticeUntil = 0;
     juce::Rectangle<float> noticeAnchor;

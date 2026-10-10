@@ -38,7 +38,8 @@ namespace osp::mod
     The graph is acyclic by construction: only the envelopes' own settings are destinations
     owned by a source, and only the LFOs and the mod wheel may reach them (nothing modulates
     an LFO or the wheel), so no chain can return to where it began; createsCycle() checks
-    it anyway. Deterministic: the smooth-random shape draws one value per cycle from the
+    it anyway. A route may also move another route's depth (Dest::routeDepth, one level only,
+    never its own route's: depthRule()); it reaches what that route reaches. Deterministic: the smooth-random shape draws one value per cycle from the
     stored seed and the cycle index, so a host-synced LFO repeats exactly when the song does.
 
     Pure C++, real-time safe: the settings are plain values (no allocation), compiled once
@@ -180,6 +181,8 @@ enum class Dest : std::uint8_t
     startA, startB, startC,   ///< where a new note begins in the layer's recording (taken at note-on)
     env1Attack, env1Decay, env1Sustain, env1Release,
     env2Attack, env2Decay, env2Sustain, env2Release,
+    // Meta-modulation: the depth of another route (Route::target), not a parameter.
+    routeDepth,
     count
 };
 constexpr int destCount = static_cast<int> (Dest::count);
@@ -225,6 +228,10 @@ struct Route
     Dest dest = Dest::none;
     double depth = 0.0;    ///< -1..1 (a negative depth inverts the source)
     bool enabled = true;
+    /** Dest::routeDepth: the index (in Settings::routes) of the route whose depth this one
+        moves. The plugin keeps stable route IDs in its state and resolves them to this index;
+        -1: none. */
+    int target = -1;
 };
 constexpr int maxRoutes = 16;
 
@@ -247,9 +254,35 @@ enum class RouteState : std::uint8_t
     active,
     empty,        ///< no source or destination, or depth 0
     bypassed,
-    scope         ///< a per-voice source on a shared destination
+    scope,        ///< a per-voice source on a shared destination (or a rule refuses it)
+    noTarget      ///< a depth route whose route is gone or does nothing (appended)
 };
+/** A route's state without the others (a depth route: see the overload). */
 RouteState routeState (const Settings& settings, const Route& route) noexcept;
+/** A route's state among the others: a depth route needs a working target, and a route at
+    depth 0 still works when another route moves its depth. */
+RouteState routeState (const Settings& settings, int index) noexcept;
+
+/**
+    Meta-modulation: a source moving another route's depth (one level only).
+
+        effective depth = clamp (depth + sum of (meta depth x meta source), -1, 1)
+
+    taken wherever the route is read (continuously, at note-on, at release), with the
+    sources' values at that moment, in the scope the route's destination is heard in (a
+    shared stage: the global sources and the global envelopes; a voice: its own).
+*/
+inline bool isDepthRoute (const Route& r) noexcept { return r.dest == Dest::routeDepth; }
+enum class DepthRule : std::uint8_t
+{
+    ok,
+    noRoute,     ///< the target is empty (or not a route)
+    nested,      ///< the target is itself a depth route: one level only
+    self,        ///< the source would move the depth of its own route
+    scope,       ///< the source cannot reach the target's destination (the ordinary rules)
+    cycle        ///< it would loop back through the routes
+};
+DepthRule depthRule (const Settings& settings, Source source, int target) noexcept;
 /** A source can drive this destination: the scope rule (a poly LFO has no single value on a
     shared stage), the timing rule (an envelope has no value yet when a note starts, so it
     cannot choose START) and the source rule (an envelope's settings take LFOs and the wheel). */
@@ -267,23 +300,46 @@ struct Compiled
     {
         std::uint8_t source;   ///< sourceIndex
         float depth;
+        std::uint8_t metaFirst = 0, metaCount = 0;   ///< the routes moving this depth (in `meta`)
+    };
+    struct Meta
+    {
+        std::uint8_t source;
+        float depth;
     };
     static constexpr int maxTerms = maxRoutes;
     std::array<std::array<Term, maxTerms>, destCount> terms {};
     std::array<std::uint8_t, destCount> termCount {};
+    std::array<Meta, maxRoutes> meta {};
+    int metaCount = 0;
     bool any = false;            ///< any active route
     bool anyGlobalDest = false;  ///< a route to a shared stage (the engine then updates them at control rate)
     bool anyVoiceDest = false;
     std::array<bool, sourceCount> used {};   ///< a source feeds an active route
 
     void compile (const Settings& settings) noexcept;
-    /** Sum of depth x value over the destination's routes (values indexed by source). */
+    /** A route's depth now: its own, moved by its depth routes (clamped to -1..1). Without
+        depth routes exactly the stored depth. */
+    double depthOf (const Term& t, const std::array<float, sourceCount>& values) const noexcept
+    {
+        double depth = static_cast<double> (t.depth);
+        if (t.metaCount == 0)
+            return depth;
+        for (int m = t.metaFirst; m < t.metaFirst + t.metaCount; ++m)
+            depth += static_cast<double> (meta[static_cast<std::size_t> (m)].depth) * values[meta[static_cast<std::size_t> (m)].source];
+        return depth < -1.0 ? -1.0 : (depth > 1.0 ? 1.0 : depth);
+    }
+    /** Sum of depth x value over the destination's routes (values indexed by source), each
+        depth as its depth routes move it now. */
     double sum (Dest d, const std::array<float, sourceCount>& values) const noexcept
     {
         const auto i = static_cast<std::size_t> (d);
         double s = 0.0;
         for (int k = 0; k < termCount[i]; ++k)
-            s += static_cast<double> (terms[i][static_cast<std::size_t> (k)].depth) * values[terms[i][static_cast<std::size_t> (k)].source];
+        {
+            const auto& t = terms[i][static_cast<std::size_t> (k)];
+            s += depthOf (t, values) * values[t.source];
+        }
         return s;
     }
     bool has (Dest d) const noexcept { return termCount[static_cast<std::size_t> (d)] > 0; }

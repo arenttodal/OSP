@@ -719,7 +719,14 @@ void InstrumentVoice::updateModulation (bool advance) noexcept
         for (int k = 0; k < rt.compiled.termCount[i]; ++k)
         {
             const auto& term = rt.compiled.terms[i][static_cast<std::size_t> (k)];
-            if (mod::isPolySource (rt.settings, static_cast<mod::Source> (term.source + 1)))
+            if (term.metaCount > 0)
+            {
+                // Its depth moved by other routes: this voice's whole term, less the part the
+                // engine already added from the single-valued sources.
+                own += rt.compiled.depthOf (term, modState.values) * modState.values[term.source]
+                       - rt.compiled.depthOf (term, rt.globalValue) * rt.globalValue[term.source];
+            }
+            else if (mod::isPolySource (rt.settings, static_cast<mod::Source> (term.source + 1)))
                 own += static_cast<double> (term.depth) * modState.values[term.source];
         }
         modReimagined = static_cast<float> (mod::destInfo (d).span * own);

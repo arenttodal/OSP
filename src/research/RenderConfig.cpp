@@ -240,6 +240,8 @@ std::optional<RenderConfig> loadRenderConfig (const std::filesystem::path& path,
 
     // Modulation (optional, engine C): "modulation": { "lfo1": { "shape": "sine", "rateHz": 2, ... },
     // "env1": { "attack": 0.01, ... }, "routes": [ { "source": "lfo1", "dest": "cutoff", "depth": 0.5 } ] }
+    // Meta-modulation: { "id": "env", "source": "env1", "dest": "cutoff", "depth": 0.4 },
+    // { "source": "lfo1", "dest": "routeDepth", "target": "env", "depth": 0.2 }.
     if (json::has (root, "modulation"))
     {
         const auto& m = root["modulation"];
@@ -278,12 +280,23 @@ std::optional<RenderConfig> loadRenderConfig (const std::filesystem::path& path,
         }
         if (const auto* routes = m["routes"].getArray())
         {
+            // A route may name itself ("id"); a depth route ("dest": "routeDepth") names the
+            // route whose depth it moves ("target": that id, or its place in this list).
+            juce::StringArray routeIds;
+            for (const auto& route : *routes)
+                routeIds.add (juce::String (json::getString (route, "id", "")));
             int r = 0;
             for (const auto& route : *routes)
             {
                 if (r >= mod::maxRoutes)
                     break;
                 auto& out = ms.routes[static_cast<std::size_t> (r++)];
+                if (json::has (route, "target"))
+                {
+                    const auto& t = route["target"];
+                    const int index = t.isString() ? routeIds.indexOf (t.toString()) : static_cast<int> (t);
+                    out.target = index >= 0 && index < std::min (mod::maxRoutes, routes->size()) && t.toString().isNotEmpty() ? index : -1;
+                }
                 const auto source = juce::String (json::getString (route, "source", "")).toLowerCase().removeCharacters (" ");
                 for (int k = 1; k <= mod::sourceCount; ++k)
                     if (source == juce::String (mod::sourceName (static_cast<mod::Source> (k))).toLowerCase().removeCharacters (" "))

@@ -515,7 +515,15 @@ START A/B/C read at note-on, the envelopes' own times). The shared stages hear `
 sharedValue`: the single-valued sources plus one global instance of each envelope (restarted
 by each note-on, released by the last key and pedal). Voices hear `globalValue` and their own
 envelopes and poly LFOs. Every assignment (drag, right-click, popover) goes through
-`OspAudioProcessor::assignModulation` (rules, `mod::createsCycle`, duplicates, capacity). Headless:
+`OspAudioProcessor::assignModulation` (rules, `mod::createsCycle`, duplicates, capacity).
+Meta-modulation: a route may move another route's depth (`Dest::routeDepth`, `Route::target`,
+one level, `mod::depthRule`). `Compiled` keeps each term's depth routes beside it and
+`Compiled::depthOf` sums them, clamped, wherever the term is read (so scope and timing follow
+the target's destination; without them the stored depth exactly). The plugin links routes by
+stable IDs in the state's `ModLinks` child and resolves them to slots on the message thread
+(atomics to the audio thread); `assignDepthModulation` is the same path for depths, and
+removing a route removes its depth routes in one undo step. `ModulationOverlay::hitAt` tells a
+halo's ring (a route's depth) from the knob (its value). Headless:
 the `"modulation"` block of render configs. Report: `docs/reports/modulation.md`.
 
 ## PER-LAYER EQ (parameters v18)

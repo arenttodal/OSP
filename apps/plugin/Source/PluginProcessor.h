@@ -34,7 +34,8 @@ namespace osp::plugin
       - loader:  a single background thread that imports, hashes and analyses samples, then
                  builds the model stages (playable -> sustain -> register anchors).
 */
-class OspAudioProcessor final : public juce::AudioProcessor, private juce::Timer, private juce::AudioProcessorParameter::Listener
+class OspAudioProcessor final : public juce::AudioProcessor, private juce::Timer, private juce::AudioProcessorParameter::Listener,
+                                private juce::ValueTree::Listener
 {
 public:
     OspAudioProcessor();
@@ -129,12 +130,27 @@ public:
     ModAssignResult assignModulation (mod::Source source, mod::Dest dest, float depthPercent = 50.0f);
     /** The modulation settings as the parameters say now (the rules and loop checks use them). */
     mod::Settings modulationProbe() const;
+    /** Removes a route; the routes moving its depth go with it, in the same undo step. */
     void removeModulationRoute (int slot, bool ownUndoStep = true);
+    /** META-MODULATION through the same path: `source` moves the depth of the route in
+        `targetSlot` (a depth route, Dest::routeDepth, linked by the target's stable ID). The
+        same checks as assignModulation, plus one level only and never a source on its own
+        route's depth; an existing pairing is selected, never duplicated. */
+    ModAssignResult assignDepthModulation (mod::Source source, int targetSlot, float depthPercent = 20.0f);
+    /** Why `source` cannot move that route's depth (empty: it can). */
+    juce::String depthModulationRefusal (mod::Source source, int targetSlot) const;
+    bool canModulateDepth (mod::Source source, int targetSlot) const { return depthModulationRefusal (source, targetSlot).isEmpty(); }
+    /** A route's stable ID (saved with the session; 0 until it needs one), a depth route's
+        target slot (-1: none), and the depth routes moving a route. */
+    int modRouteUid (int slot) const;
+    int modRouteTarget (int slot) const;
+    std::vector<int> depthRoutesOf (int slot) const;
     struct ModRouteInfo
     {
         int slot = -1;
-        mod::Route route;
+        mod::Route route;   ///< a depth route: route.target is its target's slot
         mod::RouteState state = mod::RouteState::empty;
+        bool isDepth() const noexcept { return mod::isDepthRoute (route); }
     };
     std::vector<ModRouteInfo> modulationRoutes() const;
 
@@ -502,7 +518,21 @@ private:
     std::array<std::array<std::atomic<float>*, 8>, 2> modLfoParams {};
     std::array<std::array<std::atomic<float>*, 7>, 2> modEnvParams {};
     std::array<std::array<std::atomic<float>*, 4>, mod::maxRoutes> modRouteParams {};
-    static constexpr int numModValues = 2 * 8 + 2 * 7 + mod::maxRoutes * 4;
+    static constexpr int numModValues = 2 * 8 + 2 * 7 + mod::maxRoutes * 5;
+    // META-MODULATION's links: each route's stable ID and a depth route's target ID live in
+    // the state's ModLinks child (saved, undoable); the audio thread reads them resolved to
+    // slots (message thread writes on every change of the links or the state).
+    std::array<std::atomic<int>, mod::maxRoutes> modRouteTargets {};
+    juce::ValueTree modLinks() const;
+    void setModLink (int slot, int uid, int targetUid);
+    int newModRouteUid() const;
+    int resolveModTarget (int slot) const;
+    void refreshModLinks();
+    void commitRouteChange();
+    void valueTreePropertyChanged (juce::ValueTree&, const juce::Identifier&) override;
+    void valueTreeChildAdded (juce::ValueTree&, juce::ValueTree&) override;
+    void valueTreeChildRemoved (juce::ValueTree&, juce::ValueTree&, int) override;
+    void valueTreeRedirected (juce::ValueTree&) override;
     std::array<float, numModValues> lastModValues {};
     mod::Settings modSettings;   ///< the audio thread's working copy (built in place, never allocated)
     std::array<mod::Curve, 4> modCurves {};

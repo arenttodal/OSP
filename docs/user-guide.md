@@ -360,6 +360,25 @@ less; below zero turns the movement around, and the knob's own setting never cha
 several sources move one knob, the selected one is drawn bold and the others as thin arcs
 outside.
 
+**Modulating a modulation.** A halo is a target too. Drop a source **on the halo** (the ring)
+instead of the knob and it moves that route's **depth**: drop LFO 1 on the halo of ENV 1 →
+CHARACTER and ENV 1 still moves CHARACTER, but how much now rises and falls with LFO 1. Drop
+it **on the knob** and it moves the knob itself, as before. While you drag, a note under the
+control says which it will be ("LFO 1 → ENV 1 / CHARACTER CUTOFF DEPTH" or "LFO 1 →
+CHARACTER"). When a knob has several routes, the inner ring is the selected route and the thin
+outer arcs the others; where several lie together, a small menu asks which one you mean.
+- **Right-click a halo** for that route's depth: **MODULATE THIS DEPTH** offers the sources that
+  can do it, **EXISTING DEPTH MODULATION** lists those already on it (edit, bypass, remove), and
+  **Remove Depth Modulation** clears them. The knob's own menu is under **This Control**.
+- A small dot in the depth source's colour rides just outside the halo: it shows where the
+  depth is right now, while the halo itself stays on the depth you set. Point at the halo for
+  the base depth, the amount and the range the depth can move through.
+- Just after you make one (or pick **Edit Amount**), dragging the halo changes the depth
+  source's amount; **Edit Base Depth** (or clicking the route's source) goes back to the route's
+  own depth. Your knob setting and the route's depth are never changed by the movement.
+- One level only: a depth's amount cannot itself be modulated, and a source cannot move the
+  depth of its own route. Removing a route removes what moved its depth (one undo).
+
 **N ROUTES** opens the source's routes: each with its depth (drag the bar; double-click for 0),
 a light to bypass it and × to remove it. The corner mark beside it opens a large curve editor.
 For CUSTOM and ONE SHOT, drag the points, double-click to add or remove one, drag a line to

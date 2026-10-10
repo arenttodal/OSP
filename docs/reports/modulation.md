@@ -301,6 +301,108 @@ the text and the plugin as it is.
   destination choice in an older build would land on other entries. Sessions and presets
   store the index and are unaffected.
 
+## Meta-modulation: sources on a route's depth
+
+A source can move another route's **depth** (Vital-style modulation of modulation). Drop LFO 1
+on the halo of ENV 1 → CHARACTER and ENV 1 keeps moving CHARACTER, but how far it moves it now
+follows LFO 1. The stored values never change: CHARACTER's knob, the route's saved depth and
+the depth route's amount stay as set; only the engine's sum moves.
+
+### Model
+
+- **A depth route is an ordinary route** in one of the 16 slots, with the appended destination
+  `ROUTE DEPTH` (`mod::Dest::routeDepth`) and a target: `Route::target`, the index of the route
+  whose depth it moves. There is no second, hidden system. The same assignment path makes it
+  (`OspAudioProcessor::assignDepthModulation`), the same list shows it ("LFO 1 → DEPTH OF
+  ENV 1 → CHARACTER CUTOFF" in LFO 1's routes) and the same removal clears it.
+- **Effective depth** = clamp (saved depth + Σ amount × source, −1, +1). It goes through zero
+  into the other direction. Without a depth route it is exactly the saved depth (bit-identical:
+  `Compiled::depthOf` returns the stored float unchanged).
+- **Order of evaluation** (as the spec asks): the sources advance first (global LFOs, the wheel
+  and the global envelopes per control period; each voice its own), then `Compiled::sum` takes
+  each route's depth with its depth routes and multiplies by the route's source, then the
+  destination maps and smooths the result as it always did. Nothing new is smoothed: the
+  destinations' existing control-rate paths (32 samples for the shared stages, per voice) carry
+  the new sum, so DRIVE, CHARACTER and the filter move as smoothly as with a plain route.
+- **Several sources** may move one route's depth; they add up before the clamp.
+- **Read where the route is read.** A route to START or to an envelope's attack takes its depth
+  as the note starts; a release route at release; a continuous one continuously.
+
+### Rules (`mod::depthRule`)
+
+A depth route is refused, with its reason, when:
+
+| Rule | Example | Why |
+|---|---|---|
+| no route | the slot is empty | nothing to modulate (drop on the knob to make a route) |
+| one level | LFO 2 on the amount of LFO 1 → DEPTH OF ... | depth routes are never targets themselves |
+| self | ENV 1 on the depth of ENV 1 → CHARACTER | not designed yet (spec: refuse until it is) |
+| scope / timing | a POLY LFO on the depth of LFO 2 → DRIVE; an envelope on a START or an envelope-time route | the target's destination decides, by the ordinary rules |
+| loop | (cannot happen with the rules above) | `mod::createsCycle` now follows depth routes to their target's destination |
+
+**Global vs per voice.** The depth is evaluated in the scope its route's destination is heard
+in: on a shared stage (macros, EQ) with the global sources and the **global envelopes** (the
+policy chosen in the refinement: one instance per envelope, restarted per note, released by
+the last key); on a voice destination with that voice's own sources. A POLY LFO has no single
+value on a shared stage, so it is refused there; it never silently picks a voice. A route at
+depth 0 stays a target and works while something moves its depth.
+
+### Data model and lifecycle
+
+- Routes get **stable IDs**. The plugin keeps them in a `ModLinks` child of its state
+  (`schemaVersion` 1; `uidN` = slot N's route ID, `targetN` = the ID of the route a depth route
+  moves). The message thread resolves the IDs to slots on every change (a `ValueTree::Listener`:
+  edits, undo, session and preset loads) and hands the audio thread the slots through atomics;
+  `applyModulation` copies them into `Route::target`. The audio thread never sees an ID, a tree
+  or a string. Slots are no identity: a session whose routes sit in other slots resolves the
+  same (tested by swapping two routes' slots in a saved state).
+- **Removing a route removes its depth routes** in the same undo step. Removing a depth route
+  leaves its route alone. New routes always get a new ID, so a reused slot can never inherit
+  an old link.
+- **Undo.** APVTS writes parameters into its tree (and undo step) on a timer; the links are
+  written at once. A route change now flushes immediately (`commitRouteChange`), so the
+  parameters and the links of one change are always one undo step, however quickly the next
+  edit follows.
+- **Presets and sessions** carry `ModLinks`. Older ones have none and load exactly as before.
+  INIT and Reset drop the links with the routes.
+- **Host automation** stays on the saved depths. A depth route's amount is an ordinary,
+  automatable `mod.routeN.depth`. The moving effective depth is never written back to a
+  parameter.
+
+### Interface
+
+- **Two targets on one knob.** While a source is dragged, the knob body is the knob's value and
+  the halo's ring band (−5 … +3 px around the ring) is the depth of the route it shows. Outside
+  it (+3 … +11 px) are the thin arcs of the knob's other routes. With one other route the band
+  is that route; with several the drop opens a small **chooser** (never a guess). A knob with no
+  route has no depth to target: the whole control is the control, and no route is invented.
+  - The value field of an EQ band has its range bar as the halo.
+- **While dragging**: the knob's value is a thin circle around the knob, bright when it is the
+  target; over a halo, that route's ring turns brighter and thicker. A tooltip under the
+  control says what a drop would make ("LFO 1 → ENV 1 / CHARACTER CUTOFF DEPTH",
+  "LFO 1 → CHARACTER") or why it cannot ("ENV 1 cannot modulate the depth of its own route").
+- **Right-click a halo**: the route and its depth; **Edit Base Depth**; **MODULATE THIS DEPTH**
+  (Assign / Edit for each source the rules allow, none that would be refused); **EXISTING DEPTH
+  MODULATION** (each with Edit Amount, Bypass, Remove); **Remove Depth Modulation**; and the
+  knob's own menu one level down (**This Control**). Right-clicking the knob itself shows the
+  knob's menu as before, and each route there has **Modulate Its Depth**.
+- **On the halo**: the ring stays on the saved depth (a stable reference; the drag handle never
+  jumps). A fine accent in the depth route's colour runs just outside the ring from the saved
+  depth's end to where the depth routes take it now, ending in a small dot. It moves with the
+  engine's own sources (`modulationView`, mirrored, the same values the sum uses; no GUI
+  oscillator), and the "now" marker follows the effective depth. Hover reads: the route, Base
+  depth, each depth route's amount (± for a bipolar LFO), Effective lo to hi, the base value
+  and the range the depth routes can open.
+- **Editing.** Dragging a knob changes its value. Dragging a halo changes the selected route's
+  saved depth. When a depth route is selected (just made, from its menu, or in its source's
+  routes), the same halo edits that depth route's amount and its readout says so ("LFO 1 →
+  DEPTH OF ..."). Edit Base Depth goes back to the route.
+
+### Headless
+
+Render configs: a route may name itself (`"id"`); a depth route is
+`{ "source": "lfo1", "dest": "routeDepth", "target": "<id>" | <index>, "depth": 0.2 }`.
+
 ## Tests
 
 | Test | What it covers |
@@ -310,6 +412,9 @@ the text and the plugin as it is.
 | `[ui][mod-ui]` (xvfb) | The window keeps 1086 px, and the panel sits inside the macro section. Switching tabs leaves the LFO's phase untouched. The RATE menu switches Sync / Hz. A tab drag needs the threshold and drops onto CHARACTER. The polarity menu works. The halo clears the knob's reach, and the labels sit above the halos. The hover readout appears. Drag +70 then −40 changes depth through zero while the base stays put. ENV 1 → cutoff; per-route editing with several sources. The routes popover has its rows and six add groups; the curve popover opens. Rapid tab switching, the MOD button, ARP with the panel, the smallest and largest scales, and recall of the tab. Screenshots `modui-01` … `modui-15`. |
 | `[unit][mod]` (refinement, 5 cases) | The global LFO after ONE SHOT, with no voices, across transport changes and repeated keys; the global envelope (restart, hold with a key or the pedal, release); MOD WHEEL (glide, -12 dB at full wheel on LEVEL, no change wheel-down); START (= the equivalent knob setting, forwards and reversed, no jump when the wheel moves mid-note, bounded); envelope times (taken at note-on, sustain followed, envelopes refused). |
 | `[ui][andor-ui]` (xvfb) | Tab sockets and spacing; ENV 1 dropped on DRIVE; halos on all six macros clear of their names; right-click: hit test, Assign / Edit / Remove, no duplicates, refused sources absent; the wheel dragged onto SPACE, then moved on screen and by CC 1; LFO 1 on START A and on ENV 1 ATTACK; Granular hover-to-open (not on a pass), drop on POS; the source card; ADVANCED full width; the MIX triangle hidden with three layers, its values kept; recall. Screenshots `andor-01` ... `andor-12`. |
+| `[unit][mod][meta]` (5 cases) | The depth rules (one level, self, scope, timing, no route) and states (a route at depth 0 working while moved, a depth route without its route, bypassed); compiled terms (only the targeted route carries them, several add up); the clamp and through-zero; heard: -12 dB becomes 0 dB / -24 dB / -6 dB as the wheel moves the depth, bit-identical with the wheel down, block-size independent, stored values unchanged; a global LFO on a shared stage's depth keeps moving after ONE SHOT, keys, transport and reloads while another route stays still; render configs by id and by place; eight routes with eight depth routes: finite, no measurable cost. |
+| `[plugin][mod][meta]` | The assignment path and its reasons; existing pairs selected; heard in the plugin; CHARACTER, the saved depth and the amount unchanged; host automation of the saved depth; two routes on CHARACTER each with its own; recall, also with the routes in other slots; removal takes the depth routes in one undo step (undo, redo); older sessions; INIT. |
+| `[ui][meta-ui]` (xvfb) | Tests A-I in the editor: body vs halo (and the tooltips), the self refusal before and on the drop, LFO 1 on ENV 1's halo, the effective depth moving between +20 % and +60 % with the stored values fixed, the hover readout, the halo's menu (offered and refused sources), Assign LFO 2 from it, negative and unipolar amounts, editing the amount vs the saved depth, a zero-depth route as a target, two and three routes (outer band, chooser), removal and undo, reload and transport. Screenshots `meta-01` ... `meta-11`. |
 | `[.][mod-cpu]` | Stress measurement (below). |
 
 ## CPU
@@ -356,8 +461,7 @@ a concern for MOD. Only the ARP editor still grows the height, as before.
 3. **Not done in this round (refinement).** No DAW was used, so automation lanes, project
    recall in hosts and real controller wheels are untested; CC 1 is tested headless (the
    source and the on-screen wheel follow it). The A/B/C source card opens on hover and click,
-   not from keyboard focus. Meta-modulation (a source on a route's depth) is queued as the
-   next piece of work.
+   not from keyboard focus.
 4. **CHARACTER's ring for cutoff routes.** It is an approximation: four octaves drawn over
    the macro's travel. The audio is exact. Only the drawing approximates.
 5. **Depth on the halo.** Depth is changed by dragging the halo, or the knob with Option,
@@ -365,3 +469,11 @@ a concern for MOD. Only the ARP editor still grows the height, as before.
    path.
 6. **Host validation.** Logic, Ableton, REAPER and AudioPluginHost resizing and automation
    are still to be checked on a Mac or PC.
+7. **Meta-modulation.** Depth routes share the 16 route slots (no separate capacity), so a
+   patch with many depth routes has fewer ordinary ones. One level only, and a source never on
+   its own route's depth (both deliberate for this first release). A per-voice source's
+   accent on a halo follows the newest sounding note, as the halo's marker always has. The
+   Vital reference screenshot was not attached; the accent and the tooltip are a proposal from
+   the text. `ROUTE DEPTH` is appended to `mod.routeN.dest`, so (as with any appended choice) a
+   DAW lane recorded on a route's destination choice in an older build would land elsewhere.
+   Not tried in a DAW.

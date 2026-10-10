@@ -6,12 +6,16 @@
 #include "engine/InstrumentBuilder.h"
 #include "engine/InstrumentEngine.h"
 #include "engine/Modulation.h"
+#include "research/RenderConfig.h"
 #include "support/TestHelpers.h"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <chrono>
 #include <cmath>
+#include <filesystem>
+#include <fstream>
 #include <numbers>
 #include <vector>
 
@@ -584,4 +588,293 @@ TEST_CASE ("mod: LFO and wheel on the modulation envelopes' times - taken at not
     mod::VoiceState w;
     w.start (r2);
     CHECK (w.envNow[0].attackSeconds == plain.env[0].attackSeconds);
+}
+
+//==============================================================================
+// Meta-modulation: a source moving another route's depth.
+
+TEST_CASE ("mod: depth routes - one level, no self, the target's scope, no loop; states and compiled terms", "[unit][mod][meta]")
+{
+    using Src = mod::Source;
+    using D = mod::Dest;
+    using R = mod::DepthRule;
+    mod::Settings s;
+    s.routes[0] = { Src::env1, D::cutoff, 0.4, true };          // ENV 1 -> CHARACTER (each note's filter)
+    s.routes[1] = { Src::lfo1, D::routeDepth, 0.2, true, 0 };   // LFO 1 -> its depth
+    s.routes[2] = { Src::lfo2, D::drive, 0.5, true };           // LFO 2 -> DRIVE (a shared stage)
+    s.routes[3] = { Src::lfo1, D::env1Attack, 0.3, true };      // LFO 1 -> ENV 1's attack
+    CHECK (mod::depthRule (s, Src::lfo1, 0) == R::ok);
+    CHECK (mod::depthRule (s, Src::modWheel, 0) == R::ok);
+    CHECK (mod::depthRule (s, Src::env2, 0) == R::ok);           // a voice destination: any source
+    CHECK (mod::depthRule (s, Src::env1, 0) == R::self);         // its own route's depth
+    CHECK (mod::depthRule (s, Src::lfo2, 1) == R::nested);       // a depth route's depth: one level only
+    CHECK (mod::depthRule (s, Src::lfo1, 5) == R::noRoute);      // an empty slot
+    CHECK (mod::depthRule (s, Src::lfo1, -1) == R::noRoute);
+    CHECK (mod::depthRule (s, Src::lfo1, 99) == R::noRoute);
+    CHECK (mod::depthRule (s, Src::env1, 2) == R::ok);           // the global envelope on a shared stage
+    CHECK (mod::depthRule (s, Src::env2, 3) == R::scope);        // an envelope never reaches an envelope's times
+    CHECK (mod::depthRule (s, Src::env1, 3) == R::scope);
+    s.lfo[0].scope = mod::Scope::poly;
+    CHECK (mod::depthRule (s, Src::lfo1, 2) == R::scope);        // a poly LFO has no single value on DRIVE
+    s.lfo[0].scope = mod::Scope::global;
+    s.routes[4] = { Src::modWheel, D::startA, 0.5, true };
+    CHECK (mod::depthRule (s, Src::env2, 4) == R::scope);        // no envelope value yet when a note starts
+    CHECK_FALSE (mod::compatible (s, Src::lfo1, D::routeDepth)); // only through a route
+    CHECK_FALSE (mod::createsCycle (s, Src::modWheel, D::cutoff));
+
+    CHECK (mod::routeState (s, 1) == mod::RouteState::active);
+    mod::Compiled c;
+    c.compile (s);
+    const auto& cutoff = c.terms[static_cast<std::size_t> (D::cutoff)];
+    REQUIRE (c.termCount[static_cast<std::size_t> (D::cutoff)] == 1);
+    CHECK (cutoff[0].metaCount == 1);
+    CHECK (c.terms[static_cast<std::size_t> (D::drive)][0].metaCount == 0);   // only the targeted route
+    CHECK (c.termCount[static_cast<std::size_t> (D::routeDepth)] == 0);         // never a destination itself
+    CHECK (c.used[0]);
+
+    // effective depth = clamp (0.4 + 0.2 x LFO 1); the depth then scales ENV 1.
+    std::array<float, mod::sourceCount> v {};
+    v[2] = 0.5f;   // ENV 1
+    for (const float lfo : { -1.0f, 0.0f, 0.5f, 1.0f })
+    {
+        v[0] = lfo;
+        CHECK (c.depthOf (cutoff[0], v) == Approx (0.4 + 0.2 * lfo).margin (1.0e-6));
+        CHECK (c.sum (D::cutoff, v) == Approx ((0.4 + 0.2 * lfo) * 0.5).margin (1.0e-6));
+    }
+    // Clamped to -1..1; a negative amount inverts the influence; through zero to the other way.
+    s.routes[1].depth = 1.0;
+    s.routes[0].depth = 0.8;
+    c.compile (s);
+    v[0] = 1.0f;
+    CHECK (c.depthOf (c.terms[static_cast<std::size_t> (D::cutoff)][0], v) == Approx (1.0));
+    s.routes[1].depth = -1.0;
+    c.compile (s);
+    CHECK (c.depthOf (c.terms[static_cast<std::size_t> (D::cutoff)][0], v) == Approx (-0.2).margin (1.0e-6));
+    v[0] = -1.0f;
+    CHECK (c.depthOf (c.terms[static_cast<std::size_t> (D::cutoff)][0], v) == Approx (1.0));
+
+    // A route at depth 0 still works while a depth route moves it; a depth route without its
+    // route does nothing (and says so); bypassed, it stops.
+    s.routes[0].depth = 0.0;
+    CHECK (mod::routeState (s, 0) == mod::RouteState::active);
+    s.routes[1].enabled = false;
+    CHECK (mod::routeState (s, 0) == mod::RouteState::empty);
+    CHECK (mod::routeState (s, 1) == mod::RouteState::bypassed);
+    s.routes[1].enabled = true;
+    s.routes[0] = {};
+    CHECK (mod::routeState (s, 1) == mod::RouteState::noTarget);
+    c.compile (s);
+    CHECK (c.metaCount == 0);
+    // A refused pairing (the self rule) is shown, never silently compiled.
+    s.routes[0] = { Src::lfo1, D::cutoff, 0.4, true };
+    CHECK (mod::routeState (s, 1) == mod::RouteState::scope);
+    c.compile (s);
+    CHECK (c.terms[static_cast<std::size_t> (D::cutoff)][0].metaCount == 0);
+
+    // Several sources on one route's depth add up; several routes keep their own.
+    mod::Settings m;
+    m.routes[0] = { Src::env1, D::cutoff, 0.4, true };
+    m.routes[1] = { Src::lfo2, D::cutoff, 0.3, true };
+    m.routes[2] = { Src::lfo1, D::routeDepth, 0.2, true, 0 };
+    m.routes[3] = { Src::modWheel, D::routeDepth, -0.1, true, 0 };
+    c.compile (m);
+    REQUIRE (c.termCount[static_cast<std::size_t> (D::cutoff)] == 2);
+    const auto& t = c.terms[static_cast<std::size_t> (D::cutoff)];
+    CHECK (t[0].metaCount == 2);
+    CHECK (t[1].metaCount == 0);
+    std::array<float, mod::sourceCount> w {};
+    w[0] = 1.0f;   // LFO 1
+    w[1] = 1.0f;   // LFO 2
+    w[2] = 1.0f;   // ENV 1
+    w[4] = 1.0f;   // wheel
+    CHECK (c.depthOf (t[0], w) == Approx (0.5).margin (1.0e-6));   // 0.4 + 0.2 - 0.1
+    CHECK (c.depthOf (t[1], w) == Approx (0.3).margin (1.0e-6));   // LFO 2's route untouched
+}
+
+TEST_CASE ("mod: depth routes are heard - the route's strength moves, the stored values never", "[unit][mod][meta]")
+{
+    const auto model = sineModel (220.0);
+    auto settings = quietSettings();
+    // ENV 1 (instant, held at 1) -> LEVEL A at -50 % (-12 dB); the wheel moves that depth.
+    auto render = [&] (float wheel, double meta, bool withMeta, int block = 256) {
+        InstrumentEngine e;
+        e.prepare (rate, block, settings);
+        e.setModel (model.get());
+        mod::Settings m;
+        m.env[0].attackSeconds = 0.0;
+        m.env[0].decaySeconds = 0.0;
+        m.env[0].sustain = 1.0;
+        m.routes[0] = { mod::Source::env1, mod::Dest::levelA, -0.5, true };
+        if (withMeta)
+            m.routes[5] = { mod::Source::modWheel, mod::Dest::routeDepth, meta, true, 0 };
+        e.setModulation (m);
+        e.setModWheel (wheel);
+        auto out = renderNotes (e, { 57 }, 0.5, block);
+        // Test C: what is stored stays as it was (the effective depth lives in the sum only).
+        CHECK (e.modulation().settings.routes[0].depth == -0.5);
+        CHECK (e.modulation().settings.routes[5].depth == (withMeta ? meta : 0.0));
+        return out;
+    };
+    auto peak = [] (const std::vector<float>& x) {
+        double p = 0.0;
+        for (std::size_t i = x.size() / 2; i < x.size(); ++i)
+            p = std::max (p, static_cast<double> (std::abs (x[i])));
+        return p;
+    };
+    const auto plain = render (0.0f, 0.0, false);
+    const auto none = [&] {
+        InstrumentEngine e;
+        e.prepare (rate, 256, settings);
+        e.setModel (model.get());
+        return renderNotes (e, { 57 }, 0.5, 256);
+    }();
+    // The wheel down: the depth routes add nothing - exactly the route alone.
+    CHECK (render (0.0f, 0.5, true) == plain);
+    // Test A: +50 % at full wheel takes the depth from -50 % to 0: no level change at all.
+    CHECK (peak (render (1.0f, 0.5, true)) / peak (none) == Approx (1.0).margin (0.01));
+    CHECK (peak (plain) / peak (none) == Approx (std::pow (10.0, -12.0 / 20.0)).margin (0.02));
+    // Test E: a negative amount deepens it: -100 % -> -24 dB.
+    CHECK (peak (render (1.0f, -0.5, true)) / peak (none) == Approx (std::pow (10.0, -24.0 / 20.0)).margin (0.01));
+    // Halfway: -50 % + 25 % = -25 % -> -6 dB.
+    CHECK (peak (render (0.5f, 0.5, true)) / peak (none) == Approx (std::pow (10.0, -6.0 / 20.0)).margin (0.02));
+    // Deterministic and the same in any block size.
+    CHECK (render (1.0f, -0.5, true) == render (1.0f, -0.5, true));
+    const auto small = render (1.0f, -0.5, true, 32), large = render (1.0f, -0.5, true, 512);
+    double worst = 0.0;
+    for (std::size_t i = 0; i < small.size(); ++i)
+        worst = std::max (worst, static_cast<double> (std::abs (small[i] - large[i])));
+    CHECK (worst < 1.0e-4);
+}
+
+TEST_CASE ("mod: a global LFO on a route's depth - a shared stage moves, another route does not, after reloads and transport", "[unit][mod][meta][regression]")
+{
+    // Test F and I on the shared stages: LFO 1 (global, FREE) moves the depth of LFO 2 -> SPACE
+    // only; LFO 2 -> DRIVE keeps its own. The movement carries on with no keys, after ONE SHOT
+    // was switched away, across transport starts and stops, and after settings are reloaded.
+    mod::Settings s;
+    s.lfo[0].rateHz = 2.0;
+    s.lfo[1].shape = mod::LfoShape::pulse;   // LFO 2 holds +1 for half a cycle
+    s.lfo[1].rateHz = 0.01;
+    s.routes[0] = { mod::Source::lfo2, mod::Dest::space, 0.5, true };
+    s.routes[1] = { mod::Source::lfo2, mod::Dest::drive, 0.5, true };
+    s.routes[2] = { mod::Source::lfo1, mod::Dest::routeDepth, 0.4, true, 0 };
+    mod::Runtime rt;
+    rt.setSettings (s);
+    auto spread = [&rt] (int blocks) {
+        double lo = 9.0, hi = -9.0, driveLo = 9.0, driveHi = -9.0;
+        for (int i = 0; i < blocks; ++i)
+        {
+            rt.advanceGlobal (480, rate);
+            const double space = rt.compiled.sum (mod::Dest::space, rt.sharedValue);
+            const double drive = rt.compiled.sum (mod::Dest::drive, rt.sharedValue);
+            lo = std::min (lo, space);
+            hi = std::max (hi, space);
+            driveLo = std::min (driveLo, drive);
+            driveHi = std::max (driveHi, drive);
+        }
+        CHECK (driveHi - driveLo < 1.0e-3);   // DRIVE's route is not touched
+        return hi - lo;
+    };
+    CHECK (spread (100) == Approx (0.8).margin (0.05));   // depth 0.5 +/- 0.4, LFO 2 at +1
+    rt.noteStarted (60, 1);
+    rt.noteEnded (60, 1);
+    CHECK (spread (100) > 0.7);
+    // ONE SHOT, then FREE again (the old freeze): it runs on.
+    s.lfo[0].mode = mod::LfoMode::oneShot;
+    rt.setSettings (s);
+    rt.noteStarted (61, 1);
+    spread (200);
+    s.lfo[0].mode = mod::LfoMode::free;
+    rt.setSettings (s);
+    CHECK (spread (100) > 0.7);
+    // Transport starts and stops.
+    HostTiming playing;
+    playing.valid = true;
+    playing.playing = true;
+    playing.bpm = 120.0;
+    playing.ppq = 8.0;
+    rt.setTiming (playing);
+    CHECK (spread (100) > 0.7);
+    playing.playing = false;
+    rt.setTiming (playing);
+    CHECK (spread (100) > 0.7);
+    // A preset reloaded: a fresh copy of the same settings.
+    mod::Runtime reloaded;
+    reloaded.setSettings (mod::Settings (s));
+    rt.setSettings (s);
+    CHECK (spread (100) > 0.7);
+}
+
+TEST_CASE ("mod: depth routes in render configs, by id or by place", "[unit][mod][meta]")
+{
+    const auto dir = std::filesystem::temp_directory_path() / "osp-meta-config-test";
+    std::filesystem::create_directories (dir);
+    const auto file = dir / "meta.json";
+    {
+        std::ofstream out (file);
+        out << R"({ "schemaVersion": 1, "engine": "C", "modulation": { "routes": [
+                    { "id": "env", "source": "env1", "dest": "cutoff", "depth": 0.4 },
+                    { "source": "lfo2", "dest": "cutoff", "depth": 0.3 },
+                    { "source": "lfo1", "dest": "routeDepth", "target": "env", "depth": 0.2 },
+                    { "source": "mod wheel", "dest": "routeDepth", "target": 1, "depth": -0.5 },
+                    { "source": "lfo2", "dest": "routeDepth", "target": "missing", "depth": 0.5 } ] } })";
+    }
+    std::string error;
+    const auto config = research::loadRenderConfig (file, error);
+    std::filesystem::remove_all (dir);
+    REQUIRE (config.has_value());
+    const auto& routes = config->modulation.routes;
+    CHECK (routes[2].dest == mod::Dest::routeDepth);
+    CHECK (routes[2].target == 0);
+    CHECK (routes[3].source == mod::Source::modWheel);
+    CHECK (routes[3].target == 1);
+    CHECK (routes[4].target == -1);
+    CHECK (routes[0].target == -1);
+    CHECK (mod::routeState (config->modulation, 2) == mod::RouteState::active);
+    CHECK (mod::routeState (config->modulation, 3) == mod::RouteState::active);
+    CHECK (mod::routeState (config->modulation, 4) == mod::RouteState::noTarget);
+}
+
+TEST_CASE ("mod: many depth routes stay cheap and finite", "[unit][mod][meta]")
+{
+    // Test J: eight routes, each with a depth route at the extremes, against the same eight
+    // without: finite, bounded, and not much dearer.
+    const auto model = sineModel (220.0);
+    auto settings = quietSettings();
+    settings.shaping.filterType = FilterType::lp24;
+    auto run = [&] (bool meta, double& seconds) {
+        InstrumentEngine e;
+        e.prepare (rate, 256, settings);
+        e.setModel (model.get());
+        mod::Settings m;
+        m.lfo[0].rateHz = 7.0;
+        m.lfo[1].rateHz = 0.3;
+        m.lfo[1].scope = mod::Scope::poly;
+        const std::array<mod::Dest, 8> dests { mod::Dest::cutoff, mod::Dest::levelA, mod::Dest::panA, mod::Dest::fineTuneA,
+                                               mod::Dest::resonance, mod::Dest::drive, mod::Dest::space, mod::Dest::character };
+        for (std::size_t i = 0; i < dests.size(); ++i)
+        {
+            const auto global = mod::destInfo (dests[i]).owner == mod::Owner::global;
+            m.routes[i] = { global ? mod::Source::env1 : mod::Source::lfo2, dests[i], i % 2 == 0 ? 1.0 : -1.0, true };
+            if (meta)
+                m.routes[8 + i] = { i % 2 == 0 ? mod::Source::lfo1 : mod::Source::modWheel, mod::Dest::routeDepth, i % 2 == 0 ? 1.0 : -1.0, true, static_cast<int> (i) };
+        }
+        e.setModulation (m);
+        e.setModWheel (1.0f);
+        const auto begin = std::chrono::steady_clock::now();
+        auto out = renderNotes (e, { 45, 52, 57, 60, 64, 69 }, 2.0, 256);
+        seconds = std::chrono::duration<double> (std::chrono::steady_clock::now() - begin).count();
+        return out;
+    };
+    double plainSeconds = 0.0, metaSeconds = 0.0;
+    run (false, plainSeconds);
+    const auto out = run (true, metaSeconds);
+    run (false, plainSeconds);   // warmed up
+    for (const float x : out)
+        REQUIRE (std::isfinite (x));
+    double peak = 0.0;
+    for (const float x : out)
+        peak = std::max (peak, static_cast<double> (std::abs (x)));
+    CHECK (peak < 4.0);
+    CHECK (metaSeconds < 2.0 * plainSeconds + 0.05);
 }

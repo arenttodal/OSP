@@ -291,7 +291,14 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       the badge's card (no file name in the header); the MOD button gone, ADVANCED full width;
       the three-layer MIX triangle hidden behind `design::showMixTriangle` (DSP and state kept);
       ANDOR/OSP, One Shot Performer.
-- [ ] Meta-modulation: a source dropped on a halo modulates that route's depth (queued spec).
+- [x] META-MODULATION (docs/reports/modulation.md, "Meta-modulation"): a source dropped on a
+      halo (or assigned from its right-click) moves that route's depth: clamp (depth + Σ amount x
+      source), evaluated in the route's own scope and timing, base values and automation
+      untouched. Depth routes are ordinary routes (`ROUTE DEPTH`, appended) linked by stable
+      route IDs (`ModLinks` in the state); one level, no self, the ordinary scope / timing / loop
+      rules, each refusal explained; removing a route removes its depth routes in one undo step.
+      Halo vs knob drop targets, a chooser where arcs lie together, drag tooltips, a quiet
+      effective-depth accent, readout, amount editing. Headless `"routeDepth"` routes.
 - [ ] MODULATION: compare the panel and halo against the mockups (not received); host checks
       (Logic, Ableton, REAPER, AudioPluginHost); a global envelope mode needs a
       gate-aggregation rule before ENV may reach the macros.

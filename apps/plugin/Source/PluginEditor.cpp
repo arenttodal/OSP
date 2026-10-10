@@ -1390,19 +1390,11 @@ int OspAudioProcessorEditor::dropModulation (int source, juce::Point<float> wher
 {
     int slot = -1;
     modOverlay.setDrag (source, where);   // the targets as they are now (a popover or EQ may have opened)
-    if (auto* control = modOverlay.controlAt (where))
-    {
-        // The one assignment path (as the right-click menu's): an existing pairing is
-        // selected as it is, a refused one says why.
-        const auto id = control->getProperties()["paramId"].toString();
-        const auto dest = modui::destinationFor (id, modui::isPerVoice (ospProcessor, source));
-        if (dest != mod::Dest::none)
-        {
-            slot = modOverlay.assign (source, dest);
-            if (slot >= 0)
-                modPanel.refresh();
-        }
-    }
+    // The one assignment path (as the right-click menu's): on a halo the route's depth, on
+    // the control its value; an existing pairing is selected as it is, a refused one says why.
+    slot = modOverlay.drop (source, where);
+    if (slot >= 0)
+        modPanel.refresh();
     hoverMacro = -1;
     modOverlay.setDrag (-1, {});
     return slot;

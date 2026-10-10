@@ -22,6 +22,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <functional>
+#include <map>
 #include <typeinfo>
 
 using Catch::Approx;
@@ -4681,6 +4682,171 @@ TEST_CASE ("plugin: MODULATION parameters, routes, recall, older sessions, curve
     CHECK (p->modulationCurve (0) == mod::defaultLfoCurve());
 }
 
+TEST_CASE ("plugin: META-MODULATION - depth routes by stable ID: rules, heard, base values kept, removal, undo, recall", "[plugin][mod][meta]")
+{
+    TempDir tmp;
+    const auto file = writeSource (tmp.dir, "vowel.wav", testsignals::vowel (midiToHz (57), 2.0, 48000.0, 3));
+    auto make = [&] {
+        auto p = std::make_unique<OspAudioProcessor>();
+        p->initPatch();
+        loadAndWait (*p, file);
+        p->setParameterValue ("space", 0.0f);
+        p->setParameterValue ("character.type", 1.0f);   // a low-pass to move
+        p->setParameterValue ("character", 40.0f);
+        p->setParameterValue (OspAudioProcessor::modLfoId (0, "rate"), 2.0f);
+        return p;
+    };
+    auto flush = [] (OspAudioProcessor& p) { p.parameters.copyState(); };   // the parameters into the undo step
+    auto value = [] (OspAudioProcessor& p, const juce::String& id) {
+        auto* parameter = p.parameters.getParameter (id);
+        REQUIRE (parameter != nullptr);
+        return parameter->convertFrom0to1 (parameter->getValue());
+    };
+
+    // Test A (in the plugin): ENV 1 -> CHARACTER (each note's filter) at +40 %; LFO 1 on its depth.
+    auto p = make();
+    const auto primary = p->assignModulation (mod::Source::env1, mod::Dest::cutoff, 40.0f);
+    REQUIRE (primary.slot == 0);
+    CHECK (p->modRouteUid (0) > 0);
+    const auto envOnly = renderChord (*p, 1.0);
+    p = make();   // a fresh instance: LIFE's performance memory moves on with every chord
+    REQUIRE (p->assignModulation (mod::Source::env1, mod::Dest::cutoff, 40.0f).slot == 0);
+    const auto meta = p->assignDepthModulation (mod::Source::lfo1, 0, 20.0f);
+    REQUIRE (meta.slot == 1);
+    CHECK_FALSE (meta.existed);
+    CHECK (p->modRouteTarget (1) == 0);
+    CHECK (p->depthRoutesOf (0) == std::vector<int> { 1 });
+    auto routes = p->modulationRoutes();
+    REQUIRE (routes.size() == 2);
+    CHECK (routes[1].isDepth());
+    CHECK (routes[1].route.target == 0);
+    CHECK (routes[1].state == mod::RouteState::active);
+    CHECK (p->assignDepthModulation (mod::Source::lfo1, 0, 50.0f).existed);   // never duplicated
+    CHECK (value (*p, OspAudioProcessor::modRouteId (1, "depth")) == Approx (20.0f));
+    const auto withMeta = renderChord (*p, 1.0);
+    CHECK (withMeta != envOnly);
+    // Test C: the stored values never move (CHARACTER, the base depth, the amount).
+    CHECK (value (*p, "character") == Approx (40.0f));
+    CHECK (value (*p, OspAudioProcessor::modRouteId (0, "depth")) == Approx (40.0f));
+    CHECK (value (*p, OspAudioProcessor::modRouteId (1, "depth")) == Approx (20.0f));
+    // Host automation of the base depth still works (and the depth route follows it).
+    p->setParameterValue (OspAudioProcessor::modRouteId (0, "depth"), 10.0f);
+    renderChord (*p, 0.2);
+    CHECK (p->modulationRoutes()[0].route.depth == Approx (0.1));
+    CHECK (p->modulationRoutes()[1].state == mod::RouteState::active);
+    p->setParameterValue (OspAudioProcessor::modRouteId (0, "depth"), 40.0f);
+
+    // The rules, each with its reason; nothing is made.
+    CHECK (p->depthModulationRefusal (mod::Source::env1, 0).contains ("its own route"));
+    CHECK (p->assignDepthModulation (mod::Source::env1, 0).slot == -1);
+    CHECK (p->depthModulationRefusal (mod::Source::lfo2, 1).contains ("one level"));
+    CHECK (p->depthModulationRefusal (mod::Source::lfo2, 7).contains ("no modulation route"));
+    REQUIRE (p->assignModulation (mod::Source::lfo2, mod::Dest::drive, 30.0f).slot == 2);
+    p->setParameterValue (OspAudioProcessor::modLfoId (0, "scope"), 1.0f);   // LFO 1 per voice
+    CHECK (p->depthModulationRefusal (mod::Source::lfo1, 2).contains ("POLY"));
+    p->setParameterValue (OspAudioProcessor::modLfoId (0, "scope"), 0.0f);
+    CHECK (p->canModulateDepth (mod::Source::env2, 2));   // the global envelope on DRIVE's route
+    CHECK (p->assignModulation (mod::Source::lfo1, mod::Dest::routeDepth).slot == -1);   // only from a halo
+    CHECK (p->modulationRoutes().size() == 3);
+
+    // Test F: two routes on CHARACTER; LFO 2's depth route touches only its own.
+    REQUIRE (p->assignModulation (mod::Source::lfo2, mod::Dest::cutoff, 30.0f).slot == 3);
+    REQUIRE (p->assignDepthModulation (mod::Source::modWheel, 3, -25.0f).slot == 4);
+    CHECK (p->depthRoutesOf (0) == std::vector<int> { 1 });
+    CHECK (p->depthRoutesOf (3) == std::vector<int> { 4 });
+
+    // Test H: recall, by identity - even with the routes in other slots.
+    flush (*p);
+    juce::MemoryBlock state;
+    p->getStateInformation (state);
+    {
+        OspAudioProcessor q;
+        q.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+        CHECK (q.modulationRoutes().size() == 5);
+        CHECK (q.modRouteTarget (1) == 0);
+        CHECK (q.modRouteTarget (4) == 3);
+        CHECK (q.modulationRoutes()[1].state == mod::RouteState::active);
+    }
+    {
+        // The same session with route 0 and route 3 swapped (slots are no identity).
+        auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
+        REQUIRE (xml != nullptr);
+        std::map<juce::String, juce::String> renames;
+        for (const juce::String name : { "source", "dest", "depth", "enabled" })
+        {
+            renames[OspAudioProcessor::modRouteId (0, name)] = OspAudioProcessor::modRouteId (3, name);
+            renames[OspAudioProcessor::modRouteId (3, name)] = OspAudioProcessor::modRouteId (0, name);
+        }
+        for (auto* child : xml->getChildIterator())
+        {
+            const auto id = child->getStringAttribute ("id");
+            if (renames.count (id) > 0)
+                child->setAttribute ("id", renames[id]);
+        }
+        auto* links = xml->getChildByName ("ModLinks");
+        REQUIRE (links != nullptr);
+        const auto uid1 = links->getStringAttribute ("uid1"), uid4 = links->getStringAttribute ("uid4");
+        links->setAttribute ("uid1", uid4);
+        links->setAttribute ("uid4", uid1);
+        juce::MemoryBlock swapped;
+        juce::AudioProcessor::copyXmlToBinary (*xml, swapped);
+        OspAudioProcessor q;
+        q.setStateInformation (swapped.getData(), static_cast<int> (swapped.getSize()));
+        CHECK (q.modRouteTarget (1) == 3);   // ENV 1 -> CUTOFF now lives in slot 3
+        CHECK (q.modulationRoutes()[1].route.target == 3);
+        CHECK (q.modRouteTarget (4) == 0);
+        const auto r = q.modulationRoutes();
+        CHECK (r[3].route.source == mod::Source::env1);
+    }
+
+    // Test G: removing ENV 1 -> CHARACTER takes LFO 1's depth route with it, in one undo step.
+    p->removeModulationRoute (0);
+    flush (*p);
+    routes = p->modulationRoutes();
+    CHECK (routes.size() == 3);
+    for (const auto& r : routes)
+        CHECK (r.route.target != 0);
+    CHECK (p->modRouteUid (0) == 0);
+    CHECK (p->modRouteTarget (1) == -1);
+    p->undoManager.undo();
+    CHECK (p->modulationRoutes().size() == 5);
+    CHECK (p->modRouteTarget (1) == 0);
+    CHECK (p->modulationRoutes()[1].state == mod::RouteState::active);
+    p->undoManager.redo();
+    CHECK (p->modulationRoutes().size() == 3);
+
+    // Removing a depth route leaves its route alone.
+    p->removeModulationRoute (4);
+    CHECK (p->modulationRoutes().size() == 2);
+    CHECK (p->modulationRoutes()[1].route.source == mod::Source::lfo2);
+
+    // Older sessions (no ModLinks) load unchanged; INIT leaves no links behind.
+    {
+        auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
+        REQUIRE (xml != nullptr);
+        xml->removeChildElement (xml->getChildByName ("ModLinks"), true);
+        for (auto* child = xml->getFirstChildElement(); child != nullptr;)
+        {
+            auto* next = child->getNextElement();
+            const auto id = child->getStringAttribute ("id");
+            if (id == OspAudioProcessor::modRouteId (1, "dest") || id == OspAudioProcessor::modRouteId (4, "dest") || id == OspAudioProcessor::modRouteId (1, "source")
+                || id == OspAudioProcessor::modRouteId (4, "source"))
+                xml->removeChildElement (child, true);
+            child = next;
+        }
+        juce::MemoryBlock old;
+        juce::AudioProcessor::copyXmlToBinary (*xml, old);
+        OspAudioProcessor q;
+        q.setStateInformation (old.getData(), static_cast<int> (old.getSize()));
+        CHECK (q.modulationRoutes().size() == 3);
+        CHECK (q.modulationRoutes()[0].route.depth == Approx (0.4));
+        CHECK (q.modRouteUid (0) == 0);
+    }
+    p->initPatch();
+    CHECK (p->modulationRoutes().empty());
+    CHECK (p->modRouteUid (3) == 0);
+}
+
 TEST_CASE ("plugin: MODULATION with the ARP, every source, Granular and three layers: heard, finite, every note ends", "[plugin][mod]")
 {
     TempDir tmp;
@@ -5387,6 +5553,362 @@ TEST_CASE ("plugin: ANDOR/OSP refinement - assignment everywhere, wheel, START, 
 // MODULATION's cost (measurement, hidden): three layers (A Granular), REIMAGINED on every
 // layer, the ARP running, an 8-note chord, all four sources and all 16 routes, against the
 // same patch with no route.
+// META-MODULATION in the real editor: a source dropped on a halo modulates that route's depth,
+// on the knob its value; the halo's right-click, the drag tooltip, the accent and readout, editing
+// the amount, several routes on one control (and the chooser), removal, recall, transport.
+TEST_CASE ("plugin: META-MODULATION - halos take sources: drop, right-click, readout, accents", "[.][ui][meta-ui]")
+{
+    namespace mod = osp::mod;
+    namespace modui = osp::plugin::modui;
+    using Editor = osp::plugin::OspAudioProcessorEditor;
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "vowel.wav", testsignals::vowel (midiToHz (57), 3.0, 48000.0, 3));
+    OspAudioProcessor p;
+    loadAndWait (p, a);
+    p.setParameterValue ("character.type", 1.0f);   // a low-pass: CHARACTER's cutoff is heard
+    p.setParameterValue ("character", 45.0f);
+    std::unique_ptr<juce::AudioProcessorEditor> base (p.createEditorIfNeeded());
+    auto* editor = dynamic_cast<Editor*> (base.get());
+    REQUIRE (editor != nullptr);
+    editor->refreshNow();
+    auto snapshot = [&] (const juce::String& name) {
+        editor->refreshNow();
+        const auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f);
+        if (const char* dir = std::getenv ("OSP_SNAPSHOT_DIR"))
+        {
+            juce::FileOutputStream out (juce::File (dir).getChildFile (name));
+            out.setPosition (0);
+            out.truncate();
+            juce::PNGImageFormat().writeImageToStream (image, out);
+        }
+    };
+    auto writeMenu = [&] (const juce::PopupMenu& menu, const juce::String& name) {
+        const char* dir = std::getenv ("OSP_SNAPSHOT_DIR");
+        if (dir == nullptr)
+            return;
+        auto& laf = editor->getLookAndFeel();
+        struct Row { juce::String text; bool header = false, ticked = false, separator = false, sub = false, enabled = true; int height = 0; };
+        std::vector<Row> rows;
+        int menuWidth = 120, menuHeight = 8;
+        for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+        {
+            const auto& item = it.getItem();
+            int w = 0, h = 0;
+            laf.getIdealPopupMenuItemSize (item.text, item.isSeparator, -1, w, h);
+            if (item.isSectionHeader)
+                h = std::max (h, 26);
+            rows.push_back ({ item.text, item.isSectionHeader, item.isTicked, item.isSeparator, item.subMenu != nullptr, item.isEnabled, h });
+            menuWidth = std::max (menuWidth, w + 40);
+            menuHeight += h;
+        }
+        juce::Image image (juce::Image::ARGB, menuWidth, menuHeight + 8, true);
+        juce::Graphics g (image);
+        laf.drawPopupMenuBackground (g, menuWidth, menuHeight + 8);
+        int y = 8;
+        for (const auto& row : rows)
+        {
+            const juce::Rectangle<int> area (0, y, menuWidth, row.height);
+            if (row.header)
+                laf.drawPopupMenuSectionHeader (g, area, row.text);
+            else
+                laf.drawPopupMenuItem (g, area, row.separator, row.enabled, false, row.ticked, row.sub, row.text, {}, nullptr, nullptr);
+            y += row.height;
+        }
+        juce::FileOutputStream out (juce::File (dir).getChildFile (name));
+        out.setPosition (0);
+        out.truncate();
+        juce::PNGImageFormat().writeImageToStream (image, out);
+    };
+    auto runItem = [] (const juce::PopupMenu& menu, const juce::String& text) {
+        for (juce::PopupMenu::MenuItemIterator it (menu, true); it.next();)
+            if (it.getItem().text == text && it.getItem().action != nullptr)
+            {
+                it.getItem().action();
+                return true;
+            }
+        return false;
+    };
+    auto hasItem = [] (const juce::PopupMenu& menu, const juce::String& text) {
+        for (juce::PopupMenu::MenuItemIterator it (menu, true); it.next();)
+            if (it.getItem().text == text)
+                return true;
+        return false;
+    };
+    auto mouse = [] (juce::Component& c, juce::Point<float> at, juce::Point<float> down, bool dragged) {
+        auto source = juce::Desktop::getInstance().getMainMouseSource();
+        const auto now = juce::Time::getCurrentTime();
+        return juce::MouseEvent (source, at, {}, juce::MouseInputSource::defaultPressure, 0.0f, 0.0f, 0.0f, 0.0f, &c, &c, now, down, now, 1, dragged);
+    };
+    p.prepareToPlay (48000.0, 512);
+    juce::AudioBuffer<float> buffer (2, 512);
+    auto play = [&] (int blocks, bool notes) {
+        for (int i = 0; i < blocks; ++i)
+        {
+            juce::MidiBuffer midi;
+            if (i == 0 && notes)
+                for (int note : { 57, 64 })
+                    midi.addEvent (juce::MidiMessage::noteOn (1, note, static_cast<juce::uint8> (100)), 0);
+            buffer.clear();
+            p.processBlock (buffer, midi);
+        }
+    };
+    auto& instrument = *editor->modulationOverlay().getParentComponent();
+    auto& overlay = editor->modulationOverlay();
+    std::function<juce::Slider* (juce::Component&, const juce::String&)> find = [&] (juce::Component& parent, const juce::String& id) -> juce::Slider* {
+        for (auto* child : parent.getChildren())
+        {
+            if (! child->isVisible())
+                continue;
+            if (auto* sl = dynamic_cast<juce::Slider*> (child); sl != nullptr && sl->getProperties()["paramId"].toString() == id)
+                return sl;
+            if (auto* found = find (*child, id))
+                return found;
+        }
+        return nullptr;
+    };
+    auto* characterKnob = find (instrument, "character");
+    REQUIRE (characterKnob != nullptr);
+    const auto centre = instrument.getLocalArea (characterKnob, characterKnob->getLocalBounds()).toFloat().getCentre();
+    const auto rotary = characterKnob->getRotaryParameters();
+    auto onRing = [&] (float extra, float along) {
+        // A point on CHARACTER's halo (along its sweep, 0..1), `extra` px outside the ring.
+        const float angle = rotary.startAngleRadians + along * (rotary.endAngleRadians - rotary.startAngleRadians);
+        return overlay.haloCentre ("character").getPointOnCircumference (overlay.haloRadius ("character") + extra, angle);
+    };
+    auto depthOf = [&p] (int slot) { return p.parameterValue (OspAudioProcessor::modRouteId (slot, "depth")); };
+    auto route = [&p] (int slot) {
+        for (const auto& r : p.modulationRoutes())
+            if (r.slot == slot)
+                return r;
+        return OspAudioProcessor::ModRouteInfo {};
+    };
+    const auto arrow = juce::String::fromUTF8 (" \xe2\x86\x92 ");
+
+    // No halo yet: the whole control is the control (there is no depth to target).
+    editor->dragModulation (0, centre + juce::Point<float> (0.0f, 30.0f));
+    CHECK (overlay.dragTip() == "LFO 1" + arrow + "CHARACTER");
+    editor->dragModulation (-1, {});
+
+    // ENV 1 -> CHARACTER (each note's filter) at +40 %.
+    const int envSlot = editor->dropModulation (2, centre);
+    REQUIRE (envSlot >= 0);
+    CHECK (route (envSlot).route.dest == mod::Dest::cutoff);
+    p.setParameterValue (OspAudioProcessor::modRouteId (envSlot, "depth"), 40.0f);
+    editor->refreshNow();
+    REQUIRE (overlay.haloRadius ("character") > 0.0f);
+    const auto halo = onRing (0.0f, 0.2f);
+
+    // Test B: the knob body makes an ordinary route; the halo the depth route. Never confused.
+    CHECK (overlay.hitAt (centre).body);
+    CHECK (overlay.hitAt (halo).halo());
+    CHECK (overlay.hitAt (halo).slot == envSlot);
+    editor->dragModulation (0, centre);
+    CHECK (overlay.dragTip() == "LFO 1" + arrow + "CHARACTER");
+    snapshot ("meta-02-drag-body.png");
+    const int lfoSlot = editor->dropModulation (0, centre);
+    REQUIRE (lfoSlot >= 0);
+    CHECK_FALSE (route (lfoSlot).isDepth());
+    CHECK (route (lfoSlot).route.dest == mod::Dest::character);
+    p.removeModulationRoute (lfoSlot);
+    editor->selectModulation (2, envSlot);
+    editor->refreshNow();
+    editor->dragModulation (0, halo);
+    CHECK (overlay.dragTip() == "LFO 1" + arrow + "ENV 1 / CHARACTER CUTOFF DEPTH");
+    snapshot ("meta-01-drag-halo.png");
+    // ENV 1 on its own route's depth: refused, and the tooltip says why before the drop.
+    editor->dragModulation (2, halo);
+    CHECK (overlay.dragTip().contains ("its own route"));
+    CHECK (editor->dropModulation (2, halo) == -1);
+    CHECK (overlay.currentNotice().contains ("its own route"));
+    snapshot ("meta-11-refused.png");
+    overlay.showNotice ({});   // (it fades by itself after a few seconds)
+
+    // Test A: LFO 1 onto ENV 1's halo, +20 %.
+    const int metaSlot = editor->dropModulation (0, halo);
+    REQUIRE (metaSlot >= 0);
+    CHECK (route (metaSlot).isDepth());
+    CHECK (route (metaSlot).route.target == envSlot);
+    CHECK (depthOf (metaSlot) == Approx (20.0f));
+    CHECK (p.modulationRoutes().size() == 2);   // no LFO 1 -> CHARACTER was made
+    CHECK (modui::routeTitle (p, route (metaSlot)) == "LFO 1" + arrow + "DEPTH OF ENV 1" + arrow + "CHARACTER CUTOFF");   // its name in LFO 1's routes
+    editor->selectModulation (2, envSlot);
+    double lo = 9.0, hi = -9.0;
+    for (int i = 0; i < 60; ++i)
+    {
+        play (3, i == 0);
+        editor->refreshNow();
+        lo = std::min (lo, overlay.effectiveDepth (envSlot));
+        hi = std::max (hi, overlay.effectiveDepth (envSlot));
+    }
+    // The depth moves with LFO 1 (1 Hz, 1.9 s played), between +20 % and +60 %.
+    CHECK (hi - lo > 0.25);
+    CHECK (lo >= 0.2 - 1.0e-3);
+    CHECK (hi <= 0.6 + 1.0e-3);
+    CHECK (overlay.effectiveDepthRange (envSlot).getStart() == Approx (0.2));
+    CHECK (overlay.effectiveDepthRange (envSlot).getEnd() == Approx (0.6));
+    // Test C: the saved values stay.
+    CHECK (p.parameterValue ("character") == Approx (45.0f));
+    CHECK (depthOf (envSlot) == Approx (40.0f));
+    CHECK (depthOf (metaSlot) == Approx (20.0f));
+    snapshot ("meta-03-playing.png");
+
+    // Hover: base depth, the depth route, the effective range.
+    overlay.mouseMove (mouse (overlay, halo, halo, false));
+    CHECK (overlay.isHovering());
+    auto readout = overlay.haloReadout ("character");
+    CHECK (readout.contains ("Base depth +40%"));
+    CHECK (readout.contains ("LFO 1" + arrow.trimEnd() + " depth " + juce::String::fromUTF8 ("\xc2\xb1") + "20%"));
+    CHECK (readout.contains ("Effective +20% to +60%"));
+    snapshot ("meta-04-hover.png");
+    overlay.mouseExit (mouse (overlay, halo, halo, false));
+
+    // Test D: the halo's right-click (the control's own menu stays the control's).
+    auto menu = overlay.depthMenu (envSlot);
+    CHECK (hasItem (menu, "MODULATE THIS DEPTH"));
+    CHECK (hasItem (menu, "Edit LFO 1"));
+    CHECK (hasItem (menu, "Assign LFO 2"));
+    CHECK (hasItem (menu, "Assign ENV 2"));
+    CHECK (hasItem (menu, "Assign MOD WHEEL"));
+    CHECK_FALSE (hasItem (menu, "Assign ENV 1"));   // its own route: not offered
+    CHECK (hasItem (menu, "EXISTING DEPTH MODULATION"));
+    CHECK (hasItem (menu, "Remove Depth Modulation"));
+    writeMenu (menu, "meta-05-halo-menu.png");
+    CHECK (hasItem (overlay.contextMenu ("character"), "Modulate Its Depth"));
+    REQUIRE (runItem (menu, "Assign LFO 2"));
+    CHECK (p.depthRoutesOf (envSlot).size() == 2);
+    int lfo2Meta = -1;
+    for (const int d : p.depthRoutesOf (envSlot))
+        if (route (d).route.source == mod::Source::lfo2)
+            lfo2Meta = d;
+    REQUIRE (lfo2Meta >= 0);
+    CHECK (route (lfo2Meta).state == mod::RouteState::active);
+    p.removeModulationRoute (lfo2Meta);   // a depth route goes alone
+    CHECK (p.depthRoutesOf (envSlot).size() == 1);
+    CHECK (route (envSlot).route.source == mod::Source::env1);
+
+    // Test E: a negative amount (bipolar LFO: the same reach, the other way round), and a
+    // unipolar LFO (only below the saved depth).
+    p.setParameterValue (OspAudioProcessor::modRouteId (metaSlot, "depth"), -30.0f);
+    play (4, false);
+    editor->refreshNow();
+    CHECK (overlay.effectiveDepthRange (envSlot).getStart() == Approx (0.1));
+    CHECK (overlay.effectiveDepthRange (envSlot).getEnd() == Approx (0.7));
+    const auto view = p.modulationView();
+    CHECK (overlay.effectiveDepth (envSlot) == Approx (std::clamp (0.4 - 0.3 * view.value[0], -1.0, 1.0)).margin (1.0e-4));
+    p.setParameterValue (OspAudioProcessor::modLfoId (0, "polarity"), 1.0f);   // unipolar
+    editor->refreshNow();
+    CHECK (overlay.effectiveDepthRange (envSlot).getStart() == Approx (0.1));
+    CHECK (overlay.effectiveDepthRange (envSlot).getEnd() == Approx (0.4));
+    overlay.mouseMove (mouse (overlay, halo, halo, false));
+    CHECK (overlay.haloReadout ("character").contains ("LFO 1" + arrow.trimEnd() + " depth -30%"));
+    snapshot ("meta-06-negative.png");
+    overlay.mouseExit (mouse (overlay, halo, halo, false));
+    p.setParameterValue (OspAudioProcessor::modLfoId (0, "polarity"), 0.0f);
+
+    // The depth route selected: the halo edits its amount, never the saved depth.
+    editor->selectModulation (0, metaSlot);
+    editor->refreshNow();
+    CHECK (overlay.haloRoute ("character") == envSlot);
+    CHECK (overlay.haloReadout ("character")[0].contains ("DEPTH OF"));
+    overlay.mouseDown (mouse (overlay, halo, halo, false));
+    CHECK (overlay.isEditing());
+    overlay.mouseDrag (mouse (overlay, halo + juce::Point<float> (0.0f, -60.0f), halo, true));
+    snapshot ("meta-07-edit-amount.png");
+    overlay.mouseUp (mouse (overlay, halo + juce::Point<float> (0.0f, -60.0f), halo, true));
+    CHECK (depthOf (metaSlot) == Approx (0.0f).margin (0.6f));   // -30 % + 60 px x 0.5
+    CHECK (depthOf (envSlot) == Approx (40.0f));
+    p.setParameterValue (OspAudioProcessor::modRouteId (metaSlot, "depth"), 20.0f);
+    // ... and selecting the route again edits its saved depth.
+    editor->selectModulation (2, envSlot);
+    overlay.mouseDown (mouse (overlay, halo, halo, false));
+    overlay.mouseDrag (mouse (overlay, halo + juce::Point<float> (0.0f, -10.0f), halo, true));
+    overlay.mouseUp (mouse (overlay, halo + juce::Point<float> (0.0f, -10.0f), halo, true));
+    CHECK (depthOf (envSlot) == Approx (45.0f).margin (0.6f));
+    CHECK (depthOf (metaSlot) == Approx (20.0f));
+    p.setParameterValue (OspAudioProcessor::modRouteId (envSlot, "depth"), 40.0f);
+
+    // A route at depth 0 stays a target.
+    p.setParameterValue (OspAudioProcessor::modRouteId (envSlot, "depth"), 0.0f);
+    editor->refreshNow();
+    CHECK (overlay.hitAt (halo).slot == envSlot);
+    CHECK (route (envSlot).state == mod::RouteState::active);   // moved by LFO 1
+    p.setParameterValue (OspAudioProcessor::modRouteId (envSlot, "depth"), 40.0f);
+
+    // Test F: LFO 2 -> CHARACTER too. The selected route is the inner ring, ENV 1's the outer
+    // arc: each depth targeted alone.
+    const int lfo2Slot = overlay.assign (1, mod::Dest::character);
+    REQUIRE (lfo2Slot >= 0);
+    editor->refreshNow();
+    CHECK (overlay.haloRoute ("character") == lfo2Slot);
+    const auto outer = onRing (7.0f, 0.2f);
+    CHECK (overlay.hitAt (outer).slot == envSlot);
+    CHECK (overlay.hitAt (halo).slot == lfo2Slot);
+    CHECK (editor->dropModulation (0, outer) == metaSlot);   // LFO 1 is already on ENV 1's depth: selected
+    // Selected, that depth route's own route is the inner ring now (its amount is edited there).
+    CHECK (overlay.haloRoute ("character") == envSlot);
+    editor->selectModulation (1, lfo2Slot);
+    editor->refreshNow();
+    const int wheelMeta = editor->dropModulation (4, onRing (0.0f, 0.2f));
+    REQUIRE (wheelMeta >= 0);
+    CHECK (route (wheelMeta).route.target == lfo2Slot);
+    CHECK (p.depthRoutesOf (envSlot) == std::vector<int> { metaSlot });
+    CHECK (p.depthRoutesOf (lfo2Slot) == std::vector<int> { wheelMeta });
+    // Three routes: the outer arcs lie together - the chooser asks which.
+    const int env2Slot = overlay.assign (3, mod::Dest::cutoff);
+    REQUIRE (env2Slot >= 0);
+    editor->selectModulation (1, lfo2Slot);
+    editor->refreshNow();
+    const auto both = overlay.hitAt (outer);
+    CHECK (both.slot == -1);
+    CHECK (both.routes.size() == 2);
+    const auto chooser = overlay.depthChooser (0, both.routes);
+    CHECK (hasItem (chooser, "ENV 1" + arrow + "CHARACTER CUTOFF  +40%"));
+    writeMenu (chooser, "meta-08-chooser.png");
+    snapshot ("meta-09-three-routes.png");
+    p.removeModulationRoute (env2Slot);
+
+    // Test G: removing ENV 1 -> CHARACTER removes LFO 1's depth route with it (one undo step).
+    p.removeModulationRoute (envSlot);
+    p.parameters.copyState();
+    for (const auto& r : p.modulationRoutes())
+        CHECK (r.route.target != envSlot);
+    CHECK (p.depthRoutesOf (lfo2Slot) == std::vector<int> { wheelMeta });
+    editor->refreshNow();
+    INFO (p.undoManager.getUndoDescription());
+    p.undoManager.undo();
+    editor->refreshNow();
+    CHECK (p.depthRoutesOf (envSlot) == std::vector<int> { metaSlot });
+
+    // Test H and I: recall, and the global LFO keeps moving the depth after a reload, with the
+    // transport starting and stopping.
+    p.parameters.copyState();
+    juce::MemoryBlock state;
+    p.getStateInformation (state);
+    p.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+    CHECK (p.depthRoutesOf (envSlot) == std::vector<int> { metaSlot });
+    CHECK (p.depthRoutesOf (lfo2Slot) == std::vector<int> { wheelMeta });
+    TestPlayHead head;
+    p.setPlayHead (&head);
+    for (const bool playing : { true, false, true })
+    {
+        head.playing = playing;
+        lo = 9.0;
+        hi = -9.0;
+        for (int i = 0; i < 40; ++i)
+        {
+            play (3, i == 0);
+            head.ppq += 3.0 * 512.0 / 48000.0 * 2.0;
+            editor->refreshNow();
+            lo = std::min (lo, overlay.effectiveDepth (envSlot));
+            hi = std::max (hi, overlay.effectiveDepth (envSlot));
+        }
+        CAPTURE (playing);
+        CHECK (hi - lo > 0.2);
+    }
+    p.setPlayHead (nullptr);
+    snapshot ("meta-10-after-reload.png");
+}
+
 TEST_CASE ("plugin: MODULATION stress - 16 routes, three layers, Granular, ARP (CPU)", "[.][mod-cpu]")
 {
     namespace mod = osp::mod;

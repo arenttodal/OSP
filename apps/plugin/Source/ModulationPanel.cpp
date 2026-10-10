@@ -114,6 +114,23 @@ namespace modui
         return sourceLabels[static_cast<std::size_t> (juce::jlimit (0, 4, source))];
     }
 
+    juce::String routeTitle (const OspAudioProcessor& p, const OspAudioProcessor::ModRouteInfo& info, bool withSource)
+    {
+        const auto arrow = juce::String::fromUTF8 (" \xe2\x86\x92 ");
+        const auto lead = withSource ? juce::String (sourceLabel (mod::sourceIndex (info.route.source))) + arrow : juce::String::fromUTF8 ("\xe2\x86\x92 ");
+        if (! info.isDepth())
+            return lead + mod::destInfo (info.route.dest).name;
+        juce::String target = "(its route is gone)";
+        if (info.route.target >= 0 && info.route.target < mod::maxRoutes)
+        {
+            const auto probe = p.modulationProbe();
+            const auto& t = probe.routes[static_cast<std::size_t> (info.route.target)];
+            if (t.source != mod::Source::none && t.dest != mod::Dest::none)
+                target = juce::String (sourceLabel (mod::sourceIndex (t.source))) + arrow + mod::destInfo (t.dest).name;
+        }
+        return lead + "DEPTH OF " + target;
+    }
+
     int sourceOfTab (int tab) noexcept
     {
         // AMP, ENV 1, ENV 2, LFO 1, LFO 2 on screen; the sources' order is LFO 1, LFO 2, ENV 1, ENV 2.
@@ -1208,7 +1225,8 @@ void ModulationPanel::tabMouseUp (const juce::MouseEvent& e)
 // A source's routes (a popover)
 
 ModRoutesPopup::Row::Row (ModRoutesPopup& o, const OspAudioProcessor::ModRouteInfo& i)
-    : owner (o), info (i), depth (o.ospProcessor, i.slot, modui::sourceColour (mod::sourceIndex (i.route.source)))
+    : owner (o), info (i), title (modui::routeTitle (o.ospProcessor, i, false)),
+      depth (o.ospProcessor, i.slot, modui::sourceColour (mod::sourceIndex (i.route.source)))
 {
     addAndMakeVisible (depth);
     setMouseCursor (juce::MouseCursor::PointingHandCursor);
@@ -1246,8 +1264,8 @@ void ModRoutesPopup::Row::paint (juce::Graphics& g)
     const float dim = live ? 1.0f : 0.45f;
     g.setFont (type::popupLabel (12.5f));
     g.setColour (info.state == mod::RouteState::scope ? colour::accent.withAlpha (0.8f) : colour::text.withAlpha (0.86f * dim));
-    g.drawFittedText (juce::String::fromUTF8 ("\xe2\x86\x92 ") + mod::destInfo (info.route.dest).name,
-                      juce::Rectangle<float> (10.0f, 0.0f, r.getWidth() - 10.0f - 166.0f, r.getHeight()).getSmallestIntegerContainer(), juce::Justification::centredLeft, 1, 0.8f);
+    g.drawFittedText (title, juce::Rectangle<float> (10.0f, 0.0f, r.getWidth() - 10.0f - 166.0f, r.getHeight()).getSmallestIntegerContainer(),
+                      juce::Justification::centredLeft, 1, 0.7f);
     const auto bypass = bypassArea();
     g.setColour (colour::hairline.darker (0.15f));
     g.drawEllipse (bypass.reduced (2.5f), 1.0f);
@@ -1534,6 +1552,8 @@ const OspAudioProcessor::ModRouteInfo* ModulationOverlay::emphasised (const Targ
     const auto list = routesOf (t);
     if (list.empty())
         return nullptr;
+    if (const auto* meta = selectedDepthRoute (t))
+        return routeInSlot (meta->route.target);   // the route whose depth is being edited
     for (const auto* r : list)
         if (r->slot == selectedSlot)
             return r;
@@ -1580,24 +1600,109 @@ ModulationOverlay::Sweep ModulationOverlay::sweepOf (const Target& t, const OspA
     const double d = r.route.depth;
     const bool bipolar = isBipolarSource (ospProcessor, source);
     // A bipolar source swings both ways around the base; a unipolar one (and an envelope)
-    // only towards the depth's sign. The handle is where the source at its top takes it.
+    // only towards the depth's sign. The handle is where the source at its top takes it, at
+    // the saved depth (it never jumps while depth routes move the depth).
     s.lo = positionOf (t, bipolar ? -std::abs (d) : std::min (0.0, d), r.route.dest);
     s.hi = positionOf (t, bipolar ? std::abs (d) : std::max (0.0, d), r.route.dest);
     s.handle = positionOf (t, d, r.route.dest);
+    // Depth routes: where they take the handle now (the engine's own sum, mirrored).
+    double depthNow = d;
+    for (const auto* m : depthRoutesOf (r.slot))
+        if (m->state == mod::RouteState::active)
+        {
+            if (s.metaSource < 0)
+                s.metaSource = mod::sourceIndex (m->route.source);
+            depthNow = effectiveDepth (r.slot);
+        }
+    s.effective = positionOf (t, depthNow, r.route.dest);
     // Where it is now: a shared stage hears the global envelope; a voice destination the
     // newest note's own sources.
-    const bool shared = mod::destInfo (r.route.dest).owner == mod::Owner::global;
-    if (r.state == mod::RouteState::active && shared && (source == 2 || source == 3))
+    bool known = false;
+    const double v = valueNow (source, r.route.dest, known);
+    if (r.state == mod::RouteState::active && known)
     {
-        s.now = positionOf (t, d * static_cast<double> (view.globalEnv[static_cast<std::size_t> (source - 2)]), r.route.dest);
-        s.nowKnown = true;
-    }
-    else if (r.state == mod::RouteState::active && (! isPolySource (ospProcessor, source) || view.voice))
-    {
-        s.now = positionOf (t, d * static_cast<double> (view.value[static_cast<std::size_t> (source)]), r.route.dest);
+        s.now = positionOf (t, depthNow * v, r.route.dest);
         s.nowKnown = true;
     }
     return s;
+}
+
+double ModulationOverlay::valueNow (int source, mod::Dest dest, bool& known) const
+{
+    known = true;
+    if (mod::destInfo (dest).owner == mod::Owner::global && (source == 2 || source == 3))
+        return static_cast<double> (view.globalEnv[static_cast<std::size_t> (source - 2)]);
+    if (! isPolySource (ospProcessor, source) || view.voice)
+        return static_cast<double> (view.value[static_cast<std::size_t> (juce::jlimit (0, mod::sourceCount - 1, source))]);
+    known = false;   // a per-voice source with no note sounding
+    return 0.0;
+}
+
+juce::Range<double> ModulationOverlay::sourceRange (int source) const
+{
+    return isBipolarSource (ospProcessor, source) ? juce::Range<double> (-1.0, 1.0) : juce::Range<double> (0.0, 1.0);
+}
+
+const OspAudioProcessor::ModRouteInfo* ModulationOverlay::routeInSlot (int slot) const
+{
+    for (const auto& r : routes)
+        if (r.slot == slot)
+            return &r;
+    return nullptr;
+}
+
+std::vector<const OspAudioProcessor::ModRouteInfo*> ModulationOverlay::depthRoutesOf (int slot) const
+{
+    std::vector<const OspAudioProcessor::ModRouteInfo*> list;
+    for (const auto& r : routes)
+        if (r.isDepth() && r.route.target == slot && slot >= 0)
+            list.push_back (&r);
+    return list;
+}
+
+const OspAudioProcessor::ModRouteInfo* ModulationOverlay::selectedDepthRoute (const Target& t) const
+{
+    const auto* meta = routeInSlot (selectedSlot);
+    if (meta == nullptr || ! meta->isDepth())
+        return nullptr;
+    for (const auto* r : routesOf (t))
+        if (r->slot == meta->route.target)
+            return meta;
+    return nullptr;
+}
+
+double ModulationOverlay::effectiveDepth (int slot) const
+{
+    // As the engine sums it: depth + amount x source, clamped (the sources as the route's
+    // destination hears them; a per-voice source with no note adds nothing).
+    const auto* r = routeInSlot (slot);
+    if (r == nullptr)
+        return 0.0;
+    double depth = r->route.depth;
+    for (const auto* m : depthRoutesOf (slot))
+        if (m->state == mod::RouteState::active)
+        {
+            bool known = false;
+            depth += m->route.depth * valueNow (mod::sourceIndex (m->route.source), r->route.dest, known);
+        }
+    return std::clamp (depth, -1.0, 1.0);
+}
+
+juce::Range<double> ModulationOverlay::effectiveDepthRange (int slot) const
+{
+    const auto* r = routeInSlot (slot);
+    if (r == nullptr)
+        return {};
+    double lo = r->route.depth, hi = r->route.depth;
+    for (const auto* m : depthRoutesOf (slot))
+        if (m->state == mod::RouteState::active)
+        {
+            const auto range = sourceRange (mod::sourceIndex (m->route.source));
+            const double a = m->route.depth * range.getStart(), b = m->route.depth * range.getEnd();
+            lo += std::min (a, b);
+            hi += std::max (a, b);
+        }
+    return { std::clamp (lo, -1.0, 1.0), std::clamp (hi, -1.0, 1.0) };
 }
 
 const ModulationOverlay::Target* ModulationOverlay::find (const juce::String& id) const
@@ -1636,10 +1741,50 @@ juce::StringArray ModulationOverlay::haloReadout (const juce::String& id) const
     if (r == nullptr || param == nullptr)
         return lines;
     const auto s = sweepOf (*t, *r);
-    lines.add (juce::String (modui::sourceLabel (mod::sourceIndex (r->route.source))) + juce::String::fromUTF8 (" \xe2\x86\x92 ") + mod::destInfo (r->route.dest).name);
-    lines.add ("Depth " + signedPercent (100.0 * r->route.depth) + (r->route.enabled ? juce::String() : juce::String ("  (bypassed)")));
+    const auto title = modui::routeTitle (ospProcessor, *r);
+    const auto deps = depthRoutesOf (r->slot);
+    auto effective = [this, r] {
+        const auto range = effectiveDepthRange (r->slot);
+        return "Effective " + signedPercent (100.0 * range.getStart()) + " to " + signedPercent (100.0 * range.getEnd());
+    };
+    if (const auto* meta = selectedDepthRoute (*t))
+    {
+        // Editing a depth route on its route's halo: its amount, the saved depth, the reach.
+        const int ms = mod::sourceIndex (meta->route.source);
+        lines.add (juce::String (modui::sourceLabel (ms)) + juce::String::fromUTF8 (" \xe2\x86\x92 DEPTH OF ") + title);
+        lines.add ("Amount " + juce::String (isBipolarSource (ospProcessor, ms) ? juce::String::fromUTF8 ("\xc2\xb1") + signedPercent (100.0 * std::abs (meta->route.depth)).trimCharactersAtStart ("+")
+                                                                                : signedPercent (100.0 * meta->route.depth))
+                   + (meta->route.enabled ? juce::String() : juce::String ("  (bypassed)")));
+        lines.add ("Base depth " + signedPercent (100.0 * r->route.depth));
+        lines.add (effective());
+        return lines;
+    }
+    lines.add (title);
+    lines.add ((deps.empty() ? "Depth " : "Base depth ") + signedPercent (100.0 * r->route.depth) + (r->route.enabled ? juce::String() : juce::String ("  (bypassed)")));
+    for (const auto* m : deps)
+    {
+        const int ms = mod::sourceIndex (m->route.source);
+        const auto amount = isBipolarSource (ospProcessor, ms) ? juce::String::fromUTF8 ("\xc2\xb1") + signedPercent (100.0 * std::abs (m->route.depth)).trimCharactersAtStart ("+")
+                                                               : signedPercent (100.0 * m->route.depth);
+        lines.add (juce::String (modui::sourceLabel (ms)) + juce::String::fromUTF8 (" \xe2\x86\x92 depth ") + amount
+                   + (m->state == mod::RouteState::active ? juce::String() : juce::String ("  (off)")));
+    }
+    if (! deps.empty())
+        lines.add (effective());
     lines.add ("Base " + valueText (*param, s.base));
-    lines.add ("Range " + valueText (*param, std::min (s.lo, s.hi)) + juce::String::fromUTF8 (" \xe2\x80\x93 ") + valueText (*param, std::max (s.lo, s.hi)));
+    float lo = std::min (s.lo, s.hi), hi = std::max (s.lo, s.hi);
+    if (! deps.empty())
+    {
+        // The range the depth routes can open it to.
+        const bool bipolar = isBipolarSource (ospProcessor, mod::sourceIndex (r->route.source));
+        const auto range = effectiveDepthRange (r->slot);
+        for (const double d : { range.getStart(), range.getEnd() })
+        {
+            lo = std::min (lo, positionOf (*t, bipolar ? -std::abs (d) : std::min (0.0, d), r->route.dest));
+            hi = std::max (hi, positionOf (*t, bipolar ? std::abs (d) : std::max (0.0, d), r->route.dest));
+        }
+    }
+    lines.add ("Range " + valueText (*param, lo) + juce::String::fromUTF8 (" \xe2\x80\x93 ") + valueText (*param, hi));
     const auto others = static_cast<int> (routesOf (*t).size()) - 1;
     if (others > 0)
         lines.add ("+ " + juce::String (others) + (others == 1 ? " other route" : " other routes"));
@@ -1692,6 +1837,9 @@ void ModulationOverlay::refresh()
         if (static_cast<int> (i) == hover || static_cast<int> (i) == editTarget)
             areas.push_back (readoutArea (t).expanded (2.0f).getSmallestIntegerContainer());
     }
+    if (dragSource >= 0)
+        if (const auto tip = dragTipArea(); ! tip.isEmpty())
+            areas.push_back (tip.expanded (3.0f).getSmallestIntegerContainer());
     for (const auto& a : shownAreas)
         repaint (a);
     for (const auto& a : areas)
@@ -1799,6 +1947,8 @@ juce::PopupMenu ModulationOverlay::contextMenu (const juce::String& parameterId)
             }
         });
         items.addItem ("Remove", [&p, slot] { p.removeModulationRoute (slot); });
+        items.addSeparator();
+        items.addSubMenu ("Modulate Its Depth", depthMenu (slot));
         if (source < 4)
         {
             items.addSeparator();
@@ -1873,6 +2023,238 @@ int ModulationOverlay::assign (int source, mod::Dest dest)
     return result.slot;
 }
 
+int ModulationOverlay::assignDepth (int source, int slot)
+{
+    const auto result = ospProcessor.assignDepthModulation (static_cast<mod::Source> (source + 1), slot, 20.0f);
+    if (result.slot < 0)
+    {
+        showNotice (result.error);
+        return -1;
+    }
+    // Selected: the route's halo now edits this depth route's amount.
+    refresh();
+    if (onSelect != nullptr)
+        onSelect (source, result.slot);
+    setSelection (source, result.slot);
+    refresh();
+    repaint();
+    return result.slot;
+}
+
+ModulationOverlay::HaloHit ModulationOverlay::hitAt (juce::Point<float> p) const
+{
+    // The ring's band is the route's depth; inside it, the control's own value. Where the
+    // outer arcs of several other routes lie, the chooser decides. Front-most control first.
+    HaloHit hit;
+    for (int i = static_cast<int> (targets.size()) - 1; i >= 0; --i)
+    {
+        const auto& t = targets[static_cast<std::size_t> (i)];
+        if (t.slider == nullptr)
+            continue;
+        const auto list = routesOf (t);
+        const auto* main = emphasised (t);
+        hit.target = i;
+        hit.parameterId = t.parameterId;
+        if (t.field)
+        {
+            // A value field: its range bar under it is the halo.
+            const auto bar = juce::Rectangle<float> (t.area.getX(), t.area.getBottom() - 1.0f, t.area.getWidth(), 10.0f);
+            if (main != nullptr && bar.contains (p))
+            {
+                hit.slot = main->slot;
+                return hit;
+            }
+            if (t.area.expanded (3.0f).contains (p))
+            {
+                hit.body = true;
+                return hit;
+            }
+            continue;
+        }
+        const float d = t.centre.getDistanceFrom (p);
+        if (main != nullptr)
+        {
+            if (d >= t.radius - 5.0f && d <= t.radius + 3.25f)
+            {
+                hit.slot = main->slot;
+                return hit;
+            }
+            if (d > t.radius + 3.25f && d <= t.radius + 11.0f)
+            {
+                std::vector<int> others;
+                for (const auto* r : list)
+                    if (r != main)
+                        others.push_back (r->slot);
+                if (others.size() > 1)
+                    hit.routes = others;
+                else
+                    hit.slot = others.empty() ? main->slot : others.front();
+                return hit;
+            }
+        }
+        if (d < (main != nullptr ? t.radius - 5.0f : t.radius + 4.0f))
+        {
+            hit.body = true;
+            return hit;
+        }
+    }
+    return {};
+}
+
+int ModulationOverlay::drop (int source, juce::Point<float> where)
+{
+    const auto hit = hitAt (where);
+    if (hit.target < 0)
+        return -1;
+    noticeAnchor = targets[static_cast<std::size_t> (hit.target)].area;
+    if (hit.halo())
+    {
+        if (hit.slot >= 0)
+            return assignDepth (source, hit.slot);
+        // Arcs lying together: which route's depth (never a guess).
+        depthChooser (source, hit.routes).showMenuAsync (juce::PopupMenu::Options().withDeletionCheck (*this));
+        return -1;
+    }
+    const auto dest = modui::destinationFor (hit.parameterId, modui::isPerVoice (ospProcessor, source));
+    return dest != mod::Dest::none ? assign (source, dest) : -1;
+}
+
+juce::PopupMenu ModulationOverlay::depthChooser (int source, const std::vector<int>& slots)
+{
+    juce::PopupMenu menu;
+    juce::Component::SafePointer<ModulationOverlay> safe (this);
+    menu.addSectionHeader (juce::String (modui::sourceLabel (source)) + juce::String::fromUTF8 (" \xe2\x86\x92 THE DEPTH OF"));
+    for (const int slot : slots)
+        if (const auto* r = routeInSlot (slot))
+        {
+            const bool ok = ospProcessor.canModulateDepth (static_cast<mod::Source> (source + 1), slot);
+            menu.addItem (modui::routeTitle (ospProcessor, *r) + "  " + signedPercent (100.0 * r->route.depth), ok, false, [safe, source, slot] {
+                if (safe != nullptr)
+                    safe->assignDepth (source, slot);
+            });
+        }
+    return menu;
+}
+
+juce::PopupMenu ModulationOverlay::depthMenu (int slot)
+{
+    juce::PopupMenu menu;
+    const auto* r = routeInSlot (slot);
+    if (r == nullptr || r->isDepth())
+        return menu;
+    auto& p = ospProcessor;
+    juce::Component::SafePointer<ModulationOverlay> safe (this);
+    const int routeSource = mod::sourceIndex (r->route.source);
+    menu.addSectionHeader (modui::routeTitle (p, *r));
+    menu.addItem ("Depth: " + signedPercent (100.0 * r->route.depth), false, false, nullptr);
+    menu.addItem ("Edit Base Depth", [safe, routeSource, slot] {
+        if (safe == nullptr)
+            return;
+        if (safe->onSelect != nullptr)
+            safe->onSelect (routeSource, slot);
+        safe->setSelection (routeSource, slot);
+    });
+    const auto deps = depthRoutesOf (slot);
+    menu.addSectionHeader ("MODULATE THIS DEPTH");
+    const std::array<int, 5> order { 0, 1, 2, 3, 4 };   // LFO 1, LFO 2, ENV 1, ENV 2, MOD WHEEL
+    for (const int source : order)
+    {
+        // Only what the engine can do: no source on its own route, no loop, no scope it lacks.
+        if (! p.canModulateDepth (static_cast<mod::Source> (source + 1), slot))
+            continue;
+        bool assigned = false;
+        for (const auto* m : deps)
+            assigned = assigned || mod::sourceIndex (m->route.source) == source;
+        menu.addItem (juce::String (assigned ? "Edit " : "Assign ") + modui::sourceLabel (source), true, assigned, [safe, source, slot] {
+            if (safe != nullptr)
+                safe->assignDepth (source, slot);
+        });
+    }
+    if (deps.empty())
+        return menu;
+    menu.addSectionHeader ("EXISTING DEPTH MODULATION");
+    std::vector<int> depSlots;
+    for (const auto* m : deps)
+    {
+        const int ms = mod::sourceIndex (m->route.source), mslot = m->slot;
+        const bool enabled = m->route.enabled;
+        depSlots.push_back (mslot);
+        juce::PopupMenu items;
+        items.addItem ("Edit Amount", [safe, ms, mslot] {
+            if (safe == nullptr)
+                return;
+            if (safe->onSelect != nullptr)
+                safe->onSelect (ms, mslot);
+            safe->setSelection (ms, mslot);
+        });
+        items.addItem (enabled ? "Bypass" : "Enable", [&p, mslot, enabled] {
+            if (auto* param = p.parameters.getParameter (OspAudioProcessor::modRouteId (mslot, "enabled")))
+            {
+                p.undoManager.beginNewTransaction (enabled ? "Bypass depth modulation" : "Enable depth modulation");
+                param->beginChangeGesture();
+                param->setValueNotifyingHost (enabled ? 0.0f : 1.0f);
+                param->endChangeGesture();
+            }
+        });
+        items.addItem ("Remove", [&p, mslot] { p.removeModulationRoute (mslot); });
+        menu.addSubMenu (juce::String (modui::sourceLabel (ms)) + "        " + signedPercent (100.0 * m->route.depth), items);
+    }
+    menu.addSeparator();
+    menu.addItem ("Remove Depth Modulation", [&p, depSlots] {
+        p.undoManager.beginNewTransaction ("Remove depth modulation");
+        for (const int d : depSlots)
+            p.removeModulationRoute (d, false);
+    });
+    return menu;
+}
+
+juce::String ModulationOverlay::dragTip() const
+{
+    if (dragSource < 0)
+        return {};
+    const auto hit = hitAt (dragPoint);
+    if (hit.target < 0)
+        return {};
+    const juce::String source (modui::sourceLabel (dragSource));
+    const auto arrow = juce::String::fromUTF8 (" \xe2\x86\x92 ");
+    if (hit.halo())
+    {
+        if (hit.slot < 0)
+            return source + arrow + "the depth of... (choose the route)";
+        const auto* r = routeInSlot (hit.slot);
+        if (r == nullptr)
+            return {};
+        const auto refusal = ospProcessor.depthModulationRefusal (static_cast<mod::Source> (dragSource + 1), hit.slot);
+        if (refusal.isNotEmpty())
+            return refusal;
+        return source + arrow + modui::sourceLabel (mod::sourceIndex (r->route.source)) + " / " + mod::destInfo (r->route.dest).name + " DEPTH";
+    }
+    const auto dest = modui::destinationFor (hit.parameterId, modui::isPerVoice (ospProcessor, dragSource));
+    if (dest == mod::Dest::none || ! ospProcessor.canModulate (static_cast<mod::Source> (dragSource + 1), dest))
+        return {};
+    return source + arrow + mod::destInfo (dest).name;
+}
+
+juce::Rectangle<float> ModulationOverlay::dragTipArea() const
+{
+    const auto text = dragTip();
+    if (text.isEmpty())
+        return {};
+    const float w = std::min (360.0f, juce::GlyphArrangement::getStringWidth (type::popupValue (12.0f), text) + 22.0f);
+    const auto bounds = getLocalBounds().toFloat().reduced (6.0f);
+    // Just under the control it names (clear of the knob and its ring), else above it.
+    const auto hit = hitAt (dragPoint);
+    if (hit.target < 0)
+        return juce::Rectangle<float> (dragPoint.x + 16.0f, dragPoint.y + 18.0f, w, 26.0f).constrainedWithin (bounds);
+    const auto& t = targets[static_cast<std::size_t> (hit.target)];
+    const float below = t.field ? t.area.getBottom() + 12.0f : t.centre.y + t.radius + 14.0f;
+    const float above = t.field ? t.area.getY() - 38.0f : t.centre.y - t.radius - 40.0f;
+    auto box = juce::Rectangle<float> (w, 26.0f).withCentre ({ t.field ? t.area.getCentreX() : t.centre.x, below + 13.0f });
+    if (box.getBottom() > bounds.getBottom())
+        box.setY (above);
+    return box.constrainedWithin (bounds);
+}
+
 juce::String ModulationOverlay::currentNotice() const
 {
     return juce::Time::getMillisecondCounter() < noticeUntil ? notice : juce::String();
@@ -1889,7 +2271,7 @@ juce::Rectangle<float> ModulationOverlay::noticeArea() const
 {
     // Beside the control the menu was opened on, kept inside the instrument.
     const auto bounds = getLocalBounds().toFloat().reduced (8.0f);
-    auto box = juce::Rectangle<float> (300.0f, 34.0f).withCentre ({ noticeAnchor.getCentreX(), noticeAnchor.getBottom() + 26.0f });
+    auto box = juce::Rectangle<float> (340.0f, 44.0f).withCentre ({ noticeAnchor.getCentreX(), noticeAnchor.getBottom() + 30.0f });
     if (noticeAnchor.isEmpty())
         box = box.withCentre (bounds.getCentre());
     return box.constrainedWithin (bounds);
@@ -1936,6 +2318,8 @@ void ModulationOverlay::paintHalo (juce::Graphics& g, const Target& t, int index
     const auto c = modui::sourceColour (source).darker (0.08f);
     const bool live = main->state == mod::RouteState::active;
     const auto s = sweepOf (t, *main);
+    const auto* meta = selectedDepthRoute (t);   // its amount is what this halo edits now
+    const auto mc = s.metaSource >= 0 ? modui::sourceColour (s.metaSource).darker (0.1f) : c;
 
     if (t.field)
     {
@@ -1950,6 +2334,12 @@ void ModulationOverlay::paintHalo (juce::Graphics& g, const Target& t, int index
             g.fillRect (juce::Rectangle<float> (bar.getX() + lo * bar.getWidth(), bar.getY(), (hi - lo) * bar.getWidth(), bar.getHeight()));
             if (s.nowKnown)
                 g.fillRect (juce::Rectangle<float> (bar.getX() + s.now * bar.getWidth() - 1.0f, bar.getY() - 2.0f, 2.0f, bar.getHeight() + 4.0f));
+            if (s.metaSource >= 0)
+            {
+                // Its depth moved: the effective end as a small dot in the depth route's colour.
+                g.setColour (mc);
+                g.fillEllipse (juce::Rectangle<float> (4.0f, 4.0f).withCentre ({ bar.getX() + s.effective * bar.getWidth(), bar.getBottom() + 3.0f }));
+            }
         }
         return;
     }
@@ -1981,6 +2371,21 @@ void ModulationOverlay::paintHalo (juce::Graphics& g, const Target& t, int index
         arc (t.radius, s.lo, s.hi, width, hovered ? c.brighter (0.12f) : c.withAlpha (0.92f));
     else
         arc (t.radius, s.base, s.base, 3.0f, c.withAlpha (0.4f));
+    if (live && s.metaSource >= 0)
+    {
+        // Depth modulation, quietly: a fine accent in the depth route's colour just outside
+        // the ring, from the saved depth's end to where the depth routes take it now (the
+        // engine's sum, mirrored), ending in a small dot. The arc itself stays on the saved depth.
+        const float accent = t.radius + 0.5f * width + 2.0f;
+        const bool strong = meta != nullptr || hovered;
+        if (std::abs (s.effective - s.handle) > 0.002f)
+            arc (accent, s.handle, s.effective, strong ? 2.0f : 1.5f, mc.withAlpha (strong ? 0.95f : 0.8f));
+        const auto dot = pointAt (accent, s.effective);
+        g.setColour (juce::Colours::white.withAlpha (0.85f));
+        g.fillEllipse (juce::Rectangle<float> (5.6f, 5.6f).withCentre (dot));
+        g.setColour (mc);
+        g.fillEllipse (juce::Rectangle<float> (3.8f, 3.8f).withCentre (dot));
+    }
     if (s.nowKnown && ! editing)
     {
         const auto at = pointAt (t.radius, s.now);
@@ -1992,14 +2397,16 @@ void ModulationOverlay::paintHalo (juce::Graphics& g, const Target& t, int index
     clipped.reset();
     if (hovered)
     {
-        // The endpoint handle: where the source at its top takes the value (its direction).
-        const auto at = pointAt (t.radius, s.handle);
+        // The endpoint handle: where the source at its top takes the value (its direction);
+        // editing a depth route, where its source at the top takes the depth.
+        const float handle = meta != nullptr ? positionOf (t, std::clamp (main->route.depth + meta->route.depth, -1.0, 1.0), main->route.dest) : s.handle;
+        const auto at = pointAt (t.radius, handle);
         const float r = editing ? 7.5f : 6.0f;
         g.setColour (juce::Colour (0x33302418));
         g.fillEllipse (juce::Rectangle<float> (2.0f * r, 2.0f * r).withCentre (at.translated (0.0f, 1.0f)));
         g.setColour (colour::panelTop);
         g.fillEllipse (juce::Rectangle<float> (2.0f * r, 2.0f * r).withCentre (at));
-        g.setColour (c);
+        g.setColour (meta != nullptr ? mc : c);
         g.drawEllipse (juce::Rectangle<float> (2.0f * r - 2.0f, 2.0f * r - 2.0f).withCentre (at), 2.0f);
         // The readout: route, depth, base, range.
         const auto box = readoutArea (t);
@@ -2013,9 +2420,93 @@ void ModulationOverlay::paintHalo (juce::Graphics& g, const Target& t, int index
         for (int i = 0; i < lines.size(); ++i)
         {
             g.setFont (i == 0 ? type::popupLabel (11.5f) : type::popupValue (12.0f));
-            g.setColour (i == 0 ? modui::sourceOnDark (source) : juce::Colour (0xffeee8dd).withAlpha (i == 1 ? 1.0f : 0.78f));
+            const int lineSource = meta != nullptr ? mod::sourceIndex (meta->route.source) : source;
+            g.setColour (i == 0 ? modui::sourceOnDark (lineSource) : juce::Colour (0xffeee8dd).withAlpha (i == 1 ? 1.0f : 0.78f));
             g.drawFittedText (lines[i], row.getSmallestIntegerContainer(), juce::Justification::centredLeft, 1, 0.85f);
             row.translate (0.0f, 15.0f);
+        }
+    }
+}
+
+void ModulationOverlay::paintDragTarget (juce::Graphics& g, const Target& t, int index, const HaloHit& hit)
+{
+    const auto c = modui::sourceColour (dragSource);
+    const auto dest = modui::destinationFor (t.parameterId, isPolySource (ospProcessor, dragSource));
+    const bool baseOk = dest != mod::Dest::none && ospProcessor.canModulate (static_cast<mod::Source> (dragSource + 1), dest);
+    const bool overThis = hit.target == index;
+    const auto list = routesOf (t);
+    auto ring = [&g, &t] (float radius, float from, float to, float width, juce::Colour colour) {
+        juce::Path p;
+        const float a0 = t.start + juce::jlimit (0.0f, 1.0f, from) * (t.end - t.start);
+        const float a1 = t.start + juce::jlimit (0.0f, 1.0f, to) * (t.end - t.start);
+        p.addCentredArc (t.centre.x, t.centre.y, radius, radius, 0.0f, std::min (a0, a1) - (std::abs (a1 - a0) < 0.03f ? 0.035f : 0.0f),
+                         std::max (a0, a1) + (std::abs (a1 - a0) < 0.03f ? 0.035f : 0.0f), true);
+        g.setColour (colour);
+        g.strokePath (p, juce::PathStrokeType (width, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    };
+    if (t.field)
+    {
+        if (! list.empty())
+            paintHalo (g, t, index);
+        if (baseOk)
+        {
+            const bool over = overThis && hit.body;
+            g.setColour (c.withAlpha (over ? 0.95f : 0.5f));
+            g.drawRoundedRectangle (t.area.expanded (2.0f), 6.0f, over ? 2.0f : 1.0f);
+        }
+        if (overThis && hit.halo())
+        {
+            g.setColour (c.withAlpha (0.9f));
+            g.fillRoundedRectangle (juce::Rectangle<float> (t.area.getX() + 1.0f, t.area.getBottom() + 0.5f, t.area.getWidth() - 2.0f, 5.0f), 2.5f);
+        }
+        return;
+    }
+    if (list.empty())
+    {
+        // No route yet: the ring is the control (there is no depth to target).
+        const bool hot = overThis && hit.body;
+        juce::Path p;
+        p.addCentredArc (t.centre.x, t.centre.y, t.radius, t.radius, 0.0f, t.start, t.end, true);
+        if (hot)
+        {
+            g.setColour (c.withAlpha (0.2f));
+            g.strokePath (p, juce::PathStrokeType (9.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        }
+        g.setColour (c.withAlpha (hot ? 0.95f : 0.45f));
+        g.strokePath (p, juce::PathStrokeType (hot ? 3.0f : 1.4f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        return;
+    }
+    paintHalo (g, t, index);
+    // The control's value: a thin circle just around the knob (inside the halo).
+    if (baseOk)
+    {
+        const bool hot = overThis && hit.body;
+        const float r = t.bodyRadius + 1.2f;
+        if (hot)
+        {
+            g.setColour (c.withAlpha (0.18f));
+            g.drawEllipse (juce::Rectangle<float> (2.0f * r, 2.0f * r).withCentre (t.centre), 6.0f);
+        }
+        g.setColour (c.withAlpha (hot ? 0.95f : 0.3f));
+        g.drawEllipse (juce::Rectangle<float> (2.0f * r, 2.0f * r).withCentre (t.centre), hot ? 2.2f : 1.0f);
+    }
+    // A route's depth: the ring under the pointer, brighter and thicker.
+    if (overThis && hit.halo())
+    {
+        const auto* main = emphasised (t);
+        std::vector<int> slots = hit.routes;
+        if (hit.slot >= 0)
+            slots = { hit.slot };
+        for (const int slot : slots)
+        {
+            const auto* r = routeInSlot (slot);
+            if (r == nullptr)
+                continue;
+            const bool ok = ospProcessor.canModulateDepth (static_cast<mod::Source> (dragSource + 1), slot);
+            const float radius = r == main ? t.radius : t.radius + 6.5f;
+            ring (radius, 0.0f, 1.0f, 10.0f, c.withAlpha (ok ? 0.2f : 0.07f));
+            const auto sweep = sweepOf (t, *r);
+            ring (radius, sweep.lo, sweep.hi, r == main ? 6.5f : 3.4f, modui::sourceColour (mod::sourceIndex (r->route.source)).brighter (ok ? 0.18f : 0.0f).withAlpha (ok ? 1.0f : 0.5f));
         }
     }
 }
@@ -2023,36 +2514,22 @@ void ModulationOverlay::paintHalo (juce::Graphics& g, const Target& t, int index
 void ModulationOverlay::paint (juce::Graphics& g)
 {
     int rings = 0;
+    const auto dropHit = dragSource >= 0 ? hitAt (dragPoint) : HaloHit {};
     for (std::size_t i = 0; i < targets.size(); ++i)
     {
         const auto& t = targets[i];
         if (t.slider == nullptr)
             continue;
-        // Assigning: where this source can go, quietly; the control under the pointer clearly.
+        // Assigning: where this source can go, quietly; the control under the pointer clearly
+        // (its value inside the ring, a route's depth on the ring).
         if (dragSource >= 0)
         {
             const auto dest = modui::destinationFor (t.parameterId, isPolySource (ospProcessor, dragSource));
-            if (dest == mod::Dest::none || ! ospProcessor.canModulate (static_cast<mod::Source> (dragSource + 1), dest))
+            const bool baseOk = dest != mod::Dest::none && ospProcessor.canModulate (static_cast<mod::Source> (dragSource + 1), dest);
+            if (! baseOk && routesOf (t).empty())
                 continue;
-            const auto c = modui::sourceColour (dragSource);
             ++rings;
-            if (t.field)
-            {
-                const bool over = t.area.expanded (3.0f).contains (dragPoint);
-                g.setColour (c.withAlpha (over ? 0.95f : 0.5f));
-                g.drawRoundedRectangle (t.area.expanded (2.0f), 6.0f, over ? 2.0f : 1.0f);
-                continue;
-            }
-            const bool hot = t.centre.getDistanceFrom (dragPoint) <= t.radius + 4.0f;
-            juce::Path p;
-            p.addCentredArc (t.centre.x, t.centre.y, t.radius, t.radius, 0.0f, t.start, t.end, true);
-            if (hot)
-            {
-                g.setColour (c.withAlpha (0.2f));
-                g.strokePath (p, juce::PathStrokeType (9.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-            }
-            g.setColour (c.withAlpha (hot ? 0.95f : 0.45f));
-            g.strokePath (p, juce::PathStrokeType (hot ? 3.0f : 1.4f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            paintDragTarget (g, t, static_cast<int> (i), dropHit);
             continue;
         }
         if (routesOf (t).empty())
@@ -2061,6 +2538,20 @@ void ModulationOverlay::paint (juce::Graphics& g)
         paintHalo (g, t, static_cast<int> (i));
     }
     shownRings = rings;
+    if (dragSource >= 0)
+    {
+        // What a drop here would make (or why not).
+        if (const auto box = dragTipArea(); ! box.isEmpty())
+        {
+            const auto hit = hitAt (dragPoint);
+            const bool refused = hit.halo() && hit.slot >= 0 && ! ospProcessor.canModulateDepth (static_cast<mod::Source> (dragSource + 1), hit.slot);
+            g.setColour (juce::Colour (0xf41c2122));
+            g.fillRoundedRectangle (box, 6.0f);
+            g.setColour (refused ? juce::Colour (0xffeee8dd).withAlpha (0.62f) : modui::sourceOnDark (dragSource));
+            g.setFont (type::popupValue (12.0f));
+            g.drawFittedText (dragTip(), box.reduced (10.0f, 2.0f).getSmallestIntegerContainer(), juce::Justification::centredLeft, 1, 0.75f);
+        }
+    }
     if (const auto text = currentNotice(); text.isNotEmpty())
     {
         // A refused assignment: why, briefly (the graphite readout's card).
@@ -2102,10 +2593,33 @@ void ModulationOverlay::mouseDown (const juce::MouseEvent& e)
     if (e.mods.isPopupMenu())
     {
         noticeAnchor = t.area;
-        contextMenu (t.parameterId).showMenuAsync (juce::PopupMenu::Options().withDeletionCheck (*this));
+        // On a halo: that route's depth (the control's own menu one level down); on the
+        // control: the control's.
+        const auto hit = hitAt (e.position);
+        juce::PopupMenu menu;
+        if (hit.halo())
+        {
+            if (hit.slot >= 0)
+                menu = depthMenu (hit.slot);
+            else
+            {
+                menu.addSectionHeader ("WHICH ROUTE?");
+                for (const int slot : hit.routes)
+                    if (const auto* r = routeInSlot (slot))
+                        menu.addSubMenu (modui::routeTitle (ospProcessor, *r), depthMenu (slot));
+            }
+            menu.addSeparator();
+            menu.addSubMenu ("This Control", contextMenu (hit.parameterId));
+        }
+        else
+            menu = contextMenu (t.parameterId);
+        menu.showMenuAsync (juce::PopupMenu::Options().withDeletionCheck (*this));
         return;
     }
-    const auto* r = emphasised (t);
+    // The halo edits the route it shows - or, while one of its depth routes is selected,
+    // that depth route's amount.
+    const auto* meta = selectedDepthRoute (t);
+    const auto* r = meta != nullptr ? meta : emphasised (t);
     if (r == nullptr)
         return;
     editSlot = r->slot;

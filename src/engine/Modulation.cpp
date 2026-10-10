@@ -117,9 +117,29 @@ namespace
         { "env2Decay", "ENV 2 DECAY", Owner::voice, -1, Domain::octaves, 4.0, Update::noteOn, Source::env2 },
         { "env2Sustain", "ENV 2 SUSTAIN", Owner::voice, -1, Domain::unit, 1.0, Update::continuous, Source::env2 },
         { "env2Release", "ENV 2 RELEASE", Owner::voice, -1, Domain::octaves, 4.0, Update::noteOff, Source::env2 },
+        // Another route's depth (Route::target): read wherever that route is read.
+        { "routeDepth", "ROUTE DEPTH", Owner::voice, -1, Domain::unit, 1.0, Update::continuous },
     } };
 
     bool isEnvelope (Source s) noexcept { return s == Source::env1 || s == Source::env2; }
+
+    /** A depth route's target, when it is an ordinary route (else -1). */
+    int targetOf (const Settings& settings, const Route& r) noexcept
+    {
+        if (! isDepthRoute (r) || r.target < 0 || r.target >= maxRoutes)
+            return -1;
+        const auto& t = settings.routes[static_cast<std::size_t> (r.target)];
+        return &t != &r && t.source != Source::none && t.dest != Dest::none && ! isDepthRoute (t) && static_cast<int> (t.dest) < destCount ? r.target : -1;
+    }
+
+    /** Where a route's source ends up: its destination, or a depth route's route's. */
+    Dest effectiveDest (const Settings& settings, const Route& r) noexcept
+    {
+        if (! isDepthRoute (r))
+            return r.dest;
+        const int t = targetOf (settings, r);
+        return t >= 0 ? settings.routes[static_cast<std::size_t> (t)].dest : Dest::none;
+    }
 }
 
 double syncQuarters (int division) noexcept
@@ -241,6 +261,9 @@ bool compatible (const Settings& settings, Source source, Dest dest) noexcept
 {
     if (source == Source::none || dest == Dest::none || static_cast<int> (dest) >= destCount || static_cast<int> (source) > sourceCount)
         return false;
+    // A route's depth is reached through depthRule (it needs the route).
+    if (dest == Dest::routeDepth)
+        return false;
     const auto& info = destInfo (dest);
     // An envelope's settings: the LFOs and the wheel only (no envelope drives an envelope).
     if (info.modulates != Source::none && (isEnvelope (source) || source == info.modulates))
@@ -277,7 +300,8 @@ bool createsCycle (const Settings& settings, Source source, Dest dest) noexcept
         {
             if (r.source != from || r.dest == Dest::none || static_cast<int> (r.dest) >= destCount)
                 continue;
-            const auto next = destInfo (r.dest).modulates;
+            // A depth route reaches what its route reaches.
+            const auto next = destInfo (effectiveDest (settings, r)).modulates;
             if (next == Source::none || reached[static_cast<std::size_t> (next)])
                 continue;
             if (next == source)
@@ -289,8 +313,70 @@ bool createsCycle (const Settings& settings, Source source, Dest dest) noexcept
     return false;
 }
 
+DepthRule depthRule (const Settings& settings, Source source, int target) noexcept
+{
+    if (target < 0 || target >= maxRoutes)
+        return DepthRule::noRoute;
+    const auto& t = settings.routes[static_cast<std::size_t> (target)];
+    if (t.source == Source::none || t.dest == Dest::none || static_cast<int> (t.dest) >= destCount)
+        return DepthRule::noRoute;
+    if (isDepthRoute (t))
+        return DepthRule::nested;
+    if (source == t.source)
+        return DepthRule::self;
+    // The depth is read where the route's destination is: the same scope and timing rules.
+    if (! compatible (settings, source, t.dest))
+        return DepthRule::scope;
+    if (createsCycle (settings, source, t.dest))
+        return DepthRule::cycle;
+    return DepthRule::ok;
+}
+
+RouteState routeState (const Settings& settings, int index) noexcept
+{
+    if (index < 0 || index >= maxRoutes)
+        return RouteState::empty;
+    const auto& route = settings.routes[static_cast<std::size_t> (index)];
+    if (isDepthRoute (route))
+    {
+        if (route.source == Source::none || std::abs (route.depth) < 1.0e-6)
+            return RouteState::empty;
+        if (! route.enabled)
+            return RouteState::bypassed;
+        const int t = targetOf (settings, route);
+        if (t < 0)
+            return RouteState::noTarget;
+        if (depthRule (settings, route.source, t) != DepthRule::ok)
+            return RouteState::scope;
+        // Its route must work (a route at depth 0 does, moved by this one).
+        const auto target = routeState (settings, t);
+        return target == RouteState::active ? RouteState::active : RouteState::noTarget;
+    }
+    const auto plain = routeState (settings, route);
+    if (plain != RouteState::empty || route.source == Source::none || route.dest == Dest::none || static_cast<int> (route.dest) >= destCount)
+        return plain;
+    // Depth 0, but a depth route moves it: it works.
+    for (int k = 0; k < maxRoutes; ++k)
+    {
+        const auto& m = settings.routes[static_cast<std::size_t> (k)];
+        if (k != index && isDepthRoute (m) && m.target == index && m.source != Source::none && m.enabled && std::abs (m.depth) >= 1.0e-6
+            && depthRule (settings, m.source, index) == DepthRule::ok)
+            return route.enabled ? (compatible (settings, route.source, route.dest) ? RouteState::active : RouteState::scope) : RouteState::bypassed;
+    }
+    return plain;
+}
+
 RouteState routeState (const Settings& settings, const Route& route) noexcept
 {
+    if (isDepthRoute (route))
+    {
+        // Without the other routes: only whether it could work at all.
+        if (route.source == Source::none || std::abs (route.depth) < 1.0e-6)
+            return RouteState::empty;
+        if (! route.enabled)
+            return RouteState::bypassed;
+        return targetOf (settings, route) >= 0 ? RouteState::active : RouteState::noTarget;
+    }
     if (route.source == Source::none || route.dest == Dest::none || static_cast<int> (route.dest) >= destCount || std::abs (route.depth) < 1.0e-6)
         return RouteState::empty;
     if (! route.enabled)
@@ -304,16 +390,32 @@ void Compiled::compile (const Settings& settings) noexcept
 {
     termCount.fill (0);
     used.fill (false);
+    metaCount = 0;
     any = anyGlobalDest = anyVoiceDest = false;
-    for (const auto& route : settings.routes)
+    for (int index = 0; index < maxRoutes; ++index)
     {
-        if (routeState (settings, route) != RouteState::active)
+        const auto& route = settings.routes[static_cast<std::size_t> (index)];
+        if (isDepthRoute (route) || routeState (settings, index) != RouteState::active)
             continue;
         const auto d = static_cast<std::size_t> (route.dest);
         if (termCount[d] >= maxTerms)
             continue;
         const auto s = static_cast<std::uint8_t> (sourceIndex (route.source));
-        terms[d][termCount[d]++] = { s, static_cast<float> (std::clamp (route.depth, -1.0, 1.0)) };
+        Term term { s, static_cast<float> (std::clamp (route.depth, -1.0, 1.0)) };
+        // Its depth routes, next to each other (one level: they are never moved themselves).
+        term.metaFirst = static_cast<std::uint8_t> (metaCount);
+        for (int k = 0; k < maxRoutes && metaCount < maxRoutes; ++k)
+        {
+            const auto& m = settings.routes[static_cast<std::size_t> (k)];
+            if (isDepthRoute (m) && m.target == index && routeState (settings, k) == RouteState::active)
+            {
+                const auto ms = static_cast<std::uint8_t> (sourceIndex (m.source));
+                meta[static_cast<std::size_t> (metaCount++)] = { ms, static_cast<float> (std::clamp (m.depth, -1.0, 1.0)) };
+                used[ms] = true;
+            }
+        }
+        term.metaCount = static_cast<std::uint8_t> (metaCount - term.metaFirst);
+        terms[d][termCount[d]++] = term;
         used[s] = true;
         any = true;
         if (destInfo (route.dest).owner == Owner::global)

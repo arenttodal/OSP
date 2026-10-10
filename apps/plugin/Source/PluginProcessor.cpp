@@ -749,6 +749,8 @@ OspAudioProcessor::OspAudioProcessor()
         for (std::size_t k = 0; k < rp.size(); ++k)
             rp[k] = parameters.getRawParameterValue (modRouteId (r, names[k]));
     }
+    parameters.state.addListener (this);   // META-MODULATION's links (ModLinks)
+    refreshModLinks();
     for (int c = 0; c < 4; ++c)
         modCurves[static_cast<std::size_t> (c)] = c < 2 ? mod::defaultLfoCurve() : mod::defaultEnvCurve();
     publishModulationCurves();
@@ -812,6 +814,7 @@ OspAudioProcessor::OspAudioProcessor()
 OspAudioProcessor::~OspAudioProcessor()
 {
     stopTimer();
+    parameters.state.removeListener (this);
     for (auto* p : reimaginedParameters)
         if (p != nullptr)
             p->removeListener (this);
@@ -1065,6 +1068,8 @@ void OspAudioProcessor::applyModulation (bool force) noexcept
     for (const auto& r : modRouteParams)
         for (auto* p : r)
             now[k++] = p->load();
+    for (const auto& t : modRouteTargets)
+        now[k++] = static_cast<float> (t.load (std::memory_order_relaxed));
     const auto generation = modCurveGeneration.load (std::memory_order_acquire);
     const auto seed = static_cast<std::uint64_t> (std::max (1.0f, seedParam->load()));
     if (! force && now == lastModValues && generation == appliedModCurveGeneration && seed == modSettings.seed)
@@ -1102,6 +1107,7 @@ void OspAudioProcessor::applyModulation (bool force) noexcept
         route.dest = static_cast<mod::Dest> (std::clamp (juce::roundToInt (rp[1]->load()), 0, mod::destCount - 1));
         route.depth = 0.01 * rp[2]->load();
         route.enabled = rp[3]->load() >= 0.5f;
+        route.target = modRouteTargets[r].load (std::memory_order_relaxed);
     }
     if (generation != appliedModCurveGeneration || force)
     {
@@ -1365,10 +1371,13 @@ int OspAudioProcessor::addModulationRoute (mod::Source source, mod::Dest dest, f
     if (slot < 0)
         return -1;
     undoManager.beginNewTransaction ("Add modulation");
+    if (juce::roundToInt (parameterValue (modRouteId (slot, "source"))) == 0)
+        setModLink (slot, newModRouteUid(), 0);   // a new route: a new identity
     setParameterValue (modRouteId (slot, "source"), static_cast<float> (source));
     setParameterValue (modRouteId (slot, "dest"), static_cast<float> (dest));
     setParameterValue (modRouteId (slot, "depth"), depthPercent);
     setParameterValue (modRouteId (slot, "enabled"), 1.0f);
+    commitRouteChange();
     return slot;
 }
 
@@ -1378,10 +1387,134 @@ void OspAudioProcessor::removeModulationRoute (int slot, bool ownUndoStep)
         return;
     if (ownUndoStep)
         undoManager.beginNewTransaction ("Remove modulation");
-    setParameterValue (modRouteId (slot, "source"), 0.0f);
-    setParameterValue (modRouteId (slot, "dest"), 0.0f);
-    setParameterValue (modRouteId (slot, "depth"), 0.0f);
-    setParameterValue (modRouteId (slot, "enabled"), 1.0f);
+    // The routes moving its depth go with it (no reference is left to a route that is gone).
+    auto clear = [this] (int r) {
+        setParameterValue (modRouteId (r, "source"), 0.0f);
+        setParameterValue (modRouteId (r, "dest"), 0.0f);
+        setParameterValue (modRouteId (r, "depth"), 0.0f);
+        setParameterValue (modRouteId (r, "enabled"), 1.0f);
+        setModLink (r, 0, 0);
+    };
+    for (const int dependent : depthRoutesOf (slot))
+        clear (dependent);
+    clear (slot);
+    commitRouteChange();
+}
+
+void OspAudioProcessor::commitRouteChange()
+{
+    // The parameters reach the state tree (and so the undo step) on APVTS's timer; a route's
+    // links are written at once. Flushed now, a route change and its links are one undo step
+    // whatever happens next (copyState is the only public flush).
+    parameters.copyState();
+}
+
+namespace
+{
+    const juce::Identifier modLinksType ("ModLinks");
+}
+
+juce::ValueTree OspAudioProcessor::modLinks() const
+{
+    return parameters.state.getChildWithName (modLinksType);
+}
+
+void OspAudioProcessor::setModLink (int slot, int uid, int targetUid)
+{
+    if (slot < 0 || slot >= mod::maxRoutes)
+        return;
+    auto links = parameters.state.getChildWithName (modLinksType);
+    if (! links.isValid())
+    {
+        if (uid <= 0 && targetUid <= 0)
+            return;
+        links = juce::ValueTree (modLinksType);
+        links.setProperty ("schemaVersion", 1, nullptr);
+        parameters.state.appendChild (links, &undoManager);
+    }
+    const auto n = juce::String (slot + 1);
+    for (const auto& [name, value] : { std::pair<juce::String, int> { "uid" + n, uid }, { "target" + n, targetUid } })
+    {
+        if (value > 0)
+            links.setProperty (name, value, &undoManager);
+        else if (links.hasProperty (name))
+            links.removeProperty (name, &undoManager);
+    }
+}
+
+int OspAudioProcessor::modRouteUid (int slot) const
+{
+    const auto links = modLinks();
+    return links.isValid() && slot >= 0 && slot < mod::maxRoutes ? static_cast<int> (links.getProperty ("uid" + juce::String (slot + 1), 0)) : 0;
+}
+
+int OspAudioProcessor::newModRouteUid() const
+{
+    int highest = 0;
+    for (int r = 0; r < mod::maxRoutes; ++r)
+        highest = std::max (highest, modRouteUid (r));
+    return highest + 1;
+}
+
+int OspAudioProcessor::resolveModTarget (int slot) const
+{
+    // By identity only (the slot holding the target's ID), whatever the parameters say now:
+    // the engine checks that it is a route and that the pairing is allowed.
+    const auto links = modLinks();
+    if (! links.isValid() || slot < 0 || slot >= mod::maxRoutes)
+        return -1;
+    const int targetUid = static_cast<int> (links.getProperty ("target" + juce::String (slot + 1), 0));
+    if (targetUid <= 0)
+        return -1;
+    for (int r = 0; r < mod::maxRoutes; ++r)
+        if (r != slot && modRouteUid (r) == targetUid)
+            return r;
+    return -1;
+}
+
+int OspAudioProcessor::modRouteTarget (int slot) const
+{
+    if (slot < 0 || slot >= mod::maxRoutes || juce::roundToInt (parameterValue (modRouteId (slot, "dest"))) != static_cast<int> (mod::Dest::routeDepth))
+        return -1;
+    return resolveModTarget (slot);
+}
+
+std::vector<int> OspAudioProcessor::depthRoutesOf (int slot) const
+{
+    std::vector<int> list;
+    for (int r = 0; r < mod::maxRoutes; ++r)
+        if (r != slot && juce::roundToInt (parameterValue (modRouteId (r, "source"))) != 0 && modRouteTarget (r) == slot)
+            list.push_back (r);
+    return list;
+}
+
+void OspAudioProcessor::refreshModLinks()
+{
+    for (int r = 0; r < mod::maxRoutes; ++r)
+        modRouteTargets[static_cast<std::size_t> (r)].store (resolveModTarget (r), std::memory_order_relaxed);
+}
+
+void OspAudioProcessor::valueTreePropertyChanged (juce::ValueTree& tree, const juce::Identifier&)
+{
+    if (tree.hasType (modLinksType))
+        refreshModLinks();
+}
+
+void OspAudioProcessor::valueTreeChildAdded (juce::ValueTree&, juce::ValueTree& child)
+{
+    if (child.hasType (modLinksType))
+        refreshModLinks();
+}
+
+void OspAudioProcessor::valueTreeChildRemoved (juce::ValueTree&, juce::ValueTree& child, int)
+{
+    if (child.hasType (modLinksType))
+        refreshModLinks();
+}
+
+void OspAudioProcessor::valueTreeRedirected (juce::ValueTree&)
+{
+    refreshModLinks();   // a session or preset replaced the state
 }
 
 mod::Settings OspAudioProcessor::modulationProbe() const
@@ -1396,6 +1529,7 @@ mod::Settings OspAudioProcessor::modulationProbe() const
         route.dest = static_cast<mod::Dest> (std::clamp (juce::roundToInt (parameterValue (modRouteId (r, "dest"))), 0, mod::destCount - 1));
         route.depth = 0.01 * parameterValue (modRouteId (r, "depth"));
         route.enabled = parameterValue (modRouteId (r, "enabled")) >= 0.5f;
+        route.target = resolveModTarget (r);
     }
     return probe;
 }
@@ -1404,6 +1538,83 @@ bool OspAudioProcessor::canModulate (mod::Source source, mod::Dest dest) const
 {
     const auto probe = modulationProbe();
     return mod::compatible (probe, source, dest) && ! mod::createsCycle (probe, source, dest);
+}
+
+namespace
+{
+    /** Why a source the rules refuse cannot reach a destination (after "X cannot reach Y"). */
+    juce::String compatibilityReason (mod::Dest dest)
+    {
+        const bool envelopeTime = mod::destInfo (dest).modulates != mod::Source::none;
+        const bool start = dest == mod::Dest::startA || dest == mod::Dest::startB || dest == mod::Dest::startC;
+        return envelopeTime ? ": an envelope's times take the LFOs and the mod wheel"
+                            : start ? ": an envelope has no value yet when a note starts"
+                                    : ": a POLY LFO has no single value on a shared stage";
+    }
+}
+
+juce::String OspAudioProcessor::depthModulationRefusal (mod::Source source, int targetSlot) const
+{
+    if (source == mod::Source::none)
+        return "Nothing to assign";
+    const auto probe = modulationProbe();
+    if (targetSlot < 0 || targetSlot >= mod::maxRoutes)
+        return "There is no modulation route here: drop on the knob to make one";
+    const auto& target = probe.routes[static_cast<std::size_t> (targetSlot)];
+    const juce::String name (mod::sourceName (source));
+    const auto route = juce::String (mod::sourceName (target.source)) + juce::String::fromUTF8 (" \xe2\x86\x92 ") + mod::destInfo (target.dest).name;
+    switch (mod::depthRule (probe, source, targetSlot))
+    {
+        case mod::DepthRule::ok: return {};
+        case mod::DepthRule::noRoute: return "There is no modulation route here: drop on the knob to make one";
+        case mod::DepthRule::nested: return name + " cannot move a depth modulation's own amount: one level only";
+        case mod::DepthRule::self: return name + " cannot modulate the depth of its own route (" + route + ")";
+        case mod::DepthRule::scope: return name + " cannot reach the depth of " + route + compatibilityReason (target.dest);
+        case mod::DepthRule::cycle: return name + " cannot reach the depth of " + route + ": it would loop back on itself";
+    }
+    return {};
+}
+
+OspAudioProcessor::ModAssignResult OspAudioProcessor::assignDepthModulation (mod::Source source, int targetSlot, float depthPercent)
+{
+    ModAssignResult result;
+    result.error = depthModulationRefusal (source, targetSlot);
+    if (result.error.isNotEmpty())
+        return result;
+    const auto probe = modulationProbe();
+    for (int r = 0; r < mod::maxRoutes; ++r)
+    {
+        const auto& route = probe.routes[static_cast<std::size_t> (r)];
+        if (mod::isDepthRoute (route) && route.source == source && route.target == targetSlot)
+        {
+            result.slot = r;
+            result.existed = true;   // selected for editing, as it is
+            return result;
+        }
+    }
+    for (int r = 0; r < mod::maxRoutes && result.slot < 0; ++r)
+        if (probe.routes[static_cast<std::size_t> (r)].source == mod::Source::none)
+            result.slot = r;
+    if (result.slot < 0)
+    {
+        result.error = "All " + juce::String (mod::maxRoutes) + " modulation routes are in use: remove one first";
+        return result;
+    }
+    undoManager.beginNewTransaction ("Modulate route depth");
+    // The target is referred to by its identity (given one now if it had none), never by its slot.
+    int targetUid = modRouteUid (targetSlot);
+    if (targetUid <= 0)
+    {
+        targetUid = newModRouteUid();
+        setModLink (targetSlot, targetUid, 0);
+    }
+    setModLink (result.slot, newModRouteUid(), targetUid);
+    setParameterValue (modRouteId (result.slot, "source"), static_cast<float> (source));
+    setParameterValue (modRouteId (result.slot, "dest"), static_cast<float> (mod::Dest::routeDepth));
+    setParameterValue (modRouteId (result.slot, "depth"), depthPercent);
+    setParameterValue (modRouteId (result.slot, "enabled"), 1.0f);
+    commitRouteChange();
+    return result;
 }
 
 OspAudioProcessor::ModAssignResult OspAudioProcessor::assignModulation (mod::Source source, mod::Dest dest, float depthPercent)
@@ -1416,13 +1627,14 @@ OspAudioProcessor::ModAssignResult OspAudioProcessor::assignModulation (mod::Sou
         return result;
     }
     const juce::String pair = juce::String (mod::sourceName (source)) + " cannot reach " + mod::destInfo (dest).name;
+    if (dest == mod::Dest::routeDepth)
+    {
+        result.error = "A route's depth is modulated from its halo";
+        return result;
+    }
     if (! mod::compatible (probe, source, dest))
     {
-        const bool envelopeTime = mod::destInfo (dest).modulates != mod::Source::none;
-        const bool start = dest == mod::Dest::startA || dest == mod::Dest::startB || dest == mod::Dest::startC;
-        result.error = pair + (envelopeTime ? ": an envelope's times take the LFOs and the mod wheel"
-                                            : start ? ": an envelope has no value yet when a note starts"
-                                                    : ": a POLY LFO has no single value on a shared stage");
+        result.error = pair + compatibilityReason (dest);
         return result;
     }
     if (mod::createsCycle (probe, source, dest))
@@ -1446,30 +1658,29 @@ OspAudioProcessor::ModAssignResult OspAudioProcessor::assignModulation (mod::Sou
         return result;
     }
     undoManager.beginNewTransaction ("Add modulation");
+    setModLink (result.slot, newModRouteUid(), 0);   // a new route: a new identity
     setParameterValue (modRouteId (result.slot, "source"), static_cast<float> (source));
     setParameterValue (modRouteId (result.slot, "dest"), static_cast<float> (dest));
     setParameterValue (modRouteId (result.slot, "depth"), depthPercent);
     setParameterValue (modRouteId (result.slot, "enabled"), 1.0f);
+    commitRouteChange();
     return result;
 }
 
 std::vector<OspAudioProcessor::ModRouteInfo> OspAudioProcessor::modulationRoutes() const
 {
     std::vector<ModRouteInfo> list;
-    mod::Settings probe;   // only the scope rule needs the sources' settings
-    for (int i = 0; i < 2; ++i)
-        probe.lfo[static_cast<std::size_t> (i)].scope = parameterValue (modLfoId (i, "scope")) >= 0.5f ? mod::Scope::poly : mod::Scope::global;
+    const auto probe = modulationProbe();   // the rules need the sources' scopes, depth routes the others
     for (int r = 0; r < mod::maxRoutes; ++r)
     {
         ModRouteInfo info;
         info.slot = r;
-        info.route.source = static_cast<mod::Source> (juce::roundToInt (parameterValue (modRouteId (r, "source"))));
-        info.route.dest = static_cast<mod::Dest> (juce::roundToInt (parameterValue (modRouteId (r, "dest"))));
-        info.route.depth = 0.01 * parameterValue (modRouteId (r, "depth"));
-        info.route.enabled = parameterValue (modRouteId (r, "enabled")) >= 0.5f;
+        info.route = probe.routes[static_cast<std::size_t> (r)];
         if (info.route.source == mod::Source::none)
             continue;
-        info.state = mod::routeState (probe, info.route);
+        if (! info.isDepth())
+            info.route.target = -1;
+        info.state = mod::routeState (probe, r);
         list.push_back (info);
     }
     return list;
@@ -3091,6 +3302,8 @@ void OspAudioProcessor::resetSettings()
     for (auto* parameter : getParameters())
         if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*> (parameter))
             ranged->setValueNotifyingHost (ranged->getDefaultValue());
+    if (const auto links = modLinks(); links.isValid())
+        parameters.state.removeChild (links, &undoManager);   // no routes, no links
     perLayerReimagined = true;   // a new patch
     // The sounds still loaded are heard: two meet in the middle of the blend, three at the
     // centre of the triangle, and every layer starts as Reimagined as A.

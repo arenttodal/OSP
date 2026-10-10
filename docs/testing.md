@@ -29,7 +29,10 @@ menu, tab drags, polarity, halos (geometry, hover readout, depth through zero, s
 the routes and curve popovers, scales and recall; screenshots modui-01..15 with
 `OSP_SNAPSHOT_DIR`), `[ui][andor-ui]` (right-click assignment, the mod wheel as a source,
 Granular hover-to-open, START and envelope-time routes, ENV on DRIVE, halo clearance, the source
-card, ADVANCED, the hidden MIX triangle; screenshots andor-01..12), `[unit][mod][regression]`
+card, ADVANCED, the hidden MIX triangle; screenshots andor-01..12), `[unit][mod][meta]`,
+`[plugin][mod][meta]` and `[ui][meta-ui]` (meta-modulation: depth rules, heard, stored values
+unchanged, stable IDs and recall, removal and undo, halo vs knob drops, menus, readout, the
+chooser; screenshots meta-01..11), `[unit][mod][regression]`
 (the global LFO after ONE SHOT, without voices, across transport changes and repeated keys) and the hidden `[mod-cpu]`
 measurement (16 routes against none).
 
@@ -42,7 +45,9 @@ mode/routing and effect, REVERSE/LOOP/Granular/layers, lifecycle, the stage's CP
 `OSP_ARP_BASELINE=write` with the old build, `=compare` with the new, same
 `OSP_ARP_BASELINE_DIR`) and `[arp-ui]` (the keyboard control, the inline editor and the
 window resizing; screenshots with `OSP_SNAPSHOT_DIR`, under xvfb-run). A render config's `"modulation"` block may set `"modWheel": 0..1` (the MOD WHEEL source for the
-whole render) and route `"source": "mod wheel"`. A render config may
+whole render) and route `"source": "mod wheel"`; a route may name itself (`"id"`) and a depth route
+(`"dest": "routeDepth"`) names the route whose depth it moves (`"target"`: that id, or its place
+in the list). A render config may
 carry `"arp": { "enabled": true, "pattern": "up|down|updown|played|random|chord|downup|up&down|down&up|converge|diverge|con&diverge|pinkyup|pinkyupdown|thumbup|thumbupdown|randomother|randomonce", "rate":
 "1/16", "gate": 0.75, "octaves": 2, "swing": 0.15, "bpm": 110, "transport": true }`: the fixture's notes are
 arpeggiated as the plugin does it, for engines A, B and C alike (`transport` false: no host,
