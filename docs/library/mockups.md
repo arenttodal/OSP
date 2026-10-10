@@ -6,7 +6,7 @@ content.
 
 | Panel | View | What it fixes | Stage |
 |---|---|---|---|
-| 1 Main interface | the instrument | the top bar: preset name with arrows and heart in the middle, the MIX icon, an icon that opens the Library, the menu. The instrument below is unchanged | 5 |
+| 1 Main interface | the instrument | **not adopted** (the user, 2026-10-10: ignore this panel). The instrument's current top bar and layout stay; the Library opens from the existing interface | - |
 | 2 Presets view | A | one overlay titled ANDOR/OSP LIBRARY with tabs Presets / Templates / Sounds; left column: Collections (All Presets, Factory, User, Packs, Favorites, with counts) and Categories (Keys, Pads, Basses, Plucks, Rhythmic, Textures, Evolving, FX, Experimental, with counts); search; a table Name / Category / Origin / Rating / Date; a detail strip (artwork, name, origin, category, size, description, heart, Load, Replace, more) | 5 |
 | 3 Templates view | B | the same frame; categories Evolving, Rhythmic, Granular, Keys, Basses, Textured, FX; detail: "Ready for your own sounds", Load Template | 5 |
 | 4 Sounds view | C | left: Library (All Sounds, Recent, Favorites, Inbox), Collections (Factory, User, Flux, Field Recordings, Drums, Voices, Imported), Types (Bass, Keys, Pluck, Pad, Percussion, Vocal, Texture, Other), with counts; filters All Types / All Collections / All Origins / Any Length and a One-shots switch; rows with a waveform thumbnail, Type, Length, Origin, Date; the 3-slot audition area (A B C with waveforms, play, Load to Instrument) | 4, 5 |
@@ -23,9 +23,10 @@ content.
 - **Category** lists per type (presets, templates) and **sound Type** (Bass, Keys, Pluck, Pad,
   Percussion, Vocal, Texture, Other), separate from free tags: `assets.category` holds both
   (a sound's category is its Type).
-- **Artwork** for presets and templates: the mockup shows photographs. Proposal (D-09): a
-  drawn thumbnail from the preset's own sounds (waveform / texture) by default, and an optional
-  image the user attaches; nothing is downloaded.
+- **Artwork** for presets and templates: the mockup shows photographs. Decided (D-09, the
+  user, 2026-10-10): no images are attached or shipped; each preset and template shows a
+  generated gradient placeholder (colours derived deterministically from its id, so it is
+  stable), optionally textured from its sounds. Nothing is downloaded.
 - **Size** of a preset (14.2 MB: its sounds) and of a template (45 KB): computed, not stored.
 - **Inbox** as a Library section with its own count.
 - **Save dialog** "Include audio as portable copy": saving a preset can also write the
