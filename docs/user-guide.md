@@ -1,6 +1,6 @@
-# OSP user guide
+# ANDOR/OSP user guide
 
-**Drop in a sound. Play an instrument.**
+**ANDOR/OSP, One Shot Performer. Drop in a sound. Play an instrument.**
 
 ## Getting a sound in
 
@@ -9,6 +9,8 @@
   immediately; the status line shows what is still being prepared in the background.
 - One sound is a whole instrument: it gets one large card the width of the window.
 - **⋮ → Load example** loads a synthetic vowel.
+- Rest the pointer on (or click) the layer's letter **A / B / C** to see the sample's full file
+  name, its length, sample rate, channels, bit depth and root.
 - The detected root is shown next to the layer's letter. If it is wrong (or `?`), choose
   the right one in the card's **⋮ → Root** (undoable with Cmd/Ctrl+Z).
 - Your files are copied into OSP's own sample library, so projects still open when the
@@ -75,20 +77,18 @@ left switches the whole EQ off and on without losing the settings.
 The curve is exactly what you hear. The EQ works the same for One Shot, Granular, reversed and
 REIMAGINED sounds and for ARP notes, and comes after the layer's REIMAGINED, before its LEVEL and
 PAN. Closing the editor leaves the EQ playing. Sounds from before have it off and sound exactly
-as they did. With MOD open, an LFO can be dragged onto the bell's frequency or gain or a shelf's
-gain.
+as they did. An LFO (or the mod wheel, or an envelope) can be dragged onto the bell's frequency
+or gain or a shelf's gain, or assigned there with a right-click.
 
 ### Mixing the layers
 
 **MIX** sits in the header between the preset and VOLUME, and grows with the instrument:
 nothing with one sound; with two a small line **A ─●─ B** (drag the node; the middle is
-both at equal power); with three the line unfolds upwards into a triangle with **C** on
-top (A bottom left, B bottom right). Adding C makes it heard at once - it takes a third of
-the mix while A and B keep the balance you had (a centred pair puts all three in the middle);
-removing a layer keeps the other two's balance. While
-you hover or drag, a small readout shows each layer's share; double-click for equal shares.
-With three layers, click **MIX** for the large mix. The mix keeps the total level steady
-wherever it is.
+both at equal power). While you hover or drag, a small readout shows each layer's share;
+double-click for equal shares. The mix keeps the total level steady wherever it is. With
+three layers the A/B/C triangle is hidden for now (it is being redrawn); the three layers keep
+the mix they have, and a sound saved with a triangle mix plays exactly as before. Use each
+layer's LEVEL to balance three.
 
 ### REIMAGINED modes
 
@@ -299,17 +299,17 @@ note sounds at once.
 The **sustain pedal** keeps released keys in the pattern. **All Notes Off** stops everything.
 Pitch bend, the mod wheel and pressure work as usual. The settings are automatable and saved
 with the project. Projects from before the arpeggiator open with it off and sound exactly as
-they did. **Advanced** is the card under ARP.
+they did. **Advanced** is the card under ARP (the whole width: the MOD button there is gone,
+the modulation tabs are always in the envelope panel).
 
 ## MODULATION
 
 Modulation lives in the envelope panel beside the macros. Its small tabs are **AMP** (the
-volume envelope), **ENV 1**, **ENV 2**, **LFO 1** and **LFO 2**; one is shown at a time. **MOD**
-(beside Advanced) jumps between AMP and the last source you looked at. A small dot after a
-tab's name means that source is in use, and a small orange light on MOD means the sound has
-modulation.
+volume envelope), **ENV 1**, **ENV 2**, **LFO 1** and **LFO 2**; one is shown at a time.
+After each source's name sits a small **socket**: grab it (or the name) and drag it onto any
+knob to modulate that knob. Its centre fills while the source is in use.
 
-There are four sources:
+There are five sources:
 
 - **LFO 1, LFO 2**: a repeating movement. SHAPE (sine, triangle, ramp up, ramp down, pulse,
   random, or CUSTOM: your own curve), MODE (FREE keeps running, RETRIG starts over when you
@@ -319,27 +319,52 @@ There are four sources:
   corner (± BIPOLAR / + UNIPOLAR) says whether it swings both ways around the setting or only
   adds; click it, or right-click the graph or the tab, to change it.
 - **ENV 1, ENV 2**: a shape every note plays: ATTACK, DECAY, SUSTAIN, RELEASE and CURVE, or a
-  ONE SHOT curve over LENGTH. Each note (also every ARP note) has its own.
+  ONE SHOT curve over LENGTH. Each note (also every ARP note) has its own. On the macros and
+  the EQ (which are shared by all notes) the envelope runs once for the whole instrument:
+  every new note restarts it from where it is, and it releases when the last key (and the
+  sustain pedal) lets go.
+- **MOD WHEEL**: your controller's wheel (MIDI CC 1) or the on-screen one. Drag **MOD**
+  (with its socket, under the wheel) onto a knob. Moving the wheel itself still just moves it.
+  Until the wheel is routed it opens MOVEMENT up, as it always did. Once you route it, it
+  does only what its routes say.
 
-To use one, **drag its tab onto a knob** and let go. The controls it can reach light up while
-you drag. Rest on CHARACTER for a moment and its settings open, so you can drop onto RES. Or
-click **+ ROUTE** (top right of the panel) and pick a destination under **+ ADD**.
+To use one, **drag it onto a knob** and let go. The controls it can reach light up while you
+drag. Rest on CHARACTER for a moment and its settings open, so you can drop onto RES. Rest on
+a Granular layer's picture and its POS, SIZE, DENS and SPREAD come up for the drop.
+
+Or **right-click any knob** (control-click on a Mac) for its MODULATION menu:
+- **Assign MOD WHEEL / LFO 1 / LFO 2 / ENV 1 / ENV 2**: only the sources that can reach that
+  knob are offered. One already assigned reads **Edit** and is selected rather than added
+  twice.
+- The knob's routes, each with Select, Bypass, Depth to 0 and Remove.
+- **Remove All Assignments**.
+
+If a route cannot be made (all 16 are in use, or the rules below), a short note says why.
+
+What can move what:
+- **START** (each layer's): where a new note begins in the recording, taken as the note
+  starts. A sounding note never jumps. A free-running LFO gives each note a different start.
+  The envelopes cannot choose START, because they have no value yet when a note begins.
+- **ENV 1 / ENV 2's ATTACK, DECAY, SUSTAIN, RELEASE**: the LFOs and the wheel can move them.
+  - ATTACK and DECAY are taken as the note starts, and RELEASE as it is released.
+  - SUSTAIN follows continuously.
+  - An envelope cannot move an envelope.
+- A POLY LFO belongs to single notes, so it cannot move the macros or the EQ. Dropped on
+  CHARACTER, the envelopes and POLY LFOs move each note's filter. The right-click menu also
+  offers an envelope on the whole instrument's CHARACTER.
 
 A modulated knob gets a **halo**, an arc just outside it in the source's colour. It shows the
 range the knob moves through and a dot where it is now. Point at it to see the route, its
 depth and the range. **Drag the halo** (or the knob with **Option**) up or down for more or
-less; below zero turns the movement around, and the knob's own setting never changes.
-Right-click the halo to select, bypass, zero or remove the route. When several sources move one
-knob, the selected one is drawn bold and the others as thin arcs outside.
+less; below zero turns the movement around, and the knob's own setting never changes. When
+several sources move one knob, the selected one is drawn bold and the others as thin arcs
+outside.
 
 **N ROUTES** opens the source's routes: each with its depth (drag the bar; double-click for 0),
 a light to bypass it and × to remove it. The corner mark beside it opens a large curve editor.
 For CUSTOM and ONE SHOT, drag the points, double-click to add or remove one, drag a line to
 bend it; RESET starts over.
 
-Envelopes and POLY LFOs belong to single notes, so they can move a layer's level, pan, tune,
-REIMAGINED, the granular controls, the filter and the amp envelope, but not the macros (which
-are shared by all notes); dropped on CHARACTER they move the filter of each note instead.
 Everything is saved with the preset and the project, and can be automated. Sounds from before
 have no modulation and sound exactly as they did.
 

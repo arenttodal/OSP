@@ -18,18 +18,28 @@ namespace osp::mod
       LFO 1, LFO 2   global (one phase for the instrument) or poly (a phase per voice);
                      FREE, RETRIGGER or ONE SHOT; synced to the host or free in Hz.
       ENV 1, ENV 2   per voice: an ADSR (or a one-shot curve) started by each note,
-                     released by its note-off (ARP notes included).
+                     released by its note-off (ARP notes included). For the shared stages
+                     each envelope also runs once for the whole instrument (the "global
+                     envelope"): every note-on restarts it from where it is, it releases
+                     when the last key (and the sustain pedal) lets go.
+      MOD WHEEL      MIDI CC 1 (and the on-screen wheel), 0..1, smoothed over ~10 ms.
 
     Destinations have an owner:
-      global  shared stages (the macros: LIFE, DRIVE, CHARACTER, MOVEMENT, SPACE): only
-              global LFOs may reach them (a per-voice envelope has no single value);
-      voice   read by each voice at its control rate (layer LEVEL, PAN, FINE TUNE,
-              REIMAGINED, granular POS / DENS / SIZE / SPREAD, CHARACTER cutoff and
-              resonance, the amp envelope): any source.
+      global  shared stages (the macros, each layer's EQ): one value for the instrument, so
+              global LFOs, the global envelopes and the mod wheel (a poly LFO has no single
+              value there and is refused);
+      voice   read by each voice (layer LEVEL, PAN, FINE TUNE, START, REIMAGINED, granular
+              POS / DENS / SIZE / SPREAD, CHARACTER cutoff and resonance, the amp envelope,
+              the modulation envelopes' own times): any source the rules allow.
 
-    The graph is acyclic: sources are never modulated. Deterministic: the smooth-random
-    shape draws one value per cycle from the stored seed and the cycle index, so a host-
-    synced LFO repeats exactly when the song does.
+    When a destination is read (Update): continuously, when a note starts (START, envelope
+    attack and decay) or when it is released (envelope release).
+
+    The graph is acyclic by construction: only the envelopes' own settings are destinations
+    owned by a source, and only the LFOs and the mod wheel may reach them (nothing modulates
+    an LFO or the wheel), so no chain can return to where it began; createsCycle() checks
+    it anyway. Deterministic: the smooth-random shape draws one value per cycle from the
+    stored seed and the cycle index, so a host-synced LFO repeats exactly when the song does.
 
     Pure C++, real-time safe: the settings are plain values (no allocation), compiled once
     per change into flat per-destination lists.
@@ -41,9 +51,10 @@ enum class Source : std::uint8_t
     lfo1,
     lfo2,
     env1,
-    env2
+    env2,
+    modWheel   ///< appended (the route's choice order is saved)
 };
-constexpr int sourceCount = 4;   ///< lfo1 .. env2
+constexpr int sourceCount = 5;   ///< lfo1 .. modWheel
 inline int sourceIndex (Source s) noexcept { return static_cast<int> (s) - 1; }
 const char* sourceName (Source s) noexcept;   ///< "LFO 1", "ENV 2"
 
@@ -164,6 +175,11 @@ enum class Dest : std::uint8_t
     eqBellGainA, eqBellGainB, eqBellGainC,
     eqLowShelfGainA, eqLowShelfGainB, eqLowShelfGainC,
     eqHighShelfGainA, eqHighShelfGainB, eqHighShelfGainC,
+    // Appended later (ANDOR/OSP refinement).
+    echo,
+    startA, startB, startC,   ///< where a new note begins in the layer's recording (taken at note-on)
+    env1Attack, env1Decay, env1Sustain, env1Release,
+    env2Attack, env2Decay, env2Sustain, env2Release,
     count
 };
 constexpr int destCount = static_cast<int> (Dest::count);
@@ -199,6 +215,7 @@ struct DestInfo
     Domain domain;
     double span;           ///< what full depth (100 %) moves, in the domain's units
     Update update;
+    Source modulates = Source::none;   ///< a source's own setting (the envelopes' times): its owner
 };
 const DestInfo& destInfo (Dest d) noexcept;
 
@@ -233,8 +250,14 @@ enum class RouteState : std::uint8_t
     scope         ///< a per-voice source on a shared destination
 };
 RouteState routeState (const Settings& settings, const Route& route) noexcept;
-/** A source can drive this destination (scope rule). */
+/** A source can drive this destination: the scope rule (a poly LFO has no single value on a
+    shared stage), the timing rule (an envelope has no value yet when a note starts, so it
+    cannot choose START) and the source rule (an envelope's settings take LFOs and the wheel). */
 bool compatible (const Settings& settings, Source source, Dest dest) noexcept;
+/** Adding source -> dest would close a loop through the routes already set (source to the
+    source that owns a destination). With the rules above it never does; the assignment
+    path checks it all the same. */
+bool createsCycle (const Settings& settings, Source source, Dest dest) noexcept;
 bool isPolySource (const Settings& settings, Source source) noexcept;
 
 /** Routes flattened per destination for the audio thread. */
@@ -317,20 +340,49 @@ struct Runtime
     Settings settings;
     Compiled compiled;
     std::array<LfoState, 2> globalLfo {};
-    std::array<float, sourceCount> globalValue {};   ///< the global LFOs now (poly sources: 0)
+    /** The sources with one value for the instrument, as voices read them: the global LFOs
+        and the wheel (poly LFOs and the envelopes: 0, a voice has its own). */
+    std::array<float, sourceCount> globalValue {};
+    /** The same plus the global envelopes: what the shared stages hear. */
+    std::array<float, sourceCount> sharedValue {};
+    std::array<EnvState, 2> globalEnv {};
     double bpm = 120.0;
     bool hostPlaying = false;
     double ppq = 0.0;
-    int heldNotes = 0;          ///< notes held (a global RETRIGGER LFO restarts after silence)
+    int heldNotes = 0;          ///< keys held (a global RETRIGGER LFO restarts after silence)
+    bool pedal = false;
+    float modWheelTarget = 0.0f, modWheelNow = 0.0f;
 
     void setSettings (const Settings& s) noexcept;
-    /** Advances the global LFOs by `samples` at `sampleRate` (at the host's position when
-        it plays) and refreshes globalValue. */
+    /** Advances the global LFOs, envelopes and the wheel by `samples` at `sampleRate` (at the
+        host's position when it plays) and refreshes globalValue and sharedValue. */
     void advanceGlobal (int samples, double sampleRate) noexcept;
-    /** A note started: a global RETRIGGER / ONE SHOT LFO restarts when it is the first held. */
-    void noteStarted() noexcept;
-    void noteEnded() noexcept;
+    /** A key went down: a global RETRIGGER / ONE SHOT LFO restarts when it is the first held,
+        the global envelopes restart. A key pressed again without its note-off counts once. */
+    void noteStarted (int note = 0, int channel = 1) noexcept;
+    void noteEnded (int note = 0, int channel = 1) noexcept;
+    void setPedal (bool down) noexcept;
+    void allNotesOff() noexcept;
+    void setModWheel (float value) noexcept { modWheelTarget = value < 0.0f ? 0.0f : (value > 1.0f ? 1.0f : value); }
     void setTiming (const HostTiming& timing) noexcept;
+
+    /** An envelope's settings for a note starting now, its times moved by the routes to them
+        (`values`: the sources' values as it starts). */
+    EnvSettings envAtStart (int env, const std::array<float, sourceCount>& values) const noexcept;
+    /** ... and at its release (the release time), and while it runs (sustain). */
+    double envReleaseSeconds (int env, const std::array<float, sourceCount>& values) const noexcept;
+    double envSustain (int env, const std::array<float, sourceCount>& values) const noexcept;
+    /** What a running envelope follows: the stored settings, with the times it took. */
+    EnvSettings envRunning (int env, const EnvSettings& taken, const std::array<float, sourceCount>& values) const noexcept;
+
+private:
+    std::array<std::uint16_t, 128> keysDown {};   ///< a bit per MIDI channel
+    std::array<EnvSettings, 2> globalEnvNow {};
+    double offsetOf (Dest d, const std::array<float, sourceCount>& values) const noexcept
+    {
+        return compiled.has (d) ? destInfo (d).span * compiled.sum (d, values) : 0.0;
+    }
+    void releaseGlobalEnvelopes() noexcept;
 };
 
 /** One voice's modulation (its poly LFOs and envelopes) and the offsets it applies. */
@@ -338,10 +390,11 @@ struct VoiceState
 {
     std::array<LfoState, 2> lfo {};
     std::array<EnvState, 2> env {};
+    std::array<EnvSettings, 2> envNow {};       ///< this note's envelope settings (times taken at its start)
     std::array<float, sourceCount> values {};   ///< global and this voice's sources, now
 
     void start (const Runtime& runtime) noexcept;
-    void release() noexcept;
+    void release (const Runtime& runtime) noexcept;
     /** Advances this voice's sources by `seconds` and gathers every source's value. */
     void advance (const Runtime& runtime, double seconds) noexcept;
     /** The summed contribution to a destination, in its domain's units (span x depth x value). */

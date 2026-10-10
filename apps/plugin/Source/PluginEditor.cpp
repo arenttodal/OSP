@@ -402,6 +402,8 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     content.addChildComponent (samplesPanel);
 
     headerMix.onOpenMix = [this] {
+        if (! design::showMixTriangle)
+            return;   // the triangle is hidden for now (design::showMixTriangle)
         if (closedByLabelPress == mixPopup)
         {
             closedByLabelPress = -1;   // that press closed it
@@ -489,22 +491,18 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
 
     // MODULATION: the envelope panel's tabs (AMP, ENV 1, ENV 2, LFO 1, LFO 2) hold the
     // sources' editors; a source's tab dragged onto a control makes a route; the halos on the
-    // modulated controls show and edit them. MOD (beside Advanced) brings the panel's last
-    // modulation source forward (or AMP back).
-    modButton.setTitle ("Modulation");
-    modButton.setTooltip ("Modulation: show the LFOs and envelopes in the envelope panel (drag a tab onto a knob)");
-    modButton.setChevron (0);
-    modButton.onClick = [this] { modPanel.showTab (modPanel.tab() == 0 ? lastModTab : 0); };
-    content.addAndMakeVisible (modButton);
+    // modulated controls show and edit them. (The MOD button that brought the panel forward is
+    // gone: the tabs are always there.) The mod wheel is a source too: its MOD caption is a
+    // drag socket.
+    modWheel.setAssignable (modui::sourceColour (4));
+    modWheel.onSourceDrag = [this] (juce::Point<int> screen) { dragModulation (4, content.getLocalPoint (nullptr, screen).toFloat()); };
+    modWheel.onSourceDrop = [this] (juce::Point<int> screen) { dropModulation (4, content.getLocalPoint (nullptr, screen).toFloat()); };
     modPanel.onDragMove = [this] (int source, juce::Point<int> screen) { dragModulation (source, content.getLocalPoint (nullptr, screen).toFloat()); };
     modPanel.onDragEnd = [this] (int source, juce::Point<int> screen) { dropModulation (source, content.getLocalPoint (nullptr, screen).toFloat()); };
     modPanel.onShowRoutes = [this] (int source) { openModulationPopup (routesPopup, source); };
     modPanel.onExpandCurve = [this] (int source) { openModulationPopup (curvePopup, source); };
     modPanel.onTabChanged = [this] (int tab) {
         ospProcessor.setModPanelTab (tab);
-        modButton.setToggleState (tab != 0, juce::dontSendNotification);
-        if (tab != 0)
-            lastModTab = tab;
         const int source = modui::sourceOfTab (tab);
         // The panel's source is the selection's source (its route stays chosen if it is that source's).
         int slot = -1;
@@ -516,7 +514,6 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     modOverlay.onSelect = [this] (int source, int slot) { selectModulation (source, slot); };
     modOverlay.onShowRoutes = [this] (int source) { openModulationPopup (routesPopup, source); };
     modPanel.showTab (ospProcessor.modPanelTab());
-    modButton.setToggleState (modPanel.tab() != 0, juce::dontSendNotification);
     content.addAndMakeVisible (modOverlay);   // last: above everything (popups bring it back up)
 
     juce::Desktop::getInstance().addGlobalMouseListener (&outsideClicks);
@@ -1203,23 +1200,22 @@ void OspAudioProcessorEditor::paintInstrument (juce::Graphics& g)
     using namespace design;
     draw::housing (g, content.getLocalBounds().toFloat());
 
-    // Identity: ANDOR/2-OSP and what kind of instrument it is now.
+    // Identity: ANDOR/OSP, One Shot Performer.
     {
         const auto bold = fonts::make (60.0f, fonts::Weight::displayBold).withHorizontalScale (1.07f);
         const auto light = fonts::make (60.0f, fonts::Weight::displayLight).withHorizontalScale (1.07f);
         juce::GlyphArrangement osp, rest;
         osp.addLineOfText (bold, "ANDOR", layout::logo.x, layout::logo.y);
         const float w = osp.getBoundingBox (0, -1, true).getRight() - layout::logo.x + 1.0f;
-        rest.addLineOfText (light, "/2-OSP", layout::logo.x + w, layout::logo.y);
+        rest.addLineOfText (light, "/OSP", layout::logo.x + w, layout::logo.y);
         g.setColour (colour::text);
         osp.draw (g);
         // The slash a shade lighter, as in the identity.
         rest.draw (g);
-        const int count = std::max (0, shownCount);
-        const char* kind = count <= 1 ? "ONE SOURCE INSTRUMENT" : (count == 2 ? "TWO LAYER INSTRUMENT" : "THREE LAYER INSTRUMENT");
-        g.setFont (fonts::make (13.0f, fonts::Weight::regular, 0.52f));
+        // As written (not set in capitals), with a little air between the letters.
+        g.setFont (fonts::make (15.0f, fonts::Weight::regular, 0.16f));
         g.setColour (colour::textSecondary);
-        g.drawText (kind, layout::logoSubtitle, juce::Justification::centredLeft, false);
+        g.drawText ("One Shot Performer", layout::logoSubtitle.withHeight (17.0f), juce::Justification::centredLeft, false);
     }
 
     // The keyboard's frame: a quiet rim, the keys set into it.
@@ -1250,7 +1246,7 @@ void OspAudioProcessorEditor::paintInstrument (juce::Graphics& g)
             const auto knob = macros[i].slider.getBounds().toFloat();
             const bool lit = macros[i].label != nullptr && macros[i].label->isCustomised();
             const auto identity = colour::macro (static_cast<int> (i));
-            draw::led (g, { knob.getCentreX(), 877.0f }, 9.0f, lit ? identity.withMultipliedBrightness (1.2f) : identity.interpolatedWith (colour::panelBottom, 0.35f), lit ? 0.8f : 0.0f);
+            draw::led (g, { knob.getCentreX(), knob.getCentreY() + 65.0f }, 9.0f, lit ? identity.withMultipliedBrightness (1.2f) : identity.interpolatedWith (colour::panelBottom, 0.35f), lit ? 0.8f : 0.0f);
         }
     }
 }
@@ -1315,7 +1311,7 @@ void OspAudioProcessorEditor::selectModulation (int source, int slot)
     // halos emphasise its routes (the chosen one most), an open routes popover marks the row.
     modSelSource = source;
     modSelSlot = slot;
-    if (source >= 0 && modPanel.tab() != 0 && modPanel.selectedSource() != source)
+    if (source >= 0 && source < 4 && modPanel.tab() != 0 && modPanel.selectedSource() != source)   // the wheel has no tab
         modPanel.showTab (modui::tabOfSource (source));
     modOverlay.setSelection (modSelSource, modSelSlot);
     if (auto* routes = dynamic_cast<ModRoutesPopup*> (popup.get()))
@@ -1324,6 +1320,8 @@ void OspAudioProcessorEditor::selectModulation (int source, int slot)
 
 void OspAudioProcessorEditor::openModulationPopup (int which, int source)
 {
+    if (source > 3)
+        return;   // the wheel's routes are on its controls (no source page)
     popupSource = juce::jlimit (0, 3, source);
     openPopup (which);
 }
@@ -1344,14 +1342,31 @@ void OspAudioProcessorEditor::dragModulation (int source, juce::Point<float> whe
                 over = static_cast<int> (i);
     }
     for (auto& card : cards)
-        if (card->isVisible() && content.getLocalArea (card.get(), card->eqToggle().getBounds()).toFloat().contains (where))
+    {
+        if (! card->isVisible())
+            continue;
+        if (content.getLocalArea (card.get(), card->eqToggle().getBounds()).toFloat().contains (where))
             over = 100 + card->layer();
+        // A Granular layer's display: its POS SIZE DENS TUNE SPREAD come up (the pointer's own
+        // hover never reaches the card while a source is being dragged).
+        else if (card->isGranular() && ! card->granularControlsShown() && ! card->isEqOpen()
+                 && content.getLocalArea (card.get(), card->display().getBounds()).toFloat().contains (where))
+            over = 200 + card->layer();
+    }
     if (over != hoverMacro)
     {
         hoverMacro = over;
         hoverSince = juce::Time::getMillisecondCounter();
     }
-    else if (over >= 0 && juce::Time::getMillisecondCounter() - hoverSince > 550)
+    else if (over >= 200 && juce::Time::getMillisecondCounter() - hoverSince > 380)
+    {
+        // A short rest (not a pass across it) opens the granular controls; the drag goes on.
+        cards[static_cast<std::size_t> (over - 200)]->showGranularControls (true, true);
+        hoverMacro = -1;
+        modOverlay.setDrag (-1, where);   // collect the knobs now shown
+        modOverlay.setDrag (source, where);
+    }
+    else if (over >= 0 && over < 200 && juce::Time::getMillisecondCounter() - hoverSince > 550)
     {
         if (over >= 100)
         {
@@ -1377,18 +1392,15 @@ int OspAudioProcessorEditor::dropModulation (int source, juce::Point<float> wher
     modOverlay.setDrag (source, where);   // the targets as they are now (a popover or EQ may have opened)
     if (auto* control = modOverlay.controlAt (where))
     {
+        // The one assignment path (as the right-click menu's): an existing pairing is
+        // selected as it is, a refused one says why.
         const auto id = control->getProperties()["paramId"].toString();
-        const bool poly = source >= 2 || ospProcessor.parameterValue (OspAudioProcessor::modLfoId (source, "scope")) >= 0.5f;
-        const auto dest = modui::destinationFor (id, poly);
-        const auto from = static_cast<mod::Source> (source + 1);
-        if (dest != mod::Dest::none && ospProcessor.canModulate (from, dest))
+        const auto dest = modui::destinationFor (id, modui::isPerVoice (ospProcessor, source));
+        if (dest != mod::Dest::none)
         {
-            slot = ospProcessor.addModulationRoute (from, dest, 50.0f);
+            slot = modOverlay.assign (source, dest);
             if (slot >= 0)
-            {
                 modPanel.refresh();
-                selectModulation (source, slot);
-            }
         }
     }
     hoverMacro = -1;
@@ -1412,9 +1424,11 @@ void OspAudioProcessorEditor::layoutInstrument()
     for (std::size_t i = 0; i < macros.size(); ++i)
     {
         auto& knob = macros[i];
-        // The name stands clear above the knob's modulation halo (it sat at 743 before the halo).
-        knob.label->setBounds (at (juce::Rectangle<float> (150.0f, 22.0f).withCentre ({ centres[i], 725.0f })));
-        knob.slider.setBounds (at (juce::Rectangle<float> (132.0f, 132.0f).withCentre ({ centres[i], 812.0f })));
+        // The name stands clear above everything the knob's modulation halo can draw (its
+        // outer route arcs, the selection glow and the handle reach 77 px above the knob's
+        // centre): the name a little higher, the knob a little lower than before.
+        knob.label->setBounds (at (juce::Rectangle<float> (150.0f, 22.0f).withCentre ({ centres[i], 719.0f })));
+        knob.slider.setBounds (at (juce::Rectangle<float> (132.0f, 132.0f).withCentre ({ centres[i], 818.0f })));
     }
     // The envelope panel's tab row on the macros' title line; its display takes the extra height.
     modPanel.setBounds (at (juce::Rectangle<float> (layout::envelopeX, 688.0f, 1405.0f - layout::envelopeX, 206.0f)));
@@ -1433,7 +1447,6 @@ void OspAudioProcessorEditor::layoutInstrument()
     statusLabel.setBounds (low (layout::status));
     arpButton.setBounds (low (layout::arpControl));
     advancedButton.setBounds (low (layout::advanced));
-    modButton.setBounds (low (layout::modButton));
 
     modOverlay.setBounds (content.getLocalBounds());
 
@@ -1484,7 +1497,13 @@ void OspAudioProcessorEditor::timerCallback()
             card->refresh();
     updateFocus();
     presetBar.refresh();
-    modWheel.setValue (ospProcessor.screenModWheel());
+    // The controller's wheel moves it too: taken when it changes (a screen drag keeps its
+    // place even while the host is not processing).
+    if (const float wheel = ospProcessor.modWheelPosition(); ! juce::exactlyEqual (wheel, shownWheelPosition))
+    {
+        shownWheelPosition = wheel;
+        modWheel.setValue (wheel);
+    }
     if (samplesShown)
     {
         const auto instrument = ospProcessor.currentInstrument (ospProcessor.editLayer());
@@ -1527,10 +1546,10 @@ void OspAudioProcessorEditor::timerCallback()
     modOverlay.refresh();
     if (popup != nullptr)
         popup->refreshContent();
-    bool anyActive = false;
+    bool wheelInUse = false;
     for (const auto& route : ospProcessor.modulationRoutes())
-        anyActive = anyActive || route.state == mod::RouteState::active;
-    modButton.setIndicator (anyActive);
+        wheelInUse = wheelInUse || (route.route.source == mod::Source::modWheel && route.state == mod::RouteState::active);
+    modWheel.setInUse (wheelInUse);
 }
 
 } // namespace osp::plugin

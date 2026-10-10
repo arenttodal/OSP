@@ -1449,6 +1449,19 @@ TEST_CASE ("plugin: the editor adapts to one, two and three sounds; drops replac
         };
         std::vector<juce::Component*> triangles;
         collect (*editor, triangles);
+        if constexpr (! osp::plugin::design::showMixTriangle)
+        {
+            // Hidden for now (design::showMixTriangle): no triangle, nothing opens, the mix
+            // keeps its values.
+            CHECK (triangles.empty());
+            const float x0 = p.parameterValue ("mix.x"), y0 = p.parameterValue ("mix.y");
+            ui->headerMixControl().onOpenMix();
+            CHECK (ui->openPopupIndex() != osp::plugin::OspAudioProcessorEditor::mixPopup);
+            CHECK (p.parameterValue ("mix.x") == Approx (x0));
+            CHECK (p.parameterValue ("mix.y") == Approx (y0));
+        }
+        else
+        {
         REQUIRE (triangles.size() == 1);
         auto* header = dynamic_cast<osp::plugin::HeaderMix*> (triangles.front());
         REQUIRE (header != nullptr);
@@ -1473,6 +1486,7 @@ TEST_CASE ("plugin: the editor adapts to one, two and three sounds; drops replac
         snapshot ("osp-adaptive-3-mix-c.png");
         p.setParameterValue ("mix.x", 0.5f);
         p.setParameterValue ("mix.y", 1.0f / 3.0f);
+        }
     }
     // REIMAGINED is in every card (the central Original <-> Reimagined track is gone); with
     // LINK on two layers a change of one moves the other by the same amount.
@@ -4608,9 +4622,14 @@ TEST_CASE ("plugin: MODULATION parameters, routes, recall, older sessions, curve
     REQUIRE (routes.size() == 1);
     CHECK (routes[0].state == mod::RouteState::active);
 
-    // A per-voice envelope on a shared stage is refused (and silent).
+    // An envelope on a shared stage plays through its global instance; a POLY LFO there has
+    // no single value and is refused (and silent).
     CHECK (p->addModulationRoute (mod::Source::env1, mod::Dest::drive, 100.0f) == 1);
-    CHECK (p->modulationRoutes()[1].state == mod::RouteState::scope);
+    CHECK (p->modulationRoutes()[1].state == mod::RouteState::active);
+    p->setParameterValue (OspAudioProcessor::modLfoId (1, "scope"), 1.0f);
+    CHECK (p->assignModulation (mod::Source::lfo2, mod::Dest::space).slot == -1);
+    CHECK (p->assignModulation (mod::Source::lfo2, mod::Dest::space).error.contains ("POLY"));
+    p->setParameterValue (OspAudioProcessor::modLfoId (1, "scope"), 0.0f);
 
     // Recall: routes, depths and sources come back.
     juce::MemoryBlock state;
@@ -4918,8 +4937,11 @@ TEST_CASE ("plugin: MODULATION panel tabs and halos", "[.][ui][mod-ui]")
         for (auto* child : instrument.getChildren())
             if (auto* l = dynamic_cast<osp::plugin::MacroLabel*> (child))
             {
+                // The outermost thing the halo draws above its knob: another route's arc
+                // (+6.5 px, 1.6 px wide), the selection glow (9 px wide) and the handle
+                // (7.5 px radius): all of it clear of the name, with room to spare.
                 const float labelBottom = static_cast<float> (l->getBottom());
-                CHECK (labelBottom < characterAt.y - radius - 4.0f);
+                CHECK (labelBottom + 6.0f < characterAt.y - radius - 7.5f);
             }
     }
 
@@ -5010,13 +5032,13 @@ TEST_CASE ("plugin: MODULATION panel tabs and halos", "[.][ui][mod-ui]")
     }
     CHECK (p.modulationRoutes().size() == routeCount);
 
-    // MOD: back to AMP and to the last source.
-    panel.showTab (4);
-    editor->modulationButton().onClick();
-    CHECK (panel.tab() == 0);
-    editor->modulationButton().onClick();
-    CHECK (panel.tab() == 4);
-    CHECK (editor->modulationButton().hasIndicator());
+    // The MOD button is gone (the tabs are always there): ADVANCED takes the whole width
+    // under ARP; the mod wheel carries a drag socket.
+    {
+        CHECK (std::abs (static_cast<float> (editor->advancedSettingsButton().getWidth()) - osp::plugin::design::layout::advanced.getWidth()) <= 1.0f);
+        CHECK (editor->advancedSettingsButton().getWidth() > editor->arpControl().getWidth() - 4);
+        CHECK (editor->modulationWheel().socketArea().getHeight() > 10.0f);
+    }
 
     // ARP open with the panel: the window grows down only; nothing overlaps.
     panel.showTab (3);
@@ -5046,6 +5068,320 @@ TEST_CASE ("plugin: MODULATION panel tabs and halos", "[.][ui][mod-ui]")
     recalled.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
     CHECK (recalled.modPanelTab() == 3);
     CHECK (recalled.modulationRoutes().size() == routeCount);
+}
+
+// ANDOR/OSP refinement: tab sockets, halo clearance, right-click assignment, the mod wheel as a
+// source, Granular hover-to-open, START and envelope-time destinations, ENV on the macros, the
+// source info card, ADVANCED full width, the hidden MIX triangle and the name.
+TEST_CASE ("plugin: ANDOR/OSP refinement - assignment everywhere, wheel, START, Granular drops, cleanup", "[.][ui][andor-ui]")
+{
+    namespace mod = osp::mod;
+    namespace modui = osp::plugin::modui;
+    using Editor = osp::plugin::OspAudioProcessorEditor;
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "Vowel A3 long take for the source card.wav", testsignals::vowel (midiToHz (57), 3.0, 48000.0, 3));
+    const auto b = writeSource (tmp.dir, "b.wav", testsignals::saw (midiToHz (48), 2.0, 48000.0));
+    const auto c = writeSource (tmp.dir, "c.wav", testsignals::pluck (midiToHz (60), 2.0, 48000.0, 5));
+    OspAudioProcessor p;
+    loadAndWait (p, a);
+    std::unique_ptr<juce::AudioProcessorEditor> base (p.createEditorIfNeeded());
+    auto* editor = dynamic_cast<Editor*> (base.get());
+    REQUIRE (editor != nullptr);
+    editor->refreshNow();
+    auto snapshot = [&] (const juce::String& name) {
+        editor->refreshNow();
+        const auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f);
+        if (const char* dir = std::getenv ("OSP_SNAPSHOT_DIR"))
+        {
+            juce::FileOutputStream out (juce::File (dir).getChildFile (name));
+            out.setPosition (0);
+            out.truncate();
+            juce::PNGImageFormat().writeImageToStream (image, out);
+        }
+    };
+    auto writeMenu = [&] (const juce::PopupMenu& menu, const juce::String& name) {
+        const char* dir = std::getenv ("OSP_SNAPSHOT_DIR");
+        if (dir == nullptr)
+            return;
+        auto& laf = editor->getLookAndFeel();
+        struct Row { juce::String text; bool header = false, ticked = false, separator = false, sub = false; int height = 0; };
+        std::vector<Row> rows;
+        int menuWidth = 120, menuHeight = 8;
+        for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+        {
+            const auto& item = it.getItem();
+            int w = 0, h = 0;
+            laf.getIdealPopupMenuItemSize (item.text, item.isSeparator, -1, w, h);
+            if (item.isSectionHeader)
+                h = std::max (h, 26);
+            rows.push_back ({ item.text, item.isSectionHeader, item.isTicked, item.isSeparator, item.subMenu != nullptr, h });
+            menuWidth = std::max (menuWidth, w + 40);
+            menuHeight += h;
+        }
+        juce::Image image (juce::Image::ARGB, menuWidth, menuHeight + 8, true);
+        juce::Graphics g (image);
+        laf.drawPopupMenuBackground (g, menuWidth, menuHeight + 8);
+        int y = 8;
+        for (const auto& row : rows)
+        {
+            const juce::Rectangle<int> area (0, y, menuWidth, row.height);
+            if (row.header)
+                laf.drawPopupMenuSectionHeader (g, area, row.text);
+            else
+                laf.drawPopupMenuItem (g, area, row.separator, true, false, row.ticked, row.sub, row.text, {}, nullptr, nullptr);
+            y += row.height;
+        }
+        juce::FileOutputStream out (juce::File (dir).getChildFile (name));
+        out.setPosition (0);
+        out.truncate();
+        juce::PNGImageFormat().writeImageToStream (image, out);
+    };
+    auto runItem = [] (const juce::PopupMenu& menu, const juce::String& text) {
+        for (juce::PopupMenu::MenuItemIterator it (menu, true); it.next();)
+            if (it.getItem().text == text && it.getItem().action != nullptr)
+            {
+                it.getItem().action();
+                return true;
+            }
+        return false;
+    };
+    auto hasItem = [] (const juce::PopupMenu& menu, const juce::String& text) {
+        for (juce::PopupMenu::MenuItemIterator it (menu, true); it.next();)
+            if (it.getItem().text == text)
+                return true;
+        return false;
+    };
+    auto play = [&] (int blocks, bool notes) {
+        p.prepareToPlay (48000.0, 512);
+        juce::AudioBuffer<float> buffer (2, 512);
+        for (int i = 0; i < blocks; ++i)
+        {
+            juce::MidiBuffer midi;
+            if (i == 0 && notes)
+                for (int note : { 57, 64 })
+                    midi.addEvent (juce::MidiMessage::noteOn (1, note, static_cast<juce::uint8> (100)), 0);
+            buffer.clear();
+            p.processBlock (buffer, midi);
+        }
+    };
+    auto& instrument = *editor->modulationOverlay().getParentComponent();
+    auto& panel = editor->modulationPanel();
+    auto& overlay = editor->modulationOverlay();
+    std::function<juce::Slider* (juce::Component&, const juce::String&)> find = [&] (juce::Component& parent, const juce::String& id) -> juce::Slider* {
+        for (auto* child : parent.getChildren())
+        {
+            if (! child->isVisible())
+                continue;
+            if (auto* sl = dynamic_cast<juce::Slider*> (child); sl != nullptr && sl->getProperties()["paramId"].toString() == id)
+                return sl;
+            if (auto* found = find (*child, id))
+                return found;
+        }
+        return nullptr;
+    };
+    auto centreOf = [&] (const juce::String& id) {
+        auto* sl = find (instrument, id);
+        REQUIRE (sl != nullptr);
+        return instrument.getLocalArea (sl, sl->getLocalBounds()).toFloat().getCentre();
+    };
+    auto routeExists = [&p] (mod::Source s, mod::Dest d) {
+        for (const auto& r : p.modulationRoutes())
+            if (r.route.source == s && r.route.dest == d)
+                return r.state == mod::RouteState::active;
+        return false;
+    };
+    snapshot ("andor-01-main.png");
+
+    // 1. The name and the subtitle (painted: checked in the snapshot); identifiers unchanged.
+    CHECK (p.getName().isNotEmpty());
+
+    // 2. The tabs: room between them and a drag socket on every source (none on AMP).
+    panel.showTab (3);
+    CHECK (panel.socketArea (0).isEmpty());
+    for (int t = 1; t < modui::tabCount; ++t)
+    {
+        CHECK_FALSE (panel.socketArea (t).isEmpty());
+        CHECK (panel.tabArea (t).contains (panel.socketArea (t).getCentre()));
+        CHECK (panel.tabArea (t).getX() - panel.tabArea (t - 1).getRight() >= 14.0f);
+    }
+    snapshot ("andor-02-tabs.png");
+
+    // 9. ENV 1 onto DRIVE (refused before): a drop makes the route, the global envelope moves it.
+    const int driveSlot = editor->dropModulation (2, centreOf ("drive"));
+    CHECK (driveSlot >= 0);
+    CHECK (routeExists (mod::Source::env1, mod::Dest::drive));
+    play (30, true);
+    CHECK (p.modulationView().globalEnv[0] > 0.1f);
+    snapshot ("andor-09-env-drive.png");
+
+    // 3. Halos on every macro (two on DRIVE): every name stays clear of all a halo draws.
+    for (const char* id : { "life", "drive", "character", "motion", "space", "echo" })
+        CHECK (overlay.assign (0, modui::destinationFor (id, false)) >= 0);
+    editor->selectModulation (2, driveSlot);
+    play (10, true);
+    editor->refreshNow();
+    for (auto* child : instrument.getChildren())
+        if (auto* l = dynamic_cast<osp::plugin::MacroLabel*> (child))
+            for (const char* id : { "life", "drive", "character", "motion", "space", "echo" })
+            {
+                const auto centre = overlay.haloCentre (id);
+                if (std::abs (centre.x - static_cast<float> (l->getBounds().getCentreX())) > 20.0f)
+                    continue;
+                CAPTURE (id);
+                CHECK (static_cast<float> (l->getBottom()) + 6.0f < centre.y - overlay.haloRadius (id) - 7.5f);
+            }
+    snapshot ("andor-03-macro-halos.png");
+
+    // 4. Right-click on any destination: its menu assigns through the one path; an existing
+    //    pairing is offered for editing, never twice; a refused source is not offered.
+    {
+        const auto at = centreOf ("space");
+        const auto saved = juce::ModifierKeys::currentModifiers;
+        juce::ModifierKeys::currentModifiers = juce::ModifierKeys (juce::ModifierKeys::rightButtonModifier);
+        CHECK (overlay.hitTest (juce::roundToInt (at.x), juce::roundToInt (at.y)));   // the knob body takes a right-click
+        juce::ModifierKeys::currentModifiers = saved;
+        CHECK_FALSE (overlay.hitTest (juce::roundToInt (at.x), juce::roundToInt (at.y)));   // a plain click stays the knob's
+        const auto menu = overlay.contextMenu ("space");
+        writeMenu (menu, "andor-04-assign-menu.png");
+        CHECK (hasItem (menu, "Assign MOD WHEEL"));
+        CHECK (hasItem (menu, "Edit LFO 1"));          // already routed: selected, not duplicated
+        CHECK (hasItem (menu, "Assign ENV 2"));
+        CHECK (hasItem (menu, "Remove Assignment"));
+        const auto before = p.modulationRoutes().size();
+        CHECK (runItem (menu, "Edit LFO 1"));
+        CHECK (p.modulationRoutes().size() == before);
+        CHECK (runItem (overlay.contextMenu ("drive"), "Edit ENV 1"));
+        CHECK (editor->selectedModulationRoute() == driveSlot);
+    }
+
+    // 5. The mod wheel: dragged from its socket onto SPACE, then played from the screen and
+    //    from MIDI CC 1 alike.
+    CHECK (runItem (overlay.contextMenu ("space"), "Remove Assignment"));
+    {
+        const auto wheel = instrument.getLocalArea (&editor->modulationWheel(), editor->modulationWheel().socketArea().getSmallestIntegerContainer()).toFloat().getCentre();
+        editor->dragModulation (4, wheel + juce::Point<float> (40.0f, -40.0f));
+        CHECK (editor->dropModulation (4, centreOf ("space")) >= 0);
+        CHECK (routeExists (mod::Source::modWheel, mod::Dest::space));
+        p.setScreenModWheel (1.0f);
+        play (20, false);
+        CHECK (p.modulationView().value[4] == Approx (1.0f).margin (0.02));
+        p.setScreenModWheel (0.0f);
+        play (20, false);
+        CHECK (p.modulationView().value[4] == Approx (0.0f).margin (0.02));
+        // MIDI CC 1 reaches the same source.
+        p.prepareToPlay (48000.0, 512);
+        juce::AudioBuffer<float> buffer (2, 512);
+        for (int i = 0; i < 20; ++i)
+        {
+            juce::MidiBuffer midi;
+            if (i == 0)
+                midi.addEvent (juce::MidiMessage::controllerEvent (1, 1, 127), 0);
+            buffer.clear();
+            p.processBlock (buffer, midi);
+        }
+        CHECK (p.modulationView().value[4] == Approx (1.0f).margin (0.02));
+        CHECK (hasItem (overlay.contextMenu ("drive"), "Assign MOD WHEEL"));
+        snapshot ("andor-05-mod-wheel.png");
+    }
+
+    // 7. LFO 1 on START A (right-click), 8. LFO 1 on ENV 1's ATTACK; an envelope is not offered
+    //    for either (START: no value yet as a note starts; an envelope's times: LFOs and wheel).
+    {
+        const auto startId = OspAudioProcessor::layerParameterId (0, "start");
+        const auto menu = overlay.contextMenu (startId);
+        CHECK_FALSE (hasItem (menu, "Assign ENV 1"));
+        CHECK (runItem (menu, "Assign LFO 1"));
+        CHECK (routeExists (mod::Source::lfo1, mod::Dest::startA));
+        snapshot ("andor-07-lfo-start.png");
+        panel.showTab (1);   // ENV 1's page: its ATTACK knob on screen
+        editor->refreshNow();
+        const auto attackId = OspAudioProcessor::modEnvId (0, "attack");
+        CHECK (find (instrument, attackId) != nullptr);
+        const auto envMenu = overlay.contextMenu (attackId);
+        writeMenu (envMenu, "andor-08-env-attack-menu.png");
+        CHECK_FALSE (hasItem (envMenu, "Assign ENV 1"));
+        CHECK_FALSE (hasItem (envMenu, "Assign ENV 2"));
+        CHECK (runItem (envMenu, "Assign LFO 1"));
+        CHECK (routeExists (mod::Source::lfo1, mod::Dest::env1Attack));
+        CHECK (panel.tab() == modui::tabOfSource (0));   // the new route's source is shown, selected
+        snapshot ("andor-08-lfo-env1.png");
+    }
+
+    // 6. Granular: dragging LFO 2 onto the display opens POS SIZE DENS TUNE SPREAD after a
+    //    short rest (not at once); a drop on POS makes LFO 2 -> POSITION A.
+    {
+        p.setParameterValue (OspAudioProcessor::layerParameterId (0, "sourceMode"), 1.0f);
+        editor->refreshNow();
+        auto& card = editor->engineCard (0);
+        REQUIRE (card.isGranular());
+        CHECK_FALSE (card.granularControlsShown());
+        const auto display = instrument.getLocalArea (&card, card.display().getBounds()).toFloat().getCentre();
+        editor->dragModulation (1, display);
+        CHECK_FALSE (card.granularControlsShown());   // passing across does not open it
+        juce::Thread::sleep (450);
+        editor->dragModulation (1, display);
+        CHECK (card.granularControlsShown());
+        const auto pos = centreOf (OspAudioProcessor::layerParameterId (0, "granular.position"));
+        editor->dragModulation (1, pos);
+        snapshot ("andor-06-granular-drag.png");
+        CHECK (editor->dropModulation (1, pos) >= 0);
+        CHECK (routeExists (mod::Source::lfo2, mod::Dest::grainPositionA));
+        // Right-click works on them too.
+        CHECK (hasItem (overlay.contextMenu (OspAudioProcessor::layerParameterId (0, "granular.size")), "Assign LFO 1"));
+    }
+
+    // 10. The sample's details in the badge's card; the header no longer spells the name.
+    {
+        auto& card = editor->engineCard (0);
+        const auto lines = card.sourceInfoLines();
+        REQUIRE (lines.size() >= 3);
+        CHECK (lines[0] == "Vowel A3 long take for the source card.wav");
+        CHECK (lines[1].contains ("kHz"));
+        CHECK (lines[1].contains ("s"));
+        CHECK (lines[2].startsWith ("Root"));
+        card.showSourceInfo (true);
+        CHECK (card.isSourceInfoShown());
+        snapshot ("andor-10-source-info.png");
+        card.showSourceInfo (false);
+    }
+
+    // 11. ADVANCED alone under ARP, full width.
+    {
+        // (instrument coordinates: the reference canvas, scaled as a whole)
+        CHECK (std::abs (static_cast<float> (editor->advancedSettingsButton().getWidth()) - osp::plugin::design::layout::advanced.getWidth()) <= 1.0f);
+        CHECK (editor->advancedSettingsButton().isVisible());
+    }
+
+    // The MIX triangle (three layers) is hidden; two layers keep their A/B line; nothing in
+    // the mix is lost.
+    {
+        const auto mixX = p.parameterValue ("mix.x"), mixY = p.parameterValue ("mix.y");
+        p.addLayers (juce::Array<juce::File> { b });
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        editor->refreshNow();
+        editor->headerMixControl().finishAnimations();
+        CHECK (editor->headerMixControl().isVisible());
+        p.addLayers (juce::Array<juce::File> { c });
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        editor->refreshNow();
+        editor->headerMixControl().finishAnimations();
+        CHECK_FALSE (editor->headerMixControl().isVisible());
+        CHECK (p.parameterValue ("mix.x") == mixX);
+        CHECK (p.parameterValue ("mix.y") == mixY);
+        snapshot ("andor-11-three-layers-advanced.png");
+    }
+    snapshot ("andor-12-final.png");
+
+    // Recall: every new route (wheel, START, ENV ATTACK, ENV on DRIVE) comes back.
+    const auto routes = p.modulationRoutes().size();
+    base.reset();
+    juce::MemoryBlock state;
+    p.getStateInformation (state);
+    OspAudioProcessor recalled;
+    recalled.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+    CHECK (recalled.modulationRoutes().size() == routes);
 }
 
 // MODULATION's cost (measurement, hidden): three layers (A Granular), REIMAGINED on every
@@ -5390,7 +5726,11 @@ TEST_CASE ("plugin: EQ editor over the waveform", "[.][ui][eq-ui]")
     const int slot = editor->dropModulation (0, bellAt);
     REQUIRE (slot >= 0);
     CHECK (juce::roundToInt (p.parameterValue (OspAudioProcessor::modRouteId (slot, "dest"))) == static_cast<int> (osp::mod::Dest::eqBellFrequencyC));
-    CHECK (editor->dropModulation (2, bellAt) == -1);   // a per-note envelope cannot drive a layer's EQ
+    // An envelope reaches a layer's EQ through its global instance (one value for the layer).
+    const int envSlot = editor->dropModulation (2, bellAt);
+    REQUIRE (envSlot >= 0);
+    CHECK (juce::roundToInt (p.parameterValue (OspAudioProcessor::modRouteId (envSlot, "source"))) == static_cast<int> (osp::mod::Source::env1));
+    p.removeModulationRoute (envSlot);
     p.setParameterValue ("layerC.eq.enabled", 1.0f);
     p.setParameterValue ("layerC.eq.bell.enabled", 1.0f);
     p.setParameterValue ("layerC.eq.bell.gain", 9.0f);

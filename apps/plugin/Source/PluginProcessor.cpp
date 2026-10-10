@@ -940,7 +940,12 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
     macros.life = values[0];
     macros.dynamics = values[1];
     macros.character = values[2];
-    macros.motion = values[3] + modWheel * (1.0 - values[3]); // mod wheel opens MOTION up
+    // The mod wheel opens MOTION up, unless it is routed as a modulation source: then it does
+    // what its routes say and nothing else (sessions without a wheel route are unchanged).
+    bool wheelRouted = false;
+    for (const auto& route : modSettings.routes)
+        wheelRouted = wheelRouted || (route.source == mod::Source::modWheel && route.dest != mod::Dest::none);
+    macros.motion = wheelRouted ? values[3] : values[3] + modWheel * (1.0 - values[3]);
     macros.space = values[4];
     macros.reimagined = values[5];
     macros.echo = values[6];
@@ -1367,23 +1372,85 @@ int OspAudioProcessor::addModulationRoute (mod::Source source, mod::Dest dest, f
     return slot;
 }
 
-void OspAudioProcessor::removeModulationRoute (int slot)
+void OspAudioProcessor::removeModulationRoute (int slot, bool ownUndoStep)
 {
     if (slot < 0 || slot >= mod::maxRoutes)
         return;
-    undoManager.beginNewTransaction ("Remove modulation");
+    if (ownUndoStep)
+        undoManager.beginNewTransaction ("Remove modulation");
     setParameterValue (modRouteId (slot, "source"), 0.0f);
     setParameterValue (modRouteId (slot, "dest"), 0.0f);
     setParameterValue (modRouteId (slot, "depth"), 0.0f);
     setParameterValue (modRouteId (slot, "enabled"), 1.0f);
 }
 
-bool OspAudioProcessor::canModulate (mod::Source source, mod::Dest dest) const
+mod::Settings OspAudioProcessor::modulationProbe() const
 {
-    mod::Settings probe;   // only the scope rule needs the sources' settings
+    mod::Settings probe;   // the rules need the sources' scopes, the loop check the routes
     for (int i = 0; i < 2; ++i)
         probe.lfo[static_cast<std::size_t> (i)].scope = parameterValue (modLfoId (i, "scope")) >= 0.5f ? mod::Scope::poly : mod::Scope::global;
-    return mod::compatible (probe, source, dest);
+    for (int r = 0; r < mod::maxRoutes; ++r)
+    {
+        auto& route = probe.routes[static_cast<std::size_t> (r)];
+        route.source = static_cast<mod::Source> (std::clamp (juce::roundToInt (parameterValue (modRouteId (r, "source"))), 0, mod::sourceCount));
+        route.dest = static_cast<mod::Dest> (std::clamp (juce::roundToInt (parameterValue (modRouteId (r, "dest"))), 0, mod::destCount - 1));
+        route.depth = 0.01 * parameterValue (modRouteId (r, "depth"));
+        route.enabled = parameterValue (modRouteId (r, "enabled")) >= 0.5f;
+    }
+    return probe;
+}
+
+bool OspAudioProcessor::canModulate (mod::Source source, mod::Dest dest) const
+{
+    const auto probe = modulationProbe();
+    return mod::compatible (probe, source, dest) && ! mod::createsCycle (probe, source, dest);
+}
+
+OspAudioProcessor::ModAssignResult OspAudioProcessor::assignModulation (mod::Source source, mod::Dest dest, float depthPercent)
+{
+    ModAssignResult result;
+    const auto probe = modulationProbe();
+    if (source == mod::Source::none || dest == mod::Dest::none)
+    {
+        result.error = "Nothing to assign";
+        return result;
+    }
+    const juce::String pair = juce::String (mod::sourceName (source)) + " cannot reach " + mod::destInfo (dest).name;
+    if (! mod::compatible (probe, source, dest))
+    {
+        const bool envelopeTime = mod::destInfo (dest).modulates != mod::Source::none;
+        const bool start = dest == mod::Dest::startA || dest == mod::Dest::startB || dest == mod::Dest::startC;
+        result.error = pair + (envelopeTime ? ": an envelope's times take the LFOs and the mod wheel"
+                                            : start ? ": an envelope has no value yet when a note starts"
+                                                    : ": a POLY LFO has no single value on a shared stage");
+        return result;
+    }
+    if (mod::createsCycle (probe, source, dest))
+    {
+        result.error = pair + ": it would loop back on itself";
+        return result;
+    }
+    for (int r = 0; r < mod::maxRoutes; ++r)
+        if (probe.routes[static_cast<std::size_t> (r)].source == source && probe.routes[static_cast<std::size_t> (r)].dest == dest)
+        {
+            result.slot = r;
+            result.existed = true;   // selected for editing, as it is
+            return result;
+        }
+    for (int r = 0; r < mod::maxRoutes && result.slot < 0; ++r)
+        if (probe.routes[static_cast<std::size_t> (r)].source == mod::Source::none)
+            result.slot = r;
+    if (result.slot < 0)
+    {
+        result.error = "All " + juce::String (mod::maxRoutes) + " modulation routes are in use: remove one first";
+        return result;
+    }
+    undoManager.beginNewTransaction ("Add modulation");
+    setParameterValue (modRouteId (result.slot, "source"), static_cast<float> (source));
+    setParameterValue (modRouteId (result.slot, "dest"), static_cast<float> (dest));
+    setParameterValue (modRouteId (result.slot, "depth"), depthPercent);
+    setParameterValue (modRouteId (result.slot, "enabled"), 1.0f);
+    return result;
 }
 
 std::vector<OspAudioProcessor::ModRouteInfo> OspAudioProcessor::modulationRoutes() const
@@ -1599,7 +1666,11 @@ void OspAudioProcessor::handleMidi (const juce::MidiMessage& m) noexcept
     else if (m.isController() && m.getControllerNumber() == 74)
         engine.setChannelTimbre (memberChannel ? channel : 1, m.getControllerValue() / 127.0);
     else if (m.isController() && m.getControllerNumber() == 1)
+    {
         modWheel = static_cast<float> (m.getControllerValue()) / 127.0f;
+        engine.setModWheel (modWheel);   // the MOD WHEEL modulation source
+        wheelShown.store (modWheel, std::memory_order_relaxed);
+    }
     else if (m.isController() && m.getControllerNumber() >= 20 && m.getControllerNumber() <= 27)
         ccMacro[static_cast<std::size_t> (m.getControllerNumber() - 20)] = static_cast<float> (m.getControllerValue()) / 127.0f;   // 27: DRIVE
     else if (m.isPitchWheel() && memberChannel)
@@ -2032,7 +2103,7 @@ int OspAudioProcessor::addLayers (const juce::Array<juce::File>& files, int firs
         ++loaded;
     }
     if (loaded < files.size())
-        showMessage (juce::String (files.size()) + " sounds dropped: OSP plays up to three, so " + juce::String (files.size() - loaded)
+        showMessage (juce::String (files.size()) + " sounds dropped: ANDOR/OSP plays up to three, so " + juce::String (files.size() - loaded)
                      + (files.size() - loaded == 1 ? " was" : " were") + " left out. Drop a folder to make one multi-sample layer.");
     return loaded;
 }

@@ -1168,10 +1168,16 @@ EngineCard::~EngineCard()
     removeMouseListener (this);
 }
 
-void EngineCard::mouseDown (const juce::MouseEvent&)
+void EngineCard::mouseDown (const juce::MouseEvent& e)
 {
     if (onFocus != nullptr)
         onFocus (layerIndex);
+    // A click on the badge shows its details at once (no need to wait for the hover).
+    if (badgeArea.contains (e.getEventRelativeTo (this).getPosition()))
+    {
+        infoDelay.stopTimer();
+        showSourceInfo (true);
+    }
 }
 
 void EngineCard::setDensity (EngineLayoutDensity d)
@@ -1199,16 +1205,124 @@ void EngineCard::mouseMove (const juce::MouseEvent& e)
     // Granular controls come up while the pointer is over the display (or one of them).
     const auto where = e.getEventRelativeTo (this).getPosition();
     showGranularControls (sourceDisplay.getBounds().contains (where));
+    // The badge: its sample's details after a short rest; they go a moment after it leaves.
+    const bool badge = badgeArea.contains (where);
+    if (badge != overBadge)
+    {
+        overBadge = badge;
+        infoDelay.fire = [this, badge] { showSourceInfo (badge); };
+        infoDelay.startTimer (badge ? 380 : 220);
+    }
 }
 
 void EngineCard::mouseExit (const juce::MouseEvent& e)
 {
     const auto where = e.getEventRelativeTo (this).getPosition();
     if (! getLocalBounds().contains (where))
+    {
         showGranularControls (false);
+        if (overBadge || isSourceInfoShown())
+        {
+            overBadge = false;
+            infoDelay.fire = [this] { showSourceInfo (false); };
+            infoDelay.startTimer (220);
+        }
+    }
 }
 
-void EngineCard::showGranularControls (bool show)
+juce::StringArray EngineCard::sourceInfoLines() const
+{
+    // Only what the loader and analysis actually know: nothing is made up.
+    juce::StringArray lines;
+    const auto instrument = processor.currentInstrument (layerIndex);
+    if (instrument == nullptr)
+    {
+        lines.add (processor.loadState (layerIndex) == OspAudioProcessor::LoadState::loading ? "Loading" : "Empty slot");
+        return lines;
+    }
+    lines.add (juce::String::fromUTF8 (instrument->filename.c_str()));
+    const auto& src = instrument->analysis.source;
+    juce::StringArray facts;
+    if (src.durationSeconds > 0.0)
+        facts.add (juce::String (src.durationSeconds, src.durationSeconds < 10.0 ? 2 : 1) + " s");
+    if (src.sampleRate > 0.0)
+        facts.add (juce::String (src.sampleRate / 1000.0, std::fmod (src.sampleRate, 1000.0) == 0.0 ? 0 : 1) + " kHz");
+    if (src.channels > 0)
+        facts.add (src.channels == 1 ? "mono" : (src.channels == 2 ? "stereo" : juce::String (src.channels) + " channels"));
+    if (src.bitDepth > 0)
+        facts.add (juce::String (src.bitDepth) + (src.isFloatingPoint ? "-bit float" : "-bit"));
+    if (! facts.isEmpty())
+        lines.add (facts.joinIntoString (juce::String::fromUTF8 ("  \xc2\xb7  ")));
+    if (processor.rootOverride (layerIndex).has_value())
+        lines.add ("Root " + rootText + " (set by you)");
+    else if (instrument->analysis.pitch.detected)
+        lines.add ("Root " + rootText + " (detected)");
+    else
+        lines.add ("Root not detected");
+    if (instrument->set != nullptr)
+        lines.add (juce::String (static_cast<int> (instrument->memberFiles.size())) + " recordings in this set");
+    return lines;
+}
+
+void EngineCard::showSourceInfo (bool show)
+{
+    if (! show)
+    {
+        if (infoCard != nullptr)
+            infoCard->setVisible (false);
+        return;
+    }
+    if (infoCard == nullptr)
+    {
+        infoCard = std::make_unique<InfoCard>();
+        infoCard->setInterceptsMouseClicks (false, false);
+        addChildComponent (*infoCard);
+    }
+    infoCard->lines = sourceInfoLines();
+    // Under the badge, over the display; wide enough for a long name on two lines.
+    const auto font = type::sourceFilename();
+    float width = 0.0f;
+    for (const auto& l : infoCard->lines)
+        width = std::max (width, juce::GlyphArrangement::getStringWidth (font, l));
+    const float w = std::clamp (width + 30.0f, 200.0f, 420.0f);
+    const int nameLines = juce::GlyphArrangement::getStringWidth (font, infoCard->lines[0]) > w - 30.0f ? 2 : 1;
+    const float h = 16.0f + 21.0f * static_cast<float> (infoCard->lines.size() - 1 + nameLines);
+    const auto area = juce::Rectangle<float> (static_cast<float> (badgeArea.getX()), static_cast<float> (badgeArea.getBottom()) + 8.0f, w, h);
+    infoCard->setBounds (area.constrainedWithin (getLocalBounds().toFloat().reduced (6.0f)).getSmallestIntegerContainer());
+    infoCard->setVisible (true);
+    infoCard->toFront (false);
+    infoCard->repaint();
+}
+
+void EngineCard::InfoCard::paint (juce::Graphics& g)
+{
+    using namespace design;
+    const auto r = getLocalBounds().toFloat().reduced (1.0f);
+    juce::Path card;
+    card.addRoundedRectangle (r, 8.0f);
+    CachedShadow (juce::Colour (0x30302418), 8, { 0, 3 }).drawForPath (g, card);
+    g.setGradientFill (juce::ColourGradient (colour::panelTop, 0.0f, r.getY(), colour::panelBottom, 0.0f, r.getBottom(), false));
+    g.fillPath (card);
+    g.setColour (colour::hairline.darker (0.1f));
+    g.strokePath (card, juce::PathStrokeType (1.0f));
+    auto row = r.reduced (14.0f, 8.0f);
+    for (int i = 0; i < lines.size(); ++i)
+    {
+        const bool name = i == 0;
+        const auto font = name ? type::sourceRoot().withHeight (type::sourceFilename().getHeight()) : type::sourceFilename();
+        g.setFont (font);
+        g.setColour (name ? colour::text.withAlpha (0.92f) : colour::textSecondary);
+        const int nameLines = name && juce::GlyphArrangement::getStringWidth (font, lines[i]) > row.getWidth() ? 2 : 1;
+        g.drawFittedText (lines[i], row.removeFromTop (21.0f * static_cast<float> (nameLines)).getSmallestIntegerContainer(), juce::Justification::centredLeft, nameLines, 0.9f);
+    }
+}
+
+bool EngineCard::isGranular() const noexcept
+{
+    return mode != nullptr && mode->mode() == 1;
+}
+
+void EngineCard::showGranularControls (bool show, bool immediately)
 {
     const bool granular = mode != nullptr && mode->mode() == 1;
     bool dragging = false;
@@ -1221,7 +1335,13 @@ void EngineCard::showGranularControls (bool show)
     auto& animator = juce::Desktop::getInstance().getAnimator();
     for (auto& k : granularKnobs)
     {
-        if (visible)
+        if (visible && immediately)
+        {
+            animator.cancelAnimation (k.get(), false);
+            k->setAlpha (1.0f);
+            k->setVisible (true);
+        }
+        else if (visible)
         {
             k->setAlpha (0.0f);
             k->setVisible (true);
@@ -1290,7 +1410,11 @@ void EngineCard::refresh()
         shownLoading = loading;
         sourceDisplay.setInstrument (instrument);
         sourceDisplay.setLoading (loading);
-        fileText = instrument != nullptr ? juce::String::fromUTF8 (instrument->filename.c_str()) : juce::String (loading ? "Loading" : "Empty slot");
+        // The file's name lives in the badge's info card; the header says only what is not
+        // obvious from the display (loading, empty).
+        fileText = instrument != nullptr ? juce::String() : juce::String (loading ? "Loading" : "Empty slot");
+        if (infoCard != nullptr && infoCard->isVisible())
+            showSourceInfo (true);   // the new sample's details
         repaint();
     }
     // Root: the correction if there is one, else the detected note.

@@ -244,6 +244,7 @@ std::optional<RenderConfig> loadRenderConfig (const std::filesystem::path& path,
     {
         const auto& m = root["modulation"];
         auto& ms = config.modulation;
+        config.modWheel = std::clamp (json::getDouble (m, "modWheel", 0.0), 0.0, 1.0);
         ms.seed = config.engineSettings.seed;
         static const char* shapes[] { "sine", "triangle", "rampup", "rampdown", "pulse", "random", "custom" };
         for (int i = 0; i < 2; ++i)

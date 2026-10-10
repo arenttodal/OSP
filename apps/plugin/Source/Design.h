@@ -7,6 +7,11 @@
 namespace osp::plugin::design
 {
 
+/** The three-layer MIX triangle in the header (and its popover) is hidden for now: its geometry
+    is to be reworked (C belongs at the top vertex). Its DSP, parameters (mixX / mixY), saved
+    state and code all stay; set this to true to bring it back. Two layers keep their A/B line. */
+constexpr bool showMixTriangle = false;
+
 /**
     The approved reference images (design/reference/, PNG) are the visual source of truth.
     The instrument is laid out once, in their coordinate system (1448 x 1086 px), and the
@@ -123,7 +128,7 @@ namespace layout
     constexpr float housingRadius = 26.0f;
 
     // Header
-    const juce::Point<float> logo { 51.0f, 79.0f };            ///< baseline of ANDOR/2-OSP
+    const juce::Point<float> logo { 51.0f, 79.0f };            ///< baseline of ANDOR/OSP
     const R logoSubtitle { 51.0f, 88.0f, 300.0f, 14.0f };
     const R presetBar { 501.0f, 45.0f, 446.0f, 48.0f };
     /** MIX between the preset and VOLUME (two or three layers; nothing for one). */
@@ -158,8 +163,7 @@ namespace layout
     const R arpControl { 1308.0f, 913.0f, 105.0f, 64.0f };
     /** Under the arpeggiator's card, side by side at its height of 31: Advanced (its popup)
         and MOD (the envelope panel's modulation editors). */
-    const R advanced { 1308.0f, 983.0f, 55.0f, 31.0f };
-    const R modButton { 1366.0f, 983.0f, 47.0f, 31.0f };
+    const R advanced { 1308.0f, 983.0f, 105.0f, 31.0f };   // the whole width under ARP (the MOD half went)
 
 
     /** The arpeggiator's inline editor, between the macros and the keyboard when open: the

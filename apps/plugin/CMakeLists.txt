@@ -29,7 +29,7 @@ juce_add_plugin(OSP_Plugin
 
 # Embedded typefaces (SIL Open Font License: Resources/fonts/*-OFL.txt): Inter for the
 # interface, with tabular figures as its default digits (values line up as they change), and
-# Outfit for the ANDOR/2-OSP identity.
+# Outfit for the ANDOR/OSP identity.
 juce_add_binary_data(OSP_PluginData
     HEADER_NAME BinaryData.h
     NAMESPACE BinaryData

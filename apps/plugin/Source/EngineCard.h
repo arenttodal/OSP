@@ -226,8 +226,19 @@ public:
     void mouseDown (const juce::MouseEvent&) override;
     void mouseMove (const juce::MouseEvent&) override;
     void mouseExit (const juce::MouseEvent&) override;
+    /** The sample's details (full file name, length, rate, channels, root), shown in a small
+        card when the pointer rests on the A / B / C badge (the header no longer spells the
+        file name out). */
+    juce::StringArray sourceInfoLines() const;
+    void showSourceInfo (bool show);
+    bool isSourceInfoShown() const noexcept { return infoCard != nullptr && infoCard->isVisible(); }
+    juce::Rectangle<int> badgeBounds() const noexcept { return badgeArea; }
+
     /** Shows / hides the granular controls over the display (they fade). */
-    void showGranularControls (bool show);
+    void showGranularControls (bool show, bool immediately = false);   ///< immediately: no fade (a source being dragged)
+    bool granularControlsShown() const noexcept { return granularShown; }
+    /** The layer plays Granular (its POS SIZE DENS TUNE SPREAD exist to be shown). */
+    bool isGranular() const noexcept;
 
 private:
     void updateMode();
@@ -256,6 +267,19 @@ private:
     std::unique_ptr<EqEditor> eqEditor;
     juce::Rectangle<int> badgeArea, textArea, dividerArea;
     juce::String rootText, fileText;
+    struct InfoCard final : juce::Component
+    {
+        juce::StringArray lines;
+        void paint (juce::Graphics&) override;
+    };
+    std::unique_ptr<InfoCard> infoCard;
+    struct Delay final : juce::Timer
+    {
+        std::function<void()> fire;
+        void timerCallback() override { stopTimer(); if (fire != nullptr) fire(); }
+    };
+    Delay infoDelay;
+    bool overBadge = false;
 };
 
 } // namespace osp::plugin

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Design.h"
 #include "OspLookAndFeel.h"
 #include "PluginProcessor.h"
 #include "ShapingPopups.h"
@@ -94,7 +95,7 @@ public:
     int layerCount() const noexcept { return count; }
     std::function<void()> onOpenMix;
     /** Whether a press on `c` is a press on the MIX opener (the editor's outside-click logic). */
-    bool isMixOpener (const juce::Component* c) const noexcept { return count == 3 && c == this; }
+    bool isMixOpener (const juce::Component* c) const noexcept { return count == 3 && design::showMixTriangle && c == this; }
 
     /** The corners at the current unfolding (C's height grows with it), for tests too. */
     std::array<juce::Point<float>, 3> corners() const;
@@ -202,6 +203,14 @@ public:
     void mouseUp (const juce::MouseEvent&) override;
     /** Shows a value set elsewhere (the processor's mod wheel); ignored while dragged. */
     void setValue (float newValue);
+    /** The wheel as a modulation source (MOD): a drag socket beside its caption. Dragging the
+        caption or socket carries a cable (screen positions); dragging the wheel still turns it. */
+    void setAssignable (juce::Colour socketColour);
+    std::function<void (juce::Point<int>)> onSourceDrag, onSourceDrop;
+    juce::Rectangle<float> socketArea() const;
+    /** The socket's centre fills while the wheel feeds a route. */
+    void setInUse (bool used);
+    void mouseMove (const juce::MouseEvent&) override;
 
 private:
     juce::Rectangle<float> slot() const;
@@ -211,6 +220,8 @@ private:
     std::function<void (float)> onMove;
     float value = 0.0f;   // pitch -1..1, mod 0..1
     float dragStart = 0.0f;
+    bool assignable = false, cabling = false, overSocket = false, inUse = false;
+    juce::Colour socket;
 };
 
 } // namespace osp::plugin

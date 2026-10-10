@@ -302,6 +302,8 @@ public:
         engine renders exactly as without modulation. */
     void setModulation (const mod::Settings& settings) noexcept;
     const mod::Runtime& modulation() const noexcept { return modRuntime; }
+    /** The mod wheel as a modulation source (0..1; the processor passes CC 1 and the screen's wheel). */
+    void setModWheel (float value) noexcept { modRuntime.setModWheel (value); }
     /** What the modulation display shows: the global LFOs, and the newest sounding voice's
         poly LFOs and envelopes (lock-free, any thread). */
     struct ModView
@@ -311,6 +313,7 @@ public:
         std::array<float, 2> envTime {};      ///< seconds into the envelope's stage (a one-shot curve: since the note started)
         std::array<int, 2> envStage {};       ///< mod::EnvState::Stage
         bool voice = false;                   ///< a voice is sounding (poly sources shown from it)
+        std::array<float, 2> globalEnv {};    ///< the global envelopes (what the shared stages hear)
     };
     ModView modulationView() const noexcept;
     /** SHAPER's pattern position (0..1) for the display; -1 when it is not running. */
@@ -467,6 +470,7 @@ private:
     std::array<std::atomic<float>, 2> modViewPhase {}, modViewEnvTime {};
     std::array<std::atomic<int>, 2> modViewEnvStage {};
     std::atomic<bool> modViewVoice { false };
+    std::array<std::atomic<float>, 2> modViewGlobalEnv {};
     void renderBlock (float* const* output, int numChannels, int numSamples) noexcept;
     double blendNow = 0.0, mixXNow = 0.5, mixYNow = 1.0 / 3.0;   ///< smoothed mix controls
     bool pedalDown = false;

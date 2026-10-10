@@ -116,7 +116,20 @@ public:
     /** A route from `source` to `dest` in the first free slot (or the slot already joining
         them); returns the slot, or -1 when all 16 are taken. One undo step. */
     int addModulationRoute (mod::Source source, mod::Dest dest, float depthPercent);
-    void removeModulationRoute (int slot);
+    /** THE assignment path (dragging a source, right-click "Assign", the routes popover):
+        checks the rules (scope, timing, source), loops and capacity; an existing route
+        joining the two is selected, never duplicated and its depth kept; a new one starts at
+        `depthPercent` (one undo step). `error` says why nothing was made. */
+    struct ModAssignResult
+    {
+        int slot = -1;
+        bool existed = false;
+        juce::String error;
+    };
+    ModAssignResult assignModulation (mod::Source source, mod::Dest dest, float depthPercent = 50.0f);
+    /** The modulation settings as the parameters say now (the rules and loop checks use them). */
+    mod::Settings modulationProbe() const;
+    void removeModulationRoute (int slot, bool ownUndoStep = true);
     struct ModRouteInfo
     {
         int slot = -1;
@@ -272,6 +285,8 @@ public:
     void setScreenPitchWheel (float value) noexcept { screenPitch = std::clamp (value, -1.0f, 1.0f); }
     void setScreenModWheel (float value) noexcept { screenMod = std::clamp (value, 0.0f, 1.0f); }
     float screenModWheel() const noexcept { return screenMod.load(); }
+    /** Where the mod wheel is, from either the screen or MIDI CC 1 (what the wheel shows). */
+    float modWheelPosition() const noexcept { return wheelShown.load (std::memory_order_relaxed); }
 
     /**
         LINK: a user change of one layer's START, TUNE, PAN or LEVEL (`control`) by `delta`
@@ -547,6 +562,7 @@ private:
     mutable juce::CriticalSection customLock;
     void publishCustomPattern() noexcept;
     float modWheel = 0.0f;
+    std::atomic<float> wheelShown { 0.0f };
     std::atomic<float> screenPitch { 0.0f }, screenMod { 0.0f };
     float lastScreenPitch = 0.0f, lastScreenMod = 0.0f;
     bool presetIsProgram = true;   ///< the header shows the starting state until a preset file is opened

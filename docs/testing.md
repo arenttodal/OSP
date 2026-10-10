@@ -27,7 +27,10 @@ SHOT, envelope stages, route rules, no-route null, per-voice independence), `[pl
 Granular and three layers), `[ui][mod-ui]` (the tabbed panel, the window keeping its size, the RATE
 menu, tab drags, polarity, halos (geometry, hover readout, depth through zero, several sources),
 the routes and curve popovers, scales and recall; screenshots modui-01..15 with
-`OSP_SNAPSHOT_DIR`) and the hidden `[mod-cpu]`
+`OSP_SNAPSHOT_DIR`), `[ui][andor-ui]` (right-click assignment, the mod wheel as a source,
+Granular hover-to-open, START and envelope-time routes, ENV on DRIVE, halo clearance, the source
+card, ADVANCED, the hidden MIX triangle; screenshots andor-01..12), `[unit][mod][regression]`
+(the global LFO after ONE SHOT, without voices, across transport changes and repeated keys) and the hidden `[mod-cpu]`
 measurement (16 routes against none).
 
 The arpeggiator: `[unit][arp]` (core: patterns, sample-exact host-grid timing over 60/90/120/174 BPM
@@ -38,7 +41,8 @@ mode/routing and effect, REVERSE/LOOP/Granular/layers, lifecycle, the stage's CP
 `[arp-baseline]` (ARP off renders sessions from the build before it bit-identically:
 `OSP_ARP_BASELINE=write` with the old build, `=compare` with the new, same
 `OSP_ARP_BASELINE_DIR`) and `[arp-ui]` (the keyboard control, the inline editor and the
-window resizing; screenshots with `OSP_SNAPSHOT_DIR`, under xvfb-run). A render config may
+window resizing; screenshots with `OSP_SNAPSHOT_DIR`, under xvfb-run). A render config's `"modulation"` block may set `"modWheel": 0..1` (the MOD WHEEL source for the
+whole render) and route `"source": "mod wheel"`. A render config may
 carry `"arp": { "enabled": true, "pattern": "up|down|updown|played|random|chord|downup|up&down|down&up|converge|diverge|con&diverge|pinkyup|pinkyupdown|thumbup|thumbupdown|randomother|randomonce", "rate":
 "1/16", "gate": 0.75, "octaves": 2, "swing": 0.15, "bpm": 110, "transport": true }`: the fixture's notes are
 arpeggiated as the plugin does it, for engines A, B and C alike (`transport` false: no host,

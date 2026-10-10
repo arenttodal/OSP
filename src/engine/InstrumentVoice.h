@@ -275,6 +275,7 @@ private:
     float modCents = 0.0f, modLevelDb = 0.0f, modPan = 0.0f, modReimagined = 0.0f;
     double modCutoff = 0.0, modResonance = 0.0, modSustain = 0.0;
     double modGrainPosition = 0.0, modGrainSpread = 0.0, modGrainSize = 0.0, modGrainDensity = 0.0;
+    double modStartOffset = 0.0;   ///< START modulation taken at note-on (0..1 of the recording)
     AdsrSettings noteAdsr {};   ///< the envelope as this note took it (ATTACK, DECAY at note-on)
     double appliedSustain = -1.0;
     /** Starts, advances (or stops) the voice's modulation and gathers its offsets. */

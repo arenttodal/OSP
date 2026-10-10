@@ -509,7 +509,13 @@ popovers hold the routes (`ModRoutesPopup`) and a large curve editor (`ModCurveP
 `ModulationOverlay` is the reusable two-layer halo: it finds modulated controls by their
 `paramId` property, sizes each ring from the knob's own reach (overridable per slider with
 `haloGap` / `haloAvoid`), edits depth without touching the base, and takes the drops. One
-selection (source, route) lives in the editor and drives tabs, popover and halos. Headless:
+selection (source, route) lives in the editor and drives tabs, popover and halos.
+Refinement (ANDOR/OSP): five sources (MOD WHEEL appended) and appended destinations (ECHO,
+START A/B/C read at note-on, the envelopes' own times). The shared stages hear `Runtime::
+sharedValue`: the single-valued sources plus one global instance of each envelope (restarted
+by each note-on, released by the last key and pedal). Voices hear `globalValue` and their own
+envelopes and poly LFOs. Every assignment (drag, right-click, popover) goes through
+`OspAudioProcessor::assignModulation` (rules, `mod::createsCycle`, duplicates, capacity). Headless:
 the `"modulation"` block of render configs. Report: `docs/reports/modulation.md`.
 
 ## PER-LAYER EQ (parameters v18)

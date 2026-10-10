@@ -213,6 +213,94 @@ was.
 - **Repainting.** Only the ring areas are repainted at 30 Hz. The overlay is transparent to
   the mouse outside the halo bands.
 
+## ANDOR/OSP refinement: modulation everywhere
+
+The third spec ("ANDOR/OSP — final modulation & GUI refinement") asked for modulation to reach
+every eligible control and to be assignable without dragging. It also asked for four defects
+to be fixed. The five reference screenshots it mentions were not attached; the work follows
+the text and the plugin as it is.
+
+### Root causes
+
+| Defect | Cause | Fix |
+|---|---|---|
+| Global LFO 1 sometimes standing still | `LfoState::finished` (ONE SHOT done) survived a change of mode or a preset load; `advance()` returned early forever, and a global LFO in FREE mode is never restarted. A second, rarer cause: the held-note count went up on a repeated note-on without its note-off, so RETRIGGER / ONE SHOT never saw "silence" again. | `finished` holds only while the mode is ONE SHOT; keys are tracked per note and channel (a bit each), so a key pressed twice counts once. Regression test: `[unit][mod][regression]` (after ONE SHOT, no voices, 20 transport changes with and without a position, repeated keys). |
+| ENV 1/2 could not reach the macros | The scope rule refused every per-voice source on a shared stage, and an envelope only existed per voice. | A global envelope per ENV (below). |
+| Dropping on the Granulator did nothing | Its POS / SIZE / DENS / TUNE / SPREAD appear on a mouse-move over the waveform. During a drag the mouse belongs to the tab, so the card never saw it, the knobs stayed hidden, and hidden knobs are not drop targets. | Resting a drag on a Granular layer's display for 380 ms shows them at once, without the fade. The drag carries on and the drop lands on the knob. |
+| Halos crossing the macro names | The names were placed against the ring itself, but the halo also draws other routes' arcs (+6.5 px), the selection glow (9 px wide) and the handle (7.5 px). Those reached about 1 px past the names. | The names moved up 6 reference px and the knobs (with their lights) down 6, so there are about 10 px clear of everything the halo draws. The UI test checks it for all six macros with two routes on DRIVE. |
+
+### Decisions
+
+- **Global envelopes (ENV on shared stages).** Each ENV also runs one instance for the whole
+  instrument (`mod::Runtime::globalEnv`). It is used only by the shared stages: the macros
+  (LIFE, DRIVE, CHARACTER, MOVEMENT, SPACE, ECHO) and each layer's EQ.
+  - Every note-on restarts it from its current level (no jump): multi-trigger, as a mono
+    synth's envelope, so each ARP note pumps DRIVE.
+  - It releases when the last key is up and the sustain pedal is not down.
+  - This was chosen over aggregating the voices' envelopes because it is deterministic, needs
+    no rule for overlapping notes, and does not depend on which voice was processed last.
+  - Voices never see it: their own envelopes stay per note.
+  - REIMAGINED's layer amount (a voice destination with a shared stage) keeps taking only the
+    single-valued sources, so nothing is counted twice.
+- **START (A/B/C, new destinations).** It is read once, as a voice starts: its sources are
+  evaluated at that instant (a probe `VoiceState`). A free-running global LFO therefore gives
+  each note a different start, and a sounding note never jumps.
+  - Reverse reads it from the sound's end, as the knob does, and it is clamped to the
+    recording.
+  - Granular voices carry the same note-on offset on their grain position, while POS keeps
+    its own continuous modulation.
+  - An envelope may not choose START, because an ADSR is at 0 when a note begins. The route is
+    refused rather than accepted and silent.
+  - A POLY LFO in RETRIGGER mode gives a constant offset (its PHASE). That is allowed and
+    documented, and no randomness is added.
+- **Envelope times as destinations (ENV 1/2 ATTACK, DECAY, SUSTAIN, RELEASE).** The LFOs and
+  the wheel may move them; the envelopes may not.
+  - ATTACK and DECAY are taken when the envelope starts, and RELEASE when it is released.
+    SUSTAIN follows continuously. A running stage is never retimed and nothing restarts.
+  - Without a route the envelopes follow their knobs live, exactly as before.
+- **No loops.** The only destinations owned by a source are the envelopes' own settings
+  (`DestInfo::modulates`), and only the LFOs and the wheel reach them. Nothing modulates an
+  LFO or the wheel, so the graph is acyclic by construction. `mod::createsCycle` checks it all
+  the same in the assignment path, and evaluation order stays fixed: LFOs and wheel, then
+  envelope times, then destinations.
+- **MOD WHEEL (a new source, appended).** It comes from MIDI CC 1 or the on-screen wheel (both
+  arrive as CC 1), as 0..1 smoothed over about 10 ms.
+  - It is global, so it reaches every destination, START and the envelope times included.
+  - The wheel's built-in "opens MOVEMENT up" stays for sessions that do not route it. Once
+    any route uses the wheel, that built-in mapping steps aside, so the wheel does only what
+    its routes say.
+- **One assignment path.** `OspAudioProcessor::assignModulation` is used by drag-and-drop,
+  the right-click menu and the overlay. It checks:
+  - the rules: scope, START timing and envelope-time sources;
+  - loops;
+  - an existing route for the same pair, which is selected with its depth kept, never
+    duplicated;
+  - capacity, which is 16 routes; when full it says so.
+
+  When it refuses, it gives the reason, and the overlay shows it as a short note.
+- **Right-click everywhere.** The overlay takes a right-click (or control-click) on any
+  registered destination, inside popovers too, because it sits above them. The menu offers the
+  knob's routes and "Assign <source>" for every allowed source, with "(each note's filter)" /
+  "(whole instrument)" on CHARACTER for an envelope. "Remove All" is one undo step. The
+  destinations are the registry's, so a control is listed whether or not it is on screen.
+- **The tabs' sockets.** A small patch socket (ring and centre dot, the bay's old assignment
+  glyph) follows each source's name; its centre fills while the source is routed.
+  - The tab gap grows to 22 px, shrinking only if the routes key needs the room.
+  - Dragging starts after 2 px from the socket and 6 px from the word.
+  - AMP has no socket, because it is not a source.
+- **ECHO** joined the macro destinations (appended).
+
+### Parameters and compatibility
+
+- `mod.routeN.source` gains MOD WHEEL (index 5) and `mod.routeN.dest` gains ECHO, START A/B/C
+  and ENV 1/2 ATTACK / DECAY / SUSTAIN / RELEASE. Both are appended, so every saved route keeps
+  its meaning.
+- No ID, range or default changed, and no audio reference was regenerated. With no route,
+  the engine is bit-identical (`[unit][mod]` null test, ARP / DRIVE baselines).
+- As with any appended choice, a DAW automation lane recorded on a route's source or
+  destination choice in an older build would land on other entries. Sessions and presets
+  store the index and are unaffected.
+
 ## Tests
 
 | Test | What it covers |
@@ -220,6 +308,8 @@ was.
 | `[unit][mod]` (7 cases) | Shapes and polarity. Phase without drift and independent of block size (1–4096). Sync follows the song position. ONE SHOT holds. ADSR stage timing, release from the current level, one-shot curve. Scope, sign, sum, bypass and empty rules. No route is bit-identical to no modulation. Routes are heard, deterministic and block-size independent. Per-voice envelopes and poly LFOs are independent per note. |
 | `[plugin][mod]` (2 cases) | Parameters and IDs; routes add, reuse and remove. Recall through the saved state (sessions and presets share it), older sessions with no routes, curves, undo. Every source with the ARP, Granular and three layers: heard, finite, every note ends. ENV 1 retriggers on each ARP note. |
 | `[ui][mod-ui]` (xvfb) | The window keeps 1086 px, and the panel sits inside the macro section. Switching tabs leaves the LFO's phase untouched. The RATE menu switches Sync / Hz. A tab drag needs the threshold and drops onto CHARACTER. The polarity menu works. The halo clears the knob's reach, and the labels sit above the halos. The hover readout appears. Drag +70 then −40 changes depth through zero while the base stays put. ENV 1 → cutoff; per-route editing with several sources. The routes popover has its rows and six add groups; the curve popover opens. Rapid tab switching, the MOD button, ARP with the panel, the smallest and largest scales, and recall of the tab. Screenshots `modui-01` … `modui-15`. |
+| `[unit][mod]` (refinement, 5 cases) | The global LFO after ONE SHOT, with no voices, across transport changes and repeated keys; the global envelope (restart, hold with a key or the pedal, release); MOD WHEEL (glide, -12 dB at full wheel on LEVEL, no change wheel-down); START (= the equivalent knob setting, forwards and reversed, no jump when the wheel moves mid-note, bounded); envelope times (taken at note-on, sustain followed, envelopes refused). |
+| `[ui][andor-ui]` (xvfb) | Tab sockets and spacing; ENV 1 dropped on DRIVE; halos on all six macros clear of their names; right-click: hit test, Assign / Edit / Remove, no duplicates, refused sources absent; the wheel dragged onto SPACE, then moved on screen and by CC 1; LFO 1 on START A and on ENV 1 ATTACK; Granular hover-to-open (not on a pass), drop on POS; the source card; ADVANCED full width; the MIX triangle hidden with three layers, its values kept; recall. Screenshots `andor-01` ... `andor-12`. |
 | `[.][mod-cpu]` | Stress measurement (below). |
 
 ## CPU
@@ -259,13 +349,19 @@ a concern for MOD. Only the ARP editor still grows the height, as before.
 
 1. **The mockup.** Neither spec's mockup was attached. The tab type, the halo's gap and widths,
    and the readout card are a proposal from the text, so refine them against the image.
-2. **Global envelope mode.** It is not implemented, so ENV cannot reach the macros. The spec
-   asks for an explicit gate-aggregation rule first, for example "first note on, last note
-   off".
-3. **CHARACTER's ring for cutoff routes.** It is an approximation: four octaves drawn over
+2. **Global envelope policy.** ENV reaches the macros through one global instance per
+   envelope: every note-on restarts it and the last key (with the pedal up) releases it. It
+   is a deliberate choice, and a per-voice aggregation could be added as an option if
+   listening asks for it.
+3. **Not done in this round (refinement).** No DAW was used, so automation lanes, project
+   recall in hosts and real controller wheels are untested; CC 1 is tested headless (the
+   source and the on-screen wheel follow it). The A/B/C source card opens on hover and click,
+   not from keyboard focus. Meta-modulation (a source on a route's depth) is queued as the
+   next piece of work.
+4. **CHARACTER's ring for cutoff routes.** It is an approximation: four octaves drawn over
    the macro's travel. The audio is exact. Only the drawing approximates.
-4. **Depth on the halo.** Depth is changed by dragging the halo, or the knob with Option,
+5. **Depth on the halo.** Depth is changed by dragging the halo, or the knob with Option,
    vertically. The endpoint handle shows where depth leads but is not dragged on its own
    path.
-5. **Host validation.** Logic, Ableton, REAPER and AudioPluginHost resizing and automation
+6. **Host validation.** Logic, Ableton, REAPER and AudioPluginHost resizing and automation
    are still to be checked on a Mac or PC.

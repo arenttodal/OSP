@@ -17,6 +17,7 @@ const char* sourceName (Source s) noexcept
         case Source::lfo2: return "LFO 2";
         case Source::env1: return "ENV 1";
         case Source::env2: return "ENV 2";
+        case Source::modWheel: return "MOD WHEEL";
         case Source::none: break;
     }
     return "-";
@@ -100,7 +101,25 @@ namespace
         { "eqHighShelfGainA", "EQ A HIGH SHELF", Owner::global, 0, Domain::decibels, 12.0, Update::continuous },
         { "eqHighShelfGainB", "EQ B HIGH SHELF", Owner::global, 1, Domain::decibels, 12.0, Update::continuous },
         { "eqHighShelfGainC", "EQ C HIGH SHELF", Owner::global, 2, Domain::decibels, 12.0, Update::continuous },
+        { "echo", "ECHO", Owner::global, -1, Domain::unit, 1.0, Update::continuous },
+        // START: read once as each note begins (a sounding note never jumps); 100 % moves it
+        // half the recording.
+        { "startA", "START A", Owner::voice, 0, Domain::unit, 0.5, Update::noteOn },
+        { "startB", "START B", Owner::voice, 1, Domain::unit, 0.5, Update::noteOn },
+        { "startC", "START C", Owner::voice, 2, Domain::unit, 0.5, Update::noteOn },
+        // The modulation envelopes' own times: attack and decay taken as a note starts,
+        // release as it is released, sustain followed (as the amp envelope's).
+        { "env1Attack", "ENV 1 ATTACK", Owner::voice, -1, Domain::octaves, 4.0, Update::noteOn, Source::env1 },
+        { "env1Decay", "ENV 1 DECAY", Owner::voice, -1, Domain::octaves, 4.0, Update::noteOn, Source::env1 },
+        { "env1Sustain", "ENV 1 SUSTAIN", Owner::voice, -1, Domain::unit, 1.0, Update::continuous, Source::env1 },
+        { "env1Release", "ENV 1 RELEASE", Owner::voice, -1, Domain::octaves, 4.0, Update::noteOff, Source::env1 },
+        { "env2Attack", "ENV 2 ATTACK", Owner::voice, -1, Domain::octaves, 4.0, Update::noteOn, Source::env2 },
+        { "env2Decay", "ENV 2 DECAY", Owner::voice, -1, Domain::octaves, 4.0, Update::noteOn, Source::env2 },
+        { "env2Sustain", "ENV 2 SUSTAIN", Owner::voice, -1, Domain::unit, 1.0, Update::continuous, Source::env2 },
+        { "env2Release", "ENV 2 RELEASE", Owner::voice, -1, Domain::octaves, 4.0, Update::noteOff, Source::env2 },
     } };
+
+    bool isEnvelope (Source s) noexcept { return s == Source::env1 || s == Source::env2; }
 }
 
 double syncQuarters (int division) noexcept
@@ -212,6 +231,7 @@ bool isPolySource (const Settings& settings, Source source) noexcept
         case Source::lfo2: return settings.lfo[1].scope == Scope::poly;
         case Source::env1:
         case Source::env2: return true;
+        case Source::modWheel:
         case Source::none: break;
     }
     return false;
@@ -219,9 +239,54 @@ bool isPolySource (const Settings& settings, Source source) noexcept
 
 bool compatible (const Settings& settings, Source source, Dest dest) noexcept
 {
-    if (source == Source::none || dest == Dest::none || static_cast<int> (dest) >= destCount)
+    if (source == Source::none || dest == Dest::none || static_cast<int> (dest) >= destCount || static_cast<int> (source) > sourceCount)
         return false;
-    return destInfo (dest).owner == Owner::voice || ! isPolySource (settings, source);
+    const auto& info = destInfo (dest);
+    // An envelope's settings: the LFOs and the wheel only (no envelope drives an envelope).
+    if (info.modulates != Source::none && (isEnvelope (source) || source == info.modulates))
+        return false;
+    // An envelope has no value yet when a note starts (an ADSR begins at 0): it cannot
+    // choose where the note begins.
+    if ((dest == Dest::startA || dest == Dest::startB || dest == Dest::startC) && isEnvelope (source))
+        return false;
+    if (info.owner == Owner::voice)
+        return true;
+    // A shared stage: one value for the instrument. The envelopes run a global instance for
+    // it; a poly LFO has none.
+    return isEnvelope (source) || ! isPolySource (settings, source);
+}
+
+bool createsCycle (const Settings& settings, Source source, Dest dest) noexcept
+{
+    // Edges run from a route's source to the source owning its destination. A new edge
+    // source -> owner closes a loop when the owner already reaches the source.
+    const auto owner = destInfo (dest).modulates;
+    if (owner == Source::none)
+        return false;
+    if (owner == source)
+        return true;
+    std::array<bool, sourceCount + 1> reached {};
+    std::array<Source, sourceCount + 1> stack {};
+    int top = 0;
+    stack[static_cast<std::size_t> (top++)] = owner;
+    reached[static_cast<std::size_t> (owner)] = true;
+    while (top > 0)
+    {
+        const auto from = stack[static_cast<std::size_t> (--top)];
+        for (const auto& r : settings.routes)
+        {
+            if (r.source != from || r.dest == Dest::none || static_cast<int> (r.dest) >= destCount)
+                continue;
+            const auto next = destInfo (r.dest).modulates;
+            if (next == Source::none || reached[static_cast<std::size_t> (next)])
+                continue;
+            if (next == source)
+                return true;
+            reached[static_cast<std::size_t> (next)] = true;
+            stack[static_cast<std::size_t> (top++)] = next;
+        }
+    }
+    return false;
 }
 
 RouteState routeState (const Settings& settings, const Route& route) noexcept
@@ -317,7 +382,15 @@ void LfoState::start (const LfoSettings&, double fromPhase) noexcept
 void LfoState::advance (const LfoSettings& s, double seconds, double bpm) noexcept
 {
     if (finished)
-        return;
+    {
+        // A finished ONE SHOT holds only while it is a ONE SHOT: switched (or a preset loaded)
+        // to FREE or RETRIGGER it runs on from where it held. (Before, the flag survived the
+        // change and a global LFO stood still until the plugin was reloaded.)
+        if (s.mode == LfoMode::oneShot)
+            return;
+        finished = false;
+        travelled = 0.0;
+    }
     const double rate = s.sync ? std::max (1.0, bpm) / 60.0 / syncQuarters (s.division) : std::clamp (s.rateHz, 0.001, 100.0);
     const double step = rate * std::max (0.0, seconds);
     if (s.mode == LfoMode::oneShot && travelled + step >= 1.0)
@@ -464,23 +537,129 @@ void Runtime::advanceGlobal (int samples, double sampleRate) noexcept
         state.evaluate (s, settings.lfoCurve[i], Prng::deriveSeed (settings.seed, 0x6c666f31ull + i, 0));
         globalValue[i] = s.scope == Scope::global ? static_cast<float> (state.value) : 0.0f;
     }
-    globalValue[2] = globalValue[3] = 0.0f;   // envelopes are per voice
+    // The wheel glides to the controller's value (CC 1 steps 1/127 at a time).
+    const double k = 1.0 - std::exp (-seconds / 0.01);
+    modWheelNow += static_cast<float> (k) * (modWheelTarget - modWheelNow);
+    if (std::abs (modWheelTarget - modWheelNow) < 1.0e-6f)
+        modWheelNow = modWheelTarget;
+    globalValue[2] = globalValue[3] = 0.0f;   // a voice's envelopes are its own
+    globalValue[4] = modWheelNow;
+    sharedValue = globalValue;
+    for (std::size_t i = 0; i < globalEnv.size(); ++i)
+    {
+        globalEnv[i].advance (envRunning (static_cast<int> (i), globalEnvNow[i], globalValue), settings.envCurve[i], seconds);
+        sharedValue[2 + i] = static_cast<float> (globalEnv[i].level);
+    }
     if (hostPlaying)
         ppq += seconds * bpm / 60.0;
 }
 
-void Runtime::noteStarted() noexcept
+EnvSettings Runtime::envAtStart (int e, const std::array<float, sourceCount>& values) const noexcept
 {
+    auto s = settings.env[static_cast<std::size_t> (e)];
+    const auto first = e == 0 ? Dest::env1Attack : Dest::env2Attack;
+    auto at = [first] (int k) { return static_cast<Dest> (static_cast<int> (first) + k); };
+    if (compiled.has (at (0)))
+        s.attackSeconds *= std::exp2 (offsetOf (at (0), values));
+    if (compiled.has (at (1)))
+        s.decaySeconds *= std::exp2 (offsetOf (at (1), values));
+    s.sustain = envSustain (e, values);
+    s.releaseSeconds = envReleaseSeconds (e, values);
+    return s;
+}
+
+EnvSettings Runtime::envRunning (int e, const EnvSettings& taken, const std::array<float, sourceCount>& values) const noexcept
+{
+    // The stored settings as they are now, but the times this note took where routes move
+    // them (without a route the envelope follows its knobs, as it always did).
+    auto s = settings.env[static_cast<std::size_t> (e)];
+    const auto first = e == 0 ? Dest::env1Attack : Dest::env2Attack;
+    auto at = [first] (int k) { return static_cast<Dest> (static_cast<int> (first) + k); };
+    if (compiled.has (at (0)))
+        s.attackSeconds = taken.attackSeconds;
+    if (compiled.has (at (1)))
+        s.decaySeconds = taken.decaySeconds;
+    if (compiled.has (at (2)))
+        s.sustain = envSustain (e, values);
+    if (compiled.has (at (3)))
+        s.releaseSeconds = taken.releaseSeconds;
+    return s;
+}
+
+double Runtime::envReleaseSeconds (int e, const std::array<float, sourceCount>& values) const noexcept
+{
+    const double base = settings.env[static_cast<std::size_t> (e)].releaseSeconds;
+    const auto d = e == 0 ? Dest::env1Release : Dest::env2Release;
+    return compiled.has (d) ? base * std::exp2 (offsetOf (d, values)) : base;
+}
+
+double Runtime::envSustain (int e, const std::array<float, sourceCount>& values) const noexcept
+{
+    const double base = settings.env[static_cast<std::size_t> (e)].sustain;
+    const auto d = e == 0 ? Dest::env1Sustain : Dest::env2Sustain;
+    return compiled.has (d) ? std::clamp (base + offsetOf (d, values), 0.0, 1.0) : base;
+}
+
+void Runtime::noteStarted (int note, int channel) noexcept
+{
+    const auto n = static_cast<std::size_t> (std::clamp (note, 0, 127));
+    const auto bit = static_cast<std::uint16_t> (1u << static_cast<unsigned> (std::clamp (channel, 1, 16) - 1));
     if (heldNotes == 0)
         for (std::size_t i = 0; i < globalLfo.size(); ++i)
             if (settings.lfo[i].mode != LfoMode::free)
                 globalLfo[i].start (settings.lfo[i], settings.lfo[i].phase);
-    ++heldNotes;
+    if ((keysDown[n] & bit) == 0)
+    {
+        keysDown[n] = static_cast<std::uint16_t> (keysDown[n] | bit);
+        ++heldNotes;
+    }
+    // The global envelopes: every note restarts them from where they are (no jump), with
+    // the times the routes give them now.
+    for (std::size_t i = 0; i < globalEnv.size(); ++i)
+    {
+        globalEnvNow[i] = envAtStart (static_cast<int> (i), globalValue);
+        globalEnv[i].start();
+    }
 }
 
-void Runtime::noteEnded() noexcept
+void Runtime::noteEnded (int note, int channel) noexcept
 {
-    heldNotes = std::max (0, heldNotes - 1);
+    const auto n = static_cast<std::size_t> (std::clamp (note, 0, 127));
+    // Channel 0: the note on any channel.
+    const auto bits = channel <= 0 ? static_cast<std::uint16_t> (0xffff)
+                                   : static_cast<std::uint16_t> (1u << static_cast<unsigned> (std::min (channel, 16) - 1));
+    for (unsigned c = 0; c < 16; ++c)
+        if ((bits & keysDown[n] & (1u << c)) != 0)
+        {
+            keysDown[n] = static_cast<std::uint16_t> (keysDown[n] & ~(1u << c));
+            heldNotes = std::max (0, heldNotes - 1);
+        }
+    if (heldNotes == 0 && ! pedal)
+        releaseGlobalEnvelopes();
+}
+
+void Runtime::setPedal (bool down) noexcept
+{
+    pedal = down;
+    if (! down && heldNotes == 0)
+        releaseGlobalEnvelopes();
+}
+
+void Runtime::allNotesOff() noexcept
+{
+    keysDown.fill (0);
+    heldNotes = 0;
+    pedal = false;
+    releaseGlobalEnvelopes();
+}
+
+void Runtime::releaseGlobalEnvelopes() noexcept
+{
+    for (std::size_t i = 0; i < globalEnv.size(); ++i)
+    {
+        globalEnvNow[i].releaseSeconds = envReleaseSeconds (static_cast<int> (i), globalValue);
+        globalEnv[i].release();
+    }
 }
 
 //==============================================================================
@@ -494,18 +673,25 @@ void VoiceState::start (const Runtime& runtime) noexcept
         lfo[i].start (s, s.mode == LfoMode::free ? runtime.globalLfo[i].phase : s.phase);
         lfo[i].cycle = s.mode == LfoMode::free ? runtime.globalLfo[i].cycle : 0;
     }
-    for (auto& e : env)
+    for (std::size_t i = 0; i < env.size(); ++i)
     {
-        e.level = 0.0;
-        e.start();
+        env[i].level = 0.0;
+        env[i].start();
+        envNow[i] = runtime.settings.env[i];
     }
-    advance (runtime, 0.0);
+    advance (runtime, 0.0);   // the sources' values as the note begins
+    // The envelopes' times as this note starts (moved by LFO or wheel routes to them).
+    for (std::size_t i = 0; i < env.size(); ++i)
+        envNow[i] = runtime.envAtStart (static_cast<int> (i), values);
 }
 
-void VoiceState::release() noexcept
+void VoiceState::release (const Runtime& runtime) noexcept
 {
-    for (auto& e : env)
-        e.release();
+    for (std::size_t i = 0; i < env.size(); ++i)
+    {
+        envNow[i].releaseSeconds = runtime.envReleaseSeconds (static_cast<int> (i), values);
+        env[i].release();
+    }
 }
 
 void VoiceState::advance (const Runtime& runtime, double seconds) noexcept
@@ -526,9 +712,10 @@ void VoiceState::advance (const Runtime& runtime, double seconds) noexcept
         lfo[i].evaluate (s, settings.lfoCurve[i], Prng::deriveSeed (settings.seed, 0x6c666f31ull + i, 0));
         values[i] = static_cast<float> (lfo[i].value);
     }
+    values[4] = runtime.globalValue[4];
     for (std::size_t i = 0; i < env.size(); ++i)
     {
-        env[i].advance (settings.env[i], settings.envCurve[i], seconds);
+        env[i].advance (runtime.envRunning (static_cast<int> (i), envNow[i], values), settings.envCurve[i], seconds);
         values[2 + i] = static_cast<float> (env[i].level);
     }
 }

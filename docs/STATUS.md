@@ -280,6 +280,18 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       UP & DOWN, DOWN & UP, CONVERGE, DIVERGE, CON & DIVERGE, PINKY UP(/DOWN), THUMB UP(/DOWN),
       RANDOM OTHER, RANDOM ONCE; seeded, older sessions unchanged); RATE as a knob from slowest
       to fastest; OCTAVES as four stacked keys. The header reads ANDOR/2-OSP.
+- [x] ANDOR/OSP refinement (docs/reports/modulation.md, "ANDOR/OSP refinement"): the global LFO
+      no longer freezes after ONE SHOT (and RETRIGGER survives repeated keys); ENV 1/2 reach the
+      macros and EQ through a global envelope (restarted per note, released by the last key /
+      pedal); MOD WHEEL is a source (drag its socket or right-click); new destinations ECHO,
+      START A/B/C (taken at note-on) and ENV 1/2 ATTACK / DECAY / SUSTAIN / RELEASE (LFOs and
+      wheel only, no loops); one assignment path (rules, loops, duplicates, capacity, reasons);
+      right-click "Assign ..." on every destination; Granular controls open under a resting drag;
+      tab sockets and spacing; macro names clear of all a halo draws; the sample's details in
+      the badge's card (no file name in the header); the MOD button gone, ADVANCED full width;
+      the three-layer MIX triangle hidden behind `design::showMixTriangle` (DSP and state kept);
+      ANDOR/OSP, One Shot Performer.
+- [ ] Meta-modulation: a source dropped on a halo modulates that route's depth (queued spec).
 - [ ] MODULATION: compare the panel and halo against the mockups (not received); host checks
       (Logic, Ableton, REAPER, AudioPluginHost); a global envelope mode needs a
       gate-aggregation rule before ENV may reach the macros.

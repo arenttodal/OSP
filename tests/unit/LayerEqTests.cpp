@@ -269,8 +269,11 @@ TEST_CASE ("eq: the engine filters each layer; without it the engine is unchange
     for (std::size_t i = 0; i < still.size(); ++i)
         worst = std::max (worst, static_cast<double> (std::abs (elsewhere[i] - still[i])));
     CHECK (worst < 1.0e-4);
-    // EQ routes are layer stages: a per-voice source cannot reach them.
+    // EQ routes are layer stages: one value for the layer. An envelope reaches them through
+    // its global instance; a POLY LFO (a value per note) cannot.
     mod::Settings probe;
-    CHECK_FALSE (mod::compatible (probe, mod::Source::env1, mod::Dest::eqBellGainA));
+    CHECK (mod::compatible (probe, mod::Source::env1, mod::Dest::eqBellGainA));
     CHECK (mod::compatible (probe, mod::Source::lfo1, mod::Dest::eqBellGainA));
+    probe.lfo[0].scope = mod::Scope::poly;
+    CHECK_FALSE (mod::compatible (probe, mod::Source::lfo1, mod::Dest::eqBellGainA));
 }

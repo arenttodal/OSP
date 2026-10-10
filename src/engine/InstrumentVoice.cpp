@@ -82,7 +82,21 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     glideOctaves = glideStep = 0.0;
     gliding = false;
     const double frames = static_cast<double> (src.numFrames());
-    const double startFraction = std::clamp (params.startFraction, 0.0, 1.0);
+    // START modulation is read once, as the note begins (the sources as they are at this
+    // instant: a free-running LFO picks a different place for each note); a sounding note
+    // never jumps. Granular voices carry it as an offset of their grain position.
+    modStartOffset = 0.0;
+    if (modRuntime != nullptr)
+    {
+        const auto startDest = static_cast<mod::Dest> (static_cast<int> (mod::Dest::startA) + std::clamp (voiceLayer, 0, 2));
+        if (modRuntime->compiled.has (startDest))
+        {
+            mod::VoiceState probe;
+            probe.start (*modRuntime);
+            modStartOffset = probe.offset (*modRuntime, startDest);
+        }
+    }
+    const double startFraction = std::clamp (params.startFraction + (granularMode ? 0.0 : modStartOffset), 0.0, 1.0);
     if (direction > 0.0)
     {
         // START moves through what follows the onset (0 = the analysed start).
@@ -311,7 +325,7 @@ void InstrumentVoice::release() noexcept
     heldByPedal = false;
     if (modStarted)
     {
-        modState.release();
+        modState.release (*modRuntime);
         if (modRuntime != nullptr && modRuntime->compiled.has (mod::Dest::ampRelease))
         {
             auto a = noteAdsr;
@@ -626,7 +640,7 @@ GranularParams InstrumentVoice::doubledGranular() const noexcept
 GranularParams InstrumentVoice::notesGranular() const noexcept
 {
     GranularParams p = *granularLive;
-    double offset = static_cast<double> (shape.grainPositionOffset);
+    double offset = static_cast<double> (shape.grainPositionOffset) + modStartOffset;
     if (modeEngine != nullptr)
         offset += modeEngine->grainPositionOffset();   // TAPE FRAME's tape, TOYBOX's heads
     if (modStarted)
@@ -678,7 +692,7 @@ void InstrumentVoice::updateModulation (bool advance) noexcept
     {
         modState.start (rt);   // routes added while the note sounds: its sources start now
         if (released)
-            modState.release();
+            modState.release (rt);
         modStarted = true;
     }
     else if (advance)

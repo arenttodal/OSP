@@ -267,7 +267,7 @@ void HeaderMix::setLayers (const std::array<bool, 3>& occupied)
     slots = which;
     // One source: nothing to mix. Two: the line fades in (from one) or folds down (from
     // three). Three: the line unfolds into the triangle. 200 ms, no overshoot.
-    opacityTarget = count >= 2 ? 1.0f : 0.0f;
+    opacityTarget = count >= 2 && (count < 3 || design::showMixTriangle) ? 1.0f : 0.0f;
     morphTarget = count >= 3 ? 1.0f : 0.0f;
     if (before <= 1 && count >= 2)
         morph = morphTarget;   // appears in its form, it does not unfold from nothing
@@ -353,7 +353,7 @@ juce::Rectangle<float> HeaderMix::captionArea() const
 
 bool HeaderMix::hitTest (int x, int y)
 {
-    if (count < 2)
+    if (count < 2 || (count >= 3 && ! design::showMixTriangle))
         return false;
     const auto c = corners();
     const auto box = juce::Rectangle<float> (c[0], c[1]).getUnion (juce::Rectangle<float> (c[2], c[2])).expanded (12.0f, 9.0f);
@@ -920,14 +920,48 @@ void Wheel::setValue (float newValue)
     repaint();
 }
 
-void Wheel::mouseDown (const juce::MouseEvent&)
+void Wheel::setAssignable (juce::Colour colour)
 {
+    assignable = true;
+    socket = colour;
+    setTooltip ("Modulation wheel. Drag MOD onto a control to modulate it");
+    repaint();
+}
+
+juce::Rectangle<float> Wheel::socketArea() const
+{
+    // The caption's line under the wheel: the word and its socket.
+    return { 0.0f, 88.0f, static_cast<float> (getWidth()), static_cast<float> (getHeight()) - 88.0f };
+}
+
+void Wheel::mouseMove (const juce::MouseEvent& e)
+{
+    const bool over = assignable && socketArea().contains (e.position);
+    if (over != overSocket)
+    {
+        overSocket = over;
+        setMouseCursor (over ? juce::MouseCursor::DraggingHandCursor : juce::MouseCursor::UpDownResizeCursor);
+        repaint();
+    }
+}
+
+void Wheel::mouseDown (const juce::MouseEvent& e)
+{
+    cabling = assignable && socketArea().contains (e.position);
+    if (cabling)
+        return;
     dragging = true;
     dragStart = value;
 }
 
 void Wheel::mouseDrag (const juce::MouseEvent& e)
 {
+    if (cabling)
+    {
+        if (e.getDistanceFromDragStart() >= 3 && onSourceDrag != nullptr)
+            onSourceDrag (e.getScreenPosition());
+        return;
+    }
     const float travel = slot().getHeight() * (springBack ? 0.5f : 1.0f);
     value = std::clamp (dragStart - static_cast<float> (e.getDistanceFromDragStartY()) / std::max (1.0f, travel), springBack ? -1.0f : 0.0f, 1.0f);
     if (onMove != nullptr)
@@ -935,8 +969,15 @@ void Wheel::mouseDrag (const juce::MouseEvent& e)
     repaint();
 }
 
-void Wheel::mouseUp (const juce::MouseEvent&)
+void Wheel::mouseUp (const juce::MouseEvent& e)
 {
+    if (cabling)
+    {
+        cabling = false;
+        if (e.getDistanceFromDragStart() >= 3 && onSourceDrop != nullptr)
+            onSourceDrop (e.getScreenPosition());
+        return;
+    }
     dragging = false;
     if (springBack)
     {
@@ -1016,8 +1057,31 @@ void Wheel::paint (juce::Graphics& g)
         g.fillRect (lit.withHeight (1.0f).reduced (1.5f, 0.0f));
     }
     g.setColour (colour::text.withAlpha (0.8f));
-    g.setFont (fonts::make (12.5f, fonts::Weight::medium, 0.06f));
-    g.drawText (caption, juce::Rectangle<float> (-12.0f, 88.0f, static_cast<float> (getWidth()) + 24.0f, 18.0f), juce::Justification::centred, false);
+    const auto font = fonts::make (12.5f, fonts::Weight::medium, 0.06f);
+    g.setFont (font);
+    if (! assignable)
+    {
+        g.drawText (caption, juce::Rectangle<float> (-12.0f, 88.0f, static_cast<float> (getWidth()) + 24.0f, 18.0f), juce::Justification::centred, false);
+        return;
+    }
+    // MOD and its patch socket (the sources' assignment glyph), together centred under the wheel.
+    const float textWidth = juce::GlyphArrangement::getStringWidth (font, caption);
+    const float left = 0.5f * (static_cast<float> (getWidth()) - (textWidth + 13.0f));
+    g.drawText (caption, juce::Rectangle<float> (left, 88.0f, textWidth + 1.0f, 18.0f), juce::Justification::centredLeft, false);
+    const juce::Point<float> c (left + textWidth + 8.5f, 97.0f);
+    g.setColour (socket.withAlpha (overSocket ? 0.95f : 0.6f));
+    g.drawEllipse (juce::Rectangle<float> (8.4f, 8.4f).withCentre (c), 1.25f);
+    if (inUse)
+        g.fillEllipse (juce::Rectangle<float> (3.6f, 3.6f).withCentre (c));
+}
+
+void Wheel::setInUse (bool used)
+{
+    if (used != inUse)
+    {
+        inUse = used;
+        repaint();
+    }
 }
 
 } // namespace osp::plugin

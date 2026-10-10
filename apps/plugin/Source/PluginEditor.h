@@ -161,9 +161,12 @@ public:
     void selectModulation (int source, int slot);
     int selectedModulationSource() const noexcept { return modSelSource; }
     int selectedModulationRoute() const noexcept { return modSelSlot; }
-    AdvancedCardButton& modulationButton() noexcept { return modButton; }
-    /** A source tab dragged to / released at a point (instrument coordinates): what the
-        bay's drag does (tests drive it directly). Returns the route's slot on release, or -1. */
+    Wheel& modulationWheel() noexcept { return modWheel; }
+    AdvancedCardButton& advancedSettingsButton() noexcept { return advancedButton; }
+    HeaderMix& headerMixControl() noexcept { return headerMix; }
+    EngineCard& engineCard (int layer) noexcept { return *cards[static_cast<std::size_t> (juce::jlimit (0, 2, layer))]; }
+    /** A source (0..3 a tab, 4 the mod wheel) dragged to / released at a point (instrument
+        coordinates): what the tabs' and the wheel's drag does (tests drive it directly). Returns the route's slot on release, or -1. */
     void dragModulation (int source, juce::Point<float> where);
     int dropModulation (int source, juce::Point<float> where);
 
@@ -257,16 +260,15 @@ private:
 
     // Keyboard row
     Wheel pitchWheel, modWheel;
+    float shownWheelPosition = -1.0f;   ///< the processor's wheel position as last shown
     OspKeyboard keyboard;
     juce::Label statusLabel;
     AdvancedCardButton advancedButton { "Advanced" };
     ArpControl arpButton { ospProcessor };
     ArpInlinePanel arpPanel { ospProcessor };
     bool arpShown = false;
-    AdvancedCardButton modButton { "MOD" };
     ModulationOverlay modOverlay { ospProcessor, content };
     int modSelSource = -1, modSelSlot = -1;
-    int lastModTab = 3;                  ///< the source tab MOD returns to (LFO 1 at first)
     int popupSource = 0;                 ///< the modulation popovers' source
     int hoverMacro = -1;                 ///< a dragged source resting on a macro (opens its popover)
     juce::uint32 hoverSince = 0;

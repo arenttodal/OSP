@@ -17,7 +17,8 @@ namespace osp::plugin
 
 namespace modui
 {
-    /** The four sources' restrained identities (0 LFO 1 sage, 1 LFO 2 blue, 2 ENV 1 amber, 3 ENV 2 rust). */
+    /** The sources' restrained identities (0 LFO 1 sage, 1 LFO 2 blue, 2 ENV 1 amber, 3 ENV 2 rust,
+        4 MOD WHEEL warm graphite). Source indices are mod::sourceIndex (lfo1 = 0 .. modWheel = 4). */
     juce::Colour sourceColour (int source);
     /** The same identity lifted for lines on the graphite displays. */
     juce::Colour sourceOnDark (int source);
@@ -26,6 +27,8 @@ namespace modui
         the CHARACTER macro is the shared CHARACTER stage for a global source and the per-voice
         cutoff for a per-voice one. Dest::none when the control is not a destination. */
     mod::Dest destinationFor (const juce::String& parameterId, bool polySource);
+    /** A source (0..4) acts per voice (the envelopes; a POLY LFO). */
+    bool isPerVoice (const OspAudioProcessor& processor, int source);
     /** Every destination a control shows (CHARACTER: the macro and the cutoff). */
     std::vector<mod::Dest> destinationsShownBy (const juce::String& parameterId);
     /** The control's parameter ID for a destination (where to show its halo), or empty. */
@@ -164,6 +167,8 @@ public:
     ModCurveView& curveView() noexcept { return curve; }
     ModSourcePage& page (int source) noexcept { return *pages[static_cast<std::size_t> (juce::jlimit (0, 3, source))]; }
     juce::Rectangle<float> tabArea (int tab) const;
+    /** A source tab's drag socket (empty for AMP). */
+    juce::Rectangle<float> socketArea (int tab) const;
     juce::Rectangle<float> routesArea() const { return routesKey; }
     juce::Rectangle<float> expandArea() const { return expandKey; }
     /** The source's context menu (polarity for an LFO, the curve's tools, its routes). */
@@ -178,7 +183,7 @@ public:
 
 private:
     /** The tab row over the panel's top (the AMP envelope fills the panel under it). */
-    struct Strip final : juce::Component
+    struct Strip final : juce::Component, juce::SettableTooltipClient
     {
         explicit Strip (ModulationPanel& p) : panel (p) {}
         void paint (juce::Graphics& g) override { panel.paintTabs (g); }
@@ -190,6 +195,7 @@ private:
         ModulationPanel& panel;
     };
     void paintTabs (juce::Graphics&);
+    static void paintSocket (juce::Graphics&, juce::Point<float> centre, juce::Colour colour, float strength, bool inUse);
     int routeCount (int source, bool activeOnly) const;
     void layoutTabs();
 
@@ -201,6 +207,9 @@ private:
     int currentTab = 0, hoverTab = -1, pressTab = -1, dragSource = -1;
     bool hoverRoutes = false, hoverExpand = false;
     std::array<juce::Rectangle<float>, modui::tabCount> tabs {};
+    std::array<juce::Rectangle<float>, modui::tabCount> sockets {};   ///< a source tab's drag socket (AMP: none)
+    int hoverSocket = -1;
+    bool pressedSocket = false;
     juce::Rectangle<float> routesKey, expandKey;
     std::array<int, 8> shownRouteCounts {};
     bool shownEditable = false;
@@ -312,6 +321,15 @@ public:
     juce::StringArray haloReadout (const juce::String& parameterId) const;
     bool isHovering() const noexcept { return hover >= 0; }
     bool isEditing() const noexcept { return editSlot >= 0; }
+    /** A destination's right-click menu: its routes (select, bypass, depth to 0, remove),
+        "Assign <source>" for every source the rules allow, "Remove All Assignments". */
+    juce::PopupMenu contextMenu (const juce::String& parameterId);
+    /** Assigns through the processor's one path (source 0..4); selects the route, or shows why
+        it could not be made. Returns the route's slot, -1 when refused. */
+    int assign (int source, mod::Dest dest);
+    /** A short message by the controls (a refused assignment), for a few seconds. */
+    void showNotice (const juce::String& text);
+    juce::String currentNotice() const;
 
     void paint (juce::Graphics&) override;
     bool hitTest (int x, int y) override;
@@ -344,7 +362,11 @@ private:
     std::vector<const OspAudioProcessor::ModRouteInfo*> routesOf (const Target& t) const;
     const OspAudioProcessor::ModRouteInfo* emphasised (const Target& t) const;
     Sweep sweepOf (const Target& t, const OspAudioProcessor::ModRouteInfo& route) const;
-    int targetAt (juce::Point<float> p, bool includeBody) const;
+    int targetAt (juce::Point<float> p, bool includeBody, bool anyControl = false) const;
+    juce::String notice;
+    juce::uint32 noticeUntil = 0;
+    juce::Rectangle<float> noticeAnchor;
+    juce::Rectangle<float> noticeArea() const;
     const Target* find (const juce::String& parameterId) const;
     juce::Rectangle<float> readoutArea (const Target& t) const;
     juce::Rectangle<int> repaintArea (const Target& t) const;

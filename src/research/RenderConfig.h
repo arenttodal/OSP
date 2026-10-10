@@ -42,6 +42,7 @@ struct RenderConfig
 
     /** Engine C's modulation (LFOs, envelopes, routes); no routes = none. */
     mod::Settings modulation {};
+    double modWheel = 0.0;   ///< the MOD WHEEL source's value for the whole render (0..1)
 
     /** The arpeggiator ahead of the engine (off: the MIDI is played as written). */
     struct Arp
