@@ -37,6 +37,11 @@ struct LibraryRow
     int layers = 0;
     int program = -1;
     bool isBuiltIn() const noexcept { return program >= 0; }
+    // A candidate (a scanned file or an Inbox item): not a Library sound yet
+    bool candidate = false, inInbox = false, rejected = false;
+    juce::String path, state, error, classification, reason, suggestedType;
+    juce::String folder;                ///< the scan root or Inbox folder it is in
+    std::string importedAs;             ///< the Library record once imported
 };
 
 /** A sound's details for the inspector (asked for when it is selected). */
@@ -47,6 +52,7 @@ struct LibrarySoundDetail
     juce::String resolvedWhere;        ///< "store", "original", ... or empty when missing
     std::vector<library::Collection> collections;
     int uses = 0;
+    juce::String classification;       ///< the analysis' or the user's (Stage 6)
 };
 
 /**
@@ -92,6 +98,8 @@ public:
     const LibraryRow& row (int index) const { return rows[static_cast<std::size_t> (index)]; }
     int selectedRow() const;
     void selectRow (int index);
+    /** Several rows at once (candidate scopes allow it: Shift/Cmd-click). */
+    void selectRows (const std::vector<int>& indices);
     void setSearchText (const juce::String& text);
     /** The scope keys the sidebar offers ("all", "factory", "user", "favourites", "recent",
         "trash", "collection:<id>", "category:<name>") and their labels with counts. */
@@ -114,7 +122,22 @@ public:
     void openSaveSheet();
     void openSettingsSheet();
     void openMissingSheet();
-    /** The sheet showing now (empty: none) - "save", "settings", "missing", "prompt", "choice". */
+    /** Stage 6: choose folders to scan, follow a scan (view F). */
+    void openScanSheet();
+    /** Stage 6: the scan sheet, scanning `folder` (the user chose it). */
+    void scanFolder (const juce::File& folder);
+    /** Stage 8: trim and slice the selected sound or candidate (view I). */
+    void openTrimSheet();
+    /** Stage 6/7: the selected candidates into the Library (with their evidence). */
+    void importSelectedCandidates (int loadIntoLayer = -1, const juce::String& name = {});
+    void setSelectedAside (bool aside);
+    /** Stage 6: the user's classification of the selected candidate or sound ("" clears it). */
+    void classifySelected (const juce::String& classification);
+    /** Stage 7: one pass over the Inbox folders (in the background). */
+    void reconcileInbox();
+    std::vector<int> selectedRows() const;
+    /** The sheet showing now (empty: none) - "save", "settings", "missing", "prompt", "choice",
+        "scan", "trim". */
     juce::String openSheetName() const;
     juce::Component* sheet() const noexcept { return sheetComponent.get(); }
     void closeSheet();
@@ -134,6 +157,9 @@ public:
 
     class Sidebar;
     class Results;
+    class CandidateInspector;
+    class ScanSheet;
+    class TrimSheet;
     class Detail;
     class Inspector;
     class Tray;
@@ -141,6 +167,9 @@ public:
 
 private:
     friend class Sidebar;
+    friend class CandidateInspector;
+    friend class ScanSheet;
+    friend class TrimSheet;
     friend class Results;
     friend class Detail;
     friend class Inspector;
@@ -183,6 +212,10 @@ private:
     std::unique_ptr<Detail> detailStrip;
     std::unique_ptr<Inspector> inspector;
     std::unique_ptr<Tray> tray;
+    std::unique_ptr<CandidateInspector> candidateInspector;
+    bool candidateScope() const { return view == View::sounds && (scopeKey == "inbox" || scopeKey == "scanned" || scopeKey == "set-aside"); }
+    juce::uint32 lastInboxPass = 0;
+    juce::String lastInboxCounts;     ///< the last pass' counts: the window asks again only when they change
     std::unique_ptr<juce::Component> sheetComponent, retiredSheet;
     juce::String sheetName;
     std::unique_ptr<juce::FileChooser> chooser;

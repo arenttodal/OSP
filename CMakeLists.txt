@@ -96,6 +96,9 @@ osp_set_warnings(osp_dsp)
 add_library(osp_library STATIC
     src/library/Catalog.cpp
     src/library/PreviewEngine.cpp
+    src/library/Tagging.cpp
+    src/library/Slicer.cpp
+    src/library/Classifier.cpp
 )
 target_include_directories(osp_library PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 # The preview's root estimate uses the analysis (pure C++); osp_dsp never links the Library.
@@ -127,6 +130,8 @@ set(OSP_IO_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/io/JsonUtil.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/midi/MidiFileIO.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/library/SoundImport.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/library/FolderScan.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/library/Inbox.cpp
 )
 
 add_library(osp_juce_headless STATIC)

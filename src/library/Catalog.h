@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -86,6 +87,7 @@ struct SoundInfo
     std::string provenance;       ///< "original", "user", "licensed", "unknown", "cleared"
     std::string parentAsset;      ///< a slice or trim: the sound it came from
     double sliceStart = 0.0, sliceEnd = 0.0;   ///< seconds in the parent
+    std::string operations;       ///< a derived sound: what was done (JSON: fades, gain, analysis version)
 };
 
 struct PresetInfo
@@ -130,6 +132,40 @@ struct SearchQuery
     int offset = 0;
 };
 
+/** A folder the user chose to scan (Stage 6.3). */
+struct ScanRoot
+{
+    std::string id, path;
+    std::string include, exclude;     ///< ';'-separated name patterns (* and ?); empty include: every supported file
+    std::int64_t added = 0;
+};
+
+/** A file a scan found: indexed in place, a candidate until the user imports it. */
+struct ScanFile
+{
+    std::string path, rootId;
+    std::int64_t size = 0, mtime = 0;
+    std::string contentHash;          ///< empty until the deep stage hashed it
+    std::string state;                ///< "indexed" (fast stage), "analysed", "failed", "imported"
+    std::string assetId;              ///< the Library record once imported
+    bool rejected = false;            ///< the user set it aside (never deleted)
+    double durationSeconds = 0.0, sampleRate = 0.0;
+    int channels = 0;
+    std::string format, error;
+};
+
+/** A file in an Inbox folder (Stage 7) and where it is on its way into the Library. */
+struct InboxItem
+{
+    std::string path, folder;
+    std::string state;                ///< detected, waiting, ready, importing, imported, failed, missing
+    std::int64_t size = 0, mtime = 0;
+    std::int64_t stableSince = 0;     ///< when its size and time last changed (milliseconds)
+    std::string contentHash, assetId, error;
+    int attempts = 0;
+    std::int64_t detected = 0, updated = 0;
+};
+
 struct Collection
 {
     std::string id, name;
@@ -140,8 +176,10 @@ class Catalog
 {
 public:
     /** 2: presets.trashed_from (where a trashed preset file came from).
-        3: assets.rating (0-5 stars). */
-    static constexpr int schemaVersion = 3;
+        3: assets.rating (0-5 stars).
+        4: scan_files details (rejected, duration, rate, channels, format, error), classification
+           overrides, inbox_items. */
+    static constexpr int schemaVersion = 4;
 
     /** Opens (creating and migrating as needed) the catalog at `file`. nullptr and `error` on
         failure (the file is never deleted or replaced). */
@@ -151,6 +189,9 @@ public:
     ~Catalog();
 
     int version() const;
+    /** Runs `work` in one transaction (a scan's batch of files): committed when it returns
+        true, rolled back otherwise. */
+    bool inTransaction (const std::function<bool()>& work);
     bool hasFullTextSearch() const noexcept { return fts; }
     /** PRAGMA integrity_check: "ok" or what is wrong. */
     std::string integrityCheck() const;
@@ -233,6 +274,55 @@ public:
     // Locations ---------------------------------------------------------------
     bool addLocation (const std::string& contentHash, const std::string& path, const std::string& kind);
     std::vector<std::string> locations (const std::string& contentHash) const;
+
+    // Scanning (Stage 6) ---------------------------------------------------------
+    /** A folder to scan (the same path again: its record, patterns updated). */
+    std::optional<std::string> addScanRoot (const std::string& path, const std::string& include = {}, const std::string& exclude = {});
+    std::vector<ScanRoot> scanRoots() const;
+    std::optional<ScanRoot> scanRoot (const std::string& id) const;
+    /** The folder is no longer scanned; its candidates go with it (no file is touched). */
+    bool removeScanRoot (const std::string& id);
+    bool putScanFile (const ScanFile& file);
+    std::optional<ScanFile> scanFile (const std::string& path) const;
+    /** Candidates: of one folder (or every one), optionally in one state, rejected ones only on request. */
+    std::vector<ScanFile> scanFiles (const std::string& rootId = {}, const std::string& state = {}, bool includeRejected = false, int limit = 100000) const;
+    bool setScanFileRejected (const std::string& path, bool rejected);
+    /** A candidate's file is gone: its row goes (the Library's own records stay). */
+    bool forgetScanFile (const std::string& path);
+    /** The sidebar's counts: scanned files (not set aside), set aside, Inbox items not imported yet. */
+    struct CandidateCounts
+    {
+        int scanned = 0, setAside = 0, inbox = 0;
+    };
+    CandidateCounts candidateCounts() const;
+
+    // Analysis results and the user's say (Stage 6.5/6.6) ------------------------
+    bool putAnalysis (const std::string& contentHash, int version, const std::string& classification, const std::string& features);
+    struct AnalysisRow
+    {
+        int version = 0;
+        std::string classification, features;
+    };
+    /** The newest analysis of a content. */
+    std::optional<AnalysisRow> analysis (const std::string& contentHash) const;
+    /** The user's classification (empty clears it): it always wins over the analysis and
+        survives every re-analysis. */
+    bool setClassificationOverride (const std::string& contentHash, const std::string& classification);
+    std::string classificationOverride (const std::string& contentHash) const;
+    /** What a content is: the user's override, else the analysis, else empty. */
+    std::string classificationOf (const std::string& contentHash) const;
+
+    // The Inbox (Stage 7) -------------------------------------------------------
+    bool putInboxItem (const InboxItem& item);
+    std::optional<InboxItem> inboxItem (const std::string& path) const;
+    std::vector<InboxItem> inboxItems (const std::string& folder = {}) const;
+    bool removeInboxItem (const std::string& path);
+
+    // Derived sounds (Stage 8) ----------------------------------------------------
+    /** Records where a sound came from: a slice or trim of `parentId` (seconds), the
+        operations applied (JSON) and the analysis version. */
+    bool setDerivation (const std::string& id, const std::string& parentId, double start, double end, const std::string& operations);
+    std::vector<std::string> derivedFrom (const std::string& parentId) const;
 
     // Search ------------------------------------------------------------------
     std::vector<Asset> search (const SearchQuery& query) const;

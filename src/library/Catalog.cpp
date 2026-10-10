@@ -324,6 +324,14 @@ bool Catalog::exec (const char* sql)
     return true;
 }
 
+bool Catalog::inTransaction (const std::function<bool()>& work)
+{
+    Transaction t (db);
+    if (! t.ok())
+        return false;
+    return work() && t.commit();
+}
+
 int Catalog::version() const
 {
     Statement s (db, "SELECT value FROM meta WHERE key = 'schema_version'");
@@ -365,6 +373,26 @@ bool Catalog::migrate()
         Transaction t (db);
         if (! t.ok() || ! exec ("ALTER TABLE assets ADD COLUMN rating INTEGER NOT NULL DEFAULT 0")
             || ! exec ("UPDATE meta SET value = '3' WHERE key = 'schema_version'") || ! t.commit())
+            return false;
+    }
+    if (version() < 4)
+    {
+        // 4: what a scan found about each file, the user's classifications, the Inbox.
+        Transaction t (db);
+        if (! t.ok()
+            || ! exec ("ALTER TABLE scan_files ADD COLUMN rejected INTEGER NOT NULL DEFAULT 0; "
+                       "ALTER TABLE scan_files ADD COLUMN duration REAL NOT NULL DEFAULT 0; "
+                       "ALTER TABLE scan_files ADD COLUMN sample_rate REAL NOT NULL DEFAULT 0; "
+                       "ALTER TABLE scan_files ADD COLUMN channels INTEGER NOT NULL DEFAULT 0; "
+                       "ALTER TABLE scan_files ADD COLUMN format TEXT NOT NULL DEFAULT ''; "
+                       "ALTER TABLE scan_files ADD COLUMN error TEXT NOT NULL DEFAULT ''; "
+                       "CREATE INDEX IF NOT EXISTS scan_files_root ON scan_files (root_id, state); "
+                       "CREATE TABLE classification_overrides (content_hash TEXT PRIMARY KEY, classification TEXT NOT NULL, updated INTEGER NOT NULL); "
+                       "CREATE TABLE inbox_items (path TEXT PRIMARY KEY, folder TEXT NOT NULL, state TEXT NOT NULL, size INTEGER NOT NULL DEFAULT 0, "
+                       "mtime INTEGER NOT NULL DEFAULT 0, stable_since INTEGER NOT NULL DEFAULT 0, content_hash TEXT NOT NULL DEFAULT '', "
+                       "asset_id TEXT NOT NULL DEFAULT '', error TEXT NOT NULL DEFAULT '', attempts INTEGER NOT NULL DEFAULT 0, "
+                       "detected INTEGER NOT NULL, updated INTEGER NOT NULL);")
+            || ! exec ("UPDATE meta SET value = '4' WHERE key = 'schema_version'") || ! t.commit())
             return false;
     }
     // Full-text search when this SQLite has FTS5; plain LIKE matching otherwise (R-09).
@@ -658,7 +686,7 @@ std::optional<Asset> Catalog::asset (const std::string& id) const
 std::optional<SoundInfo> Catalog::sound (const std::string& id) const
 {
     Statement s (db, "SELECT content_hash, managed, format, sample_rate, channels, bit_depth, frames, duration, file_size, root_midi, provenance, "
-                     "parent_asset, slice_start, slice_end FROM sounds WHERE asset_id = ?1");
+                     "coalesce(parent_asset, ''), slice_start, slice_end, operations FROM sounds WHERE asset_id = ?1");
     s.bind (1, id);
     if (s.step() != SQLITE_ROW)
         return std::nullopt;
@@ -678,6 +706,7 @@ std::optional<SoundInfo> Catalog::sound (const std::string& id) const
     i.parentAsset = s.text (11);
     i.sliceStart = s.real (12);
     i.sliceEnd = s.real (13);
+    i.operations = s.text (14);
     return i;
 }
 
@@ -1040,6 +1069,297 @@ void Catalog::reindex (const std::string& id)
                      "FROM assets a WHERE a.id = ?1");
     s.bind (1, id);
     s.run();
+}
+
+//==============================================================================
+// Scanning
+
+std::optional<std::string> Catalog::addScanRoot (const std::string& path, const std::string& include, const std::string& exclude)
+{
+    {
+        Statement found (db, "SELECT id FROM scan_roots WHERE path = ?1");
+        found.bind (1, path);
+        if (found.step() == SQLITE_ROW)
+        {
+            const auto id = found.text (0);
+            Statement update (db, "UPDATE scan_roots SET include_glob = ?1, exclude_glob = ?2 WHERE id = ?3");
+            update.bind (1, include).bind (2, exclude).bind (3, id);
+            return update.run() ? std::optional<std::string> (id) : std::nullopt;
+        }
+    }
+    Statement id (db, "SELECT lower(hex(randomblob(16)))");
+    if (id.step() != SQLITE_ROW)
+        return std::nullopt;
+    const auto value = id.text (0);
+    Statement s (db, "INSERT INTO scan_roots (id, path, include_glob, exclude_glob, added) VALUES (?1, ?2, ?3, ?4, ?5)");
+    s.bind (1, value).bind (2, path).bind (3, include).bind (4, exclude).bind (5, now());
+    if (! s.run())
+    {
+        error = sqlite3_errmsg (db);
+        return std::nullopt;
+    }
+    return value;
+}
+
+std::vector<ScanRoot> Catalog::scanRoots() const
+{
+    std::vector<ScanRoot> list;
+    Statement s (db, "SELECT id, path, include_glob, exclude_glob, added FROM scan_roots ORDER BY path");
+    while (s.step() == SQLITE_ROW)
+        list.push_back ({ s.text (0), s.text (1), s.text (2), s.text (3), s.integer (4) });
+    return list;
+}
+
+std::optional<ScanRoot> Catalog::scanRoot (const std::string& id) const
+{
+    for (auto& r : scanRoots())
+        if (r.id == id)
+            return r;
+    return std::nullopt;
+}
+
+bool Catalog::removeScanRoot (const std::string& id)
+{
+    Statement s (db, "DELETE FROM scan_roots WHERE id = ?1");
+    s.bind (1, id);
+    return s.run() && sqlite3_changes (db) == 1;
+}
+
+bool Catalog::putScanFile (const ScanFile& f)
+{
+    Statement s (db, "INSERT INTO scan_files (path, root_id, size, mtime, content_hash, state, asset_id, rejected, duration, sample_rate, channels, format, error) "
+                     "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13) "
+                     "ON CONFLICT (path) DO UPDATE SET root_id = excluded.root_id, size = excluded.size, mtime = excluded.mtime, content_hash = excluded.content_hash, "
+                     "state = excluded.state, asset_id = excluded.asset_id, duration = excluded.duration, sample_rate = excluded.sample_rate, "
+                     "channels = excluded.channels, format = excluded.format, error = excluded.error");
+    s.bind (1, f.path);
+    if (f.rootId.empty())
+        s.bindNull (2);
+    else
+        s.bind (2, f.rootId);
+    s.bind (3, f.size).bind (4, f.mtime);
+    if (f.contentHash.empty())
+        s.bindNull (5);
+    else
+        s.bind (5, f.contentHash);
+    s.bind (6, f.state);
+    if (f.assetId.empty())
+        s.bindNull (7);
+    else
+        s.bind (7, f.assetId);
+    s.bind (8, f.rejected ? 1 : 0).bind (9, f.durationSeconds).bind (10, f.sampleRate).bind (11, f.channels).bind (12, f.format).bind (13, f.error);
+    if (! s.run())
+    {
+        error = sqlite3_errmsg (db);
+        return false;
+    }
+    return true;
+}
+
+namespace
+{
+    ScanFile scanFileFrom (const Statement& s)
+    {
+        ScanFile f;
+        f.path = s.text (0);
+        f.rootId = s.text (1);
+        f.size = s.integer (2);
+        f.mtime = s.integer (3);
+        f.contentHash = s.text (4);
+        f.state = s.text (5);
+        f.assetId = s.text (6);
+        f.rejected = s.integer (7) != 0;
+        f.durationSeconds = s.real (8);
+        f.sampleRate = s.real (9);
+        f.channels = static_cast<int> (s.integer (10));
+        f.format = s.text (11);
+        f.error = s.text (12);
+        return f;
+    }
+    constexpr const char* scanColumns = "path, coalesce(root_id, ''), size, mtime, coalesce(content_hash, ''), state, coalesce(asset_id, ''), rejected, duration, "
+                                        "sample_rate, channels, format, error";
+}
+
+std::optional<ScanFile> Catalog::scanFile (const std::string& path) const
+{
+    const std::string sql = std::string ("SELECT ") + scanColumns + " FROM scan_files WHERE path = ?1";
+    Statement s (db, sql.c_str());
+    s.bind (1, path);
+    if (s.step() != SQLITE_ROW)
+        return std::nullopt;
+    return scanFileFrom (s);
+}
+
+std::vector<ScanFile> Catalog::scanFiles (const std::string& rootId, const std::string& state, bool includeRejected, int limit) const
+{
+    const std::string sql = std::string ("SELECT ") + scanColumns
+                          + " FROM scan_files WHERE (?1 = '' OR root_id = ?1) AND (?2 = '' OR state = ?2) AND (?3 = 1 OR rejected = 0) ORDER BY path LIMIT ?4";
+    Statement s (db, sql.c_str());
+    s.bind (1, rootId).bind (2, state).bind (3, includeRejected ? 1 : 0).bind (4, limit);
+    std::vector<ScanFile> list;
+    while (s.step() == SQLITE_ROW)
+        list.push_back (scanFileFrom (s));
+    return list;
+}
+
+bool Catalog::setScanFileRejected (const std::string& path, bool rejected)
+{
+    Statement s (db, "UPDATE scan_files SET rejected = ?1 WHERE path = ?2");
+    s.bind (1, rejected ? 1 : 0).bind (2, path);
+    return s.run() && sqlite3_changes (db) == 1;
+}
+
+bool Catalog::forgetScanFile (const std::string& path)
+{
+    Statement s (db, "DELETE FROM scan_files WHERE path = ?1");
+    s.bind (1, path);
+    return s.run();
+}
+
+Catalog::CandidateCounts Catalog::candidateCounts() const
+{
+    CandidateCounts counts;
+    Statement s (db, "SELECT COALESCE(SUM(rejected = 0), 0), COALESCE(SUM(rejected = 1), 0) FROM scan_files");
+    if (s.step() == SQLITE_ROW)
+        counts.scanned = static_cast<int> (s.integer (0)), counts.setAside = static_cast<int> (s.integer (1));
+    Statement i (db, "SELECT COUNT(*) FROM inbox_items WHERE state <> 'imported'");
+    if (i.step() == SQLITE_ROW)
+        counts.inbox = static_cast<int> (i.integer (0));
+    return counts;
+}
+
+bool Catalog::putAnalysis (const std::string& contentHash, int version, const std::string& classification, const std::string& features)
+{
+    Statement s (db, "INSERT INTO audio_analysis (content_hash, version, classification, features) VALUES (?1, ?2, ?3, ?4) "
+                     "ON CONFLICT (content_hash, version) DO UPDATE SET classification = excluded.classification, features = excluded.features");
+    s.bind (1, contentHash).bind (2, version).bind (3, classification).bind (4, features);
+    return s.run();
+}
+
+std::optional<Catalog::AnalysisRow> Catalog::analysis (const std::string& contentHash) const
+{
+    Statement s (db, "SELECT version, classification, features FROM audio_analysis WHERE content_hash = ?1 ORDER BY version DESC LIMIT 1");
+    s.bind (1, contentHash);
+    if (s.step() != SQLITE_ROW)
+        return std::nullopt;
+    return AnalysisRow { static_cast<int> (s.integer (0)), s.text (1), s.text (2) };
+}
+
+bool Catalog::setClassificationOverride (const std::string& contentHash, const std::string& classification)
+{
+    if (classification.empty())
+    {
+        Statement s (db, "DELETE FROM classification_overrides WHERE content_hash = ?1");
+        s.bind (1, contentHash);
+        return s.run();
+    }
+    Statement s (db, "INSERT INTO classification_overrides (content_hash, classification, updated) VALUES (?1, ?2, ?3) "
+                     "ON CONFLICT (content_hash) DO UPDATE SET classification = excluded.classification, updated = excluded.updated");
+    s.bind (1, contentHash).bind (2, classification).bind (3, now());
+    return s.run();
+}
+
+std::string Catalog::classificationOverride (const std::string& contentHash) const
+{
+    Statement s (db, "SELECT classification FROM classification_overrides WHERE content_hash = ?1");
+    s.bind (1, contentHash);
+    return s.step() == SQLITE_ROW ? s.text (0) : std::string();
+}
+
+std::string Catalog::classificationOf (const std::string& contentHash) const
+{
+    if (auto o = classificationOverride (contentHash); ! o.empty())
+        return o;
+    const auto a = analysis (contentHash);
+    return a ? a->classification : std::string();
+}
+
+bool Catalog::putInboxItem (const InboxItem& i)
+{
+    Statement s (db, "INSERT INTO inbox_items (path, folder, state, size, mtime, stable_since, content_hash, asset_id, error, attempts, detected, updated) "
+                     "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12) "
+                     "ON CONFLICT (path) DO UPDATE SET folder = excluded.folder, state = excluded.state, size = excluded.size, mtime = excluded.mtime, "
+                     "stable_since = excluded.stable_since, content_hash = excluded.content_hash, asset_id = excluded.asset_id, error = excluded.error, "
+                     "attempts = excluded.attempts, updated = excluded.updated");
+    s.bind (1, i.path).bind (2, i.folder).bind (3, i.state).bind (4, i.size).bind (5, i.mtime).bind (6, i.stableSince).bind (7, i.contentHash)
+        .bind (8, i.assetId).bind (9, i.error).bind (10, i.attempts).bind (11, i.detected > 0 ? i.detected : now()).bind (12, now());
+    if (! s.run())
+    {
+        error = sqlite3_errmsg (db);
+        return false;
+    }
+    return true;
+}
+
+namespace
+{
+    constexpr const char* inboxColumns = "path, folder, state, size, mtime, stable_since, content_hash, asset_id, error, attempts, detected, updated";
+    InboxItem inboxFrom (const Statement& s)
+    {
+        InboxItem i;
+        i.path = s.text (0);
+        i.folder = s.text (1);
+        i.state = s.text (2);
+        i.size = s.integer (3);
+        i.mtime = s.integer (4);
+        i.stableSince = s.integer (5);
+        i.contentHash = s.text (6);
+        i.assetId = s.text (7);
+        i.error = s.text (8);
+        i.attempts = static_cast<int> (s.integer (9));
+        i.detected = s.integer (10);
+        i.updated = s.integer (11);
+        return i;
+    }
+}
+
+std::optional<InboxItem> Catalog::inboxItem (const std::string& path) const
+{
+    const std::string sql = std::string ("SELECT ") + inboxColumns + " FROM inbox_items WHERE path = ?1";
+    Statement s (db, sql.c_str());
+    s.bind (1, path);
+    if (s.step() != SQLITE_ROW)
+        return std::nullopt;
+    return inboxFrom (s);
+}
+
+std::vector<InboxItem> Catalog::inboxItems (const std::string& folder) const
+{
+    const std::string sql = std::string ("SELECT ") + inboxColumns + " FROM inbox_items WHERE (?1 = '' OR folder = ?1) ORDER BY detected DESC, path";
+    Statement s (db, sql.c_str());
+    s.bind (1, folder);
+    std::vector<InboxItem> list;
+    while (s.step() == SQLITE_ROW)
+        list.push_back (inboxFrom (s));
+    return list;
+}
+
+bool Catalog::removeInboxItem (const std::string& path)
+{
+    Statement s (db, "DELETE FROM inbox_items WHERE path = ?1");
+    s.bind (1, path);
+    return s.run();
+}
+
+bool Catalog::setDerivation (const std::string& id, const std::string& parentId, double start, double end, const std::string& operations)
+{
+    Statement s (db, "UPDATE sounds SET parent_asset = ?1, slice_start = ?2, slice_end = ?3, operations = ?4 WHERE asset_id = ?5");
+    if (parentId.empty())
+        s.bindNull (1);
+    else
+        s.bind (1, parentId);
+    s.bind (2, start).bind (3, end).bind (4, operations).bind (5, id);
+    return s.run() && sqlite3_changes (db) == 1;
+}
+
+std::vector<std::string> Catalog::derivedFrom (const std::string& parentId) const
+{
+    std::vector<std::string> ids;
+    Statement s (db, "SELECT s.asset_id FROM sounds s JOIN assets a ON a.id = s.asset_id WHERE s.parent_asset = ?1 AND a.trashed_at IS NULL ORDER BY s.slice_start");
+    s.bind (1, parentId);
+    while (s.step() == SQLITE_ROW)
+        ids.push_back (s.text (0));
+    return ids;
 }
 
 struct Catalog::Filter

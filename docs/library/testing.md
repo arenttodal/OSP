@@ -9,6 +9,12 @@
 | `[plugin][library]` (presets) | same | portable manifest 2 (checksums, sizes, rights, metadata), the distribution rights check (refused, named, confirmed, recorded), incomplete and newer packages refused with nothing changed; loading a preset / template / factory state is recoverable (a swap); factory content stays read-only; rename, duplicate, trash and restore keep the records |
 | `[plugin][security]` | same | untrusted `.ospinstrument` packages |
 | `[.][library-perf]` | `CatalogTests.cpp` | measured catalog sizes (below) |
+| `[unit][library][tagging]`, `[classifier]` | `tests/library/DiscoveryTests.cpp`, `LabelledSet.h` | tags from names and folders; the labelled evaluation set (precision and recall per class, speed) and the hard cases, printed; odd input (docs/library/classification.md) |
+| `[unit][library][slicer]` | `DiscoveryTests.cpp`, `ScanInboxTests.cpp` | Sample Forge's slicer tests at three rates, sustained notes, trim, fades, stereo, gain, a quiet take, reverse; saved slices with provenance (docs/library/slicing.md) |
+| `[unit][library][scan]` | `tests/library/ScanInboxTests.cpp` | patterns; fast index then deep analysis; incremental rescans; corrections and removals that stick; set aside; removed and excluded files; offline roots; import evidence; pause, resume, cancel, skip long |
+| `[unit][library][inbox]` | same | the Inbox states: slow copy, iCloud placeholder, temporary names, duplicates, renames, missing, offline folder, crash mid-import, unreadable files; classification and evidence on import (docs/library/inbox.md) |
+| `[plugin][library-capture]` | `tests/plugin/PluginProcessorTests.cpp` | the window's scan, review, Inbox and trim/slice flows end to end (docs/library/gui.md) |
+| `[.][library-corpus]`, `[.][library-scan-perf]` | `DiscoveryTests.cpp`, `ScanInboxTests.cpp` | the research corpus classified for a person to judge; scanning 1,000 / 10,000 / 50,000 files |
 
 ## Measurements
 

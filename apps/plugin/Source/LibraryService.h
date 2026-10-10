@@ -2,6 +2,7 @@
 
 #include "LoadedInstrument.h"
 #include "library/Catalog.h"
+#include "library/FolderScan.h"
 
 #include <juce_core/juce_core.h>
 
@@ -56,6 +57,24 @@ public:
             finished.push_back ([done, result = std::move (result)] { if (done != nullptr) done (result); });
         });
     }
+    /** Long work (folder scans, Inbox passes, saving slices) on a second low-priority thread
+        with its own connection, so a scan never holds up the window's queries. */
+    void postBackground (std::function<void (library::Catalog&)> task);
+    template <typename Result>
+    void requestBackground (std::function<Result (library::Catalog&)> task, std::function<void (Result)> done)
+    {
+        background.addJob ([this, task = std::move (task), done = std::move (done)] {
+            auto* c = backgroundCatalog();
+            auto result = c != nullptr ? task (*c) : Result {};
+            const std::lock_guard<std::mutex> lock (finishedMutex);
+            finished.push_back ([done, result = std::move (result)] { if (done != nullptr) done (result); });
+        });
+    }
+    bool backgroundBusy() const { return background.getNumJobs() > 0; }
+    /** The running scan's controls and counts (one scan at a time per instance). */
+    library::ScanControl& scanControl() noexcept { return control; }
+    library::ScanProgress& scanProgress() noexcept { return progress; }
+
     /** Message thread: runs the finished requests' callbacks. */
     void deliver();
 
@@ -65,12 +84,18 @@ public:
     juce::String unavailableReason() const;
 
 private:
-    library::Catalog* catalog();   ///< the Library thread only
+    library::Catalog* catalog();             ///< the Library thread only
+    library::Catalog* backgroundCatalog();   ///< the background thread only
 
     juce::File store;
     juce::ThreadPool pool { juce::ThreadPoolOptions().withThreadName ("OSP Library").withNumberOfThreads (1).withDesiredThreadPriority (juce::Thread::Priority::low) };
     std::unique_ptr<library::Catalog> db;
     bool opened = false;
+    juce::ThreadPool background { juce::ThreadPoolOptions().withThreadName ("OSP Library scan").withNumberOfThreads (1).withDesiredThreadPriority (juce::Thread::Priority::background) };
+    std::unique_ptr<library::Catalog> backgroundDb;
+    bool backgroundOpened = false;
+    library::ScanControl control;
+    library::ScanProgress progress;
     mutable juce::CriticalSection reasonLock;
     juce::String reason;
     std::mutex finishedMutex;

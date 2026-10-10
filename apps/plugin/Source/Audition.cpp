@@ -23,6 +23,15 @@ LibrarySettings LibrarySettings::load()
         // (save() only happens on a user change).
         if (object->hasProperty ("previewGainDb"))
             s.previewGainDb = juce::jlimit (-60.0f, 6.0f, static_cast<float> (object->getProperty ("previewGainDb")));
+        if (const auto* folders = object->getProperty ("inboxFolders").getArray())
+            for (const auto& f : *folders)
+                s.inboxFolders.addIfNotAlreadyThere (f.toString());
+        if (object->hasProperty ("scanSubfolders"))
+            s.scanSubfolders = static_cast<bool> (object->getProperty ("scanSubfolders"));
+        if (object->hasProperty ("scanFindOneShots"))
+            s.scanFindOneShots = static_cast<bool> (object->getProperty ("scanFindOneShots"));
+        if (object->hasProperty ("scanSkipLong"))
+            s.scanSkipLong = static_cast<bool> (object->getProperty ("scanSkipLong"));
     }
     return s;
 }
@@ -38,6 +47,13 @@ bool LibrarySettings::save() const
     }
     object->setProperty ("schemaVersion", std::max (schemaVersion, static_cast<int> (object->getProperty ("schemaVersion"))));
     object->setProperty ("previewGainDb", previewGainDb);
+    juce::Array<juce::var> folders;
+    for (const auto& f : inboxFolders)
+        folders.add (f);
+    object->setProperty ("inboxFolders", folders);
+    object->setProperty ("scanSubfolders", scanSubfolders);
+    object->setProperty ("scanFindOneShots", scanFindOneShots);
+    object->setProperty ("scanSkipLong", scanSkipLong);
     const auto target = file();
     target.getParentDirectory().createDirectory();
     // Written beside, then moved over: a crash never leaves half a settings file.
@@ -151,6 +167,8 @@ void Audition::prepare (int slotIndex, const std::string& assetId, std::optional
     s.assetId = assetId;
     s.loading = true;
     s.name = file ? file->getFileNameWithoutExtension() : juce::String();
+    if (file)
+        s.file = *file;
     const auto request = ++requests[static_cast<std::size_t> (slotIndex)];
     changed();
 
@@ -215,6 +233,83 @@ void Audition::preview (const std::string& assetId)
     prepare (library::PreviewEngine::browserSlot, assetId, std::nullopt, true);
 }
 
+void Audition::cueFile (const juce::File& file)
+{
+    const auto& browser = slots[library::PreviewEngine::browserSlot];
+    if (browser.assetId.empty() && browser.file == file && (browser.loading || browser.sound != nullptr))
+        return;
+    prepare (library::PreviewEngine::browserSlot, {}, file, false);
+}
+
+void Audition::previewAudio (std::shared_ptr<const AudioData> audio, const juce::String& name)
+{
+    if (audio == nullptr)
+        return;
+    const int slotIndex = library::PreviewEngine::browserSlot;
+    auto& s = slots[static_cast<std::size_t> (slotIndex)];
+    s = {};
+    s.loading = true;
+    s.name = name;
+    const auto request = ++requests[static_cast<std::size_t> (slotIndex)];
+    std::weak_ptr<bool> token = alive;
+    decoder.addJob ([this, token, audio, name, request, slotIndex] {
+        if (token.expired())
+            return;
+        auto sound = library::makePreviewSound (*audio, std::nullopt, {}, name.toStdString());
+        post ([this, token, sound, request, slotIndex] {
+            if (token.expired() || requests[static_cast<std::size_t> (slotIndex)] != request)
+                return;
+            auto& target = slots[static_cast<std::size_t> (slotIndex)];
+            target.loading = false;
+            target.sound = sound;
+            engine.setSound (slotIndex, sound);
+            engine.play (1u << slotIndex);
+            changed();
+        });
+    });
+}
+
+void Audition::decode (const std::string& assetId, const juce::File& file, Decoded done)
+{
+    std::weak_ptr<bool> token = alive;
+    auto work = [this, token, done] (Found found) {
+        decoder.addJob ([this, token, done, found] {
+            if (token.expired())
+                return;
+            std::shared_ptr<const AudioData> audio;
+            juce::String error = found.error;
+            if (found.ok)
+            {
+                auto decoded = io::loadAudioFile (found.file.getFullPathName().toStdString());
+                if (decoded.ok)
+                    audio = std::make_shared<const AudioData> (std::move (decoded.audio));
+                else
+                    error = found.name + " could not be read: " + juce::String (decoded.error);
+            }
+            post ([done, audio, found, error] {
+                if (done != nullptr)
+                    done (audio, found.file, found.name, error);
+            });
+        });
+    };
+    if (assetId.empty())
+    {
+        Found found;
+        found.ok = file.existsAsFile();
+        found.file = file;
+        found.name = file.getFileNameWithoutExtension();
+        if (! found.ok)
+            found.error = file.getFileName() + " is not there any more.";
+        work (found);
+        return;
+    }
+    const auto storeDir = std::filesystem::path (store.getFullPathName().toStdString());
+    library.post ([token, storeDir, assetId, work] (library::Catalog& catalog) {
+        if (! token.expired())
+            work (find (catalog, storeDir, assetId));
+    });
+}
+
 void Audition::cue (const std::string& assetId)
 {
     if (slots[library::PreviewEngine::browserSlot].assetId == assetId && (slots[library::PreviewEngine::browserSlot].loading
@@ -232,10 +327,7 @@ const std::vector<float>* Audition::overview (const std::string& assetId)
     overviewsPending.insert (assetId);
     std::weak_ptr<bool> token = alive;
     const auto storeDir = std::filesystem::path (store.getFullPathName().toStdString());
-    library.post ([this, token, storeDir, assetId] (library::Catalog& catalog) {
-        if (token.expired())
-            return;
-        const auto found = find (catalog, storeDir, assetId);
+    auto overviewOf = [this, token, assetId] (Found found) {
         decoder.addJob ([this, token, assetId, found] {
             if (token.expired())
                 return;
@@ -262,6 +354,18 @@ const std::vector<float>* Audition::overview (const std::string& assetId)
                 changed();
             });
         });
+    };
+    if (assetId.rfind ("file:", 0) == 0)
+    {
+        Found found;
+        found.file = juce::File (juce::String (assetId.substr (5)));
+        found.ok = found.file.existsAsFile();
+        overviewOf (found);
+        return nullptr;
+    }
+    library.post ([token, storeDir, assetId, overviewOf] (library::Catalog& catalog) {
+        if (! token.expired())
+            overviewOf (find (catalog, storeDir, assetId));
     });
     return nullptr;
 }

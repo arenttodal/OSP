@@ -1,8 +1,12 @@
 #include "LibraryPanel.h"
 
 #include "Design.h"
+#include "LibraryCapture.h"
 #include "OspLookAndFeel.h"
+#include "io/AudioFileIO.h"
 #include "io/ContentHash.h"
+#include "library/Classifier.h"
+#include "library/FolderScan.h"
 #include "library/SoundImport.h"
 
 namespace osp::plugin
@@ -237,6 +241,71 @@ namespace
     };
 }
 
+namespace
+{
+    /** A classification's words ("Likely One-Shot"), or empty. */
+    juce::String kindName (const juce::String& key)
+    {
+        if (const auto c = library::soundClassFrom (key.toStdString()))
+            return juce::String (library::displayName (*c));
+        return {};
+    }
+
+    /** Where a candidate is, in a word or two (the inspector says more). */
+    juce::String candidateState (const LibraryRow& r)
+    {
+        if (! r.importedAs.empty() || r.state == "imported")
+            return "In Library";
+        if (r.rejected)
+            return "Set aside";
+        if (r.inInbox)
+        {
+            if (r.state == "ready")
+                return "Ready";
+            if (r.state == "importing")
+                return juce::String::fromUTF8 ("Importing\xe2\x80\xa6");
+            if (r.state == "failed")
+                return "Cannot read";
+            if (r.state == "missing")
+                return "Missing";
+            return juce::String::fromUTF8 ("Arriving\xe2\x80\xa6");
+        }
+        if (r.state == "failed")
+            return "Cannot read";
+        if (r.state == "indexed")
+            return "Not analysed";
+        return "New";
+    }
+
+    /** A candidate row (a scanned file or an Inbox item) with what the analysis says. */
+    LibraryRow candidateRow (const library::Catalog& c, const std::string& path, const std::string& hash)
+    {
+        LibraryRow r;
+        r.candidate = true;
+        r.id = "file:" + path;
+        r.path = juce::String (path);
+        r.name = juce::File (r.path).getFileNameWithoutExtension();
+        r.contentHash = hash;
+        r.origin = Origin::external;
+        if (! hash.empty())
+        {
+            r.classification = juce::String (c.classificationOf (hash));
+            const auto analysis = c.analysis (hash);
+            if (! c.classificationOverride (hash).empty())
+                r.reason = "set by you";
+            else if (analysis)
+                r.reason = juce::String (library::jsonString (analysis->features, "reason"));
+            if (analysis)
+            {
+                r.suggestedType = juce::String (library::jsonString (analysis->features, "type"));
+                for (const auto& t : library::jsonStrings (analysis->features, "tags"))
+                    r.tags.add (juce::String (t));
+            }
+        }
+        return r;
+    }
+}
+
 void drawLibraryArtwork (juce::Graphics& g, juce::Rectangle<float> area, const std::string& identity, float radius)
 {
     // Two of the instrument's mineral colours and an angle, all from the identity's hash: the
@@ -455,6 +524,7 @@ public:
     void update()
     {
         list.setRowHeight (panel.view == View::sounds ? 34 : 30);
+        list.setMultipleSelectionEnabled (panel.candidateScope());
         list.updateContent();
         list.repaint();
         // "Nothing here" only once the answer is in (not while the catalog is still asked).
@@ -463,6 +533,9 @@ public:
         if (none)
             empty.setText (panel.search.getText().isNotEmpty() ? "Nothing matches \"" + panel.search.getText() + "\"."
                            : panel.scopeKey == "trash"           ? juce::String ("The trash is empty.")
+                           : panel.scopeKey == "inbox"           ? juce::String::fromUTF8 ("The Inbox is empty. Choose Inbox folders in Library settings (\xe2\x8b\xaf): audio that arrives there appears here.")
+                           : panel.scopeKey == "scanned"         ? juce::String::fromUTF8 ("Nothing scanned yet. Scan folder\xe2\x80\xa6 (\xe2\x8b\xaf) finds the sounds already on your drives.")
+                           : panel.scopeKey == "set-aside"       ? juce::String ("Nothing set aside.")
                            : panel.view == View::sounds          ? juce::String ("No sounds here yet. Every sound you load into the instrument is kept here.")
                            : panel.view == View::presets         ? juce::String ("No presets here yet. Save one with Save\xe2\x80\xa6 (top right).")
                                                                  : juce::String ("No templates here yet."),
@@ -475,6 +548,8 @@ public:
     };
     std::vector<Column> columns() const
     {
+        if (panel.candidateScope())
+            return { { "", 150 }, { "Name", 0 }, { "Kind", 150 }, { "Length", 64 }, { "State", 110 } };
         if (panel.view == View::sounds)
             return { { "", 150 }, { "Name", 0 }, { "Type", 100 }, { "Length", 64 }, { "Origin", 84 }, { "Date", 96 } };
         if (panel.view == View::templates)
@@ -546,6 +621,22 @@ private:
             g.drawText (s, cell (c), juce::Justification::centredLeft, true);
         };
         const auto origin = originName (r.origin);
+        if (r.candidate)
+        {
+            const auto wave = cell (0).toFloat().reduced (0.0f, 7.0f);
+            if (const auto* bins = panel.processor.audition().overview ("file:" + r.path.toStdString()))
+                drawOverview (g, wave, *bins, colour::textSecondary.withAlpha (0.8f));
+            else
+            {
+                g.setColour (colour::hairline);
+                g.fillRect (wave.withHeight (1.0f).withY (wave.getCentreY()));
+            }
+            text (1, r.name, true);
+            text (2, kindName (r.classification));
+            text (3, lengthText (r.seconds));
+            text (4, candidateState (r));
+            return;
+        }
         if (panel.view == View::sounds)
         {
             const auto wave = cell (0).toFloat().reduced (0.0f, 7.0f);
@@ -615,7 +706,9 @@ private:
     void returnKeyPressed (int) override { panel.loadSelected(); }
     void deleteKeyPressed (int index) override
     {
-        if (index >= 0 && index < getNumRows())
+        if (index >= 0 && index < getNumRows() && panel.rows[static_cast<std::size_t> (index)].candidate)
+            panel.setSelectedAside (true);   // a candidate is set aside, never deleted
+        else if (index >= 0 && index < getNumRows())
             panel.trashRow (panel.rows[static_cast<std::size_t> (index)]);
     }
     juce::var getDragSourceDescription (const juce::SparseSet<int>& selected) override
@@ -623,6 +716,8 @@ private:
         if (panel.view != View::sounds || selected.isEmpty())
             return {};
         const int index = selected[0];
+        if (index >= 0 && index < getNumRows() && panel.rows[static_cast<std::size_t> (index)].candidate)
+            return {};   // not in the Library yet
         return index >= 0 && index < getNumRows() ? dragDescription (panel.rows[static_cast<std::size_t> (index)].id) : juce::var();
     }
 
@@ -887,6 +982,8 @@ public:
             g.setFont (type::micro (12.5f));
             g.drawText (lengthText (s.durationSeconds()) + (s.rootKnown ? juce::String ("   root ") + noteName (s.rootMidi) : juce::String ("   no clear pitch")),
                         wave.reduced (10, 4), juce::Justification::bottomRight);
+            if (panel.detail && panel.detail->id == r->id && panel.detail->classification.isNotEmpty())
+                g.drawText (kindName (panel.detail->classification), wave.reduced (10, 4), juce::Justification::bottomLeft);
         }
         else
         {
@@ -1221,49 +1318,7 @@ private:
 };
 
 //==============================================================================
-// Sheets: a card over the dimmed window (save, settings, missing sounds, a name, a choice).
-
-class LibraryPanel::Sheet : public juce::Component
-{
-public:
-    Sheet (LibraryPanel& p, juce::String t, juce::Point<int> size) : panel (p), title (std::move (t)), cardSize (size)
-    {
-        setTitle (title);
-        setWantsKeyboardFocus (true);
-    }
-    juce::Rectangle<int> card() const { return getLocalBounds().withSizeKeepingCentre (cardSize.x, cardSize.y); }
-    juce::Rectangle<int> content() const { return card().reduced (24).withTrimmedTop (40); }
-    void paint (juce::Graphics& g) override
-    {
-        g.setColour (colour::housingBottom.withAlpha (0.72f));
-        g.fillRoundedRectangle (getLocalBounds().toFloat(), 14.0f);
-        design::draw::raised (g, card().toFloat(), 14.0f, colour::cardTop, colour::cardBottom, 1.4f);
-        g.setColour (colour::text);
-        g.setFont (type::panelHeader());
-        g.drawText (title, card().reduced (24, 18).withHeight (24), juce::Justification::centredLeft);
-        paintContent (g);
-    }
-    virtual void paintContent (juce::Graphics&) {}
-    void mouseUp (const juce::MouseEvent& e) override
-    {
-        if (! card().contains (e.getPosition()))
-            panel.closeSheet();   // a click beside the card closes it (nothing is changed)
-    }
-    bool keyPressed (const juce::KeyPress& key) override
-    {
-        if (key == juce::KeyPress::escapeKey)
-        {
-            panel.closeSheet();
-            return true;
-        }
-        return false;
-    }
-
-protected:
-    LibraryPanel& panel;
-    juce::String title;
-    juce::Point<int> cardSize;
-};
+// Sheets (LibraryPanel::Sheet is in LibraryCapture.h): a name, a choice.
 
 namespace
 {
@@ -1390,6 +1445,9 @@ LibraryPanel::LibraryPanel (OspAudioProcessor& p) : processor (p)
         menu.addItem (juce::String::fromUTF8 ("Library settings\xe2\x80\xa6"), [safe] { if (safe != nullptr) safe->openSettingsSheet(); });
         menu.addItem (juce::String::fromUTF8 ("Missing sounds\xe2\x80\xa6"), [safe] { if (safe != nullptr) safe->openMissingSheet(); });
         menu.addSeparator();
+        menu.addItem (juce::String::fromUTF8 ("Scan folder\xe2\x80\xa6"), [safe] { if (safe != nullptr) safe->openScanSheet(); });
+        menu.addItem (juce::String::fromUTF8 ("Inbox folders\xe2\x80\xa6"), [safe] { if (safe != nullptr) safe->openSettingsSheet(); });
+        menu.addSeparator();
         menu.addItem ("Show presets folder", [] { OspAudioProcessor::presetFolder().createDirectory(); OspAudioProcessor::presetFolder().revealToUser(); });
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&menuButton));
     };
@@ -1447,6 +1505,8 @@ LibraryPanel::LibraryPanel (OspAudioProcessor& p) : processor (p)
     addAndMakeVisible (*detailStrip);
     inspector = std::make_unique<Inspector> (*this);
     addChildComponent (*inspector);
+    candidateInspector = std::make_unique<CandidateInspector> (*this);
+    addChildComponent (*candidateInspector);
     tray = std::make_unique<Tray> (*this);
     addChildComponent (*tray);
 
@@ -1455,6 +1515,7 @@ LibraryPanel::LibraryPanel (OspAudioProcessor& p) : processor (p)
         {
             safe->results->list.repaint();
             safe->inspector->repaint();
+            safe->candidateInspector->repaint();
             safe->tray->repaint();
         }
     };
@@ -1494,6 +1555,7 @@ void LibraryPanel::setView (View v)
     results->list.deselectAllRows();
     const bool sounds = v == View::sounds;
     inspector->setVisible (sounds);
+    candidateInspector->setVisible (false);
     tray->setVisible (sounds);
     detailStrip->setVisible (! sounds);
     originFilter.setVisible (sounds);
@@ -1509,7 +1571,14 @@ void LibraryPanel::setView (View v)
 
 void LibraryPanel::selectScope (const juce::String& key)
 {
+    const bool wasCandidates = candidateScope();
     scopeKey = key;
+    if (wasCandidates != candidateScope())
+    {
+        rows.clear();
+        results->list.deselectAllRows();
+        resized();
+    }
     sidebar->repaint();
     refresh();
 }
@@ -1530,6 +1599,26 @@ void LibraryPanel::selectRow (int index)
 {
     results->list.selectRow (index);
     selectionChanged();
+}
+
+void LibraryPanel::selectRows (const std::vector<int>& indices)
+{
+    juce::SparseSet<int> set;
+    for (const int i : indices)
+        if (i >= 0 && i < rowCount())
+            set.addRange ({ i, i + 1 });
+    results->list.setSelectedRows (set, juce::dontSendNotification);
+    selectionChanged();
+}
+
+std::vector<int> LibraryPanel::selectedRows() const
+{
+    std::vector<int> out;
+    const auto set = results->list.getSelectedRows();
+    for (int i = 0; i < set.size(); ++i)
+        if (set[i] >= 0 && set[i] < rowCount())
+            out.push_back (set[i]);
+    return out;
 }
 
 void LibraryPanel::refresh()
@@ -1581,6 +1670,11 @@ void LibraryPanel::query()
         }
     }
     const auto currentView = view;
+    const bool candidates = candidateScope();
+    if (candidates)
+        builtIns = false;
+    const int lengthChoice = lengthFilter.getSelectedId();
+    const int sortChoice = sortOrder.getSelectedId();
     const auto factoryNames = builtIns ? OspAudioProcessor::factoryStartingStates() : juce::StringArray();
     const auto type = typeFor (view);
     const auto fixedCategories = categoriesFor (view);
@@ -1592,9 +1686,83 @@ void LibraryPanel::query()
     };
     juce::Component::SafePointer<LibraryPanel> safe (this);
     processor.libraryService().request<Answer> (
-        [q, factoryNames, type, fixedCategories, currentView] (library::Catalog& c) {
+        [q, factoryNames, type, fixedCategories, currentView, candidates, key, lengthChoice, sortChoice] (library::Catalog& c) {
             Answer a;
-            if (q.origin != Origin::user && q.origin != Origin::pack)
+            if (candidates)
+            {
+                // Scanned files and Inbox items: not Library sounds yet (Stages 6 and 7).
+                const auto text = juce::String (q.text);
+                auto wanted = [&] (const std::string& path, double seconds) {
+                    if (text.isNotEmpty() && ! juce::File (juce::String (path)).getFileName().containsIgnoreCase (text))
+                        return false;
+                    switch (lengthChoice)
+                    {
+                        case 2: return seconds > 0.0 && seconds < 1.0;
+                        case 3: return seconds >= 1.0 && seconds <= 5.0;
+                        case 4: return seconds > 5.0;
+                        default: return true;
+                    }
+                };
+                if (key == "inbox")
+                {
+                    for (const auto& item : c.inboxItems())
+                    {
+                        auto r = candidateRow (c, item.path, item.contentHash);
+                        r.inInbox = true;
+                        r.state = juce::String (item.state);
+                        r.error = juce::String (item.error);
+                        r.folder = juce::String (item.folder);
+                        r.importedAs = item.state == "imported" ? item.assetId : std::string();
+                        r.created = item.detected;
+                        r.origin = Origin::captured;
+                        // Its length: from its sound once it is in the Library, else its header once it is whole.
+                        if (const auto sound = item.assetId.empty() ? std::nullopt : c.sound (item.assetId))
+                            r.seconds = sound->durationSeconds, r.sampleRate = sound->sampleRate, r.channels = sound->channels;
+                        else if (item.state == "ready")
+                        {
+                            io::AudioFileInfo info;
+                            std::string unreadable;
+                            if (io::readAudioFileInfo (item.path, info, unreadable) && info.sampleRate > 0.0)
+                                r.seconds = static_cast<double> (info.frames) / info.sampleRate, r.sampleRate = info.sampleRate, r.channels = info.channels;
+                        }
+                        if (wanted (item.path, r.seconds))
+                            a.rows.push_back (std::move (r));
+                    }
+                }
+                else
+                {
+                    std::map<std::string, std::string> roots;
+                    for (const auto& root : c.scanRoots())
+                        roots[root.id] = root.path;
+                    const bool aside = key == "set-aside";
+                    for (const auto& f : c.scanFiles ({}, {}, aside))
+                    {
+                        if (f.rejected != aside || ! wanted (f.path, f.durationSeconds))
+                            continue;
+                        auto r = candidateRow (c, f.path, f.contentHash);
+                        r.rejected = f.rejected;
+                        r.state = juce::String (f.state);
+                        r.error = juce::String (f.error);
+                        r.folder = juce::String (roots[f.rootId]);
+                        r.importedAs = f.assetId;
+                        r.seconds = f.durationSeconds;
+                        r.sampleRate = f.sampleRate;
+                        r.channels = f.channels;
+                        r.format = juce::String (f.format);
+                        r.created = f.mtime;
+                        a.rows.push_back (std::move (r));
+                        if (a.rows.size() >= 2000)
+                            break;   // a page: search narrows it
+                    }
+                }
+                if (sortChoice == 3)   // newest
+                    std::stable_sort (a.rows.begin(), a.rows.end(), [] (const LibraryRow& x, const LibraryRow& y) { return x.created > y.created; });
+                else if (sortChoice == 5)
+                    std::stable_sort (a.rows.begin(), a.rows.end(), [] (const LibraryRow& x, const LibraryRow& y) { return x.seconds < y.seconds; });
+                else if (key != "inbox")   // by name (the Inbox: newest first unless asked)
+                    std::stable_sort (a.rows.begin(), a.rows.end(), [] (const LibraryRow& x, const LibraryRow& y) { return x.name.compareNatural (y.name) < 0; });
+            }
+            else if (q.origin != Origin::user && q.origin != Origin::pack)
                 for (int i = 0; i < factoryNames.size(); ++i)
                 {
                     if (! q.text.empty() && ! factoryNames[i].containsIgnoreCase (juce::String (q.text).trim()))
@@ -1608,7 +1776,7 @@ void LibraryPanel::query()
                     r.program = i;
                     a.rows.push_back (r);
                 }
-            for (const auto& asset : c.search (q))
+            for (const auto& asset : candidates ? std::vector<library::Asset> {} : c.search (q))
             {
                 LibraryRow r;
                 r.id = asset.id;
@@ -1664,6 +1832,15 @@ void LibraryPanel::query()
             a.side.push_back ({ "favourites", "Favorites", count ([] (library::SearchQuery& s) { s.favouritesOnly = true; }) });
             a.side.push_back ({ "recent", "Recent", count ([] (library::SearchQuery& s) { s.recentOnly = true; }) });
             a.side.push_back ({ "trash", "Trash", count ([] (library::SearchQuery& s) { s.trashedOnly = true; }) });
+            if (sounds)
+            {
+                // Sounds on their way in: the Inbox, scanned folders, and what the user set aside.
+                const auto counts = c.candidateCounts();
+                a.side.push_back ({ "header:capture", "Finding sounds", -1 });
+                a.side.push_back ({ "inbox", "Inbox", counts.inbox });
+                a.side.push_back ({ "scanned", "Scanned", counts.scanned });
+                a.side.push_back ({ "set-aside", "Set aside", counts.setAside });
+            }
             a.side.push_back ({ "header:collections", "My collections", -1 });
             for (const auto& col : c.collections (type))
                 a.side.push_back ({ "collection:" + juce::String (col.id), juce::String (col.name), col.count });
@@ -1683,16 +1860,18 @@ void LibraryPanel::query()
         [safe, generation] (Answer a) {
             if (safe == nullptr || generation != safe->queryGeneration)
                 return;
-            const auto keep = safe->selectedRow() >= 0 ? safe->row (safe->selectedRow()).id : std::string();
+            std::set<std::string> keep;
+            for (const int i : safe->selectedRows())
+                keep.insert (safe->row (i).id);
             safe->rows = std::move (a.rows);
             safe->side = std::move (a.side);
             safe->appliedGeneration = generation;
             safe->results->update();
-            int select = -1;
+            juce::SparseSet<int> select;
             for (int i = 0; i < safe->rowCount(); ++i)
-                if (safe->rows[static_cast<std::size_t> (i)].id == keep)
-                    select = i;
-            safe->results->list.selectRow (select, false, true);
+                if (keep.count (safe->rows[static_cast<std::size_t> (i)].id) > 0)
+                    select.addRange ({ i, i + 1 });
+            safe->results->list.setSelectedRows (select, juce::dontSendNotification);
             safe->sidebar->setSize (sidebarWidth, std::max (safe->sidebar->contentHeight(), 10));
             safe->resized();
             safe->sidebar->repaint();
@@ -1724,6 +1903,13 @@ void LibraryPanel::selectionChanged()
 {
     detailStrip->update();
     const int i = selectedRow();
+    if (candidateScope())
+    {
+        if (i >= 0 && selectedRows().size() == 1)
+            processor.audition().cueFile (juce::File (row (i).path));
+        candidateInspector->update();
+        return;
+    }
     if (view == View::sounds && i >= 0 && ! row (i).trashed)
     {
         processor.audition().cue (row (i).id);
@@ -1753,6 +1939,7 @@ void LibraryPanel::requestDetail()
             d.resolvedWhere = where.file ? juce::String (where.where) : juce::String();
             d.collections = c.collectionsOf (id);
             d.uses = c.useCount (id);
+            d.classification = juce::String (c.classificationOf (hash));
             return d;
         },
         [safe] (LibrarySoundDetail d) {
@@ -1843,6 +2030,11 @@ void LibraryPanel::loadSelected()
     if (i < 0)
         return;
     const auto& r = row (i);
+    if (r.candidate)
+    {
+        importSelectedCandidates();
+        return;
+    }
     if (r.trashed)
     {
         restoreRow (r);
@@ -1872,7 +2064,9 @@ void LibraryPanel::loadSelected()
 void LibraryPanel::loadSelectedInto (int layer)
 {
     const int i = selectedRow();
-    if (i >= 0 && view == View::sounds && ! row (i).trashed)
+    if (i >= 0 && row (i).candidate)
+        importSelectedCandidates (layer);
+    else if (i >= 0 && view == View::sounds && ! row (i).trashed)
         loadSound (row (i).id, layer);
 }
 
@@ -1982,6 +2176,37 @@ void LibraryPanel::showRowMenu (int index, juce::Point<int> where)
     const auto r = row (index);
     juce::PopupMenu menu;
     juce::Component::SafePointer<LibraryPanel> safe (this);
+    if (r.candidate)
+    {
+        // A candidate: hear it, bring it in (with its evidence), shape it, or set it aside.
+        if (! results->list.isRowSelected (index))
+            results->list.selectRow (index);
+        menu.addItem ("Preview", [safe] { if (safe != nullptr) safe->previewSelected(); });
+        menu.addItem ("Import to Library", r.importedAs.empty(), false, [safe] { if (safe != nullptr) safe->importSelectedCandidates(); });
+        menu.addItem (juce::String::fromUTF8 ("Import as\xe2\x80\xa6"), r.importedAs.empty() && selectedRows().size() == 1, false, [safe, name = r.name] {
+            if (safe != nullptr)
+                safe->prompt ("Import as", name, [safe] (const juce::String& text) {
+                    if (safe != nullptr)
+                        safe->importSelectedCandidates (-1, text);
+                });
+        });
+        for (int l = 0; l < 3; ++l)
+            menu.addItem ("Import, load into " + OspAudioProcessor::layerName (l), [safe, l] { if (safe != nullptr) safe->importSelectedCandidates (l); });
+        menu.addItem (juce::String::fromUTF8 ("Trim / Slice\xe2\x80\xa6"), [safe] { if (safe != nullptr) safe->openTrimSheet(); });
+        juce::PopupMenu kinds;
+        kinds.addItem ("As analysed", true, r.reason != "set by you", [safe] { if (safe != nullptr) safe->classifySelected ({}); });
+        for (const char* k : { "likely-one-shot", "possible-one-shot", "multiple-events", "likely-loop", "long-recording" })
+            kinds.addItem (kindName (k), true, r.reason == "set by you" && r.classification == k, [safe, k] { if (safe != nullptr) safe->classifySelected (k); });
+        menu.addSubMenu ("Kind", kinds, ! r.contentHash.empty());
+        if (! r.inInbox)
+        {
+            menu.addSeparator();
+            menu.addItem (r.rejected ? "Bring back" : "Set aside (nothing is deleted)", [safe, aside = ! r.rejected] { if (safe != nullptr) safe->setSelectedAside (aside); });
+        }
+        menu.addItem ("Show in Finder", [file = juce::File (r.path)] { file.revealToUser(); });
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea ({ where.x, where.y, 1, 1 }));
+        return;
+    }
     if (r.trashed)
     {
         menu.addItem ("Restore", [safe, r] { if (safe != nullptr) safe->restoreRow (r); });
@@ -1997,6 +2222,7 @@ void LibraryPanel::showRowMenu (int index, juce::Point<int> where)
         for (int l = 0; l < 3; ++l)
             menu.addItem ("Load into " + OspAudioProcessor::layerName (l), [safe, l] { if (safe != nullptr) safe->loadSelectedInto (l); });
         menu.addItem ("Load into first empty", [safe] { if (safe != nullptr) safe->loadSelected(); });
+        menu.addItem (juce::String::fromUTF8 ("Trim / Slice\xe2\x80\xa6"), [safe] { if (safe != nullptr) safe->openTrimSheet(); });
         menu.addSeparator();
     }
     else
@@ -2086,6 +2312,15 @@ void LibraryPanel::previewSelected()
         return;
     auto& audition = processor.audition();
     const auto& slot = audition.slot (library::PreviewEngine::browserSlot);
+    if (row (i).candidate)
+    {
+        const juce::File file (row (i).path);
+        if (slot.assetId.empty() && slot.file == file && slot.sound != nullptr)
+            audition.play (1u << library::PreviewEngine::browserSlot);
+        else
+            audition.previewFile (file);
+        return;
+    }
     if (slot.assetId == row (i).id && slot.sound != nullptr)
         audition.play (1u << library::PreviewEngine::browserSlot);
     else
@@ -2095,7 +2330,7 @@ void LibraryPanel::previewSelected()
 void LibraryPanel::addSelectedToTray (int slot)
 {
     const int i = selectedRow();
-    if (i < 0 || view != View::sounds || row (i).trashed)
+    if (i < 0 || view != View::sounds || row (i).trashed || row (i).candidate)
         return;
     processor.audition().setSlot (slot, row (i).id);
     setStatus (row (i).name + " is in " + OspAudioProcessor::layerName (slot) + " of the audition");
@@ -2324,7 +2559,7 @@ namespace
     class SettingsSheet final : public LibraryPanel::Sheet
     {
     public:
-        SettingsSheet (LibraryPanel& p, OspAudioProcessor& proc) : Sheet (p, "Library settings", { 640, 470 }), processor (proc)
+        SettingsSheet (LibraryPanel& p, OspAudioProcessor& proc) : Sheet (p, "Library settings", { 640, 590 }), processor (proc)
         {
             level.setSliderStyle (juce::Slider::LinearHorizontal);
             level.setTextBoxStyle (juce::Slider::TextBoxRight, false, 70, 24);
@@ -2339,8 +2574,20 @@ namespace
             showStore.onClick = [] { SampleStore::defaultDirectory().revealToUser(); };
             showLibrary.onClick = [] { juce::File (juce::String (library::Catalog::defaultFile().string())).revealToUser(); };
             close.onClick = [this] { panel.closeSheet(); };
-            for (auto* c : std::initializer_list<juce::Component*> { &level, &emptyTrash, &showStore, &showLibrary, &close })
+            inboxFolders.setTitle ("Inbox folders");
+            addInbox.setTitle ("Add an Inbox folder");
+            addInbox.onClick = [this] { chooseInboxFolder(); };
+            removeInbox.setTitle ("Stop watching the chosen Inbox folder");
+            removeInbox.onClick = [this] {
+                auto& settings = processor.audition().librarySettings();
+                settings.inboxFolders.removeString (inboxFolders.getText());
+                settings.save();
+                fillInboxFolders();
+                panel.setStatus ("No longer watched (what came in from it stays in the Library)");
+            };
+            for (auto* c : std::initializer_list<juce::Component*> { &level, &emptyTrash, &showStore, &showLibrary, &inboxFolders, &addInbox, &removeInbox, &close })
                 addAndMakeVisible (c);
+            fillInboxFolders();
             measure();
         }
         void measure()
@@ -2366,6 +2613,12 @@ namespace
             g.setFont (type::popupLabel (12.0f));
             g.drawText ("PREVIEW LEVEL (YOURS, NOT THE PATCH'S)", r.getX(), level.getY() - 18, 400, 16, juce::Justification::centredLeft);
             g.drawText ("STORAGE", r.getX(), storageTop, 300, 16, juce::Justification::centredLeft);
+            g.drawText ("INBOX FOLDERS", r.getX(), inboxFolders.getY() - 20, 300, 16, juce::Justification::centredLeft);
+            g.setColour (colour::textMicro);
+            g.setFont (type::micro (13.0f));
+            g.drawFittedText ("New audio saved into these folders (a Voice Memos export, a Dropbox or iCloud Drive folder, your phone's) appears in the Inbox. "
+                              "Files are never moved or changed; nothing leaves this computer.",
+                              juce::Rectangle<int> (r.getX(), inboxFolders.getBottom() + 6, r.getWidth(), 40), juce::Justification::topLeft, 2);
             g.setColour (colour::textSecondary);
             g.setFont (type::micro (14.5f));
             const auto unavailable = processor.libraryService().unavailableReason();
@@ -2403,10 +2656,43 @@ namespace
             showStore.setBounds (row.removeFromLeft (170));
             row.removeFromLeft (8);
             showLibrary.setBounds (row.removeFromLeft (170));
+            r.removeFromTop (8 + 54 + 30);
+            auto inboxRow = r.removeFromTop (32);
+            removeInbox.setBounds (inboxRow.removeFromRight (150));
+            inboxRow.removeFromRight (8);
+            addInbox.setBounds (inboxRow.removeFromRight (150));
+            inboxRow.removeFromRight (8);
+            inboxFolders.setBounds (inboxRow);
             close.setBounds (content().removeFromBottom (38).removeFromRight (110));
         }
 
     private:
+        void fillInboxFolders()
+        {
+            const auto& folders = processor.audition().librarySettings().inboxFolders;
+            inboxFolders.clear (juce::dontSendNotification);
+            for (int i = 0; i < folders.size(); ++i)
+                inboxFolders.addItem (folders[i], i + 1);
+            inboxFolders.setTextWhenNothingSelected (folders.isEmpty() ? "No Inbox folder yet" : juce::String (folders.size()) + " folders");
+            if (! folders.isEmpty())
+                inboxFolders.setSelectedId (1, juce::dontSendNotification);
+            removeInbox.setEnabled (! folders.isEmpty());
+        }
+        void chooseInboxFolder()
+        {
+            // The user chooses each folder (never a whole drive, never one picked for them).
+            chooser = std::make_unique<juce::FileChooser> ("Choose an Inbox folder", juce::File::getSpecialLocation (juce::File::userHomeDirectory));
+            juce::Component::SafePointer<SettingsSheet> safe (this);
+            chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories, [safe] (const juce::FileChooser& fc) {
+                if (safe == nullptr || ! fc.getResult().isDirectory())
+                    return;
+                auto& settings = safe->processor.audition().librarySettings();
+                settings.inboxFolders.addIfNotAlreadyThere (fc.getResult().getFullPathName());
+                settings.save();
+                safe->fillInboxFolders();
+                safe->panel.reconcileInbox();
+            });
+        }
         void confirmEmpty()
         {
             juce::Component::SafePointer<LibraryPanel> safe (&panel);
@@ -2442,6 +2728,9 @@ namespace
         juce::Slider level;
         juce::TextButton emptyTrash { juce::String::fromUTF8 ("Empty Library trash\xe2\x80\xa6") }, showStore { "Show sample store" }, showLibrary { "Show Library folder" };
         juce::TextButton close { "Done" };
+        juce::ComboBox inboxFolders;
+        juce::TextButton addInbox { juce::String::fromUTF8 ("Add folder\xe2\x80\xa6") }, removeInbox { "Stop watching" };
+        std::unique_ptr<juce::FileChooser> chooser;
         library::StorageUsage usage;
         juce::String integrity;
         bool measured = false;
@@ -2617,8 +2906,13 @@ void LibraryPanel::timerCallback()
     if (view == View::sounds && processor.audition().isSounding())
     {
         inspector->repaint();
+        candidateInspector->repaint();
         tray->repaint();
     }
+    // The Inbox, every few seconds while the window is open (reconciliation, not notifications:
+    // docs/library/inbox.md). Not while a scan has the background thread.
+    if (juce::Time::getMillisecondCounter() - lastInboxPass > 3000 && ! processor.libraryService().backgroundBusy())
+        reconcileInbox();
 }
 
 void LibraryPanel::paint (juce::Graphics& g)
@@ -2666,7 +2960,11 @@ void LibraryPanel::resized()
     {
         tray->setBounds (r.removeFromBottom (trayHeight));
         r.removeFromBottom (10);
-        inspector->setBounds (r.removeFromRight (inspectorWidth));
+        const auto inspectorArea = r.removeFromRight (inspectorWidth);
+        inspector->setBounds (inspectorArea);
+        candidateInspector->setBounds (inspectorArea);
+        inspector->setVisible (! candidateScope());
+        candidateInspector->setVisible (candidateScope());
         r.removeFromRight (12);
     }
     else

@@ -492,6 +492,60 @@ Cmd/Ctrl+L close it.
   no longer be found; **Locate…** points the Library to the file (checked by its contents,
   not its name).
 
+### Finding the sounds you already have
+
+- **⋯ → Scan folder…**: choose a folder (only the folders you choose are ever looked at).
+  - Pick whether to include subfolders and whether to find likely one-shots, which listens
+    to each file in the background.
+  - Optionally give name patterns: **Only names like** `*kick*`, **Leave out** `*loop*`.
+  - The counts show what it found. **Pause** and **Cancel** work at any time; what is done
+    is kept.
+- **Sounds → Scanned** lists what it found. They are not in your Library yet; your files
+  stay where they are.
+- **Kind** says what each one probably is: Likely One-Shot, Possible One-Shot, Multiple
+  Events, Likely Loop, Long Recording, with the reason ("one attack", "8 attacks on a
+  regular grid", ...). It is a guess. Change it in **Kind** and your choice sticks.
+- Select one to hear it. Select several with Shift or Cmd. Then:
+  - **Import to Library** (or Return, or a double-click) brings them in, with the tags
+    their names and folders suggest (a file in `Drums/Kick 02.wav` gets "drum" and "kick")
+    and a Type.
+  - **Import to A / B / C** brings one in and loads it at once.
+  - **Set aside** hides a file from the list without deleting anything; **Set aside**
+    in the sidebar brings it back.
+
+### The Inbox
+
+Choose one or more **Inbox folders** in **⋯ → Inbox folders…**: a Voice Memos export, a
+Dropbox or iCloud Drive folder, the folder your phone saves into. New audio that lands there
+appears under **Sounds → Inbox**, newest first.
+
+- A file is offered once it has finished arriving. A file still downloading, or one that
+  is only in iCloud and not on this Mac yet, shows **Arriving…**. It is never called
+  damaged for that.
+- The Inbox is checked when the plugin starts, when the Library opens, and every few
+  seconds while it is open.
+- Hear it, check its kind, then **Import to Library**, **Import as…** (a name of your
+  own), or **Import to A / B / C** to play it right away.
+- Imported recordings are listed under **Captured**. A file that is already in your
+  Library is recognised by its contents and not copied twice.
+
+### Trimming and slicing
+
+Right-click a sound (or anything in Scanned or the Inbox) → **Trim / Slice…**.
+
+- **Suggest trim** cuts the silence before and after, gently. Soft attacks and tails stay.
+- **Find slices** finds each separate sound in a longer recording. The **Sensitivity**
+  slider finds softer hits.
+- Drag a slice's edges to move them. Click the waveform to place the cursor, then **Split
+  at cursor**. **Merge with next**, **Remove slice** and **Rename…** tidy the list. The box
+  in front of each slice includes or leaves it out. **▶ Slice** plays the selected one.
+- **Save as New Sound** (or **Save N Slices to Library**) saves each included slice as a
+  new sound, with short fades so nothing clicks.
+  - The level stays as recorded unless you tick **Bring each peak to −1 dB**.
+  - Your recording is never changed. Each slice remembers where it came from.
+  - A recording from Scanned or the Inbox is added to the Library too, so its slices have
+    their original.
+
 ## When a sound is unusual
 
 Recordings longer than a minute play with Tape pitch even when Natural is selected (Natural keeps four extra copies of the sound); the status line says so. Files longer than ten minutes are shortened to their first ten minutes.

@@ -542,7 +542,10 @@ TEST_CASE ("library: a version 1 catalog migrates to the current version and kee
     {
         sqlite3* raw = nullptr;
         REQUIRE (sqlite3_open (tmp.file().string().c_str(), &raw) == SQLITE_OK);
-        REQUIRE (sqlite3_exec (raw, "ALTER TABLE presets DROP COLUMN trashed_from; ALTER TABLE assets DROP COLUMN rating; "
+        REQUIRE (sqlite3_exec (raw, "ALTER TABLE presets DROP COLUMN trashed_from; ALTER TABLE assets DROP COLUMN rating; DROP INDEX scan_files_root; "
+                                    "ALTER TABLE scan_files DROP COLUMN rejected; ALTER TABLE scan_files DROP COLUMN duration; ALTER TABLE scan_files DROP COLUMN sample_rate; "
+                                    "ALTER TABLE scan_files DROP COLUMN channels; ALTER TABLE scan_files DROP COLUMN format; ALTER TABLE scan_files DROP COLUMN error; "
+                                    "DROP TABLE classification_overrides; DROP TABLE inbox_items; "
                                     "UPDATE meta SET value = '1' WHERE key = 'schema_version';", nullptr, nullptr, nullptr)
                  == SQLITE_OK);
         sqlite3_close (raw);

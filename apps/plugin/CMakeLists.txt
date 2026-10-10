@@ -58,6 +58,7 @@ target_sources(OSP_Plugin PRIVATE
     Source/InstrumentLoader.cpp
     Source/LibraryService.cpp
     Source/Audition.cpp
+    Source/LibraryCapture.cpp
     Source/LibraryPanel.cpp
     ${OSP_IO_SOURCES})
 

@@ -1,4 +1,4 @@
-# Library catalog schema (version 3)
+# Library catalog schema (version 4)
 
 SQLite, WAL. File: `~/Library/Application Support/OSP/Library/catalog.db` (macOS;
 `<user app data>/OSP/Library/catalog.db` elsewhere; `OSP_LIBRARY_DIR` overrides for tests).
@@ -17,8 +17,10 @@ Audio is never stored in the database.
 | `asset_tags` | asset_id, tag_id, source (`user`/`filename`/`folder`/`audio`), confidence, rejected | inferred tags kept apart from user tags; a user removal is a `rejected` row so rescans respect it |
 | `history` | id, asset_id, at, action (`loaded`/`imported`/`previewed`), layer | recent sounds, use counts |
 | `source_locations` | content_hash, path, kind (`original`/`indexed`/`inbox`), last_seen, available | where bytes were found |
-| `audio_analysis` | content_hash, version, classification, features (JSON) | cached analysis |
-| `scan_roots` / `scan_files` | root path, include/exclude; path, size, mtime, content_hash, state | incremental scanning |
+| `audio_analysis` | content_hash, version, classification, features (JSON) | cached analysis, by content: the same bytes anywhere are analysed once per classifier version (`classifierVersion`, now 1). `features` is the classifier's JSON (docs/library/classification.md): `class`, `confidence`, `reason`, `type`, `tags`, `f0`, `pitched`, the measured features |
+| `classification_overrides` (v4) | content_hash, classification, updated | the user's say on what a sound is; wins over every analysis and survives re-analysis |
+| `scan_roots` / `scan_files` | root path, include/exclude; path, size, mtime, content_hash, state (`indexed`/`analysed`/`failed`/`imported`), asset_id, rejected (v4), duration, sample_rate, channels, format, error (v4) | incremental scanning; a candidate stays a candidate until imported; `rejected` is "set aside" (never deleted); index `scan_files_root` (v4) |
+| `inbox_items` (v4) | path, folder, state (`detected`/`waiting`/`ready`/`importing`/`imported`/`failed`/`missing`), size, mtime, stable_since, content_hash, asset_id, error, attempts, detected, updated | the capture Inbox's reconciliation state (docs/library/inbox.md) |
 | `import_jobs` | id, path, state, error, created | resumable imports, inbox states |
 | `packs` | id, name, version, creator, manifest (JSON), installed | installed packs |
 | `assets_fts` | FTS5 (name, tags, collections, notes, folder, pack) | search; rebuilt from the tables when missing |
@@ -33,6 +35,7 @@ multi-row change in one transaction.
 | - | 1 | the tables above |
 | 1 | 2 | `presets.trashed_from` (where a preset sent to the Library's trash came from) |
 | 2 | 3 | `assets.rating` (0-5 stars, default 0) |
+| 3 | 4 | `scan_files` gains rejected, duration, sample_rate, channels, format, error; new `classification_overrides`, `inbox_items`; index `scan_files_root` (Stages 6-8) |
 
 Each step runs in one transaction on open; a catalog newer than the build is refused and left
 untouched. Tested: a version 1 catalog (made by hand) opens as the current version with its records.
@@ -44,4 +47,12 @@ collection places cascade); `library::emptyTrash` does it for the whole trash an
 files nothing holds to the system Trash (docs/library/preview.md, Storage).
 
 Per-user Library settings are not in the catalog: `<Library>/settings.json`
-(schemaVersion 1: `previewGainDb`).
+(schemaVersion 1: `previewGainDb`; added without a version bump, as optional fields with
+defaults: `inboxFolders` (array of paths), `scanSubfolders`, `scanFindOneShots`,
+`scanSkipLong` (the Scan sheet's last choices)).
+
+A derived sound (a trim or slice, Stage 8) is an ordinary `sounds` row with `parent_asset`
+(the original's asset id), `slice_start`/`slice_end` (seconds in the original) and
+`operations`: JSON `{"fadeIn", "fadeOut", "gainDb", "zeroCrossing", "slicer":
+"sampleforge-1", "analysis": <classifierVersion>, "source": <path, when cut from a
+candidate>}`. Its place is recorded as `(derived)`.

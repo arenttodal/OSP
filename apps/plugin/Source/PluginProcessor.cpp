@@ -7,6 +7,7 @@
 #include "core/PitchMath.h"
 #include "io/AudioFileIO.h"
 #include "io/ContentHash.h"
+#include "library/Inbox.h"
 
 #include <algorithm>
 #include <map>
@@ -757,6 +758,15 @@ OspAudioProcessor::OspAudioProcessor()
                                               [this] (const std::vector<Audition::LayerLoad>& sounds, const juce::String& label) {
                                                   return loadLibrarySounds (sounds, label);
                                               });
+    // The Inbox once at startup (in the background), so what arrived while the host was closed
+    // is waiting when the Library opens; the open Library window keeps checking.
+    if (const auto folders = auditionHub->librarySettings().inboxFolders; ! folders.isEmpty())
+    {
+        std::vector<std::filesystem::path> paths;
+        for (const auto& f : folders)
+            paths.emplace_back (f.toStdString());
+        libraryHub->postBackground ([paths] (library::Catalog& c) { library::reconcileInbox (c, paths, juce::Time::currentTimeMillis()); });
+    }
     parameters.state.addListener (this);   // META-MODULATION's links (ModLinks)
     refreshModLinks();
     for (int c = 0; c < 4; ++c)

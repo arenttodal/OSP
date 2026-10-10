@@ -17,10 +17,34 @@ LibraryService::LibraryService (juce::File sampleStoreDirectory) : store (std::m
 
 LibraryService::~LibraryService()
 {
-    // Finish what is queued (each job is short), then close the connection.
+    // A scan stops between files; what is queued finishes (each job is short), then the
+    // connections close.
+    control.cancelled = true;
+    control.paused = false;
+    background.removeAllJobs (true, 20000);
     waitUntilIdle (10000);
     pool.removeAllJobs (true, 2000);
     db.reset();
+    backgroundDb.reset();
+}
+
+library::Catalog* LibraryService::backgroundCatalog()
+{
+    if (! backgroundOpened)
+    {
+        backgroundOpened = true;
+        std::string error;
+        backgroundDb = library::Catalog::open (library::Catalog::defaultFile(), error);
+    }
+    return backgroundDb.get();
+}
+
+void LibraryService::postBackground (std::function<void (library::Catalog&)> task)
+{
+    background.addJob ([this, task = std::move (task)] {
+        if (auto* c = backgroundCatalog())
+            task (*c);
+    });
 }
 
 library::Catalog* LibraryService::catalog()
@@ -65,7 +89,7 @@ bool LibraryService::runAndWait (std::function<void (library::Catalog&)> task, i
 bool LibraryService::waitUntilIdle (int milliseconds)
 {
     const auto until = juce::Time::getMillisecondCounter() + static_cast<juce::uint32> (milliseconds);
-    while (pool.getNumJobs() > 0)
+    while (pool.getNumJobs() > 0 || background.getNumJobs() > 0)
     {
         if (juce::Time::getMillisecondCounter() > until)
             return false;

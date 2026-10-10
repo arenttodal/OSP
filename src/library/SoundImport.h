@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/AudioData.h"
 #include "library/Catalog.h"
 
 #include <atomic>
@@ -33,6 +34,16 @@ struct ImportRequest
     std::string name;              ///< display name (default: the file name without extension)
     std::string collectionId;      ///< also add it to this collection
     std::string provenance = "user";
+    std::string category;          ///< its Type, when the record has none yet
+    struct Tag
+    {
+        std::string name;
+        TagSource source = TagSource::user;
+        double confidence = 1.0;
+    };
+    std::vector<Tag> tags;         ///< inferred tags stay inferred (a user's removal still wins)
+    std::optional<double> rootMidi;
+    std::string place;             ///< the location recorded instead of the file's own path ("(derived)" for a rendered slice)
 };
 
 struct ImportResult
@@ -96,6 +107,22 @@ struct TrashEmptied
     Background thread. */
 TrashEmptied emptyTrash (Catalog& catalog, const std::filesystem::path& storeDir, const std::vector<std::string>& inUse,
                          const std::function<bool (const std::filesystem::path&)>& moveAway);
+
+/** A trim or slice saved as a new sound (Stage 8.5): written as 32-bit float WAV (nothing lost),
+    imported like any sound, and its provenance recorded (the parent's record, start and end in
+    seconds, the operations as JSON). The parent is never changed. */
+struct DerivedSound
+{
+    std::string parentAssetId;         ///< empty when the source was a file outside the Library
+    std::string name;
+    double startSeconds = 0.0, endSeconds = 0.0;
+    std::string operations;            ///< e.g. {"fadeIn":0.0005,"fadeOut":0.005,"gainDb":0,"slicer":"sampleforge-1"}
+    Origin origin = Origin::user;
+    std::string category;
+    std::vector<ImportRequest::Tag> tags;
+    std::optional<double> rootMidi;
+};
+ImportResult saveDerivedSound (Catalog& catalog, const std::filesystem::path& storeDir, const AudioData& audio, const DerivedSound& derived);
 
 /** "sha256:<hex>" -> "<hex>" (and plain hex unchanged). */
 std::string hexOf (const std::string& contentHash);

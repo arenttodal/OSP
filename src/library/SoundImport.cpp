@@ -2,6 +2,7 @@
 
 #include "io/AudioFileIO.h"
 #include "io/ContentHash.h"
+#include "library/Classifier.h"
 
 #include <algorithm>
 #include <cctype>
@@ -65,7 +66,9 @@ int clearInterruptedImports (const std::filesystem::path& storeDir, std::chrono:
     for (const auto& entry : std::filesystem::directory_iterator (storeDir, ec))
     {
         const auto name = entry.path().filename().string();
-        if (name.size() < 8 || name.compare (name.size() - 8, 8, ".partial") != 0)
+        const bool partial = name.size() >= 8 && name.compare (name.size() - 8, 8, ".partial") == 0;
+        const bool derived = name.rfind (".derived-", 0) == 0;   // a slice being saved when the host quit
+        if (! partial && ! derived)
             continue;
         if (entry.last_write_time (ec) <= cutoff && std::filesystem::remove (entry.path(), ec))
             ++removed;
@@ -177,8 +180,10 @@ ImportResult importSound (Catalog& catalog, const std::filesystem::path& storeDi
     sound.durationSeconds = info.sampleRate > 0.0 ? static_cast<double> (info.frames) / info.sampleRate : 0.0;
     sound.fileSize = static_cast<std::int64_t> (std::filesystem::file_size (request.file, ec));
     sound.provenance = request.provenance;
+    sound.rootMidi = request.rootMidi;
     const auto absolute = std::filesystem::absolute (request.file, ec);
-    const auto added = catalog.addImportedSound (asset, sound, (ec ? request.file : absolute).string(), request.origin == Origin::captured ? "inbox" : "original");
+    const auto place = ! request.place.empty() ? request.place : (ec ? request.file : absolute).string();
+    const auto added = catalog.addImportedSound (asset, sound, place, request.origin == Origin::captured ? "inbox" : "original");
     if (! added)
     {
         result.error = "the Library could not record " + request.file.filename().string() + " (" + catalog.lastError() + ")";
@@ -188,7 +193,59 @@ ImportResult importSound (Catalog& catalog, const std::filesystem::path& storeDi
     result.alreadyInLibrary = added->existed;
     if (! request.collectionId.empty())
         catalog.addToCollection (request.collectionId, added->id);
+    for (const auto& tag : request.tags)
+        catalog.addTag (added->id, tag.name, tag.source, tag.confidence);
+    if (! request.category.empty())
+        if (const auto a = catalog.asset (added->id); a && a->category.empty())
+            catalog.setCategory (added->id, request.category);
     result.ok = true;
+    return result;
+}
+
+ImportResult saveDerivedSound (Catalog& catalog, const std::filesystem::path& storeDir, const AudioData& audio, const DerivedSound& derived)
+{
+    ImportResult result;
+    if (audio.numFrames() == 0 || audio.numChannels() == 0)
+    {
+        result.error = "the slice is empty";
+        return result;
+    }
+    std::error_code ec;
+    std::filesystem::create_directories (storeDir, ec);
+    // Written beside the store under a name that is never taken for a sound, then imported
+    // (hash, verified copy, record) and removed: the store keeps the only copy.
+    static std::atomic<int> counter { 0 };
+    const auto temp = storeDir / (".derived-" + std::to_string (reinterpret_cast<std::uintptr_t> (&derived)) + "-" + std::to_string (counter++) + ".wav.partial.wav");
+    std::string error;
+    if (! io::writeAudioFile (temp, audio, io::SampleFormat::float32, error))
+    {
+        std::filesystem::remove (temp, ec);
+        result.error = "cannot write the slice: " + error;
+        return result;
+    }
+    ImportRequest request;
+    request.file = temp;
+    request.name = derived.name.empty() ? "Slice" : derived.name;
+    request.origin = derived.origin;
+    request.provenance = "user";
+    request.category = derived.category;
+    request.tags = derived.tags;
+    request.rootMidi = derived.rootMidi;
+    request.place = "(derived)";
+    result = importSound (catalog, storeDir, request);
+    std::filesystem::remove (temp, ec);
+    // Identical audio already in the Library keeps its record and where it came from (a second
+    // slice with the same bytes is the same sound; nothing is overwritten).
+    if (result.ok && ! result.alreadyInLibrary)
+    {
+        catalog.setDerivation (result.assetId, derived.parentAssetId, derived.startSeconds, derived.endSeconds, derived.operations);
+        // What the new sound is, like any scanned or captured one (from the audio in hand).
+        if (const auto known = catalog.analysis (result.contentHash); ! known || known->version < classifierVersion)
+        {
+            const auto c = classifySound (audio);
+            catalog.putAnalysis (result.contentHash, classifierVersion, toString (c.soundClass), toJson (c));
+        }
+    }
     return result;
 }
 

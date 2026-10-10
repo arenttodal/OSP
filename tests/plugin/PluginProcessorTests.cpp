@@ -14,6 +14,7 @@
 #include "io/AudioFileIO.h"
 #include "library/Catalog.h"
 #include "library/SoundImport.h"
+#include "../library/LabelledSet.h"
 
 #define CATCH_CONFIG_RUNNER
 #include <catch2/catch_approx.hpp>
@@ -1579,6 +1580,198 @@ TEST_CASE ("plugin: Library window - presets, templates and sounds; search, scop
     CHECK (ui->keyPressed (juce::KeyPress ('l', juce::ModifierKeys::commandModifier, 0)));
     CHECK (ui->libraryWindow() != nullptr);
     ui->closeLibrary();
+}
+
+TEST_CASE ("plugin: Library capture - scan a folder, review candidates, the Inbox, trim and slice", "[plugin][library][library-capture]")
+{
+    using Panel = osp::plugin::LibraryPanel;
+    TempDir tmp;
+    const ScopedEnvironment library ("OSP_LIBRARY_DIR", tmp.dir.getChildFile ("library").getFullPathName());
+    const ScopedEnvironment documents ("OSP_DOCUMENTS_DIR", tmp.dir.getChildFile ("documents").getFullPathName());
+    // A folder the user chose: two hits (one-shots) and a groove (several events).
+    const auto samples = tmp.dir.getChildFile ("Samples");
+    const auto drums = samples.getChildFile ("Drums");
+    REQUIRE (drums.createDirectory());
+    writeSource (drums, "Kick Hard.wav", labelled::kick (48000.0));
+    writeSource (drums, "Snare Tight.wav", labelled::snare (48000.0, 3));
+    auto groove = labelled::blank (4.2);
+    for (int i = 0; i < 8; ++i)
+        labelled::mix (groove, i % 2 == 0 ? labelled::kick (48000.0, 0.9 - 0.1 * i) : labelled::snare (48000.0, 10u + static_cast<std::uint64_t> (i)), 0.1 + 0.5 * i);
+    const auto grooveFile = writeSource (drums, "Groove.wav", groove);
+    const auto grooveBytes = grooveFile.getSize();
+    const auto inbox = tmp.dir.getChildFile ("Inbox");
+    REQUIRE (inbox.createDirectory());
+
+    OspAudioProcessor p;
+    p.prepareToPlay (48000.0, 256);
+    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (editor.get());
+    REQUIRE (ui != nullptr);
+    editor->setSize (1448, 1086);
+    ui->refreshNow();
+    auto snapshot = [&] (const juce::String& name) {
+        if (const char* dir = std::getenv ("OSP_SNAPSHOT_DIR"))
+        {
+            ui->refreshNow();
+            const auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f);
+            juce::FileOutputStream out (juce::File (dir).getChildFile (name));
+            out.setPosition (0);
+            out.truncate();
+            juce::PNGImageFormat().writeImageToStream (image, out);
+        }
+    };
+    ui->openLibrary();
+    auto* panel = ui->libraryWindow();
+    REQUIRE (panel != nullptr);
+    panel->setView (Panel::View::sounds);
+    REQUIRE (panel->settle());
+    CHECK (sideCount (*panel, "inbox") == 0);
+    CHECK (sideCount (*panel, "scanned") == 0);
+
+    // Scan (view F): the chosen folder only; the scan runs in the background and its result
+    // opens the Scanned list.
+    panel->scanFolder (samples);
+    CHECK (panel->openSheetName() == "scan");
+    REQUIRE (panel->settle (60000));
+    snapshot ("library-scan.png");
+    panel->closeSheet();
+    REQUIRE (panel->settle());
+    CHECK (panel->scope() == "scanned");
+    REQUIRE (panel->rowCount() == 3);
+    CHECK (sideCount (*panel, "scanned") == 3);
+    const int kick = rowNamed (*panel, "Kick Hard");
+    const int snare = rowNamed (*panel, "Snare Tight");
+    REQUIRE (kick >= 0);
+    REQUIRE (snare >= 0);
+    CHECK (panel->row (kick).candidate);
+    CHECK (panel->row (kick).classification == "likely-one-shot");
+    const int grooveRow = rowNamed (*panel, "Groove");
+    REQUIRE (grooveRow >= 0);
+    CHECK (panel->row (grooveRow).classification != "likely-one-shot");
+    // Browsing a candidate cues it (nothing in the instrument changes).
+    panel->selectRow (kick);
+    REQUIRE (panel->settle());
+    CHECK (p.audition().slot (osp::library::PreviewEngine::browserSlot).file == juce::File (panel->row (kick).path));
+    snapshot ("library-scanned.png");
+
+    // The user's say wins (and survives a refresh).
+    panel->selectRow (rowNamed (*panel, "Snare Tight"));
+    panel->classifySelected ("possible-one-shot");
+    REQUIRE (panel->settle());
+    CHECK (panel->row (rowNamed (*panel, "Snare Tight")).classification == "possible-one-shot");
+    CHECK (panel->row (rowNamed (*panel, "Snare Tight")).reason == "set by you");
+    // Set aside: out of the list, never deleted.
+    panel->selectRow (rowNamed (*panel, "Groove"));
+    panel->setSelectedAside (true);
+    REQUIRE (panel->settle());
+    CHECK (rowNamed (*panel, "Groove") < 0);
+    CHECK (sideCount (*panel, "set-aside") == 1);
+    CHECK (grooveFile.getSize() == grooveBytes);
+
+    // Import two at once, with their evidence.
+    panel->selectRows ({ rowNamed (*panel, "Kick Hard"), rowNamed (*panel, "Snare Tight") });
+    CHECK (panel->selectedRows().size() == 2);
+    panel->importSelectedCandidates();
+    REQUIRE (panel->settle());
+    CHECK (panel->statusText().contains ("Imported 2 sounds"));
+    CHECK_FALSE (panel->row (rowNamed (*panel, "Kick Hard")).importedAs.empty());
+    panel->selectScope ("all");
+    REQUIRE (panel->settle());
+    const int kickSound = rowNamed (*panel, "Kick Hard");
+    REQUIRE (kickSound >= 0);
+    CHECK_FALSE (panel->row (kickSound).candidate);
+    CHECK (panel->row (kickSound).tags.contains ("kick"));
+    CHECK (panel->row (kickSound).tags.contains ("drum"));   // from its folder ("Drums")
+
+    // The Inbox (Stage 7): a folder the user chose; a file arriving there becomes ready once
+    // it has stood still, already classified.
+    p.audition().librarySettings().inboxFolders = { inbox.getFullPathName() };
+    writeSource (inbox, "Voice memo.wav", labelled::held (220.0, 1.5, 48000.0, 0.05, 4));
+    panel->selectScope ("inbox");
+    for (int attempt = 0; attempt < 40; ++attempt)
+    {
+        panel->reconcileInbox();
+        REQUIRE (panel->settle());
+        if (panel->rowCount() == 1 && panel->row (0).state == "ready")
+            break;
+        juce::Thread::sleep (250);
+    }
+    REQUIRE (panel->rowCount() == 1);
+    CHECK (panel->row (0).state == "ready");
+    CHECK (panel->row (0).inInbox);
+    CHECK (panel->row (0).classification.isNotEmpty());
+    CHECK (sideCount (*panel, "inbox") == 1);
+    panel->selectRow (0);
+    REQUIRE (panel->settle());
+    snapshot ("library-inbox.png");
+    // Import and load into B in one step.
+    panel->importSelectedCandidates (1);
+    REQUIRE (panel->settle());
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    REQUIRE (p.currentInstrument (1) != nullptr);
+    CHECK (p.currentInstrument (1)->filename.starts_with ("Voice memo"));
+    REQUIRE (panel->settle());
+    CHECK (panel->row (0).state == "imported");
+    CHECK (sideCount (*panel, "inbox") == 0);
+    panel->selectScope ("captured");
+    REQUIRE (panel->settle());
+    CHECK (rowNamed (*panel, "Voice memo") >= 0);
+
+    // Trim and slice (Stage 8): bring the groove back and slice it straight from Scanned.
+    panel->selectScope ("set-aside");
+    REQUIRE (panel->settle());
+    REQUIRE (panel->rowCount() == 1);
+    panel->selectRow (0);
+    panel->setSelectedAside (false);
+    REQUIRE (panel->settle());
+    panel->selectScope ("scanned");
+    REQUIRE (panel->settle());
+    panel->selectRow (rowNamed (*panel, "Groove"));
+    CHECK (panel->row (rowNamed (*panel, "Groove")).importedAs.empty());
+    panel->openTrimSheet();
+    REQUIRE (panel->openSheetName() == "trim");
+    REQUIRE (panel->settle());
+    auto* findSlices = findTitled<juce::TextButton> (*panel->sheet(), "Find slices");
+    auto* sliceList = findTitled<juce::ListBox> (*panel->sheet(), "Slices");
+    REQUIRE (findSlices != nullptr);
+    REQUIRE (sliceList != nullptr);
+    CHECK (sliceList->getListBoxModel()->getNumRows() == 1);   // the whole recording until asked
+    findSlices->onClick();   // (triggerClick would wait for the message loop)
+    CHECK (sliceList->getListBoxModel()->getNumRows() == 8);
+    snapshot ("library-trim.png");
+    auto* save = findTitled<juce::Button> (*panel->sheet(), "Save as New Sound");
+    REQUIRE (save != nullptr);
+    save->onClick();
+    REQUIRE (panel->settle (30000));
+    CHECK (panel->openSheetName().isEmpty());
+    CHECK (panel->statusText().contains ("Saved 8 new sounds"));
+    CHECK (panel->statusText().contains ("the whole recording is in the Library too"));
+    panel->selectScope ("all");
+    REQUIRE (panel->settle());
+    CHECK (rowNamed (*panel, "Groove 03") >= 0);
+    REQUIRE (rowNamed (*panel, "Groove") >= 0);         // the original, imported first
+    const auto grooveId = panel->row (rowNamed (*panel, "Groove")).id;
+    CHECK (grooveFile.getSize() == grooveBytes);        // and its file is untouched
+    {
+        std::string e;
+        auto c = osp::library::Catalog::open (osp::library::Catalog::defaultFile(), e);
+        REQUIRE (c != nullptr);
+        CHECK (c->derivedFrom (grooveId).size() == 8);
+    }
+    // A slice plays like any sound: into C.
+    panel->selectRow (rowNamed (*panel, "Groove 03"));
+    panel->loadSelectedInto (2);
+    REQUIRE (panel->settle());
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    REQUIRE (p.currentInstrument (2) != nullptr);
+    CHECK (p.currentInstrument (2)->filename.starts_with ("Groove 03"));
+    snapshot ("library-slices.png");
+    panel->openSettingsSheet();
+    CHECK (panel->openSheetName() == "settings");
+    snapshot ("library-settings-inbox.png");
+    panel->closeSheet();
 }
 
 TEST_CASE ("plugin: a portable instrument is untrusted - nothing lands outside the store, damaged sounds are refused", "[plugin][security]")

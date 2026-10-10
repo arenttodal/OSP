@@ -53,6 +53,15 @@ voices); in the plugin, `LibraryService` (the catalog thread, `post` / `request`
 `deliver`), `Audition` (preview decoding, the tray, Library loads) and `LibraryPanel` (the
 window, docs/library/gui.md).
 
+As built (Stages 6-8): `src/library/Tagging` (names and folders), `src/library/Classifier`
+(five classes, audio tags), `src/library/Slicer` (Sample Forge's slicer, trim, rendering),
+all pure C++; `src/library/FolderScan` and `src/library/Inbox` (files, hashing, decoding:
+JUCE-backed like `src/io`); `saveDerivedSound` in `SoundImport`. In the plugin,
+`LibraryService` gained a second, background-priority pool with its own catalog connection
+for scans and the Inbox (`postBackground` / `requestBackground`, `scanControl`,
+`scanProgress`), and `LibraryCapture.cpp` holds the candidate inspector, the scan sheet and
+the trim editor (docs/library/classification.md, inbox.md, slicing.md).
+
 Rules (CLAUDE.md 1, 3, 6): the catalog never runs on the audio thread and is not linked by
 the engine (`osp_dsp`); sounds reach the engine only through the existing loader and
 `ModelExchange`. The Library service does not depend on GUI widgets.
@@ -104,9 +113,9 @@ and collections, never a sound a project needs (D-02).
 
 | What | Where | Version |
 |---|---|---|
-| Catalog schema | `meta.schema_version` | 1 (migrations in `Catalog::migrate`) |
+| Catalog schema | `meta.schema_version` | 4 (migrations in `Catalog::migrate`) |
 | Preset / template | the state XML's `stateVersion` | 10 (unchanged) |
 | Portable preset | `.ospinstrument` `manifest.json` `schemaVersion` | 1 -> 2 (adds metadata, provenance, checksums; 1 still reads) |
 | Library backup | `.ospbackup` manifest | 1 |
-| Analysis | `audio_analysis.version` | per analyser |
-| Inbox manifest | `inbox_items` | 1 |
+| Analysis | `audio_analysis.version` | `classifierVersion` 1 |
+| Inbox state | `inbox_items` (catalog v4) | with the catalog schema |

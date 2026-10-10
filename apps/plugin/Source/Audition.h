@@ -23,6 +23,10 @@ struct LibrarySettings
 {
     static constexpr int schemaVersion = 1;
     float previewGainDb = library::PreviewEngine::defaultGainDb;
+    juce::StringArray inboxFolders;      ///< folders whose new audio appears in the Inbox (Stage 7)
+    bool scanSubfolders = true;          ///< Scan Folder's last choices
+    bool scanFindOneShots = true;
+    bool scanSkipLong = false;
 
     static juce::File file();
     static LibrarySettings load();
@@ -81,6 +85,13 @@ public:
     void cue (const std::string& assetId);
     /** A file outside the catalog (a scan result, the Inbox): previewed the same way. */
     void previewFile (const juce::File& file);
+    void cueFile (const juce::File& file);
+    /** Audio made here (a slice in the editor): heard at once in the browser's slot. */
+    void previewAudio (std::shared_ptr<const AudioData> audio, const juce::String& name);
+    /** Decodes a Library sound (by id) or a file for an editor; `done` on the message thread with
+        the audio (nullptr and why when it cannot be read). */
+    using Decoded = std::function<void (std::shared_ptr<const AudioData>, const juce::File& file, const juce::String& name, const juce::String& error)>;
+    void decode (const std::string& assetId, const juce::File& file, Decoded done);
     /** Tray slot 0..2 (A, B, C): holds the sound for auditioning and committing. */
     void setSlot (int slot, const std::string& assetId);
     void clearSlot (int slot);
@@ -105,8 +116,9 @@ public:
     /** Something shown changed (a sound became ready, failed, was cleared, an overview came). */
     std::function<void()> onChange;
 
-    /** A small waveform overview (`bins` max-abs values, 0..1) for a Library sound's row: from
-        memory, or made in the background (onChange tells when it is there). */
+    /** A small waveform overview (`bins` max-abs values, 0..1) for a Library sound's row (by
+        asset id) or a file ("file:<path>"): from memory, or made in the background (onChange
+        tells when it is there). */
     static constexpr int overviewBins = 48;
     const std::vector<float>* overview (const std::string& assetId);
 
@@ -142,6 +154,10 @@ private:
     LoadHook loadHook;
     std::array<Slot, library::PreviewEngine::numSlots> slots;
     std::array<std::uint64_t, library::PreviewEngine::numSlots> requests {};
+public:
+    LibrarySettings& librarySettings() noexcept { return settings; }
+
+private:
     LibrarySettings settings;
     juce::ThreadPool decoder { juce::ThreadPoolOptions().withThreadName ("OSP Preview").withNumberOfThreads (1).withDesiredThreadPriority (juce::Thread::Priority::low) };
     std::shared_ptr<bool> alive = std::make_shared<bool> (true);   ///< callbacks after destruction do nothing

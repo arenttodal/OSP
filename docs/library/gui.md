@@ -28,9 +28,13 @@ instrument's own materials, colours and type roles (`design::`, `type::`).
 | - | J Library settings | Preview level; storage (managed copies by what holds them); Empty Library trash… (asks first; docs/library/preview.md, Storage); show the sample store and the Library folder; catalog check |
 | - | K Missing sounds | Every sound that cannot be found (not in the store, not where it was seen), with where it was last seen. **Locate…** checks the chosen file by its bytes and remembers the place; a sound can be sent to the trash |
 
-Views F (Scan Folder), G (Scan Results), H (Inbox) and I (Trim/Slice) belong to Stages 6–8,
-and L (Mobile Capture) to Stage 9. They are not in the window yet. There are no
-placeholders for them ("no placeholder buttons, no disconnected screens").
+| - | F Scan folder | **⋯ → Scan folder…**: the folders the user chose (Add folder…, Scan again, Stop scanning it), subfolders, "find likely one-shots", skip files over 60 s, Only names like / Leave out patterns; live counts (found, new or changed, unchanged, unreadable, analysed of, each class) with a bar; Pause/Resume, Cancel, Done. The scan runs in the background; the window shows Scanned when it finishes (docs/library/classification.md) |
+| - | G Scanned / Set aside | Sidebar **Finding sounds**: Inbox, Scanned, Set aside, with counts. Rows: waveform, Name, Kind, Length, State (New, Not analysed, Cannot read, In Library, Set aside). Several can be selected. The **candidate inspector** replaces the sound inspector: ▶ and the waveform, the kind as a chip with its reason, **Kind** (as analysed or the user's; the user's wins), details and path, **Trim / Slice…**, **Set aside / Bring back**, **Import to A / B / C**, **Import, load to first empty**, **Import to Library** (with several selected: Import N) |
+| - | H Inbox | The same list for the Inbox folders' arrivals, newest first, with their state (Arriving…, Ready, Importing…, In Library, Cannot read, Missing) and reason (docs/library/inbox.md). Inbox folders are chosen in Library settings |
+| - | I Trim and slice | Waveform with zoom and scroll, cursor, slice regions with draggable edges and names; Suggest trim, Find slices (sensitivity), Split at cursor, Merge with next, Remove slice, Rename…, ▶ Slice, Reset; the slice list (include boxes); peak to −1 dB and zero-crossing options; **Save as New Sound / Save N Slices to Library** (docs/library/slicing.md) |
+
+L (Mobile Capture) belongs to Stage 9 and is not in the window. There is no placeholder
+for it ("no placeholder buttons, no disconnected screens").
 
 ## Actions
 
@@ -40,7 +44,10 @@ placeholders for them ("no placeholder buttons, no disconnected screens").
 - **Right-click** a row:
   - Presets and templates: Load, Duplicate, Export file…, Export as portable
     instrument… (for the loaded preset), Category, Describe…, Show in Finder.
-  - Sounds: Preview, Audition in A/B/C, Load into A/B/C / first empty.
+  - Sounds: Preview, Audition in A/B/C, Load into A/B/C / first empty, Trim / Slice….
+  - Candidates (Scanned, Inbox, Set aside): Preview, Import to Library, Import as…,
+    Import, load into A/B/C, Trim / Slice…, Kind, Set aside / Bring back, Show in Finder.
+    Return and double-click import; Delete sets a scanned candidate aside (never deletes).
   - Both: favourite, Rating, Rename…, Move to Trash.
   - In the Trash: Restore (also Return or the detail's button).
 - **Delete** moves the selected item to the trash (recoverable).
@@ -85,6 +92,16 @@ copied in by hand).
 - The settings and missing-sounds sheets.
 - Every scale.
 - Cmd/Ctrl+L.
+
+`[plugin][library][library-capture]`:
+- Scanning a chosen folder from the window; the Scanned list and its counts.
+- Kinds and a correction that sticks; set aside and bring back.
+- Importing two at once with their evidence.
+- An Inbox folder: an arrival becomes ready and classified; import and load into B.
+- Slicing a scanned groove: the original imported first, eight new sounds, the file
+  unchanged; a slice into C.
+- Snapshots: `library-scan.png`, `library-scanned.png`, `library-inbox.png`,
+  `library-trim.png`, `library-slices.png`, `library-settings-inbox.png`.
 
 `OSP_SNAPSHOT_DIR=<dir>` writes `library-presets.png`, `library-templates.png`,
 `library-sounds.png`, `library-choose-layer.png`, `library-save.png` and

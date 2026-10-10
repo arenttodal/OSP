@@ -299,9 +299,10 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       rules, each refusal explained; removing a route removes its depth routes in one undo step.
       Halo vs knob drop targets, a chooser where arcs lie together, drag tooltips, a quiet
       effective-depth accent, readout, amount editing. Headless `"routeDepth"` routes.
-- [ ] LIBRARY SYSTEM (queued spec, 13 stages; docs/library/): Stages 0-5 done.
+- [ ] LIBRARY SYSTEM (queued spec, 13 stages; docs/library/): Stages 0-8 done.
       0 audit, risk register, decisions; `.ospinstrument` import hardened.
-      1 SQLite catalog (WAL, FTS5, migrations; now version 3: ratings).
+      1 SQLite catalog (WAL, FTS5, migrations; now version 4: scan candidates, the Inbox,
+        classification overrides).
       2 import transaction and resolver; every load and save recorded; cross-process safety.
       3 portable manifest 2, rights check, recoverable loads, preset file operations.
       4 preview engine (`src/library/PreviewEngine`, real-time safe, tested allocation-free),
@@ -309,8 +310,22 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
         a layer, all recoverable), storage usage and emptying the trash into the system Trash.
       5 the Library window (presets, templates, sounds, inspector, tray, save, settings,
         missing sounds; docs/library/gui.md).
-      Next: Stage 6 tagging and one-shot discovery (scan folders). Stages 9 and 12 (iPhone,
-      signing) need the user's Apple account and hardware; DAW checks need a Mac.
+      6 tags from names, folders and audio; user-chosen folder scans (index + deep, pause,
+        cancel, incremental; 50,000 files indexed in 2.2 s); one-shot classification in five
+        classes, 48/48 on the synthetic labelled set, 12/12 hard cases (not blind any more),
+        corpus 78 one-shots + 2 multiple events for the user to judge; Scanned / Set aside
+        review with corrections that stick (docs/library/classification.md).
+      7 the capture Inbox: user-chosen folders reconciled at startup, on opening and every
+        3 s while open; explicit states, stable-file detection, iCloud placeholders,
+        duplicates, renames, offline folders, crash recovery; import (Captured) and load
+        in one step (docs/library/inbox.md). Sandbox bookmarks and the helper: investigated,
+        not built (D-18).
+      8 trim and slice editor (Sample Forge's slicer ported, 20 s slices), conservative trim,
+        fades, optional gain, stereo kept; each slice a new sound with its provenance; the
+        original untouched (docs/library/slicing.md).
+      Next: Stage 9 (iPhone capture) needs the user's Apple account and hardware, like
+      Stage 12 (signing); Stage 10 packs and Stage 11 backup can go first. The classifier
+      wants real labelled recordings; DAW checks need a Mac.
 - [ ] MODULATION: compare the panel and halo against the mockups (not received); host checks
       (Logic, Ableton, REAPER, AudioPluginHost); a global envelope mode needs a
       gate-aggregation rule before ENV may reach the macros.
