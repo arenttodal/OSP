@@ -798,6 +798,72 @@ TEST_CASE ("plugin: library prototype - catalog round trip of a sound, a preset 
 #endif
 }
 
+TEST_CASE ("plugin: library - every loaded sound and saved preset or template is recorded, in the background", "[plugin][library]")
+{
+    TempDir tmp;
+    const auto file = writeSource (tmp.dir, "Glass Pluck E4.wav", testsignals::pluck (midiToHz (64), 1.2, 48000.0, 9));
+    const auto presetFile = tmp.dir.getChildFile ("Glass.osppreset");
+    const auto templateFile = tmp.dir.getChildFile ("Glass Settings.ospstate");
+    auto openCatalog = [] {
+        std::string error;
+        auto c = osp::library::Catalog::open (osp::library::Catalog::defaultFile(), error);
+        INFO (error);
+        REQUIRE (c != nullptr);
+        return c;
+    };
+    std::string hash;
+    {
+        OspAudioProcessor p;
+        loadAndWait (p, file);
+        REQUIRE (p.currentInstrument() != nullptr);
+        hash = p.currentInstrument()->contentHash;
+        REQUIRE (p.libraryService().waitUntilIdle (10000));
+        {
+            auto c = openCatalog();
+            const auto ids = c->soundsWithContent (hash);
+            REQUIRE (ids.size() == 1);
+            CHECK (c->asset (ids[0])->name == "Glass Pluck E4");
+            const auto sound = c->sound (ids[0]);
+            CHECK (sound->sampleRate == 48000.0);
+            CHECK (sound->durationSeconds > 1.1);
+            CHECK (c->useCount (ids[0]) == 1);
+            const auto recent = c->recent (5, osp::library::AssetType::sound);
+            REQUIRE_FALSE (recent.empty());
+            CHECK (recent.front().assetId == ids[0]);
+            CHECK (recent.front().layer == 0);
+        }
+        REQUIRE (p.savePreset (presetFile));
+        REQUIRE (p.savePreset (presetFile));   // saved again: the same record
+        REQUIRE (p.saveStartingState (templateFile));
+        REQUIRE (p.libraryService().waitUntilIdle (10000));
+        CHECK (p.libraryService().unavailableReason().isEmpty());
+    }
+    auto c = openCatalog();
+    const auto preset = c->presetWithFile (presetFile.getFullPathName().toStdString());
+    REQUIRE (preset.has_value());
+    CHECK (c->asset (*preset)->type == osp::library::AssetType::preset);
+    CHECK (c->preset (*preset)->soundHashes == std::vector<std::string> { hash });
+    osp::library::SearchQuery presets;
+    presets.type = osp::library::AssetType::preset;
+    presets.text = "glass";
+    CHECK (c->search (presets).size() == 1);
+    const auto settings = c->presetWithFile (templateFile.getFullPathName().toStdString());
+    REQUIRE (settings.has_value());
+    CHECK (c->asset (*settings)->type == osp::library::AssetType::templateState);
+    CHECK (c->preset (*settings)->soundHashes.empty());
+    // A project recall is not a use: the record stays one, its history unchanged.
+    {
+        OspAudioProcessor p;
+        REQUIRE (p.loadPreset (presetFile));
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        REQUIRE (p.libraryService().waitUntilIdle (10000));
+    }
+    const auto ids = c->soundsWithContent (hash);
+    REQUIRE (ids.size() == 1);
+    CHECK (c->useCount (ids[0]) == 1);
+}
+
 TEST_CASE ("plugin: a portable instrument is untrusted - nothing lands outside the store, damaged sounds are refused", "[plugin][security]")
 {
     TempDir tmp;
@@ -1251,9 +1317,18 @@ int main (int argc, char* argv[])
     setenv ("OSP_SAMPLE_STORE", store.getFullPathName().toRawUTF8(), 1);
 #endif
 
+    // ... and an isolated Library catalog.
+    const auto library = store.getSiblingFile (store.getFileName() + "-library");
+#if JUCE_WINDOWS
+    _putenv_s ("OSP_LIBRARY_DIR", library.getFullPathName().toRawUTF8());
+#else
+    setenv ("OSP_LIBRARY_DIR", library.getFullPathName().toRawUTF8(), 1);
+#endif
+
     juce::ScopedJuceInitialiser_GUI juceInit;
     const int result = Catch::Session().run (argc, argv);
     store.deleteRecursively();
+    library.deleteRecursively();
     return result;
 }
 

@@ -5,6 +5,8 @@
 
 #include "library/Catalog.h"
 
+#include <juce_core/juce_core.h>
+
 #include <sqlite3.h>
 
 #include <catch2/catch_test_macros.hpp>
@@ -419,4 +421,109 @@ TEST_CASE ("library: measured - catalog of 50,000 sounds", "[.][library-perf]")
         WARN (count << " sounds: insert " << t.insertSeconds << " s, text search " << 1000.0 * t.textSeconds << " ms (" << t.textHits << " hits), filtered "
                     << 1000.0 * t.filteredSeconds << " ms, recent " << 1000.0 * t.recentSeconds << " ms");
     }
+}
+
+// A child process for the tests below (hidden): writes sounds into OSP_LIBRARY_CHILD_DB,
+// OSP_LIBRARY_CHILD_COUNT of them (0: until it is killed).
+TEST_CASE ("library: child writer process", "[.][library-child]")
+{
+    const char* file = std::getenv ("OSP_LIBRARY_CHILD_DB");
+    const char* countText = std::getenv ("OSP_LIBRARY_CHILD_COUNT");
+    const char* tagText = std::getenv ("OSP_LIBRARY_CHILD_TAG");
+    REQUIRE (file != nullptr);
+    const int count = countText != nullptr ? std::atoi (countText) : 0;
+    const std::string tag = tagText != nullptr ? tagText : "child";
+    auto c = openOrFail (file);
+    for (int i = 0; count == 0 || i < count; ++i)
+    {
+        const auto id = c->addSound (named (tag + " " + std::to_string (i)), soundOf ("sha256:" + tag + std::to_string (i)));
+        REQUIRE (id.has_value());
+        REQUIRE (c->addTag (*id, tag));
+        REQUIRE (c->recordUse (*id, "loaded", 0));
+    }
+}
+
+namespace
+{
+    juce::ChildProcess* startWriter (const std::filesystem::path& db, int count, const std::string& tag)
+    {
+        // The environment reaches the child through the shell (ChildProcess has no env parameter).
+        const auto exe = juce::File::getSpecialLocation (juce::File::currentExecutableFile).getFullPathName();
+        const auto command = "OSP_LIBRARY_CHILD_DB='" + juce::String (db.string()) + "' OSP_LIBRARY_CHILD_COUNT=" + juce::String (count) + " OSP_LIBRARY_CHILD_TAG=" + juce::String (tag)
+                             + " exec '" + exe + "' '[library-child]'";
+        auto* child = new juce::ChildProcess();
+        if (! child->start (juce::StringArray { "/bin/sh", "-c", command }, 0))
+        {
+            delete child;
+            return nullptr;
+        }
+        return child;
+    }
+}
+
+TEST_CASE ("library: separate processes (hosts, instances) write one catalog at once", "[unit][library]")
+{
+#if JUCE_WINDOWS
+    SKIP ("uses /bin/sh to start the writers");
+#endif
+    TempLibrary tmp;
+    openOrFail (tmp.file());
+    std::vector<std::unique_ptr<juce::ChildProcess>> writers;
+    for (int i = 0; i < 3; ++i)
+    {
+        writers.emplace_back (startWriter (tmp.file(), 80, "proc" + std::to_string (i)));
+        REQUIRE (writers.back() != nullptr);
+    }
+    for (auto& w : writers)
+    {
+        REQUIRE (w->waitForProcessToFinish (60000));
+        CHECK (w->getExitCode() == 0);
+    }
+    auto c = openOrFail (tmp.file());
+    SearchQuery all;
+    all.limit = 1000;
+    CHECK (c->search (all).size() == 240);
+    SearchQuery one;
+    one.tags = { "proc1" };
+    one.limit = 1000;
+    CHECK (c->search (one).size() == 80);
+    CHECK (c->integrityCheck() == "ok");
+}
+
+TEST_CASE ("library: a writer killed mid-write leaves a sound catalog", "[unit][library]")
+{
+#if JUCE_WINDOWS
+    SKIP ("uses /bin/sh to start the writer");
+#endif
+    TempLibrary tmp;
+    openOrFail (tmp.file());
+    std::unique_ptr<juce::ChildProcess> writer (startWriter (tmp.file(), 0, "doomed"));
+    REQUIRE (writer != nullptr);
+    // Let it write for a while, then kill it without warning (a host crash, a force quit).
+    {
+        auto c = openOrFail (tmp.file());
+        const auto until = std::chrono::steady_clock::now() + std::chrono::seconds (20);
+        while (c->search ({}).size() < 30 && std::chrono::steady_clock::now() < until)
+            std::this_thread::sleep_for (std::chrono::milliseconds (20));
+    }
+    REQUIRE (writer->kill());
+    writer->waitForProcessToFinish (5000);
+    auto c = openOrFail (tmp.file());
+    CHECK (c->integrityCheck() == "ok");
+    SearchQuery all;
+    all.limit = 100000;
+    const auto sounds = c->search (all);
+    CHECK (sounds.size() >= 30);
+    // Every call was all or nothing: each record has its details (a sound and its details are
+    // one transaction). The writer tags in a second call, so only the sound it was writing when
+    // it died may lack its tag.
+    int untagged = 0;
+    for (const auto& a : sounds)
+    {
+        CHECK (c->sound (a.id).has_value());
+        untagged += c->tagsOf (a.id).empty() ? 1 : 0;
+    }
+    CHECK (untagged <= 1);
+    // And the catalog takes new writes.
+    CHECK (c->addSound (named ("after the crash"), soundOf ("sha256:after")).has_value());
 }

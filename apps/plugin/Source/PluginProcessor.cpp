@@ -750,6 +750,7 @@ OspAudioProcessor::OspAudioProcessor()
         for (std::size_t k = 0; k < rp.size(); ++k)
             rp[k] = parameters.getRawParameterValue (modRouteId (r, names[k]));
     }
+    libraryHub = std::make_unique<LibraryService> (store.directory());
     parameters.state.addListener (this);   // META-MODULATION's links (ModLinks)
     refreshModLinks();
     for (int c = 0; c < 4; ++c)
@@ -816,6 +817,7 @@ OspAudioProcessor::~OspAudioProcessor()
 {
     stopTimer();
     parameters.state.removeListener (this);
+    libraryHub.reset();   // finishes the queued catalog work (short jobs)
     for (auto* p : reimaginedParameters)
         if (p != nullptr)
             p->removeListener (this);
@@ -2704,6 +2706,8 @@ void OspAudioProcessor::timerCallback()
                 layer.latestByLoad[loadId] = result.instrument;
                 if (loadId != layer.lastPublishedLoad)
                 {
+                    // A new sound on this layer: into the Library (its history when the user chose it).
+                    libraryHub->soundLoaded (*result.instrument, static_cast<int> (index), userLoads.count (loadId) > 0);
                     // A new sample (not a later stage of the same one): undoable if the user asked for it.
                     if (userLoads.count (loadId) > 0 && layer.lastPublishedLoad != 0)
                     {
@@ -3300,6 +3304,7 @@ bool OspAudioProcessor::savePreset (const juce::File& file)
     if (xml == nullptr || ! xml->writeTo (file))
         return false;
     lastPresetFile = file;
+    libraryHub->presetSaved (file, library::AssetType::preset, soundHashesInState (*xml), slotCount(), stateVersion);
     return true;
 }
 
@@ -3368,6 +3373,7 @@ bool OspAudioProcessor::saveStartingState (const juce::File& file)
     file.getParentDirectory().createDirectory();
     if (! xml->writeTo (file))
         return false;
+    libraryHub->presetSaved (file, library::AssetType::templateState, {}, slotCount(), stateVersion);
     presetNameOverride = file.getFileNameWithoutExtension();
     presetIsProgram = false;
     lastPresetFile = juce::File();

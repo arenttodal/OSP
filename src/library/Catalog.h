@@ -156,6 +156,10 @@ public:
     };
     std::optional<Added> addImportedSound (const Asset& asset, const SoundInfo& info, const std::string& path, const std::string& kind);
     std::optional<std::string> addPreset (const Asset& asset, const PresetInfo& info);
+    /** A preset or template file saved (again): its record updated in place (same identity,
+        new name, version, sounds), or a new one. */
+    std::optional<std::string> savePreset (const Asset& asset, const PresetInfo& info);
+    std::optional<std::string> presetWithFile (const std::string& file) const;
     std::optional<Asset> asset (const std::string& id) const;
     std::optional<SoundInfo> sound (const std::string& id) const;
     std::optional<PresetInfo> preset (const std::string& id) const;

@@ -20,13 +20,13 @@ Verified. Blocked rows name what is missing.
 | S1-02 | Stable asset IDs; content hash; locations separate from identity | 1 | Catalog (UUID ids, sounds.content_hash, source_locations) | [unit][library] | Tested | one content / several records; rename keeps identity |  |
 | S1-03 | Operation contracts (inputs, outputs, errors, threading) | 1 | docs/library/architecture.md | - | Implemented | documented | each operation's tests land with its stage |
 | S1-04 | Versioned schemas (database, preset, template, backup, analysis, inbox) | 1 | schema.md, preset-format.md, template-format.md; Catalog::migrate | [unit][library] (newer schema refused untouched, index rebuilt) | Tested | catalog v1; portable manifest v2 specified | manifest v2 written in Stage 3 |
-| S2-01 | SQLite catalog with migrations and integrity check | 2 | src/library/Catalog.* | [unit][library] | Tested | WAL, busy timeout, integrity_check | recovery after an unclean shutdown: Stage 2 |
-| S2-02 | Full-text search (FTS5, fallback) | 2 | Catalog::search | [unit][library] | In Progress | prefix words, filters, sort, query syntax neutralised | 10k / 50k timing: Stage 2 |
+| S2-01 | SQLite catalog with migrations and integrity check | 2 | src/library/Catalog.* | [unit][library] | Tested | WAL, busy timeout, integrity_check; a writer process killed mid-write leaves a sound catalog that takes new writes | macOS verification in CI |
+| S2-02 | Full-text search (FTS5, fallback) | 2 | Catalog::search | [unit][library], [.][library-perf] | Tested | 10,000: 1.6 ms; 50,000: 4 ms (testing.md) | macOS timings |
 | S2-03 | Content-addressed managed audio, deduplication | 2 | SoundImport (the existing store layout) | [unit][library][import] | Tested | one stored copy per content; one record per (content, path); 4 instances x 6 files -> 6 copies, 6 records |  |
 | S2-04 | Recoverable import transaction | 2 | importSound | [unit][library][import] | Tested | .partial never a sound, cleared by age; cancel publishes nothing; copy hash-verified before rename | catalog-side `import_jobs` resume: with the Inbox (Stage 7) |
 | S2-05 | File resolution order; no name-only substitution | 2 | resolveSound | [unit][library][import] | Tested | store -> seen places by hash; a same-name different recording is missing | pack content and user relink: Stages 5 and 10 |
 | S2-06 | Indexed external files stay in place | 2 | scanning | unit | Not Started |  |  |
-| S2-07 | Multiple plugin instances share the catalog safely | 2 | Catalog (WAL, one connection each) | [unit][library] 4 x 60 concurrent writes | Tested | no failure, integrity ok | across processes: Stage 2 |
+| S2-07 | Multiple plugin instances share the catalog safely | 2 | Catalog (WAL, one connection each); LibraryService (one thread per instance) | [unit][library]: 4 threads x 60, 3 processes x 80, 4 importers | Tested | all writes land, integrity ok |  |
 | S2-08 | Integrity: duplicates, interrupted copy, corrupt audio, missing, read-only, disk full | 2 | importSound, Catalog | [unit][library][import] | In Progress | duplicates, interrupted, damaged, empty, missing, unsupported tested | read-only skipped here (tests run as root); disk full not simulated; crash during a transaction relies on SQLite WAL |
 | S3-01 | Complete (portable) preset: manifest, state, audio, metadata, integrity | 3 | presets | round trip on a clean store | Not Started |  | existing .ospinstrument is the base |
 | S3-02 | Template: state without audio or private paths | 3 | templates | unit | Not Started |  |  |
@@ -61,3 +61,6 @@ Verified. Blocked rows name what is missing.
 | S12-01 | Signed, notarized installer | 12 | release | clean Mac | Blocked |  | needs Apple Developer certificates |
 | S12-02 | User documentation | 12 | docs | - | Not Started |  |  |
 | S1-05 | The catalog is never needed to recall a preset or project | 1 | D-02 | [plugin][library] | Tested | preset recalls its sound with the catalog deleted |  |
+| S2-09 | Every sound the instrument loads is recorded (history when the user chose it) | 2 | LibraryService::soundLoaded (from the message thread, work on its own thread) | [plugin][library] | Tested | name, details, history layer; recall adds no history |  |
+| S2-10 | Saved presets and templates are indexed (re-saving updates the same record) | 2 | LibraryService::presetSaved, Catalog::savePreset | [plugin][library] | Tested | preset with its sound; template with none |  |
+| S2-11 | Audio memory lifecycle: buffers prepared off the audio thread, old ones kept while voices use them | 2 | ModelExchange, retired instruments (existing) | existing [unit] ModelExchange, [plugin] swap tests | Verified (existing) | unchanged by the Library |  |

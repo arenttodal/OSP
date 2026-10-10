@@ -1,6 +1,7 @@
 #pragma once
 
 #include "InstrumentLoader.h"
+#include "LibraryService.h"
 #include "LoadedInstrument.h"
 
 #include "engine/Arpeggiator.h"
@@ -71,6 +72,8 @@ public:
     /** The sounds a saved state (session, preset) needs: every layer's and set member's
         content hash ("sha256:<hex>"), sorted, without repeats. A template has none. */
     static std::vector<std::string> soundHashesInState (const juce::XmlElement& state);
+    /** The Library catalog's door (loads and saves are recorded through it). */
+    LibraryService& libraryService() noexcept { return *libraryHub; }
     bool savePreset (const juce::File& file);
     bool loadPreset (const juce::File& file);
     /** One file with the sources, their analysis and the settings: opens on any computer. */
@@ -485,6 +488,7 @@ private:
 
     // Loader
     SampleStore store;
+    std::unique_ptr<LibraryService> libraryHub;   ///< the catalog (background thread; never the audio thread)
     juce::ThreadPool loaderPool { 1 };
     std::mutex resultsMutex;               // loader <-> message thread only, never audio
     std::deque<Finished> finishedLoads;

@@ -4,7 +4,8 @@
 |---|---|---|
 | `[unit][library]` | `tests/library/CatalogTests.cpp` | catalog schema and reopen, identities, search (words, filters, sort, query syntax neutralised), inferred vs user tags, history, locations, newer catalog left untouched, search index rebuilt, four instances writing at once, 10,000-sound search bound |
 | `[unit][library][import]` | `tests/library/ImportTests.cpp` | import transaction: stored once under its hash, details, duplicates, damaged / empty / unsupported / missing refused with nothing left, interruption and cancel, read-only store (skipped as root), four instances importing at once, resolver by bytes never by name |
-| `[plugin][library]` | `tests/plugin/PluginProcessorTests.cpp` | a sound, a preset and a template indexed from the real plugin; recall with the catalog deleted |
+| `[unit][library]` (processes) | `CatalogTests.cpp` | three writer processes at once; a writer killed mid-write (catalog intact, takes new writes). The writers are the hidden `[.][library-child]` case of the same binary |
+| `[plugin][library]` | `tests/plugin/PluginProcessorTests.cpp` | a sound, a preset and a template indexed from the real plugin; recall with the catalog deleted; every load and save recorded by `LibraryService` (recall adds no history) |
 | `[plugin][security]` | same | untrusted `.ospinstrument` packages |
 | `[.][library-perf]` | `CatalogTests.cpp` | measured catalog sizes (below) |
 

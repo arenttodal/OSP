@@ -56,6 +56,7 @@ target_sources(OSP_Plugin PRIVATE
     Source/ModulationPanel.cpp
     Source/EqEditor.cpp
     Source/InstrumentLoader.cpp
+    Source/LibraryService.cpp
     ${OSP_IO_SOURCES})
 
 target_include_directories(OSP_Plugin PRIVATE ${PROJECT_SOURCE_DIR}/src Source)

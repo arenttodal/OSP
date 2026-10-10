@@ -533,6 +533,44 @@ std::optional<std::string> Catalog::addPreset (const Asset& a, const PresetInfo&
     return id;
 }
 
+std::optional<std::string> Catalog::presetWithFile (const std::string& file) const
+{
+    Statement s (db, "SELECT p.asset_id FROM presets p JOIN assets a ON a.id = p.asset_id WHERE p.file = ?1 AND a.trashed_at IS NULL ORDER BY a.created LIMIT 1");
+    s.bind (1, file);
+    if (s.step() != SQLITE_ROW)
+        return std::nullopt;
+    return s.text (0);
+}
+
+std::optional<std::string> Catalog::savePreset (const Asset& a, const PresetInfo& info)
+{
+    const auto existing = presetWithFile (info.file);
+    if (! existing)
+        return addPreset (a, info);
+    Transaction t (db);
+    if (! t.ok())
+        return std::nullopt;
+    Statement asset (db, "UPDATE assets SET name = ?1, type = ?2, modified = ?3 WHERE id = ?4");
+    asset.bind (1, a.name).bind (2, std::string (toString (a.type == AssetType::sound ? AssetType::preset : a.type))).bind (3, now()).bind (4, *existing);
+    Statement preset (db, "UPDATE presets SET state_version = ?1, layers = ?2, root = ?3 WHERE asset_id = ?4");
+    preset.bind (1, info.stateVersion).bind (2, info.layers).bind (3, info.root).bind (4, *existing);
+    Statement clear (db, "DELETE FROM preset_sounds WHERE preset_id = ?1");
+    clear.bind (1, *existing);
+    if (! asset.run() || ! preset.run() || ! clear.run())
+        return std::nullopt;
+    for (const auto& hash : info.soundHashes)
+    {
+        Statement d (db, "INSERT OR IGNORE INTO preset_sounds (preset_id, content_hash) VALUES (?1, ?2)");
+        d.bind (1, *existing).bind (2, hash);
+        if (! d.run())
+            return std::nullopt;
+    }
+    reindex (*existing);
+    if (! t.commit())
+        return std::nullopt;
+    return existing;
+}
+
 std::optional<Asset> Catalog::asset (const std::string& id) const
 {
     Statement s (db, "SELECT id, type, origin, name, category, notes, favourite, created, modified, trashed_at FROM assets WHERE id = ?1");
