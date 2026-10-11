@@ -79,6 +79,34 @@ jobs:
           name: OSP-macOS-test
           path: OSP-macOS-test.zip
 
+      # ANDOR Drums (docs/drums): the second plug-in from this repository, validated and
+      # packed beside OSP. OSP's steps above are unchanged.
+      - name: Validate ANDOR Drums AU (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          cp -R "build/apps/drums/ANDOR_Drums_artefacts/Release/AU/ANDOR Drums.component" ~/Library/Audio/Plug-Ins/Components/
+          killall -9 AudioComponentRegistrar || true
+          auval -v aumu Adrm Ospx
+
+      - name: Package ANDOR Drums macOS test build
+        if: runner.os == 'macOS'
+        run: |
+          out=ANDOR-Drums-macOS-test
+          mkdir -p $out
+          art=build/apps/drums/ANDOR_Drums_artefacts/Release
+          cp -R "$art/AU/ANDOR Drums.component" "$art/VST3/ANDOR Drums.vst3" $out/
+          if [ -d "$art/Standalone/ANDOR Drums.app" ]; then cp -R "$art/Standalone/ANDOR Drums.app" $out/; fi
+          cp packaging/drums-macos-test/install.command packaging/drums-macos-test/README.txt $out/
+          chmod +x $out/install.command
+          lipo -info "$out/ANDOR Drums.component/Contents/MacOS/ANDOR Drums"
+          ditto -c -k --keepParent $out ANDOR-Drums-macOS-test.zip
+
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'macOS'
+        with:
+          name: ANDOR-Drums-macOS-test
+          path: ANDOR-Drums-macOS-test.zip
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:

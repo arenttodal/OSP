@@ -311,12 +311,7 @@ TEST_CASE ("Nine pads at once; output independent of the host's block size", "[d
         KitSettings kit;   // the default drum kit: LIFE on, so the seed matters
         kit.macros.space = 0.3;
         kit.macros.echo = 0.2;
-        std::array<PadSettings, maxPads> pads {};
-        const std::array<DrumCategory, maxPads> cats { DrumCategory::kick, DrumCategory::snare, DrumCategory::closedHat, DrumCategory::openHat,
-                                                       DrumCategory::clap, DrumCategory::tom, DrumCategory::rim, DrumCategory::percussion, DrumCategory::cymbal };
-        for (int p = 0; p < maxPads; ++p)
-            pads[static_cast<std::size_t> (p)] = PadSettings::defaultsFor (cats[static_cast<std::size_t> (p)]);
-        Rig rig (kit, pads, block);
+        Rig rig (kit, std::array<PadSettings, maxPads> {}, block);   // plain pads: no chokes, so all nine sound
         for (int p = 0; p < maxPads; ++p)
             rig.engine.setPadModel (p, models[static_cast<std::size_t> (p)].get());
         for (int n : KeyMap::defaults().padNote)
