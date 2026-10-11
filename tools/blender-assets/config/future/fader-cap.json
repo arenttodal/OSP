@@ -1,0 +1,28 @@
+{
+    "schemaVersion": 1,
+    "status": "planned (not rendered yet): sizes and what differs from macro-knob.json",
+    "material": "satin-ivory",
+    "camera": "top-down",
+    "lighting": "studio-soft",
+    "name": "fader-ivory",
+    "type": "fader-cap",
+    "description": "A fader cap (the A/B blend, VOLUME): one image, moved along its track by the GUI; no rotation frames. Needs a geometry builder (a filleted box with a centre groove).",
+    "geometry": {
+        "width": 12.0,
+        "length": 22.0,
+        "height": 7.0,
+        "groove": {
+            "width": 1.0,
+            "depth": 0.3
+        }
+    },
+    "frames": {
+        "count": 1
+    },
+    "runtime": {
+        "levels": [
+            64,
+            128
+        ]
+    }
+}

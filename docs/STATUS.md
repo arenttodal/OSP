@@ -349,9 +349,13 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       connections that open a brand-new catalog at the same moment retry the migration
       instead of failing, and LibraryService no longer latches a failed open. Both bugs
       reproduced under CPU load before the fix. `[library]`.
-- [ ] RENDERED MACRO KNOB, phase 1 (tools/blender-assets, docs/reports/knob-phase1.md): a
-      procedural Blender generator; the LIFE macro as pilot; Cmd+Option+K / OSP_KNOB_SKIN
-      switches original / pilot / all macros (looks only).
+- [x] RENDERED MACRO KNOB, phase 1 (tools/blender-assets, docs/reports/knob-phase1.md): a
+      procedural Blender generator (geometry, three ivory finishes, fixed studio, calibrated
+      exposure, 129 deterministic frames); Satin Ivory with an engraved line chosen at real
+      size; SpriteKnobRenderer (lazy decode, exact-size area resampling, shared per process);
+      the LIFE macro as pilot; Cmd+Option+K / OSP_KNOB_SKIN switches original / pilot / all
+      macros (looks only: output bit-identical, state unchanged). `[plugin][sprite-knob]`.
+      Next: judge it on the Mac; engine-card knobs from config/future.
 - [ ] FINAL MODULATION SYSTEM + DAMPEN (queued spec, stages 0-10): Stage 0 audit done
       (docs/reports/mod-final-audit.md); implementation next.
 - [x] `plugin-pipeline/`: the build-and-download pipeline as a reusable kit for other JUCE

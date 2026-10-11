@@ -1,0 +1,29 @@
+{
+    "schemaVersion": 1,
+    "status": "planned (not rendered yet): sizes and what differs from macro-knob.json",
+    "material": "satin-ivory",
+    "camera": "top-down",
+    "lighting": "studio-soft",
+    "name": "engine-ivory",
+    "type": "knob",
+    "description": "The engine cards' knobs (START, TUNE, PAN, LEVEL, REIMAGINED): 92 px box with ticks, body about 65 px at 1448.",
+    "geometry": {
+        "inherits": "macro-knob",
+        "diameter": 20.0,
+        "height": 8.5,
+        "flutes": {
+            "count": 36,
+            "depth": 0.32
+        }
+    },
+    "indicator": {
+        "width": 1.15,
+        "from": 0.32
+    },
+    "runtime": {
+        "levels": [
+            128,
+            256
+        ]
+    }
+}

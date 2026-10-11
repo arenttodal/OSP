@@ -191,6 +191,7 @@ void OspLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int widt
     style.startAngle = startAngle;
     style.endAngle = endAngle;
     style.enabled = slider.isEnabled();
+    style.sprite = spriteFor (slider, *sprites);   // a rendered cap, under the current knob skin
     if (static_cast<bool> (props["spectral"]))
     {
         style.spectral = true;

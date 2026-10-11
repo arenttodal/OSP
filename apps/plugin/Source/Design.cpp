@@ -1,4 +1,5 @@
 #include "Design.h"
+#include "SpriteKnobRenderer.h"
 
 #include <cstring>
 #include <unordered_map>
@@ -352,6 +353,13 @@ void knob (juce::Graphics& g, juce::Point<float> c, float r, float position, con
                 g.setGradientFill (juce::ColourGradient (style.arc.darker (0.55f), p0.x, p0.y, style.arc.brighter (0.12f), p1.x, p1.y, false));
             g.strokePath (value, juce::PathStrokeType (arcWidth, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         }
+    }
+
+    // A rendered cap: its own light, shadow and indicator, at the same radius.
+    if (style.sprite != nullptr && style.sprite->isValid())
+    {
+        style.sprite->draw (g, c, r, angle, style.enabled ? 1.0f : 0.45f);
+        return;
     }
 
     // Body: contact shadow, bevelled rim (lit top-left, shaded bottom-right), lit cap.

@@ -1,0 +1,23 @@
+{
+    "schemaVersion": 1,
+    "status": "planned (not rendered yet): sizes and what differs from macro-knob.json",
+    "material": "satin-ivory",
+    "camera": "top-down",
+    "lighting": "studio-soft",
+    "name": "toggle-ivory",
+    "type": "toggle",
+    "description": "A two-state switch (LOOP, REVERSE): one frame per state (and a pressed one) instead of a turn. Needs a geometry builder (a bat or a rocker).",
+    "geometry": {
+        "states": [
+            "off",
+            "on",
+            "pressed"
+        ]
+    },
+    "runtime": {
+        "levels": [
+            64,
+            128
+        ]
+    }
+}

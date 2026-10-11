@@ -38,3 +38,7 @@ __pycache__/
 # Visual QA renders (scripts/visual-review.sh); design/final-review is committed
 /design/current/
 /design/review/
+
+# Rendered controls: masters, atlases and previews are regenerated (tools/blender-assets/README.md)
+/tools/blender-assets/output/
+__pycache__/

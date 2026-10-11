@@ -1,0 +1,61 @@
+{
+    "schemaVersion": 1,
+    "name": "macro-ivory",
+    "type": "knob",
+    "description": "The large macro knob (LIFE..ECHO): a shallow, tapered, fluted ivory cap on a narrow base ring, with a charcoal indicator.",
+
+    "geometry": {
+        "units": "mm",
+        "diameter": 28.0,
+        "height": 11.0,
+        "taper": 0.07,
+        "topCurvature": 0.55,
+        "bevelWidth": 1.5,
+        "bevelSegments": 10,
+        "edgeRound": 0.25,
+        "angularSamples": 1440,
+        "flutes": { "count": 48, "depth": 0.42, "sharpness": 1.15, "fadeIn": 1.2, "topFade": 0.55 },
+        "skirt": { "enabled": true, "height": 1.4, "extraRadius": 0.45, "gap": 0.35, "gapDepth": 0.35, "round": 0.3 }
+    },
+
+    "indicator": {
+        "style": "engraved",
+        "width": 1.3,
+        "from": 0.30,
+        "to": 1.0,
+        "depth": 0.22,
+        "downSide": 0.8,
+        "color": "#26231f",
+        "roughness": 0.72
+    },
+
+    "material": "satin-ivory",
+    "variants": ["soft-ivory", "brushed-ivory", "satin-ivory"],
+    "camera": "top-down",
+    "lighting": "studio-soft",
+
+    "render": {
+        "engine": "CYCLES",
+        "samples": 96,
+        "denoise": true,
+        "seed": 7,
+        "resolution": 512,
+        "filterWidth": 1.5,
+        "viewTransform": "Standard",
+        "calibrate": { "enabled": true, "target": "#f1ede6", "probeResolution": 160, "probeSamples": 96 }
+    },
+
+    "rotation": {
+        "convention": "JUCE rotary angle: radians clockwise from 12 o'clock",
+        "start": 3.9269908169872414,
+        "end": 8.639379797371932,
+        "source": "apps/plugin/Source/OspLookAndFeel.h rotaryStart (1.25 pi) / rotaryEnd (2.75 pi)"
+    },
+
+    "frames": { "count": 129 },
+
+    "runtime": {
+        "levels": [176, 352],
+        "destination": "apps/plugin/Resources/knobs/macro-ivory"
+    }
+}

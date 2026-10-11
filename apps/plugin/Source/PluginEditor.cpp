@@ -430,6 +430,10 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
         knob.slider.getProperties().set ("arc", static_cast<juce::int64> (design::colour::macro (static_cast<int> (i)).getARGB()));
         knob.slider.getProperties().set ("thinArc", 2.4);
         knob.slider.getProperties().set ("paramId", macroInfo[i].first);   // a modulation drop target
+        // The rendered ivory cap (tools/blender-assets): LIFE is its pilot; the knob skin
+        // (Cmd+Option+K, OSP_KNOB_SKIN) decides which macros show it. Looks only.
+        knob.slider.getProperties().set ("sprite", "macro-ivory");
+        knob.slider.getProperties().set ("spritePilot", i == 0);
         knob.label->setTooltip (popupHints[i]);
         const int index = popupOfMacro (static_cast<int> (i));
         knob.label->onClick = [this, index] {
@@ -1227,6 +1231,13 @@ bool OspAudioProcessorEditor::keyPressed (const juce::KeyPress& key)
             closeLibrary();
         else
             openLibrary();
+        return true;
+    }
+    if (command && key.getModifiers().isAltDown() && (key.getKeyCode() == 'K' || key.getKeyCode() == 'k'))
+    {
+        // Development: original knob / rendered pilot / all macros rendered. Looks only.
+        setKnobSkin (nextKnobSkin (knobSkin()));
+        content.repaint();
         return true;
     }
     if (command && key.getKeyCode() == 'Z')

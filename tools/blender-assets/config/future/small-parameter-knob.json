@@ -1,0 +1,32 @@
+{
+    "schemaVersion": 1,
+    "status": "planned (not rendered yet): sizes and what differs from macro-knob.json",
+    "material": "satin-ivory",
+    "camera": "top-down",
+    "lighting": "studio-soft",
+    "name": "param-ivory",
+    "type": "knob",
+    "description": "Popover and envelope knobs: body about 40 px at 1448.",
+    "geometry": {
+        "inherits": "macro-knob",
+        "diameter": 14.0,
+        "height": 6.5,
+        "flutes": {
+            "count": 30,
+            "depth": 0.25
+        },
+        "skirt": {
+            "enabled": false
+        }
+    },
+    "indicator": {
+        "width": 1.0,
+        "from": 0.3
+    },
+    "runtime": {
+        "levels": [
+            96,
+            176
+        ]
+    }
+}
