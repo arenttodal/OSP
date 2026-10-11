@@ -1,6 +1,7 @@
 #include "drums/DrumMapping.h"
 
 #include <algorithm>
+#include <cstdlib>
 
 namespace osp::drums
 {
@@ -205,6 +206,90 @@ EditResult setPadNote (KeyMap& map, int pad, int note, bool layer)
     return done();
 }
 
+EditResult clearZone (KeyMap& map, int pad)
+{
+    if (! validPad (pad))
+        return refused ("No such pad.");
+    map.zone[at (pad)] = Zone {};
+    return done();
+}
+
+int nearestFreeStart (const KeyMap& map, int width, int preferredLow, int ignorePad)
+{
+    if (width < 1 || width > 128)
+        return -1;
+    int best = -1;
+    for (int low = 0; low + width - 1 <= 127; ++low)
+    {
+        const Zone candidate { low, low + width - 1, noNote };
+        bool free = true;
+        for (int p = 0; p < maxPads && free; ++p)
+            if (p != ignorePad && map.zone[at (p)].overlaps (candidate))
+                free = false;
+        if (free && (best < 0 || std::abs (low - preferredLow) < std::abs (best - preferredLow)))
+            best = low;
+    }
+    return best;
+}
+
+EditResult moveZoneToFreeSpace (KeyMap& map, int pad)
+{
+    if (! validPad (pad) || ! map.zone[at (pad)].enabled())
+        return refused ("This pad has no zone to move.");
+    const auto z = map.zone[at (pad)];
+    const int low = nearestFreeStart (map, z.width(), z.low, pad);
+    if (low < 0)
+        return refused ("There is no free range of " + std::to_string (z.width()) + " keys for this zone.");
+    return moveZone (map, pad, low, Collision::refuse);
+}
+
+int widestFittingWidth (int pads) noexcept
+{
+    return pads > 0 ? std::min (128, 128 / pads) : 128;
+}
+
+EditResult applyStandardPadNotes (KeyMap& map)
+{
+    map.padNote = defaultPadNotes();
+    return done();
+}
+
+EditResult applyChromaticPadNotes (KeyMap& map, const std::vector<int>& order, int startNote)
+{
+    std::vector<int> pads;
+    for (int p : order)
+        if (validPad (p) && std::find (pads.begin(), pads.end(), p) == pads.end())
+            pads.push_back (p);
+    if (pads.empty())
+        return refused ("No pads to lay out.");
+    const int start = std::clamp (startNote, 0, 128 - static_cast<int> (pads.size()));
+    map.padNote.fill (noNote);
+    for (std::size_t i = 0; i < pads.size(); ++i)
+        map.padNote[at (pads[i])] = start + static_cast<int> (i);
+    return done();
+}
+
+EditResult applyStandardZones (KeyMap& map)
+{
+    const auto notes = defaultPadNotes();
+    for (int p = 0; p < maxPads; ++p)
+        map.zone[at (p)] = Zone { notes[at (p)], notes[at (p)], noNote };
+    return done();
+}
+
+std::vector<int> changedPads (const KeyMap& before, const KeyMap& after, KeyboardMode mode)
+{
+    std::vector<int> pads;
+    for (int p = 0; p < maxPads; ++p)
+    {
+        const bool changed = mode == KeyboardMode::pad ? before.padNote[at (p)] != after.padNote[at (p)]
+                                                       : ! (before.zone[at (p)] == after.zone[at (p)]);
+        if (changed)
+            pads.push_back (p);
+    }
+    return pads;
+}
+
 int widthOf (ZonePreset preset) noexcept
 {
     switch (preset)
@@ -218,17 +303,23 @@ int widthOf (ZonePreset preset) noexcept
 
 EditResult applyZonePreset (KeyMap& map, ZonePreset preset, const std::vector<int>& order, int startNote)
 {
+    return applyZoneLayout (map, widthOf (preset), order, startNote);
+}
+
+EditResult applyZoneLayout (KeyMap& map, int width, const std::vector<int>& order, int startNote)
+{
     std::vector<int> pads;
     for (int p : order)
         if (validPad (p) && std::find (pads.begin(), pads.end(), p) == pads.end())
             pads.push_back (p);
     if (pads.empty())
         return refused ("No pads to lay out.");
-    const int width = widthOf (preset);
+    if (width < 1)
+        return refused ("A zone holds at least one key.");
     const int needed = width * static_cast<int> (pads.size());
     if (needed > 128)
     {
-        const int fits = 128 / static_cast<int> (pads.size());
+        const int fits = widestFittingWidth (static_cast<int> (pads.size()));
         return refused (std::to_string (pads.size()) + " zones of " + std::to_string (width)
                         + " keys need " + std::to_string (needed) + " keys; MIDI has 128. Try "
                         + std::to_string (fits) + " keys per pad or fewer pads.");

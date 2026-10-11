@@ -158,7 +158,18 @@ idle cost of nine engines is about 1 %.
 about 5 MB. Not done yet, because it changes `InstrumentEngine`'s allocation and needs its
 own OSP regression run.
 
-## 6. Known limitations at this checkpoint
+## 6. Editor (V1.1)
+
+`DrumsEditor` scales one `DrumsContent` laid out at 1280 x 900 (fixed aspect, 0.7-1.5x).
+`PadGrid` / `PadView` (one cell component, geometry only from the grid), `SamplePanel`,
+`EnvelopePanel`, `KeyMapEditor`. Every map edit is a validated `drums::` command applied
+through `DrumsProcessor::applyEdit` (one `juce::UndoManager` transaction holding the
+arrangement before and after: both key maps, the pad order, the names). The audio thread
+sees the result through the existing seqlock. MIDI Learn and the held-note display use a
+lock-free FIFO and atomic bits written by `processBlock`. Details and test coverage:
+`v1.1-report.md`.
+
+## 7. Known limitations at this checkpoint
 
 - Several files dropped on one pad load only the first (Milestone 3: round robin, velocity
   layers, stack, replace).

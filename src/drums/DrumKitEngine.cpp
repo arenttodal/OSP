@@ -310,6 +310,12 @@ void DrumKitEngine::releasePad (int pad) noexcept
         noteOff (128 + pad);
 }
 
+void DrumKitEngine::setSustainPedal (bool down) noexcept
+{
+    for (auto& e : engines)
+        e->setSustainPedal (down);
+}
+
 void DrumKitEngine::allNotesOff() noexcept
 {
     for (auto& e : engines)

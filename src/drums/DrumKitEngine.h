@@ -129,6 +129,9 @@ public:
     /** Plays a pad at its natural pitch (mouse audition), as if its own key were played. */
     void triggerPad (int pad, int velocity) noexcept;
     void releasePad (int pad) noexcept;
+    /** Sustain pedal (CC 64): gate pads keep sounding after note-off until it is released
+        (one-shot pads ignore note-offs anyway). */
+    void setSustainPedal (bool down) noexcept;
     void allNotesOff() noexcept;
     void reset() noexcept;
     void resetPerformance() noexcept;

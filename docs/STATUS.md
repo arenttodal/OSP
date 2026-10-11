@@ -356,7 +356,9 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       Adrm) built on OSP's engine. M0 and M1 done: nine pads, each an unmodified
       `InstrumentEngine` with its post stage off (`EngineSettings::postStage`, default on),
       one shared PostProcessor, PAD / EXPANDED key maps, chokes, `fadeOutAll`; OSP suites
-      unchanged. `osp_drums_tests`, `andor_drums_plugin_tests`. Next: M2-M4 (docs/drums/plan.md).
+      unchanged. `osp_drums_tests`, `andor_drums_plugin_tests`. V1.1: pads-on-top editor,
+      KEY MAP (drag zones/roots, collisions, MIDI Learn, Auto Map, undo), state 2
+      (docs/drums/v1.1-report.md). Next: layering (round robin), kit presets.
 
 ## DONE
 

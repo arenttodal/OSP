@@ -17,19 +17,19 @@ branch.
       summed (≤ 1e-5). Per-pad gain, tune and mute act on that pad only (the snare is
       sample-identical). Both use OSP's `InstrumentEngine`. OSP's suites pass unchanged.
 - [ ] **M2 Eight-pad instrument.** Done: 9 pads, selection, mute/solo, choke groups,
-      per-pad gain/pan/tune, shared effects, session save/load, 2x4 / 3x3 with a
-      ninth-pad chip. Next: pad drag to move/swap (pad identity kept; undo), duplicate,
-      clear with undo, rename UI polish, per-pad envelope controls, kit preset files
-      (`.andorkit`, own schema).
+      per-pad gain/pan/tune/start/reverse/envelope, shared effects, session save/load,
+      2x4 / 3x3 with a PAD 9 button, pad swap by dragging (undoable), rename (undoable).
+      Next: duplicate, clear with undo, kit preset files (`.andorkit`, own schema).
 - [ ] **M3 Sample layering.** Multi-file drop choice (round robin / velocity / stack /
       replace), drum sets built with one forced root, round-robin modes (sequential,
       random, shuffle bag), layer editor, undo.
-- [ ] **M4 Keyboard performance.** Engine and data: PAD and EXPANDED maps, root override,
-      move / resize / swap with refuse-or-swap collision rules, deliberate overlap, presets
-      (compact, 1 or 2 octaves) with a fit check, mode as an automatable parameter, recall.
-      All tested. Next: the keyboard-zone editor GUI, MIDI Learn for zones, undo.
-- [ ] **M5 GUI.** Waits for the mockup review (spec 4.6 / Part 15). The functional editor
-      uses OSP's palette, fonts and knobs (screenshots: `docs/drums/screens/`).
+- [x] **M4 Keyboard performance** (V1.1, `v1.1-report.md`): KEY MAP editor (lanes,
+      aligned keyboard, zoom/scroll), drag move / resize / root, click-to-assign,
+      collision resolution (swap, move others, layer, cancel), MIDI Learn (note, range),
+      Auto Map with preview, one undo step per gesture, sustain pedal, state 2.
+- [ ] **M5 GUI** (V1.1 layout done: pads on top, equal 2x4 / 3x3 cells, selected-pad
+      editor, AMP envelope, effects, kit macros, resizable 0.7-1.5x). Open: Blender knob,
+      per-pad modulation sources, a 1x8 pad strip if the mockup's single row is wanted.
 - [ ] **M6 Break slicing** (reuse `src/library/Slicer`, onset analysis).
 - [ ] **M7 Smart classification** (reuse `src/library/Classifier`; licence review before
       any model weights).

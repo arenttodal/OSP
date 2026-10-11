@@ -35,6 +35,8 @@ set(OSP_PLUGIN_SOURCE_DIR ${PROJECT_SOURCE_DIR}/apps/plugin/Source)
 target_sources(ANDOR_Drums PRIVATE
     Source/DrumsProcessor.cpp
     Source/DrumsEditor.cpp
+    Source/PadGrid.cpp
+    Source/KeyMapEditor.cpp
     ${OSP_PLUGIN_SOURCE_DIR}/InstrumentLoader.cpp
     ${OSP_PLUGIN_SOURCE_DIR}/OspLookAndFeel.cpp
     ${OSP_PLUGIN_SOURCE_DIR}/Design.cpp

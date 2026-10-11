@@ -424,3 +424,34 @@ TEST_CASE ("Performance: callback time idle, nine pads and heavy retriggering", 
                  InstrumentEngine::voiceSlots() * sizeof (InstrumentVoice) / 1.0e6,
                  maxPads * InstrumentEngine::voiceSlots() * sizeof (InstrumentVoice) / 1.0e6);
 }
+
+TEST_CASE ("Sustain pedal holds gate pads across a mode switch; release ends them", "[drums][engine]")
+{
+    Rig rig;
+    rig.engine.setPadModel (0, kick().get());
+    rig.engine.setPadModel (1, snare().get());
+    PadSettings gate;
+    gate.trigger = TriggerMode::gate;
+    gate.adsr.releaseSeconds = 0.02;
+    rig.engine.setPadSettings (0, gate);
+    rig.engine.setPadSettings (1, gate);
+
+    rig.engine.setSustainPedal (true);
+    rig.engine.noteOn (36, 100);   // PAD kick
+    rig.engine.noteOn (38, 100);   // PAD snare
+    rig.run (0.02);
+    rig.engine.setKeyboardMode (KeyboardMode::expanded);
+    rig.engine.noteOff (36);
+    rig.engine.noteOff (38);
+    rig.run (0.1);
+    CHECK (rig.engine.activeVoiceCount (0) == 1);   // held by the pedal
+    CHECK (rig.engine.activeVoiceCount (1) == 1);
+    rig.engine.setSustainPedal (false);
+    rig.run (0.1);
+    CHECK (rig.engine.activeVoiceCount() == 0);   // no stuck notes
+
+    rig.engine.noteOn (12, 100);   // EXPANDED: pad 0
+    rig.engine.allNotesOff();
+    rig.run (0.1);
+    CHECK (rig.engine.activeVoiceCount() == 0);
+}

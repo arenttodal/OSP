@@ -163,3 +163,67 @@ TEST_CASE ("Swapping zones exchanges bounds and roots; PAD and EXPANDED maps sta
     CHECK (keyboardModeFromString (toString (KeyboardMode::expanded)) == KeyboardMode::expanded);
     CHECK (keyboardModeFromString ("nonsense", KeyboardMode::pad) == KeyboardMode::pad);
 }
+
+TEST_CASE ("Collision resolution: move the zone in the way to the nearest free place", "[drums][mapping]")
+{
+    auto map = KeyMap::defaults();
+    REQUIRE (applyZonePreset (map, ZonePreset::oneOctave, { 0, 1 }, 36).applied);   // 36-47, 48-59
+    CHECK (nearestFreeStart (map, 12, 40) == 24);          // 24-35 is nearest below 36 (60 is farther)
+    CHECK (nearestFreeStart (map, 12, 40, 0) == 36);       // ignoring pad 0, its own place
+    REQUIRE (moveZoneToFreeSpace (map, 1).applied);        // already free where it is: stays
+    CHECK (map.zone[1] == Zone { 48, 59, noNote });
+
+    // Pad 0 wants 50..61: pad 1 moves out of the way to the nearest free octave, then pad 0 lands.
+    map.zone[0] = Zone {};
+    REQUIRE (applyZoneLayout (map, 12, { 1 }, 48).applied);
+    map.zone[0] = Zone { 12, 23, noNote };
+    auto trial = map;
+    trial.zone[0] = Zone { 50, 61, noNote };
+    REQUIRE (collisions (map, 0, trial.zone[0]) == std::vector<int> { 1 });
+    map.zone[0] = trial.zone[0];
+    REQUIRE (moveZoneToFreeSpace (map, 1).applied);
+    CHECK_FALSE (map.zone[1].overlaps (map.zone[0]));
+    CHECK (map.zone[1].width() == 12);
+
+    // Nothing fits: refused with an explanation, map untouched.
+    KeyMap full = KeyMap::defaults();
+    REQUIRE (applyZoneLayout (full, 14, { 0, 1, 2, 3, 4, 5, 6, 7, 8 }, 0).applied);   // 126 keys used
+    full.zone[1] = Zone { 0, 19, noNote };   // 20 keys over pad 0 (as allowOverlap allows); only 8 + 2 keys are free
+    const auto keep = full;
+    CHECK_FALSE (moveZoneToFreeSpace (full, 1).applied);
+    CHECK (full == keep);
+}
+
+TEST_CASE ("Auto Map layouts for PAD and EXPANDED", "[drums][mapping]")
+{
+    KeyMap map = KeyMap::defaults();
+    REQUIRE (applyChromaticPadNotes (map, { 3, 0, 1 }, 60).applied);
+    CHECK (map.padNote[3] == 60);
+    CHECK (map.padNote[0] == 61);
+    CHECK (map.padNote[1] == 62);
+    CHECK (map.padNote[2] == noNote);
+    REQUIRE (applyStandardPadNotes (map).applied);
+    CHECK (map.padNote == defaultPadNotes());
+
+    REQUIRE (applyStandardZones (map).applied);
+    std::array<Hit, maxPads> hits {};
+    for (int p = 0; p < maxPads; ++p)
+    {
+        REQUIRE (resolve (map, KeyboardMode::expanded, defaultPadNotes()[static_cast<std::size_t> (p)], hits) == 1);
+        CHECK (hits[0].pad == p);
+    }
+
+    CHECK (widestFittingWidth (8) == 16);
+    CHECK (widestFittingWidth (9) == 14);
+    CHECK_FALSE (applyZoneLayout (map, 24, { 0, 1, 2, 3, 4, 5, 6, 7 }).applied);
+    REQUIRE (applyZoneLayout (map, widestFittingWidth (8), { 0, 1, 2, 3, 4, 5, 6, 7 }, 36).applied);
+    CHECK (map.zone[7].high == 127);
+    CHECK_FALSE (map.zone[8].enabled());
+
+    const auto before = KeyMap::defaults();
+    auto after = before;
+    REQUIRE (moveZone (after, 2, 0, Collision::refuse).applied);   // 0..11 is free
+    CHECK (after.zone[2] == Zone { 0, 11, noNote });
+    CHECK (changedPads (before, after, KeyboardMode::expanded) == std::vector<int> { 2 });
+    CHECK (changedPads (before, after, KeyboardMode::pad).empty());
+}

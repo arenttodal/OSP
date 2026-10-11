@@ -4,6 +4,8 @@
 
 #include "core/PitchMath.h"
 
+#include <functional>
+
 namespace osp::drumsplugin
 {
 
@@ -95,6 +97,24 @@ juce::AudioProcessorValueTreeState::ParameterLayout DrumsProcessor::createLayout
         layout.add (std::make_unique<AudioParameterFloat> (ParameterID { padParamId (p, "tune"), 1 }, "Pad" + n + " Tune",
                                                            NormalisableRange<float> (-24.0f, 24.0f, 0.01f), 0.0f, AudioParameterFloatAttributes().withLabel ("st")));
         layout.add (std::make_unique<AudioParameterBool> (ParameterID { padParamId (p, "mute"), 1 }, "Pad" + n + " Mute", false));
+        // State 2: the pad's own sample start, direction and amplitude envelope.
+        const drums::PadSettings d;
+        layout.add (std::make_unique<AudioParameterFloat> (ParameterID { padParamId (p, "start"), 2 }, "Pad" + n + " Start",
+                                                           NormalisableRange<float> (0.0f, 1.0f, 0.0001f), static_cast<float> (d.start)));
+        layout.add (std::make_unique<AudioParameterBool> (ParameterID { padParamId (p, "reverse"), 2 }, "Pad" + n + " Reverse", false));
+        auto seconds = [] (float lo, float hi, float centre) {
+            NormalisableRange<float> r (lo, hi, 0.0001f);
+            r.setSkewForCentre (centre);
+            return r;
+        };
+        layout.add (std::make_unique<AudioParameterFloat> (ParameterID { padParamId (p, "attack"), 2 }, "Pad" + n + " Attack",
+                                                           seconds (0.0f, 2.0f, 0.05f), static_cast<float> (d.adsr.attackSeconds), AudioParameterFloatAttributes().withLabel ("s")));
+        layout.add (std::make_unique<AudioParameterFloat> (ParameterID { padParamId (p, "decay"), 2 }, "Pad" + n + " Decay",
+                                                           seconds (0.0f, 5.0f, 0.4f), static_cast<float> (d.adsr.decaySeconds), AudioParameterFloatAttributes().withLabel ("s")));
+        layout.add (std::make_unique<AudioParameterFloat> (ParameterID { padParamId (p, "sustain"), 2 }, "Pad" + n + " Sustain",
+                                                           NormalisableRange<float> (0.0f, 1.0f, 0.0001f), static_cast<float> (d.adsr.sustainLevel)));
+        layout.add (std::make_unique<AudioParameterFloat> (ParameterID { padParamId (p, "release"), 2 }, "Pad" + n + " Release",
+                                                           seconds (0.005f, 5.0f, 0.3f), static_cast<float> (d.adsr.releaseSeconds), AudioParameterFloatAttributes().withLabel ("s")));
         layout.add (std::make_unique<AudioParameterBool> (ParameterID { padParamId (p, "solo"), 1 }, "Pad" + n + " Solo", false));
     }
     return layout;
@@ -134,6 +154,10 @@ void DrumsProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
         s.tuneSemitones = raw (apvts, padParamId (p, "tune"));
         s.mute = raw (apvts, padParamId (p, "mute")) > 0.5f;
         s.solo = raw (apvts, padParamId (p, "solo")) > 0.5f;
+        s.start = raw (apvts, padParamId (p, "start"));
+        s.reverse = raw (apvts, padParamId (p, "reverse")) > 0.5f;
+        s.adsr = { raw (apvts, padParamId (p, "attack")), raw (apvts, padParamId (p, "decay")),
+                   raw (apvts, padParamId (p, "sustain")), raw (apvts, padParamId (p, "release")) };
     }
     engine.prepare (sampleRate, std::max (16, samplesPerBlock), kit, settings);
     for (int p = 0; p < numPads; ++p)
@@ -253,24 +277,30 @@ void DrumsProcessor::pullSettings() noexcept
     for (int p = 0; p < numPads; ++p)
     {
         auto& c = pulled[index (p)];
-        const double gain = raw (apvts, padParamId (p, "gain"));
-        const double pan = raw (apvts, padParamId (p, "pan"));
-        const double tune = raw (apvts, padParamId (p, "tune"));
-        const bool mute = raw (apvts, padParamId (p, "mute")) > 0.5f;
-        const bool solo = raw (apvts, padParamId (p, "solo")) > 0.5f;
-        if (gain == c.gain && pan == c.pan && tune == c.tune && mute == c.mute && solo == c.solo)
+        Pulled now = c;
+        now.gain = raw (apvts, padParamId (p, "gain"));
+        now.pan = raw (apvts, padParamId (p, "pan"));
+        now.tune = raw (apvts, padParamId (p, "tune"));
+        now.start = raw (apvts, padParamId (p, "start"));
+        now.attack = raw (apvts, padParamId (p, "attack"));
+        now.decay = raw (apvts, padParamId (p, "decay"));
+        now.sustain = raw (apvts, padParamId (p, "sustain"));
+        now.release = raw (apvts, padParamId (p, "release"));
+        now.mute = raw (apvts, padParamId (p, "mute")) > 0.5f;
+        now.solo = raw (apvts, padParamId (p, "solo")) > 0.5f;
+        now.reverse = raw (apvts, padParamId (p, "reverse")) > 0.5f;
+        if (now == c)
             continue;
-        c.gain = gain;
-        c.pan = pan;
-        c.tune = tune;
-        c.mute = mute;
-        c.solo = solo;
+        c = now;
         auto s = engine.padSettings (p);
-        s.gainDb = gain;
-        s.pan = pan;
-        s.tuneSemitones = tune;
-        s.mute = mute;
-        s.solo = solo;
+        s.gainDb = now.gain;
+        s.pan = now.pan;
+        s.tuneSemitones = now.tune;
+        s.mute = now.mute;
+        s.solo = now.solo;
+        s.start = now.start;
+        s.reverse = now.reverse;
+        s.adsr = { now.attack, now.decay, now.sustain, now.release };
         engine.setPadSettings (p, s);
     }
 }
@@ -339,11 +369,35 @@ void DrumsProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
         const auto message = metadata.getMessage();
         renderTo (juce::jlimit (0, numSamples, metadata.samplePosition));
         if (message.isNoteOn())
-            engine.noteOn (message.getNoteNumber(), message.getVelocity(), message.getChannel());
+        {
+            const int note = message.getNoteNumber();
+            engine.noteOn (note, message.getVelocity(), message.getChannel());
+            heldBits[static_cast<std::size_t> (note >> 5)].fetch_or (1u << (note & 31), std::memory_order_relaxed);
+            lastNote.store (note, std::memory_order_relaxed);
+            if (learnArmed.load (std::memory_order_relaxed))
+            {
+                const auto scope = learnFifo.write (1);
+                if (scope.blockSize1 > 0)
+                    learnNotes[static_cast<std::size_t> (scope.startIndex1)] = note;
+            }
+        }
         else if (message.isNoteOff())
-            engine.noteOff (message.getNoteNumber(), message.getChannel());
+        {
+            const int note = message.getNoteNumber();
+            engine.noteOff (note, message.getChannel());
+            heldBits[static_cast<std::size_t> (note >> 5)].fetch_and (~(1u << (note & 31)), std::memory_order_relaxed);
+        }
+        else if (message.isSustainPedalOn())
+            engine.setSustainPedal (true);
+        else if (message.isSustainPedalOff())
+            engine.setSustainPedal (false);
         else if (message.isAllNotesOff() || message.isAllSoundOff())
+        {
+            engine.setSustainPedal (false);
             engine.allNotesOff();
+            for (auto& b : heldBits)
+                b.store (0, std::memory_order_relaxed);
+        }
     }
     renderTo (numSamples);
     for (int c = 2; c < buffer.getNumChannels(); ++c)
@@ -405,8 +459,9 @@ juce::String DrumsProcessor::padDisplayName (int pad) const
 
 void DrumsProcessor::setPadName (int pad, const juce::String& name)
 {
-    pads[index (pad)].name = name.trim().toStdString();
-    sendChangeMessage();
+    auto next = arrangement();
+    next.names[index (pad)] = name.trim().toStdString();
+    applyEdit (next, "Rename pad");
 }
 
 void DrumsProcessor::setPadCategory (int pad, drums::DrumCategory category, bool applyCategoryDefaults)
@@ -453,6 +508,105 @@ void DrumsProcessor::releaseAuditionedPad (int pad)
     const auto scope = auditionFifo.write (1);
     if (scope.blockSize1 > 0)
         auditions[static_cast<std::size_t> (scope.startIndex1)] = Audition { pad, 0 };
+}
+
+DrumsProcessor::Arrangement DrumsProcessor::arrangement() const
+{
+    Arrangement a;
+    a.map = map;
+    a.order = order;
+    for (int p = 0; p < numPads; ++p)
+        a.names[index (p)] = pads[index (p)].name;
+    return a;
+}
+
+void DrumsProcessor::setArrangement (const Arrangement& a)
+{
+    map = a.map;
+    order = a.order;
+    for (int p = 0; p < numPads; ++p)
+        pads[index (p)].name = a.names[index (p)];
+    publishPadConfig();
+}
+
+namespace
+{
+    /** One user edit of the arrangement: before and after, nothing else (cheap and exact). */
+    class ArrangementAction final : public juce::UndoableAction
+    {
+    public:
+        using Arrangement = DrumsProcessor::Arrangement;
+        ArrangementAction (Arrangement b, Arrangement a, std::function<void (const Arrangement&)> applyFn)
+            : before (std::move (b)), after (std::move (a)), apply (std::move (applyFn))
+        {
+        }
+        bool perform() override
+        {
+            apply (after);
+            return true;
+        }
+        bool undo() override
+        {
+            apply (before);
+            return true;
+        }
+        int getSizeInUnits() override { return 1; }
+
+    private:
+        Arrangement before, after;
+        std::function<void (const Arrangement&)> apply;
+    };
+} // namespace
+
+void DrumsProcessor::applyEdit (const Arrangement& next, const juce::String& actionName)
+{
+    const auto current = arrangement();
+    if (next == current)
+        return;
+    undo.beginNewTransaction (actionName);
+    undo.perform (new ArrangementAction (current, next, [this] (const Arrangement& a) { setArrangement (a); }), actionName);
+}
+
+int DrumsProcessor::slotOfPad (int pad) const noexcept
+{
+    for (int s = 0; s < numPads; ++s)
+        if (order[index (s)] == pad)
+            return s;
+    return pad;
+}
+
+void DrumsProcessor::swapPadSlots (int slotA, int slotB)
+{
+    if (slotA == slotB || slotA < 0 || slotB < 0 || slotA >= numPads || slotB >= numPads)
+        return;
+    auto next = arrangement();
+    std::swap (next.order[index (slotA)], next.order[index (slotB)]);
+    applyEdit (next, "Swap pads");
+}
+
+void DrumsProcessor::setLearnArmed (bool armed)
+{
+    if (armed)
+        takeLearnedNotes();   // nothing stale from before
+    learnArmed.store (armed, std::memory_order_relaxed);
+}
+
+std::vector<int> DrumsProcessor::takeLearnedNotes()
+{
+    std::vector<int> notes;
+    const auto scope = learnFifo.read (learnFifo.getNumReady());
+    for (int i = 0; i < scope.blockSize1; ++i)
+        notes.push_back (learnNotes[static_cast<std::size_t> (scope.startIndex1 + i)]);
+    for (int i = 0; i < scope.blockSize2; ++i)
+        notes.push_back (learnNotes[static_cast<std::size_t> (scope.startIndex2 + i)]);
+    return notes;
+}
+
+bool DrumsProcessor::isNoteHeld (int note) const noexcept
+{
+    if (note < 0 || note > 127)
+        return false;
+    return ((heldBits[static_cast<std::size_t> (note >> 5)].load (std::memory_order_relaxed) >> (note & 31)) & 1u) != 0;
 }
 
 void DrumsProcessor::loadPad (int pad, const juce::File& file)
@@ -602,6 +756,11 @@ void DrumsProcessor::getStateInformation (juce::MemoryBlock& destData)
         x->setAttribute ("root", map.zone[index (p)].root);
     }
 
+    juce::StringArray slots;
+    for (int slot = 0; slot < numPads; ++slot)
+        slots.add (juce::String (order[index (slot)] + 1));
+    root.createNewChildElement ("Order")->setAttribute ("slots", slots.joinIntoString (","));
+
     auto* view = root.createNewChildElement ("View");
     view->setAttribute ("layout", nineLayout ? "3x3" : "2x4");
     view->setAttribute ("selectedPad", selectedPad + 1);
@@ -674,6 +833,29 @@ void DrumsProcessor::setStateInformation (const void* data, int sizeInBytes)
                     clearPad (p);
             }
         }
+
+    order = { 0, 1, 2, 3, 4, 5, 6, 7, 8 };   // state 1 had no order: pads in identity order
+    if (auto* orderXml = root->getChildByName ("Order"))
+    {
+        juce::StringArray slots;
+        slots.addTokens (orderXml->getStringAttribute ("slots"), ",", "");
+        std::array<int, numPads> restoredOrder {};
+        std::array<bool, numPads> seen {};
+        bool valid = slots.size() == numPads;
+        for (int slot = 0; valid && slot < numPads; ++slot)
+        {
+            const int p = slots[slot].getIntValue() - 1;
+            valid = p >= 0 && p < numPads && ! seen[index (p)];
+            if (valid)
+            {
+                seen[index (p)] = true;
+                restoredOrder[index (slot)] = p;
+            }
+        }
+        if (valid)
+            order = restoredOrder;
+    }
+    undo.clearUndoHistory();   // a recalled kit starts a fresh history
 
     if (auto* view = root->getChildByName ("View"))
     {

@@ -110,6 +110,17 @@ EditResult resizeZone (KeyMap& map, int pad, int newLow, int newHigh, Collision 
 EditResult setZoneRoot (KeyMap& map, int pad, int root);
 /** Exchanges two pads' zones (bounds and roots). */
 EditResult swapZones (KeyMap& map, int padA, int padB);
+/** Removes a pad's zone (EXPANDED leaves it silent until it gets a new one). */
+EditResult clearZone (KeyMap& map, int pad);
+/**
+    Moves `pad`'s zone (same width and root offset) to the free place nearest its current
+    one: how a collision is resolved by moving the zone that was in the way. Refused when
+    no free place of that width exists.
+*/
+EditResult moveZoneToFreeSpace (KeyMap& map, int pad);
+/** The lowest note a zone of `width` keys could start at, nearest to `preferredLow`, without
+    overlapping any zone except `ignorePad`'s; -1 when none fits. */
+int nearestFreeStart (const KeyMap& map, int width, int preferredLow, int ignorePad = -1);
 /** Exchanges two pads' PAD-mode notes. */
 EditResult swapPadNotes (KeyMap& map, int padA, int padB);
 /** PAD mode: assigns a note. Refused if another pad already answers it, unless `layer`. */
@@ -129,6 +140,22 @@ int widthOf (ZonePreset preset) noexcept;
     would fit suggested in the message - when they cannot all fit in 0..127.
 */
 EditResult applyZonePreset (KeyMap& map, ZonePreset preset, const std::vector<int>& order, int startNote = 36);
+/** applyZonePreset with any width (1..128 keys per pad). */
+EditResult applyZoneLayout (KeyMap& map, int width, const std::vector<int>& order, int startNote = 36);
+/** The widest zone width that lets `pads` zones fit in MIDI 0..127. */
+int widestFittingWidth (int pads) noexcept;
+
+// PAD-mode layouts (Auto Map).
+/** The factory GM-style notes, by pad identity (Standard Drum Kit). */
+EditResult applyStandardPadNotes (KeyMap& map);
+/** One adjacent key per pad from `startNote`, in display order; pads not in `order` lose
+    their notes (Compact Chromatic). */
+EditResult applyChromaticPadNotes (KeyMap& map, const std::vector<int>& order, int startNote = 36);
+/** Standard Drum Kit for EXPANDED: one-key zones on the factory GM notes. */
+EditResult applyStandardZones (KeyMap& map);
+
+/** Pads that would answer differently after `after` replaces `before` in `mode`. */
+std::vector<int> changedPads (const KeyMap& before, const KeyMap& after, KeyboardMode mode);
 
 /** The factory EXPANDED layout: one octave per pad from C0 (MIDI 12; MIDI 12..119). */
 std::array<Zone, maxPads> defaultZones();
