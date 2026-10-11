@@ -98,6 +98,86 @@
                 "dividerGroove": true,
                 "seams": false
             }
+        },
+        "09-warm-ceramic-teak": {
+            "label": "09 Warm Ceramic + Teak",
+            "summary": "Round 2: Warm Ceramic (your pick) with oiled teak cheeks on the left and right edges; everything else as 02.",
+            "enclosure": "E1",
+            "cardMaterial": {
+                "preset": "M2-satin-ceramic-ivory",
+                "baseColor": "#e6e3dd"
+            },
+            "panel": "D3",
+            "buttons": "A1",
+            "tabs": "B1",
+            "fader": "C1",
+            "track": "T1",
+            "details": {
+                "leds": false,
+                "dividerGroove": false,
+                "seams": false
+            },
+            "trim": "teak"
+        },
+        "10-celadon-teak": {
+            "label": "10 Celadon & Teak",
+            "summary": "Round 2, Braun-inspired: cool satin off-white panel, pale celadon keys (grouped keys in a black recessed bank), a celadon fader in a recessed slot, teak cheeks; approved ivory knobs.",
+            "enclosure": "E5",
+            "panel": "D7",
+            "buttons": "A5",
+            "tabs": "B1",
+            "fader": "C4",
+            "track": "T2",
+            "trim": "teak",
+            "details": {
+                "leds": false,
+                "dividerGroove": false,
+                "seams": false
+            }
+        },
+        "11-studio-keys": {
+            "label": "11 Studio Keys",
+            "summary": "Round 2: Warm Ceramic + teak with the second reference's controls: cream keycaps in dark wells and cream cylindrical knobs on every knob (macros included).",
+            "enclosure": "E1",
+            "cardMaterial": {
+                "preset": "M2-satin-ceramic-ivory",
+                "baseColor": "#e6e3dd"
+            },
+            "panel": "D3",
+            "buttons": "A6",
+            "tabs": "B1",
+            "fader": "C5",
+            "track": "T2",
+            "details": {
+                "leds": false,
+                "dividerGroove": false,
+                "seams": false
+            },
+            "trim": "teak",
+            "knobs": "K2",
+            "knobScope": "all"
+        },
+        "12-studio-keys-approved-macros": {
+            "label": "12 Studio Keys, approved macro knob",
+            "summary": "Round 2: as 11, but the six macros keep the approved Blender knob; the layer and ADSR knobs get the cream caps.",
+            "enclosure": "E1",
+            "cardMaterial": {
+                "preset": "M2-satin-ceramic-ivory",
+                "baseColor": "#e6e3dd"
+            },
+            "panel": "D3",
+            "buttons": "A6",
+            "tabs": "B1",
+            "fader": "C5",
+            "track": "T2",
+            "details": {
+                "leds": false,
+                "dividerGroove": false,
+                "seams": false
+            },
+            "trim": "teak",
+            "knobs": "K2",
+            "knobScope": "small"
         }
     }
 }

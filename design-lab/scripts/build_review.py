@@ -124,22 +124,26 @@ def actual_size():
             crop(img, ACTUAL_RECT, s).save(os.path.join(out, f"{n}@{s:g}x.png"), optimize=True)
 
 
+# Close-ups compare today, the round-1 favourite and round 2 (the round-1 sheets stay as built).
+CLOSEUP_NAMES = ["00-original", "02-warm-ceramic", "09-warm-ceramic-teak", "10-celadon-teak", "11-studio-keys", "12-studio-keys-approved-macros"]
 CLOSEUPS = {
     "macro-panel": (30, 676, 1388, 228),
     "modulation-tabs": (948, 680, 466, 132),
     "engine-buttons": (35, 570, 451, 82),
     "volume-slider": (1140, 38, 214, 60),
+    "teak-edge": (0, 0, 260, 400),
 }
 
 
 def closeups():
     out = os.path.join(REVIEW, "closeups")
     os.makedirs(out, exist_ok=True)
-    imgs = {n: full(n, 2) for n in NAMES}
+    names = [n for n in NAMES if n in CLOSEUP_NAMES]
+    imgs = {n: full(n, 2) for n in names}
     for key, rect in CLOSEUPS.items():
-        tiles = [crop(imgs[n], rect, 2) for n in NAMES]
-        if key in ("engine-buttons", "volume-slider", "modulation-tabs"):
-            cols = 2 if key != "volume-slider" else 4
+        tiles = [crop(imgs[n], rect, 2) for n in names]
+        if key in ("engine-buttons", "volume-slider", "modulation-tabs", "teak-edge"):
+            cols = 2 if key not in ("volume-slider", "teak-edge") else 3
         else:
             cols = 1
         w, h = tiles[0].size
@@ -147,7 +151,7 @@ def closeups():
         sheet = Image.new("RGB", (cols * (w + 24) + 72, rows * (h + 46) + 120), BG)
         d = ImageDraw.Draw(sheet)
         d.text((48, 30), f"Close-up: {key.replace('-', ' ')} (2x, identical crop)", font=font(30, "SemiBold"), fill=INK)
-        for i, (n, t) in enumerate(zip(NAMES, tiles)):
+        for i, (n, t) in enumerate(zip(names, tiles)):
             x, y = 48 + (i % cols) * (w + 24), 90 + (i // cols) * (h + 46)
             d.text((x, y), LABELS[n], font=font(17, "Medium"), fill=MUTED)
             sheet.paste(t, (x, y + 24))
@@ -160,9 +164,10 @@ def contact_sheet():
     tiles = [shrink(full(n, 1), 2) for n in NAMES]
     w, h = tiles[0].size
     cols = 4
-    sheet = Image.new("RGB", (cols * (w + 20) + 60, 2 * (h + 44) + 110), BG)
+    rows = (len(tiles) + cols - 1) // cols
+    sheet = Image.new("RGB", (cols * (w + 20) + 60, rows * (h + 44) + 110), BG)
     d = ImageDraw.Draw(sheet)
-    d.text((40, 28), "ANDOR/OSP design lab: six directions and the original (same layout, values, knob)", font=font(26, "SemiBold"), fill=INK)
+    d.text((40, 28), "ANDOR/OSP design lab: the original, round 1 (01-06) and round 2 (09-12); same layout and values", font=font(26, "SemiBold"), fill=INK)
     for i, (n, t) in enumerate(zip(NAMES, tiles)):
         x, y = 40 + (i % cols) * (w + 20), 80 + (i // cols) * (h + 44)
         d.text((x, y), LABELS[n], font=font(16, "Medium"), fill=MUTED)
@@ -175,7 +180,7 @@ def sheets():
     # Buttons: actual size (1x) for every state, then 2x detail of normal and active.
     s = Sheet("Button families A1-A4", "Engine modifier row of card A (link, reverse, loop, REIMAGINED) in every state; same light, same icons. "
               "Top: actual size (100 %). Below: the card header and ARP / Advanced at 100 %, then 2x detail.", 2400)
-    for a in ("A1", "A2", "A3", "A4"):
+    for a in ("A1", "A2", "A3", "A4", "A5", "A6"):
         fam = CTRL["buttons"][a]
         states = [shrink(comp(f"buttons/{a}-{st}"), 4) for st in ("normal", "hover", "pressed", "active", "disabled")]
         s.add(fam["label"] + " - states at 100 %", fam["rationale"], states, ["normal", "hover", "pressed", "active", "disabled"])
@@ -197,8 +202,8 @@ def sheets():
 
     s = Sheet("Volume fader caps C1-C3 x tracks T1-T3", "Cap = rendered object (never carries the value); fill and labels stay software. "
               "Each row: minimum, 25, 50, 75 %, maximum at 100 %, then hover and drag at 2x.", 2400)
-    for c in ("C1", "C2", "C3"):
-        for t in ("T1", "T2", "T3"):
+    for c, t in [(c, t) for c in ("C1", "C2", "C3") for t in ("T1", "T2", "T3")] + [("C4", "T2"), ("C5", "T2")]:
+        if True:
             pos = [shrink(comp(f"sliders/{c}-{t}-{p:03d}"), 4) for p in (0, 25, 50, 75, 100)]
             st = [shrink(comp(f"sliders/{c}-{t}-{x}"), 2) for x in ("hover", "drag")]
             s.add(f"{CTRL['faders'][c]['label']} on {CTRL['tracks'][t]['label'].lower()} ({t})", CTRL["faders"][c]["rationale"], pos + st,
@@ -229,6 +234,18 @@ def sheets():
           [shrink(comp("details/arp-led-flat"), 2), shrink(comp("details/arp-led-lens"), 2), shrink(comp("details/button-wells"), 2), shrink(comp("details/recessed-track"), 2)],
           ["ARP production", "ARP lens", "button wells", "recessed track"])
     s.render(os.path.join(out, "hardware-details.png"))
+
+    # Round 2: the teak edge and the cream knob caps, each against production.
+    s = Sheet("Round 2: teak edges and studio knobs", "Left: today. Right: round 2. Same light, values, rings and halos (the rings are the plugin's own).", 3000)
+    s.add("Teak side cheeks", CTRL["trim"]["teak"]["rationale"],
+          [comp("details/trim-none"), comp("details/trim-teak"), shrink(comp("details/trim-none"), 2), shrink(comp("details/trim-teak"), 2)],
+          ["today 2x", "teak 2x", "today 100 %", "teak 100 %"])
+    s.add("Layer knobs: production vs K2 cream caps", CTRL["knobs"]["K2"]["rationale"],
+          [shrink(comp("knobs/production-layer"), 2), shrink(comp("knobs/K2-layer"), 2), shrink(comp("knobs/production-layer"), 4), shrink(comp("knobs/K2-layer"), 4)],
+          ["production 2x", "K2 2x", "production 100 %", "K2 100 %"])
+    s.add("Macro knobs: approved Blender knob vs K2 cream caps", "Direction 11 uses K2 on the macros too; 12 keeps the approved knob.",
+          [comp("knobs/approved-macro"), comp("knobs/K2-macro")], ["approved 2x", "K2 2x"])
+    s.render(os.path.join(out, "round2-details.png"))
 
 
 def web():

@@ -41,7 +41,7 @@ def gui():
     """The production layout, from the layer export (design px)."""
     with open(EXPORT, "r", encoding="utf-8") as f:
         layers = json.load(f)["layers"]
-    g = {"cards": [], "screens": [], "modifiers": [], "modes": [], "eqs": [], "layerStates": [], "macros": []}
+    g = {"cards": [], "screens": [], "modifiers": [], "modes": [], "eqs": [], "layerStates": [], "macros": [], "dials": [], "minis": []}
     card_of = {}
     for l in layers:
         cls = l["class"].split("::")[-1]
@@ -60,7 +60,11 @@ def gui():
         elif cls == "LayerStateButton":
             g["layerStates"].append((card_of[l["parent"]], r))
         elif cls == "Slider" and l["w"] == 132:
-            g["macros"].append((l.get("paramId", ""), r))
+            g["macros"].append((l.get("paramId", ""), r, l.get("sliderPos", 0.0)))
+        elif cls == "Slider" and l["w"] < 60:
+            g["minis"].append((r, l.get("sliderPos", 0.0)))
+        elif cls == "Dial":
+            g["dials"].append((r, l.get("sliderPos", 0.0)))
         elif cls == "AdvancedCardButton":
             g["advanced"] = r
         elif cls == "ArpControl":
@@ -149,7 +153,9 @@ class Builder:
         e = CTRL["emphasis"].get(role, 1.0)
         pressed = state in ("pressed", "active")
         tint = fam.get("activeTint") if state == "active" else (HOVER_TINT if state == "hover" else None)
-        body = state_tint(fam["material"], tint)
+        body = state_tint(fam.get("roleMaterial", {}).get(role, fam["material"]), tint)
+        if fam["kind"] == "bank":
+            fam = dict(fam, kind="raised", **fam["single"])
         if fam["kind"] == "inset":
             depth = fam["depth"] * (0.7 + 0.3 * e)
             glow = state == "active" and fam.get("activeGlow")
@@ -175,6 +181,64 @@ class Builder:
                 self.later.append(lambda: forms.ring(f"btn-{role}-ring", forms.expand(rect, w + 0.6), radius + w + 0.6, z0, 0.05, w, material(ring)))
         return fam
 
+    def bank(self, parent, keys, radius, role):
+        """A row of keys in one black recessed bank (A5): the pocket spans the group, each key
+        rises from the bank's floor and stands `proud` above the panel."""
+        if not keys:
+            return
+        fam = self.family("buttons", self.spec["buttons"])
+        x0 = min(r[0] for r, _ in keys)
+        y0 = min(r[1] for r, _ in keys)
+        x1 = max(r[0] + r[2] for r, _ in keys)
+        y1 = max(r[1] + r[3] for r, _ in keys)
+        g = fam["bankGrow"]
+        e = CTRL["emphasis"].get(role, 1.0)
+        depth = fam["depth"]
+        parent.pocket((x0 - g, y0 - g, x1 - x0 + 2 * g, y1 - y0 + 2 * g), fam["bankRadius"], depth, 0.05,
+                      floor=fam["bankFloor"], floor_key="bank")
+        z0 = parent.top - depth
+        for r, st in keys:
+            pressed = st in ("pressed", "active")
+            tint = fam.get("activeTint") if st == "active" else (HOVER_TINT if st == "hover" else None)
+            body = state_tint(fam["material"], tint)
+            h = depth + (fam["pressedProud"] if pressed else fam["proud"]) * e
+            self.later.append(lambda r=r, body=body, h=h: forms.slab(f"key-{role}", r, radius, z0, h, fam["bevel"], material(body)))
+
+    def plan_knobs(self, cards, deck):
+        """Restyled knob caps (K2): cylinders with a dark line at the knob's real angle, under the
+        production rings and halos (the compositor removes the production cap only)."""
+        key = self.spec.get("knobs")
+        if key not in CTRL.get("knobs", {}):
+            return
+        fam = CTRL["knobs"][key]
+        sizes = fam["sizes"]
+        jobs = []
+        for r, pos in self.g["dials"]:
+            card = next(c for c in cards if c.rect[0] <= r[0] < c.rect[0] + c.rect[2])
+            jobs.append(((r[0] + 0.5 * r[2], r[1] + 0.5 * r[3]), pos, sizes["layer"], card.top))
+        for r, pos in self.g["minis"]:
+            jobs.append(((r[0] + 0.5 * r[2], r[1] + 0.5 * r[3]), pos, sizes["mini"], deck.top))
+        if self.spec.get("knobScope", "all") == "all":
+            for _, r, pos in self.g["macros"]:
+                jobs.append(((r[0] + 0.5 * r[2], r[1] + 0.5 * r[3]), pos, sizes["macro"], deck.top))
+        for centre, pos, size, z0 in jobs:
+            self.later.append(lambda centre=centre, pos=pos, size=size, z0=z0: self.knob_cap(fam, centre, pos, size, z0))
+
+    @staticmethod
+    def knob_cap(fam, centre, pos, size, z0):
+        import math
+        from mathutils import Matrix
+        cx, cy = centre
+        r = size["radius"]
+        forms.slab("knob", (cx - r, cy - r, 2 * r, 2 * r), r, z0, size["height"], size["bevel"], material(fam["material"]), segments=6)
+        # The line, drawn pointing up, then turned to the knob's angle (225 deg + 270 deg x pos,
+        # clockwise from 12 o'clock, as OspLookAndFeel).
+        w = max(1.6, 0.075 * r)
+        line = forms.slab("knob-line", (cx - 0.5 * w, cy - 0.88 * r, w, 0.72 * r), 0.5 * w, z0 + size["height"], 0.02, 0.0, material(fam["line"]))
+        angle = math.radians(225.0 + 270.0 * pos)
+        c = (cx * geometry.PX, -cy * geometry.PX, 0.0)
+        line.matrix_world = Matrix.Translation(c) @ Matrix.Rotation(-angle, 4, "Z") @ Matrix.Translation((-c[0], -c[1], 0.0))
+
     def window(self, window, fam):
         """A shallow display window in a button's face (the ARP card's pattern and rate)."""
         if window is None:
@@ -192,7 +256,13 @@ class Builder:
 
         geometry.plane("backdrop", (-200, -200, 1848, 1486), material(self.roles["backdrop"]))
         hg = geo["housing"]
-        housing = Surface("housing", HOUSING, 26, 0.0, hg["height"], hg["bevel"], material(enc["housing"]))
+        trim = CTRL["trim"].get(spec.get("trim", ""))
+        housing = Surface("housing", HOUSING, trim["housingRadius"] if trim else 26, 0.0, hg["height"], hg["bevel"], material(enc["housing"]))
+        if trim:
+            for side in ("left", "right"):
+                rect = tuple(trim[side])
+                self.later.append(lambda rect=rect: forms.slab("trim", rect, trim["radius"], 0.0, trim["height"], trim["bevel"],
+                                                               material(self.roles[trim["material"]])))
         kb = geo["keybed"]
         housing.pocket(tuple(kb["rect"]), kb["radius"], kb["depth"], kb["lip"], floor=enc.get("keybed", self.roles["keybed"]), floor_key="keybed")
 
@@ -232,22 +302,29 @@ class Builder:
             self.later.append(lambda: forms.ring("seam", forms.expand(MACRO_PANEL, 3.0), 16.0, housing.top, 0.04, 1.0, material(seam)))
 
         # Buttons (planned now: an inset family cuts pockets into its parent).
-        for ci, r, index in g["modifiers"]:
-            st = mstate if mstate != "auto" else ("active" if index in ACTIVE_MODIFIERS else "normal")
-            self.button(cards[ci], r, 7, "modifier", st)
         sec = self.state.get("secondary", "normal")
+        mods = [(ci, r, mstate if mstate != "auto" else ("active" if index in ACTIVE_MODIFIERS else "normal")) for ci, r, index in g["modifiers"]]
+        if self.spec.get("buttons") in CTRL["buttons"] and CTRL["buttons"][self.spec["buttons"]]["kind"] == "bank":
+            # Grouped keys share one recessed bank per card: the modifiers, and M/S.
+            for ci in range(len(cards)):
+                self.bank(cards[ci], [(r, st) for c, r, st in mods if c == ci], 7, "modifier")
+                self.bank(cards[ci], [(r, sec) for c, r in g["layerStates"] if c == ci], 4, "layerState")
+        else:
+            for ci, r, st in mods:
+                self.button(cards[ci], r, 7, "modifier", st)
+            for ci, r in g["layerStates"]:
+                self.button(cards[ci], r, 4, "layerState", sec)
         for ci, r in g["modes"]:
             self.button(cards[ci], r, 7, "mode", sec)
         for ci, r in g["eqs"]:
             self.button(cards[ci], r, 6, "eq", sec)
-        for ci, r in g["layerStates"]:
-            self.button(cards[ci], r, 4, "layerState", sec)
         self.button(housing, g["advanced"], 7, "advanced", sec)
         self.button(housing, g["preset"], 12, "preset", sec)
         self.button(housing, g["arp"], 10, "arp", sec, window=(tuple(self.geo["arpPill"]), 9))
 
         self.plan_tabs(deck)
         self.plan_fader(housing)
+        self.plan_knobs(cards, deck)
         if details.get("leds"):
             self.plan_leds(deck, panel)
 
@@ -325,7 +402,9 @@ class Builder:
         self.later.append(lambda: forms.slab("fader-cap", rect, c["radius"], z0 + lift, c["height"], c["bevel"], material(body),
                                              chamfer=c.get("chamfer", False), pockets=pockets, extra_materials=tuple(extra)))
         if c.get("line") == "inlay":
-            ivory = "knob-satin-ivory" if fstate != "drag" else {"preset": "knob-satin-ivory", "emission": ["#ff9a52", 0.6]}
+            ivory = c.get("lineMaterial", "knob-satin-ivory")
+            if fstate == "drag":
+                ivory = {"preset": "knob-satin-ivory", "emission": ["#ff9a52", 0.6]}
             self.later.append(lambda: forms.slab("fader-line", (cx - 0.6, cy - 0.36 * c["h"], 1.2, 0.72 * c["h"]), 0.6, top, 0.03, 0.0, material(ivory)))
         if fstate == "drag" and c.get("line") == "engraved":
             glow = {"preset": "M1-warm-matte-ivory", "baseColor": "#f6b38a", "emission": ["#ff8a3c", 0.9]}
@@ -337,7 +416,7 @@ class Builder:
         y, d = self.geo["macroLedY"], self.geo["macroLedDiameter"]
         colours = {"life": "#be7552", "drive": "#b5843a", "character": "#7b8d69", "motion": "#73899c", "echo": "#5c9490", "space": "#96839d"}
         z0 = deck.top - (panel["depth"] if panel["kind"] == "graphiteInset" else 0.0)
-        for pid, r in self.g["macros"]:
+        for pid, r, _ in self.g["macros"]:
             lit = pid in self.geo["litMacros"]
             col = colours.get(pid, "#999999")
             lens = {"preset": "M2-satin-ceramic-ivory", "baseColor": col, "roughness": 0.22, "coat": 0.6,

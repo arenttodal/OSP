@@ -73,6 +73,11 @@ def make(name, spec, tint=None, emission=None):
         bsdf.inputs["Emission Color"].default_value = (*srgb_to_linear(emission[0]), 1.0)
         bsdf.inputs["Emission Strength"].default_value = emission[1]
 
+    wood = spec.get("wood")
+    if wood:
+        _wood(nodes, links, bsdf, wood)
+        return mat
+
     grain = spec.get("grain", {})
     if grain.get("height", 0.0) > 0.0:
         coords = nodes.new("ShaderNodeTexCoord")
@@ -114,6 +119,46 @@ def make(name, spec, tint=None, emission=None):
         rough.node.inputs[2].default_value = spec.get("roughness", 0.5)
         links.new(rough, bsdf.inputs["Roughness"])
     return mat
+
+
+def _wood(nodes, links, bsdf, wood):
+    """Oiled straight-grained wood (teak): bands along Y (the cheeks' long axis), warped by
+    noise, between a light and a dark tone; the same pattern as a faint bump (open pores)."""
+    coords = nodes.new("ShaderNodeTexCoord")
+    mapping = nodes.new("ShaderNodeMapping")
+    links.new(coords.outputs["Object"], mapping.inputs["Vector"])
+    # Grain runs along Y: compress X (many bands across), stretch Y.
+    mapping.inputs["Scale"].default_value = (1.0, wood.get("stretch", 0.08), 1.0)
+    wave = nodes.new("ShaderNodeTexWave")
+    wave.wave_type = "BANDS"
+    wave.bands_direction = "X"
+    wave.inputs["Scale"].default_value = wood.get("scale", 0.55)
+    wave.inputs["Distortion"].default_value = wood.get("distortion", 6.0)
+    wave.inputs["Detail"].default_value = 4.0
+    wave.inputs["Detail Scale"].default_value = 1.5
+    links.new(mapping.outputs["Vector"], wave.inputs["Vector"])
+    noise = nodes.new("ShaderNodeTexNoise")
+    noise.inputs["Scale"].default_value = 0.35
+    noise.inputs["Detail"].default_value = 3.0
+    links.new(mapping.outputs["Vector"], noise.inputs["Vector"])
+    # Grain value: mostly the bands, some broad figure from the noise.
+    mixf = nodes.new("ShaderNodeMix")
+    mixf.data_type = "FLOAT"
+    mixf.inputs[0].default_value = 0.35
+    links.new(wave.outputs["Fac"], mixf.inputs[2])
+    links.new(noise.outputs["Fac"], mixf.inputs[3])
+    ramp = nodes.new("ShaderNodeValToRGB")
+    ramp.color_ramp.elements[0].position = 0.25
+    ramp.color_ramp.elements[0].color = (*srgb_to_linear(wood["light"]), 1.0)
+    ramp.color_ramp.elements[1].position = 0.85
+    ramp.color_ramp.elements[1].color = (*srgb_to_linear(wood["dark"]), 1.0)
+    links.new(mixf.outputs[0], ramp.inputs["Fac"])
+    links.new(ramp.outputs["Color"], bsdf.inputs["Base Color"])
+    bump = nodes.new("ShaderNodeBump")
+    bump.inputs["Strength"].default_value = 0.25
+    bump.inputs["Distance"].default_value = wood.get("pore", 0.004)
+    links.new(wave.outputs["Fac"], bump.inputs["Height"])
+    links.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
 
 
 def by_name(name, **kwargs):

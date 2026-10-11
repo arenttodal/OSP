@@ -69,7 +69,7 @@ pre.out { white-space: pre-wrap; background: var(--bg); border: 1px solid var(--
 
 <div class="wrap">
   <header>
-    <h1>ANDOR/OSP Design Lab <small>Round 1: broad exploration</small></h1>
+    <h1>ANDOR/OSP Design Lab <small>Round 2: Warm Ceramic, teak, celadon, studio keys</small></h1>
     <p class="note">Rendered Blender surfaces composited under the plugin's own drawing (text, waveforms, approved knob, halos). Layout, values and knob are identical in every image. Nothing here is in the plugin; pick what to refine.</p>
   </header>
 
@@ -158,17 +158,22 @@ const DIRS = [
   ["03-brushed-ivory", "03 Brushed Ivory", "Brushed ivory housing, cards and macro panel (E3, D2); soft physical buttons (A1); ivory precision fader in a recessed slot (C1/T2); recessed divider."],
   ["04-warm-aluminum", "04 Warm Aluminium", "A brushed champagne-metal macro plate (D4) with a fine seam, precision metal buttons (A3), a brushed aluminium fader on a metal guide (C2/T3)."],
   ["05-graphite-contrast", "05 Graphite Contrast", "Ivory enclosure; the six macros in a graphite inset (D5) with light labels and lens LEDs; inset buttons with graphite grooves (A2); graphite keybed; graphite fader (C3/T2)."],
-  ["06-hybrid-premium", "06 Hybrid Premium", "Warm ivory housing, a subtly recessed satin macro section (D6), precision inset buttons (A2), refined flat tabs (B1), brushed aluminium cap in a recessed slot (C2/T2), lens LEDs, recessed divider."]
+  ["06-hybrid-premium", "06 Hybrid Premium", "Warm ivory housing, a subtly recessed satin macro section (D6), precision inset buttons (A2), refined flat tabs (B1), brushed aluminium cap in a recessed slot (C2/T2), lens LEDs, recessed divider."],
+  ["09-warm-ceramic-teak", "R2 · 09 Warm Ceramic + Teak", "Round 2. Your pick, 02 Warm Ceramic, with oiled teak cheeks on the left and right edges (in the window's margins, so nothing moves). Everything else as 02."],
+  ["10-celadon-teak", "R2 · 10 Celadon & Teak", "Round 2, inspired by the Braun reference: a cool satin off-white panel, pale celadon keys (the four modifiers and M/S sit in black recessed banks), a celadon fader in a recessed slot, teak cheeks; approved ivory knobs."],
+  ["11-studio-keys", "R2 · 11 Studio Keys", "Round 2, inspired by the second reference: Warm Ceramic + teak with cream keycaps standing out of dark wells, and cream cylindrical knobs with a black line on every knob, macros included. Value rings and halos are the plugin's own."],
+  ["12-studio-keys-approved-macros", "R2 · 12 Studio Keys, approved macros", "Round 2: as 11, but the six macros keep the approved Blender knob; layer and ADSR knobs get the cream caps."]
 ];
 const FAMS = [
-  ["buttons", "Buttons", ["A1 Soft Ivory", "A2 Precision Inset", "A3 Brushed Metal", "A4 Hybrid Flat"]],
+  ["round2-details", "Round 2: teak & knobs", ["Teak cheeks", "K2 cream knobs (all)", "K2 small knobs only", "Approved macro knob"]],
+  ["buttons", "Buttons", ["A1 Soft Ivory", "A2 Precision Inset", "A3 Brushed Metal", "A4 Hybrid Flat", "A5 Celadon Bank", "A6 Studio Keycaps"]],
   ["tabs", "Modulation tabs", ["B1 Refined Flat", "B2 Shallow Inset", "B3 Brushed Ivory", "B4 Precision Hardware"]],
-  ["sliders", "Volume fader", ["C1 Ivory", "C2 Brushed Aluminium", "C3 Graphite", "T1 Groove", "T2 Recessed Slot", "T3 Metal Guide"]],
+  ["sliders", "Volume fader", ["C1 Ivory", "C2 Brushed Aluminium", "C3 Graphite", "C4 Celadon", "C5 Studio Cream", "T1 Groove", "T2 Recessed Slot", "T3 Metal Guide"]],
   ["macro-panels", "Macro panel", ["D1 Current", "D2 Brushed Ivory", "D3 Satin Ceramic", "D4 Aluminium", "D5 Graphite Inset", "D6 Layered (recessed)"]],
   ["backgrounds", "Background", ["E1 Enhanced", "E2 Powder Coat", "E3 Brushed Ivory", "E4 Mixed Material"]],
   ["hardware-details", "Details", ["Lens LEDs", "Recessed divider", "Metal seam", "Button wells", "Recessed track"]]
 ];
-const CLOSE = [["macro-panel", "Macro panel"], ["modulation-tabs", "Modulation tabs"], ["engine-buttons", "Engine buttons"], ["volume-slider", "Volume slider"]];
+const CLOSE = [["macro-panel", "Macro panel"], ["engine-buttons", "Engine buttons"], ["teak-edge", "Teak edge"], ["modulation-tabs", "Modulation tabs"], ["volume-slider", "Volume slider"]];
 const web = p => "web/" + p.replace(/\//g, "__").replace(/\.png$/, ".jpg");
 
 const store = {
@@ -211,14 +216,14 @@ function zoomable(el, peers) {
 // Directions
 const dirChips = document.getElementById("dirChips");
 const dirViewer = zoomable(document.getElementById("dirViewer"));
-let current = store.get("dir", "06-hybrid-premium");
+let current = store.get("dir2", "09-warm-ceramic-teak");
 function favs() { return store.get("favs", {}) }
 function chipLabel(id, label) { return (favs()[id] ? "★ " : "") + label }
 function renderDirChips() {
   dirChips.innerHTML = "";
   for (const [id, label] of DIRS) {
     const b = document.createElement("button"); b.className = "chip"; b.textContent = chipLabel(id, label);
-    b.setAttribute("aria-pressed", id === current); b.onclick = () => { current = id; store.set("dir", id); renderDir() }; dirChips.appendChild(b);
+    b.setAttribute("aria-pressed", id === current); b.onclick = () => { current = id; store.set("dir2", id); renderDir() }; dirChips.appendChild(b);
   }
 }
 function renderDir() {
@@ -238,30 +243,30 @@ document.getElementById("dirNotes").oninput = e => store.set("note:" + current, 
 // Compare
 const cmpA = document.getElementById("cmpA"), cmpB = document.getElementById("cmpB");
 for (const sel of [cmpA, cmpB]) for (const [id, label] of DIRS) { const o = document.createElement("option"); o.value = id; o.textContent = label; sel.appendChild(o) }
-cmpA.value = store.get("cmpA", "00-original"); cmpB.value = store.get("cmpB", "06-hybrid-premium");
+cmpA.value = store.get("cmpA2", "02-warm-ceramic"); cmpB.value = store.get("cmpB2", "09-warm-ceramic-teak");
 const vA = document.getElementById("cmpViewA"), vB = document.getElementById("cmpViewB");
 const zA = zoomable(vA, () => [vB]); const zB = zoomable(vB, () => [vA]);
 function renderCmp() { vA.querySelector("img").src = web(cmpA.value + ".png"); vB.querySelector("img").src = web(cmpB.value + ".png");
-  store.set("cmpA", cmpA.value); store.set("cmpB", cmpB.value); zA.reset() }
+  store.set("cmpA2", cmpA.value); store.set("cmpB2", cmpB.value); zA.reset() }
 cmpA.onchange = cmpB.onchange = renderCmp;
 
 // Before / after
 const baSel = document.getElementById("baSel");
 for (const [id, label] of DIRS.slice(1)) { const o = document.createElement("option"); o.value = id; o.textContent = label; baSel.appendChild(o) }
-baSel.value = store.get("ba", "06-hybrid-premium");
+baSel.value = store.get("ba2", "09-warm-ceramic-teak");
 function renderBA() { document.getElementById("baBefore").src = web("00-original.png"); document.getElementById("baAfter").src = web(baSel.value + ".png");
-  document.getElementById("baTag").textContent = baSel.options[baSel.selectedIndex].text; store.set("ba", baSel.value) }
+  document.getElementById("baTag").textContent = baSel.options[baSel.selectedIndex].text; store.set("ba2", baSel.value) }
 baSel.onchange = renderBA;
 document.getElementById("baRange").oninput = e => { const v = e.target.value;
   document.getElementById("baAfter").style.clipPath = `inset(0 0 0 ${v}%)`; document.getElementById("baHandle").style.left = v + "%" };
 
 // Components
-let fam = store.get("fam", "buttons");
+let fam = store.get("fam2", "round2-details");
 const famChips = document.getElementById("famChips");
 function renderFam() {
   famChips.innerHTML = "";
   for (const [id, label] of FAMS) { const b = document.createElement("button"); b.className = "chip"; b.textContent = label;
-    b.setAttribute("aria-pressed", id === fam); b.onclick = () => { fam = id; store.set("fam", id); renderFam() }; famChips.appendChild(b) }
+    b.setAttribute("aria-pressed", id === fam); b.onclick = () => { fam = id; store.set("fam2", id); renderFam() }; famChips.appendChild(b) }
   const f = FAMS.find(x => x[0] === fam);
   document.getElementById("famImg").src = web("component-comparisons/" + fam + ".png");
   document.getElementById("famPng").href = "component-comparisons/" + fam + ".png";
@@ -283,11 +288,11 @@ function renderCU() { const c = document.getElementById("cuChips"); c.innerHTML 
   document.getElementById("cuImg").src = web("closeups/" + cu + ".png") }
 
 // Actual size
-let as = store.get("as", "06-hybrid-premium");
+let as = store.get("as2", "09-warm-ceramic-teak");
 function renderAS() {
   const c = document.getElementById("asChips"); c.innerHTML = "";
   for (const [id, label] of DIRS) { const b = document.createElement("button"); b.className = "chip"; b.textContent = label; b.setAttribute("aria-pressed", id === as);
-    b.onclick = () => { as = id; store.set("as", id); renderAS() }; c.appendChild(b) }
+    b.onclick = () => { as = id; store.set("as2", id); renderAS() }; c.appendChild(b) }
   const box = document.getElementById("asSizes"); box.innerHTML = "";
   const device = document.getElementById("asDevice").checked;
   for (const s of ["1", "1.5", "2"]) {
@@ -303,7 +308,7 @@ document.getElementById("asDevice").onchange = renderAS;
 
 // Summary
 function summaryText() {
-  const f = favs(); const lines = ["ANDOR/OSP design lab, round 1: picks and notes", ""];
+  const f = favs(); const lines = ["ANDOR/OSP design lab, round 2: picks and notes", ""];
   const favDirs = DIRS.filter(d => f[d[0]]).map(d => d[1]);
   lines.push("Favourite directions: " + (favDirs.join(", ") || "none"));
   for (const d of DIRS) { const n = store.get("note:" + d[0], "").trim(); if (n) lines.push(`- ${d[1]}: ${n}`) }

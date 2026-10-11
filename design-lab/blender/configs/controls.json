@@ -34,7 +34,21 @@
         },
         "slot": "dark-slot",
         "accentSoft": "#f2c8b0",
-        "accent": "#e8692a"
+        "accent": "#e8692a",
+        "teak": {
+            "preset": "M2-satin-ceramic-ivory",
+            "baseColor": "#b97a45",
+            "roughness": 0.5,
+            "coat": 0.22,
+            "coatRoughness": 0.35,
+            "wood": {
+                "light": "#c4834a",
+                "dark": "#7e4a24",
+                "scale": 0.55,
+                "distortion": 6.0,
+                "stretch": 0.08
+            }
+        }
     },
     "buttons": {
         "A1": {
@@ -119,6 +133,77 @@
                 0.35
             ],
             "ringWidth": 0.8
+        },
+        "A5": {
+            "label": "A5 Celadon Key Bank (Braun-inspired)",
+            "rationale": "Pale celadon keys with soft rounded tops; grouped keys (the four modifiers, M/S) sit in one black recessed bank, single keys stand on the panel. Pressed and on sit lower; on is a faint warm face.",
+            "kind": "bank",
+            "depth": 0.9,
+            "proud": 0.55,
+            "pressedProud": 0.18,
+            "bankGrow": 3.0,
+            "bankRadius": 3.0,
+            "bevel": 0.42,
+            "material": {
+                "preset": "M6-soft-polymer",
+                "baseColor": "#b3bfc1",
+                "sheen": 0.15,
+                "roughness": 0.45
+            },
+            "bankFloor": {
+                "preset": "M5-graphite-powder-coat",
+                "baseColor": "#141414",
+                "roughness": 0.6
+            },
+            "single": {
+                "height": 0.8,
+                "pressedHeight": 0.4,
+                "bevel": 0.5
+            },
+            "activeTint": [
+                "#f2c8b0",
+                0.3
+            ],
+            "roleMaterial": {
+                "preset": {
+                    "preset": "M2-satin-ceramic-ivory",
+                    "baseColor": "#e3e2dd",
+                    "roughness": 0.38,
+                    "coat": 0.08
+                }
+            }
+        },
+        "A6": {
+            "label": "A6 Studio Keycaps",
+            "rationale": "Cream keycaps with soft rounded edges standing ~0.9 mm proud out of dark wells (the gap is part of the look), like compact studio hardware; pressed sits deeper, on is a warm face.",
+            "kind": "inset",
+            "gap": 1.6,
+            "depth": 1.1,
+            "lip": 0.06,
+            "faceDrop": -0.9,
+            "pressedDrop": -0.35,
+            "faceBevel": 0.55,
+            "material": {
+                "preset": "M6-soft-polymer",
+                "baseColor": "#e3d6bd",
+                "sheen": 0.12,
+                "roughness": 0.5
+            },
+            "groove": {
+                "preset": "M5-graphite-powder-coat",
+                "baseColor": "#2a2724",
+                "roughness": 0.7
+            },
+            "activeTint": [
+                "#f2b48c",
+                0.4
+            ],
+            "roleMaterial": {
+                "preset": {
+                    "preset": "M2-satin-ceramic-ivory",
+                    "baseColor": "#e6e3dd"
+                }
+            }
         }
     },
     "emphasis": {
@@ -221,6 +306,46 @@
             "bevel": 0.5,
             "material": "M5-graphite-powder-coat",
             "line": "inlay"
+        },
+        "C4": {
+            "label": "C4 Celadon Fader",
+            "rationale": "The celadon key material as a small cap with a dark centre line.",
+            "w": 14,
+            "h": 22,
+            "radius": 4,
+            "height": 2.0,
+            "bevel": 0.6,
+            "material": {
+                "preset": "M6-soft-polymer",
+                "baseColor": "#b3bfc1",
+                "sheen": 0.15,
+                "roughness": 0.45
+            },
+            "line": "inlay",
+            "lineMaterial": {
+                "preset": "M5-graphite-powder-coat",
+                "baseColor": "#1e1c1a"
+            }
+        },
+        "C5": {
+            "label": "C5 Studio Cream Fader",
+            "rationale": "The keycaps' cream as a fader cap with a black line, kin to the cream knobs.",
+            "w": 14,
+            "h": 22,
+            "radius": 4,
+            "height": 2.2,
+            "bevel": 0.7,
+            "material": {
+                "preset": "M6-soft-polymer",
+                "baseColor": "#e3d6bd",
+                "sheen": 0.12,
+                "roughness": 0.5
+            },
+            "line": "inlay",
+            "lineMaterial": {
+                "preset": "M5-graphite-powder-coat",
+                "baseColor": "#1e1c1a"
+            }
         }
     },
     "tracks": {
@@ -328,6 +453,19 @@
                 "roughness": 0.42,
                 "coat": 0.08
             }
+        },
+        "D7": {
+            "label": "D7 Braun Satin Off-White",
+            "rationale": "The macro panel in the same cool satin off-white.",
+            "kind": "raised",
+            "height": 0.6,
+            "bevel": 0.5,
+            "material": {
+                "preset": "M2-satin-ceramic-ivory",
+                "baseColor": "#e0dfd9",
+                "roughness": 0.4,
+                "coat": 0.06
+            }
         }
     },
     "enclosures": {
@@ -384,6 +522,22 @@
                 "baseColor": "#e6e2dc"
             },
             "keybed": "M5-graphite-powder-coat"
+        },
+        "E5": {
+            "label": "E5 Braun Off-White",
+            "rationale": "A cooler satin off-white housing and cards (one quiet panel), as on the Braun reference.",
+            "housing": {
+                "preset": "M2-satin-ceramic-ivory",
+                "baseColor": "#d9d8d2",
+                "roughness": 0.42,
+                "coat": 0.05
+            },
+            "card": {
+                "preset": "M2-satin-ceramic-ivory",
+                "baseColor": "#e3e2dd",
+                "roughness": 0.38,
+                "coat": 0.08
+            }
         }
     },
     "geometry": {
@@ -498,5 +652,65 @@
             90,
             22
         ]
+    },
+    "trim": {
+        "teak": {
+            "label": "Teak side cheeks",
+            "rationale": "Oiled teak cheeks on the left and right edges (in the window's 25 px margins, so nothing moves), standing 1.5 mm proud of the housing; the housing's corners tighten to meet them.",
+            "material": "teak",
+            "left": [
+                3,
+                13,
+                22,
+                1064
+            ],
+            "right": [
+                1423,
+                13,
+                22,
+                1064
+            ],
+            "radius": 3,
+            "height": 7.5,
+            "bevel": 1.1,
+            "housingRadius": 7
+        }
+    },
+    "knobs": {
+        "K2": {
+            "label": "K2 Studio Cream Knobs",
+            "rationale": "Cylindrical cream caps with a crisp top edge and a black line from the centre to the rim; the production value rings, halos and ticks stay as drawn around them.",
+            "material": {
+                "preset": "M6-soft-polymer",
+                "baseColor": "#e3d6bd",
+                "sheen": 0.12,
+                "roughness": 0.48
+            },
+            "line": {
+                "preset": "M5-graphite-powder-coat",
+                "baseColor": "#1a1816",
+                "roughness": 0.6
+            },
+            "sizes": {
+                "macro": {
+                    "radius": 44.0,
+                    "height": 7.0,
+                    "bevel": 0.9,
+                    "mask": 50.0
+                },
+                "layer": {
+                    "radius": 24.5,
+                    "height": 4.5,
+                    "bevel": 0.6,
+                    "mask": 27.0
+                },
+                "mini": {
+                    "radius": 18.5,
+                    "height": 3.5,
+                    "bevel": 0.5,
+                    "mask": 21.0
+                }
+            }
+        }
     }
 }

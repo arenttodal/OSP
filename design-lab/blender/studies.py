@@ -17,11 +17,14 @@ CROPS = {
     "details-leds": (45, 860, 900, 40),
     "details-divider": (900, 690, 120, 200),
     "details-arp": (1300, 905, 121, 117),
+    "trim-corner": (0, 0, 220, 300),
+    "layer-knobs": (43, 460, 435, 110),
+    "macro-knobs": (40, 700, 600, 200),
 }
 
 # Render scale per crop (pixels per design px): 4x for small controls (judged up close and
 # downsampled for actual size), 2x for the large surfaces.
-SCALE = {"macro-panel": 2.0, "enclosure": 2.0}
+SCALE = {"macro-panel": 2.0, "enclosure": 2.0, "trim-corner": 2.0, "macro-knobs": 2.0}
 
 BASE = {"enclosure": "E1", "panel": "D1", "buttons": "A4", "tabs": "B1", "fader": "original", "track": "original", "details": {}}
 
@@ -33,7 +36,7 @@ def study(out, crop, state=None, chassis=None, **spec):
 
 def studies():
     out = []
-    for a in ("A1", "A2", "A3", "A4"):
+    for a in ("A1", "A2", "A3", "A4", "A5", "A6"):
         for st in ("normal", "hover", "pressed", "active"):
             out.append(study(f"buttons/{a}-{st}", "engine-buttons", {"modifier": st}, buttons=a))
         out.append(study(f"buttons/{a}-disabled", "engine-buttons", {"modifier": "disabled"}, chassis=f"buttons/{a}-normal", buttons=a))
@@ -63,4 +66,16 @@ def studies():
     out.append(study("details/arp-led-lens", "details-arp", details={"leds": True}))
     out.append(study("details/button-wells", "engine-buttons", buttons="A2"))
     out.append(study("details/recessed-track", "fader", fader="C2", track="T2"))
+    # Round 2
+    for c in ("C4", "C5"):
+        for p in (0.0, 0.25, 0.5, 0.75, 1.0):
+            out.append(study(f"sliders/{c}-T2-{int(p * 100):03d}", "fader", {"faderPos": p}, fader=c, track="T2"))
+        out.append(study(f"sliders/{c}-T2-hover", "fader", {"faderPos": 0.75, "fader": "hover"}, fader=c, track="T2"))
+        out.append(study(f"sliders/{c}-T2-drag", "fader", {"faderPos": 0.75, "fader": "drag"}, fader=c, track="T2"))
+    out.append(study("details/trim-none", "trim-corner"))
+    out.append(study("details/trim-teak", "trim-corner", trim="teak"))
+    out.append(study("knobs/production-layer", "layer-knobs"))
+    out.append(study("knobs/K2-layer", "layer-knobs", knobs="K2", knobScope="all"))
+    out.append(study("knobs/approved-macro", "macro-knobs"))
+    out.append(study("knobs/K2-macro", "macro-knobs", knobs="K2", knobScope="all"))
     return out

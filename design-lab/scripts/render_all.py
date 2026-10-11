@@ -34,7 +34,7 @@ def main():
                 subprocess.run([sys.executable, "scripts/composite_gui.py", "direction", d, "--scale", scale], cwd=LAB, check=True)
 
     def run_families():
-        for fam in ("buttons", "tabs", "sliders", "panels", "backgrounds", "details"):
+        for fam in ("buttons", "tabs", "sliders", "panels", "backgrounds", "details", "knobs"):
             subprocess.run([a.python, "generate.py", "scene", f"family:{fam}", "--quality", a.quality], cwd=blender, check=True,
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             print(f"[{time.time() - t0:7.0f}s] family {fam}", flush=True)

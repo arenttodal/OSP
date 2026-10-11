@@ -310,6 +310,30 @@ class Compositor:
             part[..., 3] *= self.local_disc(l, img, (ax, ay), 7.5)
             self.over(l, part)
 
+    def knob_layer(self, l, img, size_key):
+        """A knob restyled in the chassis (K2): the production layer without its cap (a disc
+        under the value ring / halo), so rings, halos and ticks stay the plugin's own."""
+        knobs = CTRL.get("knobs", {}).get(self.spec.get("knobs", ""))
+        if knobs is None or (size_key == "macro" and self.spec.get("knobScope", "all") != "all"):
+            self.over(l, img)
+            return
+        r = knobs["sizes"][size_key]["mask"]
+        centre = (l["bx"] + 0.5 * l["bw"], l["by"] + 0.5 * l["bh"])
+        part = img.copy()
+        part[..., 3] *= 1.0 - self.local_disc(l, img, centre, r)
+        self.over(l, part)
+
+    def do_Dial(self, l, img):
+        self.knob_layer(l, img, "layer")
+
+    def do_Slider(self, l, img):
+        if l["bw"] == 132:
+            self.knob_layer(l, img, "macro")
+        elif l["bw"] < 60:
+            self.knob_layer(l, img, "mini")
+        else:
+            self.over(l, img)
+
     def do_MacroLabel(self, l, img):
         if self.panel["kind"] == "graphiteInset":
             self.over(l, img, colour=LIGHT_INK)
