@@ -1,0 +1,103 @@
+{
+    "schemaVersion": 1,
+    "description": "The six full-GUI directions: one choice per component family (controls.json). 'original' keeps the production drawing for that family.",
+    "directions": {
+        "01-original-refined": {
+            "label": "01 Original Refined",
+            "summary": "The current GUI and approved knob; real slabs, contact shadows and bezels, hybrid flat buttons, refined flat tabs, the current volume slider.",
+            "enclosure": "E1",
+            "panel": "D1",
+            "buttons": "A4",
+            "tabs": "B1",
+            "fader": "original",
+            "track": "original",
+            "details": {
+                "leds": false,
+                "dividerGroove": false,
+                "seams": false
+            }
+        },
+        "02-warm-ceramic": {
+            "label": "02 Warm Ceramic",
+            "summary": "Satin ceramic cards and macro panel, soft ivory buttons, ivory fader cap in a minimal groove, refined flat tabs.",
+            "enclosure": "E1",
+            "cardMaterial": {
+                "preset": "M2-satin-ceramic-ivory",
+                "baseColor": "#e6e3dd"
+            },
+            "panel": "D3",
+            "buttons": "A1",
+            "tabs": "B1",
+            "fader": "C1",
+            "track": "T1",
+            "details": {
+                "leds": false,
+                "dividerGroove": false,
+                "seams": false
+            }
+        },
+        "03-brushed-ivory": {
+            "label": "03 Brushed Ivory",
+            "summary": "Brushed ivory housing, cards and macro panel; soft physical buttons; ivory precision fader in a recessed slot; minimal tabs.",
+            "enclosure": "E3",
+            "panel": "D2",
+            "buttons": "A1",
+            "tabs": "B1",
+            "fader": "C1",
+            "track": "T2",
+            "details": {
+                "leds": false,
+                "dividerGroove": true,
+                "seams": false
+            }
+        },
+        "04-warm-aluminum": {
+            "label": "04 Warm Aluminium",
+            "summary": "A brushed champagne-metal macro plate with a fine seam, precision metal buttons, a brushed aluminium fader on a metal guide; ivory knobs.",
+            "enclosure": "E1",
+            "panel": "D4",
+            "buttons": "A3",
+            "tabs": "B1",
+            "fader": "C2",
+            "track": "T3",
+            "details": {
+                "leds": false,
+                "dividerGroove": false,
+                "seams": true
+            }
+        },
+        "05-graphite-contrast": {
+            "label": "05 Graphite Contrast",
+            "summary": "Warm ivory enclosure, the six macros in a graphite inset, inset buttons with graphite grooves, graphite keybed, a graphite fader in a recessed slot.",
+            "enclosure": "E4",
+            "panel": "D5",
+            "buttons": "A2",
+            "buttonOverrides": {
+                "groove": "M5-graphite-powder-coat"
+            },
+            "tabs": "B1",
+            "fader": "C3",
+            "track": "T2",
+            "details": {
+                "leds": true,
+                "dividerGroove": false,
+                "seams": false
+            }
+        },
+        "06-hybrid-premium": {
+            "label": "06 Hybrid Premium",
+            "summary": "Warm ivory housing, a subtly recessed satin macro section, precision inset buttons, refined flat tabs, a brushed aluminium cap in a recessed slot, lens LEDs and a recessed divider.",
+            "enclosure": "E1",
+            "panel": "D6",
+            "buttons": "A2",
+            "tabs": "B1",
+            "fader": "C2",
+            "track": "T2",
+            "details": {
+                "leds": true,
+                "dividerGroove": true,
+                "seams": false
+            }
+        }
+    }
+}

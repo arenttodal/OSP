@@ -1,0 +1,502 @@
+{
+    "schemaVersion": 1,
+    "description": "Component families for the lab (A buttons, B tabs, C fader caps, T fader tracks, D macro panels, E enclosures, F details). Sizes: heights, bevels, lips and depths in mm (1 design px = 0.31 mm); gaps and rects in design px. Every render is reproducible from this file, directions.json and materials.json.",
+    "roles": {
+        "backdrop": {
+            "preset": "M1-warm-matte-ivory",
+            "baseColor": "#cec7bf"
+        },
+        "housing": {
+            "preset": "M1-warm-matte-ivory",
+            "baseColor": "#dbd7ce"
+        },
+        "card": {
+            "preset": "M1-warm-matte-ivory",
+            "baseColor": "#e6e2dc"
+        },
+        "panel": {
+            "preset": "M1-warm-matte-ivory",
+            "baseColor": "#e3dfd8"
+        },
+        "button": {
+            "preset": "M6-soft-polymer",
+            "baseColor": "#e9e7e3"
+        },
+        "groove": {
+            "preset": "M1-warm-matte-ivory",
+            "baseColor": "#948d82",
+            "roughness": 0.8
+        },
+        "screenFloor": "dark-slot",
+        "keybed": {
+            "preset": "M1-warm-matte-ivory",
+            "baseColor": "#d2ccc3"
+        },
+        "slot": "dark-slot",
+        "accentSoft": "#f2c8b0",
+        "accent": "#e8692a"
+    },
+    "buttons": {
+        "A1": {
+            "label": "A1 Soft Ivory Button",
+            "rationale": "A shallow physical key: rounded top, minimal bevel, soft contact shadow; pressed and on sit lower, on is a warm face.",
+            "kind": "raised",
+            "height": 0.8,
+            "bevel": 0.55,
+            "pressedHeight": 0.42,
+            "material": {
+                "preset": "M6-soft-polymer",
+                "baseColor": "#e9e7e3"
+            },
+            "activeTint": [
+                "#f2c8b0",
+                0.5
+            ]
+        },
+        "A2": {
+            "label": "A2 Precision Inset Button",
+            "rationale": "A face just under the panel inside a fine perimeter groove; on lights the groove (a light pipe) and warms the face.",
+            "kind": "inset",
+            "gap": 1.0,
+            "depth": 0.45,
+            "lip": 0.1,
+            "faceDrop": 0.1,
+            "pressedDrop": 0.24,
+            "faceBevel": 0.14,
+            "material": {
+                "preset": "M2-satin-ceramic-ivory",
+                "baseColor": "#e8e6e2"
+            },
+            "groove": {
+                "preset": "M1-warm-matte-ivory",
+                "baseColor": "#a89d8e",
+                "roughness": 0.85
+            },
+            "activeTint": [
+                "#f2c8b0",
+                0.35
+            ],
+            "activeGlow": [
+                "#ff8a3c",
+                1.6
+            ]
+        },
+        "A3": {
+            "label": "A3 Brushed Metal Button",
+            "rationale": "Warm brushed aluminium with a machined chamfer; on sits lower with a fine lit line round its foot.",
+            "kind": "raised",
+            "height": 0.75,
+            "bevel": 0.32,
+            "chamfer": true,
+            "pressedHeight": 0.5,
+            "material": {
+                "preset": "M4-warm-brushed-aluminum",
+                "baseColor": "#c8c0b2"
+            },
+            "activeRing": [
+                "#ff8a3c",
+                1.4
+            ],
+            "ringWidth": 1.0
+        },
+        "A4": {
+            "label": "A4 Hybrid Flat/Physical Button",
+            "rationale": "Mostly flat software face with a real, crisp thin edge and contact shadow; on is a flat warm fill with the production's fine accent rim.",
+            "kind": "raised",
+            "height": 0.42,
+            "bevel": 0.14,
+            "pressedHeight": 0.2,
+            "material": {
+                "preset": "M1-warm-matte-ivory",
+                "baseColor": "#eae8e4"
+            },
+            "activeTint": [
+                "#f2c8b0",
+                0.65
+            ],
+            "activeRing": [
+                "#e8692a",
+                0.35
+            ],
+            "ringWidth": 0.8
+        }
+    },
+    "emphasis": {
+        "modifier": 1.0,
+        "mode": 0.8,
+        "eq": 0.8,
+        "layerState": 0.6,
+        "advanced": 0.8,
+        "arp": 0.9,
+        "preset": 0.7
+    },
+    "tabs": {
+        "B1": {
+            "label": "B1 Refined Flat Tabs",
+            "rationale": "The current words and underline, sharpened: darker selected word, a crisp 2 px accent bar with round ends, quieter idle words. No geometry.",
+            "kind": "flat"
+        },
+        "B2": {
+            "label": "B2 Shallow Inset Tabs",
+            "rationale": "The words sit in a 0.35 mm recessed strip; the selected tab is a slightly raised satin pad.",
+            "kind": "inset",
+            "depth": 0.35,
+            "lip": 0.15,
+            "padHeight": 0.24,
+            "floor": {
+                "preset": "M1-warm-matte-ivory",
+                "baseColor": "#d7d2ca"
+            },
+            "pad": {
+                "preset": "M2-satin-ceramic-ivory",
+                "baseColor": "#eae8e4"
+            }
+        },
+        "B3": {
+            "label": "B3 Brushed Ivory Tabs",
+            "rationale": "A thin brushed-ivory strip (0.18 mm); the selected tab is marked by a fine lit inlay under its word.",
+            "kind": "strip",
+            "height": 0.18,
+            "bevel": 0.12,
+            "material": {
+                "preset": "M3-brushed-ivory",
+                "baseColor": "#e2ded5"
+            },
+            "indicator": [
+                "#ff8a3c",
+                1.2
+            ]
+        },
+        "B4": {
+            "label": "B4 Precision Hardware Tabs",
+            "rationale": "Very shallow individual selector keys with a machined edge; the selected one is pressed and warm.",
+            "kind": "keys",
+            "height": 0.32,
+            "bevel": 0.12,
+            "pressedHeight": 0.14,
+            "material": {
+                "preset": "M6-soft-polymer",
+                "baseColor": "#e8e6e2"
+            },
+            "activeTint": [
+                "#f2c8b0",
+                0.3
+            ]
+        }
+    },
+    "faders": {
+        "C1": {
+            "label": "C1 Ivory Precision Fader",
+            "rationale": "A warm ivory cap with three fine grip grooves across the travel and soft edges.",
+            "w": 14,
+            "h": 22,
+            "radius": 4,
+            "height": 2.0,
+            "bevel": 0.6,
+            "material": "knob-satin-ivory",
+            "grip": 3
+        },
+        "C2": {
+            "label": "C2 Brushed Aluminium Fader",
+            "rationale": "A small satin-metal cap with a machined chamfer and an engraved centre line.",
+            "w": 13,
+            "h": 21,
+            "radius": 3,
+            "height": 1.8,
+            "bevel": 0.35,
+            "chamfer": true,
+            "material": {
+                "preset": "M4-warm-brushed-aluminum",
+                "baseColor": "#cbc3b5"
+            },
+            "line": "engraved"
+        },
+        "C3": {
+            "label": "C3 Graphite Fader",
+            "rationale": "A dark matte cap with a soft edge and an ivory inlay line.",
+            "w": 13,
+            "h": 21,
+            "radius": 3,
+            "height": 1.8,
+            "bevel": 0.5,
+            "material": "M5-graphite-powder-coat",
+            "line": "inlay"
+        }
+    },
+    "tracks": {
+        "T1": {
+            "label": "Minimal dark groove",
+            "w": 3,
+            "depth": 0.35,
+            "lip": 0.08
+        },
+        "T2": {
+            "label": "Recessed precision slot",
+            "w": 7,
+            "depth": 1.0,
+            "lip": 0.2
+        },
+        "T3": {
+            "label": "Fine metal guide track",
+            "w": 3.2,
+            "height": 0.6,
+            "bevel": 0.25,
+            "material": {
+                "preset": "M4-warm-brushed-aluminum",
+                "baseColor": "#958c7e",
+                "roughness": 0.4
+            }
+        }
+    },
+    "panels": {
+        "D1": {
+            "label": "D1 Current Warm Ivory",
+            "rationale": "The current raised panel, as a real slab (control group).",
+            "kind": "raised",
+            "height": 0.6,
+            "bevel": 0.4,
+            "material": {
+                "preset": "M1-warm-matte-ivory",
+                "baseColor": "#e3dfd8"
+            }
+        },
+        "D2": {
+            "label": "D2 Brushed Ivory",
+            "rationale": "The same slab in brushed ivory: grain felt rather than seen.",
+            "kind": "raised",
+            "height": 0.6,
+            "bevel": 0.4,
+            "material": {
+                "preset": "M3-brushed-ivory",
+                "baseColor": "#e3dfd6"
+            }
+        },
+        "D3": {
+            "label": "D3 Satin Ceramic",
+            "rationale": "Smooth, softly reflective ivory with a soft edge.",
+            "kind": "raised",
+            "height": 0.6,
+            "bevel": 0.5,
+            "material": {
+                "preset": "M2-satin-ceramic-ivory",
+                "baseColor": "#e4e1da"
+            }
+        },
+        "D4": {
+            "label": "D4 Warm Brushed Aluminium",
+            "rationale": "A satin champagne-grey metal plate with very fine grain.",
+            "kind": "raised",
+            "height": 0.6,
+            "bevel": 0.3,
+            "chamfer": true,
+            "material": {
+                "preset": "M4-warm-brushed-aluminum",
+                "baseColor": "#d3cbbd",
+                "roughness": 0.55
+            }
+        },
+        "D5": {
+            "label": "D5 Dark Graphite Inset",
+            "rationale": "The six macros sit in a charcoal inset in the current panel; knobs unchanged, labels light.",
+            "kind": "graphiteInset",
+            "height": 0.6,
+            "bevel": 0.4,
+            "material": {
+                "preset": "M1-warm-matte-ivory",
+                "baseColor": "#e3dfd8"
+            },
+            "inset": [
+                45,
+                690,
+                892,
+                202
+            ],
+            "insetRadius": 10,
+            "depth": 0.7,
+            "lip": 0.35,
+            "floor": "M5-graphite-powder-coat"
+        },
+        "D6": {
+            "label": "D6 Layered Ivory (recessed)",
+            "rationale": "The macro panel is a shallow recess in the housing (0.6 mm, soft lip) with a satin floor: one physical control section, no colour change.",
+            "kind": "recessed",
+            "depth": 0.6,
+            "lip": 0.5,
+            "material": {
+                "preset": "M2-satin-ceramic-ivory",
+                "baseColor": "#e0dcd4",
+                "roughness": 0.42,
+                "coat": 0.08
+            }
+        }
+    },
+    "enclosures": {
+        "E1": {
+            "label": "E1 Current, Enhanced Detail",
+            "rationale": "Current colours as real slabs: rounded housing edge, raised cards, real contact shadows, recessed keybed and bezels.",
+            "housing": {
+                "preset": "M1-warm-matte-ivory",
+                "baseColor": "#dbd7ce"
+            },
+            "card": {
+                "preset": "M1-warm-matte-ivory",
+                "baseColor": "#e6e2dc"
+            }
+        },
+        "E2": {
+            "label": "E2 Warm Powder-Coated",
+            "rationale": "A visible fine powder coat on the housing; cards in soft polymer stay distinct.",
+            "housing": {
+                "preset": "M1-warm-matte-ivory",
+                "baseColor": "#dad5cc",
+                "grain": {
+                    "size": 0.3,
+                    "height": 0.009
+                },
+                "albedoVariation": 0.03
+            },
+            "card": {
+                "preset": "M6-soft-polymer",
+                "baseColor": "#e7e4de"
+            }
+        },
+        "E3": {
+            "label": "E3 Brushed Ivory",
+            "rationale": "Brushed ivory on the housing and cards; displays untouched.",
+            "housing": {
+                "preset": "M3-brushed-ivory",
+                "baseColor": "#dbd6cc"
+            },
+            "card": {
+                "preset": "M3-brushed-ivory",
+                "baseColor": "#e6e2db"
+            }
+        },
+        "E4": {
+            "label": "E4 Mixed Material",
+            "rationale": "Ivory housing and cards, a satin macro surface, graphite keybed and wheel wells as selected dark accents.",
+            "housing": {
+                "preset": "M1-warm-matte-ivory",
+                "baseColor": "#dbd7ce"
+            },
+            "card": {
+                "preset": "M1-warm-matte-ivory",
+                "baseColor": "#e6e2dc"
+            },
+            "keybed": "M5-graphite-powder-coat"
+        }
+    },
+    "geometry": {
+        "housing": {
+            "height": 6.0,
+            "bevel": 2.0
+        },
+        "card": {
+            "height": 0.9,
+            "bevel": 0.55
+        },
+        "bezel": {
+            "grow": 1.6,
+            "depth": 0.6,
+            "lip": 0.32
+        },
+        "keybed": {
+            "rect": [
+                146,
+                910,
+                1154,
+                106
+            ],
+            "radius": 6,
+            "depth": 1.2,
+            "lip": 0.4
+        },
+        "envelopeWell": {
+            "rect": [
+                967,
+                714,
+                426,
+                90
+            ],
+            "radius": 12
+        },
+        "divider": {
+            "rect": [
+                944.25,
+                697,
+                1.5,
+                186
+            ],
+            "depth": 0.25,
+            "lip": 0.1
+        },
+        "tabStrip": {
+            "rect": [
+                960,
+                689,
+                370,
+                22
+            ],
+            "radius": 6
+        },
+        "tabs": [
+            [
+                963,
+                689,
+                44,
+                22
+            ],
+            [
+                1020,
+                689,
+                68,
+                22
+            ],
+            [
+                1101,
+                689,
+                68,
+                22
+            ],
+            [
+                1182,
+                689,
+                67,
+                22
+            ],
+            [
+                1262,
+                689,
+                67,
+                22
+            ]
+        ],
+        "volume": {
+            "rect": [
+                1150,
+                47,
+                194,
+                44
+            ],
+            "trackY": 80,
+            "left": 1157,
+            "right": 1337
+        },
+        "macroLedY": 883,
+        "macroLedDiameter": 9,
+        "litMacros": [
+            "character"
+        ],
+        "arpLed": [
+            1324.5,
+            930,
+            11
+        ],
+        "arpPill": [
+            1315,
+            947,
+            90,
+            22
+        ]
+    }
+}

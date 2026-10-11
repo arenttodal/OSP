@@ -1,0 +1,332 @@
+<title>OSP Design Lab</title>
+<meta name="description" content="ANDOR/OSP premium GUI material exploration, round 1: six full-GUI directions, component studies, close-ups and actual-size tests.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<style>
+:root {
+  --bg: #f3efe8; --surface: #fbf8f3; --ink: #23211e; --muted: #6e685f; --line: #ddd5c8;
+  --accent: #c9531c; --accent-soft: #f2d3bf; --chip: #ebe5da; --chip-on: #23211e; --chip-on-ink: #fbf8f3;
+  --star: #c98f3e; --shadow: 0 1px 2px rgba(60,40,20,.08), 0 8px 24px rgba(60,40,20,.06);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #1b1a18; --surface: #23221f; --ink: #ece6dc; --muted: #a39b8f; --line: #3a3732;
+  --accent: #f08a50; --accent-soft: #4a3020; --chip: #2e2c28; --chip-on: #ece6dc; --chip-on-ink: #1b1a18;
+  --star: #e9b45f; --shadow: 0 1px 2px rgba(0,0,0,.4); color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #1b1a18; --surface: #23221f; --ink: #ece6dc; --muted: #a39b8f; --line: #3a3732;
+  --accent: #f08a50; --accent-soft: #4a3020; --chip: #2e2c28; --chip-on: #ece6dc; --chip-on-ink: #1b1a18;
+  --star: #e9b45f; --shadow: 0 1px 2px rgba(0,0,0,.4); color-scheme: dark }
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0 }
+.wrap { max-width: 1480px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 64px }
+header { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: baseline; justify-content: space-between; margin-bottom: 12px }
+h1 { font-size: 22px; font-weight: 600; margin: 0; letter-spacing: -.01em; text-wrap: balance }
+h1 small { font-weight: 400; color: var(--muted); font-size: 15px; margin-left: 8px }
+.note { color: var(--muted); font-size: 13px; max-width: 75ch }
+nav { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--line); margin: 12px 0 18px; position: sticky; top: env(safe-area-inset-top, 0px); background: var(--bg); z-index: 5; padding-top: 6px }
+nav button { background: none; border: 0; border-bottom: 2px solid transparent; color: var(--muted); font: inherit; font-weight: 500; padding: 8px 12px; cursor: pointer; letter-spacing: .02em }
+nav button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent) }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px }
+.chip { background: var(--chip); color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; font: inherit; font-size: 13px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center }
+.chip[aria-pressed="true"] { background: var(--chip-on); color: var(--chip-on-ink); border-color: var(--chip-on) }
+.chip .fav { color: var(--star) }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 14px; min-width: 0 }
+.row { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr) 320px }
+@media (max-width: 980px) { .row { grid-template-columns: minmax(0, 1fr) } }
+.viewer { position: relative; overflow: hidden; border-radius: 6px; background: var(--chip); cursor: zoom-in; touch-action: none; aspect-ratio: 1448 / 1086; max-width: 100% }
+.viewer.zoomed { cursor: grab }
+.viewer img { position: absolute; left: 0; top: 0; width: 100%; height: auto; transform-origin: 0 0; user-select: none; -webkit-user-drag: none; image-rendering: auto }
+.viewer.free { aspect-ratio: auto }
+.viewer.free img { position: relative }
+.tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0 0; font-size: 13px; color: var(--muted) }
+.tools a { color: var(--accent) }
+.btn { background: var(--chip); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; font: inherit; font-size: 13px; color: var(--ink); cursor: pointer }
+.btn.on { background: var(--accent-soft); border-color: var(--accent) }
+aside h2, section h2 { font-size: 16px; margin: 0 0 6px; font-weight: 600 }
+aside p { margin: 0 0 10px; color: var(--muted); font-size: 14px }
+textarea { width: 100%; min-height: 120px; resize: vertical; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 8px; font: inherit; font-size: 14px }
+label.star { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; font-size: 14px; margin: 4px 0 10px }
+.two { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)) }
+@media (max-width: 860px) { .two { grid-template-columns: minmax(0, 1fr) } }
+select { font: inherit; font-size: 14px; background: var(--chip); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; max-width: 100% }
+.ba { position: relative; overflow: hidden; border-radius: 6px; aspect-ratio: 1448 / 1086; background: var(--chip) }
+.ba img { position: absolute; inset: 0; width: 100%; height: 100% }
+.ba .after { clip-path: inset(0 0 0 50%) }
+.ba .handle { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent); left: 50%; pointer-events: none }
+.ba .tag { position: absolute; top: 8px; font-size: 12px; background: rgba(35,33,30,.75); color: #fbf8f3; padding: 2px 8px; border-radius: 4px }
+input[type=range] { width: 100%; accent-color: var(--accent) }
+.scroller { overflow-x: auto; border-radius: 6px; background: var(--chip); padding: 8px }
+.scroller img { display: block; max-width: none }
+.sizes { display: grid; gap: 14px }
+.sizes figure { margin: 0 }
+figcaption { font-size: 13px; color: var(--muted); margin: 4px 0 6px }
+.summary table { border-collapse: collapse; width: 100%; font-size: 14px }
+.summary td, .summary th { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top }
+.summary th { color: var(--muted); font-weight: 500 }
+pre.out { white-space: pre-wrap; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 10px; font-size: 13px; max-height: 320px; overflow: auto }
+[hidden] { display: none !important }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>ANDOR/OSP Design Lab <small>Round 1: broad exploration</small></h1>
+    <p class="note">Rendered Blender surfaces composited under the plugin's own drawing (text, waveforms, approved knob, halos). Layout, values and knob are identical in every image. Nothing here is in the plugin; pick what to refine.</p>
+  </header>
+
+  <nav role="tablist" id="tabs"></nav>
+
+  <!-- Directions -->
+  <section data-view="directions">
+    <div class="chips" id="dirChips"></div>
+    <div class="row">
+      <div class="panel">
+        <div class="viewer" id="dirViewer"><img id="dirImg" alt=""></div>
+        <div class="tools"><span>Click to zoom (1x / 2x / 4x of the 2x render), drag to pan.</span><a id="dirPng" href="#" target="_blank" rel="noopener">PNG master</a></div>
+      </div>
+      <aside class="panel">
+        <h2 id="dirTitle"></h2>
+        <p id="dirSummary"></p>
+        <label class="star"><input type="checkbox" id="dirFav"> Favourite</label>
+        <textarea id="dirNotes" placeholder="Notes on this direction…"></textarea>
+      </aside>
+    </div>
+  </section>
+
+  <!-- Compare -->
+  <section data-view="compare" hidden>
+    <div class="tools" style="margin:0 0 10px"><select id="cmpA"></select><span>vs</span><select id="cmpB"></select><span>Zoom and pan stay in sync.</span></div>
+    <div class="two">
+      <div class="panel"><div class="viewer" id="cmpViewA"><img alt=""></div></div>
+      <div class="panel"><div class="viewer" id="cmpViewB"><img alt=""></div></div>
+    </div>
+  </section>
+
+  <!-- Before / after -->
+  <section data-view="beforeafter" hidden>
+    <div class="tools" style="margin:0 0 10px"><span>Original (left) vs</span><select id="baSel"></select></div>
+    <div class="panel">
+      <div class="ba" id="ba"><img id="baBefore" alt="Original"><img class="after" id="baAfter" alt=""><div class="handle" id="baHandle"></div><span class="tag" style="left:8px">Original</span><span class="tag" id="baTag" style="right:8px"></span></div>
+      <input type="range" id="baRange" min="0" max="100" value="50" aria-label="Before / after split">
+    </div>
+  </section>
+
+  <!-- Components -->
+  <section data-view="components" hidden>
+    <div class="chips" id="famChips"></div>
+    <div class="row">
+      <div class="panel"><div class="scroller"><img id="famImg" alt=""></div>
+        <div class="tools"><span>Sheets are 1:1 (scroll sideways on small screens).</span><a id="famPng" href="#" target="_blank" rel="noopener">PNG master</a></div></div>
+      <aside class="panel">
+        <h2 id="famTitle"></h2>
+        <p>Pick a favourite variant (optional) and leave notes.</p>
+        <div class="chips" id="famVariants"></div>
+        <textarea id="famNotes" placeholder="Notes on this family…"></textarea>
+      </aside>
+    </div>
+  </section>
+
+  <!-- Close-ups -->
+  <section data-view="closeups" hidden>
+    <div class="chips" id="cuChips"></div>
+    <div class="panel"><div class="scroller"><img id="cuImg" alt=""></div></div>
+  </section>
+
+  <!-- Actual size -->
+  <section data-view="actual" hidden>
+    <div class="chips" id="asChips"></div>
+    <div class="tools" style="margin:0 0 10px"><label><input type="checkbox" id="asDevice"> Show device pixels 1:1 (on a Retina screen, 1 image pixel = 1 device pixel)</label></div>
+    <div class="sizes" id="asSizes"></div>
+  </section>
+
+  <!-- Summary -->
+  <section data-view="summary" hidden>
+    <div class="panel summary">
+      <h2>Your picks and notes</h2>
+      <p class="note">Saved in this browser only. Copy them into the conversation to make the decisions.</p>
+      <table id="sumTable"></table>
+      <div class="tools"><button class="btn" id="copyBtn">Copy as text</button><span id="copyMsg"></span></div>
+      <pre class="out" id="sumText"></pre>
+    </div>
+  </section>
+</div>
+
+<script>
+const DIRS = [
+  ["00-original", "00 Original", "Production today: painted gradients and edges, approved Blender knob on all six macros."],
+  ["01-original-refined", "01 Original Refined", "The current GUI and approved knob; real slabs, contact shadows and bezels, hybrid flat buttons (A4), refined flat tabs (B1), the current volume slider."],
+  ["02-warm-ceramic", "02 Warm Ceramic", "Satin ceramic cards and macro panel (D3), soft ivory buttons (A1), ivory fader cap (C1) in a minimal groove (T1), refined flat tabs."],
+  ["03-brushed-ivory", "03 Brushed Ivory", "Brushed ivory housing, cards and macro panel (E3, D2); soft physical buttons (A1); ivory precision fader in a recessed slot (C1/T2); recessed divider."],
+  ["04-warm-aluminum", "04 Warm Aluminium", "A brushed champagne-metal macro plate (D4) with a fine seam, precision metal buttons (A3), a brushed aluminium fader on a metal guide (C2/T3)."],
+  ["05-graphite-contrast", "05 Graphite Contrast", "Ivory enclosure; the six macros in a graphite inset (D5) with light labels and lens LEDs; inset buttons with graphite grooves (A2); graphite keybed; graphite fader (C3/T2)."],
+  ["06-hybrid-premium", "06 Hybrid Premium", "Warm ivory housing, a subtly recessed satin macro section (D6), precision inset buttons (A2), refined flat tabs (B1), brushed aluminium cap in a recessed slot (C2/T2), lens LEDs, recessed divider."]
+];
+const FAMS = [
+  ["buttons", "Buttons", ["A1 Soft Ivory", "A2 Precision Inset", "A3 Brushed Metal", "A4 Hybrid Flat"]],
+  ["tabs", "Modulation tabs", ["B1 Refined Flat", "B2 Shallow Inset", "B3 Brushed Ivory", "B4 Precision Hardware"]],
+  ["sliders", "Volume fader", ["C1 Ivory", "C2 Brushed Aluminium", "C3 Graphite", "T1 Groove", "T2 Recessed Slot", "T3 Metal Guide"]],
+  ["macro-panels", "Macro panel", ["D1 Current", "D2 Brushed Ivory", "D3 Satin Ceramic", "D4 Aluminium", "D5 Graphite Inset", "D6 Layered (recessed)"]],
+  ["backgrounds", "Background", ["E1 Enhanced", "E2 Powder Coat", "E3 Brushed Ivory", "E4 Mixed Material"]],
+  ["hardware-details", "Details", ["Lens LEDs", "Recessed divider", "Metal seam", "Button wells", "Recessed track"]]
+];
+const CLOSE = [["macro-panel", "Macro panel"], ["modulation-tabs", "Modulation tabs"], ["engine-buttons", "Engine buttons"], ["volume-slider", "Volume slider"]];
+const web = p => "web/" + p.replace(/\//g, "__").replace(/\.png$/, ".jpg");
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("osp-lab:" + k); return v === null ? d : JSON.parse(v) } catch (e) { return d } },
+  set(k, v) { try { localStorage.setItem("osp-lab:" + k, JSON.stringify(v)) } catch (e) {} }
+};
+
+// Tabs
+const VIEWS = [["directions", "Directions"], ["compare", "Side by side"], ["beforeafter", "Before / after"], ["components", "Components"], ["closeups", "Close-ups"], ["actual", "Actual size"], ["summary", "Picks & notes"]];
+const tabs = document.getElementById("tabs");
+function show(view) {
+  for (const s of document.querySelectorAll("section[data-view]")) s.hidden = s.dataset.view !== view;
+  for (const b of tabs.children) b.setAttribute("aria-selected", b.dataset.v === view);
+  store.set("view", view);
+  if (view === "summary") renderSummary();
+}
+for (const [v, label] of VIEWS) {
+  const b = document.createElement("button"); b.textContent = label; b.dataset.v = v; b.setAttribute("role", "tab");
+  b.onclick = () => show(v); tabs.appendChild(b);
+}
+
+// Zoomable viewer (click cycles 1x/2x/4x around the click; drag pans). `peers` share the view.
+function zoomable(el, peers) {
+  const st = { z: 1, x: 0, y: 0 };
+  let drag = null, moved = false;
+  const apply = () => { for (const v of [el, ...(peers ? peers() : [])]) {
+    const img = v.querySelector("img"); img.style.transform = `translate(${st.x}px, ${st.y}px) scale(${st.z})`; v.classList.toggle("zoomed", st.z > 1) } };
+  const clamp = () => { const w = el.clientWidth, h = el.clientHeight;
+    st.x = Math.min(0, Math.max(w - w * st.z, st.x)); st.y = Math.min(0, Math.max(h - h * st.z, st.y)) };
+  el.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY, sx: st.x, sy: st.y }; moved = false; el.setPointerCapture(e.pointerId) });
+  el.addEventListener("pointermove", e => { if (!drag || st.z === 1) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (Math.abs(dx) + Math.abs(dy) > 3) moved = true; st.x = drag.sx + dx; st.y = drag.sy + dy; clamp(); apply() });
+  el.addEventListener("pointerup", e => { const d = drag; drag = null; if (moved) return;
+    const r = el.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
+    const nz = st.z === 1 ? 2 : st.z === 2 ? 4 : 1; const ix = (px - st.x) / st.z, iy = (py - st.y) / st.z;
+    st.z = nz; st.x = px - ix * nz; st.y = py - iy * nz; if (nz === 1) { st.x = 0; st.y = 0 } clamp(); apply() });
+  return { reset() { st.z = 1; st.x = 0; st.y = 0; apply() }, apply };
+}
+
+// Directions
+const dirChips = document.getElementById("dirChips");
+const dirViewer = zoomable(document.getElementById("dirViewer"));
+let current = store.get("dir", "06-hybrid-premium");
+function favs() { return store.get("favs", {}) }
+function chipLabel(id, label) { return (favs()[id] ? "★ " : "") + label }
+function renderDirChips() {
+  dirChips.innerHTML = "";
+  for (const [id, label] of DIRS) {
+    const b = document.createElement("button"); b.className = "chip"; b.textContent = chipLabel(id, label);
+    b.setAttribute("aria-pressed", id === current); b.onclick = () => { current = id; store.set("dir", id); renderDir() }; dirChips.appendChild(b);
+  }
+}
+function renderDir() {
+  const d = DIRS.find(x => x[0] === current) || DIRS[0];
+  document.getElementById("dirImg").src = web(d[0] + ".png");
+  document.getElementById("dirImg").alt = d[1];
+  document.getElementById("dirPng").href = d[0] + ".png";
+  document.getElementById("dirTitle").textContent = d[1];
+  document.getElementById("dirSummary").textContent = d[2];
+  document.getElementById("dirFav").checked = !!favs()[d[0]];
+  document.getElementById("dirNotes").value = store.get("note:" + d[0], "");
+  dirViewer.reset(); renderDirChips();
+}
+document.getElementById("dirFav").onchange = e => { const f = favs(); f[current] = e.target.checked; store.set("favs", f); renderDirChips() };
+document.getElementById("dirNotes").oninput = e => store.set("note:" + current, e.target.value);
+
+// Compare
+const cmpA = document.getElementById("cmpA"), cmpB = document.getElementById("cmpB");
+for (const sel of [cmpA, cmpB]) for (const [id, label] of DIRS) { const o = document.createElement("option"); o.value = id; o.textContent = label; sel.appendChild(o) }
+cmpA.value = store.get("cmpA", "00-original"); cmpB.value = store.get("cmpB", "06-hybrid-premium");
+const vA = document.getElementById("cmpViewA"), vB = document.getElementById("cmpViewB");
+const zA = zoomable(vA, () => [vB]); const zB = zoomable(vB, () => [vA]);
+function renderCmp() { vA.querySelector("img").src = web(cmpA.value + ".png"); vB.querySelector("img").src = web(cmpB.value + ".png");
+  store.set("cmpA", cmpA.value); store.set("cmpB", cmpB.value); zA.reset() }
+cmpA.onchange = cmpB.onchange = renderCmp;
+
+// Before / after
+const baSel = document.getElementById("baSel");
+for (const [id, label] of DIRS.slice(1)) { const o = document.createElement("option"); o.value = id; o.textContent = label; baSel.appendChild(o) }
+baSel.value = store.get("ba", "06-hybrid-premium");
+function renderBA() { document.getElementById("baBefore").src = web("00-original.png"); document.getElementById("baAfter").src = web(baSel.value + ".png");
+  document.getElementById("baTag").textContent = baSel.options[baSel.selectedIndex].text; store.set("ba", baSel.value) }
+baSel.onchange = renderBA;
+document.getElementById("baRange").oninput = e => { const v = e.target.value;
+  document.getElementById("baAfter").style.clipPath = `inset(0 0 0 ${v}%)`; document.getElementById("baHandle").style.left = v + "%" };
+
+// Components
+let fam = store.get("fam", "buttons");
+const famChips = document.getElementById("famChips");
+function renderFam() {
+  famChips.innerHTML = "";
+  for (const [id, label] of FAMS) { const b = document.createElement("button"); b.className = "chip"; b.textContent = label;
+    b.setAttribute("aria-pressed", id === fam); b.onclick = () => { fam = id; store.set("fam", id); renderFam() }; famChips.appendChild(b) }
+  const f = FAMS.find(x => x[0] === fam);
+  document.getElementById("famImg").src = web("component-comparisons/" + fam + ".png");
+  document.getElementById("famPng").href = "component-comparisons/" + fam + ".png";
+  document.getElementById("famTitle").textContent = f[1];
+  const pick = store.get("pick:" + fam, []);
+  const vv = document.getElementById("famVariants"); vv.innerHTML = "";
+  for (const v of f[2]) { const b = document.createElement("button"); b.className = "chip"; b.textContent = (pick.includes(v) ? "★ " : "") + v;
+    b.setAttribute("aria-pressed", pick.includes(v)); b.onclick = () => { const p = store.get("pick:" + fam, []); const i = p.indexOf(v);
+      if (i >= 0) p.splice(i, 1); else p.push(v); store.set("pick:" + fam, p); renderFam() }; vv.appendChild(b) }
+  document.getElementById("famNotes").value = store.get("note:fam:" + fam, "");
+}
+document.getElementById("famNotes").oninput = e => store.set("note:fam:" + fam, e.target.value);
+
+// Close-ups
+let cu = store.get("cu", "macro-panel");
+function renderCU() { const c = document.getElementById("cuChips"); c.innerHTML = "";
+  for (const [id, label] of CLOSE) { const b = document.createElement("button"); b.className = "chip"; b.textContent = label; b.setAttribute("aria-pressed", id === cu);
+    b.onclick = () => { cu = id; store.set("cu", id); renderCU() }; c.appendChild(b) }
+  document.getElementById("cuImg").src = web("closeups/" + cu + ".png") }
+
+// Actual size
+let as = store.get("as", "06-hybrid-premium");
+function renderAS() {
+  const c = document.getElementById("asChips"); c.innerHTML = "";
+  for (const [id, label] of DIRS) { const b = document.createElement("button"); b.className = "chip"; b.textContent = label; b.setAttribute("aria-pressed", id === as);
+    b.onclick = () => { as = id; store.set("as", id); renderAS() }; c.appendChild(b) }
+  const box = document.getElementById("asSizes"); box.innerHTML = "";
+  const device = document.getElementById("asDevice").checked;
+  for (const s of ["1", "1.5", "2"]) {
+    const fig = document.createElement("figure"); const cap = document.createElement("figcaption");
+    cap.textContent = `${Math.round(parseFloat(s) * 100)} % GUI scale: engine buttons, macro panel and tabs (the plugin's own drawing at this scale, unscaled)`;
+    const sc = document.createElement("div"); sc.className = "scroller"; const img = document.createElement("img");
+    img.src = `actual-size/${as}@${s}x.png`; img.alt = cap.textContent;
+    img.onload = () => { img.style.width = (device ? img.naturalWidth / (window.devicePixelRatio || 1) : img.naturalWidth) + "px" };
+    sc.appendChild(img); fig.append(cap, sc); box.appendChild(fig);
+  }
+}
+document.getElementById("asDevice").onchange = renderAS;
+
+// Summary
+function summaryText() {
+  const f = favs(); const lines = ["ANDOR/OSP design lab, round 1: picks and notes", ""];
+  const favDirs = DIRS.filter(d => f[d[0]]).map(d => d[1]);
+  lines.push("Favourite directions: " + (favDirs.join(", ") || "none"));
+  for (const d of DIRS) { const n = store.get("note:" + d[0], "").trim(); if (n) lines.push(`- ${d[1]}: ${n}`) }
+  lines.push("");
+  for (const [id, label] of FAMS) { const p = store.get("pick:" + id, []); const n = store.get("note:fam:" + id, "").trim();
+    lines.push(`${label}: ${p.join(", ") || "no pick"}${n ? " | " + n : ""}`) }
+  return lines.join("\n");
+}
+function renderSummary() {
+  const t = document.getElementById("sumTable"); t.innerHTML = "<tr><th>Item</th><th>Pick</th><th>Notes</th></tr>";
+  const f = favs();
+  const add = (a, b, c) => { const tr = document.createElement("tr"); for (const x of [a, b, c]) { const td = document.createElement("td"); td.textContent = x; tr.appendChild(td) } t.appendChild(tr) };
+  for (const d of DIRS) add(d[1], f[d[0]] ? "★ favourite" : "", store.get("note:" + d[0], ""));
+  for (const [id, label] of FAMS) add(label, store.get("pick:" + id, []).join(", "), store.get("note:fam:" + id, ""));
+  document.getElementById("sumText").textContent = summaryText();
+}
+document.getElementById("copyBtn").onclick = () => {
+  const text = summaryText(); const msg = document.getElementById("copyMsg");
+  try { navigator.clipboard.writeText(text).then(() => msg.textContent = "Copied.", () => { msg.textContent = "Select the text below and copy it."; selectOut() }) }
+  catch (e) { msg.textContent = "Select the text below and copy it."; selectOut() }
+};
+function selectOut() { const r = document.createRange(); r.selectNodeContents(document.getElementById("sumText")); const s = getSelection(); s.removeAllRanges(); s.addRange(r) }
+
+renderDir(); renderCmp(); renderBA(); renderFam(); renderCU(); renderAS();
+show(store.get("view", "directions"));
+</script>
