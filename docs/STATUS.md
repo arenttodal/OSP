@@ -356,10 +356,14 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       the LIFE macro as pilot; Cmd+Option+K / OSP_KNOB_SKIN switches original / pilot / all
       macros (looks only: output bit-identical, state unchanged). `[plugin][sprite-knob]`.
       Next: judge it on the Mac; engine-card knobs from config/future.
+- [x] Layer knobs: each name sits as far above the dial's tick dots as the value sits below
+      the lowest ones (the knob component grows upwards by `LayerKnob::labelLift`; dial and
+      value unchanged). The MACROS title is gone from the macro panel.
 - [ ] DESIGN LAB round 1 (design-lab/, exploration only, nothing integrated): Blender-rendered
       surfaces composited under the plugin's own drawing; 6 full-GUI directions, button/tab/
       fader/panel/background/detail studies, close-ups, actual-size tests, review gallery,
-      reports (design-lab/review/). Waiting for the user's choices before round 2.
+      reports (design-lab/review/). Round 2 chosen: 09 Warm Ceramic + Teak (C1 fader on T3,
+      lens LEDs, painted divider); implementation not started.
 - [ ] FINAL MODULATION SYSTEM + DAMPEN (queued spec, stages 0-10): Stage 0 audit done
       (docs/reports/mod-final-audit.md); implementation next.
 - [x] `plugin-pipeline/`: the build-and-download pipeline as a reusable kit for other JUCE

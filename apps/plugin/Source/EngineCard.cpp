@@ -809,8 +809,8 @@ void LayerKnob::setCompact (bool c)
 // centred at 112.
 void LayerKnob::resized()
 {
-    const float k = static_cast<float> (getHeight()) / 125.0f;
-    dial->setBounds (juce::Rectangle<float> (92.0f * k, 92.0f * k).withCentre ({ 0.5f * static_cast<float> (getWidth()), 61.0f * k }).getSmallestIntegerContainer());
+    const float k = static_cast<float> (getHeight()) / designUnits;
+    dial->setBounds (juce::Rectangle<float> (92.0f * k, 92.0f * k).withCentre ({ 0.5f * static_cast<float> (getWidth()), (61.0f + labelLift) * k }).getSmallestIntegerContainer());
     // The caption sits close above the dial: a modulation halo breaks around its text
     // (in the dial's coordinates) rather than crossing it.
     const auto font = labelFont();
@@ -821,14 +821,14 @@ void LayerKnob::resized()
 
 juce::Font LayerKnob::labelFont() const
 {
-    const float k = static_cast<float> (getHeight()) / 125.0f;
+    const float k = static_cast<float> (getHeight()) / designUnits;
     // REIMAGINED: a touch tighter so it sits in the row like the short names.
     return creative ? fonts::make (14.5f * k, fonts::Weight::medium, 0.02f) : type::controlLabel (k);
 }
 
 juce::Rectangle<float> LayerKnob::labelBounds() const
 {
-    const float k = static_cast<float> (getHeight()) / 125.0f;
+    const float k = static_cast<float> (getHeight()) / designUnits;
     const float textWidth = juce::GlyphArrangement::getStringWidth (labelFont(), caption);
     return juce::Rectangle<float> (0.5f * (static_cast<float> (getWidth()) - textWidth) - 2.0f * k, 2.0f * k, textWidth + 14.0f * k, 22.0f * k);
 }
@@ -871,7 +871,7 @@ void LayerKnob::mouseUp (const juce::MouseEvent& e)
 
 void LayerKnob::paint (juce::Graphics& g)
 {
-    const float k = static_cast<float> (getHeight()) / 125.0f;
+    const float k = static_cast<float> (getHeight()) / designUnits;
     const auto w = static_cast<float> (getWidth());
     // REIMAGINED's name opens its modes: hover darkens and underlines it, open keeps the line.
     g.setColour (creative && (labelHover || labelOpen) ? juce::Colours::black : design::colour::text.withAlpha (creative ? 0.97f : 0.9f));
@@ -910,7 +910,7 @@ void LayerKnob::paint (juce::Graphics& g)
     g.setColour (design::colour::text.withAlpha (0.9f));
     g.setFont (type::controlValue (k));
     const auto value = parameter != nullptr ? parameter->getCurrentValueAsText() : juce::String();
-    g.drawText (value, juce::Rectangle<float> (0.0f, 100.0f * k, w, 24.0f * k), juce::Justification::centred, false);
+    g.drawText (value, juce::Rectangle<float> (0.0f, (100.0f + labelLift) * k, w, 24.0f * k), juce::Justification::centred, false);
 }
 
 //==============================================================================
@@ -1560,7 +1560,9 @@ void EngineCard::resized()
         {
             knobs[i]->setCompact (compactKnobs);
             const float cx = left + (0.62f + static_cast<float> (i)) * pitch;
-            knobs[i]->setBounds (at (juce::Rectangle<float> (std::min (cellWidth, pitch + 6.0f), cellHeight).withCentre ({ cx, centreY })));
+            // Taller by the name's lift, upwards only: the dial and value keep their place.
+            const float height = cellHeight * LayerKnob::designUnits / 125.0f;
+            knobs[i]->setBounds (at (juce::Rectangle<float> (std::min (cellWidth, pitch + 6.0f), height).withCentre ({ cx, centreY - 0.5f * (height - cellHeight) })));
         }
     };
 
