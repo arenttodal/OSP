@@ -116,6 +116,51 @@ TEST_CASE ("library import: a sound is stored once under its hash, recorded with
     CHECK (f.catalog->soundsWithContent (r.contentHash).size() == 2);
 }
 
+TEST_CASE ("library import: a sound in the Library's trash is never doubled - a late load record reuses it, a new import brings it back", "[unit][library][import]")
+{
+    Fixture f;
+    const auto file = f.wav ("Low Drone A2.wav", 110.0, 2, 0.5);
+    const auto first = importSound (*f.catalog, f.store, Fixture::request (file));
+    REQUIRE (first.ok);
+    REQUIRE (f.catalog->trash (first.assetId));
+    SearchQuery sounds;
+    sounds.type = AssetType::sound;
+    SearchQuery trashed = sounds;
+    trashed.trashedOnly = true;
+    CHECK (f.catalog->count (sounds) == 0);
+    CHECK (f.catalog->count (trashed) == 1);
+
+    // The plugin records a load of the same bytes from the same place (as soundLoaded does,
+    // possibly late, after the user trashed it): the trashed record is reused and stays there.
+    Asset a;
+    a.name = "Low Drone A2";
+    SoundInfo info;
+    info.contentHash = first.contentHash;
+    info.managed = true;
+    const auto place = std::filesystem::absolute (file).string();
+    const auto recorded = f.catalog->addImportedSound (a, info, place, "original");
+    REQUIRE (recorded);
+    CHECK (recorded->existed);
+    CHECK (recorded->trashed);
+    CHECK (recorded->id == first.assetId);
+    CHECK (f.catalog->count (sounds) == 0);
+    CHECK (f.catalog->count (trashed) == 1);
+    // Restored, it is the one record (the window's report: 4 sounds where 3 were).
+    REQUIRE (f.catalog->restore (first.assetId));
+    CHECK (f.catalog->count (sounds) == 1);
+    CHECK (f.catalog->soundsWithContent (first.contentHash).size() == 1);
+
+    // Imported again while in the trash: the same record comes back.
+    REQUIRE (f.catalog->trash (first.assetId));
+    const auto again = importSound (*f.catalog, f.store, Fixture::request (file));
+    REQUIRE (again.ok);
+    CHECK (again.alreadyInLibrary);
+    CHECK (again.assetId == first.assetId);
+    CHECK (f.catalog->count (sounds) == 1);
+    CHECK (f.catalog->count (trashed) == 0);
+    CHECK (f.catalog->soundsWithContent (first.contentHash).size() == 1);
+}
+
 TEST_CASE ("library import: missing, unsupported, damaged and empty files are refused, and nothing is left", "[unit][library][import]")
 {
     Fixture f;

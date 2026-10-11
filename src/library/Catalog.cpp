@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <thread>
 #include <cstdlib>
 #include <sstream>
 
@@ -297,12 +298,19 @@ std::unique_ptr<Catalog> Catalog::open (const std::filesystem::path& file, std::
     catalog->exec ("PRAGMA journal_mode = WAL");
     catalog->exec ("PRAGMA synchronous = NORMAL");
     catalog->exec ("PRAGMA foreign_keys = ON");
-    if (! catalog->migrate())
+    // Two connections opening a new (or older) catalog at once both read its version before
+    // either migrates; the second then finds the first's step already done and fails. Each
+    // step is its own transaction, so a retry reads the version again and goes on from there.
+    for (int attempt = 0;; ++attempt)
     {
-        error = catalog->error;
-        return nullptr;
+        if (catalog->migrate())
+            return catalog;
+        if (attempt == 4 || catalog->version() > schemaVersion)
+            break;
+        std::this_thread::sleep_for (std::chrono::milliseconds (20 * (attempt + 1)));
     }
-    return catalog;
+    error = catalog->error;
+    return nullptr;
 }
 
 Catalog::Catalog (sqlite3* d) : db (d) {}
@@ -511,12 +519,19 @@ std::optional<Catalog::Added> Catalog::addImportedSound (const Asset& a, const S
         return std::nullopt;
     }
     std::string existingId;
+    bool existingTrashed = false;
     {
-        Statement found (db, "SELECT s.asset_id FROM sounds s JOIN source_locations l ON l.content_hash = s.content_hash JOIN assets a ON a.id = s.asset_id "
-                             "WHERE s.content_hash = ?1 AND l.path = ?2 AND a.trashed_at IS NULL ORDER BY a.created LIMIT 1");
+        // A live record first; else the trashed one (a late load record or a re-import must
+        // not put a second record beside a sound waiting in the trash).
+        Statement found (db, "SELECT s.asset_id, a.trashed_at IS NOT NULL FROM sounds s JOIN source_locations l ON l.content_hash = s.content_hash "
+                             "JOIN assets a ON a.id = s.asset_id WHERE s.content_hash = ?1 AND l.path = ?2 "
+                             "ORDER BY a.trashed_at IS NOT NULL, a.created LIMIT 1");
         found.bind (1, info.contentHash).bind (2, path);
         if (found.step() == SQLITE_ROW)
+        {
             existingId = found.text (0);
+            existingTrashed = found.integer (1) != 0;
+        }
     }
     if (! existingId.empty())
     {
@@ -525,7 +540,7 @@ std::optional<Catalog::Added> Catalog::addImportedSound (const Asset& a, const S
         seen.run();
         if (! t.commit())
             return std::nullopt;
-        return Added { existingId, true };
+        return Added { existingId, true, existingTrashed };
     }
     auto record = a;
     record.type = AssetType::sound;

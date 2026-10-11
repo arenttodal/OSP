@@ -30,9 +30,10 @@ LibraryService::~LibraryService()
 
 library::Catalog* LibraryService::backgroundCatalog()
 {
-    if (! backgroundOpened)
+    // A catalog that would not open (busy, mid-migration elsewhere) is tried again by the next
+    // job: one failed moment must not drop this instance's background work for good.
+    if (backgroundDb == nullptr)
     {
-        backgroundOpened = true;
         std::string error;
         backgroundDb = library::Catalog::open (library::Catalog::defaultFile(), error);
     }
@@ -49,16 +50,12 @@ void LibraryService::postBackground (std::function<void (library::Catalog&)> tas
 
 library::Catalog* LibraryService::catalog()
 {
-    if (! opened)
+    if (db == nullptr)   // as backgroundCatalog(): a failed open is tried again by the next job
     {
-        opened = true;
         std::string error;
         db = library::Catalog::open (library::Catalog::defaultFile(), error);
-        if (db == nullptr)
-        {
-            const juce::ScopedLock lock (reasonLock);
-            reason = juce::String (error);
-        }
+        const juce::ScopedLock lock (reasonLock);
+        reason = db == nullptr ? juce::String (error) : juce::String();
     }
     return db.get();
 }

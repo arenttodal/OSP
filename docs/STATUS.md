@@ -344,6 +344,11 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       (LEVEL could reach +24 dB past +6 before; times had no limit). Older sessions' depths
       are scaled by old / new span on load, so they sound as before; depth steps 0.01 %.
       `[unit][mod]`, `[plugin][mod]` (docs/reports/modulation.md).
+- [x] Library fix (the flaky "sideCount all = 4" window test): re-importing a sound that is
+      in the Library's trash reuses and restores its record instead of adding a second one;
+      connections that open a brand-new catalog at the same moment retry the migration
+      instead of failing, and LibraryService no longer latches a failed open. Both bugs
+      reproduced under CPU load before the fix. `[library]`.
 - [ ] RENDERED MACRO KNOB, phase 1 (tools/blender-assets, docs/reports/knob-phase1.md): a
       procedural Blender generator; the LIFE macro as pilot; Cmd+Option+K / OSP_KNOB_SKIN
       switches original / pilot / all macros (looks only).

@@ -207,6 +207,9 @@ ImportResult importSound (Catalog& catalog, const std::filesystem::path& storeDi
     }
     result.assetId = added->id;
     result.alreadyInLibrary = added->existed;
+    // Imported again while its record is in the Library's trash: the import brings it back.
+    if (added->trashed)
+        catalog.restore (added->id);
     if (! request.collectionId.empty())
         catalog.addToCollection (request.collectionId, added->id);
     for (const auto& tag : request.tags)
