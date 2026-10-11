@@ -1,5 +1,13 @@
 # Round 2: Warm Ceramic, teak, and two reference-inspired schemes
 
+> **Chosen: 09 Warm Ceramic + Teak**, refined with the C1 ivory fader on the T3 metal
+> guide, rendered lens LEDs (macros and ARP) and the painted divider. Two plugin changes
+> came with the choice and are now in the production GUI:
+> - the layer-knob names sit as far above the tick dots as the values sit below them;
+> - the MACROS title is gone.
+>
+> The full-GUI and component images were re-composited from the updated plugin.
+
 Your round-1 pick was **02 Warm Ceramic**. This round adds the three things you asked for.
 The layout, values, text, waveforms, value rings and halos are unchanged and remain the
 plugin's own drawing.

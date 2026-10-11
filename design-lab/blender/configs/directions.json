@@ -101,7 +101,7 @@
         },
         "09-warm-ceramic-teak": {
             "label": "09 Warm Ceramic + Teak",
-            "summary": "Round 2: Warm Ceramic (your pick) with oiled teak cheeks on the left and right edges; everything else as 02.",
+            "summary": "Your round-2 pick: Warm Ceramic with oiled teak cheeks, the C1 ivory fader on the T3 metal guide, rendered lens LEDs (macros and ARP), the painted divider; layer-knob names lifted and the MACROS title removed (plugin changes).",
             "enclosure": "E1",
             "cardMaterial": {
                 "preset": "M2-satin-ceramic-ivory",
@@ -111,9 +111,9 @@
             "buttons": "A1",
             "tabs": "B1",
             "fader": "C1",
-            "track": "T1",
+            "track": "T3",
             "details": {
-                "leds": false,
+                "leds": true,
                 "dividerGroove": false,
                 "seams": false
             },
