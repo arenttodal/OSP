@@ -989,6 +989,11 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
         publishModulation();
         return;
     }
+    for (std::size_t l = 0; l < modRuntime.layerLevelDb.size(); ++l)
+    {
+        modRuntime.layerLevelDb[l] = config.layer[l].levelDb;
+        modRuntime.layerTuneSemitones[l] = config.layer[l].tuneSemitones;
+    }
     // Modulated: the shared stages and the layers' amounts follow at control rate (32
     // samples), so a rhythmic LFO keeps its edges whatever block size the host uses.
     std::array<float*, 16> chunk {};
@@ -1072,7 +1077,13 @@ void InstrumentEngine::renderBlock (float* const* output, int numChannels, int n
         {
             auto& slot = slots[static_cast<std::size_t> (layer)];
             const auto& settings = config.layer[static_cast<std::size_t> (layer)];
-            const double level = settings.levelDb <= LayerSettings::minLevelDb || ! settings.audible ? 0.0 : dbToGain (std::min (settings.levelDb, 12.0));
+            // A layer at LEVEL's bottom is silent, unless a route can lift it: then its voices
+            // take it from there (and back to silence at the bottom).
+            const auto levelDest = static_cast<mod::Dest> (static_cast<int> (mod::Dest::levelA) + layer);
+            const bool lifted = modRuntime.compiled.any && modRuntime.compiled.has (levelDest);
+            const double level = (settings.levelDb <= LayerSettings::minLevelDb && ! lifted) || ! settings.audible
+                                     ? 0.0
+                                     : dbToGain (std::clamp (settings.levelDb, LayerSettings::minLevelDb, 12.0));
             const double pan = std::clamp (settings.pan, -1.0, 1.0);
             const double weight = weights.gain[static_cast<std::size_t> (layer)] * level;
             const float targetLeft = static_cast<float> (weight * (pan > 0.0 ? 1.0 - pan : 1.0));

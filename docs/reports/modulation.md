@@ -82,23 +82,34 @@ render(): 32-sample chunks while a route is active ──┤
 layer, domain, span (what 100 % depth moves) and update policy. The enum is append-only
 because sessions store it as an index.
 
-| Destinations | Owner | Domain / span at 100 % | Update |
+**Full range (state version 11).** 100 % depth moves a destination across its knob's whole
+range, so a route can take the knob from any base to either end. The engine stops the value
+at the knob's ends, as the halo shows. Before version 11 the spans were fixed and smaller
+(LEVEL ±24 dB, TUNE ±100 cents, CUTOFF ±4 octaves...): a route on LEVEL at -39.3 dB could
+reach only -15.3 dB. Older sessions and presets have their depths scaled by old span / new
+span as they load (`migrateModulationDepths`; a depth route scales with its target), so they
+sound as they did. Route depths now step in 0.01 %.
+
+| Destinations | Owner | Domain / span at 100 % (the knob's range) | Update |
 |---|---|---|---|
-| LIFE, DRIVE, CHARACTER, MOVEMENT, SPACE | global | amount, full travel | continuous (32 samples) |
-| LEVEL A/B/C | voice | ±24 dB | continuous (gain ramped over the interval) |
-| PAN A/B/C | voice | full pan | continuous |
+| LIFE, DRIVE, CHARACTER, MOVEMENT, SPACE, ECHO | global | amount, full travel | continuous (32 samples) |
+| LEVEL A/B/C | voice | 54 dB (-48 = silence .. +6); a route lifts a silent layer and takes it back to silence | continuous (gain ramped over the interval) |
+| PAN A/B/C | voice | full pan, left to right | continuous |
 | REIMAGINED A/B/C | voice (+ the layer's shared stages hear global LFOs) | full amount | continuous |
-| FINE TUNE A/B/C | voice | ±100 cents | continuous |
-| POSITION A/B/C (granular) | voice | ±50 % of the source | continuous; grains read inside the source, reversed sources mirror |
-| DENSITY, GRAIN SIZE A/B/C | voice | ±2 octaves | continuous |
+| TUNE A/B/C | voice | 48 semitones (-24 .. +24) | continuous |
+| START A/B/C | voice | the whole recording | at note-on |
+| POSITION A/B/C (granular) | voice | the whole source | continuous; grains read inside the source, reversed sources mirror |
+| DENSITY A/B/C | voice | 4 .. 40 grains/s (3.3 octaves) | continuous |
+| GRAIN SIZE A/B/C | voice | 20 .. 400 ms (4.3 octaves) | continuous |
 | SPREAD A/B/C | voice | full | continuous |
-| CHARACTER CUTOFF | voice | ±4 octaves | continuous |
+| CHARACTER CUTOFF | voice | the filter's travel (CHARACTER min .. max) | continuous |
 | CHARACTER RESONANCE | voice | full | continuous |
-| AMP ATTACK, DECAY | voice | ±4 octaves (time ratio) | at note-on |
+| AMP ATTACK, DECAY | voice | ATTACK 0 .. 2 s, DECAY 1 ms .. 20 s (time ratio) | at note-on |
 | AMP SUSTAIN | voice | full | continuous |
-| AMP RELEASE | voice | ±4 octaves | at note-off |
-| EQ A/B/C BELL FREQ | global (the layer's EQ, after its voices are summed) | ±2 octaves | continuous |
-| EQ A/B/C BELL GAIN, LOW SHELF, HIGH SHELF | global (the layer's EQ) | ±12 dB | continuous |
+| AMP RELEASE | voice | 20 ms .. 15 s | at note-off |
+| ENV 1/2 ATTACK, DECAY, RELEASE | voice | 0 (1 ms) .. 10 s | at note-on / note-off |
+| EQ A/B/C BELL FREQ | global (the layer's EQ, after its voices are summed) | 20 Hz .. 20 kHz | continuous |
+| EQ A/B/C BELL GAIN, LOW SHELF, HIGH SHELF | global (the layer's EQ) | 36 dB (-18 .. +18) | continuous |
 
 The spec's exclusions (8.6) are not destinations: sample selection, presets, ARP pattern and
 mode, REIMAGINED mode, mono/poly, quality settings and routing topology.

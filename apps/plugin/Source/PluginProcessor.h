@@ -179,6 +179,9 @@ public:
     ModAssignResult assignModulation (mod::Source source, mod::Dest dest, float depthPercent = 50.0f);
     /** The modulation settings as the parameters say now (the rules and loop checks use them). */
     mod::Settings modulationProbe() const;
+    /** State version < 11: scales every route depth from the old fixed spans to the
+        full-range ones (same sound). */
+    void migrateModulationDepths();
     /** Removes a route; the routes moving its depth go with it, in the same undo step. */
     void removeModulationRoute (int slot, bool ownUndoStep = true);
     /** META-MODULATION through the same path: `source` moves the depth of the route in
@@ -416,7 +419,9 @@ public:
         10: SPACE v2 (HALL in CHAMBER's place; older sessions open the new EQ fully, so the
             room is not filtered where it never was), ECHO (off in older sessions) and the
             SHAPER's CUSTOM pattern (`shaperCustom`). */
-    static constexpr int stateVersion = 10;
+    /** 11: full-range modulation (100 % depth covers a destination's whole knob; older
+            sessions' depths are scaled so they sound the same: migrateModulationDepths). */
+    static constexpr int stateVersion = 11;
 
     /** SHAPER CUSTOM: the musician's 16 steps (message thread). Kept in the session and
         presets; setting it is undoable (one gesture = one transaction, see UndoManager). */

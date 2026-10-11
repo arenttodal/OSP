@@ -52,6 +52,16 @@ namespace
         { "1/16D", 0.375 }, { "1/8D", 0.75 }, { "1/4D", 1.5 },
     } };
 
+    // Full depth (100 %) moves a destination across its knob's whole range. In octaves: the
+    // ratio of the knob's ends (times from 1 ms where the knob starts at 0).
+    constexpr double densityOctaves = 3.321928094887362;      // DENSITY 4 .. 40 grains/s
+    constexpr double grainSizeOctaves = 4.321928094887363;    // GRAIN SIZE 20 .. 400 ms
+    constexpr double eqFrequencyOctaves = 9.965784284662087;  // BELL 20 Hz .. 20 kHz
+    constexpr double ampAttackOctaves = 10.965784284662087;   // ATTACK (0) 1 ms .. 2 s
+    constexpr double ampDecayOctaves = 14.287712379549449;    // DECAY 1 ms .. 20 s
+    constexpr double ampReleaseOctaves = 9.550746785383243;   // RELEASE 20 ms .. 15 s
+    constexpr double envTimeOctaves = 13.287712379549449;     // ENV times (0) 1 ms .. 10 s
+
     constexpr std::array<DestInfo, destCount> registry { {
         { "none", "-", Owner::global, -1, Domain::unit, 0.0, Update::continuous },
         { "life", "LIFE", Owner::global, -1, Domain::unit, 1.0, Update::continuous },
@@ -59,64 +69,64 @@ namespace
         { "character", "CHARACTER", Owner::global, -1, Domain::unit, 1.0, Update::continuous },
         { "movement", "MOVEMENT", Owner::global, -1, Domain::unit, 1.0, Update::continuous },
         { "space", "SPACE", Owner::global, -1, Domain::unit, 1.0, Update::continuous },
-        { "levelA", "LEVEL A", Owner::voice, 0, Domain::decibels, 24.0, Update::continuous },
-        { "levelB", "LEVEL B", Owner::voice, 1, Domain::decibels, 24.0, Update::continuous },
-        { "levelC", "LEVEL C", Owner::voice, 2, Domain::decibels, 24.0, Update::continuous },
-        { "panA", "PAN A", Owner::voice, 0, Domain::pan, 1.0, Update::continuous },
-        { "panB", "PAN B", Owner::voice, 1, Domain::pan, 1.0, Update::continuous },
-        { "panC", "PAN C", Owner::voice, 2, Domain::pan, 1.0, Update::continuous },
+        { "levelA", "LEVEL A", Owner::voice, 0, Domain::decibels, 54.0, Update::continuous },
+        { "levelB", "LEVEL B", Owner::voice, 1, Domain::decibels, 54.0, Update::continuous },
+        { "levelC", "LEVEL C", Owner::voice, 2, Domain::decibels, 54.0, Update::continuous },
+        { "panA", "PAN A", Owner::voice, 0, Domain::pan, 2.0, Update::continuous },
+        { "panB", "PAN B", Owner::voice, 1, Domain::pan, 2.0, Update::continuous },
+        { "panC", "PAN C", Owner::voice, 2, Domain::pan, 2.0, Update::continuous },
         { "reimaginedA", "REIMAGINED A", Owner::voice, 0, Domain::unit, 1.0, Update::continuous },
         { "reimaginedB", "REIMAGINED B", Owner::voice, 1, Domain::unit, 1.0, Update::continuous },
         { "reimaginedC", "REIMAGINED C", Owner::voice, 2, Domain::unit, 1.0, Update::continuous },
-        { "fineTuneA", "FINE TUNE A", Owner::voice, 0, Domain::cents, 100.0, Update::continuous },
-        { "fineTuneB", "FINE TUNE B", Owner::voice, 1, Domain::cents, 100.0, Update::continuous },
-        { "fineTuneC", "FINE TUNE C", Owner::voice, 2, Domain::cents, 100.0, Update::continuous },
-        { "grainPositionA", "POSITION A", Owner::voice, 0, Domain::unit, 0.5, Update::continuous },
-        { "grainPositionB", "POSITION B", Owner::voice, 1, Domain::unit, 0.5, Update::continuous },
-        { "grainPositionC", "POSITION C", Owner::voice, 2, Domain::unit, 0.5, Update::continuous },
-        { "grainDensityA", "DENSITY A", Owner::voice, 0, Domain::octaves, 2.0, Update::continuous },
-        { "grainDensityB", "DENSITY B", Owner::voice, 1, Domain::octaves, 2.0, Update::continuous },
-        { "grainDensityC", "DENSITY C", Owner::voice, 2, Domain::octaves, 2.0, Update::continuous },
-        { "grainSizeA", "GRAIN SIZE A", Owner::voice, 0, Domain::octaves, 2.0, Update::continuous },
-        { "grainSizeB", "GRAIN SIZE B", Owner::voice, 1, Domain::octaves, 2.0, Update::continuous },
-        { "grainSizeC", "GRAIN SIZE C", Owner::voice, 2, Domain::octaves, 2.0, Update::continuous },
+        { "fineTuneA", "FINE TUNE A", Owner::voice, 0, Domain::cents, 4800.0, Update::continuous },
+        { "fineTuneB", "FINE TUNE B", Owner::voice, 1, Domain::cents, 4800.0, Update::continuous },
+        { "fineTuneC", "FINE TUNE C", Owner::voice, 2, Domain::cents, 4800.0, Update::continuous },
+        { "grainPositionA", "POSITION A", Owner::voice, 0, Domain::unit, 1.0, Update::continuous },
+        { "grainPositionB", "POSITION B", Owner::voice, 1, Domain::unit, 1.0, Update::continuous },
+        { "grainPositionC", "POSITION C", Owner::voice, 2, Domain::unit, 1.0, Update::continuous },
+        { "grainDensityA", "DENSITY A", Owner::voice, 0, Domain::octaves, densityOctaves, Update::continuous },
+        { "grainDensityB", "DENSITY B", Owner::voice, 1, Domain::octaves, densityOctaves, Update::continuous },
+        { "grainDensityC", "DENSITY C", Owner::voice, 2, Domain::octaves, densityOctaves, Update::continuous },
+        { "grainSizeA", "GRAIN SIZE A", Owner::voice, 0, Domain::octaves, grainSizeOctaves, Update::continuous },
+        { "grainSizeB", "GRAIN SIZE B", Owner::voice, 1, Domain::octaves, grainSizeOctaves, Update::continuous },
+        { "grainSizeC", "GRAIN SIZE C", Owner::voice, 2, Domain::octaves, grainSizeOctaves, Update::continuous },
         { "grainSpreadA", "SPREAD A", Owner::voice, 0, Domain::unit, 1.0, Update::continuous },
         { "grainSpreadB", "SPREAD B", Owner::voice, 1, Domain::unit, 1.0, Update::continuous },
         { "grainSpreadC", "SPREAD C", Owner::voice, 2, Domain::unit, 1.0, Update::continuous },
-        { "cutoff", "CHARACTER CUTOFF", Owner::voice, -1, Domain::octaves, 4.0, Update::continuous },
+        { "cutoff", "CHARACTER CUTOFF", Owner::voice, -1, Domain::unit, 1.0, Update::continuous },
         { "resonance", "CHARACTER RESONANCE", Owner::voice, -1, Domain::unit, 1.0, Update::continuous },
-        { "ampAttack", "AMP ATTACK", Owner::voice, -1, Domain::octaves, 4.0, Update::noteOn },
-        { "ampDecay", "AMP DECAY", Owner::voice, -1, Domain::octaves, 4.0, Update::noteOn },
+        { "ampAttack", "AMP ATTACK", Owner::voice, -1, Domain::octaves, ampAttackOctaves, Update::noteOn, Source::none, 0.0, 2.0 },
+        { "ampDecay", "AMP DECAY", Owner::voice, -1, Domain::octaves, ampDecayOctaves, Update::noteOn, Source::none, 0.001, 20.0 },
         { "ampSustain", "AMP SUSTAIN", Owner::voice, -1, Domain::unit, 1.0, Update::continuous },
-        { "ampRelease", "AMP RELEASE", Owner::voice, -1, Domain::octaves, 4.0, Update::noteOff },
-        { "eqBellFrequencyA", "EQ A BELL FREQ", Owner::global, 0, Domain::octaves, 2.0, Update::continuous },
-        { "eqBellFrequencyB", "EQ B BELL FREQ", Owner::global, 1, Domain::octaves, 2.0, Update::continuous },
-        { "eqBellFrequencyC", "EQ C BELL FREQ", Owner::global, 2, Domain::octaves, 2.0, Update::continuous },
-        { "eqBellGainA", "EQ A BELL GAIN", Owner::global, 0, Domain::decibels, 12.0, Update::continuous },
-        { "eqBellGainB", "EQ B BELL GAIN", Owner::global, 1, Domain::decibels, 12.0, Update::continuous },
-        { "eqBellGainC", "EQ C BELL GAIN", Owner::global, 2, Domain::decibels, 12.0, Update::continuous },
-        { "eqLowShelfGainA", "EQ A LOW SHELF", Owner::global, 0, Domain::decibels, 12.0, Update::continuous },
-        { "eqLowShelfGainB", "EQ B LOW SHELF", Owner::global, 1, Domain::decibels, 12.0, Update::continuous },
-        { "eqLowShelfGainC", "EQ C LOW SHELF", Owner::global, 2, Domain::decibels, 12.0, Update::continuous },
-        { "eqHighShelfGainA", "EQ A HIGH SHELF", Owner::global, 0, Domain::decibels, 12.0, Update::continuous },
-        { "eqHighShelfGainB", "EQ B HIGH SHELF", Owner::global, 1, Domain::decibels, 12.0, Update::continuous },
-        { "eqHighShelfGainC", "EQ C HIGH SHELF", Owner::global, 2, Domain::decibels, 12.0, Update::continuous },
+        { "ampRelease", "AMP RELEASE", Owner::voice, -1, Domain::octaves, ampReleaseOctaves, Update::noteOff, Source::none, 0.02, 15.0 },
+        { "eqBellFrequencyA", "EQ A BELL FREQ", Owner::global, 0, Domain::octaves, eqFrequencyOctaves, Update::continuous },
+        { "eqBellFrequencyB", "EQ B BELL FREQ", Owner::global, 1, Domain::octaves, eqFrequencyOctaves, Update::continuous },
+        { "eqBellFrequencyC", "EQ C BELL FREQ", Owner::global, 2, Domain::octaves, eqFrequencyOctaves, Update::continuous },
+        { "eqBellGainA", "EQ A BELL GAIN", Owner::global, 0, Domain::decibels, 36.0, Update::continuous },
+        { "eqBellGainB", "EQ B BELL GAIN", Owner::global, 1, Domain::decibels, 36.0, Update::continuous },
+        { "eqBellGainC", "EQ C BELL GAIN", Owner::global, 2, Domain::decibels, 36.0, Update::continuous },
+        { "eqLowShelfGainA", "EQ A LOW SHELF", Owner::global, 0, Domain::decibels, 36.0, Update::continuous },
+        { "eqLowShelfGainB", "EQ B LOW SHELF", Owner::global, 1, Domain::decibels, 36.0, Update::continuous },
+        { "eqLowShelfGainC", "EQ C LOW SHELF", Owner::global, 2, Domain::decibels, 36.0, Update::continuous },
+        { "eqHighShelfGainA", "EQ A HIGH SHELF", Owner::global, 0, Domain::decibels, 36.0, Update::continuous },
+        { "eqHighShelfGainB", "EQ B HIGH SHELF", Owner::global, 1, Domain::decibels, 36.0, Update::continuous },
+        { "eqHighShelfGainC", "EQ C HIGH SHELF", Owner::global, 2, Domain::decibels, 36.0, Update::continuous },
         { "echo", "ECHO", Owner::global, -1, Domain::unit, 1.0, Update::continuous },
         // START: read once as each note begins (a sounding note never jumps); 100 % moves it
-        // half the recording.
-        { "startA", "START A", Owner::voice, 0, Domain::unit, 0.5, Update::noteOn },
-        { "startB", "START B", Owner::voice, 1, Domain::unit, 0.5, Update::noteOn },
-        { "startC", "START C", Owner::voice, 2, Domain::unit, 0.5, Update::noteOn },
+        // the whole recording.
+        { "startA", "START A", Owner::voice, 0, Domain::unit, 1.0, Update::noteOn },
+        { "startB", "START B", Owner::voice, 1, Domain::unit, 1.0, Update::noteOn },
+        { "startC", "START C", Owner::voice, 2, Domain::unit, 1.0, Update::noteOn },
         // The modulation envelopes' own times: attack and decay taken as a note starts,
         // release as it is released, sustain followed (as the amp envelope's).
-        { "env1Attack", "ENV 1 ATTACK", Owner::voice, -1, Domain::octaves, 4.0, Update::noteOn, Source::env1 },
-        { "env1Decay", "ENV 1 DECAY", Owner::voice, -1, Domain::octaves, 4.0, Update::noteOn, Source::env1 },
+        { "env1Attack", "ENV 1 ATTACK", Owner::voice, -1, Domain::octaves, envTimeOctaves, Update::noteOn, Source::env1, 0.0, 10.0 },
+        { "env1Decay", "ENV 1 DECAY", Owner::voice, -1, Domain::octaves, envTimeOctaves, Update::noteOn, Source::env1, 0.001, 10.0 },
         { "env1Sustain", "ENV 1 SUSTAIN", Owner::voice, -1, Domain::unit, 1.0, Update::continuous, Source::env1 },
-        { "env1Release", "ENV 1 RELEASE", Owner::voice, -1, Domain::octaves, 4.0, Update::noteOff, Source::env1 },
-        { "env2Attack", "ENV 2 ATTACK", Owner::voice, -1, Domain::octaves, 4.0, Update::noteOn, Source::env2 },
-        { "env2Decay", "ENV 2 DECAY", Owner::voice, -1, Domain::octaves, 4.0, Update::noteOn, Source::env2 },
+        { "env1Release", "ENV 1 RELEASE", Owner::voice, -1, Domain::octaves, envTimeOctaves, Update::noteOff, Source::env1, 0.001, 10.0 },
+        { "env2Attack", "ENV 2 ATTACK", Owner::voice, -1, Domain::octaves, envTimeOctaves, Update::noteOn, Source::env2, 0.0, 10.0 },
+        { "env2Decay", "ENV 2 DECAY", Owner::voice, -1, Domain::octaves, envTimeOctaves, Update::noteOn, Source::env2, 0.001, 10.0 },
         { "env2Sustain", "ENV 2 SUSTAIN", Owner::voice, -1, Domain::unit, 1.0, Update::continuous, Source::env2 },
-        { "env2Release", "ENV 2 RELEASE", Owner::voice, -1, Domain::octaves, 4.0, Update::noteOff, Source::env2 },
+        { "env2Release", "ENV 2 RELEASE", Owner::voice, -1, Domain::octaves, envTimeOctaves, Update::noteOff, Source::env2, 0.001, 10.0 },
         // Another route's depth (Route::target): read wherever that route is read.
         { "routeDepth", "ROUTE DEPTH", Owner::voice, -1, Domain::unit, 1.0, Update::continuous },
     } };
@@ -155,6 +165,37 @@ const char* syncName (int division) noexcept
 const DestInfo& destInfo (Dest d) noexcept
 {
     return registry[static_cast<std::size_t> (std::clamp (static_cast<int> (d), 0, destCount - 1))];
+}
+
+double legacySpan (Dest d) noexcept
+{
+    // The fixed spans before every destination covered its whole range (state version 10).
+    const auto& info = destInfo (d);
+    const auto in = [d] (Dest first) { return static_cast<int> (d) >= static_cast<int> (first) && static_cast<int> (d) < static_cast<int> (first) + 3; };
+    if (d == Dest::cutoff)
+        return 4.0;   // octaves (now: the filter's travel)
+    if (in (Dest::levelA))
+        return 24.0;
+    if (in (Dest::panA))
+        return 1.0;
+    if (in (Dest::fineTuneA))
+        return 100.0;
+    if (in (Dest::grainPositionA) || in (Dest::startA))
+        return 0.5;
+    if (in (Dest::grainDensityA) || in (Dest::grainSizeA) || in (Dest::eqBellFrequencyA))
+        return 2.0;
+    if (in (Dest::eqBellGainA) || in (Dest::eqLowShelfGainA) || in (Dest::eqHighShelfGainA))
+        return 12.0;
+    if (info.highSeconds > 0.0)
+        return 4.0;   // every envelope time
+    return info.span;
+}
+
+double modulatedSeconds (Dest d, double base, double octaves) noexcept
+{
+    const auto& info = destInfo (d);
+    const double t = base * std::exp2 (octaves);
+    return info.highSeconds > 0.0 ? std::clamp (t, info.lowSeconds, info.highSeconds) : t;
 }
 
 void Curve::normalise() noexcept
@@ -662,9 +703,9 @@ EnvSettings Runtime::envAtStart (int e, const std::array<float, sourceCount>& va
     const auto first = e == 0 ? Dest::env1Attack : Dest::env2Attack;
     auto at = [first] (int k) { return static_cast<Dest> (static_cast<int> (first) + k); };
     if (compiled.has (at (0)))
-        s.attackSeconds *= std::exp2 (offsetOf (at (0), values));
+        s.attackSeconds = modulatedSeconds (at (0), s.attackSeconds, offsetOf (at (0), values));
     if (compiled.has (at (1)))
-        s.decaySeconds *= std::exp2 (offsetOf (at (1), values));
+        s.decaySeconds = modulatedSeconds (at (1), s.decaySeconds, offsetOf (at (1), values));
     s.sustain = envSustain (e, values);
     s.releaseSeconds = envReleaseSeconds (e, values);
     return s;
@@ -692,7 +733,7 @@ double Runtime::envReleaseSeconds (int e, const std::array<float, sourceCount>& 
 {
     const double base = settings.env[static_cast<std::size_t> (e)].releaseSeconds;
     const auto d = e == 0 ? Dest::env1Release : Dest::env2Release;
-    return compiled.has (d) ? base * std::exp2 (offsetOf (d, values)) : base;
+    return compiled.has (d) ? modulatedSeconds (d, base, offsetOf (d, values)) : base;
 }
 
 double Runtime::envSustain (int e, const std::array<float, sourceCount>& values) const noexcept

@@ -7915,4 +7915,73 @@ TEST_CASE ("plugin: Library QA - measured: search, recent, preview start and the
     CHECK (search < 50.0);
 }
 
+TEST_CASE ("plugin: full-range modulation - 100 % reaches the knob's end; older sessions keep their sound", "[plugin][mod]")
+{
+    TempDir tmp;
+    const ScopedEnvironment library ("OSP_LIBRARY_DIR", tmp.dir.getChildFile ("library").getFullPathName());
+    const ScopedEnvironment documents ("OSP_DOCUMENTS_DIR", tmp.dir.getChildFile ("documents").getFullPathName());
+    const auto file = writeSource (tmp.dir, "Steady Pluck C4.wav", testsignals::pluck (261.6256, 1.2, 48000.0, 21));
+    const auto levelId = OspAudioProcessor::layerParameterId (0, "level");
+    auto depthOf = [] (OspAudioProcessor& q, int slot) { return q.parameterValue (OspAudioProcessor::modRouteId (slot, "depth")); };
+
+    // The report: LEVEL at -39.3 dB, ENV 1 at +100 % - its range now ends at the knob's top.
+    {
+        OspAudioProcessor p;
+        loadAndWait (p, file);
+        p.setParameterValue (levelId, -39.3f);
+        const auto route = p.assignModulation (mod::Source::env1, mod::Dest::levelA, 100.0f);
+        REQUIRE (route.slot >= 0);
+        std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+        auto* ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (editor.get());
+        REQUIRE (ui != nullptr);
+        editor->setSize (1448, 1086);
+        ui->refreshNow();
+        const auto readout = ui->modulationOverlay().haloReadout (levelId);
+        REQUIRE (readout.size() >= 4);
+        INFO (readout.joinIntoString (" | "));
+        CHECK (readout[3].contains ("+6.0 dB"));
+        // Halfway is 27 dB (half of LEVEL's 54 dB), not 12 dB.
+        p.setParameterValue (OspAudioProcessor::modRouteId (route.slot, "depth"), 50.0f);
+        ui->refreshNow();
+        CHECK (ui->modulationOverlay().haloReadout (levelId)[3].contains ("-12.3 dB"));
+    }
+
+    // An older session (state version 10): its depths are scaled to the new spans, so it
+    // sounds as it did; a session saved now keeps its depths as they are.
+    OspAudioProcessor p;
+    loadAndWait (p, file);
+    const auto level = p.assignModulation (mod::Source::env1, mod::Dest::levelA, 50.0f);
+    const auto cutoff = p.assignModulation (mod::Source::env1, mod::Dest::cutoff, 50.0f);
+    const auto tune = p.assignModulation (mod::Source::modWheel, mod::Dest::fineTuneA, 30.0f);
+    const auto space = p.assignModulation (mod::Source::lfo1, mod::Dest::space, 40.0f);
+    REQUIRE (level.slot >= 0);
+    REQUIRE (cutoff.slot >= 0);
+    REQUIRE (tune.slot >= 0);
+    REQUIRE (space.slot >= 0);
+    const auto meta = p.assignDepthModulation (mod::Source::modWheel, level.slot, 40.0f);
+    INFO (meta.error);
+    REQUIRE (meta.slot >= 0);
+    juce::MemoryBlock state;
+    p.getStateInformation (state);
+
+    OspAudioProcessor now;
+    now.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+    CHECK (depthOf (now, level.slot) == Approx (50.0f));
+    CHECK (depthOf (now, meta.slot) == Approx (40.0f));
+
+    auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
+    REQUIRE (xml != nullptr);
+    xml->setAttribute ("stateVersion", 10);
+    juce::MemoryBlock older;
+    juce::AudioProcessor::copyXmlToBinary (*xml, older);
+    OspAudioProcessor old;
+    old.setStateInformation (older.getData(), static_cast<int> (older.getSize()));
+    const double travel = std::abs (std::log2 (old.parameterValue ("character.max") / old.parameterValue ("character.min")));
+    CHECK (depthOf (old, level.slot) == Approx (50.0 * 24.0 / 54.0).margin (0.01));     // the same 12 dB
+    CHECK (depthOf (old, meta.slot) == Approx (40.0 * 24.0 / 54.0).margin (0.01));      // moves its target's depth: scaled with it
+    CHECK (depthOf (old, tune.slot) == Approx (30.0 * 100.0 / 4800.0).margin (0.01));   // the same 30 cents
+    CHECK (depthOf (old, cutoff.slot) == Approx (50.0 * 4.0 / travel).margin (0.01));   // the same 2 octaves of the filter's travel
+    CHECK (depthOf (old, space.slot) == Approx (40.0f));                                // SPACE always covered its whole range
+}
+
 #include "RenderRegression.inc"

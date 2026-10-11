@@ -291,8 +291,8 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
         // re-timed); SUSTAIN follows while held, RELEASE is taken at note-off.
         updateModulation (false);
         const auto& rt = *modRuntime;
-        noteAdsr.attackSeconds = adsrSettings.attackSeconds * std::exp2 (modState.offset (rt, mod::Dest::ampAttack));
-        noteAdsr.decaySeconds = adsrSettings.decaySeconds * std::exp2 (modState.offset (rt, mod::Dest::ampDecay));
+        noteAdsr.attackSeconds = mod::modulatedSeconds (mod::Dest::ampAttack, adsrSettings.attackSeconds, modState.offset (rt, mod::Dest::ampAttack));
+        noteAdsr.decaySeconds = mod::modulatedSeconds (mod::Dest::ampDecay, adsrSettings.decaySeconds, modState.offset (rt, mod::Dest::ampDecay));
         noteAdsr.sustainLevel = std::clamp (adsrSettings.sustainLevel + modSustain, 0.0, 1.0);
         appliedSustain = noteAdsr.sustainLevel;
     }
@@ -330,7 +330,7 @@ void InstrumentVoice::release() noexcept
         {
             auto a = noteAdsr;
             a.sustainLevel = appliedSustain >= 0.0 ? appliedSustain : a.sustainLevel;
-            a.releaseSeconds = adsrSettings.releaseSeconds * std::exp2 (modState.offset (*modRuntime, mod::Dest::ampRelease));
+            a.releaseSeconds = mod::modulatedSeconds (mod::Dest::ampRelease, adsrSettings.releaseSeconds, modState.offset (*modRuntime, mod::Dest::ampRelease));
             envelope.prepare (sampleRate, a);
         }
     }
@@ -622,7 +622,11 @@ void InstrumentVoice::updateCharacter (bool immediate) noexcept
     const double target = shaping::cutoffOctaves (rangeLoOctaves, rangeHiOctaves, shapingState->character);
     charOctaves = immediate ? target : charOctaves + (target - charOctaves) * charSmoothing;
     const double env = shaping::envelopeOctaves (s.envAmount) * filterEnv * envelopeScale;
-    const double octaves = charOctaves + env + velocityOctaves + driftTone + modCutoff;
+    // A CUTOFF route moves along the filter's travel (1 = min to max), never past its ends.
+    const double travel = modCutoff == 0.0 ? charOctaves
+                                           : std::clamp (charOctaves + modCutoff * (rangeHiOctaves - rangeLoOctaves), std::min (rangeLoOctaves, rangeHiOctaves),
+                                                         std::max (rangeLoOctaves, rangeHiOctaves));
+    const double octaves = travel + env + velocityOctaves + driftTone;
     // TILT: the knob rotates dark <-> bright (+-12 dB), the envelope and velocity lean it.
     const double tiltDb = (std::clamp (shapingState->character, 0.0, 1.0) - 0.5) * 24.0 + 3.0 * (env + velocityOctaves + driftTone);
     const double resonance = modResonance != 0.0 ? std::clamp (s.resonance + modResonance, 0.0, 1.0) : s.resonance;
@@ -647,8 +651,11 @@ GranularParams InstrumentVoice::notesGranular() const noexcept
     {
         offset += modGrainPosition;
         p.spread += modGrainSpread;
-        p.sizeSeconds *= std::exp2 (modGrainSize);
-        p.density *= std::exp2 (modGrainDensity);
+        // Routes take SIZE and DENSITY to their knobs' ends, never past.
+        if (modGrainSize != 0.0)
+            p.sizeSeconds = std::clamp (p.sizeSeconds * std::exp2 (modGrainSize), 0.02, 0.4);
+        if (modGrainDensity != 0.0)
+            p.density = std::clamp (p.density * std::exp2 (modGrainDensity), 4.0, 40.0);
     }
     if (gScatter > 0.0f)
     {
@@ -700,8 +707,23 @@ void InstrumentVoice::updateModulation (bool advance) noexcept
 
     const int layerOffset = std::clamp (voiceLayer, 0, 2);
     auto layerDest = [layerOffset] (mod::Dest a) { return static_cast<mod::Dest> (static_cast<int> (a) + layerOffset); };
-    modCents = static_cast<float> (modState.offset (rt, layerDest (mod::Dest::fineTuneA)));
-    modLevelDb = static_cast<float> (modState.offset (rt, layerDest (mod::Dest::levelA)));
+    {
+        // TUNE and LEVEL: a route takes the knob to its ends, never past; at LEVEL's bottom
+        // the layer is silent.
+        const auto l = static_cast<std::size_t> (layerOffset);
+        const double cents = modState.offset (rt, layerDest (mod::Dest::fineTuneA));
+        const double tune = rt.layerTuneSemitones[l];
+        modCents = cents == 0.0 ? 0.0f
+                                : static_cast<float> (100.0 * (std::clamp (tune + cents / 100.0, -mod::Runtime::maxTuneSemitones, mod::Runtime::maxTuneSemitones) - tune));
+        modLevelDb = 0.0f;
+        if (rt.compiled.has (layerDest (mod::Dest::levelA)))
+        {
+            // The layer's mix holds it at the bottom (-48 dB) while a route can lift it.
+            const double base = std::max (rt.layerLevelDb[l], mod::Runtime::silentLevelDb);
+            const double total = base + modState.offset (rt, layerDest (mod::Dest::levelA));
+            modLevelDb = total <= mod::Runtime::silentLevelDb ? -400.0f : static_cast<float> (std::min (total, mod::Runtime::maxLevelDb) - base);
+        }
+    }
     modPan = static_cast<float> (modState.offset (rt, layerDest (mod::Dest::panA)));
     modCutoff = modState.offset (rt, mod::Dest::cutoff);
     modResonance = modState.offset (rt, mod::Dest::resonance);

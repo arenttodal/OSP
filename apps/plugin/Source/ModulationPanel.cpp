@@ -1582,10 +1582,7 @@ float ModulationOverlay::positionOf (const Target& t, double offset, mod::Dest d
         case mod::Domain::pan: value = base + x * (length > 2.5 ? 100.0 : 1.0); break;
         case mod::Domain::decibels: value = base + x; break;
         case mod::Domain::cents: value = base + x / 100.0; break;   // the knob is in semitones
-        case mod::Domain::octaves:
-            // CHARACTER's cutoff on the CHARACTER macro: its travel spans about four octaves.
-            value = t.parameterId == "character" ? base + 100.0 * x / 4.0 : (base > 0.0 ? base * std::exp2 (x) : base);
-            break;
+        case mod::Domain::octaves: value = base > 0.0 ? base * std::exp2 (x) : base; break;   // CHARACTER's cutoff is in its travel (unit)
     }
     value = std::clamp (value, static_cast<double> (range.start), static_cast<double> (range.end));
     return param->convertTo0to1 (static_cast<float> (value));

@@ -338,6 +338,17 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [ ] MODULATION: compare the panel and halo against the mockups (not received); host checks
       (Logic, Ableton, REAPER, AudioPluginHost); a global envelope mode needs a
       gate-aggregation rule before ENV may reach the macros.
+- [x] FULL-RANGE MODULATION (state 11): 100 % depth now covers a destination's whole knob
+      (LEVEL 54 dB from silence to +6, TUNE 48 semitones, PAN, START, POS, CUTOFF along the
+      filter's travel, times and EQ at their log ranges); the engine stops at the knob's ends
+      (LEVEL could reach +24 dB past +6 before; times had no limit). Older sessions' depths
+      are scaled by old / new span on load, so they sound as before; depth steps 0.01 %.
+      `[unit][mod]`, `[plugin][mod]` (docs/reports/modulation.md).
+- [ ] RENDERED MACRO KNOB, phase 1 (tools/blender-assets, docs/reports/knob-phase1.md): a
+      procedural Blender generator; the LIFE macro as pilot; Cmd+Option+K / OSP_KNOB_SKIN
+      switches original / pilot / all macros (looks only).
+- [ ] FINAL MODULATION SYSTEM + DAMPEN (queued spec, stages 0-10): Stage 0 audit done
+      (docs/reports/mod-final-audit.md); implementation next.
 - [x] `plugin-pipeline/`: the build-and-download pipeline as a reusable kit for other JUCE
       plug-ins (`adopt.sh` for an existing repo, `new-plugin.sh` + starter for a new one, a fixed
       download link per branch); self-tested on macOS and Windows by its own workflow.

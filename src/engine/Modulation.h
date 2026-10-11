@@ -216,11 +216,23 @@ struct DestInfo
     Owner owner;
     int layer;             ///< -1: the whole instrument
     Domain domain;
-    double span;           ///< what full depth (100 %) moves, in the domain's units
+    /** What full depth (100 %) moves, in the domain's units: the destination's whole
+        range, so a route can take its knob from any base to either end (the engine clamps
+        at the ends). CHARACTER CUTOFF is in the filter's travel (1 = min to max). */
+    double span;
     Update update;
     Source modulates = Source::none;   ///< a source's own setting (the envelopes' times): its owner
+    /** Times (octaves domain): where the modulated time stops, in seconds (the knob's ends);
+        0 / 0: not a time. */
+    double lowSeconds = 0.0, highSeconds = 0.0;
 };
 const DestInfo& destInfo (Dest d) noexcept;
+/** What full depth moved before state version 11 (fixed, smaller spans). Older sessions'
+    depths are scaled by legacySpan / span when they load, so they sound as they did. For
+    CHARACTER CUTOFF it was 4 octaves (the caller converts with the filter's own travel). */
+double legacySpan (Dest d) noexcept;
+/** A time destination's value: `base` seconds moved by `octaves`, kept within its knob. */
+double modulatedSeconds (Dest d, double base, double octaves) noexcept;
 
 struct Route
 {
@@ -408,6 +420,10 @@ struct Runtime
     int heldNotes = 0;          ///< keys held (a global RETRIGGER LFO restarts after silence)
     bool pedal = false;
     float modWheelTarget = 0.0f, modWheelNow = 0.0f;
+    /** The layers' LEVEL (dB) and TUNE (semitones) knobs: a route takes them to their ends,
+        never past (the engine keeps them current while routes run). */
+    std::array<double, 3> layerLevelDb {}, layerTuneSemitones {};
+    static constexpr double silentLevelDb = -48.0, maxLevelDb = 6.0, maxTuneSemitones = 24.0;
 
     void setSettings (const Settings& s) noexcept;
     /** Advances the global LFOs, envelopes and the wheel by `samples` at `sampleRate` (at the

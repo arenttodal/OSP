@@ -477,7 +477,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
             const auto n = "Mod " + juce::String (r + 1) + " ";
             layout.add (std::make_unique<juce::AudioParameterChoice> (id17 (modRouteId (r, "source")), n + "Source", sources, 0));
             layout.add (std::make_unique<juce::AudioParameterChoice> (id17 (modRouteId (r, "dest")), n + "Destination", modDestinationNames(), 0));
-            layout.add (std::make_unique<juce::AudioParameterFloat> (id17 (modRouteId (r, "depth")), n + "Depth", juce::NormalisableRange<float> (-100.0f, 100.0f, 0.1f), 0.0f, percent));
+            // 0.01 % steps: 100 % is a destination's whole range (TUNE: 48 semitones).
+            layout.add (std::make_unique<juce::AudioParameterFloat> (id17 (modRouteId (r, "depth")), n + "Depth", juce::NormalisableRange<float> (-100.0f, 100.0f, 0.01f), 0.0f, percent));
             layout.add (std::make_unique<juce::AudioParameterBool> (id17 (modRouteId (r, "enabled")), n + "On", true));
         }
     }
@@ -1544,6 +1545,34 @@ void OspAudioProcessor::valueTreeChildRemoved (juce::ValueTree&, juce::ValueTree
 void OspAudioProcessor::valueTreeRedirected (juce::ValueTree&)
 {
     refreshModLinks();   // a session or preset replaced the state
+}
+
+void OspAudioProcessor::migrateModulationDepths()
+{
+    // Before version 11 full depth moved a destination a fixed, smaller amount (LEVEL 24 dB,
+    // TUNE 1 semitone, CUTOFF 4 octaves...); now it is the knob's whole range. Each depth is
+    // scaled by old span / new span so the session sounds as it did. A depth route moves its
+    // target's depth, so it scales with its target.
+    const auto probe = modulationProbe();
+    const double travel = std::abs (shaping::rangeOctaves (parameterValue (ids::characterMax)) - shaping::rangeOctaves (parameterValue (ids::characterMin)));
+    auto factor = [travel] (mod::Dest d) {
+        if (d == mod::Dest::none || d == mod::Dest::routeDepth)
+            return 1.0;
+        if (d == mod::Dest::cutoff)
+            return travel > 1.0e-6 ? mod::legacySpan (d) / travel : 1.0;   // 4 octaves of the filter's travel
+        return mod::legacySpan (d) / mod::destInfo (d).span;
+    };
+    for (int r = 0; r < mod::maxRoutes; ++r)
+    {
+        const auto& route = probe.routes[static_cast<std::size_t> (r)];
+        if (route.source == mod::Source::none || route.dest == mod::Dest::none)
+            continue;
+        const double k = route.dest == mod::Dest::routeDepth
+                             ? (route.target >= 0 ? factor (probe.routes[static_cast<std::size_t> (route.target)].dest) : 1.0)
+                             : factor (route.dest);
+        if (k != 1.0)
+            setParameterValue (modRouteId (r, "depth"), static_cast<float> (parameterValue (modRouteId (r, "depth")) * k));
+    }
 }
 
 mod::Settings OspAudioProcessor::modulationProbe() const
@@ -3238,6 +3267,8 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml, bool setting
         setParameterValue (ids::spaceHighCut, 20000.0f);
         setParameterValue (ids::echo, 0.0f);
     }
+    if (savedVersion < 11)
+        migrateModulationDepths();
 
     if (settingsOnly)
         return;

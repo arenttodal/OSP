@@ -214,7 +214,7 @@ TEST_CASE ("mod: route rules - scope, sign, sum, bypass, empty", "[unit][mod]")
     mod::Runtime rt;
     rt.setSettings (s);
     v.values = values;
-    CHECK (v.offset (rt, D::cutoff) == Approx (4.0 * 0.3));   // span 4 octaves
+    CHECK (v.offset (rt, D::cutoff) == Approx (1.0 * 0.3));   // span: the filter's whole travel
     // Every destination has an id and a name; per-layer ones name their layer.
     for (int d = 1; d < mod::destCount; ++d)
     {
@@ -447,6 +447,65 @@ TEST_CASE ("mod: ENV on a shared stage - one global envelope, restarted by each 
     CHECK (render (true) == driven);
 }
 
+TEST_CASE ("mod: full depth reaches a knob's whole range - LEVEL from silence to its top, times within their knobs", "[unit][mod]")
+{
+    // Every span is its knob's whole range.
+    CHECK (mod::destInfo (mod::Dest::levelB).span == 54.0);
+    CHECK (mod::destInfo (mod::Dest::fineTuneA).span == 4800.0);
+    CHECK (mod::destInfo (mod::Dest::panA).span == 2.0);
+    CHECK (mod::destInfo (mod::Dest::startA).span == 1.0);
+    CHECK (mod::destInfo (mod::Dest::grainPositionC).span == 1.0);
+    CHECK (mod::destInfo (mod::Dest::cutoff).span == 1.0);
+    CHECK (std::exp2 (mod::destInfo (mod::Dest::grainDensityA).span) == Approx (10.0));
+    CHECK (std::exp2 (mod::destInfo (mod::Dest::grainSizeA).span) == Approx (20.0));
+    CHECK (std::exp2 (mod::destInfo (mod::Dest::eqBellFrequencyA).span) == Approx (1000.0));
+    CHECK (mod::destInfo (mod::Dest::eqBellGainA).span == 36.0);
+    CHECK (std::exp2 (mod::destInfo (mod::Dest::ampRelease).span) == Approx (750.0));
+    CHECK (std::exp2 (mod::destInfo (mod::Dest::env1Decay).span) == Approx (10000.0));
+    // Times stop at their knobs' ends; a time at 0 stays 0.
+    CHECK (mod::modulatedSeconds (mod::Dest::ampAttack, 1.5, 4.0) == 2.0);
+    CHECK (mod::modulatedSeconds (mod::Dest::env1Release, 0.5, -20.0) == Approx (0.001));
+    CHECK (mod::modulatedSeconds (mod::Dest::ampAttack, 0.0, 10.0) == 0.0);
+    CHECK (mod::modulatedSeconds (mod::Dest::ampDecay, 0.5, 1.0) == Approx (1.0));
+    // The old spans, for older sessions.
+    CHECK (mod::legacySpan (mod::Dest::levelA) == 24.0);
+    CHECK (mod::legacySpan (mod::Dest::fineTuneC) == 100.0);
+    CHECK (mod::legacySpan (mod::Dest::env2Decay) == 4.0);
+    CHECK (mod::legacySpan (mod::Dest::space) == 1.0);
+
+    const auto model = sineModel (220.0);
+    auto peakAt = [&] (double levelDb, double depth, float wheel) {
+        auto settings = quietSettings();
+        settings.layer[0].levelDb = levelDb;
+        InstrumentEngine e;
+        e.prepare (rate, 256, settings);
+        e.setModel (model.get());
+        mod::Settings m;
+        if (depth != 0.0)
+            m.routes[0] = { mod::Source::modWheel, mod::Dest::levelA, depth, true };
+        e.setModulation (m);
+        e.setModWheel (wheel);
+        const auto out = renderNotes (e, { 57 }, 0.5, 256);
+        double p = 0.0;
+        for (std::size_t i = out.size() / 2; i < out.size(); ++i)
+            p = std::max (p, static_cast<double> (std::abs (out[i])));
+        return p;
+    };
+    const double top = peakAt (6.0, 0.0, 0.0f);
+    REQUIRE (top > 0.01);
+    // The report: from -39.3 dB, +100 % takes LEVEL to its top (+6 dB), not 24 dB higher.
+    CHECK (peakAt (-39.3, 1.0, 1.0f) / top == Approx (1.0).margin (0.02));
+    CHECK (peakAt (-39.3, 0.5, 1.0f) / top == Approx (std::pow (10.0, (-39.3 + 27.0 - 6.0) / 20.0)).margin (0.003));
+    // Never past the top: from 0 dB, +100 % is +6 dB.
+    CHECK (peakAt (0.0, 1.0, 1.0f) / top == Approx (1.0).margin (0.02));
+    // From the knob's bottom (silence) a route lifts it all the way; down there it is silent.
+    CHECK (peakAt (-48.0, 0.0, 0.0f) == 0.0);
+    CHECK (peakAt (-48.0, 1.0, 0.0f) < 1.0e-9);
+    CHECK (peakAt (-48.0, 1.0, 1.0f) / top == Approx (1.0).margin (0.02));
+    // ... and down to silence from anywhere.
+    CHECK (peakAt (0.0, -1.0, 1.0f) < 1.0e-9);
+}
+
 TEST_CASE ("mod: MOD WHEEL - a smoothed 0..1 source for every destination", "[unit][mod]")
 {
     mod::Settings s;
@@ -471,7 +530,7 @@ TEST_CASE ("mod: MOD WHEEL - a smoothed 0..1 source for every destination", "[un
         e.setModel (model.get());
         mod::Settings m;
         if (routed)
-            m.routes[0] = { mod::Source::modWheel, mod::Dest::levelA, -0.5, true };
+            m.routes[0] = { mod::Source::modWheel, mod::Dest::levelA, -12.0 / 54.0, true };   // LEVEL's whole range is 54 dB
         e.setModulation (m);
         e.setModWheel (wheel);
         return renderNotes (e, { 57 }, 0.5, 256);
@@ -485,7 +544,7 @@ TEST_CASE ("mod: MOD WHEEL - a smoothed 0..1 source for every destination", "[un
         peakUp = std::max (peakUp, static_cast<double> (std::abs (up[i])));
         peakDown = std::max (peakDown, static_cast<double> (std::abs (down[i])));
     }
-    CHECK (peakUp / peakDown == Approx (std::pow (10.0, -12.0 / 20.0)).margin (0.02));   // -12 dB at full wheel (span 24 dB x 0.5)
+    CHECK (peakUp / peakDown == Approx (std::pow (10.0, -12.0 / 20.0)).margin (0.02));   // -12 dB at full wheel
 }
 
 TEST_CASE ("mod: START - taken as each note begins, never moving a sounding note", "[unit][mod]")
@@ -502,7 +561,7 @@ TEST_CASE ("mod: START - taken as each note begins, never moving a sounding note
         e.setModel (model.get());
         mod::Settings m;
         if (routed)
-            m.routes[0] = { mod::Source::modWheel, mod::Dest::startA, 0.5, true };   // full wheel: +25 %
+            m.routes[0] = { mod::Source::modWheel, mod::Dest::startA, 0.25, true };   // full wheel: +25 % (100 % = the whole recording)
         e.setModulation (m);
         e.setModWheel (wheel);
         std::vector<float> l (256), r (256), out;
@@ -549,9 +608,11 @@ TEST_CASE ("mod: LFO and wheel on the modulation envelopes' times - taken at not
     s.env[0].decaySeconds = 0.1;
     s.env[0].sustain = 0.5;
     s.env[0].releaseSeconds = 0.1;
-    s.routes[0] = { mod::Source::modWheel, mod::Dest::env1Attack, 0.25, true };    // +1 octave at full wheel
-    s.routes[1] = { mod::Source::modWheel, mod::Dest::env1Sustain, -0.25, true };  // 0.5 -> 0.25
-    s.routes[2] = { mod::Source::modWheel, mod::Dest::env1Release, -0.25, true };  // halved
+    // 100 % moves a time across its knob's whole range (1 ms .. 10 s: log2 10000 octaves).
+    const double octave = 1.0 / std::log2 (10000.0);
+    s.routes[0] = { mod::Source::modWheel, mod::Dest::env1Attack, octave, true };    // +1 octave at full wheel
+    s.routes[1] = { mod::Source::modWheel, mod::Dest::env1Sustain, -0.25, true };    // 0.5 -> 0.25
+    s.routes[2] = { mod::Source::modWheel, mod::Dest::env1Release, -octave, true };  // halved
     mod::Runtime rt;
     rt.setSettings (s);
     rt.setModWheel (1.0f);
@@ -704,15 +765,17 @@ TEST_CASE ("mod: depth routes are heard - the route's strength moves, the stored
         m.env[0].attackSeconds = 0.0;
         m.env[0].decaySeconds = 0.0;
         m.env[0].sustain = 1.0;
-        m.routes[0] = { mod::Source::env1, mod::Dest::levelA, -0.5, true };
+        // In units of 24 dB (LEVEL's whole range is 54 dB): -50 % of them is -12 dB.
+        const double k = 24.0 / 54.0;
+        m.routes[0] = { mod::Source::env1, mod::Dest::levelA, -0.5 * k, true };
         if (withMeta)
-            m.routes[5] = { mod::Source::modWheel, mod::Dest::routeDepth, meta, true, 0 };
+            m.routes[5] = { mod::Source::modWheel, mod::Dest::routeDepth, meta * k, true, 0 };
         e.setModulation (m);
         e.setModWheel (wheel);
         auto out = renderNotes (e, { 57 }, 0.5, block);
         // Test C: what is stored stays as it was (the effective depth lives in the sum only).
-        CHECK (e.modulation().settings.routes[0].depth == -0.5);
-        CHECK (e.modulation().settings.routes[5].depth == (withMeta ? meta : 0.0));
+        CHECK (e.modulation().settings.routes[0].depth == -0.5 * k);
+        CHECK (e.modulation().settings.routes[5].depth == (withMeta ? meta * k : 0.0));
         return out;
     };
     auto peak = [] (const std::vector<float>& x) {
