@@ -89,6 +89,19 @@ target_link_libraries(osp_dsp PRIVATE signalsmith-stretch)
 osp_set_warnings(osp_dsp)
 
 # ---------------------------------------------------------------------------
+# osp_drums: ANDOR Drums' instrument (pure C++20, docs/drums). Built on osp_dsp; OSP itself
+# never links it, so nothing here can change how OSP sounds (docs/drums/architecture.md).
+# ---------------------------------------------------------------------------
+add_library(osp_drums STATIC
+    src/drums/DrumMapping.cpp
+    src/drums/DrumKitEngine.cpp
+)
+target_include_directories(osp_drums PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(osp_drums PUBLIC osp_dsp)
+set_target_properties(osp_drums PROPERTIES POSITION_INDEPENDENT_CODE ON)
+osp_set_warnings(osp_drums)
+
+# ---------------------------------------------------------------------------
 # The Library (docs/library): the catalog of sounds, presets and templates. Pure C++ on the
 # system SQLite (macOS SDK, libsqlite3 elsewhere; decision D-03). Never linked by osp_dsp:
 # the engine and the audio thread do not see it.
@@ -190,6 +203,7 @@ add_subdirectory(apps/research-renderer)
 
 if(OSP_BUILD_PLUGIN)
     add_subdirectory(apps/plugin)
+    add_subdirectory(apps/drums)   # ANDOR Drums: a second plugin (needs OSP_PluginData from apps/plugin)
 endif()
 
 if(OSP_BUILD_TESTS)

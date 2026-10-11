@@ -46,6 +46,19 @@ target_link_libraries(osp_tests PRIVATE osp_research Catch2::Catch2WithMain)
 target_compile_definitions(osp_tests PRIVATE OSP_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 osp_set_warnings(osp_tests)
 
+# ANDOR Drums (docs/drums): its own executable and CTest entry, so the OSP suites above stay
+# exactly what they were and a drums failure is never mistaken for an OSP one.
+add_executable(osp_drums_tests
+    support/TestHelpers.cpp
+    drums/DrumMappingTests.cpp
+    drums/DrumKitEngineTests.cpp
+)
+target_include_directories(osp_drums_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(osp_drums_tests PRIVATE osp_drums osp_research Catch2::Catch2WithMain)
+target_compile_definitions(osp_drums_tests PRIVATE OSP_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+osp_set_warnings(osp_drums_tests)
+add_test(NAME drums COMMAND osp_drums_tests)
+
 # One CTest entry per suite (Catch2 tags) keeps output readable.
 add_test(NAME unit COMMAND osp_tests "[unit]")
 add_test(NAME integration COMMAND osp_tests "[integration]")

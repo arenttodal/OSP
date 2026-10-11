@@ -864,6 +864,14 @@ void InstrumentEngine::allNotesOff() noexcept
         voice.release();
 }
 
+void InstrumentEngine::fadeOutAll (double seconds) noexcept
+{
+    const auto fade = std::max (1, static_cast<int> (std::clamp (seconds, 0.001, 1.0) * sampleRate));
+    for (auto& voice : voices)
+        if (voice.isActive() && ! voice.isFading())
+            voice.beginFastFade (fade);
+}
+
 void InstrumentEngine::reset() noexcept
 {
     pedalDown = false;
@@ -1190,8 +1198,11 @@ void InstrumentEngine::renderBlock (float* const* output, int numChannels, int n
                 main = l;
         post.setModel (main >= 0 ? slots[static_cast<std::size_t> (main)].model : nullptr);
     }
-    post.setVoicesActive (activeVoiceCount() > 0);
-    post.process (left, right, numSamples);
+    if (config.postStage)
+    {
+        post.setVoicesActive (activeVoiceCount() > 0);
+        post.process (left, right, numSamples);
+    }
     publishGrains();
     for (int ch = 0; ch < std::min (numChannels, 2); ++ch)
         for (int i = 0; i < numSamples; ++i)

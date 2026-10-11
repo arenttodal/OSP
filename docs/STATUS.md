@@ -352,6 +352,11 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [x] `plugin-pipeline/`: the build-and-download pipeline as a reusable kit for other JUCE
       plug-ins (`adopt.sh` for an existing repo, `new-plugin.sh` + starter for a new one, a fixed
       download link per branch); self-tested on macOS and Windows by its own workflow.
+- [ ] ANDOR DRUMS (branch drum-plugin; docs/drums/): a second plugin (`ANDOR_Drums`, code
+      Adrm) built on OSP's engine. M0 and M1 done: nine pads, each an unmodified
+      `InstrumentEngine` with its post stage off (`EngineSettings::postStage`, default on),
+      one shared PostProcessor, PAD / EXPANDED key maps, chokes, `fadeOutAll`; OSP suites
+      unchanged. `osp_drums_tests`, `andor_drums_plugin_tests`. Next: M2-M4 (docs/drums/plan.md).
 
 ## DONE
 

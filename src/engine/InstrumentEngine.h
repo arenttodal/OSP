@@ -127,6 +127,10 @@ struct EngineSettings
     bool mono = false;
     double glideSeconds = 0.0;
     ReimaginedRouting reimaginedRouting = ReimaginedRouting::legacyGlobal;
+    /** Run the post stage (DRIVE, MOVEMENT, SPACE, ECHO, the shared REIMAGINED) inside the
+        engine. A host of several engines (ANDOR Drums: one per pad) turns it off and runs
+        ONE PostProcessor on their sum, so the effects are shared, not multiplied. */
+    bool postStage = true;
 };
 
 /**
@@ -359,6 +363,9 @@ public:
     void setChannelTimbre (int channel, double timbre01) noexcept;
     void setSustainPedal (bool down) noexcept;
     void allNotesOff() noexcept;
+    /** Every sounding voice fades out over `seconds` (clamped to 1 ms .. 1 s) and ends: a
+        choke (a closed hat cutting an open one) or a mono retrigger. Real-time safe. */
+    void fadeOutAll (double seconds) noexcept;
     void reset() noexcept;
 
     /** Restarts performance memory and the note counter (host transport start, bounce). */
