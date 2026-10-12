@@ -566,32 +566,21 @@ void KeyboardRangeStrip::paint (juce::Graphics& g)
     smallLabel (g, { getWidth() - 312, 9, 94, 28 }, "ZONE PRESETS", juce::Justification::centredRight);
 
     const auto k = keys();
-    const bool exp = proc.keyboardMode() == drums::KeyboardMode::expanded;
     const auto& map = proc.keyMap();
+    const auto mode = proc.keyboardMode();
 
-    // Each pad's range: from its lowest key's left edge to its highest key's right edge.
-    struct Span
-    {
-        int pad, low, high;
-        float x0, x1;
-    };
-    std::vector<Span> spans;
-    for (int p = 0; p < drums::maxPads; ++p)
-    {
-        const auto i = static_cast<std::size_t> (p);
-        int lo = -1, hi = -1;
-        if (exp && map.zone[i].enabled())
-        {
-            lo = map.zone[i].low;
-            hi = map.zone[i].high;
-        }
-        else if (! exp && map.padNote[i] >= 0)
-            lo = hi = map.padNote[i];
-        if (lo >= 0)
-            spans.push_back ({ p, lo, hi, keyRect (lo).getX(), keyRect (hi).getRight() });
-    }
+    // Which pad each key plays (the first hit; -1 = none). Everything below is drawn per
+    // key, inside that key's own shape, so a colour never reaches a neighbour.
+    std::array<int, 128> owner {};
+    std::array<drums::Hit, drums::maxPads> hits {};
+    for (int n = 0; n < 128; ++n)
+        owner[static_cast<std::size_t> (n)] = drums::resolve (map, mode, n, hits) > 0 ? hits[0].pad : -1;
+    const auto ownerOf = [&owner] (int n) { return n < 0 || n > 127 ? -1 : owner[static_cast<std::size_t> (n)]; };
+    const auto colourOf = [this] (int pad) { return zoneColour (proc.padInfo (pad).category); };
 
-    // The keybed: ivory white keys with fine separators.
+    // The keybed: ivory white keys; a mapped white key takes its pad's colour on its face.
+    // (The black keys are drawn afterwards, on top, so the tint shows only where the white
+    // key is visible.)
     ceramic::recess (g, k.expanded (3.0f), 4.0f);
     for (int n = 0; n < 128; ++n)
         if (! look::isBlackKey (n))
@@ -599,68 +588,112 @@ void KeyboardRangeStrip::paint (juce::Graphics& g)
             const auto r = keyRect (n);
             g.setGradientFill (juce::ColourGradient (juce::Colour (0xfff6f3ec), r.getX(), r.getY(), juce::Colour (0xffe9e5dc), r.getX(), r.getBottom(), false));
             g.fillRect (r);
+            if (const int pad = ownerOf (n); pad >= 0)
+            {
+                const auto c = colourOf (pad);
+                g.setGradientFill (juce::ColourGradient (c.withAlpha (0.78f), r.getX(), r.getY(), c.withAlpha (0.58f), r.getX(), r.getBottom(), false));
+                g.fillRect (r.withTrimmedRight (0.8f));
+            }
             g.setColour (juce::Colour (0xffcdc6ba));
             g.fillRect (juce::Rectangle<float> (r.getRight() - 0.5f, r.getY(), 0.8f, r.getHeight()));
         }
 
-    // Zones: a solid tab above the keys, then a strong wash over them that fades a little
-    // towards the front of the keys (the mockup's look).
-    const float tab = 16.0f;
-    for (const auto& s : spans)
-    {
-        const auto c = zoneColour (proc.padInfo (s.pad).category);
-        const bool selected = proc.selectedPad == s.pad;
-        const auto body = juce::Rectangle<float> (s.x0, k.getY() - tab, s.x1 - s.x0, k.getHeight() + tab);
-        juce::Path shape;
-        shape.addRoundedRectangle (body.getX(), body.getY(), body.getWidth(), body.getHeight(), 4.0f, 4.0f, true, true, false, false);
-        g.setGradientFill (juce::ColourGradient (c.withAlpha (0.96f), 0.0f, body.getY(), c.withAlpha (0.92f), 0.0f, k.getY(), false));
-        g.saveState();
-        g.reduceClipRegion (juce::Rectangle<float> (body.getX(), body.getY(), body.getWidth(), tab + 1.0f).toNearestInt());
-        g.fillPath (shape);
-        g.restoreState();
-        g.setGradientFill (juce::ColourGradient (c.withAlpha (0.82f), 0.0f, k.getY(), c.withAlpha (0.62f), 0.0f, k.getBottom(), false));
-        g.fillRect (body.withTop (k.getY()));
-        // Key separators show through the wash.
-        for (int n = s.low; n <= s.high + 1 && n < 128; ++n)
-            if (! look::isBlackKey (n) && n > s.low)
-            {
-                g.setColour (c.darker (0.35f).withAlpha (0.35f));
-                g.fillRect (juce::Rectangle<float> (keyRect (n).getX() - 0.5f, k.getY(), 0.8f, k.getHeight()));
-            }
-        // Edges: a slightly darker outline; the selected pad's is stronger.
-        g.setColour (c.darker (selected ? 0.45f : 0.25f).withAlpha (selected ? 0.95f : 0.6f));
-        g.strokePath (shape, juce::PathStrokeType (selected ? 1.6f : 1.0f));
-    }
-
-    // Black keys on top (dark through every zone), and held notes.
+    // Black keys on top: dark, or (mapped) their pad's colour inside a dark rim.
     for (int n = 0; n < 128; ++n)
-    {
-        const auto r = keyRect (n);
-        const bool black = look::isBlackKey (n);
-        if (black)
+        if (look::isBlackKey (n))
         {
+            const auto r = keyRect (n);
             g.setColour (juce::Colours::black.withAlpha (0.18f));
             g.fillRoundedRectangle (r.translated (0.6f, 0.8f), 1.5f);
             g.setGradientFill (juce::ColourGradient (juce::Colour (0xff4a4a4c), r.getX(), r.getY(), juce::Colour (0xff232324), r.getX(), r.getBottom(), false));
             g.fillRoundedRectangle (r, 1.5f);
-            g.setColour (juce::Colours::white.withAlpha (0.12f));
-            g.fillRect (r.reduced (r.getWidth() * 0.22f, 0.0f).withHeight (r.getHeight() - 4.0f).withTrimmedTop (2.0f).withWidth (1.0f));
+            if (const int pad = ownerOf (n); pad >= 0)
+            {
+                const auto c = colourOf (pad);
+                const auto face = r.reduced (1.2f, 0.0f).withTrimmedBottom (1.6f);
+                g.setGradientFill (juce::ColourGradient (c.darker (0.3f), face.getX(), face.getY(), c.darker (0.8f), face.getX(), face.getBottom(), false));
+                g.fillRoundedRectangle (face, 1.0f);
+            }
+            else
+            {
+                g.setColour (juce::Colours::white.withAlpha (0.12f));
+                g.fillRect (r.reduced (r.getWidth() * 0.22f, 0.0f).withHeight (r.getHeight() - 4.0f).withTrimmedTop (2.0f).withWidth (1.0f));
+            }
         }
+
+    // Held notes.
+    for (int n = 0; n < 128; ++n)
         if (held[static_cast<std::size_t> (n)])
         {
+            const auto r = keyRect (n);
+            const bool black = look::isBlackKey (n);
             g.setColour (cc::accent.withAlpha (black ? 0.85f : 0.6f));
             black ? g.fillRoundedRectangle (r, 1.5f) : g.fillRect (r.withTrimmedTop (r.getHeight() * blackHeight));
         }
+
+    // Caps: a slim bar above each run of keys one pad owns. A white key's cap gives up the
+    // half of a neighbouring black key that belongs to another pad, so caps never overlap.
+    const auto capSpan = [&] (int n) -> juce::Range<float>
+    {
+        const auto r = keyRect (n);
+        float x0 = r.getX(), x1 = r.getRight();
+        if (! look::isBlackKey (n))
+        {
+            const int pad = ownerOf (n);
+            if (n > 0 && look::isBlackKey (n - 1) && ownerOf (n - 1) >= 0 && ownerOf (n - 1) != pad)
+                x0 = keyRect (n - 1).getRight();
+            if (n < 127 && look::isBlackKey (n + 1) && ownerOf (n + 1) >= 0 && ownerOf (n + 1) != pad)
+                x1 = keyRect (n + 1).getX();
+        }
+        return { x0, x1 };
+    };
+    struct Run
+    {
+        int pad;
+        float x0, x1;
+    };
+    std::vector<Run> runs;
+    for (int n = 0; n < 128;)
+    {
+        const int pad = ownerOf (n);
+        int end = n;
+        while (end + 1 < 128 && ownerOf (end + 1) == pad)
+            ++end;
+        if (pad >= 0)
+            runs.push_back ({ pad, capSpan (n).getStart(), capSpan (end).getEnd() });
+        n = end + 1;
     }
 
-    // Pad numbers above their tabs; the selected pad's in the accent colour.
-    for (const auto& s : spans)
+    const float capHeight = 6.0f, capGap = 3.0f;
+    const float capY = k.getY() - capGap - capHeight;
+    for (const auto& run : runs)
     {
-        const auto label = juce::Rectangle<float> (s.x0 - 10.0f, k.getY() - tab - 19.0f, s.x1 - s.x0 + 20.0f, 17.0f);
-        g.setColour (proc.selectedPad == s.pad ? cc::accent : juce::Colour (0xff55524c));
-        g.setFont (plugin::fonts::make (13.0f, look::Weight::semibold));
-        g.drawText (juce::String (s.pad + 1), label, juce::Justification::centred);
+        const auto c = colourOf (run.pad);
+        const bool selected = proc.selectedPad == run.pad;
+        const auto cap = juce::Rectangle<float> (run.x0 + 0.6f, capY, run.x1 - run.x0 - 1.2f, capHeight);
+        g.setColour (c);
+        g.fillRoundedRectangle (cap, 2.0f);
+        g.setColour (c.darker (selected ? 0.5f : 0.25f).withAlpha (selected ? 0.95f : 0.55f));
+        g.drawRoundedRectangle (cap, 2.0f, selected ? 1.4f : 0.8f);
     }
+
+    // Pad numbers above their caps (once per pad, over its widest run); the selected
+    // pad's in the accent colour.
+    std::array<const Run*, drums::maxPads> widest {};
+    for (const auto& run : runs)
+    {
+        auto& w = widest[static_cast<std::size_t> (run.pad)];
+        if (w == nullptr || run.x1 - run.x0 > w->x1 - w->x0)
+            w = &run;
+    }
+    g.setFont (plugin::fonts::make (12.5f, look::Weight::semibold));
+    for (int p = 0; p < drums::maxPads; ++p)
+        if (const auto* run = widest[static_cast<std::size_t> (p)])
+        {
+            const float centre = (run->x0 + run->x1) * 0.5f;
+            g.setColour (proc.selectedPad == p ? cc::accent : juce::Colour (0xff55524c));
+            g.drawText (juce::String (p + 1), juce::Rectangle<float> (centre - 15.0f, capY - 17.0f, 30.0f, 16.0f), juce::Justification::centred);
+        }
 
     // Octave names under the C keys.
     g.setColour (cc::textSecondary);

@@ -9,6 +9,8 @@
   grows for them), the selected pad's sound with a draggable START, an always-visible
   KEYBOARD RANGE strip (root note, zone presets), AMP / EFFECTS / GLOBAL below.
 - Kit name (saved), output meter, effect power keys.
+- Keyboard range colours per key: tints stay inside each key (no spill onto black keys or
+  other pads' keys), with a slim cap and the pad number above each pad's keys.
 
 ## 0.1.1 (unreleased, branch drum-plugin): interface and keyboard mapping
 
