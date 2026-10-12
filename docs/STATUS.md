@@ -363,7 +363,8 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       surfaces composited under the plugin's own drawing; 6 full-GUI directions, button/tab/
       fader/panel/background/detail studies, close-ups, actual-size tests, review gallery,
       reports (design-lab/review/). Round 2 chosen: 09 Warm Ceramic + Teak (C1 fader on T3,
-      lens LEDs, painted divider); implementation not started.
+      lens LEDs, painted divider); style guide and build spec in
+      docs/design/warm-ceramic-teak-style-guide.md; implementation in progress.
 - [ ] FINAL MODULATION SYSTEM + DAMPEN (queued spec, stages 0-10): Stage 0 audit done
       (docs/reports/mod-final-audit.md); implementation next.
 - [x] `plugin-pipeline/`: the build-and-download pipeline as a reusable kit for other JUCE
