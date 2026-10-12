@@ -16,10 +16,14 @@ branch.
       kick on 36 and snare on 38 answer only their own notes. Both together equal both alone,
       summed (≤ 1e-5). Per-pad gain, tune and mute act on that pad only (the snare is
       sample-identical). Both use OSP's `InstrumentEngine`. OSP's suites pass unchanged.
-- [ ] **M2 Eight-pad instrument.** Done: 9 pads, selection, mute/solo, choke groups,
-      per-pad gain/pan/tune/start/reverse/envelope, shared effects, session save/load,
-      2x4 / 3x3 with a PAD 9 button, pad swap by dragging (undoable), rename (undoable).
-      Next: duplicate, clear with undo, kit preset files (`.andorkit`, own schema).
+- [x] **M2 Eight-pad instrument.** Done:
+      - 9 pads, selection, mute/solo, choke groups;
+      - per-pad gain/pan/tune/start/reverse/envelope, shared effects, session save/load;
+      - 1x8 / 2x4 / 3x3 with a PAD 9 button;
+      - pad swap by dragging (undoable), rename (undoable);
+      - duplicate pad (undoable), clear with undo;
+      - `.andorkit` kits with their own schema, portable kit export, finding and relinking
+        missing samples by content (`m2-kits.md`).
 - [x] **M3 Sample layering** (`m3-layers.md`). Done:
       - the multi-file drop choice (round robin / velocity / stack / replace);
       - 1–16 layers per pad, each at its own natural pitch;

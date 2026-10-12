@@ -10,6 +10,7 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 
 #include <array>
+#include <functional>
 #include <map>
 #include <atomic>
 #include <mutex>
@@ -141,6 +142,41 @@ public:
     void removeLayer (int pad, int layer);
     void duplicateLayer (int pad, int layer);
     void moveLayer (int pad, int from, int to);
+    // Pads
+    /** Copies pad `from` onto pad `to`: its layers (sounds shared, no reload), name,
+        category, play modes and every per-pad parameter except SOLO. Each pad keeps its own
+        MIDI note and zone. One undo step. False if nothing to copy or the same pad. */
+    bool duplicatePad (int from, int to);
+    /** The first pad with no layers (visible pads first), or -1. */
+    int firstEmptyPad() const;
+
+    // Kits: .andorkit files with their own versioned schema (spec 10.2, 10.5)
+    static constexpr int kitSchemaVersion = 1;
+    static constexpr const char* kitTag = "AndorDrumsKit";
+    static constexpr const char* kitExtension = ".andorkit";
+    /** Everything about the kit: pads, layers, sounds (by content hash, original path),
+        key maps, chokes, envelopes, effects, macros, keyboard mode, layout and name. */
+    bool saveKit (const juce::File& file, juce::String& error);
+    /** Replaces the kit (one undo step). Never reads an OSP preset or session as a kit. */
+    bool loadKit (const juce::File& file, juce::String& error);
+    /** An empty kit with factory pads and defaults (one undo step). */
+    void newKit();
+    /** A self-contained kit (spec 10.3): <parent>/<kit name>/<kit name>.andorkit and a
+        Samples/ folder with a copy of every sound, referenced by relative path (no private
+        absolute paths). Returns the kit file, or an empty File and the error. */
+    juce::File exportPortableKit (const juce::File& parentDirectory, juce::String& error);
+    juce::File kitFile;   ///< the kit file last saved or opened (view; not saved)
+
+    // Missing samples (spec 10.4): never substituted silently
+    int missingLayerCount() const;
+    /** Points one missing (or any) layer at a file the user chose (one undo step). */
+    void relinkLayer (int pad, int layer, const juce::File& file);
+    /** Searches a folder (and below) for the missing samples: same name first, then any
+        audio file; a file is used only when its content hash matches. Background; the
+        result is reported in relinkReport. */
+    void findMissingSamples (const juce::File& folder);
+    juce::String relinkReport;
+
     /** Mouse audition of one layer (lock-free; plays it alone, at the pad's settings). */
     void auditionLayer (int pad, int layer, int velocity);
     /** The layer the pad's last hit played (display; -1 before any). */
@@ -235,6 +271,8 @@ private:
         LayerDrop how = LayerDrop::replace;
         bool recall = false;               ///< state recall: becomes the pad as saved, no undo step
         PadLayers result;                  ///< recall: the saved layers (sounds filled in as they load)
+        int targetLayer = -1;              ///< relinkLayer: the layer the one file replaces
+        bool relink = false;               ///< findMissingSamples: fill the missing layers whose hash matches
         std::vector<std::shared_ptr<const LoadedInstrument>> loaded;   ///< a drop: one per file (null: failed)
         int remaining = 0;
         std::string error;
@@ -242,6 +280,21 @@ private:
     void startBatch (int pad, Batch batch, std::vector<plugin::LoadRequest> requests);
     void finishBatch (std::uint64_t id, Batch& batch);
     void setPadLayers (int pad, const PadLayers& layers);   // no undo step; publishes
+    /** The kit as XML (session state and kit files share it). `soundPath` (portable export)
+        returns a sound's path relative to the kit, written as kitPath. */
+    std::unique_ptr<juce::XmlElement> createStateXml (const char* tag, std::function<juce::String (const LoadedInstrument&)> soundPath = {});
+    /** Restores a kit from XML; `baseDirectory` resolves kitPath (portable kits). No undo step. */
+    void restoreStateXml (const juce::XmlElement& root, const juce::File& baseDirectory = {});
+    void resetKit();   // factory pads, defaults; no undo step
+    void factoryPad (int pad);
+    struct Found
+    {
+        int pad = 0;
+        std::string hash;     ///< "sha256:<hex>"
+        juce::File file;
+    };
+    std::vector<Found> found;   // loader -> message thread (resultsMutex)
+    juce::String foundReport;
     void publishLayers (int pad);
     void publishPadConfig();
     void pullSettings() noexcept;          // audio thread

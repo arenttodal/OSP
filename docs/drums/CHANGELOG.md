@@ -1,5 +1,16 @@
 # ANDOR Drums — version history
 
+## 0.1.4 (unreleased, branch drum-plugin): kits
+
+- **Duplicate to** on every pad's menu: copies the layers, name and settings, and keeps the
+  target's note. One undo step.
+- A kit menu by the kit name, with these commands:
+  - new kit and open kit, each undoable;
+  - save and save as (`.andorkit`, own schema; OSP files are refused);
+  - export a portable kit: a folder with the samples, no private paths;
+  - find missing samples in a folder: by content hash only, including renamed files.
+- **Relink...** on a missing layer.
+
 ## 0.1.3 (unreleased, branch drum-plugin): sample layers
 
 - Several samples on one pad, from a multi-file drop or **Add Layers...**. They play as round

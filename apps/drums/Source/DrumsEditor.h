@@ -175,7 +175,11 @@ private:
 
     DrumsProcessor& proc;
     PadGrid grid;
-    ceramic::KeyButton undoButton { {}, 0.7f }, redoButton { {}, 0.7f };
+    ceramic::KeyButton undoButton { {}, 0.7f }, redoButton { {}, 0.7f }, kitMenu { {}, 0.7f };
+    void showKitMenu();
+    void saveKitAs();
+    void tell (const juce::String& title, const juce::String& message);
+    juce::String shownRelinkReport;
     ceramic::KeyButton layout1x8 { "1 x 8", 0.6f }, layout2x4 { "2 x 4", 0.6f }, layout3x3 { "3 x 3", 0.6f }, ninthPad { "PAD 9", 0.6f };
     juce::Label kitName;
     ceramic::Fader volume;

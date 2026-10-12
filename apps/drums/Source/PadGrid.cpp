@@ -443,8 +443,9 @@ void PadView::showMenu()
             swaps.addItem ("Pad " + juce::String (other + 1) + "  " + proc.padDisplayName (other), [&proc, a = slotIndex, s] { proc.swapPadSlots (a, s); });
         }
     menu.addSubMenu ("Swap places with", swaps);
+    menu.addSubMenu ("Duplicate to", duplicateMenu (proc, p, grid.onSelect));
     menu.addSeparator();
-    menu.addItem ("Clear pad", proc.padInfo (p).sound != nullptr || ! proc.padInfo (p).missingFilename.empty(), false, [&proc, p] { proc.clearPad (p); });
+    menu.addItem ("Clear pad", ! proc.padLayers (p).layers.empty(), false, [&proc, p] { proc.clearPad (p); });
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (menuArea().toNearestInt())));
 }
 

@@ -28,6 +28,10 @@ void offerLayerDrop (DrumsProcessor& proc, int pad, const juce::Array<juce::File
 
 bool isAudioFileName (const juce::String& path);
 
+/** "Duplicate to": the first empty pad, then every other pad (replacing what it holds).
+    `onDone` gets the copy's pad (to select it). */
+juce::PopupMenu duplicateMenu (DrumsProcessor& proc, int pad, std::function<void (int)> onDone);
+
 /**
     The selected pad's layers, one row each: play (hold to audition), number, name and
     its velocity range or level. Click selects (the waveform shows it), drag reorders,
@@ -81,6 +85,7 @@ private:
     int shownLastPlayed = -1;
     bool fileOver = false;
     std::unique_ptr<juce::TextEditor> renameEditor;
+    std::unique_ptr<juce::FileChooser> chooser;
 };
 
 /**

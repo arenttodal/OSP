@@ -383,7 +383,13 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
         `endFraction`;
       - OSP's suites are unchanged.
 
-      Next: kit presets (M2), break slicing (M6).
+      M2 is finished (docs/drums/m2-kits.md):
+      - duplicate pad;
+      - `.andorkit` kits (own schema; new and open are undoable);
+      - portable kit export;
+      - finding missing samples by content, and relinking.
+
+      Next: break slicing (M6).
 
 ## DONE
 

@@ -107,6 +107,10 @@ part moves out with tests for both products (CLAUDE.md Rule 6).
 | Parameter IDs | OSP's (unchanged) | `keyboardMode`, `kit.*`, `padN.{gain,pan,tune,mute,solo}` |
 | Version | 0.1.0 | 0.1.0 (own history in docs/drums/CHANGELOG.md) |
 
+Kit files (`.andorkit`, root `AndorDrumsKit`, `kitSchemaVersion` 1) carry the same
+children as the session state. Portable kits add `kitPath` per sound
+(`m2-kits.md`).
+
 Both plugins can be installed together. An OSP session loaded into Drums is ignored
 (tested), and OSP never sees Drums' tag.
 

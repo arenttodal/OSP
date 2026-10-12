@@ -941,6 +941,179 @@ TEST_CASE ("Layer editor: drops on pads, the list selects, the velocity bar edit
     CHECK (p.padLayers (1).layers.size() == 3);
 }
 
+TEST_CASE ("Duplicate pad: layers, settings and name, keeping each pad's note; one undo step", "[drums-plugin][kits]")
+{
+    TempDir tmp;
+    const ScopedStore store (tmp.dir.getChildFile ("store"));
+    DrumsProcessor p;
+    p.prepareToPlay (rate, 256);
+    p.addPadLayers (0, { writeDrum (tmp.dir, "K1.wav", 110.0, 0.4), writeDrum (tmp.dir, "K2.wav", 130.0, 0.4) }, drumsplugin::LayerDrop::roundRobin);
+    REQUIRE (p.waitForLoads());
+    p.setPadName (0, "Boom");
+    p.parameters().getParameter (DrumsProcessor::padParamId (0, "gain"))->setValueNotifyingHost (0.4f);
+    const int target = p.firstEmptyPad();
+    CHECK (target == 1);
+    const auto noteBefore = p.keyMap().padNote[1];
+    REQUIRE (p.duplicatePad (0, target));
+    CHECK (p.padLayers (1).layers.size() == 2);
+    CHECK (p.padLayers (1).layers[0].sound == p.padLayers (0).layers[0].sound);   // shared, not reloaded
+    CHECK (p.padDisplayName (1) == "Boom copy");
+    CHECK (p.padInfo (1).category == p.padInfo (0).category);
+    CHECK (p.parameters().getParameter (DrumsProcessor::padParamId (1, "gain"))->getValue() == Approx (0.4f));
+    CHECK (p.keyMap().padNote[1] == noteBefore);
+    CHECK (rmsOf (hit (p, noteBefore, 100, 0.2)) > 1.0e-5);   // the copy plays on its own note (at -31 dB)
+    p.undoManager().undo();
+    CHECK (p.padLayers (1).layers.empty());
+    CHECK (p.padDisplayName (1) == "Snare");
+    CHECK_FALSE (p.duplicatePad (2, 3));   // nothing to copy
+    CHECK_FALSE (p.duplicatePad (0, 0));
+}
+
+TEST_CASE ("Kits: save, new and open (undoable); not an OSP file; not a newer schema", "[drums-plugin][kits]")
+{
+    TempDir tmp;
+    const ScopedStore store (tmp.dir.getChildFile ("store"));
+    DrumsProcessor p;
+    p.prepareToPlay (rate, 256);
+    p.addPadLayers (0, { writeDrum (tmp.dir, "A.wav", 110.0, 0.4), writeDrum (tmp.dir, "B.wav", 150.0, 0.4) }, drumsplugin::LayerDrop::stack);
+    p.loadPad (1, writeDrum (tmp.dir, "S.wav", 400.0, 0.3));
+    REQUIRE (p.waitForLoads());
+    p.kitName = "Studio Kit";
+    p.setKeyboardMode (drums::KeyboardMode::expanded);
+    p.parameters().getParameter ("kit.space")->setValueNotifyingHost (0.3f);
+    p.setPadChoke (1, 4);
+    p.prepareToPlay (rate, 256);
+    const auto reference = play (p, { p.keyMap().zone[0].rootNote(), p.keyMap().zone[1].rootNote() }, 0.4);
+
+    const auto file = tmp.dir.getChildFile ("Studio Kit.andorkit");
+    juce::String error;
+    REQUIRE (p.saveKit (file, error));
+    const auto xml = juce::XmlDocument::parse (file);
+    REQUIRE (xml != nullptr);
+    CHECK (xml->hasTagName ("AndorDrumsKit"));
+    CHECK (xml->getIntAttribute ("kitSchemaVersion") == 1);
+
+    p.newKit();
+    CHECK (p.padLayers (0).layers.empty());
+    CHECK (p.kitName == "New Kit");
+    CHECK (p.keyboardMode() == drums::KeyboardMode::pad);
+    p.undoManager().undo();   // the kit is back
+    REQUIRE (p.waitForLoads());
+    CHECK (p.padLayers (0).layers.size() == 2);
+    CHECK (p.kitName == "Studio Kit");
+
+    DrumsProcessor q;
+    REQUIRE (q.loadKit (file, error));
+    REQUIRE (q.waitForLoads());
+    CHECK (q.kitName == "Studio Kit");
+    CHECK (q.padLayers (0).mode == drums::LayerMode::stack);
+    CHECK (q.padInfo (1).chokeGroup == 4);
+    CHECK (q.keyboardMode() == drums::KeyboardMode::expanded);
+    q.prepareToPlay (rate, 256);
+    CHECK (play (q, { q.keyMap().zone[0].rootNote(), q.keyMap().zone[1].rootNote() }, 0.4) == reference);
+    q.undoManager().undo();   // opening a kit is undoable
+    CHECK (q.padLayers (0).layers.empty());
+
+    // An OSP preset or session is never read as a kit.
+    const auto ospFile = tmp.dir.getChildFile ("Preset.andorkit");
+    juce::XmlElement osp ("OSP");
+    osp.setAttribute ("stateVersion", 18);
+    REQUIRE (osp.writeTo (ospFile));
+    CHECK_FALSE (q.loadKit (ospFile, error));
+    CHECK (error.contains ("not an ANDOR Drums kit"));
+    // A kit from a newer version is refused, not misread.
+    auto newer = juce::XmlElement (*xml);
+    newer.setAttribute ("kitSchemaVersion", 99);
+    const auto newerFile = tmp.dir.getChildFile ("Newer.andorkit");
+    REQUIRE (newer.writeTo (newerFile));
+    CHECK_FALSE (q.loadKit (newerFile, error));
+}
+
+TEST_CASE ("Portable kits: samples travel inside the kit, no absolute paths, duplicate names kept apart", "[drums-plugin][kits]")
+{
+    TempDir tmp;
+    juce::File kit;
+    std::vector<float> reference;
+    {
+        const ScopedStore store (tmp.dir.getChildFile ("store-a"));
+        DrumsProcessor p;
+        p.prepareToPlay (rate, 256);
+        const auto a = tmp.dir.getChildFile ("one");
+        const auto b = tmp.dir.getChildFile ("two");
+        a.createDirectory();
+        b.createDirectory();
+        p.loadPad (0, writeDrum (a, "Kick.wav", 110.0, 0.4));
+        p.loadPad (1, writeDrum (b, "Kick.wav", 170.0, 0.4));   // same name, other sound
+        REQUIRE (p.waitForLoads());
+        p.kitName = "Road Kit";
+        p.prepareToPlay (rate, 256);
+        reference = play (p, { 36, 38 }, 0.3);
+        juce::String error;
+        kit = p.exportPortableKit (tmp.dir.getChildFile ("export"), error);
+        REQUIRE (kit.existsAsFile());
+        CHECK (error.isEmpty());
+        CHECK (kit.getParentDirectory().getChildFile ("Samples").getNumberOfChildFiles (juce::File::findFiles) == 2);
+        const auto text = kit.loadFileAsString();
+        CHECK_FALSE (text.contains (tmp.dir.getFullPathName()));   // nothing private
+        a.deleteRecursively();
+        b.deleteRecursively();
+    }
+    // Another computer: an empty sample store, the originals gone; only the kit folder.
+    const ScopedStore store (tmp.dir.getChildFile ("store-b"));
+    const auto moved = tmp.dir.getChildFile ("elsewhere");
+    REQUIRE (kit.getParentDirectory().moveFileTo (moved));
+    DrumsProcessor q;
+    juce::String error;
+    REQUIRE (q.loadKit (moved.getChildFile ("Road Kit.andorkit"), error));
+    REQUIRE (q.waitForLoads());
+    REQUIRE (q.padInfo (0).sound != nullptr);
+    REQUIRE (q.padInfo (1).sound != nullptr);
+    CHECK (q.padInfo (0).sound->contentHash != q.padInfo (1).sound->contentHash);
+    q.prepareToPlay (rate, 256);
+    CHECK (play (q, { 36, 38 }, 0.3) == reference);
+}
+
+TEST_CASE ("Missing samples: a folder search relinks by content, never by name alone; manual relink", "[drums-plugin][kits]")
+{
+    TempDir tmp;
+    juce::MemoryBlock state;
+    {
+        const ScopedStore store (tmp.dir.getChildFile ("store-a"));
+        DrumsProcessor p;
+        const auto lib = tmp.dir.getChildFile ("library");
+        lib.createDirectory();
+        p.loadPad (0, writeDrum (lib, "Kick.wav", 110.0, 0.4));
+        p.loadPad (1, writeDrum (lib, "Snare.wav", 600.0, 0.3));
+        REQUIRE (p.waitForLoads());
+        p.getStateInformation (state);
+        // The library moves; the kick is renamed, and an unrelated file now has the snare's name.
+        const auto moved = tmp.dir.getChildFile ("moved");
+        moved.createDirectory();
+        REQUIRE (lib.getChildFile ("Kick.wav").moveFileTo (moved.getChildFile ("Kick renamed.wav")));
+        lib.getChildFile ("Snare.wav").deleteFile();
+        writeDrum (moved, "Snare.wav", 900.0, 0.3);   // same name, other content
+        lib.deleteRecursively();
+    }
+    const ScopedStore store (tmp.dir.getChildFile ("store-b"));
+    DrumsProcessor q;
+    q.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+    REQUIRE (q.waitForLoads());
+    CHECK (q.missingLayerCount() == 2);
+    q.findMissingSamples (tmp.dir.getChildFile ("moved"));
+    REQUIRE (q.waitForLoads());
+    CHECK (q.padInfo (0).sound != nullptr);       // found by content under its new name
+    CHECK (q.padInfo (1).sound == nullptr);       // the same-named impostor is not used
+    CHECK (q.missingLayerCount() == 1);
+    CHECK (q.relinkReport == "Found 1 of 2 missing samples.");
+    // The user points the snare at a file explicitly: that is allowed (one undo step).
+    q.relinkLayer (1, 0, tmp.dir.getChildFile ("moved").getChildFile ("Snare.wav"));
+    REQUIRE (q.waitForLoads());
+    CHECK (q.padInfo (1).sound != nullptr);
+    CHECK (q.missingLayerCount() == 0);
+    q.undoManager().undo();
+    CHECK (q.missingLayerCount() == 1);
+}
+
 TEST_CASE ("Snapshots of every major state (written when ANDOR_DRUMS_SNAPSHOT_DIR is set)", "[drums-plugin][ui][snapshots]")
 {
     const juce::ScopedJuceInitialiser_GUI gui;

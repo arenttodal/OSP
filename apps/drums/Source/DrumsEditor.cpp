@@ -182,7 +182,8 @@ void WaveDisplay::paint (juce::Graphics& g)
         if (info.loading)
             text = "Loading...";
         else if (layer != nullptr && layer->sound == nullptr)
-            text = "Missing sample: " + juce::String::fromUTF8 (layer->fileName().c_str()) + ". Load a file to relink it.";
+            text = "Missing sample: " + juce::String::fromUTF8 (layer->fileName().c_str())
+                   + ". Kit menu > Find missing samples, or right-click the layer > Relink.";
         else if (! info.missingFilename.empty())
             text = "Missing sample: " + juce::String::fromUTF8 (info.missingFilename.c_str()) + ". Load a file to relink it.";
         else if (! info.error.empty())
@@ -454,6 +455,7 @@ void SamplePanel::showMenu()
     }
     m.addSubMenu ("Category", categories);
     m.addItem ("Add layers...", proc.padLayers (p).layers.size() < static_cast<std::size_t> (drums::maxLayers), false, [this] { openAddDialog(); });
+    m.addSubMenu ("Duplicate to", duplicateMenu (proc, p, onSelect));
     m.addSeparator();
     m.addItem ("Clear pad", ! proc.padLayers (p).layers.empty(), false, [this, p] { proc.clearPad (p); });
     m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&menu));
@@ -1003,7 +1005,10 @@ DrumsContent::DrumsContent (DrumsProcessor& p) : proc (p), grid (p), sample (p),
     layout3x3.onClick = [this] { setLayout (DrumsProcessor::PadLayout::grid9); };
     ninthPad.setTooltip ("Pad 9 holds a sound and keeps playing in this layout. Click to edit it.");
     ninthPad.onClick = [this] { selectPad (proc.padAtSlot (8)); };
-    for (auto* c : std::initializer_list<juce::Component*> { &undoButton, &redoButton, &kitName, &layout1x8, &layout2x4, &layout3x3, &volume, &meter })
+    kitMenu.icon = [] (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour c) { ceramic::iconMenu (g, r, c); };
+    kitMenu.setTooltip ("Kits: new, open, save, export a portable kit, find missing samples");
+    kitMenu.onClick = [this] { showKitMenu(); };
+    for (auto* c : std::initializer_list<juce::Component*> { &undoButton, &redoButton, &kitName, &kitMenu, &layout1x8, &layout2x4, &layout3x3, &volume, &meter })
         addAndMakeVisible (c);
     addChildComponent (ninthPad);
     volume.setTooltip ("Kit volume");
@@ -1134,6 +1139,74 @@ void DrumsContent::openLoadDialog (int pad)
                           });
 }
 
+void DrumsContent::tell (const juce::String& title, const juce::String& message)
+{
+    if (getPeer() != nullptr)
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, title, message);
+}
+
+void DrumsContent::saveKitAs()
+{
+    const auto start = proc.kitFile != juce::File() ? proc.kitFile
+                                                     : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
+                                                           .getChildFile (juce::File::createLegalFileName (juce::String::fromUTF8 (proc.kitName.c_str())) + DrumsProcessor::kitExtension);
+    chooser = std::make_unique<juce::FileChooser> ("Save kit", start, juce::String ("*") + DrumsProcessor::kitExtension);
+    chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting,
+                          [this] (const juce::FileChooser& fc) {
+                              if (fc.getResult() == juce::File())
+                                  return;
+                              juce::String error;
+                              if (! proc.saveKit (fc.getResult(), error))
+                                  tell ("Save kit", error);
+                          });
+}
+
+void DrumsContent::showKitMenu()
+{
+    juce::PopupMenu m;
+    m.addItem ("New kit", [this] { proc.newKit(); });
+    m.addItem ("Open kit...", [this] {
+        chooser = std::make_unique<juce::FileChooser> ("Open kit", proc.kitFile.getParentDirectory(), juce::String ("*") + DrumsProcessor::kitExtension);
+        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [this] (const juce::FileChooser& fc) {
+            if (! fc.getResult().existsAsFile())
+                return;
+            juce::String error;
+            if (! proc.loadKit (fc.getResult(), error))
+                tell ("Open kit", error);
+        });
+    });
+    m.addSeparator();
+    m.addItem ("Save kit", [this] {
+        juce::String error;
+        if (proc.kitFile == juce::File())
+            saveKitAs();
+        else if (! proc.saveKit (proc.kitFile, error))
+            tell ("Save kit", error);
+    });
+    m.addItem ("Save kit as...", [this] { saveKitAs(); });
+    m.addItem ("Export portable kit...", [this] {
+        chooser = std::make_unique<juce::FileChooser> ("Export a portable kit into a folder", juce::File::getSpecialLocation (juce::File::userDocumentsDirectory));
+        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories, [this] (const juce::FileChooser& fc) {
+            if (! fc.getResult().isDirectory())
+                return;
+            juce::String error;
+            const auto kit = proc.exportPortableKit (fc.getResult(), error);
+            tell ("Export portable kit", kit == juce::File() ? error
+                                                             : "Saved " + kit.getParentDirectory().getFullPathName() + " with its samples." + (error.isEmpty() ? "" : "\n" + error));
+        });
+    });
+    m.addSeparator();
+    const int missing = proc.missingLayerCount();
+    m.addItem (missing > 0 ? "Find missing samples (" + juce::String (missing) + ")..." : juce::String ("Find missing samples..."), missing > 0, false, [this] {
+        chooser = std::make_unique<juce::FileChooser> ("Find missing samples in a folder", juce::File::getSpecialLocation (juce::File::userHomeDirectory));
+        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories, [this] (const juce::FileChooser& fc) {
+            if (fc.getResult().isDirectory())
+                proc.findMissingSamples (fc.getResult());
+        });
+    });
+    m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&kitMenu));
+}
+
 void DrumsContent::refreshModeBar()
 {
     lastExpanded = proc.keyboardMode() == drums::KeyboardMode::expanded;
@@ -1154,6 +1227,12 @@ void DrumsContent::refreshModeBar()
 
 void DrumsContent::changeListenerCallback (juce::ChangeBroadcaster*)
 {
+    if (proc.relinkReport != shownRelinkReport)
+    {
+        shownRelinkReport = proc.relinkReport;
+        if (shownRelinkReport.startsWith ("Found"))
+            tell ("Find missing samples", shownRelinkReport);
+    }
     sample.bind();
     envelope.repaint();
     refreshModeBar();
@@ -1204,7 +1283,8 @@ void DrumsContent::resized()
     // Top bar: the kit bar (undo, name, redo), the layout switch, the volume fader and meter.
     undoButton.setBounds (440, 28, 40, 36);
     redoButton.setBounds (484, 28, 40, 36);
-    kitName.setBounds (532, 28, 360, 36);
+    kitName.setBounds (532, 28, 316, 36);
+    kitMenu.setBounds (852, 28, 40, 36);
     layout1x8.setBounds (960, 30, 66, 32);
     layout2x4.setBounds (1026, 30, 66, 32);
     layout3x3.setBounds (1092, 30, 66, 32);

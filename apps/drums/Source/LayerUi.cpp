@@ -18,6 +18,30 @@ LayerDrop defaultLayerDrop (int fileCount) noexcept { return fileCount > 1 ? Lay
 
 bool isAudioFileName (const juce::String& path) { return juce::File (path).hasFileExtension ("wav;aif;aiff;flac;caf"); }
 
+juce::PopupMenu duplicateMenu (DrumsProcessor& proc, int pad, std::function<void (int)> onDone)
+{
+    juce::PopupMenu m;
+    const bool has = ! proc.padLayers (pad).layers.empty();
+    const int empty = proc.firstEmptyPad();
+    auto copyTo = [&proc, pad, onDone] (int to) {
+        if (proc.duplicatePad (pad, to) && onDone)
+            onDone (to);
+    };
+    m.addItem (empty >= 0 ? "Next empty pad (" + juce::String (empty + 1) + ")" : juce::String ("No empty pad"), has && empty >= 0, false,
+               [copyTo, empty] { copyTo (empty); });
+    m.addSeparator();
+    for (int slot = 0; slot < DrumsProcessor::numPads; ++slot)
+    {
+        const int other = proc.padAtSlot (slot);
+        if (other == pad || other == empty)
+            continue;
+        const bool occupied = ! proc.padLayers (other).layers.empty();
+        m.addItem ("Pad " + juce::String (other + 1) + "  " + proc.padDisplayName (other) + (occupied ? "  (replaces it)" : ""), has, false,
+                   [copyTo, other] { copyTo (other); });
+    }
+    return m;
+}
+
 void offerLayerDrop (DrumsProcessor& proc, int pad, const juce::Array<juce::File>& dropped, juce::Component* target, std::optional<LayerDrop> preferred)
 {
     juce::Array<juce::File> files;
@@ -296,6 +320,14 @@ void LayerList::showMenu (int layer)
     const int p = pad();
     const int n = layerCount();
     juce::PopupMenu m;
+    const bool missing = proc.padLayers (p).layers[static_cast<std::size_t> (layer)].sound == nullptr;
+    m.addItem (missing ? "Relink..." : "Replace sample...", [this, p, layer, missing] {
+        chooser = std::make_unique<juce::FileChooser> (missing ? "Find the missing sample" : "Replace this layer's sample", juce::File(), "*.wav;*.aif;*.aiff;*.flac;*.caf");
+        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [this, p, layer] (const juce::FileChooser& fc) {
+            if (fc.getResult().existsAsFile())
+                proc.relinkLayer (p, layer, fc.getResult());
+        });
+    });
     m.addItem ("Rename", [this, layer] { startRename (layer); });
     m.addItem ("Duplicate", n < drums::maxLayers, false, [this, p, layer] {
         proc.duplicateLayer (p, layer);

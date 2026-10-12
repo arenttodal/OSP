@@ -3,14 +3,19 @@
 #include "DrumsEditor.h"
 
 #include "core/PitchMath.h"
+#include "io/ContentHash.h"
 
+#include <filesystem>
 #include <functional>
+#include <set>
 
 namespace osp::drumsplugin
 {
 
 namespace
 {
+    std::string bareHash (const std::string& h) { return h.rfind ("sha256:", 0) == 0 ? h.substr (7) : h; }
+
     const char* const kitIds[] = { "kit.volume", "kit.life", "kit.dynamics", "kit.character", "kit.drive", "kit.motion", "kit.echo", "kit.space" };
 
     float raw (juce::AudioProcessorValueTreeState& state, const juce::String& id)
@@ -43,24 +48,28 @@ DrumsProcessor::DrumsProcessor()
     : AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
       apvts (*this, nullptr, "Parameters", createLayout())
 {
-    // The factory kit's pads: the GM layout's instruments (names, colours and voice modes).
-    using C = drums::DrumCategory;
-    const std::array<C, numPads> factory { C::kick, C::snare, C::closedHat, C::openHat, C::clap, C::tom, C::rim, C::percussion, C::cymbal };
     for (int p = 0; p < numPads; ++p)
-    {
-        auto& info = pads[index (p)];
-        const auto defaults = drums::PadSettings::defaultsFor (factory[index (p)]);
-        info.category = factory[index (p)];
-        info.chokeGroup = defaults.chokeGroup;
-        info.voiceMode = defaults.voiceMode;
-        info.trigger = defaults.trigger;
-    }
+        factoryPad (p);
     for (auto& r : retired)
         r.fill (nullptr);
     for (auto& l : lastLayer)
         l.store (-1, std::memory_order_relaxed);
     publishPadConfig();
     startTimerHz (20);
+}
+
+void DrumsProcessor::factoryPad (int pad)
+{
+    // The factory kit's pads: the GM layout's instruments (names, colours and voice modes).
+    using C = drums::DrumCategory;
+    const std::array<C, numPads> factory { C::kick, C::snare, C::closedHat, C::openHat, C::clap, C::tom, C::rim, C::percussion, C::cymbal };
+    auto& info = pads[index (pad)];
+    const auto defaults = drums::PadSettings::defaultsFor (factory[index (pad)]);
+    info.name.clear();
+    info.category = factory[index (pad)];
+    info.chokeGroup = defaults.chokeGroup;
+    info.voiceMode = defaults.voiceMode;
+    info.trigger = defaults.trigger;
 }
 
 DrumsProcessor::~DrumsProcessor()
@@ -772,6 +781,34 @@ void DrumsProcessor::finishBatch (std::uint64_t, Batch& batch)
     for (auto& l : batch.loaded)
         if (l != nullptr)
             loaded.push_back (l);
+    if (batch.relink)
+    {
+        // Each found sound fills every missing layer with its content (never another one).
+        auto next = info.layers;
+        for (const auto& sound : loaded)
+            for (auto& l : next.layers)
+                if (l.sound == nullptr && l.missing.has_value() && bareHash (l.missing->expectedHash) == bareHash (sound->contentHash))
+                {
+                    l.sound = sound;
+                    l.missing.reset();
+                }
+        info.error.clear();
+        setPadLayers (pad, next);
+        return;
+    }
+    if (batch.targetLayer >= 0 && ! loaded.empty())
+    {
+        auto next = info.layers;
+        if (batch.targetLayer < static_cast<int> (next.layers.size()))
+        {
+            auto& l = next.layers[static_cast<std::size_t> (batch.targetLayer)];
+            l.sound = loaded.front();
+            l.missing.reset();
+            info.error.clear();
+            applyLayerEdit (pad, next, "Relink sample");
+        }
+        return;
+    }
     if (loaded.empty())
     {
         info.error = batch.error.empty() ? std::string ("The file could not be loaded") : batch.error;
@@ -1014,12 +1051,342 @@ void DrumsProcessor::moveLayer (int pad, int from, int to)
     selectedLayer[index (pad)] = to;
 }
 
+// ---------------------------------------------------------------------------------------
+// Pads: duplicate
+// ---------------------------------------------------------------------------------------
+
+namespace
+{
+    /** Any undoable step given as two functions. */
+    class FunctionAction final : public juce::UndoableAction
+    {
+    public:
+        FunctionAction (std::function<void()> doFn, std::function<void()> undoFn) : doIt (std::move (doFn)), undoIt (std::move (undoFn)) {}
+        bool perform() override
+        {
+            doIt();
+            return true;
+        }
+        bool undo() override
+        {
+            undoIt();
+            return true;
+        }
+        int getSizeInUnits() override { return 10; }
+
+    private:
+        std::function<void()> doIt, undoIt;
+    };
+
+    // Per-pad parameters a duplicate copies (SOLO stays: soloing a copy is never wanted).
+    const char* const copiedPadParams[] = { "gain", "pan", "tune", "mute", "start", "reverse", "attack", "decay", "sustain", "release" };
+} // namespace
+
+int DrumsProcessor::firstEmptyPad() const
+{
+    for (int slot = 0; slot < numPads; ++slot)
+    {
+        const int p = order[index (slot)];
+        if (pads[index (p)].layers.layers.empty() && ! pads[index (p)].loading && (slot < visiblePads() || slot == numPads - 1))
+            return p;
+    }
+    return -1;
+}
+
+bool DrumsProcessor::duplicatePad (int from, int to)
+{
+    if (from == to || from < 0 || to < 0 || from >= numPads || to >= numPads || pads[index (from)].layers.layers.empty())
+        return false;
+    struct Snapshot
+    {
+        PadInfo info;
+        std::array<float, std::size (copiedPadParams)> params {};
+    };
+    auto take = [this] (int p) {
+        Snapshot snap;
+        snap.info = pads[index (p)];
+        for (std::size_t k = 0; k < std::size (copiedPadParams); ++k)
+            if (auto* param = apvts.getParameter (padParamId (p, copiedPadParams[k])))
+                snap.params[k] = param->getValue();
+        return snap;
+    };
+    auto put = [this] (int p, const Snapshot& snap) {
+        auto& info = pads[index (p)];
+        info.name = snap.info.name;
+        info.category = snap.info.category;
+        info.chokeGroup = snap.info.chokeGroup;
+        info.voiceMode = snap.info.voiceMode;
+        info.trigger = snap.info.trigger;
+        info.error.clear();
+        latestRequest[index (p)] = nextGeneration.fetch_add (1);   // a load still running is dropped
+        info.loading = false;
+        for (std::size_t k = 0; k < std::size (copiedPadParams); ++k)
+            if (auto* param = apvts.getParameter (padParamId (p, copiedPadParams[k])))
+                param->setValueNotifyingHost (snap.params[k]);
+        selectedLayer[index (p)] = 0;
+        setPadLayers (p, snap.info.layers);
+        publishPadConfig();
+    };
+    const auto before = take (to);
+    auto after = take (from);
+    if (! after.info.name.empty())
+        after.info.name += " copy";
+    undo.beginNewTransaction ("Duplicate pad");
+    undo.perform (new FunctionAction ([put, to, after] { put (to, after); }, [put, to, before] { put (to, before); }), "Duplicate pad");
+    return true;
+}
+
+// ---------------------------------------------------------------------------------------
+// Kits
+// ---------------------------------------------------------------------------------------
+
+void DrumsProcessor::resetKit()
+{
+    for (auto* param : getParameters())
+        if (auto* p = dynamic_cast<juce::RangedAudioParameter*> (param))
+            p->setValueNotifyingHost (p->getDefaultValue());
+    for (int p = 0; p < numPads; ++p)
+    {
+        latestRequest[index (p)] = nextGeneration.fetch_add (1);
+        factoryPad (p);
+        pads[index (p)].loading = false;
+        pads[index (p)].error.clear();
+        selectedLayer[index (p)] = 0;
+        setPadLayers (p, PadLayers {});
+    }
+    map = drums::KeyMap::defaults();
+    order = { 0, 1, 2, 3, 4, 5, 6, 7, 8 };
+    kitName = "New Kit";
+    selectedPad = 0;
+    kitFile = juce::File();
+    publishPadConfig();
+}
+
+void DrumsProcessor::newKit()
+{
+    std::shared_ptr<juce::XmlElement> before (createStateXml (stateTag).release());
+    undo.beginNewTransaction ("New kit");
+    undo.perform (new FunctionAction ([this] { resetKit(); }, [this, before] { restoreStateXml (*before); }), "New kit");
+    sendChangeMessage();
+}
+
+bool DrumsProcessor::saveKit (const juce::File& file, juce::String& error)
+{
+    auto xml = createStateXml (kitTag);
+    xml->setAttribute ("kitSchemaVersion", kitSchemaVersion);
+    xml->setAttribute ("name", juce::String::fromUTF8 (kitName.c_str()));
+    xml->setAttribute ("saved", juce::Time::getCurrentTime().toISO8601 (true));
+    const auto target = file.hasFileExtension (kitExtension) ? file : file.withFileExtension (kitExtension);
+    if (! xml->writeTo (target))
+    {
+        error = "Could not write " + target.getFullPathName();
+        return false;
+    }
+    kitFile = target;
+    return true;
+}
+
+bool DrumsProcessor::loadKit (const juce::File& file, juce::String& error)
+{
+    const auto xml = juce::XmlDocument::parse (file);
+    if (xml == nullptr || ! xml->hasTagName (kitTag))
+    {
+        // Not a drum kit (an OSP preset or session is never read as one: spec 10.5).
+        error = file.getFileName() + " is not an ANDOR Drums kit";
+        return false;
+    }
+    if (xml->getIntAttribute ("kitSchemaVersion", 0) > kitSchemaVersion)
+    {
+        error = file.getFileName() + " was saved by a newer ANDOR Drums";
+        return false;
+    }
+    std::shared_ptr<juce::XmlElement> before (createStateXml (stateTag).release());
+    std::shared_ptr<juce::XmlElement> after (new juce::XmlElement (*xml));
+    const auto base = file.getParentDirectory();
+    undo.beginNewTransaction ("Open kit");
+    undo.perform (new FunctionAction ([this, after, base] { restoreStateXml (*after, base); },
+                                      [this, before] { restoreStateXml (*before); }), "Open kit");
+    kitFile = file;
+    sendChangeMessage();
+    return true;
+}
+
+juce::File DrumsProcessor::exportPortableKit (const juce::File& parentDirectory, juce::String& error)
+{
+    auto name = juce::File::createLegalFileName (juce::String::fromUTF8 (kitName.c_str())).trim();
+    if (name.isEmpty())
+        name = "Kit";
+    const auto folder = parentDirectory.getNonexistentChildFile (name, "", false);
+    const auto samples = folder.getChildFile ("Samples");
+    if (! samples.createDirectory())
+    {
+        error = "Could not create " + samples.getFullPathName();
+        return {};
+    }
+    // One copy per sound (by content); same names for different sounds get the hash's start.
+    std::map<std::string, juce::String> copied;   // content hash -> relative path
+    std::set<juce::String> usedNames;
+    juce::StringArray failed;
+    auto soundPath = [&] (const LoadedInstrument& sound) -> juce::String {
+        if (auto it = copied.find (sound.contentHash); it != copied.end())
+            return it->second;
+        juce::String fileName = juce::String::fromUTF8 (sound.filename.c_str());
+        if (fileName.isEmpty() || usedNames.count (fileName.toLowerCase()) > 0)
+            fileName = juce::String (sound.contentHash).fromFirstOccurrenceOf (":", false, false).substring (0, 8) + "-" + fileName;
+        usedNames.insert (fileName.toLowerCase());
+        juce::File source (juce::File::isAbsolutePath (sound.storedPath) ? juce::String::fromUTF8 (sound.storedPath.c_str()) : juce::String());
+        if (! source.existsAsFile() && juce::File::isAbsolutePath (sound.originalPath))
+            source = juce::File (juce::String::fromUTF8 (sound.originalPath.c_str()));
+        if (! source.existsAsFile() || ! source.copyFileTo (samples.getChildFile (fileName)))
+            failed.add (juce::String::fromUTF8 (sound.filename.c_str()));
+        const auto relative = "Samples/" + fileName;
+        copied[sound.contentHash] = relative;
+        return relative;
+    };
+    auto xml = createStateXml (kitTag, soundPath);
+    xml->setAttribute ("kitSchemaVersion", kitSchemaVersion);
+    xml->setAttribute ("name", juce::String::fromUTF8 (kitName.c_str()));
+    xml->setAttribute ("portable", true);
+    xml->setAttribute ("saved", juce::Time::getCurrentTime().toISO8601 (true));
+    const auto kit = folder.getChildFile (name + kitExtension);
+    if (! xml->writeTo (kit))
+    {
+        error = "Could not write " + kit.getFullPathName();
+        return {};
+    }
+    const int missing = missingLayerCount();
+    if (! failed.isEmpty() || missing > 0)
+        error = (failed.isEmpty() ? juce::String() : "Could not copy: " + failed.joinIntoString (", ") + ". ")
+                + (missing > 0 ? juce::String (missing) + " missing sample(s) were not included." : juce::String());
+    return kit;
+}
+
+// ---------------------------------------------------------------------------------------
+// Missing samples
+// ---------------------------------------------------------------------------------------
+
+int DrumsProcessor::missingLayerCount() const
+{
+    int n = 0;
+    for (const auto& info : pads)
+        for (const auto& l : info.layers.layers)
+            n += l.sound == nullptr ? 1 : 0;
+    return n;
+}
+
+void DrumsProcessor::relinkLayer (int pad, int layer, const juce::File& file)
+{
+    if (layer < 0 || layer >= static_cast<int> (padLayers (pad).layers.size()))
+        return;
+    plugin::LoadRequest r;
+    r.file = file;
+    Batch batch;
+    batch.targetLayer = layer;
+    startBatch (pad, std::move (batch), { r });
+}
+
+void DrumsProcessor::findMissingSamples (const juce::File& folder)
+{
+    struct Want
+    {
+        int pad;
+        std::string hash, filename;
+    };
+    std::vector<Want> wants;
+    for (int p = 0; p < numPads; ++p)
+        for (const auto& l : pads[index (p)].layers.layers)
+            if (l.sound == nullptr && l.missing.has_value() && ! l.missing->expectedHash.empty())
+                wants.push_back ({ p, bareHash (l.missing->expectedHash), l.missing->filename });
+    relinkReport = wants.empty() ? "No missing samples to look for." : "Searching " + folder.getFullPathName() + "...";
+    if (wants.empty())
+    {
+        sendChangeMessage();
+        return;
+    }
+    ++pendingLoads;
+    loaderPool.addJob ([this, folder, wants] {
+        // Same name first (cheap); then, for what is still missing, every audio file
+        // (renamed files). Only an exact content match counts.
+        std::vector<juce::File> audio;
+        for (const auto& entry : juce::RangedDirectoryIterator (folder, true, "*.wav;*.aif;*.aiff;*.flac;*.caf", juce::File::findFiles))
+            if (audio.size() < 20000)
+                audio.push_back (entry.getFile());
+        std::map<std::string, std::string> nameOf;   // wanted hash -> its file name
+        for (const auto& w : wants)
+            nameOf.emplace (w.hash, w.filename);
+        std::map<std::string, juce::File> byHash;   // wanted hash -> the file with that content
+        int hashed = 0;
+        for (const bool byName : { true, false })
+            for (const auto& [hash, filename] : nameOf)
+            {
+                if (byHash.count (hash) > 0)
+                    continue;
+                for (const auto& f : audio)
+                {
+                    if (byName != (f.getFileName() == juce::String::fromUTF8 (filename.c_str())))
+                        continue;
+                    if (! byName && hashed > 3000)
+                        break;   // a huge folder: beyond this, names only
+                    ++hashed;
+                    if (io::sha256OfFile (std::filesystem::path (f.getFullPathName().toStdString())).value_or (std::string()) == hash)
+                    {
+                        byHash[hash] = f;
+                        break;
+                    }
+                }
+            }
+        std::vector<Found> resolved;
+        for (const auto& w : wants)
+            if (auto it = byHash.find (w.hash); it != byHash.end())
+                resolved.push_back ({ w.pad, "sha256:" + w.hash, it->second });
+        {
+            const std::lock_guard<std::mutex> lock (resultsMutex);
+            for (auto& r : resolved)
+                found.push_back (r);
+            foundReport = "Found " + juce::String (static_cast<int> (byHash.size())) + " of " + juce::String (static_cast<int> (nameOf.size())) + " missing samples.";
+        }
+        --pendingLoads;
+    });
+}
+
 void DrumsProcessor::publishFinishedLoads()
 {
     std::vector<Finished> results;
+    std::vector<Found> located;
+    juce::String report;
     {
         const std::lock_guard<std::mutex> lock (resultsMutex);
         results.swap (finished);
+        located.swap (found);
+        report.swapWith (foundReport);
+    }
+    if (report.isNotEmpty())
+    {
+        relinkReport = report;
+        sendChangeMessage();
+    }
+    // Missing samples found by content: load them per pad, filling the layers they belong to.
+    std::map<int, std::vector<plugin::LoadRequest>> perPad;
+    for (const auto& f : located)
+    {
+        auto& list = perPad[f.pad];
+        bool already = false;
+        for (const auto& r : list)
+            already = already || r.expectedHash == f.hash;
+        if (already)
+            continue;
+        plugin::LoadRequest r;
+        r.file = f.file;
+        r.expectedHash = f.hash;
+        r.originalPath = f.file.getFullPathName().toStdString();
+        r.filename = f.file.getFileName().toStdString();
+        list.push_back (std::move (r));
+    }
+    for (auto& [pad, requests] : perPad)
+    {
+        Batch batch;
+        batch.relink = true;
+        startBatch (pad, std::move (batch), std::move (requests));
     }
     for (auto& f : results)
     {
@@ -1070,7 +1437,7 @@ bool DrumsProcessor::waitForLoads (int timeoutMs)
         bool idle = false;
         {
             const std::lock_guard<std::mutex> lock (resultsMutex);
-            idle = finished.empty() && pendingLoads.load() == 0;
+            idle = finished.empty() && found.empty() && pendingLoads.load() == 0;
         }
         publishFinishedLoads();
         if (idle)
@@ -1136,11 +1503,26 @@ namespace
 
 void DrumsProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    juce::XmlElement root (stateTag);
+    copyXmlToBinary (*createStateXml (stateTag), destData);
+}
+
+std::unique_ptr<juce::XmlElement> DrumsProcessor::createStateXml (const char* tag, std::function<juce::String (const LoadedInstrument&)> soundPath)
+{
+    auto rootPtr = std::make_unique<juce::XmlElement> (tag);
+    auto& root = *rootPtr;
     root.setAttribute ("schemaVersion", stateVersion);
     root.setAttribute ("product", JucePlugin_Name);
     if (auto params = apvts.copyState().createXml())
         root.addChildElement (params.release());
+    // A portable kit: each sound also by its path inside the kit; no private absolute paths.
+    auto writeLayerSound = [&soundPath] (juce::XmlElement& x, const LoadedInstrument& sound) {
+        writeSound (x, sound);
+        if (soundPath)
+        {
+            x.setAttribute ("kitPath", soundPath (sound));
+            x.setAttribute ("originalPath", juce::String());
+        }
+    };
 
     auto* padsXml = root.createNewChildElement ("Pads");
     for (int p = 0; p < numPads; ++p)
@@ -1156,7 +1538,7 @@ void DrumsProcessor::getStateInformation (juce::MemoryBlock& destData)
         // Layers (state 3). The first loaded layer is also written as <Sound>, so a build
         // from before layers still opens the kit with one sample per pad.
         if (info.sound != nullptr)
-            writeSound (*x->createNewChildElement ("Sound"), *info.sound);
+            writeLayerSound (*x->createNewChildElement ("Sound"), *info.sound);
         if (! info.layers.layers.empty())
         {
             auto* layersXml = x->createNewChildElement ("Layers");
@@ -1166,7 +1548,7 @@ void DrumsProcessor::getStateInformation (juce::MemoryBlock& destData)
             {
                 auto* l = layersXml->createNewChildElement ("Layer");
                 if (layer.sound != nullptr)
-                    writeSound (*l, *layer.sound);
+                    writeLayerSound (*l, *layer.sound);
                 else if (layer.missing.has_value())
                     writeRequest (*l, *layer.missing);
                 l->setAttribute ("name", juce::String::fromUTF8 (layer.name.c_str()));
@@ -1200,7 +1582,7 @@ void DrumsProcessor::getStateInformation (juce::MemoryBlock& destData)
     view->setAttribute ("layout", layoutName (padLayout));
     view->setAttribute ("kitName", juce::String::fromUTF8 (kitName.c_str()));
     view->setAttribute ("selectedPad", selectedPad + 1);
-    copyXmlToBinary (root, destData);
+    return rootPtr;
 }
 
 void DrumsProcessor::setStateInformation (const void* data, int sizeInBytes)
@@ -1208,7 +1590,13 @@ void DrumsProcessor::setStateInformation (const void* data, int sizeInBytes)
     const auto root = getXmlFromBinary (data, sizeInBytes);
     if (root == nullptr || ! root->hasTagName (stateTag))
         return;   // not an ANDOR Drums session: keep the current kit
+    restoreStateXml (*root);
+    undo.clearUndoHistory();   // a recalled kit starts a fresh history
+}
 
+void DrumsProcessor::restoreStateXml (const juce::XmlElement& rootRef, const juce::File& baseDirectory)
+{
+    const auto* root = &rootRef;
     if (auto* params = root->getChildByName (apvts.state.getType()))
         apvts.replaceState (juce::ValueTree::fromXml (*params));
 
@@ -1254,6 +1642,18 @@ void DrumsProcessor::setStateInformation (const void* data, int sizeInBytes)
                     return;
                 PadLayer layer;
                 layer.missing = readRequest (l);   // until it loads
+                // A portable kit: the copy inside the kit, when the original is not here.
+                const auto kitPath = l.getStringAttribute ("kitPath");
+                if (kitPath.isNotEmpty() && baseDirectory != juce::File())
+                {
+                    const auto inKit = baseDirectory.getChildFile (kitPath);
+                    const auto& original = layer.missing->originalPath;
+                    const bool originalHere = juce::File::isAbsolutePath (original) && juce::File (original).existsAsFile();
+                    if (inKit.existsAsFile() && ! originalHere)
+                        layer.missing->originalPath = inKit.getFullPathName().toStdString();
+                }
+                if (! juce::File::isAbsolutePath (layer.missing->originalPath))
+                    layer.missing->originalPath.clear();
                 if (withSettings)
                 {
                     layer.name = l.getStringAttribute ("name").toStdString();
@@ -1318,7 +1718,6 @@ void DrumsProcessor::setStateInformation (const void* data, int sizeInBytes)
         if (valid)
             order = restoredOrder;
     }
-    undo.clearUndoHistory();   // a recalled kit starts a fresh history
 
     if (auto* view = root->getChildByName ("View"))
     {
