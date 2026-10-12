@@ -1,5 +1,6 @@
 #include "PadGrid.h"
 
+#include "BreakView.h"
 #include "LayerUi.h"
 
 #include "CeramicSkin.h"
@@ -485,12 +486,14 @@ void PadView::filesDropped (const juce::StringArray& files, int, int)
 
 bool PadView::isInterestedInDragSource (const SourceDetails& d)
 {
-    return d.description.toString().startsWith (dragPrefix);
+    const auto text = d.description.toString();
+    return text.startsWith (dragPrefix) || text.startsWith (BreakView::dragPrefix);
 }
 
 void PadView::itemDragEnter (const SourceDetails& d)
 {
-    padOver = d.description.toString().fromFirstOccurrenceOf (dragPrefix, false, false).getIntValue() != slotIndex;
+    const auto text = d.description.toString();
+    padOver = text.startsWith (BreakView::dragPrefix) || text.fromFirstOccurrenceOf (dragPrefix, false, false).getIntValue() != slotIndex;
     repaint();
 }
 
@@ -503,7 +506,21 @@ void PadView::itemDragExit (const SourceDetails&)
 void PadView::itemDropped (const SourceDetails& d)
 {
     padOver = false;
-    const int from = d.description.toString().fromFirstOccurrenceOf (dragPrefix, false, false).getIntValue();
+    const auto text = d.description.toString();
+    if (text.startsWith (BreakView::dragPrefix))
+    {
+        // Break slices dropped here: this pad becomes their destination in the import plan.
+        juce::StringArray list;
+        list.addTokens (text.fromFirstOccurrenceOf (BreakView::dragPrefix, false, false), ",", "");
+        auto slices = grid.processor().breakSession().slices;
+        for (const auto& item : list)
+            if (const int i = item.getIntValue(); i >= 0 && i < static_cast<int> (slices.size()))
+                slices[static_cast<std::size_t> (i)].pad = pad();
+        grid.processor().editBreakSlices (slices, "Assign slices");
+        repaint();
+        return;
+    }
+    const int from = text.fromFirstOccurrenceOf (dragPrefix, false, false).getIntValue();
     grid.processor().swapPadSlots (from, slotIndex);   // undoable; sounds and MIDI stay with their pads
     grid.repaintAll();
 }

@@ -53,6 +53,7 @@ add_executable(osp_drums_tests
     drums/DrumMappingTests.cpp
     drums/DrumKitEngineTests.cpp
     drums/DrumLayerTests.cpp
+    drums/BreakSlicerTests.cpp
 )
 target_include_directories(osp_drums_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(osp_drums_tests PRIVATE osp_drums osp_research Catch2::Catch2WithMain)

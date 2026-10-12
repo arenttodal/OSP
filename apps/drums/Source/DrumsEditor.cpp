@@ -979,7 +979,7 @@ juce::Rectangle<int> DrumsContent::editorCard() const { return { 44, padCard().g
 juce::Rectangle<int> DrumsContent::rangeCard() const { return { 44, editorCard().getBottom() + 10, 1448, 150 }; }
 juce::Rectangle<int> DrumsContent::bottomRow() const { return { 44, rangeCard().getBottom() + 10, 1448, 195 }; }
 
-DrumsContent::DrumsContent (DrumsProcessor& p) : proc (p), grid (p), sample (p), range (p), envelope (p), keyMap (p)
+DrumsContent::DrumsContent (DrumsProcessor& p) : proc (p), grid (p), sample (p), range (p), envelope (p), keyMap (p), breaks (p)
 {
     setWantsKeyboardFocus (true);
     addAndMakeVisible (grid);
@@ -1005,6 +1005,13 @@ DrumsContent::DrumsContent (DrumsProcessor& p) : proc (p), grid (p), sample (p),
     layout3x3.onClick = [this] { setLayout (DrumsProcessor::PadLayout::grid9); };
     ninthPad.setTooltip ("Pad 9 holds a sound and keeps playing in this layout. Click to edit it.");
     ninthPad.onClick = [this] { selectPad (proc.padAtSlot (8)); };
+    breakButton.setTooltip ("Slice a break into a kit: click to choose a file, or drop one here");
+    breakButton.onClick = [this] { openBreakDialog(); };
+    breakButton.onFile = [this] (const juce::File& f) { proc.importBreak (f); };
+    addAndMakeVisible (breakButton);
+    addChildComponent (breaks);
+    breaks.onClose = [this] { syncBreakView(); };
+    breaks.onReport = [this] (const juce::String& title, const juce::String& message) { tell (title, message); };
     kitMenu.icon = [] (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour c) { ceramic::iconMenu (g, r, c); };
     kitMenu.setTooltip ("Kits: new, open, save, export a portable kit, find missing samples");
     kitMenu.onClick = [this] { showKitMenu(); };
@@ -1117,6 +1124,8 @@ void DrumsContent::setLayout (DrumsProcessor::PadLayout layout)
 
 void DrumsContent::setKeyMapOpen (bool open)
 {
+    if (open && breaks.isVisible())
+        return;   // finish the break first
     keyMap.setVisible (open);
     sample.setVisible (! open);
     range.setVisible (! open);
@@ -1196,6 +1205,17 @@ void DrumsContent::showKitMenu()
         });
     });
     m.addSeparator();
+    m.addItem ("Slice a break...", [this] { openBreakDialog(); });
+    m.addItem ("Save groove as MIDI...", ! proc.groove.hits.empty(), false, [this] {
+        chooser = std::make_unique<juce::FileChooser> ("Save the groove as MIDI", juce::File::getSpecialLocation (juce::File::userDocumentsDirectory), "*.mid");
+        chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting,
+                              [this] (const juce::FileChooser& fc) {
+                                  juce::String error;
+                                  if (fc.getResult() != juce::File() && ! proc.writeGrooveMidi (fc.getResult().withFileExtension ("mid"), error))
+                                      tell ("Save groove", error);
+                              });
+    });
+    m.addSeparator();
     const int missing = proc.missingLayerCount();
     m.addItem (missing > 0 ? "Find missing samples (" + juce::String (missing) + ")..." : juce::String ("Find missing samples..."), missing > 0, false, [this] {
         chooser = std::make_unique<juce::FileChooser> ("Find missing samples in a folder", juce::File::getSpecialLocation (juce::File::userHomeDirectory));
@@ -1225,8 +1245,39 @@ void DrumsContent::refreshModeBar()
     repaint();
 }
 
+void DrumsContent::openBreakDialog()
+{
+    chooser = std::make_unique<juce::FileChooser> ("Slice a break", juce::File(), "*.wav;*.aif;*.aiff;*.flac;*.caf");
+    chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [this] (const juce::FileChooser& fc) {
+        if (fc.getResult().existsAsFile())
+            proc.importBreak (fc.getResult());
+    });
+}
+
+void DrumsContent::syncBreakView()
+{
+    const bool open = proc.breakSession().open();
+    if (open && keyMap.isVisible())
+        setKeyMapOpen (false);
+    if (breaks.isVisible() != open)
+    {
+        breaks.setVisible (open);
+        sample.setVisible (! open && ! keyMap.isVisible());
+        range.setVisible (! open && ! keyMap.isVisible());
+        if (open)
+        {
+            breaks.selection.clear();
+            breaks.grabKeyboardFocus();
+        }
+    }
+    breakButton.setToggleState (open, juce::dontSendNotification);
+    if (open)
+        breaks.refresh();
+}
+
 void DrumsContent::changeListenerCallback (juce::ChangeBroadcaster*)
 {
+    syncBreakView();
     if (proc.relinkReport != shownRelinkReport)
     {
         shownRelinkReport = proc.relinkReport;
@@ -1285,6 +1336,7 @@ void DrumsContent::resized()
     redoButton.setBounds (484, 28, 40, 36);
     kitName.setBounds (532, 28, 316, 36);
     kitMenu.setBounds (852, 28, 40, 36);
+    breakButton.setBounds (318, 28, 104, 36);
     layout1x8.setBounds (960, 30, 66, 32);
     layout2x4.setBounds (1026, 30, 66, 32);
     layout3x3.setBounds (1092, 30, 66, 32);
@@ -1297,6 +1349,7 @@ void DrumsContent::resized()
     sample.setBounds (editorCard());
     range.setBounds (rangeCard());
     keyMap.setBounds (editorCard().getUnion (rangeCard()));
+    breaks.setBounds (editorCard().getUnion (rangeCard()));
 
     const auto row = bottomRow();
     envelope.setBounds (row.withWidth (556));

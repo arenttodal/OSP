@@ -7,6 +7,7 @@
 #include "DrumsProcessor.h"
 
 #include "audio/utility/TestSignals.h"
+#include "core/Prng.h"
 #include "io/AudioFileIO.h"
 
 #define CATCH_CONFIG_RUNNER
@@ -114,6 +115,42 @@ namespace
         for (std::size_t i = 0; i < x.size(); ++i)
             x[i] *= static_cast<float> (std::pow (10.0, -2.0 * static_cast<double> (i) / static_cast<double> (x.size())));
         testsignals::applyFades (audio, 0.002, 0.02);
+        const auto file = dir.getChildFile (name);
+        std::string error;
+        REQUIRE (io::writeAudioFile (std::filesystem::path (file.getFullPathName().toStdString()), audio, io::SampleFormat::pcm24, error));
+        return file;
+    }
+
+    /** A small synthetic break: kick, hat, snare, hat ... on 8ths at 120 BPM (known onsets). */
+    juce::File writeBreak (const juce::File& dir, const juce::String& name, int hits = 8)
+    {
+        AudioData audio;
+        audio.sampleRate = rate;
+        std::vector<float> x (static_cast<std::size_t> ((0.1 + hits * 0.25 + 0.5) * rate), 0.0f);
+        Prng rng (11);
+        for (int h = 0; h < hits; ++h)
+        {
+            const auto at = static_cast<std::size_t> ((0.1 + h * 0.25) * rate);
+            const int kind = h % 4;   // kick, hat, snare, hat
+            const auto length = static_cast<std::size_t> ((kind == 0 ? 0.22 : kind == 2 ? 0.18 : 0.05) * rate);
+            double prev = 0.0;
+            for (std::size_t i = 0; i < length && at + i < x.size(); ++i)
+            {
+                const double t = static_cast<double> (i) / rate;
+                const double fade = std::min (1.0, static_cast<double> (length - i) / (0.01 * rate));
+                const double n = rng.uniform (-1.0, 1.0);
+                double v = 0.0;
+                if (kind == 0)
+                    v = 0.8 * std::sin (2.0 * 3.14159265358979 * 60.0 * t) * std::exp (-t / 0.08);
+                else if (kind == 2)
+                    v = 0.4 * (n - 0.6 * prev) * std::exp (-t / 0.05) + 0.3 * std::sin (2.0 * 3.14159265358979 * 200.0 * t) * std::exp (-t / 0.04);
+                else
+                    v = 0.25 * (n - prev) * std::exp (-t / 0.015);
+                prev = n;
+                x[at + i] += static_cast<float> (v * fade);
+            }
+        }
+        audio.channels.push_back (std::move (x));
         const auto file = dir.getChildFile (name);
         std::string error;
         REQUIRE (io::writeAudioFile (std::filesystem::path (file.getFullPathName().toStdString()), audio, io::SampleFormat::pcm24, error));
@@ -1114,6 +1151,203 @@ TEST_CASE ("Missing samples: a folder search relinks by content, never by name a
     CHECK (q.missingLayerCount() == 1);
 }
 
+TEST_CASE ("Break: import slices it, the plan suggests pads, slice edits undo", "[drums-plugin][breaks]")
+{
+    TempDir tmp;
+    const ScopedStore store (tmp.dir.getChildFile ("store"));
+    DrumsProcessor p;
+    p.prepareToPlay (rate, 256);
+    p.importBreak (writeBreak (tmp.dir, "Amen-ish.wav"));
+    CHECK (p.breakSession().loading);
+    REQUIRE (p.waitForLoads());
+    const auto& session = p.breakSession();
+    REQUIRE (session.sound != nullptr);
+    REQUIRE (session.slices.size() == 8);
+    for (int h = 0; h < 8; ++h)
+        CHECK (std::abs (static_cast<double> (session.slices[static_cast<std::size_t> (h)].onset) / rate - (0.1 + h * 0.25)) < 0.006);
+    CHECK (session.bpm == Approx (120.0).margin (1.0));
+    // An empty kit: the slices go to pads 1..8 in order.
+    for (int h = 0; h < 8; ++h)
+        CHECK (session.slices[static_cast<std::size_t> (h)].pad == p.padAtSlot (h));
+
+    // Delete a boundary, then undo it.
+    auto edited = session.slices;
+    REQUIRE (drums::removeSlice (edited, 3));
+    p.editBreakSlices (edited, "Delete slice");
+    CHECK (p.breakSession().slices.size() == 7);
+    p.undoManager().undo();
+    CHECK (p.breakSession().slices.size() == 8);
+
+    // Audition a slice: the preview plays it (pads untouched).
+    p.auditionSlice (0);
+    juce::AudioBuffer<float> buffer (2, 256);
+    juce::MidiBuffer midi;
+    double energy = 0.0;
+    for (int b = 0; b < 20; ++b)
+    {
+        buffer.clear();
+        p.processBlock (buffer, midi);
+        energy += buffer.getRMSLevel (0, 0, 256);
+    }
+    CHECK (energy > 0.01);
+    CHECK (p.padVoices (0) == 0);
+
+    // A less sensitive setting finds no more slices than a sensitive one.
+    auto settings = p.breakSession().settings;
+    settings.sensitivity = 1.0;
+    p.resliceBreak (settings);
+    CHECK (p.breakSession().slices.size() >= 8);
+    p.closeBreak();
+    CHECK_FALSE (p.breakSession().open());
+}
+
+TEST_CASE ("Break: apply as a new kit, fill empty pads or merge; one undo step; the groove as MIDI", "[drums-plugin][breaks]")
+{
+    TempDir tmp;
+    const ScopedStore store (tmp.dir.getChildFile ("store"));
+    DrumsProcessor p;
+    p.prepareToPlay (rate, 256);
+    p.loadPad (1, writeDrum (tmp.dir, "MySnare.wav", 400.0, 0.3));
+    REQUIRE (p.waitForLoads());
+    const auto mySnare = p.padInfo (1).sound;
+
+    // Fill empty pads: pad 2 is taken, so its slice stays in the tray.
+    p.importBreak (writeBreak (tmp.dir, "Break.wav"));
+    REQUIRE (p.waitForLoads());
+    {
+        auto plan = p.breakSession().slices;
+        for (auto& s : plan)
+            s.pad = -1;
+        plan[0].pad = 0;
+        plan[2].pad = 1;   // the occupied snare pad
+        plan[4].pad = 0;   // a second kick: a round robin on pad 1
+        p.editBreakSlices (plan, "Plan");
+    }
+    const auto report = p.applyBreak (DrumsProcessor::BreakApply::emptyPads);
+    CHECK (report.contains ("2 slices placed"));
+    CHECK (report.contains ("1 left in the tray"));
+    REQUIRE (p.padLayers (0).layers.size() == 2);
+    CHECK (p.padLayers (0).mode == drums::LayerMode::roundRobin);
+    CHECK (p.padLayers (0).layers[0].sound == p.padLayers (0).layers[1].sound);   // one sound, two regions
+    CHECK (p.padLayers (0).layers[0].params.end < p.padLayers (0).layers[1].params.start + 1.0e-9);
+    CHECK (p.padInfo (1).sound == mySnare);
+    CHECK_FALSE (p.breakSession().open());
+    // The pad plays its slice: a low kick, not the whole break.
+    p.prepareToPlay (rate, 256);
+    const auto kick = hit (p, p.keyMap().padNote[0], 110, 0.2);
+    CHECK (rmsOf (kick) > 0.001);
+    CHECK (frequencyOf (kick, 480, 4800) == Approx (60.0).margin (6.0));
+    // One undo step takes it all back.
+    p.undoManager().undo();
+    REQUIRE (p.waitForLoads());
+    CHECK (p.padLayers (0).layers.empty());
+    CHECK (p.padInfo (1).sound != nullptr);
+
+    // Merge: the occupied pad gets the slice as a round robin next to its own sound.
+    p.importBreak (writeBreak (tmp.dir, "Break.wav"));
+    REQUIRE (p.waitForLoads());
+    {
+        auto plan = p.breakSession().slices;
+        for (auto& s : plan)
+            s.pad = -1;
+        plan[2].pad = 1;
+        plan[2].category = drums::DrumCategory::snare;
+        p.editBreakSlices (plan, "Plan");
+    }
+    p.applyBreak (DrumsProcessor::BreakApply::merge);
+    REQUIRE (p.padLayers (1).layers.size() == 2);
+    CHECK (p.padLayers (1).layers[0].sound->filename == "MySnare.wav");
+
+    // A new kit from the break: named after it, every planned slice on its pad.
+    p.importBreak (writeBreak (tmp.dir, "Funky Drummer.wav"));
+    REQUIRE (p.waitForLoads());
+    p.suggestBreakPlan (true);
+    p.applyBreak (DrumsProcessor::BreakApply::newKit);
+    CHECK (p.kitName == "Funky Drummer");
+    for (int slot = 0; slot < 8; ++slot)
+        CHECK (p.padLayers (p.padAtSlot (slot)).layers.size() == 1);
+    REQUIRE (p.groove.hits.size() == 8);
+    CHECK (p.groove.bpm == Approx (120.0).margin (1.0));
+    CHECK (p.groove.hits[2].seconds == Approx (0.5).margin (0.006));
+
+    // The groove as MIDI: 8 notes on the pads' notes, at 120 BPM.
+    const auto mid = tmp.dir.getChildFile ("groove.mid");
+    juce::String error;
+    REQUIRE (p.writeGrooveMidi (mid, error));
+    juce::MidiFile file;
+    juce::FileInputStream in (mid);
+    REQUIRE (file.readFrom (in));
+    file.convertTimestampTicksToSeconds();
+    std::vector<std::pair<double, int>> notes;
+    for (const auto* e : *file.getTrack (0))
+        if (e->message.isNoteOn())
+            notes.push_back ({ e->message.getTimeStamp(), e->message.getNoteNumber() });
+    REQUIRE (notes.size() == 8);
+    CHECK (notes[2].first == Approx (0.5).margin (0.006));
+    CHECK (notes[0].second == p.keyMap().padNote[static_cast<std::size_t> (p.padAtSlot (0))]);
+
+    // The groove is saved with the kit.
+    juce::MemoryBlock state;
+    p.getStateInformation (state);
+    DrumsProcessor q;
+    q.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+    REQUIRE (q.waitForLoads());
+    CHECK (q.groove.hits.size() == 8);
+    CHECK (q.padLayers (q.padAtSlot (3)).layers.size() == 1);
+}
+
+TEST_CASE ("Break view: opens with the session, chips drop onto pads, Delete joins slices", "[drums-plugin][ui][breaks]")
+{
+    const juce::ScopedJuceInitialiser_GUI gui;
+    TempDir tmp;
+    const ScopedStore store (tmp.dir.getChildFile ("store"));
+    DrumsProcessor p;
+    auto editor = openEditor (p);
+    editor->setSize (1536, 1024);
+    auto& content = editor->content();
+    p.importBreak (writeBreak (tmp.dir, "Break.wav"));
+    REQUIRE (p.waitForLoads());
+    content.syncBreakView();   // the change message does this live
+    auto& view = content.breakView();
+    REQUIRE (view.isVisible());
+    CHECK_FALSE (content.samplePanel().isVisible());
+    // The markers sit where the slices start; the slice under a click is found.
+    const auto& slices = p.breakSession().slices;
+    REQUIRE (slices.size() == 8);
+    CHECK (view.markerNear (view.xOfFrame (slices[3].start)) == 3);
+    CHECK (view.sliceAtX (view.xOfFrame ((slices[5].start + slices[5].end) / 2)) == 5);
+    CHECK (view.chipAt (view.chipRect (2).getCentre()) == 2);
+
+    // Two chips dragged onto pad 5: both go there in the plan (one undo step).
+    auto& cell = content.padGrid().cell (4);
+    const juce::DragAndDropTarget::SourceDetails drop (juce::var (juce::String (drumsplugin::BreakView::dragPrefix) + "1,3"), &view, {});
+    REQUIRE (cell.isInterestedInDragSource (drop));
+    cell.itemDropped (drop);
+    CHECK (p.breakSession().slices[1].pad == cell.pad());
+    CHECK (p.breakSession().slices[3].pad == cell.pad());
+    p.undoManager().undo();
+    CHECK (p.breakSession().slices[1].pad != cell.pad());
+
+    // Select two slices and press Delete: they join their previous slices.
+    view.selection = { 2, 6 };
+    view.removeSelectedBoundaries();
+    CHECK (p.breakSession().slices.size() == 6);
+    p.undoManager().undo();
+    CHECK (p.breakSession().slices.size() == 8);
+
+    // Category for the selection (the user's word: full confidence).
+    view.selection = { 0 };
+    view.setSelectionCategory (drums::DrumCategory::kick);
+    CHECK (p.breakSession().slices[0].category == drums::DrumCategory::kick);
+    CHECK (p.breakSession().slices[0].confidence == Approx (1.0));
+
+    // Closing the session brings the pad editor back.
+    p.closeBreak();
+    content.syncBreakView();
+    CHECK_FALSE (view.isVisible());
+    CHECK (content.samplePanel().isVisible());
+}
+
 TEST_CASE ("Snapshots of every major state (written when ANDOR_DRUMS_SNAPSHOT_DIR is set)", "[drums-plugin][ui][snapshots]")
 {
     const juce::ScopedJuceInitialiser_GUI gui;
@@ -1204,6 +1438,22 @@ TEST_CASE ("Snapshots of every major state (written when ANDOR_DRUMS_SNAPSHOT_DI
     CHECK (p.lastLayerPlayed (0) == 2);   // velocity 100: the hard layer
     editor->content().samplePanel().bind();
     snapshot (*editor, "13-layers-velocity");
+    // Slicing a break: the import plan over the pad editor, some slices planned.
+    p.importBreak (writeBreak (tmp.dir, "Break 120.wav", 16));
+    REQUIRE (p.waitForLoads());
+    {
+        auto plan = p.breakSession().slices;
+        const drums::DrumCategory kinds[] = { drums::DrumCategory::kick, drums::DrumCategory::closedHat, drums::DrumCategory::snare, drums::DrumCategory::closedHat };
+        for (std::size_t i = 0; i < plan.size(); ++i)
+            plan[i].category = kinds[i % 4];
+        plan[9].pad = -1;
+        plan[13].pad = -1;
+        p.editBreakSlices (plan, "Plan");
+    }
+    editor->content().syncBreakView();
+    editor->content().breakView().selection = { 2, 6 };
+    editor->content().breakView().refresh();
+    snapshot (*editor, "14-break-slicing");
 }
 
 int main (int argc, char* argv[])

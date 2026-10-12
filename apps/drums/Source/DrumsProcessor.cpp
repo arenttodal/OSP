@@ -180,6 +180,9 @@ void DrumsProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     configSeen = ~0u;
     audioMap = map;
     wasPlaying = false;
+    hostRate = sampleRate;
+    previewNow = {};
+    previewInUse.store (nullptr, std::memory_order_release);
 }
 
 // ---------------------------------------------------------------------------------------
@@ -456,6 +459,7 @@ void DrumsProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
         }
     }
     renderTo (numSamples);
+    renderPreview (buffer, numSamples);
     {
         // Display meter: the block's peak per side, kept until the editor reads it.
         const float pl = buffer.getMagnitude (0, 0, numSamples);
@@ -1349,17 +1353,364 @@ void DrumsProcessor::findMissingSamples (const juce::File& folder)
     });
 }
 
+// ---------------------------------------------------------------------------------------
+// Break slicing
+// ---------------------------------------------------------------------------------------
+
+void DrumsProcessor::importBreak (const juce::File& file)
+{
+    breakState = {};
+    breakState.file = file;
+    breakState.loading = true;
+    breakRequest = nextGeneration.fetch_add (1);
+    const auto request = breakRequest;
+    const auto settings = breakState.settings;
+    ++pendingLoads;
+    loaderPool.addJob ([this, file, request, settings] {
+        plugin::LoadRequest r;
+        r.file = file;
+        BreakLoaded loaded;
+        loaded.request = request;
+        loaded.result = plugin::loadInstrument (r, store, request);
+        if (loaded.result.audio != nullptr)
+            loaded.slices = drums::sliceBreak (*loaded.result.audio, settings);
+        {
+            const std::lock_guard<std::mutex> lock (resultsMutex);
+            breakLoaded.push_back (std::move (loaded));
+        }
+        --pendingLoads;
+    });
+    sendChangeMessage();
+}
+
+void DrumsProcessor::closeBreak()
+{
+    breakRequest = nextGeneration.fetch_add (1);   // a load still running is dropped
+    breakState = {};
+    sendChangeMessage();
+}
+
+void DrumsProcessor::setBreakSlices (const std::vector<drums::BreakSlice>& slices)
+{
+    breakState.slices = slices;
+    if (breakState.audio != nullptr)
+        breakState.bpm = drums::estimateTempo (slices, breakState.audio->sampleRate);
+    sendChangeMessage();
+}
+
+void DrumsProcessor::editBreakSlices (const std::vector<drums::BreakSlice>& slices, const juce::String& actionName, bool newTransaction)
+{
+    if (slices == breakState.slices)
+        return;
+    const auto before = breakState.slices;
+    const auto request = breakRequest;
+    if (newTransaction)
+        undo.beginNewTransaction (actionName);
+    // Only while the same break is open (a closed or replaced session ignores old steps).
+    undo.perform (new FunctionAction ([this, slices, request] { if (request == breakRequest) setBreakSlices (slices); },
+                                      [this, before, request] { if (request == breakRequest) setBreakSlices (before); }),
+                  actionName);
+}
+
+void DrumsProcessor::resliceBreak (const drums::SliceSettings& settings)
+{
+    if (breakState.audio == nullptr)
+        return;
+    breakState.settings = settings;
+    auto next = drums::sliceBreak (*breakState.audio, settings);
+    // Keep the plan of slices that survive (the same onset within 10 ms).
+    const auto tolerance = static_cast<std::int64_t> (0.01 * breakState.audio->sampleRate);
+    for (auto& n : next)
+        for (const auto& old : breakState.slices)
+            if (std::abs (old.onset - n.onset) <= tolerance)
+            {
+                n.pad = old.pad;
+                n.category = old.category;
+                n.confidence = old.confidence;
+            }
+    editBreakSlices (next, "Slice settings");
+}
+
+void DrumsProcessor::suggestBreakPlan (bool forNewKit)
+{
+    std::vector<int> targets;
+    for (int slot = 0; slot < numPads; ++slot)
+    {
+        const int p = order[index (slot)];
+        if (forNewKit || pads[index (p)].layers.layers.empty())
+            targets.push_back (p);
+    }
+    if (targets.empty())
+        for (int slot = 0; slot < numPads; ++slot)
+            targets.push_back (order[index (slot)]);   // a full kit: suggest every pad (merge adds round robins)
+    for (std::size_t i = 0; i < breakState.slices.size(); ++i)
+        breakState.slices[i].pad = i < targets.size() ? targets[i] : -1;
+    sendChangeMessage();
+}
+
+void DrumsProcessor::auditionSlice (int i)
+{
+    if (breakState.audio == nullptr || i < 0 || i >= static_cast<int> (breakState.slices.size()))
+        return;
+    const auto& s = breakState.slices[static_cast<std::size_t> (i)];
+    if (std::find (previewKeep.begin(), previewKeep.end(), breakState.audio) == previewKeep.end())
+        previewKeep.push_back (breakState.audio);
+    const auto scope = previewFifo.write (1);
+    if (scope.blockSize1 > 0)
+        previews[static_cast<std::size_t> (scope.startIndex1)] = Preview { breakState.audio.get(), s.start, s.end };
+}
+
+void DrumsProcessor::renderPreview (juce::AudioBuffer<float>& buffer, int numSamples) noexcept
+{
+    {
+        const auto scope = previewFifo.read (previewFifo.getNumReady());
+        auto take = [this] (const Preview& p) {
+            previewNow = p;
+            previewPosition = static_cast<double> (p.start);
+            previewFade = 0;
+        };
+        for (int i = 0; i < scope.blockSize1; ++i)
+            take (previews[static_cast<std::size_t> (scope.startIndex1 + i)]);
+        for (int i = 0; i < scope.blockSize2; ++i)
+            take (previews[static_cast<std::size_t> (scope.startIndex2 + i)]);
+    }
+    previewInUse.store (previewNow.audio, std::memory_order_release);
+    const auto* audio = previewNow.audio;
+    if (audio == nullptr || audio->channels.empty() || hostRate <= 0.0)
+        return;
+    // Linear interpolation at the break's own speed, a 2 ms fade in and out, -6 dB.
+    const double step = audio->sampleRate / hostRate;
+    const int fade = std::max (1, static_cast<int> (0.002 * hostRate));
+    const auto end = std::min<std::int64_t> (previewNow.end, audio->numFrames() - 1);
+    for (int i = 0; i < numSamples; ++i)
+    {
+        if (previewPosition >= static_cast<double> (end))
+        {
+            previewNow = {};
+            previewInUse.store (nullptr, std::memory_order_release);
+            return;
+        }
+        const auto k = static_cast<std::size_t> (previewPosition);
+        const auto frac = static_cast<float> (previewPosition - static_cast<double> (k));
+        const double left = (static_cast<double> (end) - previewPosition) / step;
+        const float gain = 0.5f * std::min ({ 1.0f, static_cast<float> (++previewFade) / static_cast<float> (fade), static_cast<float> (left / fade) });
+        for (int c = 0; c < std::min (2, buffer.getNumChannels()); ++c)
+        {
+            const auto& ch = audio->channels[static_cast<std::size_t> (std::min (c, audio->numChannels() - 1))];
+            const float v = ch[k] + (ch[std::min (k + 1, ch.size() - 1)] - ch[k]) * frac;
+            buffer.addSample (c, i, v * gain);
+        }
+        previewPosition += step;
+    }
+}
+
+PadLayer DrumsProcessor::sliceLayer (const drums::BreakSlice& s, int number) const
+{
+    PadLayer layer;
+    layer.sound = breakState.sound;
+    layer.name = "Slice " + std::to_string (number);
+    if (breakState.sound != nullptr && breakState.audio != nullptr)
+    {
+        // The voice reads START/END as fractions of what follows the sound's analysed start.
+        const double rate = breakState.audio->sampleRate;
+        const double startFrame = breakState.sound->startSeconds * rate;
+        const double span = std::max (1.0, static_cast<double> (breakState.audio->numFrames()) - startFrame);
+        layer.params.start = std::clamp ((static_cast<double> (s.start) - startFrame) / span, 0.0, 1.0);
+        layer.params.end = std::clamp ((static_cast<double> (s.end) - startFrame) / span, layer.params.start, 1.0);
+    }
+    return layer;
+}
+
+void DrumsProcessor::applyBreakNow (BreakApply how, juce::String& report)
+{
+    if (how == BreakApply::newKit)
+    {
+        const auto keepName = juce::File (juce::String::fromUTF8 (breakState.sound->filename.c_str())).getFileNameWithoutExtension();
+        resetKit();
+        kitName = keepName.toStdString();
+    }
+    std::array<std::vector<int>, numPads> perPad;
+    for (int i = 0; i < static_cast<int> (breakState.slices.size()); ++i)
+    {
+        const int pad = breakState.slices[static_cast<std::size_t> (i)].pad;
+        if (pad >= 0 && pad < numPads)
+            perPad[index (pad)].push_back (i);
+    }
+    int placed = 0, skipped = 0;
+    for (int p = 0; p < numPads; ++p)
+    {
+        const auto& list = perPad[index (p)];
+        if (list.empty())
+            continue;
+        auto& info = pads[index (p)];
+        const bool empty = info.layers.layers.empty();
+        if (how == BreakApply::emptyPads && ! empty)
+        {
+            skipped += static_cast<int> (list.size());
+            continue;
+        }
+        auto next = empty ? PadLayers {} : info.layers;
+        next.mode = drums::LayerMode::roundRobin;
+        for (int i : list)
+            if (static_cast<int> (next.layers.size()) < drums::maxLayers)
+            {
+                next.layers.push_back (sliceLayer (breakState.slices[static_cast<std::size_t> (i)], i + 1));
+                ++placed;
+            }
+        // A pad that was empty takes its slices' category when they agree.
+        if (empty)
+        {
+            const auto c = breakState.slices[static_cast<std::size_t> (list.front())].category;
+            bool same = c != drums::DrumCategory::unknown;
+            for (int i : list)
+                same = same && breakState.slices[static_cast<std::size_t> (i)].category == c;
+            if (same)
+            {
+                info.category = c;
+                const auto d = drums::PadSettings::defaultsFor (c);
+                info.chokeGroup = d.chokeGroup;
+                info.voiceMode = d.voiceMode;
+                info.trigger = d.trigger;
+            }
+        }
+        latestRequest[index (p)] = nextGeneration.fetch_add (1);
+        info.loading = false;
+        info.error.clear();
+        selectedLayer[index (p)] = 0;
+        setPadLayers (p, next);
+    }
+    publishPadConfig();
+    // The groove: every hit's original timing and its pad (spec 7.13).
+    groove = sessionGroove();
+    report = juce::String (placed) + " slice" + (placed == 1 ? "" : "s") + " placed";
+    if (skipped > 0)
+        report << ", " << skipped << " left in the tray (their pads are not empty)";
+    report << ".";
+}
+
+juce::String DrumsProcessor::applyBreak (BreakApply how)
+{
+    if (breakState.sound == nullptr || breakState.audio == nullptr)
+        return "No break to apply.";
+    auto report = std::make_shared<juce::String>();
+    std::shared_ptr<juce::XmlElement> before (createStateXml (stateTag).release());
+    auto after = std::make_shared<std::shared_ptr<juce::XmlElement>>();
+    const auto grooveBefore = groove;
+    auto grooveAfter = std::make_shared<Groove>();
+    undo.beginNewTransaction ("Apply break");
+    undo.perform (new FunctionAction (
+                      [this, how, after, grooveAfter, report] {
+                          if (*after == nullptr)
+                          {
+                              applyBreakNow (how, *report);
+                              *after = std::shared_ptr<juce::XmlElement> (createStateXml (stateTag).release());
+                              *grooveAfter = groove;
+                          }
+                          else
+                          {
+                              restoreStateXml (**after);
+                              groove = *grooveAfter;
+                          }
+                      },
+                      [this, before, grooveBefore] {
+                          restoreStateXml (*before);
+                          groove = grooveBefore;
+                      }),
+                  "Apply break");
+    breakRequest = nextGeneration.fetch_add (1);
+    breakState = {};
+    sendChangeMessage();
+    return *report;
+}
+
+DrumsProcessor::Groove DrumsProcessor::sessionGroove() const
+{
+    Groove g;
+    if (breakState.sound == nullptr || breakState.audio == nullptr || breakState.slices.empty())
+        return g;
+    g.filename = breakState.sound->filename;
+    g.hash = breakState.sound->contentHash;
+    g.bpm = breakState.bpm > 0.0 ? breakState.bpm : 120.0;
+    const auto first = breakState.slices.front().onset;
+    for (const auto& sl : breakState.slices)
+        g.hits.push_back ({ static_cast<double> (sl.onset - first) / breakState.audio->sampleRate, sl.pad, sl.strength });
+    return g;
+}
+
+bool DrumsProcessor::writeGrooveMidi (const juce::File& file, juce::String& error, const Groove* source) const
+{
+    const auto& g = source != nullptr ? *source : groove;
+    if (g.hits.empty())
+    {
+        error = "There is no groove yet: slice a break and apply it first.";
+        return false;
+    }
+    constexpr int ticks = 960;
+    juce::MidiMessageSequence track;
+    track.addEvent (juce::MidiMessage::tempoMetaEvent (juce::roundToInt (60.0e6 / g.bpm)), 0.0);
+    track.addEvent (juce::MidiMessage::timeSignatureMetaEvent (4, 4), 0.0);
+    track.addEvent (juce::MidiMessage::textMetaEvent (3, juce::String::fromUTF8 (g.filename.c_str())), 0.0);
+    const double perSecond = g.bpm / 60.0 * ticks;
+    for (const auto& h : g.hits)
+    {
+        if (h.pad < 0 || h.pad >= numPads || map.padNote[index (h.pad)] < 0)
+            continue;
+        const int note = map.padNote[index (h.pad)];
+        const auto velocity = static_cast<juce::uint8> (juce::jlimit (1, 127, juce::roundToInt (30.0 + 97.0 * h.strength)));
+        const double at = std::round (h.seconds * perSecond);
+        track.addEvent (juce::MidiMessage::noteOn (10, note, velocity), at);
+        track.addEvent (juce::MidiMessage::noteOff (10, note), at + ticks / 8.0);
+    }
+    track.updateMatchedPairs();
+    juce::MidiFile midi;
+    midi.setTicksPerQuarterNote (ticks);
+    midi.addTrack (track);
+    juce::FileOutputStream out (file);
+    if (! out.openedOk())
+    {
+        error = "Could not write " + file.getFullPathName();
+        return false;
+    }
+    out.setPosition (0);
+    out.truncate();
+    if (! midi.writeTo (out))
+    {
+        error = "Could not write the MIDI file";
+        return false;
+    }
+    return true;
+}
+
 void DrumsProcessor::publishFinishedLoads()
 {
     std::vector<Finished> results;
     std::vector<Found> located;
+    std::vector<BreakLoaded> breaks;
     juce::String report;
     {
         const std::lock_guard<std::mutex> lock (resultsMutex);
         results.swap (finished);
         located.swap (found);
+        breaks.swap (breakLoaded);
         report.swapWith (foundReport);
     }
+    for (auto& b : breaks)
+        if (b.request == breakRequest)
+        {
+            breakState.loading = false;
+            if (b.result.instrument == nullptr || b.result.audio == nullptr)
+            {
+                breakState.error = b.result.error.empty() ? std::string ("The break could not be loaded") : b.result.error;
+                continue;
+            }
+            breakState.sound = b.result.instrument;
+            breakState.audio = b.result.audio;
+            previewKeep.push_back (breakState.audio);
+            breakState.slices = std::move (b.slices);
+            breakState.bpm = drums::estimateTempo (breakState.slices, breakState.audio->sampleRate);
+            suggestBreakPlan();
+            sendChangeMessage();
+        }
     if (report.isNotEmpty())
     {
         relinkReport = report;
@@ -1427,6 +1778,14 @@ void DrumsProcessor::timerCallback()
     publishFinishedLoads();
     for (auto& e : exchange)
         e.collectGarbage();
+    // Preview audio no longer queued, playing or open is let go.
+    if (previewFifo.getNumReady() == 0)
+    {
+        const auto* inUse = previewInUse.load (std::memory_order_acquire);
+        previewKeep.erase (std::remove_if (previewKeep.begin(), previewKeep.end(),
+                                           [this, inUse] (const auto& a) { return a.get() != inUse && a != breakState.audio; }),
+                           previewKeep.end());
+    }
 }
 
 bool DrumsProcessor::waitForLoads (int timeoutMs)
@@ -1437,7 +1796,7 @@ bool DrumsProcessor::waitForLoads (int timeoutMs)
         bool idle = false;
         {
             const std::lock_guard<std::mutex> lock (resultsMutex);
-            idle = finished.empty() && found.empty() && pendingLoads.load() == 0;
+            idle = finished.empty() && found.empty() && breakLoaded.empty() && pendingLoads.load() == 0;
         }
         publishFinishedLoads();
         if (idle)
@@ -1578,6 +1937,21 @@ std::unique_ptr<juce::XmlElement> DrumsProcessor::createStateXml (const char* ta
         slots.add (juce::String (order[index (slot)] + 1));
     root.createNewChildElement ("Order")->setAttribute ("slots", slots.joinIntoString (","));
 
+    if (! groove.hits.empty())
+    {
+        auto* g = root.createNewChildElement ("Groove");
+        g->setAttribute ("filename", juce::String::fromUTF8 (groove.filename.c_str()));
+        g->setAttribute ("hash", juce::String (groove.hash));
+        g->setAttribute ("bpm", groove.bpm);
+        for (const auto& h : groove.hits)
+        {
+            auto* x = g->createNewChildElement ("Hit");
+            x->setAttribute ("seconds", juce::String (h.seconds, 6));
+            x->setAttribute ("pad", h.pad + 1);
+            x->setAttribute ("strength", juce::String (h.strength, 4));
+        }
+    }
+
     auto* view = root.createNewChildElement ("View");
     view->setAttribute ("layout", layoutName (padLayout));
     view->setAttribute ("kitName", juce::String::fromUTF8 (kitName.c_str()));
@@ -1717,6 +2091,16 @@ void DrumsProcessor::restoreStateXml (const juce::XmlElement& rootRef, const juc
         }
         if (valid)
             order = restoredOrder;
+    }
+
+    groove = {};
+    if (auto* g = root->getChildByName ("Groove"))
+    {
+        groove.filename = g->getStringAttribute ("filename").toStdString();
+        groove.hash = g->getStringAttribute ("hash").toStdString();
+        groove.bpm = juce::jlimit (20.0, 400.0, g->getDoubleAttribute ("bpm", 120.0));
+        for (auto* x : g->getChildWithTagNameIterator ("Hit"))
+            groove.hits.push_back ({ x->getDoubleAttribute ("seconds"), x->getIntAttribute ("pad", 0) - 1, juce::jlimit (0.0, 1.0, x->getDoubleAttribute ("strength", 1.0)) });
     }
 
     if (auto* view = root->getChildByName ("View"))

@@ -389,7 +389,12 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       - portable kit export;
       - finding missing samples by content, and relinking.
 
-      Next: break slicing (M6).
+      M6 break slicing (docs/drums/m6-breaks.md):
+      - a multi-band flux slicer, F ≥ 0.95 on 9 of 10 synthetic breaks;
+      - a slice view with a tray, drag to pads, three apply modes;
+      - the groove kept and exported as MIDI.
+
+      Next: smart classification (M7).
 
 ## DONE
 

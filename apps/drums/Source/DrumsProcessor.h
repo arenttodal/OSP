@@ -3,6 +3,7 @@
 #include "InstrumentLoader.h"
 #include "LoadedInstrument.h"
 
+#include "drums/BreakSlicer.h"
 #include "drums/DrumKitEngine.h"
 #include "model/ModelExchange.h"
 
@@ -177,6 +178,66 @@ public:
     void findMissingSamples (const juce::File& folder);
     juce::String relinkReport;
 
+    // Break slicing (spec Part 7) ---------------------------------------------------------
+    /** A break being sliced: one loaded sound (every slice on a pad is a layer of it, its
+        own START/END: no audio is copied), the decoded audio, the slices and the plan. */
+    struct BreakSession
+    {
+        juce::File file;
+        std::shared_ptr<const LoadedInstrument> sound;
+        std::shared_ptr<const AudioData> audio;
+        drums::SliceSettings settings;
+        std::vector<drums::BreakSlice> slices;
+        double bpm = 0.0;
+        bool loading = false;
+        std::string error;
+        bool open() const noexcept { return loading || sound != nullptr || ! error.empty(); }
+    };
+    const BreakSession& breakSession() const noexcept { return breakState; }
+    /** Loads and slices a break (background); the session opens at once (loading). */
+    void importBreak (const juce::File& file);
+    void closeBreak();
+    /** Slices again with new settings (the plan is kept for slices that survive). Undoable. */
+    void resliceBreak (const drums::SliceSettings& settings);
+    /** Any edit of the slices or the plan (boundaries, pads, categories). Undoable. */
+    void editBreakSlices (const std::vector<drums::BreakSlice>& slices, const juce::String& actionName, bool newTransaction = true);
+    /** The default plan: the slices, in order, onto the empty pads (all pads for a new kit);
+        the rest stay in the tray. */
+    void suggestBreakPlan (bool forNewKit = false);
+    /** Plays one slice of the break (lock-free preview, independent of the pads). */
+    void auditionSlice (int index);
+    enum class BreakApply
+    {
+        newKit,      ///< a new kit from the break
+        emptyPads,   ///< only into pads that hold nothing (others are left alone, reported)
+        merge        ///< into the kit: empty pads get the slices, others get them as round robins
+    };
+    /** Puts the planned slices on their pads (several on one pad: round robin), keeps the
+        groove, closes the session. One undo step. Returns a short report. */
+    juce::String applyBreak (BreakApply how);
+    /** The layer that plays slice `s` of the session's sound (START/END fractions). */
+    PadLayer sliceLayer (const drums::BreakSlice& s, int number) const;
+
+    /** The last applied break's groove (original timing, spec 7.13), saved with the kit. */
+    struct GrooveHit
+    {
+        double seconds = 0.0;   ///< from the first hit
+        int pad = -1;
+        double strength = 1.0;
+    };
+    struct Groove
+    {
+        std::string filename, hash;
+        double bpm = 120.0;
+        std::vector<GrooveHit> hits;
+    };
+    Groove groove;
+    /** The groove as a MIDI file: each hit on its pad's PAD-mode note, velocity from its
+        strength, at the groove's tempo. */
+    bool writeGrooveMidi (const juce::File& file, juce::String& error, const Groove* source = nullptr) const;
+    /** The open break's groove as planned now (before applying it). */
+    Groove sessionGroove() const;
+
     /** Mouse audition of one layer (lock-free; plays it alone, at the pad's settings). */
     void auditionLayer (int pad, int layer, int velocity);
     /** The layer the pad's last hit played (display; -1 before any). */
@@ -295,6 +356,36 @@ private:
     };
     std::vector<Found> found;   // loader -> message thread (resultsMutex)
     juce::String foundReport;
+
+    // Break session (message thread) and its loader hand-over
+    BreakSession breakState;
+    std::uint64_t breakRequest = 0;
+    struct BreakLoaded
+    {
+        std::uint64_t request = 0;
+        plugin::LoadResult result;
+        std::vector<drums::BreakSlice> slices;
+    };
+    std::vector<BreakLoaded> breakLoaded;   // resultsMutex
+    void setBreakSlices (const std::vector<drums::BreakSlice>& slices);
+    void applyBreakNow (BreakApply how, juce::String& report);
+
+    // Slice preview (message -> audio): a region of a decoded break, lock-free
+    struct Preview
+    {
+        const AudioData* audio = nullptr;
+        std::int64_t start = 0, end = 0;
+    };
+    juce::AbstractFifo previewFifo { 16 };
+    std::array<Preview, 16> previews {};
+    std::vector<std::shared_ptr<const AudioData>> previewKeep;   // alive while queued or playing
+    std::atomic<const AudioData*> previewInUse { nullptr };
+    // Audio thread
+    Preview previewNow;
+    double previewPosition = 0.0;
+    int previewFade = 0;
+    void renderPreview (juce::AudioBuffer<float>& buffer, int numSamples) noexcept;
+    double hostRate = 48000.0;
     void publishLayers (int pad);
     void publishPadConfig();
     void pullSettings() noexcept;          // audio thread

@@ -1,5 +1,14 @@
 # ANDOR Drums — version history
 
+## 0.1.5 (unreleased, branch drum-plugin): break slicing
+
+- **BREAK:** drop a break and SLICE BREAK opens. Its markers can be moved, added and
+  deleted, and its sensitivity and minimum gap adjusted. Every slice can be heard.
+- **The slice tray:** drag slices onto pads, or assign them; set categories.
+- **Apply:** as a new kit, into the empty pads, or merged as round robins. It is undoable.
+- **No audio is copied:** each slice is a region of the one break.
+- **The groove as MIDI:** drag it into the DAW or save it. It is kept with the kit.
+
 ## 0.1.4 (unreleased, branch drum-plugin): kits
 
 - **Duplicate to** on every pad's menu: copies the layers, name and settings, and keeps the

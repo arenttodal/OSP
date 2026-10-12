@@ -107,6 +107,9 @@ part moves out with tests for both products (CLAUDE.md Rule 6).
 | Parameter IDs | OSP's (unchanged) | `keyboardMode`, `kit.*`, `padN.{gain,pan,tune,mute,solo}` |
 | Version | 0.1.0 | 0.1.0 (own history in docs/drums/CHANGELOG.md) |
 
+A `<Groove>` element keeps the last applied break's timing (`m6-breaks.md`). It is
+additive, so the schema stays 3.
+
 Kit files (`.andorkit`, root `AndorDrumsKit`, `kitSchemaVersion` 1) carry the same
 children as the session state. Portable kits add `kitPath` per sound
 (`m2-kits.md`).

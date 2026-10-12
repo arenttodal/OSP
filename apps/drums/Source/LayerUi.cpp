@@ -3,6 +3,8 @@
 #include "CeramicSkin.h"
 #include "DrumsLook.h"
 
+#include <juce_audio_formats/juce_audio_formats.h>
+
 namespace osp::drumsplugin
 {
 
@@ -52,12 +54,29 @@ void offerLayerDrop (DrumsProcessor& proc, int pad, const juce::Array<juce::File
         return;
     const bool populated = ! proc.padLayers (pad).layers.empty();
     const auto fallback = preferred.value_or (defaultLayerDrop (files.size()));
-    if ((! populated && files.size() == 1) || target == nullptr || target->getPeer() == nullptr)
+    // A single long recording might be a break: then offer slicing it too.
+    bool longFile = false;
+    if (files.size() == 1)
+    {
+        juce::AudioFormatManager formats;
+        formats.registerBasicFormats();
+        if (std::unique_ptr<juce::AudioFormatReader> reader { formats.createReaderFor (files[0]) })
+            longFile = reader->sampleRate > 0.0 && static_cast<double> (reader->lengthInSamples) / reader->sampleRate > 1.5;
+    }
+    if ((! populated && files.size() == 1 && ! longFile) || target == nullptr || target->getPeer() == nullptr)
     {
         proc.addPadLayers (pad, files, fallback);
         return;
     }
     juce::PopupMenu m;
+    if (! populated && files.size() == 1)
+    {
+        m.addSectionHeader (files[0].getFileName());
+        m.addItem ("Load onto " + proc.padDisplayName (pad).toUpperCase(), true, true, [&proc, pad, files] { proc.addPadLayers (pad, files, LayerDrop::replace); });
+        m.addItem ("Slice as a break...", [&proc, file = files[0]] { proc.importBreak (file); });
+        m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (target));
+        return;
+    }
     const auto what = files.size() == 1 ? juce::String ("1 file") : juce::String (files.size()) + " files";
     m.addSectionHeader (what + " onto " + proc.padDisplayName (pad).toUpperCase());
     auto add = [&] (const juce::String& text, LayerDrop how) {
@@ -69,6 +88,8 @@ void offerLayerDrop (DrumsProcessor& proc, int pad, const juce::Array<juce::File
     add (verb + "a stack (all together)", LayerDrop::stack);
     if (populated)
         add (files.size() == 1 ? "Replace the pad's sample" : "Replace the pad's samples", LayerDrop::replace);
+    if (longFile)
+        m.addItem ("Slice as a break...", [&proc, file = files[0]] { proc.importBreak (file); });
     m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (target));
 }
 

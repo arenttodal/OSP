@@ -40,7 +40,12 @@ branch.
 - [ ] **M5 GUI** (V1.1 layout done: pads on top, equal 2x4 / 3x3 cells, selected-pad
       editor, AMP envelope, effects, kit macros, resizable 0.7-1.5x). Open: Blender knob,
       per-pad modulation sources, a 1x8 pad strip if the mockup's single row is wanted.
-- [ ] **M6 Break slicing** (reuse `src/library/Slicer`, onset analysis).
+- [x] **M6 Break slicing** (`m6-breaks.md`). Done:
+      - a multi-band spectral-flux slicer, validated on a synthetic collection;
+      - SLICE BREAK view: markers, edits, audition, tray, drag to pads;
+      - apply as a new kit, into empty pads, or merged;
+      - slices are non-destructive layers of one sound;
+      - the groove is kept and exported as MIDI.
 - [ ] **M7 Smart classification** (reuse `src/library/Classifier`; licence review before
       any model weights).
 - [ ] **M8 Integration and polish** (portable kits, MIDI Learn, automation, profiling on a

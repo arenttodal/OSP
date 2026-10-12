@@ -1,5 +1,6 @@
 #pragma once
 
+#include "BreakView.h"
 #include "CeramicSkin.h"
 #include "DrumsProcessor.h"
 #include "KeyMapEditor.h"
@@ -137,8 +138,22 @@ private:
     LabelledKnob attack, decay, sustain, release;
 };
 
+/** BREAK in the top bar: click to choose a break, or drop one on it. */
+class BreakButton final : public ceramic::KeyButton, public juce::FileDragAndDropTarget
+{
+public:
+    using ceramic::KeyButton::KeyButton;
+    bool isInterestedInFileDrag (const juce::StringArray& files) override { return files.size() == 1 && isAudioFileName (files[0]); }
+    void filesDropped (const juce::StringArray& files, int, int) override
+    {
+        if (onFile && ! files.isEmpty())
+            onFile (juce::File (files[0]));
+    }
+    std::function<void (const juce::File&)> onFile;
+};
+
 /** Everything inside the window, laid out once at the base size and scaled as a whole. */
-class DrumsContent final : public juce::Component, private juce::Timer, private juce::ChangeListener
+class DrumsContent final : public juce::Component, public juce::DragAndDropContainer, private juce::Timer, private juce::ChangeListener
 {
 public:
     static constexpr int baseWidth = 1536;
@@ -160,6 +175,9 @@ public:
     PadGrid& padGrid() noexcept { return grid; }
     KeyMapEditor& keyMapEditor() noexcept { return keyMap; }
     SamplePanel& samplePanel() noexcept { return sample; }
+    BreakView& breakView() noexcept { return breaks; }
+    void openBreakDialog();
+    void syncBreakView();
     void openLoadDialog (int pad);
     /** Brings the mode switches, undo state and labels in line with the processor now. */
     void refreshModeBar();
@@ -193,6 +211,8 @@ private:
     std::array<float, 4> effectMemory { 0.3f, 0.3f, 0.3f, 0.3f };
     std::array<LabelledKnob, 3> macros;    // LIFE, DYNAMICS, CHARACTER
     KeyMapEditor keyMap;
+    BreakView breaks;
+    BreakButton breakButton { "BREAK", 0.7f };
     std::unique_ptr<juce::FileChooser> chooser;
     bool lastExpanded = false;
 };
