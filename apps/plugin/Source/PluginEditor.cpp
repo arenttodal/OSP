@@ -490,6 +490,9 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     content.addAndMakeVisible (advancedButton);
     arpButton.onToggleEditor = [this] { setArpExpanded (! arpShown); };
     arpPanel.onCollapse = [this] { setArpExpanded (false); };
+    arpPanel.onOctavesMenu = [this] {
+        modOverlay.contextMenu ("arp.octaves").showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&arpPanel));
+    };
     content.addAndMakeVisible (arpButton);
     content.addChildComponent (arpPanel);
     arpShown = ospProcessor.arpEditorExpanded();
@@ -571,6 +574,7 @@ void OspAudioProcessorEditor::openLibrary (LibraryPanel::View view)
                 safe->timerCallback();
             }
         };
+        libraryPanel->getProperties().set ("modCover", true);   // the halos stay under it
         content.addAndMakeVisible (*libraryPanel);
     }
     placeLibrary();
@@ -1415,7 +1419,7 @@ void OspAudioProcessorEditor::selectModulation (int source, int slot)
     // halos emphasise its routes (the chosen one most), an open routes popover marks the row.
     modSelSource = source;
     modSelSlot = slot;
-    if (source >= 0 && source < 4 && modPanel.tab() != 0 && modPanel.selectedSource() != source)   // the wheel has no tab
+    if (modui::tabOfSource (source) > 0 && modPanel.tab() != 0 && modPanel.selectedSource() != source)   // the wheel, ENV 2, the controllers: no tab
         modPanel.showTab (modui::tabOfSource (source));
     modOverlay.setSelection (modSelSource, modSelSlot);
     if (auto* routes = dynamic_cast<ModRoutesPopup*> (popup.get()))

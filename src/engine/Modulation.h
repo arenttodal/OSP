@@ -23,6 +23,12 @@ namespace osp::mod
                      envelope"): every note-on restarts it from where it is, it releases
                      when the last key (and the sustain pedal) lets go.
       MOD WHEEL      MIDI CC 1 (and the on-screen wheel), 0..1, smoothed over ~10 ms.
+      VEL, NOTE      per note: the note-on velocity / the sounding MIDI note through its
+                     curve (Settings::velCurve, noteCurve), fixed for the note's life. The
+                     shared stages hear the most recently pressed input key's.
+      CC 1-4         four MIDI controller slots (the plugin chooses their numbers), 0..1,
+                     smoothed like the wheel.
+      PRESSURE       channel pressure (aftertouch), 0..1, smoothed like the wheel.
 
     Destinations have an owner:
       global  shared stages (the macros, each layer's EQ): one value for the instrument, so
@@ -53,9 +59,20 @@ enum class Source : std::uint8_t
     lfo2,
     env1,
     env2,
-    modWheel   ///< appended (the route's choice order is saved)
+    modWheel,  ///< appended (the route's choice order is saved)
+    // Appended (final modulation system): per note, then global controllers.
+    vel,
+    note,
+    cc1, cc2, cc3, cc4,
+    pressure
 };
-constexpr int sourceCount = 5;   ///< lfo1 .. modWheel
+constexpr int sourceCount = 12;   ///< lfo1 .. pressure
+constexpr int ccSlots = 4;
+/** Where the sources sit in a value array (sourceIndex). */
+namespace slot
+{
+    constexpr int lfo1 = 0, lfo2 = 1, env1 = 2, env2 = 3, modWheel = 4, vel = 5, note = 6, cc1 = 7, pressure = 11;
+}
 inline int sourceIndex (Source s) noexcept { return static_cast<int> (s) - 1; }
 const char* sourceName (Source s) noexcept;   ///< "LFO 1", "ENV 2"
 
@@ -123,6 +140,30 @@ struct Curve
 };
 Curve defaultLfoCurve() noexcept;   ///< a soft rise and fall
 Curve defaultEnvCurve() noexcept;   ///< a falling sweep
+Curve straightCurve() noexcept;     ///< 0 -> 1, straight (VEL's and NOTE's default)
+
+/** VEL's and NOTE's starting shapes. SOFT, LINEAR and HARD are exactly DYNAMICS' velocity
+    curves (gamma 0.6, 1, 1.7: one segment, its tension the gamma's). */
+enum class CurvePreset : std::uint8_t
+{
+    linear,
+    soft,
+    hard,
+    exponential,
+    inverted,
+    flat,
+    // NOTE's own (over the keys)
+    lowToHigh,
+    highToLow,
+    highOnly,
+    lowOnly,
+    midEmphasis
+};
+constexpr int curvePresetCount = 11;
+Curve presetCurve (CurvePreset preset) noexcept;
+const char* curvePresetName (CurvePreset preset) noexcept;
+/** The preset a curve is (exactly), or -1: edited. */
+int matchingPreset (const Curve& curve) noexcept;
 CurveTable compileCurve (const Curve& curve) noexcept;
 
 struct LfoSettings
@@ -183,6 +224,13 @@ enum class Dest : std::uint8_t
     env2Attack, env2Decay, env2Sustain, env2Release,
     // Meta-modulation: the depth of another route (Route::target), not a parameter.
     routeDepth,
+    // The arpeggiator (shared: one clock for the instrument). RATE in octaves of speed,
+    // OCTAVES in octaves of range (quantised), the rest in their own fraction.
+    arpRate, arpGate, arpSwing, arpOctaves, arpVelocity,
+    // Each layer's DAMPEN (per voice): AMOUNT, Soft Shelf's corner, Low-Pass's minimum.
+    dampenAmountA, dampenAmountB, dampenAmountC,
+    dampenShelfA, dampenShelfB, dampenShelfC,
+    dampenCutoffA, dampenCutoffB, dampenCutoffC,
     count
 };
 constexpr int destCount = static_cast<int> (Dest::count);
@@ -255,6 +303,11 @@ struct Settings
     std::array<Route, maxRoutes> routes {};
     std::array<CurveTable, 2> lfoCurve {};   ///< LFO custom shapes
     std::array<CurveTable, 2> envCurve {};   ///< envelope one-shot curves
+    CurveTable velCurve {};                  ///< VEL: velocity / 127 -> value (default straight)
+    CurveTable noteCurve {};                 ///< NOTE: MIDI note / 127 -> value (default straight)
+    /** APPLY TO AMP: the VEL curve sets a note's amplitude velocity (in place of DYNAMICS'
+        SOFT / LINEAR / HARD; never both). */
+    bool velocityToAmp = false;
     std::uint64_t seed = 1;
 
     Settings();
@@ -420,6 +473,9 @@ struct Runtime
     int heldNotes = 0;          ///< keys held (a global RETRIGGER LFO restarts after silence)
     bool pedal = false;
     float modWheelTarget = 0.0f, modWheelNow = 0.0f;
+    std::array<float, ccSlots> ccTarget {}, ccNow {};
+    float pressureTarget = 0.0f, pressureNow = 0.0f;
+    int inputNote = 60, inputVelocity = 100;   ///< the shared stages' VEL and NOTE (setInputNote)
     /** The layers' LEVEL (dB) and TUNE (semitones) knobs: a route takes them to their ends,
         never past (the engine keeps them current while routes run). */
     std::array<double, 3> layerLevelDb {}, layerTuneSemitones {};
@@ -436,6 +492,17 @@ struct Runtime
     void setPedal (bool down) noexcept;
     void allNotesOff() noexcept;
     void setModWheel (float value) noexcept { modWheelTarget = value < 0.0f ? 0.0f : (value > 1.0f ? 1.0f : value); }
+    /** A CC slot's controller moved (0..1); channel pressure (0..1). */
+    void setController (int slotIndex, float value) noexcept;
+    void setPressure (float value) noexcept;
+    /** The input key the shared stages' VEL and NOTE follow (the most recently pressed: the
+        player's key, before an arpeggiator). Velocity 1..127. */
+    void setInputNote (int note, int velocity) noexcept;
+    /** A note's raw (uncurved) velocity as it starts (voices take it for their VEL). */
+    int noteVelocity = 100;
+    /** VEL's and NOTE's values for a note (through their curves). */
+    float velocityValue (int velocity) const noexcept;
+    float noteValue (int note) const noexcept;
     void setTiming (const HostTiming& timing) noexcept;
 
     /** An envelope's settings for a note starting now, its times moved by the routes to them
@@ -465,6 +532,10 @@ struct VoiceState
     std::array<EnvSettings, 2> envNow {};       ///< this note's envelope settings (times taken at its start)
     std::array<float, sourceCount> values {};   ///< global and this voice's sources, now
 
+    int note = 60;          ///< the sounding note (NOTE)
+    int velocity = 100;     ///< its raw note-on velocity (VEL)
+
+    /** Starts this note's sources (`note`, `velocity` set first: they hold for its life). */
     void start (const Runtime& runtime) noexcept;
     void release (const Runtime& runtime) noexcept;
     /** Advances this voice's sources by `seconds` and gathers every source's value. */

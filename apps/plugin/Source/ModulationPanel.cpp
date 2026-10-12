@@ -1,5 +1,6 @@
 #include "ModulationPanel.h"
 
+#include "ArpSection.h"
 #include "EngineCard.h"
 #include "OspLookAndFeel.h"
 
@@ -18,7 +19,9 @@ namespace
         return *ranged;
     }
 
-    const std::array<const char*, 5> sourceLabels { "LFO 1", "LFO 2", "ENV 1", "ENV 2", "MOD WHEEL" };
+    // ENV is today's ENV 1; ENV 2 has no tab any more (its routes still play).
+    const std::array<const char*, mod::sourceCount> sourceLabels { "LFO 1", "LFO 2", "ENV", "ENV 2 (legacy)", "MOD WHEEL", "VEL", "NOTE",
+                                                                   "CC 1", "CC 2", "CC 3", "CC 4", "PRESSURE" };
 
     juce::String sourceParameter (int source, const juce::String& name)
     {
@@ -74,7 +77,8 @@ namespace
     const juce::StringArray& destinationParameters()
     {
         static const juce::StringArray ids = [] {
-            juce::StringArray list { "life", "drive", "character", "motion", "space", "echo", "character.resonance", "attack", "decay", "sustainLevel", "release" };
+            juce::StringArray list { "life", "drive", "character", "motion", "space", "echo", "character.resonance", "attack", "decay", "sustainLevel", "release",
+                                     "arp.rate", "arp.gate", "arp.swing", "arp.octaves", "arp.velocity" };
             for (int e = 0; e < 2; ++e)
                 for (const char* name : { "attack", "decay", "sustain", "release" })
                     list.add (OspAudioProcessor::modEnvId (e, name));
@@ -85,6 +89,8 @@ namespace
                     list.add (OspAudioProcessor::layerParameterId (l, name));
                 for (const char* name : { "bell.frequency", "bell.gain", "lowShelf.gain", "highShelf.gain" })
                     list.add (OspAudioProcessor::eqParameterId (l, name));
+                for (const char* name : { "amount", "frequency", "cutoff" })
+                    list.add (OspAudioProcessor::dampenParameterId (l, name));
             }
             return list;
         }();
@@ -103,15 +109,19 @@ namespace modui
 {
     juce::Colour sourceColour (int source)
     {
-        // ... and the MOD WHEEL a warm graphite (the wheel's own material).
-        static const std::array<juce::Colour, 5> colours { juce::Colour (0xff7f9a7a), juce::Colour (0xff7189a3), juce::Colour (0xffc49548),
-                                                           juce::Colour (0xffb06a4f), juce::Colour (0xff8c7f72) };
-        return colours[static_cast<std::size_t> (juce::jlimit (0, 4, source))];
+        // ... the MOD WHEEL a warm graphite (the wheel's own material); VEL a dusty rose,
+        // NOTE a slate teal (the keys); the CC slots and PRESSURE quiet controller tones.
+        static const std::array<juce::Colour, mod::sourceCount> colours {
+            juce::Colour (0xff7f9a7a), juce::Colour (0xff7189a3), juce::Colour (0xffc49548), juce::Colour (0xffb06a4f), juce::Colour (0xff8c7f72),
+            juce::Colour (0xffb8798c), juce::Colour (0xff5f8e94),
+            juce::Colour (0xff9a8a6a), juce::Colour (0xff8a7f98), juce::Colour (0xff7d9184), juce::Colour (0xff9c7f74), juce::Colour (0xffa0785c)
+        };
+        return colours[static_cast<std::size_t> (juce::jlimit (0, mod::sourceCount - 1, source))];
     }
 
     const char* sourceLabel (int source)
     {
-        return sourceLabels[static_cast<std::size_t> (juce::jlimit (0, 4, source))];
+        return sourceLabels[static_cast<std::size_t> (juce::jlimit (0, mod::sourceCount - 1, source))];
     }
 
     juce::String routeTitle (const OspAudioProcessor& p, const OspAudioProcessor::ModRouteInfo& info, bool withSource)
@@ -133,15 +143,103 @@ namespace modui
 
     int sourceOfTab (int tab) noexcept
     {
-        // AMP, ENV 1, ENV 2, LFO 1, LFO 2 on screen; the sources' order is LFO 1, LFO 2, ENV 1, ENV 2.
-        static constexpr std::array<int, tabCount> map { -1, 2, 3, 0, 1 };
+        // AMP, ENV, LFO 1, LFO 2, VEL, NOTE on screen; the sources' order is LFO 1, LFO 2,
+        // ENV 1, ENV 2, MOD WHEEL, VEL, NOTE, ...
+        static constexpr std::array<int, tabCount> map { -1, mod::slot::env1, mod::slot::lfo1, mod::slot::lfo2, mod::slot::vel, mod::slot::note };
         return map[static_cast<std::size_t> (std::clamp (tab, 0, tabCount - 1))];
     }
 
     int tabOfSource (int source) noexcept
     {
-        static constexpr std::array<int, 5> map { 3, 4, 1, 2, 0 };   // the wheel has no tab (AMP)
-        return source < 0 ? 0 : map[static_cast<std::size_t> (std::min (source, 3))];
+        for (int t = 1; t < tabCount; ++t)
+            if (sourceOfTab (t) == source)
+                return t;
+        return 0;   // the wheel, ENV 2, the controllers: no tab (AMP stays)
+    }
+
+    int migratedTab (int oldTab) noexcept
+    {
+        // AMP, ENV 1, ENV 2, LFO 1, LFO 2 -> AMP, ENV, ENV, LFO 1, LFO 2.
+        static constexpr std::array<int, 5> map { 0, 1, 1, 2, 3 };
+        return map[static_cast<std::size_t> (std::clamp (oldTab, 0, 4))];
+    }
+
+    int keyCurveIndex (int source) noexcept
+    {
+        return source == mod::slot::vel ? 4 : (source == mod::slot::note ? 5 : -1);
+    }
+
+    std::vector<int> menuSources (const OspAudioProcessor& p, bool forDepth)
+    {
+        bool env2 = false;
+        for (const auto& r : p.modulationRoutes())
+            env2 = env2 || r.route.source == mod::Source::env2;
+        std::vector<int> out;
+        if (! forDepth)
+            out.push_back (mod::slot::modWheel);
+        for (const int s : { mod::slot::lfo1, mod::slot::lfo2, mod::slot::env1 })
+            out.push_back (s);
+        if (env2)
+            out.push_back (mod::slot::env2);
+        if (forDepth)
+            out.push_back (mod::slot::modWheel);
+        for (int s = mod::slot::vel; s < mod::sourceCount; ++s)
+            out.push_back (s);
+        return out;
+    }
+
+    juce::String controllerName (int controller)
+    {
+        static const std::array<std::pair<int, const char*>, 13> names { { { 1, "Mod Wheel" }, { 2, "Breath" }, { 4, "Foot" }, { 5, "Portamento" },
+                                                                             { 7, "Volume" }, { 8, "Balance" }, { 10, "Pan" }, { 11, "Expression" },
+                                                                             { 16, "General 1" }, { 17, "General 2" }, { 18, "General 3" },
+                                                                             { 19, "General 4" }, { 64, "Sustain" } } };
+        auto text = "CC " + juce::String (controller);
+        for (const auto& [number, name] : names)
+            if (number == controller)
+                text << " " << name;
+        return text;
+    }
+
+    juce::String menuLabel (const OspAudioProcessor& p, int source)
+    {
+        juce::String label (sourceLabel (source));
+        if (source >= mod::slot::cc1 && source < mod::slot::cc1 + mod::ccSlots)
+        {
+            const int slot = source - mod::slot::cc1;
+            label << " (" << (p.learningModController() == slot ? juce::String::fromUTF8 ("learning\xe2\x80\xa6") : controllerName (p.modControllerNumber (slot))) << ")";
+        }
+        return label;
+    }
+
+    juce::PopupMenu controllerMenu (OspAudioProcessor& p)
+    {
+        juce::PopupMenu menu;
+        menu.addSectionHeader ("CC SOURCES FOLLOW");
+        for (int slot = 0; slot < mod::ccSlots; ++slot)
+        {
+            juce::PopupMenu items;
+            const int current = p.modControllerNumber (slot);
+            const bool learning = p.learningModController() == slot;
+            items.addItem (learning ? juce::String::fromUTF8 ("Learning: move a controller\xe2\x80\xa6") : juce::String ("Learn (move a controller)"), true, learning,
+                           [&p, slot, learning] { p.learnModController (learning ? -1 : slot); });
+            items.addSeparator();
+            for (const int cc : { 1, 2, 4, 7, 11, 16, 17, 18, 19, 64 })
+                items.addItem (controllerName (cc), true, cc == current, [&p, slot, cc] { p.setModControllerNumber (slot, cc); });
+            // Any controller by number (120-127 are channel-mode messages, not controllers).
+            juce::PopupMenu any;
+            for (int from = 0; from < 120; from += 20)
+            {
+                juce::PopupMenu range;
+                for (int cc = from; cc < from + 20; ++cc)
+                    range.addItem (controllerName (cc), true, cc == current, [&p, slot, cc] { p.setModControllerNumber (slot, cc); });
+                any.addSubMenu ("CC " + juce::String (from) + juce::String::fromUTF8 ("\xe2\x80\x93") + juce::String (from + 19), range, true,
+                                nullptr, current >= from && current < from + 20);
+            }
+            items.addSubMenu ("Other", any);
+            menu.addSubMenu (menuLabel (p, mod::slot::cc1 + slot), items);
+        }
+        return menu;
     }
 
     juce::Colour sourceOnDark (int source)
@@ -160,6 +258,11 @@ namespace modui
         if (id == "motion") return Dest::movement;
         if (id == "space") return Dest::space;
         if (id == "echo") return Dest::echo;
+        if (id == "arp.rate") return Dest::arpRate;
+        if (id == "arp.gate") return Dest::arpGate;
+        if (id == "arp.swing") return Dest::arpSwing;
+        if (id == "arp.octaves") return Dest::arpOctaves;
+        if (id == "arp.velocity") return Dest::arpVelocity;
         for (int e = 0; e < 2; ++e)
         {
             const auto first = e == 0 ? Dest::env1Attack : Dest::env2Attack;
@@ -188,13 +291,16 @@ namespace modui
             if (id == OspAudioProcessor::eqParameterId (l, "bell.gain")) return offsetDest (Dest::eqBellGainA, l);
             if (id == OspAudioProcessor::eqParameterId (l, "lowShelf.gain")) return offsetDest (Dest::eqLowShelfGainA, l);
             if (id == OspAudioProcessor::eqParameterId (l, "highShelf.gain")) return offsetDest (Dest::eqHighShelfGainA, l);
+            if (id == OspAudioProcessor::dampenParameterId (l, "amount")) return offsetDest (Dest::dampenAmountA, l);
+            if (id == OspAudioProcessor::dampenParameterId (l, "frequency")) return offsetDest (Dest::dampenShelfA, l);
+            if (id == OspAudioProcessor::dampenParameterId (l, "cutoff")) return offsetDest (Dest::dampenCutoffA, l);
         }
         return Dest::none;
     }
 
     bool isPerVoice (const OspAudioProcessor& p, int source)
     {
-        if (source == 2 || source == 3)
+        if (source == mod::slot::env1 || source == mod::slot::env2 || source == mod::slot::vel || source == mod::slot::note)
             return true;
         return source >= 0 && source < 2 && p.parameterValue (OspAudioProcessor::modLfoId (source, "scope")) >= 0.5f;
     }
@@ -240,6 +346,8 @@ void ModCurveView::setSource (int s)
 
 bool ModCurveView::isEditable() const
 {
+    if (isKey())
+        return true;   // VEL's and NOTE's curve is all they are
     if (sourceIndex < 2)
         return juce::roundToInt (ospProcessor.parameterValue (OspAudioProcessor::modLfoId (sourceIndex, "shape"))) == static_cast<int> (mod::LfoShape::custom);
     return ospProcessor.parameterValue (OspAudioProcessor::modEnvId (sourceIndex - 2, "mode")) >= 0.5f;
@@ -310,7 +418,12 @@ void ModCurveView::refresh()
     // Repaint only when what is drawn changed: the sourceIndex's settings, its curve, the playhead.
     std::array<float, 24> signature {};
     std::size_t n = 0;
-    if (sourceIndex < 2)
+    if (isKey())
+    {
+        signature[n++] = static_cast<float> (sourceIndex);
+        signature[n++] = ospProcessor.velocityAppliesToAmp() ? 1.0f : 0.0f;
+    }
+    else if (sourceIndex < 2)
         for (const char* name : { "shape", "rate", "sync", "division", "phase", "polarity", "mode", "scope" })
             signature[n++] = ospProcessor.parameterValue (OspAudioProcessor::modLfoId (sourceIndex, name));
     else
@@ -329,8 +442,22 @@ void ModCurveView::refresh()
         }
     }
     const auto view = ospProcessor.modulationView();
-    float playhead = -1.0f;   // LFO: its phase; envelope: stage x 100 + seconds in the stage
-    if (sourceIndex < 2)
+    float playhead = -1.0f;   // LFO: its phase; envelope: stage x 100 + seconds in the stage; VEL / NOTE: the last note's
+    if (isKey())
+    {
+        // The marker: the last note's velocity or key on the curve.
+        int last = -1;
+        if (sourceIndex == mod::slot::vel)
+        {
+            const int count = ospProcessor.velocityCount.load (std::memory_order_acquire);
+            if (count > 0)
+                last = ospProcessor.recentVelocity[static_cast<std::size_t> ((count - 1) % OspAudioProcessor::velocityHistory)].load (std::memory_order_relaxed);
+        }
+        else
+            last = ospProcessor.lastPlayedNote.load (std::memory_order_relaxed);
+        playhead = last >= 0 ? static_cast<float> (last) / 127.0f : -1.0f;
+    }
+    else if (sourceIndex < 2)
     {
         if (! isPolySource (ospProcessor, sourceIndex) || view.voice)
             playhead = view.lfoPhase[static_cast<std::size_t> (sourceIndex)];
@@ -340,7 +467,9 @@ void ModCurveView::refresh()
         const auto i = static_cast<std::size_t> (sourceIndex - 2);
         playhead = view.envStage[i] >= 1 && view.envStage[i] <= 4 ? static_cast<float> (view.envStage[i]) * 100.0f + view.envTime[i] : -1.0f;
     }
-    const float value = view.value[static_cast<std::size_t> (sourceIndex)];
+    float value = view.value[static_cast<std::size_t> (sourceIndex)];
+    if (isKey())
+        value = playhead >= 0.0f ? static_cast<float> (mod::curveAt (mod::compileCurve (curve), playhead)) : 0.0f;
     if (changed || std::abs (playhead - shownPlayhead) > 1.0e-4f || std::abs (value - shownValue) > 1.0e-4f)
     {
         shownPlayhead = playhead;
@@ -371,7 +500,9 @@ void ModCurveView::paint (juce::Graphics& g)
         g.fillRect (juce::Rectangle<float> (plot.getX(), y - 0.5f, plot.getWidth(), 1.0f));
     }
 
-    if (sourceIndex < 2)
+    if (isKey())
+        paintKey (g, plot, colour);
+    else if (sourceIndex < 2)
         paintLfo (g, plot, colour);
     else
         paintEnvelope (g, plot, colour);
@@ -577,6 +708,75 @@ void ModCurveView::paintEnvelope (juce::Graphics& g, juce::Rectangle<float> plot
     }
 }
 
+void ModCurveView::paintKey (juce::Graphics& g, juce::Rectangle<float> plot, juce::Colour colour)
+{
+    using namespace design;
+    // The curve over the velocities (0..127) or the keys (C0..C8 marked), its value 0..1.
+    const bool vel = sourceIndex == mod::slot::vel;
+    const auto table = mod::compileCurve (curve);
+    juce::Path line, fill;
+    for (int i = 0; i <= 200; ++i)
+    {
+        const float x = static_cast<float> (i) / 200.0f;
+        const auto p = toScreen (x, static_cast<float> (mod::curveAt (table, x)));
+        if (i == 0)
+        {
+            line.startNewSubPath (p);
+            fill.startNewSubPath (p.x, plot.getBottom());
+        }
+        else
+            line.lineTo (p);
+        fill.lineTo (p);
+    }
+    fill.lineTo (plot.getRight(), plot.getBottom());
+    fill.closeSubPath();
+    g.setGradientFill (juce::ColourGradient (colour.withAlpha (0.30f), 0.0f, plot.getY(), colour.withAlpha (0.04f), 0.0f, plot.getBottom(), false));
+    g.fillPath (fill);
+    g.setColour (colour);
+    g.strokePath (line, juce::PathStrokeType (1.8f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+
+    const auto top = compact ? getLocalBounds().toFloat().reduced (12.0f, 0.0f).withY (2.0f).withHeight (15.0f)
+                             : getLocalBounds().toFloat().reduced (18.0f, 0.0f).withHeight (36.0f);
+    g.setFont (type::popupLabel (compact ? 10.5f : 12.5f));
+    g.setColour (colour);
+    const int preset = mod::matchingPreset (curve);
+    const juce::String name = preset >= 0 ? juce::String (mod::curvePresetName (static_cast<mod::CurvePreset> (preset))).toUpperCase() : juce::String ("CUSTOM");
+    g.drawText (juce::String (vel ? "VEL  " : "NOTE  ") + name, top, juce::Justification::centredLeft, false);
+    g.setColour (colour::wellText.brighter (0.3f));
+    g.drawText (vel && ospProcessor.velocityAppliesToAmp() ? juce::String::fromUTF8 ("PER NOTE  \xc2\xb7  AMP") : juce::String ("PER NOTE"), top, juce::Justification::centredRight, false);
+
+    // The keys' octaves (NOTE) or a few velocities (VEL), faint, along the foot.
+    g.setFont (type::popupLabel (9.5f));
+    g.setColour (colour::wellText.withAlpha (0.7f));
+    if (vel)
+    {
+        for (const int v : { 0, 64, 127 })
+        {
+            const float x = plot.getX() + plot.getWidth() * static_cast<float> (v) / 127.0f;
+            g.drawText (juce::String (v), juce::Rectangle<float> (x - 14.0f, plot.getBottom() - 12.0f, 28.0f, 11.0f),
+                        v == 0 ? juce::Justification::centredLeft : (v == 127 ? juce::Justification::centredRight : juce::Justification::centred), false);
+        }
+    }
+    else
+        for (int octave = 0; octave <= 8; ++octave)
+        {
+            const int note = 12 + 12 * octave;   // C0 = MIDI 12 (C4 = 60)
+            const float x = plot.getX() + plot.getWidth() * static_cast<float> (note) / 127.0f;
+            g.fillRect (juce::Rectangle<float> (x - 0.5f, plot.getBottom() - 3.0f, 1.0f, 3.0f));
+            if (octave % 2 == 0)
+                g.drawText ("C" + juce::String (octave), juce::Rectangle<float> (x - 12.0f, plot.getBottom() - 14.0f, 24.0f, 11.0f), juce::Justification::centred, false);
+        }
+
+    // The marker: what the last note gave.
+    if (shownPlayhead >= 0.0f)
+    {
+        const auto p = toScreen (shownPlayhead, shownValue);
+        g.setColour (juce::Colours::white.withAlpha (0.35f));
+        g.fillRect (juce::Rectangle<float> (p.x - 0.5f, plot.getY(), 1.0f, plot.getHeight()));
+        draw::led (g, p, 7.0f, colour.brighter (0.25f), 0.8f);
+    }
+}
+
 void ModCurveView::paintCurvePoints (juce::Graphics& g, juce::Colour colour)
 {
     for (int i = 0; i < curve.count; ++i)
@@ -628,7 +828,7 @@ void ModCurveView::mouseDown (const juce::MouseEvent& e)
     before = curve;
     if (resetArea().contains (e.position))
     {
-        ospProcessor.setModulationCurve (curveIndex(), sourceIndex < 2 ? mod::defaultLfoCurve() : mod::defaultEnvCurve(), true);
+        ospProcessor.setModulationCurve (curveIndex(), isKey() ? mod::straightCurve() : (sourceIndex < 2 ? mod::defaultLfoCurve() : mod::defaultEnvCurve()), true);
         curve = ospProcessor.modulationCurve (curveIndex());
         repaint();
         return;
@@ -837,6 +1037,154 @@ void ModSourcePage::resized()
 }
 
 //==============================================================================
+// VEL's and NOTE's row
+
+ModKeyPage::ModKeyPage (OspAudioProcessor& p, int s) : ospProcessor (p), source (s)
+{
+    setTitle (s == mod::slot::vel ? "Velocity curve" : "Key curve");
+}
+
+juce::Rectangle<float> ModKeyPage::curveArea() const
+{
+    const auto r = getLocalBounds().toFloat();
+    return juce::Rectangle<float> (150.0f, 44.0f).withCentre ({ r.getX() + 0.2f * r.getWidth(), r.getCentreY() });
+}
+
+juce::Rectangle<float> ModKeyPage::ampArea() const
+{
+    if (source != mod::slot::vel)
+        return {};
+    const auto r = getLocalBounds().toFloat();
+    return juce::Rectangle<float> (130.0f, 44.0f).withCentre ({ r.getX() + 0.5f * r.getWidth(), r.getCentreY() });
+}
+
+juce::PopupMenu ModKeyPage::presetMenu()
+{
+    juce::PopupMenu menu;
+    const int index = modui::keyCurveIndex (source);
+    const int current = mod::matchingPreset (ospProcessor.modulationCurve (index));
+    juce::Component::SafePointer<ModKeyPage> safe (this);
+    std::vector<mod::CurvePreset> presets { mod::CurvePreset::linear, mod::CurvePreset::soft, mod::CurvePreset::hard,
+                                            mod::CurvePreset::exponential, mod::CurvePreset::inverted, mod::CurvePreset::flat };
+    if (source == mod::slot::note)
+        presets = { mod::CurvePreset::lowToHigh, mod::CurvePreset::highToLow, mod::CurvePreset::highOnly, mod::CurvePreset::lowOnly,
+                    mod::CurvePreset::midEmphasis, mod::CurvePreset::soft, mod::CurvePreset::hard, mod::CurvePreset::exponential, mod::CurvePreset::flat };
+    menu.addSectionHeader ("CURVE");
+    for (const auto preset : presets)
+    {
+        // NOTE's LOW TO HIGH and HIGH TO LOW are the LINEAR and INVERTED shapes.
+        const int id = static_cast<int> (preset);
+        const bool ticked = current == id || (source == mod::slot::note && ((preset == mod::CurvePreset::lowToHigh && current == static_cast<int> (mod::CurvePreset::linear))
+                                                                            || (preset == mod::CurvePreset::highToLow && current == static_cast<int> (mod::CurvePreset::inverted))));
+        menu.addItem (mod::curvePresetName (preset), true, ticked, [safe, index, preset] {
+            if (safe != nullptr)
+            {
+                safe->ospProcessor.setModulationCurve (index, mod::presetCurve (preset), true);
+                safe->refresh();
+            }
+        });
+    }
+    return menu;
+}
+
+void ModKeyPage::refresh()
+{
+    const int index = modui::keyCurveIndex (source);
+    const int preset = mod::matchingPreset (ospProcessor.modulationCurve (index));
+    const juce::String name = preset >= 0 ? juce::String (mod::curvePresetName (static_cast<mod::CurvePreset> (preset))) : juce::String ("Custom");
+    int last = -1;
+    if (source == mod::slot::vel)
+    {
+        const int count = ospProcessor.velocityCount.load (std::memory_order_acquire);
+        if (count > 0)
+            last = ospProcessor.recentVelocity[static_cast<std::size_t> ((count - 1) % OspAudioProcessor::velocityHistory)].load (std::memory_order_relaxed);
+    }
+    else
+        last = ospProcessor.lastPlayedNote.load (std::memory_order_relaxed);
+    const bool amp = ospProcessor.velocityAppliesToAmp();
+    if (name != shownPreset || amp != shownAmp || last != shownLast)
+    {
+        shownPreset = name;
+        shownAmp = amp;
+        shownLast = last;
+        repaint();
+    }
+}
+
+void ModKeyPage::paint (juce::Graphics& g)
+{
+    using namespace design;
+    auto caption = [&g] (juce::Rectangle<float> r, const juce::String& text) {
+        g.setColour (colour::textSecondary);
+        g.setFont (fonts::make (11.5f, fonts::Weight::regular, 0.05f));
+        g.drawText (text, r.withHeight (14.0f).translated (0.0f, -16.0f), juce::Justification::centred, false);
+    };
+    // CURVE: the preset (or CUSTOM) on a key, a chevron for the list.
+    const auto c = curveArea().withTrimmedTop (16.0f);
+    caption (c, "CURVE");
+    draw::button (g, c, 7.0f, false, hover == 1, colour::accent);
+    g.setColour (colour::text.withAlpha (0.9f));
+    g.setFont (type::popupValue (13.0f));
+    auto text = c.reduced (12.0f, 0.0f);
+    icons::draw (g, icons::Kind::chevronDown, text.removeFromRight (14.0f).withSizeKeepingCentre (12.0f, 12.0f), colour::text.withAlpha (0.55f), 1.3f);
+    g.drawText (shownPreset.toUpperCase(), text, juce::Justification::centredLeft, true);
+    // APPLY TO AMP (VEL): on, the curve shapes the notes' loudness too.
+    if (source == mod::slot::vel)
+    {
+        const auto a = ampArea().withTrimmedTop (16.0f);
+        caption (a, "APPLY TO AMP");
+        draw::button (g, a, 7.0f, shownAmp, hover == 2, colour::accent);
+        g.setColour (shownAmp ? colour::accent.darker (0.15f) : colour::text.withAlpha (0.6f));
+        g.setFont (type::popupValue (13.0f));
+        g.drawText (shownAmp ? "ON" : "OFF", a, juce::Justification::centred, false);
+    }
+    // What the last note gave: its velocity or key, and the curve's value there.
+    const auto r = getLocalBounds().toFloat();
+    const auto readout = juce::Rectangle<float> (180.0f, 44.0f).withCentre ({ r.getX() + 0.82f * r.getWidth(), r.getCentreY() });
+    g.setColour (colour::textSecondary);
+    g.setFont (fonts::make (11.5f, fonts::Weight::regular, 0.05f));
+    g.drawText ("LAST NOTE", readout.withHeight (14.0f), juce::Justification::centred, false);
+    g.setColour (colour::text.withAlpha (0.85f));
+    g.setFont (type::popupValue (14.0f));
+    juce::String value = juce::String::fromUTF8 ("\xe2\x80\x94");
+    if (shownLast >= 0)
+    {
+        const double y = mod::curveAt (mod::compileCurve (ospProcessor.modulationCurve (modui::keyCurveIndex (source))), shownLast / 127.0);
+        const auto key = source == mod::slot::vel ? juce::String (shownLast) : juce::MidiMessage::getMidiNoteName (shownLast, true, true, 4);
+        value = key + juce::String::fromUTF8 ("  \xe2\x86\x92  ") + juce::String (juce::roundToInt (100.0 * y)) + " %";
+    }
+    g.drawText (value, readout.withTrimmedTop (16.0f), juce::Justification::centred, false);
+}
+
+void ModKeyPage::mouseMove (const juce::MouseEvent& e)
+{
+    const int now = curveArea().contains (e.position) ? 1 : (ampArea().contains (e.position) ? 2 : 0);
+    setMouseCursor (now != 0 ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+    if (now != hover)
+    {
+        hover = now;
+        repaint();
+    }
+}
+
+void ModKeyPage::mouseExit (const juce::MouseEvent&)
+{
+    hover = 0;
+    repaint();
+}
+
+void ModKeyPage::mouseUp (const juce::MouseEvent& e)
+{
+    if (curveArea().contains (e.position))
+        presetMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (curveArea().toNearestInt())));
+    else if (ampArea().contains (e.position))
+    {
+        ospProcessor.setVelocityAppliesToAmp (! ospProcessor.velocityAppliesToAmp());
+        refresh();
+    }
+}
+
+//==============================================================================
 // A route's depth
 
 ModDepthBar::ModDepthBar (OspAudioProcessor& p, int slot, juce::Colour c)
@@ -898,7 +1246,7 @@ void ModDepthBar::mouseDoubleClick (const juce::MouseEvent&)
 
 namespace
 {
-    const std::array<const char*, modui::tabCount> tabNames { "AMP", "ENV 1", "ENV 2", "LFO 1", "LFO 2" };
+    const std::array<const char*, modui::tabCount> tabNames { "AMP", "ENV", "LFO 1", "LFO 2", "VEL", "NOTE" };
     juce::Font tabFont() { return fonts::make (13.0f, fonts::Weight::medium, 0.08f); }
 }
 
@@ -913,6 +1261,11 @@ ModulationPanel::ModulationPanel (OspAudioProcessor& p) : ospProcessor (p), amp 
     {
         pages[static_cast<std::size_t> (s)] = std::make_unique<ModSourcePage> (p, s);
         addChildComponent (*pages[static_cast<std::size_t> (s)]);
+    }
+    for (std::size_t k = 0; k < keyPages.size(); ++k)
+    {
+        keyPages[k] = std::make_unique<ModKeyPage> (p, k == 0 ? mod::slot::vel : mod::slot::note);
+        addChildComponent (*keyPages[k]);
     }
     juce::Component::SafePointer<ModulationPanel> safe (this);
     curve.onContextMenu = [safe] {
@@ -937,8 +1290,12 @@ void ModulationPanel::showTab (int t)
         curve.setSource (source);
     for (int s = 0; s < 4; ++s)
         pages[static_cast<std::size_t> (s)]->setVisible (s == source);
-    if (source >= 0)
+    keyPages[0]->setVisible (source == mod::slot::vel);
+    keyPages[1]->setVisible (source == mod::slot::note);
+    if (source >= 0 && source < 4)
         pages[static_cast<std::size_t> (source)]->refresh();
+    else if (modui::keyCurveIndex (source) >= 0)
+        keyPage (source).refresh();
     layoutTabs();
     strip.repaint();
     if (onTabChanged != nullptr)
@@ -1012,6 +1369,8 @@ void ModulationPanel::resized()
     curve.setBounds (12, 26, w - 24, std::max (40, h - 116));   // the AMP display's place
     for (auto& page : pages)
         page->setBounds (0, h - 89, w, 87);                      // the AMP knob row's place
+    for (auto& page : keyPages)
+        page->setBounds (0, h - 89, w, 87);
     strip.setBounds (0, 0, w, 24);
     layoutTabs();
 }
@@ -1022,14 +1381,17 @@ void ModulationPanel::refresh()
     if (source >= 0)
     {
         curve.refresh();
-        pages[static_cast<std::size_t> (source)]->refresh();
+        if (source < 4)
+            pages[static_cast<std::size_t> (source)]->refresh();
+        else if (modui::keyCurveIndex (source) >= 0)
+            keyPage (source).refresh();
     }
     // The tabs' route dots and the route count follow the routes.
-    std::array<int, 8> counts {};
-    for (int s = 0; s < 4; ++s)
+    std::array<int, 2 * mod::sourceCount> counts {};
+    for (int s = 0; s < mod::sourceCount; ++s)
     {
         counts[static_cast<std::size_t> (s)] = routeCount (s, true);
-        counts[static_cast<std::size_t> (4 + s)] = routeCount (s, false);
+        counts[static_cast<std::size_t> (mod::sourceCount + s)] = routeCount (s, false);
     }
     const bool editable = source >= 0 && curve.isEditable();
     if (counts != shownRouteCounts || editable != shownEditable)
@@ -1046,6 +1408,18 @@ juce::PopupMenu ModulationPanel::sourceMenu (int source)
     juce::PopupMenu menu;
     juce::Component::SafePointer<ModulationPanel> safe (this);
     auto& p = ospProcessor;
+    if (const int curveIndex = modui::keyCurveIndex (source); curveIndex >= 0)
+    {
+        // VEL / NOTE: the curve's presets, its editor, APPLY TO AMP (VEL).
+        menu.addSubMenu ("Curve", keyPage (source).presetMenu());
+        menu.addItem ("Edit curve...", [safe, source] { if (safe != nullptr && safe->onExpandCurve != nullptr) safe->onExpandCurve (source); });
+        menu.addItem ("Reset curve", [&p, curveIndex] { p.setModulationCurve (curveIndex, mod::straightCurve(), true); });
+        if (source == mod::slot::vel)
+            menu.addItem ("Apply to AMP", true, p.velocityAppliesToAmp(), [&p] { p.setVelocityAppliesToAmp (! p.velocityAppliesToAmp()); });
+        menu.addSeparator();
+        menu.addItem ("Routes...", [safe, source] { if (safe != nullptr && safe->onShowRoutes != nullptr) safe->onShowRoutes (source); });
+        return menu;
+    }
     if (source < 2)
     {
         // Polarity: a secondary setting, here rather than a permanent switch.
@@ -1110,7 +1484,7 @@ void ModulationPanel::paintTabs (juce::Graphics& g)
     }
     if (! routesKey.isEmpty())
     {
-        const int n = shownRouteCounts[static_cast<std::size_t> (4 + selectedSource())];
+        const int n = shownRouteCounts[static_cast<std::size_t> (mod::sourceCount + selectedSource())];
         g.setFont (fonts::make (11.5f, fonts::Weight::medium, 0.08f));
         g.setColour (colour::text.withAlpha (hoverRoutes ? 0.9f : 0.55f));
         g.drawText (n == 0 ? juce::String ("+ ROUTE") : juce::String (n) + (n == 1 ? " ROUTE" : " ROUTES"), routesKey, juce::Justification::centredRight, false);
@@ -1454,7 +1828,7 @@ void ModRoutesPopup::mouseDown (const juce::MouseEvent& e)
 // The larger curve editor (a popover)
 
 ModCurvePopup::ModCurvePopup (OspAudioProcessor& p, int s)
-    : MiniPanel (juce::String (modui::sourceLabel (s)) + (s < 2 ? " CUSTOM SHAPE" : " ONE SHOT CURVE")), view (p)
+    : MiniPanel (juce::String (modui::sourceLabel (s)) + (s < 2 ? " CUSTOM SHAPE" : (modui::keyCurveIndex (s) >= 0 ? " CURVE" : " ONE SHOT CURVE"))), view (p)
 {
     view.setSource (s);
     addAndMakeVisible (view);
@@ -1480,6 +1854,47 @@ ModulationOverlay::ModulationOverlay (OspAudioProcessor& p, juce::Component& r) 
 {
     setInterceptsMouseClicks (true, false);
     setTitle ("Modulation halos");
+}
+
+void ModulationOverlay::collectAll()
+{
+    collect (root);
+    findCovers();
+}
+
+void ModulationOverlay::findCovers()
+{
+    // A popover (a macro's, the routes', ...) is one of the root's children, above the part
+    // of the window its knobs' controls sit in: those controls' halos stay under it. The
+    // overlay itself is above everything, so it leaves out what is covered.
+    const auto& children = root.getChildren();
+    auto topOf = [this] (juce::Component* c) {
+        while (c != nullptr && c->getParentComponent() != &root)
+            c = c->getParentComponent();
+        return c;
+    };
+    for (auto& t : targets)
+    {
+        t.covers.clear();
+        auto* top = topOf (t.slider.getComponent());
+        const int own = top != nullptr ? children.indexOf (top) : -1;
+        if (own < 0)
+            continue;
+        const auto reach = t.field ? t.area.expanded (4.0f, 14.0f) : juce::Rectangle<float> (2.0f * (t.radius + 12.0f), 2.0f * (t.radius + 12.0f)).withCentre (t.centre);
+        for (int i = own + 1; i < children.size(); ++i)
+        {
+            auto* above = children[i];
+            // Only what floats over the window: the popovers (MiniPanel) and what asks to be
+            // treated as one (the Library). Neighbouring sections never clip a halo.
+            if (above == this || ! above->isVisible() || (dynamic_cast<MiniPanel*> (above) == nullptr && ! static_cast<bool> (above->getProperties()["modCover"])))
+                continue;
+            // A popover's card (its shadow margin does not cover anything).
+            const auto* panel = dynamic_cast<MiniPanel*> (above);
+            const auto bounds = panel != nullptr ? root.getLocalArea (panel, panel->card().toFloat()) : above->getBoundsInParent().toFloat();
+            if (bounds.intersects (reach))
+                t.covers.push_back (bounds);
+        }
+    }
 }
 
 void ModulationOverlay::collect (juce::Component& c)
@@ -1578,6 +1993,8 @@ float ModulationOverlay::positionOf (const Target& t, double offset, mod::Dest d
     auto* param = ospProcessor.parameters.getParameter (t.parameterId);
     if (param == nullptr)
         return 0.0f;
+    if (dest == mod::Dest::arpRate)
+        return arpRatePosition (static_cast<double> (mod::destInfo (dest).span) * offset);
     const auto& range = param->getNormalisableRange();
     const double base = param->convertFrom0to1 (param->getValue());
     const double x = mod::destInfo (dest).span * offset;
@@ -1595,11 +2012,31 @@ float ModulationOverlay::positionOf (const Target& t, double offset, mod::Dest d
     return param->convertTo0to1 (static_cast<float> (value));
 }
 
+float ModulationOverlay::arpRatePosition (double octaves) const
+{
+    // RATE's knob walks the step lengths slowest to fastest: its position for the step the
+    // modulation makes (the knob's step sped up by `octaves`), between neighbours by octaves.
+    const auto& order = ArpInlinePanel::rateOrder();
+    const int count = static_cast<int> (order.size());
+    const int index = juce::jlimit (0, arp::rateCount - 1, juce::roundToInt (ospProcessor.parameterValue ("arp.rate")));
+    const double want = std::log2 (arp::rateQuarters (static_cast<ArpRate> (index))) - std::clamp (octaves, -2.0, 2.0);
+    auto at = [&order] (int i) { return std::log2 (arp::rateQuarters (static_cast<ArpRate> (order[static_cast<std::size_t> (i)]))); };
+    double position = want >= at (0) ? 0.0 : static_cast<double> (count - 1);
+    for (int i = 0; i + 1 < count; ++i)
+        if (want <= at (i) && want >= at (i + 1))
+        {
+            const double span = at (i) - at (i + 1);
+            position = i + (span > 0.0 ? (at (i) - want) / span : 0.0);
+            break;
+        }
+    return static_cast<float> (position / std::max (1, count - 1));
+}
+
 ModulationOverlay::Sweep ModulationOverlay::sweepOf (const Target& t, const OspAudioProcessor::ModRouteInfo& r) const
 {
     Sweep s;
     auto* param = ospProcessor.parameters.getParameter (t.parameterId);
-    s.base = param != nullptr ? param->getValue() : 0.0f;
+    s.base = r.route.dest == mod::Dest::arpRate ? arpRatePosition (0.0) : (param != nullptr ? param->getValue() : 0.0f);
     const int source = mod::sourceIndex (r.route.source);
     const double d = r.route.depth;
     const bool bipolar = isBipolarSource (ospProcessor, source);
@@ -1723,6 +2160,14 @@ juce::Point<float> ModulationOverlay::haloCentre (const juce::String& id) const
     return t != nullptr ? t->centre : juce::Point<float>();
 }
 
+std::vector<juce::Rectangle<float>> ModulationOverlay::haloCovers (const juce::String& parameterId) const
+{
+    for (const auto& t : targets)
+        if (t.parameterId == parameterId)
+            return t.covers;
+    return {};
+}
+
 float ModulationOverlay::haloRadius (const juce::String& id) const
 {
     const auto* t = find (id);
@@ -1827,7 +2272,7 @@ void ModulationOverlay::refresh()
     targets.clear();
     // Walk the instrument only when something could be drawn (a route, a drag).
     if (! routes.empty() || dragSource >= 0 || before > 0 || shownRings > 0)
-        collect (root);
+        collectAll();
     if (hover >= static_cast<int> (targets.size()))
         hover = -1;
     // Repaint only around the halos (now and as last drawn): the instrument under the
@@ -1869,7 +2314,7 @@ void ModulationOverlay::setDrag (int source, juce::Point<float> where)
     if (changed)
     {
         targets.clear();
-        collect (root);
+        collectAll();
         repaint();
     }
     else
@@ -1880,7 +2325,7 @@ juce::Slider* ModulationOverlay::controlAt (juce::Point<float> where) const
 {
     // The front-most (collected last) control under the point (its knob or its halo).
     for (auto it = targets.rbegin(); it != targets.rend(); ++it)
-        if (it->slider != nullptr && (it->field ? it->area.expanded (3.0f).contains (where) : it->centre.getDistanceFrom (where) <= it->radius + 4.0f))
+        if (it->slider != nullptr && ! it->coveredAt (where) && (it->field ? it->area.expanded (3.0f).contains (where) : it->centre.getDistanceFrom (where) <= it->radius + 4.0f))
             return it->slider.getComponent();
     return nullptr;
 }
@@ -1894,7 +2339,7 @@ int ModulationOverlay::targetAt (juce::Point<float> p, bool includeBody, bool an
     for (int i = static_cast<int> (targets.size()) - 1; i >= 0; --i)
     {
         const auto& t = targets[static_cast<std::size_t> (i)];
-        if (t.slider == nullptr)
+        if (t.slider == nullptr || t.coveredAt (p))
             continue;
         if (anyControl && (t.field ? t.area.expanded (2.0f).contains (p) : t.centre.getDistanceFrom (p) <= std::max (t.bodyRadius, 0.5f * std::min (t.area.getWidth(), t.area.getHeight()))))
             return i;
@@ -1967,8 +2412,7 @@ juce::PopupMenu ModulationOverlay::contextMenu (const juce::String& parameterId)
     }
     if (! list.empty())
         menu.addSeparator();
-    const std::array<int, 5> order { 4, 0, 1, 2, 3 };   // MOD WHEEL, LFO 1, LFO 2, ENV 1, ENV 2
-    for (const int source : order)
+    for (const int source : modui::menuSources (p, false))   // MOD WHEEL, LFO 1, LFO 2, ENV (ENV 2 when used), VEL, NOTE, CC 1-4, PRESSURE
     {
         const auto primary = modui::destinationFor (parameterId, modui::isPerVoice (p, source));
         if (primary == mod::Dest::none)
@@ -1976,7 +2420,7 @@ juce::PopupMenu ModulationOverlay::contextMenu (const juce::String& parameterId)
         std::vector<std::pair<mod::Dest, juce::String>> dests { { primary, {} } };
         // CHARACTER with an envelope: each note's filter (as a drop does) or the whole
         // instrument's CHARACTER (through its global envelope).
-        if (parameterId == "character" && (source == 2 || source == 3))
+        if (parameterId == "character" && (source == 2 || source == 3 || source == mod::slot::vel || source == mod::slot::note))
         {
             dests[0].second = " (each note's filter)";
             dests.push_back ({ mod::Dest::character, " (whole instrument)" });
@@ -1988,7 +2432,7 @@ juce::PopupMenu ModulationOverlay::contextMenu (const juce::String& parameterId)
             bool assigned = false;
             for (const auto* r : list)
                 assigned = assigned || (r->route.source == static_cast<mod::Source> (source + 1) && r->route.dest == dest);
-            const auto label = juce::String (assigned ? "Edit " : "Assign ") + modui::sourceLabel (source) + suffix;
+            const auto label = juce::String (assigned ? "Edit " : "Assign ") + modui::menuLabel (p, source) + suffix;
             const auto d = dest;
             menu.addItem (label, true, assigned, [safe, source, d] {
                 if (safe != nullptr)
@@ -2008,6 +2452,16 @@ juce::PopupMenu ModulationOverlay::contextMenu (const juce::String& parameterId)
                 p.removeModulationRoute (slot, false);
         });
     }
+    if (parameterId == "arp.rate")
+    {
+        // How a source moves the rate: smoothly, or in musical ratios at the next step.
+        menu.addSeparator();
+        menu.addSectionHeader ("RATE MODULATION");
+        menu.addItem ("Smooth", true, ! p.arpRateIsStepped(), [&p] { p.setArpRateStepped (false); });
+        menu.addItem ("Stepped (musical ratios)", true, p.arpRateIsStepped(), [&p] { p.setArpRateStepped (true); });
+    }
+    menu.addSeparator();
+    menu.addSubMenu ("MIDI Controllers", modui::controllerMenu (p));
     return menu;
 }
 
@@ -2053,7 +2507,7 @@ ModulationOverlay::HaloHit ModulationOverlay::hitAt (juce::Point<float> p) const
     for (int i = static_cast<int> (targets.size()) - 1; i >= 0; --i)
     {
         const auto& t = targets[static_cast<std::size_t> (i)];
-        if (t.slider == nullptr)
+        if (t.slider == nullptr || t.coveredAt (p))
             continue;
         const auto list = routesOf (t);
         const auto* main = emphasised (t);
@@ -2160,8 +2614,7 @@ juce::PopupMenu ModulationOverlay::depthMenu (int slot)
     });
     const auto deps = depthRoutesOf (slot);
     menu.addSectionHeader ("MODULATE THIS DEPTH");
-    const std::array<int, 5> order { 0, 1, 2, 3, 4 };   // LFO 1, LFO 2, ENV 1, ENV 2, MOD WHEEL
-    for (const int source : order)
+    for (const int source : modui::menuSources (p, true))   // LFO 1, LFO 2, ENV (ENV 2 when used), MOD WHEEL, VEL, NOTE, CC 1-4, PRESSURE
     {
         // Only what the engine can do: no source on its own route, no loop, no scope it lacks.
         if (! p.canModulateDepth (static_cast<mod::Source> (source + 1), slot))
@@ -2169,7 +2622,7 @@ juce::PopupMenu ModulationOverlay::depthMenu (int slot)
         bool assigned = false;
         for (const auto* m : deps)
             assigned = assigned || mod::sourceIndex (m->route.source) == source;
-        menu.addItem (juce::String (assigned ? "Edit " : "Assign ") + modui::sourceLabel (source), true, assigned, [safe, source, slot] {
+        menu.addItem (juce::String (assigned ? "Edit " : "Assign ") + modui::menuLabel (p, source), true, assigned, [safe, source, slot] {
             if (safe != nullptr)
                 safe->assignDepth (source, slot);
         });
@@ -2291,7 +2744,7 @@ bool ModulationOverlay::hitTest (int x, int y)
     // controls are walked now if nothing is modulated yet: no walk at 30 Hz for it).
     const auto mods = juce::ModifierKeys::currentModifiers;
     if (mods.isPopupMenu() && targets.empty())
-        collect (root);
+        collectAll();
     return targetAt ({ static_cast<float> (x), static_cast<float> (y) }, mods.isAltDown(), mods.isPopupMenu()) >= 0;
 }
 
@@ -2515,6 +2968,22 @@ void ModulationOverlay::paintDragTarget (juce::Graphics& g, const Target& t, int
     }
 }
 
+namespace
+{
+    /** Draws only outside the covers (the popovers' rounded cards over a control). */
+    void clipOutside (juce::Graphics& g, const std::vector<juce::Rectangle<float>>& covers)
+    {
+        if (covers.empty())
+            return;
+        juce::Path outside;
+        outside.addRectangle (g.getClipBounds().toFloat().expanded (2.0f));
+        for (const auto& c : covers)
+            outside.addRoundedRectangle (c, 12.0f);
+        outside.setUsingNonZeroWinding (false);   // even-odd: the cards are holes
+        g.reduceClipRegion (outside);
+    }
+}
+
 void ModulationOverlay::paint (juce::Graphics& g)
 {
     int rings = 0;
@@ -2533,12 +3002,17 @@ void ModulationOverlay::paint (juce::Graphics& g)
             if (! baseOk && routesOf (t).empty())
                 continue;
             ++rings;
+            const juce::Graphics::ScopedSaveState clip (g);
+            clipOutside (g, t.covers);
             paintDragTarget (g, t, static_cast<int> (i), dropHit);
             continue;
         }
         if (routesOf (t).empty())
             continue;
         ++rings;
+        // Under an open popover the halo is hidden where the popover lies.
+        const juce::Graphics::ScopedSaveState clip (g);
+        clipOutside (g, t.covers);
         paintHalo (g, t, static_cast<int> (i));
     }
     shownRings = rings;

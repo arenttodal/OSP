@@ -93,3 +93,70 @@ sessions get safe defaults (DAMPEN bypassed, no new routes).
    OCTAVES and VELOCITY.
 6. DAMPEN DSP and lookup; then the editor; then its destinations.
 7. State 12 and migrations, the full tests, renders, CPU measurements and screenshots.
+
+## Results (stages 1-7)
+
+Stages 1-6 and the state of stage 7 landed together in one commit (the stages share their
+files: the registry, the processor's state and the panel), with the suite green.
+
+**Sources (1-4).**
+- VEL, NOTE, CC 1-4 and PRESSURE are appended to `mod::Source`.
+- VEL and NOTE are per note.
+- The shared stages follow the player's latest key, also behind the arpeggiator.
+- The VEL presets reproduce SOFT / LINEAR / HARD exactly, for all 127 velocities.
+- Older sessions get their DYNAMICS curve as the VEL curve, with APPLY TO AMP on.
+- CC slots follow controllers 2, 11, 16 and 17 by default. Any control's right-click menu
+  has **MIDI Controllers**, where each slot can learn the next controller moved or take a
+  controller from a list (any one by number). The assign menus show each slot's
+  controller, for example "CC 1 (CC 2 Breath)".
+- Tests: [mod-final] (unit and plugin).
+
+**ARP destinations (5).**
+- RATE, GATE, SWING, OCTAVES and VELOCITY are destinations.
+- `arp.velocity` is the one new arpeggiator control: a knob in the ARP panel, 100 % by
+  default.
+- RATE runs a phase accumulator in steps while the multiplier is off 1x:
+  - the phase is kept across speed changes;
+  - free running, the plain clock continues at the same phase;
+  - on the host's grid, it returns to the boundary nearest the step it expected, with no
+    double and no drop;
+  - Stepped (the RATE knob's right-click menu) keeps to 1/4, 1/3, 1/2, 2/3, 3/4, 1, 4/3,
+    3/2, 2, 3 and 4, and changes at the next step;
+  - at 1x, the timing is exactly the old grid. The existing arpeggiator tests are unchanged
+    and pass.
+- OCTAVES by modulation is quantised with hysteresis. A new count waits for the next cycle,
+  which starts from the pattern's beginning.
+- The OCTAVES keys take routes through their right-click menu.
+
+**DAMPEN (6).**
+- `engine/Dampen` runs per voice, after CHARACTER, at both voice tails.
+- **Soft Shelf** (default) is a high shelf down to -18 dB at the shelf frequency (1-8 kHz,
+  default 3 kHz).
+- **Low-Pass** is 12 dB/oct, from 20 kHz down to MIN CUTOFF on a log scale (300 Hz - 12 kHz,
+  default 2 kHz).
+- The damping is curve[key] × AMOUNT, glided over about 10 ms. At 0 the filter is skipped.
+- Off by default: renders are bit-identical with DAMPEN off, whatever its curve (tested).
+- Destinations, per layer: AMOUNT, FREQ, MIN CUTOFF.
+- Editor: the EQ overlay's second page (**EQ | DAMPEN**):
+  - the curve over C0 … C8, no damping at the top;
+  - the last played key is marked;
+  - drag a point, double-click to add or remove one, drag a segment to bend it;
+  - presets;
+  - the mode, AMOUNT and the frequency or minimum cutoff.
+- Edits are undoable.
+
+**State (7).**
+- State version 12. The curves are saved as "c3"; "c2" and "c1" still read.
+- New properties: `arpRateStepped`, `velToAmp`, `modControllers`, `modTabs`.
+- New parameters (hint 19): ARP VELOCITY and DAMPEN, with defaults that reproduce older
+  sessions.
+
+**Not done yet.**
+These parts of stages 7-10 were not run, so no results are claimed:
+- the resampling audit (Granular / Kaleidoscope aliasing at +24 / +36 semitones);
+- CPU measurements of DAMPEN and the modulated arpeggiator;
+- the listening scenarios A-J;
+- new screenshots.
+
+The destination and source choice parameters grow as before (append only). Saved sessions
+keep their indices.

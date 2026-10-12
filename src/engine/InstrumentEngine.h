@@ -219,6 +219,9 @@ public:
     void setLayerSettings (int layer, const LayerSettings& settings) noexcept;
     /** A layer's EQ alone (the rest of its settings unchanged). */
     void setLayerEq (int layer, const eq::Settings& settings) noexcept { config.layer[layerIndex (layer)].eq = settings; }
+    /** A layer's DAMPEN (each of its notes, by key; live). Bypassed until set. */
+    void setLayerDampen (int layer, const dampen::Settings& settings) noexcept { layerDampen[layerIndex (layer)] = settings; }
+    const dampen::Settings& layerDampenSettings (int layer) const noexcept { return layerDampen[layerIndex (layer)]; }
     /** The source mode applies to notes started afterwards; granular settings apply live. */
     void setSourceMode (int layer, SourceMode mode) noexcept { config.sourceMode[layerIndex (layer)] = mode; }
     void setGranular (int layer, const GranularParams& params) noexcept
@@ -304,6 +307,20 @@ public:
     const mod::Runtime& modulation() const noexcept { return modRuntime; }
     /** The mod wheel as a modulation source (0..1; the processor passes CC 1 and the screen's wheel). */
     void setModWheel (float value) noexcept { modRuntime.setModWheel (value); }
+    /** CC slot 0..3's controller (0..1) and channel pressure (0..1), as modulation sources. */
+    void setModController (int slot, float value) noexcept { modRuntime.setController (slot, value); }
+    void setModPressure (float value) noexcept { modRuntime.setPressure (value); }
+    /** The player's key (before an arpeggiator): the shared stages' VEL and NOTE. While
+        `external` is set (an arpeggiator owns the notes), the engine's own notes no longer
+        move them. */
+    void setInputNote (int note, int velocity) noexcept { modRuntime.setInputNote (note, velocity); }
+    void setExternalInputNotes (bool external) noexcept { externalInputNotes = external; }
+    /** The arpeggiator's destinations (Dest::arpRate .. arpVelocity), from the last control
+        period: the offset in the destination's units (0 without a route), and whether a
+        route reaches it. Audio thread (the processor runs the arpeggiator before render). */
+    static constexpr int arpDestCount = 5;
+    double arpModulation (mod::Dest d) const noexcept;
+    bool arpModulated (mod::Dest d) const noexcept;
     /** What the modulation display shows: the global LFOs, and the newest sounding voice's
         poly LFOs and envelopes (lock-free, any thread). */
     struct ModView
@@ -464,9 +481,13 @@ private:
     mod::Runtime modRuntime;
     std::array<double, 3> modReimaginedOffset {};   ///< global LFOs on each layer's REIMAGINED
     double modLifeOffset = 0.0;
+    std::array<dampen::Settings, 3> layerDampen {};
+    std::array<double, arpDestCount> modArpOffset {};
+    std::array<bool, arpDestCount> modArpRouted {};
     std::array<std::array<double, 4>, 3> modEqOffset {};   ///< per layer: bell octaves, bell dB, low shelf dB, high shelf dB
     bool modGlobalApplied = false;
     std::array<std::atomic<float>, mod::sourceCount> modViewValue {};
+    bool externalInputNotes = false;
     std::array<std::atomic<float>, 2> modViewPhase {}, modViewEnvTime {};
     std::array<std::atomic<int>, 2> modViewEnvStage {};
     std::atomic<bool> modViewVoice { false };

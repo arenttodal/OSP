@@ -96,6 +96,18 @@ public:
         double gate = 0.75;   ///< of a step, 0.10 .. 1.50
         double swing = 0.0;   ///< 0 .. 1: every second step later by up to half a step
         int octaves = 1;      ///< 1 .. 4
+        /** ARP RATE modulation: the step clock's speed, 0.25 .. 4 (two octaves each way).
+            At exactly 1 the clock is the plain grid; otherwise a phase accumulator in steps
+            runs on from where the step was (no restart, the phase kept). */
+        double rateMultiplier = 1.0;
+        /** The multiplier changes only as a step plays (the caller rounds it to a musical
+            ratio); otherwise it follows block by block. */
+        bool rateStepped = false;
+        /** ARP VELOCITY: generated velocities scaled (0 .. 2; 1 leaves them as played). */
+        double velocityScale = 1.0;
+        /** OCTAVES moved by modulation: a new count waits for the start of the next cycle,
+            and that cycle starts from the pattern's beginning. */
+        bool octavesAtCycle = false;
     };
 
     struct Event
@@ -184,8 +196,19 @@ private:
     /** RANDOM OTHER / RANDOM ONCE: the note at `position` of the cycle's shuffled order. */
     int pickShuffled (std::int64_t cycle, int position, int length) const noexcept;
 
+    /** Where the pattern is: steps since the phrase (or the last octave change) began. */
+    std::int64_t patternStep (std::int64_t step) const noexcept { return step - cycleOrigin; }
+    bool atCycleStart() const noexcept;
+
     // time
     double stepSamples() const noexcept;
+    /** SWING's delay of a step, in steps (straight grid). */
+    double swingSteps (std::int64_t index) const noexcept;
+    /** The modulated clock (ARP RATE off 1x): enter from the last step's time, leave to the
+        plain clock (free: the same phase; on the host's grid: the boundary nearest the step
+        the accumulator expected). */
+    void enterModulatedClock() noexcept;
+    void leaveModulatedClock() noexcept;
     /** How late a step with this index plays (odd steps, by SWING), in samples. */
     double swingDelay (std::int64_t index) const noexcept;
     double samplesPerQuarter() const noexcept { return sampleRate * 60.0 / bpm; }
@@ -226,8 +249,16 @@ private:
     double lastStepExact = 0.0;    ///< absolute sample time of the last step on the straight grid (before SWING)
     double phraseStartExact = 0.0;
 
+    // the modulated clock (ARP RATE)
+    double rateMultiplier = 1.0, pendingRate = 1.0;
+    bool modClock = false;
+    double modPhase = 0.0;         ///< straight-grid steps since the last step's straight time, at modPhaseTime
+    double modPhaseTime = 0.0;     ///< absolute sample time (exact)
+
     // the phrase
     std::int64_t stepCount = 0;    ///< steps played in this phrase
+    std::int64_t cycleOrigin = 0;  ///< the step the pattern restarted at (an octave change by modulation)
+    int pendingOctaves = 0;        ///< OCTAVES waiting for the next cycle (0: none)
     int previousIndex = -1;
     std::uint64_t phraseSeed = 0, phraseCounter = 0;
     std::array<std::array<std::int8_t, 2>, displaySteps> history {};

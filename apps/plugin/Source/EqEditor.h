@@ -67,6 +67,61 @@ private:
 };
 
 /**
+    A layer's DAMPEN, the EQ overlay's second page: the damping over the keys (C0 .. C8 across,
+    no damping at the top, full at the bottom), the last played key marked; drag a point,
+    double-click to add or remove one, drag between points to bend the segment. The top row:
+    DAMPEN's switch, the EQ tab, the mode (SOFT SHELF | LOW-PASS), AMOUNT, the shelf's
+    frequency or the low-pass's minimum cutoff, the curve's presets, close.
+*/
+class DampenEditor final : public juce::Component, public juce::SettableTooltipClient
+{
+public:
+    DampenEditor (OspAudioProcessor& processor, int layer);
+
+    std::function<void()> onClose, onShowEq;
+    void refresh();
+
+    juce::Rectangle<float> graphArea() const;
+    juce::Rectangle<float> powerArea() const { return { 12.0f, 10.0f, 22.0f, 22.0f }; }
+    juce::Rectangle<float> eqTabArea() const { return eqTab; }
+    juce::Rectangle<float> modeArea() const { return mode; }
+    juce::Rectangle<float> presetArea() const { return presets; }
+    juce::Point<float> pointPosition (int index) const;
+    /** The damping drawn at a key (0..1, the curve as the processor holds it). */
+    double dampingAt (int note) const;
+    void applyPreset (int preset);   ///< 0 the default, then mod::CurvePreset values + 1
+
+    void paint (juce::Graphics&) override;
+    void resized() override;
+    void mouseDown (const juce::MouseEvent&) override;
+    void mouseDrag (const juce::MouseEvent&) override;
+    void mouseUp (const juce::MouseEvent&) override;
+    void mouseDoubleClick (const juce::MouseEvent&) override;
+    void mouseMove (const juce::MouseEvent&) override;
+
+private:
+    juce::RangedAudioParameter* parameter (const char* name) const;
+    bool enabled() const;
+    bool lowPass() const;
+    int pointAt (juce::Point<float> p) const;
+    juce::Point<float> toScreen (float x, float y) const;
+    juce::Point<float> fromScreen (juce::Point<float> p) const;
+    void layoutFields();
+
+    OspAudioProcessor& ospProcessor;
+    int layer;
+    mod::Curve curve, before;
+    int dragPoint = -1, dragSegment = -1, hoverPoint = -1;
+    float dragStartTension = 0.0f;
+    juce::Point<float> dragStart;
+    bool dragging = false;
+    std::array<float, 6> shownSignature {};
+    int shownNote = -2;
+    std::unique_ptr<EqValueField> amountField, frequencyField, cutoffField;
+    juce::Rectangle<float> title, eqTab, mode, presets, closeArea, amountCaption, valueCaption;
+};
+
+/**
     A layer's EQ, drawn over its waveform (the waveform stays faintly visible underneath):
     a logarithmic frequency grid (20 Hz - 20 kHz) and +-18 dB, the EQ's exact response (the
     same section designs the audio runs), and the five bands. A band that is off is a small,
@@ -83,6 +138,11 @@ public:
     std::function<void()> onClose;
     /** Follows the parameters and the modulation (editor timer); repaints only on change. */
     void refresh();
+    /** EQ | DAMPEN: the overlay's two pages (a view setting). */
+    void showDampen (bool show);
+    bool dampenShown() const noexcept { return dampenPage != nullptr && dampenPage->isVisible(); }
+    DampenEditor* dampenEditor() noexcept { return dampenPage.get(); }
+    juce::Rectangle<float> dampenTabArea() const { return dampenTab; }
 
     int selectedBand() const noexcept { return selected; }
     void selectBand (int band);
@@ -120,7 +180,8 @@ private:
     double dragFromHz = 1000.0, dragFromDb = 0.0;
     std::array<double, 4> shownModulation {};
     std::unique_ptr<EqValueField> frequencyField, gainField, qField;
-    juce::Rectangle<float> titleArea, nameArea, slopeArea, bandSwitchArea, resetArea, closeArea;
+    juce::Rectangle<float> titleArea, nameArea, slopeArea, bandSwitchArea, resetArea, closeArea, dampenTab;
+    std::unique_ptr<DampenEditor> dampenPage;
     std::array<double, 4> modulationOffsets() const;   ///< bell octaves, bell dB, low shelf dB, high shelf dB (global LFOs now)
     eq::Settings effective() const;                     ///< what is heard now (the settings plus modulation)
 };

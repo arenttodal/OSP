@@ -325,14 +325,18 @@ ArpInlinePanel::ArpInlinePanel (OspAudioProcessor& p)
           return OspAudioProcessor::arpRateNames()[order[static_cast<std::size_t> (position)]];
       }),
       gate (p.parameters, "arp.gate", "GATE", [] (double v) { return juce::String (juce::roundToInt (v)) + " %"; }),
-      swing (p.parameters, "arp.swing", "SWING", [] (double v) { return juce::String (juce::roundToInt (v)) + " %"; })
+      swing (p.parameters, "arp.swing", "SWING", [] (double v) { return juce::String (juce::roundToInt (v)) + " %"; }),
+      velocity (p.parameters, "arp.velocity", "VELOCITY", [] (double v) { return juce::String (juce::roundToInt (v)) + " %"; })
 {
     setTitle ("Arpeggiator settings");
     rate.setChoiceOrder (parameter (p, "arp.rate"), rateOrder(), &p.undoManager);
     rate.slider.setTooltip ("Step length, from 1/4 dotted (slowest) to 1/32 (fastest)");
-    for (auto* knob : { &rate, &gate, &swing })
+    velocity.slider.setTooltip ("The arpeggiated notes' velocity: 100 % plays them as the keys were played");
+    const std::array<std::pair<MiniKnob*, const char*>, 4> knobs { { { &rate, "arp.rate" }, { &gate, "arp.gate" }, { &swing, "arp.swing" }, { &velocity, "arp.velocity" } } };
+    for (const auto& [knob, id] : knobs)
     {
         knob->setArcColour (design::colour::accent);
+        knob->slider.getProperties().set ("paramId", id);   // a modulation drop target
         addAndMakeVisible (*knob);
     }
     enabledAttachment.sendInitialUpdate();
@@ -407,11 +411,12 @@ void ArpInlinePanel::resized()
     field = { 562.0f, 72.0f, 150.0f, 84.0f };
     list = { 722.0f, 50.0f, 156.0f, 106.0f };
     const float knobTop = 58.0f, knobH = 94.0f, knobW = 100.0f;
-    rate.setBounds (juce::Rectangle<float> (knobW, knobH).withCentre ({ 940.0f, knobTop + 0.5f * knobH }).getSmallestIntegerContainer());
-    octaveCaption = { 995.0f, knobTop, 80.0f, 0.22f * knobH };
-    octaveKeys = { 1012.0f, knobTop + 0.22f * knobH + 2.0f, 46.0f, 156.0f - (knobTop + 0.22f * knobH + 2.0f) };
-    gate.setBounds (juce::Rectangle<float> (knobW, knobH).withCentre ({ 1140.0f, knobTop + 0.5f * knobH }).getSmallestIntegerContainer());
-    swing.setBounds (juce::Rectangle<float> (knobW, knobH).withCentre ({ 1255.0f, knobTop + 0.5f * knobH }).getSmallestIntegerContainer());
+    rate.setBounds (juce::Rectangle<float> (knobW, knobH).withCentre ({ 930.0f, knobTop + 0.5f * knobH }).getSmallestIntegerContainer());
+    octaveCaption = { 985.0f, knobTop, 80.0f, 0.22f * knobH };
+    octaveKeys = { 1002.0f, knobTop + 0.22f * knobH + 2.0f, 46.0f, 156.0f - (knobTop + 0.22f * knobH + 2.0f) };
+    gate.setBounds (juce::Rectangle<float> (knobW, knobH).withCentre ({ 1115.0f, knobTop + 0.5f * knobH }).getSmallestIntegerContainer());
+    swing.setBounds (juce::Rectangle<float> (knobW, knobH).withCentre ({ 1215.0f, knobTop + 0.5f * knobH }).getSmallestIntegerContainer());
+    velocity.setBounds (juce::Rectangle<float> (knobW, knobH).withCentre ({ 1315.0f, knobTop + 0.5f * knobH }).getSmallestIntegerContainer());
     revealSelected();
 }
 
@@ -733,6 +738,13 @@ void ArpInlinePanel::mouseExit (const juce::MouseEvent&)
 
 void ArpInlinePanel::mouseDown (const juce::MouseEvent& e)
 {
+    // OCTAVES' keys are not a knob: their right-click asks for the control's modulation menu.
+    if (e.mods.isPopupMenu() && octaveKeys.getUnion (octaveCaption).contains (e.position))
+    {
+        if (onOctavesMenu != nullptr)
+            onOctavesMenu();
+        return;
+    }
     if (const int row = rowAt (e.position); row >= 0)
     {
         choosePattern (listOrder()[static_cast<std::size_t> (row)]);

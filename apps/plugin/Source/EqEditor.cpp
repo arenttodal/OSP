@@ -147,6 +147,24 @@ EqEditor::EqEditor (OspAudioProcessor& p, int l) : ospProcessor (p), layer (l)
     setTitle ("EQ " + OspAudioProcessor::layerName (layer));
     shown = ospProcessor.layerEqSettings (layer);
     setRepaintsOnMouseActivity (false);
+    dampenPage = std::make_unique<DampenEditor> (ospProcessor, layer);
+    dampenPage->onShowEq = [this] { showDampen (false); };
+    dampenPage->onClose = [this] {
+        if (onClose != nullptr)
+            onClose();
+    };
+    addChildComponent (*dampenPage);
+}
+
+void EqEditor::showDampen (bool show)
+{
+    dampenPage->setVisible (show);
+    if (show)
+    {
+        dampenPage->toFront (false);
+        dampenPage->refresh();
+    }
+    repaint();
 }
 
 double EqEditor::sampleRate() const
@@ -281,6 +299,8 @@ eq::Settings EqEditor::effective() const
 
 void EqEditor::refresh()
 {
+    if (dampenShown())
+        dampenPage->refresh();
     const auto now = ospProcessor.layerEqSettings (layer);
     const auto offsets = modulationOffsets();
     bool moved = false;
@@ -334,6 +354,9 @@ void EqEditor::resized()
     // right, then close.
     const float w = static_cast<float> (getWidth());
     titleArea = { 40.0f, 8.0f, 70.0f, 26.0f };
+    dampenTab = { 112.0f, 9.0f, 64.0f, 24.0f };
+    if (dampenPage != nullptr)
+        dampenPage->setBounds (getLocalBounds());
     closeArea = { w - 32.0f, 10.0f, 22.0f, 22.0f };
     float x = closeArea.getX() - 10.0f;
     auto take = [&x] (float width) {
@@ -357,7 +380,7 @@ void EqEditor::resized()
             slopeArea = take (70.0f);
         frequency = take (74.0f);
     }
-    nameArea = x - titleArea.getRight() > 90.0f ? juce::Rectangle<float> (x - 90.0f, 9.0f, 90.0f, 24.0f) : juce::Rectangle<float>();
+    nameArea = x - dampenTab.getRight() > 90.0f ? juce::Rectangle<float> (x - 90.0f, 9.0f, 90.0f, 24.0f) : juce::Rectangle<float>();
     auto place = [] (std::unique_ptr<EqValueField>& f, juce::Rectangle<float> r) {
         if (f != nullptr)
             f->setBounds (r.getSmallestIntegerContainer());
@@ -542,6 +565,11 @@ void EqEditor::paint (juce::Graphics& g)
         g.setFont (type::panelHeader());
         g.setColour (juce::Colour (0xffeee8dd).withAlpha (heard ? 0.95f : 0.6f));
         g.drawText ("EQ " + OspAudioProcessor::layerName (layer), titleArea, juce::Justification::centredLeft, false);
+        // EQ | DAMPEN: the other page.
+        g.setFont (type::popupLabel (12.0f));
+        g.setColour (colour::wellText.brighter (0.2f));
+        g.drawText ("DAMPEN", dampenTab, juce::Justification::centred, false);
+        g.setFont (type::panelHeader());
         if (! heard)
         {
             g.setFont (type::popupLabel (11.0f));
@@ -630,6 +658,11 @@ void EqEditor::mouseDown (const juce::MouseEvent& e)
     {
         if (onClose != nullptr)
             onClose();
+        return;
+    }
+    if (dampenTab.contains (p))
+    {
+        showDampen (true);
         return;
     }
     if (powerArea().expanded (4.0f).contains (p) || titleArea.contains (p))
@@ -767,6 +800,416 @@ void EqEditor::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheel
     else
         setValue (bandParameter (band, "slope"), wheel.deltaY > 0.0f ? 1.0f : 0.0f);
     refresh();
+}
+
+//==============================================================================
+// DAMPEN
+
+namespace
+{
+    const juce::Colour dampenColour { 0xff93a9b8 };   // a cool, quiet blue-grey: taking the highs away
+}
+
+DampenEditor::DampenEditor (OspAudioProcessor& p, int l) : ospProcessor (p), layer (l)
+{
+    setTitle ("DAMPEN " + OspAudioProcessor::layerName (layer));
+    setTooltip ("DAMPEN: each note loses highs by its key. Drag a point, double-click to add or remove one");
+    auto make = [this] (const char* name) {
+        auto f = std::make_unique<EqValueField> (ospProcessor, OspAudioProcessor::dampenParameterId (layer, name));
+        f->setColour (dampenColour);
+        addAndMakeVisible (*f);
+        return f;
+    };
+    amountField = make ("amount");
+    frequencyField = make ("frequency");
+    cutoffField = make ("cutoff");
+    curve = ospProcessor.modulationCurve (OspAudioProcessor::dampenCurveIndex (layer));
+}
+
+juce::RangedAudioParameter* DampenEditor::parameter (const char* name) const
+{
+    return ospProcessor.parameters.getParameter (OspAudioProcessor::dampenParameterId (layer, name));
+}
+
+bool DampenEditor::enabled() const
+{
+    return ospProcessor.parameterValue (OspAudioProcessor::dampenParameterId (layer, "enabled")) >= 0.5f;
+}
+
+bool DampenEditor::lowPass() const
+{
+    return ospProcessor.parameterValue (OspAudioProcessor::dampenParameterId (layer, "mode")) >= 0.5f;
+}
+
+juce::Rectangle<float> DampenEditor::graphArea() const
+{
+    return getLocalBounds().toFloat().withTrimmedLeft (38.0f).withTrimmedRight (14.0f).withTrimmedTop (44.0f).withTrimmedBottom (24.0f);
+}
+
+juce::Point<float> DampenEditor::toScreen (float x, float y) const
+{
+    // Keys across; no damping at the top, full damping at the bottom.
+    const auto g = graphArea();
+    return { g.getX() + x * g.getWidth(), g.getY() + y * g.getHeight() };
+}
+
+juce::Point<float> DampenEditor::fromScreen (juce::Point<float> p) const
+{
+    const auto g = graphArea();
+    return { juce::jlimit (0.0f, 1.0f, (p.x - g.getX()) / std::max (1.0f, g.getWidth())),
+             juce::jlimit (0.0f, 1.0f, (p.y - g.getY()) / std::max (1.0f, g.getHeight())) };
+}
+
+juce::Point<float> DampenEditor::pointPosition (int index) const
+{
+    const auto& pt = curve.points[static_cast<std::size_t> (juce::jlimit (0, std::max (0, curve.count - 1), index))];
+    return toScreen (pt.x, pt.y);
+}
+
+double DampenEditor::dampingAt (int note) const
+{
+    return mod::curveAt (mod::compileCurve (curve), juce::jlimit (0, 127, note) / 127.0);
+}
+
+int DampenEditor::pointAt (juce::Point<float> p) const
+{
+    int best = -1;
+    float distance = 9.0f;
+    for (int i = 0; i < curve.count; ++i)
+        if (const float d = pointPosition (i).getDistanceFrom (p); d < distance)
+        {
+            distance = d;
+            best = i;
+        }
+    return best;
+}
+
+void DampenEditor::refresh()
+{
+    const auto now = ospProcessor.modulationCurve (OspAudioProcessor::dampenCurveIndex (layer));
+    std::array<float, 6> signature { enabled() ? 1.0f : 0.0f, lowPass() ? 1.0f : 0.0f,
+                                     ospProcessor.parameterValue (OspAudioProcessor::dampenParameterId (layer, "amount")),
+                                     ospProcessor.parameterValue (OspAudioProcessor::dampenParameterId (layer, "frequency")),
+                                     ospProcessor.parameterValue (OspAudioProcessor::dampenParameterId (layer, "cutoff")), 0.0f };
+    const int note = ospProcessor.lastPlayedNote.load (std::memory_order_relaxed);
+    const bool modeMoved = signature[1] != shownSignature[1];
+    if ((! dragging && ! (now == curve)) || signature != shownSignature || note != shownNote)
+    {
+        if (! dragging)
+            curve = now;
+        shownSignature = signature;
+        shownNote = note;
+        if (modeMoved)
+            layoutFields();
+        repaint();
+    }
+}
+
+void DampenEditor::applyPreset (int preset)
+{
+    const auto next = preset <= 0 ? dampen::defaultCurve() : mod::presetCurve (static_cast<mod::CurvePreset> (preset - 1));
+    ospProcessor.undoManager.beginNewTransaction ("DAMPEN curve");
+    ospProcessor.setModulationCurve (OspAudioProcessor::dampenCurveIndex (layer), next, true);
+    curve = ospProcessor.modulationCurve (OspAudioProcessor::dampenCurveIndex (layer));
+    repaint();
+}
+
+void DampenEditor::resized()
+{
+    const float w = static_cast<float> (getWidth());
+    title = { 40.0f, 8.0f, 98.0f, 26.0f };
+    eqTab = { 140.0f, 9.0f, 34.0f, 24.0f };
+    closeArea = { w - 32.0f, 10.0f, 22.0f, 22.0f };
+    float x = closeArea.getX() - 10.0f;
+    auto take = [&x] (float width) {
+        x -= width;
+        const juce::Rectangle<float> r (x, 9.0f, width, 24.0f);
+        x -= 6.0f;
+        return r;
+    };
+    presets = take (64.0f);
+    const auto value = take (74.0f);
+    valueCaption = take (34.0f);
+    const auto amount = take (58.0f);
+    amountCaption = take (52.0f);
+    mode = take (136.0f);
+    amountField->setBounds (amount.getSmallestIntegerContainer());
+    frequencyField->setBounds (value.getSmallestIntegerContainer());
+    cutoffField->setBounds (value.getSmallestIntegerContainer());
+    layoutFields();
+}
+
+void DampenEditor::layoutFields()
+{
+    frequencyField->setVisible (! lowPass());
+    cutoffField->setVisible (lowPass());
+}
+
+void DampenEditor::paint (juce::Graphics& g)
+{
+    using namespace design;
+    const auto bounds = getLocalBounds().toFloat();
+    g.setColour (colour::wellA.withAlpha (0.92f));
+    g.fillRoundedRectangle (bounds, 10.0f);
+    const auto graph = graphArea();
+    const bool heard = enabled();
+
+    // Grid: the octaves (C0 .. C8) across, damping in quarters down.
+    g.setFont (type::popupLabel (10.5f));
+    for (int octave = 0; octave <= 8; ++octave)
+    {
+        const float x = toScreen (static_cast<float> (12 * (octave + 1)) / 127.0f, 0.0f).x;
+        g.setColour (colour::wellGrid.withAlpha (octave == 4 ? 1.0f : 0.55f));
+        g.fillRect (juce::Rectangle<float> (x - 0.5f, graph.getY(), 1.0f, graph.getHeight()));
+        g.setColour (colour::wellText.withAlpha (0.85f));
+        g.drawText ("C" + juce::String (octave), juce::Rectangle<float> (x - 14.0f, graph.getBottom() + 4.0f, 28.0f, 14.0f), juce::Justification::centred, false);
+    }
+    for (int q = 0; q <= 4; ++q)
+    {
+        const float y = graph.getY() + graph.getHeight() * static_cast<float> (q) / 4.0f;
+        g.setColour (colour::wellGrid.withAlpha (q == 0 ? 1.0f : 0.6f));
+        g.fillRect (juce::Rectangle<float> (graph.getX(), y - 0.5f, graph.getWidth(), 1.0f));
+    }
+    g.setColour (colour::wellText.withAlpha (0.8f));
+    g.drawText ("0", juce::Rectangle<float> (4.0f, graph.getY() - 7.0f, 30.0f, 14.0f), juce::Justification::centredRight, false);
+    g.drawText (lowPass() ? "LP" : "-18", juce::Rectangle<float> (4.0f, graph.getBottom() - 7.0f, 30.0f, 14.0f), juce::Justification::centredRight, false);
+
+    // The curve, the damping it takes filled below the top (dashed while DAMPEN is off).
+    const auto table = mod::compileCurve (curve);
+    juce::Path line;
+    for (int i = 0; i <= 200; ++i)
+    {
+        const float x = static_cast<float> (i) / 200.0f;
+        const auto p = toScreen (x, static_cast<float> (mod::curveAt (table, x)));
+        i == 0 ? line.startNewSubPath (p) : line.lineTo (p);
+    }
+    if (heard)
+    {
+        auto fill = line;
+        fill.lineTo (graph.getRight(), graph.getY());
+        fill.lineTo (graph.getX(), graph.getY());
+        fill.closeSubPath();
+        g.setColour (dampenColour.withAlpha (0.16f));
+        g.fillPath (fill);
+        g.setColour (dampenColour);
+        g.strokePath (line, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    }
+    else
+    {
+        juce::Path dashed;
+        const float dashes[] { 4.0f, 4.0f };
+        juce::PathStrokeType (1.2f).createDashedStroke (dashed, line, dashes, 2);
+        g.setColour (dampenColour.withAlpha (0.45f));
+        g.fillPath (dashed);
+    }
+    for (int i = 0; i < curve.count; ++i)
+    {
+        const auto at = pointPosition (i);
+        const float r = i == hoverPoint || i == dragPoint ? 6.0f : 4.5f;
+        g.setColour (colour::wellA);
+        g.fillEllipse (juce::Rectangle<float> (2.0f * r + 3.0f, 2.0f * r + 3.0f).withCentre (at));
+        g.setColour (heard ? dampenColour : dampenColour.withAlpha (0.6f));
+        g.fillEllipse (juce::Rectangle<float> (2.0f * r, 2.0f * r).withCentre (at));
+    }
+    // The last key played: where it sits on the curve.
+    if (const int note = ospProcessor.lastPlayedNote.load (std::memory_order_relaxed); note >= 0)
+    {
+        const float x = static_cast<float> (note) / 127.0f;
+        const auto at = toScreen (x, static_cast<float> (mod::curveAt (table, x)));
+        g.setColour (colour::accent.withAlpha (0.55f));
+        g.fillRect (juce::Rectangle<float> (at.x - 0.5f, graph.getY(), 1.0f, graph.getHeight()));
+        g.setColour (colour::accent);
+        g.fillEllipse (juce::Rectangle<float> (7.0f, 7.0f).withCentre (at));
+    }
+
+    // The top row.
+    {
+        const auto p = powerArea();
+        g.setColour (heard ? colour::accent : colour::wellText.withAlpha (0.6f));
+        juce::Path icon;
+        icon.addCentredArc (p.getCentreX(), p.getCentreY() + 1.0f, 7.0f, 7.0f, 0.0f, 0.65f, 2.0f * juce::MathConstants<float>::pi - 0.65f, true);
+        g.strokePath (icon, juce::PathStrokeType (1.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        g.drawLine (p.getCentreX(), p.getY() + 2.0f, p.getCentreX(), p.getCentreY(), 1.6f);
+        g.setFont (type::panelHeader());
+        g.setColour (juce::Colour (0xffeee8dd).withAlpha (heard ? 0.95f : 0.6f));
+        g.drawText ("DAMPEN " + OspAudioProcessor::layerName (layer), title, juce::Justification::centredLeft, false);
+        g.setFont (type::popupLabel (12.0f));
+        g.setColour (colour::wellText.brighter (0.2f));
+        g.drawText ("EQ", eqTab, juce::Justification::centred, false);
+    }
+    for (int k = 0; k < 2; ++k)
+    {
+        const auto cell = mode.withWidth (0.5f * mode.getWidth()).translated (static_cast<float> (k) * 0.5f * mode.getWidth(), 0.0f).reduced (1.0f, 0.0f);
+        const bool on = lowPass() == (k == 1);
+        g.setColour (on ? dampenColour.withAlpha (0.35f) : juce::Colour (0xff2b3031));
+        g.fillRoundedRectangle (cell, 5.0f);
+        g.setColour (on ? dampenColour : juce::Colour (0xff3e4446));
+        g.drawRoundedRectangle (cell.reduced (0.5f), 5.0f, 1.0f);
+        g.setFont (type::popupValue (11.5f));
+        g.setColour (juce::Colour (0xffeee8dd).withAlpha (on ? 1.0f : 0.6f));
+        g.drawText (k == 0 ? "SHELF" : "LOW-PASS", cell, juce::Justification::centred, false);
+    }
+    g.setFont (type::popupLabel (11.0f));
+    g.setColour (colour::wellText.brighter (0.2f));
+    g.drawText ("AMOUNT", amountCaption, juce::Justification::centredRight, false);
+    g.drawText (lowPass() ? "MIN" : "FREQ", valueCaption, juce::Justification::centredRight, false);
+    g.setColour (juce::Colour (0xff2b3031));
+    g.fillRoundedRectangle (presets.reduced (0.5f), 5.0f);
+    g.setColour (juce::Colour (0xff3e4446));
+    g.drawRoundedRectangle (presets.reduced (0.5f), 5.0f, 1.0f);
+    g.setColour (juce::Colour (0xffeee8dd).withAlpha (0.85f));
+    g.drawText (juce::String::fromUTF8 ("CURVE \xe2\x96\xbe"), presets, juce::Justification::centred, false);
+    {
+        const auto x = closeArea.reduced (6.0f);
+        g.setColour (colour::wellText.brighter (0.3f));
+        g.drawLine (x.getX(), x.getY(), x.getRight(), x.getBottom(), 1.4f);
+        g.drawLine (x.getRight(), x.getY(), x.getX(), x.getBottom(), 1.4f);
+    }
+    if (! heard)
+    {
+        g.setFont (type::popupLabel (12.0f));
+        g.setColour (colour::wellText);
+        g.drawText ("DAMPEN is off: switch it on to tame bright high notes", graph.withHeight (22.0f).translated (0.0f, 6.0f), juce::Justification::centred, false);
+    }
+}
+
+void DampenEditor::mouseMove (const juce::MouseEvent& e)
+{
+    if (const int now = pointAt (e.position); now != hoverPoint)
+    {
+        hoverPoint = now;
+        setMouseCursor (now >= 0 ? juce::MouseCursor::DraggingHandCursor : juce::MouseCursor::NormalCursor);
+        repaint();
+    }
+}
+
+void DampenEditor::mouseDown (const juce::MouseEvent& e)
+{
+    const auto p = e.position;
+    auto set = [] (juce::RangedAudioParameter* param, float value) {
+        if (param == nullptr)
+            return;
+        param->beginChangeGesture();
+        param->setValueNotifyingHost (param->convertTo0to1 (value));
+        param->endChangeGesture();
+    };
+    if (closeArea.contains (p))
+    {
+        if (onClose != nullptr)
+            onClose();
+        return;
+    }
+    if (eqTab.contains (p))
+    {
+        if (onShowEq != nullptr)
+            onShowEq();
+        return;
+    }
+    if (powerArea().expanded (4.0f).contains (p) || title.contains (p))
+    {
+        ospProcessor.undoManager.beginNewTransaction (enabled() ? "DAMPEN off" : "DAMPEN on");
+        set (parameter ("enabled"), enabled() ? 0.0f : 1.0f);
+        refresh();
+        return;
+    }
+    if (mode.contains (p))
+    {
+        ospProcessor.undoManager.beginNewTransaction ("DAMPEN mode");
+        set (parameter ("mode"), p.x >= mode.getCentreX() ? 1.0f : 0.0f);
+        refresh();
+        return;
+    }
+    if (presets.contains (p))
+    {
+        juce::PopupMenu menu;
+        juce::Component::SafePointer<DampenEditor> safe (this);
+        menu.addItem ("High notes (default)", [safe] { if (safe != nullptr) safe->applyPreset (0); });
+        for (const auto preset : { mod::CurvePreset::lowToHigh, mod::CurvePreset::highOnly, mod::CurvePreset::highToLow, mod::CurvePreset::lowOnly,
+                                   mod::CurvePreset::midEmphasis, mod::CurvePreset::flat })
+            menu.addItem (mod::curvePresetName (preset), [safe, preset] { if (safe != nullptr) safe->applyPreset (static_cast<int> (preset) + 1); });
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea (localAreaToGlobal (presets.getSmallestIntegerContainer())));
+        return;
+    }
+    curve = ospProcessor.modulationCurve (OspAudioProcessor::dampenCurveIndex (layer));
+    before = curve;
+    dragPoint = pointAt (p);
+    dragSegment = -1;
+    if (dragPoint < 0 && graphArea().contains (p))
+    {
+        // A press on the line bends that segment (its end point's tension).
+        const float x = fromScreen (p).x;
+        for (int i = 1; i < curve.count; ++i)
+            if (x <= curve.points[static_cast<std::size_t> (i)].x)
+            {
+                dragSegment = i;
+                break;
+            }
+        if (dragSegment > 0)
+            dragStartTension = curve.points[static_cast<std::size_t> (dragSegment)].tension;
+    }
+    dragStart = p;
+    dragging = dragPoint >= 0 || dragSegment > 0;
+}
+
+void DampenEditor::mouseDrag (const juce::MouseEvent& e)
+{
+    if (! dragging)
+        return;
+    if (dragPoint >= 0)
+    {
+        auto& point = curve.points[static_cast<std::size_t> (dragPoint)];
+        const auto p = fromScreen (e.position);
+        if (dragPoint > 0 && dragPoint < curve.count - 1)
+            point.x = juce::jlimit (curve.points[static_cast<std::size_t> (dragPoint - 1)].x + 0.005f,
+                                    curve.points[static_cast<std::size_t> (dragPoint + 1)].x - 0.005f, p.x);
+        point.y = p.y;
+    }
+    else
+    {
+        const auto& a = curve.points[static_cast<std::size_t> (dragSegment - 1)];
+        auto& b = curve.points[static_cast<std::size_t> (dragSegment)];
+        const float direction = b.y >= a.y ? -1.0f : 1.0f;   // the graph runs downwards
+        b.tension = juce::jlimit (-1.0f, 1.0f, dragStartTension + direction * (e.position.y - dragStart.y) / 80.0f);
+    }
+    ospProcessor.setModulationCurve (OspAudioProcessor::dampenCurveIndex (layer), curve, false);   // heard while dragging; one undo step on release
+    repaint();
+}
+
+void DampenEditor::mouseUp (const juce::MouseEvent&)
+{
+    if (dragging && ! (curve == before))
+    {
+        const auto edited = curve;
+        ospProcessor.setModulationCurve (OspAudioProcessor::dampenCurveIndex (layer), before, false);
+        ospProcessor.undoManager.beginNewTransaction ("DAMPEN curve");
+        ospProcessor.setModulationCurve (OspAudioProcessor::dampenCurveIndex (layer), edited, true);
+    }
+    dragging = false;
+    dragPoint = dragSegment = -1;
+    repaint();
+}
+
+void DampenEditor::mouseDoubleClick (const juce::MouseEvent& e)
+{
+    if (! graphArea().expanded (6.0f).contains (e.position))
+        return;
+    auto next = ospProcessor.modulationCurve (OspAudioProcessor::dampenCurveIndex (layer));
+    curve = next;
+    const int hit = pointAt (e.position);
+    if (hit > 0 && hit < next.count - 1)
+        next.remove (hit);
+    else if (hit < 0)
+    {
+        const auto p = fromScreen (e.position);
+        next.add ({ p.x, p.y, 0.0f });
+    }
+    else
+        return;
+    ospProcessor.undoManager.beginNewTransaction ("DAMPEN curve");
+    ospProcessor.setModulationCurve (OspAudioProcessor::dampenCurveIndex (layer), next, true);
+    curve = ospProcessor.modulationCurve (OspAudioProcessor::dampenCurveIndex (layer));
+    hoverPoint = -1;
+    repaint();
 }
 
 } // namespace osp::plugin

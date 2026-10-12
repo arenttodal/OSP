@@ -4,6 +4,7 @@
 #include "audio/pitch/SincInterpolator.h"
 #include "core/Prng.h"
 #include "engine/CharacterFilter.h"
+#include "engine/Dampen.h"
 #include "engine/GranularSource.h"
 #include "engine/Modulation.h"
 #include "engine/MirageEngine.h"
@@ -47,6 +48,8 @@ struct InstrumentVoiceStart
         engine, reading the layer's live amount and settings from `reimagined`. */
     ReimaginedMode reimaginedMode = ReimaginedMode::kaleidoscope;
     const ReimaginedLive* reimagined = nullptr;
+    /** The layer's DAMPEN (read live at control rate); null: none. */
+    const dampen::Settings* dampen = nullptr;
 };
 
 /**
@@ -276,6 +279,7 @@ private:
     double modCutoff = 0.0, modResonance = 0.0, modSustain = 0.0;
     double modGrainPosition = 0.0, modGrainSpread = 0.0, modGrainSize = 0.0, modGrainDensity = 0.0;
     double modStartOffset = 0.0;   ///< START modulation taken at note-on (0..1 of the recording)
+    double modDampenAmount = 0.0, modDampenShelf = 0.0, modDampenCutoff = 0.0;
     AdsrSettings noteAdsr {};   ///< the envelope as this note took it (ATTACK, DECAY at note-on)
     double appliedSustain = -1.0;
     /** Starts, advances (or stops) the voice's modulation and gathers its offsets. */
@@ -295,6 +299,14 @@ private:
     double velocityOctaves = 0.0, envelopeScale = 1.0;
     double driftTone = 0.0, driftToneTarget = 0.0;
     void updateCharacter (bool immediate) noexcept;
+
+    // DAMPEN: the note's own damping by its key (after CHARACTER), control rate
+    const dampen::Settings* dampenLive = nullptr;
+    dampen::Filter dampenFilter;
+    int dampenNote = 60;
+    double dampenNow = 0.0, dampenApplied = -1.0, dampenShelfApplied = 0.0, dampenCutoffApplied = 0.0;
+    dampen::Mode dampenModeApplied = dampen::Mode::softShelf;
+    void updateDampen (bool immediate) noexcept;
     /** The layer's live grain settings with this note's LIFE variation applied. */
     GranularParams notesGranular() const noexcept;
 

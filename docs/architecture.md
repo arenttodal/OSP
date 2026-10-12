@@ -537,6 +537,27 @@ the global LFOs' EQ routes (`effectiveEq`) every 32-sample control chunk, and th
 glides to them. Off, it is not in the path (bit-identical). The editor (`EqEditor`) draws
 `eq::responseDb`, the exact response of the running sections. Report: `docs/reports/eq.md`.
 
+## FINAL MODULATION AND DAMPEN (state 12, parameters v19; docs/reports/mod-final.md)
+
+Sources appended to `mod::Source` (saved by index): VEL and NOTE (per note; on a shared
+stage the player's latest key, `Runtime::setInputNote`, which the processor feeds from the
+keys while the arpeggiator owns the notes), CC 1-4 and PRESSURE (global, glided like the
+wheel). VEL and NOTE go through their own `mod::Curve` (the same bounded, tension-shaped
+curves as the LFO and envelope shapes); APPLY TO AMP (`Settings::velocityToAmp`) lets the VEL
+curve replace DYNAMICS' Soft / Linear / Hard for the amplitude, and the presets reproduce
+those three exactly. The panel has six tabs (AMP | ENV | LFO 1 | LFO 2 | VEL | NOTE); ENV 2
+keeps working without a tab. The curves live in the state as `modCurves` "c3" (nine: LFOs,
+envelopes, VEL, NOTE, DAMPEN A-C), published like before through atomics and a generation.
+ARP destinations (shared): the processor reads the engine's last control period
+(`InstrumentEngine::arpModulation`) before running the arpeggiator. RATE is a multiplier on
+the step clock: off 1x the arpeggiator runs a phase accumulator in steps (no restart; at 1x
+the plain clock, back on the host's grid at the boundary nearest the expected step); Stepped
+latches musical ratios at a step. OCTAVES by modulation applies at the next cycle. DAMPEN
+(`engine/Dampen`): per voice after CHARACTER at both voice tails, a high shelf (to -18 dB) or a
+12 dB/oct low-pass whose amount is the layer's curve at the sounding key times AMOUNT (plus its
+routes), glided at control rate and skipped at 0 (bypassed by default: bit-identical). The
+editor is the EQ overlay's second page (`DampenEditor`, EQ | DAMPEN).
+
 ## RENDERED CONTROLS (tools/blender-assets; docs/reports/knob-phase1.md)
 
 Controls can be drawn from offline renders instead of vectors.

@@ -99,6 +99,10 @@ void Arpeggiator::reset() noexcept
     stepCount = 0;
     previousIndex = -1;
     phraseCounter = 0;
+    cycleOrigin = 0;
+    pendingOctaves = 0;
+    rateMultiplier = pendingRate = 1.0;
+    modClock = false;
     for (auto& h : history)
         h = { -1, -1 };
     offTime.fill (never);
@@ -112,10 +116,12 @@ void Arpeggiator::restartPattern() noexcept
     if (running)
     {
         stepCount = 0;
+        cycleOrigin = 0;
         previousIndex = -1;
         phraseSeed = Prng::deriveSeed (baseSeed, phraseCounter++, 0x417270);
         for (auto& h : history)
             h = { -1, -1 };
+        modClock = false;   // the first step of the new phrase is on the plain clock
     }
 }
 
@@ -129,6 +135,15 @@ void Arpeggiator::beginBlock (const Settings& s, const HostTiming& timing, int n
     next.gate = std::clamp (std::isfinite (next.gate) ? next.gate : 0.75, arp::minGate, arp::maxGate);
     next.octaves = std::clamp (next.octaves, arp::minOctaves, arp::maxOctaves);
     next.swing = std::clamp (std::isfinite (next.swing) ? next.swing : 0.0, 0.0, arp::maxSwing);
+    next.velocityScale = std::clamp (std::isfinite (next.velocityScale) ? next.velocityScale : 1.0, 0.0, 2.0);
+    next.rateMultiplier = std::clamp (std::isfinite (next.rateMultiplier) ? next.rateMultiplier : 1.0, 0.25, 4.0);
+    // OCTAVES by modulation: kept until the next cycle starts (fireStep).
+    pendingOctaves = 0;
+    if (next.octavesAtCycle && running && next.octaves != settings.octaves)
+    {
+        pendingOctaves = next.octaves;
+        next.octaves = settings.octaves;
+    }
     if (next.pattern != settings.pattern || next.octaves != settings.octaves)
         sequenceDirty = true;
     const bool wantEnabled = next.enabled;
@@ -168,6 +183,16 @@ void Arpeggiator::beginBlock (const Settings& s, const HostTiming& timing, int n
         hadSync = false;
     }
 
+    // ARP RATE: smooth follows each block; stepped waits for a step (or applies while idle).
+    pendingRate = settings.rateMultiplier;
+    if (! settings.rateStepped || ! running)
+        rateMultiplier = pendingRate;
+    const bool modulated = running && stepCount > 0 && rateMultiplier != 1.0;
+    if (modulated && ! modClock)
+        enterModulatedClock();
+    else if (! modulated && modClock)
+        leaveModulatedClock();
+
     if (wantEnabled != enabled)
     {
         enabled = wantEnabled;
@@ -182,6 +207,13 @@ void Arpeggiator::beginBlock (const Settings& s, const HostTiming& timing, int n
 void Arpeggiator::endBlock() noexcept
 {
     advanceTo (blockSize);
+    if (modClock)
+    {
+        // The phase moves on at this block's speed; the next block may run at another.
+        const double end = static_cast<double> (blockStart + blockSize);
+        modPhase += (end - modPhaseTime) * rateMultiplier / stepSamples();
+        modPhaseTime = end;
+    }
     blockStart += blockSize;
     cursor = 0;
 }
@@ -543,6 +575,48 @@ void Arpeggiator::syncGridTo (int offset) noexcept
     gridIndex = static_cast<std::int64_t> (std::floor (after / gridQuarters));
 }
 
+double Arpeggiator::swingSteps (std::int64_t index) const noexcept
+{
+    return (index % 2 + 2) % 2 == 1 ? settings.swing * 0.5 : 0.0;
+}
+
+void Arpeggiator::enterModulatedClock() noexcept
+{
+    // From the last step's time on the straight grid (both clocks keep it).
+    const double now = static_cast<double> (blockStart + cursor);
+    modPhase = std::max (0.0, (now - lastStepExact) / stepSamples());
+    modPhaseTime = now;
+    modClock = true;
+}
+
+void Arpeggiator::leaveModulatedClock() noexcept
+{
+    modClock = false;
+    const double S = stepSamples();
+    const double now = static_cast<double> (blockStart + cursor);
+    lastStepExact = now - modPhase * S;   // the free clock goes on with the same phase
+    if (! synced)
+        return;
+    // Back on the host's grid: the boundary nearest where the next step was due (never one
+    // already past), so the hand-over neither doubles nor drops a step.
+    const double spq = samplesPerQuarter();
+    const double due = ppqStart + (lastStepExact + S - static_cast<double> (blockStart)) / spq;
+    const auto nearest = static_cast<std::int64_t> (std::llround (due / gridQuarters));
+    const auto first = static_cast<std::int64_t> (std::floor ((ppqStart + (cursor - 1 + timeEpsilon) / spq) / gridQuarters)) + 1;
+    gridIndex = std::max (nearest, first) - 1;
+}
+
+bool Arpeggiator::atCycleStart() const noexcept
+{
+    ensureSequence();
+    if (sequenceLength == 0)
+        return true;
+    std::int64_t length = sequenceLength;
+    if (settings.pattern == ArpPattern::chord)
+        length = std::max (1, std::min (settings.octaves, (127 - sequence[0].note) / 12 + 1));
+    return patternStep (stepCount) % length == 0;
+}
+
 double Arpeggiator::swingDelay (std::int64_t index) const noexcept
 {
     // SWING delays the off-beat steps: on the host's grid the odd grid positions (so the
@@ -556,6 +630,12 @@ std::int64_t Arpeggiator::nextStepTime() const noexcept
     if (! running)
         return never;
     const std::int64_t now = blockStart + cursor;
+    if (modClock)
+    {
+        // The step is due when the phase reaches it (plus its SWING), at this block's speed.
+        const double due = modPhaseTime + (1.0 + swingSteps (stepCount) - modPhase) * stepSamples() / rateMultiplier;
+        return std::max (now, static_cast<std::int64_t> (std::ceil (due - timeEpsilon)));
+    }
     if (synced)
     {
         const double boundary = static_cast<double> (gridIndex + 1) * gridQuarters;
@@ -572,6 +652,8 @@ void Arpeggiator::startPhrase (int offset) noexcept
 {
     running = true;
     stepCount = 0;
+    cycleOrigin = 0;
+    modClock = false;
     previousIndex = -1;
     phraseSeed = Prng::deriveSeed (baseSeed, phraseCounter++, 0x417270);
     for (auto& h : history)
@@ -621,7 +703,17 @@ void Arpeggiator::fireStep (std::int64_t time) noexcept
 {
     // The clock first: whatever happens below, this step is done. A step that is late (the
     // host moved a little) plays now, once; older ones are not caught up.
-    if (synced)
+    if (modClock)
+    {
+        const double S = stepSamples();
+        double exact = modPhaseTime + (1.0 + swingSteps (stepCount) - modPhase) * S / rateMultiplier;
+        if (exact < static_cast<double> (time) - 1.0)
+            exact = static_cast<double> (time);
+        modPhase = swingSteps (stepCount);   // the phase now counts from this step's straight time
+        modPhaseTime = exact;
+        lastStepExact = exact - modPhase * S / rateMultiplier;
+    }
+    else if (synced)
     {
         const double spq = samplesPerQuarter();
         const auto latest = static_cast<std::int64_t> (std::floor ((ppqStart + (cursor - swingDelay (gridIndex + 1) + timeEpsilon) / spq) / gridQuarters));
@@ -637,11 +729,29 @@ void Arpeggiator::fireStep (std::int64_t time) noexcept
             exact = static_cast<double> (time) - delay;
         lastStepExact = exact;
     }
+    // ARP RATE stepped: the new ratio from this step on. Off 1x the accumulator takes over
+    // from here (the first step of a phrase plays on the plain clock).
+    if (settings.rateStepped)
+        rateMultiplier = pendingRate;
+    if (! modClock && rateMultiplier != 1.0)
+    {
+        modClock = true;
+        modPhase = (static_cast<double> (time) - lastStepExact) / stepSamples();
+        modPhaseTime = static_cast<double> (time);
+    }
+    // OCTAVES by modulation: at the start of a cycle, and the new cycle from the beginning.
+    if (pendingOctaves > 0 && atCycleStart())
+    {
+        settings.octaves = pendingOctaves;
+        pendingOctaves = 0;
+        sequenceDirty = true;
+        cycleOrigin = stepCount;
+    }
 
     std::array<Step, maxHeld> notes;
     int index = -1;
-    const int count = stepNotes (stepCount, previousIndex, notes, index);
-    const auto gateSamples = std::max<std::int64_t> (1, std::llround (settings.gate * stepSamples()));
+    const int count = stepNotes (patternStep (stepCount), previousIndex, notes, index);
+    const auto gateSamples = std::max<std::int64_t> (1, std::llround (settings.gate * stepSamples() / rateMultiplier));
 
     // A pitch still sounding (gate above 100 %) ends right before it plays again: the engine
     // ends every voice of a pitch on its note-off, so the old note-off must not reach the new one.
@@ -658,7 +768,9 @@ void Arpeggiator::fireStep (std::int64_t time) noexcept
     for (int i = 0; i < count; ++i)
     {
         const auto& s = notes[static_cast<std::size_t> (i)];
-        if (offTime[s.note] == never && emit (time, Event::Kind::noteOn, s.note, std::max<int> (1, s.velocity), s.channel))
+        const int velocity = settings.velocityScale == 1.0 ? static_cast<int> (s.velocity)
+                                                           : static_cast<int> (std::lround (settings.velocityScale * s.velocity));
+        if (offTime[s.note] == never && emit (time, Event::Kind::noteOn, s.note, std::clamp (velocity, 1, 127), s.channel))
         {
             offTime[s.note] = time + gateSamples;
             offChannel[s.note] = s.channel;
@@ -725,7 +837,7 @@ void Arpeggiator::display (Display& out) const noexcept
             continue;
         }
         int index = -1;
-        const int count = stepNotes (s, previous, notes, index);
+        const int count = stepNotes (patternStep (s), previous, notes, index);
         previous = index;
         if (count == 0)
             continue;

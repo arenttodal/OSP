@@ -626,8 +626,16 @@ void InstrumentEngine::noteOn (int note, int velocity, int channel) noexcept
         return;
     }
     modRuntime.noteStarted (note, channel);
-    // DYNAMICS curve: SOFT reaches expressive levels easily, HARD needs a firm touch.
-    velocity = shaping::curvedVelocity (config.shaping.velocityCurve, velocity);
+    // VEL takes the raw velocity (its own curve); the voices read it as they start.
+    modRuntime.noteVelocity = std::clamp (velocity, 1, 127);
+    if (! externalInputNotes)
+        modRuntime.setInputNote (note, velocity);
+    // DYNAMICS curve: SOFT reaches expressive levels easily, HARD needs a firm touch. With
+    // APPLY TO AMP the VEL curve takes its place (one curve, never both).
+    if (modRuntime.settings.velocityToAmp)
+        velocity = std::clamp (static_cast<int> (std::lround (127.0 * mod::curveAt (modRuntime.settings.velCurve, std::clamp (velocity, 1, 127) / 127.0))), 1, 127);
+    else
+        velocity = shaping::curvedVelocity (config.shaping.velocityCurve, velocity);
     if (occupiedLayerCount() == 0)
         return;
     // One event for every layer (same note order and performance memory); layers B and C
@@ -816,6 +824,7 @@ void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int
     params.layerIndex = layerNumber;
     params.sourceMode = config.sourceMode[context];
     params.granular = &slots[context].liveGranular;
+    params.dampen = &layerDampen[context];
     params.startFraction = layerSettings.start;
     params.reverse = layerSettings.reverse;
     params.follow = layerSettings.follow;
@@ -888,6 +897,8 @@ void InstrumentEngine::setModulation (const mod::Settings& settings) noexcept
         // The last route to a shared stage went: the stages go back to the stored values.
         modReimaginedOffset.fill (0.0);
         modLifeOffset = 0.0;
+        modArpOffset.fill (0.0);
+        modArpRouted.fill (false);
         for (auto& o : modEqOffset)
             o.fill (0.0);
         modGlobalApplied = false;
@@ -901,7 +912,11 @@ void InstrumentEngine::applyGlobalModulation (int samples) noexcept
 {
     modRuntime.advanceGlobal (samples, sampleRate);
     if (! modRuntime.compiled.anyGlobalDest)
+    {
+        modArpOffset.fill (0.0);
+        modArpRouted.fill (false);
         return;
+    }
     // Effective values next to the stored ones (config.macros never changes here).
     // The shared stages hear the global envelopes too; REIMAGINED's layer amount (a voice
     // destination whose shared stage follows it) takes only the sources with one value here,
@@ -931,7 +946,25 @@ void InstrumentEngine::applyGlobalModulation (int samples) noexcept
         modEqOffset[l] = { offset (layerDest (mod::Dest::eqBellFrequencyA)), offset (layerDest (mod::Dest::eqBellGainA)),
                            offset (layerDest (mod::Dest::eqLowShelfGainA)), offset (layerDest (mod::Dest::eqHighShelfGainA)) };
     }
+    for (int i = 0; i < arpDestCount; ++i)
+    {
+        const auto d = static_cast<mod::Dest> (static_cast<int> (mod::Dest::arpRate) + i);
+        modArpRouted[static_cast<std::size_t> (i)] = c.has (d);
+        modArpOffset[static_cast<std::size_t> (i)] = offset (d);
+    }
     modGlobalApplied = true;
+}
+
+double InstrumentEngine::arpModulation (mod::Dest d) const noexcept
+{
+    const int i = static_cast<int> (d) - static_cast<int> (mod::Dest::arpRate);
+    return i >= 0 && i < arpDestCount ? modArpOffset[static_cast<std::size_t> (i)] : 0.0;
+}
+
+bool InstrumentEngine::arpModulated (mod::Dest d) const noexcept
+{
+    const int i = static_cast<int> (d) - static_cast<int> (mod::Dest::arpRate);
+    return i >= 0 && i < arpDestCount && modArpRouted[static_cast<std::size_t> (i)];
 }
 
 void InstrumentEngine::publishModulation() noexcept
@@ -954,7 +987,12 @@ void InstrumentEngine::publishModulation() noexcept
         modViewEnvTime[i].store (static_cast<float> (envTime), std::memory_order_relaxed);
         modViewEnvStage[i].store (env != nullptr ? static_cast<int> (env->stage) : 0, std::memory_order_relaxed);
     }
-    modViewValue[4].store (modRuntime.globalValue[4], std::memory_order_relaxed);   // the wheel
+    // The wheel and the controllers; VEL and NOTE: the newest voice's, else the input key's.
+    for (std::size_t i = mod::slot::modWheel; i < modViewValue.size(); ++i)
+        modViewValue[i].store (modRuntime.sharedValue[i], std::memory_order_relaxed);
+    if (newest != nullptr)
+        for (const auto i : { mod::slot::vel, mod::slot::note })
+            modViewValue[static_cast<std::size_t> (i)].store (newest->modulationState().values[static_cast<std::size_t> (i)], std::memory_order_relaxed);
     for (std::size_t i = 0; i < 2; ++i)
         modViewGlobalEnv[i].store (static_cast<float> (modRuntime.globalEnv[i].level), std::memory_order_relaxed);
     modViewVoice.store (newest != nullptr, std::memory_order_release);

@@ -373,8 +373,21 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       reports (design-lab/review/). Round 2 chosen: 09 Warm Ceramic + Teak (C1 fader on T3,
       lens LEDs, painted divider); style guide and build spec in
       docs/design/warm-ceramic-teak-style-guide.md; built (CERAMIC SKIN above).
-- [ ] FINAL MODULATION SYSTEM + DAMPEN (queued spec, stages 0-10): Stage 0 audit done
-      (docs/reports/mod-final-audit.md); implementation next.
+- [ ] FINAL MODULATION SYSTEM + DAMPEN (queued spec, stages 0-10; design
+      docs/reports/mod-final.md): Stage 0 audit done (docs/reports/mod-final-audit.md).
+      Stages 1-4 done: sources VEL, NOTE, CC 1-4 and PRESSURE appended (VEL and NOTE per note,
+      the shared stages following the player's latest key, also behind the arpeggiator);
+      six tabs AMP | ENV | LFO 1 | LFO 2 | VEL | NOTE (ENV 2 legacy: no tab, its routes still
+      work and show; older sessions' tab migrated); VEL and NOTE curves with presets, the
+      played-key marker and APPLY TO AMP (older sessions keep their DYNAMICS response
+      exactly; `dynamics.curve` sets the VEL curve when moved); curves saved as "c2"; CC 1-4
+      follow controllers 2, 11, 16, 17 by default, chosen or learned from any control's
+      right-click menu (MIDI Controllers), saved with the session. Stage 5 done: ARP RATE
+      (phase-accumulator clock, smooth or Stepped), GATE, SWING, OCTAVES (next cycle) and the
+      new ARP VELOCITY as destinations. Stage 6 done (DSP, editor, destinations): DAMPEN per
+      layer and voice (Soft Shelf / Low-Pass by key, EQ | DAMPEN page), off by default.
+      Stage 7: state 12. Still open: the resampling audit, CPU measurements, scenarios A-J,
+      screenshots (docs/reports/mod-final.md, Results). Tests [mod-final], [dampen].
 - [x] `plugin-pipeline/`: the build-and-download pipeline as a reusable kit for other JUCE
       plug-ins (`adopt.sh` for an existing repo, `new-plugin.sh` + starter for a new one, a fixed
       download link per branch); self-tested on macOS and Windows by its own workflow.

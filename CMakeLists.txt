@@ -75,6 +75,7 @@ add_library(osp_dsp STATIC
     src/engine/Arpeggiator.cpp
     src/engine/Modulation.cpp
     src/engine/LayerEq.cpp
+    src/engine/Dampen.cpp
     src/engine/GranularSource.cpp
     src/engine/RhythmicShaper.cpp
     src/engine/SampleSetInference.cpp

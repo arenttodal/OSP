@@ -99,6 +99,8 @@ public:
 
     /** The collapse button (top right): hides the editor (a view setting). */
     std::function<void()> onCollapse;
+    /** A right-click on OCTAVES (ARP OCTAVES as a modulation destination). */
+    std::function<void()> onOctavesMenu;
 
     /** Pulls the scheduler's step display and the parameters (editor timer, ~30 Hz). */
     void refresh();
@@ -151,7 +153,7 @@ private:
 
     OspAudioProcessor& ospProcessor;
     juce::ParameterAttachment enabledAttachment, patternAttachment, octavesAttachment;
-    MiniKnob rate, gate, swing;
+    MiniKnob rate, gate, swing, velocity;
     bool enabled = false;
     int pattern = 0, octaveCount = 1;
     OspAudioProcessor::ArpView shown;
