@@ -136,7 +136,24 @@ public:
     void releaseAuditionedPad (int pad);
 
     /** View settings, saved with the session (not parameters, not undoable). */
-    bool nineLayout = false;   ///< 3x3 instead of 2x4
+    /** The pad grid: one row of 8 (the default, as the mockup), 2 x 4, or 3 x 3. */
+    enum class PadLayout
+    {
+        row8,
+        grid8,
+        grid9
+    };
+    PadLayout padLayout = PadLayout::row8;
+    std::string kitName = "New Kit";   ///< shown in the top bar (double-click to rename); saved
+    bool isNineLayout() const noexcept { return padLayout == PadLayout::grid9; }
+    int visiblePads() const noexcept { return isNineLayout() ? 9 : 8; }
+    static const char* layoutName (PadLayout l) noexcept { return l == PadLayout::grid9 ? "3x3" : l == PadLayout::grid8 ? "2x4" : "1x8"; }
+
+    /** Output peaks since the last call (display meter; lock-free, resets on read). */
+    std::pair<float, float> takeOutputPeaks() noexcept
+    {
+        return { outPeakL.exchange (0.0f, std::memory_order_relaxed), outPeakR.exchange (0.0f, std::memory_order_relaxed) };
+    }
     int selectedPad = 0;
 
     /** Display: hits since prepare and sounding voices (lock-free). */
@@ -210,6 +227,7 @@ private:
     std::array<int, 128> learnNotes {};
     std::array<std::atomic<std::uint32_t>, 4> heldBits {};
     std::atomic<int> lastNote { -1 };
+    std::atomic<float> outPeakL { 0.0f }, outPeakR { 0.0f };
 
     // Audio thread caches
     struct Pulled

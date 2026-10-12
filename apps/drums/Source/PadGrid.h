@@ -97,7 +97,7 @@ public:
     std::function<void (int pad)> onSelect;      ///< a pad was selected (the editor follows)
     std::function<void (int pad)> onLoadRequest; ///< "Load sample..." from a pad's menu
 
-    int visibleCells() const noexcept { return proc.nineLayout ? 9 : 8; }
+    int visibleCells() const noexcept { return proc.visiblePads(); }
     /** For tests: the cell of a screen slot. */
     PadView& cell (int slot) { return *cells[static_cast<std::size_t> (slot)]; }
     static constexpr float gap = 10.0f;

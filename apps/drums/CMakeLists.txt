@@ -37,6 +37,7 @@ target_sources(ANDOR_Drums PRIVATE
     Source/DrumsEditor.cpp
     Source/PadGrid.cpp
     Source/KeyMapEditor.cpp
+    Source/CeramicSkin.cpp
     ${OSP_PLUGIN_SOURCE_DIR}/InstrumentLoader.cpp
     ${OSP_PLUGIN_SOURCE_DIR}/OspLookAndFeel.cpp
     ${OSP_PLUGIN_SOURCE_DIR}/Design.cpp

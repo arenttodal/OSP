@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CeramicSkin.h"
 #include "DrumsProcessor.h"
 
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -144,19 +145,19 @@ private:
     int lastShownNote = -1;
 
     // header
-    juce::TextButton padMode { "PAD" }, expandedMode { "EXPANDED" };
+    ceramic::KeyButton padMode { "PAD" }, expandedMode { "EXPANDED" };
     juce::ComboBox autoMap;
-    juce::TextButton learnButton { "LEARN" }, overlapButton { "ALLOW OVERLAP" };
-    juce::TextButton undoButton { "UNDO" }, redoButton { "REDO" };
-    juce::TextButton zoomOut { "-" }, zoomIn { "+" }, fitButton { "FIT" }, allButton { "0-127" };
-    juce::TextButton doneButton { "DONE" };
-    juce::TextButton applyButton { "APPLY" }, cancelButton { "CANCEL" };
+    ceramic::KeyButton learnButton { "LEARN" }, overlapButton { "ALLOW OVERLAP" };
+    ceramic::KeyButton undoButton { "UNDO" }, redoButton { "REDO" };
+    ceramic::KeyButton zoomOut { "-" }, zoomIn { "+" }, fitButton { "FIT" }, allButton { "0-127" };
+    ceramic::KeyButton doneButton { "DONE" };
+    ceramic::KeyButton applyButton { "APPLY" }, cancelButton { "CANCEL" };
     juce::ScrollBar scroll { false };
 
     // inspector
     juce::Label noteLabel, lowLabel, highLabel, rootLabel;
     juce::Slider noteBox, lowBox, highBox, rootBox;
-    juce::TextButton resetButton { "RESET" }, clearButton { "CLEAR" };
+    ceramic::KeyButton resetButton { "RESET" }, clearButton { "CLEAR" };
     bool updatingInspector = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (KeyMapEditor)

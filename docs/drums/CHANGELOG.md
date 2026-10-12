@@ -1,5 +1,15 @@
 # ANDOR Drums — version history
 
+## 0.1.2 (unreleased, branch drum-plugin): Warm Ceramic + Teak, the mockup's layout
+
+- The look of ANDOR/OSP's direction 09: teak cheeks, ceramic housing and cards, A1 ivory
+  keys, B1 tabs, the C1/T3 volume fader, glass lens LEDs, and OSP's rendered Blender macro
+  knob for all macro knobs.
+- Layout after the mockup: one row of 8 pads (2 x 4 and 3 x 3 still available; the window
+  grows for them), the selected pad's sound with a draggable START, an always-visible
+  KEYBOARD RANGE strip (root note, zone presets), AMP / EFFECTS / GLOBAL below.
+- Kit name (saved), output meter, effect power keys.
+
 ## 0.1.1 (unreleased, branch drum-plugin): interface and keyboard mapping
 
 - New layout: equal pads on top (2 x 4 or 3 x 3), PAD | EXPANDED and KEY MAP below them,

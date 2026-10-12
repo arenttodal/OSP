@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CeramicSkin.h"
 #include "DrumsProcessor.h"
 #include "KeyMapEditor.h"
 #include "OspLookAndFeel.h"
@@ -17,18 +18,38 @@ namespace osp::drumsplugin
 using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
 using ButtonAttachment = juce::AudioProcessorValueTreeState::ButtonAttachment;
 
-/** A knob with its label and value, in OSP's style. */
+/** A knob with its label above and value below, in OSP's style (vector, or the rendered
+    macro sprite with `rendered`). */
 struct LabelledKnob
 {
     juce::Slider slider;
     juce::Label label;
     std::unique_ptr<SliderAttachment> attachment;
-    void setup (juce::Component& parent, const juce::String& text, juce::Colour arc, bool bipolar = false);
+    void setup (juce::Component& parent, const juce::String& text, juce::Colour arc, bool bipolar = false, bool rendered = false);
     void attach (juce::AudioProcessorValueTreeState& state, const juce::String& id);
-    void setBounds (juce::Rectangle<int> r);
+    void setBounds (juce::Rectangle<int> r, int labelHeight = 18);
 };
 
-/** The selected pad's sound: waveform, START / TUNE / GAIN / PAN / REVERSE, play modes. */
+/** The selected pad's waveform: the sound in a dark display; drag the START marker. */
+class WaveDisplay final : public juce::Component
+{
+public:
+    explicit WaveDisplay (DrumsProcessor&);
+    void paint (juce::Graphics&) override;
+    void mouseDown (const juce::MouseEvent&) override;
+    void mouseDrag (const juce::MouseEvent&) override;
+    void mouseUp (const juce::MouseEvent&) override;
+    void mouseMove (const juce::MouseEvent&) override;
+
+private:
+    juce::Rectangle<float> wave() const;
+    float startX() const;
+    DrumsProcessor& proc;
+    bool dragging = false;
+};
+
+/** The selected pad: header (badge, name, < >, SAMPLE | KEY MAP tabs, menu), waveform,
+    START / TUNE / REVERSE, its layer list, play mode, choke, one shot, VOLUME and PAN. */
 class SamplePanel final : public juce::Component
 {
 public:
@@ -38,17 +59,45 @@ public:
     void bind();   ///< follow the selected pad
     std::function<void (int)> onSelect;
     std::function<void()> onLoad;
+    std::function<void()> onOpenKeyMap;
 
 private:
-    juce::Rectangle<int> waveArea() const;
+    void showMenu();
     DrumsProcessor& proc;
     juce::Label name;
-    juce::TextButton previous { "<" }, next { ">" }, load { "LOAD" }, clear { "CLEAR" };
-    LabelledKnob start, tune, gain, pan;
-    juce::ToggleButton reverse { "REVERSE" };
+    void mouseDown (const juce::MouseEvent&) override;
+    juce::Rectangle<int> keyMapTabArea() const { return { 488, 12, 84, 30 }; }
+    ceramic::KeyButton previous { {}, 0.7f }, next { {}, 0.7f }, menu { {}, 0.7f }, replace { "Replace Sample...", 0.8f };
+    ceramic::KeyButton auditionLayer { {}, 0.6f };
+    WaveDisplay wave;
+    LabelledKnob start, tune, volume, pan;
+    ceramic::PillSwitch reverse;
     std::unique_ptr<ButtonAttachment> reverseAttachment;
-    juce::ComboBox trigger, voice, choke, category;
-    juce::Label triggerLabel, voiceLabel, chokeLabel, categoryLabel;
+    juce::ComboBox voice, choke;
+    ceramic::CheckKey oneShot { "One Shot" };
+};
+
+/** The always-visible KEYBOARD RANGE strip: every pad's note or zone on one keyboard. */
+class KeyboardRangeStrip final : public juce::Component
+{
+public:
+    explicit KeyboardRangeStrip (DrumsProcessor&);
+    void paint (juce::Graphics&) override;
+    void resized() override;
+    void mouseDown (const juce::MouseEvent&) override;
+    void refresh();
+    std::function<void (int)> onSelect;
+    std::function<void()> onOpenKeyMap;
+    std::function<void (int autoMapId)> onAutoMap;
+    std::function<void()> onModeChanged;
+
+private:
+    juce::Rectangle<float> keys() const;
+    float noteX (double note) const;
+    DrumsProcessor& proc;
+    ceramic::KeyButton padMode { "PAD", 0.6f }, expandedMode { "EXPANDED", 0.6f }, open { {}, 0.8f };
+    juce::ComboBox root, presets;
+    std::array<bool, 128> held {};
 };
 
 /** The selected pad's amplitude envelope (AMP), drawn from its own parameters. */
@@ -65,12 +114,15 @@ private:
     LabelledKnob attack, decay, sustain, release;
 };
 
-/** Everything below the top bar, laid out once at the base size and scaled as a whole. */
+/** Everything inside the window, laid out once at the base size and scaled as a whole. */
 class DrumsContent final : public juce::Component, private juce::Timer, private juce::ChangeListener
 {
 public:
-    static constexpr int baseWidth = 1280;
-    static constexpr int baseHeight = 900;
+    static constexpr int baseWidth = 1536;
+    static constexpr int baseHeight = 1024;   ///< with one row of 8 pads; the grids add height
+    /** Extra height the 2 x 4 and 3 x 3 grids need below the one-row layout. */
+    static int extraHeight (DrumsProcessor::PadLayout layout) noexcept;
+    int contentHeight() const noexcept { return baseHeight + extraHeight (proc.padLayout); }
 
     explicit DrumsContent (DrumsProcessor&);
     ~DrumsContent() override;
@@ -81,26 +133,36 @@ public:
     void selectPad (int pad);
     void setKeyMapOpen (bool open);
     bool isKeyMapOpen() const noexcept { return keyMap.isVisible(); }
+    void setLayout (DrumsProcessor::PadLayout layout);
     PadGrid& padGrid() noexcept { return grid; }
     KeyMapEditor& keyMapEditor() noexcept { return keyMap; }
     void openLoadDialog (int pad);
-    /** Brings the mode bar, undo state and labels in line with the processor now. */
+    /** Brings the mode switches, undo state and labels in line with the processor now. */
     void refreshModeBar();
+    std::function<void()> onHeightChanged;
 
 private:
     void timerCallback() override;
     void changeListenerCallback (juce::ChangeBroadcaster*) override;
+    juce::Rectangle<int> padCard() const;
+    juce::Rectangle<int> editorCard() const;
+    juce::Rectangle<int> rangeCard() const;
+    juce::Rectangle<int> bottomRow() const;
 
     DrumsProcessor& proc;
     PadGrid grid;
-    juce::TextButton padMode { "PAD" }, expandedMode { "EXPANDED" }, keyMapButton { "KEY MAP" };
-    juce::TextButton layout8 { "2 x 4" }, layout9 { "3 x 3" }, ninthPad { "PAD 9" };
-    juce::TextButton undoButton { "UNDO" }, redoButton { "REDO" };
-    juce::Slider volume;
+    ceramic::KeyButton undoButton { {}, 0.7f }, redoButton { {}, 0.7f };
+    ceramic::KeyButton layout1x8 { "1 x 8", 0.6f }, layout2x4 { "2 x 4", 0.6f }, layout3x3 { "3 x 3", 0.6f }, ninthPad { "PAD 9", 0.6f };
+    juce::Label kitName;
+    ceramic::Fader volume;
+    ceramic::Meter meter;
     std::unique_ptr<SliderAttachment> volumeAttachment;
     SamplePanel sample;
+    KeyboardRangeStrip range;
     EnvelopePanel envelope;
     std::array<LabelledKnob, 4> effects;   // DRIVE, MOVEMENT, ECHO, SPACE
+    std::array<ceramic::KeyButton, 4> effectPower;
+    std::array<float, 4> effectMemory { 0.3f, 0.3f, 0.3f, 0.3f };
     std::array<LabelledKnob, 3> macros;    // LIFE, DYNAMICS, CHARACTER
     KeyMapEditor keyMap;
     std::unique_ptr<juce::FileChooser> chooser;
@@ -108,11 +170,11 @@ private:
 };
 
 /**
-    ANDOR Drums' editor (V1.1): pads on top (2 x 4 or 3 x 3, equal cells), PAD / EXPANDED
-    and KEY MAP under them, then the selected pad's sound, its envelope, the kit's effects and
-    macros. KEY MAP replaces the lower part while open (the pads stay visible and playable).
-    Resizable with a fixed aspect ratio: the content is laid out once and scaled, so every
-    proportion (and every pad) stays exactly equal at any size.
+    ANDOR Drums' editor (V1.2): the Warm Ceramic + Teak look of ANDOR/OSP and the mockup's
+    layout - pads on top (one row of 8, or 2 x 4 / 3 x 3), the selected pad's sound, the
+    keyboard range, then AMP, the kit's effects and its global macros. KEY MAP opens over
+    the sound and the keyboard range. Resizable with a fixed aspect: the content is laid out
+    once and scaled, so every proportion (and every pad) stays exactly equal at any size.
 */
 class DrumsEditor final : public juce::AudioProcessorEditor
 {
@@ -122,12 +184,15 @@ public:
     void resized() override;
     void paint (juce::Graphics&) override;
     DrumsContent& content() noexcept { return body; }
+    /** Applies the content's height (the layout) at the current scale. */
+    void updateSizeForContent();
 
-    static constexpr double minScale = 0.7, defaultScale = 0.9, maxScale = 1.5;
+    static constexpr double minScale = 0.6, defaultScale = 0.75, maxScale = 1.25;
 
 private:
     plugin::OspLookAndFeel lookAndFeel;
     DrumsContent body;
+    double scale = defaultScale;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (DrumsEditor)
 };

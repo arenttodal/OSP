@@ -1,5 +1,6 @@
 #include "PadGrid.h"
 
+#include "CeramicSkin.h"
 #include "DrumsLook.h"
 
 namespace osp::drumsplugin
@@ -33,7 +34,7 @@ PadView::PadView (PadGrid& g, int slot) : grid (g), slotIndex (slot)
 
 int PadView::pad() const { return grid.processor().padAtSlot (slotIndex); }
 
-juce::Rectangle<float> PadView::headerArea() const { return getLocalBounds().toFloat().reduced (1.0f).removeFromTop (headerHeight); }
+juce::Rectangle<float> PadView::headerArea() const { return getLocalBounds().toFloat().reduced (5.0f).withTrimmedTop (4.0f).removeFromTop (headerHeight); }
 juce::Rectangle<float> PadView::badgeArea() const { return headerArea().reduced (8.0f, 6.0f).removeFromLeft (20.0f); }
 juce::Rectangle<float> PadView::muteArea() const
 {
@@ -48,7 +49,7 @@ juce::Rectangle<float> PadView::soloArea() const
 }
 juce::Rectangle<float> PadView::footerArea() const
 {
-    const auto r = getLocalBounds().toFloat().reduced (1.0f);
+    const auto r = getLocalBounds().toFloat().reduced (5.0f);
     return r.getHeight() < compactBelow ? juce::Rectangle<float>() : r.withTop (r.getBottom() - footerHeight);
 }
 juce::Rectangle<float> PadView::menuArea() const
@@ -63,8 +64,8 @@ juce::Rectangle<float> PadView::menuArea() const
 }
 juce::Rectangle<float> PadView::waveArea() const
 {
-    auto r = getLocalBounds().toFloat().reduced (1.0f);
-    r.removeFromTop (headerHeight);
+    auto r = getLocalBounds().toFloat().reduced (5.0f);
+    r.removeFromTop (headerHeight + 4.0f);
     if (! footerArea().isEmpty())
         r.removeFromBottom (footerHeight);
     return r.reduced (8.0f, 2.0f);
@@ -141,22 +142,24 @@ void PadView::paint (juce::Graphics& g)
     const auto accent = look::category (info.category);
     const auto r = getLocalBounds().toFloat().reduced (1.0f);
 
-    // Selected: the accent ring sits outside the tile, so the tile itself never changes.
+    // Selected: an accent frame around the tile (inside the cell, so the tile never moves).
+    const auto tile = r.reduced (4.0f);
     if (selected)
     {
+        g.setColour (colour::accent.withAlpha (0.25f));
+        g.fillRoundedRectangle (r.reduced (0.5f), corner + 3.0f);
         g.setColour (colour::accent);
-        g.drawRoundedRectangle (r.reduced (0.5f), corner + 1.0f, 2.0f);
+        g.drawRoundedRectangle (r.reduced (1.5f), corner + 2.5f, 2.6f);
     }
-    const auto tile = r.reduced (2.5f);
-    g.setColour (juce::Colours::black.withAlpha (0.16f));
-    g.fillRoundedRectangle (tile.translated (0.0f, 1.5f), corner);
+    else
+        ceramic::contactShadow (g, tile, corner, 1.1f);
     g.setGradientFill (juce::ColourGradient (tileTop, tile.getX(), tile.getY(), tileBottom, tile.getX(), tile.getBottom(), false));
     g.fillRoundedRectangle (tile, corner);
 
     // The category strip along the top; brighter while the pad plays.
     {
         juce::Path strip;
-        strip.addRoundedRectangle (tile.getX(), tile.getY(), tile.getWidth(), 3.0f, 1.5f, 1.5f, true, true, false, false);
+        strip.addRoundedRectangle (tile.getX(), tile.getY(), tile.getWidth(), 5.0f, corner, corner, true, true, false, false);
         g.setColour (accent.withAlpha (silenced ? 0.35f : 0.75f + 0.25f * flash));
         g.fillPath (strip);
     }
@@ -523,8 +526,9 @@ void PadGrid::resized()
 {
     // Equal cells: the grid divides its area exactly; leftover pixels go to the margins,
     // never to one cell.
-    const int columns = proc.nineLayout ? 3 : 4;
-    const int rows = proc.nineLayout ? 3 : 2;
+    using L = DrumsProcessor::PadLayout;
+    const int columns = proc.padLayout == L::row8 ? 8 : proc.padLayout == L::grid8 ? 4 : 3;
+    const int rows = proc.padLayout == L::row8 ? 1 : proc.padLayout == L::grid8 ? 2 : 3;
     const auto area = getLocalBounds().toFloat();
     const float cw = std::floor ((area.getWidth() - gap * static_cast<float> (columns - 1)) / static_cast<float> (columns));
     const float ch = std::floor ((area.getHeight() - gap * static_cast<float> (rows - 1)) / static_cast<float> (rows));

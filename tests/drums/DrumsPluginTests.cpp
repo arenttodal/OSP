@@ -2,6 +2,7 @@
 // (never OSP's), Milestone 1 through processBlock (two pads, independent notes, the shared
 // engine), keyboard modes, session recall, and the functional editor.
 
+#include "CeramicSkin.h"
 #include "DrumsEditor.h"
 #include "DrumsProcessor.h"
 
@@ -201,7 +202,8 @@ TEST_CASE ("Session recall: sounds, map, mode, parameters, names and view", "[dr
         p.setKeyMap (map);
         p.setPadName (1, "Crack");
         p.setPadChoke (1, 3);
-        p.nineLayout = true;
+        p.padLayout = DrumsProcessor::PadLayout::grid9;
+        p.kitName = "Test Kit";
         p.selectedPad = 4;
         p.parameters().getParameter (DrumsProcessor::padParamId (1, "gain"))->setValueNotifyingHost (0.6f);
         p.parameters().getParameter ("kit.space")->setValueNotifyingHost (0.4f);
@@ -216,7 +218,8 @@ TEST_CASE ("Session recall: sounds, map, mode, parameters, names and view", "[dr
     CHECK (q.keyMap() == map);
     CHECK (q.padDisplayName (1) == "Crack");
     CHECK (q.padInfo (1).chokeGroup == 3);
-    CHECK (q.nineLayout);
+    CHECK (q.padLayout == DrumsProcessor::PadLayout::grid9);
+    CHECK (q.kitName == "Test Kit");
     CHECK (q.selectedPad == 4);
     q.prepareToPlay (rate, 256);
     CHECK (play (q, { 36, 40 }, 0.5) == reference);   // bit-identical after reopening
@@ -332,7 +335,8 @@ TEST_CASE ("Pads are equal cells in 2x4 and 3x3 at every size; content never res
     p.prepareToPlay (rate, 256);
     loadKit (p, tmp);
     auto editor = openEditor (p);
-    CHECK (editor->getWidth() == static_cast<int> (1280 * DrumsEditor::defaultScale));
+    CHECK (editor->getWidth() == juce::roundToInt (1536 * DrumsEditor::defaultScale));
+    CHECK (p.padLayout == DrumsProcessor::PadLayout::row8);   // the mockup's single row by default
 
     const auto cell8 = uniformCells (*editor, 8);
     p.setPadName (0, "An extremely long kick drum name that will never fit on any pad");
@@ -342,14 +346,18 @@ TEST_CASE ("Pads are equal cells in 2x4 and 3x3 at every size; content never res
 
     for (double scale : { DrumsEditor::minScale, 1.0, DrumsEditor::maxScale })
     {
-        editor->setSize (static_cast<int> (1280 * scale), static_cast<int> (900 * scale));
+        editor->setSize (juce::roundToInt (1536 * scale), juce::roundToInt (1024 * scale));
         uniformCells (*editor, 8);
-        CHECK (std::abs (editor->content().padGrid().getScreenBounds().getWidth() - juce::roundToInt (1232 * editor->getWidth() / 1280.0)) <= 2);
+        CHECK (std::abs (editor->content().padGrid().getScreenBounds().getWidth() - juce::roundToInt (1424 * editor->getWidth() / 1536.0)) <= 2);
     }
-    p.nineLayout = true;
-    editor->content().padGrid().layoutChanged();
+    // 2 x 4 and 3 x 3: equal cells too; the window grows taller instead of squeezing them.
+    const int heightRow = editor->getHeight();
+    editor->content().setLayout (DrumsProcessor::PadLayout::grid8);
+    uniformCells (*editor, 8);
+    CHECK (editor->getHeight() > heightRow);
+    editor->content().setLayout (DrumsProcessor::PadLayout::grid9);
     const auto cell9 = uniformCells (*editor, 9);
-    CHECK (cell9.getHeight() < cell8.getHeight());
+    CHECK (cell9.getWidth() > cell8.getWidth());
 }
 
 TEST_CASE ("Pad 9 survives layout switches; swapping places keeps identity, sound and MIDI", "[drums-plugin][ui]")
@@ -361,10 +369,9 @@ TEST_CASE ("Pad 9 survives layout switches; swapping places keeps identity, soun
     loadNine (p, tmp);
     auto editor = openEditor (p);
     const auto crash = p.padInfo (8).sound;
-    for (bool nine : { true, false, true, false })
+    for (auto layout : { DrumsProcessor::PadLayout::grid9, DrumsProcessor::PadLayout::row8, DrumsProcessor::PadLayout::grid9, DrumsProcessor::PadLayout::grid8 })
     {
-        p.nineLayout = nine;
-        editor->content().padGrid().layoutChanged();
+        editor->content().setLayout (layout);
         CHECK (p.padInfo (8).sound == crash);
         CHECK (p.keyMap().padNote[8] == 49);
     }
@@ -644,6 +651,29 @@ TEST_CASE ("Mode switch with held notes and the pedal: note-offs end what they s
     CHECK (p.padVoices (0) == 0);
 }
 
+TEST_CASE ("The ceramic skin draws its materials in the style guide's colours", "[drums-plugin][ui]")
+{
+    const juce::ScopedJuceInitialiser_GUI gui;
+    juce::Image img (juce::Image::ARGB, 40, 400, true);
+    {
+        juce::Graphics g (img);
+        g.fillAll (osp::drumsplugin::ceramic::colour::backdrop);
+        osp::drumsplugin::ceramic::teakCheek (g, { 9.0f, 10.0f, 22.0f, 380.0f });
+    }
+    // The middle of the cheek is teak (warm, saturated), not the backdrop or a shadow.
+    const auto c = img.getPixelAt (20, 200);
+    INFO ("teak pixel " << c.toDisplayString (true));
+    {
+        // Opaque wood, not a tinted shadow (images draw at the current colour's alpha).
+        juce::Image clear (juce::Image::ARGB, 40, 400, true);
+        juce::Graphics g2 (clear);
+        osp::drumsplugin::ceramic::teakCheek (g2, { 9.0f, 10.0f, 22.0f, 380.0f });
+        CHECK (clear.getPixelAt (20, 200).getAlpha() == 255);
+    }
+    CHECK (c.getRed() > c.getBlue() + 45);
+    CHECK (c.getSaturation() > 0.3f);
+}
+
 TEST_CASE ("Snapshots of every major state (written when ANDOR_DRUMS_SNAPSHOT_DIR is set)", "[drums-plugin][ui][snapshots]")
 {
     const juce::ScopedJuceInitialiser_GUI gui;
@@ -659,17 +689,17 @@ TEST_CASE ("Snapshots of every major state (written when ANDOR_DRUMS_SNAPSHOT_DI
     p.setPadCategory (0, drums::DrumCategory::kick, false);
     p.parameters().getParameter (DrumsProcessor::padParamId (3, "mute"))->setValueNotifyingHost (1.0f);
     auto editor = openEditor (p);
-    editor->setSize (1280, 900);
-    snapshot (*editor, "02-pads-2x4");
+    editor->setSize (1536, 1024);
+    snapshot (*editor, "02-pads-1x8");
     sendNotes (p, { { 36, true }, { 38, true }, { 42, true } });
     editor->content().padGrid().refresh();
     snapshot (*editor, "03-playing");
-    p.nineLayout = true;
-    editor->content().padGrid().layoutChanged();
+    editor->content().setLayout (DrumsProcessor::PadLayout::grid8);
+    snapshot (*editor, "04a-pads-2x4");
+    editor->content().setLayout (DrumsProcessor::PadLayout::grid9);
     editor->content().selectPad (8);
-    snapshot (*editor, "04-pads-3x3");
-    p.nineLayout = false;
-    editor->content().padGrid().layoutChanged();
+    snapshot (*editor, "04b-pads-3x3");
+    editor->content().setLayout (DrumsProcessor::PadLayout::row8);
     editor->content().selectPad (0);
     editor->content().setKeyMapOpen (true);
     auto& km = editor->content().keyMapEditor();
@@ -697,11 +727,11 @@ TEST_CASE ("Snapshots of every major state (written when ANDOR_DRUMS_SNAPSHOT_DI
     REQUIRE (km.previewAutoMap (KeyMapEditor::AutoMap::twoOctaves));
     snapshot (*editor, "09-keymap-automap-preview");
     km.cancelPreview();
-    editor->setSize (static_cast<int> (1280 * DrumsEditor::minScale), static_cast<int> (900 * DrumsEditor::minScale));
+    editor->setSize (juce::roundToInt (1536 * DrumsEditor::minScale), juce::roundToInt (1024 * DrumsEditor::minScale));
     snapshot (*editor, "10-keymap-minimum-size");
     editor->content().setKeyMapOpen (false);
     snapshot (*editor, "11-minimum-size");
-    editor->setSize (1280, 900);
+    editor->setSize (1536, 1024);
     snapshot (*editor, "12-retina-2x", 2.0f);
 }
 

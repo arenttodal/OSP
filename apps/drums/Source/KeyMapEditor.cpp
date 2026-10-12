@@ -1,5 +1,6 @@
 #include "KeyMapEditor.h"
 
+#include "CeramicSkin.h"
 #include "DrumsLook.h"
 
 namespace osp::drumsplugin
@@ -192,7 +193,7 @@ juce::Rectangle<float> KeyMapEditor::keyboardArea() const
     return { t.getX(), t.getBottom() + 2.0f, t.getWidth(), keyboardHeight };
 }
 
-int KeyMapEditor::laneCount() const { return proc.nineLayout ? 9 : 8; }
+int KeyMapEditor::laneCount() const { return proc.visiblePads(); }
 
 int KeyMapEditor::padOfLane (int lane) const { return proc.padAtSlot (lane); }
 
@@ -278,7 +279,7 @@ void KeyMapEditor::resized()
 {
     auto r = getLocalBounds();
     auto header = r.removeFromTop (static_cast<int> (headerHeight)).reduced (0, 6);
-    header.removeFromLeft (110);   // the title
+    header.removeFromLeft (150);   // the title
     padMode.setBounds (header.removeFromLeft (64));
     expandedMode.setBounds (header.removeFromLeft (96));
     header.removeFromLeft (12);
@@ -424,7 +425,7 @@ std::vector<int> KeyMapEditor::layoutOrder() const
     std::vector<int> order;
     for (int s = 0; s < laneCount(); ++s)
         order.push_back (proc.padAtSlot (s));
-    if (! proc.nineLayout && proc.padInfo (proc.padAtSlot (8)).sound != nullptr)
+    if (! proc.isNineLayout() && proc.padInfo (proc.padAtSlot (8)).sound != nullptr)
         order.push_back (proc.padAtSlot (8));
     return order;
 }
@@ -1078,11 +1079,11 @@ void KeyMapEditor::timerCallback()
 
 void KeyMapEditor::paint (juce::Graphics& g)
 {
-    look::panel (g, getLocalBounds().toFloat());
+    ceramic::card (g, getLocalBounds().toFloat(), 12.0f);
     // Header title
     g.setColour (colour::text);
     g.setFont (look::type::sectionTitle());
-    g.drawText ("KEY MAP", juce::Rectangle<int> (16, 0, 100, static_cast<int> (headerHeight)), juce::Justification::centredLeft);
+    g.drawText ("KEY MAP", juce::Rectangle<int> (18, 0, 130, static_cast<int> (headerHeight)), juce::Justification::centredLeft);
 
     // Banner: what is going on (learn, preview, collision, last action).
     auto banner = juce::Rectangle<float> (16.0f, headerHeight, static_cast<float> (getWidth()) - 32.0f, bannerHeight).reduced (0.0f, 2.0f);

@@ -400,6 +400,15 @@ void DrumsProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
         }
     }
     renderTo (numSamples);
+    {
+        // Display meter: the block's peak per side, kept until the editor reads it.
+        const float pl = buffer.getMagnitude (0, 0, numSamples);
+        const float pr = buffer.getNumChannels() > 1 ? buffer.getMagnitude (1, 0, numSamples) : pl;
+        if (pl > outPeakL.load (std::memory_order_relaxed))
+            outPeakL.store (pl, std::memory_order_relaxed);
+        if (pr > outPeakR.load (std::memory_order_relaxed))
+            outPeakR.store (pr, std::memory_order_relaxed);
+    }
     for (int c = 2; c < buffer.getNumChannels(); ++c)
         buffer.clear (c, 0, numSamples);
     midi.clear();
@@ -762,7 +771,8 @@ void DrumsProcessor::getStateInformation (juce::MemoryBlock& destData)
     root.createNewChildElement ("Order")->setAttribute ("slots", slots.joinIntoString (","));
 
     auto* view = root.createNewChildElement ("View");
-    view->setAttribute ("layout", nineLayout ? "3x3" : "2x4");
+    view->setAttribute ("layout", layoutName (padLayout));
+    view->setAttribute ("kitName", juce::String::fromUTF8 (kitName.c_str()));
     view->setAttribute ("selectedPad", selectedPad + 1);
     copyXmlToBinary (root, destData);
 }
@@ -859,7 +869,9 @@ void DrumsProcessor::setStateInformation (const void* data, int sizeInBytes)
 
     if (auto* view = root->getChildByName ("View"))
     {
-        nineLayout = view->getStringAttribute ("layout") == "3x3";
+        const auto layout = view->getStringAttribute ("layout");
+        padLayout = layout == "3x3" ? PadLayout::grid9 : layout == "2x4" ? PadLayout::grid8 : PadLayout::row8;
+        kitName = view->getStringAttribute ("kitName", "New Kit").toStdString();
         selectedPad = juce::jlimit (0, numPads - 1, view->getIntAttribute ("selectedPad", 1) - 1);
     }
     publishPadConfig();
