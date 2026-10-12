@@ -47,7 +47,11 @@ void EqButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
     using namespace design;
     const auto r = getLocalBounds().toFloat().reduced (1.0f);
     const bool open = getToggleState();
-    if (open || down)
+    if (skin::drawnBySurface())
+    {
+        // Ceramic: the card draws the key (pressed in while open).
+    }
+    else if (open || down)
     {
         g.setGradientFill (juce::ColourGradient (juce::Colour (0xffe2d9cc), 0.0f, r.getY(), juce::Colour (0xffebe4d9), 0.0f, r.getBottom(), false));
         g.fillRoundedRectangle (r, 7.0f);

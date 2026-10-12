@@ -209,10 +209,15 @@ private:
 
 namespace draw
 {
+    /** The colour around the instrument when the window's shape differs from the layout's. */
+    juce::Colour surround();
     /** The housing: the instrument's body on its surround, with a broad quiet shadow. */
     void housing (juce::Graphics&, juce::Rectangle<float> bounds);
     /** A raised card or panel: soft contact shadow, vertical light, 1 px lit top edge. */
     void raised (juce::Graphics&, juce::Rectangle<float> r, float radius, juce::Colour top, juce::Colour bottom, float shadow = 1.0f);
+    /** Ceramic: the raised face of every visible child of `parent` that is a
+        skin::SurfaceFace, at its bounds (classic: nothing; each draws its own). */
+    void raisedChildren (juce::Graphics&, juce::Component& parent);
     /** A recessed dark display: inner shadow under its top edge, a faint lower reflection. */
     void well (juce::Graphics&, juce::Rectangle<float> r, float radius, juce::Colour fill);
     /** A small raised control face (buttons, the mode selector, the preset bar). */

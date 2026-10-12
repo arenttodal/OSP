@@ -1090,12 +1090,19 @@ void ModulationPanel::paintTabs (juce::Graphics& g)
         const int source = modui::sourceOfTab (t);
         // Muted words; the shown one a step stronger with a fine underline in its colour.
         const auto words = source >= 0 ? r.withTrimmedRight (sockets[static_cast<std::size_t> (t)].getWidth() - 3.0f) : r;
-        g.setColour (colour::text.withAlpha (on ? 0.92f : (t == hoverTab ? 0.72f : 0.5f)));
+        // Ceramic (B1 refined flat tabs): the shown word in the full text colour, the others
+        // quieter, and a crisp 2 px bar with round ends.
+        const bool refined = skin::active() != nullptr;
+        const float idle = t == hoverTab ? 0.72f : (refined ? 0.44f : 0.5f);
+        g.setColour (colour::text.withAlpha (on ? (refined ? 1.0f : 0.92f) : idle));
         g.drawText (tabNames[static_cast<std::size_t> (t)], words, juce::Justification::centred, false);
         if (on)
         {
             g.setColour (source < 0 ? colour::accent : modui::sourceColour (source));
-            g.fillRoundedRectangle (words.reduced (4.0f, 0.0f).withY (r.getBottom() - 4.0f).withHeight (1.6f), 0.8f);
+            if (refined)
+                g.fillRoundedRectangle (words.reduced (4.0f, 0.0f).withY (r.getBottom() - 4.4f).withHeight (2.0f), 1.0f);
+            else
+                g.fillRoundedRectangle (words.reduced (4.0f, 0.0f).withY (r.getBottom() - 4.0f).withHeight (1.6f), 0.8f);
         }
         if (source >= 0)
             paintSocket (g, sockets[static_cast<std::size_t> (t)].getCentre(), modui::sourceColour (source),

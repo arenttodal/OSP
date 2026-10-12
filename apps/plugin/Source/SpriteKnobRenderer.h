@@ -127,7 +127,8 @@ private:
 /**
     Development switch between the original (vector) knob and the rendered one. It changes
     only how knobs look: no parameter, no state, nothing the audio thread reads. Not saved;
-    OSP_KNOB_SKIN=original|pilot|macros sets it at start-up, Cmd+Option+K cycles it.
+    OSP_KNOB_SKIN=original|pilot|macros sets it at start-up (default: macros, the ceramic
+    design's), Cmd+Option+K cycles it.
 */
 enum class KnobSkin
 {

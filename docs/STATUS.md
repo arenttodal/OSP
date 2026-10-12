@@ -359,12 +359,20 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [x] Layer knobs: each name sits as far above the dial's tick dots as the value sits below
       the lowest ones (the knob component grows upwards by `LayerKnob::labelLift`; dial and
       value unchanged). The MACROS title is gone from the macro panel.
+- [x] CERAMIC SKIN (direction 09 Warm Ceramic + Teak, built into the plugin; style guide and spec
+      docs/design/warm-ceramic-teak-style-guide.md): rendered pieces (tools/blender-assets/skin,
+      from the design lab's own config: housing + teak cheeks, cards at the three layout widths,
+      D3 panels, A1 keys per role and state, badges, C1 fader cap on the T3 rail, lens LEDs,
+      display bezels, keybed recess) nine-sliced by `skin::Pieces` (CeramicSkin) at the physical
+      scale; keys and cards drawn by the surface below so their shadows fall there; B1 tabs; all
+      six macros rendered by default. Classic stays (Cmd+Option+G, OSP_SKIN=classic). Tests
+      [ceramic]; hidden screenshots [ceramic-shots].
 - [ ] DESIGN LAB round 1 (design-lab/, exploration only, nothing integrated): Blender-rendered
       surfaces composited under the plugin's own drawing; 6 full-GUI directions, button/tab/
       fader/panel/background/detail studies, close-ups, actual-size tests, review gallery,
       reports (design-lab/review/). Round 2 chosen: 09 Warm Ceramic + Teak (C1 fader on T3,
       lens LEDs, painted divider); style guide and build spec in
-      docs/design/warm-ceramic-teak-style-guide.md; implementation in progress.
+      docs/design/warm-ceramic-teak-style-guide.md; built (CERAMIC SKIN above).
 - [ ] FINAL MODULATION SYSTEM + DAMPEN (queued spec, stages 0-10): Stage 0 audit done
       (docs/reports/mod-final-audit.md); implementation next.
 - [x] `plugin-pipeline/`: the build-and-download pipeline as a reusable kit for other JUCE

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CeramicSkin.h"
 #include "Design.h"
 #include "PluginProcessor.h"
 
@@ -22,13 +23,19 @@ namespace equi
 /** "EQ" in a source card's header: opens the layer's EQ over its waveform (a view setting);
     a small light while the layer's EQ is heard. Opening never switches the EQ on, closing
     never off. */
-class EqButton final : public juce::Button
+class EqButton final : public juce::Button, public skin::KeyFace
 {
 public:
     explicit EqButton (int layer);
     void setActive (bool on) { if (active != on) { active = on; repaint(); } }
     bool isActive() const noexcept { return active; }
     void paintButton (juce::Graphics&, bool highlighted, bool down) override;
+    void buttonStateChanged() override { skin::repaintKey (*this); }
+    skin::KeyRole keyRole() const override { return skin::KeyRole::eq; }
+    skin::KeyState keyState() const override
+    {
+        return getToggleState() || isDown() ? skin::KeyState::pressed : isOver() ? skin::KeyState::hover : skin::KeyState::normal;
+    }
 
 private:
     int layer;

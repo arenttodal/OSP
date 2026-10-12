@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CeramicSkin.h"
 #include "Design.h"
 #include "PluginProcessor.h"
 #include "ShapingPopups.h"
@@ -20,7 +21,7 @@ namespace osp::plugin
     editor (a view setting) and nothing else. The editor can be open while the arpeggiator is
     off and the other way round.
 */
-class ArpControl final : public juce::Component, public juce::SettableTooltipClient
+class ArpControl final : public juce::Component, public juce::SettableTooltipClient, public skin::KeyFace
 {
 public:
     explicit ArpControl (OspAudioProcessor& processor);
@@ -42,6 +43,8 @@ public:
     /** The inset's text, "UP · 1/8". */
     juce::String statusText() const { return status; }
     bool isOn() const noexcept { return enabled; }
+    skin::KeyRole keyRole() const override { return skin::KeyRole::arp; }
+    skin::KeyState keyState() const override { return hover != 0 ? skin::KeyState::hover : skin::KeyState::normal; }
 
 private:
     OspAudioProcessor& ospProcessor;
@@ -54,10 +57,16 @@ private:
 /** "Advanced" and "MOD ›" as raised half cards under the arpeggiator's, pressed in while
     open. The type shrinks a little to fit the half width (never below 12 px); the chevron
     goes when it does not fit. */
-class AdvancedCardButton final : public juce::Button
+class AdvancedCardButton final : public juce::Button, public skin::KeyFace
 {
 public:
     explicit AdvancedCardButton (const juce::String& caption);
+    void buttonStateChanged() override { skin::repaintKey (*this); }
+    skin::KeyRole keyRole() const override { return skin::KeyRole::advanced; }
+    skin::KeyState keyState() const override
+    {
+        return getToggleState() || isDown() ? skin::KeyState::pressed : isOver() ? skin::KeyState::hover : skin::KeyState::normal;
+    }
     /** The chevron's direction: 1 right, -1 left, 0 none. */
     void setChevron (int direction) { chevron = direction; repaint(); }
     /** A small light: the patch has active modulation (MOD), never a switch. */
@@ -80,11 +89,13 @@ private:
     stacked keys, and GATE and SWING as the instrument's small knobs. No power switch: the light
     by the keyboard is the only one.
 */
-class ArpInlinePanel final : public juce::Component
+class ArpInlinePanel final : public juce::Component, public skin::SurfaceFace
 {
 public:
     explicit ArpInlinePanel (OspAudioProcessor& processor);
     ~ArpInlinePanel() override;
+    float surfaceRadius() const override { return design::layout::panelRadius; }
+    bool surfaceIsCard() const override { return false; }
 
     /** The collapse button (top right): hides the editor (a view setting). */
     std::function<void()> onCollapse;

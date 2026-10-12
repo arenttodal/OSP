@@ -134,16 +134,19 @@ private:
 };
 
 /** A source modifier toggle (LINK, REVERSE, LOOP, FOLLOW) bound to a layer's bool parameter. */
-class ModifierButton final : public juce::Component, public juce::SettableTooltipClient
+class ModifierButton final : public juce::Component, public juce::SettableTooltipClient, public skin::KeyFace
 {
 public:
     ModifierButton (juce::RangedAudioParameter& parameter, icons::Kind icon, juce::Colour onColour);
     void setSuppressed (bool suppressed, const juce::String& why);
     bool isOn() const noexcept { return on; }
     void paint (juce::Graphics&) override;
+    void mouseDown (const juce::MouseEvent&) override { skin::repaintKey (*this); }
     void mouseUp (const juce::MouseEvent&) override;
-    void mouseEnter (const juce::MouseEvent&) override { repaint(); }
-    void mouseExit (const juce::MouseEvent&) override { repaint(); }
+    void mouseEnter (const juce::MouseEvent&) override { skin::repaintKey (*this); }
+    void mouseExit (const juce::MouseEvent&) override { skin::repaintKey (*this); }
+    skin::KeyRole keyRole() const override { return skin::KeyRole::modifier; }
+    skin::KeyState keyState() const override;
 
 private:
     icons::Kind icon;
@@ -155,15 +158,18 @@ private:
 
 /** A layer's MUTE or SOLO: a small key beside its badge, bound to its bool parameter.
     SOLO lights in the layer's colour, MUTE in graphite; alt-click on SOLO solos it alone. */
-class LayerStateButton final : public juce::Component, public juce::SettableTooltipClient
+class LayerStateButton final : public juce::Component, public juce::SettableTooltipClient, public skin::KeyFace
 {
 public:
     LayerStateButton (OspAudioProcessor& processor, int layer, bool solo);
     bool isOn() const noexcept { return on; }
     void paint (juce::Graphics&) override;
+    void mouseDown (const juce::MouseEvent&) override { skin::repaintKey (*this); }
     void mouseUp (const juce::MouseEvent&) override;
-    void mouseEnter (const juce::MouseEvent&) override { repaint(); }
-    void mouseExit (const juce::MouseEvent&) override { repaint(); }
+    void mouseEnter (const juce::MouseEvent&) override { skin::repaintKey (*this); }
+    void mouseExit (const juce::MouseEvent&) override { skin::repaintKey (*this); }
+    skin::KeyRole keyRole() const override { return skin::KeyRole::layerState; }
+    skin::KeyState keyState() const override;
 
 private:
     OspAudioProcessor& processor;
@@ -173,16 +179,19 @@ private:
 };
 
 /** ONE SHOT / GRANULAR as a compact selector with a menu. */
-class ModeSelector final : public juce::Component, public juce::SettableTooltipClient
+class ModeSelector final : public juce::Component, public juce::SettableTooltipClient, public skin::KeyFace
 {
 public:
     explicit ModeSelector (juce::RangedAudioParameter& parameter);
     std::function<void (int)> onChange;
     int mode() const noexcept { return current; }
     void paint (juce::Graphics&) override;
+    void mouseDown (const juce::MouseEvent&) override { skin::repaintKey (*this); }
     void mouseUp (const juce::MouseEvent&) override;
-    void mouseEnter (const juce::MouseEvent&) override { repaint(); }
-    void mouseExit (const juce::MouseEvent&) override { repaint(); }
+    void mouseEnter (const juce::MouseEvent&) override { skin::repaintKey (*this); }
+    void mouseExit (const juce::MouseEvent&) override { skin::repaintKey (*this); }
+    skin::KeyRole keyRole() const override { return skin::KeyRole::mode; }
+    skin::KeyState keyState() const override { return isMouseButtonDown() ? skin::KeyState::pressed : isMouseOver() ? skin::KeyState::hover : skin::KeyState::normal; }
 
 private:
     void choose (int mode);
@@ -196,9 +205,11 @@ private:
     LINK REVERSE LOOP FOLLOW; in Granular mode POS SIZE DENS TUNE SPREAD over the display.
     Hero / Dual / Triple change sizes and arrangement, never what is there.
 */
-class EngineCard final : public juce::Component
+class EngineCard final : public juce::Component, public skin::SurfaceFace
 {
 public:
+    float surfaceRadius() const override { return design::layout::cardRadius; }
+    bool surfaceIsCard() const override { return true; }
     EngineCard (OspAudioProcessor& processor, int layer);
     ~EngineCard() override;
 

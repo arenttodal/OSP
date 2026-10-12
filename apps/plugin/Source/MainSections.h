@@ -140,7 +140,7 @@ private:
 std::unique_ptr<MiniPanel> createMixPopup (OspAudioProcessor& processor);
 
 /** ‹  PRESET NAME  ♡  › : the factory starting states, then the user's presets. */
-class PresetBar final : public juce::Component
+class PresetBar final : public juce::Component, public skin::KeyFace
 {
 public:
     explicit PresetBar (OspAudioProcessor& processor);
@@ -152,6 +152,8 @@ public:
     void mouseUp (const juce::MouseEvent&) override;
     void mouseMove (const juce::MouseEvent&) override { repaint(); }
     void mouseExit (const juce::MouseEvent&) override { repaint(); }
+    skin::KeyRole keyRole() const override { return skin::KeyRole::preset; }
+    skin::KeyState keyState() const override { return skin::KeyState::normal; }
 
 private:
     enum class Part { none, previous, name, favourite, next };
