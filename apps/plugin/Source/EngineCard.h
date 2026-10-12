@@ -21,7 +21,7 @@ enum class EngineLayoutDensity { hero, dual, triple };
 /** Small line icons for the source modifiers and the header (drawn, not glyphs). */
 namespace icons
 {
-    enum class Kind { link, reverse, loop, follow, dots, chevronDown, chevronLeft, chevronRight, heart, heartFilled, plus };
+    enum class Kind { link, reverse, loop, follow, dots, chevronDown, chevronLeft, chevronRight, heart, heartFilled, plus, cassette };
     void draw (juce::Graphics&, Kind, juce::Rectangle<float> area, juce::Colour colour, float stroke = 1.5f);
 }
 

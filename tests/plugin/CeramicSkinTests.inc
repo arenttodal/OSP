@@ -414,3 +414,38 @@ TEST_CASE ("plugin: ceramic vs classic screenshots (full GUI, close-ups, states)
         save (e->createComponentSnapshot (e->getLocalBounds(), true, 1.0f), "gui-ceramic-" + juce::String (count) + "-layer@1x.png");
     }
 }
+
+TEST_CASE ("plugin: the GUI's texts are clean UTF-8 (no mis-encoded ellipses); SAVE is a key beside the preset bar", "[plugin][ceramic]")
+{
+    // "…" saved through a wrong encoding reads "â€¦" / "â¦" in a menu: the sources hold escapes
+    // (\xe2\x80\xa6) or plain ASCII, never a decoded-twice character.
+    const juce::File sources (juce::String (OSP_SOURCE_DIR) + "/apps/plugin/Source");
+    REQUIRE (sources.isDirectory());
+    const juce::String doubled = juce::String::fromUTF8 ("\xc3\xa2");   // 'â': the first byte of a UTF-8 sequence read as Latin-1
+    for (const auto& file : sources.findChildFiles (juce::File::findFiles, false, "*.cpp;*.h"))
+    {
+        INFO (file.getFileName());
+        CHECK_FALSE (file.loadFileAsString().contains (doubled));
+    }
+    // SAVE: a key right of the preset bar, the bar's height; the main menu no longer saves.
+    using osp::plugin::design::layout::presetBar;
+    using osp::plugin::design::layout::savePreset;
+    CHECK (savePreset.getX() > presetBar.getRight());
+    CHECK (savePreset.getY() == Approx (presetBar.getY()));
+    CHECK (savePreset.getHeight() == Approx (presetBar.getHeight()));
+    CHECK (savePreset.getRight() <= 950.0f);   // clear of the header's MIX
+    OspAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+    editor->setSize (1448, 1086);
+    osp::plugin::SavePresetButton* save = nullptr;
+    std::function<void (juce::Component&)> find = [&] (juce::Component& c) {
+        if (auto* s = dynamic_cast<osp::plugin::SavePresetButton*> (&c))
+            save = s;
+        for (auto* child : c.getChildren())
+            find (*child);
+    };
+    find (*editor);
+    REQUIRE (save != nullptr);
+    CHECK (save->isVisible());
+    CHECK (save->getTooltip() == "Save preset");
+}

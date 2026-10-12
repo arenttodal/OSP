@@ -135,7 +135,9 @@ namespace layout
     // Header
     const juce::Point<float> logo { 51.0f, 79.0f };            ///< baseline of ANDOR/OSP
     const R logoSubtitle { 51.0f, 88.0f, 300.0f, 14.0f };
-    const R presetBar { 501.0f, 45.0f, 446.0f, 48.0f };
+    const R presetBar { 501.0f, 45.0f, 394.0f, 48.0f };
+    /** SAVE (the cassette) right of the preset bar, the bar's height. */
+    const R savePreset { 903.0f, 45.0f, 44.0f, 48.0f };
     /** MIX between the preset and VOLUME (two or three layers; nothing for one). */
     const R headerMix { 966.0f, 23.0f, 164.0f, 88.0f };
     /** Master volume: a thin utility slider (VOLUME and its value above the track). */

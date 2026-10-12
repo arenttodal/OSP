@@ -244,6 +244,7 @@ private:
     PresetBar presetBar { ospProcessor };
     VolumeSlider volume { ospProcessor.parameters };
     HeaderMenuButton menuButton;
+    SavePresetButton savePresetButton;
     juce::Rectangle<int> headerArea, logoArea, volumeCaption;
 
     // Sources

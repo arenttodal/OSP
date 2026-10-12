@@ -358,6 +358,8 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     presetBar.onSaveStartingState = [this] { saveStartingState(); };
     presetBar.onOpenLibrary = [this] { openLibrary(); };
     content.addAndMakeVisible (presetBar);
+    savePresetButton.onClick = [this] { choosePresetFile (true, false); };
+    content.addAndMakeVisible (savePresetButton);
     content.addAndMakeVisible (volume);
     menuButton.setTooltip ("Sounds, presets, instruments, undo, size");
     menuButton.onClick = [this] { showMenu(); };
@@ -1116,9 +1118,8 @@ void OspAudioProcessorEditor::showMenu()
         });
         return list;
     };
-    menu.addItem (juce::String::fromUTF8 ("Libraryâ¦"), [safe] { if (safe != nullptr) safe->openLibrary(); });
+    menu.addItem (juce::String::fromUTF8 ("Library\xe2\x80\xa6"), [safe] { if (safe != nullptr) safe->openLibrary(); });
     menu.addSubMenu ("Presets", browse (OspAudioProcessor::presetFolder(), OspAudioProcessor::presetExtension, false));
-    menu.addItem ("Save preset...", [safe] { if (safe != nullptr) safe->choosePresetFile (true, false); });
     menu.addItem ("Open preset file...", [safe] { if (safe != nullptr) safe->choosePresetFile (false, false); });
     menu.addSeparator();
     menu.addSubMenu ("Instruments", browse (OspAudioProcessor::instrumentFolder(), OspAudioProcessor::instrumentExtension, true));
@@ -1510,6 +1511,7 @@ void OspAudioProcessorEditor::layoutInstrument()
 
     // Header: identity left (painted), preset in the middle, volume and menu right.
     presetBar.setBounds (at (layout::presetBar));
+    savePresetButton.setBounds (at (layout::savePreset));
     volume.setBounds (at (layout::volume));
     menuButton.setBounds (at (layout::menu));
 

@@ -139,6 +139,17 @@ private:
 /** The large three-layer mix (opened from MIX in the header). */
 std::unique_ptr<MiniPanel> createMixPopup (OspAudioProcessor& processor);
 
+/** SAVE: the cassette key right of the preset bar (saves the patch as a preset). */
+class SavePresetButton final : public juce::Button, public skin::KeyFace
+{
+public:
+    SavePresetButton();
+    void paintButton (juce::Graphics&, bool highlighted, bool down) override;
+    void buttonStateChanged() override { skin::repaintKey (*this); }
+    skin::KeyRole keyRole() const override { return skin::KeyRole::preset; }
+    skin::KeyState keyState() const override { return isDown() ? skin::KeyState::pressed : isOver() ? skin::KeyState::hover : skin::KeyState::normal; }
+};
+
 /** ‹  PRESET NAME  ♡  › : the factory starting states, then the user's presets. */
 class PresetBar final : public juce::Component, public skin::KeyFace
 {

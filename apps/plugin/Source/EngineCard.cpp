@@ -123,6 +123,23 @@ namespace icons
                 g.drawLine (c.x - 0.25f * s, c.y, c.x + 0.25f * s, c.y, stroke);
                 g.drawLine (c.x, c.y - 0.25f * s, c.x, c.y + 0.25f * s, stroke);
                 return;
+            case Kind::cassette:
+            {
+                // SAVE: a compact cassette (after Serum's save key): the shell, the label's
+                // window with its two reels, and the tape opening at the foot.
+                const auto shell = juce::Rectangle<float> (0.86f * s, 0.6f * s).withCentre (c);
+                p.addRoundedRectangle (shell, 0.09f * s);
+                const auto window = juce::Rectangle<float> (0.56f * s, 0.2f * s).withCentre ({ c.x, shell.getY() + 0.25f * s });
+                p.addRoundedRectangle (window, 0.1f * s);
+                for (const float dx : { -0.15f, 0.15f })
+                    p.addEllipse (juce::Rectangle<float> (0.11f * s, 0.11f * s).withCentre ({ c.x + dx * s, window.getCentreY() }));
+                p.startNewSubPath (c.x - 0.25f * s, shell.getBottom());
+                p.lineTo (c.x - 0.19f * s, shell.getBottom() - 0.13f * s);
+                p.lineTo (c.x + 0.19f * s, shell.getBottom() - 0.13f * s);
+                p.lineTo (c.x + 0.25f * s, shell.getBottom());
+                g.strokePath (p, line);
+                return;
+            }
         }
     }
 }

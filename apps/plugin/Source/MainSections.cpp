@@ -688,7 +688,7 @@ void PresetBar::mouseUp (const juce::MouseEvent& e)
             };
             if (onOpenLibrary != nullptr)
             {
-                menu.addItem (juce::String::fromUTF8 ("Open Libraryâ¦"), [safe] {
+                menu.addItem (juce::String::fromUTF8 ("Open Library\xe2\x80\xa6"), [safe] {
                     if (safe != nullptr && safe->onOpenLibrary != nullptr)
                         safe->onOpenLibrary();
                 });
@@ -740,6 +740,24 @@ void PresetBar::mouseUp (const juce::MouseEvent& e)
     refresh();
     if (onChange != nullptr)
         onChange();
+}
+
+SavePresetButton::SavePresetButton() : juce::Button ("Save preset")
+{
+    setTooltip ("Save preset");
+    setTitle ("Save preset");
+    setMouseCursor (juce::MouseCursor::PointingHandCursor);
+}
+
+void SavePresetButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
+{
+    using namespace design;
+    const auto r = getLocalBounds().toFloat();
+    const float k = r.getHeight() / 48.0f;
+    if (! skin::drawnBySurface())   // ceramic: the housing draws the key
+        draw::raised (g, r.reduced (0.5f), 9.0f * k, colour::cardTop, colour::cardBottom, 0.9f);
+    icons::draw (g, icons::Kind::cassette, r.withSizeKeepingCentre (27.0f * k, 27.0f * k).translated (0.0f, down ? 0.5f : 0.0f),
+                 colour::text.withAlpha (highlighted || down ? 0.85f : 0.6f), 1.6f * k);
 }
 
 void PresetBar::paint (juce::Graphics& g)
