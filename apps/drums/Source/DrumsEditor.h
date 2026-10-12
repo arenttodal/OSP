@@ -93,7 +93,10 @@ public:
 
 private:
     juce::Rectangle<float> keys() const;
+    /** A key's rectangle on the piano (white keys full height, black keys shorter on top). */
+    juce::Rectangle<float> keyRect (int note) const;
     float noteX (double note) const;
+    int noteAt (juce::Point<float>) const;
     DrumsProcessor& proc;
     ceramic::KeyButton padMode { "PAD", 0.6f }, expandedMode { "EXPANDED", 0.6f }, open { {}, 0.8f };
     juce::ComboBox root, presets;

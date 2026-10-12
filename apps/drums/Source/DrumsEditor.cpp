@@ -456,12 +456,67 @@ KeyboardRangeStrip::KeyboardRangeStrip (DrumsProcessor& p) : proc (p)
     refresh();
 }
 
-juce::Rectangle<float> KeyboardRangeStrip::keys() const { return { 18.0f, 64.0f, static_cast<float> (getWidth()) - 36.0f, 58.0f }; }
+juce::Rectangle<float> KeyboardRangeStrip::keys() const { return { 18.0f, 70.0f, static_cast<float> (getWidth()) - 36.0f, 56.0f }; }
+
+namespace
+{
+    // A real piano (as the mockup): 75 equal white keys for MIDI 0..127, black keys
+    // narrower and shorter, centred on the line between their two white neighbours.
+    constexpr int whiteKeys = 75;
+    constexpr float blackWidth = 0.58f;    // of a white key
+    constexpr float blackHeight = 0.62f;   // of the key height
+
+    int whiteIndex (int note) noexcept
+    {
+        static const int inOctave[] = { 0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6 };
+        return note / 12 * 7 + inOctave[note % 12];
+    }
+
+    /** The zone-tab colours sampled from the mockup, by category: strong, but still warm. */
+    juce::Colour zoneColour (drums::DrumCategory c)
+    {
+        switch (c)
+        {
+            case drums::DrumCategory::kick: return juce::Colour (0xffe8895b);
+            case drums::DrumCategory::snare: return juce::Colour (0xff819ec6);
+            case drums::DrumCategory::closedHat: return juce::Colour (0xffa2bca1);
+            case drums::DrumCategory::openHat: return juce::Colour (0xff91ad96);
+            case drums::DrumCategory::clap: return juce::Colour (0xffb8a996);
+            case drums::DrumCategory::tom: return juce::Colour (0xff9d87b6);
+            case drums::DrumCategory::rim: return juce::Colour (0xffafafad);
+            case drums::DrumCategory::percussion: return juce::Colour (0xffe5b779);
+            case drums::DrumCategory::cymbal: return juce::Colour (0xff86b4b0);
+            case drums::DrumCategory::unknown: break;
+        }
+        return juce::Colour (0xffafafad);
+    }
+} // namespace
+
+juce::Rectangle<float> KeyboardRangeStrip::keyRect (int note) const
+{
+    const auto k = keys();
+    const float w = k.getWidth() / static_cast<float> (whiteKeys);
+    if (! look::isBlackKey (note))
+        return { k.getX() + w * static_cast<float> (whiteIndex (note)), k.getY(), w, k.getHeight() };
+    const float boundary = k.getX() + w * static_cast<float> (whiteIndex (note) + 1);
+    return { boundary - w * blackWidth * 0.5f, k.getY(), w * blackWidth, k.getHeight() * blackHeight };
+}
 
 float KeyboardRangeStrip::noteX (double note) const
 {
-    const auto k = keys();
-    return k.getX() + static_cast<float> (note / 128.0) * k.getWidth();
+    return keyRect (juce::jlimit (0, 127, static_cast<int> (note))).getX();
+}
+
+int KeyboardRangeStrip::noteAt (juce::Point<float> p) const
+{
+    // Black keys sit on top: test them first.
+    for (int n = 0; n < 128; ++n)
+        if (look::isBlackKey (n) && keyRect (n).contains (p))
+            return n;
+    for (int n = 0; n < 128; ++n)
+        if (! look::isBlackKey (n) && keyRect (n).withY (keys().getY() - 26.0f).withHeight (keys().getHeight() + 26.0f).contains (p))
+            return n;
+    return -1;
 }
 
 void KeyboardRangeStrip::refresh()
@@ -486,17 +541,18 @@ void KeyboardRangeStrip::resized()
 {
     padMode.setBounds (200, 9, 72, 28);
     expandedMode.setBounds (272, 9, 104, 28);
-    root.setBounds (getWidth() - 360, 26, 150, 28);
-    presets.setBounds (getWidth() - 196, 26, 140, 28);
-    open.setBounds (getWidth() - 50, 25, 34, 30);
+    // In the title row, so the pad numbers above the zones are never covered.
+    root.setBounds (getWidth() - 468, 9, 150, 28);
+    presets.setBounds (getWidth() - 214, 9, 156, 28);
+    open.setBounds (getWidth() - 50, 8, 34, 30);
 }
 
 void KeyboardRangeStrip::mouseDown (const juce::MouseEvent& e)
 {
-    // A click on a zone (or a PAD note) selects its pad.
-    if (! keys().expanded (0.0f, 22.0f).contains (e.position))
+    // A click on a zone (its tab or its keys) or a PAD note selects that pad.
+    const int note = noteAt (e.position);
+    if (note < 0)
         return;
-    const int note = juce::jlimit (0, 127, static_cast<int> ((e.position.x - keys().getX()) / keys().getWidth() * 128.0f));
     std::array<drums::Hit, drums::maxPads> hits {};
     if (drums::resolve (proc.keyMap(), proc.keyboardMode(), note, hits) > 0 && onSelect)
         onSelect (hits[0].pad);
@@ -506,55 +562,20 @@ void KeyboardRangeStrip::paint (juce::Graphics& g)
 {
     ceramic::card (g, getLocalBounds().toFloat(), 12.0f);
     sectionTitle (g, { 18, 9, 180, 28 }, "KEYBOARD RANGE");
-    smallLabel (g, { getWidth() - 360, 6, 150, 18 }, "ROOT NOTE");
-    smallLabel (g, { getWidth() - 196, 6, 140, 18 }, "ZONE PRESETS");
+    smallLabel (g, { getWidth() - 552, 9, 80, 28 }, "ROOT NOTE", juce::Justification::centredRight);
+    smallLabel (g, { getWidth() - 312, 9, 94, 28 }, "ZONE PRESETS", juce::Justification::centredRight);
 
     const auto k = keys();
-    ceramic::recess (g, k.expanded (3.0f), 5.0f);
-    const float px = k.getWidth() / 128.0f;
     const bool exp = proc.keyboardMode() == drums::KeyboardMode::expanded;
     const auto& map = proc.keyMap();
-    // Keys: equal semitone columns (exactly under the zones), white then black on top.
-    for (int n = 0; n < 128; ++n)
+
+    // Each pad's range: from its lowest key's left edge to its highest key's right edge.
+    struct Span
     {
-        const auto col = juce::Rectangle<float> (noteX (n), k.getY(), px, k.getHeight());
-        std::array<drums::Hit, drums::maxPads> hits {};
-        const int count = drums::resolve (map, proc.keyboardMode(), n, hits);
-        auto face = cc::keyNormal;
-        if (count > 0)
-            face = face.interpolatedWith (look::category (proc.padInfo (hits[0].pad).category), proc.selectedPad == hits[0].pad ? 0.55f : 0.38f);
-        if (held[static_cast<std::size_t> (n)])
-            face = cc::keyOn.interpolatedWith (cc::accent, 0.45f);
-        g.setColour (face);
-        g.fillRect (col.withTrimmedTop (k.getHeight() * 0.6f));
-        if (! look::isBlackKey (n))
-            g.fillRect (col.withHeight (k.getHeight() * 0.6f));
-    }
-    for (int n = 0; n < 128; ++n)
-    {
-        const float x = noteX (n);
-        const bool whiteBoundary = n % 12 == 0 || n % 12 == 5;
-        g.setColour (juce::Colour (0xffd2cabd));
-        g.fillRect (juce::Rectangle<float> (x, whiteBoundary ? k.getY() : k.getY() + k.getHeight() * 0.6f, 0.8f, whiteBoundary ? k.getHeight() : k.getHeight() * 0.4f));
-        if (look::isBlackKey (n))
-        {
-            const auto blackKey = juce::Rectangle<float> (x + px * 0.08f, k.getY(), px * 0.84f, k.getHeight() * 0.6f);
-            g.setGradientFill (juce::ColourGradient (juce::Colour (0xff3a3936), blackKey.getX(), blackKey.getY(), juce::Colour (0xff1e1e1d), blackKey.getX(), blackKey.getBottom(), false));
-            g.fillRoundedRectangle (blackKey, 1.5f);
-            if (held[static_cast<std::size_t> (n)])
-            {
-                g.setColour (cc::accent.withAlpha (0.8f));
-                g.fillRoundedRectangle (blackKey, 1.5f);
-            }
-        }
-        if (n % 12 == 0)
-        {
-            g.setColour (cc::textSecondary);
-            g.setFont (type::micro (11.5f));
-            g.drawText (look::noteName (n), juce::Rectangle<float> (x - 18.0f, k.getBottom() + 4.0f, 36.0f, 14.0f), juce::Justification::centred);
-        }
-    }
-    // Pad numbers above their zones (or notes), in the pad's colour.
+        int pad, low, high;
+        float x0, x1;
+    };
+    std::vector<Span> spans;
     for (int p = 0; p < drums::maxPads; ++p)
     {
         const auto i = static_cast<std::size_t> (p);
@@ -566,15 +587,88 @@ void KeyboardRangeStrip::paint (juce::Graphics& g)
         }
         else if (! exp && map.padNote[i] >= 0)
             lo = hi = map.padNote[i];
-        if (lo < 0)
-            continue;
-        const auto band = juce::Rectangle<float> (noteX (lo), k.getY() - 16.0f, noteX (hi + 1) - noteX (lo), 14.0f);
-        const auto c = look::category (proc.padInfo (p).category);
-        g.setColour (c.withAlpha (proc.selectedPad == p ? 0.95f : 0.7f));
-        g.fillRoundedRectangle (band.withTrimmedTop (10.0f), 1.5f);
-        g.setColour (proc.selectedPad == p ? cc::accent : cc::text);
-        g.setFont (plugin::fonts::make (12.0f, look::Weight::semibold));
-        g.drawText (juce::String (p + 1), band.withTrimmedBottom (4.0f).expanded (8.0f, 0.0f), juce::Justification::centred);
+        if (lo >= 0)
+            spans.push_back ({ p, lo, hi, keyRect (lo).getX(), keyRect (hi).getRight() });
+    }
+
+    // The keybed: ivory white keys with fine separators.
+    ceramic::recess (g, k.expanded (3.0f), 4.0f);
+    for (int n = 0; n < 128; ++n)
+        if (! look::isBlackKey (n))
+        {
+            const auto r = keyRect (n);
+            g.setGradientFill (juce::ColourGradient (juce::Colour (0xfff6f3ec), r.getX(), r.getY(), juce::Colour (0xffe9e5dc), r.getX(), r.getBottom(), false));
+            g.fillRect (r);
+            g.setColour (juce::Colour (0xffcdc6ba));
+            g.fillRect (juce::Rectangle<float> (r.getRight() - 0.5f, r.getY(), 0.8f, r.getHeight()));
+        }
+
+    // Zones: a solid tab above the keys, then a strong wash over them that fades a little
+    // towards the front of the keys (the mockup's look).
+    const float tab = 16.0f;
+    for (const auto& s : spans)
+    {
+        const auto c = zoneColour (proc.padInfo (s.pad).category);
+        const bool selected = proc.selectedPad == s.pad;
+        const auto body = juce::Rectangle<float> (s.x0, k.getY() - tab, s.x1 - s.x0, k.getHeight() + tab);
+        juce::Path shape;
+        shape.addRoundedRectangle (body.getX(), body.getY(), body.getWidth(), body.getHeight(), 4.0f, 4.0f, true, true, false, false);
+        g.setGradientFill (juce::ColourGradient (c.withAlpha (0.96f), 0.0f, body.getY(), c.withAlpha (0.92f), 0.0f, k.getY(), false));
+        g.saveState();
+        g.reduceClipRegion (juce::Rectangle<float> (body.getX(), body.getY(), body.getWidth(), tab + 1.0f).toNearestInt());
+        g.fillPath (shape);
+        g.restoreState();
+        g.setGradientFill (juce::ColourGradient (c.withAlpha (0.82f), 0.0f, k.getY(), c.withAlpha (0.62f), 0.0f, k.getBottom(), false));
+        g.fillRect (body.withTop (k.getY()));
+        // Key separators show through the wash.
+        for (int n = s.low; n <= s.high + 1 && n < 128; ++n)
+            if (! look::isBlackKey (n) && n > s.low)
+            {
+                g.setColour (c.darker (0.35f).withAlpha (0.35f));
+                g.fillRect (juce::Rectangle<float> (keyRect (n).getX() - 0.5f, k.getY(), 0.8f, k.getHeight()));
+            }
+        // Edges: a slightly darker outline; the selected pad's is stronger.
+        g.setColour (c.darker (selected ? 0.45f : 0.25f).withAlpha (selected ? 0.95f : 0.6f));
+        g.strokePath (shape, juce::PathStrokeType (selected ? 1.6f : 1.0f));
+    }
+
+    // Black keys on top (dark through every zone), and held notes.
+    for (int n = 0; n < 128; ++n)
+    {
+        const auto r = keyRect (n);
+        const bool black = look::isBlackKey (n);
+        if (black)
+        {
+            g.setColour (juce::Colours::black.withAlpha (0.18f));
+            g.fillRoundedRectangle (r.translated (0.6f, 0.8f), 1.5f);
+            g.setGradientFill (juce::ColourGradient (juce::Colour (0xff4a4a4c), r.getX(), r.getY(), juce::Colour (0xff232324), r.getX(), r.getBottom(), false));
+            g.fillRoundedRectangle (r, 1.5f);
+            g.setColour (juce::Colours::white.withAlpha (0.12f));
+            g.fillRect (r.reduced (r.getWidth() * 0.22f, 0.0f).withHeight (r.getHeight() - 4.0f).withTrimmedTop (2.0f).withWidth (1.0f));
+        }
+        if (held[static_cast<std::size_t> (n)])
+        {
+            g.setColour (cc::accent.withAlpha (black ? 0.85f : 0.6f));
+            black ? g.fillRoundedRectangle (r, 1.5f) : g.fillRect (r.withTrimmedTop (r.getHeight() * blackHeight));
+        }
+    }
+
+    // Pad numbers above their tabs; the selected pad's in the accent colour.
+    for (const auto& s : spans)
+    {
+        const auto label = juce::Rectangle<float> (s.x0 - 10.0f, k.getY() - tab - 19.0f, s.x1 - s.x0 + 20.0f, 17.0f);
+        g.setColour (proc.selectedPad == s.pad ? cc::accent : juce::Colour (0xff55524c));
+        g.setFont (plugin::fonts::make (13.0f, look::Weight::semibold));
+        g.drawText (juce::String (s.pad + 1), label, juce::Justification::centred);
+    }
+
+    // Octave names under the C keys.
+    g.setColour (cc::textSecondary);
+    g.setFont (type::micro (11.5f));
+    for (int n = 0; n < 128; n += 12)
+    {
+        const auto r = keyRect (n);
+        g.drawText (look::noteName (n), juce::Rectangle<float> (r.getX() - 4.0f, k.getBottom() + 4.0f, 40.0f, 14.0f), juce::Justification::centredLeft);
     }
 }
 

@@ -694,6 +694,19 @@ TEST_CASE ("Snapshots of every major state (written when ANDOR_DRUMS_SNAPSHOT_DI
     sendNotes (p, { { 36, true }, { 38, true }, { 42, true } });
     editor->content().padGrid().refresh();
     snapshot (*editor, "03-playing");
+    {
+        // The mockup's state: EXPANDED, one octave per pad from C1 (MIDI 24 in OSP's names).
+        const auto pads = p.keyMap();
+        auto m = pads;
+        REQUIRE (drums::applyZoneLayout (m, 12, { 0, 1, 2, 3, 4, 5, 6, 7 }, 24).applied);
+        p.setKeyMap (m);
+        p.setKeyboardMode (drums::KeyboardMode::expanded);
+        editor->content().refreshModeBar();
+        snapshot (*editor, "03b-keyboard-range-expanded");
+        p.setKeyMap (pads);
+        p.setKeyboardMode (drums::KeyboardMode::pad);
+        editor->content().refreshModeBar();
+    }
     editor->content().setLayout (DrumsProcessor::PadLayout::grid8);
     snapshot (*editor, "04a-pads-2x4");
     editor->content().setLayout (DrumsProcessor::PadLayout::grid9);
