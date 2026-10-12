@@ -73,6 +73,7 @@ struct PadInfo
 
     std::shared_ptr<const LoadedInstrument> sound;   ///< the first layer that plays (null: nothing plays)
     PadLayers layers;                                ///< every layer (sound is the first loaded one)
+    drums::PadModulation modulation;                 ///< the pad's own modulation (MODULATION card)
     bool loading = false;
     std::string error;                     ///< the last load's failure, shown on the pad
     /** A sound the saved session refers to but which could not be found (relink later). */
@@ -90,7 +91,7 @@ class DrumsProcessor final : public juce::AudioProcessor,
 {
 public:
     static constexpr int numPads = drums::maxPads;
-    static constexpr int stateVersion = 3;   ///< 2: pad order, per-pad envelope/START/REVERSE parameters; 3: sample layers
+    static constexpr int stateVersion = 4;   ///< 2: pad order, per-pad envelope/START/REVERSE parameters; 3: sample layers; 4: pad modulation
     static constexpr const char* stateTag = "AndorDrums";
 
     DrumsProcessor();
@@ -138,6 +139,10 @@ public:
     const PadLayers& padLayers (int pad) const noexcept { return pads[index (pad)].layers; }
     void applyLayerEdit (int pad, const PadLayers& next, const juce::String& actionName, bool newTransaction = true);
     void setLayerParams (int pad, int layer, const drums::LayerParams& params, bool newTransaction = true);
+    /** A pad's own modulation (ENV, LFO, VELOCITY, WHEEL, PRESSURE -> PITCH, LEVEL, PAN, FILTER,
+        START, DECAY). Undoable; a knob drag passes newTransaction only at its start. */
+    const drums::PadModulation& padModulation (int pad) const noexcept { return pads[index (pad)].modulation; }
+    void setPadModulation (int pad, const drums::PadModulation& modulation, bool newTransaction = true);
     void setLayerMode (int pad, drums::LayerMode mode);
     void setLayerOrder (int pad, drums::RoundRobinOrder order);
     void renameLayer (int pad, int layer, const juce::String& name);
@@ -447,6 +452,8 @@ private:
     void pullSettings() noexcept;          // audio thread
     void pullKeyMap() noexcept;            // audio thread
     void takeNewSounds() noexcept;         // audio thread
+    void takeNewModulation() noexcept;     // audio thread
+    void applyModulation (int pad, const drums::PadModulation& modulation);   // message thread: store and publish
 
     juce::AudioProcessorValueTreeState apvts;
     drums::DrumKitEngine engine;
@@ -487,6 +494,14 @@ private:
     };
     void applySound (int pad, const PadSound* sound) noexcept;   // audio thread
     std::array<ModelExchange<PadSound>, numPads> exchange;
+    // Message -> audio: each pad's modulation (a plain value; the engine copies it on arrival)
+    struct PadMod
+    {
+        std::uint64_t generation = 0;
+        drums::PadModulation modulation;
+    };
+    std::array<ModelExchange<PadMod>, numPads> modExchange;
+    std::uint64_t modGeneration = 0;
     // Audio thread: what plays and what still rings out
     std::array<const PadSound*, numPads> playing {};
     std::array<std::array<const PadSound*, 8>, numPads> retired {};

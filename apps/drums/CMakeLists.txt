@@ -41,6 +41,7 @@ target_sources(ANDOR_Drums PRIVATE
     Source/LayerUi.cpp
     Source/BreakView.cpp
     Source/ImportView.cpp
+    Source/ModulationUi.cpp
     ${OSP_PLUGIN_SOURCE_DIR}/InstrumentLoader.cpp
     ${OSP_PLUGIN_SOURCE_DIR}/OspLookAndFeel.cpp
     ${OSP_PLUGIN_SOURCE_DIR}/Design.cpp

@@ -2,6 +2,7 @@
 
 #include "drums/DrumLayers.h"
 #include "drums/DrumMapping.h"
+#include "drums/PadModulation.h"
 #include "engine/InstrumentEngine.h"
 #include "engine/PostProcessor.h"
 
@@ -154,6 +155,13 @@ public:
     /** Sustain pedal (CC 64): gate pads keep sounding after note-off until it is released
         (one-shot pads ignore note-offs anyway). */
     void setSustainPedal (bool down) noexcept;
+    /** A pad's own modulation (sources -> pitch, level, pan, filter, start, decay). Real-time
+        safe: a plain copy compiled into the pad's engine. */
+    void setPadModulation (int pad, const PadModulation& modulation) noexcept;
+    const PadModulation& padModulation (int pad) const noexcept { return padMod[index (pad)]; }
+    /** The mod wheel (CC 1) and channel pressure, 0..1, for every pad's WHEEL / PRESSURE. */
+    void setModWheel (float value) noexcept;
+    void setPressure (float value) noexcept;
     void allNotesOff() noexcept;
     void reset() noexcept;
     void resetPerformance() noexcept;
@@ -186,6 +194,8 @@ private:
     std::array<std::array<const InstrumentModel*, maxLayers>, maxPads> layerModels {};
     std::array<LayerPlan, maxPads> plans {};
     std::array<LayerPicker, maxPads> pickers {};
+    std::array<PadModulation, maxPads> padMod {};
+    void applyModulation (int pad) noexcept;
     std::array<std::uint64_t, maxPads> layerHits {};  ///< hits since prepare/reset (the picker's randomness)
     PostProcessor post;
     double sampleRate = 48000.0;

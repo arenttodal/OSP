@@ -1687,6 +1687,11 @@ TEST_CASE ("Real-time: processBlock never allocates, whatever happens around it"
         }
         if (b % 40 == 0)
             midi.addEvent (juce::MidiMessage::controllerEvent (1, 64, b % 80 == 0 ? 127 : 0), 10);
+        if (b % 7 == 0)
+        {
+            midi.addEvent (juce::MidiMessage::controllerEvent (1, 1, b % 128), 20);         // WHEEL
+            midi.addEvent (juce::MidiMessage::channelPressureChange (1, (b * 3) % 128), 30); // PRESSURE
+        }
         block (p, buffer, midi);
 
         // Meanwhile on the message thread (outside the counted call).
@@ -1713,6 +1718,9 @@ TEST_CASE ("Real-time: processBlock never allocates, whatever happens around it"
             case 470: p.duplicatePad (1, 7); break;
             case 500: p.parameters().getParameter ("kit.machine")->setValueNotifyingHost (0.6f); break;   // MACHINE on
             case 540: p.parameters().getParameter ("kit.machine")->setValueNotifyingHost (0.2f); break;
+            case 560: p.setPadModulation (0, drums::modPreset (drums::ModPreset::kickPitchDrop)); break;   // reaches the audio thread
+            case 570: p.setPadModulation (2, drums::modPreset (drums::ModPreset::hatMotion)); break;
+            case 580: p.undoManager().undo(); break;
             default: break;
         }
         if (b % 25 == 0)
@@ -2072,6 +2080,16 @@ TEST_CASE ("Snapshots of every major state (written when ANDOR_DRUMS_SNAPSHOT_DI
     editor->content().syncBreakView();
     p.parameters().getParameter ("kit.machine")->setValueNotifyingHost (0.4f);
     snapshot (*editor, "16-machine");
+
+    // Per-pad modulation: the kick's ENV page (a pitch drop) with VELOCITY on the filter too.
+    auto kickMod = drums::modPreset (drums::ModPreset::kickPitchDrop);
+    kickMod.slot (drums::ModSource::velocity, 0) = { drums::ModTarget::filter, 0.45 };
+    p.setPadModulation (0, kickMod);
+    editor->content().selectPad (0);
+    editor->content().envelopePanel().setTab (osp::drumsplugin::EnvelopePanel::env);
+    snapshot (*editor, "17-modulation-env");
+    editor->content().envelopePanel().setTab (osp::drumsplugin::EnvelopePanel::lfo);
+    snapshot (*editor, "18-modulation-lfo");
 }
 
 TEST_CASE ("MACHINE: a kit parameter, off by default, saved with the session, and audible", "[drums-plugin][machine]")
@@ -2105,6 +2123,132 @@ TEST_CASE ("MACHINE: a kit parameter, off by default, saved with the session, an
     const auto off = render (0.0f), offAgain = render (0.0f), on = render (0.7f);
     CHECK (off == offAgain);   // off: exactly the kit as it was
     CHECK (off != on);
+}
+
+TEST_CASE ("Per-pad modulation: undoable, saved, duplicated, cleared, and heard only on its pad", "[drums-plugin][padmod]")
+{
+    TempDir tmp;
+    const ScopedStore store (tmp.dir.getChildFile ("store"));
+    DrumsProcessor p, plain;
+    p.prepareToPlay (rate, 256);
+    plain.prepareToPlay (rate, 256);
+    loadNine (p, tmp);
+    loadNine (plain, tmp);
+
+    const auto drop = drums::modPreset (drums::ModPreset::kickPitchDrop);
+    p.setPadModulation (0, drop);
+    CHECK (p.padModulation (0) == drop);
+    p.undoManager().undo();
+    CHECK_FALSE (p.padModulation (0).active());
+    p.undoManager().redo();
+    CHECK (p.padModulation (0) == drop);
+
+    // Heard: pad 0 differs from the plain kit, pad 1 does not.
+    auto render = [] (DrumsProcessor& proc, int note) {
+        juce::AudioBuffer<float> buffer (2, 256);
+        juce::MidiBuffer midi;
+        std::vector<float> out;
+        for (int b = 0; b < 40; ++b)
+        {
+            midi.clear();
+            if (b == 1)
+                midi.addEvent (juce::MidiMessage::noteOn (10, note, static_cast<juce::uint8> (100)), 0);
+            block (proc, buffer, midi);
+            out.insert (out.end(), buffer.getReadPointer (0), buffer.getReadPointer (0) + 256);
+        }
+        return out;
+    };
+    CHECK (render (p, p.keyMap().padNote[1]) == render (plain, plain.keyMap().padNote[1]));   // first: no tail of pad 0
+    CHECK (render (p, p.keyMap().padNote[0]) != render (plain, plain.keyMap().padNote[0]));
+
+    // Saved with the session (state 4) and with kits; a pad without <Modulation> is plain.
+    juce::MemoryBlock state;
+    p.getStateInformation (state);
+    DrumsProcessor q;
+    q.setPadModulation (3, drums::modPreset (drums::ModPreset::hatMotion));   // replaced by the state
+    q.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+    CHECK (q.padModulation (0) == drop);
+    CHECK_FALSE (q.padModulation (3).active());
+    REQUIRE (q.waitForLoads());
+
+    // Duplicate copies it; undo takes it back.
+    REQUIRE (p.duplicatePad (0, 5));
+    CHECK (p.padModulation (5) == drop);
+    p.undoManager().undo();
+    CHECK_FALSE (p.padModulation (5).active());
+
+    // Clear: the pad starts plain, in the same undo step.
+    p.clearPad (0);
+    CHECK_FALSE (p.padModulation (0).active());
+    p.undoManager().undo();
+    CHECK (p.padModulation (0) == drop);
+}
+
+TEST_CASE ("Per-pad modulation: the MODULATION card's tabs edit the selected pad", "[drums-plugin][padmod][ui]")
+{
+    const juce::ScopedJuceInitialiser_GUI gui;
+    TempDir tmp;
+    const ScopedStore store (tmp.dir.getChildFile ("store"));
+    DrumsProcessor p;
+    p.prepareToPlay (rate, 256);
+    loadNine (p, tmp);
+    auto editor = openEditor (p);
+    editor->content().selectPad (1);
+    auto& card = editor->content().envelopePanel();
+    card.setTab (osp::drumsplugin::EnvelopePanel::vel);
+    auto& mods = card.modEditor();
+    CHECK (mods.source() == drums::ModSource::velocity);
+    mods.targetBox (0).setSelectedItemIndex (static_cast<int> (drums::ModTarget::filter), juce::sendNotificationSync);   // one undo step
+    CHECK (p.padModulation (1).slot (drums::ModSource::velocity, 0).target == drums::ModTarget::filter);
+    CHECK (p.padModulation (1).slot (drums::ModSource::velocity, 0).depth > 0.0);   // starts audible
+    mods.depthSlider (0).setValue (0.6, juce::sendNotificationSync);
+    CHECK (p.padModulation (1).slot (drums::ModSource::velocity, 0).depth == Approx (0.6));
+    CHECK_FALSE (p.padModulation (0).active());   // only the selected pad
+
+    // Another pad shows its own (empty) routes; undo comes back to the card.
+    editor->content().selectPad (0);
+    CHECK (mods.targetBox (0).getSelectedItemIndex() == 0);
+    editor->content().selectPad (1);
+    CHECK (mods.targetBox (0).getSelectedItemIndex() == static_cast<int> (drums::ModTarget::filter));
+    while (p.undoManager().canUndo() && p.padModulation (1).active())
+        p.undoManager().undo();
+    editor->content().envelopePanel().refresh();
+    CHECK (mods.targetBox (0).getSelectedItemIndex() == 0);
+}
+
+TEST_CASE ("Dropping a sample on a pad replaces it at once; only Cmd asks", "[drums-plugin][ui]")
+{
+    const juce::ScopedJuceInitialiser_GUI gui;
+    TempDir tmp;
+    const ScopedStore store (tmp.dir.getChildFile ("store"));
+    DrumsProcessor p;
+    p.prepareToPlay (rate, 256);
+    loadNine (p, tmp);
+    auto editor = openEditor (p);
+    editor->addToDesktop (0);   // a real window: a menu could open
+    REQUIRE (editor->getPeer() != nullptr);
+    auto& target = editor->content().padGrid();
+
+    // No modifier: the new sample replaces the kick, no menu.
+    const auto fresh = writeDrum (tmp.dir, "NewKick.wav", 70.0, 0.4);
+    osp::drumsplugin::offerLayerDrop (p, 0, { fresh }, &target);
+    CHECK_FALSE (juce::PopupMenu::dismissAllActiveMenus());
+    REQUIRE (p.waitForLoads());
+    REQUIRE (p.padLayers (0).layers.size() == 1);
+    CHECK (p.padLayers (0).layers[0].fileName().find ("NewKick") != std::string::npos);
+
+    // Several files: round robins, still no menu.
+    osp::drumsplugin::offerLayerDrop (p, 1, { writeDrum (tmp.dir, "S1.wav", 200.0, 0.3), writeDrum (tmp.dir, "S2.wav", 210.0, 0.3) }, &target);
+    CHECK_FALSE (juce::PopupMenu::dismissAllActiveMenus());
+    REQUIRE (p.waitForLoads());
+    CHECK (p.padLayers (1).layers.size() == 3);   // added to the snare's own sample
+    CHECK (p.padLayers (1).mode == drums::LayerMode::roundRobin);
+
+    // Asking (Cmd held): the menu opens and nothing changes until a choice.
+    osp::drumsplugin::offerLayerDrop (p, 2, { writeDrum (tmp.dir, "H.wav", 900.0, 0.2) }, &target, std::nullopt, osp::drumsplugin::DropAsk::always);
+    CHECK (juce::PopupMenu::dismissAllActiveMenus());
+    CHECK (p.padLayers (2).layers.size() == 1);
+    editor->removeFromDesktop();
 }
 
 int main (int argc, char* argv[])

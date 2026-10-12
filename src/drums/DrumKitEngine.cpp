@@ -102,6 +102,7 @@ void DrumKitEngine::prepare (double rate, int maximumBlockSize, const KitSetting
         auto& engine = *engines[index (p)];
         engine.prepare (rate, blockSize, s);
         applyPad (p);
+        applyModulation (p);
     }
 
     Macros postMacros = effectiveMacros();
@@ -326,7 +327,11 @@ void DrumKitEngine::setSeed (std::uint64_t seed) noexcept
 {
     kit.seed = seed;
     for (int p = 0; p < maxPads; ++p)
+    {
         engines[index (p)]->setSeed (Prng::deriveSeed (seed, padSeedSalt, static_cast<std::uint64_t> (p)));
+        if (padMod[index (p)].active())
+            applyModulation (p);
+    }
 }
 
 void DrumKitEngine::setHostTiming (const HostTiming& timing) noexcept
@@ -444,6 +449,32 @@ void DrumKitEngine::releasePad (int pad) noexcept
 {
     if (pad >= 0 && pad < maxPads)
         noteOff (128 + pad);
+}
+
+void DrumKitEngine::setPadModulation (int pad, const PadModulation& modulation) noexcept
+{
+    padMod[index (pad)] = modulation;
+    applyModulation (pad);
+}
+
+void DrumKitEngine::applyModulation (int pad) noexcept
+{
+    // A plain value compiled into the pad's own engine (no allocation). With no route the
+    // pad renders exactly as without modulation.
+    const auto seed = Prng::deriveSeed (kit.seed, padSeedSalt ^ 0x4d4f44ull, static_cast<std::uint64_t> (pad));
+    engines[index (pad)]->setModulation (padMod[index (pad)].toSettings (seed));
+}
+
+void DrumKitEngine::setModWheel (float value) noexcept
+{
+    for (auto& e : engines)
+        e->setModWheel (value);
+}
+
+void DrumKitEngine::setPressure (float value) noexcept
+{
+    for (auto& e : engines)
+        e->setModPressure (value);
 }
 
 void DrumKitEngine::setSustainPedal (bool down) noexcept

@@ -1,5 +1,18 @@
 # ANDOR Drums — version history
 
+## 0.1.9 (unreleased, branch drum-plugin): per-pad modulation, drops, OSP update
+
+- **Per-pad modulation:** the MODULATION card gains ENV, LFO, VEL and CTRL tabs (mod wheel,
+  aftertouch). Each source goes to up to three of PITCH, LEVEL, PAN, FILTER, START and
+  DECAY, with presets: kick pitch drop, harder is brighter or higher, tom bend, moving
+  hats, ghost notes. Saved with sessions and kits, undoable, copied by Duplicate.
+- **Drops replace at once:** dropping a sample on a pad replaces its sound, with no menu.
+  Several files become round robins. Hold Cmd (Ctrl on Windows) while dropping to choose.
+- **OSP update merged:** the rendered knobs, the ceramic skin and OSP's final modulation
+  system.
+- **Specs** for multi-sound kits (several toms and percs on their own keys) and for a drum
+  library with pools that cycle or randomise.
+
 ## 0.1.8 (unreleased, branch drum-plugin): MACHINE (experimental)
 
 - **MACHINE** in the GLOBAL header: one fader from OFF to STRONG for the character of an

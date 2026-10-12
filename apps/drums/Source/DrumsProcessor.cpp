@@ -80,6 +80,8 @@ void DrumsProcessor::factoryPad (int pad)
     info.chokeGroup = defaults.chokeGroup;
     info.voiceMode = defaults.voiceMode;
     info.trigger = defaults.trigger;
+    if (! (info.modulation == drums::PadModulation {}))
+        applyModulation (pad, {});
 }
 
 DrumsProcessor::~DrumsProcessor()
@@ -233,6 +235,26 @@ bool DrumsProcessor::stillSounding (int pad, const PadSound& old) const noexcept
     return false;
 }
 
+void DrumsProcessor::takeNewModulation() noexcept
+{
+    for (int p = 0; p < numPads; ++p)
+        if (const PadMod* fresh = modExchange[index (p)].takePending())
+        {
+            engine.setPadModulation (p, fresh->modulation);   // copied: the bundle is free at once
+            modExchange[index (p)].publishOldestInUse (fresh->generation);
+        }
+}
+
+void DrumsProcessor::applyModulation (int pad, const drums::PadModulation& modulation)
+{
+    pads[index (pad)].modulation = modulation;
+    auto bundle = std::make_shared<PadMod>();
+    bundle->generation = ++modGeneration;
+    bundle->modulation = modulation;
+    modExchange[index (pad)].publish (std::move (bundle));
+    sendChangeMessage();
+}
+
 void DrumsProcessor::takeNewSounds() noexcept
 {
     for (int p = 0; p < numPads; ++p)
@@ -378,6 +400,7 @@ void DrumsProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
     juce::ScopedNoDenormals noDenormals;
     const int numSamples = buffer.getNumSamples();
     takeNewSounds();
+    takeNewModulation();
     pullKeyMap();
     pullSettings();
 
@@ -465,6 +488,10 @@ void DrumsProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
             engine.noteOff (note, message.getChannel());
             heldBits[static_cast<std::size_t> (note >> 5)].fetch_and (~(1u << (note & 31)), std::memory_order_relaxed);
         }
+        else if (message.isControllerOfType (1))
+            engine.setModWheel (static_cast<float> (message.getControllerValue()) / 127.0f);   // WHEEL
+        else if (message.isChannelPressure())
+            engine.setPressure (static_cast<float> (message.getChannelPressureValue()) / 127.0f);   // PRESSURE
         else if (message.isSustainPedalOn())
             engine.setSustainPedal (true);
         else if (message.isSustainPedalOff())
@@ -895,6 +922,7 @@ void DrumsProcessor::clearPad (int pad)
     info.loading = false;
     info.error.clear();
     applyLayerEdit (pad, PadLayers {}, "Clear pad");
+    setPadModulation (pad, {}, false);   // same undo step: a cleared pad starts plain
     info.missingFilename.clear();
     sendChangeMessage();
 }
@@ -1148,6 +1176,7 @@ bool DrumsProcessor::duplicatePad (int from, int to)
                 param->setValueNotifyingHost (snap.params[k]);
         selectedLayer[index (p)] = 0;
         setPadLayers (p, snap.info.layers);
+        applyModulation (p, snap.info.modulation);
         publishPadConfig();
     };
     const auto before = take (to);
@@ -1157,6 +1186,20 @@ bool DrumsProcessor::duplicatePad (int from, int to)
     undo.beginNewTransaction ("Duplicate pad");
     undo.perform (new FunctionAction ([put, to, after] { put (to, after); }, [put, to, before] { put (to, before); }), "Duplicate pad");
     return true;
+}
+
+void DrumsProcessor::setPadModulation (int pad, const drums::PadModulation& modulation, bool newTransaction)
+{
+    if (pad < 0 || pad >= numPads)
+        return;
+    const auto before = pads[index (pad)].modulation;
+    if (before == modulation)
+        return;
+    if (newTransaction)
+        undo.beginNewTransaction ("Edit modulation");
+    undo.perform (new FunctionAction ([this, pad, modulation] { applyModulation (pad, modulation); },
+                                      [this, pad, before] { applyModulation (pad, before); }),
+                  "Edit modulation");
 }
 
 // ---------------------------------------------------------------------------------------
@@ -2086,6 +2129,8 @@ void DrumsProcessor::timerCallback()
     publishFinishedLoads();
     for (auto& e : exchange)
         e.collectGarbage();
+    for (auto& e : modExchange)
+        e.collectGarbage();
     // Preview audio no longer queued, playing or open is let go.
     if (previewFifo.getNumReady() == 0)
     {
@@ -2126,6 +2171,84 @@ bool DrumsProcessor::waitForLoads (int timeoutMs)
 
 namespace
 {
+    /** A pad's modulation (state 4). Only written when it differs from the default. */
+    void writeModulation (juce::XmlElement& pad, const drums::PadModulation& m)
+    {
+        if (m == drums::PadModulation {})
+            return;
+        auto num = [] (double v) { return juce::String (v, 17); };
+        auto* x = pad.createNewChildElement ("Modulation");
+        x->setAttribute ("velocityShape", static_cast<int> (m.velocityShape));
+        auto* env = x->createNewChildElement ("Env");
+        env->setAttribute ("attack", num (m.env.attackSeconds));
+        env->setAttribute ("decay", num (m.env.decaySeconds));
+        env->setAttribute ("sustain", num (m.env.sustain));
+        env->setAttribute ("release", num (m.env.releaseSeconds));
+        env->setAttribute ("curve", num (m.env.curve));
+        auto* lfo = x->createNewChildElement ("Lfo");
+        lfo->setAttribute ("shape", static_cast<int> (m.lfo.shape));
+        lfo->setAttribute ("rate", num (m.lfo.rateHz));
+        lfo->setAttribute ("sync", m.lfo.sync);
+        lfo->setAttribute ("division", m.lfo.division);
+        lfo->setAttribute ("phase", num (m.lfo.phase));
+        lfo->setAttribute ("bipolar", m.lfo.bipolar);
+        lfo->setAttribute ("mode", static_cast<int> (m.lfo.mode));
+        lfo->setAttribute ("scope", static_cast<int> (m.lfo.scope));
+        for (int src = 0; src < drums::modSourceCount; ++src)
+            for (int i = 0; i < drums::modSlotsPerSource; ++i)
+            {
+                const auto& slot = m.slot (static_cast<drums::ModSource> (src), i);
+                if (slot.target == drums::ModTarget::none)
+                    continue;
+                auto* r = x->createNewChildElement ("Route");
+                r->setAttribute ("source", src);
+                r->setAttribute ("slot", i);
+                r->setAttribute ("target", static_cast<int> (slot.target));
+                r->setAttribute ("depth", num (slot.depth));
+            }
+    }
+
+    drums::PadModulation readModulation (const juce::XmlElement* x)
+    {
+        drums::PadModulation m;
+        if (x == nullptr)
+            return m;
+        auto num = [] (const juce::XmlElement& e, const char* name, double fallback, double lo, double hi) {
+            return juce::jlimit (lo, hi, e.hasAttribute (name) ? e.getStringAttribute (name).getDoubleValue() : fallback);
+        };
+        m.velocityShape = static_cast<drums::VelocityShape> (juce::jlimit (0, 2, x->getIntAttribute ("velocityShape", 0)));
+        if (auto* env = x->getChildByName ("Env"))
+        {
+            m.env.attackSeconds = num (*env, "attack", m.env.attackSeconds, 0.0, 10.0);
+            m.env.decaySeconds = num (*env, "decay", m.env.decaySeconds, 0.001, 20.0);
+            m.env.sustain = num (*env, "sustain", m.env.sustain, 0.0, 1.0);
+            m.env.releaseSeconds = num (*env, "release", m.env.releaseSeconds, 0.001, 20.0);
+            m.env.curve = num (*env, "curve", m.env.curve, -1.0, 1.0);
+        }
+        if (auto* lfo = x->getChildByName ("Lfo"))
+        {
+            m.lfo.shape = static_cast<mod::LfoShape> (juce::jlimit (0, mod::lfoShapeCount - 2, lfo->getIntAttribute ("shape", 0)));   // no custom curve here
+            m.lfo.rateHz = num (*lfo, "rate", m.lfo.rateHz, 0.01, 30.0);
+            m.lfo.sync = lfo->getBoolAttribute ("sync", m.lfo.sync);
+            m.lfo.division = juce::jlimit (0, mod::syncDivisionCount - 1, lfo->getIntAttribute ("division", m.lfo.division));
+            m.lfo.phase = num (*lfo, "phase", m.lfo.phase, 0.0, 1.0);
+            m.lfo.bipolar = lfo->getBoolAttribute ("bipolar", m.lfo.bipolar);
+            m.lfo.mode = static_cast<mod::LfoMode> (juce::jlimit (0, 2, lfo->getIntAttribute ("mode", static_cast<int> (m.lfo.mode))));
+            m.lfo.scope = static_cast<mod::Scope> (juce::jlimit (0, 1, lfo->getIntAttribute ("scope", static_cast<int> (m.lfo.scope))));
+        }
+        for (auto* r : x->getChildWithTagNameIterator ("Route"))
+        {
+            const int src = r->getIntAttribute ("source", -1), i = r->getIntAttribute ("slot", -1);
+            const int target = r->getIntAttribute ("target", 0);
+            if (src < 0 || src >= drums::modSourceCount || i < 0 || i >= drums::modSlotsPerSource || target <= 0 || target >= drums::modTargetCount)
+                continue;   // a newer build's source or target: left out, never misread
+            auto& slot = m.slot (static_cast<drums::ModSource> (src), i);
+            slot.target = static_cast<drums::ModTarget> (target);
+            slot.depth = num (*r, "depth", 0.0, -1.0, 1.0);
+        }
+        return m;
+    }
+
     /** A sound's identity and its exact playback model, so a reopened project sounds
         identical even if analysis changes later (as OSP does). */
     void writeSound (juce::XmlElement& x, const LoadedInstrument& s)
@@ -2207,6 +2330,7 @@ std::unique_ptr<juce::XmlElement> DrumsProcessor::createStateXml (const char* ta
         x->setAttribute ("choke", info.chokeGroup);
         x->setAttribute ("voice", drums::toString (info.voiceMode));
         x->setAttribute ("trigger", drums::toString (info.trigger));
+        writeModulation (*x, info.modulation);
         // Layers (state 3). The first loaded layer is also written as <Sound>, so a build
         // from before layers still opens the kit with one sample per pad.
         if (info.sound != nullptr)
@@ -2308,6 +2432,10 @@ void DrumsProcessor::restoreStateXml (const juce::XmlElement& rootRef, const juc
     }
     map = restored;
 
+    // Modulation (state 4): a pad the state does not describe starts plain.
+    for (int p = 0; p < numPads; ++p)
+        if (! (pads[index (p)].modulation == drums::PadModulation {}))
+            applyModulation (p, {});
     if (auto* padsXml = root->getChildByName ("Pads"))
         for (auto* x : padsXml->getChildWithTagNameIterator ("Pad"))
         {
@@ -2320,6 +2448,8 @@ void DrumsProcessor::restoreStateXml (const juce::XmlElement& rootRef, const juc
             info.chokeGroup = juce::jlimit (0, 8, x->getIntAttribute ("choke", 0));
             info.voiceMode = x->getStringAttribute ("voice") == "mono" ? drums::VoiceMode::monoRetrigger : drums::VoiceMode::poly;
             info.trigger = x->getStringAttribute ("trigger") == "gate" ? drums::TriggerMode::gate : drums::TriggerMode::oneShot;
+            if (auto* m = x->getChildByName ("Modulation"))
+                applyModulation (p, readModulation (m));
             // The pad's layers (state 3), or its one <Sound> (states 1 and 2: one layer).
             Batch batch;
             batch.recall = true;

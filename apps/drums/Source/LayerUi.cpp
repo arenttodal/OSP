@@ -44,7 +44,8 @@ juce::PopupMenu duplicateMenu (DrumsProcessor& proc, int pad, std::function<void
     return m;
 }
 
-void offerLayerDrop (DrumsProcessor& proc, int pad, const juce::Array<juce::File>& dropped, juce::Component* target, std::optional<LayerDrop> preferred)
+void offerLayerDrop (DrumsProcessor& proc, int pad, const juce::Array<juce::File>& dropped, juce::Component* target, std::optional<LayerDrop> preferred,
+                     DropAsk ask)
 {
     juce::Array<juce::File> files;
     for (const auto& f : dropped)
@@ -54,6 +55,13 @@ void offerLayerDrop (DrumsProcessor& proc, int pad, const juce::Array<juce::File
         return;
     const bool populated = ! proc.padLayers (pad).layers.empty();
     const auto fallback = preferred.value_or (defaultLayerDrop (files.size()));
+    // A drop never interrupts: the default happens, unless Cmd is held to choose.
+    const bool asking = ask == DropAsk::always || (ask == DropAsk::fromModifiers && juce::ModifierKeys::getCurrentModifiersRealtime().isCommandDown());
+    if (! asking || target == nullptr || target->getPeer() == nullptr)
+    {
+        proc.addPadLayers (pad, files, fallback);
+        return;
+    }
     // A single long recording might be a break: then offer slicing it too.
     bool longFile = false;
     if (files.size() == 1)
@@ -62,11 +70,6 @@ void offerLayerDrop (DrumsProcessor& proc, int pad, const juce::Array<juce::File
         formats.registerBasicFormats();
         if (std::unique_ptr<juce::AudioFormatReader> reader { formats.createReaderFor (files[0]) })
             longFile = reader->sampleRate > 0.0 && static_cast<double> (reader->lengthInSamples) / reader->sampleRate > 1.5;
-    }
-    if ((! populated && files.size() == 1 && ! longFile) || target == nullptr || target->getPeer() == nullptr)
-    {
-        proc.addPadLayers (pad, files, fallback);
-        return;
     }
     juce::PopupMenu m;
     if (! populated && files.size() == 1)

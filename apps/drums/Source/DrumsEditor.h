@@ -6,6 +6,7 @@
 #include "DrumsProcessor.h"
 #include "KeyMapEditor.h"
 #include "LayerUi.h"
+#include "ModulationUi.h"
 #include "OspLookAndFeel.h"
 #include "PadGrid.h"
 
@@ -132,11 +133,25 @@ public:
     explicit EnvelopePanel (DrumsProcessor&);
     void paint (juce::Graphics&) override;
     void resized() override;
+    void mouseDown (const juce::MouseEvent&) override;
     void bind();
+    /** The processor changed (an undo, a preset): the modulation page follows. */
+    void refresh();
+
+    /** The card's tabs: AMP, then the pad's modulation sources. */
+    enum Tab { amp, env, lfo, vel, ctrl, tabCount };
+    void setTab (int tab);
+    int currentTab() const noexcept { return tab; }
+    juce::Rectangle<int> tabRect (int tab) const;
+    PadModEditor& modEditor() noexcept { return mods; }
+    void showPresetMenu();
 
 private:
     DrumsProcessor& proc;
     LabelledKnob attack, decay, sustain, release;
+    PadModEditor mods;
+    ceramic::KeyButton presets { "PRESETS", 0.6f };
+    int tab = amp;
 };
 
 /** BREAK in the top bar: click to choose a break, or drop one on it. */
@@ -192,6 +207,7 @@ public:
     SamplePanel& samplePanel() noexcept { return sample; }
     BreakView& breakView() noexcept { return breaks; }
     ImportView& importView() noexcept { return imports; }
+    EnvelopePanel& envelopePanel() noexcept { return envelope; }
     void openBreakDialog();
     void syncBreakView();
     void openLoadDialog (int pad);

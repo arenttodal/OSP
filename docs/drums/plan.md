@@ -37,9 +37,13 @@ branch.
       aligned keyboard, zoom/scroll), drag move / resize / root, click-to-assign,
       collision resolution (swap, move others, layer, cancel), MIDI Learn (note, range),
       Auto Map with preview, one undo step per gesture, sustain pedal, state 2.
-- [ ] **M5 GUI** (V1.1 layout done: pads on top, equal 2x4 / 3x3 cells, selected-pad
-      editor, AMP envelope, effects, kit macros, resizable 0.7-1.5x). Open: Blender knob,
-      per-pad modulation sources, a 1x8 pad strip if the mockup's single row is wanted.
+- [x] **M5 GUI.** Done:
+      - V1.1 layout: pads on top, equal 2x4 / 3x3 cells, the selected-pad editor, AMP
+        envelope, effects, kit macros, resizable 0.7-1.5x;
+      - 1x8 as it is (confirmed by the user);
+      - OSP's rendered knob and ceramic skin merged in (OSP's default branch, 2026-10-12);
+      - per-pad modulation (`pad-modulation.md`);
+      - drops replace without a menu; Cmd-drop asks.
 - [x] **M6 Break slicing** (`m6-breaks.md`). Done:
       - a multi-band spectral-flux slicer, validated on a synthetic collection;
       - SLICE BREAK view: markers, edits, audition, tray, drag to pads;
@@ -70,9 +74,15 @@ branch.
       Open: the A/B listening test to tune the curve; timing imperfection is deliberately
       left out.
 
+## Next (specs, waiting for the user's answers)
+
+- **Multi-sound kits** (`spec-multi-sound-kits.md`): family pads, with several toms or percs
+  on their own keys, then possibly 16 pads.
+- **Library and pools** (`spec-library-pools.md`): a drum library on OSP's catalog, saved
+  pools, pads that cycle or randomise from a pool, and Roll the kit.
+
 ## Needs the user
 
 - Mockups: 2x4, 3x3, selected pad, keyboard mapping and break import, before the final
   pad artwork. Functional work continues meanwhile.
-- The Blender knob: Drums picks it up through `OspLookAndFeel` once it is committed.
 - DAW checks on a Mac (AU validation, Logic, Live, REAPER).

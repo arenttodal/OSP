@@ -6,14 +6,17 @@ layer editor). A pad holds 1 to 16 sample layers. A screenshot is in
 
 ## What a musician does
 
-- **Drop several files on a pad** (or use **Add Layers...**). A menu offers:
+- **Drop files on a pad.** No menu interrupts a drop: one file replaces the pad's sound,
+  and several become round robins. **Add Layers...** adds round robins.
+- **Hold Cmd (Ctrl on Windows) while dropping** to choose instead. A menu offers:
   - round robin: a different layer every hit;
   - velocity layers: soft to hard;
   - a stack: all together;
-  - replace.
+  - replace;
+  - slicing a long file as a break;
+  - sorting several files into the kit.
 
-  The default is ticked: several files become round robins, and one file replaces. One file
-  on an empty pad just loads, with no menu.
+  The default is ticked.
 - **Velocity layers** are sorted softest first, by the level each file was recorded at. Each
   gets an equal share of 1–127. OSP's loader levels every file, so the import restores each
   layer's recorded level against the loudest file, and a soft hit stays soft.

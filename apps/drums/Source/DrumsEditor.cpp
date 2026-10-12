@@ -872,8 +872,12 @@ void KeyboardRangeStrip::paint (juce::Graphics& g)
 // AMP envelope
 // ---------------------------------------------------------------------------------------
 
-EnvelopePanel::EnvelopePanel (DrumsProcessor& p) : proc (p)
+EnvelopePanel::EnvelopePanel (DrumsProcessor& p) : proc (p), mods (p)
 {
+    addChildComponent (mods);
+    presets.setTooltip ("Starting points for this pad's modulation");
+    presets.onClick = [this] { showPresetMenu(); };
+    addAndMakeVisible (presets);
     attack.setup (*this, "ATTACK", cc::accent);
     decay.setup (*this, "DECAY", cc::accent);
     sustain.setup (*this, "SUSTAIN", cc::accent);
@@ -894,11 +898,91 @@ void EnvelopePanel::bind()
     sustain.slider.textFromValueFunction = [] (double v) { return percent (v); };
     for (auto* k : { &attack, &decay, &sustain, &release })
         k->slider.updateText();
+    mods.refresh();
     repaint();
+}
+
+void EnvelopePanel::refresh()
+{
+    mods.refresh();
+    repaint();
+}
+
+juce::Rectangle<int> EnvelopePanel::tabRect (int t) const
+{
+    // After the title: AMP | ENV | LFO | VEL | CTRL
+    static constexpr int widths[] = { 42, 42, 40, 40, 46 };
+    int x = 18 + 132;
+    for (int i = 0; i < t; ++i)
+        x += widths[i];
+    return { x, 8, widths[t], 26 };
+}
+
+void EnvelopePanel::setTab (int t)
+{
+    tab = juce::jlimit (0, tabCount - 1, t);
+    const bool isAmp = tab == amp;
+    for (auto* k : { &attack, &decay, &sustain, &release })
+    {
+        k->slider.setVisible (isAmp);
+        k->label.setVisible (isAmp);
+    }
+    mods.setVisible (! isAmp);
+    if (! isAmp)
+    {
+        // CTRL keeps WHEEL or PRESSURE, whichever was shown (WHEEL first).
+        const auto shown = mods.source();
+        const auto source = tab == env ? drums::ModSource::env
+                          : tab == lfo ? drums::ModSource::lfo
+                          : tab == vel ? drums::ModSource::velocity
+                          : (shown == drums::ModSource::pressure ? drums::ModSource::pressure : drums::ModSource::wheel);
+        mods.setSource (source);
+    }
+    repaint();
+}
+
+void EnvelopePanel::mouseDown (const juce::MouseEvent& e)
+{
+    for (int t = 0; t < tabCount; ++t)
+        if (tabRect (t).contains (e.getPosition()))
+        {
+            setTab (t);
+            return;
+        }
+}
+
+void EnvelopePanel::showPresetMenu()
+{
+    juce::PopupMenu m;
+    m.addSectionHeader ("Modulation for " + proc.padDisplayName (proc.selectedPad));
+    for (int i = 1; i < drums::modPresetCount; ++i)
+        m.addItem (i + 1, drums::modPresetName (static_cast<drums::ModPreset> (i)));
+    m.addSeparator();
+    m.addItem (1, "Clear modulation", proc.padModulation (proc.selectedPad).active());
+    juce::Component::SafePointer<EnvelopePanel> safe (this);
+    m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&presets), [safe] (int id) {
+        if (safe == nullptr || id <= 0)
+            return;
+        const auto preset = static_cast<drums::ModPreset> (id - 1);
+        safe->proc.setPadModulation (safe->proc.selectedPad, drums::modPreset (preset));
+        // Show where the preset works.
+        const auto& m2 = safe->proc.padModulation (safe->proc.selectedPad);
+        if (m2.activeSlots (drums::ModSource::env) > 0)
+            safe->setTab (env);
+        else if (m2.activeSlots (drums::ModSource::lfo) > 0)
+            safe->setTab (lfo);
+        else if (m2.activeSlots (drums::ModSource::velocity) > 0)
+            safe->setTab (vel);
+        safe->refresh();
+    });
 }
 
 void EnvelopePanel::resized()
 {
+    auto body = getLocalBounds().reduced (14, 8);
+    body.removeFromTop (30);
+    presets.setBounds (getWidth() - 18 - 78, 10, 78, 24);
+    mods.setBounds (body.reduced (4, 2));
     auto knobs = getLocalBounds().reduced (14, 8).removeFromBottom (86);
     const int kw = knobs.getWidth() / 4;
     for (auto* k : { &attack, &decay, &sustain, &release })
@@ -910,15 +994,31 @@ void EnvelopePanel::paint (juce::Graphics& g)
     ceramic::card (g, getLocalBounds().toFloat(), 12.0f);
     auto r = getLocalBounds().reduced (18, 8);
     auto header = r.removeFromTop (26);
-    sectionTitle (g, header.removeFromLeft (150), "MODULATION");
-    g.setFont (plugin::fonts::make (13.0f, look::Weight::semibold, 0.1f));
-    g.setColour (cc::text);
-    g.drawText ("AMP", header.removeFromLeft (44), juce::Justification::centred);
-    ceramic::tabUnderline (g, static_cast<float> (header.getX()) - 38.0f, static_cast<float> (header.getBottom()) - 2.0f, 32.0f);
-    g.setColour (cc::textMicro);
-    g.setFont (type::micro (12.0f));
-    g.drawFittedText ("of " + proc.padDisplayName (proc.selectedPad).toUpperCase() + ".  LFO / ENV / VEL / NOTE routes: next round", header.withTrimmedLeft (8),
-                      juce::Justification::centredLeft, 1, 1.0f);
+    sectionTitle (g, header.removeFromLeft (130), "MODULATION");
+    static const char* tabNames[] = { "AMP", "ENV", "LFO", "VEL", "CTRL" };
+    const auto& m = proc.padModulation (proc.selectedPad);
+    for (int t = 0; t < tabCount; ++t)
+    {
+        const auto tr = tabRect (t);
+        g.setFont (plugin::fonts::make (13.0f, look::Weight::semibold, 0.1f));
+        g.setColour (t == tab ? cc::text : cc::textSecondary);
+        g.drawText (tabNames[t], tr, juce::Justification::centred);
+        if (t == tab)
+            ceramic::tabUnderline (g, static_cast<float> (tr.getCentreX()) - 15.0f, static_cast<float> (tr.getBottom()) - 2.0f, 30.0f);
+        // A dot on a source that is in use.
+        int used = 0;
+        if (t == env) used = m.activeSlots (drums::ModSource::env);
+        if (t == lfo) used = m.activeSlots (drums::ModSource::lfo);
+        if (t == vel) used = m.activeSlots (drums::ModSource::velocity);
+        if (t == ctrl) used = m.activeSlots (drums::ModSource::wheel) + m.activeSlots (drums::ModSource::pressure);
+        if (used > 0)
+        {
+            g.setColour (cc::accent);
+            g.fillEllipse (juce::Rectangle<float> (5.0f, 5.0f).withCentre ({ static_cast<float> (tr.getRight()) - 3.0f, static_cast<float> (tr.getY()) + 7.0f }));
+        }
+    }
+    if (tab != amp)
+        return;
 
     auto well = r.removeFromTop (r.getHeight() - 92).toFloat().reduced (0.0f, 4.0f);
     const auto inner = ceramic::display (g, well, 7.0f);
@@ -929,27 +1029,27 @@ void EnvelopePanel::paint (juce::Graphics& g)
     const auto area = inner.reduced (12.0f, 8.0f);
     auto px = [&] (double t) { return area.getX() + static_cast<float> (t / total) * area.getWidth(); };
     auto py = [&] (double level) { return area.getBottom() - static_cast<float> (level) * area.getHeight(); };
-    juce::Path env;
+    juce::Path ampPath;
     double t = 0.0;
-    env.startNewSubPath (px (0.0), py (0.0));
+    ampPath.startNewSubPath (px (0.0), py (0.0));
     t += tx (a);
     const juce::Point<float> peak (px (t), py (1.0));
-    env.lineTo (peak);
+    ampPath.lineTo (peak);
     t += tx (d);
     const juce::Point<float> knee (px (t), py (d > 0.0 ? s : 1.0));
-    env.lineTo (knee);
+    ampPath.lineTo (knee);
     t += tx (hold);
-    env.lineTo (px (t), py (d > 0.0 ? s : 1.0));
+    ampPath.lineTo (px (t), py (d > 0.0 ? s : 1.0));
     t += tx (rel);
     const juce::Point<float> end (px (t), py (0.0));
-    env.lineTo (end);
-    juce::Path fill (env);
+    ampPath.lineTo (end);
+    juce::Path fill (ampPath);
     fill.lineTo (px (0.0), py (0.0));
     fill.closeSubPath();
     g.setGradientFill (juce::ColourGradient (cc::accent.withAlpha (0.35f), 0.0f, area.getY(), cc::accent.withAlpha (0.05f), 0.0f, area.getBottom(), false));
     g.fillPath (fill);
     g.setColour (cc::accent);
-    g.strokePath (env, juce::PathStrokeType (1.8f));
+    g.strokePath (ampPath, juce::PathStrokeType (1.8f));
     for (auto pt : { juce::Point<float> (px (0.0), py (0.0)), peak, knee, end })
     {
         g.setColour (juce::Colours::white);
@@ -1316,7 +1416,7 @@ void DrumsContent::changeListenerCallback (juce::ChangeBroadcaster*)
             tell ("Find missing samples", shownRelinkReport);
     }
     sample.bind();
-    envelope.repaint();
+    envelope.refresh();
     refreshModeBar();
     if (keyMap.isVisible())
         keyMap.refreshFromProcessor();

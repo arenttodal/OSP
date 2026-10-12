@@ -18,13 +18,23 @@ namespace osp::drumsplugin
 /** What a drop does when nobody chooses: one file replaces, several become round robins. */
 LayerDrop defaultLayerDrop (int fileCount) noexcept;
 
+/** Whether a drop asks what to do: only with Cmd (Ctrl on Windows) held, by default. */
+enum class DropAsk
+{
+    fromModifiers,   ///< ask while Cmd is held as the files land
+    never,
+    always
+};
+
 /**
-    Files dropped (or chosen) for a pad. One file on an empty pad just loads. Otherwise a
-    menu offers round robin, velocity layers, stack and replace, with the default ticked;
-    without a window to show it in (headless), the default is applied.
+    Files dropped (or chosen) for a pad. Without asking, the default just happens: one file
+    replaces the pad's sound, several become round robins (or `preferred`). Asking (Cmd held
+    while dropping) opens a menu: round robin, velocity layers, stack, replace, slicing a
+    long file as a break, sorting several into the kit; the default is ticked. Without a
+    window to show it in (headless), the default is applied.
 */
 void offerLayerDrop (DrumsProcessor& proc, int pad, const juce::Array<juce::File>& files, juce::Component* target,
-                     std::optional<LayerDrop> preferred = std::nullopt);
+                     std::optional<LayerDrop> preferred = std::nullopt, DropAsk ask = DropAsk::fromModifiers);
 
 bool isAudioFileName (const juce::String& path);
 

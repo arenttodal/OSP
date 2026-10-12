@@ -7,8 +7,8 @@ Milestone 7. Screenshot: `screens/15-import-preview.png`.
 
 1. **Drop several files.** Any of these opens **IMPORT SAMPLES**:
    - dropping several files on **BREAK**;
-   - choosing **Sort into the kit (import preview)...** when dropping them on a pad (the
-     ticked default on an empty kit);
+   - choosing **Sort into the kit (import preview)...** when Cmd-dropping them on a pad
+     (the ticked default on an empty kit);
    - the kit menu's **Import samples...**.
 
    Nothing changes until Import.

@@ -433,7 +433,19 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       - bit-identical at 0;
       - END fixed for REIMAGINED mode voices.
 
-      Next: listening tests on a Mac (the MACHINE curve, hosts), then the open M5 items.
+      Per-pad modulation (docs/drums/pad-modulation.md):
+      - ENV / LFO / VEL / WHEEL / PRESSURE to PITCH, LEVEL, PAN, FILTER, START, DECAY on
+        OSP's modulation system;
+      - state 4.
+
+      Drops replace without a menu (Cmd-drop asks). OSP's default branch merged (knobs,
+      ceramic skin, MOD-FINAL).
+
+      Specs written:
+      - docs/drums/spec-multi-sound-kits.md;
+      - docs/drums/spec-library-pools.md.
+
+      Next: the user's answers on those specs, then listening tests on a Mac.
 
 ## DONE
 
