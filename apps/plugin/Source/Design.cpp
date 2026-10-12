@@ -1,4 +1,5 @@
 #include "Design.h"
+#include "CeramicSkin.h"
 #include "SpriteKnobRenderer.h"
 
 #include <cstring>
@@ -98,9 +99,65 @@ void CachedShadow::drawForPath (juce::Graphics& g, const juce::Path& path) const
 namespace osp::plugin::design::draw
 {
 
+namespace
+{
+    juce::Colour average (juce::Colour a, juce::Colour b) { return a.interpolatedWith (b, 0.5f); }
+
+    template <size_t n>
+    int nearest (const int (&values)[n], float x)
+    {
+        int best = values[0];
+        for (const int v : values)
+            if (std::abs (static_cast<float> (v) - x) < std::abs (static_cast<float> (best) - x))
+                best = v;
+        return best;
+    }
+
+    /** The ceramic piece for a raised surface: the cards and panels at their rendered sizes,
+        smaller panels at the nearest rendered corner. */
+    juce::String raisedPiece (juce::Rectangle<float> r, float radius, bool& card)
+    {
+        card = std::abs (radius - layout::cardRadius) < 0.5f;
+        if (card)
+        {
+            static constexpr int widths[] = { 451, 683, 1379 };
+            return "card-" + juce::String (nearest (widths, r.getWidth()));
+        }
+        if (std::abs (radius - layout::panelRadius) < 0.5f && r.getWidth() > 600.0f)
+            return r.getHeight() > 196.0f ? "panel-macro" : "panel-arp";
+        static constexpr int radii[] = { 7, 9, 10, 12 };
+        return "raised-r" + juce::String (nearest (radii, radius));
+    }
+
+    /** The face a piece shows for a requested colour: as rendered for the colour its role was
+        designed with, proportionally lighter or darker for another. */
+    juce::Colour faceFor (juce::Colour rendered, juce::Colour designed, juce::Colour requested)
+    {
+        auto channel = [] (juce::uint8 r, juce::uint8 d, juce::uint8 q) {
+            return static_cast<juce::uint8> (juce::jlimit (0, 255, juce::roundToInt (static_cast<float> (r) * static_cast<float> (q) / static_cast<float> (std::max<juce::uint8> (1, d)))));
+        };
+        if (requested.getARGB() == designed.getARGB() || ! rendered.isOpaque())
+            return {};
+        return juce::Colour (channel (rendered.getRed(), designed.getRed(), requested.getRed()), channel (rendered.getGreen(), designed.getGreen(), requested.getGreen()),
+                             channel (rendered.getBlue(), designed.getBlue(), requested.getBlue()));
+    }
+}
+
+juce::Colour surround()
+{
+    if (auto* pieces = skin::active())
+        if (const auto* p = pieces->find ("housing"); p != nullptr && p->edge.isOpaque())
+            return p->edge;
+    return colour::backdropTop;
+}
+
 void housing (juce::Graphics& g, juce::Rectangle<float> bounds)
 {
     using namespace colour;
+    // Ceramic: the rendered surround, housing and teak cheeks (taller with the arpeggiator's
+    // editor: the nine-slice stretches the middle).
+    if (auto* pieces = skin::active(); pieces != nullptr && pieces->draw (g, "housing", bounds))
+        return;
     // The surround: a warm surface, a touch darker at the top left.
     g.setGradientFill (juce::ColourGradient (backdropTop, bounds.getX(), bounds.getY(), backdropBottom, bounds.getRight(), bounds.getBottom(), false));
     g.fillRect (bounds);
@@ -133,6 +190,17 @@ void housing (juce::Graphics& g, juce::Rectangle<float> bounds)
 void raised (juce::Graphics& g, juce::Rectangle<float> r, float radius, juce::Colour top, juce::Colour bottom, float shadow)
 {
     using namespace colour;
+    if (auto* pieces = skin::active())
+    {
+        bool card = false;
+        const auto name = raisedPiece (r, radius, card);
+        if (const auto* p = pieces->find (name))
+        {
+            const auto designed = card ? average (cardTop, cardBottom) : average (panelTop, panelBottom);
+            if (pieces->draw (g, name, r, 1.0f, faceFor (p->face, designed, average (top, bottom))))
+                return;
+        }
+    }
     juce::Path shape;
     shape.addRoundedRectangle (r, radius);
     if (shadow > 0.0f)
@@ -157,15 +225,39 @@ void raised (juce::Graphics& g, juce::Rectangle<float> r, float radius, juce::Co
     g.strokePath (shape, juce::PathStrokeType (0.8f));
 }
 
+void raisedChildren (juce::Graphics& g, juce::Component& parent)
+{
+    if (! skin::drawnBySurface())
+        return;
+    auto* pieces = skin::active();
+    auto& animator = juce::Desktop::getInstance().getAnimator();
+    for (auto* child : parent.getChildren())
+        if (const auto* face = dynamic_cast<const skin::SurfaceFace*> (child); face != nullptr && child->isVisible())
+        {
+            // As the face fades and moves with its component (a layer settling in).
+            bool card = false;
+            const auto r = child->getBounds().toFloat();
+            const auto name = raisedPiece (r, face->surfaceRadius(), card);
+            pieces->draw (g, name, r, child->getAlpha(), {}, animator.isAnimating (child));
+        }
+}
+
 void well (juce::Graphics& g, juce::Rectangle<float> r, float radius, juce::Colour fill)
 {
     juce::Path shape;
     shape.addRoundedRectangle (r, radius);
-    // The rim catches light from above on the card around it.
-    juce::Path lip;
-    lip.addRoundedRectangle (r.expanded (1.0f), radius + 1.0f);
-    g.setColour (juce::Colours::white.withAlpha (0.55f));
-    g.strokePath (lip.createPathWithRoundedCorners (0.0f), juce::PathStrokeType (1.0f), juce::AffineTransform::translation (0.0f, 1.0f));
+    auto* pieces = skin::active();
+    static constexpr int bezels[] = { 8, 9, 10, 12 };
+    // Ceramic: the display sits in a 1.6 px lip cut into the surface (rendered).
+    if (pieces != nullptr)
+        pieces->draw (g, "bezel-r" + juce::String (nearest (bezels, radius)), r.expanded (1.6f));
+    // The rim catches light from above (kept in both looks: the approved render has it).
+    {
+        juce::Path lip;
+        lip.addRoundedRectangle (r.expanded (1.0f), radius + 1.0f);
+        g.setColour (juce::Colours::white.withAlpha (0.55f));
+        g.strokePath (lip.createPathWithRoundedCorners (0.0f), juce::PathStrokeType (1.0f), juce::AffineTransform::translation (0.0f, 1.0f));
+    }
     g.setColour (fill);
     g.fillPath (shape);
     juce::Graphics::ScopedSaveState state (g);
@@ -190,6 +282,22 @@ void well (juce::Graphics& g, juce::Rectangle<float> r, float radius, juce::Colo
 void button (juce::Graphics& g, juce::Rectangle<float> r, float radius, bool active, bool hover, juce::Colour activeColour)
 {
     using namespace colour;
+    if (skin::active() != nullptr)
+    {
+        // Ceramic: an A1 key. On in the accent: the warm face; on in another colour (a
+        // macro's own): pressed, with that colour's fine rim.
+        const bool accentOn = active && activeColour.getARGB() == accent.getARGB();
+        const auto state = accentOn ? skin::KeyState::active : active ? skin::KeyState::pressed : hover ? skin::KeyState::hover : skin::KeyState::normal;
+        if (skin::key (g, r, radius, skin::KeyRole::generic, state))
+        {
+            if (active && ! accentOn)
+            {
+                g.setColour (activeColour.withAlpha (0.7f));
+                g.drawRoundedRectangle (r.reduced (0.5f), radius, 1.0f);
+            }
+            return;
+        }
+    }
     juce::Path shape;
     shape.addRoundedRectangle (r, radius);
     CachedShadow (juce::Colour (0x24302418), 3, { 0, 1 }).drawForPath (g, shape);

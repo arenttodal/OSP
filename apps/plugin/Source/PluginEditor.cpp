@@ -358,6 +358,8 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     presetBar.onSaveStartingState = [this] { saveStartingState(); };
     presetBar.onOpenLibrary = [this] { openLibrary(); };
     content.addAndMakeVisible (presetBar);
+    savePresetButton.onClick = [this] { choosePresetFile (true, false); };
+    content.addAndMakeVisible (savePresetButton);
     content.addAndMakeVisible (volume);
     menuButton.setTooltip ("Sounds, presets, instruments, undo, size");
     menuButton.onClick = [this] { showMenu(); };
@@ -488,6 +490,9 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     content.addAndMakeVisible (advancedButton);
     arpButton.onToggleEditor = [this] { setArpExpanded (! arpShown); };
     arpPanel.onCollapse = [this] { setArpExpanded (false); };
+    arpPanel.onOctavesMenu = [this] {
+        modOverlay.contextMenu ("arp.octaves").showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&arpPanel));
+    };
     content.addAndMakeVisible (arpButton);
     content.addChildComponent (arpPanel);
     arpShown = ospProcessor.arpEditorExpanded();
@@ -569,6 +574,7 @@ void OspAudioProcessorEditor::openLibrary (LibraryPanel::View view)
                 safe->timerCallback();
             }
         };
+        libraryPanel->getProperties().set ("modCover", true);   // the halos stay under it
         content.addAndMakeVisible (*libraryPanel);
     }
     placeLibrary();
@@ -1116,9 +1122,8 @@ void OspAudioProcessorEditor::showMenu()
         });
         return list;
     };
-    menu.addItem (juce::String::fromUTF8 ("Libraryâ¦"), [safe] { if (safe != nullptr) safe->openLibrary(); });
+    menu.addItem (juce::String::fromUTF8 ("Library\xe2\x80\xa6"), [safe] { if (safe != nullptr) safe->openLibrary(); });
     menu.addSubMenu ("Presets", browse (OspAudioProcessor::presetFolder(), OspAudioProcessor::presetExtension, false));
-    menu.addItem ("Save preset...", [safe] { if (safe != nullptr) safe->choosePresetFile (true, false); });
     menu.addItem ("Open preset file...", [safe] { if (safe != nullptr) safe->choosePresetFile (false, false); });
     menu.addSeparator();
     menu.addSubMenu ("Instruments", browse (OspAudioProcessor::instrumentFolder(), OspAudioProcessor::instrumentExtension, true));
@@ -1233,6 +1238,16 @@ bool OspAudioProcessorEditor::keyPressed (const juce::KeyPress& key)
             openLibrary();
         return true;
     }
+    if (command && key.getModifiers().isAltDown() && (key.getKeyCode() == 'G' || key.getKeyCode() == 'g'))
+    {
+        // Ceramic / classic look (comparison). Looks only.
+        skin::setLook (skin::look() == skin::Look::ceramic ? skin::Look::classic : skin::Look::ceramic);
+        repaint();
+        content.repaint();
+        for (auto* c : content.getChildren())
+            c->repaint();
+        return true;
+    }
     if (command && key.getModifiers().isAltDown() && (key.getKeyCode() == 'K' || key.getKeyCode() == 'k'))
     {
         // Development: original knob / rendered pilot / all macros rendered. Looks only.
@@ -1257,13 +1272,16 @@ bool OspAudioProcessorEditor::keyPressed (const juce::KeyPress& key)
 void OspAudioProcessorEditor::paint (juce::Graphics& g)
 {
     // Around the instrument when the window's shape differs from the reference's.
-    g.fillAll (design::colour::backdropTop);
+    g.fillAll (design::draw::surround());
 }
 
 void OspAudioProcessorEditor::paintInstrument (juce::Graphics& g)
 {
     using namespace design;
     draw::housing (g, content.getLocalBounds().toFloat());
+    // Ceramic: the source cards and the arpeggiator's panel, drawn here so their shadows
+    // fall on the housing.
+    draw::raisedChildren (g, content);
 
     // Identity: ANDOR/OSP, One Shot Performer.
     {
@@ -1283,9 +1301,17 @@ void OspAudioProcessorEditor::paintInstrument (juce::Graphics& g)
         g.drawText ("One Shot Performer", layout::logoSubtitle.withHeight (17.0f), juce::Justification::centredLeft, false);
     }
 
-    // The keyboard's frame: a quiet rim, the keys set into it.
+    // The keyboard's frame: a quiet rim, the keys set into it. Ceramic: the keys sit in a
+    // recess cut into the housing (rendered at the keybed's place: 2 px left and right, 3
+    // above and 2 below the keys).
+    const auto keys = layout::keyboard.translated (0.0f, arpShown ? layout::arpShift : 0.0f);
+    if (auto* pieces = skin::active(); pieces != nullptr
+        && pieces->draw (g, "keybed", juce::Rectangle<float> (keys.getX() - 2.0f, keys.getY() - 3.0f, keys.getWidth() + 4.0f, keys.getHeight() + 5.0f)))
     {
-        const auto bed = layout::keyboard.translated (0.0f, arpShown ? layout::arpShift : 0.0f).expanded (2.0f);
+    }
+    else
+    {
+        const auto bed = keys.expanded (2.0f);
         juce::Path frame;
         frame.addRoundedRectangle (bed, 6.0f);
         design::CachedShadow (juce::Colour (0x22302418), 3, { 0, 1 }).drawForPath (g, frame);
@@ -1303,14 +1329,33 @@ void OspAudioProcessorEditor::paintInstrument (juce::Graphics& g)
         g.fillRect (juce::Rectangle<float> (layout::envelopeX - 10.0f, 695.0f, 1.0f, 190.0f));
         // No panel title: the six named knobs speak for themselves.
         // Under each macro a small light: lit when the macro's own settings are in use.
+        // Ceramic: a rendered glass lens in the macro's colour (its glow stays drawn).
+        static const char* const lensNames[] = { "life", "drive", "character", "motion", "space", "echo" };
+        auto* pieces = skin::active();
         for (std::size_t i = 0; i < macros.size(); ++i)
         {
             const auto knob = macros[i].slider.getBounds().toFloat();
             const bool lit = macros[i].label != nullptr && macros[i].label->isCustomised();
             const auto identity = colour::macro (static_cast<int> (i));
-            draw::led (g, { knob.getCentreX(), knob.getCentreY() + 65.0f }, 9.0f, lit ? identity.withMultipliedBrightness (1.2f) : identity.interpolatedWith (colour::panelBottom, 0.35f), lit ? 0.8f : 0.0f);
+            const juce::Point<float> centre { knob.getCentreX(), knob.getCentreY() + 65.0f };
+            if (pieces != nullptr && i < std::size (lensNames))
+            {
+                if (lit)
+                {
+                    juce::ColourGradient halo (identity.withAlpha (0.3f), centre.x, centre.y, identity.withAlpha (0.0f), centre.x + 10.0f, centre.y, true);
+                    g.setGradientFill (halo);
+                    g.fillEllipse (juce::Rectangle<float> (20.0f, 20.0f).withCentre (centre));
+                }
+                if (pieces->draw (g, juce::String ("led-") + lensNames[i] + (lit ? "-lit" : "-unlit"), juce::Rectangle<float> (9.0f, 9.0f).withCentre (centre)))
+                    continue;
+            }
+            draw::led (g, centre, 9.0f, lit ? identity.withMultipliedBrightness (1.2f) : identity.interpolatedWith (colour::panelBottom, 0.35f), lit ? 0.8f : 0.0f);
         }
     }
+
+    // Ceramic: the keys on the housing (preset, ARP, Advanced), drawn here so their shadows
+    // fall on it.
+    skin::drawKeys (g, content);
 }
 
 void OspAudioProcessorEditor::resized()
@@ -1374,7 +1419,7 @@ void OspAudioProcessorEditor::selectModulation (int source, int slot)
     // halos emphasise its routes (the chosen one most), an open routes popover marks the row.
     modSelSource = source;
     modSelSlot = slot;
-    if (source >= 0 && source < 4 && modPanel.tab() != 0 && modPanel.selectedSource() != source)   // the wheel has no tab
+    if (modui::tabOfSource (source) > 0 && modPanel.tab() != 0 && modPanel.selectedSource() != source)   // the wheel, ENV 2, the controllers: no tab
         modPanel.showTab (modui::tabOfSource (source));
     modOverlay.setSelection (modSelSource, modSelSlot);
     if (auto* routes = dynamic_cast<ModRoutesPopup*> (popup.get()))
@@ -1470,6 +1515,7 @@ void OspAudioProcessorEditor::layoutInstrument()
 
     // Header: identity left (painted), preset in the middle, volume and menu right.
     presetBar.setBounds (at (layout::presetBar));
+    savePresetButton.setBounds (at (layout::savePreset));
     volume.setBounds (at (layout::volume));
     menuButton.setBounds (at (layout::menu));
 

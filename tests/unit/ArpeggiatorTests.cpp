@@ -16,6 +16,7 @@
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
+#include <tuple>
 #include <fstream>
 #include <functional>
 #include <map>
@@ -946,4 +947,107 @@ TEST_CASE ("arp: SWING delays every second step by up to half a step, on the gri
     CHECK (ons[0].time == 24000);
     CHECK (ons[1].time == 36000 + 3000);
     CHECK (ons[2].time == 48000);
+}
+
+// ---------------------------------------------------------------------------------------------
+// ARP destinations (MOD-FINAL Stage 5): RATE's phase-accumulator clock, GATE, VELOCITY, OCTAVES
+
+TEST_CASE ("arp: ARP RATE - free running, a speed change keeps the phase and back at 1x the plain clock goes on", "[unit][arp][mod-final]")
+{
+    // 1/8 at 120 BPM: 12000 samples a step. Blocks of 1000 so the changes land on known samples.
+    Harness h (48000.0, 1000);
+    h.run (36000, { on (0, 60), on (0, 64) }, [] (Harness& self, std::int64_t at) {
+        self.settings.rateMultiplier = at >= 18000 ? 2.0 : 1.0;
+    });
+    h.run (30000, {}, [] (Harness& self, std::int64_t) { self.settings.rateMultiplier = 1.0; });
+    std::vector<std::int64_t> times;
+    for (const auto& e : h.ons())
+        times.push_back (e.time);
+    // 0, 12000; at 18000 half the step is done: the other half at twice the speed (3000),
+    // then every 6000; at 36000 half a step again: back at 1x the step ends at 42000.
+    const std::vector<std::int64_t> expected { 0, 12000, 21000, 27000, 33000, 42000, 54000 };
+    CHECK (times == expected);
+    CHECK (offsBeforeOns (h.out));
+}
+
+TEST_CASE ("arp: ARP RATE - from the first step at a multiplier; the gate follows the step it plays in", "[unit][arp][mod-final]")
+{
+    for (int block : { 1, 64, 256, 4096 })
+    {
+        CAPTURE (block);
+        Harness h (48000.0, block);
+        h.settings.rateMultiplier = 2.0;
+        h.settings.gate = 0.5;
+        h.run (60000, { on (100, 60) });
+        const auto ons = h.ons();
+        REQUIRE (ons.size() >= 9);
+        for (std::size_t k = 0; k < ons.size(); ++k)
+            CHECK (ons[k].time == 100 + static_cast<std::int64_t> (6000 * k));
+        for (std::size_t i = 1; i < h.out.size(); ++i)
+            if (h.out[i].kind == Kind::noteOff && h.out[i - 1].kind == Kind::noteOn)
+                CHECK (h.out[i].time - h.out[i - 1].time == 3000);   // half of a 6000-sample step
+    }
+}
+
+TEST_CASE ("arp: ARP RATE on the host's grid - twice as fast, then back on the grid with no doubled step", "[unit][arp][mod-final]")
+{
+    Harness h (48000.0, 500);
+    h.transport = { true, true, 120.0, 0.0 };
+    h.run (48000, { on (0, 60), on (0, 67) }, [] (Harness& self, std::int64_t) { self.settings.rateMultiplier = 2.0; });
+    h.run (60000, {}, [] (Harness& self, std::int64_t) { self.settings.rateMultiplier = 1.0; });
+    const auto ons = h.ons();
+    REQUIRE (ons.size() > 10);
+    // Twice as fast from the first (grid) step: every 6000.
+    std::size_t k = 0;
+    for (; k < ons.size() && ons[k].time < 48000; ++k)
+        CHECK (ons[k].time == static_cast<std::int64_t> (6000 * k));
+    // Back at 1x: every later step on the 1/8 grid, never two closer than a step.
+    for (; k < ons.size(); ++k)
+    {
+        CHECK (ons[k].time % 12000 == 0);
+        CHECK (ons[k].time - ons[k - 1].time >= 6000);
+    }
+}
+
+TEST_CASE ("arp: ARP RATE stepped - a new ratio waits for the next step", "[unit][arp][mod-final]")
+{
+    Harness h (48000.0, 1000);
+    h.settings.rateStepped = true;
+    h.run (40000, { on (0, 60) }, [] (Harness& self, std::int64_t at) { self.settings.rateMultiplier = at >= 18000 ? 2.0 : 1.0; });
+    std::vector<std::int64_t> times;
+    for (const auto& e : h.ons())
+        times.push_back (e.time);
+    // The step under way keeps its length (24000); from there every 6000.
+    const std::vector<std::int64_t> expected { 0, 12000, 24000, 30000, 36000 };
+    CHECK (times == expected);
+}
+
+TEST_CASE ("arp: ARP VELOCITY scales the generated velocities (1..127); 100 % plays them as pressed", "[unit][arp][mod-final]")
+{
+    for (const auto& [scale, wantLow, wantHigh] : { std::tuple<double, int, int> { 1.0, 1, 100 }, { 0.5, 1, 50 }, { 2.0, 2, 127 }, { 0.0, 1, 1 } })
+    {
+        CAPTURE (scale);
+        Harness h;
+        h.settings.velocityScale = scale;
+        h.settings.pattern = ArpPattern::played;
+        h.run (30000, { on (0, 60, 1), on (0, 64, 100) });
+        const auto ons = h.ons();
+        REQUIRE (ons.size() >= 2);
+        CHECK (ons[0].velocity == wantLow);
+        CHECK (ons[1].velocity == wantHigh);
+    }
+}
+
+TEST_CASE ("arp: ARP OCTAVES by modulation - the new count at the start of the next cycle, from the pattern's beginning", "[unit][arp][mod-final]")
+{
+    Harness h;
+    h.settings.octavesAtCycle = true;
+    // C E G, UP, one octave; after the second step OCTAVES becomes 2.
+    h.run (2 * 12000 - 100, { on (0, 60), on (0, 64), on (0, 67) });
+    h.settings.octaves = 2;
+    h.run (8 * 12000, {});
+    const std::vector<int> expected { 60, 64, 67, 60, 64, 67, 72, 76, 79, 60 };
+    auto notes = h.onNotes();
+    notes.resize (std::min (notes.size(), expected.size()));
+    CHECK (notes == expected);
 }

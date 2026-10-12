@@ -18,6 +18,13 @@ const char* sourceName (Source s) noexcept
         case Source::env1: return "ENV 1";
         case Source::env2: return "ENV 2";
         case Source::modWheel: return "MOD WHEEL";
+        case Source::vel: return "VEL";
+        case Source::note: return "NOTE";
+        case Source::cc1: return "CC 1";
+        case Source::cc2: return "CC 2";
+        case Source::cc3: return "CC 3";
+        case Source::cc4: return "CC 4";
+        case Source::pressure: return "PRESSURE";
         case Source::none: break;
     }
     return "-";
@@ -129,6 +136,24 @@ namespace
         { "env2Release", "ENV 2 RELEASE", Owner::voice, -1, Domain::octaves, envTimeOctaves, Update::noteOff, Source::env2, 0.001, 10.0 },
         // Another route's depth (Route::target): read wherever that route is read.
         { "routeDepth", "ROUTE DEPTH", Owner::voice, -1, Domain::unit, 1.0, Update::continuous },
+        // The arpeggiator: RATE two octaves of speed each way (0.25x .. 4x), GATE its whole
+        // 10 .. 150 %, SWING 0 .. 100 %, OCTAVES 1 .. 4, VELOCITY 0 .. 200 %.
+        { "arpRate", "ARP RATE", Owner::global, -1, Domain::octaves, 2.0, Update::continuous },
+        { "arpGate", "ARP GATE", Owner::global, -1, Domain::unit, 1.4, Update::continuous },
+        { "arpSwing", "ARP SWING", Owner::global, -1, Domain::unit, 1.0, Update::continuous },
+        { "arpOctaves", "ARP OCTAVES", Owner::global, -1, Domain::unit, 3.0, Update::continuous },
+        { "arpVelocity", "ARP VELOCITY", Owner::global, -1, Domain::unit, 2.0, Update::continuous },
+        // DAMPEN per layer: AMOUNT 0..1, the shelf's corner 1..8 kHz (3 octaves), Low-Pass's
+        // minimum 300 Hz .. 12 kHz (about 5.3 octaves).
+        { "dampenAmountA", "DAMPEN A AMOUNT", Owner::voice, 0, Domain::unit, 1.0, Update::continuous },
+        { "dampenAmountB", "DAMPEN B AMOUNT", Owner::voice, 1, Domain::unit, 1.0, Update::continuous },
+        { "dampenAmountC", "DAMPEN C AMOUNT", Owner::voice, 2, Domain::unit, 1.0, Update::continuous },
+        { "dampenShelfA", "DAMPEN A FREQ", Owner::voice, 0, Domain::octaves, 3.0, Update::continuous },
+        { "dampenShelfB", "DAMPEN B FREQ", Owner::voice, 1, Domain::octaves, 3.0, Update::continuous },
+        { "dampenShelfC", "DAMPEN C FREQ", Owner::voice, 2, Domain::octaves, 3.0, Update::continuous },
+        { "dampenCutoffA", "DAMPEN A MIN CUTOFF", Owner::voice, 0, Domain::octaves, 5.321928094887363, Update::continuous },
+        { "dampenCutoffB", "DAMPEN B MIN CUTOFF", Owner::voice, 1, Domain::octaves, 5.321928094887363, Update::continuous },
+        { "dampenCutoffC", "DAMPEN C MIN CUTOFF", Owner::voice, 2, Domain::octaves, 5.321928094887363, Update::continuous },
     } };
 
     bool isEnvelope (Source s) noexcept { return s == Source::env1 || s == Source::env2; }
@@ -282,6 +307,87 @@ Settings::Settings()
         c = compileCurve (defaultLfoCurve());
     for (auto& c : envCurve)
         c = compileCurve (defaultEnvCurve());
+    velCurve = noteCurve = compileCurve (straightCurve());
+}
+
+namespace
+{
+    Curve segments (std::initializer_list<CurvePoint> points)
+    {
+        Curve c;
+        for (const auto& p : points)
+            c.points[static_cast<std::size_t> (c.count++)] = p;
+        return c;
+    }
+    float tensionOfGamma (double gamma) { return static_cast<float> (std::log2 (gamma) / 2.0); }
+}
+
+Curve presetCurve (CurvePreset preset) noexcept
+{
+    switch (preset)
+    {
+        case CurvePreset::linear:
+        case CurvePreset::lowToHigh: return straightCurve();
+        // A segment's tension t bends it to x^(2^(2t)): DYNAMICS' gammas exactly.
+        case CurvePreset::soft: return segments ({ { 0.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, tensionOfGamma (0.6) } });
+        case CurvePreset::hard: return segments ({ { 0.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, tensionOfGamma (1.7) } });
+        case CurvePreset::exponential: return segments ({ { 0.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, tensionOfGamma (3.0) } });
+        case CurvePreset::inverted:
+        case CurvePreset::highToLow: return segments ({ { 0.0f, 1.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } });
+        case CurvePreset::flat: return segments ({ { 0.0f, 1.0f, 0.0f }, { 1.0f, 1.0f, 0.0f } });
+        case CurvePreset::highOnly: return segments ({ { 0.0f, 0.0f, 0.0f }, { 0.5f, 0.0f, 0.0f }, { 1.0f, 1.0f, -0.25f } });
+        case CurvePreset::lowOnly: return segments ({ { 0.0f, 1.0f, 0.0f }, { 0.5f, 0.0f, 0.25f }, { 1.0f, 0.0f, 0.0f } });
+        case CurvePreset::midEmphasis: return segments ({ { 0.0f, 0.0f, 0.0f }, { 0.5f, 1.0f, -0.3f }, { 1.0f, 0.0f, 0.3f } });
+    }
+    return straightCurve();
+}
+
+const char* curvePresetName (CurvePreset preset) noexcept
+{
+    switch (preset)
+    {
+        case CurvePreset::linear: return "Linear";
+        case CurvePreset::soft: return "Soft";
+        case CurvePreset::hard: return "Hard";
+        case CurvePreset::exponential: return "Exponential";
+        case CurvePreset::inverted: return "Inverted";
+        case CurvePreset::flat: return "Flat";
+        case CurvePreset::lowToHigh: return "Low to High";
+        case CurvePreset::highToLow: return "High to Low";
+        case CurvePreset::highOnly: return "High notes only";
+        case CurvePreset::lowOnly: return "Low notes only";
+        case CurvePreset::midEmphasis: return "Mid emphasis";
+    }
+    return "Linear";
+}
+
+int matchingPreset (const Curve& curve) noexcept
+{
+    auto close = [] (const Curve& a, const Curve& b) {
+        if (a.count != b.count)
+            return false;
+        for (int i = 0; i < a.count; ++i)
+        {
+            const auto& p = a.points[static_cast<std::size_t> (i)];
+            const auto& q = b.points[static_cast<std::size_t> (i)];
+            if (std::abs (p.x - q.x) > 1.0e-3f || std::abs (p.y - q.y) > 1.0e-3f || std::abs (p.tension - q.tension) > 1.0e-3f)
+                return false;
+        }
+        return true;
+    };
+    for (int i = 0; i < curvePresetCount; ++i)
+        if (close (curve, presetCurve (static_cast<CurvePreset> (i))))
+            return i;
+    return -1;
+}
+
+Curve straightCurve() noexcept
+{
+    Curve c;
+    c.count = 2;
+    c.points[0] = { 0.0f, 0.0f, 0.0f };
+    c.points[1] = { 1.0f, 1.0f, 0.0f };
+    return c;
 }
 
 bool isPolySource (const Settings& settings, Source source) noexcept
@@ -291,8 +397,15 @@ bool isPolySource (const Settings& settings, Source source) noexcept
         case Source::lfo1: return settings.lfo[0].scope == Scope::poly;
         case Source::lfo2: return settings.lfo[1].scope == Scope::poly;
         case Source::env1:
-        case Source::env2: return true;
+        case Source::env2:
+        case Source::vel:
+        case Source::note: return true;
         case Source::modWheel:
+        case Source::cc1:
+        case Source::cc2:
+        case Source::cc3:
+        case Source::cc4:
+        case Source::pressure:
         case Source::none: break;
     }
     return false;
@@ -316,8 +429,8 @@ bool compatible (const Settings& settings, Source source, Dest dest) noexcept
     if (info.owner == Owner::voice)
         return true;
     // A shared stage: one value for the instrument. The envelopes run a global instance for
-    // it; a poly LFO has none.
-    return isEnvelope (source) || ! isPolySource (settings, source);
+    // it, VEL and NOTE follow the latest input key; a poly LFO has none.
+    return isEnvelope (source) || source == Source::vel || source == Source::note || ! isPolySource (settings, source);
 }
 
 bool createsCycle (const Settings& settings, Source source, Dest dest) noexcept
@@ -680,14 +793,27 @@ void Runtime::advanceGlobal (int samples, double sampleRate) noexcept
         state.evaluate (s, settings.lfoCurve[i], Prng::deriveSeed (settings.seed, 0x6c666f31ull + i, 0));
         globalValue[i] = s.scope == Scope::global ? static_cast<float> (state.value) : 0.0f;
     }
-    // The wheel glides to the controller's value (CC 1 steps 1/127 at a time).
-    const double k = 1.0 - std::exp (-seconds / 0.01);
-    modWheelNow += static_cast<float> (k) * (modWheelTarget - modWheelNow);
-    if (std::abs (modWheelTarget - modWheelNow) < 1.0e-6f)
-        modWheelNow = modWheelTarget;
-    globalValue[2] = globalValue[3] = 0.0f;   // a voice's envelopes are its own
-    globalValue[4] = modWheelNow;
+    // The wheel, the CC slots and pressure glide to their controller's value (a controller
+    // steps 1/127 at a time).
+    const float k = static_cast<float> (1.0 - std::exp (-seconds / 0.01));
+    auto glide = [k] (float& now, float target) {
+        now += k * (target - now);
+        if (std::abs (target - now) < 1.0e-6f)
+            now = target;
+    };
+    glide (modWheelNow, modWheelTarget);
+    for (std::size_t i = 0; i < ccNow.size(); ++i)
+        glide (ccNow[i], ccTarget[i]);
+    glide (pressureNow, pressureTarget);
+    globalValue[slot::env1] = globalValue[slot::env2] = 0.0f;   // a voice's envelopes are its own
+    globalValue[slot::modWheel] = modWheelNow;
+    globalValue[slot::vel] = globalValue[slot::note] = 0.0f;    // ... and its note
+    for (std::size_t i = 0; i < ccNow.size(); ++i)
+        globalValue[static_cast<std::size_t> (slot::cc1) + i] = ccNow[i];
+    globalValue[slot::pressure] = pressureNow;
     sharedValue = globalValue;
+    sharedValue[slot::vel] = velocityValue (inputVelocity);
+    sharedValue[slot::note] = noteValue (inputNote);
     for (std::size_t i = 0; i < globalEnv.size(); ++i)
     {
         globalEnv[i].advance (envRunning (static_cast<int> (i), globalEnvNow[i], globalValue), settings.envCurve[i], seconds);
@@ -741,6 +867,33 @@ double Runtime::envSustain (int e, const std::array<float, sourceCount>& values)
     const double base = settings.env[static_cast<std::size_t> (e)].sustain;
     const auto d = e == 0 ? Dest::env1Sustain : Dest::env2Sustain;
     return compiled.has (d) ? std::clamp (base + offsetOf (d, values), 0.0, 1.0) : base;
+}
+
+void Runtime::setController (int slotIndex, float value) noexcept
+{
+    if (slotIndex >= 0 && slotIndex < ccSlots)
+        ccTarget[static_cast<std::size_t> (slotIndex)] = std::clamp (value, 0.0f, 1.0f);
+}
+
+void Runtime::setPressure (float value) noexcept
+{
+    pressureTarget = std::clamp (value, 0.0f, 1.0f);
+}
+
+void Runtime::setInputNote (int note, int velocity) noexcept
+{
+    inputNote = std::clamp (note, 0, 127);
+    inputVelocity = std::clamp (velocity, 1, 127);
+}
+
+float Runtime::velocityValue (int velocity) const noexcept
+{
+    return static_cast<float> (curveAt (settings.velCurve, std::clamp (velocity, 0, 127) / 127.0));
+}
+
+float Runtime::noteValue (int note) const noexcept
+{
+    return static_cast<float> (curveAt (settings.noteCurve, std::clamp (note, 0, 127) / 127.0));
 }
 
 void Runtime::noteStarted (int note, int channel) noexcept
@@ -855,7 +1008,12 @@ void VoiceState::advance (const Runtime& runtime, double seconds) noexcept
         lfo[i].evaluate (s, settings.lfoCurve[i], Prng::deriveSeed (settings.seed, 0x6c666f31ull + i, 0));
         values[i] = static_cast<float> (lfo[i].value);
     }
-    values[4] = runtime.globalValue[4];
+    values[slot::modWheel] = runtime.globalValue[slot::modWheel];
+    // This note's VEL and NOTE (held for its life), and the global controllers.
+    values[slot::vel] = runtime.velocityValue (velocity);
+    values[slot::note] = runtime.noteValue (note);
+    for (int i = slot::cc1; i <= slot::pressure; ++i)
+        values[static_cast<std::size_t> (i)] = runtime.globalValue[static_cast<std::size_t> (i)];
     for (std::size_t i = 0; i < env.size(); ++i)
     {
         env[i].advance (runtime.envRunning (static_cast<int> (i), envNow[i], values), settings.envCurve[i], seconds);

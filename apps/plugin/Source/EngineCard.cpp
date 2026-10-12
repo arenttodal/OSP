@@ -123,6 +123,23 @@ namespace icons
                 g.drawLine (c.x - 0.25f * s, c.y, c.x + 0.25f * s, c.y, stroke);
                 g.drawLine (c.x, c.y - 0.25f * s, c.x, c.y + 0.25f * s, stroke);
                 return;
+            case Kind::cassette:
+            {
+                // SAVE: a compact cassette (after Serum's save key): the shell, the label's
+                // window with its two reels, and the tape opening at the foot.
+                const auto shell = juce::Rectangle<float> (0.86f * s, 0.6f * s).withCentre (c);
+                p.addRoundedRectangle (shell, 0.09f * s);
+                const auto window = juce::Rectangle<float> (0.56f * s, 0.2f * s).withCentre ({ c.x, shell.getY() + 0.25f * s });
+                p.addRoundedRectangle (window, 0.1f * s);
+                for (const float dx : { -0.15f, 0.15f })
+                    p.addEllipse (juce::Rectangle<float> (0.11f * s, 0.11f * s).withCentre ({ c.x + dx * s, window.getCentreY() }));
+                p.startNewSubPath (c.x - 0.25f * s, shell.getBottom());
+                p.lineTo (c.x - 0.19f * s, shell.getBottom() - 0.13f * s);
+                p.lineTo (c.x + 0.19f * s, shell.getBottom() - 0.13f * s);
+                p.lineTo (c.x + 0.25f * s, shell.getBottom());
+                g.strokePath (p, line);
+                return;
+            }
         }
     }
 }
@@ -919,7 +936,7 @@ LayerStateButton::LayerStateButton (OspAudioProcessor& p, int l, bool isSolo)
     : processor (p), layer (l), solo (isSolo),
       attachment (*p.parameters.getParameter (OspAudioProcessor::layerParameterId (l, isSolo ? "solo" : "mute")), [this] (float v) {
           on = v >= 0.5f;
-          repaint();
+          skin::repaintKey (*this);
       })
 {
     attachment.sendInitialUpdate();
@@ -947,7 +964,8 @@ void LayerStateButton::paint (juce::Graphics& g)
     }
     else
     {
-        design::draw::button (g, r, 4.0f, false, hot, colour::accent);
+        if (! skin::drawnBySurface())   // ceramic: the card draws the key (its shadow)
+            design::draw::button (g, r, 4.0f, false, hot, colour::accent);
         g.setColour (colour::text.withAlpha (hot ? 0.85f : 0.55f));
     }
     g.setFont (fonts::make (0.62f * r.getHeight(), fonts::Weight::medium, 0.02f));
@@ -970,7 +988,7 @@ ModifierButton::ModifierButton (juce::RangedAudioParameter& p, icons::Kind i, ju
     : icon (i), onColour (c),
       attachment (p, [this] (float v) {
           on = v >= 0.5f;
-          repaint();
+          skin::repaintKey (*this);
       })
 {
     attachment.sendInitialUpdate();
@@ -987,7 +1005,7 @@ void ModifierButton::setSuppressed (bool s, const juce::String& why)
         suppressed = s;
         setTooltip (s ? tip + ": " + why : tip);
         setMouseCursor (s ? juce::MouseCursor::NormalCursor : juce::MouseCursor::PointingHandCursor);
-        repaint();
+        skin::repaintKey (*this);
     }
 }
 
@@ -997,14 +1015,33 @@ void ModifierButton::mouseUp (const juce::MouseEvent& e)
         attachment.setValueAsCompleteGesture (on ? 0.0f : 1.0f);
 }
 
+skin::KeyState ModifierButton::keyState() const
+{
+    if (on && ! suppressed)
+        return skin::KeyState::active;
+    if (suppressed)
+        return skin::KeyState::normal;
+    return isMouseButtonDown() ? skin::KeyState::pressed : isMouseOver() ? skin::KeyState::hover : skin::KeyState::normal;
+}
+
+skin::KeyState LayerStateButton::keyState() const
+{
+    // On: pressed in (its own colour is drawn over the key's face).
+    if (on || isMouseButtonDown())
+        return skin::KeyState::pressed;
+    return isMouseOver() ? skin::KeyState::hover : skin::KeyState::normal;
+}
+
 void ModifierButton::paint (juce::Graphics& g)
 {
     const auto r = getLocalBounds().toFloat().reduced (1.5f);
     // One state rule for all four: off, a neutral raised key with a soft graphite icon at
     // about 60 %; on, the key pressed in with a fine accent rim and the icon in the accent.
-    // Thin strokes (about 1.3 px at the reference size), crisp at any scale.
+    // Thin strokes (about 1.3 px at the reference size), crisp at any scale. Ceramic: the
+    // card draws the key (A1: on is a warm face), this only the icon.
     const bool active = on && ! suppressed;
-    design::draw::button (g, r, 0.16f * r.getHeight(), active, isMouseOver() && ! suppressed, onColour);
+    if (! skin::drawnBySurface())
+        design::draw::button (g, r, 0.16f * r.getHeight(), active, isMouseOver() && ! suppressed, onColour);
     const auto colour = active ? onColour.darker (0.15f).withAlpha (0.95f) : design::colour::text.withAlpha (suppressed ? 0.22f : 0.6f);
     const float icon = 0.6f * r.getHeight();
     icons::draw (g, this->icon, r.withSizeKeepingCentre (icon, icon), colour, std::max (1.0f, 0.03f * r.getHeight()));
@@ -1046,7 +1083,8 @@ void ModeSelector::paint (juce::Graphics& g)
     // A compact source property (157 x 41 in the reference): raised face, name, chevron.
     const auto r = getLocalBounds().toFloat().reduced (1.0f);
     const float k = r.getHeight() / 39.0f;
-    design::draw::button (g, r, 7.0f * k, false, isMouseOver(), design::colour::accent);
+    if (! skin::drawnBySurface())   // ceramic: the card draws the key
+        design::draw::button (g, r, 7.0f * k, false, isMouseOver(), design::colour::accent);
     // Quiet: the waveform is the hero, the mode only a property of it.
     g.setColour (design::colour::text.withAlpha (0.95f));
     g.setFont (type::sourceMode (k));
@@ -1469,19 +1507,30 @@ void EngineCard::paint (juce::Graphics& g)
 {
     using namespace design;
     const auto bounds = getLocalBounds().toFloat();
-    draw::raised (g, bounds, layout::cardRadius, colour::cardTop, colour::cardBottom);
+    if (! skin::drawnBySurface())   // ceramic: the housing draws the card (its shadow falls there)
+        draw::raised (g, bounds, layout::cardRadius, colour::cardTop, colour::cardBottom);
+    // Ceramic: the keys on the card (modifiers, M/S, mode, EQ), drawn here so their
+    // shadows fall on the card; and the display's bezel, the lip around it (outside the
+    // display's own bounds).
+    skin::drawKeys (g, *this);
+    if (auto* pieces = skin::active(); pieces != nullptr && sourceDisplay.isVisible())
+        pieces->draw (g, "bezel-r9", sourceDisplay.getBounds().toFloat().reduced (0.5f).expanded (1.6f));
 
     // Header: the layer's badge, its light, the root and the file.
     const auto& id = colour::identity (layerIndex);
     {
         const auto badge = badgeArea.toFloat();
-        juce::Path shape;
-        shape.addRoundedRectangle (badge, 6.0f);
-        design::CachedShadow (juce::Colour (0x40302418), 4, { 0, 2 }).drawForPath (g, shape);
-        g.setGradientFill (juce::ColourGradient (id.badgeTop, 0.0f, badge.getY(), id.badgeBottom, 0.0f, badge.getBottom(), false));
-        g.fillPath (shape);
-        g.setColour (juce::Colours::white.withAlpha (0.35f));
-        g.strokePath (shape, juce::PathStrokeType (1.0f), juce::AffineTransform::translation (0.0f, 0.5f));
+        auto* pieces = skin::active();
+        if (pieces == nullptr || ! pieces->draw (g, juce::String ("badge-") + OspAudioProcessor::layerName (layerIndex), badge))
+        {
+            juce::Path shape;
+            shape.addRoundedRectangle (badge, 6.0f);
+            design::CachedShadow (juce::Colour (0x40302418), 4, { 0, 2 }).drawForPath (g, shape);
+            g.setGradientFill (juce::ColourGradient (id.badgeTop, 0.0f, badge.getY(), id.badgeBottom, 0.0f, badge.getBottom(), false));
+            g.fillPath (shape);
+            g.setColour (juce::Colours::white.withAlpha (0.35f));
+            g.strokePath (shape, juce::PathStrokeType (1.0f), juce::AffineTransform::translation (0.0f, 0.5f));
+        }
         g.setColour (juce::Colour (0xfffff6ec));
         g.setFont (fonts::make (29.0f, fonts::Weight::regular));
         g.drawText (OspAudioProcessor::layerName (layerIndex), badge.translated (0.0f, 0.5f), juce::Justification::centred, false);

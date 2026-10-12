@@ -7986,3 +7986,5 @@ TEST_CASE ("plugin: full-range modulation - 100 % reaches the knob's end; older 
 
 #include "RenderRegression.inc"
 #include "SpriteKnobTests.inc"
+#include "CeramicSkinTests.inc"
+#include "ModFinalTests.inc"

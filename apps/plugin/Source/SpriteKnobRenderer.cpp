@@ -359,9 +359,11 @@ namespace
         const auto value = juce::SystemStats::getEnvironmentVariable ("OSP_KNOB_SKIN", {}).trim().toLowerCase();
         if (value == "original")
             return KnobSkin::original;
-        if (value == "macros")
-            return KnobSkin::macros;
-        return KnobSkin::pilot;
+        if (value == "pilot")
+            return KnobSkin::pilot;
+        // The chosen design (ceramic, docs/design/warm-ceramic-teak-style-guide.md): all six
+        // macros rendered.
+        return KnobSkin::macros;
     }
 
     std::atomic<int>& skinState()

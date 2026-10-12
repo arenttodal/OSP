@@ -98,9 +98,9 @@ This change is vector only.
 
 | | Today | 09 |
 |---|---|---|
-| Underline | The current bar | A **2 px accent bar with round ends**, 19.6 px below the strip top |
-| Selected word | Secondary text colour | **Full text colour `#23211e`** |
-| Idle words | Secondary text colour | Secondary text at **88 %** |
+| Underline | A 1.6 px bar | A **2 px accent bar with round ends**, 19.6 px below the strip top |
+| Selected word | Text colour at 92 % | **Full text colour `#23211e`** |
+| Idle words | Text colour at 50 % | **Quieter**: 88 % of today's, so 44 % |
 
 ## 8. Volume fader: C1 ivory on T3
 
@@ -144,6 +144,11 @@ This change is vector only.
 | Text | `#23211e` (unchanged) |
 
 ## 12. How it is built
+
+> **Built.** The production skin is `apps/plugin/Source/CeramicSkin` with assets from
+> `tools/blender-assets/skin` (see docs/architecture.md, "Ceramic skin"). Ceramic is the
+> default look; Cmd+Option+G or `OSP_SKIN=classic` shows the classic drawing for
+> comparison.
 
 The layout is adaptive: the ARP panel adds 187 px, and the two- and three-layer card
 widths differ. So the build does not use one full-window bitmap. It uses offline-rendered

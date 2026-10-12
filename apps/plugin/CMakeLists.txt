@@ -45,7 +45,9 @@ juce_add_binary_data(OSP_PluginData
         # Rendered controls (tools/blender-assets): one zip of frames per size; the plugin
         # registers every "<name>-<size>.zip" it finds here (SpriteKnobRenderer).
         Resources/knobs/macro-ivory/macro-ivory-176.zip
-        Resources/knobs/macro-ivory/macro-ivory-352.zip)
+        Resources/knobs/macro-ivory/macro-ivory-352.zip
+        # The ceramic skin's rendered surfaces (tools/blender-assets/skin): CeramicSkin.
+        Resources/skin/ceramic-skin.zip)
 
 target_sources(OSP_Plugin PRIVATE
     Source/PluginProcessor.cpp
@@ -53,6 +55,7 @@ target_sources(OSP_Plugin PRIVATE
     Source/OspLookAndFeel.cpp
     Source/Design.cpp
     Source/SpriteKnobRenderer.cpp
+    Source/CeramicSkin.cpp
     Source/ShapingPopups.cpp
     Source/MacroPopups.cpp
     Source/EngineCard.cpp

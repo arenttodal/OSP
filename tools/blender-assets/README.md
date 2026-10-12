@@ -131,7 +131,31 @@ controls only need a config. The fader cap and toggle switch need a geometry bui
 (`osp_assets/geometry.py`) and, at runtime, a frame per position or state rather than per
 angle.
 
+## The ceramic skin (`skin/`)
+
+The instrument's rendered surfaces for the chosen design (design-lab direction
+`09-warm-ceramic-teak`; docs/design/warm-ceramic-teak-style-guide.md). They use the design
+lab's studio, materials and calibrated exposure (`design-lab/blender/lab`, `configs`), so the
+production pieces and the approved lab renders come from one source.
+
+```sh
+cd tools/blender-assets/skin
+python render.py                       # every piece (about 25 min on 4 cores); --only 'key-*' --force
+python3 pack.py                        # -> apps/plugin/Resources/skin/ceramic-skin.zip
+```
+
+- `pieces.py` lists the pieces: what, where in the design canvas, the margin for the shadow
+  and the nine-slice insets.
+- `render.py` renders each piece at its real place (the light falls on it as in the full
+  render): slabs over a shadow catcher of the surface below, recesses with and without
+  themselves, the window opaque.
+- `pack.py` turns recesses into overlays, stores the 4x pieces also at 2x, and writes the
+  manifest (schemaVersion 1) the plugin reads (`apps/plugin/Source/CeramicSkin`).
+
+Rendered pieces are skipped when they are already on disk; pass `--force` after changing a
+piece, a material or the light.
+
 ## Not committed
 
-`output/` (masters, atlases, previews) is regenerated, not stored. The comparison sheets
+`output/` (masters, atlases, previews, the skin's raw renders) is regenerated, not stored. The comparison sheets
 chosen for review are copied to `docs/reports/knob-phase1/`.

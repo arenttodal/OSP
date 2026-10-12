@@ -218,6 +218,22 @@ void VolumeSlider::paint (juce::Graphics& g)
     const float cy = bounds.getBottom() - 11.0f;
     const float left = static_cast<float> (thumbRadius), right = bounds.getWidth() - static_cast<float> (thumbRadius);
     const float x = static_cast<float> (getPositionOfValue (getValue()));
+
+    // Ceramic: the C1 ivory cap (three grip grooves) on the T3 metal guide, rendered; the
+    // value is a fine accent line along the guide up to the cap (exact at any value).
+    if (auto* pieces = skin::active())
+    {
+        const juce::Rectangle<float> rail (left - 1.6f, cy - 1.6f, right - left + 3.2f, 3.2f);
+        const auto cap = juce::Rectangle<float> (14.0f, 22.0f).withCentre ({ x, cy });
+        const bool drawn = pieces->draw (g, "rail", rail);
+        if (drawn)
+        {
+            g.setColour (colour::accent.withAlpha (hot ? 1.0f : 0.92f));
+            g.fillRoundedRectangle (juce::Rectangle<float> (left, cy - 0.6f, std::max (0.0f, x - left), 1.2f), 0.6f);
+        }
+        if (drawn && pieces->draw (g, isMouseButtonDown() ? "fader-drag" : hot ? "fader-hover" : "fader-normal", cap))
+            return;
+    }
     g.setColour (juce::Colour (0xffbdb2a2));
     g.fillRoundedRectangle (juce::Rectangle<float> (left, cy - 0.75f, right - left, 1.5f), 0.75f);
     g.setColour (juce::Colours::white.withAlpha (0.55f));
@@ -672,7 +688,7 @@ void PresetBar::mouseUp (const juce::MouseEvent& e)
             };
             if (onOpenLibrary != nullptr)
             {
-                menu.addItem (juce::String::fromUTF8 ("Open Libraryâ¦"), [safe] {
+                menu.addItem (juce::String::fromUTF8 ("Open Library\xe2\x80\xa6"), [safe] {
                     if (safe != nullptr && safe->onOpenLibrary != nullptr)
                         safe->onOpenLibrary();
                 });
@@ -726,12 +742,31 @@ void PresetBar::mouseUp (const juce::MouseEvent& e)
         onChange();
 }
 
+SavePresetButton::SavePresetButton() : juce::Button ("Save preset")
+{
+    setTooltip ("Save preset");
+    setTitle ("Save preset");
+    setMouseCursor (juce::MouseCursor::PointingHandCursor);
+}
+
+void SavePresetButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
+{
+    using namespace design;
+    const auto r = getLocalBounds().toFloat();
+    const float k = r.getHeight() / 48.0f;
+    if (! skin::drawnBySurface())   // ceramic: the housing draws the key
+        draw::raised (g, r.reduced (0.5f), 9.0f * k, colour::cardTop, colour::cardBottom, 0.9f);
+    icons::draw (g, icons::Kind::cassette, r.withSizeKeepingCentre (27.0f * k, 27.0f * k).translated (0.0f, down ? 0.5f : 0.0f),
+                 colour::text.withAlpha (highlighted || down ? 0.85f : 0.6f), 1.6f * k);
+}
+
 void PresetBar::paint (juce::Graphics& g)
 {
     using namespace design;
     const auto r = getLocalBounds().toFloat();
     const float k = r.getHeight() / 48.0f;
-    draw::raised (g, r.reduced (0.5f), 9.0f * k, colour::cardTop, colour::cardBottom, 0.9f);
+    if (! skin::drawnBySurface())   // ceramic: the housing draws the key
+        draw::raised (g, r.reduced (0.5f), 9.0f * k, colour::cardTop, colour::cardBottom, 0.9f);
     const auto hover = isMouseOver() ? partAt (getMouseXYRelative()) : Part::none;
     for (auto part : { Part::previous, Part::next })
     {

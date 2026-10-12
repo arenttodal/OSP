@@ -19,6 +19,17 @@
 namespace osp::plugin
 {
 
+namespace
+{
+    /** CC 1-4's controllers at first: 2 (breath), 11 (expression), 16 and 17 (general purpose). */
+    int defaultModController (int slot) noexcept
+    {
+        static constexpr std::array<int, mod::ccSlots> numbers { 2, 11, 16, 17 };
+        return numbers[static_cast<std::size_t> (std::clamp (slot, 0, mod::ccSlots - 1))];
+    }
+}
+
+
 namespace ids
 {
     static const juce::String attack = "attack";
@@ -109,6 +120,7 @@ namespace ids
     static const juce::String arpGate = "arp.gate";
     static const juce::String arpOctaves = "arp.octaves";
     static const juce::String arpSwing = "arp.swing";   // version hint 16
+    static const juce::String arpVelocity = "arp.velocity";   // version hint 19
     // A/B layers (stable: never rename). Per layer: layerA.sourceMode, layerA.granular.position, ...
     static const juce::String blend = "ab.blend";
     static const juce::Identifier instrument = "Instrument";
@@ -436,6 +448,35 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
         // SWING came after (hint 16); 0 % is straight, as every session before it played.
         layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::arpSwing, 16 }, "Arp Swing",
                                                                  juce::NormalisableRange<float> (0.0f, 100.0f, 1.0f), 0.0f, percent));
+        // VELOCITY (hint 19, an ARP destination): the generated notes' velocities scaled;
+        // 100 % plays them as the keys were played, as every session before it did.
+        layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ids::arpVelocity, 19 }, "Arp Velocity",
+                                                                 juce::NormalisableRange<float> (0.0f, 200.0f, 1.0f), 100.0f, percent));
+    }
+    {
+        // DAMPEN (hint 19), per layer: off by default, so sessions from before (and new
+        // layers) sound exactly as they did.
+        auto logRange = [] (float lo, float hi) {
+            return juce::NormalisableRange<float> (
+                lo, hi, [] (float start, float end, float x) { return start * std::pow (end / start, x); },
+                [] (float start, float end, float v) { return std::log (v / start) / std::log (end / start); },
+                [] (float start, float end, float v) { return juce::jlimit (start, end, v); });
+        };
+        const auto hz = juce::AudioParameterFloatAttributes().withLabel ("Hz").withStringFromValueFunction ([] (float v, int) {
+            return v >= 1000.0f ? juce::String (v / 1000.0f, v >= 10000.0f ? 1 : 2) + " kHz" : juce::String (juce::roundToInt (v)) + " Hz";
+        });
+        for (int layer = 0; layer < numLayers; ++layer)
+        {
+            const auto n = "Layer " + layerName (layer) + " Dampen ";
+            auto id = [layer] (const char* name) { return juce::ParameterID { dampenParameterId (layer, name), 19 }; };
+            layout.add (std::make_unique<juce::AudioParameterBool> (id ("enabled"), n + "On", false));
+            layout.add (std::make_unique<juce::AudioParameterChoice> (id ("mode"), n + "Mode", juce::StringArray { "Soft Shelf", "Low-Pass" }, 0));
+            layout.add (std::make_unique<juce::AudioParameterFloat> (id ("amount"), n + "Amount", juce::NormalisableRange<float> (0.0f, 100.0f, 0.1f), 100.0f, percent));
+            layout.add (std::make_unique<juce::AudioParameterFloat> (id ("frequency"), n + "Frequency",
+                                                                     logRange (static_cast<float> (dampen::minShelfHz), static_cast<float> (dampen::maxShelfHz)), 3000.0f, hz));
+            layout.add (std::make_unique<juce::AudioParameterFloat> (id ("cutoff"), n + "Min Cutoff",
+                                                                     logRange (static_cast<float> (dampen::minCutoffLowHz), static_cast<float> (dampen::minCutoffHighHz)), 2000.0f, hz));
+        }
     }
     {
         // MODULATION (version hint 17): two LFOs, two envelopes and 16 route slots. A route
@@ -529,6 +570,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
         }
     }
     return layout;
+}
+
+const juce::StringArray& OspAudioProcessor::dampenParameterNames()
+{
+    static const juce::StringArray names { "enabled", "mode", "amount", "frequency", "cutoff" };
+    return names;
 }
 
 const juce::StringArray& OspAudioProcessor::eqParameterNames()
@@ -737,6 +784,7 @@ OspAudioProcessor::OspAudioProcessor()
     arpGateParam = parameters.getRawParameterValue (ids::arpGate);
     arpOctavesParam = parameters.getRawParameterValue (ids::arpOctaves);
     arpSwingParam = parameters.getRawParameterValue (ids::arpSwing);
+    arpVelocityParam = parameters.getRawParameterValue (ids::arpVelocity);
     for (int i = 0; i < 2; ++i)
     {
         auto& l = modLfoParams[static_cast<std::size_t> (i)];
@@ -776,9 +824,10 @@ OspAudioProcessor::OspAudioProcessor()
         });
     parameters.state.addListener (this);   // META-MODULATION's links (ModLinks)
     refreshModLinks();
-    for (int c = 0; c < 4; ++c)
-        modCurves[static_cast<std::size_t> (c)] = c < 2 ? mod::defaultLfoCurve() : mod::defaultEnvCurve();
+    modCurves = defaultModulationCurves();
     publishModulationCurves();
+    for (int slot = 0; slot < mod::ccSlots; ++slot)
+        modCcNumber[static_cast<std::size_t> (slot)].store (defaultModController (slot));
     lastModValues.fill (-1.0e9f);
     customPattern = RhythmicShaper::patternSteps (ShaperParams().pattern);   // CUSTOM starts as THREE
     publishCustomPattern();
@@ -809,6 +858,9 @@ OspAudioProcessor::OspAudioProcessor()
         for (int i = 0; i < eqParameterNames().size(); ++i)
             lp.eq[static_cast<std::size_t> (i)] = parameters.getRawParameterValue (eqParameterId (layer, eqParameterNames()[i]));
         lp.lastEq.fill (-1.0e9f);
+        for (int i = 0; i < dampenParameterNames().size(); ++i)
+            lp.dampen[static_cast<std::size_t> (i)] = parameters.getRawParameterValue (dampenParameterId (layer, dampenParameterNames()[i]));
+        lp.lastDampen.fill (-1.0e9f);
     }
     for (int layer = 0; layer < numLayers; ++layer)
     {
@@ -1025,6 +1077,28 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
                 engine.setLayerEq (layer, lp.eqSettings);
             }
         }
+        {
+            // DAMPEN: its settings and its curve over the keys (published with the others).
+            std::array<float, 5> values {};
+            for (std::size_t i = 0; i < values.size(); ++i)
+                values[i] = lp.dampen[i]->load();
+            const auto generation = modCurveGeneration.load (std::memory_order_acquire);
+            if (force || values != lp.lastDampen || generation != lp.dampenGeneration)
+            {
+                lp.lastDampen = values;
+                lp.dampenGeneration = generation;
+                auto& d = lp.dampenSettings;
+                d.enabled = values[0] >= 0.5f;
+                d.mode = values[1] >= 0.5f ? dampen::Mode::lowPass : dampen::Mode::softShelf;
+                d.amount = std::clamp (values[2] / 100.0, 0.0, 1.0);
+                d.shelfHz = values[3];
+                d.minCutoffHz = values[4];
+                const auto c = static_cast<std::size_t> (dampenCurveIndex (layer));
+                for (std::size_t i = 0; i < d.curve.size(); ++i)
+                    d.curve[i] = modCurveValues[c * mod::curvePoints + i].load (std::memory_order_relaxed);
+                engine.setLayerDampen (layer, d);
+            }
+        }
         engine.setLayerPitchOffsetSemitones (layer, layers[static_cast<std::size_t> (layer)].rootShiftSemitones.load());
         std::array<float, 8> controls {};
         for (std::size_t i = 0; i < controls.size(); ++i)
@@ -1142,13 +1216,14 @@ void OspAudioProcessor::applyModulation (bool force) noexcept
     if (generation != appliedModCurveGeneration || force)
     {
         appliedModCurveGeneration = generation;
-        for (std::size_t c = 0; c < 4; ++c)
+        for (std::size_t c = 0; c < 6; ++c)   // (6.. are DAMPEN's: the layers read them)
         {
-            auto& table = c < 2 ? s.lfoCurve[c] : s.envCurve[c - 2];
+            auto& table = c < 2 ? s.lfoCurve[c] : c < 4 ? s.envCurve[c - 2] : c == 4 ? s.velCurve : s.noteCurve;
             for (std::size_t i = 0; i < table.size(); ++i)
                 table[i] = modCurveValues[c * mod::curvePoints + i].load (std::memory_order_relaxed);
         }
     }
+    s.velocityToAmp = velToAmp.load (std::memory_order_relaxed);
     engine.setModulation (s);
 }
 
@@ -1303,15 +1378,32 @@ namespace
     };
 }
 
+void OspAudioProcessor::setVelocityAppliesToAmp (bool on) noexcept
+{
+    velToAmp.store (on, std::memory_order_relaxed);
+    modCurveGeneration.fetch_add (1, std::memory_order_release);   // the audio thread re-reads the settings
+}
+
+int OspAudioProcessor::modControllerNumber (int slot) const noexcept
+{
+    return slot >= 0 && slot < mod::ccSlots ? modCcNumber[static_cast<std::size_t> (slot)].load (std::memory_order_relaxed) : -1;
+}
+
+void OspAudioProcessor::setModControllerNumber (int slot, int controller) noexcept
+{
+    if (slot >= 0 && slot < mod::ccSlots)
+        modCcNumber[static_cast<std::size_t> (slot)].store (std::clamp (controller, 0, 119), std::memory_order_relaxed);
+}
+
 mod::Curve OspAudioProcessor::modulationCurve (int index) const
 {
     const juce::ScopedLock lock (customLock);
-    return modCurves[static_cast<std::size_t> (std::clamp (index, 0, 3))];
+    return modCurves[static_cast<std::size_t> (std::clamp (index, 0, modCurveCount - 1))];
 }
 
 void OspAudioProcessor::setModulationCurve (int index, const mod::Curve& curve, bool undoable)
 {
-    index = std::clamp (index, 0, 3);
+    index = std::clamp (index, 0, modCurveCount - 1);
     auto next = curve;
     next.normalise();
     const auto before = modulationCurve (index);
@@ -1331,7 +1423,7 @@ void OspAudioProcessor::setModulationCurve (int index, const mod::Curve& curve, 
 
 void OspAudioProcessor::publishModulationCurves() noexcept
 {
-    std::array<mod::Curve, 4> copy;
+    ModCurves copy;
     {
         const juce::ScopedLock lock (customLock);
         copy = modCurves;
@@ -1345,9 +1437,15 @@ void OspAudioProcessor::publishModulationCurves() noexcept
     modCurveGeneration.fetch_add (1, std::memory_order_release);
 }
 
-juce::String OspAudioProcessor::encodeModulationCurves (const std::array<mod::Curve, 4>& curves)
+OspAudioProcessor::ModCurves OspAudioProcessor::defaultModulationCurves()
 {
-    // "c1:" then four curves separated by '|', each its points "x,y,tension" separated by ';'.
+    return { mod::defaultLfoCurve(), mod::defaultLfoCurve(), mod::defaultEnvCurve(), mod::defaultEnvCurve(), mod::straightCurve(), mod::straightCurve(),
+             dampen::defaultCurve(), dampen::defaultCurve(), dampen::defaultCurve() };
+}
+
+juce::String OspAudioProcessor::encodeModulationCurves (const ModCurves& curves)
+{
+    // "c3:" then nine curves separated by '|', each its points "x,y,tension" separated by ';'.
     juce::StringArray parts;
     for (const auto& c : curves)
     {
@@ -1359,18 +1457,20 @@ juce::String OspAudioProcessor::encodeModulationCurves (const std::array<mod::Cu
         }
         parts.add (points.joinIntoString (";"));
     }
-    return "c1:" + parts.joinIntoString ("|");
+    return "c3:" + parts.joinIntoString ("|");
 }
 
-std::optional<std::array<mod::Curve, 4>> OspAudioProcessor::decodeModulationCurves (const juce::String& text)
+std::optional<OspAudioProcessor::ModCurves> OspAudioProcessor::decodeModulationCurves (const juce::String& text)
 {
-    if (! text.startsWith ("c1:"))
+    // c1 (state 11): the four LFO and envelope curves; c2 adds VEL and NOTE; c3 DAMPEN A-C.
+    const int count = text.startsWith ("c3:") ? 9 : text.startsWith ("c2:") ? 6 : text.startsWith ("c1:") ? 4 : 0;
+    if (count == 0)
         return std::nullopt;
     const auto parts = juce::StringArray::fromTokens (text.substring (3), "|", "");
-    if (parts.size() != 4)
+    if (parts.size() != count)
         return std::nullopt;
-    std::array<mod::Curve, 4> curves;
-    for (int c = 0; c < 4; ++c)
+    auto curves = defaultModulationCurves();
+    for (int c = 0; c < count; ++c)
     {
         const auto points = juce::StringArray::fromTokens (parts[c], ";", "");
         auto& curve = curves[static_cast<std::size_t> (c)];
@@ -1919,11 +2019,25 @@ void OspAudioProcessor::handleMidi (const juce::MidiMessage& m) noexcept
     const int channel = m.getChannel();
     // MPE (lower zone): channel 1 is the manager channel, 2..16 carry one note each.
     const bool memberChannel = engine.isMpe() && channel >= 2;
+    // The CC 1-4 sources: the slots following this controller (Learn takes it first), and
+    // PRESSURE (channel pressure; MPE members keep their own expression).
+    if (m.isController() && m.getControllerNumber() < 120)
+    {
+        const int cc = m.getControllerNumber();
+        if (const int learn = modCcLearn.exchange (-1, std::memory_order_acq_rel); learn >= 0 && learn < mod::ccSlots)
+            modCcNumber[static_cast<std::size_t> (learn)].store (cc, std::memory_order_relaxed);
+        for (int slot = 0; slot < mod::ccSlots; ++slot)
+            if (modCcNumber[static_cast<std::size_t> (slot)].load (std::memory_order_relaxed) == cc)
+                engine.setModController (slot, static_cast<float> (m.getControllerValue()) / 127.0f);
+    }
+    if ((m.isChannelPressure() || m.isAftertouch()) && ! memberChannel)
+        engine.setModPressure (static_cast<float> (m.isChannelPressure() ? m.getChannelPressureValue() : m.getAfterTouchValue()) / 127.0f);
     if (m.isNoteOn())
     {
         engine.noteOn (m.getNoteNumber(), m.getVelocity(), channel);
         const int count = velocityCount.load (std::memory_order_relaxed);
         recentVelocity[static_cast<std::size_t> (count % velocityHistory)].store (m.getVelocity(), std::memory_order_relaxed);
+        lastPlayedNote.store (m.getNoteNumber(), std::memory_order_relaxed);
         velocityCount.store (count + 1, std::memory_order_release);
     }
     else if (m.isNoteOff())
@@ -2083,8 +2197,16 @@ const juce::MidiBuffer& OspAudioProcessor::runArpeggiator (const juce::MidiBuffe
     settings.gate = arpGateParam->load() / 100.0;
     settings.octaves = std::clamp (juce::roundToInt (arpOctavesParam->load()), arp::minOctaves, arp::maxOctaves);
     settings.swing = arpSwingParam->load() / 100.0;
+    settings.velocityScale = arpVelocityParam->load() / 100.0;
+    applyArpModulation (settings);
     arpeggiator.setSeed (static_cast<std::uint64_t> (std::max (1.0f, seedParam->load())));
     arpeggiator.beginBlock (settings, timing, numSamples);
+    // VEL and NOTE on the shared stages follow the player's keys, not the arpeggiator's.
+    engine.setExternalInputNotes (settings.enabled);
+    if (settings.enabled)
+        for (const auto metadata : midi)
+            if (const auto m = metadata.getMessage(); m.isNoteOn())
+                engine.setInputNote (m.getNoteNumber(), m.getVelocity());
 
     auto feed = [this, numSamples] (const juce::MidiMessage& m, int samplePosition) {
         const int offset = std::clamp (samplePosition, 0, std::max (0, numSamples - 1));
@@ -2140,6 +2262,48 @@ const juce::MidiBuffer& OspAudioProcessor::runArpeggiator (const juce::MidiBuffe
     // out), and arpMidi keeps its own preallocated storage.
     publishArpDisplay();
     return arpMidi;
+}
+
+double OspAudioProcessor::steppedArpRatio (double multiplier) noexcept
+{
+    // The musical ratios ARP RATE's Stepped mode keeps to (the nearest, by octaves).
+    static constexpr std::array<double, 11> ratios { 0.25, 1.0 / 3.0, 0.5, 2.0 / 3.0, 0.75, 1.0, 4.0 / 3.0, 1.5, 2.0, 3.0, 4.0 };
+    const double octaves = std::log2 (std::max (multiplier, 1.0e-6));
+    double best = 1.0, distance = 1.0e9;
+    for (const double r : ratios)
+        if (const double d = std::abs (std::log2 (r) - octaves); d < distance)
+        {
+            distance = d;
+            best = r;
+        }
+    return best;
+}
+
+void OspAudioProcessor::applyArpModulation (Arpeggiator::Settings& settings) noexcept
+{
+    // The ARP destinations, from the engine's last control period (global sources; VEL and
+    // NOTE follow the player's keys). Without a route every offset is 0: today's settings.
+    using mod::Dest;
+    const double rate = std::clamp (engine.arpModulation (Dest::arpRate), -2.0, 2.0);
+    settings.rateStepped = arpRateStepped.load (std::memory_order_relaxed);
+    settings.rateMultiplier = settings.rateStepped ? steppedArpRatio (std::exp2 (rate)) : std::exp2 (rate);
+    settings.gate += engine.arpModulation (Dest::arpGate);
+    settings.swing += engine.arpModulation (Dest::arpSwing);
+    settings.velocityScale = std::clamp (settings.velocityScale + engine.arpModulation (Dest::arpVelocity), 0.0, 2.0);
+    if (engine.arpModulated (Dest::arpOctaves))
+    {
+        // Quantised with hysteresis (a count changes once the value is well past half-way),
+        // and the arpeggiator applies it at the start of its next cycle.
+        const double wanted = settings.octaves + engine.arpModulation (Dest::arpOctaves);
+        if (arpModOctaves < arp::minOctaves || std::abs (wanted - arpModOctaves) > 0.6)
+            arpModOctaves = std::clamp (static_cast<int> (std::lround (wanted)), arp::minOctaves, arp::maxOctaves);
+        settings.octaves = arpModOctaves;
+        settings.octavesAtCycle = true;
+    }
+    else
+    {
+        arpModOctaves = 0;
+    }
 }
 
 void OspAudioProcessor::publishArpDisplay() noexcept
@@ -2802,6 +2966,13 @@ void OspAudioProcessor::suggestGranularPosition (int index, const LoadedInstrume
 
 void OspAudioProcessor::timerCallback()
 {
+    // DYNAMICS' SOFT / LINEAR / HARD (kept for compatibility) sets the VEL curve when moved.
+    if (const int dyn = juce::roundToInt (parameterValue (ids::dynamicsCurve)); dyn != shownDynamicsCurve)
+    {
+        shownDynamicsCurve = dyn;
+        static constexpr std::array<mod::CurvePreset, 3> presets { mod::CurvePreset::soft, mod::CurvePreset::linear, mod::CurvePreset::hard };
+        setModulationCurve (4, mod::presetCurve (presets[static_cast<std::size_t> (std::clamp (dyn, 0, 2))]), false);
+    }
     std::deque<Finished> results;
     {
         const std::lock_guard<std::mutex> lock (resultsMutex);
@@ -3002,6 +3173,7 @@ std::unique_ptr<juce::XmlElement> OspAudioProcessor::createStateXml()
     stateTree.setProperty ("advancedOpen", advancedPanelOpen.load(), nullptr);
     stateTree.setProperty ("arpExpanded", arpEditorOpen.load(), nullptr);   // UI only, never audio
     stateTree.setProperty ("modTab", modTab.load(), nullptr);              // UI only, never audio
+    stateTree.setProperty ("modTabs", 6, nullptr);                         // ... in the six-tab order
     stateTree.setProperty ("program", currentProgram, nullptr);
 
     stateTree.setProperty ("editLayer", editLayer(), nullptr);
@@ -3009,13 +3181,21 @@ std::unique_ptr<juce::XmlElement> OspAudioProcessor::createStateXml()
     stateTree.setProperty ("reimaginedRouting", perLayerReimagined.load() ? "perLayer" : "legacyGlobal", nullptr);
     stateTree.setProperty ("shaperCustom", encodeShaperPattern (shaperCustomPattern()), nullptr);
     {
-        std::array<mod::Curve, 4> curves;
+        ModCurves curves;
         {
             const juce::ScopedLock lock (customLock);
             curves = modCurves;
         }
         stateTree.setProperty ("modCurves", encodeModulationCurves (curves), nullptr);
     }
+    {
+        juce::StringArray numbers;
+        for (int slot = 0; slot < mod::ccSlots; ++slot)
+            numbers.add (juce::String (modControllerNumber (slot)));
+        stateTree.setProperty ("modControllers", numbers.joinIntoString (","), nullptr);
+    }
+    stateTree.setProperty ("velToAmp", velocityAppliesToAmp(), nullptr);
+    stateTree.setProperty ("arpRateStepped", arpRateIsStepped(), nullptr);
     for (int layer = 0; layer < numLayers; ++layer)
     {
         const auto tree = instrumentTree (layer);
@@ -3087,7 +3267,14 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml, bool setting
         uiScaleFactor = std::clamp (static_cast<float> (stateTree.getProperty ("uiScale", 1.0f)), 0.8f, 2.0f);
         advancedPanelOpen = static_cast<bool> (stateTree.getProperty ("advancedOpen", false));
         arpEditorOpen = static_cast<bool> (stateTree.getProperty ("arpExpanded", false));
-        modTab = std::clamp (static_cast<int> (stateTree.getProperty ("modTab", 0)), 0, 4);
+        {
+            // Before the six tabs (AMP, ENV 1, ENV 2, LFO 1, LFO 2): ENV 2 opens ENV, the LFOs move by one.
+            static constexpr std::array<int, 5> fromFive { 0, 1, 1, 2, 3 };
+            const int saved = static_cast<int> (stateTree.getProperty ("modTab", 0));
+            modTab = static_cast<int> (stateTree.getProperty ("modTabs", 5)) == 6 ? std::clamp (saved, 0, 5)
+                                                                                   : fromFive[static_cast<std::size_t> (std::clamp (saved, 0, 4))];
+            stateTree.removeProperty ("modTabs", nullptr);
+        }
         currentProgram = static_cast<int> (stateTree.getProperty ("program", 0));
         setEditLayer (static_cast<int> (stateTree.getProperty ("editLayer", 0)));
     }
@@ -3104,17 +3291,46 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml, bool setting
     // SHAPER CUSTOM: the session's own steps, or (older sessions) CUSTOM's starting point.
     setShaperCustomPattern (decodeShaperPattern (stateTree["shaperCustom"].toString()).value_or (RhythmicShaper::patternSteps (ShaperParams().pattern)), false);
     stateTree.removeProperty ("shaperCustom", nullptr);
-    // MODULATION's curves: the session's own, or (older sessions) the defaults.
+    // MODULATION's curves: the session's own, or (older sessions) the defaults. Before VEL
+    // (c1 or none): the VEL curve is the session's DYNAMICS curve, applied to AMP, so it
+    // responds exactly as it did.
     {
-        auto curves = decodeModulationCurves (stateTree["modCurves"].toString());
+        const auto text = stateTree["modCurves"].toString();
+        auto curves = decodeModulationCurves (text);
         if (! curves)
-            curves = std::array<mod::Curve, 4> { mod::defaultLfoCurve(), mod::defaultLfoCurve(), mod::defaultEnvCurve(), mod::defaultEnvCurve() };
+            curves = defaultModulationCurves();
+        // The session's DYNAMICS curve (its parameters are applied below; one it lacks keeps
+        // the current value).
+        float savedDyn = parameterValue (ids::dynamicsCurve);
+        for (const auto& child : stateTree)
+            if (child.getProperty ("id").toString() == ids::dynamicsCurve && child.hasProperty ("value"))
+                savedDyn = static_cast<float> (child.getProperty ("value"));
+        const int dyn = std::clamp (juce::roundToInt (savedDyn), 0, 2);
+        shownDynamicsCurve = dyn;
+        if (! text.startsWith ("c2:") && ! text.startsWith ("c3:"))
+        {
+            static constexpr std::array<mod::CurvePreset, 3> presets { mod::CurvePreset::soft, mod::CurvePreset::linear, mod::CurvePreset::hard };
+            (*curves)[4] = mod::presetCurve (presets[static_cast<std::size_t> (dyn)]);
+        }
+        setVelocityAppliesToAmp (! stateTree.hasProperty ("velToAmp") || static_cast<bool> (stateTree["velToAmp"]));
+        stateTree.removeProperty ("velToAmp", nullptr);
+        // ARP RATE's modulation: smooth unless the session chose Stepped.
+        setArpRateStepped (static_cast<bool> (stateTree.getProperty ("arpRateStepped", false)));
+        stateTree.removeProperty ("arpRateStepped", nullptr);
         {
             const juce::ScopedLock lock (customLock);
             modCurves = *curves;
         }
         publishModulationCurves();
         stateTree.removeProperty ("modCurves", nullptr);
+    }
+    // The CC 1-4 sources' controllers (older sessions: the defaults).
+    {
+        const auto numbers = juce::StringArray::fromTokens (stateTree["modControllers"].toString(), ",", "");
+        for (int slot = 0; slot < mod::ccSlots; ++slot)
+            setModControllerNumber (slot, slot < numbers.size() && numbers[slot].containsOnly ("0123456789") && numbers[slot].isNotEmpty()
+                                              ? numbers[slot].getIntValue() : defaultModController (slot));
+        stateTree.removeProperty ("modControllers", nullptr);
     }
     // Before MOVEMENT v2 the three movement knobs were shared by every mode.
     std::array<std::optional<float>, 3> genericMovement;

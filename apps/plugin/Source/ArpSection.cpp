@@ -90,11 +90,32 @@ void ArpControl::paint (juce::Graphics& g)
 {
     using namespace design;
     const auto r = getLocalBounds().toFloat();
-    draw::raised (g, r.reduced (1.0f), 10.0f, colour::panelTop, colour::panelBottom);
+    if (! skin::drawnBySurface())   // ceramic: the housing draws the key
+        draw::raised (g, r.reduced (1.0f), 10.0f, colour::panelTop, colour::panelBottom);
 
-    // The light: an orange ring with a lit centre when on, a grey lens when off.
+    // The light: an orange ring with a lit centre when on, a grey lens when off. Ceramic: a
+    // rendered lens (graphite when off, the accent lit when on; its glow stays drawn).
     const auto c = lightArea().getCentre();
-    if (enabled)
+    auto* pieces = skin::active();
+    if (pieces != nullptr)
+    {
+        if (enabled)
+        {
+            g.setColour (colour::accent.withAlpha (hover == 1 ? 0.3f : 0.22f));
+            g.fillEllipse (juce::Rectangle<float> (21.0f, 21.0f).withCentre (c));
+        }
+        if (! pieces->draw (g, enabled ? "led-arp-on" : "led-arp-off", juce::Rectangle<float> (11.0f, 11.0f).withCentre (c)))
+            pieces = nullptr;
+        else if (! enabled && hover == 1)
+        {
+            g.setColour (colour::text.withAlpha (0.35f));
+            g.drawEllipse (juce::Rectangle<float> (13.0f, 13.0f).withCentre (c), 1.0f);
+        }
+    }
+    if (pieces != nullptr)
+    {
+    }
+    else if (enabled)
     {
         g.setColour (colour::accent.withAlpha (hover == 1 ? 0.3f : 0.22f));
         g.fillEllipse (juce::Rectangle<float> (21.0f, 21.0f).withCentre (c));
@@ -121,6 +142,19 @@ void ArpControl::paint (juce::Graphics& g)
 
     // The inset: pattern and rate.
     const auto inset = juce::Rectangle<float> (r.getX() + 7.0f, r.getY() + 0.53f * r.getHeight(), r.getWidth() - 14.0f, 0.35f * r.getHeight());
+    if (pieces != nullptr)
+    {
+        // Ceramic: a shallow window in the key's face (no drawn rims): a shade deeper, a
+        // soft shade under its top edge.
+        g.setColour (juce::Colour (0xffe9e2d7));
+        g.fillRoundedRectangle (inset, 9.0f);
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0x18503a20), 0.0f, inset.getY(), juce::Colour (0x00503a20), 0.0f, inset.getY() + 5.0f, false));
+        g.fillRoundedRectangle (inset, 9.0f);
+        g.setFont (fonts::make (12.5f, fonts::Weight::medium, 0.04f));
+        g.setColour (enabled ? colour::textSecondary : colour::textMicro);
+        g.drawFittedText (status, inset.getSmallestIntegerContainer(), juce::Justification::centred, 1, 0.8f);
+        return;
+    }
     g.setColour (juce::Colours::white.withAlpha (0.45f));
     g.drawRoundedRectangle (inset.translated (0.0f, 1.0f), 6.0f, 1.0f);
     g.setGradientFill (juce::ColourGradient (juce::Colour (0xffe6ded1), 0.0f, inset.getY(), juce::Colour (0xffede6db), 0.0f, inset.getBottom(), false));
@@ -139,14 +173,14 @@ void ArpControl::mouseMove (const juce::MouseEvent& e)
     {
         hover = now;
         setMouseCursor (juce::MouseCursor::PointingHandCursor);
-        repaint();
+        skin::repaintKey (*this);
     }
 }
 
 void ArpControl::mouseExit (const juce::MouseEvent&)
 {
     hover = 0;
-    repaint();
+    skin::repaintKey (*this);
 }
 
 void ArpControl::toggleEnabled()
@@ -174,7 +208,11 @@ void AdvancedCardButton::paintButton (juce::Graphics& g, bool highlighted, bool 
     using namespace design;
     const auto r = getLocalBounds().toFloat().reduced (1.0f);
     const bool open = getToggleState();
-    if (open || down)
+    if (skin::drawnBySurface())
+    {
+        // Ceramic: the housing draws the key (pressed in while open).
+    }
+    else if (open || down)
     {
         // Pressed in (Advanced is open): a recessed face.
         g.setGradientFill (juce::ColourGradient (juce::Colour (0xffe2d9cc), 0.0f, r.getY(), juce::Colour (0xffebe4d9), 0.0f, r.getBottom(), false));
@@ -287,14 +325,18 @@ ArpInlinePanel::ArpInlinePanel (OspAudioProcessor& p)
           return OspAudioProcessor::arpRateNames()[order[static_cast<std::size_t> (position)]];
       }),
       gate (p.parameters, "arp.gate", "GATE", [] (double v) { return juce::String (juce::roundToInt (v)) + " %"; }),
-      swing (p.parameters, "arp.swing", "SWING", [] (double v) { return juce::String (juce::roundToInt (v)) + " %"; })
+      swing (p.parameters, "arp.swing", "SWING", [] (double v) { return juce::String (juce::roundToInt (v)) + " %"; }),
+      velocity (p.parameters, "arp.velocity", "VELOCITY", [] (double v) { return juce::String (juce::roundToInt (v)) + " %"; })
 {
     setTitle ("Arpeggiator settings");
     rate.setChoiceOrder (parameter (p, "arp.rate"), rateOrder(), &p.undoManager);
     rate.slider.setTooltip ("Step length, from 1/4 dotted (slowest) to 1/32 (fastest)");
-    for (auto* knob : { &rate, &gate, &swing })
+    velocity.slider.setTooltip ("The arpeggiated notes' velocity: 100 % plays them as the keys were played");
+    const std::array<std::pair<MiniKnob*, const char*>, 4> knobs { { { &rate, "arp.rate" }, { &gate, "arp.gate" }, { &swing, "arp.swing" }, { &velocity, "arp.velocity" } } };
+    for (const auto& [knob, id] : knobs)
     {
         knob->setArcColour (design::colour::accent);
+        knob->slider.getProperties().set ("paramId", id);   // a modulation drop target
         addAndMakeVisible (*knob);
     }
     enabledAttachment.sendInitialUpdate();
@@ -369,11 +411,12 @@ void ArpInlinePanel::resized()
     field = { 562.0f, 72.0f, 150.0f, 84.0f };
     list = { 722.0f, 50.0f, 156.0f, 106.0f };
     const float knobTop = 58.0f, knobH = 94.0f, knobW = 100.0f;
-    rate.setBounds (juce::Rectangle<float> (knobW, knobH).withCentre ({ 940.0f, knobTop + 0.5f * knobH }).getSmallestIntegerContainer());
-    octaveCaption = { 995.0f, knobTop, 80.0f, 0.22f * knobH };
-    octaveKeys = { 1012.0f, knobTop + 0.22f * knobH + 2.0f, 46.0f, 156.0f - (knobTop + 0.22f * knobH + 2.0f) };
-    gate.setBounds (juce::Rectangle<float> (knobW, knobH).withCentre ({ 1140.0f, knobTop + 0.5f * knobH }).getSmallestIntegerContainer());
-    swing.setBounds (juce::Rectangle<float> (knobW, knobH).withCentre ({ 1255.0f, knobTop + 0.5f * knobH }).getSmallestIntegerContainer());
+    rate.setBounds (juce::Rectangle<float> (knobW, knobH).withCentre ({ 930.0f, knobTop + 0.5f * knobH }).getSmallestIntegerContainer());
+    octaveCaption = { 985.0f, knobTop, 80.0f, 0.22f * knobH };
+    octaveKeys = { 1002.0f, knobTop + 0.22f * knobH + 2.0f, 46.0f, 156.0f - (knobTop + 0.22f * knobH + 2.0f) };
+    gate.setBounds (juce::Rectangle<float> (knobW, knobH).withCentre ({ 1115.0f, knobTop + 0.5f * knobH }).getSmallestIntegerContainer());
+    swing.setBounds (juce::Rectangle<float> (knobW, knobH).withCentre ({ 1215.0f, knobTop + 0.5f * knobH }).getSmallestIntegerContainer());
+    velocity.setBounds (juce::Rectangle<float> (knobW, knobH).withCentre ({ 1315.0f, knobTop + 0.5f * knobH }).getSmallestIntegerContainer());
     revealSelected();
 }
 
@@ -441,7 +484,8 @@ void ArpInlinePanel::paint (juce::Graphics& g)
 {
     using namespace design;
     const auto r = getLocalBounds().toFloat();
-    draw::raised (g, r, layout::panelRadius, colour::panelTop, colour::panelBottom);
+    if (! skin::drawnBySurface())   // ceramic: the housing draws the panel (its shadow falls there)
+        draw::raised (g, r, layout::panelRadius, colour::panelTop, colour::panelBottom);
     g.setColour (colour::text.withAlpha (0.9f));
     g.setFont (type::panelHeader());
     g.drawText ("ARPEGGIATOR", title, juce::Justification::centredLeft, false);
@@ -694,6 +738,13 @@ void ArpInlinePanel::mouseExit (const juce::MouseEvent&)
 
 void ArpInlinePanel::mouseDown (const juce::MouseEvent& e)
 {
+    // OCTAVES' keys are not a knob: their right-click asks for the control's modulation menu.
+    if (e.mods.isPopupMenu() && octaveKeys.getUnion (octaveCaption).contains (e.position))
+    {
+        if (onOctavesMenu != nullptr)
+            onOctavesMenu();
+        return;
+    }
     if (const int row = rowAt (e.position); row >= 0)
     {
         choosePattern (listOrder()[static_cast<std::size_t> (row)]);

@@ -2,6 +2,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include "CeramicSkin.h"
 #include "SpriteKnobRenderer.h"
 
 namespace osp::plugin
@@ -158,6 +159,8 @@ public:
 
 private:
     juce::SharedResourcePointer<SpriteKnobLibrary> sprites;
+    /** The ceramic skin's rendered pieces (skin::active() reaches them while this lives). */
+    skin::Pieces::Holder skinPieces;
 };
 
 } // namespace osp::plugin

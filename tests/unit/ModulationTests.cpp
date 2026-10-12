@@ -6,6 +6,7 @@
 #include "engine/InstrumentBuilder.h"
 #include "engine/InstrumentEngine.h"
 #include "engine/Modulation.h"
+#include "engine/Shaping.h"
 #include "research/RenderConfig.h"
 #include "support/TestHelpers.h"
 
@@ -940,4 +941,352 @@ TEST_CASE ("mod: many depth routes stay cheap and finite", "[unit][mod][meta]")
         peak = std::max (peak, static_cast<double> (std::abs (x)));
     CHECK (peak < 4.0);
     CHECK (metaSeconds < 2.0 * plainSeconds + 0.05);
+}
+
+//==============================================================================
+// Final modulation system, stage 1: VEL, NOTE, CC 1-4, PRESSURE.
+
+TEST_CASE ("mod: new sources are appended - saved route sources keep their meaning", "[unit][mod]")
+{
+    // Sessions save a route's source by its place: the first five never move.
+    CHECK (static_cast<int> (mod::Source::lfo1) == 1);
+    CHECK (static_cast<int> (mod::Source::env2) == 4);
+    CHECK (static_cast<int> (mod::Source::modWheel) == 5);
+    CHECK (static_cast<int> (mod::Source::vel) == 6);
+    CHECK (static_cast<int> (mod::Source::pressure) == mod::sourceCount);
+    CHECK (mod::sourceIndex (mod::Source::vel) == mod::slot::vel);
+    CHECK (mod::sourceIndex (mod::Source::note) == mod::slot::note);
+    CHECK (mod::sourceIndex (mod::Source::cc1) == mod::slot::cc1);
+    CHECK (mod::sourceIndex (mod::Source::pressure) == mod::slot::pressure);
+    CHECK (std::string (mod::sourceName (mod::Source::vel)) == "VEL");
+    CHECK (std::string (mod::sourceName (mod::Source::cc3)) == "CC 3");
+    CHECK (std::string (mod::sourceName (mod::Source::pressure)) == "PRESSURE");
+}
+
+TEST_CASE ("mod: VEL and NOTE - per note through their curves; shared stages follow the input key", "[unit][mod]")
+{
+    mod::Settings s;
+    mod::Runtime rt;
+    rt.setSettings (s);
+    mod::VoiceState v;
+    v.note = 72;
+    v.velocity = 127;
+    v.start (rt);
+    CHECK (v.values[mod::slot::vel] == Approx (1.0f));
+    CHECK (v.values[mod::slot::note] == Approx (72.0f / 127.0f).margin (1.0e-3));
+    v.advance (rt, 0.5);   // held for the note's life
+    CHECK (v.values[mod::slot::vel] == Approx (1.0f));
+
+    // A curve shapes them (inverted: the hardest touch gives 0).
+    mod::Curve inverted;
+    inverted.count = 2;
+    inverted.points[0] = { 0.0f, 1.0f, 0.0f };
+    inverted.points[1] = { 1.0f, 0.0f, 0.0f };
+    s.velCurve = mod::compileCurve (inverted);
+    rt.setSettings (s);
+    v.start (rt);
+    CHECK (v.values[mod::slot::vel] == Approx (0.0f).margin (1.0e-3));
+
+    // Shared stages: the latest input key; voices never read it from there.
+    rt.setInputNote (48, 64);
+    rt.advanceGlobal (32, rate);
+    CHECK (rt.sharedValue[mod::slot::vel] == Approx (1.0f - 64.0f / 127.0f).margin (1.0e-2));
+    CHECK (rt.sharedValue[mod::slot::note] == Approx (48.0f / 127.0f).margin (1.0e-3));
+    CHECK (rt.globalValue[mod::slot::vel] == 0.0f);
+    CHECK (rt.globalValue[mod::slot::note] == 0.0f);
+
+    // Rules: per note, and on shared stages; they know their value as a note starts.
+    for (const auto src : { mod::Source::vel, mod::Source::note })
+    {
+        CHECK (mod::isPolySource (s, src));
+        CHECK (mod::compatible (s, src, mod::Dest::drive));
+        CHECK (mod::compatible (s, src, mod::Dest::levelA));
+        CHECK (mod::compatible (s, src, mod::Dest::startA));
+        CHECK (mod::compatible (s, src, mod::Dest::env1Attack));
+        CHECK_FALSE (mod::createsCycle (s, src, mod::Dest::env1Attack));
+    }
+
+    // In the engine: a soft note is quieter than a hard one with VEL -> LEVEL; NOTE moves a
+    // high note's level differently from a low one's; no route renders as before.
+    const auto model = sineModel (220.0);
+    auto settings = quietSettings();
+    auto render = [&] (int note, int velocity, mod::Source source, double depth) {
+        InstrumentEngine e;
+        e.prepare (rate, 256, settings);
+        e.setModel (model.get());
+        mod::Settings m;
+        if (source != mod::Source::none)
+            m.routes[0] = { source, mod::Dest::levelA, depth, true };
+        e.setModulation (m);
+        std::vector<float> l (256), r (256), out;
+        e.noteOn (note, velocity);
+        for (int done = 0; done < static_cast<int> (0.4 * rate); done += 256)
+        {
+            float* ch[2] = { l.data(), r.data() };
+            e.render (ch, 2, 256);
+            out.insert (out.end(), l.begin(), l.end());
+        }
+        return out;
+    };
+    auto peak = [] (const std::vector<float>& x) {
+        double p = 0.0;
+        for (std::size_t i = x.size() / 2; i < x.size(); ++i)
+            p = std::max (p, static_cast<double> (std::abs (x[i])));
+        return p;
+    };
+    // VEL -> LEVEL +12 dB at full velocity: the hard note gains 12 dB more than at velocity 0
+    // would; compared at the same velocity with and without the route.
+    const double withRoute = peak (render (57, 127, mod::Source::vel, 12.0 / 54.0));
+    const double without = peak (render (57, 127, mod::Source::none, 0.0));
+    CHECK (withRoute / without == Approx (std::pow (10.0, 6.0 / 20.0)).margin (0.05));   // +12 dB at 1, but LEVEL tops out at +6 dB
+    CHECK (render (57, 127, mod::Source::vel, 12.0 / 54.0) == render (57, 127, mod::Source::vel, 12.0 / 54.0));
+    const double soft = peak (render (57, 20, mod::Source::vel, -24.0 / 54.0)) / peak (render (57, 20, mod::Source::none, 0.0));
+    const double hard = peak (render (57, 120, mod::Source::vel, -24.0 / 54.0)) / peak (render (57, 120, mod::Source::none, 0.0));
+    CHECK (soft > hard * 2.0);   // -24 dB x velocity: the hard note is cut far more
+    const double low = peak (render (45, 100, mod::Source::note, -24.0 / 54.0)) / peak (render (45, 100, mod::Source::none, 0.0));
+    const double high = peak (render (81, 100, mod::Source::note, -24.0 / 54.0)) / peak (render (81, 100, mod::Source::none, 0.0));
+    CHECK (low > high * 1.5);
+}
+
+TEST_CASE ("mod: CC 1-4 and PRESSURE - smoothed global sources, heard on every destination", "[unit][mod]")
+{
+    mod::Settings s;
+    mod::Runtime rt;
+    rt.setSettings (s);
+    rt.setController (2, 1.0f);
+    rt.setPressure (0.5f);
+    rt.advanceGlobal (48, rate);   // 1 ms: gliding, never a step
+    CHECK (rt.globalValue[mod::slot::cc1 + 2] > 0.0f);
+    CHECK (rt.globalValue[mod::slot::cc1 + 2] < 0.5f);
+    for (int i = 0; i < 100; ++i)
+        rt.advanceGlobal (48, rate);
+    CHECK (rt.globalValue[mod::slot::cc1 + 2] == Approx (1.0f).margin (1.0e-3));
+    CHECK (rt.globalValue[mod::slot::pressure] == Approx (0.5f).margin (1.0e-3));
+    CHECK (rt.globalValue[mod::slot::cc1] == 0.0f);
+    CHECK (rt.sharedValue[mod::slot::pressure] == rt.globalValue[mod::slot::pressure]);
+    rt.setController (9, 1.0f);   // no such slot: ignored
+    rt.setController (-1, 1.0f);
+    for (const auto src : { mod::Source::cc1, mod::Source::cc4, mod::Source::pressure })
+    {
+        CHECK_FALSE (mod::isPolySource (s, src));
+        CHECK (mod::compatible (s, src, mod::Dest::space));
+        CHECK (mod::compatible (s, src, mod::Dest::cutoff));
+    }
+    // A voice reads them as they move.
+    mod::VoiceState v;
+    v.start (rt);
+    CHECK (v.values[mod::slot::cc1 + 2] == Approx (1.0f).margin (1.0e-3));
+
+    const auto model = sineModel (220.0);
+    auto settings = quietSettings();
+    auto render = [&] (float value, bool routed) {
+        InstrumentEngine e;
+        e.prepare (rate, 256, settings);
+        e.setModel (model.get());
+        mod::Settings m;
+        if (routed)
+            m.routes[0] = { mod::Source::cc2, mod::Dest::levelA, -12.0 / 54.0, true };
+        e.setModulation (m);
+        e.setModController (1, value);
+        return renderNotes (e, { 57 }, 0.5, 256);
+    };
+    CHECK (render (0.0f, true) == render (0.0f, false));
+    CHECK (render (1.0f, true) != render (0.0f, true));
+    auto pressure = [&] (float value) {
+        InstrumentEngine e;
+        e.prepare (rate, 256, settings);
+        e.setModel (model.get());
+        mod::Settings m;
+        m.routes[0] = { mod::Source::pressure, mod::Dest::levelA, -12.0 / 54.0, true };
+        e.setModulation (m);
+        e.setModPressure (value);
+        return renderNotes (e, { 57 }, 0.5, 256);
+    };
+    CHECK (pressure (1.0f) != pressure (0.0f));
+}
+
+TEST_CASE ("mod: VEL presets - SOFT, LINEAR and HARD are DYNAMICS' curves exactly; APPLY TO AMP uses the VEL curve", "[unit][mod][dynamics]")
+{
+    // Every velocity maps exactly as DYNAMICS' own curve did (older sessions sound the same).
+    const std::array<std::pair<mod::CurvePreset, VelocityCurve>, 3> pairs { { { mod::CurvePreset::soft, VelocityCurve::soft },
+                                                                             { mod::CurvePreset::linear, VelocityCurve::linear },
+                                                                             { mod::CurvePreset::hard, VelocityCurve::hard } } };
+    for (const auto& [preset, dynamics] : pairs)
+    {
+        // The plugin saves curves with 4 decimals: compare through that too.
+        auto curve = mod::presetCurve (preset);
+        for (int i = 0; i < curve.count; ++i)
+            curve.points[static_cast<std::size_t> (i)].tension = std::round (curve.points[static_cast<std::size_t> (i)].tension * 1.0e4f) / 1.0e4f;
+        const auto table = mod::compileCurve (curve);
+        for (int v = 1; v <= 127; ++v)
+        {
+            CAPTURE (v, static_cast<int> (preset));
+            const int viaCurve = std::clamp (static_cast<int> (std::lround (127.0 * mod::curveAt (table, v / 127.0))), 1, 127);
+            CHECK (viaCurve == shaping::curvedVelocity (dynamics, v));
+        }
+        CHECK (mod::matchingPreset (mod::presetCurve (preset)) == static_cast<int> (preset));
+    }
+    for (int i = 0; i < mod::curvePresetCount; ++i)
+    {
+        auto c = mod::presetCurve (static_cast<mod::CurvePreset> (i));
+        const auto before = c;
+        c.normalise();
+        CHECK (c == before);   // valid as they are
+    }
+    CHECK (mod::matchingPreset (mod::defaultLfoCurve()) == -1);
+
+    // The engine: APPLY TO AMP with the HARD preset renders exactly as DYNAMICS HARD.
+    const auto model = sineModel (220.0);
+    auto render = [&] (VelocityCurve dynamics, bool viaVel, mod::CurvePreset preset) {
+        auto settings = quietSettings();
+        settings.shaping.velocityCurve = dynamics;
+        InstrumentEngine e;
+        e.prepare (rate, 256, settings);
+        e.setModel (model.get());
+        mod::Settings m;
+        m.velocityToAmp = viaVel;
+        m.velCurve = mod::compileCurve (mod::presetCurve (preset));
+        e.setModulation (m);
+        std::vector<float> l (256), r (256), out;
+        e.noteOn (57, 70);
+        for (int done = 0; done < static_cast<int> (0.3 * rate); done += 256)
+        {
+            float* ch[2] = { l.data(), r.data() };
+            e.render (ch, 2, 256);
+            out.insert (out.end(), l.begin(), l.end());
+        }
+        return out;
+    };
+    CHECK (render (VelocityCurve::linear, true, mod::CurvePreset::hard) == render (VelocityCurve::hard, false, mod::CurvePreset::linear));
+    CHECK (render (VelocityCurve::hard, true, mod::CurvePreset::linear) == render (VelocityCurve::linear, false, mod::CurvePreset::linear));   // never both
+    CHECK (render (VelocityCurve::linear, true, mod::CurvePreset::flat) != render (VelocityCurve::linear, false, mod::CurvePreset::flat));
+}
+
+// ---------------------------------------------------------------------------------------------
+// DAMPEN (MOD-FINAL Stage 6): per voice, by key, after CHARACTER
+
+namespace
+{
+    /** Energy above `hz` relative to the total (a crude spectral split by one-pole high-pass). */
+    double highShare (const std::vector<float>& x, double hz)
+    {
+        const double a = std::exp (-2.0 * std::numbers::pi * hz / rate);
+        double lp = 0.0, high = 0.0, total = 0.0;
+        for (const float s : x)
+        {
+            lp = (1.0 - a) * s + a * lp;
+            const double h = s - lp;
+            high += h * h;
+            total += static_cast<double> (s) * s;
+        }
+        return total > 0.0 ? high / total : 0.0;
+    }
+
+    std::shared_ptr<InstrumentModel> brightModel()
+    {
+        // A bright tone (a stack of harmonics) so the damping is measurable.
+        auto audio = testsignals::sine (220.0, 2.0, rate, 0.1, 1);
+        for (int h = 2; h <= 30; ++h)
+        {
+            const auto partial = testsignals::sine (220.0 * h, 2.0, rate, 0.1 / h, 1);
+            for (std::size_t c = 0; c < audio.channels.size(); ++c)
+                for (std::size_t i = 0; i < audio.channels[c].size(); ++i)
+                    audio.channels[c][i] += partial.channels[c][i];
+        }
+        testsignals::applyFades (audio, 0.01, 0.05);
+        return instrument::buildComplete (audio, test::analyse (audio), {}, false);
+    }
+}
+
+TEST_CASE ("dampen: bypassed is exactly no DAMPEN; on, high keys lose their highs and low keys keep them", "[unit][mod][mod-final][dampen]")
+{
+    const auto model = brightModel();
+    const auto settings = quietSettings();
+    auto run = [&] (const dampen::Settings* d, int note, int block = 256, const mod::Settings* m = nullptr) {
+        InstrumentEngine e;
+        e.prepare (rate, block, settings);
+        e.setModel (model.get());
+        if (d != nullptr)
+            e.setLayerDampen (0, *d);
+        if (m != nullptr)
+            e.setModulation (*m);
+        return renderNotes (e, { note }, 0.8, block);
+    };
+    const auto plainHigh = run (nullptr, 96);
+    auto off = dampen::defaultSettings();   // bypassed by default
+    CHECK_FALSE (off.enabled);
+    CHECK (run (&off, 96) == plainHigh);
+
+    auto on = dampen::defaultSettings();
+    on.enabled = true;
+    // The default curve: nothing up to C4, full at the top.
+    CHECK (dampen::noteDamping (on, 48) == 0.0);
+    CHECK (dampen::noteDamping (on, 127) == Approx (1.0));
+    CHECK (run (&on, 48) == run (nullptr, 48));   // a key the curve leaves alone: untouched
+    const auto shelf = run (&on, 96);
+    CHECK (shelf != plainHigh);
+    CHECK (highShare (shelf, 4000.0) < 0.8 * highShare (plainHigh, 4000.0));
+    on.mode = dampen::Mode::lowPass;
+    const auto lowPass = run (&on, 96);
+    CHECK (highShare (lowPass, 4000.0) < highShare (plainHigh, 4000.0));
+    // AMOUNT 0: nothing; and deterministic, block-size independent.
+    on.amount = 0.0;
+    CHECK (run (&on, 96) == plainHigh);
+    on.amount = 1.0;
+    const auto small = run (&on, 96, 32), large = run (&on, 96, 512);
+    double worst = 0.0;
+    for (std::size_t i = 0; i < small.size(); ++i)
+        worst = std::max (worst, static_cast<double> (std::abs (small[i] - large[i])));
+    CHECK (worst < 1.0e-4);
+    CHECK (run (&on, 96) == lowPass);
+
+    // AMOUNT is a destination: the wheel at 0 through -100 % leaves the amount; a route at
+    // -100 % from a source held at 1 takes it to nothing.
+    mod::Settings m;
+    m.routes[0] = { mod::Source::modWheel, mod::Dest::dampenAmountA, -1.0, true };
+    {
+        InstrumentEngine e;
+        e.prepare (rate, 256, settings);
+        e.setModel (model.get());
+        e.setLayerDampen (0, on);
+        e.setModulation (m);
+        e.setModWheel (1.0f);
+        const auto undamped = renderNotes (e, { 96 }, 0.8, 256);
+        CHECK (highShare (undamped, 4000.0) > highShare (lowPass, 4000.0));
+    }
+}
+
+TEST_CASE ("dampen: the filters - shelf at -18 dB, low-pass on a log scale, finite at every rate", "[unit][mod-final][dampen]")
+{
+    CHECK (dampen::lowPassHz (0.0, 2000.0) == Approx (20000.0));
+    CHECK (dampen::lowPassHz (1.0, 2000.0) == Approx (2000.0));
+    CHECK (dampen::lowPassHz (0.5, 2000.0) == Approx (std::sqrt (20000.0 * 2000.0)));
+    for (double sr : { 22050.0, 44100.0, 96000.0, 192000.0 })
+        for (auto mode : { dampen::Mode::softShelf, dampen::Mode::lowPass })
+        {
+            dampen::Filter f;
+            f.setup (mode, sr, 1.0, 1000.0, 300.0);
+            CHECK (f.active());
+            // A tone far above the corner: the shelf takes 18 dB, the low-pass more.
+            double in = 0.0, out = 0.0;
+            for (int i = 0; i < 20000; ++i)
+            {
+                float l = static_cast<float> (std::sin (2.0 * std::numbers::pi * 0.48 * i)), r = l;   // near Nyquist
+                const float x = l;
+                f.process (l, r);
+                if (i > 2000)
+                {
+                    in += x * x;
+                    out += l * l;
+                }
+                CHECK (std::isfinite (l));
+            }
+            const double db = 10.0 * std::log10 (out / in);
+            if (mode == dampen::Mode::softShelf)
+                CHECK (db == Approx (-18.0).margin (1.5));
+            else
+                CHECK (db < -20.0);
+            f.setup (mode, sr, 0.0, 3000.0, 2000.0);
+            CHECK_FALSE (f.active());
+        }
 }

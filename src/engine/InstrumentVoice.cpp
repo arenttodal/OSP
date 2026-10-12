@@ -54,6 +54,9 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
 
     cont = &layer->continuation;
     currentNote = params.note;
+    // VEL and NOTE for this note's life: the sounding note, the raw velocity it was played at.
+    modState.note = params.note;
+    modState.velocity = modRuntime != nullptr ? modRuntime->noteVelocity : params.velocity;
     midiChannel = params.channel;
     order = params.startOrder;
     expressionGainDb = expressionBrightDb = 0.0f;
@@ -92,6 +95,8 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
         if (modRuntime->compiled.has (startDest))
         {
             mod::VoiceState probe;
+            probe.note = modState.note;
+            probe.velocity = modState.velocity;
             probe.start (*modRuntime);
             modStartOffset = probe.offset (*modRuntime, startDest);
         }
@@ -287,6 +292,12 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     filtersActive = false;
 
     clearModulation();
+    // DAMPEN: the sounding key (the arpeggiator's octaves included, not pitch bend).
+    dampenLive = params.dampen;
+    dampenNote = params.note;
+    dampenFilter.reset();
+    dampenApplied = -1.0;
+    updateDampen (true);
     modPanApplied = false;
     noteAdsr = adsrSettings;
     if (modRuntime != nullptr && modRuntime->compiled.anyVoiceDest)
@@ -637,6 +648,36 @@ void InstrumentVoice::updateCharacter (bool immediate) noexcept
     charFilter.setParameters (s.filterType, std::exp2 (octaves), resonance, s.drive, tiltDb);
 }
 
+void InstrumentVoice::updateDampen (bool immediate) noexcept
+{
+    // amount = curve[note] x AMOUNT (plus its routes), glided over ~10 ms; switched off it
+    // glides to nothing, and the filter is skipped once there.
+    const auto* s = dampenLive;
+    double target = 0.0;
+    double shelf = 3000.0, cutoff = 2000.0;
+    auto mode = dampen::Mode::softShelf;
+    if (s != nullptr)
+    {
+        mode = s->mode;
+        shelf = std::clamp (s->shelfHz * (modDampenShelf != 0.0 ? std::exp2 (modDampenShelf) : 1.0), dampen::minShelfHz, dampen::maxShelfHz);
+        cutoff = std::clamp (s->minCutoffHz * (modDampenCutoff != 0.0 ? std::exp2 (modDampenCutoff) : 1.0), dampen::minCutoffLowHz, dampen::minCutoffHighHz);
+        if (s->enabled)
+            target = dampen::noteDamping (*s, dampenNote) * std::clamp (s->amount + modDampenAmount, 0.0, 1.0);
+    }
+    dampenNow = immediate ? target : dampenNow + (target - dampenNow) * charSmoothing;
+    if (target == 0.0 && dampenNow < 1.0e-3)
+        dampenNow = 0.0;
+    const bool moved = std::abs (dampenNow - dampenApplied) > 1.0e-3 || (dampenNow == 0.0 && dampenApplied != 0.0) || mode != dampenModeApplied
+                       || std::abs (shelf - dampenShelfApplied) > 0.002 * shelf || std::abs (cutoff - dampenCutoffApplied) > 0.002 * cutoff;
+    if (! moved)
+        return;
+    dampenApplied = dampenNow;
+    dampenModeApplied = mode;
+    dampenShelfApplied = shelf;
+    dampenCutoffApplied = cutoff;
+    dampenFilter.setup (mode, sampleRate, dampenNow, shelf, cutoff);
+}
+
 GranularParams InstrumentVoice::doubledGranular() const noexcept
 {
     GranularParams p = notesGranular();
@@ -680,6 +721,7 @@ void InstrumentVoice::clearModulation() noexcept
     modStarted = false;
     modCents = modLevelDb = modPan = modReimagined = 0.0f;
     modCutoff = modResonance = modSustain = 0.0;
+    modDampenAmount = modDampenShelf = modDampenCutoff = 0.0;
     modGrainPosition = modGrainSpread = modGrainSize = modGrainDensity = 0.0;
     appliedSustain = -1.0;
 }
@@ -736,6 +778,9 @@ void InstrumentVoice::updateModulation (bool advance) noexcept
     modGrainSize = modState.offset (rt, layerDest (mod::Dest::grainSizeA));
     modGrainDensity = modState.offset (rt, layerDest (mod::Dest::grainDensityA));
     modSustain = modState.offset (rt, mod::Dest::ampSustain);
+    modDampenAmount = modState.offset (rt, layerDest (mod::Dest::dampenAmountA));
+    modDampenShelf = modState.offset (rt, layerDest (mod::Dest::dampenShelfA));
+    modDampenCutoff = modState.offset (rt, layerDest (mod::Dest::dampenCutoffA));
     {
         // REIMAGINED: the engine already adds the global LFOs to the layer's amount (its
         // shared stage hears them too); a voice adds its own sources on top.
@@ -823,6 +868,8 @@ void InstrumentVoice::updateControl() noexcept
     }
     if (shapingState != nullptr)
         updateCharacter (false);
+    if (dampenLive != nullptr)
+        updateDampen (false);
     if (granularMode)
     {
         granularSource.setParams (notesGranular());
@@ -1177,6 +1224,7 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
             r = std::tanh (saturationDrive * r) * saturationNorm;
         }
         charFilter.process (l, r);
+        dampenFilter.process (l, r);
 
         controlGain += controlGainStep;
         float g = env * baseGain * std::max (fadeGain, 0.0f) * controlGain * dampingGain * (1.0f + transientExtra) * attackRamp;
@@ -1382,6 +1430,7 @@ void InstrumentVoice::renderMode (float* left, float* right, int numSamples, dou
                 r = lowR.process (highR.process (r));
             }
             charFilter.process (l, r);
+            dampenFilter.process (l, r);
             controlGain += controlGainStep;
             float g = env * baseGain * std::max (fadeGain, 0.0f) * controlGain * dampingGain * (1.0f + transientExtra) * attackRamp;
             if (! followContour)

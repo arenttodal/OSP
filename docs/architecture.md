@@ -537,6 +537,27 @@ the global LFOs' EQ routes (`effectiveEq`) every 32-sample control chunk, and th
 glides to them. Off, it is not in the path (bit-identical). The editor (`EqEditor`) draws
 `eq::responseDb`, the exact response of the running sections. Report: `docs/reports/eq.md`.
 
+## FINAL MODULATION AND DAMPEN (state 12, parameters v19; docs/reports/mod-final.md)
+
+Sources appended to `mod::Source` (saved by index): VEL and NOTE (per note; on a shared
+stage the player's latest key, `Runtime::setInputNote`, which the processor feeds from the
+keys while the arpeggiator owns the notes), CC 1-4 and PRESSURE (global, glided like the
+wheel). VEL and NOTE go through their own `mod::Curve` (the same bounded, tension-shaped
+curves as the LFO and envelope shapes); APPLY TO AMP (`Settings::velocityToAmp`) lets the VEL
+curve replace DYNAMICS' Soft / Linear / Hard for the amplitude, and the presets reproduce
+those three exactly. The panel has six tabs (AMP | ENV | LFO 1 | LFO 2 | VEL | NOTE); ENV 2
+keeps working without a tab. The curves live in the state as `modCurves` "c3" (nine: LFOs,
+envelopes, VEL, NOTE, DAMPEN A-C), published like before through atomics and a generation.
+ARP destinations (shared): the processor reads the engine's last control period
+(`InstrumentEngine::arpModulation`) before running the arpeggiator. RATE is a multiplier on
+the step clock: off 1x the arpeggiator runs a phase accumulator in steps (no restart; at 1x
+the plain clock, back on the host's grid at the boundary nearest the expected step); Stepped
+latches musical ratios at a step. OCTAVES by modulation applies at the next cycle. DAMPEN
+(`engine/Dampen`): per voice after CHARACTER at both voice tails, a high shelf (to -18 dB) or a
+12 dB/oct low-pass whose amount is the layer's curve at the sounding key times AMOUNT (plus its
+routes), glided at control rate and skipped at 0 (bypassed by default: bit-identical). The
+editor is the EQ overlay's second page (`DampenEditor`, EQ | DAMPEN).
+
 ## RENDERED CONTROLS (tools/blender-assets; docs/reports/knob-phase1.md)
 
 Controls can be drawn from offline renders instead of vectors.
@@ -556,7 +577,52 @@ the body and pointer when `KnobStyle::sprite` is set. A slider asks for one with
 property `sprite`.
 
 **Skin.** A development knob skin (Cmd+Option+K, `OSP_KNOB_SKIN`) chooses original, pilot
-(LIFE) or all macros. It is looks only and never touches state.
+(LIFE) or all macros (the default, as in the ceramic design). It is looks only and never
+touches state.
+
+## CERAMIC SKIN (docs/design/warm-ceramic-teak-style-guide.md)
+
+The instrument's look is the design lab's chosen direction (09 Warm Ceramic + Teak): rendered
+surfaces under the plugin's own drawing. Text, icons, values, waveforms, knobs' rings and
+halos, the keyboard and the dark displays stay vector-drawn.
+
+**Generator.** `tools/blender-assets/skin/`: `pieces.py` lists what is rendered and where,
+`render.py` renders it with the design lab's studio, materials and calibrated exposure (the
+direction's own config in `design-lab/blender/configs`, so nothing restates a colour or a
+light), `pack.py` writes `apps/plugin/Resources/skin/ceramic-skin.zip` (manifest plus one image
+per piece and level).
+
+Each piece is rendered at its real place and size in the design canvas, so the light falls on
+it as in the approved full render:
+- the window (surround, housing, teak cheeks), opaque;
+- the cards at the three layout widths, the panels;
+- the keys per role and state (normal, hover, pressed, on);
+- the badges, the fader cap and rail, the lens LEDs;
+- the displays' bezels and the keybed, as overlays.
+
+Slabs keep their contact shadow in the alpha (a shadow catcher of the surface below). A
+recess is rendered with and without itself, and the difference becomes the least opaque
+overlay that turns the plain surface into the recessed one.
+
+**Plugin side.** `CeramicSkin` (`skin::Pieces`, one per process while an editor holds it):
+- a piece is drawn as a nine-slice over the part's bounds: at its rendered size it is the
+  render itself, at other sizes the edges and middle stretch;
+- for the physical scale (window times display) it is composed once from its nearest level,
+  resampled by area, then cached and drawn 1:1; the cache is bounded;
+- a requested face colour scales a piece's light and shading (another panel colour from the
+  same render); the shadow stays a shadow.
+
+`design::draw::housing`, `raised`, `button` and `well` use the pieces while the look is
+ceramic. Keys (`skin::KeyFace`) and raised faces (`skin::SurfaceFace`) are drawn by the
+surface they sit on, so their shadows can fall outside their own bounds (a component cannot
+paint there). The component then draws only its ink, and repaints with room for the shadow
+when its state changes. A face that is animating is stretched while drawing instead of being
+composed for every size in passing.
+
+**Look.** `skin::look()`: ceramic (default) or classic (the vector drawing it replaced,
+kept for comparison and as the fallback when the pack cannot be read). It is set by
+`OSP_SKIN=classic|ceramic` and toggled with Cmd+Option+G. It is looks only: no parameter,
+no state, nothing the audio thread reads.
 
 ## LIBRARY (in progress; docs/library/)
 

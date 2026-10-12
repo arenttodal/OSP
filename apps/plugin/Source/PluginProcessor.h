@@ -151,18 +151,30 @@ public:
     /** Which editor the envelope panel shows (0 AMP, 1 ENV 1, 2 ENV 2, 3 LFO 1, 4 LFO 2): a
         view setting only, stored with the session; every source runs whichever is shown. */
     int modPanelTab() const noexcept { return modTab.load(); }
-    void setModPanelTab (int tab) noexcept { modTab = std::clamp (tab, 0, 4); }
+    /** The modulation panel's tab: AMP, ENV, LFO 1, LFO 2, VEL, NOTE (0..5). */
+    void setModPanelTab (int tab) noexcept { modTab = std::clamp (tab, 0, 5); }
 
     // MODULATION: parameter IDs, the destinations' names (registry order), the editable
-    // curves (0, 1: LFO 1/2 CUSTOM; 2, 3: ENV 1/2 one-shot), routes by slot, the display.
+    // curves (0, 1: LFO 1/2 CUSTOM; 2, 3: ENV 1/2 one-shot; 4 VEL; 5 NOTE), routes by slot, the display.
     static juce::String modLfoId (int lfo, const juce::String& name);
     static juce::String modEnvId (int env, const juce::String& name);
     static juce::String modRouteId (int route, const juce::String& name);
     static const juce::StringArray& modDestinationNames();
     mod::Curve modulationCurve (int index) const;
     void setModulationCurve (int index, const mod::Curve& curve, bool undoable = true);
-    static juce::String encodeModulationCurves (const std::array<mod::Curve, 4>& curves);
-    static std::optional<std::array<mod::Curve, 4>> decodeModulationCurves (const juce::String& text);
+    /** The editable curves: 0, 1 LFO 1/2 CUSTOM; 2, 3 ENV 1/2 one-shot; 4 VEL; 5 NOTE;
+        6, 7, 8 DAMPEN A/B/C (over the keys). */
+    static constexpr int modCurveCount = 9;
+    static constexpr int dampenCurveIndex (int layer) noexcept { return 6 + std::clamp (layer, 0, numLayers - 1); }
+    static juce::String dampenParameterId (int layer, const juce::String& name) { return layerParameterId (layer, "dampen." + name); }
+    /** DAMPEN's parameters in their order: enabled, mode, amount, frequency, cutoff. */
+    static const juce::StringArray& dampenParameterNames();
+    using ModCurves = std::array<mod::Curve, modCurveCount>;
+    static ModCurves defaultModulationCurves();
+    /** "c3:" + nine curves; "c2:" (six: before DAMPEN) and "c1:" (four: before VEL and NOTE)
+        still read, the curves they lack at their defaults. */
+    static juce::String encodeModulationCurves (const ModCurves& curves);
+    static std::optional<ModCurves> decodeModulationCurves (const juce::String& text);
     /** A route from `source` to `dest` in the first free slot (or the slot already joining
         them); returns the slot, or -1 when all 16 are taken. One undo step. */
     int addModulationRoute (mod::Source source, mod::Dest dest, float depthPercent);
@@ -217,6 +229,12 @@ public:
         source never reaches a shared stage). */
     bool canModulate (mod::Source source, mod::Dest dest) const;
     InstrumentEngine::ModView modulationView() const noexcept { return engine.modulationView(); }
+    /** The CC 1-4 sources' controller numbers (0..119; default 2, 11, 16, 17), saved with the
+        session. Learn: the next controller that moves is taken for the slot (-1: none). */
+    int modControllerNumber (int slot) const noexcept;
+    void setModControllerNumber (int slot, int controller) noexcept;
+    void learnModController (int slot) noexcept { modCcLearn.store (slot >= 0 && slot < mod::ccSlots ? slot : -1, std::memory_order_release); }
+    int learningModController() const noexcept { return modCcLearn.load (std::memory_order_acquire); }
 
     /** The arpeggiator's choices, in parameter order (never reorder: sessions store indices). */
     static const juce::StringArray& arpPatternNames();
@@ -348,6 +366,21 @@ public:
     static constexpr int velocityHistory = 16;
     std::array<std::atomic<int>, velocityHistory> recentVelocity {};
     std::atomic<int> velocityCount { 0 };
+    /** The last played note (the NOTE tab's marker; -1 before the first). */
+    std::atomic<int> lastPlayedNote { -1 };
+
+    /** APPLY TO AMP: the VEL curve sets the amplitude's velocity response in place of
+        DYNAMICS' curve (one curve, never both). Saved with the session; on by default (older
+        sessions get their DYNAMICS curve as the VEL curve: they sound as they did). */
+    bool velocityAppliesToAmp() const noexcept { return velToAmp.load (std::memory_order_relaxed); }
+    void setVelocityAppliesToAmp (bool on) noexcept;
+    /** ARP RATE's modulation: Stepped keeps to musical ratios (1/2, 2/3, 1, 3/2, 2, ...) and
+        changes at the next step; smooth (the default) follows the source. Saved with the
+        session. */
+    bool arpRateIsStepped() const noexcept { return arpRateStepped.load (std::memory_order_relaxed); }
+    void setArpRateStepped (bool stepped) noexcept { arpRateStepped.store (stepped, std::memory_order_relaxed); }
+    /** The ratio Stepped plays for a multiplier (the nearest of 1/4 .. 4, by octaves). */
+    static double steppedArpRatio (double multiplier) noexcept;
 
     /** The on-screen wheels (message thread -> audio thread): pitch -1..1 (springs back), mod 0..1. */
     void setScreenPitchWheel (float value) noexcept { screenPitch = std::clamp (value, -1.0f, 1.0f); }
@@ -420,8 +453,15 @@ public:
             room is not filtered where it never was), ECHO (off in older sessions) and the
             SHAPER's CUSTOM pattern (`shaperCustom`). */
     /** 11: full-range modulation (100 % depth covers a destination's whole knob; older
-            sessions' depths are scaled so they sound the same: migrateModulationDepths). */
-    static constexpr int stateVersion = 11;
+            sessions' depths are scaled so they sound the same: migrateModulationDepths).
+        12: the final modulation system: the sources VEL, NOTE, CC 1-4 and PRESSURE (appended),
+            the curves as "c3" (VEL, NOTE, DAMPEN A-C), APPLY TO AMP (`velToAmp`; absent: on,
+            the session's DYNAMICS curve as the VEL curve), the CC slots' controllers
+            (`modControllers`), the panel's six tabs (`modTabs`), ARP RATE Stepped
+            (`arpRateStepped`), ARP VELOCITY and DAMPEN (parameters, hint 19; absent: 100 %,
+            off). Every addition reads its default from an older session, so nothing there is
+            migrated beyond the VEL curve and the panel's tab. */
+    static constexpr int stateVersion = 12;
 
     /** SHAPER CUSTOM: the musician's 16 steps (message thread). Kept in the session and
         presets; setting it is undoable (one gesture = one transaction, see UndoManager). */
@@ -586,6 +626,7 @@ private:
     std::atomic<float>* arpRateParam = nullptr;
     std::atomic<float>* arpGateParam = nullptr;
     std::atomic<float>* arpOctavesParam = nullptr;
+    std::atomic<float>* arpVelocityParam = nullptr;
     std::atomic<float>* arpSwingParam = nullptr;
     // MODULATION's parameters, its curves (message thread, customLock) and their tables
     // for the audio thread (atomics + generation, as SHAPER CUSTOM's steps).
@@ -609,8 +650,8 @@ private:
     void valueTreeRedirected (juce::ValueTree&) override;
     std::array<float, numModValues> lastModValues {};
     mod::Settings modSettings;   ///< the audio thread's working copy (built in place, never allocated)
-    std::array<mod::Curve, 4> modCurves {};
-    std::array<std::atomic<float>, 4 * mod::curvePoints> modCurveValues {};
+    ModCurves modCurves {};
+    std::array<std::atomic<float>, modCurveCount * mod::curvePoints> modCurveValues {};
     std::atomic<std::uint32_t> modCurveGeneration { 1 };
     std::uint32_t appliedModCurveGeneration = 0;
     void publishModulationCurves() noexcept;
@@ -638,6 +679,10 @@ private:
         std::array<std::atomic<float>*, 19> eq {};   ///< in eqParameterNames() order
         std::array<float, 19> lastEq {};
         eq::Settings eqSettings;
+        std::array<std::atomic<float>*, 5> dampen {};   ///< in dampenParameterNames() order
+        std::array<float, 5> lastDampen {};
+        std::uint32_t dampenGeneration = 0;
+        dampen::Settings dampenSettings;
     };
     std::atomic<float>* mixXParam = nullptr;
     std::atomic<float>* mixYParam = nullptr;
@@ -667,6 +712,13 @@ private:
     void publishCustomPattern() noexcept;
     float modWheel = 0.0f;
     std::atomic<float> wheelShown { 0.0f };
+    std::array<std::atomic<int>, mod::ccSlots> modCcNumber {};
+    std::atomic<bool> velToAmp { true };
+    std::atomic<bool> arpRateStepped { false };
+    int arpModOctaves = 0;   ///< audio thread: OCTAVES by modulation, after hysteresis (0: none)
+    void applyArpModulation (Arpeggiator::Settings& settings) noexcept;
+    int shownDynamicsCurve = 1;   ///< DYNAMICS' curve as last followed (message thread): moving it sets the VEL curve
+    std::atomic<int> modCcLearn { -1 };
     std::atomic<float> screenPitch { 0.0f }, screenMod { 0.0f };
     float lastScreenPitch = 0.0f, lastScreenMod = 0.0f;
     bool presetIsProgram = true;   ///< the header shows the starting state until a preset file is opened

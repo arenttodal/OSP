@@ -359,14 +359,35 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [x] Layer knobs: each name sits as far above the dial's tick dots as the value sits below
       the lowest ones (the knob component grows upwards by `LayerKnob::labelLift`; dial and
       value unchanged). The MACROS title is gone from the macro panel.
+- [x] CERAMIC SKIN (direction 09 Warm Ceramic + Teak, built into the plugin; style guide and spec
+      docs/design/warm-ceramic-teak-style-guide.md): rendered pieces (tools/blender-assets/skin,
+      from the design lab's own config: housing + teak cheeks, cards at the three layout widths,
+      D3 panels, A1 keys per role and state, badges, C1 fader cap on the T3 rail, lens LEDs,
+      display bezels, keybed recess) nine-sliced by `skin::Pieces` (CeramicSkin) at the physical
+      scale; keys and cards drawn by the surface below so their shadows fall there; B1 tabs; all
+      six macros rendered by default. Classic stays (Cmd+Option+G, OSP_SKIN=classic). Tests
+      [ceramic]; hidden screenshots [ceramic-shots].
 - [ ] DESIGN LAB round 1 (design-lab/, exploration only, nothing integrated): Blender-rendered
       surfaces composited under the plugin's own drawing; 6 full-GUI directions, button/tab/
       fader/panel/background/detail studies, close-ups, actual-size tests, review gallery,
       reports (design-lab/review/). Round 2 chosen: 09 Warm Ceramic + Teak (C1 fader on T3,
       lens LEDs, painted divider); style guide and build spec in
-      docs/design/warm-ceramic-teak-style-guide.md; implementation in progress.
-- [ ] FINAL MODULATION SYSTEM + DAMPEN (queued spec, stages 0-10): Stage 0 audit done
-      (docs/reports/mod-final-audit.md); implementation next.
+      docs/design/warm-ceramic-teak-style-guide.md; built (CERAMIC SKIN above).
+- [ ] FINAL MODULATION SYSTEM + DAMPEN (queued spec, stages 0-10; design
+      docs/reports/mod-final.md): Stage 0 audit done (docs/reports/mod-final-audit.md).
+      Stages 1-4 done: sources VEL, NOTE, CC 1-4 and PRESSURE appended (VEL and NOTE per note,
+      the shared stages following the player's latest key, also behind the arpeggiator);
+      six tabs AMP | ENV | LFO 1 | LFO 2 | VEL | NOTE (ENV 2 legacy: no tab, its routes still
+      work and show; older sessions' tab migrated); VEL and NOTE curves with presets, the
+      played-key marker and APPLY TO AMP (older sessions keep their DYNAMICS response
+      exactly; `dynamics.curve` sets the VEL curve when moved); curves saved as "c2"; CC 1-4
+      follow controllers 2, 11, 16, 17 by default, chosen or learned from any control's
+      right-click menu (MIDI Controllers), saved with the session. Stage 5 done: ARP RATE
+      (phase-accumulator clock, smooth or Stepped), GATE, SWING, OCTAVES (next cycle) and the
+      new ARP VELOCITY as destinations. Stage 6 done (DSP, editor, destinations): DAMPEN per
+      layer and voice (Soft Shelf / Low-Pass by key, EQ | DAMPEN page), off by default.
+      Stage 7: state 12. Still open: the resampling audit, CPU measurements, scenarios A-J,
+      screenshots (docs/reports/mod-final.md, Results). Tests [mod-final], [dampen].
 - [x] `plugin-pipeline/`: the build-and-download pipeline as a reusable kit for other JUCE
       plug-ins (`adopt.sh` for an existing repo, `new-plugin.sh` + starter for a new one, a fixed
       download link per branch); self-tested on macOS and Windows by its own workflow.

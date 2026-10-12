@@ -135,7 +135,9 @@ namespace layout
     // Header
     const juce::Point<float> logo { 51.0f, 79.0f };            ///< baseline of ANDOR/OSP
     const R logoSubtitle { 51.0f, 88.0f, 300.0f, 14.0f };
-    const R presetBar { 501.0f, 45.0f, 446.0f, 48.0f };
+    const R presetBar { 501.0f, 45.0f, 394.0f, 48.0f };
+    /** SAVE (the cassette) right of the preset bar, the bar's height. */
+    const R savePreset { 903.0f, 45.0f, 44.0f, 48.0f };
     /** MIX between the preset and VOLUME (two or three layers; nothing for one). */
     const R headerMix { 966.0f, 23.0f, 164.0f, 88.0f };
     /** Master volume: a thin utility slider (VOLUME and its value above the track). */
@@ -209,10 +211,15 @@ private:
 
 namespace draw
 {
+    /** The colour around the instrument when the window's shape differs from the layout's. */
+    juce::Colour surround();
     /** The housing: the instrument's body on its surround, with a broad quiet shadow. */
     void housing (juce::Graphics&, juce::Rectangle<float> bounds);
     /** A raised card or panel: soft contact shadow, vertical light, 1 px lit top edge. */
     void raised (juce::Graphics&, juce::Rectangle<float> r, float radius, juce::Colour top, juce::Colour bottom, float shadow = 1.0f);
+    /** Ceramic: the raised face of every visible child of `parent` that is a
+        skin::SurfaceFace, at its bounds (classic: nothing; each draws its own). */
+    void raisedChildren (juce::Graphics&, juce::Component& parent);
     /** A recessed dark display: inner shadow under its top edge, a faint lower reflection. */
     void well (juce::Graphics&, juce::Rectangle<float> r, float radius, juce::Colour fill);
     /** A small raised control face (buttons, the mode selector, the preset bar). */
