@@ -26,6 +26,9 @@ enum class DropAsk
     always
 };
 
+/** The rule: a drop asks only with Cmd (Ctrl on Windows) held, unless `ask` decides. */
+bool dropAsks (DropAsk ask, juce::ModifierKeys modifiers) noexcept;
+
 /**
     Files dropped (or chosen) for a pad. Without asking, the default just happens: one file
     replaces the pad's sound, several become round robins (or `preferred`). Asking (Cmd held

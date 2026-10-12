@@ -2218,6 +2218,16 @@ TEST_CASE ("Per-pad modulation: the MODULATION card's tabs edit the selected pad
 
 TEST_CASE ("Dropping a sample on a pad replaces it at once; only Cmd asks", "[drums-plugin][ui]")
 {
+    using osp::drumsplugin::DropAsk;
+    using osp::drumsplugin::dropAsks;
+    // The rule: only Cmd (Ctrl on Windows) held asks.
+    CHECK_FALSE (dropAsks (DropAsk::fromModifiers, juce::ModifierKeys()));
+    CHECK_FALSE (dropAsks (DropAsk::fromModifiers, juce::ModifierKeys (juce::ModifierKeys::shiftModifier | juce::ModifierKeys::altModifier)));
+    CHECK (dropAsks (DropAsk::fromModifiers, juce::ModifierKeys (juce::ModifierKeys::commandModifier)));
+    CHECK (dropAsks (DropAsk::always, juce::ModifierKeys()));
+    CHECK_FALSE (dropAsks (DropAsk::never, juce::ModifierKeys (juce::ModifierKeys::commandModifier)));
+
+    // Without asking the default just happens (on the editor's pad grid).
     const juce::ScopedJuceInitialiser_GUI gui;
     TempDir tmp;
     const ScopedStore store (tmp.dir.getChildFile ("store"));
@@ -2225,30 +2235,20 @@ TEST_CASE ("Dropping a sample on a pad replaces it at once; only Cmd asks", "[dr
     p.prepareToPlay (rate, 256);
     loadNine (p, tmp);
     auto editor = openEditor (p);
-    editor->addToDesktop (0);   // a real window: a menu could open
-    REQUIRE (editor->getPeer() != nullptr);
     auto& target = editor->content().padGrid();
 
-    // No modifier: the new sample replaces the kick, no menu.
-    const auto fresh = writeDrum (tmp.dir, "NewKick.wav", 70.0, 0.4);
-    osp::drumsplugin::offerLayerDrop (p, 0, { fresh }, &target);
-    CHECK_FALSE (juce::PopupMenu::dismissAllActiveMenus());
+    // One file replaces the kick.
+    osp::drumsplugin::offerLayerDrop (p, 0, { writeDrum (tmp.dir, "NewKick.wav", 70.0, 0.4) }, &target, std::nullopt, DropAsk::never);
     REQUIRE (p.waitForLoads());
     REQUIRE (p.padLayers (0).layers.size() == 1);
     CHECK (p.padLayers (0).layers[0].fileName().find ("NewKick") != std::string::npos);
 
-    // Several files: round robins, still no menu.
-    osp::drumsplugin::offerLayerDrop (p, 1, { writeDrum (tmp.dir, "S1.wav", 200.0, 0.3), writeDrum (tmp.dir, "S2.wav", 210.0, 0.3) }, &target);
-    CHECK_FALSE (juce::PopupMenu::dismissAllActiveMenus());
+    // Several files become round robins.
+    osp::drumsplugin::offerLayerDrop (p, 1, { writeDrum (tmp.dir, "S1.wav", 200.0, 0.3), writeDrum (tmp.dir, "S2.wav", 210.0, 0.3) }, &target, std::nullopt,
+                                      DropAsk::never);
     REQUIRE (p.waitForLoads());
     CHECK (p.padLayers (1).layers.size() == 3);   // added to the snare's own sample
     CHECK (p.padLayers (1).mode == drums::LayerMode::roundRobin);
-
-    // Asking (Cmd held): the menu opens and nothing changes until a choice.
-    osp::drumsplugin::offerLayerDrop (p, 2, { writeDrum (tmp.dir, "H.wav", 900.0, 0.2) }, &target, std::nullopt, osp::drumsplugin::DropAsk::always);
-    CHECK (juce::PopupMenu::dismissAllActiveMenus());
-    CHECK (p.padLayers (2).layers.size() == 1);
-    editor->removeFromDesktop();
 }
 
 int main (int argc, char* argv[])

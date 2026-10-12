@@ -44,6 +44,11 @@ juce::PopupMenu duplicateMenu (DrumsProcessor& proc, int pad, std::function<void
     return m;
 }
 
+bool dropAsks (DropAsk ask, juce::ModifierKeys modifiers) noexcept
+{
+    return ask == DropAsk::always || (ask == DropAsk::fromModifiers && modifiers.isCommandDown());
+}
+
 void offerLayerDrop (DrumsProcessor& proc, int pad, const juce::Array<juce::File>& dropped, juce::Component* target, std::optional<LayerDrop> preferred,
                      DropAsk ask)
 {
@@ -56,7 +61,7 @@ void offerLayerDrop (DrumsProcessor& proc, int pad, const juce::Array<juce::File
     const bool populated = ! proc.padLayers (pad).layers.empty();
     const auto fallback = preferred.value_or (defaultLayerDrop (files.size()));
     // A drop never interrupts: the default happens, unless Cmd is held to choose.
-    const bool asking = ask == DropAsk::always || (ask == DropAsk::fromModifiers && juce::ModifierKeys::getCurrentModifiersRealtime().isCommandDown());
+    const bool asking = dropAsks (ask, juce::ModifierKeys::getCurrentModifiersRealtime());
     if (! asking || target == nullptr || target->getPeer() == nullptr)
     {
         proc.addPadLayers (pad, files, fallback);
