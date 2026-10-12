@@ -53,8 +53,14 @@ branch.
       - break slices classified and planned by category;
       - licence review. No model weights are shipped: none is cleared, and CLAUDE.md
         rule 5 applies.
-- [ ] **M8 Integration and polish** (portable kits, MIDI Learn, automation, profiling on a
-      Mac, hosts).
+- [x] **M8 Integration and polish** (`m8-integration.md`). Done:
+      - a zero-allocation proof of processBlock, which found and fixed a per-block
+        allocation;
+      - two instances, sample rates and small buffers, host automation;
+      - measurements for every scenario in 11.5;
+      - voice memory per pad cut from 208 to 48 slots.
+
+      Needs a Mac: worst-case timing and host checks.
 - [ ] **M9 MACHINE prototype** from existing DRIVE / CHARACTER / ECHO first.
 
 ## Needs the user

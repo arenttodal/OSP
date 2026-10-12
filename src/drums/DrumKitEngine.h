@@ -64,7 +64,7 @@ struct PadSettings
     VoiceMode voiceMode = VoiceMode::poly;
     TriggerMode trigger = TriggerMode::oneShot;
     int chokeGroup = 0;             ///< 0 = none, 1..8: a hit fades the group's other pads
-    int polyphony = 12;             ///< voices for this pad (1..64)
+    int polyphony = 12;             ///< voices for this pad (1..24: half its voice slots)
     AdsrSettings adsr { 0.0005, 0.0, 1.0, 0.12 };
     /** The pad's own LIFE, DYNAMICS, CHARACTER and REIMAGINED; below 0 = the kit's. */
     double life = -1.0, dynamics = -1.0, character = -1.0, reimagined = -1.0;
@@ -161,6 +161,7 @@ public:
     /** For tests and diagnostics: the pad's OSP engine. */
     const InstrumentEngine& padEngine (int pad) const noexcept { return *engines[index (pad)]; }
     static constexpr int engineNoteOffset = 60;
+    static constexpr int voiceSlotsPerPad = 48;
 
 private:
     static std::size_t index (int pad) noexcept { return static_cast<std::size_t> (std::clamp (pad, 0, maxPads - 1)); }

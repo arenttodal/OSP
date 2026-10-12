@@ -67,8 +67,10 @@ PadSettings PadSettings::defaultsFor (DrumCategory category)
 
 DrumKitEngine::DrumKitEngine()
 {
+    // A pad plays up to its polyphony (12) on one layer; 48 slots leave room for stacked
+    // layers and the fade-outs of fast retriggers (OSP's 208 would cost 36 MB per kit).
     for (auto& e : engines)
-        e = std::make_unique<InstrumentEngine>();
+        e = std::make_unique<InstrumentEngine> (voiceSlotsPerPad);
     for (auto& row : started)
         row.fill (-1);
 }
@@ -90,7 +92,7 @@ void DrumKitEngine::prepare (double rate, int maximumBlockSize, const KitSetting
         s.postStage = false;                                 // ONE shared post stage for the kit
         s.reimaginedRouting = ReimaginedRouting::perLayer;   // each pad's REIMAGINED is its own
         s.outputGainDb = 0.0;                                // pad gain and kit volume are applied here
-        s.polyphony = std::clamp (ps.polyphony, 1, EngineSettings::maxPolyphony);
+        s.polyphony = std::clamp (ps.polyphony, 1, voiceSlotsPerPad / 2);   // half the slots: the rest are fading tails
         s.adsr = ps.adsr;
         s.macros = padMacros (p);
         s.shaping = kit.shaping;

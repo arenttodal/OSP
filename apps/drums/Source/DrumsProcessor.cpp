@@ -50,6 +50,16 @@ DrumsProcessor::DrumsProcessor()
 {
     for (int p = 0; p < numPads; ++p)
         factoryPad (p);
+    rawKeyboardMode = apvts.getRawParameterValue ("keyboardMode");
+    for (std::size_t k = 0; k < rawKit.size(); ++k)
+        rawKit[k] = apvts.getRawParameterValue (kitIds[k]);
+    for (int p = 0; p < numPads; ++p)
+    {
+        auto& r = rawPad[index (p)];
+        auto get = [this, p] (const char* name) { return apvts.getRawParameterValue (padParamId (p, name)); };
+        r = { get ("gain"), get ("pan"), get ("tune"), get ("start"), get ("attack"), get ("decay"), get ("sustain"), get ("release"),
+              get ("mute"), get ("solo"), get ("reverse") };
+    }
     for (auto& r : retired)
         r.fill (nullptr);
     for (auto& l : lastLayer)
@@ -302,11 +312,12 @@ void DrumsProcessor::pullKeyMap() noexcept
 
 void DrumsProcessor::pullSettings() noexcept
 {
-    engine.setKeyboardMode (raw (apvts, "keyboardMode") > 0.5f ? drums::KeyboardMode::expanded : drums::KeyboardMode::pad);
+    auto v = [] (const std::atomic<float>* a) { return static_cast<double> (a->load (std::memory_order_relaxed)); };
+    engine.setKeyboardMode (v (rawKeyboardMode) > 0.5 ? drums::KeyboardMode::expanded : drums::KeyboardMode::pad);
 
     std::array<double, 8> kit {};
     for (std::size_t k = 0; k < kit.size(); ++k)
-        kit[k] = raw (apvts, kitIds[k]);
+        kit[k] = v (rawKit[k]);
     if (! kitPulled || kit != pulledKit)
     {
         pulledKit = kit;
@@ -327,17 +338,18 @@ void DrumsProcessor::pullSettings() noexcept
     {
         auto& c = pulled[index (p)];
         Pulled now = c;
-        now.gain = raw (apvts, padParamId (p, "gain"));
-        now.pan = raw (apvts, padParamId (p, "pan"));
-        now.tune = raw (apvts, padParamId (p, "tune"));
-        now.start = raw (apvts, padParamId (p, "start"));
-        now.attack = raw (apvts, padParamId (p, "attack"));
-        now.decay = raw (apvts, padParamId (p, "decay"));
-        now.sustain = raw (apvts, padParamId (p, "sustain"));
-        now.release = raw (apvts, padParamId (p, "release"));
-        now.mute = raw (apvts, padParamId (p, "mute")) > 0.5f;
-        now.solo = raw (apvts, padParamId (p, "solo")) > 0.5f;
-        now.reverse = raw (apvts, padParamId (p, "reverse")) > 0.5f;
+        const auto& r = rawPad[index (p)];
+        now.gain = v (r.gain);
+        now.pan = v (r.pan);
+        now.tune = v (r.tune);
+        now.start = v (r.start);
+        now.attack = v (r.attack);
+        now.decay = v (r.decay);
+        now.sustain = v (r.sustain);
+        now.release = v (r.release);
+        now.mute = v (r.mute) > 0.5;
+        now.solo = v (r.solo) > 0.5;
+        now.reverse = v (r.reverse) > 0.5;
         if (now == c)
             continue;
         c = now;

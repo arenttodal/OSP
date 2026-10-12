@@ -1,5 +1,14 @@
 # ANDOR Drums — version history
 
+## 0.1.7 (unreleased, branch drum-plugin): integration
+
+- **Fix:** the audio callback no longer allocates. Parameter values were looked up by
+  building strings on every block; they are now looked up once.
+- **Less memory:** about 28 MB less per instance (48 voice slots per pad instead of 208), and
+  a quarter of the idle CPU.
+- **Tests:** a zero-allocation guard, two instances, sample rates and small buffers, host
+  automation, and the performance table.
+
 ## 0.1.6 (unreleased, branch drum-plugin): smart classification and import
 
 - **Drop a folder's worth of samples.** IMPORT SAMPLES suggests a category (from the name

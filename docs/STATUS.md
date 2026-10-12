@@ -401,7 +401,13 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       - categories for break slices;
       - licence review (no weights shipped).
 
-      Next: integration and polish (M8).
+      M8 integration (docs/drums/m8-integration.md):
+      - a zero-allocation processBlock guard, which found and fixed a per-block bug;
+      - voice slots per pad 208 → 48;
+      - measurements;
+      - instances, sample rates, automation.
+
+      Next: the MACHINE prototype (M9).
 
 ## DONE
 

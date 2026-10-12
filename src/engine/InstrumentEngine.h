@@ -160,6 +160,10 @@ class InstrumentEngine
 {
 public:
     InstrumentEngine();
+    /** An engine with its own number of voice slots (ANDOR Drums: a pad needs far fewer than
+        OSP's three layers). Fewer slots only mean earlier stealing; OSP uses the default. */
+    explicit InstrumentEngine (int voiceSlotCount);
+    int voiceSlotCount() const noexcept { return static_cast<int> (voices.size()); }
 
     void prepare (double outputSampleRate, int maximumBlockSize, const EngineSettings& settings);
 

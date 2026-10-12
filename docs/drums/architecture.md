@@ -172,10 +172,9 @@ remembered. It is never substituted.
 The cost per playing voice is OSP's voice (about 25–30 µs per 256-sample block here). The
 idle cost of nine engines is about 1 %.
 
-**Memory:** 9 × 208 voice slots × 19 KB ≈ 36 MB of preallocated voices. Drums use at most
-12 + 16 slots per pad, so an additive `EngineSettings` voice-slot count could cut this to
-about 5 MB. Not done yet, because it changes `InstrumentEngine`'s allocation and needs its
-own OSP regression run.
+**Memory:** OSP allocates 9 × 208 voice slots × 19 KB ≈ 36 MB of preallocated voices. Since
+M8, Drums constructs each pad's engine with 48 slots (`InstrumentEngine (int)`, an inert
+addition; OSP keeps its default), about 8 MB per kit. See `m8-integration.md`.
 
 ## 6. Editor (V1.1)
 

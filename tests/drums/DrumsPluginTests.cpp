@@ -15,9 +15,58 @@
 #include <catch2/catch_session.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <atomic>
+#if ! JUCE_WINDOWS
+ #include <execinfo.h>
+#endif
+#include <chrono>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
+#include <fstream>
+#include <new>
 #include <set>
+
+namespace
+{
+    // Allocations made on THIS thread while `countHere` is set: processBlock must make none
+    // (CLAUDE.md rule 1). Other threads (the loader) allocate freely meanwhile.
+    thread_local bool countHere = false;
+    std::atomic<int> audioAllocations { 0 };
+}
+
+#if defined(__GNUC__) && ! defined(__clang__)
+ #pragma GCC diagnostic push
+ #pragma GCC diagnostic ignored "-Wmismatched-new-delete"   // a false positive on replaced operators
+#endif
+void* operator new (std::size_t size)
+{
+    if (countHere)
+    {
+        if (audioAllocations.fetch_add (1, std::memory_order_relaxed) == 0 && std::getenv ("ALLOC_TRACE") != nullptr)
+        {
+#if ! JUCE_WINDOWS
+            // Where the first one comes from (ALLOC_TRACE=1; addr2line the addresses).
+            countHere = false;
+            void* frames[40];
+            const int n = backtrace (frames, 40);
+            backtrace_symbols_fd (frames, n, 2);
+            countHere = true;
+#endif
+        }
+    }
+    if (void* p = std::malloc (size == 0 ? 1 : size))
+        return p;
+    throw std::bad_alloc();
+}
+void operator delete (void* p) noexcept { std::free (p); }
+void operator delete (void* p, std::size_t) noexcept { std::free (p); }
+void* operator new[] (std::size_t size) { return operator new (size); }
+void operator delete[] (void* p) noexcept { operator delete (p); }
+void operator delete[] (void* p, std::size_t) noexcept { operator delete (p); }
+#if defined(__GNUC__) && ! defined(__clang__)
+ #pragma GCC diagnostic pop
+#endif
 
 using namespace osp;
 using osp::drumsplugin::DrumsProcessor;
@@ -1584,6 +1633,298 @@ TEST_CASE ("Import view: opens with the session; split, move, group and destinat
     content.syncBreakView();
     CHECK_FALSE (view.isVisible());
     CHECK (content.samplePanel().isVisible());
+}
+
+namespace
+{
+    /** processBlock with the given events, counting this thread's allocations inside it. */
+    void block (DrumsProcessor& p, juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
+    {
+        buffer.clear();
+        countHere = true;
+        p.processBlock (buffer, midi);
+        countHere = false;
+    }
+} // namespace
+
+TEST_CASE ("Real-time: processBlock never allocates, whatever happens around it", "[drums-plugin][realtime]")
+{
+    TempDir tmp;
+    const ScopedStore store (tmp.dir.getChildFile ("store"));
+    DrumsProcessor p;
+    p.prepareToPlay (rate, 256);
+    loadNine (p, tmp);
+    p.addPadLayers (0, { writeDrum (tmp.dir, "K2.wav", 120.0, 0.4), writeDrum (tmp.dir, "K3.wav", 130.0, 0.4), writeDrum (tmp.dir, "K4.wav", 140.0, 0.4) },
+                    drumsplugin::LayerDrop::roundRobin);
+    REQUIRE (p.waitForLoads());
+    p.parameters().getParameter ("kit.space")->setValueNotifyingHost (0.5f);
+    p.parameters().getParameter ("kit.echo")->setValueNotifyingHost (0.5f);
+    p.parameters().getParameter ("kit.drive")->setValueNotifyingHost (0.4f);
+    p.parameters().getParameter ("kit.motion")->setValueNotifyingHost (0.4f);
+    juce::AudioBuffer<float> buffer (2, 256);
+    juce::MidiBuffer midi;
+    midi.ensureSize (4096);
+    // Warm up (the first hits of each pad).
+    for (int b = 0; b < 8; ++b)
+        block (p, buffer, midi);
+    audioAllocations = 0;
+
+    Prng rng (5);
+    const auto loadWhilePlaying = writeDrum (tmp.dir, "New.wav", 300.0, 0.3);
+    const auto breakFile = writeBreak (tmp.dir, "Break.wav", 8);
+    for (int b = 0; b < 600; ++b)
+    {
+        midi.clear();
+        // Dense playing: several notes per block on every pad, offs, the pedal.
+        for (int k = 0; k < 6; ++k)
+        {
+            const int pad = static_cast<int> (rng.nextBelow (9));
+            const int note = p.keyMap().padNote[static_cast<std::size_t> (pad)];
+            const int at = static_cast<int> (rng.nextBelow (256));
+            midi.addEvent (juce::MidiMessage::noteOn (10, note, static_cast<juce::uint8> (20 + rng.nextBelow (107))), at);
+            if (rng.nextBelow (3) == 0)
+                midi.addEvent (juce::MidiMessage::noteOff (10, note), std::min (255, at + 30));
+        }
+        if (b % 40 == 0)
+            midi.addEvent (juce::MidiMessage::controllerEvent (1, 64, b % 80 == 0 ? 127 : 0), 10);
+        block (p, buffer, midi);
+
+        // Meanwhile on the message thread (outside the counted call).
+        switch (b)
+        {
+            case 50: p.setKeyboardMode (drums::KeyboardMode::expanded); break;
+            case 90: p.setKeyboardMode (drums::KeyboardMode::pad); break;
+            case 120:
+            {
+                auto params = p.padLayers (0).layers[1].params;
+                params.gainDb = -4.0;
+                params.end = 0.5;
+                p.setLayerParams (0, 1, params);   // a new bundle reaches the audio thread
+                break;
+            }
+            case 150: p.auditionPad (3, 100); break;
+            case 160: p.auditionLayer (0, 2, 90); break;
+            case 200: p.loadPad (5, loadWhilePlaying); break;   // a load while playing
+            case 260: p.importBreak (breakFile); break;          // analysis while playing
+            case 300: p.setLayerMode (0, drums::LayerMode::stack); break;
+            case 340: p.clearPad (7); break;
+            case 380: p.undoManager().undo(); break;
+            case 420: p.auditionSlice (2); break;                // the slice preview mixes in
+            case 470: p.duplicatePad (1, 7); break;
+            default: break;
+        }
+        if (b % 25 == 0)
+            p.waitForLoads (1);   // the timer's work: publish finished loads
+    }
+    REQUIRE (p.waitForLoads());
+    for (int b = 0; b < 40; ++b)
+        block (p, buffer, midi);
+    CHECK (audioAllocations.load() == 0);
+
+    // Small buffers and other sample rates: the same, and it still plays.
+    for (const double sr : { 44100.0, 96000.0 })
+        for (const int size : { 16, 64, 1024 })
+        {
+            p.prepareToPlay (sr, size);
+            juce::AudioBuffer<float> small (2, size);
+            juce::MidiBuffer m;
+            m.ensureSize (256);
+            block (p, small, m);
+            audioAllocations = 0;
+            double energy = 0.0;
+            for (int b = 0; b < 4096 / size + 8; ++b)
+            {
+                m.clear();
+                if (b == 1)
+                    m.addEvent (juce::MidiMessage::noteOn (10, p.keyMap().padNote[1], static_cast<juce::uint8> (110)), 0);
+                block (p, small, m);
+                energy += small.getRMSLevel (0, 0, size);
+            }
+            INFO (sr << " Hz, " << size << " samples");
+            CHECK (audioAllocations.load() == 0);
+            CHECK (energy > 0.0);
+        }
+}
+
+TEST_CASE ("Two instances are independent (state, sound, sample store shared safely)", "[drums-plugin][realtime]")
+{
+    TempDir tmp;
+    const ScopedStore store (tmp.dir.getChildFile ("store"));
+    DrumsProcessor a, b;
+    a.prepareToPlay (rate, 256);
+    b.prepareToPlay (rate, 256);
+    a.loadPad (0, writeDrum (tmp.dir, "A.wav", 110.0, 0.4));
+    b.loadPad (0, writeDrum (tmp.dir, "B.wav", 330.0, 0.4));
+    REQUIRE (a.waitForLoads());
+    REQUIRE (b.waitForLoads());
+    b.setPadName (0, "Other");
+    b.parameters().getParameter ("kit.space")->setValueNotifyingHost (0.8f);
+    a.prepareToPlay (rate, 256);
+    const auto alone = play (a, { 36 }, 0.3);
+    // Interleaved with a busy second instance: A sounds exactly the same.
+    a.prepareToPlay (rate, 256);
+    b.prepareToPlay (rate, 256);
+    std::vector<float> together;
+    juce::AudioBuffer<float> ba (2, 256), bb (2, 256);
+    for (int pos = 0; pos < static_cast<int> (0.3 * rate); pos += 256)
+    {
+        juce::MidiBuffer ma, mb;
+        if (pos == 0)
+            ma.addEvent (juce::MidiMessage::noteOn (10, 36, static_cast<juce::uint8> (100)), 0);
+        mb.addEvent (juce::MidiMessage::noteOn (10, 36, static_cast<juce::uint8> (100)), 0);
+        ba.clear();
+        bb.clear();
+        a.processBlock (ba, ma);
+        b.processBlock (bb, mb);
+        const int n = std::min (256, static_cast<int> (0.3 * rate) - pos);
+        together.insert (together.end(), ba.getReadPointer (0), ba.getReadPointer (0) + n);
+    }
+    CHECK (together == alone);
+    CHECK (a.padDisplayName (0) != b.padDisplayName (0));
+    CHECK (a.padInfo (0).sound->contentHash != b.padInfo (0).sound->contentHash);
+}
+
+TEST_CASE ("Host automation: every pad and kit parameter reaches the sound smoothly", "[drums-plugin][realtime]")
+{
+    TempDir tmp;
+    const ScopedStore store (tmp.dir.getChildFile ("store"));
+    DrumsProcessor p;
+    p.prepareToPlay (rate, 256);
+    p.loadPad (0, writeDrum (tmp.dir, "A.wav", 220.0, 1.0));
+    REQUIRE (p.waitForLoads());
+    // Every parameter is automatable and named for the host.
+    int count = 0;
+    for (auto* param : p.getParameters())
+    {
+        CHECK (param->isAutomatable());
+        CHECK (param->getName (64).isNotEmpty());
+        ++count;
+    }
+    CHECK (count == 1 + 8 + 9 * 11);   // keyboard mode, kit, 11 per pad
+    // Gain automation during a held note: no jump larger than 10 ms of ramp allows.
+    juce::AudioBuffer<float> buffer (2, 256);
+    juce::MidiBuffer midi;
+    midi.addEvent (juce::MidiMessage::noteOn (10, 36, static_cast<juce::uint8> (100)), 0);
+    std::vector<float> out;
+    for (int b = 0; b < 40; ++b)
+    {
+        if (b == 12)
+            p.parameters().getParameter (DrumsProcessor::padParamId (0, "gain"))->setValueNotifyingHost (0.0f);   // -60 dB: silent
+        buffer.clear();
+        p.processBlock (buffer, midi);
+        midi.clear();
+        out.insert (out.end(), buffer.getReadPointer (0), buffer.getReadPointer (0) + 256);
+    }
+    // Before: sounding; after the ramp: silent; never a step bigger than the sound itself.
+    double before = 0.0, after = 0.0, worstStep = 0.0;
+    for (std::size_t i = 256 * 8; i < 256 * 12; ++i)
+        before += std::abs (out[i]);
+    for (std::size_t i = 256 * 20; i < 256 * 24; ++i)
+        after += std::abs (out[i]);
+    for (std::size_t i = 256 * 12 + 1; i < 256 * 16; ++i)
+        worstStep = std::max (worstStep, static_cast<double> (std::abs (out[i] - out[i - 1])));
+    CHECK (before > 0.1);
+    CHECK (after < 1.0e-4);
+    CHECK (worstStep < 0.1);
+}
+
+TEST_CASE ("Performance: callback time across the spec's scenarios (11.5)", "[.][perf]")
+{
+    TempDir tmp;
+    const ScopedStore store (tmp.dir.getChildFile ("store"));
+    auto rss = [] {
+        std::ifstream f ("/proc/self/status");
+        std::string line;
+        while (std::getline (f, line))
+            if (line.rfind ("VmRSS:", 0) == 0)
+                return std::stod (line.substr (6)) / 1024.0;
+        return 0.0;
+    };
+    const double rssStart = rss();
+    DrumsProcessor p, second;
+    const int size = 256;
+    p.prepareToPlay (rate, size);
+    second.prepareToPlay (rate, size);
+    loadNine (p, tmp);
+    p.addPadLayers (1, { writeDrum (tmp.dir, "S2.wav", 820.0, 0.5), writeDrum (tmp.dir, "S3.wav", 840.0, 0.5), writeDrum (tmp.dir, "S4.wav", 860.0, 0.5) },
+                    drumsplugin::LayerDrop::roundRobin);
+    REQUIRE (p.waitForLoads());
+    const double rssLoaded = rss();
+    juce::AudioBuffer<float> buffer (2, size);
+    juce::MidiBuffer midi;
+    midi.ensureSize (4096);
+    const double blockSeconds = size / rate;
+    struct Row
+    {
+        const char* name;
+        double meanUs, worstUs;
+        int voices;
+    };
+    std::vector<Row> rows;
+    auto run = [&] (const char* name, int pads, double hitsPerSecond, bool effects, std::function<void (int)> during = {}, bool two = false) {
+        for (const char* id : { "kit.space", "kit.echo", "kit.drive", "kit.motion" })
+            p.parameters().getParameter (id)->setValueNotifyingHost (effects ? 0.5f : 0.0f);
+        p.prepareToPlay (rate, size);
+        Prng rng (9);
+        double sum = 0.0, worst = 0.0;
+        int peak = 0;
+        const int blocks = static_cast<int> (8.0 / blockSeconds);
+        double due = 0.0;
+        for (int b = 0; b < blocks; ++b)
+        {
+            midi.clear();
+            due += hitsPerSecond * blockSeconds;
+            while (due >= 1.0)
+            {
+                const int pad = static_cast<int> (rng.nextBelow (static_cast<std::uint64_t> (pads)));
+                midi.addEvent (juce::MidiMessage::noteOn (10, p.keyMap().padNote[static_cast<std::size_t> (pad)], static_cast<juce::uint8> (60 + rng.nextBelow (67))),
+                               static_cast<int> (rng.nextBelow (size)));
+                due -= 1.0;
+            }
+            if (during)
+                during (b);
+            buffer.clear();
+            const auto t0 = std::chrono::steady_clock::now();
+            p.processBlock (buffer, midi);
+            if (two)
+            {
+                juce::MidiBuffer m2 (midi);
+                juce::AudioBuffer<float> b2 (2, size);
+                second.processBlock (b2, m2);
+            }
+            const double us = std::chrono::duration<double, std::micro> (std::chrono::steady_clock::now() - t0).count();
+            sum += us;
+            worst = std::max (worst, us);
+            int voices = 0;
+            for (int q = 0; q < 9; ++q)
+                voices += p.padVoices (q);
+            peak = std::max (peak, voices);
+        }
+        rows.push_back ({ name, sum / blocks, worst, peak });
+    };
+    run ("idle, 9 pads loaded", 9, 0.0, false);
+    run ("8 pads, 16ths at 120 (8 hits/s)", 8, 8.0, false);
+    run ("9 pads together, 32nds (16 hits/s)", 9, 16.0, false);
+    run ("9 pads, 32nds, global effects", 9, 16.0, true);
+    run ("round-robin pad (4 layers), 32 hits/s", 2, 32.0, true);
+    run ("high-polyphony retrigger, 100 hits/s", 9, 100.0, true);
+    {
+        const auto file = writeDrum (tmp.dir, "Loading.wav", 500.0, 2.0);
+        run ("loading samples while playing", 9, 16.0, true, [&] (int b) { if (b % 200 == 0) p.loadPad (8, file); if (b % 20 == 0) p.waitForLoads (1); });
+    }
+    {
+        const auto file = writeBreak (tmp.dir, "B.wav", 32);
+        run ("break analysis while playing", 9, 16.0, true, [&] (int b) { if (b % 400 == 0) p.importBreak (file); if (b % 20 == 0) p.waitForLoads (1); });
+    }
+    second.loadPad (0, writeDrum (tmp.dir, "Second.wav", 90.0, 0.5));
+    REQUIRE (second.waitForLoads());
+    run ("two instances, 32nds, effects (both timed)", 9, 16.0, true, {}, true);
+    p.waitForLoads();
+    std::printf ("\n48 kHz, %d-sample blocks (%.2f ms). Linux container, shared CPU.\n", size, blockSeconds * 1000.0);
+    std::printf ("%-44s %10s %10s %8s %6s\n", "scenario", "mean us", "worst us", "mean %", "voices");
+    for (const auto& r : rows)
+        std::printf ("%-44s %10.0f %10.0f %7.1f%% %6d\n", r.name, r.meanUs, r.worstUs, 100.0 * r.meanUs / (blockSeconds * 1.0e6), r.voices);
+    std::printf ("memory: %.0f MB at start, %.0f MB with a 9-pad kit loaded (two instances)\n", rssStart, rssLoaded);
 }
 
 TEST_CASE ("Snapshots of every major state (written when ANDOR_DRUMS_SNAPSHOT_DIR is set)", "[drums-plugin][ui][snapshots]")
