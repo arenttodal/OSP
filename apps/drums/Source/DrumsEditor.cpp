@@ -979,7 +979,7 @@ juce::Rectangle<int> DrumsContent::editorCard() const { return { 44, padCard().g
 juce::Rectangle<int> DrumsContent::rangeCard() const { return { 44, editorCard().getBottom() + 10, 1448, 150 }; }
 juce::Rectangle<int> DrumsContent::bottomRow() const { return { 44, rangeCard().getBottom() + 10, 1448, 195 }; }
 
-DrumsContent::DrumsContent (DrumsProcessor& p) : proc (p), grid (p), sample (p), range (p), envelope (p), keyMap (p), breaks (p)
+DrumsContent::DrumsContent (DrumsProcessor& p) : proc (p), grid (p), sample (p), range (p), envelope (p), keyMap (p), breaks (p), imports (p)
 {
     setWantsKeyboardFocus (true);
     addAndMakeVisible (grid);
@@ -1008,6 +1008,10 @@ DrumsContent::DrumsContent (DrumsProcessor& p) : proc (p), grid (p), sample (p),
     breakButton.setTooltip ("Slice a break into a kit: click to choose a file, or drop one here");
     breakButton.onClick = [this] { openBreakDialog(); };
     breakButton.onFile = [this] (const juce::File& f) { proc.importBreak (f); };
+    breakButton.onFiles = [this] (const juce::Array<juce::File>& files) { proc.importFiles (files); };
+    addChildComponent (imports);
+    imports.onClose = [this] { syncBreakView(); };
+    imports.onReport = [this] (const juce::String& title, const juce::String& message) { tell (title, message); };
     addAndMakeVisible (breakButton);
     addChildComponent (breaks);
     breaks.onClose = [this] { syncBreakView(); };
@@ -1124,8 +1128,8 @@ void DrumsContent::setLayout (DrumsProcessor::PadLayout layout)
 
 void DrumsContent::setKeyMapOpen (bool open)
 {
-    if (open && breaks.isVisible())
-        return;   // finish the break first
+    if (open && (breaks.isVisible() || imports.isVisible()))
+        return;   // finish the break or import first
     keyMap.setVisible (open);
     sample.setVisible (! open);
     range.setVisible (! open);
@@ -1205,6 +1209,14 @@ void DrumsContent::showKitMenu()
         });
     });
     m.addSeparator();
+    m.addItem ("Import samples...", [this] {
+        chooser = std::make_unique<juce::FileChooser> ("Import samples into the kit", juce::File(), "*.wav;*.aif;*.aiff;*.flac;*.caf");
+        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::canSelectMultipleItems,
+                              [this] (const juce::FileChooser& fc) {
+                                  if (! fc.getResults().isEmpty())
+                                      proc.importFiles (fc.getResults());
+                              });
+    });
     m.addItem ("Slice a break...", [this] { openBreakDialog(); });
     m.addItem ("Save groove as MIDI...", ! proc.groove.hits.empty(), false, [this] {
         chooser = std::make_unique<juce::FileChooser> ("Save the groove as MIDI", juce::File::getSpecialLocation (juce::File::userDocumentsDirectory), "*.mid");
@@ -1256,23 +1268,34 @@ void DrumsContent::openBreakDialog()
 
 void DrumsContent::syncBreakView()
 {
-    const bool open = proc.breakSession().open();
-    if (open && keyMap.isVisible())
+    // The break and import plans open over the pad editor (one at a time).
+    const bool breakOpen = proc.breakSession().open();
+    const bool importOpen = ! breakOpen && proc.importSession().open();
+    if ((breakOpen || importOpen) && keyMap.isVisible())
         setKeyMapOpen (false);
-    if (breaks.isVisible() != open)
+    if (breaks.isVisible() != breakOpen)
     {
-        breaks.setVisible (open);
-        sample.setVisible (! open && ! keyMap.isVisible());
-        range.setVisible (! open && ! keyMap.isVisible());
-        if (open)
+        breaks.setVisible (breakOpen);
+        if (breakOpen)
         {
             breaks.selection.clear();
             breaks.grabKeyboardFocus();
         }
     }
-    breakButton.setToggleState (open, juce::dontSendNotification);
-    if (open)
+    if (imports.isVisible() != importOpen)
+    {
+        imports.setVisible (importOpen);
+        if (importOpen)
+            imports.selection.clear();
+    }
+    const bool overlay = breakOpen || importOpen || keyMap.isVisible();
+    sample.setVisible (! overlay);
+    range.setVisible (! overlay);
+    breakButton.setToggleState (breakOpen || importOpen, juce::dontSendNotification);
+    if (breakOpen)
         breaks.refresh();
+    if (importOpen)
+        imports.refresh();
 }
 
 void DrumsContent::changeListenerCallback (juce::ChangeBroadcaster*)
@@ -1350,6 +1373,7 @@ void DrumsContent::resized()
     range.setBounds (rangeCard());
     keyMap.setBounds (editorCard().getUnion (rangeCard()));
     breaks.setBounds (editorCard().getUnion (rangeCard()));
+    imports.setBounds (editorCard().getUnion (rangeCard()));
 
     const auto row = bottomRow();
     envelope.setBounds (row.withWidth (556));

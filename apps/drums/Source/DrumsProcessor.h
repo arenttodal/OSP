@@ -4,6 +4,7 @@
 #include "LoadedInstrument.h"
 
 #include "drums/BreakSlicer.h"
+#include "drums/DrumClassifier.h"
 #include "drums/DrumKitEngine.h"
 #include "model/ModelExchange.h"
 
@@ -238,6 +239,47 @@ public:
     /** The open break's groove as planned now (before applying it). */
     Groove sessionGroove() const;
 
+    // Batch import (spec Part 6) ---------------------------------------------------------
+    struct ImportItem
+    {
+        juce::File file;
+        std::shared_ptr<const LoadedInstrument> sound;   ///< null: could not load (error says why)
+        std::shared_ptr<const AudioData> audio;          ///< decoded (preview)
+        drums::DrumFeatures features;
+        drums::DrumGuess guess;
+        std::string error;
+        int duplicateOf = -1;                            ///< the same content as an earlier item
+    };
+    struct ImportGroup
+    {
+        std::vector<int> items;                          ///< round robins on one pad
+        drums::DrumCategory category = drums::DrumCategory::unknown;
+        int pad = -1;                                    ///< -1: the import tray
+    };
+    struct ImportSession
+    {
+        std::vector<ImportItem> items;
+        std::vector<ImportGroup> groups;
+        int remaining = 0;
+        bool open() const noexcept { return remaining > 0 || ! items.empty(); }
+        bool loading() const noexcept { return remaining > 0; }
+    };
+    const ImportSession& importSession() const noexcept { return importState; }
+    /** Loads, classifies, groups and maps several files (background); opens the preview. */
+    void importFiles (const juce::Array<juce::File>& files);
+    void closeImport();
+    /** Any change of the groups (category, destination, split, merge). Undoable. */
+    void editImportGroups (const std::vector<ImportGroup>& groups, const juce::String& actionName);
+    /** Groups and destinations as the classifier suggests them (undoable). */
+    void resetImportSuggestions();
+    /** The proposed groups and pads for the current items (no change). */
+    std::vector<ImportGroup> suggestImportGroups() const;
+    /** Puts every group with a pad onto it (its files as round robins, the pad's category
+        from the group), one undo step. Groups left in the tray stay in the preview. */
+    juce::String applyImport();
+    /** Mouse audition of one import item (the preview player). */
+    void auditionImportItem (int item);
+
     /** Mouse audition of one layer (lock-free; plays it alone, at the pad's settings). */
     void auditionLayer (int pad, int layer, int velocity);
     /** The layer the pad's last hit played (display; -1 before any). */
@@ -357,6 +399,19 @@ private:
     std::vector<Found> found;   // loader -> message thread (resultsMutex)
     juce::String foundReport;
 
+    // Import session (message thread) and its loader hand-over
+    ImportSession importState;
+    std::uint64_t importRequest = 0;
+    struct ImportLoaded
+    {
+        std::uint64_t request = 0;
+        int index = 0;
+        plugin::LoadResult result;
+        drums::DrumFeatures features;
+    };
+    std::vector<ImportLoaded> importLoaded;   // resultsMutex
+    void setImportGroups (const std::vector<ImportGroup>& groups);
+
     // Break session (message thread) and its loader hand-over
     BreakSession breakState;
     std::uint64_t breakRequest = 0;
@@ -368,6 +423,7 @@ private:
     };
     std::vector<BreakLoaded> breakLoaded;   // resultsMutex
     void setBreakSlices (const std::vector<drums::BreakSlice>& slices);
+    static void classifySlices (std::vector<drums::BreakSlice>& slices, const AudioData& audio);
     void applyBreakNow (BreakApply how, juce::String& report);
 
     // Slice preview (message -> audio): a region of a decoded break, lock-free

@@ -97,6 +97,7 @@ add_library(osp_drums STATIC
     src/drums/DrumKitEngine.cpp
     src/drums/DrumLayers.cpp
     src/drums/BreakSlicer.cpp
+    src/drums/DrumClassifier.cpp
 )
 target_include_directories(osp_drums PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(osp_drums PUBLIC osp_dsp)

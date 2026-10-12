@@ -394,7 +394,14 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       - a slice view with a tray, drag to pads, three apply modes;
       - the groove kept and exported as MIDI.
 
-      Next: smart classification (M7).
+      M7 smart classification and batch import (docs/drums/m7-classification.md):
+      - a name + sound classifier with confidence, Unknown and layered hits;
+      - grouping and auto-mapping;
+      - an import preview with corrections and undo;
+      - categories for break slices;
+      - licence review (no weights shipped).
+
+      Next: integration and polish (M8).
 
 ## DONE
 

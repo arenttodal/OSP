@@ -17,6 +17,7 @@
 
 #include <cmath>
 #include <cstdlib>
+#include <set>
 
 using namespace osp;
 using osp::drumsplugin::DrumsProcessor;
@@ -149,6 +150,57 @@ namespace
                 prev = n;
                 x[at + i] += static_cast<float> (v * fade);
             }
+        }
+        audio.channels.push_back (std::move (x));
+        const auto file = dir.getChildFile (name);
+        std::string error;
+        REQUIRE (io::writeAudioFile (std::filesystem::path (file.getFullPathName().toStdString()), audio, io::SampleFormat::pcm24, error));
+        return file;
+    }
+
+    /** A drum one-shot of a kind (synthetic, seeded): kick, 808, snare, hat, open hat, clap,
+        tom, crash, rim, shaker. */
+    juce::File writeOneShot (const juce::File& dir, const juce::String& name, const juce::String& kind, std::uint64_t seed)
+    {
+        AudioData audio;
+        audio.sampleRate = rate;
+        const double seconds = kind == "crash" ? 2.5 : kind == "open" || kind == "808" ? 1.2 : 0.5;
+        std::vector<float> x (static_cast<std::size_t> (seconds * rate), 0.0f);
+        Prng rng (seed);
+        const double level = 0.6 * rng.uniform (0.85, 1.0);   // takes differ a little
+        double phase = 0.0, prev = 0.0, prev2 = 0.0, lp1 = 0.0, lp2 = 0.0;
+        for (std::size_t i = 0; i < x.size(); ++i)
+        {
+            const double t = static_cast<double> (i) / rate;
+            const double n = rng.uniform (-1.0, 1.0);
+            lp1 += 0.6 * (n - lp1);
+            lp2 += 0.6 * (lp1 - lp2);
+            double v = 0.0;
+            if (kind == "kick" || kind == "808")
+            {
+                phase += 2.0 * 3.14159265358979 * (50.0 + 100.0 * std::exp (-t / 0.03)) / rate;
+                v = std::sin (phase) * std::exp (-t / (kind == "808" ? 0.6 : 0.15));
+            }
+            else if (kind == "snare")
+                v = 1.2 * (lp2 - 0.7 * prev) * std::exp (-t / 0.1) + 0.5 * std::sin (2.0 * 3.14159265358979 * 200.0 * t) * std::exp (-t / 0.05);
+            else if (kind == "hat" || kind == "open" || kind == "crash")
+                v = 0.5 * (n - 2.0 * prev + prev2) * std::exp (-t / (kind == "hat" ? 0.03 : kind == "open" ? 0.3 : 1.2));
+            else if (kind == "tom")
+            {
+                phase += 2.0 * 3.14159265358979 * 150.0 / rate;
+                v = std::sin (phase) * std::exp (-t / 0.25);
+            }
+            else if (kind == "rim")
+                v = std::sin (2.0 * 3.14159265358979 * 900.0 * t) * std::exp (-t / 0.012);
+            else if (kind == "shaker")
+                v = 0.5 * (n - prev) * std::min (1.0, t / 0.025) * std::exp (-t / 0.08);
+            else if (kind == "clap")
+                for (int b = 0; b < 3; ++b)
+                    if (t - b * 0.01 >= 0.0)
+                        v += lp2 * std::exp (-(t - b * 0.01) / (b == 2 ? 0.06 : 0.004));
+            prev2 = prev;
+            prev = kind == "snare" ? lp2 : n;
+            x[i] = static_cast<float> (level * v * std::min (1.0, (seconds - t) / 0.02));
         }
         audio.channels.push_back (std::move (x));
         const auto file = dir.getChildFile (name);
@@ -1166,9 +1218,16 @@ TEST_CASE ("Break: import slices it, the plan suggests pads, slice edits undo", 
     for (int h = 0; h < 8; ++h)
         CHECK (std::abs (static_cast<double> (session.slices[static_cast<std::size_t> (h)].onset) / rate - (0.1 + h * 0.25)) < 0.006);
     CHECK (session.bpm == Approx (120.0).margin (1.0));
-    // An empty kit: the slices go to pads 1..8 in order.
+    // Classified (kick, hat, snare, hat ...) and grouped: the kicks share the kick pad, the
+    // snares the snare pad, the hats the closed-hat pad (M7's category plan).
     for (int h = 0; h < 8; ++h)
-        CHECK (session.slices[static_cast<std::size_t> (h)].pad == p.padAtSlot (h));
+    {
+        const auto& sl = session.slices[static_cast<std::size_t> (h)];
+        const int kind = h % 4;
+        INFO (h);
+        CHECK (sl.category == (kind == 0 ? drums::DrumCategory::kick : kind == 2 ? drums::DrumCategory::snare : drums::DrumCategory::closedHat));
+        CHECK (sl.pad == (kind == 0 ? 0 : kind == 2 ? 1 : 2));
+    }
 
     // Delete a boundary, then undo it.
     auto edited = session.slices;
@@ -1264,8 +1323,12 @@ TEST_CASE ("Break: apply as a new kit, fill empty pads or merge; one undo step; 
     p.suggestBreakPlan (true);
     p.applyBreak (DrumsProcessor::BreakApply::newKit);
     CHECK (p.kitName == "Funky Drummer");
-    for (int slot = 0; slot < 8; ++slot)
-        CHECK (p.padLayers (p.padAtSlot (slot)).layers.size() == 1);
+    CHECK (p.padLayers (0).layers.size() == 2);   // two kicks: round robins
+    CHECK (p.padLayers (1).layers.size() == 2);   // two snares
+    CHECK (p.padLayers (2).layers.size() == 4);   // four hats
+    CHECK (p.padInfo (2).category == drums::DrumCategory::closedHat);
+    for (int pad = 3; pad < 9; ++pad)
+        CHECK (p.padLayers (pad).layers.empty());
     REQUIRE (p.groove.hits.size() == 8);
     CHECK (p.groove.bpm == Approx (120.0).margin (1.0));
     CHECK (p.groove.hits[2].seconds == Approx (0.5).margin (0.006));
@@ -1293,7 +1356,7 @@ TEST_CASE ("Break: apply as a new kit, fill empty pads or merge; one undo step; 
     q.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
     REQUIRE (q.waitForLoads());
     CHECK (q.groove.hits.size() == 8);
-    CHECK (q.padLayers (q.padAtSlot (3)).layers.size() == 1);
+    CHECK (q.padLayers (2).layers.size() == 4);
 }
 
 TEST_CASE ("Break view: opens with the session, chips drop onto pads, Delete joins slices", "[drums-plugin][ui][breaks]")
@@ -1343,6 +1406,181 @@ TEST_CASE ("Break view: opens with the session, chips drop onto pads, Delete joi
 
     // Closing the session brings the pad editor back.
     p.closeBreak();
+    content.syncBreakView();
+    CHECK_FALSE (view.isVisible());
+    CHECK (content.samplePanel().isVisible());
+}
+
+TEST_CASE ("Import a sample folder (scenario 6): classify, group, map, correct, import in one step", "[drums-plugin][import]")
+{
+    TempDir tmp;
+    const ScopedStore store (tmp.dir.getChildFile ("store"));
+    DrumsProcessor p;
+    p.prepareToPlay (rate, 256);
+    juce::Array<juce::File> files;
+    // Three takes of one kick, a long 808, two snares, three hats, open hat, clap, tom, crash,
+    // rim, shaker: 15 drum samples; plus a broken file and a duplicate.
+    for (int i = 1; i <= 3; ++i)
+        files.add (writeOneShot (tmp.dir, "Kick_0" + juce::String (i) + ".wav", "kick", static_cast<std::uint64_t> (i)));
+    files.add (writeOneShot (tmp.dir, "808 Long.wav", "808", 5));
+    files.add (writeOneShot (tmp.dir, "Snare_01.wav", "snare", 3));
+    files.add (writeOneShot (tmp.dir, "Snare_02.wav", "snare", 4));
+    for (int i = 1; i <= 3; ++i)
+        files.add (writeOneShot (tmp.dir, "HH_0" + juce::String (i) + ".wav", "hat", static_cast<std::uint64_t> (10 + i)));
+    files.add (writeOneShot (tmp.dir, "Open Hat.wav", "open", 20));
+    files.add (writeOneShot (tmp.dir, "Clap.wav", "clap", 21));
+    files.add (writeOneShot (tmp.dir, "Tom Low.wav", "tom", 22));
+    files.add (writeOneShot (tmp.dir, "Crash.wav", "crash", 23));
+    files.add (writeOneShot (tmp.dir, "Rim.wav", "rim", 24));
+    files.add (writeOneShot (tmp.dir, "Shaker.wav", "shaker", 25));
+    const auto broken = tmp.dir.getChildFile ("Broken.wav");
+    REQUIRE (broken.replaceWithText ("this is not audio"));
+    files.add (broken);
+    const auto copy = tmp.dir.getChildFile ("Snare_01 copy.wav");
+    REQUIRE (files[4].copyFileTo (copy));
+    files.add (copy);
+
+    p.importFiles (files);
+    CHECK (p.importSession().loading());
+    REQUIRE (p.waitForLoads());
+    const auto& session = p.importSession();
+    REQUIRE (session.items.size() == 17);
+    CHECK_FALSE (session.items[15].error.empty());           // the broken file: listed, with why
+    CHECK (session.items[16].duplicateOf == 4);               // the copy: listed, not placed twice
+    CHECK (session.items[0].guess.category == drums::DrumCategory::kick);
+    CHECK (session.items[7].guess.category == drums::DrumCategory::closedHat);
+
+    // Groups: the three kick takes together, the 808 apart; snares together; hats together.
+    auto groupOf = [&session] (int item) {
+        for (std::size_t g = 0; g < session.groups.size(); ++g)
+            for (int i : session.groups[g].items)
+                if (i == item)
+                    return static_cast<int> (g);
+        return -1;
+    };
+    CHECK (groupOf (0) == groupOf (1));
+    CHECK (groupOf (1) == groupOf (2));
+    CHECK (groupOf (3) != groupOf (0));
+    CHECK (groupOf (4) == groupOf (5));
+    CHECK (groupOf (6) == groupOf (7));
+    CHECK (groupOf (15) == -1);
+    CHECK (groupOf (16) == -1);
+    REQUIRE (session.groups.size() == 10);   // ten groups for nine pads: one waits in the tray
+    int inTray = 0;
+    for (const auto& g : session.groups)
+        inTray += g.pad < 0 ? 1 : 0;
+    CHECK (inTray == 1);
+    CHECK (session.groups[static_cast<std::size_t> (groupOf (0))].pad == 0);   // the kicks on the kick pad
+    CHECK (session.groups[static_cast<std::size_t> (groupOf (4))].pad == 1);   // the snares on the snare pad
+
+    // Corrections: the 808 joins the kicks as a round robin; the clap is really a snare.
+    {
+        auto groups = session.groups;
+        const auto kicks = static_cast<std::size_t> (groupOf (0)), eight = static_cast<std::size_t> (groupOf (3));
+        groups[kicks].items.push_back (3);
+        groups.erase (groups.begin() + static_cast<std::ptrdiff_t> (eight));
+        p.editImportGroups (groups, "Merge");
+    }
+    CHECK (p.importSession().groups.size() == 9);
+    {
+        auto groups = p.importSession().groups;
+        for (auto& g : groups)
+            if (std::find (g.items.begin(), g.items.end(), 10) != g.items.end())
+                g.category = drums::DrumCategory::snare;
+        p.editImportGroups (groups, "Category");
+    }
+    // Now nine groups: every one gets a pad when suggestions are reset? No: corrections stay
+    // until Reset. Give the tray group the last free pad by hand if there is one.
+    {
+        auto groups = p.importSession().groups;
+        std::set<int> used;
+        for (const auto& g : groups)
+            if (g.pad >= 0)
+                used.insert (g.pad);
+        for (auto& g : groups)
+            if (g.pad < 0)
+                for (int pad = 0; pad < 9; ++pad)
+                    if (used.count (pad) == 0)
+                    {
+                        g.pad = pad;
+                        used.insert (pad);
+                        break;
+                    }
+        p.editImportGroups (groups, "Assign");
+    }
+
+    const auto report = p.applyImport();
+    CHECK (report.contains ("15 files on 9 pads"));
+    CHECK_FALSE (p.importSession().open());
+    CHECK (p.padLayers (0).layers.size() == 4);   // three kick takes and the 808
+    CHECK (p.padInfo (0).category == drums::DrumCategory::kick);
+    CHECK (p.padLayers (1).layers.size() == 2);
+    // The kit plays: the kick pad's note sounds.
+    p.prepareToPlay (rate, 256);
+    CHECK (rmsOf (hit (p, p.keyMap().padNote[0], 100, 0.2)) > 0.001);
+    // One undo step: the kit is empty again.
+    p.undoManager().undo();
+    REQUIRE (p.waitForLoads());
+    for (int pad = 0; pad < 9; ++pad)
+        CHECK (p.padLayers (pad).layers.empty());
+}
+
+TEST_CASE ("Import: a kit in use only gets its empty pads; a cancelled import changes nothing", "[drums-plugin][import]")
+{
+    TempDir tmp;
+    const ScopedStore store (tmp.dir.getChildFile ("store"));
+    DrumsProcessor p;
+    p.loadPad (0, writeOneShot (tmp.dir, "MyKick.wav", "kick", 1));
+    REQUIRE (p.waitForLoads());
+    p.importFiles ({ writeOneShot (tmp.dir, "Kick B.wav", "808", 2), writeOneShot (tmp.dir, "Snare.wav", "snare", 3) });
+    REQUIRE (p.waitForLoads());
+    for (const auto& g : p.importSession().groups)
+        CHECK (g.pad != 0);   // the used kick pad is never suggested
+    p.closeImport();
+    CHECK (p.padInfo (0).sound->filename == "MyKick.wav");
+    CHECK (p.padLayers (1).layers.empty());
+}
+
+TEST_CASE ("Import view: opens with the session; split, move, group and destinations are undoable", "[drums-plugin][ui][import]")
+{
+    const juce::ScopedJuceInitialiser_GUI gui;
+    TempDir tmp;
+    const ScopedStore store (tmp.dir.getChildFile ("store"));
+    DrumsProcessor p;
+    auto editor = openEditor (p);
+    editor->setSize (1536, 1024);
+    auto& content = editor->content();
+    p.importFiles ({ writeOneShot (tmp.dir, "Kick_01.wav", "kick", 1), writeOneShot (tmp.dir, "Kick_02.wav", "kick", 2),
+                     writeOneShot (tmp.dir, "Snare.wav", "snare", 3), writeOneShot (tmp.dir, "HH.wav", "hat", 4) });
+    REQUIRE (p.waitForLoads());
+    content.syncBreakView();
+    auto& view = content.importView();
+    REQUIRE (view.isVisible());
+    CHECK_FALSE (content.samplePanel().isVisible());
+    REQUIRE (p.importSession().groups.size() == 3);
+    REQUIRE (p.importSession().groups[0].items.size() == 2);   // the kick takes
+
+    view.splitItem (1);   // the second kick gets its own (tray) group
+    CHECK (p.importSession().groups.size() == 4);
+    CHECK (p.importSession().groups.back().pad == -1);
+    view.setGroupPad (3, p.importSession().groups[1].pad);   // onto the snare's pad: the snare goes to the tray
+    CHECK (p.importSession().groups[1].pad == -1);
+    p.undoManager().undo();
+    p.undoManager().undo();
+    CHECK (p.importSession().groups.size() == 3);
+    CHECK (p.importSession().groups[1].pad >= 0);
+
+    view.selection = { 2, 3 };   // snare and hat on one pad
+    view.groupSelection();
+    CHECK (p.importSession().groups.size() == 2);
+    p.undoManager().undo();
+    view.moveItem (3, 0);         // the hat into the kick group
+    CHECK (p.importSession().groups[0].items.size() == 3);
+    p.undoManager().undo();
+
+    view.setGroupCategory (2, drums::DrumCategory::openHat);
+    CHECK (p.importSession().groups[2].category == drums::DrumCategory::openHat);
+    p.closeImport();
     content.syncBreakView();
     CHECK_FALSE (view.isVisible());
     CHECK (content.samplePanel().isVisible());
@@ -1454,6 +1692,38 @@ TEST_CASE ("Snapshots of every major state (written when ANDOR_DRUMS_SNAPSHOT_DI
     editor->content().breakView().selection = { 2, 6 };
     editor->content().breakView().refresh();
     snapshot (*editor, "14-break-slicing");
+
+    // Importing a folder: the plan before anything changes (scenario 6), on an empty kit.
+    p.closeBreak();
+    p.newKit();
+    REQUIRE (p.waitForLoads());
+    {
+        const auto dir = tmp.dir.getChildFile ("folder");
+        dir.createDirectory();
+        juce::Array<juce::File> files;
+        for (int i = 1; i <= 3; ++i)
+            files.add (writeOneShot (dir, "Kick_0" + juce::String (i) + ".wav", "kick", static_cast<std::uint64_t> (i)));
+        files.add (writeOneShot (dir, "808 Long.wav", "808", 5));
+        files.add (writeOneShot (dir, "Snare_01.wav", "snare", 6));
+        files.add (writeOneShot (dir, "Snare_02.wav", "snare", 7));
+        for (int i = 1; i <= 3; ++i)
+            files.add (writeOneShot (dir, "HH_0" + juce::String (i) + ".wav", "hat", static_cast<std::uint64_t> (10 + i)));
+        files.add (writeOneShot (dir, "Open Hat.wav", "open", 20));
+        files.add (writeOneShot (dir, "Clap.wav", "clap", 21));
+        files.add (writeOneShot (dir, "Tom Low.wav", "tom", 22));
+        files.add (writeOneShot (dir, "Crash.wav", "crash", 23));
+        files.add (writeOneShot (dir, "Rim.wav", "rim", 24));
+        files.add (writeOneShot (dir, "Shaker.wav", "shaker", 25));
+        const auto broken = dir.getChildFile ("Broken.wav");
+        REQUIRE (broken.replaceWithText ("not audio"));
+        files.add (broken);
+        p.importFiles (files);
+        REQUIRE (p.waitForLoads());
+    }
+    editor->content().syncBreakView();
+    editor->content().importView().selection = { 0 };
+    editor->content().importView().refresh();
+    snapshot (*editor, "15-import-preview");
 }
 
 int main (int argc, char* argv[])

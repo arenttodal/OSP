@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BreakView.h"
+#include "ImportView.h"
 #include "CeramicSkin.h"
 #include "DrumsProcessor.h"
 #include "KeyMapEditor.h"
@@ -143,13 +144,27 @@ class BreakButton final : public ceramic::KeyButton, public juce::FileDragAndDro
 {
 public:
     using ceramic::KeyButton::KeyButton;
-    bool isInterestedInFileDrag (const juce::StringArray& files) override { return files.size() == 1 && isAudioFileName (files[0]); }
+    bool isInterestedInFileDrag (const juce::StringArray& files) override
+    {
+        for (const auto& f : files)
+            if (isAudioFileName (f))
+                return true;
+        return false;
+    }
+    /** One file: a break to slice. Several: an import into the kit. */
     void filesDropped (const juce::StringArray& files, int, int) override
     {
-        if (onFile && ! files.isEmpty())
-            onFile (juce::File (files[0]));
+        juce::Array<juce::File> list;
+        for (const auto& f : files)
+            if (isAudioFileName (f))
+                list.add (juce::File (f));
+        if (list.size() == 1 && onFile)
+            onFile (list[0]);
+        else if (list.size() > 1 && onFiles)
+            onFiles (list);
     }
     std::function<void (const juce::File&)> onFile;
+    std::function<void (const juce::Array<juce::File>&)> onFiles;
 };
 
 /** Everything inside the window, laid out once at the base size and scaled as a whole. */
@@ -176,6 +191,7 @@ public:
     KeyMapEditor& keyMapEditor() noexcept { return keyMap; }
     SamplePanel& samplePanel() noexcept { return sample; }
     BreakView& breakView() noexcept { return breaks; }
+    ImportView& importView() noexcept { return imports; }
     void openBreakDialog();
     void syncBreakView();
     void openLoadDialog (int pad);
@@ -212,6 +228,7 @@ private:
     std::array<LabelledKnob, 3> macros;    // LIFE, DYNAMICS, CHARACTER
     KeyMapEditor keyMap;
     BreakView breaks;
+    ImportView imports;
     BreakButton breakButton { "BREAK", 0.7f };
     std::unique_ptr<juce::FileChooser> chooser;
     bool lastExpanded = false;

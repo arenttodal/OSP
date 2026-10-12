@@ -46,8 +46,13 @@ branch.
       - apply as a new kit, into empty pads, or merged;
       - slices are non-destructive layers of one sound;
       - the groove is kept and exported as MIDI.
-- [ ] **M7 Smart classification** (reuse `src/library/Classifier`; licence review before
-      any model weights).
+- [x] **M7 Smart classification** (`m7-classification.md`). Done:
+      - classification by name and sound, with confidence, Unknown and layered hits;
+      - similarity grouping and auto-mapping with an overflow tray;
+      - the import preview with corrections and undo;
+      - break slices classified and planned by category;
+      - licence review. No model weights are shipped: none is cleared, and CLAUDE.md
+        rule 5 applies.
 - [ ] **M8 Integration and polish** (portable kits, MIDI Learn, automation, profiling on a
       Mac, hosts).
 - [ ] **M9 MACHINE prototype** from existing DRIVE / CHARACTER / ECHO first.

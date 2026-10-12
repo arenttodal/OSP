@@ -1359,6 +1359,8 @@ void DrumsProcessor::findMissingSamples (const juce::File& folder)
 
 void DrumsProcessor::importBreak (const juce::File& file)
 {
+    if (importState.open())
+        closeImport();   // one plan at a time
     breakState = {};
     breakState.file = file;
     breakState.loading = true;
@@ -1373,7 +1375,10 @@ void DrumsProcessor::importBreak (const juce::File& file)
         loaded.request = request;
         loaded.result = plugin::loadInstrument (r, store, request);
         if (loaded.result.audio != nullptr)
+        {
             loaded.slices = drums::sliceBreak (*loaded.result.audio, settings);
+            classifySlices (loaded.slices, *loaded.result.audio);
+        }
         {
             const std::lock_guard<std::mutex> lock (resultsMutex);
             breakLoaded.push_back (std::move (loaded));
@@ -1418,6 +1423,7 @@ void DrumsProcessor::resliceBreak (const drums::SliceSettings& settings)
         return;
     breakState.settings = settings;
     auto next = drums::sliceBreak (*breakState.audio, settings);
+    classifySlices (next, *breakState.audio);
     // Keep the plan of slices that survive (the same onset within 10 ms).
     const auto tolerance = static_cast<std::int64_t> (0.01 * breakState.audio->sampleRate);
     for (auto& n : next)
@@ -1431,20 +1437,58 @@ void DrumsProcessor::resliceBreak (const drums::SliceSettings& settings)
     editBreakSlices (next, "Slice settings");
 }
 
+void DrumsProcessor::classifySlices (std::vector<drums::BreakSlice>& slices, const AudioData& audio)
+{
+    for (auto& sl : slices)
+    {
+        const auto g = drums::classifyFeatures (drums::drumFeatures (audio, sl.start, sl.end));
+        sl.category = g.confidence >= 0.45 ? g.category : drums::DrumCategory::unknown;
+        sl.confidence = g.confidence;
+        sl.layered = g.layered;
+    }
+}
+
 void DrumsProcessor::suggestBreakPlan (bool forNewKit)
 {
-    std::vector<int> targets;
+    if (breakState.audio == nullptr)
+        return;
+    // Alike slices of one category become one pad's layers; each group goes to a pad of its
+    // category (the kit's, or the factory's for a new kit), then to free pads; the rest stay
+    // in the tray.
+    std::vector<drums::GroupItem> items;
+    for (const auto& sl : breakState.slices)
+    {
+        drums::GroupItem it;
+        it.name = "break slice";
+        it.features = drums::drumFeatures (*breakState.audio, sl.start, sl.end);
+        it.guess.category = sl.category;
+        it.guess.confidence = sl.confidence;
+        items.push_back (it);
+    }
+    const auto groups = drums::groupItems (items);
+    std::array<drums::DrumCategory, drums::maxPads> categories {};
+    std::vector<int> freePads, allPads;
     for (int slot = 0; slot < numPads; ++slot)
     {
         const int p = order[index (slot)];
+        allPads.push_back (p);
         if (forNewKit || pads[index (p)].layers.layers.empty())
-            targets.push_back (p);
+            freePads.push_back (p);
     }
-    if (targets.empty())
-        for (int slot = 0; slot < numPads; ++slot)
-            targets.push_back (order[index (slot)]);   // a full kit: suggest every pad (merge adds round robins)
-    for (std::size_t i = 0; i < breakState.slices.size(); ++i)
-        breakState.slices[i].pad = i < targets.size() ? targets[i] : -1;
+    for (int p = 0; p < numPads; ++p)
+        categories[index (p)] = pads[index (p)].category;
+    if (forNewKit)
+    {
+        using C = drums::DrumCategory;
+        const std::array<C, numPads> factory { C::kick, C::snare, C::closedHat, C::openHat, C::clap, C::tom, C::rim, C::percussion, C::cymbal };
+        categories = factory;
+    }
+    const auto target = drums::mapGroupsToPads (groups, items, categories, freePads.empty() ? allPads : freePads);
+    for (auto& sl : breakState.slices)
+        sl.pad = -1;
+    for (std::size_t g = 0; g < groups.size(); ++g)
+        for (int i : groups[g])
+            breakState.slices[static_cast<std::size_t> (i)].pad = target[g];
     sendChangeMessage();
 }
 
@@ -1551,12 +1595,37 @@ void DrumsProcessor::applyBreakNow (BreakApply how, juce::String& report)
         }
         auto next = empty ? PadLayers {} : info.layers;
         next.mode = drums::LayerMode::roundRobin;
+        // Hits of very different strength (ghost notes and accents) become velocity layers,
+        // softest first, so a ghost note stays a ghost note; alike hits are round robins.
+        auto ordered = list;
+        double weakest = 1.0, strongest = 0.0;
         for (int i : list)
+        {
+            weakest = std::min (weakest, breakState.slices[static_cast<std::size_t> (i)].strength);
+            strongest = std::max (strongest, breakState.slices[static_cast<std::size_t> (i)].strength);
+        }
+        const bool dynamic = empty && list.size() > 1 && strongest - weakest >= 0.25;
+        if (dynamic)
+            std::stable_sort (ordered.begin(), ordered.end(), [this] (int a, int b) {
+                return breakState.slices[static_cast<std::size_t> (a)].strength < breakState.slices[static_cast<std::size_t> (b)].strength;
+            });
+        for (int i : ordered)
             if (static_cast<int> (next.layers.size()) < drums::maxLayers)
             {
                 next.layers.push_back (sliceLayer (breakState.slices[static_cast<std::size_t> (i)], i + 1));
                 ++placed;
             }
+        if (dynamic)
+        {
+            next.mode = drums::LayerMode::velocity;
+            drums::LayerPlan ranges;
+            drums::spreadVelocityRanges (ranges, 0, static_cast<int> (next.layers.size()));
+            for (std::size_t l = 0; l < next.layers.size(); ++l)
+            {
+                next.layers[l].params.velocityLow = ranges.layer[l].velocityLow;
+                next.layers[l].params.velocityHigh = ranges.layer[l].velocityHigh;
+            }
+        }
         // A pad that was empty takes its slices' category when they agree.
         if (empty)
         {
@@ -1681,18 +1750,238 @@ bool DrumsProcessor::writeGrooveMidi (const juce::File& file, juce::String& erro
     return true;
 }
 
+// ---------------------------------------------------------------------------------------
+// Batch import
+// ---------------------------------------------------------------------------------------
+
+void DrumsProcessor::importFiles (const juce::Array<juce::File>& files)
+{
+    if (breakState.open())
+        closeBreak();   // one plan at a time
+    importState = {};
+    importRequest = nextGeneration.fetch_add (1);
+    const auto request = importRequest;
+    for (int i = 0; i < files.size(); ++i)
+    {
+        ImportItem item;
+        item.file = files[i];
+        importState.items.push_back (item);
+        ++importState.remaining;
+        ++pendingLoads;
+        loaderPool.addJob ([this, file = files[i], request, i] {
+            plugin::LoadRequest r;
+            r.file = file;
+            ImportLoaded loaded;
+            loaded.request = request;
+            loaded.index = i;
+            loaded.result = plugin::loadInstrument (r, store, request);
+            if (loaded.result.audio != nullptr)
+                loaded.features = drums::drumFeatures (*loaded.result.audio);
+            {
+                const std::lock_guard<std::mutex> lock (resultsMutex);
+                importLoaded.push_back (std::move (loaded));
+            }
+            --pendingLoads;
+        });
+    }
+    sendChangeMessage();
+}
+
+void DrumsProcessor::closeImport()
+{
+    importRequest = nextGeneration.fetch_add (1);
+    importState = {};
+    sendChangeMessage();
+}
+
+std::vector<DrumsProcessor::ImportGroup> DrumsProcessor::suggestImportGroups() const
+{
+    std::vector<drums::GroupItem> items;
+    std::vector<int> sessionIndex;
+    for (int i = 0; i < static_cast<int> (importState.items.size()); ++i)
+    {
+        const auto& it = importState.items[static_cast<std::size_t> (i)];
+        if (it.sound == nullptr || it.duplicateOf >= 0)
+            continue;   // listed, not placed
+        drums::GroupItem g;
+        g.name = it.file.getFileName().toStdString();
+        g.features = it.features;
+        g.guess = it.guess;
+        items.push_back (g);
+        sessionIndex.push_back (i);
+    }
+    const auto groups = drums::groupItems (items);
+    std::array<drums::DrumCategory, drums::maxPads> categories {};
+    bool kitEmpty = true;
+    for (int p = 0; p < numPads; ++p)
+    {
+        categories[index (p)] = pads[index (p)].category;
+        kitEmpty = kitEmpty && pads[index (p)].layers.layers.empty();
+    }
+    std::vector<int> freePads;
+    for (int slot = 0; slot < numPads; ++slot)
+    {
+        const int p = order[index (slot)];
+        if (kitEmpty || pads[index (p)].layers.layers.empty())
+            freePads.push_back (p);
+    }
+    const auto target = drums::mapGroupsToPads (groups, items, categories, freePads);
+    std::vector<ImportGroup> out;
+    for (std::size_t g = 0; g < groups.size(); ++g)
+    {
+        ImportGroup group;
+        for (int k : groups[g])
+            group.items.push_back (sessionIndex[static_cast<std::size_t> (k)]);
+        group.category = items[static_cast<std::size_t> (groups[g].front())].guess.category;
+        group.pad = target[g];
+        out.push_back (group);
+    }
+    return out;
+}
+
+void DrumsProcessor::setImportGroups (const std::vector<ImportGroup>& groups)
+{
+    importState.groups = groups;
+    sendChangeMessage();
+}
+
+void DrumsProcessor::editImportGroups (const std::vector<ImportGroup>& groups, const juce::String& actionName)
+{
+    const auto before = importState.groups;
+    const auto request = importRequest;
+    undo.beginNewTransaction (actionName);
+    undo.perform (new FunctionAction ([this, groups, request] { if (request == importRequest) setImportGroups (groups); },
+                                      [this, before, request] { if (request == importRequest) setImportGroups (before); }),
+                  actionName);
+}
+
+void DrumsProcessor::resetImportSuggestions()
+{
+    editImportGroups (suggestImportGroups(), "Reset suggestions");
+}
+
+void DrumsProcessor::auditionImportItem (int i)
+{
+    if (i < 0 || i >= static_cast<int> (importState.items.size()))
+        return;
+    const auto& audio = importState.items[static_cast<std::size_t> (i)].audio;
+    if (audio == nullptr)
+        return;
+    if (std::find (previewKeep.begin(), previewKeep.end(), audio) == previewKeep.end())
+        previewKeep.push_back (audio);
+    const auto scope = previewFifo.write (1);
+    if (scope.blockSize1 > 0)
+        previews[static_cast<std::size_t> (scope.startIndex1)] = Preview { audio.get(), 0, std::min<std::int64_t> (audio->numFrames(), static_cast<std::int64_t> (4.0 * audio->sampleRate)) };
+}
+
+juce::String DrumsProcessor::applyImport()
+{
+    std::vector<ImportGroup> placed, kept;
+    for (const auto& g : importState.groups)
+        (g.pad >= 0 && g.pad < numPads ? placed : kept).push_back (g);
+    if (placed.empty())
+        return "No group has a pad yet.";
+    std::shared_ptr<juce::XmlElement> before (createStateXml (stateTag).release());
+    auto after = std::make_shared<std::shared_ptr<juce::XmlElement>>();
+    const auto items = importState.items;
+    int files = 0;
+    for (const auto& g : placed)
+        files += static_cast<int> (g.items.size());
+    undo.beginNewTransaction ("Import samples");
+    undo.perform (new FunctionAction (
+                      [this, placed, items, after] {
+                          if (*after != nullptr)
+                          {
+                              restoreStateXml (**after);
+                              return;
+                          }
+                          for (const auto& g : placed)
+                          {
+                              PadLayers next;
+                              for (int i : g.items)
+                                  if (items[static_cast<std::size_t> (i)].sound != nullptr && static_cast<int> (next.layers.size()) < drums::maxLayers)
+                                  {
+                                      PadLayer layer;
+                                      layer.sound = items[static_cast<std::size_t> (i)].sound;
+                                      next.layers.push_back (layer);
+                                  }
+                              auto& info = pads[index (g.pad)];
+                              if (g.category != drums::DrumCategory::unknown)
+                              {
+                                  info.category = g.category;
+                                  const auto d = drums::PadSettings::defaultsFor (g.category);
+                                  info.chokeGroup = d.chokeGroup;
+                                  info.voiceMode = d.voiceMode;
+                                  info.trigger = d.trigger;
+                              }
+                              info.name.clear();
+                              latestRequest[index (g.pad)] = nextGeneration.fetch_add (1);
+                              info.loading = false;
+                              info.error.clear();
+                              selectedLayer[index (g.pad)] = 0;
+                              setPadLayers (g.pad, next);
+                          }
+                          publishPadConfig();
+                          *after = std::shared_ptr<juce::XmlElement> (createStateXml (stateTag).release());
+                      },
+                      [this, before] { restoreStateXml (*before); }),
+                  "Import samples");
+    juce::String report = juce::String (files) + " file" + (files == 1 ? "" : "s") + " on " + juce::String (static_cast<int> (placed.size())) + " pad"
+                          + (placed.size() == 1 ? "" : "s");
+    if (! kept.empty())
+    {
+        report << "; " << static_cast<int> (kept.size()) << " group" << (kept.size() == 1 ? "" : "s") << " still in the tray";
+        importState.groups = kept;   // the rest stays in the preview (never discarded)
+    }
+    else
+        closeImport();
+    sendChangeMessage();
+    return report + ".";
+}
+
 void DrumsProcessor::publishFinishedLoads()
 {
     std::vector<Finished> results;
     std::vector<Found> located;
     std::vector<BreakLoaded> breaks;
+    std::vector<ImportLoaded> imports;
     juce::String report;
     {
         const std::lock_guard<std::mutex> lock (resultsMutex);
         results.swap (finished);
         located.swap (found);
         breaks.swap (breakLoaded);
+        imports.swap (importLoaded);
         report.swapWith (foundReport);
+    }
+    for (auto& l : imports)
+    {
+        if (l.request != importRequest || l.index < 0 || l.index >= static_cast<int> (importState.items.size()))
+            continue;
+        auto& item = importState.items[static_cast<std::size_t> (l.index)];
+        item.sound = l.result.instrument;
+        item.audio = l.result.audio;
+        item.features = l.features;
+        item.error = item.sound == nullptr ? (l.result.error.empty() ? std::string ("could not be loaded") : l.result.error) : std::string();
+        if (item.sound != nullptr)
+        {
+            item.guess = drums::classify (item.file.getFileName().toStdString(), item.features);
+            previewKeep.push_back (item.audio);
+        }
+        if (--importState.remaining == 0)
+        {
+            // The same content twice is listed once more, never placed twice.
+            for (std::size_t i = 0; i < importState.items.size(); ++i)
+                for (std::size_t j = 0; j < i; ++j)
+                    if (importState.items[i].sound != nullptr && importState.items[j].sound != nullptr && importState.items[j].duplicateOf < 0
+                        && importState.items[i].sound->contentHash == importState.items[j].sound->contentHash)
+                    {
+                        importState.items[i].duplicateOf = static_cast<int> (j);
+                        break;
+                    }
+            importState.groups = suggestImportGroups();
+        }
+        sendChangeMessage();
     }
     for (auto& b : breaks)
         if (b.request == breakRequest)
@@ -1783,7 +2072,12 @@ void DrumsProcessor::timerCallback()
     {
         const auto* inUse = previewInUse.load (std::memory_order_acquire);
         previewKeep.erase (std::remove_if (previewKeep.begin(), previewKeep.end(),
-                                           [this, inUse] (const auto& a) { return a.get() != inUse && a != breakState.audio; }),
+                                           [this, inUse] (const auto& a) {
+                                               bool importing = false;
+                                               for (const auto& it : importState.items)
+                                                   importing = importing || it.audio == a;
+                                               return a.get() != inUse && a != breakState.audio && ! importing;
+                                           }),
                            previewKeep.end());
     }
 }
@@ -1796,7 +2090,7 @@ bool DrumsProcessor::waitForLoads (int timeoutMs)
         bool idle = false;
         {
             const std::lock_guard<std::mutex> lock (resultsMutex);
-            idle = finished.empty() && found.empty() && breakLoaded.empty() && pendingLoads.load() == 0;
+            idle = finished.empty() && found.empty() && breakLoaded.empty() && importLoaded.empty() && pendingLoads.load() == 0;
         }
         publishFinishedLoads();
         if (idle)

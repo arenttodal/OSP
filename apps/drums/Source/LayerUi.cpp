@@ -88,6 +88,15 @@ void offerLayerDrop (DrumsProcessor& proc, int pad, const juce::Array<juce::File
     add (verb + "a stack (all together)", LayerDrop::stack);
     if (populated)
         add (files.size() == 1 ? "Replace the pad's sample" : "Replace the pad's samples", LayerDrop::replace);
+    if (files.size() > 1)
+    {
+        // Several files might be a whole kit: sort them onto the pads (spec 6).
+        bool kitEmpty = true;
+        for (int p = 0; p < DrumsProcessor::numPads; ++p)
+            kitEmpty = kitEmpty && proc.padLayers (p).layers.empty();
+        m.addSeparator();
+        m.addItem ("Sort into the kit (import preview)...", true, kitEmpty, [&proc, files] { proc.importFiles (files); });
+    }
     if (longFile)
         m.addItem ("Slice as a break...", [&proc, file = files[0]] { proc.importBreak (file); });
     m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (target));

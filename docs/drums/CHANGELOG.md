@@ -1,5 +1,15 @@
 # ANDOR Drums — version history
 
+## 0.1.6 (unreleased, branch drum-plugin): smart classification and import
+
+- **Drop a folder's worth of samples.** IMPORT SAMPLES suggests a category (from the name
+  first, then the sound) with a confidence dot. Alike takes are grouped as round robins and
+  placed on matching pads. Overflow goes to a tray. Broken files and duplicates are listed.
+- **Corrections:** own pad, move, group, destination, category, reset. Import is one undo
+  step.
+- **Breaks:** slices are classified and grouped onto the kick, snare and hat pads.
+  Strongly varying hits become velocity layers, so ghost notes are kept.
+
 ## 0.1.5 (unreleased, branch drum-plugin): break slicing
 
 - **BREAK:** drop a break and SLICE BREAK opens. Its markers can be moved, added and
