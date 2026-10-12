@@ -178,6 +178,7 @@ private:
     double endPosition = 0.0;
     double stopPosition = 0.0;       ///< END: where the note has faded out (with hasStop)
     bool hasStop = false;
+    double stopSamplesLeft = 0.0;    ///< END for REIMAGINED mode voices: output samples (at the note's pitch) until END
 
     // Continuation
     ContinuationStrategy strategy = ContinuationStrategy::off;

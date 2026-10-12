@@ -226,6 +226,8 @@ private:
     std::array<ceramic::KeyButton, 4> effectPower;
     std::array<float, 4> effectMemory { 0.3f, 0.3f, 0.3f, 0.3f };
     std::array<LabelledKnob, 3> macros;    // LIFE, DYNAMICS, CHARACTER
+    ceramic::Fader machine;                // MACHINE (M9, experimental), in GLOBAL's header
+    std::unique_ptr<SliderAttachment> machineAttachment;
     KeyMapEditor keyMap;
     BreakView breaks;
     ImportView imports;

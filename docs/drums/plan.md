@@ -61,7 +61,14 @@ branch.
       - voice memory per pad cut from 208 to 48 slots.
 
       Needs a Mac: worst-case timing and host checks.
-- [ ] **M9 MACHINE prototype** from existing DRIVE / CHARACTER / ECHO first.
+- [x] **M9 MACHINE prototype** (`m9-machine.md`). Done:
+      - one control, built only from existing OSP processing (TOYBOX's digital character,
+        the CHARACTER filter, tape DRIVE and MOVEMENT, LIFE);
+      - bit-identical at 0; pitch within a few cents;
+      - END now works for REIMAGINED mode voices.
+
+      Open: the A/B listening test to tune the curve; timing imperfection is deliberately
+      left out.
 
 ## Needs the user
 

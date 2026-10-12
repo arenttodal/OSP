@@ -529,14 +529,14 @@ private:
     std::array<Pulled, numPads> pulled;
     // The parameters' values, looked up once (the audio thread never builds IDs or searches).
     std::atomic<float>* rawKeyboardMode = nullptr;
-    std::array<std::atomic<float>*, 8> rawKit {};
+    std::array<std::atomic<float>*, 9> rawKit {};
     struct PadRaw
     {
         std::atomic<float>* gain = nullptr, * pan = nullptr, * tune = nullptr, * start = nullptr, * attack = nullptr, * decay = nullptr,
                           * sustain = nullptr, * release = nullptr, * mute = nullptr, * solo = nullptr, * reverse = nullptr;
     };
     std::array<PadRaw, numPads> rawPad {};
-    std::array<double, 8> pulledKit {};
+    std::array<double, 9> pulledKit {};
     bool kitPulled = false;
     drums::KeyMap audioMap = drums::KeyMap::defaults();
     bool wasPlaying = false;

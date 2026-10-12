@@ -1711,6 +1711,8 @@ TEST_CASE ("Real-time: processBlock never allocates, whatever happens around it"
             case 380: p.undoManager().undo(); break;
             case 420: p.auditionSlice (2); break;                // the slice preview mixes in
             case 470: p.duplicatePad (1, 7); break;
+            case 500: p.parameters().getParameter ("kit.machine")->setValueNotifyingHost (0.6f); break;   // MACHINE on
+            case 540: p.parameters().getParameter ("kit.machine")->setValueNotifyingHost (0.2f); break;
             default: break;
         }
         if (b % 25 == 0)
@@ -1800,7 +1802,7 @@ TEST_CASE ("Host automation: every pad and kit parameter reaches the sound smoot
         CHECK (param->getName (64).isNotEmpty());
         ++count;
     }
-    CHECK (count == 1 + 8 + 9 * 11);   // keyboard mode, kit, 11 per pad
+    CHECK (count == 1 + 9 + 9 * 11);   // keyboard mode, kit (with MACHINE), 11 per pad
     // Gain automation during a held note: no jump larger than 10 ms of ramp allows.
     juce::AudioBuffer<float> buffer (2, 256);
     juce::MidiBuffer midi;
@@ -2065,6 +2067,44 @@ TEST_CASE ("Snapshots of every major state (written when ANDOR_DRUMS_SNAPSHOT_DI
     editor->content().importView().selection = { 0 };
     editor->content().importView().refresh();
     snapshot (*editor, "15-import-preview");
+
+    p.closeImport();
+    editor->content().syncBreakView();
+    p.parameters().getParameter ("kit.machine")->setValueNotifyingHost (0.4f);
+    snapshot (*editor, "16-machine");
+}
+
+TEST_CASE ("MACHINE: a kit parameter, off by default, saved with the session, and audible", "[drums-plugin][machine]")
+{
+    TempDir tmp;
+    const ScopedStore store (tmp.dir.getChildFile ("store"));
+    auto render = [&] (float machine) {
+        DrumsProcessor p;
+        p.prepareToPlay (rate, 256);
+        loadNine (p, tmp);
+        CHECK (p.parameters().getRawParameterValue ("kit.machine")->load() <= 0.0f);   // off by default
+        p.parameters().getParameter ("kit.machine")->setValueNotifyingHost (machine);
+        juce::AudioBuffer<float> buffer (2, 256);
+        juce::MidiBuffer midi;
+        std::vector<float> out;
+        for (int b = 0; b < 60; ++b)
+        {
+            midi.clear();
+            if (b % 15 == 1)
+                midi.addEvent (juce::MidiMessage::noteOn (10, p.keyMap().padNote[1], static_cast<juce::uint8> (110)), 0);
+            block (p, buffer, midi);
+            out.insert (out.end(), buffer.getReadPointer (0), buffer.getReadPointer (0) + 256);
+        }
+        juce::MemoryBlock state;
+        p.getStateInformation (state);
+        DrumsProcessor q;
+        q.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+        CHECK (q.parameters().getRawParameterValue ("kit.machine")->load() == Approx (machine).margin (1.0e-4));
+        return out;
+    };
+    const auto off = render (0.0f), offAgain = render (0.0f), on = render (0.7f);
+    CHECK (off == offAgain);   // off: exactly the kit as it was
+    CHECK (off != on);
 }
 
 int main (int argc, char* argv[])

@@ -1,5 +1,13 @@
 # ANDOR Drums — version history
 
+## 0.1.8 (unreleased, branch drum-plugin): MACHINE (experimental)
+
+- **MACHINE** in the GLOBAL header: one fader from OFF to STRONG for the character of an
+  older drum machine over the whole kit. It brings a lower rate and fewer bits, a gentler
+  top end, tape saturation and wear, and more hit-to-hit variation, while tuned drums stay
+  in tune. At OFF the kit sounds exactly as before.
+- **Fix:** slices and END now stop where they end, also on sounds using a REIMAGINED mode.
+
 ## 0.1.7 (unreleased, branch drum-plugin): integration
 
 - **Fix:** the audio callback no longer allocates. Parameter values were looked up by

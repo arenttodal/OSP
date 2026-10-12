@@ -1084,6 +1084,14 @@ DrumsContent::DrumsContent (DrumsProcessor& p) : proc (p), grid (p), sample (p),
         macros[i].slider.updateText();
     }
 
+    // MACHINE: one control, the character of an older drum machine over the whole kit.
+    addAndMakeVisible (machine);
+    machine.setTooltip ("MACHINE (experimental): the character of an older drum machine over the whole kit. "
+                        "Left: the samples as they are. Double-click: off.");
+    machine.setDoubleClickReturnValue (true, 0.0);
+    machineAttachment = std::make_unique<SliderAttachment> (proc.parameters(), "kit.machine", machine);
+    machine.onValueChange = [this] { repaint (machine.getBounds().withLeft (machine.getX() - 114)); };
+
     addChildComponent (keyMap);
     keyMap.onClose = [this] { setKeyMapOpen (false); };
     keyMap.onSelect = [this] (int pad) { selectPad (pad); };
@@ -1390,6 +1398,7 @@ void DrumsContent::resized()
     const int mw = (global.getWidth() - 20) / 3;
     for (std::size_t i = 0; i < macros.size(); ++i)
         macros[i].setBounds (juce::Rectangle<int> (global.getX() + 10 + static_cast<int> (i) * mw, global.getY() + 34, mw, global.getHeight() - 58), 22);
+    machine.setBounds (global.getRight() - 16 - 84, global.getY() + 10, 84, 22);
 }
 
 void DrumsContent::paint (juce::Graphics& g)
@@ -1438,7 +1447,19 @@ void DrumsContent::paint (juce::Graphics& g)
             g.drawText (fxNames[i], cell.withTrimmedLeft (38.0f).withHeight (32.0f), juce::Justification::centredLeft);
         }
         ceramic::card (g, global.toFloat(), 12.0f);
-        sectionTitle (g, global.reduced (18, 8).removeFromTop (26), "GLOBAL", "(KIT)");
+        sectionTitle (g, global.reduced (18, 8).removeFromTop (26), "GLOBAL");   // no "(KIT)": MACHINE needs the room
+        {
+            // MACHINE's name and its amount in words, left of its fader.
+            const double amount = machine.getValue();
+            const char* word = amount < 0.0001 ? "OFF" : amount < 0.2 ? "TOUCH" : amount < 0.5 ? "SUBTLE" : amount < 0.8 ? "CLEAR" : "STRONG";
+            const auto label = juce::Rectangle<int> (machine.getX() - 112, machine.getY(), 106, machine.getHeight());
+            g.setColour (cc::text);
+            g.setFont (plugin::fonts::make (11.5f, look::Weight::semibold, 0.06f));
+            g.drawText ("MACHINE", label, juce::Justification::centredLeft);
+            g.setColour (amount < 0.0001 ? cc::textMicro : cc::accent);
+            g.setFont (plugin::fonts::make (10.5f, look::Weight::medium, 0.04f));
+            g.drawText (word, label, juce::Justification::centredRight);
+        }
         // Macro LEDs: lit while the macro does something (the glass lens, §9).
         const int mw = (global.getWidth() - 20) / 3;
         static const char* ids[] = { "kit.life", "kit.dynamics", "kit.character" };

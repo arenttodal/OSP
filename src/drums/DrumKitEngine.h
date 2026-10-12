@@ -83,6 +83,10 @@ struct KitSettings
     std::uint64_t seed = 1;
     KeyboardMode keyboardMode = KeyboardMode::pad;
     KeyMap keyMap = KeyMap::defaults();
+    /** MACHINE (experimental, docs/drums/m9-machine.md): 0 = the samples as they are,
+        about 0.35 = a subtle older-drum-machine character, 1 = a strong transformation.
+        Built only from existing OSP processing (spec 9.4). */
+    double machine = 0.0;
 
     KitSettings()
     {
@@ -126,6 +130,11 @@ public:
     void setKitMacros (const Macros& macros) noexcept;
     void setShaping (const Shaping& shaping) noexcept;
     void setVolumeDb (double db) noexcept { kit.volumeDb = db; }
+    void setMachine (double amount) noexcept;
+    double machine() const noexcept { return kit.machine; }
+    /** What the kit's macros and shaping become with MACHINE applied (identical at 0). */
+    Macros effectiveMacros() const noexcept;
+    Shaping effectiveShaping() const noexcept;
     void setKeyboardMode (KeyboardMode mode) noexcept { kit.keyboardMode = mode; }
     KeyboardMode keyboardMode() const noexcept { return kit.keyboardMode; }
     void setKeyMap (const KeyMap& map) noexcept { kit.keyMap = map; }

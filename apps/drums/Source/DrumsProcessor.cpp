@@ -16,7 +16,7 @@ namespace
 {
     std::string bareHash (const std::string& h) { return h.rfind ("sha256:", 0) == 0 ? h.substr (7) : h; }
 
-    const char* const kitIds[] = { "kit.volume", "kit.life", "kit.dynamics", "kit.character", "kit.drive", "kit.motion", "kit.echo", "kit.space" };
+    const char* const kitIds[] = { "kit.volume", "kit.life", "kit.dynamics", "kit.character", "kit.drive", "kit.motion", "kit.echo", "kit.space", "kit.machine" };
 
     float raw (juce::AudioProcessorValueTreeState& state, const juce::String& id)
     {
@@ -107,6 +107,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout DrumsProcessor::createLayout
     macro ("kit.motion", "Movement", kit.macros.motion);
     macro ("kit.echo", "Echo", kit.macros.echo);
     macro ("kit.space", "Space", kit.macros.space);
+    // MACHINE (M9, experimental): 0 leaves every sound exactly as it was.
+    layout.add (std::make_unique<AudioParameterFloat> (ParameterID { "kit.machine", 3 }, "Machine",
+                                                       NormalisableRange<float> (0.0f, 1.0f, 0.0001f), 0.0f));
 
     for (int p = 0; p < numPads; ++p)
     {
@@ -161,6 +164,7 @@ void DrumsProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     kit.macros.motion = raw (apvts, "kit.motion");
     kit.macros.echo = raw (apvts, "kit.echo");
     kit.macros.space = raw (apvts, "kit.space");
+    kit.machine = raw (apvts, "kit.machine");
     std::array<drums::PadSettings, numPads> settings {};
     for (int p = 0; p < numPads; ++p)
     {
@@ -315,11 +319,14 @@ void DrumsProcessor::pullSettings() noexcept
     auto v = [] (const std::atomic<float>* a) { return static_cast<double> (a->load (std::memory_order_relaxed)); };
     engine.setKeyboardMode (v (rawKeyboardMode) > 0.5 ? drums::KeyboardMode::expanded : drums::KeyboardMode::pad);
 
-    std::array<double, 8> kit {};
+    std::array<double, 9> kit {};
     for (std::size_t k = 0; k < kit.size(); ++k)
         kit[k] = v (rawKit[k]);
     if (! kitPulled || kit != pulledKit)
     {
+        // MACHINE first: the macros below are applied on top of its character.
+        if (! kitPulled || kit[8] < pulledKit[8] || kit[8] > pulledKit[8])
+            engine.setMachine (kit[8]);
         pulledKit = kit;
         kitPulled = true;
         engine.setVolumeDb (kit[0]);

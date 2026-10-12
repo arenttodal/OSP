@@ -95,7 +95,7 @@ void DrumKitEngine::prepare (double rate, int maximumBlockSize, const KitSetting
         s.polyphony = std::clamp (ps.polyphony, 1, voiceSlotsPerPad / 2);   // half the slots: the rest are fading tails
         s.adsr = ps.adsr;
         s.macros = padMacros (p);
-        s.shaping = kit.shaping;
+        s.shaping = effectiveShaping();
         s.releaseGraft = false;                              // a gate's release is the envelope's, predictably
         s.seed = Prng::deriveSeed (kit.seed, padSeedSalt, static_cast<std::uint64_t> (p));
         s.pitchCharacter = PitchCharacter::tape;             // drums transpose like a sampler: speed and pitch together
@@ -104,10 +104,10 @@ void DrumKitEngine::prepare (double rate, int maximumBlockSize, const KitSetting
         applyPad (p);
     }
 
-    Macros postMacros = kit.macros;
+    Macros postMacros = effectiveMacros();
     postMacros.reimagined = 0.0;
     post.setMacros (postMacros);
-    post.setShaping (kit.shaping);
+    post.setShaping (effectiveShaping());
     post.prepare (rate, blockSize, kit.seed);
     post.setReimagined (0.0);
     gainL.fill (0.0f);
@@ -124,10 +124,64 @@ void DrumKitEngine::prepare (double rate, int maximumBlockSize, const KitSetting
         h.store (0, std::memory_order_relaxed);
 }
 
+Macros DrumKitEngine::effectiveMacros() const noexcept
+{
+    Macros m = kit.macros;
+    const double a = std::clamp (kit.machine, 0.0, 1.0);
+    if (a <= 0.0)
+        return m;
+    // A little saturation, a little wear and motion, a little more per-hit variation:
+    // never less than the musician set.
+    m.drive = std::max (m.drive, 0.35 * a);
+    m.motion = std::max (m.motion, 0.22 * a);
+    m.life = std::max (m.life, 0.25 + 0.2 * a);
+    return m;
+}
+
+Shaping DrumKitEngine::effectiveShaping() const noexcept
+{
+    Shaping s = kit.shaping;
+    const double a = std::clamp (kit.machine, 0.0, 1.0);
+    if (a <= 0.0)
+        return s;
+    // Bandwidth: CHARACTER's low-pass closes from the kit's top towards ~6 kHz (12 dB/oct,
+    // the gentler slope of older converters' filters).
+    s.filterType = FilterType::lp12;
+    s.filterMaxHz = shaping::logLerp (std::max (s.filterMaxHz, 6000.0), 6000.0, a);
+    s.resonance = std::min (s.resonance, 0.1);
+    // Saturation: tape, rounder (transients rounded a little, punch kept by the attack).
+    s.driveMode = DriveMode::tape;
+    s.driveBody = 0.5 + 0.25 * a;
+    s.driveTone = 0.5 - 0.2 * a;
+    // Instability: tape wow and flutter, kept small; wear adds noise and colour.
+    s.movementMode = MovementMode::tape;
+    s.tapeWow = 0.15;
+    s.tapeFlutter = 0.25 + 0.2 * a;
+    s.tapeWear = 0.25 + 0.5 * a;
+    // Per-hit pitch: at most 1.5-5 cents (tuned percussion keeps its pitch, spec 9.3).
+    s.lifePitchCents = std::min (s.lifePitchCents, 1.5 + 3.5 * a);
+    s.lifeTone = std::max (s.lifeTone, 0.3 + 0.25 * a);
+    return s;
+}
+
+void DrumKitEngine::setMachine (double amount) noexcept
+{
+    kit.machine = std::clamp (amount, 0.0, 1.0);
+    const auto shaping = effectiveShaping();
+    post.setShaping (shaping);
+    for (auto& e : engines)
+        e->setShaping (shaping);
+    Macros postMacros = effectiveMacros();
+    postMacros.reimagined = 0.0;
+    post.setMacros (postMacros);
+    for (int p = 0; p < maxPads; ++p)
+        applyPad (p);
+}
+
 Macros DrumKitEngine::padMacros (int pad) const noexcept
 {
     const auto& ps = pads[index (pad)];
-    Macros m = kit.macros;
+    Macros m = effectiveMacros();
     if (ps.life >= 0.0)
         m.life = ps.life;
     if (ps.dynamics >= 0.0)
@@ -152,6 +206,16 @@ void DrumKitEngine::applyPad (int pad) noexcept
     layer.reverse = ps.reverse;
     layer.loop = false;   // one-shots play their recording once; no sustain loops
     layer.reimagined = ps.reimagined >= 0.0 ? ps.reimagined : kit.macros.reimagined;
+    if (const double a = std::clamp (kit.machine, 0.0, 1.0); a > 0.0)
+    {
+        // The sample memory of a small, older machine: TOYBOX at its digital character only
+        // (lower rate, fewer bits, a simple DAC); below 25 % it never loops or turns.
+        layer.reimaginedSettings.mode = ReimaginedMode::toybox;
+        layer.reimaginedSettings.toybox.play = ToyboxPlay::forward;
+        layer.reimaginedSettings.toybox.motion = 0.0;
+        layer.reimaginedSettings.toybox.digital = 0.25 + 0.6 * a;
+        layer.reimagined = std::max (layer.reimagined, 0.22 * a);
+    }
     engine.setLayerSettings (0, layer);
 }
 
@@ -241,7 +305,7 @@ void DrumKitEngine::setPadSettings (int pad, const PadSettings& settings) noexce
 void DrumKitEngine::setKitMacros (const Macros& macros) noexcept
 {
     kit.macros = macros;
-    Macros postMacros = macros;
+    Macros postMacros = effectiveMacros();
     postMacros.reimagined = 0.0;
     post.setMacros (postMacros);
     post.setReimagined (0.0);
@@ -252,9 +316,10 @@ void DrumKitEngine::setKitMacros (const Macros& macros) noexcept
 void DrumKitEngine::setShaping (const Shaping& shaping) noexcept
 {
     kit.shaping = shaping;
-    post.setShaping (shaping);
+    const auto effective = effectiveShaping();
+    post.setShaping (effective);
     for (auto& e : engines)
-        e->setShaping (shaping);
+        e->setShaping (effective);
 }
 
 void DrumKitEngine::setSeed (std::uint64_t seed) noexcept

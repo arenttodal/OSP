@@ -113,6 +113,7 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
         stopPosition = soundEnd - std::clamp (params.endFraction, 0.0, 1.0) * std::max (0.0, soundEnd - src.startFrame());
     }
     hasStop = ! granularMode && params.endFraction < 1.0;
+    stopSamplesLeft = hasStop ? (stopPosition - position) * direction / std::max (1.0e-9, params.increment) : 0.0;
     endPosition = frames + static_cast<double> (sinc->maxReach());
 
     released = false;
@@ -1282,8 +1283,20 @@ void InstrumentVoice::renderMode (float* left, float* right, int numSamples, dou
             control.step = currentStep;
             modeEngine->control (control);
             modeStep = currentStep * modeEngine->stepFactor();
+            if (hasStop && ! isFading())
+            {
+                // END, as in render(): a mode engine reads on its own, so count the output.
+                const int minimumFade = std::max (1, static_cast<int> (0.0015 * sampleRate));
+                if (stopSamplesLeft <= static_cast<double> (controlInterval + minimumFade))
+                {
+                    beginFastFade (std::max (minimumFade, static_cast<int> (stopSamplesLeft)));
+                    hasStop = false;
+                }
+            }
         }
         const int n = std::min (modeCountdown, numSamples - done);
+        if (hasStop)
+            stopSamplesLeft -= static_cast<double> (n) * currentStep / std::max (1.0e-9, baseIncrement);
         const bool dry = ! granularMode && modeEngine->wantsDryRead();
 
         // The engine's input: the grains, the plain read of the recording, or nothing.

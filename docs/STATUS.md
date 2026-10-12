@@ -407,7 +407,12 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       - measurements;
       - instances, sample rates, automation.
 
-      Next: the MACHINE prototype (M9).
+      M9 MACHINE (docs/drums/m9-machine.md):
+      - one experimental control from existing modules;
+      - bit-identical at 0;
+      - END fixed for REIMAGINED mode voices.
+
+      Next: listening tests on a Mac (the MACHINE curve, hosts), then the open M5 items.
 
 ## DONE
 
