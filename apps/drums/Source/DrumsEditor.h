@@ -3,6 +3,7 @@
 #include "CeramicSkin.h"
 #include "DrumsProcessor.h"
 #include "KeyMapEditor.h"
+#include "LayerUi.h"
 #include "OspLookAndFeel.h"
 #include "PadGrid.h"
 
@@ -30,7 +31,9 @@ struct LabelledKnob
     void setBounds (juce::Rectangle<int> r, int labelHeight = 18);
 };
 
-/** The selected pad's waveform: the sound in a dark display; drag the START marker. */
+/** The selected pad's waveform (its selected layer): the sound in a dark display; drag
+    the START and END markers. With one layer START is the pad's START parameter; with
+    several, START and END belong to the layer shown. */
 class WaveDisplay final : public juce::Component
 {
 public:
@@ -44,8 +47,12 @@ public:
 private:
     juce::Rectangle<float> wave() const;
     float startX() const;
+    float endX() const;
+    const PadLayer* shownLayer() const;
+    bool padStartMarker() const;
     DrumsProcessor& proc;
-    bool dragging = false;
+    enum class Drag { none, start, end } dragging = Drag::none;
+    bool firstMove = true;
 };
 
 /** The selected pad: header (badge, name, < >, SAMPLE | KEY MAP tabs, menu), waveform,
@@ -60,15 +67,28 @@ public:
     std::function<void (int)> onSelect;
     std::function<void()> onLoad;
     std::function<void()> onOpenKeyMap;
+    // Tests
+    LayerList& layerList() noexcept { return layers; }
+    VelocityRange& velocityRange() noexcept { return velocity; }
+    juce::Slider& layerLevelSlider() noexcept { return layerLevel.slider; }
 
 private:
     void showMenu();
+    void openAddDialog();
+    void bindLayer();   ///< the selected layer's LEVEL and VELOCITY
+    juce::Rectangle<int> velocityCaption() const { return { 488, 270, 284, 22 }; }
     DrumsProcessor& proc;
     juce::Label name;
     void mouseDown (const juce::MouseEvent&) override;
     juce::Rectangle<int> keyMapTabArea() const { return { 488, 12, 84, 30 }; }
-    ceramic::KeyButton previous { {}, 0.7f }, next { {}, 0.7f }, menu { {}, 0.7f }, replace { "Replace Sample...", 0.8f };
-    ceramic::KeyButton auditionLayer { {}, 0.6f };
+    ceramic::KeyButton previous { {}, 0.7f }, next { {}, 0.7f }, menu { {}, 0.7f }, addLayers { "Add Layers...", 0.8f };
+    ceramic::KeyButton modeRobin { "ROBIN", 0.6f }, modeVelocity { "VELOCITY", 0.6f }, modeStack { "STACK", 0.6f };
+    juce::ComboBox order;
+    LayerList layers;
+    LabelledKnob layerLevel;
+    VelocityRange velocity;
+    bool levelGesture = false;
+    std::unique_ptr<juce::FileChooser> chooser;
     WaveDisplay wave;
     LabelledKnob start, tune, volume, pan;
     ceramic::PillSwitch reverse;
@@ -139,6 +159,7 @@ public:
     void setLayout (DrumsProcessor::PadLayout layout);
     PadGrid& padGrid() noexcept { return grid; }
     KeyMapEditor& keyMapEditor() noexcept { return keyMap; }
+    SamplePanel& samplePanel() noexcept { return sample; }
     void openLoadDialog (int pad);
     /** Brings the mode switches, undo state and labels in line with the processor now. */
     void refreshModeBar();

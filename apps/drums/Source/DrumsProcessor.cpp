@@ -57,6 +57,8 @@ DrumsProcessor::DrumsProcessor()
     }
     for (auto& r : retired)
         r.fill (nullptr);
+    for (auto& l : lastLayer)
+        l.store (-1, std::memory_order_relaxed);
     publishPadConfig();
     startTimerHz (20);
 }
@@ -162,8 +164,7 @@ void DrumsProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     engine.prepare (sampleRate, std::max (16, samplesPerBlock), kit, settings);
     for (int p = 0; p < numPads; ++p)
     {
-        if (playing[index (p)] != nullptr)
-            engine.setPadModel (p, playing[index (p)]->model.get());
+        applySound (p, playing[index (p)]);
         pulled[index (p)] = Pulled {};
     }
     kitPulled = false;
@@ -176,35 +177,71 @@ void DrumsProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 // Audio thread
 // ---------------------------------------------------------------------------------------
 
+void DrumsProcessor::applySound (int pad, const PadSound* sound) noexcept
+{
+    std::array<const InstrumentModel*, drums::maxLayers> models {};
+    drums::LayerPlan plan;
+    if (sound != nullptr)
+    {
+        plan = sound->plan;
+        plan.count = std::min ({ plan.count, drums::maxLayers, static_cast<int> (sound->sounds.size()) });
+        for (int l = 0; l < plan.count; ++l)
+            models[static_cast<std::size_t> (l)] = sound->sounds[static_cast<std::size_t> (l)]->model.get();
+    }
+    engine.setPadLayers (pad, models, plan);
+}
+
+bool DrumsProcessor::stillSounding (int pad, const PadSound& old) const noexcept
+{
+    // Sounds the current bundle also holds stay alive through it; only the others count.
+    const auto* now = playing[index (pad)];
+    for (const auto& s : old.sounds)
+    {
+        bool kept = false;
+        if (now != nullptr)
+            for (const auto& n : now->sounds)
+                kept = kept || n.get() == s.get();
+        if (! kept && engine.isModelInUse (s->model.get()))
+            return true;
+    }
+    return false;
+}
+
 void DrumsProcessor::takeNewSounds() noexcept
 {
     for (int p = 0; p < numPads; ++p)
     {
         const auto i = index (p);
-        const LoadedInstrument* fresh = exchange[i].takePending();
-        const bool clear = clearRequest[i].exchange (false, std::memory_order_acq_rel);
-        if (fresh != nullptr || clear)
+        if (const PadSound* fresh = exchange[i].takePending())
         {
             if (playing[i] != nullptr)
             {
-                // Held hits finish on the old sound; with no room left, the oldest one ends.
+                // Held hits finish on the old sounds; with no room left, the oldest bundle's
+                // sounds that are gone from the new one end.
                 auto& slots = retired[i];
                 auto* free = std::find (slots.begin(), slots.end(), nullptr);
                 if (free == slots.end())
                 {
-                    engine.killVoicesUsing (slots.front()->model.get());
+                    for (const auto& s : slots.front()->sounds)
+                    {
+                        bool kept = false;
+                        for (const auto& n : fresh->sounds)
+                            kept = kept || n.get() == s.get();
+                        if (! kept)
+                            engine.killVoicesUsing (s->model.get());
+                    }
                     std::move (slots.begin() + 1, slots.end(), slots.begin());
                     free = slots.end() - 1;
                 }
                 *free = playing[i];
             }
-            playing[i] = clear && fresh == nullptr ? nullptr : fresh;
-            engine.setPadModel (p, playing[i] != nullptr ? playing[i]->model.get() : nullptr);
+            playing[i] = fresh;
+            applySound (p, fresh);
         }
         std::uint64_t oldest = playing[i] != nullptr ? playing[i]->generation : std::numeric_limits<std::uint64_t>::max();
         for (auto& r : retired[i])
         {
-            if (r != nullptr && ! engine.isModelInUse (r->model.get()))
+            if (r != nullptr && ! stillSounding (p, *r))
                 r = nullptr;
             if (r != nullptr)
                 oldest = std::min (oldest, r->generation);
@@ -340,17 +377,27 @@ void DrumsProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
 
     // Mouse auditions land at the block's start.
     {
+        auto audition = [this] (const Audition& a) {
+            if (a.velocity <= 0)
+            {
+                engine.releasePad (a.pad);
+                return;
+            }
+            const auto* sound = playing[index (a.pad)];
+            int engineLayer = -1;
+            if (a.layer >= 0 && sound != nullptr)
+                for (int l = 0; l < sound->plan.count; ++l)
+                    if (sound->uiIndex[static_cast<std::size_t> (l)] == a.layer)
+                        engineLayer = l;
+            if (a.layer >= 0 && engineLayer < 0)
+                return;   // a missing layer: nothing to play
+            engineLayer >= 0 ? engine.triggerPadLayer (a.pad, engineLayer, a.velocity) : engine.triggerPad (a.pad, a.velocity);
+        };
         const auto scope = auditionFifo.read (auditionFifo.getNumReady());
         for (int i = 0; i < scope.blockSize1; ++i)
-        {
-            const auto& a = auditions[static_cast<std::size_t> (scope.startIndex1 + i)];
-            a.velocity > 0 ? engine.triggerPad (a.pad, a.velocity) : engine.releasePad (a.pad);
-        }
+            audition (auditions[static_cast<std::size_t> (scope.startIndex1 + i)]);
         for (int i = 0; i < scope.blockSize2; ++i)
-        {
-            const auto& a = auditions[static_cast<std::size_t> (scope.startIndex2 + i)];
-            a.velocity > 0 ? engine.triggerPad (a.pad, a.velocity) : engine.releasePad (a.pad);
-        }
+            audition (auditions[static_cast<std::size_t> (scope.startIndex2 + i)]);
     }
 
     // Sample-accurate MIDI: render up to each event, then apply it.
@@ -408,6 +455,13 @@ void DrumsProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
             outPeakL.store (pl, std::memory_order_relaxed);
         if (pr > outPeakR.load (std::memory_order_relaxed))
             outPeakR.store (pr, std::memory_order_relaxed);
+    }
+    for (int p = 0; p < numPads; ++p)
+    {
+        const auto* sound = playing[index (p)];
+        const int l = engine.lastLayerPlayed (p);
+        lastLayer[index (p)].store (sound != nullptr && l >= 0 && l < sound->plan.count ? sound->uiIndex[static_cast<std::size_t> (l)] : -1,
+                                    std::memory_order_relaxed);
     }
     for (int c = 2; c < buffer.getNumChannels(); ++c)
         buffer.clear (c, 0, numSamples);
@@ -509,14 +563,21 @@ void DrumsProcessor::auditionPad (int pad, int velocity)
 {
     const auto scope = auditionFifo.write (1);
     if (scope.blockSize1 > 0)
-        auditions[static_cast<std::size_t> (scope.startIndex1)] = Audition { pad, juce::jlimit (1, 127, velocity) };
+        auditions[static_cast<std::size_t> (scope.startIndex1)] = Audition { pad, juce::jlimit (1, 127, velocity), -1 };
+}
+
+void DrumsProcessor::auditionLayer (int pad, int layer, int velocity)
+{
+    const auto scope = auditionFifo.write (1);
+    if (scope.blockSize1 > 0)
+        auditions[static_cast<std::size_t> (scope.startIndex1)] = Audition { pad, juce::jlimit (1, 127, velocity), std::max (0, layer) };
 }
 
 void DrumsProcessor::releaseAuditionedPad (int pad)
 {
     const auto scope = auditionFifo.write (1);
     if (scope.blockSize1 > 0)
-        auditions[static_cast<std::size_t> (scope.startIndex1)] = Audition { pad, 0 };
+        auditions[static_cast<std::size_t> (scope.startIndex1)] = Audition { pad, 0, -1 };
 }
 
 DrumsProcessor::Arrangement DrumsProcessor::arrangement() const
@@ -620,39 +681,337 @@ bool DrumsProcessor::isNoteHeld (int note) const noexcept
 
 void DrumsProcessor::loadPad (int pad, const juce::File& file)
 {
-    plugin::LoadRequest request;
-    request.file = file;
-    startLoad (pad, std::move (request));
+    addPadLayers (pad, juce::Array<juce::File> { file }, LayerDrop::replace);
 }
 
-void DrumsProcessor::startLoad (int pad, plugin::LoadRequest request)
+void DrumsProcessor::addPadLayers (int pad, const juce::Array<juce::File>& files, LayerDrop how)
 {
-    const auto generation = nextGeneration.fetch_add (1);
-    latestRequest[index (pad)] = generation;
-    pads[index (pad)].loading = true;
-    pads[index (pad)].error.clear();
-    ++pendingLoads;
-    loaderPool.addJob ([this, request = std::move (request), generation, pad] {
-        auto result = plugin::loadInstrument (request, store, generation);
+    std::vector<plugin::LoadRequest> requests;
+    for (const auto& f : files)
+        if (static_cast<int> (requests.size()) < drums::maxLayers)
         {
-            const std::lock_guard<std::mutex> lock (resultsMutex);
-            finished.push_back ({ pad, generation, std::move (result) });
+            plugin::LoadRequest r;
+            r.file = f;
+            requests.push_back (std::move (r));
         }
-        --pendingLoads;
-    });
+    if (requests.empty())
+        return;
+    Batch batch;
+    batch.how = how;
+    startBatch (pad, std::move (batch), std::move (requests));
+}
+
+void DrumsProcessor::startBatch (int pad, Batch batch, std::vector<plugin::LoadRequest> requests)
+{
+    const auto i = index (pad);
+    const auto id = nextGeneration.fetch_add (1);
+    latestRequest[i] = id;   // a batch still loading for this pad is dropped
+    for (auto it = batches.begin(); it != batches.end();)
+        it = it->second.pad == pad ? batches.erase (it) : std::next (it);
+    batch.pad = pad;
+    batch.remaining = static_cast<int> (requests.size());
+    batch.loaded.assign (requests.size(), nullptr);
+    pads[i].loading = true;
+    pads[i].error.clear();
+    auto& stored = batches[id] = std::move (batch);
+    if (requests.empty())
+    {
+        finishBatch (id, stored);
+        batches.erase (id);
+        sendChangeMessage();
+        return;
+    }
+    for (std::size_t k = 0; k < requests.size(); ++k)
+    {
+        ++pendingLoads;
+        loaderPool.addJob ([this, request = std::move (requests[k]), id, pad, slot = static_cast<int> (k)] {
+            auto result = plugin::loadInstrument (request, store, id);
+            {
+                const std::lock_guard<std::mutex> lock (resultsMutex);
+                finished.push_back ({ pad, id, slot, std::move (result) });
+            }
+            --pendingLoads;
+        });
+    }
     sendChangeMessage();
+}
+
+namespace
+{
+    /** The level each file was recorded at, against the loudest of them (dB, <= 0): the
+        loader levels every file, velocity layers want their own dynamics back. */
+    void restoreRecordedLevels (PadLayers& layers)
+    {
+        double loudest = -1.0e9;
+        for (const auto& l : layers.layers)
+            if (l.sound != nullptr)
+                loudest = std::max (loudest, -l.sound->playbackGainDb);
+        for (auto& l : layers.layers)
+            if (l.sound != nullptr)
+                l.params.gainDb = std::clamp (-l.sound->playbackGainDb - loudest, -60.0, 0.0);
+    }
+
+    double recordedLevel (const PadLayer& l)
+    {
+        return l.sound != nullptr ? l.sound->analysis.envelope.maxRmsDbfs : -1.0e9;
+    }
+} // namespace
+
+void DrumsProcessor::finishBatch (std::uint64_t, Batch& batch)
+{
+    const int pad = batch.pad;
+    auto& info = pads[index (pad)];
+    info.loading = false;
+    if (batch.recall)
+    {
+        setPadLayers (pad, batch.result);
+        info.error = batch.error;
+        return;
+    }
+    std::vector<std::shared_ptr<const LoadedInstrument>> loaded;
+    for (auto& l : batch.loaded)
+        if (l != nullptr)
+            loaded.push_back (l);
+    if (loaded.empty())
+    {
+        info.error = batch.error.empty() ? std::string ("The file could not be loaded") : batch.error;
+        sendChangeMessage();
+        return;
+    }
+    info.error.clear();
+    PadLayers next = batch.how == LayerDrop::replace ? PadLayers {} : info.layers;
+    for (auto& sound : loaded)
+        if (static_cast<int> (next.layers.size()) < drums::maxLayers)
+        {
+            PadLayer layer;
+            layer.sound = std::move (sound);
+            next.layers.push_back (std::move (layer));
+        }
+    const int count = static_cast<int> (next.layers.size());
+    drums::LayerPlan ranges;
+    switch (batch.how)
+    {
+        case LayerDrop::replace:
+        case LayerDrop::roundRobin:
+            next.mode = drums::LayerMode::roundRobin;
+            for (auto& l : next.layers)
+            {
+                l.params.velocityLow = 1;
+                l.params.velocityHigh = 127;
+            }
+            break;
+        case LayerDrop::stack:
+            next.mode = drums::LayerMode::stack;
+            for (auto& l : next.layers)
+            {
+                l.params.velocityLow = 1;
+                l.params.velocityHigh = 127;
+            }
+            break;
+        case LayerDrop::velocity:
+        {
+            // Softest recording first; each its own equal share of the velocity range, at
+            // the level it was recorded at against the loudest.
+            next.mode = drums::LayerMode::velocity;
+            std::stable_sort (next.layers.begin(), next.layers.end(),
+                              [] (const PadLayer& a, const PadLayer& b) { return recordedLevel (a) < recordedLevel (b); });
+            drums::spreadVelocityRanges (ranges, 0, count);
+            for (int l = 0; l < count; ++l)
+            {
+                next.layers[static_cast<std::size_t> (l)].params.velocityLow = ranges.layer[static_cast<std::size_t> (l)].velocityLow;
+                next.layers[static_cast<std::size_t> (l)].params.velocityHigh = ranges.layer[static_cast<std::size_t> (l)].velocityHigh;
+            }
+            restoreRecordedLevels (next);
+            break;
+        }
+    }
+    applyLayerEdit (pad, next, batch.how == LayerDrop::replace ? (count > 1 ? "Load samples" : "Load sample") : "Add layers");
 }
 
 void DrumsProcessor::clearPad (int pad)
 {
     auto& info = pads[index (pad)];
     latestRequest[index (pad)] = nextGeneration.fetch_add (1);   // a load still running is dropped
-    info.sound.reset();
     info.loading = false;
     info.error.clear();
+    applyLayerEdit (pad, PadLayers {}, "Clear pad");
     info.missingFilename.clear();
-    clearRequest[index (pad)].store (true, std::memory_order_release);
     sendChangeMessage();
+}
+
+void DrumsProcessor::setPadLayers (int pad, const PadLayers& layers)
+{
+    pads[index (pad)].layers = layers;
+    auto& selected = selectedLayer[index (pad)];
+    selected = juce::jlimit (0, std::max (0, static_cast<int> (layers.layers.size()) - 1), selected);
+    publishLayers (pad);
+}
+
+void DrumsProcessor::publishLayers (int pad)
+{
+    auto& info = pads[index (pad)];
+    auto bundle = std::make_shared<PadSound>();
+    bundle->generation = nextGeneration.fetch_add (1);
+    bundle->plan.mode = info.layers.mode;
+    bundle->plan.order = info.layers.order;
+    info.sound.reset();
+    info.missingFilename.clear();
+    for (int l = 0; l < static_cast<int> (info.layers.layers.size()); ++l)
+    {
+        const auto& layer = info.layers.layers[static_cast<std::size_t> (l)];
+        if (layer.sound == nullptr)
+        {
+            if (info.missingFilename.empty())
+                info.missingFilename = layer.fileName();
+            continue;
+        }
+        const int n = bundle->plan.count;
+        if (n >= drums::maxLayers)
+            break;
+        if (info.sound == nullptr)
+            info.sound = layer.sound;
+        bundle->uiIndex[static_cast<std::size_t> (n)] = l;
+        bundle->plan.layer[static_cast<std::size_t> (n)] = layer.params;
+        bundle->sounds.push_back (layer.sound);
+        bundle->plan.count = n + 1;
+    }
+    exchange[index (pad)].publish (std::move (bundle));
+    sendChangeMessage();
+}
+
+namespace
+{
+    /** One undoable change of one pad's layers (before and after; sounds are shared). */
+    class LayerAction final : public juce::UndoableAction
+    {
+    public:
+        LayerAction (int padIndex, PadLayers b, PadLayers a, std::function<void (int, const PadLayers&)> applyFn)
+            : pad (padIndex), before (std::move (b)), after (std::move (a)), apply (std::move (applyFn))
+        {
+        }
+        bool perform() override
+        {
+            apply (pad, after);
+            return true;
+        }
+        bool undo() override
+        {
+            apply (pad, before);
+            return true;
+        }
+        int getSizeInUnits() override { return 1; }
+
+    private:
+        int pad;
+        PadLayers before, after;
+        std::function<void (int, const PadLayers&)> apply;
+    };
+} // namespace
+
+void DrumsProcessor::applyLayerEdit (int pad, const PadLayers& next, const juce::String& actionName, bool newTransaction)
+{
+    const auto& current = pads[index (pad)].layers;
+    if (next == current)
+        return;
+    if (newTransaction)
+        undo.beginNewTransaction (actionName);
+    undo.perform (new LayerAction (pad, current, next, [this] (int p, const PadLayers& l) { setPadLayers (p, l); }), actionName);
+}
+
+void DrumsProcessor::setLayerParams (int pad, int layer, const drums::LayerParams& params, bool newTransaction)
+{
+    auto next = padLayers (pad);
+    if (layer < 0 || layer >= static_cast<int> (next.layers.size()))
+        return;
+    auto p = params;
+    p.gainDb = juce::jlimit (-60.0, 12.0, p.gainDb);
+    p.start = juce::jlimit (0.0, 1.0, p.start);
+    p.end = juce::jlimit (p.start, 1.0, p.end);
+    p.velocityLow = juce::jlimit (1, 127, p.velocityLow);
+    p.velocityHigh = juce::jlimit (p.velocityLow, 127, p.velocityHigh);
+    next.layers[static_cast<std::size_t> (layer)].params = p;
+    applyLayerEdit (pad, next, "Edit layer", newTransaction);
+}
+
+void DrumsProcessor::setLayerMode (int pad, drums::LayerMode mode)
+{
+    auto next = padLayers (pad);
+    if (next.mode == mode)
+        return;
+    const int count = static_cast<int> (next.layers.size());
+    bool allFull = true;
+    for (const auto& l : next.layers)
+        allFull = allFull && l.params.velocityLow == 1 && l.params.velocityHigh == 127;
+    if (mode == drums::LayerMode::velocity && allFull)
+    {
+        // Velocity layers need ranges: equal shares in layer order (softest first).
+        drums::LayerPlan ranges;
+        drums::spreadVelocityRanges (ranges, 0, count);
+        for (int l = 0; l < count; ++l)
+        {
+            next.layers[static_cast<std::size_t> (l)].params.velocityLow = ranges.layer[static_cast<std::size_t> (l)].velocityLow;
+            next.layers[static_cast<std::size_t> (l)].params.velocityHigh = ranges.layer[static_cast<std::size_t> (l)].velocityHigh;
+        }
+    }
+    else if (next.mode == drums::LayerMode::velocity)
+        for (auto& l : next.layers)   // round robin and stack play every layer at every velocity
+        {
+            l.params.velocityLow = 1;
+            l.params.velocityHigh = 127;
+        }
+    next.mode = mode;
+    applyLayerEdit (pad, next, "Layer mode");
+}
+
+void DrumsProcessor::setLayerOrder (int pad, drums::RoundRobinOrder newOrder)
+{
+    auto next = padLayers (pad);
+    next.order = newOrder;
+    applyLayerEdit (pad, next, "Round robin order");
+}
+
+void DrumsProcessor::renameLayer (int pad, int layer, const juce::String& name)
+{
+    auto next = padLayers (pad);
+    if (layer < 0 || layer >= static_cast<int> (next.layers.size()))
+        return;
+    auto& l = next.layers[static_cast<std::size_t> (layer)];
+    l.name = name.trim().toStdString();
+    if (l.name == l.fileName())
+        l.name.clear();
+    applyLayerEdit (pad, next, "Rename layer");
+}
+
+void DrumsProcessor::removeLayer (int pad, int layer)
+{
+    auto next = padLayers (pad);
+    if (layer < 0 || layer >= static_cast<int> (next.layers.size()))
+        return;
+    next.layers.erase (next.layers.begin() + layer);
+    applyLayerEdit (pad, next, "Remove layer");
+}
+
+void DrumsProcessor::duplicateLayer (int pad, int layer)
+{
+    auto next = padLayers (pad);
+    if (layer < 0 || layer >= static_cast<int> (next.layers.size()) || static_cast<int> (next.layers.size()) >= drums::maxLayers)
+        return;
+    next.layers.insert (next.layers.begin() + layer + 1, next.layers[static_cast<std::size_t> (layer)]);
+    applyLayerEdit (pad, next, "Duplicate layer");
+    selectedLayer[index (pad)] = layer + 1;
+}
+
+void DrumsProcessor::moveLayer (int pad, int from, int to)
+{
+    auto next = padLayers (pad);
+    const int n = static_cast<int> (next.layers.size());
+    if (from < 0 || from >= n || to < 0 || to >= n || from == to)
+        return;
+    auto moved = next.layers[static_cast<std::size_t> (from)];
+    next.layers.erase (next.layers.begin() + from);
+    next.layers.insert (next.layers.begin() + to, std::move (moved));
+    applyLayerEdit (pad, next, "Reorder layers");
+    selectedLayer[index (pad)] = to;
 }
 
 void DrumsProcessor::publishFinishedLoads()
@@ -664,20 +1023,33 @@ void DrumsProcessor::publishFinishedLoads()
     }
     for (auto& f : results)
     {
-        const auto i = index (f.pad);
-        if (f.generation != latestRequest[i])
-            continue;   // superseded by a newer request for this pad
-        auto& info = pads[i];
-        info.loading = false;
-        if (f.result.instrument == nullptr)
+        const auto it = batches.find (f.generation);
+        if (it == batches.end())
+            continue;   // superseded by a newer request for this pad (or the pad was cleared)
+        auto& batch = it->second;
+        if (f.generation != latestRequest[index (batch.pad)])
         {
-            info.error = f.result.error;
+            batches.erase (it);
             continue;
         }
-        info.error.clear();
-        info.missingFilename.clear();
-        info.sound = f.result.instrument;
-        exchange[i].publish (f.result.instrument);
+        const auto slot = static_cast<std::size_t> (f.slot);
+        if (f.result.instrument == nullptr && batch.error.empty())
+            batch.error = f.result.error;
+        if (batch.recall)
+        {
+            if (f.result.instrument != nullptr && slot < batch.result.layers.size())
+            {
+                batch.result.layers[slot].sound = f.result.instrument;
+                batch.result.layers[slot].missing.reset();
+            }
+        }
+        else if (slot < batch.loaded.size())
+            batch.loaded[slot] = f.result.instrument;
+        if (--batch.remaining <= 0)
+        {
+            finishBatch (f.generation, batch);
+            batches.erase (f.generation);
+        }
     }
     if (! results.empty())
         sendChangeMessage();
@@ -713,6 +1085,55 @@ bool DrumsProcessor::waitForLoads (int timeoutMs)
 // map, view. Never an OSP session: OSP's root tag is different and is ignored here.
 // ---------------------------------------------------------------------------------------
 
+namespace
+{
+    /** A sound's identity and its exact playback model, so a reopened project sounds
+        identical even if analysis changes later (as OSP does). */
+    void writeSound (juce::XmlElement& x, const LoadedInstrument& s)
+    {
+        x.setAttribute ("hash", juce::String (s.contentHash));
+        x.setAttribute ("filename", juce::String::fromUTF8 (s.filename.c_str()));
+        x.setAttribute ("originalPath", juce::String::fromUTF8 (s.originalPath.c_str()));
+        x.setAttribute ("rootMidi", juce::String (s.analysisRootMidi, 17));
+        x.setAttribute ("rootOrigin", juce::String (s.rootOrigin));
+        x.setAttribute ("startSeconds", juce::String (s.startSeconds, 17));
+        x.setAttribute ("gainDb", juce::String (s.playbackGainDb, 17));
+    }
+
+    /** A missing sound: written back exactly as it was read (still findable later). */
+    void writeRequest (juce::XmlElement& x, const plugin::LoadRequest& r)
+    {
+        x.setAttribute ("hash", juce::String (r.expectedHash));
+        x.setAttribute ("filename", juce::String::fromUTF8 (r.filename.c_str()));
+        x.setAttribute ("originalPath", juce::String::fromUTF8 (r.originalPath.c_str()));
+        if (r.savedPlayback.has_value())
+        {
+            x.setAttribute ("rootMidi", juce::String (r.savedPlayback->rootMidi, 17));
+            x.setAttribute ("rootOrigin", juce::String (r.savedPlayback->rootOrigin));
+            x.setAttribute ("startSeconds", juce::String (r.savedPlayback->startSeconds, 17));
+            x.setAttribute ("gainDb", juce::String (r.savedPlayback->gainDb, 17));
+        }
+    }
+
+    plugin::LoadRequest readRequest (const juce::XmlElement& x)
+    {
+        plugin::LoadRequest request;
+        request.expectedHash = x.getStringAttribute ("hash").toStdString();
+        request.originalPath = x.getStringAttribute ("originalPath").toStdString();
+        request.filename = x.getStringAttribute ("filename").toStdString();
+        if (x.hasAttribute ("rootMidi"))
+        {
+            plugin::LoadRequest::SavedPlayback saved;
+            saved.rootMidi = x.getStringAttribute ("rootMidi", "60").getDoubleValue();
+            saved.rootOrigin = x.getStringAttribute ("rootOrigin").toStdString();
+            saved.startSeconds = x.getStringAttribute ("startSeconds", "0").getDoubleValue();
+            saved.gainDb = x.getStringAttribute ("gainDb", "0").getDoubleValue();
+            request.savedPlayback = saved;
+        }
+        return request;
+    }
+} // namespace
+
 void DrumsProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     juce::XmlElement root (stateTag);
@@ -732,24 +1153,29 @@ void DrumsProcessor::getStateInformation (juce::MemoryBlock& destData)
         x->setAttribute ("choke", info.chokeGroup);
         x->setAttribute ("voice", drums::toString (info.voiceMode));
         x->setAttribute ("trigger", drums::toString (info.trigger));
+        // Layers (state 3). The first loaded layer is also written as <Sound>, so a build
+        // from before layers still opens the kit with one sample per pad.
         if (info.sound != nullptr)
+            writeSound (*x->createNewChildElement ("Sound"), *info.sound);
+        if (! info.layers.layers.empty())
         {
-            const auto& s = *info.sound;
-            auto* sound = x->createNewChildElement ("Sound");
-            sound->setAttribute ("hash", juce::String (s.contentHash));
-            sound->setAttribute ("filename", juce::String::fromUTF8 (s.filename.c_str()));
-            sound->setAttribute ("originalPath", juce::String::fromUTF8 (s.originalPath.c_str()));
-            // The exact playback model, so a reopened project sounds identical even if
-            // analysis changes later (as OSP does).
-            sound->setAttribute ("rootMidi", juce::String (s.analysisRootMidi, 17));
-            sound->setAttribute ("rootOrigin", juce::String (s.rootOrigin));
-            sound->setAttribute ("startSeconds", juce::String (s.startSeconds, 17));
-            sound->setAttribute ("gainDb", juce::String (s.playbackGainDb, 17));
-        }
-        else if (! info.missingFilename.empty())
-        {
-            auto* sound = x->createNewChildElement ("Missing");
-            sound->setAttribute ("filename", juce::String::fromUTF8 (info.missingFilename.c_str()));
+            auto* layersXml = x->createNewChildElement ("Layers");
+            layersXml->setAttribute ("mode", drums::toString (info.layers.mode));
+            layersXml->setAttribute ("order", drums::toString (info.layers.order));
+            for (const auto& layer : info.layers.layers)
+            {
+                auto* l = layersXml->createNewChildElement ("Layer");
+                if (layer.sound != nullptr)
+                    writeSound (*l, *layer.sound);
+                else if (layer.missing.has_value())
+                    writeRequest (*l, *layer.missing);
+                l->setAttribute ("name", juce::String::fromUTF8 (layer.name.c_str()));
+                l->setAttribute ("level", juce::String (layer.params.gainDb, 17));
+                l->setAttribute ("start", juce::String (layer.params.start, 17));
+                l->setAttribute ("end", juce::String (layer.params.end, 17));
+                l->setAttribute ("velocityLow", layer.params.velocityLow);
+                l->setAttribute ("velocityHigh", layer.params.velocityHigh);
+            }
         }
     }
 
@@ -819,28 +1245,55 @@ void DrumsProcessor::setStateInformation (const void* data, int sizeInBytes)
             info.chokeGroup = juce::jlimit (0, 8, x->getIntAttribute ("choke", 0));
             info.voiceMode = x->getStringAttribute ("voice") == "mono" ? drums::VoiceMode::monoRetrigger : drums::VoiceMode::poly;
             info.trigger = x->getStringAttribute ("trigger") == "gate" ? drums::TriggerMode::gate : drums::TriggerMode::oneShot;
-            info.missingFilename.clear();
-            if (auto* sound = x->getChildByName ("Sound"))
+            // The pad's layers (state 3), or its one <Sound> (states 1 and 2: one layer).
+            Batch batch;
+            batch.recall = true;
+            std::vector<plugin::LoadRequest> requests;
+            auto addLayer = [&] (const juce::XmlElement& l, bool withSettings) {
+                if (static_cast<int> (requests.size()) >= drums::maxLayers || l.getStringAttribute ("filename").isEmpty())
+                    return;
+                PadLayer layer;
+                layer.missing = readRequest (l);   // until it loads
+                if (withSettings)
+                {
+                    layer.name = l.getStringAttribute ("name").toStdString();
+                    drums::LayerParams lp;
+                    lp.gainDb = juce::jlimit (-60.0, 12.0, l.getStringAttribute ("level", "0").getDoubleValue());
+                    lp.start = juce::jlimit (0.0, 1.0, l.getStringAttribute ("start", "0").getDoubleValue());
+                    lp.end = juce::jlimit (lp.start, 1.0, l.getStringAttribute ("end", "1").getDoubleValue());
+                    lp.velocityLow = juce::jlimit (1, 127, l.getIntAttribute ("velocityLow", 1));
+                    lp.velocityHigh = juce::jlimit (lp.velocityLow, 127, l.getIntAttribute ("velocityHigh", 127));
+                    layer.params = lp;
+                }
+                requests.push_back (*layer.missing);
+                batch.result.layers.push_back (std::move (layer));
+            };
+            if (auto* layersXml = x->getChildByName ("Layers"))
             {
-                plugin::LoadRequest request;
-                request.expectedHash = sound->getStringAttribute ("hash").toStdString();
-                request.originalPath = sound->getStringAttribute ("originalPath").toStdString();
-                request.filename = sound->getStringAttribute ("filename").toStdString();
-                plugin::LoadRequest::SavedPlayback saved;
-                saved.rootMidi = sound->getStringAttribute ("rootMidi", "60").getDoubleValue();
-                saved.rootOrigin = sound->getStringAttribute ("rootOrigin").toStdString();
-                saved.startSeconds = sound->getStringAttribute ("startSeconds", "0").getDoubleValue();
-                saved.gainDb = sound->getStringAttribute ("gainDb", "0").getDoubleValue();
-                request.savedPlayback = saved;
-                info.missingFilename = request.filename;   // until the load succeeds
-                startLoad (p, std::move (request));
+                batch.result.mode = drums::layerModeFromString (layersXml->getStringAttribute ("mode").toStdString());
+                batch.result.order = drums::roundRobinOrderFromString (layersXml->getStringAttribute ("order").toStdString());
+                for (auto* l : layersXml->getChildWithTagNameIterator ("Layer"))
+                    addLayer (*l, true);
             }
+            else if (auto* sound = x->getChildByName ("Sound"))
+                addLayer (*sound, false);
+            else if (auto* missing = x->getChildByName ("Missing"))   // state 2's missing sample: kept by name
+            {
+                PadLayer layer;
+                plugin::LoadRequest r;
+                r.filename = missing->getStringAttribute ("filename").toStdString();
+                layer.missing = r;
+                batch.result.layers.push_back (std::move (layer));
+            }
+            latestRequest[index (p)] = nextGeneration.fetch_add (1);   // a load still running is dropped
+            info.loading = false;
+            info.error.clear();
+            if (requests.empty())
+                setPadLayers (p, batch.result);   // empty, or only a sample known to be missing
             else
             {
-                if (auto* missing = x->getChildByName ("Missing"))
-                    info.missingFilename = missing->getStringAttribute ("filename").toStdString();
-                if (info.sound != nullptr)
-                    clearPad (p);
+                info.missingFilename = requests.front().filename;   // until the load succeeds
+                startBatch (p, std::move (batch), std::move (requests));
             }
         }
 

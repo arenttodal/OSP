@@ -20,9 +20,15 @@ branch.
       per-pad gain/pan/tune/start/reverse/envelope, shared effects, session save/load,
       2x4 / 3x3 with a PAD 9 button, pad swap by dragging (undoable), rename (undoable).
       Next: duplicate, clear with undo, kit preset files (`.andorkit`, own schema).
-- [ ] **M3 Sample layering.** Multi-file drop choice (round robin / velocity / stack /
-      replace), drum sets built with one forced root, round-robin modes (sequential,
-      random, shuffle bag), layer editor, undo.
+- [x] **M3 Sample layering** (`m3-layers.md`). Done:
+      - the multi-file drop choice (round robin / velocity / stack / replace);
+      - 1–16 layers per pad, each at its own natural pitch;
+      - orders: sequential, random without repeats, shuffle bag;
+      - velocity ranges, with recorded levels kept;
+      - the layer editor: list, audition, rename, reorder, duplicate, remove, level,
+        velocity range, START/END;
+      - one undo step per edit;
+      - state 3.
 - [x] **M4 Keyboard performance** (V1.1, `v1.1-report.md`): KEY MAP editor (lanes,
       aligned keyboard, zoom/scroll), drag move / resize / root, click-to-assign,
       collision resolution (swap, move others, layer, cancel), MIDI Learn (note, range),

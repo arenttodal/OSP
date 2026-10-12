@@ -102,6 +102,7 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
         // START moves through what follows the onset (0 = the analysed start).
         position = src.startFrame() + startFraction * std::max (0.0, frames - src.startFrame())
                    + std::max (0.0, shape.startOffsetSeconds) * src.sampleRate();
+        stopPosition = src.startFrame() + std::clamp (params.endFraction, 0.0, 1.0) * std::max (0.0, frames - src.startFrame());
     }
     else
     {
@@ -109,7 +110,9 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
         const double trailing = std::max (0.0, currentModel->analysis.envelope.trailingSilenceSeconds) * src.sampleRate();
         const double soundEnd = std::clamp (frames - trailing, std::min (frames - 1.0, src.startFrame() + 1.0), frames - 1.0);
         position = soundEnd - startFraction * std::max (0.0, soundEnd - src.startFrame());
+        stopPosition = soundEnd - std::clamp (params.endFraction, 0.0, 1.0) * std::max (0.0, soundEnd - src.startFrame());
     }
+    hasStop = ! granularMode && params.endFraction < 1.0;
     endPosition = frames + static_cast<double> (sinc->maxReach());
 
     released = false;
@@ -976,6 +979,17 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
             controlCountdown = controlInterval - 1;
             updateControl();
             currentStep = baseIncrement * pitchRatio * pitchMod;
+            if (hasStop && ! isFading())
+            {
+                // END: fade so the note is silent where END is (at least 1.5 ms: no click).
+                const double toStop = (stopPosition - position) * direction / std::max (1.0e-9, currentStep);
+                const int minimumFade = std::max (1, static_cast<int> (0.0015 * sampleRate));
+                if (toStop <= static_cast<double> (controlInterval + minimumFade))
+                {
+                    beginFastFade (std::max (minimumFade, static_cast<int> (toStop)));
+                    hasStop = false;
+                }
+            }
             if (gliding)
             {
                 // Linear in pitch, constant time: every interval takes GLIDE to cross.

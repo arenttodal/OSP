@@ -1,5 +1,16 @@
 # ANDOR Drums — version history
 
+## 0.1.3 (unreleased, branch drum-plugin): sample layers
+
+- Several samples on one pad, from a multi-file drop or **Add Layers...**. They play as round
+  robin (shuffle, sequential or random), as velocity layers (sorted soft to hard, keeping
+  their recorded levels), or as a stack.
+- A layer editor in the selected pad:
+  - a list with audition, a last-played mark, rename, drag to reorder, duplicate and remove;
+  - the selected layer's level, velocity range, and START/END on the waveform.
+- Every layer edit is undoable. Sessions save every layer (state 3), and older sessions open
+  unchanged.
+
 ## 0.1.2 (unreleased, branch drum-plugin): Warm Ceramic + Teak, the mockup's layout
 
 - The look of ANDOR/OSP's direction 09: teak cheeks, ceramic housing and cards, A1 ivory

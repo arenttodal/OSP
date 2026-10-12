@@ -103,7 +103,7 @@ part moves out with tests for both products (CLAUDE.md Rule 6).
 | Plugin code / AU subtype | Osp1 | **Adrm** |
 | VST3 class id | derived from Ospx+Osp1 | derived from Ospx+Adrm |
 | VST3 category | Instrument, Sampler | Instrument, Drum, Sampler |
-| State root tag | `OSP` (stateVersion 18) | `AndorDrums` (schemaVersion 1) |
+| State root tag | `OSP` (stateVersion 18) | `AndorDrums` (schemaVersion 3) |
 | Parameter IDs | OSP's (unchanged) | `keyboardMode`, `kit.*`, `padN.{gain,pan,tune,mute,solo}` |
 | Version | 0.1.0 | 0.1.0 (own history in docs/drums/CHANGELOG.md) |
 
@@ -115,18 +115,30 @@ by SHA-256). The same file imported by either product is stored once. Settings a
 are not shared. Drums has no preset files yet (Milestone 2), and they will get their own
 extension and schema.
 
-## 4. State (schemaVersion 1)
+## 4. State (schemaVersion 3)
 
 ```xml
-<AndorDrums schemaVersion="1" product="ANDOR Drums">
+<AndorDrums schemaVersion="3" product="ANDOR Drums">
   <Parameters …/>                          APVTS: keyboardMode, kit.*, padN.*
   <Pads><Pad id="1" name="" category="kick" choke="0" voice="mono" trigger="oneShot">
           <Sound hash="sha256:…" filename originalPath rootMidi rootOrigin startSeconds gainDb/>
-        </Pad>…</Pads>                      or <Missing filename/> (kept for relinking)
+          <Layers mode="roundRobin|velocity|stack" order="shuffle|sequential|random">
+            <Layer hash filename originalPath rootMidi rootOrigin startSeconds gainDb
+                   name level start end velocityLow velocityHigh/>…
+          </Layers>
+        </Pad>…</Pads>
   <KeyMap allowOverlap="0"><Pad id="1" note="36" low="12" high="23" root="-1"/>…</KeyMap>
-  <View layout="2x4" selectedPad="1"/>
+  <Order slots="1,2,…"/>
+  <View layout="1x8" kitName="" selectedPad="1"/>
 </AndorDrums>
 ```
+
+History:
+
+- **State 2** added `<Order>` and the per-pad envelope, START and REVERSE parameters.
+- **State 3** added `<Layers>` (`m3-layers.md`). `<Sound>` still names the first loaded
+  layer, for older builds. States 1 and 2 open as one layer per pad. A state-2
+  `<Missing filename/>` is kept as a missing layer.
 
 Pads are stored by stable id, never by screen position. Sounds are stored by content hash,
 with the original path as a fallback. The exact playback model (root, start, gain) is stored
@@ -171,8 +183,9 @@ lock-free FIFO and atomic bits written by `processBlock`. Details and test cover
 
 ## 7. Known limitations at this checkpoint
 
-- Several files dropped on one pad load only the first (Milestone 3: round robin, velocity
-  layers, stack, replace).
+- ~~Several files dropped on one pad load only the first.~~ Done in M3 (`m3-layers.md`).
+  For sample layers there are two additive OSP engine hooks, both inert unless set:
+  `InstrumentEngine::NoteOverride` and `InstrumentVoiceStart::endFraction`.
 - Pad polyphony is applied at `prepare()` (the host's next prepare), not live.
 - A note transposed past MIDI 0..127 from the pad's root is clamped (about ±60 semitones).
 - REIMAGINED on short transients: not yet evaluated (Part 8.5 list, Milestone 5).

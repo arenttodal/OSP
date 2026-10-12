@@ -628,14 +628,16 @@ void InstrumentEngine::noteOn (int note, int velocity, int channel) noexcept
     modRuntime.noteStarted (note, channel);
     // DYNAMICS curve: SOFT reaches expressive levels easily, HARD needs a firm touch.
     velocity = shaping::curvedVelocity (config.shaping.velocityCurve, velocity);
-    if (occupiedLayerCount() == 0)
-        return;
-    // One event for every layer (same note order and performance memory); layers B and C
-    // draw their own randomness from a salted index.
-    if (config.mono)
-        monoNoteOn (note, velocity, channel);
-    else
-        startNote (note, velocity, channel);
+    if (occupiedLayerCount() > 0)
+    {
+        // One event for every layer (same note order and performance memory); layers B and C
+        // draw their own randomness from a salted index.
+        if (config.mono)
+            monoNoteOn (note, velocity, channel);
+        else
+            startNote (note, velocity, channel);
+    }
+    noteOverride = {};
 }
 
 void InstrumentEngine::startNote (int note, int velocity, int channel) noexcept
@@ -716,8 +718,9 @@ void InstrumentEngine::monoNoteOff (int note, int channel) noexcept
 void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int channel, std::uint64_t eventIndex) noexcept
 {
     context = layerIndex (layerNumber);
-    const InstrumentModel* model = slots[context].model;
-    const auto* set = slots[context].set;
+    const bool overridden = context == 0 && noteOverride.model != nullptr && noteOverride.model->isValid();
+    const InstrumentModel* model = overridden ? noteOverride.model : slots[context].model;
+    const auto* set = overridden ? nullptr : slots[context].set;
     if (model == nullptr || ! model->isValid())
         return;
 
@@ -817,6 +820,13 @@ void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int
     params.sourceMode = config.sourceMode[context];
     params.granular = &slots[context].liveGranular;
     params.startFraction = layerSettings.start;
+    if (overridden)
+    {
+        params.increment *= semitonesToRatio (noteOverride.pitchSemitones);
+        params.shape.gain *= static_cast<float> (dbToGain (noteOverride.gainDb));
+        params.startFraction = std::clamp (noteOverride.start, 0.0, 1.0);
+        params.endFraction = std::clamp (noteOverride.end, params.startFraction, 1.0);
+    }
     params.reverse = layerSettings.reverse;
     params.follow = layerSettings.follow;
     if (params.sourceMode == SourceMode::granular)

@@ -376,7 +376,14 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       one shared PostProcessor, PAD / EXPANDED key maps, chokes, `fadeOutAll`; OSP suites
       unchanged. `osp_drums_tests`, `andor_drums_plugin_tests`. V1.1: pads-on-top editor,
       KEY MAP (drag zones/roots, collisions, MIDI Learn, Auto Map, undo), state 2
-      (docs/drums/v1.1-report.md). Next: layering (round robin), kit presets.
+      (docs/drums/v1.1-report.md). V1.2: the Warm Ceramic + Teak skin.
+      M3: sample layers (docs/drums/m3-layers.md):
+      - round robin, velocity and stack modes, with the layer editor and state 3;
+      - two inert OSP engine hooks, `InstrumentEngine::NoteOverride` and the voice
+        `endFraction`;
+      - OSP's suites are unchanged.
+
+      Next: kit presets (M2), break slicing (M6).
 
 ## DONE
 

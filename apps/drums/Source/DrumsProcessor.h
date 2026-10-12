@@ -10,6 +10,7 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 
 #include <array>
+#include <map>
 #include <atomic>
 #include <mutex>
 #include <optional>
@@ -21,6 +22,42 @@ namespace osp::drumsplugin
 
 using plugin::LoadedInstrument;
 
+/** One sample layer of a pad (message thread). */
+struct PadLayer
+{
+    std::shared_ptr<const LoadedInstrument> sound;   ///< null: missing (recall found no file)
+    std::string name;                                ///< empty: the file's name
+    drums::LayerParams params;
+    /** A missing layer keeps how to find it again (saved with the session as it was). */
+    std::optional<plugin::LoadRequest> missing;
+
+    std::string fileName() const { return sound != nullptr ? sound->filename : missing.has_value() ? missing->filename : std::string(); }
+    std::string displayName() const { return ! name.empty() ? name : fileName(); }
+    bool operator== (const PadLayer& o) const
+    {
+        return sound == o.sound && name == o.name && params == o.params && missing.has_value() == o.missing.has_value()
+               && (! missing.has_value() || (missing->expectedHash == o.missing->expectedHash && missing->filename == o.missing->filename));
+    }
+};
+
+/** A pad's layers and how hits use them (DrumLayers.h). */
+struct PadLayers
+{
+    std::vector<PadLayer> layers;
+    drums::LayerMode mode = drums::LayerMode::roundRobin;
+    drums::RoundRobinOrder order = drums::RoundRobinOrder::shuffle;
+    bool operator== (const PadLayers&) const = default;
+};
+
+/** How dropped files join a pad (spec §3.2). */
+enum class LayerDrop
+{
+    replace,      ///< the files become the pad's layers (one file: a plain one-sample pad)
+    roundRobin,   ///< added as round-robin alternatives (full velocity range each)
+    velocity,     ///< added as velocity layers, softest to loudest by their recorded level
+    stack         ///< added to sound together with every hit
+};
+
 /** What the message thread knows about a pad (its identity is its index 0..8, never its
     place on screen). */
 struct PadInfo
@@ -31,7 +68,8 @@ struct PadInfo
     drums::VoiceMode voiceMode = drums::VoiceMode::poly;
     drums::TriggerMode trigger = drums::TriggerMode::oneShot;
 
-    std::shared_ptr<const LoadedInstrument> sound;   ///< what plays (null: empty pad)
+    std::shared_ptr<const LoadedInstrument> sound;   ///< the first layer that plays (null: nothing plays)
+    PadLayers layers;                                ///< every layer (sound is the first loaded one)
     bool loading = false;
     std::string error;                     ///< the last load's failure, shown on the pad
     /** A sound the saved session refers to but which could not be found (relink later). */
@@ -49,7 +87,7 @@ class DrumsProcessor final : public juce::AudioProcessor,
 {
 public:
     static constexpr int numPads = drums::maxPads;
-    static constexpr int stateVersion = 2;   ///< 2: pad order, per-pad envelope/START/REVERSE parameters
+    static constexpr int stateVersion = 3;   ///< 2: pad order, per-pad envelope/START/REVERSE parameters; 3: sample layers
     static constexpr const char* stateTag = "AndorDrums";
 
     DrumsProcessor();
@@ -86,7 +124,29 @@ public:
 
     /** Loads a file onto a pad (replacing what it holds once the new sound is ready). */
     void loadPad (int pad, const juce::File& file);
+    /** Loads several files onto a pad; when all are ready they join it as `how` says, as
+        ONE undoable step. Files that fail are skipped (the pad shows why if none loads). */
+    void addPadLayers (int pad, const juce::Array<juce::File>& files, LayerDrop how);
+    /** Undoable: empties the pad. */
     void clearPad (int pad);
+
+    // Layers (every edit is undoable; `newTransaction` false joins the current undo step,
+    // e.g. while dragging a value)
+    const PadLayers& padLayers (int pad) const noexcept { return pads[index (pad)].layers; }
+    void applyLayerEdit (int pad, const PadLayers& next, const juce::String& actionName, bool newTransaction = true);
+    void setLayerParams (int pad, int layer, const drums::LayerParams& params, bool newTransaction = true);
+    void setLayerMode (int pad, drums::LayerMode mode);
+    void setLayerOrder (int pad, drums::RoundRobinOrder order);
+    void renameLayer (int pad, int layer, const juce::String& name);
+    void removeLayer (int pad, int layer);
+    void duplicateLayer (int pad, int layer);
+    void moveLayer (int pad, int from, int to);
+    /** Mouse audition of one layer (lock-free; plays it alone, at the pad's settings). */
+    void auditionLayer (int pad, int layer, int velocity);
+    /** The layer the pad's last hit played (display; -1 before any). */
+    int lastLayerPlayed (int pad) const noexcept { return lastLayer[index (pad)].load (std::memory_order_relaxed); }
+    /** The layer shown in the editor (view state, not saved). */
+    std::array<int, drums::maxPads> selectedLayer {};
     const PadInfo& padInfo (int pad) const noexcept { return pads[index (pad)]; }
     juce::String padDisplayName (int pad) const;
     void setPadName (int pad, const juce::String& name);
@@ -168,7 +228,21 @@ private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createLayout();
     void timerCallback() override;
     void publishFinishedLoads();
-    void startLoad (int pad, plugin::LoadRequest request);
+    /** A group of files loading for one pad (a drop, or a recalled pad's layers). */
+    struct Batch
+    {
+        int pad = 0;
+        LayerDrop how = LayerDrop::replace;
+        bool recall = false;               ///< state recall: becomes the pad as saved, no undo step
+        PadLayers result;                  ///< recall: the saved layers (sounds filled in as they load)
+        std::vector<std::shared_ptr<const LoadedInstrument>> loaded;   ///< a drop: one per file (null: failed)
+        int remaining = 0;
+        std::string error;
+    };
+    void startBatch (int pad, Batch batch, std::vector<plugin::LoadRequest> requests);
+    void finishBatch (std::uint64_t id, Batch& batch);
+    void setPadLayers (int pad, const PadLayers& layers);   // no undo step; publishes
+    void publishLayers (int pad);
     void publishPadConfig();
     void pullSettings() noexcept;          // audio thread
     void pullKeyMap() noexcept;            // audio thread
@@ -194,17 +268,30 @@ private:
     struct Finished
     {
         int pad = 0;
-        std::uint64_t generation = 0;
+        std::uint64_t generation = 0;   ///< the batch
+        int slot = 0;                   ///< which file of the batch
         plugin::LoadResult result;
     };
     std::vector<Finished> finished;
+    std::map<std::uint64_t, Batch> batches;   // message thread
 
-    // Message -> audio: sounds
-    std::array<ModelExchange<LoadedInstrument>, numPads> exchange;
-    std::array<std::atomic<bool>, numPads> clearRequest {};
+    /** What a pad plays, as one immutable bundle (message -> audio): the layers' sounds
+        and the plan for them (the layer settings and mode). Every layer edit publishes a
+        new one; sounds are shared between bundles. */
+    struct PadSound
+    {
+        std::uint64_t generation = 0;
+        std::vector<std::shared_ptr<const LoadedInstrument>> sounds;   ///< plan.count of them
+        drums::LayerPlan plan;
+        std::array<int, drums::maxLayers> uiIndex {};   ///< engine layer -> PadLayers index (missing layers are skipped)
+    };
+    void applySound (int pad, const PadSound* sound) noexcept;   // audio thread
+    std::array<ModelExchange<PadSound>, numPads> exchange;
     // Audio thread: what plays and what still rings out
-    std::array<const LoadedInstrument*, numPads> playing {};
-    std::array<std::array<const LoadedInstrument*, 8>, numPads> retired {};
+    std::array<const PadSound*, numPads> playing {};
+    std::array<std::array<const PadSound*, 8>, numPads> retired {};
+    bool stillSounding (int pad, const PadSound& old) const noexcept;
+    std::array<std::atomic<int>, numPads> lastLayer {};
 
     // Message -> audio: key map and pad modes, seqlocked (odd generation = being written)
     std::atomic<std::uint32_t> configGeneration { 0 };
@@ -217,6 +304,7 @@ private:
     {
         int pad = 0;
         int velocity = 0;   ///< 0 = release
+        int layer = -1;     ///< one layer alone (-1: the pad as it plays)
     };
     juce::AbstractFifo auditionFifo { 64 };
     std::array<Audition, 64> auditions {};   // written by the message thread only

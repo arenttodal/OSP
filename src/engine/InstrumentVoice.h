@@ -40,6 +40,9 @@ struct InstrumentVoiceStart
     const GranularParams* granular = nullptr;   ///< live settings of the layer (granular mode)
     // Source modifiers of the layer (One Shot; Granular takes them from `granular`).
     double startFraction = 0.0;   ///< START: 0..1 of the recording after its onset (from the end when reversed)
+    /** END (ANDOR Drums' layers): the note fades out to silence at this fraction of the
+        recording, measured as START is. 1 = play to the end (OSP: always). */
+    double endFraction = 1.0;
     bool reverse = false;         ///< REVERSE: read backwards (LOOP then loops the best loop, mirrored)
     bool follow = true;           ///< FOLLOW off: flatten the recording's loudness contour
     /** REIMAGINED mode of the layer when the note starts (KALEIDOSCOPE: the voice's own
@@ -173,6 +176,8 @@ private:
     bool gliding = false;
     void setGlideTime (double seconds) noexcept;
     double endPosition = 0.0;
+    double stopPosition = 0.0;       ///< END: where the note has faded out (with hasStop)
+    bool hasStop = false;
 
     // Continuation
     ContinuationStrategy strategy = ContinuationStrategy::off;

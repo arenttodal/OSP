@@ -88,6 +88,38 @@ namespace
         return crossings > 1 ? rate * (crossings - 1) / static_cast<double> (last - first) : 0.0;
     }
 
+    /** One hit of `note` at `velocity`, rendered for `seconds`. */
+    std::vector<float> hit (DrumsProcessor& p, int note, int velocity, double seconds, int block = 256)
+    {
+        std::vector<float> out;
+        juce::AudioBuffer<float> buffer (2, block);
+        const auto total = static_cast<int> (seconds * rate);
+        for (int pos = 0; pos < total; pos += block)
+        {
+            juce::MidiBuffer midi;
+            if (pos == 0)
+                midi.addEvent (juce::MidiMessage::noteOn (10, note, static_cast<juce::uint8> (velocity)), 0);
+            buffer.clear();
+            p.processBlock (buffer, midi);
+            const int n = std::min (block, total - pos);
+            out.insert (out.end(), buffer.getReadPointer (0), buffer.getReadPointer (0) + n);
+        }
+        return out;
+    }
+
+    juce::File writeDrumAt (const juce::File& dir, const juce::String& name, double hz, double seconds, double amplitude)
+    {
+        auto audio = testsignals::sine (hz, seconds, rate, amplitude, 1);
+        auto& x = audio.channels[0];
+        for (std::size_t i = 0; i < x.size(); ++i)
+            x[i] *= static_cast<float> (std::pow (10.0, -2.0 * static_cast<double> (i) / static_cast<double> (x.size())));
+        testsignals::applyFades (audio, 0.002, 0.02);
+        const auto file = dir.getChildFile (name);
+        std::string error;
+        REQUIRE (io::writeAudioFile (std::filesystem::path (file.getFullPathName().toStdString()), audio, io::SampleFormat::pcm24, error));
+        return file;
+    }
+
     /** Points the sample store somewhere else for one scope (restored afterwards). */
     struct ScopedStore
     {
@@ -674,6 +706,241 @@ TEST_CASE ("The ceramic skin draws its materials in the style guide's colours", 
     CHECK (c.getSaturation() > 0.3f);
 }
 
+TEST_CASE ("Layers: several files join a pad as round robins, in one undo step", "[drums-plugin][layers]")
+{
+    TempDir tmp;
+    const ScopedStore store (tmp.dir.getChildFile ("store"));
+    DrumsProcessor p;
+    p.prepareToPlay (rate, 256);
+    p.loadPad (0, writeDrum (tmp.dir, "Kick_A.wav", 110.0, 0.5));
+    REQUIRE (p.waitForLoads());
+    REQUIRE (p.padLayers (0).layers.size() == 1);
+    p.addPadLayers (0, { writeDrum (tmp.dir, "Kick_B.wav", 220.0, 0.5), writeDrum (tmp.dir, "Kick_C.wav", 330.0, 0.5) },
+                    drumsplugin::LayerDrop::roundRobin);
+    REQUIRE (p.waitForLoads());
+    const auto& layers = p.padLayers (0);
+    REQUIRE (layers.layers.size() == 3);
+    CHECK (layers.mode == drums::LayerMode::roundRobin);
+    CHECK (layers.layers[1].displayName() == "Kick_B.wav");
+    CHECK (p.padInfo (0).sound == layers.layers[0].sound);
+
+    // Sequential order: every hit is the next layer, each at its own pitch.
+    p.setLayerOrder (0, drums::RoundRobinOrder::sequential);
+    hit (p, 36, 100, 0.02);   // the new bundle reaches the audio thread
+    std::vector<int> order;
+    std::vector<double> hz;
+    for (int i = 0; i < 3; ++i)
+    {
+        p.prepareToPlay (rate, 256);   // silence between hits (and the picker starts again)
+        for (int k = 0; k <= i; ++k)
+        {
+            const auto out = hit (p, 36, 100, 0.25);
+            if (k == i)
+                hz.push_back (frequencyOf (out, 2400, 11000));
+        }
+        order.push_back (p.lastLayerPlayed (0));
+    }
+    CHECK (order == std::vector<int> { 0, 1, 2 });
+    CHECK (hz[0] == Approx (110.0).margin (2.0));
+
+    // One undo removes both added layers; redo brings them back.
+    p.undoManager().undo();   // the order change
+    p.undoManager().undo();   // the added layers
+    CHECK (p.padLayers (0).layers.size() == 1);
+    p.undoManager().redo();
+    CHECK (p.padLayers (0).layers.size() == 3);
+}
+
+TEST_CASE ("Layers: velocity layers sort softest first and keep their recorded levels", "[drums-plugin][layers]")
+{
+    TempDir tmp;
+    const ScopedStore store (tmp.dir.getChildFile ("store"));
+    DrumsProcessor p;
+    p.prepareToPlay (rate, 256);
+    // Dropped loud-first: the import sorts them.
+    p.addPadLayers (0, { writeDrumAt (tmp.dir, "Loud.wav", 200.0, 0.5, 0.8), writeDrumAt (tmp.dir, "Soft.wav", 200.0, 0.5, 0.1),
+                         writeDrumAt (tmp.dir, "Mid.wav", 200.0, 0.5, 0.3) },
+                    drumsplugin::LayerDrop::velocity);
+    REQUIRE (p.waitForLoads());
+    const auto& l = p.padLayers (0);
+    REQUIRE (l.layers.size() == 3);
+    CHECK (l.mode == drums::LayerMode::velocity);
+    CHECK (l.layers[0].displayName() == "Soft.wav");
+    CHECK (l.layers[1].displayName() == "Mid.wav");
+    CHECK (l.layers[2].displayName() == "Loud.wav");
+    CHECK (l.layers[0].params.velocityLow == 1);
+    CHECK (l.layers[2].params.velocityHigh == 127);
+    CHECK (l.layers[1].params.velocityLow == l.layers[0].params.velocityHigh + 1);
+    // Levels as recorded, against the loudest: about -18 dB and -8.5 dB.
+    CHECK (l.layers[2].params.gainDb == Approx (0.0).margin (0.01));
+    CHECK (l.layers[0].params.gainDb == Approx (20.0 * std::log10 (0.1 / 0.8)).margin (0.6));
+    CHECK (l.layers[1].params.gainDb == Approx (20.0 * std::log10 (0.3 / 0.8)).margin (0.6));
+
+    hit (p, 36, 20, 0.02);
+    CHECK (p.lastLayerPlayed (0) == 0);
+    hit (p, 36, 64, 0.02);
+    CHECK (p.lastLayerPlayed (0) == 1);
+    hit (p, 36, 127, 0.02);
+    CHECK (p.lastLayerPlayed (0) == 2);
+}
+
+TEST_CASE ("Layers: edit, rename, reorder, duplicate, remove - each one undo step", "[drums-plugin][layers]")
+{
+    TempDir tmp;
+    const ScopedStore store (tmp.dir.getChildFile ("store"));
+    DrumsProcessor p;
+    p.addPadLayers (2, { writeDrum (tmp.dir, "H1.wav", 3000.0, 0.2), writeDrum (tmp.dir, "H2.wav", 3200.0, 0.2) },
+                    drumsplugin::LayerDrop::replace);
+    REQUIRE (p.waitForLoads());
+    REQUIRE (p.padLayers (2).layers.size() == 2);
+    CHECK (p.padLayers (2).mode == drums::LayerMode::roundRobin);
+    const auto before = p.padLayers (2);
+
+    auto params = before.layers[0].params;
+    params.gainDb = -6.0;
+    params.start = 0.1;
+    params.end = 0.05;   // clamped to START
+    p.setLayerParams (2, 0, params);
+    CHECK (p.padLayers (2).layers[0].params.end == Approx (0.1));
+    p.renameLayer (2, 1, "Tight");
+    CHECK (p.padLayers (2).layers[1].displayName() == "Tight");
+    p.moveLayer (2, 1, 0);
+    CHECK (p.padLayers (2).layers[0].displayName() == "Tight");
+    p.duplicateLayer (2, 0);
+    CHECK (p.padLayers (2).layers.size() == 3);
+    CHECK (p.padLayers (2).layers[1].sound == p.padLayers (2).layers[0].sound);
+    p.removeLayer (2, 2);
+    CHECK (p.padLayers (2).layers.size() == 2);
+    p.setLayerMode (2, drums::LayerMode::velocity);
+    CHECK (p.padLayers (2).layers[0].params.velocityHigh < 127);   // velocity layers get ranges
+    p.setLayerMode (2, drums::LayerMode::stack);
+    CHECK (p.padLayers (2).layers[0].params.velocityHigh == 127);  // and give them back
+
+    for (int i = 0; i < 7; ++i)
+        p.undoManager().undo();
+    CHECK (p.padLayers (2) == before);
+
+    // Clearing a pad is undoable too.
+    p.clearPad (2);
+    CHECK (p.padInfo (2).sound == nullptr);
+    p.undoManager().undo();
+    CHECK (p.padLayers (2) == before);
+}
+
+TEST_CASE ("Layers: a session recalls every layer, its settings and the mode, bit-identically", "[drums-plugin][layers]")
+{
+    TempDir tmp;
+    const ScopedStore store (tmp.dir.getChildFile ("store"));
+    juce::MemoryBlock state;
+    std::vector<float> reference;
+    drumsplugin::PadLayers saved;
+    {
+        DrumsProcessor p;
+        p.prepareToPlay (rate, 256);
+        p.addPadLayers (0, { writeDrum (tmp.dir, "S1.wav", 400.0, 0.4), writeDrum (tmp.dir, "S2.wav", 500.0, 0.4) },
+                        drumsplugin::LayerDrop::stack);
+        REQUIRE (p.waitForLoads());
+        auto params = p.padLayers (0).layers[1].params;
+        params.gainDb = -3.5;
+        params.end = 0.6;
+        p.setLayerParams (0, 1, params);
+        p.renameLayer (0, 0, "Body");
+        saved = p.padLayers (0);
+        p.prepareToPlay (rate, 256);
+        reference = hit (p, 36, 100, 0.4);
+        p.getStateInformation (state);
+    }
+    DrumsProcessor q;
+    q.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+    REQUIRE (q.waitForLoads());
+    const auto& got = q.padLayers (0);
+    REQUIRE (got.layers.size() == 2);
+    CHECK (got.mode == drums::LayerMode::stack);
+    CHECK (got.layers[0].displayName() == "Body");
+    CHECK (got.layers[1].params == saved.layers[1].params);
+    CHECK (q.undoManager().canUndo() == false);
+    q.prepareToPlay (rate, 256);
+    CHECK (hit (q, 36, 100, 0.4) == reference);
+
+    // A state-2 session (one <Sound> per pad, no <Layers>) opens as one layer.
+    auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
+    REQUIRE (xml != nullptr);
+    xml->setAttribute ("schemaVersion", 2);
+    for (auto* pad : xml->getChildByName ("Pads")->getChildWithTagNameIterator ("Pad"))
+        if (auto* layers = pad->getChildByName ("Layers"))
+            pad->removeChildElement (layers, true);
+    juce::MemoryBlock old;
+    juce::AudioProcessor::copyXmlToBinary (*xml, old);
+    DrumsProcessor r;
+    r.setStateInformation (old.getData(), static_cast<int> (old.getSize()));
+    REQUIRE (r.waitForLoads());
+    REQUIRE (r.padLayers (0).layers.size() == 1);
+    CHECK (r.padLayers (0).layers[0].fileName() == "S1.wav");
+}
+
+TEST_CASE ("Layers: a layer auditions alone, without moving the round robin", "[drums-plugin][layers]")
+{
+    TempDir tmp;
+    const ScopedStore store (tmp.dir.getChildFile ("store"));
+    DrumsProcessor p;
+    p.prepareToPlay (rate, 256);
+    p.addPadLayers (0, { writeDrum (tmp.dir, "A.wav", 110.0, 0.5), writeDrum (tmp.dir, "B.wav", 330.0, 0.5) },
+                    drumsplugin::LayerDrop::roundRobin);
+    REQUIRE (p.waitForLoads());
+    p.auditionLayer (0, 1, 100);
+    const auto out = hit (p, 0, 0, 0.25);   // velocity 0: no note, only the audition
+    CHECK (frequencyOf (out, 2400, 11000) == Approx (330.0).margin (3.0));
+    CHECK (p.lastLayerPlayed (0) == -1);   // a hit has not happened yet
+}
+
+TEST_CASE ("Layer editor: drops on pads, the list selects, the velocity bar edits in one undo step", "[drums-plugin][ui][layers]")
+{
+    const juce::ScopedJuceInitialiser_GUI gui;
+    TempDir tmp;
+    const ScopedStore store (tmp.dir.getChildFile ("store"));
+    DrumsProcessor p;
+    auto editor = openEditor (p);
+    editor->setSize (1536, 1024);
+    auto& content = editor->content();
+    // Three files onto an empty pad (no window to ask in: the default, round robin).
+    juce::StringArray files { writeDrum (tmp.dir, "Snare_1.wav", 300.0, 0.3).getFullPathName(), writeDrum (tmp.dir, "Snare_2.wav", 320.0, 0.3).getFullPathName(),
+                              writeDrum (tmp.dir, "Snare_3.wav", 340.0, 0.3).getFullPathName() };
+    auto& cell = content.padGrid().cell (p.slotOfPad (1));
+    cell.filesDropped (files, 10, 10);
+    REQUIRE (p.waitForLoads());
+    CHECK (p.selectedPad == 1);
+    REQUIRE (p.padLayers (1).layers.size() == 3);
+    CHECK (p.padLayers (1).mode == drums::LayerMode::roundRobin);
+
+    // Click the third row: it is selected and its controls follow.
+    auto& panel = content.samplePanel();
+    auto& list = panel.layerList();
+    const auto row = list.rowRect (2).getCentre();
+    juce::MouseEvent down (juce::Desktop::getInstance().getMainMouseSource(), row.translated (20.0f, 0.0f), juce::ModifierKeys(), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                           &list, &list, juce::Time::getCurrentTime(), row.translated (20.0f, 0.0f), juce::Time::getCurrentTime(), 1, false);
+    list.mouseDown (down);
+    list.mouseUp (down);
+    CHECK (p.selectedLayer[1] == 2);
+
+    // Velocity bar: the drag is one undo step.
+    auto& bar = panel.velocityRange();
+    REQUIRE (bar.isVisible());
+    REQUIRE (bar.onChange != nullptr);
+    bar.onChange (40, 127, true);
+    bar.onChange (60, 127, false);
+    bar.onChange (80, 127, false);
+    CHECK (p.padLayers (1).layers[2].params.velocityLow == 80);
+    p.undoManager().undo();
+    CHECK (p.padLayers (1).layers[2].params.velocityLow == 1);
+
+    // One more file onto the populated pad (headless: replaces).
+    cell.filesDropped (juce::StringArray { writeDrum (tmp.dir, "Snare_4.wav", 360.0, 0.3).getFullPathName() }, 10, 10);
+    REQUIRE (p.waitForLoads());
+    CHECK (p.padLayers (1).layers.size() == 1);
+    p.undoManager().undo();
+    CHECK (p.padLayers (1).layers.size() == 3);
+}
+
 TEST_CASE ("Snapshots of every major state (written when ANDOR_DRUMS_SNAPSHOT_DIR is set)", "[drums-plugin][ui][snapshots]")
 {
     const juce::ScopedJuceInitialiser_GUI gui;
@@ -746,6 +1013,24 @@ TEST_CASE ("Snapshots of every major state (written when ANDOR_DRUMS_SNAPSHOT_DI
     snapshot (*editor, "11-minimum-size");
     editor->setSize (1536, 1024);
     snapshot (*editor, "12-retina-2x", 2.0f);
+
+    // Sample layers: a kick with three velocity layers, the middle one selected.
+    p.addPadLayers (0, { writeDrumAt (tmp.dir, "Kick_soft.wav", 100.0, 0.5, 0.15), writeDrumAt (tmp.dir, "Kick_hard.wav", 100.0, 0.5, 0.9) },
+                    drumsplugin::LayerDrop::velocity);
+    REQUIRE (p.waitForLoads());
+    editor->content().selectPad (0);
+    p.selectedLayer[0] = 1;
+    {
+        auto params = p.padLayers (0).layers[1].params;
+        params.end = 0.7;
+        p.setLayerParams (0, 1, params);
+    }
+    p.setKeyboardMode (drums::KeyboardMode::pad);
+    editor->content().refreshModeBar();
+    sendNotes (p, { { p.keyMap().padNote[0], true } });
+    CHECK (p.lastLayerPlayed (0) == 2);   // velocity 100: the hard layer
+    editor->content().samplePanel().bind();
+    snapshot (*editor, "13-layers-velocity");
 }
 
 int main (int argc, char* argv[])

@@ -352,6 +352,23 @@ public:
     void noteOff (int note, int channel = 0) noexcept; ///< channel 0 = any channel
 
     /**
+        ANDOR Drums' sample layers: what the NEXT note-on plays on layer A instead of the
+        slot's sound - another model (which must stay alive while isModelInUse says so),
+        with its own level, START / END and a pitch correction (its root against the
+        slot's). Per voice, so hits of different layers ring out side by side. The next
+        note-on consumes it; OSP never sets one (nothing changes without it).
+    */
+    struct NoteOverride
+    {
+        const InstrumentModel* model = nullptr;   ///< null: no override
+        double gainDb = 0.0;
+        double start = 0.0;                       ///< replaces the layer's START (0..1)
+        double end = 1.0;                         ///< END (0..1, 1 = to the end)
+        double pitchSemitones = 0.0;
+    };
+    void setNextNoteOverride (const NoteOverride& next) noexcept { noteOverride = next; }
+
+    /**
         Expression (spec §50, §51). Without MPE, pitch bend stays global (setPitchOffsetSemitones)
         and pressure / timbre act on every voice. With MPE on, each member channel bends,
         presses and colours only its own notes.
@@ -488,6 +505,7 @@ private:
     int monoNote = -1;       ///< the note the mono voices play (-1: none held)
     int lastMonoNote = -1;   ///< the last note played in mono (a fresh note glides from it)
     std::uint64_t noteCounter = 0;
+    NoteOverride noteOverride;
     float outputGain = 1.0f;
     double pitchRatio = 1.0;
     void publishGrains() noexcept;

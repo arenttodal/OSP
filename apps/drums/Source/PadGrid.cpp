@@ -1,5 +1,7 @@
 #include "PadGrid.h"
 
+#include "LayerUi.h"
+
 #include "CeramicSkin.h"
 #include "DrumsLook.h"
 
@@ -253,12 +255,9 @@ void PadView::paint (juce::Graphics& g)
     {
         auto f = footerArea().reduced (10.0f, 3.0f);
         juce::String text = noteLabel;
-        if (info.sound != nullptr)
-        {
-            const int layers = info.sound->set != nullptr ? static_cast<int> (info.sound->set->members.size()) : 1;
-            if (layers > 1)
-                text << "  \xc2\xb7  " << layers << " layers";
-        }
+        const auto layers = info.layers.layers.size();
+        if (layers > 1)
+            text << juce::String (juce::CharPointer_UTF8 ("  \xc2\xb7  ")) << static_cast<int> (layers) << " layers";
         g.setColour (juce::Colour (0xffb8b2a8));
         g.setFont (type::micro (12.5f));
         g.drawFittedText (text, f.withTrimmedRight (24.0f).toNearestInt(), juce::Justification::centred, 1, 1.0f);
@@ -472,15 +471,14 @@ void PadView::fileDragExit (const juce::StringArray&)
 void PadView::filesDropped (const juce::StringArray& files, int, int)
 {
     fileOver = false;
-    // One file per pad until layering (round robin / velocity / stack) arrives: the first audio file.
+    // One file onto an empty pad loads; otherwise the pad offers round robin, velocity
+    // layers, stack or replace (spec 3.2).
+    juce::Array<juce::File> list;
     for (const auto& f : files)
-        if (isAudioFile (f))
-        {
-            grid.processor().loadPad (pad(), juce::File (f));
-            if (grid.onSelect)
-                grid.onSelect (pad());
-            break;
-        }
+        list.add (juce::File (f));
+    if (grid.onSelect)
+        grid.onSelect (pad());
+    offerLayerDrop (grid.processor(), pad(), list, this);
     repaint();
 }
 

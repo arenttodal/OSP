@@ -1,5 +1,6 @@
 #pragma once
 
+#include "drums/DrumLayers.h"
 #include "drums/DrumMapping.h"
 #include "engine/InstrumentEngine.h"
 #include "engine/PostProcessor.h"
@@ -103,6 +104,16 @@ public:
     // Sounds (the model or set must stay alive while isModelInUse / isSetInUse say so)
     void setPadModel (int pad, const InstrumentModel* model) noexcept;
     void setPadSet (int pad, const InstrumentSet* set) noexcept;
+    /**
+        Several sample layers on one pad (DrumLayers.h): models[0 .. plan.count-1] are the
+        layers' sounds (each must stay alive while isModelInUse says so). Every layer plays
+        at its own natural pitch on the pad's keys. A plan with one layer at its defaults
+        plays exactly as setPadModel. The picker's memory is kept while the count stays.
+    */
+    void setPadLayers (int pad, const std::array<const InstrumentModel*, maxLayers>& models, const LayerPlan& plan) noexcept;
+    const LayerPlan& padLayerPlan (int pad) const noexcept { return plans[index (pad)]; }
+    /** The layer the pad's last hit played (round robin / velocity; -1 before any). */
+    int lastLayerPlayed (int pad) const noexcept { return pickers[index (pad)].lastPicked(); }
     bool hasSound (int pad) const noexcept;
     bool isModelInUse (const InstrumentModel* model) const noexcept;
     bool isSetInUse (const InstrumentSet* set) const noexcept;
@@ -128,6 +139,8 @@ public:
     void noteOff (int note, int channel = 0) noexcept;
     /** Plays a pad at its natural pitch (mouse audition), as if its own key were played. */
     void triggerPad (int pad, int velocity) noexcept;
+    /** Plays one layer of a pad alone (layer audition; the round robin is not advanced). */
+    void triggerPadLayer (int pad, int layer, int velocity) noexcept;
     void releasePad (int pad) noexcept;
     /** Sustain pedal (CC 64): gate pads keep sounding after note-off until it is released
         (one-shot pads ignore note-offs anyway). */
@@ -152,7 +165,7 @@ public:
 private:
     static std::size_t index (int pad) noexcept { return static_cast<std::size_t> (std::clamp (pad, 0, maxPads - 1)); }
     void applyPad (int pad) noexcept;
-    void startHit (int pad, int semitones, int velocity, int channel, int sourceNote) noexcept;
+    void startHit (int pad, int semitones, int velocity, int channel, int sourceNote, int onlyLayer = -1) noexcept;
     Macros padMacros (int pad) const noexcept;
 
     KitSettings kit;
@@ -160,6 +173,10 @@ private:
     std::array<std::unique_ptr<InstrumentEngine>, maxPads> engines;
     std::array<double, maxPads> rootShift {};        ///< model root - its rounded root (exact natural pitch)
     std::array<int, maxPads> baseNote {};            ///< the engine note that plays the sample untransposed
+    std::array<std::array<const InstrumentModel*, maxLayers>, maxPads> layerModels {};
+    std::array<LayerPlan, maxPads> plans {};
+    std::array<LayerPicker, maxPads> pickers {};
+    std::array<std::uint64_t, maxPads> layerHits {};  ///< hits since prepare/reset (the picker's randomness)
     PostProcessor post;
     double sampleRate = 48000.0;
     int blockSize = 0;

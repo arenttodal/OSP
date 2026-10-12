@@ -113,6 +113,9 @@ void DrumKitEngine::prepare (double rate, int maximumBlockSize, const KitSetting
     primed = false;
     for (auto& row : started)
         row.fill (-1);
+    for (auto& picker : pickers)
+        picker.reset();
+    layerHits.fill (0);
     for (auto& v : padVoices)
         v.store (0, std::memory_order_relaxed);
     for (auto& h : padHits)
@@ -152,6 +155,15 @@ void DrumKitEngine::applyPad (int pad) noexcept
 
 void DrumKitEngine::setPadModel (int pad, const InstrumentModel* model) noexcept
 {
+    if (layerModels[index (pad)][0] != model)
+    {
+        // A single sound set directly (not through setPadLayers): one layer, its defaults.
+        plans[index (pad)] = {};
+        plans[index (pad)].count = model != nullptr ? 1 : 0;
+        layerModels[index (pad)] = {};
+        layerModels[index (pad)][0] = model;
+        pickers[index (pad)].reset();
+    }
     auto& engine = *engines[index (pad)];
     engine.setModel (model, 0);
     const double root = model != nullptr ? model->rootMidi : 60.0;
@@ -160,8 +172,25 @@ void DrumKitEngine::setPadModel (int pad, const InstrumentModel* model) noexcept
     engine.setLayerPitchOffsetSemitones (0, rootShift[index (pad)]);
 }
 
+void DrumKitEngine::setPadLayers (int pad, const std::array<const InstrumentModel*, maxLayers>& models, const LayerPlan& plan) noexcept
+{
+    const auto p = index (pad);
+    const int count = std::clamp (plan.count, 0, maxLayers);
+    if (count != std::clamp (plans[p].count, 0, maxLayers))
+        pickers[p].reset();
+    plans[p] = plan;
+    plans[p].count = count;
+    layerModels[p] = models;
+    for (int i = count; i < maxLayers; ++i)
+        layerModels[p][static_cast<std::size_t> (i)] = nullptr;
+    setPadModel (pad, count > 0 ? models[0] : nullptr);
+}
+
 void DrumKitEngine::setPadSet (int pad, const InstrumentSet* set) noexcept
 {
+    plans[index (pad)] = {};
+    layerModels[index (pad)] = {};
+    pickers[index (pad)].reset();
     auto& engine = *engines[index (pad)];
     engine.setInstrumentSet (set, 0);
     const auto* primary = engine.model (0);
@@ -240,7 +269,7 @@ void DrumKitEngine::setHostTiming (const HostTiming& timing) noexcept
         e->setHostTiming (timing);
 }
 
-void DrumKitEngine::startHit (int pad, int semitones, int velocity, int channel, int sourceNote) noexcept
+void DrumKitEngine::startHit (int pad, int semitones, int velocity, int channel, int sourceNote, int onlyLayer) noexcept
 {
     const auto p = index (pad);
     auto& engine = *engines[p];
@@ -261,7 +290,40 @@ void DrumKitEngine::startHit (int pad, int semitones, int velocity, int channel,
     if (slot >= 0 && ps.trigger == TriggerMode::gate)
         engine.noteOff (slot, 0);
     slot = static_cast<std::int16_t> (engineNote);
-    engine.noteOn (engineNote, velocity, channel);
+    const auto& plan = plans[p];
+    if (plan.count > 1 || (plan.count == 1 && ! (plan.layer[0] == LayerParams {})))
+    {
+        // Sample layers: the chosen ones start together, each at its own natural pitch,
+        // level and START / END (the pad's START moves every layer's start further in).
+        std::array<int, maxLayers> chosen {};
+        int n = 1;
+        if (onlyLayer >= 0 && onlyLayer < plan.count)
+            chosen[0] = onlyLayer;
+        else
+            n = pickers[p].pick (plan, velocity, Prng::deriveSeed (kit.seed, padSeedSalt, static_cast<std::uint64_t> (pad)),
+                                 layerHits[p]++, chosen);
+        const double padRoot = baseNote[p] + rootShift[p];
+        for (int i = 0; i < n; ++i)
+        {
+            const auto l = static_cast<std::size_t> (chosen[static_cast<std::size_t> (i)]);
+            const auto* model = layerModels[p][l];
+            if (model == nullptr || ! model->isValid())
+                continue;
+            const auto& lp = plan.layer[l];
+            InstrumentEngine::NoteOverride o;
+            o.model = model;
+            o.gainDb = lp.gainDb > -60.0 ? std::min (lp.gainDb, 12.0) : -200.0;
+            const double padStart = std::clamp (ps.start, 0.0, 1.0);
+            const double layerStart = std::clamp (lp.start, 0.0, 1.0);
+            o.start = layerStart + (1.0 - layerStart) * padStart;
+            o.end = std::max (std::clamp (lp.end, 0.0, 1.0), o.start);
+            o.pitchSemitones = model->rootMidi - padRoot;
+            engine.setNextNoteOverride (o);
+            engine.noteOn (engineNote, velocity, channel);
+        }
+    }
+    else
+        engine.noteOn (engineNote, velocity, channel);
     padHits[p].fetch_add (1, std::memory_order_relaxed);
     post.noteStarted();
 }
@@ -304,6 +366,13 @@ void DrumKitEngine::triggerPad (int pad, int velocity) noexcept
     startHit (pad, 0, std::clamp (velocity, 1, 127), 1, 128 + pad);
 }
 
+void DrumKitEngine::triggerPadLayer (int pad, int layer, int velocity) noexcept
+{
+    if (pad < 0 || pad >= maxPads)
+        return;
+    startHit (pad, 0, std::clamp (velocity, 1, 127), 1, 128 + pad, std::max (0, layer));
+}
+
 void DrumKitEngine::releasePad (int pad) noexcept
 {
     if (pad >= 0 && pad < maxPads)
@@ -332,6 +401,9 @@ void DrumKitEngine::reset() noexcept
     primed = false;
     for (auto& row : started)
         row.fill (-1);
+    for (auto& picker : pickers)
+        picker.reset();
+    layerHits.fill (0);
 }
 
 void DrumKitEngine::resetPerformance() noexcept

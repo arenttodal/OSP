@@ -89,10 +89,31 @@ WaveDisplay::WaveDisplay (DrumsProcessor& p) : proc (p) {}
 
 juce::Rectangle<float> WaveDisplay::wave() const { return getLocalBounds().toFloat().reduced (14.0f, 12.0f).withTrimmedBottom (16.0f); }
 
+const PadLayer* WaveDisplay::shownLayer() const
+{
+    const auto& layers = proc.padLayers (proc.selectedPad).layers;
+    if (layers.empty())
+        return nullptr;
+    const int i = juce::jlimit (0, static_cast<int> (layers.size()) - 1, proc.selectedLayer[static_cast<std::size_t> (proc.selectedPad)]);
+    return &layers[static_cast<std::size_t> (i)];
+}
+
+bool WaveDisplay::padStartMarker() const { return proc.padLayers (proc.selectedPad).layers.size() <= 1; }
+
 float WaveDisplay::startX() const
 {
-    const float start = proc.parameters().getRawParameterValue (DrumsProcessor::padParamId (proc.selectedPad, "start"))->load();
+    float start = 0.0f;
+    if (padStartMarker())
+        start = proc.parameters().getRawParameterValue (DrumsProcessor::padParamId (proc.selectedPad, "start"))->load();
+    else if (const auto* l = shownLayer())
+        start = static_cast<float> (l->params.start);
     return wave().getX() + wave().getWidth() * start;
+}
+
+float WaveDisplay::endX() const
+{
+    const auto* l = shownLayer();
+    return wave().getX() + wave().getWidth() * (l != nullptr ? static_cast<float> (l->params.end) : 1.0f);
 }
 
 void WaveDisplay::paint (juce::Graphics& g)
@@ -105,23 +126,37 @@ void WaveDisplay::paint (juce::Graphics& g)
     for (int i = 1; i < 8; ++i)
         g.fillRect (juce::Rectangle<float> (inner.getX() + inner.getWidth() * static_cast<float> (i) / 8.0f, inner.getY() + 4.0f, 1.0f, inner.getHeight() - 22.0f));
     g.fillRect (juce::Rectangle<float> (inner.getX() + 6.0f, wave().getCentreY(), inner.getWidth() - 12.0f, 1.0f));
-    if (info.sound != nullptr && ! info.sound->peakMax.empty())
+    const auto* layer = shownLayer();
+    const auto sound = layer != nullptr ? layer->sound : nullptr;
+    if (sound != nullptr && ! sound->peakMax.empty())
     {
-        const float start = proc.parameters().getRawParameterValue (DrumsProcessor::padParamId (proc.selectedPad, "start"))->load();
-        look::waveform (g, wave(), info.sound->peakMin, info.sound->peakMax, accent.interpolatedWith (juce::Colours::white, 0.1f), start);
-        // START: a handle on the region it keeps.
-        const float sx = startX();
+        const float sx = startX(), ex = endX();
+        const float start = (sx - wave().getX()) / wave().getWidth();
+        look::waveform (g, wave(), sound->peakMin, sound->peakMax, accent.interpolatedWith (juce::Colours::white, 0.1f), start);
+        // START and END: handles on the region that plays; after END is dimmed.
         g.setColour (cc::accent.withAlpha (0.12f));
-        g.fillRect (wave().withLeft (sx));
-        g.setColour (cc::accent);
-        g.fillRect (juce::Rectangle<float> (sx - 0.75f, wave().getY(), 1.5f, wave().getHeight()));
-        g.setColour (juce::Colours::white);
-        g.fillRect (juce::Rectangle<float> (8.0f, 8.0f).withCentre ({ sx, wave().getY() }));
-        g.setColour (cc::accent);
-        g.drawRect (juce::Rectangle<float> (8.0f, 8.0f).withCentre ({ sx, wave().getY() }), 1.5f);
+        g.fillRect (wave().withLeft (sx).withRight (std::max (sx, ex)));
+        if (ex < wave().getRight() - 0.5f)
+        {
+            g.setColour (cc::well.withAlpha (0.7f));
+            g.fillRect (wave().withLeft (ex));
+        }
+        for (const bool isEnd : { false, true })
+        {
+            const float x = isEnd ? ex : sx;
+            if (isEnd && ex >= wave().getRight() - 0.5f)
+                continue;   // END at the very end: no handle drawn over the frame (still draggable)
+            g.setColour (cc::accent);
+            g.fillRect (juce::Rectangle<float> (x - 0.75f, wave().getY(), 1.5f, wave().getHeight()));
+            const auto handle = juce::Rectangle<float> (8.0f, 8.0f).withCentre ({ x, isEnd ? wave().getBottom() : wave().getY() });
+            g.setColour (juce::Colours::white);
+            g.fillRect (handle);
+            g.setColour (cc::accent);
+            g.drawRect (handle, 1.5f);
+        }
         g.setColour (juce::Colour (0xff8d8c86));
         g.setFont (type::micro (11.5f));
-        const double dur = info.sound->durationSeconds;
+        const double dur = sound->durationSeconds;
         for (int i = 0; i <= 4; ++i)
         {
             const float x = wave().getX() + wave().getWidth() * static_cast<float> (i) / 4.0f;
@@ -131,14 +166,23 @@ void WaveDisplay::paint (juce::Graphics& g)
             g.drawText (juce::String (dur * i / 4.0, 2) + " s", box,
                         i == 0 ? juce::Justification::centredLeft : i == 4 ? juce::Justification::centredRight : juce::Justification::centred);
         }
+        if (! padStartMarker())
+        {
+            g.setColour (juce::Colour (0xffc9c4ba));
+            g.setFont (type::micro (12.0f));
+            g.drawText ("LAYER " + juce::String (proc.selectedLayer[static_cast<std::size_t> (proc.selectedPad)] + 1) + "  " + juce::String::fromUTF8 (layer->displayName().c_str()),
+                        inner.reduced (12.0f, 6.0f).withHeight (16.0f).toNearestInt(), juce::Justification::centredRight);
+        }
     }
     else
     {
         g.setColour (juce::Colour (0xff8d8c86));
         g.setFont (type::micro (14.0f));
-        juce::String text = "Drop a sample on the pad, or Replace Sample...";
+        juce::String text = "Drop samples on the pad, or Add Layers...";
         if (info.loading)
             text = "Loading...";
+        else if (layer != nullptr && layer->sound == nullptr)
+            text = "Missing sample: " + juce::String::fromUTF8 (layer->fileName().c_str()) + ". Load a file to relink it.";
         else if (! info.missingFilename.empty())
             text = "Missing sample: " + juce::String::fromUTF8 (info.missingFilename.c_str()) + ". Load a file to relink it.";
         else if (! info.error.empty())
@@ -149,39 +193,59 @@ void WaveDisplay::paint (juce::Graphics& g)
 
 void WaveDisplay::mouseMove (const juce::MouseEvent& e)
 {
-    setMouseCursor (std::abs (e.position.x - startX()) < 8.0f ? juce::MouseCursor::LeftRightResizeCursor : juce::MouseCursor::NormalCursor);
+    const bool near = std::abs (e.position.x - startX()) < 8.0f || (shownLayer() != nullptr && std::abs (e.position.x - endX()) < 8.0f);
+    setMouseCursor (near ? juce::MouseCursor::LeftRightResizeCursor : juce::MouseCursor::NormalCursor);
 }
 
 void WaveDisplay::mouseDown (const juce::MouseEvent& e)
 {
-    dragging = std::abs (e.position.x - startX()) < 8.0f;
-    if (dragging)
+    const float ds = std::abs (e.position.x - startX());
+    const float de = shownLayer() != nullptr ? std::abs (e.position.x - endX()) : 1.0e9f;
+    dragging = ds < 8.0f && ds <= de ? Drag::start : de < 8.0f ? Drag::end : Drag::none;
+    if (dragging == Drag::start && padStartMarker())
         if (auto* p = proc.parameters().getParameter (DrumsProcessor::padParamId (proc.selectedPad, "start")))
             p->beginChangeGesture();
 }
 
 void WaveDisplay::mouseDrag (const juce::MouseEvent& e)
 {
-    if (! dragging)
+    if (dragging == Drag::none)
         return;
-    if (auto* p = proc.parameters().getParameter (DrumsProcessor::padParamId (proc.selectedPad, "start")))
-        p->setValueNotifyingHost (juce::jlimit (0.0f, 1.0f, (e.position.x - wave().getX()) / wave().getWidth()));
+    const float at = juce::jlimit (0.0f, 1.0f, (e.position.x - wave().getX()) / wave().getWidth());
+    const int pad = proc.selectedPad;
+    if (dragging == Drag::start && padStartMarker())
+    {
+        if (auto* p = proc.parameters().getParameter (DrumsProcessor::padParamId (pad, "start")))
+            p->setValueNotifyingHost (at);
+    }
+    else if (const auto* l = shownLayer())
+    {
+        // One undo step per drag: the first move opens it, the rest join it.
+        auto params = l->params;
+        if (dragging == Drag::start)
+            params.start = std::min (static_cast<double> (at), params.end);
+        else
+            params.end = std::max (static_cast<double> (at), params.start);
+        proc.setLayerParams (pad, proc.selectedLayer[static_cast<std::size_t> (pad)], params, firstMove);
+        firstMove = false;
+    }
     repaint();
 }
 
 void WaveDisplay::mouseUp (const juce::MouseEvent&)
 {
-    if (dragging)
+    if (dragging == Drag::start && padStartMarker())
         if (auto* p = proc.parameters().getParameter (DrumsProcessor::padParamId (proc.selectedPad, "start")))
             p->endChangeGesture();
-    dragging = false;
+    dragging = Drag::none;
+    firstMove = true;
 }
 
 // ---------------------------------------------------------------------------------------
 // Selected pad
 // ---------------------------------------------------------------------------------------
 
-SamplePanel::SamplePanel (DrumsProcessor& p) : proc (p), wave (p)
+SamplePanel::SamplePanel (DrumsProcessor& p) : proc (p), layers (p), wave (p)
 {
     name.setEditable (false, true, false);
     name.setFont (plugin::fonts::make (26.0f, look::Weight::semibold, 0.04f));
@@ -192,7 +256,6 @@ SamplePanel::SamplePanel (DrumsProcessor& p) : proc (p), wave (p)
     previous.icon = [] (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour c) { ceramic::iconChevron (g, r, c, false); };
     next.icon = [] (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour c) { ceramic::iconChevron (g, r, c, true); };
     menu.icon = [] (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour c) { ceramic::iconGear (g, r, c); };
-    auditionLayer.icon = [] (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour c) { ceramic::iconPlay (g, r, c); };
     previous.onClick = [this] {
         const int n = proc.visiblePads();
         if (onSelect)
@@ -204,22 +267,73 @@ SamplePanel::SamplePanel (DrumsProcessor& p) : proc (p), wave (p)
             onSelect (proc.padAtSlot ((proc.slotOfPad (proc.selectedPad) + 1) % n));
     };
     menu.onClick = [this] { showMenu(); };
-    replace.onClick = [this] {
-        if (onLoad)
-            onLoad();
-    };
-    auditionLayer.onStateChange = [this] {
-        static bool wasDown = false;
-        const bool down = auditionLayer.isDown();
-        if (down && ! wasDown)
-            proc.auditionPad (proc.selectedPad, 100);
-        else if (! down && wasDown)
-            proc.releaseAuditionedPad (proc.selectedPad);
-        wasDown = down;
-    };
-    for (auto* b : { &previous, &next, &menu, &replace, &auditionLayer })
+    addLayers.onClick = [this] { openAddDialog(); };
+    addLayers.setTooltip ("Add samples to this pad as round robins, velocity layers or a stack");
+    for (auto* b : { &previous, &next, &menu, &addLayers })
         addAndMakeVisible (b);
     addAndMakeVisible (wave);
+
+    // Layers: how hits use them, the list, the round-robin order.
+    const std::array<std::pair<ceramic::KeyButton*, drums::LayerMode>, 3> modes { { { &modeRobin, drums::LayerMode::roundRobin },
+                                                                                      { &modeVelocity, drums::LayerMode::velocity },
+                                                                                      { &modeStack, drums::LayerMode::stack } } };
+    for (const auto& [button, mode] : modes)
+    {
+        button->fontHeight = 11.5f;
+        button->onClick = [this, m = mode] { proc.setLayerMode (proc.selectedPad, m); };
+        addAndMakeVisible (button);
+    }
+    modeRobin.setTooltip ("Round robin: a different layer every hit");
+    modeVelocity.setTooltip ("Velocity layers: how hard you play chooses the layer");
+    modeStack.setTooltip ("Stack: every layer sounds together");
+    order.addItem ("Shuffle", 1);
+    order.addItem ("Sequential", 2);
+    order.addItem ("Random", 3);
+    order.setTooltip ("Round-robin order. Shuffle: every layer once before any repeats. Random: never the same twice in a row.");
+    order.onChange = [this] {
+        const int id = order.getSelectedId();
+        proc.setLayerOrder (proc.selectedPad, id == 2 ? drums::RoundRobinOrder::sequential : id == 3 ? drums::RoundRobinOrder::random : drums::RoundRobinOrder::shuffle);
+    };
+    styleCombo (order);
+    addAndMakeVisible (order);
+    layers.onSelectionChanged = [this] {
+        bindLayer();
+        wave.repaint();
+        repaint();
+    };
+    addAndMakeVisible (layers);
+
+    // The selected layer's LEVEL and VELOCITY range.
+    layerLevel.setup (*this, "LAYER LEVEL", cc::accent);
+    layerLevel.slider.setRange (-60.0, 12.0, 0.1);
+    layerLevel.slider.setDoubleClickReturnValue (true, 0.0);
+    layerLevel.slider.setSkewFactorFromMidPoint (-12.0);
+    layerLevel.slider.textFromValueFunction = [] (double v) { return v <= -59.95 ? juce::String ("off") : juce::String (v, 1) + " dB"; };
+    layerLevel.slider.onDragStart = [this] { levelGesture = true; };
+    layerLevel.slider.onValueChange = [this] {
+        const int pad = proc.selectedPad;
+        const int l = proc.selectedLayer[static_cast<std::size_t> (pad)];
+        const auto& list = proc.padLayers (pad).layers;
+        if (l < 0 || l >= static_cast<int> (list.size()))
+            return;
+        auto params = list[static_cast<std::size_t> (l)].params;
+        params.gainDb = layerLevel.slider.getValue();
+        proc.setLayerParams (pad, l, params, levelGesture || ! layerLevel.slider.isMouseButtonDown());
+        levelGesture = false;
+    };
+    velocity.onChange = [this] (int low, int high, bool gestureStart) {
+        const int pad = proc.selectedPad;
+        const int l = proc.selectedLayer[static_cast<std::size_t> (pad)];
+        const auto& list = proc.padLayers (pad).layers;
+        if (l < 0 || l >= static_cast<int> (list.size()))
+            return;
+        auto params = list[static_cast<std::size_t> (l)].params;
+        params.velocityLow = low;
+        params.velocityHigh = high;
+        proc.setLayerParams (pad, l, params, gestureStart);
+        repaint (velocityCaption());
+    };
+    addAndMakeVisible (velocity);
 
     start.setup (*this, "START", cc::accent);
     tune.setup (*this, "TUNE", cc::accent, true);
@@ -273,9 +387,54 @@ void SamplePanel::bind()
     voice.setSelectedId (info.voiceMode == drums::VoiceMode::monoRetrigger ? 2 : 1, juce::dontSendNotification);
     choke.setSelectedId (info.chokeGroup + 1, juce::dontSendNotification);
     oneShot.setToggleState (info.trigger == drums::TriggerMode::oneShot, juce::dontSendNotification);
-    auditionLayer.setEnabled (info.sound != nullptr);
+    const auto& padLayers = proc.padLayers (p);
+    modeRobin.setToggleState (padLayers.mode == drums::LayerMode::roundRobin, juce::dontSendNotification);
+    modeVelocity.setToggleState (padLayers.mode == drums::LayerMode::velocity, juce::dontSendNotification);
+    modeStack.setToggleState (padLayers.mode == drums::LayerMode::stack, juce::dontSendNotification);
+    order.setSelectedId (padLayers.order == drums::RoundRobinOrder::sequential ? 2 : padLayers.order == drums::RoundRobinOrder::random ? 3 : 1,
+                         juce::dontSendNotification);
+    order.setEnabled (padLayers.mode != drums::LayerMode::stack && padLayers.layers.size() > 1);
+    for (auto* b : { &modeRobin, &modeVelocity, &modeStack })
+        b->setEnabled (padLayers.layers.size() > 1);
+    addLayers.setEnabled (padLayers.layers.size() < static_cast<std::size_t> (drums::maxLayers));
+    layers.refresh();
+    bindLayer();
     repaint();
     wave.repaint();
+}
+
+void SamplePanel::bindLayer()
+{
+    const int p = proc.selectedPad;
+    const auto& list = proc.padLayers (p).layers;
+    const int l = proc.selectedLayer[static_cast<std::size_t> (p)];
+    const bool has = l >= 0 && l < static_cast<int> (list.size());
+    for (juce::Component* c : { static_cast<juce::Component*> (&layerLevel.slider), static_cast<juce::Component*> (&layerLevel.label),
+                                static_cast<juce::Component*> (&velocity) })
+        c->setVisible (has);
+    if (! has)
+        return;
+    const auto& params = list[static_cast<std::size_t> (l)].params;
+    const auto accent = look::category (proc.padInfo (p).category);
+    layerLevel.slider.getProperties().set ("arc", static_cast<juce::int64> (accent.getARGB()));
+    if (! layerLevel.slider.isMouseButtonDown())
+        layerLevel.slider.setValue (params.gainDb, juce::dontSendNotification);
+    layerLevel.slider.updateText();
+    layerLevel.slider.repaint();
+    velocity.setRange (params.velocityLow, params.velocityHigh, accent);
+    repaint (velocityCaption());
+}
+
+void SamplePanel::openAddDialog()
+{
+    const int pad = proc.selectedPad;
+    chooser = std::make_unique<juce::FileChooser> ("Add layers to " + proc.padDisplayName (pad), juce::File(), "*.wav;*.aif;*.aiff;*.flac;*.caf");
+    chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::canSelectMultipleItems,
+                          [this, pad] (const juce::FileChooser& fc) {
+                              const auto files = fc.getResults();
+                              if (! files.isEmpty())
+                                  offerLayerDrop (proc, pad, files, &addLayers, LayerDrop::roundRobin);
+                          });
 }
 
 void SamplePanel::showMenu()
@@ -294,8 +453,9 @@ void SamplePanel::showMenu()
         categories.addItem (look::categoryName (cat), true, proc.padInfo (p).category == cat, [this, p, cat] { proc.setPadCategory (p, cat, true); });
     }
     m.addSubMenu ("Category", categories);
+    m.addItem ("Add layers...", proc.padLayers (p).layers.size() < static_cast<std::size_t> (drums::maxLayers), false, [this] { openAddDialog(); });
     m.addSeparator();
-    m.addItem ("Clear pad", proc.padInfo (p).sound != nullptr || ! proc.padInfo (p).missingFilename.empty(), false, [this, p] { proc.clearPad (p); });
+    m.addItem ("Clear pad", ! proc.padLayers (p).layers.empty(), false, [this, p] { proc.clearPad (p); });
     m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&menu));
 }
 
@@ -319,9 +479,17 @@ void SamplePanel::resized()
     knobs.removeFromLeft (24);
     reverse.setBounds (knobs.removeFromLeft (70).withTrimmedTop (30).withHeight (28));
 
+    // The selected layer, after REVERSE
+    layerLevel.setBounds ({ 352, 262, 100, 80 });
+    velocity.setBounds (480, 300, 300, 26);
+
     // Layers column
-    auditionLayer.setBounds (982, 92, 30, 26);
-    replace.setBounds (980, 214, 200, 32);
+    modeRobin.setBounds (980, 80, 76, 26);
+    modeVelocity.setBounds (1058, 80, 98, 26);
+    modeStack.setBounds (1158, 80, 82, 26);
+    layers.setBounds (978, 114, 262, 6 + 5 * static_cast<int> (LayerList::rowHeight));
+    order.setBounds (980, 258, 112, 28);
+    addLayers.setBounds (1098, 256, 142, 32);
 
     // Play settings column
     voice.setBounds (1272, 74, 160, 28);
@@ -336,7 +504,6 @@ void SamplePanel::paint (juce::Graphics& g)
 {
     ceramic::card (g, getLocalBounds().toFloat(), 12.0f);
     const int p = proc.selectedPad;
-    const auto& info = proc.padInfo (p);
     ceramic::badge (g, juce::Rectangle<float> (18.0f, 12.0f, 36.0f, 30.0f), juce::String (p + 1), cc::accent, juce::Colours::white, 17.0f);
 
     // Tabs (B1 refined flat): SAMPLE is this view; KEY MAP opens the editor.
@@ -352,38 +519,32 @@ void SamplePanel::paint (juce::Graphics& g)
     // Sample name in the header (right).
     g.setColour (cc::textSecondary);
     g.setFont (type::micro (13.5f));
-    if (info.sound != nullptr)
-        g.drawFittedText (juce::String::fromUTF8 (info.sound->filename.c_str()), juce::Rectangle<int> (getWidth() - 360, 12, 300, 30), juce::Justification::centredRight, 1, 1.0f);
+    {
+        // The layer shown below (with several, which one of how many).
+        const auto& list = proc.padLayers (p).layers;
+        const int l = juce::jlimit (0, std::max (0, static_cast<int> (list.size()) - 1), proc.selectedLayer[static_cast<std::size_t> (p)]);
+        if (! list.empty())
+            g.drawFittedText (juce::String::fromUTF8 (list[static_cast<std::size_t> (l)].fileName().c_str()), juce::Rectangle<int> (getWidth() - 360, 12, 300, 30),
+                              juce::Justification::centredRight, 1, 1.0f);
+    }
 
     // Layers column
     g.setColour (juce::Colour (0xffded4c5));
     g.fillRect (968, 60, 1, getHeight() - 76);
     g.fillRect (1252, 60, 1, getHeight() - 76);
-    smallLabel (g, { 982, 56, 200, 20 }, "SAMPLE LAYER");
-    auto list = juce::Rectangle<float> (978.0f, 84.0f, 262.0f, 120.0f);
-    ceramic::recess (g, list, 6.0f, juce::Colour (0xfff7f2ea));
-    if (info.sound != nullptr)
+    smallLabel (g, { 982, 54, 160, 20 }, "SAMPLE LAYERS");
+    const auto& padLayers = proc.padLayers (p);
+    if (! padLayers.layers.empty())
+        smallLabel (g, { 1140, 54, 100, 20 }, juce::String (padLayers.layers.size()) + " / " + juce::String (drums::maxLayers), juce::Justification::centredRight);
+
+    // The selected layer's velocity range
+    if (velocity.isVisible())
     {
-        auto row = juce::Rectangle<float> (list.getX() + 4.0f, list.getY() + 4.0f, list.getWidth() - 8.0f, 30.0f);
-        g.setColour (cc::keyOn.withAlpha (0.8f));
-        g.fillRoundedRectangle (row, 4.0f);
-        g.setColour (cc::accent);
-        g.fillRect (row.withWidth (2.5f));
+        const int l = proc.selectedLayer[static_cast<std::size_t> (p)];
+        smallLabel (g, velocityCaption(), "LAYER " + juce::String (l + 1) + " VELOCITY");
         g.setColour (cc::text);
-        g.setFont (type::micro (13.5f));
-        g.drawFittedText (juce::String::fromUTF8 (info.sound->filename.c_str()), row.withTrimmedLeft (40.0f).withTrimmedRight (52.0f).toNearestInt(), juce::Justification::centredLeft, 1, 1.0f);
-        g.setColour (cc::textSecondary);
-        g.drawText (juce::String (info.sound->durationSeconds, 2) + " s", row.withTrimmedRight (8.0f), juce::Justification::centredRight);
-        g.setColour (cc::textMicro);
-        g.setFont (type::micro (12.0f));
-        g.drawFittedText ("Round robin, velocity layers and stacks come with multi-file drops (next).", list.withTrimmedTop (42.0f).reduced (10.0f, 4.0f).toNearestInt(),
-                          juce::Justification::topLeft, 3, 1.0f);
-    }
-    else
-    {
-        g.setColour (cc::textMicro);
-        g.setFont (type::micro (13.0f));
-        g.drawText ("No sample", list.reduced (12.0f, 0.0f), juce::Justification::centredLeft);
+        g.setFont (plugin::fonts::make (13.0f, look::Weight::semibold));
+        g.drawText (juce::String (velocity.low()) + juce::String (juce::CharPointer_UTF8 ("\xe2\x80\x93")) + juce::String (velocity.high()), velocityCaption(), juce::Justification::centredRight);
     }
 
     // Play settings column
@@ -965,10 +1126,12 @@ void DrumsContent::setKeyMapOpen (bool open)
 void DrumsContent::openLoadDialog (int pad)
 {
     chooser = std::make_unique<juce::FileChooser> ("Load a sample onto " + proc.padDisplayName (pad), juce::File(), "*.wav;*.aif;*.aiff;*.flac;*.caf");
-    chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [this, pad] (const juce::FileChooser& fc) {
-        if (fc.getResult().existsAsFile())
-            proc.loadPad (pad, fc.getResult());
-    });
+    chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::canSelectMultipleItems,
+                          [this, pad] (const juce::FileChooser& fc) {
+                              // Load replaces the pad (several files: round robins); Add Layers... adds.
+                              if (! fc.getResults().isEmpty())
+                                  proc.addPadLayers (pad, fc.getResults(), LayerDrop::replace);
+                          });
 }
 
 void DrumsContent::refreshModeBar()
