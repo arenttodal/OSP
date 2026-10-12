@@ -115,6 +115,13 @@ public:
     class Dial;
     std::unique_ptr<Dial> dial;
 
+    /** The knob's design is 125 units tall (name, dial, value); the component is this many
+        units taller so the name can sit higher above the dial's tick dots, as far above them
+        as the value sits below the lowest ones. The card grows the bounds upwards by as much,
+        so the dial and the value stay where they were. */
+    static constexpr float labelLift = 15.1f;
+    static constexpr float designUnits = 125.0f + labelLift;
+
 private:
     OspAudioProcessor& processor;
     juce::RangedAudioParameter* parameter = nullptr;

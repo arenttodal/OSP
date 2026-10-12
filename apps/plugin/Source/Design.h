@@ -4,6 +4,11 @@
 
 #include <array>
 
+namespace osp::plugin
+{
+class SpriteKnobAsset;
+}
+
 namespace osp::plugin::design
 {
 
@@ -231,6 +236,9 @@ namespace draw
         float spectralLift = 1.0f;                     ///< hover: a few percent brighter
         float startAngle = -2.356f, endAngle = 2.356f;
         bool enabled = true;
+        /** A rendered cap (SpriteKnobRenderer) in place of the drawn body and pointer; the
+            ticks and the arcs stay drawn. nullptr: the drawn knob. */
+        SpriteKnobAsset* sprite = nullptr;
     };
     void knob (juce::Graphics&, juce::Point<float> centre, float bodyRadius, float position, const KnobStyle& style);
     /** A glowing indicator dot (layer identity, macro LEDs). */

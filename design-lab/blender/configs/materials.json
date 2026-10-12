@@ -1,0 +1,151 @@
+{
+    "schemaVersion": 1,
+    "description": "The lab's PBR materials. Colours sRGB; grain size and height in mm (1 design px = 0.31 mm, the scale of the approved knob: its 93 px body is 28.9 mm). Grain sizes are set against the render pixel (0.155 mm at 2x, 0.31 mm at 1x): finer grain averages away to flat colour. Wear is 0 everywhere.",
+    "materials": {
+        "M1-warm-matte-ivory": {
+            "label": "M1 Warm Matte Ivory",
+            "baseColor": "#ece5d8",
+            "roughness": 0.62,
+            "metallic": 0.0,
+            "specular": 0.35,
+            "coat": 0.0,
+            "sheen": 0.06,
+            "anisotropic": 0.0,
+            "grain": {
+                "kind": "powder",
+                "size": 0.22,
+                "height": 0.004
+            },
+            "albedoVariation": 0.012
+        },
+        "M2-satin-ceramic-ivory": {
+            "label": "M2 Satin Ceramic Ivory",
+            "baseColor": "#eee8dd",
+            "roughness": 0.34,
+            "metallic": 0.0,
+            "specular": 0.5,
+            "coat": 0.16,
+            "coatRoughness": 0.2,
+            "sheen": 0.0,
+            "anisotropic": 0.0,
+            "grain": {
+                "kind": "powder",
+                "size": 0.3,
+                "height": 0.0012
+            },
+            "albedoVariation": 0.004
+        },
+        "M3-brushed-ivory": {
+            "label": "M3 Brushed Ivory",
+            "baseColor": "#ebe4d6",
+            "roughness": 0.44,
+            "metallic": 0.0,
+            "specular": 0.45,
+            "coat": 0.0,
+            "sheen": 0.0,
+            "anisotropic": 0.45,
+            "grain": {
+                "kind": "brushed",
+                "size": 0.09,
+                "stretch": 90.0,
+                "height": 0.006
+            },
+            "albedoVariation": 0.035
+        },
+        "M4-warm-brushed-aluminum": {
+            "label": "M4 Warm Brushed Aluminium",
+            "baseColor": "#b8b0a2",
+            "roughness": 0.5,
+            "metallic": 1.0,
+            "specular": 0.5,
+            "coat": 0.0,
+            "sheen": 0.0,
+            "anisotropic": 0.75,
+            "grain": {
+                "kind": "brushed",
+                "size": 0.08,
+                "stretch": 120.0,
+                "height": 0.006
+            },
+            "albedoVariation": 0.09
+        },
+        "M5-graphite-powder-coat": {
+            "label": "M5 Graphite Powder Coat",
+            "baseColor": "#2f2d2b",
+            "roughness": 0.68,
+            "metallic": 0.0,
+            "specular": 0.4,
+            "coat": 0.0,
+            "sheen": 0.08,
+            "anisotropic": 0.0,
+            "grain": {
+                "kind": "powder",
+                "size": 0.2,
+                "height": 0.004
+            },
+            "albedoVariation": 0.03
+        },
+        "M6-soft-polymer": {
+            "label": "M6 Soft Polymer",
+            "baseColor": "#e7e1d6",
+            "roughness": 0.52,
+            "metallic": 0.0,
+            "specular": 0.4,
+            "coat": 0.0,
+            "sheen": 0.22,
+            "anisotropic": 0.0,
+            "grain": {
+                "kind": "powder",
+                "size": 0.25,
+                "height": 0.002
+            },
+            "albedoVariation": 0.008
+        },
+        "knob-satin-ivory": {
+            "label": "Approved knob ivory (reference)",
+            "baseColor": "#ece8e0",
+            "roughness": 0.36,
+            "metallic": 0.0,
+            "specular": 0.5,
+            "coat": 0.18,
+            "coatRoughness": 0.22,
+            "sheen": 0.0,
+            "anisotropic": 0.0,
+            "grain": {
+                "kind": "powder",
+                "size": 0.04,
+                "height": 0.0008
+            }
+        },
+        "graphite-key": {
+            "label": "Graphite key",
+            "baseColor": "#3a3835",
+            "roughness": 0.5,
+            "metallic": 0.0,
+            "specular": 0.45,
+            "coat": 0.0,
+            "sheen": 0.05,
+            "anisotropic": 0.0,
+            "grain": {
+                "kind": "powder",
+                "size": 0.04,
+                "height": 0.0015
+            }
+        },
+        "dark-slot": {
+            "label": "Dark slot",
+            "baseColor": "#1d1c1b",
+            "roughness": 0.7,
+            "metallic": 0.0,
+            "specular": 0.3,
+            "coat": 0.0,
+            "sheen": 0.0,
+            "anisotropic": 0.0,
+            "grain": {
+                "kind": "powder",
+                "size": 0.05,
+                "height": 0.001
+            }
+        }
+    }
+}

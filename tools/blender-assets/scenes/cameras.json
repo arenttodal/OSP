@@ -1,0 +1,9 @@
+{
+    "schemaVersion": 1,
+    "description": "Orthographic cameras. elevation 90 looks straight down (the GUI's view); lower values tilt towards the player (the bottom of the screen). margin: frame side / the control's widest diameter.",
+    "presets": {
+        "top-down":          { "elevation": 90, "margin": 1.45 },
+        "near-top-down-6":   { "elevation": 84, "margin": 1.45 },
+        "near-top-down-12":  { "elevation": 78, "margin": 1.45 }
+    }
+}

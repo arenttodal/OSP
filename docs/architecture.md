@@ -537,6 +537,27 @@ the global LFOs' EQ routes (`effectiveEq`) every 32-sample control chunk, and th
 glides to them. Off, it is not in the path (bit-identical). The editor (`EqEditor`) draws
 `eq::responseDb`, the exact response of the running sections. Report: `docs/reports/eq.md`.
 
+## RENDERED CONTROLS (tools/blender-assets; docs/reports/knob-phase1.md)
+
+Controls can be drawn from offline renders instead of vectors.
+
+**Generator.** `tools/blender-assets/` is a procedural, headless Blender pipeline (JSON
+configs plus named material, lighting and camera presets). It writes one zip of PNG frames
+per size into `apps/plugin/Resources/knobs/<name>/`. These are embedded as binary data.
+
+**Plugin side.** `SpriteKnobRenderer`:
+- decodes a frame when first shown;
+- resamples it once to the exact physical pixels at the current window and display scale,
+  then draws it 1:1;
+- shares one asset per process.
+
+**Integration.** `design::draw::knob` keeps the ticks, arcs and halos drawn and replaces only
+the body and pointer when `KnobStyle::sprite` is set. A slider asks for one with the
+property `sprite`.
+
+**Skin.** A development knob skin (Cmd+Option+K, `OSP_KNOB_SKIN`) chooses original, pilot
+(LIFE) or all macros. It is looks only and never touches state.
+
 ## LIBRARY (in progress; docs/library/)
 
 The Library indexes sounds, presets and templates in one local SQLite catalog

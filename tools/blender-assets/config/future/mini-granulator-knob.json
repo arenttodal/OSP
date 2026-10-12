@@ -1,0 +1,31 @@
+{
+    "schemaVersion": 1,
+    "status": "planned (not rendered yet): sizes and what differs from macro-knob.json",
+    "material": "satin-ivory",
+    "camera": "top-down",
+    "lighting": "studio-soft (a dark-panel variant to add)",
+    "name": "mini-ivory",
+    "type": "knob",
+    "description": "The granular overlay's MiniKnobs on the dark display: body about 30 px; lit for a dark surround (its own lighting preset to add).",
+    "geometry": {
+        "inherits": "macro-knob",
+        "diameter": 11.0,
+        "height": 5.0,
+        "flutes": {
+            "count": 24,
+            "depth": 0.2
+        },
+        "skirt": {
+            "enabled": false
+        }
+    },
+    "indicator": {
+        "width": 0.9
+    },
+    "runtime": {
+        "levels": [
+            72,
+            144
+        ]
+    }
+}

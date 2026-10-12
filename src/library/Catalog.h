@@ -208,7 +208,10 @@ public:
     {
         std::string id;
         bool existed = false;
+        bool trashed = false;   ///< the existing record is in the Library's trash (left there)
     };
+    /** The same bytes from the same place are one record, whatever its state: a live one is
+        preferred, else the trashed one is reused (never a second record beside it). */
     std::optional<Added> addImportedSound (const Asset& asset, const SoundInfo& info, const std::string& path, const std::string& kind);
     std::optional<std::string> addPreset (const Asset& asset, const PresetInfo& info);
     /** A preset or template file saved (again): its record updated in place (same identity,

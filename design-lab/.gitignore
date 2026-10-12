@@ -1,0 +1,14 @@
+# Large, reproducible outputs (blender/generate.py, scripts/render_all.py, scripts/build_review.py).
+/renders/
+/mockups/
+/work/
+/references/current-gui/export4x/
+/references/current-gui/export1.5x/
+# Full-resolution review PNG masters (regenerate with scripts/build_review.py); the gallery's
+# web copies, reports, sheets and actual-size crops are kept.
+/review/0*.png
+__pycache__/
+/review/actual-size/
+/review/component-comparisons/
+/review/closeups/
+/review/contact-sheets/

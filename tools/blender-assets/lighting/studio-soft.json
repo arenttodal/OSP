@@ -1,0 +1,15 @@
+{
+    "schemaVersion": 1,
+    "description": "Fixed product-photography rigs. Azimuth in degrees on the panel as seen on screen (0 = right, 90 = up, 135 = upper left); elevation in degrees above the panel; distance and size in mm; energy in watts. The rig never moves while the control turns.",
+    "presets": {
+        "studio-soft": {
+            "world": { "color": "#e9e4dc", "strength": 0.14 },
+            "lights": [
+                { "name": "key",  "azimuth": 128, "elevation": 70, "distance": 190, "size": 140, "energy": 0.30, "color": "#fffaf4" },
+                { "name": "fill", "azimuth": -40, "elevation": 45, "distance": 210, "size": 190, "energy": 0.13, "color": "#f4f2ef" },
+                { "name": "edge", "azimuth": 60,  "elevation": 14, "distance": 160, "size": 60,  "energy": 0.03, "color": "#fffaf2" }
+            ],
+            "panel": { "color": "#ece5d9", "roughness": 0.8 }
+        }
+    }
+}

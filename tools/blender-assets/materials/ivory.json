@@ -1,0 +1,46 @@
+{
+    "schemaVersion": 1,
+    "description": "Ivory finishes for knobs, caps and switches. Colours are sRGB; grain sizes and heights in mm.",
+    "presets": {
+        "soft-ivory": {
+            "label": "A - Soft Ivory",
+            "baseColor": "#ebe7df",
+            "roughness": 0.56,
+            "roughnessVariation": 0.04,
+            "specular": 0.42,
+            "sheen": 0.12,
+            "subsurface": 0.0,
+            "coat": 0.0,
+            "coatRoughness": 0.3,
+            "grain": { "kind": "powder", "size": 0.05, "height": 0.0016, "detail": 2.0 }
+        },
+        "brushed-ivory": {
+            "label": "B - Brushed Ivory",
+            "baseColor": "#eae6dd",
+            "roughness": 0.5,
+            "roughnessVariation": 0.08,
+            "specular": 0.45,
+            "sheen": 0.06,
+            "subsurface": 0.0,
+            "coat": 0.0,
+            "coatRoughness": 0.3,
+            "grain": { "kind": "brushed", "size": 0.035, "height": 0.006, "detail": 3.0 }
+        },
+        "satin-ivory": {
+            "label": "C - Satin Ivory",
+            "baseColor": "#ece8e0",
+            "roughness": 0.36,
+            "roughnessVariation": 0.03,
+            "specular": 0.5,
+            "sheen": 0.0,
+            "subsurface": 0.0,
+            "coat": 0.18,
+            "coatRoughness": 0.22,
+            "grain": { "kind": "powder", "size": 0.04, "height": 0.0008, "detail": 2.0 }
+        }
+    },
+    "inks": {
+        "charcoal": { "color": "#26231f", "roughness": 0.72 },
+        "charcoal-print": { "color": "#2a2723", "roughness": 0.5 }
+    }
+}

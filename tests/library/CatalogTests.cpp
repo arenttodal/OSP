@@ -425,6 +425,37 @@ TEST_CASE ("library: measured - catalog of 50,000 sounds", "[.][library-perf]")
 
 // A child process for the tests below (hidden): writes sounds into OSP_LIBRARY_CHILD_DB,
 // OSP_LIBRARY_CHILD_COUNT of them (0: until it is killed).
+TEST_CASE ("library: connections opening a new catalog at the same moment all open it (none loses the migration race)", "[unit][library]")
+{
+    // The plugin opens its Library thread's and its background thread's connections at once,
+    // often on a catalog that does not exist yet: both read version 0, one migrates, and the
+    // other found the first step already done and failed (and dropped its jobs for good).
+    for (int round = 0; round < 25; ++round)
+    {
+        const auto dir = std::filesystem::temp_directory_path() / ("osp-library-race-" + std::to_string (round) + "-" + std::to_string (reinterpret_cast<std::uintptr_t> (&round)));
+        std::filesystem::remove_all (dir);
+        const auto file = dir / "catalog.db";
+        constexpr int connections = 4;
+        std::atomic<int> ready { 0 }, opened { 0 };
+        std::vector<std::string> errors (connections);
+        std::vector<std::thread> threads;
+        for (int i = 0; i < connections; ++i)
+            threads.emplace_back ([&, i] {
+                ++ready;
+                while (ready.load() < connections)
+                    std::this_thread::yield();
+                auto c = Catalog::open (file, errors[static_cast<std::size_t> (i)]);
+                if (c != nullptr && c->version() == Catalog::schemaVersion)
+                    ++opened;
+            });
+        for (auto& t : threads)
+            t.join();
+        INFO ("round " << round << ": " << errors[0] << errors[1] << errors[2] << errors[3]);
+        CHECK (opened.load() == connections);
+        std::filesystem::remove_all (dir);
+    }
+}
+
 TEST_CASE ("library: child writer process", "[.][library-child]")
 {
     const char* file = std::getenv ("OSP_LIBRARY_CHILD_DB");

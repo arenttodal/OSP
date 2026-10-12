@@ -40,6 +40,7 @@ target_sources(ANDOR_Drums PRIVATE
     ${OSP_PLUGIN_SOURCE_DIR}/InstrumentLoader.cpp
     ${OSP_PLUGIN_SOURCE_DIR}/OspLookAndFeel.cpp
     ${OSP_PLUGIN_SOURCE_DIR}/Design.cpp
+    ${OSP_PLUGIN_SOURCE_DIR}/SpriteKnobRenderer.cpp
     ${OSP_IO_SOURCES})
 
 target_include_directories(ANDOR_Drums PRIVATE ${PROJECT_SOURCE_DIR}/src Source ${OSP_PLUGIN_SOURCE_DIR})

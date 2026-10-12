@@ -90,10 +90,8 @@ private:
     juce::File store;
     juce::ThreadPool pool { juce::ThreadPoolOptions().withThreadName ("OSP Library").withNumberOfThreads (1).withDesiredThreadPriority (juce::Thread::Priority::low) };
     std::unique_ptr<library::Catalog> db;
-    bool opened = false;
     juce::ThreadPool background { juce::ThreadPoolOptions().withThreadName ("OSP Library scan").withNumberOfThreads (1).withDesiredThreadPriority (juce::Thread::Priority::background) };
     std::unique_ptr<library::Catalog> backgroundDb;
-    bool backgroundOpened = false;
     library::ScanControl control;
     library::ScanProgress progress;
     mutable juce::CriticalSection reasonLock;

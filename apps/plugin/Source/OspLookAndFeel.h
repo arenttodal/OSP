@@ -2,6 +2,8 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include "SpriteKnobRenderer.h"
+
 namespace osp::plugin
 {
 
@@ -150,6 +152,12 @@ public:
 
     static constexpr float rotaryStart = juce::MathConstants<float>::pi * 1.25f;
     static constexpr float rotaryEnd = juce::MathConstants<float>::pi * 2.75f;
+
+    /** The rendered controls, shared by every editor of the process. */
+    SpriteKnobLibrary& spriteKnobs() noexcept { return *sprites; }
+
+private:
+    juce::SharedResourcePointer<SpriteKnobLibrary> sprites;
 };
 
 } // namespace osp::plugin

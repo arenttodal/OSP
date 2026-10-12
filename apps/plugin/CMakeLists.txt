@@ -41,13 +41,18 @@ juce_add_binary_data(OSP_PluginData
         Resources/fonts/Inter-Bold.ttf
         Resources/fonts/Inter-ExtraBold.ttf
         Resources/fonts/Outfit-ExtraBold.ttf
-        Resources/fonts/Outfit-ExtraLight.ttf)
+        Resources/fonts/Outfit-ExtraLight.ttf
+        # Rendered controls (tools/blender-assets): one zip of frames per size; the plugin
+        # registers every "<name>-<size>.zip" it finds here (SpriteKnobRenderer).
+        Resources/knobs/macro-ivory/macro-ivory-176.zip
+        Resources/knobs/macro-ivory/macro-ivory-352.zip)
 
 target_sources(OSP_Plugin PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
     Source/OspLookAndFeel.cpp
     Source/Design.cpp
+    Source/SpriteKnobRenderer.cpp
     Source/ShapingPopups.cpp
     Source/MacroPopups.cpp
     Source/EngineCard.cpp

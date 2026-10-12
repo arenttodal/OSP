@@ -430,6 +430,10 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
         knob.slider.getProperties().set ("arc", static_cast<juce::int64> (design::colour::macro (static_cast<int> (i)).getARGB()));
         knob.slider.getProperties().set ("thinArc", 2.4);
         knob.slider.getProperties().set ("paramId", macroInfo[i].first);   // a modulation drop target
+        // The rendered ivory cap (tools/blender-assets): LIFE is its pilot; the knob skin
+        // (Cmd+Option+K, OSP_KNOB_SKIN) decides which macros show it. Looks only.
+        knob.slider.getProperties().set ("sprite", "macro-ivory");
+        knob.slider.getProperties().set ("spritePilot", i == 0);
         knob.label->setTooltip (popupHints[i]);
         const int index = popupOfMacro (static_cast<int> (i));
         knob.label->onClick = [this, index] {
@@ -1229,6 +1233,13 @@ bool OspAudioProcessorEditor::keyPressed (const juce::KeyPress& key)
             openLibrary();
         return true;
     }
+    if (command && key.getModifiers().isAltDown() && (key.getKeyCode() == 'K' || key.getKeyCode() == 'k'))
+    {
+        // Development: original knob / rendered pilot / all macros rendered. Looks only.
+        setKnobSkin (nextKnobSkin (knobSkin()));
+        content.repaint();
+        return true;
+    }
     if (command && key.getKeyCode() == 'Z')
     {
         if (key.getModifiers().isShiftDown())
@@ -1290,10 +1301,7 @@ void OspAudioProcessorEditor::paintInstrument (juce::Graphics& g)
         draw::raised (g, r, layout::panelRadius, colour::panelTop, colour::panelBottom);
         g.setColour (colour::divider);
         g.fillRect (juce::Rectangle<float> (layout::envelopeX - 10.0f, 695.0f, 1.0f, 190.0f));
-        g.setColour (colour::text.withAlpha (0.9f));
-        g.setFont (type::panelHeader());
-        // The title on the panel's own first line (the names moved up to clear the halos).
-        g.drawText ("MACROS", juce::Rectangle<float> (59.0f, 688.0f, 200.0f, 24.0f), juce::Justification::centredLeft, false);
+        // No panel title: the six named knobs speak for themselves.
         // Under each macro a small light: lit when the macro's own settings are in use.
         for (std::size_t i = 0; i < macros.size(); ++i)
         {

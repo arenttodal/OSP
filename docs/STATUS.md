@@ -344,9 +344,27 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       (LEVEL could reach +24 dB past +6 before; times had no limit). Older sessions' depths
       are scaled by old / new span on load, so they sound as before; depth steps 0.01 %.
       `[unit][mod]`, `[plugin][mod]` (docs/reports/modulation.md).
-- [ ] RENDERED MACRO KNOB, phase 1 (tools/blender-assets, docs/reports/knob-phase1.md): a
-      procedural Blender generator; the LIFE macro as pilot; Cmd+Option+K / OSP_KNOB_SKIN
-      switches original / pilot / all macros (looks only).
+- [x] Library fix (the flaky "sideCount all = 4" window test): re-importing a sound that is
+      in the Library's trash reuses and restores its record instead of adding a second one;
+      connections that open a brand-new catalog at the same moment retry the migration
+      instead of failing, and LibraryService no longer latches a failed open. Both bugs
+      reproduced under CPU load before the fix. `[library]`.
+- [x] RENDERED MACRO KNOB, phase 1 (tools/blender-assets, docs/reports/knob-phase1.md): a
+      procedural Blender generator (geometry, three ivory finishes, fixed studio, calibrated
+      exposure, 129 deterministic frames); Satin Ivory with an engraved line chosen at real
+      size; SpriteKnobRenderer (lazy decode, exact-size area resampling, shared per process);
+      the LIFE macro as pilot; Cmd+Option+K / OSP_KNOB_SKIN switches original / pilot / all
+      macros (looks only: output bit-identical, state unchanged). `[plugin][sprite-knob]`.
+      Next: judge it on the Mac; engine-card knobs from config/future.
+- [x] Layer knobs: each name sits as far above the dial's tick dots as the value sits below
+      the lowest ones (the knob component grows upwards by `LayerKnob::labelLift`; dial and
+      value unchanged). The MACROS title is gone from the macro panel.
+- [ ] DESIGN LAB round 1 (design-lab/, exploration only, nothing integrated): Blender-rendered
+      surfaces composited under the plugin's own drawing; 6 full-GUI directions, button/tab/
+      fader/panel/background/detail studies, close-ups, actual-size tests, review gallery,
+      reports (design-lab/review/). Round 2 chosen: 09 Warm Ceramic + Teak (C1 fader on T3,
+      lens LEDs, painted divider); style guide and build spec in
+      docs/design/warm-ceramic-teak-style-guide.md; implementation in progress.
 - [ ] FINAL MODULATION SYSTEM + DAMPEN (queued spec, stages 0-10): Stage 0 audit done
       (docs/reports/mod-final-audit.md); implementation next.
 - [x] `plugin-pipeline/`: the build-and-download pipeline as a reusable kit for other JUCE
