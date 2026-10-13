@@ -187,6 +187,26 @@ sees the result through the existing seqlock. MIDI Learn and the held-note displ
 lock-free FIFO and atomic bits written by `processBlock`. Details and test coverage:
 `v1.1-report.md`.
 
+## 6b. Shared design language, separate downloads (2026-10-13)
+
+ANDOR Drums and OSP are separate plugins that share one design language. What the two
+share, and what stays each plugin's own:
+
+- **Shared, from one source.** OSP's typefaces (Inter, Outfit) and the rendered macro knob
+  (`apps/plugin/Resources/fonts`, `apps/plugin/Resources/knobs`), together with the shared
+  drawing code Drums compiles (`OspLookAndFeel`, `Design`, `SpriteKnobRenderer`,
+  `CeramicSkin`). A change to the shared design language there reaches both plugins at their
+  next build.
+- **Each plugin's own embedded data.** Drums embeds `ANDOR_DrumsData` (about 12 MB: the fonts
+  and the knob's two sizes). OSP embeds `OSP_PluginData`, which also holds OSP's
+  ceramic skin pack. Drums draws its own ceramic look (`Source/CeramicSkin`), and the shared
+  drawing code falls back to vector drawing without the pack.
+- **Merging OSP into Drums does not grow Drums.** After the 2026-10-12 merge, each Drums
+  binary grew by the 12.5 MB skin, to 37.9 MB (Linux VST3; a universal Mac binary holds the data
+  twice). With its own data it is back to 25.4 MB.
+- **A guard.** The test `[drums-plugin][size]` fails if OSP's skin is embedded again, or if the
+  embedded data grows past its 13 MB budget.
+
 ## 7. Known limitations at this checkpoint
 
 - ~~Several files dropped on one pad load only the first.~~ Done in M3 (`m3-layers.md`).

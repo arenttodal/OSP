@@ -31,6 +31,27 @@ juce_add_plugin(ANDOR_Drums
     MICROPHONE_PERMISSION_ENABLED FALSE)
 
 set(OSP_PLUGIN_SOURCE_DIR ${PROJECT_SOURCE_DIR}/apps/plugin/Source)
+set(OSP_PLUGIN_RESOURCE_DIR ${PROJECT_SOURCE_DIR}/apps/plugin/Resources)
+
+# Drums' own embedded resources: only what it draws. The shared design language (OSP's
+# typefaces and the rendered macro knob) comes from OSP's Resources, so an update there
+# reaches both plugins. OSP's ceramic skin pack (12.5 MB, and twice that in a universal
+# binary) is OSP's alone: Drums draws its own ceramic look (Source/CeramicSkin), and OSP's
+# shared drawing code falls back to vector drawing when the pack is not embedded.
+juce_add_binary_data(ANDOR_DrumsData
+    HEADER_NAME BinaryData.h
+    NAMESPACE BinaryData
+    SOURCES
+        ${OSP_PLUGIN_RESOURCE_DIR}/fonts/Inter-Light.ttf
+        ${OSP_PLUGIN_RESOURCE_DIR}/fonts/Inter-Regular.ttf
+        ${OSP_PLUGIN_RESOURCE_DIR}/fonts/Inter-Medium.ttf
+        ${OSP_PLUGIN_RESOURCE_DIR}/fonts/Inter-SemiBold.ttf
+        ${OSP_PLUGIN_RESOURCE_DIR}/fonts/Inter-Bold.ttf
+        ${OSP_PLUGIN_RESOURCE_DIR}/fonts/Inter-ExtraBold.ttf
+        ${OSP_PLUGIN_RESOURCE_DIR}/fonts/Outfit-ExtraBold.ttf
+        ${OSP_PLUGIN_RESOURCE_DIR}/fonts/Outfit-ExtraLight.ttf
+        ${OSP_PLUGIN_RESOURCE_DIR}/knobs/macro-ivory/macro-ivory-176.zip
+        ${OSP_PLUGIN_RESOURCE_DIR}/knobs/macro-ivory/macro-ivory-352.zip)
 
 target_sources(ANDOR_Drums PRIVATE
     Source/DrumsProcessor.cpp
@@ -66,7 +87,7 @@ target_link_libraries(ANDOR_Drums
         osp_drums
         osp_dsp
         osp_library
-        OSP_PluginData
+        ANDOR_DrumsData
         juce::juce_audio_utils
         juce::juce_audio_formats
         juce::juce_cryptography

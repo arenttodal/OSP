@@ -6,6 +6,8 @@
 #include "DrumsEditor.h"
 #include "DrumsProcessor.h"
 
+#include <BinaryData.h>
+
 #include "audio/utility/TestSignals.h"
 #include "core/Prng.h"
 #include "io/AudioFileIO.h"
@@ -2249,6 +2251,25 @@ TEST_CASE ("Dropping a sample on a pad replaces it at once; only Cmd asks", "[dr
     REQUIRE (p.waitForLoads());
     CHECK (p.padLayers (1).layers.size() == 3);   // added to the snare's own sample
     CHECK (p.padLayers (1).mode == drums::LayerMode::roundRobin);
+}
+
+TEST_CASE ("Drums embeds only its own resources: the shared design language, never OSP's skin", "[drums-plugin][size]")
+{
+    // The download stays lean: OSP's ceramic skin pack (12.5 MB, twice in a universal Mac
+    // binary) belongs to OSP. Drums draws its own ceramic look.
+    int size = 0;
+    CHECK (BinaryData::getNamedResource ("ceramicskin_zip", size) == nullptr);
+    // What it does draw: OSP's typefaces and the rendered macro knob (both sizes).
+    CHECK (BinaryData::getNamedResource ("InterMedium_ttf", size) != nullptr);
+    CHECK (BinaryData::getNamedResource ("OutfitExtraBold_ttf", size) != nullptr);
+    CHECK (BinaryData::getNamedResource ("macroivory176_zip", size) != nullptr);
+    CHECK (BinaryData::getNamedResource ("macroivory352_zip", size) != nullptr);
+    std::int64_t total = 0;
+    for (int i = 0; i < BinaryData::namedResourceListSize; ++i)
+        if (BinaryData::getNamedResource (BinaryData::namedResourceList[i], size) != nullptr)
+            total += size;
+    INFO ("embedded: " << total << " bytes");
+    CHECK (total < 13 * 1024 * 1024);   // a budget: raise it only on purpose
 }
 
 int main (int argc, char* argv[])

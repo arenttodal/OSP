@@ -8,8 +8,9 @@
   hats, ghost notes. Saved with sessions and kits, undoable, copied by Duplicate.
 - **Drops replace at once:** dropping a sample on a pad replaces its sound, with no menu.
   Several files become round robins. Hold Cmd (Ctrl on Windows) while dropping to choose.
-- **OSP update merged:** the rendered knobs, the ceramic skin and OSP's final modulation
-  system.
+- **OSP update merged:** the rendered knobs and OSP's final modulation system. Drums
+  embeds only its own resources (OSP's fonts and rendered knob, not OSP's skin), so the
+  download is no bigger than before the merge. A test guards it.
 - **Specs** for multi-sound kits (several toms and percs on their own keys) and for a drum
   library with pools that cycle or randomise.
 
