@@ -3010,6 +3010,9 @@ void ModulationOverlay::paint (juce::Graphics& g)
         if (routesOf (t).empty())
             continue;
         ++rings;
+        // Only what this repaint touches (a moving read head repaints a thin strip).
+        if (! g.clipRegionIntersects (repaintArea (t)) && static_cast<int> (i) != hover && static_cast<int> (i) != editTarget)
+            continue;
         // Under an open popover the halo is hidden where the popover lies.
         const juce::Graphics::ScopedSaveState clip (g);
         clipOutside (g, t.covers);

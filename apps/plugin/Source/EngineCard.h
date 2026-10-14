@@ -35,6 +35,12 @@ namespace icons
 class SourceDisplay final : public juce::Component
 {
 public:
+    SourceDisplay();
+    /** At most this many read heads are drawn (the loudest notes): past a few, more lines
+        are noise rather than information, and every one costs a repaint. */
+    static constexpr int maxHeadsShown = 8;
+    /** Past this many moving strips, one repaint of the plot is cheaper than the strips. */
+    static constexpr int maxStrips = 12;
     struct View
     {
         bool granular = false;
@@ -66,6 +72,12 @@ public:
 
     void paint (juce::Graphics&) override;
     void resized() override { cacheDirty = true; }
+    /** What lies behind the display (its rounded corners show it) is painted from a picture
+        of its parents taken once, so the display can be opaque: a moving read head then
+        repaints only the display, never the housing and card behind it. Taken again when
+        the display moves, resizes, changes scale or skin, or the card's focus changes. */
+    void invalidateBackdrop() noexcept { backdropKey = {}; }
+    int headsShown() const noexcept { return static_cast<int> (heads.size()); }
 
     /** Where the recording is drawn: the time window() maps across this. */
     juce::Rectangle<float> plotArea() const;
@@ -77,6 +89,11 @@ public:
 
 private:
     void paintStatic (juce::Graphics&);
+    /** Paints, into `g` (this display's coordinates), what its ancestors paint behind it:
+        each ancestor's own paint and the siblings below the branch that leads here. */
+    void paintBackdrop (juce::Graphics&);
+    void moved() override { invalidateBackdrop(); }
+    void parentHierarchyChanged() override { invalidateBackdrop(); }
     /** x of a time in the file (seconds), and of a fraction of the whole file (0..1). */
     float xAtSeconds (double seconds, juce::Rectangle<float> plot) const;
     float xAtFraction (double fraction, juce::Rectangle<float> plot) const;
@@ -92,6 +109,8 @@ private:
     int bottomInset = 0, overlayBand = 0;
     juce::Image cache;
     bool cacheDirty = true;
+    juce::Image backdrop;
+    juce::String backdropKey;
 };
 
 /** A layer knob: caption above, value below; LINK passes the user's changes on. */

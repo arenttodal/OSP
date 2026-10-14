@@ -161,10 +161,54 @@ TEST_CASE ("plugin: CPU of a saved three-layer preset, block by block", "[.][cpu
                     for (int k = 0; k < 20; ++k)
                         (void) editor->createComponentSnapshot (strip, true, scale);
                     const double stripMs = std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - t1).count() / 20.0;
+                    // The display alone (its own paint: the cached waveform and the marks), no parents.
+                    (void) display.createComponentSnapshot (display.getLocalBounds(), true, scale);
+                    const auto t2 = std::chrono::steady_clock::now();
+                    for (int k = 0; k < 10; ++k)
+                        (void) display.createComponentSnapshot (display.getLocalBounds(), true, scale);
+                    const double ownMs = std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - t2).count() / 10.0;
+                    std::cout << "  card " << OspAudioProcessor::layerName (layer) << " display alone: " << juce::String (ownMs, 2) << " ms\n";
+                    // The same pixels as the display painted the old way (transparent, its parents
+                    // behind it): the backdrop must reproduce them.
+                    {
+                        const auto now = editor->createComponentSnapshot (r, true, scale);
+                        display.setOpaque (false);
+                        display.invalidateBackdrop();
+                        const auto old = editor->createComponentSnapshot (r, true, scale);
+                        display.setOpaque (true);
+                        int worst = 0;
+                        for (int y = 0; y < now.getHeight(); ++y)
+                            for (int x = 0; x < now.getWidth(); ++x)
+                            {
+                                const auto a = now.getPixelAt (x, y), b = old.getPixelAt (x, y);
+                                worst = std::max ({ worst, std::abs (a.getRed() - b.getRed()), std::abs (a.getGreen() - b.getGreen()),
+                                                    std::abs (a.getBlue() - b.getBlue()) });
+                            }
+                        std::cout << "  card " << OspAudioProcessor::layerName (layer) << " opaque vs old pixels, worst difference: " << worst << " of 255\n";
+                    }
                     std::cout << "  card " << OspAudioProcessor::layerName (layer) << ": " << snap.playheads.load() << " read heads, " << snap.count.load()
                               << " grains; one full display frame at " << scale << "x: " << juce::String (ms, 2) << " ms, one head's strip "
                               << juce::String (stripMs, 2) << " ms\n";
                 }
             }
     }
+}
+
+TEST_CASE ("plugin: a card shows at most eight read heads, the loudest; the display is opaque", "[plugin][cpu]")
+{
+    using namespace osp::plugin;
+    SourceDisplay display;
+    display.setSize (600, 360);
+    CHECK (display.isOpaque());
+    std::vector<SourceDisplay::Dot> dots;
+    for (int i = 0; i < 20; ++i)
+        dots.push_back ({ static_cast<float> (i) / 20.0f, static_cast<float> (i) / 19.0f, 0.5f });
+    display.setPlayheads (dots.data(), static_cast<int> (dots.size()));
+    CHECK (display.headsShown() == SourceDisplay::maxHeadsShown);
+    display.setPlayheads (dots.data(), 5);
+    CHECK (display.headsShown() == 5);   // a few: all of them
+    // Painting it alone (no parents) is safe: the backdrop is then just its own well.
+    juce::Image image (juce::Image::RGB, 600, 360, true);
+    juce::Graphics g (image);
+    display.paint (g);
 }

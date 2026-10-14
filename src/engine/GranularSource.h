@@ -43,7 +43,11 @@ public:
     /** `envelope` / `durationSeconds`: the recording's loudness contour (FOLLOW off), may be null. */
     void start (const PlaybackSource& source, const GranularParams& params, double outputSampleRate, std::uint64_t seed,
                 const EnvelopeAnalysis* envelope = nullptr, double durationSeconds = 0.0) noexcept;
-    void setParams (const GranularParams& params) noexcept { settings = params; }
+    void setParams (const GranularParams& params) noexcept
+    {
+        settings = params;
+        updateNorm();
+    }
     void stopSpawning() noexcept { spawning = false; }
     bool isFinished() const noexcept { return ! spawning && activeGrains == 0; }
     int grainCount() const noexcept { return activeGrains; }
@@ -73,7 +77,11 @@ private:
     };
 
     void spawn (double step) noexcept;
-    float read (int channel, double pos) const noexcept;
+    /** Both channels at one position (4-point cubic Hermite; the caller keeps pos inside
+        [1, frames - 3]): the index and the fraction found once for both. */
+    void readStereo (double pos, float& left, float& right) const noexcept;
+    /** The level correction for overlapping grains (it depends only on the settings). */
+    void updateNorm() noexcept;
 
     const PlaybackSource* src = nullptr;
     const EnvelopeAnalysis* contour = nullptr;
@@ -86,6 +94,7 @@ private:
     int countdown = 0;
     bool spawning = false;
     bool stereo = false;
+    float norm = 1.0f;
 };
 
 } // namespace osp

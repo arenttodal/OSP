@@ -215,12 +215,58 @@ void SourceDisplay::setLayer (int l)
     }
 }
 
+SourceDisplay::SourceDisplay()
+{
+    // Opaque: it paints its own backdrop (the parents' picture behind its corners), so JUCE
+    // never repaints the housing and the card under a moving read head.
+    setOpaque (true);
+}
+
+void SourceDisplay::paintBackdrop (juce::Graphics& g)
+{
+    // From the top: each ancestor's own paint (not its paintOverChildren, which lies above
+    // this display anyway), then its children below the branch leading here that overlap
+    // the display. Components above this display (the overlay, popovers) are never taken.
+    std::vector<juce::Component*> chain;
+    for (auto* c = getParentComponent(); c != nullptr; c = c->getParentComponent())
+        chain.insert (chain.begin(), c);
+    const auto mine = getLocalBounds().toFloat();
+    // A component's coordinates to this display's, through any transforms (UI scale).
+    auto transformFrom = [this] (juce::Component* c) {
+        const auto o = getLocalPoint (c, juce::Point<float> (0.0f, 0.0f));
+        const auto x = getLocalPoint (c, juce::Point<float> (1.0f, 0.0f)) - o;
+        const auto y = getLocalPoint (c, juce::Point<float> (0.0f, 1.0f)) - o;
+        return juce::AffineTransform (x.x, y.x, o.x, x.y, y.y, o.y);
+    };
+    for (std::size_t i = 0; i < chain.size(); ++i)
+    {
+        auto* a = chain[i];
+        {
+            const juce::Graphics::ScopedSaveState state (g);
+            g.addTransform (transformFrom (a));
+            a->paint (g);
+        }
+        juce::Component* next = i + 1 < chain.size() ? chain[i + 1] : this;
+        for (auto* child : a->getChildren())
+        {
+            if (child == next)
+                break;
+            if (! child->isVisible() || ! getLocalArea (a, child->getBoundsInParent()).toFloat().intersects (mine))
+                continue;
+            const juce::Graphics::ScopedSaveState state (g);
+            g.addTransform (transformFrom (child));
+            child->paintEntireComponent (g, false);
+        }
+    }
+}
+
 void SourceDisplay::setFocused (bool f)
 {
     if (focused != f)
     {
         focused = f;
         cacheDirty = true;
+        invalidateBackdrop();
         repaint();
     }
 }
@@ -280,8 +326,21 @@ void SourceDisplay::setPlayheads (const Dot* dots, int count)
             repaint (juce::Rectangle<float> (x - 2.0f, plot.getY() - 1.0f, 4.0f, plot.getHeight() + 2.0f).getSmallestIntegerContainer());
         }
     };
-    strips (heads);
+    const auto before = heads;
     heads.assign (dots, dots + count);
+    if (static_cast<int> (heads.size()) > maxHeadsShown)
+    {
+        // The loudest notes (held ones before fading tails; ties: the order they came in).
+        std::stable_sort (heads.begin(), heads.end(), [] (const Dot& a, const Dot& b) { return a.level > b.level; });
+        heads.resize (static_cast<std::size_t> (maxHeadsShown));
+    }
+    if (static_cast<int> (before.size() + heads.size()) > maxStrips)
+    {
+        // Many strips: one repaint of the plot's height (the display only: it is opaque).
+        repaint (juce::Rectangle<float> (plot.getX() - 2.0f, plot.getY() - 1.0f, plot.getWidth() + 4.0f, plot.getHeight() + 2.0f).getSmallestIntegerContainer());
+        return;
+    }
+    strips (before);
     strips (heads);
 }
 
@@ -363,10 +422,28 @@ void SourceDisplay::paint (juce::Graphics& g)
     const float scale = std::max (1.0f, g.getInternalContext().getPhysicalPixelScaleFactor());
     const int w = std::max (1, juce::roundToInt (static_cast<float> (getWidth()) * scale));
     const int h = std::max (1, juce::roundToInt (static_cast<float> (getHeight()) * scale));
+    {
+        // The backdrop: what the parents paint here, at this scale, in this skin.
+        const auto* top = getTopLevelComponent();
+        const auto where = top != nullptr ? top->getLocalArea (this, getLocalBounds()) : getLocalBounds();
+        const auto key = juce::String (w) + "x" + juce::String (h) + "@" + where.toString() + (skin::active() != nullptr ? " ceramic" : " classic")
+                         + (focused ? " focused" : "");
+        if (key != backdropKey || ! backdrop.isValid())
+        {
+            backdrop = juce::Image (juce::Image::RGB, w, h, true);
+            juce::Graphics bg (backdrop);
+            bg.addTransform (juce::AffineTransform::scale (scale));
+            paintBackdrop (bg);
+            backdropKey = key;
+            cacheDirty = true;
+        }
+    }
     if (cacheDirty || ! cache.isValid() || cache.getWidth() != w || cache.getHeight() != h)
     {
-        cache = juce::Image (juce::Image::ARGB, w, h, true);
+        // The static picture over its backdrop, in one opaque image: a frame is one copy.
+        cache = juce::Image (juce::Image::RGB, w, h, false);
         juce::Graphics cg (cache);
+        cg.drawImageAt (backdrop, 0, 0);
         cg.addTransform (juce::AffineTransform::scale (scale));
         paintStatic (cg);
         cacheDirty = false;

@@ -730,6 +730,22 @@ void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int
         return;
 
     const auto stealFade = std::max (1, static_cast<int> (config.stealFadeSeconds * sampleRate));
+    if (config.voicesPerKey > 0 && ! config.mono)
+    {
+        // The same key again: past the limit its oldest voice on this layer fades (struck
+        // repeatedly under the pedal, a key never piles up voices).
+        InstrumentVoice* oldest = nullptr;
+        int same = 0;
+        for (auto& v : voices)
+            if (v.isActive() && ! v.isFading() && v.layerIndex() == layerNumber && v.note() == note)
+            {
+                ++same;
+                if (oldest == nullptr || v.startOrder() < oldest->startOrder())
+                    oldest = &v;
+            }
+        if (same >= config.voicesPerKey && oldest != nullptr)
+            oldest->beginFastFade (stealFade);
+    }
     if (countSoundingVoices (layerNumber) >= config.polyphony)
         if (auto* victim = chooseVictim (layerNumber))
             victim->beginFastFade (stealFade);
@@ -1080,6 +1096,8 @@ void InstrumentEngine::renderBlock (float* const* output, int numChannels, int n
     auto towards = [] (double now, double target, double step) {
         return target > now ? std::min (target, now + step) : std::max (target, now - step);
     };
+    const auto retireBelow = config.retireBelowDb < 0.0 ? static_cast<float> (dbToGain (config.retireBelowDb)) : 0.0f;
+    const auto retireAfter = static_cast<int> (config.retireSeconds * sampleRate);
     for (int done = 0; done < numSamples;)
     {
         const int n = std::min (bufferSize, numSamples - done);
@@ -1200,6 +1218,18 @@ void InstrumentEngine::renderBlock (float* const* output, int numChannels, int n
                 const auto ch = static_cast<std::size_t> (mpe ? std::clamp (voice.channel(), 1, 16) : 1);
                 voice.render (bl.data(), mono ? bl.data() : br.data(), n, pitchRatio * slot.pitchRatio * (mpe ? channelBendRatio[ch] : 1.0),
                               sampleClock + done);
+                // A voice nobody can hear any more (its key up, below the threshold after the
+                // layer's mix for a while) ends with the steal fade.
+                const float peak = voice.takeOutputPeak();
+                if (retireBelow > 0.0f && voice.retirable())
+                {
+                    const float heard = peak * std::max (std::max (l0, l1), std::max (r0, r1)) * outputGain;
+                    voice.quietSamples = heard < retireBelow ? voice.quietSamples + n : 0;
+                    if (voice.quietSamples >= retireAfter)
+                        voice.beginFastFade (std::max (1, static_cast<int> (config.stealFadeSeconds * sampleRate)));
+                }
+                else
+                    voice.quietSamples = 0;
             }
             if (layerStage)
                 runLayerStage (slot, bl.data(), br.data(), n, mono);

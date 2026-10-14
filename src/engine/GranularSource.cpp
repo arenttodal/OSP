@@ -24,18 +24,28 @@ void GranularSource::start (const PlaybackSource& source, const GranularParams& 
     countdown = 0;   // the first grain starts with the note
     spawning = source.numFrames() > 8;
     stereo = source.numChannels() > 1;
+    updateNorm();
 }
 
-float GranularSource::read (int channel, double pos) const noexcept
+void GranularSource::updateNorm() noexcept
 {
-    // 4-point cubic (Hermite); the caller keeps pos inside [1, frames - 3].
+    // Overlapping grains add up (incoherently): keep the level near the recording's.
+    const double overlap = std::clamp (settings.density, 1.0, 80.0) * std::clamp (settings.sizeSeconds, 0.005, 1.0);
+    norm = static_cast<float> (1.0 / std::max (1.0, 0.612 * std::sqrt (overlap)));
+}
+
+void GranularSource::readStereo (double pos, float& left, float& right) const noexcept
+{
     const auto i = static_cast<std::int64_t> (pos);
     const float t = static_cast<float> (pos - static_cast<double> (i));
-    const float* x = src->channelData (channel) + i;
-    const float c1 = 0.5f * (x[1] - x[-1]);
-    const float c2 = x[-1] - 2.5f * x[0] + 2.0f * x[1] - 0.5f * x[2];
-    const float c3 = 0.5f * (x[2] - x[-1]) + 1.5f * (x[0] - x[1]);
-    return ((c3 * t + c2) * t + c1) * t + x[0];
+    auto hermite = [t] (const float* x) {
+        const float c1 = 0.5f * (x[1] - x[-1]);
+        const float c2 = x[-1] - 2.5f * x[0] + 2.0f * x[1] - 0.5f * x[2];
+        const float c3 = 0.5f * (x[2] - x[-1]) + 1.5f * (x[0] - x[1]);
+        return ((c3 * t + c2) * t + c1) * t + x[0];
+    };
+    left = hermite (src->channelData (0) + i);
+    right = stereo ? hermite (src->channelData (1) + i) : left;
 }
 
 void GranularSource::spawn (double step) noexcept
@@ -110,9 +120,10 @@ void GranularSource::render (float& left, float& right, double step) noexcept
             continue;
         const auto window = static_cast<float> (0.5 - 0.5 * g.c) * g.gain;
         const double pos = std::clamp (g.position, 1.0, lastFrame);
-        const float a = read (0, pos);
+        float a, b;
+        readStereo (pos, a, b);
         l += window * a;
-        r += window * (stereo ? read (1, pos) : a);
+        r += window * b;
         g.position += g.direction * step * g.ratio;
         const double c = g.c * g.cd - g.s * g.sd;
         g.s = g.s * g.cd + g.c * g.sd;
@@ -123,9 +134,6 @@ void GranularSource::render (float& left, float& right, double step) noexcept
             --activeGrains;
         }
     }
-    // Overlapping grains add up (incoherently): keep the level near the recording's.
-    const double overlap = std::clamp (settings.density, 1.0, 80.0) * std::clamp (settings.sizeSeconds, 0.005, 1.0);
-    const auto norm = static_cast<float> (1.0 / std::max (1.0, 0.612 * std::sqrt (overlap)));
     left = l * norm;
     right = r * norm;
 }

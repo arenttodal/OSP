@@ -127,6 +127,24 @@ public:
         expressionBrightDb = brightnessDb;
     }
     std::uint64_t startOrder() const noexcept { return order; }
+    /** The largest |left| + |right| this voice added since the last call (before the layer's
+        mix gain), then reset: how loud it is, for retiring voices nobody can hear. */
+    float takeOutputPeak() noexcept
+    {
+        const float p = outputPeak;
+        outputPeak = 0.0f;
+        return p;
+    }
+    /** Its key is up (released, or only the pedal holds it) and its output has no natural
+        gaps: a long quiet stretch means it has faded for good. Granular voices still making
+        grains under the pedal and REIMAGINED mode engines (sparse events) are never retired. */
+    bool retirable() const noexcept
+    {
+        if (! active || fadeRemaining > 0 || modeEngine != nullptr)
+            return false;
+        return released || (heldByPedal && ! granularMode);
+    }
+    int quietSamples = 0;   ///< the engine's count of samples this voice stayed inaudible
     const InstrumentModel* model() const noexcept { return currentModel; }
     float currentLevel() const noexcept { return envelope.level() * baseGain * fadeGain; }
 
@@ -248,7 +266,7 @@ private:
     };
     static constexpr int maxGrains = 8;
     void spawnGrain() noexcept;
-    float readHermite (int channel, double pos) const noexcept;
+    void readHermiteStereo (double pos, bool stereo, float& left, float& right) const noexcept;
     std::array<Grain, maxGrains> grains {};
     Prng grainRng;
     float gAmount = 0.0f, gFade = 0.0f, gFadeStep = 0.0f, gNorm = 1.0f, gLowCoef = 1.0f, gLowL = 0.0f, gLowR = 0.0f;
@@ -320,6 +338,7 @@ private:
     float fadeStep = 0.0f;
 
     SincInterpolator::Kernel kernel;
+    SincInterpolator::LevelCache kernelLevel;   ///< the stretch level of the last increment (saves a log2 per sample)
 
     // REIMAGINED modes other than KALEIDOSCOPE: one engine of each kind, preallocated; a
     // note plays through the one its layer's mode named when it started.
@@ -335,6 +354,7 @@ private:
     MosaicEngine mosaicEngine;
     MirageEngine mirageEngine;
     ReimaginedVoiceEngine* modeEngine = nullptr;
+    float outputPeak = 0.0f;
     ReimaginedMode playingMode = ReimaginedMode::kaleidoscope;
     const ReimaginedLive* modeLive = nullptr;
     int modeCountdown = 0;

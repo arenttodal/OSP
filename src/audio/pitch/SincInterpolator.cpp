@@ -114,6 +114,12 @@ void SincInterpolator::prepareStretchTables()
 
 void SincInterpolator::computeKernelFast (double position, double increment, Kernel& kernel) const noexcept
 {
+    LevelCache once;
+    computeKernelFast (position, increment, kernel, once);
+}
+
+void SincInterpolator::computeKernelFast (double position, double increment, Kernel& kernel, LevelCache& cache) const noexcept
+{
     if (increment <= 1.0)
     {
         computeKernelUnity (position, kernel);
@@ -125,7 +131,12 @@ void SincInterpolator::computeKernelFast (double position, double increment, Ker
         return;
     }
     // Next semitone level up (a slightly lower cutoff, never a higher one).
-    const auto level = std::clamp (static_cast<int> (std::ceil (12.0 * std::log2 (increment) - 1.0e-9)), 1, stretchSteps);
+    if (increment != cache.increment)
+    {
+        cache.increment = increment;
+        cache.level = std::clamp (static_cast<int> (std::ceil (12.0 * std::log2 (increment) - 1.0e-9)), 1, stretchSteps);
+    }
+    const auto level = cache.level;
     const auto& table = stretchTables[static_cast<std::size_t> (level)];
     if (table.rows.empty())
     {

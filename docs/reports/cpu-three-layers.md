@@ -149,4 +149,32 @@ golden update explained in the commit.
    - Q1 as the default: live and bounce would differ. It could come later as an opt-in.
    - Q2: large; worth it only if one instance must carry very dense three-layer playing.
 
-Nothing has been changed yet: this is for a decision.
+## 4. Step 1: done
+
+Chosen: A1–A3, V1, V2, U1–U3. U2 was already there (the display cached its waveform); the
+real cost turned out to be elsewhere, see below.
+
+| What | Change | Result |
+|---|---|---|
+| A1 | Granular: one index and one set of weights for both channels; the level correction computed when the settings change instead of every sample (a `sqrt` per sample) | bit-exact; granular −13 % |
+| A2 | KALEIDOSCOPE grains: the same fused read | bit-exact; that read −36 % |
+| A3 | The sinc stretch level cached per voice (it depends only on the increment) | bit-exact |
+| V1 | A voice whose key is up, quieter than −90 dBFS after its layer's mix for 0.25 s, ends with the 5 ms steal fade. The level margin allows for EQ and DRIVE after it. Granular voices still making grains under the pedal, and REIMAGINED mode engines, are never retired (their output has natural gaps). | inaudible; ends tails nobody hears |
+| V2 | At most two voices of one key per layer: a key struck again fades its oldest | the pedal case: 38 → 30 voices |
+| U1 + U3 | At most 8 read heads per card (the loudest); past 12 moving strips, one repaint of the plot instead | bounded frames |
+| U2' | **The display is opaque.** It paints its parents' picture (taken once per position, size, scale, skin and focus) behind its rounded corners, so a moving head repaints only the display, never the housing and card behind it. The overlay skips halos outside the repaint. | pixel-identical (worst difference 0 of 255 at 1× and 2×); **a full display frame 13–15 → 3–4 ms at 2×** |
+
+**Audio, by instruction counts** (callgrind, the same 4 s): 10.90 G → 9.53 G, **−12.6 %**. By
+time on this VM (noisier):
+
+| Playing | Mean, before → after | p99, before → after |
+|---|---|---|
+| chords | 44 → 37–41 % | 80 → 70–76 % |
+| pedal | 123 → 114–117 % | 252 → 221–228 % |
+
+**The pedal case stays heavy.** The notes the pedal holds are still clearly audible, so V1
+rightly leaves them alone. What bounds that case is step 2, or V3 / R1: REIMAGINED at 100 %
+on B and C is still half the cost.
+
+Tests: [voices] (two per key, and the limit off; an inaudible release retired, an audible
+one, and retiring off); the display's cap and opacity; the goldens unchanged.

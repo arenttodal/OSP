@@ -46,6 +46,8 @@ void InstrumentVoice::setEnvelopeSettings (const AdsrSettings& adsr) noexcept
 
 void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
 {
+    outputPeak = 0.0f;
+    quietSamples = 0;
     currentModel = params.model;
     layer = params.layer;
     active = currentModel != nullptr && layer != nullptr && layer->source != nullptr && layer->source->isValid() && sinc != nullptr;
@@ -928,7 +930,7 @@ void InstrumentVoice::updateControl() noexcept
 void InstrumentVoice::readFrame (double pos, double step, float& l, float& r) noexcept
 {
     const auto& src = *layer->source;
-    sinc->computeKernelFast (pos, step, kernel);
+    sinc->computeKernelFast (pos, step, kernel, kernelLevel);
     l = SincInterpolator::apply (kernel, src.channelData (0));
     r = src.numChannels() > 1 ? SincInterpolator::apply (kernel, src.channelData (1)) : l;
 }
@@ -938,23 +940,27 @@ float InstrumentVoice::readTransient (const PlaybackSource& src, double pos, dou
     // The transient buffers are short and silent at their end; past it they read as zero.
     if (pos < 0.0 || pos >= static_cast<double> (src.numFrames()))
         return 0.0f;
-    sinc->computeKernelFast (pos, step, kernel);
+    sinc->computeKernelFast (pos, step, kernel, kernelLevel);
     return SincInterpolator::apply (kernel, src.channelData (channel));
 }
 
-float InstrumentVoice::readHermite (int channel, double pos) const noexcept
+void InstrumentVoice::readHermiteStereo (double pos, bool stereo, float& left, float& right) const noexcept
 {
-    // Cheap 4-point read for grains (their bus is darkened, so no band-limiting needed).
+    // Cheap 4-point read for grains (their bus is darkened, so no band-limiting needed), both
+    // channels: the clamp, the index and the fraction found once.
     const auto& src = *layer->source;
     const auto last = static_cast<double> (std::max<std::int64_t> (2, src.numFrames() - 3));
     pos = std::clamp (pos, 1.0, last);
     const auto i = static_cast<std::int64_t> (pos);
     const float t = static_cast<float> (pos - static_cast<double> (i));
-    const float* x = src.channelData (channel) + i;
-    const float c0 = x[0], c1 = 0.5f * (x[1] - x[-1]);
-    const float c2 = x[-1] - 2.5f * x[0] + 2.0f * x[1] - 0.5f * x[2];
-    const float c3 = 0.5f * (x[2] - x[-1]) + 1.5f * (x[0] - x[1]);
-    return ((c3 * t + c2) * t + c1) * t + c0;
+    auto hermite = [t] (const float* x) {
+        const float c0 = x[0], c1 = 0.5f * (x[1] - x[-1]);
+        const float c2 = x[-1] - 2.5f * x[0] + 2.0f * x[1] - 0.5f * x[2];
+        const float c3 = 0.5f * (x[2] - x[-1]) + 1.5f * (x[0] - x[1]);
+        return ((c3 * t + c2) * t + c1) * t + c0;
+    };
+    left = hermite (src.channelData (0) + i);
+    right = stereo ? hermite (src.channelData (1) + i) : left;
 }
 
 void InstrumentVoice::spawnGrain() noexcept
@@ -1173,8 +1179,8 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
                         continue;
                     const auto x = static_cast<float> (grain.phase);
                     const float w = 16.0f * x * x * (1.0f - x) * (1.0f - x);
-                    const float sl = readHermite (0, grain.position);
-                    const float sr = stereoSource ? readHermite (1, grain.position) : sl;
+                    float sl, sr;
+                    readHermiteStereo (grain.position, stereoSource, sl, sr);
                     gl += w * sl * grain.left;
                     gr += w * sr * grain.right;
                     grain.position += grain.step;
@@ -1223,10 +1229,13 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
         if (attackRamp < 1.0f)
             attackRamp = std::min (1.0f, attackRamp + attackRampStep);
 
+        // (l * g) * pan is what l * g * pan computes: the same samples, and the peak for free.
+        const float lg = l * g, rg = r * g;
+        outputPeak = std::max (outputPeak, std::abs (lg) + std::abs (rg));
         if (stereoOutput)
         {
-            left[i] += l * g * panLeft;
-            right[i] += r * g * panRight;
+            left[i] += lg * panLeft;
+            right[i] += rg * panRight;
         }
         else
         {
@@ -1416,10 +1425,12 @@ void InstrumentVoice::renderMode (float* left, float* right, int numSamples, dou
             if (attackRamp < 1.0f)
                 attackRamp = std::min (1.0f, attackRamp + attackRampStep);
             const int at = done + k;
+            const float lg = l * g, rg = r * g;
+            outputPeak = std::max (outputPeak, std::abs (lg) + std::abs (rg));
             if (stereoOutput)
             {
-                left[at] += l * g * panLeft;
-                right[at] += r * g * panRight;
+                left[at] += lg * panLeft;
+                right[at] += rg * panRight;
             }
             else
                 left[at] += 0.5f * (l + r) * g;

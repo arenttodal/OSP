@@ -1290,3 +1290,65 @@ TEST_CASE ("dampen: the filters - shelf at -18 dB, low-pass on a log scale, fini
             CHECK_FALSE (f.active());
         }
 }
+
+// ---------------------------------------------------------------------------------------------
+// Voice economy (CPU step 1): two voices per key, inaudible voices retired
+
+TEST_CASE ("voices: a key struck again and again under the pedal keeps at most two voices", "[unit][voices]")
+{
+    const auto model = sineModel (220.0);
+    auto settings = quietSettings();
+    settings.adsr.releaseSeconds = 2.0;
+    std::vector<float> l (256), r (256);
+    float* ch[2] = { l.data(), r.data() };
+    for (int limit : { 2, 0 })
+    {
+        CAPTURE (limit);
+        settings.voicesPerKey = limit;
+        InstrumentEngine e;
+        e.prepare (rate, 256, settings);
+        e.setModel (model.get());
+        e.setSustainPedal (true);
+        for (int strike = 0; strike < 6; ++strike)
+        {
+            e.noteOn (57, 100);
+            e.noteOff (57);
+            for (int b = 0; b < 20; ++b)   // ~0.1 s between strikes
+                e.render (ch, 2, 256);
+        }
+        // The steal fades (5 ms) are over: what still sounds.
+        if (limit == 2)
+            CHECK (e.activeVoiceCount (0) <= 2);
+        else
+            CHECK (e.activeVoiceCount (0) == 6);   // no limit: they pile up under the pedal
+    }
+}
+
+TEST_CASE ("voices: a released voice nobody can hear ends; one that can be heard rings its release out", "[unit][voices]")
+{
+    auto settings = quietSettings();
+    settings.adsr.releaseSeconds = 3.0;
+    std::vector<float> l (256), r (256);
+    float* ch[2] = { l.data(), r.data() };
+    auto voicesAfterRelease = [&] (double amplitude, double retireDb, double seconds) {
+        auto audio = testsignals::sine (220.0, 2.0, rate, amplitude, 1);
+        testsignals::applyFades (audio, 0.01, 0.05);
+        const auto model = instrument::buildComplete (audio, test::analyse (audio), {}, false);
+        settings.retireBelowDb = retireDb;
+        InstrumentEngine e;
+        e.prepare (rate, 256, settings);
+        e.setModel (model.get());
+        e.noteOn (57, 100);
+        for (int b = 0; b < 40; ++b)
+            e.render (ch, 2, 256);
+        e.noteOff (57);
+        for (int b = 0; b < static_cast<int> (seconds * rate / 256); ++b)
+            e.render (ch, 2, 256);
+        return e.activeVoiceCount (0);
+    };
+    // A sound at -126 dBFS: under the threshold from the start, gone 0.25 s after its release.
+    CHECK (voicesAfterRelease (1.0e-6, -90.0, 0.6) == 0);
+    CHECK (voicesAfterRelease (1.0e-6, 0.0, 0.6) == 1);   // retiring off: it rings its 3 s release
+    // An ordinary level: its release is heard, so it plays it.
+    CHECK (voicesAfterRelease (0.4, -90.0, 0.6) == 1);
+}

@@ -74,6 +74,15 @@ public:
         computeKernel's (never higher: no extra aliasing).
     */
     void computeKernelFast (double position, double increment, Kernel& kernel) const noexcept;
+    /** The stretch level an increment last used (the reader's own: one per voice). The level
+        is a pure function of the increment, so reusing it is exact; it saves a log2 per
+        sample while the pitch holds still. */
+    struct LevelCache
+    {
+        double increment = -1.0;
+        int level = 0;
+    };
+    void computeKernelFast (double position, double increment, Kernel& kernel, LevelCache& cache) const noexcept;
 
     static constexpr double maxTableStretch = 4.0;
 

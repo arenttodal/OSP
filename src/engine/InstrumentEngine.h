@@ -106,6 +106,14 @@ struct EngineSettings
     double outputGainDb = -9.0;
     int interpolationZeroCrossings = 16;
     double stealFadeSeconds = 0.005;
+    /** One key on one layer sounds at most this many times at once (a key struck again
+        under the pedal fades its oldest voice, as a piano's damper would); 0: no limit. */
+    int voicesPerKey = 2;
+    /** A voice whose key is up and whose sound stays below this level (dBFS, after the
+        layer's mix) for `retireSeconds` ends with the steal fade: nobody can hear it.
+        Zero or above: never. */
+    double retireBelowDb = -90.0;
+    double retireSeconds = 0.25;
     std::uint64_t seed = 1;
 
     PitchCharacter pitchCharacter = PitchCharacter::tape;

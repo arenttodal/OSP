@@ -367,6 +367,12 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       scale; keys and cards drawn by the surface below so their shadows fall there; B1 tabs; all
       six macros rendered by default. Classic stays (Cmd+Option+G, OSP_SKIN=classic). Tests
       [ceramic]; hidden screenshots [ceramic-shots].
+- [x] CPU, three layers (docs/reports/cpu-three-layers.md; harness [cpu-preset]). Step 1:
+      bit-exact granular and KALEIDOSCOPE reads and the sinc level cache (−12.6 % instructions
+      on the measured patch); voices: two per key per layer, inaudible released voices retired
+      (−90 dBFS for 0.25 s); the source display is opaque with a cached parents' backdrop
+      (pixel-identical, a frame about 4× cheaper) and draws at most 8 read heads. Steps 2–3
+      (SIMD reads, REIMAGINED scaling, voice budget) await a decision.
 - [ ] DESIGN LAB round 1 (design-lab/, exploration only, nothing integrated): Blender-rendered
       surfaces composited under the plugin's own drawing; 6 full-GUI directions, button/tab/
       fader/panel/background/detail studies, close-ups, actual-size tests, review gallery,

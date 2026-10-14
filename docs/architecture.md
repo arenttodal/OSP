@@ -558,6 +558,17 @@ latches musical ratios at a step. OCTAVES by modulation applies at the next cycl
 routes), glided at control rate and skipped at 0 (bypassed by default: bit-identical). The
 editor is the EQ overlay's second page (`DampenEditor`, EQ | DAMPEN).
 
+## Voice economy and the opaque display (docs/reports/cpu-three-layers.md)
+
+`EngineSettings::voicesPerKey` (2): a key struck again on a layer fades its oldest voice past
+the limit. `retireBelowDb` / `retireSeconds` (−90 dBFS, 0.25 s): each voice reports the peak it
+added (`takeOutputPeak`). A voice whose key is up (`retirable`: released, or held only by the
+pedal, never Granular under the pedal nor a REIMAGINED mode engine), heard below the threshold
+after its layer's gain for that long, ends with the steal fade. `SourceDisplay` is opaque: it
+paints its ancestors' own paint behind its corners from a backdrop image (`paintBackdrop`,
+keyed by size, position, scale, skin and focus), so moving marks repaint only the display. It
+shows at most `maxHeadsShown` read heads.
+
 ## RENDERED CONTROLS (tools/blender-assets; docs/reports/knob-phase1.md)
 
 Controls can be drawn from offline renders instead of vectors.
