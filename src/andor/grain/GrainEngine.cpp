@@ -189,6 +189,8 @@ int GrainEngine::chooseRegion (int key, GrainRegion& out) noexcept
     if (! current->hasAtlas() || params.policy == SourcePolicy::wholeSource)
     {
         out = current->whole;
+        if (params.wholeRootMidi >= 0.0)
+            out.rootMidi = params.wholeRootMidi;
         return 0;
     }
     const auto& regions = current->regions;

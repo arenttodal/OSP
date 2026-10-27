@@ -137,6 +137,7 @@ struct GrainParams
     // Sources
     SourcePolicy policy = SourcePolicy::mapped;
     int fixedNoteIndex = 0;
+    double wholeRootMidi = -1.0;      ///< >= 0: the whole source's root (the ROOT control); < 0: the model's
 
     std::array<ModSlot, numModSlots> mod {};
 

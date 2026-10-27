@@ -223,6 +223,7 @@ if(OSP_BUILD_PLUGIN)
     option(ANDOR_BUILD_LAB "Build the ANDOR Phrase and ANDOR Grain plug-ins" ON)
     if(ANDOR_BUILD_LAB)
         add_subdirectory(apps/phrase)
+        add_subdirectory(apps/grain)
     endif()
 endif()
 

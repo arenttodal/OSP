@@ -77,4 +77,8 @@ function(andor_lab_plugin_tests name target source)
         $<TARGET_PROPERTY:${target},INCLUDE_DIRECTORIES>)
     target_compile_definitions(${name} PRIVATE $<TARGET_PROPERTY:${target},COMPILE_DEFINITIONS> OSP_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
     target_link_libraries(${name} PRIVATE ${target} andor_dsp Catch2::Catch2)
+    if(NOT MSVC)
+        # The tests compare samples and recalled values exactly on purpose (bit-identical recall).
+        target_compile_options(${name} PRIVATE -Wno-float-equal)
+    endif()
 endfunction()
