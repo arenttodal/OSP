@@ -75,7 +75,7 @@ The CMake targets are the standard JUCE ones and include AU on Apple (`build-and
 | `andor_tests`: atlas, phrase analysis (13 + 8 fixtures), engines, edits, interop, real-time allocation (43 cases, ~6000 assertions) | **pass** |
 | `andor_tests` under AddressSanitizer + UBSan + LeakSanitizer | **clean** (the only reports are alloc/dealloc "mismatches" caused by the test's own allocation-counting `operator new`; with that check off: 0) |
 | `andor_phrase_plugin_tests` (10 cases) / `andor_grain_plugin_tests` (10 cases) | **pass** |
-| Plug-in tests under ASan + UBSan | RESULT_ASAN_PLUGIN |
+| Plug-in tests under ASan + UBSan (processor, editor, loader threads, concurrency test) | **clean**: no address or UB errors in either suite (leak checking off for JUCE GUI singletons) |
 | pluginval 1.0.4, strictness 10, VST3, in-process | **SUCCESS** (both) |
 | Standalone start / SIGTERM | both start and exit cleanly (Linux, Xvfb, no audio device) |
 | AU / auval, Ableton, second host, multiple instances in a host, offline bounce in a host | **pending (needs a Mac)** |

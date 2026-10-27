@@ -71,7 +71,8 @@ On macOS the same folders hold `ANDOR Phrase.component` / `ANDOR Grain.component
 | `andor_grain_plugin_tests` (identity, sample, KEY DNA on the audio thread, seeds, oscillator, modulation, recall/presets bit-identical, Note Atlas interop, missing atlas audio, host rates × blocks, `processBlock` allocation-free, editor) | Linux + Xvfb | pass |
 | **pluginval 1.0.4, strictness 10**, `--validate-in-process`, VST3 | Linux + Xvfb | **SUCCESS** for both (logs: `data/pluginval-ANDOR-Phrase.txt`, `data/pluginval-ANDOR-Grain.txt`). Its embedded Steinberg `validator` step needs a separately built validator binary and was not run. |
 | Standalone start (6 s) and SIGTERM shutdown | Linux + Xvfb, no audio device | both start and exit cleanly |
-| OSP's own suites after all changes (`unit`, `integration`, `regression`, `performance-smoke`, `plugin`) | Linux | see `handoff.md` §4 |
+| OSP's own suites after all changes (`unit`, `integration`, `regression`, `performance-smoke`, `plugin`) | Linux | **all pass** (unchanged from the baseline) |
+| ANDOR engine and plug-in tests under ASan + UBSan | Linux | clean |
 | AU validation (`auval -v aumu Aphr Ospx`, `auval -v aumu Agrn Ospx`) | needs macOS | **pending** |
 | Ableton Live and a second host (Logic / Reaper) | needs the user's Mac | **pending** — `test-instructions.md` |
 
