@@ -79,6 +79,7 @@ function(andor_lab_plugin_tests name target source)
     target_link_libraries(${name} PRIVATE ${target} andor_dsp Catch2::Catch2)
     if(NOT MSVC)
         # The tests compare samples and recalled values exactly on purpose (bit-identical recall).
-        target_compile_options(${name} PRIVATE -Wno-float-equal)
+        # (A source property: it comes after the plug-in's recommended warning flags.)
+        set_source_files_properties(${source} PROPERTIES COMPILE_OPTIONS "-Wno-float-equal;-Wno-mismatched-new-delete")
     endif()
 endfunction()

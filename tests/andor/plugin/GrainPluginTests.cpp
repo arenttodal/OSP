@@ -17,6 +17,8 @@
 #include <catch2/catch_session.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+ANDOR_DEFINE_ALLOCATION_COUNTER
+
 using namespace osp;
 using namespace osp::andorlab;
 using Catch::Approx;
@@ -428,6 +430,92 @@ TEST_CASE ("ANDOR Grain plugin: the editor", "[grain-plugin][editor]")
     p.editorBeingDeleted (editor.get());
     editor.reset();
     CHECK (true);
+}
+
+TEST_CASE ("ANDOR Grain plugin: processBlock never allocates", "[grain-plugin][realtime]")
+{
+    plugintest::IsolatedFolders folders;
+    GrainProcessor p;
+    p.loadSample (writeTone (folders.root));
+    REQUIRE (p.waitForLoad (30000));
+    setParam (p, "density", 150.0f);
+    setParam (p, "size", 0.5f);
+    setParam (p, "oscMix", 0.4f);
+    setParam (p, "space", 0.5f);
+    setParam (p, "mod1Src", 6.0f);
+    setParam (p, "mod1Dst", 2.0f);
+    setParam (p, "mod1Amt", 0.5f);
+    grain::DnaCurve c;
+    c.addPoint (30.0f, 0.8f);
+    c.addPoint (90.0f, -0.8f);
+    p.setCurve (grain::DnaParam::size, c);   // the curve snapshot is taken inside processBlock
+    CHECK (plugintest::allocationsWhilePlaying (p, 400) == 0);
+}
+
+// Hidden: `andor_grain_plugin_tests "[.demo-presets]"` with ANDOR_DEMO_DIR set writes demo
+// presets and their generated sources there (see the Phrase counterpart).
+TEST_CASE ("ANDOR Grain plugin: demo presets", "[.demo-presets]")
+{
+    const auto dirText = juce::SystemStats::getEnvironmentVariable ("ANDOR_DEMO_DIR", {});
+    if (dirText.isEmpty())
+        return;
+    const juce::File dir (dirText);
+    const auto audio = dir.getChildFile ("Audio");
+    audio.createDirectory();
+    const auto tone = writeTone (audio);
+    const auto atlas = exportPhraseAtlas (audio);
+    auto save = [&] (GrainProcessor& p, const char* name)
+    {
+        std::string error;
+        REQUIRE (p.savePreset (dir.getChildFile ("Grain Presets").getChildFile (juce::String (name) + GrainProcessor::presetExtension), error));
+    };
+    {
+        GrainProcessor p;
+        p.loadSample (tone);
+        REQUIRE (p.waitForLoad (30000));
+        grain::DnaCurve size;
+        size.addPoint (28.0f, 0.9f);
+        size.addPoint (100.0f, -0.8f);
+        p.setCurve (grain::DnaParam::size, size);
+        grain::DnaCurve density;
+        density.addPoint (36.0f, -0.5f);
+        density.addPoint (64.0f, 0.4f);
+        density.addPoint (96.0f, -0.2f);
+        p.setCurve (grain::DnaParam::density, density);
+        setParam (p, "dnaVariation", 0.4f);
+        setParam (p, "space", 0.35f);
+        save (p, "Tone - Long Low, Short High (KEY DNA)");
+        setParam (p, "oscMix", 0.45f);
+        setParam (p, "oscShape", 2.0f);
+        setParam (p, "tone", 4500.0f);
+        setParam (p, "mod1Src", 6.0f);
+        setParam (p, "mod1Dst", 8.0f);
+        setParam (p, "mod1Amt", 0.25f);
+        save (p, "Tone - Hybrid Saw");
+        setParam (p, "oscMix", 0.0f);
+        setParam (p, "size", 0.03f);
+        setParam (p, "density", 90.0f);
+        setParam (p, "pitchScatter", 0.4f);
+        setParam (p, "dnaIndividual", 0.9f);
+        setParam (p, "dnaVariation", 0.8f);
+        save (p, "Tone - Individual Keys Cloud");
+    }
+    {
+        GrainProcessor p;
+        p.loadAtlas (atlas);
+        REQUIRE (p.waitForLoad (30000));
+        setParam (p, "policy", 0.0f);
+        setParam (p, "space", 0.3f);
+        save (p, "Phrase Atlas - Mapped Notes");
+        setParam (p, "policy", 3.0f);
+        setParam (p, "size", 0.4f);
+        setParam (p, "density", 12.0f);
+        setParam (p, "scatter", 0.6f);
+        setParam (p, "mod1Src", 6.0f);
+        setParam (p, "mod1Dst", 3.0f);
+        setParam (p, "mod1Amt", 0.3f);
+        save (p, "Phrase Atlas - Whole Texture");
+    }
 }
 
 int main (int argc, char* argv[])

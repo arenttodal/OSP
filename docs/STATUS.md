@@ -491,3 +491,34 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
   high-F0 or broadband sources it is noise. Guard rail only.
 - Plugin: a host that never calls processBlock keeps the previous instrument alive in
   memory until processing starts (by design of the hand-over; harmless).
+
+## Milestone: ANDOR LAB — ANDOR Phrase + ANDOR Grain (branch `andor-lab`; docs/andor-lab/)
+
+Status: **engineering-complete development prototypes, host validation pending** (no Mac,
+DAW, listening or real recordings in the build environment). No installer.
+
+- [x] M0 isolation (separate cloud clone, branch `andor-lab`, start 50103c0), baseline build,
+      all OSP suites green, benchmarks, audit (docs/andor-lab/audit.md)
+- [x] M1 Note Atlas schema 1: model, JSON (exact round trip), validation, repair, resolving,
+      relinking (docs/andor-lab/note-atlas.md)
+- [x] M2 Phrase analysis: YIN and YIN+Viterbi backends, vibrato/tremolo-aware segmentation,
+      refinement, tuning rule; 13 generated fixtures 79/79; stress set 33/42 (round 1, held
+      out) -> 42/42 (round 2, fixed by general rules) (docs/andor-lab/phrase-analysis.md)
+- [ ] M2 real-recording evaluation (needs the user's annotated recordings)
+- [x] M3 Phrase engine: exact keys, variations, Fill limits, ONE SHOT / GATE / SUSTAIN,
+      polyphony, stealing, tests
+- [x] M4 Phrase plug-in + editor: import (drag/drop, picker, progress, cancel, cache), note
+      regions, markers, pitch/key/include/split/merge/re-analyse, undo/redo, keyboard map,
+      presets, bit-identical recall, relink, atlas export
+- [x] M5/M6 Grain engine + KEY DNA: pool, fair-share budget, windows, bounds, stereo,
+      oscillator, modulation, precedence chain, curves, seeded individuality
+- [x] M7 Grain plug-in + editor: source display with grain cloud, KEY DNA curve editor,
+      modulation, oscillator/voice, presets, bit-identical recall
+- [x] M8 Phrase -> Grain: atlas export/import, four source policies, end-to-end tests
+- [x] M9 identities, VST3 + Standalone (Linux), pluginval strictness 10 SUCCESS (both)
+- [ ] M9/M10 macOS AU builds, auval, Ableton + second host (docs/andor-lab/test-instructions.md)
+- [x] M10 tests (engine, plug-in, real-time allocation, host rates/blocks), CPU matrix on the
+      container (docs/andor-lab/benchmarks.md), OSP regression run
+- [ ] M10 listening evaluation, CPU on reference hardware
+- [x] M11 changelog, known issues, test instructions, demo-preset generator, handoff report
+      (docs/andor-lab/handoff.md)

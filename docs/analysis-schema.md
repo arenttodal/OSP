@@ -139,3 +139,10 @@ The engine's in-memory models (`InstrumentModel`, `ContinuationModel`, `Instrume
 `ReimaginedAnalysis` schema 1: the TAPE FRAME splice map and MOSAIC's harmonic frames)
 are never persisted: they are rebuilt from the cached analysis, deterministically, so
 there is no model file format to migrate.
+
+
+## Related schema: the Note Atlas (ANDOR Lab)
+
+ANDOR Phrase and ANDOR Grain persist their analysis as a **Note Atlas** (`.andoratlas`, format
+tag `andor.noteAtlas`, its own `schemaVersion`, currently 1). It is documented in
+`docs/andor-lab/note-atlas.md`; it does not change this report's schema.

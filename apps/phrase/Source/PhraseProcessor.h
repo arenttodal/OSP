@@ -56,7 +56,6 @@ public:
     void setStateInformation (const void*, int) override;
 
     juce::AudioProcessorValueTreeState state;
-    juce::MidiKeyboardState keyboard;   ///< the editor's keys and audition
 
     //==========================================================================
     // Document (message thread)
@@ -106,8 +105,9 @@ public:
     // Display (written by the audio thread, read by the editor).
     DisplayMailbox<32> display;
 
-    /** For audition from the editor: one note on/off through the keyboard state. */
-    void audition (int key, bool down) { down ? keyboard.noteOn (1, key, 0.8f) : keyboard.noteOff (1, key, 0.0f); }
+    /** For audition from the editor: one note on/off, lock-free to the audio thread. */
+    void audition (int key, bool down) { auditions.push (key, down); }
+    AuditionQueue auditions;   ///< the editor's keys, lock-free to the audio thread
 
 private:
     struct Job;

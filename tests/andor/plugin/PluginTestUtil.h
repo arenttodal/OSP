@@ -113,3 +113,73 @@ struct IsolatedFolders
 };
 
 } // namespace plugintest
+
+/** Counts heap allocations while `plugintest::counting` is set. Expand once per test program. */
+#define ANDOR_DEFINE_ALLOCATION_COUNTER                                                     \
+    namespace plugintest                                                                    \
+    {                                                                                       \
+        std::atomic<bool> counting { false };                                               \
+        std::atomic<int> allocations { 0 };                                                 \
+    }                                                                                       \
+    void* operator new (std::size_t size)                                                   \
+    {                                                                                       \
+        if (plugintest::counting.load (std::memory_order_relaxed))                          \
+            ++plugintest::allocations;                                                      \
+        if (void* p = std::malloc (size == 0 ? 1 : size))                                   \
+            return p;                                                                       \
+        throw std::bad_alloc();                                                             \
+    }                                                                                       \
+    void* operator new[] (std::size_t size) { return operator new (size); }                 \
+    void operator delete (void* p) noexcept { std::free (p); }                              \
+    void operator delete (void* p, std::size_t) noexcept { std::free (p); }                 \
+    void operator delete[] (void* p) noexcept { std::free (p); }                            \
+    void operator delete[] (void* p, std::size_t) noexcept { std::free (p); }
+
+namespace plugintest
+{
+extern std::atomic<bool> counting;
+extern std::atomic<int> allocations;
+
+/** Runs `blocks` process calls with prepared MIDI and editor auditions; returns the allocations made. */
+template <typename Processor>
+int allocationsWhilePlaying (Processor& p, int blocks)
+{
+    const double rate = 48000.0;
+    const int block = 256;
+    p.setPlayConfigDetails (0, 2, rate, block);
+    p.prepareToPlay (rate, block);
+    juce::AudioBuffer<float> buffer (2, block);
+    std::vector<juce::MidiBuffer> midi (static_cast<std::size_t> (blocks));
+    for (int b = 0; b < blocks; ++b)
+    {
+        auto& m = midi[static_cast<std::size_t> (b)];
+        m.ensureSize (256);
+        if (b % 6 == 0)
+            m.addEvent (juce::MidiMessage::noteOn (1, 48 + (b * 5) % 36, 0.8f), b % block);
+        if (b % 9 == 0)
+            m.addEvent (juce::MidiMessage::noteOff (1, 48 + (b * 3) % 36), 17);
+        if (b == 40)
+            m.addEvent (juce::MidiMessage::controllerEvent (1, 64, 127), 3);
+        if (b == 90)
+            m.addEvent (juce::MidiMessage::controllerEvent (1, 64, 0), 3);
+        m.addEvent (juce::MidiMessage::pitchWheel (1, 8192 + (b * 97) % 4000), 100);
+    }
+    for (int b = 0; b < 20; ++b)   // warm up (first notes, effect wake-up)
+    {
+        juce::MidiBuffer none;
+        buffer.clear();
+        p.processBlock (buffer, none);
+    }
+    allocations = 0;
+    counting = true;
+    for (int b = 0; b < blocks; ++b)
+    {
+        if (b % 13 == 0)
+            p.audition (60 + b % 12, (b / 13) % 2 == 0);   // what the editor's keys do (message thread in real life)
+        buffer.clear();
+        p.processBlock (buffer, midi[static_cast<std::size_t> (b)]);
+    }
+    counting = false;
+    return allocations.load();
+}
+} // namespace plugintest

@@ -164,7 +164,6 @@ void PhraseProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     engine.prepare (sampleRate, samplesPerBlock);
     if (auto m = models.latestModel())
         engine.setModel (m.get());
-    keyboard.reset();
 }
 
 phrase::PhraseParams PhraseProcessor::currentParams() const
@@ -215,7 +214,13 @@ void PhraseProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
             wasPlaying = playing;
         }
 
-    keyboard.processNextMidiBuffer (midi, 0, n, true);
+    auditions.drain ([this] (const AuditionQueue::Event& e)
+                     {
+                         if (e.down)
+                             engine.noteOn (e.key, e.velocity);
+                         else
+                             engine.noteOff (e.key);
+                     });
     float* left = buffer.getWritePointer (0);
     float* right = buffer.getNumChannels() > 1 ? buffer.getWritePointer (1) : left;
     int done = 0;

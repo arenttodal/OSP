@@ -82,4 +82,39 @@ struct DisplayMailbox
     std::atomic<std::uint32_t> heldKeys[4] {};   ///< 128-bit mask of sounding keys
 };
 
+/**
+    Notes the editor plays (keyboard clicks, audition) on their way to the audio thread:
+    a lock-free single-producer / single-consumer queue (juce::AbstractFifo), so the audio
+    thread never takes a lock for them (juce::MidiKeyboardState would).
+*/
+class AuditionQueue
+{
+public:
+    struct Event
+    {
+        int key = 60;
+        bool down = true;
+        float velocity = 0.8f;
+    };
+
+    /** Message thread. Drops the event when the queue is full (a click, not a stream). */
+    void push (int key, bool down, float velocity = 0.8f)
+    {
+        const auto scope = fifo.write (1);
+        scope.forEach ([&] (int index) { events[static_cast<std::size_t> (index)] = { key, down, velocity }; });
+    }
+
+    /** Audio thread. */
+    template <typename Handler>
+    void drain (Handler&& handler)
+    {
+        const auto scope = fifo.read (fifo.getNumReady());
+        scope.forEach ([&] (int index) { handler (events[static_cast<std::size_t> (index)]); });
+    }
+
+private:
+    juce::AbstractFifo fifo { 128 };
+    std::array<Event, 128> events {};
+};
+
 } // namespace osp::andorlab

@@ -55,7 +55,6 @@ public:
     void setStateInformation (const void*, int) override;
 
     juce::AudioProcessorValueTreeState state;
-    juce::MidiKeyboardState keyboard;
 
     //==========================================================================
     struct Document
@@ -102,7 +101,8 @@ public:
 
     grain::GrainParams currentParams() const;
     std::shared_ptr<const grain::GrainModel> model() const { return models.latestModel(); }
-    void audition (int key, bool down) { down ? keyboard.noteOn (1, key, 0.8f) : keyboard.noteOff (1, key, 0.0f); }
+    void audition (int key, bool down) { auditions.push (key, down); }
+    AuditionQueue auditions;   ///< the editor's keys, lock-free to the audio thread
 
     std::function<void()> onDocumentChanged;
 

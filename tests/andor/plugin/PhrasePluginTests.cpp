@@ -16,6 +16,8 @@
 #include <catch2/catch_session.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+ANDOR_DEFINE_ALLOCATION_COUNTER
+
 #include <thread>
 
 using namespace osp;
@@ -346,6 +348,61 @@ TEST_CASE ("ANDOR Phrase plugin: the editor", "[phrase-plugin][editor]")
         p.editorBeingDeleted (editor.get());
     }
     CHECK (true);
+}
+
+TEST_CASE ("ANDOR Phrase plugin: processBlock never allocates", "[phrase-plugin][realtime]")
+{
+    plugintest::IsolatedFolders folders;
+    PhraseProcessor p;
+    p.loadFile (writeFixture (folders.root, "vocal-phrase"));
+    REQUIRE (p.waitForLoad (30000));
+    p.state.getParameter ("space")->setValueNotifyingHost (0.5f);
+    p.state.getParameter ("echo")->setValueNotifyingHost (0.5f);
+    p.state.getParameter ("sustainCharacter")->setValueNotifyingHost (0.5f);
+    p.state.getParameter ("fill")->setValueNotifyingHost (1.0f);
+    CHECK (plugintest::allocationsWhilePlaying (p, 400) == 0);
+}
+
+// Hidden: `andor_phrase_plugin_tests "[.demo-presets]"` with ANDOR_DEMO_DIR set writes demo
+// presets and their generated (rights-free) recordings there. Run it on the machine that will
+// use them (presets find the audio by its path and fingerprint).
+TEST_CASE ("ANDOR Phrase plugin: demo presets", "[.demo-presets]")
+{
+    const auto dirText = juce::SystemStats::getEnvironmentVariable ("ANDOR_DEMO_DIR", {});
+    if (dirText.isEmpty())
+        return;
+    const juce::File dir (dirText);
+    const auto audio = dir.getChildFile ("Audio");
+    audio.createDirectory();
+    struct Demo
+    {
+        const char* name;
+        const char* fixture;
+        std::vector<std::pair<const char*, float>> params;
+    };
+    const std::vector<Demo> demos {
+        { "Sung Phrase - Sustain", "vocal-phrase", { { "playMode", 2.0f }, { "space", 0.25f }, { "release", 0.6f } } },
+        { "Sung Phrase - Bloom", "vocal-phrase", { { "playMode", 2.0f }, { "sustainCharacter", 0.65f }, { "space", 0.45f }, { "attack", 0.08f }, { "release", 1.6f } } },
+        { "Sung Phrase - Synthetic Half", "vocal-phrase", { { "synthetic", 0.5f }, { "tone", 0.7f }, { "echo", 0.25f } } },
+        { "Legato Line - Gate", "legato", { { "playMode", 1.0f }, { "fill", 3.0f } } },
+        { "Staccato - One Shot", "staccato", { { "playMode", 0.0f }, { "roundRobin", 1.0f }, { "space", 0.2f } } },
+    };
+    for (const auto& d : demos)
+    {
+        const auto file = audio.getChildFile (juce::String (d.fixture) + ".wav");
+        if (! file.existsAsFile())
+        {
+            std::string error;
+            REQUIRE (io::writeAudioFile (file.getFullPathName().toStdString(), phrase::makePhraseFixture (d.fixture).audio, io::SampleFormat::pcm24, error));
+        }
+        PhraseProcessor p;
+        p.loadFile (file);
+        REQUIRE (p.waitForLoad (30000));
+        for (const auto& [id, value] : d.params)
+            p.state.getParameter (id)->setValueNotifyingHost (p.state.getParameter (id)->convertTo0to1 (value));
+        std::string error;
+        REQUIRE (p.savePreset (dir.getChildFile ("Phrase Presets").getChildFile (juce::String (d.name) + PhraseProcessor::presetExtension), error));
+    }
 }
 
 int main (int argc, char* argv[])
