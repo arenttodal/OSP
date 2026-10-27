@@ -71,6 +71,27 @@ jobs:
           auval -v aumu Aphr Ospx
           auval -v aumu Agrn Ospx
 
+      - name: Package ANDOR Lab macOS test build
+        # Bundles + manual copy instructions only: ANDOR Lab ships no installer or install script.
+        if: runner.os == 'macOS'
+        run: |
+          out=ANDOR-Lab-macOS-test
+          mkdir -p $out
+          for p in phrase:Phrase grain:Grain; do
+            art="build/apps/${p%%:*}/ANDOR_${p##*:}_artefacts/Release"
+            name="ANDOR ${p##*:}"
+            cp -R "$art/AU/$name.component" "$art/VST3/$name.vst3" "$art/Standalone/$name.app" $out/
+            lipo -info "$out/$name.component/Contents/MacOS/$name"
+          done
+          cp packaging/andor-lab-macos-test/README.txt $out/
+          ditto -c -k --keepParent $out ANDOR-Lab-macOS-test.zip
+
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'macOS'
+        with:
+          name: ANDOR-Lab-macOS-test
+          path: ANDOR-Lab-macOS-test.zip
+
       - name: Package macOS test build
         if: runner.os == 'macOS'
         run: |
