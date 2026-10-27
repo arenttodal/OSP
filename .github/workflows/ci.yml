@@ -60,6 +60,17 @@ jobs:
           killall -9 AudioComponentRegistrar || true
           auval -v aumu Osp1 Ospx
 
+      - name: Validate ANDOR Lab AU (macOS)
+        # ANDOR Phrase and ANDOR Grain (docs/andor-lab); their unique codes never replace OSP.
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p ~/Library/Audio/Plug-Ins/Components
+          cp -R "build/apps/phrase/ANDOR_Phrase_artefacts/Release/AU/ANDOR Phrase.component" ~/Library/Audio/Plug-Ins/Components/
+          cp -R "build/apps/grain/ANDOR_Grain_artefacts/Release/AU/ANDOR Grain.component" ~/Library/Audio/Plug-Ins/Components/
+          killall -9 AudioComponentRegistrar || true
+          auval -v aumu Aphr Ospx
+          auval -v aumu Agrn Ospx
+
       - name: Package macOS test build
         if: runner.os == 'macOS'
         run: |
