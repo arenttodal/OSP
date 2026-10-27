@@ -2,8 +2,8 @@
 
 **Status: engineering-complete development prototypes — host validation pending.** Both
 instruments build, load, analyse, play, save and reopen, pass their automated tests and
-pluginval at the strictest level on Linux. Nothing has been heard, run on a Mac or opened in
-Ableton yet; those steps are the user's (`test-instructions.md`). No installer was made.
+pluginval at the strictest level on Linux; CI builds them universal on macOS 14, runs all tests
+and passes auval for both AUs. Nothing has been heard or opened in a DAW yet; those steps are the user's (`test-instructions.md`). No installer was made.
 
 ## 1. Repository
 
@@ -63,7 +63,8 @@ xvfb-run -a ctest --test-dir build-plugin -R andor --output-on-failure
 | ANDOR Grain VST3 | `build-plugin/apps/grain/ANDOR_Grain_artefacts/Release/VST3/ANDOR Grain.vst3` |
 | ANDOR Grain Standalone | `build-plugin/apps/grain/ANDOR_Grain_artefacts/Release/Standalone/ANDOR Grain` |
 
-Missing platform builds: **macOS (AU, VST3, .app) — not built here**; Windows not attempted.
+macOS (AU, VST3, .app; universal) is built by CI on `macos-14` and published as the
+`ANDOR-Lab-macOS-test` artefact (unsigned, no installer); Windows not attempted.
 The CMake targets are the standard JUCE ones and include AU on Apple (`build-and-validation.md`).
 
 ## 4. Verification
@@ -78,7 +79,8 @@ The CMake targets are the standard JUCE ones and include AU on Apple (`build-and
 | Plug-in tests under ASan + UBSan (processor, editor, loader threads, concurrency test) | **clean**: no address or UB errors in either suite (leak checking off for JUCE GUI singletons) |
 | pluginval 1.0.4, strictness 10, VST3, in-process | **SUCCESS** (both) |
 | Standalone start / SIGTERM | both start and exit cleanly (Linux, Xvfb, no audio device) |
-| AU / auval, Ableton, second host, multiple instances in a host, offline bounce in a host | **pending (needs a Mac)** |
+| macOS universal build, all tests and auval for both AUs (CI, `macos-14`) | **pass** |
+| Ableton, second host, multiple instances in a host, offline bounce in a host | **pending (needs a Mac)** |
 
 Highlights the tests prove: sessions and presets recall **bit-identically** (Phrase and Grain);
 renders are identical across host block sizes (1–4096) and work at 22.05–192 kHz;
@@ -138,7 +140,7 @@ as a third engine in `src/andor/` behind the same atlas, prove it headlessly wit
 ## 7. Installer readiness (not started on purpose)
 
 Blockers before any installer:
-- Gate E on a Mac (AU validation, Ableton + second host, multiple instances, save/reopen,
+- Gate E on a Mac (Ableton + second host, multiple instances, save/reopen,
   offline render, audio/MIDI settings) and a listening round.
 - Real-recording evaluation of Phrase's analysis.
 - Visual approval of the screens (and whether to build a ceramic skin for these layouts).

@@ -516,7 +516,9 @@ DAW, listening or real recordings in the build environment). No installer.
       modulation, oscillator/voice, presets, bit-identical recall
 - [x] M8 Phrase -> Grain: atlas export/import, four source policies, end-to-end tests
 - [x] M9 identities, VST3 + Standalone (Linux), pluginval strictness 10 SUCCESS (both)
-- [ ] M9/M10 macOS AU builds, auval, Ableton + second host (docs/andor-lab/test-instructions.md)
+- [x] M9/M10 macOS universal AU/VST3/app builds, all tests, auval for both (CI `macos-14`);
+      downloadable `ANDOR-Lab-macOS-test` artefact
+- [ ] Ableton + second host (docs/andor-lab/test-instructions.md)
 - [x] M10 tests (engine, plug-in, real-time allocation, host rates/blocks), CPU matrix on the
       container (docs/andor-lab/benchmarks.md), OSP regression run
 - [ ] M10 listening evaluation, CPU on reference hardware

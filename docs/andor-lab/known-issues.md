@@ -7,7 +7,6 @@ candidates.
 
 | Item | Why open | How to close |
 | --- | --- | --- |
-| macOS builds, AU validation (`auval`) | Linux container only | `build-and-validation.md` |
 | Ableton Live + a second host (Gate E) | no Mac, no DAW | `test-instructions.md` §2 |
 | Listening: loops, SUSTAIN CHARACTER bloom, filled-key timbre, Natural ↔ Synthetic, Grain presets | no audio playback here | `test-instructions.md` §3 |
 | Phrase analysis on real recordings | none in the repository (the corpus is local-only) | `test-instructions.md` §4 |
