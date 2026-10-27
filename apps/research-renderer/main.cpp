@@ -1,6 +1,7 @@
 // research-renderer: headless analysis / rendering / corpus / benchmark tool.
 // See README.md and docs/testing.md for usage.
 
+#include "AndorCommands.h"
 #include "analysis/continuation/ContinuationAnalyzer.h"
 #include "core/PitchMath.h"
 #include "io/AnalysisJson.h"
@@ -116,7 +117,7 @@ std::optional<Args> parseArgs (int argc, char** argv, std::string& error)
             error = "unexpected argument '" + key + "'";
             return std::nullopt;
         }
-        if (flagOptions.count (key))
+        if (flagOptions.count (key) || andorcli::flagOptions().count (key))
         {
             args.flags.insert (key);
             continue;
@@ -529,7 +530,7 @@ int main (int argc, char** argv)
     {
         if (args.has ("--help") || argc == 1)
         {
-            std::cout << usageText;
+            std::cout << usageText << andorcli::usageText;
             return argc == 1 ? exitUsage : exitOk;
         }
         if (args.has ("--version"))
@@ -538,6 +539,8 @@ int main (int argc, char** argv)
                       << ", fixtures v" << fixtures::fixtureVersion << ")\n";
             return exitOk;
         }
+        if (andorcli::handles (args.values, args.flags))
+            return andorcli::run (args.values, args.flags);
         if (args.has ("--analyze"))
             return commandAnalyze (args);
         if (args.has ("--source"))

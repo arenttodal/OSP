@@ -1,0 +1,143 @@
+#pragma once
+
+#include "andor/atlas/NoteAtlas.h"
+#include "core/AudioData.h"
+
+#include <atomic>
+#include <memory>
+#include <string>
+#include <vector>
+
+namespace osp::phrase
+{
+
+/**
+    ANDOR Phrase analysis (docs/andor-lab/phrase-analysis.md): a monophonic pitched recording
+    becomes a Note Atlas in explicit stages. Pure C++, headless, never on the audio thread
+    (it allocates and takes time). Deterministic: no randomness at all.
+
+      1 preprocess   mono analysis copy (high-passed), level envelope, silence
+      2 pitch        time-varying contour from a pluggable tracker
+      3 segment      voicing + pitch change (vibrato-tolerant) + re-articulation dips
+      4 describe     robust centre pitch, stability, vibrato, voicing, confidence
+      5 refine       attack start, sustain, release, fades
+      6 map          root key under the tuning rule, cents kept apart, variation groups
+      7 atlas        the shared Note Atlas
+*/
+
+/** Pitch backends compared in docs/andor-lab/phrase-analysis.md. */
+enum class PitchBackend
+{
+    yin,          ///< YIN per frame (absolute threshold), octave folding against the local median
+    yinViterbi,   ///< pYIN-inspired: several YIN dips per frame weighted over a threshold range,
+                  ///< then the most plausible path through them (Viterbi) with a voicing state
+};
+
+const char* toString (PitchBackend) noexcept;
+
+struct AnalysisSettings
+{
+    PitchBackend backend = PitchBackend::yinViterbi;
+    double minHz = 40.0;               ///< E1 is 41 Hz
+    double maxHz = 2200.0;             ///< C7 is 2093 Hz
+    double hopSeconds = 0.005;
+    double highPassHz = 50.0;           ///< analysis copy only: rumble never moves a boundary
+    double silenceDb = -45.0;           ///< below the recording's peak level: silence
+    double absoluteFloorDb = -72.0;     ///< dBFS: never louder than this counts as sound
+    double minNoteSeconds = 0.05;
+    double bridgeGapSeconds = 0.03;     ///< voicing dropouts shorter than this do not end a note
+    double pitchChangeSemitones = 0.6;  ///< a sustained move this far starts a new note
+    double pitchHoldSeconds = 0.04;     ///< ... when it lasts at least this long
+    double rearticulationDb = 6.0;      ///< a level dip this deep between two rises splits a note
+    double maxAnalysisSeconds = 180.0;  ///< longer recordings: the first part is analysed (warning)
+    double a4Hz = 440.0;
+    bool autoTuning = false;            ///< estimate the recording's global offset before rounding
+
+    std::string digest() const;
+};
+
+/** One analysis frame of the contour. */
+struct PitchFrame
+{
+    double hz = 0.0;           ///< 0 when unvoiced
+    double midi = 0.0;         ///< fractional MIDI note (0 when unvoiced)
+    double confidence = 0.0;   ///< 0..1 (periodicity / path probability)
+    float levelDb = -120.0f;   ///< RMS of the analysis copy around the frame, dBFS
+    bool voiced = false;
+};
+
+struct PitchContour
+{
+    double hopSeconds = 0.005;
+    std::vector<PitchFrame> frames;
+
+    double timeOf (std::size_t frame) const noexcept { return static_cast<double> (frame) * hopSeconds; }
+};
+
+/** Stage 1 output. */
+struct Preprocessed
+{
+    std::vector<float> mono;          ///< high-passed analysis copy (playback audio untouched)
+    double sampleRate = 0.0;
+    std::int64_t analysedFrames = 0;  ///< may be shorter than the file (maxAnalysisSeconds)
+    float peakDb = -120.0f;
+    std::vector<float> levelDb;       ///< per hop
+    float silenceThresholdDb = -120.0f;
+    float noiseFloorDb = -120.0f;     ///< quietest tenth of the audible frames
+};
+
+Preprocessed preprocess (const AudioData& audio, const AnalysisSettings& settings);
+
+/** Stage 2: a pitch tracker. One instance per thread. */
+class PitchTracker
+{
+public:
+    virtual ~PitchTracker() = default;
+    virtual const char* name() const noexcept = 0;
+    virtual int version() const noexcept = 0;
+    /** Returns false when cancelled. `progress` (0..1) may be null. */
+    virtual bool track (const Preprocessed& input, const AnalysisSettings& settings, PitchContour& out,
+                        const std::atomic<bool>* cancel, std::atomic<float>* progress) = 0;
+};
+
+std::unique_ptr<PitchTracker> makePitchTracker (PitchBackend backend);
+
+/** Stage 3 output: a candidate note as a range of contour frames [begin, end). */
+struct Segment
+{
+    std::size_t begin = 0;
+    std::size_t end = 0;
+    bool legatoIn = false;    ///< joined to the previous segment without a gap
+    bool legatoOut = false;
+};
+
+std::vector<Segment> segment (const PitchContour& contour, const Preprocessed& pre, const AnalysisSettings& settings);
+
+/** Stages 4-6 for one segment (neighbours bound the attack and release searches). */
+atlas::NoteEvent describe (const Segment& seg, const Segment* previous, const Segment* next, const PitchContour& contour,
+                           const Preprocessed& pre, const AnalysisSettings& settings);
+
+struct AnalysisResult
+{
+    bool ok = false;
+    bool cancelled = false;
+    std::string error;
+    std::vector<std::string> warnings;
+    PitchContour contour;
+    std::vector<float> levelDb;
+    atlas::NoteAtlas atlas;
+    double analysisSeconds = 0.0;   ///< wall-clock time of the run (diagnostics only, never stored in the atlas)
+};
+
+/**
+    The whole pipeline. `source` describes the file (hash, name, paths); its frame count and
+    rate are filled from `audio`. Never throws; odd input (silence, noise, tiny files) gives an
+    atlas with no notes and a warning, not a failure.
+*/
+AnalysisResult analysePhrase (const AudioData& audio, const atlas::SourceAsset& source, const AnalysisSettings& settings = {},
+                              const std::atomic<bool>* cancel = nullptr, std::atomic<float>* progress = nullptr);
+
+/** The analysis algorithm's version: bump when results change (it invalidates caches). */
+constexpr int analysisVersion = 1;
+
+} // namespace osp::phrase
