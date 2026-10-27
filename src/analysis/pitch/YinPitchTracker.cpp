@@ -37,7 +37,8 @@ YinFrame YinPitchTracker::analyse (const float* signal, std::int64_t numSamples,
                                                          + frame[static_cast<std::size_t> (i)] * frame[static_cast<std::size_t> (i)];
 
     const double windowEnergy = energyPrefix[static_cast<std::size_t> (window)];
-    if (windowEnergy < 1.0e-10 * window)
+    silent = windowEnergy < 1.0e-10 * window;
+    if (silent)
         return {};
 
     // Pack a = frame[0, window) (real) and b = frame[0, frameLength) (imag) into one complex FFT.

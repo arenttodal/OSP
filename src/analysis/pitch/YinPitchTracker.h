@@ -32,6 +32,16 @@ public:
 
     int windowSize() const noexcept { return window; }
 
+    /** The cumulative-mean-normalised difference of the last analyse() call, indexed by lag
+        (valid for lags minLagValue()..maxLagValue()); empty meaning when that frame was
+        silent (lastFrameSilent()). For trackers that keep several candidates per frame
+        (ANDOR Phrase); analyse() itself is unchanged by reading it. */
+    const std::vector<double>& lastCmnd() const noexcept { return cmnd; }
+    bool lastFrameSilent() const noexcept { return silent; }
+    int minLagValue() const noexcept { return minLag; }
+    int maxLagValue() const noexcept { return maxLag; }
+    double rate() const noexcept { return sampleRate; }
+
 private:
     double sampleRate;
     double threshold;
@@ -45,6 +55,7 @@ private:
     std::vector<double> energyPrefix;
     std::vector<double> difference;
     std::vector<double> cmnd;
+    bool silent = true;
 };
 
 } // namespace osp
