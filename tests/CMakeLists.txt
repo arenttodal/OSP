@@ -66,6 +66,7 @@ add_executable(andor_tests
     andor/PhraseEngineTests.cpp
     andor/PhraseEditTests.cpp
     andor/GrainTests.cpp
+    andor/InteropTests.cpp
 )
 target_include_directories(andor_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(andor_tests PRIVATE andor_io Catch2::Catch2WithMain)
@@ -74,3 +75,4 @@ osp_set_warnings(andor_tests)
 add_test(NAME andor-atlas COMMAND andor_tests "[atlas]")
 add_test(NAME andor-phrase COMMAND andor_tests "[phrase]")
 add_test(NAME andor-grain COMMAND andor_tests "[grain]")
+add_test(NAME andor-interop COMMAND andor_tests "[interop]")
