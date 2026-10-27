@@ -71,7 +71,7 @@ The CMake targets are the standard JUCE ones and include AU on Apple (`build-and
 | Suite | Result |
 | --- | --- |
 | OSP headless (`unit`, `integration`, `regression` goldens, `performance-smoke`) after all changes | **pass** (same as the baseline) |
-| OSP plug-in suite (`plugin`) after all changes | RESULT_OSP_PLUGIN |
+| OSP plug-in suite (`plugin`) after all changes | **pass** (1335 s, same as the baseline) |
 | `andor_tests`: atlas, phrase analysis (13 + 8 fixtures), engines, edits, interop, real-time allocation (43 cases, ~6000 assertions) | **pass** |
 | `andor_tests` under AddressSanitizer + UBSan + LeakSanitizer | **clean** (the only reports are alloc/dealloc "mismatches" caused by the test's own allocation-counting `operator new`; with that check off: 0) |
 | `andor_phrase_plugin_tests` (10 cases) / `andor_grain_plugin_tests` (10 cases) | **pass** |
