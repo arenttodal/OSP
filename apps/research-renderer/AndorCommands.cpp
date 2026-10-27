@@ -1,6 +1,13 @@
 #include "AndorCommands.h"
 
+#include "analysis/Analyzer.h"
+#include "analysis/pitch/YinPitchTracker.h"
+#include "andor/dsp/OfflineRender.h"
 #include "andor/io/NoteAtlasJson.h"
+#include "andor/phrase/PhraseEngine.h"
+#include "midi/MidiFileIO.h"
+#include "model/RootChoice.h"
+#include "research/RenderSession.h"
 #include "andor/phrase/PhraseAnalysis.h"
 #include "andor/phrase/PhraseFixtures.h"
 #include "core/PitchMath.h"
@@ -27,6 +34,13 @@ ANDOR LAB (docs/andor-lab)
   --phrase-eval-file <file> --truth <truth.json> [--backend ..]
         The same against your own annotated recording (truth: {"notes":[{"start":s,"end":s,"midi":n}]}).
   --phrase-fixtures <dir>     write the generated phrases (WAV) and their ground truth (JSON)
+  --phrase-render <file> (--midi <f.mid> | --demo melody|chords|hold|chromatic) --output <out.wav>
+        [--atlas <f.andoratlas>] [--mode oneshot|gate|sustain] [--fill off|natural|balanced|wide|extended]
+        [--round-robin sequential|random|shuffle] [--tuning corrected|original] [--character 0..1]
+        [--synthetic 0..1] [--space 0..1] [--seed n]
+        Analyse (or load an atlas for) a phrase and play MIDI through ANDOR Phrase.
+  --phrase-ab <file> --output-dir <dir> [--demo ..]
+        The same demo through baseline A (plain resampler), baseline B (randomised) and Phrase.
 )";
 
 namespace
@@ -266,6 +280,210 @@ namespace
         }
         return 0;
     }
+    MidiSequence demoSequence (const std::string& name)
+    {
+        MidiSequence seq;
+        seq.name = name;
+        if (name == "chords")
+        {
+            const int chords[4][3] = { { 60, 64, 67 }, { 57, 60, 64 }, { 62, 65, 69 }, { 55, 59, 62 } };
+            for (int c = 0; c < 4; ++c)
+                for (int k : chords[c])
+                    andor::addNote (seq, 1.6 * c, 1.4, k, 90);
+        }
+        else if (name == "hold")
+        {
+            andor::addNote (seq, 0.0, 8.0, 64, 100);
+            andor::addNote (seq, 8.5, 6.0, 60, 90);
+        }
+        else if (name == "chromatic")
+        {
+            for (int k = 48; k <= 84; ++k)
+                andor::addNote (seq, 0.25 * (k - 48), 0.22, k, 96);
+        }
+        else
+        {
+            // A short melody with repeats (round robin) and steps between recorded keys (fill).
+            const int keys[] = { 60, 62, 64, 64, 65, 64, 62, 60, 67, 66, 64, 62, 60, 60 };
+            for (int i = 0; i < 14; ++i)
+                andor::addNote (seq, 0.4 * i, i == 13 ? 1.5 : 0.36, keys[i], 70 + (i * 13) % 50);
+        }
+        seq.sort();
+        return seq;
+    }
+
+    std::optional<MidiSequence> sequenceFrom (const Values& v, std::string& error)
+    {
+        if (v.count ("--midi"))
+        {
+            auto midi = io::readMidiFile (get (v, "--midi"), error);
+            if (! midi)
+                return std::nullopt;
+            return *midi;
+        }
+        return demoSequence (get (v, "--demo", "melody"));
+    }
+
+    phrase::PhraseParams phraseParamsFrom (const Values& v)
+    {
+        phrase::PhraseParams p;
+        const auto mode = get (v, "--mode", "sustain");
+        p.playMode = mode == "oneshot" ? phrase::PlayMode::oneShot : mode == "gate" ? phrase::PlayMode::gate : phrase::PlayMode::sustain;
+        const auto fill = get (v, "--fill", "balanced");
+        p.fill = fill == "off" ? phrase::FillMode::off : fill == "natural" ? phrase::FillMode::natural
+               : fill == "wide" ? phrase::FillMode::wide : fill == "extended" ? phrase::FillMode::extended : phrase::FillMode::balanced;
+        const auto rr = get (v, "--round-robin", "shuffle");
+        p.roundRobin = rr == "sequential" ? phrase::RoundRobin::sequential : rr == "random" ? phrase::RoundRobin::random : phrase::RoundRobin::shuffle;
+        p.tuning = get (v, "--tuning", "corrected") == "original" ? phrase::Tuning::original : phrase::Tuning::corrected;
+        p.sustainCharacter = std::stod (get (v, "--character", "0"));
+        p.synthetic = std::stod (get (v, "--synthetic", "0"));
+        p.space = std::stod (get (v, "--space", "0"));
+        p.seed = std::stoull (get (v, "--seed", std::to_string (p.seed)));
+        return p;
+    }
+
+    struct LoadedPhrase
+    {
+        io::LoadResult audio;
+        atlas::NoteAtlas atlas;
+    };
+
+    std::optional<LoadedPhrase> loadPhrase (const fs::path& file, const Values& v, std::string& error)
+    {
+        LoadedPhrase lp;
+        lp.audio = io::loadAudioFile (file);
+        if (! lp.audio.ok)
+        {
+            error = lp.audio.error;
+            return std::nullopt;
+        }
+        if (v.count ("--atlas"))
+        {
+            auto a = io::readNoteAtlas (get (v, "--atlas"), error);
+            if (! a)
+                return std::nullopt;
+            lp.atlas = *a;
+        }
+        else
+        {
+            const auto source = describeFile (file, error);
+            if (! source)
+                return std::nullopt;
+            lp.atlas = phrase::analysePhrase (lp.audio.audio, *source).atlas;
+        }
+        return lp;
+    }
+
+    AudioData renderPhrase (const LoadedPhrase& lp, const MidiSequence& seq, const phrase::PhraseParams& params)
+    {
+        auto source = std::make_shared<const PlaybackSource> (lp.audio.audio, 60.0, phrase::phrasePadding());
+        const auto model = phrase::buildPhraseModel (source, lp.atlas, 1);
+        phrase::PhraseEngine engine;
+        engine.prepare (48000.0, 128);
+        engine.setModel (model.get());
+        engine.setParams (params);
+        return andor::renderOffline (engine, seq, 48000.0, 128, 3.0);
+    }
+
+    int phraseRender (const Values& v)
+    {
+        if (! v.count ("--output"))
+            return fail (1, "--phrase-render needs --output <out.wav>");
+        std::string error;
+        const auto lp = loadPhrase (get (v, "--phrase-render"), v, error);
+        if (! lp)
+            return fail (2, error);
+        const auto seq = sequenceFrom (v, error);
+        if (! seq)
+            return fail (2, error);
+        const auto out = renderPhrase (*lp, *seq, phraseParamsFrom (v));
+        if (! io::writeAudioFile (get (v, "--output"), out, io::SampleFormat::float32, error))
+            return fail (3, error);
+        std::cout << "rendered " << get (v, "--output") << " (" << lp->atlas.notes.size() << " notes in the atlas)\n";
+        return 0;
+    }
+
+
+    /** Per-note pitch accuracy of a render against the keys that were played (objective
+        companion to listening): mean |cents| and the share of notes within 10 cents. */
+    std::string pitchReport (const AudioData& out, const MidiSequence& seq)
+    {
+        YinPitchTracker yin (out.sampleRate, 30.0, 3000.0, 0.15);
+        const auto& x = out.channels[0];
+        double sum = 0.0;
+        int within = 0, measured = 0, silent = 0;
+        for (const auto& e : seq.events)
+        {
+            if (e.type != MidiEvent::Type::noteOn)
+                continue;
+            double end = e.timeSeconds + 0.2;
+            for (const auto& f : seq.events)
+                if (f.type == MidiEvent::Type::noteOff && f.note == e.note && f.timeSeconds > e.timeSeconds)
+                {
+                    end = f.timeSeconds;
+                    break;
+                }
+            std::vector<double> hz;
+            for (double t = e.timeSeconds + 0.05; t < end - 0.02; t += 0.01)
+            {
+                const auto r = yin.analyse (x.data(), static_cast<std::int64_t> (x.size()), static_cast<std::int64_t> (t * out.sampleRate));
+                if (r.hz > 0.0 && r.aperiodicity < 0.3)
+                    hz.push_back (r.hz);
+            }
+            if (hz.empty())
+            {
+                ++silent;
+                continue;
+            }
+            std::nth_element (hz.begin(), hz.begin() + static_cast<std::ptrdiff_t> (hz.size() / 2), hz.end());
+            const double cents = 1200.0 * std::log2 (hz[hz.size() / 2] / midiToHz (e.note));
+            sum += std::abs (cents);
+            within += std::abs (cents) <= 10.0 ? 1 : 0;
+            ++measured;
+        }
+        return "pitch: " + std::to_string (measured) + " notes measured, mean |error| " + fmt (measured > 0 ? sum / measured : 0.0, 1)
+               + " c, " + std::to_string (within) + " within 10 c, " + std::to_string (silent) + " unpitched/silent";
+    }
+
+    int phraseAb (const Values& v)
+    {
+        if (! v.count ("--output-dir"))
+            return fail (1, "--phrase-ab needs --output-dir <dir>");
+        std::string error;
+        const fs::path file = get (v, "--phrase-ab");
+        const auto lp = loadPhrase (file, v, error);
+        if (! lp)
+            return fail (2, error);
+        const auto seq = sequenceFrom (v, error);
+        if (! seq)
+            return fail (2, error);
+        const fs::path dir = get (v, "--output-dir");
+        std::error_code ec;
+        fs::create_directories (dir, ec);
+        const auto stem = file.stem().string() + "-" + get (v, "--demo", "melody");
+
+        // Baselines A and B treat the whole phrase as one sample at its single analysed root:
+        // what a conventional sampler (and OSP) would do with it.
+        const auto analysis = Analyzer::analyse (lp->audio.audio);
+        const double root = chooseRoot (&analysis, std::nullopt).rootMidi;
+        for (auto engine : { research::EngineId::baselineA, research::EngineId::baselineB })
+        {
+            research::RenderConfig config;
+            config.engine = engine;
+            config.maxTailSeconds = 3.0;
+            const auto out = research::renderSequence (lp->audio.audio, root, *seq, config);
+            const auto name = dir / (stem + (engine == research::EngineId::baselineA ? "-A-baseline.wav" : "-B-randomised.wav"));
+            if (! io::writeAudioFile (name, out.audio, io::SampleFormat::float32, error))
+                return fail (3, error);
+            std::cout << "wrote " << name.string() << "\n    " << pitchReport (out.audio, *seq) << "\n";
+        }
+        const auto out = renderPhrase (*lp, *seq, phraseParamsFrom (v));
+        const auto name = dir / (stem + "-C-phrase.wav");
+        if (! io::writeAudioFile (name, out, io::SampleFormat::float32, error))
+            return fail (3, error);
+        std::cout << "wrote " << name.string() << "  (single root for A/B: " << midiNoteName (static_cast<int> (std::lround (root))) << ")\n    " << pitchReport (out, *seq) << "\n";
+        return 0;
+    }
 }
 
 const std::set<std::string>& flagOptions()
@@ -276,7 +494,8 @@ const std::set<std::string>& flagOptions()
 
 bool handles (const Values& v, const Flags& flags)
 {
-    return flags.count ("--phrase-eval") || v.count ("--phrase-analyze") || v.count ("--phrase-eval-file") || v.count ("--phrase-fixtures");
+    return flags.count ("--phrase-eval") || v.count ("--phrase-analyze") || v.count ("--phrase-eval-file") || v.count ("--phrase-fixtures")
+           || v.count ("--phrase-render") || v.count ("--phrase-ab");
 }
 
 int run (const Values& v, const Flags& flags)
@@ -289,6 +508,10 @@ int run (const Values& v, const Flags& flags)
         return phraseEvalFile (v);
     if (v.count ("--phrase-fixtures"))
         return phraseFixtures (v);
+    if (v.count ("--phrase-render"))
+        return phraseRender (v);
+    if (v.count ("--phrase-ab"))
+        return phraseAb (v);
     return 1;
 }
 

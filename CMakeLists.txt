@@ -192,6 +192,9 @@ add_library(andor_dsp STATIC
     src/andor/atlas/NoteAtlas.cpp
     src/andor/phrase/PhraseAnalysis.cpp
     src/andor/phrase/PhraseFixtures.cpp
+    src/andor/phrase/PhraseEngine.cpp
+    src/andor/dsp/Wavetable.cpp
+    src/andor/dsp/SharedFx.cpp
 )
 target_include_directories(andor_dsp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(andor_dsp PUBLIC osp_dsp)

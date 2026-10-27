@@ -63,6 +63,7 @@ add_executable(andor_tests
     support/TestHelpers.cpp
     andor/AtlasTests.cpp
     andor/PhraseAnalysisTests.cpp
+    andor/PhraseEngineTests.cpp
 )
 target_include_directories(andor_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(andor_tests PRIVATE andor_io Catch2::Catch2WithMain)
