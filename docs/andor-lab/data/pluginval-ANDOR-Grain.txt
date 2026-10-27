@@ -1,5 +1,5 @@
 Started validating: /home/user/OSP/build-plugin/apps/grain/ANDOR_Grain_artefacts/Release/VST3/ANDOR Grain.vst3
-Random seed: 0x74a7f2c
+Random seed: 0x315feee
 Validation started
 Strictness level: 10
 -----------------------------------------------------------------

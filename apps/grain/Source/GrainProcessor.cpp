@@ -106,8 +106,10 @@ namespace
         real (dnaIndividual, "Smooth / Individual", { 0.0f, 1.0f }, 0.3f, pct);
         integer (dnaSeed, "DNA Seed", 1, 9999, 1);
         choice (policy, "Source Policy", { "Mapped", "Closest", "Fixed Note", "Whole Source" }, 0);
-        integer (fixedNote, "Fixed Note", 0, 255, 0);
-        integer (root, "Root", 0, 127, 60);
+        l.add (std::make_unique<AudioParameterInt> (ParameterID { ids[fixedNote], 1 }, "Fixed Note", 0, 255, 0,
+                                                    AudioParameterIntAttributes().withStringFromValueFunction ([] (int v, int) { return "note " + String (v + 1); })));
+        l.add (std::make_unique<AudioParameterInt> (ParameterID { ids[root], 1 }, "Root", 0, 127, 60,
+                                                    AudioParameterIntAttributes().withStringFromValueFunction ([] (int v, int) { return String (midiNoteName (v)); })));
         choice (quality, "Quality", { "Eco", "Standard", "High" }, 1);
         l.add (std::make_unique<AudioParameterBool> (ParameterID { ids[deterministic], 1 }, "Deterministic", true));
         integer (seed, "Seed", 1, 9999, 1);

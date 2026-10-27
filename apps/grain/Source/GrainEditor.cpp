@@ -675,7 +675,7 @@ void GrainEditor::Content::resized()
     fixedNote.setBounds (820, 600, 80, 72);
     root.setBounds (910, 600, 80, 72);
     seed.setBounds (1000, 600, 80, 72);
-    deterministic.setBounds (1090, 618, 120, 30);
+    deterministic.setBounds (1086, 618, 112, 30);
 }
 
 void GrainEditor::Content::paint (juce::Graphics& g)
