@@ -195,6 +195,8 @@ add_library(andor_dsp STATIC
     src/andor/phrase/PhraseEngine.cpp
     src/andor/dsp/Wavetable.cpp
     src/andor/dsp/SharedFx.cpp
+    src/andor/grain/KeyDna.cpp
+    src/andor/grain/GrainEngine.cpp
 )
 target_include_directories(andor_dsp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(andor_dsp PUBLIC osp_dsp)

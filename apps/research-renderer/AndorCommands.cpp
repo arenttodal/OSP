@@ -4,6 +4,7 @@
 #include "analysis/pitch/YinPitchTracker.h"
 #include "andor/dsp/OfflineRender.h"
 #include "andor/io/NoteAtlasJson.h"
+#include "andor/grain/GrainEngine.h"
 #include "andor/phrase/PhraseEngine.h"
 #include "midi/MidiFileIO.h"
 #include "model/RootChoice.h"
@@ -39,6 +40,9 @@ ANDOR LAB (docs/andor-lab)
         [--round-robin sequential|random|shuffle] [--tuning corrected|original] [--character 0..1]
         [--synthetic 0..1] [--space 0..1] [--seed n]
         Analyse (or load an atlas for) a phrase and play MIDI through ANDOR Phrase.
+  --andor-bench [--engine grain|phrase|all] [--seconds 3] [--preset typical|stress] [--output-json <f>]
+        Callback timing over 44.1/48/96 kHz x blocks 64..512 x polyphony 1..16 (container numbers
+        are not Mac numbers: report the hardware with them).
   --phrase-ab <file> --output-dir <dir> [--demo ..]
         The same demo through baseline A (plain resampler), baseline B (randomised) and Phrase.
 )";
@@ -445,6 +449,176 @@ namespace
                + " c, " + std::to_string (within) + " within 10 c, " + std::to_string (silent) + " unpitched/silent";
     }
 
+
+    struct BenchRow
+    {
+        std::string engine, preset;
+        double rate = 0.0;
+        int block = 0, voices = 0;
+        double meanUs = 0.0, worstUs = 0.0, p99Us = 0.0, budgetUs = 0.0;
+        int overruns = 0, blocks = 0;
+        int peakGrains = 0, grainBudget = 0;
+        std::uint64_t denied = 0;
+        double realtime = 0.0;
+    };
+
+    template <typename Engine>
+    BenchRow benchEngine (Engine& engine, double rate, int block, int voices, double seconds)
+    {
+        std::vector<float> l (static_cast<std::size_t> (block)), r (static_cast<std::size_t> (block));
+        for (int k = 0; k < voices; ++k)
+            engine.noteOn (48 + (k * 7) % 36, 0.8f);
+        const int blocks = static_cast<int> (seconds * rate / block);
+        std::vector<double> times;
+        times.reserve (static_cast<std::size_t> (blocks));
+        const auto start = std::chrono::steady_clock::now();
+        for (int b = 0; b < blocks; ++b)
+        {
+            // Keep the notes alive and moving: retrigger one voice every 0.5 s.
+            if (b > 0 && b % std::max (1, static_cast<int> (0.5 * rate / block)) == 0)
+            {
+                const int k = (b / std::max (1, static_cast<int> (0.5 * rate / block))) % std::max (1, voices);
+                engine.noteOff (48 + (k * 7) % 36);
+                engine.noteOn (48 + (k * 7) % 36, 0.7f);
+            }
+            const auto t0 = std::chrono::steady_clock::now();
+            engine.render (l.data(), r.data(), block);
+            times.push_back (std::chrono::duration<double, std::micro> (std::chrono::steady_clock::now() - t0).count());
+        }
+        const double total = std::chrono::duration<double> (std::chrono::steady_clock::now() - start).count();
+        BenchRow row;
+        row.rate = rate;
+        row.block = block;
+        row.voices = voices;
+        row.blocks = blocks;
+        row.budgetUs = 1.0e6 * block / rate;
+        double sum = 0.0;
+        for (double t : times)
+        {
+            sum += t;
+            row.worstUs = std::max (row.worstUs, t);
+            row.overruns += t > row.budgetUs ? 1 : 0;
+        }
+        row.meanUs = times.empty() ? 0.0 : sum / static_cast<double> (times.size());
+        auto sorted = times;
+        std::sort (sorted.begin(), sorted.end());
+        row.p99Us = sorted.empty() ? 0.0 : sorted[std::min (sorted.size() - 1, static_cast<std::size_t> (0.99 * static_cast<double> (sorted.size())))];
+        row.realtime = total > 0.0 ? seconds / total : 0.0;
+        return row;
+    }
+
+    int andorBench (const Values& v)
+    {
+        const auto which = get (v, "--engine", "all");
+        const double seconds = std::stod (get (v, "--seconds", "3"));
+        const auto preset = get (v, "--preset", "typical");
+        std::vector<BenchRow> rows;
+
+        // A source shared by both engines: the generated vocal phrase.
+        const auto fx = phrase::makePhraseFixture ("vocal-phrase");
+        const auto atlas = phrase::analysePhrase (fx.audio, {}).atlas;
+
+        auto print = [] (const BenchRow& row)
+        {
+            char line[300];
+            std::snprintf (line, sizeof (line), "%-6s %6.0f Hz  block %3d  voices %2d  mean %7.1f us  p99 %7.1f us  worst %8.1f us  budget %7.1f us  load %5.1f%%  overruns %d/%d  grains %d/%d",
+                           row.engine.c_str(), row.rate, row.block, row.voices, row.meanUs, row.p99Us, row.worstUs, row.budgetUs,
+                           100.0 * row.meanUs / row.budgetUs, row.overruns, row.blocks, row.peakGrains, row.grainBudget);
+            std::cout << line << std::endl;
+        };
+        for (double rate : { 44100.0, 48000.0, 96000.0 })
+            for (int block : { 64, 128, 256, 512 })
+                for (int voices : { 1, 4, 8, 12, 16 })
+                {
+                    if (which == "grain" || which == "all")
+                    {
+                        auto src = std::make_shared<const PlaybackSource> (fx.audio, 64.0, grain::grainPadding());
+                        const auto model = grain::buildGrainModel (src, std::make_shared<const atlas::NoteAtlas> (atlas), 64.0, 1);
+                        grain::GrainEngine e;
+                        e.prepare (rate, block);
+                        e.setModel (model.get());
+                        grain::GrainParams p;
+                        p.quality = grain::Quality::high;
+                        if (preset == "stress")
+                        {
+                            p.sizeSeconds = 0.6;
+                            p.density = 120.0;
+                            p.pitchScatter = 2.0;
+                        }
+                        else
+                        {
+                            p.sizeSeconds = 0.15;
+                            p.density = 30.0;
+                        }
+                        p.oscMix = 0.25;
+                        p.space = 0.3;
+                        p.echo = 0.2;
+                        p.dna.variationAmount = 0.5;
+                        p.mod[0] = { grain::ModSource::lfo1, grain::ModDest::position, 0.2 };
+                        e.setParams (p);
+                        auto row = benchEngine (e, rate, block, voices, seconds);
+                        row.engine = "grain";
+                        row.preset = preset;
+                        row.peakGrains = e.peakGrains();
+                        row.grainBudget = e.grainBudget();
+                        row.denied = e.deniedGrains();
+                        rows.push_back (row);
+                        print (row);
+                    }
+                    if (which == "phrase" || which == "all")
+                    {
+                        auto src = std::make_shared<const PlaybackSource> (fx.audio, 60.0, phrase::phrasePadding());
+                        const auto model = phrase::buildPhraseModel (src, atlas, 1);
+                        phrase::PhraseEngine e;
+                        e.prepare (rate, block);
+                        e.setModel (model.get());
+                        phrase::PhraseParams p;
+                        p.polyphony = 16;
+                        p.fill = phrase::FillMode::extended;
+                        p.sustainCharacter = preset == "stress" ? 0.5 : 0.0;
+                        p.synthetic = preset == "stress" ? 0.3 : 0.0;
+                        p.tone = 0.8;
+                        p.space = 0.3;
+                        p.echo = 0.2;
+                        e.setParams (p);
+                        auto row = benchEngine (e, rate, block, voices, seconds);
+                        row.engine = "phrase";
+                        row.preset = preset;
+                        rows.push_back (row);
+                        print (row);
+                    }
+                }
+
+        if (v.count ("--output-json"))
+        {
+            auto list = json::array();
+            for (const auto& row : rows)
+            {
+                auto o = json::object();
+                json::set (o, "engine", json::str (row.engine));
+                json::set (o, "preset", json::str (row.preset));
+                json::set (o, "sampleRate", row.rate);
+                json::set (o, "block", row.block);
+                json::set (o, "voices", row.voices);
+                json::set (o, "meanUs", json::number (row.meanUs, 1));
+                json::set (o, "p99Us", json::number (row.p99Us, 1));
+                json::set (o, "worstUs", json::number (row.worstUs, 1));
+                json::set (o, "budgetUs", json::number (row.budgetUs, 1));
+                json::set (o, "loadPercent", json::number (100.0 * row.meanUs / row.budgetUs, 2));
+                json::set (o, "overruns", row.overruns);
+                json::set (o, "blocks", row.blocks);
+                json::set (o, "peakGrains", row.peakGrains);
+                json::set (o, "grainBudget", row.grainBudget);
+                json::set (o, "deniedGrains", static_cast<juce::int64> (row.denied));
+                list.append (o);
+            }
+            std::string error;
+            if (! json::writeFile (get (v, "--output-json"), list, error))
+                return fail (3, error);
+        }
+        return 0;
+    }
+
     int phraseAb (const Values& v)
     {
         if (! v.count ("--output-dir"))
@@ -488,14 +662,14 @@ namespace
 
 const std::set<std::string>& flagOptions()
 {
-    static const std::set<std::string> flags { "--auto-tuning", "--verbose", "--phrase-eval", "--stress" };
+    static const std::set<std::string> flags { "--auto-tuning", "--verbose", "--phrase-eval", "--stress", "--andor-bench" };
     return flags;
 }
 
 bool handles (const Values& v, const Flags& flags)
 {
     return flags.count ("--phrase-eval") || v.count ("--phrase-analyze") || v.count ("--phrase-eval-file") || v.count ("--phrase-fixtures")
-           || v.count ("--phrase-render") || v.count ("--phrase-ab");
+           || v.count ("--phrase-render") || v.count ("--phrase-ab") || flags.count ("--andor-bench");
 }
 
 int run (const Values& v, const Flags& flags)
@@ -512,6 +686,8 @@ int run (const Values& v, const Flags& flags)
         return phraseRender (v);
     if (v.count ("--phrase-ab"))
         return phraseAb (v);
+    if (flags.count ("--andor-bench"))
+        return andorBench (v);
     return 1;
 }
 
