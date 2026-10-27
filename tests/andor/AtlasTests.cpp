@@ -167,6 +167,18 @@ TEST_CASE ("Note Atlas: JSON round trip is exact for positions and lossless for 
     CHECK (back->notes[2].corrections.pitch);
     CHECK (back->notes[2].midiPitch == Approx (64.13));
     CHECK (io::noteAtlasToString (*back) == text);   // stable serialisation
+
+    // Values playback reads survive exactly (bit-identical session recall).
+    a.notes[0].midiPitch = 61.123456789012345;
+    a.notes[0].pitchHz = 280.98765432109876;
+    a.notes[0].confidence = 0.912345678901234;
+    a.notes[0].rmsDb = -23.456789012345678;
+    const auto exact = io::noteAtlasFromString (io::noteAtlasToString (a), error);
+    REQUIRE (exact);
+    CHECK (exact->notes[0].midiPitch == a.notes[0].midiPitch);
+    CHECK (exact->notes[0].pitchHz == a.notes[0].pitchHz);
+    CHECK (exact->notes[0].confidence == a.notes[0].confidence);
+    CHECK (exact->notes[0].rmsDb == a.notes[0].rmsDb);
 }
 
 TEST_CASE ("Note Atlas: versioning refuses what it cannot read", "[atlas][unit]")

@@ -219,6 +219,11 @@ add_subdirectory(apps/research-renderer)
 
 if(OSP_BUILD_PLUGIN)
     add_subdirectory(apps/plugin)
+    # ANDOR Lab plug-ins (docs/andor-lab): separate products built from the same repository.
+    option(ANDOR_BUILD_LAB "Build the ANDOR Phrase and ANDOR Grain plug-ins" ON)
+    if(ANDOR_BUILD_LAB)
+        add_subdirectory(apps/phrase)
+    endif()
 endif()
 
 if(OSP_BUILD_TESTS)

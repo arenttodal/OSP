@@ -64,9 +64,13 @@ struct PhraseModel
 /** Padding a PlaybackSource needs for the engine's interpolator. */
 int phrasePadding() noexcept;
 
-/** Builds the model. `source` must hold the atlas' source audio with phrasePadding(). */
+/**
+    Builds the model. `source` must hold the atlas' source audio with phrasePadding(). With
+    `previous` (the same source), notes whose range and pitch did not change keep their loop
+    points instead of searching again: an edit rebuilds in well under a millisecond per note.
+*/
 std::shared_ptr<PhraseModel> buildPhraseModel (std::shared_ptr<const PlaybackSource> source, const atlas::NoteAtlas& atlas,
-                                               std::uint64_t generation);
+                                               std::uint64_t generation, const PhraseModel* previous = nullptr);
 
 /** The playable state of one key, for the keyboard map. */
 enum class KeyState { missing, exact, variations, filled };

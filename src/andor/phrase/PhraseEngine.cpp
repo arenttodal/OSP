@@ -86,7 +86,7 @@ namespace
 }
 
 std::shared_ptr<PhraseModel> buildPhraseModel (std::shared_ptr<const PlaybackSource> source, const atlas::NoteAtlas& atlas,
-                                               std::uint64_t generation)
+                                               std::uint64_t generation, const PhraseModel* previous)
 {
     auto model = std::make_shared<PhraseModel>();
     model->generation = generation;
@@ -121,7 +121,27 @@ std::shared_ptr<PhraseModel> buildPhraseModel (std::shared_ptr<const PlaybackSou
         r.fadeIn = std::max (1.0, static_cast<double> (n.fadeInFrames));
         r.fadeOut = std::max (1.0, static_cast<double> (n.fadeOutFrames));
         r.levelDb = n.rmsDb > -119.0 ? n.rmsDb : n.peakDb - 6.0;
-        if (n.articulation != atlas::Articulation::noisy)
+        const PlayRegion* reuse = nullptr;
+        if (previous != nullptr && previous->source == source)
+            for (const auto& old : previous->regions)
+            {
+                const auto& on = previous->atlas.notes[static_cast<std::size_t> (old.noteIndex)];
+                if (on.id == n.id && on.sustain.start == n.sustain.start && on.sustain.end == n.sustain.end && on.pitchHz == n.pitchHz
+                    && on.articulation == n.articulation)
+                {
+                    reuse = &old;
+                    break;
+                }
+            }
+        if (reuse != nullptr)
+        {
+            r.loopable = reuse->loopable;
+            r.loopStart = reuse->loopStart;
+            r.loopEnd = reuse->loopEnd;
+            r.loopCrossfade = reuse->loopCrossfade;
+            r.equalPowerLoop = reuse->equalPowerLoop;
+        }
+        else if (n.articulation != atlas::Articulation::noisy)
             findLoop (r, *source, n.pitchHz);
         regionOfNote[i] = static_cast<int> (model->regions.size());
         levelSum += r.levelDb;

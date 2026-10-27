@@ -76,18 +76,19 @@ namespace
         json::set (o, "releaseStart", frames (n.releaseStart));
         json::set (o, "fadeIn", frames (n.fadeInFrames));
         json::set (o, "fadeOut", frames (n.fadeOutFrames));
-        // Pitch values keep enough decimals for a tenth of a cent.
-        json::set (o, "pitchHz", json::number (n.pitchHz, 4));
-        json::set (o, "midiPitch", json::number (n.midiPitch, 5));
+        // Everything playback reads is written at full precision: a recalled session must play
+        // sample for sample like the one that was saved (a rounded pitch moves every read).
+        json::set (o, "pitchHz", n.pitchHz);
+        json::set (o, "midiPitch", n.midiPitch);
         json::set (o, "rootMidi", n.rootMidi);
-        json::set (o, "cents", json::number (n.centsOffset, 2));
+        json::set (o, "cents", n.centsOffset);
         json::set (o, "stabilityCents", json::number (n.pitchStabilityCents, 2));
         json::set (o, "vibratoCents", json::number (n.vibratoDepthCents, 2));
         json::set (o, "vibratoHz", json::number (n.vibratoRateHz, 2));
-        json::set (o, "voicing", json::number (n.voicing, 4));
-        json::set (o, "confidence", json::number (n.confidence, 4));
-        json::set (o, "peakDb", json::number (n.peakDb, 2));
-        json::set (o, "rmsDb", json::number (n.rmsDb, 2));
+        json::set (o, "voicing", n.voicing);
+        json::set (o, "confidence", n.confidence);
+        json::set (o, "peakDb", n.peakDb);
+        json::set (o, "rmsDb", n.rmsDb);
         json::set (o, "articulation", json::str (atlas::toString (n.articulation)));
         json::set (o, "method", json::str (n.analysisMethod));
         json::set (o, "methodVersion", n.analysisVersion);
@@ -166,7 +167,7 @@ juce::var noteAtlasToJson (const atlas::NoteAtlas& a)
     json::set (analysis, "method", json::str (a.analysis.method));
     json::set (analysis, "version", a.analysis.version);
     json::set (analysis, "a4Hz", a.analysis.a4Hz);
-    json::set (analysis, "tuningOffsetCents", json::number (a.analysis.tuningOffsetCents, 2));
+    json::set (analysis, "tuningOffsetCents", a.analysis.tuningOffsetCents);
     json::set (analysis, "settingsDigest", json::str (a.analysis.settingsDigest));
     json::set (root, "analysis", analysis);
 
@@ -229,7 +230,9 @@ std::optional<atlas::NoteAtlas> noteAtlasFromJson (const juce::var& json, std::s
 
 std::string noteAtlasToString (const atlas::NoteAtlas& a)
 {
-    return json::toString (noteAtlasToJson (a));
+    // Not json::toString (6 decimals, for reports): doubles round-trip exactly here.
+    const auto options = juce::JSON::FormatOptions {}.withSpacing (juce::JSON::Spacing::multiLine).withMaxDecimalPlaces (17);
+    return juce::JSON::toString (noteAtlasToJson (a), options).toStdString();
 }
 
 std::optional<atlas::NoteAtlas> noteAtlasFromString (const std::string& text, std::string& error)
@@ -253,7 +256,15 @@ bool writeNoteAtlas (const std::filesystem::path& path, const atlas::NoteAtlas& 
         if (! ec && ! rel.empty())
             s.relativePath = utf8 (rel.generic_u8string());
     }
-    return json::writeFile (path, noteAtlasToJson (copy), error);
+    std::error_code absoluteError;
+    const auto absolute = std::filesystem::absolute (path, absoluteError);
+    const juce::File file (juce::String::fromUTF8 (utf8 ((absoluteError ? path : absolute).u8string()).c_str()));
+    if (! file.replaceWithText (juce::String::fromUTF8 (noteAtlasToString (copy).c_str()) + "\n"))
+    {
+        error = "cannot write " + utf8 (path.u8string());
+        return false;
+    }
+    return true;
 }
 
 std::optional<atlas::NoteAtlas> readNoteAtlas (const std::filesystem::path& path, std::string& error)
