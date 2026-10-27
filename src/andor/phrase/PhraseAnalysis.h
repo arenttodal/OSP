@@ -137,6 +137,14 @@ struct AnalysisResult
 AnalysisResult analysePhrase (const AudioData& audio, const atlas::SourceAsset& source, const AnalysisSettings& settings = {},
                               const std::atomic<bool>* cancel = nullptr, std::atomic<float>* progress = nullptr);
 
+/**
+    Re-describes one source range as a single note (split halves, merges, "reanalyse selection"):
+    the range is analysed on its own (with a little context either side) and its frames are
+    described without segmentation. Positions in the result are source frames. Off the audio
+    thread; deterministic.
+*/
+atlas::NoteEvent analyseRange (const AudioData& audio, std::int64_t startFrame, std::int64_t endFrame, const AnalysisSettings& settings = {});
+
 /** The analysis algorithm's version: bump when results change (it invalidates caches). */
 constexpr int analysisVersion = 1;
 

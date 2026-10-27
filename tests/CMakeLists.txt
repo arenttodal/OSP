@@ -64,6 +64,7 @@ add_executable(andor_tests
     andor/AtlasTests.cpp
     andor/PhraseAnalysisTests.cpp
     andor/PhraseEngineTests.cpp
+    andor/PhraseEditTests.cpp
     andor/GrainTests.cpp
 )
 target_include_directories(andor_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

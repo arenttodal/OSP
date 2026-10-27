@@ -1066,6 +1066,50 @@ atlas::NoteEvent describe (const Segment& seg, const Segment* previous, const Se
     return note;
 }
 
+atlas::NoteEvent analyseRange (const AudioData& audio, std::int64_t startFrame, std::int64_t endFrame, const AnalysisSettings& s)
+{
+    const auto frames = audio.numFrames();
+    startFrame = std::clamp<std::int64_t> (startFrame, 0, std::max<std::int64_t> (0, frames - 1));
+    endFrame = std::clamp<std::int64_t> (endFrame, startFrame + 1, frames);
+    // Context either side lets the tracker settle; the note itself is exactly [start, end).
+    const auto context = static_cast<std::int64_t> (0.05 * audio.sampleRate);
+    const auto from = std::max<std::int64_t> (0, startFrame - context);
+    const auto to = std::min (frames, endFrame + context);
+    AudioData slice;
+    slice.sampleRate = audio.sampleRate;
+    for (const auto& ch : audio.channels)
+        slice.channels.emplace_back (ch.begin() + from, ch.begin() + to);
+    auto local = s;
+    local.maxAnalysisSeconds = std::max (s.maxAnalysisSeconds, static_cast<double> (to - from) / audio.sampleRate + 1.0);
+
+    const auto pre = preprocess (slice, local);
+    PitchContour contour;
+    makePitchTracker (local.backend)->track (pre, local, contour, nullptr, nullptr);
+    const int hop = hopSamplesFor (local, audio.sampleRate);
+    Segment seg;
+    seg.begin = static_cast<std::size_t> ((startFrame - from) / hop);
+    seg.end = std::max (seg.begin + 1, std::min (contour.frames.size(), static_cast<std::size_t> ((endFrame - from + hop - 1) / hop)));
+    // The range is given by the user: its edges are joins, not onsets to search around.
+    seg.legatoIn = seg.legatoOut = true;
+    auto note = describe (seg, nullptr, nullptr, contour, pre, local);
+    auto shift = [&] (std::int64_t& f) { f = std::clamp<std::int64_t> (f + from, startFrame, endFrame); };
+    shift (note.sourceStart);
+    shift (note.attackStart);
+    shift (note.sustain.start);
+    shift (note.sustain.end);
+    shift (note.releaseStart);
+    shift (note.sourceEnd);
+    note.sourceStart = note.attackStart = startFrame;
+    note.sourceEnd = endFrame;
+    note.releaseStart = std::clamp (note.releaseStart, note.sustain.end, endFrame);
+    note.analysisMethod = toString (local.backend);
+    note.analysisVersion = analysisVersion * 100 + 1;
+    const auto r = atlas::roundPitch (note.midiPitch);
+    note.rootMidi = r.key;
+    note.centsOffset = r.cents;
+    return note;
+}
+
 AnalysisResult analysePhrase (const AudioData& audio, const atlas::SourceAsset& sourceIn, const AnalysisSettings& s,
                               const std::atomic<bool>* cancel, std::atomic<float>* progress)
 {

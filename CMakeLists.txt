@@ -193,6 +193,7 @@ add_library(andor_dsp STATIC
     src/andor/phrase/PhraseAnalysis.cpp
     src/andor/phrase/PhraseFixtures.cpp
     src/andor/phrase/PhraseEngine.cpp
+    src/andor/phrase/PhraseEdits.cpp
     src/andor/dsp/Wavetable.cpp
     src/andor/dsp/SharedFx.cpp
     src/andor/grain/KeyDna.cpp
