@@ -23,6 +23,7 @@ add_executable(osp_tests
     unit/ModulationTests.cpp
     unit/LayerEqTests.cpp
     unit/SampleSetTests.cpp
+    unit/FastNumericsTests.cpp
     library/CatalogTests.cpp
     library/ImportTests.cpp
     library/PreviewTests.cpp

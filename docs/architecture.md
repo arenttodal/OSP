@@ -569,6 +569,25 @@ paints its ancestors' own paint behind its corners from a backdrop image (`paint
 keyed by size, position, scale, skin and focus), so moving marks repaint only the display. It
 shows at most `maxHeadsShown` read heads.
 
+## Fast numerics in engine C (docs/reports/cpu-three-layers.md, step 2)
+
+`core/Simd.h` is four float lanes (`simd::Float4`): SSE2 on x86-64, NEON on arm64 (both part
+of those platforms' baselines, so no runtime dispatch), and a plain-array fallback. Lane sums
+are taken in one fixed order. It serves only engine C's hottest loops, which differ from the
+plain forms by float rounding:
+
+- `SincInterpolator::readFast`: table kernel and apply in one pass, both channels, taps summed
+  in four lanes. The baselines keep `computeKernel` + `apply`, so their goldens never change.
+- `GranularSource::render` and KALEIDOSCOPE's grains: Hermite reads as four tap weights
+  (`hermiteWeights`) on one 4-sample load, the window and pan folded into the weights.
+- `CharacterFilter`: LP24's left and right ladders in two lanes of one pass, with the loop's
+  constants (powers of G, the feedback reciprocal, the saturator's bias offset) computed in
+  `setParameters`.
+- `engine/FastMath.h`: `fastTanh` (a rational fit within 4e-7 of tanh) for KALEIDOSCOPE's
+  saturation, and `Phasor` (sin by rotation) for the doubling's slow sway.
+
+`tests/unit/FastNumericsTests.cpp` keeps each one against the form it replaced.
+
 ## RENDERED CONTROLS (tools/blender-assets; docs/reports/knob-phase1.md)
 
 Controls can be drawn from offline renders instead of vectors.

@@ -5,6 +5,7 @@
 #include "core/Prng.h"
 #include "engine/CharacterFilter.h"
 #include "engine/Dampen.h"
+#include "engine/FastMath.h"
 #include "engine/GranularSource.h"
 #include "engine/Modulation.h"
 #include "engine/MirageEngine.h"
@@ -253,7 +254,8 @@ private:
 
     // Reimagined doubling head
     float dAmount = 0.0f, dRamp = 0.0f, dRampStep = 0.0f, dSide = 1.0f;
-    double dBase = 0.0, dDepth = 0.0, dPhase = 0.0, dOmega = 0.0, dEnd = 0.0;
+    double dBase = 0.0, dDepth = 0.0, dEnd = 0.0;
+    Phasor dSway;   // the doubling's slow sway (0.25-0.45 Hz)
     int dDelaySamples = 0;
 
     // Reimagined granular continuation: a small pool of windowed grains read from what the
@@ -266,7 +268,6 @@ private:
     };
     static constexpr int maxGrains = 8;
     void spawnGrain() noexcept;
-    void readHermiteStereo (double pos, bool stereo, float& left, float& right) const noexcept;
     std::array<Grain, maxGrains> grains {};
     Prng grainRng;
     float gAmount = 0.0f, gFade = 0.0f, gFadeStep = 0.0f, gNorm = 1.0f, gLowCoef = 1.0f, gLowL = 0.0f, gLowR = 0.0f;

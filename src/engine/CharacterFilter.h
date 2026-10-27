@@ -32,24 +32,22 @@ public:
     FilterType type() const noexcept { return current; }
 
 private:
-    struct Ladder
-    {
-        float s[4] {};
-    };
     struct Svf
     {
         float ic1 = 0.0f, ic2 = 0.0f;
     };
 
-    float ladder (Ladder& st, float x) const noexcept;
+    /** Both channels' ladders in one pass (two of four SIMD lanes). */
+    void ladder (float inLeft, float inRight, float& outLeft, float& outRight) noexcept;
     void svf (Svf& st, float x, float& low, float& band, float& high) const noexcept;
 
     double sampleRate = 48000.0;
     FilterType current = FilterType::lp24, previous = FilterType::lp24;
     int fadeRemaining = 0, fadeLength = 1;
 
-    // Ladder (LP24)
+    // Ladder (LP24), and what its per-sample loop derives from them (setParameters).
     float G = 0.5f, k = 0.0f, comp = 1.0f;
+    float G2 = 0.25f, G3 = 0.125f, beta = 0.5f, feedbackNorm = 1.0f, clipBias = 0.0f;
     // SVF (LP12/HP12/BP12)
     float g = 0.5f, kSvf = 1.4f, a1 = 0.0f, a2 = 0.0f, a3 = 0.0f;
     // Drive (shared)
@@ -61,7 +59,7 @@ private:
     ShelfFilter tiltLowL, tiltLowR, tiltHighL, tiltHighR;
     float appliedTilt = 1.0e9f;
 
-    Ladder ladderL, ladderR;
+    alignas (16) float ladderState[4][4] {};   // [stage][lane]: lane 0 left, 1 right, 2-3 unused
     Svf svfL, svfR;
 };
 

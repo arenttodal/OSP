@@ -108,9 +108,9 @@ namespace reimagined
     /** Bandlimited read of the recording at `pos` (both channels). */
     inline void readSinc (const ReimaginedNote& n, double pos, double step, float& l, float& r) noexcept
     {
-        n.sinc->computeKernelFast (pos, std::max (step, 1.0e-6), *n.kernel);
-        l = SincInterpolator::apply (*n.kernel, n.source->channelData (0));
-        r = n.source->numChannels() > 1 ? SincInterpolator::apply (*n.kernel, n.source->channelData (1)) : l;
+        SincInterpolator::LevelCache level;
+        n.sinc->readFast (pos, std::max (step, 1.0e-6), level, *n.kernel, n.source->channelData (0),
+                          n.source->numChannels() > 1 ? n.source->channelData (1) : nullptr, l, r);
     }
 
     /** Cheap 4-point read (for lowpassed or deliberately primitive heads). */
