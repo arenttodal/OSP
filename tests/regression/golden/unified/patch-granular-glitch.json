@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "patch-granular-glitch",
+  "description": "SIZE 30 ms, DENS 40, TUNE -12, SPREAD 100, LIFE 90 fray with pitch",
+  "midi": "scale-c3-c4",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "ac29ff37b398c2e3",
+  "seconds": 2.442667,
+  "rmsDb": -39.032452,
+  "peakDb": -25.343614,
+  "brightness": 0.062795,
+  "stereoWidth": 0.915929
+}

@@ -177,6 +177,7 @@ add_library(osp_research STATIC
     src/research/TestSignalSet.cpp
     src/research/Bakeoff.cpp
     src/research/Experiment.cpp
+    src/research/UnifiedScenes.cpp
 )
 target_include_directories(osp_research PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(osp_research PUBLIC osp_dsp osp_library osp_juce_headless)

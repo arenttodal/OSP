@@ -8,6 +8,7 @@
 
 #include <juce_core/juce_core.h>
 
+#include <array>
 #include <filesystem>
 #include <optional>
 #include <string>
@@ -39,6 +40,11 @@ struct RenderConfig
     PlaybackOptions playback {};      ///< start-at-onset / level normalisation (off = plain baselines)
     EngineSettings engineSettings {}; ///< engine C only
     bool anchors = false;             ///< engine C: build register anchors (needed for pitchCharacter = natural)
+
+    /** Engine C's layers B and C (paths of their recordings; empty = the layer stays empty).
+        Layer A plays the render's own source. Their source modes, granular settings and
+        layer controls are in engineSettings ("layers" in the JSON). */
+    std::array<std::string, 3> layerSources {};
 
     /** Engine C's modulation (LFOs, envelopes, routes); no routes = none. */
     mod::Settings modulation {};

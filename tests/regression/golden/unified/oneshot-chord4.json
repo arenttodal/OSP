@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "oneshot-chord4",
+  "description": "One Shot, default instrument, four-note chord",
+  "midi": "chord4-cmaj7",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "34b39c356d611f5",
+  "seconds": 2.576,
+  "rmsDb": -28.811718,
+  "peakDb": -15.554705,
+  "brightness": 0.258523,
+  "stereoWidth": 0.934351
+}

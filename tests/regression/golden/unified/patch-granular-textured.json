@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "patch-granular-textured",
+  "description": "POS 72, SIZE 320 ms, DENS 32, TUNE +7, SPREAD 60, START 10, REVERSE, FOLLOW off, LIFE 80 loose, REIMAGINED 60 per layer, SPACE 40",
+  "midi": "chord4-cmaj7",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "cbcedc5da5b5ff6f",
+  "seconds": 2.474667,
+  "rmsDb": -29.184249,
+  "peakDb": -16.077935,
+  "brightness": 0.369079,
+  "stereoWidth": 1.160501
+}

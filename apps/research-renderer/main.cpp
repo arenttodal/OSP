@@ -9,6 +9,7 @@
 #include "midi/MidiFileIO.h"
 #include "midi/MidiFixtures.h"
 #include "engine/InstrumentBuilder.h"
+#include "engine/InstrumentEngine.h"
 #include "research/Bakeoff.h"
 #include "research/Experiment.h"
 #include "research/Benchmark.h"
@@ -19,8 +20,10 @@
 #include "research/RenderSession.h"
 #include "research/SourceAnalysis.h"
 #include "research/TestSignalSet.h"
+#include "research/UnifiedScenes.h"
 
 #include <chrono>
+#include <fstream>
 #include <iostream>
 #include <map>
 #include <set>
@@ -80,6 +83,11 @@ PITCH BAKE-OFF (Phase 2)
   --experiment <plan.json> [--output <dir>]   blind listening experiment (any engines/settings), see docs/testing.md
   --register-test <dir>                       multi-pitch ground truth: hide each pitch, rebuild from the rest (spec §70)
   --continuation-report <file|dir>            stable region, jumps and release per file
+
+UNIFIED ENGINE (docs/research/unified-andor)
+  --unified <dir> [--scene <name>] [--repeats 3] [--no-audio]
+                                              renders the baseline scenes (src/research/UnifiedScenes.cpp):
+                                              <scene>.wav, <scene>.json (digest), costs.json and summary.md
 
 BENCHMARK
   --benchmark [--engine A|C] [--voices 24] [--seconds 20] [--sample-rate 48000] [--block-size 128] [--output-json <f>] [--no-retrigger] [--transpose <semitones>]
@@ -471,6 +479,72 @@ int commandIndex (const Args& args)
     return exitOk;
 }
 
+int commandUnified (const Args& args)
+{
+    namespace u = unified;
+    const fs::path dir = args.get ("--unified");
+    std::error_code ec;
+    fs::create_directories (dir, ec);
+    const auto scenes = u::baselineScenes();
+    const auto only = args.get ("--scene");
+    const auto repeats = parseNumber (args.get ("--repeats", "3"));
+    const auto platform = u::platformTag();
+    std::string error;
+    auto costs = juce::var (juce::Array<juce::var>());
+    std::ostringstream md;
+    md << "# Unified-engine scenes (" << platform << ")\n\n"
+       << "| Scene | Seconds | RMS dB | Peak dB | Brightness | Width | Hash | Mean block % | Worst block % | Peak voices | Peak grains |\n"
+       << "|---|---|---|---|---|---|---|---|---|---|---|\n";
+    int rendered = 0;
+    for (const auto& scene : scenes)
+    {
+        if (! only.empty() && scene.name != only)
+            continue;
+        const auto out = u::render (scene);
+        const auto d = u::digest (out.audio);
+        if (! args.has ("--no-audio") && ! io::writeAudioFile (dir / (scene.name + ".wav"), out.audio, io::SampleFormat::float32, error))
+            return fail (exitProcessing, error);
+        if (! json::writeFile (dir / (scene.name + ".json"), u::digestToJson (scene, d, platform), error))
+            return fail (exitProcessing, error);
+        const auto cost = u::measure (scene, static_cast<int> (repeats.value_or (3.0)));
+        auto c = json::object();
+        json::set (c, "scene", json::str (scene.name));
+        json::set (c, "renderedSeconds", json::number (cost.renderedSeconds, 3));
+        json::set (c, "meanBlockMicros", json::number (cost.meanBlockMicros, 2));
+        json::set (c, "p99BlockMicros", json::number (cost.p99BlockMicros, 2));
+        json::set (c, "worstBlockMicros", json::number (cost.worstBlockMicros, 2));
+        json::set (c, "meanBudgetPercent", json::number (cost.meanBudgetPercent, 3));
+        json::set (c, "worstBudgetPercent", json::number (cost.worstBudgetPercent, 3));
+        json::set (c, "peakVoices", cost.peakVoices);
+        json::set (c, "peakGrains", cost.peakGrains);
+        costs.append (c);
+        md << "| " << scene.name << " | " << json::round (d.seconds, 2) << " | " << json::round (d.rmsDb, 2) << " | " << json::round (d.peakDb, 2) << " | "
+           << json::round (d.brightness, 3) << " | " << json::round (d.stereoWidth, 3) << " | `" << d.hash << "` | "
+           << json::round (cost.meanBudgetPercent, 2) << " | " << json::round (cost.worstBudgetPercent, 2) << " | " << cost.peakVoices << " | "
+           << cost.peakGrains << " |\n";
+        std::cout << scene.name << ": " << json::round (d.seconds, 2) << " s, rms " << json::round (d.rmsDb, 2) << " dB, hash " << d.hash
+                  << ", mean " << json::round (cost.meanBudgetPercent, 2) << " % of a " << scene.config.blockSize << "-sample block, "
+                  << cost.peakGrains << " grains at most" << std::endl;
+        ++rendered;
+    }
+    if (rendered == 0)
+        return fail (exitUsage, "no scene named '" + only + "'");
+    auto summary = json::object();
+    json::set (summary, "platform", json::str (platform));
+    json::set (summary, "peakResidentMegabytes", json::number (u::peakResidentMegabytes(), 1));
+    // The engine's own footprint (its voices, layers and stages; the models are shared data).
+    json::set (summary, "engineBytes", static_cast<juce::int64> (sizeof (InstrumentEngine)));
+    json::set (summary, "voiceBytes", static_cast<juce::int64> (sizeof (InstrumentVoice)));
+    json::set (summary, "scenes", costs);
+    if (! json::writeFile (dir / "costs.json", summary, error))
+        return fail (exitProcessing, error);
+    md << "\nPeak resident memory of the renderer: " << json::round (u::peakResidentMegabytes(), 1) << " MB. InstrumentEngine object: "
+       << sizeof (InstrumentEngine) << " bytes (InstrumentVoice " << sizeof (InstrumentVoice) << " bytes each).\n";
+    std::ofstream (dir / "summary.md") << md.str();
+    std::cout << rendered << " scenes -> " << dir.string() << "\n";
+    return exitOk;
+}
+
 int commandBenchmark (const Args& args)
 {
     BenchmarkOptions options;
@@ -548,6 +622,8 @@ int main (int argc, char** argv)
             return commandIndex (args);
         if (args.has ("--benchmark"))
             return commandBenchmark (args);
+        if (args.has ("--unified"))
+            return commandUnified (args);
         if (args.has ("--bakeoff"))
         {
             const auto plan = loadBakeoffPlan (args.get ("--bakeoff"), error);

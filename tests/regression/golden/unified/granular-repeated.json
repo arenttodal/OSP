@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "granular-repeated",
+  "description": "Granular defaults, the same key six times (LIFE varies each trigger)",
+  "midi": "repeated-a3x6",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "b5ec75dd8e6fd072",
+  "seconds": 2.506667,
+  "rmsDb": -36.705602,
+  "peakDb": -23.566831,
+  "brightness": 0.142263,
+  "stereoWidth": 0.79568
+}

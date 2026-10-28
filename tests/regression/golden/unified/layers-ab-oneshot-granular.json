@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "layers-ab-oneshot-granular",
+  "description": "A One Shot, B Granular, equal blend, chord",
+  "midi": "chord4-cmaj7",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "b401f5ddf18ba8ef",
+  "seconds": 2.576,
+  "rmsDb": -31.334033,
+  "peakDb": -18.149088,
+  "brightness": 0.303258,
+  "stereoWidth": 0.763818
+}

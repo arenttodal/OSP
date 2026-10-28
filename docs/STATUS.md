@@ -380,7 +380,16 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [x] UNIFIED ANDOR research (docs/research/unified-andor, research only): audit of OSP, ANDOR
       Grain and ANDOR Phrase (origin/andor-lab), same-VM benchmarks, architecture options and a
       recommendation (extend OSP: KEY DNA into the existing granulator, Note Atlas as an
-      InstrumentSet), annotated GUI mockups, roadmap. Awaiting decisions (11-decision-brief.md).
+      InstrumentSet), annotated GUI mockups, roadmap. Decisions approved (Architecture A:
+      extend OSP); Phase 0 and Phase 1 approved, Phase 2 onward wait for review.
+- [x] UNIFIED ENGINE Phase 0 (docs/research/unified-andor/phase-0-baseline.md): the baseline
+      harness. 15 headless scenes (src/research/UnifiedScenes.cpp: One Shot, granular single,
+      repeated, scale, 4- and 8-note chords, A/B/C layers, modulation-heavy, non-default
+      patches, mono glide, a CPU stress), `research-renderer --unified`, config `"layers"`;
+      digests captured from the unmodified engine (tests/regression/golden/unified, exact on
+      linux-x86_64-gcc, figures elsewhere) plus three plugin sessions
+      (tests/audio/unified-baseline); per-block CPU and memory. Found: output depends on the
+      block size (existing: block-to-block gain glides), so baselines fix it.
 - [x] ANDOR DESIGN SYSTEM and INSTRUMENT SHELL (andor-design-system/, start with HANDOFF.md).
       ANDOR OSP's interface was extracted, unchanged, into shared/andor-ui:
       - the components, look and assets;

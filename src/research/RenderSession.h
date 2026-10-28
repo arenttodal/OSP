@@ -9,6 +9,7 @@
 #include "model/RootChoice.h"
 #include "research/RenderConfig.h"
 
+#include <array>
 #include <optional>
 #include <string>
 
@@ -48,6 +49,13 @@ RenderOutput renderInstrument (const InstrumentModel& model, const MidiSequence&
 
 /** A multi-sample instrument through engine C. */
 RenderOutput renderSet (const InstrumentSet& set, const MidiSequence& sequence, const RenderConfig& config);
+/**
+    Up to three source layers (A, B, C) through engine C, as the plugin plays them: each
+    layer its own model (null: the layer stays empty), its source mode, granular settings
+    and layer controls from config.engineSettings, and the mix from config.engineSettings.
+    With one model on layer A this is renderInstrument.
+*/
+RenderOutput renderLayers (const std::array<const InstrumentModel*, 3>& models, const MidiSequence& sequence, const RenderConfig& config);
 
 /**
     The notes the arpeggiator makes from `sequence` (config.arp), as the plugin plays them:

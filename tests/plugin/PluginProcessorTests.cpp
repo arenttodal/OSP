@@ -7992,3 +7992,4 @@ TEST_CASE ("plugin: full-range modulation - 100 % reaches the knob's end; older 
 #include "DesignCaptureTests.inc"
 #include "ParameterSchemaTests.inc"
 #include "VisualReferenceTests.inc"
+#include "UnifiedBaselineTests.inc"

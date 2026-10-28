@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "layers-abc-mixed",
+  "description": "A vowel granular, B pluck granular, C vowel One Shot, mix in the triangle's middle, chord",
+  "midi": "chord4-cmaj7",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "62ed6d7c00e14240",
+  "seconds": 2.576,
+  "rmsDb": -32.274187,
+  "peakDb": -18.626998,
+  "brightness": 0.254632,
+  "stereoWidth": 0.795623
+}

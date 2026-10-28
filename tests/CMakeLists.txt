@@ -41,6 +41,7 @@ add_executable(osp_tests
     integration/ShaperTests.cpp
     integration/ReimaginedModesTests.cpp
     regression/GoldenTests.cpp
+    regression/UnifiedBaselineTests.cpp
 )
 target_include_directories(osp_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(osp_tests PRIVATE osp_research Catch2::Catch2WithMain)

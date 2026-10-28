@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "granular-modulated",
+  "description": "Granular with LFO 1 (poly), LFO 2, ENV 1, VEL, NOTE, MOD WHEEL routes and a meta route",
+  "midi": "chord4-cmaj7",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "b650bcd8aa1fa11b",
+  "seconds": 2.064,
+  "rmsDb": -29.075416,
+  "peakDb": -13.215823,
+  "brightness": 0.258511,
+  "stereoWidth": 1.02554
+}

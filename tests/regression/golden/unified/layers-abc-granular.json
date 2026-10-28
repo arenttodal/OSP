@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "layers-abc-granular",
+  "description": "A, B and C all Granular with different settings, a scale",
+  "midi": "scale-c3-c4",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "fd186dba06c0cb8c",
+  "seconds": 2.677333,
+  "rmsDb": -40.679521,
+  "peakDb": -26.566595,
+  "brightness": 0.126678,
+  "stereoWidth": 0.735262
+}

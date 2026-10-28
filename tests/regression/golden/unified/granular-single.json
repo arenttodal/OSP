@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "granular-single",
+  "description": "Granular defaults, one held note, LIFE 0 (the plain grain stream)",
+  "midi": "single-a3",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "feaaff4e7c1dd03e",
+  "seconds": 2.544,
+  "rmsDb": -35.142444,
+  "peakDb": -24.636196,
+  "brightness": 0.14201,
+  "stereoWidth": 0.686975
+}

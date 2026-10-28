@@ -311,6 +311,56 @@ std::optional<RenderConfig> loadRenderConfig (const std::filesystem::path& path,
         }
     }
 
+    // Source layers (optional, engine C): "layers": [ { "sourceMode": "granular", "granular":
+    // { "position": 0.5, "sizeSeconds": 0.15, "density": 14, "tuneSemitones": 0, "spread": 0.2 },
+    // "start": 0, "tuneSemitones": 0, "pan": 0, "levelDb": 0, "reverse": false, "loop": true,
+    // "follow": true, "reimagined": -1 }, { "source": "b.wav", ... } ]. The first entry is
+    // layer A (the render's --source); "source" (relative to this file) gives B and C their
+    // recordings. "mix": { "blend": 0.5, "x": 0.5, "y": 0.33 }; "reimaginedRouting": "perLayer".
+    if (const auto* layers = root["layers"].getArray())
+    {
+        auto& es = config.engineSettings;
+        for (int i = 0; i < std::min (3, layers->size()); ++i)
+        {
+            const auto& l = (*layers)[i];
+            const auto li = static_cast<std::size_t> (i);
+            if (i > 0 && json::has (l, "source"))
+            {
+                const std::filesystem::path source = json::getString (l, "source");
+                config.layerSources[li] = (source.is_absolute() ? source : path.parent_path() / source).string();
+            }
+            if (json::has (l, "sourceMode"))
+                es.sourceMode[li] = json::getString (l, "sourceMode") == "granular" ? SourceMode::granular : SourceMode::oneShot;
+            auto& g = es.granular[li];
+            const auto& gj = l["granular"];
+            g.position = std::clamp (json::getDouble (gj, "position", g.position), 0.0, 1.0);
+            g.sizeSeconds = std::clamp (json::getDouble (gj, "sizeSeconds", g.sizeSeconds), 0.02, 0.4);
+            g.density = std::clamp (json::getDouble (gj, "density", g.density), 4.0, 40.0);
+            g.tuneSemitones = std::clamp (json::getDouble (gj, "tuneSemitones", g.tuneSemitones), -12.0, 12.0);
+            g.spread = std::clamp (json::getDouble (gj, "spread", g.spread), 0.0, 1.0);
+            auto& ls = es.layer[li];
+            ls.start = std::clamp (json::getDouble (l, "start", ls.start), 0.0, 1.0);
+            ls.tuneSemitones = std::clamp (json::getDouble (l, "tuneSemitones", ls.tuneSemitones), -24.0, 24.0);
+            ls.pan = std::clamp (json::getDouble (l, "pan", ls.pan), -1.0, 1.0);
+            ls.levelDb = std::clamp (json::getDouble (l, "levelDb", ls.levelDb), LayerSettings::minLevelDb, 6.0);
+            ls.reverse = json::getBool (l, "reverse", ls.reverse);
+            ls.loop = json::getBool (l, "loop", ls.loop);
+            ls.follow = json::getBool (l, "follow", ls.follow);
+            ls.reimagined = std::clamp (json::getDouble (l, "reimagined", ls.reimagined), -1.0, 1.0);
+        }
+    }
+    if (json::has (root, "mix"))
+    {
+        const auto& m = root["mix"];
+        auto& es = config.engineSettings;
+        es.blend = std::clamp (json::getDouble (m, "blend", es.blend), 0.0, 1.0);
+        es.mixX = std::clamp (json::getDouble (m, "x", es.mixX), 0.0, 1.0);
+        es.mixY = std::clamp (json::getDouble (m, "y", es.mixY), 0.0, 1.0);
+    }
+    if (json::has (root, "reimaginedRouting"))
+        config.engineSettings.reimaginedRouting = json::getString (root, "reimaginedRouting") == "perLayer" ? ReimaginedRouting::perLayer
+                                                                                                         : ReimaginedRouting::legacyGlobal;
+
     // Layer A's EQ (optional, engine C): "eq": { "enabled": true, "bands": { "hp": { "frequencyHz": 90,
     // "steep": false }, "bell": { "frequencyHz": 3200, "gainDb": -4, "q": 2 }, ... } }; a band
     // listed is on unless it says "enabled": false. Band names: hp, lowShelf, bell, highShelf, lp.

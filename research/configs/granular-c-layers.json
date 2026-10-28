@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "engine": "instrument",
+  "sampleRate": 48000,
+  "blockSize": 256,
+  "seed": 1,
+  "instrument": { "macros": { "life": 0.5, "space": 0.2 } },
+  "layers": [
+    { "sourceMode": "granular", "granular": { "position": 0.35, "sizeSeconds": 0.18, "density": 16, "spread": 0.25 } },
+    { "source": "../corpus/plucks/pluck.wav", "sourceMode": "granular", "granular": { "position": 0.6, "sizeSeconds": 0.08, "density": 24, "tuneSemitones": 12 }, "pan": -0.3 },
+    { "source": "../corpus/sus/pad.wav", "sourceMode": "oneShot", "levelDb": -3 }
+  ],
+  "mix": { "x": 0.5, "y": 0.35 }
+}

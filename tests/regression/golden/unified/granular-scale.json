@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "granular-scale",
+  "description": "Granular defaults, default instrument (LIFE 50 %), a scale",
+  "midi": "scale-c3-c4",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "2423153b47d2003d",
+  "seconds": 2.432,
+  "rmsDb": -37.927104,
+  "peakDb": -25.230004,
+  "brightness": 0.126616,
+  "stereoWidth": 0.783652
+}

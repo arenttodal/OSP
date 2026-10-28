@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "granular-mono-glide",
+  "description": "Granular in mono with glide: keys glide the sounding note (voice allocation)",
+  "midi": "legato-line",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "f8a5a73380506b8e",
+  "seconds": 2.016,
+  "rmsDb": -34.917577,
+  "peakDb": -22.515824,
+  "brightness": 0.177788,
+  "stereoWidth": 0.661735
+}

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "stress-abc-granular-chord8",
+  "description": "CPU stress: A, B, C Granular, SIZE 250-350 ms, DENS 32-40, eight-note chord",
+  "midi": "chord8-c",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "4e200c8246570948",
+  "seconds": 2.576,
+  "rmsDb": -27.411909,
+  "peakDb": -13.640847,
+  "brightness": 0.160833,
+  "stereoWidth": 0.760128
+}

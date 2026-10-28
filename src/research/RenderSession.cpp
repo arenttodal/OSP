@@ -5,6 +5,7 @@
 #include "engine/InstrumentBuilder.h"
 #include "engine/InstrumentEngine.h"
 #include "model/PlaybackSource.h"
+#include "research/SourceAnalysis.h"
 
 #include <algorithm>
 #include <cmath>
@@ -186,6 +187,23 @@ RenderOutput renderSet (const InstrumentSet& set, const MidiSequence& sequence, 
     return runBlocks (engine, outputRate, blockSize, arpeggiate (sequence, config, outputRate), config.maxTailSeconds);
 }
 
+RenderOutput renderLayers (const std::array<const InstrumentModel*, 3>& models, const MidiSequence& sequence, const RenderConfig& config)
+{
+    const InstrumentModel* first = nullptr;
+    for (const auto* m : models)
+        if (first == nullptr && m != nullptr)
+            first = m;
+    const double outputRate = config.sampleRate > 0.0 ? config.sampleRate : (first != nullptr ? first->original.source->sampleRate() : 48000.0);
+    const int blockSize = std::max (1, config.blockSize);
+    InstrumentEngine engine;
+    engine.prepare (outputRate, blockSize, config.engineSettings);
+    for (int layer = 0; layer < 3; ++layer)
+        engine.setModel (models[static_cast<std::size_t> (layer)], layer);
+    engine.setModulation (config.modulation);
+    engine.setModWheel (static_cast<float> (config.modWheel));
+    return runBlocks (engine, outputRate, blockSize, arpeggiate (sequence, config, outputRate), config.maxTailSeconds);
+}
+
 RenderOutput renderWithEngine (const AudioData& source, const AnalysisData& analysis, double rootMidi, const MidiSequence& sequence,
                                const RenderConfig& config, const PlaybackPreparation& preparation)
 {
@@ -196,7 +214,22 @@ RenderOutput renderWithEngine (const AudioData& source, const AnalysisData& anal
     options.interpolationZeroCrossings = config.engineSettings.interpolationZeroCrossings;
     options.seed = config.engineSettings.seed;
     const auto model = instrument::buildComplete (source, analysis, options, config.anchors);
-    return renderInstrument (*model, sequence, config);
+    if (config.layerSources[1].empty() && config.layerSources[2].empty())
+        return renderInstrument (*model, sequence, config);
+    // Layers B and C play their own recordings (each analysed and built like layer A's,
+    // at its own detected root).
+    std::array<std::shared_ptr<InstrumentModel>, 3> layers { model, nullptr, nullptr };
+    for (std::size_t l = 1; l < layers.size(); ++l)
+        if (! config.layerSources[l].empty())
+        {
+            auto loaded = loadAndAnalyse (config.layerSources[l]);
+            if (! loaded.ok)
+                continue;   // an unreadable layer stays empty (the render goes on)
+            InstrumentBuildOptions layerOptions = options;
+            layerOptions.rootOverrideMidi.reset();
+            layers[l] = instrument::buildComplete (loaded.audio, loaded.analysis, layerOptions, config.anchors);
+        }
+    return renderLayers ({ layers[0].get(), layers[1].get(), layers[2].get() }, sequence, config);
 }
 
 } // namespace osp::research

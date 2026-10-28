@@ -1,4 +1,4 @@
-# Unified ANDOR source engine — research (no production changes)
+# Unified ANDOR source engine — research, then implementation
 
 Feasibility study for bringing ANDOR Grain (KEY DNA) and ANDOR Phrase (Note Atlas) into
 ANDOR OSP's A/B/C sources. Start with **[11-decision-brief.md](11-decision-brief.md)**.
@@ -15,6 +15,7 @@ ANDOR OSP's A/B/C sources. Start with **[11-decision-brief.md](11-decision-brief
 | [08-gui-proposals.md](08-gui-proposals.md) | space budget, six annotated mockups on real screenshots |
 | [09-performance-and-risks.md](09-performance-and-risks.md) | benchmarks (OSP scratch harness + lab harness, same VM), memory, risks |
 | [10-implementation-roadmap.md](10-implementation-roadmap.md) | phases 0-8 with goals, files, tests, acceptance |
+| [phase-0-baseline.md](phase-0-baseline.md) | **Phase 0 (done):** the baseline harness, the PRNG streams, the baseline scenes and their costs |
 | `bench/` | `bench_osp.cpp` (scratch harness, not built by CMake) and raw outputs |
 | `mockups/` | annotated screenshots and the script that draws them |
 

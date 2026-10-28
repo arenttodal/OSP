@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "granular-chord4",
+  "description": "Granular defaults, four-note chord",
+  "midi": "chord4-cmaj7",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "51b40d391c403e68",
+  "seconds": 2.144,
+  "rmsDb": -28.940685,
+  "peakDb": -14.991397,
+  "brightness": 0.258838,
+  "stereoWidth": 0.991325
+}

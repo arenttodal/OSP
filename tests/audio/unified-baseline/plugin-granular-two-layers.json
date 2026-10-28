@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "scene": "plugin-granular-two-layers",
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "2893263d39ed393a",
+  "rmsDb": -35.352200963766151,
+  "peakDb": -18.802801786139465,
+  "brightness": 0.177752595070184
+}
