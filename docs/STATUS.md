@@ -377,6 +377,10 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       engine/FastMath.h): instructions −38.5 % (−46 % with step 1); chords 31 → 18 %,
       pedal 100 → 57 % on the VM. Renders differ by −120 dBFS RMS (one float step's worth);
       baselines and goldens unchanged. Step 3 (REIMAGINED scaling, voice budget) only if needed.
+- [x] UNIFIED ANDOR research (docs/research/unified-andor, research only): audit of OSP, ANDOR
+      Grain and ANDOR Phrase (origin/andor-lab), same-VM benchmarks, architecture options and a
+      recommendation (extend OSP: KEY DNA into the existing granulator, Note Atlas as an
+      InstrumentSet), annotated GUI mockups, roadmap. Awaiting decisions (11-decision-brief.md).
 - [ ] DESIGN LAB round 1 (design-lab/, exploration only, nothing integrated): Blender-rendered
       surfaces composited under the plugin's own drawing; 6 full-GUI directions, button/tab/
       fader/panel/background/detail studies, close-ups, actual-size tests, review gallery,
