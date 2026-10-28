@@ -69,7 +69,7 @@ ShellEditor::ShellEditor (ShellProcessor& p)
     const bool macroPopovers = shell.product().macroPopover != nullptr;
     for (std::size_t i = 0; i < macros.size(); ++i)
     {
-        frame::setUpMacro (macros[i], static_cast<int> (i), shell.product().macros[i], shell.parameters, content, macroPopovers);
+        frame::setUpMacro (macros[i], static_cast<int> (i), shell.macroSpecs()[i], shell.parameters, content, macroPopovers);
         if (macroPopovers)
             macros[i].label->onClick = [this, i] {
                 if (closedByLabelPress == static_cast<int> (i))
@@ -302,6 +302,8 @@ int ShellEditor::dropLayerAt (juce::Point<int> editorPoint) const
 
 bool ShellEditor::isInterestedInFileDrag (const juce::StringArray& files)
 {
+    if (shell.isGenerator())
+        return false;   // it makes its own sound: there is nowhere to drop a recording
     for (const auto& f : files)
         if (juce::File (f).hasFileExtension ("wav;aif;aiff;flac"))
             return true;
@@ -365,6 +367,15 @@ void ShellEditor::chooseFile (int layer)
 void ShellEditor::showLayerMenu (int layer, juce::Component& target)
 {
     juce::PopupMenu menu;
+    if (shell.isGenerator())
+    {
+        // The oscillators are the instrument: nothing to replace or remove.
+        menu.addSectionHeader (shell.generatedSourceName());
+        menu.addItem ("Init", [this] { shell.initPatch(); timerCallback(); });
+        menu.addItem ("Reset settings", [this] { shell.resetSettings(); timerCallback(); });
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&target));
+        return;
+    }
     menu.addSectionHeader ("Layer " + InstrumentHost::layerName (layer));
     menu.addItem (juce::String::fromUTF8 ("Replace sound\xe2\x80\xa6"), [this, layer] { chooseFile (layer); });
     menu.addItem ("Remove layer", [this, layer] { shell.removeLayer (layer); timerCallback(); });
@@ -378,8 +389,11 @@ void ShellEditor::showMenu()
 {
     juce::PopupMenu menu;
     menu.addSectionHeader (shell.product().name);
-    menu.addItem (juce::String::fromUTF8 ("Add sound\xe2\x80\xa6"), shell.slotCount() < InstrumentHost::numLayers, false, [this] { chooseFile (-1); });
-    menu.addSeparator();
+    if (! shell.isGenerator())
+    {
+        menu.addItem (juce::String::fromUTF8 ("Add sound\xe2\x80\xa6"), shell.slotCount() < InstrumentHost::numLayers, false, [this] { chooseFile (-1); });
+        menu.addSeparator();
+    }
     menu.addItem (juce::String::fromUTF8 ("Open preset\xe2\x80\xa6"), [this] { choosePresetFile (false); });
     menu.addItem (juce::String::fromUTF8 ("Save preset\xe2\x80\xa6"), [this] { choosePresetFile (true); });
     menu.addItem ("Init", [this] { shell.initPatch(); timerCallback(); });

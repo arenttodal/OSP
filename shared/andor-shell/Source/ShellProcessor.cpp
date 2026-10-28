@@ -33,20 +33,45 @@ namespace
     };
 
     const juce::Identifier sourcesType ("Sources"), layerType ("Layer"), viewType ("View"), curvesType ("Curves");
+
+    /** ANDOR OSP's schema, then the product's own parameters (ProductInfo::addParameters). */
+    juce::AudioProcessorValueTreeState::ParameterLayout productParameterLayout()
+    {
+        auto layout = InstrumentHost::createParameterLayout();
+        if (productInfo().addParameters != nullptr)
+            productInfo().addParameters (layout);
+        return layout;
+    }
+
+    /** A small, stable fingerprint of a picture (the card repaints when it changes). */
+    std::uint64_t fingerprint (const std::vector<float>& values)
+    {
+        std::uint64_t h = 1469598103934665603ull;
+        for (const float v : values)
+        {
+            h ^= static_cast<std::uint64_t> (juce::roundToInt (v * 4096.0f) + 65536);
+            h *= 1099511628211ull;
+        }
+        return h;
+    }
 }
 
 //==============================================================================
 ShellProcessor::ShellProcessor (std::unique_ptr<Engine> productEngine)
     : AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
-      parameters (*this, &undoManager, productInfo().stateType, createParameterLayout()),
+      parameters (*this, &undoManager, productInfo().stateType, productParameterLayout()),
       engine (std::move (productEngine))
 {
     jassert (engine != nullptr);
     description = engine->describe();
     bound = engine->boundParameters();
+    generatorName = engine->generatorName();
+    macros = productInfo().macros;
     for (std::size_t i = 0; i < ccNumbers.size(); ++i)
         ccNumbers[i].store (defaultControllers[i]);
     store = std::make_unique<osp::plugin::SampleStore> (sampleStoreFolder());
+    if (productInfo().installFactoryPresets != nullptr)
+        productInfo().installFactoryPresets (*this, presetFolder().getChildFile ("Factory"));
     startTimerHz (20);
 }
 
@@ -60,6 +85,7 @@ ShellProcessor::~ShellProcessor()
 void ShellProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     engine->prepare (sampleRate, samplesPerBlock, parameters);
+    setLatencySamples (engine->latencySamples());
     // A prepared engine plays the sources it is given from now on: hand it the current ones.
     for (int l = 0; l < numLayers; ++l)
     {
@@ -124,6 +150,27 @@ void ShellProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
         performance.modWheel = lastScreenMod = m;
     wheelShown.store (performance.modWheel, std::memory_order_relaxed);
 
+    // The host's transport (tempo-synced movement and echoes): once per block.
+    performance.hasPosition = false;
+    performance.playing = false;
+    if (auto* head = getPlayHead())
+        if (const auto position = head->getPosition())
+        {
+            performance.playing = position->getIsPlaying();
+            if (const auto bpm = position->getBpm(); bpm.hasValue() && *bpm > 1.0)
+                performance.bpm = *bpm;
+            if (const auto ppq = position->getPpqPosition(); ppq.hasValue())
+            {
+                performance.ppq = *ppq;
+                performance.hasPosition = true;
+            }
+            if (const auto signature = position->getTimeSignature(); signature.hasValue())
+            {
+                performance.numerator = signature->numerator;
+                performance.denominator = signature->denominator;
+            }
+        }
+
     buffer.clear();
     engine->process (buffer, midi, performance);
 }
@@ -138,6 +185,8 @@ juce::AudioProcessorEditor* ShellProcessor::createEditor()
 
 InstrumentHost::LoadState ShellProcessor::loadState (int layer) const noexcept
 {
+    if (isGenerator())
+        return resolve (layer) == 0 ? LoadState::ready : LoadState::empty;
     return layers[static_cast<std::size_t> (resolve (layer))].state.load();
 }
 
@@ -148,6 +197,8 @@ std::shared_ptr<const LoadedInstrument> ShellProcessor::currentInstrument (int l
 
 bool ShellProcessor::isLayerOccupied (int layer) const
 {
+    if (isGenerator())
+        return layer == 0;
     const auto& slot = layers[static_cast<std::size_t> (std::clamp (layer, 0, numLayers - 1))];
     return slot.state.load() == LoadState::loading || slot.instrument != nullptr;
 }
@@ -157,8 +208,23 @@ const osp::InstrumentEngine::GrainSnapshot& ShellProcessor::grainSnapshot (int l
     return noGrains[static_cast<std::size_t> (std::clamp (layer, 0, numLayers - 1))];
 }
 
+bool ShellProcessor::generatedSource (int layer, GeneratedSource& out) const
+{
+    if (! isGenerator() || layer != 0)
+        return false;
+    out.name = generatorName;
+    out.cycle.clear();
+    engine->sourcePicture (layer, parameters, out.cycle);
+    if (out.cycle.empty())
+        out.cycle.assign (2, 0.0f);   // a flat line: the card still shows the generator, not a drop target
+    out.revision = fingerprint (out.cycle);
+    return true;
+}
+
 int ShellProcessor::slotCount() const
 {
+    if (isGenerator())
+        return 1;
     int count = 0;
     for (int l = 0; l < numLayers; ++l)
         if (isLayerOccupied (l))
@@ -168,6 +234,16 @@ int ShellProcessor::slotCount() const
 
 int ShellProcessor::addLayers (const juce::Array<juce::File>& files)
 {
+    if (isGenerator())
+    {
+        // Nothing to load: the instrument makes its own sound.
+        if (! files.isEmpty())
+        {
+            const std::lock_guard<std::mutex> lock (messageMutex);
+            lastMessage = productInfo().name + " makes its own sound: it plays no recordings";
+        }
+        return 0;
+    }
     int loaded = 0;
     const bool pairBefore = occupiedLayerCount() >= 2;   // an A/B mix the musician has already set
     for (const auto& file : files)
@@ -193,6 +269,11 @@ int ShellProcessor::addLayers (const juce::Array<juce::File>& files)
 
 void ShellProcessor::loadFile (const juce::File& file, int layer)
 {
+    if (isGenerator())
+    {
+        addLayers ({ file });
+        return;
+    }
     osp::plugin::LoadRequest request;
     request.file = file;
     enqueueLoad (std::move (request), resolve (layer));
@@ -254,6 +335,8 @@ void ShellProcessor::clearLayer (int layer)
 
 void ShellProcessor::removeLayer (int layer)
 {
+    if (isGenerator())
+        return;
     if (layer < 0 || layer >= numLayers || pendingLoads.load() > 0)
         return;
     // The layers above move down with their sounds and settings (every "layerX." parameter;
@@ -384,6 +467,8 @@ bool ShellProcessor::applyStateXml (const juce::XmlElement& xml)
             const int index = e->getIntAttribute ("index", -1);
             if (index < 0 || index >= numLayers)
                 continue;
+            if (isGenerator())
+                continue;   // (never saved by a generator; ignored if a file says otherwise)
             osp::plugin::LoadRequest request;
             request.expectedHash = e->getStringAttribute ("hash").toStdString();
             request.originalPath = e->getStringAttribute ("path").toStdString();

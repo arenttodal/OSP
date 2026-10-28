@@ -196,6 +196,14 @@ if(OSP_BUILD_PLUGIN)
     option(ANDOR_BUILD_PRODUCTS "Build the ANDOR instruments in products/ (needs OSP_BUILD_PLUGIN)" ON)
     if(ANDOR_BUILD_PRODUCTS)
         add_subdirectory(products)
+        # Products kept in their own repositories, which build ANDOR OSP as a submodule and
+        # name their product folders here (ANDOR ANALOG: arenttodal/analog, product/). They
+        # are built exactly like products/*, inside this project.
+        set(ANDOR_EXTERNAL_PRODUCTS "" CACHE STRING "Product folders outside this repository, built like products/*")
+        foreach(dir IN LISTS ANDOR_EXTERNAL_PRODUCTS)
+            get_filename_component(name ${dir} NAME)
+            add_subdirectory(${dir} ${CMAKE_CURRENT_BINARY_DIR}/external-products/${name})
+        endforeach()
     endif()
 endif()
 

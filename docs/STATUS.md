@@ -435,6 +435,21 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       plug-ins (`adopt.sh` for an existing repo, `new-plugin.sh` + starter for a new one, a fixed
       download link per branch); self-tested on macOS and Windows by its own workflow.
 
+## Milestone: ANDOR Instrument Shell extensions for ANDOR ANALOG (a synthesizer)
+
+- [x] Opt-in extension points (HANDOFF.md, "What a product may add"): product parameters after
+      the frozen schema (own golden), generator engines (a card without recordings, its waveform
+      picture), the host transport and latency at the engine boundary, factory presets, product
+      test sources, products built from another repository (`ANDOR_EXTERNAL_PRODUCTS`), VST3
+      categories, ANDOR OSP's macro names in the parity render.
+- [x] ANDOR ANALOG registered (`Aanl`, `com.osp.andoranalog`); it lives in arenttodal/analog.
+- [x] ANDOR OSP unchanged (Linux, Xvfb): the design capture is byte-identical before/after in
+      every state and component except the MOVEMENT popover (06-popup-movement and its @2x crop),
+      which also differs between two runs of the unchanged build (its moving picture: not this
+      change); the schema golden is unchanged; ctest 12/12 green in the arenttodal/analog build
+      (unit, integration, regression, plugin, osp_visual_reference, ANDOR Example's and ANDOR
+      Analog's visual regressions at 0 px outside the masks in all 18 states).
+
 ## DONE
 
 - Pure C++20 DSP/analysis library (`osp_dsp`) independent of JUCE; JUCE used for file

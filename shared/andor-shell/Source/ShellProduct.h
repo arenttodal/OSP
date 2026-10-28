@@ -32,6 +32,15 @@ struct ProductInfo
     /** A macro's popover (its settings, built from the shared popover parts), or nullptr:
         without one the macro's name opens nothing and does not invite a click. */
     std::function<std::unique_ptr<osp::plugin::MiniPanel> (int macro, osp::plugin::InstrumentHost&)> macroPopover;
+    /** The product's own parameters, appended after the ANDOR schema (which stays exactly
+        ANDOR OSP's): IDs in the product's own namespace ("analog.*"), never an ANDOR ID.
+        Null: the schema alone. Their listing is pinned by the product's own golden file
+        (andor_add_instrument_tests ... GOLDEN). */
+    std::function<void (juce::AudioProcessorValueTreeState::ParameterLayout&)> addParameters;
+    /** Writes the product's factory presets into `folder` (Documents/<product>/Presets/Factory)
+        when they are missing or from another version; never touches the musician's own.
+        Called once per processor, on the message thread. Null: none. */
+    std::function<void (osp::plugin::InstrumentHost&, const juce::File& folder)> installFactoryPresets;
 };
 
 /** Defined by the product (Product.cpp). */

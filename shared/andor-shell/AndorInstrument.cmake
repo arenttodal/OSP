@@ -8,7 +8,8 @@
 #       PLUGIN_CODE Aexm               # 4 characters, at least one capital; unique per plugin
 #       BUNDLE_ID com.osp.andorexample # unique per plugin
 #       VERSION 0.1.0
-#       SOURCES Source/Product.cpp)    # productInfo(), createEngine() and the engine
+#       SOURCES Source/Product.cpp     # productInfo(), createEngine() and the engine
+#       VST3_CATEGORIES Instrument Synth) # optional (default: Instrument Sampler)
 #
 # Every product shares ANDOR OSP's manufacturer code (Ospx) and company, so hosts list them
 # together. A product's identifiers must be its own entry in andor-design-system/
@@ -48,7 +49,10 @@ function(andor_check_registry target slug name code bundle)
 endfunction()
 
 function(andor_add_instrument target)
-    cmake_parse_arguments(A "" "PRODUCT_NAME;SLUG;PLUGIN_CODE;BUNDLE_ID;VERSION" "SOURCES" ${ARGN})
+    cmake_parse_arguments(A "" "PRODUCT_NAME;SLUG;PLUGIN_CODE;BUNDLE_ID;VERSION" "SOURCES;VST3_CATEGORIES" ${ARGN})
+    if(NOT A_VST3_CATEGORIES)
+        set(A_VST3_CATEGORIES Instrument Sampler)
+    endif()
     foreach(required PRODUCT_NAME SLUG PLUGIN_CODE BUNDLE_ID VERSION SOURCES)
         if(NOT A_${required})
             message(FATAL_ERROR "andor_add_instrument(${target}): ${required} is required")
@@ -89,7 +93,7 @@ function(andor_add_instrument target)
         IS_MIDI_EFFECT FALSE
         EDITOR_WANTS_KEYBOARD_FOCUS FALSE
         COPY_PLUGIN_AFTER_BUILD FALSE
-        VST3_CATEGORIES Instrument Sampler
+        VST3_CATEGORIES ${A_VST3_CATEGORIES}
         AU_MAIN_TYPE kAudioUnitType_MusicDevice
         MICROPHONE_PERMISSION_ENABLED FALSE)
 
@@ -126,17 +130,26 @@ endfunction()
 # Headless tests of a product built from the shell (tests/shell): it builds, loads sounds,
 # plays MIDI, saves and reloads presets, keeps its identity, and its interface matches ANDOR
 # OSP's (the visual regression). Registered as ctest test `test_name`.
+#   SOURCES  the product's own test files, compiled into the same test program
+#   GOLDEN   the listing of the product's own parameters (ProductInfo::addParameters), checked
+#            like ANDOR OSP's schema (OSP_UPDATE_GOLDEN=1 writes it)
 function(andor_add_instrument_tests target test_name)
     if(NOT OSP_BUILD_TESTS)
         return()
     endif()
-    add_executable(${test_name} ${PROJECT_SOURCE_DIR}/tests/shell/ShellTests.cpp)
+    cmake_parse_arguments(T "" "GOLDEN" "SOURCES" ${ARGN})
+    add_executable(${test_name} ${PROJECT_SOURCE_DIR}/tests/shell/ShellTests.cpp ${T_SOURCES})
     target_include_directories(${test_name} PRIVATE
         ${PROJECT_SOURCE_DIR}/src
+        ${PROJECT_SOURCE_DIR}/tests
         $<TARGET_PROPERTY:${target},INCLUDE_DIRECTORIES>)
     target_compile_definitions(${test_name} PRIVATE
         $<TARGET_PROPERTY:${target},COMPILE_DEFINITIONS>
         OSP_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+    if(T_GOLDEN)
+        get_filename_component(golden "${T_GOLDEN}" ABSOLUTE BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+        target_compile_definitions(${test_name} PRIVATE ANDOR_PRODUCT_SCHEMA_GOLDEN="${golden}")
+    endif()
     target_link_libraries(${test_name} PRIVATE ${target} osp_dsp osp_library Catch2::Catch2)
     add_test(NAME ${test_name} COMMAND ${test_name})
     # The visual regression: this product's interface against ANDOR OSP's renders.

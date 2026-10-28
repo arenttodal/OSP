@@ -45,6 +45,9 @@ class Engine
     virtual Description describe() const;                  // name; diagnostic?; status line
     virtual juce::StringArray boundParameters() const;     // the IDs it reads ("arp.*" patterns allowed)
     virtual void prepare (double sampleRate, int maxBlock, juce::AudioProcessorValueTreeState&);   // allocate; cache raw parameter pointers
+    virtual int latencySamples() const;                     // optional: reported to the host
+    virtual juce::String generatorName() const;             // optional: a synthesizer's card ("OSCILLATORS")
+    virtual bool sourcePicture (int layer, const APVTS&, std::vector<float>&) const;   // optional: its waveform
     virtual void setSource (int layer, const LoadedInstrument*) noexcept;                          // audio thread
     virtual void process (juce::AudioBuffer<float>&, const juce::MidiBuffer&, const Performance&) noexcept;  // audio thread
 };
@@ -71,6 +74,10 @@ with the same IDs, ranges and defaults.
   check against it (the `[parameter-schema]` test and `shell: the parameter schema is ANDOR OSP's`).
 - Adding a parameter means appending it in `AndorParameters.cpp` with a new version hint,
   then `OSP_UPDATE_GOLDEN=1`, and documenting why (CLAUDE.md rule 8). Never rename or re-range.
+
+A product's own parameters (`ProductInfo::addParameters`) come after the schema, in its own
+namespace, pinned by its own golden listing (`andor_add_instrument_tests (... GOLDEN ...)`);
+the schema itself is never touched.
 
 Known limitation: a product exposes all 350 parameters to the host, including those its
 engine ignores. The interface disables those, but the host still lists them. Trimming the

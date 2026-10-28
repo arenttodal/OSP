@@ -69,6 +69,7 @@ public:
     std::shared_ptr<const osp::plugin::LoadedInstrument> currentInstrument (int layer = -1) const override;
     std::optional<double> rootOverride (int) const override { return std::nullopt; }
     bool isLayerOccupied (int layer) const override;
+    bool generatedSource (int layer, GeneratedSource& out) const override;
     const osp::InstrumentEngine::GrainSnapshot& grainSnapshot (int layer) const noexcept override;
 
     // InstrumentHost: presets (Documents/<product>/Presets, *.<product extension>)
@@ -108,6 +109,17 @@ public:
     const Engine::Description& engineDescription() const noexcept { return description; }
     /** The parameter IDs and patterns the product's engine reads (Engine::boundParameters). */
     const juce::StringArray& boundParameters() const noexcept { return bound; }
+    /** The engine makes its own sound (Engine::Description::generator): layer A is its card,
+        and nothing is ever loaded. */
+    bool isGenerator() const noexcept { return generatorName.isNotEmpty(); }
+    const juce::String& generatedSourceName() const noexcept { return generatorName; }
+    /** The macro row as the editor shows it: the product's (ProductInfo::macros), or ANDOR
+        OSP's own while showReferenceMacros() is on. */
+    const std::array<osp::plugin::frame::MacroSpec, osp::plugin::frame::macroCount>& macroSpecs() const noexcept { return macros; }
+    /** The visual regression's parity render only: ANDOR OSP's macro names and parameters,
+        so a product that renames its macros is compared with ANDOR OSP where nothing else
+        differs. Call before the editor opens. */
+    void showReferenceMacros() { macros = osp::plugin::frame::ospMacroSpecs(); }
 
     /** Each file becomes a new layer in the first free slots (beyond the third: not loaded). Returns how many. */
     int addLayers (const juce::Array<juce::File>& files);
@@ -167,6 +179,8 @@ private:
     std::unique_ptr<Engine> engine;
     Engine::Description description;
     juce::StringArray bound;
+    juce::String generatorName;
+    std::array<osp::plugin::frame::MacroSpec, osp::plugin::frame::macroCount> macros;
 
     struct Layer
     {

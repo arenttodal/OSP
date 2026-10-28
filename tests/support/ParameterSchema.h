@@ -108,9 +108,8 @@ namespace parameterschema
         return true;
     }
 
-    inline void checkAgainstGolden (const juce::String& listing, const juce::String& goldenName)
+    inline void checkAgainstGoldenFile (const juce::String& listing, const juce::File& golden)
     {
-        const auto golden = juce::File (OSP_SOURCE_DIR).getChildFile ("tests/plugin/golden").getChildFile (goldenName);
         if (const char* update = std::getenv ("OSP_UPDATE_GOLDEN"); update != nullptr && juce::String (update) == "1")
         {
             golden.getParentDirectory().createDirectory();
@@ -129,5 +128,9 @@ namespace parameterschema
             CHECK (sameLine (actual[i], expected[i]));
         }
     }
-}
 
+    inline void checkAgainstGolden (const juce::String& listing, const juce::String& goldenName)
+    {
+        checkAgainstGoldenFile (listing, juce::File (OSP_SOURCE_DIR).getChildFile ("tests/plugin/golden").getChildFile (goldenName));
+    }
+}
