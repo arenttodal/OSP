@@ -104,6 +104,11 @@ public:
     virtual const InstrumentEngine::GrainSnapshot& grainSnapshot (int layer) const noexcept = 0;
     /** The layer holds or loads a sound. */
     virtual bool isLayerOccupied (int layer) const = 0;
+    int occupiedLayerCount() const;
+    /** A layer the musician just added is heard at once: two layers meet in the middle of the
+        blend; a third added to a pair the musician set (`keepMix`) takes a third of the mix,
+        A and B keeping their balance; three together meet at the centre. Message thread. */
+    void makeLayerAudible (int layer, bool keepMix = false);
     /** Layer control names for layerParameterId: start, tune, pan, level, link, reverse, loop, follow. */
     static const juce::StringArray& layerControlNames();
     /**

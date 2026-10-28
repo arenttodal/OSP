@@ -79,6 +79,11 @@ adding fields must be documented in `docs/analysis-schema.md`.
 - `apps/research-renderer` — the CLI. `apps/plugin` — JUCE plugin + standalone
   (processor, loader thread, sample store, minimal editor). New instruments reach the
   audio thread only through `ModelExchange`; never share mutable state with it.
+- `shared/andor-ui` — the ANDOR interface (components, look, frame, parameter schema, loader,
+  assets) that ANDOR OSP and every sister product are built from; components depend only on
+  `InstrumentHost`. `shared/andor-shell` + `products/` — sister products (andor-design-system/
+  HANDOFF.md). Any change here must keep OSP pixel-identical (`[design-capture]`) and every
+  product's visual regression at 0 pixels.
 - `src/engine` — the instrument engine ("engine C": continuation, performance, dynamics,
   macros, sets). Baselines A/B stay in `audio/sampler` unchanged; every listening test
   compares against them.

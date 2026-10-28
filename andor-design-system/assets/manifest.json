@@ -1,0 +1,157 @@
+{
+  "schemaVersion": 1,
+  "about": "Every asset the ANDOR interface embeds, with what it is, how it is made and what may be done with it. Checked against the files by sha256; update this file (and say why in the commit) whenever an asset changes.",
+  "assets": [
+    {
+      "path": "shared/andor-ui/Resources/fonts/Inter-Bold.ttf",
+      "kind": "font",
+      "family": "Inter",
+      "style": "Bold",
+      "bytes": 68360,
+      "sha256": "432e4be793dccf90b4782e575273c8ca5897cdbcb053572efef4ee2dcaf455d7",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "shared/andor-ui/Resources/fonts/Inter-OFL.txt",
+      "copyright": "The Inter Project Authors (2016-2018)",
+      "redistribution": "allowed with the license file; the fonts may not be sold on their own; reserved font names apply to modified versions",
+      "embeddedIn": "every ANDOR plugin (AndorUiData)"
+    },
+    {
+      "path": "shared/andor-ui/Resources/fonts/Inter-ExtraBold.ttf",
+      "kind": "font",
+      "family": "Inter",
+      "style": "ExtraBold",
+      "bytes": 68436,
+      "sha256": "810fb52a83f424a7c79beca608545af34ee04e04964744e55737d4768304b5e1",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "shared/andor-ui/Resources/fonts/Inter-OFL.txt",
+      "copyright": "The Inter Project Authors (2016-2018)",
+      "redistribution": "allowed with the license file; the fonts may not be sold on their own; reserved font names apply to modified versions",
+      "embeddedIn": "every ANDOR plugin (AndorUiData)"
+    },
+    {
+      "path": "shared/andor-ui/Resources/fonts/Inter-Light.ttf",
+      "kind": "font",
+      "family": "Inter",
+      "style": "Light",
+      "bytes": 67388,
+      "sha256": "58438dbd8572f69ee4a1aed013989410a6acc140c0641e0750281e19cfa51c46",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "shared/andor-ui/Resources/fonts/Inter-OFL.txt",
+      "copyright": "The Inter Project Authors (2016-2018)",
+      "redistribution": "allowed with the license file; the fonts may not be sold on their own; reserved font names apply to modified versions",
+      "embeddedIn": "every ANDOR plugin (AndorUiData)"
+    },
+    {
+      "path": "shared/andor-ui/Resources/fonts/Inter-Medium.ttf",
+      "kind": "font",
+      "family": "Inter",
+      "style": "Medium",
+      "bytes": 122788,
+      "sha256": "077edc27afdb6ab5be88bccf12027c0bd434ed89501eaa2aa091118639d5e1c0",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "shared/andor-ui/Resources/fonts/Inter-OFL.txt",
+      "copyright": "The Inter Project Authors (2016-2018)",
+      "redistribution": "allowed with the license file; the fonts may not be sold on their own; reserved font names apply to modified versions",
+      "embeddedIn": "every ANDOR plugin (AndorUiData)"
+    },
+    {
+      "path": "shared/andor-ui/Resources/fonts/Inter-Regular.ttf",
+      "kind": "font",
+      "family": "Inter",
+      "style": "Regular",
+      "bytes": 119120,
+      "sha256": "fac66594eb783a7ef48d7e3a8f23eba25e692760f888fd18aeb2c21900cfe21d",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "shared/andor-ui/Resources/fonts/Inter-OFL.txt",
+      "copyright": "The Inter Project Authors (2016-2018)",
+      "redistribution": "allowed with the license file; the fonts may not be sold on their own; reserved font names apply to modified versions",
+      "embeddedIn": "every ANDOR plugin (AndorUiData)"
+    },
+    {
+      "path": "shared/andor-ui/Resources/fonts/Inter-SemiBold.ttf",
+      "kind": "font",
+      "family": "Inter",
+      "style": "SemiBold",
+      "bytes": 125788,
+      "sha256": "c5f0409efd0af9712353b7f05415ad7f612d4d824b5072abda8a715257320fa1",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "shared/andor-ui/Resources/fonts/Inter-OFL.txt",
+      "copyright": "The Inter Project Authors (2016-2018)",
+      "redistribution": "allowed with the license file; the fonts may not be sold on their own; reserved font names apply to modified versions",
+      "embeddedIn": "every ANDOR plugin (AndorUiData)"
+    },
+    {
+      "path": "shared/andor-ui/Resources/fonts/Outfit-ExtraBold.ttf",
+      "kind": "font",
+      "family": "Outfit",
+      "style": "ExtraBold",
+      "bytes": 33236,
+      "sha256": "16dbfca711ac406b3502e9c5b19321bdf6981f16b668246c74c3e8228185492f",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "shared/andor-ui/Resources/fonts/Outfit-OFL.txt",
+      "copyright": "The Outfit Project Authors (2021)",
+      "redistribution": "allowed with the license file; the fonts may not be sold on their own; reserved font names apply to modified versions",
+      "embeddedIn": "every ANDOR plugin (AndorUiData)"
+    },
+    {
+      "path": "shared/andor-ui/Resources/fonts/Outfit-ExtraLight.ttf",
+      "kind": "font",
+      "family": "Outfit",
+      "style": "ExtraLight",
+      "bytes": 32924,
+      "sha256": "b6e2066b0168d8ebc9989a8514f2ed88fe9bab1da6580b4109a58dccec690220",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "shared/andor-ui/Resources/fonts/Outfit-OFL.txt",
+      "copyright": "The Outfit Project Authors (2021)",
+      "redistribution": "allowed with the license file; the fonts may not be sold on their own; reserved font names apply to modified versions",
+      "embeddedIn": "every ANDOR plugin (AndorUiData)"
+    },
+    {
+      "path": "shared/andor-ui/Resources/knobs/macro-ivory/macro-ivory-176.zip",
+      "kind": "rendered sprite sheet",
+      "what": "the ivory macro knob cap, frames at 176 px",
+      "producedBy": "tools/blender-assets (config/macro-knob.json, generate.py, postprocess.py)",
+      "bytes": 2689581,
+      "sha256": "a53f5b8f2b404f591530fac21f971ffcf13121411915a842562d994be98c1b2b",
+      "license": "ANDOR / OSP project artwork: no license file in the repository",
+      "redistribution": "owner's decision. The repository arenttodal/OSP is public, so these files are already publicly readable there; that is not a license. Do not copy them into another public repository or package without the owner's written authorization.",
+      "embeddedIn": "every ANDOR plugin (AndorUiData)",
+      "regenerate": "tools/blender-assets/README.md; never redraw with primitives or generate with AI images"
+    },
+    {
+      "path": "shared/andor-ui/Resources/knobs/macro-ivory/macro-ivory-352.zip",
+      "kind": "rendered sprite sheet",
+      "what": "the ivory macro knob cap, frames at 352 px",
+      "producedBy": "tools/blender-assets (config/macro-knob.json, generate.py, postprocess.py)",
+      "bytes": 8603880,
+      "sha256": "ceab0c28f5996438af0cfe02d48d9aefe31549785d32263e52d61d669602eb2b",
+      "license": "ANDOR / OSP project artwork: no license file in the repository",
+      "redistribution": "owner's decision. The repository arenttodal/OSP is public, so these files are already publicly readable there; that is not a license. Do not copy them into another public repository or package without the owner's written authorization.",
+      "embeddedIn": "every ANDOR plugin (AndorUiData)",
+      "regenerate": "tools/blender-assets/README.md; never redraw with primitives or generate with AI images"
+    },
+    {
+      "path": "shared/andor-ui/Resources/skin/ceramic-skin.zip",
+      "kind": "rendered surface pack",
+      "what": "the ceramic skin: 80 pieces (housing with teak rails, cards, panels, raised faces, keys in four states, badges, bezels, fader, lenses, keybed), manifest.json schemaVersion 1, direction 09-warm-ceramic-teak",
+      "producedBy": "tools/blender-assets/skin (pieces.py, render.py, pack.py)",
+      "bytes": 12489395,
+      "sha256": "f4f82cc8e4fbb9255b4425b273e18d421ac24815305a4426e360b1e65620b3f2",
+      "license": "ANDOR / OSP project artwork: no license file in the repository",
+      "redistribution": "owner's decision. The repository arenttodal/OSP is public, so these files are already publicly readable there; that is not a license. Do not copy them into another public repository or package without the owner's written authorization.",
+      "embeddedIn": "every ANDOR plugin (AndorUiData)",
+      "regenerate": "tools/blender-assets/README.md; never redraw with primitives or generate with AI images"
+    }
+  ],
+  "derivedImages": {
+    "paths": [
+      "andor-design-system/guide/img/"
+    ],
+    "what": "screenshots and crops rendered by the tests from the code and the assets above",
+    "redistribution": "as the artwork they show (owner's decision)"
+  },
+  "notIncluded": [
+    "licensed sample audio (the tests use deterministic test signals only)",
+    "signing certificates or secrets"
+  ]
+}

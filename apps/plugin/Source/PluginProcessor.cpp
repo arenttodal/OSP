@@ -1506,47 +1506,12 @@ bool OspAudioProcessor::isLayerOccupied (int layer) const
     return layers[index].state.load() == LoadState::loading || currentInstrument (static_cast<int> (index)) != nullptr;
 }
 
-int OspAudioProcessor::occupiedLayerCount() const
-{
-    int count = 0;
-    for (int layer = 0; layer < numLayers; ++layer)
-        count += isLayerOccupied (layer) ? 1 : 0;
-    return count;
-}
-
 int OspAudioProcessor::firstFreeLayer() const
 {
     for (int layer = 0; layer < numLayers; ++layer)
         if (! isLayerOccupied (layer))
             return layer;
     return -1;
-}
-
-void OspAudioProcessor::makeLayerAudible (int layer, bool keepMix)
-{
-    // A layer the musician just added is heard at once: two layers meet in the middle of the
-    // blend. A third added to an A/B pair takes a third of the mix while A and B keep the
-    // balance they had (a centred pair: all three at the centre). Three dropped together (or
-    // a reset) meet at the centre.
-    const int count = occupiedLayerCount();
-    if (layer >= 1)   // it starts as Reimagined as the instrument (A) is
-        setParameterValue (reimaginedParameterId (layer), parameterValue (reimaginedParameterId (0)));
-    if (count == 2 && layer >= 1)
-        setParameterValue (ids::blend, 0.5f);
-    else if (count == 3 && keepMix)
-    {
-        const double s = std::sin (0.5 * juce::MathConstants<double>::pi * std::clamp (static_cast<double> (parameterValue (ids::blend)), 0.0, 1.0));
-        const double shareB = s * s;   // equal-power blend -> B's power share
-        // Shares A = 1 - x - y/2, B = y, C = x - y/2: C 1/3, A and B 2/3 in their old ratio.
-        const double b = 2.0 / 3.0 * shareB;
-        setParameterValue (ids::mixX, static_cast<float> (1.0 / 3.0 + 0.5 * b));
-        setParameterValue (ids::mixY, static_cast<float> (b));
-    }
-    else if (count == 3)
-    {
-        setParameterValue (ids::mixX, 0.5f);
-        setParameterValue (ids::mixY, 1.0f / 3.0f);
-    }
 }
 
 int OspAudioProcessor::addLayers (const juce::Array<juce::File>& files, int firstLayer)

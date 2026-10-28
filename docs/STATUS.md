@@ -381,6 +381,26 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       Grain and ANDOR Phrase (origin/andor-lab), same-VM benchmarks, architecture options and a
       recommendation (extend OSP: KEY DNA into the existing granulator, Note Atlas as an
       InstrumentSet), annotated GUI mockups, roadmap. Awaiting decisions (11-decision-brief.md).
+- [x] ANDOR DESIGN SYSTEM and INSTRUMENT SHELL (andor-design-system/, start with HANDOFF.md).
+      ANDOR OSP's interface was extracted, unchanged, into shared/andor-ui:
+      - the components, look and assets;
+      - the frame;
+      - the parameter schema;
+      - the loader;
+      - the parameter-only host behaviour, behind InstrumentHost.
+      OSP is pixel-identical before and after (design capture), and its 350-parameter schema is
+      pinned to HEAD's by a golden test.
+      The ANDOR Instrument Shell (shared/andor-shell) adds:
+      - andor_add_instrument;
+      - a ShellProcessor and a ShellEditor, ANDOR OSP's layout from the shared code;
+      - the Engine DSP boundary;
+      - a labelled diagnostic engine (baseline A / test tone);
+      - disabling of every control the engine does not read.
+      tools/create_andor_instrument.py validates arguments, checks the product registry,
+      never overwrites, and wrote products/andor-example (ANDOR Example, Aexm).
+      The visual regression (osp_visual_reference + andor_example_tests_visual) covers 18 states
+      at tolerance 0: 0 pixels differ outside three masks (identity, preset name, status line).
+      Mac AU validation of ANDOR Example runs in CI.
 - [ ] DESIGN LAB round 1 (design-lab/, exploration only, nothing integrated): Blender-rendered
       surfaces composited under the plugin's own drawing; 6 full-GUI directions, button/tab/
       fader/panel/background/detail studies, close-ups, actual-size tests, review gallery,

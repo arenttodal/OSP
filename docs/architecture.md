@@ -594,7 +594,7 @@ Controls can be drawn from offline renders instead of vectors.
 
 **Generator.** `tools/blender-assets/` is a procedural, headless Blender pipeline (JSON
 configs plus named material, lighting and camera presets). It writes one zip of PNG frames
-per size into `apps/plugin/Resources/knobs/<name>/`. These are embedded as binary data.
+per size into `shared/andor-ui/Resources/knobs/<name>/`. These are embedded as binary data.
 
 **Plugin side.** `SpriteKnobRenderer`:
 - decodes a frame when first shown;
@@ -619,7 +619,7 @@ halos, the keyboard and the dark displays stay vector-drawn.
 **Generator.** `tools/blender-assets/skin/`: `pieces.py` lists what is rendered and where,
 `render.py` renders it with the design lab's studio, materials and calibrated exposure (the
 direction's own config in `design-lab/blender/configs`, so nothing restates a colour or a
-light), `pack.py` writes `apps/plugin/Resources/skin/ceramic-skin.zip` (manifest plus one image
+light), `pack.py` writes `shared/andor-ui/Resources/skin/ceramic-skin.zip` (manifest plus one image
 per piece and level).
 
 Each piece is rendered at its real place and size in the design canvas, so the light falls on
@@ -663,3 +663,33 @@ sample store keeps the sounds and presets refer to them by hash, so a project re
 the catalog (decision D-02). `osp_dsp` never links it, and nothing of it runs on the audio
 thread. Architecture, contracts, schema and formats: `docs/library/architecture.md`,
 `schema.md`, `preset-format.md`, `template-format.md`; progress in `requirements-matrix.md`.
+
+## ANDOR DESIGN SYSTEM AND INSTRUMENT SHELL (andor-design-system/HANDOFF.md)
+
+**Why.** Sister products (ANDOR Drums, Grain, Phrase and those to come) must look and behave
+exactly like ANDOR OSP. A copy of the interface would drift; subclassing OSP's processor would
+drag along its engine and Library. So the interface became a shared library that OSP itself
+is built from.
+
+**What moved.**
+- `shared/andor-ui` holds, unchanged:
+  - the components, the look (design tokens, look-and-feel, ceramic skin, sprite knobs) and the embedded assets;
+  - the frame (canvas, painting, placement, keyboard, macro row, popover placement), extracted from OSP's editor;
+  - the parameter schema (`AndorParameters`, OSP's layout and IDs);
+  - the sample loader.
+- `InstrumentHost` is the only thing the components know about an instrument. OSP's processor implements it.
+- Behaviour that needs only the parameters and the state tree lives in `InstrumentHost`, once: modulation routes and links, the assignment rules, MUTE/SOLO, LINK, the mix when layers are added, the curve codec.
+- OSP keeps its editor's composition, its own popovers, the Library, its presets and its engine.
+- `apps/plugin/CMakeLists.txt` adds the shared code with `andor_ui_add_to (OSP_Plugin)`.
+
+**Guarantees.** Nothing about OSP changed:
+- Its renders are pixel-identical to before the extraction (`[design-capture]` before and after).
+- Its 350-parameter schema equals the listing from the unmodified build (`tests/plugin/golden/osp-parameter-schema.txt`).
+- Its full suite passes.
+
+**The shell.**
+- `shared/andor-shell` builds a complete plugin around a product's `Engine` with `andor_add_instrument`: processor, editor, presets, state, a diagnostic engine.
+- Sources reach the audio thread through `ModelExchange`, as in OSP.
+- The editor disables every control whose parameter the engine does not read (`Binding.h` tags, which are non-visual).
+- Products live in `products/`. They are written by `tools/create_andor_instrument.py` and checked against `andor-design-system/product-registry.json`.
+- Each product is tested by `andor_<slug>_tests` and compared with OSP, pixel for pixel, by `andor_<slug>_tests_visual`.

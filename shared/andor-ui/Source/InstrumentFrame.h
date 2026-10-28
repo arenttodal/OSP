@@ -28,6 +28,41 @@ private:
     juce::String getWhiteNoteText (int note) override;
 };
 
+/** The empty instrument: one full-width invitation to drop a sound (no empty A/B halves). */
+class DropZone final : public juce::Component
+{
+public:
+    DropZone();
+    std::function<void()> onBrowse, onExample;
+    void setHighlight (bool on);
+    void paint (juce::Graphics&) override;
+    void resized() override;
+
+private:
+    juce::TextButton browse { juce::String::fromUTF8 ("Browse\xe2\x80\xa6") }, example { "Load example" };
+    bool highlight = false;
+};
+
+/** While a sound is dragged over the instrument (fewer than three layers): where a new layer would go. */
+class AddLayerTarget final : public juce::Component
+{
+public:
+    void setLetter (const juce::String& letter);
+    void setHighlight (bool on);
+    void paint (juce::Graphics&) override;
+
+private:
+    juce::String letter = "B";
+    bool highlight = false;
+};
+
+/** The header's menu: three round dots. */
+struct HeaderMenuButton final : juce::Button
+{
+    HeaderMenuButton() : juce::Button ("Menu") {}
+    void paintButton (juce::Graphics&, bool highlighted, bool down) override;
+};
+
 /**
     The ANDOR instrument's frame, shared by ANDOR OSP and every product built from the ANDOR
     Instrument Shell: the scaled reference canvas, the housing and its identity, the macro
@@ -78,7 +113,8 @@ namespace frame
     std::array<MacroSpec, macroCount> ospMacroSpecs();
     /** Sets a macro up as ANDOR OSP's (identity colour `index` on its ring, the ivory sprite,
         the value bubble, a modulation drop target) and adds it to `content`. */
-    void setUpMacro (MacroKnob& knob, int index, const MacroSpec& spec, juce::AudioProcessorValueTreeState& state, juce::Component& content);
+    void setUpMacro (MacroKnob& knob, int index, const MacroSpec& spec, juce::AudioProcessorValueTreeState& state, juce::Component& content,
+                     bool opensPopup = true);
 
     /** The keyboard's range (A0..C8), naming (MIDI 60 = C4) and colours. */
     void setUpKeyboard (OspKeyboard& keyboard);
@@ -114,6 +150,22 @@ namespace frame
     /** The housing, the identity, the keybed, the macro panel with its lights and the keys
         on the housing: everything the instrument paints under its components. */
     void paint (juce::Graphics& g, juce::Component& content, const Identity& identity, bool arpShown, const MacroRow& macros);
+
+    /** A popover's card size in reference pixels (a panel laid out at a smaller unit is
+        scaled up, so every popover's shell reads alike). */
+    juce::Point<float> popoverSize (const MiniPanel& popup);
+    /** Where the modulation popovers (routes, larger curve) unfold: above the envelope
+        panel (`panel`), at its right. */
+    juce::Point<float> modulationPopoverOrigin (juce::Rectangle<float> panel, juce::Point<float> size);
+    /** A macro's popover unfolds directly above its name (`label`): centred on it, its foot
+        10 px above (kept inside the instrument by placePopover). */
+    juce::Point<float> macroPopoverOrigin (juce::Rectangle<float> label, juce::Point<float> size);
+    /** Advanced unfolds above its key (`key`), right-aligned with it. */
+    juce::Point<float> advancedPopoverOrigin (juce::Rectangle<float> key, juce::Point<float> size);
+    /** Places a popover's card at `at` (reference pixels), kept inside the instrument. */
+    void placePopover (MiniPanel& popup, const juce::Component& content, juce::Point<float> at);
+    /** Opening: a short fade and a 3 px settle (110 ms), nothing more. */
+    void animatePopoverOpening (MiniPanel& popup);
 
     /** The instrument's height in reference pixels (taller while the arpeggiator's editor shows). */
     float instrumentHeight (bool arpShown) noexcept;

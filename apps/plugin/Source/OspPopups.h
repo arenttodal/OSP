@@ -7,7 +7,8 @@ namespace osp::plugin
 
 class OspAudioProcessor;
 
-// ANDOR OSP's own popover contents (the shared MiniPanel frame is in shared/andor-ui).
+// ANDOR OSP's own popover contents (the shared MiniPanel frame and the Advanced popover are
+// in shared/andor-ui).
 
 /** Which macro a popup belongs to (the order of the macro row). */
 enum class MacroPopup { life, drive, character, movement, space, echo };
@@ -18,7 +19,5 @@ const juce::StringArray& popupParameterIds (MacroPopup macro);
 std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, OspAudioProcessor& processor);
 /** REIMAGINED (one per layer): the mode, its picture and its own two or three settings. */
 std::unique_ptr<MiniPanel> createReimaginedPopup (OspAudioProcessor& processor, int layer);
-/** Advanced (spec §13): tuning, bend, pitch character, MPE, reseed. */
-std::unique_ptr<MiniPanel> createAdvancedPopup (OspAudioProcessor& processor);
 
 } // namespace osp::plugin

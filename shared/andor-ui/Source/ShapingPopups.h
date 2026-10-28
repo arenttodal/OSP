@@ -207,4 +207,7 @@ namespace format
     juce::String hertz (double hz);
 }
 
+/** Advanced (spec §13): tuning, bend, voices, pitch character, dynamics, MPE, reseed. */
+std::unique_ptr<MiniPanel> createAdvancedPopup (InstrumentHost& processor);
+
 } // namespace osp::plugin

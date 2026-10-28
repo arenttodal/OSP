@@ -136,111 +136,6 @@ void SamplesPanel::resized()
 }
 
 //==============================================================================
-DropZone::DropZone()
-{
-    for (auto* b : { &browse, &example })
-        addAndMakeVisible (*b);
-    browse.onClick = [this] { if (onBrowse != nullptr) onBrowse(); };
-    example.onClick = [this] { if (onExample != nullptr) onExample(); };
-    setTitle ("Drop a sound");
-}
-
-void DropZone::setHighlight (bool on)
-{
-    if (highlight != on)
-    {
-        highlight = on;
-        repaint();
-    }
-}
-
-void DropZone::resized()
-{
-    auto r = getLocalBounds().withSizeKeepingCentre (260, 30).translated (0, 52);
-    browse.setBounds (r.removeFromLeft (124));
-    r.removeFromLeft (12);
-    example.setBounds (r);
-}
-
-void DropZone::paint (juce::Graphics& g)
-{
-    using namespace palette;
-    const auto r = getLocalBounds().toFloat().reduced (1.5f);
-    g.setColour (highlight ? recessed.interpolatedWith (accent, 0.06f) : recessed.interpolatedWith (housing, 0.4f));
-    g.fillRoundedRectangle (r, 12.0f);
-    juce::Path outline;
-    outline.addRoundedRectangle (r, 12.0f);
-    juce::Path dashed;
-    const float dashes[] = { 6.0f, 5.0f };
-    juce::PathStrokeType (1.2f).createDashedStroke (dashed, outline, dashes, 2);
-    g.setColour (highlight ? accent : hairline.darker (0.12f));
-    g.fillPath (dashed);
-
-    auto text = getLocalBounds().toFloat().withSizeKeepingCentre (r.getWidth(), 90.0f).translated (0.0f, -22.0f);
-    g.setColour (text.isEmpty() ? palette::text : palette::text);
-    g.setFont (fonts::make (24.0f, fonts::Weight::regular, 0.14f));
-    g.drawText ("DROP A SOUND", text.removeFromTop (36.0f), juce::Justification::centred, false);
-    g.setColour (textDim);
-    g.setFont (fonts::make (13.5f));
-    g.drawText (juce::String::fromUTF8 ("One tonal recording is enough \xc2\xb7 WAV, AIFF, FLAC \xc2\xb7 add up to three sounds later"),
-                text.removeFromTop (22.0f), juce::Justification::centred, false);
-    g.drawText ("A folder becomes one multi-sample sound", text.removeFromTop (20.0f), juce::Justification::centred, false);
-}
-
-//==============================================================================
-void AddLayerTarget::setLetter (const juce::String& l)
-{
-    if (letter != l)
-    {
-        letter = l;
-        repaint();
-    }
-}
-
-void AddLayerTarget::setHighlight (bool on)
-{
-    if (highlight != on)
-    {
-        highlight = on;
-        repaint();
-    }
-}
-
-void AddLayerTarget::paint (juce::Graphics& g)
-{
-    using namespace palette;
-    const auto r = getLocalBounds().toFloat().reduced (1.5f);
-    g.setColour (highlight ? recessed.interpolatedWith (accent, 0.08f) : recessed.interpolatedWith (housing, 0.5f));
-    g.fillRoundedRectangle (r, 10.0f);
-    juce::Path outline;
-    outline.addRoundedRectangle (r, 10.0f);
-    juce::Path dashed;
-    const float dashes[] = { 6.0f, 5.0f };
-    juce::PathStrokeType (1.2f).createDashedStroke (dashed, outline, dashes, 2);
-    g.setColour (highlight ? accent : hairline.darker (0.15f));
-    g.fillPath (dashed);
-    const auto centre = r.withSizeKeepingCentre (r.getWidth(), 60.0f);
-    icons::draw (g, icons::Kind::plus, centre.withHeight (28.0f).withSizeKeepingCentre (28.0f, 28.0f), highlight ? accent : textDim, 1.8f);
-    g.setColour (highlight ? palette::text : textDim);
-    g.setFont (fonts::make (14.0f, fonts::Weight::medium, 0.1f));
-    g.drawText ("ADD LAYER " + letter, centre.withTrimmedTop (34.0f), juce::Justification::centredTop, false);
-}
-
-//==============================================================================
-void OspAudioProcessorEditor::HeaderMenuButton::paintButton (juce::Graphics& g, bool highlighted, bool)
-{
-    const auto r = getLocalBounds().toFloat();
-    if (highlighted)
-    {
-        g.setColour (design::colour::text.withAlpha (0.06f));
-        g.fillRoundedRectangle (r, 6.0f);
-    }
-    // Three round dots, 11 px apart (reference).
-    g.setColour (design::colour::text);
-    for (int i = -1; i <= 1; ++i)
-        g.fillEllipse (juce::Rectangle<float> (6.0f, 6.0f).withCentre (r.getCentre().translated (0.0f, 11.0f * static_cast<float> (i))));
-}
-
 void OspAudioProcessorEditor::OutsideClickWatcher::mouseDown (const juce::MouseEvent& e)
 {
     editor.mouseDownAnywhere (e.eventComponent);
@@ -539,13 +434,7 @@ void OspAudioProcessorEditor::openPopup (int which)
     popup->toFront (false);
     modOverlay.toFront (false);
     positionPopup();
-    {
-        // Opening: a short fade and a 3 px settle (110 ms), nothing more.
-        const auto final = popup->getBounds();
-        popup->setBounds (final.translated (0, 3));
-        popup->setAlpha (0.0f);
-        juce::Desktop::getInstance().getAnimator().animateComponent (popup.get(), final, 1.0f, 110, false, 1.0, 0.0);
-    }
+    frame::animatePopoverOpening (*popup);
     if (const int m = macroOfPopup (which); m >= 0)
         macros[static_cast<std::size_t> (m)].label->setOpen (true);
     if (reimagined)
@@ -583,18 +472,13 @@ void OspAudioProcessorEditor::positionPopup()
         return;
     juce::Desktop::getInstance().getAnimator().cancelAnimation (popup.get(), false);
     popup->setAlpha (1.0f);
-    // A panel laid out at a smaller unit is scaled up so every popup's shell reads alike.
-    const float scale = 1.0f / popup->unit();
-    const auto size = (popup->cardSize().toFloat() * scale);
-    const float m = static_cast<float> (MiniPanel::shadowMargin) * scale;
+    const auto size = frame::popoverSize (*popup);
     float x = 0.0f, y = 0.0f;
     if (const int macro = macroOfPopup (popupIndex); macro >= 0)
     {
-        // A macro's popover unfolds directly above its name: centred on it, its foot 10 px
-        // above, kept inside the instrument at the edges (LIFE, SPACE).
-        const auto anchor = macros[static_cast<std::size_t> (macro)].label->getBounds().toFloat();
-        x = anchor.getCentreX() - 0.5f * size.x;
-        y = anchor.getY() - 10.0f - size.y;
+        const auto at = frame::macroPopoverOrigin (macros[static_cast<std::size_t> (macro)].label->getBounds().toFloat(), size);
+        x = at.x;
+        y = at.y;
     }
     else if (popupIndex >= reimaginedPopup && popupIndex < reimaginedPopup + OspAudioProcessor::numLayers)
     {
@@ -606,10 +490,9 @@ void OspAudioProcessorEditor::positionPopup()
     }
     else if (popupIndex == routesPopup || popupIndex == curvePopup)
     {
-        // The modulation popovers unfold above the envelope panel, at its right.
-        const auto anchor = modPanel.getBounds().toFloat();
-        x = anchor.getRight() - size.x + 10.0f;
-        y = anchor.getY() - 6.0f - size.y;
+        const auto at = frame::modulationPopoverOrigin (modPanel.getBounds().toFloat(), size);
+        x = at.x;
+        y = at.y;
     }
     else if (popupIndex == mixPopup)
     {
@@ -620,18 +503,11 @@ void OspAudioProcessorEditor::positionPopup()
     }
     else
     {
-        const auto anchor = advancedButton.getBounds().toFloat();
-        x = anchor.getRight() - size.x;
-        y = anchor.getY() - 8.0f - size.y;
+        const auto at = frame::advancedPopoverOrigin (advancedButton.getBounds().toFloat(), size);
+        x = at.x;
+        y = at.y;
     }
-    // Inside the instrument itself (never over the modulation bay).
-    const auto limits = content.getLocalBounds().toFloat().withWidth (design::width).reduced (14.0f);
-    x = juce::jlimit (limits.getX(), std::max (limits.getX(), limits.getRight() - size.x), x);
-    y = std::max (limits.getY(), y);
-    popup->setTransform (juce::AffineTransform::scale (scale));
-    const auto card = popup->cardSize();
-    popup->setBounds (juce::roundToInt ((x - m) / scale), juce::roundToInt ((y - m) / scale),
-                      card.x + 2 * MiniPanel::shadowMargin, card.y + 2 * MiniPanel::shadowMargin);
+    frame::placePopover (*popup, content, { x, y });
 }
 
 void OspAudioProcessorEditor::updateCustomisedDots()

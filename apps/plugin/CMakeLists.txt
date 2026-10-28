@@ -80,4 +80,10 @@ if(OSP_BUILD_TESTS)
         OSP_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
     target_link_libraries(osp_plugin_tests PRIVATE OSP_Plugin osp_dsp osp_library Catch2::Catch2)
     add_test(NAME plugin COMMAND osp_plugin_tests)
+    # The ANDOR visual regression's reference: OSP renders the shared states that every
+    # product built from the ANDOR Instrument Shell is compared with (andor_*_tests_visual).
+    add_test(NAME osp_visual_reference COMMAND osp_plugin_tests "[visual-reference]")
+    set_tests_properties(osp_visual_reference PROPERTIES
+        ENVIRONMENT "ANDOR_VISUAL_REFERENCE_DIR=${CMAKE_BINARY_DIR}/andor-visual-regression/osp"
+        FIXTURES_SETUP andor_visual_reference)
 endif()

@@ -199,7 +199,6 @@ public:
     // the instrument shows one card per occupied layer, and they are kept contiguous
     // (A, A+B, A+B+C) by removeLayer.
     bool isLayerOccupied (int layer) const override;
-    int occupiedLayerCount() const;
     /** The first slot without a sound, or -1 when all three hold one. */
     int firstFreeLayer() const;
     /** Each file becomes a new layer (from `firstLayer` if it is free, then the free slots),
@@ -459,7 +458,6 @@ private:
     };
     LayerSnapshot captureLayer (int layer) const;
     void applyLayer (int layer, const LayerSnapshot& snapshot);
-    void makeLayerAudible (int layer, bool keepMix = false);
     struct RemovedLayer
     {
         int index = 0;

@@ -191,6 +191,11 @@ add_subdirectory(apps/research-renderer)
 
 if(OSP_BUILD_PLUGIN)
     add_subdirectory(apps/plugin)
+    # ANDOR instruments built from the ANDOR Instrument Shell (shared/andor-shell).
+    option(ANDOR_BUILD_PRODUCTS "Build the ANDOR instruments in products/ (needs OSP_BUILD_PLUGIN)" ON)
+    if(ANDOR_BUILD_PRODUCTS)
+        add_subdirectory(products)
+    endif()
 endif()
 
 if(OSP_BUILD_TESTS)

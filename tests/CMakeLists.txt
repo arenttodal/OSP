@@ -57,3 +57,9 @@ add_test(NAME regression COMMAND osp_tests "[regression]")
 add_test(NAME performance-smoke
     COMMAND research-renderer --benchmark --seconds 3 --voices 24 --output-json ${CMAKE_BINARY_DIR}/benchmark-smoke.json)
 set_tests_properties(performance-smoke PROPERTIES LABELS performance)
+
+# The ANDOR bootstrap tool (tools/create_andor_instrument.py), in a sandbox.
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+    add_test(NAME andor_bootstrap_tool COMMAND ${Python3_EXECUTABLE} -I ${PROJECT_SOURCE_DIR}/tools/tests/test_create_andor_instrument.py)
+endif()

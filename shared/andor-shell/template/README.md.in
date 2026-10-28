@@ -1,0 +1,24 @@
+# {{PRODUCT_NAME}}
+
+An ANDOR instrument built from the ANDOR Instrument Shell (`shared/andor-shell`), written by
+`tools/create_andor_instrument.py` on {{DATE}}.
+
+| | |
+|---|---|
+| Product name | {{PRODUCT_NAME}} |
+| Slug | `{{SLUG}}` |
+| Plugin code | `{{PLUGIN_CODE}}` (manufacturer `Ospx`) |
+| Bundle ID | `{{BUNDLE_ID}}` |
+| Version | {{VERSION}} |
+| CMake target | `{{TARGET}}` (tests: `{{TEST_NAME}}`) |
+| Presets | `Documents/{{PRODUCT_NAME}}/Presets/*{{PRESET_EXTENSION}}` |
+| Saved state | `<{{STATE_TYPE}} product="{{SLUG}}">` |
+
+Build: `cmake -B build-plugin -G Ninja -DOSP_BUILD_PLUGIN=ON && cmake --build build-plugin --target {{TARGET}}_All`
+Test: `ctest --test-dir build-plugin -R {{TEST_NAME}} --output-on-failure`
+
+What to change, and what never to change: `andor-design-system/HANDOFF.md`.
+- `Source/Product.cpp`: the identity, the macros, the engine.
+- The engine: implement `andor::shell::Engine` (`shared/andor-shell/Source/ShellEngine.h`).
+  It names the parameters it reads; every other control is shown disabled.
+- The look is ANDOR OSP's, from `shared/andor-ui`: never copy or restyle it here.

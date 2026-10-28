@@ -1,0 +1,14 @@
+# {{PRODUCT_NAME}}: an ANDOR instrument built from the ANDOR Instrument Shell (shared/andor-shell).
+# Its identifiers are its entry in andor-design-system/product-registry.json; never change them
+# once it has shipped (hosts recall sessions and automation by them).
+include(${PROJECT_SOURCE_DIR}/shared/andor-shell/AndorInstrument.cmake)
+
+andor_add_instrument({{TARGET}}
+    PRODUCT_NAME "{{PRODUCT_NAME}}"
+    SLUG {{SLUG}}
+    PLUGIN_CODE {{PLUGIN_CODE}}
+    BUNDLE_ID {{BUNDLE_ID}}
+    VERSION {{VERSION}}
+    SOURCES Source/Product.cpp)
+
+andor_add_instrument_tests({{TARGET}} {{TEST_NAME}})

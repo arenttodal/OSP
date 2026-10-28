@@ -44,34 +44,6 @@ private:
     std::uint64_t shownGeneration = 0;
 };
 
-/** The empty instrument: one full-width invitation to drop a sound (no empty A/B halves). */
-class DropZone final : public juce::Component
-{
-public:
-    DropZone();
-    std::function<void()> onBrowse, onExample;
-    void setHighlight (bool on);
-    void paint (juce::Graphics&) override;
-    void resized() override;
-
-private:
-    juce::TextButton browse { juce::String::fromUTF8 ("Browse\xe2\x80\xa6") }, example { "Load example" };
-    bool highlight = false;
-};
-
-/** While a sound is dragged over the instrument (fewer than three layers): where a new layer would go. */
-class AddLayerTarget final : public juce::Component
-{
-public:
-    void setLetter (const juce::String& letter);
-    void setHighlight (bool on);
-    void paint (juce::Graphics&) override;
-
-private:
-    juce::String letter = "B";
-    bool highlight = false;
-};
-
 /**
     The instrument (adaptive 1-3 layer redesign). From the top: header (identity, preset,
     volume, menu); the source area, which is the only part that changes with the number of
@@ -197,12 +169,6 @@ private:
         explicit OutsideClickWatcher (OspAudioProcessorEditor& e) : editor (e) {}
         void mouseDown (const juce::MouseEvent& e) override;
         OspAudioProcessorEditor& editor;
-    };
-
-    struct HeaderMenuButton final : juce::Button
-    {
-        HeaderMenuButton() : juce::Button ("Menu") {}
-        void paintButton (juce::Graphics&, bool highlighted, bool down) override;
     };
 
     OspLookAndFeel lookAndFeel;

@@ -1,0 +1,893 @@
+[
+  {
+    "class": "osp::plugin::frame::Content",
+    "name": "",
+    "depth": 0,
+    "x": 0,
+    "y": 0,
+    "w": 1448,
+    "h": 1086
+  },
+  {
+    "class": "osp::plugin::PresetBar",
+    "name": "",
+    "depth": 1,
+    "x": 501,
+    "y": 45,
+    "w": 394,
+    "h": 48
+  },
+  {
+    "class": "osp::plugin::SavePresetButton",
+    "name": "Save preset",
+    "depth": 1,
+    "x": 903,
+    "y": 45,
+    "w": 44,
+    "h": 48
+  },
+  {
+    "class": "osp::plugin::VolumeSlider",
+    "name": "",
+    "depth": 1,
+    "x": 1150,
+    "y": 47,
+    "w": 194,
+    "h": 44
+  },
+  {
+    "class": "osp::plugin::HeaderMenuButton",
+    "name": "Menu",
+    "depth": 1,
+    "x": 1366,
+    "y": 50,
+    "w": 28,
+    "h": 36
+  },
+  {
+    "class": "osp::plugin::EngineCard",
+    "name": "",
+    "depth": 1,
+    "x": 35,
+    "y": 127,
+    "w": 451,
+    "h": 525
+  },
+  {
+    "class": "osp::plugin::SourceDisplay",
+    "name": "",
+    "depth": 2,
+    "x": 51,
+    "y": 190,
+    "w": 419,
+    "h": 258
+  },
+  {
+    "class": "osp::plugin::LayerStateButton",
+    "name": "",
+    "depth": 2,
+    "x": 112,
+    "y": 137,
+    "w": 27,
+    "h": 21
+  },
+  {
+    "class": "osp::plugin::LayerStateButton",
+    "name": "",
+    "depth": 2,
+    "x": 112,
+    "y": 159,
+    "w": 27,
+    "h": 21
+  },
+  {
+    "class": "osp::plugin::ModeSelector",
+    "name": "",
+    "depth": 2,
+    "x": 296,
+    "y": 139,
+    "w": 128,
+    "h": 41
+  },
+  {
+    "class": "osp::plugin::EqButton",
+    "name": "EQ",
+    "depth": 2,
+    "x": 250,
+    "y": 143,
+    "w": 38,
+    "h": 33
+  },
+  {
+    "class": "osp::plugin::EngineCard::MenuDots",
+    "name": "Layer menu",
+    "depth": 2,
+    "x": 435,
+    "y": 141,
+    "w": 30,
+    "h": 36
+  },
+  {
+    "class": "osp::plugin::LayerKnob",
+    "name": "",
+    "depth": 2,
+    "x": 57,
+    "y": 454,
+    "w": 87,
+    "h": 112
+  },
+  {
+    "class": "osp::plugin::LayerKnob::Dial",
+    "name": "",
+    "depth": 3,
+    "x": 63,
+    "y": 478,
+    "w": 75,
+    "h": 74
+  },
+  {
+    "class": "osp::plugin::LayerKnob",
+    "name": "",
+    "depth": 2,
+    "x": 137,
+    "y": 454,
+    "w": 87,
+    "h": 112
+  },
+  {
+    "class": "osp::plugin::LayerKnob::Dial",
+    "name": "",
+    "depth": 3,
+    "x": 143,
+    "y": 478,
+    "w": 75,
+    "h": 74
+  },
+  {
+    "class": "osp::plugin::LayerKnob",
+    "name": "",
+    "depth": 2,
+    "x": 217,
+    "y": 454,
+    "w": 87,
+    "h": 112
+  },
+  {
+    "class": "osp::plugin::LayerKnob::Dial",
+    "name": "",
+    "depth": 3,
+    "x": 223,
+    "y": 478,
+    "w": 75,
+    "h": 74
+  },
+  {
+    "class": "osp::plugin::LayerKnob",
+    "name": "",
+    "depth": 2,
+    "x": 297,
+    "y": 454,
+    "w": 87,
+    "h": 112
+  },
+  {
+    "class": "osp::plugin::LayerKnob::Dial",
+    "name": "",
+    "depth": 3,
+    "x": 303,
+    "y": 478,
+    "w": 75,
+    "h": 74
+  },
+  {
+    "class": "osp::plugin::LayerKnob",
+    "name": "",
+    "depth": 2,
+    "x": 377,
+    "y": 454,
+    "w": 87,
+    "h": 112
+  },
+  {
+    "class": "osp::plugin::LayerKnob::Dial",
+    "name": "",
+    "depth": 3,
+    "x": 383,
+    "y": 478,
+    "w": 75,
+    "h": 74
+  },
+  {
+    "class": "osp::plugin::ModifierButton",
+    "name": "",
+    "depth": 2,
+    "x": 51,
+    "y": 586,
+    "w": 98,
+    "h": 45
+  },
+  {
+    "class": "osp::plugin::ModifierButton",
+    "name": "",
+    "depth": 2,
+    "x": 158,
+    "y": 586,
+    "w": 98,
+    "h": 45
+  },
+  {
+    "class": "osp::plugin::ModifierButton",
+    "name": "",
+    "depth": 2,
+    "x": 265,
+    "y": 586,
+    "w": 98,
+    "h": 45
+  },
+  {
+    "class": "osp::plugin::ModifierButton",
+    "name": "",
+    "depth": 2,
+    "x": 372,
+    "y": 586,
+    "w": 98,
+    "h": 45
+  },
+  {
+    "class": "osp::plugin::EngineCard",
+    "name": "",
+    "depth": 1,
+    "x": 498,
+    "y": 127,
+    "w": 451,
+    "h": 525
+  },
+  {
+    "class": "osp::plugin::SourceDisplay",
+    "name": "",
+    "depth": 2,
+    "x": 514,
+    "y": 190,
+    "w": 419,
+    "h": 258
+  },
+  {
+    "class": "osp::plugin::LayerStateButton",
+    "name": "",
+    "depth": 2,
+    "x": 575,
+    "y": 137,
+    "w": 27,
+    "h": 21
+  },
+  {
+    "class": "osp::plugin::LayerStateButton",
+    "name": "",
+    "depth": 2,
+    "x": 575,
+    "y": 159,
+    "w": 27,
+    "h": 21
+  },
+  {
+    "class": "osp::plugin::ModeSelector",
+    "name": "",
+    "depth": 2,
+    "x": 759,
+    "y": 139,
+    "w": 128,
+    "h": 41
+  },
+  {
+    "class": "osp::plugin::EqButton",
+    "name": "EQ",
+    "depth": 2,
+    "x": 713,
+    "y": 143,
+    "w": 38,
+    "h": 33
+  },
+  {
+    "class": "osp::plugin::EngineCard::MenuDots",
+    "name": "Layer menu",
+    "depth": 2,
+    "x": 898,
+    "y": 141,
+    "w": 30,
+    "h": 36
+  },
+  {
+    "class": "osp::plugin::LayerKnob",
+    "name": "",
+    "depth": 2,
+    "x": 520,
+    "y": 454,
+    "w": 87,
+    "h": 112
+  },
+  {
+    "class": "osp::plugin::LayerKnob::Dial",
+    "name": "",
+    "depth": 3,
+    "x": 526,
+    "y": 478,
+    "w": 75,
+    "h": 74
+  },
+  {
+    "class": "osp::plugin::LayerKnob",
+    "name": "",
+    "depth": 2,
+    "x": 600,
+    "y": 454,
+    "w": 87,
+    "h": 112
+  },
+  {
+    "class": "osp::plugin::LayerKnob::Dial",
+    "name": "",
+    "depth": 3,
+    "x": 606,
+    "y": 478,
+    "w": 75,
+    "h": 74
+  },
+  {
+    "class": "osp::plugin::LayerKnob",
+    "name": "",
+    "depth": 2,
+    "x": 680,
+    "y": 454,
+    "w": 87,
+    "h": 112
+  },
+  {
+    "class": "osp::plugin::LayerKnob::Dial",
+    "name": "",
+    "depth": 3,
+    "x": 686,
+    "y": 478,
+    "w": 75,
+    "h": 74
+  },
+  {
+    "class": "osp::plugin::LayerKnob",
+    "name": "",
+    "depth": 2,
+    "x": 760,
+    "y": 454,
+    "w": 87,
+    "h": 112
+  },
+  {
+    "class": "osp::plugin::LayerKnob::Dial",
+    "name": "",
+    "depth": 3,
+    "x": 766,
+    "y": 478,
+    "w": 75,
+    "h": 74
+  },
+  {
+    "class": "osp::plugin::LayerKnob",
+    "name": "",
+    "depth": 2,
+    "x": 840,
+    "y": 454,
+    "w": 87,
+    "h": 112
+  },
+  {
+    "class": "osp::plugin::LayerKnob::Dial",
+    "name": "",
+    "depth": 3,
+    "x": 846,
+    "y": 478,
+    "w": 75,
+    "h": 74
+  },
+  {
+    "class": "osp::plugin::ModifierButton",
+    "name": "",
+    "depth": 2,
+    "x": 514,
+    "y": 586,
+    "w": 98,
+    "h": 45
+  },
+  {
+    "class": "osp::plugin::ModifierButton",
+    "name": "",
+    "depth": 2,
+    "x": 621,
+    "y": 586,
+    "w": 98,
+    "h": 45
+  },
+  {
+    "class": "osp::plugin::ModifierButton",
+    "name": "",
+    "depth": 2,
+    "x": 728,
+    "y": 586,
+    "w": 98,
+    "h": 45
+  },
+  {
+    "class": "osp::plugin::ModifierButton",
+    "name": "",
+    "depth": 2,
+    "x": 835,
+    "y": 586,
+    "w": 98,
+    "h": 45
+  },
+  {
+    "class": "osp::plugin::EngineCard",
+    "name": "",
+    "depth": 1,
+    "x": 961,
+    "y": 127,
+    "w": 451,
+    "h": 525
+  },
+  {
+    "class": "osp::plugin::SourceDisplay",
+    "name": "",
+    "depth": 2,
+    "x": 977,
+    "y": 190,
+    "w": 419,
+    "h": 258
+  },
+  {
+    "class": "osp::plugin::LayerStateButton",
+    "name": "",
+    "depth": 2,
+    "x": 1038,
+    "y": 137,
+    "w": 27,
+    "h": 21
+  },
+  {
+    "class": "osp::plugin::LayerStateButton",
+    "name": "",
+    "depth": 2,
+    "x": 1038,
+    "y": 159,
+    "w": 27,
+    "h": 21
+  },
+  {
+    "class": "osp::plugin::ModeSelector",
+    "name": "",
+    "depth": 2,
+    "x": 1222,
+    "y": 139,
+    "w": 128,
+    "h": 41
+  },
+  {
+    "class": "osp::plugin::EqButton",
+    "name": "EQ",
+    "depth": 2,
+    "x": 1176,
+    "y": 143,
+    "w": 38,
+    "h": 33
+  },
+  {
+    "class": "osp::plugin::EngineCard::MenuDots",
+    "name": "Layer menu",
+    "depth": 2,
+    "x": 1361,
+    "y": 141,
+    "w": 30,
+    "h": 36
+  },
+  {
+    "class": "osp::plugin::LayerKnob",
+    "name": "",
+    "depth": 2,
+    "x": 983,
+    "y": 454,
+    "w": 87,
+    "h": 112
+  },
+  {
+    "class": "osp::plugin::LayerKnob::Dial",
+    "name": "",
+    "depth": 3,
+    "x": 989,
+    "y": 478,
+    "w": 75,
+    "h": 74
+  },
+  {
+    "class": "osp::plugin::LayerKnob",
+    "name": "",
+    "depth": 2,
+    "x": 1063,
+    "y": 454,
+    "w": 87,
+    "h": 112
+  },
+  {
+    "class": "osp::plugin::LayerKnob::Dial",
+    "name": "",
+    "depth": 3,
+    "x": 1069,
+    "y": 478,
+    "w": 75,
+    "h": 74
+  },
+  {
+    "class": "osp::plugin::LayerKnob",
+    "name": "",
+    "depth": 2,
+    "x": 1143,
+    "y": 454,
+    "w": 87,
+    "h": 112
+  },
+  {
+    "class": "osp::plugin::LayerKnob::Dial",
+    "name": "",
+    "depth": 3,
+    "x": 1149,
+    "y": 478,
+    "w": 75,
+    "h": 74
+  },
+  {
+    "class": "osp::plugin::LayerKnob",
+    "name": "",
+    "depth": 2,
+    "x": 1223,
+    "y": 454,
+    "w": 87,
+    "h": 112
+  },
+  {
+    "class": "osp::plugin::LayerKnob::Dial",
+    "name": "",
+    "depth": 3,
+    "x": 1229,
+    "y": 478,
+    "w": 75,
+    "h": 74
+  },
+  {
+    "class": "osp::plugin::LayerKnob",
+    "name": "",
+    "depth": 2,
+    "x": 1303,
+    "y": 454,
+    "w": 87,
+    "h": 112
+  },
+  {
+    "class": "osp::plugin::LayerKnob::Dial",
+    "name": "",
+    "depth": 3,
+    "x": 1309,
+    "y": 478,
+    "w": 75,
+    "h": 74
+  },
+  {
+    "class": "osp::plugin::ModifierButton",
+    "name": "",
+    "depth": 2,
+    "x": 977,
+    "y": 586,
+    "w": 98,
+    "h": 45
+  },
+  {
+    "class": "osp::plugin::ModifierButton",
+    "name": "",
+    "depth": 2,
+    "x": 1084,
+    "y": 586,
+    "w": 98,
+    "h": 45
+  },
+  {
+    "class": "osp::plugin::ModifierButton",
+    "name": "",
+    "depth": 2,
+    "x": 1191,
+    "y": 586,
+    "w": 98,
+    "h": 45
+  },
+  {
+    "class": "osp::plugin::ModifierButton",
+    "name": "",
+    "depth": 2,
+    "x": 1298,
+    "y": 586,
+    "w": 98,
+    "h": 45
+  },
+  {
+    "class": "osp::plugin::MacroLabel",
+    "name": "",
+    "depth": 1,
+    "x": 53,
+    "y": 708,
+    "w": 150,
+    "h": 22
+  },
+  {
+    "class": "juce::Slider",
+    "name": "",
+    "depth": 1,
+    "x": 62,
+    "y": 752,
+    "w": 132,
+    "h": 132
+  },
+  {
+    "class": "osp::plugin::MacroLabel",
+    "name": "",
+    "depth": 1,
+    "x": 199,
+    "y": 708,
+    "w": 150,
+    "h": 22
+  },
+  {
+    "class": "juce::Slider",
+    "name": "",
+    "depth": 1,
+    "x": 208,
+    "y": 752,
+    "w": 132,
+    "h": 132
+  },
+  {
+    "class": "osp::plugin::MacroLabel",
+    "name": "",
+    "depth": 1,
+    "x": 345,
+    "y": 708,
+    "w": 150,
+    "h": 22
+  },
+  {
+    "class": "juce::Slider",
+    "name": "",
+    "depth": 1,
+    "x": 354,
+    "y": 752,
+    "w": 132,
+    "h": 132
+  },
+  {
+    "class": "osp::plugin::MacroLabel",
+    "name": "",
+    "depth": 1,
+    "x": 491,
+    "y": 708,
+    "w": 150,
+    "h": 22
+  },
+  {
+    "class": "juce::Slider",
+    "name": "",
+    "depth": 1,
+    "x": 500,
+    "y": 752,
+    "w": 132,
+    "h": 132
+  },
+  {
+    "class": "osp::plugin::MacroLabel",
+    "name": "",
+    "depth": 1,
+    "x": 783,
+    "y": 708,
+    "w": 150,
+    "h": 22
+  },
+  {
+    "class": "juce::Slider",
+    "name": "",
+    "depth": 1,
+    "x": 792,
+    "y": 752,
+    "w": 132,
+    "h": 132
+  },
+  {
+    "class": "osp::plugin::MacroLabel",
+    "name": "",
+    "depth": 1,
+    "x": 637,
+    "y": 708,
+    "w": 150,
+    "h": 22
+  },
+  {
+    "class": "juce::Slider",
+    "name": "",
+    "depth": 1,
+    "x": 646,
+    "y": 752,
+    "w": 132,
+    "h": 132
+  },
+  {
+    "class": "osp::plugin::ModulationPanel",
+    "name": "",
+    "depth": 1,
+    "x": 955,
+    "y": 688,
+    "w": 450,
+    "h": 206
+  },
+  {
+    "class": "osp::plugin::EnvelopePanel",
+    "name": "",
+    "depth": 2,
+    "x": 955,
+    "y": 688,
+    "w": 450,
+    "h": 206
+  },
+  {
+    "class": "osp::plugin::MiniKnob",
+    "name": "",
+    "depth": 3,
+    "x": 973,
+    "y": 806,
+    "w": 90,
+    "h": 87
+  },
+  {
+    "class": "juce::Slider",
+    "name": "",
+    "depth": 4,
+    "x": 994,
+    "y": 823,
+    "w": 48,
+    "h": 49
+  },
+  {
+    "class": "osp::plugin::MiniKnob",
+    "name": "",
+    "depth": 3,
+    "x": 1080,
+    "y": 806,
+    "w": 90,
+    "h": 87
+  },
+  {
+    "class": "juce::Slider",
+    "name": "",
+    "depth": 4,
+    "x": 1101,
+    "y": 823,
+    "w": 48,
+    "h": 49
+  },
+  {
+    "class": "osp::plugin::MiniKnob",
+    "name": "",
+    "depth": 3,
+    "x": 1189,
+    "y": 806,
+    "w": 90,
+    "h": 87
+  },
+  {
+    "class": "juce::Slider",
+    "name": "",
+    "depth": 4,
+    "x": 1210,
+    "y": 823,
+    "w": 48,
+    "h": 49
+  },
+  {
+    "class": "osp::plugin::MiniKnob",
+    "name": "",
+    "depth": 3,
+    "x": 1299,
+    "y": 806,
+    "w": 90,
+    "h": 87
+  },
+  {
+    "class": "juce::Slider",
+    "name": "",
+    "depth": 4,
+    "x": 1320,
+    "y": 823,
+    "w": 48,
+    "h": 49
+  },
+  {
+    "class": "osp::plugin::ModulationPanel::Strip",
+    "name": "",
+    "depth": 2,
+    "x": 955,
+    "y": 688,
+    "w": 450,
+    "h": 24
+  },
+  {
+    "class": "osp::plugin::Wheel",
+    "name": "",
+    "depth": 1,
+    "x": 42,
+    "y": 913,
+    "w": 36,
+    "h": 115
+  },
+  {
+    "class": "osp::plugin::Wheel",
+    "name": "",
+    "depth": 1,
+    "x": 93,
+    "y": 913,
+    "w": 36,
+    "h": 115
+  },
+  {
+    "class": "osp::plugin::OspKeyboard",
+    "name": "",
+    "depth": 1,
+    "x": 148,
+    "y": 913,
+    "w": 1150,
+    "h": 101
+  },
+  {
+    "class": "juce::Label",
+    "name": "",
+    "depth": 1,
+    "x": 48,
+    "y": 1038,
+    "w": 600,
+    "h": 24
+  },
+  {
+    "class": "osp::plugin::AdvancedCardButton",
+    "name": "Advanced",
+    "depth": 1,
+    "x": 1308,
+    "y": 983,
+    "w": 105,
+    "h": 31
+  },
+  {
+    "class": "osp::plugin::ArpControl",
+    "name": "",
+    "depth": 1,
+    "x": 1308,
+    "y": 913,
+    "w": 105,
+    "h": 64
+  },
+  {
+    "class": "osp::plugin::ModulationOverlay",
+    "name": "",
+    "depth": 1,
+    "x": 0,
+    "y": 0,
+    "w": 1448,
+    "h": 1086
+  },
+  {
+    "class": "juce::ResizableCornerComponent",
+    "name": "",
+    "depth": 0,
+    "x": 1430,
+    "y": 1068,
+    "w": 18,
+    "h": 18
+  }
+]
