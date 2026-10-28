@@ -5,6 +5,7 @@
 #include "engine/Arpeggiator.h"
 #include "engine/InstrumentEngine.h"
 #include "engine/Modulation.h"
+#include "engine/RhythmicShaper.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
@@ -232,6 +233,38 @@ public:
         bool active = false;
     };
     virtual ArpView arpView() const noexcept = 0;
+
+    // -- The macro popovers (MacroPopups.h) --------------------------------------------------
+    /** The layer the interface edits (0 A, 1 B, 2 C). Any thread. */
+    virtual int editLayer() const noexcept = 0;
+    /** The host's tempo in BPM (120 when it gives none): ECHO's synced picture. Any thread. */
+    virtual float hostTempo() const noexcept = 0;
+    /** MOVEMENT SHAPER's playhead, 0..1 of its bar (lock-free, for the picture). */
+    virtual float shaperPhase() const noexcept = 0;
+    /** SHAPER's CUSTOM pattern (saved with the session; message thread). An undoable change
+        is one undo step. */
+    virtual ShaperPattern shaperCustomPattern() const = 0;
+    virtual void setShaperCustomPattern (const ShaperPattern& pattern, bool undoable = true) = 0;
+    /** The SHAPER editor's magnified view (a view setting saved with the session). */
+    virtual bool shaperEditorLarge() const noexcept = 0;
+    virtual void setShaperEditorLarge (bool large) noexcept = 0;
+    /** A REIMAGINED mode (ReimaginedMode's index) this instrument cannot play on `layer`: its
+        popover's picture says so in these words. Empty (the default): the mode plays. */
+    virtual juce::String reimaginedModeUnavailable (int layer, int mode) const
+    {
+        juce::ignoreUnused (layer, mode);
+        return {};
+    }
+    /** Saved SHAPER patterns: one JSON file each in Documents/OSP/Shaper Patterns, shared by
+        every ANDOR product. */
+    static constexpr const char* shaperPatternExtension = ".ospshaper";
+    static juce::File shaperPatternFolder();
+    static juce::Array<juce::File> savedShaperPatterns();
+    static bool writeShaperPatternFile (const juce::File& file, const ShaperPattern& pattern);
+    static std::optional<ShaperPattern> readShaperPatternFile (const juce::File& file);
+    /** The pattern as the session stores it ("v1:" + 16 steps), and back. */
+    static juce::String encodeShaperPattern (const ShaperPattern& pattern);
+    static std::optional<ShaperPattern> decodeShaperPattern (const juce::String& text);
 
 protected:
     juce::ValueTree modLinks() const;

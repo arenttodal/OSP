@@ -41,6 +41,14 @@ struct ProductInfo
         when they are missing or from another version; never touches the musician's own.
         Called once per processor, on the message thread. Null: none. */
     std::function<void (osp::plugin::InstrumentHost&, const juce::File& folder)> installFactoryPresets;
+    /** The version of the product's own state (saved with every session and preset as
+        "productVersion"; a state without one is version 1). Raise it when a parameter's
+        meaning moves elsewhere, and say in migrateState how an older state is brought up to date. */
+    int stateVersion = 1;
+    /** Called after an older state's parameters are restored (`fromVersion` < stateVersion):
+        moves its settings to where this version reads them, so it sounds as it did. Message
+        thread. Null: nothing to migrate. */
+    std::function<void (osp::plugin::InstrumentHost&, int fromVersion)> migrateState;
 };
 
 /** Defined by the product (Product.cpp). */

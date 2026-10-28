@@ -104,6 +104,16 @@ public:
     int lastPlayedNoteNumber() const noexcept override { return lastNote.load (std::memory_order_relaxed); }
     ArpView arpView() const noexcept override { return {}; }
 
+    // InstrumentHost: the macro popovers
+    int editLayer() const noexcept override { return editLayerIndex.load(); }
+    float hostTempo() const noexcept override { return tempo.load (std::memory_order_relaxed); }
+    float shaperPhase() const noexcept override { return engine->shaperPhase(); }
+    osp::ShaperPattern shaperCustomPattern() const override;
+    void setShaperCustomPattern (const osp::ShaperPattern& pattern, bool undoable = true) override;
+    bool shaperEditorLarge() const noexcept override { return shaperLarge.load(); }
+    void setShaperEditorLarge (bool large) noexcept override { shaperLarge = large; }
+    juce::String reimaginedModeUnavailable (int layer, int mode) const override { return engine->reimaginedModeUnavailable (layer, mode); }
+
     // The shell -------------------------------------------------------------------------
     const ProductInfo& product() const noexcept { return productInfo(); }
     const Engine::Description& engineDescription() const noexcept { return description; }
@@ -129,7 +139,6 @@ public:
     void removeLayer (int layer);
     /** How many cards the instrument shows (every layer up to the highest one with a sound). */
     int slotCount() const;
-    int editLayer() const noexcept { return editLayerIndex.load(); }
     void setEditLayer (int layer) noexcept { editLayerIndex = std::clamp (layer, 0, numLayers - 1); }
     /** Blocks until pending loads have finished (tests, offline hosts). */
     bool waitForLoads (int timeoutMs);
@@ -210,12 +219,29 @@ private:
     mutable std::mutex messageMutex;
     juce::String lastMessage;
 
-    // Modulation curves (message thread; the engine reads them through its own means).
+    // Modulation curves (message thread, under their lock) and their points as the audio
+    // thread hands them to the engine (x, y, tension per point, then the count; a new
+    // generation means "changed").
     mutable juce::CriticalSection curveLock;
     ModCurves curves = defaultModulationCurves();
+    static constexpr int curveValues = 3 * osp::mod::maxCurvePoints + 1;
+    std::array<std::array<std::atomic<float>, curveValues>, modCurveCount> curveShared {};
+    std::array<std::atomic<std::uint32_t>, modCurveCount> curveGeneration {};
+    std::array<std::uint32_t, modCurveCount> curveGenerationSeen {};   ///< audio thread
+    void publishCurve (int index) noexcept;
     std::array<std::atomic<int>, osp::mod::ccSlots> ccNumbers {};
     std::atomic<int> ccLearn { -1 };
     std::atomic<bool> velToAmp { true }, arpStepped { false };
+
+    // SHAPER CUSTOM: the pattern (message thread, under its lock) and its steps as the audio
+    // thread reads them (start, end, shape per step; a new generation means "changed").
+    mutable juce::CriticalSection shaperLock;
+    osp::ShaperPattern shaperPattern = osp::RhythmicShaper::patternSteps (osp::ShaperParams().pattern);
+    std::array<std::atomic<float>, 3 * osp::RhythmicShaper::steps> shaperSteps {};
+    std::atomic<std::uint32_t> shaperGeneration { 1 };
+    std::uint32_t shaperGenerationSeen = 0;   ///< audio thread
+    void publishShaperPattern() noexcept;
+    std::atomic<float> tempo { 120.0f };
 
     // Live displays and the wheels.
     std::array<std::atomic<int>, velocityHistory> recentVelocity {};
@@ -225,7 +251,7 @@ private:
     Engine::Performance performance;                       ///< audio thread
 
     // View settings.
-    std::atomic<bool> arpOpen { false };
+    std::atomic<bool> arpOpen { false }, shaperLarge { false };
     std::atomic<int> modTab { 0 };
 
     // Presets.

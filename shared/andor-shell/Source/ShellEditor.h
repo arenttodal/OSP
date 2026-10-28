@@ -43,11 +43,13 @@ public:
     osp::plugin::ModulationPanel& modulationPanel() noexcept { return modPanel; }
     void setArpExpanded (bool open);
     float instrumentHeight() const noexcept { return osp::plugin::frame::instrumentHeight (arpShown); }
-    /** The popovers: a macro's (0..5, when the product has one), Advanced, a modulation
-        source's routes or larger curve (source 0 LFO 1 .. 3 ENV 2). */
-    static constexpr int advancedPopup = 6, routesPopup = 11, curvePopup = 12;
+    /** The popovers: a macro's (0..5, when the product has one), Advanced, a layer's
+        REIMAGINED (7 + layer, when the engine reads it), a modulation source's routes or
+        larger curve (source 0 LFO 1 .. 3 ENV 2). */
+    static constexpr int advancedPopup = 6, reimaginedPopup = 7, routesPopup = 11, curvePopup = 12;
     void openPopup (int which, int source = 0);
     void closePopup();
+    static constexpr bool isReimaginedPopup (int which) noexcept { return which >= reimaginedPopup && which < reimaginedPopup + osp::plugin::InstrumentHost::numLayers; }
     int openPopupIndex() const noexcept { return popupIndex; }
     osp::plugin::MiniPanel* openPopupPanel() noexcept { return popup.get(); }
     /** For tests: the controls shown disabled because the engine does not read their parameters. */

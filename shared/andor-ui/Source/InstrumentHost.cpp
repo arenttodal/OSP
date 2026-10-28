@@ -553,4 +553,95 @@ void InstrumentHost::makeLayerAudible (int layer, bool keepMix)
     }
 }
 
+//==============================================================================
+// SHAPER CUSTOM: the session's and the files' encodings
+namespace
+{
+    constexpr const char* stepShapeNames[] = { "hold", "fall", "rise", "dip", "pulse", "soft" };
+}
+
+juce::String InstrumentHost::encodeShaperPattern (const ShaperPattern& pattern)
+{
+    // "v1:" then 16 steps "start,end,shape" separated by ';' (shape by name: stable).
+    juce::StringArray steps;
+    for (const auto& step : pattern)
+        steps.add (juce::String (step.start, 4) + "," + juce::String (step.end, 4) + "," + stepShapeNames[static_cast<int> (step.shape)]);
+    return "v1:" + steps.joinIntoString (";");
+}
+
+std::optional<ShaperPattern> InstrumentHost::decodeShaperPattern (const juce::String& text)
+{
+    if (! text.startsWith ("v1:"))
+        return std::nullopt;
+    const auto steps = juce::StringArray::fromTokens (text.substring (3), ";", "");
+    if (steps.size() != RhythmicShaper::steps)
+        return std::nullopt;
+    ShaperPattern pattern;
+    for (int i = 0; i < steps.size(); ++i)
+    {
+        const auto parts = juce::StringArray::fromTokens (steps[i], ",", "");
+        if (parts.size() != 3)
+            return std::nullopt;
+        auto& step = pattern[static_cast<std::size_t> (i)];
+        step.start = std::clamp (parts[0].getFloatValue(), 0.0f, 1.0f);
+        step.end = std::clamp (parts[1].getFloatValue(), 0.0f, 1.0f);
+        step.shape = StepShape::hold;
+        for (int k = 0; k < 6; ++k)
+            if (parts[2].trim() == stepShapeNames[k])
+                step.shape = static_cast<StepShape> (k);
+    }
+    return pattern;
+}
+
+juce::File InstrumentHost::shaperPatternFolder()
+{
+    return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("OSP/Shaper Patterns");
+}
+
+juce::Array<juce::File> InstrumentHost::savedShaperPatterns()
+{
+    auto files = shaperPatternFolder().findChildFiles (juce::File::findFiles, false, juce::String ("*") + shaperPatternExtension);
+    std::sort (files.begin(), files.end(), [] (const juce::File& a, const juce::File& b) {
+        return a.getFileNameWithoutExtension().compareNatural (b.getFileNameWithoutExtension()) < 0;
+    });
+    return files;
+}
+
+bool InstrumentHost::writeShaperPatternFile (const juce::File& file, const ShaperPattern& pattern)
+{
+    auto* object = new juce::DynamicObject();
+    object->setProperty ("schemaVersion", 1);
+    object->setProperty ("kind", "osp.shaperPattern");
+    object->setProperty ("name", file.getFileNameWithoutExtension());
+    juce::Array<juce::var> steps;
+    for (const auto& step : pattern)
+        steps.add (juce::Array<juce::var> { step.start, step.end, juce::String (stepShapeNames[static_cast<int> (step.shape)]) });
+    object->setProperty ("steps", steps);
+    file.getParentDirectory().createDirectory();
+    return file.replaceWithText (juce::JSON::toString (juce::var (object)));
+}
+
+std::optional<ShaperPattern> InstrumentHost::readShaperPatternFile (const juce::File& file)
+{
+    const auto json = juce::JSON::parse (file.loadFileAsString());
+    const auto* steps = json["steps"].getArray();
+    if (static_cast<int> (json["schemaVersion"]) < 1 || steps == nullptr || steps->size() != RhythmicShaper::steps)
+        return std::nullopt;
+    ShaperPattern pattern;
+    for (int i = 0; i < steps->size(); ++i)
+    {
+        const auto& item = (*steps)[i];
+        if (! item.isArray() || item.size() != 3)
+            return std::nullopt;
+        auto& step = pattern[static_cast<std::size_t> (i)];
+        step.start = std::clamp (static_cast<float> (item[0]), 0.0f, 1.0f);
+        step.end = std::clamp (static_cast<float> (item[1]), 0.0f, 1.0f);
+        step.shape = StepShape::hold;
+        for (int k = 0; k < 6; ++k)
+            if (item[2].toString() == stepShapeNames[k])
+                step.shape = static_cast<StepShape> (k);
+    }
+    return pattern;
+}
+
 } // namespace osp::plugin

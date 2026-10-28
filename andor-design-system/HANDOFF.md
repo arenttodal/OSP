@@ -61,6 +61,10 @@ parameter for parameter). ANDOR ANALOG (arenttodal/analog) uses all of them.
 | Its own test files | `andor_add_instrument_tests (... SOURCES <files>)`: compiled with the shell's tests. | |
 | A home outside this repository | Build ANDOR OSP as a submodule and list the product folder in `ANDOR_EXTERNAL_PRODUCTS`; register it here (`product-registry.json`, `location`). | CMake checks the registry as for `products/*`. |
 | Host category | `andor_add_instrument (... VST3_CATEGORIES Instrument Synth)` (default `Instrument Sampler`). | |
+| ANDOR OSP's macro popovers | `createMacroPopup (MacroPopup::drive / movement / space / echo / ..., host)` from `ProductInfo::macroPopover` (MacroPopups.h): exactly ANDOR OSP's. MOVEMENT's SHAPER reads `Engine::setShaperPattern` (the custom pattern) and shows `Engine::shaperPhase()`. | OSP's design capture before/after the move. |
+| REIMAGINED | Bind `reimagined` (and `layerA.reimagined.*`): the card's REIMAGINED name opens ANDOR OSP's popover. A mode the engine cannot play: `Engine::reimaginedModeUnavailable` says why in its picture. | |
+| Drawn modulation curves | `Engine::setModulationCurve` (audio thread, on change; LFO CUSTOM, ...). | |
+| Moving a setting to another parameter | `ProductInfo::stateVersion` + `migrateState`: an older session or preset is brought up to date after its parameters are restored. | |
 
 The visual regression's parity render shows ANDOR OSP's macro names (`ShellProcessor::showReferenceMacros`): a
 product's macro names are its identity, like the header's. Everything else must still match at 0 pixels.

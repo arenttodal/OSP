@@ -679,7 +679,9 @@ is built from.
   - the sample loader.
 - `InstrumentHost` is the only thing the components know about an instrument. OSP's processor implements it.
 - Behaviour that needs only the parameters and the state tree lives in `InstrumentHost`, once: modulation routes and links, the assignment rules, MUTE/SOLO, LINK, the mix when layers are added, the curve codec.
-- OSP keeps its editor's composition, its own popovers, the Library, its presets and its engine.
+- OSP keeps its editor's composition, the Library, its presets and its engine. Its macro and
+  REIMAGINED popovers (`MacroPopups`) are shared too since ANDOR ANALOG uses them: they read
+  only `InstrumentHost` (including SHAPER's custom pattern, the tempo and the shaper's phase).
 - `apps/plugin/CMakeLists.txt` adds the shared code with `andor_ui_add_to (OSP_Plugin)`.
 
 **Guarantees.** Nothing about OSP changed:
