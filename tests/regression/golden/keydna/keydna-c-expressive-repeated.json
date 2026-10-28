@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "keydna-c-expressive-repeated",
+  "description": "C expressive KEY DNA: pitch-dependent POS, SIZE and DENS, repeated",
+  "midi": "repeated-a3x6",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "d1fa457b4e69e1e2",
+  "seconds": 2.490667,
+  "rmsDb": -36.694139,
+  "peakDb": -24.083024,
+  "brightness": 0.142193,
+  "stereoWidth": 1.379541
+}

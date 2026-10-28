@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/AudioData.h"
+#include "engine/KeyDna.h"
 #include "midi/MidiEvent.h"
 #include "research/RenderConfig.h"
 #include "research/RenderSession.h"
@@ -52,6 +53,31 @@ struct Scene
 
 /** Every baseline scene, in a fixed order (append only). */
 std::vector<Scene> baselineScenes();
+/**
+    The KEY DNA demonstrations (Phase 1): three patches on one sample, each played as single
+    notes, repeated notes, a scale, a four-note and an eight-note chord.
+      A static     the existing Granulator, KEY DNA off (must be the original audio);
+      B organic    small, smooth per-key differences: one sound across the keyboard;
+      C expressive pitch-dependent POS, SIZE and DENS that are clearly heard in a chord.
+    Their settings are public so tests and reports read the same profile.
+*/
+std::vector<Scene> keyDnaScenes();
+keydna::Settings organicKeyDna();
+keydna::Settings expressiveKeyDna();
+
+/** What one key does on its own: its profile, and what its grains measurably did. */
+struct KeyMeasure
+{
+    int key = 60;
+    double posOffset = 0.0, sizeOctaves = 0.0, densityOctaves = 0.0, spreadOffset = 0.0;   ///< the profile
+    double position = 0.5, sizeMs = 0.0, density = 0.0, spread = 0.0;   ///< the layer's settings after the profile
+    double meanGrainPosition = -1.0;   ///< where its grains read (0..1 of the recording), from the grain display
+    double meanGrains = 0.0;           ///< grains sounding at once on average (expected about DENS x SIZE)
+    double rmsDb = -200.0, brightness = 0.0;
+};
+/** Plays each key alone (0.8 s, LIFE off so only KEY DNA differs) through the scene's first layer and measures it. */
+std::vector<KeyMeasure> measureKeys (const Scene& scene, const std::vector<int>& keys);
+
 /** A scene by name (nullptr: none). */
 const Scene* findScene (const std::vector<Scene>& scenes, const std::string& name);
 

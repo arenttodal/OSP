@@ -6,6 +6,20 @@ namespace osp
 {
 
 /**
+    KEY DNA (engine/KeyDna.h): one key's granular identity on its layer, in each parameter's own
+    units, fixed at note-on. Neutral (all zero, inactive) means the layer's own settings.
+*/
+struct KeyDnaOffsets
+{
+    double position = 0.0;         ///< added to POS (fraction of the recording)
+    double sizeOctaves = 0.0;      ///< SIZE x 2^this
+    double densityOctaves = 0.0;   ///< DENS x 2^this
+    double spread = 0.0;           ///< added to SPREAD
+    double tuneSemitones = 0.0;    ///< added to TUNE
+    bool active = false;           ///< any of them non-zero
+};
+
+/**
     Everything that makes one note's performance different from another (spec §29),
     decided once at note-on by the engine (Performance + Dynamics) and applied by the
     voice. All-zero values mean "play the recording as it is".
@@ -63,6 +77,10 @@ struct NoteShape
     float grainDensityRatio = 1.0f;     ///< DENS x
     float grainSpreadOffset = 0.0f;     ///< added to SPREAD (0..1)
     float grainTuneCents = 0.0f;        ///< added to TUNE
+
+    /** KEY DNA (Granular mode): this key's identity on the layer, applied to the layer's own
+        settings before modulation and LIFE. Neutral = no change. */
+    KeyDnaOffsets keyDna;
 
     /** Reimagined: soft saturation drive (0 = clean) and continuation segment scale (<1 = shorter, more granular). */
     float saturation = 0.0f;

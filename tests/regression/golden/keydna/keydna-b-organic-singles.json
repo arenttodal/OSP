@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "keydna-b-organic-singles",
+  "description": "B subtle organic keyboard: small, smooth per-key differences, singles",
+  "midi": "singles-g2-g5",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "78c1dec710e6b02e",
+  "seconds": 4.192,
+  "rmsDb": -35.155467,
+  "peakDb": -22.948935,
+  "brightness": 0.246447,
+  "stereoWidth": 0.905341
+}

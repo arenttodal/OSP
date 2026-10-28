@@ -1,7 +1,9 @@
 add_executable(osp_tests
     support/TestHelpers.cpp
+    support/AllocationCounter.cpp
     unit/PitchMathTests.cpp
     unit/PrngTests.cpp
+    unit/KeyDnaTests.cpp
     unit/InterpolationTests.cpp
     unit/AdsrTests.cpp
     unit/SamplerTests.cpp
@@ -37,6 +39,7 @@ add_executable(osp_tests
     integration/EngineIntegrationTests.cpp
     integration/ShapingTests.cpp
     integration/LayerTests.cpp
+    integration/KeyDnaEngineTests.cpp
     integration/EngineSlotTests.cpp
     integration/ShaperTests.cpp
     integration/ReimaginedModesTests.cpp

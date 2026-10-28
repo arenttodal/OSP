@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "keydna-a-static-repeated",
+  "description": "A static: the existing Granulator, KEY DNA off, repeated",
+  "midi": "repeated-a3x6",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "e0230a68f03b72ab",
+  "seconds": 2.474667,
+  "rmsDb": -37.030717,
+  "peakDb": -24.82502,
+  "brightness": 0.142456,
+  "stereoWidth": 1.384773
+}

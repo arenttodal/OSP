@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "keydna-c-expressive-singles",
+  "description": "C expressive KEY DNA: pitch-dependent POS, SIZE and DENS, singles",
+  "midi": "singles-g2-g5",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "6eefcc7aae148b25",
+  "seconds": 4.154667,
+  "rmsDb": -36.474999,
+  "peakDb": -23.171567,
+  "brightness": 0.23249,
+  "stereoWidth": 0.791232
+}

@@ -88,3 +88,47 @@ TEST_CASE ("unified baseline: OSP's One Shot and Granular playback render as the
         }
     }
 }
+
+TEST_CASE ("KEY DNA demonstrations: A is the unmodified Granulator, B and C differ, all as stored", "[regression][unified-baseline][keydna]")
+{
+    // The Phase 1 demonstration renders (research-renderer --unified <dir> --set keydna): pinned
+    // like the baseline, so later phases can tell when they change.
+    const auto scenes = unified::keyDnaScenes();
+    REQUIRE (scenes.size() == 15);
+    const auto platform = unified::platformTag();
+    for (const auto& scene : scenes)
+    {
+        DYNAMIC_SECTION (scene.name)
+        {
+            const auto d = unified::digest (unified::render (scene).audio);
+            REQUIRE (unified::digest (unified::render (scene).audio).hash == d.hash);
+            auto plain = scene;
+            plain.config.keyDna = {};
+            const auto withoutDna = unified::digest (unified::render (plain).audio).hash;
+            if (scene.name.find ("-a-static-") != std::string::npos)
+                CHECK (d.hash == withoutDna);   // A: exactly the Granulator without KEY DNA
+            else
+                CHECK (d.hash != withoutDna);   // B and C: the profile is heard
+            const auto path = std::filesystem::path (OSP_SOURCE_DIR) / "tests" / "regression" / "golden" / "keydna" / (scene.name + ".json");
+            if (updateGolden())
+            {
+                std::filesystem::create_directories (path.parent_path());
+                std::string error;
+                REQUIRE (json::writeFile (path, unified::digestToJson (scene, d, platform), error));
+                continue;
+            }
+            std::string error;
+            const auto stored = json::readFile (path, error);
+            INFO ("missing golden " << path.string() << "; run with OSP_UPDATE_GOLDEN=1");
+            REQUIRE (stored.has_value());
+            const auto& golden = *stored;
+            if (json::getString (golden, "platform") == platform)
+                CHECK (json::getString (golden, "sampleHash") == d.hash);
+            else if (json::getString (golden, "sampleHash") != d.hash)
+                WARN (scene.name << ": not bit-identical to the " << json::getString (golden, "platform") << " render (this is " << platform << ")");
+            CHECK (d.rmsDb == Approx (json::getDouble (golden, "rmsDb", -1.0e9)).margin (0.05));
+            CHECK (d.peakDb == Approx (json::getDouble (golden, "peakDb", -1.0e9)).margin (0.1));
+            CHECK (d.brightness == Approx (json::getDouble (golden, "brightness", -1.0e9)).epsilon (0.01));
+        }
+    }
+}

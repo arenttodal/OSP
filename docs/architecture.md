@@ -693,3 +693,15 @@ is built from.
 - The editor disables every control whose parameter the engine does not read (`Binding.h` tags, which are non-visual).
 - Products live in `products/`. They are written by `tools/create_andor_instrument.py` and checked against `andor-design-system/product-registry.json`.
 - Each product is tested by `andor_<slug>_tests` and compared with OSP, pixel for pixel, by `andor_<slug>_tests_visual`.
+
+## KEY DNA (unified engine Phase 1; docs/research/unified-andor/phase-1-key-dna.md)
+
+A per-layer layer on the existing Granulator, not a second engine. `keydna::Settings` per layer
+(curves as OSP curve tables, depth, variation, Smooth <-> Individual, seed, AMOUNT) produce a
+`keydna::Table` of 128 keys (computed in `InstrumentEngine::setLayerKeyDna`, allocation-free,
+only when the settings change). At note-on a Granular voice copies its key's offsets into its
+`NoteShape`; `InstrumentVoice::notesGranular()` applies them to the layer's own settings before
+modulation, REIMAGINED scatter and LIFE, clamped to the knobs' ranges, untouched when zero.
+The individuality draws from its own stream (`"keydna"` root), never from LIFE's or the grain
+scheduler's. Off or neutral, the output is bit-identical to the engine without it (the Phase 0
+baseline, tests/regression/golden/unified). Engine only: the plugin does not set it yet.

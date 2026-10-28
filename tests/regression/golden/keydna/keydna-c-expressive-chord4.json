@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "keydna-c-expressive-chord4",
+  "description": "C expressive KEY DNA: pitch-dependent POS, SIZE and DENS, chord4",
+  "midi": "chord4-cmaj7",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "fdb4b3c05cdee84b",
+  "seconds": 2.170667,
+  "rmsDb": -30.099254,
+  "peakDb": -17.023459,
+  "brightness": 0.254039,
+  "stereoWidth": 0.759111
+}

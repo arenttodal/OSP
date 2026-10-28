@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "keydna-b-organic-repeated",
+  "description": "B subtle organic keyboard: small, smooth per-key differences, repeated",
+  "midi": "repeated-a3x6",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "106e9d0928cb8014",
+  "seconds": 2.506667,
+  "rmsDb": -36.772845,
+  "peakDb": -24.223729,
+  "brightness": 0.139687,
+  "stereoWidth": 0.968698
+}

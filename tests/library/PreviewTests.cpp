@@ -5,35 +5,16 @@
 
 #include "audio/utility/TestSignals.h"
 #include "library/PreviewEngine.h"
+#include "support/AllocationCounter.h"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
-#include <atomic>
 #include <cmath>
 #include <cstdlib>
-#include <new>
 
 using namespace osp;
 using namespace osp::library;
-
-namespace
-{
-    // Counts allocations made while `counting` is set (render() must make none).
-    std::atomic<bool> counting { false };
-    std::atomic<int> allocations { 0 };
-}
-
-void* operator new (std::size_t size)
-{
-    if (counting.load (std::memory_order_relaxed))
-        ++allocations;
-    if (void* p = std::malloc (size == 0 ? 1 : size))
-        return p;
-    throw std::bad_alloc();
-}
-void operator delete (void* p) noexcept { std::free (p); }
-void operator delete (void* p, std::size_t) noexcept { std::free (p); }
 
 namespace
 {
@@ -236,8 +217,8 @@ TEST_CASE ("preview: render, notes and commands never allocate (audio thread)", 
     engine.play (0b1111u);   // queued by the message thread before counting
     std::vector<float> l (512), r (512);
     float* channels[2] = { l.data(), r.data() };
-    allocations = 0;
-    counting = true;
+    int allocations = 0;
+    test::AllocationScope counting;
     for (int b = 0; b < 50; ++b)
     {
         if (b % 7 == 0)
@@ -250,6 +231,6 @@ TEST_CASE ("preview: render, notes and commands never allocate (audio thread)", 
     }
     engine.allNotesOff();
     engine.render (channels, 2, 512);
-    counting = false;
-    CHECK (allocations.load() == 0);
+    allocations = counting.count();
+    CHECK (allocations == 0);
 }

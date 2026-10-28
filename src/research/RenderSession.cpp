@@ -169,6 +169,8 @@ RenderOutput renderInstrument (const InstrumentModel& model, const MidiSequence&
     InstrumentEngine engine;
     engine.prepare (outputRate, blockSize, config.engineSettings);
     engine.setModel (&model);
+    for (int layer = 0; layer < 3; ++layer)
+        engine.setLayerKeyDna (layer, config.keyDna[static_cast<std::size_t> (layer)]);
     engine.setModulation (config.modulation);
     engine.setModWheel (static_cast<float> (config.modWheel));
     return runBlocks (engine, outputRate, blockSize, arpeggiate (sequence, config, outputRate), config.maxTailSeconds);
@@ -182,6 +184,8 @@ RenderOutput renderSet (const InstrumentSet& set, const MidiSequence& sequence, 
     InstrumentEngine engine;
     engine.prepare (outputRate, blockSize, config.engineSettings);
     engine.setInstrumentSet (&set);
+    for (int layer = 0; layer < 3; ++layer)
+        engine.setLayerKeyDna (layer, config.keyDna[static_cast<std::size_t> (layer)]);
     engine.setModulation (config.modulation);
     engine.setModWheel (static_cast<float> (config.modWheel));
     return runBlocks (engine, outputRate, blockSize, arpeggiate (sequence, config, outputRate), config.maxTailSeconds);
@@ -198,7 +202,10 @@ RenderOutput renderLayers (const std::array<const InstrumentModel*, 3>& models, 
     InstrumentEngine engine;
     engine.prepare (outputRate, blockSize, config.engineSettings);
     for (int layer = 0; layer < 3; ++layer)
+    {
         engine.setModel (models[static_cast<std::size_t> (layer)], layer);
+        engine.setLayerKeyDna (layer, config.keyDna[static_cast<std::size_t> (layer)]);
+    }
     engine.setModulation (config.modulation);
     engine.setModWheel (static_cast<float> (config.modWheel));
     return runBlocks (engine, outputRate, blockSize, arpeggiate (sequence, config, outputRate), config.maxTailSeconds);

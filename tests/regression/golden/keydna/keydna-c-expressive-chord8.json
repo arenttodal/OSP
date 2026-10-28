@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "keydna-c-expressive-chord8",
+  "description": "C expressive KEY DNA: pitch-dependent POS, SIZE and DENS, chord8",
+  "midi": "chord8-c",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "65bf0a64b3a5348c",
+  "seconds": 2.245333,
+  "rmsDb": -25.943359,
+  "peakDb": -12.970858,
+  "brightness": 0.164944,
+  "stereoWidth": 0.906459
+}

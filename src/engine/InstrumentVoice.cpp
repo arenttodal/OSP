@@ -4,6 +4,7 @@
 
 #include "analysis/continuation/ContinuationAnalyzer.h"
 #include "engine/FastMath.h"
+#include "engine/KeyDna.h"
 #include "engine/LevelContour.h"
 
 #include <algorithm>
@@ -687,7 +688,11 @@ GranularParams InstrumentVoice::doubledGranular() const noexcept
 
 GranularParams InstrumentVoice::notesGranular() const noexcept
 {
+    // The order (docs/research/unified-andor/phase-1-key-dna.md): the layer's knobs (START
+    // included) -> KEY DNA (this key, fixed at note-on) -> modulation -> REIMAGINED scatter ->
+    // LIFE (this trigger) -> the final clamp; the grains add their own randomness at spawn.
     GranularParams p = *granularLive;
+    keydna::apply (shape.keyDna, p);
     double offset = static_cast<double> (shape.grainPositionOffset) + modStartOffset;
     if (modeEngine != nullptr)
         offset += modeEngine->grainPositionOffset();   // TAPE FRAME's tape, TOYBOX's heads

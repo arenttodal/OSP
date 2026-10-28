@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "keydna-a-static-chord8",
+  "description": "A static: the existing Granulator, KEY DNA off, chord8",
+  "midi": "chord8-c",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "b6ba270391b76f56",
+  "seconds": 2.186667,
+  "rmsDb": -25.911652,
+  "peakDb": -12.681152,
+  "brightness": 0.161014,
+  "stereoWidth": 0.884897
+}

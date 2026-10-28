@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "keydna-a-static-scale",
+  "description": "A static: the existing Granulator, KEY DNA off, scale",
+  "midi": "scale-c3-c4",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "6f35684f2a134c0d",
+  "seconds": 2.453333,
+  "rmsDb": -37.779533,
+  "peakDb": -25.759648,
+  "brightness": 0.126563,
+  "stereoWidth": 1.190149
+}

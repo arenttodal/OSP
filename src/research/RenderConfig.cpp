@@ -347,6 +347,39 @@ std::optional<RenderConfig> loadRenderConfig (const std::filesystem::path& path,
             ls.loop = json::getBool (l, "loop", ls.loop);
             ls.follow = json::getBool (l, "follow", ls.follow);
             ls.reimagined = std::clamp (json::getDouble (l, "reimagined", ls.reimagined), -1.0, 1.0);
+            // KEY DNA (Granular): "keyDna": { "enabled": true, "amount": 1, "individuality": 0.3,
+            // "seed": 7, "size": { "depth": 0.5, "variation": 0.2, "curve": [[0, 0.2], [1, 0.8]] }, ... }
+            // per parameter (position, size, density, spread, tune); a curve's points are
+            // [x 0..1 over the keys, y 0..1 with 0.5 = no offset]; without one it is flat.
+            if (json::has (l, "keyDna"))
+            {
+                const auto& k = l["keyDna"];
+                auto& dna = config.keyDna[li];
+                dna.enabled = json::getBool (k, "enabled", true);
+                dna.amount = std::clamp (json::getDouble (k, "amount", dna.amount), 0.0, 1.0);
+                dna.individuality = std::clamp (json::getDouble (k, "individuality", dna.individuality), 0.0, 1.0);
+                dna.seed = static_cast<std::uint64_t> (std::max (0.0, json::getDouble (k, "seed", static_cast<double> (dna.seed))));
+                for (int p = 0; p < keydna::paramCount; ++p)
+                {
+                    const auto param = static_cast<keydna::Param> (p);
+                    if (! json::has (k, keydna::paramId (param)))
+                        continue;
+                    const auto& pj = k[juce::Identifier (keydna::paramId (param))];
+                    auto& ps = dna[param];
+                    ps.curveDepth = std::clamp (json::getDouble (pj, "depth", ps.curveDepth), -1.0, 1.0);
+                    ps.variation = std::clamp (json::getDouble (pj, "variation", ps.variation), 0.0, 1.0);
+                    if (const auto* points = pj["curve"].getArray(); points != nullptr && points->size() >= 2)
+                    {
+                        mod::Curve curve;
+                        for (const auto& pt : *points)
+                            if (curve.count < mod::maxCurvePoints && pt.isArray() && pt.size() >= 2)
+                                curve.points[static_cast<std::size_t> (curve.count++)] = { static_cast<float> (static_cast<double> (pt[0])),
+                                                                                          static_cast<float> (static_cast<double> (pt[1])), 0.0f };
+                        curve.normalise();
+                        ps.curve = keydna::curveFrom (curve);
+                    }
+                }
+            }
         }
     }
     if (json::has (root, "mix"))

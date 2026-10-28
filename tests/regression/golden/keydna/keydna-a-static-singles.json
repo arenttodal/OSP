@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "keydna-a-static-singles",
+  "description": "A static: the existing Granulator, KEY DNA off, singles",
+  "midi": "singles-g2-g5",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "c139a8a1a0c647fc",
+  "seconds": 4.128,
+  "rmsDb": -35.327726,
+  "peakDb": -23.447734,
+  "brightness": 0.241176,
+  "stereoWidth": 1.08068
+}

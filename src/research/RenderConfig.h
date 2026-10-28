@@ -3,6 +3,7 @@
 #include "audio/sampler/BaselineSampler.h"
 #include "engine/Arpeggiator.h"
 #include "engine/InstrumentEngine.h"
+#include "engine/KeyDna.h"
 #include "engine/Modulation.h"
 #include "model/PlaybackPreparation.h"
 
@@ -45,6 +46,9 @@ struct RenderConfig
         Layer A plays the render's own source. Their source modes, granular settings and
         layer controls are in engineSettings ("layers" in the JSON). */
     std::array<std::string, 3> layerSources {};
+
+    /** Engine C's KEY DNA per layer (engine/KeyDna.h; off by default). */
+    std::array<keydna::Settings, 3> keyDna {};
 
     /** Engine C's modulation (LFOs, envelopes, routes); no routes = none. */
     mod::Settings modulation {};

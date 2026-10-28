@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "keydna-b-organic-chord4",
+  "description": "B subtle organic keyboard: small, smooth per-key differences, chord4",
+  "midi": "chord4-cmaj7",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "d4a1f7eaf7107f00",
+  "seconds": 2.186667,
+  "rmsDb": -29.505792,
+  "peakDb": -15.491983,
+  "brightness": 0.251965,
+  "stereoWidth": 1.222372
+}

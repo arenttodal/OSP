@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "keydna-b-organic-scale",
+  "description": "B subtle organic keyboard: small, smooth per-key differences, scale",
+  "midi": "scale-c3-c4",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "b0ce8e6e341dcd",
+  "seconds": 2.48,
+  "rmsDb": -37.758791,
+  "peakDb": -24.880428,
+  "brightness": 0.127405,
+  "stereoWidth": 0.829804
+}

@@ -85,9 +85,10 @@ PITCH BAKE-OFF (Phase 2)
   --continuation-report <file|dir>            stable region, jumps and release per file
 
 UNIFIED ENGINE (docs/research/unified-andor)
-  --unified <dir> [--scene <name>] [--repeats 3] [--no-audio]
-                                              renders the baseline scenes (src/research/UnifiedScenes.cpp):
-                                              <scene>.wav, <scene>.json (digest), costs.json and summary.md
+  --unified <dir> [--set baseline|keydna] [--with-keydna organic|expressive] [--scene <name>] [--repeats 3] [--no-audio]
+                                              renders the baseline scenes or the KEY DNA demonstrations
+                                              (src/research/UnifiedScenes.cpp): <scene>.wav, <scene>.json
+                                              (digest), costs.json, summary.md (keydna: also keys.md)
 
 BENCHMARK
   --benchmark [--engine A|C] [--voices 24] [--seconds 20] [--sample-rate 48000] [--block-size 128] [--output-json <f>] [--no-retrigger] [--transpose <semitones>]
@@ -485,7 +486,21 @@ int commandUnified (const Args& args)
     const fs::path dir = args.get ("--unified");
     std::error_code ec;
     fs::create_directories (dir, ec);
-    const auto scenes = u::baselineScenes();
+    const auto set = args.get ("--set", "baseline");
+    if (set != "baseline" && set != "keydna")
+        return fail (exitUsage, "--set is baseline or keydna");
+    auto scenes = set == "keydna" ? u::keyDnaScenes() : u::baselineScenes();
+    // --with-keydna organic|expressive: the same scenes with that profile on every layer (cost and
+    // sound of KEY DNA on the baseline's own material).
+    if (args.has ("--with-keydna"))
+    {
+        const auto which = args.get ("--with-keydna");
+        if (which != "organic" && which != "expressive")
+            return fail (exitUsage, "--with-keydna is organic or expressive");
+        const auto dna = which == "organic" ? u::organicKeyDna() : u::expressiveKeyDna();
+        for (auto& scene : scenes)
+            scene.config.keyDna = { dna, dna, dna };
+    }
     const auto only = args.get ("--scene");
     const auto repeats = parseNumber (args.get ("--repeats", "3"));
     const auto platform = u::platformTag();
@@ -538,6 +553,51 @@ int commandUnified (const Args& args)
     json::set (summary, "scenes", costs);
     if (! json::writeFile (dir / "costs.json", summary, error))
         return fail (exitProcessing, error);
+    if (set == "keydna" && only.empty())
+    {
+        // Each patch's keys on their own: the profile, and what the grains measurably did.
+        const std::vector<int> keys { 36, 43, 48, 55, 60, 67, 72, 79, 84 };
+        std::ostringstream km;
+        km << "# KEY DNA: each key on its own (" << platform << ")\n\n"
+           << "Each key played alone for 0.8 s with LIFE off (so only KEY DNA differs; the demonstration renders keep LIFE 30 %). "
+              "Profile: POS offset (fraction of the recording), SIZE and DENS in octaves. Settings: the layer's POS, SIZE and DENS "
+              "after the profile. Measured: the grains' mean read position (expected near POS), how many sound at once "
+              "(expected near DENS x SIZE), level and brightness.\n";
+        auto keysJson = juce::var (juce::Array<juce::var>());
+        for (const char* patch : { "a-static", "b-organic", "c-expressive" })
+        {
+            const auto* scene = u::findScene (scenes, std::string ("keydna-") + patch + "-scale");
+            if (scene == nullptr)
+                continue;
+            km << "\n## " << patch << "\n\n| Key | POS + | SIZE oct | DENS oct | POS | SIZE ms | DENS /s | Grain position | DENS x SIZE | Grains at once | RMS dB | Brightness |\n"
+               << "|---|---|---|---|---|---|---|---|---|---|---|---|\n";
+            for (const auto& m : u::measureKeys (*scene, keys))
+            {
+                km << "| " << m.key << " | " << json::round (m.posOffset, 3) << " | " << json::round (m.sizeOctaves, 3) << " | "
+                   << json::round (m.densityOctaves, 3) << " | " << json::round (m.position, 3) << " | " << json::round (m.sizeMs, 0) << " | "
+                   << json::round (m.density, 1) << " | " << json::round (m.meanGrainPosition, 3) << " | " << json::round (m.density * m.sizeMs / 1000.0, 2)
+                   << " | " << json::round (m.meanGrains, 2) << " | " << json::round (m.rmsDb, 2) << " | " << json::round (m.brightness, 3) << " |\n";
+                auto k = json::object();
+                json::set (k, "patch", json::str (patch));
+                json::set (k, "key", m.key);
+                json::set (k, "posOffset", json::number (m.posOffset, 5));
+                json::set (k, "sizeOctaves", json::number (m.sizeOctaves, 5));
+                json::set (k, "densityOctaves", json::number (m.densityOctaves, 5));
+                json::set (k, "spreadOffset", json::number (m.spreadOffset, 5));
+                json::set (k, "position", json::number (m.position, 5));
+                json::set (k, "sizeMs", json::number (m.sizeMs, 3));
+                json::set (k, "density", json::number (m.density, 3));
+                json::set (k, "meanGrainPosition", json::number (m.meanGrainPosition, 5));
+                json::set (k, "meanGrains", json::number (m.meanGrains, 3));
+                json::set (k, "rmsDb", json::number (m.rmsDb, 3));
+                json::set (k, "brightness", json::number (m.brightness, 4));
+                keysJson.append (k);
+            }
+        }
+        std::ofstream (dir / "keys.md") << km.str();
+        if (! json::writeFile (dir / "keys.json", keysJson, error))
+            return fail (exitProcessing, error);
+    }
     md << "\nPeak resident memory of the renderer: " << json::round (u::peakResidentMegabytes(), 1) << " MB. InstrumentEngine object: "
        << sizeof (InstrumentEngine) << " bytes (InstrumentVoice " << sizeof (InstrumentVoice) << " bytes each).\n";
     std::ofstream (dir / "summary.md") << md.str();

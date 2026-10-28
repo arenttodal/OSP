@@ -1,0 +1,173 @@
+{
+  "platform": "linux-x86_64-gcc",
+  "peakResidentMegabytes": 26.6,
+  "engineBytes": 108256,
+  "voiceBytes": 19440,
+  "scenes": [
+    {
+      "scene": "oneshot-chord4",
+      "renderedSeconds": 6.053,
+      "meanBlockMicros": 99.5,
+      "p99BlockMicros": 233.37,
+      "worstBlockMicros": 265.34,
+      "meanBudgetPercent": 1.866,
+      "worstBudgetPercent": 4.975,
+      "peakVoices": 4,
+      "peakGrains": 0
+    },
+    {
+      "scene": "oneshot-scale-pluck",
+      "renderedSeconds": 6.432,
+      "meanBlockMicros": 73.55,
+      "p99BlockMicros": 126.67,
+      "worstBlockMicros": 176.19,
+      "meanBudgetPercent": 1.379,
+      "worstBudgetPercent": 3.303,
+      "peakVoices": 3,
+      "peakGrains": 0
+    },
+    {
+      "scene": "granular-single",
+      "renderedSeconds": 6.453,
+      "meanBlockMicros": 12.33,
+      "p99BlockMicros": 23.73,
+      "worstBlockMicros": 36.89,
+      "meanBudgetPercent": 0.231,
+      "worstBudgetPercent": 0.692,
+      "peakVoices": 1,
+      "peakGrains": 3
+    },
+    {
+      "scene": "granular-scale",
+      "renderedSeconds": 6.432,
+      "meanBlockMicros": 62.64,
+      "p99BlockMicros": 92.11,
+      "worstBlockMicros": 186.67,
+      "meanBudgetPercent": 1.174,
+      "worstBudgetPercent": 3.5,
+      "peakVoices": 2,
+      "peakGrains": 6
+    },
+    {
+      "scene": "granular-repeated",
+      "renderedSeconds": 6.373,
+      "meanBlockMicros": 60.21,
+      "p99BlockMicros": 89.06,
+      "worstBlockMicros": 97.5,
+      "meanBudgetPercent": 1.129,
+      "worstBudgetPercent": 1.828,
+      "peakVoices": 2,
+      "peakGrains": 4
+    },
+    {
+      "scene": "granular-chord4",
+      "renderedSeconds": 6.053,
+      "meanBlockMicros": 81.55,
+      "p99BlockMicros": 202.97,
+      "worstBlockMicros": 212.3,
+      "meanBudgetPercent": 1.529,
+      "worstBudgetPercent": 3.981,
+      "peakVoices": 4,
+      "peakGrains": 10
+    },
+    {
+      "scene": "granular-chord8",
+      "renderedSeconds": 6.053,
+      "meanBlockMicros": 117.57,
+      "p99BlockMicros": 367.45,
+      "worstBlockMicros": 383.75,
+      "meanBudgetPercent": 2.204,
+      "worstBudgetPercent": 7.195,
+      "peakVoices": 8,
+      "peakGrains": 29
+    },
+    {
+      "scene": "layers-abc-mixed",
+      "renderedSeconds": 6.053,
+      "meanBlockMicros": 153.0,
+      "p99BlockMicros": 522.86,
+      "worstBlockMicros": 539.86,
+      "meanBudgetPercent": 2.869,
+      "worstBudgetPercent": 10.122,
+      "peakVoices": 4,
+      "peakGrains": 23
+    },
+    {
+      "scene": "layers-abc-granular",
+      "renderedSeconds": 6.432,
+      "meanBlockMicros": 80.13,
+      "p99BlockMicros": 227.64,
+      "worstBlockMicros": 261.53,
+      "meanBudgetPercent": 1.503,
+      "worstBudgetPercent": 4.904,
+      "peakVoices": 3,
+      "peakGrains": 12
+    },
+    {
+      "scene": "layers-ab-oneshot-granular",
+      "renderedSeconds": 6.053,
+      "meanBlockMicros": 126.62,
+      "p99BlockMicros": 366.63,
+      "worstBlockMicros": 378.94,
+      "meanBudgetPercent": 2.374,
+      "worstBudgetPercent": 7.105,
+      "peakVoices": 4,
+      "peakGrains": 14
+    },
+    {
+      "scene": "granular-modulated",
+      "renderedSeconds": 6.053,
+      "meanBlockMicros": 114.82,
+      "p99BlockMicros": 386.94,
+      "worstBlockMicros": 468.49,
+      "meanBudgetPercent": 2.153,
+      "worstBudgetPercent": 8.784,
+      "peakVoices": 4,
+      "peakGrains": 53
+    },
+    {
+      "scene": "patch-granular-textured",
+      "renderedSeconds": 6.053,
+      "meanBlockMicros": 156.37,
+      "p99BlockMicros": 390.09,
+      "worstBlockMicros": 402.32,
+      "meanBudgetPercent": 2.932,
+      "worstBudgetPercent": 7.543,
+      "peakVoices": 4,
+      "peakGrains": 49
+    },
+    {
+      "scene": "patch-granular-glitch",
+      "renderedSeconds": 6.432,
+      "meanBlockMicros": 60.56,
+      "p99BlockMicros": 156.42,
+      "worstBlockMicros": 184.72,
+      "meanBudgetPercent": 1.136,
+      "worstBudgetPercent": 3.464,
+      "peakVoices": 2,
+      "peakGrains": 5
+    },
+    {
+      "scene": "granular-mono-glide",
+      "renderedSeconds": 5.904,
+      "meanBlockMicros": 59.21,
+      "p99BlockMicros": 90.33,
+      "worstBlockMicros": 93.35,
+      "meanBudgetPercent": 1.11,
+      "worstBudgetPercent": 1.75,
+      "peakVoices": 1,
+      "peakGrains": 3
+    },
+    {
+      "scene": "stress-abc-granular-chord8",
+      "renderedSeconds": 6.053,
+      "meanBlockMicros": 402.01,
+      "p99BlockMicros": 1341.31,
+      "worstBlockMicros": 1423.47,
+      "meanBudgetPercent": 7.538,
+      "worstBudgetPercent": 26.69,
+      "peakVoices": 8,
+      "peakGrains": 294
+    }
+  ]
+}

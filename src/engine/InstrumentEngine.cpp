@@ -845,7 +845,12 @@ void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int
     params.reverse = layerSettings.reverse;
     params.follow = layerSettings.follow;
     if (params.sourceMode == SourceMode::granular)
+    {
         granularLife (params.shape, note, eventIndex);
+        // KEY DNA: this key's identity on this layer (the played key, not a set member's root).
+        if (const auto& dna = layerKeyDnaTable[context]; dna.active())
+            params.shape.keyDna = dna.at (note);
+    }
     slot->start (params);
 }
 

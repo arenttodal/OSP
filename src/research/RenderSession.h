@@ -52,8 +52,8 @@ RenderOutput renderSet (const InstrumentSet& set, const MidiSequence& sequence, 
 /**
     Up to three source layers (A, B, C) through engine C, as the plugin plays them: each
     layer its own model (null: the layer stays empty), its source mode, granular settings
-    and layer controls from config.engineSettings, and the mix from config.engineSettings.
-    With one model on layer A this is renderInstrument.
+    and layer controls from config.engineSettings, the mix from config.engineSettings, and
+    each layer's KEY DNA from config.keyDna. With one model on layer A this is renderInstrument.
 */
 RenderOutput renderLayers (const std::array<const InstrumentModel*, 3>& models, const MidiSequence& sequence, const RenderConfig& config);
 

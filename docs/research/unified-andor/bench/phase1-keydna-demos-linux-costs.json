@@ -1,0 +1,173 @@
+{
+  "platform": "linux-x86_64-gcc",
+  "peakResidentMegabytes": 26.4,
+  "engineBytes": 108256,
+  "voiceBytes": 19440,
+  "scenes": [
+    {
+      "scene": "keydna-a-static-singles",
+      "renderedSeconds": 8.101,
+      "meanBlockMicros": 189.21,
+      "p99BlockMicros": 483.82,
+      "worstBlockMicros": 513.19,
+      "meanBudgetPercent": 3.548,
+      "worstBudgetPercent": 9.622,
+      "peakVoices": 1,
+      "peakGrains": 3
+    },
+    {
+      "scene": "keydna-a-static-repeated",
+      "renderedSeconds": 6.373,
+      "meanBlockMicros": 223.44,
+      "p99BlockMicros": 486.17,
+      "worstBlockMicros": 512.74,
+      "meanBudgetPercent": 4.19,
+      "worstBudgetPercent": 9.614,
+      "peakVoices": 2,
+      "peakGrains": 3
+    },
+    {
+      "scene": "keydna-a-static-scale",
+      "renderedSeconds": 6.432,
+      "meanBlockMicros": 226.1,
+      "p99BlockMicros": 471.11,
+      "worstBlockMicros": 503.35,
+      "meanBudgetPercent": 4.239,
+      "worstBudgetPercent": 9.438,
+      "peakVoices": 2,
+      "peakGrains": 4
+    },
+    {
+      "scene": "keydna-a-static-chord4",
+      "renderedSeconds": 6.053,
+      "meanBlockMicros": 281.52,
+      "p99BlockMicros": 478.06,
+      "worstBlockMicros": 500.85,
+      "meanBudgetPercent": 5.279,
+      "worstBudgetPercent": 9.391,
+      "peakVoices": 4,
+      "peakGrains": 11
+    },
+    {
+      "scene": "keydna-a-static-chord8",
+      "renderedSeconds": 6.053,
+      "meanBlockMicros": 310.65,
+      "p99BlockMicros": 481.37,
+      "worstBlockMicros": 549.33,
+      "meanBudgetPercent": 5.825,
+      "worstBudgetPercent": 10.3,
+      "peakVoices": 8,
+      "peakGrains": 21
+    },
+    {
+      "scene": "keydna-b-organic-singles",
+      "renderedSeconds": 8.101,
+      "meanBlockMicros": 183.03,
+      "p99BlockMicros": 494.08,
+      "worstBlockMicros": 602.17,
+      "meanBudgetPercent": 3.432,
+      "worstBudgetPercent": 11.291,
+      "peakVoices": 1,
+      "peakGrains": 3
+    },
+    {
+      "scene": "keydna-b-organic-repeated",
+      "renderedSeconds": 6.373,
+      "meanBlockMicros": 221.08,
+      "p99BlockMicros": 462.61,
+      "worstBlockMicros": 560.6,
+      "meanBudgetPercent": 4.145,
+      "worstBudgetPercent": 10.511,
+      "peakVoices": 2,
+      "peakGrains": 3
+    },
+    {
+      "scene": "keydna-b-organic-scale",
+      "renderedSeconds": 6.432,
+      "meanBlockMicros": 226.1,
+      "p99BlockMicros": 449.77,
+      "worstBlockMicros": 473.05,
+      "meanBudgetPercent": 4.239,
+      "worstBudgetPercent": 8.87,
+      "peakVoices": 2,
+      "peakGrains": 4
+    },
+    {
+      "scene": "keydna-b-organic-chord4",
+      "renderedSeconds": 6.053,
+      "meanBlockMicros": 298.4,
+      "p99BlockMicros": 499.01,
+      "worstBlockMicros": 522.91,
+      "meanBudgetPercent": 5.595,
+      "worstBudgetPercent": 9.805,
+      "peakVoices": 4,
+      "peakGrains": 11
+    },
+    {
+      "scene": "keydna-b-organic-chord8",
+      "renderedSeconds": 6.053,
+      "meanBlockMicros": 306.7,
+      "p99BlockMicros": 460.9,
+      "worstBlockMicros": 479.51,
+      "meanBudgetPercent": 5.751,
+      "worstBudgetPercent": 8.991,
+      "peakVoices": 8,
+      "peakGrains": 23
+    },
+    {
+      "scene": "keydna-c-expressive-singles",
+      "renderedSeconds": 8.101,
+      "meanBlockMicros": 182.07,
+      "p99BlockMicros": 482.08,
+      "worstBlockMicros": 494.98,
+      "meanBudgetPercent": 3.414,
+      "worstBudgetPercent": 9.281,
+      "peakVoices": 1,
+      "peakGrains": 3
+    },
+    {
+      "scene": "keydna-c-expressive-repeated",
+      "renderedSeconds": 6.373,
+      "meanBlockMicros": 216.52,
+      "p99BlockMicros": 496.93,
+      "worstBlockMicros": 549.2,
+      "meanBudgetPercent": 4.06,
+      "worstBudgetPercent": 10.297,
+      "peakVoices": 2,
+      "peakGrains": 3
+    },
+    {
+      "scene": "keydna-c-expressive-scale",
+      "renderedSeconds": 6.432,
+      "meanBlockMicros": 242.79,
+      "p99BlockMicros": 520.49,
+      "worstBlockMicros": 555.04,
+      "meanBudgetPercent": 4.552,
+      "worstBudgetPercent": 10.407,
+      "peakVoices": 2,
+      "peakGrains": 5
+    },
+    {
+      "scene": "keydna-c-expressive-chord4",
+      "renderedSeconds": 6.053,
+      "meanBlockMicros": 275.18,
+      "p99BlockMicros": 463.27,
+      "worstBlockMicros": 504.68,
+      "meanBudgetPercent": 5.16,
+      "worstBudgetPercent": 9.463,
+      "peakVoices": 4,
+      "peakGrains": 10
+    },
+    {
+      "scene": "keydna-c-expressive-chord8",
+      "renderedSeconds": 6.053,
+      "meanBlockMicros": 316.24,
+      "p99BlockMicros": 491.6,
+      "worstBlockMicros": 531.24,
+      "meanBudgetPercent": 5.93,
+      "worstBudgetPercent": 9.961,
+      "peakVoices": 8,
+      "peakGrains": 25
+    }
+  ]
+}

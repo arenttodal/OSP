@@ -3,6 +3,7 @@
 #include "audio/envelopes/Adsr.h"
 #include "audio/pitch/SincInterpolator.h"
 #include "engine/InstrumentVoice.h"
+#include "engine/KeyDna.h"
 #include "engine/LayerEq.h"
 #include "engine/Modulation.h"
 #include "engine/PerformanceEngine.h"
@@ -230,6 +231,20 @@ public:
     /** A layer's DAMPEN (each of its notes, by key; live). Bypassed until set. */
     void setLayerDampen (int layer, const dampen::Settings& settings) noexcept { layerDampen[layerIndex (layer)] = settings; }
     const dampen::Settings& layerDampenSettings (int layer) const noexcept { return layerDampen[layerIndex (layer)]; }
+    /** A layer's KEY DNA (Granular mode: each key's own granular identity, engine/KeyDna.h).
+        Applies to notes started afterwards (a sounding note keeps its profile). Off until set;
+        off or neutral, the layer plays exactly as without it. Real-time safe: the profile of
+        all keys is recomputed here (no allocation) only when the settings changed. */
+    void setLayerKeyDna (int layer, const keydna::Settings& settings) noexcept
+    {
+        const auto l = layerIndex (layer);
+        if (settings == layerKeyDna[l])
+            return;
+        layerKeyDna[l] = settings;
+        layerKeyDnaTable[l].compute (settings);
+    }
+    const keydna::Settings& layerKeyDnaSettings (int layer) const noexcept { return layerKeyDna[layerIndex (layer)]; }
+    const keydna::Table& layerKeyDnaProfile (int layer) const noexcept { return layerKeyDnaTable[layerIndex (layer)]; }
     /** The source mode applies to notes started afterwards; granular settings apply live. */
     void setSourceMode (int layer, SourceMode mode) noexcept { config.sourceMode[layerIndex (layer)] = mode; }
     void setGranular (int layer, const GranularParams& params) noexcept
@@ -490,6 +505,8 @@ private:
     std::array<double, 3> modReimaginedOffset {};   ///< global LFOs on each layer's REIMAGINED
     double modLifeOffset = 0.0;
     std::array<dampen::Settings, 3> layerDampen {};
+    std::array<keydna::Settings, 3> layerKeyDna {};
+    std::array<keydna::Table, 3> layerKeyDnaTable {};   ///< inactive until a non-neutral profile is set
     std::array<double, arpDestCount> modArpOffset {};
     std::array<bool, arpDestCount> modArpRouted {};
     std::array<std::array<double, 4>, 3> modEqOffset {};   ///< per layer: bell octaves, bell dB, low shelf dB, high shelf dB

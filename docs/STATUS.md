@@ -390,6 +390,15 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       linux-x86_64-gcc, figures elsewhere) plus three plugin sessions
       (tests/audio/unified-baseline); per-block CPU and memory. Found: output depends on the
       block size (existing: block-to-block gain glides), so baselines fix it.
+- [x] UNIFIED ENGINE Phase 1, KEY DNA in OSP's Granulator, engine only
+      (docs/research/unified-andor/phase-1-key-dna.md): src/engine/KeyDna (ANDOR Lab's maths on
+      POS, SIZE, DENS, SPREAD, TUNE; OSP curve tables; own "keydna" PRNG stream), a per-layer
+      128-key table, offsets fixed at note-on and applied first in notesGranular(). Off/neutral
+      bit-identical to the Phase 0 baseline; 7 unit + 11 integration tests (identity per key,
+      polyphony, A/B/C, held notes, modulation, no allocation, bounds); demonstrations A static /
+      B organic / C expressive (`--unified --set keydna`, research/configs/keydna-*.json, pinned
+      in tests/regression/golden/keydna); CPU within noise, +49.5 KB per engine. No plugin
+      parameter, state or GUI change. Stopped for review before Phase 2.
 - [x] ANDOR DESIGN SYSTEM and INSTRUMENT SHELL (andor-design-system/, start with HANDOFF.md).
       ANDOR OSP's interface was extracted, unchanged, into shared/andor-ui:
       - the components, look and assets;

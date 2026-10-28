@@ -1,5 +1,9 @@
 # 10 — Implementation roadmap (re-ordered by dependency)
 
+> **Status:** Phase 0 and Phase 1 are done (phase-0-baseline.md, phase-1-key-dna.md). The
+> approved product decisions and the updated plan for Phase 2 onward are in
+> phase-1-key-dna.md §9; that table supersedes the phase descriptions below where they differ.
+
 The brief's order is adjusted. KEY DNA comes first because it needs nothing else and proves
 the central claim, that OSP's granulator can carry Grain's identity. The Atlas comes before
 Phrase analysis because a set can be built from a hand-made atlas.

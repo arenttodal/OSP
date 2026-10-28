@@ -278,6 +278,156 @@ std::vector<Scene> baselineScenes()
     return scenes;
 }
 
+namespace
+{
+    mod::CurveTable line (float fromY, float toY)
+    {
+        mod::Curve c;
+        c.count = 2;
+        c.points[0] = { 0.0f, fromY, 0.0f };
+        c.points[1] = { 1.0f, toY, 0.0f };
+        return keydna::curveFrom (c);
+    }
+
+    /** The demonstrations' instrument: one Granular vowel, a little LIFE, a little SPACE. */
+    RenderConfig demoConfig()
+    {
+        auto c = baseConfig();
+        granular (c, 0, { 0.45, 0.12, 16.0, 0.0, 0.15 });
+        c.engineSettings.macros.life = 0.3;
+        c.engineSettings.macros.space = 0.15;
+        c.engineSettings.macros.motion = 0.0;
+        c.engineSettings.macros.reimagined = 0.0;
+        return c;
+    }
+}
+
+keydna::Settings organicKeyDna()
+{
+    // Small and smooth: neighbouring keys nearly alike, longer grains towards the bass.
+    keydna::Settings s;
+    s.enabled = true;
+    s.seed = 11;
+    s.individuality = 0.15;
+    s[keydna::Param::position].variation = 0.12;
+    s[keydna::Param::size].curve = line (0.8f, 0.2f);   // low keys longer, high keys shorter
+    s[keydna::Param::size].curveDepth = 0.2;
+    s[keydna::Param::size].variation = 0.12;
+    s[keydna::Param::density].variation = 0.1;
+    s[keydna::Param::spread].variation = 0.1;
+    return s;
+}
+
+keydna::Settings expressiveKeyDna()
+{
+    // Clearly heard: each key its own place in the recording, long sparse grains low, short
+    // dense ones high, and a distinct individuality.
+    keydna::Settings s;
+    s.enabled = true;
+    s.seed = 23;
+    s.individuality = 0.6;
+    s[keydna::Param::position].variation = 0.7;
+    s[keydna::Param::size].curve = line (1.0f, 0.0f);
+    s[keydna::Param::size].curveDepth = 0.55;
+    s[keydna::Param::size].variation = 0.35;
+    s[keydna::Param::density].curve = line (0.0f, 1.0f);
+    s[keydna::Param::density].curveDepth = 0.5;
+    s[keydna::Param::density].variation = 0.3;
+    s[keydna::Param::spread].variation = 0.3;
+    return s;
+}
+
+std::vector<Scene> keyDnaScenes()
+{
+    using L = std::vector<LayerSpec>;
+    const L vowel { { SourceId::vowelA3 } };
+    struct Patch
+    {
+        const char* name;
+        const char* what;
+        keydna::Settings dna;
+    };
+    const Patch patches[] = { { "a-static", "A static: the existing Granulator, KEY DNA off", keydna::Settings {} },
+                              { "b-organic", "B subtle organic keyboard: small, smooth per-key differences", organicKeyDna() },
+                              { "c-expressive", "C expressive KEY DNA: pitch-dependent POS, SIZE and DENS", expressiveKeyDna() } };
+    MidiSequence singles = Notes().note (0.05, 0.9, 43).note (1.1, 0.9, 55).note (2.15, 0.9, 67).note (3.2, 0.9, 79).done ("singles-g2-g5");
+    const std::pair<const char*, MidiSequence> takes[] = { { "singles", singles },
+                                                           { "repeated", repeatedNotes() },
+                                                           { "scale", scale() },
+                                                           { "chord4", chord4() },
+                                                           { "chord8", chord8() } };
+    std::vector<Scene> scenes;
+    for (const auto& patch : patches)
+        for (const auto& [take, midi] : takes)
+        {
+            auto c = demoConfig();
+            c.keyDna[0] = patch.dna;
+            scenes.push_back ({ std::string ("keydna-") + patch.name + "-" + take, std::string (patch.what) + ", " + take, vowel, c, midi });
+        }
+    return scenes;
+}
+
+std::vector<KeyMeasure> measureKeys (const Scene& scene, const std::vector<int>& keys)
+{
+    const auto models = modelsFor (scene);
+    keydna::Table table;
+    table.compute (scene.config.keyDna[0]);
+    std::vector<KeyMeasure> out;
+    const int block = 256;
+    std::vector<float> l (static_cast<std::size_t> (block)), r (static_cast<std::size_t> (block));
+    auto settings = scene.config.engineSettings;
+    settings.macros.life = 0.0;   // LIFE's per-trigger variation would blur what each key's profile does
+    for (int key : keys)
+    {
+        InstrumentEngine engine;
+        engine.prepare (scene.config.sampleRate, block, settings);
+        engine.setModel (models[0], 0);
+        engine.setLayerKeyDna (0, scene.config.keyDna[0]);
+        engine.noteOn (key, 100);
+        KeyMeasure m;
+        m.key = key;
+        const auto& o = table.at (key);
+        m.posOffset = o.position;
+        m.sizeOctaves = o.sizeOctaves;
+        m.densityOctaves = o.densityOctaves;
+        m.spreadOffset = o.spread;
+        auto g = settings.granular[0];
+        g.position = std::clamp (g.position + settings.layer[0].start, 0.0, 1.0);
+        keydna::apply (o, g);
+        m.position = g.position;
+        m.sizeMs = 1000.0 * g.sizeSeconds;
+        m.density = g.density;
+        m.spread = g.spread;
+        double pos = 0.0, sum = 0.0, diff = 0.0;
+        int grains = 0, blocks = 0;
+        float previous = 0.0f;
+        const int total = static_cast<int> (0.8 * scene.config.sampleRate / block);
+        for (int b = 0; b < total; ++b)
+        {
+            float* ch[2] = { l.data(), r.data() };
+            engine.render (ch, 2, block);
+            const auto& snap = engine.grainSnapshot (0);
+            const int n = snap.count.load();
+            for (int i = 0; i < n; ++i)
+                pos += snap.position[static_cast<std::size_t> (i)].load();
+            grains += n;
+            ++blocks;
+            for (int i = 0; i < block; ++i)
+            {
+                sum += static_cast<double> (l[static_cast<std::size_t> (i)]) * l[static_cast<std::size_t> (i)];
+                diff += static_cast<double> (l[static_cast<std::size_t> (i)] - previous) * (l[static_cast<std::size_t> (i)] - previous);
+                previous = l[static_cast<std::size_t> (i)];
+            }
+        }
+        m.meanGrainPosition = grains > 0 ? pos / grains : -1.0;
+        m.meanGrains = static_cast<double> (grains) / std::max (1, blocks);
+        m.rmsDb = 10.0 * std::log10 (std::max (1.0e-20, sum / std::max (1, total * block)));
+        m.brightness = std::sqrt (diff / std::max (1.0e-20, sum));
+        out.push_back (m);
+    }
+    return out;
+}
+
 const Scene* findScene (const std::vector<Scene>& scenes, const std::string& name)
 {
     for (const auto& s : scenes)
@@ -389,7 +539,10 @@ Cost measure (const Scene& scene, int repeats)
         InstrumentEngine engine;
         engine.prepare (rate, block, config.engineSettings);
         for (int layer = 0; layer < 3; ++layer)
+        {
             engine.setModel (models[static_cast<std::size_t> (layer)], layer);
+            engine.setLayerKeyDna (layer, config.keyDna[static_cast<std::size_t> (layer)]);
+        }
         engine.setModulation (config.modulation);
         engine.setModWheel (static_cast<float> (config.modWheel));
         const auto& events = sequence.events;

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "engine": "instrument",
+  "sampleRate": 48000,
+  "blockSize": 256,
+  "seed": 1,
+  "instrument": {
+    "macros": {
+      "life": 0.3,
+      "space": 0.15,
+      "motion": 0.0,
+      "reimagined": 0.0
+    }
+  },
+  "layers": [
+    {
+      "sourceMode": "granular",
+      "granular": {
+        "position": 0.45,
+        "sizeSeconds": 0.12,
+        "density": 16,
+        "tuneSemitones": 0,
+        "spread": 0.15
+      }
+    }
+  ]
+}
