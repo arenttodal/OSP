@@ -463,4 +463,4 @@ no change.
 
 ## 15. Commit and branch
 
-Branch `claude/charming-lovelace-n25fte`; COMMIT.
+Branch `claude/charming-lovelace-n25fte`; the implementation is commit `1f40764` (this line was added in the commit after it).
