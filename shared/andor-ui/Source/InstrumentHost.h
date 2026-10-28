@@ -104,6 +104,22 @@ public:
     virtual const InstrumentEngine::GrainSnapshot& grainSnapshot (int layer) const noexcept = 0;
     /** The layer holds or loads a sound. */
     virtual bool isLayerOccupied (int layer) const = 0;
+    /** A layer whose sound the instrument makes itself (a synthesizer's oscillators) rather
+        than a loaded recording: its card shows `name` where a file's state would be, and
+        `cycle` (one period of the waveform, -1..1) instead of the recording. `revision`
+        changes whenever the picture does. ANDOR OSP has none: every layer plays a recording. */
+    struct GeneratedSource
+    {
+        juce::String name;
+        std::vector<float> cycle;
+        std::uint64_t revision = 0;
+    };
+    /** Message thread. False (the default): the layer plays recordings. */
+    virtual bool generatedSource (int layer, GeneratedSource& out) const
+    {
+        juce::ignoreUnused (layer, out);
+        return false;
+    }
     int occupiedLayerCount() const;
     /** A layer the musician just added is heard at once: two layers meet in the middle of the
         blend; a third added to a pair the musician set (`keepMix`) takes a third of the mix,

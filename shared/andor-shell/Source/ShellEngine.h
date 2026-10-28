@@ -4,6 +4,8 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
+#include <vector>
+
 namespace andor::shell
 {
 
@@ -43,6 +45,24 @@ public:
         engine lives: cache getRawParameterValue() pointers now, read them in process(). */
     virtual void prepare (double sampleRate, int maximumBlockSize, juce::AudioProcessorValueTreeState& parameters) = 0;
     virtual void release() {}
+    /** The output's delay in samples after prepare() (oversampling filters): the shell
+        reports it to the host. */
+    virtual int latencySamples() const { return 0; }
+
+    /** An engine that makes its own sound (a synthesizer's oscillators) and plays no
+        recordings returns the name its card shows ("OSCILLATORS"): the instrument then shows
+        one card (layer A) for it with sourcePicture(), never invites a file and loads none.
+        Empty (the default): the engine plays the recordings it is given. */
+    virtual juce::String generatorName() const { return {}; }
+
+    /** A generator engine's card picture: one period of what the layer sounds like with
+        `parameters` as they are, -1..1, in `cycle` (any length). Message thread (before
+        prepare() too); false: none. */
+    virtual bool sourcePicture (int layer, const juce::AudioProcessorValueTreeState& parameters, std::vector<float>& cycle) const
+    {
+        juce::ignoreUnused (layer, parameters, cycle);
+        return false;
+    }
 
     /** Audio thread: layer `layer` plays `source` from now on (null: silent). When this
         returns the engine must no longer read the layer's previous source. */
@@ -54,9 +74,18 @@ public:
     {
         float pitchWheel = 0.0f;   ///< -1..1 (centre 0)
         float modWheel = 0.0f;     ///< 0..1
+        /** The host's transport at the block's first sample (hasPosition: the host gave a
+            musical position; otherwise 120 BPM, stopped). */
+        bool hasPosition = false;
+        bool playing = false;
+        double bpm = 120.0;
+        double ppq = 0.0;          ///< quarter notes since the song start
+        int numerator = 4, denominator = 4;
     };
     /** Audio thread: renders one block (the buffer arrives cleared) from the block's MIDI
-        (the on-screen keyboard is already merged in). */
+        (the on-screen keyboard is already merged in). The wheels in `performance` are the
+        block's last positions; an engine that wants them sample-accurate reads the MIDI
+        (the on-screen wheels arrive only here, at the block's start). */
     virtual void process (juce::AudioBuffer<float>& buffer, const juce::MidiBuffer& midi, const Performance& performance) noexcept = 0;
 
     /** Sounding notes (the status line). Any thread. */

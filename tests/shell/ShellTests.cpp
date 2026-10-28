@@ -161,10 +161,64 @@ TEST_CASE ("shell: the product is itself (name, codes, namespaces) and its ident
     CHECK (rest.getBoundingBox (0, -1, true).getRight() < design::layout::presetBar.getX() - 12.0f);
 }
 
-TEST_CASE ("shell: the parameter schema is ANDOR OSP's, unchanged", "[shell]")
+TEST_CASE ("shell: the parameter schema is ANDOR OSP's, unchanged; the product's own come after, in its namespace", "[shell]")
 {
     ShellProcessor p;
-    parameterschema::checkAgainstGolden (parameterschema::describe (p), "osp-parameter-schema.txt");
+    // ANDOR OSP's schema first, exactly; then the product's own parameters (if any), every
+    // ID in the product's namespace ("<slug>."), pinned by the product's golden listing.
+    const auto prefix = andor::shell::productInfo().slug + ".";
+    juce::StringArray base, own;
+    bool ownStarted = false, orderKept = true;
+    for (const auto& line : juce::StringArray::fromLines (parameterschema::describe (p).trimEnd()))
+    {
+        const bool isOwn = line.startsWith (prefix);
+        orderKept = orderKept && (isOwn || ! ownStarted);
+        ownStarted = ownStarted || isOwn;
+        (isOwn ? own : base).add (line);
+    }
+    CHECK (orderKept);
+    parameterschema::checkAgainstGolden (base.joinIntoString ("\n") + "\n", "osp-parameter-schema.txt");
+#ifdef ANDOR_PRODUCT_SCHEMA_GOLDEN
+    REQUIRE_FALSE (own.isEmpty());
+    parameterschema::checkAgainstGoldenFile (own.joinIntoString ("\n") + "\n", juce::File (ANDOR_PRODUCT_SCHEMA_GOLDEN));
+#else
+    CHECK (own.isEmpty());   // a product with parameters of its own pins them (andor_add_instrument_tests ... GOLDEN)
+#endif
+}
+
+TEST_CASE ("shell: a generator engine has one card, layer A, and never loads a file", "[shell][engine]")
+{
+    TempDir tmp;
+    ShellProcessor p;
+    if (! p.isGenerator())
+        return;
+    CHECK (p.slotCount() == 1);
+    CHECK (p.isLayerOccupied (0));
+    CHECK_FALSE (p.isLayerOccupied (1));
+    CHECK (p.loadState (0) == osp::plugin::InstrumentHost::LoadState::ready);
+    osp::plugin::InstrumentHost::GeneratedSource source;
+    REQUIRE (p.generatedSource (0, source));
+    CHECK (source.name.isNotEmpty());
+    CHECK (source.cycle.size() >= 2);
+    CHECK_FALSE (p.generatedSource (1, source));
+    // A dropped recording is refused, said so, and nothing changes.
+    const auto file = writeSource (tmp.dir, "pluck.wav", osp::testsignals::pluck (220.0, 0.5, 48000.0, 1));
+    CHECK (p.addLayers ({ file }) == 0);
+    p.loadFile (file, 0);
+    CHECK (p.waitForLoads (1000));
+    p.pollLoads();
+    CHECK (p.currentInstrument (0) == nullptr);
+    CHECK (p.statusMessage().isNotEmpty());
+    CHECK (p.slotCount() == 1);
+    // It sounds with nothing loaded.
+    CHECK (rms (play (p, 60, 1.0, 0.6), 0.1, 0.5) > 0.003f);
+    // The editor shows its card, not the drop zone, and takes no files.
+    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<ShellEditor*> (editor.get());
+    REQUIRE (ui != nullptr);
+    ui->refreshNow();
+    CHECK (ui->visibleCardCount() == 1);
+    CHECK_FALSE (ui->isInterestedInFileDrag ({ file.getFullPathName() }));
 }
 
 TEST_CASE ("shell: the diagnostic engine plays the sources it is given, says what it is, binds only what it reads", "[shell][engine]")
@@ -213,6 +267,8 @@ TEST_CASE ("shell: a new sound replaces a layer's on the audio thread without a 
 {
     TempDir tmp;
     ShellProcessor p;
+    if (p.isGenerator())
+        return;   // it loads nothing (the generator test above)
     const auto first = writeSource (tmp.dir, "one.wav", osp::testsignals::pluck (220.0, 1.5, 48000.0, 1));
     const auto second = writeSource (tmp.dir, "two.wav", osp::testsignals::pluck (330.0, 1.5, 48000.0, 2));
     p.prepareToPlay (48000.0, 256);
@@ -243,6 +299,7 @@ TEST_CASE ("shell: presets and sessions save and reload; another product's state
     const auto file = writeSource (tmp.dir, "pluck E4.wav", osp::testsignals::pluck (329.63, 2.0, 48000.0, 5));
     juce::MemoryBlock session;
     juce::File preset;
+    const bool generator = ShellProcessor().isGenerator();   // no sources to save or recall
     {
         ShellProcessor p;
         p.addLayers ({ file });
@@ -252,11 +309,12 @@ TEST_CASE ("shell: presets and sessions save and reload; another product's state
         p.setParameterValue ("attack", 120.0f);
         REQUIRE (p.assignModulation (osp::mod::Source::lfo1, osp::mod::Dest::levelA, 40.0f).slot >= 0);
         preset = p.presetFolder().getChildFile ("Soft Pluck");
+        const auto factory = p.presetList().size();   // a product's factory presets, if it has any
         REQUIRE (p.savePreset (preset));
         preset = preset.withFileExtension (andor::shell::productInfo().presetExtension);
         CHECK (preset.existsAsFile());
         p.getStateInformation (session);
-        CHECK (p.presetList().size() == 1);
+        CHECK (p.presetList().size() == factory + 1);
         CHECK (p.presetDisplayName() == "Soft Pluck");
     }
     // A session recalls parameters, routes and sources.
@@ -268,8 +326,11 @@ TEST_CASE ("shell: presets and sessions save and reload; another product's state
         CHECK (q.parameterValue ("layerA.level") == Approx (-6.0f).margin (0.05f));
         CHECK (q.parameterValue ("attack") == Approx (120.0f).margin (0.5f));
         CHECK (q.modulationRoutes().size() == 1);
-        REQUIRE (q.currentInstrument (0) != nullptr);
-        CHECK (q.currentInstrument (0)->filename == "pluck E4.wav");
+        if (! generator)
+        {
+            REQUIRE (q.currentInstrument (0) != nullptr);
+            CHECK (q.currentInstrument (0)->filename == "pluck E4.wav");
+        }
     }
     // A preset file loads the same way (and can be undone with "previous state").
     {
@@ -407,9 +468,13 @@ TEST_CASE ("shell: the interface is ANDOR OSP's, pixel for pixel outside the app
     const ScopedLook ceramic (osp::plugin::skin::Look::ceramic);
     TempDir tmp;
 
-    // Parity: the same states rendered by the shell with every control enabled.
-    visualstates::render<ShellProcessor, ShellEditor> (output.getChildFile ("parity"), tmp.dir.getChildFile ("parity"),
-                                                       [] { return std::make_unique<ShellProcessor> (std::make_unique<ParityEngine>()); });
+    // Parity: the same states rendered by the shell with every control enabled (and ANDOR
+    // OSP's macro names: a product's own are its identity, like the header's).
+    visualstates::render<ShellProcessor, ShellEditor> (output.getChildFile ("parity"), tmp.dir.getChildFile ("parity"), [] {
+        auto p = std::make_unique<ShellProcessor> (std::make_unique<ParityEngine>());
+        p->showReferenceMacros();
+        return p;
+    });
     // As shipped: the product's own engine (its unbound controls disabled), for the gallery.
     visualstates::render<ShellProcessor, ShellEditor> (output.getChildFile ("shipped"), tmp.dir.getChildFile ("shipped"),
                                                        [] { return std::make_unique<ShellProcessor>(); });

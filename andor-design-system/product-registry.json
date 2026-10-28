@@ -53,6 +53,18 @@
       "target": "ANDOR_Example",
       "location": "products/andor-example",
       "builtFromShell": true
+    },
+    {
+      "name": "ANDOR Analog",
+      "productName": "ANDOR Analog",
+      "slug": "analog",
+      "pluginCode": "Aanl",
+      "bundleId": "com.osp.andoranalog",
+      "stateType": "ANDOR_ANALOG",
+      "presetExtension": ".andoranalog",
+      "target": "ANDOR_Analog",
+      "location": "arenttodal/analog: product",
+      "builtFromShell": true
     }
   ]
 }

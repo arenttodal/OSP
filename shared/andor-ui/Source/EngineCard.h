@@ -57,6 +57,9 @@ public:
     };
 
     void setInstrument (std::shared_ptr<const LoadedInstrument>);
+    /** A generated source (a synthesizer's oscillators): one period of its waveform (-1..1),
+        drawn across the display in place of a recording. Empty: the recording, as before. */
+    void setGeneratedCycle (std::vector<float> cycle);
     void setLayer (int layer);
     void setFocused (bool focused);
     void setLoading (bool loading);
@@ -89,6 +92,7 @@ public:
 
 private:
     void paintStatic (juce::Graphics&);
+    void paintGenerated (juce::Graphics&);
     /** Paints, into `g` (this display's coordinates), what its ancestors paint behind it:
         each ancestor's own paint and the siblings below the branch that leads here. */
     void paintBackdrop (juce::Graphics&);
@@ -101,6 +105,7 @@ private:
     double startSeconds() const;
 
     std::shared_ptr<const LoadedInstrument> instrument;
+    std::vector<float> generatedCycle;   ///< a generated source's period (empty: none)
     int layer = 0;
     bool focused = true, loading = false;
     View view;
@@ -304,6 +309,8 @@ private:
     std::unique_ptr<EqEditor> eqEditor;
     juce::Rectangle<int> badgeArea, textArea, dividerArea;
     juce::String rootText, fileText;
+    bool generated = false;               ///< the layer's sound is made by the instrument itself
+    std::uint64_t shownGeneratedRevision = ~0ull;
     struct InfoCard final : juce::Component
     {
         juce::StringArray lines;
