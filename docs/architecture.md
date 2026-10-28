@@ -569,13 +569,32 @@ paints its ancestors' own paint behind its corners from a backdrop image (`paint
 keyed by size, position, scale, skin and focus), so moving marks repaint only the display. It
 shows at most `maxHeadsShown` read heads.
 
+## Fast numerics in engine C (docs/reports/cpu-three-layers.md, step 2)
+
+`core/Simd.h` is four float lanes (`simd::Float4`): SSE2 on x86-64, NEON on arm64 (both part
+of those platforms' baselines, so no runtime dispatch), and a plain-array fallback. Lane sums
+are taken in one fixed order. It serves only engine C's hottest loops, which differ from the
+plain forms by float rounding:
+
+- `SincInterpolator::readFast`: table kernel and apply in one pass, both channels, taps summed
+  in four lanes. The baselines keep `computeKernel` + `apply`, so their goldens never change.
+- `GranularSource::render` and KALEIDOSCOPE's grains: Hermite reads as four tap weights
+  (`hermiteWeights`) on one 4-sample load, the window and pan folded into the weights.
+- `CharacterFilter`: LP24's left and right ladders in two lanes of one pass, with the loop's
+  constants (powers of G, the feedback reciprocal, the saturator's bias offset) computed in
+  `setParameters`.
+- `engine/FastMath.h`: `fastTanh` (a rational fit within 4e-7 of tanh) for KALEIDOSCOPE's
+  saturation, and `Phasor` (sin by rotation) for the doubling's slow sway.
+
+`tests/unit/FastNumericsTests.cpp` keeps each one against the form it replaced.
+
 ## RENDERED CONTROLS (tools/blender-assets; docs/reports/knob-phase1.md)
 
 Controls can be drawn from offline renders instead of vectors.
 
 **Generator.** `tools/blender-assets/` is a procedural, headless Blender pipeline (JSON
 configs plus named material, lighting and camera presets). It writes one zip of PNG frames
-per size into `apps/plugin/Resources/knobs/<name>/`. These are embedded as binary data.
+per size into `shared/andor-ui/Resources/knobs/<name>/`. These are embedded as binary data.
 
 **Plugin side.** `SpriteKnobRenderer`:
 - decodes a frame when first shown;
@@ -600,7 +619,7 @@ halos, the keyboard and the dark displays stay vector-drawn.
 **Generator.** `tools/blender-assets/skin/`: `pieces.py` lists what is rendered and where,
 `render.py` renders it with the design lab's studio, materials and calibrated exposure (the
 direction's own config in `design-lab/blender/configs`, so nothing restates a colour or a
-light), `pack.py` writes `apps/plugin/Resources/skin/ceramic-skin.zip` (manifest plus one image
+light), `pack.py` writes `shared/andor-ui/Resources/skin/ceramic-skin.zip` (manifest plus one image
 per piece and level).
 
 Each piece is rendered at its real place and size in the design canvas, so the light falls on
@@ -668,9 +687,9 @@ apps/grain           ANDOR_Grain plug-in (processor, editor, KEY DNA editor)
 ```
 
 Libraries: `andor_dsp` (links `osp_dsp`) and `andor_io` (links `osp_research`); the plug-ins
-compile OSP's `Design`, `OspLookAndFeel`, `SpriteKnobRenderer` and `CeramicSkin` again with
-their own `BinaryData` (fonts and the rendered ivory knob; no ceramic skin pack), as ANDOR
-Drums does on its branch.
+compile the look from `shared/andor-ui` (`Design`, `OspLookAndFeel`, `SpriteKnobRenderer`,
+`CeramicSkin`; not the instrument components) again with their own `BinaryData` (fonts and the
+rendered ivory knob; no ceramic skin pack), as ANDOR Drums does on its branch.
 
 Threading follows the OSP plug-in: the message thread owns the document (source, atlas or
 KEY DNA curves, undo); a `juce::ThreadPool` worker decodes, hashes and analyses; the audio
@@ -684,3 +703,33 @@ The Note Atlas is the seam for a later hybrid: Phrase writes it, Grain reads it 
 policies), and both engines can play from one `PlaybackSource` (tested). Recorded deviation
 from the suggested `shared/ products/` layout: the existing `src/` + `apps/` structure was kept
 (no refactor of OSP before working prototypes existed); see docs/andor-lab/audit.md §6.
+
+## ANDOR DESIGN SYSTEM AND INSTRUMENT SHELL (andor-design-system/HANDOFF.md)
+
+**Why.** Sister products (ANDOR Drums, Grain, Phrase and those to come) must look and behave
+exactly like ANDOR OSP. A copy of the interface would drift; subclassing OSP's processor would
+drag along its engine and Library. So the interface became a shared library that OSP itself
+is built from.
+
+**What moved.**
+- `shared/andor-ui` holds, unchanged:
+  - the components, the look (design tokens, look-and-feel, ceramic skin, sprite knobs) and the embedded assets;
+  - the frame (canvas, painting, placement, keyboard, macro row, popover placement), extracted from OSP's editor;
+  - the parameter schema (`AndorParameters`, OSP's layout and IDs);
+  - the sample loader.
+- `InstrumentHost` is the only thing the components know about an instrument. OSP's processor implements it.
+- Behaviour that needs only the parameters and the state tree lives in `InstrumentHost`, once: modulation routes and links, the assignment rules, MUTE/SOLO, LINK, the mix when layers are added, the curve codec.
+- OSP keeps its editor's composition, its own popovers, the Library, its presets and its engine.
+- `apps/plugin/CMakeLists.txt` adds the shared code with `andor_ui_add_to (OSP_Plugin)`.
+
+**Guarantees.** Nothing about OSP changed:
+- Its renders are pixel-identical to before the extraction (`[design-capture]` before and after).
+- Its 350-parameter schema equals the listing from the unmodified build (`tests/plugin/golden/osp-parameter-schema.txt`).
+- Its full suite passes.
+
+**The shell.**
+- `shared/andor-shell` builds a complete plugin around a product's `Engine` with `andor_add_instrument`: processor, editor, presets, state, a diagnostic engine.
+- Sources reach the audio thread through `ModelExchange`, as in OSP.
+- The editor disables every control whose parameter the engine does not read (`Binding.h` tags, which are non-visual).
+- Products live in `products/`. They are written by `tools/create_andor_instrument.py` and checked against `andor-design-system/product-registry.json`.
+- Each product is tested by `andor_<slug>_tests` and compared with OSP, pixel for pixel, by `andor_<slug>_tests_visual`.

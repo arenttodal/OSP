@@ -93,6 +93,14 @@ jobs:
           name: ANDOR-Lab-macOS-test
           path: ANDOR-Lab-macOS-test.zip
 
+      - name: Validate ANDOR Example AU (macOS)
+        # The product built from the ANDOR Instrument Shell is its own plugin (code Aexm).
+        if: runner.os == 'macOS'
+        run: |
+          cp -R "build/products/andor-example/ANDOR_Example_artefacts/Release/AU/ANDOR Example.component" ~/Library/Audio/Plug-Ins/Components/
+          killall -9 AudioComponentRegistrar || true
+          auval -v aumu Aexm Ospx
+
       - name: Package macOS test build
         if: runner.os == 'macOS'
         run: |
@@ -111,6 +119,14 @@ jobs:
         with:
           name: OSP-macOS-test
           path: OSP-macOS-test.zip
+
+      - uses: actions/upload-artifact@v4
+        # The ANDOR visual regression: OSP's renders, each shell product's, the diffs and report.
+        if: always() && matrix.plugin == 'ON'
+        with:
+          name: andor-visual-regression-${{ matrix.os }}
+          path: build/andor-visual-regression/
+          if-no-files-found: ignore
 
       - uses: actions/upload-artifact@v4
         if: always()

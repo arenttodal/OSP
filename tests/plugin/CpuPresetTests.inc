@@ -5,6 +5,8 @@
 // way a player's do. Every block is timed: the mean, the 99th percentile and the worst, and the
 // blocks with note-ons apart from the rest, since a stutter is one late block.
 //   OSP_CPU_PRESET=<file.osppreset> [OSP_CPU_BLOCK=256] [OSP_CPU_SECONDS=20] ./osp_plugin_tests "[cpu-preset]"
+// OSP_CPU_DUMP=<file>: the output as raw 32-bit floats, left and right interleaved (to compare
+// two builds sample by sample).
 // Included at the end of PluginProcessorTests.cpp.
 
 #include <algorithm>
@@ -74,6 +76,12 @@ TEST_CASE ("plugin: CPU of a saved three-layer preset, block by block", "[.][cpu
     const int period = static_cast<int> (1.5 * rate), hold = static_cast<int> (1.2 * rate);
     juce::AudioBuffer<float> buffer (2, block);
     std::vector<double> plain, withOn;
+    std::unique_ptr<juce::FileOutputStream> dump;
+    if (const char* dumpPath = std::getenv ("OSP_CPU_DUMP"))
+    {
+        juce::File (dumpPath).deleteFile();
+        dump = std::make_unique<juce::FileOutputStream> (juce::File (dumpPath));
+    }
     int maxVoices = 0;
     double sum = 0.0;
     for (int i = 0; i < total; ++i)
@@ -97,6 +105,12 @@ TEST_CASE ("plugin: CPU of a saved three-layer preset, block by block", "[.][cpu
         const auto t0 = std::chrono::steady_clock::now();
         p.processBlock (buffer, midi);
         const double us = std::chrono::duration<double, std::micro> (std::chrono::steady_clock::now() - t0).count();
+        if (dump != nullptr)
+            for (int n = 0; n < block; ++n)
+            {
+                dump->writeFloat (buffer.getSample (0, n));
+                dump->writeFloat (buffer.getSample (1, n));
+            }
         if (i < 20)
             continue;   // warm-up
         sum += us;

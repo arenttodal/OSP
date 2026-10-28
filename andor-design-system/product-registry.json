@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "about": "Every ANDOR plugin's identifiers. tools/create_andor_instrument.py refuses a new product that reuses any of them, and andor_add_instrument (shared/andor-shell/AndorInstrument.cmake) checks a product against this file at configure time. Never change an entry of a released product: hosts recall sessions and automation by these.",
+  "manufacturerCode": "Ospx",
+  "companyName": "OSP",
+  "products": [
+    {
+      "name": "ANDOR OSP",
+      "productName": "OSP",
+      "slug": "osp",
+      "pluginCode": "Osp1",
+      "bundleId": "com.osp.instrument",
+      "stateType": "OSP",
+      "presetExtension": ".osppreset",
+      "location": "apps/plugin",
+      "builtFromShell": false
+    },
+    {
+      "name": "ANDOR Drums",
+      "productName": "ANDOR Drums",
+      "slug": "drums",
+      "pluginCode": "Adrm",
+      "bundleId": "com.osp.andordrums",
+      "location": "branch drum-plugin: apps/drums",
+      "builtFromShell": false
+    },
+    {
+      "name": "ANDOR Grain",
+      "productName": "ANDOR Grain",
+      "slug": "grain",
+      "pluginCode": "Agrn",
+      "bundleId": "com.osp.andorgrain",
+      "location": "branch andor-lab: apps/grain",
+      "builtFromShell": false
+    },
+    {
+      "name": "ANDOR Phrase",
+      "productName": "ANDOR Phrase",
+      "slug": "phrase",
+      "pluginCode": "Aphr",
+      "bundleId": "com.osp.andorphrase",
+      "location": "branch andor-lab: apps/phrase",
+      "builtFromShell": false
+    },
+    {
+      "name": "ANDOR Example",
+      "productName": "ANDOR Example",
+      "slug": "example",
+      "pluginCode": "Aexm",
+      "bundleId": "com.osp.andorexample",
+      "stateType": "ANDOR_EXAMPLE",
+      "presetExtension": ".andorexample",
+      "target": "ANDOR_Example",
+      "location": "products/andor-example",
+      "builtFromShell": true
+    }
+  ]
+}

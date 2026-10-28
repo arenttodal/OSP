@@ -3,6 +3,7 @@
 #include "core/Prng.h"
 
 #include "analysis/continuation/ContinuationAnalyzer.h"
+#include "engine/FastMath.h"
 #include "engine/LevelContour.h"
 
 #include <algorithm>
@@ -174,8 +175,8 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
         const double sr = src.sampleRate();
         dBase = (0.012 + 0.008 * dRng.nextDouble()) * sr;
         dDepth = 0.0018 * sr;
-        dPhase = 2.0 * std::numbers::pi * dRng.nextDouble();
-        dOmega = 2.0 * std::numbers::pi * (0.25 + 0.2 * dRng.nextDouble()) / sampleRate;
+        const double phase = 2.0 * std::numbers::pi * dRng.nextDouble();
+        dSway.reset (phase, 2.0 * std::numbers::pi * (0.25 + 0.2 * dRng.nextDouble()) / sampleRate);
         dRamp = 0.0f;
         dRampStep = 1.0f / static_cast<float> (0.08 * sampleRate);
         dDelaySamples = static_cast<int> (0.03 * sampleRate);
@@ -930,9 +931,7 @@ void InstrumentVoice::updateControl() noexcept
 void InstrumentVoice::readFrame (double pos, double step, float& l, float& r) noexcept
 {
     const auto& src = *layer->source;
-    sinc->computeKernelFast (pos, step, kernel, kernelLevel);
-    l = SincInterpolator::apply (kernel, src.channelData (0));
-    r = src.numChannels() > 1 ? SincInterpolator::apply (kernel, src.channelData (1)) : l;
+    sinc->readFast (pos, step, kernelLevel, kernel, src.channelData (0), src.numChannels() > 1 ? src.channelData (1) : nullptr, l, r);
 }
 
 float InstrumentVoice::readTransient (const PlaybackSource& src, double pos, double step, int channel) noexcept
@@ -942,25 +941,6 @@ float InstrumentVoice::readTransient (const PlaybackSource& src, double pos, dou
         return 0.0f;
     sinc->computeKernelFast (pos, step, kernel, kernelLevel);
     return SincInterpolator::apply (kernel, src.channelData (channel));
-}
-
-void InstrumentVoice::readHermiteStereo (double pos, bool stereo, float& left, float& right) const noexcept
-{
-    // Cheap 4-point read for grains (their bus is darkened, so no band-limiting needed), both
-    // channels: the clamp, the index and the fraction found once.
-    const auto& src = *layer->source;
-    const auto last = static_cast<double> (std::max<std::int64_t> (2, src.numFrames() - 3));
-    pos = std::clamp (pos, 1.0, last);
-    const auto i = static_cast<std::int64_t> (pos);
-    const float t = static_cast<float> (pos - static_cast<double> (i));
-    auto hermite = [t] (const float* x) {
-        const float c0 = x[0], c1 = 0.5f * (x[1] - x[-1]);
-        const float c2 = x[-1] - 2.5f * x[0] + 2.0f * x[1] - 0.5f * x[2];
-        const float c3 = 0.5f * (x[2] - x[-1]) + 1.5f * (x[0] - x[1]);
-        return ((c3 * t + c2) * t + c1) * t + c0;
-    };
-    left = hermite (src.channelData (0) + i);
-    right = stereo ? hermite (src.channelData (1) + i) : left;
 }
 
 void InstrumentVoice::spawnGrain() noexcept
@@ -1096,12 +1076,12 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
                 else if (dRamp < 1.0f)
                     dRamp = std::min (1.0f, dRamp + dRampStep);
                 float l2 = 0.0f, r2 = 0.0f;
-                doubleSource.render (l2, r2, currentStep * (1.0 + 0.004 * std::sin (dPhase)));
+                doubleSource.render (l2, r2, currentStep * (1.0 + 0.004 * dSway.sin()));
                 const float g = dAmount * dRamp;
                 const float norm = 1.0f / std::sqrt (1.0f + g * g);
                 l = (l + g * (dSide < 0.0f ? 1.0f : dNear) * l2) * norm;
                 r = (r + g * (dSide < 0.0f ? dNear : 1.0f) * r2) * norm;
-                dPhase += dOmega;
+                dSway.advance();
             }
         }
         else
@@ -1126,7 +1106,7 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
                     dRamp = std::min (1.0f, dRamp + dRampStep);
                 if (dRamp > 0.0f)
                 {
-                    const double behind = dBase + dDepth * std::sin (dPhase);
+                    const double behind = dBase + dDepth * dSway.sin();
                     float l2, r2;
                     // Behind = what was just played: earlier in the file, or later when reversed.
                     const double doubled = direction > 0.0 ? std::max (0.0, bodyPosition - behind * currentStep)
@@ -1138,7 +1118,7 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
                     l = (l + g * (dSide < 0.0f ? 1.0f : dNear) * l2) * norm;
                     r = (r + g * (dSide < 0.0f ? dNear : 1.0f) * r2) * norm;
                 }
-                dPhase += dOmega;
+                dSway.advance();
             }
             position += direction * currentStep;
             if (tRemaining > 0)
@@ -1171,23 +1151,32 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
                     if (gFade < 1.0f)
                         gFade = std::min (1.0f, gFade + gFadeStep);
                 }
-                float gl = 0.0f, gr = 0.0f;
-                const bool stereoSource = layer->source->numChannels() > 1;
+                // Cheap 4-point reads (the grains' bus is darkened, so no band-limiting is
+                // needed): each grain's Hermite taps, weighted by its window and pan, go into
+                // four lanes per channel, summed once for the sample.
+                using simd::Float4;
+                const auto& src = *layer->source;
+                const float* dataL = src.channelData (0);
+                const float* dataR = src.numChannels() > 1 ? src.channelData (1) : dataL;
+                const auto last = static_cast<double> (std::max<std::int64_t> (2, src.numFrames() - 3));
+                auto accL = Float4::zero(), accR = Float4::zero();
                 for (auto& grain : grains)
                 {
                     if (! grain.active)
                         continue;
                     const auto x = static_cast<float> (grain.phase);
                     const float w = 16.0f * x * x * (1.0f - x) * (1.0f - x);
-                    float sl, sr;
-                    readHermiteStereo (grain.position, stereoSource, sl, sr);
-                    gl += w * sl * grain.left;
-                    gr += w * sr * grain.right;
+                    const double at = std::clamp (grain.position, 1.0, last);
+                    const auto index = static_cast<std::int64_t> (at);
+                    const auto taps = hermiteWeights (static_cast<float> (at - static_cast<double> (index)));
+                    accL = accL + taps * Float4::broadcast (w * grain.left) * Float4::load (dataL + index - 1);
+                    accR = accR + taps * Float4::broadcast (w * grain.right) * Float4::load (dataR + index - 1);
                     grain.position += grain.step;
                     grain.phase += grain.phaseStep;
                     if (grain.phase >= 1.0)
                         grain.active = false;
                 }
+                const float gl = accL.sum(), gr = accR.sum();
                 gLowL += (gl - gLowL) * gLowCoef;
                 gLowR += (gr - gLowR) * gLowCoef;
                 // Alternate synthetic sustain: towards the far end the grains carry the sustain.
@@ -1211,8 +1200,8 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
         if (saturationDrive > 1.0f)
         {
             // Gentle harmonic generation (Reimagined): unity gain for small signals.
-            l = std::tanh (saturationDrive * l) * saturationNorm;
-            r = std::tanh (saturationDrive * r) * saturationNorm;
+            l = fastTanh (saturationDrive * l) * saturationNorm;
+            r = fastTanh (saturationDrive * r) * saturationNorm;
         }
         charFilter.process (l, r);
         dampenFilter.process (l, r);

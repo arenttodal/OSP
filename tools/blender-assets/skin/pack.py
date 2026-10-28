@@ -3,7 +3,7 @@
     python3 pack.py            # Python 3 + numpy + Pillow (no Blender)
 
 Reads tools/blender-assets/output/ceramic/raw/ (render.py) and writes
-apps/plugin/Resources/skin/ceramic-skin.zip (stored, not deflated: PNG is compressed
+shared/andor-ui/Resources/skin/ceramic-skin.zip (stored, not deflated: PNG is compressed
 already) with manifest.json and one image per piece and level:
 
 - slabs and lenses keep their straight alpha (the part and its contact shadow);
@@ -32,7 +32,7 @@ sys.path.insert(0, HERE)
 import pieces as P  # noqa: E402
 
 RAW = os.path.join(REPO, "tools", "blender-assets", "output", "ceramic", "raw")
-OUT = os.path.join(REPO, "apps", "plugin", "Resources", "skin", "ceramic-skin.zip")
+OUT = os.path.join(REPO, "shared", "andor-ui", "Resources", "skin", "ceramic-skin.zip")
 SCHEMA = 1
 
 

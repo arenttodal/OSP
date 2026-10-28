@@ -77,9 +77,6 @@ private:
     };
 
     void spawn (double step) noexcept;
-    /** Both channels at one position (4-point cubic Hermite; the caller keeps pos inside
-        [1, frames - 3]): the index and the fraction found once for both. */
-    void readStereo (double pos, float& left, float& right) const noexcept;
     /** The level correction for overlapping grains (it depends only on the settings). */
     void updateNorm() noexcept;
 

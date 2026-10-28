@@ -1,5 +1,7 @@
 #include "audio/pitch/SincInterpolator.h"
 
+#include "core/Simd.h"
+
 #include <algorithm>
 #include <cmath>
 #include <numbers>
@@ -118,6 +120,27 @@ void SincInterpolator::computeKernelFast (double position, double increment, Ker
     computeKernelFast (position, increment, kernel, once);
 }
 
+int SincInterpolator::tableLevel (double increment, LevelCache& cache) const noexcept
+{
+    if (stretchTables.empty() || increment > maxTableStretch)
+        return 0;
+    // Next semitone level up (a slightly lower cutoff, never a higher one).
+    if (increment != cache.increment)
+    {
+        cache.increment = increment;
+        cache.level = std::clamp (static_cast<int> (std::ceil (12.0 * std::log2 (increment) - 1.0e-9)), 1, stretchSteps);
+    }
+    return stretchTables[static_cast<std::size_t> (cache.level)].rows.empty() ? 0 : cache.level;
+}
+
+SincInterpolator::Row SincInterpolator::rowFor (double position, int resolution, int reachOfTable, const float* rows, int taps) noexcept
+{
+    const auto base = static_cast<int> (std::floor (position));
+    const double scaled = (position - static_cast<double> (base)) * resolution;
+    const auto row = std::min (static_cast<int> (scaled), resolution - 1);
+    return { rows + static_cast<std::size_t> (row * taps), static_cast<float> (scaled - static_cast<double> (row)), base - reachOfTable + 1 };
+}
+
 void SincInterpolator::computeKernelFast (double position, double increment, Kernel& kernel, LevelCache& cache) const noexcept
 {
     if (increment <= 1.0)
@@ -125,35 +148,122 @@ void SincInterpolator::computeKernelFast (double position, double increment, Ker
         computeKernelUnity (position, kernel);
         return;
     }
-    if (stretchTables.empty() || increment > maxTableStretch)
+    const int level = tableLevel (increment, cache);
+    if (level == 0)
     {
         computeKernel (position, increment, kernel);
         return;
     }
-    // Next semitone level up (a slightly lower cutoff, never a higher one).
-    if (increment != cache.increment)
-    {
-        cache.increment = increment;
-        cache.level = std::clamp (static_cast<int> (std::ceil (12.0 * std::log2 (increment) - 1.0e-9)), 1, stretchSteps);
-    }
-    const auto level = cache.level;
     const auto& table = stretchTables[static_cast<std::size_t> (level)];
-    if (table.rows.empty())
-    {
-        computeKernel (position, increment, kernel);
-        return;
-    }
-    const auto base = static_cast<int> (std::floor (position));
-    const double scaled = (position - static_cast<double> (base)) * stretchResolution;
-    const auto row = std::min (static_cast<int> (scaled), stretchResolution - 1);
-    const auto a = static_cast<float> (scaled - static_cast<double> (row));
     const int taps = 2 * table.reach;
-    kernel.firstIndex = base - table.reach + 1;
+    const auto row = rowFor (position, stretchResolution, table.reach, table.rows.data(), taps);
+    kernel.firstIndex = row.first;
     kernel.numTaps = taps;
-    const float* r0 = table.rows.data() + static_cast<std::size_t> (row * taps);
+    const float* r0 = row.r0;
     const float* r1 = r0 + taps;
     for (int t = 0; t < taps; ++t)
-        kernel.weights[t] = r0[t] + a * (r1[t] - r0[t]);
+        kernel.weights[t] = r0[t] + row.a * (r1[t] - r0[t]);
+}
+
+namespace
+{
+    /** Weights blended between two table rows (r0 + a * (r1 - r0), as the kernel functions
+        make them) and applied to one or two channels, four taps at a time. */
+    inline void blendApply (const float* r0, const float* r1, float a, int taps, const float* left, const float* right,
+                            float& outLeft, float& outRight) noexcept
+    {
+        using simd::Float4;
+        const auto fa = Float4::broadcast (a);
+        auto accL = Float4::zero(), accR = Float4::zero();
+        int t = 0;
+        if (right != nullptr)
+        {
+            for (; t + 4 <= taps; t += 4)
+            {
+                const auto w0 = Float4::load (r0 + t);
+                const auto w = w0 + fa * (Float4::load (r1 + t) - w0);
+                accL = accL + w * Float4::load (left + t);
+                accR = accR + w * Float4::load (right + t);
+            }
+            float l = accL.sum(), r = accR.sum();
+            for (; t < taps; ++t)
+            {
+                const float w = r0[t] + a * (r1[t] - r0[t]);
+                l += w * left[t];
+                r += w * right[t];
+            }
+            outLeft = l;
+            outRight = r;
+            return;
+        }
+        for (; t + 4 <= taps; t += 4)
+        {
+            const auto w0 = Float4::load (r0 + t);
+            accL = accL + (w0 + fa * (Float4::load (r1 + t) - w0)) * Float4::load (left + t);
+        }
+        float l = accL.sum();
+        for (; t < taps; ++t)
+            l += (r0[t] + a * (r1[t] - r0[t])) * left[t];
+        outLeft = outRight = l;
+    }
+}
+
+void SincInterpolator::applyLanes (const Kernel& kernel, const float* left, const float* right, float& outLeft, float& outRight) noexcept
+{
+    using simd::Float4;
+    const float* w = kernel.weights;
+    const float* pl = left + kernel.firstIndex;
+    const float* pr = right != nullptr ? right + kernel.firstIndex : nullptr;
+    const int taps = kernel.numTaps;
+    auto accL = Float4::zero(), accR = Float4::zero();
+    int t = 0;
+    if (pr != nullptr)
+    {
+        for (; t + 4 <= taps; t += 4)
+        {
+            const auto wt = Float4::load (w + t);
+            accL = accL + wt * Float4::load (pl + t);
+            accR = accR + wt * Float4::load (pr + t);
+        }
+        float l = accL.sum(), r = accR.sum();
+        for (; t < taps; ++t)
+        {
+            l += w[t] * pl[t];
+            r += w[t] * pr[t];
+        }
+        outLeft = l;
+        outRight = r;
+        return;
+    }
+    for (; t + 4 <= taps; t += 4)
+        accL = accL + Float4::load (w + t) * Float4::load (pl + t);
+    float l = accL.sum();
+    for (; t < taps; ++t)
+        l += w[t] * pl[t];
+    outLeft = outRight = l;
+}
+
+void SincInterpolator::readFast (double position, double increment, LevelCache& cache, Kernel& scratch,
+                                 const float* left, const float* right, float& outLeft, float& outRight) const noexcept
+{
+    if (increment <= 1.0)
+    {
+        const int taps = 2 * numZeroCrossings;
+        const auto row = rowFor (position, polyphaseResolution, numZeroCrossings, polyphase.data(), taps);
+        blendApply (row.r0, row.r0 + taps, row.a, taps, left + row.first, right != nullptr ? right + row.first : nullptr, outLeft, outRight);
+        return;
+    }
+    const int level = tableLevel (increment, cache);
+    if (level == 0)
+    {
+        computeKernel (position, increment, scratch);
+        applyLanes (scratch, left, right, outLeft, outRight);
+        return;
+    }
+    const auto& table = stretchTables[static_cast<std::size_t> (level)];
+    const int taps = 2 * table.reach;
+    const auto row = rowFor (position, stretchResolution, table.reach, table.rows.data(), taps);
+    blendApply (row.r0, row.r0 + taps, row.a, taps, left + row.first, right != nullptr ? right + row.first : nullptr, outLeft, outRight);
 }
 
 float SincInterpolator::lookup (const std::vector<float>& table, double index) noexcept

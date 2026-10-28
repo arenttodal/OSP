@@ -2,6 +2,8 @@
 // from the same formulas and parameters the sound uses, plus a few compact controls.
 #include "EngineCard.h"
 #include "Design.h"
+#include "OspPopups.h"
+#include "PluginProcessor.h"
 #include "ShapingPopups.h"
 
 #include "core/Prng.h"

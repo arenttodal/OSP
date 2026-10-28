@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ANDOR Design Gallery</title>
+<style>
+  /* This page only frames the renders. Its own colours and type are documentation chrome,
+     not the ANDOR interface; every picture of the interface is a real render (see below). */
+  :root { --bg: #f4f1ec; --fg: #23211e; --dim: #6b665e; --rule: #d8d0c3; --card: #fbf9f5; --accent: #c2541d; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #1d1c1a; --fg: #ece8e1; --dim: #a39d93; --rule: #3a3733; --card: #262422; --accent: #e8813f; color-scheme: dark; } }
+  :root[data-theme="dark"] { --bg: #1d1c1a; --fg: #ece8e1; --dim: #a39d93; --rule: #3a3733; --card: #262422; --accent: #e8813f; color-scheme: dark; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 -apple-system, "Segoe UI", Inter, system-ui, sans-serif; }
+  header, main { max-width: 1500px; margin: 0 auto; padding-inline: 16px; }
+  header { padding-block: 28px 8px; }
+  h1 { font-size: 26px; letter-spacing: .02em; margin: 0 0 6px; text-wrap: balance; }
+  h2 { font-size: 18px; letter-spacing: .04em; text-transform: uppercase; margin: 40px 0 6px; border-top: 1px solid var(--rule); padding-top: 18px; }
+  p, li { max-width: 78ch; }
+  .dim { color: var(--dim); }
+  .bar { position: sticky; top: 0; z-index: 2; background: var(--bg); border-bottom: 1px solid var(--rule); padding: 10px 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .bar button { font: inherit; border: 1px solid var(--rule); background: var(--card); color: var(--fg); border-radius: 6px; padding: 4px 12px; cursor: pointer; }
+  .bar button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+  figure { margin: 18px 0; }
+  figcaption { font-size: 13px; color: var(--dim); margin-top: 6px; max-width: 100ch; }
+  figcaption b { color: var(--fg); font-weight: 600; }
+  .scroll { overflow-x: auto; border: 1px solid var(--rule); border-radius: 6px; background: var(--card); padding: 8px; }
+  .scroll img { display: block; image-rendering: auto; }
+  .scroll img.enlarged { image-rendering: pixelated; }
+  .grid { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+  .grid figure { margin: 0; min-width: 0; }
+  .tag { display: inline-block; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; border: 1px solid var(--rule); border-radius: 4px; padding: 0 6px; margin-left: 6px; color: var(--dim); }
+  table { border-collapse: collapse; font-size: 13px; }
+  td, th { border-bottom: 1px solid var(--rule); padding: 4px 10px 4px 0; text-align: left; font-variant-numeric: tabular-nums; }
+  code { font-size: 13px; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>ANDOR design gallery</h1>
+  <p>Every picture of the interface on this page is a <b>render of the real code</b> (ANDOR OSP's
+  editor and the shared components in <code>shared/andor-ui</code>), produced by the tests:
+  <code>tests/plugin/DesignCaptureTests.inc</code> (ANDOR OSP) and
+  <code>tests/support/VisualStates.h</code> (ANDOR Example). Nothing here is a CSS or hand-drawn
+  recreation. This page's own frame, type and colours are documentation chrome only.</p>
+  <p class="dim">Zoom: <b>100 %</b> shows one render pixel per CSS pixel at reference size
+  (1448 × 1086). The three-layer state was rendered at 1×, 1.5× and 2×, so each zoom shows a real
+  render at that scale. Other states are 1× renders; above 100 % they are enlarged
+  (marked <span class="tag">1× enlarged</span>). Component crops are 2× renders: 100 % shows them
+  at reference size, 200 % pixel for pixel.</p>
+  <p class="dim">Tokens, components and rules: <a href="02-tokens.md">tokens</a>,
+  <a href="03-components.md">components</a>, <a href="04-interaction.md">interaction</a>,
+  <a href="05-assets.md">assets</a>, <a href="06-code.md">code</a>,
+  <a href="../HANDOFF.md">HANDOFF (absolute design rules)</a>.</p>
+</header>
+
+<div class="bar" role="toolbar" aria-label="Zoom">
+  <span>Zoom</span>
+  <button data-zoom="1" aria-pressed="true">100 %</button>
+  <button data-zoom="1.5" aria-pressed="false">150 %</button>
+  <button data-zoom="2" aria-pressed="false">200 %</button>
+  <span class="dim" id="zoomnote"></span>
+</div>
+
+<main>
+  <h2>The reference instrument (ANDOR OSP, three layers)</h2>
+  <figure>
+    <div class="scroll"><img id="hero" data-native="1" data-variants='{"1":"img/osp/03-three-layers.png","1.5":"img/osp/03-three-layers@1.5x.png","2":"img/osp/03-three-layers@2.0x.png"}' src="img/osp/03-three-layers.png" alt="ANDOR OSP with three layers: the reference state"></div>
+    <figcaption><b>03-three-layers</b>, real renders at 1×, 1.5× and 2× (the zoom picks the matching one). Shown: housing with teak rails, header, three triple cards, the macro row with lenses, the modulation panel, the keyboard row, ARP and Advanced.</figcaption>
+  </figure>
+
+  <h2>States</h2>
+  <div id="states"></div>
+
+  <h2>Popovers</h2>
+  <div class="grid" id="popovers"></div>
+
+  <h2>Components (2× crops)</h2>
+  <div class="grid" id="components"></div>
+
+  <h2>A product built from the shell: ANDOR Example</h2>
+  <p>ANDOR Example was written by <code>tools/create_andor_instrument.py</code> and builds as its own
+  plugin (plugin code <code>Aexm</code>). It plays through the shell's labelled diagnostic engine: a
+  plain resampler, or a test tone with no sound loaded. That engine reads only LEVEL, PAN, TUNE,
+  MUTE/SOLO, the AMP envelope, volume, fine tune, bend and velocity range, so every other control
+  is shown disabled in ANDOR OSP's own disabled look, and the footer says what it is.</p>
+  <div id="example"></div>
+  <table>
+    <tr><th>Visual regression (ANDOR Example vs ANDOR OSP)</th><th></th></tr>
+    <tr><td>States compared</td><td>18 (all in <code>tests/support/VisualStates.h</code>)</td></tr>
+    <tr><td>Tolerance</td><td>0 (exact)</td></tr>
+    <tr><td>Masks (approved dynamic regions)</td><td>identity, preset name, status line</td></tr>
+    <tr><td>Differing pixels outside the masks</td><td><b>0 in every state</b> (Linux, Xvfb; macOS CI run 152). One earlier macOS run showed 15 px in 03-three-layers@2x, not yet explained: see <a href="../reports/validation.md">validation</a>.</td></tr>
+  </table>
+</main>
+
+<script>
+  const states = [
+    ["00-empty", "The empty instrument: the drop zone"],
+    ["01-one-layer", "One layer: the hero card"],
+    ["02-two-layers", "Two layers: dual cards; MIX in the header"],
+    ["04-window-869", "The smallest window (869 px wide): the same layout, scaled"],
+    ["05-mod-tab-amp", "Modulation panel: AMP"],
+    ["05-mod-tab-lfo1", "Modulation panel: LFO 1"],
+    ["05-mod-tab-vel", "Modulation panel: VEL curve"],
+    ["06-popup-routes-lfo1", "A source's routes popover"],
+    ["07-card-granular", "Granular: POS SIZE DENS TUNE SPREAD over the display"],
+    ["07-card-eq", "A layer's EQ over its waveform"],
+    ["07-card-dampen", "DAMPEN, the EQ's second page"],
+    ["08-keys-held", "Keys held: the keyboard warms"],
+    ["09-arp-open", "The arpeggiator's inline editor (the window grows by 187 px)"],
+    ["06-popup-space", "A macro popover in place (SPACE)"],
+    ["06-popup-advanced", "Advanced in place"],
+  ];
+  const popovers = ["life", "drive", "character", "movement", "space", "echo", "advanced", "reimagined-a"];
+  const components = ["EngineCard-1", "SourceDisplay-1", "LayerKnob-1", "Dial-1", "ModifierButton-1", "LayerStateButton-1", "ModeSelector-1", "EqButton-1",
+    "MenuDots-1", "Slider-1", "MacroLabel-1", "MiniKnob-1", "ModulationPanel-1", "PresetBar-1", "SavePresetButton-1", "VolumeSlider-1",
+    "HeaderMenuButton-1", "Wheel-1", "OspKeyboard-1", "ArpControl-1", "AdvancedCardButton-1"];
+  const example = [
+    ["shipped-03-three-layers", "ANDOR Example as it ships (three layers): its identity, and its unbound controls disabled"],
+    ["shipped-01-one-layer", "ANDOR Example, one layer"],
+    ["shipped-05-mod-tab-lfo1", "LFO 1 page: disabled (the diagnostic engine reads no modulation)"],
+    ["diff-03-three-layers", "The regression's diff for 03-three-layers: ANDOR OSP in grey, masks tinted blue, differing pixels red (none)"],
+  ];
+
+  function figure (src, caption, native, tagEnlarged) {
+    const f = document.createElement ("figure");
+    const box = document.createElement ("div");
+    box.className = "scroll";
+    const img = document.createElement ("img");
+    img.src = src;
+    img.alt = caption;
+    img.dataset.native = native;
+    if (tagEnlarged) img.dataset.enlarges = "1";
+    img.loading = "lazy";
+    box.appendChild (img);
+    const c = document.createElement ("figcaption");
+    c.innerHTML = "<b>" + src.split ("/").pop().replace (".png", "") + "</b> " + caption + (tagEnlarged ? ' <span class="tag zoomtag" hidden>1× enlarged</span>' : "");
+    f.append (box, c);
+    return f;
+  }
+  const statesBox = document.getElementById ("states");
+  states.forEach (([n, c]) => statesBox.appendChild (figure ("img/osp/" + n + ".png", c, 1, true)));
+  const pop = document.getElementById ("popovers");
+  popovers.forEach (n => pop.appendChild (figure ("img/components/popover-" + n + "@2x.png", "", 2, false)));
+  const comp = document.getElementById ("components");
+  components.forEach (n => comp.appendChild (figure ("img/components/" + n + "@2x.png", "", 2, false)));
+  const ex = document.getElementById ("example");
+  example.forEach (([n, c]) => ex.appendChild (figure ("img/example/" + n + ".png", c, 1, true)));
+
+  let zoom = 1;
+  function size (img) {
+    if (! img.naturalWidth) return;
+    const native = Number (img.dataset.native || 1);
+    img.style.width = (img.naturalWidth / native * zoom) + "px";
+    img.style.maxWidth = "none";
+    const enlarged = img.dataset.enlarges === "1" && zoom > native;
+    img.classList.toggle ("enlarged", enlarged);
+    const tag = img.closest ("figure").querySelector (".zoomtag");
+    if (tag) tag.hidden = ! enlarged;
+  }
+  function apply() {
+    const hero = document.getElementById ("hero");
+    const variants = JSON.parse (hero.dataset.variants);
+    const src = variants[String (zoom)];
+    hero.dataset.native = String (zoom);
+    if (! hero.src.endsWith (src)) hero.src = src; else size (hero);
+    document.querySelectorAll ("main img").forEach (size);
+    document.querySelectorAll (".bar button").forEach (b => b.setAttribute ("aria-pressed", String (Number (b.dataset.zoom) === zoom)));
+    document.getElementById ("zoomnote").textContent = zoom === 1 ? "reference size" : (zoom + "×: the hero is a real " + zoom + "× render; 2× crops are real at 200 %");
+  }
+  document.querySelectorAll ("main img").forEach (img => img.addEventListener ("load", () => size (img)));
+  document.querySelectorAll (".bar button").forEach (b => b.addEventListener ("click", () => { zoom = Number (b.dataset.zoom); apply(); }));
+  apply();
+</script>
+</body>
+</html>

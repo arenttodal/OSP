@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "name": "ANDOR Example",
+  "slug": "example",
+  "pluginCode": "Aexm",
+  "bundleId": "com.osp.andorexample",
+  "version": "0.1.0",
+  "target": "ANDOR_Example",
+  "identity": "/EXAMPLE",
+  "tagline": "Built from the ANDOR shell",
+  "presetExtension": ".andorexample",
+  "stateType": "ANDOR_EXAMPLE",
+  "shellTemplateVersion": 1,
+  "created": "2026-10-28"
+}

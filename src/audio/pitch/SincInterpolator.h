@@ -86,6 +86,21 @@ public:
 
     static constexpr double maxTableStretch = 4.0;
 
+    /**
+        Engine C's read: computeKernelFast, then apply on one or both channels, in one pass.
+        The table weights are used as they are made (never stored) and the taps are summed in
+        four lanes, so the result differs from apply() by float rounding only (about -140 dBFS
+        and below). The baselines keep computeKernel + apply, so their renders never change.
+
+        @param right    null for a mono source: `outRight` then equals `outLeft`.
+        @param scratch  used only by increments the tables do not cover (computeKernel).
+    */
+    void readFast (double position, double increment, LevelCache& cache, Kernel& scratch,
+                   const float* left, const float* right, float& outLeft, float& outRight) const noexcept;
+
+    /** apply() on one or two channels with the taps summed in four lanes (as readFast). */
+    static void applyLanes (const Kernel& kernel, const float* left, const float* right, float& outLeft, float& outRight) noexcept;
+
     /** Applies a computed kernel to one (padded) channel. `data` points at source sample 0. */
     static float apply (const Kernel& kernel, const float* data) noexcept
     {
@@ -100,6 +115,17 @@ public:
     static constexpr double rolloff = 0.96;
 
 private:
+    /** The table row for a position at one of the tables' resolutions (shared by the fast paths). */
+    struct Row
+    {
+        const float* r0;
+        float a;
+        int first;
+    };
+    static Row rowFor (double position, int resolution, int reachOfTable, const float* rows, int taps) noexcept;
+    /** Stretch level for an increment in (1, maxTableStretch], or 0 when no table covers it. */
+    int tableLevel (double increment, LevelCache& cache) const noexcept;
+
     static float lookup (const std::vector<float>& table, double index) noexcept;
 
     int numZeroCrossings;

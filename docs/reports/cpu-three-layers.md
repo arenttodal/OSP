@@ -178,3 +178,50 @@ on B and C is still half the cost.
 
 Tests: [voices] (two per key, and the limit off; an inaudible release retired, an audible
 one, and retiring off); the display's cap and opacity; the goldens unchanged.
+
+## 5. Step 2: done
+
+Chosen: A4–A7. They are the inaudible group: no setting, no voice and no stage changes what it
+does; each loop computes the same thing in a cheaper order.
+
+| What | Change | Its own difference (unit tests) |
+|---|---|---|
+| A4 | The sinc read (`SincInterpolator::readFast`): the table weights blended and applied to both channels in one pass, never stored; the taps summed in four SIMD lanes. KALEIDOSCOPE's and the REIMAGINED modes' sinc reads use it too. | ≤ 4e-7 on full-scale noise (−128 dB) |
+| A5 | The LP24 ladder: left and right in two lanes of one pass; its per-sample constants (powers of G, the feedback reciprocal, the saturator's bias offset) computed with the coefficients | −136 dB or less below its output |
+| A6 | KALEIDOSCOPE's saturation: a rational `tanh` (the minimax fit Eigen uses) instead of libm's, which goes through `expm1f`; the doubling's slow sway by rotation instead of a `sin` per sample | tanh ≤ 4e-7; the sway ≤ 2e-9 after ten minutes |
+| A7 | Granular and KALEIDOSCOPE's grains: the Hermite read as four tap weights on one 4-sample load, the window and pan folded into the weights, the grains summed in lanes | ≤ 7e-7 on full-scale noise |
+
+The SIMD is SSE2 on Intel and NEON on Apple Silicon, both part of those processors' baselines,
+so the universal binary needs no runtime dispatch (`core/Simd.h`; a plain fallback elsewhere).
+The baselines A and B keep their own reads, so the goldens are unchanged and needed no update.
+
+**Audio, by instruction counts** (callgrind, the same 4 s): 9.53 G → **5.86 G, −38.5 %**
+(10.90 G → 5.86 G, −46 %, with step 1).
+
+| Function | Step 1 | Step 2 |
+|---|---|---|
+| Granular (B's grains) | 3.37 G | 1.79 G |
+| The voice loop, with KALEIDOSCOPE's grains, saturation and sway | 2.20 G | 1.32 G |
+| The sinc reads | 1.74 G | 0.97 G |
+| The LP24 ladder | 1.00 G | 0.59 G |
+
+By time on this VM. It ran faster this day than for step 1, so before and after were measured
+the same day:
+
+| Playing | Mean, before → after | p99, before → after |
+|---|---|---|
+| chords | 31 → **18 %** | 57–60 → **28–29 %** |
+| pedal | 100 → **57 %** | 189 → **103 %** |
+
+**What changed in the sound.** The same seeded performance of the preset (20 s, chords, with
+and without the pedal) rendered with both builds. The difference is −120 dBFS RMS, peaking at
+−103 dBFS, about 90 dB below the music. That is below the noise floor of a 16-bit file.
+
+It is the floor for any change here. Moving every one of the old reads by a single float step
+(1 ulp, about 1e-7) gives the same difference: −91 dB below the music. The voice chain carries
+rounding up to that level whichever way it arises.
+
+Two renders of one build are bit-identical: still seed → exact output.
+
+Tests: `tests/unit/FastNumericsTests.cpp` keeps each fast form against the one it replaced.
+Each fast form is written out there as it was.

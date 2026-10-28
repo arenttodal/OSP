@@ -23,6 +23,7 @@ add_executable(osp_tests
     unit/ModulationTests.cpp
     unit/LayerEqTests.cpp
     unit/SampleSetTests.cpp
+    unit/FastNumericsTests.cpp
     library/CatalogTests.cpp
     library/ImportTests.cpp
     library/PreviewTests.cpp
@@ -78,3 +79,9 @@ add_test(NAME andor-phrase COMMAND andor_tests "[phrase]")
 add_test(NAME andor-grain COMMAND andor_tests "[grain]")
 add_test(NAME andor-interop COMMAND andor_tests "[interop]")
 add_test(NAME andor-realtime COMMAND andor_tests "[realtime]")
+
+# The ANDOR bootstrap tool (tools/create_andor_instrument.py), in a sandbox.
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+    add_test(NAME andor_bootstrap_tool COMMAND ${Python3_EXECUTABLE} -I ${PROJECT_SOURCE_DIR}/tools/tests/test_create_andor_instrument.py)
+endif()

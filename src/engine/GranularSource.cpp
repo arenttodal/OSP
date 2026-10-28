@@ -1,5 +1,6 @@
 #include "engine/GranularSource.h"
 
+#include "engine/FastMath.h"
 #include "engine/LevelContour.h"
 
 #include <algorithm>
@@ -32,20 +33,6 @@ void GranularSource::updateNorm() noexcept
     // Overlapping grains add up (incoherently): keep the level near the recording's.
     const double overlap = std::clamp (settings.density, 1.0, 80.0) * std::clamp (settings.sizeSeconds, 0.005, 1.0);
     norm = static_cast<float> (1.0 / std::max (1.0, 0.612 * std::sqrt (overlap)));
-}
-
-void GranularSource::readStereo (double pos, float& left, float& right) const noexcept
-{
-    const auto i = static_cast<std::int64_t> (pos);
-    const float t = static_cast<float> (pos - static_cast<double> (i));
-    auto hermite = [t] (const float* x) {
-        const float c1 = 0.5f * (x[1] - x[-1]);
-        const float c2 = x[-1] - 2.5f * x[0] + 2.0f * x[1] - 0.5f * x[2];
-        const float c3 = 0.5f * (x[2] - x[-1]) + 1.5f * (x[0] - x[1]);
-        return ((c3 * t + c2) * t + c1) * t + x[0];
-    };
-    left = hermite (src->channelData (0) + i);
-    right = stereo ? hermite (src->channelData (1) + i) : left;
 }
 
 void GranularSource::spawn (double step) noexcept
@@ -112,18 +99,24 @@ void GranularSource::render (float& left, float& right, double step) noexcept
     if (activeGrains == 0)
         return;
 
+    // Every grain adds its four Hermite taps, weighted by its window, into four lanes per
+    // channel; the lanes are summed once for the sample.
+    using simd::Float4;
     const double lastFrame = static_cast<double> (src->numFrames()) - 3.0;
-    float l = 0.0f, r = 0.0f;
+    const float* dataL = src->channelData (0);
+    const float* dataR = stereo ? src->channelData (1) : nullptr;
+    auto accL = Float4::zero(), accR = Float4::zero();
     for (auto& g : grains)
     {
         if (! g.active)
             continue;
         const auto window = static_cast<float> (0.5 - 0.5 * g.c) * g.gain;
         const double pos = std::clamp (g.position, 1.0, lastFrame);
-        float a, b;
-        readStereo (pos, a, b);
-        l += window * a;
-        r += window * b;
+        const auto i = static_cast<std::int64_t> (pos);
+        const auto w = hermiteWeights (static_cast<float> (pos - static_cast<double> (i))) * Float4::broadcast (window);
+        accL = accL + w * Float4::load (dataL + i - 1);
+        if (dataR != nullptr)
+            accR = accR + w * Float4::load (dataR + i - 1);
         g.position += g.direction * step * g.ratio;
         const double c = g.c * g.cd - g.s * g.sd;
         g.s = g.s * g.cd + g.c * g.sd;
@@ -134,8 +127,8 @@ void GranularSource::render (float& left, float& right, double step) noexcept
             --activeGrains;
         }
     }
-    left = l * norm;
-    right = r * norm;
+    left = accL.sum() * norm;
+    right = dataR != nullptr ? accR.sum() * norm : left;
 }
 
 int GranularSource::collect (GrainView* out, int max) const noexcept

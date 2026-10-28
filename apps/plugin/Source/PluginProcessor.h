@@ -2,6 +2,7 @@
 
 #include "Audition.h"
 #include "InstrumentLoader.h"
+#include "InstrumentHost.h"
 #include "LibraryService.h"
 #include "LoadedInstrument.h"
 
@@ -36,7 +37,7 @@ namespace osp::plugin
       - loader:  a single background thread that imports, hashes and analyses samples, then
                  builds the model stages (playable -> sustain -> register anchors).
 */
-class OspAudioProcessor final : public juce::AudioProcessor, private juce::Timer, private juce::AudioProcessorParameter::Listener,
+class OspAudioProcessor final : public juce::AudioProcessor, public InstrumentHost, private juce::Timer, private juce::AudioProcessorParameter::Listener,
                                 private juce::ValueTree::Listener
 {
 public:
@@ -110,9 +111,9 @@ public:
 
     /** Loading a preset, template or instrument replaces the whole patch (and clears undo):
         the patch as it was is kept, and one call brings it back. */
-    bool canRestorePreviousState() const noexcept { return previousState != nullptr; }
-    juce::String previousStateDescription() const { return previousStateLabel; }
-    bool restorePreviousState();
+    bool canRestorePreviousState() const noexcept override { return previousState != nullptr; }
+    juce::String previousStateDescription() const override { return previousStateLabel; }
+    bool restorePreviousState() override;
 
     /** Preset and template files in the Library: renamed (the record follows), duplicated,
         sent to the Library's trash (recoverable) and restored. Factory content is never a file
@@ -156,113 +157,33 @@ public:
 
     // MODULATION: parameter IDs, the destinations' names (registry order), the editable
     // curves (0, 1: LFO 1/2 CUSTOM; 2, 3: ENV 1/2 one-shot; 4 VEL; 5 NOTE), routes by slot, the display.
-    static juce::String modLfoId (int lfo, const juce::String& name);
-    static juce::String modEnvId (int env, const juce::String& name);
-    static juce::String modRouteId (int route, const juce::String& name);
-    static const juce::StringArray& modDestinationNames();
-    mod::Curve modulationCurve (int index) const;
-    void setModulationCurve (int index, const mod::Curve& curve, bool undoable = true);
-    /** The editable curves: 0, 1 LFO 1/2 CUSTOM; 2, 3 ENV 1/2 one-shot; 4 VEL; 5 NOTE;
-        6, 7, 8 DAMPEN A/B/C (over the keys). */
-    static constexpr int modCurveCount = 9;
-    static constexpr int dampenCurveIndex (int layer) noexcept { return 6 + std::clamp (layer, 0, numLayers - 1); }
-    static juce::String dampenParameterId (int layer, const juce::String& name) { return layerParameterId (layer, "dampen." + name); }
-    /** DAMPEN's parameters in their order: enabled, mode, amount, frequency, cutoff. */
-    static const juce::StringArray& dampenParameterNames();
-    using ModCurves = std::array<mod::Curve, modCurveCount>;
-    static ModCurves defaultModulationCurves();
-    /** "c3:" + nine curves; "c2:" (six: before DAMPEN) and "c1:" (four: before VEL and NOTE)
-        still read, the curves they lack at their defaults. */
-    static juce::String encodeModulationCurves (const ModCurves& curves);
-    static std::optional<ModCurves> decodeModulationCurves (const juce::String& text);
-    /** A route from `source` to `dest` in the first free slot (or the slot already joining
-        them); returns the slot, or -1 when all 16 are taken. One undo step. */
-    int addModulationRoute (mod::Source source, mod::Dest dest, float depthPercent);
-    /** THE assignment path (dragging a source, right-click "Assign", the routes popover):
-        checks the rules (scope, timing, source), loops and capacity; an existing route
-        joining the two is selected, never duplicated and its depth kept; a new one starts at
-        `depthPercent` (one undo step). `error` says why nothing was made. */
-    struct ModAssignResult
-    {
-        int slot = -1;
-        bool existed = false;
-        juce::String error;
-    };
-    ModAssignResult assignModulation (mod::Source source, mod::Dest dest, float depthPercent = 50.0f);
-    /** The modulation settings as the parameters say now (the rules and loop checks use them). */
-    mod::Settings modulationProbe() const;
+    mod::Curve modulationCurve (int index) const override;
+    void setModulationCurve (int index, const mod::Curve& curve, bool undoable = true) override;
     /** State version < 11: scales every route depth from the old fixed spans to the
         full-range ones (same sound). */
     void migrateModulationDepths();
-    /** Removes a route; the routes moving its depth go with it, in the same undo step. */
-    void removeModulationRoute (int slot, bool ownUndoStep = true);
-    /** META-MODULATION through the same path: `source` moves the depth of the route in
-        `targetSlot` (a depth route, Dest::routeDepth, linked by the target's stable ID). The
-        same checks as assignModulation, plus one level only and never a source on its own
-        route's depth; an existing pairing is selected, never duplicated. */
-    ModAssignResult assignDepthModulation (mod::Source source, int targetSlot, float depthPercent = 20.0f);
-    /** Why `source` cannot move that route's depth (empty: it can). */
-    juce::String depthModulationRefusal (mod::Source source, int targetSlot) const;
-    bool canModulateDepth (mod::Source source, int targetSlot) const { return depthModulationRefusal (source, targetSlot).isEmpty(); }
-    /** A route's stable ID (saved with the session; 0 until it needs one), a depth route's
-        target slot (-1: none), and the depth routes moving a route. */
-    int modRouteUid (int slot) const;
-    int modRouteTarget (int slot) const;
-    std::vector<int> depthRoutesOf (int slot) const;
-    struct ModRouteInfo
-    {
-        int slot = -1;
-        mod::Route route;   ///< a depth route: route.target is its target's slot
-        mod::RouteState state = mod::RouteState::empty;
-        bool isDepth() const noexcept { return mod::isDepthRoute (route); }
-    };
-    std::vector<ModRouteInfo> modulationRoutes() const;
+    // The routes themselves (assign, remove, rules, links): InstrumentHost.
 
-    // EQ (version hint 18): each layer's five bands, `layerA.eq.*`. Off by default (older
-    // sessions open with it off and sound as they did).
-    static const juce::StringArray& eqParameterNames();   ///< enabled, hp.enabled, hp.frequency, ... in order
-    static juce::String eqParameterId (int layer, const juce::String& name) { return layerParameterId (layer, "eq." + name); }
-    static const char* eqBandKey (eq::Band band) noexcept;   ///< "hp", "lowShelf", "bell", "highShelf", "lp"
-    /** The layer's EQ as its parameters set it now (message thread: the editor's display). */
-    eq::Settings layerEqSettings (int layer) const;
-    /** Whether `source` may drive `dest` with the sources' current scopes (a per-voice
-        source never reaches a shared stage). */
-    bool canModulate (mod::Source source, mod::Dest dest) const;
-    InstrumentEngine::ModView modulationView() const noexcept { return engine.modulationView(); }
+    // EQ (version hint 18): each layer's five bands, `layerA.eq.*` (InstrumentHost::eqParameterId).
+    // Off by default (older sessions open with it off and sound as they did).
+    InstrumentEngine::ModView modulationView() const noexcept override { return engine.modulationView(); }
     /** The CC 1-4 sources' controller numbers (0..119; default 2, 11, 16, 17), saved with the
         session. Learn: the next controller that moves is taken for the slot (-1: none). */
-    int modControllerNumber (int slot) const noexcept;
-    void setModControllerNumber (int slot, int controller) noexcept;
-    void learnModController (int slot) noexcept { modCcLearn.store (slot >= 0 && slot < mod::ccSlots ? slot : -1, std::memory_order_release); }
-    int learningModController() const noexcept { return modCcLearn.load (std::memory_order_acquire); }
+    int modControllerNumber (int slot) const noexcept override;
+    void setModControllerNumber (int slot, int controller) noexcept override;
+    void learnModController (int slot) noexcept override { modCcLearn.store (slot >= 0 && slot < mod::ccSlots ? slot : -1, std::memory_order_release); }
+    int learningModController() const noexcept override { return modCcLearn.load (std::memory_order_acquire); }
 
-    /** The arpeggiator's choices, in parameter order (never reorder: sessions store indices). */
-    static const juce::StringArray& arpPatternNames();
-    static const juce::StringArray& arpRateNames();
     /** What the arpeggiator's 16-step display shows (lock-free snapshot, any thread). */
-    struct ArpView
-    {
-        std::array<int, Arpeggiator::displaySteps> low {}, high {};   ///< -1: no note
-        int current = -1;
-        bool active = false;
-    };
-    ArpView arpView() const noexcept;
+    ArpView arpView() const noexcept override;
 
-    // A/B source layers. Everything below that takes a `layer` acts on the layer being
-    // edited when it is -1 (the A/B tabs choose it).
-    static constexpr int numLayers = EngineSettings::layers;   ///< A, B, C (the instrument uses 1-3 of them)
+    // A/B source layers (numLayers, layerName, layerParameterId: InstrumentHost). Everything
+    // below that takes a `layer` acts on the layer being edited when it is -1 (the A/B tabs choose it).
     int editLayer() const noexcept { return editLayerIndex.load(); }
     void setEditLayer (int layer) noexcept { editLayerIndex = std::clamp (layer, 0, numLayers - 1); }
-    static juce::String layerName (int layer) { return layer == 2 ? "C" : (layer == 1 ? "B" : "A"); }
-    /** The stable parameter ID of a layer setting, e.g. layerParameterId (1, "sourceMode") -> "layerB.sourceMode". */
-    static juce::String layerParameterId (int layer, const juce::String& name) { return "layer" + layerName (layer) + "." + name; }
-    /** A layer's Original <-> Reimagined: A's is the instrument's `reimagined` (the ID older
-        sessions and automation know); B and C have their own. */
-    static juce::String reimaginedParameterId (int layer) { return layer <= 0 ? juce::String ("reimagined") : layerParameterId (layer, "reimagined"); }
     /** REIMAGINED modes (version hint 11): a layer's mode and every mode's own settings,
         "layerA.reimagined.mode", "layerA.reimagined.tapeFrame.age", ... in this order. */
     static const juce::StringArray& reimaginedModeNames();
-    static juce::String reimaginedModeParameterId (int layer, const juce::String& name) { return layerParameterId (layer, "reimagined." + name); }
 
     // Instrument loading (message thread)
     void loadFile (const juce::File& file, int layer = -1);
@@ -277,8 +198,7 @@ public:
     // Adaptive layers (message thread). A layer is occupied while it holds or loads a sound;
     // the instrument shows one card per occupied layer, and they are kept contiguous
     // (A, A+B, A+B+C) by removeLayer.
-    bool isLayerOccupied (int layer) const;
-    int occupiedLayerCount() const;
+    bool isLayerOccupied (int layer) const override;
     /** The first slot without a sound, or -1 when all three hold one. */
     int firstFreeLayer() const;
     /** Each file becomes a new layer (from `firstLayer` if it is free, then the free slots),
@@ -308,11 +228,9 @@ public:
     void setKeptSlots (int slots) noexcept { keptSlotCount = std::clamp (slots, 0, numLayers); }
     /** Neutral layer controls and granular settings, automatic root. */
     void resetLayerControls (int layer);
-    void setParameterValue (const juce::String& id, float value);
-    float parameterValue (const juce::String& id) const;
+    // setParameterValue / parameterValue: InstrumentHost.
 
-    enum class LoadState { empty, loading, ready, failed };
-    LoadState loadState (int layer = -1) const noexcept { return layers[resolve (layer)].state.load(); }
+    LoadState loadState (int layer = -1) const noexcept override { return layers[resolve (layer)].state.load(); }
     juce::String statusMessage() const;
     void showMessage (const juce::String& message)
     {
@@ -323,23 +241,18 @@ public:
     juce::String stageMessage() const;
     /** Granular settings names for layerParameterId: the source mode, then POS, SIZE, DENS, TUNE, SPREAD. */
     static const juce::StringArray& granularNames();
-    /** Layer control names for layerParameterId: start, tune, pan, level, link, reverse, loop, follow. */
-    static const juce::StringArray& layerControlNames();
     /** MUTE and SOLO ("layerA.mute", "layerA.solo"): kept apart from the controls (LINK never shares them). */
     static const juce::StringArray& layerStateNames();
-    /** Heard in the mix: SOLO wins (only soloed layers are heard), else MUTE decides. */
-    bool isLayerHeard (int layer) const;
-    /** SOLO this layer alone (alt-click on S). */
-    void soloOnly (int layer);
+    // isLayerHeard / soloOnly (MUTE and SOLO): InstrumentHost.
 
     /** Most recently loaded instrument of a layer, or nullptr when it is empty (any non-audio thread). */
-    std::shared_ptr<const LoadedInstrument> currentInstrument (int layer = -1) const;
+    std::shared_ptr<const LoadedInstrument> currentInstrument (int layer = -1) const override;
 
     /** Manual root (fractional MIDI) or nullopt for the analysed root. Message thread. */
     void setRootOverride (std::optional<double> midi, int layer = -1);
     /** Same, as an undoable user action (the editor's root menu). */
     void changeRootOverride (std::optional<double> midi, int layer = -1);
-    std::optional<double> rootOverride (int layer = -1) const;
+    std::optional<double> rootOverride (int layer = -1) const override;
     double effectiveRootMidi (int layer = -1) const;
 
     /** Blocks until pending loads have finished (tests, offline hosts). */
@@ -355,7 +268,7 @@ public:
     /** The host's tempo (120 until a host tells), for ECHO's synced times in the display. */
     float hostTempo() const noexcept { return hostBpm.load (std::memory_order_relaxed); }
     /** The grains a layer is playing now (display; lock-free, any thread). */
-    const InstrumentEngine::GrainSnapshot& grainSnapshot (int layer) const noexcept { return engine.grainSnapshot (layer); }
+    const InstrumentEngine::GrainSnapshot& grainSnapshot (int layer) const noexcept override { return engine.grainSnapshot (layer); }
 
     juce::AudioProcessorValueTreeState parameters;
     juce::MidiKeyboardState keyboardState;
@@ -363,22 +276,24 @@ public:
 
     /** The last played velocities (newest at `velocityCount - 1`, a ring of 16) and how many
         notes have been played: written by the audio thread, read by the popups (lock-free). */
-    static constexpr int velocityHistory = 16;
     std::array<std::atomic<int>, velocityHistory> recentVelocity {};
     std::atomic<int> velocityCount { 0 };
     /** The last played note (the NOTE tab's marker; -1 before the first). */
     std::atomic<int> lastPlayedNote { -1 };
+    int recentVelocityAt (int index) const noexcept override { return recentVelocity[static_cast<std::size_t> (index)].load (std::memory_order_relaxed); }
+    int playedVelocityCount() const noexcept override { return velocityCount.load (std::memory_order_acquire); }
+    int lastPlayedNoteNumber() const noexcept override { return lastPlayedNote.load (std::memory_order_relaxed); }
 
     /** APPLY TO AMP: the VEL curve sets the amplitude's velocity response in place of
         DYNAMICS' curve (one curve, never both). Saved with the session; on by default (older
         sessions get their DYNAMICS curve as the VEL curve: they sound as they did). */
-    bool velocityAppliesToAmp() const noexcept { return velToAmp.load (std::memory_order_relaxed); }
-    void setVelocityAppliesToAmp (bool on) noexcept;
+    bool velocityAppliesToAmp() const noexcept override { return velToAmp.load (std::memory_order_relaxed); }
+    void setVelocityAppliesToAmp (bool on) noexcept override;
     /** ARP RATE's modulation: Stepped keeps to musical ratios (1/2, 2/3, 1, 3/2, 2, ...) and
         changes at the next step; smooth (the default) follows the source. Saved with the
         session. */
-    bool arpRateIsStepped() const noexcept { return arpRateStepped.load (std::memory_order_relaxed); }
-    void setArpRateStepped (bool stepped) noexcept { arpRateStepped.store (stepped, std::memory_order_relaxed); }
+    bool arpRateIsStepped() const noexcept override { return arpRateStepped.load (std::memory_order_relaxed); }
+    void setArpRateStepped (bool stepped) noexcept override { arpRateStepped.store (stepped, std::memory_order_relaxed); }
     /** The ratio Stepped plays for a multiplier (the nearest of 1/4 .. 4, by octaves). */
     static double steppedArpRatio (double multiplier) noexcept;
 
@@ -389,40 +304,26 @@ public:
     /** Where the mod wheel is, from either the screen or MIDI CC 1 (what the wheel shows). */
     float modWheelPosition() const noexcept { return wheelShown.load (std::memory_order_relaxed); }
 
-    /**
-        LINK: a user change of one layer's START, TUNE, PAN or LEVEL (`control`) by `delta`
-        moves every other linked layer's same control by the same amount (clamped), so
-        their relationship is kept. Nothing happens unless `layer` itself is linked.
-        Message thread (a UI gesture; automation is never propagated).
-    */
-    void applyLinkedDelta (int layer, const juce::String& control, float delta);
-    bool isLayerLinked (int layer) const { return parameterValue (layerParameterId (layer, "link")) >= 0.5f; }
+    // LINK (applyLinkedDelta, isLayerLinked): InstrumentHost.
 
     // Header preset navigation (spec: previous / name / favourite / next): the factory
     // starting states first, then the user's preset files.
-    juce::String presetDisplayName() const;
-    void stepPresetList (int delta);
-    struct PresetEntry
-    {
-        juce::String name;
-        int program = -1;         ///< a starting state, or -1
-        juce::File file;          ///< a preset file, or a user starting state (startingState)
-        bool startingState = false;
-    };
+    juce::String presetDisplayName() const override;
+    void stepPresetList (int delta) override;
     /** INIT: an empty patch - no sounds, no kept slots, every setting at its default. */
-    void initPatch();
+    void initPatch() override;
     /** Every setting to its default; the sounds stay (two or three meet in the middle of the mix). */
-    void resetSettings();
+    void resetSettings() override;
     /** A user starting state: every setting and the slot count, no audio. Opening one applies
         the settings to the sounds already loaded (and keeps empty slots for the rest). */
     bool saveStartingState (const juce::File& file);
     bool loadStartingState (const juce::File& file);
     static juce::File startingStateFolder();
     static constexpr const char* startingStateExtension = ".ospstate";
-    std::vector<PresetEntry> presetList() const;
-    void openPresetEntry (const PresetEntry& entry);
-    bool isFavourite() const;
-    void toggleFavourite();
+    std::vector<PresetEntry> presetList() const override;
+    void openPresetEntry (const PresetEntry& entry) override;
+    bool isFavourite() const override;
+    void toggleFavourite() override;
     /** A preset or starting state's favourite mark by name (the header's heart and the Library's). */
     bool isFavouriteName (const juce::String& name) const;
     void setFavouriteName (const juce::String& name, bool favourite);
@@ -438,6 +339,12 @@ private:
     mutable bool favouritesLoaded = false;
 public:
     juce::UndoManager undoManager;
+
+    // InstrumentHost: the shared interface's view of the parameters.
+    juce::AudioProcessorValueTreeState& apvts() override { return parameters; }
+    const juce::AudioProcessorValueTreeState& apvts() const override { return parameters; }
+    juce::UndoManager& undo() override { return undoManager; }
+    double hostSampleRate() const override { return getSampleRate(); }
 
     /** 2: engine C parameters (macros, pitch character, sustain, seed). v1 sessions migrate to neutral settings.
         3: shaping system v1.0 (popup settings; CHARACTER is a filter, so older sessions open it fully).
@@ -551,7 +458,6 @@ private:
     };
     LayerSnapshot captureLayer (int layer) const;
     void applyLayer (int layer, const LayerSnapshot& snapshot);
-    void makeLayerAudible (int layer, bool keepMix = false);
     struct RemovedLayer
     {
         int index = 0;
@@ -638,12 +544,7 @@ private:
     // the state's ModLinks child (saved, undoable); the audio thread reads them resolved to
     // slots (message thread writes on every change of the links or the state).
     std::array<std::atomic<int>, mod::maxRoutes> modRouteTargets {};
-    juce::ValueTree modLinks() const;
-    void setModLink (int slot, int uid, int targetUid);
-    int newModRouteUid() const;
-    int resolveModTarget (int slot) const;
     void refreshModLinks();
-    void commitRouteChange();
     void valueTreePropertyChanged (juce::ValueTree&, const juce::Identifier&) override;
     void valueTreeChildAdded (juce::ValueTree&, juce::ValueTree&) override;
     void valueTreeChildRemoved (juce::ValueTree&, juce::ValueTree&, int) override;

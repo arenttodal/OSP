@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "name": "{{PRODUCT_NAME}}",
+  "slug": "{{SLUG}}",
+  "pluginCode": "{{PLUGIN_CODE}}",
+  "bundleId": "{{BUNDLE_ID}}",
+  "version": "{{VERSION}}",
+  "target": "{{TARGET}}",
+  "identity": "/{{IDENTITY}}",
+  "tagline": "{{TAGLINE}}",
+  "presetExtension": "{{PRESET_EXTENSION}}",
+  "stateType": "{{STATE_TYPE}}",
+  "shellTemplateVersion": 1,
+  "created": "{{DATE}}"
+}

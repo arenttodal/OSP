@@ -1,0 +1,20 @@
+rate 48000 Hz, block 256, 6.0 s per scenario, default macros unless noted
+1 layer one-shot, 1 note                   load   2.0 %  p99   3.2 %  worst    6.9 %  voices peak  2 mean  1.9  grains(display) peak   0  overruns 0/1115
+1 layer one-shot, 8 notes                  load   4.7 %  p99   7.5 %  worst  102.0 %  voices peak 10 mean  7.7  grains(display) peak   0  overruns 1/1115
+1 layer one-shot, 16 notes                 load   7.0 %  p99  10.9 %  worst   15.3 %  voices peak 18 mean 13.1  grains(display) peak   0  overruns 0/1115
+1 layer one-shot, 8 notes, REIM 0          load   4.7 %  p99  14.0 %  worst   16.8 %  voices peak 10 mean  7.7  grains(display) peak   0  overruns 0/1115
+1 layer one-shot, 8 notes, REIM 100        load   8.5 %  p99  11.6 %  worst   23.7 %  voices peak 10 mean  7.7  grains(display) peak   0  overruns 0/1115
+3 layers one-shot, 8 notes                 load  13.8 %  p99  23.8 %  worst  199.1 %  voices peak 30 mean 23.9  grains(display) peak   0  overruns 1/1115
+1 layer granular, 8 notes                  load   4.0 %  p99   6.4 %  worst    7.7 %  voices peak  9 mean  8.2  grains(display) peak  21  overruns 0/1115
+1 layer granular dense, 8 notes            load   6.3 %  p99  10.4 %  worst   48.3 %  voices peak  9 mean  8.5  grains(display) peak  79  overruns 0/1115
+1 layer granular, 16 notes                 load   9.6 %  p99  18.4 %  worst   68.5 %  voices peak 17 mean 16.2  grains(display) peak  44  overruns 0/1115
+3 layers granular, 8 notes                 load  12.3 %  p99  19.5 %  worst   22.8 %  voices peak 27 mean 24.7  grains(display) peak  60  overruns 0/1115
+3 layers granular dense, 8 notes           load  19.7 %  p99  31.7 %  worst  551.5 %  voices peak 27 mean 25.6  grains(display) peak 236  overruns 1/1115
+3 layers A one-shot + B,C granular, 8      load  14.1 %  p99  22.9 %  worst   73.8 %  voices peak 28 mean 24.2  grains(display) peak  41  overruns 0/1115
+3 layers granular, 8 notes, REIM 100       load  23.4 %  p99  36.8 %  worst  105.8 %  voices peak 27 mean 24.7  grains(display) peak  86  overruns 1/1115
+1 layer 12-member set, 8 notes             load   2.5 %  p99   4.7 %  worst    6.9 %  voices peak  9 mean  4.1  grains(display) peak   0  overruns 0/1115
+1 layer 12-member set, 16 notes            load   4.7 %  p99  16.5 %  worst   61.7 %  voices peak 17 mean  6.0  grains(display) peak   0  overruns 0/1115
+3 layers (set + 2 granular), 8 notes       load  11.6 %  p99  19.7 %  worst  102.8 %  voices peak 27 mean 20.6  grains(display) peak  41  overruns 1/1115
+3 layers one-shot, 8 notes, pedal          load  20.1 %  p99  36.8 %  worst   94.5 %  voices peak 38 mean 31.9  grains(display) peak   0  overruns 0/1115
+3 layers granular, 8 notes, 16 routes      load  20.3 %  p99  43.4 %  worst  106.3 %  voices peak 28 mean 25.1  grains(display) peak 248  overruns 1/1115
+3 layers granular, 16 notes, 16 routes     load  39.8 %  p99  81.0 %  worst  123.3 %  voices peak 51 mean 49.0  grains(display) peak 384  overruns 1/1115

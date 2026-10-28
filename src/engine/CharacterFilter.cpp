@@ -1,5 +1,7 @@
 #include "engine/CharacterFilter.h"
 
+#include "core/Simd.h"
+
 #include <algorithm>
 #include <cmath>
 #include <numbers>
@@ -16,6 +18,14 @@ namespace
         const float x2 = x * x;
         return x * (27.0f + x2) / (27.0f + 9.0f * x2);
     }
+
+    inline simd::Float4 softClip (simd::Float4 x) noexcept
+    {
+        using simd::Float4;
+        x = Float4::min (Float4::max (x, Float4::broadcast (-3.0f)), Float4::broadcast (3.0f));
+        const auto x2 = x * x;
+        return x * (Float4::broadcast (27.0f) + x2) / (Float4::broadcast (27.0f) + Float4::broadcast (9.0f) * x2);
+    }
 }
 
 void CharacterFilter::prepare (double rate) noexcept
@@ -28,8 +38,9 @@ void CharacterFilter::prepare (double rate) noexcept
 
 void CharacterFilter::reset() noexcept
 {
-    ladderL = {};
-    ladderR = {};
+    for (auto& stage : ladderState)
+        for (auto& lane : stage)
+            lane = 0.0f;
     svfL = {};
     svfR = {};
     tiltLowL.reset();
@@ -95,6 +106,14 @@ void CharacterFilter::setParameters (FilterType type, double cutoffHz, double re
         lastDrive = d;
     }
 
+    // The ladder's per-sample constants: the powers of G, the feedback solve's reciprocal and
+    // the saturator's bias offset.
+    G2 = G * G;
+    G3 = G2 * G;
+    beta = 1.0f - G;
+    feedbackNorm = 1.0f / (1.0f + k * G2 * G2);
+    clipBias = softClip (driveBias);
+
     const auto tilt = static_cast<float> (std::clamp (tiltDb, -15.0, 15.0));
     if ((current == FilterType::tilt || previous == FilterType::tilt) && std::abs (tilt - appliedTilt) > 0.02f)
     {
@@ -106,24 +125,31 @@ void CharacterFilter::setParameters (FilterType type, double cutoffHz, double re
     }
 }
 
-float CharacterFilter::ladder (Ladder& st, float x) const noexcept
+void CharacterFilter::ladder (float inLeft, float inRight, float& outLeft, float& outRight) noexcept
 {
     // Zero-delay feedback: solve the loop for the input of the first stage, then
-    // saturate it (the transistor pair at the ladder's input).
-    const float beta = 1.0f - G;
-    const float sigma = beta * (G * G * G * st.s[0] + G * G * st.s[1] + G * st.s[2] + st.s[3]);
-    const float g4 = G * G * G * G;
-    float u = (x - k * sigma) / (1.0f + k * g4);
-    u = softClip (u + driveBias) - softClip (driveBias);
-    float y = u;
+    // saturate it (the transistor pair at the ladder's input). Left and right run in two
+    // lanes of one pass.
+    using simd::Float4;
+    Float4 s[4];
+    for (int i = 0; i < 4; ++i)
+        s[i] = Float4::load (ladderState[i]);
+    const auto pole = Float4::broadcast (G);
+    const auto sigma = Float4::broadcast (beta) * (Float4::broadcast (G3) * s[0] + Float4::broadcast (G2) * s[1] + pole * s[2] + s[3]);
+    auto u = (Float4::set (inLeft, inRight, 0.0f, 0.0f) - Float4::broadcast (k) * sigma) * Float4::broadcast (feedbackNorm);
+    u = softClip (u + Float4::broadcast (driveBias)) - Float4::broadcast (clipBias);
+    auto y = u;
     for (int i = 0; i < 4; ++i)
     {
-        const float v = (y - st.s[i]) * G;
-        const float out = v + st.s[i];
-        st.s[i] = out + v;
+        const auto v = (y - s[i]) * pole;
+        const auto out = v + s[i];
+        (out + v).store (ladderState[i]);
         y = out;
     }
-    return y * comp;
+    float result[4];
+    (y * Float4::broadcast (comp)).store (result);
+    outLeft = result[0];
+    outRight = result[1];
 }
 
 void CharacterFilter::svf (Svf& st, float x, float& low, float& band, float& high) const noexcept
@@ -152,11 +178,15 @@ void CharacterFilter::process (float& left, float& right) noexcept
     // Each topology runs once per sample; a crossfade reads two of their outputs.
     float out[2][6] {};   // per channel, indexed by FilterType: lp24, lp12, hp12, bp12, tilt, off (dry)
     const float in[2] = { left, right };
+    if (useLadder)
+    {
+        ladder (in[0] * driveGain, in[1] * driveGain, out[0][0], out[1][0]);
+        out[0][0] *= driveOut;
+        out[1][0] *= driveOut;
+    }
     for (int c = 0; c < 2; ++c)
     {
         out[c][5] = in[c];
-        if (useLadder)
-            out[c][0] = ladder (c == 0 ? ladderL : ladderR, in[c] * driveGain) * driveOut;
         if (useSvf)
         {
             float low, band, high;

@@ -3,13 +3,14 @@
 # Each plug-in is its own juce_add_plugin target with its own identity. They share:
 #   - andor_dsp (pure C++: Note Atlas, Phrase analysis/engine, Grain engine)
 #   - apps/andor-common (sample store, widgets)
-#   - ANDOR/OSP's design system (Design, OspLookAndFeel, rendered knobs), compiled again with
-#     the plug-in's own JUCE configuration and its own embedded fonts and knob frames. OSP's
-#     12.5 MB ceramic skin pack is not embedded: the shared drawing falls back to its vector
-#     ivory look, as ANDOR Drums does.
+#   - ANDOR/OSP's design look (Design, OspLookAndFeel, rendered knobs) from shared/andor-ui,
+#     compiled again with the plug-in's own JUCE configuration and its own embedded fonts and
+#     knob frames. Only the look is taken, not the instrument components (they expect an
+#     InstrumentHost). OSP's 12.5 MB ceramic skin pack is not embedded: the shared drawing
+#     falls back to its vector ivory look, as ANDOR Drums does.
 set(ANDOR_COMMON_DIR ${PROJECT_SOURCE_DIR}/apps/andor-common)
-set(OSP_PLUGIN_SOURCE_DIR ${PROJECT_SOURCE_DIR}/apps/plugin/Source)
-set(OSP_PLUGIN_RESOURCE_DIR ${PROJECT_SOURCE_DIR}/apps/plugin/Resources)
+set(OSP_PLUGIN_SOURCE_DIR ${PROJECT_SOURCE_DIR}/shared/andor-ui/Source)
+set(OSP_PLUGIN_RESOURCE_DIR ${PROJECT_SOURCE_DIR}/shared/andor-ui/Resources)
 
 if(APPLE)
     set(ANDOR_LAB_FORMATS AU VST3 Standalone)
