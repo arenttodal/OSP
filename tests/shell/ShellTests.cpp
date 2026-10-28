@@ -348,10 +348,17 @@ namespace
 {
     /** Pixels that differ (any channel by more than `tolerance`) outside the masks; writes a
         diff image (red: differs, blue tint: masked). */
+    struct Difference
+    {
+        juce::Rectangle<int> bounds; ///< of the differing pixels outside the masks, in image pixels
+        int largest = 0;             ///< the largest channel difference among them (0..255)
+    };
+
     int compareImages (const juce::Image& a, const juce::Image& b, const std::vector<visualstates::Mask>& masks, float scale,
-                       int tolerance, const juce::File& diffFile, int& differingInMasks)
+                       int tolerance, const juce::File& diffFile, int& differingInMasks, Difference& where)
     {
         differingInMasks = 0;
+        where = {};
         if (a.getWidth() != b.getWidth() || a.getHeight() != b.getHeight())
             return a.getWidth() * a.getHeight();
         juce::Image diff (juce::Image::ARGB, a.getWidth(), a.getHeight(), true);
@@ -378,6 +385,9 @@ namespace
                 {
                     shown = juce::Colours::red;
                     ++count;
+                    const juce::Rectangle<int> pixel (x, y, 1, 1);
+                    where.bounds = where.bounds.isEmpty() ? pixel : where.bounds.getUnion (pixel);
+                    where.largest = std::max (where.largest, d);
                 }
                 dd.setPixelColour (x, y, shown);
             }
@@ -421,8 +431,16 @@ TEST_CASE ("shell: the interface is ANDOR OSP's, pixel for pixel outside the app
         const float scale = name.endsWith ("@2x") ? 2.0f : (name.startsWith ("04-window-") ? static_cast<float> (a.getWidth()) / osp::plugin::design::width : 1.0f);
         const auto masks = visualstates::masks (name == "09-arp-open" ? osp::plugin::design::layout::arpShift : 0.0f);
         int inMasks = 0;
-        const int differing = compareImages (a, b, masks, scale, tolerance, output.getChildFile ("diff/" + name + ".png"), inMasks);
-        report.add ("| " + name + " | " + juce::String (differing) + " | " + juce::String (inMasks) + " |");
+        Difference where;
+        const int differing = compareImages (a, b, masks, scale, tolerance, output.getChildFile ("diff/" + name + ".png"), inMasks, where);
+        // Where and how much, in reference pixels, so a failure reads without the diff image.
+        const auto at = where.bounds.toFloat() / scale;
+        const juce::String located = differing == 0 ? juce::String()
+                                                    : " (x " + juce::String (at.getX(), 1) + ".." + juce::String (at.getRight(), 1) + ", y "
+                                                          + juce::String (at.getY(), 1) + ".." + juce::String (at.getBottom(), 1)
+                                                          + " reference px; largest channel difference " + juce::String (where.largest) + ")";
+        report.add ("| " + name + " | " + juce::String (differing) + located + " | " + juce::String (inMasks) + " |");
+        INFO (name << located);
         CHECK (differing == 0);
         failures += differing > 0 ? 1 : 0;
     }
