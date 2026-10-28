@@ -1,9 +1,9 @@
 // The five macro popups (redesign §2): each one explains its DSP with a picture drawn
 // from the same formulas and parameters the sound uses, plus a few compact controls.
+#include "Binding.h"
 #include "EngineCard.h"
 #include "Design.h"
-#include "OspPopups.h"
-#include "PluginProcessor.h"
+#include "MacroPopups.h"
 #include "ShapingPopups.h"
 
 #include "core/Prng.h"
@@ -525,7 +525,7 @@ namespace
     class EchoVisual final : public Visual
     {
     public:
-        explicit EchoVisual (OspAudioProcessor& p) : processor (p), state (p.parameters) {}
+        explicit EchoVisual (InstrumentHost& p) : processor (p), state (p.apvts()) {}
 
     private:
         bool native() const override { return true; }
@@ -649,7 +649,7 @@ namespace
             }
         }
 
-        OspAudioProcessor& processor;
+        InstrumentHost& processor;
         juce::AudioProcessorValueTreeState& state;
         Watch watch;
     };
@@ -660,7 +660,7 @@ namespace
     class CharacterVisual final : public Visual
     {
     public:
-        explicit CharacterVisual (OspAudioProcessor& p) : processor (p) {}
+        explicit CharacterVisual (InstrumentHost& p) : processor (p) {}
 
         /** The response (dB) at f of `type` with cutoff fc (the CharacterFilter designs). */
         static double responseDb (FilterType type, double f, double fc, double resonance, double tiltDb)
@@ -700,7 +700,7 @@ namespace
     private:
         bool changed() override
         {
-            auto& s = processor.parameters;
+            auto& s = processor.apvts();
             const auto instrument = processor.currentInstrument (processor.editLayer());
             const int type = juce::roundToInt (value (s, "character.type"));
             if (type != shownType && shownType >= 0)
@@ -714,7 +714,7 @@ namespace
         void paintVisual (juce::Graphics& g, juce::Rectangle<float> plot) override
         {
             using namespace palette;
-            auto& s = processor.parameters;
+            auto& s = processor.apvts();
             const auto type = static_cast<FilterType> (std::clamp (juce::roundToInt (value (s, "character.type")), 0, 4));
             Shaping shaping;
             shaping.filterMinHz = value (s, "character.min");
@@ -809,7 +809,7 @@ namespace
                         leftOf ? juce::Justification::centredRight : juce::Justification::centredLeft, false);
         }
 
-        OspAudioProcessor& processor;
+        InstrumentHost& processor;
         Watch watch;
         int shownType = -1;
     };
@@ -820,13 +820,13 @@ namespace
     class MovementVisual final : public Visual
     {
     public:
-        explicit MovementVisual (OspAudioProcessor& p) : processor (p) {}
+        explicit MovementVisual (InstrumentHost& p) : processor (p) {}
 
     private:
         bool animates() const override { return true; }
         bool changed() override
         {
-            const int mode = juce::roundToInt (value (processor.parameters, "movement.mode"));
+            const int mode = juce::roundToInt (value (processor.apvts(), "movement.mode"));
             if (mode != shownMode && shownMode >= 0)
                 transition();
             shownMode = mode;
@@ -864,7 +864,7 @@ namespace
         void paintVisual (juce::Graphics& g, juce::Rectangle<float> area) override
         {
             using namespace palette;
-            auto& s = processor.parameters;
+            auto& s = processor.apvts();
             const auto mode = static_cast<MovementMode> (std::clamp (juce::roundToInt (value (s, "movement.mode")), 0, 4));
             const double amount = std::clamp (0.01 * value (s, "motion"), 0.0, 1.0);
             const float depth = static_cast<float> (0.25 + 0.75 * amount);   // the knob's amount, still visible at 0
@@ -1001,7 +1001,7 @@ namespace
             }
         }
 
-        OspAudioProcessor& processor;
+        InstrumentHost& processor;
         int shownMode = -1;
     };
 
@@ -1033,28 +1033,28 @@ namespace
     class ShaperEditor final : public Visual, public juce::SettableTooltipClient
     {
     public:
-        ShaperEditor (OspAudioProcessor& p, ShaperTool& t, bool isLarge) : processor (p), tool (t), large (isLarge)
+        ShaperEditor (InstrumentHost& p, ShaperTool& t, bool isLarge) : processor (p), tool (t), large (isLarge)
         {
             setInterceptsMouseClicks (true, false);
             setTooltip (large ? "Draw the pattern: STEP sets each step's level (its shape from the brush), DRAW paints a free line"
                               : "Click or drag to set the steps (the magnifier opens the large editor)");
         }
 
-        bool custom() const { return value (processor.parameters, "movement.shaper.custom") >= 0.5f; }
+        bool custom() const { return value (processor.apvts(), "movement.shaper.custom") >= 0.5f; }
         ShaperPattern steps() const
         {
-            return custom() ? processor.shaperCustomPattern() : RhythmicShaper::patternSteps (juce::roundToInt (value (processor.parameters, "movement.shaper.pattern")));
+            return custom() ? processor.shaperCustomPattern() : RhythmicShaper::patternSteps (juce::roundToInt (value (processor.apvts(), "movement.shaper.pattern")));
         }
 
         void mouseDown (const juce::MouseEvent& e) override
         {
-            processor.undoManager.beginNewTransaction ("Shaper pattern");
+            processor.undo().beginNewTransaction ("Shaper pattern");
             working = steps();
             if (! custom())
             {
                 // Editing a library pattern: it becomes CUSTOM, starting from it.
                 processor.setShaperCustomPattern (working);
-                if (auto* c = processor.parameters.getParameter ("movement.shaper.custom"))
+                if (auto* c = processor.apvts().getParameter ("movement.shaper.custom"))
                     c->setValueNotifyingHost (1.0f);
             }
             last = e.position;
@@ -1135,7 +1135,7 @@ namespace
         void paintVisual (juce::Graphics& g, juce::Rectangle<float>) override
         {
             using namespace palette;
-            auto& s = processor.parameters;
+            auto& s = processor.apvts();
             const auto area = plotArea();
             const auto pattern = steps();
             const double smooth = 0.01 * value (s, "movement.shaper.smooth");
@@ -1207,7 +1207,7 @@ namespace
             }
         }
 
-        OspAudioProcessor& processor;
+        InstrumentHost& processor;
         ShaperTool& tool;
         bool large;
         ShaperPattern working {};
@@ -1349,30 +1349,30 @@ namespace
     class LifeVisual final : public Visual
     {
     public:
-        explicit LifeVisual (OspAudioProcessor& p) : processor (p) {}
+        explicit LifeVisual (InstrumentHost& p) : processor (p) {}
 
     private:
         bool changed() override
         {
-            auto& s = processor.parameters;
+            auto& s = processor.apvts();
             const int mode = juce::roundToInt (value (s, "life.mode"));
             if (mode != shownMode && shownMode >= 0)
                 transition();
             shownMode = mode;
             return watch.differs ({ static_cast<double> (mode), value (s, "life"), value (s, "life.pitch"), value (s, "life.tone"), value (s, "life.attack"),
                                     value (s, "life.takes"), value (s, "life.takesSeed"), value (s, "life.character"),
-                                    static_cast<double> (processor.velocityCount.load()) });
+                                    static_cast<double> (processor.playedVelocityCount()) });
         }
 
         void paintVisual (juce::Graphics& g, juce::Rectangle<float> area) override
         {
             using namespace palette;
-            auto& s = processor.parameters;
+            auto& s = processor.apvts();
             const double life = std::clamp (0.01 * value (s, "life"), 0.0, 1.0);
             const auto mode = static_cast<LifeMode> (std::clamp (juce::roundToInt (value (s, "life.mode")), 0, 2));
             const double modeScale = mode == LifeMode::loose ? 1.5 : (mode == LifeMode::fray ? 1.2 : 1.0);
             const double pitch = value (s, "life.pitch") / 15.0, tone = 0.01 * value (s, "life.tone"), attack = 0.01 * value (s, "life.attack");
-            const auto notes = static_cast<std::uint64_t> (processor.velocityCount.load());
+            const auto notes = static_cast<std::uint64_t> (processor.playedVelocityCount());
             // TAKES: the note's fixed set of takes, all drawn, the one playing now strong;
             // endless: the last few performances, a new one with every note.
             const int takeIndex = juce::roundToInt (value (s, "life.takes"));
@@ -1445,7 +1445,7 @@ namespace
                         area.withHeight (11.0f), juce::Justification::centredRight, false);
         }
 
-        OspAudioProcessor& processor;
+        InstrumentHost& processor;
         Watch watch;
         int shownMode = -1;
     };
@@ -1571,13 +1571,13 @@ namespace
         /** A compact popover (230-270 x 170-210 reference px) that unfolds above its macro:
             a small title with the mode as a quiet selector beside it, the visualisation as
             the largest element, then small knobs. */
-        MacroPanel (OspAudioProcessor& p, juce::String popupTitle, int width, int displayHeight, design::colour::Macro macro)
+        MacroPanel (InstrumentHost& p, juce::String popupTitle, int width, int displayHeight, design::colour::Macro macro)
             : MiniPanel (std::move (popupTitle)), processor (p), panelWidth (width), visualHeight (displayHeight),
               identity (macro), accent (design::colour::macro (macro))
         {
         }
         /** A popover without a macro identity of its own (REIMAGINED: the aurora at its amount). */
-        MacroPanel (OspAudioProcessor& p, juce::String popupTitle, int width, int displayHeight, juce::Colour colour)
+        MacroPanel (InstrumentHost& p, juce::String popupTitle, int width, int displayHeight, juce::Colour colour)
             : MiniPanel (std::move (popupTitle)), processor (p), panelWidth (width), visualHeight (displayHeight),
               identity (design::colour::Macro::life), accent (colour), ownColour (true)
         {
@@ -1587,7 +1587,7 @@ namespace
 
         ValueSelector& mode (const char* id, juce::String tooltip)
         {
-            modeSelector = std::make_unique<ValueSelector> (*processor.parameters.getParameter (id), juce::String());
+            modeSelector = std::make_unique<ValueSelector> (*processor.apvts().getParameter (id), juce::String());
             modeSelector->setPlain (true);
             modeSelector->setAccent (accent);
             modeSelector->setTooltip (tooltip);
@@ -1597,7 +1597,7 @@ namespace
         /** SPACE also shows its types as a row of tabs under the display. */
         SegmentedControl& tabs (const char* id, juce::StringArray items, juce::String tooltip)
         {
-            modeTabs = std::make_unique<SegmentedControl> (*processor.parameters.getParameter (id), std::move (items));
+            modeTabs = std::make_unique<SegmentedControl> (*processor.apvts().getParameter (id), std::move (items));
             modeTabs->setAccent (accent);
             modeTabs->setTooltip (tooltip);
             addAndMakeVisible (*modeTabs);
@@ -1614,7 +1614,7 @@ namespace
         }
         MiniKnob& knob (bool secondary, const char* id, const char* caption, MiniKnob::Formatter f)
         {
-            auto k = std::make_unique<MiniKnob> (processor.parameters, id, caption, std::move (f));
+            auto k = std::make_unique<MiniKnob> (processor.apvts(), id, caption, std::move (f));
             k->setSmall (secondary);
             k->setArcColour (accent);
             addAndMakeVisible (*k);
@@ -1672,7 +1672,7 @@ namespace
                 k->setBounds (line.removeFromLeft (cell));
         }
 
-        OspAudioProcessor& processor;
+        InstrumentHost& processor;
         int panelWidth;
         int visualHeight;
         design::colour::Macro identity;
@@ -1691,9 +1691,9 @@ namespace
     class MovementPanel final : public MacroPanel
     {
     public:
-        explicit MovementPanel (OspAudioProcessor& p)
+        explicit MovementPanel (InstrumentHost& p)
             : MacroPanel (p, "MOVEMENT", 270, 62, design::colour::Macro::movement),
-              customAttachment (*p.parameters.getParameter ("movement.shaper.custom"), [this] (float) {
+              customAttachment (*p.apvts().getParameter ("movement.shaper.custom"), [this] (float) {
                   for (auto& sel : selectors)
                       sel->repaint();
               })
@@ -1744,7 +1744,7 @@ namespace
             magnifier.setVisible (shaperMode);
             magnifier.setExpanded (expanded);
             magnifier.toFront (false);
-            auto& state = processor.parameters;
+            auto& state = processor.apvts();
             const auto percent = [] (double v) { return format::percent (v) + " %"; };
             switch (static_cast<MovementMode> (newMode))
             {
@@ -1804,7 +1804,7 @@ namespace
         /** PATTERN also offers CUSTOM, a copy of any pattern to start from, and the saved ones. */
         void setUpPatternSelector (ValueSelector& selector)
         {
-            auto* customParam = processor.parameters.getParameter ("movement.shaper.custom");
+            auto* customParam = processor.apvts().getParameter ("movement.shaper.custom");
             selector.textOverride = [customParam] { return customParam != nullptr && customParam->getValue() >= 0.5f ? juce::String ("CUSTOM") : juce::String(); };
             selector.onPick = [customParam] (int) {
                 if (customParam != nullptr && customParam->getValue() >= 0.5f)
@@ -1818,7 +1818,7 @@ namespace
             selector.extraItems = [safe, customParam] (juce::PopupMenu& menu) {
                 menu.addSeparator();
                 menu.addItem ("CUSTOM", true, customParam != nullptr && customParam->getValue() >= 0.5f, [safe] { if (safe != nullptr) safe->setCustomOn(); });
-                const auto files = OspAudioProcessor::savedShaperPatterns();
+                const auto files = InstrumentHost::savedShaperPatterns();
                 if (! files.isEmpty())
                 {
                     juce::PopupMenu saved;
@@ -1831,7 +1831,7 @@ namespace
 
         void setCustomOn()
         {
-            if (auto* c = processor.parameters.getParameter ("movement.shaper.custom"))
+            if (auto* c = processor.apvts().getParameter ("movement.shaper.custom"))
             {
                 c->beginChangeGesture();
                 c->setValueNotifyingHost (1.0f);
@@ -1841,7 +1841,7 @@ namespace
         }
         void setCustom (const ShaperPattern& pattern)
         {
-            processor.undoManager.beginNewTransaction ("Shaper pattern");
+            processor.undo().beginNewTransaction ("Shaper pattern");
             processor.setShaperCustomPattern (pattern);
             setCustomOn();
         }
@@ -1864,21 +1864,21 @@ namespace
         {
             juce::PopupMenu menu;
             juce::Component::SafePointer<MovementPanel> safe (this);
-            const auto files = OspAudioProcessor::savedShaperPatterns();
+            const auto files = InstrumentHost::savedShaperPatterns();
             for (const auto& f : files)
                 menu.addItem (f.getFileNameWithoutExtension(), [safe, f] { if (safe != nullptr) safe->loadFile (f); });
             if (files.isEmpty())
                 menu.addItem ("No saved patterns yet", false, false, [] {});
             menu.addSeparator();
             menu.addItem ("Show folder", [] {
-                OspAudioProcessor::shaperPatternFolder().createDirectory();
-                OspAudioProcessor::shaperPatternFolder().revealToUser();
+                InstrumentHost::shaperPatternFolder().createDirectory();
+                InstrumentHost::shaperPatternFolder().revealToUser();
             });
             menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (toolbar.get()).withDeletionCheck (*this));
         }
         void loadFile (const juce::File& file)
         {
-            if (const auto pattern = OspAudioProcessor::readShaperPatternFile (file))
+            if (const auto pattern = InstrumentHost::readShaperPatternFile (file))
                 setCustom (*pattern);
         }
         void savePattern()
@@ -1893,7 +1893,7 @@ namespace
                 if (result == 1 && name.isNotEmpty() && safe != nullptr)
                 {
                     const auto pattern = safe->processor.shaperCustomPattern();
-                    OspAudioProcessor::writeShaperPatternFile (OspAudioProcessor::shaperPatternFolder().getChildFile (name + OspAudioProcessor::shaperPatternExtension), pattern);
+                    InstrumentHost::writeShaperPatternFile (InstrumentHost::shaperPatternFolder().getChildFile (name + InstrumentHost::shaperPatternExtension), pattern);
                 }
             }), true);
         }
@@ -1935,16 +1935,16 @@ namespace
     class EchoPanel final : public MacroPanel
     {
     public:
-        explicit EchoPanel (OspAudioProcessor& p) : MacroPanel (p, "ECHO", 286, 86, design::colour::Macro::echo)
+        explicit EchoPanel (InstrumentHost& p) : MacroPanel (p, "ECHO", 286, 86, design::colour::Macro::echo)
         {
             mode ("echo.type", "Tape echo or bucket-brigade (BBD) delay");
             setVisual (std::make_unique<EchoVisual> (p));
-            sync = std::make_unique<SegmentedControl> (*p.parameters.getParameter ("echo.sync"), juce::StringArray { "FREE", "SYNC" });
+            sync = std::make_unique<SegmentedControl> (*p.apvts().getParameter ("echo.sync"), juce::StringArray { "FREE", "SYNC" });
             sync->setAccent (accent);
             sync->setTooltip ("Free time in ms, or a note value synced to the host tempo");
             sync->onChange = [this] (int) { build(); };
             addAndMakeVisible (*sync);
-            stereo = std::make_unique<SegmentedControl> (*p.parameters.getParameter ("echo.stereo"), juce::StringArray { "MONO", "PING-PONG", "WIDE" });
+            stereo = std::make_unique<SegmentedControl> (*p.apvts().getParameter ("echo.stereo"), juce::StringArray { "MONO", "PING-PONG", "WIDE" });
             stereo->setAccent (accent);
             stereo->setTooltip ("In the centre, alternating left and right, or two heads a little apart");
             addAndMakeVisible (*stereo);
@@ -2053,11 +2053,11 @@ namespace
     class LifePanel final : public MacroPanel
     {
     public:
-        explicit LifePanel (OspAudioProcessor& p) : MacroPanel (p, "LIFE", 268, 66, design::colour::Macro::life)
+        explicit LifePanel (InstrumentHost& p) : MacroPanel (p, "LIFE", 268, 66, design::colour::Macro::life)
         {
             mode ("life.mode", "Natural: subtle; Loose: wider; Fray: now and then a note strays");
             setVisual (std::make_unique<LifeVisual> (p));
-            auto& state = p.parameters;
+            auto& state = p.apvts();
             const std::pair<const char*, const char*> keys[] = {
                 { "life.character", "Character: how performances vary. Auto reads the sample; Pluck, Synth and Drum use round-robin models" },
                 { "life.takes", "Takes: endless (every note new) or a fixed set of round robins per note" },
@@ -2124,7 +2124,7 @@ namespace
     class ReimaginedVisual final : public Visual
     {
     public:
-        ReimaginedVisual (OspAudioProcessor& p, int l) : processor (p), layer (l) {}
+        ReimaginedVisual (InstrumentHost& p, int l) : processor (p), layer (l) {}
 
         void modeChanged() { transition(); }
 
@@ -2143,19 +2143,19 @@ namespace
 
         float number (const char* name) const
         {
-            if (auto* p = processor.parameters.getParameter (OspAudioProcessor::reimaginedModeParameterId (layer, name)))
+            if (auto* p = processor.apvts().getParameter (InstrumentHost::reimaginedModeParameterId (layer, name)))
                 return p->getValue();   // 0..100 % as 0..1
             return 0.5f;
         }
         int choice (const char* name) const
         {
-            if (auto* p = processor.parameters.getParameter (OspAudioProcessor::reimaginedModeParameterId (layer, name)))
+            if (auto* p = processor.apvts().getParameter (InstrumentHost::reimaginedModeParameterId (layer, name)))
                 return juce::roundToInt (p->convertFrom0to1 (p->getValue()));
             return 0;
         }
         float amount() const
         {
-            if (auto* p = processor.parameters.getParameter (OspAudioProcessor::reimaginedParameterId (layer)))
+            if (auto* p = processor.apvts().getParameter (InstrumentHost::reimaginedParameterId (layer)))
                 return p->getValue();
             return 0.0f;
         }
@@ -2220,6 +2220,8 @@ namespace
                     break;
                 case ReimaginedMode::mirage: mirage (g, plot, analysis); break;
             }
+            if (const auto why = processor.reimaginedModeUnavailable (layer, choice ("mode")); why.isNotEmpty())
+                status (g, r, why);
         }
 
         // KALEIDOSCOPE: one source form refracting into related traces. They overlap at low
@@ -2577,7 +2579,7 @@ namespace
             g.strokePath (response, juce::PathStrokeType (1.4f));
         }
 
-        OspAudioProcessor& processor;
+        InstrumentHost& processor;
         int layer;
         Watch watch;
     };
@@ -2588,10 +2590,10 @@ namespace
     class ReimaginedPanel final : public MacroPanel, private juce::Timer
     {
     public:
-        ReimaginedPanel (OspAudioProcessor& p, int l)
+        ReimaginedPanel (InstrumentHost& p, int l)
             : MacroPanel (p, "REIMAGINED", 270, 80, design::colour::reimagined (amountOf (p, l))), layer (l)
         {
-            const auto modeId = OspAudioProcessor::reimaginedModeParameterId (l, "mode");
+            const auto modeId = InstrumentHost::reimaginedModeParameterId (l, "mode");
             auto& m = mode (modeId.toRawUTF8(), "Reimagined mode: the way this source is reinterpreted");
             m.onChange = [this] (int newMode) {
                 build (newMode);
@@ -2609,9 +2611,9 @@ namespace
         juce::Point<int> cardSize() const override { return { panelWidth, headerTop + visualHeight + gap + cellHeight + bottom }; }
 
     private:
-        static float amountOf (OspAudioProcessor& p, int l)
+        static float amountOf (InstrumentHost& p, int l)
         {
-            auto* param = p.parameters.getParameter (OspAudioProcessor::reimaginedParameterId (l));
+            auto* param = p.apvts().getParameter (InstrumentHost::reimaginedParameterId (l));
             return param != nullptr ? param->getValue() : 0.0f;
         }
 
@@ -2636,15 +2638,16 @@ namespace
             cells.clear();
             const auto percent = [] (double v) { return format::percent (v) + " %"; };
             auto addKnob = [&] (const char* name, const char* caption) {
-                const auto pid = OspAudioProcessor::reimaginedModeParameterId (layer, name);
+                const auto pid = InstrumentHost::reimaginedModeParameterId (layer, name);
                 cells.push_back (&knob (false, pid.toRawUTF8(), caption, percent));
             };
             auto addChoice = [&] (const char* name, const char* caption, const char* tip) {
-                auto* param = processor.parameters.getParameter (OspAudioProcessor::reimaginedModeParameterId (layer, name));
+                auto* param = processor.apvts().getParameter (InstrumentHost::reimaginedModeParameterId (layer, name));
                 if (param == nullptr)
                     return;
                 selectors.push_back (std::make_unique<ValueSelector> (*param, caption));
                 selectors.back()->setTooltip (tip);
+                binding::tag (*selectors.back(), param->getParameterID());   // (a product's editor dims a mode setting its engine does not read)
                 addAndMakeVisible (*selectors.back());
                 cells.push_back (selectors.back().get());
             };
@@ -2707,14 +2710,14 @@ namespace
     };
 }
 
-std::unique_ptr<MiniPanel> createReimaginedPopup (OspAudioProcessor& processor, int layer)
+std::unique_ptr<MiniPanel> createReimaginedPopup (InstrumentHost& processor, int layer)
 {
     return std::make_unique<ReimaginedPanel> (processor, layer);
 }
 
-std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, OspAudioProcessor& processor)
+std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, InstrumentHost& processor)
 {
-    auto& state = processor.parameters;
+    auto& state = processor.apvts();
     auto ms = [] (double v) { return format::milliseconds (v); };
     auto percent = [] (double v) { return format::percent (v) + " %"; };
     switch (macro)
@@ -2778,6 +2781,35 @@ std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, OspAudioProcessor
     popup->knob (true, "space.highCut", "HIGH CUT", [] (double v) { return format::hertz (v); });
     types.onChange = [&decay] (int) { decay.repaint(); };
     return popup;
+}
+
+
+const juce::StringArray& popupParameterIds (MacroPopup macro)
+{
+    static const juce::StringArray life { "life.mode", "life.pitch", "life.tone", "life.attack" };
+    static const juce::StringArray drive { "drive.mode", "drive.tone", "drive.body" };
+    static const juce::StringArray character { "character.type", "character.min", "character.max", "character.resonance",
+                                               "character.drive", "character.envAmount", "character.envAttack", "character.envDecay" };
+    static const juce::StringArray movement { "movement.mode", "movement.drift.speed", "movement.drift.pitch", "movement.drift.tone",
+                                              "movement.tape.wow", "movement.tape.flutter", "movement.tape.wear",
+                                              "movement.chorus.rate", "movement.chorus.width", "movement.chorus.stereo",
+                                              "movement.pulse.rate", "movement.pulse.shape", "movement.pulse.stereo",
+                                              "movement.shaper.pattern", "movement.shaper.rate", "movement.shaper.target",
+                                              "movement.shaper.smooth", "movement.shaper.custom" };
+    static const juce::StringArray space { "space.type", "space.decay", "space.preDelay", "space.size", "space.damping",
+                                           "space.modulation", "space.width", "space.lowCut", "space.highCut" };
+    static const juce::StringArray echo { "echo.type", "echo.sync", "echo.division", "echo.time", "echo.feedback",
+                                          "echo.tone", "echo.age", "echo.stereo" };
+    switch (macro)
+    {
+        case MacroPopup::life: return life;
+        case MacroPopup::drive: return drive;
+        case MacroPopup::character: return character;
+        case MacroPopup::movement: return movement;
+        case MacroPopup::echo: return echo;
+        case MacroPopup::space: break;
+    }
+    return space;
 }
 
 } // namespace osp::plugin

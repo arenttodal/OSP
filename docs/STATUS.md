@@ -478,6 +478,18 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       change); the schema golden is unchanged; ctest 12/12 green in the arenttodal/analog build
       (unit, integration, regression, plugin, osp_visual_reference, ANDOR Example's and ANDOR
       Analog's visual regressions at 0 px outside the masks in all 18 states).
+- [x] ANDOR OSP's macro popovers shared (for ANDOR ANALOG's effects): MacroPopups (LIFE, DRIVE,
+      CHARACTER, MOVEMENT, SPACE, ECHO and REIMAGINED) moved unchanged from apps/plugin to
+      shared/andor-ui, on `InstrumentHost` instead of OSP's processor. The host gained what they
+      read: editLayer, hostTempo, shaperPhase, SHAPER's custom pattern and editor size (OSP's
+      own, now overrides), the shaper-pattern files and codec (moved from OSP's processor), and
+      `reimaginedModeUnavailable` (default: every mode plays; OSP is unchanged). The shell
+      implements them (the custom pattern saved with the session and handed to the engine on
+      the audio thread, lock-free), opens the REIMAGINED popover from a card when the engine
+      reads `reimagined`, hands the engine the modulation curves, and lets a product migrate
+      an older state (`ProductInfo::stateVersion`, `migrateState`). OSP: design capture
+      byte-identical before/after except the moving MOVEMENT strip (differs run to run on the
+      same build); ctest 9/9 green.
 
 ## DONE
 

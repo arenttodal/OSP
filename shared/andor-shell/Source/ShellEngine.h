@@ -2,6 +2,9 @@
 
 #include "LoadedInstrument.h"
 
+#include "engine/Modulation.h"
+#include "engine/RhythmicShaper.h"
+
 #include <juce_audio_processors/juce_audio_processors.h>
 
 #include <vector>
@@ -87,6 +90,25 @@ public:
         block's last positions; an engine that wants them sample-accurate reads the MIDI
         (the on-screen wheels arrive only here, at the block's start). */
     virtual void process (juce::AudioBuffer<float>& buffer, const juce::MidiBuffer& midi, const Performance& performance) noexcept = 0;
+
+    /** Audio thread, before process(): MOVEMENT SHAPER's CUSTOM pattern changed (the
+        musician's 16 steps; given once after prepare() and on every change). */
+    virtual void setShaperPattern (const osp::ShaperPattern& pattern) noexcept { juce::ignoreUnused (pattern); }
+    /** Audio thread, before process(): an editable modulation curve changed
+        (InstrumentHost::ModCurves' index: 0, 1 LFO 1/2 CUSTOM, ...; given once after
+        prepare() and on every change). */
+    virtual void setModulationCurve (int index, const osp::mod::Curve& curve) noexcept { juce::ignoreUnused (index, curve); }
+    /** MOVEMENT SHAPER's playhead, 0..1 of its bar, for its picture (0: none). Any thread. */
+    virtual float shaperPhase() const noexcept { return 0.0f; }
+
+    /** A REIMAGINED mode (osp::ReimaginedMode's index) the engine cannot play on `layer`,
+        in the words its popover shows (InstrumentHost::reimaginedModeUnavailable). Empty:
+        it plays (or the engine does not read REIMAGINED at all). Message thread. */
+    virtual juce::String reimaginedModeUnavailable (int layer, int mode) const
+    {
+        juce::ignoreUnused (layer, mode);
+        return {};
+    }
 
     /** Sounding notes (the status line). Any thread. */
     virtual int activeNotes() const noexcept { return 0; }

@@ -35,8 +35,6 @@ andor_ui_add_to(OSP_Plugin)
 target_sources(OSP_Plugin PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
-    Source/MacroPopups.cpp
-    Source/OspPopups.cpp
     Source/LibraryService.cpp
     Source/Audition.cpp
     Source/LibraryCapture.cpp

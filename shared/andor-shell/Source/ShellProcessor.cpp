@@ -32,7 +32,16 @@ namespace
         osp::mod::Curve from, to;
     };
 
-    const juce::Identifier sourcesType ("Sources"), layerType ("Layer"), viewType ("View"), curvesType ("Curves");
+    struct ShaperAction final : juce::UndoableAction
+    {
+        ShaperAction (ShellProcessor& p, const osp::ShaperPattern& a, const osp::ShaperPattern& b) : processor (p), from (a), to (b) {}
+        bool perform() override { processor.setShaperCustomPattern (to, false); return true; }
+        bool undo() override { processor.setShaperCustomPattern (from, false); return true; }
+        ShellProcessor& processor;
+        osp::ShaperPattern from, to;
+    };
+
+    const juce::Identifier sourcesType ("Sources"), layerType ("Layer"), viewType ("View"), curvesType ("Curves"), shaperType ("Shaper");
 
     /** ANDOR OSP's schema, then the product's own parameters (ProductInfo::addParameters). */
     juce::AudioProcessorValueTreeState::ParameterLayout productParameterLayout()
@@ -69,6 +78,9 @@ ShellProcessor::ShellProcessor (std::unique_ptr<Engine> productEngine)
     macros = productInfo().macros;
     for (std::size_t i = 0; i < ccNumbers.size(); ++i)
         ccNumbers[i].store (defaultControllers[i]);
+    publishShaperPattern();
+    for (int i = 0; i < modCurveCount; ++i)
+        publishCurve (i);
     store = std::make_unique<osp::plugin::SampleStore> (sampleStoreFolder());
     if (productInfo().installFactoryPresets != nullptr)
         productInfo().installFactoryPresets (*this, presetFolder().getChildFile ("Factory"));
@@ -85,6 +97,8 @@ ShellProcessor::~ShellProcessor()
 void ShellProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     engine->prepare (sampleRate, samplesPerBlock, parameters);
+    shaperGenerationSeen = 0;   // the prepared engine is given the pattern and curves again
+    curveGenerationSeen.fill (0);
     setLatencySamples (engine->latencySamples());
     // A prepared engine plays the sources it is given from now on: hand it the current ones.
     for (int l = 0; l < numLayers; ++l)
@@ -170,6 +184,37 @@ void ShellProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
                 performance.denominator = signature->denominator;
             }
         }
+
+    tempo.store (static_cast<float> (performance.bpm), std::memory_order_relaxed);
+
+    // SHAPER CUSTOM: a changed pattern reaches the engine before the block.
+    if (const auto generation = shaperGeneration.load (std::memory_order_acquire); generation != shaperGenerationSeen)
+    {
+        shaperGenerationSeen = generation;
+        osp::ShaperPattern pattern;
+        for (std::size_t i = 0; i < pattern.size(); ++i)
+        {
+            pattern[i].start = shaperSteps[3 * i].load (std::memory_order_relaxed);
+            pattern[i].end = shaperSteps[3 * i + 1].load (std::memory_order_relaxed);
+            pattern[i].shape = static_cast<osp::StepShape> (std::clamp (static_cast<int> (shaperSteps[3 * i + 2].load (std::memory_order_relaxed)), 0, 5));
+        }
+        engine->setShaperPattern (pattern);
+    }
+    for (int c = 0; c < modCurveCount; ++c)
+    {
+        const auto index = static_cast<std::size_t> (c);
+        if (const auto generation = curveGeneration[index].load (std::memory_order_acquire); generation != curveGenerationSeen[index])
+        {
+            curveGenerationSeen[index] = generation;
+            const auto& shared = curveShared[index];
+            osp::mod::Curve curve;
+            curve.count = std::clamp (static_cast<int> (shared[curveValues - 1].load (std::memory_order_relaxed)), 0, osp::mod::maxCurvePoints);
+            for (std::size_t i = 0; i < static_cast<std::size_t> (curve.count); ++i)
+                curve.points[i] = { shared[3 * i].load (std::memory_order_relaxed), shared[3 * i + 1].load (std::memory_order_relaxed),
+                                    shared[3 * i + 2].load (std::memory_order_relaxed) };
+            engine->setModulationCurve (c, curve);
+        }
+    }
 
     buffer.clear();
     engine->process (buffer, midi, performance);
@@ -422,6 +467,7 @@ std::unique_ptr<juce::XmlElement> ShellProcessor::stateXml() const
     auto xml = std::make_unique<juce::XmlElement> (productInfo().stateType);
     xml->setAttribute ("schemaVersion", stateVersion);
     xml->setAttribute ("product", productInfo().slug);
+    xml->setAttribute ("productVersion", productInfo().stateVersion);
     // copyState() flushes the parameters; the shell's tree is only read here.
     if (auto params = const_cast<juce::AudioProcessorValueTreeState&> (parameters).copyState().createXml())
         xml->addChildElement (params.release());
@@ -439,8 +485,10 @@ std::unique_ptr<juce::XmlElement> ShellProcessor::stateXml() const
         const juce::ScopedLock lock (curveLock);
         xml->createNewChildElement (curvesType.toString())->setAttribute ("value", encodeModulationCurves (curves));
     }
+    xml->createNewChildElement (shaperType.toString())->setAttribute ("value", encodeShaperPattern (shaperCustomPattern()));
     auto* view = xml->createNewChildElement (viewType.toString());
     view->setAttribute ("arpOpen", arpOpen.load() ? 1 : 0);
+    view->setAttribute ("shaperLarge", shaperLarge.load() ? 1 : 0);
     view->setAttribute ("modTab", modTab.load());
     view->setAttribute ("editLayer", editLayer());
     view->setAttribute ("velToAmp", velToAmp.load() ? 1 : 0);
@@ -459,6 +507,9 @@ bool ShellProcessor::applyStateXml (const juce::XmlElement& xml)
         return false;
     if (auto* params = xml.getChildByName (parameters.state.getType()))
         parameters.replaceState (juce::ValueTree::fromXml (*params));
+    // An older version's state: the product moves its settings to where it reads them now.
+    if (const int from = xml.getIntAttribute ("productVersion", 1); from < productInfo().stateVersion && productInfo().migrateState != nullptr)
+        productInfo().migrateState (*this, from);
     for (int l = 0; l < numLayers; ++l)
         clearLayer (l);
     if (auto* sources = xml.getChildByName (sourcesType))
@@ -479,12 +530,22 @@ bool ShellProcessor::applyStateXml (const juce::XmlElement& xml)
     if (auto* c = xml.getChildByName (curvesType))
         if (const auto decoded = decodeModulationCurves (c->getStringAttribute ("value")))
         {
-            const juce::ScopedLock lock (curveLock);
-            curves = *decoded;
+            {
+                const juce::ScopedLock lock (curveLock);
+                curves = *decoded;
+            }
+            for (int i = 0; i < modCurveCount; ++i)
+                publishCurve (i);
         }
+    {
+        const auto* shaper = xml.getChildByName (shaperType);
+        const auto decoded = shaper != nullptr ? decodeShaperPattern (shaper->getStringAttribute ("value")) : std::nullopt;
+        setShaperCustomPattern (decoded.value_or (osp::RhythmicShaper::patternSteps (osp::ShaperParams().pattern)), false);
+    }
     if (auto* view = xml.getChildByName (viewType))
     {
         arpOpen = view->getIntAttribute ("arpOpen") != 0;
+        shaperLarge = view->getIntAttribute ("shaperLarge") != 0;
         setModPanelTab (view->getIntAttribute ("modTab"));
         setEditLayer (view->getIntAttribute ("editLayer"));
         velToAmp = view->getIntAttribute ("velToAmp", 1) != 0;
@@ -643,8 +704,11 @@ void ShellProcessor::resetSettings()
         const juce::ScopedLock lock (curveLock);
         curves = defaultModulationCurves();
     }
+    for (int i = 0; i < modCurveCount; ++i)
+        publishCurve (i);
     if (auto links = parameters.state.getChildWithName (modLinksTreeType()); links.isValid())
         parameters.state.removeChild (links, nullptr);
+    setShaperCustomPattern (osp::RhythmicShaper::patternSteps (osp::ShaperParams().pattern), false);
 }
 
 void ShellProcessor::initPatch()
@@ -679,8 +743,25 @@ void ShellProcessor::setModulationCurve (int index, const osp::mod::Curve& curve
         undoManager.perform (new CurveAction (*this, index, before, next));
         return;
     }
-    const juce::ScopedLock lock (curveLock);
-    curves[static_cast<std::size_t> (index)] = next;
+    {
+        const juce::ScopedLock lock (curveLock);
+        curves[static_cast<std::size_t> (index)] = next;
+    }
+    publishCurve (index);
+}
+
+void ShellProcessor::publishCurve (int index) noexcept
+{
+    const auto curve = modulationCurve (index);
+    auto& shared = curveShared[static_cast<std::size_t> (index)];
+    for (std::size_t i = 0; i < static_cast<std::size_t> (osp::mod::maxCurvePoints); ++i)
+    {
+        shared[3 * i].store (curve.points[i].x, std::memory_order_relaxed);
+        shared[3 * i + 1].store (curve.points[i].y, std::memory_order_relaxed);
+        shared[3 * i + 2].store (curve.points[i].tension, std::memory_order_relaxed);
+    }
+    shared[curveValues - 1].store (static_cast<float> (curve.count), std::memory_order_relaxed);
+    curveGeneration[static_cast<std::size_t> (index)].fetch_add (1, std::memory_order_release);
 }
 
 int ShellProcessor::modControllerNumber (int slot) const noexcept
@@ -692,6 +773,44 @@ void ShellProcessor::setModControllerNumber (int slot, int controller) noexcept
 {
     if (slot >= 0 && slot < osp::mod::ccSlots)
         ccNumbers[static_cast<std::size_t> (slot)].store (std::clamp (controller, 0, 119), std::memory_order_relaxed);
+}
+
+//==============================================================================
+// SHAPER CUSTOM
+
+osp::ShaperPattern ShellProcessor::shaperCustomPattern() const
+{
+    const juce::ScopedLock lock (shaperLock);
+    return shaperPattern;
+}
+
+void ShellProcessor::setShaperCustomPattern (const osp::ShaperPattern& pattern, bool undoable)
+{
+    const auto before = shaperCustomPattern();
+    if (before == pattern)
+        return;
+    if (undoable)
+    {
+        undoManager.perform (new ShaperAction (*this, before, pattern));
+        return;
+    }
+    {
+        const juce::ScopedLock lock (shaperLock);
+        shaperPattern = pattern;
+    }
+    publishShaperPattern();
+}
+
+void ShellProcessor::publishShaperPattern() noexcept
+{
+    const auto pattern = shaperCustomPattern();
+    for (std::size_t i = 0; i < pattern.size(); ++i)
+    {
+        shaperSteps[3 * i].store (std::clamp (pattern[i].start, 0.0f, 1.0f), std::memory_order_relaxed);
+        shaperSteps[3 * i + 1].store (std::clamp (pattern[i].end, 0.0f, 1.0f), std::memory_order_relaxed);
+        shaperSteps[3 * i + 2].store (static_cast<float> (pattern[i].shape), std::memory_order_relaxed);
+    }
+    shaperGeneration.fetch_add (1, std::memory_order_release);
 }
 
 int ShellProcessor::recentVelocityAt (int index) const noexcept
