@@ -1,4 +1,5 @@
 #include "ArpSection.h"
+#include "Binding.h"
 
 #include "OspLookAndFeel.h"
 
@@ -7,9 +8,9 @@ namespace osp::plugin
 
 namespace
 {
-    juce::RangedAudioParameter& parameter (OspAudioProcessor& p, const juce::String& id)
+    juce::RangedAudioParameter& parameter (InstrumentHost& p, const juce::String& id)
     {
-        auto* ranged = p.parameters.getParameter (id);
+        auto* ranged = p.apvts().getParameter (id);
         jassert (ranged != nullptr);
         return *ranged;
     }
@@ -35,13 +36,14 @@ namespace
 //==============================================================================
 // The card by the keyboard
 
-ArpControl::ArpControl (OspAudioProcessor& p)
+ArpControl::ArpControl (InstrumentHost& p)
     : ospProcessor (p),
       enabledAttachment (parameter (p, "arp.enabled"), [this] (float v) {
           enabled = v >= 0.5f;
           repaint();
-      }, &p.undoManager)
+      }, &p.undo())
 {
+    binding::tag (*this, "arp.*");
     setTitle ("Arpeggiator");
     setTooltip ("The light switches the arpeggiator on and off; click the card for its settings");
     enabledAttachment.sendInitialUpdate();
@@ -64,7 +66,7 @@ void ArpControl::refresh()
     // The inset is small: the longer styles in short (the list and the host show them whole).
     static const juce::StringArray shortNames { "UP", "DOWN", "UP/DOWN", "PLAYED", "RANDOM", "CHORD", "DN/UP", "UP&DN", "DN&UP", "CONV",
                                                 "DIV", "CON/DIV", "PINKY", "PINKY UD", "THUMB", "THUMB UD", "RND OTH", "RND 1" };
-    const auto text = shortNames[pattern] + "  " + middleDot + "  " + OspAudioProcessor::arpRateNames()[rate];
+    const auto text = shortNames[pattern] + "  " + middleDot + "  " + InstrumentHost::arpRateNames()[rate];
     if (text != status)
     {
         status = text;
@@ -302,34 +304,35 @@ juce::String ArpInlinePanel::patternLabel (int index)
     return labels[juce::jlimit (0, labels.size() - 1, index)];
 }
 
-ArpInlinePanel::ArpInlinePanel (OspAudioProcessor& p)
+ArpInlinePanel::ArpInlinePanel (InstrumentHost& p)
     : ospProcessor (p),
       enabledAttachment (parameter (p, "arp.enabled"), [this] (float v) {
           enabled = v >= 0.5f;
           repaint();
-      }, &p.undoManager),
+      }, &p.undo()),
       patternAttachment (parameter (p, "arp.pattern"), [this] (float v) {
           pattern = juce::jlimit (0, arp::patternCount - 1, juce::roundToInt (v));
           updatePreview();
           revealSelected();
           repaint();
-      }, &p.undoManager),
+      }, &p.undo()),
       octavesAttachment (parameter (p, "arp.octaves"), [this] (float v) {
           octaveCount = juce::jlimit (arp::minOctaves, arp::maxOctaves, juce::roundToInt (v));
           updatePreview();
           repaint();
-      }, &p.undoManager),
-      rate (p.parameters, "arp.rate", "RATE", [] (double v) {
+      }, &p.undo()),
+      rate (p.apvts(), "arp.rate", "RATE", [] (double v) {
           const auto& order = rateOrder();
           const int position = juce::jlimit (0, static_cast<int> (order.size()) - 1, juce::roundToInt (v));
-          return OspAudioProcessor::arpRateNames()[order[static_cast<std::size_t> (position)]];
+          return InstrumentHost::arpRateNames()[order[static_cast<std::size_t> (position)]];
       }),
-      gate (p.parameters, "arp.gate", "GATE", [] (double v) { return juce::String (juce::roundToInt (v)) + " %"; }),
-      swing (p.parameters, "arp.swing", "SWING", [] (double v) { return juce::String (juce::roundToInt (v)) + " %"; }),
-      velocity (p.parameters, "arp.velocity", "VELOCITY", [] (double v) { return juce::String (juce::roundToInt (v)) + " %"; })
+      gate (p.apvts(), "arp.gate", "GATE", [] (double v) { return juce::String (juce::roundToInt (v)) + " %"; }),
+      swing (p.apvts(), "arp.swing", "SWING", [] (double v) { return juce::String (juce::roundToInt (v)) + " %"; }),
+      velocity (p.apvts(), "arp.velocity", "VELOCITY", [] (double v) { return juce::String (juce::roundToInt (v)) + " %"; })
 {
+    binding::tag (*this, "arp.*");
     setTitle ("Arpeggiator settings");
-    rate.setChoiceOrder (parameter (p, "arp.rate"), rateOrder(), &p.undoManager);
+    rate.setChoiceOrder (parameter (p, "arp.rate"), rateOrder(), &p.undo());
     rate.slider.setTooltip ("Step length, from 1/4 dotted (slowest) to 1/32 (fastest)");
     velocity.slider.setTooltip ("The arpeggiated notes' velocity: 100 % plays them as the keys were played");
     const std::array<std::pair<MiniKnob*, const char*>, 4> knobs { { { &rate, "arp.rate" }, { &gate, "arp.gate" }, { &swing, "arp.swing" }, { &velocity, "arp.velocity" } } };

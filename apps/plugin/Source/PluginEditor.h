@@ -3,6 +3,7 @@
 #include "ArpSection.h"
 #include "Design.h"
 #include "EngineCard.h"
+#include "InstrumentFrame.h"
 #include "LibraryPanel.h"
 #include "MainSections.h"
 #include "ModulationPanel.h"
@@ -41,20 +42,6 @@ private:
     juce::Component content;
     std::vector<std::unique_ptr<Row>> rows;
     std::uint64_t shownGeneration = 0;
-};
-
-/** The on-screen keyboard: warm white keys, soft graphite black keys, a quiet coral for held notes. */
-class OspKeyboard final : public juce::MidiKeyboardComponent
-{
-public:
-    explicit OspKeyboard (juce::MidiKeyboardState& keyState) : MidiKeyboardComponent (keyState, horizontalKeyboard) {}
-
-private:
-    void drawWhiteNote (int note, juce::Graphics&, juce::Rectangle<float> area, bool isDown, bool isOver,
-                        juce::Colour lineColour, juce::Colour textColour) override;
-    void drawBlackNote (int note, juce::Graphics&, juce::Rectangle<float> area, bool isDown, bool isOver,
-                        juce::Colour noteFillColour) override;
-    juce::String getWhiteNoteText (int note) override;
 };
 
 /** The empty instrument: one full-width invitation to drop a sound (no empty A/B halves). */
@@ -150,7 +137,7 @@ public:
     void setArpExpanded (bool open);
     bool isArpExpanded() const noexcept { return arpShown; }
     /** The instrument's height in reference pixels (taller while the arpeggiator's editor shows). */
-    float instrumentHeight() const noexcept { return design::height + (arpShown ? design::layout::arpShift : 0.0f); }
+    float instrumentHeight() const noexcept { return frame::instrumentHeight (arpShown); }
     ArpInlinePanel& arpInlinePanel() noexcept { return arpPanel; }
     ArpControl& arpControl() noexcept { return arpButton; }
 
@@ -204,13 +191,6 @@ private:
     DropTarget targetAt (juce::Point<int> where) const;
     void showDropTarget (const DropTarget& target);
 
-    struct Knob
-    {
-        juce::Slider slider { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::NoTextBox };
-        std::unique_ptr<MacroLabel> label;
-        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
-    };
-
     /** Closes the open popup when the mouse goes down anywhere outside it. */
     struct OutsideClickWatcher final : juce::MouseListener
     {
@@ -230,15 +210,7 @@ private:
 
     /** The instrument at the reference size, scaled to the window as one piece. Declared
         before every child so it outlives them. */
-    struct Content final : juce::Component
-    {
-        std::function<void (juce::Graphics&)> onPaint;
-        void paint (juce::Graphics& g) override
-        {
-            if (onPaint != nullptr)
-                onPaint (g);
-        }
-    } content;
+    frame::Content content;
 
     // Header
     PresetBar presetBar { ospProcessor };
@@ -263,7 +235,7 @@ private:
     // Mix, macros, envelope
     HeaderMix headerMix { ospProcessor };   ///< MIX in the header (two or three layers)
     juce::Rectangle<int> lowerPanel;
-    std::array<Knob, 6> macros;      // LIFE, DYNAMICS, CHARACTER, MOVEMENT, SPACE, ECHO (ECHO sits before SPACE on screen)
+    frame::MacroRow macros;      // LIFE, DYNAMICS, CHARACTER, MOVEMENT, SPACE, ECHO (ECHO sits before SPACE on screen)
     ModulationPanel modPanel { ospProcessor };   ///< the AMP envelope's place, with the modulation editors
 
     // Keyboard row

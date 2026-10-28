@@ -2,7 +2,7 @@
 
 #include "EqEditor.h"
 #include "OspLookAndFeel.h"
-#include "PluginProcessor.h"
+#include "InstrumentHost.h"
 #include "ShapingPopups.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -117,7 +117,7 @@ private:
 class LayerKnob final : public juce::Component
 {
 public:
-    LayerKnob (OspAudioProcessor&, int layer, const juce::String& control, const juce::String& caption);
+    LayerKnob (InstrumentHost&, int layer, const juce::String& control, const juce::String& caption);
     void setCompact (bool compact);
     void paint (juce::Graphics&) override;
     void resized() override;
@@ -142,7 +142,7 @@ public:
     static constexpr float designUnits = 125.0f + labelLift;
 
 private:
-    OspAudioProcessor& processor;
+    InstrumentHost& processor;
     juce::RangedAudioParameter* parameter = nullptr;
     juce::String caption;
     bool compact = false;
@@ -180,7 +180,7 @@ private:
 class LayerStateButton final : public juce::Component, public juce::SettableTooltipClient, public skin::KeyFace
 {
 public:
-    LayerStateButton (OspAudioProcessor& processor, int layer, bool solo);
+    LayerStateButton (InstrumentHost& processor, int layer, bool solo);
     bool isOn() const noexcept { return on; }
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override { skin::repaintKey (*this); }
@@ -191,7 +191,7 @@ public:
     skin::KeyState keyState() const override;
 
 private:
-    OspAudioProcessor& processor;
+    InstrumentHost& processor;
     int layer;
     bool solo, on = false;
     juce::ParameterAttachment attachment;
@@ -229,7 +229,7 @@ class EngineCard final : public juce::Component, public skin::SurfaceFace
 public:
     float surfaceRadius() const override { return design::layout::cardRadius; }
     bool surfaceIsCard() const override { return true; }
-    EngineCard (OspAudioProcessor& processor, int layer);
+    EngineCard (InstrumentHost& processor, int layer);
     ~EngineCard() override;
 
     int layer() const noexcept { return layerIndex; }
@@ -281,7 +281,7 @@ private:
     void updateMode();
     bool granularShown = false;
 
-    OspAudioProcessor& processor;
+    InstrumentHost& processor;
     const int layerIndex;
     EngineLayoutDensity density = EngineLayoutDensity::hero;
     bool focused = true;

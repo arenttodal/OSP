@@ -27,43 +27,16 @@ juce_add_plugin(OSP_Plugin
     AU_MAIN_TYPE kAudioUnitType_MusicDevice
     MICROPHONE_PERMISSION_ENABLED FALSE)
 
-# Embedded typefaces (SIL Open Font License: Resources/fonts/*-OFL.txt): Inter for the
-# interface, with tabular figures as its default digits (values line up as they change), and
-# Outfit for the ANDOR/OSP identity.
-juce_add_binary_data(OSP_PluginData
-    HEADER_NAME BinaryData.h
-    NAMESPACE BinaryData
-    SOURCES
-        Resources/fonts/Inter-Light.ttf
-        Resources/fonts/Inter-Regular.ttf
-        Resources/fonts/Inter-Medium.ttf
-        Resources/fonts/Inter-SemiBold.ttf
-        Resources/fonts/Inter-Bold.ttf
-        Resources/fonts/Inter-ExtraBold.ttf
-        Resources/fonts/Outfit-ExtraBold.ttf
-        Resources/fonts/Outfit-ExtraLight.ttf
-        # Rendered controls (tools/blender-assets): one zip of frames per size; the plugin
-        # registers every "<name>-<size>.zip" it finds here (SpriteKnobRenderer).
-        Resources/knobs/macro-ivory/macro-ivory-176.zip
-        Resources/knobs/macro-ivory/macro-ivory-352.zip
-        # The ceramic skin's rendered surfaces (tools/blender-assets/skin): CeramicSkin.
-        Resources/skin/ceramic-skin.zip)
+# The interface (components, look, fonts, knob sprites, ceramic skin) is the shared ANDOR
+# interface in shared/andor-ui; OSP's own windows (editor, popovers, Library) stay here.
+include(${PROJECT_SOURCE_DIR}/shared/andor-ui/AndorUi.cmake)
+andor_ui_add_to(OSP_Plugin)
 
 target_sources(OSP_Plugin PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
-    Source/OspLookAndFeel.cpp
-    Source/Design.cpp
-    Source/SpriteKnobRenderer.cpp
-    Source/CeramicSkin.cpp
-    Source/ShapingPopups.cpp
     Source/MacroPopups.cpp
-    Source/EngineCard.cpp
-    Source/MainSections.cpp
-    Source/ArpSection.cpp
-    Source/ModulationPanel.cpp
-    Source/EqEditor.cpp
-    Source/InstrumentLoader.cpp
+    Source/OspPopups.cpp
     Source/LibraryService.cpp
     Source/Audition.cpp
     Source/LibraryCapture.cpp
@@ -88,7 +61,6 @@ target_link_libraries(OSP_Plugin
     PRIVATE
         osp_dsp
         osp_library
-        OSP_PluginData
         juce::juce_audio_utils
         juce::juce_audio_formats
         juce::juce_cryptography

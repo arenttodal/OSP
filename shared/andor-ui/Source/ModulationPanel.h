@@ -2,7 +2,7 @@
 
 #include "Design.h"
 #include "MainSections.h"
-#include "PluginProcessor.h"
+#include "InstrumentHost.h"
 #include "ShapingPopups.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -28,14 +28,14 @@ namespace modui
         cutoff for a per-voice one. Dest::none when the control is not a destination. */
     mod::Dest destinationFor (const juce::String& parameterId, bool polySource);
     /** A source (0..4) acts per voice (the envelopes; a POLY LFO). */
-    bool isPerVoice (const OspAudioProcessor& processor, int source);
+    bool isPerVoice (const InstrumentHost& processor, int source);
     /** Every destination a control shows (CHARACTER: the macro and the cutoff). */
     std::vector<mod::Dest> destinationsShownBy (const juce::String& parameterId);
     /** The control's parameter ID for a destination (where to show its halo), or empty. */
     juce::String parameterFor (mod::Dest dest);
     /** A route's name: "ENV 1 → CHARACTER CUTOFF"; a depth route's "LFO 1 → DEPTH OF ENV 1 → ..."
         (withSource false: without its own source). */
-    juce::String routeTitle (const OspAudioProcessor& processor, const OspAudioProcessor::ModRouteInfo& info, bool withSource = true);
+    juce::String routeTitle (const InstrumentHost& processor, const InstrumentHost::ModRouteInfo& info, bool withSource = true);
     /** The panel's tabs: 0 AMP, 1 ENV, 2 LFO 1, 3 LFO 2, 4 VEL, 5 NOTE; their sources (-1
         AMP). ENV is ENV 1; ENV 2 (legacy) has no tab: its routes still work and show. */
     constexpr int tabCount = 6;
@@ -48,14 +48,14 @@ namespace modui
     int keyCurveIndex (int source) noexcept;
     /** The sources a menu offers, in its order (ENV 2 only while a route uses it):
         `forDepth` false: MOD WHEEL first (a control's menu), true: the LFOs first. */
-    std::vector<int> menuSources (const OspAudioProcessor& processor, bool forDepth);
+    std::vector<int> menuSources (const InstrumentHost& processor, bool forDepth);
     /** A MIDI controller as a musician knows it: "CC 11 Expression" (number alone if unnamed). */
     juce::String controllerName (int controller);
     /** A source in a menu: CC 1-4 with the controller they follow ("CC 1 (CC 2 Breath)"). */
-    juce::String menuLabel (const OspAudioProcessor& processor, int source);
+    juce::String menuLabel (const InstrumentHost& processor, int source);
     /** CC 1-4's controllers: each slot's Learn (the next controller moved) and a choice of
         controller (the common ones first, then any by number). */
-    juce::PopupMenu controllerMenu (OspAudioProcessor& processor);
+    juce::PopupMenu controllerMenu (InstrumentHost& processor);
 }
 
 /**
@@ -69,7 +69,7 @@ namespace modui
 class ModCurveView final : public juce::Component
 {
 public:
-    explicit ModCurveView (OspAudioProcessor& processor);
+    explicit ModCurveView (InstrumentHost& processor);
     void setSource (int source);
     int source() const noexcept { return sourceIndex; }
     void setCompact (bool shouldBeCompact);
@@ -104,7 +104,7 @@ private:
     void paintEnvelope (juce::Graphics&, juce::Rectangle<float> plot, juce::Colour colour);
     void paintCurvePoints (juce::Graphics&, juce::Colour colour);
 
-    OspAudioProcessor& ospProcessor;
+    InstrumentHost& ospProcessor;
     int sourceIndex = 0;
     bool compact = false;
     mod::Curve curve, before;
@@ -124,7 +124,7 @@ private:
 class ModSourcePage final : public juce::Component
 {
 public:
-    ModSourcePage (OspAudioProcessor& processor, int source);
+    ModSourcePage (InstrumentHost& processor, int source);
     void refresh();
     void resized() override;
     /** The RATE caption's choice (tests, the panel). */
@@ -133,7 +133,7 @@ public:
     MiniKnob* divisionKnob() const noexcept { return division.get(); }
 
 private:
-    OspAudioProcessor& ospProcessor;
+    InstrumentHost& ospProcessor;
     int source;
     bool isLfo() const noexcept { return source < 2; }
     std::unique_ptr<ValueSelector> shape, mode, scope;
@@ -147,7 +147,7 @@ private:
 class ModKeyPage final : public juce::Component
 {
 public:
-    ModKeyPage (OspAudioProcessor& processor, int source);
+    ModKeyPage (InstrumentHost& processor, int source);
     void refresh();
     void paint (juce::Graphics&) override;
     void mouseUp (const juce::MouseEvent&) override;
@@ -158,7 +158,7 @@ public:
     juce::Rectangle<float> ampArea() const;   ///< VEL's APPLY TO AMP (empty for NOTE)
 
 private:
-    OspAudioProcessor& ospProcessor;
+    InstrumentHost& ospProcessor;
     int source;
     int hover = 0;   ///< 1 CURVE, 2 APPLY TO AMP
     juce::String shownPreset;
@@ -170,7 +170,7 @@ private:
 class ModDepthBar final : public juce::Component, public juce::SettableTooltipClient
 {
 public:
-    ModDepthBar (OspAudioProcessor& processor, int slot, juce::Colour colour);
+    ModDepthBar (InstrumentHost& processor, int slot, juce::Colour colour);
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
     void mouseDrag (const juce::MouseEvent&) override;
@@ -195,7 +195,7 @@ private:
 class ModulationPanel final : public juce::Component
 {
 public:
-    explicit ModulationPanel (OspAudioProcessor& processor);
+    explicit ModulationPanel (InstrumentHost& processor);
 
     std::function<void (int tab)> onTabChanged;
     /** A source tab dragged (screen position) / released there; the editor finds the target. */
@@ -247,7 +247,7 @@ private:
     int routeCount (int source, bool activeOnly) const;
     void layoutTabs();
 
-    OspAudioProcessor& ospProcessor;
+    InstrumentHost& ospProcessor;
     EnvelopePanel amp;
     ModCurveView curve;
     std::array<std::unique_ptr<ModSourcePage>, 4> pages;
@@ -271,7 +271,7 @@ private:
 class ModRoutesPopup final : public MiniPanel
 {
 public:
-    ModRoutesPopup (OspAudioProcessor& processor, int source);
+    ModRoutesPopup (InstrumentHost& processor, int source);
     std::function<void (int slot)> onSelectRoute;
     void setSelectedSlot (int slot);
     int source() const noexcept { return sourceIndex; }
@@ -290,7 +290,7 @@ protected:
 private:
     struct Row final : juce::Component
     {
-        Row (ModRoutesPopup& owner, const OspAudioProcessor::ModRouteInfo& info);
+        Row (ModRoutesPopup& owner, const InstrumentHost::ModRouteInfo& info);
         void paint (juce::Graphics&) override;
         void resized() override;
         void mouseDown (const juce::MouseEvent&) override;
@@ -299,13 +299,13 @@ private:
         juce::Rectangle<float> bypassArea() const;
         juce::Rectangle<float> removeArea() const;
         ModRoutesPopup& owner;
-        OspAudioProcessor::ModRouteInfo info;
+        InstrumentHost::ModRouteInfo info;
         juce::String title;
         ModDepthBar depth;
     };
     void rebuild();
 
-    OspAudioProcessor& ospProcessor;
+    InstrumentHost& ospProcessor;
     int sourceIndex;
     int selectedSlot = -1;
     std::vector<std::unique_ptr<Row>> rows;
@@ -318,7 +318,7 @@ private:
 class ModCurvePopup final : public MiniPanel
 {
 public:
-    ModCurvePopup (OspAudioProcessor& processor, int source);
+    ModCurvePopup (InstrumentHost& processor, int source);
     juce::Point<int> cardSize() const override { return { 640, 330 }; }
     bool compact() const override { return true; }
     void refreshContent() override { view.refresh(); }
@@ -346,7 +346,7 @@ private:
 class ModulationOverlay final : public juce::Component
 {
 public:
-    ModulationOverlay (OspAudioProcessor& processor, juce::Component& root);
+    ModulationOverlay (InstrumentHost& processor, juce::Component& root);
 
     /** A route or source chosen here (a halo pressed, "Select"): the editor's one selection. */
     std::function<void (int source, int slot)> onSelect;
@@ -408,7 +408,7 @@ public:
     /** Which route's depth (arcs lying together). */
     juce::PopupMenu depthChooser (int source, const std::vector<int>& slots);
     /** The depth routes of a route. */
-    std::vector<const OspAudioProcessor::ModRouteInfo*> depthRoutesOf (int slot) const;
+    std::vector<const InstrumentHost::ModRouteInfo*> depthRoutesOf (int slot) const;
     /** A route's depth now (moved by its depth routes, as the engine takes it) and the range
         its depth routes can take it through; base depth when none. */
     double effectiveDepth (int slot) const;
@@ -461,16 +461,16 @@ private:
     void collectAll();
     void findCovers();
     float positionOf (const Target& t, double offset, mod::Dest dest) const;
-    std::vector<const OspAudioProcessor::ModRouteInfo*> routesOf (const Target& t) const;
-    const OspAudioProcessor::ModRouteInfo* emphasised (const Target& t) const;
-    Sweep sweepOf (const Target& t, const OspAudioProcessor::ModRouteInfo& route) const;
+    std::vector<const InstrumentHost::ModRouteInfo*> routesOf (const Target& t) const;
+    const InstrumentHost::ModRouteInfo* emphasised (const Target& t) const;
+    Sweep sweepOf (const Target& t, const InstrumentHost::ModRouteInfo& route) const;
     int targetAt (juce::Point<float> p, bool includeBody, bool anyControl = false) const;
-    const OspAudioProcessor::ModRouteInfo* routeInSlot (int slot) const;
+    const InstrumentHost::ModRouteInfo* routeInSlot (int slot) const;
     /** A source's value now as a destination hears it (a shared stage: the global envelope). */
     double valueNow (int source, mod::Dest dest, bool& known) const;
     juce::Range<double> sourceRange (int source) const;
     /** The depth route being edited on this control's halo (the selection), or nullptr. */
-    const OspAudioProcessor::ModRouteInfo* selectedDepthRoute (const Target& t) const;
+    const InstrumentHost::ModRouteInfo* selectedDepthRoute (const Target& t) const;
     juce::Rectangle<float> dragTipArea() const;
     void paintDragTarget (juce::Graphics&, const Target& t, int index, const HaloHit& hit);
     juce::String notice;
@@ -482,11 +482,11 @@ private:
     juce::Rectangle<int> repaintArea (const Target& t) const;
     void paintHalo (juce::Graphics&, const Target& t, int index);
 
-    OspAudioProcessor& ospProcessor;
+    InstrumentHost& ospProcessor;
     juce::Component& root;
     std::vector<Target> targets;
     std::vector<juce::Rectangle<int>> shownAreas;
-    std::vector<OspAudioProcessor::ModRouteInfo> routes;
+    std::vector<InstrumentHost::ModRouteInfo> routes;
     InstrumentEngine::ModView view;
     int dragSource = -1, selectedSource = -1, selectedSlot = -1, shownRings = 0;
     int hover = -1;

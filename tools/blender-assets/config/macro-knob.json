@@ -49,13 +49,13 @@
         "convention": "JUCE rotary angle: radians clockwise from 12 o'clock",
         "start": 3.9269908169872414,
         "end": 8.639379797371932,
-        "source": "apps/plugin/Source/OspLookAndFeel.h rotaryStart (1.25 pi) / rotaryEnd (2.75 pi)"
+        "source": "shared/andor-ui/Source/OspLookAndFeel.h rotaryStart (1.25 pi) / rotaryEnd (2.75 pi)"
     },
 
     "frames": { "count": 129 },
 
     "runtime": {
         "levels": [176, 352],
-        "destination": "apps/plugin/Resources/knobs/macro-ivory"
+        "destination": "shared/andor-ui/Resources/knobs/macro-ivory"
     }
 }

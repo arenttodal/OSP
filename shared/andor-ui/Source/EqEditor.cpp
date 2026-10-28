@@ -1,4 +1,5 @@
 #include "EqEditor.h"
+#include "Binding.h"
 
 #include "OspLookAndFeel.h"
 
@@ -37,6 +38,7 @@ juce::Colour equi::bandColour (eq::Band band)
 //==============================================================================
 EqButton::EqButton (int l) : juce::Button ("EQ"), layer (l)
 {
+    binding::tag (*this, InstrumentHost::eqParameterId (l, "*") + " " + InstrumentHost::dampenParameterId (l, "*"));
     setMouseCursor (juce::MouseCursor::PointingHandCursor);
     setTooltip ("This layer's EQ (it opens over the waveform)");
     setTitle ("EQ");
@@ -70,15 +72,16 @@ void EqButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
 }
 
 //==============================================================================
-EqValueField::EqValueField (OspAudioProcessor& processor, const juce::String& id)
+EqValueField::EqValueField (InstrumentHost& processor, const juce::String& id)
     : juce::Slider (juce::Slider::RotaryVerticalDrag, juce::Slider::NoTextBox)
 {
-    parameter = processor.parameters.getParameter (id);
+    parameter = processor.apvts().getParameter (id);
     getProperties().set ("paramId", id);   // a modulation drop target
     getProperties().set ("modField", true);
+    binding::tag (*this, id);
     setMouseDragSensitivity (220);
     setMouseCursor (juce::MouseCursor::UpDownResizeCursor);
-    attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (processor.parameters, id, *this);
+    attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (processor.apvts(), id, *this);
     if (parameter != nullptr)
         setTooltip (parameter->getName (64) + ": drag up or down, double-click to type");
     onValueChange = [this] { repaint(); };
@@ -142,9 +145,10 @@ void EqValueField::commitTyping (const juce::String& text)
 }
 
 //==============================================================================
-EqEditor::EqEditor (OspAudioProcessor& p, int l) : ospProcessor (p), layer (l)
+EqEditor::EqEditor (InstrumentHost& p, int l) : ospProcessor (p), layer (l)
 {
-    setTitle ("EQ " + OspAudioProcessor::layerName (layer));
+    binding::tag (*this, InstrumentHost::eqParameterId (l, "*"));
+    setTitle ("EQ " + InstrumentHost::layerName (layer));
     shown = ospProcessor.layerEqSettings (layer);
     setRepaintsOnMouseActivity (false);
     dampenPage = std::make_unique<DampenEditor> (ospProcessor, layer);
@@ -169,14 +173,14 @@ void EqEditor::showDampen (bool show)
 
 double EqEditor::sampleRate() const
 {
-    const double rate = ospProcessor.getSampleRate();
+    const double rate = ospProcessor.hostSampleRate();
     return rate > 0.0 ? rate : 48000.0;
 }
 
 juce::RangedAudioParameter* EqEditor::bandParameter (int band, const char* name) const
 {
-    return ospProcessor.parameters.getParameter (
-        OspAudioProcessor::eqParameterId (layer, juce::String (OspAudioProcessor::eqBandKey (static_cast<eq::Band> (band))) + "." + name));
+    return ospProcessor.apvts().getParameter (
+        InstrumentHost::eqParameterId (layer, juce::String (InstrumentHost::eqBandKey (static_cast<eq::Band> (band))) + "." + name));
 }
 
 void EqEditor::setValue (juce::RangedAudioParameter* p, float value)
@@ -190,7 +194,7 @@ void EqEditor::setValue (juce::RangedAudioParameter* p, float value)
 
 void EqEditor::switchBand (int band, bool on)
 {
-    ospProcessor.undoManager.beginNewTransaction (on ? "EQ band on" : "EQ band off");
+    ospProcessor.undo().beginNewTransaction (on ? "EQ band on" : "EQ band off");
     // The first band switched on also switches the EQ on (what else would the musician
     // mean); once anything is on, the EQ's own switch is theirs alone.
     if (on && ! shown.enabled)
@@ -199,7 +203,7 @@ void EqEditor::switchBand (int band, bool on)
         for (const auto& b : shown.bands)
             anyOn = anyOn || b.enabled;
         if (! anyOn)
-            setValue (ospProcessor.parameters.getParameter (OspAudioProcessor::eqParameterId (layer, "enabled")), 1.0f);
+            setValue (ospProcessor.apvts().getParameter (InstrumentHost::eqParameterId (layer, "enabled")), 1.0f);
     }
     setValue (bandParameter (band, "enabled"), on ? 1.0f : 0.0f);
     shown = ospProcessor.layerEqSettings (layer);
@@ -331,9 +335,9 @@ void EqEditor::rebuildInspector()
     if (selected >= 0)
     {
         const auto band = static_cast<eq::Band> (selected);
-        const juce::String key = OspAudioProcessor::eqBandKey (band);
+        const juce::String key = InstrumentHost::eqBandKey (band);
         auto make = [&] (const char* name) {
-            auto f = std::make_unique<EqValueField> (ospProcessor, OspAudioProcessor::eqParameterId (layer, key + "." + name));
+            auto f = std::make_unique<EqValueField> (ospProcessor, InstrumentHost::eqParameterId (layer, key + "." + name));
             f->setColour (equi::bandColour (band));
             addAndMakeVisible (*f);
             return f;
@@ -564,7 +568,7 @@ void EqEditor::paint (juce::Graphics& g)
         g.drawLine (p.getCentreX(), p.getY() + 2.0f, p.getCentreX(), p.getCentreY(), 1.6f);
         g.setFont (type::panelHeader());
         g.setColour (juce::Colour (0xffeee8dd).withAlpha (heard ? 0.95f : 0.6f));
-        g.drawText ("EQ " + OspAudioProcessor::layerName (layer), titleArea, juce::Justification::centredLeft, false);
+        g.drawText ("EQ " + InstrumentHost::layerName (layer), titleArea, juce::Justification::centredLeft, false);
         // EQ | DAMPEN: the other page.
         g.setFont (type::popupLabel (12.0f));
         g.setColour (colour::wellText.brighter (0.2f));
@@ -667,8 +671,8 @@ void EqEditor::mouseDown (const juce::MouseEvent& e)
     }
     if (powerArea().expanded (4.0f).contains (p) || titleArea.contains (p))
     {
-        ospProcessor.undoManager.beginNewTransaction (shown.enabled ? "EQ off" : "EQ on");
-        setValue (ospProcessor.parameters.getParameter (OspAudioProcessor::eqParameterId (layer, "enabled")), shown.enabled ? 0.0f : 1.0f);
+        ospProcessor.undo().beginNewTransaction (shown.enabled ? "EQ off" : "EQ on");
+        setValue (ospProcessor.apvts().getParameter (InstrumentHost::eqParameterId (layer, "enabled")), shown.enabled ? 0.0f : 1.0f);
         refresh();
         return;
     }
@@ -682,7 +686,7 @@ void EqEditor::mouseDown (const juce::MouseEvent& e)
         }
         if (resetArea.contains (p))
         {
-            ospProcessor.undoManager.beginNewTransaction ("EQ band reset");
+            ospProcessor.undo().beginNewTransaction ("EQ band reset");
             const auto range = eq::frequencyRange (band);
             setValue (bandParameter (selected, "frequency"), static_cast<float> (range.defaultHz));
             if (eq::hasGain (band))
@@ -697,7 +701,7 @@ void EqEditor::mouseDown (const juce::MouseEvent& e)
         }
         if (slopeArea.contains (p))
         {
-            ospProcessor.undoManager.beginNewTransaction ("EQ slope");
+            ospProcessor.undo().beginNewTransaction ("EQ slope");
             setValue (bandParameter (selected, "slope"), p.x > slopeArea.getCentreX() ? 1.0f : 0.0f);
             refresh();
             return;
@@ -719,7 +723,7 @@ void EqEditor::mouseDown (const juce::MouseEvent& e)
     // Pressing a band that is off starts using it: on, and dragging at once.
     if (! shown.bands[static_cast<std::size_t> (band)].enabled)
         switchBand (band, true);
-    ospProcessor.undoManager.beginNewTransaction ("EQ band");
+    ospProcessor.undo().beginNewTransaction ("EQ band");
     dragBand = band;
     dragFromX = xForHz (shown.bands[static_cast<std::size_t> (band)].frequencyHz);
     dragFromY = eq::hasGain (static_cast<eq::Band> (band)) ? yForDb (shown.bands[static_cast<std::size_t> (band)].gainDb) : 0.0f;
@@ -772,7 +776,7 @@ void EqEditor::mouseDoubleClick (const juce::MouseEvent& e)
     const int band = bandAt (e.position);
     if (band < 0)
         return;
-    ospProcessor.undoManager.beginNewTransaction ("EQ band reset");
+    ospProcessor.undo().beginNewTransaction ("EQ band reset");
     if (eq::hasGain (static_cast<eq::Band> (band)))
         setValue (bandParameter (band, "gain"), 0.0f);
     else
@@ -810,12 +814,13 @@ namespace
     const juce::Colour dampenColour { 0xff93a9b8 };   // a cool, quiet blue-grey: taking the highs away
 }
 
-DampenEditor::DampenEditor (OspAudioProcessor& p, int l) : ospProcessor (p), layer (l)
+DampenEditor::DampenEditor (InstrumentHost& p, int l) : ospProcessor (p), layer (l)
 {
-    setTitle ("DAMPEN " + OspAudioProcessor::layerName (layer));
+    binding::tag (*this, InstrumentHost::dampenParameterId (l, "*"));
+    setTitle ("DAMPEN " + InstrumentHost::layerName (layer));
     setTooltip ("DAMPEN: each note loses highs by its key. Drag a point, double-click to add or remove one");
     auto make = [this] (const char* name) {
-        auto f = std::make_unique<EqValueField> (ospProcessor, OspAudioProcessor::dampenParameterId (layer, name));
+        auto f = std::make_unique<EqValueField> (ospProcessor, InstrumentHost::dampenParameterId (layer, name));
         f->setColour (dampenColour);
         addAndMakeVisible (*f);
         return f;
@@ -823,22 +828,22 @@ DampenEditor::DampenEditor (OspAudioProcessor& p, int l) : ospProcessor (p), lay
     amountField = make ("amount");
     frequencyField = make ("frequency");
     cutoffField = make ("cutoff");
-    curve = ospProcessor.modulationCurve (OspAudioProcessor::dampenCurveIndex (layer));
+    curve = ospProcessor.modulationCurve (InstrumentHost::dampenCurveIndex (layer));
 }
 
 juce::RangedAudioParameter* DampenEditor::parameter (const char* name) const
 {
-    return ospProcessor.parameters.getParameter (OspAudioProcessor::dampenParameterId (layer, name));
+    return ospProcessor.apvts().getParameter (InstrumentHost::dampenParameterId (layer, name));
 }
 
 bool DampenEditor::enabled() const
 {
-    return ospProcessor.parameterValue (OspAudioProcessor::dampenParameterId (layer, "enabled")) >= 0.5f;
+    return ospProcessor.parameterValue (InstrumentHost::dampenParameterId (layer, "enabled")) >= 0.5f;
 }
 
 bool DampenEditor::lowPass() const
 {
-    return ospProcessor.parameterValue (OspAudioProcessor::dampenParameterId (layer, "mode")) >= 0.5f;
+    return ospProcessor.parameterValue (InstrumentHost::dampenParameterId (layer, "mode")) >= 0.5f;
 }
 
 juce::Rectangle<float> DampenEditor::graphArea() const
@@ -886,12 +891,12 @@ int DampenEditor::pointAt (juce::Point<float> p) const
 
 void DampenEditor::refresh()
 {
-    const auto now = ospProcessor.modulationCurve (OspAudioProcessor::dampenCurveIndex (layer));
+    const auto now = ospProcessor.modulationCurve (InstrumentHost::dampenCurveIndex (layer));
     std::array<float, 6> signature { enabled() ? 1.0f : 0.0f, lowPass() ? 1.0f : 0.0f,
-                                     ospProcessor.parameterValue (OspAudioProcessor::dampenParameterId (layer, "amount")),
-                                     ospProcessor.parameterValue (OspAudioProcessor::dampenParameterId (layer, "frequency")),
-                                     ospProcessor.parameterValue (OspAudioProcessor::dampenParameterId (layer, "cutoff")), 0.0f };
-    const int note = ospProcessor.lastPlayedNote.load (std::memory_order_relaxed);
+                                     ospProcessor.parameterValue (InstrumentHost::dampenParameterId (layer, "amount")),
+                                     ospProcessor.parameterValue (InstrumentHost::dampenParameterId (layer, "frequency")),
+                                     ospProcessor.parameterValue (InstrumentHost::dampenParameterId (layer, "cutoff")), 0.0f };
+    const int note = ospProcessor.lastPlayedNoteNumber();
     const bool modeMoved = signature[1] != shownSignature[1];
     if ((! dragging && ! (now == curve)) || signature != shownSignature || note != shownNote)
     {
@@ -908,9 +913,9 @@ void DampenEditor::refresh()
 void DampenEditor::applyPreset (int preset)
 {
     const auto next = preset <= 0 ? dampen::defaultCurve() : mod::presetCurve (static_cast<mod::CurvePreset> (preset - 1));
-    ospProcessor.undoManager.beginNewTransaction ("DAMPEN curve");
-    ospProcessor.setModulationCurve (OspAudioProcessor::dampenCurveIndex (layer), next, true);
-    curve = ospProcessor.modulationCurve (OspAudioProcessor::dampenCurveIndex (layer));
+    ospProcessor.undo().beginNewTransaction ("DAMPEN curve");
+    ospProcessor.setModulationCurve (InstrumentHost::dampenCurveIndex (layer), next, true);
+    curve = ospProcessor.modulationCurve (InstrumentHost::dampenCurveIndex (layer));
     repaint();
 }
 
@@ -1012,7 +1017,7 @@ void DampenEditor::paint (juce::Graphics& g)
         g.fillEllipse (juce::Rectangle<float> (2.0f * r, 2.0f * r).withCentre (at));
     }
     // The last key played: where it sits on the curve.
-    if (const int note = ospProcessor.lastPlayedNote.load (std::memory_order_relaxed); note >= 0)
+    if (const int note = ospProcessor.lastPlayedNoteNumber(); note >= 0)
     {
         const float x = static_cast<float> (note) / 127.0f;
         const auto at = toScreen (x, static_cast<float> (mod::curveAt (table, x)));
@@ -1032,7 +1037,7 @@ void DampenEditor::paint (juce::Graphics& g)
         g.drawLine (p.getCentreX(), p.getY() + 2.0f, p.getCentreX(), p.getCentreY(), 1.6f);
         g.setFont (type::panelHeader());
         g.setColour (juce::Colour (0xffeee8dd).withAlpha (heard ? 0.95f : 0.6f));
-        g.drawText ("DAMPEN " + OspAudioProcessor::layerName (layer), title, juce::Justification::centredLeft, false);
+        g.drawText ("DAMPEN " + InstrumentHost::layerName (layer), title, juce::Justification::centredLeft, false);
         g.setFont (type::popupLabel (12.0f));
         g.setColour (colour::wellText.brighter (0.2f));
         g.drawText ("EQ", eqTab, juce::Justification::centred, false);
@@ -1107,14 +1112,14 @@ void DampenEditor::mouseDown (const juce::MouseEvent& e)
     }
     if (powerArea().expanded (4.0f).contains (p) || title.contains (p))
     {
-        ospProcessor.undoManager.beginNewTransaction (enabled() ? "DAMPEN off" : "DAMPEN on");
+        ospProcessor.undo().beginNewTransaction (enabled() ? "DAMPEN off" : "DAMPEN on");
         set (parameter ("enabled"), enabled() ? 0.0f : 1.0f);
         refresh();
         return;
     }
     if (mode.contains (p))
     {
-        ospProcessor.undoManager.beginNewTransaction ("DAMPEN mode");
+        ospProcessor.undo().beginNewTransaction ("DAMPEN mode");
         set (parameter ("mode"), p.x >= mode.getCentreX() ? 1.0f : 0.0f);
         refresh();
         return;
@@ -1130,7 +1135,7 @@ void DampenEditor::mouseDown (const juce::MouseEvent& e)
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea (localAreaToGlobal (presets.getSmallestIntegerContainer())));
         return;
     }
-    curve = ospProcessor.modulationCurve (OspAudioProcessor::dampenCurveIndex (layer));
+    curve = ospProcessor.modulationCurve (InstrumentHost::dampenCurveIndex (layer));
     before = curve;
     dragPoint = pointAt (p);
     dragSegment = -1;
@@ -1171,7 +1176,7 @@ void DampenEditor::mouseDrag (const juce::MouseEvent& e)
         const float direction = b.y >= a.y ? -1.0f : 1.0f;   // the graph runs downwards
         b.tension = juce::jlimit (-1.0f, 1.0f, dragStartTension + direction * (e.position.y - dragStart.y) / 80.0f);
     }
-    ospProcessor.setModulationCurve (OspAudioProcessor::dampenCurveIndex (layer), curve, false);   // heard while dragging; one undo step on release
+    ospProcessor.setModulationCurve (InstrumentHost::dampenCurveIndex (layer), curve, false);   // heard while dragging; one undo step on release
     repaint();
 }
 
@@ -1180,9 +1185,9 @@ void DampenEditor::mouseUp (const juce::MouseEvent&)
     if (dragging && ! (curve == before))
     {
         const auto edited = curve;
-        ospProcessor.setModulationCurve (OspAudioProcessor::dampenCurveIndex (layer), before, false);
-        ospProcessor.undoManager.beginNewTransaction ("DAMPEN curve");
-        ospProcessor.setModulationCurve (OspAudioProcessor::dampenCurveIndex (layer), edited, true);
+        ospProcessor.setModulationCurve (InstrumentHost::dampenCurveIndex (layer), before, false);
+        ospProcessor.undo().beginNewTransaction ("DAMPEN curve");
+        ospProcessor.setModulationCurve (InstrumentHost::dampenCurveIndex (layer), edited, true);
     }
     dragging = false;
     dragPoint = dragSegment = -1;
@@ -1193,7 +1198,7 @@ void DampenEditor::mouseDoubleClick (const juce::MouseEvent& e)
 {
     if (! graphArea().expanded (6.0f).contains (e.position))
         return;
-    auto next = ospProcessor.modulationCurve (OspAudioProcessor::dampenCurveIndex (layer));
+    auto next = ospProcessor.modulationCurve (InstrumentHost::dampenCurveIndex (layer));
     curve = next;
     const int hit = pointAt (e.position);
     if (hit > 0 && hit < next.count - 1)
@@ -1205,9 +1210,9 @@ void DampenEditor::mouseDoubleClick (const juce::MouseEvent& e)
     }
     else
         return;
-    ospProcessor.undoManager.beginNewTransaction ("DAMPEN curve");
-    ospProcessor.setModulationCurve (OspAudioProcessor::dampenCurveIndex (layer), next, true);
-    curve = ospProcessor.modulationCurve (OspAudioProcessor::dampenCurveIndex (layer));
+    ospProcessor.undo().beginNewTransaction ("DAMPEN curve");
+    ospProcessor.setModulationCurve (InstrumentHost::dampenCurveIndex (layer), next, true);
+    curve = ospProcessor.modulationCurve (InstrumentHost::dampenCurveIndex (layer));
     hoverPoint = -1;
     repaint();
 }

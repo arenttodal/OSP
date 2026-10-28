@@ -1,7 +1,7 @@
 #pragma once
 
 #include "OspLookAndFeel.h"
-#include "PluginProcessor.h"
+#include "InstrumentHost.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -198,18 +198,6 @@ protected:
     juce::Rectangle<float> closeButton() const;
     juce::String title, subtitle;
 };
-
-/** Which macro a popup belongs to (the order of the macro row). */
-enum class MacroPopup { life, drive, character, movement, space, echo };
-
-/** The parameters behind a macro's popup (the "customised" dot compares them to their defaults). */
-const juce::StringArray& popupParameterIds (MacroPopup macro);
-/** The macro popups (MacroPopups.cpp): each with its own visualisation of what it does. */
-std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, OspAudioProcessor& processor);
-/** REIMAGINED (one per layer): the mode, its picture and its own two or three settings. */
-std::unique_ptr<MiniPanel> createReimaginedPopup (OspAudioProcessor& processor, int layer);
-/** Advanced (spec §13): tuning, bend, pitch character, MPE, reseed. */
-std::unique_ptr<MiniPanel> createAdvancedPopup (OspAudioProcessor& processor);
 
 namespace format
 {

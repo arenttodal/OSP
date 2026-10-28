@@ -2,7 +2,7 @@
 
 #include "CeramicSkin.h"
 #include "Design.h"
-#include "PluginProcessor.h"
+#include "InstrumentHost.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -51,7 +51,7 @@ private:
 class EqValueField final : public juce::Slider
 {
 public:
-    EqValueField (OspAudioProcessor& processor, const juce::String& parameterId);
+    EqValueField (InstrumentHost& processor, const juce::String& parameterId);
     void paint (juce::Graphics&) override;
     void mouseDoubleClick (const juce::MouseEvent&) override;
     void setColour (juce::Colour c) { accent = c; repaint(); }
@@ -76,7 +76,7 @@ private:
 class DampenEditor final : public juce::Component, public juce::SettableTooltipClient
 {
 public:
-    DampenEditor (OspAudioProcessor& processor, int layer);
+    DampenEditor (InstrumentHost& processor, int layer);
 
     std::function<void()> onClose, onShowEq;
     void refresh();
@@ -108,7 +108,7 @@ private:
     juce::Point<float> fromScreen (juce::Point<float> p) const;
     void layoutFields();
 
-    OspAudioProcessor& ospProcessor;
+    InstrumentHost& ospProcessor;
     int layer;
     mod::Curve curve, before;
     int dragPoint = -1, dragSegment = -1, hoverPoint = -1;
@@ -133,7 +133,7 @@ private:
 class EqEditor final : public juce::Component, public juce::SettableTooltipClient
 {
 public:
-    EqEditor (OspAudioProcessor& processor, int layer);
+    EqEditor (InstrumentHost& processor, int layer);
 
     std::function<void()> onClose;
     /** Follows the parameters and the modulation (editor timer); repaints only on change. */
@@ -172,7 +172,7 @@ private:
     void rebuildInspector();
     double sampleRate() const;
 
-    OspAudioProcessor& ospProcessor;
+    InstrumentHost& ospProcessor;
     int layer;
     eq::Settings shown;
     int selected = -1, hover = -1, dragBand = -1;

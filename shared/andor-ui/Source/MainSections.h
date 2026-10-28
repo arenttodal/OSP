@@ -2,7 +2,7 @@
 
 #include "Design.h"
 #include "OspLookAndFeel.h"
-#include "PluginProcessor.h"
+#include "InstrumentHost.h"
 #include "ShapingPopups.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -89,7 +89,7 @@ private:
 class HeaderMix final : public juce::Component, public juce::SettableTooltipClient, private juce::Timer
 {
 public:
-    explicit HeaderMix (OspAudioProcessor& processor);
+    explicit HeaderMix (InstrumentHost& processor);
     /** Which slots the instrument shows (count 0..3); 1 hides the control. */
     void setLayers (const std::array<bool, 3>& occupied);
     int layerCount() const noexcept { return count; }
@@ -124,7 +124,7 @@ private:
     juce::Rectangle<float> captionArea() const;
     std::array<double, 3> shownShares() const;
 
-    OspAudioProcessor& processor;
+    InstrumentHost& processor;
     juce::ParameterAttachment blendAttachment, xAttachment, yAttachment;
     float blend = 0.5f, mixX = 0.5f, mixY = 1.0f / 3.0f;
     int count = 0;
@@ -137,7 +137,7 @@ private:
 };
 
 /** The large three-layer mix (opened from MIX in the header). */
-std::unique_ptr<MiniPanel> createMixPopup (OspAudioProcessor& processor);
+std::unique_ptr<MiniPanel> createMixPopup (InstrumentHost& processor);
 
 /** SAVE: the cassette key right of the preset bar (saves the patch as a preset). */
 class SavePresetButton final : public juce::Button, public skin::KeyFace
@@ -154,7 +154,7 @@ public:
 class PresetBar final : public juce::Component, public skin::KeyFace
 {
 public:
-    explicit PresetBar (OspAudioProcessor& processor);
+    explicit PresetBar (InstrumentHost& processor);
     std::function<void()> onChange;   ///< a preset or starting state was opened
     std::function<void()> onSaveStartingState;   ///< "Save starting state..." (the editor asks for a name)
     std::function<void()> onOpenLibrary;         ///< "Open Library..." (the menu's first item)
@@ -170,7 +170,7 @@ private:
     enum class Part { none, previous, name, favourite, next };
     Part partAt (juce::Point<int>) const;
     juce::Rectangle<float> partBounds (Part) const;
-    OspAudioProcessor& processor;
+    InstrumentHost& processor;
     juce::String name;
     bool favourite = false;
 };

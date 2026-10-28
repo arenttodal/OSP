@@ -1,4 +1,5 @@
 #include "ModulationPanel.h"
+#include "Binding.h"
 
 #include "ArpSection.h"
 #include "EngineCard.h"
@@ -12,9 +13,9 @@ namespace osp::plugin
 
 namespace
 {
-    juce::RangedAudioParameter& parameter (OspAudioProcessor& p, const juce::String& id)
+    juce::RangedAudioParameter& parameter (InstrumentHost& p, const juce::String& id)
     {
-        auto* ranged = p.parameters.getParameter (id);
+        auto* ranged = p.apvts().getParameter (id);
         jassert (ranged != nullptr);
         return *ranged;
     }
@@ -25,14 +26,14 @@ namespace
 
     juce::String sourceParameter (int source, const juce::String& name)
     {
-        return source < 2 ? OspAudioProcessor::modLfoId (source, name) : OspAudioProcessor::modEnvId (source - 2, name);
+        return source < 2 ? InstrumentHost::modLfoId (source, name) : InstrumentHost::modEnvId (source - 2, name);
     }
 
-    mod::LfoSettings lfoSettings (const OspAudioProcessor& p, int i)
+    mod::LfoSettings lfoSettings (const InstrumentHost& p, int i)
     {
         // The same reading as the processor's (applyModulation), so the picture is the sound.
         mod::LfoSettings s;
-        auto value = [&p, i] (const char* name) { return p.parameterValue (OspAudioProcessor::modLfoId (i, name)); };
+        auto value = [&p, i] (const char* name) { return p.parameterValue (InstrumentHost::modLfoId (i, name)); };
         s.shape = static_cast<mod::LfoShape> (std::clamp (juce::roundToInt (value ("shape")), 0, mod::lfoShapeCount - 1));
         s.rateHz = value ("rate");
         s.sync = value ("sync") >= 0.5f;
@@ -44,10 +45,10 @@ namespace
         return s;
     }
 
-    mod::EnvSettings envSettings (const OspAudioProcessor& p, int i)
+    mod::EnvSettings envSettings (const InstrumentHost& p, int i)
     {
         mod::EnvSettings s;
-        auto value = [&p, i] (const char* name) { return p.parameterValue (OspAudioProcessor::modEnvId (i, name)); };
+        auto value = [&p, i] (const char* name) { return p.parameterValue (InstrumentHost::modEnvId (i, name)); };
         s.oneShotCurve = value ("mode") >= 0.5f;
         s.attackSeconds = 0.001 * value ("attack");
         s.decaySeconds = 0.001 * value ("decay");
@@ -58,14 +59,14 @@ namespace
         return s;
     }
 
-    bool isPolySource (const OspAudioProcessor& p, int source)
+    bool isPolySource (const InstrumentHost& p, int source)
     {
         return modui::isPerVoice (p, source);
     }
 
-    bool isBipolarSource (const OspAudioProcessor& p, int source)
+    bool isBipolarSource (const InstrumentHost& p, int source)
     {
-        return source < 2 && p.parameterValue (OspAudioProcessor::modLfoId (source, "polarity")) < 0.5f;
+        return source < 2 && p.parameterValue (InstrumentHost::modLfoId (source, "polarity")) < 0.5f;
     }
 
     mod::Dest offsetDest (mod::Dest first, int layer)
@@ -81,16 +82,16 @@ namespace
                                      "arp.rate", "arp.gate", "arp.swing", "arp.octaves", "arp.velocity" };
             for (int e = 0; e < 2; ++e)
                 for (const char* name : { "attack", "decay", "sustain", "release" })
-                    list.add (OspAudioProcessor::modEnvId (e, name));
-            for (int l = 0; l < OspAudioProcessor::numLayers; ++l)
+                    list.add (InstrumentHost::modEnvId (e, name));
+            for (int l = 0; l < InstrumentHost::numLayers; ++l)
             {
-                list.add (OspAudioProcessor::reimaginedParameterId (l));
+                list.add (InstrumentHost::reimaginedParameterId (l));
                 for (const char* name : { "start", "level", "pan", "tune", "granular.position", "granular.density", "granular.size", "granular.spread" })
-                    list.add (OspAudioProcessor::layerParameterId (l, name));
+                    list.add (InstrumentHost::layerParameterId (l, name));
                 for (const char* name : { "bell.frequency", "bell.gain", "lowShelf.gain", "highShelf.gain" })
-                    list.add (OspAudioProcessor::eqParameterId (l, name));
+                    list.add (InstrumentHost::eqParameterId (l, name));
                 for (const char* name : { "amount", "frequency", "cutoff" })
-                    list.add (OspAudioProcessor::dampenParameterId (l, name));
+                    list.add (InstrumentHost::dampenParameterId (l, name));
             }
             return list;
         }();
@@ -124,7 +125,7 @@ namespace modui
         return sourceLabels[static_cast<std::size_t> (juce::jlimit (0, mod::sourceCount - 1, source))];
     }
 
-    juce::String routeTitle (const OspAudioProcessor& p, const OspAudioProcessor::ModRouteInfo& info, bool withSource)
+    juce::String routeTitle (const InstrumentHost& p, const InstrumentHost::ModRouteInfo& info, bool withSource)
     {
         const auto arrow = juce::String::fromUTF8 (" \xe2\x86\x92 ");
         const auto lead = withSource ? juce::String (sourceLabel (mod::sourceIndex (info.route.source))) + arrow : juce::String::fromUTF8 ("\xe2\x86\x92 ");
@@ -169,7 +170,7 @@ namespace modui
         return source == mod::slot::vel ? 4 : (source == mod::slot::note ? 5 : -1);
     }
 
-    std::vector<int> menuSources (const OspAudioProcessor& p, bool forDepth)
+    std::vector<int> menuSources (const InstrumentHost& p, bool forDepth)
     {
         bool env2 = false;
         for (const auto& r : p.modulationRoutes())
@@ -201,7 +202,7 @@ namespace modui
         return text;
     }
 
-    juce::String menuLabel (const OspAudioProcessor& p, int source)
+    juce::String menuLabel (const InstrumentHost& p, int source)
     {
         juce::String label (sourceLabel (source));
         if (source >= mod::slot::cc1 && source < mod::slot::cc1 + mod::ccSlots)
@@ -212,7 +213,7 @@ namespace modui
         return label;
     }
 
-    juce::PopupMenu controllerMenu (OspAudioProcessor& p)
+    juce::PopupMenu controllerMenu (InstrumentHost& p)
     {
         juce::PopupMenu menu;
         menu.addSectionHeader ("CC SOURCES FOLLOW");
@@ -268,7 +269,7 @@ namespace modui
             const auto first = e == 0 ? Dest::env1Attack : Dest::env2Attack;
             const std::array<const char*, 4> names { "attack", "decay", "sustain", "release" };
             for (int k = 0; k < 4; ++k)
-                if (id == OspAudioProcessor::modEnvId (e, names[static_cast<std::size_t> (k)]))
+                if (id == InstrumentHost::modEnvId (e, names[static_cast<std::size_t> (k)]))
                     return static_cast<Dest> (static_cast<int> (first) + k);
         }
         if (id == "character.resonance") return Dest::resonance;
@@ -276,33 +277,33 @@ namespace modui
         if (id == "decay") return Dest::ampDecay;
         if (id == "sustainLevel") return Dest::ampSustain;
         if (id == "release") return Dest::ampRelease;
-        for (int l = 0; l < OspAudioProcessor::numLayers; ++l)
+        for (int l = 0; l < InstrumentHost::numLayers; ++l)
         {
-            if (id == OspAudioProcessor::reimaginedParameterId (l)) return offsetDest (Dest::reimaginedA, l);
-            if (id == OspAudioProcessor::layerParameterId (l, "start")) return offsetDest (Dest::startA, l);
-            if (id == OspAudioProcessor::layerParameterId (l, "level")) return offsetDest (Dest::levelA, l);
-            if (id == OspAudioProcessor::layerParameterId (l, "pan")) return offsetDest (Dest::panA, l);
-            if (id == OspAudioProcessor::layerParameterId (l, "tune")) return offsetDest (Dest::fineTuneA, l);
-            if (id == OspAudioProcessor::layerParameterId (l, "granular.position")) return offsetDest (Dest::grainPositionA, l);
-            if (id == OspAudioProcessor::layerParameterId (l, "granular.density")) return offsetDest (Dest::grainDensityA, l);
-            if (id == OspAudioProcessor::layerParameterId (l, "granular.size")) return offsetDest (Dest::grainSizeA, l);
-            if (id == OspAudioProcessor::layerParameterId (l, "granular.spread")) return offsetDest (Dest::grainSpreadA, l);
-            if (id == OspAudioProcessor::eqParameterId (l, "bell.frequency")) return offsetDest (Dest::eqBellFrequencyA, l);
-            if (id == OspAudioProcessor::eqParameterId (l, "bell.gain")) return offsetDest (Dest::eqBellGainA, l);
-            if (id == OspAudioProcessor::eqParameterId (l, "lowShelf.gain")) return offsetDest (Dest::eqLowShelfGainA, l);
-            if (id == OspAudioProcessor::eqParameterId (l, "highShelf.gain")) return offsetDest (Dest::eqHighShelfGainA, l);
-            if (id == OspAudioProcessor::dampenParameterId (l, "amount")) return offsetDest (Dest::dampenAmountA, l);
-            if (id == OspAudioProcessor::dampenParameterId (l, "frequency")) return offsetDest (Dest::dampenShelfA, l);
-            if (id == OspAudioProcessor::dampenParameterId (l, "cutoff")) return offsetDest (Dest::dampenCutoffA, l);
+            if (id == InstrumentHost::reimaginedParameterId (l)) return offsetDest (Dest::reimaginedA, l);
+            if (id == InstrumentHost::layerParameterId (l, "start")) return offsetDest (Dest::startA, l);
+            if (id == InstrumentHost::layerParameterId (l, "level")) return offsetDest (Dest::levelA, l);
+            if (id == InstrumentHost::layerParameterId (l, "pan")) return offsetDest (Dest::panA, l);
+            if (id == InstrumentHost::layerParameterId (l, "tune")) return offsetDest (Dest::fineTuneA, l);
+            if (id == InstrumentHost::layerParameterId (l, "granular.position")) return offsetDest (Dest::grainPositionA, l);
+            if (id == InstrumentHost::layerParameterId (l, "granular.density")) return offsetDest (Dest::grainDensityA, l);
+            if (id == InstrumentHost::layerParameterId (l, "granular.size")) return offsetDest (Dest::grainSizeA, l);
+            if (id == InstrumentHost::layerParameterId (l, "granular.spread")) return offsetDest (Dest::grainSpreadA, l);
+            if (id == InstrumentHost::eqParameterId (l, "bell.frequency")) return offsetDest (Dest::eqBellFrequencyA, l);
+            if (id == InstrumentHost::eqParameterId (l, "bell.gain")) return offsetDest (Dest::eqBellGainA, l);
+            if (id == InstrumentHost::eqParameterId (l, "lowShelf.gain")) return offsetDest (Dest::eqLowShelfGainA, l);
+            if (id == InstrumentHost::eqParameterId (l, "highShelf.gain")) return offsetDest (Dest::eqHighShelfGainA, l);
+            if (id == InstrumentHost::dampenParameterId (l, "amount")) return offsetDest (Dest::dampenAmountA, l);
+            if (id == InstrumentHost::dampenParameterId (l, "frequency")) return offsetDest (Dest::dampenShelfA, l);
+            if (id == InstrumentHost::dampenParameterId (l, "cutoff")) return offsetDest (Dest::dampenCutoffA, l);
         }
         return Dest::none;
     }
 
-    bool isPerVoice (const OspAudioProcessor& p, int source)
+    bool isPerVoice (const InstrumentHost& p, int source)
     {
         if (source == mod::slot::env1 || source == mod::slot::env2 || source == mod::slot::vel || source == mod::slot::note)
             return true;
-        return source >= 0 && source < 2 && p.parameterValue (OspAudioProcessor::modLfoId (source, "scope")) >= 0.5f;
+        return source >= 0 && source < 2 && p.parameterValue (InstrumentHost::modLfoId (source, "scope")) >= 0.5f;
     }
 
     std::vector<mod::Dest> destinationsShownBy (const juce::String& id)
@@ -328,7 +329,7 @@ namespace modui
 //==============================================================================
 // The display
 
-ModCurveView::ModCurveView (OspAudioProcessor& p) : ospProcessor (p)
+ModCurveView::ModCurveView (InstrumentHost& p) : ospProcessor (p)
 {
     setTitle ("Modulation shape");
 }
@@ -349,8 +350,8 @@ bool ModCurveView::isEditable() const
     if (isKey())
         return true;   // VEL's and NOTE's curve is all they are
     if (sourceIndex < 2)
-        return juce::roundToInt (ospProcessor.parameterValue (OspAudioProcessor::modLfoId (sourceIndex, "shape"))) == static_cast<int> (mod::LfoShape::custom);
-    return ospProcessor.parameterValue (OspAudioProcessor::modEnvId (sourceIndex - 2, "mode")) >= 0.5f;
+        return juce::roundToInt (ospProcessor.parameterValue (InstrumentHost::modLfoId (sourceIndex, "shape"))) == static_cast<int> (mod::LfoShape::custom);
+    return ospProcessor.parameterValue (InstrumentHost::modEnvId (sourceIndex - 2, "mode")) >= 0.5f;
 }
 
 void ModCurveView::setCompact (bool c)
@@ -425,10 +426,10 @@ void ModCurveView::refresh()
     }
     else if (sourceIndex < 2)
         for (const char* name : { "shape", "rate", "sync", "division", "phase", "polarity", "mode", "scope" })
-            signature[n++] = ospProcessor.parameterValue (OspAudioProcessor::modLfoId (sourceIndex, name));
+            signature[n++] = ospProcessor.parameterValue (InstrumentHost::modLfoId (sourceIndex, name));
     else
         for (const char* name : { "mode", "attack", "decay", "sustain", "release", "curve", "length" })
-            signature[n++] = ospProcessor.parameterValue (OspAudioProcessor::modEnvId (sourceIndex - 2, name));
+            signature[n++] = ospProcessor.parameterValue (InstrumentHost::modEnvId (sourceIndex - 2, name));
     signature[n++] = ospProcessor.parameterValue ("seed");
     bool changed = signature != shownSignature;
     shownSignature = signature;
@@ -449,12 +450,12 @@ void ModCurveView::refresh()
         int last = -1;
         if (sourceIndex == mod::slot::vel)
         {
-            const int count = ospProcessor.velocityCount.load (std::memory_order_acquire);
+            const int count = ospProcessor.playedVelocityCount();
             if (count > 0)
-                last = ospProcessor.recentVelocity[static_cast<std::size_t> ((count - 1) % OspAudioProcessor::velocityHistory)].load (std::memory_order_relaxed);
+                last = ospProcessor.recentVelocityAt ((count - 1) % InstrumentHost::velocityHistory);
         }
         else
-            last = ospProcessor.lastPlayedNote.load (std::memory_order_relaxed);
+            last = ospProcessor.lastPlayedNoteNumber();
         playhead = last >= 0 ? static_cast<float> (last) / 127.0f : -1.0f;
     }
     else if (sourceIndex < 2)
@@ -916,9 +917,10 @@ void ModCurveView::mouseDoubleClick (const juce::MouseEvent& e)
 //==============================================================================
 // A source's controls (one row, the AMP envelope's knob row)
 
-ModSourcePage::ModSourcePage (OspAudioProcessor& p, int s) : ospProcessor (p), source (s)
+ModSourcePage::ModSourcePage (InstrumentHost& p, int s) : ospProcessor (p), source (s)
 {
-    auto& state = ospProcessor.parameters;
+    binding::tag (*this, sourceParameter (source, "*"));
+    auto& state = ospProcessor.apvts();
     const auto accent = modui::sourceColour (source);
     auto makeKnob = [&] (const char* name, const char* caption, MiniKnob::Formatter f) {
         auto knob = std::make_unique<MiniKnob> (state, sourceParameter (source, name), caption, std::move (f));
@@ -977,7 +979,7 @@ juce::PopupMenu ModSourcePage::rateMenu()
         if (safe == nullptr)
             return;
         auto& p = parameter (safe->ospProcessor, sourceParameter (safe->source, "sync"));
-        safe->ospProcessor.undoManager.beginNewTransaction (on ? "LFO sync" : "LFO Hz");
+        safe->ospProcessor.undo().beginNewTransaction (on ? "LFO sync" : "LFO Hz");
         p.beginChangeGesture();
         p.setValueNotifyingHost (on ? 1.0f : 0.0f);
         p.endChangeGesture();
@@ -1039,8 +1041,10 @@ void ModSourcePage::resized()
 //==============================================================================
 // VEL's and NOTE's row
 
-ModKeyPage::ModKeyPage (OspAudioProcessor& p, int s) : ospProcessor (p), source (s)
+ModKeyPage::ModKeyPage (InstrumentHost& p, int s) : ospProcessor (p), source (s)
 {
+    // VEL and NOTE are curves, not parameters: tagged by name for the shell.
+    binding::tag (*this, s == mod::slot::vel ? "mod.vel.*" : "mod.note.*");
     setTitle (s == mod::slot::vel ? "Velocity curve" : "Key curve");
 }
 
@@ -1095,12 +1099,12 @@ void ModKeyPage::refresh()
     int last = -1;
     if (source == mod::slot::vel)
     {
-        const int count = ospProcessor.velocityCount.load (std::memory_order_acquire);
+        const int count = ospProcessor.playedVelocityCount();
         if (count > 0)
-            last = ospProcessor.recentVelocity[static_cast<std::size_t> ((count - 1) % OspAudioProcessor::velocityHistory)].load (std::memory_order_relaxed);
+            last = ospProcessor.recentVelocityAt ((count - 1) % InstrumentHost::velocityHistory);
     }
     else
-        last = ospProcessor.lastPlayedNote.load (std::memory_order_relaxed);
+        last = ospProcessor.lastPlayedNoteNumber();
     const bool amp = ospProcessor.velocityAppliesToAmp();
     if (name != shownPreset || amp != shownAmp || last != shownLast)
     {
@@ -1187,14 +1191,15 @@ void ModKeyPage::mouseUp (const juce::MouseEvent& e)
 //==============================================================================
 // A route's depth
 
-ModDepthBar::ModDepthBar (OspAudioProcessor& p, int slot, juce::Colour c)
+ModDepthBar::ModDepthBar (InstrumentHost& p, int slot, juce::Colour c)
     : colour (c),
-      attachment (parameter (p, OspAudioProcessor::modRouteId (slot, "depth")), [this] (float v) {
+      attachment (parameter (p, InstrumentHost::modRouteId (slot, "depth")), [this] (float v) {
           depth = v;
           repaint();
-      }, &p.undoManager)
+      }, &p.undo())
 {
     attachment.sendInitialUpdate();
+    binding::tag (*this, InstrumentHost::modRouteId (slot, "*"));
     setMouseCursor (juce::MouseCursor::LeftRightResizeCursor);
     setTitle ("Depth");
     setTooltip ("Depth: drag (double-click: 0). A negative depth turns the movement around");
@@ -1250,7 +1255,7 @@ namespace
     juce::Font tabFont() { return fonts::make (13.0f, fonts::Weight::medium, 0.08f); }
 }
 
-ModulationPanel::ModulationPanel (OspAudioProcessor& p) : ospProcessor (p), amp (p.parameters), curve (p)
+ModulationPanel::ModulationPanel (InstrumentHost& p) : ospProcessor (p), amp (p.apvts()), curve (p)
 {
     setTitle ("Envelope and modulation");
     amp.setShowsTitle (false);   // the tab row names it
@@ -1424,11 +1429,11 @@ juce::PopupMenu ModulationPanel::sourceMenu (int source)
     {
         // Polarity: a secondary setting, here rather than a permanent switch.
         menu.addSectionHeader ("POLARITY");
-        const bool bipolar = p.parameterValue (OspAudioProcessor::modLfoId (source, "polarity")) < 0.5f;
+        const bool bipolar = p.parameterValue (InstrumentHost::modLfoId (source, "polarity")) < 0.5f;
         auto set = [&p, source] (float v) {
-            if (auto* param = p.parameters.getParameter (OspAudioProcessor::modLfoId (source, "polarity")))
+            if (auto* param = p.apvts().getParameter (InstrumentHost::modLfoId (source, "polarity")))
             {
-                p.undoManager.beginNewTransaction ("LFO polarity");
+                p.undo().beginNewTransaction ("LFO polarity");
                 param->beginChangeGesture();
                 param->setValueNotifyingHost (param->convertTo0to1 (v));
                 param->endChangeGesture();
@@ -1438,8 +1443,8 @@ juce::PopupMenu ModulationPanel::sourceMenu (int source)
         menu.addItem ("Unipolar", true, ! bipolar, [set] { set (1.0f); });
         menu.addSeparator();
     }
-    const bool editable = source < 2 ? juce::roundToInt (p.parameterValue (OspAudioProcessor::modLfoId (source, "shape"))) == static_cast<int> (mod::LfoShape::custom)
-                                     : p.parameterValue (OspAudioProcessor::modEnvId (source - 2, "mode")) >= 0.5f;
+    const bool editable = source < 2 ? juce::roundToInt (p.parameterValue (InstrumentHost::modLfoId (source, "shape"))) == static_cast<int> (mod::LfoShape::custom)
+                                     : p.parameterValue (InstrumentHost::modEnvId (source - 2, "mode")) >= 0.5f;
     if (editable)
     {
         menu.addItem (source < 2 ? "Edit shape..." : "Edit curve...", [safe, source] { if (safe != nullptr && safe->onExpandCurve != nullptr) safe->onExpandCurve (source); });
@@ -1605,7 +1610,7 @@ void ModulationPanel::tabMouseUp (const juce::MouseEvent& e)
 //==============================================================================
 // A source's routes (a popover)
 
-ModRoutesPopup::Row::Row (ModRoutesPopup& o, const OspAudioProcessor::ModRouteInfo& i)
+ModRoutesPopup::Row::Row (ModRoutesPopup& o, const InstrumentHost::ModRouteInfo& i)
     : owner (o), info (i), title (modui::routeTitle (o.ospProcessor, i, false)),
       depth (o.ospProcessor, i.slot, modui::sourceColour (mod::sourceIndex (i.route.source)))
 {
@@ -1664,8 +1669,8 @@ void ModRoutesPopup::Row::mouseDown (const juce::MouseEvent& e)
     auto& p = owner.ospProcessor;
     if (bypassArea().expanded (3.0f).contains (e.position))
     {
-        auto& enabled = parameter (p, OspAudioProcessor::modRouteId (info.slot, "enabled"));
-        p.undoManager.beginNewTransaction (info.route.enabled ? "Bypass modulation" : "Enable modulation");
+        auto& enabled = parameter (p, InstrumentHost::modRouteId (info.slot, "enabled"));
+        p.undo().beginNewTransaction (info.route.enabled ? "Bypass modulation" : "Enable modulation");
         enabled.beginChangeGesture();
         enabled.setValueNotifyingHost (info.route.enabled ? 0.0f : 1.0f);
         enabled.endChangeGesture();
@@ -1690,7 +1695,7 @@ void ModRoutesPopup::Row::mouseDown (const juce::MouseEvent& e)
     owner.setSelectedSlot (info.slot);
 }
 
-ModRoutesPopup::ModRoutesPopup (OspAudioProcessor& p, int s)
+ModRoutesPopup::ModRoutesPopup (InstrumentHost& p, int s)
     : MiniPanel (juce::String (modui::sourceLabel (s)) + " ROUTES"), ospProcessor (p), sourceIndex (s)
 {
     rebuild();
@@ -1711,7 +1716,7 @@ juce::Point<int> ModRoutesPopup::cardSize() const
 
 void ModRoutesPopup::rebuild()
 {
-    std::vector<OspAudioProcessor::ModRouteInfo> mine;
+    std::vector<InstrumentHost::ModRouteInfo> mine;
     for (const auto& r : ospProcessor.modulationRoutes())
         if (mod::sourceIndex (r.route.source) == sourceIndex)
             mine.push_back (r);
@@ -1806,14 +1811,14 @@ juce::PopupMenu ModRoutesPopup::addMenu()
     menu.addSubMenu ("Macros", macros);
     menu.addSubMenu ("Character", character);
     menu.addSubMenu ("Amp envelope", ampEnv);
-    for (int l = 0; l < OspAudioProcessor::numLayers; ++l)
+    for (int l = 0; l < InstrumentHost::numLayers; ++l)
     {
         juce::PopupMenu layer;
         for (auto first : { mod::Dest::levelA, mod::Dest::panA, mod::Dest::fineTuneA, mod::Dest::reimaginedA, mod::Dest::grainPositionA,
                             mod::Dest::grainDensityA, mod::Dest::grainSizeA, mod::Dest::grainSpreadA, mod::Dest::eqBellFrequencyA,
                             mod::Dest::eqBellGainA, mod::Dest::eqLowShelfGainA, mod::Dest::eqHighShelfGainA })
             add (layer, offsetDest (first, l));
-        menu.addSubMenu ("Layer " + OspAudioProcessor::layerName (l), layer);
+        menu.addSubMenu ("Layer " + InstrumentHost::layerName (l), layer);
     }
     return menu;
 }
@@ -1827,7 +1832,7 @@ void ModRoutesPopup::mouseDown (const juce::MouseEvent& e)
 //==============================================================================
 // The larger curve editor (a popover)
 
-ModCurvePopup::ModCurvePopup (OspAudioProcessor& p, int s)
+ModCurvePopup::ModCurvePopup (InstrumentHost& p, int s)
     : MiniPanel (juce::String (modui::sourceLabel (s)) + (s < 2 ? " CUSTOM SHAPE" : (modui::keyCurveIndex (s) >= 0 ? " CURVE" : " ONE SHOT CURVE"))), view (p)
 {
     view.setSource (s);
@@ -1850,7 +1855,7 @@ namespace
     }
 }
 
-ModulationOverlay::ModulationOverlay (OspAudioProcessor& p, juce::Component& r) : ospProcessor (p), root (r)
+ModulationOverlay::ModulationOverlay (InstrumentHost& p, juce::Component& r) : ospProcessor (p), root (r)
 {
     setInterceptsMouseClicks (true, false);
     setTitle ("Modulation halos");
@@ -1957,17 +1962,17 @@ void ModulationOverlay::collect (juce::Component& c)
     }
 }
 
-std::vector<const OspAudioProcessor::ModRouteInfo*> ModulationOverlay::routesOf (const Target& t) const
+std::vector<const InstrumentHost::ModRouteInfo*> ModulationOverlay::routesOf (const Target& t) const
 {
     const auto dests = modui::destinationsShownBy (t.parameterId);
-    std::vector<const OspAudioProcessor::ModRouteInfo*> list;
+    std::vector<const InstrumentHost::ModRouteInfo*> list;
     for (const auto& r : routes)
         if (std::find (dests.begin(), dests.end(), r.route.dest) != dests.end())
             list.push_back (&r);
     return list;
 }
 
-const OspAudioProcessor::ModRouteInfo* ModulationOverlay::emphasised (const Target& t) const
+const InstrumentHost::ModRouteInfo* ModulationOverlay::emphasised (const Target& t) const
 {
     // The one route the halo shows and edits: the selected route, else the selected source's,
     // else the first.
@@ -1990,7 +1995,7 @@ float ModulationOverlay::positionOf (const Target& t, double offset, mod::Dest d
     // The knob position (0..1) of base + offset, offset in the destination's own units
     // (span x contribution), mapped the way the engine applies it and clamped where the
     // parameter ends.
-    auto* param = ospProcessor.parameters.getParameter (t.parameterId);
+    auto* param = ospProcessor.apvts().getParameter (t.parameterId);
     if (param == nullptr)
         return 0.0f;
     if (dest == mod::Dest::arpRate)
@@ -2032,10 +2037,10 @@ float ModulationOverlay::arpRatePosition (double octaves) const
     return static_cast<float> (position / std::max (1, count - 1));
 }
 
-ModulationOverlay::Sweep ModulationOverlay::sweepOf (const Target& t, const OspAudioProcessor::ModRouteInfo& r) const
+ModulationOverlay::Sweep ModulationOverlay::sweepOf (const Target& t, const InstrumentHost::ModRouteInfo& r) const
 {
     Sweep s;
-    auto* param = ospProcessor.parameters.getParameter (t.parameterId);
+    auto* param = ospProcessor.apvts().getParameter (t.parameterId);
     s.base = r.route.dest == mod::Dest::arpRate ? arpRatePosition (0.0) : (param != nullptr ? param->getValue() : 0.0f);
     const int source = mod::sourceIndex (r.route.source);
     const double d = r.route.depth;
@@ -2084,7 +2089,7 @@ juce::Range<double> ModulationOverlay::sourceRange (int source) const
     return isBipolarSource (ospProcessor, source) ? juce::Range<double> (-1.0, 1.0) : juce::Range<double> (0.0, 1.0);
 }
 
-const OspAudioProcessor::ModRouteInfo* ModulationOverlay::routeInSlot (int slot) const
+const InstrumentHost::ModRouteInfo* ModulationOverlay::routeInSlot (int slot) const
 {
     for (const auto& r : routes)
         if (r.slot == slot)
@@ -2092,16 +2097,16 @@ const OspAudioProcessor::ModRouteInfo* ModulationOverlay::routeInSlot (int slot)
     return nullptr;
 }
 
-std::vector<const OspAudioProcessor::ModRouteInfo*> ModulationOverlay::depthRoutesOf (int slot) const
+std::vector<const InstrumentHost::ModRouteInfo*> ModulationOverlay::depthRoutesOf (int slot) const
 {
-    std::vector<const OspAudioProcessor::ModRouteInfo*> list;
+    std::vector<const InstrumentHost::ModRouteInfo*> list;
     for (const auto& r : routes)
         if (r.isDepth() && r.route.target == slot && slot >= 0)
             list.push_back (&r);
     return list;
 }
 
-const OspAudioProcessor::ModRouteInfo* ModulationOverlay::selectedDepthRoute (const Target& t) const
+const InstrumentHost::ModRouteInfo* ModulationOverlay::selectedDepthRoute (const Target& t) const
 {
     const auto* meta = routeInSlot (selectedSlot);
     if (meta == nullptr || ! meta->isDepth())
@@ -2186,7 +2191,7 @@ juce::StringArray ModulationOverlay::haloReadout (const juce::String& id) const
     juce::StringArray lines;
     const auto* t = find (id);
     const auto* r = t != nullptr ? emphasised (*t) : nullptr;
-    auto* param = t != nullptr ? ospProcessor.parameters.getParameter (t->parameterId) : nullptr;
+    auto* param = t != nullptr ? ospProcessor.apvts().getParameter (t->parameterId) : nullptr;
     if (r == nullptr || param == nullptr)
         return lines;
     const auto s = sweepOf (*t, *r);
@@ -2378,18 +2383,18 @@ juce::PopupMenu ModulationOverlay::contextMenu (const juce::String& parameterId)
                 safe->onSelect (source, slot);
         });
         items.addItem (enabled ? "Bypass" : "Enable", [&p, slot, enabled] {
-            if (auto* param = p.parameters.getParameter (OspAudioProcessor::modRouteId (slot, "enabled")))
+            if (auto* param = p.apvts().getParameter (InstrumentHost::modRouteId (slot, "enabled")))
             {
-                p.undoManager.beginNewTransaction (enabled ? "Bypass modulation" : "Enable modulation");
+                p.undo().beginNewTransaction (enabled ? "Bypass modulation" : "Enable modulation");
                 param->beginChangeGesture();
                 param->setValueNotifyingHost (enabled ? 0.0f : 1.0f);
                 param->endChangeGesture();
             }
         });
         items.addItem ("Depth to 0", [&p, slot] {
-            if (auto* param = p.parameters.getParameter (OspAudioProcessor::modRouteId (slot, "depth")))
+            if (auto* param = p.apvts().getParameter (InstrumentHost::modRouteId (slot, "depth")))
             {
-                p.undoManager.beginNewTransaction ("Modulation depth");
+                p.undo().beginNewTransaction ("Modulation depth");
                 param->beginChangeGesture();
                 param->setValueNotifyingHost (param->convertTo0to1 (0.0f));
                 param->endChangeGesture();
@@ -2447,7 +2452,7 @@ juce::PopupMenu ModulationOverlay::contextMenu (const juce::String& parameterId)
         for (const auto* r : list)
             slots.push_back (r->slot);
         menu.addItem (list.size() == 1 ? "Remove Assignment" : "Remove All Assignments", [&p, slots] {
-            p.undoManager.beginNewTransaction ("Remove modulation");
+            p.undo().beginNewTransaction ("Remove modulation");
             for (const int slot : slots)
                 p.removeModulationRoute (slot, false);
         });
@@ -2645,9 +2650,9 @@ juce::PopupMenu ModulationOverlay::depthMenu (int slot)
             safe->setSelection (ms, mslot);
         });
         items.addItem (enabled ? "Bypass" : "Enable", [&p, mslot, enabled] {
-            if (auto* param = p.parameters.getParameter (OspAudioProcessor::modRouteId (mslot, "enabled")))
+            if (auto* param = p.apvts().getParameter (InstrumentHost::modRouteId (mslot, "enabled")))
             {
-                p.undoManager.beginNewTransaction (enabled ? "Bypass depth modulation" : "Enable depth modulation");
+                p.undo().beginNewTransaction (enabled ? "Bypass depth modulation" : "Enable depth modulation");
                 param->beginChangeGesture();
                 param->setValueNotifyingHost (enabled ? 0.0f : 1.0f);
                 param->endChangeGesture();
@@ -2658,7 +2663,7 @@ juce::PopupMenu ModulationOverlay::depthMenu (int slot)
     }
     menu.addSeparator();
     menu.addItem ("Remove Depth Modulation", [&p, depSlots] {
-        p.undoManager.beginNewTransaction ("Remove depth modulation");
+        p.undo().beginNewTransaction ("Remove depth modulation");
         for (const int d : depSlots)
             p.removeModulationRoute (d, false);
     });
@@ -3106,7 +3111,7 @@ void ModulationOverlay::mouseDown (const juce::MouseEvent& e)
     editSlot = r->slot;
     editTarget = index;
     hover = index;
-    editParameter = ospProcessor.parameters.getParameter (OspAudioProcessor::modRouteId (editSlot, "depth"));
+    editParameter = ospProcessor.apvts().getParameter (InstrumentHost::modRouteId (editSlot, "depth"));
     if (onSelect != nullptr)
         onSelect (mod::sourceIndex (r->route.source), r->slot);
     setSelection (mod::sourceIndex (r->route.source), r->slot);
@@ -3116,7 +3121,7 @@ void ModulationOverlay::mouseDown (const juce::MouseEvent& e)
         return;
     }
     editFrom = editParameter->convertFrom0to1 (editParameter->getValue());
-    ospProcessor.undoManager.beginNewTransaction ("Modulation depth");
+    ospProcessor.undo().beginNewTransaction ("Modulation depth");
     editParameter->beginChangeGesture();
     refresh();
 }

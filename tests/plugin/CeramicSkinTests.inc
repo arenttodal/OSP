@@ -419,13 +419,17 @@ TEST_CASE ("plugin: the GUI's texts are clean UTF-8 (no mis-encoded ellipses); S
 {
     // "…" saved through a wrong encoding reads "â€¦" / "â¦" in a menu: the sources hold escapes
     // (\xe2\x80\xa6) or plain ASCII, never a decoded-twice character.
-    const juce::File sources (juce::String (OSP_SOURCE_DIR) + "/apps/plugin/Source");
-    REQUIRE (sources.isDirectory());
+    // OSP's own windows and the shared ANDOR interface (shared/andor-ui) alike.
     const juce::String doubled = juce::String::fromUTF8 ("\xc3\xa2");   // 'â': the first byte of a UTF-8 sequence read as Latin-1
-    for (const auto& file : sources.findChildFiles (juce::File::findFiles, false, "*.cpp;*.h"))
+    for (const char* folder : { "/apps/plugin/Source", "/shared/andor-ui/Source" })
     {
-        INFO (file.getFileName());
-        CHECK_FALSE (file.loadFileAsString().contains (doubled));
+        const juce::File sources (juce::String (OSP_SOURCE_DIR) + folder);
+        REQUIRE (sources.isDirectory());
+        for (const auto& file : sources.findChildFiles (juce::File::findFiles, false, "*.cpp;*.h"))
+        {
+            INFO (file.getFileName());
+            CHECK_FALSE (file.loadFileAsString().contains (doubled));
+        }
     }
     // SAVE: a key right of the preset bar, the bar's height; the main menu no longer saves.
     using osp::plugin::design::layout::presetBar;

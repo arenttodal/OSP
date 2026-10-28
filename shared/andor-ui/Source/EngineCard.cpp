@@ -1,4 +1,5 @@
 #include "EngineCard.h"
+#include "Binding.h"
 
 #include "Design.h"
 
@@ -804,7 +805,7 @@ void SourceDisplay::paintStatic (juce::Graphics& g)
 class LayerKnob::Dial final : public juce::Slider
 {
 public:
-    Dial (OspAudioProcessor& p, int l, juce::String c, bool semitones)
+    Dial (InstrumentHost& p, int l, juce::String c, bool semitones)
         : juce::Slider (juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::NoTextBox),
           processor (p), layer (l), control (std::move (c)), snapSemitones (semitones)
     {
@@ -855,7 +856,7 @@ private:
         user = true;
         last = getValue();
     }
-    OspAudioProcessor& processor;
+    InstrumentHost& processor;
     int layer;
     juce::String control;
     bool snapSemitones;
@@ -863,12 +864,13 @@ private:
     double last = 0.0;
 };
 
-LayerKnob::LayerKnob (OspAudioProcessor& p, int layer, const juce::String& control, const juce::String& c)
+LayerKnob::LayerKnob (InstrumentHost& p, int layer, const juce::String& control, const juce::String& c)
     : processor (p), caption (c), creative (control == "reimagined")
 {
     // REIMAGINED keeps its shipped IDs: A's is the instrument's `reimagined`.
-    const auto id = creative ? OspAudioProcessor::reimaginedParameterId (layer) : OspAudioProcessor::layerParameterId (layer, control);
-    parameter = processor.parameters.getParameter (id);
+    const auto id = creative ? InstrumentHost::reimaginedParameterId (layer) : InstrumentHost::layerParameterId (layer, control);
+    parameter = processor.apvts().getParameter (id);
+    binding::tag (*this, id);
     dial = std::make_unique<Dial> (processor, layer, control, control == "tune");
     dial->setRotaryParameters (OspLookAndFeel::rotaryStart, OspLookAndFeel::rotaryEnd, true);
     dial->getProperties().set ("arc", static_cast<juce::int64> ((creative ? palette::accent : palette::layer (layer)).getARGB()));
@@ -876,8 +878,8 @@ LayerKnob::LayerKnob (OspAudioProcessor& p, int layer, const juce::String& contr
     dial->getProperties().set ("bipolar", control == "tune" || control == "pan");
     dial->getProperties().set ("paramId", id);   // a modulation drop target
     dial->getProperties().set ("haloGap", 2.0);  // its caption sits close above: a nearer halo
-    dial->setTitle ("Layer " + OspAudioProcessor::layerName (layer) + " " + caption);
-    attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (processor.parameters, id, *dial);
+    dial->setTitle ("Layer " + InstrumentHost::layerName (layer) + " " + caption);
+    attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (processor.apvts(), id, *dial);
     if (parameter != nullptr)
     {
         dial->setDoubleClickReturnValue (true, parameter->convertFrom0to1 (parameter->getDefaultValue()));
@@ -1009,15 +1011,16 @@ void LayerKnob::paint (juce::Graphics& g)
 
 //==============================================================================
 //==============================================================================
-LayerStateButton::LayerStateButton (OspAudioProcessor& p, int l, bool isSolo)
+LayerStateButton::LayerStateButton (InstrumentHost& p, int l, bool isSolo)
     : processor (p), layer (l), solo (isSolo),
-      attachment (*p.parameters.getParameter (OspAudioProcessor::layerParameterId (l, isSolo ? "solo" : "mute")), [this] (float v) {
+      attachment (*p.apvts().getParameter (InstrumentHost::layerParameterId (l, isSolo ? "solo" : "mute")), [this] (float v) {
           on = v >= 0.5f;
           skin::repaintKey (*this);
       })
 {
     attachment.sendInitialUpdate();
-    const auto name = OspAudioProcessor::layerName (layer);
+    binding::tag (*this, InstrumentHost::layerParameterId (l, isSolo ? "solo" : "mute"));
+    const auto name = InstrumentHost::layerName (layer);
     setTooltip (solo ? "Solo layer " + name + ": hear only the soloed layers (alt-click: this one alone)" : "Mute layer " + name);
     setTitle (solo ? "Solo " + name : "Mute " + name);
     setMouseCursor (juce::MouseCursor::PointingHandCursor);
@@ -1069,6 +1072,7 @@ ModifierButton::ModifierButton (juce::RangedAudioParameter& p, icons::Kind i, ju
       })
 {
     attachment.sendInitialUpdate();
+    binding::tag (*this, p.getParameterID());
     tip = p.getName (64);
     setTooltip (tip);
     setTitle (tip);
@@ -1134,6 +1138,7 @@ ModeSelector::ModeSelector (juce::RangedAudioParameter& p)
       })
 {
     attachment.sendInitialUpdate();
+    binding::tag (*this, p.getParameterID());
     setMouseCursor (juce::MouseCursor::PointingHandCursor);
     setTitle (p.getName (64));
 }
@@ -1186,7 +1191,7 @@ void EngineCard::MenuDots::paintButton (juce::Graphics& g, bool highlighted, boo
         g.fillEllipse (juce::Rectangle<float> (d, d).withCentre (r.getCentre().translated (0.0f, static_cast<float> (i) * gap)));
 }
 
-EngineCard::EngineCard (OspAudioProcessor& p, int layer)
+EngineCard::EngineCard (InstrumentHost& p, int layer)
     : processor (p), layerIndex (layer), muteButton (p, layer, false), soloButton (p, layer, true)
 {
     sourceDisplay.setLayer (layer);
@@ -1194,10 +1199,10 @@ EngineCard::EngineCard (OspAudioProcessor& p, int layer)
     addAndMakeVisible (muteButton);
     addAndMakeVisible (soloButton);
 
-    if (auto* param = processor.parameters.getParameter (OspAudioProcessor::layerParameterId (layer, "sourceMode")))
+    if (auto* param = processor.apvts().getParameter (InstrumentHost::layerParameterId (layer, "sourceMode")))
     {
         mode = std::make_unique<ModeSelector> (*param);
-        mode->setTooltip ("Layer " + OspAudioProcessor::layerName (layer) + ": play the recording through, or as a cloud of grains");
+        mode->setTooltip ("Layer " + InstrumentHost::layerName (layer) + ": play the recording through, or as a cloud of grains");
         mode->onChange = [this] (int) { updateMode(); };
         addAndMakeVisible (*mode);
     }
@@ -1229,7 +1234,7 @@ EngineCard::EngineCard (OspAudioProcessor& p, int layer)
     const std::array<std::pair<const char*, icons::Kind>, 4> mods { { { "link", icons::Kind::link }, { "reverse", icons::Kind::reverse },
                                                                        { "loop", icons::Kind::loop }, { "follow", icons::Kind::follow } } };
     for (std::size_t i = 0; i < modifiers.size(); ++i)
-        if (auto* param = processor.parameters.getParameter (OspAudioProcessor::layerParameterId (layer, mods[i].first)))
+        if (auto* param = processor.apvts().getParameter (InstrumentHost::layerParameterId (layer, mods[i].first)))
         {
             modifiers[i] = std::make_unique<ModifierButton> (*param, mods[i].second, palette::accent);
             addAndMakeVisible (*modifiers[i]);
@@ -1244,8 +1249,8 @@ EngineCard::EngineCard (OspAudioProcessor& p, int layer)
                                                                         { "granular.spread", "SPREAD" } } };
     for (std::size_t i = 0; i < granularKnobs.size(); ++i)
     {
-        const auto id = OspAudioProcessor::layerParameterId (layer, grain[i].first);
-        auto* param = processor.parameters.getParameter (id);
+        const auto id = InstrumentHost::layerParameterId (layer, grain[i].first);
+        auto* param = processor.apvts().getParameter (id);
         MiniKnob::Formatter f = [param] (double) { return param != nullptr ? param->getCurrentValueAsText() + (param->getLabel().isNotEmpty() ? " " + param->getLabel() : juce::String()) : juce::String(); };
         if (i == 0 || i == 4)
             f = [] (double v) { return juce::String (juce::roundToInt (v)) + " %"; };
@@ -1255,7 +1260,7 @@ EngineCard::EngineCard (OspAudioProcessor& p, int layer)
             f = [] (double v) { return juce::String (v, v < 10.0 ? 1 : 0) + "/s"; };
         else if (i == 3)
             f = [] (double v) { const int st = juce::roundToInt (v); return (st > 0 ? "+" : "") + juce::String (st) + " st"; };
-        granularKnobs[i] = std::make_unique<MiniKnob> (processor.parameters, id, grain[i].second, std::move (f));
+        granularKnobs[i] = std::make_unique<MiniKnob> (processor.apvts(), id, grain[i].second, std::move (f));
         granularKnobs[i]->setOnDark (true);
         granularKnobs[i]->slider.getProperties().set ("arc", static_cast<juce::int64> (palette::layer (layer).getARGB()));
         addChildComponent (*granularKnobs[i]);
@@ -1352,7 +1357,7 @@ juce::StringArray EngineCard::sourceInfoLines() const
     const auto instrument = processor.currentInstrument (layerIndex);
     if (instrument == nullptr)
     {
-        lines.add (processor.loadState (layerIndex) == OspAudioProcessor::LoadState::loading ? "Loading" : "Empty slot");
+        lines.add (processor.loadState (layerIndex) == InstrumentHost::LoadState::loading ? "Loading" : "Empty slot");
         return lines;
     }
     lines.add (juce::String::fromUTF8 (instrument->filename.c_str()));
@@ -1517,7 +1522,7 @@ void EngineCard::refresh()
     if (eqEditor != nullptr)
         eqEditor->refresh();
     const auto instrument = processor.currentInstrument (layerIndex);
-    const bool loading = processor.loadState (layerIndex) == OspAudioProcessor::LoadState::loading;
+    const bool loading = processor.loadState (layerIndex) == InstrumentHost::LoadState::loading;
     const auto generation = instrument != nullptr ? instrument->generation : 0;
     if (generation != shownGeneration || loading != shownLoading)
     {
@@ -1551,7 +1556,7 @@ void EngineCard::refresh()
         repaint (sourceDisplay.getBounds());
     }
 
-    auto value = [this] (const char* name) { return processor.parameterValue (OspAudioProcessor::layerParameterId (layerIndex, name)); };
+    auto value = [this] (const char* name) { return processor.parameterValue (InstrumentHost::layerParameterId (layerIndex, name)); };
     SourceDisplay::View view;
     view.granular = value ("sourceMode") >= 0.5f;
     view.start = 0.01f * value ("start");
@@ -1598,7 +1603,7 @@ void EngineCard::paint (juce::Graphics& g)
     {
         const auto badge = badgeArea.toFloat();
         auto* pieces = skin::active();
-        if (pieces == nullptr || ! pieces->draw (g, juce::String ("badge-") + OspAudioProcessor::layerName (layerIndex), badge))
+        if (pieces == nullptr || ! pieces->draw (g, juce::String ("badge-") + InstrumentHost::layerName (layerIndex), badge))
         {
             juce::Path shape;
             shape.addRoundedRectangle (badge, 6.0f);
@@ -1610,7 +1615,7 @@ void EngineCard::paint (juce::Graphics& g)
         }
         g.setColour (juce::Colour (0xfffff6ec));
         g.setFont (fonts::make (29.0f, fonts::Weight::regular));
-        g.drawText (OspAudioProcessor::layerName (layerIndex), badge.translated (0.0f, 0.5f), juce::Justification::centred, false);
+        g.drawText (InstrumentHost::layerName (layerIndex), badge.translated (0.0f, 0.5f), juce::Justification::centred, false);
     }
     auto row = textArea.toFloat();
     if (rootText.isNotEmpty())
@@ -1644,7 +1649,7 @@ void EngineCard::paintOverChildren (juce::Graphics& g)
         g.fillRoundedRectangle (sourceDisplay.getBounds().toFloat(), 9.0f);
         g.setColour (juce::Colour (0xffd9dcd8).withAlpha (0.55f));
         g.setFont (fonts::make (13.0f, fonts::Weight::medium, 0.12f));
-        g.drawText (processor.parameterValue (OspAudioProcessor::layerParameterId (layerIndex, "mute")) >= 0.5f ? "MUTED" : "NOT SOLOED",
+        g.drawText (processor.parameterValue (InstrumentHost::layerParameterId (layerIndex, "mute")) >= 0.5f ? "MUTED" : "NOT SOLOED",
                     sourceDisplay.getBounds().toFloat().removeFromBottom (28.0f), juce::Justification::centred, false);
     }
 }

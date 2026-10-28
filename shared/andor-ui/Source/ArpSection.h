@@ -2,7 +2,7 @@
 
 #include "CeramicSkin.h"
 #include "Design.h"
-#include "PluginProcessor.h"
+#include "InstrumentHost.h"
 #include "ShapingPopups.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -24,7 +24,7 @@ namespace osp::plugin
 class ArpControl final : public juce::Component, public juce::SettableTooltipClient, public skin::KeyFace
 {
 public:
-    explicit ArpControl (OspAudioProcessor& processor);
+    explicit ArpControl (InstrumentHost& processor);
 
     std::function<void()> onToggleEditor;
     void setExpanded (bool open);
@@ -47,7 +47,7 @@ public:
     skin::KeyState keyState() const override { return hover != 0 ? skin::KeyState::hover : skin::KeyState::normal; }
 
 private:
-    OspAudioProcessor& ospProcessor;
+    InstrumentHost& ospProcessor;
     juce::ParameterAttachment enabledAttachment;
     bool enabled = false, expanded = false;
     juce::String status;
@@ -92,7 +92,7 @@ private:
 class ArpInlinePanel final : public juce::Component, public skin::SurfaceFace
 {
 public:
-    explicit ArpInlinePanel (OspAudioProcessor& processor);
+    explicit ArpInlinePanel (InstrumentHost& processor);
     ~ArpInlinePanel() override;
     float surfaceRadius() const override { return design::layout::panelRadius; }
     bool surfaceIsCard() const override { return false; }
@@ -151,12 +151,12 @@ private:
     void revealSelected();
     int rowAt (juce::Point<float> p) const;
 
-    OspAudioProcessor& ospProcessor;
+    InstrumentHost& ospProcessor;
     juce::ParameterAttachment enabledAttachment, patternAttachment, octavesAttachment;
     MiniKnob rate, gate, swing, velocity;
     bool enabled = false;
     int pattern = 0, octaveCount = 1;
-    OspAudioProcessor::ArpView shown;
+    InstrumentHost::ArpView shown;
     Arpeggiator::Display preview;   ///< the pattern on a C major chord, while nothing is held
     Arpeggiator::Display fieldSteps; ///< the picture: the style on C E G B, one octave
     int fieldShown = -1;

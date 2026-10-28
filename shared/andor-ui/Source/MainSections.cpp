@@ -1,4 +1,5 @@
 #include "MainSections.h"
+#include "Binding.h"
 #include "ValueFormat.h"
 
 #include "Design.h"
@@ -72,6 +73,7 @@ TriangleMix::TriangleMix (juce::AudioProcessorValueTreeState& state)
 {
     xAttachment.sendInitialUpdate();
     yAttachment.sendInitialUpdate();
+    binding::tag (*this, "mix.x mix.y");
     setTooltip ("Three-layer mix: drag between A, B and C (double-click: all three equal)");
     setMouseCursor (juce::MouseCursor::PointingHandCursor);
     setTitle ("Layer mix");
@@ -191,6 +193,7 @@ VolumeSlider::VolumeSlider (juce::AudioProcessorValueTreeState& state)
       attachment (state, "gain", *this)
 {
     getProperties().set ("volume", true);
+    binding::tag (*this, "gain");
     setTitle ("Volume");
     setTooltip ("Master volume");
     setDoubleClickReturnValue (true, 0.0);
@@ -253,15 +256,16 @@ void VolumeSlider::paint (juce::Graphics& g)
 }
 
 //==============================================================================
-HeaderMix::HeaderMix (OspAudioProcessor& p)
+HeaderMix::HeaderMix (InstrumentHost& p)
     : processor (p),
-      blendAttachment (*p.parameters.getParameter ("ab.blend"), [this] (float v) { blend = v; repaint(); }),
-      xAttachment (*p.parameters.getParameter ("mix.x"), [this] (float v) { mixX = v; repaint(); }),
-      yAttachment (*p.parameters.getParameter ("mix.y"), [this] (float v) { mixY = v; repaint(); })
+      blendAttachment (*p.apvts().getParameter ("ab.blend"), [this] (float v) { blend = v; repaint(); }),
+      xAttachment (*p.apvts().getParameter ("mix.x"), [this] (float v) { mixX = v; repaint(); }),
+      yAttachment (*p.apvts().getParameter ("mix.y"), [this] (float v) { mixY = v; repaint(); })
 {
     blendAttachment.sendInitialUpdate();
     xAttachment.sendInitialUpdate();
     yAttachment.sendInitialUpdate();
+    binding::tag (*this, "ab.blend mix.x mix.y");
     setTitle ("Layer mix");
     setTooltip ("Mix: drag between the layers (double-click: equal)");
     setMouseCursor (juce::MouseCursor::PointingHandCursor);
@@ -497,7 +501,7 @@ void HeaderMix::paint (juce::Graphics& g)
     auto letter = [&] (int index, juce::Rectangle<float> r, juce::Justification j, float alpha) {
         const int l = slots[static_cast<std::size_t> (index)];
         g.setColour (colour::textSecondary.interpolatedWith (colour::identity (l).badgeBottom, 0.35f).withMultipliedAlpha (alpha));
-        g.drawText (OspAudioProcessor::layerName (l), r, j, false);
+        g.drawText (InstrumentHost::layerName (l), r, j, false);
     };
     letter (0, { c[0].x - 16.0f, c[0].y - 7.0f, 12.0f, 14.0f }, juce::Justification::centredRight, 1.0f);
     letter (1, { c[1].x + 4.0f, c[1].y - 7.0f, 12.0f, 14.0f }, juce::Justification::centredLeft, 1.0f);
@@ -520,7 +524,7 @@ void HeaderMix::paint (juce::Graphics& g)
         const auto share = shownShares();
         juce::String text;
         for (int i = 0; i < std::min (count, 3); ++i)
-            text << (i > 0 ? "   " : "") << OspAudioProcessor::layerName (slots[static_cast<std::size_t> (i)]) << " "
+            text << (i > 0 ? "   " : "") << InstrumentHost::layerName (slots[static_cast<std::size_t> (i)]) << " "
                  << juce::roundToInt (100.0 * share[static_cast<std::size_t> (i)]);
         g.setFont (fonts::make (10.5f, fonts::Weight::regular, 0.02f));
         g.setColour (colour::textSecondary.withAlpha (0.9f * readout));
@@ -536,8 +540,8 @@ namespace
     class MixPopup final : public MiniPanel, private juce::Timer
     {
     public:
-        explicit MixPopup (OspAudioProcessor& p)
-            : MiniPanel ("MIX", "HOW MUCH OF EACH LAYER YOU HEAR"), processor (p), triangle (p.parameters)
+        explicit MixPopup (InstrumentHost& p)
+            : MiniPanel ("MIX", "HOW MUCH OF EACH LAYER YOU HEAR"), processor (p), triangle (p.apvts())
         {
             triangle.setTooltip ("Drag between A, B and C (double-click: all three equal)");
             addAndMakeVisible (triangle);
@@ -566,7 +570,7 @@ namespace
                 g.fillRoundedRectangle (badge, 3.5f);
                 g.setColour (juce::Colours::white);
                 g.setFont (fonts::make (10.5f, fonts::Weight::medium));
-                g.drawText (OspAudioProcessor::layerName (l), badge, juce::Justification::centred, false);
+                g.drawText (InstrumentHost::layerName (l), badge, juce::Justification::centred, false);
                 row.removeFromLeft (8.0f);
                 const auto percent = juce::String (juce::roundToInt (100.0 * share[static_cast<std::size_t> (l)])) + " %";
                 g.setFont (fonts::make (12.0f, fonts::Weight::medium));
@@ -608,7 +612,7 @@ namespace
             readout = area.removeFromTop (3 * 20).reduced (4, 0);
         }
 
-        OspAudioProcessor& processor;
+        InstrumentHost& processor;
         TriangleMix triangle;
         std::array<juce::String, 3> names;
         std::array<double, 3> shown {};
@@ -616,13 +620,13 @@ namespace
     };
 }
 
-std::unique_ptr<MiniPanel> createMixPopup (OspAudioProcessor& processor)
+std::unique_ptr<MiniPanel> createMixPopup (InstrumentHost& processor)
 {
     return std::make_unique<MixPopup> (processor);
 }
 
 //==============================================================================
-PresetBar::PresetBar (OspAudioProcessor& p) : processor (p)
+PresetBar::PresetBar (InstrumentHost& p) : processor (p)
 {
     setTitle ("Preset");
     refresh();

@@ -33,8 +33,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from osp_assets import config as cfg  # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(cfg.ROOT))
-FONT = os.path.join(REPO, "apps", "plugin", "Resources", "fonts", "Inter-Regular.ttf")
-FONT_MEDIUM = os.path.join(REPO, "apps", "plugin", "Resources", "fonts", "Inter-Medium.ttf")
+FONT = os.path.join(REPO, "shared", "andor-ui", "Resources", "fonts", "Inter-Regular.ttf")
+FONT_MEDIUM = os.path.join(REPO, "shared", "andor-ui", "Resources", "fonts", "Inter-Medium.ttf")
 
 # The plugin's macro panel behind the knobs (sampled from the instrument at 1448 x 1086) and
 # the macro knob's body diameter there (design::draw::knob: 132 px box, ticks: / 1.42).
