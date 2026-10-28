@@ -1,5 +1,6 @@
 // The five macro popups (redesign §2): each one explains its DSP with a picture drawn
 // from the same formulas and parameters the sound uses, plus a few compact controls.
+#include "Binding.h"
 #include "EngineCard.h"
 #include "Design.h"
 #include "MacroPopups.h"
@@ -2646,6 +2647,7 @@ namespace
                     return;
                 selectors.push_back (std::make_unique<ValueSelector> (*param, caption));
                 selectors.back()->setTooltip (tip);
+                binding::tag (*selectors.back(), param->getParameterID());   // (a product's editor dims a mode setting its engine does not read)
                 addAndMakeVisible (*selectors.back());
                 cells.push_back (selectors.back().get());
             };
