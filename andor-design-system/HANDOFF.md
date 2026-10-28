@@ -46,6 +46,25 @@ Check the output against the following:
    - Randomness comes only from `osp::Prng` seeded from `seed` (CLAUDE.md rules 1 and 2).
 3. **Factory presets**: files with your extension in `Documents/<Product>/Presets/`.
 
+## What a product may add (extension points)
+
+Each is opt-in; ANDOR OSP and products that do not use it are unchanged (pixel for pixel,
+parameter for parameter). ANDOR ANALOG (arenttodal/analog) uses all of them.
+
+| Need | Use | Proof |
+|---|---|---|
+| Parameters of its own | `ProductInfo::addParameters`: appended after the ANDOR schema, IDs in the product's namespace (`<slug>.*`). | `andor_add_instrument_tests (... GOLDEN <file>)` pins them; the shell test checks the ANDOR schema is still exactly ANDOR OSP's and comes first. |
+| A synthesizer (no recordings) | `Engine::generatorName()` (the card's name) and `Engine::sourcePicture()` (one period of the waveform). The shell shows layer A's card for it, never a drop zone; it refuses files and saves no sources. | `shell: a generator engine has one card ...` |
+| Tempo | `Engine::Performance` carries the host's transport (BPM, position, playing, meter) once per block. | |
+| Oversampling delay | `Engine::latencySamples()`: the shell reports it to the host. | |
+| Factory presets | `ProductInfo::installFactoryPresets`: writes them under `Presets/Factory`, never over the musician's own. | |
+| Its own test files | `andor_add_instrument_tests (... SOURCES <files>)`: compiled with the shell's tests. | |
+| A home outside this repository | Build ANDOR OSP as a submodule and list the product folder in `ANDOR_EXTERNAL_PRODUCTS`; register it here (`product-registry.json`, `location`). | CMake checks the registry as for `products/*`. |
+| Host category | `andor_add_instrument (... VST3_CATEGORIES Instrument Synth)` (default `Instrument Sampler`). | |
+
+The visual regression's parity render shows ANDOR OSP's macro names (`ShellProcessor::showReferenceMacros`): a
+product's macro names are its identity, like the header's. Everything else must still match at 0 pixels.
+
 ## What you never change
 
 See the rules below.
@@ -107,7 +126,7 @@ These are not guidelines. A product that breaks one is not an ANDOR product.
 
 ## Known limitations and next steps
 
-- **Host-visible parameters.** Every product exposes the full ANDOR schema (350 parameters) to the host, including those its engine ignores. The interface disables those, but hosts list them.
+- **Host-visible parameters.** Every product exposes the full ANDOR schema (350 parameters) to the host, including those its engine ignores (and, after them, its own). The interface disables those, but hosts list them.
   - Next step: a grouped layout (`createParameterLayout (groups)`), plus components that tolerate absent parameters, behind the same golden test.
 - **What the shell does not have.** It has no Library window and no Samples inspector, and it loads one file per layer (no multi-sample sets). Those are ANDOR OSP features. If a product needs them, move them into `shared/andor-ui` the same way.
 - **OSP behaviour the shell does not copy.** ANDOR OSP picks a granular POS from its analysis; the shell keeps the default 50 %. This is engine behaviour. A product's engine may do the same.

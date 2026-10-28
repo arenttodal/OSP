@@ -206,6 +206,13 @@ void SourceDisplay::setInstrument (std::shared_ptr<const LoadedInstrument> next)
     repaint();
 }
 
+void SourceDisplay::setGeneratedCycle (std::vector<float> cycle)
+{
+    generatedCycle = std::move (cycle);
+    cacheDirty = true;
+    repaint();
+}
+
 void SourceDisplay::setLayer (int l)
 {
     if (layer != l)
@@ -417,6 +424,54 @@ double SourceDisplay::startSeconds() const
     return soundEnd - view.start * (soundEnd - begin);
 }
 
+void SourceDisplay::paintGenerated (juce::Graphics& g)
+{
+    // A generated source: two periods of its waveform as the recording's display would show
+    // a sustained tone (the same well, grid rows and layer tones): a body from the centre
+    // line to the wave, and the wave's own line, lighter, over it.
+    using namespace design;
+    const auto bounds = getLocalBounds().toFloat();
+    const auto inner = bounds.reduced (2.0f);
+    for (int row = 1; row < 4; ++row)
+    {
+        g.setColour (colour::wellGrid.withAlpha (row == 2 ? 0.95f : 0.45f));
+        g.fillRect (juce::Rectangle<float> (inner.getX(), inner.getY() + inner.getHeight() * static_cast<float> (row) / 4.0f, inner.getWidth(), 1.0f));
+    }
+    const auto plot = plotArea().reduced (8.0f, 0.0f);
+    const float mid = plot.getCentreY(), half = plot.getHeight() * 0.40f;
+    const auto& tones = waveTones (layer);
+    const float tint = focused ? 1.0f : 0.82f;
+    const int n = static_cast<int> (generatedCycle.size());
+    float peak = 1.0e-3f;
+    for (const float v : generatedCycle)
+        peak = std::max (peak, std::abs (v));
+    const float gain = 1.0f / std::max (peak, 0.25f);   // a quiet mixture still reads; never louder than full scale
+    const int columns = std::max (2, juce::roundToInt (plot.getWidth()));
+    juce::Path line, body;
+    body.startNewSubPath (plot.getX(), mid);
+    for (int c = 0; c <= columns; ++c)
+    {
+        const float t = 2.0f * static_cast<float> (c) / static_cast<float> (columns);   // two periods
+        const float position = (t - std::floor (t)) * static_cast<float> (n);
+        const int i = static_cast<int> (position) % n;
+        const float f = position - std::floor (position);
+        const float v = generatedCycle[static_cast<std::size_t> (i)] * (1.0f - f) + generatedCycle[static_cast<std::size_t> ((i + 1) % n)] * f;
+        const float x = plot.getX() + plot.getWidth() * static_cast<float> (c) / static_cast<float> (columns);
+        const float y = mid - half * std::clamp (v * gain, -1.0f, 1.0f);
+        if (c == 0)
+            line.startNewSubPath (x, y);
+        else
+            line.lineTo (x, y);
+        body.lineTo (x, y);
+    }
+    body.lineTo (plot.getRight(), mid);
+    body.closeSubPath();
+    g.setGradientFill (juce::ColourGradient (tones.body.withAlpha (0.55f * tint), 0.0f, mid - half, tones.deep.withAlpha (0.35f * tint), 0.0f, mid, false));
+    g.fillPath (body);
+    g.setColour (tones.light.withAlpha (0.95f * tint));
+    g.strokePath (line, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+}
+
 void SourceDisplay::paint (juce::Graphics& g)
 {
     using namespace palette;
@@ -530,6 +585,11 @@ void SourceDisplay::paintStatic (juce::Graphics& g)
     using namespace design;
     const auto bounds = getLocalBounds().toFloat();
     draw::well (g, bounds.reduced (0.5f), 9.0f, layer == 1 ? colour::wellB : colour::wellA);
+    if (! generatedCycle.empty())
+    {
+        paintGenerated (g);
+        return;
+    }
 
     const auto plot = plotArea();
     const bool hasWave = instrument != nullptr && ! instrument->peakMax.empty();
@@ -1354,6 +1414,12 @@ juce::StringArray EngineCard::sourceInfoLines() const
 {
     // Only what the loader and analysis actually know: nothing is made up.
     juce::StringArray lines;
+    if (generated)
+    {
+        lines.add (fileText);
+        lines.add ("Made by the instrument: no recording to load");
+        return lines;
+    }
     const auto instrument = processor.currentInstrument (layerIndex);
     if (instrument == nullptr)
     {
@@ -1521,6 +1587,33 @@ void EngineCard::refresh()
     eqButton.setActive (processor.layerEqSettings (layerIndex).audible());
     if (eqEditor != nullptr)
         eqEditor->refresh();
+    // A generated source (a synthesizer's oscillators): its name and its waveform instead of
+    // a recording's state and picture.
+    if (InstrumentHost::GeneratedSource source; processor.generatedSource (layerIndex, source))
+    {
+        generated = true;
+        if (source.revision != shownGeneratedRevision || source.name != fileText)
+        {
+            shownGeneratedRevision = source.revision;
+            fileText = source.name;
+            rootText.clear();
+            sourceDisplay.setGeneratedCycle (std::move (source.cycle));
+            repaint();
+        }
+        if (const bool heard = processor.isLayerHeard (layerIndex); heard != shownHeard)
+        {
+            shownHeard = heard;
+            repaint (sourceDisplay.getBounds());
+        }
+        return;
+    }
+    if (generated)
+    {
+        generated = false;
+        shownGeneratedRevision = ~0ull;
+        shownGeneration = ~0ull;
+        sourceDisplay.setGeneratedCycle ({});
+    }
     const auto instrument = processor.currentInstrument (layerIndex);
     const bool loading = processor.loadState (layerIndex) == InstrumentHost::LoadState::loading;
     const auto generation = instrument != nullptr ? instrument->generation : 0;
