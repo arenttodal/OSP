@@ -20,6 +20,8 @@ From the first real recordings (a ney and a cello melody; analysis version 2,
 - New stress fixtures `stress-breath-swells`, `stress-scoops`; CLI `--detection`, `--min-note`,
   `--output-contour`; `--phrase-fixtures` also writes the stress set; a hidden plug-in test
   renders the editor for any recording (`ANDOR_RECORDING`).
+- The macOS test zip (`ANDOR-Lab-macOS-test`) has a double-click `install.command` (user-level
+  copy of both plug-ins and apps, quarantine cleared), replacing the manual copy steps.
 - Sessions saved with 0.1.0 reopen exactly as saved (no re-analysis); only a new import or a
   re-analysis uses version 2. Cached analyses of version 1 are not reused.
 

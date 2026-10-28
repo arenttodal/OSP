@@ -1,6 +1,7 @@
 # ANDOR Lab — builds, artefacts and validation
 
-No installers, no signing, no notarisation, no copying into system plug-in folders: these are
+No installers (beyond the test zip's user-level `install.command`, at the user's request), no
+signing, no notarisation, and builds never copy themselves into plug-in folders: these are
 development builds. The installer is a later release step.
 
 ## Targets (actual CMake names)
@@ -75,7 +76,7 @@ On macOS the same folders hold `ANDOR Phrase.component` / `ANDOR Grain.component
 | ANDOR engine and plug-in tests under ASan + UBSan | Linux | clean |
 | macOS universal build (arm64 + x86_64) + all ctest suites incl. ANDOR plug-in tests | CI, `macos-14` | **pass** |
 | AU validation (`auval -v aumu Aphr Ospx`, `auval -v aumu Agrn Ospx`) | CI, `macos-14` (every push) | **AU VALIDATION SUCCEEDED** (both) |
-| Downloadable test build (`ANDOR-Lab-macOS-test` artefact: AU, VST3, app; unsigned) | CI, `macos-14` | produced on every green run |
+| Downloadable test build (`ANDOR-Lab-macOS-test` artefact: AU, VST3, app, double-click `install.command`; unsigned) | CI, `macos-14` | produced on every green run |
 | Ableton Live and a second host (Logic / Reaper) | needs the user's Mac | **pending** — `test-instructions.md` |
 
 Host results (Ableton, Logic, Reaper) must not be inferred from the Linux runs or from CI's auval.

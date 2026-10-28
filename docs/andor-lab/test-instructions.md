@@ -6,8 +6,9 @@ does not have. Results go into `known-issues.md` and `STATUS.md`.
 ## 0. Build and install (development only)
 
 Easiest: download the `ANDOR-Lab-macOS-test` artefact from a green CI run (GitHub → Actions →
-the run → Artifacts; universal, unsigned) and follow its `README.txt` (copy by hand, no
-installer). CI already runs auval on both. Or build locally: `build-and-validation.md`
+the run → Artifacts; universal, unsigned), unzip it and double-click `install.command` (copies
+both plug-ins and apps for the current user and clears the download quarantine; see its
+`README.txt`). CI already runs auval on both. Or build locally: `build-and-validation.md`
 ("Development-only installation on a Mac"). Run `auval -v aumu Aphr Ospx` and
 `auval -v aumu Agrn Ospx` and note the result.
 

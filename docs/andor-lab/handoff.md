@@ -3,7 +3,7 @@
 **Status: engineering-complete development prototypes — host validation pending.** Both
 instruments build, load, analyse, play, save and reopen, pass their automated tests and
 pluginval at the strictest level on Linux; CI builds them universal on macOS 14, runs all tests
-and passes auval for both AUs. Nothing has been heard or opened in a DAW yet; those steps are the user's (`test-instructions.md`). No installer was made.
+and passes auval for both AUs. Nothing has been heard or opened in a DAW yet; those steps are the user's (`test-instructions.md`). No signed installer was made (the test zip has a user-level `install.command`).
 
 ## 1. Repository
 
@@ -64,7 +64,8 @@ xvfb-run -a ctest --test-dir build-plugin -R andor --output-on-failure
 | ANDOR Grain Standalone | `build-plugin/apps/grain/ANDOR_Grain_artefacts/Release/Standalone/ANDOR Grain` |
 
 macOS (AU, VST3, .app; universal) is built by CI on `macos-14` and published as the
-`ANDOR-Lab-macOS-test` artefact (unsigned, no installer); Windows not attempted.
+`ANDOR-Lab-macOS-test` artefact (unsigned; a double-click `install.command` copies it for the
+current user, like OSP's test build; no signed installer); Windows not attempted.
 The CMake targets are the standard JUCE ones and include AU on Apple (`build-and-validation.md`).
 
 ## 4. Verification
