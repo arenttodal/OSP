@@ -90,6 +90,17 @@ enum class ReimaginedRouting
     perLayer
 };
 
+/**
+    How a finite grain budget holds.
+    - shared (Phase 2): every sounding stream gets its fair share of the budget, at least one
+      grain. With more streams than the budget allows that floor exceeds it (each stream still
+      plays one grain), and grains already playing when a share drops finish their course.
+    - bounded (Phase 3, new sessions): never more grains than the budget. An engine-wide gate
+      refuses any new grain while the budget is reached; with more streams than grains, the
+      newest notes get one grain each and the older ones none (their grains end naturally).
+*/
+enum class GrainBudgetPolicy { shared, bounded };
+
 /** How loud each layer is in the mix (before its LEVEL and PAN). */
 struct LayerMixWeights
 {
@@ -139,6 +150,8 @@ struct EngineSettings
     /** Grains at once across A, B and C (InstrumentEngine::setGrainBudget); 0 = unlimited (every
         session made before the budget existed). */
     int grainBudget = 0;
+    /** How a finite budget holds (GrainBudgetPolicy). Unlimited ignores it. */
+    GrainBudgetPolicy grainBudgetPolicy = GrainBudgetPolicy::bounded;
 };
 
 /**
@@ -276,6 +289,7 @@ public:
         floor is one grain per stream (more streams than the budget exceed it). Real-time safe.
     */
     void setGrainBudget (int grains) noexcept { config.grainBudget = std::max (0, grains); }
+    void setGrainBudgetPolicy (GrainBudgetPolicy policy) noexcept { config.grainBudgetPolicy = policy; }
     int grainBudget() const noexcept { return config.grainBudget; }
     /** Grains playing now on every layer, and the current per-stream share (24 without a budget). */
     int liveGrainCount() const noexcept;
@@ -467,8 +481,10 @@ public:
     NoteShape shapeFor (const InstrumentModel* model, int note, int velocity, std::uint64_t eventIndex, double referenceVelocity,
                         double registerBrightnessDb, bool setMember = false, bool layered = false) noexcept;
 
-    /** Which member of a layer's set a note would use (no state change). -1 without a set. */
+    /** Which member of a layer's set a note would use (no state change). -1 without a set;
+        unmappedMember when the set's mapping (a Note Atlas's FILL reach) leaves the key silent. */
     int memberFor (int note, int velocity, std::uint64_t eventIndex, int layer = 0) const noexcept;
+    static constexpr int unmappedMember = -2;
 
 private:
     static constexpr int tailSlots = 16;
@@ -545,6 +561,7 @@ private:
     std::array<const keydna::Table*, 3> layerKeyDnaProfile {};   ///< null: no KEY DNA
     std::array<double, 3> layerKeyDnaAmount { 1.0, 1.0, 1.0 };
     int currentGrainShare = GranularSource::maxGrains;
+    GrainGate grainGate;   ///< the bounded policy's gate (limit 0: off)
     /** The budget's share for this block (all sounding grain streams), applied to the voices. */
     void applyGrainBudget() noexcept;
     std::array<double, arpDestCount> modArpOffset {};

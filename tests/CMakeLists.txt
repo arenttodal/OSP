@@ -4,6 +4,7 @@ add_executable(osp_tests
     unit/PitchMathTests.cpp
     unit/PrngTests.cpp
     unit/KeyDnaTests.cpp
+    unit/NoteAtlasTests.cpp
     unit/InterpolationTests.cpp
     unit/AdsrTests.cpp
     unit/SamplerTests.cpp
@@ -41,6 +42,7 @@ add_executable(osp_tests
     integration/LayerTests.cpp
     integration/KeyDnaEngineTests.cpp
     integration/GrainPhase2Tests.cpp
+    integration/AtlasSetTests.cpp
     integration/EngineSlotTests.cpp
     integration/ShaperTests.cpp
     integration/ReimaginedModesTests.cpp

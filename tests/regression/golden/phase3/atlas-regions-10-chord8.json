@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "atlas-regions-10-chord8",
+  "description": "an atlas of 10 one-second regions, eight-note chord",
+  "midi": "chord8-c",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "3c70f3396d7b6282",
+  "seconds": 2.576,
+  "rmsDb": -23.98658,
+  "peakDb": -10.584468,
+  "brightness": 0.134464,
+  "stereoWidth": 1.285131
+}

@@ -10,6 +10,7 @@
 #include "research/RenderConfig.h"
 
 #include <array>
+#include <functional>
 #include <optional>
 #include <string>
 
@@ -56,6 +57,12 @@ RenderOutput renderSet (const InstrumentSet& set, const MidiSequence& sequence, 
     each layer's KEY DNA from config.keyDna. With one model on layer A this is renderInstrument.
 */
 RenderOutput renderLayers (const std::array<const InstrumentModel*, 3>& models, const MidiSequence& sequence, const RenderConfig& config);
+
+/** As renderLayers, where a layer may play a multi-sample instrument (a set, e.g. a Note
+    Atlas's) instead of one model; a layer with a set ignores its model. */
+RenderOutput renderLayerInstruments (const std::array<const InstrumentModel*, 3>& models, const std::array<const InstrumentSet*, 3>& sets,
+                                     const MidiSequence& sequence, const RenderConfig& config,
+                                     const std::function<void (InstrumentEngine&, double seconds)>& onBlock = {});
 
 /** Sets each layer's automated KEY DNA AMOUNT (config.keyDnaAmountAutomation) for the block
     starting at `seconds`; layers without automation are left alone. */

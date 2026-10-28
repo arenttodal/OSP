@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "atlas-boundary-granular",
+  "description": "Granular, SPREAD 100 %, on a 440 Hz note recorded next to a 3 kHz one: no 3 kHz may leak",
+  "midi": "held-a4",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "22be61c93f75effb",
+  "seconds": 2.330667,
+  "rmsDb": -34.260948,
+  "peakDb": -26.436143,
+  "brightness": 0.057499,
+  "stereoWidth": 0.0
+}

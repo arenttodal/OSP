@@ -39,6 +39,14 @@ struct GranularParams
     GrainWindow window = GrainWindow::hann;
 };
 
+/** A bounded grain budget's engine-wide gate (InstrumentEngine, policy `bounded`): no new grain
+    starts while `live` has reached `limit` (0: no gate). Audio thread only. */
+struct GrainGate
+{
+    int live = 0;    ///< grains playing at the start of the block, plus those started since
+    int limit = 0;
+};
+
 /**
     Granular source mode of one voice (A/B layer system): instead of reading the
     recording through, the voice plays a stream of Hann-windowed grains taken around POS,
@@ -63,11 +71,13 @@ public:
         updateNorm();
     }
     void stopSpawning() noexcept { spawning = false; }
-    /** The grain budget's share for this stream: at most this many grains at once (1..24;
-        24, the pool, is unlimited). Once a note has been capped its level follows the grains it
+    /** The grain budget's share for this stream: at most this many grains at once (0..24;
+        24, the pool, is unlimited; 0 only under a bounded budget with more streams than grains). Once a note has been capped its level follows the grains it
         may actually play, gliding over about half a grain (no step when the share changes). */
     void setGrainCap (int cap) noexcept;
     int grainCap() const noexcept { return cap; }
+    /** The engine's gate for a bounded budget (null: none). */
+    void setGrainGate (GrainGate* g) noexcept { gate = g; }
     /** Grains this stream plays at once at its settings (DENS x SIZE, plus one for the spawn
         jitter; 1..24): what it asks of the budget. */
     int grainDemand() const noexcept;
@@ -122,6 +132,7 @@ private:
     int activeGrains = 0;
     int shapedGrains = 0;
     int cap = maxGrains;
+    GrainGate* gate = nullptr;
     // Under a budget (only once this note has been capped; otherwise the original law, exactly):
     // the overlap the level is normalised for, gliding to the admitted one.
     bool budgeted = false;

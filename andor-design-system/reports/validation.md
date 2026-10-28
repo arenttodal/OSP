@@ -39,6 +39,16 @@ differing pixels' bounding box (reference px) and largest channel difference, so
 locates it if it recurs. Until it is explained, the regression is not claimed to be
 deterministic on macOS. Its tolerance stays 0 and its masks are unchanged.
 
+**Recurred, and addressed (unified engine Phase 3).** In run 164 (commit 0c796af) the same state
+showed 122 pixels, x 514..933 and y 192..448 reference px, with the largest channel difference
+2. Again it was macOS only, and both renders came from the same run. Both renders took
+`createComponentSnapshot`, which draws into the platform's native image, CoreGraphics on
+macOS. `tests/support/VisualStates.h` now paints each state into a `SoftwareImageType` image
+(JUCE's own renderer) for OSP and the shell alike. On Linux that was already the renderer, so
+the pictures there are unchanged. The diff image still cannot be fetched from this environment,
+so CoreGraphics as the cause is likely but not proven: the next macOS runs will tell. Tolerance
+and masks are unchanged.
+
 ## Not verified here (needs a Mac, a DAW or the owner)
 
 - Loading ANDOR Example in a DAW (auval passes; no DAW session was run).

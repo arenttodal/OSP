@@ -252,6 +252,32 @@ RenderOutput renderLayers (const std::array<const InstrumentModel*, 3>& models, 
                       KeyDnaAutomation { engine, config });
 }
 
+RenderOutput renderLayerInstruments (const std::array<const InstrumentModel*, 3>& models, const std::array<const InstrumentSet*, 3>& sets,
+                                     const MidiSequence& sequence, const RenderConfig& config,
+                                     const std::function<void (InstrumentEngine&, double)>& onBlock)
+{
+    const double outputRate = config.sampleRate > 0.0 ? config.sampleRate : 48000.0;
+    const int blockSize = std::max (1, config.blockSize);
+    InstrumentEngine engine;
+    engine.prepare (outputRate, blockSize, config.engineSettings);
+    for (int layer = 0; layer < 3; ++layer)
+    {
+        if (const auto* set = sets[static_cast<std::size_t> (layer)])
+            engine.setInstrumentSet (set, layer);
+        else
+            engine.setModel (models[static_cast<std::size_t> (layer)], layer);
+        engine.setLayerKeyDna (layer, config.keyDna[static_cast<std::size_t> (layer)]);
+    }
+    engine.setModulation (config.modulation);
+    engine.setModWheel (static_cast<float> (config.modWheel));
+    return runBlocks (engine, outputRate, blockSize, arpeggiate (sequence, config, outputRate), config.maxTailSeconds,
+                      [&] (double seconds) {
+                          applyKeyDnaAutomation (engine, config, seconds);
+                          if (onBlock)
+                              onBlock (engine, seconds);
+                      });
+}
+
 RenderOutput renderWithEngine (const AudioData& source, const AnalysisData& analysis, double rootMidi, const MidiSequence& sequence,
                                const RenderConfig& config, const PlaybackPreparation& preparation)
 {

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "atlas-velocity-layers",
+  "description": "C4 soft and loud in turn: the soft and loud recordings (velocity layers)",
+  "midi": "velocity-c4",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "aaa0d54dfbe9b51",
+  "seconds": 3.104,
+  "rmsDb": -33.159704,
+  "peakDb": -20.338831,
+  "brightness": 0.137504,
+  "stereoWidth": 2.264637
+}

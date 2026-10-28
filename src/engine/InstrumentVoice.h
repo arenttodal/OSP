@@ -56,6 +56,8 @@ struct InstrumentVoiceStart
     const double* keyDnaAmount = nullptr;
     /** The grain budget's share for each of this voice's grain streams (24: no budget). */
     int grainCap = GranularSource::maxGrains;
+    /** The engine's gate for a bounded budget (null: none). */
+    GrainGate* grainGate = nullptr;
 };
 
 /**

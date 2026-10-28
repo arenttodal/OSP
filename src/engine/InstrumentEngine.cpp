@@ -370,15 +370,11 @@ int InstrumentEngine::memberFor (int note, int velocity, std::uint64_t eventInde
     const auto* set = slots[which].set;
     if (set == nullptr || set->groups.empty())
         return -1;
-    // Nearest pitch anchor.
-    const PitchGroup* group = &set->groups.front();
-    int groupIndex = 0;
-    for (int g = 0; g < static_cast<int> (set->groups.size()); ++g)
-        if (std::abs (set->groups[static_cast<std::size_t> (g)].rootMidi - note) < std::abs (group->rootMidi - note))
-        {
-            group = &set->groups[static_cast<std::size_t> (g)];
-            groupIndex = g;
-        }
+    // Nearest pitch anchor (ties: the lower one); an atlas's mapping may leave the key silent.
+    const int groupIndex = set->groupFor (note);
+    if (groupIndex < 0)
+        return unmappedMember;
+    const PitchGroup* group = &set->groups[static_cast<std::size_t> (groupIndex)];
     // Velocity layer, then a round-robin take that is never the previous one.
     const int layer = std::clamp (static_cast<int> (std::clamp (velocity, 1, 127) / 128.0 * group->layers), 0, group->layers - 1);
     // The requested layer, or the nearest layer that has playable takes.
@@ -728,6 +724,10 @@ void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int
     const auto* set = slots[context].set;
     if (model == nullptr || ! model->isValid())
         return;
+    // A key the layer's set does not play (a Note Atlas's FILL reach): no voice is started and
+    // nothing is stolen. (File sets play every key: their member is chosen below as before.)
+    if (set != nullptr && set->restrictsKeys() && set->groupFor (note) < 0)
+        return;
 
     const auto stealFade = std::max (1, static_cast<int> (config.stealFadeSeconds * sampleRate));
     if (config.voicesPerKey > 0 && ! config.mono)
@@ -764,7 +764,7 @@ void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int
     double referenceVelocity = 100.0;
     double registerDb = 0.0;
     bool setMember = false, layered = false;
-    if (set != nullptr && set->members.size() > 1)
+    if (set != nullptr && (set->members.size() > 1 || set->restrictsKeys()))
     {
         const int index = memberFor (note, velocity, eventIndex, layerNumber);
         if (index >= 0)
@@ -853,6 +853,7 @@ void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int
             params.shape.keyDna = dna->at (note);
         params.keyDnaAmount = &layerKeyDnaAmount[context];
         params.grainCap = config.grainBudget > 0 ? currentGrainShare : GranularSource::maxGrains;
+        params.grainGate = &grainGate;
     }
     slot->start (params);
 }
@@ -1049,6 +1050,11 @@ int InstrumentEngine::liveGrainCount() const noexcept
 
 void InstrumentEngine::applyGrainBudget() noexcept
 {
+    // The bounded policy's gate: the grains playing now, and the limit (0: no gate).
+    const bool bounded = config.grainBudget > 0 && config.grainBudgetPolicy == GrainBudgetPolicy::bounded;
+    grainGate.limit = bounded ? config.grainBudget : 0;
+    if (bounded)
+        grainGate.live = liveGrainCount();
     if (config.grainBudget <= 0)
     {
         // Unlimited (the original behaviour): every stream its whole pool, set once.
@@ -1090,6 +1096,24 @@ void InstrumentEngine::applyGrainBudget() noexcept
     if (streams == 0 || thinned == 0)
         share = GranularSource::maxGrains;   // the budget is not reached: every stream its pool
     currentGrainShare = share;
+    if (bounded && streams > config.grainBudget)
+    {
+        // More streams than grains: one grain each for the newest notes, none for the older
+        // ones (deterministic: by start order, then slot order). No allocation.
+        std::array<std::pair<std::uint64_t, int>, static_cast<std::size_t> (2 * totalSlots)> order {};
+        int n = 0;
+        for (int v = 0; v < totalSlots; ++v)
+            for (int s = 0; s < voices[static_cast<std::size_t> (v)].grainStreams(); ++s)
+                order[static_cast<std::size_t> (n++)] = { voices[static_cast<std::size_t> (v)].startOrder(), 2 * v + s };
+        std::sort (order.begin(), order.begin() + n, [] (const auto& a, const auto& b) { return a.first != b.first ? a.first > b.first : a.second < b.second; });
+        for (int i = 0; i < n; ++i)
+        {
+            const auto& [age, id] = order[static_cast<std::size_t> (i)];
+            voices[static_cast<std::size_t> (id / 2)].setGrainCap (id % 2, i < config.grainBudget ? 1 : 0);
+        }
+        currentGrainShare = 0;   // a note starting now waits for the next block's share
+        return;
+    }
     int spare = share < GranularSource::maxGrains ? std::max (0, config.grainBudget - total) : 0;
     for (auto& voice : voices)
         for (int s = 0; s < voice.grainStreams(); ++s)

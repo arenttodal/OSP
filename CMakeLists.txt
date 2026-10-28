@@ -80,9 +80,11 @@ add_library(osp_dsp STATIC
     src/engine/GranularSource.cpp
     src/engine/RhythmicShaper.cpp
     src/engine/SampleSetInference.cpp
+    src/engine/AtlasSet.cpp
     src/midi/MidiFixtures.cpp
     src/model/RootChoice.cpp
     src/model/PlaybackPreparation.cpp
+    src/model/NoteAtlas.cpp
 )
 target_include_directories(osp_dsp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 # Linked into plugin shared objects (VST3/AU bundles).
@@ -130,6 +132,7 @@ set(OSP_IO_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/io/ContentHash.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/io/AnalysisJson.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/io/JsonUtil.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/io/NoteAtlasJson.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/midi/MidiFileIO.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/library/SoundImport.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/library/FolderScan.cpp
@@ -179,6 +182,7 @@ add_library(osp_research STATIC
     src/research/Bakeoff.cpp
     src/research/Experiment.cpp
     src/research/UnifiedScenes.cpp
+    src/research/AtlasFixtures.cpp
 )
 target_include_directories(osp_research PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(osp_research PUBLIC osp_dsp osp_library osp_juce_headless)

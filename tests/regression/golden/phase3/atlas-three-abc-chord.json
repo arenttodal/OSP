@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "atlas-three-abc-chord",
+  "description": "three atlases: A sung (One Shot), B bowed (Granular, SCATTER, PAN), C stereo-wide (One Shot)",
+  "midi": "chord-g",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "7153ac3c3f10eeb1",
+  "seconds": 2.576,
+  "rmsDb": -31.280698,
+  "peakDb": -16.472493,
+  "brightness": 0.149857,
+  "stereoWidth": 0.590097
+}

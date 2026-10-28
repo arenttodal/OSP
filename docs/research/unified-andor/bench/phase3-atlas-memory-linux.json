@@ -1,0 +1,132 @@
+{
+  "atlases": [
+    {
+      "atlas": "boundary-probe",
+      "notes": 2,
+      "regionSeconds": 1.0,
+      "memberBytes": 404432,
+      "buildMilliseconds": 129.02
+    },
+    {
+      "atlas": "bowed-phrase",
+      "notes": 3,
+      "regionSeconds": 1.65,
+      "memberBytes": 1270776,
+      "buildMilliseconds": 436.34
+    },
+    {
+      "atlas": "legato",
+      "notes": 4,
+      "regionSeconds": 1.6,
+      "memberBytes": 1310368,
+      "buildMilliseconds": 330.69
+    },
+    {
+      "atlas": "missing-notes",
+      "notes": 3,
+      "regionSeconds": 2.1,
+      "memberBytes": 1443576,
+      "buildMilliseconds": 358.53
+    },
+    {
+      "atlas": "missing-notes:fill-4",
+      "notes": 3,
+      "regionSeconds": 2.1,
+      "memberBytes": 1443576,
+      "buildMilliseconds": 351.37
+    },
+    {
+      "atlas": "missing-notes:no-fill",
+      "notes": 3,
+      "regionSeconds": 2.1,
+      "memberBytes": 1443576,
+      "buildMilliseconds": 347.26
+    },
+    {
+      "atlas": "out-of-tune",
+      "notes": 3,
+      "regionSeconds": 2.1,
+      "memberBytes": 1443576,
+      "buildMilliseconds": 366.35
+    },
+    {
+      "atlas": "out-of-tune:as-recorded",
+      "notes": 3,
+      "regionSeconds": 2.1,
+      "memberBytes": 1443576,
+      "buildMilliseconds": 335.31
+    },
+    {
+      "atlas": "regions-10",
+      "notes": 10,
+      "regionSeconds": 10.0,
+      "memberBytes": 5969280,
+      "buildMilliseconds": 2677.86
+    },
+    {
+      "atlas": "regions-50",
+      "notes": 50,
+      "regionSeconds": 50.0,
+      "memberBytes": 29843440,
+      "buildMilliseconds": 12171.11
+    },
+    {
+      "atlas": "repeated-note",
+      "notes": 3,
+      "regionSeconds": 2.1,
+      "memberBytes": 1443576,
+      "buildMilliseconds": 371.29
+    },
+    {
+      "atlas": "silence-gaps",
+      "notes": 3,
+      "regionSeconds": 2.1,
+      "memberBytes": 727416,
+      "buildMilliseconds": 261.98
+    },
+    {
+      "atlas": "stereo-wide",
+      "notes": 2,
+      "regionSeconds": 1.6,
+      "memberBytes": 1041504,
+      "buildMilliseconds": 435.92
+    },
+    {
+      "atlas": "sung-four",
+      "notes": 4,
+      "regionSeconds": 3.2,
+      "memberBytes": 2079608,
+      "buildMilliseconds": 635.87
+    },
+    {
+      "atlas": "velocity-layers",
+      "notes": 4,
+      "regionSeconds": 2.4,
+      "memberBytes": 1771168,
+      "buildMilliseconds": 464.27
+    }
+  ],
+  "scaling": [
+    {
+      "regions": 10,
+      "memberBytes": 5969280,
+      "buildMilliseconds": 2677.86,
+      "peakResidentMegabytes": 100.3,
+      "lookupNanoseconds": 10.59
+    },
+    {
+      "regions": 50,
+      "memberBytes": 29843440,
+      "buildMilliseconds": 12171.11,
+      "peakResidentMegabytes": 100.3,
+      "lookupNanoseconds": 12.46
+    },
+    {
+      "regions": 200,
+      "memberBytes": 119370608,
+      "buildMilliseconds": 49973.37,
+      "peakResidentMegabytes": 326.7,
+      "lookupNanoseconds": 12.52
+    }
+  ]
+}

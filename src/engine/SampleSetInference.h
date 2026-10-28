@@ -43,6 +43,16 @@ struct SetAssignment
 */
 InstrumentSet inferSampleSet (const std::vector<SetInput>& inputs, const std::vector<SetAssignment>& assignments = {});
 
+/**
+    The set's derived figures from its members' places (each member's pitch group, layer, take
+    and role already set): the levelling reference per (group, layer), the multi-velocity and
+    register models, and the primary member. inferSampleSet ends with it; sets built from
+    explicit places (a Note Atlas, engine/AtlasSet) call it the same way. Offline only.
+*/
+void finaliseSampleSet (InstrumentSet& set);
+/** A member for `model` with its loudness figures (place: group 0, layer 0, take 0). */
+SetMember makeSetMember (std::shared_ptr<const InstrumentModel> model, std::string filename);
+
 /** Dynamics word in a file name -> rough loudness rank (pp = 1 ... ff = 6), or nullopt. */
 std::optional<double> dynamicsRankFromName (const std::string& filename);
 

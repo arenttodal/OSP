@@ -397,6 +397,11 @@ std::optional<RenderConfig> loadRenderConfig (const std::filesystem::path& path,
     }
     // The grain budget (engine C): grains at once across A, B and C; 0 or absent = unlimited.
     config.engineSettings.grainBudget = std::max (0, json::getInt (root, "grainBudget", config.engineSettings.grainBudget));
+    // "grainBudgetPolicy": "bounded" (default: never more grains than the budget) or "shared"
+    // (Phase 2: a fair share each, at least one grain per stream).
+    if (json::has (root, "grainBudgetPolicy"))
+        config.engineSettings.grainBudgetPolicy = json::getString (root, "grainBudgetPolicy") == "shared" ? GrainBudgetPolicy::shared
+                                                                                                         : GrainBudgetPolicy::bounded;
     if (json::has (root, "mix"))
     {
         const auto& m = root["mix"];

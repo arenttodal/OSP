@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "atlas-fill-12",
+  "description": "only C3, C4, C5 recorded: FILL within 12 semitones plays every key",
+  "midi": "sweep-c2-c6",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "f88d515c222dc7e2",
+  "seconds": 4.005333,
+  "rmsDb": -36.563258,
+  "peakDb": -23.901135,
+  "brightness": 0.170099,
+  "stereoWidth": 0.241722
+}

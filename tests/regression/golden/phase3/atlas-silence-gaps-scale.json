@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "atlas-silence-gaps-scale",
+  "description": "mono plucks recorded with long silences between them, a scale",
+  "midi": "scale-c3-c4",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "4d8bf355ddfb082b",
+  "seconds": 2.677333,
+  "rmsDb": -42.889372,
+  "peakDb": -30.957967,
+  "brightness": 0.25974,
+  "stereoWidth": 0.013751
+}

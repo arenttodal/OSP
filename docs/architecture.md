@@ -751,3 +751,56 @@ The grain budget (`EngineSettings::grainBudget`, 0 = unlimited) is applied at th
 - The floor is one grain per stream.
 - In the plugin, sessions saved before state version 13 open Unlimited; new sessions start
   at 256.
+
+**Phase 3 made a finite budget a hard bound (`GrainBudgetPolicy`).** Under Phase 2's policy
+(`shared`) the one-grain floor exceeds the budget when more streams sound than the budget has
+grains (24 streams on a budget of 10 play at least 24 grains). The `bounded` policy, the
+default for new engines and new plugin sessions, never exceeds it:
+- an engine-wide `GrainGate {live, limit}` that every granular source checks before starting a
+  grain. `live` is recounted at the start of each block and counts every grain started since;
+  it never decreases within a block, so it errs on the safe side;
+- with more streams than grains, the newest notes (by start order, then slot) get a cap of 1
+  and the others 0. A cap of 0 holds the stream's normalisation, so its last grains fade out at
+  their own level and nothing swells;
+- the Granulator itself is unchanged. `shared` remains for sessions saved before state 14 and
+  for the Phase 2 budget scenes, which pin it explicitly.
+
+## NOTE ATLAS (unified engine Phase 3; docs/research/unified-andor/phase-3-report.md)
+
+A recorded phrase becomes an ordinary OSP multi-sample instrument. There is no second sampler.
+
+    finalised audio asset(s) ──► NoteAtlas (model/NoteAtlas, plain data, JSON io/NoteAtlasJson)
+                              ──► atlasset::buildInstrumentSet (engine/AtlasSet, loader thread)
+                              ──► InstrumentSet (members = region copies, groups = play keys)
+                              ──► LoadedInstrument ──► ModelExchange ──► the layer's voices
+
+- **The model** (`osp::atlas`, pure C++): sources are immutable assets identified by
+  `contentHash` (sha256 of the stored file), with an origin (`fileImport`, `library`,
+  `liveCapture`, `bufferSnapshot`). Paths are hints only, so a capture that never had a path is
+  a first-class source. Notes carry exact frame regions (sourceStart <= attackStart <= sustain <=
+  releaseStart <= sourceEnd), MIDI root + cents + confidence, velocity layer, round-robin
+  group/variation, analysis or user origin, and corrections. `Mapping {fill,
+  maxTransposeSemitones, correctTuning}` is FILL KEYBOARD. Schema 2; ANDOR Lab's schema 1 is
+  read and migrated.
+- **The conversion** copies each included note (attackStart..sourceEnd, its fades, a 64-frame
+  anti-click edge at each cut) and builds one member per note with OSP's own builder
+  (`buildProvisional` + `addContinuation`), its root forced to the play key (plus its cents
+  when playing in tune), one playback gain for the whole atlas. Groups are play keys, layers
+  are velocity layers, takes follow the variation order. `finaliseSampleSet` (shared with
+  inferred sample sets) derives the dynamics and register models. Region copies keep grains,
+  loops and releases inside their note by construction; each member still records its source
+  asset and frame range, so a later shared-buffer implementation can read in place.
+- **Selection** (`InstrumentSet::groupFor`): the exact key's group, else (FILL on) the nearest
+  recorded key within `fillLimitSemitones` (ties: the lower key), else none. The engine's
+  `memberFor` then picks the velocity layer and the round-robin take as for any set. An
+  unmapped key starts no voice and steals nothing. Legacy sets keep an infinite limit and
+  behave exactly as before.
+- **Loading and publication** (`InstrumentLoader::loadInstrumentAtlas`, loader thread): every
+  source is found by hash in the sample store, then through the atlas's hints; decoded once;
+  checked against the atlas's rate / channels / length; kept in the store. Any missing or
+  mismatched source fails the whole load. The result is published like every sound, so
+  sounding voices keep the instrument they started on and it is freed on the message thread.
+- **State 14**: the layer's `Instrument` tree holds an `Atlas` child (the atlas JSON plus each
+  source's store hash), never audio. On recall the layer is emptied first, so a session whose
+  recordings are missing opens empty and failed (`missingSources`), never with the previous
+  sound.

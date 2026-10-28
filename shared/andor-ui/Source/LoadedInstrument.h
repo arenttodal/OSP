@@ -5,6 +5,7 @@
 #include "model/InstrumentModel.h"
 #include "engine/SampleSetInference.h"
 #include "model/InstrumentSet.h"
+#include "model/NoteAtlas.h"
 
 #include <memory>
 
@@ -47,6 +48,13 @@ struct LoadedInstrument
     };
     std::vector<MemberFile> memberFiles;           ///< identities of set->members, same order
     std::vector<SetAssignment> assignments;        ///< user corrections the set was built with
+    /** A set built from a Note Atlas (Phase 3): the atlas, as loaded (null otherwise; a source
+        relinked while loading keeps its new location). The session saves it in place of
+        member files. */
+    std::shared_ptr<const atlas::NoteAtlas> atlas;
+    /** The atlas's source recordings as the sample store holds them (store hash, name, path):
+        what presets, the Library and portable instruments reference. */
+    std::vector<MemberFile> atlasSources;
     double startSeconds = 0.0;       ///< where notes start reading (analysed onset minus pre-roll)
     double playbackGainDb = 0.0;     ///< non-destructive level match
 

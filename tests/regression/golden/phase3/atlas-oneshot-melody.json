@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "atlas-oneshot-melody",
+  "description": "One Shot: a melody over the four recorded notes and the keys FILL lends them",
+  "midi": "atlas-melody",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "142b352c08cef698",
+  "seconds": 4.378667,
+  "rmsDb": -37.210305,
+  "peakDb": -23.606826,
+  "brightness": 0.128738,
+  "stereoWidth": 1.231276
+}

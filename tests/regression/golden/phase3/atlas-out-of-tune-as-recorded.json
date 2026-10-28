@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "atlas-out-of-tune-as-recorded",
+  "description": "the same notes as recorded (Mapping.correctTuning off)",
+  "midi": "tuning-c-major",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "2c617321f7a7016f",
+  "seconds": 3.402667,
+  "rmsDb": -34.118021,
+  "peakDb": -20.615942,
+  "brightness": 0.127277,
+  "stereoWidth": 1.011184
+}

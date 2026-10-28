@@ -2,10 +2,12 @@
 
 #include "analysis/Analyzer.h"
 #include "core/Fft.h"
+#include "engine/AtlasSet.h"
 #include "engine/InstrumentBuilder.h"
 #include "io/AnalysisJson.h"
 #include "io/AudioFileIO.h"
 #include "io/ContentHash.h"
+#include "io/NoteAtlasJson.h"
 #include "model/PlaybackPreparation.h"
 #include "model/RootChoice.h"
 
@@ -459,6 +461,142 @@ LoadResult loadInstrumentSet (const SetLoadRequest& request, SampleStore& store,
     catch (...)
     {
         result.error = "unexpected error while loading the set";
+    }
+    return result;
+}
+
+LoadResult loadInstrumentAtlas (const AtlasLoadRequest& request, SampleStore& store, std::uint64_t generation)
+{
+    LoadResult result;
+    try
+    {
+        const auto& atlas = request.atlas;
+        if (const auto report = atlas::validate (atlas); ! report.ok())
+        {
+            result.error = "the Note Atlas is not valid: " + report.errors.front();
+            return result;
+        }
+        std::vector<atlasset::SourceAudio> sources;
+        const AudioData* primaryAudio = nullptr;
+        // The instrument keeps the atlas as found: a source relinked through its hints keeps
+        // its new location (and, found by shape only, its new fingerprint), as io::relinkSource.
+        auto resolvedAtlas = std::make_shared<atlas::NoteAtlas> (atlas);
+        std::vector<LoadedInstrument::MemberFile> instrumentSources;
+        for (const auto& src : atlas.sources)
+        {
+            const bool used = std::any_of (atlas.notes.begin(), atlas.notes.end(), [&] (const auto& n) { return n.included && n.sourceId == src.assetId; });
+            if (! used)
+                continue;
+            const auto describe = src.assetId + ": " + (src.fileName.empty() ? std::string ("(unnamed)") : src.fileName) + " (" + src.contentHash + ")";
+            // 1. By content hash in the managed store, then the atlas's own hints.
+            const auto hash = src.contentHash.rfind ("sha256:", 0) == 0 ? src.contentHash.substr (7) : src.contentHash;
+            std::optional<std::filesystem::path> found;
+            bool exact = false, fromStore = false;
+            if (auto stored = store.find (hash))
+            {
+                found = toPath (*stored);
+                exact = fromStore = true;
+            }
+            else
+            {
+                std::vector<std::filesystem::path> search;
+                for (const auto& f : request.searchFolders)
+                    search.emplace_back (f);
+                if (auto resolved = io::resolveSource (src, std::filesystem::path (request.atlasFolder), search))
+                {
+                    found = resolved->path;
+                    exact = resolved->match == atlas::RelinkResult::exact;
+                }
+            }
+            if (! found)
+            {
+                result.missingSources.push_back (describe);
+                continue;
+            }
+            // 2. Decode and check the shape: positions are frames.
+            auto decoded = io::loadAudioFile (*found);
+            if (! decoded.ok)
+            {
+                result.missingSources.push_back (describe + ": " + decoded.error);
+                continue;
+            }
+            if (decoded.audio.numFrames() != src.numFrames || std::abs (decoded.audio.sampleRate - src.sampleRate) > 1.0e-6
+                || std::min (decoded.audio.numChannels(), 2) != src.numChannels)
+            {
+                result.missingSources.push_back (describe + ": the file found does not match the recording (rate, channels or length)");
+                continue;
+            }
+            if (! exact)
+                result.warnings.push_back ("source " + describe + " was found by its shape, not its exact content");
+            // 3. Keep a managed copy (by its own hash) so the session survives the file moving.
+            const auto fileHash = io::sha256OfFile (*found);
+            if (fileHash)
+            {
+                std::string error;
+                if (! store.import (juce::File (juce::String (found->string())), *fileHash, error))
+                    result.warnings.push_back (error);
+            }
+            auto kept = std::find_if (resolvedAtlas->sources.begin(), resolvedAtlas->sources.end(), [&] (const auto& s) { return s.assetId == src.assetId; });
+            if (! fromStore)
+            {
+                std::error_code ec;
+                kept->lastKnownPath = std::filesystem::absolute (*found, ec).string();
+            }
+            if (! exact && fileHash)
+                kept->contentHash = io::contentId (*fileHash);
+            instrumentSources.push_back ({ fileHash ? io::contentId (*fileHash) : src.contentHash, src.fileName, kept->lastKnownPath });
+            auto audio = std::make_shared<const AudioData> (std::move (decoded.audio));
+            if (primaryAudio == nullptr)
+                primaryAudio = audio.get();
+            sources.push_back ({ src.assetId, std::move (audio) });
+        }
+        if (! result.missingSources.empty())
+        {
+            result.error = "audio missing for the Note Atlas: " + result.missingSources.front()
+                           + (result.missingSources.size() > 1 ? " (and " + std::to_string (result.missingSources.size() - 1) + " more)" : std::string());
+            return result;
+        }
+
+        atlasset::BuildOptions options;
+        options.instrument.interpolationZeroCrossings = playbackZeroCrossings;
+        const auto built = atlasset::buildInstrumentSet (atlas, sources, options);
+        result.warnings.insert (result.warnings.end(), built.report.warnings.begin(), built.report.warnings.end());
+        if (built.set == nullptr)
+        {
+            result.error = built.report.errors.empty() ? std::string ("the Note Atlas could not be built") : built.report.errors.front();
+            return result;
+        }
+        const auto& set = *built.set;
+        const auto& primary = set.members[static_cast<std::size_t> (set.primary)];
+        auto instrument = std::make_shared<LoadedInstrument>();
+        instrument->generation = generation;
+        instrument->loadId = generation;
+        const auto* primarySource = atlas.findSource (primary.sourceAssetId);
+        instrument->contentHash = primarySource != nullptr ? primarySource->contentHash : std::string();
+        instrument->filename = std::to_string (set.members.size()) + " notes" + (primarySource != nullptr ? " · " + primarySource->fileName : std::string());
+        instrument->originalPath = primarySource != nullptr ? primarySource->lastKnownPath : std::string();
+        instrument->analysis = primary.model->analysis;
+        instrument->analysisRootMidi = primary.model->rootMidi;
+        instrument->rootOrigin = "atlas";
+        instrument->startSeconds = 0.0;
+        instrument->playbackGainDb = primary.model->playback.gainDb;
+        instrument->model = primary.model;
+        instrument->set = built.set;
+        instrument->atlas = std::move (resolvedAtlas);
+        instrument->atlasSources = std::move (instrumentSources);
+        instrument->character = describeCharacter (instrument->analysis);
+        for (const auto& s : sources)
+            if (s.assetId == primary.sourceAssetId)
+                computeOverview (*instrument, *s.audio);
+        result.instrument = std::move (instrument);
+    }
+    catch (const std::exception& e)
+    {
+        result.error = std::string ("unexpected error while loading the Note Atlas: ") + e.what();
+    }
+    catch (...)
+    {
+        result.error = "unexpected error while loading the Note Atlas";
     }
     return result;
 }

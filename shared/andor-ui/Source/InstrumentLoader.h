@@ -4,6 +4,7 @@
 
 #include "core/AudioData.h"
 #include "engine/SampleSetInference.h"
+#include "model/NoteAtlas.h"
 
 #include <juce_core/juce_core.h>
 
@@ -67,12 +68,30 @@ struct SetLoadRequest
     std::vector<SetAssignment> assignments;  ///< user corrections from the Samples inspector
 };
 
+/**
+    A Note Atlas for one layer (unified engine Phase 3): its notes become a multi-sample
+    instrument built from region copies of its source assets (engine/AtlasSet). The audio is
+    found by content hash - the managed sample store first (where imports, Library assets and,
+    later, finalised live captures live), then the atlas's path hints (relative to
+    `atlasFolder`, the last known path, the managed copy, `searchFolders` by name). A found
+    file must be the asset (same hash) or at least its shape (rate, channels, length).
+*/
+struct AtlasLoadRequest
+{
+    atlas::NoteAtlas atlas;
+    std::string atlasFolder;                  ///< where a stand-alone .andoratlas was read from (relative hints)
+    std::vector<std::string> searchFolders;   ///< extra folders to look in by file name
+};
+
 struct LoadResult
 {
     std::shared_ptr<const LoadedInstrument> instrument;  ///< null on failure
     std::shared_ptr<const AudioData> audio;              ///< decoded source, kept for the next model stages
     std::string error;
     std::vector<std::string> warnings;
+    /** Atlas loads: the sources whose audio was not found (the load then fails: a session must
+        never look restored without its audio). "<asset id>: <name> (<hash>)". */
+    std::vector<std::string> missingSources;
 };
 
 /**
@@ -93,6 +112,13 @@ LoadResult refineInstrument (const LoadedInstrument& base, std::shared_ptr<const
     Files that fail are skipped with a warning; fails only if no file loads.
 */
 LoadResult loadInstrumentSet (const SetLoadRequest& request, SampleStore& store, std::uint64_t generation);
+
+/**
+    A Note Atlas -> one multi-sample instrument (Phase 3): finds and decodes every source the
+    atlas plays (keeping a managed copy, by hash), builds the set from region copies. Fails -
+    with `missingSources` - when any source's audio cannot be found or does not match.
+*/
+LoadResult loadInstrumentAtlas (const AtlasLoadRequest& request, SampleStore& store, std::uint64_t generation);
 
 /** Re-infers the current set with new user assignments (no re-analysis). */
 LoadResult reassignInstrumentSet (const LoadedInstrument& base, const std::vector<SetAssignment>& assignments, std::uint64_t generation);

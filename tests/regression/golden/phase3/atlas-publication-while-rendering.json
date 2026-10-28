@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "atlas-publication-while-rendering",
+  "description": "layer A's atlas replaced every 0.25 s (sung <-> bowed) while a chord is held and notes start",
+  "midi": "held-and-new",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "2c49b0ebd8e2655e",
+  "seconds": 3.818667,
+  "rmsDb": -33.888412,
+  "peakDb": -17.837973,
+  "brightness": 0.138595,
+  "stereoWidth": 1.149498
+}

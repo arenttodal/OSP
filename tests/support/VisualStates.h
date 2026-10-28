@@ -69,7 +69,11 @@ namespace visualstates
         const auto sounds = writeSounds (scratch);
         auto shoot = [&] (juce::AudioProcessorEditor& e, Editor& u, const juce::String& name, float scale = 1.0f) {
             u.refreshNow();
-            savePng (e.createComponentSnapshot (e.getLocalBounds(), true, scale), out.getChildFile (name + ".png"));
+            // JUCE's own software renderer, not the platform's: by default the snapshot is a native
+            // image, CoreGraphics on macOS, where two renders of the same state differed by a channel
+            // level or two now and then (runs 151 and 164). On Linux the native image is this
+            // renderer already, so the pictures there are unchanged.
+            savePng (e.createComponentSnapshot (e.getLocalBounds(), true, scale, juce::SoftwareImageType()), out.getChildFile (name + ".png"));
         };
         auto open = [] (Processor& p) {
             std::unique_ptr<juce::AudioProcessorEditor> e (p.createEditorIfNeeded());

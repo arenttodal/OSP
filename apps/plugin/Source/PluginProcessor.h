@@ -194,6 +194,19 @@ public:
     void loadExample (int layer = -1);
     /** Empties a layer (it then contributes silence). */
     void clearLayer (int layer = -1);
+    /**
+        A Note Atlas on a layer (unified engine Phase 3): its notes become the layer's
+        multi-sample instrument, built on the loader thread (InstrumentLoader's
+        loadInstrumentAtlas) and published like any sound. Its audio is found by content hash
+        in the sample store, then through the atlas's hints (`atlasFolder`: where a stand-alone
+        .andoratlas was read from). Missing audio fails the load (missingSources).
+    */
+    void loadAtlas (const atlas::NoteAtlas& atlas, int layer = -1, const std::string& atlasFolder = {});
+    /** The sources the layer's last Atlas load could not find (empty when it loaded). */
+    std::vector<std::string> missingSources (int layer = -1) const;
+    /** The grain budget's policy (state v14; new sessions bounded, older ones shared). */
+    bool isGrainBudgetBounded() const noexcept { return boundedGrainBudget.load(); }
+    void setGrainBudgetBounded (bool bounded) noexcept { boundedGrainBudget = bounded; }
 
     // Adaptive layers (message thread). A layer is occupied while it holds or loads a sound;
     // the instrument shows one card per occupied layer, and they are kept contiguous
@@ -371,8 +384,12 @@ public:
         13: the unified engine's Phase 2: each layer's KEY DNA (the `KeyDna` child, its own
             schemaVersion; absent: none), the grain options SCATTER / PAN / WINDOW and KEY DNA
             AMOUNT (parameters, hint 20; absent: neutral) and the grain budget (absent, i.e.
-            any older session or preset: Unlimited, the original grains). */
-    static constexpr int stateVersion = 13;
+            any older session or preset: Unlimited, the original grains).
+        14: the unified engine's Phase 3: a layer can hold a Note Atlas (its `Instrument` tree's
+            `Atlas` child: the atlas JSON, own schemaVersion; the audio stays in the sample store,
+            referenced by hash), and the grain budget's policy (`grainBudgetPolicy`; absent, i.e.
+            any older session: `shared`, Phase 2's; new sessions `bounded`, never above the budget). */
+    static constexpr int stateVersion = 14;
 
     /** KEY DNA (message thread): a layer's per-key identity. Its profile (all 128 keys) is
         computed here and handed to the audio thread through a ModelExchange; new notes take
@@ -420,6 +437,9 @@ private:
     void parameterValueChanged (int, float) override {}
     void parameterGestureChanged (int parameterIndex, bool gestureIsStarting) override;
     std::atomic<bool> perLayerReimagined { true };
+    /** The grain budget's policy (state v14): bounded (never above the budget) for new
+        sessions, shared (Phase 2's) for older ones. Message thread writes, audio thread reads. */
+    std::atomic<bool> boundedGrainBudget { true };
     /** Every layer's REIMAGINED amount, mode and mode setting: a gesture on any converts a legacy patch. */
     std::vector<juce::AudioProcessorParameter*> reimaginedParameters;
 
@@ -432,6 +452,7 @@ private:
         std::atomic<std::uint64_t> latestLoadId { 0 };   // newest load request; older refinements are skipped
         std::atomic<LoadState> state { LoadState::empty };
         bool lastLoadFailed = false;                     // message thread
+        std::vector<std::string> missingSources;         // message thread: the last Atlas load's
         // Root override (message -> audio)
         std::atomic<double> rootShiftSemitones { 0.0 };
         std::atomic<bool> hasRootOverride { false };
@@ -453,6 +474,10 @@ private:
     void enqueueLoad (LoadRequest request, int layer);
     void enqueueRefine (std::shared_ptr<const LoadedInstrument> base, std::shared_ptr<const AudioData> audio, int layer);
     void enqueueSetLoad (SetLoadRequest request, int layer);
+    void enqueueAtlasLoad (AtlasLoadRequest request, int layer);
+    /** Publishes an instrument without a model (the layer plays nothing; sounding voices finish
+        on the old one). Layer controls are untouched (clearLayer also resets those). */
+    void publishEmpty (std::size_t index);
     std::unique_ptr<juce::XmlElement> createStateXml();
     /** `settingsOnly`: parameters (with migrations) and kept slots; sounds and UI state untouched. */
     void applyStateXml (const juce::XmlElement& xml, bool settingsOnly = false);

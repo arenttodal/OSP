@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "atlas-legato-line",
+  "description": "a line on four notes recorded legato (regions on adjacent frames)",
+  "midi": "legato-line",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "a47c9b1b31999b7e",
+  "seconds": 1.936,
+  "rmsDb": -32.038539,
+  "peakDb": -21.991203,
+  "brightness": 0.128462,
+  "stereoWidth": 1.98442
+}

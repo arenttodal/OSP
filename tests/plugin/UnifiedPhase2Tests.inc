@@ -250,7 +250,7 @@ TEST_CASE ("plugin: KEY DNA is saved in the session and reopens exactly", "[plug
     {
         auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
         REQUIRE (xml != nullptr);
-        CHECK (xml->getIntAttribute ("stateVersion") == 13);
+        CHECK (xml->getIntAttribute ("stateVersion") == OspAudioProcessor::stateVersion);
         const auto* dna = xml->getChildByName ("KeyDna");
         REQUIRE (dna != nullptr);
         CHECK (dna->getIntAttribute ("schemaVersion") == 1);

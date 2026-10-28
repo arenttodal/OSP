@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "atlas-granular-keydna-chord8",
+  "description": "Granular + expressive KEY DNA, an eight-note chord (FILL beyond the recorded range is silent)",
+  "midi": "chord8-c",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "fbf6a24c839d68a7",
+  "seconds": 2.266667,
+  "rmsDb": -26.09064,
+  "peakDb": -13.304453,
+  "brightness": 0.124743,
+  "stereoWidth": 0.749293
+}

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "atlas-out-of-tune-corrected",
+  "description": "notes recorded 35 cents sharp, 40 flat, 12 sharp, played in tune",
+  "midi": "tuning-c-major",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "f8416f0b5d70d9ba",
+  "seconds": 3.402667,
+  "rmsDb": -34.187411,
+  "peakDb": -21.694626,
+  "brightness": 0.127256,
+  "stereoWidth": 0.76443
+}

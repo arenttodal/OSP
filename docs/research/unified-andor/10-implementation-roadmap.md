@@ -53,6 +53,12 @@ Every phase follows the same pattern:
 
 ### Phase 3: Note Atlas as a set source
 
+> **Done** (phase-3-report.md), with stateVersion 14 as planned. Beyond the plan: the atlas
+> model gained asset origins (live captures and snapshots are first-class, paths are hints),
+> velocity layers, note origins and FILL settings (schema 2); a session's missing recordings
+> leave the layer empty and failed rather than restored; and the grain budget gained a
+> `bounded` policy (never above the budget), the default for new sessions.
+
 | | |
 |---|---|
 | **New** | `src/model/NoteAtlas.h` and `src/io/NoteAtlasJson.*` (ported). `src/engine/AtlasSet.*` (atlas → `InstrumentSet` with region copies). A FILL limit and assigned keys in `memberFor`. stateVersion 14 (13 is Phase 2's) with the atlas JSON per layer. Documentation in `analysis-schema.md`. |

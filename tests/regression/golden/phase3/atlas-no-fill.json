@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "atlas-no-fill",
+  "description": "FILL off: only the recorded keys sound",
+  "midi": "sweep-c2-c6",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "e33a53a81face5d",
+  "seconds": 3.792,
+  "rmsDb": -46.231576,
+  "peakDb": -25.6159,
+  "brightness": 0.139,
+  "stereoWidth": 0.248021
+}

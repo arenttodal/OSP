@@ -168,3 +168,42 @@ TEST_CASE ("Phase 2 demonstrations: the grain options, live KEY DNA AMOUNT and t
         }
     }
 }
+
+TEST_CASE ("Phase 3 demonstrations: Note Atlases through OSP's voices, as stored", "[regression][phase3-demos]")
+{
+    // research-renderer --unified <dir> --set atlas, pinned like the Phase 2 demonstrations
+    // (the 50-region atlas is a cost scenario only: it takes a while to build).
+    const auto scenes = unified::atlasScenes();
+    REQUIRE (scenes.size() == 22);
+    const auto platform = unified::platformTag();
+    for (const auto& scene : scenes)
+    {
+        if (scene.name == "atlas-regions-50-chord8")
+            continue;
+        DYNAMIC_SECTION (scene.name)
+        {
+            const auto d = unified::digest (unified::render (scene).audio);
+            REQUIRE (unified::digest (unified::render (scene).audio).hash == d.hash);
+            const auto path = std::filesystem::path (OSP_SOURCE_DIR) / "tests" / "regression" / "golden" / "phase3" / (scene.name + ".json");
+            if (updateGolden())
+            {
+                std::filesystem::create_directories (path.parent_path());
+                std::string error;
+                REQUIRE (json::writeFile (path, unified::digestToJson (scene, d, platform), error));
+                continue;
+            }
+            std::string error;
+            const auto stored = json::readFile (path, error);
+            INFO ("missing golden " << path.string() << "; run with OSP_UPDATE_GOLDEN=1");
+            REQUIRE (stored.has_value());
+            const auto& golden = *stored;
+            if (json::getString (golden, "platform") == platform)
+                CHECK (json::getString (golden, "sampleHash") == d.hash);
+            else if (json::getString (golden, "sampleHash") != d.hash)
+                WARN (scene.name << ": not bit-identical to the " << json::getString (golden, "platform") << " render (this is " << platform << ")");
+            CHECK (d.rmsDb == Approx (json::getDouble (golden, "rmsDb", -1.0e9)).margin (0.05));
+            CHECK (d.peakDb == Approx (json::getDouble (golden, "peakDb", -1.0e9)).margin (0.1));
+            CHECK (d.brightness == Approx (json::getDouble (golden, "brightness", -1.0e9)).epsilon (0.01));
+        }
+    }
+}

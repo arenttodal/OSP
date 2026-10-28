@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "atlas-rapid-repeats",
+  "description": "D4 sixteen times, fast: the three recorded takes in round robin, never the same twice in a row",
+  "midi": "repeats-d4x16",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "32ed9b5d802610ac",
+  "seconds": 2.48,
+  "rmsDb": -42.150974,
+  "peakDb": -28.578167,
+  "brightness": 0.154061,
+  "stereoWidth": 1.151258
+}

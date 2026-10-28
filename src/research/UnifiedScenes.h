@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/AudioData.h"
+#include "engine/AtlasSet.h"
 #include "engine/KeyDna.h"
 #include "midi/MidiEvent.h"
 #include "research/RenderConfig.h"
@@ -41,6 +42,9 @@ AudioData sourceAudio (SourceId id);
 struct LayerSpec
 {
     SourceId source = SourceId::vowelA3;
+    /** Phase 3: a Note Atlas fixture (research/AtlasFixtures: "sung-four", ..., or "regions-<n>"
+        for n one-second notes) whose set the layer plays instead of `source`. */
+    std::string atlas = {};
 };
 
 struct Scene
@@ -50,6 +54,11 @@ struct Scene
     std::vector<LayerSpec> layers;   ///< 1..3: A, B, C (the engine's source mode, granular and layer settings are in config)
     RenderConfig config;
     MidiSequence midi;
+    /** Phase 3, publication while rendering: every `swapEverySeconds`, layer A's set is replaced
+        (on the render thread, between blocks, as the plugin's exchange hands it over) by this
+        atlas's, then back. Sounding notes keep the set they started on. */
+    std::string swapAtlas = {};
+    double swapEverySeconds = 0.0;
 };
 
 /** Every baseline scene, in a fixed order (append only). */
@@ -84,6 +93,19 @@ keydna::Settings scatterPanKeyDna();
 /** Grain-budget stress (--set budget): three dense Granular layers (DENS 40, SIZE 400 ms, KALEIDOSCOPE
     doubling on C) playing an eight-note chord, once per budget: unlimited, 512, 384, 256, 192, 128, 96, 64. */
 std::vector<Scene> budgetScenes();
+
+/**
+    The Note Atlas scenes (Phase 3, --set atlas): prepared atlases (research/AtlasFixtures, no
+    analysis) played through OSP's own voices - One Shot, Granular, KEY DNA, three atlases on
+    A/B/C, heavy polyphony, rapid repeats, atlases of 10 and 50 regions, and an atlas replaced
+    while its notes sound.
+*/
+std::vector<Scene> atlasScenes();
+/** The sets of the scene's atlas layers (null for a layer playing a source); built once per
+    atlas and kept for the process. */
+std::array<const InstrumentSet*, 3> setsFor (const Scene& scene);
+/** How an atlas fixture's set was built (memory, time, notes), from the cache. */
+atlasset::BuildReport atlasReport (const std::string& atlas);
 
 /** What one key does on its own: its profile, and what its grains measurably did. */
 struct KeyMeasure

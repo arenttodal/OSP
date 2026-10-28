@@ -222,6 +222,8 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     if (granularMode)
     {
         setGrainCap (params.grainCap);
+        granularSource.setGrainGate (params.grainGate);
+        doubleSource.setGrainGate (params.grainGate);
         granularSource.start (*layer->source, notesGranular(), sampleRate, shape.seed, &currentModel->analysis.envelope,
                               currentModel->analysis.source.durationSeconds);
     }

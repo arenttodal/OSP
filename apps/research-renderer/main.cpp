@@ -5,11 +5,15 @@
 #include "core/PitchMath.h"
 #include "io/AnalysisJson.h"
 #include "io/AudioFileIO.h"
+#include "io/ContentHash.h"
 #include "io/JsonUtil.h"
+#include "io/NoteAtlasJson.h"
 #include "midi/MidiFileIO.h"
 #include "midi/MidiFixtures.h"
+#include "engine/AtlasSet.h"
 #include "engine/InstrumentBuilder.h"
 #include "engine/InstrumentEngine.h"
+#include "research/AtlasFixtures.h"
 #include "research/Bakeoff.h"
 #include "research/Experiment.h"
 #include "research/Benchmark.h"
@@ -85,10 +89,21 @@ PITCH BAKE-OFF (Phase 2)
   --continuation-report <file|dir>            stable region, jumps and release per file
 
 UNIFIED ENGINE (docs/research/unified-andor)
-  --unified <dir> [--set baseline|keydna|phase2|budget] [--with-keydna organic|expressive] [--scene <name>] [--repeats 3] [--no-audio]
+  --unified <dir> [--set baseline|keydna|phase2|budget|atlas] [--with-keydna organic|expressive] [--scene <name>] [--repeats 3] [--no-audio]
                                               renders the baseline scenes or the KEY DNA demonstrations
                                               (src/research/UnifiedScenes.cpp): <scene>.wav, <scene>.json
-                                              (digest), costs.json, summary.md (keydna: also keys.md)
+                                              (digest), costs.json, summary.md (keydna: also keys.md;
+                                              atlas: also atlas.md / atlas.json - memory, build time,
+                                              lookup cost - and baseline A/B renders of the melody)
+
+NOTE ATLAS (Phase 3; docs/research/unified-andor/phase-3-report.md)
+  --atlas <file.andoratlas> (--midi <file.mid> | --fixture <name>) --output <out.wav>
+        [--mode oneshot|granular] [--search <dir>] [--config <f>] [--seed <n>] [--block-size <n>]
+        [--max-transpose <semitones>] [--no-fill] [--as-recorded]
+        Plays a prepared atlas (its notes placed by hand or by a later analysis) through engine C:
+        the developer harness for real recordings. Its audio is found by content hash via the
+        atlas's paths (relative to the atlas file) and --search. Fixtures use the lowest note as reference.
+  --write-atlas-fixtures <dir>                writes the synthetic test atlases (WAV + .andoratlas)
 
 BENCHMARK
   --benchmark [--engine A|C] [--voices 24] [--seconds 20] [--sample-rate 48000] [--block-size 128] [--output-json <f>] [--no-retrigger] [--transpose <semitones>]
@@ -112,7 +127,7 @@ struct Args
     }
 };
 
-const std::set<std::string> flagOptions = { "--help", "--version", "--benchmark", "--no-audio", "--strict", "--no-retrigger" };
+const std::set<std::string> flagOptions = { "--help", "--version", "--benchmark", "--no-audio", "--strict", "--no-retrigger", "--no-fill", "--as-recorded" };
 
 std::optional<Args> parseArgs (int argc, char** argv, std::string& error)
 {
@@ -480,6 +495,115 @@ int commandIndex (const Args& args)
     return exitOk;
 }
 
+/** --set atlas's extras: each atlas's memory and build time, how memory and lookup scale with
+    the number of regions, and the melody through baselines A and B (one recorded note, resampled). */
+int writeAtlasReport (const fs::path& dir, const std::vector<unified::Scene>& scenes, bool noAudio)
+{
+    namespace u = unified;
+    std::string error;
+    std::ostringstream md;
+    auto out = json::object();
+    md << "# Note Atlas: memory, preparation, lookup (" << u::platformTag() << ")\n\n"
+       << "Every member owns a copy of its note (attackStart..sourceEnd) as OSP's playback buffers: memory is the "
+          "members' approximateBytes (playback copies, transients, anchors, REIMAGINED data). Build: region copy, analysis, "
+          "model and continuation per member, on one thread.\n\n"
+       << "| Atlas | Notes | Region audio s | Member MB | MB per region second | Build ms | ms per note |\n|---|---|---|---|---|---|---|\n";
+    std::set<std::string> atlases;
+    for (const auto& scene : scenes)
+    {
+        for (const auto& layer : scene.layers)
+            if (! layer.atlas.empty())
+                atlases.insert (layer.atlas);
+        if (! scene.swapAtlas.empty())
+            atlases.insert (scene.swapAtlas);
+    }
+    auto rows = juce::var (juce::Array<juce::var>());
+    auto row = [&] (const std::string& name, const atlasset::BuildReport& r) {
+        const double seconds = static_cast<double> (r.regionFrames) / 48000.0;
+        const double mb = static_cast<double> (r.memberBytes) / (1024.0 * 1024.0);
+        md << "| " << name << " | " << r.notesUsed << " | " << json::round (seconds, 2) << " | " << json::round (mb, 2) << " | "
+           << json::round (seconds > 0.0 ? mb / seconds : 0.0, 3) << " | " << json::round (r.buildMilliseconds, 1) << " | "
+           << json::round (r.notesUsed > 0 ? r.buildMilliseconds / r.notesUsed : 0.0, 1) << " |\n";
+        auto o = json::object();
+        json::set (o, "atlas", json::str (name));
+        json::set (o, "notes", r.notesUsed);
+        json::set (o, "regionSeconds", json::number (seconds, 3));
+        json::set (o, "memberBytes", static_cast<juce::int64> (r.memberBytes));
+        json::set (o, "buildMilliseconds", json::number (r.buildMilliseconds, 2));
+        rows.append (o);
+    };
+    for (const auto& a : atlases)
+        row (a, u::atlasReport (a));
+    // Scaling: more regions (one second each, stereo, 12 keys): memory, build time, lookup.
+    md << "\n## Scaling with the number of regions\n\n"
+       << "| Regions | Member MB | Build ms | Peak RSS after, MB | Lookup ns (groupFor, per key) |\n|---|---|---|---|---|\n";
+    auto scaling = juce::var (juce::Array<juce::var>());
+    for (int count : { 10, 50, 200 })
+    {
+        const auto name = "regions-" + std::to_string (count);
+        const auto report = u::atlasReport (name);
+        u::Scene probe;
+        probe.layers = { u::LayerSpec { u::SourceId::vowelA3, name } };
+        const auto* set = u::setsFor (probe)[0];
+        double lookupNs = 0.0;
+        if (set != nullptr)
+        {
+            // Every key, many times: the note-on path's group choice (members are then picked by
+            // velocity and take within the group).
+            volatile int sink = 0;
+            const int rounds = 20000;
+            const auto t0 = std::chrono::steady_clock::now();
+            for (int r = 0; r < rounds; ++r)
+                for (int key = 0; key < 128; ++key)
+                    sink = sink + set->groupFor (key);
+            lookupNs = std::chrono::duration<double, std::nano> (std::chrono::steady_clock::now() - t0).count() / (rounds * 128.0);
+        }
+        md << "| " << count << " | " << json::round (static_cast<double> (report.memberBytes) / (1024.0 * 1024.0), 2) << " | "
+           << json::round (report.buildMilliseconds, 1) << " | " << json::round (u::peakResidentMegabytes(), 1) << " | " << json::round (lookupNs, 1) << " |\n";
+        auto o = json::object();
+        json::set (o, "regions", count);
+        json::set (o, "memberBytes", static_cast<juce::int64> (report.memberBytes));
+        json::set (o, "buildMilliseconds", json::number (report.buildMilliseconds, 2));
+        json::set (o, "peakResidentMegabytes", json::number (u::peakResidentMegabytes(), 1));
+        json::set (o, "lookupNanoseconds", json::number (lookupNs, 2));
+        scaling.append (o);
+    }
+    json::set (out, "atlases", rows);
+    json::set (out, "scaling", scaling);
+
+    // Baselines A and B: the melody from one recorded note (the atlas's A3), resampled.
+    if (const auto* melody = u::findScene (scenes, "atlas-oneshot-melody"))
+    {
+        const auto fixture = atlasfixtures::make ("sung-four");
+        const auto& note = fixture.atlas.notes.front();
+        const auto& audio = *fixture.audio.front().audio;
+        auto region = AudioData::allocate (audio.numChannels(), note.sourceEnd - note.attackStart, audio.sampleRate);
+        for (int c = 0; c < audio.numChannels(); ++c)
+            std::copy (audio.channels[static_cast<std::size_t> (c)].begin() + note.attackStart, audio.channels[static_cast<std::size_t> (c)].begin() + note.sourceEnd,
+                       region.channels[static_cast<std::size_t> (c)].begin());
+        md << "\n## Baselines A and B (the melody from the recorded A3 alone)\n\n| Render | RMS dB | Hash |\n|---|---|---|\n";
+        for (const auto engine : { EngineId::baselineA, EngineId::baselineB })
+        {
+            RenderConfig c;
+            c.engine = engine;
+            c.sampleRate = 48000.0;
+            c.blockSize = 256;
+            c.maxTailSeconds = 4.0;
+            c.sampler.seed = 1;
+            const auto rendered = renderSequence (region, note.midiPitch, melody->midi, c);
+            const auto d = u::digest (rendered.audio);
+            const std::string name = std::string ("atlas-melody-baseline-") + (engine == EngineId::baselineA ? "a" : "b");
+            md << "| " << name << " | " << json::round (d.rmsDb, 2) << " | `" << d.hash << "` |\n";
+            if (! noAudio && ! io::writeAudioFile (dir / (name + ".wav"), rendered.audio, io::SampleFormat::float32, error))
+                return fail (exitProcessing, error);
+        }
+    }
+    std::ofstream (dir / "atlas.md") << md.str();
+    if (! json::writeFile (dir / "atlas.json", out, error))
+        return fail (exitProcessing, error);
+    return exitOk;
+}
+
 int commandUnified (const Args& args)
 {
     namespace u = unified;
@@ -487,11 +611,12 @@ int commandUnified (const Args& args)
     std::error_code ec;
     fs::create_directories (dir, ec);
     const auto set = args.get ("--set", "baseline");
-    if (set != "baseline" && set != "keydna" && set != "phase2" && set != "budget")
-        return fail (exitUsage, "--set is baseline, keydna, phase2 or budget");
+    if (set != "baseline" && set != "keydna" && set != "phase2" && set != "budget" && set != "atlas")
+        return fail (exitUsage, "--set is baseline, keydna, phase2, budget or atlas");
     auto scenes = set == "keydna" ? u::keyDnaScenes()
                 : set == "phase2" ? u::phase2Scenes()
                 : set == "budget" ? u::budgetScenes()
+                : set == "atlas"  ? u::atlasScenes()
                                   : u::baselineScenes();
     // --with-keydna organic|expressive: the same scenes with that profile on every layer (cost and
     // sound of KEY DNA on the baseline's own material).
@@ -605,10 +730,134 @@ int commandUnified (const Args& args)
         if (! json::writeFile (dir / "keys.json", keysJson, error))
             return fail (exitProcessing, error);
     }
+    if (set == "atlas" && only.empty())
+        if (const auto code = writeAtlasReport (dir, scenes, args.has ("--no-audio")); code != exitOk)
+            return code;
     md << "\nPeak resident memory of the renderer: " << json::round (u::peakResidentMegabytes(), 1) << " MB. InstrumentEngine object: "
        << sizeof (InstrumentEngine) << " bytes (InstrumentVoice " << sizeof (InstrumentVoice) << " bytes each).\n";
     std::ofstream (dir / "summary.md") << md.str();
     std::cout << rendered << " scenes -> " << dir.string() << "\n";
+    return exitOk;
+}
+
+int commandAtlas (const Args& args)
+{
+    if (! args.has ("--output"))
+        return fail (exitUsage, "--output <file.wav> is required");
+    if (args.has ("--midi") == args.has ("--fixture"))
+        return fail (exitUsage, "give exactly one of --midi <file> or --fixture <name>");
+    std::string error;
+    const fs::path path = args.get ("--atlas");
+    auto atlas = io::readNoteAtlas (path, error);
+    if (! atlas)
+        return fail (exitInput, error);
+    if (args.has ("--max-transpose"))
+    {
+        const auto v = parseNumber (args.get ("--max-transpose"));
+        if (! v || *v < 0.0)
+            return fail (exitUsage, "invalid --max-transpose");
+        atlas->mapping.maxTransposeSemitones = *v;
+    }
+    if (args.has ("--no-fill"))
+        atlas->mapping.fill = false;
+    if (args.has ("--as-recorded"))
+        atlas->mapping.correctTuning = false;
+    auto config = configFromArgs (args, error);
+    if (! config)
+        return fail (exitUsage, error);
+    config->engine = EngineId::instrument;
+    if (config->sampleRate <= 0.0)
+        config->sampleRate = 48000.0;
+    if (args.get ("--mode", "oneshot") == "granular")
+        config->engineSettings.sourceMode[0] = SourceMode::granular;
+
+    // The audio: by content hash through the atlas's own hints, then --search.
+    std::vector<fs::path> search;
+    if (args.has ("--search"))
+        search.emplace_back (args.get ("--search"));
+    std::vector<atlasset::SourceAudio> sources;
+    for (const auto& src : atlas->sources)
+    {
+        const auto resolved = io::resolveSource (src, path.parent_path(), search);
+        if (! resolved)
+        {
+            std::cerr << "missing: " << src.assetId << " (" << src.fileName << ", " << src.contentHash << ")\n";
+            continue;
+        }
+        if (resolved->match != atlas::RelinkResult::exact)
+            std::cerr << "warning: " << src.assetId << " found by its shape, not its exact content: " << resolved->path.string() << "\n";
+        auto decoded = io::loadAudioFile (resolved->path);
+        if (! decoded.ok)
+            return fail (exitInput, decoded.error);
+        sources.push_back ({ src.assetId, std::make_shared<const AudioData> (std::move (decoded.audio)) });
+    }
+    atlasset::BuildOptions options;
+    options.instrument.interpolationZeroCrossings = config->engineSettings.interpolationZeroCrossings;
+    options.instrument.seed = config->engineSettings.seed;
+    const auto built = atlasset::buildInstrumentSet (*atlas, sources, options);
+    for (const auto& w : built.report.warnings)
+        std::cerr << "warning: " << w << "\n";
+    if (built.set == nullptr)
+        return fail (exitProcessing, built.report.errors.empty() ? std::string ("the atlas could not be built") : built.report.errors.front());
+    std::cout << "atlas " << atlas->atlasId << ": " << built.report.notesUsed << " notes (" << built.report.notesSkipped << " skipped), "
+              << json::round (static_cast<double> (built.report.memberBytes) / (1024.0 * 1024.0), 2) << " MB, built in "
+              << json::round (built.report.buildMilliseconds, 1) << " ms; FILL " << (atlas->mapping.fill ? "on" : "off") << ", max "
+              << atlas->mapping.maxTransposeSemitones << " semitones, " << (atlas->mapping.correctTuning ? "in tune" : "as recorded") << "\n";
+
+    MidiSequence sequence;
+    if (args.has ("--midi"))
+    {
+        auto midi = io::readMidiFile (args.get ("--midi"), error);
+        if (! midi)
+            return fail (exitInput, error);
+        sequence = std::move (*midi);
+    }
+    else
+    {
+        int reference = 127;
+        for (const auto& n : atlas->notes)
+            if (n.included)
+                reference = std::min (reference, n.playKey());
+        auto fixture = fixtures::byName (args.get ("--fixture"), reference);
+        if (! fixture)
+            return fail (exitUsage, "unknown fixture '" + args.get ("--fixture") + "'");
+        sequence = std::move (*fixture);
+    }
+    const auto output = renderSet (*built.set, sequence, *config);
+    if (! io::writeAudioFile (args.get ("--output"), output.audio, io::SampleFormat::float32, error))
+        return fail (exitProcessing, error);
+    std::cout << "wrote " << args.get ("--output") << "\n";
+    return exitOk;
+}
+
+int commandWriteAtlasFixtures (const Args& args)
+{
+    const fs::path dir = args.get ("--write-atlas-fixtures");
+    std::error_code ec;
+    fs::create_directories (dir, ec);
+    std::string error;
+    for (const auto& name : atlasfixtures::names())
+    {
+        auto fixture = atlasfixtures::make (name);
+        for (std::size_t i = 0; i < fixture.audio.size(); ++i)
+        {
+            auto& src = fixture.atlas.sources[i];
+            const auto file = dir / (name + (fixture.audio.size() > 1 ? "-" + std::to_string (i) : std::string()) + ".wav");
+            if (! io::writeAudioFile (file, *fixture.audio[i].audio, io::SampleFormat::float32, error))
+                return fail (exitProcessing, error);
+            const auto hash = io::sha256OfFile (file);
+            if (! hash)
+                return fail (exitProcessing, "cannot read " + file.string());
+            src.contentHash = io::contentId (*hash);   // the file is the asset now
+            src.fileName = file.filename().string();
+            src.relativePath = src.fileName;
+            src.lastKnownPath.clear();
+        }
+        const auto atlasFile = dir / (name + io::noteAtlasExtension);
+        if (! io::writeNoteAtlas (atlasFile, fixture.atlas, error))
+            return fail (exitProcessing, error);
+        std::cout << "wrote " << atlasFile.string() << "\n";
+    }
     return exitOk;
 }
 
@@ -691,6 +940,10 @@ int main (int argc, char** argv)
             return commandBenchmark (args);
         if (args.has ("--unified"))
             return commandUnified (args);
+        if (args.has ("--atlas"))
+            return commandAtlas (args);
+        if (args.has ("--write-atlas-fixtures"))
+            return commandWriteAtlasFixtures (args);
         if (args.has ("--bakeoff"))
         {
             const auto plan = loadBakeoffPlan (args.get ("--bakeoff"), error);

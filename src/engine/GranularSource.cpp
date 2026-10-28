@@ -98,7 +98,9 @@ void GranularSource::updateNorm (bool snap) noexcept
     // asked for (sqrt (asked) x the law), spread over the grains actually admitted. Grains
     // already sounding drain (or new ones fill in) over about one grain, so the admitted count
     // the level is divided by glides there instead of stepping.
-    overlapTarget = cap < maxGrains ? std::min (overlap, static_cast<double> (cap)) : overlap;
+    // (a share of 0 - a bounded budget with more streams than grains - lets the stream's
+    // grains drain at the level they had: it is going silent, it must not swell)
+    overlapTarget = cap == 0 ? overlapNow : (cap < maxGrains ? std::min (overlap, static_cast<double> (cap)) : overlap);
     askedLevel = std::sqrt (std::max (1.0, overlap)) / std::max (1.0, 0.612 * std::sqrt (overlap));
     overlapGlide = 1.0 / std::max (1.0, 0.5 * std::clamp (settings.sizeSeconds, 0.005, 1.0) * sampleRate);
     if (snap)
@@ -116,7 +118,7 @@ void GranularSource::glideNorm() noexcept
 
 void GranularSource::setGrainCap (int newCap) noexcept
 {
-    newCap = std::clamp (newCap, 1, maxGrains);
+    newCap = std::clamp (newCap, 0, maxGrains);
     if (newCap == cap)
         return;
     cap = newCap;
@@ -135,6 +137,8 @@ void GranularSource::spawn (double step) noexcept
 {
     if (activeGrains >= cap)
         return;   // the budget's share (24, the whole pool, without a budget)
+    if (gate != nullptr && gate->limit > 0 && gate->live >= gate->limit)
+        return;   // a bounded budget is reached: no grain anywhere until one ends
     Grain* slot = nullptr;
     for (auto& g : grains)
         if (! g.active)
@@ -201,6 +205,8 @@ void GranularSource::spawn (double step) noexcept
     }
     slot->active = true;
     ++activeGrains;
+    if (gate != nullptr)
+        ++gate->live;
     shapedGrains += slot->shaped ? 1 : 0;
 }
 

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "atlas-stereo-wide-granular",
+  "description": "Granular from a wide stereo recording: each grain keeps its own stereo",
+  "midi": "chord-a-d",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "435f9f4198d44e1c",
+  "seconds": 2.144,
+  "rmsDb": -32.025811,
+  "peakDb": -20.151599,
+  "brightness": 0.151088,
+  "stereoWidth": 1.244034
+}

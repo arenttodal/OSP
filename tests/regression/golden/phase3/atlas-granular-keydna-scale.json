@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "atlas-granular-keydna-scale",
+  "description": "Granular + expressive KEY DNA, a scale across recorded and filled keys",
+  "midi": "scale-c3-c4",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "b2917aa57d603041",
+  "seconds": 2.469333,
+  "rmsDb": -37.216378,
+  "peakDb": -24.085945,
+  "brightness": 0.112563,
+  "stereoWidth": 0.827132
+}

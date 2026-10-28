@@ -9,6 +9,7 @@
 #include "core/PitchMath.h"
 #include "io/AudioFileIO.h"
 #include "io/ContentHash.h"
+#include "io/NoteAtlasJson.h"
 #include "library/Inbox.h"
 
 #include <algorithm>
@@ -545,6 +546,8 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
     }
     engineSettings.grainBudget = grainBudgetGrains (grainBudgetParam->load());
     engine.setGrainBudget (engineSettings.grainBudget);
+    engineSettings.grainBudgetPolicy = boundedGrainBudget.load() ? GrainBudgetPolicy::bounded : GrainBudgetPolicy::shared;
+    engine.setGrainBudgetPolicy (engineSettings.grainBudgetPolicy);
     applyModulation (force);
 }
 
@@ -1586,6 +1589,33 @@ void OspAudioProcessor::enqueueSetLoad (SetLoadRequest request, int layer)
     });
 }
 
+void OspAudioProcessor::enqueueAtlasLoad (AtlasLoadRequest request, int layer)
+{
+    auto& target = layers[resolve (layer)];
+    ++pendingLoads;
+    target.state = LoadState::loading;
+    const auto generation = nextGeneration.fetch_add (1);
+    target.latestLoadId = generation;
+    loaderPool.addJob ([this, request = std::move (request), generation, layer] {
+        pushResult (loadInstrumentAtlas (request, store, generation), layer);
+        --pendingLoads;
+    });
+}
+
+void OspAudioProcessor::loadAtlas (const atlas::NoteAtlas& atlas, int layer, const std::string& atlasFolder)
+{
+    AtlasLoadRequest request;
+    request.atlas = atlas;
+    request.atlasFolder = atlasFolder;
+    userLoads.insert (nextGeneration.load());
+    enqueueAtlasLoad (std::move (request), static_cast<int> (resolve (layer)));
+}
+
+std::vector<std::string> OspAudioProcessor::missingSources (int layer) const
+{
+    return layers[resolve (layer)].missingSources;
+}
+
 void OspAudioProcessor::loadFiles (const juce::Array<juce::File>& files, int layer)
 {
     if (files.size() == 1)
@@ -1608,7 +1638,8 @@ void OspAudioProcessor::reassignSample (const std::string& filename, SampleRole 
 {
     const int layer = static_cast<int> (resolve (-1));
     const auto instrument = currentInstrument (layer);
-    if (instrument == nullptr || instrument->set == nullptr)
+    // An atlas's places are its own (its notes, not inference): corrected in the atlas.
+    if (instrument == nullptr || instrument->set == nullptr || instrument->atlas != nullptr)
         return;
     auto assignments = instrument->assignments;
     assignments.erase (std::remove_if (assignments.begin(), assignments.end(), [&] (const SetAssignment& a) { return a.filename == filename; }),
@@ -1642,9 +1673,8 @@ void OspAudioProcessor::loadExample (int layer)
     loadFile (file, layer);
 }
 
-void OspAudioProcessor::clearLayer (int layer)
+void OspAudioProcessor::publishEmpty (std::size_t index)
 {
-    const auto index = resolve (layer);
     auto& target = layers[index];
     // An instrument without a model: the layer plays nothing (voices on the old one finish).
     auto empty = std::make_shared<LoadedInstrument>();
@@ -1657,7 +1687,14 @@ void OspAudioProcessor::clearLayer (int layer)
     }
     target.lastPublishedLoad = empty->loadId;
     target.lastLoadFailed = false;
+    target.missingSources.clear();
     target.state = LoadState::empty;
+}
+
+void OspAudioProcessor::clearLayer (int layer)
+{
+    const auto index = resolve (layer);
+    publishEmpty (index);
     setRootOverride (std::nullopt, static_cast<int> (index));
     // An empty slot is neither muted nor soloed (a solo left on it would silence the others).
     for (const auto& name : layerStateNames())
@@ -2103,6 +2140,8 @@ void OspAudioProcessor::timerCallback()
         auto& result = finished.result;
         touched[index] = true;
         lastFailed[index] = result.instrument == nullptr;
+        if (result.instrument == nullptr || result.instrument->atlas != nullptr)
+            layer.missingSources = result.missingSources;   // an atlas's (a failed load names what it lacked)
         juce::String message;
         if (result.instrument != nullptr)
         {
@@ -2310,6 +2349,7 @@ std::unique_ptr<juce::XmlElement> OspAudioProcessor::createStateXml()
     }
     stateTree.setProperty ("velToAmp", velocityAppliesToAmp(), nullptr);
     stateTree.setProperty ("arpRateStepped", arpRateIsStepped(), nullptr);
+    stateTree.setProperty ("grainBudgetPolicy", boundedGrainBudget.load() ? "bounded" : "shared", nullptr);
     {
         std::array<keydna::Settings, 3> dna;
         {
@@ -2345,7 +2385,22 @@ juce::ValueTree OspAudioProcessor::instrumentTree (int layer)
     }
     if (const auto overrideMidi = rootOverride (layer))
         tree.setProperty ("rootOverride", exactString (*overrideMidi), nullptr);
-    if (instrument != nullptr && instrument->set != nullptr)
+    if (instrument != nullptr && instrument->atlas != nullptr)
+    {
+        // A Note Atlas: its JSON (own schemaVersion). The recordings stay in the sample store,
+        // named by content hash; the session holds no audio.
+        juce::ValueTree atlasTree ("Atlas");
+        atlasTree.setProperty ("json", juce::String (io::noteAtlasToString (*instrument->atlas)), nullptr);
+        for (const auto& source : instrument->atlasSources)
+        {
+            juce::ValueTree m ("Source");
+            m.setProperty ("contentHash", juce::String (source.contentHash), nullptr);
+            m.setProperty ("filename", juce::String (source.filename), nullptr);
+            atlasTree.appendChild (m, nullptr);
+        }
+        tree.appendChild (atlasTree, nullptr);
+    }
+    else if (instrument != nullptr && instrument->set != nullptr)
     {
         // Multi-sample sessions: every member file plus the user's corrections. The set is
         // re-inferred from the (cached) analyses on recall.
@@ -2438,6 +2493,13 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml, bool setting
         }
         setVelocityAppliesToAmp (! stateTree.hasProperty ("velToAmp") || static_cast<bool> (stateTree["velToAmp"]));
         stateTree.removeProperty ("velToAmp", nullptr);
+        // The grain budget's policy: the session's; before v14 Phase 2's shared budget (exactly
+        // as they sounded), from v14 on bounded.
+        if (stateTree.hasProperty ("grainBudgetPolicy"))
+            boundedGrainBudget = stateTree["grainBudgetPolicy"].toString() != "shared";
+        else
+            boundedGrainBudget = savedVersion >= 14;
+        stateTree.removeProperty ("grainBudgetPolicy", nullptr);
         // ARP RATE's modulation: smooth unless the session chose Stepped.
         setArpRateStepped (static_cast<bool> (stateTree.getProperty ("arpRateStepped", false)));
         stateTree.removeProperty ("arpRateStepped", nullptr);
@@ -2628,7 +2690,7 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml, bool setting
     for (int layer = 0; layer < numLayers; ++layer)
     {
         const auto& tree = layerTrees[static_cast<std::size_t> (layer)];
-        if (tree.isValid() && (tree.hasProperty ("contentHash") || tree.getChildWithName ("Set").isValid()))
+        if (tree.isValid() && (tree.hasProperty ("contentHash") || tree.getChildWithName ("Set").isValid() || tree.getChildWithName ("Atlas").isValid()))
             recallInstrument (tree, layer);
         else
         {
@@ -2647,6 +2709,29 @@ void OspAudioProcessor::recallInstrument (const juce::ValueTree& tree, int layer
         setRootOverride (exactValue (tree["rootOverride"], 60.0), layer);
     else
         setRootOverride (std::nullopt, layer);
+
+    if (const auto atlasTree = tree.getChildWithName ("Atlas"); atlasTree.isValid())
+    {
+        // The layer is emptied first: until every recording is found, it must not look (or
+        // sound) restored with the previous sound. A failed load leaves it empty, failed, with
+        // its missing sources named.
+        const auto index = resolve (layer);
+        publishEmpty (index);
+        std::string error;
+        auto atlas = io::noteAtlasFromString (atlasTree["json"].toString().toStdString(), error);
+        if (! atlas)
+        {
+            LoadResult failed;
+            failed.error = "the session's Note Atlas cannot be read: " + error;
+            layers[index].latestLoadId = nextGeneration.fetch_add (1);
+            pushResult (std::move (failed), layer);
+            return;
+        }
+        AtlasLoadRequest request;
+        request.atlas = std::move (*atlas);
+        enqueueAtlasLoad (std::move (request), layer);
+        return;
+    }
 
     const auto setTree = tree.getChildWithName ("Set");
     if (setTree.isValid() && setTree.getNumChildren() > 0)
@@ -2776,6 +2861,10 @@ std::vector<std::string> OspAudioProcessor::soundHashesInState (const juce::XmlE
             if (const auto* set = layer->getChildByName ("Set"))
                 for (const auto* member : set->getChildWithTagNameIterator ("Member"))
                     if (const auto hash = member->getStringAttribute ("contentHash"); hash.isNotEmpty())
+                        hashes.push_back (hash.toStdString());
+            if (const auto* atlas = layer->getChildByName ("Atlas"))
+                for (const auto* source : atlas->getChildWithTagNameIterator ("Source"))
+                    if (const auto hash = source->getStringAttribute ("contentHash"); hash.isNotEmpty())
                         hashes.push_back (hash.toStdString());
         }
     std::sort (hashes.begin(), hashes.end());
@@ -2942,7 +3031,9 @@ bool OspAudioProcessor::exportInstrument (const juce::File& file, juce::String& 
     for (int layer = 0; layer < numLayers; ++layer)
         if (const auto instrument = currentInstrument (layer))
         {
-            if (instrument->memberFiles.empty())
+            if (instrument->atlas != nullptr)
+                members.insert (members.end(), instrument->atlasSources.begin(), instrument->atlasSources.end());
+            else if (instrument->memberFiles.empty())
                 members.push_back ({ instrument->contentHash, instrument->filename, instrument->originalPath });
             else
                 members.insert (members.end(), instrument->memberFiles.begin(), instrument->memberFiles.end());

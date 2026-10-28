@@ -2,6 +2,9 @@
 
 #include "model/InstrumentModel.h"
 
+#include <cmath>
+#include <cstdint>
+#include <limits>
 #include <memory>
 #include <string>
 #include <vector>
@@ -34,6 +37,12 @@ struct SetMember
     double layerLoudnessDb = 0.0; ///< mean onset loudness of its (pitch group, layer): levelling keeps take-to-take differences
     double confidence = 1.0; ///< how sure the inference is about role/layer, 0..1
     bool userAssigned = false;
+    /** A set built from a Note Atlas (engine/AtlasSet): the note region this member was copied
+        from, in its source asset's frames, so the region stays identifiable (and a later
+        shared-buffer implementation can read it in place). Empty for file sets. */
+    std::string regionId;
+    std::string sourceAssetId;
+    std::int64_t regionStart = 0, regionEnd = 0;
 };
 
 struct PitchGroup
@@ -73,6 +82,31 @@ struct InstrumentSet
 
     /** The member that best represents the set (UI, analysis display). */
     int primary = 0;
+
+    /** How keys find a pitch group (FILL KEYBOARD). File sets: the nearest group always (the
+        original behaviour). Sets from a Note Atlas: the nearest group within
+        `fillLimitSemitones` when `fill`, else only a key's own group; a key out of reach
+        starts no voice. Ties between two equally near groups: the lower one. */
+    bool fill = true;
+    double fillLimitSemitones = std::numeric_limits<double>::infinity();
+    /** Whether a key can be left silent (a set from an atlas with a finite reach or no fill). */
+    bool restrictsKeys() const noexcept { return ! fill || std::isfinite (fillLimitSemitones); }
+    /** The pitch group `note` plays, or -1 when the mapping leaves it silent. */
+    int groupFor (int note) const noexcept
+    {
+        if (groups.empty())
+            return -1;
+        int best = 0;
+        for (int g = 1; g < static_cast<int> (groups.size()); ++g)
+            if (std::abs (groups[static_cast<std::size_t> (g)].rootMidi - note) < std::abs (groups[static_cast<std::size_t> (best)].rootMidi - note))
+                best = g;
+        const double distance = std::abs (groups[static_cast<std::size_t> (best)].rootMidi - note);
+        if (! fill && distance > 0.5)
+            return -1;
+        if (distance > fillLimitSemitones + 1.0e-9)
+            return -1;
+        return best;
+    }
 
     bool isValid() const noexcept { return ! members.empty() && members.front().model != nullptr && members.front().model->isValid(); }
 };

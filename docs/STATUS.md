@@ -419,6 +419,27 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       - Demonstrations: `--set phase2`, `--set budget`, research/configs/phase2-*.json, and
         tests/regression/golden/phase2.
       Stopped for review before Phase 3.
+- [x] UNIFIED ENGINE Phase 3, the Note Atlas as an OSP instrument
+      (docs/research/unified-andor/phase-3-report.md):
+      - src/model/NoteAtlas + io/NoteAtlasJson (ported from ANDOR Lab, schema 2: asset
+        origins incl. live capture, paths only hints, velocity layers, note origin, FILL
+        mapping; Lab schema 1 migrated).
+      - engine/AtlasSet: atlas -> InstrumentSet from region copies, one member per note,
+        built by OSP's own builder (no second sampler); one gain per atlas; limits 300 s total
+        / 60 s per region (measured 0.57-0.78 MB per region second).
+      - FILL KEYBOARD in InstrumentSet::groupFor: exact key, velocity/round robin, nearest
+        within the limit (ties lower), else silent without stealing. Legacy sets unchanged.
+      - Plugin: loadAtlas (loader thread, ModelExchange), stateVersion 14 (`Atlas` child: JSON
+        + store hashes, no audio; a session with missing audio recalls empty and failed,
+        naming the sources), atlas sources in presets and portable instruments.
+      - Grain budget: `bounded` policy (engine-wide gate; never above the budget, also with
+        more streams than grains), default for new sessions; v13 and older keep `shared`.
+      - Harness: `--unified --set atlas` (22 scenes, 21 pinned in golden/phase3, memory /
+        build / lookup in atlas.md), `--atlas <file>`, `--write-atlas-fixtures`.
+      - Tests: 8 unit, 19 integration, 7 plugin; every Phase 0-2 golden unchanged.
+      - Visual regression: snapshots now use JUCE's software renderer on every platform
+        (the intermittent macOS-only difference, runs 151 and 164).
+      Stopped for review before Phase 4.
 - [x] ANDOR DESIGN SYSTEM and INSTRUMENT SHELL (andor-design-system/, start with HANDOFF.md).
       ANDOR OSP's interface was extracted, unchanged, into shared/andor-ui:
       - the components, look and assets;

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "atlas-fill-4",
+  "description": "the same with FILL limited to 4 semitones: keys out of reach stay silent",
+  "midi": "sweep-c2-c6",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "4a79cdb7317b2446",
+  "seconds": 3.792,
+  "rmsDb": -38.811864,
+  "peakDb": -25.351859,
+  "brightness": 0.145587,
+  "stereoWidth": 0.263054
+}

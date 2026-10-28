@@ -81,6 +81,16 @@ namespace
     }
 }
 
+SetMember makeSetMember (std::shared_ptr<const InstrumentModel> model, std::string filename)
+{
+    SetMember m;
+    m.loudnessDb = model->analysis.envelope.maxRmsDbfs;
+    m.onsetLoudnessDb = onsetLoudness (*model);
+    m.model = std::move (model);
+    m.filename = std::move (filename);
+    return m;
+}
+
 InstrumentSet inferSampleSet (const std::vector<SetInput>& inputs, const std::vector<SetAssignment>& assignments)
 {
     InstrumentSet set;
@@ -88,12 +98,7 @@ InstrumentSet inferSampleSet (const std::vector<SetInput>& inputs, const std::ve
     {
         if (in.model == nullptr || ! in.model->isValid())
             continue;
-        SetMember m;
-        m.model = in.model;
-        m.filename = in.filename;
-        m.loudnessDb = in.model->analysis.envelope.maxRmsDbfs;
-        m.onsetLoudnessDb = onsetLoudness (*in.model);
-        set.members.push_back (std::move (m));
+        set.members.push_back (makeSetMember (in.model, in.filename));
     }
     if (set.members.empty())
         return set;
@@ -221,6 +226,14 @@ InstrumentSet inferSampleSet (const std::vector<SetInput>& inputs, const std::ve
         }
     }
 
+    finaliseSampleSet (set);
+    return set;
+}
+
+void finaliseSampleSet (InstrumentSet& set)
+{
+    if (set.members.empty() || set.groups.empty())
+        return;
     // Levelling reference: each (group, layer) by its mean loudness, so groups and layers
     // line up while round-robin takes keep their natural differences.
     set.loudestDb = -200.0;
@@ -328,7 +341,6 @@ InstrumentSet inferSampleSet (const std::vector<SetInput>& inputs, const std::ve
     for (int id : centre->members)
         if (set.members[static_cast<std::size_t> (id)].loudnessDb > set.members[static_cast<std::size_t> (set.primary)].loudnessDb)
             set.primary = id;
-    return set;
 }
 
 } // namespace osp

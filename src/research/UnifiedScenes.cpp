@@ -7,6 +7,7 @@
 #include "engine/InstrumentBuilder.h"
 #include "engine/InstrumentEngine.h"
 #include "io/JsonUtil.h"
+#include "research/AtlasFixtures.h"
 
 #if ! defined(_WIN32)
  #include <sys/resource.h>
@@ -16,6 +17,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstring>
+#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -478,11 +480,123 @@ std::vector<Scene> budgetScenes()
         {
             auto s = *scene;
             s.config.engineSettings.grainBudget = budget;
+            // Pinned in Phase 2 under its policy (the bounded one came with Phase 3).
+            s.config.engineSettings.grainBudgetPolicy = GrainBudgetPolicy::shared;
             s.name = std::string ("budget-") + material + "-" + (budget == 0 ? std::string ("unlimited") : std::to_string (budget));
             s.description = std::string (material == std::string ("stress") ? "the CPU stress scene" : "every layer at the pool, doubled")
                             + (budget == 0 ? ", no budget" : ", grain budget " + std::to_string (budget));
             scenes.push_back (std::move (s));
         }
+    return scenes;
+}
+
+std::vector<Scene> atlasScenes()
+{
+    using L = std::vector<LayerSpec>;
+    auto atlasLayer = [] (const char* atlas) { return LayerSpec { SourceId::vowelA3, atlas }; };
+    std::vector<Scene> scenes;
+    auto add = [&scenes] (const char* name, const char* description, L layers, RenderConfig config, MidiSequence midi) {
+        scenes.push_back ({ name, description, std::move (layers), std::move (config), std::move (midi) });
+    };
+    auto granularOn = [] (RenderConfig c, int layer = 0) {
+        granular (c, layer);
+        return c;
+    };
+    const L sung { atlasLayer ("sung-four") };
+    Notes melodyNotes;
+    {
+        // Recorded keys (A3, C4, E4, G4) and the keys FILL plays from their neighbours.
+        const int keys[] = { 57, 59, 60, 62, 64, 65, 67, 69, 67, 64, 60, 57 };
+        for (int i = 0; i < 12; ++i)
+            melodyNotes.note (0.05 + 0.32 * i, 0.3, keys[i], 88 + 3 * (i % 4));
+    }
+    const auto melody = melodyNotes.done ("atlas-melody");
+    const auto chordSung = Notes().chord (0.05, 2.0, { 57, 60, 64, 67 }).done ("chord-sung-four");
+    add ("atlas-oneshot-melody", "One Shot: a melody over the four recorded notes and the keys FILL lends them", sung, baseConfig(), melody);
+    add ("atlas-oneshot-chord", "One Shot: the four recorded notes as a chord", sung, baseConfig(), chordSung);
+    add ("atlas-granular-chord", "Granular from the atlas: each key's grains from its own note", sung, granularOn (baseConfig()), chordSung);
+    {
+        auto c = granularOn (baseConfig());
+        c.keyDna[0] = expressiveKeyDna();
+        add ("atlas-granular-keydna-scale", "Granular + expressive KEY DNA, a scale across recorded and filled keys", sung, c, scale());
+        add ("atlas-granular-keydna-chord8", "Granular + expressive KEY DNA, an eight-note chord (FILL beyond the recorded range is silent)", sung, c, chord8());
+    }
+    {
+        auto c = granularOn (baseConfig(), 1);
+        c.engineSettings.granular[1].scatterSemitones = 0.5;
+        c.engineSettings.granular[1].pan = 0.6;
+        add ("atlas-three-abc-chord", "three atlases: A sung (One Shot), B bowed (Granular, SCATTER, PAN), C stereo-wide (One Shot)",
+             L { atlasLayer ("sung-four"), atlasLayer ("bowed-phrase"), atlasLayer ("stereo-wide") }, c,
+             Notes().chord (0.05, 2.0, { 55, 59, 62, 67 }).done ("chord-g"));
+    }
+    {
+        auto c = baseConfig();
+        c.engineSettings.polyphony = 24;
+        Notes n;
+        for (int k = 0; k < 24; ++k)
+            n.note (0.05 + 0.02 * k, 2.5, 46 + k, 70 + k);
+        add ("atlas-polyphony-24", "24 notes at once from four recorded notes (One Shot)", sung, c, n.done ("cluster-24"));
+        add ("atlas-polyphony-24-granular", "24 notes at once, Granular", sung, granularOn (c), n.done ("cluster-24"));
+    }
+    {
+        Notes n;
+        for (int i = 0; i < 16; ++i)
+            n.note (0.05 + 0.12 * i, 0.1, 62, 80 + 2 * (i % 5));
+        add ("atlas-rapid-repeats", "D4 sixteen times, fast: the three recorded takes in round robin, never the same twice in a row",
+             L { atlasLayer ("repeated-note") }, baseConfig(), n.done ("repeats-d4x16"));
+    }
+    {
+        Notes n;
+        for (int i = 0; i < 8; ++i)
+            n.note (0.05 + 0.35 * i, 0.3, 60, i % 2 == 0 ? 40 : 120);
+        add ("atlas-velocity-layers", "C4 soft and loud in turn: the soft and loud recordings (velocity layers)", L { atlasLayer ("velocity-layers") }, baseConfig(),
+             n.done ("velocity-c4"));
+    }
+    {
+        const auto tune = Notes().note (0.05, 0.6, 60).note (0.75, 0.6, 64).note (1.45, 0.6, 67).chord (2.2, 1.2, { 60, 64, 67 }).done ("tuning-c-major");
+        add ("atlas-out-of-tune-corrected", "notes recorded 35 cents sharp, 40 flat, 12 sharp, played in tune", L { atlasLayer ("out-of-tune") }, baseConfig(), tune);
+        add ("atlas-out-of-tune-as-recorded", "the same notes as recorded (Mapping.correctTuning off)", L { atlasLayer ("out-of-tune:as-recorded") },
+             baseConfig(), tune);
+    }
+    {
+        Notes n;
+        for (int k = 36; k <= 84; k += 2)
+            n.note (0.05 + 0.15 * (k - 36) / 2, 0.14, k, 96);
+        const auto sweep = n.done ("sweep-c2-c6");
+        add ("atlas-fill-12", "only C3, C4, C5 recorded: FILL within 12 semitones plays every key", L { atlasLayer ("missing-notes") }, baseConfig(), sweep);
+        add ("atlas-fill-4", "the same with FILL limited to 4 semitones: keys out of reach stay silent", L { atlasLayer ("missing-notes:fill-4") }, baseConfig(),
+             sweep);
+        add ("atlas-no-fill", "FILL off: only the recorded keys sound", L { atlasLayer ("missing-notes:no-fill") }, baseConfig(), sweep);
+    }
+    add ("atlas-legato-line", "a line on four notes recorded legato (regions on adjacent frames)", L { atlasLayer ("legato") }, baseConfig(), legatoLine());
+    add ("atlas-silence-gaps-scale", "mono plucks recorded with long silences between them, a scale", L { atlasLayer ("silence-gaps") }, baseConfig(), scale());
+    {
+        auto c = granularOn (baseConfig());
+        c.engineSettings.granular[0].pan = 0.0;
+        add ("atlas-stereo-wide-granular", "Granular from a wide stereo recording: each grain keeps its own stereo", L { atlasLayer ("stereo-wide") }, c,
+             Notes().chord (0.05, 2.0, { 57, 62 }).done ("chord-a-d"));
+    }
+    {
+        auto c = granularOn (dryConfig());
+        c.engineSettings.granular[0].spread = 1.0;
+        c.engineSettings.granular[0].sizeSeconds = 0.3;
+        add ("atlas-boundary-granular", "Granular, SPREAD 100 %, on a 440 Hz note recorded next to a 3 kHz one: no 3 kHz may leak",
+             L { atlasLayer ("boundary-probe") }, c, Notes().note (0.05, 2.0, 69).done ("held-a4"));
+    }
+    add ("atlas-regions-10-chord8", "an atlas of 10 one-second regions, eight-note chord", L { atlasLayer ("regions-10") }, baseConfig(), chord8());
+    add ("atlas-regions-50-chord8", "an atlas of 50 one-second regions (round robins on 12 keys), eight-note chord", L { atlasLayer ("regions-50") },
+         baseConfig(), chord8());
+    {
+        Notes n;
+        n.chord (0.05, 3.5, { 55, 59, 62 });
+        for (int i = 0; i < 12; ++i)
+            n.note (0.1 + 0.28 * i, 0.25, 67 + (i % 3) * 2, 90);
+        Scene s { "atlas-publication-while-rendering", "layer A's atlas replaced every 0.25 s (sung <-> bowed) while a chord is held and notes start",
+                  sung, baseConfig(), n.done ("held-and-new") };
+        s.swapAtlas = "bowed-phrase";
+        s.swapEverySeconds = 0.25;
+        scenes.push_back (std::move (s));
+    }
     return scenes;
 }
 
@@ -555,14 +669,69 @@ const Scene* findScene (const std::vector<Scene>& scenes, const std::string& nam
     return nullptr;
 }
 
+namespace
+{
+    /** An atlas fixture by scene name: "<fixture>[:as-recorded|:fill-4|:no-fill]" or "regions-<n>". */
+    atlasfixtures::Fixture atlasFixture (const std::string& spec)
+    {
+        const auto colon = spec.find (':');
+        const auto base = spec.substr (0, colon);
+        const auto variant = colon == std::string::npos ? std::string() : spec.substr (colon + 1);
+        auto f = base.rfind ("regions-", 0) == 0 ? atlasfixtures::manyRegions (std::stoi (base.substr (8)), 1.0) : atlasfixtures::make (base);
+        if (variant == "as-recorded")
+            f.atlas.mapping.correctTuning = false;
+        else if (variant == "fill-4")
+            f.atlas.mapping.maxTransposeSemitones = 4.0;
+        else if (variant == "no-fill")
+            f.atlas.mapping.fill = false;
+        return f;
+    }
+
+    std::mutex atlasLock;
+    std::map<std::string, atlasset::BuildResult>& atlasCache()
+    {
+        static std::map<std::string, atlasset::BuildResult> cache;
+        return cache;
+    }
+    const atlasset::BuildResult& builtAtlas (const std::string& spec)
+    {
+        const std::lock_guard<std::mutex> guard (atlasLock);
+        auto& cache = atlasCache();
+        auto it = cache.find (spec);
+        if (it == cache.end())
+            it = cache.emplace (spec, atlasfixtures::build (atlasFixture (spec))).first;
+        return it->second;
+    }
+}
+
+std::array<const InstrumentSet*, 3> setsFor (const Scene& scene)
+{
+    std::array<const InstrumentSet*, 3> sets {};
+    for (std::size_t i = 0; i < scene.layers.size() && i < sets.size(); ++i)
+        if (! scene.layers[i].atlas.empty())
+            sets[i] = builtAtlas (scene.layers[i].atlas).set.get();
+    return sets;
+}
+
+atlasset::BuildReport atlasReport (const std::string& atlas)
+{
+    return builtAtlas (atlas).report;
+}
+
 std::array<const InstrumentModel*, 3> modelsFor (const Scene& scene)
 {
     static std::mutex lock;
     static std::map<SourceId, std::shared_ptr<InstrumentModel>> cache;
+    const auto sets = setsFor (scene);
     const std::lock_guard<std::mutex> guard (lock);
     std::array<const InstrumentModel*, 3> models {};
     for (std::size_t i = 0; i < scene.layers.size() && i < models.size(); ++i)
     {
+        if (const auto* set = sets[i]; set != nullptr && set->isValid())
+        {
+            models[i] = set->members[static_cast<std::size_t> (set->primary)].model.get();
+            continue;
+        }
         const auto id = scene.layers[i].source;
         auto& model = cache[id];
         if (model == nullptr)
@@ -582,7 +751,23 @@ RenderOutput render (const Scene& scene, int blockSizeOverride)
     auto config = scene.config;
     if (blockSizeOverride > 0)
         config.blockSize = blockSizeOverride;
-    return renderLayers (modelsFor (scene), scene.midi, config);
+    const auto sets = setsFor (scene);
+    if (std::all_of (sets.begin(), sets.end(), [] (const auto* s) { return s == nullptr; }))
+        return renderLayers (modelsFor (scene), scene.midi, config);
+    std::function<void (InstrumentEngine&, double)> swap;
+    if (! scene.swapAtlas.empty() && scene.swapEverySeconds > 0.0)
+    {
+        const auto* other = builtAtlas (scene.swapAtlas).set.get();
+        swap = [sets, other, every = scene.swapEverySeconds, last = -1] (InstrumentEngine& engine, double seconds) mutable {
+            const int period = static_cast<int> (seconds / every);
+            if (period != last)
+            {
+                last = period;
+                engine.setInstrumentSet (period % 2 == 0 ? sets[0] : other, 0);
+            }
+        };
+    }
+    return renderLayerInstruments (modelsFor (scene), sets, scene.midi, config, swap);
 }
 
 Digest digest (const AudioData& audio)
@@ -649,6 +834,8 @@ Cost measure (const Scene& scene, int repeats)
     const double rate = config.sampleRate;
     const int block = std::max (1, config.blockSize);
     const auto models = modelsFor (scene);
+    const auto sets = setsFor (scene);
+    const InstrumentSet* swapSet = scene.swapAtlas.empty() ? nullptr : builtAtlas (scene.swapAtlas).set.get();
     const auto sequence = arpeggiate (scene.midi, config, rate);
     std::vector<double> best;
     Cost cost;
@@ -659,11 +846,15 @@ Cost measure (const Scene& scene, int repeats)
         engine.prepare (rate, block, config.engineSettings);
         for (int layer = 0; layer < 3; ++layer)
         {
-            engine.setModel (models[static_cast<std::size_t> (layer)], layer);
+            if (const auto* set = sets[static_cast<std::size_t> (layer)])
+                engine.setInstrumentSet (set, layer);
+            else
+                engine.setModel (models[static_cast<std::size_t> (layer)], layer);
             engine.setLayerKeyDna (layer, config.keyDna[static_cast<std::size_t> (layer)]);
         }
         engine.setModulation (config.modulation);
         engine.setModWheel (static_cast<float> (config.modWheel));
+        int swapPeriod = 0;
         const auto& events = sequence.events;
         const auto end = static_cast<std::int64_t> ((sequence.endTimeSeconds() + config.maxTailSeconds) * rate);
         std::size_t next = 0;
@@ -672,6 +863,13 @@ Cost measure (const Scene& scene, int repeats)
         {
             applyKeyDnaAutomation (engine, config, static_cast<double> (pos) / rate);
             const auto t0 = std::chrono::steady_clock::now();
+            if (swapSet != nullptr && scene.swapEverySeconds > 0.0)
+                if (const int period = static_cast<int> (static_cast<double> (pos) / rate / scene.swapEverySeconds); period != swapPeriod)
+                {
+                    // The plugin's audio thread takes a published instrument at a block's start: timed with the block.
+                    swapPeriod = period;
+                    engine.setInstrumentSet (period % 2 == 0 ? sets[0] : swapSet, 0);
+                }
             int offset = 0;
             while (next < events.size())
             {
