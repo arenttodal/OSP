@@ -291,6 +291,29 @@ TEST_CASE ("Phrase engine: ONE SHOT, GATE and SUSTAIN behave as named", "[phrase
     }
 }
 
+TEST_CASE ("Phrase engine: SUSTAIN never buzzes on a too-short loop; short notes hold their own pitch", "[phrase][integration]")
+{
+    // First user tests: loops under 0.1 s sounded like noise, not like the note.
+    for (const auto* name : { "vibrato", "legato", "vocal-phrase", "staccato", "repeated" })
+    {
+        INFO (name);
+        const auto model = modelFor (name);
+        for (const auto& r : model->regions)
+            if (r.loopable)
+                CHECK (r.loopEnd - r.loopStart >= phrase::minLoopSeconds * 48000.0 - 1.0);
+    }
+
+    // A 90 ms staccato note has no loop; held in SUSTAIN, its grains stay inside the note.
+    const auto st = modelFor ("staccato");
+    phrase::PhraseParams p;
+    p.playMode = phrase::PlayMode::sustain;
+    MidiSequence hold;
+    andor::addNote (hold, 0.0, 2.0, 67);
+    const auto out = play (*st, hold, p, 0.5);
+    CHECK (rmsOf (out, 0.5, 1.8) > 0.005);
+    CHECK (std::abs (centsBetweenHz (midiToHz (67), pitchOf (out, 0.5, 1.8))) < 30.0);
+}
+
 TEST_CASE ("Phrase engine: the sustain pedal holds released keys", "[phrase][integration]")
 {
     const auto model = modelFor ("vibrato");

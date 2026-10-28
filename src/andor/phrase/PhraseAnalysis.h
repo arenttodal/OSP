@@ -35,6 +35,19 @@ enum class PitchBackend
 
 const char* toString (PitchBackend) noexcept;
 
+/**
+    The musician's one detection choice (FEWER / NORMAL / MORE NOTES): how readily a held sound is
+    cut into separate notes. It scales the pitch-change and re-articulation rules together.
+*/
+enum class Detection
+{
+    fewer,    ///< only clear pitch steps and near-silent re-attacks split a note
+    normal,
+    more,     ///< shallow re-articulations and smaller pitch moves split too
+};
+
+const char* toString (Detection) noexcept;
+
 struct AnalysisSettings
 {
     PitchBackend backend = PitchBackend::yinViterbi;
@@ -44,16 +57,24 @@ struct AnalysisSettings
     double highPassHz = 50.0;           ///< analysis copy only: rumble never moves a boundary
     double silenceDb = -45.0;           ///< below the recording's peak level: silence
     double absoluteFloorDb = -72.0;     ///< dBFS: never louder than this counts as sound
-    double minNoteSeconds = 0.05;
+    double minNoteSeconds = 0.05;       ///< detection floor: nothing shorter is ever a note
     double bridgeGapSeconds = 0.03;     ///< voicing dropouts shorter than this do not end a note
     double pitchChangeSemitones = 0.6;  ///< a sustained move this far starts a new note
     double pitchHoldSeconds = 0.04;     ///< ... when it lasts at least this long
-    double rearticulationDb = 6.0;      ///< a level dip this deep between two rises splits a note
+    double rearticulationDb = 9.0;      ///< a level dip this far under the sound either side splits a note
+    Detection detection = Detection::normal;
+    /** MIN NOTE: a piece shorter than this, joined to a neighbour and without a pitch of its own
+        (a fragment of the same note, a slide, an octave slip, a weak scrap), becomes part of that
+        neighbour. Short notes with their own pitch (fast runs, grace notes) are kept. */
+    double minPieceSeconds = 0.25;
     double maxAnalysisSeconds = 180.0;  ///< longer recordings: the first part is analysed (warning)
     double a4Hz = 440.0;
     bool autoTuning = false;            ///< estimate the recording's global offset before rounding
 
     std::string digest() const;
+
+    /** These settings with `detection` applied to the pitch-change and re-articulation rules. */
+    AnalysisSettings effective() const;
 };
 
 /** One analysis frame of the contour. */
@@ -146,6 +167,6 @@ AnalysisResult analysePhrase (const AudioData& audio, const atlas::SourceAsset& 
 atlas::NoteEvent analyseRange (const AudioData& audio, std::int64_t startFrame, std::int64_t endFrame, const AnalysisSettings& settings = {});
 
 /** The analysis algorithm's version: bump when results change (it invalidates caches). */
-constexpr int analysisVersion = 1;
+constexpr int analysisVersion = 2;   // 2: scoops/falls/octave slips absorbed, level-relative re-articulation, MIN NOTE
 
 } // namespace osp::phrase

@@ -19,6 +19,7 @@
 #include <chrono>
 #include <cstdio>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 
 namespace fs = std::filesystem;
@@ -28,7 +29,8 @@ namespace osp::andorcli
 
 const char* usageText = R"(
 ANDOR LAB (docs/andor-lab)
-  --phrase-analyze <file> [--output-atlas <f.andoratlas>] [--backend yin|yin-viterbi] [--auto-tuning]
+  --phrase-analyze <file> [--output-atlas <f.andoratlas>] [--output-contour <f.csv>] [--backend yin|yin-viterbi] [--auto-tuning]
+        [--detection fewer|normal|more] [--min-note <seconds, default 0.25>]
         Analyse a monophonic phrase into a Note Atlas; prints the notes.
   --phrase-eval [--backend yin|yin-viterbi|all] [--fixture <name> | --stress] [--output-json <f>] [--verbose]
         Run the analysis on the generated ground-truth fixtures and print note metrics.
@@ -213,6 +215,12 @@ namespace
         phrase::AnalysisSettings settings;
         settings.backend = backendsFrom (get (v, "--backend", "yin-viterbi")).front();
         settings.autoTuning = flags.count ("--auto-tuning") > 0;
+        const auto detection = get (v, "--detection", "normal");
+        if (detection != "fewer" && detection != "normal" && detection != "more")
+            return fail (1, "--detection must be fewer, normal or more");
+        settings.detection = detection == "fewer" ? phrase::Detection::fewer : (detection == "more" ? phrase::Detection::more : phrase::Detection::normal);
+        if (v.count ("--min-note"))
+            settings.minPieceSeconds = std::clamp (std::strtod (get (v, "--min-note").c_str(), nullptr), 0.0, 2.0);
         const auto result = phrase::analysePhrase (loaded.audio, *source, settings);
         for (const auto& w : result.warnings)
             std::cerr << "warning: " << w << "\n";
@@ -224,6 +232,21 @@ namespace
             if (! io::writeNoteAtlas (get (v, "--output-atlas"), result.atlas, error))
                 return fail (3, error);
             std::cout << "wrote " << get (v, "--output-atlas") << "\n";
+        }
+        if (v.count ("--output-contour"))
+        {
+            // Frame-by-frame view of what segmentation sees (plotting, tuning on real recordings).
+            std::ofstream out (get (v, "--output-contour"));
+            if (! out)
+                return fail (3, "cannot write " + get (v, "--output-contour"));
+            out << "seconds,hz,midi,confidence,levelDb,voiced\n";
+            for (std::size_t i = 0; i < result.contour.frames.size(); ++i)
+            {
+                const auto& f = result.contour.frames[i];
+                out << fmt (result.contour.timeOf (i), 4) << ',' << fmt (f.hz, 3) << ',' << fmt (f.midi, 4) << ',' << fmt (f.confidence, 3) << ','
+                    << fmt (f.levelDb, 2) << ',' << (f.voiced ? 1 : 0) << '\n';
+            }
+            std::cout << "wrote " << get (v, "--output-contour") << "\n";
         }
         return 0;
     }
@@ -259,7 +282,10 @@ namespace
         const fs::path dir = get (v, "--phrase-fixtures");
         std::error_code ec;
         fs::create_directories (dir, ec);
-        for (const auto& name : phrase::phraseFixtureNames())
+        auto names = phrase::phraseFixtureNames();
+        for (const auto& name : phrase::phraseStressFixtureNames())
+            names.push_back (name);
+        for (const auto& name : names)
         {
             const auto fx = phrase::makePhraseFixture (name);
             std::string error;

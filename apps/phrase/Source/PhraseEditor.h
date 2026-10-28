@@ -99,8 +99,10 @@ private:
         KeyboardMap keys;
         NotePanel notes;
         Key importKey, menuKey, cancelKey, octaveDown { "<" }, octaveUp { ">" };
-        Segmented mode, fill, variation, tuning;
+        Segmented mode, fill, variation, tuning, detection;
         Knob attack, release, tone, synthetic, preserve, character, pitch, levelMatch, space, echo, velocity, master;
+        juce::Slider minNote { juce::Slider::LinearHorizontal, juce::Slider::NoTextBox };
+        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> minNoteAttachment;
         juce::String statusText;
         bool dragOver = false;
         std::unique_ptr<juce::FileChooser> chooser;

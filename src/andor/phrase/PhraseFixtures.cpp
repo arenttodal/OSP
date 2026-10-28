@@ -24,6 +24,7 @@ namespace
         double vibratoCents = 0.0;
         double vibratoHz = 5.5;
         double scoopCents = 0.0;       ///< starts this far below and glides up (singers' scoop)
+        double scoopSeconds = 0.08;    ///< ... over this long
     };
 
     struct Style
@@ -39,6 +40,7 @@ namespace
         double tremoloDb = 0.0;        ///< amplitude tremolo depth (peak to trough)
         double tremoloHz = 6.0;
         double breathinessDb = 200.0;  ///< noise inside the tone, following its envelope, below the tone
+        double swellDb = 0.0;          ///< irregular breath/bow swells (peak to trough), not periodic like tremolo
     };
 
     /** A vowel-like spectral envelope ("ah": 700 / 1200 / 2600 Hz) so the tone has formants. */
@@ -74,8 +76,8 @@ namespace
                 if (t <= note.duration)
                 {
                     double m = note.midi;
-                    if (note.scoopCents != 0.0 && t < 0.08)
-                        m -= note.scoopCents / 100.0 * (1.0 - t / 0.08);
+                    if (note.scoopCents != 0.0 && t < note.scoopSeconds)
+                        m -= note.scoopCents / 100.0 * (1.0 - t / note.scoopSeconds);
                     midi[i] = m;
                     const double depth = note.vibratoCents / 100.0 * std::clamp (t / 0.15, 0.0, 1.0);
                     vib[i] = depth * std::sin (twoPi * note.vibratoHz * t);
@@ -141,6 +143,13 @@ namespace
             double level = amp[i];
             if (style.tremoloDb > 0.0)
                 level *= dbToGain (-0.5 * style.tremoloDb * (1.0 + std::sin (twoPi * style.tremoloHz * static_cast<double> (i) / sampleRate)));
+            if (style.swellDb > 0.0)
+            {
+                // Two incommensurate slow cycles: swells and sags at uneven spacing (1-4 per second).
+                const double t = static_cast<double> (i) / sampleRate;
+                const double w = (std::sin (twoPi * 1.7 * t) + 0.7 * std::sin (twoPi * 3.3 * t + 1.3)) / 1.7;
+                level *= dbToGain (-0.5 * style.swellDb * (1.0 - w));
+            }
             const double s = norm > 0.0 ? level * style.phraseLevel * sum / norm * 2.0 : 0.0;
             out[i] = static_cast<float> (s);
             voicedPower += s * s;
@@ -218,7 +227,7 @@ namespace
 std::vector<std::string> phraseStressFixtureNames()
 {
     return { "stress-fast-run", "stress-wide-vibrato", "stress-portamento", "stress-bass", "stress-high",
-             "stress-very-noisy", "stress-tremolo", "stress-breathy" };
+             "stress-very-noisy", "stress-tremolo", "stress-breathy", "stress-breath-swells", "stress-scoops" };
 }
 
 std::vector<std::string> phraseFixtureNames()
@@ -393,6 +402,31 @@ PhraseFixture makePhraseFixture (const std::string& name, double sr)
         notes = sequence ({ 67, 69, 71, 74, 72 }, 0.5, 0.15);
         style.breathinessDb = 8.0;
         seed = 6;
+    }
+    else if (name == "stress-breath-swells")
+    {
+        // Round 3 (from a real ney recording): breath swells sag 8-11 dB without a new attack.
+        fx.description = "held breathy notes, legato pairs, with irregular 11 dB breath swells (must not split)";
+        notes = sequence ({ 69, 76, 81, 76, 78, 74 }, 1.5, 0.3);
+        notes[0].legatoToNext = notes[2].legatoToNext = notes[4].legatoToNext = true;
+        notes[1].start = notes[0].start + notes[0].duration;
+        notes[3].start = notes[2].start + notes[2].duration;
+        notes[5].start = notes[4].start + notes[4].duration;
+        style.swellDb = 11.0;
+        style.breathinessDb = 14.0;
+        seed = 7;
+    }
+    else if (name == "stress-scoops")
+    {
+        // Round 3: a phrase that starts with a slow slide up into the note (ney, voice, bends).
+        fx.description = "notes after silence that each scoop up 1-2 semitones over 160 ms (the scoop is the attack)";
+        notes = sequence ({ 66, 78, 71, 74, 69 }, 0.9, 0.35);
+        const double scoops[] = { 200.0, 150.0, 100.0, 200.0, 170.0 };
+        for (std::size_t i = 0; i < notes.size(); ++i)
+        {
+            notes[i].scoopCents = scoops[i];
+            notes[i].scoopSeconds = 0.16;
+        }
     }
     else
     {

@@ -10,11 +10,42 @@ Analysis never runs on the audio thread and is deterministic (no randomness at a
 | --- | --- | --- |
 | 1 | Preprocess | mono analysis copy (the stereo source is untouched), 50 Hz high-pass (analysis only), RMS level per 5 ms hop, peak; silence threshold = max(peak − 45 dB, −72 dBFS, min(noise floor + 6 dB, peak − 30 dB)) where the noise floor is the quietest tenth of the audible frames |
 | 2 | Pitch contour | a pluggable `PitchTracker` gives frequency, MIDI pitch, confidence and voicing per 5 ms frame (40–2200 Hz by default) |
-| 3 | Segment | voiced runs (≤ 30 ms dropouts above the silence threshold are bridged); pitch changes (light smoothing, a held excursion of ≥ 0.6 st for ≥ 40 ms confirmed by the median of the next 150 ms; **vibrato veto**: where the pitch keeps moving and reversing, the one-cycle moving mean must step too); **re-articulation** at level dips ≥ 6 dB between two rises (3 dB with a voicing dropout), with a **tremolo veto** (≥ 4 evenly spaced dips at 3–10 Hz do not split); short pieces glued to a neighbour are merged; short glides between legato notes are absorbed, unless they have a pitch plateau (a real short note) |
-| 4 | Describe | confidence × level-weighted median of the voiced body (glides at both ends left out) = the note's identity; robust spread (weighted MAD); vibrato rate and depth from the residual around a 200 ms trend; voicing; confidence = voicing × mean periodicity × stability factor (vibrato is not counted as instability) |
-| 5 | Refine | attack start: walk back from the voiced onset while the level is above max(silence, note peak − 35 dB, noise floor + 3 dB), stop in the valley before the onset (breath, a previous tail), at most 120 ms; one hop of pre-roll. Sustain: from the attack peak once the pitch settles within 35 cents, to the last settled frame within 12 dB of the body level. Release: to the next note (legato) or until the tail falls into silence / the noise floor (≤ 400 ms), stopping when the level rises again. Fades: 32 samples from silence, 2 ms otherwise; 2–10 ms fade-out |
+| 3 | Segment | voiced runs (≤ 30 ms dropouts above the silence threshold are bridged, and dropouts up to 250 ms when the level stays within 10 dB of the note and the pitch returns within 0.5 st: a breathy tone sinking into its air noise); pitch changes (light smoothing, a held excursion of ≥ 0.6 st for ≥ 40 ms confirmed by the median of the next 150 ms; **vibrato veto**: where the pitch keeps moving and reversing, the one-cycle moving mean must step too); **re-articulation** where the level falls ≥ 9 dB under the *median* level of the 150 ms either side (half with a voicing dropout), so breath and bow swells do not split a held tone, with a **tremolo veto** (≥ 4 evenly spaced dips at 3–10 Hz do not split); short glides between legato notes are absorbed, unless they have a pitch plateau (a real short note); then **consolidation** (below) |
+| 4 | Describe | octave slips folded onto the note first (an absorbed breathy tail never reads as spread or vibrato); confidence × level-weighted median of the voiced body (glides at both ends left out) = the note's identity; robust spread (weighted MAD); vibrato rate and depth from the residual around a 200 ms trend; voicing; confidence = voicing × mean periodicity × stability factor (vibrato is not counted as instability) |
+| 5 | Refine | attack start: walk back from the voiced onset while the level is above max(silence, note peak − 35 dB, noise floor + 3 dB) — the noise term only when no true silence precedes the note within the window (with digital silence between notes the floor estimate is really the quiet moments of breathy notes) — stop in the valley before the onset (breath, a previous tail), at most 120 ms; one hop of pre-roll. Sustain: from the attack peak once the pitch settles within 35 cents, to the last settled frame within 12 dB of the body level. Release: to the next note (legato) or until the tail falls into silence / the noise floor (≤ 400 ms), stopping when the level rises again. Fades: 32 samples from silence, 2 ms otherwise; 2–10 ms fade-out |
 | 6 | Map | `atlas::roundPitch` (explicit tuning rule, optional auto tuning = weighted median of the notes' cents), cents kept apart, variation groups by key in time order |
 | 7 | Atlas | `NoteAtlas` with source fingerprint, settings digest, method and version per note |
+
+### Consolidation (analysis version 2)
+
+Pieces that are not notes of their own join the note they belong to; no audio is dropped, it
+becomes that note's attack or release (and KEEP ATTACK decides how much of a scoop is heard;
+the sustain still starts where the pitch settles):
+
+- **scoop into a phrase's first note**: a piece ≤ 250 ms, glued to the next note, travelling
+  ≥ 0.5 st towards it, or a brief approach (≤ 200 ms) within 2.5 st of a note at least 3× as
+  long (the split sits half-way up the slide, so the leftover can look flat), or an octave slip;
+- **fall, octave slip or fading scrap at a phrase's end**: ≤ 400 ms, glued to the previous note,
+  falling away without a plateau, an octave off, ≥ 10 dB quieter, or weak;
+- **MIN NOTE** (`minPieceSeconds`, default 0.25 s): anything shorter, glued to a neighbour, that
+  has **no pitch of its own** — a fragment at the neighbour's pitch, a slide without a plateau,
+  an octave slip or a weak scrap — joins the nearest-pitched neighbour. Short notes with their
+  own steady pitch (runs, grace notes, the 107 ms stress run) stay at any MIN NOTE;
+- octave slips and weak scraps across a ≤ 80 ms dropout, and same-pitch scraps after a
+  ≤ 100 ms gap, join the note beside them.
+
+### DETECTION and MIN NOTE (the musician's two analysis choices)
+
+| DETECTION | pitch change | hold | re-articulation depth |
+| --- | --- | --- | --- |
+| FEWER | 0.66 st | 60 ms | 13.5 dB |
+| NORMAL (default) | 0.6 st | 40 ms | 9 dB |
+| MORE | 0.51 st | 30 ms | 5.9 dB |
+
+A semitone step is a new note at every level. Both choices are part of the settings digest
+(cache key) and of the plug-in session; changing either re-analyses in the background, keeps
+corrected notes and is one undo step (`phrase.md`). CLI: `--detection fewer|normal|more`,
+`--min-note <s>`, and `--output-contour <f.csv>` dumps the frame-by-frame contour for plots.
 
 `analyseRange` re-describes a user-chosen range as one note (split halves, merges, "re-analyse
 note"). The plug-in caches results by content hash + analysis version + settings digest.
@@ -100,6 +131,30 @@ Round 2 (`data/phrase-stress-round2.txt`):
 (`[phrase]` tests). The analysis has **not** been evaluated on real recordings in this
 environment (none are in the repository; the corpus is local-only). That evaluation is the
 most important open item: see `test-instructions.md` ("Real recordings").
+
+### Round 3 — the first real recordings (user tests, 2026-10)
+
+The first two recordings from the user's tests (a ney melody and a cello melody, commercial
+loops: analysed in the session only, **never committed**) showed three faults the generated
+fixtures had not: breath/bow swells read as re-articulations (one ney A5 became 7 notes, each
+a "variation" that SHUFFLE could pick), a slide up into a phrase's first note kept as its own
+note on the key below (the "glitching E"), and breathy tails tracked an octave down (C5 →
+"C4 −23"). Plots of the contour against the level (`--output-contour`) located each one.
+
+| Recording | analysis v1 | analysis v2 | notes |
+| --- | --- | --- | --- |
+| ney, 16 s, slow melody | 19 notes on 8 keys, 11 extra variations | **8 notes** (one per played note) | scoop into F#5 now its attack; C5's tail its release |
+| cello, 15 s, 120 bpm | 36 notes | **27 notes** | real short notes kept (A3–A#3–A3 turn, 235–250 ms); MORE also keeps the re-bowed C4 at 4.76 s |
+
+Two new stress fixtures reproduce the faults with ground truth (written after seeing them, so
+they guard the fixes rather than measure them): `stress-breath-swells` (irregular 11 dB swells,
+breath noise 14 dB under, legato pairs) and `stress-scoops` (1–2 st scoops over 160 ms after
+silence). Round 3 (`data/phrase-stress-round3.txt`):
+
+| Backend | Standard (79) | Stress (53) | F (stress) |
+| --- | --- | --- | --- |
+| yin | 79 / 79 | 46 / 53 | 0.70 (breath-swells fails: voicing drops under breath) |
+| yin-viterbi (**default**) | **79 / 79** | **53 / 53** | **1.00** |
 
 ### Cost
 

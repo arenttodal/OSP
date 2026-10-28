@@ -89,6 +89,16 @@ public:
     /** Re-analyses the whole recording, keeping every note the user corrected (undoable). */
     void reanalyse();
 
+    /** The DETECTION and MIN NOTE controls as analysis settings. */
+    phrase::AnalysisSettings analysisSettings() const;
+    /** The settings the current notes were analysed with. When the controls differ, the
+        recording is re-analysed in the background (after the control rests for a moment),
+        keeping the user's corrections; the change is one undo step, so a setting can be tried,
+        played and taken back. */
+    const phrase::AnalysisSettings& analysedSettings() const noexcept { return analysed; }
+    /** Starts the re-analysis for changed controls now (the timer otherwise waits for them to rest). */
+    void applyAnalysisSettingsNow();
+
     bool exportAtlas (const juce::File& file, std::string& error) const;
     bool relink (const juce::File& file, std::string& error);
 
@@ -111,9 +121,13 @@ public:
 
 private:
     struct Job;
-    void timerCallback() override { pollLoader(); }
+    void timerCallback() override;
     void startJob (std::function<void (Job&)> work);
+    void startReanalysis (const phrase::AnalysisSettings& settings, const juce::String& undoName);
     void setAtlas (atlas::NoteAtlas atlas);
+    void setAnalysis (atlas::NoteAtlas atlas, const phrase::AnalysisSettings& settings, bool restoreControls);
+    void setControls (const phrase::AnalysisSettings& settings);
+    juce::String describeChange (const phrase::AnalysisSettings& from, const phrase::AnalysisSettings& to) const;
     void publishModel();
     void documentChanged();
     juce::ValueTree toTree();
@@ -127,13 +141,17 @@ private:
     std::shared_ptr<Job> job;
     std::unique_ptr<juce::ThreadPool> pool;
     juce::String lastStatus;
+    phrase::AnalysisSettings analysed;           ///< what doc.atlas was analysed with
+    std::string pendingDigest;                   ///< controls waiting to rest before re-analysis
+    juce::uint32 pendingSince = 0;
 
     // Audio thread
     phrase::PhraseEngine engine;
     bool wasPlaying = false;
-    std::array<std::atomic<float>*, 24> raw {};
+    std::array<std::atomic<float>*, 32> raw {};
 
     friend class AtlasEdit;
+    friend class AnalysisEdit;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PhraseProcessor)
 };
 

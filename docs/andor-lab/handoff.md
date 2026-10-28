@@ -91,7 +91,9 @@ oscillator's aliases stay > 60 dB down; Fill never transposes beyond its limit.
 
 **Analysis accuracy** (generated ground truth): 79/79 notes on the 13 standard fixtures for
 both backends; on the held-out stress set the default backend went 33/42 (round 1) → 42/42
-after general fixes (round 2, no longer held out). **No real recording was evaluated.**
+after general fixes (round 2, no longer held out). Round 3 (Phrase 0.1.1) came from the user's
+first two real recordings (ney, cello): 19 → 8 and 36 → 27 notes, stress set now 53/53
+(`phrase-analysis.md`). More real recordings are still the main open evaluation.
 
 **CPU** (virtualised 4-vCPU Xeon, not a Mac): typical patches peak at 23 % (Grain) and 18 %
 (Phrase) mean block load across 44.1/48/96 kHz × 64–512 × 1–16 voices; dense-grain stress

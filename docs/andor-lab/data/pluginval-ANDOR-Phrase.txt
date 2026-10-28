@@ -1,5 +1,5 @@
 Started validating: /home/user/OSP/build-plugin/apps/phrase/ANDOR_Phrase_artefacts/Release/VST3/ANDOR Phrase.vst3
-Random seed: 0x2bdd715
+Random seed: 0x63d038e
 Validation started
 Strictness level: 10
 -----------------------------------------------------------------
@@ -7,7 +7,7 @@ Starting tests in: pluginval / Scan for plugins located in: /home/user/OSP/build
 Num plugins found: 1
 
 Testing plugin: VST3-ANDOR Phrase-bbe1405b-2ed31884
-OSP: ANDOR Phrase v0.1.0
+OSP: ANDOR Phrase v0.1.1
 Completed tests in pluginval / Scan for plugins located in: /home/user/OSP/build-plugin/apps/phrase/ANDOR_Phrase_artefacts/Release/VST3/ANDOR Phrase.vst3
 -----------------------------------------------------------------
 Starting tests in: pluginval / Open plugin (cold)...
@@ -30,12 +30,6 @@ Starting tests in: pluginval / Plugin programs...
 Num programs: 0
 All program names checked
 Completed tests in pluginval / Plugin programs
------------------------------------------------------------------
-Starting tests in: pluginval / Editor...
-Completed tests in pluginval / Editor
------------------------------------------------------------------
-Starting tests in: pluginval / Open editor whilst processing...
-Completed tests in pluginval / Open editor whilst processing
 -----------------------------------------------------------------
 Starting tests in: pluginval / Audio processing...
 Testing with sample rate [44100] and block size [64]
@@ -97,17 +91,11 @@ Testing with sample rate [96000] and block size [512] and sub-block size [32]
 Testing with sample rate [96000] and block size [1024] and sub-block size [32]
 Completed tests in pluginval / Automation
 -----------------------------------------------------------------
-Starting tests in: pluginval / Editor Automation...
-Completed tests in pluginval / Editor Automation
------------------------------------------------------------------
 Starting tests in: pluginval / Automatable Parameters...
 Completed tests in pluginval / Automatable Parameters
 -----------------------------------------------------------------
 Starting tests in: pluginval / Parameters...
 Completed tests in pluginval / Parameters
------------------------------------------------------------------
-Starting tests in: pluginval / Background thread state...
-Completed tests in pluginval / Background thread state
 -----------------------------------------------------------------
 Starting tests in: pluginval / Parameter thread safety...
 Completed tests in pluginval / Parameter thread safety

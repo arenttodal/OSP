@@ -9,7 +9,7 @@ candidates.
 | --- | --- | --- |
 | Ableton Live + a second host (Gate E) | no Mac, no DAW | `test-instructions.md` §2 |
 | Listening: loops, SUSTAIN CHARACTER bloom, filled-key timbre, Natural ↔ Synthetic, Grain presets | no audio playback here | `test-instructions.md` §3 |
-| Phrase analysis on real recordings | none in the repository (the corpus is local-only) | `test-instructions.md` §4 |
+| Phrase analysis on more real recordings | two evaluated so far (the user's ney and cello melodies, round 3); none are in the repository | `test-instructions.md` §4; send recordings that misbehave |
 | CPU on reference hardware | only virtualised Linux numbers | `research-renderer --andor-bench` on the Mac |
 | Visual review of the new screens | the 8 screenshots in `screens/` stand in for mock-ups; the direction (OSP's ivory family, vector skin) needs approval | review `screens/` |
 | Factory presets with real sounds | needs legally owned recordings | — |
@@ -20,6 +20,11 @@ candidates.
 - No formant-preserving transposition: large Fill distances change the timbre (the UI says so
   for WIDE / EXTENDED).
 - Fast trills (≥ 2 semitones at ~4–6 Hz without plateaus) can be taken for vibrato.
+- MIN NOTE merges only pieces without a pitch of their own; a short real note (with a steady
+  pitch) stays even above MIN NOTE — merge it by hand if unwanted. A quiet, unsteady note
+  between two others may join a neighbour (DETECTION MORE or a lower MIN NOTE keeps it).
+- The plain `yin` backend (not the default) still splits breathy notes whose voicing drops
+  under the breath (`stress-breath-swells`).
 - Variation groups follow keys; the free-text group label exists in the data and edit API
   (`edit::setGroup`) but is not in the editor.
 - Selection is one note at a time; "re-analyse selection" re-describes the selected note.

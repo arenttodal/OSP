@@ -13,10 +13,10 @@
     "falseSplits": 0,
     "missed": 0,
     "spurious": 0,
-    "onsetErrorMs": 2.5,
+    "onsetErrorMs": 5.0,
     "offsetErrorMs": 61.2,
     "pitchErrorCents": 0.0,
-    "analysisMs": 117.6
+    "analysisMs": 111.8
   },
   {
     "fixture": "noisy",
@@ -35,7 +35,7 @@
     "onsetErrorMs": 0.0,
     "offsetErrorMs": 61.7,
     "pitchErrorCents": 0.4,
-    "analysisMs": 115.2
+    "analysisMs": 117.2
   },
   {
     "fixture": "vibrato",
@@ -51,10 +51,10 @@
     "falseSplits": 0,
     "missed": 0,
     "spurious": 0,
-    "onsetErrorMs": 3.7,
+    "onsetErrorMs": 5.0,
     "offsetErrorMs": 65.0,
     "pitchErrorCents": 1.9,
-    "analysisMs": 184.7
+    "analysisMs": 148.8
   },
   {
     "fixture": "legato",
@@ -73,7 +73,7 @@
     "onsetErrorMs": 5.0,
     "offsetErrorMs": 15.0,
     "pitchErrorCents": 0.0,
-    "analysisMs": 101.8
+    "analysisMs": 123.9
   },
   {
     "fixture": "long-sustain",
@@ -92,7 +92,7 @@
     "onsetErrorMs": 5.0,
     "offsetErrorMs": 65.0,
     "pitchErrorCents": 0.0,
-    "analysisMs": 184.1
+    "analysisMs": 180.5
   },
   {
     "fixture": "staccato",
@@ -111,7 +111,7 @@
     "onsetErrorMs": 5.0,
     "offsetErrorMs": 35.0,
     "pitchErrorCents": 0.1,
-    "analysisMs": 76.6
+    "analysisMs": 76.1
   },
   {
     "fixture": "silent-gaps",
@@ -130,7 +130,7 @@
     "onsetErrorMs": 5.0,
     "offsetErrorMs": 61.0,
     "pitchErrorCents": 0.0,
-    "analysisMs": 91.8
+    "analysisMs": 89.2
   },
   {
     "fixture": "repeated",
@@ -149,7 +149,7 @@
     "onsetErrorMs": 3.1,
     "offsetErrorMs": 40.0,
     "pitchErrorCents": 0.0,
-    "analysisMs": 97.3
+    "analysisMs": 94.4
   },
   {
     "fixture": "out-of-tune",
@@ -165,10 +165,10 @@
     "falseSplits": 0,
     "missed": 0,
     "spurious": 0,
-    "onsetErrorMs": 4.0,
+    "onsetErrorMs": 5.0,
     "offsetErrorMs": 63.0,
     "pitchErrorCents": 0.0,
-    "analysisMs": 84.0
+    "analysisMs": 81.5
   },
   {
     "fixture": "octave-ambiguity",
@@ -184,10 +184,10 @@
     "falseSplits": 0,
     "missed": 0,
     "spurious": 0,
-    "onsetErrorMs": 10.0,
+    "onsetErrorMs": 4.0,
     "offsetErrorMs": 60.0,
     "pitchErrorCents": 0.0,
-    "analysisMs": 103.6
+    "analysisMs": 93.5
   },
   {
     "fixture": "breath",
@@ -206,7 +206,7 @@
     "onsetErrorMs": 5.0,
     "offsetErrorMs": 60.0,
     "pitchErrorCents": 0.0,
-    "analysisMs": 147.1
+    "analysisMs": 124.6
   },
   {
     "fixture": "quiet-notes",
@@ -222,10 +222,10 @@
     "falseSplits": 0,
     "missed": 0,
     "spurious": 0,
-    "onsetErrorMs": 5.8,
+    "onsetErrorMs": 7.5,
     "offsetErrorMs": 45.8,
     "pitchErrorCents": 0.0,
-    "analysisMs": 90.1
+    "analysisMs": 90.6
   },
   {
     "fixture": "vocal-phrase",
@@ -244,7 +244,7 @@
     "onsetErrorMs": 5.6,
     "offsetErrorMs": 41.9,
     "pitchErrorCents": 1.3,
-    "analysisMs": 205.1
+    "analysisMs": 188.2
   },
   {
     "fixture": "TOTAL",
@@ -260,10 +260,10 @@
     "falseSplits": 0,
     "missed": 0,
     "spurious": 0,
-    "onsetErrorMs": 4.5,
+    "onsetErrorMs": 4.6,
     "offsetErrorMs": 48.7,
     "pitchErrorCents": 0.3,
-    "analysisMs": 1598.9
+    "analysisMs": 1520.4
   },
   {
     "fixture": "clean-scale",
@@ -279,10 +279,10 @@
     "falseSplits": 0,
     "missed": 0,
     "spurious": 0,
-    "onsetErrorMs": 2.5,
+    "onsetErrorMs": 5.0,
     "offsetErrorMs": 60.6,
     "pitchErrorCents": 0.0,
-    "analysisMs": 111.8
+    "analysisMs": 105.6
   },
   {
     "fixture": "noisy",
@@ -301,7 +301,7 @@
     "onsetErrorMs": 0.0,
     "offsetErrorMs": 61.7,
     "pitchErrorCents": 0.4,
-    "analysisMs": 145.7
+    "analysisMs": 124.7
   },
   {
     "fixture": "vibrato",
@@ -317,10 +317,10 @@
     "falseSplits": 0,
     "missed": 0,
     "spurious": 0,
-    "onsetErrorMs": 3.7,
+    "onsetErrorMs": 5.0,
     "offsetErrorMs": 65.0,
     "pitchErrorCents": 1.9,
-    "analysisMs": 187.3
+    "analysisMs": 141.5
   },
   {
     "fixture": "legato",
@@ -339,7 +339,7 @@
     "onsetErrorMs": 5.0,
     "offsetErrorMs": 14.2,
     "pitchErrorCents": 0.0,
-    "analysisMs": 101.2
+    "analysisMs": 88.4
   },
   {
     "fixture": "long-sustain",
@@ -358,7 +358,7 @@
     "onsetErrorMs": 5.0,
     "offsetErrorMs": 65.0,
     "pitchErrorCents": 0.0,
-    "analysisMs": 213.4
+    "analysisMs": 182.2
   },
   {
     "fixture": "staccato",
@@ -377,7 +377,7 @@
     "onsetErrorMs": 5.0,
     "offsetErrorMs": 35.0,
     "pitchErrorCents": 0.1,
-    "analysisMs": 44.0
+    "analysisMs": 65.2
   },
   {
     "fixture": "silent-gaps",
@@ -396,7 +396,7 @@
     "onsetErrorMs": 5.0,
     "offsetErrorMs": 61.0,
     "pitchErrorCents": 0.0,
-    "analysisMs": 95.9
+    "analysisMs": 89.3
   },
   {
     "fixture": "repeated",
@@ -412,10 +412,10 @@
     "falseSplits": 0,
     "missed": 0,
     "spurious": 0,
-    "onsetErrorMs": 3.8,
+    "onsetErrorMs": 3.1,
     "offsetErrorMs": 40.0,
     "pitchErrorCents": 0.0,
-    "analysisMs": 149.0
+    "analysisMs": 99.0
   },
   {
     "fixture": "out-of-tune",
@@ -431,10 +431,10 @@
     "falseSplits": 0,
     "missed": 0,
     "spurious": 0,
-    "onsetErrorMs": 4.0,
+    "onsetErrorMs": 5.0,
     "offsetErrorMs": 63.0,
     "pitchErrorCents": 0.0,
-    "analysisMs": 88.2
+    "analysisMs": 81.2
   },
   {
     "fixture": "octave-ambiguity",
@@ -450,10 +450,10 @@
     "falseSplits": 0,
     "missed": 0,
     "spurious": 0,
-    "onsetErrorMs": 10.0,
+    "onsetErrorMs": 4.0,
     "offsetErrorMs": 60.0,
     "pitchErrorCents": 0.0,
-    "analysisMs": 125.9
+    "analysisMs": 98.1
   },
   {
     "fixture": "breath",
@@ -472,7 +472,7 @@
     "onsetErrorMs": 5.0,
     "offsetErrorMs": 60.0,
     "pitchErrorCents": 0.0,
-    "analysisMs": 157.8
+    "analysisMs": 124.5
   },
   {
     "fixture": "quiet-notes",
@@ -488,10 +488,10 @@
     "falseSplits": 0,
     "missed": 0,
     "spurious": 0,
-    "onsetErrorMs": 6.7,
+    "onsetErrorMs": 7.5,
     "offsetErrorMs": 45.8,
     "pitchErrorCents": 0.0,
-    "analysisMs": 110.7
+    "analysisMs": 92.1
   },
   {
     "fixture": "vocal-phrase",
@@ -510,7 +510,7 @@
     "onsetErrorMs": 5.6,
     "offsetErrorMs": 41.9,
     "pitchErrorCents": 1.3,
-    "analysisMs": 196.7
+    "analysisMs": 177.9
   },
   {
     "fixture": "TOTAL",
@@ -529,6 +529,6 @@
     "onsetErrorMs": 4.6,
     "offsetErrorMs": 48.5,
     "pitchErrorCents": 0.3,
-    "analysisMs": 1727.6
+    "analysisMs": 1469.7
   }
 ]

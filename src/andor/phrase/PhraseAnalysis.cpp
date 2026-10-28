@@ -23,13 +23,45 @@ const char* toString (PitchBackend b) noexcept
     return "yin-viterbi";
 }
 
+const char* toString (Detection d) noexcept
+{
+    switch (d)
+    {
+        case Detection::fewer: return "fewer";
+        case Detection::more:  return "more";
+        case Detection::normal: break;
+    }
+    return "normal";
+}
+
 std::string AnalysisSettings::digest() const
 {
     char buffer[256];
-    std::snprintf (buffer, sizeof (buffer), "%s|%.1f-%.1f|h%.4f|hp%.0f|s%.1f|f%.1f|n%.3f|b%.3f|p%.2f/%.3f|r%.1f|a%.2f|t%d",
+    std::snprintf (buffer, sizeof (buffer), "%s|%.1f-%.1f|h%.4f|hp%.0f|s%.1f|f%.1f|n%.3f|b%.3f|p%.2f/%.3f|r%.1f|a%.2f|t%d|d%s|m%.3f",
                    toString (backend), minHz, maxHz, hopSeconds, highPassHz, silenceDb, absoluteFloorDb, minNoteSeconds,
-                   bridgeGapSeconds, pitchChangeSemitones, pitchHoldSeconds, rearticulationDb, a4Hz, autoTuning ? 1 : 0);
+                   bridgeGapSeconds, pitchChangeSemitones, pitchHoldSeconds, rearticulationDb, a4Hz, autoTuning ? 1 : 0,
+                   toString (detection), minPieceSeconds);
     return buffer;
+}
+
+AnalysisSettings AnalysisSettings::effective() const
+{
+    auto e = *this;
+    // A semitone step is always a new note, so FEWER never loosens the pitch threshold much:
+    // it mostly asks for deeper re-articulations and longer-held moves.
+    if (detection == Detection::fewer)
+    {
+        e.pitchChangeSemitones *= 1.1;
+        e.pitchHoldSeconds *= 1.5;
+        e.rearticulationDb *= 1.5;
+    }
+    else if (detection == Detection::more)
+    {
+        e.pitchChangeSemitones *= 0.85;
+        e.pitchHoldSeconds *= 0.75;
+        e.rearticulationDb *= 0.65;
+    }
+    return e;
 }
 
 namespace
@@ -609,11 +641,14 @@ namespace
                     isMin = false;
             if (! isMin)
                 continue;
+            // Depth against the typical level either side (median over 150 ms), not the loudest
+            // moment: breath and bow swells peak and sag around a held tone without re-attacking it,
+            // while a re-articulation falls well under the sound on both sides.
             const auto lo = i > reach ? i - reach : 0;
             const auto hi = std::min (level.size(), i + reach + 1);
-            const double leftMax = *std::max_element (level.begin() + static_cast<std::ptrdiff_t> (lo), level.begin() + static_cast<std::ptrdiff_t> (i + 1));
-            const double rightMax = *std::max_element (level.begin() + static_cast<std::ptrdiff_t> (i), level.begin() + static_cast<std::ptrdiff_t> (hi));
-            const double depth = std::min (leftMax, rightMax) - level[i];
+            const auto side = [&] (std::size_t from, std::size_t to)
+            { return median (std::vector<double> (level.begin() + static_cast<std::ptrdiff_t> (from), level.begin() + static_cast<std::ptrdiff_t> (std::max (to, from + 1)))); };
+            const double depth = std::min (side (lo, i > 3 ? i - 3 : i), side (std::min (i + 3, hi - 1), hi)) - level[i];
             bool unvoicedNear = false;
             for (std::size_t k = (i >= 3 ? i - 3 : 0); k <= std::min (level.size() - 1, i + 3); ++k)
                 unvoicedNear = unvoicedNear || ! c.frames[begin + k].voiced;
@@ -653,6 +688,182 @@ namespace
         for (auto a : accepted)
             splits.push_back (begin + a);
         return splits;
+    }
+    /** What the consolidation rules need to know about a candidate note. */
+    struct PieceInfo
+    {
+        double centre = 0.0;      ///< median pitch of its voiced frames (MIDI)
+        double head = 0.0;        ///< median pitch of its first quarter
+        double tail = 0.0;        ///< ... and of its last quarter
+        double levelDb = -120.0;  ///< median level
+        double confidence = 0.0;  ///< mean over voiced frames
+        bool plateau = false;     ///< most voiced frames within 0.3 semitone of the centre
+        bool weak = false;        ///< barely voiced or barely periodic
+        double seconds = 0.0;
+    };
+
+    PieceInfo describePiece (const PitchContour& c, const Segment& seg)
+    {
+        PieceInfo p;
+        std::vector<double> pitch, level;
+        double conf = 0.0;
+        for (auto k = seg.begin; k < seg.end; ++k)
+        {
+            level.push_back (c.frames[k].levelDb);
+            if (c.frames[k].voiced)
+            {
+                pitch.push_back (c.frames[k].midi);
+                conf += c.frames[k].confidence;
+            }
+        }
+        const auto len = seg.end - seg.begin;
+        p.seconds = static_cast<double> (len) * c.hopSeconds;
+        p.levelDb = median (level);
+        if (pitch.empty())
+        {
+            p.weak = true;
+            return p;
+        }
+        p.centre = median (pitch);
+        const auto quarter = std::max<std::size_t> (1, pitch.size() / 4);
+        p.head = median (std::vector<double> (pitch.begin(), pitch.begin() + static_cast<std::ptrdiff_t> (quarter)));
+        p.tail = median (std::vector<double> (pitch.end() - static_cast<std::ptrdiff_t> (quarter), pitch.end()));
+        p.confidence = conf / static_cast<double> (pitch.size());
+        std::size_t near = 0;
+        for (double m : pitch)
+            near += std::abs (m - p.centre) < 0.3 ? 1 : 0;
+        p.plateau = near * 2 > pitch.size();
+        p.weak = static_cast<double> (pitch.size()) < 0.3 * static_cast<double> (len) || p.confidence < 0.5;
+        return p;
+    }
+
+    /** Distance in semitones with octave slips folded away (the tracker's classic error). */
+    double foldedDistance (double a, double b)
+    {
+        const double d = std::abs (a - b);
+        return std::min (d, std::abs (d - 12.0));
+    }
+
+    /**
+        Pieces that are not notes of their own join the note they belong to (audio is never thrown
+        away; it becomes that note's attack or release, and KEEP ATTACK decides how much of a scoop
+        is heard):
+          - a scoop or slide into a note at the start of a phrase, and a fall or octave slip in its
+            breathy tail at the end;
+          - MIN NOTE: anything shorter than `minPieceSeconds` joined to a neighbour that has no
+            pitch of its own: a fragment of the same note, a slide without a plateau, an octave
+            slip, a weak scrap. Short notes with their own steady pitch (runs, grace notes) stay.
+          - a short scrap after a breath-length gap at the same pitch is that note's tail.
+    */
+    void consolidate (std::vector<Segment>& segs, const PitchContour& c, const AnalysisSettings& s)
+    {
+        const double fps = 1.0 / c.hopSeconds;
+        const auto mergeInto = [&] (std::size_t from, std::size_t into)
+        {
+            auto& a = segs[into];
+            a.begin = std::min (a.begin, segs[from].begin);
+            a.end = std::max (a.end, segs[from].end);
+            segs.erase (segs.begin() + static_cast<std::ptrdiff_t> (from));
+        };
+
+        for (int pass = 0; pass < 64; ++pass)
+        {
+            bool changed = false;
+            for (std::size_t i = 0; i < segs.size() && ! changed; ++i)
+            {
+                const auto& seg = segs[i];
+                const bool gluedPrev = i > 0 && segs[i - 1].end == seg.begin;
+                const bool gluedNext = i + 1 < segs.size() && segs[i + 1].begin == seg.end;
+                const auto p = describePiece (c, seg);
+
+                // Scoop into the first note of a phrase: short, travelling towards the note, or a
+                // brief approach (the boundary sits half-way up the slide, so the piece left over
+                // can look flat) leaning into a much longer note close by.
+                if (gluedNext && ! gluedPrev && p.seconds <= 0.25)
+                {
+                    const auto next = describePiece (c, segs[i + 1]);
+                    const bool travels = std::abs (p.tail - next.centre) + 0.5 <= std::abs (p.head - next.centre);
+                    const bool slide = travels && ! p.plateau && std::abs (p.centre - next.centre) <= 3.0;
+                    const bool scoop = travels && std::abs (p.centre - next.centre) <= 2.5;
+                    const bool approach = p.seconds <= 0.2 && next.seconds >= 3.0 * p.seconds && std::abs (p.centre - next.centre) <= 2.5;
+                    const bool slip = std::abs (std::abs (p.centre - next.centre) - 12.0) < 0.7;
+                    if (slide || scoop || approach || slip || p.weak)
+                    {
+                        mergeInto (i, i + 1);
+                        changed = true;
+                        continue;
+                    }
+                }
+                // Fall, octave slip or fading scrap at the end of a phrase.
+                if (gluedPrev && ! gluedNext && p.seconds <= 0.4)
+                {
+                    const auto prev = describePiece (c, segs[i - 1]);
+                    const bool falls = std::abs (p.tail - prev.centre) >= std::abs (p.head - prev.centre) + 0.5 && ! p.plateau;
+                    const bool slip = std::abs (std::abs (p.centre - prev.centre) - 12.0) < 0.7;
+                    const bool fading = p.levelDb <= prev.levelDb - 10.0;
+                    if (falls || slip || fading || p.weak)
+                    {
+                        mergeInto (i, i - 1);
+                        changed = true;
+                        continue;
+                    }
+                }
+                // MIN NOTE.
+                if ((gluedPrev || gluedNext) && p.seconds < s.minPieceSeconds)
+                {
+                    const auto prev = gluedPrev ? describePiece (c, segs[i - 1]) : PieceInfo {};
+                    const auto next = gluedNext ? describePiece (c, segs[i + 1]) : PieceInfo {};
+                    const double dPrev = gluedPrev ? foldedDistance (p.centre, prev.centre) : 1.0e9;
+                    const double dNext = gluedNext ? foldedDistance (p.centre, next.centre) : 1.0e9;
+                    const bool samePitch = std::min (dPrev, dNext) < 0.5;
+                    if (p.weak || ! p.plateau || samePitch)
+                    {
+                        mergeInto (i, dPrev <= dNext ? i - 1 : i + 1);
+                        changed = true;
+                        continue;
+                    }
+                }
+                // An octave slip or a weak scrap across a tiny gap (a voicing dropout) belongs to the
+                // note on the other side of the gap.
+                if (! gluedPrev && ! gluedNext && p.seconds < s.minPieceSeconds)
+                {
+                    const auto gapFrames = static_cast<std::size_t> (std::lround (0.08 * fps));
+                    const bool nearPrev = i > 0 && seg.begin - segs[i - 1].end <= gapFrames;
+                    const bool nearNext = i + 1 < segs.size() && segs[i + 1].begin - seg.end <= gapFrames;
+                    const auto slipOf = [&] (std::size_t j)
+                    {
+                        const auto other = describePiece (c, segs[j]);
+                        return std::abs (std::abs (p.centre - other.centre) - 12.0) < 0.7 && other.seconds > p.seconds;
+                    };
+                    if (nearNext && (slipOf (i + 1) || p.weak))
+                    {
+                        mergeInto (i, i + 1);
+                        changed = true;
+                        continue;
+                    }
+                    if (nearPrev && (slipOf (i - 1) || p.weak))
+                    {
+                        mergeInto (i, i - 1);
+                        changed = true;
+                        continue;
+                    }
+                }
+                // A scrap after a breath-length gap at the same pitch: the tail of the note before.
+                if (! gluedPrev && ! gluedNext && i > 0 && p.seconds < s.minPieceSeconds
+                    && static_cast<double> (seg.begin - segs[i - 1].end) <= 0.1 * fps)
+                {
+                    const auto prev = describePiece (c, segs[i - 1]);
+                    if (foldedDistance (p.centre, prev.centre) < 0.5 && (p.weak || p.levelDb <= prev.levelDb - 6.0))
+                    {
+                        mergeInto (i, i - 1);
+                        changed = true;
+                        continue;
+                    }
+                }
+            }
+            if (! changed)
+                break;
+        }
     }
 }
 
@@ -713,8 +924,9 @@ std::unique_ptr<PitchTracker> makePitchTracker (PitchBackend backend)
     return std::make_unique<YinViterbiTracker>();
 }
 
-std::vector<Segment> segment (const PitchContour& c, const Preprocessed& pre, const AnalysisSettings& s)
+std::vector<Segment> segment (const PitchContour& c, const Preprocessed& pre, const AnalysisSettings& settings)
 {
+    const auto s = settings.effective();
     std::vector<Segment> result;
     const auto n = c.frames.size();
     if (n == 0)
@@ -748,7 +960,27 @@ std::vector<Segment> segment (const PitchContour& c, const Preprocessed& pre, co
             for (auto k = last.end; k < i; ++k)
                 loud = loud && c.frames[k].levelDb >= pre.silenceThresholdDb;
             const bool continuous = std::abs (c.frames[last.end - 1].midi - c.frames[i].midi) < 1.0;
-            if (gap <= bridge && loud && continuous)
+            // Longer dropouts too, when the sound stays near the note's own level and the pitch
+            // comes back unchanged: a breathy tone sinking into its air noise for a moment is the
+            // same note (breath between two notes is much quieter than either).
+            bool sustained = false;
+            if (! (gap <= bridge) && gap <= static_cast<std::size_t> (std::lround (0.25 * fps)) && loud)
+            {
+                const auto around = [&] (std::size_t from, std::size_t to)
+                {
+                    std::vector<double> l;
+                    for (auto k = from; k < to; ++k)
+                        l.push_back (c.frames[k].levelDb);
+                    return median (l);
+                };
+                const auto w = static_cast<std::size_t> (std::lround (0.1 * fps));
+                const double noteLevel = std::min (around (last.end > last.begin + w ? last.end - w : last.begin, last.end), around (i, std::min (j, i + w)));
+                double gapLow = 1.0e9;
+                for (auto k = last.end; k < i; ++k)
+                    gapLow = std::min (gapLow, static_cast<double> (c.frames[k].levelDb));
+                sustained = gapLow >= noteLevel - 10.0 && std::abs (c.frames[last.end - 1].midi - c.frames[i].midi) < 0.5;
+            }
+            if ((gap <= bridge && loud && continuous) || sustained)
             {
                 last.end = j;
                 i = j;
@@ -864,6 +1096,8 @@ std::vector<Segment> segment (const PitchContour& c, const Preprocessed& pre, co
             result[i + 1].legatoIn = seg.legatoIn;
         }
     }
+
+    consolidate (kept, c, s);
     for (std::size_t i = 0; i < kept.size(); ++i)
     {
         kept[i].legatoIn = i > 0 && kept[i - 1].end == kept[i].begin;
@@ -882,6 +1116,26 @@ atlas::NoteEvent describe (const Segment& seg, const Segment* previous, const Se
     const auto totalFrames = pre.analysedFrames;
 
     // --- 4: robust centre pitch on the body (glides at both ends left out) ---
+    // Octave slips (often in an absorbed breathy tail) are folded back first, so they never
+    // read as pitch spread or vibrato.
+    std::vector<double> folded (len, 0.0);
+    {
+        std::vector<double> m;
+        for (auto i = seg.begin; i < seg.end; ++i)
+            if (c.frames[i].voiced)
+                m.push_back (c.frames[i].midi);
+        const double rough = median (m);
+        for (auto i = seg.begin; i < seg.end; ++i)
+        {
+            double x = c.frames[i].midi;
+            while (c.frames[i].voiced && x - rough > 6.0)
+                x -= 12.0;
+            while (c.frames[i].voiced && rough - x > 6.0)
+                x += 12.0;
+            folded[i - seg.begin] = x;
+        }
+    }
+    const auto pitchAt = [&] (std::size_t i) { return folded[i - seg.begin]; };
     const auto trim = len > 30 ? std::min<std::size_t> (static_cast<std::size_t> (0.2 * static_cast<double> (len)), 12) : 0;
     std::vector<std::pair<double, double>> weighted;
     double confSum = 0.0;
@@ -894,11 +1148,11 @@ atlas::NoteEvent describe (const Segment& seg, const Segment* previous, const Se
         }
     for (auto i = seg.begin + trim; i < seg.end - trim; ++i)
         if (c.frames[i].voiced)
-            weighted.emplace_back (c.frames[i].midi, std::max (1.0e-6, c.frames[i].confidence * dbToGain (c.frames[i].levelDb)));
+            weighted.emplace_back (pitchAt (i), std::max (1.0e-6, c.frames[i].confidence * dbToGain (c.frames[i].levelDb)));
     if (weighted.empty())
         for (auto i = seg.begin; i < seg.end; ++i)
             if (c.frames[i].voiced)
-                weighted.emplace_back (c.frames[i].midi, std::max (1.0e-6, c.frames[i].confidence * dbToGain (c.frames[i].levelDb)));
+                weighted.emplace_back (pitchAt (i), std::max (1.0e-6, c.frames[i].confidence * dbToGain (c.frames[i].levelDb)));
 
     const double centre = weightedMedian (weighted);
     std::vector<std::pair<double, double>> deviations;
@@ -911,7 +1165,7 @@ atlas::NoteEvent describe (const Segment& seg, const Segment* previous, const Se
         std::vector<double> body;
         for (auto i = seg.begin + trim; i < seg.end - trim; ++i)
             if (c.frames[i].voiced)
-                body.push_back (c.frames[i].midi);
+                body.push_back (pitchAt (i));
         if (body.size() > static_cast<std::size_t> (0.25 * fps))
         {
             const auto trend = movingAverage (body, static_cast<int> (std::lround (0.1 * fps)));
@@ -971,9 +1225,16 @@ atlas::NoteEvent describe (const Segment& seg, const Segment* previous, const Se
         // the level is still clearly above the floor (at most 120 ms, never into the previous note).
         // Reaching the recording's noise floor also ends the search (a hissy recording never
         // falls to the silence threshold).
-        const float floor = std::max ({ pre.silenceThresholdDb, notePeak - 35.0f, pre.noiseFloorDb + 3.0f });
         const auto limitFrame = std::max<std::ptrdiff_t> (previous != nullptr ? static_cast<std::ptrdiff_t> (previous->end) : 0,
                                                           static_cast<std::ptrdiff_t> (seg.begin) - static_cast<std::ptrdiff_t> (0.12 * fps));
+        // When true silence comes before the note, the walk ends there; the noise-floor
+        // estimate is only for hissy recordings (with digital silence between notes it is really
+        // the quiet moments of breathy notes, and would stop a breathy attack too early).
+        bool silenceBefore = false;
+        for (auto f = limitFrame; f < static_cast<std::ptrdiff_t> (seg.begin); ++f)
+            silenceBefore = silenceBefore || c.frames[static_cast<std::size_t> (f)].levelDb < pre.silenceThresholdDb;
+        const float floor = silenceBefore ? std::max (pre.silenceThresholdDb, notePeak - 35.0f)
+                                          : std::max ({ pre.silenceThresholdDb, notePeak - 35.0f, pre.noiseFloorDb + 3.0f });
         // It also stops in the valley before the onset: breath or a previous tail that rises
         // again further back is not this note's attack.
         auto k = static_cast<std::ptrdiff_t> (seg.begin);

@@ -208,6 +208,63 @@ TEST_CASE ("ANDOR Phrase plugin: the analysis cache, undo/redo, foreign states",
     CHECK (p.document().atlas.notes.size() == 8);
 }
 
+TEST_CASE ("ANDOR Phrase plugin: DETECTION and MIN NOTE re-analyse, keep corrections, undo, recall", "[phrase-plugin]")
+{
+    plugintest::IsolatedFolders folders;
+    const auto file = writeFixture (folders.root, "repeated");   // 4 separate G3s, then 4 re-articulated legato
+    PhraseProcessor p;
+    p.loadFile (file);
+    REQUIRE (p.waitForLoad (30000));
+    REQUIRE (p.document().atlas.notes.size() == 8);
+    CHECK (p.analysedSettings().digest() == p.analysisSettings().digest());
+
+    // A correction made before trying a setting survives it.
+    const auto first = p.document().atlas.notes[0].id;
+    REQUIRE (p.edit ("Pitch", [&] (atlas::NoteAtlas& a) { return phrase::edit::setRoot (a, first, 56); }));
+
+    auto set = [&] (const char* id, float value)
+    {
+        auto* param = p.state.getParameter (id);
+        REQUIRE (param != nullptr);
+        CHECK_FALSE (param->isAutomatable());
+        param->setValueNotifyingHost (param->convertTo0to1 (value));
+    };
+    set ("detection", 0.0f);   // FEWER: the 12 dB re-articulations no longer split
+    p.applyAnalysisSettingsNow();
+    REQUIRE (p.waitForLoad (30000));
+    CHECK (p.document().atlas.notes.size() == 5);
+    CHECK (p.document().atlas.findNote (first)->rootMidi == 56);
+    CHECK (p.undoManager().getUndoDescription() == "Detection: fewer notes");
+    CHECK (p.analysedSettings().detection == phrase::Detection::fewer);
+
+    // UNDO takes the notes and the control back, with nothing left to re-analyse.
+    REQUIRE (p.undoManager().undo());
+    CHECK (p.document().atlas.notes.size() == 8);
+    CHECK (p.analysisSettings().detection == phrase::Detection::normal);
+    CHECK (p.analysedSettings().digest() == p.analysisSettings().digest());
+    CHECK_FALSE (p.isBusy());
+    REQUIRE (p.undoManager().redo());
+    CHECK (p.document().atlas.notes.size() == 5);
+    CHECK (p.analysisSettings().detection == phrase::Detection::fewer);
+
+    // MIN NOTE.
+    set ("detection", 1.0f);
+    set ("minNote", 0.45f);
+    p.applyAnalysisSettingsNow();
+    REQUIRE (p.waitForLoad (30000));
+    CHECK (p.document().atlas.notes.size() == 6);
+
+    // The session reopens with these settings and these notes, without analysing again.
+    juce::MemoryBlock saved;
+    p.getStateInformation (saved);
+    PhraseProcessor q;
+    q.setStateInformation (saved.getData(), static_cast<int> (saved.getSize()));
+    REQUIRE (q.waitForLoad (30000));
+    CHECK (q.document().atlas.notes.size() == 6);
+    CHECK (q.analysisSettings().minPieceSeconds == Approx (0.45).margin (0.001));
+    CHECK (q.analysedSettings().digest() == q.analysisSettings().digest());
+}
+
 TEST_CASE ("ANDOR Phrase plugin: presets and the exported Note Atlas", "[phrase-plugin]")
 {
     plugintest::IsolatedFolders folders;
@@ -348,6 +405,29 @@ TEST_CASE ("ANDOR Phrase plugin: the editor", "[phrase-plugin][editor]")
         p.editorBeingDeleted (editor.get());
     }
     CHECK (true);
+}
+
+TEST_CASE ("ANDOR Phrase plugin: editor screenshot of a user recording", "[.recording-screenshot]")
+{
+    // Headless review of a reported recording (never committed):
+    //   ANDOR_RECORDING=take.wav ANDOR_SCREENSHOT_DIR=out xvfb-run -a andor_phrase_plugin_tests "[.recording-screenshot]"
+    //   (optional: ANDOR_DETECTION=0|1|2 for FEWER / NORMAL / MORE, ANDOR_MIN_NOTE=<seconds>)
+    const auto recording = juce::SystemStats::getEnvironmentVariable ("ANDOR_RECORDING", {});
+    if (recording.isEmpty())
+        return;
+    plugintest::IsolatedFolders folders;
+    PhraseProcessor p;
+    const auto detectionText = juce::SystemStats::getEnvironmentVariable ("ANDOR_DETECTION", "1");
+    p.state.getParameter ("detection")->setValueNotifyingHost (p.state.getParameter ("detection")->convertTo0to1 (detectionText.getFloatValue()));
+    const auto minNoteText = juce::SystemStats::getEnvironmentVariable ("ANDOR_MIN_NOTE", "0.25");
+    p.state.getParameter ("minNote")->setValueNotifyingHost (p.state.getParameter ("minNote")->convertTo0to1 (minNoteText.getFloatValue()));
+    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditor());
+    editor->setSize (PhraseEditor::designWidth, PhraseEditor::designHeight);
+    p.loadFile (juce::File (recording));
+    REQUIRE (p.waitForLoad (60000));
+    dynamic_cast<PhraseEditor*> (editor.get())->refreshNow();
+    plugintest::screenshot (*editor, (juce::File (recording).getFileNameWithoutExtension() + ".png").toStdString());
+    p.editorBeingDeleted (editor.get());
 }
 
 TEST_CASE ("ANDOR Phrase plugin: processBlock never allocates", "[phrase-plugin][realtime]")

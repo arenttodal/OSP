@@ -16,9 +16,11 @@ namespace
     // Parameter IDs are stable: they are the session and automation identity.
     const char* const ids[] = { "playMode", "roundRobin", "fill", "tuning", "pitch", "fine", "bendRange", "gain", "velocity",
                                 "attack", "decay", "sustain", "release", "attackPreserve", "startOffset", "tone", "synthetic",
-                                "sustainCharacter", "levelMatch", "space", "echo", "polyphony", "seed" };
+                                "sustainCharacter", "levelMatch", "space", "echo", "polyphony", "seed", "detection", "minNote" };
     enum Id { playMode, roundRobin, fill, tuning, pitch, fine, bendRange, gain, velocity, attack, decay, sustain, release,
-              attackPreserve, startOffset, tone, synthetic, sustainCharacter, levelMatch, space, echo, polyphony, seed, numIds };
+              attackPreserve, startOffset, tone, synthetic, sustainCharacter, levelMatch, space, echo, polyphony, seed,
+              detection, minNote, numIds };
+    static_assert (numIds <= 32, "raw[] holds 32 parameters");
 
     juce::NormalisableRange<float> timeRange (float lo, float hi, float centre)
     {
@@ -67,6 +69,11 @@ namespace
         real (echo, "Echo", { 0.0f, 1.0f }, 0.0f, pct);
         l.add (std::make_unique<AudioParameterInt> (ParameterID { ids[polyphony], 1 }, "Polyphony", 4, 28, 16));
         l.add (std::make_unique<AudioParameterInt> (ParameterID { ids[seed], 1 }, "Seed", 1, 9999, 1));
+        // Analysis choices: saved with the session, never automated (each change re-analyses).
+        l.add (std::make_unique<AudioParameterChoice> (ParameterID { ids[detection], 1 }, "Detection", StringArray { "Fewer Notes", "Normal", "More Notes" }, 1,
+                                                       AudioParameterChoiceAttributes().withAutomatable (false)));
+        l.add (std::make_unique<AudioParameterFloat> (ParameterID { ids[minNote], 1 }, "Min Note", NormalisableRange<float> (0.05f, 0.5f, 0.01f), 0.25f,
+                                                      AudioParameterFloatAttributes().withAutomatable (false).withStringFromValueFunction (seconds)));
         return l;
     }
 
@@ -100,6 +107,8 @@ struct PhraseProcessor::Job
     std::optional<LoadedSource> source;
     std::optional<atlas::NoteAtlas> atlas;
     bool mergeWithEdits = false;
+    std::optional<phrase::AnalysisSettings> settings;   ///< what the atlas was analysed with (when it was)
+    juce::String undoName;
     bool missing = false;
     std::string missingName;
     std::string error;
@@ -132,6 +141,36 @@ public:
 private:
     PhraseProcessor& processor;
     atlas::NoteAtlas before, after;
+};
+
+/** A re-analysis: the notes and the settings they came from, as one undo step. Undo puts the
+    DETECTION / MIN NOTE controls back too, without analysing again. */
+class AnalysisEdit final : public juce::UndoableAction
+{
+public:
+    AnalysisEdit (PhraseProcessor& p, atlas::NoteAtlas b, phrase::AnalysisSettings bs, atlas::NoteAtlas a, phrase::AnalysisSettings as)
+        : processor (p), before (std::move (b)), after (std::move (a)), beforeSettings (bs), afterSettings (as)
+    {
+    }
+    bool perform() override
+    {
+        // The first time, the controls already show these settings (and may have moved on since).
+        processor.setAnalysis (after, afterSettings, ! firstPerform);
+        firstPerform = false;
+        return true;
+    }
+    bool undo() override
+    {
+        processor.setAnalysis (before, beforeSettings, true);
+        return true;
+    }
+    int getSizeInUnits() override { return static_cast<int> (64 * (before.notes.size() + after.notes.size()) + 1); }
+
+private:
+    PhraseProcessor& processor;
+    atlas::NoteAtlas before, after;
+    phrase::AnalysisSettings beforeSettings, afterSettings;
+    bool firstPerform = true;
 };
 
 //==============================================================================
@@ -315,7 +354,7 @@ void PhraseProcessor::startJob (std::function<void (Job&)> work)
 
 void PhraseProcessor::loadFile (const juce::File& file)
 {
-    const auto settings = phrase::AnalysisSettings {};
+    const auto settings = analysisSettings();
     auto* storePtr = &store;
     startJob ([file, settings, storePtr] (Job& j)
               {
@@ -340,6 +379,7 @@ void PhraseProcessor::loadFile (const juce::File& file)
                           cached->sources[0].numChannels = std::min (source->audio->numChannels(), 2);
                           cached->sources[0].numFrames = source->audio->numFrames();
                           j.atlas = std::move (*cached);
+                          j.settings = settings;
                           j.source = std::move (source);
                           return;
                       }
@@ -355,6 +395,7 @@ void PhraseProcessor::loadFile (const juce::File& file)
                       j.warnings.push_back (w);
                   io::writeNoteAtlas (cache.getFullPathName().toStdString(), result.atlas, error);
                   j.atlas = std::move (result.atlas);
+                  j.settings = settings;
                   j.source = std::move (source);
               });
 }
@@ -362,7 +403,8 @@ void PhraseProcessor::loadFile (const juce::File& file)
 void PhraseProcessor::loadExample()
 {
     auto* storePtr = &store;
-    startJob ([storePtr] (Job& j)
+    const auto settings = analysisSettings();
+    startJob ([storePtr, settings] (Job& j)
               {
                   j.setStage ("Generating the example phrase");
                   const auto fx = phrase::makePhraseFixture ("vocal-phrase");
@@ -381,8 +423,9 @@ void PhraseProcessor::loadExample()
                   }
                   source->fileName = "Example phrase (generated)";
                   j.setStage ("Analysing the example");
-                  auto result = phrase::analysePhrase (*source->audio, assetOf (*source), {}, &j.cancel, &j.progress);
+                  auto result = phrase::analysePhrase (*source->audio, assetOf (*source), settings, &j.cancel, &j.progress);
                   j.atlas = std::move (result.atlas);
+                  j.settings = settings;
                   j.source = std::move (source);
               });
 }
@@ -395,22 +438,114 @@ void PhraseProcessor::cancelLoad()
 
 void PhraseProcessor::reanalyse()
 {
+    startReanalysis (analysisSettings(), "Re-analyse");
+}
+
+phrase::AnalysisSettings PhraseProcessor::analysisSettings() const
+{
+    phrase::AnalysisSettings settings;
+    const auto d = juce::roundToInt (raw[static_cast<std::size_t> (detection)]->load (std::memory_order_relaxed));
+    settings.detection = d == 0 ? phrase::Detection::fewer : (d == 2 ? phrase::Detection::more : phrase::Detection::normal);
+    settings.minPieceSeconds = raw[static_cast<std::size_t> (minNote)]->load (std::memory_order_relaxed);
+    return settings;
+}
+
+juce::String PhraseProcessor::describeChange (const phrase::AnalysisSettings& from, const phrase::AnalysisSettings& to) const
+{
+    if (from.detection != to.detection)
+        return to.detection == phrase::Detection::fewer ? "Detection: fewer notes" : (to.detection == phrase::Detection::more ? "Detection: more notes" : "Detection: normal");
+    if (std::abs (from.minPieceSeconds - to.minPieceSeconds) > 1.0e-6)
+        return "Min note " + juce::String (juce::roundToInt (to.minPieceSeconds * 1000.0)) + " ms";
+    return "Re-analyse";
+}
+
+void PhraseProcessor::startReanalysis (const phrase::AnalysisSettings& settings, const juce::String& undoName)
+{
     if (doc.source == nullptr)
         return;
+    pendingDigest.clear();
     auto source = doc.source;
-    startJob ([source] (Job& j)
+    auto* storePtr = &store;
+    startJob ([source, settings, undoName, storePtr] (Job& j)
               {
                   j.setStage ("Re-analysing (your corrections are kept)");
-                  auto result = phrase::analysePhrase (*source->audio, assetOf (*source), {}, &j.cancel, &j.progress);
+                  j.settings = settings;
+                  j.undoName = undoName;
+                  j.mergeWithEdits = true;
+                  // Each setting's analysis is cached, so trying one again is instant.
+                  std::string error;
+                  const auto cache = storePtr->analysisCache (source->sha256Hex, phrase::analysisVersion, settings.digest());
+                  if (cache.existsAsFile())
+                      if (auto cached = io::readNoteAtlas (cache.getFullPathName().toStdString(), error);
+                          cached && cached->analysis.version == phrase::analysisVersion && ! cached->sources.empty())
+                      {
+                          cached->sources[0] = assetOf (*source);
+                          cached->sources[0].sampleRate = source->audio->sampleRate;
+                          cached->sources[0].numChannels = std::min (source->audio->numChannels(), 2);
+                          cached->sources[0].numFrames = source->audio->numFrames();
+                          j.atlas = std::move (*cached);
+                          return;
+                      }
+                  auto result = phrase::analysePhrase (*source->audio, assetOf (*source), settings, &j.cancel, &j.progress);
                   if (result.cancelled)
                   {
                       j.cancelled = true;
                       return;
                   }
+                  io::writeNoteAtlas (cache.getFullPathName().toStdString(), result.atlas, error);
                   j.atlas = std::move (result.atlas);
-                  j.mergeWithEdits = true;
-                  j.source = *source;
               });
+}
+
+void PhraseProcessor::applyAnalysisSettingsNow()
+{
+    const auto wanted = analysisSettings();
+    if (doc.source != nullptr && wanted.digest() != analysed.digest())
+        startReanalysis (wanted, describeChange (analysed, wanted));
+}
+
+void PhraseProcessor::timerCallback()
+{
+    pollLoader();
+    // DETECTION / MIN NOTE: re-analyse once the control has rested for a moment (a dragged
+    // slider does not start an analysis per pixel).
+    if (doc.source == nullptr || job != nullptr)
+        return;
+    const auto wanted = analysisSettings();
+    const auto digest = wanted.digest();
+    if (digest == analysed.digest())
+    {
+        pendingDigest.clear();
+        return;
+    }
+    const auto now = juce::Time::getMillisecondCounter();
+    if (digest != pendingDigest)
+    {
+        pendingDigest = digest;
+        pendingSince = now;
+        return;
+    }
+    if (now - pendingSince >= 350)
+        startReanalysis (wanted, describeChange (analysed, wanted));
+}
+
+void PhraseProcessor::setControls (const phrase::AnalysisSettings& settings)
+{
+    if (auto* p = state.getParameter (ids[detection]))
+        p->setValueNotifyingHost (p->convertTo0to1 (settings.detection == phrase::Detection::fewer ? 0.0f : (settings.detection == phrase::Detection::more ? 2.0f : 1.0f)));
+    if (auto* p = state.getParameter (ids[minNote]))
+        p->setValueNotifyingHost (p->convertTo0to1 (static_cast<float> (settings.minPieceSeconds)));
+}
+
+void PhraseProcessor::setAnalysis (atlas::NoteAtlas a, const phrase::AnalysisSettings& settings, bool restoreControls)
+{
+    analysed = settings;
+    if (restoreControls)
+    {
+        setControls (settings);
+        pendingDigest.clear();
+    }
+    setAtlas (std::move (a));
 }
 
 void PhraseProcessor::pollLoader()
@@ -442,12 +577,15 @@ void PhraseProcessor::pollLoader()
     if (j->mergeWithEdits && j->atlas)
     {
         auto merged = phrase::edit::mergeReanalysis (doc.atlas, *j->atlas);
-        edit ("Re-analyse", [&] (atlas::NoteAtlas& a)
-              {
-                  a = merged;
-                  return true;
-              });
-        lastStatus = "Re-analysed: " + juce::String (static_cast<int> (merged.notes.size())) + " notes";
+        const auto settings = j->settings.value_or (analysed);
+        const auto name = j->undoName.isNotEmpty() ? j->undoName : juce::String ("Re-analyse");
+        undo.beginNewTransaction (name);
+        undo.perform (new AnalysisEdit (*this, doc.atlas, analysed, merged, settings), name);
+        int included = 0;
+        for (const auto& note : merged.notes)
+            included += note.included ? 1 : 0;
+        lastStatus = juce::String (included) + " notes  (" + name + ")";
+        documentChanged();
         return;
     }
     if (j->source)
@@ -460,6 +598,10 @@ void PhraseProcessor::pollLoader()
     doc.warnings = j->warnings;
     if (j->atlas)
         doc.atlas = std::move (*j->atlas);
+    // A recalled session plays its saved notes as they were: whatever the controls say now is
+    // what they were analysed with (no surprise re-analysis on reopening).
+    analysed = j->settings.value_or (analysisSettings());
+    pendingDigest.clear();
     undo.clearUndoHistory();
     publishModel();
     int included = 0;
@@ -613,6 +755,8 @@ bool PhraseProcessor::fromTree (const juce::ValueTree& tree, std::string& error)
         doc = Document {};
         if (recalled)
             doc.atlas = *recalled;
+        analysed = analysisSettings();
+        pendingDigest.clear();
         publishModel();
         documentChanged();
         return true;
@@ -620,7 +764,8 @@ bool PhraseProcessor::fromTree (const juce::ValueTree& tree, std::string& error)
     // Recall plays the saved atlas as it was: no re-analysis, edits intact.
     auto* storePtr = &store;
     const bool haveAtlas = recalled.has_value();
-    startJob ([storePtr, hash, originalPath, name, recalled, haveAtlas] (Job& j)
+    const auto settings = analysisSettings();
+    startJob ([storePtr, hash, originalPath, name, recalled, haveAtlas, settings] (Job& j)
               {
                   j.setStage ("Recalling " + juce::String (name));
                   std::string err;
@@ -639,8 +784,9 @@ bool PhraseProcessor::fromTree (const juce::ValueTree& tree, std::string& error)
                       j.atlas = recalled;
                   else
                   {
-                      auto result = phrase::analysePhrase (*loaded->audio, assetOf (*loaded), {}, &j.cancel, &j.progress);
+                      auto result = phrase::analysePhrase (*loaded->audio, assetOf (*loaded), settings, &j.cancel, &j.progress);
                       j.atlas = std::move (result.atlas);
+                      j.settings = settings;
                   }
                   j.source = std::move (loaded);
               });

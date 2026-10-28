@@ -29,6 +29,10 @@ enum class Tuning { corrected, original };
 int fillLimitSemitones (FillMode) noexcept;
 
 /** One playable region, prepared from a note (source frames, at the source's rate). */
+/** The shortest SUSTAIN loop (seconds): shorter loops repeat fast enough to buzz. 0.12 s is the
+    loop of a 200 ms sustain, the shortest that sounded like the note in the first user tests. */
+constexpr double minLoopSeconds = 0.12;
+
 struct PlayRegion
 {
     int noteIndex = 0;
@@ -38,7 +42,7 @@ struct PlayRegion
     double confidence = 0.0;
     double attackStart = 0.0, sustainStart = 0.0, sustainEnd = 0.0, releaseStart = 0.0, end = 0.0;
     double fadeIn = 32.0, fadeOut = 32.0;
-    bool loopable = false;           ///< SUSTAIN can loop it (a long enough, stable sustain)
+    bool loopable = false;           ///< SUSTAIN can loop it (a stable sustain that holds a minLoopSeconds loop)
     double loopStart = 0.0, loopEnd = 0.0, loopCrossfade = 0.0;
     bool equalPowerLoop = false;     ///< the loop's ends correlate poorly: cross-fade at equal power
     double levelDb = -20.0;          ///< body level, for Level matching

@@ -23,6 +23,13 @@ and never required before playing.
    the sounding voices. The keyboard map shows recorded keys (amber, with the number of
    variations), filled keys (pale) and keys that cannot play (hatched).
 3. **Play** at once: chromatically, in chords (a monophonic recording plays polyphonically).
+   If notes are cut too finely or too coarsely, try **DETECTION** (FEWER / NORMAL / MORE: how
+   readily a held sound is cut into notes) and **MIN NOTE** (50–500 ms, default 250 ms: shorter
+   pieces without a pitch of their own — a fragment of the same note, a slide, an octave slip —
+   join the neighbouring note; short notes with their own pitch stay). Either change
+   re-analyses in the background once the control rests (~0.35 s), keeps every corrected note
+   and is one undo step: play the result, and UNDO puts the notes *and* the control back. Each
+   setting's analysis is cached, so switching back is instant.
 4. **Correct** what is wrong (all undoable): select a note (click it, or a key on the map),
    drag its markers (attack start, sustain start / end, end), PITCH − / + and OCT − / + (an
    octave or note-name correction), PLAYS ON (map the recording to another key as it is),
@@ -62,9 +69,12 @@ and never required before playing.
 Loop points (`buildPhraseModel`): a whole number of pitch periods covering ~60 % of the
 sustain, its start aligned where the cross-fade windows correlate best (normalised
 cross-correlation, ±1 period); equal-power cross-fade when the ends correlate poorly
-(< 0.7), linear otherwise. Regions with a sustain under 120 ms, or noisy notes, do not loop:
+(< 0.7), linear otherwise. **No loop is shorter than 120 ms** (`minLoopSeconds`, the loop of a
+200 ms sustain, the shortest that sounded like the note in the first user tests): shorter loops
+repeat fast enough to buzz. Regions whose sustain cannot hold one, or noisy notes, do not loop:
 in SUSTAIN they play to their stable end and then hold with a soft granular cloud of their
-body (a graceful fallback, not a pretend loop); tiny fragments simply end.
+body, its grains (80 ms down to 20 ms) fitted inside the note so they never read into a
+neighbour and the note's own pitch is heard (a graceful fallback, not a pretend loop).
 
 **SUSTAIN CHARACTER** blends the clean loop (0) with a granular bloom of the sustain (1):
 80 ms Hann grains at 20 ms intervals, seeded per note.
@@ -83,6 +93,7 @@ steady level over 6 s holds.
 | Level | `gain` (MASTER), `velocity` (0 = ignored, 1 = 40 dB range), `levelMatch` (0 the recording's dynamics, 1 every note at one level) |
 | Pitch | `pitch` (±24 st), `fine` (±100 c), `bendRange` |
 | Effects | `space` (OSP's hall reverb as a send), `echo` (OSP's tape delay as a send) |
+| Analysis | `detection` (FEWER / NORMAL / MORE), `minNote` (0.05–0.5 s): saved with the session, **not automatable** (each change re-analyses) |
 | Other | `startOffset` |
 
 MIDI: note on/off (velocity), sustain pedal, pitch bend, All Notes Off (CC 123), All Sound
@@ -108,7 +119,9 @@ transpositions change the timbre. Formant-preserving transposition is not claime
 - Presets: the same tree in `Documents/ANDOR Lab/Phrase Presets/*.andorphrase`.
 - Another product's state (Grain, OSP, garbage) is ignored without changing anything.
 - Re-analyse (menu) keeps every note the user touched and only replaces untouched ones;
-  undoable.
+  undoable. DETECTION / MIN NOTE changes do the same; their undo step restores the controls too.
+- Recall plays the saved notes as they were, whatever analysis version made them: reopening
+  never re-analyses (the controls are taken as what the saved notes were analysed with).
 - Export Note Atlas (menu) writes `.andoratlas` for ANDOR Grain (`docs/andor-lab/note-atlas.md`).
 
 ## Real-time safety

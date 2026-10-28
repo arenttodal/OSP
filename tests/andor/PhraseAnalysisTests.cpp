@@ -286,3 +286,115 @@ TEST_CASE ("Phrase analysis: the generated atlas describes its source and method
         CHECK_FALSE (n.corrections.any());
     }
 }
+
+namespace
+{
+    /** A hand-made contour: pieces of (seconds, start pitch, end pitch, level dB, voiced). */
+    struct Piece
+    {
+        double seconds, fromMidi, toMidi;
+        float levelDb = -12.0f;
+        bool voiced = true;
+    };
+
+    phrase::PitchContour contourOf (const std::vector<Piece>& pieces, phrase::Preprocessed& pre)
+    {
+        phrase::PitchContour c;
+        c.hopSeconds = 0.005;
+        for (const auto& p : pieces)
+        {
+            const auto n = static_cast<int> (std::lround (p.seconds / c.hopSeconds));
+            for (int i = 0; i < n; ++i)
+            {
+                phrase::PitchFrame f;
+                f.voiced = p.voiced;
+                f.midi = p.voiced ? p.fromMidi + (p.toMidi - p.fromMidi) * i / std::max (1, n - 1) : 0.0;
+                f.hz = p.voiced ? midiToHz (f.midi) : 0.0;
+                f.confidence = p.voiced ? 0.95 : 0.0;
+                f.levelDb = p.levelDb;
+                c.frames.push_back (f);
+            }
+        }
+        pre.sampleRate = 48000.0;
+        pre.peakDb = -12.0f;
+        pre.silenceThresholdDb = -57.0f;
+        pre.noiseFloorDb = -100.0f;
+        for (const auto& f : c.frames)
+            pre.levelDb.push_back (f.levelDb);
+        pre.analysedFrames = static_cast<std::int64_t> (c.frames.size()) * 240;
+        return c;
+    }
+
+    std::vector<phrase::Segment> segmentsOf (const std::vector<Piece>& pieces, const phrase::AnalysisSettings& settings = {})
+    {
+        phrase::Preprocessed pre;
+        const auto c = contourOf (pieces, pre);
+        return phrase::segment (c, pre, settings);
+    }
+
+    constexpr float silent = -120.0f;
+}
+
+TEST_CASE ("Phrase analysis: scoops, falls and octave slips belong to their note", "[phrase][unit]")
+{
+    SECTION ("a slide up into the first note of a phrase is that note's attack")
+    {
+        const auto segs = segmentsOf ({ { 0.2, 0, 0, silent, false }, { 0.08, 76.3, 76.4 }, { 0.08, 76.4, 77.9 }, { 1.2, 78, 78 }, { 0.2, 0, 0, silent, false } });
+        REQUIRE (segs.size() == 1);
+        CHECK (segs[0].begin == 40);   // the scoop's first frame
+    }
+    SECTION ("a breathy tail that the tracker hears an octave down stays with the note")
+    {
+        const auto segs = segmentsOf ({ { 0.2, 0, 0, silent, false }, { 1.2, 72, 72 }, { 0.3, 59.8, 59.8, -30.0f }, { 0.2, 0, 0, silent, false } });
+        CHECK (segs.size() == 1);
+    }
+    SECTION ("an octave slip across a short dropout joins the neighbouring note")
+    {
+        const auto segs = segmentsOf ({ { 0.2, 0, 0, silent, false }, { 0.6, 72, 72 }, { 0.04, 0, 0, -40.0f, false }, { 0.07, 60.1, 60.1 },
+                                        { 0.15, 0, 0, silent, false }, { 0.6, 65, 65 }, { 0.2, 0, 0, silent, false } });
+        CHECK (segs.size() == 2);
+    }
+    SECTION ("short notes with a steady pitch of their own are kept, whatever MIN NOTE says")
+    {
+        phrase::AnalysisSettings settings;
+        settings.minPieceSeconds = 0.4;
+        const auto segs = segmentsOf ({ { 0.2, 0, 0, silent, false }, { 0.5, 72, 72 }, { 0.12, 74, 74 }, { 0.5, 76, 76 }, { 0.2, 0, 0, silent, false } }, settings);
+        CHECK (segs.size() == 3);
+    }
+    SECTION ("breath swells under a held tone do not re-articulate it; a fall to near silence does")
+    {
+        std::vector<Piece> swells { { 0.2, 0, 0, silent, false } };
+        for (int k = 0; k < 6; ++k)
+        {
+            swells.push_back ({ 0.2, 72, 72, -12.0f });
+            swells.push_back ({ 0.06, 72, 72, -19.0f });   // a 7 dB sag (the ney's measure ~6 dB against its median level)
+        }
+        swells.push_back ({ 0.2, 0, 0, silent, false });
+        CHECK (segmentsOf (swells).size() == 1);
+
+        const auto repeated = segmentsOf ({ { 0.2, 0, 0, silent, false }, { 0.5, 72, 72 }, { 0.05, 72, 72, -35.0f }, { 0.5, 72, 72 }, { 0.2, 0, 0, silent, false } });
+        CHECK (repeated.size() == 2);
+    }
+}
+
+TEST_CASE ("Phrase analysis: DETECTION and MIN NOTE are settings like any other", "[phrase][unit]")
+{
+    phrase::AnalysisSettings normal, fewer, more;
+    fewer.detection = phrase::Detection::fewer;
+    more.detection = phrase::Detection::more;
+    CHECK (fewer.effective().rearticulationDb > normal.effective().rearticulationDb);
+    CHECK (more.effective().rearticulationDb < normal.effective().rearticulationDb);
+    // A semitone step is a new note at every level.
+    CHECK (fewer.effective().pitchChangeSemitones < 0.75);
+    CHECK (more.effective().pitchChangeSemitones < normal.effective().pitchChangeSemitones);
+    // Cached analyses are keyed by the digest: both settings must change it.
+    CHECK (fewer.digest() != normal.digest());
+    auto shorter = normal;
+    shorter.minPieceSeconds = 0.1;
+    CHECK (shorter.digest() != normal.digest());
+
+    // A shallower re-articulation splits at MORE, not at NORMAL.
+    const std::vector<Piece> rebowed { { 0.2, 0, 0, silent, false }, { 0.5, 60, 60 }, { 0.05, 60, 60, -19.0f }, { 0.5, 60, 60 }, { 0.2, 0, 0, silent, false } };
+    CHECK (segmentsOf (rebowed).size() == 1);
+    CHECK (segmentsOf (rebowed, more).size() == 2);
+}

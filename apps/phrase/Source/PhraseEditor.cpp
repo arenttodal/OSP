@@ -255,9 +255,10 @@ NotePanel::NotePanel (PhraseProcessor& p) : processor (p)
         const auto audio = processor.document().source->audio;
         std::string made;
         const auto target = id;
+        const auto settings = processor.analysedSettings();
         processor.edit ("Split", [&] (atlas::NoteAtlas& a)
                         {
-                            made = phrase::edit::split (a, target, at, *audio);
+                            made = phrase::edit::split (a, target, at, *audio, settings);
                             return ! made.empty();
                         });
     };
@@ -267,7 +268,8 @@ NotePanel::NotePanel (PhraseProcessor& p) : processor (p)
             return;
         const auto audio = processor.document().source->audio;
         const auto target = id;
-        processor.edit ("Merge", [&] (atlas::NoteAtlas& a) { return phrase::edit::mergeWithNext (a, target, *audio); });
+        const auto settings = processor.analysedSettings();
+        processor.edit ("Merge", [&] (atlas::NoteAtlas& a) { return phrase::edit::mergeWithNext (a, target, *audio, settings); });
     };
     reanalyse.onClick = [this]
     {
@@ -275,7 +277,8 @@ NotePanel::NotePanel (PhraseProcessor& p) : processor (p)
             return;
         const auto audio = processor.document().source->audio;
         const auto target = id;
-        processor.edit ("Re-analyse note", [&] (atlas::NoteAtlas& a) { return phrase::edit::reanalyse (a, target, *audio); });
+        const auto settings = processor.analysedSettings();
+        processor.edit ("Re-analyse note", [&] (atlas::NoteAtlas& a) { return phrase::edit::reanalyse (a, target, *audio, settings); });
     };
     undo.onClick = [this] { processor.undoManager().undo(); };
     redo.onClick = [this] { processor.undoManager().redo(); };
@@ -418,6 +421,7 @@ PhraseEditor::Content::Content (PhraseProcessor& p)
       fill (p.state, "fill", { "OFF", "NATURAL", "BALANCED", "WIDE", "EXTENDED" }),
       variation (p.state, "roundRobin", { "IN TURN", "RANDOM", "SHUFFLE" }),
       tuning (p.state, "tuning", { "IN TUNE", "AS PLAYED" }),
+      detection (p.state, "detection", { "FEWER", "NORMAL", "MORE" }),
       attack (p.state, "attack", "Attack"),
       release (p.state, "release", "Release"),
       tone (p.state, "tone", "Tone", true, plugin::palette::gold),
@@ -433,8 +437,13 @@ PhraseEditor::Content::Content (PhraseProcessor& p)
 {
     for (auto* c : std::initializer_list<juce::Component*> { &wave, &keys, &notes, &importKey, &menuKey, &cancelKey, &octaveDown, &octaveUp, &mode, &fill,
                                                              &variation, &tuning, &attack, &release, &tone, &synthetic, &preserve, &character,
-                                                             &pitch, &levelMatch, &space, &echo, &velocity, &master })
+                                                             &pitch, &levelMatch, &space, &echo, &velocity, &master, &detection, &minNote })
         addAndMakeVisible (c);
+    // How readily the recording is cut into notes: changing either re-analyses in the background
+    // (corrections kept, one undo step), so a setting can be played before keeping it.
+    minNoteAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (p.state, "minNote", minNote);
+    minNote.onValueChange = [this] { repaint(); };
+    minNote.setTooltip ("Shorter pieces without a pitch of their own join the neighbouring note (re-analyses; UNDO goes back)");
     importKey.onClick = [this] { chooseFile(); };
     menuKey.onClick = [this] { showMenu(); };
     cancelKey.onClick = [this] { processor.cancelLoad(); };
@@ -590,6 +599,8 @@ void PhraseEditor::Content::resized()
     importKey.setBounds (720, 34, 96, 34);
     cancelKey.setBounds (826, 34, 80, 34);
     master.setBounds (1124, 18, 82, 84);
+    detection.setBounds (640, 80, 236, 24);
+    minNote.setBounds (966, 80, 96, 24);
     wave.setBounds (30, 108, 1180, 262);
     octaveDown.setBounds (30, 384, 24, 66);
     octaveUp.setBounds (1186, 384, 24, 66);
@@ -647,7 +658,16 @@ void PhraseEditor::Content::paint (juce::Graphics& g)
     juce::String source = doc.source != nullptr ? juce::String (doc.source->fileName) : doc.sourceMissing ? "Missing: " + juce::String (doc.missingName) + "  (menu > Relink)" : "No recording";
     if (doc.source != nullptr)
         source << ui::u8 ("  ·  ") << juce::String (doc.source->audio->durationSeconds(), 1) << ui::u8 (" s  ·  ") << juce::roundToInt (doc.source->audio->sampleRate / 1000.0) << " kHz";
-    g.drawText (source, juce::Rectangle<float> (32.0f, 90.0f, 800.0f, 16.0f), juce::Justification::centredLeft);
+    g.drawText (source, juce::Rectangle<float> (32.0f, 90.0f, 520.0f, 16.0f), juce::Justification::centredLeft);
+    // Analysis controls between the header and the waveform.
+    g.setFont (ui::label (11.0f));
+    g.drawText ("DETECTION", juce::Rectangle<float> (562.0f, 84.0f, 76.0f, 16.0f), juce::Justification::centredLeft);
+    g.drawText ("MIN NOTE", juce::Rectangle<float> (894.0f, 84.0f, 70.0f, 16.0f), juce::Justification::centredLeft);
+    g.setColour (design::colour::text);
+    g.setFont (ui::value (12.0f));
+    g.drawText (juce::String (juce::roundToInt (minNote.getValue() * 1000.0)) + " ms", juce::Rectangle<float> (1064.0f, 84.0f, 52.0f, 16.0f),
+                juce::Justification::centredLeft);
+    g.setColour (design::colour::textSecondary);
     g.drawText (ui::u8 ("KEYBOARD MAP  ·  amber: recorded  ·  number: variations  ·  pale: filled  ·  hatched: not playable"),
                 juce::Rectangle<float> (60.0f, 452.0f, 900.0f, 12.0f), juce::Justification::centredLeft);
 

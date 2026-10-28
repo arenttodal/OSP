@@ -36,12 +36,15 @@ namespace
         const double sr = src.sampleRate();
         const double len = r.sustainEnd - r.sustainStart;
         r.loopable = false;
-        if (len < 0.12 * sr)
+        if (len < minLoopSeconds * sr)
             return;
         const double period = pitchHz > 20.0 ? sr / pitchHz : 0.01 * sr;
         const double fade = std::clamp (0.25 * len, 2.0 * period, 0.08 * sr);
         const double loopEnd = std::floor (r.sustainEnd - 0.05 * len);
-        const double periods = std::max (2.0, std::floor (0.6 * len / period));
+        // Never shorter than minLoopSeconds: a shorter loop repeats fast enough to buzz instead
+        // of sounding like the note (sustains too short for it get the granular hold instead).
+        // One period of headroom: the seam search below may move the start by up to a period.
+        const double periods = std::max (2.0, std::ceil (std::max (0.6 * len, minLoopSeconds * sr + period) / period));
         const double loopLength = std::round (periods * period);
         const double nominalStart = loopEnd - loopLength;
         if (nominalStart - fade < r.sustainStart)
@@ -495,11 +498,14 @@ float PhraseEngine::grainSustain (Voice& v, const PlayRegion& region, double inc
     const double srcRate = src.sampleRate();
     const double lo = region.sustainEnd - region.sustainStart > 0.04 * srcRate ? region.sustainStart : region.attackStart;
     const double hi = region.sustainEnd - region.sustainStart > 0.04 * srcRate ? region.sustainEnd : region.end;
-    const int grainLength = static_cast<int> (0.08 * sampleRate);
+    // Grains fit inside the note (a short note's grains never read into its neighbour), from
+    // 80 ms down to 20 ms: still several periods, so the pitch is heard rather than a buzz.
+    const double fits = (hi - lo - 4.0) / std::max (1.0e-6, increment);
+    const int grainLength = static_cast<int> (std::clamp (fits, 0.02 * sampleRate, 0.08 * sampleRate));
     const double reach = grainLength * increment;
     if (--v.grainCountdown <= 0)
     {
-        v.grainCountdown = static_cast<int> (0.02 * sampleRate);
+        v.grainCountdown = std::max (1, grainLength / 4);
         for (auto& g : v.grains)
             if (! g.active)
             {
@@ -531,7 +537,7 @@ float PhraseEngine::grainSustain (Voice& v, const PlayRegion& region, double inc
         if (++g.age >= g.length)
             g.active = false;
     }
-    // Four grains overlap at 80 ms / 20 ms: Hann windows at 25 % hop sum to 2.
+    // Four grains overlap (a new one every quarter grain): Hann windows at 25 % hop sum to 2.
     left *= 0.5f;
     right *= 0.5f;
     return left;

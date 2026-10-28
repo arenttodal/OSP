@@ -6,7 +6,7 @@ include(${PROJECT_SOURCE_DIR}/apps/andor-common/AndorPlugin.cmake)
 
 juce_add_plugin(ANDOR_Phrase
     PRODUCT_NAME "ANDOR Phrase"
-    VERSION 0.1.0
+    VERSION 0.1.1
     COMPANY_NAME "OSP"
     BUNDLE_ID "com.osp.andorphrase"
     PLUGIN_MANUFACTURER_CODE Ospx

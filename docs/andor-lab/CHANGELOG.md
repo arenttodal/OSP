@@ -1,5 +1,28 @@
 # ANDOR Lab changelog
 
+## ANDOR Phrase 0.1.1 — first user tests (2026-10)
+
+From the first real recordings (a ney and a cello melody; analysis version 2,
+`phrase-analysis.md` "Round 3"):
+- Breath and bow swells no longer cut a held note into fragments: re-articulation is measured
+  against the median level either side (9 dB at NORMAL), and breathy voicing dropouts at the
+  note's own level are bridged.
+- A slide up into a phrase's first note becomes that note's attack (no more stray "E" on the
+  key below that leaps up); falls, fading scraps and octave slips in a breathy tail become its
+  release; octave slips are folded out of the pitch and vibrato measures.
+- **DETECTION** (FEWER / NORMAL / MORE) and **MIN NOTE** (50–500 ms, default 250 ms) controls:
+  saved with the session, not automatable; a change re-analyses in the background, keeps
+  corrections and is one undo step that also restores the control (try, play, keep or undo).
+- SUSTAIN loops are never shorter than 120 ms (shorter ones buzzed); notes too short for that
+  hold with grains fitted inside the note, so its own pitch is heard.
+- Breathy attacks after true silence are found from the silence, not from a noise-floor
+  estimate made of the notes' own quiet moments.
+- New stress fixtures `stress-breath-swells`, `stress-scoops`; CLI `--detection`, `--min-note`,
+  `--output-contour`; `--phrase-fixtures` also writes the stress set; a hidden plug-in test
+  renders the editor for any recording (`ANDOR_RECORDING`).
+- Sessions saved with 0.1.0 reopen exactly as saved (no re-analysis); only a new import or a
+  re-analysis uses version 2. Cached analyses of version 1 are not reused.
+
 ## 0.1.0 — internal development build (branch `andor-lab`, 2026-10)
 
 First versions of ANDOR Phrase and ANDOR Grain and their shared Note Atlas. No installer.

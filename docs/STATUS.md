@@ -504,7 +504,11 @@ DAW, listening or real recordings in the build environment). No installer.
 - [x] M2 Phrase analysis: YIN and YIN+Viterbi backends, vibrato/tremolo-aware segmentation,
       refinement, tuning rule; 13 generated fixtures 79/79; stress set 33/42 (round 1, held
       out) -> 42/42 (round 2, fixed by general rules) (docs/andor-lab/phrase-analysis.md)
-- [ ] M2 real-recording evaluation (needs the user's annotated recordings)
+- [x] Phrase 0.1.1 from the first user tests (ney, cello): swell-proof re-articulation,
+      scoops/falls/octave slips absorbed, DETECTION + MIN NOTE (re-analyse, undoable),
+      120 ms minimum loop; ney 19 -> 8 notes, cello 36 -> 27; stress 53/53
+      (docs/andor-lab/phrase-analysis.md "Round 3")
+- [ ] M2 real-recording evaluation beyond the first two (annotated recordings from the user)
 - [x] M3 Phrase engine: exact keys, variations, Fill limits, ONE SHOT / GATE / SUSTAIN,
       polyphony, stealing, tests
 - [x] M4 Phrase plug-in + editor: import (drag/drop, picker, progress, cancel, cache), note
