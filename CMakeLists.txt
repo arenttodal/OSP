@@ -183,6 +183,34 @@ target_link_libraries(osp_research PUBLIC osp_dsp osp_library osp_juce_headless)
 target_compile_definitions(osp_research PUBLIC OSP_VERSION_STRING="${PROJECT_VERSION}")
 osp_set_warnings(osp_research)
 
+# ---------------------------------------------------------------------------
+# ANDOR Lab (docs/andor-lab): ANDOR Phrase and ANDOR Grain. andor_dsp is pure C++20 like
+# osp_dsp (no JUCE, no I/O); andor_io adds the Note Atlas JSON on the JUCE-backed I/O.
+# OSP's own targets never link these, so OSP cannot regress through them.
+# ---------------------------------------------------------------------------
+add_library(andor_dsp STATIC
+    src/andor/atlas/NoteAtlas.cpp
+    src/andor/phrase/PhraseAnalysis.cpp
+    src/andor/phrase/PhraseFixtures.cpp
+    src/andor/phrase/PhraseEngine.cpp
+    src/andor/phrase/PhraseEdits.cpp
+    src/andor/dsp/Wavetable.cpp
+    src/andor/dsp/SharedFx.cpp
+    src/andor/grain/KeyDna.cpp
+    src/andor/grain/GrainEngine.cpp
+)
+target_include_directories(andor_dsp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(andor_dsp PUBLIC osp_dsp)
+set_target_properties(andor_dsp PROPERTIES POSITION_INDEPENDENT_CODE ON)
+osp_set_warnings(andor_dsp)
+
+set(ANDOR_IO_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/andor/io/NoteAtlasJson.cpp
+)
+add_library(andor_io STATIC ${ANDOR_IO_SOURCES})
+target_link_libraries(andor_io PUBLIC andor_dsp osp_research)
+osp_set_warnings(andor_io)
+
 if(OSP_BUILD_TESTS)
     enable_testing()
 endif()
@@ -191,6 +219,12 @@ add_subdirectory(apps/research-renderer)
 
 if(OSP_BUILD_PLUGIN)
     add_subdirectory(apps/plugin)
+    # ANDOR Lab plug-ins (docs/andor-lab): separate products built from the same repository.
+    option(ANDOR_BUILD_LAB "Build the ANDOR Phrase and ANDOR Grain plug-ins" ON)
+    if(ANDOR_BUILD_LAB)
+        add_subdirectory(apps/phrase)
+        add_subdirectory(apps/grain)
+    endif()
     # ANDOR instruments built from the ANDOR Instrument Shell (shared/andor-shell).
     option(ANDOR_BUILD_PRODUCTS "Build the ANDOR instruments in products/ (needs OSP_BUILD_PLUGIN)" ON)
     if(ANDOR_BUILD_PRODUCTS)

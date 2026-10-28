@@ -58,6 +58,28 @@ add_test(NAME performance-smoke
     COMMAND research-renderer --benchmark --seconds 3 --voices 24 --output-json ${CMAKE_BINARY_DIR}/benchmark-smoke.json)
 set_tests_properties(performance-smoke PROPERTIES LABELS performance)
 
+# ANDOR Lab: Note Atlas, Phrase and Grain (docs/andor-lab). Own executable so a failure there
+# is never mistaken for an OSP regression, and OSP's suites stay as they were.
+add_executable(andor_tests
+    support/TestHelpers.cpp
+    andor/AtlasTests.cpp
+    andor/PhraseAnalysisTests.cpp
+    andor/PhraseEngineTests.cpp
+    andor/PhraseEditTests.cpp
+    andor/GrainTests.cpp
+    andor/InteropTests.cpp
+    andor/RealtimeTests.cpp
+)
+target_include_directories(andor_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(andor_tests PRIVATE andor_io Catch2::Catch2WithMain)
+target_compile_definitions(andor_tests PRIVATE OSP_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+osp_set_warnings(andor_tests)
+add_test(NAME andor-atlas COMMAND andor_tests "[atlas]")
+add_test(NAME andor-phrase COMMAND andor_tests "[phrase]")
+add_test(NAME andor-grain COMMAND andor_tests "[grain]")
+add_test(NAME andor-interop COMMAND andor_tests "[interop]")
+add_test(NAME andor-realtime COMMAND andor_tests "[realtime]")
+
 # The ANDOR bootstrap tool (tools/create_andor_instrument.py), in a sandbox.
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)

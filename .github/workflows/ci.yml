@@ -60,6 +60,39 @@ jobs:
           killall -9 AudioComponentRegistrar || true
           auval -v aumu Osp1 Ospx
 
+      - name: Validate ANDOR Lab AU (macOS)
+        # ANDOR Phrase and ANDOR Grain (docs/andor-lab); their unique codes never replace OSP.
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p ~/Library/Audio/Plug-Ins/Components
+          cp -R "build/apps/phrase/ANDOR_Phrase_artefacts/Release/AU/ANDOR Phrase.component" ~/Library/Audio/Plug-Ins/Components/
+          cp -R "build/apps/grain/ANDOR_Grain_artefacts/Release/AU/ANDOR Grain.component" ~/Library/Audio/Plug-Ins/Components/
+          killall -9 AudioComponentRegistrar || true
+          auval -v aumu Aphr Ospx
+          auval -v aumu Agrn Ospx
+
+      - name: Package ANDOR Lab macOS test build
+        # Bundles + a double-click install.command (user copy, no admin), like OSP's test build.
+        if: runner.os == 'macOS'
+        run: |
+          out=ANDOR-Lab-macOS-test
+          mkdir -p $out
+          for p in phrase:Phrase grain:Grain; do
+            art="build/apps/${p%%:*}/ANDOR_${p##*:}_artefacts/Release"
+            name="ANDOR ${p##*:}"
+            cp -R "$art/AU/$name.component" "$art/VST3/$name.vst3" "$art/Standalone/$name.app" $out/
+            lipo -info "$out/$name.component/Contents/MacOS/$name"
+          done
+          cp packaging/andor-lab-macos-test/install.command packaging/andor-lab-macos-test/README.txt $out/
+          chmod +x $out/install.command
+          ditto -c -k --keepParent $out ANDOR-Lab-macOS-test.zip
+
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'macOS'
+        with:
+          name: ANDOR-Lab-macOS-test
+          path: ANDOR-Lab-macOS-test.zip
+
       - name: Validate ANDOR Example AU (macOS)
         # The product built from the ANDOR Instrument Shell is its own plugin (code Aexm).
         if: runner.os == 'macOS'

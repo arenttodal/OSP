@@ -664,6 +664,46 @@ the catalog (decision D-02). `osp_dsp` never links it, and nothing of it runs on
 thread. Architecture, contracts, schema and formats: `docs/library/architecture.md`,
 `schema.md`, `preset-format.md`, `template-format.md`; progress in `requirements-matrix.md`.
 
+## ANDOR LAB: ANDOR Phrase and ANDOR Grain (docs/andor-lab/)
+
+Two further instruments built from this repository as separate products (own plug-in codes,
+bundle ids, state tags and preset folders), sharing one data model, the **Note Atlas**. OSP's
+targets do not link any of it, so OSP cannot regress through them.
+
+```
+src/andor/atlas      NoteAtlas: sources by fingerprint, notes in absolute source frames   (pure C++)
+src/andor/phrase     PhraseAnalysis (YIN / YIN+Viterbi, segmentation, refinement, mapping),
+                     PhraseEngine (exact keys, variations, Fill, ONE SHOT/GATE/SUSTAIN),
+                     PhraseEdits (split, merge, pitch, markers, keep-edits re-analysis),
+                     PhraseFixtures (generated ground truth + note metrics)               (pure C++)
+src/andor/grain      GrainEngine (grain pool, fair-share budget, oscillator, modulation),
+                     KeyDna (curves + seeded per-key individuality)                       (pure C++)
+src/andor/dsp        SVF, smoother, LFO, band-limited wavetables, SharedFx (OSP's SpaceReverb
+                     and EchoDelay), offline render                                       (pure C++)
+src/andor/io         NoteAtlasJson (versioned JSON, resolving, relinking)                 (JUCE)
+apps/andor-common    sample store, display mailboxes, audition queue, widgets on OSP's Design
+apps/phrase          ANDOR_Phrase plug-in (processor, editor)
+apps/grain           ANDOR_Grain plug-in (processor, editor, KEY DNA editor)
+```
+
+Libraries: `andor_dsp` (links `osp_dsp`) and `andor_io` (links `osp_research`); the plug-ins
+compile the look from `shared/andor-ui` (`Design`, `OspLookAndFeel`, `SpriteKnobRenderer`,
+`CeramicSkin`; not the instrument components) again with their own `BinaryData` (fonts and the
+rendered ivory knob; no ceramic skin pack), as ANDOR Drums does on its branch.
+
+Threading follows the OSP plug-in: the message thread owns the document (source, atlas or
+KEY DNA curves, undo); a `juce::ThreadPool` worker decodes, hashes and analyses; the audio
+thread plays immutable models handed over by `ModelExchange` (Grain's curves too, as
+snapshots), reads parameters from APVTS atomics, and takes editor notes from a lock-free
+`AuditionQueue` instead of `juce::MidiKeyboardState` (which locks). `processBlock` of both is
+tested allocation-free. Determinism: every random choice is `Prng::deriveSeed (seed, event,
+key)`, restarted on transport start.
+
+The Note Atlas is the seam for a later hybrid: Phrase writes it, Grain reads it (four source
+policies), and both engines can play from one `PlaybackSource` (tested). Recorded deviation
+from the suggested `shared/ products/` layout: the existing `src/` + `apps/` structure was kept
+(no refactor of OSP before working prototypes existed); see docs/andor-lab/audit.md §6.
+
 ## ANDOR DESIGN SYSTEM AND INSTRUMENT SHELL (andor-design-system/HANDOFF.md)
 
 **Why.** Sister products (ANDOR Drums, Grain, Phrase and those to come) must look and behave
