@@ -434,8 +434,12 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       test sources, products built from another repository (`ANDOR_EXTERNAL_PRODUCTS`), VST3
       categories, ANDOR OSP's macro names in the parity render.
 - [x] ANDOR ANALOG registered (`Aanl`, `com.osp.andoranalog`); it lives in arenttodal/analog.
-- [x] ANDOR OSP unchanged: design capture byte-identical before/after, schema golden unchanged,
-      full suite green (see the commit message for the runs).
+- [x] ANDOR OSP unchanged (Linux, Xvfb): the design capture is byte-identical before/after in
+      every state and component except the MOVEMENT popover (06-popup-movement and its @2x crop),
+      which also differs between two runs of the unchanged build (its moving picture: not this
+      change); the schema golden is unchanged; ctest 12/12 green in the arenttodal/analog build
+      (unit, integration, regression, plugin, osp_visual_reference, ANDOR Example's and ANDOR
+      Analog's visual regressions at 0 px outside the masks in all 18 states).
 
 ## DONE
 
