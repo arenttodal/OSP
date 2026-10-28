@@ -179,7 +179,7 @@ public:
 
     // A/B source layers (numLayers, layerName, layerParameterId: InstrumentHost). Everything
     // below that takes a `layer` acts on the layer being edited when it is -1 (the A/B tabs choose it).
-    int editLayer() const noexcept { return editLayerIndex.load(); }
+    int editLayer() const noexcept override { return editLayerIndex.load(); }
     void setEditLayer (int layer) noexcept { editLayerIndex = std::clamp (layer, 0, numLayers - 1); }
     /** REIMAGINED modes (version hint 11): a layer's mode and every mode's own settings,
         "layerA.reimagined.mode", "layerA.reimagined.tapeFrame.age", ... in this order. */
@@ -274,12 +274,12 @@ public:
     void pollLoads() { timerCallback(); }
 
     /** SHAPER's pattern position (0..1) for the display, -1 when it is not running (any thread). */
-    float shaperPhase() const noexcept { return engine.shaperPhase(); }
+    float shaperPhase() const noexcept override { return engine.shaperPhase(); }
     /** SHAPER's large pattern editor was last open (the popover reopens that way). */
-    bool shaperEditorLarge() const noexcept { return shaperLarge.load(); }
-    void setShaperEditorLarge (bool large) noexcept { shaperLarge = large; }
+    bool shaperEditorLarge() const noexcept override { return shaperLarge.load(); }
+    void setShaperEditorLarge (bool large) noexcept override { shaperLarge = large; }
     /** The host's tempo (120 until a host tells), for ECHO's synced times in the display. */
-    float hostTempo() const noexcept { return hostBpm.load (std::memory_order_relaxed); }
+    float hostTempo() const noexcept override { return hostBpm.load (std::memory_order_relaxed); }
     /** The grains a layer is playing now (display; lock-free, any thread). */
     const InstrumentEngine::GrainSnapshot& grainSnapshot (int layer) const noexcept override { return engine.grainSnapshot (layer); }
 
@@ -405,16 +405,9 @@ public:
 
     /** SHAPER CUSTOM: the musician's 16 steps (message thread). Kept in the session and
         presets; setting it is undoable (one gesture = one transaction, see UndoManager). */
-    ShaperPattern shaperCustomPattern() const;
-    void setShaperCustomPattern (const ShaperPattern& pattern, bool undoable = true);
-    static juce::String encodeShaperPattern (const ShaperPattern& pattern);
-    static std::optional<ShaperPattern> decodeShaperPattern (const juce::String& text);
-    /** Saved SHAPER patterns (Documents/OSP/Shaper Patterns, *.ospshaper JSON, schemaVersion 1). */
-    static constexpr const char* shaperPatternExtension = ".ospshaper";
-    static juce::File shaperPatternFolder();
-    static juce::Array<juce::File> savedShaperPatterns();
-    static bool writeShaperPatternFile (const juce::File& file, const ShaperPattern& pattern);
-    static std::optional<ShaperPattern> readShaperPatternFile (const juce::File& file);
+    ShaperPattern shaperCustomPattern() const override;
+    void setShaperCustomPattern (const ShaperPattern& pattern, bool undoable = true) override;
+    // Its encodings and the saved pattern files are InstrumentHost's (shared with every product).
 
     /**
         Reimagined routing (see osp::ReimaginedRouting). New patches (a fresh instance,

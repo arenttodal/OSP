@@ -1,6 +1,7 @@
 #include "ShellEditor.h"
 
 #include "Binding.h"
+#include "MacroPopups.h"
 
 namespace andor::shell
 {
@@ -52,6 +53,16 @@ ShellEditor::ShellEditor (ShellProcessor& p)
             updateFocus();
         };
         card->onMenu = [this] (int l, juce::Component& target) { showLayerMenu (l, target); };
+        // REIMAGINED's name opens ANDOR OSP's mode popover when the engine reads the amount.
+        if (binding::anyBound ({ InstrumentHost::reimaginedParameterId (layer) }, p.boundParameters()))
+            card->onReimagined = [this] (int l) {
+                if (closedByLabelPress == reimaginedPopup + l)
+                {
+                    closedByLabelPress = -1;   // that press closed it
+                    return;
+                }
+                openPopup (reimaginedPopup + l);
+            };
         card->onEqToggle = [this] (int l, bool open) {
             for (auto& c : cards)
                 c->setEqOpen (open && c->layer() == l);
@@ -263,6 +274,13 @@ void ShellEditor::layoutSources()
         addTarget.setLetter (InstrumentHost::layerName (count));
     }
     headerMix.setLayers (occupied);
+    if (isReimaginedPopup (popupIndex))
+    {
+        if (! cards[static_cast<std::size_t> (popupIndex - reimaginedPopup)]->isVisible())
+            closePopup();     // its layer is gone
+        else
+            positionPopup();  // its card moved
+    }
     updateFocus();
     applyBindings();
     content.repaint();
@@ -491,6 +509,12 @@ void ShellEditor::openPopup (int which, int source)
     }
     else if (which == advancedPopup)
         popup = createAdvancedPopup (shell);
+    else if (which >= reimaginedPopup && which < reimaginedPopup + InstrumentHost::numLayers)
+    {
+        if (! cards[static_cast<std::size_t> (which - reimaginedPopup)]->isVisible())
+            return;
+        popup = createReimaginedPopup (shell, which - reimaginedPopup);
+    }
     else if (which >= 0 && which < frame::macroCount && shell.product().macroPopover != nullptr)
         popup = shell.product().macroPopover (which, shell);
     if (popup == nullptr)
@@ -508,6 +532,8 @@ void ShellEditor::openPopup (int which, int source)
         macros[static_cast<std::size_t> (which)].label->setOpen (true);
     if (which == advancedPopup)
         advancedButton.setToggleState (true, juce::dontSendNotification);
+    if (isReimaginedPopup (which))
+        cards[static_cast<std::size_t> (which - reimaginedPopup)]->setReimaginedOpen (true);
     applyBindings();   // the popover's controls follow the engine's bindings too
     if (isShowing())
         grabKeyboardFocus();
@@ -525,6 +551,13 @@ void ShellEditor::positionPopup()
         at = frame::macroPopoverOrigin (macros[static_cast<std::size_t> (popupIndex)].label->getBounds().toFloat(), size);
     else if (popupIndex == advancedPopup)
         at = frame::advancedPopoverOrigin (advancedButton.getBounds().toFloat(), size);
+    else if (isReimaginedPopup (popupIndex))
+    {
+        // A layer's REIMAGINED popover unfolds above that card's REIMAGINED name (as in ANDOR OSP).
+        const auto& card = *cards[static_cast<std::size_t> (popupIndex - reimaginedPopup)];
+        const auto anchor = content.getLocalArea (&card, card.reimaginedLabelBounds()).toFloat();
+        at = { anchor.getCentreX() - 0.5f * size.x, anchor.getY() - 10.0f - size.y };
+    }
     else
         at = frame::modulationPopoverOrigin (modPanel.getBounds().toFloat(), size);
     frame::placePopover (*popup, content, at);
@@ -538,6 +571,8 @@ void ShellEditor::closePopup()
         macros[static_cast<std::size_t> (popupIndex)].label->setOpen (false);
     if (popupIndex == advancedPopup)
         advancedButton.setToggleState (false, juce::dontSendNotification);
+    if (isReimaginedPopup (popupIndex))
+        cards[static_cast<std::size_t> (popupIndex - reimaginedPopup)]->setReimaginedOpen (false);
     juce::Desktop::getInstance().getAnimator().cancelAnimation (popup.get(), false);
     popup.reset();
     popupIndex = -1;
@@ -560,6 +595,10 @@ void ShellEditor::mouseDownAnywhere (juce::Component* c)
             pressed = i;
     if (c == &advancedButton)
         pressed = advancedPopup;
+    for (int l = 0; l < InstrumentHost::numLayers; ++l)
+        if (const auto& card = *cards[static_cast<std::size_t> (l)]; card.isReimaginedLabel (c)
+            && card.reimaginedLabelBounds().contains (card.getLocalPoint (nullptr, juce::Desktop::getMousePosition())))
+            pressed = reimaginedPopup + l;
     closedByLabelPress = pressed == popupIndex ? pressed : -1;
     closePopup();
 }

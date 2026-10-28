@@ -1,5 +1,5 @@
 #include "PluginEditor.h"
-#include "OspPopups.h"
+#include "MacroPopups.h"
 
 #include "core/PitchMath.h"
 #include "io/AudioFileIO.h"
