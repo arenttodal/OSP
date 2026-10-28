@@ -15,7 +15,7 @@ const juce::StringArray& InstrumentHost::modDestinationNames()
     static const juce::StringArray names = [] {
         juce::StringArray n;
         n.add ("None");
-        for (int d = 1; d < mod::destCount; ++d)
+        for (int d = 1; d < mod::hostDestCount; ++d)
             n.add (mod::destInfo (static_cast<mod::Dest> (d)).name);
         return n;
     }();
@@ -437,6 +437,30 @@ juce::AudioProcessorValueTreeState::ParameterLayout InstrumentHost::createParame
                     layout.add (std::make_unique<juce::AudioParameterChoice> (id18 (eqParameterId (layer, key + ".slope")), bn + "Slope", slopes, 0));
             }
         }
+    }
+    {
+        // Unified engine, Phase 2 (version hint 20), appended so nothing before moves. Each
+        // layer's new grain options (neutral: SCATTER 0, PAN 0, HANN - exactly the Granulator as
+        // it was) and its KEY DNA AMOUNT (live on sounding notes; heard only once the layer has
+        // a KEY DNA profile, which lives in the session state). Then the grain budget.
+        auto id20 = [] (const juce::String& id) { return juce::ParameterID { id, 20 }; };
+        const auto semis = juce::AudioParameterFloatAttributes().withLabel ("st").withStringFromValueFunction ([] (float v, int) {
+            return v <= 0.0f ? juce::String ("Off") : juce::String (juce::CharPointer_UTF8 ("\xc2\xb1")) + juce::String (v, 1) + " st";
+        });
+        for (int layer = 0; layer < numLayers; ++layer)
+        {
+            const auto name = "Layer " + layerName (layer) + " ";
+            layout.add (std::make_unique<juce::AudioParameterFloat> (id20 (layerParameterId (layer, "granular.scatter")), name + "Grain Scatter",
+                                                                     Range (0.0f, 12.0f, 0.01f), 0.0f, semis));
+            layout.add (std::make_unique<juce::AudioParameterFloat> (id20 (layerParameterId (layer, "granular.pan")), name + "Grain Pan", unit, 0.0f, percent));
+            layout.add (std::make_unique<juce::AudioParameterChoice> (id20 (layerParameterId (layer, "granular.window")), name + "Grain Window",
+                                                                      juce::StringArray { "Hann", "Soft", "Percussive" }, 0));
+            layout.add (std::make_unique<juce::AudioParameterFloat> (id20 (layerParameterId (layer, "keyDna.amount")), name + "KEY DNA Amount", unit, 100.0f, percent));
+        }
+        juce::StringArray budgets;
+        for (int grains : grainBudgetChoices)
+            budgets.add (grains == 0 ? juce::String ("Unlimited") : juce::String (grains) + " grains");
+        layout.add (std::make_unique<juce::AudioParameterChoice> (id20 (ids::grainBudget), "Grain Budget", budgets, newSessionGrainBudgetIndex));
     }
     return layout;
 }

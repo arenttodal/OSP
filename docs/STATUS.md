@@ -399,6 +399,26 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       B organic / C expressive (`--unified --set keydna`, research/configs/keydna-*.json, pinned
       in tests/regression/golden/keydna); CPU within noise, +49.5 KB per engine. No plugin
       parameter, state or GUI change. Stopped for review before Phase 2.
+- [x] UNIFIED ENGINE Phase 2, the Granulator's options and budget, plus KEY DNA in the plugin
+      (docs/research/unified-andor/phase-2-report.md):
+      - KEY DNA AMOUNT is live on sounding notes: 30 ms smoothing per voice, the
+        `keyDnaAmountA..C` modulation destinations (not offered by the plugin's frozen route
+        list) and the host parameter `layerX.keyDna.amount`.
+      - Profiles are precomputed off the audio thread and published as immutable tables
+        (per-layer ModelExchange<keydna::Profile>).
+      - Grain options SCATTER, PAN and WINDOW (HANN / SOFT / PERCUSSIVE), on their own PRNG
+        stream; KEY DNA gains SCATTER and PAN.
+      - A deterministic max-min fair grain budget across A/B/C that keeps each thinned stream's
+        level. Old sessions and presets open Unlimited; new sessions start at 256, chosen from
+        the benchmark sweep.
+      - Plugin: 13 parameters appended (hint 20; the first 350 schema lines are unchanged).
+        stateVersion 13 adds the `KeyDna` child (schemaVersion 1); v12 sessions are migrated.
+      - Stereo investigation: the expressive demonstration is narrower because of POS, not
+        SPREAD; the stereo code is unchanged.
+      - Every Phase 0/1 golden and plugin reference is unchanged.
+      - Demonstrations: `--set phase2`, `--set budget`, research/configs/phase2-*.json, and
+        tests/regression/golden/phase2.
+      Stopped for review before Phase 3.
 - [x] ANDOR DESIGN SYSTEM and INSTRUMENT SHELL (andor-design-system/, start with HANDOFF.md).
       ANDOR OSP's interface was extracted, unchanged, into shared/andor-ui:
       - the components, look and assets;

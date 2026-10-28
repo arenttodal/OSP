@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "p2-keydna-scatter-pan-chord8",
+  "description": "KEY DNA SCATTER and PAN on an eight-note chord",
+  "midi": "chord8-c",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "28c4966f67a70db3",
+  "seconds": 2.186667,
+  "rmsDb": -26.025494,
+  "peakDb": -12.574143,
+  "brightness": 0.162176,
+  "stereoWidth": 0.896117
+}

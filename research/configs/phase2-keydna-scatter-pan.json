@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "engine": "instrument",
+  "sampleRate": 48000,
+  "blockSize": 256,
+  "seed": 1,
+  "instrument": {
+    "macros": {
+      "life": 0.3,
+      "space": 0.15,
+      "motion": 0.0,
+      "reimagined": 0.0
+    }
+  },
+  "layers": [
+    {
+      "sourceMode": "granular",
+      "granular": {
+        "position": 0.45,
+        "sizeSeconds": 0.12,
+        "density": 16,
+        "tuneSemitones": 0,
+        "spread": 0.15
+      },
+      "keyDna": {
+        "enabled": true,
+        "amount": 1,
+        "individuality": 0.4,
+        "seed": 31,
+        "scatter": {
+          "depth": 0.8,
+          "variation": 0.1,
+          "curve": [
+            [
+              0,
+              0.5
+            ],
+            [
+              1,
+              1.0
+            ]
+          ]
+        },
+        "pan": {
+          "depth": 1.0,
+          "variation": 0.15,
+          "curve": [
+            [
+              0,
+              0.5
+            ],
+            [
+              1,
+              1.0
+            ]
+          ]
+        }
+      }
+    }
+  ]
+}

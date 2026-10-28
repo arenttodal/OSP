@@ -57,6 +57,10 @@ RenderOutput renderSet (const InstrumentSet& set, const MidiSequence& sequence, 
 */
 RenderOutput renderLayers (const std::array<const InstrumentModel*, 3>& models, const MidiSequence& sequence, const RenderConfig& config);
 
+/** Sets each layer's automated KEY DNA AMOUNT (config.keyDnaAmountAutomation) for the block
+    starting at `seconds`; layers without automation are left alone. */
+void applyKeyDnaAutomation (InstrumentEngine& engine, const RenderConfig& config, double seconds);
+
 /**
     The notes the arpeggiator makes from `sequence` (config.arp), as the plugin plays them:
     block by block at the config's rate and block size, with a host transport running from

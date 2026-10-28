@@ -136,6 +136,9 @@ struct EngineSettings
     bool mono = false;
     double glideSeconds = 0.0;
     ReimaginedRouting reimaginedRouting = ReimaginedRouting::legacyGlobal;
+    /** Grains at once across A, B and C (InstrumentEngine::setGrainBudget); 0 = unlimited (every
+        session made before the budget existed). */
+    int grainBudget = 0;
 };
 
 /**
@@ -231,20 +234,52 @@ public:
     /** A layer's DAMPEN (each of its notes, by key; live). Bypassed until set. */
     void setLayerDampen (int layer, const dampen::Settings& settings) noexcept { layerDampen[layerIndex (layer)] = settings; }
     const dampen::Settings& layerDampenSettings (int layer) const noexcept { return layerDampen[layerIndex (layer)]; }
-    /** A layer's KEY DNA (Granular mode: each key's own granular identity, engine/KeyDna.h).
-        Applies to notes started afterwards (a sounding note keeps its profile). Off until set;
-        off or neutral, the layer plays exactly as without it. Real-time safe: the profile of
-        all keys is recomputed here (no allocation) only when the settings changed. */
+    /**
+        A layer's KEY DNA (Granular mode: each key's own granular identity, engine/KeyDna.h),
+        in two parts:
+        - the profile (every key's offsets at full AMOUNT): a published, immutable table that
+          new notes read at note-on (a sounding note keeps its key's offsets);
+        - AMOUNT: live and smoothed on sounding notes, a modulation destination too.
+        Without a profile, or with AMOUNT 0, the layer plays exactly as without KEY DNA.
+
+        setLayerKeyDnaProfile and setLayerKeyDnaAmount are real-time safe (a pointer and a
+        number). The profile must stay alive until the engine has started using a newer one
+        (the plugin publishes them through a ModelExchange). setLayerKeyDna computes the profile
+        here, into the engine's own storage: for offline renders and tests, not the audio callback.
+    */
+    void setLayerKeyDnaProfile (int layer, const keydna::Table* profile) noexcept { layerKeyDnaProfile[layerIndex (layer)] = profile; }
+    void setLayerKeyDnaAmount (int layer, double amount) noexcept { layerKeyDnaAmount[layerIndex (layer)] = std::clamp (amount, 0.0, 1.0); }
     void setLayerKeyDna (int layer, const keydna::Settings& settings) noexcept
     {
         const auto l = layerIndex (layer);
-        if (settings == layerKeyDna[l])
-            return;
-        layerKeyDna[l] = settings;
-        layerKeyDnaTable[l].compute (settings);
+        auto shape = settings;
+        shape.amount = 1.0;   // AMOUNT is live, not part of the profile
+        if (! (shape == layerKeyDna[l]))
+        {
+            layerKeyDna[l] = shape;
+            layerKeyDnaOwned[l].compute (shape);
+        }
+        layerKeyDnaProfile[l] = &layerKeyDnaOwned[l];
+        setLayerKeyDnaAmount (layer, settings.amount);
     }
-    const keydna::Settings& layerKeyDnaSettings (int layer) const noexcept { return layerKeyDna[layerIndex (layer)]; }
-    const keydna::Table& layerKeyDnaProfile (int layer) const noexcept { return layerKeyDnaTable[layerIndex (layer)]; }
+    const keydna::Table* keyDnaProfile (int layer) const noexcept { return layerKeyDnaProfile[layerIndex (layer)]; }
+    double layerKeyDnaAmountValue (int layer) const noexcept { return layerKeyDnaAmount[layerIndex (layer)]; }
+
+    /**
+        The global grain budget: at most this many grains at once across A, B and C (0:
+        unlimited, the original behaviour). Deterministic and fair (max-min): at every block
+        each sounding grain stream asks for the grains its settings play at once, and the
+        densest are thinned to one common share (give or take the one spare grain some get) so
+        that the total asked fits; light notes keep every grain, one dense note cannot starve
+        the others, and a budget that is not reached changes nothing. A thinned stream keeps the
+        level it would have had (its grains are louder), gliding as its share changes. The
+        floor is one grain per stream (more streams than the budget exceed it). Real-time safe.
+    */
+    void setGrainBudget (int grains) noexcept { config.grainBudget = std::max (0, grains); }
+    int grainBudget() const noexcept { return config.grainBudget; }
+    /** Grains playing now on every layer, and the current per-stream share (24 without a budget). */
+    int liveGrainCount() const noexcept;
+    int grainShare() const noexcept { return currentGrainShare; }
     /** The source mode applies to notes started afterwards; granular settings apply live. */
     void setSourceMode (int layer, SourceMode mode) noexcept { config.sourceMode[layerIndex (layer)] = mode; }
     void setGranular (int layer, const GranularParams& params) noexcept
@@ -505,8 +540,13 @@ private:
     std::array<double, 3> modReimaginedOffset {};   ///< global LFOs on each layer's REIMAGINED
     double modLifeOffset = 0.0;
     std::array<dampen::Settings, 3> layerDampen {};
-    std::array<keydna::Settings, 3> layerKeyDna {};
-    std::array<keydna::Table, 3> layerKeyDnaTable {};   ///< inactive until a non-neutral profile is set
+    std::array<keydna::Settings, 3> layerKeyDna {};         ///< setLayerKeyDna's settings (AMOUNT apart)
+    std::array<keydna::Table, 3> layerKeyDnaOwned {};       ///< setLayerKeyDna's profiles
+    std::array<const keydna::Table*, 3> layerKeyDnaProfile {};   ///< null: no KEY DNA
+    std::array<double, 3> layerKeyDnaAmount { 1.0, 1.0, 1.0 };
+    int currentGrainShare = GranularSource::maxGrains;
+    /** The budget's share for this block (all sounding grain streams), applied to the voices. */
+    void applyGrainBudget() noexcept;
     std::array<double, arpDestCount> modArpOffset {};
     std::array<bool, arpDestCount> modArpRouted {};
     std::array<std::array<double, 4>, 3> modEqOffset {};   ///< per layer: bell octaves, bell dB, low shelf dB, high shelf dB

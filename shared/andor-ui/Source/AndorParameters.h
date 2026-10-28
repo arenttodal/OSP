@@ -105,4 +105,7 @@ namespace osp::plugin::ids
     inline const juce::String mixY = "mix.y";
     inline const juce::String decay = "decay";
     inline const juce::String sustainLevel = "sustainLevel";
+    // Unified engine, Phase 2 (version hint 20): grains at once across A, B and C. Per layer:
+    // layerA.granular.scatter / .pan / .window and layerA.keyDna.amount.
+    inline const juce::String grainBudget = "grainBudget";
 }

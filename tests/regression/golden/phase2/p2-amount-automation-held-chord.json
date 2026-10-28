@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "p2-amount-automation-held-chord",
+  "description": "held chord, expressive KEY DNA, AMOUNT automated 0 -> 100 % -> 0 (live on the sounding notes)",
+  "midi": "held-chord-g",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "d811099f5aa295c4",
+  "seconds": 5.162667,
+  "rmsDb": -30.745521,
+  "peakDb": -16.993778,
+  "brightness": 0.246544,
+  "stereoWidth": 1.112689
+}

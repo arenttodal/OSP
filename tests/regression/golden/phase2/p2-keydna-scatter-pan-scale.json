@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "p2-keydna-scatter-pan-scale",
+  "description": "KEY DNA SCATTER and PAN: low keys steady and centred, high keys scattered and wide",
+  "midi": "scale-c3-c4",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "d5e107c597a876d9",
+  "seconds": 2.453333,
+  "rmsDb": -37.694549,
+  "peakDb": -24.920783,
+  "brightness": 0.127652,
+  "stereoWidth": 1.285133
+}

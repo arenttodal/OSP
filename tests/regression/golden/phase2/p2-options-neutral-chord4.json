@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "p2-options-neutral-chord4",
+  "description": "SCATTER 0, PAN 0, window HANN set explicitly: the Phase 1 static chord exactly",
+  "midi": "chord4-cmaj7",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "c0dfe824b6e051ff",
+  "seconds": 2.154667,
+  "rmsDb": -29.786108,
+  "peakDb": -16.681987,
+  "brightness": 0.249637,
+  "stereoWidth": 1.503822
+}

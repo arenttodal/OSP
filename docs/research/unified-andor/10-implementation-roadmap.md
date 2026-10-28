@@ -38,6 +38,13 @@ Every phase follows the same pattern:
 
 ### Phase 2: Granulator options and budget
 
+> **Done** (phase-2-report.md). What was built differs from the plan below in three ways:
+> - KEY DNA AMOUNT is the only host-automatable KEY DNA parameter. The profile-shaping
+>   settings live in the session: automating them would make a bounce depend on when the
+>   message thread recomputes.
+> - Per-grain reverse chance was not in the Phase 2 brief and is deferred.
+> - stateVersion 13 is taken by Phase 2, so Phase 3's atlas state becomes 14.
+
 | | |
 |---|---|
 | **New** | Per-grain pitch scatter, pan and reverse chance (each on a new PRNG stream). Window shapes. `GrainBudget` with fair share and admitted-density normalisation. New parameters at hint 20 with neutral defaults. KEY DNA parameters added to the plugin's APVTS, with automation. |
@@ -48,7 +55,7 @@ Every phase follows the same pattern:
 
 | | |
 |---|---|
-| **New** | `src/model/NoteAtlas.h` and `src/io/NoteAtlasJson.*` (ported). `src/engine/AtlasSet.*` (atlas → `InstrumentSet` with region copies). A FILL limit and assigned keys in `memberFor`. stateVersion 13 with the atlas JSON per layer. Documentation in `analysis-schema.md`. |
+| **New** | `src/model/NoteAtlas.h` and `src/io/NoteAtlasJson.*` (ported). `src/engine/AtlasSet.*` (atlas → `InstrumentSet` with region copies). A FILL limit and assigned keys in `memberFor`. stateVersion 14 (13 is Phase 2's) with the atlas JSON per layer. Documentation in `analysis-schema.md`. |
 | **Tests** | An atlas built from fixtures gives the expected key map. FILL limits hold, and a silent key steals no voice. A session round-trips. A state-12 session loads unchanged. |
 | **Accept** | A hand-written atlas plays correctly in all three layers, One Shot and Granular. |
 

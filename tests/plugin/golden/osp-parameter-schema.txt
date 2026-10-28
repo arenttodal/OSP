@@ -348,3 +348,16 @@ layerC.eq.highShelf.q v18 float "Layer C EQ high shelf Q" label="" range=0.3000.
 layerC.eq.lp.enabled v18 bool "Layer C EQ lp On" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=Off|On|On
 layerC.eq.lp.frequency v18 float "Layer C EQ lp Frequency" label="Hz" range=500.0000..20000.0000/0.0000 skew=1.00000 default=11999.9990 steps=2147483647 texts=500 Hz|3.16 kHz|20.0 kHz
 layerC.eq.lp.slope v18 choice "Layer C EQ lp Slope" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=12 dB/oct|12 dB/oct|24 dB/oct [12 dB/oct|24 dB/oct]
+layerA.granular.scatter v20 float "Layer A Grain Scatter" label="st" range=0.0000..12.0000/0.0100 skew=1.00000 default=0.0000 steps=2147483647 texts=Off|±6.0 st|±12.0 st
+layerA.granular.pan v20 float "Layer A Grain Pan" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0.0|50.0|100.0
+layerA.granular.window v20 choice "Layer A Grain Window" label="" range=0.0000..2.0000/1.0000 skew=1.00000 default=0.0000 steps=3 texts=Hann|Soft|Percussive [Hann|Soft|Percussive]
+layerA.keyDna.amount v20 float "Layer A KEY DNA Amount" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=100.0000 steps=2147483647 texts=0.0|50.0|100.0
+layerB.granular.scatter v20 float "Layer B Grain Scatter" label="st" range=0.0000..12.0000/0.0100 skew=1.00000 default=0.0000 steps=2147483647 texts=Off|±6.0 st|±12.0 st
+layerB.granular.pan v20 float "Layer B Grain Pan" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0.0|50.0|100.0
+layerB.granular.window v20 choice "Layer B Grain Window" label="" range=0.0000..2.0000/1.0000 skew=1.00000 default=0.0000 steps=3 texts=Hann|Soft|Percussive [Hann|Soft|Percussive]
+layerB.keyDna.amount v20 float "Layer B KEY DNA Amount" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=100.0000 steps=2147483647 texts=0.0|50.0|100.0
+layerC.granular.scatter v20 float "Layer C Grain Scatter" label="st" range=0.0000..12.0000/0.0100 skew=1.00000 default=0.0000 steps=2147483647 texts=Off|±6.0 st|±12.0 st
+layerC.granular.pan v20 float "Layer C Grain Pan" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0.0|50.0|100.0
+layerC.granular.window v20 choice "Layer C Grain Window" label="" range=0.0000..2.0000/1.0000 skew=1.00000 default=0.0000 steps=3 texts=Hann|Soft|Percussive [Hann|Soft|Percussive]
+layerC.keyDna.amount v20 float "Layer C KEY DNA Amount" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=100.0000 steps=2147483647 texts=0.0|50.0|100.0
+grainBudget v20 choice "Grain Budget" label="" range=0.0000..7.0000/1.0000 skew=1.00000 default=3.0000 steps=8 texts=Unlimited|192 grains|64 grains [Unlimited|512 grains|384 grains|256 grains|192 grains|128 grains|96 grains|64 grains]

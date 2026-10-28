@@ -85,7 +85,7 @@ PITCH BAKE-OFF (Phase 2)
   --continuation-report <file|dir>            stable region, jumps and release per file
 
 UNIFIED ENGINE (docs/research/unified-andor)
-  --unified <dir> [--set baseline|keydna] [--with-keydna organic|expressive] [--scene <name>] [--repeats 3] [--no-audio]
+  --unified <dir> [--set baseline|keydna|phase2|budget] [--with-keydna organic|expressive] [--scene <name>] [--repeats 3] [--no-audio]
                                               renders the baseline scenes or the KEY DNA demonstrations
                                               (src/research/UnifiedScenes.cpp): <scene>.wav, <scene>.json
                                               (digest), costs.json, summary.md (keydna: also keys.md)
@@ -487,9 +487,12 @@ int commandUnified (const Args& args)
     std::error_code ec;
     fs::create_directories (dir, ec);
     const auto set = args.get ("--set", "baseline");
-    if (set != "baseline" && set != "keydna")
-        return fail (exitUsage, "--set is baseline or keydna");
-    auto scenes = set == "keydna" ? u::keyDnaScenes() : u::baselineScenes();
+    if (set != "baseline" && set != "keydna" && set != "phase2" && set != "budget")
+        return fail (exitUsage, "--set is baseline, keydna, phase2 or budget");
+    auto scenes = set == "keydna" ? u::keyDnaScenes()
+                : set == "phase2" ? u::phase2Scenes()
+                : set == "budget" ? u::budgetScenes()
+                                  : u::baselineScenes();
     // --with-keydna organic|expressive: the same scenes with that profile on every layer (cost and
     // sound of KEY DNA on the baseline's own material).
     if (args.has ("--with-keydna"))
@@ -508,8 +511,8 @@ int commandUnified (const Args& args)
     auto costs = juce::var (juce::Array<juce::var>());
     std::ostringstream md;
     md << "# Unified-engine scenes (" << platform << ")\n\n"
-       << "| Scene | Seconds | RMS dB | Peak dB | Brightness | Width | Hash | Mean block % | Worst block % | Peak voices | Peak grains |\n"
-       << "|---|---|---|---|---|---|---|---|---|---|---|\n";
+       << "| Scene | Seconds | RMS dB | Peak dB | Brightness | Width | Hash | Mean block % | Worst block % | Worst seen µs | Peak voices | Peak grains | Live grains |\n"
+       << "|---|---|---|---|---|---|---|---|---|---|---|---|---|\n";
     int rendered = 0;
     for (const auto& scene : scenes)
     {
@@ -532,11 +535,15 @@ int commandUnified (const Args& args)
         json::set (c, "worstBudgetPercent", json::number (cost.worstBudgetPercent, 3));
         json::set (c, "peakVoices", cost.peakVoices);
         json::set (c, "peakGrains", cost.peakGrains);
+        json::set (c, "peakLiveGrains", cost.peakLiveGrains);
+        json::set (c, "worstObservedMicros", json::number (cost.worstObservedMicros, 2));
+        json::set (c, "grainBudget", scene.config.engineSettings.grainBudget);
+        json::set (c, "rmsDb", json::number (d.rmsDb, 3));
         costs.append (c);
         md << "| " << scene.name << " | " << json::round (d.seconds, 2) << " | " << json::round (d.rmsDb, 2) << " | " << json::round (d.peakDb, 2) << " | "
            << json::round (d.brightness, 3) << " | " << json::round (d.stereoWidth, 3) << " | `" << d.hash << "` | "
-           << json::round (cost.meanBudgetPercent, 2) << " | " << json::round (cost.worstBudgetPercent, 2) << " | " << cost.peakVoices << " | "
-           << cost.peakGrains << " |\n";
+           << json::round (cost.meanBudgetPercent, 2) << " | " << json::round (cost.worstBudgetPercent, 2) << " | "
+           << json::round (cost.worstObservedMicros, 0) << " | " << cost.peakVoices << " | " << cost.peakGrains << " | " << cost.peakLiveGrains << " |\n";
         std::cout << scene.name << ": " << json::round (d.seconds, 2) << " s, rms " << json::round (d.rmsDb, 2) << " dB, hash " << d.hash
                   << ", mean " << json::round (cost.meanBudgetPercent, 2) << " % of a " << scene.config.blockSize << "-sample block, "
                   << cost.peakGrains << " grains at most" << std::endl;

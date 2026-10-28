@@ -40,11 +40,14 @@ add_executable(osp_tests
     integration/ShapingTests.cpp
     integration/LayerTests.cpp
     integration/KeyDnaEngineTests.cpp
+    integration/GrainPhase2Tests.cpp
     integration/EngineSlotTests.cpp
     integration/ShaperTests.cpp
     integration/ReimaginedModesTests.cpp
     regression/GoldenTests.cpp
     regression/UnifiedBaselineTests.cpp
+    investigation/StereoInvestigation.cpp
+    investigation/Phase2Measurements.cpp
 )
 target_include_directories(osp_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(osp_tests PRIVATE osp_research Catch2::Catch2WithMain)

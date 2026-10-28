@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "budget-stress-128",
+  "description": "the CPU stress scene, grain budget 128",
+  "midi": "chord8-c",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "96b7990f88f3ed10",
+  "seconds": 2.496,
+  "rmsDb": -27.088187,
+  "peakDb": -11.329697,
+  "brightness": 0.159633,
+  "stereoWidth": 0.716582
+}

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "p2-amount-lfo-held-chord",
+  "description": "held chord, KEY DNA AMOUNT 50 % swept +-50 % by a 0.5 Hz LFO",
+  "midi": "held-chord-g",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "1d9c1e70dc3d77e9",
+  "seconds": 5.168,
+  "rmsDb": -30.707133,
+  "peakDb": -17.187448,
+  "brightness": 0.243316,
+  "stereoWidth": 1.197326
+}

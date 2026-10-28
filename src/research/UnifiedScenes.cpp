@@ -30,6 +30,7 @@ const char* sourceName (SourceId id) noexcept
         case SourceId::vowelA3: return "vowel-A3";
         case SourceId::pluckE2: return "pluck-E2";
         case SourceId::vowelE4: return "vowel-E4";
+        case SourceId::vowelA3Mono: return "vowel-A3-mono";
     }
     return "";
 }
@@ -42,6 +43,12 @@ AudioData sourceAudio (SourceId id)
         case SourceId::vowelA3: return testsignals::vowel (midiToHz (57), 2.5, 48000.0, 3);
         case SourceId::pluckE2: return testsignals::pluck (midiToHz (40), 2.5, 48000.0, 8, 0.7, 1);
         case SourceId::vowelE4: return testsignals::vowel (midiToHz (64), 2.5, 48000.0, 7);
+        case SourceId::vowelA3Mono:
+        {
+            auto mono = sourceAudio (SourceId::vowelA3);
+            mono.channels.resize (1);
+            return mono;
+        }
     }
     return {};
 }
@@ -367,6 +374,118 @@ std::vector<Scene> keyDnaScenes()
     return scenes;
 }
 
+keydna::Settings scatterPanKeyDna()
+{
+    // Low keys steady and centred, high keys scattered in pitch and spread across the field,
+    // with a little individuality so neighbours are not identical.
+    keydna::Settings s;
+    s.enabled = true;
+    s.seed = 31;
+    s.individuality = 0.4;
+    s[keydna::Param::scatter].curve = line (0.5f, 1.0f);   // 0 at the bottom, +5 semitones at the top
+    s[keydna::Param::scatter].curveDepth = 0.8;
+    s[keydna::Param::scatter].variation = 0.1;
+    s[keydna::Param::pan].curve = line (0.5f, 1.0f);       // centred low, +-50 % at the top
+    s[keydna::Param::pan].curveDepth = 1.0;
+    s[keydna::Param::pan].variation = 0.15;
+    return s;
+}
+
+std::vector<Scene> phase2Scenes()
+{
+    using L = std::vector<LayerSpec>;
+    const L vowel { { SourceId::vowelA3 } };
+    std::vector<Scene> scenes;
+    auto add = [&scenes, &vowel] (const char* name, const char* description, RenderConfig config, MidiSequence midi) {
+        scenes.push_back ({ name, description, vowel, std::move (config), std::move (midi) });
+    };
+    auto with = [] (auto&& edit) {
+        auto c = demoConfig();
+        edit (c.engineSettings.granular[0]);
+        return c;
+    };
+    add ("p2-options-neutral-chord4", "SCATTER 0, PAN 0, window HANN set explicitly: the Phase 1 static chord exactly",
+         with ([] (GranularParams& g) { g.scatterSemitones = 0.0; g.pan = 0.0; g.window = GrainWindow::hann; }), chord4());
+    add ("p2-scatter-3-chord4", "SCATTER +-3 semitones per grain", with ([] (GranularParams& g) { g.scatterSemitones = 3.0; }), chord4());
+    add ("p2-scatter-12-single", "SCATTER +-12 semitones, one held note (a cloud)",
+         with ([] (GranularParams& g) { g.scatterSemitones = 12.0; }), Notes().note (0.05, 3.0, 57).done ("held-a3"));
+    add ("p2-pan-50-chord4", "PAN 50 %: each grain placed within +-50 % of the field", with ([] (GranularParams& g) { g.pan = 0.5; }), chord4());
+    add ("p2-pan-100-single", "PAN 100 %, one held note", with ([] (GranularParams& g) { g.pan = 1.0; }),
+         Notes().note (0.05, 3.0, 57).done ("held-a3"));
+    scenes.push_back ({ "p2-pan-100-mono-single", "PAN 100 % on a mono recording, one held note", L { { SourceId::vowelA3Mono } },
+                        with ([] (GranularParams& g) { g.pan = 1.0; }), Notes().note (0.05, 3.0, 57).done ("held-a3") });
+    add ("p2-window-soft-chord4", "window SOFT (Tukey: fuller, less pulsing)", with ([] (GranularParams& g) { g.window = GrainWindow::soft; }), chord4());
+    add ("p2-window-percussive-chord4", "window PERCUSSIVE (each grain a small attack)",
+         with ([] (GranularParams& g) { g.window = GrainWindow::percussive; }), chord4());
+    {
+        // PERCUSSIVE is most audible with sparse, longer grains.
+        auto c = demoConfig();
+        c.engineSettings.granular[0] = { 0.45, 0.2, 8.0, 0.0, 0.3 };
+        c.engineSettings.granular[0].window = GrainWindow::percussive;
+        add ("p2-window-percussive-sparse-scale", "window PERCUSSIVE, SIZE 200 ms, DENS 8: a pulse of small attacks", c, scale());
+    }
+    {
+        auto c = demoConfig();
+        c.keyDna[0] = scatterPanKeyDna();
+        add ("p2-keydna-scatter-pan-scale", "KEY DNA SCATTER and PAN: low keys steady and centred, high keys scattered and wide", c, scale());
+        add ("p2-keydna-scatter-pan-chord8", "KEY DNA SCATTER and PAN on an eight-note chord", c, chord8());
+    }
+    const auto held = Notes().chord (0.05, 5.0, { 55, 62, 67, 74 }).done ("held-chord-g");
+    {
+        auto c = demoConfig();
+        c.keyDna[0] = expressiveKeyDna();
+        c.keyDna[0].amount = 0.0;
+        c.keyDnaAmountAutomation[0] = { { 0.5, 0.0 }, { 2.0, 1.0 }, { 3.0, 1.0 }, { 4.5, 0.0 } };
+        add ("p2-amount-automation-held-chord", "held chord, expressive KEY DNA, AMOUNT automated 0 -> 100 % -> 0 (live on the sounding notes)", c, held);
+        auto step = c;
+        step.keyDnaAmountAutomation[0] = { { 1.5, 0.0 }, { 1.5001, 1.0 }, { 3.5, 1.0 }, { 3.5001, 0.0 } };
+        add ("p2-amount-step-held-chord", "held chord, AMOUNT stepped 0 -> 100 % -> 0 (the 30 ms smoothing is all that softens it)", step, held);
+    }
+    {
+        auto c = demoConfig();
+        c.keyDna[0] = expressiveKeyDna();
+        c.keyDna[0].amount = 0.5;
+        c.modulation.lfo[0].rateHz = 0.5;
+        c.modulation.routes[0] = route (mod::Source::lfo1, mod::Dest::keyDnaAmountA, 0.5);
+        add ("p2-amount-lfo-held-chord", "held chord, KEY DNA AMOUNT 50 % swept +-50 % by a 0.5 Hz LFO", c, held);
+    }
+    for (const auto& b : budgetScenes())
+        if (b.name == "budget-stress-unlimited" || b.name == "budget-stress-128")
+            scenes.push_back (b);
+    return scenes;
+}
+
+std::vector<Scene> budgetScenes()
+{
+    const auto base = baselineScenes();
+    const auto* stress = findScene (base, "stress-abc-granular-chord8");
+    std::vector<Scene> scenes;
+    if (stress == nullptr)
+        return scenes;
+    // The extreme: every layer at the pool (DENS 40 x SIZE 600 ms) and KALEIDOSCOPE's second
+    // stream on every layer: 48 streams asking for 24 grains each.
+    auto extreme = *stress;
+    for (int l = 0; l < 3; ++l)
+    {
+        auto& g = extreme.config.engineSettings.granular[static_cast<std::size_t> (l)];
+        g.density = 40.0;
+        g.sizeSeconds = 0.6;
+        extreme.config.engineSettings.layer[static_cast<std::size_t> (l)].reimagined = 0.6;
+    }
+    extreme.config.engineSettings.reimaginedRouting = ReimaginedRouting::perLayer;
+    for (const auto& [material, scene] : { std::pair<const char*, const Scene*> { "stress", stress }, { "extreme", &extreme } })
+        for (int budget : { 0, 512, 384, 256, 192, 128, 96, 64 })
+        {
+            auto s = *scene;
+            s.config.engineSettings.grainBudget = budget;
+            s.name = std::string ("budget-") + material + "-" + (budget == 0 ? std::string ("unlimited") : std::to_string (budget));
+            s.description = std::string (material == std::string ("stress") ? "the CPU stress scene" : "every layer at the pool, doubled")
+                            + (budget == 0 ? ", no budget" : ", grain budget " + std::to_string (budget));
+            scenes.push_back (std::move (s));
+        }
+    return scenes;
+}
+
 std::vector<KeyMeasure> measureKeys (const Scene& scene, const std::vector<int>& keys)
 {
     const auto models = modelsFor (scene);
@@ -393,7 +512,7 @@ std::vector<KeyMeasure> measureKeys (const Scene& scene, const std::vector<int>&
         m.spreadOffset = o.spread;
         auto g = settings.granular[0];
         g.position = std::clamp (g.position + settings.layer[0].start, 0.0, 1.0);
-        keydna::apply (o, g);
+        keydna::apply (o, 1.0, g);
         m.position = g.position;
         m.sizeMs = 1000.0 * g.sizeSeconds;
         m.density = g.density;
@@ -551,6 +670,7 @@ Cost measure (const Scene& scene, int repeats)
         int b = 0;
         for (std::int64_t pos = 0; pos < end; pos += block, ++b)
         {
+            applyKeyDnaAutomation (engine, config, static_cast<double> (pos) / rate);
             const auto t0 = std::chrono::steady_clock::now();
             int offset = 0;
             while (next < events.size())
@@ -578,6 +698,7 @@ Cost measure (const Scene& scene, int repeats)
             float* ch[2] = { l.data() + offset, r.data() + offset };
             engine.render (ch, 2, block - offset);
             const double micros = std::chrono::duration<double, std::micro> (std::chrono::steady_clock::now() - t0).count();
+            cost.worstObservedMicros = std::max (cost.worstObservedMicros, micros);
             if (static_cast<std::size_t> (b) >= best.size())
                 best.push_back (micros);
             else
@@ -589,6 +710,7 @@ Cost measure (const Scene& scene, int repeats)
                 for (int layer = 0; layer < 3; ++layer)
                     grains += engine.grainSnapshot (layer).count.load (std::memory_order_relaxed);
                 cost.peakGrains = std::max (cost.peakGrains, grains);
+                cost.peakLiveGrains = std::max (cost.peakLiveGrains, engine.liveGrainCount());
             }
         }
     }

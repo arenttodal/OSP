@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "p2-window-soft-chord4",
+  "description": "window SOFT (Tukey: fuller, less pulsing)",
+  "midi": "chord4-cmaj7",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "aefa38f7ac015716",
+  "seconds": 2.154667,
+  "rmsDb": -29.793521,
+  "peakDb": -17.0512,
+  "brightness": 0.249437,
+  "stereoWidth": 1.525377
+}

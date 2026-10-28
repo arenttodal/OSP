@@ -6,8 +6,8 @@ namespace osp::test
 {
 
 /**
-    Counts heap allocations (the test binary replaces the global operator new) while a scope
-    is alive: real-time code must make none. One scope at a time, on one thread.
+    Counts heap allocations (the test binary replaces the global operator new) made on the
+    scope's own thread while it is alive: real-time code must make none. One scope at a time.
 */
 class AllocationScope
 {

@@ -7,7 +7,8 @@ namespace osp
 
 /**
     KEY DNA (engine/KeyDna.h): one key's granular identity on its layer, in each parameter's own
-    units, fixed at note-on. Neutral (all zero, inactive) means the layer's own settings.
+    units at full AMOUNT, fixed at note-on (the live AMOUNT scales them). Neutral (all zero,
+    inactive) means the layer's own settings.
 */
 struct KeyDnaOffsets
 {
@@ -16,6 +17,8 @@ struct KeyDnaOffsets
     double densityOctaves = 0.0;   ///< DENS x 2^this
     double spread = 0.0;           ///< added to SPREAD
     double tuneSemitones = 0.0;    ///< added to TUNE
+    double scatterSemitones = 0.0; ///< added to SCATTER (per-grain pitch scatter)
+    double pan = 0.0;              ///< added to the grains' PAN
     bool active = false;           ///< any of them non-zero
 };
 

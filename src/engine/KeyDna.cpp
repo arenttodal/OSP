@@ -28,6 +28,8 @@ const char* paramName (Param p) noexcept
         case Param::density: return "DENS";
         case Param::spread: return "SPREAD";
         case Param::tune: return "TUNE";
+        case Param::scatter: return "SCATTER";
+        case Param::pan: return "PAN";
     }
     return "";
 }
@@ -41,6 +43,8 @@ const char* paramId (Param p) noexcept
         case Param::density: return "density";
         case Param::spread: return "spread";
         case Param::tune: return "tune";
+        case Param::scatter: return "scatter";
+        case Param::pan: return "pan";
     }
     return "";
 }
@@ -56,6 +60,8 @@ double halfRange (Param p) noexcept
         case Param::density: return 0.5 * std::log2 (40.0 / 4.0);
         case Param::spread: return 0.5;
         case Param::tune: return 12.0;
+        case Param::scatter: return 6.0;
+        case Param::pan: return 0.5;
     }
     return 0.0;
 }
@@ -81,7 +87,7 @@ Settings::Settings()
 bool Settings::isNeutral() const noexcept
 {
     if (! enabled || ! (amount > 0.0))
-        return true;
+        return true;   // (with AMOUNT 0 the profile exists but is not heard)
     for (const auto& p : params)
         if (p.curveDepth != 0.0 || p.variation != 0.0)
             return false;
@@ -97,7 +103,8 @@ void Table::compute (const Settings& s) noexcept
     const double ind = std::clamp (s.individuality, 0.0, 1.0);
     const double a = 1.0 - ind, b = ind;
     const double norm = 1.0 / std::sqrt (a * a + b * b);
-    const double amount = s.enabled ? std::clamp (s.amount, 0.0, 1.0) : 0.0;
+    // AMOUNT is applied live (keydna::apply); off, the profile is empty.
+    const double amount = s.enabled ? 1.0 : 0.0;
     const auto root = Prng::deriveSeed (s.seed, streamTag, 0);
     anyActive = false;
     for (auto& k : keys)
@@ -127,7 +134,7 @@ void Table::compute (const Settings& s) noexcept
                 unit += depth * curve;
             if (variation != 0.0)
                 unit += variation * individual;
-            unit = std::clamp (unit, -1.0, 1.0) * amount;
+            unit = std::clamp (unit, -1.0, 1.0) * amount;   // x 1 exactly when on
             const auto i = static_cast<std::size_t> (key) * paramCount + static_cast<std::size_t> (p);
             variations[i] = static_cast<float> (individual);
             units[i] = static_cast<float> (unit);
@@ -142,6 +149,8 @@ void Table::compute (const Settings& s) noexcept
                 case Param::density: k.densityOctaves = value; break;
                 case Param::spread: k.spread = value; break;
                 case Param::tune: k.tuneSemitones = value; break;
+                case Param::scatter: k.scatterSemitones = value; break;
+                case Param::pan: k.pan = value; break;
             }
             k.active = true;
             anyActive = true;

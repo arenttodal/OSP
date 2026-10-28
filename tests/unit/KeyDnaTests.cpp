@@ -40,7 +40,8 @@ namespace
     {
         return std::memcmp (&a.position, &b.position, sizeof (double)) == 0 && std::memcmp (&a.sizeSeconds, &b.sizeSeconds, sizeof (double)) == 0
                && std::memcmp (&a.density, &b.density, sizeof (double)) == 0 && std::memcmp (&a.tuneSemitones, &b.tuneSemitones, sizeof (double)) == 0
-               && std::memcmp (&a.spread, &b.spread, sizeof (double)) == 0 && a.reverse == b.reverse && a.follow == b.follow;
+               && std::memcmp (&a.spread, &b.spread, sizeof (double)) == 0 && std::memcmp (&a.scatterSemitones, &b.scatterSemitones, sizeof (double)) == 0
+            && std::memcmp (&a.pan, &b.pan, sizeof (double)) == 0 && a.window == b.window && a.reverse == b.reverse && a.follow == b.follow;
     }
 }
 
@@ -58,12 +59,19 @@ TEST_CASE ("KEY DNA: neutral settings give no profile at all", "[unit][keydna]")
     table.compute (s);
     CHECK_FALSE (table.active());
 
-    // Depths and variations set, but AMOUNT 0 or switched off: nothing.
+    // Depths and variations set, but AMOUNT 0: neutral as heard. AMOUNT is live (not part of
+    // the profile): the table holds the full profile, and AMOUNT 0 applies none of it.
     auto e = expressive();
     e.amount = 0.0;
     CHECK (e.isNeutral());
     table.compute (e);
-    CHECK_FALSE (table.active());
+    CHECK (table.active());
+    {
+        GranularParams base { 0.37, 0.123, 17.5, -3.25, 0.41 }, p = base;
+        keydna::apply (table.at (60), 0.0, p);
+        CHECK (sameBits (p, base));
+    }
+    // Switched off: no profile at all.
     e.amount = 1.0;
     e.enabled = false;
     table.compute (e);
@@ -85,14 +93,14 @@ TEST_CASE ("KEY DNA: a neutral profile is an exact identity on the granular sett
     GranularParams base { 0.37, 0.123, 17.5, -3.25, 0.41 };
     base.reverse = true;
     auto p = base;
-    keydna::apply (KeyDnaOffsets {}, p);
+    keydna::apply (KeyDnaOffsets {}, 1.0, p);
     CHECK (sameBits (p, base));
     // An active profile that leaves a parameter alone does not touch it (no clamp, no arithmetic).
     KeyDnaOffsets o;
     o.position = 0.1;
     o.active = true;
     p = base;
-    keydna::apply (o, p);
+    keydna::apply (o, 1.0, p);
     CHECK (p.position == Approx (0.47));
     CHECK (std::memcmp (&p.sizeSeconds, &base.sizeSeconds, sizeof (double)) == 0);
     CHECK (std::memcmp (&p.density, &base.density, sizeof (double)) == 0);
@@ -115,7 +123,7 @@ TEST_CASE ("KEY DNA: the same settings give every key the same identity; another
             CHECK (a.offset (key, param) == b.offset (key, param));
             differ += a.offset (key, param) != c.offset (key, param) ? 1 : 0;
         }
-    CHECK (differ > 600);   // nearly all of the 640 values
+    CHECK (differ > 850);   // nearly all of the 896 values
 
     // Recomputing in place (as the engine does) gives the same values again.
     a.compute (expressive (8));
@@ -170,11 +178,17 @@ TEST_CASE ("KEY DNA: a curve maps onto the keyboard, scaled by its depth and AMO
     for (int key = 0; key < 128; ++key)
         CHECK (t.at (key).position == 0.0);
 
-    // A negative depth inverts it; AMOUNT scales the whole profile.
+    // A negative depth inverts it; AMOUNT (live) scales the whole profile.
     s[keydna::Param::size].curveDepth = -0.5;
     s.amount = 0.5;
     t.compute (s);
-    CHECK (t.at (127).sizeOctaves == Approx (-0.25 * half));
+    CHECK (t.at (127).sizeOctaves == Approx (-0.5 * half));   // the profile itself: full AMOUNT
+    GranularParams base, full, half_;
+    full = half_ = base;
+    keydna::apply (t.at (127), 1.0, full);
+    keydna::apply (t.at (127), 0.5, half_);
+    CHECK (std::log2 (full.sizeSeconds / base.sizeSeconds) == Approx (-0.5 * half));
+    CHECK (std::log2 (half_.sizeSeconds / base.sizeSeconds) == Approx (-0.25 * half));
 }
 
 TEST_CASE ("KEY DNA: every offset is bounded, and applied settings stay within the knobs", "[unit][keydna]")
@@ -202,7 +216,7 @@ TEST_CASE ("KEY DNA: every offset is bounded, and applied settings stay within t
         for (int key = 0; key < 128; ++key)
         {
             auto p = base;
-            keydna::apply (t.at (key), p);
+            keydna::apply (t.at (key), 1.0, p);
             CHECK (p.position >= 0.0);
             CHECK (p.position <= 1.0);
             CHECK (p.sizeSeconds >= 0.02);
@@ -213,6 +227,10 @@ TEST_CASE ("KEY DNA: every offset is bounded, and applied settings stay within t
             CHECK (p.spread <= 1.0);
             CHECK (p.tuneSemitones >= -12.0);
             CHECK (p.tuneSemitones <= 12.0);
+            CHECK (p.scatterSemitones >= 0.0);
+            CHECK (p.scatterSemitones <= 12.0);
+            CHECK (p.pan >= 0.0);
+            CHECK (p.pan <= 1.0);
             CHECK (std::isfinite (p.sizeSeconds));
         }
 }

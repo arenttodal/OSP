@@ -75,6 +75,15 @@ public:
     static const juce::StringArray& eqParameterNames();   ///< enabled, hp.enabled, hp.frequency, ... in order
     static juce::String eqParameterId (int layer, const juce::String& name) { return layerParameterId (layer, "eq." + name); }
     static const char* eqBandKey (eq::Band band) noexcept;   ///< "hp", "lowShelf", "bell", "highShelf", "lp"
+    /** The grain budget's choices (index -> grains at once; 0 = Unlimited, the original), never
+        reorder: sessions store the index. New sessions start at 256 (index 3, chosen from the
+        Phase 2 benchmark); sessions saved before state version 13 open Unlimited. */
+    static constexpr std::array<int, 8> grainBudgetChoices { 0, 512, 384, 256, 192, 128, 96, 64 };
+    static constexpr int newSessionGrainBudgetIndex = 3;
+    static int grainBudgetGrains (float index) noexcept
+    {
+        return grainBudgetChoices[static_cast<std::size_t> (std::clamp (static_cast<int> (std::lround (index)), 0, 7))];
+    }
     /** The arpeggiator's choices, in parameter order (never reorder: sessions store indices). */
     static const juce::StringArray& arpPatternNames();
     static const juce::StringArray& arpRateNames();

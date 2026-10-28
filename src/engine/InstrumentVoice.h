@@ -51,6 +51,11 @@ struct InstrumentVoiceStart
     const ReimaginedLive* reimagined = nullptr;
     /** The layer's DAMPEN (read live at control rate); null: none. */
     const dampen::Settings* dampen = nullptr;
+    /** The layer's live KEY DNA AMOUNT (0..1, read at control rate; the note's own profile is
+        in `shape.keyDna`); null: full. */
+    const double* keyDnaAmount = nullptr;
+    /** The grain budget's share for each of this voice's grain streams (24: no budget). */
+    int grainCap = GranularSource::maxGrains;
 };
 
 /**
@@ -95,6 +100,21 @@ public:
     const mod::VoiceState& modulationState() const noexcept { return modState; }
     bool modulationRunning() const noexcept { return modStarted; }
     bool isGranular() const noexcept { return granularMode; }
+    /** Grain streams this voice plays (granular: 1, or 2 with KALEIDOSCOPE's doubling), for the budget. */
+    int grainStreams() const noexcept { return active && granularMode ? (grainDoubling ? 2 : 1) : 0; }
+    /** What stream 0 (the note's grains) or 1 (KALEIDOSCOPE's doubling) asks of the budget. */
+    int grainDemand (int stream) const noexcept { return stream == 0 ? granularSource.grainDemand() : doubleSource.grainDemand(); }
+    /** The grain budget's share for each of its streams (24: unlimited). */
+    void setGrainCap (int cap) noexcept
+    {
+        granularSource.setGrainCap (cap);
+        doubleSource.setGrainCap (cap);
+    }
+    void setGrainCap (int stream, int cap) noexcept { (stream == 0 ? granularSource : doubleSource).setGrainCap (cap); }
+    /** Grains sounding now on both streams (the display's grainCount() shows the note's own). */
+    int grainsPlaying() const noexcept { return grainCount() + (granularMode && grainDoubling ? doubleSource.grainCount() : 0); }
+    /** KEY DNA AMOUNT as this voice applies it now (smoothed; 1 without a profile). */
+    double keyDnaAmountNow() const noexcept { return keyDnaAmountApplied; }
     int grainCount() const noexcept { return granularMode ? granularSource.grainCount() : 0; }
     /** One Shot voices: where the read head is (0..1 of the recording) and how loud the
         note is now (envelope, 0..1), for the display. False for granular or idle voices. */
@@ -298,6 +318,13 @@ private:
     double modCutoff = 0.0, modResonance = 0.0, modSustain = 0.0;
     double modGrainPosition = 0.0, modGrainSpread = 0.0, modGrainSize = 0.0, modGrainDensity = 0.0;
     double modStartOffset = 0.0;   ///< START modulation taken at note-on (0..1 of the recording)
+    double modKeyDnaAmount = 0.0;  ///< KEY DNA AMOUNT routes (added to the layer's AMOUNT)
+    // KEY DNA AMOUNT, live: the layer's (plus routes), followed within ~30 ms by a control-rate
+    // one-pole; at note-on it starts where the target is (no glide in), and it lands exactly on
+    // a still target, so a constant AMOUNT 1 is exactly the profile.
+    const double* keyDnaAmountLive = nullptr;
+    double keyDnaAmountApplied = 1.0;
+    double keyDnaSmoothing = 1.0;
     double modDampenAmount = 0.0, modDampenShelf = 0.0, modDampenCutoff = 0.0;
     AdsrSettings noteAdsr {};   ///< the envelope as this note took it (ATTACK, DECAY at note-on)
     double appliedSustain = -1.0;

@@ -70,9 +70,11 @@ target_link_libraries(OSP_Plugin
 
 # Headless tests of the plugin's processor (load, play, state recall) without a DAW.
 if(OSP_BUILD_TESTS)
-    add_executable(osp_plugin_tests ${PROJECT_SOURCE_DIR}/tests/plugin/PluginProcessorTests.cpp)
+    add_executable(osp_plugin_tests ${PROJECT_SOURCE_DIR}/tests/plugin/PluginProcessorTests.cpp
+                                    ${PROJECT_SOURCE_DIR}/tests/support/AllocationCounter.cpp)
     target_include_directories(osp_plugin_tests PRIVATE
         ${PROJECT_SOURCE_DIR}/src
+        ${PROJECT_SOURCE_DIR}/tests
         Source
         $<TARGET_PROPERTY:OSP_Plugin,INCLUDE_DIRECTORIES>)
     target_compile_definitions(osp_plugin_tests PRIVATE

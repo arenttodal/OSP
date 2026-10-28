@@ -5937,7 +5937,10 @@ TEST_CASE ("plugin: MODULATION parameters, routes, recall, older sessions, curve
         CHECK (fresh.modulationRoutes().empty());
         for (int r = 0; r < mod::maxRoutes; ++r)
             REQUIRE (fresh.parameters.getParameter (OspAudioProcessor::modRouteId (r, "depth")) != nullptr);
-        CHECK (OspAudioProcessor::modDestinationNames().size() == mod::destCount);
+        // The plugin offers the destinations up to KEY DNA AMOUNT (engine-only since Phase 2):
+        // the route-destination choice stays at 75 entries so saved automation keeps its meaning.
+        CHECK (OspAudioProcessor::modDestinationNames().size() == mod::hostDestCount);
+        CHECK (mod::hostDestCount < mod::destCount);
     }
     auto make = [&] {
         auto p = std::make_unique<OspAudioProcessor>();
@@ -7993,3 +7996,4 @@ TEST_CASE ("plugin: full-range modulation - 100 % reaches the knob's end; older 
 #include "ParameterSchemaTests.inc"
 #include "VisualReferenceTests.inc"
 #include "UnifiedBaselineTests.inc"
+#include "UnifiedPhase2Tests.inc"

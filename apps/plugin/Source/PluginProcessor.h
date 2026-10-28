@@ -367,8 +367,24 @@ public:
             (`modControllers`), the panel's six tabs (`modTabs`), ARP RATE Stepped
             (`arpRateStepped`), ARP VELOCITY and DAMPEN (parameters, hint 19; absent: 100 %,
             off). Every addition reads its default from an older session, so nothing there is
-            migrated beyond the VEL curve and the panel's tab. */
-    static constexpr int stateVersion = 12;
+            migrated beyond the VEL curve and the panel's tab.
+        13: the unified engine's Phase 2: each layer's KEY DNA (the `KeyDna` child, its own
+            schemaVersion; absent: none), the grain options SCATTER / PAN / WINDOW and KEY DNA
+            AMOUNT (parameters, hint 20; absent: neutral) and the grain budget (absent, i.e.
+            any older session or preset: Unlimited, the original grains). */
+    static constexpr int stateVersion = 13;
+
+    /** KEY DNA (message thread): a layer's per-key identity. Its profile (all 128 keys) is
+        computed here and handed to the audio thread through a ModelExchange; new notes take
+        their key's values from it. AMOUNT is the host parameter layerX.keyDna.amount (live on
+        sounding notes); `settings.amount` is ignored. Off by default; saved in the session. */
+    void setKeyDnaSettings (int layer, const keydna::Settings& settings);
+    keydna::Settings keyDnaSettings (int layer) const;
+    /** The profile generation the audio thread plays now (0: none yet), for tests. */
+    std::uint64_t keyDnaGenerationInUse (int layer) const noexcept { return keyDnaInUse[resolve (layer)].load(); }
+    std::size_t keyDnaProfilesAlive (int layer) const;
+    static juce::ValueTree keyDnaToTree (const std::array<keydna::Settings, 3>& layers);
+    static std::array<keydna::Settings, 3> keyDnaFromTree (const juce::ValueTree& tree);
 
     /** SHAPER CUSTOM: the musician's 16 steps (message thread). Kept in the session and
         presets; setting it is undoable (one gesture = one transaction, see UndoManager). */
@@ -567,7 +583,7 @@ private:
     {
         std::atomic<float>* mode = nullptr;
         std::array<std::atomic<float>*, 5> granular {};
-        std::array<float, 6> last { -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f };
+        std::array<float, 9> last { -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f };
         std::array<std::atomic<float>*, 8> controls {};   ///< in layerControlNames() order
         std::array<float, 8> lastControls { -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f };
         std::atomic<float>* reimagined = nullptr;   ///< B and C (A follows the instrument's)
@@ -584,7 +600,18 @@ private:
         std::array<float, 5> lastDampen {};
         std::uint32_t dampenGeneration = 0;
         dampen::Settings dampenSettings;
+        std::array<std::atomic<float>*, 3> grainOptions {};   ///< SCATTER, PAN, WINDOW (hint 20)
+        std::atomic<float>* keyDnaAmount = nullptr;
     };
+    std::atomic<float>* grainBudgetParam = nullptr;
+    // KEY DNA: the message thread's settings and the profiles handed to the audio thread.
+    mutable std::mutex keyDnaMutex;   ///< message-side (hosts may save state off the message thread)
+    std::array<keydna::Settings, numLayers> keyDnaLayers {};
+    std::array<ModelExchange<keydna::Profile>, numLayers> keyDnaExchange;
+    std::uint64_t keyDnaGeneration = 0;
+    std::array<const keydna::Profile*, numLayers> keyDnaPlaying {};   ///< audio thread
+    std::array<std::atomic<std::uint64_t>, numLayers> keyDnaInUse {};
+    void swapKeyDnaIfPending() noexcept;
     std::atomic<float>* mixXParam = nullptr;
     std::atomic<float>* mixYParam = nullptr;
     std::atomic<float>* decayParam = nullptr;

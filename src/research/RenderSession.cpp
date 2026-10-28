@@ -15,9 +15,23 @@ namespace osp::research
 
 namespace
 {
-    /** Host-style block loop shared by every engine (sample-accurate events inside blocks). */
-    template <typename Engine>
-    RenderOutput runBlocks (Engine& engine, double outputRate, int blockSize, const MidiSequence& sequence, double maxTailSeconds)
+    struct NoAutomation
+    {
+        void operator() (double) const noexcept {}
+    };
+
+    struct KeyDnaAutomation
+    {
+        InstrumentEngine& engine;
+        const RenderConfig& config;
+        void operator() (double seconds) const { applyKeyDnaAutomation (engine, config, seconds); }
+    };
+
+    /** Host-style block loop shared by every engine (sample-accurate events inside blocks);
+        `onBlock (seconds)` runs before each block (automation). */
+    template <typename Engine, typename OnBlock = NoAutomation>
+    RenderOutput runBlocks (Engine& engine, double outputRate, int blockSize, const MidiSequence& sequence, double maxTailSeconds,
+                            OnBlock onBlock = {})
     {
         RenderOutput output;
         const auto& events = sequence.events;
@@ -52,6 +66,7 @@ namespace
         while (true)
         {
             const std::int64_t blockEnd = position + blockSize;
+            onBlock (static_cast<double> (position) / outputRate);
             int offset = 0;
             while (next < events.size())
             {
@@ -162,6 +177,29 @@ RenderOutput renderSequence (const AudioData& source, double rootMidi, const Mid
     return runBlocks (sampler, outputRate, blockSize, sequence, config.maxTailSeconds);
 }
 
+void applyKeyDnaAutomation (InstrumentEngine& engine, const RenderConfig& config, double seconds)
+{
+    for (int layer = 0; layer < 3; ++layer)
+    {
+        const auto& lane = config.keyDnaAmountAutomation[static_cast<std::size_t> (layer)];
+        if (lane.empty())
+            continue;
+        double amount = lane.back().second;
+        if (seconds <= lane.front().first)
+            amount = lane.front().second;
+        else
+            for (std::size_t i = 1; i < lane.size(); ++i)
+                if (seconds < lane[i].first)
+                {
+                    const auto& [t0, a0] = lane[i - 1];
+                    const auto& [t1, a1] = lane[i];
+                    amount = a0 + (a1 - a0) * (seconds - t0) / std::max (1.0e-9, t1 - t0);
+                    break;
+                }
+        engine.setLayerKeyDnaAmount (layer, amount);
+    }
+}
+
 RenderOutput renderInstrument (const InstrumentModel& model, const MidiSequence& sequence, const RenderConfig& config)
 {
     const double outputRate = config.sampleRate > 0.0 ? config.sampleRate : model.original.source->sampleRate();
@@ -173,7 +211,8 @@ RenderOutput renderInstrument (const InstrumentModel& model, const MidiSequence&
         engine.setLayerKeyDna (layer, config.keyDna[static_cast<std::size_t> (layer)]);
     engine.setModulation (config.modulation);
     engine.setModWheel (static_cast<float> (config.modWheel));
-    return runBlocks (engine, outputRate, blockSize, arpeggiate (sequence, config, outputRate), config.maxTailSeconds);
+    return runBlocks (engine, outputRate, blockSize, arpeggiate (sequence, config, outputRate), config.maxTailSeconds,
+                      KeyDnaAutomation { engine, config });
 }
 
 RenderOutput renderSet (const InstrumentSet& set, const MidiSequence& sequence, const RenderConfig& config)
@@ -188,7 +227,8 @@ RenderOutput renderSet (const InstrumentSet& set, const MidiSequence& sequence, 
         engine.setLayerKeyDna (layer, config.keyDna[static_cast<std::size_t> (layer)]);
     engine.setModulation (config.modulation);
     engine.setModWheel (static_cast<float> (config.modWheel));
-    return runBlocks (engine, outputRate, blockSize, arpeggiate (sequence, config, outputRate), config.maxTailSeconds);
+    return runBlocks (engine, outputRate, blockSize, arpeggiate (sequence, config, outputRate), config.maxTailSeconds,
+                      KeyDnaAutomation { engine, config });
 }
 
 RenderOutput renderLayers (const std::array<const InstrumentModel*, 3>& models, const MidiSequence& sequence, const RenderConfig& config)
@@ -208,7 +248,8 @@ RenderOutput renderLayers (const std::array<const InstrumentModel*, 3>& models, 
     }
     engine.setModulation (config.modulation);
     engine.setModWheel (static_cast<float> (config.modWheel));
-    return runBlocks (engine, outputRate, blockSize, arpeggiate (sequence, config, outputRate), config.maxTailSeconds);
+    return runBlocks (engine, outputRate, blockSize, arpeggiate (sequence, config, outputRate), config.maxTailSeconds,
+                      KeyDnaAutomation { engine, config });
 }
 
 RenderOutput renderWithEngine (const AudioData& source, const AnalysisData& analysis, double rootMidi, const MidiSequence& sequence,

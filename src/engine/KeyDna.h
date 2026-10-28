@@ -33,15 +33,19 @@ enum class Param
     density,    ///< DENS: octaves of grains per second
     spread,     ///< SPREAD: 0..1
     tune,       ///< TUNE: semitones
+    // Appended in Phase 2 (each its own stream, so the five above keep their values).
+    scatter,    ///< SCATTER: semitones of per-grain pitch scatter (0..12)
+    pan,        ///< PAN: per-grain stereo spread (0..1)
 };
-constexpr int paramCount = 5;
-const char* paramName (Param p) noexcept;   ///< "POS", "SIZE", "DENS", "SPREAD", "TUNE"
-const char* paramId (Param p) noexcept;     ///< "position", "size", "density", "spread", "tune"
+constexpr int paramCount = 7;
+const char* paramName (Param p) noexcept;   ///< "POS", "SIZE", "DENS", "SPREAD", "TUNE", "SCATTER", "PAN"
+const char* paramId (Param p) noexcept;     ///< "position", "size", "density", "spread", "tune", "scatter", "pan"
 
 /**
     The furthest a profile moves each parameter either way (offset +-1), in the parameter's own
     units: half its knob's travel (POS and SPREAD 0.5, SIZE 20..400 ms and DENS 4..40 /s in
-    octaves as modulation counts them, TUNE 12 st). The result is always clamped to the knob.
+    octaves as modulation counts them, TUNE 12 st, SCATTER 6 st, PAN 0.5). The result is always
+    clamped to the knob.
 */
 double halfRange (Param p) noexcept;
 
@@ -56,11 +60,17 @@ struct ParamSettings
     bool operator== (const ParamSettings&) const = default;
 };
 
-/** A layer's KEY DNA. The defaults are neutral: off, flat curves, no variation. */
+/**
+    A layer's KEY DNA. The defaults are neutral: off, flat curves, no variation.
+
+    Everything but AMOUNT shapes the per-key profile (a Table, computed off the audio thread
+    and published); AMOUNT scales it live, so it can be automated and modulated on sounding
+    notes without recomputing anything.
+*/
 struct Settings
 {
     bool enabled = false;
-    double amount = 1.0;          ///< 0..1: scales the whole profile (0 = none)
+    double amount = 1.0;          ///< 0..1: scales the whole profile live (0 = none)
     double individuality = 0.3;   ///< 0 Smooth (neighbours related) .. 1 Individual (independent keys)
     std::uint64_t seed = 1;       ///< the individuality's seed (its own stream, see Table::compute)
     std::array<ParamSettings, paramCount> params;
@@ -79,13 +89,15 @@ mod::CurveTable flatCurve() noexcept;
 mod::CurveTable curveFrom (const mod::Curve& curve) noexcept;
 
 /**
-    The cached profile of all 128 keys for one layer. Computing it allocates nothing and
-    takes some 1 300 PRNG draws, so the audio thread may recompute it when the settings change.
+    The profile of all 128 keys for one layer, at full AMOUNT: each key's offsets before the
+    live AMOUNT scales them. It depends only on the settings (never on what was played).
+    Computing it allocates nothing but takes some 1 800 PRNG draws and 900 cosines: do it off
+    the audio thread and publish the result (Profile), as the plugin does.
 */
 class Table
 {
 public:
-    /** Recomputes every key. Real-time safe. */
+    /** Recomputes every key (AMOUNT is not part of it). Allocation-free. */
     void compute (const Settings& settings) noexcept;
 
     /** Whether any key has an offset (false: the layer plays as without KEY DNA). */
@@ -94,7 +106,7 @@ public:
     const KeyDnaOffsets& at (int key) const noexcept { return keys[index (key)]; }
     /** The stable individuality of a key and parameter, unit scale (-1..1), before depth and amount. */
     float individuality (int key, Param p) const noexcept { return variations[index (key) * paramCount + static_cast<std::size_t> (p)]; }
-    /** The combined offset of a key and parameter, -1..1 (before halfRange). */
+    /** The combined offset of a key and parameter at full AMOUNT, -1..1 (before halfRange). */
     float offset (int key, Param p) const noexcept { return units[index (key) * paramCount + static_cast<std::size_t> (p)]; }
     /** Correlation of neighbouring keys' individuality for one parameter (tests, a future display). */
     double neighbourCorrelation (Param p) const noexcept;
@@ -106,25 +118,40 @@ private:
     bool anyActive = false;
 };
 
-/**
-    A key's offsets on top of the layer's base granular settings (the knobs, START included):
-    each moved parameter stays within its knob's range; a parameter without an offset is not
-    touched at all (so a neutral profile is an exact identity).
-*/
-inline void apply (const KeyDnaOffsets& o, GranularParams& p) noexcept
+/** An immutable published profile (engine/ModelExchange: `generation` orders them). */
+struct Profile
 {
-    if (! o.active)
+    std::uint64_t generation = 0;
+    Table table;
+};
+
+/**
+    A key's offsets, scaled by the live AMOUNT (0..1), on top of the layer's base granular
+    settings (the knobs, START included): each moved parameter stays within its knob's range;
+    a parameter without an offset is not touched at all, and at AMOUNT 1 the offsets are used
+    as they are (so a neutral profile, or AMOUNT 0, is an exact identity).
+*/
+inline void apply (const KeyDnaOffsets& o, double amount, GranularParams& p) noexcept
+{
+    if (! o.active || ! (amount > 0.0))
         return;
-    if (o.position != 0.0)
-        p.position = std::clamp (p.position + o.position, 0.0, 1.0);
-    if (o.sizeOctaves != 0.0)
-        p.sizeSeconds = std::clamp (p.sizeSeconds * std::exp2 (o.sizeOctaves), 0.02, 0.4);
-    if (o.densityOctaves != 0.0)
-        p.density = std::clamp (p.density * std::exp2 (o.densityOctaves), 4.0, 40.0);
-    if (o.spread != 0.0)
-        p.spread = std::clamp (p.spread + o.spread, 0.0, 1.0);
-    if (o.tuneSemitones != 0.0)
-        p.tuneSemitones = std::clamp (p.tuneSemitones + o.tuneSemitones, -12.0, 12.0);
+    const bool full = amount >= 1.0;
+    auto scaled = [full, amount] (double v) { return full ? v : v * amount; };
+    auto moved = [] (double v) { return v < 0.0 || v > 0.0; };   // (exactly 0: not touched)
+    if (moved (o.position))
+        p.position = std::clamp (p.position + scaled (o.position), 0.0, 1.0);
+    if (moved (o.sizeOctaves))
+        p.sizeSeconds = std::clamp (p.sizeSeconds * std::exp2 (scaled (o.sizeOctaves)), 0.02, 0.4);
+    if (moved (o.densityOctaves))
+        p.density = std::clamp (p.density * std::exp2 (scaled (o.densityOctaves)), 4.0, 40.0);
+    if (moved (o.spread))
+        p.spread = std::clamp (p.spread + scaled (o.spread), 0.0, 1.0);
+    if (moved (o.tuneSemitones))
+        p.tuneSemitones = std::clamp (p.tuneSemitones + scaled (o.tuneSemitones), -12.0, 12.0);
+    if (moved (o.scatterSemitones))
+        p.scatterSemitones = std::clamp (p.scatterSemitones + scaled (o.scatterSemitones), 0.0, 12.0);
+    if (moved (o.pan))
+        p.pan = std::clamp (p.pan + scaled (o.pan), 0.0, 1.0);
 }
 
 } // namespace osp::keydna

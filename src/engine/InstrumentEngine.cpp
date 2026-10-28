@@ -847,9 +847,12 @@ void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int
     if (params.sourceMode == SourceMode::granular)
     {
         granularLife (params.shape, note, eventIndex);
-        // KEY DNA: this key's identity on this layer (the played key, not a set member's root).
-        if (const auto& dna = layerKeyDnaTable[context]; dna.active())
-            params.shape.keyDna = dna.at (note);
+        // KEY DNA: this key's identity on this layer (the played key, not a set member's root),
+        // at full AMOUNT; the voice scales it by the layer's live AMOUNT.
+        if (const auto* dna = layerKeyDnaProfile[context]; dna != nullptr && dna->active())
+            params.shape.keyDna = dna->at (note);
+        params.keyDnaAmount = &layerKeyDnaAmount[context];
+        params.grainCap = config.grainBudget > 0 ? currentGrainShare : GranularSource::maxGrains;
     }
     slot->start (params);
 }
@@ -1036,10 +1039,76 @@ InstrumentEngine::ModView InstrumentEngine::modulationView() const noexcept
     return view;
 }
 
+int InstrumentEngine::liveGrainCount() const noexcept
+{
+    int n = 0;
+    for (const auto& voice : voices)
+        n += voice.grainsPlaying();
+    return n;
+}
+
+void InstrumentEngine::applyGrainBudget() noexcept
+{
+    if (config.grainBudget <= 0)
+    {
+        // Unlimited (the original behaviour): every stream its whole pool, set once.
+        if (currentGrainShare != GranularSource::maxGrains)
+        {
+            currentGrainShare = GranularSource::maxGrains;
+            for (auto& voice : voices)
+                voice.setGrainCap (currentGrainShare);
+        }
+        return;
+    }
+    // Fair and deterministic, decided from the voices alone (never from timing): max-min
+    // fairness over every sounding grain stream on A, B and C. Each stream asks for the grains
+    // its settings play at once; the share is the largest number of grains per stream that keeps
+    // the total asked within the budget, so light notes keep all their grains and only the
+    // densest are thinned, each to the same share. What a whole grain per thinned stream cannot
+    // use goes, one grain each, to the thinned streams in voice order (so shares differ by at
+    // most one). Nothing asked beyond the budget: no cap at all.
+    std::array<int, GranularSource::maxGrains + 1> asking {};   // streams by demand
+    int streams = 0;
+    for (const auto& voice : voices)
+        for (int s = 0; s < voice.grainStreams(); ++s)
+        {
+            ++asking[static_cast<std::size_t> (voice.grainDemand (s))];
+            ++streams;
+        }
+    int share = GranularSource::maxGrains, total = 0, thinned = 0;
+    for (; share >= 1; --share)
+    {
+        total = thinned = 0;
+        for (int d = 1; d <= GranularSource::maxGrains; ++d)
+        {
+            total += asking[static_cast<std::size_t> (d)] * std::min (d, share);
+            thinned += d > share ? asking[static_cast<std::size_t> (d)] : 0;
+        }
+        if (total <= config.grainBudget || share == 1)
+            break;
+    }
+    if (streams == 0 || thinned == 0)
+        share = GranularSource::maxGrains;   // the budget is not reached: every stream its pool
+    currentGrainShare = share;
+    int spare = share < GranularSource::maxGrains ? std::max (0, config.grainBudget - total) : 0;
+    for (auto& voice : voices)
+        for (int s = 0; s < voice.grainStreams(); ++s)
+        {
+            int cap = share;
+            if (spare > 0 && voice.grainDemand (s) > share)
+            {
+                ++cap;
+                --spare;
+            }
+            voice.setGrainCap (s, cap);
+        }
+}
+
 void InstrumentEngine::render (float* const* output, int numChannels, int numSamples) noexcept
 {
     if (numChannels <= 0 || numSamples <= 0)
         return;
+    applyGrainBudget();
     if (! modRuntime.compiled.any)
     {
         // No route: the global LFOs only keep time (for the display); the sound is untouched.

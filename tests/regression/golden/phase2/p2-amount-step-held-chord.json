@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "p2-amount-step-held-chord",
+  "description": "held chord, AMOUNT stepped 0 -> 100 % -> 0 (the 30 ms smoothing is all that softens it)",
+  "midi": "held-chord-g",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "38d6f41f99e985c2",
+  "seconds": 5.146667,
+  "rmsDb": -30.5858,
+  "peakDb": -16.037378,
+  "brightness": 0.247995,
+  "stereoWidth": 1.046947
+}

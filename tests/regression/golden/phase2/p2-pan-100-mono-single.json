@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "p2-pan-100-mono-single",
+  "description": "PAN 100 % on a mono recording, one held note",
+  "midi": "held-a3",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "57af4b393ce896c1",
+  "seconds": 3.152,
+  "rmsDb": -35.565429,
+  "peakDb": -21.834329,
+  "brightness": 0.147315,
+  "stereoWidth": 0.27028
+}

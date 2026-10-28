@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "p2-pan-50-chord4",
+  "description": "PAN 50 %: each grain placed within +-50 % of the field",
+  "midi": "chord4-cmaj7",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "22ab27e605ad546b",
+  "seconds": 2.154667,
+  "rmsDb": -29.810656,
+  "peakDb": -16.030447,
+  "brightness": 0.249348,
+  "stereoWidth": 1.434072
+}

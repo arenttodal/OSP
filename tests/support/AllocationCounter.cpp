@@ -5,13 +5,15 @@
 
 namespace
 {
-    std::atomic<bool> counting { false };
+    // Only the scope's own thread counts (the plugin's loader and library threads allocate
+    // freely meanwhile; what matters is the thread that plays the audio).
+    thread_local bool counting = false;
     std::atomic<int> allocations { 0 };
 }
 
 void* operator new (std::size_t size)
 {
-    if (counting.load (std::memory_order_relaxed))
+    if (counting)
         ++allocations;
     if (void* p = std::malloc (size == 0 ? 1 : size))
         return p;

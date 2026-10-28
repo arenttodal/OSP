@@ -705,3 +705,49 @@ modulation, REIMAGINED scatter and LIFE, clamped to the knobs' ranges, untouched
 The individuality draws from its own stream (`"keydna"` root), never from LIFE's or the grain
 scheduler's. Off or neutral, the output is bit-identical to the engine without it (the Phase 0
 baseline, tests/regression/golden/unified). Engine only: the plugin does not set it yet.
+
+**Phase 2 (docs/research/unified-andor/phase-2-report.md) changed how KEY DNA reaches the
+voices**, without changing what a profile is:
+- the table holds every key's offsets at full AMOUNT (`keydna::Profile` = generation + table).
+  It is computed off the audio thread and published as an immutable object:
+  - the plugin computes it on the message thread and hands it over through a per-layer
+    `ModelExchange<keydna::Profile>`;
+  - the engine only swaps a pointer (`setLayerKeyDnaProfile`);
+  - voices copy their key's offsets at note-on, so a superseded profile is free as soon as
+    the next block starts.
+- AMOUNT is live: `setLayerKeyDnaAmount` (the host parameter `layerX.keyDna.amount`) plus the
+  `keyDnaAmountA..C` modulation destinations. Each voice follows it with a 30 ms control-rate
+  one-pole, starts where it is (no glide in), and lands exactly on a still target.
+  `keydna::apply (offsets, amount, params)` is the identity at 0 and the Phase 1 arithmetic at 1.
+- `setLayerKeyDna (settings)` still exists: offline renders and tests use it, with storage
+  owned by the engine.
+
+## Granulator options and the grain budget (unified engine Phase 2)
+
+`GranularParams` gains three options, all neutral by default:
+- SCATTER (`scatterSemitones`): a per-grain random pitch within +-semitones.
+- PAN: a per-grain random place within +-PAN of the field. It is equal-power, at unity in the
+  centre; a stereo grain is balanced rather than summed to mono.
+- WINDOW: HANN (the original raised cosine) or table windows built at load time and matched
+  to Hann's energy (SOFT is a Tukey window; PERCUSSIVE is a quick rise and an exponential fall).
+
+How the options stay out of the original path:
+- SCATTER and PAN draw from the grains' second stream, `deriveSeed (seed, "grop")`, and only
+  when they are non-zero, so the original grain choices never move.
+- A panned or table-windowed grain is rendered by `renderShaped`. The original loop runs
+  untouched while none plays.
+
+The grain budget (`EngineSettings::grainBudget`, 0 = unlimited) is applied at the start of every
+`InstrumentEngine::render`:
+- Each sounding grain stream (a granular voice, and KALEIDOSCOPE's second stream) asks for
+  `ceil (DENS x SIZE) + 1` grains.
+- The share is the largest per-stream cap that keeps the total asked within the budget
+  (max-min fairness): light notes keep every grain, and the densest are thinned alike. The
+  integer remainder goes one grain each, in voice order.
+- A budget that is not reached changes nothing (bit-identical).
+- A thinned stream keeps the level it would have had: its norm is `sqrt (asked) x law (asked) /
+  sqrt (admitted)`. The admitted count glides over about half a grain, so a share change does
+  not step the level.
+- The floor is one grain per stream.
+- In the plugin, sessions saved before state version 13 open Unlimited; new sessions start
+  at 256.

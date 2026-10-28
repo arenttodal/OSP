@@ -154,6 +154,10 @@ namespace
         { "dampenCutoffA", "DAMPEN A MIN CUTOFF", Owner::voice, 0, Domain::octaves, 5.321928094887363, Update::continuous },
         { "dampenCutoffB", "DAMPEN B MIN CUTOFF", Owner::voice, 1, Domain::octaves, 5.321928094887363, Update::continuous },
         { "dampenCutoffC", "DAMPEN C MIN CUTOFF", Owner::voice, 2, Domain::octaves, 5.321928094887363, Update::continuous },
+        // KEY DNA AMOUNT per layer 0..1 (added to the layer's AMOUNT, clamped, smoothed per voice).
+        { "keyDnaAmountA", "KEY DNA A AMOUNT", Owner::voice, 0, Domain::unit, 1.0, Update::continuous },
+        { "keyDnaAmountB", "KEY DNA B AMOUNT", Owner::voice, 1, Domain::unit, 1.0, Update::continuous },
+        { "keyDnaAmountC", "KEY DNA C AMOUNT", Owner::voice, 2, Domain::unit, 1.0, Update::continuous },
     } };
 
     bool isEnvelope (Source s) noexcept { return s == Source::env1 || s == Source::env2; }

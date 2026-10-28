@@ -132,3 +132,39 @@ TEST_CASE ("KEY DNA demonstrations: A is the unmodified Granulator, B and C diff
         }
     }
 }
+
+TEST_CASE ("Phase 2 demonstrations: the grain options, live KEY DNA AMOUNT and the budget, as stored", "[regression][phase2-demos]")
+{
+    // research-renderer --unified <dir> --set phase2, pinned like the KEY DNA demonstrations.
+    const auto scenes = unified::phase2Scenes();
+    REQUIRE (scenes.size() == 16);
+    const auto platform = unified::platformTag();
+    for (const auto& scene : scenes)
+    {
+        DYNAMIC_SECTION (scene.name)
+        {
+            const auto d = unified::digest (unified::render (scene).audio);
+            REQUIRE (unified::digest (unified::render (scene).audio).hash == d.hash);
+            const auto path = std::filesystem::path (OSP_SOURCE_DIR) / "tests" / "regression" / "golden" / "phase2" / (scene.name + ".json");
+            if (updateGolden())
+            {
+                std::filesystem::create_directories (path.parent_path());
+                std::string error;
+                REQUIRE (json::writeFile (path, unified::digestToJson (scene, d, platform), error));
+                continue;
+            }
+            std::string error;
+            const auto stored = json::readFile (path, error);
+            INFO ("missing golden " << path.string() << "; run with OSP_UPDATE_GOLDEN=1");
+            REQUIRE (stored.has_value());
+            const auto& golden = *stored;
+            if (json::getString (golden, "platform") == platform)
+                CHECK (json::getString (golden, "sampleHash") == d.hash);
+            else if (json::getString (golden, "sampleHash") != d.hash)
+                WARN (scene.name << ": not bit-identical to the " << json::getString (golden, "platform") << " render (this is " << platform << ")");
+            CHECK (d.rmsDb == Approx (json::getDouble (golden, "rmsDb", -1.0e9)).margin (0.05));
+            CHECK (d.peakDb == Approx (json::getDouble (golden, "peakDb", -1.0e9)).margin (0.1));
+            CHECK (d.brightness == Approx (json::getDouble (golden, "brightness", -1.0e9)).epsilon (0.01));
+        }
+    }
+}

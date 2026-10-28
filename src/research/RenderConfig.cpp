@@ -338,6 +338,13 @@ std::optional<RenderConfig> loadRenderConfig (const std::filesystem::path& path,
             g.density = std::clamp (json::getDouble (gj, "density", g.density), 4.0, 40.0);
             g.tuneSemitones = std::clamp (json::getDouble (gj, "tuneSemitones", g.tuneSemitones), -12.0, 12.0);
             g.spread = std::clamp (json::getDouble (gj, "spread", g.spread), 0.0, 1.0);
+            g.scatterSemitones = std::clamp (json::getDouble (gj, "scatterSemitones", g.scatterSemitones), 0.0, 12.0);
+            g.pan = std::clamp (json::getDouble (gj, "pan", g.pan), 0.0, 1.0);
+            if (json::has (gj, "window"))
+            {
+                const auto w = json::getString (gj, "window");
+                g.window = w == "soft" ? GrainWindow::soft : (w == "percussive" ? GrainWindow::percussive : GrainWindow::hann);
+            }
             auto& ls = es.layer[li];
             ls.start = std::clamp (json::getDouble (l, "start", ls.start), 0.0, 1.0);
             ls.tuneSemitones = std::clamp (json::getDouble (l, "tuneSemitones", ls.tuneSemitones), -24.0, 24.0);
@@ -349,7 +356,7 @@ std::optional<RenderConfig> loadRenderConfig (const std::filesystem::path& path,
             ls.reimagined = std::clamp (json::getDouble (l, "reimagined", ls.reimagined), -1.0, 1.0);
             // KEY DNA (Granular): "keyDna": { "enabled": true, "amount": 1, "individuality": 0.3,
             // "seed": 7, "size": { "depth": 0.5, "variation": 0.2, "curve": [[0, 0.2], [1, 0.8]] }, ... }
-            // per parameter (position, size, density, spread, tune); a curve's points are
+            // per parameter (position, size, density, spread, tune, scatter, pan); a curve's points are
             // [x 0..1 over the keys, y 0..1 with 0.5 = no offset]; without one it is flat.
             if (json::has (l, "keyDna"))
             {
@@ -380,8 +387,16 @@ std::optional<RenderConfig> loadRenderConfig (const std::filesystem::path& path,
                     }
                 }
             }
+            // "keyDnaAmount": [[seconds, amount], ...]: AMOUNT automation (live on sounding notes).
+            if (const auto* lane = l["keyDnaAmount"].getArray(); lane != nullptr)
+                for (const auto& pt : *lane)
+                    if (pt.isArray() && pt.size() >= 2)
+                        config.keyDnaAmountAutomation[li].emplace_back (std::max (0.0, static_cast<double> (pt[0])),
+                                                                        std::clamp (static_cast<double> (pt[1]), 0.0, 1.0));
         }
     }
+    // The grain budget (engine C): grains at once across A, B and C; 0 or absent = unlimited.
+    config.engineSettings.grainBudget = std::max (0, json::getInt (root, "grainBudget", config.engineSettings.grainBudget));
     if (json::has (root, "mix"))
     {
         const auto& m = root["mix"];

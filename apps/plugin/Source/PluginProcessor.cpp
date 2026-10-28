@@ -239,7 +239,12 @@ OspAudioProcessor::OspAudioProcessor()
         for (int i = 0; i < dampenParameterNames().size(); ++i)
             lp.dampen[static_cast<std::size_t> (i)] = parameters.getRawParameterValue (dampenParameterId (layer, dampenParameterNames()[i]));
         lp.lastDampen.fill (-1.0e9f);
+        lp.grainOptions = { parameters.getRawParameterValue (layerParameterId (layer, "granular.scatter")),
+                            parameters.getRawParameterValue (layerParameterId (layer, "granular.pan")),
+                            parameters.getRawParameterValue (layerParameterId (layer, "granular.window")) };
+        lp.keyDnaAmount = parameters.getRawParameterValue (layerParameterId (layer, "keyDna.amount"));
     }
+    grainBudgetParam = parameters.getRawParameterValue (ids::grainBudget);
     for (int layer = 0; layer < numLayers; ++layer)
     {
         juce::StringArray ids { reimaginedParameterId (layer) };
@@ -514,8 +519,9 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
             engineSettings.layer[static_cast<std::size_t> (layer)] = ls;
             engine.setLayerSettings (layer, ls);
         }
-        std::array<float, 6> now { lp.mode->load(), lp.granular[0]->load(), lp.granular[1]->load(), lp.granular[2]->load(),
-                                   lp.granular[3]->load(), lp.granular[4]->load() };
+        std::array<float, 9> now { lp.mode->load(), lp.granular[0]->load(), lp.granular[1]->load(), lp.granular[2]->load(),
+                                   lp.granular[3]->load(), lp.granular[4]->load(), lp.grainOptions[0]->load(), lp.grainOptions[1]->load(),
+                                   lp.grainOptions[2]->load() };
         if (force || now != lp.last)
         {
             lp.last = now;
@@ -528,10 +534,17 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
             g.density = now[3];
             g.tuneSemitones = now[4];
             g.spread = 0.01 * now[5];
+            g.scatterSemitones = now[6];
+            g.pan = 0.01 * now[7];
+            g.window = static_cast<GrainWindow> (std::clamp (static_cast<int> (std::lround (now[8])), 0, 2));
             engineSettings.granular[static_cast<std::size_t> (layer)] = g;
             engine.setGranular (layer, g);
         }
+        // KEY DNA AMOUNT: live (the voices smooth it); a plain number, every block.
+        engine.setLayerKeyDnaAmount (layer, 0.01 * lp.keyDnaAmount->load());
     }
+    engineSettings.grainBudget = grainBudgetGrains (grainBudgetParam->load());
+    engine.setGrainBudget (engineSettings.grainBudget);
     applyModulation (force);
 }
 
@@ -586,7 +599,7 @@ void OspAudioProcessor::applyModulation (bool force) noexcept
         const auto& rp = modRouteParams[r];
         auto& route = s.routes[r];
         route.source = static_cast<mod::Source> (std::clamp (juce::roundToInt (rp[0]->load()), 0, mod::sourceCount));
-        route.dest = static_cast<mod::Dest> (std::clamp (juce::roundToInt (rp[1]->load()), 0, mod::destCount - 1));
+        route.dest = static_cast<mod::Dest> (std::clamp (juce::roundToInt (rp[1]->load()), 0, mod::hostDestCount - 1));
         route.depth = 0.01 * rp[2]->load();
         route.enabled = rp[3]->load() >= 0.5f;
         route.target = modRouteTargets[r].load (std::memory_order_relaxed);
@@ -1042,6 +1055,160 @@ void OspAudioProcessor::swapInstrumentIfPending() noexcept
     }
 }
 
+void OspAudioProcessor::swapKeyDnaIfPending() noexcept
+{
+    // A newly computed profile (message thread) replaces the layer's for notes started from
+    // now. Sounding notes copied their key's values at note-on, so nothing reads an older
+    // profile after this block: it may be freed as soon as this one is in use.
+    for (int layer = 0; layer < numLayers; ++layer)
+    {
+        auto& exchange = keyDnaExchange[static_cast<std::size_t> (layer)];
+        auto& playing = keyDnaPlaying[static_cast<std::size_t> (layer)];
+        if (const auto* next = exchange.takePending())
+        {
+            playing = next;
+            engine.setLayerKeyDnaProfile (layer, &next->table);
+        }
+        if (playing != nullptr)
+        {
+            exchange.publishOldestInUse (playing->generation);
+            keyDnaInUse[static_cast<std::size_t> (layer)].store (playing->generation, std::memory_order_relaxed);
+        }
+    }
+}
+
+void OspAudioProcessor::setKeyDnaSettings (int layer, const keydna::Settings& settings)
+{
+    const auto l = resolve (layer);
+    auto shape = settings;
+    shape.amount = 1.0;   // AMOUNT is the host parameter, live
+    auto profile = std::make_shared<keydna::Profile>();
+    profile->table.compute (shape);   // all 128 keys, here (never on the audio thread)
+    const std::lock_guard<std::mutex> lock (keyDnaMutex);
+    keyDnaLayers[l] = shape;
+    profile->generation = ++keyDnaGeneration;
+    keyDnaExchange[l].publish (std::move (profile));
+}
+
+keydna::Settings OspAudioProcessor::keyDnaSettings (int layer) const
+{
+    const std::lock_guard<std::mutex> lock (keyDnaMutex);
+    return keyDnaLayers[resolve (layer)];
+}
+
+std::size_t OspAudioProcessor::keyDnaProfilesAlive (int layer) const
+{
+    const std::lock_guard<std::mutex> lock (keyDnaMutex);
+    return keyDnaExchange[resolve (layer)].ownedCount();
+}
+
+namespace
+{
+    // KEY DNA's numbers as round-trip-exact text (a reopened session computes the same profile).
+    juce::String keyDnaNumber (double value)
+    {
+        char buffer[40];
+        std::snprintf (buffer, sizeof (buffer), "%.17g", value);
+        return buffer;
+    }
+    double keyDnaValue (const juce::var& v, double fallback)
+    {
+        const auto text = v.toString();
+        return text.isEmpty() ? fallback : std::strtod (text.toRawUTF8(), nullptr);
+    }
+    juce::String encodeCurveTable (const mod::CurveTable& t)
+    {
+        // The compiled curve, exactly (what is heard): its 256 values, 9 significant digits.
+        juce::StringArray values;
+        for (float v : t)
+        {
+            char buffer[24];
+            std::snprintf (buffer, sizeof (buffer), "%.9g", static_cast<double> (v));
+            values.add (buffer);
+        }
+        return values.joinIntoString (" ");
+    }
+    std::optional<mod::CurveTable> decodeCurveTable (const juce::String& text)
+    {
+        const auto tokens = juce::StringArray::fromTokens (text, " ", "");
+        if (tokens.size() != mod::curvePoints)
+            return std::nullopt;
+        mod::CurveTable t {};
+        for (int i = 0; i < mod::curvePoints; ++i)
+            t[static_cast<std::size_t> (i)] = std::clamp (std::strtof (tokens[i].toRawUTF8(), nullptr), 0.0f, 1.0f);
+        return t;
+    }
+    constexpr int keyDnaSchemaVersion = 1;
+}
+
+juce::ValueTree OspAudioProcessor::keyDnaToTree (const std::array<keydna::Settings, 3>& layers)
+{
+    // KEY DNA schema 1: per layer its switch, individuality and seed, and per parameter
+    // (position .. pan, by id) its curve depth, variation and curve (omitted when flat).
+    juce::ValueTree tree ("KeyDna");
+    tree.setProperty ("schemaVersion", keyDnaSchemaVersion, nullptr);
+    const auto flat = keydna::flatCurve();
+    for (int layer = 0; layer < numLayers; ++layer)
+    {
+        const auto& s = layers[static_cast<std::size_t> (layer)];
+        juce::ValueTree l ("Layer");
+        l.setProperty ("index", layer, nullptr);
+        l.setProperty ("enabled", s.enabled, nullptr);
+        l.setProperty ("individuality", keyDnaNumber (s.individuality), nullptr);
+        l.setProperty ("seed", juce::String (s.seed), nullptr);
+        for (int p = 0; p < keydna::paramCount; ++p)
+        {
+            const auto param = static_cast<keydna::Param> (p);
+            const auto& ps = s[param];
+            if (juce::exactlyEqual (ps.curveDepth, 0.0) && juce::exactlyEqual (ps.variation, 0.0) && ps.curve == flat)
+                continue;
+            juce::ValueTree pt ("Param");
+            pt.setProperty ("id", keydna::paramId (param), nullptr);
+            pt.setProperty ("depth", keyDnaNumber (ps.curveDepth), nullptr);
+            pt.setProperty ("variation", keyDnaNumber (ps.variation), nullptr);
+            if (! (ps.curve == flat))
+                pt.setProperty ("curve", encodeCurveTable (ps.curve), nullptr);
+            l.appendChild (pt, nullptr);
+        }
+        tree.appendChild (l, nullptr);
+    }
+    return tree;
+}
+
+std::array<keydna::Settings, 3> OspAudioProcessor::keyDnaFromTree (const juce::ValueTree& tree)
+{
+    // Absent (an older session) or from a newer schema this build does not know: no KEY DNA
+    // (the original Granulator), never a guess.
+    std::array<keydna::Settings, 3> layers {};
+    if (! tree.isValid() || static_cast<int> (tree.getProperty ("schemaVersion", 0)) != keyDnaSchemaVersion)
+        return layers;
+    for (const auto& l : tree)
+    {
+        if (! l.hasType ("Layer"))
+            continue;
+        const int index = static_cast<int> (l.getProperty ("index", -1));
+        if (index < 0 || index >= numLayers)
+            continue;
+        auto& s = layers[static_cast<std::size_t> (index)];
+        s.enabled = static_cast<bool> (l.getProperty ("enabled", false));
+        s.individuality = std::clamp (keyDnaValue (l.getProperty ("individuality"), 0.0), 0.0, 1.0);
+        s.seed = std::strtoull (l.getProperty ("seed", "1").toString().toRawUTF8(), nullptr, 10);
+        for (const auto& pt : l)
+            for (int p = 0; p < keydna::paramCount; ++p)
+            {
+                const auto param = static_cast<keydna::Param> (p);
+                if (! pt.hasType ("Param") || pt.getProperty ("id").toString() != keydna::paramId (param))
+                    continue;
+                auto& ps = s[param];
+                ps.curveDepth = std::clamp (keyDnaValue (pt.getProperty ("depth"), 0.0), -1.0, 1.0);
+                ps.variation = std::clamp (keyDnaValue (pt.getProperty ("variation"), 0.0), 0.0, 1.0);
+                if (const auto curve = decodeCurveTable (pt.getProperty ("curve").toString()))
+                    ps.curve = *curve;
+            }
+    }
+    return layers;
+}
+
 void OspAudioProcessor::handleMidi (const juce::MidiMessage& m) noexcept
 {
     const int channel = m.getChannel();
@@ -1137,6 +1304,7 @@ void OspAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
 
     keyboardState.processNextMidiBuffer (midi, 0, numSamples, true);
     swapInstrumentIfPending();
+    swapKeyDnaIfPending();
     routePreviewKeys (midi);
 
     // A bounce or playback from the same position must perform identically (spec §33):
@@ -2008,6 +2176,11 @@ void OspAudioProcessor::timerCallback()
         }
     }
 
+    {
+        const std::lock_guard<std::mutex> lock (keyDnaMutex);
+        for (auto& exchange : keyDnaExchange)
+            exchange.collectGarbage();
+    }
     const std::lock_guard<std::mutex> lock (modelMutex);
     for (auto& layer : layers)
         layer.exchange.collectGarbage();
@@ -2137,6 +2310,15 @@ std::unique_ptr<juce::XmlElement> OspAudioProcessor::createStateXml()
     }
     stateTree.setProperty ("velToAmp", velocityAppliesToAmp(), nullptr);
     stateTree.setProperty ("arpRateStepped", arpRateIsStepped(), nullptr);
+    {
+        std::array<keydna::Settings, 3> dna;
+        {
+            const std::lock_guard<std::mutex> lock (keyDnaMutex);
+            dna = keyDnaLayers;
+        }
+        stateTree.removeChild (stateTree.getChildWithName ("KeyDna"), nullptr);
+        stateTree.appendChild (keyDnaToTree (dna), nullptr);
+    }
     for (int layer = 0; layer < numLayers; ++layer)
     {
         const auto tree = instrumentTree (layer);
@@ -2224,6 +2406,8 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml, bool setting
                                                               stateTree.getChildWithName (ids::instrumentC) };
     for (const auto& tree : layerTrees)
         stateTree.removeChild (tree, nullptr);
+    const auto keyDnaTree = stateTree.getChildWithName ("KeyDna");
+    stateTree.removeChild (keyDnaTree, nullptr);
     const int savedVersion = static_cast<int> (stateTree.getProperty ("stateVersion", 1));
     // Made before per-layer Reimagined (no routing saved): the legacy shared stage, exactly.
     perLayerReimagined = savedVersion >= 8 && stateTree.getProperty ("reimaginedRouting", "legacyGlobal").toString() == "perLayer";
@@ -2425,6 +2609,19 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml, bool setting
     }
     if (savedVersion < 11)
         migrateModulationDepths();
+    if (savedVersion < 13)
+    {
+        // Before the grain budget every grain played: older sessions and presets keep that
+        // (Unlimited), while new sessions start from the benchmarked budget.
+        setParameterValue (ids::grainBudget, 0.0f);
+    }
+    // KEY DNA: the session's (absent before 13: none). Always published, so a session without
+    // it also clears the previous one's.
+    {
+        const auto dna = keyDnaFromTree (keyDnaTree);
+        for (int layer = 0; layer < numLayers; ++layer)
+            setKeyDnaSettings (layer, dna[static_cast<std::size_t> (layer)]);
+    }
 
     if (settingsOnly)
         return;

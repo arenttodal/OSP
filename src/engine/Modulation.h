@@ -231,9 +231,19 @@ enum class Dest : std::uint8_t
     dampenAmountA, dampenAmountB, dampenAmountC,
     dampenShelfA, dampenShelfB, dampenShelfC,
     dampenCutoffA, dampenCutoffB, dampenCutoffC,
+    // Each layer's KEY DNA AMOUNT (per voice, live on sounding notes; unified engine Phase 2).
+    keyDnaAmountA, keyDnaAmountB, keyDnaAmountC,
     count
 };
 constexpr int destCount = static_cast<int> (Dest::count);
+/**
+    The destinations a host-facing route parameter can choose (its choice list, frozen): a
+    plugin's `mod.routeN.dest` is a choice parameter, and adding choices would move every
+    existing choice's normalised value and so change its automation. Destinations after these
+    (KEY DNA AMOUNT) are reachable from the engine and the research renderer only, until a
+    versioned parameter for them is decided.
+*/
+constexpr int hostDestCount = static_cast<int> (Dest::keyDnaAmountA);
 
 enum class Owner : std::uint8_t
 {

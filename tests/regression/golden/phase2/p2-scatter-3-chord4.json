@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "p2-scatter-3-chord4",
+  "description": "SCATTER +-3 semitones per grain",
+  "midi": "chord4-cmaj7",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "5a368c923c5dfa50",
+  "seconds": 2.154667,
+  "rmsDb": -29.918924,
+  "peakDb": -16.261162,
+  "brightness": 0.25584,
+  "stereoWidth": 1.545526
+}

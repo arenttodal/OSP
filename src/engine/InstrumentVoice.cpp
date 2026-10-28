@@ -31,6 +31,7 @@ void InstrumentVoice::prepare (double outputSampleRate, const AdsrSettings& adsr
         charFilter.setParameters (FilterType::off, 1000.0, 0.0, 0.0, 0.0); // a bare voice: no CHARACTER stage
     // CHARACTER follows the knob within ~10 ms (control rate one-pole).
     charSmoothing = 1.0 - std::exp (-static_cast<double> (controlInterval) / (0.010 * outputSampleRate));
+    keyDnaSmoothing = 1.0 - std::exp (-static_cast<double> (controlInterval) / (0.030 * outputSampleRate));
     adsrSettings = adsr;
     envelope.prepare (outputSampleRate, adsr);
     tapeFrameEngine.prepare (outputSampleRate);
@@ -70,6 +71,8 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     voiceLayer = params.layerIndex;
     granularMode = params.sourceMode == SourceMode::granular && params.granular != nullptr;
     granularLive = params.granular;
+    keyDnaAmountLive = params.keyDnaAmount;
+    keyDnaAmountApplied = keyDnaAmountLive != nullptr ? std::clamp (*keyDnaAmountLive, 0.0, 1.0) : 1.0;
     // Granular voices never read the recording through: no continuation jumps or grafts.
     strategy = cont->canSustain && ! granularMode ? params.strategy : ContinuationStrategy::off;
     releaseGraftEnabled = params.releaseGraft;
@@ -217,8 +220,11 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
         dGrainBehind = dAmount > 0.0f ? dBase / std::max (1.0, static_cast<double> (src.numFrames())) : 0.0;
     }
     if (granularMode)
+    {
+        setGrainCap (params.grainCap);
         granularSource.start (*layer->source, notesGranular(), sampleRate, shape.seed, &currentModel->analysis.envelope,
                               currentModel->analysis.source.durationSeconds);
+    }
     saturationDrive = 1.0f + 4.0f * std::clamp (shape.saturation, 0.0f, 1.0f);
     saturationNorm = 1.0f / saturationDrive;
     // Drift has its own random stream (so it never changes the continuation's choices)
@@ -692,7 +698,7 @@ GranularParams InstrumentVoice::notesGranular() const noexcept
     // included) -> KEY DNA (this key, fixed at note-on) -> modulation -> REIMAGINED scatter ->
     // LIFE (this trigger) -> the final clamp; the grains add their own randomness at spawn.
     GranularParams p = *granularLive;
-    keydna::apply (shape.keyDna, p);
+    keydna::apply (shape.keyDna, keyDnaAmountApplied, p);
     double offset = static_cast<double> (shape.grainPositionOffset) + modStartOffset;
     if (modeEngine != nullptr)
         offset += modeEngine->grainPositionOffset();   // TAPE FRAME's tape, TOYBOX's heads
@@ -727,6 +733,7 @@ void InstrumentVoice::clearModulation() noexcept
     modCutoff = modResonance = modSustain = 0.0;
     modDampenAmount = modDampenShelf = modDampenCutoff = 0.0;
     modGrainPosition = modGrainSpread = modGrainSize = modGrainDensity = 0.0;
+    modKeyDnaAmount = 0.0;
     appliedSustain = -1.0;
 }
 
@@ -779,6 +786,7 @@ void InstrumentVoice::updateModulation (bool advance) noexcept
     modResonance = modState.offset (rt, mod::Dest::resonance);
     modGrainPosition = modState.offset (rt, layerDest (mod::Dest::grainPositionA));
     modGrainSpread = modState.offset (rt, layerDest (mod::Dest::grainSpreadA));
+    modKeyDnaAmount = modState.offset (rt, layerDest (mod::Dest::keyDnaAmountA));
     modGrainSize = modState.offset (rt, layerDest (mod::Dest::grainSizeA));
     modGrainDensity = modState.offset (rt, layerDest (mod::Dest::grainDensityA));
     modSustain = modState.offset (rt, mod::Dest::ampSustain);
@@ -876,6 +884,14 @@ void InstrumentVoice::updateControl() noexcept
         updateDampen (false);
     if (granularMode)
     {
+        if (shape.keyDna.active)
+        {
+            // KEY DNA AMOUNT, live on this sounding note (its profile stays its key's).
+            const double target = std::clamp ((keyDnaAmountLive != nullptr ? *keyDnaAmountLive : 1.0) + modKeyDnaAmount, 0.0, 1.0);
+            keyDnaAmountApplied += (target - keyDnaAmountApplied) * keyDnaSmoothing;
+            if (std::abs (target - keyDnaAmountApplied) < 1.0e-5)
+                keyDnaAmountApplied = target;
+        }
         granularSource.setParams (notesGranular());
         if (grainDoubling)
             doubleSource.setParams (doubledGranular());

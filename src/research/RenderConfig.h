@@ -13,6 +13,8 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace osp::research
 {
@@ -49,6 +51,10 @@ struct RenderConfig
 
     /** Engine C's KEY DNA per layer (engine/KeyDna.h; off by default). */
     std::array<keydna::Settings, 3> keyDna {};
+    /** KEY DNA AMOUNT automation per layer: (seconds, amount 0..1) breakpoints, linear between
+        them and held after the last; applied before every block, as a host would. Empty: the
+        settings' AMOUNT throughout. */
+    std::array<std::vector<std::pair<double, double>>, 3> keyDnaAmountAutomation {};
 
     /** Engine C's modulation (LFOs, envelopes, routes); no routes = none. */
     mod::Settings modulation {};

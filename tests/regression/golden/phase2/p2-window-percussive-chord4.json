@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scene": "p2-window-percussive-chord4",
+  "description": "window PERCUSSIVE (each grain a small attack)",
+  "midi": "chord4-cmaj7",
+  "sampleRate": 48000.0,
+  "blockSize": 256,
+  "seed": 1,
+  "platform": "linux-x86_64-gcc",
+  "sampleHash": "9e9cbdbec5967c6",
+  "seconds": 2.154667,
+  "rmsDb": -29.890382,
+  "peakDb": -15.107465,
+  "brightness": 0.250238,
+  "stereoWidth": 2.040361
+}

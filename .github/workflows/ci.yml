@@ -52,6 +52,15 @@ jobs:
           ./build/apps/research-renderer/research-renderer --benchmark --engine C --output-json benchmark-engine-c-${{ matrix.os }}.json
           ./build/apps/research-renderer/research-renderer --benchmark --engine C --voices 16 --no-retrigger --output-json benchmark-engine-c-16-${{ matrix.os }}.json
 
+      - name: Unified engine costs (Phase 2 demonstrations and the grain-budget sweep)
+        # Printed to the log (per scene: mean / worst block %, worst block us, grains), so the
+        # Apple Silicon figures can be read without downloading artifacts.
+        run: |
+          for set in phase2 budget; do
+            ./build/apps/research-renderer/research-renderer --unified unified-$set --set $set --repeats 3 --no-audio > /dev/null
+            cat unified-$set/summary.md
+          done
+
       - name: Validate AU (macOS)
         if: runner.os == 'macOS'
         run: |

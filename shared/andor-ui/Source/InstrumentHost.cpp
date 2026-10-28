@@ -313,7 +313,7 @@ mod::Settings InstrumentHost::modulationProbe() const
     {
         auto& route = probe.routes[static_cast<std::size_t> (r)];
         route.source = static_cast<mod::Source> (std::clamp (juce::roundToInt (parameterValue (modRouteId (r, "source"))), 0, mod::sourceCount));
-        route.dest = static_cast<mod::Dest> (std::clamp (juce::roundToInt (parameterValue (modRouteId (r, "dest"))), 0, mod::destCount - 1));
+        route.dest = static_cast<mod::Dest> (std::clamp (juce::roundToInt (parameterValue (modRouteId (r, "dest"))), 0, mod::hostDestCount - 1));
         route.depth = 0.01 * parameterValue (modRouteId (r, "depth"));
         route.enabled = parameterValue (modRouteId (r, "enabled")) >= 0.5f;
         route.target = resolveModTarget (r);

@@ -33,6 +33,7 @@ enum class SourceId
     vowelA3,   ///< a sung "ah" at A3 (220 Hz), 2.5 s
     pluckE2,   ///< a plucked string at E2, 2.5 s
     vowelE4,   ///< a sung vowel at E4, 2.5 s
+    vowelA3Mono,   ///< vowelA3's left channel alone (a mono recording: where PAN is plainly heard)
 };
 const char* sourceName (SourceId id) noexcept;
 AudioData sourceAudio (SourceId id);
@@ -64,6 +65,25 @@ std::vector<Scene> baselineScenes();
 std::vector<Scene> keyDnaScenes();
 keydna::Settings organicKeyDna();
 keydna::Settings expressiveKeyDna();
+
+/**
+    The Phase 2 demonstrations (research-renderer --unified <dir> --set phase2), on the same
+    instrument as the KEY DNA ones:
+      the grain options   SCATTER, PAN and the SOFT / PERCUSSIVE windows, alone;
+      KEY DNA's new ones  SCATTER and PAN by key (low keys steady and centred, high keys
+                          scattered and wide);
+      live AMOUNT         a held chord whose KEY DNA AMOUNT is automated 0 -> 1 -> 0, and one
+                          an LFO sweeps (the keyDnaAmount destination);
+      the grain budget    the stress scene unlimited and at 128 grains.
+    "p2-options-neutral-chord4" sets every new option to neutral explicitly: it must render
+    the Phase 1 "keydna-a-static-chord4" exactly.
+*/
+std::vector<Scene> phase2Scenes();
+/** KEY DNA with SCATTER and PAN curves (the phase-2 scale demonstration). */
+keydna::Settings scatterPanKeyDna();
+/** Grain-budget stress (--set budget): three dense Granular layers (DENS 40, SIZE 400 ms, KALEIDOSCOPE
+    doubling on C) playing an eight-note chord, once per budget: unlimited, 512, 384, 256, 192, 128, 96, 64. */
+std::vector<Scene> budgetScenes();
 
 /** What one key does on its own: its profile, and what its grains measurably did. */
 struct KeyMeasure
@@ -113,6 +133,8 @@ struct Cost
     double worstBudgetPercent = 0.0;
     int peakVoices = 0;
     int peakGrains = 0;               ///< grains displayed at once, all layers (GrainSnapshot)
+    int peakLiveGrains = 0;           ///< grains playing at once, all layers (the engine's own count)
+    double worstObservedMicros = 0.0; ///< the slowest block of any run (the figures above keep each block's fastest run)
 };
 /** Renders the scene `repeats` times and keeps the fastest run per block (less noise). */
 Cost measure (const Scene& scene, int repeats = 3);
