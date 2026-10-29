@@ -49,6 +49,9 @@ add_library(osp_dsp STATIC
     src/analysis/AnalysisFrames.cpp
     src/analysis/pitch/YinPitchTracker.cpp
     src/analysis/pitch/PitchAnalyzer.cpp
+    src/analysis/phrase/PhraseAnalysis.cpp
+    src/analysis/phrase/PhraseEdits.cpp
+    src/analysis/phrase/AnalysisJobs.cpp
     src/analysis/loudness/EnvelopeAnalyzer.cpp
     src/analysis/onset/OnsetDetector.cpp
     src/analysis/spectrum/SpectralAnalyzer.cpp
@@ -89,7 +92,8 @@ add_library(osp_dsp STATIC
 target_include_directories(osp_dsp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 # Linked into plugin shared objects (VST3/AU bundles).
 set_target_properties(osp_dsp PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_link_libraries(osp_dsp PRIVATE signalsmith-stretch)
+find_package(Threads REQUIRED)
+target_link_libraries(osp_dsp PRIVATE signalsmith-stretch PUBLIC Threads::Threads)
 osp_set_warnings(osp_dsp)
 
 # ---------------------------------------------------------------------------
@@ -133,6 +137,7 @@ set(OSP_IO_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/io/AnalysisJson.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/io/JsonUtil.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/io/NoteAtlasJson.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/io/PhraseAnalysisCache.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/midi/MidiFileIO.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/library/SoundImport.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/library/FolderScan.cpp
@@ -183,6 +188,7 @@ add_library(osp_research STATIC
     src/research/Experiment.cpp
     src/research/UnifiedScenes.cpp
     src/research/AtlasFixtures.cpp
+    src/research/PhraseFixtures.cpp
 )
 target_include_directories(osp_research PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(osp_research PUBLIC osp_dsp osp_library osp_juce_headless)

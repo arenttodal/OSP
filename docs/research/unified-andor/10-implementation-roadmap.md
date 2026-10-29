@@ -71,6 +71,7 @@ Every phase follows the same pattern:
 |---|---|
 | **New** | `src/analysis/phrase/*` (analysis, yin-viterbi, edits) using `core/Statistics`. Analysis cache in the Library store. `Classifier` hand-off: "Play as one sound / Map its notes". |
 | **Tests** | The lab's analysis tests ported. **Evaluation on real recordings** (R4), which gates the next phases. |
+| **Done** | phase-4-report.md: the analysis (version 3, doubts and verdicts), jobs and cache, corrections, staged preparation, capacity. The real-recording gate is partly met (spliced real phrases, real single-pitch takes); genuine performed phrases are still needed. Its recommendation moves short-note sustain and a re-articulation fix ahead of the GUI. |
 
 ### Phase 5: GUI (NOTE MAP, KEY DNA)
 

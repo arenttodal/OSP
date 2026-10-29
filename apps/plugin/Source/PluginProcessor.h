@@ -204,6 +204,29 @@ public:
     void loadAtlas (const atlas::NoteAtlas& atlas, int layer = -1, const std::string& atlasFolder = {});
     /** The sources the layer's last Atlas load could not find (empty when it loaded). */
     std::vector<std::string> missingSources (int layer = -1) const;
+    /**
+        Unified engine Phase 4: a monophonic recording (sung, bowed, played phrase) becomes the
+        layer's instrument. The file is imported into the sample store by hash, analysed into a
+        Note Atlas on a background job (its stored analysis is reused when the same recording
+        was analysed before with the same settings), and published in two stages: playable at
+        once (Stage A), then with sustain loops and releases (Stage B, while notes may sound:
+        a sounding note keeps what it started with). A recording that does not suit is loaded
+        as one ordinary sample, with the reason as the status message. Nothing of this runs in
+        processBlock.
+    */
+    void analyseRecording (const juce::File& file, int layer = -1, const phrase::AnalysisSettings& settings = {});
+    /** Stops the layer's analysis or preparation (the instrument already published stays). */
+    void cancelAnalysis (int layer = -1);
+    /** The layer's atlas status (stage, capacity, analysis verdict and doubts); null otherwise. */
+    std::shared_ptr<const AtlasStatus> atlasStatus (int layer = -1) const;
+    /** Capacity policy (Phase 4): region audio one layer's atlas may hold, and all layers
+        together, for new loads. A session's recall keeps the per-layer limit only, so it
+        reopens as it was saved. */
+    static constexpr double atlasLayerSeconds = 300.0, atlasSessionSeconds = 600.0;
+    /** What a new atlas on `layer` may hold now (the other layers' atlases counted). */
+    double atlasCapacityFor (int layer) const;
+    /** The folder of stored phrase analyses (inside the sample store). */
+    juce::File phraseAnalysisFolder() const { return store.phraseAnalysisFolder(); }
     /** The grain budget's policy (state v14; new sessions bounded, older ones shared). */
     bool isGrainBudgetBounded() const noexcept { return boundedGrainBudget.load(); }
     void setGrainBudgetBounded (bool bounded) noexcept { boundedGrainBudget = bounded; }
@@ -446,6 +469,8 @@ private:
         std::atomic<LoadState> state { LoadState::empty };
         bool lastLoadFailed = false;                     // message thread
         std::vector<std::string> missingSources;         // message thread: the last Atlas load's
+        std::shared_ptr<std::atomic<bool>> cancelPreparation;   // message thread: the current analysis / atlas job's
+        std::uint64_t messageLoad = 0;                   // message thread: the load the status message is about
         // Root override (message -> audio)
         std::atomic<double> rootShiftSemitones { 0.0 };
         std::atomic<bool> hasRootOverride { false };
@@ -468,6 +493,10 @@ private:
     void enqueueRefine (std::shared_ptr<const LoadedInstrument> base, std::shared_ptr<const AudioData> audio, int layer);
     void enqueueSetLoad (SetLoadRequest request, int layer);
     void enqueueAtlasLoad (AtlasLoadRequest request, int layer);
+    /** Phase 4: Stage B of an atlas load (queued before Stage A is reported). */
+    void enqueueAtlasEnhance (std::shared_ptr<const LoadedInstrument> base, std::shared_ptr<const atlasset::PreparedAtlas> pending, int layer,
+                              std::shared_ptr<std::atomic<bool>> cancel);
+    std::shared_ptr<std::atomic<bool>> newPreparation (std::size_t layer);
     /** Publishes an instrument without a model (the layer plays nothing; sounding voices finish
         on the old one). Layer controls are untouched (clearLayer also resets those). */
     void publishEmpty (std::size_t index);
@@ -536,6 +565,11 @@ private:
     std::unique_ptr<juce::XmlElement> previousState;   ///< the patch before the last preset / template / instrument load
     juce::String previousStateLabel;
     void rememberPreviousState (const juce::String& what);
+    /** Phrase analyses (Phase 4): one at a time, at most ten minutes of audio waiting. Declared
+        before the loader pool, so it outlives every loader job that waits on it. */
+    phrase::AnalysisQueue analysisQueue { 1, 600.0 };
+    io::PhraseAnalysisCache analysisCache { std::filesystem::path (store.phraseAnalysisFolder().getFullPathName().toStdString()) };
+    static constexpr int atlasThreads = 2;
     juce::ThreadPool loaderPool { 1 };
     std::mutex resultsMutex;               // loader <-> message thread only, never audio
     std::deque<Finished> finishedLoads;

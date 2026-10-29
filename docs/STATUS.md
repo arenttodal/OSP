@@ -440,6 +440,25 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       - Visual regression: snapshots now use JUCE's software renderer on every platform
         (the intermittent macOS-only difference, runs 151 and 164).
       Stopped for review before Phase 4.
+- [x] UNIFIED ENGINE Phase 4, phrase analysis and staged preparation
+      (docs/research/unified-andor/phase-4-report.md):
+      - src/analysis/phrase: ANDOR Lab's analysis ported (yin-viterbi, segmentation, description,
+        edits), analysis version 3: per-note doubts, the recording's verdict and possible
+        missed notes, quiet alternates off the keyboard, note-level harmonic repair.
+      - Jobs and cache: phrase::AnalysisQueue (bounded workers and queued audio, shared
+        identical requests, cancel, progress); io::PhraseAnalysisCache (hash + version +
+        settings digest). mergeReanalysisReported keeps ids and corrections, reports conflicts.
+      - Preparation: Stage A (playable) / Stage B (continuation) through one assembly
+        (bit-identical to single pass, any thread count); exact sliding median in the transient
+        separation (bit-identical, 2.9x); parallel members. Capacity 300 s per layer, 600 s in
+        all for new loads; partial builds listed.
+      - Plugin: analyseRecording / cancelAnalysis / atlasStatus; unsuitable recordings load as
+        one sample with the reason; state stays 14 (fields only added).
+      - Evaluation on real material: 8 spliced real phrases (F 0.87 at ±100 ms) and 78 real
+        single-pitch takes (77 pitch labels right; over-splitting of held notes is the main
+        defect). research-renderer --phrase-eval/-eval-file/-corpus/-analyze, --prepare-bench.
+      - Tests: 23 unit/integration + 6 grain-budget stress + 6 plugin; every golden unchanged.
+      Stopped for review before Phase 5 (the unified GUI not started).
 - [x] ANDOR DESIGN SYSTEM and INSTRUMENT SHELL (andor-design-system/, start with HANDOFF.md).
       ANDOR OSP's interface was extracted, unchanged, into shared/andor-ui:
       - the components, look and assets;

@@ -52,18 +52,6 @@ jobs:
           ./build/apps/research-renderer/research-renderer --benchmark --engine C --output-json benchmark-engine-c-${{ matrix.os }}.json
           ./build/apps/research-renderer/research-renderer --benchmark --engine C --voices 16 --no-retrigger --output-json benchmark-engine-c-16-${{ matrix.os }}.json
 
-      - name: Unified engine costs (Phase 2 demonstrations, the grain-budget sweep, Phase 3 atlases)
-        # Printed to the log (per scene: mean / worst block %, worst block us, grains; atlases:
-        # memory, build time, lookup), so the Apple Silicon figures can be read without
-        # downloading artifacts. Runs even when a test failed: the figures do not depend on it.
-        if: ${{ !cancelled() }}
-        run: |
-          for set in phase2 budget atlas; do
-            ./build/apps/research-renderer/research-renderer --unified unified-$set --set $set --repeats 3 --no-audio > /dev/null
-            cat unified-$set/summary.md
-          done
-          cat unified-atlas/atlas.md
-
       - name: Validate AU (macOS)
         if: runner.os == 'macOS'
         run: |
@@ -117,3 +105,26 @@ jobs:
             build/apps/plugin/OSP_Plugin_artefacts/Release/VST3/
           if-no-files-found: ignore
 
+      - name: Unified engine costs (Phase 2 demonstrations, the grain-budget sweep, Phase 3 atlases, Phase 4 preparation)
+        # The last step, so its figures are the end of the log (per scene: mean / worst block %,
+        # worst block us, grains; atlases: memory, build time, lookup; Phase 4: phrase analysis
+        # accuracy on the generated phrases and preparation time per stage). The Apple Silicon
+        # figures can then be read without downloading artifacts; they also go to the job
+        # summary. Runs even when a test failed: the figures do not depend on it.
+        if: ${{ !cancelled() }}
+        run: |
+          r=./build/apps/research-renderer/research-renderer
+          {
+            for set in phase2 budget atlas; do
+              $r --unified unified-$set --set $set --repeats 3 --no-audio > /dev/null
+              cat unified-$set/summary.md
+            done
+            cat unified-atlas/atlas.md
+            $r --phrase-fixtures phrase-fixtures > /dev/null
+            $r --phrase-eval --backend yin-viterbi | tail -1
+            $r --prepare-bench phrase-fixtures --repeat 3 --threads 1 --output-md prepare-1.md > /dev/null
+            $r --prepare-bench phrase-fixtures --repeat 3 --threads 3 --output-md prepare-3.md > /dev/null
+            echo "Preparation, 1 thread:"; cat prepare-1.md
+            echo "Preparation, 3 threads:"; cat prepare-3.md
+          } | tee unified-costs.md
+          cat unified-costs.md >> "$GITHUB_STEP_SUMMARY"

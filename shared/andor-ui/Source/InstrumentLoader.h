@@ -2,8 +2,11 @@
 
 #include "LoadedInstrument.h"
 
+#include "analysis/phrase/AnalysisJobs.h"
 #include "core/AudioData.h"
+#include "engine/AtlasSet.h"
 #include "engine/SampleSetInference.h"
+#include "io/PhraseAnalysisCache.h"
 #include "model/NoteAtlas.h"
 
 #include <juce_core/juce_core.h>
@@ -37,6 +40,9 @@ public:
     std::optional<juce::File> find (const std::string& sha256Hex) const;
 
     juce::File analysisCacheFor (const std::string& sha256Hex) const;
+
+    /** Phase 4: where finished phrase analyses are kept (a subfolder: never mistaken for audio). */
+    juce::File phraseAnalysisFolder() const { return dir.getChildFile ("phrase-analysis"); }
 
 private:
     juce::File dir;
@@ -81,6 +87,25 @@ struct AtlasLoadRequest
     atlas::NoteAtlas atlas;
     std::string atlasFolder;                  ///< where a stand-alone .andoratlas was read from (relative hints)
     std::vector<std::string> searchFolders;   ///< extra folders to look in by file name
+    /** Phase 4 capacity: region audio this layer may hold (seconds; the session's policy
+        decides it from what the other layers hold). Beyond it notes are left out - listed,
+        never silently - and the atlas keeps them all. */
+    double capacitySeconds = 300.0;
+    int threads = 2;                          ///< per-member work (results do not depend on it)
+};
+
+/**
+    Phase 4: a recording to analyse into a Note Atlas for one layer. The audio is imported into
+    the store by hash, decoded once, analysed (or its stored analysis reused), and built in two
+    stages. A recording that does not suit a monophonic analysis (polyphonic, unpitched, silent,
+    no notes) is loaded as one ordinary sample instead - playable as recorded - with the reason.
+*/
+struct AnalyseRequest
+{
+    juce::File file;
+    phrase::AnalysisSettings settings;
+    double capacitySeconds = 300.0;
+    int threads = 2;
 };
 
 struct LoadResult
@@ -92,6 +117,8 @@ struct LoadResult
     /** Atlas loads: the sources whose audio was not found (the load then fails: a session must
         never look restored without its audio). "<asset id>: <name> (<hash>)". */
     std::vector<std::string> missingSources;
+    /** Phase 4: an atlas load's Stage B input (the instrument published now is Stage A). */
+    std::shared_ptr<const atlasset::PreparedAtlas> atlasPending;
 };
 
 /**
@@ -119,6 +146,22 @@ LoadResult loadInstrumentSet (const SetLoadRequest& request, SampleStore& store,
     with `missingSources` - when any source's audio cannot be found or does not match.
 */
 LoadResult loadInstrumentAtlas (const AtlasLoadRequest& request, SampleStore& store, std::uint64_t generation);
+
+/**
+    Phase 4, Stage B of an atlas load: the same instrument with every member's continuation.
+    Background thread; never throws. A cancelled or failed stage leaves Stage A playing.
+*/
+LoadResult enhanceInstrumentAtlas (const LoadedInstrument& base, const atlasset::PreparedAtlas& pending, std::uint64_t generation,
+                                   const std::atomic<bool>* cancel = nullptr, int threads = 2);
+
+/**
+    Phase 4: a recording -> phrase analysis (through `queue`, reusing `cache`) -> Stage A of
+    its atlas instrument (Stage B follows with enhanceInstrumentAtlas). Falls back to the
+    recording as one sample when it does not suit. Background thread (it waits for the
+    analysis); `cancel` stops it. Never throws.
+*/
+LoadResult loadAnalysedRecording (const AnalyseRequest& request, SampleStore& store, phrase::AnalysisQueue& queue,
+                                  const io::PhraseAnalysisCache& cache, std::uint64_t generation, const std::atomic<bool>* cancel = nullptr);
 
 /** Re-infers the current set with new user assignments (no re-analysis). */
 LoadResult reassignInstrumentSet (const LoadedInstrument& base, const std::vector<SetAssignment>& assignments, std::uint64_t generation);

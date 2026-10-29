@@ -84,6 +84,20 @@ enum class NoteOrigin
     user,       ///< made or placed by the user (or a prepared fixture)
 };
 
+/** What an analysis was unsure about in one note (Phase 4). Hints for the musician and a
+    later NOTE MAP; playback ignores them. None set: a reliable note. User-made notes have none. */
+struct Diagnostics
+{
+    bool uncertainPitch = false;       ///< weakly periodic, unstable or quiet: the root may be wrong
+    bool possibleOctaveError = false;  ///< many of its frames sat about an octave away from its pitch
+    bool uncertainBoundary = false;    ///< a join to a neighbour within a semitone (a slide or a dip decided it), or very short
+    bool unvoiced = false;             ///< mostly breath, noise or consonant
+    bool possibleSplit = false;        ///< joined to a neighbour on the same key: maybe one note cut in two
+    bool quietAlternate = false;       ///< far quieter than another take of its key (a decaying tail): left off the keyboard
+    bool any() const noexcept { return uncertainPitch || possibleOctaveError || uncertainBoundary || unvoiced || possibleSplit || quietAlternate; }
+    bool operator== (const Diagnostics&) const = default;
+};
+
 /** What the user changed by hand. A re-analysis must never silently undo these. */
 struct Corrections
 {
@@ -94,8 +108,9 @@ struct Corrections
     bool split = false;       ///< made by splitting a region
     bool merged = false;      ///< made by merging regions
     bool velocity = false;    ///< velocity layer set by the user
+    bool included = false;    ///< included or left out by the user (Phase 4)
 
-    bool any() const noexcept { return pitch || boundaries || key || group || split || merged || velocity; }
+    bool any() const noexcept { return pitch || boundaries || key || group || split || merged || velocity || included; }
     bool operator== (const Corrections&) const = default;
 };
 
@@ -135,6 +150,7 @@ struct NoteEvent
     int analysisVersion = 0;
 
     Corrections corrections;
+    Diagnostics diagnostics;           ///< analysis notes only (Phase 4)
     bool included = true;              ///< false: kept in the atlas, not playable
     int assignedKey = -1;              ///< -1: plays at rootMidi; else the key it answers to
     int velocityLayer = 0;             ///< 0 = softest; layers of one key are played by velocity
@@ -156,6 +172,17 @@ struct AnalysisInfo
     double a4Hz = 440.0;
     double tuningOffsetCents = 0.0;
     std::string settingsDigest;
+
+    // What the analysis found about the recording as a whole (Phase 4; empty / 0 for
+    // hand-made atlases). Hints only: playback never reads them.
+    /** "monophonic" (one clear pitch at a time), "uncertain", "unsuitable" (mostly unpitched,
+        polyphonic or noise: the notes are unreliable) or "silent". Empty: not analysed. */
+    std::string suitability;
+    double analysedSeconds = 0.0;
+    double pitchedSeconds = 0.0;        ///< sound with a confident pitch
+    /** Stretches of confidently pitched sound outside every note (>= 100 ms each, source
+        frames): possible missed notes. */
+    std::vector<FrameRange> uncovered;
 };
 
 /**

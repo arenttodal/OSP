@@ -17,6 +17,31 @@ namespace osp::plugin
 {
 
 /**
+    How a layer's Note Atlas instrument came to be (unified engine Phase 4), for the musician:
+    a weak analysis or a partial build is shown as such, never as a perfect instrument.
+*/
+struct AtlasStatus
+{
+    bool playableOnly = false;          ///< Stage A: sustain loops and releases are still being prepared
+    bool partial = false;               ///< notes left out (capacity) or cut (region limit): listed
+    std::vector<std::string> skippedNoteIds, cutNoteIds;
+    double regionSeconds = 0.0;         ///< region audio the instrument holds (capacity accounting)
+    std::size_t memberBytes = 0;
+    double buildMilliseconds = 0.0;
+
+    // From the phrase analysis (a hand-made atlas has none):
+    bool analysed = false;
+    bool fromCache = false;             ///< the stored analysis of this recording was reused
+    bool olderAnalysis = false;         ///< made by an older analysis version: kept (re-analysis is the musician's choice)
+    std::string suitability;            ///< "monophonic", "uncertain", "unsuitable", "silent"
+    int notes = 0;                      ///< included notes
+    int doubtfulNotes = 0;              ///< included notes with any diagnostic
+    int leftOut = 0;                    ///< notes kept in the atlas but not on the keyboard
+    double analysisMilliseconds = 0.0;
+    std::vector<std::string> warnings;
+};
+
+/**
     Everything the plugin needs for one dropped sample. Built on the loader thread,
     then immutable. The audio thread only touches `model` (through the engine) and
     `generation` (through ModelExchange). One load publishes up to three of these, one
@@ -55,6 +80,7 @@ struct LoadedInstrument
     /** The atlas's source recordings as the sample store holds them (store hash, name, path):
         what presets, the Library and portable instruments reference. */
     std::vector<MemberFile> atlasSources;
+    std::shared_ptr<const AtlasStatus> atlasStatus;   ///< Phase 4: stage, capacity, analysis verdict (atlas sets only)
     double startSeconds = 0.0;       ///< where notes start reading (analysed onset minus pre-roll)
     double playbackGainDb = 0.0;     ///< non-destructive level match
 

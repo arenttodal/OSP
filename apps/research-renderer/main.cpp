@@ -2,6 +2,7 @@
 // See README.md and docs/testing.md for usage.
 
 #include "analysis/continuation/ContinuationAnalyzer.h"
+#include "analysis/phrase/PhraseAnalysis.h"
 #include "core/PitchMath.h"
 #include "io/AnalysisJson.h"
 #include "io/AudioFileIO.h"
@@ -20,6 +21,7 @@
 #include "research/CorpusIndex.h"
 #include "research/CorpusRunner.h"
 #include "research/Fixtures.h"
+#include "research/PhraseFixtures.h"
 #include "research/RenderMetrics.h"
 #include "research/RenderSession.h"
 #include "research/SourceAnalysis.h"
@@ -99,11 +101,30 @@ UNIFIED ENGINE (docs/research/unified-andor)
 NOTE ATLAS (Phase 3; docs/research/unified-andor/phase-3-report.md)
   --atlas <file.andoratlas> (--midi <file.mid> | --fixture <name>) --output <out.wav>
         [--mode oneshot|granular] [--search <dir>] [--config <f>] [--seed <n>] [--block-size <n>]
-        [--max-transpose <semitones>] [--no-fill] [--as-recorded]
+        [--max-transpose <semitones>] [--no-fill] [--as-recorded] [--stage-a]
         Plays a prepared atlas (its notes placed by hand or by a later analysis) through engine C:
         the developer harness for real recordings. Its audio is found by content hash via the
         atlas's paths (relative to the atlas file) and --search. Fixtures use the lowest note as reference.
+        --stage-a: the instrument as Stage A publishes it (Phase 4: playable, no continuation yet).
   --write-atlas-fixtures <dir>                writes the synthetic test atlases (WAV + .andoratlas)
+
+PHRASE ANALYSIS (Phase 4; ported from ANDOR Lab, docs/research/unified-andor/phase-4-report.md)
+  --phrase-analyze <file> [--output-atlas <f.andoratlas>] [--output-contour <f.csv>] [--backend yin|yin-viterbi]
+        [--detection fewer|normal|more] [--min-note <s>] [--auto-tuning]
+        A monophonic recording -> a Note Atlas (prints the notes, their doubts and the recording's verdict).
+  --phrase-eval [--backend yin|yin-viterbi|all] [--fixture <name> | --stress] [--output-json <f>] [--verbose]
+        The generated phrases against their exact ground truth.
+  --phrase-eval-file <file> --truth <truth.json> [--backend ..] [--verbose]
+  --phrase-corpus <dir> [--output-json <f>] [--output-md <f>] [--onset-tolerance <s>] [--verbose]
+        Every <name>.wav (or .flac/.aif) with a <name>.truth.json beside it ({"notes": [{"start", "end", "midi"}]}),
+        one row per recording: P/R/F, octave and pitch errors, false splits, missed, onset error, tuning bias,
+        confidence of right vs wrong notes, how many wrong notes were flagged, analysis time.
+        --onset-tolerance (default 0.05 s, the usual note-onset criterion) can be widened to tell
+        attacks placed a little early or late (breath, slow speech) from real segmentation errors.
+  --phrase-fixtures <dir>     write the generated phrases (WAV) and their ground truth (truth JSON)
+  --prepare-bench <file|dir> [--repeat <n>] [--threads <n>] [--output-json <f>] [--output-md <f>]
+        Preparation cost per recording, stage by stage: decode, hash, analysis, then the instrument
+        build (copies, per-region analysis, playable model, continuation) and Stage A alone.
 
 BENCHMARK
   --benchmark [--engine A|C] [--voices 24] [--seconds 20] [--sample-rate 48000] [--block-size 128] [--output-json <f>] [--no-retrigger] [--transpose <semitones>]
@@ -127,7 +148,8 @@ struct Args
     }
 };
 
-const std::set<std::string> flagOptions = { "--help", "--version", "--benchmark", "--no-audio", "--strict", "--no-retrigger", "--no-fill", "--as-recorded" };
+const std::set<std::string> flagOptions = { "--help", "--version", "--benchmark", "--no-audio", "--strict", "--no-retrigger", "--no-fill", "--as-recorded", "--stage-a",
+                                            "--stress", "--verbose", "--auto-tuning", "--phrase-eval" };
 
 std::optional<Args> parseArgs (int argc, char** argv, std::string& error)
 {
@@ -794,7 +816,9 @@ int commandAtlas (const Args& args)
     atlasset::BuildOptions options;
     options.instrument.interpolationZeroCrossings = config->engineSettings.interpolationZeroCrossings;
     options.instrument.seed = config->engineSettings.seed;
-    const auto built = atlasset::buildInstrumentSet (*atlas, sources, options);
+    // Phase 4: --stage-a plays the instrument as Stage A publishes it (no continuation yet).
+    const auto built = args.has ("--stage-a") ? atlasset::buildPlayableSet (*atlas, sources, options).playable
+                                              : atlasset::buildInstrumentSet (*atlas, sources, options);
     for (const auto& w : built.report.warnings)
         std::cerr << "warning: " << w << "\n";
     if (built.set == nullptr)
@@ -858,6 +882,502 @@ int commandWriteAtlasFixtures (const Args& args)
             return fail (exitProcessing, error);
         std::cout << "wrote " << atlasFile.string() << "\n";
     }
+    return exitOk;
+}
+
+//==============================================================================
+// Phrase analysis (Phase 4)
+
+std::vector<phrase::PitchBackend> phraseBackends (const std::string& text)
+{
+    if (text == "yin")
+        return { phrase::PitchBackend::yin };
+    if (text == "all")
+        return { phrase::PitchBackend::yin, phrase::PitchBackend::yinViterbi };
+    return { phrase::PitchBackend::yinViterbi };
+}
+
+std::string fixed (double v, int decimals)
+{
+    char buffer[64];
+    std::snprintf (buffer, sizeof (buffer), "%.*f", decimals, v);
+    return buffer;
+}
+
+std::string doubtsOf (const atlas::Diagnostics& d)
+{
+    std::string out;
+    for (const auto& [flag, name] : { std::pair { d.uncertainPitch, "pitch?" }, { d.possibleOctaveError, "octave?" }, { d.uncertainBoundary, "boundary?" },
+                                      { d.unvoiced, "unvoiced" }, { d.possibleSplit, "split?" } })
+        if (flag)
+            out += std::string (out.empty() ? "" : " ") + name;
+    return out;
+}
+
+void printPhraseNotes (const atlas::NoteAtlas& a)
+{
+    const double sr = a.sources.empty() ? 48000.0 : a.sources[0].sampleRate;
+    for (const auto& n : a.notes)
+        std::cout << "  " << n.id << "  " << fixed (static_cast<double> (n.attackStart) / sr, 3) << "-" << fixed (static_cast<double> (n.sourceEnd) / sr, 3)
+                  << " s  " << midiNoteName (n.rootMidi) << " " << (n.centsOffset >= 0 ? "+" : "") << fixed (n.centsOffset, 0) << "c"
+                  << "  conf " << fixed (n.confidence, 2) << "  stab " << fixed (n.pitchStabilityCents, 0) << "c"
+                  << (n.vibratoDepthCents > 0 ? "  vib " + fixed (n.vibratoDepthCents, 0) + "c@" + fixed (n.vibratoRateHz, 1) + "Hz" : std::string())
+                  << "  " << atlas::toString (n.articulation) << (n.included ? "" : "  (excluded)")
+                  << (n.diagnostics.any() ? "  [" + doubtsOf (n.diagnostics) + "]" : std::string()) << "\n";
+}
+
+juce::var evaluationJson (const std::string& name, phrase::PitchBackend backend, const phrase::EvaluationResult& r, double seconds, double audioSeconds)
+{
+    auto o = json::object();
+    json::set (o, "recording", json::str (name));
+    json::set (o, "backend", json::str (phrase::toString (backend)));
+    json::set (o, "seconds", json::number (audioSeconds, 2));
+    json::set (o, "truth", r.truthNotes);
+    json::set (o, "detected", r.detectedNotes);
+    json::set (o, "matched", r.matched);
+    json::set (o, "precision", json::number (r.precision(), 3));
+    json::set (o, "recall", json::number (r.recall(), 3));
+    json::set (o, "f1", json::number (r.f1(), 3));
+    json::set (o, "octaveErrors", r.octaveErrors);
+    json::set (o, "pitchErrors", r.pitchErrors);
+    json::set (o, "falseSplits", r.falseSplits);
+    json::set (o, "missed", r.missed);
+    json::set (o, "spurious", r.spurious);
+    json::set (o, "onsetErrorMs", json::number (r.meanOnsetErrorMs, 1));
+    json::set (o, "medianOnsetErrorMs", json::number (r.medianOnsetErrorMs, 1));
+    json::set (o, "offsetErrorMs", json::number (r.meanOffsetErrorMs, 1));
+    json::set (o, "pitchErrorCents", json::number (r.meanPitchErrorCents, 1));
+    json::set (o, "signedPitchErrorCents", json::number (r.meanSignedPitchErrorCents, 1));
+    json::set (o, "correctConfidence", json::number (r.correctConfidence, 3));
+    json::set (o, "wrongConfidence", json::number (r.wrongConfidence, 3));
+    json::set (o, "wrongDetected", r.wrongDetected);
+    json::set (o, "wrongFlagged", r.wrongFlagged);
+    json::set (o, "correctFlagged", r.correctFlagged);
+    json::set (o, "analysisMs", json::number (1000.0 * seconds, 1));
+    return o;
+}
+
+void printEvaluation (const std::string& name, phrase::PitchBackend backend, const phrase::EvaluationResult& r, double seconds, double audioSeconds)
+{
+    char line[512];
+    std::snprintf (line, sizeof (line),
+                   "%-26s %-11s %3d/%-3d P %.2f R %.2f F %.2f  oct %d pitch %d split %d miss %d spur %d  on %5.1f ms  %+5.1f c  conf %.2f/%.2f  flagged %d/%d (%d)  %6.0f ms (%.0fx)",
+                   name.c_str(), phrase::toString (backend), r.matched, r.truthNotes, r.precision(), r.recall(), r.f1(), r.octaveErrors,
+                   r.pitchErrors, r.falseSplits, r.missed, r.spurious, r.meanOnsetErrorMs, r.meanSignedPitchErrorCents, r.correctConfidence,
+                   r.wrongConfidence, r.wrongFlagged, r.wrongDetected, r.correctFlagged, 1000.0 * seconds, seconds > 0 ? audioSeconds / seconds : 0.0);
+    std::cout << line << "\n";
+}
+
+void accumulate (phrase::EvaluationResult& total, const phrase::EvaluationResult& r)
+{
+    total.truthNotes += r.truthNotes;
+    total.detectedNotes += r.detectedNotes;
+    total.matched += r.matched;
+    total.octaveErrors += r.octaveErrors;
+    total.pitchErrors += r.pitchErrors;
+    total.falseSplits += r.falseSplits;
+    total.missed += r.missed;
+    total.spurious += r.spurious;
+    total.meanOnsetErrorMs += r.meanOnsetErrorMs * r.matched;
+    total.meanOffsetErrorMs += r.meanOffsetErrorMs * r.matched;
+    total.meanPitchErrorCents += r.meanPitchErrorCents * r.matched;
+    total.meanSignedPitchErrorCents += r.meanSignedPitchErrorCents * r.matched;
+    total.correctConfidence += r.correctConfidence * r.matched;
+    total.wrongConfidence += r.wrongConfidence * r.wrongDetected;
+    total.wrongDetected += r.wrongDetected;
+    total.wrongFlagged += r.wrongFlagged;
+    total.correctFlagged += r.correctFlagged;
+}
+
+void finishTotal (phrase::EvaluationResult& total)
+{
+    if (total.matched > 0)
+    {
+        total.meanOnsetErrorMs /= total.matched;
+        total.meanOffsetErrorMs /= total.matched;
+        total.meanPitchErrorCents /= total.matched;
+        total.meanSignedPitchErrorCents /= total.matched;
+        total.correctConfidence /= total.matched;
+    }
+    if (total.wrongDetected > 0)
+        total.wrongConfidence /= total.wrongDetected;
+}
+
+std::optional<atlas::SourceAsset> describeFile (const fs::path& file, std::string& error)
+{
+    const auto hash = io::sha256OfFile (file);
+    if (! hash)
+    {
+        error = "cannot read " + file.string();
+        return std::nullopt;
+    }
+    atlas::SourceAsset s;
+    s.assetId = "src0";
+    s.contentHash = io::contentId (*hash);
+    s.fileName = file.filename().string();
+    std::error_code ec;
+    s.lastKnownPath = fs::absolute (file, ec).string();
+    return s;
+}
+
+std::optional<phrase::AnalysisSettings> phraseSettingsFromArgs (const Args& args, std::string& error)
+{
+    phrase::AnalysisSettings settings;
+    settings.backend = phraseBackends (args.get ("--backend", "yin-viterbi")).front();
+    settings.autoTuning = args.has ("--auto-tuning");
+    const auto detection = args.get ("--detection", "normal");
+    if (detection != "fewer" && detection != "normal" && detection != "more")
+    {
+        error = "--detection must be fewer, normal or more";
+        return std::nullopt;
+    }
+    settings.detection = detection == "fewer" ? phrase::Detection::fewer : (detection == "more" ? phrase::Detection::more : phrase::Detection::normal);
+    if (args.has ("--min-note"))
+        settings.minPieceSeconds = std::clamp (parseNumber (args.get ("--min-note")).value_or (0.25), 0.0, 2.0);
+    return settings;
+}
+
+int commandPhraseAnalyze (const Args& args)
+{
+    const fs::path file = args.get ("--phrase-analyze");
+    const auto loaded = io::loadAudioFile (file);
+    if (! loaded.ok)
+        return fail (exitInput, loaded.error);
+    std::string error;
+    const auto source = describeFile (file, error);
+    if (! source)
+        return fail (exitInput, error);
+    const auto settings = phraseSettingsFromArgs (args, error);
+    if (! settings)
+        return fail (exitUsage, error);
+    const auto result = phrase::analysePhrase (loaded.audio, *source, *settings);
+    for (const auto& w : result.warnings)
+        std::cerr << "warning: " << w << "\n";
+    std::cout << file.filename().string() << ": " << result.atlas.notes.size() << " notes in " << fixed (1000.0 * result.analysisSeconds, 0) << " ms ("
+              << phrase::toString (settings->backend) << "); recording: " << result.atlas.analysis.suitability << ", "
+              << fixed (result.atlas.analysis.pitchedSeconds, 1) << " of " << fixed (result.atlas.analysis.analysedSeconds, 1) << " s pitched\n";
+    printPhraseNotes (result.atlas);
+    if (args.has ("--output-atlas"))
+    {
+        if (! io::writeNoteAtlas (args.get ("--output-atlas"), result.atlas, error))
+            return fail (exitProcessing, error);
+        std::cout << "wrote " << args.get ("--output-atlas") << "\n";
+    }
+    if (args.has ("--output-contour"))
+    {
+        // Frame by frame what segmentation sees (plots, tuning on real recordings).
+        std::ofstream out (args.get ("--output-contour"));
+        if (! out)
+            return fail (exitProcessing, "cannot write " + args.get ("--output-contour"));
+        out << "seconds,hz,midi,confidence,levelDb,voiced\n";
+        for (std::size_t i = 0; i < result.contour.frames.size(); ++i)
+        {
+            const auto& f = result.contour.frames[i];
+            out << fixed (result.contour.timeOf (i), 4) << ',' << fixed (f.hz, 3) << ',' << fixed (f.midi, 4) << ',' << fixed (f.confidence, 3) << ','
+                << fixed (f.levelDb, 2) << ',' << (f.voiced ? 1 : 0) << '\n';
+        }
+    }
+    return exitOk;
+}
+
+int commandPhraseEval (const Args& args)
+{
+    auto names = phrase::phraseFixtureNames();
+    if (args.has ("--fixture"))
+        names = { args.get ("--fixture") };
+    if (args.has ("--stress"))
+        names = phrase::phraseStressFixtureNames();
+    auto report = juce::var (juce::Array<juce::var>());
+    atlas::SourceAsset src;
+    src.contentHash = "sha256:fixture";
+    for (auto backend : phraseBackends (args.get ("--backend", "all")))
+    {
+        phrase::EvaluationResult total;
+        double totalSeconds = 0.0, totalAudio = 0.0;
+        for (const auto& name : names)
+        {
+            const auto fx = phrase::makePhraseFixture (name);
+            if (fx.audio.isEmpty())
+                return fail (exitUsage, "unknown fixture '" + name + "'");
+            phrase::AnalysisSettings settings;
+            settings.backend = backend;
+            const auto result = phrase::analysePhrase (fx.audio, src, settings);
+            const auto r = phrase::evaluate (result.atlas, fx.notes);
+            printEvaluation (name, backend, r, result.analysisSeconds, fx.audio.durationSeconds());
+            if (args.has ("--verbose"))
+                printPhraseNotes (result.atlas);
+            report.append (evaluationJson (name, backend, r, result.analysisSeconds, fx.audio.durationSeconds()));
+            accumulate (total, r);
+            totalSeconds += result.analysisSeconds;
+            totalAudio += fx.audio.durationSeconds();
+        }
+        finishTotal (total);
+        printEvaluation ("TOTAL", backend, total, totalSeconds, totalAudio);
+        report.append (evaluationJson ("TOTAL", backend, total, totalSeconds, totalAudio));
+        std::cout << "\n";
+    }
+    std::string error;
+    if (args.has ("--output-json") && ! json::writeFile (args.get ("--output-json"), report, error))
+        return fail (exitProcessing, error);
+    return exitOk;
+}
+
+std::optional<std::vector<phrase::TruthNote>> readTruth (const fs::path& file, std::string& error)
+{
+    const auto truthJson = json::readFile (file, error);
+    if (! truthJson)
+        return std::nullopt;
+    std::vector<phrase::TruthNote> truth;
+    if (const auto* list = (*truthJson)["notes"].getArray())
+        for (const auto& n : *list)
+            truth.push_back ({ json::getDouble (n, "start", 0.0), json::getDouble (n, "end", 0.0), json::getDouble (n, "midi", 60.0) });
+    return truth;
+}
+
+int commandPhraseEvalFile (const Args& args)
+{
+    const fs::path file = args.get ("--phrase-eval-file");
+    if (! args.has ("--truth"))
+        return fail (exitUsage, "--phrase-eval-file needs --truth <truth.json>");
+    const auto loaded = io::loadAudioFile (file);
+    if (! loaded.ok)
+        return fail (exitInput, loaded.error);
+    std::string error;
+    const auto truth = readTruth (args.get ("--truth"), error);
+    if (! truth)
+        return fail (exitInput, error);
+    const auto source = describeFile (file, error);
+    if (! source)
+        return fail (exitInput, error);
+    for (auto backend : phraseBackends (args.get ("--backend", "all")))
+    {
+        phrase::AnalysisSettings settings;
+        settings.backend = backend;
+        const auto result = phrase::analysePhrase (loaded.audio, *source, settings);
+        printEvaluation (file.filename().string(), backend, phrase::evaluate (result.atlas, *truth), result.analysisSeconds, loaded.audio.durationSeconds());
+        if (args.has ("--verbose"))
+            printPhraseNotes (result.atlas);
+    }
+    return exitOk;
+}
+
+int commandPhraseCorpus (const Args& args)
+{
+    const fs::path dir = args.get ("--phrase-corpus");
+    std::vector<fs::path> files;
+    std::error_code ec;
+    for (const auto& e : fs::directory_iterator (dir, ec))
+    {
+        const auto ext = e.path().extension().string();
+        if ((ext == ".wav" || ext == ".flac" || ext == ".aif" || ext == ".aiff") && fs::exists (fs::path (e.path()).replace_extension (".truth.json")))
+            files.push_back (e.path());
+    }
+    std::sort (files.begin(), files.end());
+    if (files.empty())
+        return fail (exitInput, "no <name>.wav with a <name>.truth.json in " + dir.string());
+    auto rows = juce::var (juce::Array<juce::var>());
+    std::ostringstream md;
+    md << "| Recording | s | Truth | Found | Matched | P | R | F | Octave | Pitch | Splits | Missed | Spurious | Onset ms (median) | Tuning bias c | Conf right / wrong | Wrong flagged | Verdict | Analysis ms |\n"
+       << "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n";
+    phrase::EvaluationResult total;
+    double totalSeconds = 0.0, totalAudio = 0.0;
+    std::string error;
+    for (const auto& file : files)
+    {
+        const auto loaded = io::loadAudioFile (file);
+        if (! loaded.ok)
+        {
+            std::cerr << "skipped " << file.string() << ": " << loaded.error << "\n";
+            continue;
+        }
+        const auto truth = readTruth (fs::path (file).replace_extension (".truth.json"), error);
+        const auto source = describeFile (file, error);
+        if (! truth || ! source)
+        {
+            std::cerr << "skipped " << file.string() << ": " << error << "\n";
+            continue;
+        }
+        const auto result = phrase::analysePhrase (loaded.audio, *source, {});
+        phrase::EvaluationSettings tolerance;
+        tolerance.onsetToleranceSeconds = std::stod (args.get ("--onset-tolerance", "0.05"));
+        const auto r = phrase::evaluate (result.atlas, *truth, tolerance);
+        const auto name = file.stem().string();
+        printEvaluation (name, phrase::PitchBackend::yinViterbi, r, result.analysisSeconds, loaded.audio.durationSeconds());
+        if (args.has ("--verbose"))
+            printPhraseNotes (result.atlas);
+        auto row = evaluationJson (name, phrase::PitchBackend::yinViterbi, r, result.analysisSeconds, loaded.audio.durationSeconds());
+        json::set (row, "suitability", json::str (result.atlas.analysis.suitability));
+        json::set (row, "uncovered", static_cast<int> (result.atlas.analysis.uncovered.size()));
+        rows.append (row);
+        md << "| " << name << " | " << fixed (loaded.audio.durationSeconds(), 1) << " | " << r.truthNotes << " | " << r.detectedNotes << " | " << r.matched << " | "
+           << fixed (r.precision(), 2) << " | " << fixed (r.recall(), 2) << " | " << fixed (r.f1(), 2) << " | " << r.octaveErrors << " | " << r.pitchErrors << " | "
+           << r.falseSplits << " | " << r.missed << " | " << r.spurious << " | " << fixed (r.meanOnsetErrorMs, 0) << " (" << fixed (r.medianOnsetErrorMs, 0) << ") | "
+           << fixed (r.meanSignedPitchErrorCents, 1) << " | " << fixed (r.correctConfidence, 2) << " / " << fixed (r.wrongConfidence, 2) << " | "
+           << r.wrongFlagged << "/" << r.wrongDetected << " | " << result.atlas.analysis.suitability << " | " << fixed (1000.0 * result.analysisSeconds, 0) << " |\n";
+        accumulate (total, r);
+        totalSeconds += result.analysisSeconds;
+        totalAudio += loaded.audio.durationSeconds();
+    }
+    finishTotal (total);
+    printEvaluation ("TOTAL", phrase::PitchBackend::yinViterbi, total, totalSeconds, totalAudio);
+    md << "| **all** | " << fixed (totalAudio, 1) << " | " << total.truthNotes << " | " << total.detectedNotes << " | " << total.matched << " | "
+       << fixed (total.precision(), 2) << " | " << fixed (total.recall(), 2) << " | " << fixed (total.f1(), 2) << " | " << total.octaveErrors << " | "
+       << total.pitchErrors << " | " << total.falseSplits << " | " << total.missed << " | " << total.spurious << " | " << fixed (total.meanOnsetErrorMs, 0)
+       << " | " << fixed (total.meanSignedPitchErrorCents, 1) << " | " << fixed (total.correctConfidence, 2) << " / " << fixed (total.wrongConfidence, 2)
+       << " | " << total.wrongFlagged << "/" << total.wrongDetected << " | | " << fixed (1000.0 * totalSeconds, 0) << " |\n";
+    rows.append (evaluationJson ("TOTAL", phrase::PitchBackend::yinViterbi, total, totalSeconds, totalAudio));
+    if (args.has ("--output-json") && ! json::writeFile (args.get ("--output-json"), rows, error))
+        return fail (exitProcessing, error);
+    if (args.has ("--output-md"))
+        std::ofstream (args.get ("--output-md")) << md.str();
+    return exitOk;
+}
+
+/** Phase 4: where preparing a recording's instrument spends its time, stage by stage (decode,
+    content hash, phrase analysis, region copies, per-region analysis, playable model,
+    continuation), and what Stage A (playable, no continuation) costs against the full build. */
+int commandPrepareBench (const Args& args)
+{
+    const fs::path in = args.get ("--prepare-bench");
+    std::vector<fs::path> files;
+    std::error_code ec;
+    if (fs::is_directory (in, ec))
+    {
+        for (const auto& e : fs::directory_iterator (in, ec))
+        {
+            const auto ext = e.path().extension().string();
+            if (ext == ".wav" || ext == ".flac" || ext == ".aif" || ext == ".aiff")
+                files.push_back (e.path());
+        }
+        std::sort (files.begin(), files.end());
+    }
+    else
+        files.push_back (in);
+    const int repeat = std::clamp (static_cast<int> (parseNumber (args.get ("--repeat", "1")).value_or (1.0)), 1, 20);
+    const int threads = std::clamp (static_cast<int> (parseNumber (args.get ("--threads", "1")).value_or (1.0)), 1, 8);
+    auto ms = [] (auto t) { return std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - t).count(); };
+    auto rows = juce::var (juce::Array<juce::var>());
+    std::ostringstream md;
+    md << "| Recording | Audio s | Notes | Decode ms | Hash ms | Analysis ms | Copy ms | Region analysis ms | Playable ms | Continuation ms | "
+          "Full build ms | Stage A ms | Full MB | Stage A MB |\n"
+       << "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n";
+    std::string error;
+    for (const auto& file : files)
+    {
+        // Each figure is the median of --repeat runs.
+        std::vector<double> decode, hash, analysis, copy, regionAnalysis, playable, continuation, full, stageA;
+        atlasset::BuildReport fullReport, aReport;
+        int notes = 0;
+        double seconds = 0.0;
+        for (int i = 0; i < repeat; ++i)
+        {
+            auto t = std::chrono::steady_clock::now();
+            auto loaded = io::loadAudioFile (file);
+            decode.push_back (ms (t));
+            if (! loaded.ok)
+                break;
+            seconds = loaded.audio.durationSeconds();
+            t = std::chrono::steady_clock::now();
+            const auto source = describeFile (file, error);
+            hash.push_back (ms (t));
+            if (! source)
+                break;
+            const auto result = phrase::analysePhrase (loaded.audio, *source, {});
+            analysis.push_back (result.analysisSeconds * 1000.0);
+            notes = static_cast<int> (std::count_if (result.atlas.notes.begin(), result.atlas.notes.end(), [] (const auto& n) { return n.included; }));
+            auto audio = std::make_shared<const AudioData> (std::move (loaded.audio));
+            atlasset::BuildOptions options;
+            options.threads = threads;
+            t = std::chrono::steady_clock::now();
+            const auto built = atlasset::buildInstrumentSet (result.atlas, { { source->assetId, audio } }, options);
+            const double fullMs = ms (t);
+            fullReport = built.report;
+            copy.push_back (built.report.copyMilliseconds);
+            regionAnalysis.push_back (built.report.analysisMilliseconds);
+            playable.push_back (built.report.provisionalMilliseconds);
+            continuation.push_back (built.report.continuationMilliseconds);
+            full.push_back (fullMs);
+            t = std::chrono::steady_clock::now();
+            const auto a = atlasset::buildPlayableSet (result.atlas, { { source->assetId, audio } }, options);
+            stageA.push_back (ms (t));
+            aReport = a.playable.report;
+        }
+        if (full.empty())
+        {
+            std::cerr << "skipped " << file.string() << "\n";
+            continue;
+        }
+        auto median = [] (std::vector<double> v) { std::sort (v.begin(), v.end()); return v.empty() ? 0.0 : v[v.size() / 2]; };
+        const auto mb = [] (std::size_t b) { return static_cast<double> (b) / (1024.0 * 1024.0); };
+        const auto name = file.filename().string();
+        md << "| " << name << " | " << json::round (seconds, 2) << " | " << notes << " | " << json::round (median (decode), 1) << " | "
+           << json::round (median (hash), 1) << " | " << json::round (median (analysis), 1) << " | " << json::round (median (copy), 1) << " | "
+           << json::round (median (regionAnalysis), 1) << " | " << json::round (median (playable), 1) << " | " << json::round (median (continuation), 1)
+           << " | " << json::round (median (full), 1) << " | " << json::round (median (stageA), 1) << " | " << json::round (mb (fullReport.memberBytes), 2)
+           << " | " << json::round (mb (aReport.memberBytes), 2) << " |\n";
+        auto o = json::object();
+        json::set (o, "recording", json::str (name));
+        json::set (o, "audioSeconds", json::number (seconds, 3));
+        json::set (o, "notes", notes);
+        for (const auto& [key, v] : { std::pair { "decodeMs", &decode }, { "hashMs", &hash }, { "analysisMs", &analysis }, { "copyMs", &copy },
+                                      { "regionAnalysisMs", &regionAnalysis }, { "playableMs", &playable }, { "continuationMs", &continuation },
+                                      { "fullBuildMs", &full }, { "stageAMs", &stageA } })
+            json::set (o, key, json::number (median (*v), 2));
+        json::set (o, "fullBytes", static_cast<double> (fullReport.memberBytes));
+        json::set (o, "stageABytes", static_cast<double> (aReport.memberBytes));
+        rows.getArray()->add (o);
+        std::cout << name << ": " << notes << " notes, " << json::round (seconds, 1) << " s; analysis " << json::round (median (analysis), 1)
+                  << " ms, build " << json::round (median (full), 1) << " ms (copy " << json::round (median (copy), 1) << ", region analysis "
+                  << json::round (median (regionAnalysis), 1) << ", playable " << json::round (median (playable), 1) << ", continuation "
+                  << json::round (median (continuation), 1) << "), Stage A " << json::round (median (stageA), 1) << " ms\n";
+    }
+    if (args.has ("--output-json"))
+    {
+        auto summary = json::object();
+        json::set (summary, "schemaVersion", 1);
+        json::set (summary, "kind", json::str ("osp-prepare-bench"));
+        json::set (summary, "repeat", repeat);
+        json::set (summary, "threads", threads);
+        json::set (summary, "recordings", rows);
+        if (! json::writeFile (args.get ("--output-json"), summary, error))
+            return fail (exitProcessing, error);
+    }
+    if (args.has ("--output-md"))
+        std::ofstream (args.get ("--output-md")) << md.str();
+    return exitOk;
+}
+
+int commandPhraseFixtures (const Args& args)
+{
+    const fs::path dir = args.get ("--phrase-fixtures");
+    std::error_code ec;
+    fs::create_directories (dir, ec);
+    auto names = phrase::phraseFixtureNames();
+    for (const auto& name : phrase::phraseStressFixtureNames())
+        names.push_back (name);
+    for (const auto& name : names)
+    {
+        const auto fx = phrase::makePhraseFixture (name);
+        std::string error;
+        if (! io::writeAudioFile (dir / (name + ".wav"), fx.audio, io::SampleFormat::pcm24, error))
+            return fail (exitProcessing, error);
+        auto truth = json::object();
+        json::set (truth, "fixture", json::str (name));
+        json::set (truth, "description", json::str (fx.description));
+        auto notes = juce::var (juce::Array<juce::var>());
+        for (const auto& n : fx.notes)
+        {
+            auto o = json::object();
+            json::set (o, "start", json::number (n.startSeconds, 4));
+            json::set (o, "end", json::number (n.endSeconds, 4));
+            json::set (o, "midi", json::number (n.midi, 3));
+            notes.append (o);
+        }
+        json::set (truth, "notes", notes);
+        if (! json::writeFile (dir / (name + ".truth.json"), truth, error))
+            return fail (exitProcessing, error);
+    }
+    std::cout << "wrote " << names.size() << " phrases to " << dir.string() << "\n";
     return exitOk;
 }
 
@@ -942,6 +1462,18 @@ int main (int argc, char** argv)
             return commandUnified (args);
         if (args.has ("--atlas"))
             return commandAtlas (args);
+        if (args.has ("--phrase-analyze"))
+            return commandPhraseAnalyze (args);
+        if (args.has ("--phrase-eval"))
+            return commandPhraseEval (args);
+        if (args.has ("--phrase-eval-file"))
+            return commandPhraseEvalFile (args);
+        if (args.has ("--phrase-corpus"))
+            return commandPhraseCorpus (args);
+        if (args.has ("--prepare-bench"))
+            return commandPrepareBench (args);
+        if (args.has ("--phrase-fixtures"))
+            return commandPhraseFixtures (args);
         if (args.has ("--write-atlas-fixtures"))
             return commandWriteAtlasFixtures (args);
         if (args.has ("--bakeoff"))

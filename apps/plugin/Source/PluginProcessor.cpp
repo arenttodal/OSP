@@ -285,6 +285,9 @@ OspAudioProcessor::~OspAudioProcessor()
     // (a long file, a slow machine): stop new stages first, then wait until the pool is
     // really empty. A job must never outlive the members it reports into.
     closing = true;
+    for (auto& layer : layers)
+        if (layer.cancelPreparation != nullptr)
+            *layer.cancelPreparation = true;   // an analysis being waited for stops at its next check
     while (! loaderPool.removeAllJobs (true, 10000) || loaderPool.getNumJobs() > 0)
     {
     }
@@ -1503,15 +1506,57 @@ void OspAudioProcessor::enqueueSetLoad (SetLoadRequest request, int layer)
     });
 }
 
+std::shared_ptr<std::atomic<bool>> OspAudioProcessor::newPreparation (std::size_t index)
+{
+    // A new sound on the layer supersedes whatever was still being analysed or prepared for it.
+    auto& slot = layers[index].cancelPreparation;
+    if (slot != nullptr)
+        *slot = true;
+    slot = std::make_shared<std::atomic<bool>> (false);
+    return slot;
+}
+
 void OspAudioProcessor::enqueueAtlasLoad (AtlasLoadRequest request, int layer)
 {
-    auto& target = layers[resolve (layer)];
+    const auto index = resolve (layer);
+    auto& target = layers[index];
     ++pendingLoads;
     target.state = LoadState::loading;
     const auto generation = nextGeneration.fetch_add (1);
     target.latestLoadId = generation;
-    loaderPool.addJob ([this, request = std::move (request), generation, layer] {
-        pushResult (loadInstrumentAtlas (request, store, generation), layer);
+    request.threads = atlasThreads;
+    loaderPool.addJob ([this, request = std::move (request), generation, layer, cancel = newPreparation (index)] {
+        auto result = loadInstrumentAtlas (request, store, generation);
+        // Stage B is queued before Stage A is reported, so pendingLoads never reads 0 in between.
+        if (result.instrument != nullptr && result.atlasPending != nullptr)
+            enqueueAtlasEnhance (result.instrument, std::move (result.atlasPending), layer, cancel);
+        pushResult (std::move (result), layer);
+        --pendingLoads;
+    });
+}
+
+void OspAudioProcessor::enqueueAtlasEnhance (std::shared_ptr<const LoadedInstrument> base, std::shared_ptr<const atlasset::PreparedAtlas> pending,
+                                             int layer, std::shared_ptr<std::atomic<bool>> cancel)
+{
+    if (closing.load() || base == nullptr || pending == nullptr)
+        return;
+    ++pendingLoads;
+    loaderPool.addJob ([this, base = std::move (base), pending = std::move (pending), layer, cancel = std::move (cancel)] {
+        // A newer sound on this layer meanwhile (or cancelled, or closing): keep Stage A.
+        if (! closing.load() && ! cancel->load() && base->loadId == layers[static_cast<std::size_t> (layer)].latestLoadId.load())
+        {
+            auto result = enhanceInstrumentAtlas (*base, *pending, nextGeneration.fetch_add (1), cancel.get(), atlasThreads);
+            if (result.instrument != nullptr)
+                pushResult (std::move (result), layer);
+            else if (result.error != "cancelled")
+            {
+                // Stage A keeps playing; the musician hears why its sustain did not arrive.
+                LoadResult note;
+                note.instrument = base;
+                note.warnings.push_back ("sustain and release could not be prepared: " + result.error);
+                pushResult (std::move (note), layer);
+            }
+        }
         --pendingLoads;
     });
 }
@@ -1521,8 +1566,57 @@ void OspAudioProcessor::loadAtlas (const atlas::NoteAtlas& atlas, int layer, con
     AtlasLoadRequest request;
     request.atlas = atlas;
     request.atlasFolder = atlasFolder;
+    request.capacitySeconds = atlasCapacityFor (static_cast<int> (resolve (layer)));
     userLoads.insert (nextGeneration.load());
     enqueueAtlasLoad (std::move (request), static_cast<int> (resolve (layer)));
+}
+
+void OspAudioProcessor::analyseRecording (const juce::File& file, int layer, const phrase::AnalysisSettings& settings)
+{
+    const auto index = resolve (layer);
+    AnalyseRequest request;
+    request.file = file;
+    request.settings = settings;
+    request.capacitySeconds = atlasCapacityFor (static_cast<int> (index));
+    request.threads = atlasThreads;
+    auto& target = layers[index];
+    ++pendingLoads;
+    target.state = LoadState::loading;
+    const auto generation = nextGeneration.fetch_add (1);
+    target.latestLoadId = generation;
+    userLoads.insert (generation);
+    loaderPool.addJob ([this, request = std::move (request), generation, l = static_cast<int> (index), cancel = newPreparation (index)] {
+        auto result = loadAnalysedRecording (request, store, analysisQueue, analysisCache, generation, cancel.get());
+        if (result.instrument != nullptr && result.atlasPending != nullptr)
+            enqueueAtlasEnhance (result.instrument, std::move (result.atlasPending), l, cancel);
+        else if (result.instrument != nullptr && result.instrument->set == nullptr)
+            enqueueRefine (result.instrument, result.audio, l);   // kept as one sample: its usual stages
+        if (! (result.instrument == nullptr && result.error == "cancelled"))
+            pushResult (std::move (result), l);
+        --pendingLoads;
+    });
+}
+
+void OspAudioProcessor::cancelAnalysis (int layer)
+{
+    if (auto& flag = layers[resolve (layer)].cancelPreparation; flag != nullptr)
+        *flag = true;
+}
+
+std::shared_ptr<const AtlasStatus> OspAudioProcessor::atlasStatus (int layer) const
+{
+    const auto instrument = currentInstrument (layer);
+    return instrument != nullptr ? instrument->atlasStatus : nullptr;
+}
+
+double OspAudioProcessor::atlasCapacityFor (int layer) const
+{
+    double others = 0.0;
+    for (int l = 0; l < numLayers; ++l)
+        if (l != layer)
+            if (const auto status = atlasStatus (l); status != nullptr)
+                others += status->regionSeconds;
+    return std::clamp (atlasSessionSeconds - others, 0.0, atlasLayerSeconds);
 }
 
 std::vector<std::string> OspAudioProcessor::missingSources (int layer) const
@@ -2090,6 +2184,12 @@ void OspAudioProcessor::timerCallback()
         else
             message = juce::String (result.error);
 
+        // A later stage of the same load (sustain prepared, registers added) says nothing new:
+        // it keeps that load's message ("kept as one sample", doubts, a partial build).
+        const auto loadId = result.instrument != nullptr ? result.instrument->loadId : std::uint64_t { 0 };
+        if (message.isEmpty() && loadId != 0 && loadId == layer.messageLoad)
+            continue;
+        layer.messageLoad = loadId;
         const std::lock_guard<std::mutex> lock (messageMutex);
         lastMessage = message;
     }

@@ -12,8 +12,11 @@
 #include "model/RootChoice.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <condition_variable>
 #include <cstdlib>
+#include <mutex>
 
 namespace osp::plugin
 {
@@ -465,6 +468,65 @@ LoadResult loadInstrumentSet (const SetLoadRequest& request, SampleStore& store,
     return result;
 }
 
+namespace
+{
+    /** The analysis side of an atlas's status (counts, verdict, version). */
+    void describeAtlas (AtlasStatus& status, const atlas::NoteAtlas& a)
+    {
+        status.analysed = a.analysis.version > 0;
+        status.olderAnalysis = status.analysed && a.analysis.version < phrase::analysisVersion;
+        status.suitability = a.analysis.suitability;
+        for (const auto& n : a.notes)
+        {
+            if (! n.included)
+            {
+                ++status.leftOut;
+                continue;
+            }
+            ++status.notes;
+            status.doubtfulNotes += n.diagnostics.any() ? 1 : 0;
+        }
+    }
+
+    /** The layer's instrument for an atlas set (Stage A or B): metadata from its primary member. */
+    std::shared_ptr<LoadedInstrument> makeAtlasInstrument (const atlasset::BuildResult& built, std::shared_ptr<const atlas::NoteAtlas> atlas,
+                                                           std::vector<LoadedInstrument::MemberFile> sources, std::uint64_t generation,
+                                                           const AudioData* overviewAudio, std::shared_ptr<AtlasStatus> status)
+    {
+        const auto& set = *built.set;
+        const auto& primary = set.members[static_cast<std::size_t> (set.primary)];
+        auto instrument = std::make_shared<LoadedInstrument>();
+        instrument->generation = generation;
+        instrument->loadId = generation;
+        const auto* primarySource = atlas->findSource (primary.sourceAssetId);
+        instrument->contentHash = primarySource != nullptr ? primarySource->contentHash : std::string();
+        instrument->filename = std::to_string (set.members.size()) + " notes" + (primarySource != nullptr ? " · " + primarySource->fileName : std::string());
+        instrument->originalPath = primarySource != nullptr ? primarySource->lastKnownPath : std::string();
+        instrument->analysis = primary.model->analysis;
+        instrument->analysisRootMidi = primary.model->rootMidi;
+        instrument->rootOrigin = "atlas";
+        instrument->startSeconds = 0.0;
+        instrument->playbackGainDb = primary.model->playback.gainDb;
+        instrument->model = primary.model;
+        instrument->set = built.set;
+        instrument->atlas = std::move (atlas);
+        instrument->atlasSources = std::move (sources);
+        instrument->character = describeCharacter (instrument->analysis);
+        const auto& r = built.report;
+        status->playableOnly = r.playableOnly;
+        status->partial = r.partial;
+        status->skippedNoteIds = r.skippedNoteIds;
+        status->cutNoteIds = r.cutNoteIds;
+        status->regionSeconds = primarySource != nullptr && primarySource->sampleRate > 0.0 ? static_cast<double> (r.regionFrames) / primarySource->sampleRate : 0.0;
+        status->memberBytes = r.memberBytes;
+        status->buildMilliseconds = r.buildMilliseconds;
+        instrument->atlasStatus = std::move (status);
+        if (overviewAudio != nullptr)
+            computeOverview (*instrument, *overviewAudio);
+        return instrument;
+    }
+}
+
 LoadResult loadInstrumentAtlas (const AtlasLoadRequest& request, SampleStore& store, std::uint64_t generation)
 {
     LoadResult result;
@@ -559,35 +621,26 @@ LoadResult loadInstrumentAtlas (const AtlasLoadRequest& request, SampleStore& st
 
         atlasset::BuildOptions options;
         options.instrument.interpolationZeroCrossings = playbackZeroCrossings;
-        const auto built = atlasset::buildInstrumentSet (atlas, sources, options);
-        result.warnings.insert (result.warnings.end(), built.report.warnings.begin(), built.report.warnings.end());
-        if (built.set == nullptr)
+        options.maxTotalSeconds = std::max (0.0, request.capacitySeconds);
+        options.threads = request.threads;
+        auto staged = atlasset::buildPlayableSet (atlas, sources, options);
+        result.warnings.insert (result.warnings.end(), staged.playable.report.warnings.begin(), staged.playable.report.warnings.end());
+        if (staged.playable.set == nullptr)
         {
-            result.error = built.report.errors.empty() ? std::string ("the Note Atlas could not be built") : built.report.errors.front();
+            const auto& errors = staged.playable.report.errors;
+            result.error = errors.empty() ? std::string ("the Note Atlas could not be built") : errors.front();
             return result;
         }
-        const auto& set = *built.set;
-        const auto& primary = set.members[static_cast<std::size_t> (set.primary)];
-        auto instrument = std::make_shared<LoadedInstrument>();
-        instrument->generation = generation;
-        instrument->loadId = generation;
-        const auto* primarySource = atlas.findSource (primary.sourceAssetId);
-        instrument->contentHash = primarySource != nullptr ? primarySource->contentHash : std::string();
-        instrument->filename = std::to_string (set.members.size()) + " notes" + (primarySource != nullptr ? " · " + primarySource->fileName : std::string());
-        instrument->originalPath = primarySource != nullptr ? primarySource->lastKnownPath : std::string();
-        instrument->analysis = primary.model->analysis;
-        instrument->analysisRootMidi = primary.model->rootMidi;
-        instrument->rootOrigin = "atlas";
-        instrument->startSeconds = 0.0;
-        instrument->playbackGainDb = primary.model->playback.gainDb;
-        instrument->model = primary.model;
-        instrument->set = built.set;
-        instrument->atlas = std::move (resolvedAtlas);
-        instrument->atlasSources = std::move (instrumentSources);
-        instrument->character = describeCharacter (instrument->analysis);
+        const AudioData* overviewAudio = nullptr;
+        const auto& primaryMember = staged.playable.set->members[static_cast<std::size_t> (staged.playable.set->primary)];
         for (const auto& s : sources)
-            if (s.assetId == primary.sourceAssetId)
-                computeOverview (*instrument, *s.audio);
+            if (s.assetId == primaryMember.sourceAssetId)
+                overviewAudio = s.audio.get();
+        auto status = std::make_shared<AtlasStatus>();
+        describeAtlas (*status, *resolvedAtlas);
+        auto instrument = makeAtlasInstrument (staged.playable, std::move (resolvedAtlas), std::move (instrumentSources), generation,
+                                               overviewAudio, std::move (status));
+        result.atlasPending = std::move (staged.pending);
         result.instrument = std::move (instrument);
     }
     catch (const std::exception& e)
@@ -597,6 +650,190 @@ LoadResult loadInstrumentAtlas (const AtlasLoadRequest& request, SampleStore& st
     catch (...)
     {
         result.error = "unexpected error while loading the Note Atlas";
+    }
+    return result;
+}
+
+LoadResult enhanceInstrumentAtlas (const LoadedInstrument& base, const atlasset::PreparedAtlas& pending, std::uint64_t generation,
+                                   const std::atomic<bool>* cancel, int threads)
+{
+    LoadResult result;
+    try
+    {
+        atlasset::BuildOptions options;
+        options.threads = threads;
+        options.cancel = cancel;
+        const auto built = atlasset::enhanceSet (pending, options);
+        if (built.set == nullptr)
+        {
+            result.error = built.report.cancelled ? std::string ("cancelled")
+                                                  : (built.report.errors.empty() ? std::string ("the Note Atlas could not be finished") : built.report.errors.front());
+            return result;
+        }
+        // The same instrument (same load, places and level), every member now with continuation.
+        auto instrument = std::make_shared<LoadedInstrument> (base);
+        instrument->generation = generation;
+        const auto& primary = built.set->members[static_cast<std::size_t> (built.set->primary)];
+        instrument->set = built.set;
+        instrument->model = primary.model;
+        instrument->analysis = primary.model->analysis;
+        instrument->playbackGainDb = primary.model->playback.gainDb;
+        auto status = std::make_shared<AtlasStatus> (base.atlasStatus != nullptr ? *base.atlasStatus : AtlasStatus {});
+        status->playableOnly = false;
+        status->memberBytes = built.report.memberBytes;
+        status->buildMilliseconds = built.report.buildMilliseconds;
+        instrument->atlasStatus = std::move (status);
+        result.instrument = std::move (instrument);
+    }
+    catch (const std::exception& e)
+    {
+        result.error = std::string ("unexpected error while finishing the Note Atlas: ") + e.what();
+    }
+    catch (...)
+    {
+        result.error = "unexpected error while finishing the Note Atlas";
+    }
+    return result;
+}
+
+LoadResult loadAnalysedRecording (const AnalyseRequest& request, SampleStore& store, phrase::AnalysisQueue& queue,
+                                  const io::PhraseAnalysisCache& cache, std::uint64_t generation, const std::atomic<bool>* cancel)
+{
+    LoadResult result;
+    auto cancelled = [cancel] { return cancel != nullptr && cancel->load(); };
+    try
+    {
+        // 1. The asset: hashed, kept in the store, decoded once (the analysis and both build
+        //    stages use this one decode).
+        const auto path = toPath (request.file);
+        const auto hash = io::sha256OfFile (path);
+        if (! hash)
+        {
+            result.error = "cannot read " + request.file.getFullPathName().toStdString();
+            return result;
+        }
+        std::string error;
+        if (! store.import (request.file, *hash, error))
+            result.warnings.push_back (error);
+        auto decoded = io::loadAudioFile (path);
+        if (! decoded.ok)
+        {
+            result.error = decoded.error;
+            return result;
+        }
+        atlas::SourceAsset source;
+        source.assetId = "src0";
+        source.origin = atlas::AssetOrigin::fileImport;
+        source.contentHash = io::contentId (*hash);
+        source.fileName = request.file.getFileName().toStdString();
+        source.lastKnownPath = request.file.getFullPathName().toStdString();
+        source.sampleRate = decoded.audio.sampleRate;
+        source.numChannels = std::min (decoded.audio.numChannels(), 2);
+        source.numFrames = decoded.audio.numFrames();
+        auto audio = std::make_shared<const AudioData> (std::move (decoded.audio));
+
+        // 2. Its analysis: stored (same audio, version and settings), else analysed now.
+        auto status = std::make_shared<AtlasStatus>();
+        auto analysed = cache.find (source, request.settings);
+        std::vector<std::string> analysisWarnings;
+        if (analysed)
+            status->fromCache = true;
+        else
+        {
+            struct Wait
+            {
+                std::mutex m;
+                std::condition_variable cv;
+                std::optional<phrase::AnalysisResult> result;
+            };
+            auto wait = std::make_shared<Wait>();
+            const auto id = queue.submit ({ audio, source, request.settings },
+                                          [wait] (phrase::AnalysisQueue::JobId, const phrase::AnalysisResult& r) {
+                                              const std::lock_guard<std::mutex> lock (wait->m);
+                                              wait->result = r;
+                                              wait->cv.notify_all();
+                                          },
+                                          &error);
+            if (! id)
+            {
+                result.error = error;
+                return result;
+            }
+            std::unique_lock<std::mutex> lock (wait->m);
+            while (! wait->result)
+            {
+                if (cancelled() || queue.status (*id).state == phrase::AnalysisQueue::State::cancelled)
+                {
+                    lock.unlock();
+                    queue.cancel (*id);
+                    result.error = "cancelled";
+                    return result;
+                }
+                wait->cv.wait_for (lock, std::chrono::milliseconds (20));
+            }
+            const auto r = std::move (*wait->result);
+            lock.unlock();
+            if (! r.ok)
+            {
+                result.error = r.error.empty() ? std::string ("the analysis failed") : r.error;
+                return result;
+            }
+            analysisWarnings = r.warnings;
+            status->analysisMilliseconds = r.analysisSeconds * 1000.0;
+            analysed = r.atlas;
+            if (! cache.store (*analysed, request.settings, error))
+                result.warnings.push_back (error);
+        }
+        describeAtlas (*status, *analysed);
+        status->warnings = analysisWarnings;
+        result.warnings.insert (result.warnings.end(), analysisWarnings.begin(), analysisWarnings.end());
+
+        // 3. A recording a monophonic analysis does not suit stays playable as recorded.
+        const char* reason = status->suitability == "silent"       ? "the recording is silent"
+                           : status->suitability == "unsuitable"   ? "it does not look monophonic and pitched (polyphonic, noisy or unpitched)"
+                           : status->notes == 0                    ? "no pitched notes were found"
+                                                                   : nullptr;
+        if (reason != nullptr)
+        {
+            LoadRequest single;
+            single.file = request.file;
+            auto fallback = loadInstrument (single, store, generation);
+            fallback.warnings.insert (fallback.warnings.begin(), std::string ("kept as one sample: ") + reason);
+            return fallback;
+        }
+        if (cancelled())
+        {
+            result.error = "cancelled";
+            return result;
+        }
+
+        // 4. Stage A of its instrument (Stage B follows on the loader).
+        atlasset::BuildOptions options;
+        options.instrument.interpolationZeroCrossings = playbackZeroCrossings;
+        options.maxTotalSeconds = std::max (0.0, request.capacitySeconds);
+        options.threads = request.threads;
+        options.cancel = cancel;
+        const auto assetId = analysed->sources.front().assetId;
+        auto staged = atlasset::buildPlayableSet (*analysed, { { assetId, audio } }, options);
+        result.warnings.insert (result.warnings.end(), staged.playable.report.warnings.begin(), staged.playable.report.warnings.end());
+        if (staged.playable.set == nullptr)
+        {
+            const auto& errors = staged.playable.report.errors;
+            result.error = errors.empty() ? std::string ("the analysed recording could not be built") : errors.front();
+            return result;
+        }
+        std::vector<LoadedInstrument::MemberFile> sources { { source.contentHash, source.fileName, source.lastKnownPath } };
+        result.instrument = makeAtlasInstrument (staged.playable, std::make_shared<const atlas::NoteAtlas> (std::move (*analysed)),
+                                                 std::move (sources), generation, audio.get(), std::move (status));
+        result.atlasPending = std::move (staged.pending);
+    }
+    catch (const std::exception& e)
+    {
+        result.error = std::string ("unexpected error while analysing the recording: ") + e.what();
+    }
+    catch (...)
+    {
+        result.error = "unexpected error while analysing the recording";
     }
     return result;
 }

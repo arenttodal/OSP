@@ -806,3 +806,54 @@ A recorded phrase becomes an ordinary OSP multi-sample instrument. There is no s
   source's store hash), never audio. On recall the layer is emptied first, so a session whose
   recordings are missing opens empty and failed (`missingSources`), never with the previous
   sound.
+
+## PHRASE ANALYSIS AND STAGED PREPARATION (unified engine Phase 4; docs/research/unified-andor/phase-4-report.md)
+
+A monophonic recording (sung, bowed, played) is analysed into an ordinary schema-2 Note Atlas,
+which then follows the Phase 3 path. Nothing new reaches the audio thread.
+
+    immutable asset (decoded audio + SourceAsset: hash, origin)
+        ──► phrase::AnalysisQueue (bounded workers, bounded queued audio, shared identical requests,
+            cancel, progress) ── io::PhraseAnalysisCache (hash + analysis version + settings digest)
+        ──► phrase::analysePhrase ──► NoteAtlas (notes + per-note diagnostics + the recording's verdict)
+        ──► atlasset::buildPlayableSet  (Stage A: published at once)
+        ──► atlasset::enhanceSet        (Stage B: continuation, published while notes may sound)
+
+- **Analysis** (`src/analysis/phrase`, pure C++, ported from ANDOR Lab and adapted): decode,
+  mono, high-pass, level / silence / noise floor; pitch (yin-viterbi: pYIN-style candidates and a
+  Viterbi path; or plain YIN); segmentation (pitch changes, level-relative re-articulation,
+  vibrato and tremolo vetoes, MIN NOTE consolidation of scoops, falls and octave slips); per-note
+  description (stable pitch, cents, attack / sustain / release markers, fades, confidence);
+  mapping (rounding, optional global tuning). OSP additions: per-note `Diagnostics` (uncertain
+  pitch, possible octave error - including a spectral peak under the tracked pitch -, uncertain
+  boundary, unvoiced, possible split - including short scoop-like entries -, quiet alternate);
+  a note-level harmonic repair (relabelled only when a subharmonic spectral peak and a far deeper
+  YIN dip at that period agree over the whole note); quiet alternates (a take more than 24 dB
+  under the loudest take of its key stays in the atlas, off the keyboard); the recording's
+  verdict (`suitability`, pitched share, uncovered pitched stretches = possible missed notes).
+  `analysisVersion` 3. The analysis never sees the playback audio path and never runs in
+  processBlock.
+- **Entry point**: `analysePhrase (AudioData, SourceAsset, settings, cancel, progress)` takes any
+  immutable asset; nothing assumes a file or a file picker (a buffer snapshot or a finalised live
+  capture is the same call).
+- **Corrections** (`phrase::edit`): set root, move markers, assign key, include/leave out, group,
+  split, merge, re-describe a region. Each sets a `Corrections` flag. `mergeReanalysisReported`
+  keeps every corrected note exactly, keeps ids of re-detected untouched notes (same place and
+  key), gives new ids past every id ever used, and returns conflicts (`analysisDisagrees`,
+  `noteGone`, `uncertainMatch`) instead of applying anything over a correction.
+- **Staged preparation** (`engine/AtlasSet`): Stage A copies the regions, analyses them (in
+  parallel when allowed), sets the shared gain and builds provisional members; Stage B adds
+  continuation (sustain loops, release graft, transient layer, resonances, REIMAGINED data) per
+  member on up to 8 threads. Both assemble the set through one function, so Stage B's set is
+  bit-identical to a single-pass build, independent of the thread count (tested). A sounding note
+  keeps the model it started with (tested sample-exact). The transient separation's median
+  filters use an exact sliding median (bit-identical, about 3x faster).
+- **Capacity**: 300 s of region audio per layer, 600 s for A+B+C together for new loads
+  (`OspAudioProcessor::atlasCapacityFor`); a session's recall keeps the per-layer limit only, so
+  it reopens as saved. A build over capacity, or with a note longer than 60 s, is `partial`, lists
+  the skipped and cut note ids and warns; the atlas (and the session) keeps every note.
+- **Plugin** (`analyseRecording`, `cancelAnalysis`, `atlasStatus`): import by hash, decode once,
+  cached or queued analysis, Stage A published, Stage B queued behind it on the loader. A
+  recording whose verdict is `unsuitable` or `silent`, or with no notes, is loaded as one
+  ordinary sample instead, with the reason as the status message (kept across the later model
+  stages of the same load). State stays 14: the analysed atlas is the layer's `Atlas` child.

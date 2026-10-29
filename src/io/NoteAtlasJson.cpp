@@ -108,7 +108,21 @@ namespace
         json::set (c, "split", n.corrections.split);
         json::set (c, "merged", n.corrections.merged);
         json::set (c, "velocity", n.corrections.velocity);
+        if (n.corrections.included)
+            json::set (c, "included", true);   // Phase 4 (added field)
         json::set (o, "corrections", c);
+        if (n.diagnostics.any())
+        {
+            // Phase 4 (added field): only the doubts, so a reliable note writes nothing.
+            juce::Array<juce::var> d;
+            const auto& g = n.diagnostics;
+            for (const auto& [flag, name] : { std::pair { g.uncertainPitch, "uncertainPitch" }, { g.possibleOctaveError, "possibleOctaveError" },
+                                              { g.uncertainBoundary, "uncertainBoundary" }, { g.unvoiced, "unvoiced" },
+                                              { g.possibleSplit, "possibleSplit" }, { g.quietAlternate, "quietAlternate" } })
+                if (flag)
+                    d.add (juce::String (name));
+            json::set (o, "diagnostics", juce::var (d));
+        }
         json::set (o, "included", n.included);
         json::set (o, "assignedKey", n.assignedKey);
         json::set (o, "velocityLayer", n.velocityLayer);
@@ -156,6 +170,18 @@ namespace
         n.corrections.split = json::getBool (c, "split", false);
         n.corrections.merged = json::getBool (c, "merged", false);
         n.corrections.velocity = json::getBool (c, "velocity", false);
+        n.corrections.included = json::getBool (c, "included", false);
+        if (const auto* d = o["diagnostics"].getArray())
+            for (const auto& v : *d)
+            {
+                const auto name = v.toString();
+                n.diagnostics.uncertainPitch = n.diagnostics.uncertainPitch || name == "uncertainPitch";
+                n.diagnostics.possibleOctaveError = n.diagnostics.possibleOctaveError || name == "possibleOctaveError";
+                n.diagnostics.uncertainBoundary = n.diagnostics.uncertainBoundary || name == "uncertainBoundary";
+                n.diagnostics.unvoiced = n.diagnostics.unvoiced || name == "unvoiced";
+                n.diagnostics.possibleSplit = n.diagnostics.possibleSplit || name == "possibleSplit";
+                n.diagnostics.quietAlternate = n.diagnostics.quietAlternate || name == "quietAlternate";
+            }
         n.included = json::getBool (o, "included", true);
         n.assignedKey = json::getInt (o, "assignedKey", -1);
         n.velocityLayer = std::clamp (json::getInt (o, "velocityLayer", 0), 0, 15);
@@ -184,6 +210,17 @@ juce::var noteAtlasToJson (const atlas::NoteAtlas& a)
     json::set (analysis, "a4Hz", a.analysis.a4Hz);
     json::set (analysis, "tuningOffsetCents", a.analysis.tuningOffsetCents);
     json::set (analysis, "settingsDigest", json::str (a.analysis.settingsDigest));
+    if (! a.analysis.suitability.empty())
+    {
+        // Phase 4 (added fields): what the analysis found about the recording as a whole.
+        json::set (analysis, "suitability", json::str (a.analysis.suitability));
+        json::set (analysis, "analysedSeconds", a.analysis.analysedSeconds);
+        json::set (analysis, "pitchedSeconds", a.analysis.pitchedSeconds);
+        juce::Array<juce::var> uncovered;
+        for (const auto& r : a.analysis.uncovered)
+            uncovered.add (rangeToJson (r));
+        json::set (analysis, "uncovered", juce::var (uncovered));
+    }
     json::set (root, "analysis", analysis);
 
     auto mapping = json::object();
@@ -240,6 +277,12 @@ std::optional<atlas::NoteAtlas> noteAtlasFromJson (const juce::var& json, std::s
     a.analysis.a4Hz = json::getDouble (analysis, "a4Hz", 440.0);
     a.analysis.tuningOffsetCents = json::getDouble (analysis, "tuningOffsetCents", 0.0);
     a.analysis.settingsDigest = json::getString (analysis, "settingsDigest");
+    a.analysis.suitability = json::getString (analysis, "suitability");
+    a.analysis.analysedSeconds = json::getDouble (analysis, "analysedSeconds", 0.0);
+    a.analysis.pitchedSeconds = json::getDouble (analysis, "pitchedSeconds", 0.0);
+    if (const auto* list = analysis["uncovered"].getArray())
+        for (const auto& r : *list)
+            a.analysis.uncovered.push_back (rangeFromJson (r));
     if (json::has (json, "mapping"))
     {
         const auto& m = json["mapping"];

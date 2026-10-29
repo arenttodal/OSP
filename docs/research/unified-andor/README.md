@@ -18,7 +18,8 @@ ANDOR OSP's A/B/C sources. Start with **[11-decision-brief.md](11-decision-brief
 | [phase-0-baseline.md](phase-0-baseline.md) | **Phase 0 (done):** the baseline harness, the PRNG streams, the baseline scenes and their costs |
 | [phase-1-key-dna.md](phase-1-key-dna.md) | **Phase 1 (done, approved):** KEY DNA in OSP's granulator, evaluation order, compatibility, tests, measurements, limitations, the updated roadmap |
 | [phase-2-report.md](phase-2-report.md) | **Phase 2 (done, approved):** live KEY DNA AMOUNT, SCATTER / PAN / WINDOW, the grain budget, KEY DNA in the plugin (state 13) |
-| [phase-3-report.md](phase-3-report.md) | **Phase 3 (done, for review):** the Note Atlas as an OSP instrument: model, conversion, FILL, memory, publication, state 14 and the asset policy, the bounded grain budget, tests, costs |
+| [phase-3-report.md](phase-3-report.md) | **Phase 3 (done, approved):** the Note Atlas as an OSP instrument: model, conversion, FILL, memory, publication, state 14 and the asset policy, the bounded grain budget, tests, costs |
+| [phase-4-report.md](phase-4-report.md) | **Phase 4 (done, for review):** phrase analysis into atlases, doubts and verdicts, jobs and cache, corrections and re-analysis, staged preparation and its profile, capacity, the grain budget under stress, real-recording evaluation, limitations, Phase 5 recommendation |
 | `bench/` | `bench_osp.cpp` (scratch harness, not built by CMake) and raw outputs |
 | `mockups/` | annotated screenshots and the script that draws them |
 

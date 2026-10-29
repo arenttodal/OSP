@@ -7998,3 +7998,4 @@ TEST_CASE ("plugin: full-range modulation - 100 % reaches the knob's end; older 
 #include "UnifiedBaselineTests.inc"
 #include "UnifiedPhase2Tests.inc"
 #include "UnifiedPhase3Tests.inc"
+#include "UnifiedPhase4Tests.inc"

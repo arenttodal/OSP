@@ -13,11 +13,25 @@ namespace osp
 
 namespace
 {
-    float median (std::vector<float>& values)
+    /** Running median of a window that slides along a strided row: out[i] is the median (the
+        element at size/2 in sorted order, as std::nth_element picks it) of
+        row[max(0, i-half) .. min(count-1, i+half)]. The window is kept sorted and updated one
+        element at a time, so the result is exactly that of sorting each window afresh, without
+        its cost (Phase 4: this was 80 % of an atlas member's preparation). */
+    void slidingMedian (const float* row, std::ptrdiff_t stride, int count, int half, float* out, std::ptrdiff_t outStride, std::vector<float>& window)
     {
-        const auto mid = values.begin() + static_cast<std::ptrdiff_t> (values.size() / 2);
-        std::nth_element (values.begin(), mid, values.end());
-        return *mid;
+        window.clear();
+        for (int k = 0; k <= std::min (count - 1, half); ++k)
+            window.insert (std::upper_bound (window.begin(), window.end(), row[k * stride]), row[k * stride]);
+        for (int i = 0; i < count; ++i)
+        {
+            out[i * outStride] = window[window.size() / 2];
+            const int leaving = i - half, entering = i + half + 1;
+            if (leaving >= 0)
+                window.erase (std::lower_bound (window.begin(), window.end(), row[leaving * stride]));
+            if (entering < count)
+                window.insert (std::upper_bound (window.begin(), window.end(), row[entering * stride]), row[entering * stride]);
+        }
     }
 }
 
@@ -79,18 +93,11 @@ TransientSeparation separateOnsetTransient (const AudioData& audio, double start
         // Median along time -> harmonic estimate; along frequency -> percussive estimate.
         const int ht = options.timeMedianFrames / 2;
         const int pf = options.freqMedianBins / 2;
+        for (int b = 0; b < bins; ++b)
+            slidingMedian (magnitude.data() + b, bins, numFrames, ht, harmonic.data() + b, bins, scratch);
         for (int f = 0; f < numFrames; ++f)
-            for (int b = 0; b < bins; ++b)
-            {
-                scratch.clear();
-                for (int k = std::max (0, f - ht); k <= std::min (numFrames - 1, f + ht); ++k)
-                    scratch.push_back (magnitude[static_cast<std::size_t> (k * bins + b)]);
-                harmonic[static_cast<std::size_t> (f * bins + b)] = median (scratch);
-                scratch.clear();
-                for (int k = std::max (0, b - pf); k <= std::min (bins - 1, b + pf); ++k)
-                    scratch.push_back (magnitude[static_cast<std::size_t> (f * bins + k)]);
-                percussive[static_cast<std::size_t> (f * bins + b)] = median (scratch);
-            }
+            slidingMedian (magnitude.data() + static_cast<std::ptrdiff_t> (f) * bins, 1, bins, pf,
+                           percussive.data() + static_cast<std::ptrdiff_t> (f) * bins, 1, scratch);
 
         std::fill (output.begin(), output.end(), 0.0);
         std::fill (norm.begin(), norm.end(), 0.0);

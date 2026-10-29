@@ -5,6 +5,7 @@
 #include "model/InstrumentSet.h"
 #include "model/NoteAtlas.h"
 
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -36,6 +37,14 @@ namespace osp
     - Each member still knows its region (SetMember::regionId, sourceAssetId, regionStart/End),
       so a later shared-buffer implementation can read in place.
 
+    Two stages (Phase 4; docs/research/unified-andor/phase-4-report.md). Stage A
+    (buildPlayableSet) is playable at once: regions, roots, boundaries, fades, envelopes,
+    levels and places, every member a provisional model (no sustain loop, release graft or
+    transient layer; a note plays its region). Stage B (enhanceSet) adds that continuation to
+    every member and reassembles the same set by the same code, so the finished set is exactly
+    the one a single-pass build makes (buildInstrumentSet is A then B). Publish A, then B: a
+    note already sounding keeps the model it started with.
+
     Offline only: allocates, analyses, may take a while. Call it from a worker thread, never the
     audio thread. Never throws.
 */
@@ -60,6 +69,11 @@ namespace atlasset
         double maxTotalSeconds = 300.0;
         double maxRegionSeconds = 60.0;      ///< a longer region is cut to this (warning)
         std::int64_t edgeFadeFrames = 64;    ///< anti-click fade at each cut when the note's own fade is shorter
+        /** Worker threads for the per-member work (region analysis, Stage B), at most 8. The
+            result does not depend on it (members are independent and deterministic). */
+        int threads = 1;
+        const std::atomic<bool>* cancel = nullptr;   ///< set: stop at the next member (no set, "cancelled")
+        std::atomic<float>* progress = nullptr;      ///< 0..1 over the stage (relaxed stores)
     };
 
     struct BuildReport
@@ -69,15 +83,37 @@ namespace atlasset
         std::vector<std::string> warnings;   ///< notes skipped or cut, odd data
         std::vector<std::string> missingSources;   ///< asset ids whose audio was not supplied
         int notesUsed = 0, notesSkipped = 0;
+        /** Phase 4: the build is not the whole atlas - notes were skipped (capacity) or cut
+            (region limit). Never silent: the note ids are listed and the atlas itself keeps
+            every note, so the instrument can be rebuilt once there is room. */
+        bool partial = false;
+        std::vector<std::string> skippedNoteIds, cutNoteIds;
+        bool cancelled = false;
+        bool playableOnly = false;           ///< Stage A: members have no continuation yet
         std::int64_t regionFrames = 0;       ///< summed member frames (source rate)
         std::size_t memberBytes = 0;         ///< approximateBytes() of the built set
         double buildMilliseconds = 0.0;
+        /** Where the time went (Phase 4 profiling), milliseconds: region copies, per-region
+            analysis (Analyzer), the playable model (sources, playback), continuation (loops,
+            release, transients, resonances, REIMAGINED data), and finishing the set. */
+        double copyMilliseconds = 0.0, analysisMilliseconds = 0.0, provisionalMilliseconds = 0.0,
+               continuationMilliseconds = 0.0, finaliseMilliseconds = 0.0;
     };
 
     struct BuildResult
     {
         std::shared_ptr<const InstrumentSet> set;   ///< null when nothing could be built
         BuildReport report;
+    };
+
+    /** What Stage B needs from Stage A: each member's region copy, its analysis and playable
+        model, and the places. Immutable; released once Stage B is built. */
+    struct PreparedAtlas;
+
+    struct StagedBuild
+    {
+        BuildResult playable;                          ///< Stage A (report.playableOnly)
+        std::shared_ptr<const PreparedAtlas> pending;  ///< null when Stage A failed
     };
 
     /**
@@ -87,6 +123,17 @@ namespace atlasset
         whose audio is missing cannot look restored.
     */
     BuildResult buildInstrumentSet (const atlas::NoteAtlas& atlas, const std::vector<SourceAudio>& sources, const BuildOptions& options);
+
+    /** Stage A: the playable set and what Stage B needs (same checks and limits as above). */
+    StagedBuild buildPlayableSet (const atlas::NoteAtlas& atlas, const std::vector<SourceAudio>& sources, const BuildOptions& options);
+
+    /** Stage B: every member with continuation, the same set otherwise. `options` gives the
+        threads, cancel flag and progress (its other fields come from Stage A). */
+    BuildResult enhanceSet (const PreparedAtlas& prepared, const BuildOptions& options);
+
+    /** Region audio (seconds at the source rate) an atlas's included notes would load, with the
+        options' per-region cut: for a capacity check before building. */
+    double regionSeconds (const atlas::NoteAtlas& atlas, const BuildOptions& options);
 
     /** Approximate memory the set's audio holds (every member's playback buffers, transients,
         anchors, REIMAGINED data), in bytes. */
