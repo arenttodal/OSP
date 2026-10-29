@@ -39,9 +39,9 @@ const char* toString (Detection d) noexcept
 std::string AnalysisSettings::digest() const
 {
     char buffer[256];
-    std::snprintf (buffer, sizeof (buffer), "%s|%.1f-%.1f|h%.4f|hp%.0f|s%.1f|f%.1f|n%.3f|b%.3f|p%.2f/%.3f|r%.1f|a%.2f|t%d|d%s|m%.3f",
+    std::snprintf (buffer, sizeof (buffer), "%s|%.1f-%.1f|h%.4f|hp%.0f|s%.1f|f%.1f|n%.3f|b%.3f|p%.2f/%.3f|r%.1f/%.1f/%.1f/%.1f|a%.2f|t%d|d%s|m%.3f",
                    toString (backend), minHz, maxHz, hopSeconds, highPassHz, silenceDb, absoluteFloorDb, minNoteSeconds,
-                   bridgeGapSeconds, pitchChangeSemitones, pitchHoldSeconds, rearticulationDb, a4Hz, autoTuning ? 1 : 0,
+                   bridgeGapSeconds, pitchChangeSemitones, pitchHoldSeconds, rearticulationDb, attackRiseDb, unvoicedDipDb, softDipDb, a4Hz, autoTuning ? 1 : 0,
                    toString (detection), minPieceSeconds);
     return buffer;
 }
@@ -50,18 +50,26 @@ AnalysisSettings AnalysisSettings::effective() const
 {
     auto e = *this;
     // A semitone step is always a new note, so FEWER never loosens the pitch threshold much:
-    // it mostly asks for deeper re-articulations and longer-held moves.
+    // it mostly asks for deeper re-articulations, sharper attacks and longer-held moves.
     if (detection == Detection::fewer)
     {
         e.pitchChangeSemitones *= 1.1;
         e.pitchHoldSeconds *= 1.5;
         e.rearticulationDb *= 1.5;
+        e.attackRiseDb *= 1.3;
+        e.unvoicedDipDb *= 1.5;
+        e.softDipDb *= 1.5;
     }
     else if (detection == Detection::more)
     {
         e.pitchChangeSemitones *= 0.85;
         e.pitchHoldSeconds *= 0.75;
         e.rearticulationDb *= 0.65;
+        // MORE splits at every dip the level rule finds, as before Phase 4B (re-attacks without
+        // a sharp rise: legato repeats, re-pressed organ keys), and at softer attacks.
+        e.attackRiseDb *= 0.75;
+        e.unvoicedDipDb = 0.5 * e.rearticulationDb;
+        e.softDipDb = e.rearticulationDb;
     }
     return e;
 }
@@ -614,8 +622,11 @@ namespace
         return splits;
     }
 
-    /** Splits at level dips between two rises (re-articulated repeats, bow changes). */
-    std::vector<std::size_t> rearticulations (const PitchContour& c, std::size_t begin, std::size_t end, const AnalysisSettings& s)
+    /** Splits at level dips that re-attack the note (a re-bow, a re-pluck, a new breath). A dip
+        without a sharp rise or a breath (a bow change, a swell, beating) splits only when very
+        deep; shallower ones that the plain level rule would have split go to `doubtful`. */
+    std::vector<std::size_t> rearticulations (const PitchContour& c, std::size_t begin, std::size_t end, const AnalysisSettings& s,
+                                              std::vector<std::size_t>& doubtful)
     {
         std::vector<std::size_t> splits;
         const double fps = 1.0 / c.hopSeconds;
@@ -633,8 +644,14 @@ namespace
         {
             std::size_t at;
             double depth;
+            bool splits;   ///< a re-attack (sharp rise, breath, or very deep)
+            bool sharp;    ///< the rise out of it is an attack
         };
         std::vector<Dip> dips;
+        // The rise out of a dip, measured over 10 ms steps within 50 ms: a bow or a plectrum
+        // brings the tone back within a few milliseconds, a bow change or a swell over tens.
+        const auto step = std::max<std::size_t> (1, static_cast<std::size_t> (std::lround (0.01 * fps)));
+        const auto riseWindow = static_cast<std::size_t> (std::lround (0.05 * fps));
         for (std::size_t i = minNote; i + minNote < level.size(); ++i)
         {
             bool isMin = true;
@@ -654,17 +671,49 @@ namespace
             bool unvoicedNear = false;
             for (std::size_t k = (i >= 3 ? i - 3 : 0); k <= std::min (level.size() - 1, i + 3); ++k)
                 unvoicedNear = unvoicedNear || ! c.frames[begin + k].voiced;
-            const double needed = unvoicedNear ? 0.5 * s.rearticulationDb : s.rearticulationDb;
-            if (depth >= needed)
-                dips.push_back ({ i, depth });
+            double rise = 0.0, rawRise = 0.0;
+            for (auto k = i; k < std::min (i + riseWindow, level.size() - step); ++k)
+            {
+                rise = std::max (rise, level[k + step] - level[k]);
+                rawRise = std::max (rawRise, static_cast<double> (c.frames[begin + k + step].levelDb - c.frames[begin + k].levelDb));
+            }
+            // A rise within a few milliseconds is smoothed away above; on the unsmoothed level it
+            // marks a new attack when the dip is a full re-articulation deep.
+            const bool sharp = rise >= s.attackRiseDb || (rawRise >= 1.4 * s.attackRiseDb && depth >= s.rearticulationDb);
+            if ((sharp && depth >= 0.5 * s.rearticulationDb) || (unvoicedNear && depth >= s.unvoicedDipDb))
+                dips.push_back ({ i, depth, true, sharp });
+            else if (depth >= std::min (s.rearticulationDb, s.softDipDb))
+                dips.push_back ({ i, depth, depth >= s.softDipDb, false });
         }
-        // Tremolo is a train of evenly spaced dips (3-10 Hz); a re-articulation is a single
-        // event. Four or more dips at a regular spacing are the tremolo and do not split.
-        if (dips.size() >= 4)
+        // A re-pluck on a decaying or steady tone need not dip first: the level jumps within a few
+        // milliseconds (on the unsmoothed level; a bow change or a swell takes tens) and stays up.
         {
+            const auto ctx = static_cast<std::size_t> (std::lround (0.05 * fps));
+            const auto levelOver = [&] (std::size_t from, std::size_t to)
+            { return median (std::vector<double> (level.begin() + static_cast<std::ptrdiff_t> (from), level.begin() + static_cast<std::ptrdiff_t> (to))); };
+            const auto raw = [&] (std::size_t k) { return static_cast<double> (c.frames[begin + k].levelDb); };
+            for (std::size_t i = std::max (minNote, ctx + 8); i + std::max (minNote, ctx + step + 2) < level.size(); ++i)
+            {
+                if (raw (i + step) - raw (i) < 1.5 * s.attackRiseDb)
+                    continue;
+                auto at = i;
+                for (auto k = i - 6; k <= i; ++k)
+                    if (raw (k) < raw (at))
+                        at = k;
+                const double stepUp = levelOver (at + step + 2, std::min (level.size(), at + step + 2 + ctx)) - levelOver (at - ctx - 2, at - 2);
+                if (stepUp >= 0.5 * s.rearticulationDb)
+                    dips.push_back ({ at, stepUp, true, true });
+                i += step + 4;
+            }
+        }
+        std::sort (dips.begin(), dips.end(), [] (const Dip& a, const Dip& b) { return a.at < b.at; });
+        const auto regular = [&] (const std::vector<Dip>& train, double from, double to, double maxCv)
+        {
+            if (train.size() < 2)
+                return false;
             std::vector<double> spacing;
-            for (std::size_t k = 1; k < dips.size(); ++k)
-                spacing.push_back (static_cast<double> (dips[k].at - dips[k - 1].at) * c.hopSeconds);
+            for (std::size_t k = 1; k < train.size(); ++k)
+                spacing.push_back (static_cast<double> (train[k].at - train[k - 1].at) * c.hopSeconds);
             double m = 0.0;
             for (double x : spacing)
                 m += x;
@@ -673,22 +722,62 @@ namespace
             for (double x : spacing)
                 var += (x - m) * (x - m);
             const double cv = std::sqrt (var / static_cast<double> (spacing.size())) / m;
-            if (m >= 0.1 && m <= 0.34 && cv < 0.2)
+            return m >= from && m <= to && cv < maxCv;
+        };
+        // Tremolo is a train of evenly spaced dips (3-10 Hz); a re-articulation is a single
+        // event. Four or more dips at a regular spacing are the tremolo and do not split.
+        {
+            std::vector<Dip> splitting;
+            for (const auto& d : dips)
+                if (d.splits)
+                    splitting.push_back (d);
+            if (splitting.size() >= 4 && regular (splitting, 0.1, 0.34, 0.2))
                 dips.clear();
         }
-        std::sort (dips.begin(), dips.end(), [] (const Dip& a, const Dip& b) { return a.depth > b.depth; });
-        std::vector<std::size_t> accepted;
+        // Beating between two strings (or a slow tremolo) is a slower, very regular train of
+        // dips; it is part of the sound, not a place to split or to doubt. Only a sharp attack
+        // inside the train still splits. Repeated notes in a steady tempo are regular too, but
+        // each holds its level between the dips; beating never settles (under half the time
+        // within 1.5 dB of its peak).
+        {
+            std::vector<Dip> train;
+            for (const auto& d : dips)
+                if (d.depth >= s.rearticulationDb)
+                    train.push_back (d);
+            double settled = 0.0;
+            for (std::size_t k = 1; k < train.size(); ++k)
+            {
+                const auto from = level.begin() + static_cast<std::ptrdiff_t> (train[k - 1].at);
+                const auto to = level.begin() + static_cast<std::ptrdiff_t> (train[k].at + 1);
+                const double peak = *std::max_element (from, to);
+                settled += static_cast<double> (std::count_if (from, to, [&] (double l) { return l >= peak - 1.5; }))
+                           / static_cast<double> (to - from) / static_cast<double> (train.size() - 1);
+            }
+            if (train.size() >= 3 && regular (train, 0.25, 0.8, 0.15) && settled < 0.45)
+                dips.erase (std::remove_if (dips.begin(), dips.end(), [] (const Dip& d) { return ! d.sharp; }), dips.end());
+        }
+        std::sort (dips.begin(), dips.end(), [] (const Dip& a, const Dip& b) { return a.splits != b.splits ? a.splits : a.depth > b.depth; });
+        std::vector<std::size_t> accepted, doubts;
+        const auto farFrom = [&] (std::size_t at, const std::vector<std::size_t>& others)
+        {
+            bool far = at >= minNote && level.size() - at >= minNote;
+            for (auto a : others)
+                far = far && (at > a ? at - a : a - at) >= minNote;
+            return far;
+        };
         for (const auto& d : dips)
         {
-            bool farEnough = d.at >= minNote && level.size() - d.at >= minNote;
-            for (auto a : accepted)
-                farEnough = farEnough && (d.at > a ? d.at - a : a - d.at) >= minNote;
-            if (farEnough)
+            if (d.splits && farFrom (d.at, accepted))
                 accepted.push_back (d.at);
+            else if (! d.splits && farFrom (d.at, accepted) && farFrom (d.at, doubts))
+                doubts.push_back (d.at);
         }
         std::sort (accepted.begin(), accepted.end());
+        std::sort (doubts.begin(), doubts.end());
         for (auto a : accepted)
             splits.push_back (begin + a);
+        for (auto d : doubts)
+            doubtful.push_back (begin + d);
         return splits;
     }
     /** What the consolidation rules need to know about a candidate note. */
@@ -763,6 +852,8 @@ namespace
         const auto mergeInto = [&] (std::size_t from, std::size_t into)
         {
             auto& a = segs[into];
+            if (segs[from].begin < a.begin)
+                a.pitchCut = segs[from].pitchCut;
             a.begin = std::min (a.begin, segs[from].begin);
             a.end = std::max (a.end, segs[from].end);
             segs.erase (segs.begin() + static_cast<std::ptrdiff_t> (from));
@@ -942,6 +1033,7 @@ std::vector<Segment> segment (const PitchContour& c, const Preprocessed& pre, co
     struct Run
     {
         std::size_t begin, end;
+        bool pitchCut = false;   ///< a short loud gap that only the pitch jump kept open
     };
     std::vector<Run> runs;
     for (std::size_t i = 0; i < n;)
@@ -988,11 +1080,15 @@ std::vector<Segment> segment (const PitchContour& c, const Preprocessed& pre, co
                 i = j;
                 continue;
             }
+            runs.push_back ({ i, j, gap <= bridge && loud });
+            i = j;
+            continue;
         }
         runs.push_back ({ i, j });
         i = j;
     }
 
+    std::vector<std::size_t> doubtful;
     for (const auto& run : runs)
     {
         std::vector<std::size_t> cuts = pitchChanges (c, run.begin, run.end, s);
@@ -1002,7 +1098,7 @@ std::vector<Segment> segment (const PitchContour& c, const Preprocessed& pre, co
         for (std::size_t b = 0; b + 1 < bounds.size(); ++b)
         {
             std::vector<std::size_t> sub { bounds[b] };
-            const auto dips = rearticulations (c, bounds[b], bounds[b + 1], s);
+            const auto dips = rearticulations (c, bounds[b], bounds[b + 1], s, doubtful);
             sub.insert (sub.end(), dips.begin(), dips.end());
             sub.push_back (bounds[b + 1]);
             for (std::size_t k = 0; k + 1 < sub.size(); ++k)
@@ -1011,6 +1107,7 @@ std::vector<Segment> segment (const PitchContour& c, const Preprocessed& pre, co
                 seg.begin = sub[k];
                 seg.end = sub[k + 1];
                 seg.legatoIn = k > 0 || b > 0;
+                seg.pitchCut = k == 0 && (b > 0 || run.pitchCut);
                 seg.legatoOut = k + 2 < sub.size() || b + 2 < bounds.size();
                 result.push_back (seg);
             }
@@ -1066,6 +1163,7 @@ std::vector<Segment> segment (const PitchContour& c, const Preprocessed& pre, co
                 }
             result[i - 1].end = cut;
             result[i + 1].begin = cut;
+            result[i + 1].pitchCut = true;
             seg.end = seg.begin;   // emptied; removed below
         }
         result.erase (std::remove_if (result.begin(), result.end(), [] (const Segment& sg) { return sg.end <= sg.begin; }), result.end());
@@ -1096,6 +1194,7 @@ std::vector<Segment> segment (const PitchContour& c, const Preprocessed& pre, co
         {
             result[i + 1].begin = seg.begin;
             result[i + 1].legatoIn = seg.legatoIn;
+            result[i + 1].pitchCut = seg.pitchCut;
         }
     }
 
@@ -1104,6 +1203,9 @@ std::vector<Segment> segment (const PitchContour& c, const Preprocessed& pre, co
     {
         kept[i].legatoIn = i > 0 && kept[i - 1].end == kept[i].begin;
         kept[i].legatoOut = i + 1 < kept.size() && kept[i + 1].begin == kept[i].end;
+        for (auto d : doubtful)
+            if (d >= kept[i].begin + minNote && d + minNote <= kept[i].end)
+                kept[i].possibleRepeats.push_back (d);
     }
     return kept;
 }
@@ -1397,6 +1499,16 @@ namespace
             return other != nullptr && joined && std::abs (other->midiPitch - note.midiPitch) < 1.0;
         };
         d.uncertainBoundary = seconds < 0.08 || closeJoin (previous, seg.legatoIn) || closeJoin (next, seg.legatoOut);
+        // A dip the segmentation kept inside the note (no sharp rise, no breath) may still have
+        // been a legato repeat: NOTE MAP offers the split there.
+        const auto hop = static_cast<std::int64_t> (std::lround (c.hopSeconds * sampleRate));
+        for (auto f : seg.possibleRepeats)
+        {
+            const auto frame = static_cast<std::int64_t> (f) * hop;
+            if (frame > note.attackStart && frame < note.sourceEnd)
+                d.repeatFrames.push_back (frame);
+        }
+        d.possibleRepeat = ! d.repeatFrames.empty();
         d.possibleSplit = (previous != nullptr && seg.legatoIn && previous->rootMidi == note.rootMidi)
                           || (next != nullptr && seg.legatoOut && next->rootMidi == note.rootMidi);
         // A short entry that slides legato into a longer, nearby note is the shape of a scoop or
@@ -1581,21 +1693,63 @@ AnalysisResult analysePhrase (const AudioData& audio, const atlas::SourceAsset& 
     }
     result.levelDb = pre.levelDb;
 
-    const auto segments = segment (result.contour, pre, s);
-    for (std::size_t i = 0; i < segments.size(); ++i)
+    auto segments = segment (result.contour, pre, s);
+    const auto describeAll = [&]
     {
-        auto note = describe (segments[i], i > 0 ? &segments[i - 1] : nullptr, i + 1 < segments.size() ? &segments[i + 1] : nullptr,
-                              result.contour, pre, s);
-        note.sourceId = source.assetId;
-        note.origin = atlas::NoteOrigin::analysis;
-        note.analysisMethod = tracker->name();
-        note.analysisVersion = analysisVersion * 100 + tracker->version();
-        note.id = a.nextNoteId();
-        a.notes.push_back (std::move (note));
-    }
+        a.notes.clear();
+        for (std::size_t i = 0; i < segments.size(); ++i)
+        {
+            auto note = describe (segments[i], i > 0 ? &segments[i - 1] : nullptr, i + 1 < segments.size() ? &segments[i + 1] : nullptr,
+                                  result.contour, pre, s);
+            note.sourceId = source.assetId;
+            note.origin = atlas::NoteOrigin::analysis;
+            note.analysisMethod = tracker->name();
+            note.analysisVersion = analysisVersion * 100 + tracker->version();
+            note.id = a.nextNoteId();
+            a.notes.push_back (std::move (note));
+        }
+    };
+    describeAll();
     // The doubts need the rounded keys of the neighbours: after remapping (below), so roots are final.
 
+    std::vector<double> tracked;
+    for (const auto& n : a.notes)
+        tracked.push_back (n.midiPitch);
     repairHarmonicNotes (a.notes, pre, s);
+    // OSP Phase 4B: two joined pieces cut where the pitch moved, or that the repair put back on
+    // one pitch, but that are described at the same pitch were one note: the tracker followed a
+    // harmonic for a while (a weak fundamental: bowed harmonics, a low string), or the move was
+    // only an excursion. They become one, described again.
+    {
+        const auto bridge = static_cast<std::size_t> (std::lround (s.bridgeGapSeconds / result.contour.hopSeconds));
+        std::vector<Segment> joined;
+        for (std::size_t i = 0; i < segments.size(); ++i)
+        {
+            const auto repaired = [&] (std::size_t k) { return std::abs (a.notes[k].midiPitch - tracked[k]) > 6.0; };
+            const bool cut = segments[i].pitchCut && s.detection != Detection::more;
+            if (i > 0 && segments[i].begin <= joined.back().end + (cut ? bridge : 0) && std::abs (a.notes[i].midiPitch - a.notes[i - 1].midiPitch) < 0.5
+                && atlas::roundPitch (a.notes[i].midiPitch).key == atlas::roundPitch (a.notes[i - 1].midiPitch).key
+                && (cut || repaired (i) || repaired (i - 1)))
+            {
+                // A small move between two takes of one key (not a harmonic the tracker jumped to)
+                // may still have been two sung or played notes: offered as a split.
+                if (std::abs (tracked[i] - tracked[i - 1]) < 6.0)
+                    joined.back().possibleRepeats.push_back (segments[i].begin);
+                joined.back().end = segments[i].end;
+                joined.back().legatoOut = segments[i].legatoOut;
+                joined.back().possibleRepeats.insert (joined.back().possibleRepeats.end(), segments[i].possibleRepeats.begin(),
+                                                      segments[i].possibleRepeats.end());
+            }
+            else
+                joined.push_back (segments[i]);
+        }
+        if (joined.size() < segments.size())
+        {
+            segments = std::move (joined);
+            describeAll();
+            repairHarmonicNotes (a.notes, pre, s);
+        }
+    }
 
     // --- 6: mapping ---
     if (s.autoTuning)

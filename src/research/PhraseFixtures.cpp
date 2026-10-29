@@ -21,6 +21,7 @@ namespace
         double level = 1.0;            ///< linear, relative to the phrase level
         bool legatoToNext = false;     ///< no gap and no new attack: the pitch glides
         double dipDb = 0.0;            ///< legato only: a level dip at the join (re-articulation)
+        double dipRiseSeconds = 0.0;   ///< ... rising back this fast (a new attack); 0: as slowly as it fell
         double vibratoCents = 0.0;
         double vibratoHz = 5.5;
         double scoopCents = 0.0;       ///< starts this far below and glides up (singers' scoop)
@@ -108,7 +109,8 @@ namespace
                 for (auto i = static_cast<std::size_t> (std::max (0.0, boundary - width) * sampleRate);
                      i < std::min (frames, static_cast<std::size_t> ((boundary + width) * sampleRate)); ++i)
                 {
-                    const double x = (static_cast<double> (i) / sampleRate - boundary) / width;
+                    const double after = static_cast<double> (i) / sampleRate - boundary;
+                    const double x = after / (after > 0.0 && notes[n].dipRiseSeconds > 0.0 ? notes[n].dipRiseSeconds : width);
                     const double shape = 0.5 + 0.5 * std::cos (3.141592653589793 * std::clamp (x, -1.0, 1.0));
                     amp[i] *= dbToGain (-notes[n].dipDb * shape);
                 }
@@ -233,7 +235,9 @@ std::vector<std::string> phraseStressFixtureNames()
 std::vector<std::string> phraseFixtureNames()
 {
     return { "clean-scale", "noisy", "vibrato", "legato", "long-sustain", "staccato", "silent-gaps",
-             "repeated", "out-of-tune", "octave-ambiguity", "breath", "quiet-notes", "vocal-phrase" };
+             "repeated", "out-of-tune", "octave-ambiguity", "breath", "quiet-notes", "vocal-phrase",
+             // Phase 4B
+             "repeated-attacks", "beating" };
 }
 
 PhraseFixture makePhraseFixture (const std::string& name, double sr)
@@ -302,6 +306,27 @@ PhraseFixture makePhraseFixture (const std::string& name, double sr)
             legato[i].dipDb = 12.0;
         }
         notes.insert (notes.end(), legato.begin(), legato.end());
+    }
+    else if (name == "repeated-attacks")
+    {
+        // Phase 4B: the level falls into each join and comes back within 8 ms, as a re-bow or a
+        // re-pluck does (a bow change or a swell takes tens of milliseconds).
+        fx.description = "G3 four times legato, each join a 12 dB dip that rises back within 8 ms (new attacks)";
+        notes = sequence ({ 55, 55, 55, 55 }, 0.45, 0.0);
+        for (std::size_t i = 0; i + 1 < notes.size(); ++i)
+        {
+            notes[i].legatoToNext = true;
+            notes[i].dipDb = 12.0;
+            notes[i].dipRiseSeconds = 0.008;
+        }
+    }
+    else if (name == "beating")
+    {
+        // Phase 4B: two slightly detuned strings beat: a slow, very regular 14 dB level swing.
+        fx.description = "one held D4, 3 s, its level beating 14 dB at 2.3 Hz (one note, not repeats)";
+        notes = sequence ({ 62 }, 3.0, 0.0);
+        style.tremoloDb = 14.0;
+        style.tremoloHz = 2.3;
     }
     else if (name == "out-of-tune")
     {
@@ -453,7 +478,12 @@ EvaluationResult evaluate (const atlas::NoteAtlas& atlas, const std::vector<Trut
         bool matched = false;
     };
     std::vector<Detected> detected;
+    std::vector<double> offered;   // where notes offer a split (Phase 4B)
     const double sr = atlas.sources.empty() ? 48000.0 : atlas.sources.front().sampleRate;
+    for (const auto& n : atlas.notes)
+        if (n.included)
+            for (auto f : n.diagnostics.repeatFrames)
+                offered.push_back (static_cast<double> (f) / sr);
     for (const auto& n : atlas.notes)
         if (n.included)
             detected.push_back ({ static_cast<double> (n.attackStart) / sr, static_cast<double> (n.sourceEnd) / sr, n.midiPitch, false,
@@ -479,6 +509,12 @@ EvaluationResult evaluate (const atlas::NoteAtlas& atlas, const std::vector<Trut
         if (best < 0)
         {
             ++r.missed;
+            for (double at : offered)
+                if (std::abs (at - t.startSeconds) <= settings.onsetToleranceSeconds)
+                {
+                    ++r.missedFlagged;
+                    break;
+                }
             continue;
         }
         auto& d = detected[static_cast<std::size_t> (best)];

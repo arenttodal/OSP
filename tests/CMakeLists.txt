@@ -47,6 +47,7 @@ add_executable(osp_tests
     integration/KeyDnaEngineTests.cpp
     integration/GrainPhase2Tests.cpp
     integration/AtlasSetTests.cpp
+    integration/AtlasShortSustainTests.cpp
     integration/AtlasStagedTests.cpp
     integration/GrainBudgetStressTests.cpp
     integration/EngineSlotTests.cpp

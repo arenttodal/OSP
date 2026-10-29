@@ -459,6 +459,25 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
         defect). research-renderer --phrase-eval/-eval-file/-corpus/-analyze, --prepare-bench.
       - Tests: 23 unit/integration + 6 grain-budget stress + 6 plugin; every golden unchanged.
       Stopped for review before Phase 5 (the unified GUI not started).
+- [x] UNIFIED ENGINE Phase 4B, held and repeated notes, 0.3 s sustain
+      (docs/research/unified-andor/phase-4b-report.md):
+      - Segmentation (analysis version 4):
+        - a dip splits only as a re-attack (sharp rise, voicing gap at full depth, or 20 dB);
+        - a re-pluck without a dip splits by its step;
+        - slow dips (bow changes, swells) stay whole, flagged `possibleRepeat` with `repeatAt`;
+        - beating is recognised and left alone;
+        - pieces cut by a pitch move but described on one key are joined.
+      - DETECTION MORE keeps Phase 4's splitting. `--phrase-corpus --detection`, `missedFlagged`.
+      - Real single-pitch takes as one note 41 → 53 of 78, extra regions 169 → 87 (bowed 119 → 56);
+        spliced phrases' false splits 10 → 4 with nothing lost; slow-dip repeats now offered as
+        splits instead of split.
+      - Atlas notes sustain from 0.3 s of stable body (`BuildOptions::minSustainSeconds`; loops
+        scaled to short regions); sample sets and regions of 0.5 s or more unchanged. A note's
+        stable body is much shorter than the note: notes under about 0.5 s still play as recorded.
+      - Tests: 2 short-sustain integration, 1 segmentation unit case, 2 lab fixtures added. The
+        Phase 3 atlas goldens with 0.3-0.5 s regions were updated (the sustain change, proved by
+        reverting only the threshold); every other golden unchanged.
+      Stopped for review before Phase 5.
 - [x] ANDOR DESIGN SYSTEM and INSTRUMENT SHELL (andor-design-system/, start with HANDOFF.md).
       ANDOR OSP's interface was extracted, unchanged, into shared/andor-ui:
       - the components, look and assets;

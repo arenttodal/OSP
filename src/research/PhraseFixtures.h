@@ -55,6 +55,7 @@ struct EvaluationResult
     int pitchErrors = 0;        ///< onset matched, pitch wrong otherwise
     int falseSplits = 0;        ///< extra detected notes starting inside a truth note
     int missed = 0;             ///< truth notes without any detected onset near them
+    int missedFlagged = 0;      ///< ... of them where a note offers a split (possibleRepeat) near the onset (Phase 4B)
     int spurious = 0;           ///< detected notes outside every truth note
     double meanOnsetErrorMs = 0.0;
     double meanOffsetErrorMs = 0.0;

@@ -403,9 +403,20 @@ ContinuationModel analyseContinuation (const AudioData& audio, const AnalysisDat
     }
 
     const double regionLength = regionEnd - bodyStart;
+    double minLoopSeconds = options.minLoopSeconds, minSegmentSeconds = options.minSegmentSeconds;
+    // The decay limits are rates; over a short region a small drift (vibrato, a breath) reads as
+    // a steep rate. A short region may lose as much level in all as one of `shortRegionSeconds`
+    // could, so its loops step in level no more than before.
+    double decayScale = 1.0;
+    if (regionLength < options.shortRegionSeconds && regionLength > 0.0)
+    {
+        minLoopSeconds = std::min (minLoopSeconds, 0.6 * regionLength);
+        minSegmentSeconds = std::min (minSegmentSeconds, 0.4 * regionLength);
+        decayScale = options.shortRegionSeconds / regionLength;
+    }
     model.sustainStartFrame = bodyStart * sr;
     model.sustainEndFrame = regionEnd * sr;
-    model.minSegmentFrames = options.minSegmentSeconds * sr;
+    model.minSegmentFrames = minSegmentSeconds * sr;
     model.pitchFluctuationCents = analysis.pitch.detected ? analysis.pitch.stabilityCents : 0.0;
 
     if (regionLength < options.minRegionSeconds)
@@ -415,8 +426,8 @@ ContinuationModel analyseContinuation (const AudioData& audio, const AnalysisDat
     }
     // Struck and plucked sources (sharp attack, steady decay) are one-shot even when
     // they decay slowly: holding them forever would freeze the string, not play it.
-    const bool struck = env.attackSeconds < 0.03 && slope < -2.5;
-    if (slope < -options.maxDecayDbPerSecond || struck)
+    const bool struck = env.attackSeconds < 0.03 && slope < -2.5 * decayScale;
+    if (slope < -options.maxDecayDbPerSecond * decayScale || struck)
     {
         model.reason = "decaying source";
         return model;
@@ -451,7 +462,7 @@ ContinuationModel analyseContinuation (const AudioData& audio, const AnalysisDat
         int from, to;
         double d;
     };
-    const int minGap = static_cast<int> (std::ceil (options.minLoopSeconds / gridHop));
+    const int minGap = static_cast<int> (std::ceil (minLoopSeconds / gridHop));
     std::vector<Pair> pairs;
     const int n = static_cast<int> (grid.size());
     pairs.reserve (static_cast<std::size_t> (n) * 8);

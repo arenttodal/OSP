@@ -17,6 +17,10 @@ struct ContinuationOptions
     int maxGraftExits = 96;
     double maxDecayDbPerSecond = 6.0;  ///< steeper bodies are treated as one-shot (plucks)
     double minRegionSeconds = 0.5;
+    /** OSP Phase 4B (Note Atlas regions): a stable region shorter than this still loops when it
+        is at least `minRegionSeconds`, its shortest loop and segment shrinking with it (0.6 and
+        0.4 of the region). 0: off, the fixed minimums above (sample sets). */
+    double shortRegionSeconds = 0.0;
 };
 
 /**

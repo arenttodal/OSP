@@ -57,7 +57,11 @@ TEST_CASE ("Phrase analysis: every generated fixture is found note for note", "[
     {
         INFO (name);
         const auto r = evaluateFixture (name);
-        CHECK (r.matched == r.truthNotes);
+        // OSP Phase 4B: the legato half of "repeated" joins its notes by slow 12 dB dips, which
+        // no longer split at NORMAL (bow changes and swells have the same shape); each join is
+        // offered as a split instead. Its own test case checks that, and that MORE splits them.
+        const int offered = name == "repeated" ? r.missedFlagged : 0;
+        CHECK (r.matched + offered == r.truthNotes);
         CHECK (r.octaveErrors == 0);
         CHECK (r.falseSplits == 0);
         CHECK (r.spurious == 0);
@@ -189,7 +193,9 @@ TEST_CASE ("Phrase analysis: boundaries are ordered and sensible", "[phrase][uni
         const auto st = phrase::analysePhrase (phrase::makePhraseFixture ("staccato").audio, fixtureSource()).atlas;
         for (const auto& n : st.notes)
             CHECK (n.articulation == atlas::Articulation::short_);
-        const auto rep = phrase::analysePhrase (phrase::makePhraseFixture ("repeated").audio, fixtureSource()).atlas;
+        phrase::AnalysisSettings more;   // OSP Phase 4B: the slow-dip repeats split at MORE
+        more.detection = phrase::Detection::more;
+        const auto rep = phrase::analysePhrase (phrase::makePhraseFixture ("repeated").audio, fixtureSource(), more).atlas;
         const auto keys = atlas::notesByKey (rep);
         REQUIRE (keys[55].size() == 8);
         for (std::size_t i = 0; i < 8; ++i)

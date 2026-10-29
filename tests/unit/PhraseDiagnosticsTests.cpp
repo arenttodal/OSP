@@ -78,6 +78,8 @@ TEST_CASE ("Phrase analysis (OSP): notes are analysis notes in a valid schema-2 
     // The diagnostics and the recording summary survive JSON exactly.
     auto marked = a;
     marked.notes[0].diagnostics.uncertainPitch = marked.notes[0].diagnostics.possibleSplit = true;
+    marked.notes[1].diagnostics.possibleRepeat = true;   // Phase 4B
+    marked.notes[1].diagnostics.repeatFrames = { marked.notes[1].attackStart + 4800, marked.notes[1].attackStart + 9600 };
     marked.analysis.uncovered.push_back ({ 1000, 9000 });
     std::string error;
     const auto back = io::noteAtlasFromString (io::noteAtlasToString (marked), error);
@@ -120,8 +122,11 @@ TEST_CASE ("Phrase analysis (OSP): doubts are flagged - a far-off tuning, same-k
         far += std::abs (n.centsOffset) > 42.0 ? 1 : 0;
     }
     CHECK (far == 1);
-    // Repeated notes joined by 12 dB dips: each pair may be one note cut in two.
-    const auto rep = analyse (phrase::makePhraseFixture ("repeated").audio).atlas;
+    // Repeated notes joined by 12 dB dips, split as DETECTION MORE does: each pair may be one
+    // note cut in two. (At NORMAL these slow dips do not split: Phase 4B, below.)
+    phrase::AnalysisSettings more;
+    more.detection = phrase::Detection::more;
+    const auto rep = analyse (phrase::makePhraseFixture ("repeated").audio, more).atlas;
     CHECK (countFlag (rep, &atlas::Diagnostics::possibleSplit) > 0);
     for (const auto& n : rep.notes)
         if (n.diagnostics.possibleSplit)
@@ -171,4 +176,47 @@ TEST_CASE ("Phrase analysis (OSP): pitched sound that no note covers is reported
     for (const auto& w : r.warnings)
         warned = warned || w.find ("missed") != std::string::npos;
     CHECK (warned);
+}
+
+TEST_CASE ("Phrase analysis (OSP Phase 4B): a slow dip is kept in one note and offered as a split; a sharp re-attack splits", "[phrase][unit]")
+{
+    // "repeated": four separated G3s, then four legato G3s joined by 12 dB dips that fall and rise
+    // over 60 ms - the shape of a bow change or a swell as much as of a soft re-articulation.
+    const auto fx = phrase::makePhraseFixture ("repeated");
+    const auto normal = analyse (fx.audio).atlas;
+    REQUIRE (normal.notes.size() == 5);
+    const auto& held = normal.notes.back();
+    CHECK (held.diagnostics.possibleRepeat);
+    REQUIRE (held.diagnostics.repeatFrames.size() == 3);
+    for (std::size_t k = 0; k < 3; ++k)
+    {
+        // Each offered split sits at the join (truth: the next note's start), within 30 ms.
+        const double at = static_cast<double> (held.diagnostics.repeatFrames[k]) / fx.audio.sampleRate;
+        CHECK (at == Approx (fx.notes[5 + k].startSeconds).margin (0.03));
+    }
+    for (std::size_t i = 0; i + 1 < normal.notes.size(); ++i)
+        CHECK_FALSE (normal.notes[i].diagnostics.possibleRepeat);
+    const auto evaluated = phrase::evaluate (normal, fx.notes);
+    CHECK (evaluated.missed == 3);
+    CHECK (evaluated.missedFlagged == 3);
+
+    // DETECTION: MORE splits them as before Phase 4B; FEWER keeps them whole and quiet.
+    phrase::AnalysisSettings more, fewer;
+    more.detection = phrase::Detection::more;
+    fewer.detection = phrase::Detection::fewer;
+    CHECK (analyse (fx.audio, more).atlas.notes.size() == 8);
+    const auto quiet = analyse (fx.audio, fewer).atlas;
+    CHECK (quiet.notes.size() == 5);
+
+    // The same joins with a level that comes back within 8 ms (a re-bow, a re-pluck): new notes.
+    const auto attacks = phrase::makePhraseFixture ("repeated-attacks");
+    const auto split = analyse (attacks.audio).atlas;
+    CHECK (split.notes.size() == attacks.notes.size());
+    for (const auto& n : split.notes)
+        CHECK_FALSE (n.diagnostics.possibleRepeat);
+
+    // Beating (a slow regular 14 dB swing) is the sound of one note: not split, not doubted.
+    const auto beat = analyse (phrase::makePhraseFixture ("beating").audio).atlas;
+    REQUIRE (beat.notes.size() == 1);
+    CHECK_FALSE (beat.notes[0].diagnostics.possibleRepeat);
 }

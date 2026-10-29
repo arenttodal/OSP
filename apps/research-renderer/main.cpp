@@ -115,7 +115,7 @@ PHRASE ANALYSIS (Phase 4; ported from ANDOR Lab, docs/research/unified-andor/pha
   --phrase-eval [--backend yin|yin-viterbi|all] [--fixture <name> | --stress] [--output-json <f>] [--verbose]
         The generated phrases against their exact ground truth.
   --phrase-eval-file <file> --truth <truth.json> [--backend ..] [--verbose]
-  --phrase-corpus <dir> [--output-json <f>] [--output-md <f>] [--onset-tolerance <s>] [--verbose]
+  --phrase-corpus <dir> [--output-json <f>] [--output-md <f>] [--onset-tolerance <s>] [--detection fewer|normal|more] [--verbose]
         Every <name>.wav (or .flac/.aif) with a <name>.truth.json beside it ({"notes": [{"start", "end", "midi"}]}),
         one row per recording: P/R/F, octave and pitch errors, false splits, missed, onset error, tuning bias,
         confidence of right vs wrong notes, how many wrong notes were flagged, analysis time.
@@ -908,7 +908,7 @@ std::string doubtsOf (const atlas::Diagnostics& d)
 {
     std::string out;
     for (const auto& [flag, name] : { std::pair { d.uncertainPitch, "pitch?" }, { d.possibleOctaveError, "octave?" }, { d.uncertainBoundary, "boundary?" },
-                                      { d.unvoiced, "unvoiced" }, { d.possibleSplit, "split?" } })
+                                      { d.unvoiced, "unvoiced" }, { d.possibleSplit, "split?" }, { d.possibleRepeat, "repeat?" } })
         if (flag)
             out += std::string (out.empty() ? "" : " ") + name;
     return out;
@@ -942,6 +942,7 @@ juce::var evaluationJson (const std::string& name, phrase::PitchBackend backend,
     json::set (o, "pitchErrors", r.pitchErrors);
     json::set (o, "falseSplits", r.falseSplits);
     json::set (o, "missed", r.missed);
+    json::set (o, "missedFlagged", r.missedFlagged);
     json::set (o, "spurious", r.spurious);
     json::set (o, "onsetErrorMs", json::number (r.meanOnsetErrorMs, 1));
     json::set (o, "medianOnsetErrorMs", json::number (r.medianOnsetErrorMs, 1));
@@ -977,6 +978,7 @@ void accumulate (phrase::EvaluationResult& total, const phrase::EvaluationResult
     total.pitchErrors += r.pitchErrors;
     total.falseSplits += r.falseSplits;
     total.missed += r.missed;
+    total.missedFlagged += r.missedFlagged;
     total.spurious += r.spurious;
     total.meanOnsetErrorMs += r.meanOnsetErrorMs * r.matched;
     total.meanOffsetErrorMs += r.meanOffsetErrorMs * r.matched;
@@ -1177,11 +1179,14 @@ int commandPhraseCorpus (const Args& args)
         return fail (exitInput, "no <name>.wav with a <name>.truth.json in " + dir.string());
     auto rows = juce::var (juce::Array<juce::var>());
     std::ostringstream md;
-    md << "| Recording | s | Truth | Found | Matched | P | R | F | Octave | Pitch | Splits | Missed | Spurious | Onset ms (median) | Tuning bias c | Conf right / wrong | Wrong flagged | Verdict | Analysis ms |\n"
+    md << "| Recording | s | Truth | Found | Matched | P | R | F | Octave | Pitch | Splits | Missed (offered as a split) | Spurious | Onset ms (median) | Tuning bias c | Conf right / wrong | Wrong flagged | Verdict | Analysis ms |\n"
        << "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n";
     phrase::EvaluationResult total;
     double totalSeconds = 0.0, totalAudio = 0.0;
     std::string error;
+    const auto settings = phraseSettingsFromArgs (args, error);
+    if (! settings)
+        return fail (exitUsage, error);
     for (const auto& file : files)
     {
         const auto loaded = io::loadAudioFile (file);
@@ -1197,7 +1202,7 @@ int commandPhraseCorpus (const Args& args)
             std::cerr << "skipped " << file.string() << ": " << error << "\n";
             continue;
         }
-        const auto result = phrase::analysePhrase (loaded.audio, *source, {});
+        const auto result = phrase::analysePhrase (loaded.audio, *source, *settings);
         phrase::EvaluationSettings tolerance;
         tolerance.onsetToleranceSeconds = std::stod (args.get ("--onset-tolerance", "0.05"));
         const auto r = phrase::evaluate (result.atlas, *truth, tolerance);
@@ -1211,7 +1216,7 @@ int commandPhraseCorpus (const Args& args)
         rows.append (row);
         md << "| " << name << " | " << fixed (loaded.audio.durationSeconds(), 1) << " | " << r.truthNotes << " | " << r.detectedNotes << " | " << r.matched << " | "
            << fixed (r.precision(), 2) << " | " << fixed (r.recall(), 2) << " | " << fixed (r.f1(), 2) << " | " << r.octaveErrors << " | " << r.pitchErrors << " | "
-           << r.falseSplits << " | " << r.missed << " | " << r.spurious << " | " << fixed (r.meanOnsetErrorMs, 0) << " (" << fixed (r.medianOnsetErrorMs, 0) << ") | "
+           << r.falseSplits << " | " << r.missed << " (" << r.missedFlagged << ") | " << r.spurious << " | " << fixed (r.meanOnsetErrorMs, 0) << " (" << fixed (r.medianOnsetErrorMs, 0) << ") | "
            << fixed (r.meanSignedPitchErrorCents, 1) << " | " << fixed (r.correctConfidence, 2) << " / " << fixed (r.wrongConfidence, 2) << " | "
            << r.wrongFlagged << "/" << r.wrongDetected << " | " << result.atlas.analysis.suitability << " | " << fixed (1000.0 * result.analysisSeconds, 0) << " |\n";
         accumulate (total, r);
@@ -1222,7 +1227,7 @@ int commandPhraseCorpus (const Args& args)
     printEvaluation ("TOTAL", phrase::PitchBackend::yinViterbi, total, totalSeconds, totalAudio);
     md << "| **all** | " << fixed (totalAudio, 1) << " | " << total.truthNotes << " | " << total.detectedNotes << " | " << total.matched << " | "
        << fixed (total.precision(), 2) << " | " << fixed (total.recall(), 2) << " | " << fixed (total.f1(), 2) << " | " << total.octaveErrors << " | "
-       << total.pitchErrors << " | " << total.falseSplits << " | " << total.missed << " | " << total.spurious << " | " << fixed (total.meanOnsetErrorMs, 0)
+       << total.pitchErrors << " | " << total.falseSplits << " | " << total.missed << " (" << total.missedFlagged << ") | " << total.spurious << " | " << fixed (total.meanOnsetErrorMs, 0)
        << " | " << fixed (total.meanSignedPitchErrorCents, 1) << " | " << fixed (total.correctConfidence, 2) << " / " << fixed (total.wrongConfidence, 2)
        << " | " << total.wrongFlagged << "/" << total.wrongDetected << " | | " << fixed (1000.0 * totalSeconds, 0) << " |\n";
     rows.append (evaluationJson ("TOTAL", phrase::PitchBackend::yinViterbi, total, totalSeconds, totalAudio));

@@ -118,10 +118,18 @@ namespace
             const auto& g = n.diagnostics;
             for (const auto& [flag, name] : { std::pair { g.uncertainPitch, "uncertainPitch" }, { g.possibleOctaveError, "possibleOctaveError" },
                                               { g.uncertainBoundary, "uncertainBoundary" }, { g.unvoiced, "unvoiced" },
-                                              { g.possibleSplit, "possibleSplit" }, { g.quietAlternate, "quietAlternate" } })
+                                              { g.possibleSplit, "possibleSplit" }, { g.quietAlternate, "quietAlternate" },
+                                              { g.possibleRepeat, "possibleRepeat" } })
                 if (flag)
                     d.add (juce::String (name));
             json::set (o, "diagnostics", juce::var (d));
+            if (! g.repeatFrames.empty())
+            {
+                juce::Array<juce::var> at;   // Phase 4B (added field)
+                for (auto f : g.repeatFrames)
+                    at.add (frames (f));
+                json::set (o, "repeatAt", juce::var (at));
+            }
         }
         json::set (o, "included", n.included);
         json::set (o, "assignedKey", n.assignedKey);
@@ -181,7 +189,11 @@ namespace
                 n.diagnostics.unvoiced = n.diagnostics.unvoiced || name == "unvoiced";
                 n.diagnostics.possibleSplit = n.diagnostics.possibleSplit || name == "possibleSplit";
                 n.diagnostics.quietAlternate = n.diagnostics.quietAlternate || name == "quietAlternate";
+                n.diagnostics.possibleRepeat = n.diagnostics.possibleRepeat || name == "possibleRepeat";
             }
+        if (const auto* at = o["repeatAt"].getArray())
+            for (const auto& v : *at)
+                n.diagnostics.repeatFrames.push_back (static_cast<std::int64_t> (static_cast<juce::int64> (v)));
         n.included = json::getBool (o, "included", true);
         n.assignedKey = json::getInt (o, "assignedKey", -1);
         n.velocityLayer = std::clamp (json::getInt (o, "velocityLayer", 0), 0, 15);

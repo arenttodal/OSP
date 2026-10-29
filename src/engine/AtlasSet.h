@@ -61,6 +61,10 @@ namespace atlasset
     {
         InstrumentBuildOptions instrument;   ///< as for sample sets (playback level, interpolation, continuation)
         bool withContinuation = true;        ///< sustain loops and release graft per member (as sets)
+        /** Phase 4B: the shortest stable region an atlas note sustains from (a sung phrase's
+            notes are often short). Sample sets keep `instrument.continuation.minRegionSeconds`
+            (0.5 s); a region between the two loops with its minimums scaled to it. */
+        double minSustainSeconds = 0.3;
         /** Memory limit: at most this much region audio in total (frames at the source rate,
             summed over members); notes beyond it are skipped with a warning. Measured (Phase 3
             report, section 8): 0.57-0.78 MB of member memory per second of stereo 48 kHz region

@@ -61,7 +61,17 @@ struct AnalysisSettings
     double bridgeGapSeconds = 0.03;     ///< voicing dropouts shorter than this do not end a note
     double pitchChangeSemitones = 0.6;  ///< a sustained move this far starts a new note
     double pitchHoldSeconds = 0.04;     ///< ... when it lasts at least this long
-    double rearticulationDb = 9.0;      ///< a level dip this far under the sound either side splits a note
+    double rearticulationDb = 9.0;      ///< a level dip this far under the sound either side may split a note
+    /** A dip that a sharp rise leaves (dB per 10 ms: a re-bow, a re-pluck, a tongued note) splits
+        at half `rearticulationDb`. */
+    double attackRiseDb = 6.5;
+    /** A dip the voicing drops out of (a breath, a consonant, a new bow stroke) splits this deep.
+        Shallower voicing gaps are the tone's own noise: tremolo, harmonics, a breathy tone. */
+    double unvoicedDipDb = 9.0;
+    /** A dip without either (a bow change, a swell, beating between strings) splits only this
+        deep; from `rearticulationDb` down to here the note stays whole and is flagged
+        `possibleRepeat` at the dip. */
+    double softDipDb = 20.0;
     Detection detection = Detection::normal;
     /** MIN NOTE: a piece shorter than this, joined to a neighbour and without a pitch of its own
         (a fragment of the same note, a slide, an octave slip, a weak scrap), becomes part of that
@@ -130,6 +140,9 @@ struct Segment
     std::size_t end = 0;
     bool legatoIn = false;    ///< joined to the previous segment without a gap
     bool legatoOut = false;
+    bool pitchCut = false;    ///< begins where the pitch moved (not at a dip or a gap) (OSP Phase 4B)
+    /** Frames of dips inside the segment that may be a re-attack at the same pitch (OSP Phase 4B). */
+    std::vector<std::size_t> possibleRepeats;
 };
 
 std::vector<Segment> segment (const PitchContour& contour, const Preprocessed& pre, const AnalysisSettings& settings);
@@ -167,8 +180,9 @@ AnalysisResult analysePhrase (const AudioData& audio, const atlas::SourceAsset& 
 atlas::NoteEvent analyseRange (const AudioData& audio, std::int64_t startFrame, std::int64_t endFrame, const AnalysisSettings& settings = {});
 
 /** The analysis algorithm's version: bump when results change (it invalidates caches). */
-constexpr int analysisVersion = 3;   // 2: scoops/falls/octave slips absorbed, level-relative re-articulation, MIN NOTE
+constexpr int analysisVersion = 4;   // 2: scoops/falls/octave slips absorbed, level-relative re-articulation, MIN NOTE
                                      // 3 (OSP Phase 4): per-note doubts, the recording's verdict, quiet alternates left out
+                                     // 4 (OSP Phase 4B): a soft dip (bow change, swell, beating) no longer splits; possible repeats flagged
 /** A take of a key this much quieter (peak, dB) than the loudest take of the same key and velocity
     layer is left off the keyboard: as a round robin it would sound like a dropout. */
 constexpr double quietAlternateDb = 24.0;

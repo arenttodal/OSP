@@ -94,7 +94,12 @@ struct Diagnostics
     bool unvoiced = false;             ///< mostly breath, noise or consonant
     bool possibleSplit = false;        ///< joined to a neighbour on the same key: maybe one note cut in two
     bool quietAlternate = false;       ///< far quieter than another take of its key (a decaying tail): left off the keyboard
-    bool any() const noexcept { return uncertainPitch || possibleOctaveError || uncertainBoundary || unvoiced || possibleSplit || quietAlternate; }
+    bool possibleRepeat = false;       ///< a level dip inside it may be a re-attack on the same pitch: maybe two notes (Phase 4B)
+    std::vector<std::int64_t> repeatFrames;  ///< ... where (source frames): where a split would go
+    bool any() const noexcept
+    {
+        return uncertainPitch || possibleOctaveError || uncertainBoundary || unvoiced || possibleSplit || quietAlternate || possibleRepeat;
+    }
     bool operator== (const Diagnostics&) const = default;
 };
 
