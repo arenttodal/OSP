@@ -925,8 +925,32 @@ private:
     double last = 0.0;
 };
 
+LayerKnob::LayerKnob (InstrumentHost& p, int layer, const juce::String& c, const juce::String& id, bool)
+    : processor (p), caption (c)
+{
+    // (The control name is empty: LINK moves only the layers' own controls.)
+    parameter = processor.apvts().getParameter (id);
+    binding::tag (*this, id);
+    dial = std::make_unique<Dial> (processor, layer, juce::String(), false);
+    dial->setRotaryParameters (OspLookAndFeel::rotaryStart, OspLookAndFeel::rotaryEnd, true);
+    dial->getProperties().set ("arc", static_cast<juce::int64> (palette::layer (layer).getARGB()));
+    dial->getProperties().set ("spectral", false);
+    dial->getProperties().set ("bipolar", parameter != nullptr && parameter->getNormalisableRange().start < 0.0f);
+    dial->getProperties().set ("paramId", id);   // a modulation drop target
+    dial->getProperties().set ("haloGap", 2.0);
+    dial->setTitle ("Layer " + InstrumentHost::layerName (layer) + " " + caption);
+    attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (processor.apvts(), id, *dial);
+    if (parameter != nullptr)
+    {
+        dial->setDoubleClickReturnValue (true, parameter->convertFrom0to1 (parameter->getDefaultValue()));
+        dial->setTooltip (parameter->getName (64));
+    }
+    dial->onValueChange = [this] { repaint(); };
+    addAndMakeVisible (*dial);
+}
+
 LayerKnob::LayerKnob (InstrumentHost& p, int layer, const juce::String& control, const juce::String& c)
-    : processor (p), caption (c), creative (control == "reimagined")
+    : processor (p), caption (c), creative (control == "reimagined"), labelDoor (control == "reimagined")
 {
     // REIMAGINED keeps its shipped IDs: A's is the instrument's `reimagined`.
     const auto id = creative ? InstrumentHost::reimaginedParameterId (layer) : InstrumentHost::layerParameterId (layer, control);
@@ -1001,7 +1025,7 @@ void LayerKnob::setLabelOpen (bool open)
 
 void LayerKnob::mouseMove (const juce::MouseEvent& e)
 {
-    const bool over = creative && labelBounds().contains (e.position);
+    const bool over = labelDoor && labelBounds().contains (e.position);
     if (over != labelHover)
     {
         labelHover = over;
@@ -1022,7 +1046,7 @@ void LayerKnob::mouseExit (const juce::MouseEvent&)
 
 void LayerKnob::mouseUp (const juce::MouseEvent& e)
 {
-    if (creative && labelBounds().contains (e.position) && ! e.mouseWasDraggedSinceMouseDown() && onLabelClick != nullptr)
+    if (labelDoor && labelBounds().contains (e.position) && ! e.mouseWasDraggedSinceMouseDown() && onLabelClick != nullptr)
         onLabelClick();
 }
 
@@ -1031,16 +1055,17 @@ void LayerKnob::paint (juce::Graphics& g)
     const float k = static_cast<float> (getHeight()) / designUnits;
     const auto w = static_cast<float> (getWidth());
     // REIMAGINED's name opens its modes: hover darkens and underlines it, open keeps the line.
-    g.setColour (creative && (labelHover || labelOpen) ? juce::Colours::black : design::colour::text.withAlpha (creative ? 0.97f : 0.9f));
+    g.setColour (labelDoor && (labelHover || labelOpen) ? juce::Colours::black : design::colour::text.withAlpha (creative ? 0.97f : 0.9f));
     const auto font = labelFont();
     g.setFont (font);
     const auto labelArea = juce::Rectangle<float> (0.0f, 2.0f * k, w, 22.0f * k);
     g.drawText (caption, labelArea, juce::Justification::centred, false);
-    if (creative && (labelHover || labelOpen))
+    if (labelDoor && (labelHover || labelOpen))
     {
         const float textWidth = juce::GlyphArrangement::getStringWidth (font, caption);
         const float amount = parameter != nullptr ? parameter->getValue() : 0.0f;
-        g.setColour (labelOpen ? design::colour::reimagined (amount) : palette::text.withAlpha (0.5f));
+        // (Open: REIMAGINED's line takes the colour of its amount, another door its layer's.)
+        g.setColour (labelOpen ? (creative ? design::colour::reimagined (amount) : palette::layer (0)) : palette::text.withAlpha (0.5f));
         g.fillRect (0.5f * (w - textWidth), labelArea.getCentreY() + 0.5f * font.getHeight() + 1.0f * k, textWidth, 1.2f);
     }
     if (creative)
@@ -1342,6 +1367,27 @@ juce::Rectangle<int> EngineCard::reimaginedLabelBounds() const
 void EngineCard::setReimaginedOpen (bool open)
 {
     knobs[4]->setLabelOpen (open);
+}
+
+void EngineCard::replaceStartKnob (const juce::String& parameterId, const juce::String& caption, std::function<void()> onCaptionClick)
+{
+    const bool compactNow = knobs[0] != nullptr && knobs[0]->isCompact();
+    removeChildComponent (knobs[0].get());
+    knobs[0] = std::make_unique<LayerKnob> (processor, layerIndex, caption, parameterId, true);
+    knobs[0]->setCompact (compactNow);
+    if (onCaptionClick != nullptr)
+    {
+        knobs[0]->setLabelDoor (true);
+        knobs[0]->onLabelClick = std::move (onCaptionClick);
+    }
+    addAndMakeVisible (*knobs[0]);
+    resized();
+}
+
+juce::Rectangle<int> EngineCard::startLabelBounds() const
+{
+    const auto& k = *knobs[0];
+    return k.labelBounds().translated (static_cast<float> (k.getX()), static_cast<float> (k.getY())).getSmallestIntegerContainer();
 }
 
 EngineCard::~EngineCard()

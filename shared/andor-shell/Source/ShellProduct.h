@@ -55,6 +55,14 @@ struct ProductInfo
         saved state: append only). Each names its parameter ID; a source dragged onto that
         control assigns it. Empty: ANDOR OSP's destinations only. */
     std::vector<osp::mod::ProductDest> modulationDestinations;
+    /** A generator's card: the knob in START's place as one of the product's controls (its
+        parameter ID and name), whose name opens `popover` (null: none). Empty ID: START. */
+    struct CardControl
+    {
+        juce::String parameterId, caption;
+        std::function<std::unique_ptr<osp::plugin::MiniPanel> (osp::plugin::InstrumentHost&)> popover;
+    };
+    CardControl generatorStartControl;
 };
 
 /** Defined by the product (Product.cpp). */

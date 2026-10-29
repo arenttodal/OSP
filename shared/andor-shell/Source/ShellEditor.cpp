@@ -71,6 +71,17 @@ ShellEditor::ShellEditor (ShellProcessor& p)
         };
         content.addChildComponent (*card);
     }
+    // A generator's card may show one of the product's controls in START's place (its name
+    // opening the product's popover). The parity render keeps ANDOR OSP's card.
+    if (const auto& control = shell.product().generatorStartControl; control.parameterId.isNotEmpty() && shell.isGenerator())
+        cards[0]->replaceStartKnob (control.parameterId, control.caption, control.popover == nullptr ? std::function<void()>() : [this] {
+            if (closedByLabelPress == startControlPopup)
+            {
+                closedByLabelPress = -1;   // that press closed it
+                return;
+            }
+            openPopup (startControlPopup);
+        });
     dropZone.onBrowse = [this] { chooseFile (-1); };
     content.addChildComponent (dropZone);
     content.addChildComponent (addTarget);
@@ -524,6 +535,8 @@ void ShellEditor::openPopup (int which, int source)
     }
     else if (which >= 0 && which < frame::macroCount && shell.product().macroPopover != nullptr)
         popup = shell.product().macroPopover (which, shell);
+    else if (which == startControlPopup && shell.product().generatorStartControl.popover != nullptr)
+        popup = shell.product().generatorStartControl.popover (shell);
     if (popup == nullptr)
         return;
     popupIndex = which;
@@ -541,6 +554,8 @@ void ShellEditor::openPopup (int which, int source)
         advancedButton.setToggleState (true, juce::dontSendNotification);
     if (isReimaginedPopup (which))
         cards[static_cast<std::size_t> (which - reimaginedPopup)]->setReimaginedOpen (true);
+    if (which == startControlPopup)
+        cards[0]->setStartOpen (true);
     applyBindings();   // the popover's controls follow the engine's bindings too
     if (isShowing())
         grabKeyboardFocus();
@@ -565,6 +580,12 @@ void ShellEditor::positionPopup()
         const auto anchor = content.getLocalArea (&card, card.reimaginedLabelBounds()).toFloat();
         at = { anchor.getCentreX() - 0.5f * size.x, anchor.getY() - 10.0f - size.y };
     }
+    else if (popupIndex == startControlPopup)
+    {
+        // Above the card knob's name, as REIMAGINED's popover above its own.
+        const auto anchor = content.getLocalArea (cards[0].get(), cards[0]->startLabelBounds()).toFloat();
+        at = { anchor.getCentreX() - 0.5f * size.x, anchor.getY() - 10.0f - size.y };
+    }
     else
         at = frame::modulationPopoverOrigin (modPanel.getBounds().toFloat(), size);
     frame::placePopover (*popup, content, at);
@@ -580,6 +601,8 @@ void ShellEditor::closePopup()
         advancedButton.setToggleState (false, juce::dontSendNotification);
     if (isReimaginedPopup (popupIndex))
         cards[static_cast<std::size_t> (popupIndex - reimaginedPopup)]->setReimaginedOpen (false);
+    if (popupIndex == startControlPopup)
+        cards[0]->setStartOpen (false);
     juce::Desktop::getInstance().getAnimator().cancelAnimation (popup.get(), false);
     popup.reset();
     popupIndex = -1;
@@ -606,6 +629,8 @@ void ShellEditor::mouseDownAnywhere (juce::Component* c)
         if (const auto& card = *cards[static_cast<std::size_t> (l)]; card.isReimaginedLabel (c)
             && card.reimaginedLabelBounds().contains (card.getLocalPoint (nullptr, juce::Desktop::getMousePosition())))
             pressed = reimaginedPopup + l;
+    if (const auto& card = *cards[0]; card.isStartLabel (c) && card.startLabelBounds().contains (card.getLocalPoint (nullptr, juce::Desktop::getMousePosition())))
+        pressed = startControlPopup;
     closedByLabelPress = pressed == popupIndex ? pressed : -1;
     closePopup();
 }
