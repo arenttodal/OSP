@@ -30,6 +30,7 @@ void OspKeyboard::drawWhiteNote (int note, juce::Graphics& g, juce::Rectangle<fl
     g.setColour (colour::keyLine);
     g.fillRect (juce::Rectangle<float> (area.getRight() - 1.0f, area.getY(), 1.0f, area.getHeight()));
 
+    drawTint (note, g, key, false);
     const auto label = getWhiteNoteText (note);
     if (label.isNotEmpty())
     {
@@ -41,7 +42,7 @@ void OspKeyboard::drawWhiteNote (int note, juce::Graphics& g, juce::Rectangle<fl
     }
 }
 
-void OspKeyboard::drawBlackNote (int, juce::Graphics& g, juce::Rectangle<float> area, bool isDown, bool isOver, juce::Colour)
+void OspKeyboard::drawBlackNote (int note, juce::Graphics& g, juce::Rectangle<float> area, bool isDown, bool isOver, juce::Colour)
 {
     using namespace design;
     const auto r = area.reduced (0.8f, 0.0f).withTrimmedTop (-4.0f);
@@ -65,6 +66,45 @@ void OspKeyboard::drawBlackNote (int, juce::Graphics& g, juce::Rectangle<float> 
     g.fillRoundedRectangle (r.reduced (1.5f, 0.0f).withTrimmedBottom (0.12f * r.getHeight()), 2.0f);
     g.setColour (juce::Colours::white.withAlpha (0.16f));
     g.fillRoundedRectangle (r.withTop (r.getBottom() - 0.12f * r.getHeight()).reduced (1.5f, 1.0f), 1.5f);
+    drawTint (note, g, r, true);
+}
+
+void OspKeyboard::drawTint (int note, juce::Graphics& g, juce::Rectangle<float> area, bool black)
+{
+    if (tintOf == nullptr)
+        return;
+    const auto tint = tintOf (note);
+    if (tint.state == KeyTint::State::none)
+        return;
+    // Quiet: a band in the key's lower part (the label and the press stay readable).
+    auto band = black ? area.reduced (2.5f, 0.0f).withTrimmedBottom (0.16f * area.getHeight()).removeFromBottom (0.22f * area.getHeight())
+                      : area.reduced (2.0f, 0.0f).withTrimmedBottom (0.30f * area.getHeight()).removeFromBottom (0.24f * area.getHeight());
+    switch (tint.state)
+    {
+        case KeyTint::State::recorded:
+            g.setColour (tint.colour.withAlpha (black ? 0.9f : 0.62f));
+            g.fillRoundedRectangle (band, 2.0f);
+            break;
+        case KeyTint::State::filled:
+            g.setColour (tint.colour.withAlpha (black ? 0.42f : 0.2f));
+            g.fillRoundedRectangle (band, 2.0f);
+            break;
+        case KeyTint::State::silent:
+        {
+            // Out of reach: no voice starts. Two faint strokes, not a colour.
+            g.setColour ((black ? juce::Colours::white : juce::Colours::black).withAlpha (0.12f));
+            for (float x = band.getX() + 2.0f; x < band.getRight(); x += 4.0f)
+                g.drawLine (x, band.getBottom(), std::min (band.getRight(), x + band.getHeight() * 0.5f), band.getY(), 0.8f);
+            break;
+        }
+        case KeyTint::State::none: break;
+    }
+    if (tint.state == KeyTint::State::recorded && tint.takes > 1 && ! black && band.getWidth() >= 9.0f)
+    {
+        g.setColour (juce::Colours::white.withAlpha (0.95f));
+        g.setFont (fonts::make (std::min (11.0f, band.getHeight() - 1.0f), fonts::Weight::medium));
+        g.drawText (juce::String (tint.takes), band, juce::Justification::centred, false);
+    }
 }
 
 juce::String OspKeyboard::getWhiteNoteText (int note)

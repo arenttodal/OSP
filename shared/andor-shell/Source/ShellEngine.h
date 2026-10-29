@@ -112,6 +112,10 @@ public:
 
     /** Sounding notes (the status line). Any thread. */
     virtual int activeNotes() const noexcept { return 0; }
+
+    /** The engine plays KEY DNA on its Granular layers (ANDOR OSP's per-key profile): the
+        Granular strip then shows its KEY DNA key. Off by default (no key). */
+    virtual bool hasKeyDna() const noexcept { return false; }
 };
 
 } // namespace andor::shell

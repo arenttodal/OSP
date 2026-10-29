@@ -2,14 +2,17 @@
 
 #include "LoadedInstrument.h"
 
+#include "analysis/phrase/PhraseAnalysis.h"
 #include "engine/Arpeggiator.h"
 #include "engine/InstrumentEngine.h"
+#include "engine/KeyDna.h"
 #include "engine/Modulation.h"
 #include "engine/RhythmicShaper.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
 #include <array>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -145,6 +148,98 @@ public:
     */
     void applyLinkedDelta (int layer, const juce::String& control, float delta);
     bool isLayerLinked (int layer) const { return parameterValue (layerParameterId (layer, "link")) >= 0.5f; }
+
+    // -- Note Atlas sources and KEY DNA (unified engine Phase 5) ------------------------------
+    // A product without them keeps the defaults: nothing to map, nothing to edit, and the
+    // interface shows none of their controls.
+
+    /** What a layer is doing with its Note Atlas, for the card's quiet status line. */
+    enum class AtlasActivity { none, analysing, preparing, enhancing };
+    /** The layer holds one recording that MAP NOTES can turn into an instrument of its notes. */
+    virtual bool canMapNotes (int layer) const
+    {
+        juce::ignoreUnused (layer);
+        return false;
+    }
+    /**
+        MAP NOTES: the layer's recording is analysed (in the background) into a Note Atlas and
+        played from it, playable as soon as Stage A is built. On a layer that already holds an
+        analysed atlas it detects again with `detection` and keeps the musician's corrections
+        (one undo step). Message thread.
+    */
+    virtual void mapNotes (int layer, phrase::Detection detection = phrase::Detection::normal)
+    {
+        juce::ignoreUnused (layer, detection);
+    }
+    /** An edit of the layer's atlas, applied on a background thread (where the recording's
+        audio is at hand: splits and merges re-describe the notes) and published like a load:
+        playable at once, finished in the background, one undo step named `name`. The edit
+        returns false when it changes nothing (nothing is published). Message thread. */
+    using AtlasEdit = std::function<bool (atlas::NoteAtlas&, const AudioData& source)>;
+    virtual void editAtlas (int layer, const juce::String& name, AtlasEdit edit)
+    {
+        juce::ignoreUnused (layer, name, edit);
+    }
+    virtual AtlasActivity atlasActivity (int layer) const noexcept
+    {
+        juce::ignoreUnused (layer);
+        return AtlasActivity::none;
+    }
+    /** The atlas a layer plays (null: an ordinary sample, or none). */
+    std::shared_ptr<const atlas::NoteAtlas> layerAtlas (int layer) const
+    {
+        const auto instrument = currentInstrument (layer);
+        return instrument != nullptr ? instrument->atlas : nullptr;
+    }
+    /** The DETECTION an atlas's notes came from (its analysis settings), normal when unknown. */
+    static phrase::Detection detectionOf (const atlas::NoteAtlas& atlas);
+    /** Plays frames [start, end) of the layer's atlas source as recorded (NOTE MAP's AUDITION),
+        outside the instrument and its effects. Message thread. */
+    virtual void auditionAtlasRegion (int layer, std::int64_t start, std::int64_t end)
+    {
+        juce::ignoreUnused (layer, start, end);
+    }
+
+    /** The last re-detection on the layer (DETECTION): what it kept and where it disagrees with
+        the musician's corrections (note ids, kept as the musician left them). Empty: none. */
+    virtual juce::String atlasReport (int layer) const
+    {
+        juce::ignoreUnused (layer);
+        return {};
+    }
+    virtual std::vector<std::string> atlasConflicts (int layer) const
+    {
+        juce::ignoreUnused (layer);
+        return {};
+    }
+    /** The musician has looked at a conflict and keeps their note: it is no longer shown. */
+    virtual void dismissAtlasConflict (int layer, const std::string& noteId)
+    {
+        juce::ignoreUnused (layer, noteId);
+    }
+
+    /** A product with KEY DNA (OSP's Granular). The KEY DNA editor shows only when true. */
+    virtual bool hasKeyDna() const noexcept { return false; }
+    virtual keydna::Settings keyDnaSettings (int layer) const
+    {
+        juce::ignoreUnused (layer);
+        return {};
+    }
+    /** New settings: the profile is computed off the audio thread and published (AMOUNT, a
+        host parameter, is not part of it). `undoable`: one undo step named `name`. */
+    virtual void setKeyDnaSettings (int layer, const keydna::Settings& settings, const juce::String& name, bool undoable)
+    {
+        juce::ignoreUnused (layer, settings, name, undoable);
+    }
+    /** A parameter's drawn curve (its points; the settings hold the compiled table). A flat
+        two-point curve when none was drawn. */
+    virtual mod::Curve keyDnaCurve (int layer, keydna::Param param) const;
+    virtual void setKeyDnaCurve (int layer, keydna::Param param, const mod::Curve& curve, bool undoable)
+    {
+        juce::ignoreUnused (layer, param, curve, undoable);
+    }
+    /** The layer's KEY DNA AMOUNT parameter ("layerA.keyDna.amount"). */
+    static juce::String keyDnaAmountId (int layer) { return layerParameterId (layer, "keyDna.amount"); }
 
     // -- Presets (header) --------------------------------------------------------------------
     struct PresetEntry

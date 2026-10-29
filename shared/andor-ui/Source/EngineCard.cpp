@@ -391,6 +391,20 @@ juce::Range<double> SourceDisplay::window() const
     if (instrument == nullptr || instrument->durationSeconds <= 0.0)
         return { 0.0, 1.0 };
     const double duration = instrument->durationSeconds;
+    if (const auto& atlas = instrument->atlas; atlas != nullptr && ! atlas->sources.empty() && atlas->sources.front().sampleRate > 0.0 && ! atlas->notes.empty())
+    {
+        // A Note Atlas: its notes fill the display (the NOTE MAP shows the same span).
+        const double rate = atlas->sources.front().sampleRate;
+        double first = duration, last = 0.0;
+        for (const auto& n : atlas->notes)
+        {
+            first = std::min (first, static_cast<double> (n.attackStart) / rate);
+            last = std::max (last, static_cast<double> (n.sourceEnd) / rate);
+        }
+        const double margin = std::max (0.05, (last - first) / 40.0);
+        if (last > first)
+            return { std::max (0.0, first - margin), std::min (duration, last + margin) };
+    }
     const double soundEnd = std::clamp (duration - instrument->analysis.envelope.trailingSilenceSeconds, 0.0, duration);
     const double begin = std::clamp (instrument->startSeconds, 0.0, soundEnd);
     // A little air after the last audible moment, so the fade-out reads as an ending.
@@ -828,6 +842,14 @@ void SourceDisplay::paintStatic (juce::Graphics& g)
             }
     }
 
+    // A Note Atlas (Phase 5): its notes as quiet regions over the waveform (editing is the
+    // NOTE MAP's); the loop bracket and START belong to one recording, not to its notes.
+    if (instrument->atlas != nullptr)
+    {
+        paintNoteRegions (g, plot);
+        return;
+    }
+
     // The loop region (One Shot + LOOP): a slim bracket along the bottom.
     if (! view.granular && view.loop && instrument->model != nullptr && instrument->model->original.continuation.canSustain
         && instrument->model->original.source != nullptr)
@@ -858,6 +880,61 @@ void SourceDisplay::paintStatic (juce::Graphics& g)
         const float d = view.reverse ? -1.0f : 1.0f;
         cap.addTriangle (x, plot.getY() - 8.0f, x + d * 6.5f, plot.getY() - 5.0f, x, plot.getY() - 2.0f);
         g.fillPath (cap);
+    }
+}
+
+void SourceDisplay::paintNoteRegions (juce::Graphics& g, juce::Rectangle<float> plot)
+{
+    using namespace design;
+    const auto& atlas = *instrument->atlas;
+    if (atlas.sources.empty() || atlas.sources.front().sampleRate <= 0.0)
+        return;
+    const double rate = atlas.sources.front().sampleRate;
+    const auto tone = colour::identity (layer).wave;
+    const float tint = focused ? 1.0f : 0.7f;
+    const auto box = plot.withTrimmedTop (2.0f).withBottom (getLocalBounds().toFloat().getBottom() - 6.0f);
+    g.setFont (type::popupValue (12.0f));
+    for (const auto& n : atlas.notes)
+    {
+        if (n.sourceId != atlas.sources.front().assetId)
+            continue;
+        const float x0 = std::max (plot.getX(), xAtSeconds (static_cast<double> (n.attackStart) / rate, plot));
+        const float x1 = std::min (plot.getRight(), xAtSeconds (static_cast<double> (n.sourceEnd) / rate, plot));
+        if (x1 - x0 < 2.0f)
+            continue;
+        const auto r = juce::Rectangle<float> (x0, box.getY(), x1 - x0, box.getHeight()).reduced (1.0f, 0.0f);
+        if (n.included)
+        {
+            g.setColour (tone.withAlpha (0.05f * tint));
+            g.fillRoundedRectangle (r, 4.0f);
+            g.setColour (tone.withAlpha (0.42f * tint));
+            g.drawRoundedRectangle (r.reduced (0.5f), 4.0f, 1.0f);
+        }
+        else
+        {
+            juce::Path outline, dashed;
+            outline.addRoundedRectangle (r.reduced (0.5f), 4.0f);
+            const float dashes[] = { 3.0f, 3.0f };
+            juce::PathStrokeType (1.0f).createDashedStroke (dashed, outline, dashes, 2);
+            g.setColour (colour::wellText.withAlpha (0.4f * tint));
+            g.fillPath (dashed);
+        }
+        if (r.getWidth() > 26.0f)
+        {
+            const auto label = juce::String (midiNoteName (n.playKey()));
+            const auto text = r.reduced (5.0f, 0.0f).withHeight (18.0f).translated (0.0f, 3.0f);
+            g.setColour (juce::Colour (0xffeee8dd).withAlpha ((n.included ? 0.78f : 0.4f) * tint));
+            g.drawText (label, text, juce::Justification::topLeft, true);
+            if (n.included && n.diagnostics.any() && ! n.corrections.any())
+            {
+                const float tw = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), label);
+                if (text.getX() + tw + 11.0f < r.getRight())
+                {
+                    g.setColour (juce::Colour (0xffe0b45c).withAlpha (0.85f * tint));
+                    g.fillEllipse (juce::Rectangle<float> (4.5f, 4.5f).withCentre ({ text.getX() + tw + 6.5f, text.getY() + 7.5f }));
+                }
+            }
+        }
     }
 }
 
@@ -1273,6 +1350,13 @@ EngineCard::EngineCard (InstrumentHost& p, int layer)
             setEqOpen (! isEqOpen());
     };
     addAndMakeVisible (eqButton);
+    notesButton.onClick = [this] {
+        if (onNotesToggle != nullptr)
+            onNotesToggle (layerIndex, ! isNotesOpen());
+        else
+            setNotesOpen (! isNotesOpen());
+    };
+    addChildComponent (notesButton);
     menuButton.setTooltip ("Replace, root, remove...");
     menuButton.onClick = [this] {
         if (onMenu != nullptr)
@@ -1326,10 +1410,44 @@ EngineCard::EngineCard (InstrumentHost& p, int layer)
         addChildComponent (*granularKnobs[i]);
     }
 
+    keyDnaKey.setColour (palette::layer (layer));
+    keyDnaKey.onClick = [this] {
+        if (onKeyDna != nullptr)
+            onKeyDna (layerIndex);
+    };
+    addChildComponent (keyDnaKey);
+
     // A click anywhere on the card (its controls included) makes it the edited layer.
     addMouseListener (this, true);
     updateMode();
     refresh();
+}
+
+void NotesButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
+{
+    using namespace design;
+    const auto r = getLocalBounds().toFloat().reduced (1.0f);
+    const bool open = getToggleState();
+    if (skin::drawnBySurface())
+    {
+        // Ceramic: the card draws the key (pressed in while open), as EQ.
+    }
+    else if (open || down)
+    {
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xffe2d9cc), 0.0f, r.getY(), juce::Colour (0xffebe4d9), 0.0f, r.getBottom(), false));
+        g.fillRoundedRectangle (r, 7.0f);
+        g.setColour (colour::hairline.darker (0.1f));
+        g.drawRoundedRectangle (r.reduced (0.5f), 7.0f, 1.0f);
+    }
+    else
+        draw::button (g, r, 7.0f, false, highlighted, colour::accent);
+    const bool narrow = r.getWidth() < 60.0f;
+    // A note to look at: a small amber light, as EQ's light says it is heard.
+    if (review)
+        draw::led (g, { r.getX() + (narrow ? 7.0f : 9.0f), r.getCentreY() }, narrow ? 5.0f : 6.0f, juce::Colour (0xffe0b45c), 0.6f);
+    g.setFont (type::button (narrow ? 12.5f : 13.5f));
+    g.setColour (colour::text.withAlpha (open || review ? 0.92f : 0.62f));
+    g.drawText ("NOTES", r.withTrimmedLeft (review ? (narrow ? 9.0f : 12.0f) : 0.0f), juce::Justification::centred, false);
 }
 
 juce::Rectangle<int> EngineCard::reimaginedLabelBounds() const
@@ -1514,16 +1632,21 @@ void EngineCard::showGranularControls (bool show, bool immediately)
     bool dragging = false;
     for (auto& k : granularKnobs)
         dragging = dragging || k->slider.isMouseButtonDown();
-    const bool visible = granular && (show || dragging) && ! isEqOpen();   // the EQ's editor covers the display
+    const bool visible = granular && (show || dragging) && ! isEqOpen() && ! isNotesOpen();   // the EQ's (or NOTE MAP's) editor covers the display
     if (visible == granularShown)
         return;
     granularShown = visible;
     auto& animator = juce::Desktop::getInstance().getAnimator();
+    std::vector<juce::Component*> parts;
     for (auto& k : granularKnobs)
+        parts.push_back (k.get());
+    if (processor.hasKeyDna())
+        parts.push_back (&keyDnaKey);
+    for (auto* k : parts)
     {
         if (visible && immediately)
         {
-            animator.cancelAnimation (k.get(), false);
+            animator.cancelAnimation (k, false);
             k->setAlpha (1.0f);
             k->setVisible (true);
         }
@@ -1531,10 +1654,10 @@ void EngineCard::showGranularControls (bool show, bool immediately)
         {
             k->setAlpha (0.0f);
             k->setVisible (true);
-            animator.fadeIn (k.get(), 140);
+            animator.fadeIn (k, 140);
         }
         else
-            animator.fadeOut (k.get(), 160);
+            animator.fadeOut (k, 160);
     }
     sourceDisplay.setOverlayBand (visible ? 80 : 0);
 }
@@ -1547,6 +1670,7 @@ void EngineCard::updateMode()
         granularShown = false;
         for (auto& k : granularKnobs)
             k->setVisible (false);
+        keyDnaKey.setVisible (false);
         sourceDisplay.setOverlayBand (0);
     }
     if (modifiers[2] != nullptr)
@@ -1564,6 +1688,7 @@ void EngineCard::setEqOpen (bool open)
         eqEditor.reset();
         return;
     }
+    setNotesOpen (false);
     showGranularControls (false);
     eqEditor = std::make_unique<EqEditor> (processor, layerIndex);
     eqEditor->onClose = [this] {
@@ -1582,11 +1707,74 @@ void EngineCard::setEqOpen (bool open)
     eqEditor->setBounds (sourceDisplay.getBounds());
 }
 
+void KeyDnaKey::paint (juce::Graphics& g)
+{
+    using namespace design;
+    // On the graphite strip: a quiet outlined key (the EQ / NOTE MAP pages' cells).
+    const auto r = getLocalBounds().toFloat().reduced (1.0f);
+    const bool hover = isMouseOver();
+    g.setColour (juce::Colour (0xff2b3031).withAlpha (hover ? 1.0f : 0.85f));
+    g.fillRoundedRectangle (r, 6.0f);
+    g.setColour (lit ? accent : juce::Colour (0xff3e4446));
+    g.drawRoundedRectangle (r.reduced (0.5f), 6.0f, 1.0f);
+    if (lit)
+        draw::led (g, { r.getX() + 9.0f, r.getCentreY() }, 5.0f, accent, 0.6f);
+    g.setFont (type::popupLabel (r.getWidth() < 70.0f ? 10.5f : 11.5f));
+    g.setColour (juce::Colour (0xffeee8dd).withAlpha (hover || lit ? 0.95f : 0.7f));
+    g.drawText ("KEY DNA", r.withTrimmedLeft (lit ? 10.0f : 0.0f), juce::Justification::centred, false);
+}
+
+void EngineCard::setNotesOpen (bool open)
+{
+    if (open == isNotesOpen())
+        return;
+    notesButton.setToggleState (open, juce::dontSendNotification);
+    if (! open)
+    {
+        noteMap.reset();
+        return;
+    }
+    setEqOpen (false);
+    showGranularControls (false);
+    noteMap = std::make_unique<NoteMapEditor> (processor, layerIndex);
+    juce::Component::SafePointer<EngineCard> safe (this);
+    auto later = [safe] (std::function<void (EngineCard&)> f) {
+        juce::MessageManager::callAsync ([safe, f] {
+            if (safe != nullptr)
+                f (*safe);
+        });
+    };
+    noteMap->onClose = [later] {
+        later ([] (EngineCard& c) {
+            if (c.onNotesToggle != nullptr)
+                c.onNotesToggle (c.layerIndex, false);
+            else
+                c.setNotesOpen (false);
+        });
+    };
+    noteMap->onShowEq = [later] (bool dampen) {
+        later ([dampen] (EngineCard& c) {
+            if (c.onEqToggle != nullptr)
+                c.onEqToggle (c.layerIndex, true);
+            else
+                c.setEqOpen (true);
+            if (auto* eq = c.eqEditorComponent())
+                eq->showDampen (dampen);
+        });
+    };
+    addAndMakeVisible (*noteMap);
+    noteMap->setBounds (sourceDisplay.getBounds());
+}
+
 void EngineCard::refresh()
 {
     eqButton.setActive (processor.layerEqSettings (layerIndex).audible());
     if (eqEditor != nullptr)
         eqEditor->refresh();
+    if (noteMap != nullptr)
+        noteMap->refresh();
+    if (processor.hasKeyDna())
+        keyDnaKey.setLit (processor.keyDnaSettings (layerIndex).enabled);
     // A generated source (a synthesizer's oscillators): its name and its waveform instead of
     // a recording's state and picture.
     if (InstrumentHost::GeneratedSource source; processor.generatedSource (layerIndex, source))
@@ -1630,11 +1818,44 @@ void EngineCard::refresh()
             showSourceInfo (true);   // the new sample's details
         repaint();
     }
+    // A Note Atlas layer (Phase 5): the NOTES key, and its state where the file's name would be
+    // ("9 notes · Ready"); MAP NOTES on a recording says it is analysing. Ordinary layers: as before.
+    {
+        const bool isAtlas = instrument != nullptr && instrument->atlas != nullptr;
+        if (isAtlas != atlasLayer)
+        {
+            atlasLayer = isAtlas;
+            notesButton.setVisible (isAtlas);
+            if (! isAtlas)
+                setNotesOpen (false);
+            resized();
+            repaint();
+        }
+        juce::String text = fileText;
+        const auto status = NoteMapEditor::statusOf (processor, layerIndex);
+        if (loading && processor.atlasActivity (layerIndex) == InstrumentHost::AtlasActivity::analysing)
+            text = "Analyzing";
+        else if (isAtlas)
+        {
+            int notes = 0;
+            for (const auto& n : instrument->atlas->notes)
+                notes += n.included ? 1 : 0;
+            text = juce::String (notes) + (notes == 1 ? " note " : " notes ") + juce::String::fromUTF8 ("\xc2\xb7 ") + status;
+            notesButton.setNeedsReview (status == "Needs review");
+        }
+        else if (! loading && instrument != nullptr)
+            text = {};
+        if (text != fileText)
+        {
+            fileText = text;
+            repaint (textArea);
+        }
+    }
     // Root: the correction if there is one, else the detected note.
     juce::String root;
     if (const auto overrideMidi = processor.rootOverride (layerIndex))
         root = midiNoteName (static_cast<int> (std::lround (*overrideMidi)));
-    else if (instrument != nullptr)
+    else if (instrument != nullptr && instrument->atlas == nullptr)   // an atlas has a root per note (the NOTE MAP)
         root = instrument->analysis.pitch.detected ? juce::String (instrument->analysis.pitch.noteName) : juce::String ("?");
     if (root != rootText)
     {
@@ -1770,11 +1991,20 @@ void EngineCard::resized()
     const float eqWidth = triple ? 38.0f : 46.0f;
     eqButton.setBounds (at ({ w - 62.0f - modeWidth - 8.0f - eqWidth, 16.0f, eqWidth, 33.0f }));
     textArea = at ({ 117.0f, 14.0f, w - 62.0f - modeWidth - 12.0f - eqWidth - 8.0f - 117.0f, 36.0f });
+    if (atlasLayer)
+    {
+        // NOTES: the same key, left of EQ (only on a Note Atlas layer: an ordinary card is unchanged).
+        const float notesWidth = triple ? 54.0f : 66.0f;
+        notesButton.setBounds (at ({ static_cast<float> (eqButton.getX()) - 6.0f - notesWidth, 16.0f, notesWidth, 33.0f }));
+        textArea.setRight (notesButton.getX() - 8);
+    }
 
     const float wellHeight = h - (triple ? 267.0f : 206.0f);
     sourceDisplay.setBounds (at ({ 16.0f, 63.0f, w - 32.0f, wellHeight }));
     if (eqEditor != nullptr)
         eqEditor->setBounds (sourceDisplay.getBounds());   // exactly the display's place
+    if (noteMap != nullptr)
+        noteMap->setBounds (sourceDisplay.getBounds());
 
     // START TUNE PAN LEVEL REIMAGINED: one family at 87 % of the four-knob size, on one
     // pitch, with a little more room at the row's ends than between neighbours.
@@ -1816,7 +2046,13 @@ void EngineCard::resized()
     // is over it (the display alone otherwise, as in the reference).
     const auto display = sourceDisplay.getBounds().toFloat();
     const float strip = 74.0f;
-    const auto band = display.withTop (display.getBottom() - strip).reduced (12.0f, 6.0f);
+    auto band = display.withTop (display.getBottom() - strip).reduced (12.0f, 6.0f);
+    if (processor.hasKeyDna())
+    {
+        // KEY DNA at the strip's end (the knobs share the rest).
+        const float keyWidth = triple ? 62.0f : 78.0f;
+        keyDnaKey.setBounds (at (band.removeFromRight (keyWidth).withSizeKeepingCentre (keyWidth, 30.0f).translated (0.0f, -4.0f)));
+    }
     const float gw = band.getWidth() / 5.0f;
     for (std::size_t i = 0; i < granularKnobs.size(); ++i)
         granularKnobs[i]->setBounds (at ({ band.getX() + static_cast<float> (i) * gw, band.getY(), gw, band.getHeight() }));

@@ -4,6 +4,7 @@
 #include "Design.h"
 #include "EngineCard.h"
 #include "InstrumentFrame.h"
+#include "KeyDnaEditor.h"
 #include "LibraryPanel.h"
 #include "MainSections.h"
 #include "ModulationPanel.h"
@@ -136,6 +137,14 @@ public:
     void closeLibrary();
     LibraryPanel* libraryWindow() noexcept { return libraryPanel.get(); }
 
+    /** A layer's KEY DNA over the instrument's upper part (the Library's place), the keyboard
+        live below and its keys under the profile. From the Granular strip's KEY DNA key. */
+    void openKeyDna (int layer);
+    void closeKeyDna();
+    KeyDnaEditor* keyDnaWindow() noexcept { return keyDnaPanel.get(); }
+    OspKeyboard& keyboardComponent() noexcept { return keyboard; }
+    const std::array<OspKeyboard::KeyTint, 128>& keyboardTints() const noexcept { return keyTints; }
+
 private:
     void timerCallback() override;
     /** Places everything in reference coordinates (once: the whole layout scales). */
@@ -208,6 +217,11 @@ private:
     Wheel pitchWheel, modWheel;
     float shownWheelPosition = -1.0f;   ///< the processor's wheel position as last shown
     OspKeyboard keyboard;
+    /** The edited layer's note map on the keys (a Note Atlas layer; none otherwise). */
+    std::array<OspKeyboard::KeyTint, 128> keyTints {};
+    std::shared_ptr<const atlas::NoteAtlas> tintedAtlas;
+    int tintedLayer = -1;
+    void updateKeyTints();
     juce::Label statusLabel;
     AdvancedCardButton advancedButton { "Advanced" };
     ArpControl arpButton { ospProcessor };
@@ -225,6 +239,7 @@ private:
 
     std::unique_ptr<MiniPanel> popup;
     std::unique_ptr<LibraryPanel> libraryPanel;
+    std::unique_ptr<KeyDnaEditor> keyDnaPanel;
     void placeLibrary();
     int popupIndex = -1;
     int closedByLabelPress = -1;     // a press on an open popup's own label closes it (and must not reopen it)

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "EqEditor.h"
+#include "NoteMapEditor.h"
 #include "OspLookAndFeel.h"
 #include "InstrumentHost.h"
 #include "ShapingPopups.h"
@@ -93,6 +94,7 @@ public:
 private:
     void paintStatic (juce::Graphics&);
     void paintGenerated (juce::Graphics&);
+    void paintNoteRegions (juce::Graphics&, juce::Rectangle<float> plot);
     /** Paints, into `g` (this display's coordinates), what its ancestors paint behind it:
         each ancestor's own paint and the siblings below the branch that leads here. */
     void paintBackdrop (juce::Graphics&);
@@ -202,6 +204,49 @@ private:
     juce::ParameterAttachment attachment;
 };
 
+/** "NOTES" in a source card's header (unified engine Phase 5): only while the layer plays a
+    Note Atlas; opens its NOTE MAP in the display's place, as EQ opens the EQ. Styled as EQ. */
+class NotesButton final : public juce::Button, public skin::KeyFace
+{
+public:
+    NotesButton() : juce::Button ("NOTES")
+    {
+        setMouseCursor (juce::MouseCursor::PointingHandCursor);
+        setTooltip ("This layer's notes: where each one is, its pitch and key (it opens over the waveform)");
+        setTitle ("NOTES");
+    }
+    void setNeedsReview (bool on) { if (review != on) { review = on; repaint(); } }
+    void paintButton (juce::Graphics&, bool highlighted, bool down) override;
+    void buttonStateChanged() override { skin::repaintKey (*this); }
+    skin::KeyRole keyRole() const override { return skin::KeyRole::eq; }
+    skin::KeyState keyState() const override
+    {
+        return getToggleState() || isDown() ? skin::KeyState::pressed : isOver() ? skin::KeyState::hover : skin::KeyState::normal;
+    }
+
+private:
+    bool review = false;
+};
+
+/** "KEY DNA" at the end of the Granular hover strip (Phase 5): opens the layer's KEY DNA
+    editor; a small light while the layer's KEY DNA is on. */
+class KeyDnaKey final : public juce::Component, public juce::SettableTooltipClient
+{
+public:
+    KeyDnaKey() { setMouseCursor (juce::MouseCursor::PointingHandCursor); setTooltip ("KEY DNA: how this layer's grains differ from key to key"); setTitle ("KEY DNA"); }
+    std::function<void()> onClick;
+    void setLit (bool on) { if (lit != on) { lit = on; repaint(); } }
+    void setColour (juce::Colour c) { accent = c; }
+    void paint (juce::Graphics&) override;
+    void mouseUp (const juce::MouseEvent& e) override { if (onClick != nullptr && getLocalBounds().contains (e.getPosition())) onClick(); }
+    void mouseEnter (const juce::MouseEvent&) override { repaint(); }
+    void mouseExit (const juce::MouseEvent&) override { repaint(); }
+
+private:
+    bool lit = false;
+    juce::Colour accent;
+};
+
 /** ONE SHOT / GRANULAR as a compact selector with a menu. */
 class ModeSelector final : public juce::Component, public juce::SettableTooltipClient, public skin::KeyFace
 {
@@ -249,6 +294,8 @@ public:
     std::function<void (int)> onFocus;                 ///< the card was clicked
     std::function<void (int, juce::Component&)> onMenu; ///< its menu button
     std::function<void (int)> onReimagined;            ///< its REIMAGINED name (the mode popover)
+    std::function<void (int)> onKeyDna;                ///< the KEY DNA key in the Granular strip
+    KeyDnaKey& keyDnaToggle() noexcept { return keyDnaKey; }
     /** The REIMAGINED name, in this card's coordinates (the popover's anchor). */
     juce::Rectangle<int> reimaginedLabelBounds() const;
     /** Whether the REIMAGINED name is the door of a component (a click on it toggles the popover). */
@@ -261,6 +308,14 @@ public:
     bool isEqOpen() const noexcept { return eqEditor != nullptr; }
     EqEditor* eqEditorComponent() noexcept { return eqEditor.get(); }
     EqButton& eqToggle() noexcept { return eqButton; }
+
+    /** The layer's NOTE MAP (a Note Atlas layer only), in the display's place; the EQ and the
+        NOTE MAP are never open together. */
+    std::function<void (int, bool)> onNotesToggle;
+    void setNotesOpen (bool open);
+    bool isNotesOpen() const noexcept { return noteMap != nullptr; }
+    NoteMapEditor* noteMapComponent() noexcept { return noteMap.get(); }
+    NotesButton& notesToggle() noexcept { return notesButton; }
 
     void paint (juce::Graphics&) override;
     void paintOverChildren (juce::Graphics&) override;
@@ -305,8 +360,12 @@ private:
     LayerStateButton muteButton, soloButton;
     bool shownHeard = true;
     std::array<std::unique_ptr<MiniKnob>, 5> granularKnobs;
+    KeyDnaKey keyDnaKey;
     EqButton eqButton { layerIndex };
     std::unique_ptr<EqEditor> eqEditor;
+    NotesButton notesButton;
+    std::unique_ptr<NoteMapEditor> noteMap;
+    bool atlasLayer = false;
     juce::Rectangle<int> badgeArea, textArea, dividerArea;
     juce::String rootText, fileText;
     bool generated = false;               ///< the layer's sound is made by the instrument itself

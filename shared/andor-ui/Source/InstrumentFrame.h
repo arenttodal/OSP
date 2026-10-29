@@ -20,7 +20,21 @@ class OspKeyboard final : public juce::MidiKeyboardComponent
 public:
     explicit OspKeyboard (juce::MidiKeyboardState& keyState) : MidiKeyboardComponent (keyState, horizontalKeyboard) {}
 
+    /** A key's place in the edited layer's note map (NOTE MAP, unified engine Phase 5): a
+        recorded note, filled from a neighbour (FILL KEYBOARD) or silent. None: an ordinary key
+        (no map), drawn exactly as before. */
+    struct KeyTint
+    {
+        enum class State { none, recorded, filled, silent };
+        State state = State::none;
+        int takes = 0;              ///< recorded: how many takes play in turn (round robin)
+        juce::Colour colour;
+        bool operator== (const KeyTint&) const = default;
+    };
+    std::function<KeyTint (int note)> tintOf;
+
 private:
+    void drawTint (int note, juce::Graphics&, juce::Rectangle<float> area, bool black);
     void drawWhiteNote (int note, juce::Graphics&, juce::Rectangle<float> area, bool isDown, bool isOver,
                         juce::Colour lineColour, juce::Colour textColour) override;
     void drawBlackNote (int note, juce::Graphics&, juce::Rectangle<float> area, bool isDown, bool isOver,

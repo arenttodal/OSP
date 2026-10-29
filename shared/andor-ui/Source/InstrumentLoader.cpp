@@ -550,6 +550,17 @@ LoadResult loadInstrumentAtlas (const AtlasLoadRequest& request, SampleStore& st
             if (! used)
                 continue;
             const auto describe = src.assetId + ": " + (src.fileName.empty() ? std::string ("(unnamed)") : src.fileName) + " (" + src.contentHash + ")";
+            // 0. Already decoded (an edit of the atlas a layer plays).
+            if (const auto pre = std::find_if (request.preloaded.begin(), request.preloaded.end(), [&] (const auto& p) { return p.assetId == src.assetId; });
+                pre != request.preloaded.end() && pre->audio != nullptr && pre->audio->numFrames() == src.numFrames
+                && std::abs (pre->audio->sampleRate - src.sampleRate) <= 1.0e-6 && std::min (pre->audio->numChannels(), 2) == src.numChannels)
+            {
+                instrumentSources.push_back ({ src.contentHash, src.fileName, src.lastKnownPath });
+                if (primaryAudio == nullptr)
+                    primaryAudio = pre->audio.get();
+                sources.push_back (*pre);
+                continue;
+            }
             // 1. By content hash in the managed store, then the atlas's own hints.
             const auto hash = src.contentHash.rfind ("sha256:", 0) == 0 ? src.contentHash.substr (7) : src.contentHash;
             std::optional<std::filesystem::path> found;
@@ -642,6 +653,7 @@ LoadResult loadInstrumentAtlas (const AtlasLoadRequest& request, SampleStore& st
                                                overviewAudio, std::move (status));
         result.atlasPending = std::move (staged.pending);
         result.instrument = std::move (instrument);
+        result.atlasAudio = std::move (sources);
     }
     catch (const std::exception& e)
     {
@@ -826,6 +838,7 @@ LoadResult loadAnalysedRecording (const AnalyseRequest& request, SampleStore& st
         result.instrument = makeAtlasInstrument (staged.playable, std::make_shared<const atlas::NoteAtlas> (std::move (*analysed)),
                                                  std::move (sources), generation, audio.get(), std::move (status));
         result.atlasPending = std::move (staged.pending);
+        result.atlasAudio = { { assetId, audio } };
     }
     catch (const std::exception& e)
     {

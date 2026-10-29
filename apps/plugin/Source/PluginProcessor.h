@@ -217,6 +217,38 @@ public:
     void analyseRecording (const juce::File& file, int layer = -1, const phrase::AnalysisSettings& settings = {});
     /** Stops the layer's analysis or preparation (the instrument already published stays). */
     void cancelAnalysis (int layer = -1);
+
+    // -- Unified engine Phase 5: MAP NOTES and the NOTE MAP (InstrumentHost) ------------------
+    /** One recording (not a multi-sample set): MAP NOTES can analyse it. */
+    bool canMapNotes (int layer) const override;
+    /** MAP NOTES: the layer's recording (its copy in the sample store) analysed with
+        `detection` (analyseRecording). On an analysed atlas: detected again with `detection`,
+        the musician's corrections kept and conflicts reported (one undo step). */
+    void mapNotes (int layer, phrase::Detection detection = phrase::Detection::normal) override;
+    /** An edit of the layer's atlas on the loader thread, published through Stage A / B; one
+        undo step. Edits asked for while one is being prepared wait for it (each edits the
+        result of the one before). */
+    void editAtlas (int layer, const juce::String& name, AtlasEdit edit) override;
+    AtlasActivity atlasActivity (int layer) const noexcept override;
+    void auditionAtlasRegion (int layer, std::int64_t start, std::int64_t end) override;
+    /** The last re-detection's report for the layer (kept corrections, conflicts), and the notes
+        the musician corrected that the new analysis disagrees with. Message thread. */
+    struct RedetectReport
+    {
+        int keptCorrected = 0, conflicts = 0;
+        std::vector<std::string> conflictNoteIds;
+        juce::String summary;
+    };
+    RedetectReport redetectReport (int layer) const { return layers[resolve (layer)].redetect; }
+    juce::String atlasReport (int layer) const override { return layers[resolve (layer)].redetect.summary; }
+    std::vector<std::string> atlasConflicts (int layer) const override { return layers[resolve (layer)].redetect.conflictNoteIds; }
+    void dismissAtlasConflict (int layer, const std::string& noteId) override
+    {
+        auto& ids = layers[resolve (layer)].redetect.conflictNoteIds;
+        ids.erase (std::remove (ids.begin(), ids.end(), noteId), ids.end());
+    }
+    /** The layer's atlas back to its recording as one ordinary sample (undoable). */
+    void playAsOneSample (int layer);
     /** The layer's atlas status (stage, capacity, analysis verdict and doubts); null otherwise. */
     std::shared_ptr<const AtlasStatus> atlasStatus (int layer = -1) const;
     /** Capacity policy (Phase 4): region audio one layer's atlas may hold, and all layers
@@ -419,7 +451,16 @@ public:
         their key's values from it. AMOUNT is the host parameter layerX.keyDna.amount (live on
         sounding notes); `settings.amount` is ignored. Off by default; saved in the session. */
     void setKeyDnaSettings (int layer, const keydna::Settings& settings);
-    keydna::Settings keyDnaSettings (int layer) const;
+    keydna::Settings keyDnaSettings (int layer) const override;
+    // Phase 5 (InstrumentHost): the KEY DNA editor's undoable edits and drawn curves.
+    bool hasKeyDna() const noexcept override { return true; }
+    void setKeyDnaSettings (int layer, const keydna::Settings& settings, const juce::String& name, bool undoable) override;
+    mod::Curve keyDnaCurve (int layer, keydna::Param param) const override;
+    void setKeyDnaCurve (int layer, keydna::Param param, const mod::Curve& curve, bool undoable) override;
+    /** The drawn curves (points) of every layer, saved beside the compiled tables (`points`). */
+    using KeyDnaCurves = std::array<std::array<std::optional<mod::Curve>, keydna::paramCount>, 3>;
+    static juce::ValueTree keyDnaToTree (const std::array<keydna::Settings, 3>& layers, const KeyDnaCurves& curves);
+    static KeyDnaCurves keyDnaCurvesFromTree (const juce::ValueTree& tree);
     /** The profile generation the audio thread plays now (0: none yet), for tests. */
     std::uint64_t keyDnaGenerationInUse (int layer) const noexcept { return keyDnaInUse[resolve (layer)].load(); }
     std::size_t keyDnaProfilesAlive (int layer) const;
@@ -480,7 +521,47 @@ private:
         std::uint64_t lastPublishedLoad = 0;
         float autoPosition = -1.0f;                      // POS set from the analysis (granular), until the user moves it
         std::uint64_t autoPositionLoad = 0;
+        // Phase 5 (message thread): the atlas's decoded sources (for its edits), the edits
+        // waiting for the one being prepared, the analysis or edit running, the last report.
+        std::vector<atlasset::SourceAudio> atlasAudio;
+        struct QueuedEdit
+        {
+            juce::String name;
+            AtlasEdit edit;
+            std::shared_ptr<RedetectReport> report;
+        };
+        std::deque<QueuedEdit> editQueue;
+        std::uint64_t editInFlight = 0, analysisInFlight = 0;
+        RedetectReport redetect;
     };
+    /** Phase 5: an edit load's undo record (message thread), by its load id. */
+    struct EditRecord
+    {
+        int layer = 0;
+        juce::String name;
+        std::uint64_t beforeLoad = 0;
+        std::shared_ptr<const atlas::NoteAtlas> before;
+        std::shared_ptr<RedetectReport> report;   ///< a re-detection's (filled on the loader thread)
+        bool restore = false;                      ///< an undo / redo rebuilding an evicted state: no new undo step
+    };
+    std::map<std::uint64_t, EditRecord> editLoads;
+    void queueEdit (int layer, const juce::String& name, AtlasEdit edit, std::shared_ptr<RedetectReport> report);
+    void startEdit (int layer, const juce::String& name, AtlasEdit edit, std::shared_ptr<RedetectReport> report = nullptr);
+    /** Shows the atlas instrument of `loadId` (from the undo cache) or rebuilds it from `atlas`. */
+    bool showAtlasState (int layer, std::uint64_t loadId, std::shared_ptr<const atlas::NoteAtlas> atlas);
+    /** Prepares `atlas` again on the layer (no undo step): an evicted undo state, or Stage B lost. */
+    void restoreAtlas (int layer, std::shared_ptr<const atlas::NoteAtlas> atlas);
+    friend class AtlasEditAction;
+    friend class KeyDnaChangeAction;
+    KeyDnaCurves keyDnaCurves {};   ///< guarded by keyDnaMutex
+    /** A KEY DNA gesture's starting state (a drag: undoable once, at its end). Message thread. */
+    struct KeyDnaState
+    {
+        keydna::Settings settings;
+        std::array<std::optional<mod::Curve>, keydna::paramCount> curves;
+    };
+    std::array<std::optional<KeyDnaState>, numLayers> keyDnaGestureStart {};
+    void beginKeyDnaGesture (std::size_t layer);
     struct Finished
     {
         int layer = 0;
@@ -714,6 +795,7 @@ private:
     std::atomic<bool> arpEditorOpen { false };
     std::atomic<int> modTab { 0 };
     std::set<std::uint64_t> userLoads;     // load ids started by the user (undoable), not by recall
+    std::map<std::uint64_t, juce::String> userLoadNames;   ///< their undo names when not "Load sample" (MAP NOTES, ...)
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OspAudioProcessor)
 };

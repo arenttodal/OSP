@@ -11,6 +11,7 @@
 #include "io/ContentHash.h"
 #include "io/NoteAtlasJson.h"
 #include "library/Inbox.h"
+#include "analysis/phrase/PhraseEdits.h"
 
 #include <algorithm>
 #include <map>
@@ -115,6 +116,64 @@ private:
     int layer;
     std::uint64_t beforeLoad, afterLoad;
     bool first = true;
+};
+
+/** Phase 5: an edit of a layer's Note Atlas (NOTE MAP). Undo and redo show the instrument of
+    either state at once when it is still cached, and otherwise rebuild it from its atlas. */
+class AtlasEditAction final : public juce::UndoableAction
+{
+public:
+    AtlasEditAction (OspAudioProcessor& p, int l, std::uint64_t beforeLoadId, std::uint64_t afterLoadId,
+                     std::shared_ptr<const atlas::NoteAtlas> beforeAtlas, std::shared_ptr<const atlas::NoteAtlas> afterAtlas)
+        : processor (p), layer (l), beforeLoad (beforeLoadId), afterLoad (afterLoadId), before (std::move (beforeAtlas)), after (std::move (afterAtlas))
+    {
+    }
+    bool perform() override
+    {
+        if (first)
+        {
+            first = false;   // the edit itself already published it
+            return true;
+        }
+        return processor.showAtlasState (layer, afterLoad, after);
+    }
+    bool undo() override { return processor.showAtlasState (layer, beforeLoad, before); }
+    int getSizeInUnits() override { return 1 + static_cast<int> (before != nullptr ? before->notes.size() : 0); }
+
+private:
+    OspAudioProcessor& processor;
+    int layer;
+    std::uint64_t beforeLoad, afterLoad;
+    std::shared_ptr<const atlas::NoteAtlas> before, after;
+    bool first = true;
+};
+
+/** Phase 5: a change of a layer's KEY DNA (the editor), its drawn curves included. */
+class KeyDnaChangeAction final : public juce::UndoableAction
+{
+public:
+    using Curves = std::array<std::optional<mod::Curve>, keydna::paramCount>;
+    KeyDnaChangeAction (OspAudioProcessor& p, int l, keydna::Settings beforeSettings, Curves beforeCurves, keydna::Settings afterSettings, Curves afterCurves)
+        : processor (p), layer (l), from (std::move (beforeSettings)), to (std::move (afterSettings)), fromCurves (beforeCurves), toCurves (afterCurves)
+    {
+    }
+    bool perform() override { return apply (to, toCurves); }
+    bool undo() override { return apply (from, fromCurves); }
+
+private:
+    bool apply (const keydna::Settings& settings, const Curves& curves)
+    {
+        {
+            const std::lock_guard<std::mutex> lock (processor.keyDnaMutex);
+            processor.keyDnaCurves[static_cast<std::size_t> (layer)] = curves;
+        }
+        processor.setKeyDnaSettings (layer, settings);
+        return true;
+    }
+    OspAudioProcessor& processor;
+    int layer;
+    keydna::Settings from, to;
+    Curves fromCurves, toCurves;
 };
 
 class RootChangeAction final : public juce::UndoableAction
@@ -1010,6 +1069,76 @@ void OspAudioProcessor::setKeyDnaSettings (int layer, const keydna::Settings& se
     keyDnaExchange[l].publish (std::move (profile));
 }
 
+void OspAudioProcessor::beginKeyDnaGesture (std::size_t layer)
+{
+    auto& start = keyDnaGestureStart[layer];
+    if (start.has_value())
+        return;
+    const std::lock_guard<std::mutex> lock (keyDnaMutex);
+    start = KeyDnaState { keyDnaLayers[layer], keyDnaCurves[layer] };
+}
+
+void OspAudioProcessor::setKeyDnaSettings (int layer, const keydna::Settings& settings, const juce::String& name, bool undoable)
+{
+    // A drag publishes as it moves and becomes one undo step when it ends (undoable).
+    const auto l = resolve (layer);
+    beginKeyDnaGesture (l);
+    if (! undoable)
+    {
+        setKeyDnaSettings (static_cast<int> (l), settings);
+        return;
+    }
+    auto before = std::move (*keyDnaGestureStart[l]);
+    keyDnaGestureStart[l].reset();
+    std::array<std::optional<mod::Curve>, keydna::paramCount> after;
+    {
+        const std::lock_guard<std::mutex> lock (keyDnaMutex);
+        after = keyDnaCurves[l];
+    }
+    undoManager.beginNewTransaction (name);
+    undoManager.perform (new KeyDnaChangeAction (*this, static_cast<int> (l), std::move (before.settings), before.curves, settings, after));
+}
+
+mod::Curve OspAudioProcessor::keyDnaCurve (int layer, keydna::Param param) const
+{
+    const auto l = resolve (layer);
+    keydna::Settings settings;
+    {
+        const std::lock_guard<std::mutex> lock (keyDnaMutex);
+        if (const auto& drawn = keyDnaCurves[l][static_cast<std::size_t> (param)])
+            return *drawn;
+        settings = keyDnaLayers[l];
+    }
+    const auto& table = settings[param].curve;
+    if (table == keydna::flatCurve())
+        return InstrumentHost::keyDnaCurve (layer, param);
+    // A curve saved without its points (KEY DNA before Phase 5): nine points along its table.
+    mod::Curve curve;
+    curve.count = 9;
+    for (int i = 0; i < curve.count; ++i)
+    {
+        const auto x = static_cast<float> (i) / 8.0f;
+        const auto at = std::min (mod::curvePoints - 1, static_cast<int> (std::lround (x * (mod::curvePoints - 1))));
+        curve.points[static_cast<std::size_t> (i)] = { x, table[static_cast<std::size_t> (at)], 0.0f };
+    }
+    return curve;
+}
+
+void OspAudioProcessor::setKeyDnaCurve (int layer, keydna::Param param, const mod::Curve& curve, bool undoable)
+{
+    const auto l = resolve (layer);
+    beginKeyDnaGesture (l);
+    auto valid = curve;
+    valid.normalise();
+    auto settings = keyDnaSettings (static_cast<int> (l));
+    settings[param].curve = keydna::curveFrom (valid);
+    {
+        const std::lock_guard<std::mutex> lock (keyDnaMutex);
+        keyDnaCurves[l][static_cast<std::size_t> (param)] = valid;
+    }
+    setKeyDnaSettings (static_cast<int> (l), settings, "KEY DNA " + juce::String (keydna::paramName (param)) + " curve", undoable);
+}
+
 keydna::Settings OspAudioProcessor::keyDnaSettings (int layer) const
 {
     const std::lock_guard<std::mutex> lock (keyDnaMutex);
@@ -1058,10 +1187,47 @@ namespace
             t[static_cast<std::size_t> (i)] = std::clamp (std::strtof (tokens[i].toRawUTF8(), nullptr), 0.0f, 1.0f);
         return t;
     }
+    // The editor's points ("x y tension" per point, ";" between): the curve as drawn. The
+    // compiled table beside it stays what plays.
+    juce::String encodeCurvePoints (const mod::Curve& c)
+    {
+        juce::StringArray points;
+        for (int i = 0; i < c.count; ++i)
+        {
+            const auto& p = c.points[static_cast<std::size_t> (i)];
+            char buffer[64];
+            std::snprintf (buffer, sizeof (buffer), "%.9g %.9g %.9g", static_cast<double> (p.x), static_cast<double> (p.y), static_cast<double> (p.tension));
+            points.add (buffer);
+        }
+        return points.joinIntoString (";");
+    }
+    std::optional<mod::Curve> decodeCurvePoints (const juce::String& text)
+    {
+        const auto points = juce::StringArray::fromTokens (text, ";", "");
+        if (points.size() < 2 || points.size() > mod::maxCurvePoints)
+            return std::nullopt;
+        mod::Curve c;
+        c.count = points.size();
+        for (int i = 0; i < c.count; ++i)
+        {
+            const auto values = juce::StringArray::fromTokens (points[i], " ", "");
+            if (values.size() != 3)
+                return std::nullopt;
+            c.points[static_cast<std::size_t> (i)] = { std::strtof (values[0].toRawUTF8(), nullptr), std::strtof (values[1].toRawUTF8(), nullptr),
+                                                        std::strtof (values[2].toRawUTF8(), nullptr) };
+        }
+        c.normalise();
+        return c;
+    }
     constexpr int keyDnaSchemaVersion = 1;
 }
 
 juce::ValueTree OspAudioProcessor::keyDnaToTree (const std::array<keydna::Settings, 3>& layers)
+{
+    return keyDnaToTree (layers, KeyDnaCurves {});
+}
+
+juce::ValueTree OspAudioProcessor::keyDnaToTree (const std::array<keydna::Settings, 3>& layers, const KeyDnaCurves& curves)
 {
     // KEY DNA schema 1: per layer its switch, individuality and seed, and per parameter
     // (position .. pan, by id) its curve depth, variation and curve (omitted when flat).
@@ -1080,7 +1246,8 @@ juce::ValueTree OspAudioProcessor::keyDnaToTree (const std::array<keydna::Settin
         {
             const auto param = static_cast<keydna::Param> (p);
             const auto& ps = s[param];
-            if (juce::exactlyEqual (ps.curveDepth, 0.0) && juce::exactlyEqual (ps.variation, 0.0) && ps.curve == flat)
+            const auto& drawn = curves[static_cast<std::size_t> (layer)][static_cast<std::size_t> (p)];
+            if (juce::exactlyEqual (ps.curveDepth, 0.0) && juce::exactlyEqual (ps.variation, 0.0) && ps.curve == flat && ! drawn.has_value())
                 continue;
             juce::ValueTree pt ("Param");
             pt.setProperty ("id", keydna::paramId (param), nullptr);
@@ -1088,11 +1255,31 @@ juce::ValueTree OspAudioProcessor::keyDnaToTree (const std::array<keydna::Settin
             pt.setProperty ("variation", keyDnaNumber (ps.variation), nullptr);
             if (! (ps.curve == flat))
                 pt.setProperty ("curve", encodeCurveTable (ps.curve), nullptr);
+            if (drawn.has_value())
+                pt.setProperty ("points", encodeCurvePoints (*drawn), nullptr);   // Phase 5: the editor's points
             l.appendChild (pt, nullptr);
         }
         tree.appendChild (l, nullptr);
     }
     return tree;
+}
+
+OspAudioProcessor::KeyDnaCurves OspAudioProcessor::keyDnaCurvesFromTree (const juce::ValueTree& tree)
+{
+    KeyDnaCurves curves {};
+    if (! tree.isValid() || static_cast<int> (tree.getProperty ("schemaVersion", 0)) != keyDnaSchemaVersion)
+        return curves;
+    for (const auto& l : tree)
+    {
+        const int index = static_cast<int> (l.getProperty ("index", -1));
+        if (! l.hasType ("Layer") || index < 0 || index >= numLayers)
+            continue;
+        for (const auto& pt : l)
+            for (int p = 0; p < keydna::paramCount; ++p)
+                if (pt.hasType ("Param") && pt.getProperty ("id").toString() == keydna::paramId (static_cast<keydna::Param> (p)) && pt.hasProperty ("points"))
+                    curves[static_cast<std::size_t> (index)][static_cast<std::size_t> (p)] = decodeCurvePoints (pt.getProperty ("points").toString());
+    }
+    return curves;
 }
 
 std::array<keydna::Settings, 3> OspAudioProcessor::keyDnaFromTree (const juce::ValueTree& tree)
@@ -1584,15 +1771,18 @@ void OspAudioProcessor::analyseRecording (const juce::File& file, int layer, con
     target.state = LoadState::loading;
     const auto generation = nextGeneration.fetch_add (1);
     target.latestLoadId = generation;
+    target.analysisInFlight = generation;
+    target.editQueue.clear();   // edits of the atlas being replaced
+    target.editInFlight = 0;
     userLoads.insert (generation);
     loaderPool.addJob ([this, request = std::move (request), generation, l = static_cast<int> (index), cancel = newPreparation (index)] {
         auto result = loadAnalysedRecording (request, store, analysisQueue, analysisCache, generation, cancel.get());
+        result.requestId = generation;
         if (result.instrument != nullptr && result.atlasPending != nullptr)
             enqueueAtlasEnhance (result.instrument, std::move (result.atlasPending), l, cancel);
         else if (result.instrument != nullptr && result.instrument->set == nullptr)
             enqueueRefine (result.instrument, result.audio, l);   // kept as one sample: its usual stages
-        if (! (result.instrument == nullptr && result.error == "cancelled"))
-            pushResult (std::move (result), l);
+        pushResult (std::move (result), l);   // a cancelled one too: the layer stops showing ANALYSING
         --pendingLoads;
     });
 }
@@ -1622,6 +1812,273 @@ double OspAudioProcessor::atlasCapacityFor (int layer) const
 std::vector<std::string> OspAudioProcessor::missingSources (int layer) const
 {
     return layers[resolve (layer)].missingSources;
+}
+
+//==============================================================================
+// Phase 5: MAP NOTES and the NOTE MAP
+
+bool OspAudioProcessor::canMapNotes (int layer) const
+{
+    const auto instrument = currentInstrument (layer);
+    return instrument != nullptr && instrument->set == nullptr && instrument->model != nullptr && ! instrument->storedPath.empty()
+           && loadState (layer) != LoadState::loading;
+}
+
+void OspAudioProcessor::mapNotes (int layer, phrase::Detection detection)
+{
+    const auto index = static_cast<int> (resolve (layer));
+    const auto instrument = currentInstrument (index);
+    if (instrument == nullptr)
+        return;
+    if (instrument->atlas != nullptr)
+    {
+        // Again, with another DETECTION: the musician's corrections survive, conflicts are told.
+        auto report = std::make_shared<RedetectReport>();
+        const juce::String label = juce::String ("Detect notes (") + juce::String (phrase::toString (detection)).toUpperCase() + ")";
+        queueEdit (index, label, [detection, report] (atlas::NoteAtlas& a, const AudioData& audio) {
+            if (a.sources.empty())
+                return false;
+            phrase::AnalysisSettings settings;
+            settings.detection = detection;
+            settings.a4Hz = a.analysis.a4Hz > 0.0 ? a.analysis.a4Hz : 440.0;
+            auto fresh = phrase::analysePhrase (audio, a.sources.front(), settings);
+            if (! fresh.ok)
+                return false;
+            auto merged = phrase::edit::mergeReanalysisReported (a, fresh.atlas);
+            // The atlas keeps its own identity and sources (paths found since), the new analysis's record.
+            merged.atlas.atlasId = a.atlasId;
+            merged.atlas.sources = a.sources;
+            merged.atlas.mapping = a.mapping;
+            a = std::move (merged.atlas);
+            report->keptCorrected = merged.keptCorrected;
+            report->conflicts = static_cast<int> (merged.conflicts.size());
+            for (const auto& c : merged.conflicts)
+                report->conflictNoteIds.push_back (c.noteId);
+            juce::String summary;
+            if (merged.keptCorrected > 0)
+                summary << merged.keptCorrected << (merged.keptCorrected == 1 ? " correction kept" : " corrections kept");
+            if (! merged.conflicts.empty())
+                summary << (summary.isEmpty() ? "" : "; ") << static_cast<int> (merged.conflicts.size())
+                        << (merged.conflicts.size() == 1 ? " place where" : " places where") << " the new detection disagrees";
+            report->summary = summary;
+            return true;
+        }, report);
+        return;
+    }
+    if (! canMapNotes (index))
+        return;
+    juce::File file (juce::String::fromUTF8 (instrument->storedPath.c_str()));
+    if (! file.existsAsFile())
+        file = juce::File (juce::String::fromUTF8 (instrument->originalPath.c_str()));
+    if (! file.existsAsFile())
+    {
+        showMessage ("MAP NOTES: the recording is not in the sample store any more");
+        return;
+    }
+    phrase::AnalysisSettings settings;
+    settings.detection = detection;
+    analyseRecording (file, index, settings);
+    userLoadNames[layers[static_cast<std::size_t> (index)].latestLoadId.load()] = "Map notes " + layerName (index);
+}
+
+void OspAudioProcessor::editAtlas (int layer, const juce::String& name, AtlasEdit edit)
+{
+    queueEdit (static_cast<int> (resolve (layer)), name, std::move (edit), nullptr);
+}
+
+void OspAudioProcessor::queueEdit (int layer, const juce::String& name, AtlasEdit edit, std::shared_ptr<RedetectReport> report)
+{
+    if (edit == nullptr || layerAtlas (layer) == nullptr)
+        return;
+    auto& target = layers[static_cast<std::size_t> (layer)];
+    // One at a time: the next edits the published result of this one. Bounded: a burst of
+    // edits faster than preparation keeps the last 32.
+    if (target.editInFlight != 0 || target.analysisInFlight != 0)
+    {
+        target.editQueue.push_back ({ name, std::move (edit), std::move (report) });
+        while (target.editQueue.size() > 32)
+            target.editQueue.pop_front();
+        return;
+    }
+    startEdit (layer, name, std::move (edit), std::move (report));
+}
+
+void OspAudioProcessor::startEdit (int layer, const juce::String& name, AtlasEdit edit, std::shared_ptr<RedetectReport> report)
+{
+    const auto index = static_cast<std::size_t> (layer);
+    auto& target = layers[index];
+    const auto instrument = currentInstrument (layer);
+    if (instrument == nullptr || instrument->atlas == nullptr)
+        return;
+    const auto loadId = nextGeneration.fetch_add (1);
+    target.latestLoadId = loadId;
+    target.editInFlight = loadId;
+    EditRecord record;
+    record.layer = layer;
+    record.name = name;
+    record.beforeLoad = instrument->loadId;
+    record.before = instrument->atlas;
+    record.report = std::move (report);
+    editLoads[loadId] = record;
+    while (editLoads.size() > 64)
+        editLoads.erase (editLoads.begin());
+
+    AtlasLoadRequest request;
+    request.atlas = *instrument->atlas;
+    request.capacitySeconds = std::max (atlasCapacityFor (layer), instrument->atlasStatus != nullptr ? instrument->atlasStatus->regionSeconds : 0.0);
+    request.threads = atlasThreads;
+    request.preloaded = target.atlasAudio;
+    ++pendingLoads;
+    loaderPool.addJob ([this, request = std::move (request), edit = std::move (edit), loadId, layer, cancel = newPreparation (index)]() mutable {
+        LoadResult result;
+        result.requestId = loadId;
+        // The recording's audio: the layer's decoded copy, else from the store (as a load does).
+        const AudioData* audio = nullptr;
+        if (! request.atlas.sources.empty())
+            for (const auto& s : request.preloaded)
+                if (s.assetId == request.atlas.sources.front().assetId)
+                    audio = s.audio.get();
+        std::shared_ptr<const AudioData> decoded;
+        if (audio == nullptr && ! request.atlas.sources.empty())
+        {
+            const auto& src = request.atlas.sources.front();
+            const auto hash = src.contentHash.rfind ("sha256:", 0) == 0 ? src.contentHash.substr (7) : src.contentHash;
+            if (auto stored = store.find (hash))
+                if (auto loaded = io::loadAudioFile (std::filesystem::path (stored->getFullPathName().toStdString())); loaded.ok)
+                {
+                    decoded = std::make_shared<const AudioData> (std::move (loaded.audio));
+                    audio = decoded.get();
+                    request.preloaded.push_back ({ src.assetId, decoded });
+                }
+        }
+        bool changed = false;
+        if (audio == nullptr)
+            result.error = "the recording's audio is not in the sample store";
+        else
+        {
+            try
+            {
+                changed = edit (request.atlas, *audio);
+                atlas::repair (request.atlas);
+            }
+            catch (...)
+            {
+                result.error = "the edit could not be applied";
+            }
+        }
+        if (result.error.empty() && ! changed)
+            result.error = "unchanged";
+        if (result.error.empty() && ! cancel->load())
+        {
+            result = loadInstrumentAtlas (request, store, loadId);
+            result.requestId = loadId;
+            if (result.instrument != nullptr && result.atlasPending != nullptr)
+                enqueueAtlasEnhance (result.instrument, std::move (result.atlasPending), layer, cancel);
+        }
+        else if (result.error.empty())
+            result.error = "cancelled";
+        pushResult (std::move (result), layer);
+        --pendingLoads;
+    });
+}
+
+bool OspAudioProcessor::showAtlasState (int layer, std::uint64_t loadId, std::shared_ptr<const atlas::NoteAtlas> atlas)
+{
+    const auto index = static_cast<std::size_t> (resolve (layer));
+    auto& target = layers[index];
+    target.editQueue.clear();   // edits asked for the state being left behind
+    if (const auto it = target.latestByLoad.find (loadId);
+        it != target.latestByLoad.end() && it->second != nullptr && (it->second->atlasStatus == nullptr || ! it->second->atlasStatus->playableOnly))
+    {
+        if (target.cancelPreparation != nullptr)
+            *target.cancelPreparation = true;   // an edit still preparing is superseded
+        target.latestLoadId = loadId;
+        target.editInFlight = 0;
+        republish (it->second, static_cast<int> (index));
+        return true;
+    }
+    if (atlas == nullptr)
+        return false;
+    // Not cached any more (or still unfinished): rebuilt from its atlas, without a new undo step.
+    target.editInFlight = 0;
+    restoreAtlas (static_cast<int> (index), std::move (atlas));
+    return true;
+}
+
+void OspAudioProcessor::restoreAtlas (int layer, std::shared_ptr<const atlas::NoteAtlas> atlas)
+{
+    auto& target = layers[static_cast<std::size_t> (layer)];
+    const auto previous = target.editInFlight;
+    startEdit (layer, "Restore notes", [atlas] (atlas::NoteAtlas& a, const AudioData&) {
+        a = *atlas;
+        return true;
+    });
+    if (target.editInFlight != 0 && target.editInFlight != previous)
+        editLoads[target.editInFlight].restore = true;
+}
+
+OspAudioProcessor::AtlasActivity OspAudioProcessor::atlasActivity (int layer) const noexcept
+{
+    const auto& target = layers[resolve (layer)];
+    if (target.analysisInFlight != 0)
+        return AtlasActivity::analysing;
+    if (target.editInFlight != 0)
+        return AtlasActivity::preparing;
+    const auto instrument = currentInstrument (layer);
+    if (instrument != nullptr && instrument->atlasStatus != nullptr && instrument->atlasStatus->playableOnly && pendingLoads.load() > 0)
+        return AtlasActivity::enhancing;
+    return AtlasActivity::none;
+}
+
+void OspAudioProcessor::auditionAtlasRegion (int layer, std::int64_t start, std::int64_t end)
+{
+    const auto index = resolve (layer);
+    const auto& target = layers[index];
+    const auto atlas = layerAtlas (static_cast<int> (index));
+    if (atlas == nullptr || atlas->sources.empty() || auditionHub == nullptr)
+        return;
+    const AudioData* audio = nullptr;
+    for (const auto& s : target.atlasAudio)
+        if (s.assetId == atlas->sources.front().assetId)
+            audio = s.audio.get();
+    if (audio == nullptr || audio->isEmpty())
+        return;
+    start = std::clamp<std::int64_t> (start, 0, audio->numFrames());
+    end = std::clamp<std::int64_t> (end, start, audio->numFrames());
+    if (end - start < 16)
+        return;
+    auto slice = std::make_shared<AudioData> (AudioData::allocate (audio->numChannels(), end - start, audio->sampleRate));
+    for (int c = 0; c < audio->numChannels(); ++c)
+        std::copy (audio->channels[static_cast<std::size_t> (c)].begin() + start, audio->channels[static_cast<std::size_t> (c)].begin() + end,
+                   slice->channels[static_cast<std::size_t> (c)].begin());
+    // A short fade at each end: a cut in the middle of a note never clicks.
+    const auto fade = std::min<std::int64_t> ((end - start) / 4, static_cast<std::int64_t> (0.004 * audio->sampleRate));
+    for (auto& ch : slice->channels)
+        for (std::int64_t i = 0; i < fade; ++i)
+        {
+            const auto g = static_cast<float> (i) / static_cast<float> (fade);
+            ch[static_cast<std::size_t> (i)] *= g;
+            ch[ch.size() - 1 - static_cast<std::size_t> (i)] *= g;
+        }
+    auditionHub->previewAudio (std::move (slice), "Note " + layerName (static_cast<int> (index)));
+}
+
+void OspAudioProcessor::playAsOneSample (int layer)
+{
+    const auto index = static_cast<int> (resolve (layer));
+    const auto atlas = layerAtlas (index);
+    if (atlas == nullptr || atlas->sources.empty())
+        return;
+    const auto& src = atlas->sources.front();
+    const auto hash = src.contentHash.rfind ("sha256:", 0) == 0 ? src.contentHash.substr (7) : src.contentHash;
+    auto stored = store.find (hash);
+    if (! stored)
+    {
+        showMessage ("The recording is not in the sample store any more");
+        return;
+    }
+    replaceLayer ({ *stored }, index);
+    userLoadNames[layers[static_cast<std::size_t> (index)].latestLoadId.load()] = "Play as one sample " + layerName (index);
 }
 
 void OspAudioProcessor::loadFiles (const juce::Array<juce::File>& files, int layer)
@@ -2141,11 +2598,59 @@ void OspAudioProcessor::timerCallback()
     std::array<bool, numLayers> published {};
     std::array<bool, numLayers> touched {};
     std::array<bool, numLayers> lastFailed {};
+    std::array<bool, numLayers> dispatch {};
+    std::array<std::shared_ptr<const atlas::NoteAtlas>, numLayers> rebuild {};
     for (auto& finished : results)
     {
         const auto index = static_cast<std::size_t> (std::clamp (finished.layer, 0, numLayers - 1));
         auto& layer = layers[index];
         auto& result = finished.result;
+        // Phase 5: MAP NOTES analyses and NOTE MAP edits (a load id, or the failed request's).
+        const auto resultLoad = result.instrument != nullptr ? result.instrument->loadId : result.requestId;
+        if (resultLoad != 0 && resultLoad == layer.analysisInFlight)
+        {
+            layer.analysisInFlight = 0;
+            dispatch[index] = true;
+        }
+        const auto editIt = resultLoad != 0 ? editLoads.find (resultLoad) : editLoads.end();
+        const bool isEdit = editIt != editLoads.end();
+        if (isEdit && layer.editInFlight == resultLoad)
+        {
+            layer.editInFlight = 0;   // Stage A is in (or it failed): the next edit may start
+            dispatch[index] = true;
+        }
+        if (result.instrument == nullptr && (isEdit || result.error == "cancelled"))
+        {
+            // An edit that changed nothing, was superseded or failed: the instrument playing stays.
+            if (layer.latestLoadId.load() == resultLoad)
+                if (const auto current = currentInstrument (static_cast<int> (index)); current != nullptr)
+                {
+                    layer.latestLoadId = current->loadId;
+                    // Its Stage B was stopped for the edit: prepared again.
+                    if (isEdit && current->atlas != nullptr && current->atlasStatus != nullptr && current->atlasStatus->playableOnly)
+                        rebuild[index] = current->atlas;
+                }
+            if (isEdit)
+                editLoads.erase (editIt);
+            if (result.error != "unchanged" && result.error != "cancelled")
+            {
+                const std::lock_guard<std::mutex> lock (messageMutex);
+                lastMessage = "Edit not applied: " + juce::String (result.error);
+            }
+            continue;
+        }
+        if (! result.atlasAudio.empty())
+        {
+            // The decoded recording(s), for edits and audition (two kept: undo across a reload).
+            for (auto& audio : result.atlasAudio)
+            {
+                auto& cache = layer.atlasAudio;
+                cache.erase (std::remove_if (cache.begin(), cache.end(), [&] (const auto& a) { return a.assetId == audio.assetId; }), cache.end());
+                cache.insert (cache.begin(), std::move (audio));
+                if (cache.size() > 2)
+                    cache.resize (2);
+            }
+        }
         touched[index] = true;
         lastFailed[index] = result.instrument == nullptr;
         if (result.instrument == nullptr || result.instrument->atlas != nullptr)
@@ -2162,16 +2667,32 @@ void OspAudioProcessor::timerCallback()
                 published[index] = true;
                 const auto loadId = result.instrument->loadId;
                 layer.latestByLoad[loadId] = result.instrument;
-                if (loadId != layer.lastPublishedLoad)
+                if (loadId != layer.lastPublishedLoad && isEdit)
+                {
+                    // A NOTE MAP edit: the same sound (not a Library entry), one undo step.
+                    const auto& record = editIt->second;
+                    if (! record.restore)
+                    {
+                        undoManager.beginNewTransaction (record.name);
+                        undoManager.perform (new AtlasEditAction (*this, static_cast<int> (index), record.beforeLoad, loadId, record.before, result.instrument->atlas));
+                    }
+                    if (record.report != nullptr)
+                        layer.redetect = *record.report;
+                    layer.lastPublishedLoad = loadId;
+                }
+                else if (loadId != layer.lastPublishedLoad)
                 {
                     // A new sound on this layer: into the Library (its history when the user chose it).
                     libraryHub->soundLoaded (*result.instrument, static_cast<int> (index), userLoads.count (loadId) > 0);
                     // A new sample (not a later stage of the same one): undoable if the user asked for it.
                     if (userLoads.count (loadId) > 0 && layer.lastPublishedLoad != 0)
                     {
-                        undoManager.beginNewTransaction ("Load sample " + layerName (static_cast<int> (index)));
+                        const auto named = userLoadNames.find (loadId);
+                        undoManager.beginNewTransaction (named != userLoadNames.end() ? named->second : "Load sample " + layerName (static_cast<int> (index)));
                         undoManager.perform (new InstrumentChangeAction (*this, static_cast<int> (index), layer.lastPublishedLoad, loadId));
                     }
+                    if (result.instrument->atlas == nullptr || ! userLoadNames.count (loadId))
+                        layer.redetect = {};
                     layer.lastPublishedLoad = loadId;
                 }
                 // Keep undo history bounded (the instruments hold audio).
@@ -2197,6 +2718,15 @@ void OspAudioProcessor::timerCallback()
     for (int index = 0; index < numLayers; ++index)
     {
         auto& layer = layers[static_cast<std::size_t> (index)];
+        // Phase 5: the next NOTE MAP edit once the one before is playable (it edits that result).
+        if (rebuild[static_cast<std::size_t> (index)] != nullptr && layer.editInFlight == 0 && layer.analysisInFlight == 0)
+            restoreAtlas (index, rebuild[static_cast<std::size_t> (index)]);
+        if (dispatch[static_cast<std::size_t> (index)] && layer.editInFlight == 0 && layer.analysisInFlight == 0 && ! layer.editQueue.empty())
+        {
+            auto next = std::move (layer.editQueue.front());
+            layer.editQueue.pop_front();
+            startEdit (index, next.name, std::move (next.edit), std::move (next.report));
+        }
         if (published[static_cast<std::size_t> (index)])
         {
             setRootOverride (rootOverride (index), index); // re-derive the shift for the new analysis root
@@ -2366,12 +2896,14 @@ std::unique_ptr<juce::XmlElement> OspAudioProcessor::createStateXml()
     stateTree.setProperty ("grainBudgetPolicy", boundedGrainBudget.load() ? "bounded" : "shared", nullptr);
     {
         std::array<keydna::Settings, 3> dna;
+        KeyDnaCurves curves;
         {
             const std::lock_guard<std::mutex> lock (keyDnaMutex);
             dna = keyDnaLayers;
+            curves = keyDnaCurves;
         }
         stateTree.removeChild (stateTree.getChildWithName ("KeyDna"), nullptr);
-        stateTree.appendChild (keyDnaToTree (dna), nullptr);
+        stateTree.appendChild (keyDnaToTree (dna, curves), nullptr);
     }
     for (int layer = 0; layer < numLayers; ++layer)
     {
@@ -2695,6 +3227,11 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml, bool setting
     // it also clears the previous one's.
     {
         const auto dna = keyDnaFromTree (keyDnaTree);
+        {
+            const std::lock_guard<std::mutex> lock (keyDnaMutex);
+            keyDnaCurves = keyDnaCurvesFromTree (keyDnaTree);
+        }
+        keyDnaGestureStart = {};
         for (int layer = 0; layer < numLayers; ++layer)
             setKeyDnaSettings (layer, dna[static_cast<std::size_t> (layer)]);
     }

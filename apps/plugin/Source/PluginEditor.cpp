@@ -210,10 +210,30 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
             }
         };
         card->onMenu = [this] (int l, juce::Component& target) { showLayerMenu (l, target); };
+        card->onKeyDna = [this] (int l) { openKeyDna (l); };
         // One EQ editor open at a time (opening B's closes A's editor; A's EQ keeps playing).
         card->onEqToggle = [this] (int l, bool open) {
             for (auto& c : cards)
+            {
+                if (open)
+                    c->setNotesOpen (false);   // one page over the displays at a time
                 c->setEqOpen (open && c->layer() == l);
+            }
+            modOverlay.toFront (false);
+        };
+        // NOTE MAP (a Note Atlas layer): one open at a time, as the EQ; it edits that layer.
+        card->onNotesToggle = [this] (int l, bool open) {
+            for (auto& c : cards)
+            {
+                if (open)
+                    c->setEqOpen (false);
+                c->setNotesOpen (open && c->layer() == l);
+            }
+            if (open && ospProcessor.editLayer() != l)
+            {
+                ospProcessor.setEditLayer (l);
+                updateFocus();
+            }
             modOverlay.toFront (false);
         };
         card->onReimagined = [this] (int l) {
@@ -268,6 +288,7 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     content.addAndMakeVisible (pitchWheel);
     content.addAndMakeVisible (modWheel);
     frame::setUpKeyboard (keyboard);
+    keyboard.tintOf = [this] (int note) { return keyTints[static_cast<std::size_t> (std::clamp (note, 0, 127))]; };
     content.addAndMakeVisible (keyboard);
 
     frame::setUpStatusLabel (statusLabel);
@@ -349,12 +370,14 @@ OspAudioProcessorEditor::~OspAudioProcessorEditor()
         juce::Desktop::getInstance().getAnimator().cancelAnimation (card.get(), false);
     popup.reset();
     libraryPanel.reset();
+    keyDnaPanel.reset();
     setLookAndFeel (nullptr);
 }
 
 void OspAudioProcessorEditor::openLibrary (LibraryPanel::View view)
 {
     closePopup();
+    closeKeyDna();
     if (libraryPanel == nullptr)
     {
         libraryPanel = std::make_unique<LibraryPanel> (ospProcessor);
@@ -386,8 +409,60 @@ void OspAudioProcessorEditor::closeLibrary()
     grabKeyboardFocus();
 }
 
+void OspAudioProcessorEditor::openKeyDna (int layer)
+{
+    closePopup();
+    closeLibrary();
+    if (keyDnaPanel != nullptr && keyDnaPanel->layer() != layer)
+        keyDnaPanel.reset();
+    if (keyDnaPanel == nullptr)
+    {
+        keyDnaPanel = std::make_unique<KeyDnaEditor> (ospProcessor, layer);
+        juce::Component::SafePointer<OspAudioProcessorEditor> safe (this);
+        keyDnaPanel->onClose = [safe] {
+            juce::MessageManager::callAsync ([safe] {
+                if (safe != nullptr)
+                    safe->closeKeyDna();
+            });
+        };
+        // The profile sits over the real keys below it.
+        keyDnaPanel->keyBounds = [safe] (int note) -> juce::Rectangle<float> {
+            if (safe == nullptr || safe->keyDnaPanel == nullptr)
+                return {};
+            auto& kb = safe->keyboard;
+            if (note < kb.getRangeStart() || note > kb.getRangeEnd())
+                return {};
+            const auto r = kb.getRectangleForKey (note);
+            return r.translated (static_cast<float> (kb.getX() - safe->keyDnaPanel->getX()), static_cast<float> (kb.getY() - safe->keyDnaPanel->getY()));
+        };
+        keyDnaPanel->isKeyDown = [safe] (int note) { return safe != nullptr && safe->ospProcessor.keyboardState.isNoteOnForChannels (0xffff, note); };
+        keyDnaPanel->getProperties().set ("modCover", true);   // the halos stay under it
+        content.addAndMakeVisible (*keyDnaPanel);
+    }
+    if (ospProcessor.editLayer() != layer)
+    {
+        ospProcessor.setEditLayer (layer);
+        updateFocus();
+    }
+    placeLibrary();
+    keyDnaPanel->toFront (true);
+}
+
+void OspAudioProcessorEditor::closeKeyDna()
+{
+    if (keyDnaPanel == nullptr)
+        return;
+    keyDnaPanel.reset();
+    grabKeyboardFocus();
+}
+
 void OspAudioProcessorEditor::placeLibrary()
 {
+    if (keyDnaPanel != nullptr)
+    {
+        const float top = design::layout::keyboard.getY() + (arpShown ? design::layout::arpShift : 0.0f);
+        keyDnaPanel->setBounds (juce::Rectangle<float> (31.0f, 23.0f, 1386.0f, top - 9.0f - 23.0f).getSmallestIntegerContainer());
+    }
     if (libraryPanel == nullptr)
         return;
     // Over everything from the housing's top to just above the keyboard row, which stays
@@ -815,6 +890,35 @@ void OspAudioProcessorEditor::addLayerSection (juce::PopupMenu& menu, int layer,
         menu.addSubMenu ("Root" + (overrideMidi ? ": " + juce::String (midiNoteName (static_cast<int> (std::lround (*overrideMidi)))) : juce::String (": auto")),
                          root, loaded != nullptr);
     }
+    // Phase 5: a recording becomes an instrument of its notes (MAP NOTES), and back.
+    if (loaded != nullptr && loaded->atlas == nullptr && loaded->set == nullptr)
+        menu.addItem (juce::String::fromUTF8 ("Map notes\xe2\x80\xa6"), ospProcessor.canMapNotes (layer), false, [safe, layer] {
+            if (safe != nullptr)
+                safe->ospProcessor.mapNotes (layer, phrase::Detection::normal), safe->timerCallback();
+        });
+    if (loaded != nullptr && loaded->atlas != nullptr)
+    {
+        const auto* card = cards[static_cast<std::size_t> (layer)].get();
+        menu.addItem ("Notes", true, card != nullptr && card->isNotesOpen(), [safe, layer] {
+            if (safe == nullptr)
+                return;
+            auto& c = *safe->cards[static_cast<std::size_t> (layer)];
+            c.onNotesToggle (layer, ! c.isNotesOpen());
+        });
+        juce::PopupMenu detect;
+        const auto current = InstrumentHost::detectionOf (*loaded->atlas);
+        const bool busy = ospProcessor.atlasActivity (layer) != InstrumentHost::AtlasActivity::none;
+        for (const auto d : { phrase::Detection::fewer, phrase::Detection::normal, phrase::Detection::more })
+            detect.addItem (juce::String (phrase::toString (d)).toUpperCase() + " notes", ! busy, d == current, [safe, layer, d] {
+                if (safe != nullptr)
+                    safe->ospProcessor.mapNotes (layer, d), safe->timerCallback();
+            });
+        menu.addSubMenu ("Detect notes again", detect, loaded->atlas->analysis.version > 0);
+        menu.addItem ("Play as one sample", [safe, layer] {
+            if (safe != nullptr)
+                safe->ospProcessor.playAsOneSample (layer), safe->timerCallback();
+        });
+    }
     menu.addItem ("Samples", loaded != nullptr && loaded->set != nullptr, samplesShown && ospProcessor.editLayer() == layer, [safe, layer] {
         if (safe == nullptr)
             return;
@@ -1231,6 +1335,25 @@ void OspAudioProcessorEditor::updateStatus()
         statusLabel.setText (status, juce::dontSendNotification);
 }
 
+void OspAudioProcessorEditor::updateKeyTints()
+{
+    // Only the edited layer's map (three maps cannot share one keyboard); an ordinary layer
+    // leaves the keys as they always were.
+    const int l = ospProcessor.editLayer();
+    const auto atlas = ospProcessor.layerAtlas (l);
+    if (atlas == tintedAtlas && l == tintedLayer)
+        return;
+    tintedAtlas = atlas;
+    tintedLayer = l;
+    const auto before = keyTints;
+    if (atlas != nullptr)
+        keyTints = NoteMapEditor::keyMap (*atlas, design::colour::identity (l).arc);
+    else
+        keyTints = {};
+    if (keyTints != before)
+        keyboard.repaint();
+}
+
 void OspAudioProcessorEditor::timerCallback()
 {
     bool changed = false;
@@ -1251,6 +1374,9 @@ void OspAudioProcessorEditor::timerCallback()
         if (card->isVisible())
             card->refresh();
     updateFocus();
+    updateKeyTints();
+    if (keyDnaPanel != nullptr)
+        keyDnaPanel->refresh();
     presetBar.refresh();
     // The controller's wheel moves it too: taken when it changes (a screen drag keeps its
     // place even while the host is not processing).

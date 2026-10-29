@@ -113,6 +113,7 @@ public:
     bool shaperEditorLarge() const noexcept override { return shaperLarge.load(); }
     void setShaperEditorLarge (bool large) noexcept override { shaperLarge = large; }
     juce::String reimaginedModeUnavailable (int layer, int mode) const override { return engine->reimaginedModeUnavailable (layer, mode); }
+    bool hasKeyDna() const noexcept override { return engine->hasKeyDna(); }
 
     // The shell -------------------------------------------------------------------------
     const ProductInfo& product() const noexcept { return productInfo(); }

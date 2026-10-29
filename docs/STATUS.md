@@ -478,6 +478,30 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
         Phase 3 atlas goldens with 0.3-0.5 s regions were updated (the sustain change, proved by
         reverting only the threshold); every other golden unchanged.
       Stopped for review before Phase 5.
+- [x] UNIFIED ENGINE Phase 5, NOTE MAP and KEY DNA in the real interface
+      (docs/research/unified-andor/phase-5-report.md; testing: phase-5-ableton-guide.md):
+      - MAP NOTES (layer menu) turns a recording into an instrument of its notes in the
+        background, playable at once; one undo step back to the ordinary sample; Play as one
+        sample. Ordinary samples are never analysed by themselves and look unchanged.
+      - NOTE MAP in the display's place (beside EQ | DAMPEN, the NOTES key on atlas layers):
+        - regions, zoom and scroll, audition;
+        - boundaries, PITCH / OCT / FINE, PLAYS ON / AUTO, velocity layers;
+        - include, split (double-click, repeat markers), merge;
+        - restrained doubts, per-note sustain explanation;
+        - DETECTION FEWER / NORMAL / MORE (corrections kept, conflicts shown);
+        - FILL and its reach, tuning, its own undo / redo.
+      - Edits run on the loader thread with the recording's audio and publish through Stage A /
+        B (one undo step each, queued and bounded, held notes keep sounding, evicted undo states
+        rebuilt). Status: Analyzing / Preparing / Playable / Enhancing / Ready / Needs review /
+        Failed.
+      - Keyboard: the edited layer's map (recorded with takes, filled, silent).
+      - KEY DNA editor (Granular strip's KEY DNA key, the Library's band, aligned to the real
+        keys): ON, AMOUNT (host parameter, live), INDIVIDUALITY, SEED / RANDOMIZE; per
+        parameter a curve, DEPTH, VARIATION; the computed profile per key; undoable; drawn
+        points saved (`points`, additive). AMOUNT is not a modulation destination (frozen
+        list): reported in the editor.
+      - Tests: 10 plugin cases (workflows A-D, undo, queue, realtime swap, state, KEY DNA).
+      Stopped for musical review before Phase 6.
 - [x] ANDOR DESIGN SYSTEM and INSTRUMENT SHELL (andor-design-system/, start with HANDOFF.md).
       ANDOR OSP's interface was extracted, unchanged, into shared/andor-ui:
       - the components, look and assets;

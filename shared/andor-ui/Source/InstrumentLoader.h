@@ -92,6 +92,9 @@ struct AtlasLoadRequest
         never silently - and the atlas keeps them all. */
     double capacitySeconds = 300.0;
     int threads = 2;                          ///< per-member work (results do not depend on it)
+    /** Phase 5: sources already decoded (an edit of the atlas a layer plays): used as they are
+        when their shape matches, so an edit never decodes or hashes the recording again. */
+    std::vector<atlasset::SourceAudio> preloaded;
 };
 
 /**
@@ -119,6 +122,10 @@ struct LoadResult
     std::vector<std::string> missingSources;
     /** Phase 4: an atlas load's Stage B input (the instrument published now is Stage A). */
     std::shared_ptr<const atlasset::PreparedAtlas> atlasPending;
+    /** Phase 5: the request (load id) this answers, failures included (0: not told). */
+    std::uint64_t requestId = 0;
+    /** Phase 5: an atlas instrument's decoded sources (kept for its edits). */
+    std::vector<atlasset::SourceAudio> atlasAudio;
 };
 
 /**

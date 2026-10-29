@@ -99,6 +99,7 @@ namespace
         void prepare (double, int, juce::AudioProcessorValueTreeState&) override {}
         void setSource (int, const osp::plugin::LoadedInstrument*) noexcept override {}
         void process (juce::AudioBuffer<float>&, const juce::MidiBuffer&, const Performance&) noexcept override {}
+        bool hasKeyDna() const noexcept override { return true; }   // the Granular strip's KEY DNA key, as ANDOR OSP's
     };
 
     /** A four-character code as JUCE's plugin defines give it (0x41657870 for "Aexp"). */

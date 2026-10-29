@@ -8,6 +8,26 @@
 namespace osp::plugin
 {
 
+phrase::Detection InstrumentHost::detectionOf (const atlas::NoteAtlas& atlas)
+{
+    // The analysis records its settings (AnalysisSettings::digest: "...|d<detection>|...").
+    const auto& digest = atlas.analysis.settingsDigest;
+    for (auto d : { phrase::Detection::fewer, phrase::Detection::more })
+        if (digest.find (std::string ("|d") + phrase::toString (d) + "|") != std::string::npos)
+            return d;
+    return phrase::Detection::normal;
+}
+
+mod::Curve InstrumentHost::keyDnaCurve (int layer, keydna::Param param) const
+{
+    juce::ignoreUnused (layer, param);
+    mod::Curve flat;
+    flat.count = 2;
+    flat.points[0] = { 0.0f, 0.5f, 0.0f };
+    flat.points[1] = { 1.0f, 0.5f, 0.0f };
+    return flat;
+}
+
 juce::String InstrumentHost::modLfoId (int lfo, const juce::String& name) { return "mod.lfo" + juce::String (lfo + 1) + "." + name; }
 juce::String InstrumentHost::modEnvId (int env, const juce::String& name) { return "mod.env" + juce::String (env + 1) + "." + name; }
 juce::String InstrumentHost::modRouteId (int route, const juce::String& name) { return "mod.route" + juce::String (route + 1) + "." + name; }
