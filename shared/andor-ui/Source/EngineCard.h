@@ -82,6 +82,11 @@ public:
         the display moves, resizes, changes scale or skin, or the card's focus changes. */
     void invalidateBackdrop() noexcept { backdropKey = {}; }
     int headsShown() const noexcept { return static_cast<int> (heads.size()); }
+    /** Visual tests: the cached pictures (backdrop, waveform) in JUCE's own renderer. The
+        native image (CoreGraphics on macOS) is not bit-repeatable: two renders of the same state
+        differed by a channel level now and then. On Linux the native image is this renderer
+        already. Off in the plug-in (a native cache is drawn per frame without a conversion). */
+    static inline bool softwareCaches = false;
 
     /** Where the recording is drawn: the time window() maps across this. */
     juce::Rectangle<float> plotArea() const;

@@ -500,7 +500,7 @@ void SourceDisplay::paint (juce::Graphics& g)
                          + (focused ? " focused" : "");
         if (key != backdropKey || ! backdrop.isValid())
         {
-            backdrop = juce::Image (juce::Image::RGB, w, h, true);
+            backdrop = softwareCaches ? juce::Image (juce::Image::RGB, w, h, true, juce::SoftwareImageType()) : juce::Image (juce::Image::RGB, w, h, true);
             juce::Graphics bg (backdrop);
             bg.addTransform (juce::AffineTransform::scale (scale));
             paintBackdrop (bg);
@@ -511,7 +511,7 @@ void SourceDisplay::paint (juce::Graphics& g)
     if (cacheDirty || ! cache.isValid() || cache.getWidth() != w || cache.getHeight() != h)
     {
         // The static picture over its backdrop, in one opaque image: a frame is one copy.
-        cache = juce::Image (juce::Image::RGB, w, h, false);
+        cache = softwareCaches ? juce::Image (juce::Image::RGB, w, h, false, juce::SoftwareImageType()) : juce::Image (juce::Image::RGB, w, h, false);
         juce::Graphics cg (cache);
         cg.drawImageAt (backdrop, 0, 0);
         cg.addTransform (juce::AffineTransform::scale (scale));

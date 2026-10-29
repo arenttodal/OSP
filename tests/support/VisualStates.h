@@ -7,6 +7,7 @@
 
 #include "CeramicSkin.h"
 #include "Design.h"
+#include "EngineCard.h"
 
 #include "audio/utility/TestSignals.h"
 #include "core/PitchMath.h"
@@ -66,6 +67,7 @@ namespace visualstates
     void render (const juce::File& out, const juce::File& scratch, const std::function<std::unique_ptr<Processor>()>& makeProcessor)
     {
         using namespace osp::plugin;
+        SourceDisplay::softwareCaches = true;   // bit-repeatable cached pictures on every platform (see there)
         const auto sounds = writeSounds (scratch);
         auto shoot = [&] (juce::AudioProcessorEditor& e, Editor& u, const juce::String& name, float scale = 1.0f) {
             u.refreshNow();
