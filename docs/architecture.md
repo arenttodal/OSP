@@ -695,6 +695,17 @@ is built from.
 - The editor disables every control whose parameter the engine does not read (`Binding.h` tags, which are non-visual).
 - Products live in `products/`. They are written by `tools/create_andor_instrument.py` and checked against `andor-design-system/product-registry.json`.
 - Each product is tested by `andor_<slug>_tests` and compared with OSP, pixel for pixel, by `andor_<slug>_tests_visual`.
+- What an engine binds, the shell runs for it: `mod.*` - ANDOR OSP's modulation settings
+  gathered as OSP's processor gathers them and handed to `Engine::setModulation` on change (the
+  engine plays them with `mod::Runtime`); `arp.*` - ANDOR OSP's arpeggiator in front of the
+  engine, its ARP destinations from `Engine::arpModulation`.
+- A product's own modulation destinations (`ProductInfo::modulationDestinations`) are slots
+  `mod::Dest::product0 ...` named at start-up (`mod::setProductDestinations`, before any
+  parameter layout). They follow ANDOR OSP's destinations in the routes' choice list, so the
+  route parameter's choice index and the destination are mapped by `mod::destFromChoice` /
+  `choiceOf` (identity for ANDOR OSP's). ANDOR OSP names none: its choices, automation and
+  schema are exactly as before. Each spans its knob's whole travel (Domain::unit, span 1); the
+  engine moves the knob's normalised value and converts it as its parameter does.
 
 ## KEY DNA (unified engine Phase 1; docs/research/unified-andor/phase-1-key-dna.md)
 

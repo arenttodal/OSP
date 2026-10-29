@@ -69,7 +69,7 @@ namespace
     constexpr double ampReleaseOctaves = 9.550746785383243;   // RELEASE 20 ms .. 15 s
     constexpr double envTimeOctaves = 13.287712379549449;     // ENV times (0) 1 ms .. 10 s
 
-    constexpr std::array<DestInfo, destCount> registry { {
+    constexpr std::array<DestInfo, static_cast<std::size_t> (Dest::product0)> registry { {
         { "none", "-", Owner::global, -1, Domain::unit, 0.0, Update::continuous },
         { "life", "LIFE", Owner::global, -1, Domain::unit, 1.0, Update::continuous },
         { "drive", "DRIVE", Owner::global, -1, Domain::unit, 1.0, Update::continuous },
@@ -191,9 +191,54 @@ const char* syncName (int division) noexcept
     return divisions[static_cast<std::size_t> (std::clamp (division, 0, syncDivisionCount - 1))].name;
 }
 
+namespace
+{
+    /** A product's destinations (setProductDestinations): their names, and their infos
+        pointing at them. Unnamed slots keep a placeholder ("product1", ...). */
+    struct ProductRegistry
+    {
+        std::array<std::string, maxProductDests> ids, names;
+        std::array<DestInfo, maxProductDests> infos {};
+        int count = 0;
+
+        ProductRegistry() { set ({}); }
+        void set (const std::vector<ProductDest>& list)
+        {
+            count = std::min (static_cast<int> (list.size()), maxProductDests);
+            for (int k = 0; k < maxProductDests; ++k)
+            {
+                const auto i = static_cast<std::size_t> (k);
+                const bool named = k < count;
+                ids[i] = named ? list[i].id : "product" + std::to_string (k + 1);
+                names[i] = named ? list[i].name : "PRODUCT " + std::to_string (k + 1);
+                infos[i] = { ids[i].c_str(), names[i].c_str(), named ? list[i].owner : Owner::voice, -1, Domain::unit, 1.0,
+                             named ? list[i].update : Update::continuous };
+            }
+        }
+    };
+
+    ProductRegistry& productRegistry()
+    {
+        static ProductRegistry r;
+        return r;
+    }
+}
+
+void setProductDestinations (const std::vector<ProductDest>& destinations)
+{
+    productRegistry().set (destinations);
+}
+
+int productDestCount() noexcept
+{
+    return productRegistry().count;
+}
+
 const DestInfo& destInfo (Dest d) noexcept
 {
-    return registry[static_cast<std::size_t> (std::clamp (static_cast<int> (d), 0, destCount - 1))];
+    if (const int k = productIndex (d); k >= 0)
+        return productRegistry().infos[static_cast<std::size_t> (k)];
+    return registry[static_cast<std::size_t> (std::clamp (static_cast<int> (d), 0, static_cast<int> (Dest::product0) - 1))];
 }
 
 double legacySpan (Dest d) noexcept

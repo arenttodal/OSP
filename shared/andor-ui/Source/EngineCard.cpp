@@ -510,7 +510,8 @@ void SourceDisplay::paint (juce::Graphics& g)
     const bool hasWave = instrument != nullptr && ! instrument->peakMax.empty() && ! loading;
     const auto& tones = waveTones (layer);
     const auto inner = getLocalBounds().toFloat().reduced (2.0f);
-    if (hasWave && view.granular)
+    // (A generator's picture takes the same view: its grains read the sound it played.)
+    if ((hasWave || ! generatedCycle.empty()) && view.granular)
     {
         // Where grains may come from (SPREAD, half the length either side at 100 %), as a
         // translucent pane over the waveform; POS a fine bright line with a flare at the centre.
@@ -1605,6 +1606,7 @@ void EngineCard::refresh()
             shownHeard = heard;
             repaint (sourceDisplay.getBounds());
         }
+        refreshGrains (0.0f);   // a live granulator: POS of the way back through what it has played
         return;
     }
     if (generated)
@@ -1649,11 +1651,16 @@ void EngineCard::refresh()
         repaint (sourceDisplay.getBounds());
     }
 
+    refreshGrains (processor.parameterValue (InstrumentHost::layerParameterId (layerIndex, "start")));
+}
+
+void EngineCard::refreshGrains (float startPercent)
+{
     auto value = [this] (const char* name) { return processor.parameterValue (InstrumentHost::layerParameterId (layerIndex, name)); };
     SourceDisplay::View view;
     view.granular = value ("sourceMode") >= 0.5f;
-    view.start = 0.01f * value ("start");
-    view.position = std::clamp (0.01f * (value ("granular.position") + value ("start")), 0.0f, 1.0f);
+    view.start = 0.01f * startPercent;
+    view.position = std::clamp (0.01f * (value ("granular.position") + startPercent), 0.0f, 1.0f);
     view.spread = 0.01f * value ("granular.spread");
     view.loop = value ("loop") >= 0.5f;
     view.reverse = value ("reverse") >= 0.5f;

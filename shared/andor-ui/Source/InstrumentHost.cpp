@@ -184,7 +184,7 @@ int InstrumentHost::addModulationRoute (mod::Source source, mod::Dest dest, floa
     int slot = -1;
     for (int r = 0; r < mod::maxRoutes && slot < 0; ++r)
         if (juce::roundToInt (parameterValue (modRouteId (r, "source"))) == static_cast<int> (source)
-            && juce::roundToInt (parameterValue (modRouteId (r, "dest"))) == static_cast<int> (dest))
+            && juce::roundToInt (parameterValue (modRouteId (r, "dest"))) == mod::choiceOf (dest))
             slot = r;
     for (int r = 0; r < mod::maxRoutes && slot < 0; ++r)
         if (juce::roundToInt (parameterValue (modRouteId (r, "source"))) == 0)
@@ -195,7 +195,7 @@ int InstrumentHost::addModulationRoute (mod::Source source, mod::Dest dest, floa
     if (juce::roundToInt (parameterValue (modRouteId (slot, "source"))) == 0)
         setModLink (slot, newModRouteUid(), 0);   // a new route: a new identity
     setParameterValue (modRouteId (slot, "source"), static_cast<float> (source));
-    setParameterValue (modRouteId (slot, "dest"), static_cast<float> (dest));
+    setParameterValue (modRouteId (slot, "dest"), static_cast<float> (mod::choiceOf (dest)));
     setParameterValue (modRouteId (slot, "depth"), depthPercent);
     setParameterValue (modRouteId (slot, "enabled"), 1.0f);
     commitRouteChange();
@@ -313,7 +313,7 @@ mod::Settings InstrumentHost::modulationProbe() const
     {
         auto& route = probe.routes[static_cast<std::size_t> (r)];
         route.source = static_cast<mod::Source> (std::clamp (juce::roundToInt (parameterValue (modRouteId (r, "source"))), 0, mod::sourceCount));
-        route.dest = static_cast<mod::Dest> (std::clamp (juce::roundToInt (parameterValue (modRouteId (r, "dest"))), 0, mod::hostDestCount - 1));
+        route.dest = mod::destFromChoice (juce::roundToInt (parameterValue (modRouteId (r, "dest"))));
         route.depth = 0.01 * parameterValue (modRouteId (r, "depth"));
         route.enabled = parameterValue (modRouteId (r, "enabled")) >= 0.5f;
         route.target = resolveModTarget (r);
@@ -434,7 +434,7 @@ InstrumentHost::ModAssignResult InstrumentHost::assignModulation (mod::Source so
     undo().beginNewTransaction ("Add modulation");
     setModLink (result.slot, newModRouteUid(), 0);   // a new route: a new identity
     setParameterValue (modRouteId (result.slot, "source"), static_cast<float> (source));
-    setParameterValue (modRouteId (result.slot, "dest"), static_cast<float> (dest));
+    setParameterValue (modRouteId (result.slot, "dest"), static_cast<float> (mod::choiceOf (dest)));
     setParameterValue (modRouteId (result.slot, "depth"), depthPercent);
     setParameterValue (modRouteId (result.slot, "enabled"), 1.0f);
     commitRouteChange();

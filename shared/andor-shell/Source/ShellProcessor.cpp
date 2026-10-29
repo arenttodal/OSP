@@ -1,6 +1,9 @@
 #include "ShellProcessor.h"
 #include "ShellEditor.h"
 
+#include "AndorParameters.h"
+#include "Binding.h"
+
 #include <algorithm>
 #include <cstdlib>
 
@@ -46,6 +49,9 @@ namespace
     /** ANDOR OSP's schema, then the product's own parameters (ProductInfo::addParameters). */
     juce::AudioProcessorValueTreeState::ParameterLayout productParameterLayout()
     {
+        // The product's own modulation destinations come after ANDOR OSP's in the routes'
+        // destination list, which the layout below is made with.
+        osp::mod::setProductDestinations (productInfo().modulationDestinations);
         auto layout = InstrumentHost::createParameterLayout();
         if (productInfo().addParameters != nullptr)
             productInfo().addParameters (layout);
@@ -75,6 +81,32 @@ ShellProcessor::ShellProcessor (std::unique_ptr<Engine> productEngine)
     description = engine->describe();
     bound = engine->boundParameters();
     generatorName = engine->generatorName();
+    arpBound = osp::plugin::binding::anyBound ({ osp::plugin::ids::arpEnabled }, bound);
+    arpEnabledParam = parameters.getRawParameterValue (osp::plugin::ids::arpEnabled);
+    arpPatternParam = parameters.getRawParameterValue (osp::plugin::ids::arpPattern);
+    arpRateParam = parameters.getRawParameterValue (osp::plugin::ids::arpRate);
+    arpGateParam = parameters.getRawParameterValue (osp::plugin::ids::arpGate);
+    arpOctavesParam = parameters.getRawParameterValue (osp::plugin::ids::arpOctaves);
+    arpSwingParam = parameters.getRawParameterValue (osp::plugin::ids::arpSwing);
+    arpVelocityParam = parameters.getRawParameterValue (osp::plugin::ids::arpVelocity);
+    seedParam = parameters.getRawParameterValue (osp::plugin::ids::seed);
+    modBound = osp::plugin::binding::anyBound ({ modRouteId (0, "source") }, bound);
+    for (int i = 0; i < 2; ++i)
+    {
+        int k = 0;
+        for (const char* name : { "shape", "rate", "sync", "division", "phase", "polarity", "mode", "scope" })
+            modLfoParams[static_cast<std::size_t> (8 * i + k++)] = parameters.getRawParameterValue (modLfoId (i, name));
+        k = 0;
+        for (const char* name : { "mode", "attack", "decay", "sustain", "release", "curve", "length" })
+            modEnvParams[static_cast<std::size_t> (7 * i + k++)] = parameters.getRawParameterValue (modEnvId (i, name));
+    }
+    for (int r = 0; r < osp::mod::maxRoutes; ++r)
+    {
+        int k = 0;
+        for (const char* name : { "source", "dest", "depth", "enabled" })
+            modRouteParams[static_cast<std::size_t> (4 * r + k++)] = parameters.getRawParameterValue (modRouteId (r, name));
+        modRouteTargets[static_cast<std::size_t> (r)].store (-1);
+    }
     macros = productInfo().macros;
     for (std::size_t i = 0; i < ccNumbers.size(); ++i)
         ccNumbers[i].store (defaultControllers[i]);
@@ -97,8 +129,12 @@ ShellProcessor::~ShellProcessor()
 void ShellProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     engine->prepare (sampleRate, samplesPerBlock, parameters);
-    shaperGenerationSeen = 0;   // the prepared engine is given the pattern and curves again
+    // The arpeggiator's MIDI: room for any realistic block, so the audio thread never grows it.
+    arpeggiator.prepare (sampleRate);
+    arpMidi.ensureSize (static_cast<std::size_t> (osp::Arpeggiator::maxEvents + 4096) * 16);
+    shaperGenerationSeen = 0;   // the prepared engine is given the pattern, curves and modulation again
     curveGenerationSeen.fill (0);
+    modDirty = true;
     setLatencySamples (engine->latencySamples());
     // A prepared engine plays the sources it is given from now on: hand it the current ones.
     for (int l = 0; l < numLayers; ++l)
@@ -156,6 +192,10 @@ void ShellProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
             performance.pitchWheel = static_cast<float> (m.getPitchWheelValue() - 8192) / 8192.0f;
         else if (m.isControllerOfType (1))
             performance.modWheel = static_cast<float> (m.getControllerValue()) / 127.0f;
+        // CC 1-4's Learn: the next controller that moves is taken for the slot.
+        if (m.isController() && m.getControllerNumber() < 120)
+            if (const int learn = ccLearn.exchange (-1, std::memory_order_acq_rel); learn >= 0 && learn < osp::mod::ccSlots)
+                ccNumbers[static_cast<std::size_t> (learn)].store (m.getControllerNumber(), std::memory_order_relaxed);
     }
     // The on-screen wheels win when they move.
     if (const float p = screenPitch.load (std::memory_order_relaxed); ! juce::exactlyEqual (p, lastScreenPitch))
@@ -186,6 +226,11 @@ void ShellProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
         }
 
     tempo.store (static_cast<float> (performance.bpm), std::memory_order_relaxed);
+    // A bounce from the same position plays the same arpeggio: its pattern and RANDOM's
+    // choices start over whenever the transport starts.
+    if (performance.playing && ! hostWasPlaying)
+        arpeggiator.restartPattern();
+    hostWasPlaying = performance.playing;
 
     // SHAPER CUSTOM: a changed pattern reaches the engine before the block.
     if (const auto generation = shaperGeneration.load (std::memory_order_acquire); generation != shaperGenerationSeen)
@@ -213,11 +258,237 @@ void ShellProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
                 curve.points[i] = { shared[3 * i].load (std::memory_order_relaxed), shared[3 * i + 1].load (std::memory_order_relaxed),
                                     shared[3 * i + 2].load (std::memory_order_relaxed) };
             engine->setModulationCurve (c, curve);
+            if (c < 6)   // LFO 1-2, ENV 1-2, VEL, NOTE (the rest are DAMPEN's)
+            {
+                auto& table = c < 2 ? modSettings.lfoCurve[index] : c < 4 ? modSettings.envCurve[index - 2] : c == 4 ? modSettings.velCurve : modSettings.noteCurve;
+                table = osp::mod::compileCurve (curve);
+                modDirty = true;
+            }
         }
     }
+    if (modBound)
+        applyModulation();
 
     buffer.clear();
-    engine->process (buffer, midi, performance);
+    if (! arpBound)
+    {
+        engine->process (buffer, midi, performance);
+        return;
+    }
+    osp::HostTiming timing;
+    timing.valid = performance.hasPosition;
+    timing.playing = performance.playing;
+    timing.bpm = performance.bpm;
+    timing.ppq = performance.ppq;
+    timing.numerator = performance.numerator;
+    timing.denominator = performance.denominator;
+    const auto& notes = runArpeggiator (midi, buffer.getNumSamples(), timing);
+    engine->setPlayedKeys (arpeggiator.isEnabled(), midi);
+    engine->process (buffer, notes, performance);
+}
+
+void ShellProcessor::applyModulation() noexcept
+{
+    // As ANDOR OSP's processor gathers it (OspAudioProcessor::applyModulation): rarely
+    // changed, so compared first and handed over only when something moved.
+    std::array<float, modValueCount> now {};
+    std::size_t k = 0;
+    for (auto* p : modLfoParams)
+        now[k++] = p->load();
+    for (auto* p : modEnvParams)
+        now[k++] = p->load();
+    for (auto* p : modRouteParams)
+        now[k++] = p->load();
+    for (const auto& t : modRouteTargets)
+        now[k++] = static_cast<float> (t.load (std::memory_order_relaxed));
+    for (const auto& c : ccNumbers)
+        now[k++] = static_cast<float> (c.load (std::memory_order_relaxed));
+    now[k++] = std::max (1.0f, seedParam->load());
+    now[k++] = velToAmp.load (std::memory_order_relaxed) ? 1.0f : 0.0f;
+    if (! modDirty && now == lastModValues)
+        return;
+    modDirty = false;
+    lastModValues = now;
+    auto& s = modSettings;
+    for (std::size_t i = 0; i < 2; ++i)
+    {
+        auto l = [this, i] (std::size_t n) { return modLfoParams[8 * i + n]->load(); };
+        auto& lfo = s.lfo[i];
+        lfo.shape = static_cast<osp::mod::LfoShape> (std::clamp (juce::roundToInt (l (0)), 0, osp::mod::lfoShapeCount - 1));
+        lfo.rateHz = l (1);
+        lfo.sync = l (2) >= 0.5f;
+        lfo.division = std::clamp (juce::roundToInt (l (3)), 0, osp::mod::syncDivisionCount - 1);
+        lfo.phase = 0.01 * l (4);
+        lfo.bipolar = l (5) < 0.5f;
+        lfo.mode = static_cast<osp::mod::LfoMode> (std::clamp (juce::roundToInt (l (6)), 0, 2));
+        lfo.scope = l (7) >= 0.5f ? osp::mod::Scope::poly : osp::mod::Scope::global;
+        auto e = [this, i] (std::size_t n) { return static_cast<double> (modEnvParams[7 * i + n]->load()); };
+        auto& env = s.env[i];
+        env.oneShotCurve = e (0) >= 0.5;
+        env.attackSeconds = 0.001 * e (1);
+        env.decaySeconds = 0.001 * e (2);
+        env.sustain = 0.01 * e (3);
+        env.releaseSeconds = 0.001 * e (4);
+        env.curve = 0.01 * e (5);
+        env.lengthSeconds = 0.001 * e (6);
+    }
+    for (std::size_t r = 0; r < s.routes.size(); ++r)
+    {
+        auto& route = s.routes[r];
+        route.source = static_cast<osp::mod::Source> (std::clamp (juce::roundToInt (modRouteParams[4 * r]->load()), 0, osp::mod::sourceCount));
+        route.dest = osp::mod::destFromChoice (juce::roundToInt (modRouteParams[4 * r + 1]->load()));
+        route.depth = 0.01 * modRouteParams[4 * r + 2]->load();
+        route.enabled = modRouteParams[4 * r + 3]->load() >= 0.5f;
+        route.target = modRouteTargets[r].load (std::memory_order_relaxed);
+    }
+    s.seed = static_cast<std::uint64_t> (std::max (1.0f, seedParam->load()));
+    s.velocityToAmp = velToAmp.load (std::memory_order_relaxed);
+    for (std::size_t i = 0; i < modControllers.size(); ++i)
+        modControllers[i] = ccNumbers[i].load (std::memory_order_relaxed);
+    engine->setModulation (s, modControllers);
+}
+
+void ShellProcessor::refreshModTargets()
+{
+    // A depth route's target, by its identity (message thread: the links live in the state).
+    for (int r = 0; r < osp::mod::maxRoutes; ++r)
+        modRouteTargets[static_cast<std::size_t> (r)].store (resolveModTarget (r), std::memory_order_relaxed);
+}
+
+double ShellProcessor::steppedArpRatio (double multiplier) noexcept
+{
+    // The musical ratios ARP RATE's Stepped mode keeps to (the nearest, by octaves).
+    static constexpr std::array<double, 11> ratios { 0.25, 1.0 / 3.0, 0.5, 2.0 / 3.0, 0.75, 1.0, 4.0 / 3.0, 1.5, 2.0, 3.0, 4.0 };
+    const double octaves = std::log2 (std::max (multiplier, 1.0e-6));
+    double best = 1.0, distance = 1.0e9;
+    for (const double r : ratios)
+        if (const double d = std::abs (std::log2 (r) - octaves); d < distance)
+        {
+            distance = d;
+            best = r;
+        }
+    return best;
+}
+
+const juce::MidiBuffer& ShellProcessor::runArpeggiator (const juce::MidiBuffer& midi, int numSamples, const osp::HostTiming& timing) noexcept
+{
+    // ANDOR OSP's arpeggiator as its processor runs it (OspAudioProcessor::runArpeggiator).
+    using namespace osp;
+    Arpeggiator::Settings settings;
+    settings.enabled = arpEnabledParam->load() >= 0.5f;
+    settings.pattern = static_cast<ArpPattern> (std::clamp (juce::roundToInt (arpPatternParam->load()), 0, arp::patternCount - 1));
+    settings.rate = static_cast<ArpRate> (std::clamp (juce::roundToInt (arpRateParam->load()), 0, arp::rateCount - 1));
+    settings.gate = arpGateParam->load() / 100.0;
+    settings.octaves = std::clamp (juce::roundToInt (arpOctavesParam->load()), arp::minOctaves, arp::maxOctaves);
+    settings.swing = arpSwingParam->load() / 100.0;
+    settings.velocityScale = arpVelocityParam->load() / 100.0;
+    settings.rateStepped = arpStepped.load (std::memory_order_relaxed);
+    {
+        // The ARP destinations, from the engine's last control period (ANDOR OSP's
+        // applyArpModulation). Without a route every offset is 0: the settings as they are.
+        using osp::mod::Dest;
+        auto offset = [this] (Dest d) {
+            double v = 0.0;
+            return engine->arpModulation (d, v) ? v : 0.0;
+        };
+        const double rate = std::clamp (offset (Dest::arpRate), -2.0, 2.0);
+        settings.rateMultiplier = settings.rateStepped ? steppedArpRatio (std::exp2 (rate)) : std::exp2 (rate);
+        settings.gate += offset (Dest::arpGate);
+        settings.swing += offset (Dest::arpSwing);
+        settings.velocityScale = std::clamp (settings.velocityScale + offset (Dest::arpVelocity), 0.0, 2.0);
+        if (double octaves = 0.0; engine->arpModulation (Dest::arpOctaves, octaves))
+        {
+            // Quantised with hysteresis; the arpeggiator applies it at its next cycle.
+            const double wanted = settings.octaves + octaves;
+            if (arpModOctaves < arp::minOctaves || std::abs (wanted - arpModOctaves) > 0.6)
+                arpModOctaves = std::clamp (static_cast<int> (std::lround (wanted)), arp::minOctaves, arp::maxOctaves);
+            settings.octaves = arpModOctaves;
+            settings.octavesAtCycle = true;
+        }
+        else
+            arpModOctaves = 0;
+    }
+    arpeggiator.setSeed (static_cast<std::uint64_t> (std::max (1.0f, seedParam->load())));
+    arpeggiator.beginBlock (settings, timing, numSamples);
+
+    auto feed = [this, numSamples] (const juce::MidiMessage& m, int samplePosition) {
+        const int offset = std::clamp (samplePosition, 0, std::max (0, numSamples - 1));
+        if (m.isNoteOn())
+            arpeggiator.noteOn (offset, m.getNoteNumber(), m.getVelocity(), m.getChannel());
+        else if (m.isNoteOff())
+            arpeggiator.noteOff (offset, m.getNoteNumber(), m.getChannel());
+        else if (m.isSustainPedalOn() || m.isSustainPedalOff())
+            arpeggiator.sustainPedal (offset, m.isSustainPedalOn());
+        else if (m.isAllNotesOff() || m.isAllSoundOff())
+            arpeggiator.allNotesOff (offset);
+        else
+            return false;
+        return true;
+    };
+
+    const bool owns = arpeggiator.isEnabled();
+    if (! owns && arpeggiator.numEvents() == 0 && arpeggiator.soundingCount() == 0)
+    {
+        // Off: the held notes are only followed (to hand them over if it is switched on);
+        // the engine plays exactly the MIDI that arrived.
+        for (const auto metadata : midi)
+            feed (metadata.getMessage(), metadata.samplePosition);
+        arpeggiator.endBlock();
+        publishArpDisplay();
+        return midi;
+    }
+
+    // On (or handing back): note events and the pedal go to the arpeggiator, everything
+    // else (bends, wheels, pressure, CCs, All Notes Off) passes through at its sample.
+    arpMidi.clear();
+    for (const auto metadata : midi)
+    {
+        const auto m = metadata.getMessage();
+        const bool noteEvent = feed (m, metadata.samplePosition);
+        const bool consumed = owns && noteEvent && ! (m.isAllNotesOff() || m.isAllSoundOff());
+        if (! consumed)
+            arpMidi.addEvent (m, metadata.samplePosition);
+    }
+    arpeggiator.endBlock();
+    for (int i = 0; i < arpeggiator.numEvents(); ++i)
+    {
+        const auto& e = arpeggiator.event (i);
+        switch (e.kind)
+        {
+            case Arpeggiator::Event::Kind::noteOn: arpMidi.addEvent (juce::MidiMessage::noteOn (e.channel, e.note, e.velocity), e.offset); break;
+            case Arpeggiator::Event::Kind::noteOff: arpMidi.addEvent (juce::MidiMessage::noteOff (e.channel, e.note), e.offset); break;
+            case Arpeggiator::Event::Kind::sustainOn: arpMidi.addEvent (juce::MidiMessage::controllerEvent (e.channel, 64, 127), e.offset); break;
+            case Arpeggiator::Event::Kind::sustainOff: arpMidi.addEvent (juce::MidiMessage::controllerEvent (e.channel, 64, 0), e.offset); break;
+        }
+    }
+    publishArpDisplay();
+    return arpMidi;
+}
+
+void ShellProcessor::publishArpDisplay() noexcept
+{
+    osp::Arpeggiator::Display display;
+    arpeggiator.display (display);
+    for (std::size_t i = 0; i < arpDisplayLow.size(); ++i)
+    {
+        arpDisplayLow[i].store (display.low[i], std::memory_order_relaxed);
+        arpDisplayHigh[i].store (display.high[i], std::memory_order_relaxed);
+    }
+    arpDisplayCurrent.store (display.current, std::memory_order_relaxed);
+    arpDisplayActive.store (display.active, std::memory_order_release);
+}
+
+InstrumentHost::ArpView ShellProcessor::arpView() const noexcept
+{
+    ArpView view;
+    view.active = arpDisplayActive.load (std::memory_order_acquire);
+    view.current = arpDisplayCurrent.load (std::memory_order_relaxed);
+    for (std::size_t i = 0; i < arpDisplayLow.size(); ++i)
+    {
+        view.low[i] = arpDisplayLow[i].load (std::memory_order_relaxed);
+        view.high[i] = arpDisplayHigh[i].load (std::memory_order_relaxed);
+    }
+    return view;
 }
 
 juce::AudioProcessorEditor* ShellProcessor::createEditor()
@@ -250,7 +521,10 @@ bool ShellProcessor::isLayerOccupied (int layer) const
 
 const osp::InstrumentEngine::GrainSnapshot& ShellProcessor::grainSnapshot (int layer) const noexcept
 {
-    return noGrains[static_cast<std::size_t> (std::clamp (layer, 0, numLayers - 1))];
+    const int l = std::clamp (layer, 0, numLayers - 1);
+    if (const auto* grains = engine->grainSnapshot (l))
+        return *grains;
+    return noGrains[static_cast<std::size_t> (l)];
 }
 
 bool ShellProcessor::generatedSource (int layer, GeneratedSource& out) const
@@ -451,6 +725,8 @@ void ShellProcessor::timerCallback()
     }
     for (auto& slot : layers)
         slot.exchange.collectGarbage();
+    if (modBound)
+        refreshModTargets();
 }
 
 juce::String ShellProcessor::statusMessage() const
@@ -554,6 +830,8 @@ bool ShellProcessor::applyStateXml (const juce::XmlElement& xml)
         for (int i = 0; i < std::min (controllers.size(), osp::mod::ccSlots); ++i)
             setModControllerNumber (i, controllers[i].getIntValue());
     }
+    if (modBound)
+        refreshModTargets();
     return true;
 }
 

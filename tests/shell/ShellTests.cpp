@@ -101,6 +101,49 @@ namespace
         void process (juce::AudioBuffer<float>&, const juce::MidiBuffer&, const Performance&) noexcept override {}
     };
 
+    /** A test-only engine that logs the notes it is given (sample, note; velocity 0: off),
+        binding `bound`, and shows grains when given some. */
+    struct NoteLogEngine final : andor::shell::Engine
+    {
+        explicit NoteLogEngine (juce::StringArray b) : boundIds (std::move (b)) {}
+        Description describe() const override { return { "Note log (test only)", false, {} }; }
+        juce::StringArray boundParameters() const override { return boundIds; }
+        void prepare (double, int, juce::AudioProcessorValueTreeState&) override { clock = 0; }
+        void setSource (int, const osp::plugin::LoadedInstrument*) noexcept override {}
+        void process (juce::AudioBuffer<float>& buffer, const juce::MidiBuffer& midi, const Performance&) noexcept override
+        {
+            for (const auto m : midi)
+                if (const auto msg = m.getMessage(); msg.isNoteOnOrOff())
+                    log.push_back ({ clock + m.samplePosition, msg.getNoteNumber(), msg.isNoteOn() ? msg.getVelocity() : 0 });
+            clock += buffer.getNumSamples();
+        }
+        const osp::InstrumentEngine::GrainSnapshot* grainSnapshot (int layer) const noexcept override { return layer == 0 ? &grains : nullptr; }
+        struct Event
+        {
+            std::int64_t sample;
+            int note, velocity;
+        };
+        juce::StringArray boundIds;
+        std::vector<Event> log;
+        std::int64_t clock = 0;
+        osp::InstrumentEngine::GrainSnapshot grains;
+    };
+
+    /** A chord held from the start for `seconds`, rendered in blocks of 256 at 48 kHz. */
+    void holdChord (ShellProcessor& p, double seconds)
+    {
+        p.prepareToPlay (48000.0, 256);
+        juce::AudioBuffer<float> buffer (2, 256);
+        for (int pos = 0; pos < static_cast<int> (seconds * 48000.0); pos += 256)
+        {
+            juce::MidiBuffer midi;
+            if (pos == 0)
+                for (const int note : { 60, 64, 67 })
+                    midi.addEvent (juce::MidiMessage::noteOn (1, note, static_cast<juce::uint8> (100)), 10);
+            p.processBlock (buffer, midi);
+        }
+    }
+
     /** A four-character code as JUCE's plugin defines give it (0x41657870 for "Aexp"). */
     int fourCharCode (const juce::String& code)
     {
@@ -166,11 +209,31 @@ TEST_CASE ("shell: the parameter schema is ANDOR OSP's, unchanged; the product's
     ShellProcessor p;
     // ANDOR OSP's schema first, exactly; then the product's own parameters (if any), every
     // ID in the product's namespace ("<slug>."), pinned by the product's golden listing.
+    // A product's own modulation destinations follow ANDOR OSP's in the routes' destination
+    // choices (in its order): those are checked, and the rest of the choice as ANDOR OSP's.
     const auto prefix = andor::shell::productInfo().slug + ".";
+    const auto& productDests = andor::shell::productInfo().modulationDestinations;
+    CHECK (osp::mod::productDestCount() == static_cast<int> (productDests.size()));
     juce::StringArray base, own;
     bool ownStarted = false, orderKept = true;
-    for (const auto& line : juce::StringArray::fromLines (parameterschema::describe (p).trimEnd()))
+    for (auto* parameter : p.getParameters())
     {
+        auto* ranged = dynamic_cast<juce::RangedAudioParameter*> (parameter);
+        REQUIRE (ranged != nullptr);
+        auto line = parameterschema::describe (ranged);
+        const auto id = ranged->getParameterID();
+        if (id.startsWith ("mod.route") && id.endsWith (".dest"))
+        {
+            auto* choice = dynamic_cast<juce::AudioParameterChoice*> (ranged);
+            REQUIRE (choice != nullptr);
+            REQUIRE (choice->choices.size() == osp::mod::hostDestCount + static_cast<int> (productDests.size()));
+            for (std::size_t k = 0; k < productDests.size(); ++k)
+                CHECK (choice->choices[osp::mod::hostDestCount + static_cast<int> (k)] == juce::String (productDests[k].name));
+            juce::StringArray ospChoices (choice->choices);
+            ospChoices.removeRange (osp::mod::hostDestCount, static_cast<int> (productDests.size()));
+            juce::AudioParameterChoice asOsp ({ id, ranged->getVersionHint() }, ranged->getName (128), ospChoices, 0);
+            line = parameterschema::describe (&asOsp);
+        }
         const bool isOwn = line.startsWith (prefix);
         orderKept = orderKept && (isOwn || ! ownStarted);
         ownStarted = ownStarted || isOwn;
@@ -219,6 +282,85 @@ TEST_CASE ("shell: a generator engine has one card, layer A, and never loads a f
     ui->refreshNow();
     CHECK (ui->visibleCardCount() == 1);
     CHECK_FALSE (ui->isInterestedInFileDrag ({ file.getFullPathName() }));
+}
+
+TEST_CASE ("shell: an engine that binds arp.* is played by ANDOR OSP's arpeggiator; others get the keys as played", "[shell][engine][arp]")
+{
+    auto onsets = [] (const NoteLogEngine& e) {
+        std::vector<NoteLogEngine::Event> on;
+        for (const auto& ev : e.log)
+            if (ev.velocity > 0)
+                on.push_back (ev);
+        return on;
+    };
+    {
+        // Not bound: the chord arrives as played, even with the arpeggiator switched on.
+        auto engine = std::make_unique<NoteLogEngine> (juce::StringArray { "layerA.level" });
+        auto& log = *engine;
+        ShellProcessor p (std::move (engine));
+        CHECK_FALSE (p.runsArpeggiator());
+        p.parameters.getParameter ("arp.enabled")->setValueNotifyingHost (1.0f);
+        holdChord (p, 1.0);
+        const auto on = onsets (log);
+        REQUIRE (on.size() == 3);
+        CHECK (on[0].sample == 10);
+        CHECK_FALSE (p.arpView().active);
+    }
+    {
+        // Bound, off: as played.
+        auto engine = std::make_unique<NoteLogEngine> (juce::StringArray { "arp.*" });
+        auto& log = *engine;
+        ShellProcessor p (std::move (engine));
+        CHECK (p.runsArpeggiator());
+        holdChord (p, 1.0);
+        CHECK (onsets (log).size() == 3);
+    }
+    std::vector<NoteLogEngine::Event> first;
+    for (int run = 0; run < 2; ++run)
+    {
+        // Bound, on: UP in eighths at 120 BPM (no host: free-running), a step every 0.25 s,
+        // each note alone and held for the gate (75 %); the display runs.
+        auto engine = std::make_unique<NoteLogEngine> (juce::StringArray { "arp.*" });
+        auto& log = *engine;
+        ShellProcessor p (std::move (engine));
+        p.parameters.getParameter ("arp.enabled")->setValueNotifyingHost (1.0f);
+        holdChord (p, 1.6);
+        const auto on = onsets (log);
+        REQUIRE (on.size() >= 6);
+        const int expected[] { 60, 64, 67, 60, 64, 67 };
+        for (std::size_t i = 0; i < 6; ++i)
+        {
+            INFO ("step " << i);
+            CHECK (on[i].note == expected[i]);
+            CHECK (on[i].sample == Approx (10.0 + 12000.0 * static_cast<double> (i)).margin (1.0));
+        }
+        for (std::size_t i = 0; i + 1 < log.log.size(); ++i)
+            if (log.log[i].velocity > 0)
+                CHECK ((log.log[i + 1].velocity == 0 && log.log[i + 1].note == log.log[i].note));   // ends before the next starts
+        CHECK (p.arpView().active);
+        CHECK (p.arpView().current >= 0);
+        if (run == 0)
+            first = log.log;
+        else
+        {
+            REQUIRE (log.log.size() == first.size());   // the same every time
+            for (std::size_t i = 0; i < first.size(); ++i)
+                CHECK ((log.log[i].sample == first[i].sample && log.log[i].note == first[i].note && log.log[i].velocity == first[i].velocity));
+        }
+    }
+}
+
+TEST_CASE ("shell: a generator engine's grains reach the card", "[shell][engine]")
+{
+    auto engine = std::make_unique<NoteLogEngine> (juce::StringArray { "arp.*" });
+    auto& e = *engine;
+    ShellProcessor p (std::move (engine));
+    CHECK (p.grainSnapshot (0).count.load() == 0);
+    e.grains.position[0] = 0.25f;
+    e.grains.count = 1;
+    CHECK (&p.grainSnapshot (0) == &e.grains);
+    CHECK (p.grainSnapshot (0).position[0].load() == Approx (0.25f));
+    CHECK (p.grainSnapshot (1).count.load() == 0);   // (the engine has none there)
 }
 
 TEST_CASE ("shell: the diagnostic engine plays the sources it is given, says what it is, binds only what it reads", "[shell][engine]")

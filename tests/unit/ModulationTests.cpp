@@ -1352,3 +1352,48 @@ TEST_CASE ("voices: a released voice nobody can hear ends; one that can be heard
     // An ordinary level: its release is heard, so it plays it.
     CHECK (voicesAfterRelease (0.4, -90.0, 0.6) == 1);
 }
+
+TEST_CASE ("mod: a product's own destinations follow ANDOR OSP's; without them the route choices are ANDOR OSP's", "[unit][mod]")
+{
+    using D = mod::Dest;
+    // ANDOR OSP names none: every route choice is its destination, as saved sessions hold it.
+    mod::setProductDestinations ({});
+    CHECK (mod::productDestCount() == 0);
+    CHECK (mod::hostChoiceCount() == mod::hostDestCount);
+    for (int c = 0; c < mod::hostDestCount; ++c)
+    {
+        CHECK (static_cast<int> (mod::destFromChoice (c)) == c);
+        CHECK (mod::choiceOf (static_cast<D> (c)) == c);
+    }
+    CHECK (mod::destFromChoice (mod::hostDestCount) == D::none);
+    CHECK (mod::choiceOf (D::keyDnaAmountA) == -1);   // (engine-only)
+
+    // A product's: after ANDOR OSP's, each its knob's whole travel, owned as it says.
+    mod::setProductDestinations ({ { "product.cutoff", "CUTOFF", mod::Owner::voice, mod::Update::continuous },
+                                   { "product.reverb", "REVERB SIZE", mod::Owner::global, mod::Update::continuous } });
+    CHECK (mod::productDestCount() == 2);
+    CHECK (mod::hostChoiceCount() == mod::hostDestCount + 2);
+    CHECK (mod::destFromChoice (mod::hostDestCount) == mod::productDest (0));
+    CHECK (mod::choiceOf (mod::productDest (1)) == mod::hostDestCount + 1);
+    const auto& cutoff = mod::destInfo (mod::productDest (0));
+    CHECK (std::string (cutoff.id) == "product.cutoff");
+    CHECK (std::string (cutoff.name) == "CUTOFF");
+    CHECK (cutoff.domain == mod::Domain::unit);
+    CHECK (cutoff.span == 1.0);
+    // The rules hold for them as for ANDOR OSP's: a POLY LFO reaches a voice's control only.
+    mod::Settings s;
+    s.lfo[0].scope = mod::Scope::poly;
+    CHECK (mod::compatible (s, mod::Source::lfo1, mod::productDest (0)));
+    CHECK_FALSE (mod::compatible (s, mod::Source::lfo1, mod::productDest (1)));
+    CHECK (mod::compatible (s, mod::Source::env1, mod::productDest (1)));   // (the global envelope)
+    // Routed, summed and compiled like any other.
+    s.routes[0] = { mod::Source::lfo2, mod::productDest (0), 0.5, true, -1 };
+    mod::Runtime rt;
+    rt.setSettings (s);
+    CHECK (rt.compiled.has (mod::productDest (0)));
+    CHECK (rt.compiled.anyVoiceDest);
+    // An unnamed slot is a placeholder no route can reach.
+    CHECK (mod::destFromChoice (mod::hostDestCount + 2) == D::none);
+    CHECK (std::string (mod::destInfo (mod::productDest (5)).id) == "product6");
+    mod::setProductDestinations ({});
+}

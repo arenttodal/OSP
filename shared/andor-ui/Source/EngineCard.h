@@ -244,6 +244,9 @@ public:
 
     /** Pulls the layer's state (instrument, loading, mode, grains) from the processor (UI timer). */
     void refresh();
+    /** The granular view (POS, SPREAD) and the playing grains; START in percent (0 for a
+        generator, whose grains have no start). */
+    void refreshGrains (float startPercent);
     SourceDisplay& display() noexcept { return sourceDisplay; }
 
     std::function<void (int)> onFocus;                 ///< the card was clicked

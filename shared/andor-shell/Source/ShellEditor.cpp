@@ -483,6 +483,13 @@ void ShellEditor::dragModulation (int source, juce::Point<float> where)
 
 void ShellEditor::dropModulation (int source, juce::Point<float> where)
 {
+    // A control the engine does not read (shown disabled) is no destination.
+    if (auto* control = modOverlay.controlAt (where); control != nullptr && ! control->isEnabled())
+    {
+        modOverlay.setDrag (-1, {});
+        modOverlay.showNotice ("This instrument does not use that control");
+        return;
+    }
     modOverlay.setDrag (source, where);
     if (modOverlay.drop (source, where) >= 0)
         modPanel.refresh();

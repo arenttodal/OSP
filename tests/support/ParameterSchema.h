@@ -15,13 +15,10 @@
 
 namespace parameterschema
 {
-    inline juce::String describe (juce::AudioProcessor& processor)
+    /** One parameter's line. */
+    inline juce::String describe (juce::RangedAudioParameter* p)
     {
-        juce::StringArray lines;
-        for (auto* base : processor.getParameters())
         {
-            auto* p = dynamic_cast<juce::RangedAudioParameter*> (base);
-            REQUIRE (p != nullptr);
             const auto& range = p->getNormalisableRange();
             juce::String kind = "float";
             juce::String extra;
@@ -35,11 +32,22 @@ namespace parameterschema
             else if (dynamic_cast<juce::AudioParameterInt*> (p) != nullptr)
                 kind = "int";
             auto text = [p] (float normalised) { return p->getText (normalised, 64); };
-            lines.add (p->getParameterID() + " v" + juce::String (p->getVersionHint()) + " " + kind + " \"" + p->getName (128) + "\" label=\""
-                       + p->getLabel() + "\" range=" + juce::String (range.start, 4) + ".." + juce::String (range.end, 4) + "/"
-                       + juce::String (range.interval, 4) + " skew=" + juce::String (range.skew, 5) + " default="
-                       + juce::String (range.convertFrom0to1 (p->getDefaultValue()), 4) + " steps=" + juce::String (p->getNumSteps())
-                       + " texts=" + text (0.0f) + "|" + text (0.5f) + "|" + text (1.0f) + extra);
+            return p->getParameterID() + " v" + juce::String (p->getVersionHint()) + " " + kind + " \"" + p->getName (128) + "\" label=\""
+                   + p->getLabel() + "\" range=" + juce::String (range.start, 4) + ".." + juce::String (range.end, 4) + "/"
+                   + juce::String (range.interval, 4) + " skew=" + juce::String (range.skew, 5) + " default="
+                   + juce::String (range.convertFrom0to1 (p->getDefaultValue()), 4) + " steps=" + juce::String (p->getNumSteps())
+                   + " texts=" + text (0.0f) + "|" + text (0.5f) + "|" + text (1.0f) + extra;
+        }
+    }
+
+    inline juce::String describe (juce::AudioProcessor& processor)
+    {
+        juce::StringArray lines;
+        for (auto* base : processor.getParameters())
+        {
+            auto* p = dynamic_cast<juce::RangedAudioParameter*> (base);
+            REQUIRE (p != nullptr);
+            lines.add (describe (p));
         }
         return lines.joinIntoString ("\n") + "\n";
     }

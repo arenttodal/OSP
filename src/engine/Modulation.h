@@ -4,6 +4,8 @@
 
 #include <array>
 #include <cstdint>
+#include <string>
+#include <vector>
 
 namespace osp::mod
 {
@@ -233,7 +235,10 @@ enum class Dest : std::uint8_t
     dampenCutoffA, dampenCutoffB, dampenCutoffC,
     // Each layer's KEY DNA AMOUNT (per voice, live on sounding notes; unified engine Phase 2).
     keyDnaAmountA, keyDnaAmountB, keyDnaAmountC,
-    count
+    // An instrument's own controls: products built from the ANDOR Instrument Shell name them
+    // (setProductDestinations); ANDOR OSP names none, so it never offers or reads these.
+    product0,
+    count = product0 + 96
 };
 constexpr int destCount = static_cast<int> (Dest::count);
 /**
@@ -244,6 +249,10 @@ constexpr int destCount = static_cast<int> (Dest::count);
     versioned parameter for them is decided.
 */
 constexpr int hostDestCount = static_cast<int> (Dest::keyDnaAmountA);
+constexpr int maxProductDests = destCount - static_cast<int> (Dest::product0);
+constexpr bool isProductDest (Dest d) noexcept { return static_cast<int> (d) >= static_cast<int> (Dest::product0) && static_cast<int> (d) < destCount; }
+constexpr Dest productDest (int index) noexcept { return static_cast<Dest> (static_cast<int> (Dest::product0) + index); }
+constexpr int productIndex (Dest d) noexcept { return isProductDest (d) ? static_cast<int> (d) - static_cast<int> (Dest::product0) : -1; }
 
 enum class Owner : std::uint8_t
 {
@@ -285,6 +294,47 @@ struct DestInfo
     double lowSeconds = 0.0, highSeconds = 0.0;
 };
 const DestInfo& destInfo (Dest d) noexcept;
+
+/**
+    One of a product's own destinations (a control of an instrument built from the ANDOR
+    Instrument Shell): it is the control's whole range, 0..1 of the knob (Domain::unit, span 1),
+    so a route takes the knob from wherever it is to either end; the engine clamps there.
+*/
+struct ProductDest
+{
+    std::string id;     ///< the control's parameter ID ("analog.cutoff")
+    std::string name;   ///< "CUTOFF", as the routing list names it
+    Owner owner = Owner::voice;   ///< global: a shared stage (an effect), which a POLY source cannot reach
+    Update update = Update::continuous;
+};
+/**
+    The product's destinations, in order (product0, product1, ...; at most maxProductDests).
+    Message thread, once, before any parameter layout is made: the route parameters' choice
+    lists are built from them, and the audio thread reads them afterwards without a lock.
+*/
+void setProductDestinations (const std::vector<ProductDest>& destinations);
+int productDestCount() noexcept;
+
+/**
+    The route parameter's choices: index 0 "None", ANDOR OSP's destinations up to
+    hostDestCount (index == Dest), then the product's own (product0, ...). Without product
+    destinations this is exactly ANDOR OSP's list, so its automation keeps its meaning.
+*/
+inline int hostChoiceCount() noexcept { return hostDestCount + productDestCount(); }
+inline Dest destFromChoice (int choice) noexcept
+{
+    if (choice < hostDestCount)
+        return choice <= 0 ? Dest::none : static_cast<Dest> (choice);
+    return choice - hostDestCount < productDestCount() ? productDest (choice - hostDestCount) : Dest::none;
+}
+/** The route parameter's choice for a destination (-1: none offers it, an engine-only one). */
+inline int choiceOf (Dest d) noexcept
+{
+    if (static_cast<int> (d) < hostDestCount)
+        return static_cast<int> (d);
+    const int k = productIndex (d);
+    return k >= 0 && k < productDestCount() ? hostDestCount + k : -1;
+}
 /** What full depth moved before state version 11 (fixed, smaller spans). Older sessions'
     depths are scaled by legacySpan / span when they load, so they sound as they did. For
     CHARACTER CUTOFF it was 4 octaves (the caller converts with the filter's own travel). */
