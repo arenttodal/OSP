@@ -10,6 +10,8 @@
 
 #include <juce_audio_utils/juce_audio_utils.h>
 
+#include <array>
+
 namespace andor::shell
 {
 
@@ -107,6 +109,7 @@ private:
     osp::plugin::ModulationPanel modPanel { shell };
     osp::plugin::Wheel pitchWheel, modWheel;
     float shownWheelPosition = -1.0f;
+    std::array<float, 4> shownEnvelope {};   ///< the AMP envelope's values as last drawn
     osp::plugin::OspKeyboard keyboard;
     juce::Label statusLabel;
     osp::plugin::AdvancedCardButton advancedButton { "Advanced" };

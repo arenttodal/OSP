@@ -660,6 +660,15 @@ void ShellEditor::timerCallback()
         shownWheelPosition = wheel;
         modWheel.setValue (wheel);
     }
+    {
+        // The AMP envelope's picture follows its knobs (and automation), as in ANDOR OSP: it
+        // repaints when one of them moved.
+        const std::array<float, 4> now { shell.parameterValue ("attack"), shell.parameterValue ("decay"),
+                                         shell.parameterValue ("sustainLevel"), shell.parameterValue ("release") };
+        if (now != shownEnvelope)
+            modPanel.ampEnvelope().repaint (modPanel.ampEnvelope().graphBounds());
+        shownEnvelope = now;
+    }
     updateStatus();
     if (shell.arpEditorExpanded() != arpShown)
         setArpExpanded (shell.arpEditorExpanded());
