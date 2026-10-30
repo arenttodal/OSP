@@ -202,6 +202,7 @@ namespace
 void SourceDisplay::setInstrument (std::shared_ptr<const LoadedInstrument> next)
 {
     instrument = std::move (next);
+    litNotes.clear();   // indices into the previous atlas
     cacheDirty = true;
     repaint();
 }
@@ -350,6 +351,43 @@ void SourceDisplay::setPlayheads (const Dot* dots, int count)
     }
     strips (before);
     strips (heads);
+    updateLitNotes();
+}
+
+void SourceDisplay::updateLitNotes()
+{
+    litScratch.clear();
+    if (instrument != nullptr && instrument->atlas != nullptr && ! instrument->atlas->sources.empty()
+        && instrument->atlas->sources.front().sampleRate > 0.0 && ! loading && ! view.granular)
+    {
+        const auto& atlas = *instrument->atlas;
+        const double rate = atlas.sources.front().sampleRate;
+        for (const auto& head : heads)
+        {
+            const double frame = static_cast<double> (head.position) * instrument->durationSeconds * rate;
+            for (std::size_t i = 0; i < atlas.notes.size(); ++i)
+            {
+                const auto& n = atlas.notes[i];
+                if (n.included && n.sourceId == atlas.sources.front().assetId && frame >= static_cast<double> (n.attackStart) - 1.0
+                    && frame <= static_cast<double> (n.sourceEnd) + 1.0)
+                {
+                    if (std::find (litScratch.begin(), litScratch.end(), static_cast<int> (i)) == litScratch.end())
+                        litScratch.push_back (static_cast<int> (i));
+                    break;
+                }
+            }
+        }
+        std::sort (litScratch.begin(), litScratch.end());
+    }
+    if (litScratch == litNotes)
+        return;
+    // Repaint the regions that light up or go dark (a note starts or ends), not every frame.
+    const auto plot = plotArea();
+    for (const auto* list : { &litNotes, &litScratch })
+        for (const int i : *list)
+            if (instrument != nullptr && instrument->atlas != nullptr && i < static_cast<int> (instrument->atlas->notes.size()))
+                repaint (noteRegionBounds (instrument->atlas->notes[static_cast<std::size_t> (i)], plot).expanded (2.0f).getSmallestIntegerContainer());
+    std::swap (litNotes, litScratch);
 }
 
 void SourceDisplay::setDropLabel (const juce::String& label)
@@ -555,6 +593,22 @@ void SourceDisplay::paint (juce::Graphics& g)
             const float r = 0.8f + 1.0f * level;
             g.setColour (tones.core.withAlpha (0.3f + 0.5f * level));
             g.fillEllipse (gx - r, gy - r, 2.0f * r, 2.0f * r);
+        }
+    }
+    if (hasWave && ! litNotes.empty() && instrument->atlas != nullptr)
+    {
+        // The notes sounding now: their regions light up in their colour.
+        for (const int i : litNotes)
+        {
+            if (i >= static_cast<int> (instrument->atlas->notes.size()))
+                continue;
+            const auto& n = instrument->atlas->notes[static_cast<std::size_t> (i)];
+            const auto r = noteRegionBounds (n, plot);
+            const auto tone = design::colour::forPitch (n.playKey());
+            g.setColour (tone.withAlpha (focused ? 0.34f : 0.24f));
+            g.fillRoundedRectangle (r, 4.0f);
+            g.setColour (tone.brighter (0.3f).withAlpha (0.95f));
+            g.drawRoundedRectangle (r.reduced (0.75f), 4.0f, 1.5f);
         }
     }
     if (hasWave)
@@ -884,31 +938,44 @@ void SourceDisplay::paintStatic (juce::Graphics& g)
     }
 }
 
+juce::Rectangle<float> SourceDisplay::noteRegionBounds (const atlas::NoteEvent& n, juce::Rectangle<float> plot) const
+{
+    const double rate = instrument->atlas->sources.front().sampleRate;
+    const float x0 = std::max (plot.getX(), xAtSeconds (static_cast<double> (n.attackStart) / rate, plot));
+    const float x1 = std::min (plot.getRight(), xAtSeconds (static_cast<double> (n.sourceEnd) / rate, plot));
+    const auto box = plot.withTrimmedTop (2.0f).withBottom (getLocalBounds().toFloat().getBottom() - 6.0f);
+    return juce::Rectangle<float> (x0, box.getY(), std::max (0.0f, x1 - x0), box.getHeight()).reduced (1.0f, 0.0f);
+}
+
 void SourceDisplay::paintNoteRegions (juce::Graphics& g, juce::Rectangle<float> plot)
 {
     using namespace design;
     const auto& atlas = *instrument->atlas;
     if (atlas.sources.empty() || atlas.sources.front().sampleRate <= 0.0)
         return;
-    const double rate = atlas.sources.front().sampleRate;
-    const auto tone = colour::identity (layer).wave;
     const float tint = focused ? 1.0f : 0.7f;
-    const auto box = plot.withTrimmedTop (2.0f).withBottom (getLocalBounds().toFloat().getBottom() - 6.0f);
     g.setFont (type::popupValue (12.0f));
+    // With LOOP on, notes that cannot loop are not played: drawn as left out.
+    std::vector<std::string> leftOut;
+    if (const auto* set = instrument->set.get(); set != nullptr && ! view.granular)
+        for (const auto& m : set->members)
+            if (! m.regionId.empty() && ! set->plays (m, view.loop))
+                leftOut.push_back (m.regionId);
     for (const auto& n : atlas.notes)
     {
         if (n.sourceId != atlas.sources.front().assetId)
             continue;
-        const float x0 = std::max (plot.getX(), xAtSeconds (static_cast<double> (n.attackStart) / rate, plot));
-        const float x1 = std::min (plot.getRight(), xAtSeconds (static_cast<double> (n.sourceEnd) / rate, plot));
-        if (x1 - x0 < 2.0f)
+        const auto r = noteRegionBounds (n, plot);
+        if (r.getWidth() < 1.0f)
             continue;
-        const auto r = juce::Rectangle<float> (x0, box.getY(), x1 - x0, box.getHeight()).reduced (1.0f, 0.0f);
-        if (n.included)
+        const bool plays = n.included && std::find (leftOut.begin(), leftOut.end(), n.id) == leftOut.end();
+        if (plays)
         {
-            g.setColour (tone.withAlpha (0.05f * tint));
+            // Its pitch's colour, drawn once into the cached picture (no cost per frame).
+            const auto tone = design::colour::forPitch (n.playKey());
+            g.setColour (tone.withAlpha (0.2f * tint));
             g.fillRoundedRectangle (r, 4.0f);
-            g.setColour (tone.withAlpha (0.42f * tint));
+            g.setColour (tone.withAlpha (0.6f * tint));
             g.drawRoundedRectangle (r.reduced (0.5f), 4.0f, 1.0f);
         }
         else
@@ -924,7 +991,7 @@ void SourceDisplay::paintNoteRegions (juce::Graphics& g, juce::Rectangle<float> 
         {
             const auto label = juce::String (midiNoteName (n.playKey()));
             const auto text = r.reduced (5.0f, 0.0f).withHeight (18.0f).translated (0.0f, 3.0f);
-            g.setColour (juce::Colour (0xffeee8dd).withAlpha ((n.included ? 0.78f : 0.4f) * tint));
+            g.setColour (juce::Colour (0xffeee8dd).withAlpha ((plays ? 0.78f : 0.4f) * tint));
             g.drawText (label, text, juce::Justification::topLeft, true);
             if (n.included && n.diagnostics.any() && ! n.corrections.any())
             {

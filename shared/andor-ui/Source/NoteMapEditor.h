@@ -71,9 +71,13 @@ public:
     /** The status word in the top row: Analyzing, Preparing, Playable, Enhancing, Ready, Needs review, Failed. */
     juce::String statusText() const;
     static juce::String statusOf (const InstrumentHost& host, int layer);
-    /** The keyboard's picture of an atlas: recorded keys (and their takes), keys FILL reaches,
-        silent keys. */
-    static std::array<OspKeyboard::KeyTint, 128> keyMap (const atlas::NoteAtlas& atlas, juce::Colour colour);
+    /** The keyboard's picture of an atlas as its built `set` plays it with the layer's LOOP:
+        recorded keys (their takes, in their pitch's colour), keys FILL reaches (pale, in the
+        colour of the note that fills them), silent keys. */
+    static std::array<OspKeyboard::KeyTint, 128> keyMap (const atlas::NoteAtlas& atlas, const InstrumentSet* set = nullptr, bool loopOn = false);
+    /** Notes the built set leaves out now: with LOOP on, those that cannot loop (once the
+        loops are analysed). Their ids; empty when every note plays. */
+    static std::vector<std::string> notesLeftOut (const InstrumentSet* set, bool loopOn);
 
     void paint (juce::Graphics&) override;
     void resized() override;

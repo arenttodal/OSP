@@ -92,6 +92,10 @@ struct InstrumentModel
     };
 
     Stage stage = Stage::provisional;
+    /** Where this model's audio sits in the recording a display shows, as fractions of it: a
+        Note Atlas note is its region of the phrase (its read head moves there); a whole file
+        is 0..1. Display only, never persisted. */
+    double displayStart = 0.0, displayEnd = 1.0;
     AnalysisData analysis;
     double rootMidi = 60.0;
     PlaybackPreparation playback;

@@ -209,6 +209,62 @@ TEST_CASE ("plugin phase 5: a dropped phrase asks \"Identify notes?\" at once; o
     }
 }
 
+TEST_CASE ("plugin phase 5: a played note lights its own region, its read head inside it; keys and regions wear their pitch's colour", "[plugin][phase5][notemap][gui]")
+{
+    TempDir tmp;
+    const ScopedEnvironment storeDir ("OSP_SAMPLE_STORE", tmp.dir.getChildFile ("store").getFullPathName());
+    OspAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (editor.get());
+    REQUIRE (ui != nullptr);
+    ordinaryPhrase (p, tmp.dir, { 69, 74, 77 });
+    p.mapNotes (0);
+    settleEdits (p);
+    p.setEditLayer (0);
+    ui->refreshNow();
+    const auto instrument = p.currentInstrument (0);
+    REQUIRE (instrument != nullptr);
+    REQUIRE (instrument->atlas != nullptr);
+    const auto& atlas = *instrument->atlas;
+    auto& display = ui->engineCard (0).display();
+    CHECK (display.litNoteIndices().empty());
+
+    // Hold 74: its region lights, and only its; the read head stays inside it.
+    std::vector<int> lit;
+    bool headsInside = true;
+    int headsSeen = 0;
+    const double total = instrument->durationSeconds * atlas.sources.front().sampleRate;
+    renderHeld (p, { 74 }, 1.2, [&] (int pos) {
+        if (pos < 4800 || pos > 40000)
+            return;
+        ui->refreshNow();
+        for (const int i : display.litNoteIndices())
+            if (std::find (lit.begin(), lit.end(), i) == lit.end())
+                lit.push_back (i);
+        const auto& snapshot = p.grainSnapshot (0);
+        for (int h = 0; h < snapshot.playheads.load(); ++h, ++headsSeen)
+        {
+            const double frame = snapshot.playheadPosition[static_cast<std::size_t> (h)].load() * total;
+            bool inside = false;
+            for (const auto& n : atlas.notes)
+                inside = inside || (n.playKey() == 74 && frame >= static_cast<double> (n.attackStart) - 0.02 * total && frame <= static_cast<double> (n.sourceEnd) + 0.02 * total);
+            headsInside = headsInside && inside;
+        }
+    });
+    CHECK (headsSeen > 0);
+    CHECK (headsInside);
+    REQUIRE (lit.size() == 1);
+    CHECK (atlas.notes[static_cast<std::size_t> (lit.front())].playKey() == 74);
+
+    // Colours by pitch: the keyboard's light strip and the regions share them.
+    const auto& keys = ui->keyboardTints();
+    CHECK (keys[74].state == osp::plugin::OspKeyboard::KeyTint::State::recorded);
+    CHECK (keys[74].colour == osp::plugin::design::colour::forPitch (74));
+    CHECK (keys[69].colour == osp::plugin::design::colour::forPitch (69));
+    CHECK (osp::plugin::design::colour::forPitch (62) == osp::plugin::design::colour::forPitch (74));   // every D
+    CHECK (osp::plugin::design::colour::forPitch (74) != osp::plugin::design::colour::forPitch (75));
+}
+
 TEST_CASE ("plugin phase 5: NOTE MAP edits are one undo step each, queued in order, and keep held notes sounding", "[plugin][phase5][notemap][realtime]")
 {
     TempDir tmp;
@@ -433,7 +489,7 @@ TEST_CASE ("plugin phase 5: the NOTE MAP's controls edit the atlas (pitch, key, 
     map->refresh();
     CHECK_FALSE (p.currentInstrument()->atlas->mapping.fill);
     // The keyboard shows the edited layer's map: recorded, filled, silent.
-    const auto keys = osp::plugin::NoteMapEditor::keyMap (*p.currentInstrument()->atlas, juce::Colours::orange);
+    const auto keys = osp::plugin::NoteMapEditor::keyMap (*p.currentInstrument()->atlas);
     CHECK (keys[64].state == osp::plugin::OspKeyboard::KeyTint::State::recorded);
     CHECK (keys[65].state == osp::plugin::OspKeyboard::KeyTint::State::silent);
     // A double-click inside a note splits it there; an audition never changes anything.
@@ -667,6 +723,23 @@ TEST_CASE ("plugin phase 5: screenshots of the new states (OSP_SNAPSHOT_DIR)", "
     shoot ({ pad }, [] (OspAudioProcessor&, osp::plugin::OspAudioProcessorEditor&) {}, "p5-01-one-shot-unchanged");
     // 2 MAP NOTES just pressed: ANALYZING.
     shoot ({ rec.file }, [] (OspAudioProcessor& p, osp::plugin::OspAudioProcessorEditor&) { p.mapNotes (0); }, "p5-02-analyzing");
+    // 3b Mapped, one note held: its region lit in its colour, the read head inside it; the
+    // keyboard's light strip along the top of the keys.
+    shoot ({ rec.file }, [] (OspAudioProcessor& p, osp::plugin::OspAudioProcessorEditor&) {
+        p.mapNotes (0);
+        settleEdits (p);
+        p.setEditLayer (0);
+        p.prepareToPlay (48000.0, 256);
+        juce::AudioBuffer<float> buffer (2, 256);
+        for (int b = 0; b < 160; ++b)   // 0.85 s held: past the note's own length, looping
+        {
+            juce::MidiBuffer midi;
+            if (b == 0)
+                midi.addEvent (juce::MidiMessage::noteOn (1, 77, static_cast<juce::uint8> (100)), 0);
+            buffer.clear();
+            p.processBlock (buffer, midi);
+        }
+    }, "p5-12-playing");
     // 2b A phrase just dropped: "Identify notes?" at once (the musical review).
     shoot ({ rec.file }, [] (OspAudioProcessor&, osp::plugin::OspAudioProcessorEditor&) {}, "p5-11-identify-notes");
     // 3 Mapped: regions over the waveform, NOTES key, keyboard tints.

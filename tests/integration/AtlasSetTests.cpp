@@ -647,7 +647,9 @@ TEST_CASE ("Atlas set: file sample sets still play every key (their mapping is u
     InstrumentSet files = *atlasSet;
     files.fill = true;
     files.fillLimitSemitones = std::numeric_limits<double>::infinity();
+    files.loopSelects = false;   // an atlas's LOOP selection (file sets never have it)
     CHECK_FALSE (files.restrictsKeys());
+    CHECK_FALSE (InstrumentSet {}.loopSelects);
     for (int key : { 0, 30, 100, 127 })
         CHECK (files.groupFor (key) >= 0);
     CHECK (InstrumentSet {}.fill);

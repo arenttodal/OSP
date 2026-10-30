@@ -96,7 +96,14 @@ public:
         out) plus a short margin, so the sound always fills the display. */
     juce::Range<double> window() const;
 
+    /** Tests: the atlas notes (indices) lit now because a read head is inside them. */
+    const std::vector<int>& litNoteIndices() const noexcept { return litNotes; }
+
 private:
+    juce::Rectangle<float> noteRegionBounds (const atlas::NoteEvent&, juce::Rectangle<float> plot) const;
+    /** The atlas notes the read heads are in (a note sounding lights its region). */
+    void updateLitNotes();
+    std::vector<int> litNotes, litScratch;
     void paintStatic (juce::Graphics&);
     void paintGenerated (juce::Graphics&);
     void paintNoteRegions (juce::Graphics&, juce::Rectangle<float> plot);

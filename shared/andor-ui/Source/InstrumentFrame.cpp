@@ -30,7 +30,6 @@ void OspKeyboard::drawWhiteNote (int note, juce::Graphics& g, juce::Rectangle<fl
     g.setColour (colour::keyLine);
     g.fillRect (juce::Rectangle<float> (area.getRight() - 1.0f, area.getY(), 1.0f, area.getHeight()));
 
-    drawTint (note, g, key, false);
     const auto label = getWhiteNoteText (note);
     if (label.isNotEmpty())
     {
@@ -42,7 +41,7 @@ void OspKeyboard::drawWhiteNote (int note, juce::Graphics& g, juce::Rectangle<fl
     }
 }
 
-void OspKeyboard::drawBlackNote (int note, juce::Graphics& g, juce::Rectangle<float> area, bool isDown, bool isOver, juce::Colour)
+void OspKeyboard::drawBlackNote (int, juce::Graphics& g, juce::Rectangle<float> area, bool isDown, bool isOver, juce::Colour)
 {
     using namespace design;
     const auto r = area.reduced (0.8f, 0.0f).withTrimmedTop (-4.0f);
@@ -66,44 +65,64 @@ void OspKeyboard::drawBlackNote (int note, juce::Graphics& g, juce::Rectangle<fl
     g.fillRoundedRectangle (r.reduced (1.5f, 0.0f).withTrimmedBottom (0.12f * r.getHeight()), 2.0f);
     g.setColour (juce::Colours::white.withAlpha (0.16f));
     g.fillRoundedRectangle (r.withTop (r.getBottom() - 0.12f * r.getHeight()).reduced (1.5f, 1.0f), 1.5f);
-    drawTint (note, g, r, true);
 }
 
-void OspKeyboard::drawTint (int note, juce::Graphics& g, juce::Rectangle<float> area, bool black)
+void OspKeyboard::paint (juce::Graphics& g)
+{
+    juce::MidiKeyboardComponent::paint (g);
+    drawLightStrip (g);
+}
+
+void OspKeyboard::drawLightStrip (juce::Graphics& g)
 {
     if (tintOf == nullptr)
         return;
-    const auto tint = tintOf (note);
-    if (tint.state == KeyTint::State::none)
-        return;
-    // Quiet: a band in the key's lower part (the label and the press stay readable).
-    auto band = black ? area.reduced (2.5f, 0.0f).withTrimmedBottom (0.16f * area.getHeight()).removeFromBottom (0.22f * area.getHeight())
-                      : area.reduced (2.0f, 0.0f).withTrimmedBottom (0.30f * area.getHeight()).removeFromBottom (0.24f * area.getHeight());
-    switch (tint.state)
+    auto isBlack = [] (int note) { return juce::MidiMessage::isMidiNoteBlack (note); };
+    const float top = 0.0f;
+    for (int note = juce::jmax (0, static_cast<int> (getLowestVisibleKey()) - 1); note < 128; ++note)
     {
-        case KeyTint::State::recorded:
-            g.setColour (tint.colour.withAlpha (black ? 0.9f : 0.62f));
-            g.fillRoundedRectangle (band, 2.0f);
+        const auto tint = tintOf (note);
+        if (tint.state == KeyTint::State::none || tint.state == KeyTint::State::silent)
+            continue;   // a silent key stays dark: no light, no voice
+        auto key = getRectangleForKey (note);
+        if (key.getX() > static_cast<float> (getWidth()))
             break;
-        case KeyTint::State::filled:
-            g.setColour (tint.colour.withAlpha (black ? 0.42f : 0.2f));
-            g.fillRoundedRectangle (band, 2.0f);
-            break;
-        case KeyTint::State::silent:
+        // The part of the top edge this key owns: a white key gives way to the black keys beside
+        // it, so the segments interleave along the strip as on the hardware.
+        if (! isBlack (note))
         {
-            // Out of reach: no voice starts. Two faint strokes, not a colour.
-            g.setColour ((black ? juce::Colours::white : juce::Colours::black).withAlpha (0.12f));
-            for (float x = band.getX() + 2.0f; x < band.getRight(); x += 4.0f)
-                g.drawLine (x, band.getBottom(), std::min (band.getRight(), x + band.getHeight() * 0.5f), band.getY(), 0.8f);
-            break;
+            if (note > 0 && isBlack (note - 1))
+                key.setLeft (getRectangleForKey (note - 1).getRight());
+            if (note < 127 && isBlack (note + 1))
+                key.setRight (getRectangleForKey (note + 1).getX());
         }
-        case KeyTint::State::none: break;
-    }
-    if (tint.state == KeyTint::State::recorded && tint.takes > 1 && ! black && band.getWidth() >= 9.0f)
-    {
-        g.setColour (juce::Colours::white.withAlpha (0.95f));
-        g.setFont (fonts::make (std::min (11.0f, band.getHeight() - 1.0f), fonts::Weight::medium));
-        g.drawText (juce::String (tint.takes), band, juce::Justification::centred, false);
+        // A recorded note: a bright segment; a key FILL reaches: a faint thin line in the colour
+        // of the note that fills it (it plays, but it is not a note of the recording).
+        const bool recorded = tint.state == KeyTint::State::recorded;
+        const auto segment = juce::Rectangle<float> (key.getX(), top, key.getWidth(), recorded ? 5.0f : 2.0f).reduced (1.2f, 0.0f).withTrimmedTop (0.5f);
+        if (segment.getWidth() < 1.0f)
+            continue;
+        const auto light = tint.colour.withMultipliedSaturation (recorded ? 1.3f : 0.9f);
+        // The light it spills down the key, then the segment itself.
+        if (recorded)
+        {
+            const float spill = 16.0f;
+            g.setGradientFill (juce::ColourGradient (light.withAlpha (0.45f), 0.0f, segment.getBottom(),
+                                                     light.withAlpha (0.0f), 0.0f, segment.getBottom() + spill, false));
+            g.fillRect (segment.withY (segment.getBottom()).withHeight (spill));
+        }
+        g.setColour (recorded ? light.brighter (0.2f) : light.withAlpha (0.35f));
+        g.fillRoundedRectangle (segment, 1.5f);
+        // Takes that play in turn (round robin): small dots under the segment.
+        if (recorded && tint.takes > 1)
+        {
+            const int dots = std::min (tint.takes, 4);
+            const float d = 2.6f, gap = 2.0f;
+            float x = segment.getCentreX() - 0.5f * (static_cast<float> (dots) * d + static_cast<float> (dots - 1) * gap);
+            g.setColour (isBlack (note) ? light.brighter (0.4f) : light.darker (0.4f));
+            for (int i = 0; i < dots; ++i, x += d + gap)
+                g.fillEllipse (x, segment.getBottom() + 3.0f, d, d);
+        }
     }
 }
 

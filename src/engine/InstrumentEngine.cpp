@@ -370,8 +370,10 @@ int InstrumentEngine::memberFor (int note, int velocity, std::uint64_t eventInde
     const auto* set = slots[which].set;
     if (set == nullptr || set->groups.empty())
         return -1;
-    // Nearest pitch anchor (ties: the lower one); an atlas's mapping may leave the key silent.
-    const int groupIndex = set->groupFor (note);
+    // Nearest pitch anchor (ties: the lower one); an atlas's mapping may leave the key silent,
+    // and with LOOP on it plays only notes that can loop.
+    const bool loopOn = config.layer[which].loop;
+    const int groupIndex = set->groupFor (note, loopOn);
     if (groupIndex < 0)
         return unmappedMember;
     const PitchGroup* group = &set->groups[static_cast<std::size_t> (groupIndex)];
@@ -382,7 +384,7 @@ int InstrumentEngine::memberFor (int note, int velocity, std::uint64_t eventInde
     for (int id : group->members)
     {
         const auto& m = set->members[static_cast<std::size_t> (id)];
-        if (m.role != SampleRole::articulation && (chosenLayer < 0 || std::abs (m.layer - layer) < std::abs (chosenLayer - layer)))
+        if (m.role != SampleRole::articulation && set->plays (m, loopOn) && (chosenLayer < 0 || std::abs (m.layer - layer) < std::abs (chosenLayer - layer)))
             chosenLayer = m.layer;
     }
     int candidates[64];
@@ -390,7 +392,7 @@ int InstrumentEngine::memberFor (int note, int velocity, std::uint64_t eventInde
     for (int id : group->members)
     {
         const auto& m = set->members[static_cast<std::size_t> (id)];
-        if (m.role != SampleRole::articulation && m.layer == chosenLayer && count < 64)
+        if (m.role != SampleRole::articulation && m.layer == chosenLayer && set->plays (m, loopOn) && count < 64)
             candidates[count++] = id;
     }
     if (count == 0)
@@ -726,7 +728,7 @@ void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int
         return;
     // A key the layer's set does not play (a Note Atlas's FILL reach): no voice is started and
     // nothing is stolen. (File sets play every key: their member is chosen below as before.)
-    if (set != nullptr && set->restrictsKeys() && set->groupFor (note) < 0)
+    if (set != nullptr && set->restrictsKeys() && set->groupFor (note, config.layer[context].loop) < 0)
         return;
 
     const auto stealFade = std::max (1, static_cast<int> (config.stealFadeSeconds * sampleRate));

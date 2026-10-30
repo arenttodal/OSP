@@ -549,21 +549,40 @@ juce::String NoteMapEditor::statusOf (const InstrumentHost& host, int layer)
     return review ? "Needs review" : "Ready";
 }
 
-std::array<OspKeyboard::KeyTint, 128> NoteMapEditor::keyMap (const atlas::NoteAtlas& a, juce::Colour colour)
+std::vector<std::string> NoteMapEditor::notesLeftOut (const InstrumentSet* set, bool loopOn)
+{
+    std::vector<std::string> ids;
+    if (set == nullptr)
+        return ids;
+    for (const auto& m : set->members)
+        if (! m.regionId.empty() && ! set->plays (m, loopOn))
+            ids.push_back (m.regionId);
+    return ids;
+}
+
+std::array<OspKeyboard::KeyTint, 128> NoteMapEditor::keyMap (const atlas::NoteAtlas& a, const InstrumentSet* set, bool loopOn)
 {
     std::array<OspKeyboard::KeyTint, 128> keys {};
     const auto byKey = atlas::notesByKey (a);
+    const auto leftOut = notesLeftOut (set, loopOn);
     std::vector<int> recorded;
     for (int k = 0; k < 128; ++k)
     {
-        const auto& notes = byKey[static_cast<std::size_t> (k)];
-        if (notes.empty())
+        std::array<int, 16> perLayer {};
+        bool any = false;
+        for (const int i : byKey[static_cast<std::size_t> (k)])
+        {
+            const auto& n = a.notes[static_cast<std::size_t> (i)];
+            if (std::find (leftOut.begin(), leftOut.end(), n.id) != leftOut.end())
+                continue;   // with LOOP on, a note that cannot loop is not played
+            ++perLayer[static_cast<std::size_t> (std::clamp (n.velocityLayer, 0, 15))];
+            any = true;
+        }
+        if (! any)
             continue;
         recorded.push_back (k);
-        std::array<int, 16> perLayer {};
-        for (const int i : notes)
-            ++perLayer[static_cast<std::size_t> (std::clamp (a.notes[static_cast<std::size_t> (i)].velocityLayer, 0, 15))];
-        keys[static_cast<std::size_t> (k)] = { OspKeyboard::KeyTint::State::recorded, *std::max_element (perLayer.begin(), perLayer.end()), colour };
+        keys[static_cast<std::size_t> (k)] = { OspKeyboard::KeyTint::State::recorded, *std::max_element (perLayer.begin(), perLayer.end()),
+                                               design::colour::forPitch (k) };
     }
     if (recorded.empty())
         return keys;
@@ -572,11 +591,12 @@ std::array<OspKeyboard::KeyTint, 128> NoteMapEditor::keyMap (const atlas::NoteAt
         auto& key = keys[static_cast<std::size_t> (k)];
         if (key.state == OspKeyboard::KeyTint::State::recorded)
             continue;
-        int nearest = 128;
+        int nearest = recorded.front();
         for (const int r : recorded)
-            nearest = std::min (nearest, std::abs (r - k));
-        const bool reached = a.mapping.fill && nearest <= static_cast<int> (std::floor (a.mapping.maxTransposeSemitones + 1.0e-9));
-        key = { reached ? OspKeyboard::KeyTint::State::filled : OspKeyboard::KeyTint::State::silent, 0, colour };
+            if (std::abs (r - k) < std::abs (nearest - k))
+                nearest = r;   // ties: the lower one (as the engine)
+        const bool reached = a.mapping.fill && std::abs (nearest - k) <= static_cast<int> (std::floor (a.mapping.maxTransposeSemitones + 1.0e-9));
+        key = { reached ? OspKeyboard::KeyTint::State::filled : OspKeyboard::KeyTint::State::silent, 0, design::colour::forPitch (nearest) };
     }
     return keys;
 }
@@ -625,9 +645,11 @@ juce::String NoteMapEditor::sustainText (const atlas::NoteEvent& n) const
                 return "Sustains: one loop over the note (a fading note may pulse)";
             if (c.canSustain)
                 return "Sustains from its stable body";
-            if (c.reason == "stable region too short")
-                return "Plays as recorded: under 0.1 s of sound to loop";
-            return "Plays as recorded: " + juce::String (c.reason);
+            // With LOOP on, a note that cannot loop is left out (LOOP off plays it as recorded).
+            const juce::String why = c.reason == "stable region too short" ? juce::String ("under 0.1 s of sound to loop") : juce::String (c.reason);
+            if (instrument->set->loopSelects)
+                return "Left out while LOOP is on: cannot loop (" + why + "); LOOP off plays it";
+            return "Plays as recorded: " + why;
         }
     if (instrument->atlasStatus != nullptr && std::find (instrument->atlasStatus->skippedNoteIds.begin(), instrument->atlasStatus->skippedNoteIds.end(), n.id)
                                                   != instrument->atlasStatus->skippedNoteIds.end())
@@ -715,8 +737,13 @@ void NoteMapEditor::rebuildInspector()
                 ++included;
                 sustaining += sustainText (*n).startsWith ("Sustains") ? 1 : 0;
             }
-        sustain.note = ! loopOn ? juce::String ("LOOP is off: notes play as recorded")
-                                : juce::String (sustaining) + " of " + juce::String (included) + " notes sustain (every note of 0.1 s or more)";
+        const bool selects = instrument != nullptr && instrument->set != nullptr && instrument->set->loopSelects;
+        if (! loopOn)
+            sustain.note = "LOOP is off: every note plays as recorded";
+        else if (selects && sustaining < included)
+            sustain.note = juce::String (sustaining) + " of " + juce::String (included) + " notes loop; LOOP on plays only these (LOOP off: all)";
+        else
+            sustain.note = juce::String (sustaining) + " of " + juce::String (included) + " notes sustain (every note of 0.1 s or more)";
         rows.push_back (sustain);
         Row verdict;
         if (atlas->analysis.suitability == "unsuitable")
@@ -834,8 +861,6 @@ void NoteMapEditor::paintWave (juce::Graphics& g, juce::Rectangle<float> graph)
 void NoteMapEditor::paintRegions (juce::Graphics& g, juce::Rectangle<float> graph)
 {
     using namespace design;
-    const auto& id = colour::identity (layer);
-    const auto tone = id.wave;
     g.saveState();
     g.reduceClipRegion (graph.getSmallestIntegerContainer());
     for (const auto* n : shownNotes())
@@ -843,6 +868,7 @@ void NoteMapEditor::paintRegions (juce::Graphics& g, juce::Rectangle<float> grap
         const auto r = regionBounds (n->id);
         if (r.isEmpty())
             continue;
+        const auto tone = colour::forPitch (n->playKey());   // the colour its region and key wear everywhere
         const bool isSelected = std::find (selected.begin(), selected.end(), n->id) != selected.end();
         const bool hot = hover.noteId == n->id;
         const auto box = r.reduced (1.0f, 0.0f);

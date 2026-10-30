@@ -97,6 +97,7 @@ struct PreparedAtlas
         atlas::NoteEvent note;                            ///< a copy: Stage B outlives the caller's atlas
         std::string fileName;                             ///< its source's file name (member names)
         atlas::FrameRange range;
+        std::int64_t sourceFrames = 0;                    ///< its source recording's length (the display's 0..1)
         std::shared_ptr<const AudioData> audio;           ///< the region copy
         InstrumentBuildOptions options;                   ///< root, start and the shared gain
         std::shared_ptr<const InstrumentModel> playable;  ///< Stage A's model
@@ -146,7 +147,8 @@ namespace
 
     /** The set from the prepared regions and one model per region: places, roles, FILL and
         levelling. Stage A and Stage B both build through here, so they differ only in the models. */
-    std::shared_ptr<InstrumentSet> assemble (const PreparedAtlas& prepared, const std::vector<std::shared_ptr<const InstrumentModel>>& models)
+    std::shared_ptr<InstrumentSet> assemble (const PreparedAtlas& prepared, const std::vector<std::shared_ptr<const InstrumentModel>>& models,
+                                             bool loopsAnalysed)
     {
         auto set = std::make_shared<InstrumentSet>();
         std::map<int, int> groupOfKey;   // play key -> group index
@@ -192,6 +194,16 @@ namespace
         // Groups were created in key order (the notes are sorted by key).
         set->fill = prepared.fill;
         set->fillLimitSemitones = prepared.fillLimitSemitones;
+        // Which keys can loop (with LOOP on only they play), once the loops are analysed:
+        // Stage A plays every note while its loops are being prepared.
+        set->loopSelects = loopsAnalysed;
+        for (auto& g : set->groups)
+        {
+            g.sustains = false;
+            for (int id : g.members)
+                if (const auto& model = set->members[static_cast<std::size_t> (id)].model; model != nullptr && model->original.continuation.canSustain)
+                    g.sustains = true;
+        }
         finaliseSampleSet (*set);
         return set;
     }
@@ -304,6 +316,7 @@ StagedBuild buildPlayableSet (const atlas::NoteAtlas& atlas, const std::vector<S
         r.note = *n;
         r.fileName = src->fileName;
         r.range = range;
+        r.sourceFrames = audio.numFrames();
         r.audio = std::make_shared<const AudioData> (copyRegion (audio, *n, range, options.edgeFadeFrames));
         report.regionFrames += range.length();
         prepared->regions.push_back (std::move (r));
@@ -361,7 +374,15 @@ StagedBuild buildPlayableSet (const atlas::NoteAtlas& atlas, const std::vector<S
         r.options.preparationOverride = PlaybackPreparation { 0.0, gainDb };
         const double cents = atlas.mapping.correctTuning ? r.note.centsOffset / 100.0 : 0.0;
         r.options.rootOverrideMidi = static_cast<double> (r.note.playKey()) + cents;
-        r.playable = instrument::buildProvisional (*r.audio, analyses[i], r.options);
+        auto model = instrument::buildProvisional (*r.audio, analyses[i], r.options);
+        if (model != nullptr && r.sourceFrames > 0)
+        {
+            // The note's place in the phrase: its read head is drawn there (Stage B copies it).
+            const auto total = static_cast<double> (r.sourceFrames);
+            model->displayStart = std::clamp (static_cast<double> (r.range.start) / total, 0.0, 1.0);
+            model->displayEnd = std::clamp (static_cast<double> (r.range.end) / total, model->displayStart, 1.0);
+        }
+        r.playable = std::move (model);
         models.push_back (r.playable);
     }
     report.provisionalMilliseconds = msSince (provisionalStart);
@@ -369,7 +390,7 @@ StagedBuild buildPlayableSet (const atlas::NoteAtlas& atlas, const std::vector<S
     prepared->fillLimitSemitones = std::max (0.0, atlas.mapping.maxTransposeSemitones);
 
     const auto finaliseStart = std::chrono::steady_clock::now();
-    auto set = assemble (*prepared, models);
+    auto set = assemble (*prepared, models, false);
     report.finaliseMilliseconds = msSince (finaliseStart);
     staged.playable = finish (std::move (set), report, t0);
     prepared->report = staged.playable.report;
@@ -401,7 +422,7 @@ BuildResult enhanceSet (const PreparedAtlas& prepared, const BuildOptions& optio
         return result;
     }
     const auto finaliseStart = std::chrono::steady_clock::now();
-    auto set = assemble (prepared, models);
+    auto set = assemble (prepared, models, true);
     report.finaliseMilliseconds += msSince (finaliseStart);
     auto result = finish (std::move (set), report, t0);
     // The whole preparation: Stage A's time plus this stage's.
@@ -427,7 +448,7 @@ BuildResult buildInstrumentSet (const atlas::NoteAtlas& atlas, const std::vector
     }
     auto report = staged.playable.report;
     report.playableOnly = false;
-    return finish (assemble (*staged.pending, models), report, t0);
+    return finish (assemble (*staged.pending, models, false), report, t0);
 }
 
 } // namespace osp::atlasset
