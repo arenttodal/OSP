@@ -279,7 +279,113 @@ namespace
     }
 }
 
+namespace
+{
+    ContinuationModel analyseOnce (const AudioData& audio, const AnalysisData& analysis, const ContinuationOptions& options);
+
+    /**
+        Forced loop (ContinuationOptions::forceLoop): one jump from the end of the note's body back
+        to its start, the destination aligned on the waveform, a correlation-aware crossfade. The
+        body: the analysed region when there is one, else from just after the attack to where the
+        sound ends. Shorter than `minSeconds`: none (the note plays once).
+    */
+    ContinuationModel forcedLoop (const AudioData& audio, const AnalysisData& analysis, ContinuationModel model, double minSeconds)
+    {
+        const double sr = audio.sampleRate;
+        const auto frames = audio.numFrames();
+        const double duration = audio.durationSeconds();
+        const auto mono = audio.mixToMono();
+        double peak = 0.0;
+        for (const float x : mono)
+            peak = std::max (peak, static_cast<double> (std::abs (x)));
+        if (peak < 3.0e-5)   // about -90 dBFS: nothing to hold
+            return model;
+        // Where the sound ends: the last 10 ms block within 30 dB of the loudest.
+        const auto block = std::max<std::int64_t> (1, static_cast<std::int64_t> (0.01 * sr));
+        std::vector<double> level;
+        for (std::int64_t b = 0; b + block <= frames; b += block)
+        {
+            double sum = 0.0;
+            for (std::int64_t i = b; i < b + block; ++i)
+                sum += static_cast<double> (mono[static_cast<std::size_t> (i)]) * mono[static_cast<std::size_t> (i)];
+            level.push_back (std::sqrt (sum / static_cast<double> (block)));
+        }
+        double loudest = 0.0;
+        for (const double l : level)
+            loudest = std::max (loudest, l);
+        std::size_t last = 0;
+        for (std::size_t b = 0; b < level.size(); ++b)
+            if (level[b] > loudest * 0.0316)   // -30 dB
+                last = b;
+        const double soundEnd = std::min (duration, static_cast<double> (last + 1) * block / sr);
+        const auto& env = analysis.envelope;
+        const double onset = std::clamp (env.onsetSeconds, 0.0, duration);
+
+        double start = model.sustainEndFrame > model.sustainStartFrame ? model.sustainStartFrame / sr : onset + env.attackSeconds + 0.02;
+        double end = model.sustainEndFrame > model.sustainStartFrame ? model.sustainEndFrame / sr : soundEnd;
+        double xfade = crossfadeSecondsFor (analysis);
+        auto fit = [&] {
+            end = std::min (end, soundEnd);
+            xfade = std::clamp (std::min (xfade, 0.3 * (end - start)), 0.004, 0.15);
+            end = std::min (end, duration - xfade - 0.002);
+        };
+        fit();
+        if (end - start < minSeconds)
+        {
+            // A short body: from just after the onset to the end of the sound.
+            start = std::min (start, onset + std::min (env.attackSeconds, 0.03) + 0.01);
+            end = soundEnd;
+            xfade = crossfadeSecondsFor (analysis);
+            fit();
+        }
+        if (end - start < minSeconds || start < 0.0)
+        {
+            model.reason = "stable region too short";
+            return model;
+        }
+
+        const auto xfadeFrames = std::max (16, static_cast<int> (xfade * sr));
+        const double periodSec = analysis.pitch.detected ? 1.0 / std::max (analysis.pitch.fundamentalHz, 30.0) : 0.005;
+        const int maxLag = static_cast<int> (std::clamp (1.2 * periodSec, 0.002, 0.012) * sr);
+        const auto from = static_cast<std::int64_t> (end * sr) - xfadeFrames;
+        const auto [to, r] = alignDestination (audio, from, static_cast<std::int64_t> (start * sr), xfadeFrames, maxLag);
+        if (static_cast<double> (to) >= static_cast<double> (from) - 0.5 * minSeconds * sr)
+        {
+            model.reason = "stable region too short";
+            return model;
+        }
+        ContinuationJump jump;
+        jump.fromFrame = static_cast<double> (from);
+        jump.toFrame = static_cast<double> (to);
+        jump.crossfadeFrames = xfadeFrames;
+        jump.correlation = static_cast<float> (std::clamp (r, 0.0, 1.0));
+        jump.score = jump.correlation * jump.correlation;
+        model.jumps = { jump };
+        model.backstop = 0;
+        model.bestLoop = 0;
+        model.naiveLoop = jump;
+        model.minSegmentFrames = 0.4 * (jump.fromFrame - jump.toFrame);
+        model.sustainStartFrame = jump.toFrame;
+        model.sustainEndFrame = jump.fromFrame + xfadeFrames;
+        model.hasRelease = false;   // released through the envelope, as a plain sampler loop
+        model.graftExits.clear();
+        model.canSustain = true;
+        model.reason = "loop over the note";
+        return model;
+    }
+}
+
 ContinuationModel analyseContinuation (const AudioData& audio, const AnalysisData& analysis, const ContinuationOptions& options)
+{
+    auto model = analyseOnce (audio, analysis, options);
+    if (! options.forceLoop || model.canSustain || model.reason == "silent")
+        return model;
+    return forcedLoop (audio, analysis, std::move (model), options.minRegionSeconds);
+}
+
+namespace
+{
+ContinuationModel analyseOnce (const AudioData& audio, const AnalysisData& analysis, const ContinuationOptions& options)
 {
     ContinuationModel model;
     const double sr = audio.sampleRate;
@@ -623,6 +729,7 @@ ContinuationModel analyseContinuation (const AudioData& audio, const AnalysisDat
     }
     return model;
 }
+} // namespace
 
 ContinuationModel refineContinuationForLayer (const ContinuationModel& base, const AudioData& layer, double layerF0Hz)
 {

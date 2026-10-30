@@ -2,6 +2,7 @@
 
 #include "core/AudioData.h"
 #include "library/Tagging.h"
+#include "model/AnalysisData.h"
 
 #include <optional>
 #include <string>
@@ -70,6 +71,14 @@ struct Classification
 
 /** Classifies a sound; `hints` (its name's evidence) can tip close cases ("loop" in a name). */
 Classification classifySound (const AudioData& audio, const NameEvidence* hints = nullptr);
+
+/** Held pitches in a row in an analysis's pitch track (`SoundFeatures::notes`): stretches of at
+    least `minHoldSeconds` of confident frames within 40 cents of where they began; a new note
+    when the pitch moves more than 90 cents and stays. Vibrato, glides and jumps by an octave or
+    a fifth (a tracker on a chord or a rich pad) are not new notes unless `leapsAreNotes` (a
+    melody's octaves and fifths). Cheap: one pass over the track an ordinary load already has
+    (OSP's "Map notes?" prompt asks with it). */
+int heldNotes (const TimeSeries& trackHz, const TimeSeries& trackConfidence, double minHoldSeconds = 0.2, bool leapsAreNotes = false);
 
 /** The features and answer as compact JSON (the catalog's audio_analysis.features). */
 std::string toJson (const Classification&);

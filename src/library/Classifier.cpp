@@ -47,60 +47,6 @@ std::optional<SoundClass> soundClassFrom (const std::string& s) noexcept
 
 namespace
 {
-    /** Held pitches in a row: stretches of at least 200 ms of confident frames within 40 cents
-        of where they began; a new note when the pitch moves more than 90 cents and stays.
-        Vibrato and glides are not new notes, and neither is a jump by an octave or a fifth
-        (what a pitch tracker does on a chord or a rich pad). */
-    int heldNotes (const TimeSeries& track, const TimeSeries& confidence)
-    {
-        if (track.hopSeconds <= 0.0 || track.values.empty())
-            return 0;
-        const auto minFrames = static_cast<std::size_t> (std::ceil (0.2 / track.hopSeconds));
-        std::vector<double> held;   // each held stretch's pitch, cents re A4
-        std::size_t run = 0;
-        double runStart = 0.0;
-        for (std::size_t i = 0; i < track.values.size(); ++i)
-        {
-            const float hz = track.values[i];
-            const bool sure = i < confidence.values.size() ? confidence.values[i] >= 0.75f : true;
-            if (hz <= 0.0f || ! sure)
-            {
-                run = 0;
-                continue;
-            }
-            const double cents = 1200.0 * std::log2 (static_cast<double> (hz) / 440.0);
-            if (run == 0 || std::abs (cents - runStart) > 40.0)
-            {
-                run = 1;
-                runStart = cents;
-                continue;
-            }
-            if (++run == minFrames)
-                held.push_back (runStart);
-        }
-        if (held.empty())
-            return 0;
-        auto related = [] (double interval) {
-            const double a = std::abs (interval);
-            for (const double r : { 700.0, 1200.0, 1900.0, 2400.0 })
-                if (std::abs (a - r) < 50.0)
-                    return true;
-            return false;
-        };
-        int notes = 1;
-        double current = held.front();
-        for (std::size_t i = 1; i < held.size(); ++i)
-        {
-            const double move = held[i] - current;
-            if (std::abs (move) > 90.0 && ! related (move))
-            {
-                ++notes;
-                current = held[i];
-            }
-        }
-        return notes;
-    }
-
     /** Share of onset intervals that sit on one grid (1-4 steps of the median interval). */
     double regularity (const std::vector<std::int64_t>& onsets, double sampleRate)
     {
@@ -124,6 +70,58 @@ namespace
         }
         return static_cast<double> (onGrid) / static_cast<double> (intervals.size());
     }
+}
+
+int heldNotes (const TimeSeries& track, const TimeSeries& confidence, double minHoldSeconds, bool leapsAreNotes)
+{
+    if (track.hopSeconds <= 0.0 || track.values.empty())
+        return 0;
+    const auto minFrames = std::max<std::size_t> (2, static_cast<std::size_t> (std::ceil (minHoldSeconds / track.hopSeconds)));
+    std::vector<double> held;   // each held stretch's pitch, cents re A4
+    std::size_t run = 0;
+    double runStart = 0.0;
+    for (std::size_t i = 0; i < track.values.size(); ++i)
+    {
+        const float hz = track.values[i];
+        const bool sure = i < confidence.values.size() ? confidence.values[i] >= 0.75f : true;
+        if (hz <= 0.0f || ! sure)
+        {
+            run = 0;
+            continue;
+        }
+        const double cents = 1200.0 * std::log2 (static_cast<double> (hz) / 440.0);
+        if (run == 0 || std::abs (cents - runStart) > 40.0)
+        {
+            run = 1;
+            runStart = cents;
+            continue;
+        }
+        if (++run == minFrames)
+            held.push_back (runStart);
+    }
+    if (held.empty())
+        return 0;
+    auto related = [leapsAreNotes] (double interval) {
+        if (leapsAreNotes)
+            return false;
+        const double a = std::abs (interval);
+        for (const double r : { 700.0, 1200.0, 1900.0, 2400.0 })
+            if (std::abs (a - r) < 50.0)
+                return true;
+        return false;
+    };
+    int notes = 1;
+    double current = held.front();
+    for (std::size_t i = 1; i < held.size(); ++i)
+    {
+        const double move = held[i] - current;
+        if (std::abs (move) > 90.0 && ! related (move))
+        {
+            ++notes;
+            current = held[i];
+        }
+    }
+    return notes;
 }
 
 Classification classifySound (const AudioData& audio, const NameEvidence* hints)

@@ -124,6 +124,91 @@ TEST_CASE ("plugin phase 5: MAP NOTES analyses the layer's recording, playable a
     CHECK (p.currentInstrument (0)->contentHash == ordinary->contentHash);
 }
 
+TEST_CASE ("plugin phase 5: a dropped phrase asks \"Identify notes?\" at once; one note, a recalled session or NO asks nothing", "[plugin][phase5][notemap][gui]")
+{
+    TempDir tmp;
+    const ScopedEnvironment storeDir ("OSP_SAMPLE_STORE", tmp.dir.getChildFile ("store").getFullPathName());
+    OspAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (editor.get());
+    REQUIRE (ui != nullptr);
+    // A phrase of three notes: asked as soon as the ordinary load is in, before any analysis.
+    ordinaryPhrase (p, tmp.dir, { 69, 74, 77 });
+    CHECK (p.mapNotesPrompt (0) == 3);
+    CHECK (p.atlasActivity (0) == osp::plugin::InstrumentHost::AtlasActivity::none);
+    ui->refreshNow();
+    auto& card = ui->engineCard (0);
+    REQUIRE (card.mapNotesPromptComponent() != nullptr);
+    CHECK (card.mapNotesPromptComponent()->isVisible());
+    CHECK (card.display().getBounds().contains (card.mapNotesPromptComponent()->getBounds()));
+    // MAP NOTES: the analysis starts and the prompt is gone; the result is the mapped phrase.
+    card.answerMapNotesPrompt (true);
+    CHECK (card.mapNotesPromptComponent() == nullptr);
+    CHECK (p.mapNotesPrompt (0) == 0);
+    settleEdits (p);
+    ui->refreshNow();
+    REQUIRE (p.currentInstrument (0) != nullptr);
+    REQUIRE (p.currentInstrument (0)->atlas != nullptr);
+    CHECK (includedKeys (*p.currentInstrument (0)->atlas) == std::set<int> { 69, 74, 77 });
+    CHECK (card.mapNotesPromptComponent() == nullptr);
+    // Back to one sample (undo, or Play as one sample) asks nothing again.
+    REQUIRE (p.undo().undo());
+    p.pollLoads();
+    ui->refreshNow();
+    CHECK (p.mapNotesPrompt (0) == 0);
+    CHECK (card.mapNotesPromptComponent() == nullptr);
+
+    // NO keeps it one sample, and the prompt does not come back.
+    {
+        OspAudioProcessor q;
+        std::unique_ptr<juce::AudioProcessorEditor> qe (q.createEditorIfNeeded());
+        auto* qui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (qe.get());
+        REQUIRE (qui != nullptr);
+        auto rec = phraseRecording (tmp.dir, "second.wav", { 62, 65, 69, 72 });
+        q.addLayers ({ rec.file });
+        REQUIRE (q.waitForLoads (60000));
+        q.pollLoads();
+        CHECK (q.mapNotesPrompt (0) == 4);
+        qui->refreshNow();
+        auto& qcard = qui->engineCard (0);
+        REQUIRE (qcard.mapNotesPromptComponent() != nullptr);
+        qcard.answerMapNotesPrompt (false);
+        qui->refreshNow();
+        CHECK (qcard.mapNotesPromptComponent() == nullptr);
+        CHECK (q.mapNotesPrompt (0) == 0);
+        CHECK (q.currentInstrument (0)->atlas == nullptr);
+        CHECK (q.atlasActivity (0) == osp::plugin::InstrumentHost::AtlasActivity::none);
+        CHECK (q.canMapNotes (0));   // still on the menu
+
+        // A recalled session holding a phrase never asks.
+        juce::MemoryBlock state;
+        q.getStateInformation (state);
+        OspAudioProcessor restored;
+        restored.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+        REQUIRE (restored.waitForLoads (60000));
+        restored.pollLoads();
+        REQUIRE (restored.waitForLoads (60000));
+        restored.pollLoads();
+        REQUIRE (restored.currentInstrument (0) != nullptr);
+        CHECK (restored.mapNotesPrompt (0) == 0);
+    }
+
+    // One held note asks nothing: the card is drawn as before.
+    {
+        OspAudioProcessor one;
+        std::unique_ptr<juce::AudioProcessorEditor> oe (one.createEditorIfNeeded());
+        auto* oui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (oe.get());
+        REQUIRE (oui != nullptr);
+        auto rec = phraseRecording (tmp.dir, "one.wav", { 69 });
+        one.addLayers ({ rec.file });
+        REQUIRE (one.waitForLoads (60000));
+        one.pollLoads();
+        CHECK (one.mapNotesPrompt (0) == 0);
+        oui->refreshNow();
+        CHECK (oui->engineCard (0).mapNotesPromptComponent() == nullptr);
+    }
+}
+
 TEST_CASE ("plugin phase 5: NOTE MAP edits are one undo step each, queued in order, and keep held notes sounding", "[plugin][phase5][notemap][realtime]")
 {
     TempDir tmp;
@@ -582,6 +667,8 @@ TEST_CASE ("plugin phase 5: screenshots of the new states (OSP_SNAPSHOT_DIR)", "
     shoot ({ pad }, [] (OspAudioProcessor&, osp::plugin::OspAudioProcessorEditor&) {}, "p5-01-one-shot-unchanged");
     // 2 MAP NOTES just pressed: ANALYZING.
     shoot ({ rec.file }, [] (OspAudioProcessor& p, osp::plugin::OspAudioProcessorEditor&) { p.mapNotes (0); }, "p5-02-analyzing");
+    // 2b A phrase just dropped: "Identify notes?" at once (the musical review).
+    shoot ({ rec.file }, [] (OspAudioProcessor&, osp::plugin::OspAudioProcessorEditor&) {}, "p5-11-identify-notes");
     // 3 Mapped: regions over the waveform, NOTES key, keyboard tints.
     shoot ({ rec.file }, [] (OspAudioProcessor& p, osp::plugin::OspAudioProcessorEditor&) {
         p.mapNotes (0);

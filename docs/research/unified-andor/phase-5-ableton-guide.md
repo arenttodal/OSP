@@ -15,14 +15,15 @@ This is a development build: unsigned and not notarised. It is not a release.
 
 ## 1. An ordinary sample is unchanged (workflow A)
 
-- Drop a one-shot onto the display. It plays as before.
+- Drop a one-shot onto the display. It plays as before, and nothing asks to identify notes.
 - There is no NOTES key, nothing is analysed, and the ⋮ menu offers **Map notes…**.
 
 ## 2. A phrase becomes an instrument (workflow B)
 
 1. Drop a sung or played melodic phrase, monophonic, up to a few minutes. It first plays as one
-   sample.
-2. ⋮ → **Map notes…**. The display says ANALYZING and the header "Analyzing".
+   sample, and the card asks at once **"Identify notes? · N heard"**.
+2. Press **MAP NOTES** (or later: ⋮ → **Map notes…**; **NO** keeps it one sample). The display
+   says ANALYZING and the header "Analyzing".
 3. Within a moment the notes are on their keys (header "N notes · Playable"); "Ready" or
    "Needs review" follows.
 4. Play the keyboard:
@@ -51,7 +52,8 @@ This is a development build: unsigned and not notarised. It is not a release.
    - **FILL** on/off and its reach (±st).
    - **TUNING**: in tune, or as played.
 6. Read a held note's line under the inspector. It says why the note sustains or plays as
-   recorded: under 0.3 s of stable sound, decaying, or LOOP off.
+   recorded. Every note of 0.1 s or more holds; a fading note holds on one loop over its body
+   and may pulse a little. Only shorter notes, or LOOP off, play as recorded.
 
 ## 4. Granular and KEY DNA (workflow C)
 
@@ -87,5 +89,6 @@ Automate it in Live instead.
 - Notes cut in the wrong place, or one note split in two. Was the doubt shown?
 - Wrong octaves. Did OCT fix them in one click?
 - Clicks or dropouts while editing with notes held.
-- How short notes sustain (0.3 s rule) versus playing as recorded.
+- How short and fading notes hold (every note of 0.1 s or more loops): pulsing, clicks at the
+  loop, or a loop you would rather not hear.
 - Whether KEY DNA's curve and variation feel musical across the keyboard.

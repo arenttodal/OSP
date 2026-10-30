@@ -31,6 +31,7 @@ phrase (no private audio) and are in `phase5/`. Each comes from the snapshot tes
 | Granular: the KEY DNA key at the end of the hover strip | `phase5/p5-08-granular-strip.jpg` |
 | KEY DNA editor over the instrument, the profile over the real keys, held keys marked | `phase5/p5-09-key-dna.jpg` |
 | A mapped, B one-shot, C Granular with KEY DNA | `phase5/p5-10-abc.jpg` |
+| A phrase just dropped: "Identify notes?" at once (after the musical review) | `phase5/p5-11-identify-notes.jpg` |
 
 ![mapped](phase5/p5-03-mapped.jpg)
 ![note map](phase5/p5-05-note-selected.jpg)
@@ -95,13 +96,35 @@ cells (the EQ page's), and the NOTE MAP uses the EQ page's graphite well and typ
 - **Merge**: select neighbouring notes, then MERGE (one note: with the next).
 - **Sustain** is explained per note from what the instrument actually built:
   - "Sustains from its stable body";
-  - "Plays as recorded: under 0.3 s of stable sound to sustain from" (or "decaying source");
+  - "Sustains: one loop over the note" (the musical review's loop-every-note rule, below);
+  - "Plays as recorded: under 0.1 s of sound to loop";
   - "Sustain being prepared" (Stage A);
   - "LOOP is off"; "Granular: grains hold it";
   - "Not loaded: the layer's memory is full".
   
-  The map's summary counts how many notes sustain. There are no new sustain controls and no
-  new DSP: LOOP and the 0.3 s rule are the existing policies.
+  The map's summary counts how many notes sustain. There are no new sustain controls: LOOP
+  stays the switch.
+
+  **After the musical review: every note of 0.1 s or more loops.** The shortest region a note
+  sustains from drops from 0.3 s to 0.1 s (`atlasset::BuildOptions::minSustainSeconds`), and a
+  note the continuation analysis would not loop (a fading note, no compatible loop points, a
+  short stable body) gets one crossfaded loop over its body instead, its destination aligned on
+  the waveform (`ContinuationOptions::forceLoop`, reason "loop over the note";
+  `BuildOptions::loopEveryNote`, on). A fading note's loop may pulse a little. Notes the analysis
+  already looped keep exactly their loops. Ordinary samples and sample sets are unchanged
+  (forceLoop is off outside the atlas). Tests: `tests/integration/AtlasShortSustainTests.cpp`.
+
+  **After the musical review: "Identify notes?" on drop.** Dropping a phrase used to show
+  nothing (MAP NOTES lived only in the layer menu). Now a dropped recording that lasts a second
+  or more and whose ordinary load hears two or more held pitches asks at once, on the card over
+  its waveform: "Identify notes? · N heard", MAP NOTES / NO
+  (`phase5/p5-11-identify-notes.jpg`). No extra analysis runs to ask: the count is the
+  Library classifier's `heldNotes` over the pitch track the load already has (pitches held
+  0.2 s or more; a move of an octave or a fifth is not counted, since pitch trackers slip by
+  those on one note). NO keeps the ordinary sample and does not ask
+  again; MAP NOTES stays in the menu. A recalled session, a one-note sound, a multi-sample set
+  or an atlas never asks. A phrase that repeats one pitch, or only leaps by octaves and fifths, is
+  heard as one note and is not asked about (MAP NOTES in the menu still maps it).
 - **The map, nothing selected**:
   - DETECTION FEWER / NORMAL / MORE, a background re-detection;
   - FILL on/off and its reach (±1..48 st);

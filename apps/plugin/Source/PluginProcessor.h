@@ -225,6 +225,11 @@ public:
         `detection` (analyseRecording). On an analysed atlas: detected again with `detection`,
         the musician's corrections kept and conflicts reported (one undo step). */
     void mapNotes (int layer, phrase::Detection detection = phrase::Detection::normal) override;
+    /** The notes a dropped (user-loaded) one-file recording holds, when it holds two or more
+        and lasts a second or more (library::heldNotes over the load's own pitch track):
+        the card's "Map notes?" prompt. 0 once answered, mapped or replaced. */
+    int mapNotesPrompt (int layer) const override;
+    void dismissMapNotesPrompt (int layer) override;
     /** An edit of the layer's atlas on the loader thread, published through Stage A / B; one
         undo step. Edits asked for while one is being prepared wait for it (each edits the
         result of the one before). */
@@ -512,6 +517,8 @@ private:
         std::vector<std::string> missingSources;         // message thread: the last Atlas load's
         std::shared_ptr<std::atomic<bool>> cancelPreparation;   // message thread: the current analysis / atlas job's
         std::uint64_t messageLoad = 0;                   // message thread: the load the status message is about
+        std::uint64_t promptLoad = 0;                    // message thread: the load "Map notes?" asks about (0: none)
+        int promptNotes = 0;
         // Root override (message -> audio)
         std::atomic<double> rootShiftSemitones { 0.0 };
         std::atomic<bool> hasRootOverride { false };

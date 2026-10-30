@@ -1,6 +1,8 @@
-// Short atlas notes sustain (unified engine Phase 4B): a Note Atlas note with 0.3 s of stable
-// material holds through continuation, its loops scaled to the region; shorter or decaying ones
-// play as recorded. Sample sets keep the 0.5 s minimum and their analysis is unchanged.
+// Short atlas notes sustain. Phase 4B: a Note Atlas note with 0.3 s of stable material holds
+// through continuation, its loops scaled to the region. Phase 5's review: every note of 0.1 s or
+// more holds; where the analysis finds no loop it would choose (a fading note, no compatible
+// points), one crossfaded loop over the note's body holds it. Sample sets keep the 0.5 s minimum
+// and their analysis is unchanged.
 
 #include "analysis/continuation/ContinuationAnalyzer.h"
 #include "analysis/phrase/PhraseAnalysis.h"
@@ -30,7 +32,7 @@ namespace
         double regionSeconds() const { return (continuation().sustainEndFrame - continuation().sustainStartFrame) / 48000.0; }
     };
 
-    Short shortNote (AudioData audio, double minSustainSeconds)
+    Short shortNote (AudioData audio, double minSustainSeconds, bool loopEveryNote = true)
     {
         Short s;
         s.audio = std::move (audio);
@@ -48,6 +50,7 @@ namespace
             n.included = &n == &*main;
         atlasset::BuildOptions options;
         options.minSustainSeconds = minSustainSeconds;
+        options.loopEveryNote = loopEveryNote;
         s.built = atlasset::buildInstrumentSet (analysed.atlas, { { "src0", std::make_shared<const AudioData> (s.audio) } }, options);
         REQUIRE (s.built.set != nullptr);
         REQUIRE (s.built.set->members.size() == 1);
@@ -100,72 +103,76 @@ namespace
     }
 }
 
-TEST_CASE ("Short atlas notes: 0.3 s of stable material sustains, a longer region loops as before", "[integration][atlas][sustain]")
+TEST_CASE ("Short atlas notes: every note of 0.1 s or more holds; a note the analysis loops loops as before", "[integration][atlas][sustain]")
 {
     // Sample sets keep the fixed minimums: their continuation analysis is unchanged.
     CHECK (ContinuationOptions {}.minRegionSeconds == 0.5);
     CHECK (ContinuationOptions {}.shortRegionSeconds == 0.0);
-    CHECK (atlasset::BuildOptions {}.minSustainSeconds == 0.3);
+    CHECK_FALSE (ContinuationOptions {}.forceLoop);
+    CHECK (atlasset::BuildOptions {}.minSustainSeconds == 0.1);
+    CHECK (atlasset::BuildOptions {}.loopEveryNote);
 
-    int sustainedShort = 0;
     for (bool vibrato : { false, true })
-    for (double seconds : { 0.35, 0.45, 0.55, 0.65, 0.75, 1.2 })
+    for (double seconds : { 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 1.2 })
     {
         INFO ((vibrato ? "vibrato " : "steady ") << seconds << " s note");
-        const auto now = shortNote (tone (vibrato, seconds), 0.3);
-        const auto before = shortNote (tone (vibrato, seconds), 0.5);
-        const double region = now.regionSeconds();
-        INFO ("stable region " << region << " s: " << now.continuation().reason);
-        // The region is the note's stable body, well short of the note itself (attack, release).
-        CHECK (region < seconds - 0.05);
-        CHECK (region == before.regionSeconds());
-        if (region < 0.3)
+        const auto now = shortNote (tone (vibrato, seconds), 0.1);
+        const auto phase4b = shortNote (tone (vibrato, seconds), 0.3, false);
+        INFO ("now: " << now.continuation().reason << ", Phase 4B: " << phase4b.continuation().reason);
+        // Every one of these notes holds now.
+        CHECK (now.continuation().canSustain);
+        // A note the analysis looped at 0.3 s (its stable body that long) is looped exactly so.
+        if (phase4b.continuation().canSustain && phase4b.regionSeconds() >= 0.3)
         {
-            CHECK_FALSE (now.continuation().canSustain);
-            CHECK (now.continuation().reason == "stable region too short");
-        }
-        else if (region >= 0.5)
-        {
-            // Exactly the analysis the 0.5 s threshold gave.
-            CHECK (now.continuation().canSustain == before.continuation().canSustain);
-            REQUIRE (now.continuation().jumps.size() == before.continuation().jumps.size());
+            CHECK (now.continuation().reason == phase4b.continuation().reason);
+            REQUIRE (now.continuation().jumps.size() == phase4b.continuation().jumps.size());
             for (std::size_t j = 0; j < now.continuation().jumps.size(); ++j)
             {
-                CHECK (now.continuation().jumps[j].fromFrame == before.continuation().jumps[j].fromFrame);
-                CHECK (now.continuation().jumps[j].toFrame == before.continuation().jumps[j].toFrame);
+                CHECK (now.continuation().jumps[j].fromFrame == phase4b.continuation().jumps[j].fromFrame);
+                CHECK (now.continuation().jumps[j].toFrame == phase4b.continuation().jumps[j].toFrame);
             }
         }
-        else
-        {
-            CHECK_FALSE (before.continuation().canSustain);
-            CHECK (now.continuation().canSustain);
-            sustainedShort += now.continuation().canSustain ? 1 : 0;
-            // Loops scaled to the region, never shorter than 0.6 of it.
-            for (const auto& j : now.continuation().jumps)
-                if (j.toFrame < j.fromFrame)
-                    CHECK ((j.fromFrame - j.toFrame) / 48000.0 >= 0.6 * region - 0.02);
-        }
-        if (now.continuation().canSustain)
-        {
-            // Held three times its length: it keeps sounding at an even level (no dropout, no
-            // pumping from loop to loop).
-            const int key = now.built.set->members.front().model->rootMidi > 0 ? static_cast<int> (std::lround (now.built.set->members.front().model->rootMidi)) : 69;
-            int allocations = -1;
-            const auto levels = heldLevels (*now.built.set, key, 3.0 * seconds + 0.5, allocations);
-            CHECK (allocations == 0);
-            REQUIRE (levels.size() > 4);
-            const auto [lo, hi] = std::minmax_element (levels.begin(), levels.end());
-            CHECK (*lo > -60.0);
-            CHECK (*hi - *lo < 6.0);
-        }
+        // Held three times its length: it keeps sounding at an even level (no dropout, no
+        // pumping from loop to loop), and the audio thread allocates nothing.
+        const auto& model = *now.built.set->members.front().model;
+        const int key = model.rootMidi > 0 ? static_cast<int> (std::lround (model.rootMidi)) : 69;
+        int allocations = -1;
+        const auto levels = heldLevels (*now.built.set, key, 3.0 * seconds + 0.5, allocations);
+        CHECK (allocations == 0);
+        REQUIRE (levels.size() > 4);
+        const auto [lo, hi] = std::minmax_element (levels.begin(), levels.end());
+        CHECK (*lo > -60.0);
+        CHECK (*hi - *lo < 6.0);
     }
-    CHECK (sustainedShort >= 4);   // the change does something: 0.3-0.5 s bodies now hold
 }
 
-TEST_CASE ("Short atlas notes: a decaying note is not forced to sustain", "[integration][atlas][sustain]")
+TEST_CASE ("Short atlas notes: a fading note loops over its body; a note under 0.1 s plays once", "[integration][atlas][sustain]")
 {
     auto plucked = testsignals::pluck (220.0, 0.7, 48000.0, 3);
     testsignals::applyFades (plucked, 0.002, 0.05);
-    const auto s = shortNote (std::move (plucked), 0.3);
-    CHECK_FALSE (s.continuation().canSustain);
+    // Phase 4B: a decaying note was one-shot.
+    CHECK_FALSE (shortNote (plucked, 0.3, false).continuation().canSustain);
+    const auto s = shortNote (std::move (plucked), 0.1);
+    REQUIRE (s.continuation().canSustain);
+    CHECK (s.continuation().reason == "loop over the note");
+    REQUIRE (s.continuation().jumps.size() == 1);
+    const auto& j = s.continuation().jumps.front();
+    CHECK (j.toFrame < j.fromFrame);
+    CHECK ((j.fromFrame - j.toFrame) / 48000.0 >= 0.05);
+    // Held for 2 s: it never falls silent (it pulses with the pluck's decay, bounded).
+    const auto& model = *s.built.set->members.front().model;
+    int allocations = -1;
+    const auto levels = heldLevels (*s.built.set, static_cast<int> (std::lround (model.rootMidi)), 2.0, allocations);
+    CHECK (allocations == 0);
+    REQUIRE (levels.size() > 4);
+    CHECK (*std::min_element (levels.begin(), levels.end()) > -60.0);
+
+    // Too short to hold anything: 80 ms of sound.
+    auto blip = testsignals::saw (220.0, 0.08, 48000.0, 0.4, 2);
+    testsignals::applyFades (blip, 0.005, 0.02);
+    AnalysisData analysis;
+    ContinuationOptions options;
+    options.minRegionSeconds = 0.1;
+    options.forceLoop = true;
+    CHECK_FALSE (analyseContinuation (blip, analysis, options).canSustain);
 }

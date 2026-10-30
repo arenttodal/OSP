@@ -356,6 +356,7 @@ StagedBuild buildPlayableSet (const atlas::NoteAtlas& atlas, const std::vector<S
         r.options = options.instrument;
         r.options.continuation.shortRegionSeconds = r.options.continuation.minRegionSeconds;
         r.options.continuation.minRegionSeconds = std::min (r.options.continuation.minRegionSeconds, options.minSustainSeconds);
+        r.options.continuation.forceLoop = options.loopEveryNote;
         // Start exactly at the region (attackStart: the atlas placed it), one shared gain.
         r.options.preparationOverride = PlaybackPreparation { 0.0, gainDb };
         const double cents = atlas.mapping.correctTuning ? r.note.centsOffset / 100.0 : 0.0;

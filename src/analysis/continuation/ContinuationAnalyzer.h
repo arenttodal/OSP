@@ -21,6 +21,11 @@ struct ContinuationOptions
         is at least `minRegionSeconds`, its shortest loop and segment shrinking with it (0.6 and
         0.4 of the region). 0: off, the fixed minimums above (sample sets). */
     double shortRegionSeconds = 0.0;
+    /** Note Atlas regions (OSP Phase 5): every note of `minRegionSeconds` or more holds. Where
+        the analysis finds no loop it would choose (a fading note, no compatible loop points, a
+        short body), one crossfaded loop over the note's body, aligned on its waveform, holds it
+        instead; a fading note's loop may pulse a little. Off: such notes play once (samples). */
+    bool forceLoop = false;
 };
 
 /**

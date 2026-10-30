@@ -502,6 +502,16 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
         list): reported in the editor.
       - Tests: 10 plugin cases (workflows A-D, undo, queue, realtime swap, state, KEY DNA).
       Stopped for musical review before Phase 6.
+- [x] UNIFIED ENGINE Phase 5, first musical review (phase-5-report.md, "After the musical review"):
+      - Every Note Atlas note of 0.1 s or more holds: the shortest sustain region drops from
+        0.3 s to 0.1 s, and a note the continuation analysis would not loop (fading, no loop
+        points) gets one crossfaded loop over its body (ContinuationOptions::forceLoop, atlas
+        only; reason "loop over the note"). Notes already looped keep their loops; sample sets
+        and ordinary samples are unchanged. Atlas goldens updated (levels listed in the commit).
+      - "Identify notes?": a dropped recording of a second or more whose ordinary load hears two
+        or more held pitches (library::heldNotes over its pitch track, the Library classifier's
+        rule) asks at once on its card: MAP NOTES / NO. Recalled sessions, one-note sounds,
+        sets and atlases ask nothing; an ordinary card is drawn as before.
 - [x] ANDOR DESIGN SYSTEM and INSTRUMENT SHELL (andor-design-system/, start with HANDOFF.md).
       ANDOR OSP's interface was extracted, unchanged, into shared/andor-ui:
       - the components, look and assets;

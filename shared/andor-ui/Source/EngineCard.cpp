@@ -1668,6 +1668,130 @@ void EngineCard::InfoCard::paint (juce::Graphics& g)
     }
 }
 
+void EngineCard::updateMapPrompt()
+{
+    const int notes = (noteMap != nullptr || eqEditor != nullptr) ? 0 : processor.mapNotesPrompt (layerIndex);
+    if (notes <= 0)
+    {
+        if (mapPrompt != nullptr)
+        {
+            const auto area = mapPrompt->getBounds();
+            mapPrompt.reset();
+            repaint (area);
+        }
+        return;
+    }
+    if (mapPrompt == nullptr)
+    {
+        mapPrompt = std::make_unique<MapPrompt>();
+        juce::Component::SafePointer<EngineCard> safe (this);
+        mapPrompt->onAnswer = [safe] (bool yes) {
+            // Later: the answer removes the prompt that is calling.
+            juce::MessageManager::callAsync ([safe, yes] {
+                if (safe != nullptr)
+                    safe->answerMapNotesPrompt (yes);
+            });
+        };
+        addAndMakeVisible (*mapPrompt);
+    }
+    if (mapPrompt->notes != notes)
+    {
+        mapPrompt->notes = notes;
+        mapPrompt->repaint();
+    }
+    placeMapPrompt();
+    mapPrompt->toFront (false);
+}
+
+void EngineCard::answerMapNotesPrompt (bool yes)
+{
+    if (yes)
+        processor.mapNotes (layerIndex);
+    processor.dismissMapNotesPrompt (layerIndex);
+    updateMapPrompt();
+}
+
+void EngineCard::placeMapPrompt()
+{
+    if (mapPrompt == nullptr)
+        return;
+    // Centred low over the waveform, clear of the granular strip's band.
+    const auto display = sourceDisplay.getBounds();
+    const int w = std::min (display.getWidth() - 16, 330), h = 34;
+    mapPrompt->setBounds (display.getCentreX() - w / 2, display.getBottom() - h - 10 - (granularShown ? 80 : 0), w, h);
+}
+
+void EngineCard::MapPrompt::resized()
+{
+    auto r = getLocalBounds().toFloat().reduced (5.0f);
+    noArea = r.removeFromRight (44.0f);
+    r.removeFromRight (5.0f);
+    yesArea = r.removeFromRight (98.0f);
+}
+
+void EngineCard::MapPrompt::paint (juce::Graphics& g)
+{
+    using namespace design;
+    const auto r = getLocalBounds().toFloat().reduced (1.0f);
+    juce::Path card;
+    card.addRoundedRectangle (r, 8.0f);
+    CachedShadow (juce::Colour (0x30302418), 8, { 0, 3 }).drawForPath (g, card);
+    g.setGradientFill (juce::ColourGradient (colour::panelTop, 0.0f, r.getY(), colour::panelBottom, 0.0f, r.getBottom(), false));
+    g.fillPath (card);
+    g.setColour (colour::hairline.darker (0.1f));
+    g.strokePath (card, juce::PathStrokeType (1.0f));
+    const auto font = type::sourceFilename();
+    g.setFont (font);
+    g.setColour (colour::text.withAlpha (0.92f));
+    const auto text = "Identify notes?" + juce::String::fromUTF8 (" \xc2\xb7 ") + juce::String (notes) + " heard";
+    g.drawFittedText (text, r.withRight (yesArea.getX() - 4.0f).withTrimmedLeft (12.0f).getSmallestIntegerContainer(), juce::Justification::centredLeft, 1, 0.85f);
+    // MAP NOTES: the accent key; NO: a quiet one.
+    g.setGradientFill (juce::ColourGradient (colour::accentTop, 0.0f, yesArea.getY(), colour::accentBottom, 0.0f, yesArea.getBottom(), false));
+    g.fillRoundedRectangle (yesArea, 5.0f);
+    if (hover == 1)
+    {
+        g.setColour (juce::Colours::white.withAlpha (0.12f));
+        g.fillRoundedRectangle (yesArea, 5.0f);
+    }
+    g.setColour (juce::Colours::white);
+    g.setFont (font.withHeight (font.getHeight() * 0.86f));
+    g.drawText ("MAP NOTES", yesArea, juce::Justification::centred);
+    g.setColour (hover == 2 ? colour::hairline.darker (0.05f) : colour::hairline.withAlpha (0.6f));
+    g.fillRoundedRectangle (noArea, 5.0f);
+    g.setColour (colour::textSecondary);
+    g.drawText ("NO", noArea, juce::Justification::centred);
+}
+
+void EngineCard::MapPrompt::mouseMove (const juce::MouseEvent& e)
+{
+    const int h = yesArea.contains (e.position) ? 1 : noArea.contains (e.position) ? 2 : 0;
+    setMouseCursor (h != 0 ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+    if (h != hover)
+    {
+        hover = h;
+        repaint();
+    }
+}
+
+void EngineCard::MapPrompt::mouseExit (const juce::MouseEvent&)
+{
+    if (hover != 0)
+    {
+        hover = 0;
+        repaint();
+    }
+}
+
+void EngineCard::MapPrompt::mouseUp (const juce::MouseEvent& e)
+{
+    if (onAnswer == nullptr)
+        return;
+    if (yesArea.contains (e.position))
+        onAnswer (true);
+    else if (noArea.contains (e.position))
+        onAnswer (false);
+}
+
 bool EngineCard::isGranular() const noexcept
 {
     return mode != nullptr && mode->mode() == 1;
@@ -1899,6 +2023,7 @@ void EngineCard::refresh()
             repaint (textArea);
         }
     }
+    updateMapPrompt();
     // Root: the correction if there is one, else the detected note.
     juce::String root;
     if (const auto overrideMidi = processor.rootOverride (layerIndex))
@@ -2058,6 +2183,7 @@ void EngineCard::resized()
         eqEditor->setBounds (sourceDisplay.getBounds());   // exactly the display's place
     if (noteMap != nullptr)
         noteMap->setBounds (sourceDisplay.getBounds());
+    placeMapPrompt();
 
     // START TUNE PAN LEVEL REIMAGINED: one family at 87 % of the four-knob size, on one
     // pitch, with a little more room at the row's ends than between neighbours.

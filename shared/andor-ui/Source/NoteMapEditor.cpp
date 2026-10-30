@@ -621,10 +621,12 @@ juce::String NoteMapEditor::sustainText (const atlas::NoteEvent& n) const
         if (m.regionId == n.id && m.model != nullptr)
         {
             const auto& c = m.model->original.continuation;
+            if (c.canSustain && c.reason == "loop over the note")
+                return "Sustains: one loop over the note (a fading note may pulse)";
             if (c.canSustain)
                 return "Sustains from its stable body";
             if (c.reason == "stable region too short")
-                return "Plays as recorded: under 0.3 s of stable sound to sustain from";
+                return "Plays as recorded: under 0.1 s of sound to loop";
             return "Plays as recorded: " + juce::String (c.reason);
         }
     if (instrument->atlasStatus != nullptr && std::find (instrument->atlasStatus->skippedNoteIds.begin(), instrument->atlasStatus->skippedNoteIds.end(), n.id)
@@ -714,7 +716,7 @@ void NoteMapEditor::rebuildInspector()
                 sustaining += sustainText (*n).startsWith ("Sustains") ? 1 : 0;
             }
         sustain.note = ! loopOn ? juce::String ("LOOP is off: notes play as recorded")
-                                : juce::String (sustaining) + " of " + juce::String (included) + " notes sustain (0.3 s of stable sound needed)";
+                                : juce::String (sustaining) + " of " + juce::String (included) + " notes sustain (every note of 0.1 s or more)";
         rows.push_back (sustain);
         Row verdict;
         if (atlas->analysis.suitability == "unsuitable")

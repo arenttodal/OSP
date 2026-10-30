@@ -171,6 +171,16 @@ public:
     {
         juce::ignoreUnused (layer, detection);
     }
+    /** "Map notes?" (Phase 5 review): a recording the musician just dropped on the layer that
+        holds several notes, as its ordinary load heard them, so the card asks at once whether
+        to map them. 0: nothing to ask (one note, a recalled session, an answered prompt). */
+    virtual int mapNotesPrompt (int layer) const
+    {
+        juce::ignoreUnused (layer);
+        return 0;
+    }
+    /** The prompt answered "no" (or made moot): it is not asked again for this load. */
+    virtual void dismissMapNotesPrompt (int layer) { juce::ignoreUnused (layer); }
     /** An edit of the layer's atlas, applied on a background thread (where the recording's
         audio is at hand: splits and merges re-describe the notes) and published like a load:
         playable at once, finished in the background, one undo step named `name`. The edit

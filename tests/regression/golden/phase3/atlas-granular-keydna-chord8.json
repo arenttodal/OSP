@@ -7,10 +7,10 @@
   "blockSize": 256,
   "seed": 1,
   "platform": "linux-x86_64-gcc",
-  "sampleHash": "6a16f1a601f6713e",
+  "sampleHash": "6e14d87f295c35bc",
   "seconds": 2.266667,
-  "rmsDb": -26.087259,
-  "peakDb": -13.013569,
-  "brightness": 0.125058,
-  "stereoWidth": 0.7519
+  "rmsDb": -26.087971,
+  "peakDb": -13.010176,
+  "brightness": 0.125069,
+  "stereoWidth": 0.751799
 }

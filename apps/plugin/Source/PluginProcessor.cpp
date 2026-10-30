@@ -11,6 +11,7 @@
 #include "io/ContentHash.h"
 #include "io/NoteAtlasJson.h"
 #include "library/Inbox.h"
+#include "library/Classifier.h"
 #include "analysis/phrase/PhraseEdits.h"
 
 #include <algorithm>
@@ -1824,9 +1825,26 @@ bool OspAudioProcessor::canMapNotes (int layer) const
            && loadState (layer) != LoadState::loading;
 }
 
+int OspAudioProcessor::mapNotesPrompt (int layer) const
+{
+    const auto& l = layers[resolve (layer)];
+    const auto instrument = currentInstrument (layer);
+    if (l.promptLoad == 0 || instrument == nullptr || instrument->loadId != l.promptLoad || ! canMapNotes (layer))
+        return 0;
+    return l.promptNotes;
+}
+
+void OspAudioProcessor::dismissMapNotesPrompt (int layer)
+{
+    auto& l = layers[resolve (layer)];
+    l.promptLoad = 0;
+    l.promptNotes = 0;
+}
+
 void OspAudioProcessor::mapNotes (int layer, phrase::Detection detection)
 {
     const auto index = static_cast<int> (resolve (layer));
+    dismissMapNotesPrompt (index);
     const auto instrument = currentInstrument (index);
     if (instrument == nullptr)
         return;
@@ -2693,6 +2711,21 @@ void OspAudioProcessor::timerCallback()
                     }
                     if (result.instrument->atlas == nullptr || ! userLoadNames.count (loadId))
                         layer.redetect = {};
+                    // A dropped phrase asks at once whether to map its notes (Phase 5 review). A
+                    // recalled session, an atlas, a set or "Play as one sample" asks nothing.
+                    layer.promptLoad = 0;
+                    layer.promptNotes = 0;
+                    if (userLoads.count (loadId) > 0 && ! userLoadNames.count (loadId) && result.instrument->atlas == nullptr
+                        && result.instrument->set == nullptr && result.instrument->durationSeconds >= 1.0)
+                    {
+                        const auto& pitch = result.instrument->analysis.pitch;
+                        const int notes = library::heldNotes (pitch.trackHz, pitch.trackConfidence);
+                        if (notes >= 2)
+                        {
+                            layer.promptLoad = loadId;
+                            layer.promptNotes = notes;
+                        }
+                    }
                     layer.lastPublishedLoad = loadId;
                 }
                 // Keep undo history bounded (the instruments hold audio).

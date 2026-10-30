@@ -340,6 +340,9 @@ public:
     bool isNotesOpen() const noexcept { return noteMap != nullptr; }
     NoteMapEditor* noteMapComponent() noexcept { return noteMap.get(); }
     NotesButton& notesToggle() noexcept { return notesButton; }
+    /** Tests: the "Map notes?" prompt when it is shown (null otherwise), and its answer. */
+    juce::Component* mapNotesPromptComponent() noexcept { return mapPrompt.get(); }
+    void answerMapNotesPrompt (bool mapNotes);
 
     void paint (juce::Graphics&) override;
     void paintOverChildren (juce::Graphics&) override;
@@ -400,6 +403,24 @@ private:
         void paint (juce::Graphics&) override;
     };
     std::unique_ptr<InfoCard> infoCard;
+    /** "Map notes?" over the display (Phase 5 review): a dropped recording with several notes
+        asks once, at once, whether to become an instrument of its notes. Exists only while the
+        host asks (InstrumentHost::mapNotesPrompt), so an ordinary card is drawn as before. */
+    struct MapPrompt final : juce::Component
+    {
+        int notes = 0;
+        std::function<void (bool)> onAnswer;   ///< true: MAP NOTES; false: keep it one sample
+        juce::Rectangle<float> yesArea, noArea;
+        int hover = 0;                         ///< 1 MAP NOTES, 2 NO
+        void paint (juce::Graphics&) override;
+        void resized() override;
+        void mouseMove (const juce::MouseEvent&) override;
+        void mouseExit (const juce::MouseEvent&) override;
+        void mouseUp (const juce::MouseEvent&) override;
+    };
+    std::unique_ptr<MapPrompt> mapPrompt;
+    void updateMapPrompt();
+    void placeMapPrompt();
     struct Delay final : juce::Timer
     {
         std::function<void()> fire;
