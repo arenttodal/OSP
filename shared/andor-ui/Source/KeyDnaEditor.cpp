@@ -33,6 +33,27 @@ namespace
         }
         return {};
     }
+
+    // The display language of the EQ and NOTE MAP pages: hairlines on the device pixel grid,
+    // one node vocabulary, notes at the graph's corner.
+    void vline (juce::Graphics& g, float x, float y0, float y1, float px = 1.0f)
+    {
+        const float s = std::max (1.0f, g.getInternalContext().getPhysicalPixelScaleFactor());
+        g.fillRect (juce::Rectangle<float> (std::floor (x * s) / s, y0, px / s, y1 - y0));
+    }
+    void hline (juce::Graphics& g, float x0, float x1, float y, float px = 1.0f)
+    {
+        const float s = std::max (1.0f, g.getInternalContext().getPhysicalPixelScaleFactor());
+        g.fillRect (juce::Rectangle<float> (x0, std::floor (y * s) / s, x1 - x0, px / s));
+    }
+    void drawNode (juce::Graphics& g, juce::Point<float> at, juce::Colour c, bool heard, bool hot)
+    {
+        const float r = hot ? 6.0f : 5.0f;
+        g.setColour (osp::plugin::design::colour::wellA);
+        g.fillEllipse (juce::Rectangle<float> (2.0f * r + 3.0f, 2.0f * r + 3.0f).withCentre (at));
+        g.setColour (c.withAlpha (heard ? 1.0f : 0.6f));
+        g.fillEllipse (juce::Rectangle<float> (2.0f * r, 2.0f * r).withCentre (at));
+    }
 }
 
 KeyDnaEditor::KeyDnaEditor (InstrumentHost& h, int l) : host (h), layerIndex (l)
@@ -162,7 +183,7 @@ juce::String KeyDnaEditor::fieldText (const Field& f) const
     if (f.name == "depth")
         return (v > 0.0 ? "+" : "") + percent (v);
     if (f.name == "individuality")
-        return v < 0.15 ? "SMOOTH" : (v > 0.85 ? "INDIVIDUAL" : percent (v));
+        return v < 0.15 ? "Smooth" : (v > 0.85 ? "Individual" : percent (v));
     return percent (v);
 }
 
@@ -341,46 +362,91 @@ void KeyDnaEditor::paint (juce::Graphics& g)
     g.drawText ("KEY DNA " + juce::String::fromUTF8 ("\xc2\xb7") + " LAYER " + InstrumentHost::layerName (layerIndex), 26, 42, 240, 14,
                 juce::Justification::centredLeft);
 
+    // ON is the one physical switch here; everything else is a reading or a quiet action.
     drawKey (g, power, settings.enabled ? "ON" : "OFF", settings.enabled, hoverControl == "power", id.arc);
     for (const auto& f : fields)
     {
         if (f.area.isEmpty())
             continue;
+        // The values as readouts over a hairline (no boxes). AMOUNT leads: the largest value
+        // and a meter in the layer's colour; the seed is the quietest.
         const bool dimmed = ! settings.enabled && f.name != "amount";
-        g.setFont (type::popupLabel (11.0f));
-        g.setColour (colour::textSecondary.withAlpha (dimmed ? 0.6f : 1.0f));
+        const bool primary = f.name == "amount", secondary = f.name == "seed";
+        const bool hot = hoverControl == f.name || dragField == &f;
+        g.setFont (type::popupLabel (10.5f));
+        g.setColour ((primary ? colour::text : colour::textSecondary).withAlpha (dimmed ? 0.55f : (primary ? 0.85f : 1.0f)));
         g.drawText (f.caption, f.area.withHeight (16.0f), juce::Justification::centredLeft, false);
         const auto box = f.area.withTrimmedTop (18.0f);
-        g.setColour (colour::panelBottom.darker (hoverControl == f.name ? 0.08f : 0.04f));
-        g.fillRoundedRectangle (box, 5.0f);
-        g.setColour (colour::hairline.darker (0.15f));
-        g.drawRoundedRectangle (box.reduced (0.5f), 5.0f, 1.0f);
-        g.setFont (type::popupValue (14.0f));
-        g.setColour (colour::text.withAlpha (dimmed ? 0.5f : 0.9f));
-        g.drawText (fieldText (f), box, juce::Justification::centred, false);
+        if (hot)
+        {
+            g.setColour (colour::text.withAlpha (0.045f));
+            g.fillRoundedRectangle (box, 4.0f);
+        }
+        g.setColour (hot ? id.arc : colour::divider.darker (0.08f));
+        hline (g, box.getX(), box.getRight(), box.getBottom() - 1.0f);
+        if (primary)
+        {
+            g.setColour (id.arc.withAlpha (0.9f));
+            g.fillRect (juce::Rectangle<float> (box.getX(), box.getBottom() - 2.0f, box.getWidth() * static_cast<float> (std::clamp (amount, 0.0, 1.0)), 2.0f));
+        }
+        g.setFont (type::popupValue (primary ? 17.0f : (secondary ? 13.0f : 14.0f)));
+        g.setColour (colour::text.withAlpha (dimmed ? 0.5f : (secondary ? 0.7f : 0.92f)));
+        g.drawText (fieldText (f), box.withTrimmedBottom (2.0f), juce::Justification::centred, false);
     }
-    drawKey (g, randomize, "RANDOMIZE", false, hoverControl == "randomize", id.arc);
+    // A secondary action: a hairline outline, filled faintly under the pointer.
+    auto action = [&] (juce::Rectangle<float> r, const juce::String& text, bool hot) {
+        const auto box = r.reduced (0.5f, 2.0f);
+        if (hot)
+        {
+            g.setColour (colour::text.withAlpha (0.045f));
+            g.fillRoundedRectangle (box, 4.0f);
+        }
+        g.setColour (colour::text.withAlpha (hot ? 0.3f : 0.16f));
+        g.drawRoundedRectangle (box.reduced (0.5f), 4.0f, 1.0f);
+        g.setFont (type::popupLabel (11.5f));
+        g.setColour (colour::text.withAlpha (hot ? 0.9f : 0.62f));
+        g.drawText (text, box, juce::Justification::centred, false);
+    };
+    action (randomize, "Randomize", hoverControl == "randomize");
     {
         const auto x = closeArea.reduced (9.0f);
+        juce::Path cross;
+        cross.startNewSubPath (x.getTopLeft());
+        cross.lineTo (x.getBottomRight());
+        cross.startNewSubPath (x.getTopRight());
+        cross.lineTo (x.getBottomLeft());
         g.setColour (colour::textSecondary);
-        g.drawLine (x.getX(), x.getY(), x.getRight(), x.getBottom(), 1.5f);
-        g.drawLine (x.getRight(), x.getY(), x.getX(), x.getBottom(), 1.5f);
+        g.strokePath (cross, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     }
     g.setColour (colour::divider);
-    g.fillRect (juce::Rectangle<float> (24.0f, 68.0f, bounds.getWidth() - 48.0f, 1.0f));
+    hline (g, 24.0f, bounds.getWidth() - 24.0f, 68.0f);
 
-    // The parameters (a dot: it moves something), the shown one's depth, variation, reset.
+    // The parameters: one row of quiet text, the shown one bright and underlined in the layer's
+    // colour (the only selected mark); a small flat dot: this parameter moves something.
     for (int p = 0; p < keydna::paramCount; ++p)
     {
         const auto param = static_cast<keydna::Param> (p);
         const auto& ps = settings[param];
         const bool shown = param == shownParam;
+        const bool hot = hoverControl == "param." + juce::String (keydna::paramId (param));
         const auto r = tabs[static_cast<std::size_t> (p)];
-        drawKey (g, r, keydna::paramName (param), shown, hoverControl == "param." + juce::String (keydna::paramId (param)), id.arc);
+        const juce::String name = keydna::paramName (param);
+        g.setFont (type::popupLabel (12.5f));
+        g.setColour (colour::text.withAlpha (shown ? 0.95f : (hot ? 0.78f : 0.52f)));
+        g.drawText (name, r, juce::Justification::centred, false);
+        const float tw = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), name);
+        if (shown)
+        {
+            g.setColour (id.arc);
+            g.fillRect (juce::Rectangle<float> (r.getCentreX() - 0.5f * tw, r.getBottom() - 4.0f, tw, 1.5f));
+        }
         if (! juce::exactlyEqual (ps.curveDepth, 0.0) || ! juce::exactlyEqual (ps.variation, 0.0))
-            draw::led (g, { r.getRight() - 9.0f, r.getY() + 8.0f }, 5.0f, id.led, settings.enabled ? 0.6f : 0.0f);
+        {
+            g.setColour (id.arc.withAlpha (settings.enabled ? 0.9f : 0.35f));
+            g.fillEllipse (juce::Rectangle<float> (4.0f, 4.0f).withCentre ({ r.getCentreX() + 0.5f * tw + 5.0f, r.getCentreY() - 5.0f }));
+        }
     }
-    drawKey (g, reset, "RESET", false, hoverControl == "reset", id.arc);
+    action (reset, "Reset", hoverControl == "reset");
 
     paintGraph (g);
     paintOverview (g);
@@ -400,42 +466,47 @@ void KeyDnaEditor::paintGraph (juce::Graphics& g)
     draw::well (g, well, 9.0f, colour::wellA);
     const float mid = graph.getCentreY();
     const float half = 0.5f * graph.getHeight();
+    const auto light = juce::Colour (0xffeedfc8);
 
-    // The keys' grid (C of every octave) and the centre line (no offset).
+    // The keys' grid (C of every octave) and the centre line (no offset), on the pixel grid.
     g.setFont (type::popupLabel (10.5f));
     for (int k = 24; k <= highestKey; k += 12)
     {
         const float x = xForNote (k);
-        g.setColour (colour::wellGrid.withAlpha (0.9f));
-        g.fillRect (juce::Rectangle<float> (x, graph.getY(), 1.0f, graph.getHeight()));
+        g.setColour (colour::wellGrid.withAlpha (0.7f));
+        vline (g, x, graph.getY(), graph.getBottom());
         g.setColour (colour::wellText);
         g.drawText (juce::String (midiNoteName (k)), juce::Rectangle<float> (x - 20.0f, well.getY() + 4.0f, 40.0f, 14.0f), juce::Justification::centred, false);
     }
-    g.setColour (colour::wellGrid.brighter (0.25f));
-    g.fillRect (juce::Rectangle<float> (graph.getX(), mid, graph.getWidth(), 1.0f));
-    g.setColour (colour::wellText);
+    g.setColour (colour::wellText.withAlpha (0.35f));
+    hline (g, graph.getX(), graph.getRight(), mid);
+    g.setColour (colour::wellText.withAlpha (0.85f));
     g.drawText (juce::String (keydna::paramName (shownParam)) + "  " + rangeText (shownParam) + " at full depth",
                 juce::Rectangle<float> (graph.getX(), well.getBottom() - 20.0f, graph.getWidth(), 14.0f), juce::Justification::centredLeft, false);
 
-    // Under every key, the offset it plays (the computed profile, AMOUNT applied).
+    // Under every key, the offset it plays (the computed profile, AMOUNT applied): a thin stem
+    // from the centre line and a tick exactly at its value; a held key's tick is bright.
     for (int k = lowestKey; k <= highestKey; ++k)
     {
         const bool black = juce::MidiMessage::isMidiNoteBlack (k);
-        float x = xForNote (k), width = 7.0f;
+        const float x = xForNote (k);
+        float tick = 6.0f;
         if (keyBounds != nullptr)
             if (const auto r = keyBounds (k); ! r.isEmpty())
-                width = std::max (2.0f, r.getWidth() * (black ? 0.55f : 0.42f));
+                tick = std::clamp (r.getWidth() * (black ? 0.7f : 0.45f), 3.0f, 9.0f);
         const double off = shownOffset (k);
         const float height = static_cast<float> (off) * half * 0.94f;
         const bool on = held[static_cast<std::size_t> (k)];
-        auto bar = juce::Rectangle<float> (x - 0.5f * width, height > 0.0f ? mid - height : mid, width, std::max (1.0f, std::abs (height)));
-        g.setColour ((black ? id.arc.darker (0.25f) : id.arc).withAlpha (on ? 1.0f : (settings.enabled ? 0.62f : 0.22f)));
-        g.fillRoundedRectangle (bar, std::min (2.0f, 0.5f * width));
-        if (on)
+        const auto c = black ? id.arc.darker (0.25f) : id.arc;
+        const float alpha = on ? 1.0f : (settings.enabled ? 0.8f : 0.25f);
+        const float end = mid - height;
+        if (std::abs (height) >= 1.0f)
         {
-            g.setColour (juce::Colours::white.withAlpha (0.9f));
-            g.fillEllipse (juce::Rectangle<float> (5.0f, 5.0f).withCentre ({ x, height > 0.0f ? bar.getY() - 6.0f : bar.getBottom() + 6.0f }));
+            g.setColour (on ? light.withAlpha (0.55f) : c.withAlpha (alpha * 0.45f));
+            vline (g, x, std::min (mid, end), std::max (mid, end), 2.0f);
         }
+        g.setColour (on ? light : c.withAlpha (alpha));
+        g.fillRect (juce::Rectangle<float> (x - 0.5f * tick, end - (on ? 1.0f : 0.75f), tick, on ? 2.0f : 1.5f));
     }
 
     // The curve, drawn exactly as compiled, over the shown keys; its points to drag.
@@ -450,38 +521,32 @@ void KeyDnaEditor::paintGraph (juce::Graphics& g)
         c == 0 ? line.startNewSubPath (x, y) : line.lineTo (x, y);
     }
     const bool heard = settings.enabled && ! juce::exactlyEqual (settings[shownParam].curveDepth, 0.0);
-    g.setColour (juce::Colour (0xffeedfc8).withAlpha (heard ? 0.95f : 0.45f));
-    g.strokePath (line, juce::PathStrokeType (heard ? 2.0f : 1.4f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    g.setColour (light.withAlpha (heard ? 0.95f : 0.45f));
+    g.strokePath (line, juce::PathStrokeType (heard ? 1.6f : 1.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     for (int i = 0; i < curve.count; ++i)
     {
         const auto& pt = curve.points[static_cast<std::size_t> (i)];
-        const auto at = toScreen (pt.x, pt.y);
-        const bool hot = i == dragPoint;
-        g.setColour (colour::wellA);
-        g.fillEllipse (juce::Rectangle<float> (13.0f, 13.0f).withCentre (at));
-        g.setColour (juce::Colour (0xffeedfc8).withAlpha (heard ? 1.0f : 0.6f));
-        g.fillEllipse (juce::Rectangle<float> (hot ? 11.0f : 9.0f, hot ? 11.0f : 9.0f).withCentre (at));
+        drawNode (g, toScreen (pt.x, pt.y), light, heard, i == dragPoint);
     }
+    // A state or a hint: small, at the graph's corner, never over the curve's middle.
+    juce::String hint;
     if (! settings.enabled)
-    {
-        g.setFont (type::popupLabel (12.5f));
-        g.setColour (colour::wellText.brighter (0.2f));
-        g.drawText ("KEY DNA is off: every key plays the layer's own POS, SIZE, DENS, SPREAD and TUNE", graph.withHeight (22.0f).translated (0.0f, 8.0f),
-                    juce::Justification::centred, false);
-    }
+        hint = "KEY DNA is off: every key plays the layer's own POS, SIZE, DENS, SPREAD and TUNE";
     else if (juce::exactlyEqual (settings[shownParam].curveDepth, 0.0) && juce::exactlyEqual (settings[shownParam].variation, 0.0))
+        hint = "Draw a curve or raise VARIATION: " + juce::String (keydna::paramName (shownParam)) + " then differs from key to key";
+    if (hint.isNotEmpty())
     {
-        g.setFont (type::popupLabel (12.5f));
-        g.setColour (colour::wellText.brighter (0.2f));
-        g.drawText ("Draw a curve or raise VARIATION: " + juce::String (keydna::paramName (shownParam)) + " then differs from key to key",
-                    graph.withHeight (22.0f).translated (0.0f, 8.0f), juce::Justification::centred, false);
+        g.setFont (type::popupLabel (11.5f));
+        g.setColour (colour::wellText.brighter (0.15f));
+        g.drawText (hint, juce::Rectangle<float> (graph.getX() + 8.0f, graph.getY() + 4.0f, graph.getWidth() - 16.0f, 18.0f), juce::Justification::centredLeft, false);
     }
 }
 
 void KeyDnaEditor::paintOverview (juce::Graphics& g)
 {
     using namespace design;
-    // All seven parameters at a glance, one thin row each, under the same keys.
+    // All seven parameters at a glance, one thin row each, under the same keys: fine ticks,
+    // the shown parameter's row the strongest.
     const auto& id = colour::identity (layerIndex);
     const float rowHeight = overview.getHeight() / static_cast<float> (keydna::paramCount);
     g.setFont (type::popupLabel (10.0f));
@@ -490,11 +555,11 @@ void KeyDnaEditor::paintOverview (juce::Graphics& g)
         const auto param = static_cast<keydna::Param> (p);
         const auto row = juce::Rectangle<float> (overview.getX(), overview.getY() + static_cast<float> (p) * rowHeight, overview.getWidth(), rowHeight);
         const bool shown = param == shownParam;
-        g.setColour (colour::textMicro.withAlpha (shown ? 1.0f : 0.7f));
+        g.setColour ((shown ? colour::text : colour::textMicro).withAlpha (shown ? 0.85f : 0.7f));
         g.drawText (keydna::paramName (param), juce::Rectangle<float> (row.getX() - 70.0f, row.getY(), 62.0f, row.getHeight()), juce::Justification::centredRight,
                     false);
-        g.setColour (colour::divider.withAlpha (0.6f));
-        g.fillRect (juce::Rectangle<float> (row.getX(), row.getCentreY(), row.getWidth(), 1.0f));
+        g.setColour (colour::divider.withAlpha (shown ? 0.9f : 0.55f));
+        hline (g, row.getX(), row.getRight(), row.getCentreY());
         if (! settings.enabled)
             continue;
         for (int k = lowestKey; k <= highestKey; ++k)
@@ -502,10 +567,9 @@ void KeyDnaEditor::paintOverview (juce::Graphics& g)
             const float off = table.offset (k, param) * static_cast<float> (amount);
             if (std::abs (off) < 1.0e-4f)
                 continue;
-            const float x = xForNote (k);
             const float hgt = off * 0.5f * (rowHeight - 3.0f);
-            g.setColour (id.arc.withAlpha (shown ? 0.95f : 0.55f));
-            g.fillRect (juce::Rectangle<float> (x - 1.5f, hgt > 0.0f ? row.getCentreY() - hgt : row.getCentreY(), 3.0f, std::max (1.0f, std::abs (hgt))));
+            g.setColour (id.arc.withAlpha (shown ? 0.95f : 0.5f));
+            vline (g, xForNote (k), hgt > 0.0f ? row.getCentreY() - hgt : row.getCentreY(), hgt > 0.0f ? row.getCentreY() : row.getCentreY() - hgt + 1.0f, 2.0f);
         }
     }
 }

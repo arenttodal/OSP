@@ -2069,15 +2069,23 @@ void EngineCard::setEqOpen (bool open)
 void KeyDnaKey::paint (juce::Graphics& g)
 {
     using namespace design;
-    // On the graphite strip: a quiet outlined key (the EQ / NOTE MAP pages' cells).
+    // On the graphite strip: a hairline action cell (NOTE MAP's), filled faintly under the
+    // pointer; in use, a small flat telltale in the layer's colour (as NOTES and EQ), not a lamp.
     const auto r = getLocalBounds().toFloat().reduced (1.0f);
     const bool hover = isMouseOver();
-    g.setColour (juce::Colour (0xff2b3031).withAlpha (hover ? 1.0f : 0.85f));
-    g.fillRoundedRectangle (r, 6.0f);
-    g.setColour (lit ? accent : juce::Colour (0xff3e4446));
-    g.drawRoundedRectangle (r.reduced (0.5f), 6.0f, 1.0f);
+    const juce::Colour light (0xffeee8dd);
+    if (hover)
+    {
+        g.setColour (light.withAlpha (0.05f));
+        g.fillRoundedRectangle (r, 4.0f);
+    }
+    g.setColour (light.withAlpha (lit ? 0.28f : 0.16f));
+    g.drawRoundedRectangle (r.reduced (0.5f), 4.0f, 1.0f);
     if (lit)
-        draw::led (g, { r.getX() + 9.0f, r.getCentreY() }, 5.0f, accent, 0.6f);
+    {
+        g.setColour (accent);
+        g.fillEllipse (juce::Rectangle<float> (4.5f, 4.5f).withCentre ({ r.getX() + 9.5f, r.getCentreY() }));
+    }
     g.setFont (type::popupLabel (r.getWidth() < 70.0f ? 10.5f : 11.5f));
     g.setColour (juce::Colour (0xffeee8dd).withAlpha (hover || lit ? 0.95f : 0.7f));
     g.drawText ("KEY DNA", r.withTrimmedLeft (lit ? 10.0f : 0.0f), juce::Justification::centred, false);
