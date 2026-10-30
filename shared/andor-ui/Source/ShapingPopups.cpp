@@ -117,6 +117,11 @@ void SegmentedControl::mouseDown (const juce::MouseEvent& e)
 
 void SegmentedControl::paint (juce::Graphics& g)
 {
+    if (onDark)
+    {
+        paintOnDark (g);
+        return;
+    }
     // The reference's tab bar (SPACE: 559 x 43): one raised strip with hairline dividers;
     // the chosen segment is a coral key standing a pixel proud of it, its text in cream.
     using namespace design;
@@ -178,6 +183,45 @@ void SegmentedControl::paint (juce::Graphics& g)
         {
             g.setColour (colour::text.withAlpha (0.86f));
         }
+        g.drawText (items[i], cell, juce::Justification::centred, false);
+    }
+}
+
+void SegmentedControl::paintOnDark (juce::Graphics& g)
+{
+    // The graphite strip of the EQ / NOTE MAP pages: outlined cells on the well, the chosen
+    // one lit (a faint fill and an outline in the accent, its text in it).
+    using namespace design;
+    const auto lit = accent.isTransparent() ? colour::accent : accent;
+    const auto r = getLocalBounds().toFloat().reduced (0.5f, 1.0f);
+    const float h = r.getHeight();
+    const int count = std::max (1, items.size());
+    const float w = r.getWidth() / static_cast<float> (count);
+    const float radius = std::max (3.0f, 0.2f * h);
+    g.setColour (juce::Colour (0xff2b3031).withAlpha (isEnabled() ? 0.9f : 0.5f));
+    g.fillRoundedRectangle (r, radius);
+    g.setColour (juce::Colour (0xff3e4446));
+    g.drawRoundedRectangle (r.reduced (0.5f), radius, 1.0f);
+    g.setFont (type::popupLabel (juce::jlimit (9.5f, 13.0f, (count > 4 ? 0.36f : 0.4f) * h)));
+    for (int i = 0; i < count; ++i)
+    {
+        const auto cell = juce::Rectangle<float> (r.getX() + w * static_cast<float> (i), r.getY(), w, h);
+        if (i > 0 && i != index && i != index + 1)
+        {
+            g.setColour (juce::Colour (0xff3e4446));
+            g.drawVerticalLine (juce::roundToInt (cell.getX()), cell.getY() + 4.0f, cell.getBottom() - 4.0f);
+        }
+        if (i == index)
+        {
+            const auto key = cell.reduced (1.5f, 1.5f);
+            g.setColour (lit.withAlpha (0.16f));
+            g.fillRoundedRectangle (key, radius - 1.0f);
+            g.setColour (lit.withAlpha (0.85f));
+            g.drawRoundedRectangle (key.reduced (0.5f), radius - 1.0f, 1.0f);
+            g.setColour (lit.interpolatedWith (juce::Colour (0xfff2eee6), 0.35f));
+        }
+        else
+            g.setColour (juce::Colour (0xffeee8dd).withAlpha (isEnabled() ? 0.66f : 0.35f));
         g.drawText (items[i], cell, juce::Justification::centred, false);
     }
 }
@@ -426,6 +470,30 @@ void ValueSelector::paint (juce::Graphics& g)
         g.setColour (colour);
         g.setFont (type::popupMode (0.55f * h));
         g.drawText (valueText.toUpperCase(), r, juce::Justification::centredRight, true);
+        return;
+    }
+    if (onDark)
+    {
+        // A graphite key on the well (the EQ / NOTE MAP pages' cells): caption above it in the
+        // well's type, the value in cream, a quiet chevron.
+        if (caption.isNotEmpty())
+        {
+            g.setColour (design::colour::wellText.brighter (0.3f));
+            g.setFont (type::popupLabel (juce::jlimit (9.5f, 11.5f, 0.27f * h)));
+            g.drawText (caption, r.removeFromTop (0.36f * h), juce::Justification::centred, false);
+        }
+        const auto box = r.reduced (1.0f, 1.0f);
+        const bool hot = isMouseOver() || hasKeyboardFocus (false);
+        const float radius = std::max (3.0f, 0.2f * box.getHeight());
+        g.setColour (juce::Colour (0xff2b3031).withAlpha (hot ? 1.0f : 0.9f));
+        g.fillRoundedRectangle (box, radius);
+        g.setColour (hasKeyboardFocus (false) ? design::colour::accent.withAlpha (0.8f) : juce::Colour (hot ? 0xff59605f : 0xff3e4446));
+        g.drawRoundedRectangle (box.reduced (0.5f), radius, 1.0f);
+        g.setFont (type::popupLabel (juce::jlimit (9.5f, 13.0f, 0.42f * box.getHeight())));
+        auto text = box.reduced (0.3f * box.getHeight(), 0.0f);
+        icons::draw (g, icons::Kind::chevronDown, text.removeFromRight (0.32f * box.getHeight()), juce::Colour (0xffeee8dd).withAlpha (0.55f), 1.2f);
+        g.setColour (juce::Colour (0xffeee8dd).withAlpha (hot ? 0.95f : 0.82f));
+        g.drawText (valueText.toUpperCase(), text, juce::Justification::centred, false);
         return;
     }
     // Caption above (a third of the height) when there is one, the value on a raised key.

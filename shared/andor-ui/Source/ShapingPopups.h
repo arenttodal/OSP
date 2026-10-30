@@ -53,12 +53,18 @@ public:
     int selected() const noexcept { return index; }
     /** A macro popover's identity: the chosen segment becomes a pale key of it, its text in it. */
     void setAccent (juce::Colour colour) { accent = colour; repaint(); }
+    /** On a graphite display (an in-card editor): outlined graphite cells, the chosen one
+        lit in the accent (the EQ / NOTE MAP pages' keys). Opt-in: off, exactly as before. */
+    void setOnDark (bool dark) { onDark = dark; repaint(); }
 
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
 
 private:
+    void paintOnDark (juce::Graphics&);
+
     juce::StringArray items;
+    bool onDark = false;
     juce::Colour accent;   ///< transparent: the instrument's coral key
     int index = 0;
     juce::ParameterAttachment attachment;
@@ -126,6 +132,8 @@ public:
     void setPlain (bool shouldBePlain) { plain = shouldBePlain; repaint(); }
     /** A macro popover's identity: the plain mode's text leans to it. */
     void setAccent (juce::Colour colour) { accent = colour; hasAccent = true; repaint(); }
+    /** On a graphite display (an in-card editor): a graphite key, cream text. Opt-in. */
+    void setOnDark (bool dark) { onDark = dark; repaint(); }
     int selected() const noexcept { return index; }
     std::function<void (int)> onChange;
     /** Shown instead of the value while it returns text (SHAPER: CUSTOM); no item is ticked then. */
@@ -149,7 +157,7 @@ private:
     juce::RangedAudioParameter& parameter;
     juce::String caption;
     int index = 0;
-    bool plain = false, hasAccent = false;
+    bool plain = false, hasAccent = false, onDark = false;
     juce::Colour accent;
     juce::ParameterAttachment attachment;
 };
