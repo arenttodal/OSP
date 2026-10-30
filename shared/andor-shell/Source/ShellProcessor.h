@@ -15,6 +15,7 @@
 #include <deque>
 #include <memory>
 #include <mutex>
+#include <optional>
 
 namespace andor::shell
 {
@@ -176,6 +177,12 @@ public:
     int modPanelTab() const noexcept { return modTab.load(); }
     void setModPanelTab (int tab) noexcept { modTab = std::clamp (tab, 0, 5); }
 
+    /** The in-card editor's view (pinned, Quick / Detailed, section): an interface preference
+        of this product, kept in Documents/<product>/Interface.xml (it outlives the window and
+        the plugin), never a parameter, never in a preset or the session. Message thread. */
+    osp::plugin::CardWellEditor::ViewState wellViewState() const;
+    void setWellViewState (const osp::plugin::CardWellEditor::ViewState& state);
+
     /** The saved state's version (its root's schemaVersion attribute). */
     static constexpr int stateVersion = 1;
 
@@ -195,9 +202,11 @@ private:
     void rememberPreviousState (const juce::String& label);
     const juce::StringArray& favourites() const;
     juce::File favouritesFile() const { return documentsFolder().getChildFile ("Favourites.txt"); }
+    juce::File interfaceFile() const { return documentsFolder().getChildFile ("Interface.xml"); }
 
     std::unique_ptr<Engine> engine;
     Engine::Description description;
+    mutable std::optional<osp::plugin::CardWellEditor::ViewState> wellView;   ///< (read from Interface.xml when first asked)
     juce::StringArray bound;
     juce::String generatorName;
     std::array<osp::plugin::frame::MacroSpec, osp::plugin::frame::macroCount> macros;

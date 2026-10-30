@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CardWellEditor.h"
 #include "EqEditor.h"
 #include "NoteMapEditor.h"
 #include "OspLookAndFeel.h"
@@ -342,6 +343,15 @@ public:
         without it the card reads "One Shot", exactly as before. */
     void setFirstModeName (const juce::String& name);
 
+    /** A product's own editor in the waveform's place (opt-in; see CardWellEditor). The card
+        owns it and lays it out exactly over the display; shown, it replaces the waveform (the
+        display stops drawing beneath it). The EQ and NOTE MAP take the well while open: they
+        hide it, and the owner of the editor decides whether it returns (setWellEditorShown). */
+    void setWellEditor (std::unique_ptr<CardWellEditor> editor);
+    CardWellEditor* wellEditorComponent() noexcept { return wellEditor.get(); }
+    void setWellEditorShown (bool shown);
+    bool isWellEditorShown() const noexcept { return wellEditor != nullptr && wellEditor->isVisible(); }
+
     /** The layer's EQ over its waveform (a view setting: the EQ keeps playing either way). */
     std::function<void (int, bool)> onEqToggle;        ///< its EQ button (the editor keeps one open at a time)
     void setEqOpen (bool open);
@@ -408,6 +418,7 @@ private:
     std::unique_ptr<EqEditor> eqEditor;
     NotesButton notesButton;
     std::unique_ptr<NoteMapEditor> noteMap;
+    std::unique_ptr<CardWellEditor> wellEditor;   ///< (null on every card that did not ask for one)
     bool atlasLayer = false;
     juce::Rectangle<int> badgeArea, textArea, dividerArea;
     juce::String rootText, fileText;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CardWellEditor.h"
 #include "InstrumentFrame.h"
 #include "ShellEngine.h"
 
@@ -67,6 +68,11 @@ struct ProductInfo
         Space on the name opens this popover below it, and closes it again (null: the name is
         plain text, as on every ANDOR OSP card). Generator products only. */
     std::function<std::unique_ptr<osp::plugin::MiniPanel> (osp::plugin::InstrumentHost&)> generatorHeaderPopover;
+    /** A generator's in-card editor (opt-in): the card's heading (its name beside M and S)
+        toggles this editor in the waveform's place, the waveform's dark well, instead of a
+        popover. The EQ takes the well while open and gives it back if the editor is pinned.
+        Takes precedence over generatorHeaderPopover. Null: no in-card editor. */
+    std::function<std::unique_ptr<osp::plugin::CardWellEditor> (osp::plugin::InstrumentHost&)> generatorWellEditor;
     /** A generator product that also plays one recording (opt-in): layer B takes a dropped or
         chosen file through ANDOR OSP's loader, sample store and card, beside the generator's
         card, and is saved and recalled with the session. This is its name (menus, notices).

@@ -66,6 +66,15 @@ ShellEditor::ShellEditor (ShellProcessor& p)
         card->onEqToggle = [this] (int l, bool open) {
             for (auto& c : cards)
                 c->setEqOpen (open && c->layer() == l);
+            // The generator's in-card editor gives the well to its EQ (the card hides it) and
+            // takes it back when the EQ closes, if it is pinned.
+            if (l == 0 && hasWellEditor())
+            {
+                if (open)
+                    cards[0]->setHeadingOpen (false);
+                else if (shell.wellViewState().pinned)
+                    showWellEditor (true);
+            }
             modOverlay.toFront (false);
             applyBindings();   // the editor's fields are new controls
         };
@@ -83,8 +92,11 @@ ShellEditor::ShellEditor (ShellProcessor& p)
             openPopup (startControlPopup);
         });
     // A generator product may make its card's heading (the name beside M and S) the door to
-    // its settings. Opt-in: every other card's name stays plain text.
-    if (shell.product().generatorHeaderPopover != nullptr && shell.isGenerator())
+    // its settings: its in-card editor, in the waveform's place, or a popover. Opt-in: every
+    // other card's name stays plain text.
+    if (hasWellEditor())
+        cards[0]->setHeadingDoor ([this] { toggleWellEditor(); });
+    else if (shell.product().generatorHeaderPopover != nullptr && shell.isGenerator())
         cards[0]->setHeadingDoor ([this] {
             if (closedByLabelPress == generatorHeaderPopup || popupIndex == generatorHeaderPopup)
             {
@@ -178,6 +190,9 @@ ShellEditor::ShellEditor (ShellProcessor& p)
     setSize (juce::roundToInt (defaultScale * design::width), juce::roundToInt (defaultScale * instrumentHeight()));
     applyBindings();
     timerCallback();
+    // A pinned in-card editor is open when the window opens.
+    if (hasWellEditor() && shell.wellViewState().pinned)
+        showWellEditor (true);
     startTimerHz (30);
 }
 
@@ -492,6 +507,11 @@ bool ShellEditor::keyPressed (const juce::KeyPress& key)
         closePopup();
         return true;
     }
+    if (key == juce::KeyPress::escapeKey && isWellEditorShown())
+    {
+        toggleWellEditor();   // (as its heading: back to the waveform)
+        return true;
+    }
     if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'Z')
     {
         if (key.getModifiers().isShiftDown())
@@ -646,6 +666,68 @@ void ShellEditor::closePopup()
     juce::Desktop::getInstance().getAnimator().cancelAnimation (popup.get(), false);
     popup.reset();
     popupIndex = -1;
+}
+
+//==============================================================================
+// The generator's in-card editor (ProductInfo::generatorWellEditor)
+
+bool ShellEditor::hasWellEditor() const
+{
+    return shell.product().generatorWellEditor != nullptr && shell.isGenerator();
+}
+
+bool ShellEditor::isWellEditorShown() const
+{
+    return hasWellEditor() && cards[0]->isWellEditorShown();
+}
+
+void ShellEditor::showWellEditor (bool show)
+{
+    if (! hasWellEditor())
+        return;
+    auto& card = *cards[0];
+    if (show && card.wellEditorComponent() == nullptr)
+    {
+        // Made the first time it is asked for (never at start-up unless pinned), then kept:
+        // closing it only hides it.
+        auto editor = shell.product().generatorWellEditor (shell);
+        if (editor == nullptr)
+            return;
+        editor->setViewState (shell.wellViewState());
+        juce::Component::SafePointer<ShellEditor> safe (this);
+        editor->onShowWaveform = [safe] {
+            if (safe != nullptr)
+                safe->toggleWellEditor();
+        };
+        auto* raw = editor.get();
+        editor->onViewStateChanged = [safe, raw] {
+            if (safe != nullptr)
+                safe->shell.setWellViewState (raw->viewState());
+        };
+        card.setWellEditor (std::move (editor));
+    }
+    if (show && card.wellEditorComponent() != nullptr)
+        card.wellEditorComponent()->setViewState (shell.wellViewState());
+    card.setWellEditorShown (show);
+    card.setHeadingOpen (show && card.isWellEditorShown());
+    modOverlay.toFront (false);
+    applyBindings();   // its controls, enabled as the engine reads them
+}
+
+void ShellEditor::toggleWellEditor()
+{
+    if (! isWellEditorShown())
+    {
+        showWellEditor (true);
+        return;
+    }
+    // The musician's own "back to the waveform" outranks the pin: it unpins.
+    auto state = shell.wellViewState();
+    state.pinned = false;
+    shell.setWellViewState (state);
+    if (auto* editor = cards[0]->wellEditorComponent())
+        editor->setViewState (state);
+    showWellEditor (false);
 }
 
 void ShellEditor::mouseDownAnywhere (juce::Component* c)

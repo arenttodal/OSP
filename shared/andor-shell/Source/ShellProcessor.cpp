@@ -895,6 +895,42 @@ juce::File ShellProcessor::documentsFolder() const
     return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile (productInfo().presetFolder);
 }
 
+osp::plugin::CardWellEditor::ViewState ShellProcessor::wellViewState() const
+{
+    if (! wellView.has_value())
+    {
+        osp::plugin::CardWellEditor::ViewState v;
+        if (const auto xml = juce::XmlDocument::parse (interfaceFile()); xml != nullptr && xml->hasTagName ("Interface"))
+            if (const auto* well = xml->getChildByName ("WellEditor"))
+            {
+                v.pinned = well->getBoolAttribute ("pinned", false);
+                v.detailed = well->getBoolAttribute ("detailed", false);
+                v.section = std::max (0, well->getIntAttribute ("section", 0));
+            }
+        wellView = v;
+    }
+    return *wellView;
+}
+
+void ShellProcessor::setWellViewState (const osp::plugin::CardWellEditor::ViewState& state)
+{
+    if (wellViewState() == state)
+        return;
+    wellView = state;
+    // (Message thread, on a musician's click: a small file next to the presets.)
+    juce::XmlElement xml ("Interface");
+    if (const auto old = juce::XmlDocument::parse (interfaceFile()); old != nullptr && old->hasTagName ("Interface"))
+        xml = *old;
+    auto* well = xml.getChildByName ("WellEditor");
+    if (well == nullptr)
+        well = xml.createNewChildElement ("WellEditor");
+    well->setAttribute ("pinned", state.pinned);
+    well->setAttribute ("detailed", state.detailed);
+    well->setAttribute ("section", state.section);
+    interfaceFile().getParentDirectory().createDirectory();
+    xml.writeTo (interfaceFile());
+}
+
 juce::File ShellProcessor::sampleStoreFolder() const
 {
     if (const auto overridden = folderFromEnvironment ("ANDOR_SAMPLE_STORE"); overridden != juce::File())
