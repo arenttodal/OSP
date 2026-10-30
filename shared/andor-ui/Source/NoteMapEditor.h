@@ -162,6 +162,7 @@ private:
     };
     std::optional<Pending> pending;
     Hit hover;
+    juce::String hoverAction;   ///< the inspector cell under the pointer
 
     std::vector<Row> rows;
     juce::Rectangle<float> inspector, header, eqTab, dampenTab, titleArea, statusArea, undoArea, redoArea, closeArea;
