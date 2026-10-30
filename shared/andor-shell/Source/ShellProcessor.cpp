@@ -609,9 +609,14 @@ void ShellProcessor::loadFile (const juce::File& file, int layer)
     if (hasHybridLayer())
     {
         juce::ignoreUnused (layer);
+        const bool added = ! isLayerOccupied (hybridLayer);
         osp::plugin::LoadRequest request;
         request.file = file;
         enqueueLoad (std::move (request), hybridLayer);
+        // The recording joins the generator at the A/B mix's centre (ANDOR OSP's rule for a
+        // second layer); a replaced recording keeps the mix the musician set.
+        if (added)
+            centreHybridMix();
         return;
     }
     if (isGenerator())
@@ -1020,6 +1025,16 @@ void ShellProcessor::resetSettings()
     if (auto links = parameters.state.getChildWithName (modLinksTreeType()); links.isValid())
         parameters.state.removeChild (links, nullptr);
     setShaperCustomPattern (osp::RhythmicShaper::patternSteps (osp::ShaperParams().pattern), false);
+    // (The blend's default is all A: a recording kept through the reset stays heard.)
+    if (isLayerOccupied (hybridLayer))
+        centreHybridMix();
+}
+
+void ShellProcessor::centreHybridMix()
+{
+    // Only where the engine plays the blend (a hybrid product that reads it).
+    if (hasHybridLayer() && osp::plugin::binding::anyBound ({ osp::plugin::ids::blend }, boundParameters()))
+        setParameterValue (osp::plugin::ids::blend, 0.5f);
 }
 
 void ShellProcessor::initPatch()

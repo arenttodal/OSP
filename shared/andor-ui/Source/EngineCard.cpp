@@ -1312,13 +1312,22 @@ void ModeSelector::choose (int mode)
         attachment.setValueAsCompleteGesture (static_cast<float> (mode));
 }
 
+void ModeSelector::setFirstModeName (const juce::String& name)
+{
+    if (name.isNotEmpty() && name != firstModeName)
+    {
+        firstModeName = name;
+        repaint();
+    }
+}
+
 void ModeSelector::mouseUp (const juce::MouseEvent& e)
 {
     if (! getLocalBounds().contains (e.getPosition()))
         return;
     juce::PopupMenu menu;
     juce::Component::SafePointer<ModeSelector> safe (this);
-    menu.addItem ("One Shot", true, current == 0, [safe] { if (safe != nullptr) safe->choose (0); });
+    menu.addItem (firstModeName, true, current == 0, [safe] { if (safe != nullptr) safe->choose (0); });
     menu.addItem ("Granular", true, current == 1, [safe] { if (safe != nullptr) safe->choose (1); });
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMinimumWidth (getWidth()).withDeletionCheck (*this));
 }
@@ -1335,7 +1344,7 @@ void ModeSelector::paint (juce::Graphics& g)
     g.setFont (type::sourceMode (k));
     auto text = r.withTrimmedLeft (17.0f * k).withTrimmedRight (14.0f * k);
     icons::draw (g, icons::Kind::chevronDown, text.removeFromRight (16.0f * k).withSizeKeepingCentre (16.0f * k, 16.0f * k), design::colour::text.withAlpha (0.55f), 1.5f * k);
-    g.drawText (current == 1 ? "Granular" : "One Shot", text, juce::Justification::centredLeft, false);
+    g.drawText (current == 1 ? "Granular" : firstModeName, text, juce::Justification::centredLeft, false);
 }
 
 //==============================================================================
@@ -1590,6 +1599,12 @@ bool EngineCard::isHeading (const juce::Component* c) const noexcept
 juce::Rectangle<int> EngineCard::headingBounds() const
 {
     return headingDoor != nullptr && headingDoor->isVisible() ? headingDoor->getBounds() : juce::Rectangle<int>();
+}
+
+void EngineCard::setFirstModeName (const juce::String& name)
+{
+    if (mode != nullptr)
+        mode->setFirstModeName (name);
 }
 
 void EngineCard::setHeadingOpen (bool open)

@@ -94,6 +94,8 @@ ShellEditor::ShellEditor (ShellProcessor& p)
             }
             openPopup (generatorHeaderPopup);
         });
+    if (const auto& name = shell.product().generatorModeName; name.isNotEmpty() && shell.isGenerator())
+        cards[0]->setFirstModeName (name);
     dropZone.onBrowse = [this] { chooseFile (-1); };
     content.addChildComponent (dropZone);
     content.addChildComponent (addTarget);

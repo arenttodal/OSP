@@ -130,6 +130,8 @@ public:
     bool isGenerator() const noexcept { return generatorName.isNotEmpty(); }
     /** A generator that also plays one recording on layer B (ProductInfo::hybridSampleName). */
     bool hasHybridLayer() const noexcept { return isGenerator() && productInfo().hybridSampleName.isNotEmpty(); }
+    /** A hybrid product's recording and generator at the A/B mix's centre (where the engine reads it). */
+    void centreHybridMix();
     static constexpr int hybridLayer = 1;
     const juce::String& generatedSourceName() const noexcept { return generatorName; }
     /** The macro row as the editor shows it: the product's (ProductInfo::macros), or ANDOR

@@ -72,6 +72,9 @@ struct ProductInfo
         card, and is saved and recalled with the session. This is its name (menus, notices).
         Empty: a generator plays no recordings (every other product unchanged). */
     juce::String hybridSampleName;
+    /** A generator's card names its first source mode this (its menu and selector) instead
+        of ANDOR OSP's "One Shot" (a synthesizer's "Standard"). Empty: "One Shot", as before. */
+    juce::String generatorModeName;
 };
 
 /** Defined by the product (Product.cpp). */
