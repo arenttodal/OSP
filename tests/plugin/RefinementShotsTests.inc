@@ -150,6 +150,20 @@ TEST_CASE ("plugin: UI refinement screenshots (OSP_REFINE_DIR)", "[.][refine-sho
         ui.refreshNow();
         ui.engineCard (0).onEqToggle (0, true);
     }, "04-eq-2L");
+    // The EQ off (its hint) and the pointer over a band (its readout).
+    shoot ({ pad }, [&] (OspAudioProcessor&, Editor& ui) {
+        ui.engineCard (0).onEqToggle (0, true);
+    }, "04-eq-off-1L");
+    shoot ({ pad }, [&] (OspAudioProcessor& p, Editor& ui) {
+        eqBands (p);
+        ui.refreshNow();
+        ui.engineCard (0).onEqToggle (0, true);
+        if (auto* eq = ui.engineCard (0).eqEditorComponent())
+        {
+            eq->refresh();
+            hover (*eq, eq->nodePosition (2));
+        }
+    }, "04-eq-hover-1L");
 
     // 05 KEY DNA (the additional view): SIZE with a falling curve and variation, keys held.
     shoot ({ pad }, [] (OspAudioProcessor& p, Editor& ui) {

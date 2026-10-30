@@ -146,3 +146,56 @@ Unchanged:
 - every menu entry.
 
 The GUI tests (128 assertions) pass, and the OSP–shell visual regression stays at 0 px.
+
+## Pass 4 — EQ and DAMPEN
+
+| State | Comparison |
+|---|---|
+| EQ, three bands in use, BELL selected | `pass4-eq-1L.jpg` |
+| DAMPEN on (Shelf) | `pass4-dampen-1L.jpg` |
+| Two layers | `pass4-eq-2L.jpg` |
+| Both top rows at 2× | `pass4-toolbars@2x.jpg` |
+| EQ off (its hint) and the pointer over a band (after only) | `pass4-eq-off-hover.jpg` |
+
+Defects fixed:
+- **Bleed-through.** The EQ was painted at 86 % over the waveform, so the waveform's time labels
+  ("0.5 s", "1 s") showed in its top row. DAMPEN was painted at 92 % over the EQ page, so the
+  EQ's "DAMPEN" tab ghosted behind DAMPEN's "EQ" tab ("DAMEQ"), and the EQ's hint showed through
+  the curve. Both pages are now the display's opaque graphite, as NOTE MAP is. The faint
+  recording behind the EQ graph goes with it (one line in `EqEditor::paint` to restore it).
+- **Clipped labels.** "20k" was cut by the display's right edge ("20(") and is now right-aligned
+  on its line. The scale's "0" was half hidden under DAMPEN's first point and now ends clear of it.
+
+Changes:
+- **One text-tab row on all three pages.**
+  - EQ, DAMPEN and NOTES share one row style: the open page's name in 12 px with a 1.5 px
+    underline in the layer's colour, the other page a quiet text tab that brightens on hover,
+    and a hairline under the row.
+  - The other tab sits one even gap after the name ("Off" in between while the page is off),
+    as NOTE MAP's tabs are spaced.
+  - The power switch, close, the band switch and the reset share one stroke (1.3–1.4 px, round
+    caps).
+- **Graph first.**
+  - The grid sits on the device pixel grid; minor lines are fainter, decades and 0 dB stronger.
+  - The EQ curve is one 1.6 px line with a 6 % fill (was 2 px with 10 %); the DAMPEN curve
+    matches it.
+- **One node vocabulary.** EQ bands and DAMPEN points are the same disc: 5 px, 6 px when hovered
+  or selected, with a graphite gap ring. Selected adds one fine outer ring. Bands that are off
+  stay hollow markers.
+- **Compact readouts.**
+  - The value fields (frequency, gain, Q, AMOUNT, FREQ / MIN) are text over a hairline, no
+    longer boxes. Under the pointer the hairline takes the band's colour and the field fills
+    faintly.
+  - They still drag, double-click to type, and accept modulation drops.
+- **Segmented choices.** The slope (12 | 24) and DAMPEN's mode (Shelf | Low-pass) use NOTE MAP's
+  DETECTION style: one hairline frame, the chosen part filled once. Labels are in sentence case.
+- **Actions.** "Curve ▾" is a hairline-outlined action that fills faintly on hover.
+- **Hints.** "Drag a marker to shape this sound" and "DAMPEN is off…" are small notes at the
+  graph's corner, no longer centred over the curve.
+
+Unchanged:
+- the display's bounds, the graph's area, scales and mapping;
+- every drag, wheel, double-click, menu, undo step and parameter.
+
+The `[eq]`, `[dampen]`, `[mod-final]` and `[gui]` tests pass (775 assertions), as do the per-layer
+EQ tests (120). The OSP–shell visual regression stays at 0 px.
