@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CardWellEditor.h"
 #include "EqEditor.h"
 #include "NoteMapEditor.h"
 #include "OspLookAndFeel.h"
@@ -274,6 +275,8 @@ public:
     explicit ModeSelector (juce::RangedAudioParameter& parameter);
     std::function<void (int)> onChange;
     int mode() const noexcept { return current; }
+    /** The first mode's name ("One Shot"; a product's generator may name it otherwise). */
+    void setFirstModeName (const juce::String& name);
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override { skin::repaintKey (*this); }
     void mouseUp (const juce::MouseEvent&) override;
@@ -289,6 +292,7 @@ public:
 private:
     void choose (int mode);
     int current = 0;
+    juce::String firstModeName { "One Shot" };
     juce::ParameterAttachment attachment;
 };
 
@@ -346,6 +350,18 @@ public:
     bool isHeading (const juce::Component* c) const noexcept;
     bool hasHeadingDoor() const noexcept { return headingDoor != nullptr; }
     void setHeadingOpen (bool open);
+    /** The mode selector's first mode under another name (a generator's "Standard"). Opt-in:
+        without it the card reads "One Shot", exactly as before. */
+    void setFirstModeName (const juce::String& name);
+
+    /** A product's own editor in the waveform's place (opt-in; see CardWellEditor). The card
+        owns it and lays it out exactly over the display; shown, it replaces the waveform (the
+        display stops drawing beneath it). The EQ and NOTE MAP take the well while open: they
+        hide it, and the owner of the editor decides whether it returns (setWellEditorShown). */
+    void setWellEditor (std::unique_ptr<CardWellEditor> editor);
+    CardWellEditor* wellEditorComponent() noexcept { return wellEditor.get(); }
+    void setWellEditorShown (bool shown);
+    bool isWellEditorShown() const noexcept { return wellEditor != nullptr && wellEditor->isVisible(); }
 
     /** The layer's EQ over its waveform (a view setting: the EQ keeps playing either way). */
     std::function<void (int, bool)> onEqToggle;        ///< its EQ button (the editor keeps one open at a time)
@@ -413,6 +429,7 @@ private:
     std::unique_ptr<EqEditor> eqEditor;
     NotesButton notesButton;
     std::unique_ptr<NoteMapEditor> noteMap;
+    std::unique_ptr<CardWellEditor> wellEditor;   ///< (null on every card that did not ask for one)
     bool atlasLayer = false;
     juce::Rectangle<int> badgeArea, textArea, dividerArea;
     juce::String rootText, fileText;

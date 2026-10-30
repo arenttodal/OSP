@@ -631,12 +631,16 @@ TEST_CASE ("shell: the interface is ANDOR OSP's, pixel for pixel outside the app
     TempDir tmp;
 
     // Parity: the same states rendered by the shell with every control enabled (and ANDOR
-    // OSP's macro names: a product's own are its identity, like the header's).
-    visualstates::render<ShellProcessor, ShellEditor> (output.getChildFile ("parity"), tmp.dir.getChildFile ("parity"), [] {
-        auto p = std::make_unique<ShellProcessor> (std::make_unique<ParityEngine>());
-        p->showReferenceMacros();
-        return p;
-    });
+    // OSP's macro names and materials: a product's own are its identity, like the header's;
+    // the shipped render below shows them).
+    {
+        const osp::plugin::design::ScopedMaterials ospMaterials (osp::plugin::design::Materials::osp());
+        visualstates::render<ShellProcessor, ShellEditor> (output.getChildFile ("parity"), tmp.dir.getChildFile ("parity"), [] {
+            auto p = std::make_unique<ShellProcessor> (std::make_unique<ParityEngine>());
+            p->showReferenceMacros();
+            return p;
+        });
+    }
     // As shipped: the product's own engine (its unbound controls disabled), for the gallery.
     visualstates::render<ShellProcessor, ShellEditor> (output.getChildFile ("shipped"), tmp.dir.getChildFile ("shipped"),
                                                        [] { return std::make_unique<ShellProcessor>(); });
@@ -645,7 +649,7 @@ TEST_CASE ("shell: the interface is ANDOR OSP's, pixel for pixel outside the app
     // every pixel outside the masks must be exactly ANDOR OSP's.
     constexpr int tolerance = 0;
     juce::StringArray report { "# Visual regression: " + andor::shell::productInfo().name + " vs ANDOR OSP", "",
-                               "Tolerance: " + juce::String (tolerance) + " (exact), masks: identity, preset-name, status-line.", "",
+                               "Tolerance: " + juce::String (tolerance) + " (exact), masks: identity, preset-name, status-line. Rendered with ANDOR OSP's materials (a product's own finish is its identity: see shipped/).", "",
                                "| State | Differing pixels outside the masks | Inside the masks (allowed) |", "|---|---|---|" };
     int failures = 0;
     for (const auto& name : visualstates::names())

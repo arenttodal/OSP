@@ -105,6 +105,10 @@ public:
     Usage usage() const;
     void release();
 
+    /** The product's own pieces (design::Materials::pack) that replace these by name, when it
+        has some: find, draw, composed and decode then answer from them for those names. */
+    Pieces* overlayPack() const;
+
     /** The one set of pieces while any editor (or test) holds a Holder; nullptr otherwise. */
     static Pieces* current() noexcept;
 
@@ -142,6 +146,10 @@ private:
     std::map<juce::String, Piece> pieces;
     std::map<Key, juce::Image> cache;
     std::list<Key> order;   ///< least recently used first
+    bool isOverlay = false;
+    mutable std::unique_ptr<Pieces> overlay;   ///< (made when the materials name a pack)
+    mutable const void* overlayData = nullptr;
+    bool owns (const Piece& p) const;
     size_t cachedBytes = 0;
     bool valid = false;
     juce::String error;

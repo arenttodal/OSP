@@ -1,6 +1,7 @@
 #include "CeramicSkin.h"
 
 #include "BinaryData.h"
+#include "Design.h"
 
 #include <atomic>
 #include <cmath>
@@ -231,14 +232,43 @@ void Pieces::read (const void* data, size_t size)
     valid = true;
 }
 
+Pieces* Pieces::overlayPack() const
+{
+    if (isOverlay)
+        return nullptr;
+    const auto& m = design::materials();
+    if (m.pack != overlayData)
+    {
+        overlay.reset();
+        overlayData = m.pack;
+        if (m.pack != nullptr && m.packSize > 0)
+        {
+            overlay = std::make_unique<Pieces> (m.pack, m.packSize);
+            overlay->isOverlay = true;
+        }
+    }
+    return overlay != nullptr && overlay->isValid() ? overlay.get() : nullptr;
+}
+
+bool Pieces::owns (const Piece& p) const
+{
+    const auto found = pieces.find (p.name);
+    return found != pieces.end() && &found->second == &p;
+}
+
 const Pieces::Piece* Pieces::find (const juce::String& name) const
 {
+    if (auto* o = overlayPack())
+        if (const auto* own = o->find (name))
+            return own;
     const auto found = pieces.find (name);
     return valid && found != pieces.end() ? &found->second : nullptr;
 }
 
-juce::Image Pieces::decode (const Piece&, const Level& level) const
+juce::Image Pieces::decode (const Piece& piece, const Level& level) const
 {
+    if (auto* o = overlayPack(); o != nullptr && o->owns (piece))
+        return o->decode (piece, level);
     std::unique_ptr<juce::InputStream> in (zip->createStreamForEntry (level.entry));
     if (in == nullptr)
         return {};
@@ -250,6 +280,8 @@ juce::Image Pieces::decode (const Piece&, const Level& level) const
 
 juce::Image Pieces::composed (const Piece& p, int pw, int ph, float physicalScale, juce::Colour face)
 {
+    if (auto* o = overlayPack(); o != nullptr && o->owns (p))
+        return o->composed (p, pw, ph, physicalScale, face);   // (its own cache: never mixed with the shared piece's)
     if (pw < 1 || ph < 1 || physicalScale <= 0.0f)
         return {};
     const bool tinted = ! face.isTransparent() && p.face.isOpaque() && face.getARGB() != p.face.getARGB();
@@ -345,6 +377,8 @@ juce::Image Pieces::composed (const Piece& p, int pw, int ph, float physicalScal
 
 bool Pieces::draw (juce::Graphics& g, const juce::String& name, juce::Rectangle<float> target, float opacity, juce::Colour face, bool moving)
 {
+    if (auto* o = overlayPack(); o != nullptr && o->find (name) != nullptr)
+        return o->draw (g, name, target, opacity, face, moving);
     const auto* p = find (name);
     if (p == nullptr || target.isEmpty())
         return false;
@@ -397,6 +431,8 @@ Pieces::Usage Pieces::usage() const
 
 void Pieces::release()
 {
+    if (overlay != nullptr)
+        overlay->release();
     cache.clear();
     order.clear();
     cachedBytes = 0;

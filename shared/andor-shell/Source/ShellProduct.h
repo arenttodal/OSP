@@ -1,11 +1,14 @@
 #pragma once
 
+#include "CardWellEditor.h"
+#include "Design.h"
 #include "InstrumentFrame.h"
 #include "ShellEngine.h"
 
 #include <array>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <vector>
 
 namespace andor::shell
@@ -67,11 +70,23 @@ struct ProductInfo
         Space on the name opens this popover below it, and closes it again (null: the name is
         plain text, as on every ANDOR OSP card). Generator products only. */
     std::function<std::unique_ptr<osp::plugin::MiniPanel> (osp::plugin::InstrumentHost&)> generatorHeaderPopover;
+    /** A generator's in-card editor (opt-in): the card's heading (its name beside M and S)
+        toggles this editor in the waveform's place, the waveform's dark well, instead of a
+        popover. The EQ takes the well while open and gives it back if the editor is pinned.
+        Takes precedence over generatorHeaderPopover. Null: no in-card editor. */
+    std::function<std::unique_ptr<osp::plugin::CardWellEditor> (osp::plugin::InstrumentHost&)> generatorWellEditor;
     /** A generator product that also plays one recording (opt-in): layer B takes a dropped or
         chosen file through ANDOR OSP's loader, sample store and card, beside the generator's
         card, and is saved and recalled with the session. This is its name (menus, notices).
         Empty: a generator plays no recordings (every other product unchanged). */
     juce::String hybridSampleName;
+    /** A generator's card names its first source mode this (its menu and selector) instead
+        of ANDOR OSP's "One Shot" (a synthesizer's "Standard"). Empty: "One Shot", as before. */
+    juce::String generatorModeName;
+    /** The product's own materials (opt-in): its finish (the accent family, ceramic tones)
+        and rendered pieces of its own (its housing's wood, its badge) in place of ANDOR OSP's,
+        for every instance of the product. Unset: ANDOR OSP's, exactly. Interface only. */
+    std::optional<osp::plugin::design::Materials> materials;
 };
 
 /** Defined by the product (Product.cpp). */

@@ -1383,13 +1383,22 @@ void ModeSelector::choose (int mode)
         attachment.setValueAsCompleteGesture (static_cast<float> (mode));
 }
 
+void ModeSelector::setFirstModeName (const juce::String& name)
+{
+    if (name.isNotEmpty() && name != firstModeName)
+    {
+        firstModeName = name;
+        repaint();
+    }
+}
+
 void ModeSelector::mouseUp (const juce::MouseEvent& e)
 {
     if (! getLocalBounds().contains (e.getPosition()))
         return;
     juce::PopupMenu menu;
     juce::Component::SafePointer<ModeSelector> safe (this);
-    menu.addItem ("One Shot", true, current == 0, [safe] { if (safe != nullptr) safe->choose (0); });
+    menu.addItem (firstModeName, true, current == 0, [safe] { if (safe != nullptr) safe->choose (0); });
     menu.addItem ("Granular", true, current == 1, [safe] { if (safe != nullptr) safe->choose (1); });
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMinimumWidth (getWidth()).withDeletionCheck (*this));
 }
@@ -1407,7 +1416,7 @@ void ModeSelector::paint (juce::Graphics& g)
     g.setFont (type::sourceMode (0.88f * k));
     auto text = r.withTrimmedLeft (15.0f * k).withTrimmedRight (12.0f * k);
     icons::draw (g, icons::Kind::chevronDown, text.removeFromRight (14.0f * k).withSizeKeepingCentre (12.0f * k, 12.0f * k), design::colour::text.withAlpha (0.5f), 1.25f * k);
-    g.drawText (current == 1 ? "Granular" : "One Shot", text, juce::Justification::centredLeft, false);
+    g.drawText (current == 1 ? "Granular" : firstModeName, text, juce::Justification::centredLeft, false);
 }
 
 //==============================================================================
@@ -1505,6 +1514,8 @@ EngineCard::EngineCard (InstrumentHost& p, int layer)
         granularKnobs[i] = std::make_unique<MiniKnob> (processor.apvts(), id, grain[i].second, std::move (f));
         granularKnobs[i]->setOnDark (true);
         granularKnobs[i]->slider.getProperties().set ("arc", static_cast<juce::int64> (palette::layer (layer).getARGB()));
+        if (design::materials().graphiteOnWell)
+            granularKnobs[i]->slider.getProperties().set ("graphite", true);   // (the product's finish)
         addChildComponent (*granularKnobs[i]);
     }
 
@@ -1665,6 +1676,48 @@ bool EngineCard::isHeading (const juce::Component* c) const noexcept
 juce::Rectangle<int> EngineCard::headingBounds() const
 {
     return headingDoor != nullptr && headingDoor->isVisible() ? headingDoor->getBounds() : juce::Rectangle<int>();
+}
+
+void EngineCard::setFirstModeName (const juce::String& name)
+{
+    if (mode != nullptr)
+        mode->setFirstModeName (name);
+}
+
+void EngineCard::setWellEditor (std::unique_ptr<CardWellEditor> editor)
+{
+    if (wellEditor != nullptr)
+    {
+        setWellEditorShown (false);
+        removeChildComponent (wellEditor.get());
+    }
+    wellEditor = std::move (editor);
+    if (wellEditor != nullptr)
+    {
+        addChildComponent (*wellEditor);
+        wellEditor->setBounds (sourceDisplay.getBounds());
+    }
+}
+
+void EngineCard::setWellEditorShown (bool shown)
+{
+    if (wellEditor == nullptr || shown == wellEditor->isVisible())
+        return;
+    if (shown)
+    {
+        // The well is one view at a time: the EQ or NOTE MAP give it up, the grains go.
+        setEqOpen (false);
+        setNotesOpen (false);
+        showGranularControls (false, true);
+        wellEditor->setBounds (sourceDisplay.getBounds());
+        wellEditor->toFront (false);
+    }
+    wellEditor->setVisible (shown);
+    // The waveform does not draw (or animate) under it; it is back the moment it closes.
+    sourceDisplay.setVisible (! shown);
+    if (shown)
+        wellEditor->refresh();
+    repaint (sourceDisplay.getBounds());
 }
 
 void EngineCard::setHeadingOpen (bool open)
@@ -1991,7 +2044,7 @@ void EngineCard::showGranularControls (bool show, bool immediately)
     bool dragging = false;
     for (auto& k : granularKnobs)
         dragging = dragging || k->slider.isMouseButtonDown();
-    const bool visible = granular && (show || dragging) && ! isEqOpen() && ! isNotesOpen();   // the EQ's (or NOTE MAP's) editor covers the display
+    const bool visible = granular && (show || dragging) && ! isEqOpen() && ! isNotesOpen() && ! isWellEditorShown();   // the EQ's (or NOTE MAP's, or the product's) editor covers the display
     if (visible == granularShown)
         return;
     granularShown = visible;
@@ -2048,6 +2101,7 @@ void EngineCard::setEqOpen (bool open)
         return;
     }
     setNotesOpen (false);
+    setWellEditorShown (false);
     showGranularControls (false);
     eqEditor = std::make_unique<EqEditor> (processor, layerIndex);
     eqEditor->onClose = [this] {
@@ -2102,6 +2156,7 @@ void EngineCard::setNotesOpen (bool open)
         return;
     }
     setEqOpen (false);
+    setWellEditorShown (false);
     showGranularControls (false);
     noteMap = std::make_unique<NoteMapEditor> (processor, layerIndex);
     juce::Component::SafePointer<EngineCard> safe (this);
@@ -2140,6 +2195,8 @@ void EngineCard::refresh()
         eqEditor->refresh();
     if (noteMap != nullptr)
         noteMap->refresh();
+    if (isWellEditorShown())
+        wellEditor->refresh();
     if (processor.hasKeyDna())
         keyDnaKey.setLit (processor.keyDnaSettings (layerIndex).enabled);
     // A generated source (a synthesizer's oscillators): its name and its waveform instead of
@@ -2342,8 +2399,9 @@ void EngineCard::paint (juce::Graphics& g)
 
 void EngineCard::paintOverChildren (juce::Graphics& g)
 {
-    // Not heard (muted, or another layer soloed): a graphite veil over the display.
-    if (! shownHeard)
+    // Not heard (muted, or another layer soloed): a graphite veil over the display (not over
+    // a product's editor in its place: its controls stay as they are).
+    if (! shownHeard && ! isWellEditorShown())
     {
         g.setColour (juce::Colour (0xff15191a).withAlpha (0.62f));
         g.fillRoundedRectangle (sourceDisplay.getBounds().toFloat(), 9.0f);
@@ -2392,6 +2450,8 @@ void EngineCard::resized()
         eqEditor->setBounds (sourceDisplay.getBounds());   // exactly the display's place
     if (noteMap != nullptr)
         noteMap->setBounds (sourceDisplay.getBounds());
+    if (wellEditor != nullptr)
+        wellEditor->setBounds (sourceDisplay.getBounds());
     placeMapPrompt();
 
     // START TUNE PAN LEVEL REIMAGINED: one family at 87 % of the four-knob size, on one

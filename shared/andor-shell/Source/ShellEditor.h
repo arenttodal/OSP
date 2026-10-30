@@ -57,6 +57,12 @@ public:
     /** For tests: a mouse press on `clicked` as the instrument's outside-click watch sees it
         (a press outside the open popover closes it; on its own door it marks the toggle). */
     void pressAnywhere (juce::Component* clicked) { mouseDownAnywhere (clicked); }
+    /** The generator card's in-card editor (ProductInfo::generatorWellEditor), in the
+        waveform's place: shown or not (the heading's toggle unpins when it hides it). */
+    bool hasWellEditor() const;
+    void showWellEditor (bool show);
+    void toggleWellEditor();
+    bool isWellEditorShown() const;
     /** For tests: the controls shown disabled because the engine does not read their parameters. */
     int disabledControlCount() const noexcept { return disabledControls; }
 

@@ -78,6 +78,9 @@ ShellProcessor::ShellProcessor (std::unique_ptr<Engine> productEngine)
       engine (std::move (productEngine))
 {
     jassert (engine != nullptr);
+    // The product's finish, before any window (every instance sets the same).
+    if (productInfo().materials.has_value())
+        osp::plugin::design::useMaterials (*productInfo().materials);
     description = engine->describe();
     bound = engine->boundParameters();
     generatorName = engine->generatorName();
@@ -609,9 +612,14 @@ void ShellProcessor::loadFile (const juce::File& file, int layer)
     if (hasHybridLayer())
     {
         juce::ignoreUnused (layer);
+        const bool added = ! isLayerOccupied (hybridLayer);
         osp::plugin::LoadRequest request;
         request.file = file;
         enqueueLoad (std::move (request), hybridLayer);
+        // The recording joins the generator at the A/B mix's centre (ANDOR OSP's rule for a
+        // second layer); a replaced recording keeps the mix the musician set.
+        if (added)
+            centreHybridMix();
         return;
     }
     if (isGenerator())
@@ -890,6 +898,42 @@ juce::File ShellProcessor::documentsFolder() const
     return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile (productInfo().presetFolder);
 }
 
+osp::plugin::CardWellEditor::ViewState ShellProcessor::wellViewState() const
+{
+    if (! wellView.has_value())
+    {
+        osp::plugin::CardWellEditor::ViewState v;
+        if (const auto xml = juce::XmlDocument::parse (interfaceFile()); xml != nullptr && xml->hasTagName ("Interface"))
+            if (const auto* well = xml->getChildByName ("WellEditor"))
+            {
+                v.pinned = well->getBoolAttribute ("pinned", false);
+                v.detailed = well->getBoolAttribute ("detailed", false);
+                v.section = std::max (0, well->getIntAttribute ("section", 0));
+            }
+        wellView = v;
+    }
+    return *wellView;
+}
+
+void ShellProcessor::setWellViewState (const osp::plugin::CardWellEditor::ViewState& state)
+{
+    if (wellViewState() == state)
+        return;
+    wellView = state;
+    // (Message thread, on a musician's click: a small file next to the presets.)
+    juce::XmlElement xml ("Interface");
+    if (const auto old = juce::XmlDocument::parse (interfaceFile()); old != nullptr && old->hasTagName ("Interface"))
+        xml = *old;
+    auto* well = xml.getChildByName ("WellEditor");
+    if (well == nullptr)
+        well = xml.createNewChildElement ("WellEditor");
+    well->setAttribute ("pinned", state.pinned);
+    well->setAttribute ("detailed", state.detailed);
+    well->setAttribute ("section", state.section);
+    interfaceFile().getParentDirectory().createDirectory();
+    xml.writeTo (interfaceFile());
+}
+
 juce::File ShellProcessor::sampleStoreFolder() const
 {
     if (const auto overridden = folderFromEnvironment ("ANDOR_SAMPLE_STORE"); overridden != juce::File())
@@ -1020,6 +1064,16 @@ void ShellProcessor::resetSettings()
     if (auto links = parameters.state.getChildWithName (modLinksTreeType()); links.isValid())
         parameters.state.removeChild (links, nullptr);
     setShaperCustomPattern (osp::RhythmicShaper::patternSteps (osp::ShaperParams().pattern), false);
+    // (The blend's default is all A: a recording kept through the reset stays heard.)
+    if (isLayerOccupied (hybridLayer))
+        centreHybridMix();
+}
+
+void ShellProcessor::centreHybridMix()
+{
+    // Only where the engine plays the blend (a hybrid product that reads it).
+    if (hasHybridLayer() && osp::plugin::binding::anyBound ({ osp::plugin::ids::blend }, boundParameters()))
+        setParameterValue (osp::plugin::ids::blend, 0.5f);
 }
 
 void ShellProcessor::initPatch()

@@ -30,6 +30,82 @@ constexpr float height = 1086.0f;
 //==============================================================================
 namespace colour
 {
+    // Layer identities: A warm amber/terracotta, B cool slate-blue, C a quiet sage.
+    struct Identity
+    {
+        juce::Colour badgeTop, badgeBottom, led, arc, thumb, wave;
+    };
+}
+
+/**
+    A product's materials (opt-in): the few colours that carry its finish (the live accent and
+    its gradient, the ceramic of cards and panels, the warm accent of the look-and-feel and of
+    layer A) and, optionally, a pack of rendered pieces that replace the shared ones of the
+    same name (a product's own housing and cheeks, its badge). ANDOR OSP's are the defaults:
+    a product that sets none is drawn exactly as ANDOR OSP.
+
+    The tokens below (colour::accent, palette::layer (0) ...) read these, so no drawing code
+    knows which product it draws. A product sets its materials once, for its whole binary
+    (useMaterials, from the shell's ProductInfo, before any window); every instance of it is
+    the same product, and two products are two binaries, each with its own. Message thread.
+*/
+struct Materials
+{
+    juce::Colour accent, accentTop, accentBottom, accentSoft;
+    juce::Colour cardTop, cardBottom, panelTop, panelBottom;
+    juce::Colour paletteAccent, layerA;   ///< palette::accent, palette::layer (0)
+    colour::Identity identityA;           ///< colour::identity (0)
+    /** Knobs drawn over a card's dark well (GRANULAR's) in graphite rather than ivory. */
+    bool graphiteOnWell = false;
+    /** A skin pack (Resources/skin's format: manifest.json and images) whose pieces replace
+        the shared pack's of the same name; null: none. Must outlive the process (BinaryData). */
+    const void* pack = nullptr;
+    size_t packSize = 0;
+
+    /** ANDOR OSP's own. */
+    static Materials osp()
+    {
+        Materials m;
+        m.accent = juce::Colour (0xffe8692a);
+        m.accentTop = juce::Colour (0xfff36a2c);
+        m.accentBottom = juce::Colour (0xffd3461a);
+        m.accentSoft = juce::Colour (0xfff2c8b0);
+        m.cardTop = juce::Colour (0xfff5eee4);
+        m.cardBottom = juce::Colour (0xffe9e2d6);
+        m.panelTop = juce::Colour (0xfff2ebe0);
+        m.panelBottom = juce::Colour (0xffe6dfd2);
+        m.paletteAccent = juce::Colour (0xffe1774f);
+        m.layerA = juce::Colour (0xffd9895a);
+        m.identityA = { juce::Colour (0xffe9844a), juce::Colour (0xffa9420e), juce::Colour (0xfffc9f4f), juce::Colour (0xffe8692a), juce::Colour (0xffef8640),
+                        juce::Colour (0xffeeb070) };
+        return m;
+    }
+};
+
+namespace detail
+{
+    inline Materials materials = Materials::osp();
+}
+
+/** The materials drawn with (ANDOR OSP's unless the product set its own). */
+inline const Materials& materials() noexcept { return detail::materials; }
+/** A product's own materials, for every instance of it: from the shell, before any window. */
+void useMaterials (const Materials&);
+/** Materials for a scope, whatever the product's (tests: a product's parity render with
+    ANDOR OSP's materials); the previous ones come back at its end. */
+class ScopedMaterials
+{
+public:
+    explicit ScopedMaterials (const Materials&);
+    ~ScopedMaterials();
+
+private:
+    Materials previous;
+    JUCE_DECLARE_NON_COPYABLE (ScopedMaterials)
+};
+
+namespace colour
+{
     // The surround and the housing (one physical instrument on a warm surface).
     const juce::Colour backdropTop { 0xffd6ccc2 };
     const juce::Colour backdropBottom { 0xffe3dacd };
@@ -38,10 +114,11 @@ namespace colour
     const juce::Colour housingRim { 0xffc9bfb1 };
 
     // Cards (sources) and panels (blend, macros): a lit top, a warmer, darker foot.
-    const juce::Colour cardTop { 0xfff5eee4 };
-    const juce::Colour cardBottom { 0xffe9e2d6 };
-    const juce::Colour panelTop { 0xfff2ebe0 };
-    const juce::Colour panelBottom { 0xffe6dfd2 };
+    // (The product's materials: ANDOR OSP's unless it set its own.)
+    inline const juce::Colour& cardTop = detail::materials.cardTop;
+    inline const juce::Colour& cardBottom = detail::materials.cardBottom;
+    inline const juce::Colour& panelTop = detail::materials.panelTop;
+    inline const juce::Colour& panelBottom = detail::materials.panelBottom;
     const juce::Colour edgeLight { 0xfffffbf2 };      ///< 1 px light along a raised top edge
     const juce::Colour edgeShade { 0xffc8c0b2 };      ///< 1 px shade along a raised bottom edge
     const juce::Colour hairline { 0xffd8d0c3 };
@@ -60,10 +137,11 @@ namespace colour
     const juce::Colour textMicro { 0xff8a847b };
 
     // The one live accent (active states, arcs) and its gradient for filled elements.
-    const juce::Colour accent { 0xffe8692a };
-    const juce::Colour accentTop { 0xfff36a2c };
-    const juce::Colour accentBottom { 0xffd3461a };
-    const juce::Colour accentSoft { 0xfff2c8b0 };      ///< an active modifier's fill
+    // (The product's materials: ANDOR OSP's coral unless it set its own.)
+    inline const juce::Colour& accent = detail::materials.accent;
+    inline const juce::Colour& accentTop = detail::materials.accentTop;
+    inline const juce::Colour& accentBottom = detail::materials.accentBottom;
+    inline const juce::Colour& accentSoft = detail::materials.accentSoft;      ///< an active modifier's fill
 
     /** The arpeggiator's restrained amber (its light, its steps): not a macro colour. */
     const juce::Colour arp { 0xffc98f3e };
@@ -91,13 +169,12 @@ namespace colour
         interpolated in OKLab (no neon steps). The same on every layer. */
     juce::Colour reimagined (float position);
 
-    // Layer identities: A warm amber/terracotta, B cool slate-blue, C a quiet sage.
-    struct Identity
-    {
-        juce::Colour badgeTop, badgeBottom, led, arc, thumb, wave;
-    };
+    // Layer identities (Identity above): A's is the product's materials' (ANDOR OSP's warm
+    // amber/terracotta unless it set its own).
     inline const Identity& identity (int layer)
     {
+        if (layer <= 0)
+            return detail::materials.identityA;
         static const std::array<Identity, 3> ids { {
             { juce::Colour (0xffe9844a), juce::Colour (0xffa9420e), juce::Colour (0xfffc9f4f), juce::Colour (0xffe8692a), juce::Colour (0xffef8640), juce::Colour (0xffeeb070) },
             { juce::Colour (0xff8297aa), juce::Colour (0xff324659), juce::Colour (0xff8cc4ef), juce::Colour (0xff5d93c4), juce::Colour (0xff69a9d5), juce::Colour (0xffb4c6dc) },
@@ -258,6 +335,9 @@ namespace draw
         /** A rendered cap (SpriteKnobRenderer) in place of the drawn body and pointer; the
             ticks and the arcs stay drawn. nullptr: the drawn knob. */
         SpriteKnobAsset* sprite = nullptr;
+        /** The same knob in graphite (a cap for a dark well: charcoal, a cream pointer), drawn
+            in place of the rendered ivory cap. Opt-in (the slider property "graphite"). */
+        bool graphite = false;
     };
     void knob (juce::Graphics&, juce::Point<float> centre, float bodyRadius, float position, const KnobStyle& style);
     /** A glowing indicator dot (layer identity, macro LEDs). */
