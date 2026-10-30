@@ -530,6 +530,17 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       way: the EQ and DAMPEN pages showed the layer below through them, and "20k" and DAMPEN's
       "0" were clipped. No DSP, parameter, schema or bounds change. The OSP–shell visual
       regression stays at 0 px; design-bible captures regenerated.
+- [ ] ANDOR MEMO LAB MVP 0.1 (docs/research/memo-lab: brief, architecture, guide): a standalone
+      Mac app (apps/memo-lab) that turns iCloud-synced Voice Memos (or any approved folder) into
+      playable ANDOR instruments. It hosts OSP's own processor:
+      - ONE SHOT = `loadFile`, MAP NOTES = `analyseRecording` (Stage A then B);
+      - NOTE MAP = the plugin's editor;
+      - Save = `exportInstrument`, the `.ospinstrument` the plugin opens.
+      It adds a read-only scanner, decoding (JUCE / CoreAudio, AVFoundation fallback),
+      passages, a preview and the window; it adds no DSP, changes no plugin code or format,
+      and never writes the recordings. Tests `memo_lab` (13 cases) pass, including the round
+      trip into a fresh processor with an empty store and the recording deleted. Awaiting the
+      owner's test on a Mac: the real Voice Memos folder, real memos, Ableton.
 - [x] ANDOR DESIGN SYSTEM and INSTRUMENT SHELL (andor-design-system/, start with HANDOFF.md).
       ANDOR OSP's interface was extracted, unchanged, into shared/andor-ui:
       - the components, look and assets;

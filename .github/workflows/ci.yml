@@ -40,6 +40,11 @@ jobs:
       - name: Test
         run: ctest --test-dir build --output-on-failure
 
+      - name: Memo Lab timing
+        # How long a 10-second sung memo takes to become playable (MAP NOTES) and a hum (ONE SHOT).
+        if: matrix.plugin == 'ON'
+        run: ./build/apps/memo-lab/memo_lab_tests "[timing]"
+
       - name: Editor snapshot (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -76,6 +81,9 @@ jobs:
           art=build/apps/plugin/OSP_Plugin_artefacts/Release
           cp -R $art/AU/OSP.component $art/VST3/OSP.vst3 $out/
           if [ -d "$art/Standalone/OSP.app" ]; then cp -R "$art/Standalone/OSP.app" $out/; fi
+          # ANDOR Memo Lab (recordings to instruments; docs/research/memo-lab).
+          memo="build/apps/memo-lab/ANDOR_Memo_Lab_artefacts/Release/ANDOR Memo Lab.app"
+          if [ -d "$memo" ]; then cp -R "$memo" $out/; fi
           cp packaging/macos-test/install.command packaging/macos-test/README.txt $out/
           chmod +x $out/install.command
           lipo -info $out/OSP.component/Contents/MacOS/OSP
