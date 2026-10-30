@@ -502,7 +502,12 @@ juce::AudioProcessorEditor* ShellProcessor::createEditor()
 InstrumentHost::LoadState ShellProcessor::loadState (int layer) const noexcept
 {
     if (isGenerator())
-        return resolve (layer) == 0 ? LoadState::ready : LoadState::empty;
+    {
+        const int r = resolve (layer);
+        if (r == hybridLayer && hasHybridLayer())
+            return layers[static_cast<std::size_t> (r)].state.load();
+        return r == 0 ? LoadState::ready : LoadState::empty;
+    }
     return layers[static_cast<std::size_t> (resolve (layer))].state.load();
 }
 
@@ -513,7 +518,7 @@ std::shared_ptr<const LoadedInstrument> ShellProcessor::currentInstrument (int l
 
 bool ShellProcessor::isLayerOccupied (int layer) const
 {
-    if (isGenerator())
+    if (isGenerator() && ! (hasHybridLayer() && layer == hybridLayer))
         return layer == 0;
     const auto& slot = layers[static_cast<std::size_t> (std::clamp (layer, 0, numLayers - 1))];
     return slot.state.load() == LoadState::loading || slot.instrument != nullptr;
@@ -543,7 +548,7 @@ bool ShellProcessor::generatedSource (int layer, GeneratedSource& out) const
 int ShellProcessor::slotCount() const
 {
     if (isGenerator())
-        return 1;
+        return hasHybridLayer() && isLayerOccupied (hybridLayer) ? 2 : 1;
     int count = 0;
     for (int l = 0; l < numLayers; ++l)
         if (isLayerOccupied (l))
@@ -553,6 +558,19 @@ int ShellProcessor::slotCount() const
 
 int ShellProcessor::addLayers (const juce::Array<juce::File>& files)
 {
+    if (hasHybridLayer())
+    {
+        // The generator's one recording: the first file goes to layer B (replacing its sound).
+        if (files.isEmpty())
+            return 0;
+        if (files.size() > 1)
+        {
+            const std::lock_guard<std::mutex> lock (messageMutex);
+            lastMessage = productInfo().hybridSampleName + " takes one recording: " + files[0].getFileName() + " was loaded";
+        }
+        loadFile (files[0], hybridLayer);
+        return 1;
+    }
     if (isGenerator())
     {
         // Nothing to load: the instrument makes its own sound.
@@ -588,6 +606,14 @@ int ShellProcessor::addLayers (const juce::Array<juce::File>& files)
 
 void ShellProcessor::loadFile (const juce::File& file, int layer)
 {
+    if (hasHybridLayer())
+    {
+        juce::ignoreUnused (layer);
+        osp::plugin::LoadRequest request;
+        request.file = file;
+        enqueueLoad (std::move (request), hybridLayer);
+        return;
+    }
     if (isGenerator())
     {
         addLayers ({ file });
@@ -654,6 +680,12 @@ void ShellProcessor::clearLayer (int layer)
 
 void ShellProcessor::removeLayer (int layer)
 {
+    if (hasHybridLayer() && layer == hybridLayer)
+    {
+        clearLayer (hybridLayer);   // (its settings stay: the next recording plays with them)
+        engine->sourcePublished (hybridLayer, nullptr);
+        return;
+    }
     if (isGenerator())
         return;
     if (layer < 0 || layer >= numLayers || pendingLoads.load() > 0)
@@ -722,6 +754,7 @@ void ShellProcessor::timerCallback()
         slot.instrument = item.result.instrument;
         slot.state = LoadState::ready;
         slot.exchange.publish (slot.instrument);
+        engine->sourcePublished (item.layer, slot.instrument);
     }
     for (auto& slot : layers)
         slot.exchange.collectGarbage();
@@ -794,7 +827,7 @@ bool ShellProcessor::applyStateXml (const juce::XmlElement& xml)
             const int index = e->getIntAttribute ("index", -1);
             if (index < 0 || index >= numLayers)
                 continue;
-            if (isGenerator())
+            if (isGenerator() && ! (hasHybridLayer() && index == hybridLayer))
                 continue;   // (never saved by a generator; ignored if a file says otherwise)
             osp::plugin::LoadRequest request;
             request.expectedHash = e->getStringAttribute ("hash").toStdString();
