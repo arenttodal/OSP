@@ -343,7 +343,7 @@ int ShellEditor::dropLayerAt (juce::Point<int> editorPoint) const
 
 bool ShellEditor::isInterestedInFileDrag (const juce::StringArray& files)
 {
-    if (shell.isGenerator())
+    if (shell.isGenerator() && ! shell.hasHybridLayer())
         return false;   // it makes its own sound: there is nowhere to drop a recording
     for (const auto& f : files)
         if (juce::File (f).hasFileExtension ("wav;aif;aiff;flac"))
@@ -408,6 +408,15 @@ void ShellEditor::chooseFile (int layer)
 void ShellEditor::showLayerMenu (int layer, juce::Component& target)
 {
     juce::PopupMenu menu;
+    if (shell.hasHybridLayer() && layer == ShellProcessor::hybridLayer)
+    {
+        // The generator's recording: replaced (or relinked, when its file went missing) or removed.
+        menu.addSectionHeader (shell.product().hybridSampleName);
+        menu.addItem (juce::String::fromUTF8 ("Replace or relink recording\xe2\x80\xa6"), [this] { chooseFile (ShellProcessor::hybridLayer); });
+        menu.addItem ("Remove recording", [this] { shell.removeLayer (ShellProcessor::hybridLayer); timerCallback(); });
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&target));
+        return;
+    }
     if (shell.isGenerator())
     {
         // The oscillators are the instrument: nothing to replace or remove.
@@ -433,6 +442,11 @@ void ShellEditor::showMenu()
     if (! shell.isGenerator())
     {
         menu.addItem (juce::String::fromUTF8 ("Add sound\xe2\x80\xa6"), shell.slotCount() < InstrumentHost::numLayers, false, [this] { chooseFile (-1); });
+        menu.addSeparator();
+    }
+    else if (shell.hasHybridLayer())
+    {
+        menu.addItem (shell.product().hybridSampleName + juce::String::fromUTF8 (": load a recording\xe2\x80\xa6"), [this] { chooseFile (ShellProcessor::hybridLayer); });
         menu.addSeparator();
     }
     menu.addItem (juce::String::fromUTF8 ("Open preset\xe2\x80\xa6"), [this] { choosePresetFile (false); });

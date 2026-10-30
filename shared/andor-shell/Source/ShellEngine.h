@@ -69,6 +69,14 @@ public:
         return false;
     }
 
+    /** Message thread: the shell has just published `source` for `layer` (null: cleared);
+        it reaches the audio thread through setSource() soon after. An engine that derives
+        data of its own from a recording (an analysis on its own worker) starts here and may
+        keep the pointer as long as it needs. */
+    virtual void sourcePublished (int layer, std::shared_ptr<const osp::plugin::LoadedInstrument> source)
+    {
+        juce::ignoreUnused (layer, source);
+    }
     /** Audio thread: layer `layer` plays `source` from now on (null: silent). When this
         returns the engine must no longer read the layer's previous source. */
     virtual void setSource (int layer, const osp::plugin::LoadedInstrument* source) noexcept = 0;
