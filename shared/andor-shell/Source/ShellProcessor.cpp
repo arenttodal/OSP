@@ -78,6 +78,9 @@ ShellProcessor::ShellProcessor (std::unique_ptr<Engine> productEngine)
       engine (std::move (productEngine))
 {
     jassert (engine != nullptr);
+    // The product's finish, before any window (every instance sets the same).
+    if (productInfo().materials.has_value())
+        osp::plugin::design::useMaterials (*productInfo().materials);
     description = engine->describe();
     bound = engine->boundParameters();
     generatorName = engine->generatorName();

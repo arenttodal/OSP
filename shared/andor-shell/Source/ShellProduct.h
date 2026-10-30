@@ -1,12 +1,14 @@
 #pragma once
 
 #include "CardWellEditor.h"
+#include "Design.h"
 #include "InstrumentFrame.h"
 #include "ShellEngine.h"
 
 #include <array>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <vector>
 
 namespace andor::shell
@@ -81,6 +83,10 @@ struct ProductInfo
     /** A generator's card names its first source mode this (its menu and selector) instead
         of ANDOR OSP's "One Shot" (a synthesizer's "Standard"). Empty: "One Shot", as before. */
     juce::String generatorModeName;
+    /** The product's own materials (opt-in): its finish (the accent family, ceramic tones)
+        and rendered pieces of its own (its housing's wood, its badge) in place of ANDOR OSP's,
+        for every instance of the product. Unset: ANDOR OSP's, exactly. Interface only. */
+    std::optional<osp::plugin::design::Materials> materials;
 };
 
 /** Defined by the product (Product.cpp). */

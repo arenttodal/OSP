@@ -3,6 +3,7 @@
 #include "SpriteKnobRenderer.h"
 
 #include <cstring>
+#include <optional>
 #include <unordered_map>
 
 namespace osp::plugin::design
@@ -92,6 +93,39 @@ void CachedShadow::drawForPath (juce::Graphics& g, const juce::Path& path) const
     const auto& mask = found->second;
     g.setColour (colour);
     g.drawImageAt (mask.image, origin.x + mask.area.getX(), origin.y + mask.area.getY(), true);
+}
+
+//==============================================================================
+// The product's materials (Materials in Design.h)
+
+namespace
+{
+    std::optional<Materials>& productMaterials()
+    {
+        static std::optional<Materials> m;
+        return m;
+    }
+    int scopedMaterials = 0;
+}
+
+void useMaterials (const Materials& m)
+{
+    productMaterials() = m;
+    if (scopedMaterials == 0)
+        detail::materials = m;
+}
+
+ScopedMaterials::ScopedMaterials (const Materials& m) : previous (detail::materials)
+{
+    ++scopedMaterials;
+    detail::materials = m;
+}
+
+ScopedMaterials::~ScopedMaterials()
+{
+    --scopedMaterials;
+    // The product's own once no scope is left (it may have set them meanwhile).
+    detail::materials = scopedMaterials == 0 && productMaterials().has_value() ? *productMaterials() : previous;
 }
 
 }
@@ -423,9 +457,10 @@ void knob (juce::Graphics& g, juce::Point<float> c, float r, float position, con
         // The track: a soft grey ring, shaded on its inner edge.
         juce::Path track;
         track.addCentredArc (c.x, c.y, arcRadius, arcRadius, 0.0f, style.startAngle, style.endAngle, true);
-        g.setColour (juce::Colour (0xffc3b9aa));
+        // (Graphite: a dark groove cut into the well instead, no light on its edge.)
+        g.setColour (style.graphite ? juce::Colour (0xff383533) : juce::Colour (0xffc3b9aa));
         g.strokePath (track, juce::PathStrokeType (arcWidth, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        g.setColour (juce::Colours::white.withAlpha (0.35f));
+        g.setColour (juce::Colours::white.withAlpha (style.graphite ? 0.0f : 0.35f));
         juce::Path lit;
         lit.addCentredArc (c.x, c.y, arcRadius + 0.3f * arcWidth, arcRadius + 0.3f * arcWidth, 0.0f, style.startAngle, style.endAngle, true);
         g.strokePath (lit, juce::PathStrokeType (0.35f * arcWidth));
@@ -464,9 +499,31 @@ void knob (juce::Graphics& g, juce::Point<float> c, float r, float position, con
     }
 
     // A rendered cap: its own light, shadow and indicator, at the same radius.
-    if (style.sprite != nullptr && style.sprite->isValid())
+    if (style.sprite != nullptr && style.sprite->isValid() && ! style.graphite)
     {
         style.sprite->draw (g, c, r, angle, style.enabled ? 1.0f : 0.45f);
+        return;
+    }
+    if (style.graphite)
+    {
+        // Graphite: the same body on a dark well. A darker rim lit at the top left, a charcoal
+        // cap with a quiet sheen, a cream engraved pointer (it must read on dark).
+        const auto body = juce::Rectangle<float> (2.0f * r, 2.0f * r).withCentre (c);
+        juce::Path disc;
+        disc.addEllipse (body);
+        CachedShadow (juce::Colour (0x8c000000), juce::roundToInt (0.22f * r) + 2, { 0, juce::roundToInt (0.09f * r) + 1 }).drawForPath (g, disc);
+        // (A muted bronze rim, the cap warm charcoal.)
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xff9a7454), c.x - 0.7f * r, c.y - 0.8f * r, juce::Colour (0xff221a15), c.x + 0.6f * r, c.y + 0.9f * r, false));
+        g.fillEllipse (body);
+        const float capR = 0.86f * r;
+        const auto cap = juce::Rectangle<float> (2.0f * capR, 2.0f * capR).withCentre (c);
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xff4b4642), c.x - 0.35f * r, c.y - 0.55f * r, juce::Colour (0xff24211f), c.x + 0.5f * r, c.y + 0.85f * r, true));
+        g.fillEllipse (cap);
+        g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.14f), c.x, cap.getY(), juce::Colours::white.withAlpha (0.0f), c.x, c.y, false));
+        g.fillEllipse (cap.reduced (0.08f * r).withTrimmedBottom (0.7f * r));
+        const auto p0 = at (style.pointerFrom * r, angle), p1 = at (style.pointerTo * r, angle);
+        g.setColour (juce::Colour (0xffeee6da).withAlpha (style.enabled ? 0.95f : 0.4f));
+        g.drawLine ({ p0, p1 }, std::max (1.6f, 0.08f * r));
         return;
     }
 

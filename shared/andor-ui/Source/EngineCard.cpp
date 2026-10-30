@@ -1442,6 +1442,8 @@ EngineCard::EngineCard (InstrumentHost& p, int layer)
         granularKnobs[i] = std::make_unique<MiniKnob> (processor.apvts(), id, grain[i].second, std::move (f));
         granularKnobs[i]->setOnDark (true);
         granularKnobs[i]->slider.getProperties().set ("arc", static_cast<juce::int64> (palette::layer (layer).getARGB()));
+        if (design::materials().graphiteOnWell)
+            granularKnobs[i]->slider.getProperties().set ("graphite", true);   // (the product's finish)
         addChildComponent (*granularKnobs[i]);
     }
 

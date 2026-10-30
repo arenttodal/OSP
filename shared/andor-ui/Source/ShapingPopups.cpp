@@ -213,12 +213,17 @@ void SegmentedControl::paintOnDark (juce::Graphics& g)
         }
         if (i == index)
         {
+            // A lit key in the accent's own dark tone: a warm brown face, a keyline of the
+            // accent, the text in it (light on dark, never a glare).
             const auto key = cell.reduced (1.5f, 1.5f);
-            g.setColour (lit.withAlpha (0.16f));
+            const auto deep = lit.interpolatedWith (juce::Colour (0xff1e2222), 0.62f);
+            g.setGradientFill (juce::ColourGradient (deep.brighter (0.25f), 0.0f, key.getY(), deep.darker (0.15f), 0.0f, key.getBottom(), false));
             g.fillRoundedRectangle (key, radius - 1.0f);
-            g.setColour (lit.withAlpha (0.85f));
+            g.setColour (lit.withAlpha (0.18f));
+            g.drawHorizontalLine (juce::roundToInt (key.getY() + 1.0f), key.getX() + radius, key.getRight() - radius);
+            g.setColour (lit.withAlpha (0.9f));
             g.drawRoundedRectangle (key.reduced (0.5f), radius - 1.0f, 1.0f);
-            g.setColour (lit.interpolatedWith (juce::Colour (0xfff2eee6), 0.35f));
+            g.setColour (lit.interpolatedWith (juce::Colour (0xfffff0e4), 0.3f));
         }
         else
             g.setColour (juce::Colour (0xffeee8dd).withAlpha (isEnabled() ? 0.66f : 0.35f));

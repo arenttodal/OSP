@@ -3,6 +3,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "CeramicSkin.h"
+#include "Design.h"
 #include "SpriteKnobRenderer.h"
 
 namespace osp::plugin
@@ -24,7 +25,8 @@ namespace palette
     const juce::Colour text { 0xff272622 };
     const juce::Colour textDim { 0xff77746d };
     const juce::Colour graphite { 0xff34332f };     ///< the sound displays (colour reads as light on it)
-    const juce::Colour accent { 0xffe1774f };       ///< live position, focus, active state: small areas only
+    /** Live position, focus, active state: small areas only (the product's materials). */
+    inline const juce::Colour& accent = design::detail::materials.paletteAccent;
 
     // The sound's spectral colours (usually at reduced opacity).
     const juce::Colour amber { 0xffd79a43 };
@@ -57,7 +59,7 @@ namespace palette
             case 2: return juce::Colour (0xff86a596);
             default: break;
         }
-        return juce::Colour (0xffd9895a);
+        return design::detail::materials.layerA;   // (the product's materials)
     }
 
     /** The spectral gradient at t (0 = warm/low .. 1 = cool/high). */
