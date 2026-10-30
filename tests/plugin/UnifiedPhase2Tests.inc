@@ -154,12 +154,15 @@ TEST_CASE ("plugin: Phase 2's parameters are appended and neutral; the modulatio
 {
     OspAudioProcessor p;
     const auto& all = p.getParameters();
-    // The last thirteen parameters, in order: per layer SCATTER, PAN, WINDOW, KEY DNA AMOUNT; the budget.
+    // Thirteen parameters, in order: per layer SCATTER, PAN, WINDOW, KEY DNA AMOUNT; the budget.
+    // Only the routes' second destinations (version 21, MIX modulation) come after them.
     juce::StringArray expected;
     for (int l = 0; l < 3; ++l)
         for (const char* n : { "granular.scatter", "granular.pan", "granular.window", "keyDna.amount" })
             expected.add (osp::plugin::InstrumentHost::layerParameterId (l, n));
     expected.add ("grainBudget");
+    for (int r = 0; r < osp::mod::maxRoutes; ++r)
+        expected.add (osp::plugin::InstrumentHost::modRouteId (r, "destExt"));
     REQUIRE (all.size() > expected.size());
     for (int i = 0; i < expected.size(); ++i)
     {

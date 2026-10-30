@@ -167,6 +167,7 @@ public:
     // EQ (version hint 18): each layer's five bands, `layerA.eq.*` (InstrumentHost::eqParameterId).
     // Off by default (older sessions open with it off and sound as they did).
     InstrumentEngine::ModView modulationView() const noexcept override { return engine.modulationView(); }
+    InstrumentEngine::LiveMix liveMix() const noexcept override { return engine.liveMix(); }
     /** The CC 1-4 sources' controller numbers (0..119; default 2, 11, 16, 17), saved with the
         session. Learn: the next controller that moves is taken for the slot (-1: none). */
     int modControllerNumber (int slot) const noexcept override;
@@ -694,8 +695,8 @@ private:
     // for the audio thread (atomics + generation, as SHAPER CUSTOM's steps).
     std::array<std::array<std::atomic<float>*, 8>, 2> modLfoParams {};
     std::array<std::array<std::atomic<float>*, 7>, 2> modEnvParams {};
-    std::array<std::array<std::atomic<float>*, 4>, mod::maxRoutes> modRouteParams {};
-    static constexpr int numModValues = 2 * 8 + 2 * 7 + mod::maxRoutes * 5;
+    std::array<std::array<std::atomic<float>*, 5>, mod::maxRoutes> modRouteParams {};   ///< source, dest, depth, enabled, destExt
+    static constexpr int numModValues = 2 * 8 + 2 * 7 + mod::maxRoutes * 6;   // (each route's five parameters and its target)
     // META-MODULATION's links: each route's stable ID and a depth route's target ID live in
     // the state's ModLinks child (saved, undoable); the audio thread reads them resolved to
     // slots (message thread writes on every change of the links or the state).

@@ -106,6 +106,21 @@ public:
     /** Ends any running transition (tests and snapshots). */
     void finishAnimations();
 
+    // -- Modulation (the MIX as a destination; nothing changes on screen without a route) --
+    /** A right-click: the MIX's modulation menu (the editor's overlay builds it). */
+    std::function<void()> onModulationMenu;
+    /** A source being dragged (0..4, -1: none), and whether it is over the MIX (its drop ring). */
+    void setModulationDrag (int source, bool over);
+    /** Whether a point (in the parent's coordinates) would drop a source on the MIX. */
+    bool acceptsModulationDrop (juce::Point<float> inParent) const;
+    /** Follows the mix as it plays and the routes moving it (the editor's timer). */
+    void refreshModulation();
+    /** Whether a route moves the MIX (the range and the live node are drawn). */
+    bool showsModulation() const noexcept { return modulated; }
+    /** Where the live (hollow) node is drawn, and the range bar's ends on the line. */
+    juce::Point<float> liveNodePosition() const;
+    juce::Range<float> modulationRange() const noexcept { return modRange; }
+
     void paint (juce::Graphics&) override;
     bool hitTest (int x, int y) override;
     void mouseEnter (const juce::MouseEvent&) override;
@@ -134,6 +149,13 @@ private:
     float readout = 0.0f, readoutTarget = 0.0f;
     juce::uint32 readoutHoldUntil = 0;
     bool dragging = false, pressedCaption = false, hovering = false;
+    // Modulation: the live mix, the range the routes can take it through (B's share along
+    // the line, 0..1), the first route's source colour, and a source being dragged over it.
+    bool modulated = false;
+    float liveBlend = 0.5f, liveX = 0.5f, liveY = 1.0f / 3.0f;
+    juce::Range<float> modRange;
+    int modSource = -1, modDragSource = -1;
+    bool modDragOver = false;
 };
 
 /** The large three-layer mix (opened from MIX in the header). */

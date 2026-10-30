@@ -111,6 +111,9 @@ ShellEditor::ShellEditor (ShellProcessor& p)
     dropZone.onBrowse = [this] { chooseFile (-1); };
     content.addChildComponent (dropZone);
     content.addChildComponent (addTarget);
+    headerMix.onModulationMenu = [this] {
+        modOverlay.contextMenu (modui::mixTargetId).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&headerMix));
+    };
     content.addChildComponent (headerMix);
 
     // The six macros (the product's): names and knobs as ANDOR OSP's.
@@ -538,6 +541,7 @@ void ShellEditor::selectModulation (int source, int slot)
 void ShellEditor::dragModulation (int source, juce::Point<float> where)
 {
     modOverlay.setDrag (source, where);
+    headerMix.setModulationDrag (source, headerMix.acceptsModulationDrop (where));
 }
 
 void ShellEditor::dropModulation (int source, juce::Point<float> where)
@@ -545,12 +549,15 @@ void ShellEditor::dropModulation (int source, juce::Point<float> where)
     // A control the engine does not read (shown disabled) is no destination.
     if (auto* control = modOverlay.controlAt (where); control != nullptr && ! control->isEnabled())
     {
+        headerMix.setModulationDrag (-1, false);
         modOverlay.setDrag (-1, {});
         modOverlay.showNotice ("This instrument does not use that control");
         return;
     }
     modOverlay.setDrag (source, where);
-    if (modOverlay.drop (source, where) >= 0)
+    const bool onMix = headerMix.acceptsModulationDrop (where);
+    headerMix.setModulationDrag (-1, false);
+    if ((onMix ? modOverlay.dropOn (source, modui::mixTargetId, headerMix.getBounds().toFloat()) : modOverlay.drop (source, where)) >= 0)
         modPanel.refresh();
     modOverlay.setDrag (-1, {});
 }
@@ -803,6 +810,7 @@ void ShellEditor::timerCallback()
         if (card->isVisible())
             card->refresh();
     updateFocus();
+    headerMix.refreshModulation();
     presetBar.refresh();
     if (const float wheel = shell.modWheelPosition(); ! juce::exactlyEqual (wheel, shownWheelPosition))
     {

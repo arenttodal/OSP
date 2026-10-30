@@ -393,6 +393,19 @@ public:
     static constexpr int arpDestCount = 5;
     double arpModulation (mod::Dest d) const noexcept;
     bool arpModulated (mod::Dest d) const noexcept;
+    /** The mix as it plays now (the stored controls plus any MIX modulation, smoothed): the
+        blend, and the triangle's x and y; and whether a route moves it (the header's live
+        node). Lock-free, any thread. */
+    struct LiveMix
+    {
+        float blend = 0.0f, x = 0.5f, y = 1.0f / 3.0f;
+        bool modulated = false;
+    };
+    LiveMix liveMix() const noexcept
+    {
+        return { liveMixValue[0].load (std::memory_order_relaxed), liveMixValue[1].load (std::memory_order_relaxed),
+                 liveMixValue[2].load (std::memory_order_relaxed), liveMixModulated.load (std::memory_order_relaxed) };
+    }
     /** What the modulation display shows: the global LFOs, and the newest sounding voice's
         poly LFOs and envelopes (lock-free, any thread). */
     struct ModView
@@ -567,6 +580,10 @@ private:
     std::array<double, arpDestCount> modArpOffset {};
     std::array<bool, arpDestCount> modArpRouted {};
     std::array<std::array<double, 4>, 3> modEqOffset {};   ///< per layer: bell octaves, bell dB, low shelf dB, high shelf dB
+    std::array<double, 2> modMixOffset {};                 ///< MIX and MIX TOWARDS C (0 without a route)
+    bool modMixRouted = false;
+    std::array<std::atomic<float>, 3> liveMixValue {};
+    std::atomic<bool> liveMixModulated { false };
     bool modGlobalApplied = false;
     std::array<std::atomic<float>, mod::sourceCount> modViewValue {};
     bool externalInputNotes = false;

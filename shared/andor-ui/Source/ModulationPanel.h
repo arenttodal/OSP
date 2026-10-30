@@ -27,6 +27,13 @@ namespace modui
         the CHARACTER macro is the shared CHARACTER stage for a global source and the per-voice
         cutoff for a per-voice one. Dest::none when the control is not a destination. */
     mod::Dest destinationFor (const juce::String& parameterId, bool polySource);
+    /** The header MIX as a destination (no parameter of its own): MIX, and MIX TOWARDS C with
+        three layers. */
+    inline const juce::String mixTargetId = "mix";
+    /** The layers the MIX blends (the occupied ones). */
+    int mixLayerCount (const InstrumentHost& processor);
+    /** A source (0..) swings both ways (an LFO set to bipolar); else only towards its depth. */
+    bool isBipolar (const InstrumentHost& processor, int source);
     /** A source (0..4) acts per voice (the envelopes; a POLY LFO). */
     bool isPerVoice (const InstrumentHost& processor, int source);
     /** Every destination a control shows (CHARACTER: the macro and the cutoff). */
@@ -379,6 +386,9 @@ public:
     /** Assigns through the processor's one path (source 0..4); selects the route, or shows why
         it could not be made. Returns the route's slot, -1 when refused. */
     int assign (int source, mod::Dest dest);
+    /** A source dropped on a control the overlay does not ring (the header MIX): assigns the
+        destination it stands for; a refusal is shown by `area` (root coordinates). */
+    int dropOn (int source, const juce::String& parameterId, juce::Rectangle<float> area);
     /** A short message by the controls (a refused assignment), for a few seconds. */
     void showNotice (const juce::String& text);
     juce::String currentNotice() const;

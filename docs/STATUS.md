@@ -541,6 +541,22 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       and never writes the recordings. Tests `memo_lab` (13 cases) pass, including the round
       trip into a fresh processor with an empty store and the recording deleted. Awaiting the
       owner's test on a Mac: the real Voice Memos folder, real memos, Ableton.
+- [x] MIX as a modulation destination (docs/research/mix-modulation-plan.md, "Implemented"):
+      - engine: `mod::Dest::mixPosition` (MIX: the A <-> B blend, the triangle's A -> B
+        direction) and `mixTowardsC`, global and continuous; a routed mix follows within 2 ms
+        (an LFO keeps its shape, the gains still ramp per sample); unrouted, the 20 ms glide is
+        unchanged bit for bit;
+      - host: a second destination per route, `mod.routeN.destExt` (version hint 21; "None",
+        KEY DNA A-C AMOUNT, MIX, MIX TOWARDS C, append only). It wins when set; `dest` keeps its
+        list and its automation; older sessions open unchanged. KEY DNA AMOUNT is now reachable
+        from the routes too;
+      - interface: drop a source on the header MIX, or right-click it (Assign / Edit / Remove);
+        the routes popover's + ADD has Mix and each layer's KEY DNA AMOUNT. While routed the
+        MIX draws the range in the source's colour and a hollow live node; nothing changes
+        without a route. With three layers (the header triangle is hidden) MIX TOWARDS C is in
+        + ADD.
+      Tests `[mix]` (engine 3, plugin 2, editor `[mix-ui]` with snapshots). Parameter schema
+      golden updated for the 16 new parameters. Per-note MIX (VEL -> MIX per voice) is later.
 - [x] ANDOR DESIGN SYSTEM and INSTRUMENT SHELL (andor-design-system/, start with HANDOFF.md).
       ANDOR OSP's interface was extracted, unchanged, into shared/andor-ui:
       - the components, look and assets;

@@ -4,6 +4,7 @@
 
 #include "Design.h"
 #include "EngineCard.h"
+#include "ModulationPanel.h"
 
 #include "engine/InstrumentEngine.h"
 
@@ -342,9 +343,10 @@ std::array<juce::Point<float>, 3> HeaderMix::corners() const
 
 std::array<double, 3> HeaderMix::shownShares() const
 {
+    // While modulated, what is heard now (the live mix), else the controls.
     if (count >= 3)
-        return mixgeometry::shares (mixX, mixY);
-    const double b = mixgeometry::blendShare (blend);
+        return modulated ? mixgeometry::shares (liveX, liveY) : mixgeometry::shares (mixX, mixY);
+    const double b = mixgeometry::blendShare (modulated ? liveBlend : blend);
     return { 1.0 - b, b, 0.0 };
 }
 
@@ -361,6 +363,74 @@ juce::Point<float> HeaderMix::nodePosition() const
     if (count < 3 && morph <= 0.0f)
         return onLine;
     return onLine + (inTriangle - onLine) * morph;
+}
+
+juce::Point<float> HeaderMix::liveNodePosition() const
+{
+    const auto c = corners();
+    if (count >= 3)
+        return mixgeometry::pointFor (mixgeometry::shares (liveX, liveY), c);
+    return c[0] + (c[1] - c[0]) * static_cast<float> (mixgeometry::blendShare (liveBlend));
+}
+
+void HeaderMix::setModulationDrag (int source, bool over)
+{
+    over = over && source >= 0;
+    if (source == modDragSource && over == modDragOver)
+        return;
+    modDragSource = source;
+    modDragOver = over;
+    repaint();
+}
+
+bool HeaderMix::acceptsModulationDrop (juce::Point<float> inParent) const
+{
+    if (! isVisible() || count < 2)
+        return false;
+    const auto p = inParent - getPosition().toFloat();
+    return const_cast<HeaderMix*> (this)->hitTest (juce::roundToInt (p.x), juce::roundToInt (p.y));
+}
+
+void HeaderMix::refreshModulation()
+{
+    // The routes onto the MIX (A <-> B: the line, and the triangle's A -> B direction). A
+    // bipolar LFO swings both ways around the base; a unipolar source (and an envelope) only
+    // towards its depth's sign, as the knobs' halos show it.
+    double lo = 0.0, hi = 0.0;
+    int source = -1;
+    bool routed = false;
+    for (const auto& r : processor.modulationRoutes())
+    {
+        if (r.isDepth() || r.state != mod::RouteState::active || (r.route.dest != mod::Dest::mixPosition && r.route.dest != mod::Dest::mixTowardsC))
+            continue;
+        routed = true;
+        if (source < 0)
+            source = mod::sourceIndex (r.route.source);
+        if (r.route.dest != mod::Dest::mixPosition)
+            continue;
+        const double d = r.route.depth;
+        const bool bipolar = modui::isBipolar (processor, mod::sourceIndex (r.route.source));
+        lo += bipolar ? -std::abs (d) : std::min (0.0, d);
+        hi += bipolar ? std::abs (d) : std::max (0.0, d);
+    }
+    const auto live = processor.liveMix();
+    routed = routed && live.modulated;
+    juce::Range<float> range;
+    if (routed)
+    {
+        auto share = [] (double b) { return static_cast<float> (mixgeometry::blendShare (std::clamp (b, 0.0, 1.0))); };
+        range = { share (blend + lo), share (blend + hi) };
+    }
+    const bool changed = routed != modulated || range != modRange || source != modSource
+                         || (routed && (! juce::exactlyEqual (live.blend, liveBlend) || ! juce::exactlyEqual (live.x, liveX) || ! juce::exactlyEqual (live.y, liveY)));
+    modulated = routed;
+    modRange = range;
+    modSource = source;
+    liveBlend = live.blend;
+    liveX = live.x;
+    liveY = live.y;
+    if (changed)
+        repaint();
 }
 
 juce::Rectangle<float> HeaderMix::captionArea() const
@@ -421,6 +491,12 @@ void HeaderMix::dragTo (juce::Point<float> where)
 
 void HeaderMix::mouseDown (const juce::MouseEvent& e)
 {
+    if (e.mods.isPopupMenu())
+    {
+        if (onModulationMenu != nullptr)
+            onModulationMenu();
+        return;
+    }
     pressedCaption = count == 3 && captionArea().expanded (4.0f).contains (e.position);
     if (pressedCaption)
         return;
@@ -508,6 +584,23 @@ void HeaderMix::paint (juce::Graphics& g)
     if (morph > 0.0f)
         letter (2, { c[2].x + 5.0f, c[2].y - 4.0f, 12.0f, 12.0f }, juce::Justification::centredLeft, morph);
 
+    // Modulated: the range the routes take the mix through, a thicker stretch of the line in
+    // the source's colour (the knobs' halo, here).
+    const auto modColour = modui::sourceColour (std::max (0, modSource));
+    if (modulated && count < 3 && modRange.getLength() > 0.0f)
+    {
+        const auto a = c[0] + (c[1] - c[0]) * modRange.getStart(), b = c[0] + (c[1] - c[0]) * modRange.getEnd();
+        g.setColour (modColour.withAlpha (0.7f));
+        g.drawLine ({ a, b }, 2.6f);
+    }
+    // A source being dragged: a ring round the MIX (strong when a drop would land on it).
+    if (modDragSource >= 0)
+    {
+        const auto ring = juce::Rectangle<float> (c[0], c[1]).getUnion (juce::Rectangle<float> (c[2], c[2])).expanded (21.0f, 8.0f);
+        g.setColour (modui::sourceColour (modDragSource).withAlpha (modDragOver ? 0.85f : 0.35f));
+        g.drawRoundedRectangle (ring, 6.0f, modDragOver ? 1.6f : 1.0f);
+    }
+
     // The node: a small cream cap with a fine dark rim and a contact shadow.
     const auto node = nodePosition();
     juce::Path disc;
@@ -517,6 +610,13 @@ void HeaderMix::paint (juce::Graphics& g)
     g.fillPath (disc);
     g.setColour (colour::text.withAlpha (0.75f));
     g.strokePath (disc, juce::PathStrokeType (0.9f));
+    // ... and where the modulation has the mix now: a hollow ring that moves (the solid node
+    // stays where the musician set it).
+    if (modulated)
+    {
+        g.setColour (modColour);
+        g.drawEllipse (juce::Rectangle<float> (9.0f, 9.0f).withCentre (liveNodePosition()), 1.4f);
+    }
 
     // While hovered or dragged: each layer's share, small and tabular, under the line.
     if (readout > 0.0f)

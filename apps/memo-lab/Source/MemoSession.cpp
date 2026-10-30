@@ -97,6 +97,7 @@ bool MemoSession::convert (const Recording& recording, const DecodedAudio& audio
     started = true;
     sawWork = false;
     quietPolls = 0;
+    stageAQuietSince = 0;
     current = {};
     current.mode = m;
     current.stage = Status::Stage::building;
@@ -147,6 +148,7 @@ MemoSession::Status MemoSession::update()
     using Stage = Status::Stage;
     if (working)
     {
+        stageAQuietSince = 0;
         const bool playable = fresh && (mode == Mode::oneShot || current.atlas);
         current.stage = playable ? Stage::playable : Stage::building;
         if (activity == InstrumentHost::AtlasActivity::analysing)
@@ -171,6 +173,23 @@ MemoSession::Status MemoSession::update()
         started = false;
         return current;
     }
+    // Stage A's notes with nothing running: Stage B's loader may have finished while its
+    // instrument is not published yet (the next pollLoads does it). Stay "Playable" until
+    // the full instrument is there; a Stage B that never comes (it failed) ends it after a
+    // few quiet seconds, the notes still playable.
+    if (mode == Mode::mapNotes && current.atlas && instrument->atlasStatus != nullptr && instrument->atlasStatus->playableOnly)
+    {
+        const auto now = juce::Time::getMillisecondCounter();
+        if (stageAQuietSince == 0)
+            stageAQuietSince = now;
+        if (now - stageAQuietSince < 3000)
+        {
+            current.stage = Stage::playable;
+            current.text = "Playable. Adding sustain and release";
+            return current;
+        }
+    }
+    stageAQuietSince = 0;
     osp.dismissMapNotesPrompt (0);
     if (mode == Mode::mapNotes && ! current.atlas)
     {

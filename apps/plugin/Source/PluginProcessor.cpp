@@ -238,7 +238,7 @@ OspAudioProcessor::OspAudioProcessor()
     for (int r = 0; r < mod::maxRoutes; ++r)
     {
         auto& rp = modRouteParams[static_cast<std::size_t> (r)];
-        const char* names[] { "source", "dest", "depth", "enabled" };
+        const char* names[] { "source", "dest", "depth", "enabled", "destExt" };
         for (std::size_t k = 0; k < rp.size(); ++k)
             rp[k] = parameters.getRawParameterValue (modRouteId (r, names[k]));
     }
@@ -665,7 +665,7 @@ void OspAudioProcessor::applyModulation (bool force) noexcept
         const auto& rp = modRouteParams[r];
         auto& route = s.routes[r];
         route.source = static_cast<mod::Source> (std::clamp (juce::roundToInt (rp[0]->load()), 0, mod::sourceCount));
-        route.dest = static_cast<mod::Dest> (std::clamp (juce::roundToInt (rp[1]->load()), 0, mod::hostDestCount - 1));
+        route.dest = mod::routeDestFromChoices (std::clamp (juce::roundToInt (rp[1]->load()), 0, mod::hostDestCount - 1), juce::roundToInt (rp[4]->load()));
         route.depth = 0.01 * rp[2]->load();
         route.enabled = rp[3]->load() >= 0.5f;
         route.target = modRouteTargets[r].load (std::memory_order_relaxed);

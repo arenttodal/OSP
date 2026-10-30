@@ -75,6 +75,7 @@ private:
     std::uint64_t previousLoad = 0;
     bool started = false, sawWork = false;
     int quietPolls = 0;
+    juce::uint32 stageAQuietSince = 0;   ///< MAP NOTES: when Stage A's notes were first seen with nothing running
 };
 
 /**

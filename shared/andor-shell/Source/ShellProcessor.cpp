@@ -106,8 +106,8 @@ ShellProcessor::ShellProcessor (std::unique_ptr<Engine> productEngine)
     for (int r = 0; r < osp::mod::maxRoutes; ++r)
     {
         int k = 0;
-        for (const char* name : { "source", "dest", "depth", "enabled" })
-            modRouteParams[static_cast<std::size_t> (4 * r + k++)] = parameters.getRawParameterValue (modRouteId (r, name));
+        for (const char* name : { "source", "dest", "depth", "enabled", "destExt" })
+            modRouteParams[static_cast<std::size_t> (5 * r + k++)] = parameters.getRawParameterValue (modRouteId (r, name));
         modRouteTargets[static_cast<std::size_t> (r)].store (-1);
     }
     macros = productInfo().macros;
@@ -338,10 +338,10 @@ void ShellProcessor::applyModulation() noexcept
     for (std::size_t r = 0; r < s.routes.size(); ++r)
     {
         auto& route = s.routes[r];
-        route.source = static_cast<osp::mod::Source> (std::clamp (juce::roundToInt (modRouteParams[4 * r]->load()), 0, osp::mod::sourceCount));
-        route.dest = osp::mod::destFromChoice (juce::roundToInt (modRouteParams[4 * r + 1]->load()));
-        route.depth = 0.01 * modRouteParams[4 * r + 2]->load();
-        route.enabled = modRouteParams[4 * r + 3]->load() >= 0.5f;
+        route.source = static_cast<osp::mod::Source> (std::clamp (juce::roundToInt (modRouteParams[5 * r]->load()), 0, osp::mod::sourceCount));
+        route.dest = osp::mod::routeDestFromChoices (juce::roundToInt (modRouteParams[5 * r + 1]->load()), juce::roundToInt (modRouteParams[5 * r + 4]->load()));
+        route.depth = 0.01 * modRouteParams[5 * r + 2]->load();
+        route.enabled = modRouteParams[5 * r + 3]->load() >= 0.5f;
         route.target = modRouteTargets[r].load (std::memory_order_relaxed);
     }
     s.seed = static_cast<std::uint64_t> (std::max (1.0f, seedParam->load()));
