@@ -518,6 +518,18 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       - LOOP on plays only the notes that can loop (InstrumentSet::loopSelects after Stage B;
         FILL reaches past them); LOOP off plays all. NOTE MAP, overview and keyboard say so.
       - The keyboard map is a light strip along the top of the keys (one segment per key).
+- [x] FINAL PRECISION UI REFINEMENT, visual only (docs/research/ui-refinement/README.md). Five
+      passes, one commit each:
+      1. NOTE MAP and its inspector;
+      2. the source header;
+      3. preset navigation;
+      4. EQ / DAMPEN;
+      5. KEY DNA.
+      The housing keeps its depth; the displays share one flat language (device-pixel hairlines,
+      text tabs, readouts, segmented choices, one node and telltale vocabulary). Fixed on the
+      way: the EQ and DAMPEN pages showed the layer below through them, and "20k" and DAMPEN's
+      "0" were clipped. No DSP, parameter, schema or bounds change. The OSP–shell visual
+      regression stays at 0 px; design-bible captures regenerated.
 - [x] ANDOR DESIGN SYSTEM and INSTRUMENT SHELL (andor-design-system/, start with HANDOFF.md).
       ANDOR OSP's interface was extracted, unchanged, into shared/andor-ui:
       - the components, look and assets;
