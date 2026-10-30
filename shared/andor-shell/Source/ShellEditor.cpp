@@ -82,6 +82,18 @@ ShellEditor::ShellEditor (ShellProcessor& p)
             }
             openPopup (startControlPopup);
         });
+    // A generator product may make its card's heading (the name beside M and S) the door to
+    // its settings. Opt-in: every other card's name stays plain text.
+    if (shell.product().generatorHeaderPopover != nullptr && shell.isGenerator())
+        cards[0]->setHeadingDoor ([this] {
+            if (closedByLabelPress == generatorHeaderPopup || popupIndex == generatorHeaderPopup)
+            {
+                closedByLabelPress = -1;   // that press closed it (or closes it: keyboard)
+                closePopup();
+                return;
+            }
+            openPopup (generatorHeaderPopup);
+        });
     dropZone.onBrowse = [this] { chooseFile (-1); };
     content.addChildComponent (dropZone);
     content.addChildComponent (addTarget);
@@ -331,7 +343,7 @@ int ShellEditor::dropLayerAt (juce::Point<int> editorPoint) const
 
 bool ShellEditor::isInterestedInFileDrag (const juce::StringArray& files)
 {
-    if (shell.isGenerator())
+    if (shell.isGenerator() && ! shell.hasHybridLayer())
         return false;   // it makes its own sound: there is nowhere to drop a recording
     for (const auto& f : files)
         if (juce::File (f).hasFileExtension ("wav;aif;aiff;flac"))
@@ -396,6 +408,15 @@ void ShellEditor::chooseFile (int layer)
 void ShellEditor::showLayerMenu (int layer, juce::Component& target)
 {
     juce::PopupMenu menu;
+    if (shell.hasHybridLayer() && layer == ShellProcessor::hybridLayer)
+    {
+        // The generator's recording: replaced (or relinked, when its file went missing) or removed.
+        menu.addSectionHeader (shell.product().hybridSampleName);
+        menu.addItem (juce::String::fromUTF8 ("Replace or relink recording\xe2\x80\xa6"), [this] { chooseFile (ShellProcessor::hybridLayer); });
+        menu.addItem ("Remove recording", [this] { shell.removeLayer (ShellProcessor::hybridLayer); timerCallback(); });
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&target));
+        return;
+    }
     if (shell.isGenerator())
     {
         // The oscillators are the instrument: nothing to replace or remove.
@@ -421,6 +442,11 @@ void ShellEditor::showMenu()
     if (! shell.isGenerator())
     {
         menu.addItem (juce::String::fromUTF8 ("Add sound\xe2\x80\xa6"), shell.slotCount() < InstrumentHost::numLayers, false, [this] { chooseFile (-1); });
+        menu.addSeparator();
+    }
+    else if (shell.hasHybridLayer())
+    {
+        menu.addItem (shell.product().hybridSampleName + juce::String::fromUTF8 (": load a recording\xe2\x80\xa6"), [this] { chooseFile (ShellProcessor::hybridLayer); });
         menu.addSeparator();
     }
     menu.addItem (juce::String::fromUTF8 ("Open preset\xe2\x80\xa6"), [this] { choosePresetFile (false); });
@@ -537,6 +563,8 @@ void ShellEditor::openPopup (int which, int source)
         popup = shell.product().macroPopover (which, shell);
     else if (which == startControlPopup && shell.product().generatorStartControl.popover != nullptr)
         popup = shell.product().generatorStartControl.popover (shell);
+    else if (which == generatorHeaderPopup && shell.product().generatorHeaderPopover != nullptr && cards[0]->hasHeadingDoor())
+        popup = shell.product().generatorHeaderPopover (shell);
     if (popup == nullptr)
         return;
     popupIndex = which;
@@ -556,6 +584,8 @@ void ShellEditor::openPopup (int which, int source)
         cards[static_cast<std::size_t> (which - reimaginedPopup)]->setReimaginedOpen (true);
     if (which == startControlPopup)
         cards[0]->setStartOpen (true);
+    if (which == generatorHeaderPopup)
+        cards[0]->setHeadingOpen (true);
     applyBindings();   // the popover's controls follow the engine's bindings too
     if (isShowing())
         grabKeyboardFocus();
@@ -586,6 +616,12 @@ void ShellEditor::positionPopup()
         const auto anchor = content.getLocalArea (cards[0].get(), cards[0]->startLabelBounds()).toFloat();
         at = { anchor.getCentreX() - 0.5f * size.x, anchor.getY() - 10.0f - size.y };
     }
+    else if (popupIndex == generatorHeaderPopup)
+    {
+        // Below the card's heading, starting at its first letter (placePopover keeps it inside).
+        const auto anchor = content.getLocalArea (cards[0].get(), cards[0]->headingBounds()).toFloat();
+        at = { anchor.getX() - 14.0f, anchor.getBottom() + 8.0f };
+    }
     else
         at = frame::modulationPopoverOrigin (modPanel.getBounds().toFloat(), size);
     frame::placePopover (*popup, content, at);
@@ -603,6 +639,8 @@ void ShellEditor::closePopup()
         cards[static_cast<std::size_t> (popupIndex - reimaginedPopup)]->setReimaginedOpen (false);
     if (popupIndex == startControlPopup)
         cards[0]->setStartOpen (false);
+    if (popupIndex == generatorHeaderPopup)
+        cards[0]->setHeadingOpen (false);
     juce::Desktop::getInstance().getAnimator().cancelAnimation (popup.get(), false);
     popup.reset();
     popupIndex = -1;
@@ -631,6 +669,8 @@ void ShellEditor::mouseDownAnywhere (juce::Component* c)
             pressed = reimaginedPopup + l;
     if (const auto& card = *cards[0]; card.isStartLabel (c) && card.startLabelBounds().contains (card.getLocalPoint (nullptr, juce::Desktop::getMousePosition())))
         pressed = startControlPopup;
+    if (cards[0]->isHeading (c))
+        pressed = generatorHeaderPopup;
     closedByLabelPress = pressed == popupIndex ? pressed : -1;
     closePopup();
 }

@@ -63,6 +63,15 @@ struct ProductInfo
         std::function<std::unique_ptr<osp::plugin::MiniPanel> (osp::plugin::InstrumentHost&)> popover;
     };
     CardControl generatorStartControl;
+    /** A generator's card heading (its name beside M and S) as a door: a click, Return or
+        Space on the name opens this popover below it, and closes it again (null: the name is
+        plain text, as on every ANDOR OSP card). Generator products only. */
+    std::function<std::unique_ptr<osp::plugin::MiniPanel> (osp::plugin::InstrumentHost&)> generatorHeaderPopover;
+    /** A generator product that also plays one recording (opt-in): layer B takes a dropped or
+        chosen file through ANDOR OSP's loader, sample store and card, beside the generator's
+        card, and is saved and recalled with the session. This is its name (menus, notices).
+        Empty: a generator plays no recordings (every other product unchanged). */
+    juce::String hybridSampleName;
 };
 
 /** Defined by the product (Product.cpp). */

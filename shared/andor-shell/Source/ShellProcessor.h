@@ -114,6 +114,7 @@ public:
     bool shaperEditorLarge() const noexcept override { return shaperLarge.load(); }
     void setShaperEditorLarge (bool large) noexcept override { shaperLarge = large; }
     juce::String reimaginedModeUnavailable (int layer, int mode) const override { return engine->reimaginedModeUnavailable (layer, mode); }
+    juce::String engineStatus (const juce::String& topic) const override { return engine->status (topic); }
     bool hasKeyDna() const noexcept override { return engine->hasKeyDna(); }
 
     // The shell -------------------------------------------------------------------------
@@ -127,6 +128,9 @@ public:
     /** The engine makes its own sound (Engine::Description::generator): layer A is its card,
         and nothing is ever loaded. */
     bool isGenerator() const noexcept { return generatorName.isNotEmpty(); }
+    /** A generator that also plays one recording on layer B (ProductInfo::hybridSampleName). */
+    bool hasHybridLayer() const noexcept { return isGenerator() && productInfo().hybridSampleName.isNotEmpty(); }
+    static constexpr int hybridLayer = 1;
     const juce::String& generatedSourceName() const noexcept { return generatorName; }
     /** The macro row as the editor shows it: the product's (ProductInfo::macros), or ANDOR
         OSP's own while showReferenceMacros() is on. */

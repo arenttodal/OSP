@@ -265,8 +265,27 @@ TEST_CASE ("shell: a generator engine has one card, layer A, and never loads a f
     CHECK (source.name.isNotEmpty());
     CHECK (source.cycle.size() >= 2);
     CHECK_FALSE (p.generatedSource (1, source));
-    // A dropped recording is refused, said so, and nothing changes.
     const auto file = writeSource (tmp.dir, "pluck.wav", osp::testsignals::pluck (220.0, 0.5, 48000.0, 1));
+    if (p.hasHybridLayer())
+    {
+        // A hybrid generator (ProductInfo::hybridSampleName) takes one recording on layer B,
+        // beside its card; layer A stays the generator, layer C is never used.
+        CHECK (p.addLayers ({ file, file }) == 1);
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        CHECK (p.currentInstrument (0) == nullptr);
+        CHECK (p.currentInstrument (1) != nullptr);
+        CHECK (p.loadState (1) == osp::plugin::InstrumentHost::LoadState::ready);
+        CHECK (p.slotCount() == 2);
+        CHECK_FALSE (p.isLayerOccupied (2));
+        CHECK_FALSE (p.generatedSource (1, source));
+        CHECK (p.statusMessage().isNotEmpty());   // (the second file was not loaded: said so)
+        p.removeLayer (1);
+        CHECK (p.slotCount() == 1);
+        CHECK (p.currentInstrument (1) == nullptr);
+        return;
+    }
+    // A dropped recording is refused, said so, and nothing changes.
     CHECK (p.addLayers ({ file }) == 0);
     p.loadFile (file, 0);
     CHECK (p.waitForLoads (1000));
@@ -514,7 +533,7 @@ TEST_CASE ("shell: the interface binds what the engine reads and disables the re
     REQUIRE (p.waitForLoads (30000));
     p.pollLoads();
     ui->refreshNow();
-    CHECK (ui->visibleCardCount() == 1);
+    CHECK (ui->visibleCardCount() == (p.hasHybridLayer() ? 2 : 1));   // (a hybrid generator: its card and the recording's)
 
     // Each tagged control is enabled exactly when the engine reads one of its parameters.
     int checked = 0;
