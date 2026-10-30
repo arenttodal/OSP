@@ -114,6 +114,7 @@ public:
     bool shaperEditorLarge() const noexcept override { return shaperLarge.load(); }
     void setShaperEditorLarge (bool large) noexcept override { shaperLarge = large; }
     juce::String reimaginedModeUnavailable (int layer, int mode) const override { return engine->reimaginedModeUnavailable (layer, mode); }
+    juce::String engineStatus (const juce::String& topic) const override { return engine->status (topic); }
     bool hasKeyDna() const noexcept override { return engine->hasKeyDna(); }
 
     // The shell -------------------------------------------------------------------------

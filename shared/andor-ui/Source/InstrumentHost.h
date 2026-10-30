@@ -352,6 +352,14 @@ public:
     /** The SHAPER editor's magnified view (a view setting saved with the session). */
     virtual bool shaperEditorLarge() const noexcept = 0;
     virtual void setShaperEditorLarge (bool large) noexcept = 0;
+    /** A product's own state in words, for its popovers (`topic` is the product's: e.g. a
+        derived analysis' progress). Empty (the default): nothing to say. Message thread. */
+    virtual juce::String engineStatus (const juce::String& topic) const
+    {
+        juce::ignoreUnused (topic);
+        return {};
+    }
+
     /** A REIMAGINED mode (ReimaginedMode's index) this instrument cannot play on `layer`: its
         popover's picture says so in these words. Empty (the default): the mode plays. */
     virtual juce::String reimaginedModeUnavailable (int layer, int mode) const

@@ -159,6 +159,13 @@ public:
         return nullptr;
     }
 
+    /** The engine's own state in words, for the product's popovers (InstrumentHost::
+        engineStatus). Empty (the default): nothing to say. Message thread. */
+    virtual juce::String status (const juce::String& topic) const
+    {
+        juce::ignoreUnused (topic);
+        return {};
+    }
     /** Sounding notes (the status line). Any thread. */
     virtual int activeNotes() const noexcept { return 0; }
 
