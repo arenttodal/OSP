@@ -326,6 +326,16 @@ public:
     bool isStartLabel (const juce::Component* c) const noexcept { return c != nullptr && c == knobs[0].get(); }
     void setStartOpen (bool open) { knobs[0]->setLabelOpen (open); }
 
+    /** A generator's heading (its name beside M and S) as a door: a click, Return or Space on
+        the name calls `onHeadingClick`. Opt-in: without it the name is plain text, exactly as
+        before. The target covers the name's glyphs only (never the EQ, mode or menu). */
+    void setHeadingDoor (std::function<void()> onHeadingClick);
+    /** The name's glyphs, in this card's coordinates (the popover's anchor); empty: no door. */
+    juce::Rectangle<int> headingBounds() const;
+    bool isHeading (const juce::Component* c) const noexcept;
+    bool hasHeadingDoor() const noexcept { return headingDoor != nullptr; }
+    void setHeadingOpen (bool open);
+
     /** The layer's EQ over its waveform (a view setting: the EQ keeps playing either way). */
     std::function<void (int, bool)> onEqToggle;        ///< its EQ button (the editor keeps one open at a time)
     void setEqOpen (bool open);
@@ -392,6 +402,9 @@ private:
     bool atlasLayer = false;
     juce::Rectangle<int> badgeArea, textArea, dividerArea;
     juce::String rootText, fileText;
+    struct HeadingDoor;
+    std::unique_ptr<HeadingDoor> headingDoor;   ///< (null on every card that did not ask for one)
+    void placeHeadingDoor();
     bool generated = false;               ///< the layer's sound is made by the instrument itself
     std::uint64_t shownGeneratedRevision = ~0ull;
     struct InfoCard final : juce::Component

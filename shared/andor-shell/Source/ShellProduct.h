@@ -63,6 +63,10 @@ struct ProductInfo
         std::function<std::unique_ptr<osp::plugin::MiniPanel> (osp::plugin::InstrumentHost&)> popover;
     };
     CardControl generatorStartControl;
+    /** A generator's card heading (its name beside M and S) as a door: a click, Return or
+        Space on the name opens this popover below it, and closes it again (null: the name is
+        plain text, as on every ANDOR OSP card). Generator products only. */
+    std::function<std::unique_ptr<osp::plugin::MiniPanel> (osp::plugin::InstrumentHost&)> generatorHeaderPopover;
 };
 
 /** Defined by the product (Product.cpp). */

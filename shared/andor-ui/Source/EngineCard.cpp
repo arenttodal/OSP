@@ -1502,6 +1502,119 @@ void EngineCard::replaceStartKnob (const juce::String& parameterId, const juce::
     resized();
 }
 
+/** The heading's door: transparent over the name's glyphs, so the name at rest is drawn by the
+    card exactly as before. Hover, keyboard focus or its popover open darken the name and
+    underline it, as a knob's door name (REIMAGINED) does. */
+struct EngineCard::HeadingDoor final : juce::Component, juce::SettableTooltipClient
+{
+    std::function<void()> onClick;
+    std::function<void()> onLitChange;
+    bool hover = false, open = false;
+
+    HeadingDoor()
+    {
+        setWantsKeyboardFocus (true);
+        setMouseCursor (juce::MouseCursor::PointingHandCursor);
+        setTitle ("Oscillator settings");
+        setDescription ("Opens the settings of the card's source");
+        setTooltip ("Settings");
+    }
+    bool lit() const { return hover || open || hasKeyboardFocus (false); }
+    void changed()
+    {
+        repaint();
+        if (onLitChange != nullptr)
+            onLitChange();
+    }
+    void mouseEnter (const juce::MouseEvent&) override { hover = true; changed(); }
+    void mouseExit (const juce::MouseEvent&) override { hover = false; changed(); }
+    void mouseUp (const juce::MouseEvent& e) override
+    {
+        if (getLocalBounds().contains (e.getPosition()) && ! e.mouseWasDraggedSinceMouseDown() && onClick != nullptr)
+            onClick();
+    }
+    bool keyPressed (const juce::KeyPress& key) override
+    {
+        if (key == juce::KeyPress::returnKey || key == juce::KeyPress (juce::KeyPress::spaceKey))
+        {
+            if (onClick != nullptr)
+                onClick();
+            return true;
+        }
+        return false;
+    }
+    void focusGained (FocusChangeType) override { changed(); }
+    void focusLost (FocusChangeType) override { changed(); }
+    void paint (juce::Graphics& g) override
+    {
+        if (! lit())
+            return;
+        g.setColour (open ? palette::layer (0) : palette::text.withAlpha (0.5f));
+        g.fillRect (0.0f, static_cast<float> (getHeight()) - 2.2f, static_cast<float> (getWidth()), 1.2f);
+    }
+    std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override
+    {
+        return std::make_unique<juce::AccessibilityHandler> (*this, juce::AccessibilityRole::button,
+                                                             juce::AccessibilityActions().addAction (juce::AccessibilityActionType::press, [this] {
+                                                                 if (onClick != nullptr)
+                                                                     onClick();
+                                                             }));
+    }
+};
+
+void EngineCard::setHeadingDoor (std::function<void()> onHeadingClick)
+{
+    if (onHeadingClick == nullptr)
+    {
+        if (headingDoor != nullptr)
+            removeChildComponent (headingDoor.get());
+        headingDoor.reset();
+        repaint();
+        return;
+    }
+    if (headingDoor == nullptr)
+    {
+        headingDoor = std::make_unique<HeadingDoor>();
+        headingDoor->onLitChange = [this] { repaint (textArea); };
+        addAndMakeVisible (*headingDoor);
+    }
+    headingDoor->onClick = std::move (onHeadingClick);
+    placeHeadingDoor();
+}
+
+bool EngineCard::isHeading (const juce::Component* c) const noexcept
+{
+    return c != nullptr && headingDoor != nullptr && c == headingDoor.get();
+}
+
+juce::Rectangle<int> EngineCard::headingBounds() const
+{
+    return headingDoor != nullptr && headingDoor->isVisible() ? headingDoor->getBounds() : juce::Rectangle<int>();
+}
+
+void EngineCard::setHeadingOpen (bool open)
+{
+    if (headingDoor != nullptr && headingDoor->open != open)
+    {
+        headingDoor->open = open;
+        headingDoor->changed();
+    }
+}
+
+void EngineCard::placeHeadingDoor()
+{
+    if (headingDoor == nullptr)
+        return;
+    // The name's own glyphs (clamped to the text area, never over the EQ / mode / menu).
+    const auto font = type::sourceFilename();
+    const float textWidth = juce::GlyphArrangement::getStringWidth (font, fileText);
+    const auto row = textArea.toFloat();
+    const float width = std::min (textWidth + 2.0f, row.getWidth());
+    const float height = font.getHeight() + 8.0f;
+    headingDoor->setBounds (juce::Rectangle<float> (row.getX() - 2.0f, row.getCentreY() - 0.5f * height, width + 4.0f, height).getSmallestIntegerContainer());
+    headingDoor->setVisible (fileText.isNotEmpty() && width > 0.0f);
+}
+
 juce::Rectangle<int> EngineCard::startLabelBounds() const
 {
     const auto& k = *knobs[0];
@@ -1833,6 +1946,7 @@ void EngineCard::refresh()
             fileText = source.name;
             rootText.clear();
             sourceDisplay.setGeneratedCycle (std::move (source.cycle));
+            placeHeadingDoor();
             repaint();
         }
         if (const bool heard = processor.isLayerHeard (layerIndex); heard != shownHeard)
@@ -1994,8 +2108,8 @@ void EngineCard::paint (juce::Graphics& g)
         g.drawText (rootText, row.removeFromLeft (w + 2.0f), juce::Justification::centredLeft, false);
         row.removeFromLeft (17.0f);
     }
-    // Metadata: quieter than the root and the controls.
-    g.setColour (colour::textSecondary);
+    // Metadata: quieter than the root and the controls (a heading door, lit, darkens it).
+    g.setColour (headingDoor != nullptr && headingDoor->lit() ? juce::Colours::black : colour::textSecondary);
     g.setFont (type::sourceFilename());
     g.drawText (fileText, row, juce::Justification::centredLeft, true);
 
@@ -2051,6 +2165,7 @@ void EngineCard::resized()
         notesButton.setBounds (at ({ static_cast<float> (eqButton.getX()) - 6.0f - notesWidth, 16.0f, notesWidth, 33.0f }));
         textArea.setRight (notesButton.getX() - 8);
     }
+    placeHeadingDoor();
 
     const float wellHeight = h - (triple ? 267.0f : 206.0f);
     sourceDisplay.setBounds (at ({ 16.0f, 63.0f, w - 32.0f, wellHeight }));

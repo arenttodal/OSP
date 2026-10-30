@@ -48,12 +48,15 @@ public:
     /** The popovers: a macro's (0..5, when the product has one), Advanced, a layer's
         REIMAGINED (7 + layer, when the engine reads it), a modulation source's routes or
         larger curve (source 0 LFO 1 .. 3 ENV 2). */
-    static constexpr int advancedPopup = 6, reimaginedPopup = 7, routesPopup = 11, curvePopup = 12, startControlPopup = 13;
+    static constexpr int advancedPopup = 6, reimaginedPopup = 7, routesPopup = 11, curvePopup = 12, startControlPopup = 13, generatorHeaderPopup = 14;
     void openPopup (int which, int source = 0);
     void closePopup();
     static constexpr bool isReimaginedPopup (int which) noexcept { return which >= reimaginedPopup && which < reimaginedPopup + osp::plugin::InstrumentHost::numLayers; }
     int openPopupIndex() const noexcept { return popupIndex; }
     osp::plugin::MiniPanel* openPopupPanel() noexcept { return popup.get(); }
+    /** For tests: a mouse press on `clicked` as the instrument's outside-click watch sees it
+        (a press outside the open popover closes it; on its own door it marks the toggle). */
+    void pressAnywhere (juce::Component* clicked) { mouseDownAnywhere (clicked); }
     /** For tests: the controls shown disabled because the engine does not read their parameters. */
     int disabledControlCount() const noexcept { return disabledControls; }
 
