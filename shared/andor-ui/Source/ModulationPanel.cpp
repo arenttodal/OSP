@@ -93,6 +93,9 @@ namespace
                 for (const char* name : { "amount", "frequency", "cutoff" })
                     list.add (InstrumentHost::dampenParameterId (l, name));
             }
+            // A product's own controls (mod::setProductDestinations; ANDOR OSP has none).
+            for (int k = 0; k < mod::productDestCount(); ++k)
+                list.add (mod::destInfo (mod::productDest (k)).id);
             return list;
         }();
         return ids;
@@ -296,6 +299,9 @@ namespace modui
             if (id == InstrumentHost::dampenParameterId (l, "frequency")) return offsetDest (Dest::dampenShelfA, l);
             if (id == InstrumentHost::dampenParameterId (l, "cutoff")) return offsetDest (Dest::dampenCutoffA, l);
         }
+        for (int k = 0; k < mod::productDestCount(); ++k)
+            if (id == mod::destInfo (mod::productDest (k)).id)
+                return mod::productDest (k);
         return Dest::none;
     }
 
@@ -2000,6 +2006,9 @@ float ModulationOverlay::positionOf (const Target& t, double offset, mod::Dest d
         return 0.0f;
     if (dest == mod::Dest::arpRate)
         return arpRatePosition (static_cast<double> (mod::destInfo (dest).span) * offset);
+    // A product's own control: its knob's whole travel (the engine moves it the same way).
+    if (mod::isProductDest (dest))
+        return std::clamp (param->getValue() + static_cast<float> (mod::destInfo (dest).span * offset), 0.0f, 1.0f);
     const auto& range = param->getNormalisableRange();
     const double base = param->convertFrom0to1 (param->getValue());
     const double x = mod::destInfo (dest).span * offset;

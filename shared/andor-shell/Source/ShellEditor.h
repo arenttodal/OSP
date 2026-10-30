@@ -10,6 +10,8 @@
 
 #include <juce_audio_utils/juce_audio_utils.h>
 
+#include <array>
+
 namespace andor::shell
 {
 
@@ -46,7 +48,7 @@ public:
     /** The popovers: a macro's (0..5, when the product has one), Advanced, a layer's
         REIMAGINED (7 + layer, when the engine reads it), a modulation source's routes or
         larger curve (source 0 LFO 1 .. 3 ENV 2). */
-    static constexpr int advancedPopup = 6, reimaginedPopup = 7, routesPopup = 11, curvePopup = 12;
+    static constexpr int advancedPopup = 6, reimaginedPopup = 7, routesPopup = 11, curvePopup = 12, startControlPopup = 13;
     void openPopup (int which, int source = 0);
     void closePopup();
     static constexpr bool isReimaginedPopup (int which) noexcept { return which >= reimaginedPopup && which < reimaginedPopup + osp::plugin::InstrumentHost::numLayers; }
@@ -107,6 +109,7 @@ private:
     osp::plugin::ModulationPanel modPanel { shell };
     osp::plugin::Wheel pitchWheel, modWheel;
     float shownWheelPosition = -1.0f;
+    std::array<float, 4> shownEnvelope {};   ///< the AMP envelope's values as last drawn
     osp::plugin::OspKeyboard keyboard;
     juce::Label statusLabel;
     osp::plugin::AdvancedCardButton advancedButton { "Advanced" };

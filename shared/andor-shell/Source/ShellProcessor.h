@@ -4,6 +4,7 @@
 #include "InstrumentLoader.h"
 #include "ShellProduct.h"
 
+#include "engine/Arpeggiator.h"
 #include "model/ModelExchange.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -88,7 +89,7 @@ public:
     // InstrumentHost: modulation (the routes themselves are InstrumentHost's)
     osp::mod::Curve modulationCurve (int index) const override;
     void setModulationCurve (int index, const osp::mod::Curve& curve, bool undoable = true) override;
-    osp::InstrumentEngine::ModView modulationView() const noexcept override { return {}; }
+    osp::InstrumentEngine::ModView modulationView() const noexcept override { return engine->modulationView(); }
     int modControllerNumber (int slot) const noexcept override;
     void setModControllerNumber (int slot, int controller) noexcept override;
     void learnModController (int slot) noexcept override { ccLearn.store (slot, std::memory_order_release); }
@@ -102,7 +103,7 @@ public:
     int recentVelocityAt (int index) const noexcept override;
     int playedVelocityCount() const noexcept override { return velocityCount.load (std::memory_order_acquire); }
     int lastPlayedNoteNumber() const noexcept override { return lastNote.load (std::memory_order_relaxed); }
-    ArpView arpView() const noexcept override { return {}; }
+    ArpView arpView() const noexcept override;
 
     // InstrumentHost: the macro popovers
     int editLayer() const noexcept override { return editLayerIndex.load(); }
@@ -120,6 +121,9 @@ public:
     const Engine::Description& engineDescription() const noexcept { return description; }
     /** The parameter IDs and patterns the product's engine reads (Engine::boundParameters). */
     const juce::StringArray& boundParameters() const noexcept { return bound; }
+    /** The engine binds the arpeggiator's parameters (arp.*): the shell then plays ANDOR OSP's
+        arpeggiator in front of it, and the engine is given the notes it generates. */
+    bool runsArpeggiator() const noexcept { return arpBound; }
     /** The engine makes its own sound (Engine::Description::generator): layer A is its card,
         and nothing is ever loaded. */
     bool isGenerator() const noexcept { return generatorName.isNotEmpty(); }
@@ -233,6 +237,44 @@ private:
     std::array<std::atomic<int>, osp::mod::ccSlots> ccNumbers {};
     std::atomic<int> ccLearn { -1 };
     std::atomic<bool> velToAmp { true }, arpStepped { false };
+
+    // Modulation, when the engine binds the routes (mod.*): the settings gathered from the
+    // parameters, the curves and the controllers (audio thread), handed to the engine when
+    // any of it changes. A depth route's target is resolved on the message thread.
+    void applyModulation() noexcept;
+    void refreshModTargets();
+    bool modBound = false, modDirty = true;
+    std::array<std::atomic<float>*, 2 * 8> modLfoParams {};
+    std::array<std::atomic<float>*, 2 * 7> modEnvParams {};
+    std::array<std::atomic<float>*, 4 * osp::mod::maxRoutes> modRouteParams {};
+    std::array<std::atomic<int>, osp::mod::maxRoutes> modRouteTargets {};
+    static constexpr int modValueCount = 2 * 8 + 2 * 7 + 5 * osp::mod::maxRoutes + osp::mod::ccSlots + 2;
+    std::array<float, modValueCount> lastModValues {};
+    osp::mod::Settings modSettings;
+    std::array<int, osp::mod::ccSlots> modControllers {};
+
+    // The arpeggiator (audio thread), when the engine binds arp.*: ANDOR OSP's, run as its
+    // processor runs it. Its display is published lock-free for the ARP section.
+    const juce::MidiBuffer& runArpeggiator (const juce::MidiBuffer& midi, int numSamples, const osp::HostTiming& timing) noexcept;
+    void publishArpDisplay() noexcept;
+    /** ARP RATE's Stepped mode: the musical ratio nearest a speed (as ANDOR OSP's). */
+    static double steppedArpRatio (double multiplier) noexcept;
+    bool arpBound = false;
+    int arpModOctaves = 0;
+    osp::Arpeggiator arpeggiator;
+    juce::MidiBuffer arpMidi;
+    bool hostWasPlaying = false;
+    std::atomic<float>* arpEnabledParam = nullptr;
+    std::atomic<float>* arpPatternParam = nullptr;
+    std::atomic<float>* arpRateParam = nullptr;
+    std::atomic<float>* arpGateParam = nullptr;
+    std::atomic<float>* arpOctavesParam = nullptr;
+    std::atomic<float>* arpSwingParam = nullptr;
+    std::atomic<float>* arpVelocityParam = nullptr;
+    std::atomic<float>* seedParam = nullptr;
+    std::array<std::atomic<int>, osp::Arpeggiator::displaySteps> arpDisplayLow {}, arpDisplayHigh {};
+    std::atomic<int> arpDisplayCurrent { -1 };
+    std::atomic<bool> arpDisplayActive { false };
 
     // SHAPER CUSTOM: the pattern (message thread, under its lock) and its steps as the audio
     // thread reads them (start, end, shape per step; a new generation means "changed").

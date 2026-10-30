@@ -573,6 +573,15 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       an older state (`ProductInfo::stateVersion`, `migrateState`). OSP: design capture
       byte-identical before/after except the moving MOVEMENT strip (differs run to run on the
       same build); ctest 9/9 green.
+- [x] The shell plays modulation, the arpeggiator and a generator's grains for a product that
+      binds them (ANDOR ANALOG): `Engine::setModulation` (ANDOR OSP's mod::Settings and the CC
+      controllers, on change), `arpModulation`, `setPlayedKeys`, `modulationView`,
+      `grainSnapshot`; ANDOR OSP's arpeggiator in front of an engine binding `arp.*`; CC Learn.
+      A product's own modulation destinations (`ProductInfo::modulationDestinations`,
+      `mod::ProductDest`) follow ANDOR OSP's in the routes' choices (`mod::destFromChoice` /
+      `choiceOf`) and in the drag-to-assign mapping; ANDOR OSP registers none, so its route
+      choices, schema golden and sessions are unchanged. A generator's card draws POS, SPREAD
+      and its grains. Proof: see the PR (design capture before/after, OSP suites).
 
 ## DONE
 

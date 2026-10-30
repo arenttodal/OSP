@@ -2,11 +2,13 @@
 
 #include "LoadedInstrument.h"
 
+#include "engine/InstrumentEngine.h"
 #include "engine/Modulation.h"
 #include "engine/RhythmicShaper.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
+#include <array>
 #include <vector>
 
 namespace andor::shell
@@ -98,6 +100,34 @@ public:
         (InstrumentHost::ModCurves' index: 0, 1 LFO 1/2 CUSTOM, ...; given once after
         prepare() and on every change). */
     virtual void setModulationCurve (int index, const osp::mod::Curve& curve) noexcept { juce::ignoreUnused (index, curve); }
+    /** Audio thread, before process(): the instrument's modulation as the musician set it
+        (ANDOR OSP's mod::Settings: LFO 1 and 2, ENV 1 and 2, the 16 routes with their depth
+        links, the curves compiled, APPLY TO AMP, the seed) and the MIDI controllers CC 1-4
+        follow. Given after prepare() and whenever any of it changes, to an engine that binds
+        the routes ("mod.*"). A route may name ANDOR OSP's destinations or the product's own
+        (ProductInfo::modulationDestinations: mod::productDest (k) is the k-th). */
+    virtual void setModulation (const osp::mod::Settings& settings, const std::array<int, osp::mod::ccSlots>& controllers) noexcept
+    {
+        juce::ignoreUnused (settings, controllers);
+    }
+    /** The arpeggiator's destinations now (ARP RATE in octaves of speed, OCTAVES in octaves,
+        GATE, SWING and VELOCITY in their own fractions), read by the shell before it runs the
+        arpeggiator. False: no route reaches it. Audio thread. */
+    virtual bool arpModulation (osp::mod::Dest dest, double& offset) const noexcept
+    {
+        juce::ignoreUnused (dest, offset);
+        return false;
+    }
+    /** Audio thread: while the arpeggiator plays, the keys the musician pressed (VEL and NOTE
+        on shared stages follow them, not the generated notes); `arpeggiating` false: the
+        notes the engine is given are the musician's. Called before process(). */
+    virtual void setPlayedKeys (bool arpeggiating, const juce::MidiBuffer& played) noexcept
+    {
+        juce::ignoreUnused (arpeggiating, played);
+    }
+    /** The modulation sources' live values (the panel's meters and moving dots). Any thread. */
+    virtual osp::InstrumentEngine::ModView modulationView() const noexcept { return {}; }
+
     /** MOVEMENT SHAPER's playhead, 0..1 of its bar, for its picture (0: none). Any thread. */
     virtual float shaperPhase() const noexcept { return 0.0f; }
 
@@ -108,6 +138,17 @@ public:
     {
         juce::ignoreUnused (layer, mode);
         return {};
+    }
+
+    /** The grains a generator layer plays now, for its card (the POS line, the SPREAD pane
+        and a mote per grain, as over a recording): the engine fills it on the audio thread
+        (positions 0..1 on the POS scale, levels 0..1, lanes 0..1), the card reads it on the
+        message thread. Null (the default): no grains shown. Any thread; the object lives
+        as long as the engine. */
+    virtual const osp::InstrumentEngine::GrainSnapshot* grainSnapshot (int layer) const noexcept
+    {
+        juce::ignoreUnused (layer);
+        return nullptr;
     }
 
     /** Sounding notes (the status line). Any thread. */

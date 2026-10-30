@@ -15,8 +15,8 @@ const juce::StringArray& InstrumentHost::modDestinationNames()
     static const juce::StringArray names = [] {
         juce::StringArray n;
         n.add ("None");
-        for (int d = 1; d < mod::hostDestCount; ++d)
-            n.add (mod::destInfo (static_cast<mod::Dest> (d)).name);
+        for (int d = 1; d < mod::hostChoiceCount(); ++d)   // (a product's own after ANDOR OSP's)
+            n.add (mod::destInfo (mod::destFromChoice (d)).name);
         return n;
     }();
     return names;

@@ -130,12 +130,19 @@ class LayerKnob final : public juce::Component
 {
 public:
     LayerKnob (InstrumentHost&, int layer, const juce::String& control, const juce::String& caption);
+    /** A product's own control in a layer knob's place (a generator's card): `parameterId` is
+        any parameter; it never moves with LINK. */
+    LayerKnob (InstrumentHost&, int layer, const juce::String& caption, const juce::String& parameterId, bool productControl);
     void setCompact (bool compact);
+    bool isCompact() const noexcept { return compact; }
     void paint (juce::Graphics&) override;
     void resized() override;
 
-    /** REIMAGINED: its name is the door to the mode popover (hover darkens and underlines it). */
+    /** REIMAGINED (and a product's control given a door): its name opens a popover (hover
+        darkens and underlines it). */
     std::function<void()> onLabelClick;
+    /** The name is a door (REIMAGINED's always is). */
+    void setLabelDoor (bool door) { labelDoor = door; }
     void setLabelOpen (bool open);
     /** Where the name is drawn (this component's coordinates). */
     juce::Rectangle<float> labelBounds() const;
@@ -160,6 +167,7 @@ private:
     bool compact = false;
     bool creative = false;   ///< REIMAGINED: the same knob, a coral arc and a small coral light by its name
     bool labelHover = false, labelOpen = false;
+    bool labelDoor = false;   ///< the name opens something (REIMAGINED; a product's door)
     juce::Font labelFont() const;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
 };
@@ -294,6 +302,9 @@ public:
 
     /** Pulls the layer's state (instrument, loading, mode, grains) from the processor (UI timer). */
     void refresh();
+    /** The granular view (POS, SPREAD) and the playing grains; START in percent (0 for a
+        generator, whose grains have no start). */
+    void refreshGrains (float startPercent);
     SourceDisplay& display() noexcept { return sourceDisplay; }
 
     std::function<void (int)> onFocus;                 ///< the card was clicked
@@ -306,6 +317,14 @@ public:
     /** Whether the REIMAGINED name is the door of a component (a click on it toggles the popover). */
     bool isReimaginedLabel (const juce::Component* c) const noexcept { return c != nullptr && c == knobs[4].get(); }
     void setReimaginedOpen (bool open);
+
+    /** A generator's card: START's knob becomes one of the product's own controls (its
+        parameter and name); a click on the name calls `onCaptionClick` (null: none). The card
+        lays it out exactly where START was. */
+    void replaceStartKnob (const juce::String& parameterId, const juce::String& caption, std::function<void()> onCaptionClick);
+    juce::Rectangle<int> startLabelBounds() const;
+    bool isStartLabel (const juce::Component* c) const noexcept { return c != nullptr && c == knobs[0].get(); }
+    void setStartOpen (bool open) { knobs[0]->setLabelOpen (open); }
 
     /** The layer's EQ over its waveform (a view setting: the EQ keeps playing either way). */
     std::function<void (int, bool)> onEqToggle;        ///< its EQ button (the editor keeps one open at a time)

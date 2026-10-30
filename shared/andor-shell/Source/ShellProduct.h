@@ -6,6 +6,7 @@
 #include <array>
 #include <functional>
 #include <memory>
+#include <vector>
 
 namespace andor::shell
 {
@@ -49,6 +50,19 @@ struct ProductInfo
         moves its settings to where this version reads them, so it sounds as it did. Message
         thread. Null: nothing to migrate. */
     std::function<void (osp::plugin::InstrumentHost&, int fromVersion)> migrateState;
+    /** The product's own controls a modulation route can reach, in order (they follow ANDOR
+        OSP's destinations in the routes' destination list, so their order is part of the
+        saved state: append only). Each names its parameter ID; a source dragged onto that
+        control assigns it. Empty: ANDOR OSP's destinations only. */
+    std::vector<osp::mod::ProductDest> modulationDestinations;
+    /** A generator's card: the knob in START's place as one of the product's controls (its
+        parameter ID and name), whose name opens `popover` (null: none). Empty ID: START. */
+    struct CardControl
+    {
+        juce::String parameterId, caption;
+        std::function<std::unique_ptr<osp::plugin::MiniPanel> (osp::plugin::InstrumentHost&)> popover;
+    };
+    CardControl generatorStartControl;
 };
 
 /** Defined by the product (Product.cpp). */
