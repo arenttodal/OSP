@@ -96,6 +96,28 @@ TEST_CASE ("plugin: UI refinement screenshots (OSP_REFINE_DIR)", "[.][refine-sho
 
     // 03 Preset bar, volume, menu: the plain instrument and a favourite preset.
     shoot ({ pad }, [] (OspAudioProcessor&, Editor&) {}, "03-topbar-1L");
+    {
+        // The header's icon family at its displayed size, 1x and 2x: heart, filled heart,
+        // cassette, chevrons, on the card colour.
+        for (const float scale : { 1.0f, 2.0f })
+        {
+            juce::Image sheet (juce::Image::RGB, juce::roundToInt (260.0f * scale), juce::roundToInt (40.0f * scale), true, juce::SoftwareImageType());
+            juce::Graphics g (sheet);
+            g.addTransform (juce::AffineTransform::scale (scale));
+            g.fillAll (osp::plugin::design::colour::cardTop);
+            using osp::plugin::icons::Kind;
+            const auto ink = osp::plugin::design::colour::text.withAlpha (0.6f);
+            osp::plugin::icons::draw (g, Kind::chevronLeft, { 8.0f, 8.0f, 24.0f, 24.0f }, ink, 1.5f);
+            osp::plugin::icons::draw (g, Kind::heart, { 48.0f, 8.0f, 24.0f, 24.0f }, ink, 1.5f);
+            osp::plugin::icons::draw (g, Kind::heartFilled, { 88.0f, 8.0f, 24.0f, 24.0f }, osp::plugin::design::colour::accent, 1.5f);
+            osp::plugin::icons::draw (g, Kind::chevronRight, { 128.0f, 8.0f, 24.0f, 24.0f }, ink, 1.5f);
+            osp::plugin::icons::draw (g, Kind::cassette, { 166.0f, 6.5f, 27.0f, 27.0f }, ink, 1.5f);
+            g.setColour (osp::plugin::design::colour::text.withAlpha (0.72f));
+            for (int i = -1; i <= 1; ++i)
+                g.fillEllipse (juce::Rectangle<float> (4.6f, 4.6f).withCentre ({ 230.0f, 20.0f + 9.5f * static_cast<float> (i) }));
+            save (sheet, juce::String ("03-icons") + (scale > 1.5f ? "@2x.png" : "@1x.png"));
+        }
+    }
 
     // 04 EQ (bands in use) and DAMPEN (on, a shelf).
     auto eqBands = [] (OspAudioProcessor& p) {

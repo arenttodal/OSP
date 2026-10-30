@@ -110,10 +110,14 @@ namespace icons
             case Kind::heart:
             case Kind::heartFilled:
             {
-                const float w = s * 0.36f;
-                p.startNewSubPath (c.x, c.y + 0.3f * s);
-                p.cubicTo (c.x - 1.4f * w, c.y - 0.05f * s, c.x - 0.6f * w, c.y - 0.45f * s, c.x, c.y - 0.12f * s);
-                p.cubicTo (c.x + 0.6f * w, c.y - 0.45f * s, c.x + 1.4f * w, c.y - 0.05f * s, c.x, c.y + 0.3f * s);
+                // Two round lobes meeting in a soft notch, a clean point: symmetric about the
+                // centre line, optically centred (its mass sits a little high).
+                auto at = [c, s] (float x, float y) { return juce::Point<float> (c.x + x * s, c.y + y * s); };
+                p.startNewSubPath (at (0.0f, 0.29f));
+                p.cubicTo (at (-0.13f, 0.19f), at (-0.36f, 0.04f), at (-0.33f, -0.13f));
+                p.cubicTo (at (-0.31f, -0.27f), at (-0.13f, -0.33f), at (0.0f, -0.17f));
+                p.cubicTo (at (0.13f, -0.33f), at (0.31f, -0.27f), at (0.33f, -0.13f));
+                p.cubicTo (at (0.36f, 0.04f), at (0.13f, 0.19f), at (0.0f, 0.29f));
                 p.closeSubPath();
                 if (kind == Kind::heartFilled)
                     g.fillPath (p);

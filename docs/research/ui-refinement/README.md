@@ -117,3 +117,32 @@ Changes:
   It is never a word cut in two ("6 n…").
 
 Unchanged: the card layout, every bound, the keys' materials and states, the root and badge.
+
+## Pass 3 — Preset navigation
+
+| State | Comparison |
+|---|---|
+| Preset bar, SAVE, volume and menu at 2× | `pass3-presetbar@2x.jpg` |
+| The whole top row at 1× | `pass3-topbar-1x.jpg` |
+| The icon family at its displayed size, magnified 4× | `pass3-icons@4x.jpg` |
+
+Changes:
+- **One icon family.**
+  - Chevrons, heart, cassette and menu share a 1.5 px stroke with round caps and joins. They
+    used to be drawn at 1.3–1.8 px.
+  - The heart is redrawn with one symmetric path: a narrower cleft and a softer point. The
+    filled heart is the same path, filled.
+- **States.**
+  - The chevrons rest at 60 % ink and rise to 85 % under the pointer.
+  - The heart takes the accent colour when the preset is a favourite or the heart is hovered.
+- **Dividers.** The two dividers in the preset bar sit on a whole pixel and keep the same
+  inset from top and bottom (9 px at 1×), so they read as one sharp hairline.
+- **Main menu.** The dots are 4.6 px and 9.5 px apart (were 5 and 10), at 72 % ink (90 % on
+  hover): quieter than the controls beside them, matching the source header's menu.
+
+Unchanged:
+- the preset bar's size, its keys and its hit areas;
+- the volume slider, its value and its gain law;
+- every menu entry.
+
+The GUI tests (128 assertions) pass, and the OSP–shell visual regression stays at 0 px.

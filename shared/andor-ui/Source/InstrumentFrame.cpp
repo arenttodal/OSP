@@ -232,10 +232,11 @@ void HeaderMenuButton::paintButton (juce::Graphics& g, bool highlighted, bool)
         g.setColour (design::colour::text.withAlpha (0.06f));
         g.fillRoundedRectangle (r, 6.0f);
     }
-    // Three round dots, 11 px apart (reference).
-    g.setColour (design::colour::text);
+    // Three round dots, 9.5 px apart (reference): the source menus' grammar, a little larger
+    // for the instrument's menu; quiet at rest.
+    g.setColour (design::colour::text.withAlpha (highlighted ? 0.9f : 0.72f));
     for (int i = -1; i <= 1; ++i)
-        g.fillEllipse (juce::Rectangle<float> (6.0f, 6.0f).withCentre (r.getCentre().translated (0.0f, 11.0f * static_cast<float> (i))));
+        g.fillEllipse (juce::Rectangle<float> (4.6f, 4.6f).withCentre (r.getCentre().translated (0.0f, 9.5f * static_cast<float> (i))));
 }
 
 //==============================================================================

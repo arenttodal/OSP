@@ -760,8 +760,9 @@ void SavePresetButton::paintButton (juce::Graphics& g, bool highlighted, bool do
     const float k = r.getHeight() / 48.0f;
     if (! skin::drawnBySurface())   // ceramic: the housing draws the key
         draw::raised (g, r.reduced (0.5f), 9.0f * k, colour::cardTop, colour::cardBottom, 0.9f);
+    // The header's icons share one stroke (1.5 px at the reference size) and one ink.
     icons::draw (g, icons::Kind::cassette, r.withSizeKeepingCentre (27.0f * k, 27.0f * k).translated (0.0f, down ? 0.5f : 0.0f),
-                 colour::text.withAlpha (highlighted || down ? 0.85f : 0.6f), 1.6f * k);
+                 colour::text.withAlpha (highlighted || down ? 0.85f : 0.6f), 1.5f * k);
 }
 
 void PresetBar::paint (juce::Graphics& g)
@@ -781,13 +782,15 @@ void PresetBar::paint (juce::Graphics& g)
             g.fillRoundedRectangle (b.reduced (3.0f * k), 6.0f * k);
         }
         icons::draw (g, part == Part::previous ? icons::Kind::chevronLeft : icons::Kind::chevronRight,
-                     b.withSizeKeepingCentre (24.0f * k, 24.0f * k), colour::text.withAlpha (0.6f), 1.8f * k);
+                     b.withSizeKeepingCentre (24.0f * k, 24.0f * k), colour::text.withAlpha (hover == part ? 0.85f : 0.6f), 1.5f * k);
+        // A hairline on the pixel grid between the arrow and the name.
         g.setColour (colour::divider);
-        g.fillRect (juce::Rectangle<float> (part == Part::previous ? b.getRight() : b.getX(), r.getY() + 8.0f * k, 1.0f, r.getHeight() - 16.0f * k));
+        g.fillRect (juce::Rectangle<float> (std::round (part == Part::previous ? b.getRight() : b.getX()), r.getY() + 9.0f * k, 1.0f, r.getHeight() - 18.0f * k));
     }
     const auto heart = partBounds (Part::favourite);
-    icons::draw (g, favourite ? icons::Kind::heartFilled : icons::Kind::heart, heart.withSizeKeepingCentre (26.0f * k, 26.0f * k),
-                 favourite || hover == Part::favourite ? colour::accent : colour::text.withAlpha (0.6f), 1.7f * k);
+    // A favourite: filled in the accent; at rest the quiet outline, the accent outline on hover.
+    icons::draw (g, favourite ? icons::Kind::heartFilled : icons::Kind::heart, heart.withSizeKeepingCentre (24.0f * k, 24.0f * k),
+                 favourite || hover == Part::favourite ? colour::accent : colour::text.withAlpha (0.6f), 1.5f * k);
     g.setColour (hover == Part::name ? juce::Colours::black : colour::text);
     g.setFont (type::preset (k));
     g.drawText (name, r.withTrimmedLeft (60.0f * k + 46.0f * k).withTrimmedRight (56.0f * k + 46.0f * k), juce::Justification::centred, true);
