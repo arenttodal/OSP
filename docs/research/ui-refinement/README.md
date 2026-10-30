@@ -86,3 +86,34 @@ Unchanged:
 
 The NOTE MAP and phase-5 tests pass (336 / 355 assertions), and the OSP–shell visual
 regression stays at 0 px.
+
+## Pass 2 — Source header
+
+| State | Comparison |
+|---|---|
+| A mapped layer (NOTES, EQ, mode, menu) | `pass2-header-1L-mapped.jpg` |
+| Two layers (B's EQ open) | `pass2-header-2L.jpg` |
+| Three layers | `pass2-header-3L.jpg` |
+| All three at 2× | `pass2-header-1-2-3-layers@2x.jpg` |
+
+Changes:
+- **Mode key.** Its drawn body is now as tall as NOTES and EQ (33 px, on their shared centre
+  line), where it used to be 41 px.
+  - The whole 41 px stays the hit area: `skin::KeyFace::keyArea`, a shared primitive that lets
+    a key show a smaller body than its hit area.
+  - The name drops to ~14.5 px at 88 % ink, the same weight as NOTES and EQ.
+  - The chevron is smaller and finer (12 px, 1.25 px stroke).
+- **Telltales.**
+  - NOTES's "to review" is a 4.5 px flat amber dot.
+  - EQ's "heard" is the same dot in the layer colour.
+  - Both used to be glowing lens lamps.
+  - An open editor is shown by the pressed key alone, never lit.
+- **Menu.** The three dots are 4.2 px, 8.5 px apart (were 5 and 10), at 72 % ink (90 % on
+  hover). It is the quietest control in the header; the 30 × 36 px hit area is unchanged.
+- **Metadata truncation.** The line now degrades predictably:
+  1. the whole line ("6 notes · Needs review");
+  2. else its first part ("6 notes");
+  3. else nothing (on a mapped layer, whose NOTES key already says it).
+  It is never a word cut in two ("6 n…").
+
+Unchanged: the card layout, every bound, the keys' materials and states, the root and badge.

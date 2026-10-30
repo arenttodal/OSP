@@ -1392,16 +1392,17 @@ void ModeSelector::mouseUp (const juce::MouseEvent& e)
 
 void ModeSelector::paint (juce::Graphics& g)
 {
-    // A compact source property (157 x 41 in the reference): raised face, name, chevron.
-    const auto r = getLocalBounds().toFloat().reduced (1.0f);
-    const float k = r.getHeight() / 39.0f;
+    // A compact source property (157 x 41 in the reference): the key's body as tall as NOTES
+    // and EQ (keyArea), its name and a quiet chevron.
+    const auto r = keyArea (getLocalBounds().toFloat()).reduced (1.0f);
+    const float k = getHeight() / 41.0f;
     if (! skin::drawnBySurface())   // ceramic: the card draws the key
         design::draw::button (g, r, 7.0f * k, false, isMouseOver(), design::colour::accent);
     // Quiet: the waveform is the hero, the mode only a property of it.
-    g.setColour (design::colour::text.withAlpha (0.95f));
-    g.setFont (type::sourceMode (k));
-    auto text = r.withTrimmedLeft (17.0f * k).withTrimmedRight (14.0f * k);
-    icons::draw (g, icons::Kind::chevronDown, text.removeFromRight (16.0f * k).withSizeKeepingCentre (16.0f * k, 16.0f * k), design::colour::text.withAlpha (0.55f), 1.5f * k);
+    g.setColour (design::colour::text.withAlpha (0.88f));
+    g.setFont (type::sourceMode (0.88f * k));
+    auto text = r.withTrimmedLeft (15.0f * k).withTrimmedRight (12.0f * k);
+    icons::draw (g, icons::Kind::chevronDown, text.removeFromRight (14.0f * k).withSizeKeepingCentre (12.0f * k, 12.0f * k), design::colour::text.withAlpha (0.5f), 1.25f * k);
     g.drawText (current == 1 ? "Granular" : "One Shot", text, juce::Justification::centredLeft, false);
 }
 
@@ -1414,9 +1415,9 @@ void EngineCard::MenuDots::paintButton (juce::Graphics& g, bool highlighted, boo
         g.setColour (design::colour::text.withAlpha (0.06f));
         g.fillRoundedRectangle (r, 6.0f);
     }
-    // Three round dots, 10 px apart (reference).
-    const float d = 5.0f * r.getHeight() / 36.0f, gap = 10.0f * r.getHeight() / 36.0f;
-    g.setColour (design::colour::text);
+    // Three round dots, 8.5 px apart (reference): the quietest control in the header.
+    const float d = 4.2f * r.getHeight() / 36.0f, gap = 8.5f * r.getHeight() / 36.0f;
+    g.setColour (design::colour::text.withAlpha (highlighted ? 0.9f : 0.72f));
     for (int i = -1; i <= 1; ++i)
         g.fillEllipse (juce::Rectangle<float> (d, d).withCentre (r.getCentre().translated (0.0f, static_cast<float> (i) * gap)));
 }
@@ -1535,9 +1536,12 @@ void NotesButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
     else
         draw::button (g, r, 7.0f, false, highlighted, colour::accent);
     const bool narrow = r.getWidth() < 60.0f;
-    // A note to look at: a small amber light, as EQ's light says it is heard.
+    // A note to look at: a small flat amber telltale (as EQ's says it is heard), not a lamp.
     if (review)
-        draw::led (g, { r.getX() + (narrow ? 7.0f : 9.0f), r.getCentreY() }, narrow ? 5.0f : 6.0f, juce::Colour (0xffe0b45c), 0.6f);
+    {
+        g.setColour (juce::Colour (0xffd79a43));
+        g.fillEllipse (juce::Rectangle<float> (4.5f, 4.5f).withCentre ({ r.getX() + (narrow ? 7.0f : 9.5f), r.getCentreY() }));
+    }
     g.setFont (type::button (narrow ? 12.5f : 13.5f));
     g.setColour (colour::text.withAlpha (open || review ? 0.92f : 0.62f));
     g.drawText ("NOTES", r.withTrimmedLeft (review ? (narrow ? 9.0f : 12.0f) : 0.0f), juce::Justification::centred, false);
@@ -2303,7 +2307,18 @@ void EngineCard::paint (juce::Graphics& g)
     // Metadata: quieter than the root and the controls (a heading door, lit, darkens it).
     g.setColour (headingDoor != nullptr && headingDoor->lit() ? juce::Colours::black : colour::textSecondary);
     g.setFont (type::sourceFilename());
-    g.drawText (fileText, row, juce::Justification::centredLeft, true);
+    {
+        // Predictable truncation: the whole line, else its first part ("6 notes"), else
+        // nothing, never a word cut in two ("6 n...").
+        const auto font = type::sourceFilename();
+        juce::String shown = fileText;
+        const auto dot = juce::String::fromUTF8 (" \xc2\xb7 ");
+        if (juce::GlyphArrangement::getStringWidth (font, shown) > row.getWidth() && shown.contains (dot))
+            shown = shown.upToFirstOccurrenceOf (dot, false, false);
+        if (juce::GlyphArrangement::getStringWidth (font, shown) > row.getWidth() && atlasLayer)
+            shown.clear();
+        g.drawText (shown, row, juce::Justification::centredLeft, true);
+    }
 
     // Hairline between the knobs and the modifiers.
     if (! dividerArea.isEmpty())

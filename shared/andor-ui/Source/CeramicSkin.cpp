@@ -456,7 +456,7 @@ void drawKeys (juce::Graphics& g, juce::Component& surface)
         return;
     for (auto* child : surface.getChildren())
         if (const auto* face = dynamic_cast<const KeyFace*> (child); face != nullptr && child->isVisible())
-            key (g, child->getBounds().toFloat(), keyRadius (face->keyRole()), face->keyRole(), face->keyState());
+            key (g, face->keyArea (child->getBounds().toFloat()), keyRadius (face->keyRole()), face->keyRole(), face->keyState());
 }
 
 bool drawnBySurface() noexcept { return active() != nullptr; }

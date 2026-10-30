@@ -281,6 +281,10 @@ public:
     void mouseExit (const juce::MouseEvent&) override { skin::repaintKey (*this); }
     skin::KeyRole keyRole() const override { return skin::KeyRole::mode; }
     skin::KeyState keyState() const override { return isMouseButtonDown() ? skin::KeyState::pressed : isMouseOver() ? skin::KeyState::hover : skin::KeyState::normal; }
+    /** The key's body: as tall as NOTES and EQ beside it (33 px), on their centre line; the
+        whole 41 px stays the hit area. */
+    juce::Rectangle<float> keyArea (juce::Rectangle<float> bounds) const override { return bounds.withSizeKeepingCentre (bounds.getWidth(), std::min (bounds.getHeight(), bodyHeight)); }
+    static constexpr float bodyHeight = 33.0f;
 
 private:
     void choose (int mode);

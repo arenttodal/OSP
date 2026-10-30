@@ -65,7 +65,11 @@ void EqButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
     // The light: the layer's EQ is heard.
     const bool narrow = r.getWidth() < 42.0f;
     if (active)
-        draw::led (g, { r.getX() + (narrow ? 7.0f : 9.0f), r.getCentreY() }, narrow ? 5.0f : 6.0f, colour::identity (layer).led, 0.6f);
+    {
+        // A small flat telltale in the layer's colour (as NOTES' amber one), not a lamp.
+        g.setColour (colour::identity (layer).arc);
+        g.fillEllipse (juce::Rectangle<float> (4.5f, 4.5f).withCentre ({ r.getX() + (narrow ? 7.0f : 9.5f), r.getCentreY() }));
+    }
     g.setFont (type::button (narrow ? 12.5f : 13.5f));
     g.setColour (colour::text.withAlpha (open || active ? 0.92f : 0.62f));
     g.drawText ("EQ", r.withTrimmedLeft (active ? (narrow ? 9.0f : 12.0f) : 0.0f), juce::Justification::centred, false);
