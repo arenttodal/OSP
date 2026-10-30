@@ -14,8 +14,6 @@ namespace
 {
     const juce::Colour light { 0xffeee8dd };
     const juce::Colour doubt { 0xffe0b45c };      ///< a doubt: quiet amber, never a percentage
-    const juce::Colour cellOff { 0xff2b3031 };
-    const juce::Colour cellRim { 0xff3e4446 };
 
     juce::String noteName (int key) { return juce::String (midiNoteName (std::clamp (key, 0, 127))); }
 
@@ -32,6 +30,34 @@ namespace
         s.detection = InstrumentHost::detectionOf (a);
         s.a4Hz = a.analysis.a4Hz > 0.0 ? a.analysis.a4Hz : 440.0;
         return s;
+    }
+
+    /** A vertical hairline `px` device pixels wide, on the device pixel grid (the transform's
+        scale), so a 1 px rule is one sharp pixel at 1x and at 2x. */
+    void vline (juce::Graphics& g, float x, float y0, float y1, float px = 1.0f)
+    {
+        const float s = std::max (1.0f, g.getInternalContext().getPhysicalPixelScaleFactor());
+        g.fillRect (juce::Rectangle<float> (std::floor (x * s) / s, y0, px / s, y1 - y0));
+    }
+    void hline (juce::Graphics& g, float x0, float x1, float y, float px = 1.0f)
+    {
+        const float s = std::max (1.0f, g.getInternalContext().getPhysicalPixelScaleFactor());
+        g.fillRect (juce::Rectangle<float> (x0, std::floor (y * s) / s, x1 - x0, px / s));
+    }
+
+    /** What an inspector cell is, for how it is drawn (values, actions and states differ). */
+    enum class CellKind { value, stepper, segment, toggle, action };
+    CellKind kindOf (const juce::String& action, const juce::String& text, bool value)
+    {
+        if (value)
+            return CellKind::value;
+        if (text.length() <= 1)
+            return CellKind::stepper;
+        if (action.startsWith ("detect."))
+            return CellKind::segment;
+        if (action == "include" || action == "fill" || action == "tuning" || action == "key.auto")
+            return CellKind::toggle;
+        return CellKind::action;
     }
 
     constexpr float edgeGrab = 5.0f;
@@ -549,21 +575,40 @@ juce::String NoteMapEditor::statusOf (const InstrumentHost& host, int layer)
     return review ? "Needs review" : "Ready";
 }
 
-std::array<OspKeyboard::KeyTint, 128> NoteMapEditor::keyMap (const atlas::NoteAtlas& a, juce::Colour colour)
+std::vector<std::string> NoteMapEditor::notesLeftOut (const InstrumentSet* set, bool loopOn)
+{
+    std::vector<std::string> ids;
+    if (set == nullptr)
+        return ids;
+    for (const auto& m : set->members)
+        if (! m.regionId.empty() && ! set->plays (m, loopOn))
+            ids.push_back (m.regionId);
+    return ids;
+}
+
+std::array<OspKeyboard::KeyTint, 128> NoteMapEditor::keyMap (const atlas::NoteAtlas& a, const InstrumentSet* set, bool loopOn)
 {
     std::array<OspKeyboard::KeyTint, 128> keys {};
     const auto byKey = atlas::notesByKey (a);
+    const auto leftOut = notesLeftOut (set, loopOn);
     std::vector<int> recorded;
     for (int k = 0; k < 128; ++k)
     {
-        const auto& notes = byKey[static_cast<std::size_t> (k)];
-        if (notes.empty())
+        std::array<int, 16> perLayer {};
+        bool any = false;
+        for (const int i : byKey[static_cast<std::size_t> (k)])
+        {
+            const auto& n = a.notes[static_cast<std::size_t> (i)];
+            if (std::find (leftOut.begin(), leftOut.end(), n.id) != leftOut.end())
+                continue;   // with LOOP on, a note that cannot loop is not played
+            ++perLayer[static_cast<std::size_t> (std::clamp (n.velocityLayer, 0, 15))];
+            any = true;
+        }
+        if (! any)
             continue;
         recorded.push_back (k);
-        std::array<int, 16> perLayer {};
-        for (const int i : notes)
-            ++perLayer[static_cast<std::size_t> (std::clamp (a.notes[static_cast<std::size_t> (i)].velocityLayer, 0, 15))];
-        keys[static_cast<std::size_t> (k)] = { OspKeyboard::KeyTint::State::recorded, *std::max_element (perLayer.begin(), perLayer.end()), colour };
+        keys[static_cast<std::size_t> (k)] = { OspKeyboard::KeyTint::State::recorded, *std::max_element (perLayer.begin(), perLayer.end()),
+                                               design::colour::forPitch (k) };
     }
     if (recorded.empty())
         return keys;
@@ -572,11 +617,12 @@ std::array<OspKeyboard::KeyTint, 128> NoteMapEditor::keyMap (const atlas::NoteAt
         auto& key = keys[static_cast<std::size_t> (k)];
         if (key.state == OspKeyboard::KeyTint::State::recorded)
             continue;
-        int nearest = 128;
+        int nearest = recorded.front();
         for (const int r : recorded)
-            nearest = std::min (nearest, std::abs (r - k));
-        const bool reached = a.mapping.fill && nearest <= static_cast<int> (std::floor (a.mapping.maxTransposeSemitones + 1.0e-9));
-        key = { reached ? OspKeyboard::KeyTint::State::filled : OspKeyboard::KeyTint::State::silent, 0, colour };
+            if (std::abs (r - k) < std::abs (nearest - k))
+                nearest = r;   // ties: the lower one (as the engine)
+        const bool reached = a.mapping.fill && std::abs (nearest - k) <= static_cast<int> (std::floor (a.mapping.maxTransposeSemitones + 1.0e-9));
+        key = { reached ? OspKeyboard::KeyTint::State::filled : OspKeyboard::KeyTint::State::silent, 0, design::colour::forPitch (nearest) };
     }
     return keys;
 }
@@ -625,9 +671,11 @@ juce::String NoteMapEditor::sustainText (const atlas::NoteEvent& n) const
                 return "Sustains: one loop over the note (a fading note may pulse)";
             if (c.canSustain)
                 return "Sustains from its stable body";
-            if (c.reason == "stable region too short")
-                return "Plays as recorded: under 0.1 s of sound to loop";
-            return "Plays as recorded: " + juce::String (c.reason);
+            // With LOOP on, a note that cannot loop is left out (LOOP off plays it as recorded).
+            const juce::String why = c.reason == "stable region too short" ? juce::String ("under 0.1 s of sound to loop") : juce::String (c.reason);
+            if (instrument->set->loopSelects)
+                return "Left out while LOOP is on: cannot loop (" + why + "); LOOP off plays it";
+            return "Plays as recorded: " + why;
         }
     if (instrument->atlasStatus != nullptr && std::find (instrument->atlasStatus->skippedNoteIds.begin(), instrument->atlasStatus->skippedNoteIds.end(), n.id)
                                                   != instrument->atlasStatus->skippedNoteIds.end())
@@ -669,16 +717,16 @@ void NoteMapEditor::rebuildInspector()
         rows.push_back ({ "PITCH", { cell ("pitch-", minus), cell ("pitch+", "+"), valueCell ("OCT"), cell ("oct-", minus), cell ("oct+", "+") } });
         rows.push_back ({ "FINE", { cell ("fine-", minus), valueCell (centsText (n.centsOffset)), cell ("fine+", "+") } });
         rows.push_back ({ narrow ? "KEY" : "PLAYS ON", { cell ("key-", minus), valueCell (noteName (n.playKey())), cell ("key+", "+"),
-                                                          cell ("key.auto", "AUTO", n.assignedKey < 0) } });
+                                                          cell ("key.auto", "Auto", n.assignedKey < 0) } });
         rows.push_back ({ narrow ? "VEL" : "VEL LAYER", { cell ("layer-", minus, false, n.velocityLayer > 0), valueCell (juce::String (n.velocityLayer + 1)),
                                                           cell ("layer+", "+", false, n.velocityLayer < 15) } });
-        rows.push_back ({ {}, { cell ("include", n.included ? "INCLUDED" : "LEFT OUT", n.included), cell ("audition", "AUDITION") } });
+        rows.push_back ({ {}, { cell ("include", n.included ? "Included" : "Left out", n.included), cell ("audition", "Audition") } });
         const auto it = std::find (all.begin(), all.end(), notes.front());
-        rows.push_back ({ {}, { cell ("split", "SPLIT"), cell ("merge", narrow ? "MERGE" : juce::String::fromUTF8 ("MERGE \xe2\x86\x92"), false, it != all.end() && it + 1 != all.end()) } });
+        rows.push_back ({ {}, { cell ("split", "Split"), cell ("merge", narrow ? "Merge" : juce::String::fromUTF8 ("Merge \xe2\x86\x92"), false, it != all.end() && it + 1 != all.end()) } });
         if (! repeatMarkers (n.id).empty())
-            rows.push_back ({ narrow ? "TWO?" : "TWO NOTES?", { cell ("repeat.split", "SPLIT"), cell ("repeat.keep", "KEEP ONE") } });
+            rows.push_back ({ narrow ? "REPEAT?" : "REPEATED?", { cell ("repeat.split", "Split here"), cell ("repeat.keep", "Keep one") } });
         if (isConflict (n.id))
-            rows.push_back ({ narrow ? "NEW" : "DETECTION", { cell ("conflict.keep", "KEEP MINE"), cell ("conflict.redescribe", narrow ? "NEW" : "USE NEW") } });
+            rows.push_back ({ narrow ? "NEW" : "DETECTION", { cell ("conflict.keep", "Keep mine"), cell ("conflict.redescribe", narrow ? "New" : "Use new") } });
         Row sustain;
         sustain.note = sustainText (n);
         rows.push_back (sustain);
@@ -686,11 +734,11 @@ void NoteMapEditor::rebuildInspector()
     else if (notes.size() > 1)
     {
         const auto& n = *notes.front();
-        rows.push_back ({ narrow ? "KEY" : "PLAYS ON", { cell ("key-", minus), valueCell (noteName (n.playKey())), cell ("key+", "+"), cell ("key.auto", "AUTO") } });
-        rows.push_back ({ {}, { cell ("include", n.included ? "INCLUDED" : "LEFT OUT", n.included), cell ("audition", "AUDITION") } });
+        rows.push_back ({ narrow ? "KEY" : "PLAYS ON", { cell ("key-", minus), valueCell (noteName (n.playKey())), cell ("key+", "+"), cell ("key.auto", "Auto") } });
+        rows.push_back ({ {}, { cell ("include", n.included ? "Included" : "Left out", n.included), cell ("audition", "Audition") } });
         const auto first = std::find (all.begin(), all.end(), notes.front()), last = std::find (all.begin(), all.end(), notes.back());
         const bool adjacent = static_cast<std::size_t> (std::distance (first, last)) + 1 == notes.size();
-        rows.push_back ({ {}, { cell ("merge", "MERGE", false, adjacent), cell ("layer+", "LOUDER"), cell ("layer-", "SOFTER") } });
+        rows.push_back ({ {}, { cell ("merge", "Merge", false, adjacent), cell ("layer+", "Louder"), cell ("layer-", "Softer") } });
         Row hint;
         hint.note = "PLAYS ON puts them on one key: its takes, in turn (round robin)";
         rows.push_back (hint);
@@ -703,10 +751,10 @@ void NoteMapEditor::rebuildInspector()
                                                              cell ("detect.normal", narrow ? "NORM" : "NORMAL", detection == phrase::Detection::normal, ! busy),
                                                              cell ("detect.more", "MORE", detection == phrase::Detection::more, ! busy) } });
         const auto& m = atlas->mapping;
-        rows.push_back ({ "FILL", { cell ("fill", m.fill ? "ON" : "OFF", m.fill), cell ("fill-", minus, false, m.fill),
+        rows.push_back ({ "FILL", { cell ("fill", m.fill ? "On" : "Off", m.fill), cell ("fill-", minus, false, m.fill),
                                     valueCell (juce::String::fromUTF8 ("\xc2\xb1") + juce::String (juce::roundToInt (m.maxTransposeSemitones)) + " st"),
                                     cell ("fill+", "+", false, m.fill) } });
-        rows.push_back ({ narrow ? "TUNE" : "TUNING", { cell ("tuning", m.correctTuning ? "IN TUNE" : "AS PLAYED", m.correctTuning) } });
+        rows.push_back ({ narrow ? "TUNE" : "TUNING", { cell ("tuning", m.correctTuning ? "In tune" : "As played", m.correctTuning) } });
         Row sustain;
         int sustaining = 0, included = 0;
         for (const auto* n : all)
@@ -715,8 +763,13 @@ void NoteMapEditor::rebuildInspector()
                 ++included;
                 sustaining += sustainText (*n).startsWith ("Sustains") ? 1 : 0;
             }
-        sustain.note = ! loopOn ? juce::String ("LOOP is off: notes play as recorded")
-                                : juce::String (sustaining) + " of " + juce::String (included) + " notes sustain (every note of 0.1 s or more)";
+        const bool selects = instrument != nullptr && instrument->set != nullptr && instrument->set->loopSelects;
+        if (! loopOn)
+            sustain.note = "LOOP is off: every note plays as recorded";
+        else if (selects && sustaining < included)
+            sustain.note = juce::String (sustaining) + " of " + juce::String (included) + " notes loop; LOOP on plays only these (LOOP off: all)";
+        else
+            sustain.note = juce::String (sustaining) + " of " + juce::String (included) + " notes sustain (every note of 0.1 s or more)";
         rows.push_back (sustain);
         Row verdict;
         if (atlas->analysis.suitability == "unsuitable")
@@ -744,11 +797,11 @@ void NoteMapEditor::layoutRows()
     int cellRows = 0, noteRows = 0;
     for (const auto& row : rows)
         (row.cells.empty() ? noteRows : cellRows) += 1;
-    const float room = inspector.getBottom() - 8.0f - (inspector.getY() + 50.0f);
+    const float room = inspector.getBottom() - 8.0f - (inspector.getY() + 58.0f);
     const float needed = static_cast<float> (cellRows) * (rowHeight + rowGap) + static_cast<float> (noteRows) * (34.0f + rowGap);
     const float k = needed > room ? std::max (0.68f, room / std::max (1.0f, needed)) : 1.0f;
     const float cellHeight = rowHeight * k, gapHeight = rowGap * k, noteHeight = 34.0f * k;
-    float y = inspector.getY() + 50.0f;
+    float y = inspector.getY() + 58.0f;
     for (auto& row : rows)
     {
         row.y = y;
@@ -812,7 +865,23 @@ void NoteMapEditor::paintWave (juce::Graphics& g, juce::Rectangle<float> graph)
     const float mid = graph.getY() + 18.0f + 0.5f * (graph.getHeight() - 18.0f);
     const float half = 0.45f * (graph.getHeight() - 18.0f);
     const int columns = std::max (1, juce::roundToInt (graph.getWidth()));
-    g.setColour (colour::identity (layer).wave.withAlpha (0.42f));
+    // One continuous waveform: the notes are divisions in it, not cards. Only the selected
+    // note rises in contrast; a hovered one a little; a left-out one recedes.
+    struct Span
+    {
+        float x0, x1;
+        float alpha;
+    };
+    std::vector<Span> spans;
+    for (const auto* n : shownNotes())
+    {
+        const auto r = regionBounds (n->id);
+        if (r.isEmpty())
+            continue;
+        const bool isSelected = std::find (selected.begin(), selected.end(), n->id) != selected.end();
+        spans.push_back ({ r.getX(), r.getRight(), ! n->included ? 0.2f : (isSelected ? 0.95f : (hover.noteId == n->id ? 0.56f : 0.42f)) });
+    }
+    const auto wave = colour::identity (layer).wave;
     for (int c = 0; c < columns; ++c)
     {
         const auto f0 = static_cast<double> (view.getStart()) + static_cast<double> (view.getLength()) * c / columns;
@@ -827,6 +896,11 @@ void NoteMapEditor::paintWave (juce::Graphics& g, juce::Rectangle<float> graph)
         }
         auto shape = [maxAbs, half] (float a) { return half * std::pow (std::clamp (std::abs (a) / maxAbs, 0.0f, 1.0f), 0.85f); };
         const float x = graph.getX() + static_cast<float> (c);
+        float alpha = 0.3f;   // between notes: the recording, not a note
+        for (const auto& span : spans)
+            if (x + 0.5f >= span.x0 && x + 0.5f <= span.x1)
+                alpha = span.alpha;
+        g.setColour (wave.withAlpha (alpha));
         g.fillRect (juce::Rectangle<float> (x, mid - shape (top), 1.0f, std::max (1.0f, shape (top) + shape (bottom))));
     }
 }
@@ -835,93 +909,119 @@ void NoteMapEditor::paintRegions (juce::Graphics& g, juce::Rectangle<float> grap
 {
     using namespace design;
     const auto& id = colour::identity (layer);
-    const auto tone = id.wave;
     g.saveState();
     g.reduceClipRegion (graph.getSmallestIntegerContainer());
-    for (const auto* n : shownNotes())
+    const auto notes = shownNotes();
+    // Boundaries: one fine neutral line per note edge (two notes that touch share one).
+    {
+        std::vector<float> edges;
+        for (const auto* n : notes)
+        {
+            const auto r = regionBounds (n->id);
+            if (r.isEmpty())
+                continue;
+            for (const float x : { r.getX(), r.getRight() })
+                if (std::none_of (edges.begin(), edges.end(), [x] (float e) { return std::abs (e - x) < 1.5f; }))
+                    edges.push_back (x);
+        }
+        g.setColour (light.withAlpha (0.13f));
+        for (const float x : edges)
+            vline (g, x, graph.getY() + 18.0f, graph.getBottom());
+    }
+    for (const auto* n : notes)
     {
         const auto r = regionBounds (n->id);
         if (r.isEmpty())
             continue;
         const bool isSelected = std::find (selected.begin(), selected.end(), n->id) != selected.end();
         const bool hot = hover.noteId == n->id;
-        const auto box = r.reduced (1.0f, 0.0f);
-        if (n->included)
-        {
-            g.setColour (tone.withAlpha (isSelected ? 0.20f : (hot ? 0.11f : 0.07f)));
-            g.fillRoundedRectangle (box, 5.0f);
-            g.setColour (tone.withAlpha (isSelected ? 0.95f : 0.48f));
-            g.drawRoundedRectangle (box.reduced (0.5f), 5.0f, isSelected ? 1.6f : 1.0f);
-            // The sustained body: a quiet bar along the foot.
-            const float s0 = std::max (box.getX() + 3.0f, xForFrame (n->sustain.start)), s1 = std::min (box.getRight() - 3.0f, xForFrame (n->sustain.end));
-            if (s1 > s0 + 1.0f)
-            {
-                g.setColour (tone.withAlpha (isSelected ? 0.6f : 0.32f));
-                g.fillRoundedRectangle ({ s0, box.getBottom() - 6.0f, s1 - s0, 3.0f }, 1.5f);
-            }
-        }
-        else
-        {
-            // Left out: a dashed outline, no fill.
-            juce::Path outline, dashed;
-            outline.addRoundedRectangle (box.reduced (0.5f), 5.0f);
-            const float dashes[] = { 3.0f, 3.0f };
-            juce::PathStrokeType (1.0f).createDashedStroke (dashed, outline, dashes, 2);
-            g.setColour (colour::wellText.withAlpha (isSelected ? 0.9f : 0.5f));
-            g.fillPath (dashed);
-        }
-        // Edges of the selected note: handles to drag.
         if (isSelected && n->included)
         {
-            g.setColour (tone);
-            for (const float x : { box.getX(), box.getRight() })
-                g.fillRoundedRectangle ({ x - 1.5f, box.getCentreY() - 12.0f, 3.0f, 24.0f }, 1.5f);
+            // The one selected state: a low layer-coloured field, its two edges in the layer's
+            // colour, and a narrow handle on each (the hit area is wider than what is drawn).
+            g.setColour (id.wave.withAlpha (0.07f));
+            g.fillRect (r);
+            g.setColour (id.wave.withAlpha (0.9f));
+            for (const float x : { r.getX(), r.getRight() })
+                vline (g, x, r.getY(), r.getBottom(), 1.5f);
+            g.setColour (light);
+            for (const float x : { r.getX(), r.getRight() })
+            {
+                const bool grabbed = hover.noteId == n->id && hover.edge == (x == r.getX() ? Edge::start : Edge::end);
+                g.fillRoundedRectangle (juce::Rectangle<float> (grabbed ? 3.0f : 2.0f, 20.0f).withCentre ({ x, r.getCentreY() }), 1.0f);
+            }
         }
-        // Possible repeats: a dashed line with a small tab to split there.
+        else if (isSelected)
+        {
+            g.setColour (light.withAlpha (0.4f));
+            for (const float x : { r.getX(), r.getRight() })
+                vline (g, x, r.getY(), r.getBottom());
+        }
+        else if (hot)
+        {
+            g.setColour (light.withAlpha (0.03f));
+            g.fillRect (r);
+            g.setColour (light.withAlpha (0.24f));
+            for (const float x : { r.getX(), r.getRight() })
+                vline (g, x, r.getY(), r.getBottom());
+        }
+        // The sustained body: a hairline along the foot.
+        if (n->included)
+        {
+            const float s0 = std::max (r.getX() + 3.0f, xForFrame (n->sustain.start)), s1 = std::min (r.getRight() - 3.0f, xForFrame (n->sustain.end));
+            if (s1 > s0 + 1.0f)
+            {
+                g.setColour (isSelected ? id.wave.withAlpha (0.6f) : light.withAlpha (0.12f));
+                hline (g, s0, s1, r.getBottom() - 5.0f);
+            }
+        }
+        // A suggested repeat: a fine dashed amber line with a small tab (stronger on hover).
         for (const auto f : repeatMarkers (n->id))
         {
-            const float x = xForFrame (f);
+            const float x = std::round (xForFrame (f)) + 0.5f;
             juce::Path line, dashed;
-            line.startNewSubPath (x, box.getY() + 14.0f);
-            line.lineTo (x, box.getBottom() - 8.0f);
-            const float dashes[] = { 3.0f, 3.0f };
+            line.startNewSubPath (x, r.getY() + 12.0f);
+            line.lineTo (x, r.getBottom() - 8.0f);
+            const float dashes[] = { 2.0f, 3.0f };
             juce::PathStrokeType (1.0f).createDashedStroke (dashed, line, dashes, 2);
             const bool tabHot = hover.repeat.has_value() && *hover.repeat == f;
-            g.setColour (doubt.withAlpha (tabHot ? 0.95f : 0.6f));
+            g.setColour (doubt.withAlpha (tabHot ? 0.95f : 0.45f));
             g.fillPath (dashed);
             juce::Path tab;
-            tab.addTriangle (x - 5.0f, box.getY() + 3.0f, x + 5.0f, box.getY() + 3.0f, x, box.getY() + 11.0f);
+            tab.addTriangle (x - 4.0f, r.getY() + 2.0f, x + 4.0f, r.getY() + 2.0f, x, r.getY() + 8.0f);
+            g.setColour (doubt.withAlpha (tabHot ? 1.0f : 0.7f));
             g.fillPath (tab);
         }
-        // Its name (and cents when there is room); a doubt is a small amber dot, details only
-        // when selected (the inspector).
-        if (box.getWidth() > 22.0f)
+        // Its pitch, only when it fits whole (never cut short); cents when there is room too.
+        g.setFont (type::popupValue (12.0f));
+        const auto text = r.reduced (6.0f, 0.0f).withHeight (20.0f).translated (0.0f, 4.0f);
+        const auto font = g.getCurrentFont();
+        juce::String label = noteName (n->playKey());
+        const auto withCents = label + " " + centsText (n->centsOffset).upToFirstOccurrenceOf (" ", false, false);
+        if (std::abs (n->centsOffset) >= 1.0 && juce::GlyphArrangement::getStringWidth (font, withCents) + 12.0f <= text.getWidth())
+            label = withCents;
+        const float tw = juce::GlyphArrangement::getStringWidth (font, label);
+        if (tw <= text.getWidth())
         {
-            juce::String label = noteName (n->playKey());
-            const bool roomy = box.getWidth() > 64.0f;
-            if (roomy && std::abs (n->centsOffset) >= 1.0)
-                label << " " << centsText (n->centsOffset).upToFirstOccurrenceOf (" ", false, false);
-            g.setFont (type::popupValue (12.0f));
-            g.setColour (light.withAlpha (n->included ? (isSelected ? 1.0f : 0.82f) : 0.45f));
-            const auto text = box.reduced (6.0f, 0.0f).withHeight (20.0f).translated (0.0f, 4.0f);
-            g.drawText (label, text, juce::Justification::topLeft, true);
+            g.setColour (light.withAlpha (! n->included ? 0.35f : (isSelected ? 1.0f : (hot ? 0.85f : 0.62f))));
+            g.drawText (label, text, juce::Justification::topLeft, false);
             const bool doubtful = n->included && ((n->diagnostics.any() && ! n->corrections.any()) || isConflict (n->id));
-            if (doubtful)
+            if (doubtful && text.getX() + tw + 10.0f < r.getRight())
             {
-                const float tw = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), label);
-                if (text.getX() + tw + 12.0f < box.getRight())
-                {
-                    g.setColour (doubt.withAlpha (0.9f));
-                    const auto dot = juce::Rectangle<float> (5.0f, 5.0f).withCentre ({ text.getX() + tw + 7.0f, text.getY() + 7.5f });
-                    isConflict (n->id) ? g.drawEllipse (dot.expanded (0.5f), 1.2f) : g.fillEllipse (dot);
-                }
+                g.setColour (doubt.withAlpha (0.9f));
+                const auto dot = juce::Rectangle<float> (4.0f, 4.0f).withCentre ({ text.getX() + tw + 6.0f, text.getY() + 7.5f });
+                isConflict (n->id) ? g.drawEllipse (dot.expanded (0.5f), 1.0f) : g.fillEllipse (dot);
             }
-            if (n->assignedKey >= 0 && roomy)
+            if (n->assignedKey >= 0)
             {
                 // Played on another key than it was sung on: its own pitch, quietly.
+                const auto from = juce::String ("from ") + noteName (n->rootMidi);
                 g.setFont (type::popupLabel (10.5f));
-                g.setColour (colour::wellText);
-                g.drawText (juce::String ("from ") + noteName (n->rootMidi), text.translated (0.0f, 15.0f), juce::Justification::topLeft, true);
+                if (juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), from) <= text.getWidth())
+                {
+                    g.setColour (colour::wellText);
+                    g.drawText (from, text.translated (0.0f, 15.0f), juce::Justification::topLeft, false);
+                }
             }
         }
     }
@@ -932,34 +1032,31 @@ void NoteMapEditor::paintInspector (juce::Graphics& g)
 {
     using namespace design;
     const auto box = inspector;
-    g.setColour (juce::Colour (0xff181c1d).withAlpha (0.92f));
-    g.fillRoundedRectangle (box, 8.0f);
-    g.setColour (cellRim.withAlpha (0.7f));
-    g.drawRoundedRectangle (box.reduced (0.5f), 8.0f, 1.0f);
+    // Part of the editor, not a card: one fine divider at its left, the same graphite.
+    g.setColour (light.withAlpha (0.09f));
+    vline (g, box.getX() - 6.0f, box.getY(), box.getBottom() - 4.0f);
     if (atlas == nullptr)
     {
-        g.setFont (type::popupLabel (12.0f));
+        g.setFont (type::popupLabel (11.5f));
         g.setColour (colour::wellText);
-        g.drawFittedText (activity == InstrumentHost::AtlasActivity::analysing ? "Finding the notes" : "No notes mapped",
-                          box.reduced (14.0f).getSmallestIntegerContainer(), juce::Justification::centred, 3);
+        g.drawFittedText (activity == InstrumentHost::AtlasActivity::analysing ? juce::String::fromUTF8 ("Finding the notes\xe2\x80\xa6") : juce::String ("No notes mapped"),
+                          box.reduced (12.0f, 8.0f).withHeight (20.0f).getSmallestIntegerContainer(), juce::Justification::centredLeft, 1);
         return;
     }
-    // The headline: the selected note (its name, cents, doubts), or the map.
+    // The headline: the selected note (its name, then quieter cents and take), or the map.
     const auto notes = selectedNotes();
-    auto head = box.reduced (12.0f, 0.0f).withY (box.getY() + 8.0f).withHeight (24.0f);
-    auto sub = head.translated (0.0f, 21.0f).withHeight (16.0f);
+    const bool narrow = box.getWidth() < 200.0f;
+    auto head = box.reduced (12.0f, 0.0f).withY (box.getY() + 4.0f).withHeight (30.0f);
+    auto sub = head.translated (0.0f, 28.0f).withHeight (15.0f);
+    const auto meta = colour::wellText.brighter (0.35f);
     if (notes.size() == 1)
     {
         const auto& n = *notes.front();
-        g.setFont (type::popupValue (19.0f));
+        g.setFont (fonts::make (narrow ? 22.0f : 27.0f, fonts::Weight::light));
         g.setColour (light);
         const auto name = noteName (n.rootMidi);
         g.drawText (name, head, juce::Justification::centredLeft, false);
         const float nw = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), name);
-        g.setFont (type::popupValue (13.0f));
-        g.setColour (light.withAlpha (0.7f));
-        g.drawText (centsText (n.centsOffset), head.withTrimmedLeft (nw + 8.0f), juce::Justification::centredLeft, false);
-        // Its takes on its key (round robin), at the right.
         int takes = 0, index = 0;
         for (const auto* other : shownNotes())
             if (other->included && other->playKey() == n.playKey() && other->velocityLayer == n.velocityLayer)
@@ -967,17 +1064,17 @@ void NoteMapEditor::paintInspector (juce::Graphics& g)
                 ++takes;
                 index += other->attackStart < n.attackStart ? 1 : 0;
             }
+        juce::String details = centsText (n.centsOffset);
         if (n.included && takes > 1)
-        {
-            g.setFont (type::popupLabel (11.0f));
-            g.setColour (colour::wellText.brighter (0.3f));
-            g.drawText ("TAKE " + juce::String (index + 1) + "/" + juce::String (takes), head, juce::Justification::centredRight, false);
-        }
+            details << juce::String::fromUTF8 ("  \xc2\xb7  ") << "Take " << (index + 1) << "/" << takes;
+        g.setFont (type::popupValue (narrow ? 11.5f : 12.5f));
+        g.setColour (meta);
+        g.drawText (details, head.withTrimmedLeft (nw + 10.0f).translated (0.0f, 2.0f), juce::Justification::centredLeft, true);
         const auto doubts = doubtText (n);
         g.setFont (type::popupLabel (11.0f));
         g.setColour (doubts.isNotEmpty() ? doubt.withAlpha (0.9f) : colour::wellText);
         const double seconds = static_cast<double> (n.sourceEnd - n.attackStart) / sampleRate();
-        g.drawText (doubts.isNotEmpty() ? doubts : juce::String (seconds, 2) + " s" + (n.corrections.any() ? juce::String::fromUTF8 (" \xc2\xb7 edited") : juce::String()),
+        g.drawText (doubts.isNotEmpty() ? doubts : juce::String (seconds, 2) + " s" + (n.corrections.any() ? juce::String::fromUTF8 ("  \xc2\xb7  edited") : juce::String()),
                     sub, juce::Justification::centredLeft, true);
     }
     else
@@ -988,16 +1085,19 @@ void NoteMapEditor::paintInspector (juce::Graphics& g)
             included += n->included ? 1 : 0;
             review += n->included && ((n->diagnostics.any() && ! n->corrections.any()) || isConflict (n->id)) ? 1 : 0;
         }
-        g.setFont (type::popupValue (17.0f));
+        g.setFont (fonts::make (narrow ? 18.0f : 21.0f, fonts::Weight::light));
         g.setColour (light);
         g.drawText (notes.size() > 1 ? juce::String (static_cast<int> (notes.size())) + " notes selected" : juce::String (included) + (included == 1 ? " note" : " notes"),
                     head, juce::Justification::centredLeft, false);
         g.setFont (type::popupLabel (11.0f));
         g.setColour (review > 0 ? doubt.withAlpha (0.9f) : colour::wellText);
         if (notes.empty())
-            g.drawText (review > 0 ? juce::String (review) + " to look at (amber)" : juce::String ("nothing to review"), sub, juce::Justification::centredLeft, true);
+            g.drawText (review > 0 ? juce::String (review) + " to look at" : juce::String ("Nothing to review"), sub, juce::Justification::centredLeft, true);
     }
+    g.setColour (light.withAlpha (0.08f));
+    hline (g, box.getX() + 12.0f, box.getRight() - 12.0f, box.getY() + 48.0f);
 
+    const auto rim = light.withAlpha (0.16f);
     for (const auto& row : rows)
     {
         if (row.cells.empty())
@@ -1005,33 +1105,80 @@ void NoteMapEditor::paintInspector (juce::Graphics& g)
             g.setFont (type::popupLabel (11.0f));
             g.setColour (colour::wellText.brighter (0.15f));
             g.drawFittedText (row.note, juce::Rectangle<float> (box.getX() + 12.0f, row.y, box.getWidth() - 24.0f, row.height).getSmallestIntegerContainer(),
-                              juce::Justification::topLeft, 2, 0.9f);
+                              juce::Justification::topLeft, 2, 1.0f);
             continue;
         }
         if (row.label.isNotEmpty())
         {
             g.setFont (type::popupLabel (10.5f));
-            g.setColour (colour::wellText.brighter (0.2f));
+            g.setColour (colour::wellText);
             g.drawText (row.label, juce::Rectangle<float> (box.getX() + 12.0f, row.y, 80.0f, row.height), juce::Justification::centredLeft, false);
+        }
+        // A segmented choice (DETECTION): one hairline frame for the group, the chosen part filled.
+        juce::Rectangle<float> group;
+        for (const auto& c : row.cells)
+            if (kindOf (c.action, c.text, c.value) == CellKind::segment)
+                group = group.isEmpty() ? c.area : group.getUnion (c.area);
+        if (! group.isEmpty())
+        {
+            g.setColour (rim);
+            g.drawRoundedRectangle (group.reduced (0.5f), 4.0f, 1.0f);
         }
         for (const auto& c : row.cells)
         {
-            if (c.value)
+            const auto kind = kindOf (c.action, c.text, c.value);
+            const bool hot = c.enabled && hoverAction == c.action && c.action.isNotEmpty();
+            const auto cellBox = c.area.reduced (0.5f, 1.5f);
+            switch (kind)
             {
-                g.setFont (type::popupValue (12.5f));
-                g.setColour (light.withAlpha (0.9f));
-                g.drawText (c.text, c.area, juce::Justification::centred, false);
-                continue;
+                case CellKind::value:
+                {
+                    // A value is text, not a control (OCT between its steppers is a caption).
+                    const bool caption = c.text == "OCT";
+                    g.setFont (caption ? type::popupLabel (10.5f) : type::popupValue (13.0f));
+                    g.setColour (caption ? colour::wellText : light.withAlpha (0.95f));
+                    g.drawText (c.text, c.area, juce::Justification::centred, false);
+                    break;
+                }
+                case CellKind::stepper:
+                    // A quiet minus or plus; brighter under the pointer.
+                    if (hot)
+                    {
+                        g.setColour (light.withAlpha (0.07f));
+                        g.fillRoundedRectangle (cellBox.withSizeKeepingCentre (std::min (cellBox.getWidth(), 24.0f), cellBox.getHeight()), 3.0f);
+                    }
+                    g.setFont (type::popupValue (14.0f));
+                    g.setColour (light.withAlpha (! c.enabled ? 0.2f : (hot ? 0.95f : 0.55f)));
+                    g.drawText (c.text, c.area, juce::Justification::centred, false);
+                    break;
+                case CellKind::segment:
+                    if (c.on)
+                    {
+                        g.setColour (light.withAlpha (0.1f));
+                        g.fillRoundedRectangle (cellBox.reduced (1.5f, 0.5f), 3.0f);
+                    }
+                    g.setFont (type::popupLabel (10.5f));
+                    g.setColour (light.withAlpha (! c.enabled ? 0.25f : (c.on ? 0.95f : (hot ? 0.8f : 0.5f))));
+                    g.drawText (c.text, c.area, juce::Justification::centred, false);
+                    break;
+                case CellKind::toggle:
+                case CellKind::action:
+                {
+                    // Actions and states: a hairline outline; a state that is on is filled, once.
+                    const bool on = kind == CellKind::toggle && c.on;
+                    if (on || hot)
+                    {
+                        g.setColour (light.withAlpha (on ? 0.1f : 0.05f));
+                        g.fillRoundedRectangle (cellBox, 4.0f);
+                    }
+                    g.setColour (on ? light.withAlpha (0.28f) : rim);
+                    g.drawRoundedRectangle (cellBox.reduced (0.5f), 4.0f, 1.0f);
+                    g.setFont (type::popupValue (11.5f));
+                    g.setColour (light.withAlpha (! c.enabled ? 0.25f : (on || hot ? 0.95f : 0.72f)));
+                    g.drawText (c.text, cellBox, juce::Justification::centred, false);
+                    break;
+                }
             }
-            const auto accent = colour::identity (layer).arc;
-            const auto cellBox = c.area.reduced (0.5f, 0.0f);
-            g.setColour (c.on ? accent.withAlpha (0.32f) : cellOff);
-            g.fillRoundedRectangle (cellBox, 5.0f);
-            g.setColour (c.on ? accent : cellRim);
-            g.drawRoundedRectangle (cellBox.reduced (0.5f), 5.0f, 1.0f);
-            g.setFont (c.text.length() <= 1 ? type::popupValue (14.0f) : type::popupLabel (11.0f));
-            g.setColour (light.withAlpha (! c.enabled ? 0.28f : (c.on ? 1.0f : 0.75f)));
-            g.drawText (c.text, cellBox, juce::Justification::centred, false);
         }
     }
 }
@@ -1040,16 +1187,15 @@ void NoteMapEditor::paint (juce::Graphics& g)
 {
     using namespace design;
     const auto bounds = getLocalBounds().toFloat();
-    // Over the waveform, as the EQ: the same graphite.
-    g.setColour (colour::wellA.withAlpha (0.94f));
+    // The display's graphite, opaque: nothing of the overview shows through.
+    g.setColour (colour::wellA);
     g.fillRoundedRectangle (bounds, 10.0f);
     const auto graph = graphArea();
 
-    // A quiet time grid (seconds), as the display's.
+    // A quiet time grid (seconds): a label every 100 px at most, round values only.
     {
-        // A label every 70 px at most (three layers' narrow page included).
         const double seconds = static_cast<double> (view.getLength()) / sampleRate();
-        const double labels = std::max (2.0, static_cast<double> (graph.getWidth()) / 70.0);
+        const double labels = std::max (2.0, static_cast<double> (graph.getWidth()) / 100.0);
         double step = 60.0;
         for (const double s : { 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0 })
             if (seconds / s <= labels)
@@ -1063,13 +1209,12 @@ void NoteMapEditor::paint (juce::Graphics& g)
         for (double t = t0; t * sampleRate() < static_cast<double> (view.getEnd()); t += step)
         {
             const float x = xForFrame (static_cast<std::int64_t> (t * sampleRate()));
-            g.setColour (colour::wellGrid.withAlpha (0.8f));
-            g.fillRect (juce::Rectangle<float> (x, graph.getY() + 16.0f, 1.0f, graph.getHeight() - 16.0f));
-            if (x < graph.getRight() - 24.0f)
+            g.setColour (colour::wellGrid.withAlpha (0.55f));
+            vline (g, x, graph.getY() + 16.0f, graph.getBottom());
+            if (x > graph.getX() + 14.0f && x < graph.getRight() - 24.0f)
             {
-                g.setColour (colour::wellText);
-                g.drawText (juce::String (t, decimals) + " s", juce::Rectangle<float> (x - 30.0f, graph.getY(), 60.0f, 14.0f),
-                            juce::Justification::centred, false);
+                g.setColour (colour::wellText.withAlpha (0.8f));
+                g.drawText (juce::String (t, decimals) + " s", juce::Rectangle<float> (x - 30.0f, graph.getY(), 60.0f, 14.0f), juce::Justification::centred, false);
             }
         }
     }
@@ -1077,44 +1222,57 @@ void NoteMapEditor::paint (juce::Graphics& g)
     paintRegions (g, graph);
     if (atlas == nullptr || shownNotes().empty())
     {
-        g.setFont (type::popupLabel (12.5f));
+        // A small, understated state at the graph's corner (the editor stays usable).
+        g.setFont (type::popupLabel (11.5f));
         g.setColour (colour::wellText);
-        g.drawText (activity == InstrumentHost::AtlasActivity::analysing ? juce::String::fromUTF8 ("ANALYZING\xe2\x80\xa6") : juce::String ("No notes found"),
-                    graph, juce::Justification::centred, false);
+        g.drawText (activity == InstrumentHost::AtlasActivity::analysing ? juce::String::fromUTF8 ("Analyzing\xe2\x80\xa6") : juce::String ("No notes found"),
+                    graph.withTrimmedTop (20.0f).withHeight (18.0f), juce::Justification::centredLeft, false);
     }
     paintInspector (g);
 
-    // The top row: EQ | DAMPEN | NOTES A, the state, undo / redo, close.
+    // The top row: EQ | DAMPEN | NOTES as one row of text tabs (the open one bright and
+    // underlined in the layer's colour), the state, undo / redo, close; a hairline below.
     g.setFont (type::popupLabel (12.0f));
-    g.setColour (colour::wellText.brighter (0.2f));
+    g.setColour (colour::wellText.brighter (0.15f));
     g.drawText ("EQ", eqTab, juce::Justification::centred, false);
     g.drawText ("DAMPEN", dampenTab, juce::Justification::centred, false);
-    g.setFont (type::panelHeader());
+    const auto title = "NOTES " + InstrumentHost::layerName (layer);
     g.setColour (light.withAlpha (0.95f));
-    g.drawText ("NOTES " + InstrumentHost::layerName (layer), titleArea, juce::Justification::centredLeft, false);
+    g.drawText (title, titleArea, juce::Justification::centredLeft, false);
+    {
+        const float tw = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), title);
+        g.setColour (colour::identity (layer).arc);
+        g.fillRect (juce::Rectangle<float> (titleArea.getX(), titleArea.getBottom() - 2.0f, tw, 1.5f));
+    }
     {
         const auto status = statusText();
         g.setFont (type::popupLabel (11.5f));
         const bool working = activity != InstrumentHost::AtlasActivity::none || status == "Playable";
-        g.setColour (status == "Needs review" ? doubt.withAlpha (0.9f) : (working ? colour::identity (layer).led.withAlpha (0.9f) : colour::wellText.brighter (0.2f)));
-        g.drawText (status.toUpperCase(), statusArea, juce::Justification::centredLeft, true);
+        g.setColour (status == "Needs review" ? doubt.withAlpha (0.85f) : (working ? colour::identity (layer).led.withAlpha (0.85f) : colour::wellText));
+        g.drawText (status, statusArea, juce::Justification::centredLeft, true);
     }
+    g.setColour (light.withAlpha (0.08f));
+    hline (g, 12.0f, bounds.getRight() - 12.0f, 38.0f);
     auto arrow = [&g] (juce::Rectangle<float> r, bool redo, bool enabled) {
         const auto c = r.reduced (5.0f);
         juce::Path p;
         p.addCentredArc (c.getCentreX(), c.getCentreY() + 1.0f, 5.5f, 5.0f, 0.0f, redo ? -1.9f : 1.9f, redo ? 1.2f : -1.2f, true);
         g.setColour (colour::wellText.brighter (0.3f).withAlpha (enabled ? 1.0f : 0.35f));
-        g.strokePath (p, juce::PathStrokeType (1.3f));
+        g.strokePath (p, juce::PathStrokeType (1.3f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         const auto tip = juce::Point<float> (c.getCentreX() + (redo ? 1.0f : -1.0f) * 5.5f * std::sin (1.2f), c.getCentreY() + 1.0f - 5.0f * std::cos (1.2f));
-        g.fillEllipse (juce::Rectangle<float> (3.0f, 3.0f).withCentre (tip));
+        g.fillEllipse (juce::Rectangle<float> (2.8f, 2.8f).withCentre (tip));
     };
     arrow (undoArea, false, host.undo().canUndo());
     arrow (redoArea, true, host.undo().canRedo());
     {
-        const auto x = closeArea.reduced (6.0f);
+        const auto x = closeArea.reduced (6.5f);
+        juce::Path cross;
+        cross.startNewSubPath (x.getTopLeft());
+        cross.lineTo (x.getBottomRight());
+        cross.startNewSubPath (x.getTopRight());
+        cross.lineTo (x.getBottomLeft());
         g.setColour (colour::wellText.brighter (0.3f));
-        g.drawLine (x.getX(), x.getY(), x.getRight(), x.getBottom(), 1.4f);
-        g.drawLine (x.getRight(), x.getY(), x.getX(), x.getBottom(), 1.4f);
+        g.strokePath (cross, juce::PathStrokeType (1.3f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     }
 }
 
@@ -1128,9 +1286,19 @@ void NoteMapEditor::mouseMove (const juce::MouseEvent& e)
         repaint (graphArea().getSmallestIntegerContainer());
     }
     bool overCell = false;
+    juce::String overAction;
     for (const auto& row : rows)
         for (const auto& c : row.cells)
-            overCell = overCell || (! c.value && c.enabled && c.area.contains (e.position));
+            if (! c.value && c.enabled && c.area.contains (e.position))
+            {
+                overCell = true;
+                overAction = c.action;
+            }
+    if (overAction != hoverAction)
+    {
+        hoverAction = overAction;
+        repaint (inspector.getSmallestIntegerContainer());
+    }
     const bool overKey = closeArea.contains (e.position) || undoArea.contains (e.position) || redoArea.contains (e.position) || eqTab.contains (e.position)
                          || dampenTab.contains (e.position);
     setMouseCursor (now.edge != Edge::none ? juce::MouseCursor::LeftRightResizeCursor
@@ -1148,6 +1316,7 @@ void NoteMapEditor::mouseMove (const juce::MouseEvent& e)
 void NoteMapEditor::mouseExit (const juce::MouseEvent&)
 {
     hover = {};
+    hoverAction.clear();
     repaint();
 }
 

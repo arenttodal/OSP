@@ -220,6 +220,8 @@ private:
     /** The edited layer's note map on the keys (a Note Atlas layer; none otherwise). */
     std::array<OspKeyboard::KeyTint, 128> keyTints {};
     std::shared_ptr<const atlas::NoteAtlas> tintedAtlas;
+    const InstrumentSet* tintedSet = nullptr;
+    bool tintedLoop = true;
     int tintedLayer = -1;
     void updateKeyTints();
     juce::Label statusLabel;

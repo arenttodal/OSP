@@ -32,6 +32,7 @@ phrase (no private audio) and are in `phase5/`. Each comes from the snapshot tes
 | KEY DNA editor over the instrument, the profile over the real keys, held keys marked | `phase5/p5-09-key-dna.jpg` |
 | A mapped, B one-shot, C Granular with KEY DNA | `phase5/p5-10-abc.jpg` |
 | A phrase just dropped: "Identify notes?" at once (after the musical review) | `phase5/p5-11-identify-notes.jpg` |
+| A note held: its region lit in its pitch's colour, the read head inside it; the keyboard's light strip | `phase5/p5-12-playing.jpg` |
 
 ![mapped](phase5/p5-03-mapped.jpg)
 ![note map](phase5/p5-05-note-selected.jpg)
@@ -125,6 +126,32 @@ cells (the EQ page's), and the NOTE MAP uses the EQ page's graphite well and typ
   again; MAP NOTES stays in the menu. A recalled session, a one-note sound, a multi-sample set
   or an atlas never asks. A phrase that repeats one pitch, or only leaps by octaves and fifths, is
   heard as one note and is not asked about (MAP NOTES in the menu still maps it).
+
+  **After the musical review: the played note, colours, LOOP and the keyboard.**
+  - *Read head.* A Note Atlas note is played from its own copy of its region, so its read head
+    used to run across the whole display. Each note's model now records where its region sits in
+    the recording (`InstrumentModel::displayStart / displayEnd`, display only), and the read head
+    moves inside the note, looping there while the key is held.
+  - *The note sounding lights up.* Its region brightens in its colour while it plays (repainted
+    only when a note starts or ends).
+  - *Colours by pitch.* `design::colour::forPitch`: one muted hue per pitch class round the circle
+    of fifths, alternate pitch classes lighter and darker. The overview's regions, the NOTE MAP
+    and the keyboard share it. The regions are drawn into the display's cached picture: no cost
+    per frame.
+  - *LOOP on plays only notes that can loop.* Once the loops are analysed (Stage B),
+    `InstrumentSet::loopSelects` is on: with LOOP on the engine plays only groups and takes that
+    can loop (`groupFor (note, loop)`, `plays (member, loop)`); FILL reaches past a left-out key,
+    without FILL it is silent. LOOP off plays every note. While Stage A is being prepared every
+    note plays. The NOTE MAP says "Left out while LOOP is on: cannot loop (…)", the summary "N of
+    M notes loop; LOOP on plays only these"; the overview draws a left-out note dashed and the
+    keyboard map follows.
+  - *Keyboard light strip.* The map is drawn as a light guide along the top of the keys: one short
+    segment per key, white and black interleaved, over the keys. A recorded note: a bright
+    segment in its colour with a glow down the key (dots for takes in turn). A key FILL reaches:
+    a faint thin line in the colour of the note that fills it. A silent key: dark.
+  - Tests: `tests/integration/AtlasShortSustainTests.cpp` ("with LOOP on only notes that can loop
+    play; the read head stays inside the note it reads"), `tests/plugin/UnifiedPhase5Tests.inc`
+    ("a played note lights its own region…").
 - **The map, nothing selected**:
   - DETECTION FEWER / NORMAL / MORE, a background re-detection;
   - FILL on/off and its reach (±1..48 st);

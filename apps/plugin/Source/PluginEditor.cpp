@@ -1341,13 +1341,20 @@ void OspAudioProcessorEditor::updateKeyTints()
     // leaves the keys as they always were.
     const int l = ospProcessor.editLayer();
     const auto atlas = ospProcessor.layerAtlas (l);
-    if (atlas == tintedAtlas && l == tintedLayer)
+    // The set as built (Stage B knows which notes loop) and the layer's LOOP: with LOOP on,
+    // notes that cannot loop are not played, so their keys show what plays instead.
+    const auto instrument = ospProcessor.currentInstrument (l);
+    const InstrumentSet* set = instrument != nullptr && instrument->atlas != nullptr ? instrument->set.get() : nullptr;
+    const bool loop = ospProcessor.parameterValue (InstrumentHost::layerParameterId (l, "loop")) >= 0.5f;
+    if (atlas == tintedAtlas && l == tintedLayer && set == tintedSet && loop == tintedLoop)
         return;
     tintedAtlas = atlas;
+    tintedSet = set;
+    tintedLoop = loop;
     tintedLayer = l;
     const auto before = keyTints;
     if (atlas != nullptr)
-        keyTints = NoteMapEditor::keyMap (*atlas, design::colour::identity (l).arc);
+        keyTints = NoteMapEditor::keyMap (*atlas, set, loop);
     else
         keyTints = {};
     if (keyTints != before)

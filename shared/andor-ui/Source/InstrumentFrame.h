@@ -33,8 +33,12 @@ public:
     };
     std::function<KeyTint (int note)> tintOf;
 
+    /** The keys, then the map's light strip along their top edge (a hardware keyboard's light
+        guide: one short segment per key, white and black interleaved, over everything). */
+    void paint (juce::Graphics&) override;
+
 private:
-    void drawTint (int note, juce::Graphics&, juce::Rectangle<float> area, bool black);
+    void drawLightStrip (juce::Graphics&);
     void drawWhiteNote (int note, juce::Graphics&, juce::Rectangle<float> area, bool isDown, bool isOver,
                         juce::Colour lineColour, juce::Colour textColour) override;
     void drawBlackNote (int note, juce::Graphics&, juce::Rectangle<float> area, bool isDown, bool isOver,

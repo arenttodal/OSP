@@ -50,6 +50,8 @@ struct PitchGroup
     double rootMidi = 60.0;
     int layers = 1;
     std::vector<int> members;          ///< indices into InstrumentSet::members
+    /** One of its notes can loop (InstrumentSet::loopSelects): with LOOP on it is played. */
+    bool sustains = true;
 };
 
 /**
@@ -89,17 +91,33 @@ struct InstrumentSet
         starts no voice. Ties between two equally near groups: the lower one. */
     bool fill = true;
     double fillLimitSemitones = std::numeric_limits<double>::infinity();
-    /** Whether a key can be left silent (a set from an atlas with a finite reach or no fill). */
-    bool restrictsKeys() const noexcept { return ! fill || std::isfinite (fillLimitSemitones); }
-    /** The pitch group `note` plays, or -1 when the mapping leaves it silent. */
-    int groupFor (int note) const noexcept
+    /** A set from a Note Atlas whose loops are analysed (Stage B): with LOOP on only the notes
+        that can loop are played (groups and takes that cannot are left out, FILL reaches past
+        them); LOOP off plays every note. Off for file sets and while a set is being prepared. */
+    bool loopSelects = false;
+    /** Whether a key can be left silent (a set from an atlas with a finite reach or no fill,
+        or one that leaves notes that cannot loop out). */
+    bool restrictsKeys() const noexcept { return ! fill || std::isfinite (fillLimitSemitones) || loopSelects; }
+    /** Whether a member is played: with LOOP on in a set that selects, only one that can loop. */
+    bool plays (const SetMember& m, bool loopOn) const noexcept
     {
-        if (groups.empty())
-            return -1;
-        int best = 0;
-        for (int g = 1; g < static_cast<int> (groups.size()); ++g)
-            if (std::abs (groups[static_cast<std::size_t> (g)].rootMidi - note) < std::abs (groups[static_cast<std::size_t> (best)].rootMidi - note))
+        return ! (loopOn && loopSelects) || (m.model != nullptr && m.model->original.continuation.canSustain);
+    }
+    /** The pitch group `note` plays (`loopOn`: the layer's LOOP), or -1 when the mapping leaves
+        it silent. */
+    int groupFor (int note, bool loopOn = false) const noexcept
+    {
+        const bool onlyLooping = loopOn && loopSelects;
+        int best = -1;
+        for (int g = 0; g < static_cast<int> (groups.size()); ++g)
+        {
+            if (onlyLooping && ! groups[static_cast<std::size_t> (g)].sustains)
+                continue;
+            if (best < 0 || std::abs (groups[static_cast<std::size_t> (g)].rootMidi - note) < std::abs (groups[static_cast<std::size_t> (best)].rootMidi - note))
                 best = g;
+        }
+        if (best < 0)
+            return -1;
         const double distance = std::abs (groups[static_cast<std::size_t> (best)].rootMidi - note);
         if (! fill && distance > 0.5)
             return -1;

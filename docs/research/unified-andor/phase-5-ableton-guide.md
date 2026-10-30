@@ -26,10 +26,12 @@ This is a development build: unsigned and not notarised. It is not a release.
    says ANALYZING and the header "Analyzing".
 3. Within a moment the notes are on their keys (header "N notes · Playable"); "Ready" or
    "Needs review" follows.
-4. Play the keyboard:
-   - strongly tinted keys are recorded notes (a number counts takes, played in turn);
-   - pale keys are filled from a neighbour;
-   - struck keys are silent.
+4. Play the keyboard. The light strip along the top of the keys is the map:
+   - a bright segment is a recorded note, in its pitch's colour (dots count takes, played in turn);
+   - a faint line is a key filled from a neighbour;
+   - no light: silent.
+   The note you play lights up over the waveform, its read head moving inside it.
+   With LOOP on only the notes that can loop play (the rest are drawn dashed); LOOP off plays all.
 5. Hold a note while the analysis finishes. It must not click or drop out.
 
 ## 3. Correct it (NOTE MAP)

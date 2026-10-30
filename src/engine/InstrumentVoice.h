@@ -118,15 +118,19 @@ public:
     /** KEY DNA AMOUNT as this voice applies it now (smoothed; 1 without a profile). */
     double keyDnaAmountNow() const noexcept { return keyDnaAmountApplied; }
     int grainCount() const noexcept { return granularMode ? granularSource.grainCount() : 0; }
-    /** One Shot voices: where the read head is (0..1 of the recording) and how loud the
-        note is now (envelope, 0..1), for the display. False for granular or idle voices. */
+    /** One Shot voices: where the read head is (0..1 of the recording the display shows: a
+        Note Atlas note reads inside its own region of the phrase) and how loud the note is
+        now (envelope, 0..1), for the display. False for granular or idle voices. */
     bool playhead (float& where, float& level) const noexcept
     {
         if (! active || granularMode || layer == nullptr || layer->source == nullptr)
             return false;
         const auto frames = static_cast<double> (std::max<std::int64_t> (1, layer->source->numFrames()));
         const double read = modeEngine != nullptr && modeEngine->sourcePosition() >= 0.0 ? modeEngine->sourcePosition() : position;
-        where = static_cast<float> (std::clamp (read / frames, 0.0, 1.0));
+        const double inSource = std::clamp (read / frames, 0.0, 1.0);
+        const double from = currentModel != nullptr ? currentModel->displayStart : 0.0;
+        const double to = currentModel != nullptr ? currentModel->displayEnd : 1.0;
+        where = static_cast<float> (std::clamp (from + inSource * (to - from), 0.0, 1.0));
         level = std::clamp (envelope.level() * fadeGain, 0.0f, 1.0f);
         return true;
     }

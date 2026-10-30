@@ -70,7 +70,7 @@ private:
     A layer's DAMPEN, the EQ overlay's second page: the damping over the keys (C0 .. C8 across,
     no damping at the top, full at the bottom), the last played key marked; drag a point,
     double-click to add or remove one, drag between points to bend the segment. The top row:
-    DAMPEN's switch, the EQ tab, the mode (SOFT SHELF | LOW-PASS), AMOUNT, the shelf's
+    DAMPEN's switch, the EQ tab, the mode (Shelf | Low-pass), AMOUNT, the shelf's
     frequency or the low-pass's minimum cutoff, the curve's presets, close.
 */
 class DampenEditor final : public juce::Component, public juce::SettableTooltipClient
@@ -98,6 +98,7 @@ public:
     void mouseUp (const juce::MouseEvent&) override;
     void mouseDoubleClick (const juce::MouseEvent&) override;
     void mouseMove (const juce::MouseEvent&) override;
+    void mouseExit (const juce::MouseEvent&) override;
 
 private:
     juce::RangedAudioParameter* parameter (const char* name) const;
@@ -119,10 +120,11 @@ private:
     int shownNote = -2;
     std::unique_ptr<EqValueField> amountField, frequencyField, cutoffField;
     juce::Rectangle<float> title, eqTab, mode, presets, closeArea, amountCaption, valueCaption;
+    bool hotTab = false, hotPresets = false;
 };
 
 /**
-    A layer's EQ, drawn over its waveform (the waveform stays faintly visible underneath):
+    A layer's EQ, opened over its waveform on the display's opaque graphite (graph first):
     a logarithmic frequency grid (20 Hz - 20 kHz) and +-18 dB, the EQ's exact response (the
     same section designs the audio runs), and the five bands. A band that is off is a small,
     quiet marker on the 0 dB line; pressing or dragging it switches it on. Dragging a band
@@ -176,6 +178,7 @@ private:
     int layer;
     eq::Settings shown;
     int selected = -1, hover = -1, dragBand = -1;
+    bool hotTab = false;
     float dragFromX = 0.0f, dragFromY = 0.0f;
     double dragFromHz = 1000.0, dragFromDb = 0.0;
     std::array<double, 4> shownModulation {};

@@ -204,6 +204,9 @@ public:
     virtual ~KeyFace() = default;
     virtual KeyRole keyRole() const = 0;
     virtual KeyState keyState() const = 0;
+    /** Where the key's body is drawn within its bounds (the surface's coordinates): a key
+        may keep a taller hit area than the body it shows (the source header's mode). */
+    virtual juce::Rectangle<float> keyArea (juce::Rectangle<float> bounds) const { return bounds; }
 };
 
 /** The A1 key of every visible child of `surface` that is a KeyFace, at its bounds. */

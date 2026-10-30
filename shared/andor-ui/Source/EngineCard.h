@@ -97,7 +97,14 @@ public:
         out) plus a short margin, so the sound always fills the display. */
     juce::Range<double> window() const;
 
+    /** Tests: the atlas notes (indices) lit now because a read head is inside them. */
+    const std::vector<int>& litNoteIndices() const noexcept { return litNotes; }
+
 private:
+    juce::Rectangle<float> noteRegionBounds (const atlas::NoteEvent&, juce::Rectangle<float> plot) const;
+    /** The atlas notes the read heads are in (a note sounding lights its region). */
+    void updateLitNotes();
+    std::vector<int> litNotes, litScratch;
     void paintStatic (juce::Graphics&);
     void paintGenerated (juce::Graphics&);
     void paintNoteRegions (juce::Graphics&, juce::Rectangle<float> plot);
@@ -277,6 +284,10 @@ public:
     void mouseExit (const juce::MouseEvent&) override { skin::repaintKey (*this); }
     skin::KeyRole keyRole() const override { return skin::KeyRole::mode; }
     skin::KeyState keyState() const override { return isMouseButtonDown() ? skin::KeyState::pressed : isMouseOver() ? skin::KeyState::hover : skin::KeyState::normal; }
+    /** The key's body: as tall as NOTES and EQ beside it (33 px), on their centre line; the
+        whole 41 px stays the hit area. */
+    juce::Rectangle<float> keyArea (juce::Rectangle<float> bounds) const override { return bounds.withSizeKeepingCentre (bounds.getWidth(), std::min (bounds.getHeight(), bodyHeight)); }
+    static constexpr float bodyHeight = 33.0f;
 
 private:
     void choose (int mode);

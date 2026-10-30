@@ -512,6 +512,12 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
         or more held pitches (library::heldNotes over its pitch track, the Library classifier's
         rule) asks at once on its card: MAP NOTES / NO. Recalled sessions, one-note sounds,
         sets and atlases ask nothing; an ordinary card is drawn as before.
+      - The played note: its read head moves inside its own region (InstrumentModel display
+        range) and its region lights up; regions, NOTE MAP and keys coloured by pitch
+        (design::colour::forPitch, drawn into the cached picture).
+      - LOOP on plays only the notes that can loop (InstrumentSet::loopSelects after Stage B;
+        FILL reaches past them); LOOP off plays all. NOTE MAP, overview and keyboard say so.
+      - The keyboard map is a light strip along the top of the keys (one segment per key).
 - [x] ANDOR DESIGN SYSTEM and INSTRUMENT SHELL (andor-design-system/, start with HANDOFF.md).
       ANDOR OSP's interface was extracted, unchanged, into shared/andor-ui:
       - the components, look and assets;

@@ -176,3 +176,102 @@ TEST_CASE ("Short atlas notes: a fading note loops over its body; a note under 0
     options.forceLoop = true;
     CHECK_FALSE (analyseContinuation (blip, analysis, options).canSustain);
 }
+
+TEST_CASE ("Atlas sets: with LOOP on only notes that can loop play; the read head stays inside the note it reads", "[integration][atlas][sustain]")
+{
+    // A held tone, a gap, then a pluck: the pluck cannot loop when the forced loop is off.
+    auto held = tone (false, 0.9);
+    auto pluck = testsignals::pluck (330.0, 0.6, 48000.0, 9, 0.6, 2);
+    const auto gap = static_cast<std::int64_t> (0.3 * 48000.0);
+    auto audio = AudioData::allocate (2, held.numFrames() + gap + pluck.numFrames(), 48000.0);
+    for (int c = 0; c < 2; ++c)
+    {
+        auto& out = audio.channels[static_cast<std::size_t> (c)];
+        std::copy (held.channels[static_cast<std::size_t> (c)].begin(), held.channels[static_cast<std::size_t> (c)].end(), out.begin());
+        std::copy (pluck.channels[static_cast<std::size_t> (c)].begin(), pluck.channels[static_cast<std::size_t> (c)].end(),
+                   out.begin() + held.numFrames() + gap);
+    }
+    atlas::SourceAsset source;
+    source.assetId = "src0";
+    source.contentHash = atlasfixtures::contentHashOf (audio);
+    source.fileName = "two.wav";
+    auto analysed = phrase::analysePhrase (audio, source);
+    // The two longest notes: the tone and the pluck (scraps are left out).
+    auto& notes = analysed.atlas.notes;
+    REQUIRE (notes.size() >= 2);
+    std::vector<atlas::NoteEvent*> byLength;
+    for (auto& n : notes)
+        byLength.push_back (&n);
+    std::sort (byLength.begin(), byLength.end(), [] (auto* a, auto* b) { return a->sourceEnd - a->attackStart > b->sourceEnd - b->attackStart; });
+    for (auto& n : notes)
+        n.included = &n == byLength[0] || &n == byLength[1];
+    const auto* toneNote = byLength[0]->attackStart < byLength[1]->attackStart ? byLength[0] : byLength[1];
+    const auto* pluckNote = toneNote == byLength[0] ? byLength[1] : byLength[0];
+    REQUIRE (toneNote->playKey() != pluckNote->playKey());
+    analysed.atlas.mapping.fill = false;   // a left-out key is silent (FILL would reach past it)
+
+    atlasset::BuildOptions options;
+    options.loopEveryNote = false;
+    const auto sources = std::vector<atlasset::SourceAudio> { { "src0", std::make_shared<const AudioData> (audio) } };
+    const auto built = atlasset::buildInstrumentSet (analysed.atlas, sources, options);
+    REQUIRE (built.set != nullptr);
+    const auto& set = *built.set;
+    CHECK (set.loopSelects);
+    // The loops decide: the tone can loop, the pluck cannot.
+    const int toneGroup = set.groupFor (toneNote->playKey());
+    const int pluckGroup = set.groupFor (pluckNote->playKey());
+    REQUIRE (toneGroup >= 0);
+    REQUIRE (pluckGroup >= 0);
+    CHECK (set.groups[static_cast<std::size_t> (toneGroup)].sustains);
+    CHECK_FALSE (set.groups[static_cast<std::size_t> (pluckGroup)].sustains);
+    CHECK (set.groupFor (pluckNote->playKey(), true) < 0);    // LOOP on: left out
+    CHECK (set.groupFor (pluckNote->playKey(), false) >= 0);  // LOOP off: played
+    CHECK (set.groupFor (toneNote->playKey(), true) == toneGroup);
+
+    // Stage A (loops not analysed yet) plays every note.
+    const auto stagedA = atlasset::buildPlayableSet (analysed.atlas, sources, options);
+    REQUIRE (stagedA.playable.set != nullptr);
+    CHECK_FALSE (stagedA.playable.set->loopSelects);
+    CHECK (stagedA.playable.set->groupFor (pluckNote->playKey(), true) >= 0);
+
+    // The engine: where the read head of a held key is, as a fraction of the recording.
+    const double total = static_cast<double> (audio.numFrames());
+    auto heads = [&] (int key, bool loop) {
+        EngineSettings s;
+        s.macros.life = 0.0;
+        s.macros.motion = 0.0;
+        s.macros.space = 0.0;
+        s.macros.reimagined = 0.0;
+        for (auto& l : s.layer)
+            l.loop = loop;
+        InstrumentEngine engine;
+        engine.prepare (48000.0, 240, s);
+        engine.setInstrumentSet (&set);
+        std::vector<float> l (240), r (240);
+        std::vector<float> where;
+        engine.noteOn (key, 100);
+        for (int b = 0; b < 200; ++b)   // 1 s held
+        {
+            float* ch[2] = { l.data(), r.data() };
+            engine.render (ch, 2, 240);
+            const auto& snapshot = engine.grainSnapshot (0);
+            for (int h = 0; h < snapshot.playheads.load(); ++h)
+                where.push_back (snapshot.playheadPosition[static_cast<std::size_t> (h)].load());
+        }
+        return where;
+    };
+    auto inside = [total] (const atlas::NoteEvent& n, float f) {
+        return f >= static_cast<double> (n.attackStart) / total - 0.02 && f <= static_cast<double> (n.sourceEnd) / total + 0.02;
+    };
+    // The tone held for 1 s (longer than the note): its read head loops inside its own region.
+    const auto toneHeads = heads (toneNote->playKey(), true);
+    REQUIRE_FALSE (toneHeads.empty());
+    for (const float f : toneHeads)
+        CHECK (inside (*toneNote, f));
+    // The pluck: silent with LOOP on, read inside its own region with LOOP off.
+    CHECK (heads (pluckNote->playKey(), true).empty());
+    const auto pluckHeads = heads (pluckNote->playKey(), false);
+    REQUIRE_FALSE (pluckHeads.empty());
+    for (const float f : pluckHeads)
+        CHECK (inside (*pluckNote, f));
+}

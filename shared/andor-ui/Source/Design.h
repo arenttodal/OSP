@@ -182,6 +182,18 @@ namespace colour
         } };
         return ids[static_cast<std::size_t> (juce::jlimit (0, 2, layer))];
     }
+    /** A mapped note's colour (Note Atlas regions, the NOTE MAP, the keyboard's light strip):
+        one muted hue per pitch class, walked round the circle of fifths, so every E (any
+        octave) wears the same colour and neighbouring semitones are far apart on the wheel;
+        alternate pitch classes are lighter and darker, so a fourth or a fifth apart (neighbours
+        on that circle) still differ. */
+    inline juce::Colour forPitch (int midiNote)
+    {
+        const int pc = ((midiNote % 12) + 12) % 12;
+        const float hue = std::fmod (0.04f + static_cast<float> ((pc * 7) % 12) / 12.0f, 1.0f);
+        // A fourth or a fifth apart (neighbours on that circle) differ in brightness too.
+        return juce::Colour::fromHSV (hue, pc % 2 == 0 ? 0.5f : 0.6f, pc % 2 == 0 ? 0.92f : 0.74f, 1.0f);
+    }
 
     // Controls.
     const juce::Colour knobCapTop { 0xfff8f3ea };

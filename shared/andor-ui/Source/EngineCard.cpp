@@ -110,10 +110,14 @@ namespace icons
             case Kind::heart:
             case Kind::heartFilled:
             {
-                const float w = s * 0.36f;
-                p.startNewSubPath (c.x, c.y + 0.3f * s);
-                p.cubicTo (c.x - 1.4f * w, c.y - 0.05f * s, c.x - 0.6f * w, c.y - 0.45f * s, c.x, c.y - 0.12f * s);
-                p.cubicTo (c.x + 0.6f * w, c.y - 0.45f * s, c.x + 1.4f * w, c.y - 0.05f * s, c.x, c.y + 0.3f * s);
+                // Two round lobes meeting in a soft notch, a clean point: symmetric about the
+                // centre line, optically centred (its mass sits a little high).
+                auto at = [c, s] (float x, float y) { return juce::Point<float> (c.x + x * s, c.y + y * s); };
+                p.startNewSubPath (at (0.0f, 0.29f));
+                p.cubicTo (at (-0.13f, 0.19f), at (-0.36f, 0.04f), at (-0.33f, -0.13f));
+                p.cubicTo (at (-0.31f, -0.27f), at (-0.13f, -0.33f), at (0.0f, -0.17f));
+                p.cubicTo (at (0.13f, -0.33f), at (0.31f, -0.27f), at (0.33f, -0.13f));
+                p.cubicTo (at (0.36f, 0.04f), at (0.13f, 0.19f), at (0.0f, 0.29f));
                 p.closeSubPath();
                 if (kind == Kind::heartFilled)
                     g.fillPath (p);
@@ -202,6 +206,7 @@ namespace
 void SourceDisplay::setInstrument (std::shared_ptr<const LoadedInstrument> next)
 {
     instrument = std::move (next);
+    litNotes.clear();   // indices into the previous atlas
     cacheDirty = true;
     repaint();
 }
@@ -350,6 +355,43 @@ void SourceDisplay::setPlayheads (const Dot* dots, int count)
     }
     strips (before);
     strips (heads);
+    updateLitNotes();
+}
+
+void SourceDisplay::updateLitNotes()
+{
+    litScratch.clear();
+    if (instrument != nullptr && instrument->atlas != nullptr && ! instrument->atlas->sources.empty()
+        && instrument->atlas->sources.front().sampleRate > 0.0 && ! loading && ! view.granular)
+    {
+        const auto& atlas = *instrument->atlas;
+        const double rate = atlas.sources.front().sampleRate;
+        for (const auto& head : heads)
+        {
+            const double frame = static_cast<double> (head.position) * instrument->durationSeconds * rate;
+            for (std::size_t i = 0; i < atlas.notes.size(); ++i)
+            {
+                const auto& n = atlas.notes[i];
+                if (n.included && n.sourceId == atlas.sources.front().assetId && frame >= static_cast<double> (n.attackStart) - 1.0
+                    && frame <= static_cast<double> (n.sourceEnd) + 1.0)
+                {
+                    if (std::find (litScratch.begin(), litScratch.end(), static_cast<int> (i)) == litScratch.end())
+                        litScratch.push_back (static_cast<int> (i));
+                    break;
+                }
+            }
+        }
+        std::sort (litScratch.begin(), litScratch.end());
+    }
+    if (litScratch == litNotes)
+        return;
+    // Repaint the regions that light up or go dark (a note starts or ends), not every frame.
+    const auto plot = plotArea();
+    for (const auto* list : { &litNotes, &litScratch })
+        for (const int i : *list)
+            if (instrument != nullptr && instrument->atlas != nullptr && i < static_cast<int> (instrument->atlas->notes.size()))
+                repaint (noteRegionBounds (instrument->atlas->notes[static_cast<std::size_t> (i)], plot).expanded (2.0f).getSmallestIntegerContainer());
+    std::swap (litNotes, litScratch);
 }
 
 void SourceDisplay::setDropLabel (const juce::String& label)
@@ -555,6 +597,22 @@ void SourceDisplay::paint (juce::Graphics& g)
             const float r = 0.8f + 1.0f * level;
             g.setColour (tones.core.withAlpha (0.3f + 0.5f * level));
             g.fillEllipse (gx - r, gy - r, 2.0f * r, 2.0f * r);
+        }
+    }
+    if (hasWave && ! litNotes.empty() && instrument->atlas != nullptr)
+    {
+        // The notes sounding now: their regions light up in their colour.
+        for (const int i : litNotes)
+        {
+            if (i >= static_cast<int> (instrument->atlas->notes.size()))
+                continue;
+            const auto& n = instrument->atlas->notes[static_cast<std::size_t> (i)];
+            const auto r = noteRegionBounds (n, plot);
+            const auto tone = design::colour::forPitch (n.playKey());
+            g.setColour (tone.withAlpha (focused ? 0.34f : 0.24f));
+            g.fillRoundedRectangle (r, 4.0f);
+            g.setColour (tone.brighter (0.3f).withAlpha (0.95f));
+            g.drawRoundedRectangle (r.reduced (0.75f), 4.0f, 1.5f);
         }
     }
     if (hasWave)
@@ -884,31 +942,44 @@ void SourceDisplay::paintStatic (juce::Graphics& g)
     }
 }
 
+juce::Rectangle<float> SourceDisplay::noteRegionBounds (const atlas::NoteEvent& n, juce::Rectangle<float> plot) const
+{
+    const double rate = instrument->atlas->sources.front().sampleRate;
+    const float x0 = std::max (plot.getX(), xAtSeconds (static_cast<double> (n.attackStart) / rate, plot));
+    const float x1 = std::min (plot.getRight(), xAtSeconds (static_cast<double> (n.sourceEnd) / rate, plot));
+    const auto box = plot.withTrimmedTop (2.0f).withBottom (getLocalBounds().toFloat().getBottom() - 6.0f);
+    return juce::Rectangle<float> (x0, box.getY(), std::max (0.0f, x1 - x0), box.getHeight()).reduced (1.0f, 0.0f);
+}
+
 void SourceDisplay::paintNoteRegions (juce::Graphics& g, juce::Rectangle<float> plot)
 {
     using namespace design;
     const auto& atlas = *instrument->atlas;
     if (atlas.sources.empty() || atlas.sources.front().sampleRate <= 0.0)
         return;
-    const double rate = atlas.sources.front().sampleRate;
-    const auto tone = colour::identity (layer).wave;
     const float tint = focused ? 1.0f : 0.7f;
-    const auto box = plot.withTrimmedTop (2.0f).withBottom (getLocalBounds().toFloat().getBottom() - 6.0f);
     g.setFont (type::popupValue (12.0f));
+    // With LOOP on, notes that cannot loop are not played: drawn as left out.
+    std::vector<std::string> leftOut;
+    if (const auto* set = instrument->set.get(); set != nullptr && ! view.granular)
+        for (const auto& m : set->members)
+            if (! m.regionId.empty() && ! set->plays (m, view.loop))
+                leftOut.push_back (m.regionId);
     for (const auto& n : atlas.notes)
     {
         if (n.sourceId != atlas.sources.front().assetId)
             continue;
-        const float x0 = std::max (plot.getX(), xAtSeconds (static_cast<double> (n.attackStart) / rate, plot));
-        const float x1 = std::min (plot.getRight(), xAtSeconds (static_cast<double> (n.sourceEnd) / rate, plot));
-        if (x1 - x0 < 2.0f)
+        const auto r = noteRegionBounds (n, plot);
+        if (r.getWidth() < 1.0f)
             continue;
-        const auto r = juce::Rectangle<float> (x0, box.getY(), x1 - x0, box.getHeight()).reduced (1.0f, 0.0f);
-        if (n.included)
+        const bool plays = n.included && std::find (leftOut.begin(), leftOut.end(), n.id) == leftOut.end();
+        if (plays)
         {
-            g.setColour (tone.withAlpha (0.05f * tint));
+            // Its pitch's colour, drawn once into the cached picture (no cost per frame).
+            const auto tone = design::colour::forPitch (n.playKey());
+            g.setColour (tone.withAlpha (0.2f * tint));
             g.fillRoundedRectangle (r, 4.0f);
-            g.setColour (tone.withAlpha (0.42f * tint));
+            g.setColour (tone.withAlpha (0.6f * tint));
             g.drawRoundedRectangle (r.reduced (0.5f), 4.0f, 1.0f);
         }
         else
@@ -924,7 +995,7 @@ void SourceDisplay::paintNoteRegions (juce::Graphics& g, juce::Rectangle<float> 
         {
             const auto label = juce::String (midiNoteName (n.playKey()));
             const auto text = r.reduced (5.0f, 0.0f).withHeight (18.0f).translated (0.0f, 3.0f);
-            g.setColour (juce::Colour (0xffeee8dd).withAlpha ((n.included ? 0.78f : 0.4f) * tint));
+            g.setColour (juce::Colour (0xffeee8dd).withAlpha ((plays ? 0.78f : 0.4f) * tint));
             g.drawText (label, text, juce::Justification::topLeft, true);
             if (n.included && n.diagnostics.any() && ! n.corrections.any())
             {
@@ -1334,16 +1405,17 @@ void ModeSelector::mouseUp (const juce::MouseEvent& e)
 
 void ModeSelector::paint (juce::Graphics& g)
 {
-    // A compact source property (157 x 41 in the reference): raised face, name, chevron.
-    const auto r = getLocalBounds().toFloat().reduced (1.0f);
-    const float k = r.getHeight() / 39.0f;
+    // A compact source property (157 x 41 in the reference): the key's body as tall as NOTES
+    // and EQ (keyArea), its name and a quiet chevron.
+    const auto r = keyArea (getLocalBounds().toFloat()).reduced (1.0f);
+    const float k = getHeight() / 41.0f;
     if (! skin::drawnBySurface())   // ceramic: the card draws the key
         design::draw::button (g, r, 7.0f * k, false, isMouseOver(), design::colour::accent);
     // Quiet: the waveform is the hero, the mode only a property of it.
-    g.setColour (design::colour::text.withAlpha (0.95f));
-    g.setFont (type::sourceMode (k));
-    auto text = r.withTrimmedLeft (17.0f * k).withTrimmedRight (14.0f * k);
-    icons::draw (g, icons::Kind::chevronDown, text.removeFromRight (16.0f * k).withSizeKeepingCentre (16.0f * k, 16.0f * k), design::colour::text.withAlpha (0.55f), 1.5f * k);
+    g.setColour (design::colour::text.withAlpha (0.88f));
+    g.setFont (type::sourceMode (0.88f * k));
+    auto text = r.withTrimmedLeft (15.0f * k).withTrimmedRight (12.0f * k);
+    icons::draw (g, icons::Kind::chevronDown, text.removeFromRight (14.0f * k).withSizeKeepingCentre (12.0f * k, 12.0f * k), design::colour::text.withAlpha (0.5f), 1.25f * k);
     g.drawText (current == 1 ? "Granular" : firstModeName, text, juce::Justification::centredLeft, false);
 }
 
@@ -1356,9 +1428,9 @@ void EngineCard::MenuDots::paintButton (juce::Graphics& g, bool highlighted, boo
         g.setColour (design::colour::text.withAlpha (0.06f));
         g.fillRoundedRectangle (r, 6.0f);
     }
-    // Three round dots, 10 px apart (reference).
-    const float d = 5.0f * r.getHeight() / 36.0f, gap = 10.0f * r.getHeight() / 36.0f;
-    g.setColour (design::colour::text);
+    // Three round dots, 8.5 px apart (reference): the quietest control in the header.
+    const float d = 4.2f * r.getHeight() / 36.0f, gap = 8.5f * r.getHeight() / 36.0f;
+    g.setColour (design::colour::text.withAlpha (highlighted ? 0.9f : 0.72f));
     for (int i = -1; i <= 1; ++i)
         g.fillEllipse (juce::Rectangle<float> (d, d).withCentre (r.getCentre().translated (0.0f, static_cast<float> (i) * gap)));
 }
@@ -1479,9 +1551,12 @@ void NotesButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
     else
         draw::button (g, r, 7.0f, false, highlighted, colour::accent);
     const bool narrow = r.getWidth() < 60.0f;
-    // A note to look at: a small amber light, as EQ's light says it is heard.
+    // A note to look at: a small flat amber telltale (as EQ's says it is heard), not a lamp.
     if (review)
-        draw::led (g, { r.getX() + (narrow ? 7.0f : 9.0f), r.getCentreY() }, narrow ? 5.0f : 6.0f, juce::Colour (0xffe0b45c), 0.6f);
+    {
+        g.setColour (juce::Colour (0xffd79a43));
+        g.fillEllipse (juce::Rectangle<float> (4.5f, 4.5f).withCentre ({ r.getX() + (narrow ? 7.0f : 9.5f), r.getCentreY() }));
+    }
     g.setFont (type::button (narrow ? 12.5f : 13.5f));
     g.setColour (colour::text.withAlpha (open || review ? 0.92f : 0.62f));
     g.drawText ("NOTES", r.withTrimmedLeft (review ? (narrow ? 9.0f : 12.0f) : 0.0f), juce::Justification::centred, false);
@@ -2293,7 +2368,18 @@ void EngineCard::paint (juce::Graphics& g)
     // Metadata: quieter than the root and the controls (a heading door, lit, darkens it).
     g.setColour (headingDoor != nullptr && headingDoor->lit() ? juce::Colours::black : colour::textSecondary);
     g.setFont (type::sourceFilename());
-    g.drawText (fileText, row, juce::Justification::centredLeft, true);
+    {
+        // Predictable truncation: the whole line, else its first part ("6 notes"), else
+        // nothing, never a word cut in two ("6 n...").
+        const auto font = type::sourceFilename();
+        juce::String shown = fileText;
+        const auto dot = juce::String::fromUTF8 (" \xc2\xb7 ");
+        if (juce::GlyphArrangement::getStringWidth (font, shown) > row.getWidth() && shown.contains (dot))
+            shown = shown.upToFirstOccurrenceOf (dot, false, false);
+        if (juce::GlyphArrangement::getStringWidth (font, shown) > row.getWidth() && atlasLayer)
+            shown.clear();
+        g.drawText (shown, row, juce::Justification::centredLeft, true);
+    }
 
     // Hairline between the knobs and the modifiers.
     if (! dividerArea.isEmpty())

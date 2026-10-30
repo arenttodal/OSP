@@ -26,6 +26,117 @@ namespace
     {
         return (db > 0.04 ? "+" : "") + juce::String (db, 1) + " dB";
     }
+
+    // The display language shared with NOTE MAP: one light ink, hairlines on the device pixel
+    // grid, text tabs, flat segmented choices, one node vocabulary for EQ and DAMPEN.
+    const juce::Colour light { 0xffeee8dd };
+    const juce::Colour rim = light.withAlpha (0.16f);
+
+    void vline (juce::Graphics& g, float x, float y0, float y1, float px = 1.0f)
+    {
+        const float s = std::max (1.0f, g.getInternalContext().getPhysicalPixelScaleFactor());
+        g.fillRect (juce::Rectangle<float> (std::floor (x * s) / s, y0, px / s, y1 - y0));
+    }
+    void hline (juce::Graphics& g, float x0, float x1, float y, float px = 1.0f)
+    {
+        const float s = std::max (1.0f, g.getInternalContext().getPhysicalPixelScaleFactor());
+        g.fillRect (juce::Rectangle<float> (x0, std::floor (y * s) / s, x1 - x0, px / s));
+    }
+
+    void drawPower (juce::Graphics& g, juce::Rectangle<float> p, bool on)
+    {
+        g.setColour (on ? osp::plugin::design::colour::accent : osp::plugin::design::colour::wellText.withAlpha (0.7f));
+        juce::Path icon;
+        icon.addCentredArc (p.getCentreX(), p.getCentreY() + 1.0f, 6.5f, 6.5f, 0.0f, 0.65f, 2.0f * juce::MathConstants<float>::pi - 0.65f, true);
+        icon.startNewSubPath (p.getCentreX(), p.getY() + 2.5f);
+        icon.lineTo (p.getCentreX(), p.getCentreY());
+        g.strokePath (icon, juce::PathStrokeType (1.4f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    }
+
+    void drawClose (juce::Graphics& g, juce::Rectangle<float> area)
+    {
+        const auto x = area.reduced (6.5f);
+        juce::Path cross;
+        cross.startNewSubPath (x.getTopLeft());
+        cross.lineTo (x.getBottomRight());
+        cross.startNewSubPath (x.getTopRight());
+        cross.lineTo (x.getBottomLeft());
+        g.setColour (osp::plugin::design::colour::wellText.brighter (0.3f));
+        g.strokePath (cross, juce::PathStrokeType (1.3f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    }
+
+    /** The open page's name, bright and underlined in the layer's colour ("Off" after it while
+        it is off), the other page a quiet text tab; a hairline under the whole row. */
+    void drawTabs (juce::Graphics& g, juce::Rectangle<float> title, const juce::String& name, bool on, juce::Rectangle<float> other,
+                   const juce::String& otherName, bool otherHot, int layer, float right)
+    {
+        using namespace osp::plugin::design;
+        g.setFont (type::popupLabel (12.0f));
+        g.setColour (light.withAlpha (on ? 0.95f : 0.6f));
+        g.drawText (name, title, juce::Justification::centredLeft, false);
+        const float tw = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), name);
+        g.setColour (colour::identity (layer).arc.withAlpha (on ? 1.0f : 0.5f));
+        g.fillRect (juce::Rectangle<float> (title.getX(), title.getBottom() - 2.0f, tw, 1.5f));
+        if (! on)
+        {
+            g.setFont (type::popupLabel (10.5f));
+            g.setColour (colour::wellText);
+            g.drawText ("Off", juce::Rectangle<float> (title.getX() + tw + 8.0f, title.getY(), 30.0f, title.getHeight()), juce::Justification::centredLeft, false);
+            g.setFont (type::popupLabel (12.0f));
+        }
+        g.setColour (otherHot ? light.withAlpha (0.85f) : colour::wellText.brighter (0.15f));
+        g.drawText (otherName, other, juce::Justification::centred, false);
+        g.setColour (light.withAlpha (0.08f));
+        hline (g, 12.0f, right - 12.0f, 38.0f);
+    }
+
+    /** A segmented choice: one hairline frame, the chosen part filled once. */
+    void drawSegments (juce::Graphics& g, juce::Rectangle<float> area, std::initializer_list<const char*> parts, int chosen, bool numerals)
+    {
+        using namespace osp::plugin::design;
+        g.setColour (rim);
+        g.drawRoundedRectangle (area.reduced (0.5f), 4.0f, 1.0f);
+        const float w = area.getWidth() / static_cast<float> (parts.size());
+        int k = 0;
+        for (const auto* text : parts)
+        {
+            const auto cell = area.withWidth (w).translated (w * static_cast<float> (k), 0.0f);
+            if (k == chosen)
+            {
+                g.setColour (light.withAlpha (0.1f));
+                g.fillRoundedRectangle (cell.reduced (2.0f), 3.0f);
+            }
+            g.setFont (numerals ? type::popupValue (11.5f) : type::popupLabel (10.5f));
+            g.setColour (light.withAlpha (k == chosen ? 0.95f : 0.5f));
+            g.drawText (text, cell, juce::Justification::centred, false);
+            ++k;
+        }
+    }
+
+    /** A node: a disc in its colour with a graphite gap ring; selected adds one fine outer ring. */
+    void drawNode (juce::Graphics& g, juce::Point<float> at, juce::Colour c, bool heard, bool hot, bool selected)
+    {
+        using namespace osp::plugin::design;
+        const float r = hot || selected ? 6.0f : 5.0f;
+        if (selected)
+        {
+            g.setColour (c.withAlpha (0.45f));
+            g.drawEllipse (juce::Rectangle<float> (2.0f * r + 9.0f, 2.0f * r + 9.0f).withCentre (at), 1.2f);
+        }
+        g.setColour (colour::wellA);
+        g.fillEllipse (juce::Rectangle<float> (2.0f * r + 3.0f, 2.0f * r + 3.0f).withCentre (at));
+        g.setColour (heard ? c : c.withMultipliedSaturation (0.5f).withAlpha (0.7f));
+        g.fillEllipse (juce::Rectangle<float> (2.0f * r, 2.0f * r).withCentre (at));
+    }
+
+    /** The graph's corner note (a hint or a state), small, never over the curve's middle. */
+    void drawCornerNote (juce::Graphics& g, juce::Rectangle<float> graph, const juce::String& text)
+    {
+        using namespace osp::plugin::design;
+        g.setFont (type::popupLabel (11.5f));
+        g.setColour (colour::wellText);
+        g.drawText (text, juce::Rectangle<float> (graph.getX() + 8.0f, graph.getY() + 6.0f, graph.getWidth() - 16.0f, 18.0f), juce::Justification::centredLeft, false);
+    }
 }
 
 juce::Colour equi::bandColour (eq::Band band)
@@ -65,7 +176,11 @@ void EqButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
     // The light: the layer's EQ is heard.
     const bool narrow = r.getWidth() < 42.0f;
     if (active)
-        draw::led (g, { r.getX() + (narrow ? 7.0f : 9.0f), r.getCentreY() }, narrow ? 5.0f : 6.0f, colour::identity (layer).led, 0.6f);
+    {
+        // A small flat telltale in the layer's colour (as NOTES' amber one), not a lamp.
+        g.setColour (colour::identity (layer).arc);
+        g.fillEllipse (juce::Rectangle<float> (4.5f, 4.5f).withCentre ({ r.getX() + (narrow ? 7.0f : 9.5f), r.getCentreY() }));
+    }
     g.setFont (type::button (narrow ? 12.5f : 13.5f));
     g.setColour (colour::text.withAlpha (open || active ? 0.92f : 0.62f));
     g.drawText ("EQ", r.withTrimmedLeft (active ? (narrow ? 9.0f : 12.0f) : 0.0f), juce::Justification::centred, false);
@@ -89,16 +204,22 @@ EqValueField::EqValueField (InstrumentHost& processor, const juce::String& id)
 
 void EqValueField::paint (juce::Graphics& g)
 {
-    const auto r = getLocalBounds().toFloat().reduced (0.5f);
-    g.setColour (juce::Colour (0xff2b3031));
-    g.fillRoundedRectangle (r, 5.0f);
-    g.setColour (isMouseOverOrDragging() ? accent.withAlpha (0.8f) : juce::Colour (0xff3e4446));
-    g.drawRoundedRectangle (r, 5.0f, 1.0f);
+    // A readout, not a box: the value over a hairline that takes the band's colour under the
+    // pointer (drag it, double-click to type).
+    const auto r = getLocalBounds().toFloat();
+    const bool hot = isMouseOverOrDragging();
+    if (hot)
+    {
+        g.setColour (light.withAlpha (0.05f));
+        g.fillRoundedRectangle (r.reduced (0.5f, 1.5f), 4.0f);
+    }
+    g.setColour (hot ? accent.withAlpha (0.85f) : rim);
+    hline (g, r.getX() + 3.0f, r.getRight() - 3.0f, r.getBottom() - 2.0f);
     if (editor != nullptr)
         return;
     const auto text = parameter != nullptr ? parameter->getCurrentValueAsText() : juce::String();
     g.setFont (type::popupValue (12.5f));
-    g.setColour (juce::Colour (0xffeee8dd));
+    g.setColour (light.withAlpha (hot ? 1.0f : 0.92f));
     g.drawText (text, r, juce::Justification::centred, false);
 }
 
@@ -312,8 +433,11 @@ void EqEditor::refresh()
         moved = moved || std::abs (offsets[i] - shownModulation[i]) > 1.0e-4;
     if (! (now == shown) || moved)
     {
+        const bool switched = now.enabled != shown.enabled;
         shown = now;
         shownModulation = offsets;
+        if (switched)
+            resized();   // "Off" after the name moves the DAMPEN tab
         repaint();
     }
 }
@@ -357,8 +481,11 @@ void EqEditor::resized()
     // The top row: the EQ's switch and name at the left, the selected band's values at the
     // right, then close.
     const float w = static_cast<float> (getWidth());
-    titleArea = { 40.0f, 8.0f, 70.0f, 26.0f };
-    dampenTab = { 112.0f, 9.0f, 64.0f, 24.0f };
+    // The open page's name, then the other page's tab one even gap after it (after "Off" while
+    // the EQ is off), as NOTE MAP's tabs are spaced.
+    const float tw = juce::GlyphArrangement::getStringWidth (type::popupLabel (12.0f), "EQ " + InstrumentHost::layerName (layer));
+    titleArea = { 40.0f, 9.0f, tw + (shown.enabled ? 4.0f : 30.0f), 24.0f };
+    dampenTab = { titleArea.getRight() + 10.0f, 9.0f, 64.0f, 24.0f };
     if (dampenPage != nullptr)
         dampenPage->setBounds (getLocalBounds());
     closeArea = { w - 32.0f, 10.0f, 22.0f, 22.0f };
@@ -398,46 +525,60 @@ void EqEditor::paint (juce::Graphics& g)
 {
     using namespace design;
     const auto bounds = getLocalBounds().toFloat();
-    // Over the waveform: the same graphite, the recording still faintly there.
-    g.setColour (colour::wellA.withAlpha (0.86f));
+    // The display's graphite, opaque: graph first, nothing of the waveform's labels showing
+    // through (NOTE MAP's rule).
+    g.setColour (colour::wellA);
     g.fillRoundedRectangle (bounds, 10.0f);
     const auto graph = graphArea();
     const bool heard = shown.enabled;
 
-    // Grid: frequencies (decades stronger) and gain (0 dB stronger), with quiet labels.
+    // Grid: frequencies (decades stronger) and gain (0 dB stronger), on the device pixel grid,
+    // with quiet labels that never leave the display.
     g.setFont (type::popupLabel (10.5f));
     for (double hz : { 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0, 200.0, 300.0, 400.0, 500.0, 600.0, 700.0, 800.0, 900.0, 1000.0, 2000.0,
                        3000.0, 4000.0, 5000.0, 6000.0, 7000.0, 8000.0, 9000.0, 10000.0, 20000.0 })
     {
-        const float x = xForHz (hz);
         const int whole = juce::roundToInt (hz);
         const bool decade = whole == 100 || whole == 1000 || whole == 10000;
-        g.setColour (colour::wellGrid.withAlpha (decade ? 1.0f : 0.45f));
-        g.fillRect (juce::Rectangle<float> (x - 0.5f, graph.getY(), 1.0f, graph.getHeight()));
+        g.setColour (colour::wellGrid.withAlpha (decade ? 0.9f : 0.4f));
+        vline (g, xForHz (hz), graph.getY(), graph.getBottom());
     }
     const std::array<std::pair<double, const char*>, 7> labels { { { 20.0, "20" }, { 100.0, "100" }, { 500.0, "500" }, { 1000.0, "1k" },
                                                                   { 5000.0, "5k" }, { 10000.0, "10k" }, { 20000.0, "20k" } } };
-    g.setColour (colour::wellText.withAlpha (0.85f));
+    g.setColour (colour::wellText.withAlpha (0.8f));
     float lastRight = -100.0f;
     for (const auto& [hz, text] : labels)
     {
         const float x = xForHz (hz);
-        const auto r = juce::Rectangle<float> (x - 18.0f, graph.getBottom() + 4.0f, 36.0f, 14.0f);
+        const int whole = juce::roundToInt (hz);
+        // The ends start or finish on their line, inside the display; the rest are centred.
+        auto r = juce::Rectangle<float> (x - 18.0f, graph.getBottom() + 4.0f, 36.0f, 14.0f);
+        auto just = juce::Justification::centred;
+        if (whole == 20)
+        {
+            r = r.withX (x);
+            just = juce::Justification::centredLeft;
+        }
+        else if (whole == 20000)
+        {
+            r = r.withRightX (x);
+            just = juce::Justification::centredRight;
+        }
         if (r.getX() < lastRight + 2.0f)
             continue;   // never crowded
-        const int whole = juce::roundToInt (hz);
-        g.drawText (text, r, whole == 20 ? juce::Justification::centredLeft : (whole == 20000 ? juce::Justification::centredRight : juce::Justification::centred), false);
+        g.drawText (text, r, just, false);
         lastRight = r.getRight();
     }
     for (int db = -18; db <= 18; db += 6)
     {
         const float y = yForDb (db);
-        g.setColour (db == 0 ? colour::wellText.withAlpha (0.45f) : colour::wellGrid.withAlpha (0.7f));
-        g.fillRect (juce::Rectangle<float> (graph.getX(), y - 0.5f, graph.getWidth(), 1.0f));
+        g.setColour (db == 0 ? colour::wellText.withAlpha (0.4f) : colour::wellGrid.withAlpha (0.6f));
+        hline (g, graph.getX(), graph.getRight(), y);
         if (db % 12 == 0)
         {
             g.setColour (colour::wellText.withAlpha (0.8f));
-            g.drawText (db > 0 ? "+" + juce::String (db) : juce::String (db), juce::Rectangle<float> (4.0f, y - 7.0f, 30.0f, 14.0f), juce::Justification::centredRight, false);
+            g.drawText (db > 0 ? "+" + juce::String (db) : juce::String (db), juce::Rectangle<float> (2.0f, y - 7.0f, graph.getX() - 10.0f, 14.0f),
+                        juce::Justification::centredRight, false);
         }
     }
 
@@ -458,13 +599,13 @@ void EqEditor::paint (juce::Graphics& g)
         fill.lineTo (graph.getRight(), yForDb (0.0));
         fill.lineTo (graph.getX(), yForDb (0.0));
         fill.closeSubPath();
-        g.setColour (equi::bandColour (band).withAlpha (0.14f));
+        g.setColour (equi::bandColour (band).withAlpha (0.1f));
         g.fillPath (fill);
         g.setColour (equi::bandColour (band).withAlpha (0.5f));
         g.strokePath (own, juce::PathStrokeType (1.0f));
     }
 
-    // The EQ as heard (its switch off: a quiet flat line, the shape it would have dashed).
+    // The EQ as heard: one crisp line (its switch off: a quiet dashed line of the shape it would have).
     {
         const auto heardSettings = effective();
         auto probe = heardSettings;
@@ -483,10 +624,10 @@ void EqEditor::paint (juce::Graphics& g)
             fill.lineTo (graph.getRight(), yForDb (0.0));
             fill.lineTo (graph.getX(), yForDb (0.0));
             fill.closeSubPath();
-            g.setColour (warm.withAlpha (0.10f));
+            g.setColour (warm.withAlpha (0.06f));
             g.fillPath (fill);
             g.setColour (warm);
-            g.strokePath (curve, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            g.strokePath (curve, juce::PathStrokeType (1.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         }
         else
         {
@@ -498,7 +639,7 @@ void EqEditor::paint (juce::Graphics& g)
         }
     }
 
-    // The bands: quiet markers on 0 dB while off, coloured nodes while on.
+    // The bands: quiet hollow markers on 0 dB while off, nodes while on.
     for (int b = 0; b < eq::bandCount; ++b)
     {
         const auto band = static_cast<eq::Band> (b);
@@ -508,9 +649,9 @@ void EqEditor::paint (juce::Graphics& g)
         const bool hot = b == hover || b == dragBand;
         if (! s.enabled)
         {
-            const float r = hot ? 5.5f : 4.0f;
+            const float r = hot ? 5.0f : 4.0f;
             g.setColour (c.withAlpha (hot ? 0.95f : 0.45f));
-            g.drawEllipse (juce::Rectangle<float> (2.0f * r, 2.0f * r).withCentre (at), 1.3f);
+            g.drawEllipse (juce::Rectangle<float> (2.0f * r, 2.0f * r).withCentre (at), 1.2f);
             continue;
         }
         // Modulated: the range it sweeps (a thin line through the node) and where it is now.
@@ -519,20 +660,11 @@ void EqEditor::paint (juce::Graphics& g)
         {
             const auto now = juce::Point<float> (xForHz (eff.frequencyHz), eq::hasGain (band) ? yForDb (eff.gainDb) : at.y);
             g.setColour (c.withAlpha (0.5f));
-            g.drawLine ({ at, now }, 1.2f);
+            g.drawLine ({ at, now }, 1.0f);
             g.setColour (c.withAlpha (0.8f));
             g.drawEllipse (juce::Rectangle<float> (7.0f, 7.0f).withCentre (now), 1.2f);
         }
-        const float r = hot || b == selected ? 7.0f : 6.0f;
-        if (b == selected)
-        {
-            g.setColour (c.withAlpha (0.3f));
-            g.drawEllipse (juce::Rectangle<float> (2.0f * r + 9.0f, 2.0f * r + 9.0f).withCentre (at), 1.5f);
-        }
-        g.setColour (colour::wellA);
-        g.fillEllipse (juce::Rectangle<float> (2.0f * r + 3.0f, 2.0f * r + 3.0f).withCentre (at));
-        g.setColour (heard ? c : c.withMultipliedSaturation (0.5f).withAlpha (0.7f));
-        g.fillEllipse (juce::Rectangle<float> (2.0f * r, 2.0f * r).withCentre (at));
+        drawNode (g, at, c, heard, hot, b == selected);
     }
 
     // The pointer's band: what it is (and, off, how to start it).
@@ -553,34 +685,14 @@ void EqEditor::paint (juce::Graphics& g)
         if (tip.getY() < graph.getY())
             tip = tip.withY (at.y + 12.0f);
         g.setColour (juce::Colour (0xee141819));
-        g.fillRoundedRectangle (tip, 5.0f);
+        g.fillRoundedRectangle (tip, 4.0f);
         g.setColour (equi::bandColour (band).brighter (0.3f));
         g.drawText (text, tip, juce::Justification::centred, false);
     }
 
-    // The top row: the EQ's switch, its name, the selected band.
-    {
-        const auto p = powerArea();
-        g.setColour (heard ? colour::accent : colour::wellText.withAlpha (0.6f));
-        juce::Path icon;
-        icon.addCentredArc (p.getCentreX(), p.getCentreY() + 1.0f, 7.0f, 7.0f, 0.0f, 0.65f, 2.0f * juce::MathConstants<float>::pi - 0.65f, true);
-        g.strokePath (icon, juce::PathStrokeType (1.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        g.drawLine (p.getCentreX(), p.getY() + 2.0f, p.getCentreX(), p.getCentreY(), 1.6f);
-        g.setFont (type::panelHeader());
-        g.setColour (juce::Colour (0xffeee8dd).withAlpha (heard ? 0.95f : 0.6f));
-        g.drawText ("EQ " + InstrumentHost::layerName (layer), titleArea, juce::Justification::centredLeft, false);
-        // EQ | DAMPEN: the other page.
-        g.setFont (type::popupLabel (12.0f));
-        g.setColour (colour::wellText.brighter (0.2f));
-        g.drawText ("DAMPEN", dampenTab, juce::Justification::centred, false);
-        g.setFont (type::panelHeader());
-        if (! heard)
-        {
-            g.setFont (type::popupLabel (11.0f));
-            g.setColour (colour::wellText);
-            g.drawText ("OFF", titleArea.translated (titleArea.getWidth() - 18.0f, 0.0f), juce::Justification::centredLeft, false);
-        }
-    }
+    // The top row: the EQ's switch, EQ | DAMPEN as text tabs, the selected band's values.
+    drawPower (g, powerArea(), heard);
+    drawTabs (g, titleArea, "EQ " + InstrumentHost::layerName (layer), heard, dampenTab, "DAMPEN", hotTab, layer, bounds.getRight());
     if (selected >= 0)
     {
         const auto band = static_cast<eq::Band> (selected);
@@ -588,69 +700,50 @@ void EqEditor::paint (juce::Graphics& g)
         const auto& s = shown.bands[static_cast<std::size_t> (selected)];
         if (! nameArea.isEmpty())
         {
-            g.setFont (type::popupLabel (12.0f));
+            g.setFont (type::popupLabel (10.5f));
             g.setColour (c.brighter (0.2f));
             g.drawText (eq::bandName (band), nameArea, juce::Justification::centredRight, false);
         }
         if (! slopeArea.isEmpty())
-        {
-            for (int k = 0; k < 2; ++k)
-            {
-                const auto cell = slopeArea.withWidth (0.5f * slopeArea.getWidth()).translated (static_cast<float> (k) * 0.5f * slopeArea.getWidth(), 0.0f).reduced (1.0f, 0.0f);
-                const bool on = s.steep == (k == 1);
-                g.setColour (on ? c.withAlpha (0.35f) : juce::Colour (0xff2b3031));
-                g.fillRoundedRectangle (cell, 5.0f);
-                g.setColour (on ? c : juce::Colour (0xff3e4446));
-                g.drawRoundedRectangle (cell.reduced (0.5f), 5.0f, 1.0f);
-                g.setFont (type::popupValue (12.0f));
-                g.setColour (juce::Colour (0xffeee8dd).withAlpha (on ? 1.0f : 0.6f));
-                g.drawText (k == 0 ? "12" : "24", cell, juce::Justification::centred, false);
-            }
-        }
-        // The band's own switch and its reset.
-        const auto sw = bandSwitchArea.reduced (3.0f);
-        g.setColour (s.enabled ? c : juce::Colour (0xff3e4446));
-        g.drawEllipse (sw.reduced (1.0f), 1.3f);
+            drawSegments (g, slopeArea, { "12", "24" }, s.steep ? 1 : 0, true);
+        // The band's own switch and its reset (the same 1.3 px line as close).
+        const auto sw = bandSwitchArea.reduced (4.0f);
+        g.setColour (s.enabled ? c : rim.withAlpha (0.4f));
+        g.drawEllipse (sw.reduced (0.65f), 1.3f);
         if (s.enabled)
-            g.fillEllipse (sw.reduced (5.0f));
+            g.fillEllipse (sw.reduced (4.0f));
         const auto re = resetArea.reduced (5.0f);
         juce::Path arrow;
         arrow.addCentredArc (re.getCentreX(), re.getCentreY(), 6.0f, 6.0f, 0.0f, -2.2f, 2.4f, true);
         g.setColour (colour::wellText.brighter (0.3f));
-        g.strokePath (arrow, juce::PathStrokeType (1.3f));
-        g.fillEllipse (juce::Rectangle<float> (3.0f, 3.0f).withCentre (re.getCentre().getPointOnCircumference (6.0f, -2.2f)));
+        g.strokePath (arrow, juce::PathStrokeType (1.3f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        g.fillEllipse (juce::Rectangle<float> (2.8f, 2.8f).withCentre (re.getCentre().getPointOnCircumference (6.0f, -2.2f)));
     }
-    // Close.
-    {
-        const auto x = closeArea.reduced (6.0f);
-        g.setColour (colour::wellText.brighter (0.3f));
-        g.drawLine (x.getX(), x.getY(), x.getRight(), x.getBottom(), 1.4f);
-        g.drawLine (x.getRight(), x.getY(), x.getX(), x.getBottom(), 1.4f);
-    }
+    drawClose (g, closeArea);
     if (shown.enabled == false && selected < 0)
-    {
-        g.setFont (type::popupLabel (12.0f));
-        g.setColour (colour::wellText);
-        g.drawText ("Drag a marker to shape this sound", graph.withHeight (22.0f).translated (0.0f, 6.0f), juce::Justification::centred, false);
-    }
+        drawCornerNote (g, graph, "Drag a marker to shape this sound");
 }
 
 void EqEditor::mouseMove (const juce::MouseEvent& e)
 {
     const int now = bandAt (e.position);
-    if (now != hover)
+    const bool tab = dampenTab.contains (e.position);
+    if (now != hover || tab != hotTab)
     {
         hover = now;
-        setMouseCursor (now >= 0 ? juce::MouseCursor::DraggingHandCursor : juce::MouseCursor::NormalCursor);
+        hotTab = tab;
+        setMouseCursor (now >= 0 ? juce::MouseCursor::DraggingHandCursor
+                                 : (tab ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor));
         repaint();
     }
 }
 
 void EqEditor::mouseExit (const juce::MouseEvent&)
 {
-    if (hover >= 0)
+    if (hover >= 0 || hotTab)
     {
         hover = -1;
+        hotTab = false;
         repaint();
     }
 }
@@ -902,9 +995,12 @@ void DampenEditor::refresh()
     {
         if (! dragging)
             curve = now;
+        const bool switched = signature[0] != shownSignature[0];
         shownSignature = signature;
         shownNote = note;
-        if (modeMoved)
+        if (switched)
+            resized();   // "Off" after the name moves the EQ tab
+        else if (modeMoved)
             layoutFields();
         repaint();
     }
@@ -922,8 +1018,9 @@ void DampenEditor::applyPreset (int preset)
 void DampenEditor::resized()
 {
     const float w = static_cast<float> (getWidth());
-    title = { 40.0f, 8.0f, 98.0f, 26.0f };
-    eqTab = { 140.0f, 9.0f, 34.0f, 24.0f };
+    const float tw = juce::GlyphArrangement::getStringWidth (type::popupLabel (12.0f), "DAMPEN " + InstrumentHost::layerName (layer));
+    title = { 40.0f, 9.0f, tw + (enabled() ? 4.0f : 30.0f), 24.0f };
+    eqTab = { title.getRight() + 10.0f, 9.0f, 34.0f, 24.0f };
     closeArea = { w - 32.0f, 10.0f, 22.0f, 22.0f };
     float x = closeArea.getX() - 10.0f;
     auto take = [&x] (float width) {
@@ -954,30 +1051,32 @@ void DampenEditor::paint (juce::Graphics& g)
 {
     using namespace design;
     const auto bounds = getLocalBounds().toFloat();
-    g.setColour (colour::wellA.withAlpha (0.92f));
+    // Opaque, as the EQ page it covers: nothing of that page shows through.
+    g.setColour (colour::wellA);
     g.fillRoundedRectangle (bounds, 10.0f);
     const auto graph = graphArea();
     const bool heard = enabled();
 
-    // Grid: the octaves (C0 .. C8) across, damping in quarters down.
+    // Grid: the octaves (C0 .. C8) across, damping in quarters down, on the device pixel grid.
     g.setFont (type::popupLabel (10.5f));
     for (int octave = 0; octave <= 8; ++octave)
     {
         const float x = toScreen (static_cast<float> (12 * (octave + 1)) / 127.0f, 0.0f).x;
-        g.setColour (colour::wellGrid.withAlpha (octave == 4 ? 1.0f : 0.55f));
-        g.fillRect (juce::Rectangle<float> (x - 0.5f, graph.getY(), 1.0f, graph.getHeight()));
-        g.setColour (colour::wellText.withAlpha (0.85f));
+        g.setColour (colour::wellGrid.withAlpha (octave == 4 ? 0.9f : 0.45f));
+        vline (g, x, graph.getY(), graph.getBottom());
+        g.setColour (colour::wellText.withAlpha (0.8f));
         g.drawText ("C" + juce::String (octave), juce::Rectangle<float> (x - 14.0f, graph.getBottom() + 4.0f, 28.0f, 14.0f), juce::Justification::centred, false);
     }
     for (int q = 0; q <= 4; ++q)
     {
         const float y = graph.getY() + graph.getHeight() * static_cast<float> (q) / 4.0f;
-        g.setColour (colour::wellGrid.withAlpha (q == 0 ? 1.0f : 0.6f));
-        g.fillRect (juce::Rectangle<float> (graph.getX(), y - 0.5f, graph.getWidth(), 1.0f));
+        g.setColour (q == 0 ? colour::wellText.withAlpha (0.4f) : colour::wellGrid.withAlpha (0.6f));
+        hline (g, graph.getX(), graph.getRight(), y);
     }
+    // The scale's ends, clear of a point sitting on the edge.
     g.setColour (colour::wellText.withAlpha (0.8f));
-    g.drawText ("0", juce::Rectangle<float> (4.0f, graph.getY() - 7.0f, 30.0f, 14.0f), juce::Justification::centredRight, false);
-    g.drawText (lowPass() ? "LP" : "-18", juce::Rectangle<float> (4.0f, graph.getBottom() - 7.0f, 30.0f, 14.0f), juce::Justification::centredRight, false);
+    g.drawText ("0", juce::Rectangle<float> (2.0f, graph.getY() - 7.0f, graph.getX() - 10.0f, 14.0f), juce::Justification::centredRight, false);
+    g.drawText (lowPass() ? "LP" : "-18", juce::Rectangle<float> (2.0f, graph.getBottom() - 7.0f, graph.getX() - 10.0f, 14.0f), juce::Justification::centredRight, false);
 
     // The curve, the damping it takes filled below the top (dashed while DAMPEN is off).
     const auto table = mod::compileCurve (curve);
@@ -994,10 +1093,10 @@ void DampenEditor::paint (juce::Graphics& g)
         fill.lineTo (graph.getRight(), graph.getY());
         fill.lineTo (graph.getX(), graph.getY());
         fill.closeSubPath();
-        g.setColour (dampenColour.withAlpha (0.16f));
+        g.setColour (dampenColour.withAlpha (0.1f));
         g.fillPath (fill);
         g.setColour (dampenColour);
-        g.strokePath (line, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        g.strokePath (line, juce::PathStrokeType (1.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     }
     else
     {
@@ -1008,82 +1107,67 @@ void DampenEditor::paint (juce::Graphics& g)
         g.fillPath (dashed);
     }
     for (int i = 0; i < curve.count; ++i)
-    {
-        const auto at = pointPosition (i);
-        const float r = i == hoverPoint || i == dragPoint ? 6.0f : 4.5f;
-        g.setColour (colour::wellA);
-        g.fillEllipse (juce::Rectangle<float> (2.0f * r + 3.0f, 2.0f * r + 3.0f).withCentre (at));
-        g.setColour (heard ? dampenColour : dampenColour.withAlpha (0.6f));
-        g.fillEllipse (juce::Rectangle<float> (2.0f * r, 2.0f * r).withCentre (at));
-    }
+        drawNode (g, pointPosition (i), dampenColour, heard, i == hoverPoint || i == dragPoint, false);
     // The last key played: where it sits on the curve.
     if (const int note = ospProcessor.lastPlayedNoteNumber(); note >= 0)
     {
         const float x = static_cast<float> (note) / 127.0f;
         const auto at = toScreen (x, static_cast<float> (mod::curveAt (table, x)));
-        g.setColour (colour::accent.withAlpha (0.55f));
-        g.fillRect (juce::Rectangle<float> (at.x - 0.5f, graph.getY(), 1.0f, graph.getHeight()));
+        g.setColour (colour::accent.withAlpha (0.45f));
+        vline (g, at.x, graph.getY(), graph.getBottom());
         g.setColour (colour::accent);
-        g.fillEllipse (juce::Rectangle<float> (7.0f, 7.0f).withCentre (at));
+        g.fillEllipse (juce::Rectangle<float> (6.0f, 6.0f).withCentre (at));
     }
 
-    // The top row.
-    {
-        const auto p = powerArea();
-        g.setColour (heard ? colour::accent : colour::wellText.withAlpha (0.6f));
-        juce::Path icon;
-        icon.addCentredArc (p.getCentreX(), p.getCentreY() + 1.0f, 7.0f, 7.0f, 0.0f, 0.65f, 2.0f * juce::MathConstants<float>::pi - 0.65f, true);
-        g.strokePath (icon, juce::PathStrokeType (1.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        g.drawLine (p.getCentreX(), p.getY() + 2.0f, p.getCentreX(), p.getCentreY(), 1.6f);
-        g.setFont (type::panelHeader());
-        g.setColour (juce::Colour (0xffeee8dd).withAlpha (heard ? 0.95f : 0.6f));
-        g.drawText ("DAMPEN " + InstrumentHost::layerName (layer), title, juce::Justification::centredLeft, false);
-        g.setFont (type::popupLabel (12.0f));
-        g.setColour (colour::wellText.brighter (0.2f));
-        g.drawText ("EQ", eqTab, juce::Justification::centred, false);
-    }
-    for (int k = 0; k < 2; ++k)
-    {
-        const auto cell = mode.withWidth (0.5f * mode.getWidth()).translated (static_cast<float> (k) * 0.5f * mode.getWidth(), 0.0f).reduced (1.0f, 0.0f);
-        const bool on = lowPass() == (k == 1);
-        g.setColour (on ? dampenColour.withAlpha (0.35f) : juce::Colour (0xff2b3031));
-        g.fillRoundedRectangle (cell, 5.0f);
-        g.setColour (on ? dampenColour : juce::Colour (0xff3e4446));
-        g.drawRoundedRectangle (cell.reduced (0.5f), 5.0f, 1.0f);
-        g.setFont (type::popupValue (11.5f));
-        g.setColour (juce::Colour (0xffeee8dd).withAlpha (on ? 1.0f : 0.6f));
-        g.drawText (k == 0 ? "SHELF" : "LOW-PASS", cell, juce::Justification::centred, false);
-    }
-    g.setFont (type::popupLabel (11.0f));
-    g.setColour (colour::wellText.brighter (0.2f));
+    // The top row: DAMPEN's switch, DAMPEN | EQ as text tabs, the mode, AMOUNT, the value, the
+    // curve's presets, close (the EQ page's vocabulary).
+    drawPower (g, powerArea(), heard);
+    drawTabs (g, title, "DAMPEN " + InstrumentHost::layerName (layer), heard, eqTab, "EQ", hotTab, layer, bounds.getRight());
+    drawSegments (g, mode, { "Shelf", "Low-pass" }, lowPass() ? 1 : 0, false);
+    g.setFont (type::popupLabel (10.5f));
+    g.setColour (colour::wellText.brighter (0.1f));
     g.drawText ("AMOUNT", amountCaption, juce::Justification::centredRight, false);
     g.drawText (lowPass() ? "MIN" : "FREQ", valueCaption, juce::Justification::centredRight, false);
-    g.setColour (juce::Colour (0xff2b3031));
-    g.fillRoundedRectangle (presets.reduced (0.5f), 5.0f);
-    g.setColour (juce::Colour (0xff3e4446));
-    g.drawRoundedRectangle (presets.reduced (0.5f), 5.0f, 1.0f);
-    g.setColour (juce::Colour (0xffeee8dd).withAlpha (0.85f));
-    g.drawText (juce::String::fromUTF8 ("CURVE \xe2\x96\xbe"), presets, juce::Justification::centred, false);
     {
-        const auto x = closeArea.reduced (6.0f);
-        g.setColour (colour::wellText.brighter (0.3f));
-        g.drawLine (x.getX(), x.getY(), x.getRight(), x.getBottom(), 1.4f);
-        g.drawLine (x.getRight(), x.getY(), x.getX(), x.getBottom(), 1.4f);
+        // An action: a hairline outline, filled faintly under the pointer.
+        const auto box = presets.reduced (0.5f, 1.5f);
+        if (hotPresets)
+        {
+            g.setColour (light.withAlpha (0.05f));
+            g.fillRoundedRectangle (box, 4.0f);
+        }
+        g.setColour (rim);
+        g.drawRoundedRectangle (box.reduced (0.5f), 4.0f, 1.0f);
+        g.setFont (type::popupValue (11.5f));
+        g.setColour (light.withAlpha (hotPresets ? 0.95f : 0.72f));
+        g.drawText (juce::String::fromUTF8 ("Curve \xe2\x96\xbe"), box, juce::Justification::centred, false);
     }
+    drawClose (g, closeArea);
     if (! heard)
+        drawCornerNote (g, graph, "DAMPEN is off: switch it on to tame bright high notes");
+}
+
+void DampenEditor::mouseExit (const juce::MouseEvent&)
+{
+    if (hoverPoint >= 0 || hotTab || hotPresets)
     {
-        g.setFont (type::popupLabel (12.0f));
-        g.setColour (colour::wellText);
-        g.drawText ("DAMPEN is off: switch it on to tame bright high notes", graph.withHeight (22.0f).translated (0.0f, 6.0f), juce::Justification::centred, false);
+        hoverPoint = -1;
+        hotTab = hotPresets = false;
+        repaint();
     }
 }
 
 void DampenEditor::mouseMove (const juce::MouseEvent& e)
 {
-    if (const int now = pointAt (e.position); now != hoverPoint)
+    const int now = pointAt (e.position);
+    const bool tab = eqTab.contains (e.position), preset = presets.contains (e.position);
+    if (now != hoverPoint || tab != hotTab || preset != hotPresets)
     {
         hoverPoint = now;
-        setMouseCursor (now >= 0 ? juce::MouseCursor::DraggingHandCursor : juce::MouseCursor::NormalCursor);
+        hotTab = tab;
+        hotPresets = preset;
+        setMouseCursor (now >= 0 ? juce::MouseCursor::DraggingHandCursor
+                                 : (tab || preset ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor));
         repaint();
     }
 }
