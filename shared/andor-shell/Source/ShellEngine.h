@@ -3,6 +3,7 @@
 #include "LoadedInstrument.h"
 
 #include "engine/InstrumentEngine.h"
+#include "engine/KeyDna.h"
 #include "engine/Modulation.h"
 #include "engine/RhythmicShaper.h"
 
@@ -172,6 +173,11 @@ public:
     /** The engine plays KEY DNA on its Granular layers (ANDOR OSP's per-key profile): the
         Granular strip then shows its KEY DNA key. Off by default (no key). */
     virtual bool hasKeyDna() const noexcept { return false; }
+    /** A layer's KEY DNA profile (all 128 keys at full AMOUNT; AMOUNT is the host parameter
+        layerX.keyDna.amount), computed by the shell off the audio thread from the KEY DNA
+        editor's settings, or null (none). Audio thread, at the start of a block; the table
+        stays valid until the next call for that layer. Only called when hasKeyDna(). */
+    virtual void setKeyDnaTable (int layer, const osp::keydna::Table* table) noexcept { juce::ignoreUnused (layer, table); }
 };
 
 } // namespace andor::shell

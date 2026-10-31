@@ -21,6 +21,93 @@ namespace
     }
 }
 
+//==============================================================================
+SampleDock::SampleDock()
+{
+    setTitle ("Add sample");
+    setDescription ("Load a recording: click to browse, or drop an audio file on the instrument");
+    setMouseCursor (juce::MouseCursor::PointingHandCursor);
+    setWantsKeyboardFocus (true);
+}
+
+void SampleDock::setHighlight (bool on)
+{
+    if (on != highlight)
+    {
+        highlight = on;
+        repaint();
+    }
+}
+
+void SampleDock::setHover (bool on)
+{
+    if (on != hover)
+    {
+        hover = on;
+        repaint();
+    }
+}
+
+void SampleDock::setText (const juce::String& sourceName, const juce::String& why)
+{
+    if (sourceName == name && why == problem)
+        return;
+    name = sourceName;
+    problem = why;
+    repaint();
+}
+
+void SampleDock::mouseUp (const juce::MouseEvent& e)
+{
+    if (getLocalBounds().contains (e.getPosition()) && onBrowse != nullptr)
+        onBrowse();
+}
+
+bool SampleDock::keyPressed (const juce::KeyPress& key)
+{
+    if (key == juce::KeyPress::returnKey || key == juce::KeyPress::spaceKey)
+    {
+        if (onBrowse != nullptr)
+            onBrowse();
+        return true;
+    }
+    return false;
+}
+
+void SampleDock::paint (juce::Graphics& g)
+{
+    using namespace osp::plugin;
+    using namespace osp::plugin::design;
+    const auto bounds = getLocalBounds().toFloat();
+    if (! skin::drawnBySurface())   // ceramic: the housing draws the card (its shadow falls there)
+        draw::raised (g, bounds, layout::cardRadius, colour::cardTop, colour::cardBottom);
+    // The recessed, dashed place a recording goes (the shell's add target, at card scale).
+    const auto lit = highlight || hover || hasKeyboardFocus (false);
+    const auto r = bounds.reduced (14.0f);
+    g.setColour (highlight ? palette::recessed.interpolatedWith (palette::accent, 0.08f) : palette::recessed.interpolatedWith (palette::housing, hover ? 0.35f : 0.5f));
+    g.fillRoundedRectangle (r, 10.0f);
+    juce::Path outline;
+    outline.addRoundedRectangle (r, 10.0f);
+    juce::Path dashed;
+    const float dashes[] = { 6.0f, 5.0f };
+    juce::PathStrokeType (1.2f).createDashedStroke (dashed, outline, dashes, 2);
+    g.setColour (lit ? palette::accent : palette::hairline.darker (0.15f));
+    g.fillPath (dashed);
+
+    auto centre = r.withSizeKeepingCentre (r.getWidth() - 16.0f, 104.0f);
+    icons::draw (g, problem.isEmpty() ? icons::Kind::plus : icons::Kind::loop, centre.removeFromTop (30.0f).withSizeKeepingCentre (28.0f, 28.0f),
+                 lit ? palette::accent : palette::textDim, 1.8f);
+    centre.removeFromTop (10.0f);
+    g.setColour (lit ? palette::text : palette::text.withAlpha (0.78f));
+    g.setFont (fonts::make (14.0f, fonts::Weight::medium, 0.1f));
+    g.drawText (problem.isEmpty() ? juce::String ("ADD SAMPLE") : juce::String ("TRY ANOTHER FILE"), centre.removeFromTop (20.0f), juce::Justification::centred, false);
+    g.setColour (palette::textDim);
+    g.setFont (type::popupLabel (11.0f));
+    g.drawFittedText (problem.isEmpty() ? name + juce::String::fromUTF8 (" \xc2\xb7 DROP OR BROWSE") : problem, centre.removeFromTop (34.0f).toNearestInt(),
+                      juce::Justification::centredTop, 2, 1.0f);
+}
+
+//==============================================================================
 ShellEditor::ShellEditor (ShellProcessor& p)
     : AudioProcessorEditor (p),
       shell (p),
@@ -78,6 +165,8 @@ ShellEditor::ShellEditor (ShellProcessor& p)
             modOverlay.toFront (false);
             applyBindings();   // the editor's fields are new controls
         };
+        if (p.hasKeyDna())
+            card->onKeyDna = [this] (int l) { openKeyDna (l); };
         content.addChildComponent (*card);
     }
     // A generator's card may show one of the product's controls in START's place (its name
@@ -111,6 +200,12 @@ ShellEditor::ShellEditor (ShellProcessor& p)
     dropZone.onBrowse = [this] { chooseFile (-1); };
     content.addChildComponent (dropZone);
     content.addChildComponent (addTarget);
+    if (shell.product().hybridSampleDock && shell.hasHybridLayer())
+    {
+        sampleDock.onBrowse = [this] { chooseFile (ShellProcessor::hybridLayer); };
+        sampleDock.setText (shell.product().hybridSampleName, {});
+        content.addChildComponent (sampleDock);
+    }
     content.addChildComponent (headerMix);
 
     // The six macros (the product's): names and knobs as ANDOR OSP's.
@@ -203,6 +298,7 @@ ShellEditor::~ShellEditor()
     for (auto& card : cards)
         juce::Desktop::getInstance().getAnimator().cancelAnimation (card.get(), false);
     popup.reset();
+    keyDnaPanel.reset();
     setLookAndFeel (nullptr);
 }
 
@@ -289,11 +385,23 @@ void ShellEditor::layoutSources()
     std::array<bool, InstrumentHost::numLayers> occupied {};
     for (int l = 0; l < InstrumentHost::numLayers; ++l)
         occupied[static_cast<std::size_t> (l)] = l < count;
-    const bool showAdd = dragging && count >= 1 && count < InstrumentHost::numLayers;
+    // A hybrid product's dock (opt-in): the generator's card and, beside it, the empty
+    // recording's compact dock (about a fifth of the area); it is the drop target itself.
+    const bool dock = sampleDockShown();
+    const bool showAdd = dragging && count >= 1 && count < InstrumentHost::numLayers && ! dock;
     const int columns = count + (showAdd ? 1 : 0);
     const auto density = columns <= 1 ? EngineLayoutDensity::hero : (columns == 2 ? EngineLayoutDensity::dual : EngineLayoutDensity::triple);
     dropZone.setVisible (count == 0);
     dropZone.setBounds (sourceArea);
+    auto cardArea = sourceArea;
+    if (dock)
+    {
+        constexpr int gap = 12;
+        const int dockWidth = juce::roundToInt (0.2f * static_cast<float> (sourceArea.getWidth()));
+        sampleDock.setBounds (cardArea.removeFromRight (dockWidth));
+        cardArea.removeFromRight (gap);
+    }
+    sampleDock.setVisible (dock);
     int col = 0;
     for (int l = 0; l < InstrumentHost::numLayers; ++l)
     {
@@ -304,7 +412,7 @@ void ShellEditor::layoutSources()
             continue;
         }
         card.setDensity (density);
-        card.setBounds (frame::sourceColumn (sourceArea, columns, col++));
+        card.setBounds (frame::sourceColumn (cardArea, columns, col++));
         card.setVisible (true);
     }
     addTarget.setVisible (showAdd);
@@ -324,6 +432,11 @@ void ShellEditor::layoutSources()
     updateFocus();
     applyBindings();
     content.repaint();
+}
+
+bool ShellEditor::sampleDockShown() const
+{
+    return shell.product().hybridSampleDock && shell.hasHybridLayer() && ! shell.isLayerOccupied (ShellProcessor::hybridLayer);
 }
 
 void ShellEditor::updateFocus()
@@ -375,6 +488,7 @@ void ShellEditor::fileDragEnter (const juce::StringArray&, int x, int y)
     shownCount = -1;
     layoutSources();
     dropZone.setHighlight (true);
+    sampleDock.setHighlight (true);   // (a hybrid product: any drop loads the recording)
 }
 
 void ShellEditor::fileDragMove (const juce::StringArray&, int x, int y)
@@ -387,6 +501,7 @@ void ShellEditor::fileDragExit (const juce::StringArray&)
 {
     dragging = false;
     dropZone.setHighlight (false);
+    sampleDock.setHighlight (false);
     shownCount = -1;
     layoutSources();
 }
@@ -396,6 +511,7 @@ void ShellEditor::filesDropped (const juce::StringArray& files, int x, int y)
     const int layer = dropLayerAt ({ x, y });
     dragging = false;
     dropZone.setHighlight (false);
+    sampleDock.setHighlight (false);
     juce::Array<juce::File> list;
     for (const auto& f : files)
         if (juce::File (f).hasFileExtension ("wav;aif;aiff;flac"))
@@ -771,7 +887,64 @@ void ShellEditor::setArpExpanded (bool open)
         arpPanel.refresh();
     layoutInstrument();
     frame::applyWindowShape (*this, instrumentHeight(), true);
+    placeKeyDna();
     content.repaint();
+}
+
+void ShellEditor::openKeyDna (int layer)
+{
+    // As ANDOR OSP's editor opens it.
+    closePopup();
+    if (keyDnaPanel != nullptr && keyDnaPanel->layer() != layer)
+        keyDnaPanel.reset();
+    if (keyDnaPanel == nullptr)
+    {
+        keyDnaPanel = std::make_unique<osp::plugin::KeyDnaEditor> (shell, layer);
+        juce::Component::SafePointer<ShellEditor> safe (this);
+        keyDnaPanel->onClose = [safe] {
+            juce::MessageManager::callAsync ([safe] {
+                if (safe != nullptr)
+                    safe->closeKeyDna();
+            });
+        };
+        // The profile sits over the real keys below it.
+        keyDnaPanel->keyBounds = [safe] (int note) -> juce::Rectangle<float> {
+            if (safe == nullptr || safe->keyDnaPanel == nullptr)
+                return {};
+            auto& kb = safe->keyboard;
+            if (note < kb.getRangeStart() || note > kb.getRangeEnd())
+                return {};
+            const auto r = kb.getRectangleForKey (note);
+            return r.translated (static_cast<float> (kb.getX() - safe->keyDnaPanel->getX()), static_cast<float> (kb.getY() - safe->keyDnaPanel->getY()));
+        };
+        keyDnaPanel->isKeyDown = [safe] (int note) { return safe != nullptr && safe->shell.keyboardState.isNoteOnForChannels (0xffff, note); };
+        keyDnaPanel->getProperties().set ("modCover", true);   // the halos stay under it
+        content.addAndMakeVisible (*keyDnaPanel);
+    }
+    if (shell.editLayer() != layer)
+    {
+        shell.setEditLayer (layer);
+        updateFocus();
+    }
+    placeKeyDna();
+    keyDnaPanel->toFront (true);
+    modOverlay.toFront (false);
+}
+
+void ShellEditor::closeKeyDna()
+{
+    if (keyDnaPanel == nullptr)
+        return;
+    keyDnaPanel.reset();
+    grabKeyboardFocus();
+}
+
+void ShellEditor::placeKeyDna()
+{
+    // ANDOR OSP's place: the instrument's width, from the housing's top to just above the
+    // keyboard row (which stays visible and playable).
+    if (keyDnaPanel != nullptr)
+        keyDnaPanel->setBounds (juce::Rectangle<float> (31.0f, 23.0f, 1386.0f, static_cast<float> (keyboard.getY()) - 9.0f - 23.0f).getSmallestIntegerContainer());
 }
 
 //==============================================================================
@@ -799,10 +972,19 @@ void ShellEditor::updateStatus()
 void ShellEditor::timerCallback()
 {
     layoutSources();
+    if (sampleDock.isVisible())
+    {
+        // After a failed load: what went wrong, and that another file can be tried (the
+        // sound as it was is untouched).
+        const bool failed = shell.loadState (ShellProcessor::hybridLayer) == InstrumentHost::LoadState::failed;
+        sampleDock.setText (shell.product().hybridSampleName, failed ? juce::String ("COULD NOT LOAD THAT FILE\nCLICK TO CHOOSE ANOTHER") : juce::String());
+    }
     for (auto& card : cards)
         if (card->isVisible())
             card->refresh();
     updateFocus();
+    if (keyDnaPanel != nullptr)
+        keyDnaPanel->refresh();
     presetBar.refresh();
     if (const float wheel = shell.modWheelPosition(); ! juce::exactlyEqual (wheel, shownWheelPosition))
     {

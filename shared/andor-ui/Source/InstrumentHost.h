@@ -362,6 +362,9 @@ public:
     /** The SHAPER editor's magnified view (a view setting saved with the session). */
     virtual bool shaperEditorLarge() const noexcept = 0;
     virtual void setShaperEditorLarge (bool large) noexcept = 0;
+    /** The product's wordmark as its full-window pages head themselves (KEY DNA): ANDOR OSP's
+        own by default; a product built from the shell says its own. Message thread. */
+    virtual juce::String productWordmark() const { return "ANDOR/OSP"; }
     /** A product's own state in words, for its popovers (`topic` is the product's: e.g. a
         derived analysis' progress). Empty (the default): nothing to say. Message thread. */
     virtual juce::String engineStatus (const juce::String& topic) const

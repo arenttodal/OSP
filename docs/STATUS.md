@@ -598,6 +598,13 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       `choiceOf`) and in the drag-to-assign mapping; ANDOR OSP registers none, so its route
       choices, schema golden and sessions are unchanged. A generator's card draws POS, SPREAD
       and its grains. Proof: see the PR (design capture before/after, OSP suites).
+- [x] KEY DNA, EQ, playheads and an ORGANIC dock for a hybrid product (ANDOR ANALOG), all
+      opt-in: the KEY DNA codec moved unchanged from ANDOR OSP's processor to the shared
+      `KeyDnaState` (ANDOR OSP's statics call it: its sessions are byte-identical); the shell
+      implements InstrumentHost's KEY DNA (settings, curves, undo, the `KeyDna` tree, the
+      profile handed to `Engine::setKeyDnaTable`) and opens `KeyDnaEditor` when the engine
+      has KEY DNA; `InstrumentHost::productWordmark()` (ANDOR OSP: "ANDOR/OSP", drawn exactly as
+      before); `ProductInfo::hybridSampleDock`. Proof: OSP suites and design capture.
 
 ## DONE
 

@@ -80,6 +80,12 @@ struct ProductInfo
         card, and is saved and recalled with the session. This is its name (menus, notices).
         Empty: a generator plays no recordings (every other product unchanged). */
     juce::String hybridSampleName;
+    /** A hybrid product's empty recording is a compact dock beside the generator's card
+        (about a fifth of the source area: ADD SAMPLE, drop a file or click to browse) rather
+        than nothing until a file is dragged in; loading a recording opens its card (the two
+        cards then share the area equally) and removing it brings the dock back. Interface
+        only. Off: the shell's layout as before. */
+    bool hybridSampleDock = false;
     /** A generator's card names its first source mode this (its menu and selector) instead
         of ANDOR OSP's "One Shot" (a synthesizer's "Standard"). Empty: "One Shot", as before. */
     juce::String generatorModeName;

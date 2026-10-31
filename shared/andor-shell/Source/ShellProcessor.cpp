@@ -3,6 +3,7 @@
 
 #include "AndorParameters.h"
 #include "Binding.h"
+#include "KeyDnaState.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -44,7 +45,7 @@ namespace
         osp::ShaperPattern from, to;
     };
 
-    const juce::Identifier sourcesType ("Sources"), layerType ("Layer"), viewType ("View"), curvesType ("Curves"), shaperType ("Shaper");
+    const juce::Identifier sourcesType ("Sources"), layerType ("Layer"), viewType ("View"), curvesType ("Curves"), shaperType ("Shaper"), keyDnaType ("KeyDna");
 
     /** ANDOR OSP's schema, then the product's own parameters (ProductInfo::addParameters). */
     juce::AudioProcessorValueTreeState::ParameterLayout productParameterLayout()
@@ -179,6 +180,9 @@ void ShellProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
             layer.exchange.publishOldestInUse (next->generation);
         }
     }
+
+    if (engine->hasKeyDna())
+        swapKeyDnaIfPending();
 
     keyboardState.processNextMidiBuffer (midi, 0, buffer.getNumSamples(), true);
     for (const auto metadata : midi)
@@ -803,6 +807,22 @@ std::unique_ptr<juce::XmlElement> ShellProcessor::stateXml() const
         xml->createNewChildElement (curvesType.toString())->setAttribute ("value", encodeModulationCurves (curves));
     }
     xml->createNewChildElement (shaperType.toString())->setAttribute ("value", encodeShaperPattern (shaperCustomPattern()));
+    if (engine->hasKeyDna())
+    {
+        // KEY DNA: ANDOR OSP's own tree (schema 1), so a profile reopens exactly.
+        std::array<osp::keydna::Settings, osp::plugin::keyDnaState::layerCount> keyDna {};
+        osp::plugin::keyDnaState::Curves drawn {};
+        {
+            const std::lock_guard<std::mutex> lock (keyDnaMutex);
+            for (std::size_t l = 0; l < keyDna.size(); ++l)
+            {
+                keyDna[l] = keyDnaLayers[l];
+                drawn[l] = keyDnaCurves[l];
+            }
+        }
+        if (auto tree = osp::plugin::keyDnaState::toTree (keyDna, drawn).createXml())
+            xml->addChildElement (tree.release());
+    }
     auto* view = xml->createNewChildElement (viewType.toString());
     view->setAttribute ("arpOpen", arpOpen.load() ? 1 : 0);
     view->setAttribute ("shaperLarge", shaperLarge.load() ? 1 : 0);
@@ -824,9 +844,24 @@ bool ShellProcessor::applyStateXml (const juce::XmlElement& xml)
         return false;
     if (auto* params = xml.getChildByName (parameters.state.getType()))
         parameters.replaceState (juce::ValueTree::fromXml (*params));
+    if (engine->hasKeyDna())
+    {
+        // KEY DNA (absent: every layer off), restored before a migration that may set it.
+        const auto* e = xml.getChildByName (keyDnaType);
+        const auto tree = e != nullptr ? juce::ValueTree::fromXml (*e) : juce::ValueTree();
+        const auto keyDna = osp::plugin::keyDnaState::fromTree (tree);
+        const auto drawn = osp::plugin::keyDnaState::curvesFromTree (tree);
+        for (int l = 0; l < numLayers; ++l)
+        {
+            keyDnaGestureStart[static_cast<std::size_t> (l)].reset();
+            publishKeyDna (l, keyDna[static_cast<std::size_t> (l)], &drawn[static_cast<std::size_t> (l)]);
+        }
+    }
     // An older version's state: the product moves its settings to where it reads them now.
     if (const int from = xml.getIntAttribute ("productVersion", 1); from < productInfo().stateVersion && productInfo().migrateState != nullptr)
         productInfo().migrateState (*this, from);
+    for (auto& gesture : keyDnaGestureStart)
+        gesture.reset();   // (a migration's KEY DNA is where the session starts, not a gesture)
     for (int l = 0; l < numLayers; ++l)
         clearLayer (l);
     if (auto* sources = xml.getChildByName (sourcesType))
@@ -1064,6 +1099,13 @@ void ShellProcessor::resetSettings()
     if (auto links = parameters.state.getChildWithName (modLinksTreeType()); links.isValid())
         parameters.state.removeChild (links, nullptr);
     setShaperCustomPattern (osp::RhythmicShaper::patternSteps (osp::ShaperParams().pattern), false);
+    if (engine->hasKeyDna())
+        for (int l = 0; l < numLayers; ++l)
+        {
+            const KeyDnaCurves none {};
+            keyDnaGestureStart[static_cast<std::size_t> (l)].reset();
+            publishKeyDna (l, {}, &none);
+        }
     // (The blend's default is all A: a recording kept through the reset stays heard.)
     if (isLayerOccupied (hybridLayer))
         centreHybridMix();
@@ -1181,6 +1223,133 @@ void ShellProcessor::publishShaperPattern() noexcept
 int ShellProcessor::recentVelocityAt (int index) const noexcept
 {
     return recentVelocity[static_cast<std::size_t> (((index % velocityHistory) + velocityHistory) % velocityHistory)].load (std::memory_order_relaxed);
+}
+
+
+//==============================================================================
+// KEY DNA (an engine that has it): ANDOR OSP's processor's, unchanged in behaviour.
+
+/** A change of a layer's KEY DNA (the editor), its drawn curves included: one undo step. */
+static_assert (ShellProcessor::numLayers == osp::plugin::keyDnaState::layerCount);
+
+class ShellProcessor::KeyDnaAction final : public juce::UndoableAction
+{
+public:
+    KeyDnaAction (ShellProcessor& p, int l, KeyDnaGesture before, KeyDnaGesture after) : processor (p), layer (l), from (std::move (before)), to (std::move (after)) {}
+    bool perform() override { return apply (to); }
+    bool undo() override { return apply (from); }
+
+private:
+    bool apply (const KeyDnaGesture& state)
+    {
+        processor.publishKeyDna (layer, state.settings, &state.curves);
+        return true;
+    }
+    ShellProcessor& processor;
+    int layer;
+    KeyDnaGesture from, to;
+};
+
+void ShellProcessor::swapKeyDnaIfPending() noexcept
+{
+    // A newly computed profile (message thread) replaces the layer's for notes started from
+    // now; an older one may be freed once this one is in use.
+    for (int l = 0; l < numLayers; ++l)
+    {
+        auto& exchange = keyDnaExchange[static_cast<std::size_t> (l)];
+        auto& playing = keyDnaPlaying[static_cast<std::size_t> (l)];
+        if (const auto* next = exchange.takePending())
+        {
+            playing = next;
+            engine->setKeyDnaTable (l, &next->table);
+        }
+        if (playing != nullptr)
+            exchange.publishOldestInUse (playing->generation);
+    }
+}
+
+void ShellProcessor::publishKeyDna (int layer, const osp::keydna::Settings& settings, const KeyDnaCurves* curves)
+{
+    const auto l = static_cast<std::size_t> (resolve (layer));
+    auto shape = settings;
+    shape.amount = 1.0;   // AMOUNT is the host parameter, live
+    auto profile = std::make_shared<osp::keydna::Profile>();
+    profile->table.compute (shape);   // all 128 keys, here (never on the audio thread)
+    const std::lock_guard<std::mutex> lock (keyDnaMutex);
+    keyDnaLayers[l] = shape;
+    if (curves != nullptr)
+        keyDnaCurves[l] = *curves;
+    profile->generation = ++keyDnaGeneration;
+    keyDnaExchange[l].publish (std::move (profile));
+}
+
+void ShellProcessor::beginKeyDnaGesture (int layer)
+{
+    auto& start = keyDnaGestureStart[static_cast<std::size_t> (layer)];
+    if (start.has_value())
+        return;
+    const std::lock_guard<std::mutex> lock (keyDnaMutex);
+    start = KeyDnaGesture { keyDnaLayers[static_cast<std::size_t> (layer)], keyDnaCurves[static_cast<std::size_t> (layer)] };
+}
+
+osp::keydna::Settings ShellProcessor::keyDnaSettings (int layer) const
+{
+    const std::lock_guard<std::mutex> lock (keyDnaMutex);
+    return keyDnaLayers[static_cast<std::size_t> (resolve (layer))];
+}
+
+void ShellProcessor::setKeyDnaSettings (int layer, const osp::keydna::Settings& settings, const juce::String& name, bool undoable)
+{
+    const int l = resolve (layer);
+    beginKeyDnaGesture (l);
+    if (! undoable)
+    {
+        publishKeyDna (l, settings);
+        return;
+    }
+    auto before = std::move (*keyDnaGestureStart[static_cast<std::size_t> (l)]);
+    keyDnaGestureStart[static_cast<std::size_t> (l)].reset();
+    KeyDnaGesture after { settings, {} };
+    {
+        const std::lock_guard<std::mutex> lock (keyDnaMutex);
+        after.curves = keyDnaCurves[static_cast<std::size_t> (l)];
+    }
+    undoManager.beginNewTransaction (name);
+    undoManager.perform (new KeyDnaAction (*this, l, std::move (before), std::move (after)));
+}
+
+osp::mod::Curve ShellProcessor::keyDnaCurve (int layer, osp::keydna::Param param) const
+{
+    const int l = resolve (layer);
+    osp::keydna::Settings settings;
+    std::optional<osp::mod::Curve> drawn;
+    {
+        const std::lock_guard<std::mutex> lock (keyDnaMutex);
+        settings = keyDnaLayers[static_cast<std::size_t> (l)];
+        drawn = keyDnaCurves[static_cast<std::size_t> (l)][static_cast<std::size_t> (param)];
+    }
+    return osp::plugin::keyDnaState::editorCurve (settings, drawn, param, InstrumentHost::keyDnaCurve (l, param));
+}
+
+void ShellProcessor::setKeyDnaCurve (int layer, osp::keydna::Param param, const osp::mod::Curve& curve, bool undoable)
+{
+    const int l = resolve (layer);
+    beginKeyDnaGesture (l);
+    auto valid = curve;
+    valid.normalise();
+    auto settings = keyDnaSettings (l);
+    settings[param].curve = osp::keydna::curveFrom (valid);
+    {
+        const std::lock_guard<std::mutex> lock (keyDnaMutex);
+        keyDnaCurves[static_cast<std::size_t> (l)][static_cast<std::size_t> (param)] = valid;
+    }
+    setKeyDnaSettings (l, settings, "KEY DNA " + juce::String (osp::keydna::paramName (param)) + " curve", undoable);
+}
+
+std::size_t ShellProcessor::keyDnaProfilesAlive (int layer) const
+{
+    const std::lock_guard<std::mutex> lock (keyDnaMutex);
+    return keyDnaExchange[static_cast<std::size_t> (resolve (layer))].ownedCount();
 }
 
 } // namespace andor::shell

@@ -335,7 +335,9 @@ void KeyDnaEditor::paint (juce::Graphics& g)
     // The identity, as the Library writes it, and what this page is.
     g.setColour (colour::text);
     g.setFont (fonts::make (30.0f, fonts::Weight::displayBold, 0.01f));
-    g.drawText ("ANDOR/OSP", 24, 10, 220, 34, juce::Justification::centredLeft);
+    const auto wordmark = host.productWordmark();
+    const int wordmarkWidth = std::max (220, juce::roundToInt (juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), wordmark)) + 4);
+    g.drawText (wordmark, 24, 10, wordmarkWidth, 34, juce::Justification::centredLeft);
     g.setColour (colour::textMicro);
     g.setFont (type::popupTitle (12.0f));
     g.drawText ("KEY DNA " + juce::String::fromUTF8 ("\xc2\xb7") + " LAYER " + InstrumentHost::layerName (layerIndex), 26, 42, 240, 14,

@@ -3,6 +3,7 @@
 #include "ArpSection.h"
 #include "EngineCard.h"
 #include "InstrumentFrame.h"
+#include "KeyDnaEditor.h"
 #include "MainSections.h"
 #include "ModulationPanel.h"
 #include "OspLookAndFeel.h"
@@ -14,6 +15,37 @@
 
 namespace andor::shell
 {
+
+/**
+    A hybrid product's empty recording (ProductInfo::hybridSampleDock): a compact raised card
+    beside the generator's, its one action ADD SAMPLE (a click browses; a file dropped
+    anywhere on the instrument loads it, the dock lit while one is dragged). After a failed
+    load it says so and offers another try. Not a third source: the recording's own card
+    replaces it as soon as one loads.
+*/
+class SampleDock final : public juce::Component, public osp::plugin::skin::SurfaceFace
+{
+public:
+    SampleDock();
+    std::function<void()> onBrowse;
+    void setHighlight (bool on);
+    /** The name it shows (the product's: "ORGANIC") and, after a failed load, the reason. */
+    void setText (const juce::String& sourceName, const juce::String& problem);
+    float surfaceRadius() const override { return osp::plugin::design::layout::cardRadius; }
+    bool surfaceIsCard() const override { return true; }
+    void paint (juce::Graphics&) override;
+    void mouseUp (const juce::MouseEvent&) override;
+    void mouseEnter (const juce::MouseEvent&) override { setHover (true); }
+    void mouseExit (const juce::MouseEvent&) override { setHover (false); }
+    bool keyPressed (const juce::KeyPress&) override;
+    bool isHighlighted() const noexcept { return highlight; }
+    const juce::String& problemText() const noexcept { return problem; }
+
+private:
+    void setHover (bool on);
+    juce::String name { "SAMPLE" }, problem;
+    bool highlight = false, hover = false;
+};
 
 /**
     The ANDOR Instrument Shell's window: ANDOR OSP's layout and look, built from the very same
@@ -63,6 +95,13 @@ public:
     void showWellEditor (bool show);
     void toggleWellEditor();
     bool isWellEditorShown() const;
+    /** KEY DNA (an engine that has it): ANDOR OSP's editor over the instrument, above the
+        keyboard (its profile drawn over the real keys), opened by a card's KEY DNA key. */
+    void openKeyDna (int layer);
+    void closeKeyDna();
+    osp::plugin::KeyDnaEditor* keyDnaWindow() noexcept { return keyDnaPanel.get(); }
+    /** For tests: the hybrid recording's dock (ProductInfo::hybridSampleDock). */
+    SampleDock& recordingDock() noexcept { return sampleDock; }
     /** For tests: the controls shown disabled because the engine does not read their parameters. */
     int disabledControlCount() const noexcept { return disabledControls; }
 
@@ -109,6 +148,9 @@ private:
     std::array<std::unique_ptr<osp::plugin::EngineCard>, osp::plugin::InstrumentHost::numLayers> cards;
     osp::plugin::DropZone dropZone;
     osp::plugin::AddLayerTarget addTarget;
+    SampleDock sampleDock;
+    /** The hybrid recording's dock is shown (opt-in, the recording absent). */
+    bool sampleDockShown() const;
     int shownCount = -1;
     bool dragging = false;
     int dragLayer = -1;
@@ -130,6 +172,8 @@ private:
     int disabledControls = 0;
 
     std::unique_ptr<osp::plugin::MiniPanel> popup;
+    std::unique_ptr<osp::plugin::KeyDnaEditor> keyDnaPanel;
+    void placeKeyDna();
     int popupIndex = -1, popupSource = 0;
     int closedByLabelPress = -1;   ///< a press on an open popover's own door closes it (and must not reopen it)
     OutsideClickWatcher outsideClicks { *this };
