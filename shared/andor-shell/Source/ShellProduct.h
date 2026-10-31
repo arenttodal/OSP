@@ -86,6 +86,17 @@ struct ProductInfo
         cards then share the area equally) and removing it brings the dock back. Interface
         only. Off: the shell's layout as before. */
     bool hybridSampleDock = false;
+    /** A hybrid product's recording card, while it shows the engine's own source
+        (Engine::engineSourceName), makes its heading the door to this popover (its sounds, say).
+        Unset: the heading stays plain text. Interface only. */
+    std::function<std::unique_ptr<osp::plugin::MiniPanel> (osp::plugin::InstrumentHost&)> hybridHeaderPopover;
+    /** A second way to fill the hybrid layer (an import), offered quietly on its dock and in its
+        card's menu. Unset (no label): neither shows. */
+    struct HybridAction
+    {
+        juce::String label;
+        std::function<void (osp::plugin::InstrumentHost&)> run;
+    } hybridAction;
     /** A generator's card names its first source mode this (its menu and selector) instead
         of ANDOR OSP's "One Shot" (a synthesizer's "Standard"). Empty: "One Shot", as before. */
     juce::String generatorModeName;

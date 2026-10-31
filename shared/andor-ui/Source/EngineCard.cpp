@@ -211,8 +211,9 @@ void SourceDisplay::setInstrument (std::shared_ptr<const LoadedInstrument> next)
     repaint();
 }
 
-void SourceDisplay::setGeneratedCycle (std::vector<float> cycle)
+void SourceDisplay::setGeneratedCycle (std::vector<float> cycle, bool periodic)
 {
+    generatedPeriodic = periodic;
     generatedCycle = std::move (cycle);
     cacheDirty = true;
     repaint();
@@ -507,11 +508,23 @@ void SourceDisplay::paintGenerated (juce::Graphics& g)
     body.startNewSubPath (plot.getX(), mid);
     for (int c = 0; c <= columns; ++c)
     {
-        const float t = 2.0f * static_cast<float> (c) / static_cast<float> (columns);   // two periods
-        const float position = (t - std::floor (t)) * static_cast<float> (n);
-        const int i = static_cast<int> (position) % n;
-        const float f = position - std::floor (position);
-        const float v = generatedCycle[static_cast<std::size_t> (i)] * (1.0f - f) + generatedCycle[static_cast<std::size_t> ((i + 1) % n)] * f;
+        float v = 0.0f;
+        if (generatedPeriodic)
+        {
+            const float t = 2.0f * static_cast<float> (c) / static_cast<float> (columns);   // two periods
+            const float position = (t - std::floor (t)) * static_cast<float> (n);
+            const int i = static_cast<int> (position) % n;
+            const float f = position - std::floor (position);
+            v = generatedCycle[static_cast<std::size_t> (i)] * (1.0f - f) + generatedCycle[static_cast<std::size_t> ((i + 1) % n)] * f;
+        }
+        else
+        {
+            // An outline: once, across (no wrap).
+            const float position = static_cast<float> (c) / static_cast<float> (columns) * static_cast<float> (std::max (1, n - 1));
+            const int i = std::min (static_cast<int> (position), std::max (0, n - 2));
+            const float f = std::clamp (position - static_cast<float> (i), 0.0f, 1.0f);
+            v = generatedCycle[static_cast<std::size_t> (i)] * (1.0f - f) + generatedCycle[static_cast<std::size_t> (std::min (i + 1, n - 1))] * f;
+        }
         const float x = plot.getX() + plot.getWidth() * static_cast<float> (c) / static_cast<float> (columns);
         const float y = mid - half * std::clamp (v * gain, -1.0f, 1.0f);
         if (c == 0)
@@ -2201,7 +2214,7 @@ void EngineCard::refresh()
             shownGeneratedRevision = source.revision;
             fileText = source.name;
             rootText.clear();
-            sourceDisplay.setGeneratedCycle (std::move (source.cycle));
+            sourceDisplay.setGeneratedCycle (std::move (source.cycle), source.periodic);
             placeHeadingDoor();
             repaint();
         }

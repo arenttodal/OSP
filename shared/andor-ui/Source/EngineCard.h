@@ -61,7 +61,7 @@ public:
     void setInstrument (std::shared_ptr<const LoadedInstrument>);
     /** A generated source (a synthesizer's oscillators): one period of its waveform (-1..1),
         drawn across the display in place of a recording. Empty: the recording, as before. */
-    void setGeneratedCycle (std::vector<float> cycle);
+    void setGeneratedCycle (std::vector<float> cycle, bool periodic = true);
     void setLayer (int layer);
     void setFocused (bool focused);
     void setLoading (bool loading);
@@ -121,6 +121,7 @@ private:
 
     std::shared_ptr<const LoadedInstrument> instrument;
     std::vector<float> generatedCycle;   ///< a generated source's period (empty: none)
+    bool generatedPeriodic = true;       ///< a period (drawn twice), or an outline (drawn once)
     int layer = 0;
     bool focused = true, loading = false;
     View view;

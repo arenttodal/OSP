@@ -605,6 +605,11 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       profile handed to `Engine::setKeyDnaTable`) and opens `KeyDnaEditor` when the engine
       has KEY DNA; `InstrumentHost::productWordmark()` (ANDOR OSP: "ANDOR/OSP", drawn exactly as
       before); `ProductInfo::hybridSampleDock`. Proof: OSP suites and design capture.
+- [x] An engine-owned source for a hybrid product (ANDOR ANALOG's Sample Source importer),
+      all opt-in: `Engine::saveState` / `restoreState`, `engineSourceName` /
+      `removeEngineSource`, `ProductInfo::hybridHeaderPopover` / `hybridAction`,
+      `GeneratedSource::periodic`, `ShellProcessor::productEngine()`. ANDOR OSP uses none of
+      them. Proof: OSP suites and design capture.
 
 ## DONE
 

@@ -28,6 +28,10 @@ class SampleDock final : public juce::Component, public osp::plugin::skin::Surfa
 public:
     SampleDock();
     std::function<void()> onBrowse;
+    /** A second, quieter action under the first (ProductInfo::hybridAction): its label and what
+        it does. Empty: none. */
+    void setSecondaryAction (const juce::String& label, std::function<void()> action);
+    juce::Rectangle<int> secondaryActionBounds() const;
     void setHighlight (bool on);
     /** The name it shows (the product's: "ORGANIC") and, after a failed load, the reason. */
     void setText (const juce::String& sourceName, const juce::String& problem);
@@ -43,7 +47,8 @@ public:
 
 private:
     void setHover (bool on);
-    juce::String name { "SAMPLE" }, problem;
+    juce::String name { "SAMPLE" }, problem, secondaryLabel;
+    std::function<void()> secondary;
     bool highlight = false, hover = false;
 };
 
@@ -80,7 +85,8 @@ public:
     /** The popovers: a macro's (0..5, when the product has one), Advanced, a layer's
         REIMAGINED (7 + layer, when the engine reads it), a modulation source's routes or
         larger curve (source 0 LFO 1 .. 3 ENV 2). */
-    static constexpr int advancedPopup = 6, reimaginedPopup = 7, routesPopup = 11, curvePopup = 12, startControlPopup = 13, generatorHeaderPopup = 14;
+    static constexpr int advancedPopup = 6, reimaginedPopup = 7, routesPopup = 11, curvePopup = 12, startControlPopup = 13, generatorHeaderPopup = 14,
+                         hybridHeaderPopup = 15;
     void openPopup (int which, int source = 0);
     void closePopup();
     static constexpr bool isReimaginedPopup (int which) noexcept { return which >= reimaginedPopup && which < reimaginedPopup + osp::plugin::InstrumentHost::numLayers; }
@@ -174,6 +180,10 @@ private:
     std::unique_ptr<osp::plugin::MiniPanel> popup;
     std::unique_ptr<osp::plugin::KeyDnaEditor> keyDnaPanel;
     void placeKeyDna();
+    /** The recording card's heading opens ProductInfo::hybridHeaderPopover while it shows the
+        engine's own source. */
+    void updateHybridDoor();
+    bool hybridDoorSet = false;
     int popupIndex = -1, popupSource = 0;
     int closedByLabelPress = -1;   ///< a press on an open popover's own door closes it (and must not reopen it)
     OutsideClickWatcher outsideClicks { *this };

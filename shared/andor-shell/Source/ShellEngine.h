@@ -178,6 +178,23 @@ public:
         editor's settings, or null (none). Audio thread, at the start of a block; the table
         stays valid until the next call for that layer. Only called when hasKeyDna(). */
     virtual void setKeyDnaTable (int layer, const osp::keydna::Table* table) noexcept { juce::ignoreUnused (layer, table); }
+
+    /** The engine's own state beyond the parameters (opt-in: an imported source, say), saved with
+        presets and sessions: children added to `state`. Message thread (or a host's saving
+        thread: the engine guards what it reads). */
+    virtual void saveState (juce::XmlElement& state) const { juce::ignoreUnused (state); }
+    /** Restored from a session or a preset (after its parameters), or reset (a state with none
+        of the engine's children: back to none). `assetFolder`: the shell's sample store, where
+        the engine may keep files it needs again. Message thread. */
+    virtual void restoreState (const juce::XmlElement& state, const juce::File& assetFolder) { juce::ignoreUnused (state, assetFolder); }
+
+    /** A source the engine plays on a layer itself (opt-in: a hybrid product's imported sample
+        source on its recording's layer): its name, or empty (none). While it has one, the
+        shell shows that layer's card (its name, and sourcePicture() as its picture) in place of
+        an empty layer. Message thread. */
+    virtual juce::String engineSourceName (int layer) const { juce::ignoreUnused (layer); return {}; }
+    /** The musician removed the layer's source: the engine lets go of its own. Message thread. */
+    virtual void removeEngineSource (int layer) { juce::ignoreUnused (layer); }
 };
 
 } // namespace andor::shell

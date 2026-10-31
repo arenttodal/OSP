@@ -57,9 +57,27 @@ void SampleDock::setText (const juce::String& sourceName, const juce::String& wh
     repaint();
 }
 
+void SampleDock::setSecondaryAction (const juce::String& label, std::function<void()> action)
+{
+    secondaryLabel = label;
+    secondary = std::move (action);
+    repaint();
+}
+
+juce::Rectangle<int> SampleDock::secondaryActionBounds() const
+{
+    if (secondaryLabel.isEmpty())
+        return {};
+    return getLocalBounds().reduced (14).removeFromBottom (44).withSizeKeepingCentre (getWidth() - 40, 28);
+}
+
 void SampleDock::mouseUp (const juce::MouseEvent& e)
 {
-    if (getLocalBounds().contains (e.getPosition()) && onBrowse != nullptr)
+    if (! getLocalBounds().contains (e.getPosition()))
+        return;
+    if (secondary != nullptr && secondaryActionBounds().contains (e.getPosition()))
+        secondary();
+    else if (onBrowse != nullptr)
         onBrowse();
 }
 
@@ -105,6 +123,18 @@ void SampleDock::paint (juce::Graphics& g)
     g.setFont (type::popupLabel (11.0f));
     g.drawFittedText (problem.isEmpty() ? name + juce::String::fromUTF8 (" \xc2\xb7 DROP OR BROWSE") : problem, centre.removeFromTop (34.0f).toNearestInt(),
                       juce::Justification::centredTop, 2, 1.0f);
+    if (secondaryLabel.isNotEmpty())
+    {
+        // The second way in, quieter: a text key at the foot of the dock.
+        const auto key = secondaryActionBounds().toFloat();
+        const bool over = isMouseOver (false) && key.contains (getMouseXYRelative().toFloat());
+        g.setColour (palette::text.withAlpha (over ? 0.9f : 0.55f));
+        g.setFont (type::popupLabel (10.5f));
+        g.drawText (secondaryLabel, key, juce::Justification::centred, false);
+        g.setColour (palette::hairline.withAlpha (over ? 0.9f : 0.5f));
+        g.fillRect (juce::Rectangle<float> (key.getCentreX() - 0.5f * juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), secondaryLabel), key.getBottom() - 4.0f,
+                                            juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), secondaryLabel), 1.0f));
+    }
 }
 
 //==============================================================================
@@ -203,6 +233,8 @@ ShellEditor::ShellEditor (ShellProcessor& p)
     if (shell.product().hybridSampleDock && shell.hasHybridLayer())
     {
         sampleDock.onBrowse = [this] { chooseFile (ShellProcessor::hybridLayer); };
+        if (const auto& action = shell.product().hybridAction; action.label.isNotEmpty() && action.run != nullptr)
+            sampleDock.setSecondaryAction (action.label.toUpperCase(), [this] { shell.product().hybridAction.run (shell); });
         sampleDock.setText (shell.product().hybridSampleName, {});
         content.addChildComponent (sampleDock);
     }
@@ -547,6 +579,8 @@ void ShellEditor::showLayerMenu (int layer, juce::Component& target)
         menu.addSectionHeader (shell.product().hybridSampleName);
         menu.addItem (juce::String::fromUTF8 ("Replace or relink recording\xe2\x80\xa6"), [this] { chooseFile (ShellProcessor::hybridLayer); });
         menu.addItem ("Remove recording", [this] { shell.removeLayer (ShellProcessor::hybridLayer); timerCallback(); });
+        if (const auto& action = shell.product().hybridAction; action.label.isNotEmpty() && action.run != nullptr)
+            menu.addItem (action.label + juce::String::fromUTF8 ("\xe2\x80\xa6"), [this] { shell.product().hybridAction.run (shell); });
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&target));
         return;
     }
@@ -703,6 +737,8 @@ void ShellEditor::openPopup (int which, int source)
         popup = shell.product().generatorStartControl.popover (shell);
     else if (which == generatorHeaderPopup && shell.product().generatorHeaderPopover != nullptr && cards[0]->hasHeadingDoor())
         popup = shell.product().generatorHeaderPopover (shell);
+    else if (which == hybridHeaderPopup && shell.product().hybridHeaderPopover != nullptr && cards[ShellProcessor::hybridLayer]->hasHeadingDoor())
+        popup = shell.product().hybridHeaderPopover (shell);
     if (popup == nullptr)
         return;
     popupIndex = which;
@@ -724,6 +760,8 @@ void ShellEditor::openPopup (int which, int source)
         cards[0]->setStartOpen (true);
     if (which == generatorHeaderPopup)
         cards[0]->setHeadingOpen (true);
+    if (which == hybridHeaderPopup)
+        cards[ShellProcessor::hybridLayer]->setHeadingOpen (true);
     applyBindings();   // the popover's controls follow the engine's bindings too
     if (isShowing())
         grabKeyboardFocus();
@@ -754,10 +792,11 @@ void ShellEditor::positionPopup()
         const auto anchor = content.getLocalArea (cards[0].get(), cards[0]->startLabelBounds()).toFloat();
         at = { anchor.getCentreX() - 0.5f * size.x, anchor.getY() - 10.0f - size.y };
     }
-    else if (popupIndex == generatorHeaderPopup)
+    else if (popupIndex == generatorHeaderPopup || popupIndex == hybridHeaderPopup)
     {
         // Below the card's heading, starting at its first letter (placePopover keeps it inside).
-        const auto anchor = content.getLocalArea (cards[0].get(), cards[0]->headingBounds()).toFloat();
+        const auto& card = *cards[popupIndex == hybridHeaderPopup ? static_cast<std::size_t> (ShellProcessor::hybridLayer) : 0u];
+        const auto anchor = content.getLocalArea (&card, card.headingBounds()).toFloat();
         at = { anchor.getX() - 14.0f, anchor.getBottom() + 8.0f };
     }
     else
@@ -779,6 +818,8 @@ void ShellEditor::closePopup()
         cards[0]->setStartOpen (false);
     if (popupIndex == generatorHeaderPopup)
         cards[0]->setHeadingOpen (false);
+    if (popupIndex == hybridHeaderPopup)
+        cards[ShellProcessor::hybridLayer]->setHeadingOpen (false);
     juce::Desktop::getInstance().getAnimator().cancelAnimation (popup.get(), false);
     popup.reset();
     popupIndex = -1;
@@ -871,6 +912,8 @@ void ShellEditor::mouseDownAnywhere (juce::Component* c)
         pressed = startControlPopup;
     if (cards[0]->isHeading (c))
         pressed = generatorHeaderPopup;
+    if (cards[ShellProcessor::hybridLayer]->isHeading (c) && hybridDoorSet)
+        pressed = hybridHeaderPopup;
     closedByLabelPress = pressed == popupIndex ? pressed : -1;
     closePopup();
 }
@@ -969,9 +1012,37 @@ void ShellEditor::updateStatus()
         statusLabel.setText (status, juce::dontSendNotification);
 }
 
+void ShellEditor::updateHybridDoor()
+{
+    if (shell.product().hybridHeaderPopover == nullptr || ! shell.hasHybridLayer())
+        return;
+    InstrumentHost::GeneratedSource source;
+    const bool engineSource = shell.generatedSource (ShellProcessor::hybridLayer, source);
+    if (engineSource == hybridDoorSet)
+        return;
+    hybridDoorSet = engineSource;
+    if (! engineSource)
+    {
+        if (popupIndex == hybridHeaderPopup)
+            closePopup();
+        cards[ShellProcessor::hybridLayer]->setHeadingDoor (nullptr);
+        return;
+    }
+    cards[ShellProcessor::hybridLayer]->setHeadingDoor ([this] {
+        if (closedByLabelPress == hybridHeaderPopup || popupIndex == hybridHeaderPopup)
+        {
+            closedByLabelPress = -1;
+            closePopup();
+            return;
+        }
+        openPopup (hybridHeaderPopup);
+    });
+}
+
 void ShellEditor::timerCallback()
 {
     layoutSources();
+    updateHybridDoor();
     if (sampleDock.isVisible())
     {
         // After a failed load: what went wrong, and that another file can be tried (the

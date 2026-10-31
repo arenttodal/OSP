@@ -128,6 +128,8 @@ public:
 
     // The shell -------------------------------------------------------------------------
     const ProductInfo& product() const noexcept { return productInfo(); }
+    /** The product's engine (its own interface reaches its own features through it). */
+    Engine& productEngine() noexcept { return *engine; }
     const Engine::Description& engineDescription() const noexcept { return description; }
     /** The parameter IDs and patterns the product's engine reads (Engine::boundParameters). */
     const juce::StringArray& boundParameters() const noexcept { return bound; }

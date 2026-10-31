@@ -528,7 +528,10 @@ bool ShellProcessor::isLayerOccupied (int layer) const
     if (isGenerator() && ! (hasHybridLayer() && layer == hybridLayer))
         return layer == 0;
     const auto& slot = layers[static_cast<std::size_t> (std::clamp (layer, 0, numLayers - 1))];
-    return slot.state.load() == LoadState::loading || slot.instrument != nullptr;
+    if (slot.state.load() == LoadState::loading || slot.instrument != nullptr)
+        return true;
+    // (A hybrid product's engine may play its own source there: an imported one.)
+    return hasHybridLayer() && layer == hybridLayer && engine->engineSourceName (layer).isNotEmpty();
 }
 
 const osp::InstrumentEngine::GrainSnapshot& ShellProcessor::grainSnapshot (int layer) const noexcept
@@ -541,6 +544,22 @@ const osp::InstrumentEngine::GrainSnapshot& ShellProcessor::grainSnapshot (int l
 
 bool ShellProcessor::generatedSource (int layer, GeneratedSource& out) const
 {
+    if (hasHybridLayer() && layer == hybridLayer && layers[static_cast<std::size_t> (hybridLayer)].instrument == nullptr
+        && layers[static_cast<std::size_t> (hybridLayer)].state.load() != LoadState::loading)
+    {
+        // The engine's own source on the recording's layer (an imported one): its name and picture.
+        const auto name = engine->engineSourceName (layer);
+        if (name.isEmpty())
+            return false;
+        out.name = name;
+        out.cycle.clear();
+        engine->sourcePicture (layer, parameters, out.cycle);
+        if (out.cycle.empty())
+            out.cycle.assign (2, 0.0f);
+        out.revision = fingerprint (out.cycle) ^ static_cast<std::uint64_t> (name.hashCode64());
+        out.periodic = false;   // (a recording's outline, drawn once)
+        return true;
+    }
     if (! isGenerator() || layer != 0)
         return false;
     out.name = generatorName;
@@ -696,6 +715,7 @@ void ShellProcessor::removeLayer (int layer)
     {
         clearLayer (hybridLayer);   // (its settings stay: the next recording plays with them)
         engine->sourcePublished (hybridLayer, nullptr);
+        engine->removeEngineSource (hybridLayer);
         return;
     }
     if (isGenerator())
@@ -823,6 +843,7 @@ std::unique_ptr<juce::XmlElement> ShellProcessor::stateXml() const
         if (auto tree = osp::plugin::keyDnaState::toTree (keyDna, drawn).createXml())
             xml->addChildElement (tree.release());
     }
+    engine->saveState (*xml);   // (the engine's own: none unless it keeps some)
     auto* view = xml->createNewChildElement (viewType.toString());
     view->setAttribute ("arpOpen", arpOpen.load() ? 1 : 0);
     view->setAttribute ("shaperLarge", shaperLarge.load() ? 1 : 0);
@@ -862,6 +883,7 @@ bool ShellProcessor::applyStateXml (const juce::XmlElement& xml)
         productInfo().migrateState (*this, from);
     for (auto& gesture : keyDnaGestureStart)
         gesture.reset();   // (a migration's KEY DNA is where the session starts, not a gesture)
+    engine->restoreState (xml, sampleStoreFolder());
     for (int l = 0; l < numLayers; ++l)
         clearLayer (l);
     if (auto* sources = xml.getChildByName (sourcesType))
@@ -1099,6 +1121,7 @@ void ShellProcessor::resetSettings()
     if (auto links = parameters.state.getChildWithName (modLinksTreeType()); links.isValid())
         parameters.state.removeChild (links, nullptr);
     setShaperCustomPattern (osp::RhythmicShaper::patternSteps (osp::ShaperParams().pattern), false);
+    engine->restoreState (juce::XmlElement (productInfo().stateType), sampleStoreFolder());   // (none of its own)
     if (engine->hasKeyDna())
         for (int l = 0; l < numLayers; ++l)
         {
