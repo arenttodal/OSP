@@ -294,3 +294,118 @@ TEST_CASE ("plugin synthesize: automation on held notes allocates nothing and re
     }
     CHECK (allocations == 0);
 }
+
+TEST_CASE ("plugin synthesize: A, B and C each have their own SYNTH control, in One Shot and Granular", "[plugin][synthesize][ui]")
+{
+    TempDir tmp;
+    OspAudioProcessor p;
+    loadLayers (p, tmp.dir, 3);
+    std::unique_ptr<juce::AudioProcessorEditor> e (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (e.get());
+    REQUIRE (ui != nullptr);
+    e->setSize (1448, 1086);
+    for (const float mode : { 0.0f, 1.0f })
+    {
+        for (int l = 0; l < 3; ++l)
+            p.setParameterValue (osp::plugin::InstrumentHost::layerParameterId (l, "sourceMode"), mode);
+        ui->refreshNow();
+        for (int l = 0; l < 3; ++l)
+        {
+            auto* chip = ui->engineCard (l).synthesizeControl();
+            REQUIRE (chip != nullptr);
+            CHECK (chip->isVisible());
+            chip->setValue (10.0 + 20.0 * l, juce::sendNotificationSync);   // the musician's drag
+            for (int other = 0; other < 3; ++other)
+                CHECK (p.parameterValue (synthId (other)) == Approx (other <= l ? 10.0f + 20.0f * static_cast<float> (other) : 0.0f));
+        }
+        for (int l = 0; l < 3; ++l)
+            ui->engineCard (l).synthesizeControl()->setValue (0.0, juce::sendNotificationSync);
+    }
+}
+
+TEST_CASE ("plugin synthesize: the development audition (blend law, envelope) is heard, never saved, silent at 0 %", "[plugin][synthesize]")
+{
+    TempDir tmp;
+    OspAudioProcessor p;
+    loadLayers (p, tmp.dir, 1);
+    CHECK (p.synthAuditionBlend() == 0);
+    CHECK (p.synthAuditionEnvelope() == 0);
+    const auto plain = audioHash (renderHeld (p, chord8, 1.0));
+    p.setParameterValue (synthId (0), 50.0f);
+    const auto hybrid = audioHash (renderHeld (p, chord8, 1.0));
+    p.setSynthAudition (1, 0);
+    const auto equalPower = audioHash (renderHeld (p, chord8, 1.0));
+    p.setSynthAudition (0, 1);
+    const auto follow = audioHash (renderHeld (p, chord8, 1.0));
+    CHECK (equalPower != hybrid);
+    CHECK (follow != hybrid);
+    // At 0 % no audition changes anything.
+    p.setSynthAudition (2, 1);
+    p.setParameterValue (synthId (0), 0.0f);
+    CHECK (audioHash (renderHeld (p, chord8, 1.0)) == plain);
+    // Not saved: a session reopens with the defaults (and plays as the defaults).
+    juce::MemoryBlock state;
+    p.setParameterValue (synthId (0), 50.0f);
+    p.getStateInformation (state);
+    OspAudioProcessor reopened;
+    reopened.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+    REQUIRE (reopened.waitForLoads (30000));
+    reopened.pollLoads();
+    CHECK (reopened.synthAuditionBlend() == 0);
+    CHECK (reopened.synthAuditionEnvelope() == 0);
+    p.setSynthAudition (0, 0);
+    CHECK (audioHash (renderHeld (p, chord8, 1.0)) == hybrid);
+}
+
+TEST_CASE ("plugin synthesize: CPU of the whole plug-in, SYNTHESIZE off and on", "[.][synthbench]")
+{
+    // On demand: osp_plugin_tests "[synthbench]". The default patch (macros and effects as a new
+    // instance has them), 48 kHz / 256, notes held; % of real time, median of 5 runs.
+    TempDir tmp;
+    struct Scenario { const char* name; int notes, layers; bool granular; };
+    const Scenario scenarios[] = { { "1 note", 1, 1, false },       { "8 notes", 8, 1, false },          { "16 notes", 16, 1, false },
+                                   { "32 notes", 32, 1, false },    { "8 notes x 3 layers", 8, 3, false }, { "16 notes Granular", 16, 1, true },
+                                   { "8 notes x 3 layers Granular", 8, 3, true } };
+    std::printf ("%-32s %10s %10s %8s\n", "scenario", "off % RT", "100 % RT", "added");
+    for (const auto& sc : scenarios)
+    {
+        double cost[2] {};
+        for (int on = 0; on < 2; ++on)
+        {
+            std::vector<double> runs;
+            for (int run = 0; run < 5; ++run)
+            {
+                OspAudioProcessor p;
+                loadLayers (p, tmp.dir, sc.layers);
+                for (int l = 0; l < sc.layers; ++l)
+                {
+                    p.setParameterValue (synthId (l), on ? 100.0f : 0.0f);
+                    p.setParameterValue (osp::plugin::InstrumentHost::layerParameterId (l, "sourceMode"), sc.granular ? 1.0f : 0.0f);
+                }
+                p.prepareToPlay (48000.0, 256);
+                juce::AudioBuffer<float> buffer (2, 256);
+                juce::MidiBuffer midi;
+                for (int n = 0; n < sc.notes; ++n)
+                    midi.addEvent (juce::MidiMessage::noteOn (1, 36 + (n * 7) % 48 + n / 7, static_cast<juce::uint8> (100)), 0);
+                for (int b = 0; b < 8; ++b)   // notes started and settled
+                {
+                    buffer.clear();
+                    p.processBlock (buffer, midi);
+                    midi.clear();
+                }
+                const int blocks = static_cast<int> (2.0 * 48000.0 / 256.0);
+                const auto t0 = std::chrono::steady_clock::now();
+                for (int b = 0; b < blocks; ++b)
+                {
+                    buffer.clear();
+                    p.processBlock (buffer, midi);
+                }
+                const double seconds = std::chrono::duration<double> (std::chrono::steady_clock::now() - t0).count();
+                runs.push_back (100.0 * seconds / (blocks * 256.0 / 48000.0));
+            }
+            std::sort (runs.begin(), runs.end());
+            cost[on] = runs[2];
+        }
+        std::printf ("%-32s %10.2f %10.2f %+7.1f%%\n", sc.name, cost[0], cost[1], 100.0 * (cost[1] / cost[0] - 1.0));
+    }
+}

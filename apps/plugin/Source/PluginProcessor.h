@@ -461,6 +461,9 @@ public:
     // Phase 5 (InstrumentHost): the KEY DNA editor's undoable edits and drawn curves.
     bool hasKeyDna() const noexcept override { return true; }
     bool hasSynthesize() const noexcept override { return true; }
+    int synthAuditionBlend() const noexcept override { return synthAudition.load() & 0xff; }
+    int synthAuditionEnvelope() const noexcept override { return synthAudition.load() >> 8; }
+    void setSynthAudition (int blend, int envelope) override { synthAudition = std::clamp (blend, 0, 2) | (std::clamp (envelope, 0, 1) << 8); }
     void setKeyDnaSettings (int layer, const keydna::Settings& settings, const juce::String& name, bool undoable) override;
     mod::Curve keyDnaCurve (int layer, keydna::Param param) const override;
     void setKeyDnaCurve (int layer, keydna::Param param, const mod::Curve& curve, bool undoable) override;
@@ -747,6 +750,7 @@ private:
         std::atomic<float>* synthesize = nullptr;   ///< SYNTHESIZE 0..100 % (hint 22)
     };
     std::atomic<float>* grainBudgetParam = nullptr;
+    std::atomic<int> synthAudition { 0 };   ///< SYNTHESIZE's development audition (blend | envelope << 8); never saved
     // KEY DNA: the message thread's settings and the profiles handed to the audio thread.
     mutable std::mutex keyDnaMutex;   ///< message-side (hosts may save state off the message thread)
     std::array<keydna::Settings, numLayers> keyDnaLayers {};

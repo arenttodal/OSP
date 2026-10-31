@@ -256,6 +256,12 @@ public:
         config.layer[l].synthesize = std::clamp (amount, 0.0, 1.0);
         slots[l].synthesizeLive = config.layer[l].synthesize;
     }
+    /** SYNTHESIZE's blend law and envelope (development audition; notes started afterwards). */
+    void setSynthCharacter (synth::Blend blend, synth::Envelope envelope) noexcept
+    {
+        config.synthBlend = blend;
+        config.synthEnvelope = envelope;
+    }
     /** A layer's EQ alone (the rest of its settings unchanged). */
     void setLayerEq (int layer, const eq::Settings& settings) noexcept { config.layer[layerIndex (layer)].eq = settings; }
     /** A layer's DAMPEN (each of its notes, by key; live). Bypassed until set. */

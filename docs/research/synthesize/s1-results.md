@@ -4,6 +4,27 @@ Phase S1: one analog-style oscillator per sounding voice, blended with the recor
 SYNTHESIZE amount per source (A, B, C). Design and the PHRASE comparison: `s1-audit.md`.
 This build is for musical evaluation; nothing here claims a musical verdict. That is yours.
 
+## 0. Installing the development build (macOS, Apple Silicon and Intel)
+
+Every push to `claude/charming-lovelace-n25fte` builds it in CI (macOS 15, Apple Silicon
+runner, universal binaries, the AU validated with `auval`). Download the **OSP-macOS-test**
+artifact of the latest green "CI" run, unzip it, double-click `install.command` (right-click →
+Open the first time; it is unsigned and the installer removes the quarantine), then:
+
+| | installed to |
+|---|---|
+| AU | `~/Library/Audio/Plug-Ins/Components/OSP.component` |
+| VST3 | `~/Library/Audio/Plug-Ins/VST3/OSP.vst3` |
+| Standalone | `~/Applications/OSP.app` |
+
+Ableton Live: Settings → Plug-Ins → enable "Use Audio Units v2" and/or "VST3 Plug-In System
+Folders", then **Rescan**. OSP appears under Plug-Ins → Audio Units → OSP, or under VST3 → OSP.
+Uninstall: delete those three files.
+
+Building it yourself instead: `cmake -B build-plugin -G Ninja -DCMAKE_BUILD_TYPE=Release
+-DOSP_BUILD_PLUGIN=ON && cmake --build build-plugin`. The bundles are then in
+`build-plugin/apps/plugin/OSP_Plugin_artefacts/Release/{AU,VST3,Standalone}`.
+
 ## 1. What was built
 
 | | |
@@ -88,7 +109,33 @@ renders `law-*` are there for your ears. Envelope B (`env-*-follow-050`) measure
 
 ## 5. CPU
 
-See §8 (measured after the test suites, on an idle machine).
+Measured on the cloud build machine (Linux, x86-64, shared, 48 kHz / 256-sample blocks, notes
+held, median of 5 runs). Apple Silicon will be faster in absolute terms; the ratios are the
+point. Re-run with `osp_tests "[synthbench]"` and `osp_plugin_tests "[synthbench]"`.
+
+**The oscillator itself** (saw, low-pass, envelope, control update): **4.9 ns per sample =
+0.024 % of one core per voice**, so 32 voices add about 0.8 %. At 0 % it does not run.
+
+**The engine** (no effects), % of one core, off vs 100 % (two runs; the shared VM varies by
+±20 %):
+
+| | off | 100 % | added |
+|---|---|---|---|
+| 1 voice | 0.31-0.33 | 0.34-0.35 | +8 % |
+| 8 voices | 2.0-3.0 | 2.5-3.4 | +15-30 % |
+| 16 voices | 5.1-7.9 | 6.7-8.9 | +13-32 % |
+| 32 voices | 12.0-15.1 | 13.0-13.4 | -14 to +11 % (noise) |
+| 8 notes x 3 layers | 6.0-7.5 | 7.7-8.1 | +8-29 % |
+| 8 voices Granular | 2.0-2.5 | 2.2-2.7 | +7-13 % |
+| 8 voices Granular + KEY DNA | 2.3-3.6 | 2.5-3.8 | +6-11 % |
+| 8 notes x 3 layers Granular + KEY DNA | 5.8-6.4 | 6.7-6.8 | +5-14 % |
+
+**The whole plug-in** (default patch: macros, CHARACTER, SPACE and the rest as a new instance
+has them): 1 note 1.2 → 1.9 %; 8 notes 4.2 → 4.8 %; 16 notes 12.9 → 10.1 %; 32 notes 24.5 →
+24.4 %; 8 notes x 3 layers 18.9 → 19.4 %; 16 notes Granular 5.9 → 6.0 %; 8 x 3 layers Granular
+8.0 → 9.5 %. The differences are within the machine's noise: the effects and the sample reads
+dominate. Granular budgets and KEY DNA are untouched (the oscillator is per voice, not per
+grain).
 
 ## 6. Tests
 
@@ -112,7 +159,62 @@ See §8 (measured after the test suites, on an idle machine).
 - Main ctest (goldens, legacy and Phase 0-4B renders): unchanged.
 - Parameter-schema golden: three appended lines.
 
-## 7. Listening guide (renders are local, in the session scratchpad: `synth-listen/`)
+## 7. Auditioning the alternatives in the plug-in (development only)
+
+**Right-click (or Ctrl-click) any SYNTH fader** → *SYNTHESIZE audition (development, not saved)*:
+
+- **Blend:** Hybrid (default) · Equal power (PHRASE's) · Additive
+- **Envelope:** Gate (default) · Follow the recording (envelope B)
+- **Back to the defaults**
+
+The choice applies to every source, for notes played afterwards. While it is not the
+default, a small amber corner marks every SYNTH fader. It is **never saved**: sessions and
+presets do not store it, and every new instance starts at Hybrid + Gate, so nothing you save
+depends on it. At 0 % it changes nothing (tested). `[plugin][synthesize]` covers it.
+
+## 8. Problems found (for your listening)
+
+1. **Pitch: the oscillator is in equal temperament, the recording is not.** On the held notes:
+   - Sung E5: the recording is +5.6 cents with ±20 cents of vibrato (7.9 c spread); the
+     oscillator holds +1.3 c (LIFE).
+   - Nyckelharpa: −4.3 c on its first note; −11 c on average over the bow, ranging −77 to
+     +18 c.
+   - Pluck: −5.9 c against +2.0 c.
+
+   At 25-75 % the two therefore **beat slowly**: 0.4-1.7 Hz at the fundamental, n times that
+   at the n-th harmonic. It moves with the vibrato. This is the most likely reason the
+   oscillator could read as "a synth underneath" rather than the sample itself changing.
+   Not changed in S1. The S2 candidate is to let the oscillator follow the recording's own
+   pitch: the analysis already has a per-frame pitch track, as PHRASE's oscillator followed
+   the region. Listen for it in A, B and D at 50 %.
+2. **Release: at high amounts the release is shorter than the instrument's R.** The oscillator
+   has its own release (about 140 ms to −40 dB) inside the voice's ADSR. At 100 %, where the
+   recording is silent, a note therefore stops in about 0.2 s even with R at 700 ms (the
+   default). Below 50 % the recording carries the release and this is barely audible. It is
+   a one-line change if you prefer the oscillator to release with R; deliberately not changed
+   before your listening.
+3. **Beating in chords (F):** at 75-100 % an eight-note chord of saws beats as any saw chord
+   does (equal temperament); low notes add level (C0 in F). The whole-render level stays
+   within 0.3 dB.
+4. **High register:** the oscillator's worst alias, relative to its fundamental:
+   - −87 dB at C5, −69 dB at C6, −55 dB at C7, −61 dB at C8, −53 dB at C9;
+   - the low-pass caps the tone at 12 kHz.
+
+   Unlikely to be heard under a recording; possibly audible as faint inharmonic tones on
+   pure-oscillator (100 %) notes above C7.
+5. **Envelope transitions:**
+   - Attack: 12 ms, so on plucks the recording's attack leads and the oscillator swells in
+     under it, as intended.
+   - Turning SYNTH while holding: smoothed over 20 ms, no clicks (tested).
+   - Envelope B (follow) measures within 0.3 dB of A.
+6. **Voice stealing:** a stolen voice fades the sample and the oscillator together (the
+   voice's own fast fade); 60-note storms, pedal, all-notes-off and panic leave nothing
+   sounding (tested).
+7. **Loudness:** 1-25 % stays within 0.1 dB. At 100 % decaying sources rise by up to +4.4 dB
+   over a whole phrase, because the oscillator sustains where the recording decays. The
+   eight-note chord stays within 0.3 dB. No clipping.
+
+## 9. Listening guide (renders are local, in the session scratchpad: `synth-review/`)
 
 Each file is `<scene>-<amount>.wav`, made from your recordings, so they stay out of the
 repository. Suggested order:
@@ -133,7 +235,7 @@ repository. Suggested order:
 In the plugin: load anything, raise SYNTH on a card, play. Try Granular, an Atlas
 instrument (MAP NOTES), chords and the pedal. Save, reopen.
 
-## 8. Known limitations
+## 10. Known limitations
 
 - One fixed saw and one fixed tone: no TONE, no shape, by the brief. Bright, high
   recordings may want a brighter oscillator, and dark ones a darker one.
@@ -143,7 +245,8 @@ instrument (MAP NOTES), chords and the pedal. Save, reopen.
   followed (on purpose): the oscillator plays the key.
 - REIMAGINED modes: the oscillator is added before the voice's filters, beside the mode's
   output. It is not fed into the mode engines.
-- Envelope B and the alternative blend laws are reachable only from research configs.
+- Envelope B and the alternative blend laws: the development audition menu (§7) and
+  research configs; not in presets.
 - The SYNTH fader is not a modulation target yet. The route destination list is frozen, and
   adding it means extending `destExt`.
 - Not verified on a Mac by ear: Apple Silicon build from CI, untested in a DAW.

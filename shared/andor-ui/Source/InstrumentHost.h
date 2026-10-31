@@ -240,6 +240,13 @@ public:
     /** A product whose voices blend SYNTHESIZE's oscillator (ANDOR OSP, Phase S1): each source
         card then shows its SYNTHESIZE knob after REIMAGINED. Off by default (five knobs). */
     virtual bool hasSynthesize() const noexcept { return false; }
+    /** SYNTHESIZE's development audition (S1 listening only): the blend law (0 hybrid, the
+        default; 1 equal power; 2 additive) and the envelope (0 gate, the default; 1 following
+        the recording), for every source, for notes started afterwards. Never saved: each load
+        starts at the defaults, so sessions and presets always play the default behaviour. */
+    virtual int synthAuditionBlend() const noexcept { return 0; }
+    virtual int synthAuditionEnvelope() const noexcept { return 0; }
+    virtual void setSynthAudition (int blend, int envelope) { juce::ignoreUnused (blend, envelope); }
     virtual keydna::Settings keyDnaSettings (int layer) const
     {
         juce::ignoreUnused (layer);

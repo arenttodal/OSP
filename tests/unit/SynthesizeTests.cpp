@@ -421,3 +421,57 @@ TEST_CASE ("synthesize: CPU at 1 / 8 / 16 / 32 voices, layers, Granular and KEY 
         std::printf ("%-40s %12.3f %12.3f %+9.1f%%\n", sc.name, cost[0], cost[1], 100.0 * (cost[1] / cost[0] - 1.0));
     }
 }
+
+TEST_CASE ("synthesize: aliasing of the oscillator alone across the top of the keyboard", "[.][synthbench]")
+{
+    // The strongest non-harmonic component (aliased partials) relative to the fundamental, for
+    // the raw PolyBLEP saw after its low-pass, at 48 kHz.
+    std::printf ("%-6s %10s %18s\n", "key", "Hz", "worst alias (dB)");
+    for (const int key : { 72, 84, 96, 102, 108, 120 })
+    {
+        const double hz = midiToHz (key);
+        auto x = oscillator (hz, 1.2);
+        // Hann window over 0.2..1.2 s, so a probe between harmonics does not hear their leakage.
+        const auto a = static_cast<std::size_t> (0.2 * rate), b = x.size();
+        for (std::size_t i = 0; i < x.size(); ++i)
+            x[i] = i < a ? 0.0f : static_cast<float> (x[i] * (0.5 - 0.5 * std::cos (2.0 * std::numbers::pi * static_cast<double> (i - a) / static_cast<double> (b - a))));
+        const double f = toneLevel (x, hz, 0.2, 1.2);
+        double worst = 0.0;
+        // Scan 50 Hz steps away from every harmonic (more than 25 Hz from k x hz).
+        for (double probe = 60.0; probe < 0.5 * rate - 60.0; probe += 37.0)
+        {
+            const double k = std::round (probe / hz);
+            if (k >= 1.0 && std::abs (probe - k * hz) < 40.0)
+                continue;
+            worst = std::max (worst, toneLevel (x, probe, 0.2, 1.2));
+        }
+        std::printf ("%-6d %10.1f %18.1f\n", key, hz, 20.0 * std::log10 (worst / f + 1.0e-12));
+    }
+}
+
+
+TEST_CASE ("synthesize: the oscillator's own cost per voice", "[.][synthbench]")
+{
+    // One synth::Voice (saw, low-pass, envelope) for 10 s of audio at 48 kHz, with its control
+    // update every 32 samples as the voice does it: ns per sample and % of real time per voice.
+    synth::Voice v;
+    v.prepare (rate);
+    v.start (3, 0.8, synth::Envelope::gate);
+    const int samples = static_cast<int> (10.0 * rate);
+    float sink = 0.0f;
+    std::vector<double> runs;
+    for (int run = 0; run < 7; ++run)
+    {
+        const auto t0 = std::chrono::steady_clock::now();
+        for (int i = 0; i < samples; ++i)
+        {
+            if ((i & 31) == 0)
+                v.setPitch (220.0 + 0.001 * (i >> 5));
+            sink += v.next (0.1f);
+        }
+        runs.push_back (std::chrono::duration<double> (std::chrono::steady_clock::now() - t0).count());
+    }
+    std::sort (runs.begin(), runs.end());
+    const double nsPerSample = 1.0e9 * runs[3] / samples;
+    std::printf ("oscillator: %.2f ns per sample, %.4f %% of real time per voice (sink %g)\n", nsPerSample, 100.0 * runs[3] / 10.0, static_cast<double> (sink));
+}

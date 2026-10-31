@@ -239,4 +239,10 @@ TEST_CASE ("plugin: UI refinement screenshots (OSP_REFINE_DIR)", "[.][refine-sho
     shoot ({ pad }, [&] (OspAudioProcessor& p, Editor&) { synth (p, { 35.0f }); }, "06-synth-1L");
     shoot ({ pad, pluck }, [&] (OspAudioProcessor& p, Editor&) { synth (p, { 35.0f, 0.0f }); }, "06-synth-2L");
     shoot ({ pad, pluck, rec.file }, [&] (OspAudioProcessor& p, Editor&) { synth (p, { 35.0f, 0.0f, 80.0f }); }, "06-synth-3L");
+    // ... the same in Granular (each source's own, beside its granular controls).
+    shoot ({ pad, pluck, rec.file }, [&] (OspAudioProcessor& p, Editor&) {
+        for (int l = 0; l < 3; ++l)
+            p.setParameterValue (osp::plugin::InstrumentHost::layerParameterId (l, "sourceMode"), 1.0f);
+        synth (p, { 20.0f, 55.0f, 100.0f });
+    }, "06-synth-granular-3L");
 }

@@ -2139,7 +2139,7 @@ void EngineCard::setEqOpen (bool open)
 
 SynthChip::SynthChip (InstrumentHost& processor, int layer)
     : juce::Slider (juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::NoTextBox),
-      accent (palette::layer (layer))
+      host (processor), accent (palette::layer (layer))
 {
     const auto id = InstrumentHost::synthesizeId (layer);
     binding::tag (*this, id);
@@ -2148,10 +2148,38 @@ SynthChip::SynthChip (InstrumentHost& processor, int layer)
     setMouseCursor (juce::MouseCursor::UpDownLeftRightResizeCursor);
     setTitle ("Layer " + InstrumentHost::layerName (layer) + " Synthesize");
     setTooltip ("SYNTHESIZE: blend a warm analog oscillator, playing this source's own notes, into its sound.\n"
-                "Drag to set (Alt: fine), double-click for 0.");
+                "Drag to set (Alt: fine), double-click for 0. Right-click: development audition.");
     attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (processor.apvts(), id, *this);
     setDoubleClickReturnValue (true, 0.0);
     onValueChange = [this] { repaint(); };
+}
+
+juce::PopupMenu SynthChip::auditionMenu()
+{
+    // S1 listening only: the alternatives kept from the comparison, for every source, for the
+    // notes played next. Not saved; every load starts at Hybrid + Gate.
+    const int blend = host.synthAuditionBlend(), envelope = host.synthAuditionEnvelope();
+    juce::PopupMenu m;
+    m.addSectionHeader ("SYNTHESIZE audition (development, not saved)");
+    const char* blends[] = { "Blend: Hybrid (default)", "Blend: Equal power (PHRASE)", "Blend: Additive" };
+    for (int i = 0; i < 3; ++i)
+        m.addItem (blends[i], true, blend == i, [this, i, envelope] { host.setSynthAudition (i, envelope); repaint(); });
+    m.addSeparator();
+    m.addItem ("Envelope: Gate (default)", true, envelope == 0, [this, blend] { host.setSynthAudition (blend, 0); repaint(); });
+    m.addItem ("Envelope: Follow the recording", true, envelope == 1, [this, blend] { host.setSynthAudition (blend, 1); repaint(); });
+    m.addSeparator();
+    m.addItem ("Back to the defaults", blend != 0 || envelope != 0, false, [this] { host.setSynthAudition (0, 0); repaint(); });
+    return m;
+}
+
+void SynthChip::mouseDown (const juce::MouseEvent& e)
+{
+    if (e.mods.isPopupMenu())
+    {
+        auditionMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
+        return;
+    }
+    juce::Slider::mouseDown (e);
 }
 
 void SynthChip::paint (juce::Graphics& g)
@@ -2186,6 +2214,14 @@ void SynthChip::paint (juce::Graphics& g)
     g.drawText ("SYNTH", text, juce::Justification::centredLeft, false);
     g.setColour (light.withAlpha (hover || lit ? 0.95f : 0.5f));
     g.drawText (juce::String (juce::roundToInt (amount())) + " %", text, juce::Justification::centredRight, false);
+    if (host.synthAuditionBlend() != 0 || host.synthAuditionEnvelope() != 0)
+    {
+        // A development audition is on: a small amber corner (never seen in normal use).
+        juce::Path corner;
+        corner.addTriangle (r.getRight() - 7.0f, r.getY() + 1.0f, r.getRight() - 1.0f, r.getY() + 1.0f, r.getRight() - 1.0f, r.getY() + 7.0f);
+        g.setColour (juce::Colour (0xffe0b45c));
+        g.fillPath (corner);
+    }
 }
 
 void KeyDnaKey::paint (juce::Graphics& g)
@@ -2260,7 +2296,10 @@ void EngineCard::refresh()
 {
     eqButton.setActive (processor.layerEqSettings (layerIndex).audible());
     if (synthChip != nullptr)
+    {
         synthChip->setVisible (! isEqOpen() && ! isNotesOpen() && ! isWellEditorShown());   // (those cover the well)
+        synthChip->refreshAudition();
+    }
     if (eqEditor != nullptr)
         eqEditor->refresh();
     if (noteMap != nullptr)

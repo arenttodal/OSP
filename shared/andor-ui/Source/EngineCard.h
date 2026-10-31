@@ -282,12 +282,28 @@ class SynthChip final : public juce::Slider
 public:
     SynthChip (InstrumentHost& processor, int layer);
     void paint (juce::Graphics&) override;
+    /** Right-click (or Ctrl-click): the development audition menu (blend law, envelope). */
+    void mouseDown (const juce::MouseEvent&) override;
+    /** The audition menu's items, as shown (tests). */
+    juce::PopupMenu auditionMenu();
+    /** Repaints when the audition changed (from another source's menu): the UI timer. */
+    void refreshAudition()
+    {
+        const int now = host.synthAuditionBlend() | (host.synthAuditionEnvelope() << 8);
+        if (now != shownAudition)
+        {
+            shownAudition = now;
+            repaint();
+        }
+    }
     void mouseEnter (const juce::MouseEvent& e) override { juce::Slider::mouseEnter (e); repaint(); }
     void mouseExit (const juce::MouseEvent& e) override { juce::Slider::mouseExit (e); repaint(); }
     /** The amount, 0..100 %. */
     float amount() const noexcept { return static_cast<float> (getValue()); }
 
 private:
+    InstrumentHost& host;
+    int shownAudition = 0;
     juce::Colour accent;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
 };

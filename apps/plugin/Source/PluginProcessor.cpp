@@ -613,6 +613,15 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
         engineSettings.layer[static_cast<std::size_t> (layer)].synthesize = synthesize;
         engine.setLayerSynthesize (layer, synthesize);
     }
+    {
+        // SYNTHESIZE's development audition (never saved; default hybrid + gate).
+        const int audition = synthAudition.load (std::memory_order_relaxed);
+        const auto blend = static_cast<synth::Blend> (std::clamp (audition & 0xff, 0, 2));
+        const auto envelope = static_cast<synth::Envelope> (std::clamp (audition >> 8, 0, 1));
+        engineSettings.synthBlend = blend;
+        engineSettings.synthEnvelope = envelope;
+        engine.setSynthCharacter (blend, envelope);
+    }
     engineSettings.grainBudget = grainBudgetGrains (grainBudgetParam->load());
     engine.setGrainBudget (engineSettings.grainBudget);
     engineSettings.grainBudgetPolicy = boundedGrainBudget.load() ? GrainBudgetPolicy::bounded : GrainBudgetPolicy::shared;

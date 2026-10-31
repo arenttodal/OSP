@@ -8,6 +8,10 @@ OSP test build for macOS (universal: Apple Silicon and Intel)
    - Ableton Live / Reaper: rescan plug-ins, then use the VST3 or AU "OSP"
    - Or open ~/Applications/OSP.app (standalone, choose your audio device in Options)
 
+SYNTHESIZE (development): each source's display has a small SYNTH fader in its top-right
+corner. Drag it (Alt: fine), double-click for 0. Right-click it to audition the alternative
+blend laws and the "follow the recording" envelope (development only, never saved).
+
 ANDOR Memo Lab (~/Applications/ANDOR Memo Lab.app): your iPhone's Voice Memos, synced to
 this Mac, as playable ANDOR instruments. Choose a recording, then ONE SHOT or MAP NOTES, play
 it, and Save Instrument; in OSP open it from the main menu (Instruments). The guide is
