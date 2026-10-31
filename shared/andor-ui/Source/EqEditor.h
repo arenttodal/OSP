@@ -121,6 +121,7 @@ private:
     std::unique_ptr<EqValueField> amountField, frequencyField, cutoffField;
     juce::Rectangle<float> title, eqTab, mode, presets, closeArea, amountCaption, valueCaption;
     bool hotTab = false, hotPresets = false;
+    bool twoRows = false;   ///< narrow (three cards): the mode and values on a second row under the tabs
 };
 
 /**
@@ -179,6 +180,7 @@ private:
     eq::Settings shown;
     int selected = -1, hover = -1, dragBand = -1;
     bool hotTab = false;
+    bool twoRows = false;   ///< narrow (three cards): the band's values on a second row under the tabs
     float dragFromX = 0.0f, dragFromY = 0.0f;
     double dragFromHz = 1000.0, dragFromDb = 0.0;
     std::array<double, 4> shownModulation {};

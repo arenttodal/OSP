@@ -68,7 +68,7 @@ namespace
     /** The open page's name, bright and underlined in the layer's colour ("Off" after it while
         it is off), the other page a quiet text tab; a hairline under the whole row. */
     void drawTabs (juce::Graphics& g, juce::Rectangle<float> title, const juce::String& name, bool on, juce::Rectangle<float> other,
-                   const juce::String& otherName, bool otherHot, int layer, float right)
+                   const juce::String& otherName, bool otherHot, int layer, float right, float rule = 38.0f)
     {
         using namespace osp::plugin::design;
         g.setFont (type::popupLabel (12.0f));
@@ -87,8 +87,11 @@ namespace
         g.setColour (otherHot ? light.withAlpha (0.85f) : colour::wellText.brighter (0.15f));
         g.drawText (otherName, other, juce::Justification::centred, false);
         g.setColour (light.withAlpha (0.08f));
-        hline (g, 12.0f, right - 12.0f, 38.0f);
+        hline (g, 12.0f, right - 12.0f, rule);
     }
+
+    /** The second row's top and the graph's top when a page's values sit under its tabs. */
+    constexpr float secondRowY = 37.0f, rowDrop = 28.0f;
 
     /** A segmented choice: one hairline frame, the chosen part filled once. */
     void drawSegments (juce::Graphics& g, juce::Rectangle<float> area, std::initializer_list<const char*> parts, int chosen, bool numerals)
@@ -333,7 +336,7 @@ void EqEditor::switchBand (int band, bool on)
 
 juce::Rectangle<float> EqEditor::graphArea() const
 {
-    return getLocalBounds().toFloat().withTrimmedLeft (38.0f).withTrimmedRight (14.0f).withTrimmedTop (44.0f).withTrimmedBottom (24.0f);
+    return getLocalBounds().toFloat().withTrimmedLeft (38.0f).withTrimmedRight (14.0f).withTrimmedTop (twoRows ? 44.0f + rowDrop : 44.0f).withTrimmedBottom (24.0f);
 }
 
 juce::Rectangle<float> EqEditor::powerArea() const
@@ -489,10 +492,16 @@ void EqEditor::resized()
     if (dampenPage != nullptr)
         dampenPage->setBounds (getLocalBounds());
     closeArea = { w - 32.0f, 10.0f, 22.0f, 22.0f };
-    float x = closeArea.getX() - 10.0f;
-    auto take = [&x] (float width) {
+    // The widest band's values (a bell: Q, gain, frequency, its switch and reset) beside the
+    // tabs when they fit; else on a second row under them (three cards), the graph lower.
+    // Decided by the width alone, so selecting a band never moves the graph.
+    const float widest = 24.0f + 24.0f + 52.0f + 64.0f + 74.0f + 5.0f * 6.0f;
+    twoRows = closeArea.getX() - 10.0f - widest < dampenTab.getRight() + 8.0f;
+    const float rowY = twoRows ? secondRowY : 9.0f;
+    float x = twoRows ? w - 10.0f : closeArea.getX() - 10.0f;
+    auto take = [&x, rowY] (float width) {
         x -= width;
-        const juce::Rectangle<float> r (x, 9.0f, width, 24.0f);
+        const juce::Rectangle<float> r (x, rowY, width, 24.0f);
         x -= 6.0f;
         return r;
     };
@@ -511,7 +520,8 @@ void EqEditor::resized()
             slopeArea = take (70.0f);
         frequency = take (74.0f);
     }
-    nameArea = x - dampenTab.getRight() > 90.0f ? juce::Rectangle<float> (x - 90.0f, 9.0f, 90.0f, 24.0f) : juce::Rectangle<float>();
+    const float left = twoRows ? 12.0f : dampenTab.getRight();
+    nameArea = x - left > 90.0f ? juce::Rectangle<float> (x - 90.0f, rowY, 90.0f, 24.0f) : juce::Rectangle<float>();
     auto place = [] (std::unique_ptr<EqValueField>& f, juce::Rectangle<float> r) {
         if (f != nullptr)
             f->setBounds (r.getSmallestIntegerContainer());
@@ -692,7 +702,8 @@ void EqEditor::paint (juce::Graphics& g)
 
     // The top row: the EQ's switch, EQ | DAMPEN as text tabs, the selected band's values.
     drawPower (g, powerArea(), heard);
-    drawTabs (g, titleArea, "EQ " + InstrumentHost::layerName (layer), heard, dampenTab, "DAMPEN", hotTab, layer, bounds.getRight());
+    drawTabs (g, titleArea, "EQ " + InstrumentHost::layerName (layer), heard, dampenTab, "DAMPEN", hotTab, layer, bounds.getRight(),
+              twoRows ? 38.0f + rowDrop : 38.0f);
     if (selected >= 0)
     {
         const auto band = static_cast<eq::Band> (selected);
@@ -941,7 +952,7 @@ bool DampenEditor::lowPass() const
 
 juce::Rectangle<float> DampenEditor::graphArea() const
 {
-    return getLocalBounds().toFloat().withTrimmedLeft (38.0f).withTrimmedRight (14.0f).withTrimmedTop (44.0f).withTrimmedBottom (24.0f);
+    return getLocalBounds().toFloat().withTrimmedLeft (38.0f).withTrimmedRight (14.0f).withTrimmedTop (twoRows ? 44.0f + rowDrop : 44.0f).withTrimmedBottom (24.0f);
 }
 
 juce::Point<float> DampenEditor::toScreen (float x, float y) const
@@ -1022,19 +1033,28 @@ void DampenEditor::resized()
     title = { 40.0f, 9.0f, tw + (enabled() ? 4.0f : 30.0f), 24.0f };
     eqTab = { title.getRight() + 10.0f, 9.0f, 34.0f, 24.0f };
     closeArea = { w - 32.0f, 10.0f, 22.0f, 22.0f };
-    float x = closeArea.getX() - 10.0f;
-    auto take = [&x] (float width) {
+    // Everything beside the tabs when it fits; else (three cards) the curve's presets stay
+    // up there and the mode, AMOUNT and the value take a second row, compact.
+    const float full = 64.0f + 74.0f + 34.0f + 58.0f + 52.0f + 136.0f + 6.0f * 6.0f;
+    twoRows = closeArea.getX() - 10.0f - full < eqTab.getRight() + 8.0f;
+    float x = closeArea.getX() - 10.0f, rowY = 9.0f;
+    auto take = [&x, &rowY] (float width) {
         x -= width;
-        const juce::Rectangle<float> r (x, 9.0f, width, 24.0f);
+        const juce::Rectangle<float> r (x, rowY, width, 24.0f);
         x -= 6.0f;
         return r;
     };
     presets = take (64.0f);
-    const auto value = take (74.0f);
-    valueCaption = take (34.0f);
-    const auto amount = take (58.0f);
-    amountCaption = take (52.0f);
-    mode = take (136.0f);
+    if (twoRows)
+    {
+        x = w - 10.0f;
+        rowY = secondRowY;
+    }
+    const auto value = take (twoRows ? 60.0f : 74.0f);
+    valueCaption = take (twoRows ? 32.0f : 34.0f);
+    const auto amount = take (twoRows ? 50.0f : 58.0f);
+    amountCaption = take (twoRows ? 48.0f : 52.0f);
+    mode = take (twoRows ? std::clamp (x - 12.0f, 72.0f, 136.0f) : 136.0f);
     amountField->setBounds (amount.getSmallestIntegerContainer());
     frequencyField->setBounds (value.getSmallestIntegerContainer());
     cutoffField->setBounds (value.getSmallestIntegerContainer());
@@ -1122,8 +1142,12 @@ void DampenEditor::paint (juce::Graphics& g)
     // The top row: DAMPEN's switch, DAMPEN | EQ as text tabs, the mode, AMOUNT, the value, the
     // curve's presets, close (the EQ page's vocabulary).
     drawPower (g, powerArea(), heard);
-    drawTabs (g, title, "DAMPEN " + InstrumentHost::layerName (layer), heard, eqTab, "EQ", hotTab, layer, bounds.getRight());
-    drawSegments (g, mode, { "Shelf", "Low-pass" }, lowPass() ? 1 : 0, false);
+    drawTabs (g, title, "DAMPEN " + InstrumentHost::layerName (layer), heard, eqTab, "EQ", hotTab, layer, bounds.getRight(),
+              twoRows ? 38.0f + rowDrop : 38.0f);
+    if (mode.getWidth() >= 110.0f)
+        drawSegments (g, mode, { "Shelf", "Low-pass" }, lowPass() ? 1 : 0, false);
+    else
+        drawSegments (g, mode, { "Shelf", "LP" }, lowPass() ? 1 : 0, false);
     g.setFont (type::popupLabel (10.5f));
     g.setColour (colour::wellText.brighter (0.1f));
     g.drawText ("AMOUNT", amountCaption, juce::Justification::centredRight, false);

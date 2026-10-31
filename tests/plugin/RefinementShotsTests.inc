@@ -150,6 +150,31 @@ TEST_CASE ("plugin: UI refinement screenshots (OSP_REFINE_DIR)", "[.][refine-sho
         ui.refreshNow();
         ui.engineCard (0).onEqToggle (0, true);
     }, "04-eq-2L");
+    // Three engines: the narrower cards stack the EQ's band values, and DAMPEN's mode, AMOUNT
+    // and value, under the tabs instead of over them.
+    shoot ({ pad, pluck, rec.file }, [&] (OspAudioProcessor& p, Editor& ui) {
+        ui.setSize (1086, 814);   // the default window: the narrowest cards
+        eqBands (p);
+        ui.refreshNow();
+        ui.engineCard (0).onEqToggle (0, true);
+        if (auto* eq = ui.engineCard (0).eqEditorComponent())
+            eq->selectBand (2);
+    }, "04-eq-3L");
+    shoot ({ pad, pluck, rec.file }, [&] (OspAudioProcessor& p, Editor& ui) {
+        ui.setSize (1086, 814);
+        p.setParameterValue (osp::plugin::InstrumentHost::dampenParameterId (0, "enabled"), 1.0f);
+        ui.refreshNow();
+        ui.engineCard (0).onEqToggle (0, true);
+        if (auto* eq = ui.engineCard (0).eqEditorComponent())
+            eq->showDampen (true);
+    }, "04-dampen-3L");
+    shoot ({ pad, pluck, rec.file }, [&] (OspAudioProcessor&, Editor& ui) {
+        ui.setSize (1086, 814);
+        ui.refreshNow();
+        ui.engineCard (0).onEqToggle (0, true);
+        if (auto* eq = ui.engineCard (0).eqEditorComponent())
+            eq->showDampen (true);
+    }, "04-dampen-off-3L");
     // The EQ off (its hint) and the pointer over a band (its readout).
     shoot ({ pad }, [&] (OspAudioProcessor&, Editor& ui) {
         ui.engineCard (0).onEqToggle (0, true);
