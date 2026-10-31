@@ -2565,7 +2565,7 @@ void EngineCard::resized()
     if (synthChip != nullptr)
     {
         // SYNTHESIZE in the ruler band's top-right corner (the ruler's labels keep clear of it).
-        const float chipWidth = triple ? 84.0f : 96.0f;
+        const float chipWidth = triple ? 92.0f : 96.0f;   // ("SYNTH" and "100 %" apart in a narrow card)
         const auto well = sourceDisplay.getBounds().toFloat();
         synthChip->setBounds (at ({ well.getRight() - 8.0f - chipWidth, well.getY() + 6.0f, chipWidth, 20.0f }));
         sourceDisplay.setRulerReserve (static_cast<int> (chipWidth) + 12);
