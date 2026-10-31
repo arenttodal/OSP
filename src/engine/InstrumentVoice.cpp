@@ -94,7 +94,7 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
         // As read: the playback levelling is in baseGain and applies to both alike.
         const auto& envelope = currentModel->analysis.envelope;
         const double typicalDb = envelope.maxRmsDbfs + 0.5 * std::clamp (envelope.sustainLevelDb, -12.0, 0.0);
-        synthLevel = static_cast<float> (std::clamp (std::pow (10.0, typicalDb / 20.0), 0.01, 1.0) / synth::Voice::referenceRms);
+        synthLevel = static_cast<float> (std::clamp (std::pow (10.0, typicalDb / 20.0), 1.0e-4, 1.0) / synth::Voice::referenceRms);   // (quiet recordings too: -40 dBFS is ordinary before levelling)
     }
     keyDnaAmountApplied = keyDnaAmountLive != nullptr ? std::clamp (*keyDnaAmountLive, 0.0, 1.0) : 1.0;
     // Granular voices never read the recording through: no continuation jumps or grafts.
