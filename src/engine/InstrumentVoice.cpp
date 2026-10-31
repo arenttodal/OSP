@@ -87,10 +87,14 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     synthGain = synthSampleStep = synthGainStep = 0.0f;
     synthVoice.stop();
     {
-        // The oscillator at 100 % as loud as this recording's loudest 20 ms (an Atlas member by
-        // its own), as read: the playback levelling is in baseGain and applies to both alike.
-        const double loudest = std::pow (10.0, currentModel->analysis.envelope.maxRmsDbfs / 20.0);
-        synthLevel = static_cast<float> (std::clamp (loudest, 0.01, 1.0) / synth::Voice::referenceRms);
+        // The oscillator at 100 % as loud as this recording's typical level (an Atlas member by
+        // its own): halfway in dB between its loudest 20 ms and its body's median, at most 6 dB
+        // under the loudest. The loudest alone made dynamic material (a bow, a decaying pluck)
+        // jump by 8-10 dB at 100 % in the listening matrix (docs/research/synthesize/s1-results.md).
+        // As read: the playback levelling is in baseGain and applies to both alike.
+        const auto& envelope = currentModel->analysis.envelope;
+        const double typicalDb = envelope.maxRmsDbfs + 0.5 * std::clamp (envelope.sustainLevelDb, -12.0, 0.0);
+        synthLevel = static_cast<float> (std::clamp (std::pow (10.0, typicalDb / 20.0), 0.01, 1.0) / synth::Voice::referenceRms);
     }
     keyDnaAmountApplied = keyDnaAmountLive != nullptr ? std::clamp (*keyDnaAmountLive, 0.0, 1.0) : 1.0;
     // Granular voices never read the recording through: no continuation jumps or grafts.
