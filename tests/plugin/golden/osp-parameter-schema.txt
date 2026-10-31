@@ -377,3 +377,6 @@ mod.route13.destExt v21 choice "Mod 13 Destination+" label="" range=0.0000..5.00
 mod.route14.destExt v21 choice "Mod 14 Destination+" label="" range=0.0000..5.0000/1.0000 skew=1.00000 default=0.0000 steps=6 texts=None|KEY DNA B AMOUNT|MIX TOWARDS C [None|KEY DNA A AMOUNT|KEY DNA B AMOUNT|KEY DNA C AMOUNT|MIX|MIX TOWARDS C]
 mod.route15.destExt v21 choice "Mod 15 Destination+" label="" range=0.0000..5.0000/1.0000 skew=1.00000 default=0.0000 steps=6 texts=None|KEY DNA B AMOUNT|MIX TOWARDS C [None|KEY DNA A AMOUNT|KEY DNA B AMOUNT|KEY DNA C AMOUNT|MIX|MIX TOWARDS C]
 mod.route16.destExt v21 choice "Mod 16 Destination+" label="" range=0.0000..5.0000/1.0000 skew=1.00000 default=0.0000 steps=6 texts=None|KEY DNA B AMOUNT|MIX TOWARDS C [None|KEY DNA A AMOUNT|KEY DNA B AMOUNT|KEY DNA C AMOUNT|MIX|MIX TOWARDS C]
+layerA.synthesize v22 float "Layer A Synthesize" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0 %|50 %|100 %
+layerB.synthesize v22 float "Layer B Synthesize" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0 %|50 %|100 %
+layerC.synthesize v22 float "Layer C Synthesize" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0 %|50 %|100 %

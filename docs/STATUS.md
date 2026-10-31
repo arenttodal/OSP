@@ -610,6 +610,31 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       plug-ins (`adopt.sh` for an existing repo, `new-plugin.sh` + starter for a new one, a fixed
       download link per branch); self-tested on macOS and Windows by its own workflow.
 
+## Milestone: SYNTHESIZE Phase S1 — analog oscillator blend (docs/research/synthesize)
+
+- [x] S1.1 audit of PHRASE's Natural / Synthetic (`s1-audit.md`): what it did, the OSP voice
+      integration point, and the differences.
+- [x] S1.2 DSP (`engine/SynthVoice.h`): one PolyBLEP saw per sounding voice, a fixed warm
+      12 dB/oct low-pass (about 4-8 x the pitch with velocity), envelope A (gate, default) and
+      B (sample-informed, internal). Real-time safe, deterministic (start phase from the note's
+      seed). Plays the played key with bend, fine, TUNE, LIFE, drift, routes and glide, never the
+      recording's root or a root correction; in Granular the layer's TUNE, not grain scatter.
+- [x] S1.3 blend: hybrid law (the sample whole up to 35 %, the oscillator rising as a^1.5,
+      power-normalised), chosen against equal-power and additive; each voice's oscillator
+      calibrated to its recording's loudest 20 ms. 0 % computes nothing: bit-identical (main
+      ctest and goldens unchanged).
+- [x] S1.4 GUI: SYNTH, a slim graphite fader in each source well's top-right corner (no
+      window growth, no new section, no third mode, established controls untouched; the
+      ruler keeps clear of it). Drag or wheel, Alt fine, double-click 0. A host capability
+      (`InstrumentHost::hasSynthesize`): sister products show nothing; the shell's parity
+      engine shows it, so the OSP-vs-shell visual regression stays at 0 px.
+- [x] S1.5 host parameter `layerX.synthesize` (version hint 22, appended; 0 % default; older
+      sessions open with it off), automation smoothed in the voices, saved with the session.
+      Tests: `[synth]` (engine) and `[plugin][synthesize]` (pedal, stealing, all notes off,
+      panic, a One Shot held past its end, mute/solo, A/B/C, Atlas keys left silent,
+      automation without allocation, persistence).
+- [ ] S1.6 musical evaluation by the user (renders, CPU and known limits in `s1-results.md`).
+
 ## Milestone: ANDOR Instrument Shell extensions for ANDOR ANALOG (a synthesizer)
 
 - [x] Opt-in extension points (HANDOFF.md, "What a product may add"): product parameters after

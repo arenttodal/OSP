@@ -72,6 +72,8 @@ public:
     void setDropLabel (const juce::String& label);
     /** Room kept free at the bottom (the granular strip sits there). */
     void setBottomInset (int pixels);
+    /** The ruler's labels keep clear of this many pixels at the top-right (a control sits there). */
+    void setRulerReserve (int pixels);
     /** A short display: the granular strip floats over the waveform on a translucent band of this height. */
     void setOverlayBand (int pixels);
 
@@ -126,7 +128,7 @@ private:
     View view;
     std::vector<Dot> grains, heads;
     juce::String dropLabel;
-    int bottomInset = 0, overlayBand = 0;
+    int bottomInset = 0, overlayBand = 0, rulerReserve = 0;
     juce::Image cache;
     bool cacheDirty = true;
     juce::Image backdrop;
@@ -268,6 +270,28 @@ private:
     juce::Colour accent;
 };
 
+/**
+    SYNTHESIZE (Phase S1) in a source's well: a slim graphite fader in the ruler's top-right
+    corner, in the KEY DNA key's hairline vocabulary. "SYNTH" and the amount; while it is above
+    0 a small light in the layer's colour and a thin bar show how much. Drag (up or right) or
+    turn the wheel to set it, Alt for fine; double-click returns it to 0. It takes no room from
+    the card: the well's ruler leaves its corner free (SourceDisplay::setRulerReserve).
+*/
+class SynthChip final : public juce::Slider
+{
+public:
+    SynthChip (InstrumentHost& processor, int layer);
+    void paint (juce::Graphics&) override;
+    void mouseEnter (const juce::MouseEvent& e) override { juce::Slider::mouseEnter (e); repaint(); }
+    void mouseExit (const juce::MouseEvent& e) override { juce::Slider::mouseExit (e); repaint(); }
+    /** The amount, 0..100 %. */
+    float amount() const noexcept { return static_cast<float> (getValue()); }
+
+private:
+    juce::Colour accent;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
+};
+
 /** ONE SHOT / GRANULAR as a compact selector with a menu. */
 class ModeSelector final : public juce::Component, public juce::SettableTooltipClient, public skin::KeyFace
 {
@@ -332,6 +356,8 @@ public:
     /** Whether the REIMAGINED name is the door of a component (a click on it toggles the popover). */
     bool isReimaginedLabel (const juce::Component* c) const noexcept { return c != nullptr && c == knobs[4].get(); }
     void setReimaginedOpen (bool open);
+    /** SYNTHESIZE's control (null when the host has none). */
+    SynthChip* synthesizeControl() noexcept { return synthChip.get(); }
 
     /** A generator's card: START's knob becomes one of the product's own controls (its
         parameter and name); a click on the name calls `onCaptionClick` (null: none). The card
@@ -420,6 +446,7 @@ private:
         void paintButton (juce::Graphics&, bool highlighted, bool down) override;
     } menuButton;
     std::array<std::unique_ptr<LayerKnob>, 5> knobs;   ///< START TUNE PAN LEVEL REIMAGINED
+    std::unique_ptr<SynthChip> synthChip;              ///< SYNTHESIZE in the well's corner (a host with hasSynthesize(); null otherwise)
     std::array<std::unique_ptr<ModifierButton>, 4> modifiers;
     LayerStateButton muteButton, soloButton;
     bool shownHeard = true;

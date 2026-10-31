@@ -43,6 +43,7 @@ void InstrumentEngine::prepare (double outputSampleRate, int maximumBlockSize, c
         slot.rootRatio = 1.0;
         slot.tuneRatio = semitonesToRatio (config.layer[l].tuneSemitones);
         slot.pitchRatio = slot.rootRatio * slot.tuneRatio;
+        slot.synthesizeLive = std::clamp (config.layer[l].synthesize, 0.0, 1.0);
         slot.primed = false;
         refreshLiveGranular (l);
     }
@@ -272,6 +273,7 @@ void InstrumentEngine::setLayerSettings (int layer, const LayerSettings& setting
     auto& slot = slots[l];
     slot.tuneRatio = semitonesToRatio (std::clamp (settings.tuneSemitones, -48.0, 48.0));
     slot.pitchRatio = slot.rootRatio * slot.tuneRatio;
+    slot.synthesizeLive = std::clamp (settings.synthesize, 0.0, 1.0);
     refreshLiveGranular (l);
 }
 
@@ -849,6 +851,9 @@ void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int
     params.startFraction = layerSettings.start;
     params.reverse = layerSettings.reverse;
     params.follow = layerSettings.follow;
+    params.synthesize = &slots[context].synthesizeLive;
+    params.synthBlend = config.synthBlend;
+    params.synthEnvelope = config.synthEnvelope;
     if (params.sourceMode == SourceMode::granular)
     {
         granularLife (params.shape, note, eventIndex);
@@ -1340,7 +1345,7 @@ void InstrumentEngine::renderBlock (float* const* output, int numChannels, int n
                     continue;
                 const auto ch = static_cast<std::size_t> (mpe ? std::clamp (voice.channel(), 1, 16) : 1);
                 voice.render (bl.data(), mono ? bl.data() : br.data(), n, pitchRatio * slot.pitchRatio * (mpe ? channelBendRatio[ch] : 1.0),
-                              sampleClock + done);
+                              sampleClock + done, slot.rootRatio);
                 // A voice nobody can hear any more (its key up, below the threshold after the
                 // layer's mix for a while) ends with the steal fade.
                 const float peak = voice.takeOutputPeak();

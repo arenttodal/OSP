@@ -16,6 +16,7 @@
 #include "engine/TapeFrameEngine.h"
 #include "engine/ToyboxEngine.h"
 #include "engine/ShelfFilter.h"
+#include "engine/SynthVoice.h"
 #include "model/ContinuationModel.h"
 #include "model/InstrumentModel.h"
 
@@ -58,6 +59,11 @@ struct InstrumentVoiceStart
     int grainCap = GranularSource::maxGrains;
     /** The engine's gate for a bounded budget (null: none). */
     GrainGate* grainGate = nullptr;
+    /** SYNTHESIZE: the layer's live amount (0..1, read at control rate; null or 0: no
+        oscillator at all, the voice exactly as before), and its internal blend and envelope. */
+    const double* synthesize = nullptr;
+    synth::Blend synthBlend = synth::Blend::hybrid;
+    synth::Envelope synthEnvelope = synth::Envelope::gate;
 };
 
 /**
@@ -88,7 +94,12 @@ public:
 
     /** Adds into left/right (right may equal left). pitchRatio: global bend/fine tune. */
     /** `clockAtStart`: the engine's sample clock at the first sample (shared movement). */
-    void render (float* left, float* right, int numSamples, double pitchRatio, std::int64_t clockAtStart = 0) noexcept;
+    /** `rootCorrection`: the part of pitchRatio that only corrects the recording's root (a root
+        override); SYNTHESIZE's oscillator leaves it out (it plays the key itself). */
+    void render (float* left, float* right, int numSamples, double pitchRatio, std::int64_t clockAtStart = 0, double rootCorrection = 1.0) noexcept;
+    /** SYNTHESIZE: the amount this voice plays now (smoothed), and its oscillator's pitch. */
+    double synthesizeNow() const noexcept { return synthAmountNow; }
+    double synthHz() const noexcept { return synthPitchHz; }
 
     bool isActive() const noexcept { return active; }
     bool isReleased() const noexcept { return released; }
@@ -304,6 +315,24 @@ private:
     bool granularMode = false;
     GranularSource granularSource;
     const GranularParams* granularLive = nullptr;
+
+    // SYNTHESIZE (Phase S1): the voice's own oscillator, blended in right after the source
+    // read. Off (amount 0 from the start) nothing of it runs: the voice is exactly as before.
+    synth::Voice synthVoice;
+    const double* synthAmountLive = nullptr;
+    synth::Blend synthBlend = synth::Blend::hybrid;
+    synth::Envelope synthEnvelope = synth::Envelope::gate;
+    bool synthOn = false;          ///< the oscillator runs (an amount above 0 was seen on this note)
+    bool sourceEnded = false;      ///< the recording ran out while the oscillator holds the note
+    double synthAmountNow = 0.0, synthPitchHz = 0.0, synthRootCorrection = 1.0;
+    float synthLevel = 1.0f;       ///< the recording's loudest RMS over the oscillator's reference
+    float synthSampleGain = 1.0f, synthGain = 0.0f, synthSampleStep = 0.0f, synthGainStep = 0.0f;
+    std::uint64_t synthSeed = 0;
+    int synthVelocity = 100;
+    void synthControl (int samplesToNext) noexcept;
+    void mixSynth (float& l, float& r) noexcept;
+    /** The recording ended: keep the voice for the oscillator (true) or end it (false). */
+    bool synthHoldsVoice() noexcept;
     // KALEIDOSCOPE on a granular layer: its doubling is a second grain stream a little
     // behind POS, detuned by a few cents of chorus and placed to one side; its granular
     // continuation scatters the grains wider and denser.

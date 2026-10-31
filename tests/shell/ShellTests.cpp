@@ -100,6 +100,7 @@ namespace
         void setSource (int, const osp::plugin::LoadedInstrument*) noexcept override {}
         void process (juce::AudioBuffer<float>&, const juce::MidiBuffer&, const Performance&) noexcept override {}
         bool hasKeyDna() const noexcept override { return true; }   // the Granular strip's KEY DNA key, as ANDOR OSP's
+        bool hasSynthesize() const noexcept override { return true; }   // the cards' SYNTHESIZE knob, as ANDOR OSP's
     };
 
     /** A test-only engine that logs the notes it is given (sample, note; velocity 0: off),

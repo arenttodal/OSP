@@ -229,4 +229,14 @@ TEST_CASE ("plugin: UI refinement screenshots (OSP_REFINE_DIR)", "[.][refine-sho
         if (auto* d = ui.keyDnaWindow())
             d->showParameter (keydna::Param::size);
     }, "05-keydna-drawn-1L");
+
+    // 06 SYNTHESIZE (Phase S1): each card's sixth knob, in one, two and three layers.
+    auto synth = [] (OspAudioProcessor& p, std::initializer_list<float> amounts) {
+        int l = 0;
+        for (const float a : amounts)
+            p.setParameterValue (osp::plugin::InstrumentHost::synthesizeId (l++), a);
+    };
+    shoot ({ pad }, [&] (OspAudioProcessor& p, Editor&) { synth (p, { 35.0f }); }, "06-synth-1L");
+    shoot ({ pad, pluck }, [&] (OspAudioProcessor& p, Editor&) { synth (p, { 35.0f, 0.0f }); }, "06-synth-2L");
+    shoot ({ pad, pluck, rec.file }, [&] (OspAudioProcessor& p, Editor&) { synth (p, { 35.0f, 0.0f, 80.0f }); }, "06-synth-3L");
 }

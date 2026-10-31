@@ -354,6 +354,8 @@ std::optional<RenderConfig> loadRenderConfig (const std::filesystem::path& path,
             ls.loop = json::getBool (l, "loop", ls.loop);
             ls.follow = json::getBool (l, "follow", ls.follow);
             ls.reimagined = std::clamp (json::getDouble (l, "reimagined", ls.reimagined), -1.0, 1.0);
+            // SYNTHESIZE (Phase S1): 0..1, the layer's voices turning into their own oscillator.
+            ls.synthesize = std::clamp (json::getDouble (l, "synthesize", ls.synthesize), 0.0, 1.0);
             // KEY DNA (Granular): "keyDna": { "enabled": true, "amount": 1, "individuality": 0.3,
             // "seed": 7, "size": { "depth": 0.5, "variation": 0.2, "curve": [[0, 0.2], [1, 0.8]] }, ... }
             // per parameter (position, size, density, spread, tune, scatter, pan); a curve's points are
@@ -410,6 +412,15 @@ std::optional<RenderConfig> loadRenderConfig (const std::filesystem::path& path,
         es.mixX = std::clamp (json::getDouble (m, "x", es.mixX), 0.0, 1.0);
         es.mixY = std::clamp (json::getDouble (m, "y", es.mixY), 0.0, 1.0);
     }
+    // SYNTHESIZE's internal choices (listening comparisons): "synthBlend": "hybrid" (default),
+    // "equalPower" or "additive"; "synthEnvelope": "gate" (default) or "follow".
+    if (json::has (root, "synthBlend"))
+    {
+        const auto b = json::getString (root, "synthBlend");
+        config.engineSettings.synthBlend = b == "equalPower" ? synth::Blend::equalPower : (b == "additive" ? synth::Blend::additive : synth::Blend::hybrid);
+    }
+    if (json::has (root, "synthEnvelope"))
+        config.engineSettings.synthEnvelope = json::getString (root, "synthEnvelope") == "follow" ? synth::Envelope::follow : synth::Envelope::gate;
     if (json::has (root, "reimaginedRouting"))
         config.engineSettings.reimaginedRouting = json::getString (root, "reimaginedRouting") == "perLayer" ? ReimaginedRouting::perLayer
                                                                                                          : ReimaginedRouting::legacyGlobal;

@@ -29,6 +29,7 @@ add_executable(osp_tests
     unit/ArpeggiatorTests.cpp
     unit/ModulationTests.cpp
     unit/LayerEqTests.cpp
+    unit/SynthesizeTests.cpp
     unit/SampleSetTests.cpp
     unit/FastNumericsTests.cpp
     library/CatalogTests.cpp

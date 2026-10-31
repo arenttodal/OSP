@@ -237,6 +237,9 @@ public:
 
     /** A product with KEY DNA (OSP's Granular). The KEY DNA editor shows only when true. */
     virtual bool hasKeyDna() const noexcept { return false; }
+    /** A product whose voices blend SYNTHESIZE's oscillator (ANDOR OSP, Phase S1): each source
+        card then shows its SYNTHESIZE knob after REIMAGINED. Off by default (five knobs). */
+    virtual bool hasSynthesize() const noexcept { return false; }
     virtual keydna::Settings keyDnaSettings (int layer) const
     {
         juce::ignoreUnused (layer);
@@ -257,6 +260,8 @@ public:
     }
     /** The layer's KEY DNA AMOUNT parameter ("layerA.keyDna.amount"). */
     static juce::String keyDnaAmountId (int layer) { return layerParameterId (layer, "keyDna.amount"); }
+    /** The layer's SYNTHESIZE parameter ("layerA.synthesize", 0..100 %, Phase S1). */
+    static juce::String synthesizeId (int layer) { return layerParameterId (layer, "synthesize"); }
 
     // -- Presets (header) --------------------------------------------------------------------
     struct PresetEntry

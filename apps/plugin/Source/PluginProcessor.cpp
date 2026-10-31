@@ -304,6 +304,7 @@ OspAudioProcessor::OspAudioProcessor()
                             parameters.getRawParameterValue (layerParameterId (layer, "granular.pan")),
                             parameters.getRawParameterValue (layerParameterId (layer, "granular.window")) };
         lp.keyDnaAmount = parameters.getRawParameterValue (layerParameterId (layer, "keyDna.amount"));
+        lp.synthesize = parameters.getRawParameterValue (layerParameterId (layer, "synthesize"));
     }
     grainBudgetParam = parameters.getRawParameterValue (ids::grainBudget);
     for (int layer = 0; layer < numLayers; ++layer)
@@ -580,6 +581,7 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
             rs.toybox = { 0.01 * modes[6], 0.01 * modes[7], static_cast<ToyboxPlay> (std::clamp (pick (8), 0, 2)) };
             rs.mosaic = { 0.01 * modes[9], 0.01 * modes[10], static_cast<MosaicModel> (std::clamp (pick (11), 0, 1)) };
             rs.mirage = { 0.01 * modes[12], 0.01 * modes[13], static_cast<MirageTone> (std::clamp (pick (14), 0, 1)) };
+            ls.synthesize = 0.01 * lp.synthesize->load();
             engineSettings.layer[static_cast<std::size_t> (layer)] = ls;
             engine.setLayerSettings (layer, ls);
         }
@@ -606,6 +608,10 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
         }
         // KEY DNA AMOUNT: live (the voices smooth it); a plain number, every block.
         engine.setLayerKeyDnaAmount (layer, 0.01 * lp.keyDnaAmount->load());
+        // SYNTHESIZE: live as well (the voices smooth it over ~20 ms).
+        const double synthesize = 0.01 * lp.synthesize->load();
+        engineSettings.layer[static_cast<std::size_t> (layer)].synthesize = synthesize;
+        engine.setLayerSynthesize (layer, synthesize);
     }
     engineSettings.grainBudget = grainBudgetGrains (grainBudgetParam->load());
     engine.setGrainBudget (engineSettings.grainBudget);

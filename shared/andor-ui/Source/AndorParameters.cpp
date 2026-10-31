@@ -501,6 +501,15 @@ juce::AudioProcessorValueTreeState::ParameterLayout InstrumentHost::createParame
             layout.add (std::make_unique<juce::AudioParameterChoice> (id21 (modRouteId (r, "destExt")), "Mod " + juce::String (r + 1) + " Destination+",
                                                                       modExtendedDestinationNames(), 0));
     }
+    {
+        // SYNTHESIZE (Phase S1, version hint 22), appended so nothing before moves: each
+        // source's analog oscillator blended into its own voices. 0 by default (the voice is
+        // bit-identical to playing without it), so every session from before plays as it did.
+        auto id22 = [] (const juce::String& id) { return juce::ParameterID { id, 22 }; };
+        for (int layer = 0; layer < numLayers; ++layer)
+            layout.add (std::make_unique<juce::AudioParameterFloat> (id22 (layerParameterId (layer, "synthesize")), "Layer " + layerName (layer) + " Synthesize",
+                                                                     unit, 0.0f, reimaginedText));
+    }
     return layout;
 }
 

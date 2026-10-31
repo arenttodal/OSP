@@ -26,6 +26,7 @@ void InstrumentVoice::prepare (double outputSampleRate, const AdsrSettings& adsr
     sampleRate = outputSampleRate;
     sinc = interpolator;
     shapingState = shaping;
+    synthVoice.prepare (outputSampleRate);
     charFilter.prepare (outputSampleRate);
     if (shaping == nullptr)
         charFilter.setParameters (FilterType::off, 1000.0, 0.0, 0.0, 0.0); // a bare voice: no CHARACTER stage
@@ -72,6 +73,25 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     granularMode = params.sourceMode == SourceMode::granular && params.granular != nullptr;
     granularLive = params.granular;
     keyDnaAmountLive = params.keyDnaAmount;
+    // SYNTHESIZE: armed when the layer's amount is above 0 (now or later in the note).
+    synthAmountLive = params.synthesize;
+    synthBlend = params.synthBlend;
+    synthEnvelope = params.synthEnvelope;
+    synthSeed = params.shape.seed;
+    synthVelocity = params.velocity;
+    synthOn = false;
+    sourceEnded = false;
+    synthAmountNow = 0.0;
+    synthPitchHz = 0.0;
+    synthSampleGain = 1.0f;
+    synthGain = synthSampleStep = synthGainStep = 0.0f;
+    synthVoice.stop();
+    {
+        // The oscillator at 100 % as loud as this recording's loudest 20 ms (an Atlas member by
+        // its own), as read: the playback levelling is in baseGain and applies to both alike.
+        const double loudest = std::pow (10.0, currentModel->analysis.envelope.maxRmsDbfs / 20.0);
+        synthLevel = static_cast<float> (std::clamp (loudest, 0.01, 1.0) / synth::Voice::referenceRms);
+    }
     keyDnaAmountApplied = keyDnaAmountLive != nullptr ? std::clamp (*keyDnaAmountLive, 0.0, 1.0) : 1.0;
     // Granular voices never read the recording through: no continuation jumps or grafts.
     strategy = cont->canSustain && ! granularMode ? params.strategy : ContinuationStrategy::off;
@@ -346,6 +366,8 @@ void InstrumentVoice::release() noexcept
         return;
     released = true;
     heldByPedal = false;
+    if (synthOn)
+        synthVoice.release();
     if (modStarted)
     {
         modState.release (*modRuntime);
@@ -1012,11 +1034,12 @@ void InstrumentVoice::spawnGrain() noexcept
     slot->active = true;
 }
 
-void InstrumentVoice::render (float* left, float* right, int numSamples, double pitchRatio, std::int64_t clockAtStart) noexcept
+void InstrumentVoice::render (float* left, float* right, int numSamples, double pitchRatio, std::int64_t clockAtStart, double rootCorrection) noexcept
 {
     clock = clockAtStart;
     if (! active)
         return;
+    synthRootCorrection = rootCorrection;
     if (modeEngine != nullptr)
     {
         renderMode (left, right, numSamples, pitchRatio);
@@ -1046,14 +1069,23 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
                     currentStep *= std::exp2 (glideOctaves);
                 }
             }
+            if (synthAmountLive != nullptr)
+                synthControl (controlInterval);
         }
 
-        if (granularMode)
+        if (sourceEnded)
+            ;   // the recording has ended; the oscillator holds the note
+        else if (granularMode)
         {
             if (granularSource.isFinished())
             {
-                kill();
-                return;
+                if (synthHoldsVoice())
+                    sourceEnded = true;
+                else
+                {
+                    kill();
+                    return;
+                }
             }
         }
         else
@@ -1065,8 +1097,13 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
                 beginFastFade (static_cast<int> (0.05 * sampleRate));
             if (direction > 0.0 ? position >= endPosition : position <= 0.0)
             {
-                kill();
-                return;
+                if (synthHoldsVoice())
+                    sourceEnded = true;
+                else
+                {
+                    kill();
+                    return;
+                }
             }
         }
 
@@ -1087,7 +1124,9 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
         }
 
         float l, r;
-        if (granularMode)
+        if (sourceEnded)
+            l = r = 0.0f;
+        else if (granularMode)
         {
             granularSource.render (l, r, currentStep);
             if (grainDoubling)
@@ -1215,6 +1254,16 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
             }
         }
 
+        if (synthOn)
+        {
+            mixSynth (l, r);
+            if (sourceEnded && (synthVoice.isSilent() || (synthGain <= 0.0f && synthGainStep <= 0.0f)))
+            {
+                kill();
+                return;
+            }
+        }
+
         if (filtersActive)
         {
             l = lowL.process (highL.process (l));
@@ -1337,6 +1386,8 @@ void InstrumentVoice::renderMode (float* left, float* right, int numSamples, dou
             control.step = currentStep;
             modeEngine->control (control);
             modeStep = currentStep * modeEngine->stepFactor();
+            if (synthAmountLive != nullptr)
+                synthControl (controlInterval);
         }
         const int n = std::min (modeCountdown, numSamples - done);
         const bool dry = ! granularMode && modeEngine->wantsDryRead();
@@ -1418,6 +1469,8 @@ void InstrumentVoice::renderMode (float* left, float* right, int numSamples, dou
                 }
             }
             float l = wetL[static_cast<std::size_t> (k)], r = wetR[static_cast<std::size_t> (k)];
+            if (synthOn)
+                mixSynth (l, r);
             if (filtersActive)
             {
                 l = lowL.process (highL.process (l));
@@ -1455,6 +1508,60 @@ void InstrumentVoice::renderMode (float* left, float* right, int numSamples, dou
             return;
         }
     }
+}
+
+//==============================================================================
+// SYNTHESIZE
+
+void InstrumentVoice::synthControl (int samplesToNext) noexcept
+{
+    const double target = std::clamp (*synthAmountLive, 0.0, 1.0);
+    if (! synthOn)
+    {
+        if (! (target > 0.0))
+            return;   // never on: nothing of the oscillator runs
+        synthOn = true;
+        synthVoice.start (synthSeed, std::clamp (synthVelocity, 1, 127) / 127.0, synthEnvelope);
+        if (released)
+            synthVoice.release();
+        synthAmountNow = 0.0;
+        synthSampleGain = 1.0f;
+        synthGain = 0.0f;
+    }
+    // About 20 ms to a new amount (automation and turning the control stay click-free).
+    const double k = 1.0 - std::exp (-static_cast<double> (samplesToNext) / (0.02 * sampleRate));
+    synthAmountNow += (target - synthAmountNow) * k;
+    if (std::abs (target - synthAmountNow) < 1.0e-4)
+        synthAmountNow = target;
+    const auto gains = synth::blendGains (synthAmountNow, synthBlend);
+    const auto n = static_cast<float> (std::max (1, samplesToNext));
+    synthSampleStep = (gains.sample - synthSampleGain) / n;
+    synthGainStep = (gains.synth - synthGain) / n;
+
+    // The played pitch: the key, with everything intentional on the voice (bend, fine tune,
+    // the layer's TUNE, LIFE / DRIFT / routed cents, glide), never the recording's own root or
+    // a root correction; Granular's own TUNE too (not its scatter or KEY DNA's offsets).
+    double ratio = currentStep / std::max (1.0e-12, baseIncrement) / std::max (1.0e-12, synthRootCorrection);
+    if (granularMode && granularLive != nullptr && granularLive->tuneSemitones != 0.0)
+        ratio *= std::exp2 (granularLive->tuneSemitones / 12.0);
+    synthPitchHz = 440.0 * std::exp2 ((static_cast<double> (currentNote) - 69.0) / 12.0) * ratio;
+    synthVoice.setPitch (synthPitchHz);
+}
+
+void InstrumentVoice::mixSynth (float& l, float& r) noexcept
+{
+    synthSampleGain += synthSampleStep;
+    synthGain += synthGainStep;
+    const float y = synthVoice.next (0.5f * (std::abs (l) + std::abs (r))) * std::max (0.0f, synthGain) * synthLevel;
+    l = l * synthSampleGain + y;
+    r = r * synthSampleGain + y;
+}
+
+bool InstrumentVoice::synthHoldsVoice() noexcept
+{
+    // A note whose recording ran out keeps sounding through its oscillator while the key is
+    // held (a pluck turning into a held tone), then releases with it.
+    return synthOn && (synthAmountNow > 0.0 || (synthAmountLive != nullptr && *synthAmountLive > 0.0));
 }
 
 } // namespace osp

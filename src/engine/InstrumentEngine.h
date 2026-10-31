@@ -73,6 +73,9 @@ struct LayerSettings
     /** The layer's own EQ, after its voices (and its REIMAGINED stage), before LEVEL and PAN.
         Off by default: the layer untouched. */
     eq::Settings eq;
+    /** SYNTHESIZE (Phase S1): 0..1, how far each of the layer's voices turns from its sample
+        into its own analog-style oscillator (live, smoothed per voice). 0 = exactly as before. */
+    double synthesize = 0.0;
 };
 
 /**
@@ -152,6 +155,10 @@ struct EngineSettings
     int grainBudget = 0;
     /** How a finite budget holds (GrainBudgetPolicy). Unlimited ignores it. */
     GrainBudgetPolicy grainBudgetPolicy = GrainBudgetPolicy::bounded;
+    /** SYNTHESIZE's blend law and envelope (internal: listening comparisons, research renders;
+        the plugin uses the defaults). Apply to notes started afterwards. */
+    synth::Blend synthBlend = synth::Blend::hybrid;
+    synth::Envelope synthEnvelope = synth::Envelope::gate;
 };
 
 /**
@@ -242,6 +249,13 @@ public:
     /** START, TUNE, PAN, LEVEL and the modifiers. START, REVERSE and LOOP apply to notes
         started afterwards (Granular: live); TUNE, PAN, LEVEL and FOLLOW apply live. */
     void setLayerSettings (int layer, const LayerSettings& settings) noexcept;
+    /** SYNTHESIZE alone (0..1), live on sounding notes: real-time safe (a number). */
+    void setLayerSynthesize (int layer, double amount) noexcept
+    {
+        const auto l = layerIndex (layer);
+        config.layer[l].synthesize = std::clamp (amount, 0.0, 1.0);
+        slots[l].synthesizeLive = config.layer[l].synthesize;
+    }
     /** A layer's EQ alone (the rest of its settings unchanged). */
     void setLayerEq (int layer, const eq::Settings& settings) noexcept { config.layer[layerIndex (layer)].eq = settings; }
     /** A layer's DAMPEN (each of its notes, by key; live). Bypassed until set. */
@@ -521,6 +535,7 @@ private:
         int reimaginedCountdown = 0;
         ReimaginedLive reimaginedLive;          ///< what this layer's mode-engine voices read (refreshed every block)
         eq::Processor eq;                       ///< the layer's EQ (LayerSettings::eq, plus modulation)
+        double synthesizeLive = 0.0;            ///< SYNTHESIZE, read by the layer's voices at control rate
     };
     /** The layer's EQ as heard: its settings with the global LFOs' routes added. */
     eq::Settings effectiveEq (std::size_t layer) const noexcept;

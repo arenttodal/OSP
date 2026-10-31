@@ -172,6 +172,9 @@ public:
     /** The engine plays KEY DNA on its Granular layers (ANDOR OSP's per-key profile): the
         Granular strip then shows its KEY DNA key. Off by default (no key). */
     virtual bool hasKeyDna() const noexcept { return false; }
+    /** The engine reads each layer's SYNTHESIZE (layerA.synthesize): the source cards then show
+        its knob, as ANDOR OSP's. Off by default (no knob). */
+    virtual bool hasSynthesize() const noexcept { return false; }
 };
 
 } // namespace andor::shell

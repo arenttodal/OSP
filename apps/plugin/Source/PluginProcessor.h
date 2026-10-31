@@ -460,6 +460,7 @@ public:
     keydna::Settings keyDnaSettings (int layer) const override;
     // Phase 5 (InstrumentHost): the KEY DNA editor's undoable edits and drawn curves.
     bool hasKeyDna() const noexcept override { return true; }
+    bool hasSynthesize() const noexcept override { return true; }
     void setKeyDnaSettings (int layer, const keydna::Settings& settings, const juce::String& name, bool undoable) override;
     mod::Curve keyDnaCurve (int layer, keydna::Param param) const override;
     void setKeyDnaCurve (int layer, keydna::Param param, const mod::Curve& curve, bool undoable) override;
@@ -743,6 +744,7 @@ private:
         dampen::Settings dampenSettings;
         std::array<std::atomic<float>*, 3> grainOptions {};   ///< SCATTER, PAN, WINDOW (hint 20)
         std::atomic<float>* keyDnaAmount = nullptr;
+        std::atomic<float>* synthesize = nullptr;   ///< SYNTHESIZE 0..100 % (hint 22)
     };
     std::atomic<float>* grainBudgetParam = nullptr;
     // KEY DNA: the message thread's settings and the profiles handed to the audio thread.

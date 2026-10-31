@@ -117,6 +117,7 @@ public:
     juce::String reimaginedModeUnavailable (int layer, int mode) const override { return engine->reimaginedModeUnavailable (layer, mode); }
     juce::String engineStatus (const juce::String& topic) const override { return engine->status (topic); }
     bool hasKeyDna() const noexcept override { return engine->hasKeyDna(); }
+    bool hasSynthesize() const noexcept override { return engine->hasSynthesize(); }
 
     // The shell -------------------------------------------------------------------------
     const ProductInfo& product() const noexcept { return productInfo(); }
