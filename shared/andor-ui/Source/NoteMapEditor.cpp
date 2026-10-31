@@ -5,6 +5,7 @@
 #include "core/PitchMath.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 namespace osp::plugin
@@ -59,6 +60,24 @@ namespace
             return CellKind::toggle;
         return CellKind::action;
     }
+
+    // SPEED's steps (playback rate through the recording, pitch kept).
+    constexpr std::array<double, 12> speedSteps { 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.25, 1.5, 1.75, 2.0 };
+    double nextSpeed (double speed, int direction)
+    {
+        if (direction > 0)
+        {
+            for (const auto s : speedSteps)
+                if (s > speed + 1.0e-6)
+                    return s;
+            return speedSteps.back();
+        }
+        for (auto it = speedSteps.rbegin(); it != speedSteps.rend(); ++it)
+            if (*it < speed - 1.0e-6)
+                return *it;
+        return speedSteps.front();
+    }
+    juce::String speedText (double speed) { return juce::String (juce::roundToInt (100.0 * speed)) + " %"; }
 
     constexpr float edgeGrab = 5.0f;
     constexpr float rowHeight = 24.0f;
@@ -503,10 +522,15 @@ bool NoteMapEditor::perform (const juce::String& action)
         host.mapNotes (layer, detection);
         refresh();
     }
-    else if (action == "fill" || action == "fill+" || action == "fill-" || action == "tuning")
+    else if (action == "fill" || action == "fill+" || action == "fill-" || action == "tuning"
+             || action == "speed-" || action == "speed+" || action == "speed.reset")
     {
         auto mapping = atlas->mapping;
-        if (action == "fill")
+        if (action == "speed-" || action == "speed+")
+            mapping.speed = std::clamp (nextSpeed (mapping.speed, action == "speed+" ? 1 : -1), atlas::Mapping::minSpeed, atlas::Mapping::maxSpeed);
+        else if (action == "speed.reset")
+            mapping.speed = 1.0;
+        else if (action == "fill")
             mapping.fill = ! mapping.fill;
         else if (action == "tuning")
             mapping.correctTuning = ! mapping.correctTuning;
@@ -515,7 +539,8 @@ bool NoteMapEditor::perform (const juce::String& action)
         if (mapping == atlas->mapping)
             return false;
         const auto name = action == "tuning" ? juce::String (mapping.correctTuning ? "Play in tune" : "Play as recorded")
-                                             : juce::String ("Fill keyboard");
+                        : action.startsWith ("speed") ? "Speed " + speedText (mapping.speed)
+                                                      : juce::String ("Fill keyboard");
         edit (name, [mapping] (atlas::NoteAtlas& a, const AudioData&) {
             if (a.mapping == mapping)
                 return false;
@@ -755,6 +780,9 @@ void NoteMapEditor::rebuildInspector()
                                     valueCell (juce::String::fromUTF8 ("\xc2\xb1") + juce::String (juce::roundToInt (m.maxTransposeSemitones)) + " st"),
                                     cell ("fill+", "+", false, m.fill) } });
         rows.push_back ({ narrow ? "TUNE" : "TUNING", { cell ("tuning", m.correctTuning ? "In tune" : "As played", m.correctTuning) } });
+        rows.push_back ({ "SPEED", { cell ("speed-", minus, false, m.speed > atlas::Mapping::minSpeed + 1.0e-6), valueCell (speedText (m.speed)),
+                                     cell ("speed+", "+", false, m.speed < atlas::Mapping::maxSpeed - 1.0e-6),
+                                     cell ("speed.reset", "Reset", false, m.speed != 1.0) } });
         Row sustain;
         int sustaining = 0, included = 0;
         for (const auto* n : all)

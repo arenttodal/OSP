@@ -104,6 +104,8 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     // takes the same jumps mirrored (scheduleNextJump); the release graft does not apply
     // (the recording's ending is where a reversed note begins).
     direction = params.reverse && ! granularMode ? -1.0 : 1.0;
+    stretchSpeed = std::clamp (params.speed, 0.3, 2.0);
+    stretching = false;
     if (direction < 0.0)
         releaseGraftEnabled = false;
     followContour = params.follow;
@@ -349,6 +351,7 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
 
     scheduleNextJump();
     startModeEngine (params);
+    startStretch (params.note);   // (after the mode engine: a REIMAGINED mode keeps its own read)
     if (granularMode)
     {
         if (modeEngine != nullptr)
@@ -1153,16 +1156,30 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
         else
         {
             const double bodyPosition = position; // what this sample's main read used
-            readFrame (position, currentStep, l, r);
-            if (crossfading)
+            if (stretching)
             {
-                float l2, r2, gOut, gIn;
-                readFrame (xPosition, currentStep, l2, r2);
-                crossfadeGains (static_cast<float> (xProgress / xLength), xCorrelation, gOut, gIn);
-                l = l * gOut + l2 * gIn;
-                r = r * gOut + r2 * gIn;
-                xPosition += direction * currentStep;
-                xProgress += currentStep;
+                // SPEED: the grains carry the sound; the timeline (and a crossfade's other
+                // read) moves at speed x the pitch step.
+                stretchRead (l, r);
+                if (crossfading)
+                {
+                    xPosition += direction * currentStep * stretchSpeed;
+                    xProgress += currentStep * stretchSpeed;
+                }
+            }
+            else
+            {
+                readFrame (position, currentStep, l, r);
+                if (crossfading)
+                {
+                    float l2, r2, gOut, gIn;
+                    readFrame (xPosition, currentStep, l2, r2);
+                    crossfadeGains (static_cast<float> (xProgress / xLength), xCorrelation, gOut, gIn);
+                    l = l * gOut + l2 * gIn;
+                    r = r * gOut + r2 * gIn;
+                    xPosition += direction * currentStep;
+                    xProgress += currentStep;
+                }
             }
             if (dAmount > 0.0f)
             {
@@ -1186,7 +1203,10 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
                 }
                 dSway.advance();
             }
-            position += direction * currentStep;
+            if (stretching)
+                position += direction * currentStep * stretchSpeed;
+            else
+                position += direction * currentStep;
             if (tRemaining > 0)
             {
                 const auto& native = *currentModel->original.transient;
@@ -1566,6 +1586,99 @@ bool InstrumentVoice::synthHoldsVoice() noexcept
     // A note whose recording ran out keeps sounding through its oscillator while the key is
     // held (a pluck turning into a held tone), then releases with it.
     return synthOn && (synthAmountNow > 0.0 || (synthAmountLive != nullptr && *synthAmountLive > 0.0));
+}
+
+//==============================================================================
+// SPEED
+
+void InstrumentVoice::startStretch (int note) noexcept
+{
+    stretching = ! granularMode && modeEngine == nullptr && std::abs (stretchSpeed - 1.0) > 1.0e-6;
+    if (! stretching)
+        return;
+    // Grains of about four periods of the played note (40..120 ms): long enough to hold the
+    // pitch, short enough to follow the recording.
+    const double hz = 440.0 * std::exp2 ((static_cast<double> (note) - 69.0) / 12.0);
+    const double seconds = std::clamp (4.0 / std::max (20.0, hz), 0.04, 0.12);
+    stretchLength = 2 * std::max (32, static_cast<int> (0.5 * seconds * sampleRate));
+    stretchHop = stretchLength / 2;
+    // The recording's own period, in its (layer) frames: the note's analysed pitch.
+    const auto& src = *layer->source;
+    const double rootHz = 440.0 * std::exp2 ((src.rootMidi() - 69.0) / 12.0);
+    stretchPeriod = rootHz > 0.0 ? src.sampleRate() / rootHz : 0.0;
+    // The first grain starts at its full level (the attack is heard as recorded); the next one
+    // rises from the first sample, so the two always sum to one.
+    stretchGrains = {};
+    auto& first = stretchGrains[0];
+    first.active = true;
+    first.pos = position;
+    first.age = stretchHop;
+    stretchCountdown = 1;
+}
+
+void InstrumentVoice::spawnStretchGrain() noexcept
+{
+    StretchGrain* slot = nullptr;
+    const StretchGrain* previous = nullptr;
+    for (auto& g : stretchGrains)
+    {
+        if (! g.active && slot == nullptr)
+            slot = &g;
+        else if (g.active)
+            previous = &g;
+    }
+    if (slot == nullptr)
+        return;
+    StretchGrain g;
+    g.active = true;
+    g.pos = position;
+    if (crossfading)
+    {
+        // Inside a loop's crossfade: both reads, at their gains now.
+        crossfadeGains (static_cast<float> (xProgress / xLength), xCorrelation, g.gainA, g.gainB);
+        g.posB = xPosition;
+    }
+    else if (previous != nullptr && stretchPeriod > 0.0)
+    {
+        // In phase with the grain it overlaps: where that one reads now, plus whole periods
+        // towards the timeline.
+        const double k = std::round ((position - previous->pos) / stretchPeriod);
+        g.pos = previous->pos + k * stretchPeriod;
+    }
+    *slot = g;
+}
+
+void InstrumentVoice::stretchRead (float& l, float& r) noexcept
+{
+    if (--stretchCountdown <= 0)
+    {
+        spawnStretchGrain();
+        stretchCountdown = stretchHop;
+    }
+    l = r = 0.0f;
+    const double length = static_cast<double> (stretchLength);
+    for (auto& g : stretchGrains)
+    {
+        if (! g.active)
+            continue;
+        const auto w = static_cast<float> (std::sin (std::numbers::pi * static_cast<double> (g.age) / length));
+        const float window = w * w;
+        float a, b;
+        readFrame (g.pos, currentStep, a, b);
+        float left = a * g.gainA, right = b * g.gainA;
+        if (g.gainB > 0.0f)
+        {
+            readFrame (g.posB, currentStep, a, b);
+            left += a * g.gainB;
+            right += b * g.gainB;
+            g.posB += direction * currentStep;
+        }
+        l += window * left;
+        r += window * right;
+        g.pos += direction * currentStep;
+        if (++g.age >= stretchLength)
+            g.active = false;
+    }
 }
 
 } // namespace osp

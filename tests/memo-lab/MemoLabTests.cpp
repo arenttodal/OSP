@@ -28,6 +28,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 
@@ -794,6 +795,263 @@ TEST_CASE ("memo lab: Z and X move the Mac keys an octave, and a new instrument 
         CHECK (low <= 49);    // the middle of G2..G3 is within reach
         CHECK (high >= 49);
         CHECK (ui.keyOctave() == 3);
+    }
+    juce::LookAndFeel::setDefaultLookAndFeel (nullptr);
+}
+
+//==============================================================================
+// The library scan's sorting (MemoClassifier).
+#include "MemoClassifier.h"
+
+namespace
+{
+    MemoProfile profileOf (const AudioData& a)
+    {
+        std::vector<float> mono (a.channels[0].size(), 0.0f);
+        for (const auto& ch : a.channels)
+            for (std::size_t i = 0; i < mono.size(); ++i)
+                mono[i] += ch[i] / static_cast<float> (a.channels.size());
+        return profileRecording (mono.data(), static_cast<std::int64_t> (mono.size()), a.sampleRate);
+    }
+
+    std::string describe (const MemoProfile& p)
+    {
+        std::string s = std::string (soundClassName (p.label)) + " (" + std::to_string (juce::roundToInt (100.0f * p.confidence)) + " %):";
+        for (int c = 0; c < soundClassCount; ++c)
+            s += std::string (" ") + soundClassId (static_cast<SoundClass> (c)) + " " + std::to_string (juce::roundToInt (100.0f * p.share[static_cast<std::size_t> (c)]));
+        return s;
+    }
+}
+
+TEST_CASE ("memo lab: the library scan profiles every file in OSP_CLASSIFY_DIR (run on demand)", "[.][memo-lab][classify-files]")
+{
+    const char* dir = std::getenv ("OSP_CLASSIFY_DIR");
+    if (dir == nullptr)
+        return;
+    for (const auto& entry : juce::RangedDirectoryIterator (juce::File (juce::String::fromUTF8 (dir)), false, "*.wav;*.aif;*.aiff;*.m4a;*.flac"))
+    {
+        DecodedAudio audio;
+        juce::String error;
+        if (! decode (entry.getFile(), audio, error))
+            continue;
+        std::vector<float> mono (static_cast<std::size_t> (audio.buffer.getNumSamples()), 0.0f);
+        for (int c = 0; c < audio.buffer.getNumChannels(); ++c)
+            for (int i = 0; i < audio.buffer.getNumSamples(); ++i)
+                mono[static_cast<std::size_t> (i)] += audio.buffer.getSample (c, i) / static_cast<float> (audio.buffer.getNumChannels());
+        const auto t0 = juce::Time::getMillisecondCounterHiRes();
+        const auto p = profileRecording (mono.data(), static_cast<std::int64_t> (mono.size()), audio.info.sampleRate);
+        std::printf ("%-48s %6.1f s  %5.0f ms  %s  music@%.0f\n", entry.getFile().getFileName().substring (0, 48).toRawUTF8(), p.durationSeconds,
+                     juce::Time::getMillisecondCounterHiRes() - t0, describe (p).c_str(), p.firstMusicSeconds);
+    }
+}
+
+namespace
+{
+    constexpr double sr = 48000.0;
+    AudioData silence (double seconds) { return AudioData::allocate (1, static_cast<std::int64_t> (seconds * sr), sr); }
+
+    /** Speech-like: syllables of 80-220 ms, the pitch gliding down through each (150-220 Hz),
+        a few harmonics, short gaps with a little breath noise between them. */
+    AudioData talking (double seconds, std::uint64_t seed)
+    {
+        auto a = silence (seconds);
+        Prng rng (seed);
+        double t = 0.1, phase = 0.0;
+        while (t < seconds - 0.4)
+        {
+            const double len = rng.uniform (0.08, 0.22), gap = rng.uniform (0.05, 0.18);
+            const double f0 = rng.uniform (150.0, 220.0), drop = rng.uniform (0.75, 0.9);
+            const auto start = static_cast<std::size_t> (t * sr), n = static_cast<std::size_t> (len * sr);
+            for (std::size_t i = 0; i < n; ++i)
+            {
+                const double u = static_cast<double> (i) / static_cast<double> (n);
+                const double hz = f0 * (1.0 - (1.0 - drop) * u);
+                phase += 2.0 * std::numbers::pi * hz / sr;
+                const double env = std::sin (std::numbers::pi * u);
+                a.channels[0][start + i] = static_cast<float> (0.25 * env * (std::sin (phase) + 0.5 * std::sin (2.0 * phase) + 0.3 * std::sin (3.0 * phase)));
+            }
+            const auto gs = start + n, gn = static_cast<std::size_t> (gap * sr);
+            for (std::size_t i = 0; i < gn && gs + i < a.channels[0].size(); ++i)
+                a.channels[0][gs + i] = static_cast<float> (0.004 * rng.bipolar());
+            t += len + gap;
+        }
+        return a;
+    }
+
+    /** Humming: held dark notes (a fundamental and a soft second harmonic) with a natural
+        slow vibrato, one after another. */
+    AudioData humming (std::vector<int> keys, double noteSeconds)
+    {
+        auto a = silence (static_cast<double> (keys.size()) * noteSeconds + 0.4);
+        double phase = 0.0;
+        for (std::size_t k = 0; k < keys.size(); ++k)
+        {
+            const auto start = static_cast<std::size_t> ((0.2 + static_cast<double> (k) * noteSeconds) * sr), n = static_cast<std::size_t> (noteSeconds * sr);
+            for (std::size_t i = 0; i < n; ++i)
+            {
+                const double tt = static_cast<double> (i) / sr;
+                const double hz = midiToHz (keys[k]) * std::exp2 (0.18 / 12.0 * std::sin (2.0 * std::numbers::pi * 5.2 * tt) + 0.06 / 12.0 * std::sin (2.0 * std::numbers::pi * 0.7 * tt));
+                phase += 2.0 * std::numbers::pi * hz / sr;
+                const double env = std::min (1.0, std::min (tt / 0.08, (noteSeconds - tt) / 0.08));
+                a.channels[0][start + i] = static_cast<float> (0.3 * env * (std::sin (phase) + 0.12 * std::sin (2.0 * phase)));
+            }
+        }
+        return a;
+    }
+
+    /** A jam: chords of several plucked strings, restruck four times a second, without a break. */
+    AudioData jam (double seconds)
+    {
+        auto a = silence (seconds);
+        const std::vector<std::vector<int>> chords { { 48, 55, 64, 67, 72 }, { 45, 52, 60, 64, 69 }, { 50, 57, 62, 65, 69 }, { 43, 50, 59, 62, 67 } };
+        int c = 0;
+        for (double t = 0.0; t < seconds - 0.5; t += 0.25, ++c)
+            for (const int key : chords[static_cast<std::size_t> ((c / 8) % 4)])
+            {
+                const auto p = testsignals::pluck (midiToHz (key), 0.6, sr, static_cast<std::uint64_t> (c * 7 + key), 0.18, 1);
+                const auto start = static_cast<std::size_t> (t * sr);
+                for (std::size_t i = 0; i < p.channels[0].size() && start + i < a.channels[0].size(); ++i)
+                    a.channels[0][start + i] += p.channels[0][i];
+            }
+        return a;
+    }
+}
+
+TEST_CASE ("memo lab: the library scan tells talking, humming, phrases, jams, noise and quiet apart", "[memo-lab][unit][classify]")
+{
+    auto check = [] (const AudioData& a, SoundClass expected, const char* what) {
+        const auto p = profileOf (a);
+        INFO (what << ": " << describe (p));
+        CHECK (p.label == expected);
+        CHECK (p.confidence >= 0.6f);
+        return p;
+    };
+    check (talking (20.0, 3), SoundClass::talk, "talking");
+    const auto hum = check (humming ({ 57, 60, 62, 64, 60, 57 }, 2.0), SoundClass::hum, "humming");
+    CHECK (hum.firstMusicSeconds >= 0.0);
+    check (sungPhrase ({ 57, 62, 66, 69, 71, 69, 66, 62 }, sr, 1), SoundClass::phrase, "sung phrase (vowels)");
+    check (testsignals::pluck (220.0, 1.5, sr, 3, 0.7, 1), SoundClass::phrase, "a plucked note (not a hum: it decays)");
+    check (jam (20.0), SoundClass::jam, "jam");
+    {
+        auto noise = silence (10.0);
+        Prng rng (9);
+        for (auto& x : noise.channels[0])
+            x = static_cast<float> (0.1 * rng.bipolar());
+        check (noise, SoundClass::noise, "noise");
+    }
+    {
+        auto quiet = silence (10.0);
+        Prng rng (4);
+        for (auto& x : quiet.channels[0])
+            x = static_cast<float> (0.00002 * rng.bipolar());   // -94 dBFS of hiss
+        const auto p = profileOf (quiet);
+        CHECK (p.label == SoundClass::quiet);
+        CHECK (p.tags() == std::vector<SoundClass> { SoundClass::quiet });
+    }
+    // Talking, then music: two tags, and the music's first second.
+    {
+        auto talkFirst = talking (12.0, 5);
+        const auto tune = humming ({ 60, 62, 64, 65, 67, 65, 64, 62 }, 1.5);
+        talkFirst.channels[0].insert (talkFirst.channels[0].end(), tune.channels[0].begin(), tune.channels[0].end());
+        const auto p = profileOf (talkFirst);
+        INFO (describe (p));
+        const auto tags = p.tags();
+        CHECK (std::find (tags.begin(), tags.end(), SoundClass::talk) != tags.end());
+        CHECK (std::find (tags.begin(), tags.end(), SoundClass::hum) != tags.end());
+        CHECK (p.firstMusicSeconds >= 11.0);
+        CHECK (p.firstMusicSeconds <= 14.0);
+    }
+    // Odd input never fails: nothing, a sliver, another sample rate.
+    CHECK (profileRecording (nullptr, 0, 48000.0).label == SoundClass::quiet);
+    {
+        const std::vector<float> sliver (100, 0.5f);
+        CHECK_NOTHROW (profileRecording (sliver.data(), 100, 44100.0));
+    }
+    {
+        const auto hum441 = humming ({ 55, 57, 59 }, 2.0);
+        std::vector<float> resampled;
+        for (double t = 0.0; t < static_cast<double> (hum441.channels[0].size() - 1); t += sr / 44100.0)
+            resampled.push_back (hum441.channels[0][static_cast<std::size_t> (t)]);
+        CHECK (profileRecording (resampled.data(), static_cast<std::int64_t> (resampled.size()), 44100.0).label == SoundClass::hum);
+    }
+}
+
+TEST_CASE ("memo lab: Scan sorts the library on request, filters by kind, remembers it and can stop", "[memo-lab][ui][classify]")
+{
+    TempDir tmp;
+    setEnv ("MEMO_LAB_DATA_DIR", tmp.dir.getChildFile ("data").getFullPathName());   // the scan's cache
+    const auto folder = tmp.dir.getChildFile ("Memos");
+    folder.createDirectory();
+    auto loudJam = jam (20.0);
+    for (auto& x : loudJam.channels[0])
+        x *= 0.5f;   // no clipping in the file
+    write (folder, "20241030 120000-AAAA0001.wav", talking (20.0, 3));
+    write (folder, "20241029 120000-AAAA0002.wav", humming ({ 57, 60, 62, 64, 60, 57 }, 2.0));
+    write (folder, "20241028 120000-AAAA0003.wav", loudJam);
+    SourceSettings settings (tmp.dir.getChildFile ("settings.json"));
+    settings.setOfferedVoiceMemos();
+    settings.addFolder (folder);
+    OspAudioProcessor p;
+    osp::plugin::OspLookAndFeel look;
+    juce::LookAndFeel::setDefaultLookAndFeel (&look);
+    auto labelOf = [] (const MemoLabComponent& ui, const juce::String& prefix) {
+        for (const auto& r : ui.recordings())
+            if (r.file.getFileName().startsWith (prefix))
+                if (const auto* profile = ui.profileOf (r))
+                    return static_cast<int> (profile->label);
+        return -1;
+    };
+    {
+        MemoLabComponent ui (p, nullptr, settings);
+        ui.setSize (1240, 820);
+        REQUIRE (ui.waitForIdle (30000));
+        REQUIRE (ui.recordings().size() == 3);
+        // Nothing is analysed until asked.
+        for (const auto& r : ui.recordings())
+            CHECK (ui.profileOf (r) == nullptr);
+        // Stop at once: the scan ends early and nothing breaks.
+        ui.startScan();
+        CHECK (ui.isScanningLibrary());
+        ui.stopScan();
+        REQUIRE (ui.waitForIdle (30000));
+        CHECK_FALSE (ui.isScanningLibrary());
+
+        ui.startScan();
+        REQUIRE (ui.waitForIdle (60000));
+        CHECK_FALSE (ui.isScanningLibrary());
+        CHECK (labelOf (ui, "20241030") == static_cast<int> (SoundClass::talk));
+        CHECK (labelOf (ui, "20241029") == static_cast<int> (SoundClass::hum));
+        CHECK (labelOf (ui, "20241028") == static_cast<int> (SoundClass::jam));
+        ui.setCategoryFilter (static_cast<int> (SoundClass::hum));
+        REQUIRE (ui.recordings().size() == 1);
+        CHECK (ui.recordings()[0].file.getFileName().startsWith ("20241029"));
+        ui.setCategoryFilter (soundClassCount);   // not scanned yet: none
+        CHECK (ui.recordings().empty());
+        ui.setCategoryFilter (-1);
+        CHECK (ui.recordings().size() == 3);
+        if (const char* shots = std::getenv ("MEMO_LAB_SHOTS"))
+        {
+            ui.selectRecording (0);
+            REQUIRE (ui.waitForIdle (30000));
+            ui.tick();
+            juce::FileOutputStream out (juce::File (juce::String::fromUTF8 (shots)).getChildFile ("07-library-scan@1x.png"));
+            out.setPosition (0);
+            out.truncate();
+            juce::PNGImageFormat().writeImageToStream (ui.createComponentSnapshot (ui.getLocalBounds(), true, 1.0f), out);
+        }
+    }
+    CHECK (tmp.dir.getChildFile ("data").getChildFile ("library-scan.json").existsAsFile());
+    // A new window remembers the scan; a changed recording is scanned again.
+    folder.getChildFile ("20241030 120000-AAAA0001.wav").setLastModificationTime (juce::Time::getCurrentTime() - juce::RelativeTime::minutes (30.0));
+    {
+        MemoLabComponent ui (p, nullptr, settings);
+        ui.setSize (1240, 820);
+        REQUIRE (ui.waitForIdle (30000));
+        CHECK (labelOf (ui, "20241029") == static_cast<int> (SoundClass::hum));
+        CHECK (labelOf (ui, "20241028") == static_cast<int> (SoundClass::jam));
+        CHECK (labelOf (ui, "20241030") == -1);
+        ui.setCategoryFilter (soundClassCount);
+        CHECK (ui.recordings().size() == 1);
     }
     juce::LookAndFeel::setDefaultLookAndFeel (nullptr);
 }

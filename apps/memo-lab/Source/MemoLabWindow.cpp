@@ -4,6 +4,8 @@
 #include "OspLookAndFeel.h"
 #include "core/PitchMath.h"
 
+#include <algorithm>
+#include <array>
 #include <cmath>
 
 namespace osp::memolab
@@ -242,7 +244,27 @@ struct MemoLabComponent::ListModel final : juce::ListBoxModel
             detail << (detail.isEmpty() ? "" : "   ") << clock (r.seconds);
         if (! ready)
             detail = r.state == Recording::State::notDownloaded ? juce::String ("Not downloaded") : (r.state == Recording::State::changing ? "Still syncing" : "Cannot be read");
-        g.drawText (detail, box.reduced (14.0f, 0.0f).withTrimmedTop (box.getHeight() * 0.56f), juce::Justification::topLeft, true);
+        auto textArea = box.reduced (14.0f, 0.0f);
+        // The library scan's kinds, right-aligned on the title's line: lit when musical.
+        if (const auto* profile = ready ? owner.profileOf (r) : nullptr)
+        {
+            juce::String tag;
+            bool music = false;
+            for (const auto t : profile->tags())
+            {
+                tag << (tag.isEmpty() ? "" : " + ") << juce::String (soundClassName (t)).toUpperCase();
+                music = music || t == SoundClass::hum || t == SoundClass::phrase || t == SoundClass::jam;
+            }
+            if (profile->confidence < 0.6f && profile->label != SoundClass::quiet)
+                tag << " ?";
+            g.setFont (type::popupLabel (10.5f));
+            const auto tagArea = textArea.withTrimmedBottom (box.getHeight() * 0.48f).removeFromRight (std::min (120.0f, textArea.getWidth() * 0.45f));
+            g.setColour (music ? colour::identity (0).arc : colour::textSecondary);
+            g.drawText (tag, tagArea, juce::Justification::bottomRight, true);
+        }
+        g.setFont (type::popupLabel (11.5f));
+        g.setColour (colour::textSecondary.withAlpha (ready ? 1.0f : 0.8f));
+        g.drawText (detail, textArea.withTrimmedTop (box.getHeight() * 0.56f), juce::Justification::topLeft, true);
     }
 
     void selectedRowsChanged (int row) override { owner.selectRecording (row); }
@@ -264,8 +286,15 @@ MemoLabComponent::MemoLabComponent (OspAudioProcessor& p, juce::AudioDeviceManag
     search.setIndents (10, 0);
     addAndMakeVisible (search);
     for (auto* b : { &refreshButton, &addButton, &foldersButton, &audioButton, &playButton, &wholeButton, &clearButton, &oneShotButton, &mapNotesButton,
-                     &rootButton, &saveButton, &auditionButton })
+                     &rootButton, &saveButton, &auditionButton, &scanButton, &showButton })
         addAndMakeVisible (*b);
+    scanButton.onClick = [this] { libraryScanning ? stopScan() : startScan(); };
+    scanButton.setTooltip ("Listen through the recordings not scanned yet and sort them: talk, hum, phrase, jam, noise. Nothing leaves the Mac.");
+    showButton.onClick = [this] { showCategoryMenu(); };
+    showButton.setTooltip ("Show one kind of recording (after Scan)");
+    addButton.setTooltip ("Add a folder of recordings");
+    loadScanCache();
+    updateShowButton();
     refreshButton.onClick = [this] { refresh(); };
     addButton.onClick = [this] { addFolder(); };
     foldersButton.onClick = [this] { showFolders(); };
@@ -390,8 +419,27 @@ void MemoLabComponent::applyFilter()
     const auto query = search.getText().trim();
     shown.clear();
     for (const auto& r : all)
-        if (query.isEmpty() || r.title.containsIgnoreCase (query) || r.file.getFileName().containsIgnoreCase (query))
-            shown.push_back (r);
+    {
+        if (! (query.isEmpty() || r.title.containsIgnoreCase (query) || r.file.getFileName().containsIgnoreCase (query)))
+            continue;
+        if (category >= 0)
+        {
+            const auto* p = profileOf (r);
+            if (category == soundClassCount ? p != nullptr : p == nullptr)
+                continue;
+            if (category < soundClassCount)
+            {
+                // Every kind a memo is tagged with counts; noise and quiet are one choice.
+                const bool quietOrNoise = category == static_cast<int> (SoundClass::noise) || category == static_cast<int> (SoundClass::quiet);
+                bool match = false;
+                for (const auto t : p->tags())
+                    match = match || static_cast<int> (t) == category || (quietOrNoise && (t == SoundClass::noise || t == SoundClass::quiet));
+                if (! match)
+                    continue;
+            }
+        }
+        shown.push_back (r);
+    }
     selected = -1;
     list.updateContent();
     list.deselectAllRows();
@@ -918,9 +966,13 @@ void MemoLabComponent::resized()
     auto top = side.removeFromTop (34);
     search.setBounds (top);
     side.removeFromTop (8);
+    showButton.setBounds (side.removeFromTop (26).removeFromLeft (150));
+    side.removeFromTop (6);
     auto row = side.removeFromBottom (30);
-    const int w = (row.getWidth() - 8) / 3;
+    const int w = (row.getWidth() - 12) / 4;
     refreshButton.setBounds (row.removeFromLeft (w));
+    row.removeFromLeft (4);
+    scanButton.setBounds (row.removeFromLeft (w));
     row.removeFromLeft (4);
     foldersButton.setBounds (row.removeFromLeft (w));
     row.removeFromLeft (4);
@@ -963,6 +1015,222 @@ void MemoLabComponent::resized()
     keyboard.setBounds (main.removeFromBottom (std::min (110, main.getHeight() / 2)));
     main.removeFromBottom (10);
     noteMap->setBounds (main);
+}
+
+//==============================================================================
+// Library scan
+
+namespace
+{
+    juce::File scanCacheFile() { return appDataFolder().getChildFile ("library-scan.json"); }
+    juce::int64 modifiedOf (const juce::File& f) { return f.getLastModificationTime().toMilliseconds(); }
+}
+
+const MemoProfile* MemoLabComponent::profileOf (const Recording& r) const
+{
+    const auto it = scanned.find (r.file.getFullPathName());
+    if (it == scanned.end() || it->second.size != r.file.getSize() || it->second.modified != modifiedOf (r.file))
+        return nullptr;   // not scanned, or changed since
+    return &it->second.profile;
+}
+
+void MemoLabComponent::loadScanCache()
+{
+    scanned.clear();
+    const auto json = juce::JSON::parse (scanCacheFile());
+    if (static_cast<int> (json.getProperty ("version", 0)) != MemoProfile::version)
+        return;   // other rules: scanned again when asked
+    if (const auto* entries = json.getProperty ("recordings", {}).getArray())
+        for (const auto& e : *entries)
+        {
+            Scanned s;
+            s.size = static_cast<juce::int64> (e.getProperty ("size", 0));
+            s.modified = static_cast<juce::int64> (e.getProperty ("modified", 0));
+            auto& p = s.profile;
+            p.label = static_cast<SoundClass> (std::clamp (static_cast<int> (e.getProperty ("label", 0)), 0, soundClassCount - 1));
+            p.confidence = static_cast<float> (static_cast<double> (e.getProperty ("confidence", 0.0)));
+            p.firstMusicSeconds = static_cast<double> (e.getProperty ("firstMusic", -1.0));
+            p.durationSeconds = static_cast<double> (e.getProperty ("duration", 0.0));
+            const auto classes = e.getProperty ("seconds", "").toString();
+            for (const auto ch : classes)
+                p.seconds.push_back (static_cast<std::uint8_t> (std::clamp (static_cast<int> (ch - '0'), 0, soundClassCount - 1)));
+            for (const auto c : p.seconds)
+                p.share[c] += 1.0f / static_cast<float> (p.seconds.size());
+            scanned[e.getProperty ("path", "").toString()] = std::move (s);
+        }
+}
+
+void MemoLabComponent::saveScanCache() const
+{
+    // Memo Lab's own folder (never next to the recordings): what each file sounded like, its
+    // size and date (a changed file is scanned again).
+    juce::Array<juce::var> entries;
+    for (const auto& [path, s] : scanned)
+    {
+        auto* o = new juce::DynamicObject();
+        o->setProperty ("path", path);
+        o->setProperty ("size", s.size);
+        o->setProperty ("modified", s.modified);
+        o->setProperty ("label", static_cast<int> (s.profile.label));
+        o->setProperty ("confidence", s.profile.confidence);
+        o->setProperty ("firstMusic", s.profile.firstMusicSeconds);
+        o->setProperty ("duration", s.profile.durationSeconds);
+        juce::String classes;
+        for (const auto c : s.profile.seconds)
+            classes << juce::String::charToString (static_cast<juce::juce_wchar> ('0' + c));
+        o->setProperty ("seconds", classes);
+        entries.add (juce::var (o));
+    }
+    auto* root = new juce::DynamicObject();
+    root->setProperty ("version", MemoProfile::version);
+    root->setProperty ("recordings", entries);
+    appDataFolder().createDirectory();
+    scanCacheFile().replaceWithText (juce::JSON::toString (juce::var (root)));
+}
+
+void MemoLabComponent::startScan()
+{
+    if (libraryScanning)
+        return;
+    // Every listed recording not scanned yet (or changed since), newest first.
+    std::vector<Recording> todo;
+    for (const auto& r : all)
+        if (r.state == Recording::State::ready && profileOf (r) == nullptr)
+            todo.push_back (r);
+    libraryScanning = true;
+    scanDone = 0;
+    scanTotal = static_cast<int> (todo.size());
+    scanStop = std::make_shared<std::atomic<bool>> (false);
+    const int run = ++scanRun;
+    ++pendingJobs;
+    auto stop = scanStop;
+    pool.addJob ([this, todo, stop, run] {
+        for (const auto& r : todo)
+        {
+            if (stop->load() || cancelJobs.load())
+                break;
+            DecodedAudio audio;
+            juce::String error;
+            auto result = std::make_shared<Scanned>();
+            result->size = r.file.getSize();
+            result->modified = modifiedOf (r.file);
+            if (decode (r.file, audio, error, 900.0))
+            {
+                // One channel, then the profile (a few milliseconds per minute of audio).
+                const int n = audio.buffer.getNumSamples(), channels = audio.buffer.getNumChannels();
+                std::vector<float> mono (static_cast<std::size_t> (n), 0.0f);
+                for (int c = 0; c < channels; ++c)
+                {
+                    const float* d = audio.buffer.getReadPointer (c);
+                    for (int i = 0; i < n; ++i)
+                        mono[static_cast<std::size_t> (i)] += d[i] / static_cast<float> (channels);
+                }
+                result->profile = profileRecording (mono.data(), n, audio.info.sampleRate);
+            }
+            else
+            {
+                post ([this, run] {   // unreadable now: left for the next scan
+                    if (run == scanRun)
+                        ++scanDone;
+                });
+                continue;
+            }
+            const auto path = r.file.getFullPathName();
+            post ([this, path, result, run] {
+                if (run != scanRun)
+                    return;
+                scanned[path] = *result;
+                ++scanDone;
+                list.repaint();
+                updateShowButton();
+            });
+        }
+        post ([this, run] {
+            --pendingJobs;
+            if (run != scanRun)
+                return;
+            libraryScanning = false;
+            saveScanCache();
+            applyFilter();
+            updateShowButton();
+        });
+    });
+    updateShowButton();
+}
+
+void MemoLabComponent::stopScan()
+{
+    if (scanStop != nullptr)
+        scanStop->store (true);
+}
+
+void MemoLabComponent::setCategoryFilter (int c)
+{
+    category = std::clamp (c, -1, soundClassCount);
+    applyFilter();
+    updateShowButton();
+}
+
+void MemoLabComponent::updateShowButton()
+{
+    scanButton.setButtonText (libraryScanning ? "Stop" : "Scan");
+    juce::String text = "Show: ";
+    if (category < 0)
+        text << "All";
+    else if (category == soundClassCount)
+        text << "Not scanned";
+    else
+        text << (category == static_cast<int> (SoundClass::noise) ? juce::String ("Noise / quiet") : juce::String (soundClassName (static_cast<SoundClass> (category))));
+    text << juce::String::fromUTF8 (" \xe2\x96\xbe");
+    if (libraryScanning)
+        text = juce::String::fromUTF8 ("Scanning ") + juce::String (scanDone) + " / " + juce::String (scanTotal) + juce::String::fromUTF8 ("\xe2\x80\xa6");
+    showButton.setButtonText (text);
+}
+
+void MemoLabComponent::showCategoryMenu()
+{
+    // Counts over the listed recordings (search aside); a memo counts under each of its tags.
+    std::array<int, soundClassCount + 1> counts {};
+    for (const auto& r : all)
+    {
+        const auto* p = profileOf (r);
+        if (p == nullptr)
+        {
+            ++counts[soundClassCount];
+            continue;
+        }
+        bool quietCounted = false;
+        for (const auto t : p->tags())
+        {
+            if (t == SoundClass::quiet || t == SoundClass::noise)
+            {
+                if (! quietCounted)
+                    ++counts[static_cast<std::size_t> (SoundClass::noise)];
+                quietCounted = true;
+            }
+            else
+                ++counts[static_cast<std::size_t> (t)];
+        }
+    }
+    juce::PopupMenu m;
+    m.addItem (1, "All recordings", true, category < 0);
+    m.addSeparator();
+    const std::pair<SoundClass, const char*> kinds[] = { { SoundClass::phrase, "Phrases (sung or played lines)" },
+                                                         { SoundClass::hum, "Humming" },
+                                                         { SoundClass::jam, "Jams (several at once)" },
+                                                         { SoundClass::talk, "Talking" },
+                                                         { SoundClass::noise, "Noise / quiet" } };
+    for (const auto& [kind, name] : kinds)
+        m.addItem (10 + static_cast<int> (kind), juce::String (name) + "  (" + juce::String (counts[static_cast<std::size_t> (kind)]) + ")", true,
+                   category == static_cast<int> (kind));
+    m.addSeparator();
+    m.addItem (20, "Not scanned yet  (" + juce::String (counts[soundClassCount]) + ")", true, category == soundClassCount);
+    juce::Component::SafePointer<MemoLabComponent> safe (this);
+    m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (showButton), [safe] (int result) {
+        if (safe == nullptr || result == 0)
+            return;
+        safe->setCategoryFilter (result == 1 ? -1 : (result == 20 ? soundClassCount : result - 10));
+    });
 }
 
 } // namespace osp::memolab

@@ -941,3 +941,66 @@ TEST_CASE ("plugin phase 5: KEY DNA keys drawn by hand - dragging a bar, one und
     CHECK_FALSE (p.keyDnaSettings (0)[keydna::Param::size].anyDrawn());
     ui->closeKeyDna();
 }
+
+TEST_CASE ("plugin phase 5: SPEED under TUNING slows or speeds every note, one undo step each, saved with the session", "[plugin][phase5][notemap][speed]")
+{
+    TempDir tmp;
+    const ScopedEnvironment storeDir ("OSP_SAMPLE_STORE", tmp.dir.getChildFile ("store").getFullPathName());
+    const auto rec = phraseRecording (tmp.dir, "speed.wav", { 60, 64, 67 });
+    OspAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (editor.get());
+    REQUIRE (ui != nullptr);
+    p.loadAtlas (rec.atlas);
+    settleEdits (p);
+    editor->setSize (1448, 1086);
+    ui->refreshNow();
+    auto& card = ui->engineCard (0);
+    card.onNotesToggle (0, true);
+    auto* map = card.noteMapComponent();
+    REQUIRE (map != nullptr);
+    map->refresh();
+    // 100 %: slower and faster are offered, Reset is not.
+    CHECK (map->actions().contains ("speed-"));
+    CHECK (map->actions().contains ("speed+"));
+    CHECK_FALSE (map->actions().contains ("speed.reset"));
+    p.undo().clearUndoHistory();
+    REQUIRE (map->perform ("speed-"));
+    settleEdits (p);
+    map->refresh();
+    REQUIRE (map->perform ("speed-"));
+    settleEdits (p);
+    map->refresh();
+    CHECK (p.currentInstrument()->atlas->mapping.speed == Approx (0.8));
+    CHECK (p.undo().getUndoDescription() == "Speed 80 %");
+    CHECK (map->actions().contains ("speed.reset"));
+    REQUIRE (p.undo().undo());
+    settleEdits (p);
+    CHECK (p.currentInstrument()->atlas->mapping.speed == Approx (0.9));
+    // To the slowest: it stops there.
+    map->refresh();
+    for (int i = 0; i < 12; ++i)
+    {
+        if (! map->actions().contains ("speed-"))
+            break;
+        REQUIRE (map->perform ("speed-"));
+        settleEdits (p);
+        map->refresh();
+    }
+    CHECK (p.currentInstrument()->atlas->mapping.speed == Approx (atlas::Mapping::minSpeed));
+    CHECK_FALSE (map->actions().contains ("speed-"));
+    // The playing set follows; the session keeps it.
+    CHECK (p.currentInstrument()->set->speed == Approx (atlas::Mapping::minSpeed));
+    juce::MemoryBlock state;
+    p.getStateInformation (state);
+    OspAudioProcessor restored;
+    restored.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+    settleEdits (restored);
+    REQUIRE (restored.currentInstrument (0) != nullptr);
+    REQUIRE (restored.currentInstrument (0)->atlas != nullptr);
+    CHECK (restored.currentInstrument (0)->atlas->mapping.speed == Approx (atlas::Mapping::minSpeed));
+    // Reset: back to as recorded.
+    REQUIRE (map->perform ("speed.reset"));
+    settleEdits (p);
+    CHECK (p.currentInstrument()->atlas->mapping.speed == Approx (1.0));
+}

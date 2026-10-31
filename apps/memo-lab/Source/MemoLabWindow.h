@@ -1,6 +1,7 @@
 #pragma once
 
 #include "InstrumentFrame.h"
+#include "MemoClassifier.h"
 #include "MemoSession.h"
 #include "NoteMapEditor.h"
 
@@ -8,6 +9,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include <atomic>
+#include <map>
 #include <mutex>
 #include <memory>
 
@@ -90,6 +92,19 @@ public:
     /** "C3 - E4": what the Mac keys play now. */
     juce::String keyRangeText() const;
 
+    /** Library scan (on request): profiles every listed recording not scanned yet, newest
+        first, on a background thread; Stop keeps what is done. Results are cached in Memo
+        Lab's own folder, keyed by path, size and date. */
+    void startScan();
+    void stopScan();
+    bool isScanningLibrary() const noexcept { return libraryScanning; }
+    /** The recording's profile, or null when not scanned (or changed since). */
+    const MemoProfile* profileOf (const Recording& r) const;
+    /** Show only one kind (a SoundClass; noise and quiet together), -1 all, soundClassCount:
+        the recordings not scanned yet. */
+    void setCategoryFilter (int category);
+    int categoryFilter() const noexcept { return category; }
+
 private:
     struct ListModel;
     void timerCallback() override;
@@ -114,6 +129,10 @@ private:
     void updateInstrumentArea();
     void updateButtons();
     juce::String selectionText() const;
+    void loadScanCache();
+    void saveScanCache() const;
+    void showCategoryMenu();
+    void updateShowButton();
 
     OspAudioProcessor& osp;
     juce::AudioDeviceManager* devices;
@@ -124,8 +143,8 @@ private:
     std::unique_ptr<ListModel> model;
 
     juce::TextEditor search;
-    juce::TextButton refreshButton { "Refresh" }, addButton { juce::String::fromUTF8 ("Add Folder\xe2\x80\xa6") }, foldersButton { "Folders" },
-        audioButton { "Audio / MIDI" };
+    juce::TextButton refreshButton { "Refresh" }, addButton { juce::String::fromUTF8 ("Add\xe2\x80\xa6") }, foldersButton { "Folders" },
+        audioButton { "Audio / MIDI" }, scanButton { "Scan" }, showButton;
     juce::ListBox list;
     WaveformView wave;
     juce::TextButton playButton { "Play" }, wholeButton { "Whole recording" }, clearButton { "Clear selection" };
@@ -149,6 +168,16 @@ private:
     bool scanning = false;
     bool auditioning = false;
     bool decodedPartial = false;   ///< audition's quick read of the opening; the whole recording follows
+    struct Scanned
+    {
+        juce::int64 size = 0, modified = 0;   ///< the file as it was scanned
+        MemoProfile profile;
+    };
+    std::map<juce::String, Scanned> scanned;   ///< by full path
+    bool libraryScanning = false;
+    int scanDone = 0, scanTotal = 0, scanRun = 0;
+    int category = -1;
+    std::shared_ptr<std::atomic<bool>> scanStop;
     int keysOctave = 5;   ///< A plays C4 (MIDI 60) until an instrument says otherwise
     void centreKeysOnInstrument();
 };

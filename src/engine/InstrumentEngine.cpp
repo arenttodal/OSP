@@ -851,6 +851,8 @@ void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int
     params.startFraction = layerSettings.start;
     params.reverse = layerSettings.reverse;
     params.follow = layerSettings.follow;
+    if (const auto* set = slots[context].set; set != nullptr)
+        params.speed = set->speed;   // SPEED (atlas sets; file sets keep 1)
     params.synthesize = &slots[context].synthesizeLive;
     params.synthBlend = config.synthBlend;
     params.synthEnvelope = config.synthEnvelope;

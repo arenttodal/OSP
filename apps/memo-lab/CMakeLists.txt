@@ -7,7 +7,8 @@
 set(MEMO_LAB_CORE
     ${CMAKE_CURRENT_SOURCE_DIR}/Source/MemoDecoder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Source/MemoSources.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Source/MemoSession.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/Source/MemoSession.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Source/MemoClassifier.cpp)
 if(APPLE)
     list(APPEND MEMO_LAB_CORE ${CMAKE_CURRENT_SOURCE_DIR}/Source/MemoDecoderMac.mm)
 endif()

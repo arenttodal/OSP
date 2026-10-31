@@ -64,6 +64,9 @@ struct InstrumentVoiceStart
     const double* synthesize = nullptr;
     synth::Blend synthBlend = synth::Blend::hybrid;
     synth::Envelope synthEnvelope = synth::Envelope::gate;
+    /** SPEED: how fast the note moves through its recording, pitch kept (1: as recorded,
+        the plain read; 0.3..2). Not in Granular or REIMAGINED modes. */
+    double speed = 1.0;
 };
 
 /**
@@ -333,6 +336,24 @@ private:
     void mixSynth (float& l, float& r) noexcept;
     /** The recording ended: keep the voice for the oscillator (true) or end it (false). */
     bool synthHoldsVoice() noexcept;
+    // SPEED (atlas notes, not Granular or REIMAGINED): a pitch-preserving stretch. The timeline
+    // (`position`) moves at speed x the pitch step; two overlapping sin^2 grains (a partition
+    // of unity) read the recording at the pitch step, each new one a whole number of the
+    // recording's periods from the one it overlaps, so the pitch and its phase carry on.
+    struct StretchGrain
+    {
+        bool active = false;
+        double pos = 0.0, posB = 0.0;     ///< read positions (posB: a loop crossfade's other read)
+        float gainA = 1.0f, gainB = 0.0f;
+        int age = 0;
+    };
+    std::array<StretchGrain, 2> stretchGrains {};
+    bool stretching = false;
+    double stretchSpeed = 1.0, stretchPeriod = 0.0;
+    int stretchLength = 0, stretchHop = 0, stretchCountdown = 0;
+    void startStretch (int note) noexcept;
+    void spawnStretchGrain() noexcept;
+    void stretchRead (float& l, float& r) noexcept;
     // KALEIDOSCOPE on a granular layer: its doubling is a second grain stream a little
     // behind POS, detuned by a few cents of chorus and placed to one side; its granular
     // continuation scatters the grains wider and denser.

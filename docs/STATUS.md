@@ -541,6 +541,16 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       and never writes the recordings. Tests `memo_lab` (13 cases) pass, including the round
       trip into a fresh processor with an empty store and the recording deleted. Awaiting the
       owner's test on a Mac: the real Voice Memos folder, real memos, Ableton.
+      Added after the owner's first test (README, "Audition and the Mac keys", "Library scan",
+      "SPEED"):
+      - Audition: arrows browse and play each memo from its first sound; long memos start
+        from their opening while the rest is read;
+      - Z / X move the Mac keys an octave; a new instrument centres them;
+      - Scan (on request) sorts memos into Talk / Hum / Phrase / Jam / Noise / Quiet by rules
+        (`MemoClassifier`, no model), Show ▾ filters, cached in `library-scan.json`;
+      - SPEED (NOTE MAP > TUNING, 30-200 %): Note Atlas `mapping.speed`, a pitch-preserving
+        two-grain stretch in `InstrumentVoice` for atlas notes; 100 % is bit-identical.
+      Tests `[audition]`, `[classify]`, `[speed]`.
 - [x] KEY DNA keys by hand: drag a key's bar (away from the curve) and that key plays the value
       drawn, in place of the curve and its variation (a stroke draws every key it passes, one
       undo step; a click alone draws nothing, so double-click still adds a curve point).

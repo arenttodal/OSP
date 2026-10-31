@@ -105,6 +105,7 @@ struct PreparedAtlas
     std::vector<Region> regions;                          ///< in member order
     bool fill = false;
     double fillLimitSemitones = 0.0;
+    double speed = 1.0;                                   ///< SPEED (atlas mapping), clamped
     BuildReport report;                                   ///< Stage A's (warnings, skipped and cut notes)
 };
 
@@ -194,6 +195,7 @@ namespace
         // Groups were created in key order (the notes are sorted by key).
         set->fill = prepared.fill;
         set->fillLimitSemitones = prepared.fillLimitSemitones;
+        set->speed = prepared.speed;
         // Which keys can loop (with LOOP on only they play), once the loops are analysed:
         // Stage A plays every note while its loops are being prepared.
         set->loopSelects = loopsAnalysed;
@@ -388,6 +390,7 @@ StagedBuild buildPlayableSet (const atlas::NoteAtlas& atlas, const std::vector<S
     report.provisionalMilliseconds = msSince (provisionalStart);
     prepared->fill = atlas.mapping.fill;
     prepared->fillLimitSemitones = std::max (0.0, atlas.mapping.maxTransposeSemitones);
+    prepared->speed = std::clamp (atlas.mapping.speed, atlas::Mapping::minSpeed, atlas::Mapping::maxSpeed);
 
     const auto finaliseStart = std::chrono::steady_clock::now();
     auto set = assemble (*prepared, models, false);

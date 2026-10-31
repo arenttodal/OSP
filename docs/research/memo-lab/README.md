@@ -81,11 +81,35 @@ The macOS test build (CI artifact `OSP-macOS-test`) contains `ANDOR Memo Lab.app
 - **Z / X** move the Mac keys (A S D F ... ;) an octave down / up; the range is shown beside
   the instrument's name. A new instrument puts them over its notes.
 
+### Library scan (Scan, Show ▾)
+
+- **Scan** (bottom left) listens through every listed recording not scanned yet, newest first,
+  on a background thread; **Stop** ends it (what is done is kept). It runs only when you press
+  it. Once a memo is read, sorting it takes well under a millisecond per second of audio.
+- Each row then carries what it mostly holds: **TALK**, **HUM**, **PHRASE** (a sung or played
+  line of clear notes), **JAM** (several things sounding at once, no single clear pitch),
+  **NOISE** or **QUIET**; two when the memo is both (e.g. JAM + TALK), "?" when it leans only
+  weakly. Musical kinds are lit, the rest grey.
+- **Show ▾** (above the list) keeps only one kind, with counts, or the recordings not scanned
+  yet. A memo counts under every kind it is tagged with.
+- The result is kept in Memo Lab's own folder (`library-scan.json`); a recording that changes is
+  scanned again next time.
+- How it decides: rules on measured features (level, pitch and how periodic it is, brightness,
+  how long voiced runs last and whether the pitch settles), second by second, with no trained
+  model and nothing sent anywhere. It is a sorting aid, not a verdict.
+
+### SPEED (NOTE MAP > TUNING)
+
+- After MAP NOTES, **SPEED** under TUNING (– / + / Reset) plays every note slower or faster,
+  30-200 %, keeping its pitch: short notes stop sounding like fast loops at 50 %. It is saved
+  with the instrument and undoable. Granular and REIMAGINED ignore it.
+
 ## What it never does
 
 - It never changes, renames, moves or deletes a recording, and never writes into Voice Memos'
   folder or its database.
-- It never analyses a recording until you choose MAP NOTES or ONE SHOT on it.
+- It never analyses a recording until you choose MAP NOTES or ONE SHOT on it, or press Scan
+  (which only sorts the library).
 - Nothing leaves the Mac: no network, no account, no telemetry, no transcription.
 - Its working copy of a passage (in `~/Library/Application Support/ANDOR/Memo Lab/Passages`)
   is replaced by the next conversion and removed when the app quits. The instrument's audio
@@ -126,6 +150,14 @@ The macOS test build (CI artifact `OSP-macOS-test`) contains `ANDOR Memo Lab.app
 - **Folder access.** Without the sandbox there are no security-scoped bookmarks; approved
   folders are plain paths. A folder macOS refuses is reported, not worked around.
 - **No folder watching.** Use **Refresh** after a new memo syncs.
+- **Scan is rules, not listening.** Checked on generated talking, humming, sung phrases,
+  plucked notes, strummed-chord jams, noise, silence and talk-then-hum (every one sorted
+  right), not yet on a real library. Likely misses: a tremolo string with strong harmonics
+  can read as Talk; a solo instrument's line reads as Phrase, not Hum; humming with words
+  reads partly as Talk. Long memos are read up to 15 minutes.
+- **SPEED** stretches by overlapping short pieces of the recording a whole number of pitch
+  periods apart: smooth on steady tones, but at 30 % fast vibrato and consonants smear, and
+  at 200 % very short notes may lose their tail.
 - **One recording in memory** (up to 15 minutes), one conversion at a time; analysis covers at
   most OSP's 180 s per recording.
 - **NOTE MAP** shows its EQ and DAMPEN tabs, which do nothing here.
