@@ -633,7 +633,8 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       Tests: `[synth]` (engine) and `[plugin][synthesize]` (pedal, stealing, all notes off,
       panic, a One Shot held past its end, mute/solo, A/B/C, Atlas keys left silent,
       automation without allocation, persistence).
-- [ ] S1.6 musical evaluation by the user (renders, CPU and known limits in `s1-results.md`).
+- [ ] S1.6 musical evaluation by the user. Results (loudness matrix, blend laws, tuning,
+      tests, listening guide, known limits) in `s1-results.md`; renders local only.
 
 ## Milestone: ANDOR Instrument Shell extensions for ANDOR ANALOG (a synthesizer)
 
