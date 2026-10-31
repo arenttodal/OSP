@@ -13,7 +13,7 @@ jobs:
         # macOS only (the target platform; Linux and Windows runs were dropped to save CI
         # time). The Linux steps below stay for a local or on-demand Linux job.
         include:
-          - os: macos-14          # Apple Silicon: primary target
+          - os: macos-15          # Apple Silicon: primary target (macos-14 is retired on 2 Nov 2026)
             plugin: ON
     runs-on: ${{ matrix.os }}
     steps:
