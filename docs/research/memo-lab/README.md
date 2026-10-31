@@ -35,9 +35,12 @@ The macOS test build (CI artifact `OSP-macOS-test`) contains `ANDOR Memo Lab.app
    (`~/Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings`).
    - If macOS asks whether Memo Lab may access data from other apps, allow it. This is the
      permission to read Voice Memos' folder; Memo Lab only reads it.
-   - If the list stays empty and says the folder cannot be read, either allow it in System
-     Settings > Privacy & Security, or choose **Add Folder…** and pick a folder of recordings
-     (for example, memos you dragged out of Voice Memos into a folder).
+   - If the list stays empty and says the folder cannot be read (on your Mac, the unsigned
+     test build got no prompt at all, so nothing appears in Privacy & Security to allow):
+     either drag the memos out of Voice Memos into a folder and choose **Add Folder…**, or
+     add Memo Lab yourself under System Settings > Privacy & Security > **Full Disk Access**
+     (+, then `~/Applications/ANDOR Memo Lab.app`) and reopen it. A newer unsigned build may
+     need adding again.
    - Memo Lab never asks for Full Disk Access by itself.
 3. **Find the memo.** It is at the top (newest first); the search box filters by name.
    - Titles come from Voice Memos' own list when it can be read; otherwise from the file name
@@ -68,6 +71,15 @@ The macOS test build (CI artifact `OSP-macOS-test`) contains `ANDOR Memo Lab.app
 - Whether the memo appeared without exporting, and whether macOS asked for permission.
 - How long MAP NOTES took to become playable, and whether the notes landed on the right keys.
 - Whether the saved instrument opened and played in Ableton, and again after reopening the set.
+
+### Audition and the Mac keys
+
+- **Audition** (beside Play): ↑ / ↓ move through the recordings and each plays at once, from
+  its first sound (leading silence and handling noise skipped). ← / → jump 10 s, Space
+  stops. A long memo plays from its opening while the rest is read; MAP NOTES and ONE SHOT
+  wait for the whole recording.
+- **Z / X** move the Mac keys (A S D F ... ;) an octave down / up; the range is shown beside
+  the instrument's name. A new instrument puts them over its notes.
 
 ## What it never does
 

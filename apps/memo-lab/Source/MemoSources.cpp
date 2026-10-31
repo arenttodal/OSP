@@ -196,7 +196,7 @@ FolderReport checkFolder (const juce::File& folder)
     fs::directory_iterator it (fs::path (folder.getFullPathName().toStdString()), ec);
     report.readable = ! ec;
     if (! report.readable)
-        report.message = "macOS does not let Memo Lab read this folder. Allow it in System Settings > Privacy & Security, or choose another folder.";
+        report.message = "macOS does not let Memo Lab read this folder. Either drag your memos out of Voice Memos into a folder and choose Add Folder, or give Memo Lab Full Disk Access yourself (System Settings > Privacy & Security > Full Disk Access > +).";
     return report;
 }
 

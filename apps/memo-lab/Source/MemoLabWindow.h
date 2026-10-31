@@ -27,6 +27,7 @@ public:
     void setAudio (std::shared_ptr<const DecodedAudio> audio);
     void setMessage (const juce::String& message);
     void setPlayhead (std::int64_t frame);
+    std::int64_t playheadFrame() const noexcept { return playhead; }
     /** Empty: none (the whole recording is used). */
     juce::Range<std::int64_t> selection() const noexcept { return chosen; }
     void setSelection (juce::Range<std::int64_t> range);
@@ -70,12 +71,24 @@ public:
     void selectRecording (int index);
     bool waitForIdle (int timeoutMs);
     WaveformView& waveform() noexcept { return wave; }
+    bool isAuditioning() const noexcept { return auditioning; }
+    void audition (bool on) { setAuditioning (on); }
+    /** The recording as read so far (the opening only while audition reads the rest). */
+    std::shared_ptr<const DecodedAudio> currentAudio() const noexcept { return decoded; }
+    bool currentAudioIsPartial() const noexcept { return decodedPartial; }
     void convert (MemoSession::Mode mode);
     void tick() { timerCallback(); }
 
     void paint (juce::Graphics&) override;
     void resized() override;
     bool keyPressed (const juce::KeyPress&) override;
+
+    /** The Mac keyboard's notes (A S D F ... play C up to the E an octave and a third above):
+        the octave of the C that A plays (A = MIDI 12 x octave). Z / X move it down / up. */
+    int keyOctave() const noexcept { return keysOctave; }
+    void setKeyOctave (int octave);
+    /** "C3 - E4": what the Mac keys play now. */
+    juce::String keyRangeText() const;
 
 private:
     struct ListModel;
@@ -87,8 +100,12 @@ private:
     void drainInbox();
     void applyFilter();
     void scanFinished (ScanResult result, int generation);
-    void decodeFinished (std::shared_ptr<DecodedAudio> audio, juce::String error, int generation);
+    void decodeFinished (std::shared_ptr<DecodedAudio> audio, juce::String error, int generation, bool partial);
     void togglePreview();
+    /** Audition: arrows browse and each recording plays at once from its first sound. */
+    void setAuditioning (bool on);
+    void auditionStep (int delta);
+    void seekBy (double seconds);
     void showFolders();
     void addFolder();
     void showAudioSettings();
@@ -112,6 +129,7 @@ private:
     juce::ListBox list;
     WaveformView wave;
     juce::TextButton playButton { "Play" }, wholeButton { "Whole recording" }, clearButton { "Clear selection" };
+    juce::TextButton auditionButton { "Audition" };
     juce::TextButton oneShotButton { "ONE SHOT" }, mapNotesButton { "MAP NOTES" };
     juce::TextButton rootButton, saveButton { juce::String::fromUTF8 ("Save Instrument\xe2\x80\xa6") };
     OspKeyboard keyboard;
@@ -125,9 +143,14 @@ private:
     std::shared_ptr<const DecodedAudio> decoded;
     juce::String sourceProblem;
     std::atomic<bool> notePlayed { false }, cancelJobs { false };
+    std::atomic<int> latestDecode { 0 };   ///< the newest choice (a background read of an older one stops early)
     std::mutex inboxLock;
     std::vector<std::function<void()>> inbox;
     bool scanning = false;
+    bool auditioning = false;
+    bool decodedPartial = false;   ///< audition's quick read of the opening; the whole recording follows
+    int keysOctave = 5;   ///< A plays C4 (MIDI 60) until an instrument says otherwise
+    void centreKeysOnInstrument();
 };
 
 } // namespace osp::memolab

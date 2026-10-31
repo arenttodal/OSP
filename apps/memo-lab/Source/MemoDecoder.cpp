@@ -132,4 +132,34 @@ bool decode (const juce::File& file, DecodedAudio& out, juce::String& error, dou
     return true;
 }
 
+std::int64_t firstSoundFrame (const DecodedAudio& audio)
+{
+    const auto& b = audio.buffer;
+    const double rate = audio.info.sampleRate;
+    const int frames = b.getNumSamples(), channels = b.getNumChannels();
+    if (frames <= 0 || channels <= 0 || ! (rate > 0.0))
+        return 0;
+    const int window = std::max (1, static_cast<int> (0.02 * rate));
+    auto rmsDb = [&] (int start) {
+        double sum = 0.0;
+        const int end = std::min (frames, start + window);
+        for (int c = 0; c < channels; ++c)
+        {
+            const float* d = b.getReadPointer (c);
+            for (int i = start; i < end; ++i)
+                sum += static_cast<double> (d[i]) * d[i];
+        }
+        return 10.0 * std::log10 (sum / std::max (1, (end - start) * channels) + 1.0e-20);
+    };
+    const int lookAhead = std::min (frames, static_cast<int> (60.0 * rate));
+    double loudest = -200.0;
+    for (int s = 0; s < lookAhead; s += window)
+        loudest = std::max (loudest, rmsDb (s));
+    const double threshold = std::max (-55.0, loudest - 35.0);
+    for (int s = 0; s < frames; s += window)
+        if (rmsDb (s) >= threshold)
+            return std::max<std::int64_t> (0, s - static_cast<std::int64_t> (0.08 * rate));
+    return 0;
+}
+
 } // namespace osp::memolab

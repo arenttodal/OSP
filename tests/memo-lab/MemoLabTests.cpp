@@ -677,3 +677,123 @@ int main (int argc, char* argv[])
     base.deleteRecursively();
     return result;
 }
+
+//==============================================================================
+TEST_CASE ("memo lab: audition starts at a recording's first sound", "[memo-lab][unit][audition]")
+{
+    const double rate = 48000.0;
+    auto make = [rate] (double silence, double tone) {
+        DecodedAudio a;
+        a.info.sampleRate = rate;
+        a.info.channels = 1;
+        const int n = static_cast<int> ((silence + tone) * rate);
+        a.buffer.setSize (1, n);
+        juce::Random noise (7);
+        for (int i = 0; i < n; ++i)
+        {
+            const bool sounding = i >= static_cast<int> (silence * rate);
+            // handling noise at -70 dBFS before the sound, then a tone at about -12 dBFS
+            a.buffer.setSample (0, i, sounding ? 0.35f * std::sin (2.0f * juce::MathConstants<float>::pi * 220.0f * static_cast<float> (i) / static_cast<float> (rate))
+                                               : 0.0003f * (noise.nextFloat() * 2.0f - 1.0f));
+        }
+        a.info.frames = n;
+        return a;
+    };
+    const auto late = make (2.5, 1.0);
+    CHECK (firstSoundFrame (late) / rate == Approx (2.5 - 0.08).margin (0.025));
+    CHECK (firstSoundFrame (make (0.0, 1.0)) == 0);
+    CHECK (firstSoundFrame (make (3.0, 0.0)) == 0);   // nothing sounds: from the start
+}
+
+TEST_CASE ("memo lab: audition browses with the arrows and plays each recording from its first sound", "[memo-lab][ui][audition]")
+{
+    TempDir tmp;
+    const auto folder = tmp.dir.getChildFile ("Memos");
+    folder.createDirectory();
+    const double rate = 48000.0;
+    // A long memo (read in two steps: its opening first) whose sound starts after 3 s of silence.
+    auto longMemo = AudioData::allocate (1, static_cast<std::int64_t> (90.0 * rate), rate);
+    const auto tone = testsignals::vowel (midiToHz (60), 87.0, rate, 5, 0.5, 1);
+    for (std::size_t i = 0; i < tone.channels[0].size(); ++i)
+        longMemo.channels[0][static_cast<std::size_t> (3.0 * rate) + i] = tone.channels[0][i];
+    write (folder, "20241030 120000-AAAA0001.wav", longMemo);
+    write (folder, "20241029 120000-AAAA0002.wav", sungPhrase ({ 60, 64 }, rate, 1));
+    write (folder, "20241028 120000-AAAA0003.wav", testsignals::pluck (220.0, 1.5, rate, 3, 0.7, 1));
+    SourceSettings settings (tmp.dir.getChildFile ("settings.json"));
+    settings.setOfferedVoiceMemos();
+    settings.addFolder (folder);
+    OspAudioProcessor p;
+    osp::plugin::OspLookAndFeel look;
+    juce::LookAndFeel::setDefaultLookAndFeel (&look);
+    {
+        MemoLabComponent ui (p, nullptr, settings);
+        ui.setSize (1240, 820);
+        REQUIRE (ui.waitForIdle (30000));
+        REQUIRE (ui.recordings().size() == 3);
+        ui.audition (true);   // nothing chosen yet: the newest is chosen and heard
+        REQUIRE (ui.waitForIdle (30000));
+        CHECK (ui.isAuditioning());
+        CHECK (ui.preview().isPlaying());
+        // (No audio device in the test: the transport stays where it was started.)
+        CHECK (ui.preview().position() / rate == Approx (3.0 - 0.08).margin (0.03));
+        REQUIRE (ui.currentAudio() != nullptr);
+        CHECK_FALSE (ui.currentAudioIsPartial());   // the whole recording followed its opening
+        CHECK (ui.currentAudio()->buffer.getNumSamples() == static_cast<int> (90.0 * rate));
+        // Down: the next recording, playing at once; Up: back.
+        CHECK (ui.keyPressed (juce::KeyPress (juce::KeyPress::downKey)));
+        REQUIRE (ui.waitForIdle (30000));
+        CHECK (ui.preview().isPlaying());
+        CHECK (ui.recordings()[1].file.getFileName().startsWith ("20241029"));
+        CHECK (ui.currentAudio()->buffer.getNumSamples() < static_cast<int> (10.0 * rate));
+        // Right: 10 s on (clamped to the recording).
+        const auto before = ui.preview().position();
+        CHECK (ui.keyPressed (juce::KeyPress (juce::KeyPress::rightKey)));
+        CHECK (ui.preview().position() > before);
+        CHECK (ui.keyPressed (juce::KeyPress (juce::KeyPress::upKey)));
+        REQUIRE (ui.waitForIdle (30000));
+        CHECK (ui.currentAudio()->buffer.getNumSamples() == static_cast<int> (90.0 * rate));
+        // Off: it stops.
+        ui.audition (false);
+        CHECK_FALSE (ui.preview().isPlaying());
+    }
+    juce::LookAndFeel::setDefaultLookAndFeel (nullptr);
+}
+
+TEST_CASE ("memo lab: Z and X move the Mac keys an octave, and a new instrument centres them", "[memo-lab][ui]")
+{
+    TempDir tmp;
+    const auto folder = tmp.dir.getChildFile ("Memos");
+    folder.createDirectory();
+    write (folder, "20241030 143012-AB12CD34.wav", sungPhrase ({ 43, 47, 50, 55 }, 48000.0, 1));   // G2 .. G3
+    SourceSettings settings (tmp.dir.getChildFile ("settings.json"));
+    settings.setOfferedVoiceMemos();
+    settings.addFolder (folder);
+    OspAudioProcessor p;
+    osp::plugin::OspLookAndFeel look;
+    juce::LookAndFeel::setDefaultLookAndFeel (&look);
+    {
+        MemoLabComponent ui (p, nullptr, settings);
+        ui.setSize (1240, 820);
+        REQUIRE (ui.waitForIdle (30000));
+        CHECK (ui.keyOctave() == 5);
+        CHECK (ui.keyRangeText() == juce::String (midiNoteName (60)) + juce::String::fromUTF8 ("\xe2\x80\x93") + juce::String (midiNoteName (76)));
+        CHECK (ui.keyPressed (juce::KeyPress ('x', 0, 'x')));
+        CHECK (ui.keyOctave() == 6);
+        CHECK (ui.keyPressed (juce::KeyPress ('z', 0, 'z')));
+        CHECK (ui.keyPressed (juce::KeyPress ('z', 0, 'z')));
+        CHECK (ui.keyOctave() == 4);
+        for (int i = 0; i < 12; ++i)
+            ui.keyPressed (juce::KeyPress ('z', 0, 'z'));
+        CHECK (ui.keyOctave() == 0);   // clamped
+        // A mapped instrument from G2 to G3 puts the Mac keys over it (A = C2 .. ; = E3... in octave 3 or 4).
+        ui.selectRecording (0);
+        REQUIRE (ui.waitForIdle (30000));
+        ui.convert (MemoSession::Mode::mapNotes);
+        REQUIRE (ui.waitForIdle (60000));
+        const int low = 12 * ui.keyOctave(), high = low + 16;
+        CHECK (low <= 49);    // the middle of G2..G3 is within reach
+        CHECK (high >= 49);
+        CHECK (ui.keyOctave() == 3);
+    }
+    juce::LookAndFeel::setDefaultLookAndFeel (nullptr);
+}

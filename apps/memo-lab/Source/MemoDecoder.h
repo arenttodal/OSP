@@ -39,6 +39,14 @@ bool probe (const juce::File& file, AudioInfo& info, juce::String& error);
     while it was read, and audio that is not plausible (no frames, absurd rate). */
 bool decode (const juce::File& file, DecodedAudio& out, juce::String& error, double maxSeconds = 900.0);
 
+/**
+    Audition: where a recording first really sounds, so browsing starts there and not in the
+    seconds of silence or handling before it. The first 20 ms window whose RMS is above
+    -55 dBFS and within 35 dB of the loudest window in the first minute, less 80 ms so the
+    onset is heard whole. 0 when nothing qualifies (play from the start).
+*/
+std::int64_t firstSoundFrame (const DecodedAudio& audio);
+
 #if JUCE_MAC
 /** AVFoundation (MemoDecoderMac.mm): any audio track AVAsset can read, as float PCM. */
 bool probeWithAVFoundation (const juce::File& file, AudioInfo& info, juce::String& error);

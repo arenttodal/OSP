@@ -264,7 +264,7 @@ MemoLabComponent::MemoLabComponent (OspAudioProcessor& p, juce::AudioDeviceManag
     search.setIndents (10, 0);
     addAndMakeVisible (search);
     for (auto* b : { &refreshButton, &addButton, &foldersButton, &audioButton, &playButton, &wholeButton, &clearButton, &oneShotButton, &mapNotesButton,
-                     &rootButton, &saveButton })
+                     &rootButton, &saveButton, &auditionButton })
         addAndMakeVisible (*b);
     refreshButton.onClick = [this] { refresh(); };
     addButton.onClick = [this] { addFolder(); };
@@ -272,6 +272,12 @@ MemoLabComponent::MemoLabComponent (OspAudioProcessor& p, juce::AudioDeviceManag
     audioButton.onClick = [this] { showAudioSettings(); };
     audioButton.setEnabled (devices != nullptr);
     playButton.onClick = [this] { togglePreview(); };
+    auditionButton.setClickingTogglesState (true);
+    auditionButton.setTooltip (juce::String::fromUTF8 ("Audition: \xe2\x86\x91 \xe2\x86\x93 move through the recordings and each one plays at once, "
+                                                       "from its first sound. \xe2\x86\x90 \xe2\x86\x92 jump 10 s, Space stops."));
+    auditionButton.setColour (juce::TextButton::buttonOnColourId, design::colour::identity (0).arc);
+    auditionButton.setColour (juce::TextButton::textColourOnId, juce::Colours::white);
+    auditionButton.onClick = [this] { setAuditioning (auditionButton.getToggleState()); };
     wholeButton.onClick = [this] {
         if (decoded != nullptr)
             wave.setSelection ({ 0, decoded->buffer.getNumSamples() });
@@ -304,6 +310,7 @@ MemoLabComponent::MemoLabComponent (OspAudioProcessor& p, juce::AudioDeviceManag
     keyboard.setLowestVisibleKey (36);
     keyboard.setKeyWidth (22.0f);
     keyboard.setWantsKeyboardFocus (true);
+    keyboard.setKeyPressBaseOctave (keysOctave);
     addChildComponent (keyboard);
     osp.keyboardState.addListener (this);
 
@@ -409,32 +416,112 @@ void MemoLabComponent::selectRecording (int index)
         return;
     }
     // Decoded only now, when chosen (never the whole archive), off the message thread.
+    // Auditioning, the opening is read first (heard at once), then the whole recording.
     wave.setMessage (juce::String::fromUTF8 ("Reading\xe2\x80\xa6"));
     const int generation = ++decodeGeneration;
     ++pendingJobs;
     const auto file = r.file;
-    pool.addJob ([this, file, generation] {
+    const bool quickFirst = auditioning && r.seconds > 75.0;
+    decodedPartial = false;
+    latestDecode.store (generation);
+    pool.addJob ([this, file, generation, quickFirst] {
+        if (quickFirst && ! cancelJobs.load())
+        {
+            auto opening = std::make_shared<DecodedAudio>();
+            juce::String error;
+            if (decode (file, *opening, error, 60.0))
+                post ([this, opening, generation] { decodeFinished (opening, {}, generation, true); });
+        }
+        // (A newer choice makes this one pointless: skip the long read.)
         auto audio = std::make_shared<DecodedAudio>();
         juce::String error;
-        if (cancelJobs.load() || ! decode (file, *audio, error))
+        const bool stale = generation != latestDecode.load();
+        if (stale || cancelJobs.load() || ! decode (file, *audio, error))
             audio.reset();
-        post ([this, audio, error, generation] { decodeFinished (audio, error, generation); });
+        if (stale)
+            error = {};
+        post ([this, audio, error, generation] { decodeFinished (audio, error, generation, false); });
     });
     updateButtons();
 }
 
-void MemoLabComponent::decodeFinished (std::shared_ptr<DecodedAudio> audio, juce::String error, int generation)
+void MemoLabComponent::decodeFinished (std::shared_ptr<DecodedAudio> audio, juce::String error, int generation, bool partial)
 {
-    --pendingJobs;
+    if (! partial)
+        --pendingJobs;
     if (generation != decodeGeneration)
         return;
+    if (! partial && audio == nullptr && decodedPartial && error.isEmpty())
+        return;   // (skipped)
+    // The whole recording after its opening: carry on from where it is playing.
+    const bool continuing = ! partial && decodedPartial && audio != nullptr && previewPlayer.isPlaying();
+    const auto at = continuing ? previewPlayer.position() : std::int64_t (-1);
+    const bool firstHearing = ! (decodedPartial && ! partial);
     decoded = audio;
+    decodedPartial = partial && audio != nullptr;
     previewPlayer.setAudio (audio);
     wave.setAudio (audio);
     if (audio == nullptr)
         wave.setMessage (error);
+    if (audio != nullptr && auditioning)
+    {
+        if (continuing)
+            previewPlayer.play ({}, at);
+        else if (firstHearing)
+        {
+            const auto from = firstSoundFrame (*audio);
+            osp.keyboardState.allNotesOff (0);
+            previewPlayer.play ({}, from);
+            wave.setPlayhead (from);
+        }
+    }
     updateButtons();
     repaint();
+}
+
+void MemoLabComponent::setAuditioning (bool on)
+{
+    auditioning = on;
+    auditionButton.setToggleState (on, juce::dontSendNotification);
+    if (on)
+    {
+        // Straight away on the chosen recording (from its first sound), and the arrows go to the list.
+        if (decoded != nullptr && ! previewPlayer.isPlaying())
+        {
+            osp.keyboardState.allNotesOff (0);
+            previewPlayer.play ({}, firstSoundFrame (*decoded));
+        }
+        if (selected < 0 && ! shown.empty())
+            selectRecording (0);
+        list.grabKeyboardFocus();
+    }
+    else
+        previewPlayer.stop();
+    repaint();
+}
+
+void MemoLabComponent::auditionStep (int delta)
+{
+    if (shown.empty())
+        return;
+    const int next = std::clamp ((selected < 0 ? (delta > 0 ? -1 : 0) : selected) + delta, 0, static_cast<int> (shown.size()) - 1);
+    if (next != selected)
+        selectRecording (next);
+    list.scrollToEnsureRowIsOnscreen (next);
+}
+
+void MemoLabComponent::seekBy (double seconds)
+{
+    if (decoded == nullptr)
+        return;
+    const auto rate = decoded->info.sampleRate;
+    const auto total = static_cast<std::int64_t> (decoded->buffer.getNumSamples());
+    const auto now = previewPlayer.isPlaying() ? previewPlayer.position() : std::max<std::int64_t> (0, wave.playheadFrame());
+    const auto to = std::clamp<std::int64_t> (now + static_cast<std::int64_t> (seconds * rate), 0, std::max<std::int64_t> (0, total - 1));
+    wave.setSelection ({});
+    if (previewPlayer.isPlaying() || auditioning)
+        previewPlayer.play ({}, to);
+    wave.setPlayhead (to);
 }
 
 bool MemoLabComponent::waitForIdle (int timeoutMs)
@@ -469,7 +556,7 @@ void MemoLabComponent::togglePreview()
 
 void MemoLabComponent::convert (MemoSession::Mode mode)
 {
-    if (decoded == nullptr || selected < 0)
+    if (decoded == nullptr || decodedPartial || selected < 0)
         return;
     previewPlayer.stop();
     juce::String error;
@@ -492,6 +579,8 @@ void MemoLabComponent::timerCallback()
 
     const auto before = memo.status();
     const auto& now = memo.update();
+    if (! before.canPlay() && now.canPlay())
+        centreKeysOnInstrument();
     if (now.stage != before.stage || now.text != before.text || now.atlas != before.atlas)
     {
         updateInstrumentArea();
@@ -539,12 +628,13 @@ void MemoLabComponent::updateInstrumentArea()
 void MemoLabComponent::updateButtons()
 {
     const bool ready = decoded != nullptr;
+    const bool whole = ready && ! decodedPartial;   // (audition's quick read: the rest is coming)
     const bool working = memo.status().stage == MemoSession::Status::Stage::building;
     playButton.setEnabled (ready);
-    wholeButton.setEnabled (ready);
-    clearButton.setEnabled (ready && ! wave.selection().isEmpty());
-    oneShotButton.setEnabled (ready && ! working);
-    mapNotesButton.setEnabled (ready && ! working);
+    wholeButton.setEnabled (whole);
+    clearButton.setEnabled (whole && ! wave.selection().isEmpty());
+    oneShotButton.setEnabled (whole && ! working);
+    mapNotesButton.setEnabled (whole && ! working);
     saveButton.setEnabled (memo.status().stage == MemoSession::Status::Stage::ready || memo.status().stage == MemoSession::Status::Stage::unsuitable);
 }
 
@@ -556,8 +646,12 @@ juce::String MemoLabComponent::selectionText() const
     const auto total = decoded->buffer.getNumSamples();
     const auto sel = wave.selection();
     juce::String text = juce::String::fromUTF8 ("Recording ") + clock (total / rate);
-    if (decoded->truncated)
+    if (decodedPartial)
+        text = juce::String::fromUTF8 ("Its opening (reading the rest\xe2\x80\xa6)");
+    else if (decoded->truncated)
         text << " (its first 15 minutes)";
+    if (auditioning)
+        return text + juce::String::fromUTF8 ("   \xc2\xb7   AUDITION  \xe2\x86\x91\xe2\x86\x93 next  \xc2\xb7  \xe2\x86\x90\xe2\x86\x92 10 s  \xc2\xb7  Space stops");
     if (! sel.isEmpty())
         text << juce::String::fromUTF8 ("   \xc2\xb7   Passage ") << clock (sel.getStart() / rate) << juce::String::fromUTF8 (" \xe2\x80\x93 ") << clock (sel.getEnd() / rate)
              << "  (" << juce::String (sel.getLength() / rate, 2) << " s)";
@@ -683,12 +777,70 @@ void MemoLabComponent::saveInstrument()
 
 bool MemoLabComponent::keyPressed (const juce::KeyPress& key)
 {
-    if (key == juce::KeyPress::spaceKey && ! search.hasKeyboardFocus (false))
+    if (search.hasKeyboardFocus (false))
+        return false;
+    if (key == juce::KeyPress::spaceKey)
     {
         togglePreview();
         return true;
     }
+    // The list's own arrows move its selection (selectRecording); from anywhere else they do too.
+    if (key == juce::KeyPress::upKey || key == juce::KeyPress::downKey)
+    {
+        auditionStep (key == juce::KeyPress::upKey ? -1 : 1);
+        return true;
+    }
+    if (key == juce::KeyPress::leftKey || key == juce::KeyPress::rightKey)
+    {
+        seekBy (key == juce::KeyPress::leftKey ? -10.0 : 10.0);
+        return true;
+    }
+    // Z / X: the Mac keys an octave down / up (as in Live).
+    const auto c = juce::CharacterFunctions::toLowerCase (key.getTextCharacter());
+    if (c == 'z' || c == 'x')
+    {
+        setKeyOctave (keysOctave + (c == 'z' ? -1 : 1));
+        return true;
+    }
     return false;
+}
+
+void MemoLabComponent::setKeyOctave (int octave)
+{
+    octave = std::clamp (octave, 0, 9);   // (A..; = 17 keys from C: the top one stays a MIDI note)
+    if (octave == keysOctave)
+        return;
+    // Keys held now are let go first: released after the shift they would name other notes
+    // and stay on. (focusLost is how the keyboard releases its keys.)
+    keyboard.focusLost (juce::Component::focusChangedDirectly);
+    keysOctave = octave;
+    keyboard.setKeyPressBaseOctave (octave);
+    repaint();
+}
+
+juce::String MemoLabComponent::keyRangeText() const
+{
+    const int low = 12 * keysOctave, high = std::min (127, low + 16);
+    return juce::String (midiNoteName (low)) + juce::String::fromUTF8 ("\xe2\x80\x93") + juce::String (midiNoteName (high));
+}
+
+void MemoLabComponent::centreKeysOnInstrument()
+{
+    // The Mac keys over the new instrument: its notes' middle (an Atlas) or its root (One
+    // Shot), so A..; lands on what was recorded.
+    int low = 128, high = -1;
+    if (const auto atlas = osp.layerAtlas (0); atlas != nullptr && memo.status().atlas)
+        for (const auto& n : atlas->notes)
+            if (n.included)
+            {
+                low = std::min (low, n.playKey());
+                high = std::max (high, n.playKey());
+            }
+    if (high < 0)
+        low = high = static_cast<int> (std::lround (osp.effectiveRootMidi (0)));
+    const int centre = (low + high) / 2;
+    // A..; spans 17 keys from a C: the centre lands near the eighth (G#).
+    setKeyOctave (static_cast<int> (std::lround ((centre - 8) / 12.0)));
 }
 
 //==============================================================================
@@ -732,7 +884,7 @@ void MemoLabComponent::paint (juce::Graphics& g)
     // Under the waveform: its times; under the buttons: what is happening.
     g.setFont (type::popupLabel (12.5f));
     g.setColour (colour::textSecondary);
-    g.drawText (selectionText(), wholeButton.getBounds().withX (playButton.getRight() + 12).withRight (wholeButton.getX() - 12), juce::Justification::centredLeft, true);
+    g.drawText (selectionText(), wholeButton.getBounds().withX (auditionButton.getRight() + 12).withRight (wholeButton.getX() - 12), juce::Justification::centredLeft, true);
 
     const auto& s = memo.status();
     if (s.stage != MemoSession::Status::Stage::idle)
@@ -755,7 +907,7 @@ void MemoLabComponent::paint (juce::Graphics& g)
         g.setFont (type::popupLabel (12.0f));
         g.setColour (colour::textSecondary);
         g.drawText ((s.atlas ? juce::String ("Note Atlas") : juce::String ("One Shot")) + juce::String::fromUTF8 ("  \xc2\xb7  from ") + memo.sourceName()
-                        + juce::String::fromUTF8 ("  \xc2\xb7  play from the keyboard or a MIDI controller"),
+                        + juce::String::fromUTF8 ("  \xc2\xb7  Mac keys ") + keyRangeText() + juce::String::fromUTF8 (" (Z / X: octave)  \xc2\xb7  or a MIDI controller"),
                     header.withTrimmedLeft (header.getWidth() / 2 - 40).withTrimmedRight (rootButton.isVisible() ? rootButton.getWidth() + 8 : 0), juce::Justification::centredLeft, true);
     }
 }
@@ -785,6 +937,8 @@ void MemoLabComponent::resized()
     main.removeFromTop (8);
     auto transport = main.removeFromTop (30);
     playButton.setBounds (transport.removeFromLeft (80));
+    transport.removeFromLeft (6);
+    auditionButton.setBounds (transport.removeFromLeft (96));
     clearButton.setBounds (transport.removeFromRight (124));
     transport.removeFromRight (6);
     wholeButton.setBounds (transport.removeFromRight (132));
