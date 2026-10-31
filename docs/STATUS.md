@@ -541,6 +541,14 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       and never writes the recordings. Tests `memo_lab` (13 cases) pass, including the round
       trip into a fresh processor with an empty store and the recording deleted. Awaiting the
       owner's test on a Mac: the real Voice Memos folder, real memos, Ableton.
+- [x] KEY DNA keys by hand: drag a key's bar (away from the curve) and that key plays the value
+      drawn, in place of the curve and its variation (a stroke draws every key it passes, one
+      undo step; a click alone draws nothing, so double-click still adds a curve point).
+      Option-click or right-click returns a key, or all, to the curve; Reset clears them too.
+      Drawn keys carry a ring. Stored per parameter as `ParamSettings::drawn` (KEY DNA schema 1,
+      additive `keys` field; older sessions have none). AMOUNT still scales them. Tests
+      [keydna] (engine and editor). The EQ and DAMPEN pages also stack their values under the
+      tabs on narrow (three-card) layouts.
 - [x] MIX as a modulation destination (docs/research/mix-modulation-plan.md, "Implemented"):
       - engine: `mod::Dest::mixPosition` (MIX: the A <-> B blend, the triangle's A -> B
         direction) and `mixTowardsC`, global and continuous; a routed mix follows within 2 ms

@@ -851,3 +851,93 @@ TEST_CASE ("plugin phase 5: screenshots of the new states (OSP_SNAPSHOT_DIR)", "
         p.setEditLayer (0);
     }, "p5-10-abc");
 }
+
+TEST_CASE ("plugin phase 5: KEY DNA keys drawn by hand - dragging a bar, one undo step, returned by Option-click, saved", "[plugin][phase5][keydna][gui]")
+{
+    TempDir tmp;
+    const ScopedEnvironment storeDir ("OSP_SAMPLE_STORE", tmp.dir.getChildFile ("store").getFullPathName());
+    const auto a = writeSource (tmp.dir, "pad.wav", testsignals::vowel (midiToHz (60), 2.0, 48000.0, 3));
+    OspAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (editor.get());
+    REQUIRE (ui != nullptr);
+    p.addLayers ({ a });
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    p.setParameterValue ("layerA.sourceMode", 1.0f);
+    editor->setSize (1448, 1086);
+    ui->refreshNow();
+    p.undo().clearUndoHistory();
+    ui->openKeyDna (0);
+    auto* dna = ui->keyDnaWindow();
+    REQUIRE (dna != nullptr);
+    dna->showParameter (keydna::Param::size);
+    const auto graph = dna->graphArea();
+    // Away from the flat curve (its middle): high on C4, then a stroke across to E4, lower.
+    const juce::Point<float> c4 (dna->xForNote (60), graph.getY() + 0.2f * graph.getHeight());
+    const juce::Point<float> e4 (dna->xForNote (64), graph.getY() + 0.35f * graph.getHeight());
+    CHECK (dna->keyAt (c4) == 60);
+    // A click alone draws nothing (a double-click still adds a curve point).
+    dna->mouseDown (mouseAt (*dna, c4, c4, false));
+    dna->mouseUp (mouseAt (*dna, c4, c4, false));
+    CHECK_FALSE (p.keyDnaSettings (0)[keydna::Param::size].anyDrawn());
+    CHECK_FALSE (p.undo().canUndo());
+    // The drag: heard as it moves, one undo step on release; KEY DNA comes on.
+    dna->mouseDown (mouseAt (*dna, c4, c4, false));
+    dna->mouseDrag (mouseAt (*dna, c4 + juce::Point<float> (0.0f, 6.0f), c4, true));
+    const float first = p.keyDnaSettings (0)[keydna::Param::size].drawn[60];
+    CHECK (first == Approx (dna->unitAt (c4.y + 6.0f)));
+    CHECK (first > 0.4f);
+    CHECK_FALSE (p.undo().canUndo());
+    dna->mouseDrag (mouseAt (*dna, e4, c4, true));
+    dna->mouseUp (mouseAt (*dna, e4, c4, true));
+    const auto drawn = p.keyDnaSettings (0);
+    CHECK (drawn.enabled);
+    for (const int k : { 60, 61, 62, 63, 64 })
+        CHECK (drawn[keydna::Param::size].isDrawn (k));   // a fast stroke skips no key
+    CHECK_FALSE (drawn[keydna::Param::size].isDrawn (65));
+    CHECK (drawn[keydna::Param::size].drawn[64] == Approx (dna->unitAt (e4.y)));
+    CHECK (drawn[keydna::Param::size].drawn[62] < drawn[keydna::Param::size].drawn[60]);
+    dna->refresh();
+    CHECK (dna->shownOffset (64) == Approx (dna->unitAt (e4.y)).margin (1.0e-5));   // the bar ends at the pointer
+    REQUIRE (p.undo().undo());
+    CHECK_FALSE (p.keyDnaSettings (0)[keydna::Param::size].anyDrawn());
+    REQUIRE (p.undo().redo());
+    CHECK (p.keyDnaSettings (0)[keydna::Param::size].isDrawn (62));
+    dna->refresh();
+
+    // Saved with the session (and reopens exactly); an older session has none.
+    juce::MemoryBlock saved;
+    p.getStateInformation (saved);
+    {
+        OspAudioProcessor q;
+        q.setStateInformation (saved.getData(), static_cast<int> (saved.getSize()));
+        CHECK (q.keyDnaSettings (0)[keydna::Param::size].drawn == p.keyDnaSettings (0)[keydna::Param::size].drawn);
+    }
+
+    // Option-click on a drawn key returns it to the curve (one undo step).
+    const juce::Point<float> d4 (dna->xForNote (62), graph.getY() + 0.8f * graph.getHeight());
+    dna->mouseDown (mouseAt (*dna, d4, d4, false, 1, juce::ModifierKeys (juce::ModifierKeys::altModifier)));
+    dna->mouseUp (mouseAt (*dna, d4, d4, false, 1, juce::ModifierKeys (juce::ModifierKeys::altModifier)));
+    CHECK_FALSE (p.keyDnaSettings (0)[keydna::Param::size].isDrawn (62));
+    CHECK (p.keyDnaSettings (0)[keydna::Param::size].isDrawn (61));
+    REQUIRE (p.undo().undo());
+    CHECK (p.keyDnaSettings (0)[keydna::Param::size].isDrawn (62));
+    dna->refresh();   // (the editor's timer, in the plugin)
+
+    // The curve still bends from its line, and Reset clears the drawn keys with the rest.
+    const auto curveBefore = p.keyDnaCurve (0, keydna::Param::size);
+    const juce::Point<float> onLine (dna->xForNote (84), graph.getCentreY());
+    dna->mouseDown (mouseAt (*dna, onLine, onLine, false));
+    dna->mouseDrag (mouseAt (*dna, onLine + juce::Point<float> (0.0f, -30.0f), onLine, true));
+    dna->mouseUp (mouseAt (*dna, onLine + juce::Point<float> (0.0f, -30.0f), onLine, true));
+    CHECK (p.keyDnaSettings (0)[keydna::Param::size].isDrawn (62));   // no key drawn by the bend
+    CHECK_FALSE (p.keyDnaSettings (0)[keydna::Param::size].isDrawn (84));
+    juce::ignoreUnused (curveBefore);
+    {
+        const auto at = dna->controlArea ("reset").getCentre();
+        dna->mouseDown (mouseAt (*dna, at, at, false));
+    }
+    CHECK_FALSE (p.keyDnaSettings (0)[keydna::Param::size].anyDrawn());
+    ui->closeKeyDna();
+}

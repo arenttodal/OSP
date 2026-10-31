@@ -373,3 +373,53 @@ TEST_CASE ("KEY DNA: the research configs carry exactly the demonstration profil
         CHECK (config->engineSettings.macros.life == Approx (0.3));
     }
 }
+
+TEST_CASE ("KEY DNA: a key drawn by hand plays its own value; the others keep the curve and variation", "[integration][keydna]")
+{
+    keydna::Settings s;
+    s.enabled = true;
+    s[keydna::Param::size].variation = 0.4;
+    keydna::Table plain;
+    plain.compute (s);
+
+    auto drawn = s;
+    drawn[keydna::Param::size].drawn[60] = 0.75f;
+    drawn[keydna::Param::size].drawn[61] = -1.0f;
+    CHECK (drawn[keydna::Param::size].isDrawn (60));
+    CHECK_FALSE (drawn[keydna::Param::size].isDrawn (62));
+    keydna::Table t;
+    t.compute (drawn);
+    CHECK (t.offset (60, keydna::Param::size) == Approx (0.75f));
+    CHECK (t.offset (61, keydna::Param::size) == Approx (-1.0f));
+    CHECK (t.at (60).sizeOctaves == Approx (0.75 * keydna::halfRange (keydna::Param::size)));
+    for (int k = 0; k < 128; ++k)
+    {
+        if (k == 60 || k == 61)
+            continue;
+        CHECK (t.offset (k, keydna::Param::size) == plain.offset (k, keydna::Param::size));   // untouched, bit for bit
+    }
+    CHECK (t.offset (60, keydna::Param::position) == plain.offset (60, keydna::Param::position));   // other parameters too
+
+    // A drawn key alone is not neutral; drawn at 0 it is (no offset); off, nothing plays.
+    keydna::Settings only;
+    only.enabled = true;
+    only[keydna::Param::tune].drawn[64] = 0.5f;
+    CHECK_FALSE (only.isNeutral());
+    only[keydna::Param::tune].drawn[64] = 0.0f;
+    CHECK (only.isNeutral());
+    only[keydna::Param::tune].drawn[64] = 0.5f;
+    only.enabled = false;
+    keydna::Table off;
+    off.compute (only);
+    CHECK_FALSE (off.active());
+
+    // AMOUNT scales a drawn key as any other.
+    only.enabled = true;
+    keydna::Table half;
+    half.compute (only);
+    GranularParams base;
+    base.tuneSemitones = 0.0;
+    auto p = base;
+    keydna::apply (half.at (64), 0.5, p);
+    CHECK (p.tuneSemitones == Approx (0.5 * 0.5 * keydna::halfRange (keydna::Param::tune)));
+}

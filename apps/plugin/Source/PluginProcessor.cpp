@@ -1202,6 +1202,31 @@ namespace
         }
         return points.joinIntoString (";");
     }
+    // The keys drawn by hand ("key value" per key, ";" between; value -1..1, exact as float).
+    juce::String encodeDrawnKeys (const std::array<float, 128>& drawn)
+    {
+        juce::StringArray keys;
+        for (int k = 0; k < 128; ++k)
+            if (const float v = drawn[static_cast<std::size_t> (k)]; v <= 1.0f)
+            {
+                char buffer[40];
+                std::snprintf (buffer, sizeof (buffer), "%d %.9g", k, static_cast<double> (v));
+                keys.add (buffer);
+            }
+        return keys.joinIntoString (";");
+    }
+    std::array<float, 128> decodeDrawnKeys (const juce::String& text)
+    {
+        auto drawn = keydna::undrawnKeys();
+        for (const auto& item : juce::StringArray::fromTokens (text, ";", ""))
+        {
+            const auto values = juce::StringArray::fromTokens (item, " ", "");
+            const int key = values.size() == 2 ? values[0].getIntValue() : -1;
+            if (key >= 0 && key < 128)
+                drawn[static_cast<std::size_t> (key)] = std::clamp (std::strtof (values[1].toRawUTF8(), nullptr), -1.0f, 1.0f);
+        }
+        return drawn;
+    }
     std::optional<mod::Curve> decodeCurvePoints (const juce::String& text)
     {
         const auto points = juce::StringArray::fromTokens (text, ";", "");
@@ -1248,7 +1273,7 @@ juce::ValueTree OspAudioProcessor::keyDnaToTree (const std::array<keydna::Settin
             const auto param = static_cast<keydna::Param> (p);
             const auto& ps = s[param];
             const auto& drawn = curves[static_cast<std::size_t> (layer)][static_cast<std::size_t> (p)];
-            if (juce::exactlyEqual (ps.curveDepth, 0.0) && juce::exactlyEqual (ps.variation, 0.0) && ps.curve == flat && ! drawn.has_value())
+            if (juce::exactlyEqual (ps.curveDepth, 0.0) && juce::exactlyEqual (ps.variation, 0.0) && ps.curve == flat && ! drawn.has_value() && ! ps.anyDrawn())
                 continue;
             juce::ValueTree pt ("Param");
             pt.setProperty ("id", keydna::paramId (param), nullptr);
@@ -1258,6 +1283,8 @@ juce::ValueTree OspAudioProcessor::keyDnaToTree (const std::array<keydna::Settin
                 pt.setProperty ("curve", encodeCurveTable (ps.curve), nullptr);
             if (drawn.has_value())
                 pt.setProperty ("points", encodeCurvePoints (*drawn), nullptr);   // Phase 5: the editor's points
+            if (ps.anyDrawn())
+                pt.setProperty ("keys", encodeDrawnKeys (ps.drawn), nullptr);    // additive: keys drawn by hand
             l.appendChild (pt, nullptr);
         }
         tree.appendChild (l, nullptr);
@@ -1312,6 +1339,8 @@ std::array<keydna::Settings, 3> OspAudioProcessor::keyDnaFromTree (const juce::V
                 ps.variation = std::clamp (keyDnaValue (pt.getProperty ("variation"), 0.0), 0.0, 1.0);
                 if (const auto curve = decodeCurveTable (pt.getProperty ("curve").toString()))
                     ps.curve = *curve;
+                if (pt.hasProperty ("keys"))
+                    ps.drawn = decodeDrawnKeys (pt.getProperty ("keys").toString());
             }
     }
     return layers;

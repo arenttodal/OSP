@@ -256,6 +256,70 @@ double KeyDnaEditor::shownOffset (int note) const
     return settings.enabled ? static_cast<double> (table.offset (note, shownParam)) * amount : 0.0;
 }
 
+bool KeyDnaEditor::isDrawn (int note) const
+{
+    return settings[shownParam].isDrawn (note);
+}
+
+int KeyDnaEditor::keyAt (juce::Point<float> p) const
+{
+    return std::clamp (static_cast<int> (std::lround (noteForX (p.x))), lowestKey, highestKey);
+}
+
+double KeyDnaEditor::unitAt (float y) const
+{
+    // The bars are drawn at offset x AMOUNT x 0.94 of the half height: the inverse, so the
+    // drawn bar ends under the pointer.
+    const double shown = static_cast<double> (graph.getCentreY() - y) / std::max (1.0, 0.5 * 0.94 * static_cast<double> (graph.getHeight()));
+    const double unit = amount > 0.02 ? shown / amount : shown;
+    return std::clamp (unit, -1.0, 1.0);
+}
+
+bool KeyDnaEditor::nearCurve (juce::Point<float> p) const
+{
+    const auto compiled = keydna::curveFrom (curve);
+    const double n = std::clamp (noteForX (p.x), 0.0, 127.0);
+    const float y = graph.getBottom() - static_cast<float> (mod::curveAt (compiled, n / 127.0)) * graph.getHeight();
+    return std::abs (p.y - y) <= 7.0f;
+}
+
+void KeyDnaEditor::drawKeys (int from, double fromValue, int to, double toValue)
+{
+    // Every key between the last one and this one (a fast stroke skips none), heard as it is
+    // drawn; one undo step when the stroke ends.
+    auto s = settings;
+    s.enabled = true;
+    auto& drawn = s[shownParam].drawn;
+    const int step = to >= from ? 1 : -1;
+    for (int k = from;; k += step)
+    {
+        const double t = to == from ? 1.0 : static_cast<double> (k - from) / static_cast<double> (to - from);
+        drawn[static_cast<std::size_t> (k)] = static_cast<float> (std::clamp (fromValue + (toValue - fromValue) * t, -1.0, 1.0));
+        if (k == to)
+            break;
+    }
+    settings = s;
+    recompute();
+    host.setKeyDnaSettings (layerIndex, s, "KEY DNA " + juce::String (keydna::paramName (shownParam)) + " keys", false);
+    repaint();
+}
+
+void KeyDnaEditor::returnKeys (int key)
+{
+    auto s = settings;
+    auto& drawn = s[shownParam].drawn;
+    if (key >= 0)
+        drawn[static_cast<std::size_t> (std::clamp (key, 0, 127))] = keydna::notDrawn;
+    else
+        drawn = keydna::undrawnKeys();
+    if (s == settings)
+        return;
+    host.setKeyDnaSettings (layerIndex, s, key >= 0 ? "KEY DNA key to the curve" : "KEY DNA keys to the curve", true);
+    settings = s;
+    recompute();
+    repaint();
+}
+
 juce::Point<float> KeyDnaEditor::toScreen (float x, float y) const
 {
     // x over the keys (note / 127; the off-keyboard ends pinned to the graph's edges), y up.
@@ -440,7 +504,7 @@ void KeyDnaEditor::paint (juce::Graphics& g)
             g.setColour (id.arc);
             g.fillRect (juce::Rectangle<float> (r.getCentreX() - 0.5f * tw, r.getBottom() - 4.0f, tw, 1.5f));
         }
-        if (! juce::exactlyEqual (ps.curveDepth, 0.0) || ! juce::exactlyEqual (ps.variation, 0.0))
+        if (! juce::exactlyEqual (ps.curveDepth, 0.0) || ! juce::exactlyEqual (ps.variation, 0.0) || ps.anyDrawn())
         {
             g.setColour (id.arc.withAlpha (settings.enabled ? 0.9f : 0.35f));
             g.fillEllipse (juce::Rectangle<float> (4.0f, 4.0f).withCentre ({ r.getCentreX() + 0.5f * tw + 5.0f, r.getCentreY() - 5.0f }));
@@ -454,7 +518,7 @@ void KeyDnaEditor::paint (juce::Graphics& g)
     // What it is not (yet): honest about the modulation bay.
     g.setFont (type::annotation (12.0f));
     g.setColour (colour::textMicro);
-    g.drawText ("AMOUNT is a host parameter: automate it in the DAW. The modulation bay's destinations are unchanged in this build, so it is not a modulation target.",
+    g.drawText ("AMOUNT can be automated in the DAW and modulated (a source's + ADD > Layer). Drag a key's bar to set it by hand; Option-click returns it to the curve.",
                 note, juce::Justification::centredLeft, true);
 }
 
@@ -507,6 +571,12 @@ void KeyDnaEditor::paintGraph (juce::Graphics& g)
         }
         g.setColour (on ? light : c.withAlpha (alpha));
         g.fillRect (juce::Rectangle<float> (x - 0.5f * tick, end - (on ? 1.0f : 0.75f), tick, on ? 2.0f : 1.5f));
+        // A key drawn by hand: a small ring on its tick (its own value, not the curve's).
+        if (isDrawn (k))
+        {
+            g.setColour (light.withAlpha (settings.enabled ? 0.85f : 0.35f));
+            g.drawEllipse (juce::Rectangle<float> (5.0f, 5.0f).withCentre ({ x, end }), 1.1f);
+        }
     }
 
     // The curve, drawn exactly as compiled, over the shown keys; its points to drag.
@@ -532,8 +602,8 @@ void KeyDnaEditor::paintGraph (juce::Graphics& g)
     juce::String hint;
     if (! settings.enabled)
         hint = "KEY DNA is off: every key plays the layer's own POS, SIZE, DENS, SPREAD and TUNE";
-    else if (juce::exactlyEqual (settings[shownParam].curveDepth, 0.0) && juce::exactlyEqual (settings[shownParam].variation, 0.0))
-        hint = "Draw a curve or raise VARIATION: " + juce::String (keydna::paramName (shownParam)) + " then differs from key to key";
+    else if (juce::exactlyEqual (settings[shownParam].curveDepth, 0.0) && juce::exactlyEqual (settings[shownParam].variation, 0.0) && ! settings[shownParam].anyDrawn())
+        hint = "Draw a curve, drag a key's bar, or raise VARIATION: " + juce::String (keydna::paramName (shownParam)) + " then differs from key to key";
     if (hint.isNotEmpty())
     {
         g.setFont (type::popupLabel (11.5f));
@@ -643,6 +713,7 @@ void KeyDnaEditor::mouseDown (const juce::MouseEvent& e)
         auto s = host.keyDnaSettings (layerIndex);
         s[shownParam].curveDepth = 0.0;
         s[shownParam].variation = 0.0;
+        s[shownParam].drawn = keydna::undrawnKeys();
         host.setKeyDnaSettings (layerIndex, s, "KEY DNA " + juce::String (keydna::paramName (shownParam)) + " reset", true);
         settings = s;
         curve = flat;
@@ -670,6 +741,38 @@ void KeyDnaEditor::mouseDown (const juce::MouseEvent& e)
         return;
     curve = host.keyDnaCurve (layerIndex, shownParam);
     dragPoint = pointAt (p);
+    if (dragPoint < 0 && ! nearCurve (p))
+    {
+        // Away from the curve: a key by hand. Option-click returns it to the curve; a
+        // right-click offers that for one key or all; a drag draws.
+        const int key = keyAt (p);
+        if (e.mods.isPopupMenu())
+        {
+            juce::PopupMenu menu;
+            const juce::String name (midiNoteName (key));
+            juce::Component::SafePointer<KeyDnaEditor> safe (this);
+            menu.addItem ("Return " + name + " to the curve", isDrawn (key), false, [safe, key] {
+                if (safe != nullptr)
+                    safe->returnKeys (key);
+            });
+            menu.addItem ("Return all drawn keys to the curve", settings[shownParam].anyDrawn(), false, [safe] {
+                if (safe != nullptr)
+                    safe->returnKeys (-1);
+            });
+            menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+            return;
+        }
+        if (e.mods.isAltDown())
+        {
+            returnKeys (key);
+            return;
+        }
+        strokeKey = key;
+        strokeValue = unitAt (p.y);
+        drawArmed = true;
+        dragStart = p;
+        return;
+    }
     if (dragPoint < 0)
     {
         // A press on the line bends that segment (its end point's tension).
@@ -700,6 +803,25 @@ void KeyDnaEditor::mouseDown (const juce::MouseEvent& e)
 
 void KeyDnaEditor::mouseDrag (const juce::MouseEvent& e)
 {
+    if (drawArmed)
+    {
+        // A key's bar dragged: it draws once the pointer moves (a click alone does nothing, so
+        // a double-click still adds a curve point).
+        if (! drawingKeys && e.position.getDistanceFrom (dragStart) < 3.0f)
+            return;
+        const int key = keyAt (e.position);
+        const double value = unitAt (e.position.y);
+        if (! drawingKeys)
+        {
+            drawingKeys = true;
+            drawKeys (strokeKey, value, key, value);
+        }
+        else
+            drawKeys (strokeKey, strokeValue, key, value);
+        strokeKey = key;
+        strokeValue = value;
+        return;
+    }
     if (! dragging)
         return;
     if (dragField != nullptr)
@@ -735,6 +857,14 @@ void KeyDnaEditor::mouseDrag (const juce::MouseEvent& e)
 
 void KeyDnaEditor::mouseUp (const juce::MouseEvent&)
 {
+    if (std::exchange (drawArmed, false))
+    {
+        if (std::exchange (drawingKeys, false))
+            host.setKeyDnaSettings (layerIndex, settings, "KEY DNA " + juce::String (keydna::paramName (shownParam)) + " keys", true);
+        strokeKey = -1;
+        repaint();
+        return;
+    }
     if (dragging && dragField != nullptr)
     {
         if (dragField->name == "amount")

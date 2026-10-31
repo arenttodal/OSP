@@ -23,6 +23,9 @@ namespace osp::plugin
     - One parameter at a time (POS SIZE DENS SPREAD TUNE SCATTER PAN): its curve over the
       keys (drag a point, double-click to add or remove one, drag the line to bend it, as the
       other curve editors), its DEPTH and VARIATION.
+    - A key by hand: drag its bar (away from the curve) and the key plays that value; a stroke
+      across keys draws each one it passes. Option-click (or right-click) returns a key to the
+      curve and its variation.
     - Under every key, the profile the layer plays: the computed table (the same deterministic
       computation the processor publishes) at the current AMOUNT, held keys marked; below, the
       seven parameters at a glance.
@@ -56,6 +59,12 @@ public:
     double noteForX (float x) const;
     /** The offset the layer plays at a key for the shown parameter, -1..1 of its half range (AMOUNT applied). */
     double shownOffset (int note) const;
+    /** The shown parameter's key drawn by hand (its own value, not the curve's). */
+    bool isDrawn (int note) const;
+    /** The key a point in the graph stands for (the nearest shown key). */
+    int keyAt (juce::Point<float> p) const;
+    /** The unit value (-1..1, before AMOUNT) a height in the graph draws. */
+    double unitAt (float y) const;
     void setValue (const juce::String& field, double value, bool final);
     double value (const juce::String& field) const;
 
@@ -80,6 +89,9 @@ private:
     juce::Point<float> toScreen (float x, float y) const;
     juce::Point<float> fromScreen (juce::Point<float> p) const;
     int pointAt (juce::Point<float> p) const;
+    bool nearCurve (juce::Point<float> p) const;
+    void drawKeys (int from, double fromValue, int to, double toValue);
+    void returnKeys (int key);   ///< one key (or all, -1) back to the curve, one undo step
     void recompute();
     void paintGraph (juce::Graphics&);
     void paintOverview (juce::Graphics&);
@@ -107,6 +119,10 @@ private:
     int dragPoint = -1, dragSegment = -1;
     float dragStartTension = 0.0f;
     bool dragging = false;
+    // Drawing keys: armed by a press away from the curve, drawing once the pointer moves.
+    int strokeKey = -1;
+    double strokeValue = 0.0;
+    bool drawArmed = false, drawingKeys = false;
 };
 
 } // namespace osp::plugin

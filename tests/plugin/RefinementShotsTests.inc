@@ -212,4 +212,21 @@ TEST_CASE ("plugin: UI refinement screenshots (OSP_REFINE_DIR)", "[.][refine-sho
         p.keyboardState.noteOn (1, 60, 0.8f);
         p.keyboardState.noteOn (1, 64, 0.8f);
     }, "05-keydna-1L");
+    // ... and keys drawn by hand: a stroke from C4 up to G4 above the curve, a low B3 (each
+    // drawn key with its ring).
+    shoot ({ pad }, [] (OspAudioProcessor& p, Editor& ui) {
+        p.setParameterValue ("layerA.sourceMode", 1.0f);
+        auto dna = p.keyDnaSettings (0);
+        dna.enabled = true;
+        dna[keydna::Param::size].variation = 0.45;
+        dna[keydna::Param::size].curveDepth = 0.7;
+        for (int k = 60; k <= 67; ++k)
+            dna[keydna::Param::size].drawn[static_cast<std::size_t> (k)] = 0.3f + 0.08f * static_cast<float> (k - 60);
+        dna[keydna::Param::size].drawn[59] = -0.8f;
+        p.setKeyDnaSettings (0, dna, "KEY DNA", true);
+        ui.refreshNow();
+        ui.openKeyDna (0);
+        if (auto* d = ui.keyDnaWindow())
+            d->showParameter (keydna::Param::size);
+    }, "05-keydna-drawn-1L");
 }
