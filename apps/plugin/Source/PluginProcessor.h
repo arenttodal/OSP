@@ -167,6 +167,7 @@ public:
     // EQ (version hint 18): each layer's five bands, `layerA.eq.*` (InstrumentHost::eqParameterId).
     // Off by default (older sessions open with it off and sound as they did).
     InstrumentEngine::ModView modulationView() const noexcept override { return engine.modulationView(); }
+    InstrumentEngine::LiveMix liveMix() const noexcept override { return engine.liveMix(); }
     /** The CC 1-4 sources' controller numbers (0..119; default 2, 11, 16, 17), saved with the
         session. Learn: the next controller that moves is taken for the slot (-1: none). */
     int modControllerNumber (int slot) const noexcept override;
@@ -459,6 +460,10 @@ public:
     keydna::Settings keyDnaSettings (int layer) const override;
     // Phase 5 (InstrumentHost): the KEY DNA editor's undoable edits and drawn curves.
     bool hasKeyDna() const noexcept override { return true; }
+    bool hasSynthesize() const noexcept override { return true; }
+    int synthAuditionBlend() const noexcept override { return synthAudition.load() & 0xff; }
+    int synthAuditionEnvelope() const noexcept override { return synthAudition.load() >> 8; }
+    void setSynthAudition (int blend, int envelope) override { synthAudition = std::clamp (blend, 0, 2) | (std::clamp (envelope, 0, 1) << 8); }
     void setKeyDnaSettings (int layer, const keydna::Settings& settings, const juce::String& name, bool undoable) override;
     mod::Curve keyDnaCurve (int layer, keydna::Param param) const override;
     void setKeyDnaCurve (int layer, keydna::Param param, const mod::Curve& curve, bool undoable) override;
@@ -694,8 +699,8 @@ private:
     // for the audio thread (atomics + generation, as SHAPER CUSTOM's steps).
     std::array<std::array<std::atomic<float>*, 8>, 2> modLfoParams {};
     std::array<std::array<std::atomic<float>*, 7>, 2> modEnvParams {};
-    std::array<std::array<std::atomic<float>*, 4>, mod::maxRoutes> modRouteParams {};
-    static constexpr int numModValues = 2 * 8 + 2 * 7 + mod::maxRoutes * 5;
+    std::array<std::array<std::atomic<float>*, 5>, mod::maxRoutes> modRouteParams {};   ///< source, dest, depth, enabled, destExt
+    static constexpr int numModValues = 2 * 8 + 2 * 7 + mod::maxRoutes * 6;   // (each route's five parameters and its target)
     // META-MODULATION's links: each route's stable ID and a depth route's target ID live in
     // the state's ModLinks child (saved, undoable); the audio thread reads them resolved to
     // slots (message thread writes on every change of the links or the state).
@@ -742,8 +747,10 @@ private:
         dampen::Settings dampenSettings;
         std::array<std::atomic<float>*, 3> grainOptions {};   ///< SCATTER, PAN, WINDOW (hint 20)
         std::atomic<float>* keyDnaAmount = nullptr;
+        std::atomic<float>* synthesize = nullptr;   ///< SYNTHESIZE 0..100 % (hint 22)
     };
     std::atomic<float>* grainBudgetParam = nullptr;
+    std::atomic<int> synthAudition { 0 };   ///< SYNTHESIZE's development audition (blend | envelope << 8); never saved
     // KEY DNA: the message thread's settings and the profiles handed to the audio thread.
     mutable std::mutex keyDnaMutex;   ///< message-side (hosts may save state off the message thread)
     std::array<keydna::Settings, numLayers> keyDnaLayers {};

@@ -93,6 +93,9 @@ namespace
                 for (const char* name : { "amount", "frequency", "cutoff" })
                     list.add (InstrumentHost::dampenParameterId (l, name));
             }
+            for (int l = 0; l < InstrumentHost::numLayers; ++l)
+                list.add (InstrumentHost::keyDnaAmountId (l));
+            list.add (modui::mixTargetId);
             // A product's own controls (mod::setProductDestinations; ANDOR OSP has none).
             for (int k = 0; k < mod::productDestCount(); ++k)
                 list.add (mod::destInfo (mod::productDest (k)).id);
@@ -298,11 +301,24 @@ namespace modui
             if (id == InstrumentHost::dampenParameterId (l, "amount")) return offsetDest (Dest::dampenAmountA, l);
             if (id == InstrumentHost::dampenParameterId (l, "frequency")) return offsetDest (Dest::dampenShelfA, l);
             if (id == InstrumentHost::dampenParameterId (l, "cutoff")) return offsetDest (Dest::dampenCutoffA, l);
+            if (id == InstrumentHost::keyDnaAmountId (l)) return offsetDest (Dest::keyDnaAmountA, l);
         }
+        // The header MIX (no parameter of its own: it moves ab.blend, or mix.x and mix.y).
+        if (id == mixTargetId) return Dest::mixPosition;
         for (int k = 0; k < mod::productDestCount(); ++k)
             if (id == mod::destInfo (mod::productDest (k)).id)
                 return mod::productDest (k);
         return Dest::none;
+    }
+
+    bool isBipolar (const InstrumentHost& p, int source) { return isBipolarSource (p, source); }
+
+    int mixLayerCount (const InstrumentHost& p)
+    {
+        int n = 0;
+        for (int l = 0; l < InstrumentHost::numLayers; ++l)
+            n += p.isLayerOccupied (l) ? 1 : 0;
+        return n;
     }
 
     bool isPerVoice (const InstrumentHost& p, int source)
@@ -316,6 +332,8 @@ namespace modui
     {
         if (id == "character")
             return { mod::Dest::character, mod::Dest::cutoff };
+        if (id == mixTargetId)
+            return { mod::Dest::mixPosition, mod::Dest::mixTowardsC };
         const auto d = destinationFor (id, false);
         if (d == mod::Dest::none)
             return {};
@@ -1822,10 +1840,16 @@ juce::PopupMenu ModRoutesPopup::addMenu()
         juce::PopupMenu layer;
         for (auto first : { mod::Dest::levelA, mod::Dest::panA, mod::Dest::fineTuneA, mod::Dest::reimaginedA, mod::Dest::grainPositionA,
                             mod::Dest::grainDensityA, mod::Dest::grainSizeA, mod::Dest::grainSpreadA, mod::Dest::eqBellFrequencyA,
-                            mod::Dest::eqBellGainA, mod::Dest::eqLowShelfGainA, mod::Dest::eqHighShelfGainA })
+                            mod::Dest::eqBellGainA, mod::Dest::eqLowShelfGainA, mod::Dest::eqHighShelfGainA, mod::Dest::keyDnaAmountA })
             add (layer, offsetDest (first, l));
         menu.addSubMenu ("Layer " + InstrumentHost::layerName (l), layer);
     }
+    // The balance between the layers (towards C only with three).
+    juce::PopupMenu mix;
+    add (mix, mod::Dest::mixPosition);
+    if (modui::mixLayerCount (ospProcessor) >= 3)
+        add (mix, mod::Dest::mixTowardsC);
+    menu.addSubMenu ("Mix", mix);
     return menu;
 }
 
@@ -2439,6 +2463,12 @@ juce::PopupMenu ModulationOverlay::contextMenu (const juce::String& parameterId)
             dests[0].second = " (each note's filter)";
             dests.push_back ({ mod::Dest::character, " (whole instrument)" });
         }
+        // Three layers: the node moves A<->B, or towards C.
+        if (parameterId == modui::mixTargetId && modui::mixLayerCount (p) >= 3)
+        {
+            dests[0].second = juce::String::fromUTF8 (" (A \xe2\x86\x94 B)");
+            dests.push_back ({ mod::Dest::mixTowardsC, " (towards C)" });
+        }
         for (const auto& [dest, suffix] : dests)
         {
             if (! p.canModulate (static_cast<mod::Source> (source + 1), dest))
@@ -2588,6 +2618,13 @@ int ModulationOverlay::drop (int source, juce::Point<float> where)
         return -1;
     }
     const auto dest = modui::destinationFor (hit.parameterId, modui::isPerVoice (ospProcessor, source));
+    return dest != mod::Dest::none ? assign (source, dest) : -1;
+}
+
+int ModulationOverlay::dropOn (int source, const juce::String& parameterId, juce::Rectangle<float> area)
+{
+    noticeAnchor = area;
+    const auto dest = modui::destinationFor (parameterId, modui::isPerVoice (ospProcessor, source));
     return dest != mod::Dest::none ? assign (source, dest) : -1;
 }
 

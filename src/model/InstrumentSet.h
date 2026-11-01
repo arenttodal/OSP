@@ -95,6 +95,9 @@ struct InstrumentSet
         that can loop are played (groups and takes that cannot are left out, FILL reaches past
         them); LOOP off plays every note. Off for file sets and while a set is being prepared. */
     bool loopSelects = false;
+    /** SPEED (Note Atlas sets): every note's playback rate through its recording, pitch kept
+        (1 = as recorded). File sets keep 1. */
+    double speed = 1.0;
     /** Whether a key can be left silent (a set from an atlas with a finite reach or no fill,
         or one that leaves notes that cannot loop out). */
     bool restrictsKeys() const noexcept { return ! fill || std::isfinite (fillLimitSemitones) || loopSelects; }

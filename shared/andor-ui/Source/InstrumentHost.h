@@ -63,6 +63,13 @@ public:
     static juce::String modRouteId (int route, const juce::String& name);
     /** The modulation destinations' names, in the registry's order (append only: sessions store the index). */
     static const juce::StringArray& modDestinationNames();
+    /** The second destination parameter's choices (mod.routeN.destExt): "None", then
+        mod::extendedDests (KEY DNA AMOUNT A-C, MIX, MIX TOWARDS C). */
+    static const juce::StringArray& modExtendedDestinationNames();
+    /** A route slot's destination, from both of its parameters (the second wins when set). */
+    mod::Dest routeDest (int slot) const;
+    /** Sets a route slot's destination through whichever parameter holds it. */
+    void setRouteDest (int slot, mod::Dest dest);
     /** The editable curves: 0, 1 LFO 1/2 CUSTOM; 2, 3 ENV 1/2 one-shot; 4 VEL; 5 NOTE;
         6, 7, 8 DAMPEN A/B/C (over the keys). */
     static constexpr int modCurveCount = 9;
@@ -233,6 +240,16 @@ public:
 
     /** A product with KEY DNA (OSP's Granular). The KEY DNA editor shows only when true. */
     virtual bool hasKeyDna() const noexcept { return false; }
+    /** A product whose voices blend SYNTHESIZE's oscillator (ANDOR OSP, Phase S1): each source
+        card then shows its SYNTHESIZE knob after REIMAGINED. Off by default (five knobs). */
+    virtual bool hasSynthesize() const noexcept { return false; }
+    /** SYNTHESIZE's development audition (S1 listening only): the blend law (0 hybrid, the
+        default; 1 equal power; 2 additive) and the envelope (0 gate, the default; 1 following
+        the recording), for every source, for notes started afterwards. Never saved: each load
+        starts at the defaults, so sessions and presets always play the default behaviour. */
+    virtual int synthAuditionBlend() const noexcept { return 0; }
+    virtual int synthAuditionEnvelope() const noexcept { return 0; }
+    virtual void setSynthAudition (int blend, int envelope) { juce::ignoreUnused (blend, envelope); }
     virtual keydna::Settings keyDnaSettings (int layer) const
     {
         juce::ignoreUnused (layer);
@@ -253,6 +270,8 @@ public:
     }
     /** The layer's KEY DNA AMOUNT parameter ("layerA.keyDna.amount"). */
     static juce::String keyDnaAmountId (int layer) { return layerParameterId (layer, "keyDna.amount"); }
+    /** The layer's SYNTHESIZE parameter ("layerA.synthesize", 0..100 %, Phase S1). */
+    static juce::String synthesizeId (int layer) { return layerParameterId (layer, "synthesize"); }
 
     // -- Presets (header) --------------------------------------------------------------------
     struct PresetEntry
@@ -326,6 +345,9 @@ public:
     static const juce::Identifier& modLinksTreeType();
     /** The sources' live values for the display (lock-free). */
     virtual InstrumentEngine::ModView modulationView() const noexcept = 0;
+    /** The mix as it plays (with any MIX modulation) for the header's live node; an engine that
+        does not blend layers this way says it is not modulated. */
+    virtual InstrumentEngine::LiveMix liveMix() const noexcept { return {}; }
     virtual int modControllerNumber (int slot) const noexcept = 0;
     virtual void setModControllerNumber (int slot, int controller) noexcept = 0;
     virtual void learnModController (int slot) noexcept = 0;

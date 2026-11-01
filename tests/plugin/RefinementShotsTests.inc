@@ -150,6 +150,31 @@ TEST_CASE ("plugin: UI refinement screenshots (OSP_REFINE_DIR)", "[.][refine-sho
         ui.refreshNow();
         ui.engineCard (0).onEqToggle (0, true);
     }, "04-eq-2L");
+    // Three engines: the narrower cards stack the EQ's band values, and DAMPEN's mode, AMOUNT
+    // and value, under the tabs instead of over them.
+    shoot ({ pad, pluck, rec.file }, [&] (OspAudioProcessor& p, Editor& ui) {
+        ui.setSize (1086, 814);   // the default window: the narrowest cards
+        eqBands (p);
+        ui.refreshNow();
+        ui.engineCard (0).onEqToggle (0, true);
+        if (auto* eq = ui.engineCard (0).eqEditorComponent())
+            eq->selectBand (2);
+    }, "04-eq-3L");
+    shoot ({ pad, pluck, rec.file }, [&] (OspAudioProcessor& p, Editor& ui) {
+        ui.setSize (1086, 814);
+        p.setParameterValue (osp::plugin::InstrumentHost::dampenParameterId (0, "enabled"), 1.0f);
+        ui.refreshNow();
+        ui.engineCard (0).onEqToggle (0, true);
+        if (auto* eq = ui.engineCard (0).eqEditorComponent())
+            eq->showDampen (true);
+    }, "04-dampen-3L");
+    shoot ({ pad, pluck, rec.file }, [&] (OspAudioProcessor&, Editor& ui) {
+        ui.setSize (1086, 814);
+        ui.refreshNow();
+        ui.engineCard (0).onEqToggle (0, true);
+        if (auto* eq = ui.engineCard (0).eqEditorComponent())
+            eq->showDampen (true);
+    }, "04-dampen-off-3L");
     // The EQ off (its hint) and the pointer over a band (its readout).
     shoot ({ pad }, [&] (OspAudioProcessor&, Editor& ui) {
         ui.engineCard (0).onEqToggle (0, true);
@@ -187,4 +212,37 @@ TEST_CASE ("plugin: UI refinement screenshots (OSP_REFINE_DIR)", "[.][refine-sho
         p.keyboardState.noteOn (1, 60, 0.8f);
         p.keyboardState.noteOn (1, 64, 0.8f);
     }, "05-keydna-1L");
+    // ... and keys drawn by hand: a stroke from C4 up to G4 above the curve, a low B3 (each
+    // drawn key with its ring).
+    shoot ({ pad }, [] (OspAudioProcessor& p, Editor& ui) {
+        p.setParameterValue ("layerA.sourceMode", 1.0f);
+        auto dna = p.keyDnaSettings (0);
+        dna.enabled = true;
+        dna[keydna::Param::size].variation = 0.45;
+        dna[keydna::Param::size].curveDepth = 0.7;
+        for (int k = 60; k <= 67; ++k)
+            dna[keydna::Param::size].drawn[static_cast<std::size_t> (k)] = 0.3f + 0.08f * static_cast<float> (k - 60);
+        dna[keydna::Param::size].drawn[59] = -0.8f;
+        p.setKeyDnaSettings (0, dna, "KEY DNA", true);
+        ui.refreshNow();
+        ui.openKeyDna (0);
+        if (auto* d = ui.keyDnaWindow())
+            d->showParameter (keydna::Param::size);
+    }, "05-keydna-drawn-1L");
+
+    // 06 SYNTHESIZE (Phase S1): each card's sixth knob, in one, two and three layers.
+    auto synth = [] (OspAudioProcessor& p, std::initializer_list<float> amounts) {
+        int l = 0;
+        for (const float a : amounts)
+            p.setParameterValue (osp::plugin::InstrumentHost::synthesizeId (l++), a);
+    };
+    shoot ({ pad }, [&] (OspAudioProcessor& p, Editor&) { synth (p, { 35.0f }); }, "06-synth-1L");
+    shoot ({ pad, pluck }, [&] (OspAudioProcessor& p, Editor&) { synth (p, { 35.0f, 0.0f }); }, "06-synth-2L");
+    shoot ({ pad, pluck, rec.file }, [&] (OspAudioProcessor& p, Editor&) { synth (p, { 35.0f, 0.0f, 80.0f }); }, "06-synth-3L");
+    // ... the same in Granular (each source's own, beside its granular controls).
+    shoot ({ pad, pluck, rec.file }, [&] (OspAudioProcessor& p, Editor&) {
+        for (int l = 0; l < 3; ++l)
+            p.setParameterValue (osp::plugin::InstrumentHost::layerParameterId (l, "sourceMode"), 1.0f);
+        synth (p, { 20.0f, 55.0f, 100.0f });
+    }, "06-synth-granular-3L");
 }

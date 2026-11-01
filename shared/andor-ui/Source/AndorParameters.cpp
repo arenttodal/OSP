@@ -22,6 +22,36 @@ const juce::StringArray& InstrumentHost::modDestinationNames()
     return names;
 }
 
+const juce::StringArray& InstrumentHost::modExtendedDestinationNames()
+{
+    // mod::extendedDests' order (append only).
+    static const juce::StringArray names = [] {
+        juce::StringArray n;
+        n.add ("None");
+        for (const auto d : mod::extendedDests)
+            n.add (mod::destInfo (d).name);
+        return n;
+    }();
+    return names;
+}
+
+mod::Dest InstrumentHost::routeDest (int slot) const
+{
+    if (slot < 0 || slot >= mod::maxRoutes)
+        return mod::Dest::none;
+    return mod::routeDestFromChoices (juce::roundToInt (parameterValue (modRouteId (slot, "dest"))), juce::roundToInt (parameterValue (modRouteId (slot, "destExt"))));
+}
+
+void InstrumentHost::setRouteDest (int slot, mod::Dest dest)
+{
+    // The frozen list when it holds the destination, else the second parameter (and the
+    // first one cleared): one of the two is set, never both.
+    const int choice = mod::choiceOf (dest);
+    const int extended = choice < 0 ? mod::extendedChoiceOf (dest) : 0;
+    setParameterValue (modRouteId (slot, "dest"), static_cast<float> (std::max (0, choice)));
+    setParameterValue (modRouteId (slot, "destExt"), static_cast<float> (extended));
+}
+
 juce::AudioProcessorValueTreeState::ParameterLayout InstrumentHost::createParameterLayout()
 {
     using Range = juce::NormalisableRange<float>;
@@ -461,6 +491,24 @@ juce::AudioProcessorValueTreeState::ParameterLayout InstrumentHost::createParame
         for (int grains : grainBudgetChoices)
             budgets.add (grains == 0 ? juce::String ("Unlimited") : juce::String (grains) + " grains");
         layout.add (std::make_unique<juce::AudioParameterChoice> (id20 (ids::grainBudget), "Grain Budget", budgets, newSessionGrainBudgetIndex));
+    }
+    {
+        // MIX modulation (version hint 21), appended so nothing before moves: each route's
+        // second destination, for what the frozen `dest` list cannot hold (KEY DNA AMOUNT, the
+        // MIX). None by default, so every session from before plays its routes as it did.
+        auto id21 = [] (const juce::String& id) { return juce::ParameterID { id, 21 }; };
+        for (int r = 0; r < mod::maxRoutes; ++r)
+            layout.add (std::make_unique<juce::AudioParameterChoice> (id21 (modRouteId (r, "destExt")), "Mod " + juce::String (r + 1) + " Destination+",
+                                                                      modExtendedDestinationNames(), 0));
+    }
+    {
+        // SYNTHESIZE (Phase S1, version hint 22), appended so nothing before moves: each
+        // source's analog oscillator blended into its own voices. 0 by default (the voice is
+        // bit-identical to playing without it), so every session from before plays as it did.
+        auto id22 = [] (const juce::String& id) { return juce::ParameterID { id, 22 }; };
+        for (int layer = 0; layer < numLayers; ++layer)
+            layout.add (std::make_unique<juce::AudioParameterFloat> (id22 (layerParameterId (layer, "synthesize")), "Layer " + layerName (layer) + " Synthesize",
+                                                                     unit, 0.0f, reimaginedText));
     }
     return layout;
 }

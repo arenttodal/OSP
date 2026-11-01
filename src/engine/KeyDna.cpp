@@ -89,8 +89,13 @@ bool Settings::isNeutral() const noexcept
     if (! enabled || ! (amount > 0.0))
         return true;   // (with AMOUNT 0 the profile exists but is not heard)
     for (const auto& p : params)
+    {
         if (p.curveDepth != 0.0 || p.variation != 0.0)
             return false;
+        for (const float v : p.drawn)
+            if (v <= 1.0f && v != 0.0f)
+                return false;
+    }
     return true;
 }
 
@@ -134,6 +139,10 @@ void Table::compute (const Settings& s) noexcept
                 unit += depth * curve;
             if (variation != 0.0)
                 unit += variation * individual;
+            // A key drawn by hand plays what was drawn (its own value, the curve and the
+            // variation set aside there).
+            if (const float drawn = ps.drawn[static_cast<std::size_t> (key)]; drawn <= 1.0f)
+                unit = static_cast<double> (drawn);
             unit = std::clamp (unit, -1.0, 1.0) * amount;   // x 1 exactly when on
             const auto i = static_cast<std::size_t> (key) * paramCount + static_cast<std::size_t> (p);
             variations[i] = static_cast<float> (individual);

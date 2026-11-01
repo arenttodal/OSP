@@ -158,6 +158,9 @@ namespace
         { "keyDnaAmountA", "KEY DNA A AMOUNT", Owner::voice, 0, Domain::unit, 1.0, Update::continuous },
         { "keyDnaAmountB", "KEY DNA B AMOUNT", Owner::voice, 1, Domain::unit, 1.0, Update::continuous },
         { "keyDnaAmountC", "KEY DNA C AMOUNT", Owner::voice, 2, Domain::unit, 1.0, Update::continuous },
+        // The header MIX, 0..1 of its travel (a shared stage: global sources only).
+        { "mixPosition", "MIX", Owner::global, -1, Domain::unit, 1.0, Update::continuous },
+        { "mixTowardsC", "MIX TOWARDS C", Owner::global, -1, Domain::unit, 1.0, Update::continuous },
     } };
 
     bool isEnvelope (Source s) noexcept { return s == Source::env1 || s == Source::env2; }

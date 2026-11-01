@@ -9,12 +9,14 @@
 #include "engine/AtlasSet.h"
 #include "engine/InstrumentEngine.h"
 #include "engine/KeyDna.h"
+#include "io/NoteAtlasJson.h"
 #include "research/AtlasFixtures.h"
 #include "support/AllocationCounter.h"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <functional>
 #include <map>
@@ -681,6 +683,122 @@ TEST_CASE ("Atlas set: renders are deterministic, and playing allocates nothing"
         for (int key : { 57, 59, 62, 64, 66, 67, 80, 20 })
             rig.engine.noteOn (key, 90);
         rig.run (0.2);
+        rig.engine.allNotesOff();
+        rig.run (0.2);
+        allocations = scope.count();
+    }
+    CHECK (allocations == 0);
+}
+
+//==============================================================================
+// SPEED (NOTE MAP > TUNING): the notes play slower or faster through their recordings, pitch kept.
+
+namespace
+{
+    /** One note of `set` held with LOOP off (the recording plays once): how long it sounds
+        (seconds above -40 dB of its loudest 10 ms), and its pitch over its first 0.4 s. */
+    std::pair<double, double> heldNote (const atlas::NoteAtlas& a, const std::vector<atlasset::SourceAudio>& audio, int key, double seconds = 4.0)
+    {
+        const auto r = atlasset::buildInstrumentSet (a, audio, {});
+        REQUIRE (r.set != nullptr);
+        auto s = dry();
+        s.layer[0].loop = false;
+        Rig rig (s);
+        rig.engine.setInstrumentSet (r.set.get());
+        rig.engine.noteOn (key, 100);
+        rig.run (seconds);
+        const auto& x = rig.out.channels[0];
+        const std::size_t frame = 480;
+        std::vector<double> level;
+        for (std::size_t i = 0; i + frame <= x.size(); i += frame)
+        {
+            double sum = 0.0;
+            for (std::size_t j = 0; j < frame; ++j)
+                sum += static_cast<double> (x[i + j]) * x[i + j];
+            level.push_back (std::sqrt (sum / frame));
+        }
+        const double loudest = *std::max_element (level.begin(), level.end());
+        std::size_t last = 0;
+        for (std::size_t i = 0; i < level.size(); ++i)
+            if (level[i] > loudest * 0.01)
+                last = i;
+        AudioData opening = AudioData::allocate (1, static_cast<std::int64_t> (0.4 * 48000.0), 48000.0);
+        std::copy_n (x.begin(), opening.channels[0].size(), opening.channels[0].begin());
+        return { static_cast<double> (last + 1) * frame / 48000.0, pitchOf (opening) };
+    }
+}
+
+TEST_CASE ("Atlas set: SPEED stretches every note in time and keeps its pitch", "[integration][atlas][speed]")
+{
+    const auto& f = fixture ("sung-four");
+    auto a = f.atlas;
+    const auto [plain, plainPitch] = heldNote (a, f.audio, 60);
+    INFO ("as recorded: " << plain << " s at MIDI " << plainPitch);
+    CHECK (plainPitch == Approx (60.0).margin (0.08));
+    for (const double speed : { 0.5, 2.0, 0.3 })
+    {
+        a.mapping.speed = speed;
+        const auto [length, pitch] = heldNote (a, f.audio, 60, 6.0);
+        INFO ("speed " << speed << ": " << length << " s at MIDI " << pitch);
+        CHECK (length == Approx (plain / speed).epsilon (0.15));
+        CHECK (pitch == Approx (60.0).margin (0.08));
+    }
+    // A note a few semitones from its recording (FILL) is stretched the same way.
+    a.mapping.speed = 0.5;
+    const auto [filled, filledPitch] = heldNote (a, f.audio, 62, 6.0);
+    CHECK (filledPitch == Approx (62.0).margin (0.1));
+    CHECK (filled > 1.5 * plain);
+}
+
+TEST_CASE ("Atlas set: SPEED is saved with the atlas, 1 is the default and plays exactly as before", "[integration][atlas][speed]")
+{
+    const auto& f = fixture ("sung-four");
+    auto a = f.atlas;
+    CHECK (io::noteAtlasToString (a).find ("\"speed\"") == std::string::npos);   // 1: not written
+    a.mapping.speed = 0.6;
+    std::string error;
+    auto back = io::noteAtlasFromString (io::noteAtlasToString (a), error);
+    REQUIRE (back.has_value());
+    CHECK (back->mapping.speed == Approx (0.6));
+    auto text = io::noteAtlasToString (a);
+    const auto at = text.find ("\"speed\"");
+    REQUIRE (at != std::string::npos);
+    const auto value = text.find_first_of ("0123456789", at);
+    text.replace (value, text.find_first_not_of ("0123456789.", value) - value, "9.0");
+    back = io::noteAtlasFromString (text, error);
+    REQUIRE (back.has_value());
+    CHECK (back->mapping.speed == Approx (atlas::Mapping::maxSpeed));   // clamped
+    // 1: the plain read, sample for sample; and no allocation while stretching.
+    auto render = [&] (double speed) {
+        auto b = f.atlas;
+        b.mapping.speed = speed;
+        const auto r = atlasset::buildInstrumentSet (b, f.audio, {});
+        REQUIRE (r.set != nullptr);
+        Rig rig;
+        rig.engine.setInstrumentSet (r.set.get());
+        rig.engine.noteOn (60, 100);
+        rig.engine.noteOn (64, 90);
+        rig.run (0.5);
+        return rig.out.channels[0];
+    };
+    CHECK (render (1.0) == render (1.0));
+    CHECK (render (0.5) == render (0.5));   // deterministic
+    CHECK (render (0.5) != render (1.0));
+    auto b = f.atlas;
+    b.mapping.speed = 0.4;
+    const auto r = atlasset::buildInstrumentSet (b, f.audio, {});
+    REQUIRE (r.set != nullptr);
+    Rig rig;
+    rig.engine.setInstrumentSet (r.set.get());
+    rig.engine.noteOn (57, 100);
+    rig.run (0.1);
+    rig.record = false;
+    int allocations = 0;
+    {
+        test::AllocationScope scope;
+        for (int key : { 60, 62, 64, 67 })
+            rig.engine.noteOn (key, 90);
+        rig.run (0.3);
         rig.engine.allNotesOff();
         rig.run (0.2);
         allocations = scope.count();

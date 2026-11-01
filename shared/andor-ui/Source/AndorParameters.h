@@ -108,4 +108,6 @@ namespace osp::plugin::ids
     // Unified engine, Phase 2 (version hint 20): grains at once across A, B and C. Per layer:
     // layerA.granular.scatter / .pan / .window and layerA.keyDna.amount.
     inline const juce::String grainBudget = "grainBudget";
+    // MIX modulation (version hint 21): mod.routeN.destExt. SYNTHESIZE (version hint 22): per
+    // layer layerA.synthesize, 0..100 % (0: off, bit-identical).
 }

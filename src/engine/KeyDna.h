@@ -49,6 +49,16 @@ const char* paramId (Param p) noexcept;     ///< "position", "size", "density", 
 */
 double halfRange (Param p) noexcept;
 
+/** A key no one has drawn (KeyDna::ParamSettings::drawn): it plays the curve and its variation. */
+constexpr float notDrawn = 2.0f;
+constexpr std::array<float, 128> undrawnKeys() noexcept
+{
+    std::array<float, 128> keys {};
+    for (auto& k : keys)
+        k = notDrawn;
+    return keys;
+}
+
 /** One parameter's part of the profile. */
 struct ParamSettings
 {
@@ -57,6 +67,17 @@ struct ParamSettings
     mod::CurveTable curve {};
     double curveDepth = 0.0;   ///< -1..1: how far the curve moves the parameter (1: its half range at the curve's ends)
     double variation = 0.0;    ///< 0..1: how far each key's own individuality moves it
+    /** Keys drawn by hand in the editor: -1..1 of the half range (as `offset`), replacing the
+        curve and the variation at that key; notDrawn elsewhere. AMOUNT still scales them. */
+    std::array<float, 128> drawn = undrawnKeys();
+    bool isDrawn (int key) const noexcept { return key >= 0 && key < 128 && drawn[static_cast<std::size_t> (key)] <= 1.0f; }
+    bool anyDrawn() const noexcept
+    {
+        for (const float v : drawn)
+            if (v <= 1.0f)
+                return true;
+        return false;
+    }
     bool operator== (const ParamSettings&) const = default;
 };
 
@@ -78,7 +99,8 @@ struct Settings
     Settings();
     ParamSettings& operator[] (Param p) noexcept { return params[static_cast<std::size_t> (p)]; }
     const ParamSettings& operator[] (Param p) const noexcept { return params[static_cast<std::size_t> (p)]; }
-    /** True when nothing would move: off, amount 0, or every depth and variation 0. */
+    /** True when nothing would move: off, amount 0, or every depth and variation 0 and no key
+        drawn away from 0. */
     bool isNeutral() const noexcept;
     bool operator== (const Settings&) const = default;
 };

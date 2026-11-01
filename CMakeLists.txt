@@ -203,6 +203,8 @@ add_subdirectory(apps/research-renderer)
 
 if(OSP_BUILD_PLUGIN)
     add_subdirectory(apps/plugin)
+    # ANDOR Memo Lab: recordings (iCloud Voice Memos) to instruments, around OSP's processor.
+    add_subdirectory(apps/memo-lab)
     # ANDOR instruments built from the ANDOR Instrument Shell (shared/andor-shell).
     option(ANDOR_BUILD_PRODUCTS "Build the ANDOR instruments in products/ (needs OSP_BUILD_PLUGIN)" ON)
     if(ANDOR_BUILD_PRODUCTS)

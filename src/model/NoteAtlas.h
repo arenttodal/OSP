@@ -202,6 +202,10 @@ struct Mapping
     double maxTransposeSemitones = 12.0;
     /** Fine tuning: play each note in tune (its cents corrected) or as recorded. */
     bool correctTuning = true;
+    /** SPEED: how fast every note plays its recording, pitch kept (1 = as recorded; 0.5 =
+        twice as long). Written to JSON only when it is not 1 (older files read as 1). */
+    double speed = 1.0;
+    static constexpr double minSpeed = 0.3, maxSpeed = 2.0;
     bool operator== (const Mapping&) const = default;
 };
 

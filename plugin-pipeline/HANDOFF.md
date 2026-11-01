@@ -106,7 +106,7 @@ real Macs (and Windows) and runs its tests. It then checks the AU the way Logic 
 zip. You install it by double-clicking one file inside the zip.
 
 ```
-git push  ──►  GitHub Actions (macOS 14, Windows)
+git push  ──►  GitHub Actions (macOS 15, Windows)
                  configure → build (universal arm64 + x86_64) → ctest
                  → pack: AU, VST3, app, Install.command → auval
                  → download on the run's page
@@ -247,7 +247,7 @@ is to start from `new-plugin.sh` and move the `Source/` files in.
 |---|---|
 | `new-plugin.sh`, instrument and effect | Built and tested on Linux with JUCE 8.0.9; all starter checks pass |
 | `adopt.sh` | Run on OSP's CMake layout: found `OSP_Plugin` and turned on `OSP_BUILD_PLUGIN` |
-| macOS: universal build, tests, ad-hoc signing, packaging, `auval` | Pass on GitHub's macOS 14 runners: OSP's `plugin-pipeline-selftest` workflow builds a starter plugin through `build-local.sh` whenever the kit changes |
+| macOS: universal build, tests, ad-hoc signing, packaging, `auval` | Pass on GitHub's macOS 14 runners (macOS 15 since November 2026, when macOS 14 was retired): OSP's `plugin-pipeline-selftest` workflow builds a starter plugin through `build-local.sh` whenever the kit changes |
 | Windows: Visual Studio x64 build, tests, packaging (`7z`, `Install.bat` with CRLF) | Pass on GitHub's Windows runners (same self-test) |
 | `Install.command` on a Mac, `Install.bat` on a PC, pluginval, the fixed link | Not run yet. The installers run when you double-click them; pluginval (off by default) and the fixed link run on the first push of a repository using the pipeline |
 ````
@@ -439,7 +439,7 @@ jobs:
           echo "windows=${WINDOWS:-1}" >> "$GITHUB_OUTPUT"
 
   macos:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
         with:

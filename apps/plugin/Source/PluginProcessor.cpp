@@ -239,7 +239,7 @@ OspAudioProcessor::OspAudioProcessor()
     for (int r = 0; r < mod::maxRoutes; ++r)
     {
         auto& rp = modRouteParams[static_cast<std::size_t> (r)];
-        const char* names[] { "source", "dest", "depth", "enabled" };
+        const char* names[] { "source", "dest", "depth", "enabled", "destExt" };
         for (std::size_t k = 0; k < rp.size(); ++k)
             rp[k] = parameters.getRawParameterValue (modRouteId (r, names[k]));
     }
@@ -305,6 +305,7 @@ OspAudioProcessor::OspAudioProcessor()
                             parameters.getRawParameterValue (layerParameterId (layer, "granular.pan")),
                             parameters.getRawParameterValue (layerParameterId (layer, "granular.window")) };
         lp.keyDnaAmount = parameters.getRawParameterValue (layerParameterId (layer, "keyDna.amount"));
+        lp.synthesize = parameters.getRawParameterValue (layerParameterId (layer, "synthesize"));
     }
     grainBudgetParam = parameters.getRawParameterValue (ids::grainBudget);
     for (int layer = 0; layer < numLayers; ++layer)
@@ -581,6 +582,7 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
             rs.toybox = { 0.01 * modes[6], 0.01 * modes[7], static_cast<ToyboxPlay> (std::clamp (pick (8), 0, 2)) };
             rs.mosaic = { 0.01 * modes[9], 0.01 * modes[10], static_cast<MosaicModel> (std::clamp (pick (11), 0, 1)) };
             rs.mirage = { 0.01 * modes[12], 0.01 * modes[13], static_cast<MirageTone> (std::clamp (pick (14), 0, 1)) };
+            ls.synthesize = 0.01 * lp.synthesize->load();
             engineSettings.layer[static_cast<std::size_t> (layer)] = ls;
             engine.setLayerSettings (layer, ls);
         }
@@ -607,6 +609,19 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
         }
         // KEY DNA AMOUNT: live (the voices smooth it); a plain number, every block.
         engine.setLayerKeyDnaAmount (layer, 0.01 * lp.keyDnaAmount->load());
+        // SYNTHESIZE: live as well (the voices smooth it over ~20 ms).
+        const double synthesize = 0.01 * lp.synthesize->load();
+        engineSettings.layer[static_cast<std::size_t> (layer)].synthesize = synthesize;
+        engine.setLayerSynthesize (layer, synthesize);
+    }
+    {
+        // SYNTHESIZE's development audition (never saved; default hybrid + gate).
+        const int audition = synthAudition.load (std::memory_order_relaxed);
+        const auto blend = static_cast<synth::Blend> (std::clamp (audition & 0xff, 0, 2));
+        const auto envelope = static_cast<synth::Envelope> (std::clamp (audition >> 8, 0, 1));
+        engineSettings.synthBlend = blend;
+        engineSettings.synthEnvelope = envelope;
+        engine.setSynthCharacter (blend, envelope);
     }
     engineSettings.grainBudget = grainBudgetGrains (grainBudgetParam->load());
     engine.setGrainBudget (engineSettings.grainBudget);
@@ -666,7 +681,7 @@ void OspAudioProcessor::applyModulation (bool force) noexcept
         const auto& rp = modRouteParams[r];
         auto& route = s.routes[r];
         route.source = static_cast<mod::Source> (std::clamp (juce::roundToInt (rp[0]->load()), 0, mod::sourceCount));
-        route.dest = static_cast<mod::Dest> (std::clamp (juce::roundToInt (rp[1]->load()), 0, mod::hostDestCount - 1));
+        route.dest = mod::routeDestFromChoices (std::clamp (juce::roundToInt (rp[1]->load()), 0, mod::hostDestCount - 1), juce::roundToInt (rp[4]->load()));
         route.depth = 0.01 * rp[2]->load();
         route.enabled = rp[3]->load() >= 0.5f;
         route.target = modRouteTargets[r].load (std::memory_order_relaxed);

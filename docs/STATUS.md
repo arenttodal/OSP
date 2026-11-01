@@ -518,6 +518,63 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       - LOOP on plays only the notes that can loop (InstrumentSet::loopSelects after Stage B;
         FILL reaches past them); LOOP off plays all. NOTE MAP, overview and keyboard say so.
       - The keyboard map is a light strip along the top of the keys (one segment per key).
+- [x] FINAL PRECISION UI REFINEMENT, visual only (docs/research/ui-refinement/README.md). Five
+      passes, one commit each:
+      1. NOTE MAP and its inspector;
+      2. the source header;
+      3. preset navigation;
+      4. EQ / DAMPEN;
+      5. KEY DNA.
+      The housing keeps its depth; the displays share one flat language (device-pixel hairlines,
+      text tabs, readouts, segmented choices, one node and telltale vocabulary). Fixed on the
+      way: the EQ and DAMPEN pages showed the layer below through them, and "20k" and DAMPEN's
+      "0" were clipped. No DSP, parameter, schema or bounds change. The OSP–shell visual
+      regression stays at 0 px; design-bible captures regenerated.
+- [ ] ANDOR MEMO LAB MVP 0.1 (docs/research/memo-lab: brief, architecture, guide): a standalone
+      Mac app (apps/memo-lab) that turns iCloud-synced Voice Memos (or any approved folder) into
+      playable ANDOR instruments. It hosts OSP's own processor:
+      - ONE SHOT = `loadFile`, MAP NOTES = `analyseRecording` (Stage A then B);
+      - NOTE MAP = the plugin's editor;
+      - Save = `exportInstrument`, the `.ospinstrument` the plugin opens.
+      It adds a read-only scanner, decoding (JUCE / CoreAudio, AVFoundation fallback),
+      passages, a preview and the window; it adds no DSP, changes no plugin code or format,
+      and never writes the recordings. Tests `memo_lab` (13 cases) pass, including the round
+      trip into a fresh processor with an empty store and the recording deleted. Awaiting the
+      owner's test on a Mac: the real Voice Memos folder, real memos, Ableton.
+      Added after the owner's first test (README, "Audition and the Mac keys", "Library scan",
+      "SPEED"):
+      - Audition: arrows browse and play each memo from its first sound; long memos start
+        from their opening while the rest is read;
+      - Z / X move the Mac keys an octave; a new instrument centres them;
+      - Scan (on request) sorts memos into Talk / Hum / Phrase / Jam / Noise / Quiet by rules
+        (`MemoClassifier`, no model), Show ▾ filters, cached in `library-scan.json`;
+      - SPEED (NOTE MAP > TUNING, 30-200 %): Note Atlas `mapping.speed`, a pitch-preserving
+        two-grain stretch in `InstrumentVoice` for atlas notes; 100 % is bit-identical.
+      Tests `[audition]`, `[classify]`, `[speed]`.
+- [x] KEY DNA keys by hand: drag a key's bar (away from the curve) and that key plays the value
+      drawn, in place of the curve and its variation (a stroke draws every key it passes, one
+      undo step; a click alone draws nothing, so double-click still adds a curve point).
+      Option-click or right-click returns a key, or all, to the curve; Reset clears them too.
+      Drawn keys carry a ring. Stored per parameter as `ParamSettings::drawn` (KEY DNA schema 1,
+      additive `keys` field; older sessions have none). AMOUNT still scales them. Tests
+      [keydna] (engine and editor). The EQ and DAMPEN pages also stack their values under the
+      tabs on narrow (three-card) layouts.
+- [x] MIX as a modulation destination (docs/research/mix-modulation-plan.md, "Implemented"):
+      - engine: `mod::Dest::mixPosition` (MIX: the A <-> B blend, the triangle's A -> B
+        direction) and `mixTowardsC`, global and continuous; a routed mix follows within 2 ms
+        (an LFO keeps its shape, the gains still ramp per sample); unrouted, the 20 ms glide is
+        unchanged bit for bit;
+      - host: a second destination per route, `mod.routeN.destExt` (version hint 21; "None",
+        KEY DNA A-C AMOUNT, MIX, MIX TOWARDS C, append only). It wins when set; `dest` keeps its
+        list and its automation; older sessions open unchanged. KEY DNA AMOUNT is now reachable
+        from the routes too;
+      - interface: drop a source on the header MIX, or right-click it (Assign / Edit / Remove);
+        the routes popover's + ADD has Mix and each layer's KEY DNA AMOUNT. While routed the
+        MIX draws the range in the source's colour and a hollow live node; nothing changes
+        without a route. With three layers (the header triangle is hidden) MIX TOWARDS C is in
+        + ADD.
+      Tests `[mix]` (engine 3, plugin 2, editor `[mix-ui]` with snapshots). Parameter schema
+      golden updated for the 16 new parameters. Per-note MIX (VEL -> MIX per voice) is later.
 - [x] ANDOR DESIGN SYSTEM and INSTRUMENT SHELL (andor-design-system/, start with HANDOFF.md).
       ANDOR OSP's interface was extracted, unchanged, into shared/andor-ui:
       - the components, look and assets;
@@ -562,6 +619,32 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [x] `plugin-pipeline/`: the build-and-download pipeline as a reusable kit for other JUCE
       plug-ins (`adopt.sh` for an existing repo, `new-plugin.sh` + starter for a new one, a fixed
       download link per branch); self-tested on macOS and Windows by its own workflow.
+
+## Milestone: SYNTHESIZE Phase S1 — analog oscillator blend (docs/research/synthesize)
+
+- [x] S1.1 audit of PHRASE's Natural / Synthetic (`s1-audit.md`): what it did, the OSP voice
+      integration point, and the differences.
+- [x] S1.2 DSP (`engine/SynthVoice.h`): one PolyBLEP saw per sounding voice, a fixed warm
+      12 dB/oct low-pass (about 4-8 x the pitch with velocity), envelope A (gate, default) and
+      B (sample-informed, internal). Real-time safe, deterministic (start phase from the note's
+      seed). Plays the played key with bend, fine, TUNE, LIFE, drift, routes and glide, never the
+      recording's root or a root correction; in Granular the layer's TUNE, not grain scatter.
+- [x] S1.3 blend: hybrid law (the sample whole up to 35 %, the oscillator rising as a^1.5,
+      power-normalised), chosen against equal-power and additive; each voice's oscillator
+      calibrated to its recording's loudest 20 ms. 0 % computes nothing: bit-identical (main
+      ctest and goldens unchanged).
+- [x] S1.4 GUI: SYNTH, a slim graphite fader in each source well's top-right corner (no
+      window growth, no new section, no third mode, established controls untouched; the
+      ruler keeps clear of it). Drag or wheel, Alt fine, double-click 0. A host capability
+      (`InstrumentHost::hasSynthesize`): sister products show nothing; the shell's parity
+      engine shows it, so the OSP-vs-shell visual regression stays at 0 px.
+- [x] S1.5 host parameter `layerX.synthesize` (version hint 22, appended; 0 % default; older
+      sessions open with it off), automation smoothed in the voices, saved with the session.
+      Tests: `[synth]` (engine) and `[plugin][synthesize]` (pedal, stealing, all notes off,
+      panic, a One Shot held past its end, mute/solo, A/B/C, Atlas keys left silent,
+      automation without allocation, persistence).
+- [ ] S1.6 musical evaluation by the user. Results (loudness matrix, blend laws, tuning,
+      tests, listening guide, known limits) in `s1-results.md`; renders local only.
 
 ## Milestone: ANDOR Instrument Shell extensions for ANDOR ANALOG (a synthesizer)
 

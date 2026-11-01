@@ -15,7 +15,7 @@ How the images were made:
   `OSP_REFINE_DIR=<dir> osp_plugin_tests "[refine-shots]"`
   (`tests/plugin/RefinementShotsTests.inc`).
 - Size: 1448 × 1086, at 1× and 2×, with one, two and three layers.
-- The baseline is the tag `ui-refine-baseline`.
+- The baseline is commit `5f7dbef` (the local tag `ui-refine-baseline`).
 - In each comparison image, the top half is before and the bottom half is after.
 
 Colour rule (the owner's choice, hybrid):
@@ -199,3 +199,122 @@ Unchanged:
 
 The `[eq]`, `[dampen]`, `[mod-final]` and `[gui]` tests pass (775 assertions), as do the per-layer
 EQ tests (120). The OSP–shell visual regression stays at 0 px.
+
+## Pass 5 — KEY DNA (the additional view)
+
+| State | Comparison |
+|---|---|
+| The whole editor, SIZE shown, two keys held | `pass5-keydna.jpg` (before left, after right) |
+| Header and parameter row at 2× | `pass5-keydna-header@2x.jpg` |
+| Profile and curve at 2× | `pass5-keydna-graph@2x.jpg` (before left, after right) |
+
+The hierarchy now reads, in order:
+1. the parameter;
+2. the curve;
+3. each key's variation;
+4. AMOUNT and INDIVIDUALITY;
+5. the seed and the secondary actions.
+
+Changes:
+- **One parameter row.** POS SIZE DENS SPREAD TUNE SCATTER PAN are quiet text, no longer seven
+  ceramic keys.
+  - The shown parameter is bright with a 1.5 px underline in the layer's colour, the only
+    selected mark.
+  - Hover raises the ink.
+  - "This parameter moves something" is a 4 px flat dot after the name, no longer a lamp.
+- **AMOUNT is easy to find.**
+  - It has the largest value (17 px) and the darkest caption.
+  - A 2 px meter in the layer's colour runs under it.
+  - It is still the host parameter, live on sounding notes and automatable, with the same
+    30 ms smoothing.
+- **Readouts.** AMOUNT, INDIVIDUALITY, SEED, DEPTH and VARIATION are values over a hairline, no
+  longer recessed boxes. Hover fills them faintly and turns the hairline the layer's colour.
+  - SEED is the quietest (13 px, 70 %).
+  - "Smooth" and "Individual" are in sentence case.
+- **Secondary actions.** Randomize and Reset are hairline-outlined actions (sentence case, 62 %
+  ink, brighter on hover), no longer full ceramic keys. ON stays a ceramic key: it is the page's
+  one physical switch.
+- **Per-key variation.** Each key's offset is a thin 2 px stem from the centre line, with a tick
+  exactly at its value (as wide as the key allows), no longer a block bar.
+  - A held key's stem and tick are bright, replacing the white dot above the bar.
+  - The overview's seven rows use the same fine device-pixel ticks.
+- **The curve.** One 1.6 px line (was 2 px). Its points use the EQ's node (5 px, 6 px while
+  dragged, graphite gap ring).
+- **Grid and hints.** The grid sits on the device pixel grid. "KEY DNA is off…" and "Draw a
+  curve or raise VARIATION…" are small notes at the graph's corner.
+- **The KEY DNA key on the granular strip.** A hairline cell with a flat 4.5 px telltale (NOTES
+  and EQ's), no longer a lamp on a filled key.
+
+Unchanged:
+- the window, the graph's area and the key mapping (still the real keyboard's key centres);
+- every hit area, drag, double-click, keyboard step and undo step;
+- the deterministic profile.
+
+The `[keydna]`, `[phase5]` and `[gui]` tests pass (396 assertions), and the OSP–shell visual
+regression stays at 0 px.
+
+## Shared primitives
+
+These are the same few drawing rules everywhere the display language appears (NOTE MAP, EQ,
+DAMPEN, KEY DNA), so the pages read as one instrument:
+
+| Primitive | Where | What it guarantees |
+|---|---|---|
+| `vline` / `hline` | NoteMapEditor, EqEditor, KeyDnaEditor | Rules on the device pixel grid: one sharp pixel at 1× and 2× |
+| Text tabs | NOTE MAP, EQ, DAMPEN, KEY DNA parameters | Quiet ink; the open one bright with a 1.5 px underline in the layer's colour; one hairline under the row |
+| Readout | EQ / DAMPEN value fields, KEY DNA fields | Value over a hairline; hover fills faintly and colours the hairline |
+| Segmented choice | DETECTION, 12 \| 24, Shelf \| Low-pass | One hairline frame, the chosen part filled once |
+| Action cell | NOTE MAP actions, Curve ▾, Randomize, Reset, KEY DNA key | Hairline outline, faint fill on hover |
+| Node | EQ bands, DAMPEN points, KEY DNA points | 5 px disc (6 px hot or selected), graphite gap ring; selected adds one outer ring |
+| Telltale | NOTES, EQ, KEY DNA keys; KEY DNA parameters | A flat 4–4.5 px dot in the state's colour, never a lamp |
+| Corner note | Hints and states on every graph | Small, top-left, never over the data |
+| `skin::KeyFace::keyArea` | Mode key | A key may show a smaller body than its hit area |
+| Icon strokes | Preset bar, menus, close, undo / redo, power | 1.3 px on the displays, 1.5 px on the housing, round caps |
+
+Radius vocabulary: 3–4 px for small display controls, 5–7 px for housing keys (unchanged), 9–10
+px for the display wells (unchanged).
+
+## Regression results
+
+| Check | Result |
+|---|---|
+| OSP–shell visual regression (`osp_visual_reference`, `andor_example_tests_visual`) | 0 px, after every pass |
+| NOTE MAP and phase 5 | pass |
+| `[eq]`, `[dampen]`, `[mod-final]`, `[gui]`, per-layer EQ | pass (775 + 120 assertions) |
+| `[keydna]`, `[phase5]`, `[gui]` | pass (396 assertions) |
+| Full `ctest`, both trees | see the final commit message |
+| Design bible (`andor-design-system/guide/img`) | regenerated with `[design-capture]`; only images whose pixels changed were replaced |
+
+No DSP, parameter, preset, schema or golden file changed in any pass.
+
+## Remaining issues
+
+- **The EQ graph no longer shows the recording faintly behind it.** This was the price of
+  ending the label bleed-through. If the owner misses it, `EqEditor::paint` can paint the well at
+  86 % again, below a separately opaque top row.
+- **The KEY DNA curve looks stepped** where it crosses the keyboard's octave gaps. It is drawn
+  exactly as compiled, through the real key centres, so the steps are accurate. A smoother
+  drawing would misplace it relative to the keys.
+- **The curve's end points sit at the graph's edges, beyond the keyboard's last keys** (A0 and
+  C8). This is unchanged; they are the curve's 0 and 127.
+- **Font rendering.** The headless renders use JUCE's software renderer. On macOS the CoreGraphics
+  text is slightly heavier, so check hairline weights there once before release.
+
+## How to review in the plugin
+
+1. Build the plugin: `cmake -B build-plugin -G Ninja -DOSP_BUILD_PLUGIN=ON && cmake --build build-plugin`
+   (or take the macOS CI artifact for this branch). Open the Standalone, or the AU / VST3 in a
+   DAW.
+2. **Preset navigation.** Hover the arrows and the heart, toggle a favourite, open the main menu
+   and SAVE.
+3. **Source header.** Drop a recording on A and choose "Map notes" in the prompt. NOTES, EQ, the
+   mode key and the menu now share one height and weight.
+4. **NOTE MAP.** Open NOTES and select, hover, split and merge notes. The inspector's values,
+   actions and states should read differently at a glance.
+5. **EQ and DAMPEN.** Open EQ, drag a band, select it and read its values, then switch to DAMPEN
+   with the text tab and back. Turn each page off and on ("Off" after the name).
+6. **KEY DNA.** Switch a layer to Granular and open KEY DNA. Step through the parameters, drag the
+   curve, and play keys to see their stems light. Drag AMOUNT and automate it from the DAW.
+7. To render the review images yourself:
+   `OSP_REFINE_DIR=<dir> build-plugin/apps/plugin/osp_plugin_tests "[refine-shots]"`.
+   To compare with before, copy `tests/plugin/RefinementShotsTests.inc` (and its include line) into a worktree of commit `5f7dbef` and render the same set there.

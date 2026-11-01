@@ -239,6 +239,8 @@ juce::var noteAtlasToJson (const atlas::NoteAtlas& a)
     json::set (mapping, "fill", a.mapping.fill);
     json::set (mapping, "maxTransposeSemitones", a.mapping.maxTransposeSemitones);
     json::set (mapping, "correctTuning", a.mapping.correctTuning);
+    if (a.mapping.speed != 1.0)
+        json::set (mapping, "speed", a.mapping.speed);
     json::set (root, "mapping", mapping);
 
     auto sources = json::array();
@@ -301,6 +303,7 @@ std::optional<atlas::NoteAtlas> noteAtlasFromJson (const juce::var& json, std::s
         a.mapping.fill = json::getBool (m, "fill", a.mapping.fill);
         a.mapping.maxTransposeSemitones = json::getDouble (m, "maxTransposeSemitones", a.mapping.maxTransposeSemitones);
         a.mapping.correctTuning = json::getBool (m, "correctTuning", a.mapping.correctTuning);
+        a.mapping.speed = std::clamp (json::getDouble (m, "speed", 1.0), atlas::Mapping::minSpeed, atlas::Mapping::maxSpeed);
     }
     if (const auto* list = json["sources"].getArray())
         for (const auto& s : *list)

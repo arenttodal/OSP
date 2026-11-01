@@ -43,12 +43,16 @@ void InstrumentEngine::prepare (double outputSampleRate, int maximumBlockSize, c
         slot.rootRatio = 1.0;
         slot.tuneRatio = semitonesToRatio (config.layer[l].tuneSemitones);
         slot.pitchRatio = slot.rootRatio * slot.tuneRatio;
+        slot.synthesizeLive = std::clamp (config.layer[l].synthesize, 0.0, 1.0);
         slot.primed = false;
         refreshLiveGranular (l);
     }
     blendNow = config.blend;
     mixXNow = config.mixX;
     mixYNow = config.mixY;
+    liveMixValue[0].store (static_cast<float> (blendNow), std::memory_order_relaxed);
+    liveMixValue[1].store (static_cast<float> (mixXNow), std::memory_order_relaxed);
+    liveMixValue[2].store (static_cast<float> (mixYNow), std::memory_order_relaxed);
     pedalDown = false;
     noteCounter = 0;
     clearHeldKeys();
@@ -269,6 +273,7 @@ void InstrumentEngine::setLayerSettings (int layer, const LayerSettings& setting
     auto& slot = slots[l];
     slot.tuneRatio = semitonesToRatio (std::clamp (settings.tuneSemitones, -48.0, 48.0));
     slot.pitchRatio = slot.rootRatio * slot.tuneRatio;
+    slot.synthesizeLive = std::clamp (settings.synthesize, 0.0, 1.0);
     refreshLiveGranular (l);
 }
 
@@ -846,6 +851,11 @@ void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int
     params.startFraction = layerSettings.start;
     params.reverse = layerSettings.reverse;
     params.follow = layerSettings.follow;
+    if (const auto* set = slots[context].set; set != nullptr)
+        params.speed = set->speed;   // SPEED (atlas sets; file sets keep 1)
+    params.synthesize = &slots[context].synthesizeLive;
+    params.synthBlend = config.synthBlend;
+    params.synthEnvelope = config.synthEnvelope;
     if (params.sourceMode == SourceMode::granular)
     {
         granularLife (params.shape, note, eventIndex);
@@ -926,6 +936,8 @@ void InstrumentEngine::setModulation (const mod::Settings& settings) noexcept
         modLifeOffset = 0.0;
         modArpOffset.fill (0.0);
         modArpRouted.fill (false);
+        modMixOffset.fill (0.0);
+        modMixRouted = false;
         for (auto& o : modEqOffset)
             o.fill (0.0);
         modGlobalApplied = false;
@@ -942,6 +954,8 @@ void InstrumentEngine::applyGlobalModulation (int samples) noexcept
     {
         modArpOffset.fill (0.0);
         modArpRouted.fill (false);
+        modMixOffset.fill (0.0);
+        modMixRouted = false;
         return;
     }
     // Effective values next to the stored ones (config.macros never changes here).
@@ -979,6 +993,8 @@ void InstrumentEngine::applyGlobalModulation (int samples) noexcept
         modArpRouted[static_cast<std::size_t> (i)] = c.has (d);
         modArpOffset[static_cast<std::size_t> (i)] = offset (d);
     }
+    modMixRouted = c.has (mod::Dest::mixPosition) || c.has (mod::Dest::mixTowardsC);
+    modMixOffset = { offset (mod::Dest::mixPosition), offset (mod::Dest::mixTowardsC) };
     modGlobalApplied = true;
 }
 
@@ -1201,9 +1217,23 @@ void InstrumentEngine::renderBlock (float* const* output, int numChannels, int n
     for (int done = 0; done < numSamples;)
     {
         const int n = std::min (bufferSize, numSamples - done);
-        blendNow = towards (blendNow, config.blend, blendStep * n);
-        mixXNow = towards (mixXNow, config.mixX, blendStep * n);
-        mixYNow = towards (mixYNow, config.mixY, blendStep * n);
+        if (modMixRouted)
+        {
+            // MIX modulation: along A -> B (two layers: the blend; three: the triangle's A -> B
+            // direction) and from the A-B edge towards C. It follows within about 2 ms, so an
+            // LFO keeps its shape; the gains below still ramp sample by sample (no clicks).
+            const double along = modMixOffset[0], towardsC = modMixOffset[1];
+            const double fast = 1.0 / (0.002 * sampleRate) * n;
+            blendNow = towards (blendNow, std::clamp (config.blend + along, 0.0, 1.0), fast);
+            mixXNow = towards (mixXNow, std::clamp (config.mixX + 0.5 * along + 0.75 * towardsC, 0.0, 1.0), fast);
+            mixYNow = towards (mixYNow, std::clamp (config.mixY + along - 0.5 * towardsC, 0.0, 1.0), fast);
+        }
+        else
+        {
+            blendNow = towards (blendNow, config.blend, blendStep * n);
+            mixXNow = towards (mixXNow, config.mixX, blendStep * n);
+            mixYNow = towards (mixYNow, config.mixY, blendStep * n);
+        }
         const auto weights = mixWeights (mixLayers, blendNow, mixXNow, mixYNow);
         const bool perLayer = config.reimaginedRouting == ReimaginedRouting::perLayer;
         if (perLayer)
@@ -1317,7 +1347,7 @@ void InstrumentEngine::renderBlock (float* const* output, int numChannels, int n
                     continue;
                 const auto ch = static_cast<std::size_t> (mpe ? std::clamp (voice.channel(), 1, 16) : 1);
                 voice.render (bl.data(), mono ? bl.data() : br.data(), n, pitchRatio * slot.pitchRatio * (mpe ? channelBendRatio[ch] : 1.0),
-                              sampleClock + done);
+                              sampleClock + done, slot.rootRatio);
                 // A voice nobody can hear any more (its key up, below the threshold after the
                 // layer's mix for a while) ends with the steal fade.
                 const float peak = voice.takeOutputPeak();
@@ -1349,6 +1379,10 @@ void InstrumentEngine::renderBlock (float* const* output, int numChannels, int n
         done += n;
     }
     sampleClock += numSamples;
+    liveMixValue[0].store (static_cast<float> (blendNow), std::memory_order_relaxed);
+    liveMixValue[1].store (static_cast<float> (mixXNow), std::memory_order_relaxed);
+    liveMixValue[2].store (static_cast<float> (mixYNow), std::memory_order_relaxed);
+    liveMixModulated.store (modMixRouted, std::memory_order_relaxed);
     // The shared post stage's resonances follow the loudest layer (the first of equals).
     {
         const auto weights = mixWeights (mixLayers, config.blend, config.mixX, config.mixY);

@@ -404,6 +404,16 @@ void SourceDisplay::setDropLabel (const juce::String& label)
     }
 }
 
+void SourceDisplay::setRulerReserve (int pixels)
+{
+    if (rulerReserve != pixels)
+    {
+        rulerReserve = pixels;
+        cacheDirty = true;
+        repaint();
+    }
+}
+
 void SourceDisplay::setBottomInset (int pixels)
 {
     if (bottomInset != pixels)
@@ -731,7 +741,7 @@ void SourceDisplay::paintStatic (juce::Graphics& g)
                 continue;
             if (x > inner.getRight() - 2.0f)
                 break;
-            const bool labelFits = x < inner.getRight() - 30.0f;
+            const bool labelFits = x < inner.getRight() - std::max (30.0f, static_cast<float> (rulerReserve) + 18.0f);
             const bool major = std::abs (std::fmod (t + 1.0e-9, step)) < 1.0e-6;
             g.setColour (colour::wellGrid.withAlpha (major ? 0.95f : 0.45f));
             g.fillRect (juce::Rectangle<float> (x, inner.getY(), 1.0f, inner.getHeight()));
@@ -1495,6 +1505,13 @@ EngineCard::EngineCard (InstrumentHost& p, int layer)
         if (onReimagined != nullptr)
             onReimagined (layerIndex);
     };
+    if (processor.hasSynthesize())
+    {
+        // SYNTHESIZE (Phase S1): the source's own analog oscillator blended into its voices.
+        // A layer's own amount (LINK leaves it alone, like a product's control).
+        synthChip = std::make_unique<SynthChip> (processor, layer);
+        addAndMakeVisible (*synthChip);
+    }
     const std::array<std::pair<const char*, icons::Kind>, 4> mods { { { "link", icons::Kind::link }, { "reverse", icons::Kind::reverse },
                                                                        { "loop", icons::Kind::loop }, { "follow", icons::Kind::follow } } };
     for (std::size_t i = 0; i < modifiers.size(); ++i)
@@ -2133,18 +2150,113 @@ void EngineCard::setEqOpen (bool open)
     eqEditor->setBounds (sourceDisplay.getBounds());
 }
 
+SynthChip::SynthChip (InstrumentHost& processor, int layer)
+    : juce::Slider (juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::NoTextBox),
+      host (processor), accent (palette::layer (layer))
+{
+    const auto id = InstrumentHost::synthesizeId (layer);
+    binding::tag (*this, id);
+    setMouseDragSensitivity (220);
+    setVelocityBasedMode (false);
+    setMouseCursor (juce::MouseCursor::UpDownLeftRightResizeCursor);
+    setTitle ("Layer " + InstrumentHost::layerName (layer) + " Synthesize");
+    setTooltip ("SYNTHESIZE: blend a warm analog oscillator, playing this source's own notes, into its sound.\n"
+                "Drag to set (Alt: fine), double-click for 0. Right-click: development audition.");
+    attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (processor.apvts(), id, *this);
+    setDoubleClickReturnValue (true, 0.0);
+    onValueChange = [this] { repaint(); };
+}
+
+juce::PopupMenu SynthChip::auditionMenu()
+{
+    // S1 listening only: the alternatives kept from the comparison, for every source, for the
+    // notes played next. Not saved; every load starts at Hybrid + Gate.
+    const int blend = host.synthAuditionBlend(), envelope = host.synthAuditionEnvelope();
+    juce::PopupMenu m;
+    m.addSectionHeader ("SYNTHESIZE audition (development, not saved)");
+    const char* blends[] = { "Blend: Hybrid (default)", "Blend: Equal power (PHRASE)", "Blend: Additive" };
+    for (int i = 0; i < 3; ++i)
+        m.addItem (blends[i], true, blend == i, [this, i, envelope] { host.setSynthAudition (i, envelope); repaint(); });
+    m.addSeparator();
+    m.addItem ("Envelope: Gate (default)", true, envelope == 0, [this, blend] { host.setSynthAudition (blend, 0); repaint(); });
+    m.addItem ("Envelope: Follow the recording", true, envelope == 1, [this, blend] { host.setSynthAudition (blend, 1); repaint(); });
+    m.addSeparator();
+    m.addItem ("Back to the defaults", blend != 0 || envelope != 0, false, [this] { host.setSynthAudition (0, 0); repaint(); });
+    return m;
+}
+
+void SynthChip::mouseDown (const juce::MouseEvent& e)
+{
+    if (e.mods.isPopupMenu())
+    {
+        auditionMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
+        return;
+    }
+    juce::Slider::mouseDown (e);
+}
+
+void SynthChip::paint (juce::Graphics& g)
+{
+    using namespace design;
+    // KEY DNA's hairline cell on graphite: lighter under the pointer; in use, the layer's
+    // small light by the name and a thin bar along the foot showing how much.
+    const auto r = getLocalBounds().toFloat().reduced (0.5f);
+    const bool hover = isMouseOverOrDragging();
+    const float a = std::clamp (amount() / 100.0f, 0.0f, 1.0f);
+    const bool lit = a > 0.0f;
+    const juce::Colour light (0xffeee8dd);
+    g.setColour (colour::wellA.withAlpha (0.82f));   // legible over the waveform
+    g.fillRoundedRectangle (r, 4.0f);
+    if (hover)
+    {
+        g.setColour (light.withAlpha (0.06f));
+        g.fillRoundedRectangle (r, 4.0f);
+    }
+    g.setColour (light.withAlpha (lit || hover ? 0.28f : 0.16f));
+    g.drawRoundedRectangle (r.reduced (0.5f), 4.0f, 1.0f);
+    if (lit)
+    {
+        const auto bar = r.reduced (4.0f, 0.0f).removeFromBottom (3.0f).withTrimmedBottom (1.0f);
+        g.setColour (accent.withAlpha (0.9f));
+        g.fillRoundedRectangle (bar.withWidth (std::max (1.5f, bar.getWidth() * a)), 1.0f);
+        g.fillEllipse (juce::Rectangle<float> (4.5f, 4.5f).withCentre ({ r.getX() + 8.5f, r.getCentreY() - 0.5f }));
+    }
+    auto text = r.withTrimmedLeft (lit ? 15.0f : 7.0f).withTrimmedRight (7.0f).withTrimmedBottom (1.0f);
+    g.setFont (type::popupLabel (r.getWidth() < 90.0f ? 10.5f : 11.5f));
+    g.setColour (light.withAlpha (hover || lit ? 0.95f : 0.62f));
+    g.drawText ("SYNTH", text, juce::Justification::centredLeft, false);
+    g.setColour (light.withAlpha (hover || lit ? 0.95f : 0.5f));
+    g.drawText (juce::String (juce::roundToInt (amount())) + " %", text, juce::Justification::centredRight, false);
+    if (host.synthAuditionBlend() != 0 || host.synthAuditionEnvelope() != 0)
+    {
+        // A development audition is on: a small amber corner (never seen in normal use).
+        juce::Path corner;
+        corner.addTriangle (r.getRight() - 7.0f, r.getY() + 1.0f, r.getRight() - 1.0f, r.getY() + 1.0f, r.getRight() - 1.0f, r.getY() + 7.0f);
+        g.setColour (juce::Colour (0xffe0b45c));
+        g.fillPath (corner);
+    }
+}
+
 void KeyDnaKey::paint (juce::Graphics& g)
 {
     using namespace design;
-    // On the graphite strip: a quiet outlined key (the EQ / NOTE MAP pages' cells).
+    // On the graphite strip: a hairline action cell (NOTE MAP's), filled faintly under the
+    // pointer; in use, a small flat telltale in the layer's colour (as NOTES and EQ), not a lamp.
     const auto r = getLocalBounds().toFloat().reduced (1.0f);
     const bool hover = isMouseOver();
-    g.setColour (juce::Colour (0xff2b3031).withAlpha (hover ? 1.0f : 0.85f));
-    g.fillRoundedRectangle (r, 6.0f);
-    g.setColour (lit ? accent : juce::Colour (0xff3e4446));
-    g.drawRoundedRectangle (r.reduced (0.5f), 6.0f, 1.0f);
+    const juce::Colour light (0xffeee8dd);
+    if (hover)
+    {
+        g.setColour (light.withAlpha (0.05f));
+        g.fillRoundedRectangle (r, 4.0f);
+    }
+    g.setColour (light.withAlpha (lit ? 0.28f : 0.16f));
+    g.drawRoundedRectangle (r.reduced (0.5f), 4.0f, 1.0f);
     if (lit)
-        draw::led (g, { r.getX() + 9.0f, r.getCentreY() }, 5.0f, accent, 0.6f);
+    {
+        g.setColour (accent);
+        g.fillEllipse (juce::Rectangle<float> (4.5f, 4.5f).withCentre ({ r.getX() + 9.5f, r.getCentreY() }));
+    }
     g.setFont (type::popupLabel (r.getWidth() < 70.0f ? 10.5f : 11.5f));
     g.setColour (juce::Colour (0xffeee8dd).withAlpha (hover || lit ? 0.95f : 0.7f));
     g.drawText ("KEY DNA", r.withTrimmedLeft (lit ? 10.0f : 0.0f), juce::Justification::centred, false);
@@ -2196,6 +2308,11 @@ void EngineCard::setNotesOpen (bool open)
 void EngineCard::refresh()
 {
     eqButton.setActive (processor.layerEqSettings (layerIndex).audible());
+    if (synthChip != nullptr)
+    {
+        synthChip->setVisible (! isEqOpen() && ! isNotesOpen() && ! isWellEditorShown());   // (those cover the well)
+        synthChip->refreshAudition();
+    }
     if (eqEditor != nullptr)
         eqEditor->refresh();
     if (noteMap != nullptr)
@@ -2458,6 +2575,14 @@ void EngineCard::resized()
     if (wellEditor != nullptr)
         wellEditor->setBounds (sourceDisplay.getBounds());
     placeMapPrompt();
+    if (synthChip != nullptr)
+    {
+        // SYNTHESIZE in the ruler band's top-right corner (the ruler's labels keep clear of it).
+        const float chipWidth = triple ? 92.0f : 96.0f;   // ("SYNTH" and "100 %" apart in a narrow card)
+        const auto well = sourceDisplay.getBounds().toFloat();
+        synthChip->setBounds (at ({ well.getRight() - 8.0f - chipWidth, well.getY() + 6.0f, chipWidth, 20.0f }));
+        sourceDisplay.setRulerReserve (static_cast<int> (chipWidth) + 12);
+    }
 
     // START TUNE PAN LEVEL REIMAGINED: one family at 87 % of the four-knob size, on one
     // pitch, with a little more room at the row's ends than between neighbours.

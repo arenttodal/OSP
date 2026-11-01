@@ -32,7 +32,7 @@ jobs:
           echo "windows=${WINDOWS:-1}" >> "$GITHUB_OUTPUT"
 
   macos:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
         with:

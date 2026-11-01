@@ -16,7 +16,8 @@ namespace osp::plugin::keyDnaState
     product with KEY DNA reads it (one codec, so a profile reopens identically everywhere).
 
     Per layer: its switch, individuality and seed; per parameter (position .. pan, by id) its
-    curve depth, variation, compiled curve (omitted when flat) and the editor's drawn points.
+    curve depth, variation, compiled curve (omitted when flat), the editor's drawn points and
+    the keys drawn by hand (`keys`).
     Numbers are round-trip exact. AMOUNT is a host parameter, not part of it.
 */
 constexpr int layerCount = 3;

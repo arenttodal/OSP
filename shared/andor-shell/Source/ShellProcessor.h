@@ -125,6 +125,7 @@ public:
     void setKeyDnaCurve (int layer, osp::keydna::Param param, const osp::mod::Curve& curve, bool undoable) override;
     /** The profiles still owned for a layer (the playing one and any not yet released). */
     std::size_t keyDnaProfilesAlive (int layer) const;
+    bool hasSynthesize() const noexcept override { return engine->hasSynthesize(); }
 
     // The shell -------------------------------------------------------------------------
     const ProductInfo& product() const noexcept { return productInfo(); }
@@ -293,9 +294,9 @@ private:
     bool modBound = false, modDirty = true;
     std::array<std::atomic<float>*, 2 * 8> modLfoParams {};
     std::array<std::atomic<float>*, 2 * 7> modEnvParams {};
-    std::array<std::atomic<float>*, 4 * osp::mod::maxRoutes> modRouteParams {};
+    std::array<std::atomic<float>*, 5 * osp::mod::maxRoutes> modRouteParams {};   ///< per route: source, dest, depth, enabled, destExt
     std::array<std::atomic<int>, osp::mod::maxRoutes> modRouteTargets {};
-    static constexpr int modValueCount = 2 * 8 + 2 * 7 + 5 * osp::mod::maxRoutes + osp::mod::ccSlots + 2;
+    static constexpr int modValueCount = 2 * 8 + 2 * 7 + 6 * osp::mod::maxRoutes + osp::mod::ccSlots + 2;   // (each route: five parameters and its target)
     std::array<float, modValueCount> lastModValues {};
     osp::mod::Settings modSettings;
     std::array<int, osp::mod::ccSlots> modControllers {};

@@ -204,7 +204,7 @@ int InstrumentHost::addModulationRoute (mod::Source source, mod::Dest dest, floa
     int slot = -1;
     for (int r = 0; r < mod::maxRoutes && slot < 0; ++r)
         if (juce::roundToInt (parameterValue (modRouteId (r, "source"))) == static_cast<int> (source)
-            && juce::roundToInt (parameterValue (modRouteId (r, "dest"))) == mod::choiceOf (dest))
+            && routeDest (r) == dest)
             slot = r;
     for (int r = 0; r < mod::maxRoutes && slot < 0; ++r)
         if (juce::roundToInt (parameterValue (modRouteId (r, "source"))) == 0)
@@ -215,7 +215,7 @@ int InstrumentHost::addModulationRoute (mod::Source source, mod::Dest dest, floa
     if (juce::roundToInt (parameterValue (modRouteId (slot, "source"))) == 0)
         setModLink (slot, newModRouteUid(), 0);   // a new route: a new identity
     setParameterValue (modRouteId (slot, "source"), static_cast<float> (source));
-    setParameterValue (modRouteId (slot, "dest"), static_cast<float> (mod::choiceOf (dest)));
+    setRouteDest (slot, dest);
     setParameterValue (modRouteId (slot, "depth"), depthPercent);
     setParameterValue (modRouteId (slot, "enabled"), 1.0f);
     commitRouteChange();
@@ -231,7 +231,7 @@ void InstrumentHost::removeModulationRoute (int slot, bool ownUndoStep)
     // The routes moving its depth go with it (no reference is left to a route that is gone).
     auto clear = [this] (int r) {
         setParameterValue (modRouteId (r, "source"), 0.0f);
-        setParameterValue (modRouteId (r, "dest"), 0.0f);
+        setRouteDest (r, mod::Dest::none);
         setParameterValue (modRouteId (r, "depth"), 0.0f);
         setParameterValue (modRouteId (r, "enabled"), 1.0f);
         setModLink (r, 0, 0);
@@ -310,7 +310,7 @@ int InstrumentHost::resolveModTarget (int slot) const
 
 int InstrumentHost::modRouteTarget (int slot) const
 {
-    if (slot < 0 || slot >= mod::maxRoutes || juce::roundToInt (parameterValue (modRouteId (slot, "dest"))) != static_cast<int> (mod::Dest::routeDepth))
+    if (slot < 0 || slot >= mod::maxRoutes || routeDest (slot) != mod::Dest::routeDepth)
         return -1;
     return resolveModTarget (slot);
 }
@@ -333,7 +333,7 @@ mod::Settings InstrumentHost::modulationProbe() const
     {
         auto& route = probe.routes[static_cast<std::size_t> (r)];
         route.source = static_cast<mod::Source> (std::clamp (juce::roundToInt (parameterValue (modRouteId (r, "source"))), 0, mod::sourceCount));
-        route.dest = mod::destFromChoice (juce::roundToInt (parameterValue (modRouteId (r, "dest"))));
+        route.dest = routeDest (r);
         route.depth = 0.01 * parameterValue (modRouteId (r, "depth"));
         route.enabled = parameterValue (modRouteId (r, "enabled")) >= 0.5f;
         route.target = resolveModTarget (r);
@@ -404,7 +404,7 @@ InstrumentHost::ModAssignResult InstrumentHost::assignDepthModulation (mod::Sour
     }
     setModLink (result.slot, newModRouteUid(), targetUid);
     setParameterValue (modRouteId (result.slot, "source"), static_cast<float> (source));
-    setParameterValue (modRouteId (result.slot, "dest"), static_cast<float> (mod::Dest::routeDepth));
+    setRouteDest (result.slot, mod::Dest::routeDepth);
     setParameterValue (modRouteId (result.slot, "depth"), depthPercent);
     setParameterValue (modRouteId (result.slot, "enabled"), 1.0f);
     commitRouteChange();
@@ -454,7 +454,7 @@ InstrumentHost::ModAssignResult InstrumentHost::assignModulation (mod::Source so
     undo().beginNewTransaction ("Add modulation");
     setModLink (result.slot, newModRouteUid(), 0);   // a new route: a new identity
     setParameterValue (modRouteId (result.slot, "source"), static_cast<float> (source));
-    setParameterValue (modRouteId (result.slot, "dest"), static_cast<float> (mod::choiceOf (dest)));
+    setRouteDest (result.slot, dest);
     setParameterValue (modRouteId (result.slot, "depth"), depthPercent);
     setParameterValue (modRouteId (result.slot, "enabled"), 1.0f);
     commitRouteChange();

@@ -265,6 +265,9 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
         }
         openPopup (mixPopup);
     };
+    headerMix.onModulationMenu = [this] {
+        modOverlay.contextMenu (modui::mixTargetId).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&headerMix));
+    };
     content.addChildComponent (headerMix);
 
     // The six macros: a name with settings behind it (click: its popup) over its knob.
@@ -1218,6 +1221,7 @@ void OspAudioProcessorEditor::openModulationPopup (int which, int source)
 void OspAudioProcessorEditor::dragModulation (int source, juce::Point<float> where)
 {
     modOverlay.setDrag (source, where);
+    headerMix.setModulationDrag (source, headerMix.acceptsModulationDrop (where));
     // Resting on a macro whose popover holds destinations (CHARACTER: RES) opens it, and on
     // a card's EQ key its EQ, so the drag can continue onto them.
     int over = -1;
@@ -1281,7 +1285,10 @@ int OspAudioProcessorEditor::dropModulation (int source, juce::Point<float> wher
     modOverlay.setDrag (source, where);   // the targets as they are now (a popover or EQ may have opened)
     // The one assignment path (as the right-click menu's): on a halo the route's depth, on
     // the control its value; an existing pairing is selected as it is, a refused one says why.
-    slot = modOverlay.drop (source, where);
+    // The header MIX has no knob: a drop on it is MIX.
+    const bool onMix = headerMix.acceptsModulationDrop (where);
+    headerMix.setModulationDrag (-1, false);
+    slot = onMix ? modOverlay.dropOn (source, modui::mixTargetId, headerMix.getBounds().toFloat()) : modOverlay.drop (source, where);
     if (slot >= 0)
         modPanel.refresh();
     hoverMacro = -1;
@@ -1382,6 +1389,7 @@ void OspAudioProcessorEditor::timerCallback()
             card->refresh();
     updateFocus();
     updateKeyTints();
+    headerMix.refreshModulation();
     if (keyDnaPanel != nullptr)
         keyDnaPanel->refresh();
     presetBar.refresh();

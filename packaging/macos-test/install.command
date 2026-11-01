@@ -14,7 +14,12 @@ if [ -d "$here/OSP.app" ]; then
     mkdir -p ~/Applications
     cp -R "$here/OSP.app" ~/Applications/
 fi
+if [ -d "$here/ANDOR Memo Lab.app" ]; then
+    rm -rf ~/Applications/"ANDOR Memo Lab.app"
+    mkdir -p ~/Applications
+    cp -R "$here/ANDOR Memo Lab.app" ~/Applications/
+fi
 # Make Logic and other AU hosts rescan.
 killall -9 AudioComponentRegistrar 2>/dev/null || true
-echo "Installed: AU and VST3 in ~/Library/Audio/Plug-Ins, the standalone app in ~/Applications."
+echo "Installed: AU and VST3 in ~/Library/Audio/Plug-Ins, the standalone app and ANDOR Memo Lab in ~/Applications."
 echo "Restart your DAW. In Logic, the plug-in is under Instrument > AU Instruments > OSP."

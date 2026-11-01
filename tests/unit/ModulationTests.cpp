@@ -1397,3 +1397,175 @@ TEST_CASE ("mod: a product's own destinations follow ANDOR OSP's; without them t
     CHECK (std::string (mod::destInfo (mod::productDest (5)).id) == "product6");
     mod::setProductDestinations ({});
 }
+
+namespace
+{
+    /** The level of one frequency in a stretch of a render (its amplitude, by correlation). */
+    double toneLevel (const std::vector<float>& x, double hz, double fromSeconds, double toSeconds)
+    {
+        const auto a = static_cast<std::size_t> (fromSeconds * rate), b = std::min (x.size(), static_cast<std::size_t> (toSeconds * rate));
+        double s = 0.0, c = 0.0;
+        for (std::size_t i = a; i < b; ++i)
+        {
+            const double w = 2.0 * std::numbers::pi * hz * static_cast<double> (i) / rate;
+            s += x[i] * std::sin (w);
+            c += x[i] * std::cos (w);
+        }
+        return 2.0 * std::sqrt (s * s + c * c) / static_cast<double> (std::max<std::size_t> (1, b - a));
+    }
+}
+
+TEST_CASE ("mod: MIX - an LFO moves the blend between A and B, equal power; without a route nothing changes", "[unit][mod][mix]")
+{
+    // Each layer plays the key; B an octave up, so the two can be told apart (220 and 440 Hz).
+    const auto a = sineModel (220.0), b = sineModel (220.0);
+    auto settings = quietSettings();
+    settings.blend = 0.5;
+    auto run = [&] (const mod::Settings* m, int block, std::vector<InstrumentEngine::LiveMix>* live = nullptr) {
+        InstrumentEngine e;
+        e.prepare (rate, block, settings);
+        e.setModel (a.get(), 0);
+        e.setModel (b.get(), 1);
+        e.setLayerPitchOffsetSemitones (1, 12.0);
+        if (m != nullptr)
+            e.setModulation (*m);
+        std::vector<float> l (static_cast<std::size_t> (block)), r (static_cast<std::size_t> (block)), out;
+        e.noteOn (57, 100);
+        const auto total = static_cast<int> (1.6 * rate);
+        for (int done = 0; done < total; done += block)
+        {
+            const int n = std::min (block, total - done);
+            float* ch[2] = { l.data(), r.data() };
+            e.render (ch, 2, n);
+            out.insert (out.end(), l.begin(), l.begin() + n);
+            if (live != nullptr)
+                live->push_back (e.liveMix());
+        }
+        return out;
+    };
+    const auto plain = run (nullptr, 256);
+    // A MIX route that is bypassed changes nothing (the mix keeps its 20 ms glide, bit for bit).
+    mod::Settings off;
+    off.lfo[0].rateHz = 3.0;
+    off.routes[0] = { mod::Source::lfo1, mod::Dest::mixPosition, 0.5, false };
+    CHECK (run (&off, 256) == plain);
+
+    // A slow square LFO: +1 for the first second, -1 after. The blend goes to B, then to A.
+    mod::Settings m;
+    m.lfo[0].shape = mod::LfoShape::pulse;
+    m.lfo[0].rateHz = 0.5;
+    m.routes[0] = { mod::Source::lfo1, mod::Dest::mixPosition, 0.5, true };
+    std::vector<InstrumentEngine::LiveMix> live;
+    const auto moved = run (&m, 256, &live);
+    CHECK (run (&m, 256) == moved);   // deterministic
+    const auto at = [&] (double seconds) { return live[static_cast<std::size_t> (seconds * rate / 256.0)]; };
+    CHECK (at (0.5).modulated);
+    CHECK (at (0.5).blend == Approx (1.0).margin (1.0e-3));
+    CHECK (at (1.4).blend == Approx (0.0).margin (1.0e-3));
+    CHECK (toneLevel (moved, 440.0, 0.3, 0.6) > 20.0 * toneLevel (moved, 220.0, 0.3, 0.6));   // B only
+    CHECK (toneLevel (moved, 220.0, 1.2, 1.5) > 20.0 * toneLevel (moved, 440.0, 1.2, 1.5));   // A only
+    // Equal power at every point it passes through (the same weights as the control's own).
+    for (const auto& p : live)
+    {
+        const auto w = InstrumentEngine::mixWeights ({ true, true, false }, p.blend, p.x, p.y);
+        CHECK (w.gain[0] * w.gain[0] + w.gain[1] * w.gain[1] == Approx (1.0).margin (1.0e-6));
+    }
+    // The stored control never moves; with the route bypassed again it is back at the base.
+    InstrumentEngine e;
+    e.prepare (rate, 256, settings);
+    CHECK (e.liveMix().blend == Approx (0.5));
+    CHECK_FALSE (e.liveMix().modulated);
+}
+
+TEST_CASE ("mod: MIX - a 20 Hz LFO keeps its shape without clicks, at any block size", "[unit][mod][mix]")
+{
+    const auto a = sineModel (220.0), b = sineModel (220.0);
+    auto settings = quietSettings();
+    settings.blend = 0.5;
+    mod::Settings m;
+    m.lfo[0].rateHz = 20.0;
+    m.routes[0] = { mod::Source::lfo1, mod::Dest::mixPosition, 0.5, true };
+    auto run = [&] (int block, bool routed) {
+        InstrumentEngine e;
+        e.prepare (rate, block, settings);
+        e.setModel (a.get(), 0);
+        e.setModel (b.get(), 1);
+        e.setLayerPitchOffsetSemitones (1, 12.0);   // B at 440 Hz
+        if (routed)
+            e.setModulation (m);
+        std::vector<float> l (static_cast<std::size_t> (block)), r (static_cast<std::size_t> (block)), out;
+        e.noteOn (57, 100);
+        for (int done = 0; done < static_cast<int> (1.0 * rate); done += block)
+        {
+            float* ch[2] = { l.data(), r.data() };
+            e.render (ch, 2, block);
+            out.insert (out.end(), l.begin(), l.end());
+        }
+        return out;
+    };
+    auto worstStep = [] (const std::vector<float>& x) {
+        double worst = 0.0;
+        for (std::size_t i = static_cast<std::size_t> (0.05 * rate); i < x.size(); ++i)
+            worst = std::max (worst, static_cast<double> (std::abs (x[i] - x[i - 1])));
+        return worst;
+    };
+    const auto plain = run (256, false), wobble = run (256, true);
+    CHECK (wobble != plain);
+    // The gains ramp sample by sample: no step is larger than the tones' own.
+    CHECK (worstStep (wobble) < 1.25 * worstStep (plain) + 1.0e-3);
+    // The movement is the LFO's (20 Hz), not the 20 ms glide's smear: the 220 Hz tone's level
+    // swings deeply within each cycle.
+    double lo = 9.0, hi = 0.0;
+    for (double t = 0.5; t < 0.6; t += 0.005)
+    {
+        const double level = toneLevel (wobble, 220.0, t, t + 0.01);
+        lo = std::min (lo, level);
+        hi = std::max (hi, level);
+    }
+    CHECK (hi > 2.0 * lo);
+    const auto small = run (32, true), large = run (512, true);
+    double worst = 0.0;
+    for (std::size_t i = 0; i < std::min (small.size(), large.size()); ++i)
+        worst = std::max (worst, static_cast<double> (std::abs (small[i] - large[i])));
+    CHECK (worst < 1.0e-3);
+}
+
+TEST_CASE ("mod: MIX TOWARDS C - with three layers the node moves towards C, and MIX along A -> B", "[unit][mod][mix]")
+{
+    const auto a = sineModel (220.0), b = sineModel (330.0), c = sineModel (495.0);
+    auto settings = quietSettings();
+    settings.mixX = 0.25;   // the middle of A-B: C silent
+    settings.mixY = 0.5;
+    auto liveAfter = [&] (mod::Dest dest, double depth) {
+        mod::Settings m;
+        m.lfo[0].shape = mod::LfoShape::pulse;   // +1 for the first second
+        m.lfo[0].rateHz = 0.5;
+        m.routes[0] = { mod::Source::lfo1, dest, depth, true };
+        InstrumentEngine e;
+        e.prepare (rate, 256, settings);
+        e.setModel (a.get(), 0);
+        e.setModel (b.get(), 1);
+        e.setModel (c.get(), 2);
+        e.setModulation (m);
+        e.noteOn (57, 100);
+        std::vector<float> l (256), r (256);
+        for (int done = 0; done < static_cast<int> (0.4 * rate); done += 256)
+        {
+            float* ch[2] = { l.data(), r.data() };
+            e.render (ch, 2, 256);
+        }
+        return e.liveMix();
+    };
+    // All the way towards C: the corner (1, 0).
+    const auto towards = liveAfter (mod::Dest::mixTowardsC, 1.0);
+    CHECK (towards.x == Approx (1.0).margin (1.0e-3));
+    CHECK (towards.y == Approx (0.0).margin (1.0e-3));
+    CHECK (InstrumentEngine::triangleShares (towards.x, towards.y)[2] == Approx (1.0).margin (1.0e-3));
+    // MIX: from the middle of A-B halfway towards B.
+    const auto along = liveAfter (mod::Dest::mixPosition, 0.25);
+    CHECK (along.x == Approx (0.375).margin (1.0e-3));
+    CHECK (along.y == Approx (0.75).margin (1.0e-3));
+    const auto shares = InstrumentEngine::triangleShares (along.x, along.y);
+    CHECK (shares[1] > shares[0]);
+    CHECK (shares[2] == Approx (0.0).margin (1.0e-3));
+}

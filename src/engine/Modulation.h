@@ -235,6 +235,9 @@ enum class Dest : std::uint8_t
     dampenCutoffA, dampenCutoffB, dampenCutoffC,
     // Each layer's KEY DNA AMOUNT (per voice, live on sounding notes; unified engine Phase 2).
     keyDnaAmountA, keyDnaAmountB, keyDnaAmountC,
+    // The header MIX (a shared stage): along A <-> B (two layers: the blend; three: the
+    // triangle's A-B axis) and towards C (three layers only).
+    mixPosition, mixTowardsC,
     // An instrument's own controls: products built from the ANDOR Instrument Shell name them
     // (setProductDestinations); ANDOR OSP names none, so it never offers or reads these.
     product0,
@@ -335,6 +338,32 @@ inline int choiceOf (Dest d) noexcept
     const int k = productIndex (d);
     return k >= 0 && k < productDestCount() ? hostDestCount + k : -1;
 }
+/**
+    The destinations a route reaches through its second host parameter (mod.routeN.destExt),
+    in that parameter's choice order after "None" (append only): the frozen `dest` list keeps
+    its automation, and a route whose `destExt` is set plays that destination instead.
+*/
+inline constexpr std::array<Dest, 5> extendedDests { Dest::keyDnaAmountA, Dest::keyDnaAmountB, Dest::keyDnaAmountC, Dest::mixPosition, Dest::mixTowardsC };
+constexpr int extendedChoiceCount = 1 + static_cast<int> (extendedDests.size());
+inline Dest destFromExtendedChoice (int choice) noexcept
+{
+    return choice >= 1 && choice < extendedChoiceCount ? extendedDests[static_cast<std::size_t> (choice - 1)] : Dest::none;
+}
+/** The extended parameter's choice for a destination (0: it is not one of them). */
+inline int extendedChoiceOf (Dest d) noexcept
+{
+    for (std::size_t i = 0; i < extendedDests.size(); ++i)
+        if (extendedDests[i] == d)
+            return static_cast<int> (i) + 1;
+    return 0;
+}
+/** A route's destination from its two parameters: the extended one wins when it is set. */
+inline Dest routeDestFromChoices (int destChoice, int extendedChoice) noexcept
+{
+    const auto extended = destFromExtendedChoice (extendedChoice);
+    return extended != Dest::none ? extended : destFromChoice (destChoice);
+}
+
 /** What full depth moved before state version 11 (fixed, smaller spans). Older sessions'
     depths are scaled by legacySpan / span when they load, so they sound as they did. For
     CHARACTER CUTOFF it was 4 octaves (the caller converts with the filter's own travel). */

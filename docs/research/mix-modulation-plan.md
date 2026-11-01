@@ -3,7 +3,8 @@
 Request: assign the LFOs (and other modulation sources) to the MIX slider in the header, so
 the balance between A, B (and C) can move by itself.
 
-Status: plan only, nothing implemented. To be decided before work starts.
+Status: implemented (options 1, 2(a) and 3, both axes), see "Implemented" at the end. Per-note
+MIX (option 4) is later, as decided.
 
 ## What exists today
 
@@ -138,3 +139,54 @@ proves musical.
 2. With three layers: one MIX destination that moves along A↔B only, or both axes
    ("MIX" and "MIX towards C")?
 3. Per-note MIX (VEL → MIX) now, or after the global one has been played?
+
+## Implemented
+
+Decisions: 2(a) (`destExt`), both axes ("MIX" and "MIX TOWARDS C"), per-note MIX later.
+
+- **Engine** (`src/engine`):
+  - `mixPosition` and `mixTowardsC` are appended after KEY DNA AMOUNT (registry ids `mixPosition`,
+    `mixTowardsC`; the research renderer takes them by id).
+  - `applyGlobalModulation` stores the two offsets.
+  - In the render loop a routed mix glides towards `clamp (base + offset)` within about 2 ms:
+    - two layers: `blend + MIX`;
+    - three layers: `x + 0.5 MIX + 0.75 C` and `y + MIX − 0.5 C`. A → B is the direction
+      (0.5, 1); the middle of A–B → C is (0.75, −0.5).
+  - Without a route the original 20 ms glide runs, unchanged.
+  - `InstrumentEngine::liveMix()` gives the mix as it plays (lock-free) for the display.
+- **Host parameters:**
+  - `mod.routeN.destExt` ("Mod N Destination+", version hint 21): "None", then
+    `mod::extendedDests` (KEY DNA A–C AMOUNT, MIX, MIX TOWARDS C), append only.
+  - `mod::routeDestFromChoices` reads a route: `destExt` wins when set.
+  - `InstrumentHost::routeDest` / `setRouteDest` are the one way the interface reads and writes
+    a route's destination. Setting one parameter clears the other.
+  - Old sessions have no `destExt`, so it defaults to None and every route is as saved.
+  - Automation of `dest` drives the routes that use it, as before.
+- **Interface** (`shared/andor-ui`, both editors):
+  - The header MIX is a destination with no parameter of its own (`modui::mixTargetId`).
+  - A drop on it assigns MIX. A right-click opens the knobs' modulation menu (Assign / Edit /
+    Remove; with three layers also "(towards C)").
+  - While a source is dragged it shows a ring in the source's colour, strong when over it.
+  - While routed it draws the range along the line and a hollow node where the mix is now. The
+    solid node stays the base, and the readout shows the live shares.
+  - Nothing is drawn differently without a route, so OSP stays pixel-identical.
+  - The routes popover's + ADD lists "Mix" and each layer's KEY DNA AMOUNT. The KEY DNA
+    editor's AMOUNT is drawn by the editor itself (not a knob), so it takes no drops yet.
+  - Not done: the triangle trail and the large mix popover's depth editing. With three layers
+    the header triangle is hidden by design (`design::showMixTriangle`), so MIX TOWARDS C is
+    assigned from + ADD.
+- **Sources:**
+  - Global LFOs, the global ENV, the wheel, CC 1–4 and PRESSURE.
+  - VEL and NOTE too: a shared stage follows the latest key, as every shared destination
+    does. That is not per note.
+  - A POLY LFO is refused.
+- **Tests (`[mix]`):**
+  - a bypassed route changes nothing;
+  - a square LFO takes the mix to B, then to A (heard, at equal power);
+  - a 20 Hz LFO keeps its depth with no step larger than the tones' own, at any block size;
+  - towards C reaches the C corner;
+  - plugin: assign, undo, redo, the session, an older session, `dest` automation, the menu,
+    the drop, the range and the live node;
+  - `[mix-ui]` (hidden, xvfb): the editor drop and snapshots.
+- **Goldens:** the parameter schema golden gains the 16 `destExt` parameters, an intentional
+  update. No audio golden changes, since nothing in the fixtures routes the mix.

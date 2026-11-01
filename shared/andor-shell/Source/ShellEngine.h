@@ -195,6 +195,9 @@ public:
     virtual juce::String engineSourceName (int layer) const { juce::ignoreUnused (layer); return {}; }
     /** The musician removed the layer's source: the engine lets go of its own. Message thread. */
     virtual void removeEngineSource (int layer) { juce::ignoreUnused (layer); }
+    /** The engine reads each layer's SYNTHESIZE (layerA.synthesize): the source cards then show
+        its knob, as ANDOR OSP's. Off by default (no knob). */
+    virtual bool hasSynthesize() const noexcept { return false; }
 };
 
 } // namespace andor::shell
