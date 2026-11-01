@@ -238,6 +238,8 @@ enum class Dest : std::uint8_t
     // The header MIX (a shared stage): along A <-> B (two layers: the blend; three: the
     // triangle's A-B axis) and towards C (three layers only).
     mixPosition, mixTowardsC,
+    // Each layer's SYNTHESIZE amount (per voice, live on sounding notes; Phase S2).
+    synthAmountA, synthAmountB, synthAmountC,
     // An instrument's own controls: products built from the ANDOR Instrument Shell name them
     // (setProductDestinations); ANDOR OSP names none, so it never offers or reads these.
     product0,
@@ -343,7 +345,8 @@ inline int choiceOf (Dest d) noexcept
     in that parameter's choice order after "None" (append only): the frozen `dest` list keeps
     its automation, and a route whose `destExt` is set plays that destination instead.
 */
-inline constexpr std::array<Dest, 5> extendedDests { Dest::keyDnaAmountA, Dest::keyDnaAmountB, Dest::keyDnaAmountC, Dest::mixPosition, Dest::mixTowardsC };
+inline constexpr std::array<Dest, 8> extendedDests { Dest::keyDnaAmountA, Dest::keyDnaAmountB, Dest::keyDnaAmountC, Dest::mixPosition, Dest::mixTowardsC,
+                                                     Dest::synthAmountA, Dest::synthAmountB, Dest::synthAmountC };
 constexpr int extendedChoiceCount = 1 + static_cast<int> (extendedDests.size());
 inline Dest destFromExtendedChoice (int choice) noexcept
 {

@@ -183,16 +183,29 @@ namespace colour
         return ids[static_cast<std::size_t> (juce::jlimit (0, 2, layer))];
     }
     /** A mapped note's colour (Note Atlas regions, the NOTE MAP, the keyboard's light strip):
-        one muted hue per pitch class, walked round the circle of fifths, so every E (any
-        octave) wears the same colour and neighbouring semitones are far apart on the wheel;
-        alternate pitch classes are lighter and darker, so a fourth or a fifth apart (neighbours
-        on that circle) still differ. */
+        one colour per pitch class, so every E (any octave) wears the same one. Earth and plant
+        pigments, no violets: the even pitch classes (C D E F# G# A#) warm (rust, ochre,
+        rosewood, burnt orange, sand, terracotta), the odd ones (C# D# F G A B) green and teal
+        (sea slate, moss, pine teal, olive, deep teal, forest). A semitone or a fifth always
+        changes parity, so neighbours on the keyboard and on the circle of fifths are always
+        one warm and one cool, and a scale wears both. */
     inline juce::Colour forPitch (int midiNote)
     {
-        const int pc = ((midiNote % 12) + 12) % 12;
-        const float hue = std::fmod (0.04f + static_cast<float> ((pc * 7) % 12) / 12.0f, 1.0f);
-        // A fourth or a fifth apart (neighbours on that circle) differ in brightness too.
-        return juce::Colour::fromHSV (hue, pc % 2 == 0 ? 0.5f : 0.6f, pc % 2 == 0 ? 0.92f : 0.74f, 1.0f);
+        static const std::array<juce::Colour, 12> byPitchClass { {
+            juce::Colour (0xffbf5a3f),   // C   rust
+            juce::Colour (0xff6a93a3),   // C#  sea slate
+            juce::Colour (0xffd6a64f),   // D   ochre
+            juce::Colour (0xff86a35f),   // D#  moss
+            juce::Colour (0xffb9705f),   // E   rosewood
+            juce::Colour (0xff4f9486),   // F   pine teal
+            juce::Colour (0xffde8f46),   // F#  burnt orange
+            juce::Colour (0xffa2a85c),   // G   olive
+            juce::Colour (0xffcbb571),   // G#  sand
+            juce::Colour (0xff3f8d97),   // A   deep teal
+            juce::Colour (0xffcc7449),   // A#  terracotta
+            juce::Colour (0xff62956b),   // B   forest
+        } };
+        return byPitchClass[static_cast<std::size_t> (((midiNote % 12) + 12) % 12)];
     }
 
     // Controls.

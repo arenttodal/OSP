@@ -180,7 +180,8 @@ TEST_CASE ("synthesize: the oscillator - in tune, band-limited, click-free in an
         }
         CHECK (20.0 * std::log10 (worst / fundamental) < -40.0);
     }
-    // Envelope: from silence, no step at the start; the release falls away and ends.
+    // Envelope: from silence, no step at the start (the filter rises from rest; the voice's
+    // ADSR shapes the attack too).
     synth::Voice v;
     v.prepare (rate);
     v.start (3, 0.8, synth::Envelope::gate);
@@ -194,16 +195,27 @@ TEST_CASE ("synthesize: the oscillator - in tune, band-limited, click-free in an
         previous = s;
     }
     CHECK (worstStep < 0.01f);   // the first milliseconds rise from 0
+    // Held: a key let go does not end it by itself; the voice's ADSR release (R) does.
     v.release();
-    int samples = 0;
-    while (! v.isSilent() && samples < static_cast<int> (rate))
-    {
+    for (int i = 0; i < static_cast<int> (0.5 * rate); ++i)
         v.next (0.0f);
+    CHECK_FALSE (v.isSilent());
+    // Follow: it falls silent when the recording it follows does.
+    synth::Voice f;
+    f.prepare (rate);
+    f.start (3, 0.8, synth::Envelope::follow);
+    f.setPitch (220.0);
+    for (int i = 0; i < static_cast<int> (0.2 * rate); ++i)
+        f.next (0.3f);
+    CHECK_FALSE (f.isSilent());
+    int samples = 0;
+    while (! f.isSilent() && samples < static_cast<int> (2.0 * rate))
+    {
+        f.next (0.0f);
         ++samples;
     }
-    CHECK (v.isSilent());
-    CHECK (samples > static_cast<int> (0.12 * rate));   // a release of about 120 .. 250 ms
-    CHECK (samples < static_cast<int> (0.30 * rate));
+    CHECK (f.isSilent());
+    CHECK (samples < static_cast<int> (1.5 * rate));
 }
 
 TEST_CASE ("synthesize: off is exactly as before; on, it plays the key, with bend and without the root correction", "[unit][synth]")
@@ -233,7 +245,7 @@ TEST_CASE ("synthesize: off is exactly as before; on, it plays the key, with ben
     CHECK (measuredHz (tuned, static_cast<std::size_t> (0.2 * rate)) == Approx (220.0).epsilon (0.002));
 }
 
-TEST_CASE ("synthesize: a plucked note held by its oscillator after the recording ends; released, it ends", "[unit][synth]")
+TEST_CASE ("synthesize: Held keeps a plucked note sounding through its oscillator; released, it follows R", "[unit][synth]")
 {
     // A 0.3 s pluck (LOOP off: it plays once). Held for 1.5 s.
     auto audio = testsignals::pluck (midiToHz (57), 0.3, rate, 3);
@@ -260,9 +272,21 @@ TEST_CASE ("synthesize: a plucked note held by its oscillator after the recordin
     const auto held = play (*m, settings, 57, 2.0, 1.5, 256);
     CHECK (rms (held, 1.0, 1.4) > 0.003);                                 // sounding long after the pluck
     CHECK (toneLevel (held, midiToHz (57), 1.0, 1.4) > 0.005);            // at its pitch
-    CHECK (rms (held, 1.85, 2.0) < 1.0e-5);                               // and gone after the release
+    // The release is the ADSR's R (plainSettings: 0.1 s), not a shorter one of its own.
+    CHECK (rms (held, 1.85, 2.0) < 1.0e-5);
+    for (const double releaseSeconds : { 0.1, 0.7 })
+    {
+        settings.adsr.releaseSeconds = releaseSeconds;
+        const auto x = play (*m, settings, 57, 1.0 + releaseSeconds + 0.6, 1.0, 256);
+        const double before = rms (x, 0.85, 0.99);
+        const double half = rms (x, 1.0 + 0.45 * releaseSeconds, 1.0 + 0.55 * releaseSeconds);
+        const double halfDb = 20.0 * std::log10 (half / before);
+        INFO ("R " << releaseSeconds << " s: halfway through it " << halfDb << " dB");
+        CHECK (halfDb > -30.0);   // still sounding halfway through R
+        CHECK (rms (x, 1.0 + releaseSeconds + 0.3, 1.0 + releaseSeconds + 0.6) < 1.0e-4 * before + 1.0e-6);
+    }
+    settings.adsr.releaseSeconds = 0.1;
     // Released and gone: no voice left.
-    settings.layer[0].synthesize = 0.5;
     InstrumentEngine e;
     e.prepare (rate, 256, settings);
     e.setModel (m.get());
@@ -276,6 +300,100 @@ TEST_CASE ("synthesize: a plucked note held by its oscillator after the recordin
         e.render (ch, 2, 256);
     }
     CHECK (e.activeVoiceCount() == 0);
+}
+
+TEST_CASE ("synthesize: Follow follows the recording's sound and stops when it stops", "[unit][synth]")
+{
+    auto audio = testsignals::pluck (midiToHz (57), 0.6, rate, 3);
+    const auto m = model (audio);
+    auto settings = plainSettings();
+    settings.layer[0].loop = false;
+    settings.layer[0].synthesize = 1.0;   // the oscillator alone
+    settings.layer[0].synth.shape = synth::Envelope::follow;
+    settings.layer[0].synth.wave = synth::Wave::sine;
+    InstrumentEngine e;
+    e.prepare (rate, 256, settings);
+    e.setModel (m.get());
+    std::vector<float> l (256), r (256), out;
+    e.noteOn (57, 100);
+    int voicesAt1s = -1;
+    for (int done = 0; done < static_cast<int> (1.5 * rate); done += 256)
+    {
+        float* ch[2] = { l.data(), r.data() };
+        e.render (ch, 2, 256);
+        out.insert (out.end(), l.begin(), l.end());
+        if (done >= static_cast<int> (1.0 * rate) && voicesAt1s < 0)
+            voicesAt1s = e.activeVoiceCount();
+    }
+    // It decays as the pluck itself does (the recording alone, for comparison) ...
+    auto alone = settings;
+    alone.layer[0].synthesize = 0.0;
+    const auto pluck = play (*m, alone, 57, 1.5, 1.4, 256);
+    const double oscDrop = 20.0 * std::log10 (rms (out, 0.35, 0.45) / rms (out, 0.03, 0.1));
+    const double pluckDrop = 20.0 * std::log10 (rms (pluck, 0.35, 0.45) / rms (pluck, 0.03, 0.1));
+    INFO ("from 0.05 s to 0.4 s: oscillator " << oscDrop << " dB, the pluck " << pluckDrop << " dB");
+    CHECK (pluckDrop < -3.0);
+    CHECK (std::abs (oscDrop - pluckDrop) < 4.0);
+    // ... and ends with it, the key still held.
+    CHECK (voicesAt1s == 0);
+    CHECK (rms (out, 0.8, 1.4) < 1.0e-6);
+}
+
+TEST_CASE ("synthesize: SYNTH amount is a modulation destination (LFO, envelope, velocity), per layer", "[unit][synth][synthmod]")
+{
+    auto audio = testsignals::sine (midiToHz (60), 2.0, rate, 0.4, 1);
+    testsignals::applyFades (audio, 0.01, 0.05);
+    const auto m = model (audio);
+    auto settings = plainSettings();
+    settings.layer[0].synth.octave = 1;   // the oscillator an octave above the sine sample
+    settings.layer[0].synth.wave = synth::Wave::sine;
+    auto run = [&] (const mod::Settings* routes, int velocity = 100) {
+        InstrumentEngine e;
+        e.prepare (rate, 256, settings);
+        e.setModel (m.get());
+        if (routes != nullptr)
+            e.setModulation (*routes);
+        std::vector<float> l (256), r (256), out;
+        e.noteOn (60, velocity);
+        for (int done = 0; done < static_cast<int> (1.0 * rate); done += 256)
+        {
+            float* ch[2] = { l.data(), r.data() };
+            e.render (ch, 2, 256);
+            out.insert (out.end(), l.begin(), l.end());
+        }
+        return out;
+    };
+    const double octaveUp = 2.0 * midiToHz (60);
+    const auto plain = run (nullptr);
+    CHECK (toneLevel (plain, octaveUp, 0.2, 0.9) < 1.0e-4);   // amount 0: no oscillator
+    // VELOCITY -> SYNTH A: the amount comes from the route alone, and more for harder notes.
+    mod::Settings vel;
+    vel.routes[0] = { mod::Source::vel, mod::Dest::synthAmountA, 0.8, true };
+    const double soft = toneLevel (run (&vel, 30), octaveUp, 0.2, 0.9);
+    const double hard = toneLevel (run (&vel, 127), octaveUp, 0.2, 0.9);
+    INFO ("soft " << soft << ", hard " << hard);
+    CHECK (hard > 0.01);
+    CHECK (hard > 2.0 * soft);
+    // An LFO on it moves the oscillator's level over time.
+    mod::Settings lfo;
+    lfo.lfo[0].rateHz = 2.0;
+    lfo.routes[0] = { mod::Source::lfo1, mod::Dest::synthAmountA, 1.0, true };
+    const auto moving = run (&lfo);
+    double lo = 1.0e9, hi = 0.0;
+    for (double t = 0.1; t + 0.1 <= 1.0; t += 0.1)
+    {
+        const double v = toneLevel (moving, octaveUp, t, t + 0.1);
+        lo = std::min (lo, v);
+        hi = std::max (hi, v);
+    }
+    INFO ("LFO: " << lo << " .. " << hi);
+    CHECK (hi > 4.0 * lo + 1.0e-4);
+    // Another layer's destination leaves A alone.
+    lfo.routes[0].dest = mod::Dest::synthAmountB;
+    CHECK (toneLevel (run (&lfo), octaveUp, 0.2, 0.9) < 1.0e-4);
+    // The destination's description.
+    CHECK (mod::destInfo (mod::Dest::synthAmountB).layer == 1);
+    CHECK (mod::extendedChoiceOf (mod::Dest::synthAmountC) == static_cast<int> (mod::extendedDests.size()));
 }
 
 TEST_CASE ("synthesize: block size, automation while held, chords and no allocation", "[unit][synth]")

@@ -161,6 +161,10 @@ namespace
         // The header MIX, 0..1 of its travel (a shared stage: global sources only).
         { "mixPosition", "MIX", Owner::global, -1, Domain::unit, 1.0, Update::continuous },
         { "mixTowardsC", "MIX TOWARDS C", Owner::global, -1, Domain::unit, 1.0, Update::continuous },
+        // SYNTHESIZE per layer 0..1 (added to the layer's amount, clamped, smoothed per voice).
+        { "synthAmountA", "SYNTH A", Owner::voice, 0, Domain::unit, 1.0, Update::continuous },
+        { "synthAmountB", "SYNTH B", Owner::voice, 1, Domain::unit, 1.0, Update::continuous },
+        { "synthAmountC", "SYNTH C", Owner::voice, 2, Domain::unit, 1.0, Update::continuous },
     } };
 
     bool isEnvelope (Source s) noexcept { return s == Source::env1 || s == Source::env2; }

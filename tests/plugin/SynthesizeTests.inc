@@ -527,6 +527,45 @@ TEST_CASE ("plugin synth page: a click on SYNTH opens it over the waveform; its 
     }
 }
 
+TEST_CASE ("plugin synth page: SYNTH is a modulation destination - the chip takes a route, heard, undone, saved", "[plugin][synthesize][synthpage][mod]")
+{
+    namespace modui = osp::plugin::modui;
+    using D = mod::Dest;
+    using osp::plugin::InstrumentHost;
+    // The SYNTH chip (its parameter) stands for its layer's destination; appended to destExt.
+    for (int l = 0; l < 3; ++l)
+        CHECK (modui::destinationFor (InstrumentHost::synthesizeId (l), false) == static_cast<D> (static_cast<int> (D::synthAmountA) + l));
+    const auto& names = OspAudioProcessor::modExtendedDestinationNames();
+    REQUIRE (names.size() == mod::extendedChoiceCount);
+    CHECK (names[mod::extendedChoiceOf (D::mixPosition)] == "MIX");   // the earlier choices keep their places
+    CHECK (names[mod::extendedChoiceOf (D::synthAmountA)] == "SYNTH A");
+    CHECK (names[mod::extendedChoiceOf (D::synthAmountC)] == "SYNTH C");
+
+    TempDir tmp;
+    OspAudioProcessor p;
+    loadLayers (p, tmp.dir, 1);
+    const auto plain = audioHash (renderHeld (p, chord8, 1.2));   // SYNTH at 0
+    const auto made = p.assignModulation (mod::Source::lfo1, D::synthAmountA, 60.0f);
+    REQUIRE (made.slot >= 0);
+    CHECK (p.routeDest (made.slot) == D::synthAmountA);
+    CHECK (juce::roundToInt (p.parameterValue (OspAudioProcessor::modRouteId (made.slot, "destExt"))) == mod::extendedChoiceOf (D::synthAmountA));
+    const auto moved = renderHeld (p, chord8, 1.2);
+    CHECK (audioHash (moved) != plain);   // the LFO brings the oscillator in, the amount at 0
+    CHECK (finite (moved));
+    // Envelopes and velocity reach it too (it is read per voice).
+    CHECK (p.assignModulation (mod::Source::env1, D::synthAmountA, 40.0f).slot >= 0);
+    CHECK (p.assignModulation (mod::Source::vel, D::synthAmountA, 40.0f).slot >= 0);
+    juce::MemoryBlock saved;
+    p.getStateInformation (saved);
+    {
+        OspAudioProcessor q;
+        q.setStateInformation (saved.getData(), static_cast<int> (saved.getSize()));
+        CHECK (q.routeDest (made.slot) == D::synthAmountA);
+    }
+    p.removeModulationRoute (made.slot);
+    CHECK (p.routeDest (made.slot) == D::none);
+}
+
 TEST_CASE ("plugin synthesize: CPU of the whole plug-in, SYNTHESIZE off and on", "[.][synthbench]")
 {
     // On demand: osp_plugin_tests "[synthbench]". The default patch (macros and effects as a new

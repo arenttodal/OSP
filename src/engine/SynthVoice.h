@@ -28,11 +28,12 @@ enum class Blend : std::uint8_t
     additive      ///< the oscillator added, the sample ducked over the top half
 };
 
-/** The oscillator's level over a note (internal: A is the default). */
+/** The oscillator's level over a note (SYNTH page: SHAPE). Either way the voice's own ADSR
+    shapes it as it shapes the sample (attack, decay, sustain, release R). */
 enum class Envelope : std::uint8_t
 {
-    gate,     ///< A: its own short attack, full while the key (or pedal) holds, a short release
-    follow    ///< B: the recording's contour first, settling into full sustain over about 0.4 s
+    gate,     ///< Held: full for the whole note: the ADSR alone shapes it (and its release is R)
+    follow    ///< Follow: the recording's own contour throughout; it ends when the sound ends
 };
 
 /** The oscillator's waveform (SYNTH page: WAVE). Saw is S1's. */
@@ -127,10 +128,9 @@ public:
     {
         sampleRate = outputSampleRate;
         attackCoef = static_cast<float> (1.0 - std::exp (-1.0 / (0.004 * sampleRate)));    // ~12 ms to 95 %
-        releaseCoef = static_cast<float> (1.0 - std::exp (-1.0 / (0.030 * sampleRate)));   // ~140 ms to -40 dB, ~210 ms to -60 dB
+        releaseCoef = static_cast<float> (1.0 - std::exp (-1.0 / (0.030 * sampleRate)));   // Follow's fall (the contour's own is slower)
         followUp = static_cast<float> (1.0 - std::exp (-1.0 / (0.005 * sampleRate)));
         followDown = static_cast<float> (1.0 - std::exp (-1.0 / (0.060 * sampleRate)));
-        settleStep = 1.0f / static_cast<float> (0.4 * sampleRate);
         gainCoef = static_cast<float> (1.0 - std::exp (-1.0 / (0.007 * sampleRate)));
     }
 
@@ -145,10 +145,9 @@ public:
         gain2 = 0.0f;
         brightness = 4.0 + 4.0 * std::clamp (velocity, 0.0, 1.0);
         envelopeMode = mode;
-        level = 0.0f;
+        level = mode == Envelope::follow ? 0.0f : 1.0f;
         gate = true;
         follower = followerPeak = 0.0f;
-        settle = 0.0f;
         ic1 = ic2 = 0.0f;
         running = true;
     }
@@ -156,8 +155,10 @@ public:
     void release() noexcept { gate = false; }
     void stop() noexcept { running = false; }
     bool isRunning() const noexcept { return running; }
-    /** After its release: nothing left to hear. */
-    bool isSilent() const noexcept { return ! gate && level < 1.0e-3f; }   // -60 dB
+    bool isFollowing() const noexcept { return envelopeMode == Envelope::follow; }
+    /** Follow: the recording's contour has fallen silent (-60 dB of its peak). Held is never
+        silent by itself: its voice ends with the ADSR. */
+    bool isSilent() const noexcept { return envelopeMode == Envelope::follow && level < 1.0e-3f && followerPeak > 0.0f; }
 
     /** The pitch (Hz) and, from it, the tone's cutoff (control rate). `settings` (S2): the wave,
         octave, detune and tone, live; the defaults are S1's arithmetic exactly. */
@@ -230,18 +231,16 @@ public:
         ic1 = 2.0f * v1 - ic1;
         ic2 = 2.0f * v2 - ic2;
 
-        float target = gate ? 1.0f : 0.0f;
-        if (envelopeMode == Envelope::follow && gate)
+        if (envelopeMode == Envelope::follow)
         {
-            // B: the recording's own contour (normalised to its peak so far), handing over to
-            // full sustain as the note settles.
+            // Follow: the recording's own contour (normalised to its peak so far), the whole
+            // note through: a pluck's oscillator decays with the pluck and ends with it.
             follower += (sampleLevel > follower ? followUp : followDown) * (sampleLevel - follower);
             followerPeak = std::max (followerPeak, follower);
-            const float contour = followerPeak > 1.0e-6f ? follower / followerPeak : 0.0f;
-            settle = std::min (1.0f, settle + settleStep);
-            target = contour + (1.0f - contour) * settle;
+            const float target = followerPeak > 1.0e-6f ? follower / followerPeak : 0.0f;
+            level += (target > level ? attackCoef : releaseCoef) * (target - level);
         }
-        level += (target > level ? attackCoef : releaseCoef) * (target - level);
+        // Held: full (the voice's ADSR shapes it: its attack, sustain and R).
         return v2 * level * referenceLevel;
     }
 
@@ -292,7 +291,6 @@ private:
     float f1 = 1.0f, f2 = 0.0f, f3 = 0.0f, ic1 = 0.0f, ic2 = 0.0f;
     float level = 0.0f, attackCoef = 0.0f, releaseCoef = 0.0f;
     float follower = 0.0f, followerPeak = 0.0f, followUp = 0.0f, followDown = 0.0f;
-    float settle = 0.0f, settleStep = 0.0f;
     Envelope envelopeMode = Envelope::gate;
     bool gate = false, running = false;
 };

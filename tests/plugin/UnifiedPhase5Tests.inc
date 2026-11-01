@@ -263,6 +263,20 @@ TEST_CASE ("plugin phase 5: a played note lights its own region, its read head i
     CHECK (keys[69].colour == osp::plugin::design::colour::forPitch (69));
     CHECK (osp::plugin::design::colour::forPitch (62) == osp::plugin::design::colour::forPitch (74));   // every D
     CHECK (osp::plugin::design::colour::forPitch (74) != osp::plugin::design::colour::forPitch (75));
+    // Earthy, natural colours: twelve different ones, none violet or purple (hue 0.66-0.95),
+    // none grey.
+    {
+        std::set<juce::uint32> seen;
+        for (int pc = 0; pc < 12; ++pc)
+        {
+            const auto c = osp::plugin::design::colour::forPitch (60 + pc);
+            seen.insert (c.getARGB());
+            INFO ("pitch class " << pc << ": hue " << c.getHue());
+            CHECK ((c.getHue() < 0.66f || c.getHue() > 0.95f));
+            CHECK (c.getSaturation() > 0.2f);
+        }
+        CHECK (seen.size() == 12);
+    }
 }
 
 TEST_CASE ("plugin phase 5: NOTE MAP edits are one undo step each, queued in order, and keep held notes sounding", "[plugin][phase5][notemap][realtime]")

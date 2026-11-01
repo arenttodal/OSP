@@ -382,6 +382,7 @@ private:
     double modCutoff = 0.0, modResonance = 0.0, modSustain = 0.0;
     double modGrainPosition = 0.0, modGrainSpread = 0.0, modGrainSize = 0.0, modGrainDensity = 0.0;
     double modStartOffset = 0.0;   ///< START modulation taken at note-on (0..1 of the recording)
+    double modSynthAmount = 0.0;   ///< SYNTH routes (added to the layer's amount)
     double modKeyDnaAmount = 0.0;  ///< KEY DNA AMOUNT routes (added to the layer's AMOUNT)
     // KEY DNA AMOUNT, live: the layer's (plus routes), followed within ~30 ms by a control-rate
     // one-pole; at note-on it starts where the target is (no glide in), and it lands exactly on

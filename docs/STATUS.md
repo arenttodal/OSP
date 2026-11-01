@@ -651,6 +651,11 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       Follow) and PITCH (Keys / Recording: the recording's own tuning and vibrato from its
       pitch track). Per source, host parameters `layerX.synth.*` (version hint 23, appended;
       the defaults are S1 sample for sample). Tests `[synthpage]`.
+- [x] After S2: the oscillator has no release of its own (Held follows the ADSR, its R
+      included; Follow follows the recording's contour and ends when the recording does);
+      SYNTH A-C are modulation destinations (per voice; `mod.routeN.destExt`, appended); the
+      note colours (regions, NOTE MAP, keyboard strip) are earth and plant pigments, warm for
+      the even pitch classes and green / teal for the odd ones, no violets.
 
 ## Milestone: ANDOR Instrument Shell extensions for ANDOR ANALOG (a synthesizer)
 

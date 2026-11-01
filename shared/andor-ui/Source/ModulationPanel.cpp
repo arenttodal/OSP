@@ -96,6 +96,8 @@ namespace
             for (int l = 0; l < InstrumentHost::numLayers; ++l)
                 list.add (InstrumentHost::keyDnaAmountId (l));
             list.add (modui::mixTargetId);
+            for (int l = 0; l < InstrumentHost::numLayers; ++l)
+                list.add (InstrumentHost::synthesizeId (l));   // (appended: the SYNTH chip, Phase S2)
             // A product's own controls (mod::setProductDestinations; ANDOR OSP has none).
             for (int k = 0; k < mod::productDestCount(); ++k)
                 list.add (mod::destInfo (mod::productDest (k)).id);
@@ -302,6 +304,7 @@ namespace modui
             if (id == InstrumentHost::dampenParameterId (l, "frequency")) return offsetDest (Dest::dampenShelfA, l);
             if (id == InstrumentHost::dampenParameterId (l, "cutoff")) return offsetDest (Dest::dampenCutoffA, l);
             if (id == InstrumentHost::keyDnaAmountId (l)) return offsetDest (Dest::keyDnaAmountA, l);
+            if (id == InstrumentHost::synthesizeId (l)) return offsetDest (Dest::synthAmountA, l);
         }
         // The header MIX (no parameter of its own: it moves ab.blend, or mix.x and mix.y).
         if (id == mixTargetId) return Dest::mixPosition;
@@ -1842,6 +1845,8 @@ juce::PopupMenu ModRoutesPopup::addMenu()
                             mod::Dest::grainDensityA, mod::Dest::grainSizeA, mod::Dest::grainSpreadA, mod::Dest::eqBellFrequencyA,
                             mod::Dest::eqBellGainA, mod::Dest::eqLowShelfGainA, mod::Dest::eqHighShelfGainA, mod::Dest::keyDnaAmountA })
             add (layer, offsetDest (first, l));
+        if (ospProcessor.hasSynthesize())
+            add (layer, offsetDest (mod::Dest::synthAmountA, l));
         menu.addSubMenu ("Layer " + InstrumentHost::layerName (l), layer);
     }
     // The balance between the layers (towards C only with three).

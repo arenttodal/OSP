@@ -766,7 +766,7 @@ void InstrumentVoice::clearModulation() noexcept
     modCutoff = modResonance = modSustain = 0.0;
     modDampenAmount = modDampenShelf = modDampenCutoff = 0.0;
     modGrainPosition = modGrainSpread = modGrainSize = modGrainDensity = 0.0;
-    modKeyDnaAmount = 0.0;
+    modKeyDnaAmount = modSynthAmount = 0.0;
     appliedSustain = -1.0;
 }
 
@@ -820,6 +820,7 @@ void InstrumentVoice::updateModulation (bool advance) noexcept
     modGrainPosition = modState.offset (rt, layerDest (mod::Dest::grainPositionA));
     modGrainSpread = modState.offset (rt, layerDest (mod::Dest::grainSpreadA));
     modKeyDnaAmount = modState.offset (rt, layerDest (mod::Dest::keyDnaAmountA));
+    modSynthAmount = modState.offset (rt, layerDest (mod::Dest::synthAmountA));
     modGrainSize = modState.offset (rt, layerDest (mod::Dest::grainSizeA));
     modGrainDensity = modState.offset (rt, layerDest (mod::Dest::grainDensityA));
     modSustain = modState.offset (rt, mod::Dest::ampSustain);
@@ -1541,7 +1542,8 @@ void InstrumentVoice::renderMode (float* left, float* right, int numSamples, dou
 
 void InstrumentVoice::synthControl (int samplesToNext) noexcept
 {
-    const double target = std::clamp (*synthAmountLive, 0.0, 1.0);
+    // The layer's amount and its routes (an LFO, an envelope, velocity ...), per voice.
+    const double target = std::clamp (*synthAmountLive + modSynthAmount, 0.0, 1.0);
     if (! synthOn)
     {
         if (! (target > 0.0))
@@ -1626,7 +1628,10 @@ bool InstrumentVoice::synthHoldsVoice() noexcept
 {
     // A note whose recording ran out keeps sounding through its oscillator while the key is
     // held (a pluck turning into a held tone), then releases with it.
-    return synthOn && (synthAmountNow > 0.0 || (synthAmountLive != nullptr && *synthAmountLive > 0.0));
+    // Follow ends with the recording ("when the sound stops"); Held keeps it to the ADSR.
+    if (! synthOn || synthVoice.isFollowing())
+        return false;
+    return synthAmountNow > 0.0 || (synthAmountLive != nullptr && *synthAmountLive + modSynthAmount > 0.0);
 }
 
 //==============================================================================

@@ -2154,6 +2154,7 @@ SynthChip::SynthChip (InstrumentHost& processor, int layer)
                 "Click for its page (wave, octave, detune, tone, shape, pitch). Drag to set (Alt: fine), double-click for 0.");
     attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (processor.apvts(), id, *this);
     setDoubleClickReturnValue (true, 0.0);
+    getProperties().set ("modField", true);   // a modulation target drawn as a field (an underline), not a ring
     onValueChange = [this] { repaint(); };
 }
 
