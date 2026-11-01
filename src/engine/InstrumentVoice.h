@@ -64,6 +64,9 @@ struct InstrumentVoiceStart
     const double* synthesize = nullptr;
     synth::Blend synthBlend = synth::Blend::hybrid;
     synth::Envelope synthEnvelope = synth::Envelope::gate;
+    /** The layer's SYNTH page (Phase S2: wave, octave, detune, tone live; shape when the
+        oscillator starts; pitch live). Null: S1's defaults. */
+    const synth::Settings* synthSettings = nullptr;
     /** SPEED: how fast the note moves through its recording, pitch kept (1: as recorded,
         the plain read; 0.3..2). Not in Granular or REIMAGINED modes. */
     double speed = 1.0;
@@ -336,6 +339,11 @@ private:
     void mixSynth (float& l, float& r) noexcept;
     /** The recording ended: keep the voice for the oscillator (true) or end it (false). */
     bool synthHoldsVoice() noexcept;
+    const synth::Settings* synthSettingsLive = nullptr;
+    double synthTrackRatio = 1.0;   ///< PITCH Recording: the recording's pitch here re its root (smoothed)
+    /** PITCH Recording: the recording's pitch at the read position over the pitch it is played
+        as (its root), from the analysis' pitch track; 0 when unvoiced or out of reach. */
+    double recordedPitchRatio() const noexcept;
     // SPEED (atlas notes, not Granular or REIMAGINED): a pitch-preserving stretch. The timeline
     // (`position`) moves at speed x the pitch step; two overlapping sin^2 grains (a partition
     // of unity) read the recording at the pitch step, each new one a whole number of the

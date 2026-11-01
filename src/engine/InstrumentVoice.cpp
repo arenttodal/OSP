@@ -77,6 +77,8 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     synthAmountLive = params.synthesize;
     synthBlend = params.synthBlend;
     synthEnvelope = params.synthEnvelope;
+    synthSettingsLive = params.synthSettings;
+    synthTrackRatio = 1.0;
     synthSeed = params.shape.seed;
     synthVelocity = params.velocity;
     synthOn = false;
@@ -1545,7 +1547,9 @@ void InstrumentVoice::synthControl (int samplesToNext) noexcept
         if (! (target > 0.0))
             return;   // never on: nothing of the oscillator runs
         synthOn = true;
-        synthVoice.start (synthSeed, std::clamp (synthVelocity, 1, 127) / 127.0, synthEnvelope);
+        // SHAPE: the layer's, unless the development audition chose Follow for every source.
+        const auto shape = synthEnvelope == synth::Envelope::follow || synthSettingsLive == nullptr ? synthEnvelope : synthSettingsLive->shape;
+        synthVoice.start (synthSeed, std::clamp (synthVelocity, 1, 127) / 127.0, shape);
         if (released)
             synthVoice.release();
         synthAmountNow = 0.0;
@@ -1569,7 +1573,44 @@ void InstrumentVoice::synthControl (int samplesToNext) noexcept
     if (granularMode && granularLive != nullptr && granularLive->tuneSemitones != 0.0)
         ratio *= std::exp2 (granularLive->tuneSemitones / 12.0);
     synthPitchHz = 440.0 * std::exp2 ((static_cast<double> (currentNote) - 69.0) / 12.0) * ratio;
-    synthVoice.setPitch (synthPitchHz);
+    if (synthSettingsLive == nullptr)
+    {
+        synthVoice.setPitch (synthPitchHz);
+        return;
+    }
+    if (synthSettingsLive->pitch == synth::PitchSource::recording && ! granularMode)
+    {
+        // PITCH Recording: the pitch the recording is heard at here (its tuning, its vibrato),
+        // the root correction put back. Unvoiced moments hold the last; ~5 ms smoothing (the
+        // track's frames are already averaged over their window).
+        if (const double r = recordedPitchRatio(); r > 0.0)
+        {
+            const double c = 1.0 - std::exp (-static_cast<double> (samplesToNext) / (0.005 * sampleRate));
+            synthTrackRatio += (r - synthTrackRatio) * c;
+        }
+        synthPitchHz *= synthTrackRatio * synthRootCorrection;
+    }
+    synthVoice.setPitch (synthPitchHz, *synthSettingsLive);
+}
+
+double InstrumentVoice::recordedPitchRatio() const noexcept
+{
+    const auto& track = currentModel->analysis.pitch.trackHz;
+    const auto& src = *layer->source;
+    if (track.values.empty() || ! (track.hopSeconds > 0.0) || ! (src.sampleRate() > 0.0))
+        return 0.0;
+    const double index = position / src.sampleRate() / track.hopSeconds;
+    if (index < 0.0 || index > static_cast<double> (track.values.size() - 1))
+        return 0.0;
+    const auto i = static_cast<std::size_t> (index);
+    const auto j = std::min (i + 1, track.values.size() - 1);
+    const double a = track.values[i], b = track.values[j];
+    if (! (a > 0.0) || ! (b > 0.0))
+        return a > 0.0 ? a / (440.0 * std::exp2 ((src.rootMidi() - 69.0) / 12.0)) : 0.0;   // at a voicing edge: the voiced side
+    const double hz = a + (b - a) * (index - static_cast<double> (i));
+    const double ratio = hz / (440.0 * std::exp2 ((src.rootMidi() - 69.0) / 12.0));
+    // Within a semitone of the root: an octave error or the next note is not followed.
+    return ratio > 0.94387 && ratio < 1.05946 ? ratio : 0.0;
 }
 
 void InstrumentVoice::mixSynth (float& l, float& r) noexcept

@@ -643,8 +643,14 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       Tests: `[synth]` (engine) and `[plugin][synthesize]` (pedal, stealing, all notes off,
       panic, a One Shot held past its end, mute/solo, A/B/C, Atlas keys left silent,
       automation without allocation, persistence).
-- [ ] S1.6 musical evaluation by the user. Results (loudness matrix, blend laws, tuning,
-      tests, listening guide, known limits) in `s1-results.md`; renders local only.
+- [x] S1.6 musical evaluation by the user: "sounds great". Results (loudness matrix, blend
+      laws, tuning, tests, listening guide, known limits) in `s1-results.md`; renders local only.
+- [x] S2 the SYNTH page (`s2-synth-page.md`): a click on SYNTH opens a page over the
+      waveform (the oscillator's wave drawn as it sounds) with WAVE (saw, square, triangle,
+      sine), OCTAVE (-2..+1), DETUNE (0-50 cents, two oscillators), TONE, SHAPE (Held /
+      Follow) and PITCH (Keys / Recording: the recording's own tuning and vibrato from its
+      pitch track). Per source, host parameters `layerX.synth.*` (version hint 23, appended;
+      the defaults are S1 sample for sample). Tests `[synthpage]`.
 
 ## Milestone: ANDOR Instrument Shell extensions for ANDOR ANALOG (a synthesizer)
 

@@ -1497,6 +1497,7 @@ EngineCard::EngineCard (InstrumentHost& p, int layer)
         // SYNTHESIZE (Phase S1): the source's own analog oscillator blended into its voices.
         // A layer's own amount (LINK leaves it alone, like a product's control).
         synthChip = std::make_unique<SynthChip> (processor, layer);
+        synthChip->onOpenPage = [this] { setSynthOpen (true); };
         addAndMakeVisible (*synthChip);
     }
     const std::array<std::pair<const char*, icons::Kind>, 4> mods { { { "link", icons::Kind::link }, { "reverse", icons::Kind::reverse },
@@ -1725,6 +1726,7 @@ void EngineCard::setWellEditorShown (bool shown)
         // The well is one view at a time: the EQ or NOTE MAP give it up, the grains go.
         setEqOpen (false);
         setNotesOpen (false);
+        setSynthOpen (false);
         showGranularControls (false, true);
         wellEditor->setBounds (sourceDisplay.getBounds());
         wellEditor->toFront (false);
@@ -2061,7 +2063,7 @@ void EngineCard::showGranularControls (bool show, bool immediately)
     bool dragging = false;
     for (auto& k : granularKnobs)
         dragging = dragging || k->slider.isMouseButtonDown();
-    const bool visible = granular && (show || dragging) && ! isEqOpen() && ! isNotesOpen() && ! isWellEditorShown();   // the EQ's (or NOTE MAP's, or the product's) editor covers the display
+    const bool visible = granular && (show || dragging) && ! isEqOpen() && ! isNotesOpen() && ! isWellEditorShown() && ! isSynthOpen();   // the EQ's (or NOTE MAP's, or the product's) editor covers the display
     if (visible == granularShown)
         return;
     granularShown = visible;
@@ -2118,6 +2120,7 @@ void EngineCard::setEqOpen (bool open)
         return;
     }
     setNotesOpen (false);
+    setSynthOpen (false);
     setWellEditorShown (false);
     showGranularControls (false);
     eqEditor = std::make_unique<EqEditor> (processor, layerIndex);
@@ -2148,7 +2151,7 @@ SynthChip::SynthChip (InstrumentHost& processor, int layer)
     setMouseCursor (juce::MouseCursor::UpDownLeftRightResizeCursor);
     setTitle ("Layer " + InstrumentHost::layerName (layer) + " Synthesize");
     setTooltip ("SYNTHESIZE: blend a warm analog oscillator, playing this source's own notes, into its sound.\n"
-                "Drag to set (Alt: fine), double-click for 0. Right-click: development audition.");
+                "Click for its page (wave, octave, detune, tone, shape, pitch). Drag to set (Alt: fine), double-click for 0.");
     attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (processor.apvts(), id, *this);
     setDoubleClickReturnValue (true, 0.0);
     onValueChange = [this] { repaint(); };
@@ -2180,6 +2183,19 @@ void SynthChip::mouseDown (const juce::MouseEvent& e)
         return;
     }
     juce::Slider::mouseDown (e);
+}
+
+void SynthChip::mouseUp (const juce::MouseEvent& e)
+{
+    juce::Slider::mouseUp (e);
+    if (! e.mods.isPopupMenu() && ! e.mouseWasDraggedSinceMouseDown() && e.getNumberOfClicks() == 1)
+        startTimer (juce::MouseEvent::getDoubleClickTimeout() + 20);
+}
+
+void SynthChip::mouseDoubleClick (const juce::MouseEvent& e)
+{
+    stopTimer();   // a double-click returns the amount to 0, it does not open the page
+    juce::Slider::mouseDoubleClick (e);
 }
 
 void SynthChip::paint (juce::Graphics& g)
@@ -2249,6 +2265,33 @@ void KeyDnaKey::paint (juce::Graphics& g)
     g.drawText ("KEY DNA", r.withTrimmedLeft (lit ? 10.0f : 0.0f), juce::Justification::centred, false);
 }
 
+void EngineCard::setSynthOpen (bool open)
+{
+    if (open == isSynthOpen())
+        return;
+    if (! open)
+    {
+        synthEditor.reset();
+        refresh();
+        return;
+    }
+    setEqOpen (false);
+    setNotesOpen (false);
+    setWellEditorShown (false);
+    showGranularControls (false);
+    synthEditor = std::make_unique<SynthEditor> (processor, layerIndex);
+    juce::Component::SafePointer<EngineCard> safe (this);
+    synthEditor->onClose = [safe] {
+        juce::MessageManager::callAsync ([safe] {
+            if (safe != nullptr)
+                safe->setSynthOpen (false);
+        });
+    };
+    addAndMakeVisible (*synthEditor);
+    synthEditor->setBounds (sourceDisplay.getBounds());
+    refresh();
+}
+
 void EngineCard::setNotesOpen (bool open)
 {
     if (open == isNotesOpen())
@@ -2260,6 +2303,7 @@ void EngineCard::setNotesOpen (bool open)
         return;
     }
     setEqOpen (false);
+    setSynthOpen (false);
     setWellEditorShown (false);
     showGranularControls (false);
     noteMap = std::make_unique<NoteMapEditor> (processor, layerIndex);
@@ -2297,7 +2341,7 @@ void EngineCard::refresh()
     eqButton.setActive (processor.layerEqSettings (layerIndex).audible());
     if (synthChip != nullptr)
     {
-        synthChip->setVisible (! isEqOpen() && ! isNotesOpen() && ! isWellEditorShown());   // (those cover the well)
+        synthChip->setVisible (! isEqOpen() && ! isNotesOpen() && ! isWellEditorShown() && ! isSynthOpen());   // (those cover the well)
         synthChip->refreshAudition();
     }
     if (eqEditor != nullptr)
@@ -2561,6 +2605,8 @@ void EngineCard::resized()
         noteMap->setBounds (sourceDisplay.getBounds());
     if (wellEditor != nullptr)
         wellEditor->setBounds (sourceDisplay.getBounds());
+    if (synthEditor != nullptr)
+        synthEditor->setBounds (sourceDisplay.getBounds());
     placeMapPrompt();
     if (synthChip != nullptr)
     {

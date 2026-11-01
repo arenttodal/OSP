@@ -380,3 +380,21 @@ mod.route16.destExt v21 choice "Mod 16 Destination+" label="" range=0.0000..5.00
 layerA.synthesize v22 float "Layer A Synthesize" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0 %|50 %|100 %
 layerB.synthesize v22 float "Layer B Synthesize" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0 %|50 %|100 %
 layerC.synthesize v22 float "Layer C Synthesize" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0 %|50 %|100 %
+layerA.synth.wave v23 choice "Layer A Synth Wave" label="" range=0.0000..3.0000/1.0000 skew=1.00000 default=0.0000 steps=4 texts=Saw|Triangle|Sine [Saw|Square|Triangle|Sine]
+layerA.synth.octave v23 int "Layer A Synth Octave" label="" range=-2.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=4 texts=-2|0|1
+layerA.synth.detune v23 float "Layer A Synth Detune" label="cents" range=0.0000..50.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0.0 c|25.0 c|50.0 c
+layerA.synth.tone v23 float "Layer A Synth Tone" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=50.0000 steps=2147483647 texts=0 %|50 %|100 %
+layerA.synth.shape v23 choice "Layer A Synth Shape" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=Held|Held|Follow [Held|Follow]
+layerA.synth.pitch v23 choice "Layer A Synth Pitch" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=Keys|Keys|Recording [Keys|Recording]
+layerB.synth.wave v23 choice "Layer B Synth Wave" label="" range=0.0000..3.0000/1.0000 skew=1.00000 default=0.0000 steps=4 texts=Saw|Triangle|Sine [Saw|Square|Triangle|Sine]
+layerB.synth.octave v23 int "Layer B Synth Octave" label="" range=-2.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=4 texts=-2|0|1
+layerB.synth.detune v23 float "Layer B Synth Detune" label="cents" range=0.0000..50.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0.0 c|25.0 c|50.0 c
+layerB.synth.tone v23 float "Layer B Synth Tone" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=50.0000 steps=2147483647 texts=0 %|50 %|100 %
+layerB.synth.shape v23 choice "Layer B Synth Shape" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=Held|Held|Follow [Held|Follow]
+layerB.synth.pitch v23 choice "Layer B Synth Pitch" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=Keys|Keys|Recording [Keys|Recording]
+layerC.synth.wave v23 choice "Layer C Synth Wave" label="" range=0.0000..3.0000/1.0000 skew=1.00000 default=0.0000 steps=4 texts=Saw|Triangle|Sine [Saw|Square|Triangle|Sine]
+layerC.synth.octave v23 int "Layer C Synth Octave" label="" range=-2.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=4 texts=-2|0|1
+layerC.synth.detune v23 float "Layer C Synth Detune" label="cents" range=0.0000..50.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0.0 c|25.0 c|50.0 c
+layerC.synth.tone v23 float "Layer C Synth Tone" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=50.0000 steps=2147483647 texts=0 %|50 %|100 %
+layerC.synth.shape v23 choice "Layer C Synth Shape" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=Held|Held|Follow [Held|Follow]
+layerC.synth.pitch v23 choice "Layer C Synth Pitch" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=Keys|Keys|Recording [Keys|Recording]

@@ -5,6 +5,7 @@
 #include "engine/PerformanceEngine.h"
 #include "engine/RhythmicShaper.h"
 #include "engine/Shaping.h"
+#include "engine/SynthVoice.h"
 
 namespace osp::plugin
 {
@@ -50,6 +51,25 @@ void InstrumentHost::setRouteDest (int slot, mod::Dest dest)
     const int extended = choice < 0 ? mod::extendedChoiceOf (dest) : 0;
     setParameterValue (modRouteId (slot, "dest"), static_cast<float> (std::max (0, choice)));
     setParameterValue (modRouteId (slot, "destExt"), static_cast<float> (extended));
+}
+
+const juce::StringArray& InstrumentHost::synthParameterNames()
+{
+    static const juce::StringArray names { "wave", "octave", "detune", "tone", "shape", "pitch" };
+    return names;
+}
+
+synth::Settings InstrumentHost::synthSettingsFrom (const std::array<float, 6>& raw) noexcept
+{
+    auto pick = [&raw] (std::size_t i, int lo, int hi) { return std::clamp (static_cast<int> (std::lround (raw[i])), lo, hi); };
+    synth::Settings s;
+    s.wave = static_cast<synth::Wave> (pick (0, 0, 3));
+    s.octave = pick (1, synth::Settings::minOctave, synth::Settings::maxOctave);
+    s.detuneCents = std::clamp (static_cast<double> (raw[2]), 0.0, synth::Settings::maxDetuneCents);
+    s.tone = std::clamp (static_cast<double> (raw[3]) / 100.0, 0.0, 1.0);   // (50 % is exactly 0.5: S1)
+    s.shape = pick (4, 0, 1) == 1 ? synth::Envelope::follow : synth::Envelope::gate;
+    s.pitch = pick (5, 0, 1) == 1 ? synth::PitchSource::recording : synth::PitchSource::keys;
+    return s;
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout InstrumentHost::createParameterLayout()
@@ -509,6 +529,32 @@ juce::AudioProcessorValueTreeState::ParameterLayout InstrumentHost::createParame
         for (int layer = 0; layer < numLayers; ++layer)
             layout.add (std::make_unique<juce::AudioParameterFloat> (id22 (layerParameterId (layer, "synthesize")), "Layer " + layerName (layer) + " Synthesize",
                                                                      unit, 0.0f, reimaginedText));
+    }
+    {
+        // The SYNTH page (Phase S2, version hint 23), appended so nothing before moves: each
+        // source's oscillator. The defaults are S1's oscillator exactly, so every session from
+        // before plays as it did.
+        auto id23 = [] (const juce::String& id) { return juce::ParameterID { id, 23 }; };
+        const juce::NormalisableRange<float> detune (0.0f, static_cast<float> (synth::Settings::maxDetuneCents), 0.1f);
+        auto cents = juce::AudioParameterFloatAttributes().withLabel ("cents").withStringFromValueFunction (
+            [] (float v, int) { return juce::String (v, 1) + " c"; });
+        auto tone = juce::AudioParameterFloatAttributes().withLabel ("%").withStringFromValueFunction (
+            [] (float v, int) { return juce::String (juce::roundToInt (v)) + " %"; });
+        for (int layer = 0; layer < numLayers; ++layer)
+        {
+            const auto name = "Layer " + layerName (layer) + " Synth ";
+            layout.add (std::make_unique<juce::AudioParameterChoice> (id23 (synthParameterId (layer, "wave")), name + "Wave",
+                                                                      juce::StringArray { "Saw", "Square", "Triangle", "Sine" }, 0));
+            layout.add (std::make_unique<juce::AudioParameterInt> (id23 (synthParameterId (layer, "octave")), name + "Octave",
+                                                                   synth::Settings::minOctave, synth::Settings::maxOctave, 0));
+            layout.add (std::make_unique<juce::AudioParameterFloat> (id23 (synthParameterId (layer, "detune")), name + "Detune", detune, 0.0f, cents));
+            layout.add (std::make_unique<juce::AudioParameterFloat> (id23 (synthParameterId (layer, "tone")), name + "Tone",
+                                                                     juce::NormalisableRange<float> (0.0f, 100.0f, 0.1f), 50.0f, tone));
+            layout.add (std::make_unique<juce::AudioParameterChoice> (id23 (synthParameterId (layer, "shape")), name + "Shape",
+                                                                      juce::StringArray { "Held", "Follow" }, 0));
+            layout.add (std::make_unique<juce::AudioParameterChoice> (id23 (synthParameterId (layer, "pitch")), name + "Pitch",
+                                                                      juce::StringArray { "Keys", "Recording" }, 0));
+        }
     }
     return layout;
 }

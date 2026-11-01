@@ -277,13 +277,19 @@ private:
     turn the wheel to set it, Alt for fine; double-click returns it to 0. It takes no room from
     the card: the well's ruler leaves its corner free (SourceDisplay::setRulerReserve).
 */
-class SynthChip final : public juce::Slider
+class SynthChip final : public juce::Slider, private juce::Timer
 {
 public:
     SynthChip (InstrumentHost& processor, int layer);
+    ~SynthChip() override { stopTimer(); }
     void paint (juce::Graphics&) override;
     /** Right-click (or Ctrl-click): the development audition menu (blend law, envelope). */
     void mouseDown (const juce::MouseEvent&) override;
+    /** A click without a drag opens the SYNTH page (after the double-click time, so a
+        double-click still returns the amount to 0). */
+    void mouseUp (const juce::MouseEvent&) override;
+    void mouseDoubleClick (const juce::MouseEvent&) override;
+    std::function<void()> onOpenPage;
     /** The audition menu's items, as shown (tests). */
     juce::PopupMenu auditionMenu();
     /** Repaints when the audition changed (from another source's menu): the UI timer. */
@@ -302,6 +308,12 @@ public:
     float amount() const noexcept { return static_cast<float> (getValue()); }
 
 private:
+    void timerCallback() override
+    {
+        stopTimer();
+        if (onOpenPage != nullptr)
+            onOpenPage();
+    }
     InstrumentHost& host;
     int shownAudition = 0;
     juce::Colour accent;
@@ -412,6 +424,12 @@ public:
     EqEditor* eqEditorComponent() noexcept { return eqEditor.get(); }
     EqButton& eqToggle() noexcept { return eqButton; }
 
+    /** The layer's SYNTH page (from the SYNTH chip), in the display's place; one page at a
+        time in the well (EQ, NOTE MAP, SYNTH). */
+    void setSynthOpen (bool open);
+    bool isSynthOpen() const noexcept { return synthEditor != nullptr; }
+    SynthEditor* synthEditorComponent() noexcept { return synthEditor.get(); }
+
     /** The layer's NOTE MAP (a Note Atlas layer only), in the display's place; the EQ and the
         NOTE MAP are never open together. */
     std::function<void (int, bool)> onNotesToggle;
@@ -462,6 +480,7 @@ private:
         void paintButton (juce::Graphics&, bool highlighted, bool down) override;
     } menuButton;
     std::array<std::unique_ptr<LayerKnob>, 5> knobs;   ///< START TUNE PAN LEVEL REIMAGINED
+    std::unique_ptr<SynthEditor> synthEditor;          ///< the SYNTH page, while open
     std::unique_ptr<SynthChip> synthChip;              ///< SYNTHESIZE in the well's corner (a host with hasSynthesize(); null otherwise)
     std::array<std::unique_ptr<ModifierButton>, 4> modifiers;
     LayerStateButton muteButton, soloButton;

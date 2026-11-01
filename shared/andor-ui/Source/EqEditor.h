@@ -125,6 +125,56 @@ private:
 };
 
 /**
+    A layer's SYNTH page (SYNTHESIZE, Phase S2), opened from the SYNTH chip over the waveform
+    on the display's graphite: the oscillator's own wave drawn large (as it sounds after its
+    tone filter, so WAVE, TONE, OCTAVE and DETUNE are seen), and below it the few choices:
+    WAVE (saw, square, triangle, sine), OCTAVE (-2 .. +1), DETUNE (cents), TONE, SHAPE (Held |
+    Follow) and PITCH (Keys | Recording). The top row: the page's name, AMOUNT (the chip's
+    value) and close. Every control is a host parameter (automation, undo, sessions).
+*/
+class SynthEditor final : public juce::Component, public juce::SettableTooltipClient, private juce::Timer
+{
+public:
+    SynthEditor (InstrumentHost& processor, int layer);
+    ~SynthEditor() override;
+
+    std::function<void()> onClose;
+    /** Re-reads the parameters and redraws the wave when they changed. */
+    void refresh();
+
+    /** Where each choice sits (tests and the screenshots): "wave", "octave", "shape", "pitch". */
+    juce::Rectangle<float> choiceArea (const juce::String& name) const;
+    /** Picks part `index` of a choice, as a click there does (one undo step). */
+    void choose (const juce::String& name, int index);
+    juce::Rectangle<float> waveArea() const;
+    bool isTwoRows() const noexcept { return twoRows; }
+    /** The drawn wave (normalised samples), as painted. */
+    const std::vector<float>& shownWave() const noexcept { return wave; }
+
+    void paint (juce::Graphics&) override;
+    void resized() override;
+    void mouseDown (const juce::MouseEvent&) override;
+    void mouseMove (const juce::MouseEvent&) override;
+    void mouseExit (const juce::MouseEvent&) override;
+
+private:
+    void timerCallback() override { refresh(); }
+    std::array<float, 7> signature() const;
+    void computeWave();
+    int choiceCount (const juce::String& name) const;
+
+    InstrumentHost& ospProcessor;
+    int layer;
+    std::unique_ptr<EqValueField> amountField, detuneField, toneField;
+    juce::Rectangle<float> title, closeArea, amountCaption;
+    juce::Rectangle<float> waveChoice, octaveChoice, shapeChoice, pitchChoice, detuneArea, toneArea;
+    std::array<float, 7> shown {};
+    std::vector<float> wave;
+    juce::String hot;
+    bool twoRows = false;
+};
+
+/**
     A layer's EQ, opened over its waveform on the display's opaque graphite (graph first):
     a logarithmic frequency grid (20 Hz - 20 kHz) and +-18 dB, the EQ's exact response (the
     same section designs the audio runs), and the five bands. A band that is off is a small,

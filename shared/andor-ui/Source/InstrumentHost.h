@@ -81,6 +81,13 @@ public:
     static std::optional<ModCurves> decodeModulationCurves (const juce::String& text);
     static constexpr int dampenCurveIndex (int layer) noexcept { return 6 + std::clamp (layer, 0, numLayers - 1); }
     static juce::String dampenParameterId (int layer, const juce::String& name) { return layerParameterId (layer, "dampen." + name); }
+    /** The SYNTH page's parameters (version hint 23): "layerA.synth.wave", .octave, .detune,
+        .tone, .shape, .pitch. */
+    static juce::String synthParameterId (int layer, const juce::String& name) { return layerParameterId (layer, "synth." + name); }
+    static const juce::StringArray& synthParameterNames();   ///< wave, octave, detune, tone, shape, pitch
+    /** The page's values as the engine takes them, from the six parameters' raw values in
+        synthParameterNames() order (real-time safe). */
+    static synth::Settings synthSettingsFrom (const std::array<float, 6>& raw) noexcept;
     /** DAMPEN's parameters in their order: enabled, mode, amount, frequency, cutoff. */
     static const juce::StringArray& dampenParameterNames();
     static const juce::StringArray& eqParameterNames();   ///< enabled, hp.enabled, hp.frequency, ... in order

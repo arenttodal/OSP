@@ -109,5 +109,6 @@ namespace osp::plugin::ids
     // layerA.granular.scatter / .pan / .window and layerA.keyDna.amount.
     inline const juce::String grainBudget = "grainBudget";
     // MIX modulation (version hint 21): mod.routeN.destExt. SYNTHESIZE (version hint 22): per
-    // layer layerA.synthesize, 0..100 % (0: off, bit-identical).
+    // layer layerA.synthesize, 0..100 % (0: off, bit-identical). The SYNTH page (version hint
+    // 23): per layer layerA.synth.wave / .octave / .detune / .tone / .shape / .pitch.
 }

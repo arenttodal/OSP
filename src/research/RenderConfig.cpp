@@ -356,6 +356,21 @@ std::optional<RenderConfig> loadRenderConfig (const std::filesystem::path& path,
             ls.reimagined = std::clamp (json::getDouble (l, "reimagined", ls.reimagined), -1.0, 1.0);
             // SYNTHESIZE (Phase S1): 0..1, the layer's voices turning into their own oscillator.
             ls.synthesize = std::clamp (json::getDouble (l, "synthesize", ls.synthesize), 0.0, 1.0);
+            // The SYNTH page (Phase S2): "synth": { "wave": "saw" | "square" | "triangle" | "sine",
+            // "octave": -2..1, "detuneCents": 0..50, "tone": 0..1, "shape": "held" | "follow",
+            // "pitch": "keys" | "recording" }; absent fields keep S1's defaults.
+            if (json::has (l, "synth"))
+            {
+                const auto& sj = l["synth"];
+                auto& sy = ls.synth;
+                const auto wave = json::getString (sj, "wave", "saw");
+                sy.wave = wave == "square" ? synth::Wave::square : (wave == "triangle" ? synth::Wave::triangle : (wave == "sine" ? synth::Wave::sine : synth::Wave::saw));
+                sy.octave = std::clamp (static_cast<int> (std::lround (json::getDouble (sj, "octave", 0.0))), synth::Settings::minOctave, synth::Settings::maxOctave);
+                sy.detuneCents = std::clamp (json::getDouble (sj, "detuneCents", 0.0), 0.0, synth::Settings::maxDetuneCents);
+                sy.tone = std::clamp (json::getDouble (sj, "tone", 0.5), 0.0, 1.0);
+                sy.shape = json::getString (sj, "shape", "held") == "follow" ? synth::Envelope::follow : synth::Envelope::gate;
+                sy.pitch = json::getString (sj, "pitch", "keys") == "recording" ? synth::PitchSource::recording : synth::PitchSource::keys;
+            }
             // KEY DNA (Granular): "keyDna": { "enabled": true, "amount": 1, "individuality": 0.3,
             // "seed": 7, "size": { "depth": 0.5, "variation": 0.2, "curve": [[0, 0.2], [1, 0.8]] }, ... }
             // per parameter (position, size, density, spread, tune, scatter, pan); a curve's points are

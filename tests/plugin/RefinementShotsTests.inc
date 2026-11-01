@@ -245,4 +245,26 @@ TEST_CASE ("plugin: UI refinement screenshots (OSP_REFINE_DIR)", "[.][refine-sho
             p.setParameterValue (osp::plugin::InstrumentHost::layerParameterId (l, "sourceMode"), 1.0f);
         synth (p, { 20.0f, 55.0f, 100.0f });
     }, "06-synth-granular-3L");
+
+    // 07 The SYNTH page (Phase S2), opened from the chip: the default saw, then a detuned
+    // square an octave down, dark; three cards (two rows of controls); off (0 %).
+    auto page = [] (OspAudioProcessor& p, Editor& ui, std::initializer_list<std::pair<const char*, float>> values) {
+        for (const auto& [name, v] : values)
+            p.setParameterValue (osp::plugin::InstrumentHost::synthParameterId (0, name), v);
+        ui.refreshNow();
+        ui.engineCard (0).setSynthOpen (true);
+        if (auto* s = ui.engineCard (0).synthEditorComponent())
+            s->refresh();
+    };
+    shoot ({ pad }, [&] (OspAudioProcessor& p, Editor& ui) { synth (p, { 45.0f }); page (p, ui, {}); }, "07-synth-page-1L");
+    shoot ({ pad, pluck }, [&] (OspAudioProcessor& p, Editor& ui) {
+        synth (p, { 60.0f, 0.0f });
+        page (p, ui, { { "wave", 1.0f }, { "octave", -1.0f }, { "detune", 14.0f }, { "tone", 30.0f }, { "shape", 1.0f }, { "pitch", 1.0f } });
+    }, "07-synth-page-2L");
+    shoot ({ pad, pluck, rec.file }, [&] (OspAudioProcessor& p, Editor& ui) {
+        ui.setSize (1086, 814);
+        synth (p, { 35.0f, 0.0f, 0.0f });
+        page (p, ui, { { "wave", 3.0f } });
+    }, "07-synth-page-3L");
+    shoot ({ pad }, [&] (OspAudioProcessor& p, Editor& ui) { page (p, ui, { { "wave", 2.0f } }); }, "07-synth-page-off-1L");
 }

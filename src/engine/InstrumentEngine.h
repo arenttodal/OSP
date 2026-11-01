@@ -76,6 +76,8 @@ struct LayerSettings
     /** SYNTHESIZE (Phase S1): 0..1, how far each of the layer's voices turns from its sample
         into its own analog-style oscillator (live, smoothed per voice). 0 = exactly as before. */
     double synthesize = 0.0;
+    /** The SYNTH page (Phase S2): wave, octave, detune, tone, shape, pitch. Defaults: S1. */
+    synth::Settings synth;
 };
 
 /**
@@ -255,6 +257,13 @@ public:
         const auto l = layerIndex (layer);
         config.layer[l].synthesize = std::clamp (amount, 0.0, 1.0);
         slots[l].synthesizeLive = config.layer[l].synthesize;
+    }
+    /** A layer's SYNTH page alone (real-time safe: a copy the layer's voices read live). */
+    void setLayerSynth (int layer, const synth::Settings& settings) noexcept
+    {
+        const auto l = layerIndex (layer);
+        config.layer[l].synth = settings;
+        slots[l].synthLive = settings;
     }
     /** SYNTHESIZE's blend law and envelope (development audition; notes started afterwards). */
     void setSynthCharacter (synth::Blend blend, synth::Envelope envelope) noexcept
@@ -542,6 +551,7 @@ private:
         ReimaginedLive reimaginedLive;          ///< what this layer's mode-engine voices read (refreshed every block)
         eq::Processor eq;                       ///< the layer's EQ (LayerSettings::eq, plus modulation)
         double synthesizeLive = 0.0;            ///< SYNTHESIZE, read by the layer's voices at control rate
+        synth::Settings synthLive;              ///< the SYNTH page, read by the layer's voices at control rate
     };
     /** The layer's EQ as heard: its settings with the global LFOs' routes added. */
     eq::Settings effectiveEq (std::size_t layer) const noexcept;

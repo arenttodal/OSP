@@ -353,6 +353,246 @@ TEST_CASE ("synthesize: loudness across the amounts stays within a few dB of the
     }
 }
 
+//==============================================================================
+// The SYNTH page (Phase S2): WAVE, OCTAVE, DETUNE, TONE, SHAPE, PITCH.
+
+namespace
+{
+    std::vector<float> oscillatorWith (double hz, double seconds, const synth::Settings& settings, double velocity = 0.8)
+    {
+        synth::Voice v;
+        v.prepare (rate);
+        v.start (7, velocity, settings.shape);
+        v.setPitch (hz, settings);
+        std::vector<float> out (static_cast<std::size_t> (seconds * rate));
+        for (auto& x : out)
+            x = v.next (0.0f);
+        return out;
+    }
+
+    double db (double a, double b) { return 20.0 * std::log10 (a / b); }
+
+    /** Frequencies over consecutive windows (zero crossings), for following a moving pitch. */
+    std::vector<double> windowedHz (const std::vector<float>& x, double fromSeconds, double toSeconds, double windowSeconds)
+    {
+        std::vector<double> out;
+        for (double t = fromSeconds; t + windowSeconds <= toSeconds; t += windowSeconds)
+        {
+            const std::vector<float> part (x.begin() + static_cast<std::ptrdiff_t> (t * rate), x.begin() + static_cast<std::ptrdiff_t> ((t + windowSeconds) * rate));
+            out.push_back (measuredHz (part, 0));
+        }
+        return out;
+    }
+}
+
+TEST_CASE ("synth page: the defaults are S1's oscillator exactly", "[unit][synth][synthpage]")
+{
+    for (const double hz : { 55.0, 261.6, 1760.0 })
+    {
+        synth::Voice a, b;
+        a.prepare (rate);
+        b.prepare (rate);
+        a.start (11, 0.7, synth::Envelope::gate);
+        b.start (11, 0.7, synth::Envelope::gate);
+        a.setPitch (hz);
+        b.setPitch (hz, synth::Settings {});
+        bool same = true;
+        for (int i = 0; i < 4800; ++i)
+            same = same && a.next (0.0f) == b.next (0.0f);
+        CHECK (same);
+    }
+    // Through the engine: a layer's default page plays exactly as one without it.
+    auto audio = testsignals::vowel (midiToHz (57), 1.5, rate, 5);
+    const auto m = model (audio);
+    auto settings = plainSettings();
+    settings.layer[0].synthesize = 0.6;
+    const auto plain = play (*m, settings, 60, 1.0, 0.7, 256);
+    settings.layer[0].synth = synth::Settings {};
+    CHECK (play (*m, settings, 60, 1.0, 0.7, 256) == plain);
+}
+
+TEST_CASE ("synth page: WAVE - four waves at the pitch, about as loud as the saw, each with its own harmonics", "[unit][synth][synthpage]")
+{
+    const double hz = 220.0;
+    synth::Settings s;
+    const auto saw = oscillatorWith (hz, 0.6, s);
+    const double sawRms = rms (saw, 0.1, 0.6);
+    for (const auto wave : { synth::Wave::square, synth::Wave::triangle, synth::Wave::sine })
+    {
+        s.wave = wave;
+        const auto x = oscillatorWith (hz, 0.6, s);
+        INFO ("wave " << static_cast<int> (wave) << ": " << db (rms (x, 0.1, 0.6), sawRms) << " dB re the saw");
+        CHECK (measuredHz (x, static_cast<std::size_t> (0.1 * rate)) == Approx (hz).epsilon (0.002));
+        CHECK (std::abs (db (rms (x, 0.1, 0.6), sawRms)) < 1.5);
+        const double fundamental = toneLevel (x, hz, 0.1, 0.6);
+        const double second = toneLevel (x, 2.0 * hz, 0.1, 0.6), third = toneLevel (x, 3.0 * hz, 0.1, 0.6);
+        CHECK (db (second, fundamental) < -40.0);   // square, triangle and sine: no even harmonics
+        if (wave == synth::Wave::sine)
+            CHECK (db (third, fundamental) < -40.0);
+        else
+            CHECK (db (third, fundamental) > -30.0);
+    }
+    // The saw keeps its even harmonics.
+    CHECK (db (toneLevel (saw, 2.0 * hz, 0.1, 0.6), toneLevel (saw, hz, 0.1, 0.6)) > -12.0);
+    // Band-limited: a high square leaves little folded back below its fundamental.
+    s.wave = synth::Wave::square;
+    s.tone = 1.0;
+    const auto high = oscillatorWith (2637.0, 0.4, s);   // E7
+    double folded = 0.0;
+    for (const double f : { 400.0, 900.0, 1500.0, 2000.0 })
+        folded = std::max (folded, toneLevel (high, f, 0.1, 0.4));
+    CHECK (db (folded, toneLevel (high, 2637.0, 0.1, 0.4)) < -40.0);
+}
+
+TEST_CASE ("synth page: OCTAVE, DETUNE and TONE", "[unit][synth][synthpage]")
+{
+    synth::Settings s;
+    s.octave = -1;
+    CHECK (measuredHz (oscillatorWith (220.0, 0.5, s), static_cast<std::size_t> (0.1 * rate)) == Approx (110.0).epsilon (0.002));
+    s.octave = 1;
+    CHECK (measuredHz (oscillatorWith (220.0, 0.5, s), static_cast<std::size_t> (0.1 * rate)) == Approx (440.0).epsilon (0.002));
+    s.octave = -2;
+    const double sub = measuredHz (oscillatorWith (30.0, 1.0, s), static_cast<std::size_t> (0.2 * rate));
+    CHECK (sub >= 20.0);   // two octaves under 30 Hz would be 7.5 Hz: raised until audible
+    CHECK (sub == Approx (30.0).epsilon (0.01));
+
+    // DETUNE: two oscillators either side, the same loudness.
+    s = {};
+    s.wave = synth::Wave::sine;
+    const auto one = oscillatorWith (440.0, 1.0, s);
+    s.detuneCents = 20.0;
+    const auto two = oscillatorWith (440.0, 1.0, s);
+    const double lo = 440.0 * std::exp2 (-10.0 / 1200.0), hi = 440.0 * std::exp2 (10.0 / 1200.0);
+    CHECK (toneLevel (two, lo, 0.2, 1.0) > 0.5 * toneLevel (one, 440.0, 0.2, 1.0) * 0.70710678);
+    CHECK (toneLevel (two, hi, 0.2, 1.0) > 0.5 * toneLevel (one, 440.0, 0.2, 1.0) * 0.70710678);
+    CHECK (std::abs (db (rms (two, 0.2, 1.0), rms (one, 0.2, 1.0))) < 1.5);
+
+    // TONE: brighter upper harmonics from dark to bright, the fundamental about the same.
+    s = {};
+    double previous = -1.0;
+    for (const double tone : { 0.0, 0.5, 1.0 })
+    {
+        s.tone = tone;
+        const auto x = oscillatorWith (110.0, 0.6, s);
+        const double upper = toneLevel (x, 110.0 * 8, 0.1, 0.6) / toneLevel (x, 110.0, 0.1, 0.6);
+        INFO ("tone " << tone << ": 8th harmonic " << db (upper, 1.0) << " dB");
+        CHECK (upper > previous);
+        previous = upper;
+    }
+}
+
+TEST_CASE ("synth page: live changes are click-free and nothing allocates", "[unit][synth][synthpage]")
+{
+    auto audio = testsignals::vowel (midiToHz (57), 3.0, rate, 9);
+    const auto m = model (audio);
+    auto settings = plainSettings();
+    settings.layer[0].synthesize = 1.0;
+    InstrumentEngine e;
+    e.prepare (rate, 256, settings);
+    e.setModel (m.get());
+    std::vector<float> l (256), r (256), out;
+    std::vector<float> largestStep;   // per segment
+    out.reserve (static_cast<std::size_t> (100 * 256));
+    largestStep.reserve (8);
+    auto run = [&] (int blocks) {
+        float step = 0.0f;
+        for (int b = 0; b < blocks; ++b)
+        {
+            float* ch[2] = { l.data(), r.data() };
+            e.render (ch, 2, 256);
+            for (int i = 0; i < 256; ++i)
+            {
+                if (! out.empty())
+                    step = std::max (step, std::abs (l[static_cast<std::size_t> (i)] - out.back()));
+                out.push_back (l[static_cast<std::size_t> (i)]);
+            }
+        }
+        largestStep.push_back (step);
+    };
+    int allocations = 0;
+    {
+        test::AllocationScope scope;
+        for (int note : { 48, 55, 60, 64 })
+            e.noteOn (note, 100);
+        run (10);   // (the notes starting)
+        run (20);   // steady
+        synth::Settings s;
+        s.detuneCents = 30.0;   // the second oscillators ease in
+        e.setLayerSynth (0, s);
+        run (20);
+        s.detuneCents = 0.0;    // and out
+        e.setLayerSynth (0, s);
+        run (20);
+        s.pitch = synth::PitchSource::recording;
+        s.wave = synth::Wave::triangle;
+        s.tone = 0.8;
+        s.octave = -1;
+        e.setLayerSynth (0, s);
+        run (20);
+        allocations = scope.count();
+    }
+    CHECK (allocations == 0);
+    INFO ("largest steps: steady " << largestStep[1] << ", detune in " << largestStep[2] << ", out " << largestStep[3]);
+    CHECK (largestStep[2] < 1.6f * largestStep[1]);
+    CHECK (largestStep[3] < 1.6f * largestStep[1]);
+}
+
+TEST_CASE ("synth page: SHAPE per source is the audition's envelope; PITCH Recording follows what the sample sounds like", "[unit][synth][synthpage]")
+{
+    // SHAPE Follow on the layer = the development audition's Follow for every source.
+    {
+        auto audio = testsignals::pluck (220.0, 1.5, rate, 4, 0.7, 1);
+        const auto m = model (audio);
+        auto settings = plainSettings();
+        settings.layer[0].synthesize = 0.7;
+        auto audition = settings;
+        audition.synthEnvelope = synth::Envelope::follow;
+        settings.layer[0].synth.shape = synth::Envelope::follow;
+        CHECK (play (*m, settings, 57, 1.0, 0.8, 256) == play (*m, audition, 57, 1.0, 0.8, 256));
+    }
+    // A sung note with vibrato (5 Hz, +-30 cents): the sample's own pitch moves. With PITCH
+    // Keys the oscillator holds the key; with Recording it moves with the sample.
+    const double centre = midiToHz (60);
+    auto audio = AudioData::allocate (1, static_cast<std::int64_t> (2.5 * rate), rate);
+    double phase = 0.0;
+    for (std::size_t i = 0; i < audio.channels[0].size(); ++i)
+    {
+        const double t = static_cast<double> (i) / rate;
+        const double hz = centre * std::exp2 (30.0 / 1200.0 * std::sin (2.0 * std::numbers::pi * 5.0 * t));
+        phase += 2.0 * std::numbers::pi * hz / rate;
+        audio.channels[0][i] = static_cast<float> (0.4 * std::min (1.0, t / 0.02) * std::sin (phase));
+    }
+    const auto m = model (audio);
+    auto settings = plainSettings();
+    settings.layer[0].synthesize = 0.0;
+    const auto sample = windowedHz (play (*m, settings, 64, 1.6, 1.5, 256), 0.3, 1.3, 0.025);
+    settings.layer[0].synthesize = 1.0;   // the oscillator alone (hybrid at 100 %)
+    settings.layer[0].synth.wave = synth::Wave::sine;
+    const auto keys = windowedHz (play (*m, settings, 64, 1.6, 1.5, 256), 0.3, 1.3, 0.025);
+    settings.layer[0].synth.pitch = synth::PitchSource::recording;
+    const auto heard = windowedHz (play (*m, settings, 64, 1.6, 1.5, 256), 0.3, 1.3, 0.025);
+    auto spreadCents = [] (const std::vector<double>& f) {
+        const auto [lo, hi] = std::minmax_element (f.begin(), f.end());
+        return 1200.0 * std::log2 (*hi / *lo);
+    };
+    INFO ("sample " << spreadCents (sample) << " c, keys " << spreadCents (keys) << " c, recording " << spreadCents (heard) << " c");
+    CHECK (spreadCents (sample) > 40.0);
+    CHECK (spreadCents (keys) < 4.0);
+    CHECK (spreadCents (heard) > 0.6 * spreadCents (sample));
+    // Window by window it tracks the sample (a little behind: ~15 ms smoothing).
+    double worst = 0.0;
+    for (std::size_t i = 2; i < std::min (sample.size(), heard.size()); ++i)
+        worst = std::max (worst, std::abs (1200.0 * std::log2 (heard[i] / sample[i])));
+    INFO ("largest difference " << worst << " cents");
+    CHECK (worst < 25.0);
+    // Its centre is the sample's: a root correction is heard, so it is followed too.
+    settings.layer[0].synthesize = 0.0;
+    const auto shifted = play (*m, settings, 64, 1.0, 0.9, 256, [] (InstrumentEngine& e) { e.setLayerPitchOffsetSemitones (0, 1.0); });
+    settings.layer[0].synthesize = 1.0;
+    const auto shiftedSynth = play (*m, settings, 64, 1.0, 0.9, 256, [] (InstrumentEngine& e) { e.setLayerPitchOffsetSemitones (0, 1.0); });
+    CHECK (measuredHz (shiftedSynth, static_cast<std::size_t> (0.2 * rate)) == Approx (measuredHz (shifted, static_cast<std::size_t> (0.2 * rate))).epsilon (0.004));
+}
+
 TEST_CASE ("synthesize: CPU at 1 / 8 / 16 / 32 voices, layers, Granular and KEY DNA", "[.][synthbench]")
 {
     // On demand: osp_tests "[synthbench]". The engine alone (no plugin effects), 48 kHz, 256-sample

@@ -4,6 +4,7 @@
 #include "OspLookAndFeel.h"
 
 #include <cmath>
+#include <map>
 
 namespace osp::plugin
 {
@@ -1323,6 +1324,332 @@ void DampenEditor::mouseDoubleClick (const juce::MouseEvent& e)
     curve = ospProcessor.modulationCurve (InstrumentHost::dampenCurveIndex (layer));
     hoverPoint = -1;
     repaint();
+}
+
+} // namespace osp::plugin
+
+namespace osp::plugin
+{
+
+//==============================================================================
+// SYNTH page
+
+namespace
+{
+    // Display pitch: four cycles of A3 across the picture, so OCTAVE shows as more or fewer.
+    constexpr double pictureHz = 220.0, pictureCycles = 4.0, pictureRate = 48000.0;
+
+    /** A small picture of a wave in a segment cell (the WAVE choice). */
+    void drawWaveGlyph (juce::Graphics& g, juce::Rectangle<float> cell, synth::Wave w, float alpha)
+    {
+        const auto r = cell.reduced (cell.getWidth() * 0.26f, cell.getHeight() * 0.32f);
+        juce::Path p;
+        const int n = 48;
+        for (int i = 0; i <= n; ++i)
+        {
+            const float t = static_cast<float> (i) / static_cast<float> (n);
+            float v = 0.0f;
+            switch (w)
+            {
+                case synth::Wave::saw:      v = 1.0f - 2.0f * t; break;   // (falling read upward: the ramp)
+                case synth::Wave::square:   v = t < 0.5f ? 1.0f : -1.0f; break;
+                case synth::Wave::triangle: v = 1.0f - 4.0f * std::abs (t - 0.5f); break;
+                case synth::Wave::sine:     v = std::sin (2.0f * juce::MathConstants<float>::pi * t); break;
+            }
+            if (w == synth::Wave::saw)
+                v = -v;
+            const juce::Point<float> at (r.getX() + r.getWidth() * t, r.getCentreY() - 0.5f * r.getHeight() * v);
+            if (i == 0)
+                p.startNewSubPath (at);
+            else if (w == synth::Wave::square && (i == n / 2))
+            {
+                p.lineTo (at.x, r.getCentreY() - 0.5f * r.getHeight());
+                p.lineTo (at);
+            }
+            else
+                p.lineTo (at);
+        }
+        if (w == synth::Wave::saw)
+            p.lineTo (r.getRight(), r.getCentreY() + 0.5f * r.getHeight());
+        g.setColour (light.withAlpha (alpha));
+        g.strokePath (p, juce::PathStrokeType (1.3f, juce::PathStrokeType::mitered, juce::PathStrokeType::rounded));
+    }
+
+    void drawCaption (juce::Graphics& g, juce::Rectangle<float> control, const char* text)
+    {
+        using namespace osp::plugin::design;
+        g.setFont (type::popupLabel (10.0f));
+        g.setColour (colour::wellText.brighter (0.1f));
+        g.drawText (text, control.withY (control.getY() - 15.0f).withHeight (13.0f), juce::Justification::centredLeft, false);
+    }
+}
+
+SynthEditor::SynthEditor (InstrumentHost& p, int l) : ospProcessor (p), layer (l)
+{
+    binding::tag (*this, InstrumentHost::synthParameterId (l, "*") + " " + InstrumentHost::synthesizeId (l));
+    setTitle ("SYNTH " + InstrumentHost::layerName (layer));
+    setTooltip ("SYNTH: the analog oscillator blended into this source. Its wave is drawn as it sounds");
+    auto make = [this] (const juce::String& id) {
+        auto f = std::make_unique<EqValueField> (ospProcessor, id);
+        f->setColour (design::colour::identity (layer).arc);
+        addAndMakeVisible (*f);
+        return f;
+    };
+    amountField = make (InstrumentHost::synthesizeId (layer));
+    detuneField = make (InstrumentHost::synthParameterId (layer, "detune"));
+    toneField = make (InstrumentHost::synthParameterId (layer, "tone"));
+    refresh();
+    startTimerHz (15);   // automation, undo, the chip: the page follows its parameters
+}
+
+SynthEditor::~SynthEditor()
+{
+    stopTimer();
+}
+
+std::array<float, 7> SynthEditor::signature() const
+{
+    std::array<float, 7> v {};
+    int i = 0;
+    for (const auto& name : InstrumentHost::synthParameterNames())
+        v[static_cast<std::size_t> (i++)] = ospProcessor.parameterValue (InstrumentHost::synthParameterId (layer, name));
+    v[6] = ospProcessor.parameterValue (InstrumentHost::synthesizeId (layer));
+    return v;
+}
+
+void SynthEditor::refresh()
+{
+    const auto now = signature();
+    if (now == shown && ! wave.empty())
+        return;
+    shown = now;
+    computeWave();
+    repaint();
+}
+
+void SynthEditor::computeWave()
+{
+    // The oscillator itself (message thread, a few milliseconds of it): settled, then four
+    // cycles of A3 at this page's settings.
+    std::array<float, 6> raw {};
+    std::copy_n (shown.begin(), 6, raw.begin());
+    auto settings = InstrumentHost::synthSettingsFrom (raw);
+    settings.pitch = synth::PitchSource::keys;
+    settings.shape = synth::Envelope::gate;
+    synth::Voice v;
+    v.prepare (pictureRate);
+    v.start (1, 0.8, synth::Envelope::gate);
+    v.setPitch (pictureHz, settings);
+    for (int i = 0; i < static_cast<int> (0.15 * pictureRate); ++i)
+        v.next (0.0f);
+    const auto n = static_cast<std::size_t> (pictureCycles * pictureRate / pictureHz);
+    wave.assign (n, 0.0f);
+    float peak = 1.0e-6f;
+    for (auto& x : wave)
+    {
+        x = v.next (0.0f);
+        peak = std::max (peak, std::abs (x));
+    }
+    for (auto& x : wave)
+        x /= peak;
+}
+
+int SynthEditor::choiceCount (const juce::String& name) const
+{
+    return name == "wave" || name == "octave" ? 4 : 2;
+}
+
+juce::Rectangle<float> SynthEditor::choiceArea (const juce::String& name) const
+{
+    if (name == "wave")
+        return waveChoice;
+    if (name == "octave")
+        return octaveChoice;
+    if (name == "shape")
+        return shapeChoice;
+    if (name == "pitch")
+        return pitchChoice;
+    return {};
+}
+
+void SynthEditor::choose (const juce::String& name, int index)
+{
+    auto* param = ospProcessor.apvts().getParameter (InstrumentHost::synthParameterId (layer, name));
+    if (param == nullptr)
+        return;
+    index = std::clamp (index, 0, choiceCount (name) - 1);
+    const float value = name == "octave" ? static_cast<float> (synth::Settings::minOctave + index) : static_cast<float> (index);
+    if (juce::exactlyEqual (ospProcessor.parameterValue (InstrumentHost::synthParameterId (layer, name)), value))
+        return;
+    static const std::map<juce::String, const char*> names { { "wave", "wave" }, { "octave", "octave" }, { "shape", "shape" }, { "pitch", "pitch" } };
+    ospProcessor.undo().beginNewTransaction ("SYNTH " + InstrumentHost::layerName (layer) + " " + juce::String (names.at (name)));
+    param->beginChangeGesture();
+    param->setValueNotifyingHost (param->convertTo0to1 (value));
+    param->endChangeGesture();
+    refresh();
+}
+
+juce::Rectangle<float> SynthEditor::waveArea() const
+{
+    const float bottom = twoRows ? 2.0f * 44.0f + 8.0f : 44.0f + 8.0f;
+    return getLocalBounds().toFloat().withTrimmedLeft (14.0f).withTrimmedRight (14.0f).withTrimmedTop (46.0f).withTrimmedBottom (bottom);
+}
+
+void SynthEditor::resized()
+{
+    const float w = static_cast<float> (getWidth()), h = static_cast<float> (getHeight());
+    const float tw = juce::GlyphArrangement::getStringWidth (type::popupLabel (12.0f), "SYNTH " + InstrumentHost::layerName (layer));
+    title = { 14.0f, 9.0f, tw + 34.0f, 24.0f };
+    closeArea = { w - 32.0f, 10.0f, 22.0f, 22.0f };
+    const auto amount = juce::Rectangle<float> (closeArea.getX() - 10.0f - 58.0f, 9.0f, 58.0f, 24.0f);
+    amountCaption = amount.withX (amount.getX() - 58.0f).withWidth (54.0f);
+    amountField->setBounds (amount.getSmallestIntegerContainer());
+
+    // The six controls along the foot: one row when they fit, else two (three cards).
+    const float waveW = 120.0f, octaveW = 112.0f, fieldW = 58.0f, shapeW = 104.0f, pitchW = 120.0f, gap = 12.0f;
+    const float full = waveW + octaveW + 2.0f * fieldW + shapeW + pitchW + 5.0f * gap;
+    twoRows = full > w - 28.0f;
+    float x = 14.0f, y = h - 10.0f - 24.0f;
+    if (twoRows)
+        y -= 44.0f;
+    auto take = [&x, &y, gap] (float width) {
+        const juce::Rectangle<float> r (x, y, width, 24.0f);
+        x += width + gap;
+        return r;
+    };
+    waveChoice = take (waveW);
+    octaveChoice = take (octaveW);
+    detuneArea = take (fieldW);
+    if (twoRows)
+    {
+        x = 14.0f;
+        y += 44.0f;
+    }
+    toneArea = take (fieldW);
+    shapeChoice = take (shapeW);
+    pitchChoice = take (pitchW);
+    detuneField->setBounds (detuneArea.getSmallestIntegerContainer());
+    toneField->setBounds (toneArea.getSmallestIntegerContainer());
+}
+
+void SynthEditor::paint (juce::Graphics& g)
+{
+    using namespace design;
+    const auto bounds = getLocalBounds().toFloat();
+    g.setColour (colour::wellA);
+    g.fillRoundedRectangle (bounds, 10.0f);
+    const bool heard = shown[6] > 0.0f;
+    const auto accent = colour::identity (layer).arc;
+
+    // The wave, as the oscillator sounds (dashed while the amount is 0).
+    const auto area = waveArea();
+    g.setColour (colour::wellGrid.withAlpha (0.6f));
+    hline (g, area.getX(), area.getRight(), area.getCentreY());
+    if (! wave.empty())
+    {
+        juce::Path line;
+        const float amp = 0.36f * area.getHeight();   // (clear of the corner note)
+        for (std::size_t i = 0; i < wave.size(); ++i)
+        {
+            const juce::Point<float> at (area.getX() + area.getWidth() * static_cast<float> (i) / static_cast<float> (wave.size() - 1),
+                                         area.getCentreY() - amp * wave[i]);
+            i == 0 ? line.startNewSubPath (at) : line.lineTo (at);
+        }
+        if (heard)
+        {
+            g.setColour (accent);
+            g.strokePath (line, juce::PathStrokeType (1.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        }
+        else
+        {
+            juce::Path dashed;
+            const float dashes[] { 4.0f, 4.0f };
+            juce::PathStrokeType (1.2f).createDashedStroke (dashed, line, dashes, 2);
+            g.setColour (accent.withAlpha (0.45f));
+            g.fillPath (dashed);
+        }
+    }
+
+    // The top row: the page's name, AMOUNT, close.
+    drawTabs (g, title, "SYNTH " + InstrumentHost::layerName (layer), heard, {}, {}, false, layer, bounds.getRight());
+    g.setFont (type::popupLabel (10.5f));
+    g.setColour (colour::wellText.brighter (0.1f));
+    g.drawText ("AMOUNT", amountCaption, juce::Justification::centredRight, false);
+    drawClose (g, closeArea);
+    if (! heard)
+        drawCornerNote (g, area, "SYNTH is at 0 %: raise AMOUNT to hear the oscillator");
+
+    // The controls.
+    const auto settings = [this] {
+        std::array<float, 6> raw {};
+        std::copy_n (shown.begin(), 6, raw.begin());
+        return InstrumentHost::synthSettingsFrom (raw);
+    }();
+    {
+        drawSegments (g, waveChoice, { "", "", "", "" }, static_cast<int> (settings.wave), false);
+        const float cw = waveChoice.getWidth() / 4.0f;
+        for (int i = 0; i < 4; ++i)
+            drawWaveGlyph (g, waveChoice.withWidth (cw).translated (cw * static_cast<float> (i), 0.0f), static_cast<synth::Wave> (i),
+                           i == static_cast<int> (settings.wave) ? 0.95f : 0.5f);
+    }
+    drawSegments (g, octaveChoice, { "-2", "-1", "0", "+1" }, settings.octave - synth::Settings::minOctave, true);
+    drawSegments (g, shapeChoice, { "Held", "Follow" }, settings.shape == synth::Envelope::follow ? 1 : 0, false);
+    drawSegments (g, pitchChoice, { "Keys", "Recording" }, settings.pitch == synth::PitchSource::recording ? 1 : 0, false);
+    if (hot.isNotEmpty())
+    {
+        g.setColour (light.withAlpha (0.05f));
+        g.fillRoundedRectangle (choiceArea (hot).reduced (1.0f), 4.0f);
+    }
+    drawCaption (g, waveChoice, "WAVE");
+    drawCaption (g, octaveChoice, "OCTAVE");
+    drawCaption (g, detuneArea, "DETUNE");
+    drawCaption (g, toneArea, "TONE");
+    drawCaption (g, shapeChoice, "SHAPE");
+    drawCaption (g, pitchChoice, "PITCH");
+}
+
+void SynthEditor::mouseDown (const juce::MouseEvent& e)
+{
+    const auto p = e.position;
+    if (closeArea.contains (p))
+    {
+        if (onClose != nullptr)
+            onClose();
+        return;
+    }
+    for (const auto* name : { "wave", "octave", "shape", "pitch" })
+    {
+        const auto area = choiceArea (name);
+        if (area.contains (p))
+        {
+            const int count = choiceCount (name);
+            choose (name, std::clamp (static_cast<int> ((p.x - area.getX()) / area.getWidth() * static_cast<float> (count)), 0, count - 1));
+            return;
+        }
+    }
+}
+
+void SynthEditor::mouseMove (const juce::MouseEvent& e)
+{
+    juce::String now;
+    for (const auto* name : { "wave", "octave", "shape", "pitch" })
+        if (choiceArea (name).contains (e.position))
+            now = name;
+    if (now != hot)
+    {
+        hot = now;
+        setMouseCursor (hot.isNotEmpty() || closeArea.contains (e.position) ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+        repaint();
+    }
+}
+
+void SynthEditor::mouseExit (const juce::MouseEvent&)
+{
+    if (hot.isNotEmpty())
+    {
+        hot = {};
+        repaint();
+    }
 }
 
 } // namespace osp::plugin

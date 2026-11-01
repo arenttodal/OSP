@@ -357,6 +357,176 @@ TEST_CASE ("plugin synthesize: the development audition (blend law, envelope) is
     CHECK (audioHash (renderHeld (p, chord8, 1.0)) == hybrid);
 }
 
+TEST_CASE ("plugin synth page: six parameters per source, appended at the defaults of S1; heard, live, saved, older sessions unchanged", "[plugin][synthesize][synthpage]")
+{
+    using osp::plugin::InstrumentHost;
+    TempDir tmp;
+    OspAudioProcessor p;
+    loadLayers (p, tmp.dir, 2);
+    for (int l = 0; l < 3; ++l)
+        for (const auto& name : InstrumentHost::synthParameterNames())
+        {
+            auto* param = p.parameters.getParameter (InstrumentHost::synthParameterId (l, name));
+            REQUIRE (param != nullptr);
+            CHECK (param->getVersionHint() == 23);
+        }
+    CHECK (p.parameterValue (InstrumentHost::synthParameterId (0, "tone")) == Approx (50.0f));
+    // At the defaults: exactly the S1 sound (the page set and returned changes nothing).
+    p.setParameterValue (synthId (0), 70.0f);
+    const auto s1 = audioHash (renderHeld (p, chord8, 1.2));
+    p.setParameterValue (InstrumentHost::synthParameterId (0, "wave"), 3.0f);
+    p.setParameterValue (InstrumentHost::synthParameterId (0, "octave"), -1.0f);
+    p.setParameterValue (InstrumentHost::synthParameterId (0, "detune"), 18.0f);
+    p.setParameterValue (InstrumentHost::synthParameterId (0, "tone"), 20.0f);
+    p.setParameterValue (InstrumentHost::synthParameterId (0, "shape"), 1.0f);
+    p.setParameterValue (InstrumentHost::synthParameterId (0, "pitch"), 1.0f);
+    const auto changed = renderHeld (p, chord8, 1.2);
+    CHECK (audioHash (changed) != s1);
+    CHECK (finite (changed));
+    CHECK (audioHash (renderHeld (p, chord8, 1.2)) == audioHash (changed));   // deterministic
+    juce::MemoryBlock state;
+    p.getStateInformation (state);
+    {
+        OspAudioProcessor reopened;
+        reopened.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+        REQUIRE (reopened.waitForLoads (30000));
+        reopened.pollLoads();
+        CHECK (reopened.parameterValue (InstrumentHost::synthParameterId (0, "wave")) == Approx (3.0f));
+        CHECK (reopened.parameterValue (InstrumentHost::synthParameterId (0, "octave")) == Approx (-1.0f));
+        CHECK (reopened.parameterValue (InstrumentHost::synthParameterId (0, "detune")) == Approx (18.0f));
+        CHECK (reopened.parameterValue (InstrumentHost::synthParameterId (0, "pitch")) == Approx (1.0f));
+        CHECK (reopened.parameterValue (InstrumentHost::synthParameterId (1, "wave")) == 0.0f);
+        CHECK (audioHash (renderHeld (reopened, chord8, 1.2)) == audioHash (changed));
+    }
+    // A session from before the page (no synth.* parameters in it) opens at S1's oscillator.
+    auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
+    REQUIRE (xml != nullptr);
+    for (auto* child = xml->getFirstChildElement(); child != nullptr;)
+    {
+        auto* next = child->getNextElement();
+        if (child->getStringAttribute ("id").contains (".synth."))
+            xml->removeChildElement (child, true);
+        child = next;
+    }
+    juce::MemoryBlock old;
+    juce::AudioProcessor::copyXmlToBinary (*xml, old);
+    OspAudioProcessor older;
+    older.setStateInformation (old.getData(), static_cast<int> (old.getSize()));
+    REQUIRE (older.waitForLoads (30000));
+    older.pollLoads();
+    CHECK (older.parameterValue (InstrumentHost::synthParameterId (0, "wave")) == 0.0f);
+    CHECK (older.parameterValue (InstrumentHost::synthParameterId (0, "tone")) == Approx (50.0f));
+    CHECK (audioHash (renderHeld (older, chord8, 1.2)) == s1);
+}
+
+TEST_CASE ("plugin synth page: changing the page on held notes allocates nothing", "[plugin][synthesize][synthpage]")
+{
+    using osp::plugin::InstrumentHost;
+    TempDir tmp;
+    OspAudioProcessor p;
+    loadLayers (p, tmp.dir, 1);
+    p.setParameterValue (synthId (0), 80.0f);
+    juce::AudioBuffer<float> buffer (2, 256);
+    juce::MidiBuffer midi;
+    midi.ensureSize (4096);
+    midi.addEvent (juce::MidiMessage::noteOn (1, 60, static_cast<juce::uint8> (100)), 0);
+    midi.addEvent (juce::MidiMessage::noteOn (1, 64, static_cast<juce::uint8> (100)), 0);
+    for (int i = 0; i < 8; ++i)
+    {
+        buffer.clear();
+        p.processBlock (buffer, midi);
+        midi.clear();
+    }
+    std::vector<juce::RangedAudioParameter*> page;
+    for (const auto& name : InstrumentHost::synthParameterNames())
+        page.push_back (p.parameters.getParameter (InstrumentHost::synthParameterId (0, name)));
+    int allocations = 0;
+    for (int round = 0; round < 8; ++round)
+    {
+        for (std::size_t i = 0; i < page.size(); ++i)
+            page[i]->setValueNotifyingHost (static_cast<float> ((round + static_cast<int> (i)) % 4) / 3.0f);
+        test::AllocationScope scope;
+        for (int i = 0; i < 4; ++i)
+        {
+            buffer.clear();
+            p.processBlock (buffer, midi);
+        }
+        allocations += scope.count();
+    }
+    CHECK (allocations == 0);
+}
+
+TEST_CASE ("plugin synth page: a click on SYNTH opens it over the waveform; its choices are one undo step each; one page at a time", "[plugin][synthesize][synthpage][ui]")
+{
+    using osp::plugin::InstrumentHost;
+    TempDir tmp;
+    OspAudioProcessor p;
+    loadLayers (p, tmp.dir, 3);
+    std::unique_ptr<juce::AudioProcessorEditor> e (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (e.get());
+    REQUIRE (ui != nullptr);
+    for (const auto& size : { std::pair<int, int> { 1448, 1086 }, { 1086, 814 } })
+    {
+        e->setSize (size.first, size.second);
+        ui->refreshNow();
+        auto& card = ui->engineCard (1);
+        auto* chip = card.synthesizeControl();
+        REQUIRE (chip != nullptr);
+        REQUIRE (chip->onOpenPage != nullptr);
+        chip->onOpenPage();   // what a click (no drag) does after the double-click time
+        REQUIRE (card.isSynthOpen());
+        auto* page = card.synthEditorComponent();
+        REQUIRE (page != nullptr);
+        CHECK (page->getBounds() == card.display().getBounds());   // the display's place exactly
+        ui->refreshNow();
+        CHECK_FALSE (chip->isVisible());   // the page has the well (and its own AMOUNT)
+        std::vector<juce::Rectangle<float>> controls;
+        for (const auto* name : { "wave", "octave", "shape", "pitch" })
+        {
+            const auto area = page->choiceArea (name);
+            CHECK_FALSE (area.isEmpty());
+            CHECK (page->getLocalBounds().toFloat().contains (area));
+            CHECK_FALSE (page->waveArea().intersects (area));
+            for (const auto& other : controls)
+                CHECK_FALSE (other.intersects (area));
+            controls.push_back (area);
+        }
+        CHECK (page->waveArea().getHeight() > 40.0f);
+        const auto saw = page->shownWave();
+        REQUIRE_FALSE (saw.empty());
+        // WAVE: Sine; one undo step brings the saw back.
+        p.undo().clearUndoHistory();
+        page->choose ("wave", 3);
+        p.parameters.copyState();   // (the parameters into the undo step, as the host's timer does)
+        CHECK (p.parameterValue (InstrumentHost::synthParameterId (1, "wave")) == Approx (3.0f));
+        CHECK (p.undo().getUndoDescription() == "SYNTH B wave");
+        CHECK (page->shownWave() != saw);
+        REQUIRE (p.undo().undo());
+        page->refresh();
+        CHECK (p.parameterValue (InstrumentHost::synthParameterId (1, "wave")) == 0.0f);
+        CHECK (page->shownWave() == saw);
+        // OCTAVE: -1 is the second part; the picture shows half the cycles.
+        page->choose ("octave", 1);
+        CHECK (p.parameterValue (InstrumentHost::synthParameterId (1, "octave")) == Approx (-1.0f));
+        page->choose ("shape", 1);
+        page->choose ("pitch", 1);
+        CHECK (p.parameterValue (InstrumentHost::synthParameterId (1, "shape")) == Approx (1.0f));
+        CHECK (p.parameterValue (InstrumentHost::synthParameterId (1, "pitch")) == Approx (1.0f));
+        // Only B's page changed.
+        CHECK (p.parameterValue (InstrumentHost::synthParameterId (0, "octave")) == 0.0f);
+        // One page at a time: EQ takes the well, SYNTH gives it back; and the other way.
+        card.setEqOpen (true);
+        CHECK_FALSE (card.isSynthOpen());
+        card.setSynthOpen (true);
+        CHECK_FALSE (card.isEqOpen());
+        card.setSynthOpen (false);
+        ui->refreshNow();
+        CHECK (chip->isVisible());
+        for (const auto& name : InstrumentHost::synthParameterNames())
+            p.setParameterValue (InstrumentHost::synthParameterId (1, name), name == "tone" ? 50.0f : 0.0f);
+    }
+}
+
 TEST_CASE ("plugin synthesize: CPU of the whole plug-in, SYNTHESIZE off and on", "[.][synthbench]")
 {
     // On demand: osp_plugin_tests "[synthbench]". The default patch (macros and effects as a new

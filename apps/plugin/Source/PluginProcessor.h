@@ -748,6 +748,7 @@ private:
         std::array<std::atomic<float>*, 3> grainOptions {};   ///< SCATTER, PAN, WINDOW (hint 20)
         std::atomic<float>* keyDnaAmount = nullptr;
         std::atomic<float>* synthesize = nullptr;   ///< SYNTHESIZE 0..100 % (hint 22)
+        std::array<std::atomic<float>*, 6> synth {};   ///< the SYNTH page (hint 23), synthParameterNames() order
     };
     std::atomic<float>* grainBudgetParam = nullptr;
     std::atomic<int> synthAudition { 0 };   ///< SYNTHESIZE's development audition (blend | envelope << 8); never saved

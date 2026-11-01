@@ -44,6 +44,7 @@ void InstrumentEngine::prepare (double outputSampleRate, int maximumBlockSize, c
         slot.tuneRatio = semitonesToRatio (config.layer[l].tuneSemitones);
         slot.pitchRatio = slot.rootRatio * slot.tuneRatio;
         slot.synthesizeLive = std::clamp (config.layer[l].synthesize, 0.0, 1.0);
+        slot.synthLive = config.layer[l].synth;
         slot.primed = false;
         refreshLiveGranular (l);
     }
@@ -274,6 +275,7 @@ void InstrumentEngine::setLayerSettings (int layer, const LayerSettings& setting
     slot.tuneRatio = semitonesToRatio (std::clamp (settings.tuneSemitones, -48.0, 48.0));
     slot.pitchRatio = slot.rootRatio * slot.tuneRatio;
     slot.synthesizeLive = std::clamp (settings.synthesize, 0.0, 1.0);
+    slot.synthLive = settings.synth;
     refreshLiveGranular (l);
 }
 
@@ -856,6 +858,7 @@ void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int
     params.synthesize = &slots[context].synthesizeLive;
     params.synthBlend = config.synthBlend;
     params.synthEnvelope = config.synthEnvelope;
+    params.synthSettings = &slots[context].synthLive;
     if (params.sourceMode == SourceMode::granular)
     {
         granularLife (params.shape, note, eventIndex);
