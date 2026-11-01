@@ -579,8 +579,18 @@ void HeaderMix::paint (juce::Graphics& g)
         g.setColour (colour::textSecondary.interpolatedWith (colour::identity (l).badgeBottom, 0.35f).withMultipliedAlpha (alpha));
         g.drawText (InstrumentHost::layerName (l), r, j, false);
     };
-    letter (0, { c[0].x - 16.0f, c[0].y - 7.0f, 12.0f, 14.0f }, juce::Justification::centredRight, 1.0f);
-    letter (1, { c[1].x + 4.0f, c[1].y - 7.0f, 12.0f, 14.0f }, juce::Justification::centredLeft, 1.0f);
+    if (endLabels[0].isNotEmpty() && count == 2)
+    {
+        // A product's ends (a group against a layer): its labels, wider than a letter.
+        g.setColour (colour::textSecondary);
+        g.drawText (endLabels[0], juce::Rectangle<float> (c[0].x - 32.0f, c[0].y - 7.0f, 28.0f, 14.0f), juce::Justification::centredRight, false);
+        g.drawText (endLabels[1], juce::Rectangle<float> (c[1].x + 4.0f, c[1].y - 7.0f, 28.0f, 14.0f), juce::Justification::centredLeft, false);
+    }
+    else
+    {
+        letter (0, { c[0].x - 16.0f, c[0].y - 7.0f, 12.0f, 14.0f }, juce::Justification::centredRight, 1.0f);
+        letter (1, { c[1].x + 4.0f, c[1].y - 7.0f, 12.0f, 14.0f }, juce::Justification::centredLeft, 1.0f);
+    }
     if (morph > 0.0f)
         letter (2, { c[2].x + 5.0f, c[2].y - 4.0f, 12.0f, 12.0f }, juce::Justification::centredLeft, morph);
 

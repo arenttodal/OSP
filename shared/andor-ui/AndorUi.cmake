@@ -25,6 +25,7 @@ set(ANDOR_UI_SOURCES
     ${ANDOR_UI_DIR}/Source/NoteMapEditor.cpp
     ${ANDOR_UI_DIR}/Source/KeyDnaEditor.cpp
     ${ANDOR_UI_DIR}/Source/KeyDnaState.cpp
+    ${ANDOR_UI_DIR}/Source/WellOverlay.cpp
     ${ANDOR_UI_DIR}/Source/InstrumentFrame.cpp
     # The A/B/C sources: import, analysis and the playable model a card shows (any product
     # that plays dropped sounds; a background thread, never the audio thread).

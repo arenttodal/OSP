@@ -1104,7 +1104,7 @@ LayerKnob::LayerKnob (InstrumentHost& p, int layer, const juce::String& c, const
     binding::tag (*this, id);
     dial = std::make_unique<Dial> (processor, layer, juce::String(), false);
     dial->setRotaryParameters (OspLookAndFeel::rotaryStart, OspLookAndFeel::rotaryEnd, true);
-    dial->getProperties().set ("arc", static_cast<juce::int64> (palette::layer (layer).getARGB()));
+    dial->getProperties().set ("arc", static_cast<juce::int64> (palette::layer (InstrumentHost::shownLayer (layer)).getARGB()));
     dial->getProperties().set ("spectral", false);
     dial->getProperties().set ("bipolar", parameter != nullptr && parameter->getNormalisableRange().start < 0.0f);
     dial->getProperties().set ("paramId", id);   // a modulation drop target
@@ -1129,7 +1129,7 @@ LayerKnob::LayerKnob (InstrumentHost& p, int layer, const juce::String& control,
     binding::tag (*this, id);
     dial = std::make_unique<Dial> (processor, layer, control, control == "tune");
     dial->setRotaryParameters (OspLookAndFeel::rotaryStart, OspLookAndFeel::rotaryEnd, true);
-    dial->getProperties().set ("arc", static_cast<juce::int64> ((creative ? palette::accent : palette::layer (layer)).getARGB()));
+    dial->getProperties().set ("arc", static_cast<juce::int64> ((creative ? palette::accent : palette::layer (InstrumentHost::shownLayer (layer))).getARGB()));
     dial->getProperties().set ("spectral", creative);   // REIMAGINED: the spectral continuum, the same on every layer
     dial->getProperties().set ("bipolar", control == "tune" || control == "pan");
     dial->getProperties().set ("paramId", id);   // a modulation drop target
@@ -1277,7 +1277,7 @@ LayerStateButton::LayerStateButton (InstrumentHost& p, int l, bool isSolo)
 {
     attachment.sendInitialUpdate();
     binding::tag (*this, InstrumentHost::layerParameterId (l, isSolo ? "solo" : "mute"));
-    const auto name = InstrumentHost::layerName (layer);
+    const auto name = InstrumentHost::shownLayerName (layer);
     setTooltip (solo ? "Solo layer " + name + ": hear only the soloed layers (alt-click: this one alone)" : "Mute layer " + name);
     setTitle (solo ? "Solo " + name : "Mute " + name);
     setMouseCursor (juce::MouseCursor::PointingHandCursor);
@@ -1288,7 +1288,7 @@ void LayerStateButton::paint (juce::Graphics& g)
     using namespace design;
     const auto r = getLocalBounds().toFloat().reduced (1.0f);
     const bool hot = isMouseOver();
-    const auto& id = colour::identity (layer);
+    const auto& id = colour::identity (InstrumentHost::shownLayer (layer));
     if (on)
     {
         // SOLO glows in the layer's own colour, MUTE is a dark, pressed key.
@@ -1461,7 +1461,7 @@ void EngineCard::MenuDots::paintButton (juce::Graphics& g, bool highlighted, boo
 EngineCard::EngineCard (InstrumentHost& p, int layer)
     : processor (p), layerIndex (layer), muteButton (p, layer, false), soloButton (p, layer, true)
 {
-    sourceDisplay.setLayer (layer);
+    sourceDisplay.setLayer (InstrumentHost::shownLayer (layer));
     addAndMakeVisible (sourceDisplay);
     addAndMakeVisible (muteButton);
     addAndMakeVisible (soloButton);
@@ -1494,17 +1494,8 @@ EngineCard::EngineCard (InstrumentHost& p, int layer)
     };
     addAndMakeVisible (menuButton);
 
-    const std::array<std::pair<const char*, const char*>, 5> controls { { { "start", "START" }, { "tune", "TUNE" }, { "pan", "PAN" }, { "level", "LEVEL" },
-                                                                         { "reimagined", "REIMAGINED" } } };
-    for (std::size_t i = 0; i < knobs.size(); ++i)
-    {
-        knobs[i] = std::make_unique<LayerKnob> (processor, layer, controls[i].first, controls[i].second);
-        addAndMakeVisible (*knobs[i]);
-    }
-    knobs[4]->onLabelClick = [this] {
-        if (onReimagined != nullptr)
-            onReimagined (layerIndex);
-    };
+    for (int i = 0; i < static_cast<int> (knobs.size()); ++i)
+        restoreKnob (i);
     if (processor.hasSynthesize())
     {
         // SYNTHESIZE (Phase S1): the source's own analog oscillator blended into its voices.
@@ -1543,13 +1534,13 @@ EngineCard::EngineCard (InstrumentHost& p, int layer)
             f = [] (double v) { const int st = juce::roundToInt (v); return (st > 0 ? "+" : "") + juce::String (st) + " st"; };
         granularKnobs[i] = std::make_unique<MiniKnob> (processor.apvts(), id, grain[i].second, std::move (f));
         granularKnobs[i]->setOnDark (true);
-        granularKnobs[i]->slider.getProperties().set ("arc", static_cast<juce::int64> (palette::layer (layer).getARGB()));
+        granularKnobs[i]->slider.getProperties().set ("arc", static_cast<juce::int64> (palette::layer (InstrumentHost::shownLayer (layer)).getARGB()));
         if (design::materials().graphiteOnWell)
             granularKnobs[i]->slider.getProperties().set ("graphite", true);   // (the product's finish)
         addChildComponent (*granularKnobs[i]);
     }
 
-    keyDnaKey.setColour (palette::layer (layer));
+    keyDnaKey.setColour (palette::layer (InstrumentHost::shownLayer (layer)));
     keyDnaKey.onClick = [this] {
         if (onKeyDna != nullptr)
             onKeyDna (layerIndex);
@@ -1601,6 +1592,92 @@ juce::Rectangle<int> EngineCard::reimaginedLabelBounds() const
 void EngineCard::setReimaginedOpen (bool open)
 {
     knobs[4]->setLabelOpen (open);
+}
+
+namespace
+{
+    const std::array<std::pair<const char*, const char*>, 5> cardControls { { { "start", "START" }, { "tune", "TUNE" }, { "pan", "PAN" }, { "level", "LEVEL" },
+                                                                             { "reimagined", "REIMAGINED" } } };
+}
+
+void EngineCard::restoreKnob (int slot)
+{
+    const auto i = static_cast<std::size_t> (std::clamp (slot, 0, 4));
+    const bool compactNow = knobs[i] != nullptr && knobs[i]->isCompact();
+    if (knobs[i] != nullptr)
+        removeChildComponent (knobs[i].get());
+    knobs[i] = std::make_unique<LayerKnob> (processor, layerIndex, cardControls[i].first, cardControls[i].second);
+    knobs[i]->setCompact (compactNow);
+    if (i == 4)
+        knobs[i]->onLabelClick = [this] {
+            if (onReimagined != nullptr)
+                onReimagined (layerIndex);
+        };
+    addAndMakeVisible (*knobs[i]);
+    if (! getBounds().isEmpty())
+        resized();
+}
+
+void EngineCard::replaceKnob (int slot, const juce::String& parameterId, const juce::String& caption)
+{
+    const auto i = static_cast<std::size_t> (std::clamp (slot, 0, 4));
+    const bool compactNow = knobs[i] != nullptr && knobs[i]->isCompact();
+    removeChildComponent (knobs[i].get());
+    knobs[i] = std::make_unique<LayerKnob> (processor, layerIndex, caption, parameterId.isEmpty() ? juce::String ("layerA.level") : parameterId, true);
+    knobs[i]->setCompact (compactNow);
+    addChildComponent (*knobs[i]);
+    knobs[i]->setVisible (parameterId.isNotEmpty());
+    if (! getBounds().isEmpty())
+        resized();
+}
+
+void EngineCard::setModifiersShown (bool shown)
+{
+    for (auto& m : modifiers)
+        if (m != nullptr)
+            m->setVisible (shown);
+}
+
+bool EngineCard::hasControl (const juce::String& parameterId) const
+{
+    std::function<bool (const juce::Component&)> bound = [&] (const juce::Component& c) {
+        if (binding::tagsOf (c).contains (parameterId))
+            return true;
+        for (auto* child : c.getChildren())
+            if (bound (*child))
+                return true;
+        return false;
+    };
+    for (const auto& k : knobs)
+        if (k != nullptr && k->isVisible() && bound (*k))
+            return true;
+    return false;
+}
+
+void EngineCard::setWellOverlay (std::unique_ptr<WellOverlay> overlay)
+{
+    if (wellOverlay != nullptr)
+        removeChildComponent (wellOverlay.get());
+    wellOverlay = std::move (overlay);
+    if (wellOverlay != nullptr)
+    {
+        addChildComponent (*wellOverlay);
+        wellOverlay->setBounds (sourceDisplay.getBounds());
+    }
+    updateWellOverlay();
+}
+
+void EngineCard::updateWellOverlay()
+{
+    if (wellOverlay == nullptr)
+        return;
+    const bool wellTaken = eqEditor != nullptr || noteMap != nullptr || (wellEditor != nullptr && wellEditor->isVisible());
+    wellOverlay->setBounds (sourceDisplay.getBounds());
+    wellOverlay->setVisible (sourceDisplay.isVisible() && ! wellTaken);
+    if (const int reserve = wellOverlay->rulerReserve(); reserve > 0)
+        sourceDisplay.setRulerReserve (reserve);   // (its dropdown clear of a recording's ruler)
+    if (wellOverlay->isVisible())
+        wellOverlay->toFront (false);
 }
 
 void EngineCard::replaceStartKnob (const juce::String& parameterId, const juce::String& caption, std::function<void()> onCaptionClick)
@@ -1745,6 +1822,7 @@ void EngineCard::setWellEditorShown (bool shown)
     wellEditor->setVisible (shown);
     // The waveform does not draw (or animate) under it; it is back the moment it closes.
     sourceDisplay.setVisible (! shown);
+    updateWellOverlay();
     if (shown)
         wellEditor->refresh();
     repaint (sourceDisplay.getBounds());
@@ -2128,6 +2206,7 @@ void EngineCard::setEqOpen (bool open)
     if (! open)
     {
         eqEditor.reset();
+        updateWellOverlay();
         return;
     }
     setNotesOpen (false);
@@ -2148,11 +2227,12 @@ void EngineCard::setEqOpen (bool open)
     };
     addAndMakeVisible (*eqEditor);
     eqEditor->setBounds (sourceDisplay.getBounds());
+    updateWellOverlay();
 }
 
 SynthChip::SynthChip (InstrumentHost& processor, int layer)
     : juce::Slider (juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::NoTextBox),
-      host (processor), accent (palette::layer (layer))
+      host (processor), accent (palette::layer (InstrumentHost::shownLayer (layer)))
 {
     const auto id = InstrumentHost::synthesizeId (layer);
     binding::tag (*this, id);
@@ -2270,12 +2350,14 @@ void EngineCard::setNotesOpen (bool open)
     if (! open)
     {
         noteMap.reset();
+        updateWellOverlay();
         return;
     }
     setEqOpen (false);
     setWellEditorShown (false);
     showGranularControls (false);
     noteMap = std::make_unique<NoteMapEditor> (processor, layerIndex);
+    updateWellOverlay();
     juce::Component::SafePointer<EngineCard> safe (this);
     auto later = [safe] (std::function<void (EngineCard&)> f) {
         juce::MessageManager::callAsync ([safe, f] {
@@ -2466,12 +2548,13 @@ void EngineCard::paint (juce::Graphics& g)
     if (auto* pieces = skin::active(); pieces != nullptr && sourceDisplay.isVisible())
         pieces->draw (g, "bezel-r9", sourceDisplay.getBounds().toFloat().reduced (0.5f).expanded (1.6f));
 
-    // Header: the layer's badge, its light, the root and the file.
-    const auto& id = colour::identity (layerIndex);
+    // Header: the layer's badge, its light, the root and the file (its shown letter and
+    // colour: a product may present its layers in another order).
+    const auto& id = colour::identity (InstrumentHost::shownLayer (layerIndex));
     {
         const auto badge = badgeArea.toFloat();
         auto* pieces = skin::active();
-        if (pieces == nullptr || ! pieces->draw (g, juce::String ("badge-") + InstrumentHost::layerName (layerIndex), badge))
+        if (pieces == nullptr || ! pieces->draw (g, juce::String ("badge-") + InstrumentHost::shownLayerName (layerIndex), badge))
         {
             juce::Path shape;
             shape.addRoundedRectangle (badge, 6.0f);
@@ -2483,7 +2566,7 @@ void EngineCard::paint (juce::Graphics& g)
         }
         g.setColour (juce::Colour (0xfffff6ec));
         g.setFont (fonts::make (29.0f, fonts::Weight::regular));
-        g.drawText (InstrumentHost::layerName (layerIndex), badge.translated (0.0f, 0.5f), juce::Justification::centred, false);
+        g.drawText (InstrumentHost::shownLayerName (layerIndex), badge.translated (0.0f, 0.5f), juce::Justification::centred, false);
     }
     auto row = textArea.toFloat();
     if (rootText.isNotEmpty())
@@ -2574,6 +2657,7 @@ void EngineCard::resized()
         noteMap->setBounds (sourceDisplay.getBounds());
     if (wellEditor != nullptr)
         wellEditor->setBounds (sourceDisplay.getBounds());
+    updateWellOverlay();
     placeMapPrompt();
     if (synthChip != nullptr)
     {

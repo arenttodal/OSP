@@ -51,6 +51,14 @@ public:
     // -- The parameter-ID scheme (ANDOR OSP's; unchanged) ------------------------------------
     static constexpr int numLayers = EngineSettings::layers;   ///< A, B, C
     static juce::String layerName (int layer) { return layer == 2 ? "C" : (layer == 1 ? "B" : "A"); }
+    /** Presentation (opt-in, a product's ProductInfo::threeEngines): where a storage layer's card
+        is shown (0 first) and the letter its badge, M / S and EQ carry. Unset: the storage
+        order, as in ANDOR OSP. Parameter IDs never follow it (layerParameterId stays storage). */
+    static int shownLayer (int layer);
+    static juce::String shownLayerName (int layer) { return layerName (shownLayer (layer)); }
+    /** `shownOfStorage[l]`: the position storage layer l is shown at. Process-wide (one product
+        per binary); set before any window. */
+    static void setShownLayers (const std::array<int, 3>& shownOfStorage);
     /** The stable parameter ID of a layer setting, e.g. layerParameterId (1, "sourceMode") -> "layerB.sourceMode". */
     static juce::String layerParameterId (int layer, const juce::String& name) { return "layer" + layerName (layer) + "." + name; }
     /** A layer's Original <-> Reimagined: A's is the instrument's `reimagined` (the ID older

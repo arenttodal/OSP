@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CardWellEditor.h"
+#include "WellOverlay.h"
 #include "EqEditor.h"
 #include "NoteMapEditor.h"
 #include "OspLookAndFeel.h"
@@ -380,6 +381,20 @@ public:
         parameter and name); a click on the name calls `onCaptionClick` (null: none). The card
         lays it out exactly where START was. */
     void replaceStartKnob (const juce::String& parameterId, const juce::String& caption, std::function<void()> onCaptionClick);
+    /** A product's control in any knob's place (slot 0..4: START TUNE PAN LEVEL REIMAGINED;
+        ProductInfo::cardControls). An empty ID hides that knob, its place kept (the row's
+        rhythm never moves). restoreKnob gives the slot its own layer control back. */
+    void replaceKnob (int slot, const juce::String& parameterId, const juce::String& caption);
+    void restoreKnob (int slot);
+    /** A visible knob of the card's row bound to `parameterId` (tests, product overrides). */
+    bool hasControl (const juce::String& parameterId) const;
+    /** The four modifier keys (LINK REVERSE LOOP FOLLOW) shown, or hidden for a source they
+        mean nothing to (a product's oscillator, its noise). Shown by default. */
+    void setModifiersShown (bool shown);
+    /** Controls revealed in the well by the pointer (ProductInfo::wellOverlay); null: none.
+        Hidden while the EQ, the note map or the in-card editor take the well. */
+    void setWellOverlay (std::unique_ptr<WellOverlay> overlay);
+    WellOverlay* wellOverlayComponent() const noexcept { return wellOverlay.get(); }
     juce::Rectangle<int> startLabelBounds() const;
     bool isStartLabel (const juce::Component* c) const noexcept { return c != nullptr && c == knobs[0].get(); }
     void setStartOpen (bool open) { knobs[0]->setLabelOpen (open); }
@@ -473,6 +488,8 @@ private:
     std::unique_ptr<EqEditor> eqEditor;
     NotesButton notesButton;
     std::unique_ptr<NoteMapEditor> noteMap;
+    std::unique_ptr<WellOverlay> wellOverlay;
+    void updateWellOverlay();
     std::unique_ptr<CardWellEditor> wellEditor;   ///< (null on every card that did not ask for one)
     bool atlasLayer = false;
     juce::Rectangle<int> badgeArea, textArea, dividerArea;

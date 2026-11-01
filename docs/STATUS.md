@@ -697,6 +697,12 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       `ProductInfo::ampEnvelopeNote` (`EnvelopePanel::setNote`; empty draws exactly as before)
       and `ProductInfo::ampEnvelopeTouched` (a gesture on the four AMP parameters). ANDOR OSP
       sets neither. Proof: OSP suites and design capture.
+- [x] Three engines for a hybrid product (ANDOR ANALOG), all opt-in: `ProductInfo::threeEngines`
+      (cards always shown, in the product's order; letters and colours follow it via
+      `InstrumentHost::shownLayer`), `Engine::layerGeneratorName`, `ProductInfo::cardControls`
+      (`EngineCard::replaceKnob` / `restoreKnob`), `ProductInfo::wellOverlay` (the shared
+      `WellOverlay`: controls revealed in a card's well by the pointer). ANDOR OSP and the
+      parity render use none of them. Proof: OSP suites and design capture.
 
 ## DONE
 

@@ -79,9 +79,19 @@ ShellProcessor::ShellProcessor (std::unique_ptr<Engine> productEngine)
       engine (std::move (productEngine))
 {
     jassert (engine != nullptr);
+    engine->attachParameters (parameters);
     // The product's finish, before any window (every instance sets the same).
     if (productInfo().materials.has_value())
         osp::plugin::design::useMaterials (*productInfo().materials);
+    // Three engines (a generator with a hybrid layer): the cards' letters follow the
+    // product's order (storage IDs do not). Any other engine (a test's): the storage order.
+    {
+        std::array<int, 3> shownOfStorage { 0, 1, 2 };
+        if (const auto& three = productInfo().threeEngines; three.enabled && engine->generatorName().isNotEmpty() && productInfo().hybridSampleName.isNotEmpty())
+            for (int shown = 0; shown < 3; ++shown)
+                shownOfStorage[static_cast<std::size_t> (three.order[static_cast<std::size_t> (shown)])] = shown;
+        InstrumentHost::setShownLayers (shownOfStorage);
+    }
     description = engine->describe();
     bound = engine->boundParameters();
     generatorName = engine->generatorName();
@@ -534,6 +544,15 @@ std::shared_ptr<const LoadedInstrument> ShellProcessor::currentInstrument (int l
     return layers[static_cast<std::size_t> (resolve (layer))].instrument;
 }
 
+bool ShellProcessor::isGeneratorLayer (int layer) const
+{
+    if (! isGenerator())
+        return false;
+    if (layer == 0)
+        return true;
+    return productInfo().threeEngines.enabled && layer != hybridLayer && engine->layerGeneratorName (layer).isNotEmpty();
+}
+
 bool ShellProcessor::isLayerOccupied (int layer) const
 {
     if (isGenerator() && ! (hasHybridLayer() && layer == hybridLayer))
@@ -555,7 +574,9 @@ const osp::InstrumentEngine::GrainSnapshot& ShellProcessor::grainSnapshot (int l
 
 bool ShellProcessor::generatedSource (int layer, GeneratedSource& out) const
 {
-    if (hasHybridLayer() && layer == hybridLayer && layers[static_cast<std::size_t> (hybridLayer)].instrument == nullptr
+    // (Three engines: the engine's source wins over a recording kept dormant under it.)
+    if (hasHybridLayer() && layer == hybridLayer
+        && (layers[static_cast<std::size_t> (hybridLayer)].instrument == nullptr || productInfo().threeEngines.enabled)
         && layers[static_cast<std::size_t> (hybridLayer)].state.load() != LoadState::loading)
     {
         // The engine's own source on the recording's layer (an imported one): its name and picture.
@@ -568,12 +589,12 @@ bool ShellProcessor::generatedSource (int layer, GeneratedSource& out) const
         if (out.cycle.empty())
             out.cycle.assign (2, 0.0f);
         out.revision = fingerprint (out.cycle) ^ static_cast<std::uint64_t> (name.hashCode64());
-        out.periodic = false;   // (a recording's outline, drawn once)
+        out.periodic = engine->engineSourceIsPeriodic (layer);   // (a recording's outline is drawn once)
         return true;
     }
-    if (! isGenerator() || layer != 0)
+    if (! isGeneratorLayer (layer))
         return false;
-    out.name = generatorName;
+    out.name = layer == 0 ? generatorName : engine->layerGeneratorName (layer);
     out.cycle.clear();
     engine->sourcePicture (layer, parameters, out.cycle);
     if (out.cycle.empty())
@@ -724,6 +745,13 @@ void ShellProcessor::removeLayer (int layer)
 {
     if (hasHybridLayer() && layer == hybridLayer)
     {
+        // Three engines: Remove takes away what the card shows (the engine's own source wins
+        // over a recording kept dormant under it, which stays).
+        if (productInfo().threeEngines.enabled && engine->engineSourceName (hybridLayer).isNotEmpty())
+        {
+            engine->removeEngineSource (hybridLayer);
+            return;
+        }
         clearLayer (hybridLayer);   // (its settings stay: the next recording plays with them)
         engine->sourcePublished (hybridLayer, nullptr);
         engine->removeEngineSource (hybridLayer);

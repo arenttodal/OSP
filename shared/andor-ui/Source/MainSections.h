@@ -92,6 +92,13 @@ public:
     explicit HeaderMix (InstrumentHost& processor);
     /** Which slots the instrument shows (count 0..3); 1 hides the control. */
     void setLayers (const std::array<bool, 3>& occupied);
+    /** The two ends' labels instead of the layers' letters (a product whose MIX sets a group
+        against a layer, e.g. "A+B" and "C"). Empty: the letters, as in ANDOR OSP. */
+    void setEndLabels (const juce::String& left, const juce::String& right)
+    {
+        endLabels = { left, right };
+        repaint();
+    }
     int layerCount() const noexcept { return count; }
     std::function<void()> onOpenMix;
     /** Whether a press on `c` is a press on the MIX opener (the editor's outside-click logic). */
@@ -133,6 +140,8 @@ public:
     static constexpr float baseY = 60.0f, halfBase = 34.0f, apexHeight = 38.0f;
 
 private:
+    std::array<juce::String, 2> endLabels;
+
     void timerCallback() override;
     void dragTo (juce::Point<float> where);
     void showReadout (bool on);

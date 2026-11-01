@@ -140,6 +140,10 @@ public:
     /** The engine makes its own sound (Engine::Description::generator): layer A is its card,
         and nothing is ever loaded. */
     bool isGenerator() const noexcept { return generatorName.isNotEmpty(); }
+    /** A layer the generator plays (layer 0; with ProductInfo::threeEngines, the engine's
+        further layers): its card shows the engine's picture. Never "occupied" in the mix's
+        sense (the header MIX stays the generator against the hybrid). */
+    bool isGeneratorLayer (int layer) const;
     /** A generator that also plays one recording on layer B (ProductInfo::hybridSampleName). */
     bool hasHybridLayer() const noexcept { return isGenerator() && productInfo().hybridSampleName.isNotEmpty(); }
     /** A hybrid product's recording and generator at the A/B mix's centre (where the engine reads it). */

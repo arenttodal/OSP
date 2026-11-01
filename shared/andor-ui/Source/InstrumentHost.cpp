@@ -28,6 +28,21 @@ mod::Curve InstrumentHost::keyDnaCurve (int layer, keydna::Param param) const
     return flat;
 }
 
+namespace
+{
+    std::array<int, 3> shownOfStorage { 0, 1, 2 };
+}
+
+int InstrumentHost::shownLayer (int layer)
+{
+    return shownOfStorage[static_cast<std::size_t> (std::clamp (layer, 0, 2))];
+}
+
+void InstrumentHost::setShownLayers (const std::array<int, 3>& order)
+{
+    shownOfStorage = order;
+}
+
 juce::String InstrumentHost::modLfoId (int lfo, const juce::String& name) { return "mod.lfo" + juce::String (lfo + 1) + "." + name; }
 juce::String InstrumentHost::modEnvId (int env, const juce::String& name) { return "mod.env" + juce::String (env + 1) + "." + name; }
 juce::String InstrumentHost::modRouteId (int route, const juce::String& name) { return "mod.route" + juce::String (route + 1) + "." + name; }

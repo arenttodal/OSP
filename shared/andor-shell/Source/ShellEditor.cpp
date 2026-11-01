@@ -92,6 +92,19 @@ bool SampleDock::keyPressed (const juce::KeyPress& key)
     return false;
 }
 
+void SampleDock::setHeader (const juce::String& letter, int shownLayer, const juce::String& title)
+{
+    headerLetter = letter;
+    headerLayer = shownLayer;
+    headerTitle = title;
+    repaint();
+}
+
+juce::Rectangle<int> SampleDock::headerBounds() const
+{
+    return headerLetter.isEmpty() ? juce::Rectangle<int>() : getLocalBounds().reduced (16, 0).withTop (14).withHeight (38);
+}
+
 void SampleDock::paint (juce::Graphics& g)
 {
     using namespace osp::plugin;
@@ -99,9 +112,26 @@ void SampleDock::paint (juce::Graphics& g)
     const auto bounds = getLocalBounds().toFloat();
     if (! skin::drawnBySurface())   // ceramic: the housing draws the card (its shadow falls there)
         draw::raised (g, bounds, layout::cardRadius, colour::cardTop, colour::cardBottom);
+    // Three engines: headed as a card (its badge and title), the dashed place below.
+    auto area = bounds;
+    if (headerLetter.isNotEmpty())
+    {
+        const auto header = headerBounds().toFloat();
+        const auto badge = header.withWidth (38.0f);
+        const auto& id = colour::identity (headerLayer);
+        g.setGradientFill (juce::ColourGradient (id.badgeTop, 0.0f, badge.getY(), id.badgeBottom, 0.0f, badge.getBottom(), false));
+        g.fillRoundedRectangle (badge, 6.0f);
+        g.setColour (juce::Colour (0xfffff6ec));
+        g.setFont (fonts::make (29.0f, fonts::Weight::regular));
+        g.drawText (headerLetter, badge.translated (0.0f, 0.5f), juce::Justification::centred, false);
+        g.setColour (palette::textDim);
+        g.setFont (type::sourceFilename());
+        g.drawText (headerTitle, header.withTrimmedLeft (50.0f), juce::Justification::centredLeft, true);
+        area.removeFromTop (header.getBottom() - 4.0f);
+    }
     // The recessed, dashed place a recording goes (the shell's add target, at card scale).
     const auto lit = highlight || hover || hasKeyboardFocus (false);
-    const auto r = bounds.reduced (14.0f);
+    const auto r = area.reduced (14.0f);
     g.setColour (highlight ? palette::recessed.interpolatedWith (palette::accent, 0.08f) : palette::recessed.interpolatedWith (palette::housing, hover ? 0.35f : 0.5f));
     g.fillRoundedRectangle (r, 10.0f);
     juce::Path outline;
@@ -230,8 +260,11 @@ ShellEditor::ShellEditor (ShellProcessor& p)
     dropZone.onBrowse = [this] { chooseFile (-1); };
     content.addChildComponent (dropZone);
     content.addChildComponent (addTarget);
-    if (shell.product().hybridSampleDock && shell.hasHybridLayer())
+    if ((shell.product().hybridSampleDock || threeEngines()) && shell.hasHybridLayer())
     {
+        if (threeEngines())
+            sampleDock.setHeader (InstrumentHost::shownLayerName (ShellProcessor::hybridLayer), InstrumentHost::shownLayer (ShellProcessor::hybridLayer),
+                                  shell.product().hybridSampleName);
         sampleDock.onBrowse = [this] { chooseFile (ShellProcessor::hybridLayer); };
         if (const auto& action = shell.product().hybridAction; action.label.isNotEmpty() && action.run != nullptr)
             sampleDock.setSecondaryAction (action.label.toUpperCase(), [this] { shell.product().hybridAction.run (shell); });
@@ -411,8 +444,52 @@ int ShellEditor::visibleCardCount() const
     return n;
 }
 
+bool ShellEditor::threeEngines() const
+{
+    return shell.product().threeEngines.enabled && shell.hasHybridLayer();
+}
+
 void ShellEditor::layoutSources()
 {
+    if (threeEngines())
+    {
+        // Three engines: every card, always, at equal widths, in the product's order; the
+        // hybrid, while empty, is its ADD SAMPLE invitation in its own column.
+        const bool hybrid = shell.isLayerOccupied (ShellProcessor::hybridLayer);
+        if (hybrid == shownHybrid && shownCount == 3)
+            return;
+        shownCount = 3;
+        shownHybrid = hybrid;
+        dropZone.setVisible (false);
+        addTarget.setVisible (false);
+        const auto& order = shell.product().threeEngines.order;
+        for (int shown = 0; shown < 3; ++shown)
+        {
+            const int l = order[static_cast<std::size_t> (shown)];
+            auto& card = *cards[static_cast<std::size_t> (l)];
+            const auto column = frame::sourceColumn (sourceArea, 3, shown);
+            if (l == ShellProcessor::hybridLayer && ! hybrid)
+            {
+                card.setVisible (false);
+                sampleDock.setBounds (column);
+                sampleDock.setVisible (true);
+                continue;
+            }
+            if (l == ShellProcessor::hybridLayer)
+                sampleDock.setVisible (false);
+            card.setDensity (EngineLayoutDensity::triple);
+            card.setBounds (column);
+            card.setVisible (true);
+        }
+        if (dockOverlay != nullptr)
+            dockOverlay->setBounds (sampleDock.getLocalBounds().reduced (14).withTrimmedTop (sampleDock.headerBounds().getBottom()));
+        headerMix.setLayers ({ true, hybrid, false });   // the analog side against the hybrid
+        headerMix.setEndLabels (shell.product().mixEndLabels[0], shell.product().mixEndLabels[1]);
+        updateFocus();
+        applyBindings();
+        content.repaint();
+        return;
+    }
     const int count = shell.slotCount();
     if (count == shownCount && ! dragging)
         return;
@@ -471,6 +548,8 @@ void ShellEditor::layoutSources()
 
 bool ShellEditor::sampleDockShown() const
 {
+    if (threeEngines())
+        return ! shell.isLayerOccupied (ShellProcessor::hybridLayer);
     return shell.product().hybridSampleDock && shell.hasHybridLayer() && ! shell.isLayerOccupied (ShellProcessor::hybridLayer);
 }
 
@@ -1046,8 +1125,77 @@ void ShellEditor::updateHybridDoor()
     });
 }
 
+void ShellEditor::refreshCardExtensions()
+{
+    // A generator product's card extensions (the parity render's test engine keeps ANDOR OSP's cards).
+    if (! shell.isGenerator())
+        return;
+    const auto& product = shell.product();
+    bool changed = false;
+    for (int l = 0; l < InstrumentHost::numLayers; ++l)
+    {
+        auto& card = *cards[static_cast<std::size_t> (l)];
+        if (product.cardControls != nullptr)
+        {
+            const auto knobs = product.cardControls (l, shell);
+            juce::String key;
+            for (const auto& k : knobs)
+                key << (k.hidden ? juce::String ("-") : k.parameterId) << "|" << k.caption << ";";
+            if (key != appliedKnobs[static_cast<std::size_t> (l)])
+            {
+                appliedKnobs[static_cast<std::size_t> (l)] = key;
+                for (int i = 0; i < 5; ++i)
+                {
+                    const auto& k = knobs[static_cast<std::size_t> (i)];
+                    if (k.hidden)
+                        card.replaceKnob (i, {}, {});
+                    else if (k.parameterId.isEmpty())
+                        card.restoreKnob (i);
+                    else
+                        card.replaceKnob (i, k.parameterId, k.caption);
+                }
+                changed = true;
+            }
+        }
+        if (product.cardModifiersShown != nullptr)
+            card.setModifiersShown (product.cardModifiersShown (l, shell));
+        if (product.wellOverlay != nullptr)
+        {
+            const auto key = product.wellOverlayKey != nullptr ? product.wellOverlayKey (l, shell) : juce::String ("-");
+            if (key != appliedOverlayKeys[static_cast<std::size_t> (l)])
+            {
+                appliedOverlayKeys[static_cast<std::size_t> (l)] = key;
+                card.setWellOverlay (product.wellOverlay (l, shell));
+                changed = true;
+            }
+        }
+    }
+    // The empty hybrid's dock carries its overlay too (its source type, say).
+    if (product.wellOverlay != nullptr && threeEngines())
+    {
+        const auto key = (product.wellOverlayKey != nullptr ? product.wellOverlayKey (ShellProcessor::hybridLayer, shell) : juce::String ("-")) + "/dock";
+        if (key != dockOverlayKey)
+        {
+            dockOverlayKey = key;
+            dockOverlay = product.wellOverlay (ShellProcessor::hybridLayer, shell);
+            if (dockOverlay != nullptr)
+            {
+                sampleDock.addAndMakeVisible (*dockOverlay);
+                dockOverlay->setBounds (sampleDock.getLocalBounds().reduced (14).withTrimmedTop (sampleDock.headerBounds().getBottom()));
+            }
+            changed = true;
+        }
+    }
+    if (changed)
+    {
+        modOverlay.toFront (false);
+        applyBindings();
+    }
+}
+
 void ShellEditor::timerCallback()
 {
+    refreshCardExtensions();
     layoutSources();
     updateHybridDoor();
     if (sampleDock.isVisible())

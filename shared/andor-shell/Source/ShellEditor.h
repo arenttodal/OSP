@@ -33,6 +33,11 @@ public:
     void setSecondaryAction (const juce::String& label, std::function<void()> action);
     juce::Rectangle<int> secondaryActionBounds() const;
     void setHighlight (bool on);
+    /** Three engines: the dock is the hybrid card's empty state, headed like a card (its badge
+        letter and title). Empty letter: no header (the compact dock, as before). */
+    void setHeader (const juce::String& letter, int shownLayer, const juce::String& title);
+    /** Where a header leaves the dashed place (local coordinates). */
+    juce::Rectangle<int> headerBounds() const;
     /** The name it shows (the product's: "ORGANIC") and, after a failed load, the reason. */
     void setText (const juce::String& sourceName, const juce::String& problem);
     float surfaceRadius() const override { return osp::plugin::design::layout::cardRadius; }
@@ -47,7 +52,8 @@ public:
 
 private:
     void setHover (bool on);
-    juce::String name { "SAMPLE" }, problem, secondaryLabel;
+    juce::String name { "SAMPLE" }, problem, secondaryLabel, headerLetter, headerTitle;
+    int headerLayer = 0;
     std::function<void()> secondary;
     bool highlight = false, hover = false;
 };
@@ -158,6 +164,13 @@ private:
     /** The hybrid recording's dock is shown (opt-in, the recording absent). */
     bool sampleDockShown() const;
     int shownCount = -1;
+    bool shownHybrid = false;   ///< three engines: the hybrid's card (or its empty dock) as last laid out
+    // Three engines / product card extensions: what each card was last given.
+    std::array<juce::String, 3> appliedKnobs, appliedOverlayKeys;
+    std::unique_ptr<osp::plugin::WellOverlay> dockOverlay;
+    juce::String dockOverlayKey;
+    void refreshCardExtensions();
+    bool threeEngines() const;
     bool dragging = false;
     int dragLayer = -1;
 

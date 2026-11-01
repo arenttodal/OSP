@@ -534,7 +534,8 @@ TEST_CASE ("shell: the interface binds what the engine reads and disables the re
     REQUIRE (p.waitForLoads (30000));
     p.pollLoads();
     ui->refreshNow();
-    CHECK (ui->visibleCardCount() == (p.hasHybridLayer() ? 2 : 1));   // (a hybrid generator: its card and the recording's)
+    // (a hybrid generator: its card and the recording's; three engines: every card)
+    CHECK (ui->visibleCardCount() == (p.product().threeEngines.enabled && p.hasHybridLayer() ? 3 : (p.hasHybridLayer() ? 2 : 1)));
 
     // Each tagged control is enabled exactly when the engine reads one of its parameters.
     int checked = 0;

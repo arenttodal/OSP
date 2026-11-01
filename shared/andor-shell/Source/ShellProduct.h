@@ -1,5 +1,6 @@
 #pragma once
 
+#include "WellOverlay.h"
 #include "CardWellEditor.h"
 #include "Design.h"
 #include "InstrumentFrame.h"
@@ -97,6 +98,39 @@ struct ProductInfo
         juce::String label;
         std::function<void (osp::plugin::InstrumentHost&)> run;
     } hybridAction;
+    /** Three engines (opt-in, a generator product with a hybrid layer): the three cards always
+        shown at equal widths, storage layers in `order` (shown first, second, third: their
+        badges, M / S and EQ say A, B, C in that order), a generator's further layers named
+        by Engine::layerGeneratorName. The hybrid layer, while empty, is its ADD SAMPLE
+        invitation in its own column. The header MIX stays the generator against the hybrid.
+        Off: the shell's layout as before. */
+    struct ThreeEngines
+    {
+        bool enabled = false;
+        std::array<int, 3> order { 0, 1, 2 };
+    } threeEngines;
+    /** A card's knob slot, as a product sets it (cardControls): its own control (an empty
+        ID), a product control, or hidden. */
+    struct CardKnob
+    {
+        juce::String parameterId, caption;
+        bool hidden = false;
+    };
+    /** Per-card knob overrides (opt-in): for a storage layer, its five slots (START TUNE PAN
+        LEVEL REIMAGINED). Re-read by the editor on its timer (they may follow the product's
+        state, e.g. the hybrid's type). Unset: the cards' own controls. */
+    std::function<std::array<CardKnob, 5> (int layer, osp::plugin::InstrumentHost&)> cardControls;
+    /** Whether a card shows its four modifier keys (LINK REVERSE LOOP FOLLOW): a product hides
+        them where they mean nothing (an oscillator). Unset: shown, as in ANDOR OSP. */
+    std::function<bool (int layer, osp::plugin::InstrumentHost&)> cardModifiersShown;
+    /** The header MIX's end labels (three engines: the generator side against the hybrid,
+        e.g. "A+B" and "C"). Empty: the layers' letters. */
+    std::array<juce::String, 2> mixEndLabels;
+    /** Controls in a card's well, revealed by the pointer (opt-in): one per storage layer
+        (null: none; see osp::plugin::WellOverlay). Remade when wellOverlayKey changes (a
+        model, a source type), so its controls always match what plays. */
+    std::function<std::unique_ptr<osp::plugin::WellOverlay> (int layer, osp::plugin::InstrumentHost&)> wellOverlay;
+    std::function<juce::String (int layer, osp::plugin::InstrumentHost&)> wellOverlayKey;
     /** The AMP envelope's note (opt-in): a short word drawn on its picture while the engine
         does not follow the envelope as drawn (e.g. "GATE"), or empty. Polled by the editor.
         Unset: the picture as before. Interface only. */
