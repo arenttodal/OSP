@@ -693,6 +693,10 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       `removeEngineSource`, `ProductInfo::hybridHeaderPopover` / `hybridAction`,
       `GeneratedSource::periodic`, `ShellProcessor::productEngine()`. ANDOR OSP uses none of
       them. Proof: OSP suites and design capture.
+- [x] The AMP envelope's note and touch for a product (ANDOR ANALOG's VCA GATE), opt-in:
+      `ProductInfo::ampEnvelopeNote` (`EnvelopePanel::setNote`; empty draws exactly as before)
+      and `ProductInfo::ampEnvelopeTouched` (a gesture on the four AMP parameters). ANDOR OSP
+      sets neither. Proof: OSP suites and design capture.
 
 ## DONE
 

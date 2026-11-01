@@ -1078,6 +1078,8 @@ void ShellEditor::timerCallback()
         if (now != shownEnvelope)
             modPanel.ampEnvelope().repaint (modPanel.ampEnvelope().graphBounds());
         shownEnvelope = now;
+        if (shell.product().ampEnvelopeNote != nullptr)
+            modPanel.ampEnvelope().setNote (shell.product().ampEnvelopeNote (shell));
     }
     updateStatus();
     if (shell.arpEditorExpanded() != arpShown)

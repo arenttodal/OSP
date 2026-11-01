@@ -341,6 +341,18 @@ private:
     float lastScreenPitch = 0.0f, lastScreenMod = 0.0f;   ///< audio thread
     Engine::Performance performance;                       ///< audio thread
 
+    // The AMP envelope's edits (ProductInfo::ampEnvelopeTouched): a gesture's start on one of
+    // its four parameters, handed to the product on the message thread.
+    struct AmpEnvelopeTouch final : juce::AudioProcessorParameter::Listener
+    {
+        explicit AmpEnvelopeTouch (ShellProcessor& p) : owner (p) {}
+        void parameterValueChanged (int, float) override {}
+        void parameterGestureChanged (int, bool starting) override;
+        ShellProcessor& owner;
+    };
+    std::unique_ptr<AmpEnvelopeTouch> ampEnvelopeTouch;
+    std::atomic<bool> ampEnvelopeTouchPending { false };   ///< a touch from another thread, for the timer
+
     // View settings.
     std::atomic<bool> arpOpen { false }, shaperLarge { false };
     std::atomic<int> modTab { 0 };

@@ -120,6 +120,13 @@ ShellProcessor::ShellProcessor (std::unique_ptr<Engine> productEngine)
     store = std::make_unique<osp::plugin::SampleStore> (sampleStoreFolder());
     if (productInfo().installFactoryPresets != nullptr)
         productInfo().installFactoryPresets (*this, presetFolder().getChildFile ("Factory"));
+    if (productInfo().ampEnvelopeTouched != nullptr)
+    {
+        ampEnvelopeTouch = std::make_unique<AmpEnvelopeTouch> (*this);
+        for (const char* id : { "attack", "decay", "sustainLevel", "release" })
+            if (auto* parameter = parameters.getParameter (id))
+                parameter->addListener (ampEnvelopeTouch.get());
+    }
     startTimerHz (20);
 }
 
@@ -127,6 +134,10 @@ ShellProcessor::~ShellProcessor()
 {
     closing = true;
     stopTimer();
+    if (ampEnvelopeTouch != nullptr)
+        for (const char* id : { "attack", "decay", "sustainLevel", "release" })
+            if (auto* parameter = parameters.getParameter (id))
+                parameter->removeListener (ampEnvelopeTouch.get());
     loaderPool.removeAllJobs (true, 30000);
 }
 
@@ -762,8 +773,22 @@ bool ShellProcessor::waitForLoads (int timeoutMs)
     return true;
 }
 
+void ShellProcessor::AmpEnvelopeTouch::parameterGestureChanged (int, bool starting)
+{
+    if (! starting)
+        return;
+    // (The editor's knobs and handles start their gestures on the message thread; a host may
+    // touch from its own: the timer hands that one over.)
+    if (juce::MessageManager::existsAndIsCurrentThread())
+        productInfo().ampEnvelopeTouched (owner);
+    else
+        owner.ampEnvelopeTouchPending.store (true);
+}
+
 void ShellProcessor::timerCallback()
 {
+    if (ampEnvelopeTouchPending.exchange (false) && productInfo().ampEnvelopeTouched != nullptr)
+        productInfo().ampEnvelopeTouched (*this);
     std::deque<Finished> done;
     {
         const std::lock_guard<std::mutex> lock (resultsMutex);

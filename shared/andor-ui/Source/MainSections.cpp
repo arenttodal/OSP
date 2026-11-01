@@ -986,10 +986,17 @@ void EnvelopePanel::paint (juce::Graphics& g)
     juce::Path fill (curve);
     fill.lineTo (r.getX(), r.getBottom());
     fill.closeSubPath();
-    g.setGradientFill (juce::ColourGradient (colour::accent.withAlpha (0.38f), 0.0f, r.getY(), colour::accent.withAlpha (0.05f), 0.0f, r.getBottom(), false));
+    const float faint = note.isEmpty() ? 1.0f : 0.35f;   // (a note: the envelope is not what plays)
+    g.setGradientFill (juce::ColourGradient (colour::accent.withAlpha (0.38f * faint), 0.0f, r.getY(), colour::accent.withAlpha (0.05f * faint), 0.0f, r.getBottom(), false));
     g.fillPath (fill);
-    g.setColour (colour::accent);
+    g.setColour (colour::accent.withMultipliedAlpha (faint));
     g.strokePath (curve, juce::PathStrokeType (2.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    if (note.isNotEmpty())
+    {
+        g.setColour (colour::accent);
+        g.setFont (type::panelHeader());
+        g.drawText (note, well.reduced (14.0f, 8.0f), juce::Justification::topRight, false);
+    }
     for (int i = 0; i < 3; ++i)
     {
         const auto p = h[static_cast<std::size_t> (i)];

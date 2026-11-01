@@ -211,6 +211,17 @@ public:
     juce::Rectangle<int> graphBounds() const { return graph; }
     /** Draw the "AMP ENVELOPE" title (off when a tab row above names it). */
     void setShowsTitle (bool shows) { showsTitle = shows; repaint(); }
+    /** A short word on the picture while the sound does not follow the envelope as drawn (a
+        product's: "GATE", say); the curve is drawn faint under it. Empty (the default): the
+        picture exactly as before. */
+    void setNote (const juce::String& text)
+    {
+        if (text != note)
+        {
+            note = text;
+            repaint();
+        }
+    }
 
 private:
     struct Shape
@@ -225,6 +236,7 @@ private:
     std::array<std::unique_ptr<MiniKnob>, 4> knobs;
     juce::Rectangle<int> graph;
     bool showsTitle = true;
+    juce::String note;
     int dragHandle = -1;
 };
 

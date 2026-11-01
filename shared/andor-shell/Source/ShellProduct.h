@@ -97,6 +97,14 @@ struct ProductInfo
         juce::String label;
         std::function<void (osp::plugin::InstrumentHost&)> run;
     } hybridAction;
+    /** The AMP envelope's note (opt-in): a short word drawn on its picture while the engine
+        does not follow the envelope as drawn (e.g. "GATE"), or empty. Polled by the editor.
+        Unset: the picture as before. Interface only. */
+    std::function<juce::String (osp::plugin::InstrumentHost&)> ampEnvelopeNote;
+    /** The musician starts editing the AMP envelope (one of its knobs or handles, or a host's
+        touch on attack / decay / sustainLevel / release): e.g. the product gives the amplitude
+        back to it. Message thread. Unset: nothing listens. */
+    std::function<void (osp::plugin::InstrumentHost&)> ampEnvelopeTouched;
     /** A generator's card names its first source mode this (its menu and selector) instead
         of ANDOR OSP's "One Shot" (a synthesizer's "Standard"). Empty: "One Shot", as before. */
     juce::String generatorModeName;
