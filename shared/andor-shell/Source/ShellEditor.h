@@ -83,6 +83,10 @@ public:
 
     /** Pulls the processor's state into the UI now and finishes layout transitions (tests, snapshots). */
     void refreshNow();
+    /** Tests: a modulation source dragged over the editor (content coordinates), and dropped. */
+    void dragModulationForTest (int source, juce::Point<float> where) { dragModulation (source, where); }
+    void dropModulationForTest (int source, juce::Point<float> where) { dropModulation (source, where); }
+    juce::Component& contentForTest() noexcept { return content; }
     int visibleCardCount() const;
     osp::plugin::EngineCard& engineCard (int layer) noexcept { return *cards[static_cast<std::size_t> (juce::jlimit (0, 2, layer))]; }
     osp::plugin::ModulationPanel& modulationPanel() noexcept { return modPanel; }
@@ -130,6 +134,8 @@ private:
     void choosePresetFile (bool save);
     void selectModulation (int source, int slot);
     void dragModulation (int source, juce::Point<float> where);
+    int dragHoverCard = -1;               ///< the Granular card a source being dragged rests on
+    juce::uint32 dragHoverSince = 0;
     void dropModulation (int source, juce::Point<float> where);
     void positionPopup();
     int dropLayerAt (juce::Point<int> editorPoint) const;

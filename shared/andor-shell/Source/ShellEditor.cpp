@@ -777,6 +777,29 @@ void ShellEditor::dragModulation (int source, juce::Point<float> where)
 {
     modOverlay.setDrag (source, where);
     headerMix.setModulationDrag (source, headerMix.acceptsModulationDrop (where));
+    // As ANDOR OSP's editor: a Granular card's display, rested on (not passed across), brings
+    // up its POS SIZE DENS TUNE SPREAD so the drag can land on them (the pointer's own hover
+    // never reaches the card while a source is being dragged).
+    int over = -1;
+    for (int l = 0; l < ShellProcessor::numLayers; ++l)
+    {
+        auto& card = *cards[static_cast<std::size_t> (l)];
+        if (card.isVisible() && card.isGranular() && ! card.granularControlsShown() && ! card.isEqOpen()
+            && content.getLocalArea (&card, card.display().getBounds()).toFloat().contains (where))
+            over = l;
+    }
+    if (over != dragHoverCard)
+    {
+        dragHoverCard = over;
+        dragHoverSince = juce::Time::getMillisecondCounter();
+    }
+    else if (over >= 0 && juce::Time::getMillisecondCounter() - dragHoverSince > 380)
+    {
+        cards[static_cast<std::size_t> (over)]->showGranularControls (true, true);
+        dragHoverCard = -1;
+        modOverlay.setDrag (-1, where);   // collect the knobs now shown
+        modOverlay.setDrag (source, where);
+    }
 }
 
 void ShellEditor::dropModulation (int source, juce::Point<float> where)
@@ -794,6 +817,7 @@ void ShellEditor::dropModulation (int source, juce::Point<float> where)
     headerMix.setModulationDrag (-1, false);
     if ((onMix ? modOverlay.dropOn (source, modui::mixTargetId, headerMix.getBounds().toFloat()) : modOverlay.drop (source, where)) >= 0)
         modPanel.refresh();
+    dragHoverCard = -1;
     modOverlay.setDrag (-1, {});
 }
 
