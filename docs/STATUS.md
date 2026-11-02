@@ -743,7 +743,16 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
     take the new defaults.
   - The parameter schema golden is updated (three defaults).
 - **Plan:** three more SPACE engines (VINTAGE, BLOOM, ABYSS) in
-  `docs/spec/SPACE_ENGINES_PLAN.md`. They are not built yet.
+  `docs/spec/SPACE_ENGINES_PLAN.md`.
+- **ABYSS (phase R1): built.**
+  - `engine/AbyssReverb`, selected by `space.engine`, with GRAVITY, FREEZE and RESONANCE
+    (`space.abyss.*`, version hint 23).
+  - The SPACE popover lists ABYSS under the rooms. It shows FLOW / FREEZE, GRAVITY and
+    RESONANCE, and its own picture.
+  - ROOMS stays bit-exact: every regression golden is unchanged, and visual parity is unchanged.
+  - Evidence: the `[abyss]` tests (RT60, gravity swell, freeze, stability, determinism, no
+    allocation, level matched to HALL); the click test for engine and FREEZE switches.
+  - CPU is about 2x HALL (SIMD later). VINTAGE and BLOOM are not built.
 
 ## BLOCKERS
 

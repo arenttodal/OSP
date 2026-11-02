@@ -1,6 +1,14 @@
 # SPACE: three more reverb engines (plan)
 
-Status: a plan. Nothing in it is built yet. Applies to ANDOR OSP and every shell product that
+Status: R1 (ABYSS) is built. VINTAGE and BLOOM are still a plan. ABYSS was built leaner than
+section 4 describes:
+- ROOMS stays in `engine/SpaceReverb`. ABYSS is `engine/AbyssReverb`, and PostProcessor's two
+  crossfading slots each hold both engines.
+- The new parameters are appended with version hint 23 rather than a state-version bump: a
+  session without them opens as ROOMS, in ANDOR OSP and now in the shell too.
+- In the popover, ABYSS is picked from the same list as the rooms. FLOW / FREEZE replaces the
+  tabs, and GRAVITY and RESONANCE replace LOW and HIGH CUT, which remain on the display's handles.
+- ABYSS's variants (DEEP / DARK / INVERSE / ENDLESS) are not built yet. Applies to ANDOR OSP and every shell product that
 uses OSP's shared effects; ANDOR ANALOG is the first.
 Date: 2026-11-02.
 

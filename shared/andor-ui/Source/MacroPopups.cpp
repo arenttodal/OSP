@@ -12,6 +12,7 @@
 #include "engine/Shaping.h"
 #include "engine/DriveProcessor.h"
 #include "engine/EchoDelay.h"
+#include "engine/AbyssReverb.h"
 #include "engine/SpaceReverb.h"
 
 #include <cmath>
@@ -101,6 +102,13 @@ namespace
         void setIdentityColour (juce::Colour c)
         {
             identity = c;
+            repaint();
+        }
+        /** Up to date at once (no fade): what a snapshot without a message loop sees. */
+        void settle()
+        {
+            changed();
+            fade = 0.0f;
             repaint();
         }
 
@@ -250,13 +258,16 @@ namespace
 
         bool changed() override
         {
-            const int type = juce::roundToInt (value (state, "space.type"));
+            // (ABYSS shows as a fifth "type": a change of engine transitions like a change of room.)
+            const bool abyss = juce::roundToInt (value (state, "space.engine")) == 1;
+            const int type = abyss ? 4 : juce::roundToInt (value (state, "space.type"));
             if (type != shownType && shownType >= 0)
                 transition();
             shownType = type;
             const bool eqMoved = eqWatch.differs ({ value (state, "space.lowCut"), value (state, "space.highCut") });
             if (watch.differs ({ static_cast<double> (type), value (state, "space.decay"), value (state, "space"), value (state, "space.preDelay"),
-                                 value (state, "space.size"), value (state, "space.damping"), value (state, "space.width"), static_cast<double> (getWidth()) }))
+                                 value (state, "space.size"), value (state, "space.damping"), value (state, "space.width"), static_cast<double> (getWidth()),
+                                 abyss ? value (state, "space.abyss.gravity") : 0.0, abyss ? value (state, "space.abyss.freeze") : 0.0 }))
             {
                 cacheValid = false;
                 return true;
@@ -333,9 +344,15 @@ namespace
             come from the type's design (SpaceReverb::portrait) and DECAY. */
         void draw (juce::Graphics& g, juce::Rectangle<float> bounds)
         {
-            const auto type = static_cast<SpaceType> (std::clamp (juce::roundToInt (value (state, "space.type")), 0, 3));
+            // ABYSS (SPACE's other engine): no reflections, a tail as long as GRAVITY makes it,
+            // swelling when GRAVITY is below 0, held to the edge while FROZEN.
+            const bool abyss = juce::roundToInt (value (state, "space.engine")) == 1;
+            const double gravity = abyss ? 0.01 * value (state, "space.abyss.gravity") : 0.0;
+            const bool frozen = abyss && value (state, "space.abyss.freeze") >= 0.5;
+            const auto type = abyss ? SpaceType::hall : static_cast<SpaceType> (std::clamp (juce::roundToInt (value (state, "space.type")), 0, 3));
             double lo = 0.2, hi = 8.0;
-            shaping::decayRange (type, lo, hi);
+            if (! abyss)
+                shaping::decayRange (type, lo, hi);
             const double decay = std::clamp (static_cast<double> (value (state, "space.decay")), lo, hi);
             const double amount = 0.85 + 0.15 * std::clamp (static_cast<double> (value (state, "space")) * 0.01, 0.0, 1.0);
             SpaceReverb::Settings settings;
@@ -345,10 +362,23 @@ namespace
             settings.size = 0.01 * value (state, "space.size");
             settings.damping = 0.01 * value (state, "space.damping");
             settings.width = 0.01 * value (state, "space.width");
-            const auto portrait = SpaceReverb::portrait (settings);
+            auto portrait = SpaceReverb::portrait (settings);
+            if (abyss)
+            {
+                portrait.erCount = 0;
+                portrait.erLevel = 0.0f;
+                portrait.diffusionMs = 12.0;
+                portrait.damping = static_cast<float> (std::clamp (0.1 + 0.6 * settings.damping + 0.25 * std::max (0.0, gravity), 0.0, 1.0));
+                portrait.width = static_cast<float> (std::clamp (settings.width, 0.0, 1.0));
+            }
             // A fixed time axis for the type (its longest DECAY fills it); DECAY sets how far
             // the tail reaches along it, so turning the knob lengthens or shortens the tail.
-            const double span = hi * 1.25, tailEnd = decay * 1.25;   // drawn to -75 dB
+            // ABYSS: an axis that fits the tail GRAVITY makes (10 s at least), the whole of it
+            // while FROZEN.
+            const double abyssTail = AbyssReverb::effectiveDecay (decay, gravity) * 1.25;
+            const double span = abyss ? std::max (10.0, 5.0 * std::ceil (abyssTail * 1.1 / 5.0)) : hi * 1.25;
+            const double tailEnd = abyss ? (frozen ? span : abyssTail) : decay * 1.25;   // drawn to -75 dB
+            const double swell = abyss ? 0.9 * std::sqrt (AbyssReverb::sizeFactor (settings.size)) : 0.0;   // GRAVITY's window
             const float W = bounds.getWidth(), H = bounds.getHeight();
             // Sizes follow the display (the popover's is small): strokes, dots and counts.
             const float k = juce::jlimit (0.3f, 1.0f, H / 261.0f), dot = std::sqrt (k);
@@ -388,6 +418,15 @@ namespace
             auto tail = [&] (double t) {
                 if (t <= onset)
                     return 0.0;
+                if (abyss)
+                {
+                    // Natural (or held), and below GRAVITY 0 the swell through its window.
+                    const double fill = 1.0 - std::exp (-(t - onset) / build);
+                    const double natural = frozen ? 0.85 * fill : std::pow (std::max (0.0, 1.0 - t / tailEnd), 1.4) * fill;
+                    const double u = t - onset, inverse = std::max (0.0, -gravity);
+                    const double rise = u < swell ? (u / swell) * (u / swell) : (frozen ? 0.85 : std::pow (std::max (0.0, 1.0 - (u - swell) / tailEnd), 1.4));
+                    return ((1.0 - inverse) * natural + inverse * rise) * amount;
+                }
                 // Drawn compressed (as the ear hears a tail): a fast early fall slowing towards the floor.
                 double a = std::pow (std::max (0.0, 1.0 - t / tailEnd), 1.4) * (1.0 - std::exp (-(t - onset) / build)) * amount;
                 if (portrait.spring)
@@ -434,7 +473,7 @@ namespace
             const int count = juce::roundToInt ((type == SpaceType::plate ? 17000 : (type == SpaceType::hall ? 15000 : (type == SpaceType::room ? 13000 : 13500)))
                                                 * juce::jlimit (0.15f, 1.0f, (W * H) / (558.0f * 261.0f)) * 1.6f
                                                 * static_cast<float> (0.2 + 0.8 * tailEnd / span));   // the same density, short or long
-            Prng rng (Prng::deriveSeed (0x7370616365ull, static_cast<std::uint64_t> (type), 0));
+            Prng rng (Prng::deriveSeed (0x7370616365ull, static_cast<std::uint64_t> (abyss ? 4 : static_cast<int> (type)), 0));
             for (int i = 0; i < count; ++i)
             {
                 const double t = onset + (tailEnd - onset) * std::pow (rng.nextDouble(), 1.12);
@@ -463,7 +502,7 @@ namespace
             // part so it reads); a plate has none, only a few dense first arrivals.
             const double early = std::min (0.45 * tailEnd, span * (type == SpaceType::plate ? 0.05 : (type == SpaceType::hall ? 0.12 : 0.095)));
             const bool real = portrait.erCount > 1;
-            const int strokes = real ? portrait.erCount : 6;
+            const int strokes = abyss ? 0 : (real ? portrait.erCount : 6);   // (ABYSS has no reflections)
             const double lastMs = real ? std::max (1.0, portrait.erMs[static_cast<std::size_t> (portrait.erCount - 1)]) : 1.0;
             Prng er (Prng::deriveSeed (0x6561726c79ull, static_cast<std::uint64_t> (type), 0));
             for (int i = 0; i < strokes; ++i)
@@ -1584,6 +1623,11 @@ namespace
         }
 
         bool compact() const override { return true; }
+        void settleNow() override
+        {
+            if (visual != nullptr)
+                visual->settle();
+        }
 
         ValueSelector& mode (const char* id, juce::String tooltip)
         {
@@ -1683,6 +1727,100 @@ namespace
         std::unique_ptr<Visual> visual;
         std::vector<std::unique_ptr<MiniKnob>> knobs;
         std::vector<MiniKnob*> primaryRow, secondaryRow;
+    };
+
+    //==========================================================================
+    /** SPACE: the room, its EQ on the display (drag the corners), then its shape. ROOMS:
+        PRE-DELAY, SIZE, DECAY, DAMP on the first row; MOD, WIDTH and the EQ's values below;
+        the four rooms as tabs. ABYSS (SPACE's other engine, picked from the same list as the
+        rooms): FLOW / FREEZE in the tabs' place, GRAVITY, RESONANCE, MOD, WIDTH below (the
+        EQ on the display's corners). The popover keeps its size either way. */
+    class SpacePanel final : public MacroPanel
+    {
+    public:
+        explicit SpacePanel (InstrumentHost& p)
+            : MacroPanel (p, "SPACE", 300, 92, design::colour::Macro::space),
+              // (On the message thread; the switch comes from the header's selector, which a
+              // rebuild keeps: only the tabs and knobs are remade.)
+              engineAttachment (*p.apvts().getParameter ("space.engine"), [this] (float) { build(); })
+        {
+            auto& m = mode ("space.type", "Room, hall, plate or spring - or ABYSS, a vast moving space");
+            m.textOverride = [this] { return isAbyss() ? juce::String ("ABYSS") : juce::String(); };
+            m.extraItems = [this] (juce::PopupMenu& menu) {
+                juce::Component::SafePointer<SpacePanel> safe (this);
+                menu.addSeparator();
+                menu.addItem ("Abyss", true, isAbyss(), [safe] { if (safe != nullptr) safe->setEngine (1); });
+            };
+            m.onPick = [this] (int) { setEngine (0); };   // a room leaves ABYSS
+            setVisual (std::make_unique<SpaceVisual> (p.apvts()));
+            build();
+        }
+
+    private:
+        bool isAbyss() const { return juce::roundToInt (value (processor.apvts(), "space.engine")) == 1; }
+        void setEngine (int engine)
+        {
+            if (auto* e = processor.apvts().getParameter ("space.engine"); e != nullptr && juce::roundToInt (e->convertFrom0to1 (e->getValue())) != engine)
+            {
+                e->beginChangeGesture();
+                e->setValueNotifyingHost (e->convertTo0to1 (static_cast<float> (engine)));
+                e->endChangeGesture();
+            }
+        }
+
+        void build()
+        {
+            const bool abyss = isAbyss();
+            if (built == (abyss ? 1 : 0))
+                return;
+            built = abyss ? 1 : 0;
+            primaryRow.clear();
+            secondaryRow.clear();
+            knobs.clear();
+            modeTabs.reset();
+            const auto ms = [] (double v) { return format::milliseconds (v); };
+            const auto percent = [] (double v) { return format::percent (v) + " %"; };
+            if (! abyss)
+            {
+                auto& types = tabs ("space.type", { "ROOM", "HALL", "PLATE", "SPRING" }, "Room, hall (after the Berlin concert halls), plate or spring");
+                auto* typeParam = processor.apvts().getParameter ("space.type");
+                knob (false, "space.preDelay", "PRE-DELAY", ms);
+                knob (false, "space.size", "SIZE", percent);
+                // The readout shows the decay the chosen type actually uses (each type has its own range).
+                auto& decay = knob (false, "space.decay", "DECAY", [typeParam] (double v) {
+                    double lo = 0.2, hi = 8.0;
+                    if (typeParam != nullptr)
+                        shaping::decayRange (static_cast<SpaceType> (juce::roundToInt (typeParam->convertFrom0to1 (typeParam->getValue()))), lo, hi);
+                    return juce::String (std::clamp (v, lo, hi), 1) + " s";
+                });
+                knob (false, "space.damping", "DAMP", percent);
+                knob (true, "space.modulation", "MOD", percent);
+                knob (true, "space.width", "WIDTH", percent);
+                knob (true, "space.lowCut", "LOW CUT", [] (double v) { return format::hertz (v); });
+                knob (true, "space.highCut", "HIGH CUT", [] (double v) { return format::hertz (v); });
+                types.onChange = [&decay] (int) { decay.repaint(); };
+            }
+            else
+            {
+                tabs ("space.abyss.freeze", { "FLOW", "FREEZE" }, "FREEZE holds the space as it is (still moving); FLOW lets it decay again");
+                knob (false, "space.preDelay", "PRE-DELAY", ms);
+                knob (false, "space.size", "SIZE", percent);
+                knob (false, "space.decay", "DECAY", [] (double v) { return juce::String (std::clamp (v, 0.2, 8.0), 1) + " s"; });
+                knob (false, "space.damping", "DAMP", percent);
+                knob (true, "space.abyss.gravity", "GRAVITY", [] (double v) {
+                    const int r = juce::roundToInt (v);
+                    return (r > 0 ? juce::String ("+") : juce::String()) + juce::String (r) + " %";
+                });
+                knob (true, "space.abyss.resonance", "RESONANCE", percent);
+                knob (true, "space.modulation", "MOD", percent);
+                knob (true, "space.width", "WIDTH", percent);
+            }
+            resized();
+            repaint();
+        }
+
+        juce::ParameterAttachment engineAttachment;
+        int built = -1;
     };
 
     //==========================================================================
@@ -2758,29 +2896,7 @@ std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, InstrumentHost& p
             break;
     }
 
-    // SPACE v2: the room, its EQ on the display (drag the corners), then its shape:
-    // PRE-DELAY, SIZE, DECAY, DAMP on the first row; MOD, WIDTH and the EQ's values below.
-    auto popup = std::make_unique<MacroPanel> (processor, "SPACE", 300, 92, design::colour::Macro::space);
-    popup->mode ("space.type", "Room, hall, plate or spring");
-    auto& types = popup->tabs ("space.type", { "ROOM", "HALL", "PLATE", "SPRING" }, "Room, hall (after the Berlin concert halls), plate or spring");
-    popup->setVisual (std::make_unique<SpaceVisual> (state));
-    auto* typeParam = state.getParameter ("space.type");
-    popup->knob (false, "space.preDelay", "PRE-DELAY", ms);
-    popup->knob (false, "space.size", "SIZE", percent);
-    // The readout shows the decay the chosen type actually uses (each type has its own range).
-    auto& decay = popup->knob (false, "space.decay", "DECAY", [typeParam] (double v) {
-        double lo = 0.2, hi = 8.0;
-        if (typeParam != nullptr)
-            shaping::decayRange (static_cast<SpaceType> (juce::roundToInt (typeParam->convertFrom0to1 (typeParam->getValue()))), lo, hi);
-        return juce::String (std::clamp (v, lo, hi), 1) + " s";
-    });
-    popup->knob (false, "space.damping", "DAMP", percent);
-    popup->knob (true, "space.modulation", "MOD", percent);
-    popup->knob (true, "space.width", "WIDTH", percent);
-    popup->knob (true, "space.lowCut", "LOW CUT", [] (double v) { return format::hertz (v); });
-    popup->knob (true, "space.highCut", "HIGH CUT", [] (double v) { return format::hertz (v); });
-    types.onChange = [&decay] (int) { decay.repaint(); };
-    return popup;
+    return std::make_unique<SpacePanel> (processor);
 }
 
 
@@ -2797,7 +2913,8 @@ const juce::StringArray& popupParameterIds (MacroPopup macro)
                                               "movement.shaper.pattern", "movement.shaper.rate", "movement.shaper.target",
                                               "movement.shaper.smooth", "movement.shaper.custom" };
     static const juce::StringArray space { "space.type", "space.decay", "space.preDelay", "space.size", "space.damping",
-                                           "space.modulation", "space.width", "space.lowCut", "space.highCut" };
+                                           "space.modulation", "space.width", "space.lowCut", "space.highCut",
+                                           "space.engine", "space.abyss.gravity", "space.abyss.freeze", "space.abyss.resonance" };
     static const juce::StringArray echo { "echo.type", "echo.sync", "echo.division", "echo.time", "echo.feedback",
                                           "echo.tone", "echo.age", "echo.stereo" };
     switch (macro)

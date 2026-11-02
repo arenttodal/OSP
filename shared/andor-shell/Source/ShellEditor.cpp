@@ -578,6 +578,7 @@ void ShellEditor::refreshNow()
     {
         juce::Desktop::getInstance().getAnimator().cancelAnimation (popup.get(), true);
         popup->setAlpha (1.0f);
+        popup->settleNow();
     }
 }
 

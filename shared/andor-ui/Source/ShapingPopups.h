@@ -195,6 +195,8 @@ public:
 
     /** Follows the processor (the editor's timer, while open). */
     virtual void refreshContent() {}
+    /** Brings what it draws up to date at once, without its own timer (tests, snapshots). */
+    virtual void settleNow() {}
 
     /** Called when the card's preferred size changes (e.g. another MOVEMENT mode). */
     std::function<void()> onSizeChanged;
