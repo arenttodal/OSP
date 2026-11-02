@@ -31,6 +31,8 @@ enum class FilterType { lp24, lp12, hp12, bp12, tilt, off };   ///< off: researc
 enum class MovementMode { drift, tape, chorus, pulse, shaper };
 /** SPACE's rooms. HALL took CHAMBER's place (index 1) in SPACE v2. */
 enum class SpaceType { room, hall, plate, spring };
+/** SPACE's engine: the four ROOMS (SpaceType) or ABYSS (engine/AbyssReverb.h). */
+enum class SpaceEngine { rooms, abyss };
 /** DRIVE's three circuits (a shared saturation stage before SPACE and ECHO). */
 enum class DriveMode { tube, tape, crunch };
 
@@ -85,6 +87,11 @@ struct Shaping
     double spaceWidth = 1.0;          ///< 0..1: mono .. the type's full width
     double spaceLowCutHz = 100.0;     ///< the reverb's input EQ: 20 Hz = open
     double spaceHighCutHz = 5000.0;   ///< 20 kHz = open (5 kHz by default since 2026-11: was 12 kHz)
+    // SPACE's engine (2026-11): ROOMS (the four types above) or ABYSS, with ABYSS's own.
+    SpaceEngine spaceEngine = SpaceEngine::rooms;
+    double abyssGravity = 0.0;        ///< -1..1: below 0 the envelope swells (inverse)
+    bool abyssFreeze = false;
+    double abyssResonance = 0.0;      ///< 0..1
 
     // ECHO (a send in parallel with SPACE; the ECHO macro is its level)
     EchoType echoType = EchoType::tape;

@@ -24,6 +24,7 @@ add_executable(osp_tests
     unit/CharacterFilterTests.cpp
     unit/PerformanceTests.cpp
     unit/DynamicsTests.cpp
+    unit/AbyssReverbTests.cpp
     unit/PostProcessorTests.cpp
     unit/DriveProcessorTests.cpp
     unit/ArpeggiatorTests.cpp
