@@ -144,6 +144,33 @@ TEST_CASE ("post: the four SPACE types have their own identity", "[unit][post][s
         CHECK (m->t30 > 0.2);
 }
 
+TEST_CASE ("post: SPACE plays a parameter round trip's rounding of its EQ corners bit-identically", "[unit][post][space]")
+{
+    // macOS reads HIGH CUT's 5 kHz default (its skewed range's centre) back from a saved
+    // session as 4999.9995: the room must not hear it.
+    auto render = [] (double highCutHz, double lowCutHz) {
+        PostProcessor post;
+        post.prepare (48000.0, 256);
+        Shaping sh;
+        sh.spaceHighCutHz = highCutHz;
+        sh.spaceLowCutHz = lowCutHz;
+        post.setShaping (sh);
+        Macros m;
+        m.space = 0.6;
+        post.setMacros (m);
+        post.reset();
+        AudioData x = AudioData::allocate (2, 48000, 48000.0);
+        for (std::size_t i = 0; i < 4800; ++i)
+            x.channels[0][i] = x.channels[1][i] = static_cast<float> (0.3 * std::sin (0.05 * static_cast<double> (i)));
+        return process (post, x);
+    };
+    const auto reference = render (5000.0, 100.0);
+    const auto rounded = render (static_cast<double> (4999.9995f), static_cast<double> (std::nextafter (100.0f, 200.0f)));
+    CHECK (reference.channels[0] == rounded.channels[0]);
+    CHECK (reference.channels[1] == rounded.channels[1]);
+    CHECK (render (4990.0, 100.0).channels[0] != reference.channels[0]);   // (a real change is still heard)
+}
+
 TEST_CASE ("post: SPACE at zero is bypassed and changing type does not click", "[unit][post][space]")
 {
     const auto audio = testsignals::vowel (220.0, 3.0, 48000.0, 1);

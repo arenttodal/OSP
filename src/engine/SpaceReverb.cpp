@@ -128,6 +128,11 @@ namespace
 //==============================================================================
 SpaceReverb::Settings SpaceReverb::Settings::from (const Shaping& s) noexcept
 {
+    // The EQ's corners arrive through a host parameter's skewed normalisation, whose round
+    // trip (save, reload) is not bit-exact on every platform's libm: macOS reads HIGH CUT's
+    // 5 kHz default (its range's centre) back as 4999.9995. Snapped to 0.01 Hz, far below
+    // hearing, a recalled session plays bit-identically everywhere.
+    const auto snap = [] (double v, double perUnit) { return std::round (v * perUnit) / perUnit; };   // (a division: 5000 stays 5000)
     Settings r;
     r.type = s.spaceType;
     r.decaySeconds = s.spaceDecaySeconds;
@@ -136,8 +141,8 @@ SpaceReverb::Settings SpaceReverb::Settings::from (const Shaping& s) noexcept
     r.damping = s.spaceDamping;
     r.modulation = s.spaceModulation;
     r.width = s.spaceWidth;
-    r.lowCutHz = s.spaceLowCutHz;
-    r.highCutHz = s.spaceHighCutHz;
+    r.lowCutHz = snap (s.spaceLowCutHz, 100.0);
+    r.highCutHz = snap (s.spaceHighCutHz, 100.0);
     return r;
 }
 
