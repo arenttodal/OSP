@@ -73,7 +73,9 @@ add_library(osp_dsp STATIC
     src/engine/CharacterFilter.cpp
     src/engine/MovementBus.cpp
     src/engine/AbyssReverb.cpp
+    src/engine/BloomReverb.cpp
     src/engine/SpaceReverb.cpp
+    src/engine/VintageReverb.cpp
     src/engine/EchoDelay.cpp
     src/engine/DriveProcessor.cpp
     src/engine/Arpeggiator.cpp

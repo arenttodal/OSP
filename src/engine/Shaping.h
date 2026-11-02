@@ -31,8 +31,13 @@ enum class FilterType { lp24, lp12, hp12, bp12, tilt, off };   ///< off: researc
 enum class MovementMode { drift, tape, chorus, pulse, shaper };
 /** SPACE's rooms. HALL took CHAMBER's place (index 1) in SPACE v2. */
 enum class SpaceType { room, hall, plate, spring };
-/** SPACE's engine: the four ROOMS (SpaceType) or ABYSS (engine/AbyssReverb.h). */
-enum class SpaceEngine { rooms, abyss };
+/** SPACE's engine: the four ROOMS (SpaceType), ABYSS, VINTAGE or BLOOM (engine/*Reverb.h). */
+enum class SpaceEngine { rooms, abyss, vintage, bloom };
+/** VINTAGE's voicings and its two eras (the network's internal rate). */
+enum class VintageVariant { hall, plate, chamber, room };
+enum class VintageEra { early, later };
+/** BLOOM's character in its feedback path. */
+enum class BloomVariant { clean, vintage, tape, wash };
 /** DRIVE's three circuits (a shared saturation stage before SPACE and ECHO). */
 enum class DriveMode { tube, tape, crunch };
 
@@ -92,6 +97,14 @@ struct Shaping
     double abyssGravity = 0.0;        ///< -1..1: below 0 the envelope swells (inverse)
     bool abyssFreeze = false;
     double abyssResonance = 0.0;      ///< 0..1
+    VintageVariant vintageVariant = VintageVariant::hall;
+    VintageEra vintageEra = VintageEra::early;
+    double vintageDiffusion = 0.7;    ///< 0..1
+    BloomVariant bloomVariant = BloomVariant::clean;
+    bool bloomSync = true;
+    int bloomDivision = 6;            ///< ECHO's divisions (6 = 1/4)
+    double bloomTimeMs = 350.0;       ///< free time
+    double bloomDiffusion = 0.6;      ///< 0..1: clean repeats .. a wash
 
     // ECHO (a send in parallel with SPACE; the ECHO macro is its level)
     EchoType echoType = EchoType::tape;
