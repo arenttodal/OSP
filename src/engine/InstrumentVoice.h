@@ -354,11 +354,14 @@ private:
         double pos = 0.0, posB = 0.0;     ///< read positions (posB: a loop crossfade's other read)
         float gainA = 1.0f, gainB = 0.0f;
         int age = 0;
+        double cosine = 1.0, sine = 0.0;   ///< the window's angle (2 pi age / length), rotated per sample
     };
     std::array<StretchGrain, 2> stretchGrains {};
     bool stretching = false;
     double stretchSpeed = 1.0, stretchPeriod = 0.0;
+    double stretchLo = 0.0, stretchHi = 0.0;   ///< the note's audio (source frames): no grain reads outside it
     int stretchLength = 0, stretchHop = 0, stretchCountdown = 0;
+    double stretchRotCos = 1.0, stretchRotSin = 0.0;   ///< one sample's turn of the window's angle
     void startStretch (int note) noexcept;
     void spawnStretchGrain() noexcept;
     void stretchRead (float& l, float& r) noexcept;

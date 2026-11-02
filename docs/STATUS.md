@@ -551,6 +551,11 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       - SPEED (NOTE MAP > TUNING, 30-200 %): Note Atlas `mapping.speed`, a pitch-preserving
         two-grain stretch in `InstrumentVoice` for atlas notes; 100 % is bit-identical.
       Tests `[audition]`, `[classify]`, `[speed]`.
+      SPEED fix (owner: "a loud pop and the audio dies" at 50-60 %): the grains read past a
+      note's audio near its end (an out-of-bounds read, found with AddressSanitizer); now kept
+      inside it. A safety net in the engine drops any non-finite layer block (its notes end;
+      `droppedBlockCount()`), so a bad sample can no longer poison the reverb. The grain window
+      is a rotation instead of a sin per sample. Cost: ~+40 % per stretched voice.
 - [x] KEY DNA keys by hand: drag a key's bar (away from the curve) and that key plays the value
       drawn, in place of the curve and its variation (a stroke draws every key it passes, one
       undo step; a click alone draws nothing, so double-click still adds a curve point).

@@ -19,6 +19,7 @@
 #include <cstdio>
 #include <complex>
 #include <functional>
+#include <limits>
 #include <numbers>
 #include <vector>
 
@@ -832,4 +833,46 @@ TEST_CASE ("synthesize: the oscillator's own cost per voice", "[.][synthbench]")
     std::sort (runs.begin(), runs.end());
     const double nsPerSample = 1.0e9 * runs[3] / samples;
     std::printf ("oscillator: %.2f ns per sample, %.4f %% of real time per voice (sink %g)\n", nsPerSample, 100.0 * runs[3] / 10.0, static_cast<double> (sink));
+}
+
+TEST_CASE ("engine safety net: a voice that goes bad cannot silence the instrument", "[unit][safety]")
+{
+    // A recording with corrupt samples in its middle (as a bug reading the wrong memory would
+    // produce): its note is dropped, the output stays finite, and the next note plays.
+    auto bad = testsignals::sine (midiToHz (60), 1.0, rate, 0.4, 1);
+    for (std::size_t i = 24000; i < 24010; ++i)
+        bad.channels[0][i] = std::numeric_limits<float>::quiet_NaN();
+    const auto badModel = model (bad);
+    auto good = testsignals::sine (midiToHz (60), 2.0, rate, 0.4, 1);
+    testsignals::applyFades (good, 0.01, 0.05);
+    const auto goodModel = model (good);
+    auto settings = plainSettings();
+    settings.macros.space = 0.6;   // a reverb tank: what a bad sample would poison for good
+    InstrumentEngine e;
+    e.prepare (rate, 256, settings);
+    e.setModel (badModel.get());
+    std::vector<float> l (256), r (256), out;
+    auto run = [&] (double seconds) {
+        for (int done = 0; done < static_cast<int> (seconds * rate); done += 256)
+        {
+            float* ch[2] = { l.data(), r.data() };
+            e.render (ch, 2, 256);
+            out.insert (out.end(), l.begin(), l.end());
+        }
+    };
+    e.noteOn (60, 100);
+    run (1.0);
+    e.allNotesOff();
+    run (0.3);
+    CHECK (e.droppedBlockCount() > 0);
+    for (const float x : out)
+        REQUIRE (std::isfinite (x));
+    // The instrument still plays.
+    e.setModel (goodModel.get());
+    out.clear();
+    e.noteOn (60, 100);
+    run (0.6);
+    CHECK (rms (out, 0.2, 0.6) > 0.01);
+    for (const float x : out)
+        REQUIRE (std::isfinite (x));
 }

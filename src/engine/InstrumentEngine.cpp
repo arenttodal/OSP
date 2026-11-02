@@ -1364,6 +1364,24 @@ void InstrumentEngine::renderBlock (float* const* output, int numChannels, int n
                 else
                     voice.quietSamples = 0;
             }
+            {
+                // A safety net: a non-finite or absurd sample would poison every feedback stage
+                // after it (filters, the reverb's tank) and leave the instrument silent until it
+                // is reloaded. One pass over the block; if it is ever bad, the block is dropped
+                // and the layer's notes end, so the rest keeps playing. (NaN fails "< limit".)
+                float sum = 0.0f;
+                for (int i = 0; i < n; ++i)
+                    sum += std::abs (bl[static_cast<std::size_t> (i)]) + std::abs (br[static_cast<std::size_t> (i)]);
+                if (! (sum < 1.0e6f))
+                {
+                    std::fill_n (bl.begin(), n, 0.0f);
+                    std::fill_n (br.begin(), n, 0.0f);
+                    for (auto& voice : voices)
+                        if (voice.isActive() && voice.layerIndex() == layer)
+                            voice.kill();
+                    ++droppedBlocks;
+                }
+            }
             if (layerStage)
                 runLayerStage (slot, bl.data(), br.data(), n, mono);
             if (eqOn)

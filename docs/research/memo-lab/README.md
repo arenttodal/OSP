@@ -157,7 +157,15 @@ The macOS test build (CI artifact `OSP-macOS-test`) contains `ANDOR Memo Lab.app
   reads partly as Talk. Long memos are read up to 15 minutes.
 - **SPEED** stretches by overlapping short pieces of the recording a whole number of pitch
   periods apart: smooth on steady tones, but at 30 % fast vibrato and consonants smear, and
-  at 200 % very short notes may lose their tail.
+  at 200 % very short notes may lose their tail. It costs about 40 % more per stretched voice
+  (16 held voices on a Linux VM core: 10 % of real time at 100 %, 14-15 % at 50 % or 200 %).
+- **Fixed (after the owner's test):** at 50-60 % a loud pop and then silence. The stretch's
+  grains read up to a grain (40-120 ms) ahead of the note; near its end they read past the
+  note's audio into other memory (AddressSanitizer: an invalid read in the grain's
+  interpolation), and a garbage sample reaching the reverb's feedback left the output dead.
+  Grains are now kept inside the note (moved back by whole periods, in phase) and a read
+  outside it is silence; and the engine drops any layer block that is not finite (its notes
+  end, the instrument keeps playing).
 - **One recording in memory** (up to 15 minutes), one conversion at a time; analysis covers at
   most OSP's 180 s per recording.
 - **NOTE MAP** shows its EQ and DAMPEN tabs, which do nothing here.

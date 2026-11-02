@@ -17,7 +17,9 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <cstdio>
 #include <functional>
 #include <map>
 #include <numbers>
@@ -804,4 +806,64 @@ TEST_CASE ("Atlas set: SPEED is saved with the atlas, 1 is the default and plays
         allocations = scope.count();
     }
     CHECK (allocations == 0);
+}
+
+TEST_CASE ("Atlas set: SPEED never reads outside a note's audio - to the end, reversed, looped, every speed", "[integration][atlas][speed]")
+{
+    // A note held past its end at each speed (LOOP off: it plays once and ends; on: it loops),
+    // forwards and reversed, low and high keys (long and short grains). The stretch's grains
+    // read ahead of the timeline; near a note's end they must stay inside its audio.
+    const auto& f = fixture ("sung-four");
+    for (const double speed : { 0.3, 0.5, 0.6, 0.8, 1.25, 2.0 })
+        for (const bool reverse : { false, true })
+            for (const bool loop : { false, true })
+            {
+                auto a = f.atlas;
+                a.mapping.speed = speed;
+                const auto r = atlasset::buildInstrumentSet (a, f.audio, {});
+                REQUIRE (r.set != nullptr);
+                auto s = dry();
+                s.layer[0].reverse = reverse;
+                s.layer[0].loop = loop;
+                Rig rig (s);
+                rig.engine.setInstrumentSet (r.set.get());
+                for (int key : { 45, 57, 64, 79 })
+                    rig.engine.noteOn (key, 100);
+                rig.run (4.0);
+                rig.engine.allNotesOff();
+                rig.run (1.0);
+                float peak = 0.0f;
+                bool finite = true;
+                for (const auto& ch : rig.out.channels)
+                    for (const float x : ch)
+                    {
+                        finite = finite && std::isfinite (x);
+                        peak = std::max (peak, std::abs (x));
+                    }
+                INFO ("speed " << speed << (reverse ? " reversed" : "") << (loop ? " looped" : "") << ": peak " << peak);
+                CHECK (finite);
+                CHECK (peak < 2.0f);
+                CHECK (rig.engine.droppedBlockCount() == 0);   // nothing for the safety net to catch
+            }
+}
+
+TEST_CASE ("Atlas set: SPEED's cost - 16 held voices, 100 % against 50 % and 200 % (run on demand)", "[.][speedbench]")
+{
+    const auto& f = fixture ("sung-four");
+    for (const double speed : { 1.0, 0.5, 2.0 })
+    {
+        auto a = f.atlas;
+        a.mapping.speed = speed;
+        const auto r = atlasset::buildInstrumentSet (a, f.audio, {});
+        REQUIRE (r.set != nullptr);
+        Rig rig;
+        rig.record = false;
+        rig.engine.setInstrumentSet (r.set.get());
+        for (int i = 0; i < 16; ++i)
+            rig.engine.noteOn (48 + 2 * i, 100);
+        const auto t0 = std::chrono::steady_clock::now();
+        rig.run (10.0);
+        const double ms = std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - t0).count();
+        std::printf ("speed %.2f: %.1f ms for 10 s of 16 voices (%.2f %% of real time)\n", speed, ms, ms / 100.0);
+    }
 }

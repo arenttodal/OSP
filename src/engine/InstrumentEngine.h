@@ -527,8 +527,12 @@ public:
         unmappedMember when the set's mapping (a Note Atlas's FILL reach) leaves the key silent. */
     int memberFor (int note, int velocity, std::uint64_t eventIndex, int layer = 0) const noexcept;
     static constexpr int unmappedMember = -2;
+    /** Blocks the safety net dropped (a layer's voices summed to a non-finite or absurd value;
+        0 in normal use: tests and diagnostics). */
+    std::uint64_t droppedBlockCount() const noexcept { return droppedBlocks; }
 
 private:
+    std::uint64_t droppedBlocks = 0;
     static constexpr int tailSlots = 16;
     static constexpr int totalSlots = EngineSettings::layers * EngineSettings::maxPolyphony + tailSlots;
 

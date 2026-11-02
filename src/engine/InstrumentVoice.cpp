@@ -1652,13 +1652,21 @@ void InstrumentVoice::startStretch (int note) noexcept
     const auto& src = *layer->source;
     const double rootHz = 440.0 * std::exp2 ((src.rootMidi() - 69.0) / 12.0);
     stretchPeriod = rootHz > 0.0 ? src.sampleRate() / rootHz : 0.0;
+    // The grains read ahead of the timeline (a whole grain's length): near the note's ends
+    // they are kept inside its audio (spawnStretchGrain), and a read outside it is silence.
+    stretchLo = 0.0;
+    stretchHi = std::max (0.0, static_cast<double> (src.numFrames() - 1));
     // The first grain starts at its full level (the attack is heard as recorded); the next one
     // rises from the first sample, so the two always sum to one.
+    stretchRotCos = std::cos (2.0 * std::numbers::pi / static_cast<double> (stretchLength));
+    stretchRotSin = std::sin (2.0 * std::numbers::pi / static_cast<double> (stretchLength));
     stretchGrains = {};
     auto& first = stretchGrains[0];
     first.active = true;
     first.pos = position;
     first.age = stretchHop;
+    first.cosine = -1.0;   // halfway: the window's peak
+    first.sine = 0.0;
     stretchCountdown = 1;
 }
 
@@ -1691,6 +1699,19 @@ void InstrumentVoice::spawnStretchGrain() noexcept
         const double k = std::round ((position - previous->pos) / stretchPeriod);
         g.pos = previous->pos + k * stretchPeriod;
     }
+    // The whole grain inside the note's audio: one that would run past its end (or, reversed,
+    // its start) begins earlier by whole periods, so it stays in phase. (Its read moves by
+    // up to the grain's length at the current step; a margin covers bends and glides.)
+    const double span = 1.25 * static_cast<double> (stretchLength) * currentStep;
+    auto fit = [this, span] (double pos) {
+        const double over = direction > 0.0 ? pos + span - stretchHi : stretchLo - (pos - span);
+        if (over > 0.0)
+            pos -= direction * (stretchPeriod > 0.0 ? std::ceil (over / stretchPeriod) * stretchPeriod : over);
+        return std::clamp (pos, stretchLo, stretchHi);
+    };
+    g.pos = fit (g.pos);
+    if (g.gainB > 0.0f)
+        g.posB = fit (g.posB);
     *slot = g;
 }
 
@@ -1702,19 +1723,26 @@ void InstrumentVoice::stretchRead (float& l, float& r) noexcept
         stretchCountdown = stretchHop;
     }
     l = r = 0.0f;
-    const double length = static_cast<double> (stretchLength);
     for (auto& g : stretchGrains)
     {
         if (! g.active)
             continue;
-        const auto w = static_cast<float> (std::sin (std::numbers::pi * static_cast<double> (g.age) / length));
-        const float window = w * w;
-        float a, b;
-        readFrame (g.pos, currentStep, a, b);
+        // sin^2 (pi age / length) = (1 - cos (2 pi age / length)) / 2: the angle turned by a
+        // rotation each sample (no sin per sample; exact enough over a grain's few thousand).
+        const auto window = static_cast<float> (0.5 * (1.0 - g.cosine));
+        const double c = g.cosine * stretchRotCos - g.sine * stretchRotSin;
+        g.sine = g.sine * stretchRotCos + g.cosine * stretchRotSin;
+        g.cosine = c;
+        // (Never outside the note's audio: past its ends a grain reads silence.)
+        float a = 0.0f, b = 0.0f;
+        if (g.pos >= stretchLo && g.pos <= stretchHi)
+            readFrame (g.pos, currentStep, a, b);
         float left = a * g.gainA, right = b * g.gainA;
         if (g.gainB > 0.0f)
         {
-            readFrame (g.posB, currentStep, a, b);
+            a = b = 0.0f;
+            if (g.posB >= stretchLo && g.posB <= stretchHi)
+                readFrame (g.posB, currentStep, a, b);
             left += a * g.gainB;
             right += b * g.gainB;
             g.posB += direction * currentStep;
