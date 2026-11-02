@@ -144,7 +144,7 @@ TEST_CASE ("post: the four SPACE types have their own identity", "[unit][post][s
         CHECK (m->t30 > 0.2);
 }
 
-TEST_CASE ("post: SPACE's ABYSS engine plays, and switching engine (or FREEZE) does not click", "[unit][post][space][abyss]")
+TEST_CASE ("post: SPACE's other engines play (ABYSS, VINTAGE, BLOOM), and switching engine (or FREEZE) does not click", "[unit][post][space][abyss]")
 {
     const auto audio = testsignals::vowel (220.0, 4.0, 48000.0, 1);
     const auto model = modelFor (audio);
@@ -171,7 +171,11 @@ TEST_CASE ("post: SPACE's ABYSS engine plays, and switching engine (or FREEZE) d
             {
                 // Every 50 blocks: ROOMS / ABYSS, ABYSS's FREEZE on and off in between.
                 if (switchEngine)
-                    sh.spaceEngine = (block / 25) % 2 == 0 ? SpaceEngine::rooms : SpaceEngine::abyss;
+                {
+                    // ROOMS, ABYSS, VINTAGE, BLOOM in turn.
+                    const SpaceEngine order[] = { SpaceEngine::rooms, SpaceEngine::abyss, SpaceEngine::vintage, SpaceEngine::bloom };
+                    sh.spaceEngine = order[(block / 25) % 4];
+                }
                 else
                     sh.abyssFreeze = (block / 25) % 2 == 1;
                 post.setShaping (sh);
@@ -191,15 +195,23 @@ TEST_CASE ("post: SPACE's ABYSS engine plays, and switching engine (or FREEZE) d
         return std::make_pair (out, std::make_pair (atSwitch, steady));
     };
     const auto rooms = render (SpaceEngine::rooms, false).first;
-    const auto abyss = render (SpaceEngine::abyss, false).first;
-    CHECK (test::maxDifference (rooms, abyss) > 1.0e-3);   // (another space, heard)
-    for (const auto& c : abyss.channels)
-        for (const float x : c)
-            REQUIRE (std::isfinite (x));
+    for (const auto engine : { SpaceEngine::abyss, SpaceEngine::vintage, SpaceEngine::bloom })
     {
+        const auto other = render (engine, false).first;
+        CHECK (test::maxDifference (rooms, other) > 1.0e-3);   // (another space, heard)
+        for (const auto& c : other.channels)
+            for (const float x : c)
+                REQUIRE (std::isfinite (x));
+    }
+    {
+        // Four engines, four kinds of content (BLOOM's clean repeats are sharp): a switch is
+        // a click only if it steps further than any of them does playing on its own.
+        float own = 0.0f;
+        for (const auto engine : { SpaceEngine::rooms, SpaceEngine::abyss, SpaceEngine::vintage, SpaceEngine::bloom })
+            own = std::max (own, render (engine, false).second.second);
         const auto [atSwitch, steady] = render (SpaceEngine::rooms, true).second;
-        INFO ("largest step after an engine switch " << atSwitch << ", elsewhere " << steady);
-        CHECK (atSwitch <= steady);
+        INFO ("largest step after an engine switch " << atSwitch << ", elsewhere " << steady << ", the engines' own largest " << own);
+        CHECK (atSwitch <= own);
     }
     {
         const auto [atSwitch, steady] = render (SpaceEngine::abyss, true, false).second;

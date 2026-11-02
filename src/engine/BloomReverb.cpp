@@ -38,7 +38,7 @@ BloomReverb::Settings BloomReverb::Settings::from (const Shaping& s) noexcept
     r.variant = s.bloomVariant;
     r.sync = s.bloomSync;
     r.division = s.bloomDivision;
-    r.timeMs = s.bloomTimeMs;
+    r.timeMs = snap (s.bloomTimeMs);   // (0.01 ms: a parameter round trip's rounding never heard)
     r.diffusion = s.bloomDiffusion;
     return r;
 }

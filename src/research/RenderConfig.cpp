@@ -127,7 +127,17 @@ namespace
         s.spaceLowCutHz = json::getDouble (space, "lowCutHz", s.spaceLowCutHz);
         s.spaceHighCutHz = json::getDouble (space, "highCutHz", s.spaceHighCutHz);
         // SPACE's engine (2026-11): "rooms" (the types above) or "abyss" with its own.
-        s.spaceEngine = parseName (space, "engine", std::array { "rooms", "abyss" }, s.spaceEngine);
+        s.spaceEngine = parseName (space, "engine", std::array { "rooms", "abyss", "vintage", "bloom" }, s.spaceEngine);
+        // VINTAGE's and BLOOM's own.
+        s.vintageVariant = parseName (space, "vintageVariant", std::array { "hall", "plate", "chamber", "room" }, s.vintageVariant);
+        s.vintageEra = parseName (space, "era", std::array { "early", "later" }, s.vintageEra);
+        s.vintageDiffusion = json::getDouble (space, "vintageDiffusion", s.vintageDiffusion);
+        s.bloomVariant = parseName (space, "bloomVariant", std::array { "clean", "vintage", "tape", "wash" }, s.bloomVariant);
+        if (json::has (space, "bloomSync"))
+            s.bloomSync = static_cast<bool> (space["bloomSync"]);
+        s.bloomDivision = static_cast<int> (json::getDouble (space, "bloomDivision", s.bloomDivision));
+        s.bloomTimeMs = json::getDouble (space, "bloomTimeMs", s.bloomTimeMs);
+        s.bloomDiffusion = json::getDouble (space, "bloomDiffusion", s.bloomDiffusion);
         s.abyssGravity = json::getDouble (space, "gravity", s.abyssGravity);
         if (json::has (space, "freeze"))
             s.abyssFreeze = static_cast<bool> (space["freeze"]);

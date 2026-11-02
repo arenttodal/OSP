@@ -13,6 +13,7 @@
 #include "engine/DriveProcessor.h"
 #include "engine/EchoDelay.h"
 #include "engine/AbyssReverb.h"
+#include "engine/BloomReverb.h"
 #include "engine/SpaceReverb.h"
 
 #include <cmath>
@@ -167,7 +168,7 @@ namespace
     class SpaceVisual final : public Visual, public juce::SettableTooltipClient
     {
     public:
-        explicit SpaceVisual (juce::AudioProcessorValueTreeState& s) : state (s)
+        explicit SpaceVisual (juce::AudioProcessorValueTreeState& s, std::function<double()> hostTempo = {}) : state (s), tempo (std::move (hostTempo))
         {
             // The EQ's two corners are handles (drag them; double-click resets).
             setInterceptsMouseClicks (true, false);
@@ -258,16 +259,21 @@ namespace
 
         bool changed() override
         {
-            // (ABYSS shows as a fifth "type": a change of engine transitions like a change of room.)
-            const bool abyss = juce::roundToInt (value (state, "space.engine")) == 1;
-            const int type = abyss ? 4 : juce::roundToInt (value (state, "space.type"));
+            // (The other engines show as further "types": a change of engine, or of VINTAGE's
+            // variant, transitions like a change of room.)
+            const int engine = juce::roundToInt (value (state, "space.engine"));
+            const bool abyss = engine == 1;
+            const int type = engine == 1 ? 4 : (engine == 2 ? 5 + juce::roundToInt (value (state, "space.vintage.variant")) : (engine == 3 ? 9 : juce::roundToInt (value (state, "space.type"))));
             if (type != shownType && shownType >= 0)
                 transition();
             shownType = type;
             const bool eqMoved = eqWatch.differs ({ value (state, "space.lowCut"), value (state, "space.highCut") });
             if (watch.differs ({ static_cast<double> (type), value (state, "space.decay"), value (state, "space"), value (state, "space.preDelay"),
                                  value (state, "space.size"), value (state, "space.damping"), value (state, "space.width"), static_cast<double> (getWidth()),
-                                 abyss ? value (state, "space.abyss.gravity") : 0.0, abyss ? value (state, "space.abyss.freeze") : 0.0 }))
+                                 abyss ? value (state, "space.abyss.gravity") : 0.0, abyss ? value (state, "space.abyss.freeze") : 0.0,
+                                 engine == 3 ? value (state, "space.bloom.sync") : 0.0, engine == 3 ? value (state, "space.bloom.division") : 0.0,
+                                 engine == 3 ? value (state, "space.bloom.time") : 0.0, engine == 3 ? value (state, "space.bloom.diffusion") : 0.0,
+                                 engine == 3 && tempo != nullptr ? tempo() : 0.0 }))
             {
                 cacheValid = false;
                 return true;
@@ -346,13 +352,20 @@ namespace
         {
             // ABYSS (SPACE's other engine): no reflections, a tail as long as GRAVITY makes it,
             // swelling when GRAVITY is below 0, held to the edge while FROZEN.
-            const bool abyss = juce::roundToInt (value (state, "space.engine")) == 1;
+            const int engine = juce::roundToInt (value (state, "space.engine"));
+            const bool abyss = engine == 1, vintage = engine == 2, bloom = engine == 3;
             const double gravity = abyss ? 0.01 * value (state, "space.abyss.gravity") : 0.0;
             const bool frozen = abyss && value (state, "space.abyss.freeze") >= 0.5;
-            const auto type = abyss ? SpaceType::hall : static_cast<SpaceType> (std::clamp (juce::roundToInt (value (state, "space.type")), 0, 3));
+            // VINTAGE draws as the room its variant is voiced after; BLOOM as a hall's cloud
+            // with its repeats over it.
+            const int vintageVariant = juce::roundToInt (value (state, "space.vintage.variant"));
+            const auto type = abyss || bloom ? SpaceType::hall
+                              : (vintage ? (vintageVariant == 1 ? SpaceType::plate : (vintageVariant == 3 ? SpaceType::room : SpaceType::hall))
+                                         : static_cast<SpaceType> (std::clamp (juce::roundToInt (value (state, "space.type")), 0, 3)));
             double lo = 0.2, hi = 8.0;
-            if (! abyss)
+            if (engine == 0)
                 shaping::decayRange (type, lo, hi);
+            const double bloomDiffusion = bloom ? 0.01 * value (state, "space.bloom.diffusion") : 0.0;
             const double decay = std::clamp (static_cast<double> (value (state, "space.decay")), lo, hi);
             const double amount = 0.85 + 0.15 * std::clamp (static_cast<double> (value (state, "space")) * 0.01, 0.0, 1.0);
             SpaceReverb::Settings settings;
@@ -363,7 +376,7 @@ namespace
             settings.damping = 0.01 * value (state, "space.damping");
             settings.width = 0.01 * value (state, "space.width");
             auto portrait = SpaceReverb::portrait (settings);
-            if (abyss)
+            if (abyss || bloom)
             {
                 portrait.erCount = 0;
                 portrait.erLevel = 0.0f;
@@ -427,6 +440,8 @@ namespace
                     const double rise = u < swell ? (u / swell) * (u / swell) : (frozen ? 0.85 : std::pow (std::max (0.0, 1.0 - (u - swell) / tailEnd), 1.4));
                     return ((1.0 - inverse) * natural + inverse * rise) * amount;
                 }
+                if (bloom)   // (a diffused BLOOM fills in; a clean one is mostly its repeats)
+                    return std::pow (std::max (0.0, 1.0 - t / tailEnd), 1.4) * (1.0 - std::exp (-(t - onset) / build)) * amount * (0.25 + 0.75 * bloomDiffusion);
                 // Drawn compressed (as the ear hears a tail): a fast early fall slowing towards the floor.
                 double a = std::pow (std::max (0.0, 1.0 - t / tailEnd), 1.4) * (1.0 - std::exp (-(t - onset) / build)) * amount;
                 if (portrait.spring)
@@ -473,7 +488,7 @@ namespace
             const int count = juce::roundToInt ((type == SpaceType::plate ? 17000 : (type == SpaceType::hall ? 15000 : (type == SpaceType::room ? 13000 : 13500)))
                                                 * juce::jlimit (0.15f, 1.0f, (W * H) / (558.0f * 261.0f)) * 1.6f
                                                 * static_cast<float> (0.2 + 0.8 * tailEnd / span));   // the same density, short or long
-            Prng rng (Prng::deriveSeed (0x7370616365ull, static_cast<std::uint64_t> (abyss ? 4 : static_cast<int> (type)), 0));
+            Prng rng (Prng::deriveSeed (0x7370616365ull, static_cast<std::uint64_t> (abyss ? 4 : (bloom ? 9 : static_cast<int> (type))), 0));
             for (int i = 0; i < count; ++i)
             {
                 const double t = onset + (tailEnd - onset) * std::pow (rng.nextDouble(), 1.12);
@@ -502,7 +517,7 @@ namespace
             // part so it reads); a plate has none, only a few dense first arrivals.
             const double early = std::min (0.45 * tailEnd, span * (type == SpaceType::plate ? 0.05 : (type == SpaceType::hall ? 0.12 : 0.095)));
             const bool real = portrait.erCount > 1;
-            const int strokes = abyss ? 0 : (real ? portrait.erCount : 6);   // (ABYSS has no reflections)
+            const int strokes = abyss || bloom ? 0 : (real ? portrait.erCount : 6);   // (ABYSS and BLOOM have no reflections)
             const double lastMs = real ? std::max (1.0, portrait.erMs[static_cast<std::size_t> (portrait.erCount - 1)]) : 1.0;
             Prng er (Prng::deriveSeed (0x6561726c79ull, static_cast<std::uint64_t> (type), 0));
             for (int i = 0; i < strokes; ++i)
@@ -542,14 +557,40 @@ namespace
                 g.setColour (colour.withAlpha (0.08f));
                 g.fillRect (juce::Rectangle<float> (x - 3.5f * dot, mid - 0.8f * extent, 7.0f * dot, 1.6f * extent));
             }
+            if (bloom)
+            {
+                // BLOOM's repeats where they land (the tempo's, or free), each as loud as the
+                // feedback leaves it, softer the more DIFFUSION smears them.
+                BloomReverb::Settings b;
+                b.sync = value (state, "space.bloom.sync") >= 0.5;
+                b.division = juce::roundToInt (value (state, "space.bloom.division"));
+                b.timeMs = value (state, "space.bloom.time");
+                const double period = BloomReverb::timeSeconds (b, tempo != nullptr ? tempo() : 120.0);
+                const double fb = std::min (0.97, std::pow (10.0, -3.0 * period / std::max (0.2, decay)));
+                double level = 1.0;
+                for (int k = 1; static_cast<double> (k) * period <= span && level > 0.02 && k < 64; ++k)
+                {
+                    const double t = onset + static_cast<double> (k) * period;
+                    const float x = xAt (t), extent = half * static_cast<float> (std::clamp (level, 0.1, 1.0)) * 0.95f;
+                    const auto colour = tint (t).withAlpha (static_cast<float> ((1.0 - 0.75 * bloomDiffusion) * std::sqrt (level)));
+                    juce::ColourGradient body (colour.withAlpha (0.0f), x, mid - extent, colour.withAlpha (0.0f), x, mid + extent, false);
+                    body.addColour (0.15, colour);
+                    body.addColour (0.5, colour.brighter (0.25f));
+                    body.addColour (0.85, colour);
+                    g.setGradientFill (body);
+                    g.fillRect (juce::Rectangle<float> (x - 1.1f * dot, mid - extent, 2.2f * dot, 2.0f * extent));
+                    level *= fb;
+                }
+            }
             // The sound itself, arriving: a warm bloom at zero.
             const float x0 = xAt (onset);
-            juce::ColourGradient bloom (juce::Colour (0xffff9a3c).withAlpha (0.35f), x0, mid, juce::Colour (0xffff9a3c).withAlpha (0.0f), x0 + 0.06f * W, mid, true);
-            g.setGradientFill (bloom);
+            juce::ColourGradient arrival (juce::Colour (0xffff9a3c).withAlpha (0.35f), x0, mid, juce::Colour (0xffff9a3c).withAlpha (0.0f), x0 + 0.06f * W, mid, true);
+            g.setGradientFill (arrival);
             g.fillEllipse (juce::Rectangle<float> (0.12f * W, 0.5f * H).withCentre ({ x0, mid }));
         }
 
         juce::AudioProcessorValueTreeState& state;
+        std::function<double()> tempo;   ///< (BLOOM's synced repeats; 120 without it)
         Watch watch, eqWatch;
         int shownType = -1, hover = -1, dragging = -1;
         juce::Image cache;
@@ -1730,96 +1771,153 @@ namespace
     };
 
     //==========================================================================
-    /** SPACE: the room, its EQ on the display (drag the corners), then its shape. ROOMS:
-        PRE-DELAY, SIZE, DECAY, DAMP on the first row; MOD, WIDTH and the EQ's values below;
-        the four rooms as tabs. ABYSS (SPACE's other engine, picked from the same list as the
-        rooms): FLOW / FREEZE in the tabs' place, GRAVITY, RESONANCE, MOD, WIDTH below (the
-        EQ on the display's corners). The popover keeps its size either way. */
+    /** SPACE: the room, its EQ on the display (drag the corners), then its shape. The header's
+        list picks a room or one of SPACE's other engines; the popover keeps its size.
+          ROOMS    the four rooms as tabs; PRE-DELAY, SIZE, DECAY, DAMP; MOD, WIDTH, LOW / HIGH CUT.
+          ABYSS    FLOW / FREEZE; PRE-DELAY, SIZE, DECAY, DAMP; GRAVITY, RESONANCE, MOD, WIDTH.
+          VINTAGE  HALL / PLATE / CHAMBER / ROOM; PRE-DELAY, SIZE, DECAY, DAMP; DIFFUSION, MOD,
+                   WIDTH, ERA.
+          BLOOM    CLEAN / VINTAGE / TAPE / WASH; TIME (a division synced, ms free), DIFFUSION,
+                   DECAY, DAMP; SYNC, SIZE, MOD, WIDTH.
+        Off ROOMS, LOW / HIGH CUT stay on the display's corners. */
     class SpacePanel final : public MacroPanel
     {
     public:
         explicit SpacePanel (InstrumentHost& p)
             : MacroPanel (p, "SPACE", 300, 92, design::colour::Macro::space),
-              // (On the message thread; the switch comes from the header's selector, which a
-              // rebuild keeps: only the tabs and knobs are remade.)
-              engineAttachment (*p.apvts().getParameter ("space.engine"), [this] (float) { build(); })
+              // (On the message thread; the switch comes from the header's selector or a
+              // knob the rebuild replaces only after the change: only tabs and knobs are remade.)
+              engineAttachment (*p.apvts().getParameter ("space.engine"), [this] (float) { build(); }),
+              syncAttachment (*p.apvts().getParameter ("space.bloom.sync"), [this] (float) {
+                  juce::Component::SafePointer<SpacePanel> safe (this);   // (SYNC is itself a knob here: rebuilt after its gesture)
+                  juce::MessageManager::callAsync ([safe] { if (safe != nullptr) safe->build(); });
+              })
         {
-            auto& m = mode ("space.type", "Room, hall, plate or spring - or ABYSS, a vast moving space");
-            m.textOverride = [this] { return isAbyss() ? juce::String ("ABYSS") : juce::String(); };
+            auto& m = mode ("space.type", "Room, hall, plate or spring - or ABYSS, VINTAGE or BLOOM, SPACE's other engines");
+            m.textOverride = [this] {
+                static const char* names[] = { "", "ABYSS", "VINTAGE", "BLOOM" };
+                return juce::String (names[std::clamp (engine(), 0, 3)]);
+            };
             m.extraItems = [this] (juce::PopupMenu& menu) {
                 juce::Component::SafePointer<SpacePanel> safe (this);
                 menu.addSeparator();
-                menu.addItem ("Abyss", true, isAbyss(), [safe] { if (safe != nullptr) safe->setEngine (1); });
+                int index = 1;
+                for (const char* name : { "Abyss", "Vintage", "Bloom" })
+                {
+                    menu.addItem (name, true, engine() == index, [safe, index] { if (safe != nullptr) safe->setEngine (index); });
+                    ++index;
+                }
             };
-            m.onPick = [this] (int) { setEngine (0); };   // a room leaves ABYSS
-            setVisual (std::make_unique<SpaceVisual> (p.apvts()));
+            m.onPick = [this] (int) { setEngine (0); };   // a room leaves the other engines
+            setVisual (std::make_unique<SpaceVisual> (p.apvts(), [&p] { return static_cast<double> (p.hostTempo()); }));
             build();
         }
 
+        /** Tests: what the popover is built for now (engine * 2 + BLOOM's SYNC). */
+        int builtFor() const noexcept { return built; }
+
     private:
-        bool isAbyss() const { return juce::roundToInt (value (processor.apvts(), "space.engine")) == 1; }
-        void setEngine (int engine)
+        int engine() const { return juce::roundToInt (value (processor.apvts(), "space.engine")); }
+        void setEngine (int e)
         {
-            if (auto* e = processor.apvts().getParameter ("space.engine"); e != nullptr && juce::roundToInt (e->convertFrom0to1 (e->getValue())) != engine)
+            if (auto* param = processor.apvts().getParameter ("space.engine"); param != nullptr && juce::roundToInt (param->convertFrom0to1 (param->getValue())) != e)
             {
-                e->beginChangeGesture();
-                e->setValueNotifyingHost (e->convertTo0to1 (static_cast<float> (engine)));
-                e->endChangeGesture();
+                param->beginChangeGesture();
+                param->setValueNotifyingHost (param->convertTo0to1 (static_cast<float> (e)));
+                param->endChangeGesture();
             }
         }
 
         void build()
         {
-            const bool abyss = isAbyss();
-            if (built == (abyss ? 1 : 0))
+            const int which = engine();
+            const bool sync = value (processor.apvts(), "space.bloom.sync") >= 0.5f;
+            const int key = which * 2 + (which == 3 && sync ? 1 : 0);
+            if (built == key)
                 return;
-            built = abyss ? 1 : 0;
+            built = key;
             primaryRow.clear();
             secondaryRow.clear();
             knobs.clear();
             modeTabs.reset();
             const auto ms = [] (double v) { return format::milliseconds (v); };
             const auto percent = [] (double v) { return format::percent (v) + " %"; };
-            if (! abyss)
+            const auto seconds = [] (double v) { return juce::String (std::clamp (v, 0.2, 8.0), 1) + " s"; };
+            switch (which)
             {
-                auto& types = tabs ("space.type", { "ROOM", "HALL", "PLATE", "SPRING" }, "Room, hall (after the Berlin concert halls), plate or spring");
-                auto* typeParam = processor.apvts().getParameter ("space.type");
-                knob (false, "space.preDelay", "PRE-DELAY", ms);
-                knob (false, "space.size", "SIZE", percent);
-                // The readout shows the decay the chosen type actually uses (each type has its own range).
-                auto& decay = knob (false, "space.decay", "DECAY", [typeParam] (double v) {
-                    double lo = 0.2, hi = 8.0;
-                    if (typeParam != nullptr)
-                        shaping::decayRange (static_cast<SpaceType> (juce::roundToInt (typeParam->convertFrom0to1 (typeParam->getValue()))), lo, hi);
-                    return juce::String (std::clamp (v, lo, hi), 1) + " s";
-                });
-                knob (false, "space.damping", "DAMP", percent);
-                knob (true, "space.modulation", "MOD", percent);
-                knob (true, "space.width", "WIDTH", percent);
-                knob (true, "space.lowCut", "LOW CUT", [] (double v) { return format::hertz (v); });
-                knob (true, "space.highCut", "HIGH CUT", [] (double v) { return format::hertz (v); });
-                types.onChange = [&decay] (int) { decay.repaint(); };
-            }
-            else
-            {
-                tabs ("space.abyss.freeze", { "FLOW", "FREEZE" }, "FREEZE holds the space as it is (still moving); FLOW lets it decay again");
-                knob (false, "space.preDelay", "PRE-DELAY", ms);
-                knob (false, "space.size", "SIZE", percent);
-                knob (false, "space.decay", "DECAY", [] (double v) { return juce::String (std::clamp (v, 0.2, 8.0), 1) + " s"; });
-                knob (false, "space.damping", "DAMP", percent);
-                knob (true, "space.abyss.gravity", "GRAVITY", [] (double v) {
-                    const int r = juce::roundToInt (v);
-                    return (r > 0 ? juce::String ("+") : juce::String()) + juce::String (r) + " %";
-                });
-                knob (true, "space.abyss.resonance", "RESONANCE", percent);
-                knob (true, "space.modulation", "MOD", percent);
-                knob (true, "space.width", "WIDTH", percent);
+                case 1:   // ABYSS
+                {
+                    tabs ("space.abyss.freeze", { "FLOW", "FREEZE" }, "FREEZE holds the space as it is (still moving); FLOW lets it decay again");
+                    knob (false, "space.preDelay", "PRE-DELAY", ms);
+                    knob (false, "space.size", "SIZE", percent);
+                    knob (false, "space.decay", "DECAY", seconds);
+                    knob (false, "space.damping", "DAMP", percent);
+                    knob (true, "space.abyss.gravity", "GRAVITY", [] (double v) {
+                        const int r = juce::roundToInt (v);
+                        return (r > 0 ? juce::String ("+") : juce::String()) + juce::String (r) + " %";
+                    });
+                    knob (true, "space.abyss.resonance", "RESONANCE", percent);
+                    knob (true, "space.modulation", "MOD", percent);
+                    knob (true, "space.width", "WIDTH", percent);
+                    break;
+                }
+                case 2:   // VINTAGE
+                {
+                    tabs ("space.vintage.variant", { "HALL", "PLATE", "CHAMBER", "ROOM" }, "VINTAGE's voicings: a hall, a plate, a chamber or a room");
+                    knob (false, "space.preDelay", "PRE-DELAY", ms);
+                    knob (false, "space.size", "SIZE", percent);
+                    knob (false, "space.decay", "DECAY", seconds);
+                    knob (false, "space.damping", "DAMP", percent);
+                    knob (true, "space.vintage.diffusion", "DIFFUSION", percent);
+                    knob (true, "space.modulation", "MOD", percent);
+                    knob (true, "space.width", "WIDTH", percent);
+                    knob (true, "space.vintage.era", "ERA", [] (double v) { return juce::String (v >= 0.5 ? "LATER" : "EARLY"); })
+                        .slider.setTooltip ("EARLY: the first machines' lower rate (no air, more grain). LATER: a higher rate, a little more top");
+                    break;
+                }
+                case 3:   // BLOOM
+                {
+                    tabs ("space.bloom.variant", { "CLEAN", "VINTAGE", "TAPE", "WASH" }, "BLOOM's loop: clean, a bucket brigade, tape, or a wash");
+                    if (sync)
+                        knob (false, "space.bloom.division", "TIME", [] (double v) { return juce::String (shaping::echoDivisionName (juce::roundToInt (v))); });
+                    else
+                        knob (false, "space.bloom.time", "TIME", ms);
+                    knob (false, "space.bloom.diffusion", "DIFFUSION", percent);
+                    knob (false, "space.decay", "DECAY", seconds);
+                    knob (false, "space.damping", "DAMP", percent);
+                    knob (true, "space.bloom.sync", "SYNC", [] (double v) { return juce::String (v >= 0.5 ? "TEMPO" : "FREE"); });
+                    knob (true, "space.size", "SIZE", percent);
+                    knob (true, "space.modulation", "MOD", percent);
+                    knob (true, "space.width", "WIDTH", percent);
+                    break;
+                }
+                default:   // ROOMS
+                {
+                    auto& types = tabs ("space.type", { "ROOM", "HALL", "PLATE", "SPRING" }, "Room, hall (after the Berlin concert halls), plate or spring");
+                    auto* typeParam = processor.apvts().getParameter ("space.type");
+                    knob (false, "space.preDelay", "PRE-DELAY", ms);
+                    knob (false, "space.size", "SIZE", percent);
+                    // The readout shows the decay the chosen type actually uses (each type has its own range).
+                    auto& decay = knob (false, "space.decay", "DECAY", [typeParam] (double v) {
+                        double lo = 0.2, hi = 8.0;
+                        if (typeParam != nullptr)
+                            shaping::decayRange (static_cast<SpaceType> (juce::roundToInt (typeParam->convertFrom0to1 (typeParam->getValue()))), lo, hi);
+                        return juce::String (std::clamp (v, lo, hi), 1) + " s";
+                    });
+                    knob (false, "space.damping", "DAMP", percent);
+                    knob (true, "space.modulation", "MOD", percent);
+                    knob (true, "space.width", "WIDTH", percent);
+                    knob (true, "space.lowCut", "LOW CUT", [] (double v) { return format::hertz (v); });
+                    knob (true, "space.highCut", "HIGH CUT", [] (double v) { return format::hertz (v); });
+                    types.onChange = [&decay] (int) { decay.repaint(); };
+                    break;
+                }
             }
             resized();
             repaint();
         }
 
-        juce::ParameterAttachment engineAttachment;
+        juce::ParameterAttachment engineAttachment, syncAttachment;
         int built = -1;
     };
 
@@ -2914,7 +3012,9 @@ const juce::StringArray& popupParameterIds (MacroPopup macro)
                                               "movement.shaper.smooth", "movement.shaper.custom" };
     static const juce::StringArray space { "space.type", "space.decay", "space.preDelay", "space.size", "space.damping",
                                            "space.modulation", "space.width", "space.lowCut", "space.highCut",
-                                           "space.engine", "space.abyss.gravity", "space.abyss.freeze", "space.abyss.resonance" };
+                                           "space.engine", "space.abyss.gravity", "space.abyss.freeze", "space.abyss.resonance",
+                                           "space.vintage.variant", "space.vintage.era", "space.vintage.diffusion", "space.bloom.variant",
+                                           "space.bloom.sync", "space.bloom.division", "space.bloom.time", "space.bloom.diffusion" };
     static const juce::StringArray echo { "echo.type", "echo.sync", "echo.division", "echo.time", "echo.feedback",
                                           "echo.tone", "echo.age", "echo.stereo" };
     switch (macro)

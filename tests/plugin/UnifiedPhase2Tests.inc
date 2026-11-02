@@ -166,7 +166,9 @@ TEST_CASE ("plugin: Phase 2's parameters are appended and neutral; the modulatio
         expected.add (osp::plugin::InstrumentHost::modRouteId (r, "destExt"));
     for (int l = 0; l < 3; ++l)
         expected.add (osp::plugin::InstrumentHost::synthesizeId (l));
-    for (const char* id : { "space.engine", "space.abyss.gravity", "space.abyss.freeze", "space.abyss.resonance" })
+    for (const char* id : { "space.engine", "space.abyss.gravity", "space.abyss.freeze", "space.abyss.resonance",   // (version 23)
+                            "space.vintage.variant", "space.vintage.era", "space.vintage.diffusion", "space.bloom.variant",   // (version 24)
+                            "space.bloom.sync", "space.bloom.division", "space.bloom.time", "space.bloom.diffusion" })
         expected.add (id);
     REQUIRE (all.size() > expected.size());
     for (int i = 0; i < expected.size(); ++i)

@@ -380,7 +380,15 @@ mod.route16.destExt v21 choice "Mod 16 Destination+" label="" range=0.0000..5.00
 layerA.synthesize v22 float "Layer A Synthesize" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0 %|50 %|100 %
 layerB.synthesize v22 float "Layer B Synthesize" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0 %|50 %|100 %
 layerC.synthesize v22 float "Layer C Synthesize" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0 %|50 %|100 %
-space.engine v23 choice "Space Engine" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=Rooms|Rooms|Abyss [Rooms|Abyss]
+space.engine v23 choice "Space Engine" label="" range=0.0000..3.0000/1.0000 skew=1.00000 default=0.0000 steps=4 texts=Rooms|Vintage|Bloom [Rooms|Abyss|Vintage|Bloom]
 space.abyss.gravity v23 float "Abyss Gravity" label="%" range=-100.0000..100.0000/0.0000 skew=1.00000 default=0.0000 steps=2147483647 texts=-100 %|0 %|+100 %
 space.abyss.freeze v23 bool "Abyss Freeze" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=Off|On|On
 space.abyss.resonance v23 float "Abyss Resonance" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0.0|50.0|100.0
+space.vintage.variant v24 choice "Vintage Variant" label="" range=0.0000..3.0000/1.0000 skew=1.00000 default=0.0000 steps=4 texts=Hall|Chamber|Room [Hall|Plate|Chamber|Room]
+space.vintage.era v24 choice "Vintage Era" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=Early|Early|Later [Early|Later]
+space.vintage.diffusion v24 float "Vintage Diffusion" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=70.0000 steps=2147483647 texts=0.0|50.0|100.0
+space.bloom.variant v24 choice "Bloom Variant" label="" range=0.0000..3.0000/1.0000 skew=1.00000 default=0.0000 steps=4 texts=Clean|Tape|Wash [Clean|Vintage|Tape|Wash]
+space.bloom.sync v24 bool "Bloom Sync" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=1.0000 steps=2 texts=Off|On|On
+space.bloom.division v24 choice "Bloom Division" label="" range=0.0000..11.0000/1.0000 skew=1.00000 default=6.0000 steps=12 texts=1/16|1/4|1/1 [1/16|1/8T|1/16D|1/8|1/4T|1/8D|1/4|1/2T|1/4D|1/2|1/2D|1/1]
+space.bloom.time v24 float "Bloom Time" label="ms" range=20.0000..1500.0000/0.0000 skew=0.41630 default=349.9999 steps=2147483647 texts=20.0000000|300.0000000|1500.0000000
+space.bloom.diffusion v24 float "Bloom Diffusion" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=60.0000 steps=2147483647 texts=0.0|50.0|100.0

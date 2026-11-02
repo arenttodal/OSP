@@ -1,6 +1,10 @@
 # SPACE: three more reverb engines (plan)
 
-Status: R1 (ABYSS) is built. VINTAGE and BLOOM are still a plan. ABYSS was built leaner than
+Status: R1 (ABYSS), R2 (VINTAGE) and R3 (BLOOM) are built (see docs/STATUS.md). Two
+differences from the plan for those two:
+- VINTAGE's chorus is a seeded glide between adjacent taps on each half's long line.
+- BLOOM reads its line early by the diffusers' own length, so a repeat lands on the beat.
+The original R1 note follows. ABYSS was built leaner than
 section 4 describes:
 - ROOMS stays in `engine/SpaceReverb`. ABYSS is `engine/AbyssReverb`, and PostProcessor's two
   crossfading slots each hold both engines.

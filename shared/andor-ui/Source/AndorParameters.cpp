@@ -519,12 +519,37 @@ juce::AudioProcessorValueTreeState::ParameterLayout InstrumentHost::createParame
             const int r = juce::roundToInt (v);
             return (r > 0 ? juce::String ("+") : juce::String()) + juce::String (r) + " %";
         });
-        layout.add (std::make_unique<juce::AudioParameterChoice> (id23 (ids::spaceEngine), "Space Engine", juce::StringArray { "Rooms", "Abyss" },
+        layout.add (std::make_unique<juce::AudioParameterChoice> (id23 (ids::spaceEngine), "Space Engine", juce::StringArray { "Rooms", "Abyss", "Vintage", "Bloom" },
                                                                   static_cast<int> (d23.spaceEngine)));
         layout.add (std::make_unique<juce::AudioParameterFloat> (id23 (ids::abyssGravity), "Abyss Gravity", Range (-100.0f, 100.0f, 0.0f),
                                                                  static_cast<float> (100.0 * d23.abyssGravity), signedPercent));
         layout.add (std::make_unique<juce::AudioParameterBool> (id23 (ids::abyssFreeze), "Abyss Freeze", d23.abyssFreeze));
         layout.add (std::make_unique<juce::AudioParameterFloat> (id23 (ids::abyssResonance), "Abyss Resonance", unit, static_cast<float> (100.0 * d23.abyssResonance), percent));
+    }
+    {
+        // SPACE's VINTAGE and BLOOM engines (version hint 24), appended so nothing before moves.
+        auto id24 = [] (const juce::String& id) { return juce::ParameterID { id, 24 }; };
+        const Shaping d24;
+        auto skewedRange = [] (float lo, float hi, float centre) {
+            Range r (lo, hi, 0.0f);
+            r.setSkewForCentre (centre);
+            return r;
+        };
+        layout.add (std::make_unique<juce::AudioParameterChoice> (id24 (ids::vintageVariant), "Vintage Variant", juce::StringArray { "Hall", "Plate", "Chamber", "Room" },
+                                                                  static_cast<int> (d24.vintageVariant)));
+        layout.add (std::make_unique<juce::AudioParameterChoice> (id24 (ids::vintageEra), "Vintage Era", juce::StringArray { "Early", "Later" },
+                                                                  static_cast<int> (d24.vintageEra)));
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id24 (ids::vintageDiffusion), "Vintage Diffusion", unit, static_cast<float> (100.0 * d24.vintageDiffusion), percent));
+        layout.add (std::make_unique<juce::AudioParameterChoice> (id24 (ids::bloomVariant), "Bloom Variant", juce::StringArray { "Clean", "Vintage", "Tape", "Wash" },
+                                                                  static_cast<int> (d24.bloomVariant)));
+        layout.add (std::make_unique<juce::AudioParameterBool> (id24 (ids::bloomSync), "Bloom Sync", d24.bloomSync));
+        juce::StringArray divisions;
+        for (int i = 0; i < shaping::echoDivisionCount; ++i)
+            divisions.add (shaping::echoDivisionName (i));
+        layout.add (std::make_unique<juce::AudioParameterChoice> (id24 (ids::bloomDivision), "Bloom Division", divisions, d24.bloomDivision));
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id24 (ids::bloomTime), "Bloom Time", skewedRange (20.0f, 1500.0f, 300.0f),
+                                                                 static_cast<float> (d24.bloomTimeMs), juce::AudioParameterFloatAttributes().withLabel ("ms")));
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id24 (ids::bloomDiffusion), "Bloom Diffusion", unit, static_cast<float> (100.0 * d24.bloomDiffusion), percent));
     }
     return layout;
 }

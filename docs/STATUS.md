@@ -752,7 +752,18 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
   - ROOMS stays bit-exact: every regression golden is unchanged, and visual parity is unchanged.
   - Evidence: the `[abyss]` tests (RT60, gravity swell, freeze, stability, determinism, no
     allocation, level matched to HALL); the click test for engine and FREEZE switches.
-  - CPU is about 2x HALL (SIMD later). VINTAGE and BLOOM are not built.
+  - CPU is about 2x HALL (SIMD later).
+- **VINTAGE and BLOOM (phases R2, R3): built.**
+  - `engine/VintageReverb`: a low internal rate (20.48 / 34.13 kHz), short words, coarse
+    coefficients, tap-crossfade chorus. Variants HALL / PLATE / CHAMBER / ROOM, ERA, DIFFUSION.
+  - `engine/BloomReverb`: a diffusion delay, synced or free, CLEAN / VINTAGE / TAPE / WASH,
+    DIFFUSION.
+  - Both are chosen in the same list (`space.engine` now has four choices) and have their own
+    popover layouts and pictures (`space.vintage.*`, `space.bloom.*`, version hint 24).
+  - Evidence: the `[vintage]` and `[bloom]` tests (RT60 in every variant, era bandwidth,
+    short-word grain, repeats on the beat at two tempi, diffusion's crest factor, decay,
+    stability, determinism, no allocation, level matched to HALL); engine switches never click.
+  - CPU: VINTAGE about 0.75x, BLOOM about 0.64x HALL.
 
 ## BLOCKERS
 

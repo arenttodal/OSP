@@ -7,6 +7,8 @@
 #include "engine/ShelfFilter.h"
 #include "engine/Shaping.h"
 #include "engine/AbyssReverb.h"
+#include "engine/BloomReverb.h"
+#include "engine/VintageReverb.h"
 #include "engine/SpaceReverb.h"
 
 #include <array>
@@ -84,21 +86,31 @@ private:
     // and an ABYSS (both prepared, so switching never allocates) and plays its engine.
     std::array<SpaceReverb, 2> reverbs;
     std::array<AbyssReverb, 2> abysses;
+    std::array<VintageReverb, 2> vintages;
+    std::array<BloomReverb, 2> blooms;
     std::array<SpaceEngine, 2> slotEngine { SpaceEngine::rooms, SpaceEngine::rooms };
     int activeReverb = 0;
     int reverbFade = 0, reverbFadeLength = 1;
     SpaceReverb::Settings appliedSpace;
     AbyssReverb::Settings appliedAbyss;
+    VintageReverb::Settings appliedVintage;
+    BloomReverb::Settings appliedBloom;
     SpaceEngine appliedEngine = SpaceEngine::rooms;
     void processSlot (int slot, float l, float r, float& wl, float& wr) noexcept
     {
-        if (slotEngine[static_cast<std::size_t> (slot)] == SpaceEngine::abyss)
-            abysses[static_cast<std::size_t> (slot)].process (l, r, wl, wr);
-        else
-            reverbs[static_cast<std::size_t> (slot)].process (l, r, wl, wr);
+        const auto s = static_cast<std::size_t> (slot);
+        switch (slotEngine[s])
+        {
+            case SpaceEngine::abyss: abysses[s].process (l, r, wl, wr); break;
+            case SpaceEngine::vintage: vintages[s].process (l, r, wl, wr); break;
+            case SpaceEngine::bloom: blooms[s].process (l, r, wl, wr); break;
+            case SpaceEngine::rooms: reverbs[s].process (l, r, wl, wr); break;
+        }
     }
     void startSlot (int slot) noexcept;
     void updateAbyss() noexcept;
+    void updateVintage() noexcept;
+    void updateBloom() noexcept;
     double lastWantedSize = 0.5;
     int sizeSettled = 0;
     bool spaceIdle = true;

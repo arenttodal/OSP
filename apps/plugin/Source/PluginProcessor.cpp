@@ -724,6 +724,8 @@ const juce::StringArray& OspAudioProcessor::shapingIds()
         ids::shaperCustom,
         ids::driveMode, ids::driveTone, ids::driveBody,
         ids::spaceEngine, ids::abyssGravity, ids::abyssFreeze, ids::abyssResonance,
+        ids::vintageVariant, ids::vintageEra, ids::vintageDiffusion,
+        ids::bloomVariant, ids::bloomSync, ids::bloomDivision, ids::bloomTime, ids::bloomDiffusion,
     };
     jassert (list.size() == numShapingParams);
     return list;
@@ -791,10 +793,18 @@ Shaping OspAudioProcessor::shapingFromParameters() const noexcept
     s.driveMode = static_cast<DriveMode> (index (53, 3));
     s.driveTone = 0.01 * v (54);
     s.driveBody = 0.01 * v (55);
-    s.spaceEngine = static_cast<SpaceEngine> (index (56, 2));
+    s.spaceEngine = static_cast<SpaceEngine> (index (56, 4));
     s.abyssGravity = 0.01 * v (57);
     s.abyssFreeze = v (58) >= 0.5;
     s.abyssResonance = 0.01 * v (59);
+    s.vintageVariant = static_cast<VintageVariant> (index (60, 4));
+    s.vintageEra = static_cast<VintageEra> (index (61, 2));
+    s.vintageDiffusion = 0.01 * v (62);
+    s.bloomVariant = static_cast<BloomVariant> (index (63, 4));
+    s.bloomSync = v (64) >= 0.5;
+    s.bloomDivision = index (65, shaping::echoDivisionCount);
+    s.bloomTimeMs = v (66);
+    s.bloomDiffusion = 0.01 * v (67);
     for (std::size_t i = 0; i < s.shaper.customSteps.size(); ++i)
     {
         auto& step = s.shaper.customSteps[i];
