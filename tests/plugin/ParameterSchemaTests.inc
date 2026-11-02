@@ -33,4 +33,9 @@ TEST_CASE ("plugin: the schema check allows only floating-point rounding in valu
     CHECK (sameLine (line + "-18.0 dB|-0.0 dB|+18.0 dB", line + "-18.0 dB|0.0 dB|+18.0 dB"));
     CHECK_FALSE (sameLine (line + "a|b|c [p|q]", line + "a|b|c [p|r]"));
     CHECK_FALSE (sameLine (line.replace ("v1", "v2") + "a|b|c", line + "a|b|c"));
+    // A default through a skewed range's normalisation (macOS prints a skew centre 1 ulp off).
+    const juce::String hz = "h v12 float \"H\" label=\"Hz\" range=1000.0000..20000.0000/0.0000 skew=0.44485 default=";
+    CHECK (sameLine (hz + "4999.9995 steps=2147483647 texts=1|5000.0004883|2", hz + "5000.0000 steps=2147483647 texts=1|5000.0000000|2"));
+    CHECK_FALSE (sameLine (hz + "4999.0000 steps=2147483647 texts=1|2|3", hz + "5000.0000 steps=2147483647 texts=1|2|3"));
+    CHECK_FALSE (sameLine (hz + "5000.0000 steps=2 texts=1|2|3", hz + "5000.0000 steps=3 texts=1|2|3"));
 }
