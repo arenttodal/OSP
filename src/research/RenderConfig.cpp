@@ -126,6 +126,12 @@ namespace
         s.spaceWidth = json::getDouble (space, "width", s.spaceWidth);
         s.spaceLowCutHz = json::getDouble (space, "lowCutHz", s.spaceLowCutHz);
         s.spaceHighCutHz = json::getDouble (space, "highCutHz", s.spaceHighCutHz);
+        // SPACE's engine (2026-11): "rooms" (the types above) or "abyss" with its own.
+        s.spaceEngine = parseName (space, "engine", std::array { "rooms", "abyss" }, s.spaceEngine);
+        s.abyssGravity = json::getDouble (space, "gravity", s.abyssGravity);
+        if (json::has (space, "freeze"))
+            s.abyssFreeze = static_cast<bool> (space["freeze"]);
+        s.abyssResonance = json::getDouble (space, "resonance", s.abyssResonance);
         const auto& echo = b["echo"];
         s.echoType = parseName (echo, "type", std::array { "tape", "bbd" }, s.echoType);
         if (json::has (echo, "sync"))

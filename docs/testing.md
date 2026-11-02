@@ -201,8 +201,9 @@ block with the plugin's popup settings; anything left out keeps its default, and
                   "pulse": { "rate": 0.55, "shape": 0.3, "stereo": 0.3 },
                   "shaper": { "pattern": 3, "rate": "1/4|1/8|1/8T|1/16|1/16T|1/32",
                               "target": "vol|filter|both", "smooth": 0.3 } },
-    "space": { "type": "room|hall|plate|spring", "decaySeconds": 1.8, "preDelayMs": 8, "size": 0.5,
-               "damping": 0.4, "modulation": 0.4, "width": 1.0, "lowCutHz": 100, "highCutHz": 12000 },
+    "space": { "engine": "rooms|abyss", "type": "room|hall|plate|spring", "decaySeconds": 3.0, "preDelayMs": 8, "size": 0.5,
+               "damping": 0.4, "modulation": 0.4, "width": 1.0, "lowCutHz": 100, "highCutHz": 5000,
+               "gravity": 0.0, "freeze": false, "resonance": 0.0 },   // (gravity / freeze / resonance: ABYSS)
     "echo": { "type": "tape|bbd", "sync": true, "division": 5, "timeMs": 375, "feedback": 0.45,
               "tone": 0.5, "age": 0.35, "stereo": "mono|pingpong|wide" },
     "drive": { "mode": "tube|tape|crunch", "tone": 0.5, "body": 0.5 }

@@ -921,7 +921,21 @@ bool ShellProcessor::applyStateXml (const juce::XmlElement& xml)
     if (! xml.hasTagName (productInfo().stateType) || xml.getStringAttribute ("product") != productInfo().slug)
         return false;
     if (auto* params = xml.getChildByName (parameters.state.getType()))
-        parameters.replaceState (juce::ValueTree::fromXml (*params));
+    {
+        const auto tree = juce::ValueTree::fromXml (*params);
+        juce::StringArray savedIds;
+        for (const auto& child : tree)
+            if (child.hasProperty ("id"))
+                savedIds.add (child["id"].toString());
+        parameters.replaceState (tree);
+        // A parameter the state does not hold (it is older than the parameter) starts from
+        // its default, as in ANDOR OSP: APVTS would keep what this instance had (an ABYSS
+        // chosen before an older preset was loaded, say).
+        for (auto* parameter : getParameters())
+            if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*> (parameter))
+                if (! savedIds.contains (ranged->getParameterID()))
+                    ranged->setValueNotifyingHost (ranged->getDefaultValue());
+    }
     if (engine->hasKeyDna())
     {
         // KEY DNA (absent: every layer off), restored before a migration that may set it.

@@ -144,6 +144,70 @@ TEST_CASE ("post: the four SPACE types have their own identity", "[unit][post][s
         CHECK (m->t30 > 0.2);
 }
 
+TEST_CASE ("post: SPACE's ABYSS engine plays, and switching engine (or FREEZE) does not click", "[unit][post][space][abyss]")
+{
+    const auto audio = testsignals::vowel (220.0, 4.0, 48000.0, 1);
+    const auto model = modelFor (audio);
+    auto render = [&] (SpaceEngine engine, bool alternate, bool switchEngine = true) {
+        PostProcessor post;
+        post.prepare (48000.0, 256);
+        post.setModel (model.get());
+        Shaping sh;
+        sh.movementMode = MovementMode::pulse;
+        sh.spaceEngine = engine;
+        sh.abyssGravity = -0.4;
+        post.setShaping (sh);
+        Macros m;
+        m.space = 0.6;
+        m.reimagined = 0.0;
+        m.motion = 0.0;
+        post.setMacros (m);
+        post.reset();
+        AudioData out = audio;
+        float steady = 0.0f, atSwitch = 0.0f, prev = 0.0f;
+        for (int pos = 0, block = 0; pos < static_cast<int> (out.channels[0].size()); pos += 256, ++block)
+        {
+            if (alternate)
+            {
+                // Every 50 blocks: ROOMS / ABYSS, ABYSS's FREEZE on and off in between.
+                if (switchEngine)
+                    sh.spaceEngine = (block / 25) % 2 == 0 ? SpaceEngine::rooms : SpaceEngine::abyss;
+                else
+                    sh.abyssFreeze = (block / 25) % 2 == 1;
+                post.setShaping (sh);
+            }
+            const int n = std::min (256, static_cast<int> (out.channels[0].size()) - pos);
+            post.process (out.channels[0].data() + pos, out.channels[1].data() + pos, n);
+            const bool nearSwitch = block % 25 < 2 && block >= 25;
+            for (int i = 0; i < n; ++i)
+            {
+                const float wet = out.channels[0][static_cast<std::size_t> (pos + i)] - audio.channels[0][static_cast<std::size_t> (pos + i)];
+                const float step = std::abs (wet - prev);
+                if (block > 4)
+                    (nearSwitch ? atSwitch : steady) = std::max (nearSwitch ? atSwitch : steady, step);
+                prev = wet;
+            }
+        }
+        return std::make_pair (out, std::make_pair (atSwitch, steady));
+    };
+    const auto rooms = render (SpaceEngine::rooms, false).first;
+    const auto abyss = render (SpaceEngine::abyss, false).first;
+    CHECK (test::maxDifference (rooms, abyss) > 1.0e-3);   // (another space, heard)
+    for (const auto& c : abyss.channels)
+        for (const float x : c)
+            REQUIRE (std::isfinite (x));
+    {
+        const auto [atSwitch, steady] = render (SpaceEngine::rooms, true).second;
+        INFO ("largest step after an engine switch " << atSwitch << ", elsewhere " << steady);
+        CHECK (atSwitch <= steady);
+    }
+    {
+        const auto [atSwitch, steady] = render (SpaceEngine::abyss, true, false).second;
+        INFO ("largest step after FREEZE on / off " << atSwitch << ", elsewhere " << steady);
+        CHECK (atSwitch <= steady);
+    }
+}
+
 TEST_CASE ("post: SPACE plays a parameter round trip's rounding of its EQ corners bit-identically", "[unit][post][space]")
 {
     // macOS reads HIGH CUT's 5 kHz default (its skewed range's centre) back from a saved

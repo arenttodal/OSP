@@ -6,6 +6,7 @@
 #include "engine/ReimaginedStage.h"
 #include "engine/ShelfFilter.h"
 #include "engine/Shaping.h"
+#include "engine/AbyssReverb.h"
 #include "engine/SpaceReverb.h"
 
 #include <array>
@@ -79,11 +80,25 @@ private:
     // MOVEMENT (bus part)
     MovementBus movement;
 
-    // SPACE: two reverbs so a type change can crossfade
+    // SPACE: two slots so a type (or engine) change can crossfade; each slot holds a room
+    // and an ABYSS (both prepared, so switching never allocates) and plays its engine.
     std::array<SpaceReverb, 2> reverbs;
+    std::array<AbyssReverb, 2> abysses;
+    std::array<SpaceEngine, 2> slotEngine { SpaceEngine::rooms, SpaceEngine::rooms };
     int activeReverb = 0;
     int reverbFade = 0, reverbFadeLength = 1;
     SpaceReverb::Settings appliedSpace;
+    AbyssReverb::Settings appliedAbyss;
+    SpaceEngine appliedEngine = SpaceEngine::rooms;
+    void processSlot (int slot, float l, float r, float& wl, float& wr) noexcept
+    {
+        if (slotEngine[static_cast<std::size_t> (slot)] == SpaceEngine::abyss)
+            abysses[static_cast<std::size_t> (slot)].process (l, r, wl, wr);
+        else
+            reverbs[static_cast<std::size_t> (slot)].process (l, r, wl, wr);
+    }
+    void startSlot (int slot) noexcept;
+    void updateAbyss() noexcept;
     double lastWantedSize = 0.5;
     int sizeSettled = 0;
     bool spaceIdle = true;

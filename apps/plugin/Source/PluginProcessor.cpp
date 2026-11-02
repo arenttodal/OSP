@@ -723,6 +723,7 @@ const juce::StringArray& OspAudioProcessor::shapingIds()
         ids::echoType, ids::echoSync, ids::echoDivision, ids::echoTime, ids::echoFeedback, ids::echoTone, ids::echoAge, ids::echoStereo,
         ids::shaperCustom,
         ids::driveMode, ids::driveTone, ids::driveBody,
+        ids::spaceEngine, ids::abyssGravity, ids::abyssFreeze, ids::abyssResonance,
     };
     jassert (list.size() == numShapingParams);
     return list;
@@ -790,6 +791,10 @@ Shaping OspAudioProcessor::shapingFromParameters() const noexcept
     s.driveMode = static_cast<DriveMode> (index (53, 3));
     s.driveTone = 0.01 * v (54);
     s.driveBody = 0.01 * v (55);
+    s.spaceEngine = static_cast<SpaceEngine> (index (56, 2));
+    s.abyssGravity = 0.01 * v (57);
+    s.abyssFreeze = v (58) >= 0.5;
+    s.abyssResonance = 0.01 * v (59);
     for (std::size_t i = 0; i < s.shaper.customSteps.size(); ++i)
     {
         auto& step = s.shaper.customSteps[i];

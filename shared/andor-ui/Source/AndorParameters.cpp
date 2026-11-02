@@ -510,6 +510,22 @@ juce::AudioProcessorValueTreeState::ParameterLayout InstrumentHost::createParame
             layout.add (std::make_unique<juce::AudioParameterFloat> (id22 (layerParameterId (layer, "synthesize")), "Layer " + layerName (layer) + " Synthesize",
                                                                      unit, 0.0f, reimaginedText));
     }
+    {
+        // SPACE's ABYSS engine (version hint 23), appended so nothing before moves. ROOMS by
+        // default: every session from before plays its room as it did.
+        auto id23 = [] (const juce::String& id) { return juce::ParameterID { id, 23 }; };
+        const Shaping d23;
+        const auto signedPercent = juce::AudioParameterFloatAttributes().withLabel ("%").withStringFromValueFunction ([] (float v, int) {
+            const int r = juce::roundToInt (v);
+            return (r > 0 ? juce::String ("+") : juce::String()) + juce::String (r) + " %";
+        });
+        layout.add (std::make_unique<juce::AudioParameterChoice> (id23 (ids::spaceEngine), "Space Engine", juce::StringArray { "Rooms", "Abyss" },
+                                                                  static_cast<int> (d23.spaceEngine)));
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id23 (ids::abyssGravity), "Abyss Gravity", Range (-100.0f, 100.0f, 0.0f),
+                                                                 static_cast<float> (100.0 * d23.abyssGravity), signedPercent));
+        layout.add (std::make_unique<juce::AudioParameterBool> (id23 (ids::abyssFreeze), "Abyss Freeze", d23.abyssFreeze));
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id23 (ids::abyssResonance), "Abyss Resonance", unit, static_cast<float> (100.0 * d23.abyssResonance), percent));
+    }
     return layout;
 }
 

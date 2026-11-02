@@ -74,6 +74,10 @@ namespace osp::plugin::ids
     inline const juce::String spaceWidth = "space.width";
     inline const juce::String spaceLowCut = "space.lowCut";
     inline const juce::String spaceHighCut = "space.highCut";
+    inline const juce::String spaceEngine = "space.engine";              ///< ROOMS / ABYSS (version hint 23)
+    inline const juce::String abyssGravity = "space.abyss.gravity";
+    inline const juce::String abyssFreeze = "space.abyss.freeze";
+    inline const juce::String abyssResonance = "space.abyss.resonance";
     inline const juce::String echo = "echo";
     inline const juce::String echoType = "echo.type";
     inline const juce::String echoSync = "echo.sync";

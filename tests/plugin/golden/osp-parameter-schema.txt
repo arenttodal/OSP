@@ -380,3 +380,7 @@ mod.route16.destExt v21 choice "Mod 16 Destination+" label="" range=0.0000..5.00
 layerA.synthesize v22 float "Layer A Synthesize" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0 %|50 %|100 %
 layerB.synthesize v22 float "Layer B Synthesize" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0 %|50 %|100 %
 layerC.synthesize v22 float "Layer C Synthesize" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0 %|50 %|100 %
+space.engine v23 choice "Space Engine" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=Rooms|Rooms|Abyss [Rooms|Abyss]
+space.abyss.gravity v23 float "Abyss Gravity" label="%" range=-100.0000..100.0000/0.0000 skew=1.00000 default=0.0000 steps=2147483647 texts=-100 %|0 %|+100 %
+space.abyss.freeze v23 bool "Abyss Freeze" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=Off|On|On
+space.abyss.resonance v23 float "Abyss Resonance" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0.0|50.0|100.0
