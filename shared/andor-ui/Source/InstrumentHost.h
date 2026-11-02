@@ -144,6 +144,9 @@ public:
         /** A period (drawn twice, as a sustained tone) or, false, a recording's outline (drawn
             once, across the display: an engine's imported source). */
         bool periodic = true;
+        /** A stand-in, not a sound (an empty slot's invitation): the picture drawn faint, the
+            caption over it ("ADD SAMPLE", say). Empty: a real source. */
+        juce::String placeholder;
     };
     /** Message thread. False (the default): the layer plays recordings. */
     virtual bool generatedSource (int layer, GeneratedSource& out) const

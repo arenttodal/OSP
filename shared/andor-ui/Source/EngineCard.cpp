@@ -211,9 +211,10 @@ void SourceDisplay::setInstrument (std::shared_ptr<const LoadedInstrument> next)
     repaint();
 }
 
-void SourceDisplay::setGeneratedCycle (std::vector<float> cycle, bool periodic)
+void SourceDisplay::setGeneratedCycle (std::vector<float> cycle, bool periodic, const juce::String& placeholder)
 {
     generatedPeriodic = periodic;
+    generatedPlaceholder = placeholder;
     generatedCycle = std::move (cycle);
     cacheDirty = true;
     repaint();
@@ -507,7 +508,9 @@ void SourceDisplay::paintGenerated (juce::Graphics& g)
     const auto plot = plotArea().reduced (8.0f, 0.0f);
     const float mid = plot.getCentreY(), half = plot.getHeight() * 0.40f;
     const auto& tones = waveTones (layer);
-    const float tint = focused ? 1.0f : 0.82f;
+    // A stand-in (an empty slot): its picture faint and grey, its caption over it.
+    const bool standIn = generatedPlaceholder.isNotEmpty();
+    const float tint = (focused ? 1.0f : 0.82f) * (standIn ? 0.28f : 1.0f);
     const int n = static_cast<int> (generatedCycle.size());
     float peak = 1.0e-3f;
     for (const float v : generatedCycle)
@@ -547,8 +550,20 @@ void SourceDisplay::paintGenerated (juce::Graphics& g)
     body.closeSubPath();
     g.setGradientFill (juce::ColourGradient (tones.body.withAlpha (0.55f * tint), 0.0f, mid - half, tones.deep.withAlpha (0.35f * tint), 0.0f, mid, false));
     g.fillPath (body);
-    g.setColour (tones.light.withAlpha (0.95f * tint));
+    g.setColour ((standIn ? colour::wellText : tones.light).withAlpha (0.95f * tint));
     g.strokePath (line, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    if (standIn)
+    {
+        // The caption: first line the action, the rest quieter (lines split by '\n').
+        const auto lines = juce::StringArray::fromLines (generatedPlaceholder);
+        auto text = plot.withSizeKeepingCentre (plot.getWidth(), 44.0f);
+        g.setColour (colour::wellText.brighter (0.4f));
+        g.setFont (fonts::make (14.0f, fonts::Weight::medium, 0.1f));
+        g.drawText (lines[0], text.removeFromTop (22.0f), juce::Justification::centred, false);
+        g.setColour (colour::wellText);
+        g.setFont (type::popupLabel (10.5f));
+        g.drawText (lines.size() > 1 ? lines[1] : juce::String(), text, juce::Justification::centred, false);
+    }
 }
 
 void SourceDisplay::paint (juce::Graphics& g)
@@ -2413,7 +2428,7 @@ void EngineCard::refresh()
             shownGeneratedRevision = source.revision;
             fileText = source.name;
             rootText.clear();
-            sourceDisplay.setGeneratedCycle (std::move (source.cycle), source.periodic);
+            sourceDisplay.setGeneratedCycle (std::move (source.cycle), source.periodic, source.placeholder);
             placeHeadingDoor();
             repaint();
         }

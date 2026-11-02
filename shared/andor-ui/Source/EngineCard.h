@@ -62,7 +62,7 @@ public:
     void setInstrument (std::shared_ptr<const LoadedInstrument>);
     /** A generated source (a synthesizer's oscillators): one period of its waveform (-1..1),
         drawn across the display in place of a recording. Empty: the recording, as before. */
-    void setGeneratedCycle (std::vector<float> cycle, bool periodic = true);
+    void setGeneratedCycle (std::vector<float> cycle, bool periodic = true, const juce::String& placeholder = {});
     void setLayer (int layer);
     void setFocused (bool focused);
     void setLoading (bool loading);
@@ -125,6 +125,7 @@ private:
     std::shared_ptr<const LoadedInstrument> instrument;
     std::vector<float> generatedCycle;   ///< a generated source's period (empty: none)
     bool generatedPeriodic = true;       ///< a period (drawn twice), or an outline (drawn once)
+    juce::String generatedPlaceholder;   ///< a stand-in's caption (its picture drawn faint), or empty
     int layer = 0;
     bool focused = true, loading = false;
     View view;

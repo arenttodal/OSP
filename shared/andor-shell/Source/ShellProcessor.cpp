@@ -130,6 +130,9 @@ ShellProcessor::ShellProcessor (std::unique_ptr<Engine> productEngine)
     store = std::make_unique<osp::plugin::SampleStore> (sampleStoreFolder());
     if (productInfo().installFactoryPresets != nullptr)
         productInfo().installFactoryPresets (*this, presetFolder().getChildFile ("Factory"));
+    // Three engines: every card sounds from the start, so the MIX starts in the middle.
+    if (productInfo().threeEngines.enabled && isGenerator())
+        centreHybridMix();
     if (productInfo().ampEnvelopeTouched != nullptr)
     {
         ampEnvelopeTouch = std::make_unique<AmpEnvelopeTouch> (*this);
@@ -590,6 +593,7 @@ bool ShellProcessor::generatedSource (int layer, GeneratedSource& out) const
             out.cycle.assign (2, 0.0f);
         out.revision = fingerprint (out.cycle) ^ static_cast<std::uint64_t> (name.hashCode64());
         out.periodic = engine->engineSourceIsPeriodic (layer);   // (a recording's outline is drawn once)
+        out.placeholder = engine->engineSourcePlaceholder (layer);
         return true;
     }
     if (! isGeneratorLayer (layer))
@@ -1175,6 +1179,8 @@ void ShellProcessor::resetSettings()
         parameters.state.removeChild (links, nullptr);
     setShaperCustomPattern (osp::RhythmicShaper::patternSteps (osp::ShaperParams().pattern), false);
     engine->restoreState (juce::XmlElement (productInfo().stateType), sampleStoreFolder());   // (none of its own)
+    if (productInfo().threeEngines.enabled && isGenerator())
+        centreHybridMix();   // (three engines: the MIX in the middle, every card heard)
     if (engine->hasKeyDna())
         for (int l = 0; l < numLayers; ++l)
         {

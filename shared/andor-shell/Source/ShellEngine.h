@@ -199,6 +199,9 @@ public:
     /** Whether the engine's own source on a layer pictures a period (an oscillator, drawn as
         a sustained tone) or an outline drawn once (a recording, the default). */
     virtual bool engineSourceIsPeriodic (int layer) const { juce::ignoreUnused (layer); return false; }
+    /** The engine's source on a layer is a stand-in (an empty slot's invitation): its caption
+        ("ADD SAMPLE\nDROP OR BROWSE"), its picture drawn faint. Empty: a real source. */
+    virtual juce::String engineSourcePlaceholder (int layer) const { juce::ignoreUnused (layer); return {}; }
     /** A generator's further layers (opt-in, ProductInfo::threeEngines): what it generates on
         `layer` (its card's name, e.g. "OSC 2"; the picture is sourcePicture's), or empty.
         Layer 0's is generatorName(). Message thread. */

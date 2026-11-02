@@ -257,15 +257,17 @@ TEST_CASE ("shell: a generator engine has one card, layer A, and never loads a f
     ShellProcessor p;
     if (! p.isGenerator())
         return;
-    CHECK (p.slotCount() == 1);
+    // (Three engines: the empty hybrid is a stand-in card, its engine's own: occupied.)
+    const bool standIn = p.product().threeEngines.enabled && p.hasHybridLayer();
+    CHECK (p.slotCount() == (standIn ? 2 : 1));
     CHECK (p.isLayerOccupied (0));
-    CHECK_FALSE (p.isLayerOccupied (1));
+    CHECK (p.isLayerOccupied (1) == standIn);
     CHECK (p.loadState (0) == osp::plugin::InstrumentHost::LoadState::ready);
     osp::plugin::InstrumentHost::GeneratedSource source;
     REQUIRE (p.generatedSource (0, source));
     CHECK (source.name.isNotEmpty());
     CHECK (source.cycle.size() >= 2);
-    CHECK_FALSE (p.generatedSource (1, source));
+    CHECK (p.generatedSource (1, source) == standIn);
     const auto file = writeSource (tmp.dir, "pluck.wav", osp::testsignals::pluck (220.0, 0.5, 48000.0, 1));
     if (p.hasHybridLayer())
     {
@@ -282,7 +284,7 @@ TEST_CASE ("shell: a generator engine has one card, layer A, and never loads a f
         CHECK_FALSE (p.generatedSource (1, source));
         CHECK (p.statusMessage().isNotEmpty());   // (the second file was not loaded: said so)
         p.removeLayer (1);
-        CHECK (p.slotCount() == 1);
+        CHECK (p.slotCount() == (standIn ? 2 : 1));
         CHECK (p.currentInstrument (1) == nullptr);
         return;
     }
