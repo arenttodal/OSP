@@ -117,6 +117,7 @@ public:
     juce::String reimaginedModeUnavailable (int layer, int mode) const override { return engine->reimaginedModeUnavailable (layer, mode); }
     juce::String engineStatus (const juce::String& topic) const override { return engine->status (topic); }
     bool hasKeyDna() const noexcept override { return engine->hasKeyDna(); }
+    bool hasKeyDnaKey (int layer) const noexcept override { return engine->hasKeyDnaKey (layer); }
     juce::String productWordmark() const override { return productInfo().identity.mark + productInfo().identity.product; }
     // KEY DNA (an engine that has it): ANDOR OSP's editor, settings, undo and saved state.
     osp::keydna::Settings keyDnaSettings (int layer) const override;

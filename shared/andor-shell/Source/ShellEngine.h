@@ -176,6 +176,8 @@ public:
     /** The engine plays KEY DNA on its Granular layers (ANDOR OSP's per-key profile): the
         Granular strip then shows its KEY DNA key. Off by default (no key). */
     virtual bool hasKeyDna() const noexcept { return false; }
+    /** Which Granular cards show the KEY DNA key (default: all, when hasKeyDna()). */
+    virtual bool hasKeyDnaKey (int layer) const noexcept { juce::ignoreUnused (layer); return hasKeyDna(); }
     /** A layer's KEY DNA profile (all 128 keys at full AMOUNT; AMOUNT is the host parameter
         layerX.keyDna.amount), computed by the shell off the audio thread from the KEY DNA
         editor's settings, or null (none). Audio thread, at the start of a block; the table

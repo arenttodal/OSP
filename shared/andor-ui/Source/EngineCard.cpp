@@ -1430,6 +1430,24 @@ void ModeSelector::setFirstModeName (const juce::String& name)
     }
 }
 
+void ModeSelector::setFitsName (bool fit)
+{
+    if (fit != fitted)
+    {
+        fitted = fit;
+        repaint();
+    }
+}
+
+float ModeSelector::fittedWidth() const
+{
+    // As paint() lays it out at k = 1: the key's 1 px inset, the name from 15 px, 8 px to the
+    // chevron (14), 9 px after it.
+    const auto font = type::sourceMode (0.88f);
+    const float name = std::max (juce::GlyphArrangement::getStringWidth (font, firstModeName), juce::GlyphArrangement::getStringWidth (font, "Granular"));
+    return std::ceil (2.0f + 15.0f + name + 8.0f + 14.0f + 9.0f);
+}
+
 void ModeSelector::mouseUp (const juce::MouseEvent& e)
 {
     if (! getLocalBounds().contains (e.getPosition()))
@@ -1452,7 +1470,7 @@ void ModeSelector::paint (juce::Graphics& g)
     // Quiet: the waveform is the hero, the mode only a property of it.
     g.setColour (design::colour::text.withAlpha (0.88f));
     g.setFont (type::sourceMode (0.88f * k));
-    auto text = r.withTrimmedLeft (15.0f * k).withTrimmedRight (12.0f * k);
+    auto text = r.withTrimmedLeft (15.0f * k).withTrimmedRight ((fitted ? 9.0f : 12.0f) * k);
     icons::draw (g, icons::Kind::chevronDown, text.removeFromRight (14.0f * k).withSizeKeepingCentre (12.0f * k, 12.0f * k), design::colour::text.withAlpha (0.5f), 1.25f * k);
     g.drawText (current == 1 ? "Granular" : firstModeName, text, juce::Justification::centredLeft, false);
 }
@@ -1688,7 +1706,7 @@ void EngineCard::updateWellOverlay()
         return;
     const bool wellTaken = eqEditor != nullptr || noteMap != nullptr || (wellEditor != nullptr && wellEditor->isVisible());
     wellOverlay->setBounds (sourceDisplay.getBounds());
-    wellOverlay->setVisible (sourceDisplay.isVisible() && ! wellTaken);
+    wellOverlay->setVisible (sourceDisplay.isVisible() && ! wellTaken && (! isGranular() || wellOverlay->shownWhileGranular()));
     if (const int reserve = wellOverlay->rulerReserve(); reserve > 0)
         sourceDisplay.setRulerReserve (reserve);   // (its dropdown clear of a recording's ruler)
     if (wellOverlay->isVisible())
@@ -1804,6 +1822,16 @@ void EngineCard::setFirstModeName (const juce::String& name)
 {
     if (mode != nullptr)
         mode->setFirstModeName (name);
+    if (mode != nullptr && mode->fitsName())
+        resized();
+}
+
+void EngineCard::setModeFitsName (bool fit)
+{
+    if (mode == nullptr || mode->fitsName() == fit)
+        return;
+    mode->setFitsName (fit);
+    resized();
 }
 
 void EngineCard::setWellEditor (std::unique_ptr<CardWellEditor> editor)
@@ -2175,7 +2203,7 @@ void EngineCard::showGranularControls (bool show, bool immediately)
     std::vector<juce::Component*> parts;
     for (auto& k : granularKnobs)
         parts.push_back (k.get());
-    if (processor.hasKeyDna())
+    if (processor.hasKeyDnaKey (layerIndex))
         parts.push_back (&keyDnaKey);
     for (auto* k : parts)
     {
@@ -2416,7 +2444,7 @@ void EngineCard::refresh()
         noteMap->refresh();
     if (isWellEditorShown())
         wellEditor->refresh();
-    if (processor.hasKeyDna())
+    if (processor.hasKeyDnaKey (layerIndex))
         keyDnaKey.setLit (processor.keyDnaSettings (layerIndex).enabled);
     // A generated source (a synthesizer's oscillators): its name and its waveform instead of
     // a recording's state and picture.
@@ -2648,7 +2676,7 @@ void EngineCard::resized()
     muteButton.setBounds (at ({ 77.0f, 10.0f, 27.0f, 21.0f }));
     soloButton.setBounds (at ({ 77.0f, 32.0f, 27.0f, 21.0f }));
     menuButton.setBounds (at ({ w - 51.0f, 14.0f, 30.0f, 36.0f }));
-    const float modeWidth = triple ? 128.0f : 157.0f;
+    const float modeWidth = mode != nullptr && mode->fitsName() ? std::min (mode->fittedWidth(), triple ? 128.0f : 157.0f) : (triple ? 128.0f : 157.0f);
     if (mode != nullptr)
         mode->setBounds (at ({ w - 62.0f - modeWidth, 12.0f, modeWidth, 41.0f }));
     // EQ: a small key left of the mode (the name gives it the room).
@@ -2724,7 +2752,7 @@ void EngineCard::resized()
     const auto display = sourceDisplay.getBounds().toFloat();
     const float strip = 74.0f;
     auto band = display.withTop (display.getBottom() - strip).reduced (12.0f, 6.0f);
-    if (processor.hasKeyDna())
+    if (processor.hasKeyDnaKey (layerIndex))
     {
         // KEY DNA at the strip's end (the knobs share the rest).
         const float keyWidth = triple ? 62.0f : 78.0f;

@@ -251,6 +251,9 @@ public:
 
     /** A product with KEY DNA (OSP's Granular). The KEY DNA editor shows only when true. */
     virtual bool hasKeyDna() const noexcept { return false; }
+    /** A layer's card shows the KEY DNA key (opt-in narrowing: a product with one profile for
+        several Granular cards shows it on one). Default: every layer, when hasKeyDna(). */
+    virtual bool hasKeyDnaKey (int layer) const noexcept { juce::ignoreUnused (layer); return hasKeyDna(); }
     /** A product whose voices blend SYNTHESIZE's oscillator (ANDOR OSP, Phase S1): each source
         card then shows its SYNTHESIZE knob after REIMAGINED. Off by default (five knobs). */
     virtual bool hasSynthesize() const noexcept { return false; }

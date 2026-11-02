@@ -40,6 +40,10 @@ public:
     /** Room its persistent controls take at the well's top right (px): a recording's time
         ruler keeps its labels clear of them. */
     virtual int rulerReserve() const { return 0; }
+    /** While its card plays Granular the card's own grain controls take the well: an overlay
+        is hidden then (an oscillator's settings belong to its regular mode), unless it says
+        it stays (a source type selector the grains do not cover). */
+    virtual bool shownWhileGranular() const { return false; }
 
     void paint (juce::Graphics&) override;
     void resized() override;

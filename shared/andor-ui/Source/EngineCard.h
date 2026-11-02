@@ -320,6 +320,12 @@ public:
     int mode() const noexcept { return current; }
     /** The first mode's name ("One Shot"; a product's generator may name it otherwise). */
     void setFirstModeName (const juce::String& name);
+    /** Opt-in: the key only as wide as its longer name needs (a generator's "Regular" /
+        "Granular"), its chevron closer to the name. Off: as before. */
+    void setFitsName (bool fit);
+    bool fitsName() const noexcept { return fitted; }
+    /** The width that fits the longer name (px, at the reference 41 px height). */
+    float fittedWidth() const;
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override { skin::repaintKey (*this); }
     void mouseUp (const juce::MouseEvent&) override;
@@ -336,6 +342,7 @@ private:
     void choose (int mode);
     int current = 0;
     juce::String firstModeName { "One Shot" };
+    bool fitted = false;
     juce::ParameterAttachment attachment;
 };
 
@@ -412,6 +419,9 @@ public:
     /** The mode selector's first mode under another name (a generator's "Standard"). Opt-in:
         without it the card reads "One Shot", exactly as before. */
     void setFirstModeName (const juce::String& name);
+    /** Opt-in: the mode selector only as wide as its names need (ModeSelector::setFitsName);
+        the name beside it gets the room. Without it the card is exactly as before. */
+    void setModeFitsName (bool fit);
 
     /** A product's own editor in the waveform's place (opt-in; see CardWellEditor). The card
         owns it and lays it out exactly over the display; shown, it replaces the waveform (the

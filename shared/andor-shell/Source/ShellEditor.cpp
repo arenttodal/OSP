@@ -256,7 +256,13 @@ ShellEditor::ShellEditor (ShellProcessor& p)
             openPopup (generatorHeaderPopup);
         });
     if (const auto& name = shell.product().generatorModeName; name.isNotEmpty() && shell.isGenerator())
-        cards[0]->setFirstModeName (name);
+        for (int layer = 0; layer < ShellProcessor::numLayers; ++layer)
+            if (shell.isGeneratorLayer (layer))
+            {
+                // Each oscillator card's selector: the product's name, only as wide as it needs.
+                cards[static_cast<std::size_t> (layer)]->setFirstModeName (name);
+                cards[static_cast<std::size_t> (layer)]->setModeFitsName (true);
+            }
     dropZone.onBrowse = [this] { chooseFile (-1); };
     content.addChildComponent (dropZone);
     content.addChildComponent (addTarget);
