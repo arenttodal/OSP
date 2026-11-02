@@ -29,8 +29,8 @@ character.envAmount v4 float "Character Envelope" label="%" range=-100.0000..100
 character.envAttack v4 float "Character Env Attack" label="ms" range=0.0000..2000.0000/0.0000 skew=0.19767 default=5.0000 steps=2147483647 texts=0.0000000|60.0000000|2000.0000000
 character.envDecay v4 float "Character Env Decay" label="ms" range=20.0000..12000.0000/0.0000 skew=0.24161 default=699.9999 steps=2147483647 texts=20.0000000|700.0000610|12000.0000000
 movement.mode v4 choice "Movement Mode" label="" range=0.0000..4.0000/1.0000 skew=1.00000 default=0.0000 steps=5 texts=Drift|Chorus|Shaper [Drift|Tape|Chorus|Pulse|Shaper]
-space.type v4 choice "Space Type" label="" range=0.0000..3.0000/1.0000 skew=1.00000 default=2.0000 steps=4 texts=Room|Plate|Spring [Room|Hall|Plate|Spring]
-space.decay v4 float "Space Decay" label="s" range=0.2000..8.0000/0.0000 skew=0.43756 default=1.8000 steps=2147483647 texts=0.2000000|1.8000000|8.0000000
+space.type v4 choice "Space Type" label="" range=0.0000..3.0000/1.0000 skew=1.00000 default=1.0000 steps=4 texts=Room|Plate|Spring [Room|Hall|Plate|Spring]
+space.decay v4 float "Space Decay" label="s" range=0.2000..8.0000/0.0000 skew=0.43756 default=3.0000 steps=2147483647 texts=0.2000000|1.8000000|8.0000000
 movement.drift.speed v6 float "Drift Speed" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=70.0000 steps=2147483647 texts=0.0|50.0|100.0
 movement.drift.pitch v6 float "Drift Pitch" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=25.0000 steps=2147483647 texts=0.0|50.0|100.0
 movement.drift.tone v6 float "Drift Tone" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=40.0000 steps=2147483647 texts=0.0|50.0|100.0
@@ -160,7 +160,7 @@ space.damping v12 float "Space Damping" label="%" range=0.0000..100.0000/0.1000 
 space.modulation v12 float "Space Modulation" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=40.0000 steps=2147483647 texts=0.0|50.0|100.0
 space.width v12 float "Space Width" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=100.0000 steps=2147483647 texts=0.0|50.0|100.0
 space.lowCut v12 float "Space Low Cut" label="Hz" range=20.0000..2000.0000/0.0000 skew=0.28906 default=100.0000 steps=2147483647 texts=20.0000000|199.9999847|2000.0000000
-space.highCut v12 float "Space High Cut" label="Hz" range=1000.0000..20000.0000/0.0000 skew=0.44485 default=12000.0000 steps=2147483647 texts=1000.0000000|5000.0000000|20000.0000000
+space.highCut v12 float "Space High Cut" label="Hz" range=1000.0000..20000.0000/0.0000 skew=0.44485 default=5000.0000 steps=2147483647 texts=1000.0000000|5000.0000000|20000.0000000
 echo v12 float "Echo" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0.0|50.0|100.0
 echo.type v12 choice "Echo Type" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=Tape|Tape|BBD [Tape|BBD]
 echo.sync v12 bool "Echo Sync" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=1.0000 steps=2 texts=Off|On|On

@@ -46,15 +46,15 @@ class SpaceReverb
 public:
     struct Settings
     {
-        SpaceType type = SpaceType::plate;
-        double decaySeconds = 1.8;
+        SpaceType type = SpaceType::hall;   // (as Shaping's defaults)
+        double decaySeconds = 3.0;
         double preDelayMs = 8.0;
         double size = 0.5;
         double damping = 0.4;
         double modulation = 0.4;
         double width = 1.0;
         double lowCutHz = 100.0;
-        double highCutHz = 12000.0;
+        double highCutHz = 5000.0;
 
         static Settings from (const Shaping& s) noexcept;
         /** Type or size differ: the network's lengths change (crossfade to a new instance). */

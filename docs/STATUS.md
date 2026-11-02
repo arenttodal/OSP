@@ -733,6 +733,18 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - Real-Mac worst-case callback timing. Reads above x4 (more than about +2 octaves) still
   evaluate the stretched kernel; mip-mapped sources would cap them if that matters.
 
+## SPACE (2 Nov 2026)
+
+- **New defaults:** SPACE now starts as a HALL at 3.0 s with HIGH CUT at 5 kHz, for every
+  room type. Before, it was a PLATE at 1.8 s with HIGH CUT at 12 kHz.
+  - This changes `Shaping` and `SpaceReverb::Settings`, so the parameter defaults follow, in
+    ANDOR OSP and in every shell product.
+  - Saved sessions keep the values they stored. Only new sounds, resets and partial configs
+    take the new defaults.
+  - The parameter schema golden is updated (three defaults).
+- **Plan:** three more SPACE engines (VINTAGE, BLOOM, ABYSS) in
+  `docs/spec/SPACE_ENGINES_PLAN.md`. They are not built yet.
+
 ## BLOCKERS
 
 - DAW testing (Logic, Ableton, Reaper) needs a Mac; CI covers build, tests and auval.

@@ -130,7 +130,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout InstrumentHost::createParame
     number (ids::characterEnvAttack, "Character Env Attack", skewed (0.0f, 2000.0f, 60.0f), static_cast<float> (1000.0 * d.envAttackSeconds), ms);
     number (ids::characterEnvDecay, "Character Env Decay", skewed (20.0f, 12000.0f, 700.0f), static_cast<float> (1000.0 * d.envDecaySeconds), ms);
     choice (ids::movementMode, "Movement Mode", { "Drift", "Tape", "Chorus", "Pulse", "Shaper" }, 0);
-    choice (ids::spaceType, "Space Type", { "Room", "Hall", "Plate", "Spring" }, 2);   // HALL took CHAMBER's place (v12)
+    choice (ids::spaceType, "Space Type", { "Room", "Hall", "Plate", "Spring" }, static_cast<int> (d.spaceType));   // HALL took CHAMBER's place (v12)
     number (ids::spaceDecay, "Space Decay", skewed (0.2f, 8.0f, 1.8f), static_cast<float> (d.spaceDecaySeconds), seconds);
 
     // MOVEMENT v2 (version hint 6): every mode's own settings.
