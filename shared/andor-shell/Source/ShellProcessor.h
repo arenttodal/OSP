@@ -117,10 +117,21 @@ public:
     juce::String reimaginedModeUnavailable (int layer, int mode) const override { return engine->reimaginedModeUnavailable (layer, mode); }
     juce::String engineStatus (const juce::String& topic) const override { return engine->status (topic); }
     bool hasKeyDna() const noexcept override { return engine->hasKeyDna(); }
+    bool hasKeyDnaKey (int layer) const noexcept override { return engine->hasKeyDnaKey (layer); }
+    juce::String productWordmark() const override { return productInfo().identity.mark + productInfo().identity.product; }
+    // KEY DNA (an engine that has it): ANDOR OSP's editor, settings, undo and saved state.
+    osp::keydna::Settings keyDnaSettings (int layer) const override;
+    void setKeyDnaSettings (int layer, const osp::keydna::Settings& settings, const juce::String& name, bool undoable) override;
+    osp::mod::Curve keyDnaCurve (int layer, osp::keydna::Param param) const override;
+    void setKeyDnaCurve (int layer, osp::keydna::Param param, const osp::mod::Curve& curve, bool undoable) override;
+    /** The profiles still owned for a layer (the playing one and any not yet released). */
+    std::size_t keyDnaProfilesAlive (int layer) const;
     bool hasSynthesize() const noexcept override { return engine->hasSynthesize(); }
 
     // The shell -------------------------------------------------------------------------
     const ProductInfo& product() const noexcept { return productInfo(); }
+    /** The product's engine (its own interface reaches its own features through it). */
+    Engine& productEngine() noexcept { return *engine; }
     const Engine::Description& engineDescription() const noexcept { return description; }
     /** The parameter IDs and patterns the product's engine reads (Engine::boundParameters). */
     const juce::StringArray& boundParameters() const noexcept { return bound; }
@@ -130,6 +141,10 @@ public:
     /** The engine makes its own sound (Engine::Description::generator): layer A is its card,
         and nothing is ever loaded. */
     bool isGenerator() const noexcept { return generatorName.isNotEmpty(); }
+    /** A layer the generator plays (layer 0; with ProductInfo::threeEngines, the engine's
+        further layers): its card shows the engine's picture. Never "occupied" in the mix's
+        sense (the header MIX stays the generator against the hybrid). */
+    bool isGeneratorLayer (int layer) const;
     /** A generator that also plays one recording on layer B (ProductInfo::hybridSampleName). */
     bool hasHybridLayer() const noexcept { return isGenerator() && productInfo().hybridSampleName.isNotEmpty(); }
     /** A hybrid product's recording and generator at the A/B mix's centre (where the engine reads it). */
@@ -223,6 +238,28 @@ private:
     };
     std::array<Layer, numLayers> layers;
     std::array<osp::InstrumentEngine::GrainSnapshot, numLayers> noGrains;
+
+    // KEY DNA (when the engine has it), as ANDOR OSP's processor keeps it: the settings and
+    // the editor's drawn curves on the message side under their mutex (hosts may save state
+    // off the message thread); each layer's profile computed there and handed to the audio
+    // thread through its exchange. A drag publishes as it moves and is one undo step.
+    class KeyDnaAction;
+    using KeyDnaCurves = std::array<std::optional<osp::mod::Curve>, osp::keydna::paramCount>;
+    struct KeyDnaGesture
+    {
+        osp::keydna::Settings settings;
+        KeyDnaCurves curves;
+    };
+    mutable std::mutex keyDnaMutex;
+    std::array<osp::keydna::Settings, numLayers> keyDnaLayers {};
+    std::array<KeyDnaCurves, numLayers> keyDnaCurves {};
+    std::array<osp::ModelExchange<osp::keydna::Profile>, numLayers> keyDnaExchange;
+    std::uint64_t keyDnaGeneration = 0;
+    std::array<const osp::keydna::Profile*, numLayers> keyDnaPlaying {};   ///< audio thread
+    std::array<std::optional<KeyDnaGesture>, numLayers> keyDnaGestureStart {};
+    void publishKeyDna (int layer, const osp::keydna::Settings& settings, const KeyDnaCurves* curves = nullptr);
+    void beginKeyDnaGesture (int layer);
+    void swapKeyDnaIfPending() noexcept;
     std::atomic<int> editLayerIndex { 0 };
 
     std::unique_ptr<osp::plugin::SampleStore> store;
@@ -308,6 +345,18 @@ private:
     std::atomic<float> screenPitch { 0.0f }, screenMod { 0.0f }, wheelShown { 0.0f };
     float lastScreenPitch = 0.0f, lastScreenMod = 0.0f;   ///< audio thread
     Engine::Performance performance;                       ///< audio thread
+
+    // The AMP envelope's edits (ProductInfo::ampEnvelopeTouched): a gesture's start on one of
+    // its four parameters, handed to the product on the message thread.
+    struct AmpEnvelopeTouch final : juce::AudioProcessorParameter::Listener
+    {
+        explicit AmpEnvelopeTouch (ShellProcessor& p) : owner (p) {}
+        void parameterValueChanged (int, float) override {}
+        void parameterGestureChanged (int, bool starting) override;
+        ShellProcessor& owner;
+    };
+    std::unique_ptr<AmpEnvelopeTouch> ampEnvelopeTouch;
+    std::atomic<bool> ampEnvelopeTouchPending { false };   ///< a touch from another thread, for the timer
 
     // View settings.
     std::atomic<bool> arpOpen { false }, shaperLarge { false };

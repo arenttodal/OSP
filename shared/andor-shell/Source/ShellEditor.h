@@ -3,6 +3,7 @@
 #include "ArpSection.h"
 #include "EngineCard.h"
 #include "InstrumentFrame.h"
+#include "KeyDnaEditor.h"
 #include "MainSections.h"
 #include "ModulationPanel.h"
 #include "OspLookAndFeel.h"
@@ -14,6 +15,48 @@
 
 namespace andor::shell
 {
+
+/**
+    A hybrid product's empty recording (ProductInfo::hybridSampleDock): a compact raised card
+    beside the generator's, its one action ADD SAMPLE (a click browses; a file dropped
+    anywhere on the instrument loads it, the dock lit while one is dragged). After a failed
+    load it says so and offers another try. Not a third source: the recording's own card
+    replaces it as soon as one loads.
+*/
+class SampleDock final : public juce::Component, public osp::plugin::skin::SurfaceFace
+{
+public:
+    SampleDock();
+    std::function<void()> onBrowse;
+    /** A second, quieter action under the first (ProductInfo::hybridAction): its label and what
+        it does. Empty: none. */
+    void setSecondaryAction (const juce::String& label, std::function<void()> action);
+    juce::Rectangle<int> secondaryActionBounds() const;
+    void setHighlight (bool on);
+    /** Three engines: the dock is the hybrid card's empty state, headed like a card (its badge
+        letter and title). Empty letter: no header (the compact dock, as before). */
+    void setHeader (const juce::String& letter, int shownLayer, const juce::String& title);
+    /** Where a header leaves the dashed place (local coordinates). */
+    juce::Rectangle<int> headerBounds() const;
+    /** The name it shows (the product's: "ORGANIC") and, after a failed load, the reason. */
+    void setText (const juce::String& sourceName, const juce::String& problem);
+    float surfaceRadius() const override { return osp::plugin::design::layout::cardRadius; }
+    bool surfaceIsCard() const override { return true; }
+    void paint (juce::Graphics&) override;
+    void mouseUp (const juce::MouseEvent&) override;
+    void mouseEnter (const juce::MouseEvent&) override { setHover (true); }
+    void mouseExit (const juce::MouseEvent&) override { setHover (false); }
+    bool keyPressed (const juce::KeyPress&) override;
+    bool isHighlighted() const noexcept { return highlight; }
+    const juce::String& problemText() const noexcept { return problem; }
+
+private:
+    void setHover (bool on);
+    juce::String name { "SAMPLE" }, problem, secondaryLabel, headerLetter, headerTitle;
+    int headerLayer = 0;
+    std::function<void()> secondary;
+    bool highlight = false, hover = false;
+};
 
 /**
     The ANDOR Instrument Shell's window: ANDOR OSP's layout and look, built from the very same
@@ -40,6 +83,10 @@ public:
 
     /** Pulls the processor's state into the UI now and finishes layout transitions (tests, snapshots). */
     void refreshNow();
+    /** Tests: a modulation source dragged over the editor (content coordinates), and dropped. */
+    void dragModulationForTest (int source, juce::Point<float> where) { dragModulation (source, where); }
+    void dropModulationForTest (int source, juce::Point<float> where) { dropModulation (source, where); }
+    juce::Component& contentForTest() noexcept { return content; }
     int visibleCardCount() const;
     osp::plugin::EngineCard& engineCard (int layer) noexcept { return *cards[static_cast<std::size_t> (juce::jlimit (0, 2, layer))]; }
     osp::plugin::ModulationPanel& modulationPanel() noexcept { return modPanel; }
@@ -48,7 +95,8 @@ public:
     /** The popovers: a macro's (0..5, when the product has one), Advanced, a layer's
         REIMAGINED (7 + layer, when the engine reads it), a modulation source's routes or
         larger curve (source 0 LFO 1 .. 3 ENV 2). */
-    static constexpr int advancedPopup = 6, reimaginedPopup = 7, routesPopup = 11, curvePopup = 12, startControlPopup = 13, generatorHeaderPopup = 14;
+    static constexpr int advancedPopup = 6, reimaginedPopup = 7, routesPopup = 11, curvePopup = 12, startControlPopup = 13, generatorHeaderPopup = 14,
+                         hybridHeaderPopup = 15;
     void openPopup (int which, int source = 0);
     void closePopup();
     static constexpr bool isReimaginedPopup (int which) noexcept { return which >= reimaginedPopup && which < reimaginedPopup + osp::plugin::InstrumentHost::numLayers; }
@@ -63,6 +111,13 @@ public:
     void showWellEditor (bool show);
     void toggleWellEditor();
     bool isWellEditorShown() const;
+    /** KEY DNA (an engine that has it): ANDOR OSP's editor over the instrument, above the
+        keyboard (its profile drawn over the real keys), opened by a card's KEY DNA key. */
+    void openKeyDna (int layer);
+    void closeKeyDna();
+    osp::plugin::KeyDnaEditor* keyDnaWindow() noexcept { return keyDnaPanel.get(); }
+    /** For tests: the hybrid recording's dock (ProductInfo::hybridSampleDock). */
+    SampleDock& recordingDock() noexcept { return sampleDock; }
     /** For tests: the controls shown disabled because the engine does not read their parameters. */
     int disabledControlCount() const noexcept { return disabledControls; }
 
@@ -79,6 +134,8 @@ private:
     void choosePresetFile (bool save);
     void selectModulation (int source, int slot);
     void dragModulation (int source, juce::Point<float> where);
+    int dragHoverCard = -1;               ///< the Granular card a source being dragged rests on
+    juce::uint32 dragHoverSince = 0;
     void dropModulation (int source, juce::Point<float> where);
     void positionPopup();
     int dropLayerAt (juce::Point<int> editorPoint) const;
@@ -109,7 +166,17 @@ private:
     std::array<std::unique_ptr<osp::plugin::EngineCard>, osp::plugin::InstrumentHost::numLayers> cards;
     osp::plugin::DropZone dropZone;
     osp::plugin::AddLayerTarget addTarget;
+    SampleDock sampleDock;
+    /** The hybrid recording's dock is shown (opt-in, the recording absent). */
+    bool sampleDockShown() const;
     int shownCount = -1;
+    bool shownHybrid = false;   ///< three engines: the hybrid's card (or its empty dock) as last laid out
+    // Three engines / product card extensions: what each card was last given.
+    std::array<juce::String, 3> appliedKnobs, appliedOverlayKeys;
+    std::unique_ptr<osp::plugin::WellOverlay> dockOverlay;
+    juce::String dockOverlayKey;
+    void refreshCardExtensions();
+    bool threeEngines() const;
     bool dragging = false;
     int dragLayer = -1;
 
@@ -130,6 +197,12 @@ private:
     int disabledControls = 0;
 
     std::unique_ptr<osp::plugin::MiniPanel> popup;
+    std::unique_ptr<osp::plugin::KeyDnaEditor> keyDnaPanel;
+    void placeKeyDna();
+    /** The recording card's heading opens ProductInfo::hybridHeaderPopover while it shows the
+        engine's own source. */
+    void updateHybridDoor();
+    bool hybridDoorSet = false;
     int popupIndex = -1, popupSource = 0;
     int closedByLabelPress = -1;   ///< a press on an open popover's own door closes it (and must not reopen it)
     OutsideClickWatcher outsideClicks { *this };

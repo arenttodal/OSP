@@ -76,7 +76,7 @@ namespace
         g.setColour (light.withAlpha (on ? 0.95f : 0.6f));
         g.drawText (name, title, juce::Justification::centredLeft, false);
         const float tw = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), name);
-        g.setColour (colour::identity (layer).arc.withAlpha (on ? 1.0f : 0.5f));
+        g.setColour (colour::identity (InstrumentHost::shownLayer (layer)).arc.withAlpha (on ? 1.0f : 0.5f));
         g.fillRect (juce::Rectangle<float> (title.getX(), title.getBottom() - 2.0f, tw, 1.5f));
         if (! on)
         {
@@ -182,7 +182,7 @@ void EqButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
     if (active)
     {
         // A small flat telltale in the layer's colour (as NOTES' amber one), not a lamp.
-        g.setColour (colour::identity (layer).arc);
+        g.setColour (colour::identity (InstrumentHost::shownLayer (layer)).arc);
         g.fillEllipse (juce::Rectangle<float> (4.5f, 4.5f).withCentre ({ r.getX() + (narrow ? 7.0f : 9.5f), r.getCentreY() }));
     }
     g.setFont (type::button (narrow ? 12.5f : 13.5f));
@@ -273,7 +273,7 @@ void EqValueField::commitTyping (const juce::String& text)
 EqEditor::EqEditor (InstrumentHost& p, int l) : ospProcessor (p), layer (l)
 {
     binding::tag (*this, InstrumentHost::eqParameterId (l, "*"));
-    setTitle ("EQ " + InstrumentHost::layerName (layer));
+    setTitle ("EQ " + InstrumentHost::shownLayerName (layer));
     shown = ospProcessor.layerEqSettings (layer);
     setRepaintsOnMouseActivity (false);
     dampenPage = std::make_unique<DampenEditor> (ospProcessor, layer);
@@ -487,7 +487,7 @@ void EqEditor::resized()
     const float w = static_cast<float> (getWidth());
     // The open page's name, then the other page's tab one even gap after it (after "Off" while
     // the EQ is off), as NOTE MAP's tabs are spaced.
-    const float tw = juce::GlyphArrangement::getStringWidth (type::popupLabel (12.0f), "EQ " + InstrumentHost::layerName (layer));
+    const float tw = juce::GlyphArrangement::getStringWidth (type::popupLabel (12.0f), "EQ " + InstrumentHost::shownLayerName (layer));
     titleArea = { 40.0f, 9.0f, tw + (shown.enabled ? 4.0f : 30.0f), 24.0f };
     dampenTab = { titleArea.getRight() + 10.0f, 9.0f, 64.0f, 24.0f };
     if (dampenPage != nullptr)
@@ -703,7 +703,7 @@ void EqEditor::paint (juce::Graphics& g)
 
     // The top row: the EQ's switch, EQ | DAMPEN as text tabs, the selected band's values.
     drawPower (g, powerArea(), heard);
-    drawTabs (g, titleArea, "EQ " + InstrumentHost::layerName (layer), heard, dampenTab, "DAMPEN", hotTab, layer, bounds.getRight(),
+    drawTabs (g, titleArea, "EQ " + InstrumentHost::shownLayerName (layer), heard, dampenTab, "DAMPEN", hotTab, layer, bounds.getRight(),
               twoRows ? 38.0f + rowDrop : 38.0f);
     if (selected >= 0)
     {
@@ -922,7 +922,7 @@ namespace
 DampenEditor::DampenEditor (InstrumentHost& p, int l) : ospProcessor (p), layer (l)
 {
     binding::tag (*this, InstrumentHost::dampenParameterId (l, "*"));
-    setTitle ("DAMPEN " + InstrumentHost::layerName (layer));
+    setTitle ("DAMPEN " + InstrumentHost::shownLayerName (layer));
     setTooltip ("DAMPEN: each note loses highs by its key. Drag a point, double-click to add or remove one");
     auto make = [this] (const char* name) {
         auto f = std::make_unique<EqValueField> (ospProcessor, InstrumentHost::dampenParameterId (layer, name));
@@ -1030,7 +1030,7 @@ void DampenEditor::applyPreset (int preset)
 void DampenEditor::resized()
 {
     const float w = static_cast<float> (getWidth());
-    const float tw = juce::GlyphArrangement::getStringWidth (type::popupLabel (12.0f), "DAMPEN " + InstrumentHost::layerName (layer));
+    const float tw = juce::GlyphArrangement::getStringWidth (type::popupLabel (12.0f), "DAMPEN " + InstrumentHost::shownLayerName (layer));
     title = { 40.0f, 9.0f, tw + (enabled() ? 4.0f : 30.0f), 24.0f };
     eqTab = { title.getRight() + 10.0f, 9.0f, 34.0f, 24.0f };
     closeArea = { w - 32.0f, 10.0f, 22.0f, 22.0f };
@@ -1143,7 +1143,7 @@ void DampenEditor::paint (juce::Graphics& g)
     // The top row: DAMPEN's switch, DAMPEN | EQ as text tabs, the mode, AMOUNT, the value, the
     // curve's presets, close (the EQ page's vocabulary).
     drawPower (g, powerArea(), heard);
-    drawTabs (g, title, "DAMPEN " + InstrumentHost::layerName (layer), heard, eqTab, "EQ", hotTab, layer, bounds.getRight(),
+    drawTabs (g, title, "DAMPEN " + InstrumentHost::shownLayerName (layer), heard, eqTab, "EQ", hotTab, layer, bounds.getRight(),
               twoRows ? 38.0f + rowDrop : 38.0f);
     if (mode.getWidth() >= 110.0f)
         drawSegments (g, mode, { "Shelf", "Low-pass" }, lowPass() ? 1 : 0, false);

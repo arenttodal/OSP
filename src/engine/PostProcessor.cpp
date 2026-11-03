@@ -18,6 +18,12 @@ void PostProcessor::prepare (double rate, int /*maximumBlockSize*/, std::uint64_
     movement.prepare (rate, seed);
     for (auto& r : reverbs)
         r.prepare (rate);
+    for (auto& a : abysses)
+        a.prepare (rate);
+    for (auto& v : vintages)
+        v.prepare (rate);
+    for (auto& b : blooms)
+        b.prepare (rate);
     echo.prepare (rate);
     drive.prepare (rate);
     reverbFadeLength = std::max (1, static_cast<int> (0.25 * rate));
@@ -34,16 +40,17 @@ void PostProcessor::reset() noexcept
     movement.setTargets (shaping, motionTarget);
     movement.reset();
     appliedSpace = SpaceReverb::Settings::from (shaping);
+    appliedAbyss = AbyssReverb::Settings::from (shaping);
+    appliedVintage = VintageReverb::Settings::from (shaping);
+    appliedBloom = BloomReverb::Settings::from (shaping);
+    appliedEngine = shaping.spaceEngine;
     sizeSettled = 0;
     activeReverb = 0;
     reverbFade = 0;
     reverbAsleep = false;
     quietRun = 0;
-    for (auto& r : reverbs)
-    {
-        r.configure (appliedSpace);
-        r.reset();
-    }
+    for (int slot = 0; slot < 2; ++slot)
+        startSlot (slot);
     spaceIdle = space < 1.0e-5;
     echoLevel = echoTarget;
     echo.setSettings (EchoDelay::Settings::from (shaping));
@@ -51,6 +58,128 @@ void PostProcessor::reset() noexcept
     echoIdle = echoLevel < 1.0e-5;
     drive.reset();
     echoAsleep = false;
+}
+
+void PostProcessor::startSlot (int slot) noexcept
+{
+    // A slot starts the engine SPACE plays now, from silence, at the applied settings.
+    const auto s = static_cast<std::size_t> (slot);
+    slotEngine[s] = appliedEngine;
+    switch (appliedEngine)
+    {
+        case SpaceEngine::abyss:
+            abysses[s].configure (appliedAbyss);
+            abysses[s].reset();
+            break;
+        case SpaceEngine::vintage:
+            vintages[s].configure (appliedVintage);
+            vintages[s].reset();
+            break;
+        case SpaceEngine::bloom:
+            blooms[s].configure (appliedBloom);
+            blooms[s].reset();
+            break;
+        case SpaceEngine::rooms:
+            reverbs[s].configure (appliedSpace);
+            reverbs[s].reset();
+            break;
+    }
+}
+
+void PostProcessor::updateAbyss() noexcept
+{
+    // As the rooms below: SIZE (once it rests) fades in on the idle slot; DECAY glides; the
+    // rest (GRAVITY, FREEZE, RESONANCE among them) retunes the playing ABYSS in place.
+    const auto wanted = AbyssReverb::Settings::from (shaping);
+    sizeSettled = std::abs (wanted.size - lastWantedSize) > 1.0e-6 ? 0 : sizeSettled + 1;
+    lastWantedSize = wanted.size;
+    if (wanted.structurallyDifferent (appliedAbyss) && reverbFade == 0 && sizeSettled >= 90)
+    {
+        appliedAbyss = wanted;
+        activeReverb = 1 - activeReverb;
+        startSlot (activeReverb);
+        reverbFade = reverbFadeLength;
+        return;
+    }
+    auto tuned = appliedAbyss;
+    if (std::abs (wanted.decaySeconds - tuned.decaySeconds) > 1.0e-3)
+        tuned.decaySeconds += std::clamp (wanted.decaySeconds - tuned.decaySeconds, -0.03 * tuned.decaySeconds, 0.03 * tuned.decaySeconds);
+    tuned.preDelayMs = wanted.preDelayMs;
+    tuned.damping = wanted.damping;
+    tuned.modulation = wanted.modulation;
+    tuned.width = wanted.width;
+    tuned.lowCutHz = wanted.lowCutHz;
+    tuned.highCutHz = wanted.highCutHz;
+    tuned.gravity = wanted.gravity;
+    tuned.freeze = wanted.freeze;
+    tuned.resonance = wanted.resonance;
+    const bool moved = tuned.decaySeconds != appliedAbyss.decaySeconds || tuned.preDelayMs != appliedAbyss.preDelayMs
+                       || tuned.damping != appliedAbyss.damping || tuned.modulation != appliedAbyss.modulation
+                       || tuned.width != appliedAbyss.width || tuned.lowCutHz != appliedAbyss.lowCutHz
+                       || tuned.highCutHz != appliedAbyss.highCutHz || tuned.gravity != appliedAbyss.gravity
+                       || tuned.freeze != appliedAbyss.freeze || tuned.resonance != appliedAbyss.resonance;
+    if (moved)
+    {
+        appliedAbyss = tuned;
+        abysses[static_cast<std::size_t> (activeReverb)].tune (appliedAbyss);
+    }
+}
+
+void PostProcessor::updateVintage() noexcept
+{
+    // VARIANT, ERA and SIZE (once it rests) fade in on the idle slot; DECAY glides; the rest
+    // retunes in place.
+    const auto wanted = VintageReverb::Settings::from (shaping);
+    sizeSettled = std::abs (wanted.size - lastWantedSize) > 1.0e-6 ? 0 : sizeSettled + 1;
+    lastWantedSize = wanted.size;
+    const bool rebuilt = wanted.variant != appliedVintage.variant || wanted.era != appliedVintage.era;
+    if (wanted.structurallyDifferent (appliedVintage) && reverbFade == 0 && (rebuilt || sizeSettled >= 90))
+    {
+        appliedVintage = wanted;
+        activeReverb = 1 - activeReverb;
+        startSlot (activeReverb);
+        reverbFade = reverbFadeLength;
+        return;
+    }
+    auto tuned = appliedVintage;
+    if (std::abs (wanted.decaySeconds - tuned.decaySeconds) > 1.0e-3)
+        tuned.decaySeconds += std::clamp (wanted.decaySeconds - tuned.decaySeconds, -0.03 * tuned.decaySeconds, 0.03 * tuned.decaySeconds);
+    tuned.preDelayMs = wanted.preDelayMs;
+    tuned.damping = wanted.damping;
+    tuned.modulation = wanted.modulation;
+    tuned.width = wanted.width;
+    tuned.lowCutHz = wanted.lowCutHz;
+    tuned.highCutHz = wanted.highCutHz;
+    tuned.diffusion = wanted.diffusion;
+    const bool moved = tuned.decaySeconds != appliedVintage.decaySeconds || tuned.preDelayMs != appliedVintage.preDelayMs
+                       || tuned.damping != appliedVintage.damping || tuned.modulation != appliedVintage.modulation
+                       || tuned.width != appliedVintage.width || tuned.lowCutHz != appliedVintage.lowCutHz
+                       || tuned.highCutHz != appliedVintage.highCutHz || tuned.diffusion != appliedVintage.diffusion;
+    if (moved)
+    {
+        appliedVintage = tuned;
+        vintages[static_cast<std::size_t> (activeReverb)].tune (appliedVintage);
+    }
+}
+
+void PostProcessor::updateBloom() noexcept
+{
+    // Everything plays in place (its TIME glides): only DECAY is eased, as the others'.
+    const auto wanted = BloomReverb::Settings::from (shaping);
+    auto tuned = wanted;
+    tuned.decaySeconds = appliedBloom.decaySeconds;
+    if (std::abs (wanted.decaySeconds - tuned.decaySeconds) > 1.0e-3)
+        tuned.decaySeconds += std::clamp (wanted.decaySeconds - tuned.decaySeconds, -0.03 * tuned.decaySeconds, 0.03 * tuned.decaySeconds);
+    const auto& a = appliedBloom;
+    const bool moved = tuned.decaySeconds != a.decaySeconds || tuned.preDelayMs != a.preDelayMs || tuned.size != a.size || tuned.damping != a.damping
+                       || tuned.modulation != a.modulation || tuned.width != a.width || tuned.lowCutHz != a.lowCutHz || tuned.highCutHz != a.highCutHz
+                       || tuned.variant != a.variant || tuned.sync != a.sync || tuned.division != a.division || tuned.timeMs != a.timeMs
+                       || tuned.diffusion != a.diffusion;
+    if (moved)
+    {
+        appliedBloom = tuned;
+        blooms[static_cast<std::size_t> (activeReverb)].tune (appliedBloom);
+    }
 }
 
 void PostProcessor::setModel (const InstrumentModel* newModel) noexcept
@@ -83,12 +212,49 @@ void PostProcessor::setTiming (const HostTiming& timing) noexcept
 {
     movement.setTiming (timing);
     if (timing.bpm > 1.0)
+    {
         echo.setTempo (timing.bpm);   // ECHO follows the tempo even when the host gives no position
+        for (auto& b : blooms)
+            b.setTempo (timing.bpm);  // (and BLOOM)
+    }
 }
 
 void PostProcessor::updateCoefficients() noexcept
 {
     reimaginedStage.update();
+
+    // SPACE's engine changed: the new one fades in on the idle slot (as a new type does).
+    if (shaping.spaceEngine != appliedEngine)
+    {
+        if (reverbFade == 0)
+        {
+            appliedEngine = shaping.spaceEngine;
+            appliedSpace = SpaceReverb::Settings::from (shaping);
+            appliedAbyss = AbyssReverb::Settings::from (shaping);
+            appliedVintage = VintageReverb::Settings::from (shaping);
+            appliedBloom = BloomReverb::Settings::from (shaping);
+            lastWantedSize = shaping.spaceSize;
+            activeReverb = 1 - activeReverb;
+            startSlot (activeReverb);
+            reverbFade = reverbFadeLength;
+        }
+        return;
+    }
+    if (appliedEngine == SpaceEngine::abyss)
+    {
+        updateAbyss();
+        return;
+    }
+    if (appliedEngine == SpaceEngine::vintage)
+    {
+        updateVintage();
+        return;
+    }
+    if (appliedEngine == SpaceEngine::bloom)
+    {
+        updateBloom();
+        return;
+    }
 
     // SPACE: a new type or size fades in on the idle reverb (a size being dragged waits
     // until it rests for ~60 ms); everything else retunes the playing one in place.
@@ -178,8 +344,8 @@ void PostProcessor::process (float* left, float* right, int numSamples) noexcept
             if (spaceIdle)
             {
                 spaceIdle = false;
-                for (auto& rv : reverbs)
-                    rv.reset();
+                for (int slot = 0; slot < 2; ++slot)
+                    startSlot (slot);
             }
             const bool silentIn = l == 0.0f && r == 0.0f;
             if (reverbAsleep && (! silentIn || reverbFade > 0))
@@ -190,12 +356,15 @@ void PostProcessor::process (float* left, float* right, int numSamples) noexcept
             if (reverbAsleep)
             {
                 // Silence in, a tail below -120 dBFS: the output is silence.
-                reverbs[static_cast<std::size_t> (activeReverb)].skip();
+                if (slotEngine[static_cast<std::size_t> (activeReverb)] == SpaceEngine::abyss)
+                    abysses[static_cast<std::size_t> (activeReverb)].skip();
+                else if (slotEngine[static_cast<std::size_t> (activeReverb)] == SpaceEngine::rooms)
+                    reverbs[static_cast<std::size_t> (activeReverb)].skip();   // (VINTAGE and BLOOM keep no clocks asleep)
             }
             else
             {
                 float wl, wr;
-                reverbs[static_cast<std::size_t> (activeReverb)].process (l, r, wl, wr);
+                processSlot (activeReverb, l, r, wl, wr);
                 if (silentIn && reverbFade == 0 && std::abs (wl) < 1.0e-6f && std::abs (wr) < 1.0e-6f)
                     reverbAsleep = ++quietRun >= sleepAfter;
                 else
@@ -203,7 +372,7 @@ void PostProcessor::process (float* left, float* right, int numSamples) noexcept
                 if (reverbFade > 0)
                 {
                     float ol, orr;
-                    reverbs[static_cast<std::size_t> (1 - activeReverb)].process (l, r, ol, orr);
+                    processSlot (1 - activeReverb, l, r, ol, orr);
                     const float w = static_cast<float> (reverbFade) / static_cast<float> (reverbFadeLength);
                     wl += w * (ol - wl);
                     wr += w * (orr - wr);

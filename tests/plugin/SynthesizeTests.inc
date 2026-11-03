@@ -618,3 +618,112 @@ TEST_CASE ("plugin synthesize: CPU of the whole plug-in, SYNTHESIZE off and on",
         std::printf ("%-32s %10.2f %10.2f %+7.1f%%\n", sc.name, cost[0], cost[1], 100.0 * (cost[1] / cost[0] - 1.0));
     }
 }
+
+TEST_CASE ("plugin SPACE engines in ANDOR OSP: ROOMS, ABYSS, VINTAGE and BLOOM heard, switched on held notes, saved; older sessions on their room", "[plugin][space-engines]")
+{
+    TempDir tmp;
+    OspAudioProcessor p;
+    loadLayers (p, tmp.dir, 1);
+    p.setParameterValue ("space", 60.0f);
+    CHECK (p.parameterValue ("space.engine") == 0.0f);   // ROOMS by default
+    std::array<juce::String, 4> hashes;
+    for (int engine = 0; engine < 4; ++engine)
+    {
+        p.setParameterValue ("space.engine", static_cast<float> (engine));
+        const auto out = renderHeld (p, chord8, 2.0);
+        CHECK (finite (out));
+        CHECK (rmsDb (out, 0.5, 1.9) > -60.0);
+        hashes[static_cast<std::size_t> (engine)] = audioHash (out);
+    }
+    for (int a = 0; a < 4; ++a)
+        for (int b = a + 1; b < 4; ++b)
+            CHECK (hashes[static_cast<std::size_t> (a)] != hashes[static_cast<std::size_t> (b)]);   // each engine its own sound
+
+    // Switching engine (and the engines' own controls) on held notes: finite, no allocation.
+    juce::AudioBuffer<float> buffer (2, 256);
+    juce::MidiBuffer midi;
+    midi.ensureSize (4096);
+    for (const int n : chord8)
+        midi.addEvent (juce::MidiMessage::noteOn (1, n, static_cast<juce::uint8> (100)), 0);
+    for (int i = 0; i < 16; ++i)
+    {
+        buffer.clear();
+        p.processBlock (buffer, midi);
+        midi.clear();
+    }
+    auto* engineParam = p.parameters.getParameter ("space.engine");
+    REQUIRE (engineParam != nullptr);
+    int allocations = 0;
+    bool allFinite = true;
+    for (int round = 0; round < 12; ++round)
+    {
+        engineParam->setValueNotifyingHost (engineParam->convertTo0to1 (static_cast<float> (round % 4)));
+        p.parameters.getParameter ("space.abyss.freeze")->setValueNotifyingHost (round == 5 ? 1.0f : 0.0f);
+        test::AllocationScope scope;
+        for (int i = 0; i < 8; ++i)
+        {
+            buffer.clear();
+            p.processBlock (buffer, midi);
+            for (int c = 0; c < 2; ++c)
+                for (int k = 0; k < 256; ++k)
+                    allFinite = allFinite && std::isfinite (buffer.getSample (c, k));
+        }
+        allocations += scope.count();
+    }
+    CHECK (allocations == 0);
+    CHECK (allFinite);
+
+    // Saved with the session; a session from before (no space.engine) opens on its room.
+    p.setParameterValue ("space.engine", 3.0f);
+    p.setParameterValue ("space.bloom.variant", 2.0f);
+    juce::MemoryBlock state;
+    p.getStateInformation (state);
+    {
+        OspAudioProcessor q;
+        q.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+        CHECK (q.parameterValue ("space.engine") == Approx (3.0f));
+        CHECK (q.parameterValue ("space.bloom.variant") == Approx (2.0f));
+    }
+    auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
+    REQUIRE (xml != nullptr);
+    for (auto* child = xml->getFirstChildElement(); child != nullptr;)
+    {
+        auto* next = child->getNextElement();
+        const auto id = child->getStringAttribute ("id");
+        if (id == "space.engine" || id.startsWith ("space.abyss.") || id.startsWith ("space.vintage.") || id.startsWith ("space.bloom."))
+            xml->removeChildElement (child, true);
+        child = next;
+    }
+    juce::MemoryBlock old;
+    juce::AudioProcessor::copyXmlToBinary (*xml, old);
+    OspAudioProcessor older;
+    older.setStateInformation (old.getData(), static_cast<int> (old.getSize()));
+    CHECK (older.parameterValue ("space.engine") == 0.0f);
+}
+
+TEST_CASE ("plugin SPACE engines in ANDOR OSP: the popover's screenshots (OSP_SPACE_SHOTS)", "[.][plugin][space-shots]")
+{
+    const char* dir = std::getenv ("OSP_SPACE_SHOTS");
+    if (dir == nullptr)
+        return;
+    TempDir tmp;
+    for (const auto& [engine, name] : { std::pair<int, const char*> { 0, "rooms" }, { 1, "abyss" }, { 2, "vintage" }, { 3, "bloom" } })
+    {
+        OspAudioProcessor p;
+        loadLayers (p, tmp.dir, 1);
+        p.setParameterValue ("space", 45.0f);
+        p.setParameterValue ("space.engine", static_cast<float> (engine));
+        std::unique_ptr<juce::AudioProcessorEditor> e (p.createEditorIfNeeded());
+        auto* ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (e.get());
+        REQUIRE (ui != nullptr);
+        e->setSize (1448, 1086);
+        ui->refreshNow();
+        ui->openPopup (4);   // SPACE
+        ui->refreshNow();
+        juce::FileOutputStream out (juce::File (juce::String::fromUTF8 (dir)).getChildFile (juce::String ("space-") + name + ".png"));
+        out.setPosition (0);
+        out.truncate();
+        juce::PNGImageFormat().writeImageToStream (e->createComponentSnapshot (e->getLocalBounds(), true, 1.0f), out);
+        ui->closePopup();
+    }
+}

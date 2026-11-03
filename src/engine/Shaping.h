@@ -31,6 +31,13 @@ enum class FilterType { lp24, lp12, hp12, bp12, tilt, off };   ///< off: researc
 enum class MovementMode { drift, tape, chorus, pulse, shaper };
 /** SPACE's rooms. HALL took CHAMBER's place (index 1) in SPACE v2. */
 enum class SpaceType { room, hall, plate, spring };
+/** SPACE's engine: the four ROOMS (SpaceType), ABYSS, VINTAGE or BLOOM (engine/*Reverb.h). */
+enum class SpaceEngine { rooms, abyss, vintage, bloom };
+/** VINTAGE's voicings and its two eras (the network's internal rate). */
+enum class VintageVariant { hall, plate, chamber, room };
+enum class VintageEra { early, later };
+/** BLOOM's character in its feedback path. */
+enum class BloomVariant { clean, vintage, tape, wash };
 /** DRIVE's three circuits (a shared saturation stage before SPACE and ECHO). */
 enum class DriveMode { tube, tape, crunch };
 
@@ -76,15 +83,28 @@ struct Shaping
     ShaperParams shaper;                                                ///< THREE, 1/16, BOTH, smooth 0.3
 
     // SPACE (v2: the room's shape and its EQ besides TYPE and DECAY)
-    SpaceType spaceType = SpaceType::plate;
-    double spaceDecaySeconds = 1.8;
+    SpaceType spaceType = SpaceType::hall;   ///< (a HALL at 3 s since 2026-11: was PLATE at 1.8 s)
+    double spaceDecaySeconds = 3.0;
     double spacePreDelayMs = 8.0;     ///< 0..250 ms before the room answers
     double spaceSize = 0.5;           ///< 0..1: the room's dimensions (0.5 = the type's own)
     double spaceDamping = 0.4;        ///< 0..1: how much faster the highs die than the mids
     double spaceModulation = 0.4;     ///< 0..1: the tail's slow motion (0: still, 1: lush)
     double spaceWidth = 1.0;          ///< 0..1: mono .. the type's full width
     double spaceLowCutHz = 100.0;     ///< the reverb's input EQ: 20 Hz = open
-    double spaceHighCutHz = 12000.0;  ///< 20 kHz = open
+    double spaceHighCutHz = 5000.0;   ///< 20 kHz = open (5 kHz by default since 2026-11: was 12 kHz)
+    // SPACE's engine (2026-11): ROOMS (the four types above) or ABYSS, with ABYSS's own.
+    SpaceEngine spaceEngine = SpaceEngine::rooms;
+    double abyssGravity = 0.0;        ///< -1..1: below 0 the envelope swells (inverse)
+    bool abyssFreeze = false;
+    double abyssResonance = 0.0;      ///< 0..1
+    VintageVariant vintageVariant = VintageVariant::hall;
+    VintageEra vintageEra = VintageEra::early;
+    double vintageDiffusion = 0.7;    ///< 0..1
+    BloomVariant bloomVariant = BloomVariant::clean;
+    bool bloomSync = true;
+    int bloomDivision = 6;            ///< ECHO's divisions (6 = 1/4)
+    double bloomTimeMs = 350.0;       ///< free time
+    double bloomDiffusion = 0.6;      ///< 0..1: clean repeats .. a wash
 
     // ECHO (a send in parallel with SPACE; the ECHO macro is its level)
     EchoType echoType = EchoType::tape;

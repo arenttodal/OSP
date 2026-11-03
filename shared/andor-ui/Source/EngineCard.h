@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CardWellEditor.h"
+#include "WellOverlay.h"
 #include "EqEditor.h"
 #include "NoteMapEditor.h"
 #include "OspLookAndFeel.h"
@@ -61,7 +62,7 @@ public:
     void setInstrument (std::shared_ptr<const LoadedInstrument>);
     /** A generated source (a synthesizer's oscillators): one period of its waveform (-1..1),
         drawn across the display in place of a recording. Empty: the recording, as before. */
-    void setGeneratedCycle (std::vector<float> cycle);
+    void setGeneratedCycle (std::vector<float> cycle, bool periodic = true, const juce::String& placeholder = {});
     void setLayer (int layer);
     void setFocused (bool focused);
     void setLoading (bool loading);
@@ -123,6 +124,8 @@ private:
 
     std::shared_ptr<const LoadedInstrument> instrument;
     std::vector<float> generatedCycle;   ///< a generated source's period (empty: none)
+    bool generatedPeriodic = true;       ///< a period (drawn twice), or an outline (drawn once)
+    juce::String generatedPlaceholder;   ///< a stand-in's caption (its picture drawn faint), or empty
     int layer = 0;
     bool focused = true, loading = false;
     View view;
@@ -329,6 +332,12 @@ public:
     int mode() const noexcept { return current; }
     /** The first mode's name ("One Shot"; a product's generator may name it otherwise). */
     void setFirstModeName (const juce::String& name);
+    /** Opt-in: the key only as wide as its longer name needs (a generator's "Regular" /
+        "Granular"), its chevron closer to the name. Off: as before. */
+    void setFitsName (bool fit);
+    bool fitsName() const noexcept { return fitted; }
+    /** The width that fits the longer name (px, at the reference 41 px height). */
+    float fittedWidth() const;
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override { skin::repaintKey (*this); }
     void mouseUp (const juce::MouseEvent&) override;
@@ -345,6 +354,7 @@ private:
     void choose (int mode);
     int current = 0;
     juce::String firstModeName { "One Shot" };
+    bool fitted = false;
     juce::ParameterAttachment attachment;
 };
 
@@ -391,6 +401,20 @@ public:
         parameter and name); a click on the name calls `onCaptionClick` (null: none). The card
         lays it out exactly where START was. */
     void replaceStartKnob (const juce::String& parameterId, const juce::String& caption, std::function<void()> onCaptionClick);
+    /** A product's control in any knob's place (slot 0..4: START TUNE PAN LEVEL REIMAGINED;
+        ProductInfo::cardControls). An empty ID hides that knob, its place kept (the row's
+        rhythm never moves). restoreKnob gives the slot its own layer control back. */
+    void replaceKnob (int slot, const juce::String& parameterId, const juce::String& caption);
+    void restoreKnob (int slot);
+    /** A visible knob of the card's row bound to `parameterId` (tests, product overrides). */
+    bool hasControl (const juce::String& parameterId) const;
+    /** The four modifier keys (LINK REVERSE LOOP FOLLOW) shown, or hidden for a source they
+        mean nothing to (a product's oscillator, its noise). Shown by default. */
+    void setModifiersShown (bool shown);
+    /** Controls revealed in the well by the pointer (ProductInfo::wellOverlay); null: none.
+        Hidden while the EQ, the note map or the in-card editor take the well. */
+    void setWellOverlay (std::unique_ptr<WellOverlay> overlay);
+    WellOverlay* wellOverlayComponent() const noexcept { return wellOverlay.get(); }
     juce::Rectangle<int> startLabelBounds() const;
     bool isStartLabel (const juce::Component* c) const noexcept { return c != nullptr && c == knobs[0].get(); }
     void setStartOpen (bool open) { knobs[0]->setLabelOpen (open); }
@@ -407,6 +431,9 @@ public:
     /** The mode selector's first mode under another name (a generator's "Standard"). Opt-in:
         without it the card reads "One Shot", exactly as before. */
     void setFirstModeName (const juce::String& name);
+    /** Opt-in: the mode selector only as wide as its names need (ModeSelector::setFitsName);
+        the name beside it gets the room. Without it the card is exactly as before. */
+    void setModeFitsName (bool fit);
 
     /** A product's own editor in the waveform's place (opt-in; see CardWellEditor). The card
         owns it and lays it out exactly over the display; shown, it replaces the waveform (the
@@ -491,6 +518,8 @@ private:
     std::unique_ptr<EqEditor> eqEditor;
     NotesButton notesButton;
     std::unique_ptr<NoteMapEditor> noteMap;
+    std::unique_ptr<WellOverlay> wellOverlay;
+    void updateWellOverlay();
     std::unique_ptr<CardWellEditor> wellEditor;   ///< (null on every card that did not ask for one)
     bool atlasLayer = false;
     juce::Rectangle<int> badgeArea, textArea, dividerArea;

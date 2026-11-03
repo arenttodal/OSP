@@ -625,6 +625,17 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       plug-ins (`adopt.sh` for an existing repo, `new-plugin.sh` + starter for a new one, a fixed
       download link per branch); self-tested on macOS and Windows by its own workflow.
 
+## SPACE engines in ANDOR OSP (merged from claude/andor-analog-shell)
+
+- [x] ABYSS, VINTAGE and BLOOM (built for ANDOR ANALOG in OSP's own engine and SPACE popover;
+      docs/spec/SPACE_ENGINES_PLAN.md) are in ANDOR OSP: SPACE's header chooses Rooms / Abyss /
+      Vintage / Bloom (`space.engine`, ROOMS by default; older sessions open on their room).
+      The merge also brings SPACE's new defaults (HALL, 3 s, HIGH CUT 5 kHz; saved sessions keep
+      theirs), the EQ-corner snap and the shell's opt-in hooks. Parameter order: SYNTHESIZE
+      (22), the SYNTH page and ABYSS (23), VINTAGE and BLOOM (24). Test `[space-engines]`: every
+      engine heard through OSP's processor and distinct, switching on held notes (and FREEZE)
+      finite without allocation, saved, an older session on ROOMS.
+
 ## Milestone: SYNTHESIZE Phase S1 — analog oscillator blend (docs/research/synthesize)
 
 - [x] S1.1 audit of PHRASE's Natural / Synthetic (`s1-audit.md`): what it did, the OSP voice
@@ -697,6 +708,28 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       `choiceOf`) and in the drag-to-assign mapping; ANDOR OSP registers none, so its route
       choices, schema golden and sessions are unchanged. A generator's card draws POS, SPREAD
       and its grains. Proof: see the PR (design capture before/after, OSP suites).
+- [x] KEY DNA, EQ, playheads and an ORGANIC dock for a hybrid product (ANDOR ANALOG), all
+      opt-in: the KEY DNA codec moved unchanged from ANDOR OSP's processor to the shared
+      `KeyDnaState` (ANDOR OSP's statics call it: its sessions are byte-identical); the shell
+      implements InstrumentHost's KEY DNA (settings, curves, undo, the `KeyDna` tree, the
+      profile handed to `Engine::setKeyDnaTable`) and opens `KeyDnaEditor` when the engine
+      has KEY DNA; `InstrumentHost::productWordmark()` (ANDOR OSP: "ANDOR/OSP", drawn exactly as
+      before); `ProductInfo::hybridSampleDock`. Proof: OSP suites and design capture.
+- [x] An engine-owned source for a hybrid product (ANDOR ANALOG's Sample Source importer),
+      all opt-in: `Engine::saveState` / `restoreState`, `engineSourceName` /
+      `removeEngineSource`, `ProductInfo::hybridHeaderPopover` / `hybridAction`,
+      `GeneratedSource::periodic`, `ShellProcessor::productEngine()`. ANDOR OSP uses none of
+      them. Proof: OSP suites and design capture.
+- [x] The AMP envelope's note and touch for a product (ANDOR ANALOG's VCA GATE), opt-in:
+      `ProductInfo::ampEnvelopeNote` (`EnvelopePanel::setNote`; empty draws exactly as before)
+      and `ProductInfo::ampEnvelopeTouched` (a gesture on the four AMP parameters). ANDOR OSP
+      sets neither. Proof: OSP suites and design capture.
+- [x] Three engines for a hybrid product (ANDOR ANALOG), all opt-in: `ProductInfo::threeEngines`
+      (cards always shown, in the product's order; letters and colours follow it via
+      `InstrumentHost::shownLayer`), `Engine::layerGeneratorName`, `ProductInfo::cardControls`
+      (`EngineCard::replaceKnob` / `restoreKnob`), `ProductInfo::wellOverlay` (the shared
+      `WellOverlay`: controls revealed in a card's well by the pointer). ANDOR OSP and the
+      parity render use none of them. Proof: OSP suites and design capture.
 
 ## DONE
 
@@ -726,6 +759,38 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - Timbre clustering for sets that mix organ stops (waits on morning question 2).
 - Real-Mac worst-case callback timing. Reads above x4 (more than about +2 octaves) still
   evaluate the stretched kernel; mip-mapped sources would cap them if that matters.
+
+## SPACE (2 Nov 2026)
+
+- **New defaults:** SPACE now starts as a HALL at 3.0 s with HIGH CUT at 5 kHz, for every
+  room type. Before, it was a PLATE at 1.8 s with HIGH CUT at 12 kHz.
+  - This changes `Shaping` and `SpaceReverb::Settings`, so the parameter defaults follow, in
+    ANDOR OSP and in every shell product.
+  - Saved sessions keep the values they stored. Only new sounds, resets and partial configs
+    take the new defaults.
+  - The parameter schema golden is updated (three defaults).
+- **Plan:** three more SPACE engines (VINTAGE, BLOOM, ABYSS) in
+  `docs/spec/SPACE_ENGINES_PLAN.md`.
+- **ABYSS (phase R1): built.**
+  - `engine/AbyssReverb`, selected by `space.engine`, with GRAVITY, FREEZE and RESONANCE
+    (`space.abyss.*`, version hint 23).
+  - The SPACE popover lists ABYSS under the rooms. It shows FLOW / FREEZE, GRAVITY and
+    RESONANCE, and its own picture.
+  - ROOMS stays bit-exact: every regression golden is unchanged, and visual parity is unchanged.
+  - Evidence: the `[abyss]` tests (RT60, gravity swell, freeze, stability, determinism, no
+    allocation, level matched to HALL); the click test for engine and FREEZE switches.
+  - CPU is about 2x HALL (SIMD later).
+- **VINTAGE and BLOOM (phases R2, R3): built.**
+  - `engine/VintageReverb`: a low internal rate (20.48 / 34.13 kHz), short words, coarse
+    coefficients, tap-crossfade chorus. Variants HALL / PLATE / CHAMBER / ROOM, ERA, DIFFUSION.
+  - `engine/BloomReverb`: a diffusion delay, synced or free, CLEAN / VINTAGE / TAPE / WASH,
+    DIFFUSION.
+  - Both are chosen in the same list (`space.engine` now has four choices) and have their own
+    popover layouts and pictures (`space.vintage.*`, `space.bloom.*`, version hint 24).
+  - Evidence: the `[vintage]` and `[bloom]` tests (RT60 in every variant, era bandwidth,
+    short-word grain, repeats on the beat at two tempi, diffusion's crest factor, decay,
+    stability, determinism, no allocation, level matched to HALL); engine switches never click.
+  - CPU: VINTAGE about 0.75x, BLOOM about 0.64x HALL.
 
 ## BLOCKERS
 

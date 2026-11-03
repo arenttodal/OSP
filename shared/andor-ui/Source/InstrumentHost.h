@@ -51,6 +51,14 @@ public:
     // -- The parameter-ID scheme (ANDOR OSP's; unchanged) ------------------------------------
     static constexpr int numLayers = EngineSettings::layers;   ///< A, B, C
     static juce::String layerName (int layer) { return layer == 2 ? "C" : (layer == 1 ? "B" : "A"); }
+    /** Presentation (opt-in, a product's ProductInfo::threeEngines): where a storage layer's card
+        is shown (0 first) and the letter its badge, M / S and EQ carry. Unset: the storage
+        order, as in ANDOR OSP. Parameter IDs never follow it (layerParameterId stays storage). */
+    static int shownLayer (int layer);
+    static juce::String shownLayerName (int layer) { return layerName (shownLayer (layer)); }
+    /** `shownOfStorage[l]`: the position storage layer l is shown at. Process-wide (one product
+        per binary); set before any window. */
+    static void setShownLayers (const std::array<int, 3>& shownOfStorage);
     /** The stable parameter ID of a layer setting, e.g. layerParameterId (1, "sourceMode") -> "layerB.sourceMode". */
     static juce::String layerParameterId (int layer, const juce::String& name) { return "layer" + layerName (layer) + "." + name; }
     /** A layer's Original <-> Reimagined: A's is the instrument's `reimagined` (the ID older
@@ -140,6 +148,12 @@ public:
         juce::String name;
         std::vector<float> cycle;
         std::uint64_t revision = 0;
+        /** A period (drawn twice, as a sustained tone) or, false, a recording's outline (drawn
+            once, across the display: an engine's imported source). */
+        bool periodic = true;
+        /** A stand-in, not a sound (an empty slot's invitation): the picture drawn faint, the
+            caption over it ("ADD SAMPLE", say). Empty: a real source. */
+        juce::String placeholder;
     };
     /** Message thread. False (the default): the layer plays recordings. */
     virtual bool generatedSource (int layer, GeneratedSource& out) const
@@ -244,6 +258,9 @@ public:
 
     /** A product with KEY DNA (OSP's Granular). The KEY DNA editor shows only when true. */
     virtual bool hasKeyDna() const noexcept { return false; }
+    /** A layer's card shows the KEY DNA key (opt-in narrowing: a product with one profile for
+        several Granular cards shows it on one). Default: every layer, when hasKeyDna(). */
+    virtual bool hasKeyDnaKey (int layer) const noexcept { juce::ignoreUnused (layer); return hasKeyDna(); }
     /** A product whose voices blend SYNTHESIZE's oscillator (ANDOR OSP, Phase S1): each source
         card then shows its SYNTHESIZE knob after REIMAGINED. Off by default (five knobs). */
     virtual bool hasSynthesize() const noexcept { return false; }
@@ -391,6 +408,9 @@ public:
     /** The SHAPER editor's magnified view (a view setting saved with the session). */
     virtual bool shaperEditorLarge() const noexcept = 0;
     virtual void setShaperEditorLarge (bool large) noexcept = 0;
+    /** The product's wordmark as its full-window pages head themselves (KEY DNA): ANDOR OSP's
+        own by default; a product built from the shell says its own. Message thread. */
+    virtual juce::String productWordmark() const { return "ANDOR/OSP"; }
     /** A product's own state in words, for its popovers (`topic` is the product's: e.g. a
         derived analysis' progress). Empty (the default): nothing to say. Message thread. */
     virtual juce::String engineStatus (const juce::String& topic) const

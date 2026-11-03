@@ -13,8 +13,8 @@
   "clippedSamples": 0,
   "centroidMeanHz": 722.7,
   "centroidStdHz": 558.9,
-  "outputPitchHz": 130.823,
-  "outputPitchConfidence": 0.269,
+  "outputPitchHz": 0.0,
+  "outputPitchConfidence": 0.0,
   "maxAbsCentsError": 1.63,
   "notes": [
     {

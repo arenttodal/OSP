@@ -3,6 +3,7 @@
 
 #include "AndorParameters.h"
 #include "Binding.h"
+#include "KeyDnaState.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -44,7 +45,7 @@ namespace
         osp::ShaperPattern from, to;
     };
 
-    const juce::Identifier sourcesType ("Sources"), layerType ("Layer"), viewType ("View"), curvesType ("Curves"), shaperType ("Shaper");
+    const juce::Identifier sourcesType ("Sources"), layerType ("Layer"), viewType ("View"), curvesType ("Curves"), shaperType ("Shaper"), keyDnaType ("KeyDna");
 
     /** ANDOR OSP's schema, then the product's own parameters (ProductInfo::addParameters). */
     juce::AudioProcessorValueTreeState::ParameterLayout productParameterLayout()
@@ -78,9 +79,19 @@ ShellProcessor::ShellProcessor (std::unique_ptr<Engine> productEngine)
       engine (std::move (productEngine))
 {
     jassert (engine != nullptr);
+    engine->attachParameters (parameters);
     // The product's finish, before any window (every instance sets the same).
     if (productInfo().materials.has_value())
         osp::plugin::design::useMaterials (*productInfo().materials);
+    // Three engines (a generator with a hybrid layer): the cards' letters follow the
+    // product's order (storage IDs do not). Any other engine (a test's): the storage order.
+    {
+        std::array<int, 3> shownOfStorage { 0, 1, 2 };
+        if (const auto& three = productInfo().threeEngines; three.enabled && engine->generatorName().isNotEmpty() && productInfo().hybridSampleName.isNotEmpty())
+            for (int shown = 0; shown < 3; ++shown)
+                shownOfStorage[static_cast<std::size_t> (three.order[static_cast<std::size_t> (shown)])] = shown;
+        InstrumentHost::setShownLayers (shownOfStorage);
+    }
     description = engine->describe();
     bound = engine->boundParameters();
     generatorName = engine->generatorName();
@@ -119,6 +130,16 @@ ShellProcessor::ShellProcessor (std::unique_ptr<Engine> productEngine)
     store = std::make_unique<osp::plugin::SampleStore> (sampleStoreFolder());
     if (productInfo().installFactoryPresets != nullptr)
         productInfo().installFactoryPresets (*this, presetFolder().getChildFile ("Factory"));
+    // Three engines: every card sounds from the start, so the MIX starts in the middle.
+    if (productInfo().threeEngines.enabled && isGenerator())
+        centreHybridMix();
+    if (productInfo().ampEnvelopeTouched != nullptr)
+    {
+        ampEnvelopeTouch = std::make_unique<AmpEnvelopeTouch> (*this);
+        for (const char* id : { "attack", "decay", "sustainLevel", "release" })
+            if (auto* parameter = parameters.getParameter (id))
+                parameter->addListener (ampEnvelopeTouch.get());
+    }
     startTimerHz (20);
 }
 
@@ -126,6 +147,10 @@ ShellProcessor::~ShellProcessor()
 {
     closing = true;
     stopTimer();
+    if (ampEnvelopeTouch != nullptr)
+        for (const char* id : { "attack", "decay", "sustainLevel", "release" })
+            if (auto* parameter = parameters.getParameter (id))
+                parameter->removeListener (ampEnvelopeTouch.get());
     loaderPool.removeAllJobs (true, 30000);
 }
 
@@ -179,6 +204,9 @@ void ShellProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
             layer.exchange.publishOldestInUse (next->generation);
         }
     }
+
+    if (engine->hasKeyDna())
+        swapKeyDnaIfPending();
 
     keyboardState.processNextMidiBuffer (midi, 0, buffer.getNumSamples(), true);
     for (const auto metadata : midi)
@@ -519,12 +547,24 @@ std::shared_ptr<const LoadedInstrument> ShellProcessor::currentInstrument (int l
     return layers[static_cast<std::size_t> (resolve (layer))].instrument;
 }
 
+bool ShellProcessor::isGeneratorLayer (int layer) const
+{
+    if (! isGenerator())
+        return false;
+    if (layer == 0)
+        return true;
+    return productInfo().threeEngines.enabled && layer != hybridLayer && engine->layerGeneratorName (layer).isNotEmpty();
+}
+
 bool ShellProcessor::isLayerOccupied (int layer) const
 {
     if (isGenerator() && ! (hasHybridLayer() && layer == hybridLayer))
         return layer == 0;
     const auto& slot = layers[static_cast<std::size_t> (std::clamp (layer, 0, numLayers - 1))];
-    return slot.state.load() == LoadState::loading || slot.instrument != nullptr;
+    if (slot.state.load() == LoadState::loading || slot.instrument != nullptr)
+        return true;
+    // (A hybrid product's engine may play its own source there: an imported one.)
+    return hasHybridLayer() && layer == hybridLayer && engine->engineSourceName (layer).isNotEmpty();
 }
 
 const osp::InstrumentEngine::GrainSnapshot& ShellProcessor::grainSnapshot (int layer) const noexcept
@@ -537,9 +577,28 @@ const osp::InstrumentEngine::GrainSnapshot& ShellProcessor::grainSnapshot (int l
 
 bool ShellProcessor::generatedSource (int layer, GeneratedSource& out) const
 {
-    if (! isGenerator() || layer != 0)
+    // (Three engines: the engine's source wins over a recording kept dormant under it.)
+    if (hasHybridLayer() && layer == hybridLayer
+        && (layers[static_cast<std::size_t> (hybridLayer)].instrument == nullptr || productInfo().threeEngines.enabled)
+        && layers[static_cast<std::size_t> (hybridLayer)].state.load() != LoadState::loading)
+    {
+        // The engine's own source on the recording's layer (an imported one): its name and picture.
+        const auto name = engine->engineSourceName (layer);
+        if (name.isEmpty())
+            return false;
+        out.name = name;
+        out.cycle.clear();
+        engine->sourcePicture (layer, parameters, out.cycle);
+        if (out.cycle.empty())
+            out.cycle.assign (2, 0.0f);
+        out.revision = fingerprint (out.cycle) ^ static_cast<std::uint64_t> (name.hashCode64());
+        out.periodic = engine->engineSourceIsPeriodic (layer);   // (a recording's outline is drawn once)
+        out.placeholder = engine->engineSourcePlaceholder (layer);
+        return true;
+    }
+    if (! isGeneratorLayer (layer))
         return false;
-    out.name = generatorName;
+    out.name = layer == 0 ? generatorName : engine->layerGeneratorName (layer);
     out.cycle.clear();
     engine->sourcePicture (layer, parameters, out.cycle);
     if (out.cycle.empty())
@@ -690,8 +749,16 @@ void ShellProcessor::removeLayer (int layer)
 {
     if (hasHybridLayer() && layer == hybridLayer)
     {
+        // Three engines: Remove takes away what the card shows (the engine's own source wins
+        // over a recording kept dormant under it, which stays).
+        if (productInfo().threeEngines.enabled && engine->engineSourceName (hybridLayer).isNotEmpty())
+        {
+            engine->removeEngineSource (hybridLayer);
+            return;
+        }
         clearLayer (hybridLayer);   // (its settings stay: the next recording plays with them)
         engine->sourcePublished (hybridLayer, nullptr);
+        engine->removeEngineSource (hybridLayer);
         return;
     }
     if (isGenerator())
@@ -738,8 +805,22 @@ bool ShellProcessor::waitForLoads (int timeoutMs)
     return true;
 }
 
+void ShellProcessor::AmpEnvelopeTouch::parameterGestureChanged (int, bool starting)
+{
+    if (! starting)
+        return;
+    // (The editor's knobs and handles start their gestures on the message thread; a host may
+    // touch from its own: the timer hands that one over.)
+    if (juce::MessageManager::existsAndIsCurrentThread())
+        productInfo().ampEnvelopeTouched (owner);
+    else
+        owner.ampEnvelopeTouchPending.store (true);
+}
+
 void ShellProcessor::timerCallback()
 {
+    if (ampEnvelopeTouchPending.exchange (false) && productInfo().ampEnvelopeTouched != nullptr)
+        productInfo().ampEnvelopeTouched (*this);
     std::deque<Finished> done;
     {
         const std::lock_guard<std::mutex> lock (resultsMutex);
@@ -803,6 +884,23 @@ std::unique_ptr<juce::XmlElement> ShellProcessor::stateXml() const
         xml->createNewChildElement (curvesType.toString())->setAttribute ("value", encodeModulationCurves (curves));
     }
     xml->createNewChildElement (shaperType.toString())->setAttribute ("value", encodeShaperPattern (shaperCustomPattern()));
+    if (engine->hasKeyDna())
+    {
+        // KEY DNA: ANDOR OSP's own tree (schema 1), so a profile reopens exactly.
+        std::array<osp::keydna::Settings, osp::plugin::keyDnaState::layerCount> keyDna {};
+        osp::plugin::keyDnaState::Curves drawn {};
+        {
+            const std::lock_guard<std::mutex> lock (keyDnaMutex);
+            for (std::size_t l = 0; l < keyDna.size(); ++l)
+            {
+                keyDna[l] = keyDnaLayers[l];
+                drawn[l] = keyDnaCurves[l];
+            }
+        }
+        if (auto tree = osp::plugin::keyDnaState::toTree (keyDna, drawn).createXml())
+            xml->addChildElement (tree.release());
+    }
+    engine->saveState (*xml);   // (the engine's own: none unless it keeps some)
     auto* view = xml->createNewChildElement (viewType.toString());
     view->setAttribute ("arpOpen", arpOpen.load() ? 1 : 0);
     view->setAttribute ("shaperLarge", shaperLarge.load() ? 1 : 0);
@@ -823,10 +921,40 @@ bool ShellProcessor::applyStateXml (const juce::XmlElement& xml)
     if (! xml.hasTagName (productInfo().stateType) || xml.getStringAttribute ("product") != productInfo().slug)
         return false;
     if (auto* params = xml.getChildByName (parameters.state.getType()))
-        parameters.replaceState (juce::ValueTree::fromXml (*params));
+    {
+        const auto tree = juce::ValueTree::fromXml (*params);
+        juce::StringArray savedIds;
+        for (const auto& child : tree)
+            if (child.hasProperty ("id"))
+                savedIds.add (child["id"].toString());
+        parameters.replaceState (tree);
+        // A parameter the state does not hold (it is older than the parameter) starts from
+        // its default, as in ANDOR OSP: APVTS would keep what this instance had (an ABYSS
+        // chosen before an older preset was loaded, say).
+        for (auto* parameter : getParameters())
+            if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*> (parameter))
+                if (! savedIds.contains (ranged->getParameterID()))
+                    ranged->setValueNotifyingHost (ranged->getDefaultValue());
+    }
+    if (engine->hasKeyDna())
+    {
+        // KEY DNA (absent: every layer off), restored before a migration that may set it.
+        const auto* e = xml.getChildByName (keyDnaType);
+        const auto tree = e != nullptr ? juce::ValueTree::fromXml (*e) : juce::ValueTree();
+        const auto keyDna = osp::plugin::keyDnaState::fromTree (tree);
+        const auto drawn = osp::plugin::keyDnaState::curvesFromTree (tree);
+        for (int l = 0; l < numLayers; ++l)
+        {
+            keyDnaGestureStart[static_cast<std::size_t> (l)].reset();
+            publishKeyDna (l, keyDna[static_cast<std::size_t> (l)], &drawn[static_cast<std::size_t> (l)]);
+        }
+    }
     // An older version's state: the product moves its settings to where it reads them now.
     if (const int from = xml.getIntAttribute ("productVersion", 1); from < productInfo().stateVersion && productInfo().migrateState != nullptr)
         productInfo().migrateState (*this, from);
+    for (auto& gesture : keyDnaGestureStart)
+        gesture.reset();   // (a migration's KEY DNA is where the session starts, not a gesture)
+    engine->restoreState (xml, sampleStoreFolder());
     for (int l = 0; l < numLayers; ++l)
         clearLayer (l);
     if (auto* sources = xml.getChildByName (sourcesType))
@@ -1064,6 +1192,16 @@ void ShellProcessor::resetSettings()
     if (auto links = parameters.state.getChildWithName (modLinksTreeType()); links.isValid())
         parameters.state.removeChild (links, nullptr);
     setShaperCustomPattern (osp::RhythmicShaper::patternSteps (osp::ShaperParams().pattern), false);
+    engine->restoreState (juce::XmlElement (productInfo().stateType), sampleStoreFolder());   // (none of its own)
+    if (productInfo().threeEngines.enabled && isGenerator())
+        centreHybridMix();   // (three engines: the MIX in the middle, every card heard)
+    if (engine->hasKeyDna())
+        for (int l = 0; l < numLayers; ++l)
+        {
+            const KeyDnaCurves none {};
+            keyDnaGestureStart[static_cast<std::size_t> (l)].reset();
+            publishKeyDna (l, {}, &none);
+        }
     // (The blend's default is all A: a recording kept through the reset stays heard.)
     if (isLayerOccupied (hybridLayer))
         centreHybridMix();
@@ -1181,6 +1319,133 @@ void ShellProcessor::publishShaperPattern() noexcept
 int ShellProcessor::recentVelocityAt (int index) const noexcept
 {
     return recentVelocity[static_cast<std::size_t> (((index % velocityHistory) + velocityHistory) % velocityHistory)].load (std::memory_order_relaxed);
+}
+
+
+//==============================================================================
+// KEY DNA (an engine that has it): ANDOR OSP's processor's, unchanged in behaviour.
+
+/** A change of a layer's KEY DNA (the editor), its drawn curves included: one undo step. */
+static_assert (ShellProcessor::numLayers == osp::plugin::keyDnaState::layerCount);
+
+class ShellProcessor::KeyDnaAction final : public juce::UndoableAction
+{
+public:
+    KeyDnaAction (ShellProcessor& p, int l, KeyDnaGesture before, KeyDnaGesture after) : processor (p), layer (l), from (std::move (before)), to (std::move (after)) {}
+    bool perform() override { return apply (to); }
+    bool undo() override { return apply (from); }
+
+private:
+    bool apply (const KeyDnaGesture& state)
+    {
+        processor.publishKeyDna (layer, state.settings, &state.curves);
+        return true;
+    }
+    ShellProcessor& processor;
+    int layer;
+    KeyDnaGesture from, to;
+};
+
+void ShellProcessor::swapKeyDnaIfPending() noexcept
+{
+    // A newly computed profile (message thread) replaces the layer's for notes started from
+    // now; an older one may be freed once this one is in use.
+    for (int l = 0; l < numLayers; ++l)
+    {
+        auto& exchange = keyDnaExchange[static_cast<std::size_t> (l)];
+        auto& playing = keyDnaPlaying[static_cast<std::size_t> (l)];
+        if (const auto* next = exchange.takePending())
+        {
+            playing = next;
+            engine->setKeyDnaTable (l, &next->table);
+        }
+        if (playing != nullptr)
+            exchange.publishOldestInUse (playing->generation);
+    }
+}
+
+void ShellProcessor::publishKeyDna (int layer, const osp::keydna::Settings& settings, const KeyDnaCurves* curves)
+{
+    const auto l = static_cast<std::size_t> (resolve (layer));
+    auto shape = settings;
+    shape.amount = 1.0;   // AMOUNT is the host parameter, live
+    auto profile = std::make_shared<osp::keydna::Profile>();
+    profile->table.compute (shape);   // all 128 keys, here (never on the audio thread)
+    const std::lock_guard<std::mutex> lock (keyDnaMutex);
+    keyDnaLayers[l] = shape;
+    if (curves != nullptr)
+        keyDnaCurves[l] = *curves;
+    profile->generation = ++keyDnaGeneration;
+    keyDnaExchange[l].publish (std::move (profile));
+}
+
+void ShellProcessor::beginKeyDnaGesture (int layer)
+{
+    auto& start = keyDnaGestureStart[static_cast<std::size_t> (layer)];
+    if (start.has_value())
+        return;
+    const std::lock_guard<std::mutex> lock (keyDnaMutex);
+    start = KeyDnaGesture { keyDnaLayers[static_cast<std::size_t> (layer)], keyDnaCurves[static_cast<std::size_t> (layer)] };
+}
+
+osp::keydna::Settings ShellProcessor::keyDnaSettings (int layer) const
+{
+    const std::lock_guard<std::mutex> lock (keyDnaMutex);
+    return keyDnaLayers[static_cast<std::size_t> (resolve (layer))];
+}
+
+void ShellProcessor::setKeyDnaSettings (int layer, const osp::keydna::Settings& settings, const juce::String& name, bool undoable)
+{
+    const int l = resolve (layer);
+    beginKeyDnaGesture (l);
+    if (! undoable)
+    {
+        publishKeyDna (l, settings);
+        return;
+    }
+    auto before = std::move (*keyDnaGestureStart[static_cast<std::size_t> (l)]);
+    keyDnaGestureStart[static_cast<std::size_t> (l)].reset();
+    KeyDnaGesture after { settings, {} };
+    {
+        const std::lock_guard<std::mutex> lock (keyDnaMutex);
+        after.curves = keyDnaCurves[static_cast<std::size_t> (l)];
+    }
+    undoManager.beginNewTransaction (name);
+    undoManager.perform (new KeyDnaAction (*this, l, std::move (before), std::move (after)));
+}
+
+osp::mod::Curve ShellProcessor::keyDnaCurve (int layer, osp::keydna::Param param) const
+{
+    const int l = resolve (layer);
+    osp::keydna::Settings settings;
+    std::optional<osp::mod::Curve> drawn;
+    {
+        const std::lock_guard<std::mutex> lock (keyDnaMutex);
+        settings = keyDnaLayers[static_cast<std::size_t> (l)];
+        drawn = keyDnaCurves[static_cast<std::size_t> (l)][static_cast<std::size_t> (param)];
+    }
+    return osp::plugin::keyDnaState::editorCurve (settings, drawn, param, InstrumentHost::keyDnaCurve (l, param));
+}
+
+void ShellProcessor::setKeyDnaCurve (int layer, osp::keydna::Param param, const osp::mod::Curve& curve, bool undoable)
+{
+    const int l = resolve (layer);
+    beginKeyDnaGesture (l);
+    auto valid = curve;
+    valid.normalise();
+    auto settings = keyDnaSettings (l);
+    settings[param].curve = osp::keydna::curveFrom (valid);
+    {
+        const std::lock_guard<std::mutex> lock (keyDnaMutex);
+        keyDnaCurves[static_cast<std::size_t> (l)][static_cast<std::size_t> (param)] = valid;
+    }
+    setKeyDnaSettings (l, settings, "KEY DNA " + juce::String (osp::keydna::paramName (param)) + " curve", undoable);
+}
+
+std::size_t ShellProcessor::keyDnaProfilesAlive (int layer) const
+{
+    const std::lock_guard<std::mutex> lock (keyDnaMutex);
+    return keyDnaExchange[static_cast<std::size_t> (resolve (layer))].ownedCount();
 }
 
 } // namespace andor::shell

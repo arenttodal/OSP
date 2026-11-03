@@ -170,6 +170,9 @@ TEST_CASE ("engine: one-shot sources play once and stop", "[integration][engine]
     CHECK_FALSE (model->original.continuation.canSustain);
     research::RenderConfig config;
     config.maxTailSeconds = 10.0;
+    // The source is what must stop: SPACE off, so the (default 3 s HALL) room's own tail is
+    // not counted as the source still playing.
+    config.engineSettings.macros.space = 0.0;
     const auto out = research::renderInstrument (*model, hold (55, 10.0), config);
     CHECK (out.audio.durationSeconds() <= 10.5);
     CHECK (rmsBetween (out.audio, 4.0, 9.0) < 1.0e-6);

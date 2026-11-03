@@ -21,6 +21,153 @@ namespace
     }
 }
 
+//==============================================================================
+SampleDock::SampleDock()
+{
+    setTitle ("Add sample");
+    setDescription ("Load a recording: click to browse, or drop an audio file on the instrument");
+    setMouseCursor (juce::MouseCursor::PointingHandCursor);
+    setWantsKeyboardFocus (true);
+}
+
+void SampleDock::setHighlight (bool on)
+{
+    if (on != highlight)
+    {
+        highlight = on;
+        repaint();
+    }
+}
+
+void SampleDock::setHover (bool on)
+{
+    if (on != hover)
+    {
+        hover = on;
+        repaint();
+    }
+}
+
+void SampleDock::setText (const juce::String& sourceName, const juce::String& why)
+{
+    if (sourceName == name && why == problem)
+        return;
+    name = sourceName;
+    problem = why;
+    repaint();
+}
+
+void SampleDock::setSecondaryAction (const juce::String& label, std::function<void()> action)
+{
+    secondaryLabel = label;
+    secondary = std::move (action);
+    repaint();
+}
+
+juce::Rectangle<int> SampleDock::secondaryActionBounds() const
+{
+    if (secondaryLabel.isEmpty())
+        return {};
+    return getLocalBounds().reduced (14).removeFromBottom (44).withSizeKeepingCentre (getWidth() - 40, 28);
+}
+
+void SampleDock::mouseUp (const juce::MouseEvent& e)
+{
+    if (! getLocalBounds().contains (e.getPosition()))
+        return;
+    if (secondary != nullptr && secondaryActionBounds().contains (e.getPosition()))
+        secondary();
+    else if (onBrowse != nullptr)
+        onBrowse();
+}
+
+bool SampleDock::keyPressed (const juce::KeyPress& key)
+{
+    if (key == juce::KeyPress::returnKey || key == juce::KeyPress::spaceKey)
+    {
+        if (onBrowse != nullptr)
+            onBrowse();
+        return true;
+    }
+    return false;
+}
+
+void SampleDock::setHeader (const juce::String& letter, int shownLayer, const juce::String& title)
+{
+    headerLetter = letter;
+    headerLayer = shownLayer;
+    headerTitle = title;
+    repaint();
+}
+
+juce::Rectangle<int> SampleDock::headerBounds() const
+{
+    return headerLetter.isEmpty() ? juce::Rectangle<int>() : getLocalBounds().reduced (16, 0).withTop (14).withHeight (38);
+}
+
+void SampleDock::paint (juce::Graphics& g)
+{
+    using namespace osp::plugin;
+    using namespace osp::plugin::design;
+    const auto bounds = getLocalBounds().toFloat();
+    if (! skin::drawnBySurface())   // ceramic: the housing draws the card (its shadow falls there)
+        draw::raised (g, bounds, layout::cardRadius, colour::cardTop, colour::cardBottom);
+    // Three engines: headed as a card (its badge and title), the dashed place below.
+    auto area = bounds;
+    if (headerLetter.isNotEmpty())
+    {
+        const auto header = headerBounds().toFloat();
+        const auto badge = header.withWidth (38.0f);
+        const auto& id = colour::identity (headerLayer);
+        g.setGradientFill (juce::ColourGradient (id.badgeTop, 0.0f, badge.getY(), id.badgeBottom, 0.0f, badge.getBottom(), false));
+        g.fillRoundedRectangle (badge, 6.0f);
+        g.setColour (juce::Colour (0xfffff6ec));
+        g.setFont (fonts::make (29.0f, fonts::Weight::regular));
+        g.drawText (headerLetter, badge.translated (0.0f, 0.5f), juce::Justification::centred, false);
+        g.setColour (palette::textDim);
+        g.setFont (type::sourceFilename());
+        g.drawText (headerTitle, header.withTrimmedLeft (50.0f), juce::Justification::centredLeft, true);
+        area.removeFromTop (header.getBottom() - 4.0f);
+    }
+    // The recessed, dashed place a recording goes (the shell's add target, at card scale).
+    const auto lit = highlight || hover || hasKeyboardFocus (false);
+    const auto r = area.reduced (14.0f);
+    g.setColour (highlight ? palette::recessed.interpolatedWith (palette::accent, 0.08f) : palette::recessed.interpolatedWith (palette::housing, hover ? 0.35f : 0.5f));
+    g.fillRoundedRectangle (r, 10.0f);
+    juce::Path outline;
+    outline.addRoundedRectangle (r, 10.0f);
+    juce::Path dashed;
+    const float dashes[] = { 6.0f, 5.0f };
+    juce::PathStrokeType (1.2f).createDashedStroke (dashed, outline, dashes, 2);
+    g.setColour (lit ? palette::accent : palette::hairline.darker (0.15f));
+    g.fillPath (dashed);
+
+    auto centre = r.withSizeKeepingCentre (r.getWidth() - 16.0f, 104.0f);
+    icons::draw (g, problem.isEmpty() ? icons::Kind::plus : icons::Kind::loop, centre.removeFromTop (30.0f).withSizeKeepingCentre (28.0f, 28.0f),
+                 lit ? palette::accent : palette::textDim, 1.8f);
+    centre.removeFromTop (10.0f);
+    g.setColour (lit ? palette::text : palette::text.withAlpha (0.78f));
+    g.setFont (fonts::make (14.0f, fonts::Weight::medium, 0.1f));
+    g.drawText (problem.isEmpty() ? juce::String ("ADD SAMPLE") : juce::String ("TRY ANOTHER FILE"), centre.removeFromTop (20.0f), juce::Justification::centred, false);
+    g.setColour (palette::textDim);
+    g.setFont (type::popupLabel (11.0f));
+    g.drawFittedText (problem.isEmpty() ? name + juce::String::fromUTF8 (" \xc2\xb7 DROP OR BROWSE") : problem, centre.removeFromTop (34.0f).toNearestInt(),
+                      juce::Justification::centredTop, 2, 1.0f);
+    if (secondaryLabel.isNotEmpty())
+    {
+        // The second way in, quieter: a text key at the foot of the dock.
+        const auto key = secondaryActionBounds().toFloat();
+        const bool over = isMouseOver (false) && key.contains (getMouseXYRelative().toFloat());
+        g.setColour (palette::text.withAlpha (over ? 0.9f : 0.55f));
+        g.setFont (type::popupLabel (10.5f));
+        g.drawText (secondaryLabel, key, juce::Justification::centred, false);
+        g.setColour (palette::hairline.withAlpha (over ? 0.9f : 0.5f));
+        g.fillRect (juce::Rectangle<float> (key.getCentreX() - 0.5f * juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), secondaryLabel), key.getBottom() - 4.0f,
+                                            juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), secondaryLabel), 1.0f));
+    }
+}
+
+//==============================================================================
 ShellEditor::ShellEditor (ShellProcessor& p)
     : AudioProcessorEditor (p),
       shell (p),
@@ -78,6 +225,8 @@ ShellEditor::ShellEditor (ShellProcessor& p)
             modOverlay.toFront (false);
             applyBindings();   // the editor's fields are new controls
         };
+        if (p.hasKeyDna())
+            card->onKeyDna = [this] (int l) { openKeyDna (l); };
         content.addChildComponent (*card);
     }
     // A generator's card may show one of the product's controls in START's place (its name
@@ -107,10 +256,27 @@ ShellEditor::ShellEditor (ShellProcessor& p)
             openPopup (generatorHeaderPopup);
         });
     if (const auto& name = shell.product().generatorModeName; name.isNotEmpty() && shell.isGenerator())
-        cards[0]->setFirstModeName (name);
+        for (int layer = 0; layer < ShellProcessor::numLayers; ++layer)
+            if (shell.isGeneratorLayer (layer))
+            {
+                // Each oscillator card's selector: the product's name, only as wide as it needs.
+                cards[static_cast<std::size_t> (layer)]->setFirstModeName (name);
+                cards[static_cast<std::size_t> (layer)]->setModeFitsName (true);
+            }
     dropZone.onBrowse = [this] { chooseFile (-1); };
     content.addChildComponent (dropZone);
     content.addChildComponent (addTarget);
+    if ((shell.product().hybridSampleDock || threeEngines()) && shell.hasHybridLayer())
+    {
+        if (threeEngines())
+            sampleDock.setHeader (InstrumentHost::shownLayerName (ShellProcessor::hybridLayer), InstrumentHost::shownLayer (ShellProcessor::hybridLayer),
+                                  shell.product().hybridSampleName);
+        sampleDock.onBrowse = [this] { chooseFile (ShellProcessor::hybridLayer); };
+        if (const auto& action = shell.product().hybridAction; action.label.isNotEmpty() && action.run != nullptr)
+            sampleDock.setSecondaryAction (action.label.toUpperCase(), [this] { shell.product().hybridAction.run (shell); });
+        sampleDock.setText (shell.product().hybridSampleName, {});
+        content.addChildComponent (sampleDock);
+    }
     headerMix.onModulationMenu = [this] {
         modOverlay.contextMenu (modui::mixTargetId).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&headerMix));
     };
@@ -206,6 +372,7 @@ ShellEditor::~ShellEditor()
     for (auto& card : cards)
         juce::Desktop::getInstance().getAnimator().cancelAnimation (card.get(), false);
     popup.reset();
+    keyDnaPanel.reset();
     setLookAndFeel (nullptr);
 }
 
@@ -283,8 +450,52 @@ int ShellEditor::visibleCardCount() const
     return n;
 }
 
+bool ShellEditor::threeEngines() const
+{
+    return shell.product().threeEngines.enabled && shell.hasHybridLayer();
+}
+
 void ShellEditor::layoutSources()
 {
+    if (threeEngines())
+    {
+        // Three engines: every card, always, at equal widths, in the product's order; the
+        // hybrid, while empty, is its ADD SAMPLE invitation in its own column.
+        const bool hybrid = shell.isLayerOccupied (ShellProcessor::hybridLayer);
+        if (hybrid == shownHybrid && shownCount == 3)
+            return;
+        shownCount = 3;
+        shownHybrid = hybrid;
+        dropZone.setVisible (false);
+        addTarget.setVisible (false);
+        const auto& order = shell.product().threeEngines.order;
+        for (int shown = 0; shown < 3; ++shown)
+        {
+            const int l = order[static_cast<std::size_t> (shown)];
+            auto& card = *cards[static_cast<std::size_t> (l)];
+            const auto column = frame::sourceColumn (sourceArea, 3, shown);
+            if (l == ShellProcessor::hybridLayer && ! hybrid)
+            {
+                card.setVisible (false);
+                sampleDock.setBounds (column);
+                sampleDock.setVisible (true);
+                continue;
+            }
+            if (l == ShellProcessor::hybridLayer)
+                sampleDock.setVisible (false);
+            card.setDensity (EngineLayoutDensity::triple);
+            card.setBounds (column);
+            card.setVisible (true);
+        }
+        if (dockOverlay != nullptr)
+            dockOverlay->setBounds (sampleDock.getLocalBounds().reduced (14).withTrimmedTop (sampleDock.headerBounds().getBottom()));
+        headerMix.setLayers ({ true, hybrid, false });   // the analog side against the hybrid
+        headerMix.setEndLabels (shell.product().mixEndLabels[0], shell.product().mixEndLabels[1]);
+        updateFocus();
+        applyBindings();
+        content.repaint();
+        return;
+    }
     const int count = shell.slotCount();
     if (count == shownCount && ! dragging)
         return;
@@ -292,11 +503,23 @@ void ShellEditor::layoutSources()
     std::array<bool, InstrumentHost::numLayers> occupied {};
     for (int l = 0; l < InstrumentHost::numLayers; ++l)
         occupied[static_cast<std::size_t> (l)] = l < count;
-    const bool showAdd = dragging && count >= 1 && count < InstrumentHost::numLayers;
+    // A hybrid product's dock (opt-in): the generator's card and, beside it, the empty
+    // recording's compact dock (about a fifth of the area); it is the drop target itself.
+    const bool dock = sampleDockShown();
+    const bool showAdd = dragging && count >= 1 && count < InstrumentHost::numLayers && ! dock;
     const int columns = count + (showAdd ? 1 : 0);
     const auto density = columns <= 1 ? EngineLayoutDensity::hero : (columns == 2 ? EngineLayoutDensity::dual : EngineLayoutDensity::triple);
     dropZone.setVisible (count == 0);
     dropZone.setBounds (sourceArea);
+    auto cardArea = sourceArea;
+    if (dock)
+    {
+        constexpr int gap = 12;
+        const int dockWidth = juce::roundToInt (0.2f * static_cast<float> (sourceArea.getWidth()));
+        sampleDock.setBounds (cardArea.removeFromRight (dockWidth));
+        cardArea.removeFromRight (gap);
+    }
+    sampleDock.setVisible (dock);
     int col = 0;
     for (int l = 0; l < InstrumentHost::numLayers; ++l)
     {
@@ -307,7 +530,7 @@ void ShellEditor::layoutSources()
             continue;
         }
         card.setDensity (density);
-        card.setBounds (frame::sourceColumn (sourceArea, columns, col++));
+        card.setBounds (frame::sourceColumn (cardArea, columns, col++));
         card.setVisible (true);
     }
     addTarget.setVisible (showAdd);
@@ -329,6 +552,13 @@ void ShellEditor::layoutSources()
     content.repaint();
 }
 
+bool ShellEditor::sampleDockShown() const
+{
+    if (threeEngines())
+        return ! shell.isLayerOccupied (ShellProcessor::hybridLayer);
+    return shell.product().hybridSampleDock && shell.hasHybridLayer() && ! shell.isLayerOccupied (ShellProcessor::hybridLayer);
+}
+
 void ShellEditor::updateFocus()
 {
     int edit = shell.editLayer();
@@ -348,6 +578,7 @@ void ShellEditor::refreshNow()
     {
         juce::Desktop::getInstance().getAnimator().cancelAnimation (popup.get(), true);
         popup->setAlpha (1.0f);
+        popup->settleNow();
     }
 }
 
@@ -378,6 +609,7 @@ void ShellEditor::fileDragEnter (const juce::StringArray&, int x, int y)
     shownCount = -1;
     layoutSources();
     dropZone.setHighlight (true);
+    sampleDock.setHighlight (true);   // (a hybrid product: any drop loads the recording)
 }
 
 void ShellEditor::fileDragMove (const juce::StringArray&, int x, int y)
@@ -390,6 +622,7 @@ void ShellEditor::fileDragExit (const juce::StringArray&)
 {
     dragging = false;
     dropZone.setHighlight (false);
+    sampleDock.setHighlight (false);
     shownCount = -1;
     layoutSources();
 }
@@ -399,6 +632,7 @@ void ShellEditor::filesDropped (const juce::StringArray& files, int x, int y)
     const int layer = dropLayerAt ({ x, y });
     dragging = false;
     dropZone.setHighlight (false);
+    sampleDock.setHighlight (false);
     juce::Array<juce::File> list;
     for (const auto& f : files)
         if (juce::File (f).hasFileExtension ("wav;aif;aiff;flac"))
@@ -434,6 +668,8 @@ void ShellEditor::showLayerMenu (int layer, juce::Component& target)
         menu.addSectionHeader (shell.product().hybridSampleName);
         menu.addItem (juce::String::fromUTF8 ("Replace or relink recording\xe2\x80\xa6"), [this] { chooseFile (ShellProcessor::hybridLayer); });
         menu.addItem ("Remove recording", [this] { shell.removeLayer (ShellProcessor::hybridLayer); timerCallback(); });
+        if (const auto& action = shell.product().hybridAction; action.label.isNotEmpty() && action.run != nullptr)
+            menu.addItem (action.label + juce::String::fromUTF8 ("\xe2\x80\xa6"), [this] { shell.product().hybridAction.run (shell); });
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&target));
         return;
     }
@@ -542,6 +778,29 @@ void ShellEditor::dragModulation (int source, juce::Point<float> where)
 {
     modOverlay.setDrag (source, where);
     headerMix.setModulationDrag (source, headerMix.acceptsModulationDrop (where));
+    // As ANDOR OSP's editor: a Granular card's display, rested on (not passed across), brings
+    // up its POS SIZE DENS TUNE SPREAD so the drag can land on them (the pointer's own hover
+    // never reaches the card while a source is being dragged).
+    int over = -1;
+    for (int l = 0; l < ShellProcessor::numLayers; ++l)
+    {
+        auto& card = *cards[static_cast<std::size_t> (l)];
+        if (card.isVisible() && card.isGranular() && ! card.granularControlsShown() && ! card.isEqOpen()
+            && content.getLocalArea (&card, card.display().getBounds()).toFloat().contains (where))
+            over = l;
+    }
+    if (over != dragHoverCard)
+    {
+        dragHoverCard = over;
+        dragHoverSince = juce::Time::getMillisecondCounter();
+    }
+    else if (over >= 0 && juce::Time::getMillisecondCounter() - dragHoverSince > 380)
+    {
+        cards[static_cast<std::size_t> (over)]->showGranularControls (true, true);
+        dragHoverCard = -1;
+        modOverlay.setDrag (-1, where);   // collect the knobs now shown
+        modOverlay.setDrag (source, where);
+    }
 }
 
 void ShellEditor::dropModulation (int source, juce::Point<float> where)
@@ -559,6 +818,7 @@ void ShellEditor::dropModulation (int source, juce::Point<float> where)
     headerMix.setModulationDrag (-1, false);
     if ((onMix ? modOverlay.dropOn (source, modui::mixTargetId, headerMix.getBounds().toFloat()) : modOverlay.drop (source, where)) >= 0)
         modPanel.refresh();
+    dragHoverCard = -1;
     modOverlay.setDrag (-1, {});
 }
 
@@ -594,6 +854,8 @@ void ShellEditor::openPopup (int which, int source)
         popup = shell.product().generatorStartControl.popover (shell);
     else if (which == generatorHeaderPopup && shell.product().generatorHeaderPopover != nullptr && cards[0]->hasHeadingDoor())
         popup = shell.product().generatorHeaderPopover (shell);
+    else if (which == hybridHeaderPopup && shell.product().hybridHeaderPopover != nullptr && cards[ShellProcessor::hybridLayer]->hasHeadingDoor())
+        popup = shell.product().hybridHeaderPopover (shell);
     if (popup == nullptr)
         return;
     popupIndex = which;
@@ -615,6 +877,8 @@ void ShellEditor::openPopup (int which, int source)
         cards[0]->setStartOpen (true);
     if (which == generatorHeaderPopup)
         cards[0]->setHeadingOpen (true);
+    if (which == hybridHeaderPopup)
+        cards[ShellProcessor::hybridLayer]->setHeadingOpen (true);
     applyBindings();   // the popover's controls follow the engine's bindings too
     if (isShowing())
         grabKeyboardFocus();
@@ -645,10 +909,11 @@ void ShellEditor::positionPopup()
         const auto anchor = content.getLocalArea (cards[0].get(), cards[0]->startLabelBounds()).toFloat();
         at = { anchor.getCentreX() - 0.5f * size.x, anchor.getY() - 10.0f - size.y };
     }
-    else if (popupIndex == generatorHeaderPopup)
+    else if (popupIndex == generatorHeaderPopup || popupIndex == hybridHeaderPopup)
     {
         // Below the card's heading, starting at its first letter (placePopover keeps it inside).
-        const auto anchor = content.getLocalArea (cards[0].get(), cards[0]->headingBounds()).toFloat();
+        const auto& card = *cards[popupIndex == hybridHeaderPopup ? static_cast<std::size_t> (ShellProcessor::hybridLayer) : 0u];
+        const auto anchor = content.getLocalArea (&card, card.headingBounds()).toFloat();
         at = { anchor.getX() - 14.0f, anchor.getBottom() + 8.0f };
     }
     else
@@ -670,6 +935,8 @@ void ShellEditor::closePopup()
         cards[0]->setStartOpen (false);
     if (popupIndex == generatorHeaderPopup)
         cards[0]->setHeadingOpen (false);
+    if (popupIndex == hybridHeaderPopup)
+        cards[ShellProcessor::hybridLayer]->setHeadingOpen (false);
     juce::Desktop::getInstance().getAnimator().cancelAnimation (popup.get(), false);
     popup.reset();
     popupIndex = -1;
@@ -762,6 +1029,8 @@ void ShellEditor::mouseDownAnywhere (juce::Component* c)
         pressed = startControlPopup;
     if (cards[0]->isHeading (c))
         pressed = generatorHeaderPopup;
+    if (cards[ShellProcessor::hybridLayer]->isHeading (c) && hybridDoorSet)
+        pressed = hybridHeaderPopup;
     closedByLabelPress = pressed == popupIndex ? pressed : -1;
     closePopup();
 }
@@ -778,7 +1047,64 @@ void ShellEditor::setArpExpanded (bool open)
         arpPanel.refresh();
     layoutInstrument();
     frame::applyWindowShape (*this, instrumentHeight(), true);
+    placeKeyDna();
     content.repaint();
+}
+
+void ShellEditor::openKeyDna (int layer)
+{
+    // As ANDOR OSP's editor opens it.
+    closePopup();
+    if (keyDnaPanel != nullptr && keyDnaPanel->layer() != layer)
+        keyDnaPanel.reset();
+    if (keyDnaPanel == nullptr)
+    {
+        keyDnaPanel = std::make_unique<osp::plugin::KeyDnaEditor> (shell, layer);
+        juce::Component::SafePointer<ShellEditor> safe (this);
+        keyDnaPanel->onClose = [safe] {
+            juce::MessageManager::callAsync ([safe] {
+                if (safe != nullptr)
+                    safe->closeKeyDna();
+            });
+        };
+        // The profile sits over the real keys below it.
+        keyDnaPanel->keyBounds = [safe] (int note) -> juce::Rectangle<float> {
+            if (safe == nullptr || safe->keyDnaPanel == nullptr)
+                return {};
+            auto& kb = safe->keyboard;
+            if (note < kb.getRangeStart() || note > kb.getRangeEnd())
+                return {};
+            const auto r = kb.getRectangleForKey (note);
+            return r.translated (static_cast<float> (kb.getX() - safe->keyDnaPanel->getX()), static_cast<float> (kb.getY() - safe->keyDnaPanel->getY()));
+        };
+        keyDnaPanel->isKeyDown = [safe] (int note) { return safe != nullptr && safe->shell.keyboardState.isNoteOnForChannels (0xffff, note); };
+        keyDnaPanel->getProperties().set ("modCover", true);   // the halos stay under it
+        content.addAndMakeVisible (*keyDnaPanel);
+    }
+    if (shell.editLayer() != layer)
+    {
+        shell.setEditLayer (layer);
+        updateFocus();
+    }
+    placeKeyDna();
+    keyDnaPanel->toFront (true);
+    modOverlay.toFront (false);
+}
+
+void ShellEditor::closeKeyDna()
+{
+    if (keyDnaPanel == nullptr)
+        return;
+    keyDnaPanel.reset();
+    grabKeyboardFocus();
+}
+
+void ShellEditor::placeKeyDna()
+{
+    // ANDOR OSP's place: the instrument's width, from the housing's top to just above the
+    // keyboard row (which stays visible and playable).
+    if (keyDnaPanel != nullptr)
+        keyDnaPanel->setBounds (juce::Rectangle<float> (31.0f, 23.0f, 1386.0f, static_cast<float> (keyboard.getY()) - 9.0f - 23.0f).getSmallestIntegerContainer());
 }
 
 //==============================================================================
@@ -803,13 +1129,119 @@ void ShellEditor::updateStatus()
         statusLabel.setText (status, juce::dontSendNotification);
 }
 
+void ShellEditor::updateHybridDoor()
+{
+    if (shell.product().hybridHeaderPopover == nullptr || ! shell.hasHybridLayer())
+        return;
+    InstrumentHost::GeneratedSource source;
+    const bool engineSource = shell.generatedSource (ShellProcessor::hybridLayer, source);
+    if (engineSource == hybridDoorSet)
+        return;
+    hybridDoorSet = engineSource;
+    if (! engineSource)
+    {
+        if (popupIndex == hybridHeaderPopup)
+            closePopup();
+        cards[ShellProcessor::hybridLayer]->setHeadingDoor (nullptr);
+        return;
+    }
+    cards[ShellProcessor::hybridLayer]->setHeadingDoor ([this] {
+        if (closedByLabelPress == hybridHeaderPopup || popupIndex == hybridHeaderPopup)
+        {
+            closedByLabelPress = -1;
+            closePopup();
+            return;
+        }
+        openPopup (hybridHeaderPopup);
+    });
+}
+
+void ShellEditor::refreshCardExtensions()
+{
+    // A generator product's card extensions (the parity render's test engine keeps ANDOR OSP's cards).
+    if (! shell.isGenerator())
+        return;
+    const auto& product = shell.product();
+    bool changed = false;
+    for (int l = 0; l < InstrumentHost::numLayers; ++l)
+    {
+        auto& card = *cards[static_cast<std::size_t> (l)];
+        if (product.cardControls != nullptr)
+        {
+            const auto knobs = product.cardControls (l, shell);
+            juce::String key;
+            for (const auto& k : knobs)
+                key << (k.hidden ? juce::String ("-") : k.parameterId) << "|" << k.caption << ";";
+            if (key != appliedKnobs[static_cast<std::size_t> (l)])
+            {
+                appliedKnobs[static_cast<std::size_t> (l)] = key;
+                for (int i = 0; i < 5; ++i)
+                {
+                    const auto& k = knobs[static_cast<std::size_t> (i)];
+                    if (k.hidden)
+                        card.replaceKnob (i, {}, {});
+                    else if (k.parameterId.isEmpty())
+                        card.restoreKnob (i);
+                    else
+                        card.replaceKnob (i, k.parameterId, k.caption);
+                }
+                changed = true;
+            }
+        }
+        if (product.cardModifiersShown != nullptr)
+            card.setModifiersShown (product.cardModifiersShown (l, shell));
+        if (product.wellOverlay != nullptr)
+        {
+            const auto key = product.wellOverlayKey != nullptr ? product.wellOverlayKey (l, shell) : juce::String ("-");
+            if (key != appliedOverlayKeys[static_cast<std::size_t> (l)])
+            {
+                appliedOverlayKeys[static_cast<std::size_t> (l)] = key;
+                card.setWellOverlay (product.wellOverlay (l, shell));
+                changed = true;
+            }
+        }
+    }
+    // The empty hybrid's dock carries its overlay too (its source type, say).
+    if (product.wellOverlay != nullptr && threeEngines())
+    {
+        const auto key = (product.wellOverlayKey != nullptr ? product.wellOverlayKey (ShellProcessor::hybridLayer, shell) : juce::String ("-")) + "/dock";
+        if (key != dockOverlayKey)
+        {
+            dockOverlayKey = key;
+            dockOverlay = product.wellOverlay (ShellProcessor::hybridLayer, shell);
+            if (dockOverlay != nullptr)
+            {
+                sampleDock.addAndMakeVisible (*dockOverlay);
+                dockOverlay->setBounds (sampleDock.getLocalBounds().reduced (14).withTrimmedTop (sampleDock.headerBounds().getBottom()));
+            }
+            changed = true;
+        }
+    }
+    if (changed)
+    {
+        modOverlay.toFront (false);
+        applyBindings();
+    }
+}
+
 void ShellEditor::timerCallback()
 {
+    refreshCardExtensions();
     layoutSources();
+    updateHybridDoor();
+    if (sampleDock.isVisible())
+    {
+        // After a failed load: what went wrong, and that another file can be tried (the
+        // sound as it was is untouched).
+        const bool failed = shell.loadState (ShellProcessor::hybridLayer) == InstrumentHost::LoadState::failed;
+        sampleDock.setText (shell.product().hybridSampleName, failed ? juce::String ("COULD NOT LOAD THAT FILE\nCLICK TO CHOOSE ANOTHER") : juce::String());
+    }
     for (auto& card : cards)
         if (card->isVisible())
             card->refresh();
     updateFocus();
+    if (keyDnaPanel != nullptr)
+        keyDnaPanel->refresh();
     headerMix.refreshModulation();
     presetBar.refresh();
     if (const float wheel = shell.modWheelPosition(); ! juce::exactlyEqual (wheel, shownWheelPosition))
@@ -825,6 +1257,8 @@ void ShellEditor::timerCallback()
         if (now != shownEnvelope)
             modPanel.ampEnvelope().repaint (modPanel.ampEnvelope().graphBounds());
         shownEnvelope = now;
+        if (shell.product().ampEnvelopeNote != nullptr)
+            modPanel.ampEnvelope().setNote (shell.product().ampEnvelopeNote (shell));
     }
     updateStatus();
     if (shell.arpEditorExpanded() != arpShown)

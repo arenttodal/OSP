@@ -3726,6 +3726,11 @@ namespace
                 p.addLayers (sources);
             REQUIRE (p.waitForLoads (30000));
             p.pollLoads();
+            // SPACE as those sessions stored it (before the HALL / 3 s / HIGH CUT 5 kHz
+            // defaults of 2026-11): a saved session keeps its own room.
+            p.setParameterValue ("space.type", 2.0f);
+            p.setParameterValue ("space.decay", 1.8f);
+            p.setParameterValue ("space.highCut", 12000.0f);
             for (const auto& [id, value] : scene.values)
                 p.setParameterValue (id, value);
             p.getStateInformation (state);

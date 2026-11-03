@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "scene": "plugin-three-layers-mixed",
   "platform": "linux-x86_64-gcc",
-  "sampleHash": "d9a6e28f3d06721f",
-  "rmsDb": -36.065055229433078,
+  "sampleHash": "5c68b7b31b2b775c",
+  "rmsDb": -36.065055229979762,
   "peakDb": -19.309249375263377,
-  "brightness": 0.212863462130482
+  "brightness": 0.212863462131952
 }

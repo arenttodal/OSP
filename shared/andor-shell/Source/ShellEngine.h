@@ -3,6 +3,7 @@
 #include "LoadedInstrument.h"
 
 #include "engine/InstrumentEngine.h"
+#include "engine/KeyDna.h"
 #include "engine/Modulation.h"
 #include "engine/RhythmicShaper.h"
 
@@ -49,6 +50,9 @@ public:
     /** Message thread, before playback (allocate here). `parameters` stays valid while the
         engine lives: cache getRawParameterValue() pointers now, read them in process(). */
     virtual void prepare (double sampleRate, int maximumBlockSize, juce::AudioProcessorValueTreeState& parameters) = 0;
+    /** The parameters, as soon as they exist (message thread, before any prepare): for an
+        engine that answers the interface from them before audio runs (its card's name, say). */
+    virtual void attachParameters (juce::AudioProcessorValueTreeState& parameters) { juce::ignoreUnused (parameters); }
     virtual void release() {}
     /** The output's delay in samples after prepare() (oversampling filters): the shell
         reports it to the host. */
@@ -172,6 +176,40 @@ public:
     /** The engine plays KEY DNA on its Granular layers (ANDOR OSP's per-key profile): the
         Granular strip then shows its KEY DNA key. Off by default (no key). */
     virtual bool hasKeyDna() const noexcept { return false; }
+    /** Which Granular cards show the KEY DNA key (default: all, when hasKeyDna()). */
+    virtual bool hasKeyDnaKey (int layer) const noexcept { juce::ignoreUnused (layer); return hasKeyDna(); }
+    /** A layer's KEY DNA profile (all 128 keys at full AMOUNT; AMOUNT is the host parameter
+        layerX.keyDna.amount), computed by the shell off the audio thread from the KEY DNA
+        editor's settings, or null (none). Audio thread, at the start of a block; the table
+        stays valid until the next call for that layer. Only called when hasKeyDna(). */
+    virtual void setKeyDnaTable (int layer, const osp::keydna::Table* table) noexcept { juce::ignoreUnused (layer, table); }
+
+    /** The engine's own state beyond the parameters (opt-in: an imported source, say), saved with
+        presets and sessions: children added to `state`. Message thread (or a host's saving
+        thread: the engine guards what it reads). */
+    virtual void saveState (juce::XmlElement& state) const { juce::ignoreUnused (state); }
+    /** Restored from a session or a preset (after its parameters), or reset (a state with none
+        of the engine's children: back to none). `assetFolder`: the shell's sample store, where
+        the engine may keep files it needs again. Message thread. */
+    virtual void restoreState (const juce::XmlElement& state, const juce::File& assetFolder) { juce::ignoreUnused (state, assetFolder); }
+
+    /** A source the engine plays on a layer itself (opt-in: a hybrid product's imported sample
+        source on its recording's layer): its name, or empty (none). While it has one, the
+        shell shows that layer's card (its name, and sourcePicture() as its picture) in place of
+        an empty layer. Message thread. */
+    virtual juce::String engineSourceName (int layer) const { juce::ignoreUnused (layer); return {}; }
+    /** Whether the engine's own source on a layer pictures a period (an oscillator, drawn as
+        a sustained tone) or an outline drawn once (a recording, the default). */
+    virtual bool engineSourceIsPeriodic (int layer) const { juce::ignoreUnused (layer); return false; }
+    /** The engine's source on a layer is a stand-in (an empty slot's invitation): its caption
+        ("ADD SAMPLE\nDROP OR BROWSE"), its picture drawn faint. Empty: a real source. */
+    virtual juce::String engineSourcePlaceholder (int layer) const { juce::ignoreUnused (layer); return {}; }
+    /** A generator's further layers (opt-in, ProductInfo::threeEngines): what it generates on
+        `layer` (its card's name, e.g. "OSC 2"; the picture is sourcePicture's), or empty.
+        Layer 0's is generatorName(). Message thread. */
+    virtual juce::String layerGeneratorName (int layer) const { return layer == 0 ? generatorName() : juce::String(); }
+    /** The musician removed the layer's source: the engine lets go of its own. Message thread. */
+    virtual void removeEngineSource (int layer) { juce::ignoreUnused (layer); }
     /** The engine reads each layer's SYNTHESIZE (layerA.synthesize): the source cards then show
         its knob, as ANDOR OSP's. Off by default (no knob). */
     virtual bool hasSynthesize() const noexcept { return false; }

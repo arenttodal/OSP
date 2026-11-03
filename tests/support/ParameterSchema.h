@@ -90,14 +90,29 @@ namespace parameterschema
         return std::abs (na - nb) <= 1.0e-6 * std::max ({ 1.0, std::abs (na), std::abs (nb) });
     }
 
-    /** Two listing lines are the same parameter: every field exact, the value texts as
-        sameValueText says. */
+    /** The fields before the value texts: exact, except the default, which comes back
+        through the range's normalisation (a skewed range's centre may print 4999.9995 on one
+        platform's libm and 5000.0000 on another): as sameValueText says. */
+    inline bool sameFields (const juce::String& actual, const juce::String& expected)
+    {
+        if (actual == expected)
+            return true;
+        const auto da = actual.indexOf (" default="), de = expected.indexOf (" default=");
+        const auto sa = actual.indexOf (" steps="), se = expected.indexOf (" steps=");
+        if (da < 0 || de < 0 || sa < da || se < de)
+            return false;
+        return actual.substring (0, da) == expected.substring (0, de) && actual.substring (sa) == expected.substring (se)
+               && sameValueText (actual.substring (da + 9, sa), expected.substring (de + 9, se));
+    }
+
+    /** Two listing lines are the same parameter: every field exact, the default and the
+        value texts as sameValueText says. */
     inline bool sameLine (const juce::String& actual, const juce::String& expected)
     {
         if (actual == expected)
             return true;
         const auto at = actual.indexOf (" texts="), et = expected.indexOf (" texts=");
-        if (at < 0 || et < 0 || actual.substring (0, at) != expected.substring (0, et))
+        if (at < 0 || et < 0 || ! sameFields (actual.substring (0, at), expected.substring (0, et)))
             return false;
         // The choices (" [a|b|c]") follow the three texts; they are compared exactly.
         auto texts = [] (const juce::String& line, int from, juce::String& choices) {
