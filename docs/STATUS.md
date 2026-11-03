@@ -752,6 +752,14 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 
 ## NEXT
 
+- **Per-card arpeggiator in ANDOR OSP's own plugin** (the rule on shared SPACE / ECHO / ARP
+  features). The shell's lanes and the ARP panel's PLAYS / LINK / EDIT are shared and in
+  ANDOR ANALOG. Still to do in ANDOR OSP:
+  - share the lane logic between the shell and OspAudioProcessor;
+  - give InstrumentEngine a layer mask per note (it already starts a voice per layer);
+  - opt OSP's panel in;
+  - leave old sessions identical.
+
 - Lab round 1 scored and acted on (docs/reports/lab-1.md). Round 2 in the lab: Reimagined 2,
   Sustain 2, Dynamics 2, Multi-sample 2.
 - Transient preservation and transient mixing: both kept as options, off by default
@@ -842,6 +850,36 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
     - stable at FEEDBACK 100 % in every motion, interval and stereo picture;
     - deterministic, and silent in silence.
   - CPU: about 1.3 % of a core at 48 kHz (TAPE about 0.5 .. 0.8 %).
+
+## Shell: the per-card arpeggiator (3 Nov 2026)
+
+- **Built (opt-in: `ProductInfo::cardArpeggiator`, a three-engine product; ANDOR OSP
+  unchanged).** The shell adds, in the product's namespace (`analog.`), `arp.link` and `arp.cardA` /
+  `arp.cardB` / `arp.cardC` (which cards play the arpeggio; the others hold the keys), and B's
+  and C's own PATTERN / RATE / OCTAVES (`arp.cardB.*`, `arp.cardC.*`), all version hint 27.
+  ANDOR OSP's schema stays exactly its own; the visual regression's parity render hides the
+  panel's additions. The defaults (LINK, every card)
+  are the one arpeggiator, exactly as before: old sessions and presets play unchanged.
+- How it plays (`ShellProcessor::runCardArpeggiators`):
+  - With LINK on and every card in it (or the arpeggiator off), the one arpeggiator runs as
+    before.
+  - Otherwise up to three lanes run, each an arpeggiator playing some cards. LINK gives one
+    lane for the cards in it; unlinked gives one per card, B and C on their own settings, with
+    GATE / SWING / VELOCITY and the ARP destinations shared.
+  - The cards left out hold the keys as played, with their own sustain pedal; the engine's
+    pedal would hold the arpeggio too.
+  - Each note's MIDI channel names its cards (1 + mask) for the engine
+    (`Engine::setCardRouting`).
+  - Unlinked lanes' random patterns have their own seeds derived from the stored one.
+  - A change of cards or LINK mid-performance ends what sounds and plays the keys still
+    down into the new lanes, so no note is ever left hanging.
+- The ARP panel (`InstrumentHost::cardArpeggiator`, false in ANDOR OSP: pixel-identical):
+  - PLAYS A B C, each lit in its card's colour;
+  - LINK;
+  - unlinked, EDIT A | B | C, which picks whose PATTERN, RATE and OCTAVES the panel shows and
+    sets, and whose steps the display plays.
+- Evidence: ANDOR ANALOG's `[cardarp]` tests, its bindings test (all ten new parameters move
+  the sound), and its screenshots `analog-arp-card-c` and `analog-arp-unlinked-b`.
 
 ## BLOCKERS
 

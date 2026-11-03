@@ -393,6 +393,13 @@ public:
         bool active = false;
     };
     virtual ArpView arpView() const noexcept = 0;
+    /** The per-card arpeggiator (a three-engine product's): the ARP panel then shows which
+        cards it plays, LINK, and each card's own settings. False (ANDOR OSP): one arpeggiator. */
+    virtual bool cardArpeggiator() const noexcept { return false; }
+    /** Its parameters' namespace (the product's, "analog."): ids::arpLink (ns) ... */
+    virtual juce::String cardArpNamespace() const { return {}; }
+    /** The card (shown, 0 A .. 2 C) whose lane arpView() shows (the one the panel edits). */
+    virtual void setArpViewCard (int shown) noexcept { juce::ignoreUnused (shown); }
 
     // -- The macro popovers (MacroPopups.h) --------------------------------------------------
     /** The layer the interface edits (0 A, 1 B, 2 C). Any thread. */
