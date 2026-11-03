@@ -551,6 +551,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout InstrumentHost::createParame
                                                                  static_cast<float> (d24.bloomTimeMs), juce::AudioParameterFloatAttributes().withLabel ("ms")));
         layout.add (std::make_unique<juce::AudioParameterFloat> (id24 (ids::bloomDiffusion), "Bloom Diffusion", unit, static_cast<float> (100.0 * d24.bloomDiffusion), percent));
     }
+    {
+        // ABYSS's variants (version hint 25), appended so nothing before moves. DEEP by default:
+        // ABYSS as it was.
+        auto id25 = [] (const juce::String& id) { return juce::ParameterID { id, 25 }; };
+        layout.add (std::make_unique<juce::AudioParameterChoice> (id25 (ids::abyssVariant), "Abyss Variant", juce::StringArray { "Deep", "Dark", "Inverse", "Endless" },
+                                                                  static_cast<int> (Shaping {}.abyssVariant)));
+    }
     return layout;
 }
 

@@ -392,3 +392,4 @@ space.bloom.sync v24 bool "Bloom Sync" label="" range=0.0000..1.0000/1.0000 skew
 space.bloom.division v24 choice "Bloom Division" label="" range=0.0000..11.0000/1.0000 skew=1.00000 default=6.0000 steps=12 texts=1/16|1/4|1/1 [1/16|1/8T|1/16D|1/8|1/4T|1/8D|1/4|1/2T|1/4D|1/2|1/2D|1/1]
 space.bloom.time v24 float "Bloom Time" label="ms" range=20.0000..1500.0000/0.0000 skew=0.41630 default=349.9999 steps=2147483647 texts=20.0000000|300.0000000|1500.0000000
 space.bloom.diffusion v24 float "Bloom Diffusion" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=60.0000 steps=2147483647 texts=0.0|50.0|100.0
+space.abyss.variant v25 choice "Abyss Variant" label="" range=0.0000..3.0000/1.0000 skew=1.00000 default=0.0000 steps=4 texts=Deep|Inverse|Endless [Deep|Dark|Inverse|Endless]

@@ -33,6 +33,8 @@ enum class MovementMode { drift, tape, chorus, pulse, shaper };
 enum class SpaceType { room, hall, plate, spring };
 /** SPACE's engine: the four ROOMS (SpaceType), ABYSS, VINTAGE or BLOOM (engine/*Reverb.h). */
 enum class SpaceEngine { rooms, abyss, vintage, bloom };
+/** ABYSS's voicings: DEEP (the plain engine), DARK, INVERSE (it swells), ENDLESS. */
+enum class AbyssVariant { deep, dark, inverse, endless };
 /** VINTAGE's voicings and its two eras (the network's internal rate). */
 enum class VintageVariant { hall, plate, chamber, room };
 enum class VintageEra { early, later };
@@ -97,6 +99,7 @@ struct Shaping
     double abyssGravity = 0.0;        ///< -1..1: below 0 the envelope swells (inverse)
     bool abyssFreeze = false;
     double abyssResonance = 0.0;      ///< 0..1
+    AbyssVariant abyssVariant = AbyssVariant::deep;
     VintageVariant vintageVariant = VintageVariant::hall;
     VintageEra vintageEra = VintageEra::early;
     double vintageDiffusion = 0.7;    ///< 0..1

@@ -726,6 +726,7 @@ const juce::StringArray& OspAudioProcessor::shapingIds()
         ids::spaceEngine, ids::abyssGravity, ids::abyssFreeze, ids::abyssResonance,
         ids::vintageVariant, ids::vintageEra, ids::vintageDiffusion,
         ids::bloomVariant, ids::bloomSync, ids::bloomDivision, ids::bloomTime, ids::bloomDiffusion,
+        ids::abyssVariant,
     };
     jassert (list.size() == numShapingParams);
     return list;
@@ -805,6 +806,7 @@ Shaping OspAudioProcessor::shapingFromParameters() const noexcept
     s.bloomDivision = index (65, shaping::echoDivisionCount);
     s.bloomTimeMs = v (66);
     s.bloomDiffusion = 0.01 * v (67);
+    s.abyssVariant = static_cast<AbyssVariant> (index (68, 4));
     for (std::size_t i = 0; i < s.shaper.customSteps.size(); ++i)
     {
         auto& step = s.shaper.customSteps[i];

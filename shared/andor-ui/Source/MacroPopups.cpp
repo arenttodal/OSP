@@ -271,6 +271,7 @@ namespace
             if (watch.differs ({ static_cast<double> (type), value (state, "space.decay"), value (state, "space"), value (state, "space.preDelay"),
                                  value (state, "space.size"), value (state, "space.damping"), value (state, "space.width"), static_cast<double> (getWidth()),
                                  abyss ? value (state, "space.abyss.gravity") : 0.0, abyss ? value (state, "space.abyss.freeze") : 0.0,
+                                 abyss ? value (state, "space.abyss.variant") : 0.0,
                                  engine == 3 ? value (state, "space.bloom.sync") : 0.0, engine == 3 ? value (state, "space.bloom.division") : 0.0,
                                  engine == 3 ? value (state, "space.bloom.time") : 0.0, engine == 3 ? value (state, "space.bloom.diffusion") : 0.0,
                                  engine == 3 && tempo != nullptr ? tempo() : 0.0 }))
@@ -355,6 +356,7 @@ namespace
             const int engine = juce::roundToInt (value (state, "space.engine"));
             const bool abyss = engine == 1, vintage = engine == 2, bloom = engine == 3;
             const double gravity = abyss ? 0.01 * value (state, "space.abyss.gravity") : 0.0;
+            const auto abyssVariant = static_cast<AbyssVariant> (std::clamp (juce::roundToInt (value (state, "space.abyss.variant")), 0, 3));
             const bool frozen = abyss && value (state, "space.abyss.freeze") >= 0.5;
             // VINTAGE draws as the room its variant is voiced after; BLOOM as a hall's cloud
             // with its repeats over it.
@@ -381,17 +383,18 @@ namespace
                 portrait.erCount = 0;
                 portrait.erLevel = 0.0f;
                 portrait.diffusionMs = 12.0;
-                portrait.damping = static_cast<float> (std::clamp (0.1 + 0.6 * settings.damping + 0.25 * std::max (0.0, gravity), 0.0, 1.0));
+                portrait.damping = static_cast<float> (std::clamp (0.1 + 0.6 * settings.damping + 0.25 * std::max (0.0, gravity)
+                                                                       + (abyss && abyssVariant == AbyssVariant::dark ? 0.35 : 0.0), 0.0, 1.0));
                 portrait.width = static_cast<float> (std::clamp (settings.width, 0.0, 1.0));
             }
             // A fixed time axis for the type (its longest DECAY fills it); DECAY sets how far
             // the tail reaches along it, so turning the knob lengthens or shortens the tail.
             // ABYSS: an axis that fits the tail GRAVITY makes (10 s at least), the whole of it
             // while FROZEN.
-            const double abyssTail = AbyssReverb::effectiveDecay (decay, gravity) * 1.25;
+            const double abyssTail = AbyssReverb::effectiveDecay (decay, gravity, abyssVariant) * 1.25;
             const double span = abyss ? std::max (10.0, 5.0 * std::ceil (abyssTail * 1.1 / 5.0)) : hi * 1.25;
             const double tailEnd = abyss ? (frozen ? span : abyssTail) : decay * 1.25;   // drawn to -75 dB
-            const double swell = abyss ? 0.9 * std::sqrt (AbyssReverb::sizeFactor (settings.size)) : 0.0;   // GRAVITY's window
+            const double swell = abyss ? AbyssReverb::windowLength (abyssVariant) * std::sqrt (AbyssReverb::sizeFactor (settings.size)) : 0.0;   // GRAVITY's window
             const float W = bounds.getWidth(), H = bounds.getHeight();
             // Sizes follow the display (the popover's is small): strokes, dots and counts.
             const float k = juce::jlimit (0.3f, 1.0f, H / 261.0f), dot = std::sqrt (k);
@@ -402,7 +405,7 @@ namespace
 
             // Grid: five rows, a line every second (or the step that fits) and four between.
             double step = 2.0;
-            for (double c : { 0.1, 0.25, 0.5, 1.0, 2.0 })
+            for (double c : { 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 30.0, 60.0 })   // (ENDLESS reaches minutes)
                 if (span / c <= 6.0)
                 {
                     step = c;
@@ -436,7 +439,7 @@ namespace
                     // Natural (or held), and below GRAVITY 0 the swell through its window.
                     const double fill = 1.0 - std::exp (-(t - onset) / build);
                     const double natural = frozen ? 0.85 * fill : std::pow (std::max (0.0, 1.0 - t / tailEnd), 1.4) * fill;
-                    const double u = t - onset, inverse = std::max (0.0, -gravity);
+                    const double u = t - onset, inverse = AbyssReverb::windowShare (gravity, abyssVariant);
                     const double rise = u < swell ? (u / swell) * (u / swell) : (frozen ? 0.85 : std::pow (std::max (0.0, 1.0 - (u - swell) / tailEnd), 1.4));
                     return ((1.0 - inverse) * natural + inverse * rise) * amount;
                 }
@@ -1774,7 +1777,8 @@ namespace
     /** SPACE: the room, its EQ on the display (drag the corners), then its shape. The header's
         list picks a room or one of SPACE's other engines; the popover keeps its size.
           ROOMS    the four rooms as tabs; PRE-DELAY, SIZE, DECAY, DAMP; MOD, WIDTH, LOW / HIGH CUT.
-          ABYSS    FLOW / FREEZE; PRE-DELAY, SIZE, DECAY, DAMP; GRAVITY, RESONANCE, MOD, WIDTH.
+          ABYSS    DEEP / DARK / INVERSE / ENDLESS; PRE-DELAY, SIZE, DECAY, DAMP; GRAVITY, RESONANCE,
+                   MOD, WIDTH, FREEZE.
           VINTAGE  HALL / PLATE / CHAMBER / ROOM; PRE-DELAY, SIZE, DECAY, DAMP; DIFFUSION, MOD,
                    WIDTH, ERA.
           BLOOM    CLEAN / VINTAGE / TAPE / WASH; TIME (a division synced, ms free), DIFFUSION,
@@ -1847,7 +1851,8 @@ namespace
             {
                 case 1:   // ABYSS
                 {
-                    tabs ("space.abyss.freeze", { "FLOW", "FREEZE" }, "FREEZE holds the space as it is (still moving); FLOW lets it decay again");
+                    tabs ("space.abyss.variant", { "DEEP", "DARK", "INVERSE", "ENDLESS" },
+                          "DEEP: the vast space. DARK: a thick, dark body. INVERSE: it swells in. ENDLESS: it hardly ends");
                     knob (false, "space.preDelay", "PRE-DELAY", ms);
                     knob (false, "space.size", "SIZE", percent);
                     knob (false, "space.decay", "DECAY", seconds);
@@ -1859,6 +1864,8 @@ namespace
                     knob (true, "space.abyss.resonance", "RESONANCE", percent);
                     knob (true, "space.modulation", "MOD", percent);
                     knob (true, "space.width", "WIDTH", percent);
+                    knob (true, "space.abyss.freeze", "FREEZE", [] (double v) { return juce::String (v >= 0.5 ? "ON" : "OFF"); })
+                        .slider.setTooltip ("FREEZE holds the space as it is (still moving); off, it decays again");
                     break;
                 }
                 case 2:   // VINTAGE
@@ -3014,7 +3021,8 @@ const juce::StringArray& popupParameterIds (MacroPopup macro)
                                            "space.modulation", "space.width", "space.lowCut", "space.highCut",
                                            "space.engine", "space.abyss.gravity", "space.abyss.freeze", "space.abyss.resonance",
                                            "space.vintage.variant", "space.vintage.era", "space.vintage.diffusion", "space.bloom.variant",
-                                           "space.bloom.sync", "space.bloom.division", "space.bloom.time", "space.bloom.diffusion" };
+                                           "space.bloom.sync", "space.bloom.division", "space.bloom.time", "space.bloom.diffusion",
+                                           "space.abyss.variant" };
     static const juce::StringArray echo { "echo.type", "echo.sync", "echo.division", "echo.time", "echo.feedback",
                                           "echo.tone", "echo.age", "echo.stereo" };
     switch (macro)
