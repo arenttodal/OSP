@@ -346,17 +346,23 @@ private:
     std::atomic<float>* cardLinkParam = nullptr;
     std::array<std::atomic<float>*, 3> cardOnParams {};
     std::array<std::atomic<float>*, 2> lanePatternParams {}, laneRateParams {}, laneOctavesParams {};
-    std::array<osp::Arpeggiator, 2> laneArps;     ///< cards B and C, unlinked
     std::array<std::uint8_t, 3> laneMask {};      ///< the cards each lane plays (0: idle)
     std::uint8_t passMask = 0;                    ///< the cards that hold the keys
     int laneConfig = 0;                           ///< 0: the one arpeggiator; else LINK and the cards
     bool forceArpOff = false;                     ///< no card plays the arpeggio: the keys as played
-    juce::MidiBuffer laneMidi, legacyInput;
-    std::array<std::array<std::uint8_t, 128>, 16> heldKeys {};      ///< velocity of each key down, by channel
-    std::array<std::array<std::uint8_t, 128>, 16> passChannel {};   ///< the channel a held key sounds on (0: none)
-    std::array<std::array<bool, 128>, 16> passSustained {};         ///< released under the pedal
-    std::array<std::array<bool, 128>, 16> soundingOut {};           ///< what the engine was given, by channel
     bool pedalDown = false;
+    /** The lanes' larger state, on the heap (allocated with the parameters, never on the
+        audio thread): a processor on a stack (a host's, a test's) stays small. */
+    struct CardLanes
+    {
+        std::array<osp::Arpeggiator, 2> laneArps;     ///< cards B and C, unlinked
+        juce::MidiBuffer laneMidi, legacyInput;
+        std::array<std::array<std::uint8_t, 128>, 16> heldKeys {};      ///< velocity of each key down, by channel
+        std::array<std::array<std::uint8_t, 128>, 16> passChannel {};   ///< the channel a held key sounds on (0: none)
+        std::array<std::array<bool, 128>, 16> passSustained {};         ///< released under the pedal
+        std::array<std::array<bool, 128>, 16> soundingOut {};           ///< what the engine was given, by channel
+    };
+    std::unique_ptr<CardLanes> lanes;
     std::atomic<int> arpViewLane { 0 };           ///< the lane the ARP display shows
     std::array<std::atomic<int>, osp::Arpeggiator::displaySteps> arpDisplayLow {}, arpDisplayHigh {};
     std::atomic<int> arpDisplayCurrent { -1 };

@@ -124,6 +124,7 @@ ShellProcessor::ShellProcessor (std::unique_ptr<Engine> productEngine)
     cardArp = arpBound && productInfo().cardArpeggiator && parameters.getRawParameterValue (osp::plugin::ids::arpLink (productInfo().slug + ".")) != nullptr;
     if (cardArp)
     {
+        lanes = std::make_unique<CardLanes>();
         cardLinkParam = parameters.getRawParameterValue (osp::plugin::ids::arpLink (productInfo().slug + "."));
         for (int c = 0; c < 3; ++c)
             cardOnParams[static_cast<std::size_t> (c)] = parameters.getRawParameterValue (osp::plugin::ids::arpCard (productInfo().slug + ".", c));
@@ -192,21 +193,21 @@ void ShellProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     arpMidi.ensureSize (static_cast<std::size_t> (osp::Arpeggiator::maxEvents + 4096) * 16);
     if (cardArp)
     {
-        for (auto& a : laneArps)
+        for (auto& a : lanes->laneArps)
             a.prepare (sampleRate);
-        laneMidi.ensureSize (static_cast<std::size_t> (3 * osp::Arpeggiator::maxEvents + 8192) * 16);
-        legacyInput.ensureSize (static_cast<std::size_t> (4096 + 16 * 128) * 16);
+        lanes->laneMidi.ensureSize (static_cast<std::size_t> (3 * osp::Arpeggiator::maxEvents + 8192) * 16);
+        lanes->legacyInput.ensureSize (static_cast<std::size_t> (4096 + 16 * 128) * 16);
         laneConfig = 0;
         laneMask = {};
         passMask = 0;
         forceArpOff = false;
-        for (auto& row : heldKeys)
+        for (auto& row : lanes->heldKeys)
             row.fill (0);
-        for (auto& row : passChannel)
+        for (auto& row : lanes->passChannel)
             row.fill (0);
-        for (auto& row : passSustained)
+        for (auto& row : lanes->passSustained)
             row.fill (false);
-        for (auto& row : soundingOut)
+        for (auto& row : lanes->soundingOut)
             row.fill (false);
         pedalDown = false;
     }
@@ -312,8 +313,9 @@ void ShellProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
     if (performance.playing && ! hostWasPlaying)
     {
         arpeggiator.restartPattern();
-        for (auto& a : laneArps)
-            a.restartPattern();
+        if (lanes != nullptr)
+            for (auto& a : lanes->laneArps)
+                a.restartPattern();
     }
     hostWasPlaying = performance.playing;
 
@@ -567,7 +569,7 @@ void ShellProcessor::trackOutput (const juce::MidiBuffer& out) noexcept
         if (! m.isNoteOnOrOff())
             continue;
         const auto ch = static_cast<std::size_t> (std::clamp (m.getChannel(), 1, 16) - 1);
-        soundingOut[ch][static_cast<std::size_t> (m.getNoteNumber())] = m.isNoteOn();
+        lanes->soundingOut[ch][static_cast<std::size_t> (m.getNoteNumber())] = m.isNoteOn();
     }
 }
 
@@ -575,14 +577,14 @@ void ShellProcessor::releaseSounding (juce::MidiBuffer& out) noexcept
 {
     for (int ch = 0; ch < 16; ++ch)
         for (int n = 0; n < 128; ++n)
-            if (soundingOut[static_cast<std::size_t> (ch)][static_cast<std::size_t> (n)])
+            if (lanes->soundingOut[static_cast<std::size_t> (ch)][static_cast<std::size_t> (n)])
             {
                 out.addEvent (juce::MidiMessage::noteOff (ch + 1, n), 0);
-                soundingOut[static_cast<std::size_t> (ch)][static_cast<std::size_t> (n)] = false;
+                lanes->soundingOut[static_cast<std::size_t> (ch)][static_cast<std::size_t> (n)] = false;
             }
-    for (auto& row : passChannel)
+    for (auto& row : lanes->passChannel)
         row.fill (0);
-    for (auto& row : passSustained)
+    for (auto& row : lanes->passSustained)
         row.fill (false);
 }
 
@@ -598,8 +600,8 @@ const juce::MidiBuffer& ShellProcessor::runCardArpeggiators (const juce::MidiBuf
             toggled = static_cast<std::uint8_t> (toggled | (1 << c));
     const bool on = arpEnabledParam->load() >= 0.5f;
     const bool link = cardLinkParam->load() >= 0.5f;
-    const bool lanes = on && toggled != 0 && ! (link && toggled == 7);
-    const int config = lanes ? (link ? 0x100 : 0x200) | toggled : 0;
+    const bool laned = on && toggled != 0 && ! (link && toggled == 7);
+    const int config = laned ? (link ? 0x100 : 0x200) | toggled : 0;
     const bool changed = config != laneConfig;
 
     // The keys (always followed, so a change of lanes can play them again).
@@ -607,16 +609,16 @@ const juce::MidiBuffer& ShellProcessor::runCardArpeggiators (const juce::MidiBuf
         if (m.isNoteOnOrOff())
         {
             const auto ch = static_cast<std::size_t> (std::clamp (m.getChannel(), 1, 16) - 1);
-            heldKeys[ch][static_cast<std::size_t> (m.getNoteNumber())] = m.isNoteOn() ? static_cast<std::uint8_t> (std::max (1, static_cast<int> (m.getVelocity()))) : 0;
+            lanes->heldKeys[ch][static_cast<std::size_t> (m.getNoteNumber())] = m.isNoteOn() ? static_cast<std::uint8_t> (std::max (1, static_cast<int> (m.getVelocity()))) : 0;
         }
         else if (m.isSustainPedalOn() || m.isSustainPedalOff())
             pedalDown = m.isSustainPedalOn();
         else if (m.isAllNotesOff() || m.isAllSoundOff())
-            for (auto& row : heldKeys)
+            for (auto& row : lanes->heldKeys)
                 row.fill (0);
     };
 
-    if (! lanes && ! changed)
+    if (! laned && ! changed)
     {
         // The one arpeggiator (or the keys as played), as before.
         forceArpOff = on && toggled == 0;
@@ -628,39 +630,39 @@ const juce::MidiBuffer& ShellProcessor::runCardArpeggiators (const juce::MidiBuf
         return out;
     }
 
-    laneMidi.clear();
+    lanes->laneMidi.clear();
     if (changed)
     {
         // A new arrangement: what sounds ends, every arpeggiator starts over, and the keys
         // still down are played again into the new lanes (no note is ever left hanging).
-        releaseSounding (laneMidi);
+        releaseSounding (lanes->laneMidi);
         arpeggiator.reset();
-        for (auto& a : laneArps)
+        for (auto& a : lanes->laneArps)
             a.reset();
         arpModOctaves = 0;
         laneConfig = config;
     }
 
-    if (! lanes)
+    if (! laned)
     {
         // Back to the one arpeggiator: it is given the keys still down first.
         forceArpOff = on && toggled == 0;
         engine->setCardRouting (false);
-        legacyInput.clear();
+        lanes->legacyInput.clear();
         for (int ch = 0; ch < 16; ++ch)
             for (int n = 0; n < 128; ++n)
-                if (const int v = heldKeys[static_cast<std::size_t> (ch)][static_cast<std::size_t> (n)]; v > 0)
-                    legacyInput.addEvent (juce::MidiMessage::noteOn (ch + 1, n, static_cast<juce::uint8> (v)), 0);
+                if (const int v = lanes->heldKeys[static_cast<std::size_t> (ch)][static_cast<std::size_t> (n)]; v > 0)
+                    lanes->legacyInput.addEvent (juce::MidiMessage::noteOn (ch + 1, n, static_cast<juce::uint8> (v)), 0);
         for (const auto metadata : midi)
         {
             followKeys (metadata.getMessage());
-            legacyInput.addEvent (metadata.getMessage(), metadata.samplePosition);
+            lanes->legacyInput.addEvent (metadata.getMessage(), metadata.samplePosition);
         }
-        const auto& out = runArpeggiator (legacyInput, numSamples, timing);
+        const auto& out = runArpeggiator (lanes->legacyInput, numSamples, timing);
         for (const auto metadata : out)
-            laneMidi.addEvent (metadata.getMessage(), metadata.samplePosition);
-        trackOutput (laneMidi);
-        return laneMidi;
+            lanes->laneMidi.addEvent (metadata.getMessage(), metadata.samplePosition);
+        trackOutput (lanes->laneMidi);
+        return lanes->laneMidi;
     }
 
     // The lanes: LINK, one arpeggiator for the cards in it; unlinked, one per card in it
@@ -676,7 +678,7 @@ const juce::MidiBuffer& ShellProcessor::runCardArpeggiators (const juce::MidiBuf
                 laneMask[static_cast<std::size_t> (c)] = static_cast<std::uint8_t> (1 << c);
     passMask = static_cast<std::uint8_t> (~toggled & 7);
 
-    auto laneArp = [this] (int lane) -> Arpeggiator& { return lane == 0 ? arpeggiator : laneArps[static_cast<std::size_t> (lane - 1)]; };
+    auto laneArp = [this] (int lane) -> Arpeggiator& { return lane == 0 ? arpeggiator : lanes->laneArps[static_cast<std::size_t> (lane - 1)]; };
     const auto base = arpSettings();
     const auto seed = static_cast<std::uint64_t> (std::max (1.0f, seedParam->load()));
     for (int lane = 0; lane < 3; ++lane)
@@ -700,7 +702,7 @@ const juce::MidiBuffer& ShellProcessor::runCardArpeggiators (const juce::MidiBuf
         {
             for (int ch = 0; ch < 16; ++ch)
                 for (int n = 0; n < 128; ++n)
-                    if (const int v = heldKeys[static_cast<std::size_t> (ch)][static_cast<std::size_t> (n)]; v > 0)
+                    if (const int v = lanes->heldKeys[static_cast<std::size_t> (ch)][static_cast<std::size_t> (n)]; v > 0)
                         a.noteOn (0, n, v, ch + 1);
             if (pedalDown)
                 a.sustainPedal (0, true);
@@ -714,38 +716,38 @@ const juce::MidiBuffer& ShellProcessor::runCardArpeggiators (const juce::MidiBuf
         if (passMask == 0)
             return;
         const auto ch = static_cast<std::size_t> (std::clamp (channel, 1, 16) - 1), n = static_cast<std::size_t> (note);
-        if (passChannel[ch][n] != 0)   // (the same key again: its note ends first)
-            laneMidi.addEvent (juce::MidiMessage::noteOff (passChannel[ch][n], note), offset);
-        passChannel[ch][n] = static_cast<std::uint8_t> (passOut);
-        passSustained[ch][n] = false;
-        laneMidi.addEvent (juce::MidiMessage::noteOn (passOut, note, static_cast<juce::uint8> (velocity)), offset);
+        if (lanes->passChannel[ch][n] != 0)   // (the same key again: its note ends first)
+            lanes->laneMidi.addEvent (juce::MidiMessage::noteOff (lanes->passChannel[ch][n], note), offset);
+        lanes->passChannel[ch][n] = static_cast<std::uint8_t> (passOut);
+        lanes->passSustained[ch][n] = false;
+        lanes->laneMidi.addEvent (juce::MidiMessage::noteOn (passOut, note, static_cast<juce::uint8> (velocity)), offset);
     };
     auto passOff = [this] (int channel, int note, int offset) {
         const auto ch = static_cast<std::size_t> (std::clamp (channel, 1, 16) - 1), n = static_cast<std::size_t> (note);
-        if (passChannel[ch][n] == 0)
+        if (lanes->passChannel[ch][n] == 0)
             return;
         if (pedalDown)
         {
-            passSustained[ch][n] = true;
+            lanes->passSustained[ch][n] = true;
             return;
         }
-        laneMidi.addEvent (juce::MidiMessage::noteOff (passChannel[ch][n], note), offset);
-        passChannel[ch][n] = 0;
+        lanes->laneMidi.addEvent (juce::MidiMessage::noteOff (lanes->passChannel[ch][n], note), offset);
+        lanes->passChannel[ch][n] = 0;
     };
     auto releasePedal = [this] (int offset) {
         for (int ch = 0; ch < 16; ++ch)
             for (int n = 0; n < 128; ++n)
-                if (passSustained[static_cast<std::size_t> (ch)][static_cast<std::size_t> (n)])
+                if (lanes->passSustained[static_cast<std::size_t> (ch)][static_cast<std::size_t> (n)])
                 {
-                    passSustained[static_cast<std::size_t> (ch)][static_cast<std::size_t> (n)] = false;
-                    laneMidi.addEvent (juce::MidiMessage::noteOff (passChannel[static_cast<std::size_t> (ch)][static_cast<std::size_t> (n)], n), offset);
-                    passChannel[static_cast<std::size_t> (ch)][static_cast<std::size_t> (n)] = 0;
+                    lanes->passSustained[static_cast<std::size_t> (ch)][static_cast<std::size_t> (n)] = false;
+                    lanes->laneMidi.addEvent (juce::MidiMessage::noteOff (lanes->passChannel[static_cast<std::size_t> (ch)][static_cast<std::size_t> (n)], n), offset);
+                    lanes->passChannel[static_cast<std::size_t> (ch)][static_cast<std::size_t> (n)] = 0;
                 }
     };
     if (changed && passMask != 0)
         for (int ch = 0; ch < 16; ++ch)
             for (int n = 0; n < 128; ++n)
-                if (const int v = heldKeys[static_cast<std::size_t> (ch)][static_cast<std::size_t> (n)]; v > 0)
+                if (const int v = lanes->heldKeys[static_cast<std::size_t> (ch)][static_cast<std::size_t> (n)]; v > 0)
                     passOn (ch + 1, n, v, 0);
 
     for (const auto metadata : midi)
@@ -778,14 +780,14 @@ const juce::MidiBuffer& ShellProcessor::runCardArpeggiators (const juce::MidiBuf
             consumed = false;
         if (m.isAllNotesOff() || m.isAllSoundOff())
         {
-            for (auto& row : passChannel)
+            for (auto& row : lanes->passChannel)
                 row.fill (0);
-            for (auto& row : passSustained)
+            for (auto& row : lanes->passSustained)
                 row.fill (false);
             consumed = false;
         }
         if (! consumed)
-            laneMidi.addEvent (m, metadata.samplePosition);   // bends, wheels, pressure, CCs, All Notes Off
+            lanes->laneMidi.addEvent (m, metadata.samplePosition);   // bends, wheels, pressure, CCs, All Notes Off
     }
     for (int lane = 0; lane < 3; ++lane)
     {
@@ -799,15 +801,15 @@ const juce::MidiBuffer& ShellProcessor::runCardArpeggiators (const juce::MidiBuf
         {
             const auto& e = a.event (i);
             if (e.kind == Arpeggiator::Event::Kind::noteOn)
-                laneMidi.addEvent (juce::MidiMessage::noteOn (channel, e.note, e.velocity), e.offset);
+                lanes->laneMidi.addEvent (juce::MidiMessage::noteOn (channel, e.note, e.velocity), e.offset);
             else if (e.kind == Arpeggiator::Event::Kind::noteOff)
-                laneMidi.addEvent (juce::MidiMessage::noteOff (channel, e.note), e.offset);
+                lanes->laneMidi.addEvent (juce::MidiMessage::noteOff (channel, e.note), e.offset);
             // (its pedal events are its own: the engine's pedal would hold every lane)
         }
     }
-    trackOutput (laneMidi);
+    trackOutput (lanes->laneMidi);
     publishArpDisplay();
-    return laneMidi;
+    return lanes->laneMidi;
 }
 
 void ShellProcessor::publishArpDisplay() noexcept
@@ -815,7 +817,7 @@ void ShellProcessor::publishArpDisplay() noexcept
     osp::Arpeggiator::Display display;
     // Unlinked lanes: the card the panel edits (A's is the arpeggiator's own).
     const int lane = cardArp && laneConfig >= 0x200 ? arpViewLane.load (std::memory_order_relaxed) : 0;
-    (lane == 0 ? arpeggiator : laneArps[static_cast<std::size_t> (lane - 1)]).display (display);
+    (lane == 0 ? arpeggiator : lanes->laneArps[static_cast<std::size_t> (lane - 1)]).display (display);
     for (std::size_t i = 0; i < arpDisplayLow.size(); ++i)
     {
         arpDisplayLow[i].store (display.low[i], std::memory_order_relaxed);
