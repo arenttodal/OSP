@@ -329,7 +329,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout InstrumentHost::createParame
         layout.add (std::make_unique<juce::AudioParameterFloat> (id12 (ids::spaceHighCut), "Space High Cut", skewedRange (1000.0f, 20000.0f, 5000.0f),
                                                                  static_cast<float> (d12.spaceHighCutHz), hz12));
         layout.add (std::make_unique<juce::AudioParameterFloat> (id12 (ids::echo), "Echo", unit, 0.0f, percent));
-        layout.add (std::make_unique<juce::AudioParameterChoice> (id12 (ids::echoType), "Echo Type", juce::StringArray { "Tape", "BBD" }, static_cast<int> (d12.echoType)));
+        layout.add (std::make_unique<juce::AudioParameterChoice> (id12 (ids::echoType), "Echo Type", juce::StringArray { "Tape", "BBD", "Ascend" }, static_cast<int> (d12.echoType)));
         layout.add (std::make_unique<juce::AudioParameterBool> (id12 (ids::echoSync), "Echo Sync", d12.echoSync));
         juce::StringArray divisions;
         for (int i = 0; i < shaping::echoDivisionCount; ++i)
@@ -603,6 +603,16 @@ juce::AudioProcessorValueTreeState::ParameterLayout InstrumentHost::createParame
         auto id25 = [] (const juce::String& id) { return juce::ParameterID { id, 25 }; };
         layout.add (std::make_unique<juce::AudioParameterChoice> (id25 (ids::abyssVariant), "Abyss Variant", juce::StringArray { "Deep", "Dark", "Inverse", "Endless" },
                                                                   static_cast<int> (Shaping {}.abyssVariant)));
+    }
+    {
+        // ECHO's ASCEND (version hint 26): its own controls, appended so nothing before moves.
+        // (echo.type gained the ASCEND choice after TAPE and BBD, as space.engine gained its.)
+        auto id26 = [] (const juce::String& id) { return juce::ParameterID { id, 26 }; };
+        const Shaping d26;
+        layout.add (std::make_unique<juce::AudioParameterChoice> (id26 (ids::echoInterval), "Echo Ascend Interval", juce::StringArray { "+12", "+7", "+5", "-12" },
+                                                                  static_cast<int> (d26.echoInterval)));
+        layout.add (std::make_unique<juce::AudioParameterChoice> (id26 (ids::echoMotion), "Echo Ascend Motion", juce::StringArray { "Rise", "Steady", "Late" },
+                                                                  static_cast<int> (d26.echoMotion)));
     }
     return layout;
 }

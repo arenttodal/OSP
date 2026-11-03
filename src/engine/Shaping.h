@@ -43,8 +43,15 @@ enum class BloomVariant { clean, vintage, tape, wash };
 /** DRIVE's three circuits (a shared saturation stage before SPACE and ECHO). */
 enum class DriveMode { tube, tape, crunch };
 
-/** ECHO's machines: a tape echo and a bucket-brigade (BBD) delay. */
-enum class EchoType { tape, bbd };
+/** ECHO's machines: a tape echo, a bucket-brigade (BBD) delay, and ASCEND (a pitch shifter
+    in the loop: repeats an interval up, or climbing). */
+enum class EchoType { tape, bbd, ascend };
+/** ASCEND's interval (the shifter's ratio). */
+enum class AscendInterval { octaveUp, fifthUp, fourthUp, octaveDown };
+/** ASCEND's motion: RISE every repeat one interval above the last (the first already up);
+    STEADY every repeat the interval up, no climbing; LATE the first repeat at the played
+    pitch, then climbing (the shifter only in the feedback). */
+enum class AscendMotion { rise, steady, late };
 /** ECHO's stereo picture: one voice in the centre, repeats alternating left and right, or two offset heads. */
 enum class EchoStereo { mono, pingPong, wide };
 
@@ -116,8 +123,10 @@ struct Shaping
     double echoTimeMs = 375.0;        ///< free time (sync off), 20..1500 ms
     double echoFeedback = 0.45;       ///< 0..1 (1 runs away gently into saturation)
     double echoTone = 0.5;            ///< 0 dark .. 1 bright
-    double echoAge = 0.35;            ///< 0..1: wow / flutter (TAPE) or clock noise and chorus (BBD), and wear
+    double echoAge = 0.35;            ///< 0..1: wow / flutter (TAPE) or clock noise and chorus (BBD), and wear; ASCEND's CLOCK (13 kHz .. 7 kHz)
     EchoStereo echoStereo = EchoStereo::pingPong;
+    AscendInterval echoInterval = AscendInterval::octaveUp;   ///< ASCEND only
+    AscendMotion echoMotion = AscendMotion::rise;             ///< ASCEND only
 
     // DRIVE (the DRIVE macro is its amount; 0 % = not in the signal path)
     DriveMode driveMode = DriveMode::tube;

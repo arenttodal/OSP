@@ -96,6 +96,8 @@ namespace osp::plugin::ids
     inline const juce::String echoTone = "echo.tone";
     inline const juce::String echoAge = "echo.age";
     inline const juce::String echoStereo = "echo.stereo";
+    inline const juce::String echoInterval = "echo.ascend.interval";     ///< ASCEND (version hint 26)
+    inline const juce::String echoMotion = "echo.ascend.motion";         ///< ASCEND (version hint 26)
     inline const juce::String shaperCustom = "movement.shaper.custom";
     // DRIVE (version hint 14): the macro that took DYNAMICS' place on the panel. DYNAMICS keeps
     // its own IDs (and lives in Advanced now); never reuse one for the other.

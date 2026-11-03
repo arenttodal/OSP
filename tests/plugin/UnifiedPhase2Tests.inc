@@ -173,7 +173,8 @@ TEST_CASE ("plugin: Phase 2's parameters are appended and neutral; the modulatio
     for (const char* id : { "space.engine", "space.abyss.gravity", "space.abyss.freeze", "space.abyss.resonance",   // (version 23)
                             "space.vintage.variant", "space.vintage.era", "space.vintage.diffusion", "space.bloom.variant",   // (version 24)
                             "space.bloom.sync", "space.bloom.division", "space.bloom.time", "space.bloom.diffusion",
-                            "space.abyss.variant" })   // (version 25)
+                            "space.abyss.variant",   // (version 25)
+                            "echo.ascend.interval", "echo.ascend.motion" })   // (version 26)
         expected.add (id);
     REQUIRE (all.size() > expected.size());
     for (int i = 0; i < expected.size(); ++i)

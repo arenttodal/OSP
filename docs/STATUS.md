@@ -801,6 +801,48 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
     tail much darker, INVERSE peaks at 1.65 s, ENDLESS's RT60 5.7x DEEP's, every variant
     within 0.01 dB of HALL and stable at the extremes).
 
+## ECHO: ASCEND (3 Nov 2026)
+
+- **ASCEND: built.** ECHO's third machine (`echo.type` gained ASCEND after TAPE and BBD), an
+  original design in the spirit of an octave-up delay pedal: a pitch shifter inside the
+  delay's loop.
+  - The loop, in order:
+    - CLOCK: the line is written through a sample-rate reducer, 13 kHz down to 7 kHz. It
+      has a half-clock anti-alias filter before the hold and a reconstruction filter after.
+    - TONE's low-pass (2 .. 5 kHz), placed before the shifter.
+    - The shifter: two heads 180 degrees apart sweep a window of TIME / 8 (held within
+      30 .. 50 ms), Hann-crossfaded.
+  - The aligned splice. Where a head jumps back, it lands at the point in a 15 ms span
+    where the waveform best lines up with the other head (coarse and then exact
+    correlation).
+    - Without it, the textbook dual-head shifter drifted by up to a grain's rate: about
+      -25 cents on an A, different for every note, so partials went out of tune.
+    - With it, every note tested is within 8 cents of a true octave.
+  - New parameters (`echo.ascend.interval`, `echo.ascend.motion`, version hint 26):
+    - INTERVAL: +12 / +7 / +5 / -12.
+    - MOTION:
+      - RISE: the output and the loop are both shifted. The first repeat is up, and each
+        next one is higher.
+      - STEADY: only the output is shifted. Every repeat is at the interval.
+      - LATE: only the loop is shifted. The first repeat is as played, then climbing (the
+        spec as first drawn).
+  - Existing controls on ASCEND:
+    - AGE is shown and works as CLOCK.
+    - FEEDBACK reaches a loop gain of 0.85, with a soft ceiling on every write.
+    - There is no wow.
+  - The popover: TIME / FEEDBACK / TONE / CLOCK, plus a second row (INTERVAL, MOTION) only
+    on ASCEND. TAPE's and BBD's layout is unchanged. The picture labels each repeat's pitch.
+  - Existing sessions: TAPE and BBD are untouched.
+  - Evidence: the `[ascend]` tests:
+    - the octave, two octaves, STEADY and LATE pitches;
+    - +7 / +5 / -12;
+    - in tune across seven notes;
+    - TONE darkens;
+    - level within 30 % of TAPE's (measured 0.95 .. 1.02 from 200 Hz up);
+    - stable at FEEDBACK 100 % in every motion, interval and stereo picture;
+    - deterministic, and silent in silence.
+  - CPU: about 1.3 % of a core at 48 kHz (TAPE about 0.5 .. 0.8 %).
+
 ## BLOCKERS
 
 - DAW testing (Logic, Ableton, Reaper) needs a Mac; CI covers build, tests and auval.

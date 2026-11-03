@@ -207,8 +207,9 @@ block with the plugin's popup settings; anything left out keeps its default, and
                "vintageVariant": "hall|plate|chamber|room", "era": "early|later", "vintageDiffusion": 0.7,   // VINTAGE
                "bloomVariant": "clean|vintage|tape|wash", "bloomSync": true, "bloomDivision": 6, "bloomTimeMs": 350,
                "bloomDiffusion": 0.6 },   // BLOOM (engine: "rooms|abyss|vintage|bloom")
-    "echo": { "type": "tape|bbd", "sync": true, "division": 5, "timeMs": 375, "feedback": 0.45,
-              "tone": 0.5, "age": 0.35, "stereo": "mono|pingpong|wide" },
+    "echo": { "type": "tape|bbd|ascend", "sync": true, "division": 5, "timeMs": 375, "feedback": 0.45,
+              "tone": 0.5, "age": 0.35, "stereo": "mono|pingpong|wide",
+              "interval": "octaveup|fifthup|fourthup|octavedown", "motion": "rise|steady|late" },   // (ASCEND: age is its CLOCK)
     "drive": { "mode": "tube|tape|crunch", "tone": 0.5, "body": 0.5 }
   }
 }

@@ -144,7 +144,7 @@ namespace
         s.abyssResonance = json::getDouble (space, "resonance", s.abyssResonance);
         s.abyssVariant = parseName (space, "abyssVariant", std::array { "deep", "dark", "inverse", "endless" }, s.abyssVariant);
         const auto& echo = b["echo"];
-        s.echoType = parseName (echo, "type", std::array { "tape", "bbd" }, s.echoType);
+        s.echoType = parseName (echo, "type", std::array { "tape", "bbd", "ascend" }, s.echoType);
         if (json::has (echo, "sync"))
             s.echoSync = static_cast<bool> (echo["sync"]);
         s.echoDivision = static_cast<int> (json::getDouble (echo, "division", s.echoDivision));
@@ -153,6 +153,8 @@ namespace
         s.echoTone = json::getDouble (echo, "tone", s.echoTone);
         s.echoAge = json::getDouble (echo, "age", s.echoAge);
         s.echoStereo = parseName (echo, "stereo", std::array { "mono", "pingpong", "wide" }, s.echoStereo);
+        s.echoInterval = parseName (echo, "interval", std::array { "octaveup", "fifthup", "fourthup", "octavedown" }, s.echoInterval);
+        s.echoMotion = parseName (echo, "motion", std::array { "rise", "steady", "late" }, s.echoMotion);
         const auto& drive = b["drive"];
         s.driveMode = parseName (drive, "mode", std::array { "tube", "tape", "crunch" }, s.driveMode);
         s.driveTone = json::getDouble (drive, "tone", s.driveTone);
