@@ -203,7 +203,7 @@ block with the plugin's popup settings; anything left out keeps its default, and
                               "target": "vol|filter|both", "smooth": 0.3 } },
     "space": { "engine": "rooms|abyss", "type": "room|hall|plate|spring", "decaySeconds": 3.0, "preDelayMs": 8, "size": 0.5,
                "damping": 0.4, "modulation": 0.4, "width": 1.0, "lowCutHz": 100, "highCutHz": 5000,
-               "gravity": 0.0, "freeze": false, "resonance": 0.0,   // ABYSS
+               "gravity": 0.0, "freeze": false, "resonance": 0.0, "abyssVariant": "deep|dark|inverse|endless",   // ABYSS
                "vintageVariant": "hall|plate|chamber|room", "era": "early|later", "vintageDiffusion": 0.7,   // VINTAGE
                "bloomVariant": "clean|vintage|tape|wash", "bloomSync": true, "bloomDivision": 6, "bloomTimeMs": 350,
                "bloomDiffusion": 0.6 },   // BLOOM (engine: "rooms|abyss|vintage|bloom")

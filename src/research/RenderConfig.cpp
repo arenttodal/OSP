@@ -142,6 +142,7 @@ namespace
         if (json::has (space, "freeze"))
             s.abyssFreeze = static_cast<bool> (space["freeze"]);
         s.abyssResonance = json::getDouble (space, "resonance", s.abyssResonance);
+        s.abyssVariant = parseName (space, "abyssVariant", std::array { "deep", "dark", "inverse", "endless" }, s.abyssVariant);
         const auto& echo = b["echo"];
         s.echoType = parseName (echo, "type", std::array { "tape", "bbd" }, s.echoType);
         if (json::has (echo, "sync"))

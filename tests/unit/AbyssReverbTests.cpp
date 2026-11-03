@@ -298,3 +298,100 @@ TEST_CASE ("abyss: as loud as HALL at the same send (noise in, the tail out)", "
     INFO ("ABYSS against HALL: " << db << " dB");
     CHECK (std::abs (db) < 3.0);
 }
+
+TEST_CASE ("abyss: the variants (DEEP, DARK, INVERSE, ENDLESS) keep their promises and their level", "[unit][abyss]")
+{
+    auto brightness = [] (const std::vector<float>& x, double from, double to) {
+        double d = 0.0, e = 0.0;
+        for (auto i = static_cast<std::size_t> (from * rate) + 1; i < static_cast<std::size_t> (to * rate) && i < x.size(); ++i)
+        {
+            const double v = static_cast<double> (x[i]) - x[i - 1];
+            d += v * v;
+            e += static_cast<double> (x[i]) * x[i];
+        }
+        return d / std::max (1.0e-30, e);
+    };
+    auto withVariant = [] (AbyssVariant v) {
+        auto s = open();
+        s.variant = v;
+        return s;
+    };
+    CHECK (AbyssReverb::Settings {}.variant == AbyssVariant::deep);   // (DEEP is ABYSS as it was)
+
+    // DARK: a much darker tail than DEEP (heard once the input stops: the loop's own colour).
+    Prng a { 21 }, b { 21 };
+    const auto oneSecond = static_cast<std::size_t> (rate);
+    const auto deep = play (withVariant (AbyssVariant::deep), 4.0, [&] (std::size_t i) { return i < oneSecond ? static_cast<float> (0.3 * a.bipolar()) : 0.0f; }, [] (std::size_t, AbyssReverb&) {});
+    const auto dark = play (withVariant (AbyssVariant::dark), 4.0, [&] (std::size_t i) { return i < oneSecond ? static_cast<float> (0.3 * b.bipolar()) : 0.0f; }, [] (std::size_t, AbyssReverb&) {});
+    const double deepBright = brightness (deep.l, 2.0, 4.0), darkBright = brightness (dark.l, 2.0, 4.0);
+    INFO ("brightness DEEP " << deepBright << ", DARK " << darkBright);
+    CHECK (darkBright < 0.6 * deepBright);
+
+    // INVERSE: it swells with GRAVITY at 0 (DEEP peaks at once).
+    auto inverse = withVariant (AbyssVariant::inverse);
+    inverse.decaySeconds = 3.0;
+    const double swell = peakTime (impulse (inverse, 5.0).l);
+    INFO ("INVERSE's envelope peaks at " << swell << " s");
+    CHECK (swell > 0.8);
+
+    // ENDLESS: rings far longer than DEEP at the same DECAY.
+    auto endless = withVariant (AbyssVariant::endless);
+    endless.decaySeconds = 1.0;
+    auto plain = withVariant (AbyssVariant::deep);
+    plain.decaySeconds = 1.0;
+    const double endlessRt = rt60 (impulse (endless, 16.0).l), deepRt = rt60 (impulse (plain, 6.0).l);
+    INFO ("RT60 at DECAY 1 s: DEEP " << deepRt << " s, ENDLESS " << endlessRt << " s");
+    CHECK (endlessRt > 4.0 * deepRt);
+
+    // Every variant: as loud as HALL at the same send (within 3 dB) and never running away.
+    SpaceReverb hall;
+    hall.prepare (rate);
+    SpaceReverb::Settings h;
+    h.type = SpaceType::hall;
+    h.decaySeconds = 3.0;
+    h.lowCutHz = 20.0;
+    h.highCutHz = 20000.0;
+    h.damping = 0.0;
+    hall.configure (h);
+    hall.reset();
+    Prng hn { 9 };
+    std::vector<float> hl (static_cast<std::size_t> (6.0 * rate));
+    for (auto& y : hl)
+    {
+        const auto x = static_cast<float> (0.3 * hn.bipolar());
+        float r = 0.0f;
+        hall.process (x, x, y, r);
+    }
+    for (const auto v : { AbyssVariant::deep, AbyssVariant::dark, AbyssVariant::inverse, AbyssVariant::endless })
+    {
+        auto s = withVariant (v);
+        s.decaySeconds = 3.0;
+        Prng n { 9 };
+        const auto out = play (s, 6.0, [&] (std::size_t) { return static_cast<float> (0.3 * n.bipolar()); }, [] (std::size_t, AbyssReverb&) {});
+        const double db = 10.0 * std::log10 (energy (out.l, 2.0, 6.0) / energy (hl, 2.0, 6.0));
+        INFO ("variant " << static_cast<int> (v) << " against HALL: " << db << " dB");
+        CHECK (std::abs (db) < 3.0);
+        auto loud = withVariant (v);
+        loud.decaySeconds = 8.0;
+        loud.size = 1.0;
+        loud.resonance = 1.0;
+        Prng m { 33 };
+        float peak = 0.0f;
+        bool finite = true;
+        AbyssReverb reverb;
+        reverb.prepare (rate);
+        reverb.configure (loud);
+        reverb.reset();
+        for (int i = 0; i < static_cast<int> (20.0 * rate); ++i)
+        {
+            const auto x = static_cast<float> (0.9 * m.bipolar());
+            float l = 0.0f, r = 0.0f;
+            reverb.process (x, x, l, r);
+            finite = finite && std::isfinite (l) && std::isfinite (r);
+            peak = std::max ({ peak, std::abs (l), std::abs (r) });
+        }
+        CHECK (finite);
+        CHECK (reverb.guardEvents() == 0u);
+        CHECK (peak < 6.0f);
+    }
+}
