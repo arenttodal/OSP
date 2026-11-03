@@ -604,7 +604,8 @@ namespace
     // ECHO: the sound and its repeats along time - each repeat a stroke as loud as the
     // feedback leaves it, darker for every pass through the machine; PING-PONG alternates
     // left (up) and right (down), WIDE splits two heads. TAPE's repeats smear (wow and
-    // flutter), BBD's speckle (the clock's grain).
+    // flutter), BBD's speckle (the clock's grain). ASCEND's repeats are paler and carry their
+    // pitch (+12, +24 ..), speckled by its CLOCK.
     class EchoVisual final : public Visual
     {
     public:
@@ -616,7 +617,8 @@ namespace
         {
             return watch.differs ({ value (state, "echo.type"), value (state, "echo.sync"), value (state, "echo.division"), value (state, "echo.time"),
                                     value (state, "echo.feedback"), value (state, "echo.tone"), value (state, "echo.age"), value (state, "echo.stereo"),
-                                    value (state, "echo"), static_cast<double> (processor.hostTempo()) });
+                                    value (state, "echo"), static_cast<double> (processor.hostTempo()),
+                                    value (state, "echo.ascend.interval"), value (state, "echo.ascend.motion") });
         }
 
         void paintVisual (juce::Graphics& g, juce::Rectangle<float> bounds) override
@@ -630,8 +632,10 @@ namespace
             e.tone = 0.01 * value (state, "echo.tone");
             e.age = 0.01 * value (state, "echo.age");
             e.stereo = static_cast<EchoStereo> (juce::roundToInt (value (state, "echo.stereo")));
+            e.interval = static_cast<AscendInterval> (std::clamp (juce::roundToInt (value (state, "echo.ascend.interval")), 0, 3));
+            e.motion = static_cast<AscendMotion> (std::clamp (juce::roundToInt (value (state, "echo.ascend.motion")), 0, 2));
             const double seconds = EchoDelay::timeSeconds (e, processor.hostTempo());
-            const bool tape = e.type == EchoType::tape;
+            const bool tape = e.type == EchoType::tape, ascend = e.type == EchoType::ascend;
 
             const auto plot = juce::Rectangle<float>::leftTopRightBottom (bounds.getX() + 14.0f, bounds.getY() + 14.0f, bounds.getRight() - 10.0f, bounds.getBottom() - 5.0f);
             const float mid = plot.getCentreY(), half = 0.5f * plot.getHeight();
@@ -673,9 +677,10 @@ namespace
 
             // The repeats: level after n passes (the loop saturates near 100 %), darker each time.
             Prng grain (Prng::deriveSeed (0x6563686full, static_cast<std::uint64_t> (e.type), 0));
-            const double fb = std::min (0.98, e.feedback * (tape ? 1.04 : 1.03));
+            const double fb = std::min (0.98, e.feedback * (ascend ? 0.85 : tape ? 1.04 : 1.03));
             double level = 1.0;
-            const auto warm = tape ? juce::Colour (0xffffb15c) : juce::Colour (0xffd9c38a);
+            const auto warm = ascend ? juce::Colour (0xffd6e4f0) : tape ? juce::Colour (0xffffb15c) : juce::Colour (0xffd9c38a);
+            const int interval = ascend ? juce::roundToInt (12.0 * std::log2 (EchoDelay::intervalRatio (e.interval))) : 0;
             for (int n = 1; n <= 40; ++n)
             {
                 level = n == 1 ? 0.92 : level * fb;
@@ -721,6 +726,19 @@ namespace
                         at (t, 1.0f, false);
                         at (seconds * 1.06 * n + 0.004, -1.0f, false);
                         break;
+                }
+                if (ascend && n <= 5)
+                {
+                    // The repeat's pitch against the played note.
+                    const int passes = e.motion == AscendMotion::steady ? 1 : e.motion == AscendMotion::late ? n - 1 : n;
+                    const int semis = passes * interval;
+                    if (const float x = xAt (t); semis != 0 && x + 14.0f < plot.getRight())
+                    {
+                        g.setFont (fonts::make (8.0f, fonts::Weight::medium, 0.04f));
+                        g.setColour (c.withAlpha (0.8f));
+                        g.drawText ((semis > 0 ? "+" : "") + juce::String (semis), juce::Rectangle<float> (x + 3.0f, plot.getY() - 2.0f, 24.0f, 10.0f),
+                                    juce::Justification::centredLeft, false);
+                    }
                 }
             }
             if (e.stereo != EchoStereo::mono)
@@ -2180,7 +2198,12 @@ namespace
     public:
         explicit EchoPanel (InstrumentHost& p) : MacroPanel (p, "ECHO", 286, 86, design::colour::Macro::echo)
         {
-            mode ("echo.type", "Tape echo or bucket-brigade (BBD) delay");
+            auto& m = mode ("echo.type", "Tape echo, bucket-brigade (BBD) delay, or ASCEND: repeats an interval up (a pitch shifter in the loop)");
+            m.onChange = [this] (int) {
+                build();
+                if (onSizeChanged != nullptr)
+                    onSizeChanged();
+            };
             setVisual (std::make_unique<EchoVisual> (p));
             sync = std::make_unique<SegmentedControl> (*p.apvts().getParameter ("echo.sync"), juce::StringArray { "FREE", "SYNC" });
             sync->setAccent (accent);
@@ -2196,7 +2219,18 @@ namespace
 
         juce::Point<int> cardSize() const override
         {
-            return { panelWidth, headerTop + visualHeight + gap + tabsHeight + 6 + cellHeight + bottom };
+            return { panelWidth, headerTop + visualHeight + gap + tabsHeight + 6 + cellHeight + bottom + (secondaryRow.empty() ? 0 : 2 + secondaryCellHeight) };
+        }
+
+        /** Tests: the knobs' captions as built (TIME .. AGE, CLOCK for ASCEND, its row after). */
+        juce::StringArray captionsForTest() const
+        {
+            juce::StringArray c;
+            for (auto* k : primaryRow)
+                c.add (k->captionText());
+            for (auto* k : secondaryRow)
+                c.add (k->captionText());
+            return c;
         }
 
     private:
@@ -2204,14 +2238,31 @@ namespace
         {
             knobs.clear();
             primaryRow.clear();
+            secondaryRow.clear();
             const auto percent = [] (double v) { return format::percent (v) + " %"; };
+            const bool ascend = juce::roundToInt (value (processor.apvts(), "echo.type")) == static_cast<int> (EchoType::ascend);
             if (sync->selected() == 1)
                 knob (false, "echo.division", "TIME", [] (double v) { return juce::String (shaping::echoDivisionName (juce::roundToInt (v))); });
             else
                 knob (false, "echo.time", "TIME", [] (double v) { return format::milliseconds (v); });
             knob (false, "echo.feedback", "FEEDBACK", percent);
             knob (false, "echo.tone", "TONE", percent);
-            knob (false, "echo.age", "AGE", percent);
+            if (ascend)
+            {
+                // AGE is ASCEND's CLOCK: the rate its loop is held at (13 kHz .. 7 kHz).
+                knob (false, "echo.age", "CLOCK", [] (double v) { return juce::String (EchoDelay::clockHz (0.01 * v) / 1000.0, 1) + " kHz"; })
+                    .slider.setTooltip ("CLOCK: the rate the repeats are held at - lower is grainier");
+                knob (true, "echo.ascend.interval", "INTERVAL", [] (double v) {
+                    static const char* names[] = { "+12", "+7", "+5", "-12" };
+                    return juce::String (names[std::clamp (juce::roundToInt (v), 0, 3)]);
+                }).slider.setTooltip ("How far each pass shifts the repeats: an octave up, a fifth, a fourth, or an octave down");
+                knob (true, "echo.ascend.motion", "MOTION", [] (double v) {
+                    static const char* names[] = { "RISE", "STEADY", "LATE" };
+                    return juce::String (names[std::clamp (juce::roundToInt (v), 0, 2)]);
+                }).slider.setTooltip ("RISE: each repeat higher than the last. STEADY: every repeat at the interval. LATE: the first repeat as played, then rising");
+            }
+            else
+                knob (false, "echo.age", "AGE", percent);
             resized();
         }
 
@@ -2225,6 +2276,11 @@ namespace
             stereo->setBounds (row.withTrimmedLeft (4));
             area.removeFromTop (6);
             layoutRow (primaryRow, area.removeFromTop (cellHeight));
+            if (! secondaryRow.empty())
+            {
+                area.removeFromTop (2);
+                layoutRow (secondaryRow, area.removeFromTop (secondaryCellHeight));
+            }
         }
 
         std::unique_ptr<SegmentedControl> sync, stereo;
@@ -3024,7 +3080,7 @@ const juce::StringArray& popupParameterIds (MacroPopup macro)
                                            "space.bloom.sync", "space.bloom.division", "space.bloom.time", "space.bloom.diffusion",
                                            "space.abyss.variant" };
     static const juce::StringArray echo { "echo.type", "echo.sync", "echo.division", "echo.time", "echo.feedback",
-                                          "echo.tone", "echo.age", "echo.stereo" };
+                                          "echo.tone", "echo.age", "echo.stereo", "echo.ascend.interval", "echo.ascend.motion" };
     switch (macro)
     {
         case MacroPopup::life: return life;

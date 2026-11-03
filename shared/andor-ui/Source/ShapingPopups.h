@@ -79,6 +79,7 @@ public:
               Formatter formatter, bool horizontal = false);
 
     void setCaption (juce::String newCaption);
+    const juce::String& captionText() const noexcept { return caption; }
     void setFormatter (Formatter newFormatter);
     /** Light captions for use over a graphite display. */
     void setOnDark (bool dark) { onDark = dark; repaint(); }
