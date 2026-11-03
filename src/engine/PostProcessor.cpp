@@ -93,7 +93,8 @@ void PostProcessor::updateAbyss() noexcept
     const auto wanted = AbyssReverb::Settings::from (shaping);
     sizeSettled = std::abs (wanted.size - lastWantedSize) > 1.0e-6 ? 0 : sizeSettled + 1;
     lastWantedSize = wanted.size;
-    if (wanted.structurallyDifferent (appliedAbyss) && reverbFade == 0 && sizeSettled >= 90)
+    // (A new variant fades in at once; a SIZE being dragged waits until it rests.)
+    if (wanted.structurallyDifferent (appliedAbyss) && reverbFade == 0 && (wanted.variant != appliedAbyss.variant || sizeSettled >= 90))
     {
         appliedAbyss = wanted;
         activeReverb = 1 - activeReverb;

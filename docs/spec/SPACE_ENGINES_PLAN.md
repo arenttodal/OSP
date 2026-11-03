@@ -1,6 +1,7 @@
 # SPACE: three more reverb engines (plan)
 
-Status: R1 (ABYSS), R2 (VINTAGE) and R3 (BLOOM) are built (see docs/STATUS.md). Two
+Status: R1 (ABYSS, with its variants DEEP / DARK / INVERSE / ENDLESS as voicings of the engine,
+not presets), R2 (VINTAGE) and R3 (BLOOM) are built (see docs/STATUS.md). Two
 differences from the plan for those two:
 - VINTAGE's chorus is a seeded glide between adjacent taps on each half's long line.
 - BLOOM reads its line early by the diffusers' own length, so a repeat lands on the beat.

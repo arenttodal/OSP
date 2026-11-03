@@ -791,6 +791,15 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
     short-word grain, repeats on the beat at two tempi, diffusion's crest factor, decay,
     stability, determinism, no allocation, level matched to HALL); engine switches never click.
   - CPU: VINTAGE about 0.75x, BLOOM about 0.64x HALL.
+- **ABYSS's variants: built.** `space.abyss.variant` (version hint 25): DEEP / DARK / INVERSE /
+  ENDLESS, as the ABYSS popover's tabs (FREEZE moved to its second row).
+  - DEEP is ABYSS as it was, bit-identical.
+  - DARK: lower band corners and a much darker tail.
+  - INVERSE: GRAVITY's rising window always on and longer, and a faster loop: it swells in.
+  - ENDLESS: 6x the reverberation time, more motion.
+  - Each variant is level-matched to HALL. Evidence: the variants test in `[abyss]` (DARK's
+    tail much darker, INVERSE peaks at 1.65 s, ENDLESS's RT60 5.7x DEEP's, every variant
+    within 0.01 dB of HALL and stable at the extremes).
 
 ## BLOCKERS
 

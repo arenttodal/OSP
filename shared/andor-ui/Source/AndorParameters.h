@@ -78,6 +78,7 @@ namespace osp::plugin::ids
     inline const juce::String abyssGravity = "space.abyss.gravity";
     inline const juce::String abyssFreeze = "space.abyss.freeze";
     inline const juce::String abyssResonance = "space.abyss.resonance";
+    inline const juce::String abyssVariant = "space.abyss.variant";       ///< (version hint 25)
     inline const juce::String vintageVariant = "space.vintage.variant";   ///< (version hint 24)
     inline const juce::String vintageEra = "space.vintage.era";
     inline const juce::String vintageDiffusion = "space.vintage.diffusion";

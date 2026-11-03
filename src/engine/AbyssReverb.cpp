@@ -51,12 +51,13 @@ AbyssReverb::Settings AbyssReverb::Settings::from (const Shaping& s) noexcept
     r.gravity = s.abyssGravity;
     r.freeze = s.abyssFreeze;
     r.resonance = s.abyssResonance;
+    r.variant = s.abyssVariant;
     return r;
 }
 
 bool AbyssReverb::Settings::structurallyDifferent (const Settings& other) const noexcept
 {
-    return std::abs (size - other.size) > 1.0e-9;
+    return std::abs (size - other.size) > 1.0e-9 || variant != other.variant;
 }
 
 double AbyssReverb::sizeFactor (double size) noexcept
@@ -66,11 +67,24 @@ double AbyssReverb::sizeFactor (double size) noexcept
     return s < 0.5 ? std::pow (0.35, 1.0 - s / 0.5) : std::pow (maxLengthFactor, (s - 0.5) / 0.5);
 }
 
-double AbyssReverb::effectiveDecay (double decaySeconds, double gravity) noexcept
+double AbyssReverb::effectiveDecay (double decaySeconds, double gravity, AbyssVariant variant) noexcept
 {
     const double rt = std::clamp (decaySeconds, 0.2, 8.0);
     const double g = std::clamp (gravity, -1.0, 1.0);
-    return g >= 0.0 ? rt * (1.0 + 2.0 * g) : rt * (1.0 + 0.75 * g);
+    const double heavy = g >= 0.0 ? rt * (1.0 + 2.0 * g) : rt * (1.0 + 0.75 * g);
+    // INVERSE dies fast after its swell; ENDLESS hardly at all.
+    return variant == AbyssVariant::inverse ? 0.5 * heavy : (variant == AbyssVariant::endless ? 6.0 * heavy : heavy);
+}
+
+double AbyssReverb::windowShare (double gravity, AbyssVariant variant) noexcept
+{
+    const double inverse = std::max (0.0, -std::clamp (gravity, -1.0, 1.0));
+    return variant == AbyssVariant::inverse ? std::max (0.8, inverse) : inverse;
+}
+
+double AbyssReverb::windowLength (AbyssVariant variant) noexcept
+{
+    return variant == AbyssVariant::inverse ? 1.6 : windowSeconds;
 }
 
 //==============================================================================
@@ -147,7 +161,7 @@ void AbyssReverb::prepare (double rate)
     const auto ms = [rate] (double m) { return static_cast<int> (m * 0.001 * rate) + 8; };
     preL.allocate (ms (260.0));
     preR.allocate (ms (260.0));
-    const double windowMax = windowSeconds * std::sqrt (maxLengthFactor) * 1000.0;
+    const double windowMax = windowLength (AbyssVariant::inverse) * std::sqrt (maxLengthFactor) * 1000.0;
     windowL.allocate (ms (windowMax));
     windowR.allocate (ms (windowMax));
     for (auto& side : diff)
@@ -241,7 +255,7 @@ void AbyssReverb::configure (const Settings& s) noexcept
     }
     // GRAVITY's window: 16 taps over ~0.9 s (with SIZE), each 2.3 dB louder than the last,
     // normalised to unit power (uncorrelated taps add in power).
-    const double window = windowSeconds * std::sqrt (lengthFactor) * rate;
+    const double window = windowLength (current.variant) * std::sqrt (lengthFactor) * rate;
     double power = 0.0;
     for (int k = 0; k < gravityTaps; ++k)
     {
@@ -253,8 +267,17 @@ void AbyssReverb::configure (const Settings& s) noexcept
     for (auto& w : windowGain)
         w = static_cast<float> (w / std::sqrt (power));
     // The bands: the lows below ~250 Hz, the highs above ~3 kHz (a larger space: lower).
-    lowCoef = static_cast<float> (1.0 - std::exp (-twoPi * 250.0 / std::sqrt (lengthFactor) / rate));
-    highCoef = static_cast<float> (1.0 - std::exp (-twoPi * 3000.0 / std::sqrt (lengthFactor) / rate));
+    // DARK: both corners lower (a thick, dark body), and a little more level to make up for it.
+    const bool dark = current.variant == AbyssVariant::dark;
+    lowCoef = static_cast<float> (1.0 - std::exp (-twoPi * (dark ? 180.0 : 250.0) / std::sqrt (lengthFactor) / rate));
+    highCoef = static_cast<float> (1.0 - std::exp (-twoPi * (dark ? 1100.0 : 3000.0) / std::sqrt (lengthFactor) / rate));
+    switch (current.variant)
+    {
+        case AbyssVariant::dark: variantGain = 1.377f; break;      // (+2.8 dB: measured against DEEP)
+        case AbyssVariant::inverse: variantGain = 1.689f; break;   // (+4.5 dB)
+        case AbyssVariant::endless: variantGain = 0.327f; break;   // (-9.7 dB: its long tail piles up)
+        case AbyssVariant::deep: variantGain = 1.0f; break;
+    }
     tune (current);
 }
 
@@ -262,10 +285,12 @@ void AbyssReverb::computeDecay() noexcept
 {
     const double rate = sampleRate;
     const double g = std::clamp (current.gravity, -1.0, 1.0);
-    const double rt = effectiveDecay (current.decaySeconds, g);
+    const double rt = effectiveDecay (current.decaySeconds, g, current.variant);
     const double resonance = std::clamp (current.resonance, 0.0, 1.0);
     // The highs' share: DAMP darkens, positive GRAVITY darkens further.
-    const double treble = std::clamp (0.8 - 0.6 * std::clamp (current.damping, 0.0, 1.0) - 0.25 * std::max (0.0, g), 0.08, 1.0);
+    double treble = std::clamp (0.8 - 0.6 * std::clamp (current.damping, 0.0, 1.0) - 0.25 * std::max (0.0, g), 0.08, 1.0);
+    if (current.variant == AbyssVariant::dark)
+        treble = std::max (0.06, 0.45 * treble);   // (DARK: the highs die much sooner)
     const double rtLow = rt * 1.3, rtMid = rt * (1.0 + 2.0 * resonance), rtHigh = rt * treble;
     auto set = [rate, rtLow, rtMid, rtHigh] (Line& l) {
         const double seconds = l.length / rate;
@@ -298,8 +323,12 @@ void AbyssReverb::tune (const Settings& s) noexcept
     lowCutTarget = std::log2 (std::clamp (current.lowCutHz, 20.0, 2000.0));
     highCutTarget = std::log2 (std::clamp (current.highCutHz, 1000.0, std::min (20000.0, 0.45 * sampleRate)));
     modDepthTarget = modSamples48k * sampleRate / 48000.0 * std::pow (std::clamp (current.modulation, 0.0, 1.0), 1.3);
+    if (current.variant == AbyssVariant::endless)
+        modDepthTarget *= 1.5;   // (ENDLESS: it never stands still)
+    else if (current.variant == AbyssVariant::dark)
+        modDepthTarget *= 0.7;
     widthTarget = static_cast<float> (std::clamp (current.width, 0.0, 1.0));
-    windowMixTarget = static_cast<float> (std::max (0.0, -current.gravity));
+    windowMixTarget = static_cast<float> (windowShare (current.gravity, current.variant));
     diffGainTarget = static_cast<float> (0.72 - 0.35 * current.resonance);
     freezeTarget = current.freeze ? 1.0f : 0.0f;
 }
@@ -482,8 +511,8 @@ void AbyssReverb::process (float inL, float inR, float& outL, float& outR) noexc
     r = mid - side;
     dcL += (l - dcL) * dcCoef;
     dcR += (r - dcR) * dcCoef;
-    outL = (l - dcL) * outputGain;
-    outR = (r - dcR) * outputGain;
+    outL = (l - dcL) * outputGain * variantGain;
+    outR = (r - dcR) * outputGain * variantGain;
 }
 
 } // namespace osp
