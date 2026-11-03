@@ -69,6 +69,11 @@ adding fields must be documented in `docs/analysis-schema.md`.
   crash or abort a batch; report it and continue.
 - Do not rewrite working architecture without documenting why (`docs/architecture.md`).
 - Generated models/presets must stay backward compatible or provide migration.
+- **Features shared by both instruments.** Every new SPACE, ECHO or ARP feature is built in
+  the shared code (`src/engine`, `shared/andor-ui`, `shared/andor-shell`) and ships in both
+  ANDOR OSP and ANDOR ANALOG, tested in both. It is not done while one of the two lacks it:
+  if it cannot land in both at once, the gap and its plan are listed under NEXT in
+  `docs/STATUS.md`.
 
 ## Code layout
 

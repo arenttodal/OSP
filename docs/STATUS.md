@@ -752,6 +752,14 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 
 ## NEXT
 
+- **Per-card arpeggiator in ANDOR OSP's own plugin** (the rule on shared SPACE / ECHO / ARP
+  features). The shell's lanes and the ARP panel's PLAYS / LINK / EDIT are shared and in
+  ANDOR ANALOG. Still to do in ANDOR OSP:
+  - share the lane logic between the shell and OspAudioProcessor;
+  - give InstrumentEngine a layer mask per note (it already starts a voice per layer);
+  - opt OSP's panel in;
+  - leave old sessions identical.
+
 - Lab round 1 scored and acted on (docs/reports/lab-1.md). Round 2 in the lab: Reimagined 2,
   Sustain 2, Dynamics 2, Multi-sample 2.
 - Transient preservation and transient mixing: both kept as options, off by default
