@@ -851,6 +851,30 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
     - deterministic, and silent in silence.
   - CPU: about 1.3 % of a core at 48 kHz (TAPE about 0.5 .. 0.8 %).
 
+## SPACE presets (3 Nov 2026)
+
+- **Built (shared: ANDOR OSP and ANDOR ANALOG).** SPACE's row of four tabs (redundant with
+  the header's list on ROOMS) is now a presets bar: `‹ NAME ›`.
+  - The arrows step through the presets.
+  - The name opens them by category: ROOMS, HALLS, PLATES, SPRINGS, ABYSS, VINTAGE, BLOOM
+    (38 to start; `shared/andor-ui/Source/SpacePresets`).
+  - ABYSS's, VINTAGE's and BLOOM's variants moved into the header's list, as submenus of
+    their engines; the header shows "ABYSS · DARK".
+- A preset is values for the parameters SPACE already has, nothing else.
+  - Choosing one sets every SPACE parameter (one undo step).
+  - Sessions and patches store the parameters as ever: everything made before plays as it
+    did.
+  - The bar works its name out from the values: the preset they match; the last one chosen
+    with " *" while SPACE is still of its kind; else what is set ("ABYSS DARK").
+  - A new instrument is "Concert Hall" (SPACE's defaults).
+- Evidence: `[presets]`:
+  - every preset is recognised by its values and names its engine;
+  - edited, " *" or what is set;
+  - the bar is in every engine's popover;
+  - a session from before is named by what it plays.
+  - ANDOR ANALOG's three-engine screenshots show the bar on every engine.
+- To do: voice each preset by ear (they are starting points); user presets later.
+
 ## Shell: the per-card arpeggiator (3 Nov 2026)
 
 - **Built (opt-in: `ProductInfo::cardArpeggiator`, a three-engine product; ANDOR OSP

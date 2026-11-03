@@ -5,6 +5,7 @@
 #include "Design.h"
 #include "MacroPopups.h"
 #include "ShapingPopups.h"
+#include "SpacePresets.h"
 
 #include "core/Prng.h"
 #include "engine/InstrumentEngine.h"
@@ -1733,7 +1734,7 @@ namespace
 
         juce::Point<int> cardSize() const override
         {
-            int h = headerTop + visualHeight + gap + (modeTabs != nullptr ? tabsHeight + 6 : 0) + cellHeight + bottom;
+            int h = headerTop + visualHeight + gap + (modeTabs != nullptr || modeRow != nullptr ? tabsHeight + 6 : 0) + cellHeight + bottom;
             if (! secondaryRow.empty())
                 h += 2 + secondaryCellHeight;
             return { panelWidth, h };
@@ -1755,9 +1756,9 @@ namespace
             if (visual != nullptr)
                 visual->setBounds (area.removeFromTop (visualHeight));
             area.removeFromTop (gap);
-            if (modeTabs != nullptr)
+            if (auto* row = modeTabs != nullptr ? static_cast<juce::Component*> (modeTabs.get()) : modeRow.get())
             {
-                modeTabs->setBounds (area.removeFromTop (tabsHeight));
+                row->setBounds (area.removeFromTop (tabsHeight));
                 area.removeFromTop (6);
             }
             layoutRow (primaryRow, area.removeFromTop (cellHeight));
@@ -1786,21 +1787,153 @@ namespace
         bool ownColour = false;
         std::unique_ptr<ValueSelector> modeSelector;
         std::unique_ptr<SegmentedControl> modeTabs;
+        std::unique_ptr<juce::Component> modeRow;   ///< in the tabs' place (SPACE: its presets)
         std::unique_ptr<Visual> visual;
         std::vector<std::unique_ptr<MiniKnob>> knobs;
         std::vector<MiniKnob*> primaryRow, secondaryRow;
     };
 
     //==========================================================================
+    /** SPACE's presets in the tabs' place: < NAME > (the arrows step through them, the name
+        opens them by category). The name is worked out from the values (spacepresets): the
+        preset they match, the last one chosen with " *" once edited, else what is set. */
+    class SpacePresetBar final : public juce::Component, public juce::SettableTooltipClient, private juce::Timer
+    {
+    public:
+        SpacePresetBar (InstrumentHost& p, juce::Colour accentColour) : host (p), accent (accentColour)
+        {
+            setTitle ("SPACE presets");
+            setTooltip ("SPACE's presets: click for the list by category, the arrows for the next or previous");
+            setMouseCursor (juce::MouseCursor::PointingHandCursor);
+            refreshText();
+            startTimerHz (8);
+        }
+
+        /** What the bar shows now (tests). */
+        juce::String text() const { return shown; }
+        void choose (int index)
+        {
+            const auto& all = spacepresets::all();
+            if (index < 0 || index >= static_cast<int> (all.size()))
+                return;
+            spacepresets::apply (host.apvts(), all[static_cast<std::size_t> (index)], &host.undo());
+            last = index;
+            refreshText();
+        }
+        void step (int delta)
+        {
+            const int count = static_cast<int> (spacepresets::all().size());
+            const int from = current >= 0 ? current : last;
+            choose (from < 0 ? (delta > 0 ? 0 : count - 1) : (from + delta + count) % count);
+        }
+        void showMenu()
+        {
+            const auto& all = spacepresets::all();
+            juce::PopupMenu menu;
+            juce::Component::SafePointer<SpacePresetBar> safe (this);
+            for (const auto& category : spacepresets::categories())
+            {
+                juce::PopupMenu sub;
+                bool ticked = false;
+                for (int i = 0; i < static_cast<int> (all.size()); ++i)
+                    if (category == all[static_cast<std::size_t> (i)].category)
+                    {
+                        sub.addItem (all[static_cast<std::size_t> (i)].name, true, i == current, [safe, i] { if (safe != nullptr) safe->choose (i); });
+                        ticked = ticked || i == current;
+                    }
+                menu.addSubMenu (category, sub, true, nullptr, ticked);
+            }
+            menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
+        }
+
+        void paint (juce::Graphics& g) override
+        {
+            using namespace design;
+            // (The values may have moved since the timer last looked: what is drawn is now.)
+            current = spacepresets::matching (host.apvts());
+            if (current >= 0)
+                last = current;
+            shown = spacepresets::barText (host.apvts(), last);
+            const auto r = getLocalBounds().toFloat().reduced (0.5f);
+            g.setColour (colour::text.withAlpha (hover == 2 ? 0.07f : 0.04f));
+            g.fillRoundedRectangle (r, 5.0f);
+            g.setColour (colour::hairline.darker (0.1f));
+            g.drawRoundedRectangle (r, 5.0f, 1.0f);
+            auto arrow = [&g, this] (juce::Rectangle<float> a, bool left, bool lit) {
+                juce::Path path;
+                const auto c = a.getCentre();
+                path.startNewSubPath (c.x + (left ? 2.5f : -2.5f), c.y - 4.0f);
+                path.lineTo (c.x + (left ? -2.0f : 2.0f), c.y);
+                path.lineTo (c.x + (left ? 2.5f : -2.5f), c.y + 4.0f);
+                g.setColour (colour::text.withAlpha (lit ? 0.9f : 0.55f));
+                g.strokePath (path, juce::PathStrokeType (1.4f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            };
+            arrow (leftArea(), true, hover == 1);
+            arrow (rightArea(), false, hover == 3);
+            g.setColour (colour::hairline.darker (0.1f));
+            g.fillRect (juce::Rectangle<float> (leftArea().getRight(), r.getY() + 4.0f, 1.0f, r.getHeight() - 8.0f));
+            g.fillRect (juce::Rectangle<float> (rightArea().getX() - 1.0f, r.getY() + 4.0f, 1.0f, r.getHeight() - 8.0f));
+            g.setFont (type::popupLabel (12.5f));
+            g.setColour (current >= 0 ? accent.darker (0.35f) : colour::text.withAlpha (0.85f));
+            g.drawText (shown, getLocalBounds().toFloat().withTrimmedLeft (leftArea().getWidth() + 4.0f).withTrimmedRight (rightArea().getWidth() + 4.0f),
+                        juce::Justification::centred, true);
+        }
+
+        void mouseDown (const juce::MouseEvent& e) override
+        {
+            if (leftArea().contains (e.position))
+                step (-1);
+            else if (rightArea().contains (e.position))
+                step (1);
+            else
+                showMenu();
+        }
+        void mouseMove (const juce::MouseEvent& e) override
+        {
+            const int now = leftArea().contains (e.position) ? 1 : (rightArea().contains (e.position) ? 3 : 2);
+            if (now != hover)
+            {
+                hover = now;
+                repaint();
+            }
+        }
+        void mouseExit (const juce::MouseEvent&) override
+        {
+            hover = 0;
+            repaint();
+        }
+
+    private:
+        juce::Rectangle<float> leftArea() const { return getLocalBounds().toFloat().removeFromLeft (26.0f); }
+        juce::Rectangle<float> rightArea() const { return getLocalBounds().toFloat().removeFromRight (26.0f); }
+        void timerCallback() override { refreshText(); }
+        void refreshText()
+        {
+            current = spacepresets::matching (host.apvts());
+            if (current >= 0)
+                last = current;
+            if (const auto next = spacepresets::barText (host.apvts(), last); next != shown)
+            {
+                shown = next;
+                repaint();
+            }
+        }
+
+        InstrumentHost& host;
+        juce::Colour accent;
+        juce::String shown;
+        int current = -1, last = -1, hover = 0;
+    };
+
+    //==========================================================================
     /** SPACE: the room, its EQ on the display (drag the corners), then its shape. The header's
-        list picks a room or one of SPACE's other engines; the popover keeps its size.
-          ROOMS    the four rooms as tabs; PRE-DELAY, SIZE, DECAY, DAMP; MOD, WIDTH, LOW / HIGH CUT.
-          ABYSS    DEEP / DARK / INVERSE / ENDLESS; PRE-DELAY, SIZE, DECAY, DAMP; GRAVITY, RESONANCE,
-                   MOD, WIDTH, FREEZE.
-          VINTAGE  HALL / PLATE / CHAMBER / ROOM; PRE-DELAY, SIZE, DECAY, DAMP; DIFFUSION, MOD,
-                   WIDTH, ERA.
-          BLOOM    CLEAN / VINTAGE / TAPE / WASH; TIME (a division synced, ms free), DIFFUSION,
-                   DECAY, DAMP; SYNC, SIZE, MOD, WIDTH.
+        list picks a room or one of SPACE's other engines and its variant (ABYSS DEEP / DARK /
+        INVERSE / ENDLESS, VINTAGE HALL / PLATE / CHAMBER / ROOM, BLOOM CLEAN / VINTAGE / TAPE /
+        WASH); under the display the presets bar (SpacePresetBar); the popover keeps its size.
+          ROOMS    PRE-DELAY, SIZE, DECAY, DAMP; MOD, WIDTH, LOW / HIGH CUT.
+          ABYSS    PRE-DELAY, SIZE, DECAY, DAMP; GRAVITY, RESONANCE, MOD, WIDTH, FREEZE.
+          VINTAGE  PRE-DELAY, SIZE, DECAY, DAMP; DIFFUSION, MOD, WIDTH, ERA.
+          BLOOM    TIME (a division synced, ms free), DIFFUSION, DECAY, DAMP; SYNC, SIZE, MOD, WIDTH.
         Off ROOMS, LOW / HIGH CUT stay on the display's corners. */
     class SpacePanel final : public MacroPanel
     {
@@ -1813,41 +1946,74 @@ namespace
               syncAttachment (*p.apvts().getParameter ("space.bloom.sync"), [this] (float) {
                   juce::Component::SafePointer<SpacePanel> safe (this);   // (SYNC is itself a knob here: rebuilt after its gesture)
                   juce::MessageManager::callAsync ([safe] { if (safe != nullptr) safe->build(); });
-              })
+              }),
+              typeAttachment (*p.apvts().getParameter ("space.type"), [this] (float) {
+                  for (auto& k : knobs)
+                      k->repaint();   // (ROOMS' DECAY readout follows the type's range)
+              }),
+              variantAttachments { juce::ParameterAttachment (*p.apvts().getParameter ("space.abyss.variant"), [this] (float) { repaintMode(); }),
+                                   juce::ParameterAttachment (*p.apvts().getParameter ("space.vintage.variant"), [this] (float) { repaintMode(); }),
+                                   juce::ParameterAttachment (*p.apvts().getParameter ("space.bloom.variant"), [this] (float) { repaintMode(); }) }
         {
-            auto& m = mode ("space.type", "Room, hall, plate or spring - or ABYSS, VINTAGE or BLOOM, SPACE's other engines");
+            auto& m = mode ("space.type", "Room, hall, plate or spring - or ABYSS, VINTAGE or BLOOM, SPACE's other engines, and their variants");
             m.textOverride = [this] {
-                static const char* names[] = { "", "ABYSS", "VINTAGE", "BLOOM" };
-                return juce::String (names[std::clamp (engine(), 0, 3)]);
+                if (engine() == 0)
+                    return juce::String();
+                return spacepresets::describe (processor.apvts()).replace (" ", juce::String::fromUTF8 (" \xc2\xb7 "));
             };
             m.extraItems = [this] (juce::PopupMenu& menu) {
                 juce::Component::SafePointer<SpacePanel> safe (this);
                 menu.addSeparator();
+                static const std::array<juce::StringArray, 3> variants { juce::StringArray { "Deep", "Dark", "Inverse", "Endless" },
+                                                                         juce::StringArray { "Hall", "Plate", "Chamber", "Room" },
+                                                                         juce::StringArray { "Clean", "Vintage", "Tape", "Wash" } };
+                static const char* variantIds[] { "space.abyss.variant", "space.vintage.variant", "space.bloom.variant" };
                 int index = 1;
                 for (const char* name : { "Abyss", "Vintage", "Bloom" })
                 {
-                    menu.addItem (name, true, engine() == index, [safe, index] { if (safe != nullptr) safe->setEngine (index); });
+                    juce::PopupMenu sub;
+                    const int now = juce::roundToInt (value (processor.apvts(), variantIds[index - 1]));
+                    for (int v = 0; v < 4; ++v)
+                        sub.addItem (variants[static_cast<std::size_t> (index - 1)][v], true, engine() == index && now == v,
+                                     [safe, index, v] { if (safe != nullptr) safe->setEngine (index, v); });
+                    menu.addSubMenu (name, sub, true, nullptr, engine() == index);
                     ++index;
                 }
             };
             m.onPick = [this] (int) { setEngine (0); };   // a room leaves the other engines
             setVisual (std::make_unique<SpaceVisual> (p.apvts(), [&p] { return static_cast<double> (p.hostTempo()); }));
+            modeRow = std::make_unique<SpacePresetBar> (p, accent);
+            addAndMakeVisible (*modeRow);
             build();
         }
+
+        /** Tests: the presets bar. */
+        SpacePresetBar& presetBar() { return *static_cast<SpacePresetBar*> (modeRow.get()); }
 
         /** Tests: what the popover is built for now (engine * 2 + BLOOM's SYNC). */
         int builtFor() const noexcept { return built; }
 
     private:
         int engine() const { return juce::roundToInt (value (processor.apvts(), "space.engine")); }
-        void setEngine (int e)
+        void setEngine (int e, int variant = -1)
         {
-            if (auto* param = processor.apvts().getParameter ("space.engine"); param != nullptr && juce::roundToInt (param->convertFrom0to1 (param->getValue())) != e)
-            {
-                param->beginChangeGesture();
-                param->setValueNotifyingHost (param->convertTo0to1 (static_cast<float> (e)));
-                param->endChangeGesture();
-            }
+            auto set = [this] (const char* id, int v) {
+                if (auto* param = processor.apvts().getParameter (id); param != nullptr && juce::roundToInt (param->convertFrom0to1 (param->getValue())) != v)
+                {
+                    param->beginChangeGesture();
+                    param->setValueNotifyingHost (param->convertTo0to1 (static_cast<float> (v)));
+                    param->endChangeGesture();
+                }
+            };
+            static const char* variantIds[] { "space.abyss.variant", "space.vintage.variant", "space.bloom.variant" };
+            if (variant >= 0 && e >= 1 && e <= 3)
+                set (variantIds[e - 1], variant);
+            set ("space.engine", e);
+        }
+        void repaintMode()
+        {
+            if (modeSelector != nullptr)
+                modeSelector->repaint();
         }
 
         void build()
@@ -1869,8 +2035,6 @@ namespace
             {
                 case 1:   // ABYSS
                 {
-                    tabs ("space.abyss.variant", { "DEEP", "DARK", "INVERSE", "ENDLESS" },
-                          "DEEP: the vast space. DARK: a thick, dark body. INVERSE: it swells in. ENDLESS: it hardly ends");
                     knob (false, "space.preDelay", "PRE-DELAY", ms);
                     knob (false, "space.size", "SIZE", percent);
                     knob (false, "space.decay", "DECAY", seconds);
@@ -1888,7 +2052,6 @@ namespace
                 }
                 case 2:   // VINTAGE
                 {
-                    tabs ("space.vintage.variant", { "HALL", "PLATE", "CHAMBER", "ROOM" }, "VINTAGE's voicings: a hall, a plate, a chamber or a room");
                     knob (false, "space.preDelay", "PRE-DELAY", ms);
                     knob (false, "space.size", "SIZE", percent);
                     knob (false, "space.decay", "DECAY", seconds);
@@ -1902,7 +2065,6 @@ namespace
                 }
                 case 3:   // BLOOM
                 {
-                    tabs ("space.bloom.variant", { "CLEAN", "VINTAGE", "TAPE", "WASH" }, "BLOOM's loop: clean, a bucket brigade, tape, or a wash");
                     if (sync)
                         knob (false, "space.bloom.division", "TIME", [] (double v) { return juce::String (shaping::echoDivisionName (juce::roundToInt (v))); });
                     else
@@ -1918,12 +2080,11 @@ namespace
                 }
                 default:   // ROOMS
                 {
-                    auto& types = tabs ("space.type", { "ROOM", "HALL", "PLATE", "SPRING" }, "Room, hall (after the Berlin concert halls), plate or spring");
                     auto* typeParam = processor.apvts().getParameter ("space.type");
                     knob (false, "space.preDelay", "PRE-DELAY", ms);
                     knob (false, "space.size", "SIZE", percent);
                     // The readout shows the decay the chosen type actually uses (each type has its own range).
-                    auto& decay = knob (false, "space.decay", "DECAY", [typeParam] (double v) {
+                    knob (false, "space.decay", "DECAY", [typeParam] (double v) {
                         double lo = 0.2, hi = 8.0;
                         if (typeParam != nullptr)
                             shaping::decayRange (static_cast<SpaceType> (juce::roundToInt (typeParam->convertFrom0to1 (typeParam->getValue()))), lo, hi);
@@ -1934,7 +2095,6 @@ namespace
                     knob (true, "space.width", "WIDTH", percent);
                     knob (true, "space.lowCut", "LOW CUT", [] (double v) { return format::hertz (v); });
                     knob (true, "space.highCut", "HIGH CUT", [] (double v) { return format::hertz (v); });
-                    types.onChange = [&decay] (int) { decay.repaint(); };
                     break;
                 }
             }
@@ -1942,7 +2102,8 @@ namespace
             repaint();
         }
 
-        juce::ParameterAttachment engineAttachment, syncAttachment;
+        juce::ParameterAttachment engineAttachment, syncAttachment, typeAttachment;
+        std::array<juce::ParameterAttachment, 3> variantAttachments;
         int built = -1;
     };
 
