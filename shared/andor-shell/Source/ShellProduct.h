@@ -109,6 +109,12 @@ struct ProductInfo
         bool enabled = false;
         std::array<int, 3> order { 0, 1, 2 };
     } threeEngines;
+    /** The per-card arpeggiator (opt-in, a three-engine product whose engine plays card
+        lanes: Engine::setCardRouting). The shell adds its parameters (ids::arpLink, arpCard, arpCardSetting): which
+        cards the arpeggiator plays (the others hold the keys), LINK, and each further card's
+        own PATTERN / RATE / OCTAVES while unlinked; the ARP panel shows them. Off: one
+        arpeggiator for the instrument, as in ANDOR OSP. */
+    bool cardArpeggiator = false;
     /** A card's knob slot, as a product sets it (cardControls): its own control (an empty
         ID), a product control, or hidden. */
     struct CardKnob
