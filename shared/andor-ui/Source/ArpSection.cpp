@@ -342,34 +342,34 @@ ArpInlinePanel::ArpInlinePanel (InstrumentHost& p)
         knob->slider.getProperties().set ("paramId", id);   // a modulation drop target
         addAndMakeVisible (*knob);
     }
-    cards = p.cardArpeggiator() && p.apvts().getParameter (ids::arpLink) != nullptr;
+    cards = p.cardArpeggiator() && p.apvts().getParameter (ids::arpLink (p.cardArpNamespace())) != nullptr;
     if (cards)
     {
-        cardAttachments.push_back (std::make_unique<juce::ParameterAttachment> (parameter (p, ids::arpLink), [this] (float v) {
+        cardAttachments.push_back (std::make_unique<juce::ParameterAttachment> (parameter (p, ids::arpLink (p.cardArpNamespace())), [this] (float v) {
             linked = v >= 0.5f;
             if (linked && editCard != 0)
                 setEditCard (0);
             repaint();
         }, &p.undo()));
         for (int c = 0; c < 3; ++c)
-            cardAttachments.push_back (std::make_unique<juce::ParameterAttachment> (parameter (p, ids::arpCard (c)), [this, c] (float v) {
+            cardAttachments.push_back (std::make_unique<juce::ParameterAttachment> (parameter (p, ids::arpCard (p.cardArpNamespace(), c)), [this, c] (float v) {
                 cardOn[static_cast<std::size_t> (c)] = v >= 0.5f;
                 repaint();
             }, &p.undo()));
         for (int c = 1; c < 3; ++c)
         {
             const auto i = static_cast<std::size_t> (c - 1);
-            lanePattern[i] = std::make_unique<juce::ParameterAttachment> (parameter (p, ids::arpCardSetting (c, "pattern")), [this, c] (float v) {
+            lanePattern[i] = std::make_unique<juce::ParameterAttachment> (parameter (p, ids::arpCardSetting (p.cardArpNamespace(), c, "pattern")), [this, c] (float v) {
                 cardPattern[static_cast<std::size_t> (c)] = juce::jlimit (0, arp::patternCount - 1, juce::roundToInt (v));
                 if (editCard == c)
                     showEditedCard();
             }, &p.undo());
-            laneOctaves[i] = std::make_unique<juce::ParameterAttachment> (parameter (p, ids::arpCardSetting (c, "octaves")), [this, c] (float v) {
+            laneOctaves[i] = std::make_unique<juce::ParameterAttachment> (parameter (p, ids::arpCardSetting (p.cardArpNamespace(), c, "octaves")), [this, c] (float v) {
                 cardOctaves[static_cast<std::size_t> (c)] = juce::jlimit (arp::minOctaves, arp::maxOctaves, juce::roundToInt (v));
                 if (editCard == c)
                     showEditedCard();
             }, &p.undo());
-            const auto rateId = ids::arpCardSetting (c, "rate");
+            const auto rateId = ids::arpCardSetting (p.cardArpNamespace(), c, "rate");
             laneRate[i] = std::make_unique<MiniKnob> (p.apvts(), rateId, "RATE", [] (double v) {
                 const auto& order = rateOrder();
                 const int position = juce::jlimit (0, static_cast<int> (order.size()) - 1, juce::roundToInt (v));

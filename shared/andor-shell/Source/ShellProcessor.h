@@ -107,7 +107,8 @@ public:
     int playedVelocityCount() const noexcept override { return velocityCount.load (std::memory_order_acquire); }
     int lastPlayedNoteNumber() const noexcept override { return lastNote.load (std::memory_order_relaxed); }
     ArpView arpView() const noexcept override;
-    bool cardArpeggiator() const noexcept override { return cardArp; }
+    bool cardArpeggiator() const noexcept override { return cardArp && ! referenceParity; }
+    juce::String cardArpNamespace() const override { return productInfo().slug + "."; }
     void setArpViewCard (int shown) noexcept override { arpViewLane.store (std::clamp (shown, 0, 2), std::memory_order_relaxed); }
 
     // InstrumentHost: the macro popovers
@@ -161,7 +162,11 @@ public:
     /** The visual regression's parity render only: ANDOR OSP's macro names and parameters,
         so a product that renames its macros is compared with ANDOR OSP where nothing else
         differs. Call before the editor opens. */
-    void showReferenceMacros() { macros = osp::plugin::frame::ospMacroSpecs(); }
+    void showReferenceMacros()
+    {
+        macros = osp::plugin::frame::ospMacroSpecs();
+        referenceParity = true;   // (and none of the product's additions to ANDOR OSP's panels)
+    }
 
     /** Each file becomes a new layer in the first free slots (beyond the third: not loaded). Returns how many. */
     int addLayers (const juce::Array<juce::File>& files);
@@ -337,7 +342,7 @@ private:
     std::atomic<float>* arpVelocityParam = nullptr;
     std::atomic<float>* seedParam = nullptr;
     // The per-card lanes (audio thread). Lane 0 is `arpeggiator` (card A, or the linked cards).
-    bool cardArp = false;
+    bool cardArp = false, referenceParity = false;
     std::atomic<float>* cardLinkParam = nullptr;
     std::array<std::atomic<float>*, 3> cardOnParams {};
     std::array<std::atomic<float>*, 2> lanePatternParams {}, laneRateParams {}, laneOctavesParams {};

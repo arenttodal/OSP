@@ -846,9 +846,11 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 ## Shell: the per-card arpeggiator (3 Nov 2026)
 
 - **Built (opt-in: `ProductInfo::cardArpeggiator`, a three-engine product; ANDOR OSP
-  unchanged).** The shell adds `arp.link` and `arp.cardA` / `arp.cardB` / `arp.cardC` (which
-  cards play the arpeggio; the others hold the keys), and B's and C's own PATTERN / RATE /
-  OCTAVES (`arp.cardB.*`, `arp.cardC.*`), all version hint 27. The defaults (LINK, every card)
+  unchanged).** The shell adds, in the product's namespace (`analog.`), `arp.link` and `arp.cardA` /
+  `arp.cardB` / `arp.cardC` (which cards play the arpeggio; the others hold the keys), and B's
+  and C's own PATTERN / RATE / OCTAVES (`arp.cardB.*`, `arp.cardC.*`), all version hint 27.
+  ANDOR OSP's schema stays exactly its own; the visual regression's parity render hides the
+  panel's additions. The defaults (LINK, every card)
   are the one arpeggiator, exactly as before: old sessions and presets play unchanged.
 - How it plays (`ShellProcessor::runCardArpeggiators`):
   - With LINK on and every card in it (or the arpeggiator off), the one arpeggiator runs as

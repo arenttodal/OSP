@@ -60,15 +60,15 @@ namespace
             // The per-card arpeggiator: every card arpeggiated and linked by default (the one
             // arpeggiator, exactly as before); B's and C's own settings start as A's defaults.
             auto id = [] (const juce::String& s) { return juce::ParameterID { s, 27 }; };
-            layout.add (std::make_unique<juce::AudioParameterBool> (id (osp::plugin::ids::arpLink), "Arp Link", true));
+            layout.add (std::make_unique<juce::AudioParameterBool> (id (osp::plugin::ids::arpLink (productInfo().slug + ".")), "Arp Link", true));
             for (int c = 0; c < 3; ++c)
-                layout.add (std::make_unique<juce::AudioParameterBool> (id (osp::plugin::ids::arpCard (c)), "Arp Card " + juce::String::charToString (static_cast<juce::juce_wchar> ('A' + c)), true));
+                layout.add (std::make_unique<juce::AudioParameterBool> (id (osp::plugin::ids::arpCard (productInfo().slug + ".", c)), "Arp Card " + juce::String::charToString (static_cast<juce::juce_wchar> ('A' + c)), true));
             for (int c = 1; c < 3; ++c)
             {
                 const auto name = "Arp Card " + juce::String::charToString (static_cast<juce::juce_wchar> ('A' + c)) + " ";
-                layout.add (std::make_unique<juce::AudioParameterChoice> (id (osp::plugin::ids::arpCardSetting (c, "pattern")), name + "Pattern", InstrumentHost::arpPatternNames(), 0));
-                layout.add (std::make_unique<juce::AudioParameterChoice> (id (osp::plugin::ids::arpCardSetting (c, "rate")), name + "Rate", InstrumentHost::arpRateNames(), 1));
-                layout.add (std::make_unique<juce::AudioParameterInt> (id (osp::plugin::ids::arpCardSetting (c, "octaves")), name + "Octaves", 1, 4, 1));
+                layout.add (std::make_unique<juce::AudioParameterChoice> (id (osp::plugin::ids::arpCardSetting (productInfo().slug + ".", c, "pattern")), name + "Pattern", InstrumentHost::arpPatternNames(), 0));
+                layout.add (std::make_unique<juce::AudioParameterChoice> (id (osp::plugin::ids::arpCardSetting (productInfo().slug + ".", c, "rate")), name + "Rate", InstrumentHost::arpRateNames(), 1));
+                layout.add (std::make_unique<juce::AudioParameterInt> (id (osp::plugin::ids::arpCardSetting (productInfo().slug + ".", c, "octaves")), name + "Octaves", 1, 4, 1));
             }
         }
         if (productInfo().addParameters != nullptr)
@@ -121,17 +121,17 @@ ShellProcessor::ShellProcessor (std::unique_ptr<Engine> productEngine)
     arpSwingParam = parameters.getRawParameterValue (osp::plugin::ids::arpSwing);
     arpVelocityParam = parameters.getRawParameterValue (osp::plugin::ids::arpVelocity);
     seedParam = parameters.getRawParameterValue (osp::plugin::ids::seed);
-    cardArp = arpBound && productInfo().cardArpeggiator && parameters.getRawParameterValue (osp::plugin::ids::arpLink) != nullptr;
+    cardArp = arpBound && productInfo().cardArpeggiator && parameters.getRawParameterValue (osp::plugin::ids::arpLink (productInfo().slug + ".")) != nullptr;
     if (cardArp)
     {
-        cardLinkParam = parameters.getRawParameterValue (osp::plugin::ids::arpLink);
+        cardLinkParam = parameters.getRawParameterValue (osp::plugin::ids::arpLink (productInfo().slug + "."));
         for (int c = 0; c < 3; ++c)
-            cardOnParams[static_cast<std::size_t> (c)] = parameters.getRawParameterValue (osp::plugin::ids::arpCard (c));
+            cardOnParams[static_cast<std::size_t> (c)] = parameters.getRawParameterValue (osp::plugin::ids::arpCard (productInfo().slug + ".", c));
         for (int c = 1; c < 3; ++c)
         {
-            lanePatternParams[static_cast<std::size_t> (c - 1)] = parameters.getRawParameterValue (osp::plugin::ids::arpCardSetting (c, "pattern"));
-            laneRateParams[static_cast<std::size_t> (c - 1)] = parameters.getRawParameterValue (osp::plugin::ids::arpCardSetting (c, "rate"));
-            laneOctavesParams[static_cast<std::size_t> (c - 1)] = parameters.getRawParameterValue (osp::plugin::ids::arpCardSetting (c, "octaves"));
+            lanePatternParams[static_cast<std::size_t> (c - 1)] = parameters.getRawParameterValue (osp::plugin::ids::arpCardSetting (productInfo().slug + ".", c, "pattern"));
+            laneRateParams[static_cast<std::size_t> (c - 1)] = parameters.getRawParameterValue (osp::plugin::ids::arpCardSetting (productInfo().slug + ".", c, "rate"));
+            laneOctavesParams[static_cast<std::size_t> (c - 1)] = parameters.getRawParameterValue (osp::plugin::ids::arpCardSetting (productInfo().slug + ".", c, "octaves"));
         }
     }
     modBound = osp::plugin::binding::anyBound ({ modRouteId (0, "source") }, bound);
