@@ -405,6 +405,16 @@ void SourceDisplay::setDropLabel (const juce::String& label)
     }
 }
 
+void SourceDisplay::setRulerLeftReserve (int pixels)
+{
+    if (rulerLeftReserve != pixels)
+    {
+        rulerLeftReserve = pixels;
+        cacheDirty = true;
+        repaint();
+    }
+}
+
 void SourceDisplay::setRulerReserve (int pixels)
 {
     if (rulerReserve != pixels)
@@ -756,7 +766,8 @@ void SourceDisplay::paintStatic (juce::Graphics& g)
                 continue;
             if (x > inner.getRight() - 2.0f)
                 break;
-            const bool labelFits = x < inner.getRight() - std::max (30.0f, static_cast<float> (rulerReserve) + 18.0f);
+            const bool labelFits = x < inner.getRight() - std::max (30.0f, static_cast<float> (rulerReserve) + 18.0f)
+                                   && x > inner.getX() + static_cast<float> (rulerLeftReserve);
             const bool major = std::abs (std::fmod (t + 1.0e-9, step)) < 1.0e-6;
             g.setColour (colour::wellGrid.withAlpha (major ? 0.95f : 0.45f));
             g.fillRect (juce::Rectangle<float> (x, inner.getY(), 1.0f, inner.getHeight()));
@@ -1364,8 +1375,31 @@ void ModifierButton::setSuppressed (bool s, const juce::String& why)
 
 void ModifierButton::mouseUp (const juce::MouseEvent& e)
 {
-    if (! suppressed && getLocalBounds().contains (e.getPosition()))
+    if (getLocalBounds().contains (e.getPosition()))
+        toggle();
+}
+
+void ModifierButton::toggle()
+{
+    if (! suppressed)
         attachment.setValueAsCompleteGesture (on ? 0.0f : 1.0f);
+}
+
+void ModifierButton::setInWell (bool shouldBeInWell)
+{
+    inWell = shouldBeInWell;
+    setWantsKeyboardFocus (inWell);
+    repaint();
+}
+
+bool ModifierButton::keyPressed (const juce::KeyPress& key)
+{
+    if (inWell && (key == juce::KeyPress::spaceKey || key == juce::KeyPress::returnKey))
+    {
+        toggle();
+        return true;
+    }
+    return false;
 }
 
 skin::KeyState ModifierButton::keyState() const
@@ -1387,6 +1421,27 @@ skin::KeyState LayerStateButton::keyState() const
 
 void ModifierButton::paint (juce::Graphics& g)
 {
+    if (inWell)
+    {
+        // In the dark well: a small graphite key (the well's own controls' language), the
+        // icon cream when off, the accent with a fine accent rim when on.
+        const auto r = getLocalBounds().toFloat().reduced (1.0f);
+        const bool active = on && ! suppressed;
+        const bool hot = (isMouseOver() || hasKeyboardFocus (false)) && ! suppressed;
+        g.setColour (juce::Colour (active ? 0xff2c2a27 : 0xff252a2b).withAlpha (0.92f));
+        g.fillRoundedRectangle (r, 4.0f);
+        g.setColour (active ? onColour.withAlpha (0.85f) : juce::Colour (0xff4a5254).withAlpha (hot ? 1.0f : 0.7f));
+        g.drawRoundedRectangle (r.reduced (0.5f), 4.0f, active ? 1.2f : 1.0f);
+        if (hasKeyboardFocus (false))
+        {
+            g.setColour (juce::Colour (0xffd9dcd8).withAlpha (0.6f));
+            g.drawRoundedRectangle (r.expanded (0.5f), 4.5f, 1.0f);
+        }
+        const auto colour = active ? onColour.brighter (0.15f) : juce::Colour (0xffd9dcd8).withAlpha (suppressed ? 0.25f : (hot ? 0.95f : 0.7f));
+        const float icon = 0.62f * r.getHeight();
+        icons::draw (g, this->icon, r.withSizeKeepingCentre (icon, icon), colour, std::max (1.0f, 0.06f * r.getHeight()));
+        return;
+    }
     const auto r = getLocalBounds().toFloat().reduced (1.5f);
     // One state rule for all four: off, a neutral raised key with a soft graphite icon at
     // about 60 %; on, the key pressed in with a fine accent rim and the icon in the accent.
@@ -1667,9 +1722,46 @@ void EngineCard::replaceKnob (int slot, const juce::String& parameterId, const j
 
 void EngineCard::setModifiersShown (bool shown)
 {
+    modifiersShown = shown;
+    updateModifiers();
+}
+
+void EngineCard::setModifiersInWell (bool inWell)
+{
+    if (modifiersInWell == inWell)
+        return;
+    modifiersInWell = inWell;
     for (auto& m : modifiers)
         if (m != nullptr)
+            m->setInWell (inWell);
+    resized();
+}
+
+void EngineCard::setModifiersApplicable (int mask)
+{
+    if (modifiersApplicable == mask)
+        return;
+    modifiersApplicable = mask;
+    if (modifiersInWell)
+        resized();   // (the row closes up around the ones shown)
+    else
+        updateModifiers();
+}
+
+void EngineCard::updateModifiers()
+{
+    // In the well they give way to whatever takes it (the EQ, the note map, an editor).
+    const bool wellTaken = eqEditor != nullptr || noteMap != nullptr || synthEditor != nullptr || (wellEditor != nullptr && wellEditor->isVisible());
+    for (std::size_t i = 0; i < modifiers.size(); ++i)
+        if (auto& m = modifiers[i]; m != nullptr)
+        {
+            bool shown = modifiersShown;
+            if (modifiersInWell)
+                shown = shown && (modifiersApplicable & (1 << static_cast<int> (i))) != 0 && sourceDisplay.isVisible() && ! wellTaken;
             m->setVisible (shown);
+            if (shown && modifiersInWell)
+                m->toFront (false);
+        }
 }
 
 bool EngineCard::hasControl (const juce::String& parameterId) const
@@ -1703,6 +1795,8 @@ void EngineCard::setWellOverlay (std::unique_ptr<WellOverlay> overlay)
 
 void EngineCard::updateWellOverlay()
 {
+    if (modifiersInWell)
+        updateModifiers();
     if (wellOverlay == nullptr)
         return;
     const bool wellTaken = eqEditor != nullptr || noteMap != nullptr || synthEditor != nullptr || (wellEditor != nullptr && wellEditor->isVisible());
@@ -2774,7 +2868,30 @@ void EngineCard::resized()
         }
     };
 
-    if (! triple)
+    if (modifiersInWell)
+    {
+        // The modifiers in the well (placed with it, below): the knobs have the card's
+        // width, at the row's place for the density, the foot free.
+        if (triple)
+            row (16.0f, w - 16.0f, 0.87f * 100.0f, 0.87f * 113.0f, h - 136.0f, true);
+        else
+            row (16.0f, w - 16.0f, 0.87f * 110.0f, 0.87f * 125.0f, h - 123.0f + 50.5f, false);
+        dividerArea = {};
+        // A compact row of icon keys at the well's top-left, only the ones that apply, the
+        // ruler's labels clear of it (the source's type stays at the top-right).
+        const auto well = sourceDisplay.getBounds().toFloat();
+        const float size = triple ? 22.0f : 24.0f, gapX = 4.0f;
+        float x = well.getX() + 10.0f;
+        for (std::size_t i = 0; i < modifiers.size(); ++i)
+            if (modifiers[i] != nullptr && (modifiersApplicable & (1 << static_cast<int> (i))) != 0)
+            {
+                modifiers[i]->setBounds (at ({ x, well.getY() + 8.0f, size + 4.0f, size }));
+                x += size + 4.0f + gapX;
+            }
+        sourceDisplay.setRulerLeftReserve (static_cast<int> (x - well.getX()) + 4);
+        updateModifiers();
+    }
+    else if (! triple)
     {
         // The 2 x 2 modifiers at the right edge, behind a hairline; the knobs left of it.
         const float right = w - 16.0f;

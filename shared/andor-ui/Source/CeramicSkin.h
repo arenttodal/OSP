@@ -207,6 +207,8 @@ public:
     /** Where the key's body is drawn within its bounds (the surface's coordinates): a key
         may keep a taller hit area than the body it shows (the source header's mode). */
     virtual juce::Rectangle<float> keyArea (juce::Rectangle<float> bounds) const { return bounds; }
+    /** False: the key draws itself (one set in a dark well), the surface leaves it alone. */
+    virtual bool keyOnSurface() const { return true; }
 };
 
 /** The A1 key of every visible child of `surface` that is a KeyFace, at its bounds. */

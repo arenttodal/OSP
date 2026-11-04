@@ -139,6 +139,12 @@ struct ProductInfo
     /** Whether a card shows its four modifier keys (LINK REVERSE LOOP FOLLOW): a product hides
         them where they mean nothing (an oscillator). Unset: shown, as in ANDOR OSP. */
     std::function<bool (int layer, osp::plugin::InstrumentHost&)> cardModifiersShown;
+    /** The modifiers as a compact row of icon keys in the dark well (top-left) instead of the
+        keys under the knobs (EngineCard::setModifiersInWell), and which of them apply to a
+        layer's source now (bits 0 LINK, 1 REVERSE, 2 LOOP, 3 FOLLOW; null: all). Off: ANDOR
+        OSP's keys. */
+    bool cardModifiersInWell = false;
+    std::function<int (int layer, osp::plugin::InstrumentHost&)> cardModifiersApplicable;
     /** The header MIX's end labels (three engines: the generator side against the hybrid,
         e.g. "A+B" and "C"). Empty: the layers' letters. */
     std::array<juce::String, 2> mixEndLabels;

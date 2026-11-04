@@ -75,6 +75,8 @@ public:
     void setBottomInset (int pixels);
     /** The ruler's labels keep clear of this many pixels at the top-right (a control sits there). */
     void setRulerReserve (int pixels);
+    /** ... and of this many at the top-left (the modifiers' row in the well). */
+    void setRulerLeftReserve (int pixels);
     /** A short display: the granular strip floats over the waveform on a translucent band of this height. */
     void setOverlayBand (int pixels);
 
@@ -131,7 +133,7 @@ private:
     View view;
     std::vector<Dot> grains, heads;
     juce::String dropLabel;
-    int bottomInset = 0, overlayBand = 0, rulerReserve = 0;
+    int bottomInset = 0, overlayBand = 0, rulerReserve = 0, rulerLeftReserve = 0;
     juce::Image cache;
     bool cacheDirty = true;
     juce::Image backdrop;
@@ -192,19 +194,29 @@ public:
     ModifierButton (juce::RangedAudioParameter& parameter, icons::Kind icon, juce::Colour onColour);
     void setSuppressed (bool suppressed, const juce::String& why);
     bool isOn() const noexcept { return on; }
+    /** A small icon key in a dark well (EngineCard::setModifiersInWell): graphite, drawn by
+        itself, and reachable from the keyboard (space or return toggles it). Opt-in. */
+    void setInWell (bool inWell);
+    bool isInWell() const noexcept { return inWell; }
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override { skin::repaintKey (*this); }
     void mouseUp (const juce::MouseEvent&) override;
     void mouseEnter (const juce::MouseEvent&) override { skin::repaintKey (*this); }
     void mouseExit (const juce::MouseEvent&) override { skin::repaintKey (*this); }
+    bool keyPressed (const juce::KeyPress&) override;
+    void focusGained (FocusChangeType) override { repaint(); }
+    void focusLost (FocusChangeType) override { repaint(); }
     skin::KeyRole keyRole() const override { return skin::KeyRole::modifier; }
     skin::KeyState keyState() const override;
+    bool keyOnSurface() const override { return ! inWell; }
+    /** One toggle (a click, or space / return), as a host gesture. */
+    void toggle();
 
 private:
     icons::Kind icon;
     juce::Colour onColour;
     juce::String tip;
-    bool on = false, suppressed = false;
+    bool on = false, suppressed = false, inWell = false;
     juce::ParameterAttachment attachment;
 };
 
@@ -411,6 +423,15 @@ public:
     /** The four modifier keys (LINK REVERSE LOOP FOLLOW) shown, or hidden for a source they
         mean nothing to (a product's oscillator, its noise). Shown by default. */
     void setModifiersShown (bool shown);
+    /** The modifiers as a compact row of icon keys at the top-left of the dark well instead
+        of the keys under the knobs (a product's choice; ANDOR OSP keeps its keys). The card's
+        own foot is then free, as on a card without them. */
+    void setModifiersInWell (bool inWell);
+    /** Which of the four apply to the source now (LINK REVERSE LOOP FOLLOW, bits 0..3): the
+        others are not shown. All by default. */
+    void setModifiersApplicable (int mask);
+    /** Tests: modifier `index`'s key (0 LINK .. 3 FOLLOW), or nullptr. */
+    ModifierButton* modifierKey (int index) const noexcept { return index >= 0 && index < 4 ? modifiers[static_cast<std::size_t> (index)].get() : nullptr; }
     /** Controls revealed in the well by the pointer (ProductInfo::wellOverlay); null: none.
         Hidden while the EQ, the note map or the in-card editor take the well. */
     void setWellOverlay (std::unique_ptr<WellOverlay> overlay);
@@ -510,6 +531,9 @@ private:
     std::unique_ptr<SynthEditor> synthEditor;          ///< the SYNTH page, while open
     std::unique_ptr<SynthChip> synthChip;              ///< SYNTHESIZE in the well's corner (a host with hasSynthesize(); null otherwise)
     std::array<std::unique_ptr<ModifierButton>, 4> modifiers;
+    bool modifiersShown = true, modifiersInWell = false;
+    int modifiersApplicable = 0xf;
+    void updateModifiers();
     LayerStateButton muteButton, soloButton;
     bool shownHeard = true;
     std::array<std::unique_ptr<MiniKnob>, 5> granularKnobs;

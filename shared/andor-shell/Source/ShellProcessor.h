@@ -110,6 +110,8 @@ public:
     bool cardArpeggiator() const noexcept override { return cardArp && ! referenceParity; }
     /** The effects rack's modules (the product's; none in the visual regression's parity render). */
     bool showsRack() const noexcept { return ! referenceParity && ! product().rackModules.empty(); }
+    /** The cards' modifiers in their wells (the product's choice; not in the parity render). */
+    bool modifiersInWell() const noexcept { return ! referenceParity && product().cardModifiersInWell; }
     juce::String cardArpNamespace() const override { return productInfo().slug + "."; }
     void setArpViewCard (int shown) noexcept override { arpViewLane.store (std::clamp (shown, 0, 2), std::memory_order_relaxed); }
 

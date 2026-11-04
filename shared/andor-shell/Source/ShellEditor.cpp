@@ -1258,6 +1258,9 @@ void ShellEditor::refreshCardExtensions()
         }
         if (product.cardModifiersShown != nullptr)
             card.setModifiersShown (product.cardModifiersShown (l, shell));
+        card.setModifiersInWell (shell.modifiersInWell());
+        if (shell.modifiersInWell() && product.cardModifiersApplicable != nullptr)
+            card.setModifiersApplicable (product.cardModifiersApplicable (l, shell));
         if (product.wellOverlay != nullptr)
         {
             const auto key = product.wellOverlayKey != nullptr ? product.wellOverlayKey (l, shell) : juce::String ("-");
