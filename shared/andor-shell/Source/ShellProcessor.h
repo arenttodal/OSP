@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CardArpLanes.h"
 #include "InstrumentHost.h"
 #include "InstrumentLoader.h"
 #include "ShellProduct.h"
@@ -323,8 +324,6 @@ private:
         an arpeggiator playing some cards, and the held keys on the others. */
     const juce::MidiBuffer& runCardArpeggiators (const juce::MidiBuffer& midi, int numSamples, const osp::HostTiming& timing) noexcept;
     osp::Arpeggiator::Settings arpSettings() noexcept;
-    void trackOutput (const juce::MidiBuffer& out) noexcept;
-    void releaseSounding (juce::MidiBuffer& out) noexcept;
     void publishArpDisplay() noexcept;
     /** ARP RATE's Stepped mode: the musical ratio nearest a speed (as ANDOR OSP's). */
     static double steppedArpRatio (double multiplier) noexcept;
@@ -341,28 +340,17 @@ private:
     std::atomic<float>* arpSwingParam = nullptr;
     std::atomic<float>* arpVelocityParam = nullptr;
     std::atomic<float>* seedParam = nullptr;
-    // The per-card lanes (audio thread). Lane 0 is `arpeggiator` (card A, or the linked cards).
+    // The per-card lanes (audio thread; osp::plugin::CardArpLanes, shared with ANDOR OSP's
+    // processor). Lane 0 is `arpeggiator` (card A, or the linked cards).
     bool cardArp = false, referenceParity = false;
     std::atomic<float>* cardLinkParam = nullptr;
     std::array<std::atomic<float>*, 3> cardOnParams {};
     std::array<std::atomic<float>*, 2> lanePatternParams {}, laneRateParams {}, laneOctavesParams {};
-    std::array<std::uint8_t, 3> laneMask {};      ///< the cards each lane plays (0: idle)
-    std::uint8_t passMask = 0;                    ///< the cards that hold the keys
-    int laneConfig = 0;                           ///< 0: the one arpeggiator; else LINK and the cards
-    bool forceArpOff = false;                     ///< no card plays the arpeggio: the keys as played
-    bool pedalDown = false;
-    /** The lanes' larger state, on the heap (allocated with the parameters, never on the
-        audio thread): a processor on a stack (a host's, a test's) stays small. */
-    struct CardLanes
-    {
-        std::array<osp::Arpeggiator, 2> laneArps;     ///< cards B and C, unlinked
-        juce::MidiBuffer laneMidi, legacyInput;
-        std::array<std::array<std::uint8_t, 128>, 16> heldKeys {};      ///< velocity of each key down, by channel
-        std::array<std::array<std::uint8_t, 128>, 16> passChannel {};   ///< the channel a held key sounds on (0: none)
-        std::array<std::array<bool, 128>, 16> passSustained {};         ///< released under the pedal
-        std::array<std::array<bool, 128>, 16> soundingOut {};           ///< what the engine was given, by channel
-    };
-    std::unique_ptr<CardLanes> lanes;
+    struct LaneHost;
+    /** The lanes and their host adapter, on the heap (allocated with the parameters, never on
+        the audio thread, only for a product that opts in): a processor on a stack stays small. */
+    std::unique_ptr<osp::plugin::CardArpLanes> lanes;
+    std::unique_ptr<LaneHost> laneHost;
     std::atomic<int> arpViewLane { 0 };           ///< the lane the ARP display shows
     std::array<std::atomic<int>, osp::Arpeggiator::displaySteps> arpDisplayLow {}, arpDisplayHigh {};
     std::atomic<int> arpDisplayCurrent { -1 };

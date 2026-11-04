@@ -656,8 +656,12 @@ void InstrumentEngine::startNote (int note, int velocity, int channel) noexcept
     const std::uint64_t eventIndex = noteCounter++;
     post.noteStarted();   // without a running transport SHAPER starts its pattern here
     static constexpr std::array<std::uint64_t, 3> salt { 0, 0x4c61796572420000ull, 0x4c61796572430000ull };
+    // Card routing: the channel names the layers (the event index is spent either way, so a
+    // layer's randomness does not depend on which others the note plays).
+    const int mask = cardRouting ? std::clamp (channel - 1, 0, 7) : 7;
     for (int layer = 0; layer < EngineSettings::layers; ++layer)
-        noteOnLayer (layer, note, velocity, channel, eventIndex ^ salt[static_cast<std::size_t> (layer)]);
+        if ((mask & (1 << layer)) != 0)
+            noteOnLayer (layer, note, velocity, channel, eventIndex ^ salt[static_cast<std::size_t> (layer)]);
 }
 
 void InstrumentEngine::monoNoteOn (int note, int velocity, int channel) noexcept
@@ -885,7 +889,7 @@ void InstrumentEngine::noteOff (int note, int channel) noexcept
 void InstrumentEngine::releaseNote (int note, int channel) noexcept
 {
     for (auto& voice : voices)
-        if (voice.isActive() && ! voice.isReleased() && voice.note() == note && (channel == 0 || ! mpe || voice.channel() == channel))
+        if (voice.isActive() && ! voice.isReleased() && voice.note() == note && (channel == 0 || (! mpe && ! cardRouting) || voice.channel() == channel))
         {
             if (pedalDown)
                 voice.setHeldByPedal (true);

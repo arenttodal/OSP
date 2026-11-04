@@ -394,10 +394,16 @@ public:
     };
     virtual ArpView arpView() const noexcept = 0;
     /** The per-card arpeggiator (a three-engine product's): the ARP panel then shows which
-        cards it plays, LINK, and each card's own settings. False (ANDOR OSP): one arpeggiator. */
+        cards it plays, LINK, and each card's own settings (ANDOR OSP and every three-engine
+        product that opts in). False: one arpeggiator. */
     virtual bool cardArpeggiator() const noexcept { return false; }
     /** Its parameters' namespace (the product's, "analog."): ids::arpLink (ns) ... */
     virtual juce::String cardArpNamespace() const { return {}; }
+    /** The per-card arpeggiator's parameters (version hint 27), in namespace `ns` (ANDOR OSP:
+        "", so arp.link, arp.cardA ..; a shell product: its own, "analog."): LINK and every
+        card arpeggiated by default (the one arpeggiator, exactly as before); B's and C's own
+        PATTERN / RATE / OCTAVES start as A's defaults. One definition for OSP and the shell. */
+    static void addCardArpParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, const juce::String& ns);
     /** The card (shown, 0 A .. 2 C) whose lane arpView() shows (the one the panel edits). */
     virtual void setArpViewCard (int shown) noexcept { juce::ignoreUnused (shown); }
 

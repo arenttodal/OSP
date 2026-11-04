@@ -131,6 +131,27 @@ namespace parameterschema
         return true;
     }
 
+    /** ANDOR OSP's golden listing (never rewritten from here: a product compares against it). */
+    inline juce::StringArray ospGolden (const juce::String& goldenName)
+    {
+        const auto golden = juce::File (OSP_SOURCE_DIR).getChildFile ("tests/plugin/golden").getChildFile (goldenName);
+        INFO ("missing golden: " << golden.getFullPathName());
+        REQUIRE (golden.existsAsFile());
+        return juce::StringArray::fromLines (golden.loadFileAsString());
+    }
+
+    /** Every line of `listing` is the same parameter as `expected`'s, in the same order. */
+    inline void compareListings (const juce::String& listing, const juce::StringArray& expected)
+    {
+        const auto actual = juce::StringArray::fromLines (listing);
+        CHECK (actual.size() == expected.size());
+        for (int i = 0; i < std::min (actual.size(), expected.size()); ++i)
+        {
+            INFO ("parameter " << i << "\n  actual:   " << actual[i] << "\n  expected: " << expected[i]);
+            CHECK (sameLine (actual[i], expected[i]));
+        }
+    }
+
     inline void checkAgainstGoldenFile (const juce::String& listing, const juce::File& golden)
     {
         if (const char* update = std::getenv ("OSP_UPDATE_GOLDEN"); update != nullptr && juce::String (update) == "1")
@@ -142,14 +163,7 @@ namespace parameterschema
             INFO ("missing golden; run with OSP_UPDATE_GOLDEN=1 to create: " << golden.getFullPathName());
             REQUIRE (golden.existsAsFile());
         }
-        const auto expected = juce::StringArray::fromLines (golden.loadFileAsString());
-        const auto actual = juce::StringArray::fromLines (listing);
-        CHECK (actual.size() == expected.size());
-        for (int i = 0; i < std::min (actual.size(), expected.size()); ++i)
-        {
-            INFO ("parameter " << i << "\n  actual:   " << actual[i] << "\n  expected: " << expected[i]);
-            CHECK (sameLine (actual[i], expected[i]));
-        }
+        compareListings (listing, juce::StringArray::fromLines (golden.loadFileAsString()));
     }
 
     inline void checkAgainstGolden (const juce::String& listing, const juce::String& goldenName)

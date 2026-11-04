@@ -368,8 +368,17 @@ void Arpeggiator::ensureSequence() const noexcept
     sortedCount = held;
     for (int i = 0; i < held; ++i)
         sortedIndex[static_cast<std::size_t> (i)] = i;
-    std::stable_sort (sortedIndex.begin(), sortedIndex.begin() + sortedCount,
-                      [this] (int a, int b) { return heldNotes[static_cast<std::size_t> (a)].note < heldNotes[static_cast<std::size_t> (b)].note; });
+    // An insertion sort: stable, at most maxHeld notes, and no allocation (std::stable_sort
+    // asks for a temporary buffer, on the audio thread).
+    for (int i = 1; i < sortedCount; ++i)
+    {
+        const int moving = sortedIndex[static_cast<std::size_t> (i)];
+        const int note = heldNotes[static_cast<std::size_t> (moving)].note;
+        int j = i;
+        for (; j > 0 && heldNotes[static_cast<std::size_t> (sortedIndex[static_cast<std::size_t> (j - 1)])].note > note; --j)
+            sortedIndex[static_cast<std::size_t> (j)] = sortedIndex[static_cast<std::size_t> (j - 1)];
+        sortedIndex[static_cast<std::size_t> (j)] = moving;
+    }
 
     // The notes in order (ascending, or as played) over OCTAVES; each style is a walk over them.
     std::array<Step, maxHeld * arp::maxOctaves> base {};
