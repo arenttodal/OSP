@@ -16,6 +16,10 @@ void PostProcessor::prepare (double rate, int /*maximumBlockSize*/, std::uint64_
     sampleRate = rate;
     reimaginedStage.prepare (rate, seed);
     movement.prepare (rate, seed);
+    movementB.prepare (rate, seed + 0x9e3779b97f4a7c15ull);   // (its own randomness)
+    laneCoef = 1.0 - std::exp (-1.0 / (0.006 * rate));          // a lane on / off: in or out within ~30 ms
+    guardCoef = 1.0 - std::exp (-1.0 / (0.3 * rate));
+    guardSmooth = 1.0 - std::exp (-1.0 / (0.05 * rate));
     for (auto& r : reverbs)
         r.prepare (rate);
     for (auto& a : abysses)
@@ -37,8 +41,13 @@ void PostProcessor::reset() noexcept
     reimaginedStage.reset();
     space = spaceTarget;
     countdown = 0;
-    movement.setTargets (shaping, motionTarget);
+    applyMovementTargets();
     movement.reset();
+    movementB.reset();
+    laneA.mix = laneA.on ? 1.0 : 0.0;
+    laneB.mix = laneB.on ? 1.0 : 0.0;
+    guardIn = guardOut = 0.0;
+    guardGain = 1.0;
     appliedSpace = SpaceReverb::Settings::from (shaping);
     appliedAbyss = AbyssReverb::Settings::from (shaping);
     appliedVintage = VintageReverb::Settings::from (shaping);
@@ -196,7 +205,7 @@ void PostProcessor::setMacros (const Macros& macros) noexcept
     spaceTarget = 1.25 * std::pow (std::clamp (macros.space, 0.0, 1.0), 1.2);
     // ECHO is a send too: 50 % sits the repeats just under the dry sound, 100 % level with it.
     echoTarget = std::pow (std::clamp (macros.echo, 0.0, 1.0), 1.4);
-    movement.setTargets (shaping, motionTarget);
+    applyMovementTargets();
     driveAmount = std::clamp (macros.drive, 0.0, 1.0);
     drive.setSettings (DriveProcessor::Settings::from (shaping, driveAmount));
 }
@@ -204,14 +213,87 @@ void PostProcessor::setMacros (const Macros& macros) noexcept
 void PostProcessor::setShaping (const Shaping& newShaping) noexcept
 {
     shaping = newShaping;
-    movement.setTargets (shaping, motionTarget);
+    applyMovementTargets();
     echo.setSettings (EchoDelay::Settings::from (shaping));
     drive.setSettings (DriveProcessor::Settings::from (shaping, driveAmount));
+}
+
+void PostProcessor::applyMovementTargets() noexcept
+{
+    if (! lanes)
+    {
+        movement.setTargets (shaping, motionTarget);   // one lane: as always
+        return;
+    }
+    movement.setTargets (shaping, motionTarget * std::clamp (laneA.level, 0.0, 1.0));
+    movementB.setTargets (laneBSettings, motionTarget * std::clamp (laneB.level, 0.0, 1.0));
+}
+
+void PostProcessor::setMovementLanes (bool aOn, double aLevel, bool bOn, double bLevel, const Shaping& bSettings) noexcept
+{
+    lanes = true;
+    laneA.on = aOn;
+    laneA.level = aLevel;
+    if (bOn && ! laneB.on && laneB.mix <= 0.0)
+        movementB.reset();   // (comes in clean: no old delay line, its clock from the start)
+    laneB.on = bOn;
+    laneB.level = bLevel;
+    laneBSettings = bSettings;
+    applyMovementTargets();
+}
+
+void PostProcessor::processLanes (float& l, float& r) noexcept
+{
+    auto glide = [this] (Lane& lane) {
+        const double target = lane.on ? 1.0 : 0.0;
+        lane.mix += (target - lane.mix) * laneCoef;
+        if (std::abs (target - lane.mix) < 1.0e-5)
+            lane.mix = target;
+    };
+    glide (laneA);
+    glide (laneB);
+    if (laneA.mix > 0.0)
+    {
+        float al = l, ar = r;
+        movement.process (al, ar);
+        if (laneA.mix >= 1.0)
+        {
+            l = al;
+            r = ar;
+        }
+        else
+        {
+            const auto w = static_cast<float> (laneA.mix);
+            l += w * (al - l);
+            r += w * (ar - r);
+        }
+    }
+    if (laneB.mix > 0.0)
+    {
+        float bl = l, br = r;
+        movementB.process (bl, br);
+        // The guard: TAPE and CHORUS after lane A never raise the level (slow, at most -6 dB).
+        double target = 1.0;
+        if (laneBSettings.movementMode == MovementMode::tape || laneBSettings.movementMode == MovementMode::chorus)
+        {
+            guardIn += (0.5 * (static_cast<double> (l) * l + static_cast<double> (r) * r) - guardIn) * guardCoef;
+            guardOut += (0.5 * (static_cast<double> (bl) * bl + static_cast<double> (br) * br) - guardOut) * guardCoef;
+            if (guardOut > guardIn && guardOut > 1.0e-12)
+                target = std::max (0.5, std::sqrt (guardIn / guardOut));
+        }
+        guardGain += (target - guardGain) * guardSmooth;
+        bl *= static_cast<float> (guardGain);
+        br *= static_cast<float> (guardGain);
+        const auto w = static_cast<float> (laneB.mix);
+        l += w * (bl - l);
+        r += w * (br - r);
+    }
 }
 
 void PostProcessor::setTiming (const HostTiming& timing) noexcept
 {
     movement.setTiming (timing);
+    movementB.setTiming (timing);
     if (timing.bpm > 1.0)
     {
         echo.setTempo (timing.bpm);   // ECHO follows the tempo even when the host gives no position
@@ -312,7 +394,10 @@ void PostProcessor::process (float* left, float* right, int numSamples) noexcept
 
         drive.process (l, r);   // returns at once (untouched) while DRIVE is 0
 
-        movement.process (l, r);
+        if (lanes)
+            processLanes (l, r);
+        else
+            movement.process (l, r);
 
         // ECHO as a send, in parallel with SPACE (each hears the dry sound only).
         echoLevel += (echoTarget - echoLevel) * spaceCoef;

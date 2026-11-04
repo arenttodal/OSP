@@ -46,7 +46,19 @@ namespace
         osp::ShaperPattern from, to;
     };
 
+    /** The second MOVEMENT lane's pattern, one undo step. */
+    struct LaneShaperAction final : juce::UndoableAction
+    {
+        LaneShaperAction (ShellProcessor& p, int l, const osp::ShaperPattern& a, const osp::ShaperPattern& b) : processor (p), lane (l), from (a), to (b) {}
+        bool perform() override { processor.setLaneShaperPattern (lane, to, false); return true; }
+        bool undo() override { processor.setLaneShaperPattern (lane, from, false); return true; }
+        ShellProcessor& processor;
+        int lane;
+        osp::ShaperPattern from, to;
+    };
+
     const juce::Identifier sourcesType ("Sources"), layerType ("Layer"), viewType ("View"), curvesType ("Curves"), shaperType ("Shaper"), keyDnaType ("KeyDna");
+    const juce::Identifier shaperBType ("ShaperB");
 
     /** ANDOR OSP's schema, then the product's own parameters (ProductInfo::addParameters). */
     juce::AudioProcessorValueTreeState::ParameterLayout productParameterLayout()
@@ -156,6 +168,7 @@ ShellProcessor::ShellProcessor (std::unique_ptr<Engine> productEngine)
     for (std::size_t i = 0; i < ccNumbers.size(); ++i)
         ccNumbers[i].store (defaultControllers[i]);
     publishShaperPattern();
+    publishShaperPatternB();
     for (int i = 0; i < modCurveCount; ++i)
         publishCurve (i);
     store = std::make_unique<osp::plugin::SampleStore> (sampleStoreFolder());
@@ -212,6 +225,7 @@ void ShellProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
         pedalDown = false;
     }
     shaperGenerationSeen = 0;   // the prepared engine is given the pattern, curves and modulation again
+    shaperGenerationSeenB = 0;
     curveGenerationSeen.fill (0);
     modDirty = true;
     setLatencySamples (engine->latencySamples());
@@ -331,6 +345,18 @@ void ShellProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
             pattern[i].shape = static_cast<osp::StepShape> (std::clamp (static_cast<int> (shaperSteps[3 * i + 2].load (std::memory_order_relaxed)), 0, 5));
         }
         engine->setShaperPattern (pattern);
+    }
+    if (const auto generation = shaperGenerationB.load (std::memory_order_acquire); generation != shaperGenerationSeenB)
+    {
+        shaperGenerationSeenB = generation;
+        osp::ShaperPattern pattern;
+        for (std::size_t i = 0; i < pattern.size(); ++i)
+        {
+            pattern[i].start = shaperStepsB[3 * i].load (std::memory_order_relaxed);
+            pattern[i].end = shaperStepsB[3 * i + 1].load (std::memory_order_relaxed);
+            pattern[i].shape = static_cast<osp::StepShape> (std::clamp (static_cast<int> (shaperStepsB[3 * i + 2].load (std::memory_order_relaxed)), 0, 5));
+        }
+        engine->setLaneShaperPattern (1, pattern);
     }
     for (int c = 0; c < modCurveCount; ++c)
     {
@@ -1202,6 +1228,8 @@ std::unique_ptr<juce::XmlElement> ShellProcessor::stateXml() const
         xml->createNewChildElement (curvesType.toString())->setAttribute ("value", encodeModulationCurves (curves));
     }
     xml->createNewChildElement (shaperType.toString())->setAttribute ("value", encodeShaperPattern (shaperCustomPattern()));
+    if (movementLaneCount() > 1)
+        xml->createNewChildElement (shaperBType.toString())->setAttribute ("value", encodeShaperPattern (laneShaperPattern (1)));
     if (engine->hasKeyDna())
     {
         // KEY DNA: ANDOR OSP's own tree (schema 1), so a profile reopens exactly.
@@ -1306,6 +1334,12 @@ bool ShellProcessor::applyStateXml (const juce::XmlElement& xml)
         const auto* shaper = xml.getChildByName (shaperType);
         const auto decoded = shaper != nullptr ? decodeShaperPattern (shaper->getStringAttribute ("value")) : std::nullopt;
         setShaperCustomPattern (decoded.value_or (osp::RhythmicShaper::patternSteps (osp::ShaperParams().pattern)), false);
+    }
+    if (movementLaneCount() > 1)
+    {
+        const auto* shaper = xml.getChildByName (shaperBType);
+        const auto decoded = shaper != nullptr ? decodeShaperPattern (shaper->getStringAttribute ("value")) : std::nullopt;
+        setLaneShaperPattern (1, decoded.value_or (osp::RhythmicShaper::patternSteps (osp::ShaperParams().pattern)), false);
     }
     if (auto* view = xml.getChildByName (viewType))
     {
@@ -1513,6 +1547,8 @@ void ShellProcessor::resetSettings()
     if (auto links = parameters.state.getChildWithName (modLinksTreeType()); links.isValid())
         parameters.state.removeChild (links, nullptr);
     setShaperCustomPattern (osp::RhythmicShaper::patternSteps (osp::ShaperParams().pattern), false);
+    if (movementLaneCount() > 1)
+        setLaneShaperPattern (1, osp::RhythmicShaper::patternSteps (osp::ShaperParams().pattern), false);
     engine->restoreState (juce::XmlElement (productInfo().stateType), sampleStoreFolder());   // (none of its own)
     if (productInfo().threeEngines.enabled && isGenerator())
         centreHybridMix();   // (three engines: the MIX in the middle, every card heard)
@@ -1635,6 +1671,48 @@ void ShellProcessor::publishShaperPattern() noexcept
         shaperSteps[3 * i + 2].store (static_cast<float> (pattern[i].shape), std::memory_order_relaxed);
     }
     shaperGeneration.fetch_add (1, std::memory_order_release);
+}
+
+osp::ShaperPattern ShellProcessor::laneShaperPattern (int lane) const
+{
+    if (lane <= 0)
+        return shaperCustomPattern();
+    const juce::ScopedLock lock (shaperLock);
+    return shaperPatternB;
+}
+
+void ShellProcessor::setLaneShaperPattern (int lane, const osp::ShaperPattern& pattern, bool undoable)
+{
+    if (lane <= 0)
+    {
+        setShaperCustomPattern (pattern, undoable);
+        return;
+    }
+    const auto before = laneShaperPattern (lane);
+    if (before == pattern)
+        return;
+    if (undoable)
+    {
+        undoManager.perform (new LaneShaperAction (*this, lane, before, pattern));
+        return;
+    }
+    {
+        const juce::ScopedLock lock (shaperLock);
+        shaperPatternB = pattern;
+    }
+    publishShaperPatternB();
+}
+
+void ShellProcessor::publishShaperPatternB() noexcept
+{
+    const auto pattern = laneShaperPattern (1);
+    for (std::size_t i = 0; i < pattern.size(); ++i)
+    {
+        shaperStepsB[3 * i].store (std::clamp (pattern[i].start, 0.0f, 1.0f), std::memory_order_relaxed);
+        shaperStepsB[3 * i + 1].store (std::clamp (pattern[i].end, 0.0f, 1.0f), std::memory_order_relaxed);
+        shaperStepsB[3 * i + 2].store (static_cast<float> (pattern[i].shape), std::memory_order_relaxed);
+    }
+    shaperGenerationB.fetch_add (1, std::memory_order_release);
 }
 
 int ShellProcessor::recentVelocityAt (int index) const noexcept

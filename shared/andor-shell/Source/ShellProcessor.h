@@ -117,6 +117,15 @@ public:
     int editLayer() const noexcept override { return editLayerIndex.load(); }
     float hostTempo() const noexcept override { return tempo.load (std::memory_order_relaxed); }
     float shaperPhase() const noexcept override { return engine->shaperPhase(); }
+    int movementLaneCount() const noexcept override { return std::max (1, static_cast<int> (product().movementLanes.size())); }
+    MovementLane movementLane (int lane) const override
+    {
+        const auto& lanes = product().movementLanes;
+        return lane >= 0 && lane < static_cast<int> (lanes.size()) ? lanes[static_cast<std::size_t> (lane)] : MovementLane {};
+    }
+    float laneShaperPhase (int lane) const noexcept override { return engine->laneShaperPhase (lane); }
+    osp::ShaperPattern laneShaperPattern (int lane) const override;
+    void setLaneShaperPattern (int lane, const osp::ShaperPattern& pattern, bool undoable = true) override;
     osp::ShaperPattern shaperCustomPattern() const override;
     void setShaperCustomPattern (const osp::ShaperPattern& pattern, bool undoable = true) override;
     bool shaperEditorLarge() const noexcept override { return shaperLarge.load(); }
@@ -381,6 +390,12 @@ private:
     std::atomic<std::uint32_t> shaperGeneration { 1 };
     std::uint32_t shaperGenerationSeen = 0;   ///< audio thread
     void publishShaperPattern() noexcept;
+    // The second MOVEMENT lane's SHAPER CUSTOM (a product with lanes), the same way.
+    osp::ShaperPattern shaperPatternB = osp::RhythmicShaper::patternSteps (osp::ShaperParams().pattern);
+    std::array<std::atomic<float>, 3 * osp::RhythmicShaper::steps> shaperStepsB {};
+    std::atomic<std::uint32_t> shaperGenerationB { 1 };
+    std::uint32_t shaperGenerationSeenB = 0;   ///< audio thread
+    void publishShaperPatternB() noexcept;
     std::atomic<float> tempo { 120.0f };
 
     // Live displays and the wheels.

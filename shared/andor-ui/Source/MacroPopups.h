@@ -24,9 +24,21 @@ std::unique_ptr<MiniPanel> createReimaginedPopup (InstrumentHost& host, int laye
 std::unique_ptr<rack::Module> createRackModule (rack::Kind kind, InstrumentHost& host);
 /** The MOVEMENT module's lane shown (tests), -1 for another module. */
 int rackMovementLane (const rack::Module& module);
+/** MOVEMENT presets: one lane's settings (mode, every mode's own, INTENSITY, SYNC, CYCLE,
+    PHASE, CUSTOM steps) in a small JSON file in Documents/ANDOR/Movement Presets. Loading one
+    changes that lane only (it is switched on), nothing else of the instrument. */
+juce::File movementPresetFolder();
+juce::Array<juce::File> savedMovementPresets();
+bool writeMovementPreset (InstrumentHost& host, int lane, const juce::File& file);
+bool readMovementPreset (InstrumentHost& host, int lane, const juce::File& file);
+/** MOVEMENT's lanes: copy one onto the other (not its ON), or swap them (ON too). */
+void copyMovementLane (InstrumentHost& host, int from, int to);
+void swapMovementLanes (InstrumentHost& host);
+/** Tests: show a lane in the MOVEMENT module. */
+void showRackMovementLane (rack::Module& module, int lane);
 /** Tests and snapshots: SHAPER's editor widened across the rack (its magnifier). */
 void setRackMovementWide (rack::Module& module, bool wide);
-/** Tests: the MOVEMENT module's knobs' captions, in order ("AMOUNT SPEED PITCH TONE"). */
+/** Tests: a module's knobs' captions, in order (MOVEMENT "INTENSITY SPEED PITCH TONE", ECHO, SPACE). */
 juce::String rackMovementCaptions (const rack::Module& module);
 
 } // namespace osp::plugin

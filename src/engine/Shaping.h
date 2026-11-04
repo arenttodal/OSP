@@ -90,6 +90,13 @@ struct Shaping
     double chorusRate = 0.45, chorusWidth = 0.6, chorusStereo = 0.6;   ///< ~0.32 Hz, ~3 ms
     double pulseRate = 0.55, pulseShape = 0.3, pulseStereo = 0.3;      ///< ~0.9 Hz
     ShaperParams shaper;                                                ///< THREE, 1/16, BOTH, smooth 0.3
+    /** A MOVEMENT lane's timing (ANDOR ANALOG's lanes; ANDOR OSP keeps the defaults, which
+        play exactly as before): PULSE on the host's tempo (one cycle per pulseDivision,
+        shaping::pulseDivisionQuarters) instead of its free RATE, and the PHASE (0..1 of a
+        cycle) of synced PULSE and SHAPER. */
+    bool pulseSync = false;
+    int pulseDivision = 4;            ///< 1/4
+    double movementPhase = 0.0;
 
     // SPACE (v2: the room's shape and its EQ besides TYPE and DECAY)
     SpaceType spaceType = SpaceType::hall;   ///< (a HALL at 3 s since 2026-11: was PLATE at 1.8 s)

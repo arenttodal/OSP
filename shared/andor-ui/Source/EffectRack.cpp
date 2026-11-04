@@ -199,10 +199,12 @@ void Host::resized()
         s.collapse->setBounds (title.removeFromRight (26).withSizeKeepingCentre (26, 26).translated (0, 2));
         s.titleArea = title.removeFromLeft (160);
         title.removeFromRight (12);
-        s.module->layoutTitleRow (title.translated (0, 2).withTrimmedLeft (8));
-        y += titleHeight;
-        s.module->setBounds (0, y, getWidth(), s.module->bodyHeight());
-        y += s.module->bodyHeight();
+        // The module covers its title row too (its keys there), the collapse key above it.
+        s.module->setTitleOffset (titleHeight);
+        s.module->setBounds (0, y, getWidth(), titleHeight + s.module->bodyHeight());
+        s.module->layoutTitleRow (title.translated (0, 2 - y).withTrimmedLeft (8).reduced (0, 5));
+        s.collapse->toFront (false);
+        y += titleHeight + s.module->bodyHeight();
     }
 }
 

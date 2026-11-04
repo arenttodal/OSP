@@ -61,14 +61,21 @@ public:
     /** The body's height under the title row, in reference pixels. */
     virtual int bodyHeight() const = 0;
     /** Components of the module's own placed in the title row, right of the title (lanes,
-        presets): `row` is what is free between the title and the collapse key. */
+        presets): `row` (in the module's coordinates) is what is free between the title and
+        the collapse key. The module's bounds include its title row (the host draws the title
+        under it): its body starts at titleOffset(). */
     virtual void layoutTitleRow (juce::Rectangle<int> row) { juce::ignoreUnused (row); }
+    int titleOffset() const noexcept { return titleTop; }
+    void setTitleOffset (int top) noexcept { titleTop = top; }
     /** The editor's timer (~30 Hz): pull what the parameters and the engine show. */
     virtual void refresh() {}
     /** Up to date at once (a snapshot without a message loop). */
     virtual void settle() {}
     /** The module's height changed (a mode with more controls): the host lays out again. */
     std::function<void()> onHeightChanged;
+
+private:
+    int titleTop = 0;
 };
 
 /** The rack: the expanded modules, stacked in one ceramic panel. */

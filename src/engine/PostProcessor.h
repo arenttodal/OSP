@@ -60,9 +60,32 @@ public:
 
     // MOVEMENT's SHAPER clock and display (the host tempo also times ECHO).
     void setTiming (const HostTiming& timing) noexcept;
-    void noteStarted() noexcept { movement.noteStarted(); }
-    void setVoicesActive (bool active) noexcept { movement.setVoicesActive (active); }
+    void noteStarted() noexcept
+    {
+        movement.noteStarted();
+        movementB.noteStarted();
+    }
+    void setVoicesActive (bool active) noexcept
+    {
+        movement.setVoicesActive (active);
+        movementB.setVoicesActive (active);
+    }
     float shaperPhase() const noexcept { return movement.shaperPhase(); }
+    /** A lane's SHAPER playhead (0 MOVEMENT, 1 the second lane), -1 when idle. */
+    float shaperPhase (int lane) const noexcept { return lane == 0 ? movement.shaperPhase() : movementB.shaperPhase(); }
+
+    /**
+        MOVEMENT's two lanes (a product that has them: ANDOR ANALOG). Lane A is MOVEMENT itself
+        (setShaping's movement settings); lane B is a second, independent bus with its own
+        settings (`bSettings`'s movement fields), in series after A: two pedals in a row, so
+        amplitude movements multiply rather than add and two delay-based ones never comb
+        against a dry copy. Each lane plays at the MOVEMENT macro times its LEVEL; switching a
+        lane on or off crossfades it in or out (30 ms), and a lane that is off is not run.
+        Lane B's TAPE and CHORUS never raise the level they are given (a slow guard, -6 dB at
+        most), so a chorus after a chorus does not build up. Never called: one lane, exactly as
+        before.
+    */
+    void setMovementLanes (bool aOn, double aLevel, bool bOn, double bLevel, const Shaping& bSettings) noexcept;
 
     static constexpr int maxPeaks = 3;
 
@@ -79,8 +102,20 @@ private:
 
     ReimaginedStage reimaginedStage;
 
-    // MOVEMENT (bus part)
-    MovementBus movement;
+    // MOVEMENT (bus part): lane A, and lane B once a product sets lanes (setMovementLanes).
+    MovementBus movement, movementB;
+    struct Lane
+    {
+        bool on = true;
+        double level = 1.0, mix = 1.0;
+    };
+    Lane laneA, laneB { false, 1.0, 0.0 };
+    Shaping laneBSettings;
+    bool lanes = false;
+    double laneCoef = 0.001;
+    double guardIn = 0.0, guardOut = 0.0, guardGain = 1.0, guardCoef = 0.0001, guardSmooth = 0.001;
+    void applyMovementTargets() noexcept;
+    void processLanes (float& l, float& r) noexcept;
 
     // SPACE: two slots so a type (or engine) change can crossfade; each slot holds a room
     // and an ABYSS (both prepared, so switching never allocates) and plays its engine.

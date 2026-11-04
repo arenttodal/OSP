@@ -120,6 +120,11 @@ struct ProductInfo
         name expands between the macros and the arpeggiator (MOVEMENT, ECHO, SPACE). Empty:
         no keys and no rack, as in ANDOR OSP. */
     std::vector<osp::plugin::rack::Kind> rackModules;
+    /** MOVEMENT's lanes (InstrumentHost::movementLane), lane 0 first: a product with a second
+        lane lists both (the shell keeps the second lane's SHAPER CUSTOM pattern with the
+        session and gives it to the engine: Engine::setLaneShaperPattern). Empty: one lane,
+        MOVEMENT itself, as in ANDOR OSP. */
+    std::vector<osp::plugin::InstrumentHost::MovementLane> movementLanes;
     /** A card's knob slot, as a product sets it (cardControls): its own control (an empty
         ID), a product control, or hidden. */
     struct CardKnob

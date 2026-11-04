@@ -108,6 +108,8 @@ public:
     /** Audio thread, before process(): MOVEMENT SHAPER's CUSTOM pattern changed (the
         musician's 16 steps; given once after prepare() and on every change). */
     virtual void setShaperPattern (const osp::ShaperPattern& pattern) noexcept { juce::ignoreUnused (pattern); }
+    /** A further MOVEMENT lane's SHAPER CUSTOM pattern (lane 1 onwards; ShellProduct::movementLanes). */
+    virtual void setLaneShaperPattern (int lane, const osp::ShaperPattern& pattern) noexcept { juce::ignoreUnused (lane, pattern); }
     /** Audio thread, before process(): an editable modulation curve changed
         (InstrumentHost::ModCurves' index: 0, 1 LFO 1/2 CUSTOM, ...; given once after
         prepare() and on every change). */
@@ -147,6 +149,8 @@ public:
 
     /** MOVEMENT SHAPER's playhead, 0..1 of its bar, for its picture (0: none). Any thread. */
     virtual float shaperPhase() const noexcept { return 0.0f; }
+    /** A MOVEMENT lane's SHAPER playhead (lane 0: shaperPhase), -1 when idle. */
+    virtual float laneShaperPhase (int lane) const noexcept { return lane == 0 ? shaperPhase() : -1.0f; }
 
     /** A REIMAGINED mode (osp::ReimaginedMode's index) the engine cannot play on `layer`,
         in the words its popover shows (InstrumentHost::reimaginedModeUnavailable). Empty:

@@ -19,6 +19,7 @@
 #include "engine/SpaceReverb.h"
 
 #include <cmath>
+#include <map>
 #include <complex>
 #include <numbers>
 
@@ -2389,6 +2390,172 @@ namespace
     };
 
     //==========================================================================
+    // MOVEMENT's lanes as data: everything a lane plays (its mode, every mode's settings, its
+    // INTENSITY, SYNC, CYCLE and PHASE, its CUSTOM steps), by name, so a lane can be copied to
+    // the other, swapped with it, or saved and loaded as a MOVEMENT preset that touches
+    // nothing else of the instrument.
+    const juce::StringArray& laneSettingNames()
+    {
+        static const juce::StringArray names { "mode", "drift.speed", "drift.pitch", "drift.tone", "tape.wow", "tape.flutter", "tape.wear",
+                                               "chorus.rate", "chorus.width", "chorus.stereo", "pulse.rate", "pulse.shape", "pulse.stereo",
+                                               "shaper.pattern", "shaper.rate", "shaper.target", "shaper.smooth", "shaper.custom" };
+        return names;
+    }
+
+    struct LaneSnapshot
+    {
+        std::map<juce::String, float> values;   ///< plain values by name ("mode", "level", ...)
+        ShaperPattern pattern {};
+        bool on = true;
+    };
+
+    /** The lane's own names besides MOVEMENT's settings: "level", "sync", "pulse.division", "phase". */
+    std::vector<std::pair<juce::String, juce::String>> laneExtras (const InstrumentHost::MovementLane& ids)
+    {
+        return { { "level", ids.levelId }, { "sync", ids.syncId }, { "pulse.division", ids.pulseDivisionId }, { "phase", ids.phaseId } };
+    }
+
+    LaneSnapshot readLane (InstrumentHost& host, int laneIndex)
+    {
+        const Lane lane (host, laneIndex);
+        auto& s = host.apvts();
+        LaneSnapshot snap;
+        for (const auto& name : laneSettingNames())
+            if (s.getParameter (lane.ids.prefix + name) != nullptr)
+                snap.values[name] = value (s, lane.ids.prefix + name);
+        for (const auto& [name, id] : laneExtras (lane.ids))
+            if (id.isNotEmpty() && s.getParameter (id) != nullptr)
+                snap.values[name] = value (s, id);
+        snap.pattern = host.laneShaperPattern (laneIndex);
+        snap.on = lane.ids.onId.isEmpty() || value (s, lane.ids.onId) >= 0.5f;
+        return snap;
+    }
+
+    void setPlain (juce::AudioProcessorValueTreeState& s, const juce::String& id, float plain)
+    {
+        if (auto* p = s.getParameter (id))
+        {
+            p->beginChangeGesture();
+            p->setValueNotifyingHost (p->convertTo0to1 (plain));
+            p->endChangeGesture();
+        }
+    }
+
+    /** Writes `snap` into the lane (the SHAPER steps an undoable step of their own); its ON
+        too when `withOn`. Names the lane lacks are skipped (a preset from a richer lane). */
+    void writeLane (InstrumentHost& host, int laneIndex, const LaneSnapshot& snap, bool withOn)
+    {
+        const Lane lane (host, laneIndex);
+        auto& s = host.apvts();
+        for (const auto& name : laneSettingNames())
+            if (const auto it = snap.values.find (name); it != snap.values.end())
+                setPlain (s, lane.ids.prefix + name, it->second);
+        for (const auto& [name, id] : laneExtras (lane.ids))
+            if (const auto it = snap.values.find (name); id.isNotEmpty() && it != snap.values.end())
+                setPlain (s, id, it->second);
+        host.setLaneShaperPattern (laneIndex, snap.pattern);
+        if (withOn && lane.ids.onId.isNotEmpty())
+            setPlain (s, lane.ids.onId, snap.on ? 1.0f : 0.0f);
+    }
+
+    constexpr const char* movementPresetExtension = ".andormovement";
+}   // namespace
+
+juce::File movementPresetFolder()
+{
+    return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("ANDOR/Movement Presets");
+}
+
+juce::Array<juce::File> savedMovementPresets()
+{
+    auto files = movementPresetFolder().findChildFiles (juce::File::findFiles, false, juce::String ("*") + movementPresetExtension);
+    files.sort();
+    return files;
+}
+
+bool writeMovementPreset (InstrumentHost& host, int lane, const juce::File& file)
+{
+    const auto snap = readLane (host, lane);
+    auto* root = new juce::DynamicObject();
+    root->setProperty ("schemaVersion", 1);
+    root->setProperty ("kind", "andor.movement");
+    auto* settings = new juce::DynamicObject();
+    for (const auto& [name, plain] : snap.values)
+        settings->setProperty (juce::Identifier (name), plain);
+    root->setProperty ("settings", juce::var (settings));
+    root->setProperty ("pattern", InstrumentHost::encodeShaperPattern (snap.pattern));
+    file.getParentDirectory().createDirectory();
+    return file.replaceWithText (juce::JSON::toString (juce::var (root)));
+}
+
+bool readMovementPreset (InstrumentHost& host, int lane, const juce::File& file)
+{
+    const auto parsed = juce::JSON::parse (file.loadFileAsString());
+    if (! parsed.isObject() || parsed["kind"].toString() != "andor.movement")
+        return false;
+    LaneSnapshot snap;
+    if (auto* settings = parsed["settings"].getDynamicObject())
+        for (const auto& property : settings->getProperties())
+            snap.values[property.name.toString()] = static_cast<float> (static_cast<double> (property.value));
+    snap.pattern = InstrumentHost::decodeShaperPattern (parsed["pattern"].toString()).value_or (RhythmicShaper::patternSteps (ShaperParams().pattern));
+    snap.on = true;   // (loading into a lane that is off: it plays)
+    host.undo().beginNewTransaction ("Load MOVEMENT preset");
+    writeLane (host, lane, snap, true);
+    return true;
+}
+
+void copyMovementLane (InstrumentHost& host, int from, int to)
+{
+    if (from == to || std::max (from, to) >= host.movementLaneCount())
+        return;
+    host.undo().beginNewTransaction ("Copy MOVEMENT lane");
+    writeLane (host, to, readLane (host, from), false);
+}
+
+void swapMovementLanes (InstrumentHost& host)
+{
+    if (host.movementLaneCount() < 2)
+        return;
+    const auto a = readLane (host, 0), b = readLane (host, 1);
+    host.undo().beginNewTransaction ("Swap MOVEMENT lanes");
+    writeLane (host, 0, b, true);
+    writeLane (host, 1, a, true);
+}
+
+namespace
+{
+    /** A small key on the rack's title row (a lane, ON, COPY, SWAP, PRESET): a button, so it
+        takes keyboard focus; lit while its toggle state is on, a small light when `lit` says. */
+    class RackKey final : public juce::Button
+    {
+    public:
+        RackKey (const juce::String& text, juce::Colour colour) : juce::Button (text), accent (colour)
+        {
+            setWantsKeyboardFocus (true);
+            setMouseCursor (juce::MouseCursor::PointingHandCursor);
+        }
+        std::function<bool()> lit;
+        void paintButton (juce::Graphics& g, bool highlighted, bool down) override
+        {
+            auto r = getLocalBounds().toFloat().reduced (1.0f);
+            design::draw::button (g, r, 5.0f, getToggleState(), highlighted || down || hasKeyboardFocus (true), accent);
+            if (lit != nullptr)
+            {
+                const bool on = lit();
+                design::draw::led (g, { r.getX() + 9.0f, r.getCentreY() }, 6.0f, on ? accent.withMultipliedBrightness (1.15f) : accent.interpolatedWith (design::colour::panelBottom, 0.6f),
+                                   on ? 0.6f : 0.0f);
+                r.removeFromLeft (12.0f);
+            }
+            g.setColour (getToggleState() ? accent.darker (0.35f) : design::colour::text.withAlpha (0.82f));
+            g.setFont (fonts::make (10.5f, fonts::Weight::medium, 0.06f));
+            g.drawText (getButtonText(), r, juce::Justification::centred, false);
+        }
+
+    private:
+        juce::Colour accent;
+    };
+
+    //==========================================================================
     /**
         MOVEMENT in the effects rack (rack::Kind::movement): a lane's every control in the
         open on the left - the mode as tabs, the amount, the mode's own settings (SHAPER: its
@@ -2408,7 +2575,70 @@ namespace
                 buildMode();
             };
             addChildComponent (magnifier);
+            // The title row: the lanes (each with its light: on or off), the shown lane's ON,
+            // COPY and SWAP (two lanes), and the MOVEMENT presets.
+            const auto colour = accent();
+            if (processor.movementLaneCount() > 1)
+                for (int l = 0; l < 2; ++l)
+                {
+                    auto key = std::make_unique<RackKey> (l == 0 ? "LANE A" : "LANE B", colour);
+                    key->setTooltip (l == 0 ? "Lane A: MOVEMENT itself" : "Lane B: a second, independent MOVEMENT after A (the MOVEMENT macro scales both)");
+                    key->lit = [this, l] { const Lane x (processor, l); return x.ids.onId.isEmpty() || value (processor.apvts(), x.ids.onId) >= 0.5f; };
+                    key->onClick = [this, l] { showLane (l); };
+                    addAndMakeVisible (*key);
+                    laneKeys.push_back (std::move (key));
+                }
+            onKey = std::make_unique<RackKey> ("ON", colour);
+            onKey->setClickingTogglesState (false);
+            onKey->onClick = [this] {
+                if (lane.ids.onId.isNotEmpty())
+                    setPlain (processor.apvts(), lane.ids.onId, value (processor.apvts(), lane.ids.onId) >= 0.5f ? 0.0f : 1.0f);
+                refresh();
+            };
+            addChildComponent (*onKey);
+            if (processor.movementLaneCount() > 1)
+            {
+                copyKey = std::make_unique<RackKey> ("COPY", colour);
+                copyKey->onClick = [this] {
+                    copyMovementLane (processor, lane.index, 1 - lane.index);
+                    refresh();
+                };
+                swapKey = std::make_unique<RackKey> ("SWAP", colour);
+                swapKey->setTooltip ("Swap lanes A and B (everything, their ON too)");
+                swapKey->onClick = [this] {
+                    swapMovementLanes (processor);
+                    refresh();
+                };
+                addAndMakeVisible (*copyKey);
+                addAndMakeVisible (*swapKey);
+            }
+            presetKey = std::make_unique<RackKey> (juce::String::fromUTF8 ("PRESET \xe2\x96\xbe"), colour);
+            presetKey->setTooltip ("MOVEMENT presets: save this lane's settings, or load one into it (nothing else changes)");
+            presetKey->onClick = [this] { presetMenu(); };
+            addAndMakeVisible (*presetKey);
             buildLane();
+        }
+
+        void layoutTitleRow (juce::Rectangle<int> row) override
+        {
+            for (auto& key : laneKeys)
+            {
+                key->setBounds (row.removeFromLeft (82));
+                row.removeFromLeft (6);
+            }
+            if (onKey->isVisible())
+            {
+                row.removeFromLeft (6);
+                onKey->setBounds (row.removeFromLeft (52));
+            }
+            presetKey->setBounds (row.removeFromRight (96));
+            row.removeFromRight (8);
+            if (swapKey != nullptr)
+            {
+                swapKey->setBounds (row.removeFromRight (64));
+                row.removeFromRight (6);
+                copyKey->setBounds (row.removeFromRight (104));
+            }
         }
 
         juce::String title() const override { return "MOVEMENT"; }
@@ -2416,9 +2646,21 @@ namespace
         int bodyHeight() const override { return 206; }
         void refresh() override
         {
+            for (std::size_t l = 0; l < laneKeys.size(); ++l)
+            {
+                laneKeys[l]->setToggleState (static_cast<int> (l) == lane.index, juce::dontSendNotification);
+                laneKeys[l]->repaint();
+            }
+            if (lane.ids.onId.isNotEmpty())
+            {
+                const bool on = value (processor.apvts(), lane.ids.onId) >= 0.5f;
+                onKey->setToggleState (on, juce::dontSendNotification);
+                onKey->setTooltip (on ? "This lane plays (click: off; the other lane stays as it is)" : "This lane is off (click: on)");
+                onKey->repaint();
+            }
             // The mode or PULSE's timing moved (automation, the popover, a preset): rebuilt
             // here as well as on the control's own change, so the rack never shows stale keys.
-            if (builtMode != mode() || (builtMode == static_cast<int> (MovementMode::pulse) && builtSync != laneSynced()))
+            if (modeTabs != nullptr && builtMode != mode() || (builtMode == static_cast<int> (MovementMode::pulse) && builtSync != laneSynced()))
                 buildMode();
         }
         void settle() override
@@ -2468,6 +2710,49 @@ namespace
 
     private:
         static constexpr int margin = 22, leftWidth = 520, tabsHeight = 28, keyHeight = 26;
+
+        void refreshTitle()
+        {
+            if (getParentComponent() != nullptr)
+                getParentComponent()->resized();   // (the host lays the title row out again)
+            refresh();
+        }
+
+        void presetMenu()
+        {
+            juce::PopupMenu menu;
+            juce::Component::SafePointer<MovementRack> safe (this);
+            const auto laneName = processor.movementLaneCount() > 1 ? juce::String (lane.index == 0 ? " (lane A)" : " (lane B)") : juce::String();
+            menu.addItem (juce::String::fromUTF8 ("Save\xe2\x80\xa6") + laneName, [safe] { if (safe != nullptr) safe->savePreset(); });
+            juce::PopupMenu load;
+            const auto files = savedMovementPresets();
+            for (const auto& f : files)
+                load.addItem (f.getFileNameWithoutExtension(), [safe, f] {
+                    if (safe != nullptr && readMovementPreset (safe->processor, safe->lane.index, f))
+                        safe->refresh();
+                });
+            if (files.isEmpty())
+                load.addItem ("No saved MOVEMENT presets yet", false, false, [] {});
+            menu.addSubMenu ("Load" + laneName, load);
+            menu.addItem (juce::String::fromUTF8 ("Browse\xe2\x80\xa6"), [] {
+                movementPresetFolder().createDirectory();
+                movementPresetFolder().revealToUser();
+            });
+            menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (presetKey.get()).withDeletionCheck (*this));
+        }
+        void savePreset()
+        {
+            auto* window = new juce::AlertWindow ("Save MOVEMENT preset", "A name for this MOVEMENT:", juce::MessageBoxIconType::NoIcon);
+            window->addTextEditor ("name", "My movement");
+            window->addButton ("Save", 1, juce::KeyPress (juce::KeyPress::returnKey));
+            window->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+            juce::Component::SafePointer<MovementRack> safe (this);
+            window->enterModalState (true, juce::ModalCallbackFunction::create ([safe, window] (int result) {
+                const auto name = juce::File::createLegalFileName (window->getTextEditorContents ("name").trim());
+                if (result == 1 && name.isNotEmpty() && safe != nullptr)
+                    writeMovementPreset (safe->processor, safe->lane.index, movementPresetFolder().getChildFile (name + movementPresetExtension));
+            }), true);
+        }
         static juce::StringArray modeNames() { return { "DRIFT", "TAPE", "CHORUS", "PULSE", "SHAPER" }; }
 
         int mode() const { return std::clamp (juce::roundToInt (value (processor.apvts(), lane ("mode"))), 0, 4); }
@@ -2476,6 +2761,12 @@ namespace
         /** The lane changed: its mode tabs (they rebuild the rest when the mode moves). */
         void buildLane()
         {
+            onKey->setVisible (lane.ids.onId.isNotEmpty());
+            if (copyKey != nullptr)
+            {
+                copyKey->setButtonText (lane.index == 0 ? juce::String::fromUTF8 ("COPY A \xe2\x96\xb8 B") : juce::String::fromUTF8 ("COPY B \xe2\x96\xb8 A"));
+                copyKey->setTooltip (lane.index == 0 ? "Copy lane A's settings onto lane B" : "Copy lane B's settings onto lane A");
+            }
             auto& state = processor.apvts();
             modeTabs = std::make_unique<SegmentedControl> (*state.getParameter (lane ("mode")), modeNames());
             modeTabs->setAccent (accent());
@@ -2506,6 +2797,7 @@ namespace
                         sel->repaint();
                 });
             buildMode();
+            refreshTitle();
         }
 
         MiniKnob& knob (const juce::String& id, const char* caption, MiniKnob::Formatter f)
@@ -2626,7 +2918,7 @@ namespace
             keyCaptions.clear();
             if (modeTabs == nullptr || visual == nullptr)
                 return;
-            auto body = getLocalBounds().reduced (margin, 0).withTrimmedBottom (14);
+            auto body = getLocalBounds().withTrimmedTop (titleOffset()).reduced (margin, 0).withTrimmedBottom (14);
             const bool shaper = builtMode == static_cast<int> (MovementMode::shaper);
             if (wide)
             {
@@ -2798,6 +3090,8 @@ namespace
         std::unique_ptr<ShaperToolbar> toolbar;
         MagnifierButton magnifier;
         std::unique_ptr<juce::ParameterAttachment> customAttachment, syncAttachment;
+        std::vector<std::unique_ptr<RackKey>> laneKeys;
+        std::unique_ptr<RackKey> onKey, copyKey, swapKey, presetKey;
     };
 
     //==========================================================================
@@ -3640,6 +3934,12 @@ int rackMovementLane (const rack::Module& module)
     if (const auto* m = dynamic_cast<const MovementRack*> (&module))
         return m->laneShown();
     return -1;
+}
+
+void showRackMovementLane (rack::Module& module, int lane)
+{
+    if (auto* m = dynamic_cast<MovementRack*> (&module))
+        m->showLane (lane);
 }
 
 void setRackMovementWide (rack::Module& module, bool wide)

@@ -257,7 +257,7 @@ void RhythmicShaper::reset() noexcept
 void RhythmicShaper::setParams (const ShaperParams& p) noexcept
 {
     const bool otherPattern = p.custom != params.custom || (! p.custom && p.pattern != params.pattern);
-    if (otherPattern || p.rate != params.rate)
+    if (otherPattern || p.rate != params.rate || p.phaseOffset != params.phaseOffset)
     {
         // Crossfade from where the old pattern/rate is to where the new one is (30 ms).
         previous = params;
@@ -318,13 +318,15 @@ void RhythmicShaper::tick() noexcept
         }
         running = localRunning;
     }
-    phase = cyclePhase (ppqNow, params.rate);
+    phase = cyclePhase (ppqNow, params.rate, params.phaseOffset);
 }
 
-double RhythmicShaper::cyclePhase (double quarterNotes, ShaperRate rate) const noexcept
+double RhythmicShaper::cyclePhase (double quarterNotes, ShaperRate rate, double offset) const noexcept
 {
     const double cycle = stepQuarterNotes (rate) * steps;
-    const double p = quarterNotes / cycle;
+    double p = quarterNotes / cycle;
+    if (offset != 0.0)
+        p += offset;   // (only then: PHASE 0 plays exactly as before)
     return p - std::floor (p);
 }
 
@@ -343,7 +345,7 @@ void RhythmicShaper::process (float& left, float& right, double amount) noexcept
         shape = evaluate (playing, phase, params.smooth, currentSpan);
         if (fadeRemaining > 0)
         {
-            const double old = evaluate (previousSteps, cyclePhase (ppqNow, previous.rate), previous.smooth, previousSpan);
+            const double old = evaluate (previousSteps, cyclePhase (ppqNow, previous.rate, previous.phaseOffset), previous.smooth, previousSpan);
             shape = lerp (shape, old, static_cast<double> (fadeRemaining) / fadeLength);
             --fadeRemaining;
         }
