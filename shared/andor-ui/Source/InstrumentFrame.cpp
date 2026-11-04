@@ -323,6 +323,8 @@ void place (const Parts& parts, bool arpShown)
     set (parts.volume, at (layout::volume));
     set (parts.menu, at (layout::menu));
 
+    // Everything under the source cards moves up by their trim (0: the reference's places).
+    const float up = parts.sourceTrim;
     // The macros: name, knob and its light, at the reference's places.
     if (parts.macros != nullptr)
         for (std::size_t i = 0; i < parts.macros->size(); ++i)
@@ -332,11 +334,11 @@ void place (const Parts& parts, bool arpShown)
             // outer route arcs, the selection glow and the handle reach 77 px above the knob's
             // centre): the name a little higher, the knob a little lower than before.
             if (knob.label != nullptr)
-                knob.label->setBounds (at (juce::Rectangle<float> (150.0f, 22.0f).withCentre ({ macroCentres[i], 719.0f })));
-            knob.slider.setBounds (at (juce::Rectangle<float> (132.0f, 132.0f).withCentre ({ macroCentres[i], 818.0f })));
+                knob.label->setBounds (at (juce::Rectangle<float> (150.0f, 22.0f).withCentre ({ macroCentres[i], 719.0f - up })));
+            knob.slider.setBounds (at (juce::Rectangle<float> (132.0f, 132.0f).withCentre ({ macroCentres[i], 818.0f - up })));
         }
     // The envelope panel's tab row on the macros' title line; its display takes the extra height.
-    set (parts.modulationPanel, at (juce::Rectangle<float> (layout::envelopeX, 688.0f, 1405.0f - layout::envelopeX, 206.0f)));
+    set (parts.modulationPanel, at (juce::Rectangle<float> (layout::envelopeX, 688.0f - up, 1405.0f - layout::envelopeX, 206.0f)));
 
     // The arpeggiator's editor (when shown) takes the keyboard row's place; the row and the
     // footer move down by its height.
@@ -344,10 +346,10 @@ void place (const Parts& parts, bool arpShown)
     // the arpeggiator's editor and the keyboard row move down by its shift.
     const float rackShift = parts.rack != nullptr ? parts.rackShift : 0.0f;
     if (parts.rack != nullptr)
-        parts.rack->setBounds (at (juce::Rectangle<float> (layout::arpPanel.getX(), layout::rackTop, layout::arpPanel.getWidth(),
+        parts.rack->setBounds (at (juce::Rectangle<float> (layout::arpPanel.getX(), layout::rackTop - up, layout::arpPanel.getWidth(),
                                                            std::max (0.0f, rackShift - layout::rackGap))));
-    set (parts.arpPanel, at (layout::arpPanel.translated (0.0f, rackShift)));
-    const float shift = (arpShown ? layout::arpShift : 0.0f) + rackShift;
+    set (parts.arpPanel, at (layout::arpPanel.translated (0.0f, rackShift - up)));
+    const float shift = (arpShown ? layout::arpShift : 0.0f) + rackShift - up;
     auto low = [&] (juce::Rectangle<float> r) { return at (r.translated (0.0f, shift)); };
 
     // Keyboard row and footer.
@@ -364,9 +366,10 @@ void place (const Parts& parts, bool arpShown)
     set (parts.headerMix, at (layout::headerMix));
 }
 
-juce::Rectangle<int> sourceArea()
+juce::Rectangle<int> sourceArea (float sourceTrim)
 {
-    return at (design::layout::sources);
+    const auto r = design::layout::sources;
+    return at (r.withHeight (r.getHeight() - sourceTrim));
 }
 
 juce::Rectangle<int> sourceColumn (juce::Rectangle<int> area, int columns, int index)
@@ -376,7 +379,7 @@ juce::Rectangle<int> sourceColumn (juce::Rectangle<int> area, int columns, int i
     return { area.getX() + index * (width + gap), area.getY(), width, area.getHeight() };
 }
 
-void paint (juce::Graphics& g, juce::Component& content, const Identity& identity, bool arpShown, const MacroRow& macros, float rackShift)
+void paint (juce::Graphics& g, juce::Component& content, const Identity& identity, bool arpShown, const MacroRow& macros, float rackShift, float sourceTrim)
 {
     using namespace design;
     draw::housing (g, content.getLocalBounds().toFloat());
@@ -405,7 +408,7 @@ void paint (juce::Graphics& g, juce::Component& content, const Identity& identit
     // The keyboard's frame: a quiet rim, the keys set into it. Ceramic: the keys sit in a
     // recess cut into the housing (rendered at the keybed's place: 2 px left and right, 3
     // above and 2 below the keys).
-    const auto keys = layout::keyboard.translated (0.0f, (arpShown ? layout::arpShift : 0.0f) + rackShift);
+    const auto keys = layout::keyboard.translated (0.0f, (arpShown ? layout::arpShift : 0.0f) + rackShift - sourceTrim);
     if (auto* pieces = skin::active(); pieces != nullptr
         && pieces->draw (g, "keybed", juce::Rectangle<float> (keys.getX() - 2.0f, keys.getY() - 3.0f, keys.getWidth() + 4.0f, keys.getHeight() + 5.0f)))
     {
@@ -424,10 +427,10 @@ void paint (juce::Graphics& g, juce::Component& content, const Identity& identit
 
     // The macros and the envelope share one panel.
     {
-        const auto r = layout::macroPanel;
+        const auto r = layout::macroPanel.translated (0.0f, -sourceTrim);
         draw::raised (g, r, layout::panelRadius, colour::panelTop, colour::panelBottom);
         g.setColour (colour::divider);
-        g.fillRect (juce::Rectangle<float> (layout::envelopeX - 10.0f, 695.0f, 1.0f, 190.0f));
+        g.fillRect (juce::Rectangle<float> (layout::envelopeX - 10.0f, 695.0f - sourceTrim, 1.0f, 190.0f));
         // No panel title: the six named knobs speak for themselves.
         // Under each macro a small light: lit when the macro's own settings are in use.
         // Ceramic: a rendered glass lens in the macro's colour (its glow stays drawn).
@@ -503,9 +506,9 @@ void animatePopoverOpening (MiniPanel& popup)
     juce::Desktop::getInstance().getAnimator().animateComponent (&popup, final, 1.0f, 110, false, 1.0, 0.0);
 }
 
-float instrumentHeight (bool arpShown, float rackShift) noexcept
+float instrumentHeight (bool arpShown, float rackShift, float sourceTrim) noexcept
 {
-    return design::height + (arpShown ? design::layout::arpShift : 0.0f) + rackShift;
+    return design::height + (arpShown ? design::layout::arpShift : 0.0f) + rackShift - sourceTrim;
 }
 
 void fit (juce::Component& editor, juce::Component& content, float height)

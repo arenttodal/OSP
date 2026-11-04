@@ -430,6 +430,9 @@ public:
     /** Which of the four apply to the source now (LINK REVERSE LOOP FOLLOW, bits 0..3): the
         others are not shown. All by default. */
     void setModifiersApplicable (int mask);
+    /** How much shorter a narrow card is than the reference's with its modifiers in the well
+        (reference pixels): the band under its knobs that it no longer keeps. */
+    static constexpr float footTrim = 64.0f;
     /** Tests: modifier `index`'s key (0 LINK .. 3 FOLLOW), or nullptr. */
     ModifierButton* modifierKey (int index) const noexcept { return index >= 0 && index < 4 ? modifiers[static_cast<std::size_t> (index)].get() : nullptr; }
     /** Controls revealed in the well by the pointer (ProductInfo::wellOverlay); null: none.

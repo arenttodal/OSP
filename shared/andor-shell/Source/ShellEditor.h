@@ -93,7 +93,9 @@ public:
     osp::plugin::EngineCard& engineCard (int layer) noexcept { return *cards[static_cast<std::size_t> (juce::jlimit (0, 2, layer))]; }
     osp::plugin::ModulationPanel& modulationPanel() noexcept { return modPanel; }
     void setArpExpanded (bool open);
-    float instrumentHeight() const noexcept { return osp::plugin::frame::instrumentHeight (arpShown, rackShift()); }
+    float instrumentHeight() const noexcept { return osp::plugin::frame::instrumentHeight (arpShown, rackShift(), sourceTrim()); }
+    /** The source cards' trim (their modifiers in the well: nothing kept under the knobs). */
+    float sourceTrim() const noexcept { return shell.modifiersInWell() ? osp::plugin::EngineCard::footTrim : 0.0f; }
     /** The effects rack (the product's rackModules; tests and snapshots). */
     osp::plugin::rack::Host& effectsRack() noexcept { return rack; }
     /** The key beside a macro's name that expands its rack module, or nullptr. */

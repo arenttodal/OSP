@@ -368,7 +368,7 @@ ShellEditor::ShellEditor (ShellProcessor& p)
 
     juce::Desktop::getInstance().addGlobalMouseListener (&outsideClicks);
 
-    content.onPaint = [this] (juce::Graphics& g) { frame::paint (g, content, shell.product().identity, arpShown, macros, rackShift()); };
+    content.onPaint = [this] (juce::Graphics& g) { frame::paint (g, content, shell.product().identity, arpShown, macros, rackShift(), sourceTrim()); };
     addAndMakeVisible (content);
     layoutInstrument();
     setResizable (true, true);
@@ -427,6 +427,7 @@ void ShellEditor::layoutInstrument()
         parts.rack = &rack;
         parts.rackShift = rackShift();
     }
+    parts.sourceTrim = sourceTrim();
     frame::place (parts, arpShown);
     // The rack's keys: right of their macro's name, on its line.
     for (std::size_t i = 0; i < macros.size(); ++i)
@@ -437,7 +438,7 @@ void ShellEditor::layoutInstrument()
             rackKeys[i]->setBounds (juce::Rectangle<float> (x, label.getCentreY() - 10.0f, 24.0f, 20.0f).getSmallestIntegerContainer());
         }
     modOverlay.setBounds (content.getLocalBounds());
-    sourceArea = frame::sourceArea();
+    sourceArea = frame::sourceArea (sourceTrim());
     shownCount = -1;
     layoutSources();
 }

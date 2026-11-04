@@ -2556,6 +2556,23 @@ namespace
     };
 
     //==========================================================================
+    /** The effects rack's columns (module coordinates, the module as wide as the rack): the
+        picture exactly under the modulation window (its display's width, the same divider
+        before it), the controls on the left. */
+    namespace rackcolumns
+    {
+        inline int divider() { return juce::roundToInt (design::layout::envelopeX - 10.0f - design::layout::arpPanel.getX()); }
+        inline int pictureLeft() { return juce::roundToInt (design::layout::envelopeX + 11.0f - design::layout::arpPanel.getX()); }
+        constexpr int pictureRightMargin = 19, leftMargin = 22, bottom = 12;
+        /** The divider between the controls and the picture (as the macro panel's). */
+        inline void paintDivider (juce::Graphics& g, juce::Rectangle<int> body)
+        {
+            g.setColour (design::colour::divider);
+            g.fillRect (juce::Rectangle<float> (static_cast<float> (divider()), static_cast<float> (body.getY()) + 2.0f, 1.0f, static_cast<float> (body.getHeight()) - 4.0f));
+        }
+    }
+
+    //==========================================================================
     /**
         MOVEMENT in the effects rack (rack::Kind::movement): a lane's every control in the
         open on the left - the mode as tabs, the amount, the mode's own settings (SHAPER: its
@@ -2643,7 +2660,7 @@ namespace
 
         juce::String title() const override { return "MOVEMENT"; }
         juce::Colour accent() const override { return design::colour::macro (design::colour::Macro::movement); }
-        int bodyHeight() const override { return 206; }
+        int bodyHeight() const override { return 172; }
         void refresh() override
         {
             for (std::size_t l = 0; l < laneKeys.size(); ++l)
@@ -2701,6 +2718,8 @@ namespace
 
         void paint (juce::Graphics& g) override
         {
+            if (! wide)
+                rackcolumns::paintDivider (g, getLocalBounds().withTrimmedTop (titleOffset()).withTrimmedBottom (rackcolumns::bottom));
             // Small captions over the keys that have no knob of their own.
             g.setFont (type::popupLabel (11.0f));
             g.setColour (design::colour::text.withAlpha (0.6f));
@@ -2709,7 +2728,7 @@ namespace
         }
 
     private:
-        static constexpr int margin = 22, leftWidth = 520, tabsHeight = 28, keyHeight = 26;
+        static constexpr int tabsHeight = 26, keyHeight = 26;
 
         void refreshTitle()
         {
@@ -2837,7 +2856,7 @@ namespace
                 visual = std::make_unique<MovementVisual> (processor, lane.index);
             visual->setIdentity (design::colour::Macro::movement);
             if (! shaper)
-                visual->setPictureScale (1.45f);
+                visual->setPictureScale (1.1f);
             addAndMakeVisible (*visual);
             magnifier.setVisible (shaper);
             magnifier.setExpanded (wide);
@@ -2918,58 +2937,59 @@ namespace
             keyCaptions.clear();
             if (modeTabs == nullptr || visual == nullptr)
                 return;
-            auto body = getLocalBounds().withTrimmedTop (titleOffset()).reduced (margin, 0).withTrimmedBottom (14);
+            auto body = getLocalBounds().withTrimmedTop (titleOffset()).withTrimmedBottom (rackcolumns::bottom);
             const bool shaper = builtMode == static_cast<int> (MovementMode::shaper);
             if (wide)
             {
                 // The pattern across the rack, its tools under it.
-                toolbar->setBounds (body.removeFromBottom (keyHeight));
-                body.removeFromBottom (8);
+                body = body.reduced (rackcolumns::leftMargin, 0);
+                toolbar->setBounds (body.removeFromBottom (keyHeight - 2));
+                body.removeFromBottom (6);
                 visual->setBounds (body);
             }
             else
             {
-                auto left = body.removeFromLeft (leftWidth);
-                body.removeFromLeft (24);
+                // The picture in the modulation window's column; the controls left of the divider.
+                visual->setBounds (body.withLeft (rackcolumns::pictureLeft()).withRight (getWidth() - rackcolumns::pictureRightMargin));
+                auto left = body.withLeft (rackcolumns::leftMargin).withRight (rackcolumns::divider() - 20);
+                modeTabs->setBounds (left.removeFromTop (tabsHeight));
+                left.removeFromTop (8);
                 if (toolbar != nullptr)
                 {
-                    toolbar->setBounds (body.removeFromBottom (keyHeight));
-                    body.removeFromBottom (8);
+                    toolbar->setBounds (left.removeFromBottom (keyHeight - 2));
+                    left.removeFromBottom (6);
                 }
-                visual->setBounds (body);
-
-                modeTabs->setBounds (left.removeFromTop (tabsHeight));
-                left.removeFromTop (14);
-                // A row of keys (SHAPER's PATTERN RATE TARGET, PULSE's FREE/SYNC and CYCLE),
-                // each under its caption, then the knobs.
-                const bool keys = ! selectors.empty() || syncTabs != nullptr;
-                if (keys)
+                // One row: the keys (SHAPER's PATTERN RATE TARGET, PULSE's FREE/SYNC and
+                // CYCLE), each under its caption, then the knobs.
+                auto row = left;
+                const int count = static_cast<int> (selectors.size()) + (syncTabs != nullptr ? 1 : 0);
+                if (count > 0)
                 {
-                    auto row = left.removeFromTop (14 + keyHeight);
-                    const int count = static_cast<int> (selectors.size()) + (syncTabs != nullptr ? 1 : 0);
-                    const int cell = (row.getWidth() - 12 * (count - 1)) / std::max (1, count);
-                    int i = 0;
+                    auto keys = row.removeFromLeft (count * 132 + (count - 1) * 10);
+                    row.removeFromLeft (16);
+                    keys = keys.withSizeKeepingCentre (keys.getWidth(), 14 + keyHeight);
                     auto place = [&] (juce::Component& c, const juce::String& caption) {
-                        auto r = row.removeFromLeft (cell);
-                        row.removeFromLeft (12);
+                        auto r = keys.removeFromLeft (132);
+                        keys.removeFromLeft (10);
                         keyCaptions.push_back ({ caption, r.removeFromTop (14).toFloat() });
                         c.setBounds (r);
-                        ++i;
                     };
                     if (syncTabs != nullptr)
                         place (*syncTabs, "TIMING");
-                    for (std::size_t s = 0; s < selectors.size(); ++s)
-                        place (*selectors[s], selectorCaptions[static_cast<int> (s)]);
-                    left.removeFromTop (8);
+                    for (std::size_t sel = 0; sel < selectors.size(); ++sel)
+                        place (*selectors[sel], selectorCaptions[static_cast<int> (sel)]);
                 }
-                const int cell = std::min (left.getWidth() / std::max (1, static_cast<int> (knobs.size())), 104);
-                auto line = left.removeFromTop (keys ? 84 : 112).withSizeKeepingCentre (cell * static_cast<int> (knobs.size()), keys ? 84 : 112);
+                const int n = std::max (1, static_cast<int> (knobs.size()));
+                const int cell = std::min (row.getWidth() / n, 104);
+                const int height = std::min (row.getHeight(), 100);
+                auto line = row.withSizeKeepingCentre (cell * n, height);
                 for (auto& k : knobs)
                     k->setBounds (line.removeFromLeft (cell));
             }
             magnifier.setBounds (juce::Rectangle<int> (20, 20).withPosition (visual->getRight() - 26, visual->getY() + 5));
             magnifier.setVisible (shaper);
             magnifier.toFront (false);
+            repaint();
         }
 
         /** PATTERN also offers CUSTOM, a copy of any pattern to start from, and the saved ones. */
@@ -3125,7 +3145,7 @@ namespace
         void resized() override { layout(); }
 
     protected:
-        static constexpr int margin = 22, leftWidth = 560, selectorHeight = 26, rowGap = 10;
+        static constexpr int selectorHeight = 26, rowGap = 8;
 
         ValueSelector& selector (const char* id, const juce::String& tip)
         {
@@ -3139,7 +3159,7 @@ namespace
         {
             visual = std::move (v);
             visual->setIdentity (identity);
-            visual->setPictureScale (1.45f);
+            visual->setPictureScale (1.1f);
             addAndMakeVisible (*visual);
         }
         MiniKnob& knob (bool secondary, const char* id, const char* caption, MiniKnob::Formatter f)
@@ -3161,14 +3181,19 @@ namespace
         /** The row right of the selector (tabs, the presets bar). */
         virtual void layoutKeys (juce::Rectangle<int> row) = 0;
 
+        void paint (juce::Graphics& g) override
+        {
+            rackcolumns::paintDivider (g, getLocalBounds().withTrimmedTop (titleOffset()).withTrimmedBottom (rackcolumns::bottom));
+        }
+
         void layout()
         {
             if (visual == nullptr)
                 return;
-            auto body = getLocalBounds().withTrimmedTop (titleOffset()).reduced (margin, 0).withTrimmedBottom (14);
-            auto left = body.removeFromLeft (leftWidth);
-            body.removeFromLeft (24);
-            visual->setBounds (body);
+            auto body = getLocalBounds().withTrimmedTop (titleOffset()).withTrimmedBottom (rackcolumns::bottom);
+            // The picture in the modulation window's column; every control left of the divider.
+            visual->setBounds (body.withLeft (rackcolumns::pictureLeft()).withRight (getWidth() - rackcolumns::pictureRightMargin));
+            auto left = body.withLeft (rackcolumns::leftMargin).withRight (rackcolumns::divider() - 20);
             auto top = left.removeFromTop (selectorHeight);
             if (modeSelector != nullptr)
             {
@@ -3177,20 +3202,18 @@ namespace
             }
             layoutKeys (top);
             left.removeFromTop (rowGap);
-            auto row = [] (const std::vector<MiniKnob*>& knobsInRow, juce::Rectangle<int> line, int widest) {
-                if (knobsInRow.empty())
-                    return;
-                const int cell = std::min (line.getWidth() / static_cast<int> (knobsInRow.size()), widest);
-                line = line.withSizeKeepingCentre (cell * static_cast<int> (knobsInRow.size()), line.getHeight());
-                for (auto* k : knobsInRow)
-                    k->setBounds (line.removeFromLeft (cell));
-            };
-            const int primaryHeight = secondaryRow.empty() ? left.getHeight() : 84;
-            row (primaryRow, left.removeFromTop (std::min (primaryHeight, 108)), 112);
-            if (! secondaryRow.empty())
+            // All the knobs in one row, one size.
+            std::vector<MiniKnob*> all (primaryRow);
+            all.insert (all.end(), secondaryRow.begin(), secondaryRow.end());
+            if (all.empty())
+                return;
+            const int n = static_cast<int> (all.size());
+            const int cell = std::min (left.getWidth() / n, 108);
+            auto line = left.withSizeKeepingCentre (cell * n, std::min (left.getHeight(), 104));
+            for (auto* k : all)
             {
-                left.removeFromTop (4);
-                row (secondaryRow, left.removeFromTop (64), 96);
+                k->setSmall (false);
+                k->setBounds (line.removeFromLeft (cell));
             }
         }
 
@@ -3222,7 +3245,7 @@ namespace
             setVisual (std::make_unique<EchoVisual> (p));
             refresh();
         }
-        int bodyHeight() const override { return 206; }
+        int bodyHeight() const override { return 172; }
         void refresh() override
         {
             // The machine or FREE / SYNC moved (here, in the popover, by automation): the knobs.
@@ -3309,7 +3332,7 @@ namespace
             setVisual (std::make_unique<SpaceVisual> (p.apvts(), [&p] { return static_cast<double> (p.hostTempo()); }));
             refresh();
         }
-        int bodyHeight() const override { return 222; }
+        int bodyHeight() const override { return 172; }
         void refresh() override
         {
             const int which = engine();

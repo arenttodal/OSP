@@ -113,7 +113,8 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
 
-    static constexpr int titleHeight = 36, bottomMargin = 12, divider = 14;
+    /** A module is never taller than the macro panel above it (216 px): title 32 + body 172 + 10. */
+    static constexpr int titleHeight = 32, bottomMargin = 10, divider = 14;
 
 private:
     class CollapseButton;

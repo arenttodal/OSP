@@ -160,19 +160,23 @@ namespace frame
             plus rackGap while a module is expanded; 0 without a rack: as before). */
         juce::Component* rack = nullptr;
         float rackShift = 0.0f;
+        /** How much shorter the source cards are than the reference's (a product whose cards
+            keep nothing under their knobs: EngineCard::setModifiersInWell); everything under
+            them moves up by as much and the instrument is as much shorter. 0: as before. */
+        float sourceTrim = 0.0f;
     };
     /** Places the parts at the reference's places (the keyboard row and footer move down by
         the arpeggiator editor's height while it shows). */
     void place (const Parts& parts, bool arpShown);
     /** The source area (the A/B/C cards or the drop zone), in reference pixels. */
-    juce::Rectangle<int> sourceArea();
+    juce::Rectangle<int> sourceArea (float sourceTrim = 0.0f);
     /** The source area's column `index` of `columns` (the cards' places). */
     juce::Rectangle<int> sourceColumn (juce::Rectangle<int> area, int columns, int index);
 
     /** The housing, the identity, the keybed, the macro panel with its lights and the keys
         on the housing: everything the instrument paints under its components. */
     void paint (juce::Graphics& g, juce::Component& content, const Identity& identity, bool arpShown, const MacroRow& macros,
-                float rackShift = 0.0f);
+                float rackShift = 0.0f, float sourceTrim = 0.0f);
 
     /** A popover's card size in reference pixels (a panel laid out at a smaller unit is
         scaled up, so every popover's shell reads alike). */
@@ -191,7 +195,7 @@ namespace frame
     void animatePopoverOpening (MiniPanel& popup);
 
     /** The instrument's height in reference pixels (taller while the arpeggiator's editor shows). */
-    float instrumentHeight (bool arpShown, float rackShift = 0.0f) noexcept;
+    float instrumentHeight (bool arpShown, float rackShift = 0.0f, float sourceTrim = 0.0f) noexcept;
     /** Scales `content` (laid out at the reference size) uniformly into `editor`, centred:
         if a host keeps another window shape, the instrument still shows whole. */
     void fit (juce::Component& editor, juce::Component& content, float height);

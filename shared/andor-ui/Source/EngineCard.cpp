@@ -2833,9 +2833,10 @@ void EngineCard::resized()
     }
     placeHeadingDoor();
 
-    // With the modifiers in the well (a product's choice) a narrow card's foot has nothing
-    // under its knobs: the well takes that band and the knobs sit at the foot.
-    const float footFreed = triple && modifiersInWell ? 64.0f : 0.0f;
+    // With the modifiers in the well (a product's choice) a narrow card keeps nothing under
+    // its knobs: the shell makes the card that much shorter (frame::Parts::sourceTrim,
+    // EngineCard::footTrim), so the well keeps its height and the knobs sit at the foot.
+    const float footFreed = triple && modifiersInWell ? footTrim : 0.0f;
     const float wellHeight = h - (triple ? 267.0f : 206.0f) + footFreed;
     sourceDisplay.setBounds (at ({ 16.0f, 63.0f, w - 32.0f, wellHeight }));
     if (eqEditor != nullptr)
