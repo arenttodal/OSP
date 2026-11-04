@@ -2833,7 +2833,10 @@ void EngineCard::resized()
     }
     placeHeadingDoor();
 
-    const float wellHeight = h - (triple ? 267.0f : 206.0f);
+    // With the modifiers in the well (a product's choice) a narrow card's foot has nothing
+    // under its knobs: the well takes that band and the knobs sit at the foot.
+    const float footFreed = triple && modifiersInWell ? 64.0f : 0.0f;
+    const float wellHeight = h - (triple ? 267.0f : 206.0f) + footFreed;
     sourceDisplay.setBounds (at ({ 16.0f, 63.0f, w - 32.0f, wellHeight }));
     if (eqEditor != nullptr)
         eqEditor->setBounds (sourceDisplay.getBounds());   // exactly the display's place
@@ -2873,7 +2876,7 @@ void EngineCard::resized()
         // The modifiers in the well (placed with it, below): the knobs have the card's
         // width, at the row's place for the density, the foot free.
         if (triple)
-            row (16.0f, w - 16.0f, 0.87f * 100.0f, 0.87f * 113.0f, h - 136.0f, true);
+            row (16.0f, w - 16.0f, 0.87f * 100.0f, 0.87f * 113.0f, h - 136.0f + footFreed, true);
         else
             row (16.0f, w - 16.0f, 0.87f * 110.0f, 0.87f * 125.0f, h - 123.0f + 50.5f, false);
         dividerArea = {};
