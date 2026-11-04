@@ -755,8 +755,10 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - **The effects rack in ANDOR OSP's own plugin** (the rule on shared SPACE / ECHO / ARP
   features). The rack host (`shared/andor-ui/Source/EffectRack.*`), its modules (built in
   `MacroPopups.cpp` from the popovers' parts) and the frame's rack slot are shared and opt-in
-  (`ShellProduct::rackModules`); ANDOR ANALOG shows MOVEMENT's (Phase 1; ECHO and SPACE
-  follow). ANDOR OSP shows none, so its look and the visual parity stay exactly as they were.
+  (`ShellProduct::rackModules`); ANDOR ANALOG shows MOVEMENT's (with its two lanes:
+  `PostProcessor::setMovementLanes`), ECHO's and SPACE's. ANDOR OSP shows none, so its look
+  and the visual parity stay exactly as they were; its MOVEMENT stays one lane (every golden
+  unchanged).
   To bring it to ANDOR OSP:
   - add the keys beside its macro names and the rack to OspAudioProcessorEditor (the frame
     already places it: `Parts::rack`, `rackShift`);

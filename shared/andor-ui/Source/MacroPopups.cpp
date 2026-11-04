@@ -3095,6 +3095,318 @@ namespace
     };
 
     //==========================================================================
+    /**
+        ECHO and SPACE in the effects rack: the same controls as their popovers, laid out in the
+        open (the machine or room as a selector, its row of keys, every knob at once), and the
+        picture on the right at the modulation editors' size (ECHO's repeats; SPACE's decay,
+        whose handles set PRE-DELAY and DECAY). Everything is bound to the parameters; ECHO and
+        SPACE stay the parallel sends they are - the rack changes only how they are edited.
+    */
+    class EffectRack : public rack::Module
+    {
+    public:
+        EffectRack (InstrumentHost& p, juce::String name, design::colour::Macro macro) : processor (p), title_ (std::move (name)), identity (macro) {}
+
+        juce::String title() const override { return title_; }
+        juce::Colour accent() const override { return design::colour::macro (identity); }
+        void settle() override
+        {
+            refresh();
+            if (visual != nullptr)
+                visual->settle();
+        }
+        juce::String captions() const
+        {
+            juce::StringArray c;
+            for (const auto& k : knobs)
+                c.add (k->captionText());
+            return c.joinIntoString (" ");
+        }
+        void resized() override { layout(); }
+
+    protected:
+        static constexpr int margin = 22, leftWidth = 560, selectorHeight = 26, rowGap = 10;
+
+        ValueSelector& selector (const char* id, const juce::String& tip)
+        {
+            modeSelector = std::make_unique<ValueSelector> (*processor.apvts().getParameter (id), juce::String());
+            modeSelector->setAccent (accent());
+            modeSelector->setTooltip (tip);
+            addAndMakeVisible (*modeSelector);
+            return *modeSelector;
+        }
+        void setVisual (std::unique_ptr<Visual> v)
+        {
+            visual = std::move (v);
+            visual->setIdentity (identity);
+            visual->setPictureScale (1.45f);
+            addAndMakeVisible (*visual);
+        }
+        MiniKnob& knob (bool secondary, const char* id, const char* caption, MiniKnob::Formatter f)
+        {
+            auto k = std::make_unique<MiniKnob> (processor.apvts(), id, caption, std::move (f));
+            k->setSmall (secondary);
+            k->setArcColour (accent());
+            addAndMakeVisible (*k);
+            (secondary ? secondaryRow : primaryRow).push_back (k.get());
+            knobs.push_back (std::move (k));
+            return *knobs.back();
+        }
+        void clearKnobs()
+        {
+            primaryRow.clear();
+            secondaryRow.clear();
+            knobs.clear();
+        }
+        /** The row right of the selector (tabs, the presets bar). */
+        virtual void layoutKeys (juce::Rectangle<int> row) = 0;
+
+        void layout()
+        {
+            if (visual == nullptr)
+                return;
+            auto body = getLocalBounds().withTrimmedTop (titleOffset()).reduced (margin, 0).withTrimmedBottom (14);
+            auto left = body.removeFromLeft (leftWidth);
+            body.removeFromLeft (24);
+            visual->setBounds (body);
+            auto top = left.removeFromTop (selectorHeight);
+            if (modeSelector != nullptr)
+            {
+                modeSelector->setBounds (top.removeFromLeft (190));
+                top.removeFromLeft (12);
+            }
+            layoutKeys (top);
+            left.removeFromTop (rowGap);
+            auto row = [] (const std::vector<MiniKnob*>& knobsInRow, juce::Rectangle<int> line, int widest) {
+                if (knobsInRow.empty())
+                    return;
+                const int cell = std::min (line.getWidth() / static_cast<int> (knobsInRow.size()), widest);
+                line = line.withSizeKeepingCentre (cell * static_cast<int> (knobsInRow.size()), line.getHeight());
+                for (auto* k : knobsInRow)
+                    k->setBounds (line.removeFromLeft (cell));
+            };
+            const int primaryHeight = secondaryRow.empty() ? left.getHeight() : 84;
+            row (primaryRow, left.removeFromTop (std::min (primaryHeight, 108)), 112);
+            if (! secondaryRow.empty())
+            {
+                left.removeFromTop (4);
+                row (secondaryRow, left.removeFromTop (64), 96);
+            }
+        }
+
+        InstrumentHost& processor;
+        juce::String title_;
+        design::colour::Macro identity;
+        std::unique_ptr<ValueSelector> modeSelector;
+        std::unique_ptr<Visual> visual;
+        std::vector<std::unique_ptr<MiniKnob>> knobs;
+        std::vector<MiniKnob*> primaryRow, secondaryRow;
+    };
+
+    /** ECHO: TAPE / BBD / ASCEND, FREE or SYNC and the stereo picture, TIME, FEEDBACK, TONE and
+        AGE (ASCEND: CLOCK, INTERVAL, MOTION), the repeats on the right. */
+    class EchoRack final : public EffectRack
+    {
+    public:
+        explicit EchoRack (InstrumentHost& p) : EffectRack (p, "ECHO", design::colour::Macro::echo)
+        {
+            selector ("echo.type", "Tape echo, bucket-brigade (BBD) delay, or ASCEND: repeats an interval up (a pitch shifter in the loop)");
+            sync = std::make_unique<SegmentedControl> (*p.apvts().getParameter ("echo.sync"), juce::StringArray { "FREE", "SYNC" });
+            sync->setAccent (accent());
+            sync->setTooltip ("Free time in ms, or a note value synced to the host tempo");
+            addAndMakeVisible (*sync);
+            stereo = std::make_unique<SegmentedControl> (*p.apvts().getParameter ("echo.stereo"), juce::StringArray { "MONO", "PING-PONG", "WIDE" });
+            stereo->setAccent (accent());
+            stereo->setTooltip ("In the centre, alternating left and right, or two heads a little apart");
+            addAndMakeVisible (*stereo);
+            setVisual (std::make_unique<EchoVisual> (p));
+            refresh();
+        }
+        int bodyHeight() const override { return 206; }
+        void refresh() override
+        {
+            // The machine or FREE / SYNC moved (here, in the popover, by automation): the knobs.
+            const int key = juce::roundToInt (value (processor.apvts(), "echo.type")) * 2 + (value (processor.apvts(), "echo.sync") >= 0.5f ? 1 : 0);
+            if (key != built)
+                build (key);
+        }
+
+    private:
+        void build (int key)
+        {
+            built = key;
+            clearKnobs();
+            const auto percent = [] (double v) { return format::percent (v) + " %"; };
+            const bool ascend = key / 2 == static_cast<int> (EchoType::ascend);
+            if (key % 2 == 1)
+                knob (false, "echo.division", "TIME", [] (double v) { return juce::String (shaping::echoDivisionName (juce::roundToInt (v))); });
+            else
+                knob (false, "echo.time", "TIME", [] (double v) { return format::milliseconds (v); });
+            knob (false, "echo.feedback", "FEEDBACK", percent);
+            knob (false, "echo.tone", "TONE", percent);
+            if (ascend)
+            {
+                knob (false, "echo.age", "CLOCK", [] (double v) { return juce::String (EchoDelay::clockHz (0.01 * v) / 1000.0, 1) + " kHz"; });
+                knob (true, "echo.ascend.interval", "INTERVAL", [] (double v) {
+                    static const char* names[] = { "+12", "+7", "+5", "-12" };
+                    return juce::String (names[std::clamp (juce::roundToInt (v), 0, 3)]);
+                });
+                knob (true, "echo.ascend.motion", "MOTION", [] (double v) {
+                    static const char* names[] = { "RISE", "STEADY", "LATE" };
+                    return juce::String (names[std::clamp (juce::roundToInt (v), 0, 2)]);
+                });
+            }
+            else
+                knob (false, "echo.age", "AGE", percent);
+            layout();
+            repaint();
+        }
+        void layoutKeys (juce::Rectangle<int> row) override
+        {
+            sync->setBounds (row.removeFromLeft (row.getWidth() * 2 / 5).withTrimmedRight (6));
+            stereo->setBounds (row.withTrimmedLeft (6));
+        }
+
+        std::unique_ptr<SegmentedControl> sync, stereo;
+        int built = -1;
+    };
+
+    /** SPACE: the room or engine (and its variant) as a selector, the presets bar, then every
+        knob of the engine; the decay on the right, its handles setting PRE-DELAY and DECAY. */
+    class SpaceRack final : public EffectRack
+    {
+    public:
+        explicit SpaceRack (InstrumentHost& p) : EffectRack (p, "SPACE", design::colour::Macro::space)
+        {
+            auto& m = selector ("space.type", "Room, hall, plate or spring - or ABYSS, VINTAGE or BLOOM, SPACE's other engines, and their variants");
+            m.textOverride = [this] {
+                if (engine() == 0)
+                    return juce::String();
+                return spacepresets::describe (processor.apvts()).replace (" ", juce::String::fromUTF8 (" \xc2\xb7 "));
+            };
+            m.extraItems = [this] (juce::PopupMenu& menu) {
+                juce::Component::SafePointer<SpaceRack> safe (this);
+                menu.addSeparator();
+                static const std::array<juce::StringArray, 3> variants { juce::StringArray { "Deep", "Dark", "Inverse", "Endless" },
+                                                                         juce::StringArray { "Hall", "Plate", "Chamber", "Room" },
+                                                                         juce::StringArray { "Clean", "Vintage", "Tape", "Wash" } };
+                static const char* variantIds[] { "space.abyss.variant", "space.vintage.variant", "space.bloom.variant" };
+                int index = 1;
+                for (const char* name : { "Abyss", "Vintage", "Bloom" })
+                {
+                    juce::PopupMenu sub;
+                    const int now = juce::roundToInt (value (processor.apvts(), variantIds[index - 1]));
+                    for (int v = 0; v < 4; ++v)
+                        sub.addItem (variants[static_cast<std::size_t> (index - 1)][v], true, engine() == index && now == v,
+                                     [safe, index, v] { if (safe != nullptr) safe->setEngine (index, v); });
+                    menu.addSubMenu (name, sub, true, nullptr, engine() == index);
+                    ++index;
+                }
+            };
+            m.onPick = [this] (int) { setEngine (0); };
+            presets = std::make_unique<SpacePresetBar> (p, accent());
+            addAndMakeVisible (*presets);
+            setVisual (std::make_unique<SpaceVisual> (p.apvts(), [&p] { return static_cast<double> (p.hostTempo()); }));
+            refresh();
+        }
+        int bodyHeight() const override { return 222; }
+        void refresh() override
+        {
+            const int which = engine();
+            const bool sync = value (processor.apvts(), "space.bloom.sync") >= 0.5f;
+            const int key = which * 2 + (which == 3 && sync ? 1 : 0);
+            if (key != built)
+                build (key);
+            if (modeSelector != nullptr)
+                modeSelector->repaint();
+        }
+
+    private:
+        int engine() const { return juce::roundToInt (value (processor.apvts(), "space.engine")); }
+        void setEngine (int e, int variant = -1)
+        {
+            static const char* variantIds[] { "space.abyss.variant", "space.vintage.variant", "space.bloom.variant" };
+            if (variant >= 0 && e >= 1 && e <= 3)
+                setPlain (processor.apvts(), variantIds[e - 1], static_cast<float> (variant));
+            if (juce::roundToInt (value (processor.apvts(), "space.engine")) != e)
+                setPlain (processor.apvts(), "space.engine", static_cast<float> (e));
+            refresh();
+        }
+        void build (int key)
+        {
+            built = key;
+            clearKnobs();
+            const auto ms = [] (double v) { return format::milliseconds (v); };
+            const auto percent = [] (double v) { return format::percent (v) + " %"; };
+            const auto seconds = [] (double v) { return juce::String (std::clamp (v, 0.2, 8.0), 1) + " s"; };
+            switch (key / 2)
+            {
+                case 1:   // ABYSS
+                    knob (false, "space.preDelay", "PRE-DELAY", ms);
+                    knob (false, "space.size", "SIZE", percent);
+                    knob (false, "space.decay", "DECAY", seconds);
+                    knob (false, "space.damping", "DAMP", percent);
+                    knob (true, "space.abyss.gravity", "GRAVITY", [] (double v) {
+                        const int r = juce::roundToInt (v);
+                        return (r > 0 ? juce::String ("+") : juce::String()) + juce::String (r) + " %";
+                    });
+                    knob (true, "space.abyss.resonance", "RESONANCE", percent);
+                    knob (true, "space.modulation", "MOD", percent);
+                    knob (true, "space.width", "WIDTH", percent);
+                    knob (true, "space.abyss.freeze", "FREEZE", [] (double v) { return juce::String (v >= 0.5 ? "ON" : "OFF"); });
+                    break;
+                case 2:   // VINTAGE
+                    knob (false, "space.preDelay", "PRE-DELAY", ms);
+                    knob (false, "space.size", "SIZE", percent);
+                    knob (false, "space.decay", "DECAY", seconds);
+                    knob (false, "space.damping", "DAMP", percent);
+                    knob (true, "space.vintage.diffusion", "DIFFUSION", percent);
+                    knob (true, "space.modulation", "MOD", percent);
+                    knob (true, "space.width", "WIDTH", percent);
+                    knob (true, "space.vintage.era", "ERA", [] (double v) { return juce::String (v >= 0.5 ? "LATER" : "EARLY"); });
+                    break;
+                case 3:   // BLOOM
+                    if (key % 2 == 1)
+                        knob (false, "space.bloom.division", "TIME", [] (double v) { return juce::String (shaping::echoDivisionName (juce::roundToInt (v))); });
+                    else
+                        knob (false, "space.bloom.time", "TIME", ms);
+                    knob (false, "space.bloom.diffusion", "DIFFUSION", percent);
+                    knob (false, "space.decay", "DECAY", seconds);
+                    knob (false, "space.damping", "DAMP", percent);
+                    knob (true, "space.bloom.sync", "SYNC", [] (double v) { return juce::String (v >= 0.5 ? "TEMPO" : "FREE"); });
+                    knob (true, "space.size", "SIZE", percent);
+                    knob (true, "space.modulation", "MOD", percent);
+                    knob (true, "space.width", "WIDTH", percent);
+                    break;
+                default:   // ROOMS
+                {
+                    auto* typeParam = processor.apvts().getParameter ("space.type");
+                    knob (false, "space.preDelay", "PRE-DELAY", ms);
+                    knob (false, "space.size", "SIZE", percent);
+                    knob (false, "space.decay", "DECAY", [typeParam] (double v) {
+                        double lo = 0.2, hi = 8.0;
+                        if (typeParam != nullptr)
+                            shaping::decayRange (static_cast<SpaceType> (juce::roundToInt (typeParam->convertFrom0to1 (typeParam->getValue()))), lo, hi);
+                        return juce::String (std::clamp (v, lo, hi), 1) + " s";
+                    });
+                    knob (false, "space.damping", "DAMP", percent);
+                    knob (true, "space.modulation", "MOD", percent);
+                    knob (true, "space.width", "WIDTH", percent);
+                    knob (true, "space.lowCut", "LOW CUT", [] (double v) { return format::hertz (v); });
+                    knob (true, "space.highCut", "HIGH CUT", [] (double v) { return format::hertz (v); });
+                    break;
+                }
+            }
+            layout();
+            repaint();
+        }
+        void layoutKeys (juce::Rectangle<int> row) override { presets->setBounds (row); }
+
+        std::unique_ptr<SpacePresetBar> presets;
+        int built = -1;
+    };
+
+    //==========================================================================
     /** ECHO: the machine beside the title, its repeats, then FREE / SYNC and the stereo
         picture, then TIME (a note value when synced, ms when free), FEEDBACK, TONE, AGE. */
     class EchoPanel final : public MacroPanel
@@ -3923,8 +4235,8 @@ std::unique_ptr<rack::Module> createRackModule (rack::Kind kind, InstrumentHost&
     switch (kind)
     {
         case rack::Kind::movement: return std::make_unique<MovementRack> (processor);
-        case rack::Kind::echo:
-        case rack::Kind::space: break;
+        case rack::Kind::echo: return std::make_unique<EchoRack> (processor);
+        case rack::Kind::space: return std::make_unique<SpaceRack> (processor);
     }
     return nullptr;
 }
@@ -3952,6 +4264,8 @@ juce::String rackMovementCaptions (const rack::Module& module)
 {
     if (const auto* m = dynamic_cast<const MovementRack*> (&module))
         return m->captions();
+    if (const auto* e = dynamic_cast<const EffectRack*> (&module))
+        return e->captions();
     return {};
 }
 
