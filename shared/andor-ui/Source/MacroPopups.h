@@ -38,6 +38,18 @@ void swapMovementLanes (InstrumentHost& host);
 void showRackMovementLane (rack::Module& module, int lane);
 /** Tests and snapshots: SHAPER's editor widened across the rack (its magnifier). */
 void setRackMovementWide (rack::Module& module, bool wide);
+/** Tests: a module's presets bar - what it shows, choosing one by name, the arrows, saving
+    the settings as the musician's own, the presets of the mode it is in. */
+juce::String rackPresetText (rack::Module& module);
+bool rackPresetChoose (rack::Module& module, const juce::String& name);
+void rackPresetStep (rack::Module& module, int delta);
+bool rackPresetSave (rack::Module& module, const juce::String& name);
+juce::StringArray rackPresetNames (rack::Module& module);
+/** Tests: a module's slot (2 MODE, 3 PRESET, 4 the first control cell, 5 the picture), in its
+    own coordinates. */
+juce::Rectangle<int> rackSlot (const rack::Module& module, int slot);
+/** Tests: user presets saved under this folder instead of Documents/ANDOR. */
+void setRackPresetFolderForTest (const juce::File& folder);
 /** Tests: a module's knobs' captions, in order (MOVEMENT "INTENSITY SPEED PITCH TONE", ECHO, SPACE). */
 juce::String rackMovementCaptions (const rack::Module& module);
 
