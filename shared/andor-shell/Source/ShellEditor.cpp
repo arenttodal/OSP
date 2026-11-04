@@ -297,15 +297,21 @@ ShellEditor::ShellEditor (ShellProcessor& p)
                 openPopup (static_cast<int> (i));
             };
     }
-    // The effects rack (opt-in): a key beside each macro whose module the product shows.
+    // The effects rack (opt-in): no mark on the row - the macro's name opens its module on a
+    // double-click, a right-click offers the popover or the module, Enter opens it.
     for (std::size_t i = 0; i < macros.size(); ++i)
         if (const auto kind = rack::kindForMacro (shell.macroSpecs()[i].parameterId);
-            kind.has_value() && shell.showsRack() && std::find (shell.product().rackModules.begin(), shell.product().rackModules.end(), *kind) != shell.product().rackModules.end())
+            kind.has_value() && shell.showsRack() && macros[i].label != nullptr
+            && std::find (shell.product().rackModules.begin(), shell.product().rackModules.end(), *kind) != shell.product().rackModules.end())
         {
-            rackKeys[i] = std::make_unique<rack::ExpandButton> (*kind);
-            rackKeys[i]->setAccent (design::colour::macro (static_cast<int> (i)));
-            rackKeys[i]->onClick = [this, k = *kind] { setRackExpanded (k, ! rack.isShown (k)); };
-            content.addAndMakeVisible (*rackKeys[i]);
+            rackOfMacro[i] = *kind;
+            const auto k = *kind;
+            const int macro = static_cast<int> (i);
+            juce::Component::SafePointer<ShellEditor> safe (this);
+            macros[i].label->setRackActions ([this, k] { toggleRackFromLabel (k); }, [safe, macro, k] {
+                if (safe != nullptr)
+                    safe->rackLabelMenu (macro, k).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (safe->macros[static_cast<std::size_t> (macro)].label.get()));
+            });
         }
     content.addAndMakeVisible (modPanel);
 
@@ -334,11 +340,11 @@ ShellEditor::ShellEditor (ShellProcessor& p)
     content.addChildComponent (arpPanel);
     content.addChildComponent (rack);
     for (int k = 0; k < rack::kindCount; ++k)
-        if ((shell.rackExpanded() & (1 << k)) != 0 && rackKey (static_cast<rack::Kind> (k)) != nullptr)
+        if ((shell.rackExpanded() & (1 << k)) != 0 && hasRack (static_cast<rack::Kind> (k)))
             rack.setShown (static_cast<rack::Kind> (k), true);
-    for (auto& key : rackKeys)
-        if (key != nullptr)
-            key->setExpanded (rack.isShown (key->kind()));
+    for (std::size_t i = 0; i < macros.size(); ++i)
+        if (rackOfMacro[i].has_value())
+            macros[i].label->setRackOpen (rack.isShown (*rackOfMacro[i]));
     rack.onLayoutChanged = [this] { rackChanged(); };   // (after: the window is laid out below)
     arpShown = shell.arpEditorExpanded();
     arpButton.setExpanded (arpShown);
@@ -429,14 +435,6 @@ void ShellEditor::layoutInstrument()
     }
     parts.sourceTrim = sourceTrim();
     frame::place (parts, arpShown);
-    // The rack's keys: right of their macro's name, on its line.
-    for (std::size_t i = 0; i < macros.size(); ++i)
-        if (rackKeys[i] != nullptr && macros[i].label != nullptr)
-        {
-            const auto label = macros[i].label->getBounds().toFloat();
-            const float x = label.getCentreX() + 0.5f * macros[i].label->textWidth() + 9.0f;
-            rackKeys[i]->setBounds (juce::Rectangle<float> (x, label.getCentreY() - 10.0f, 24.0f, 20.0f).getSmallestIntegerContainer());
-        }
     modOverlay.setBounds (content.getLocalBounds());
     sourceArea = frame::sourceArea (sourceTrim());
     shownCount = -1;
@@ -1083,12 +1081,36 @@ void ShellEditor::setArpExpanded (bool open)
     content.repaint();
 }
 
-rack::ExpandButton* ShellEditor::rackKey (rack::Kind kind) noexcept
+int ShellEditor::rackMacro (rack::Kind kind) const noexcept
 {
-    for (auto& key : rackKeys)
-        if (key != nullptr && key->kind() == kind)
-            return key.get();
-    return nullptr;
+    for (std::size_t i = 0; i < rackOfMacro.size(); ++i)
+        if (rackOfMacro[i] == kind)
+            return static_cast<int> (i);
+    return -1;
+}
+
+void ShellEditor::toggleRackFromLabel (rack::Kind kind)
+{
+    // (A popover in the way closes; a press that closed it must not count later.)
+    closedByLabelPress = -1;
+    closePopup();
+    setRackExpanded (kind, ! rack.isShown (kind));
+}
+
+juce::PopupMenu ShellEditor::rackLabelMenu (int macro, rack::Kind kind)
+{
+    juce::PopupMenu menu;
+    juce::Component::SafePointer<ShellEditor> safe (this);
+    if (shell.product().macroPopover != nullptr)
+        menu.addItem ("Quick Settings", [safe, macro] {
+            if (safe != nullptr)
+            {
+                safe->closedByLabelPress = -1;
+                safe->openPopup (macro);
+            }
+        });
+    menu.addItem (rack.isShown (kind) ? "Close Rack" : "Open Rack", [safe, kind] { if (safe != nullptr) safe->toggleRackFromLabel (kind); });
+    return menu;
 }
 
 int ShellEditor::rackMask() const
@@ -1101,7 +1123,7 @@ int ShellEditor::rackMask() const
 
 void ShellEditor::setRackExpanded (rack::Kind kind, bool open)
 {
-    if (open && rackKey (kind) == nullptr)
+    if (open && ! hasRack (kind))
         return;
     rack.setShown (kind, open);   // (rackChanged follows)
 }
@@ -1110,9 +1132,9 @@ void ShellEditor::rackChanged()
 {
     // A view change only: the window grows or shrinks by the rack, nothing sounds different.
     shell.setRackExpanded (rackMask());
-    for (auto& key : rackKeys)
-        if (key != nullptr)
-            key->setExpanded (rack.isShown (key->kind()));
+    for (std::size_t i = 0; i < macros.size(); ++i)
+        if (rackOfMacro[i].has_value())
+            macros[i].label->setRackOpen (rack.isShown (*rackOfMacro[i]));
     rack.settle();
     layoutInstrument();
     frame::applyWindowShape (*this, instrumentHeight(), true);
@@ -1340,7 +1362,7 @@ void ShellEditor::timerCallback()
         // A session recalled with another rack open (the view setting it saved).
         if (const int wanted = shell.rackExpanded(); wanted != rackMask())
             for (int k = 0; k < rack::kindCount; ++k)
-                if (rackKey (static_cast<rack::Kind> (k)) != nullptr)
+                if (hasRack (static_cast<rack::Kind> (k)))
                     rack.setShown (static_cast<rack::Kind> (k), (wanted & (1 << k)) != 0);
         rack.refresh();
     }

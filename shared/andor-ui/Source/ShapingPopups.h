@@ -19,12 +19,25 @@ namespace osp::plugin
     popup. Whether the settings differ from the defaults is kept here (isCustomised) for
     the LED the editor draws under the knob.
 */
-class MacroLabel final : public juce::Component, public juce::SettableTooltipClient
+class MacroLabel final : public juce::Component, public juce::SettableTooltipClient, private juce::Timer
 {
 public:
     MacroLabel (juce::String text, bool opensPopup, bool twoWay = false);
 
     std::function<void()> onClick;
+    /** A macro whose effect also has a rack (EffectRack.h), with no mark of its own on the
+        row: a double-click opens or closes the rack (`rack`), a right-click offers both
+        (`menu`), Enter opens the rack while the name has the keyboard's focus. A click then
+        opens the popover only once a double-click can no longer follow (the system's
+        double-click interval, a cancellable deferral), so a double-click never flashes the
+        popover first. Without it a click acts at once, as before. */
+    void setRackActions (std::function<void()> rack, std::function<void()> menu);
+    /** The rack is open: the name keeps the open underline (as while its popover is open). */
+    void setRackOpen (bool open);
+    bool isRackOpen() const noexcept { return rackOpen; }
+    /** Tests: a click waits for a possible double-click; act on it now as the timer would. */
+    bool isClickPending() const noexcept { return clickPending; }
+    void flushPendingClick() { timerCallback(); }
     /** The macro's identity colour (its small light and the open underline). */
     void setAccent (juce::Colour colour) { accent = colour; repaint(); }
     void setCustomised (bool customised);
@@ -36,12 +49,19 @@ public:
     void paint (juce::Graphics&) override;
     void mouseEnter (const juce::MouseEvent&) override { repaint(); }
     void mouseExit (const juce::MouseEvent&) override { repaint(); }
+    void mouseDown (const juce::MouseEvent&) override;
     void mouseUp (const juce::MouseEvent&) override;
+    void mouseDoubleClick (const juce::MouseEvent&) override;
+    bool keyPressed (const juce::KeyPress&) override;
+    void focusGained (FocusChangeType) override { repaint(); }
+    void focusLost (FocusChangeType) override { repaint(); }
 
 private:
+    void timerCallback() override;
     juce::String text;
     bool opensPopup, twoWay;
-    bool customised = false, open = false;
+    bool customised = false, open = false, rackOpen = false, clickPending = false, swallowUp = false;
+    std::function<void()> onRack, onMenu;
     juce::Colour accent { 0xffe8692a };
 };
 

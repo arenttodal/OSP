@@ -15,9 +15,11 @@ namespace osp::plugin::rack
 
 /**
     The effects rack: full-width modules between the macro row and the arpeggiator, each
-    an effect's whole editor (its controls in the open and its picture at the size of the
-    modulation editors), expanded from a small key beside its macro's name. Opt-in: a
-    product that asks for no modules shows no keys and no rack (ANDOR OSP: as before).
+    an effect's whole editor (its controls in the open and its picture in the modulation
+    window's column). No mark on the macro row: a double-click on the macro's name opens or
+    closes its module, a right-click offers the popover or the module, Enter opens it
+    (MacroLabel::setRackActions); a click still opens the popover. Opt-in: a product that
+    asks for no modules has none (ANDOR OSP: as before). Future modules follow the same.
 
     The rack is a view: expanding or collapsing a module never changes a setting. The host
     shows one module at a time by default; it can stack several (setStacking) without
@@ -33,24 +35,6 @@ static constexpr int kindCount = 3;
 juce::String name (Kind kind);
 /** The module a macro's parameter opens ("motion" MOVEMENT, "echo", "space"), if any. */
 std::optional<Kind> kindForMacro (const juce::String& parameterId);
-
-/** The small key beside a macro's name: expands (and collapses) its module. A button, so
-    it takes keyboard focus and speaks to accessibility clients. */
-class ExpandButton final : public juce::Button
-{
-public:
-    explicit ExpandButton (Kind kind);
-    Kind kind() const noexcept { return which; }
-    void setExpanded (bool expanded);
-    bool isExpanded() const noexcept { return open; }
-    void setAccent (juce::Colour colour) { accent = colour; repaint(); }
-    void paintButton (juce::Graphics&, bool highlighted, bool down) override;
-
-private:
-    Kind which;
-    bool open = false;
-    juce::Colour accent { 0xff5b7c99 };
-};
 
 /** One module's body (the host draws the panel, its title and the collapse key). */
 class Module : public juce::Component

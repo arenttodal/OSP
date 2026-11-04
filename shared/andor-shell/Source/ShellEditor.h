@@ -98,9 +98,17 @@ public:
     float sourceTrim() const noexcept { return shell.modifiersInWell() ? osp::plugin::EngineCard::footTrim : 0.0f; }
     /** The effects rack (the product's rackModules; tests and snapshots). */
     osp::plugin::rack::Host& effectsRack() noexcept { return rack; }
-    /** The key beside a macro's name that expands its rack module, or nullptr. */
-    osp::plugin::rack::ExpandButton* rackKey (osp::plugin::rack::Kind kind) noexcept;
+    /** The macro (0..5) whose name opens a rack module (a double-click), or -1. */
+    int rackMacro (osp::plugin::rack::Kind kind) const noexcept;
+    bool hasRack (osp::plugin::rack::Kind kind) const noexcept { return rackMacro (kind) >= 0; }
+    /** A macro's name (tests: its clicks, its context menu). */
+    osp::plugin::MacroLabel* macroLabel (int macro) noexcept { return macro >= 0 && macro < osp::plugin::frame::macroCount ? macros[static_cast<std::size_t> (macro)].label.get() : nullptr; }
     void setRackExpanded (osp::plugin::rack::Kind kind, bool open);
+    /** A double-click on the macro's name: its rack opens (another one closes) or closes, and
+        a popover in the way closes. */
+    void toggleRackFromLabel (osp::plugin::rack::Kind kind);
+    /** A right-click on the name (or the keyboard's menu key): Quick Settings, Open / Close Rack. */
+    juce::PopupMenu rackLabelMenu (int macro, osp::plugin::rack::Kind kind);
     /** The popovers: a macro's (0..5, when the product has one), Advanced, a layer's
         REIMAGINED (7 + layer, when the engine reads it), a modulation source's routes or
         larger curve (source 0 LFO 1 .. 3 ENV 2). */
@@ -201,9 +209,9 @@ private:
     osp::plugin::ArpControl arpButton { shell };
     osp::plugin::ArpInlinePanel arpPanel { shell };
     bool arpShown = false;
-    // The effects rack (opt-in: the product's rackModules) and the keys beside the macros.
+    // The effects rack (opt-in: the product's rackModules), opened from the macros' names.
     osp::plugin::rack::Host rack { [this] (osp::plugin::rack::Kind kind) { return osp::plugin::createRackModule (kind, shell); } };
-    std::array<std::unique_ptr<osp::plugin::rack::ExpandButton>, osp::plugin::frame::macroCount> rackKeys;
+    std::array<std::optional<osp::plugin::rack::Kind>, osp::plugin::frame::macroCount> rackOfMacro {};
     float rackShift() const noexcept { return rack.height() > 0.0f ? rack.height() + osp::plugin::design::layout::rackGap : 0.0f; }
     int rackMask() const;
     void rackChanged();

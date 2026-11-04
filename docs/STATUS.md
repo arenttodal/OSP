@@ -760,8 +760,9 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
   and the visual parity stay exactly as they were; its MOVEMENT stays one lane (every golden
   unchanged).
   To bring it to ANDOR OSP:
-  - add the keys beside its macro names and the rack to OspAudioProcessorEditor (the frame
-    already places it: `Parts::rack`, `rackShift`);
+  - give its macro names the rack actions (MacroLabel::setRackActions: a double-click opens
+    the module, a right-click offers both, Enter) and add the rack to OspAudioProcessorEditor
+    (the frame already places it: `Parts::rack`, `rackShift`);
   - save the rack's view state with OSP's session (as `arpOpen`);
   - review the screenshots at 869 / 1448 / 1810 px and update OSP's own captures.
 

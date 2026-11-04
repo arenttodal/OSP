@@ -66,10 +66,91 @@ void MacroLabel::setOpen (bool o)
     }
 }
 
+void MacroLabel::setRackActions (std::function<void()> rack, std::function<void()> menu)
+{
+    onRack = std::move (rack);
+    onMenu = std::move (menu);
+    const bool has = onRack != nullptr;
+    setWantsKeyboardFocus (has);
+    setMouseClickGrabsKeyboardFocus (false);   // (the focus underline is the keyboard's only)
+    if (has)
+        setTooltip (juce::String::fromUTF8 ("Click for settings \xc2\xb7 Double-click for rack"));
+}
+
+void MacroLabel::setRackOpen (bool o)
+{
+    if (rackOpen != o)
+    {
+        rackOpen = o;
+        repaint();
+    }
+}
+
+void MacroLabel::mouseDown (const juce::MouseEvent& e)
+{
+    if (onMenu != nullptr && e.mods.isPopupMenu())
+    {
+        stopTimer();
+        clickPending = false;
+        swallowUp = true;
+        onMenu();
+    }
+}
+
 void MacroLabel::mouseUp (const juce::MouseEvent& e)
 {
-    if (opensPopup && onClick != nullptr && getLocalBounds().contains (e.getPosition()))
+    if (swallowUp)
+    {
+        swallowUp = false;   // (the right-click's or the double-click's own release)
+        return;
+    }
+    if (! (opensPopup && onClick != nullptr && getLocalBounds().contains (e.getPosition())))
+        return;
+    if (onRack == nullptr)
+    {
+        onClick();   // no rack: at once, as ever
+        return;
+    }
+    // Wait for a possible second click (the system's interval); a double-click cancels this.
+    clickPending = true;
+    startTimer (std::max (1, juce::MouseEvent::getDoubleClickTimeout()));
+}
+
+void MacroLabel::mouseDoubleClick (const juce::MouseEvent& e)
+{
+    if (onRack == nullptr || e.mods.isPopupMenu())
+        return;
+    stopTimer();
+    clickPending = false;
+    swallowUp = true;
+    onRack();
+}
+
+void MacroLabel::timerCallback()
+{
+    stopTimer();
+    if (! clickPending)
+        return;
+    clickPending = false;
+    if (opensPopup && onClick != nullptr)
         onClick();
+}
+
+bool MacroLabel::keyPressed (const juce::KeyPress& key)
+{
+    if (onRack == nullptr)
+        return false;
+    if (key == juce::KeyPress::returnKey)
+    {
+        onRack();
+        return true;
+    }
+    if (onMenu != nullptr && (key == juce::KeyPress (juce::KeyPress::F10Key, juce::ModifierKeys::shiftModifier, 0) || key.getKeyCode() == 0x5d /* menu key */))
+    {
+        onMenu();
+        return true;
+    }
+    return false;
 }
 
 float MacroLabel::textWidth() const
@@ -85,13 +166,15 @@ void MacroLabel::paint (juce::Graphics& g)
     auto r = getLocalBounds().toFloat();
     const auto font = type::macroLabel (0.7f * r.getHeight());
     g.setFont (font);
-    g.setColour (hover || open ? juce::Colours::black : design::colour::text.withAlpha (0.88f));
+    const bool active = open || rackOpen;   // (its popover or its rack)
+    const bool focused = hasKeyboardFocus (false);
+    g.setColour (hover || active || focused ? juce::Colours::black : design::colour::text.withAlpha (0.88f));
     const float w = juce::GlyphArrangement::getStringWidth (font, text);
     const auto textArea = juce::Rectangle<float> (r.getCentreX() - w * 0.5f, r.getY(), w + 2.0f, r.getHeight());
     g.drawText (text, textArea, juce::Justification::centredLeft, false);
-    if (hover || open)
+    if (hover || active || focused)
     {
-        g.setColour (open ? accent : palette::text.withAlpha (0.5f));
+        g.setColour (active ? accent : palette::text.withAlpha (0.5f));
         g.fillRect (textArea.getX(), r.getCentreY() + font.getHeight() * 0.5f + 1.0f, w, 1.2f);
     }
 }

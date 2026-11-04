@@ -43,38 +43,6 @@ std::optional<Kind> kindForMacro (const juce::String& parameterId)
 }
 
 //==============================================================================
-ExpandButton::ExpandButton (Kind kind) : juce::Button (name (kind) + " rack"), which (kind)
-{
-    setWantsKeyboardFocus (true);
-    setMouseCursor (juce::MouseCursor::PointingHandCursor);
-    setExpanded (false);
-}
-
-void ExpandButton::setExpanded (bool expanded)
-{
-    open = expanded;
-    setTooltip (open ? "Collapse the " + name (which) + " rack (the settings stay as they are)"
-                     : "Expand " + name (which) + " into the rack: all its settings and a larger picture");
-    setToggleState (open, juce::dontSendNotification);
-    repaint();
-}
-
-void ExpandButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
-{
-    using namespace design;
-    // A small key in the macro row's quiet language: two rack rails over a chevron (down to
-    // expand, up when open); lit in the macro's identity while its module is open.
-    const auto r = getLocalBounds().toFloat().reduced (1.5f);
-    draw::button (g, r, 4.0f, open, highlighted || down || hasKeyboardFocus (true), accent);
-    const auto ink = open ? accent.darker (0.35f) : colour::text.withAlpha (highlighted ? 0.95f : 0.7f);
-    const float cx = r.getCentreX(), w = r.getWidth() * 0.28f;
-    g.setColour (ink);
-    g.fillRoundedRectangle (juce::Rectangle<float> (cx - w, r.getY() + r.getHeight() * 0.27f, 2.0f * w, 1.4f), 0.7f);
-    g.fillRoundedRectangle (juce::Rectangle<float> (cx - w, r.getY() + r.getHeight() * 0.42f, 2.0f * w, 1.4f), 0.7f);
-    chevron (g, { cx, r.getY() + r.getHeight() * 0.68f }, w * 0.8f, r.getHeight() * 0.16f, open, ink, 1.4f);
-}
-
-//==============================================================================
 /** The module's collapse key: a small round button with an up chevron (the arpeggiator's). */
 class Host::CollapseButton final : public juce::Button
 {
