@@ -413,3 +413,13 @@ space.bloom.diffusion v24 float "Bloom Diffusion" label="%" range=0.0000..100.00
 space.abyss.variant v25 choice "Abyss Variant" label="" range=0.0000..3.0000/1.0000 skew=1.00000 default=0.0000 steps=4 texts=Deep|Inverse|Endless [Deep|Dark|Inverse|Endless]
 echo.ascend.interval v26 choice "Echo Ascend Interval" label="" range=0.0000..3.0000/1.0000 skew=1.00000 default=0.0000 steps=4 texts=+12|+5|-12 [+12|+7|+5|-12]
 echo.ascend.motion v26 choice "Echo Ascend Motion" label="" range=0.0000..2.0000/1.0000 skew=1.00000 default=0.0000 steps=3 texts=Rise|Steady|Late [Rise|Steady|Late]
+arp.link v27 bool "Arp Link" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=1.0000 steps=2 texts=Off|On|On
+arp.cardA v27 bool "Arp Card A" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=1.0000 steps=2 texts=Off|On|On
+arp.cardB v27 bool "Arp Card B" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=1.0000 steps=2 texts=Off|On|On
+arp.cardC v27 bool "Arp Card C" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=1.0000 steps=2 texts=Off|On|On
+arp.cardB.pattern v27 choice "Arp Card B Pattern" label="" range=0.0000..17.0000/1.0000 skew=1.00000 default=0.0000 steps=18 texts=UP|DOWN & UP|RANDOM ONCE [UP|DOWN|UP/DOWN|PLAYED|RANDOM|CHORD|DOWN/UP|UP & DOWN|DOWN & UP|CONVERGE|DIVERGE|CON & DIVERGE|PINKY UP|PINKY UP/DOWN|THUMB UP|THUMB UP/DOWN|RANDOM OTHER|RANDOM ONCE]
+arp.cardB.rate v27 choice "Arp Card B Rate" label="" range=0.0000..9.0000/1.0000 skew=1.00000 default=1.0000 steps=10 texts=1/4|1/4D|1/16T [1/4|1/8|1/16|1/32|1/4D|1/8D|1/16D|1/4T|1/8T|1/16T]
+arp.cardB.octaves v27 int "Arp Card B Octaves" label="" range=1.0000..4.0000/1.0000 skew=1.00000 default=1.0000 steps=4 texts=1|2|4
+arp.cardC.pattern v27 choice "Arp Card C Pattern" label="" range=0.0000..17.0000/1.0000 skew=1.00000 default=0.0000 steps=18 texts=UP|DOWN & UP|RANDOM ONCE [UP|DOWN|UP/DOWN|PLAYED|RANDOM|CHORD|DOWN/UP|UP & DOWN|DOWN & UP|CONVERGE|DIVERGE|CON & DIVERGE|PINKY UP|PINKY UP/DOWN|THUMB UP|THUMB UP/DOWN|RANDOM OTHER|RANDOM ONCE]
+arp.cardC.rate v27 choice "Arp Card C Rate" label="" range=0.0000..9.0000/1.0000 skew=1.00000 default=1.0000 steps=10 texts=1/4|1/4D|1/16T [1/4|1/8|1/16|1/32|1/4D|1/8D|1/16D|1/4T|1/8T|1/16T]
+arp.cardC.octaves v27 int "Arp Card C Octaves" label="" range=1.0000..4.0000/1.0000 skew=1.00000 default=1.0000 steps=4 texts=1|2|4

@@ -485,6 +485,13 @@ public:
     */
     void setMpe (bool enabled) noexcept { mpe = enabled; }
     bool isMpe() const noexcept { return mpe; }
+    /**
+        The per-card arpeggiator's lanes (osp::plugin::CardArpLanes): on, each note's MIDI
+        channel names the layers it plays (channel = 1 + mask, bit 0 A .. bit 2 C) and a note
+        ends only on its own channel. Off (the default): every note plays every layer.
+    */
+    void setCardRouting (bool on) noexcept { cardRouting = on; }
+    bool isCardRouting() const noexcept { return cardRouting; }
     void setChannelPitchBend (int channel, double semitones) noexcept;
     void setChannelPressure (int channel, double pressure01) noexcept;
     void setChannelTimbre (int channel, double timbre01) noexcept;
@@ -641,6 +648,7 @@ private:
     void publishGrains() noexcept;
     PostProcessor post;
     bool mpe = false;
+    bool cardRouting = false;
     std::array<double, 17> channelBendRatio {};   ///< index 1..16
     std::array<float, 17> channelPressure {};
     std::array<float, 17> channelTimbre {};

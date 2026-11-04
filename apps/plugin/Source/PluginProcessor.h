@@ -5,6 +5,7 @@
 #include "InstrumentHost.h"
 #include "LibraryService.h"
 #include "LoadedInstrument.h"
+#include "CardArpLanes.h"
 
 #include "engine/Arpeggiator.h"
 #include "engine/InstrumentEngine.h"
@@ -177,6 +178,10 @@ public:
 
     /** What the arpeggiator's 16-step display shows (lock-free snapshot, any thread). */
     ArpView arpView() const noexcept override;
+    /** The per-card arpeggiator (version hint 27): ARP plays some layers, the others hold the keys. */
+    bool cardArpeggiator() const noexcept override { return true; }
+    juce::String cardArpNamespace() const override { return {}; }
+    void setArpViewCard (int shown) noexcept override { arpViewCard.store (std::clamp (shown, 0, 2), std::memory_order_relaxed); }
 
     // A/B source layers (numLayers, layerName, layerParameterId: InstrumentHost). Everything
     // below that takes a `layer` acts on the layer being edited when it is -1 (the A/B tabs choose it).
@@ -632,6 +637,13 @@ private:
     /** The arpeggiator stage: from the block's incoming MIDI to the notes the engine plays
         (the incoming buffer itself while it is off, otherwise its own preallocated one). */
     const juce::MidiBuffer& runArpeggiator (const juce::MidiBuffer& midi, int numSamples, const HostTiming& timing) noexcept;
+    /** The per-card arpeggiator (plugin::CardArpLanes, shared with every three-engine product):
+        the one arpeggiator (runArpeggiator) while LINK holds every card, the arpeggiator is
+        off, or MPE / MONO is on; else up to three lanes, each playing some layers. */
+    const juce::MidiBuffer& runCardArpeggiators (const juce::MidiBuffer& midi, int numSamples, const HostTiming& timing) noexcept;
+    /** ARP's settings as the arpeggiator reads them (ARP destinations included; off while the
+        lanes leave no card to arpeggiate). */
+    Arpeggiator::Settings arpSettings() noexcept;
     void publishArpDisplay() noexcept;
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createLayout();
@@ -640,6 +652,12 @@ private:
     EngineSettings engineSettings;
     Arpeggiator arpeggiator;
     juce::MidiBuffer arpMidi;   ///< preallocated in prepareToPlay
+    /** The per-card lanes and their view of this processor, on the heap (the processor may
+        live on a stack: a host's, a test's). Made with the processor, prepared in prepareToPlay. */
+    struct LaneHost;
+    std::unique_ptr<plugin::CardArpLanes> lanes;
+    std::unique_ptr<LaneHost> laneHost;
+    std::atomic<int> arpViewCard { 0 };   ///< the card whose lane the ARP display shows
     std::array<std::atomic<int>, Arpeggiator::displaySteps> arpDisplayLow {}, arpDisplayHigh {};
     std::atomic<int> arpDisplayCurrent { -1 };
     std::atomic<bool> arpDisplayActive { false };
@@ -721,6 +739,10 @@ private:
     std::atomic<float>* pitchCharacterParam = nullptr;
     std::atomic<float>* sustainParam = nullptr;
     std::atomic<float>* seedParam = nullptr;
+    // The per-card arpeggiator (version hint 27).
+    std::atomic<float>* arpLinkParam = nullptr;
+    std::array<std::atomic<float>*, 3> arpCardParams {};
+    std::array<std::atomic<float>*, 2> arpLanePatternParams {}, arpLaneRateParams {}, arpLaneOctavesParams {};
     std::atomic<float>* mpeParam = nullptr;
     // A/B layers: blend, then per layer source mode and POS, SIZE, DENS, TUNE, SPREAD.
     std::atomic<float>* blendParam = nullptr;

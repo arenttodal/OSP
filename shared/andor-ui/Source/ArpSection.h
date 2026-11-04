@@ -126,7 +126,7 @@ public:
     /** The per-card arpeggiator (InstrumentHost::cardArpeggiator): on the title row, PLAYS
         A B C (the cards the arpeggio plays; the others hold the keys) and LINK; unlinked,
         EDIT A | B | C chooses whose PATTERN, RATE and OCTAVES the panel shows and sets
-        (GATE, SWING and VELOCITY are shared). Absent elsewhere (ANDOR OSP: as before). */
+        (GATE, SWING and VELOCITY are shared). Absent in a product with one arpeggiator. */
     bool showsCards() const noexcept { return cards; }
     void toggleCard (int shown);
     void toggleLink();
@@ -135,6 +135,9 @@ public:
     juce::Rectangle<float> cardChipArea (int shown) const { return cardChips[static_cast<std::size_t> (juce::jlimit (0, 2, shown))]; }
     juce::Rectangle<float> linkArea() const { return linkChip; }
     juce::Rectangle<float> editTabArea (int shown) const { return editTabs[static_cast<std::size_t> (juce::jlimit (0, 2, shown))]; }
+    /** Everything the per-card controls draw (PLAYS .. EDIT C), in panel coordinates: where a
+        product with one arpeggiator differs from ANDOR OSP (the visual regression's mask). */
+    static juce::Rectangle<float> cardRowArea() noexcept { return { 190.0f, 12.0f, 360.0f, 30.0f }; }
 
     /** Places of the parts (tests, snapshots). */
     juce::Rectangle<float> displayArea() const { return steps; }

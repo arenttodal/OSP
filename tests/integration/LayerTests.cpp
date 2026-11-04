@@ -390,3 +390,76 @@ TEST_CASE ("reimagined routing: at 0 % per layer and legacy are the same; per la
     INFO ("energy after the release: reimagined " << tail << ", original " << dryTail);
     CHECK (tail > 4.0 * dryTail);
 }
+
+TEST_CASE ("card routing: each note's channel names the layers it plays, and it ends only on its own", "[integration][layers][card-arp]")
+{
+    // A at 220 Hz, B a fifth up (its own pitch offset), both heard (blend centre).
+    const auto a = sineModel (220.0), b = sineModel (220.0);
+    auto s = quietSettings();
+    s.blend = 0.5;
+    auto rigWith = [&] (bool routing) {
+        auto rig = std::make_unique<Rig> (s);
+        rig->engine.setModel (a.get(), 0);
+        rig->engine.setModel (b.get(), 1);
+        rig->engine.setLayerPitchOffsetSemitones (1, 7.0);
+        rig->engine.setCardRouting (routing);
+        return rig;
+    };
+    const double fifth = midiToHz (64);
+
+    SECTION ("channel 1 + mask: A only, B only")
+    {
+        for (const int channel : { 2, 3 })
+        {
+            auto rig = rigWith (true);
+            rig->engine.noteOn (57, 100, channel);
+            std::vector<float> out;
+            rig->run (0.5, out);
+            const double ea = goertzel (out, 4800, 19200, 220.0), eb = goertzel (out, 4800, 19200, fifth);
+            if (channel == 2)
+                CHECK (eb < 1.0e-4 * ea);
+            else
+                CHECK (ea < 1.0e-4 * eb);
+        }
+    }
+
+    SECTION ("a note-off ends only its own channel's voices")
+    {
+        auto rig = rigWith (true);
+        rig->engine.noteOn (57, 100, 2);   // A
+        rig->engine.noteOn (57, 100, 3);   // B (the same key on the other card)
+        std::vector<float> out;
+        rig->run (0.2, out);
+        rig->engine.noteOff (57, 2);
+        rig->run (0.6, out);
+        const auto from = static_cast<std::size_t> (0.5 * rate), to = static_cast<std::size_t> (0.8 * rate);
+        CHECK (goertzel (out, from, to, 220.0) < 1.0e-3 * goertzel (out, from, to, fifth));   // A released, B holds
+        rig->engine.noteOff (57, 3);
+        std::vector<float> tail;
+        rig->run (0.5, tail);
+        CHECK (rig->engine.activeVoiceCount() == 0);
+    }
+
+    SECTION ("off (the default): every note plays every layer, whatever its channel, exactly as before")
+    {
+        auto render = [&] (bool explicitOff, int channel) {
+            auto rig = explicitOff ? rigWith (false) : [&] {
+                auto r = std::make_unique<Rig> (s);
+                r->engine.setModel (a.get(), 0);
+                r->engine.setModel (b.get(), 1);
+                r->engine.setLayerPitchOffsetSemitones (1, 7.0);
+                return r;
+            }();
+            rig->engine.noteOn (57, 100, channel);
+            std::vector<float> out;
+            rig->run (0.3, out);
+            rig->engine.noteOff (57, 1);   // any channel ends it (no MPE)
+            rig->run (0.3, out);
+            return out;
+        };
+        const auto reference = render (false, 1);
+        CHECK (render (true, 1) == reference);
+        CHECK (render (true, 3) == reference);
+        CHECK (rms (reference, reference.size() - 2000, reference.size()) < 1.0e-3);
+    }
+}

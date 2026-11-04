@@ -72,6 +72,21 @@ synth::Settings InstrumentHost::synthSettingsFrom (const std::array<float, 6>& r
     return s;
 }
 
+void InstrumentHost::addCardArpParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, const juce::String& ns)
+{
+    auto id = [] (const juce::String& s) { return juce::ParameterID { s, 27 }; };
+    layout.add (std::make_unique<juce::AudioParameterBool> (id (ids::arpLink (ns)), "Arp Link", true));
+    for (int c = 0; c < 3; ++c)
+        layout.add (std::make_unique<juce::AudioParameterBool> (id (ids::arpCard (ns, c)), "Arp Card " + juce::String::charToString (static_cast<juce::juce_wchar> ('A' + c)), true));
+    for (int c = 1; c < 3; ++c)
+    {
+        const auto name = "Arp Card " + juce::String::charToString (static_cast<juce::juce_wchar> ('A' + c)) + " ";
+        layout.add (std::make_unique<juce::AudioParameterChoice> (id (ids::arpCardSetting (ns, c, "pattern")), name + "Pattern", arpPatternNames(), 0));
+        layout.add (std::make_unique<juce::AudioParameterChoice> (id (ids::arpCardSetting (ns, c, "rate")), name + "Rate", arpRateNames(), 1));
+        layout.add (std::make_unique<juce::AudioParameterInt> (id (ids::arpCardSetting (ns, c, "octaves")), name + "Octaves", 1, 4, 1));
+    }
+}
+
 juce::AudioProcessorValueTreeState::ParameterLayout InstrumentHost::createParameterLayout()
 {
     using Range = juce::NormalisableRange<float>;

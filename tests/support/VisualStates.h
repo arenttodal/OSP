@@ -7,6 +7,7 @@
 
 #include "CeramicSkin.h"
 #include "Design.h"
+#include "ArpSection.h"
 #include "EngineCard.h"
 
 #include "audio/utility/TestSignals.h"
@@ -158,7 +159,7 @@ namespace visualstates
         juce::String name, why;
         juce::Rectangle<float> area;
     };
-    inline std::vector<Mask> masks (float arpShift = 0.0f)
+    inline std::vector<Mask> masks (float arpShift = 0.0f, bool arpOpen = false)
     {
         using namespace osp::plugin::design::layout;
         // The identity: "ANDOR" + the product word, and the tagline under it (from the
@@ -168,8 +169,14 @@ namespace visualstates
         const auto presetName = presetBar.reduced (46.0f, 4.0f);
         // The footer's status line (it names the engine; the sounds' stages differ).
         const auto statusLine = status.translated (0.0f, arpShift).expanded (2.0f, 2.0f);
-        return { { "identity", "the product's name and tagline", identity },
-                 { "preset-name", "the product's own presets", presetName },
-                 { "status-line", "the engine's and the sounds' state", statusLine } };
+        std::vector<Mask> result { { "identity", "the product's name and tagline", identity },
+                                   { "preset-name", "the product's own presets", presetName },
+                                   { "status-line", "the engine's and the sounds' state", statusLine } };
+        // The open ARP panel's per-card row (PLAYS / LINK / EDIT): ANDOR OSP's arpeggiator plays
+        // per card; a product with one engine (or one arpeggiator) draws nothing there.
+        if (arpOpen)
+            result.push_back ({ "arp-cards", "the per-card arpeggiator's row (absent with one arpeggiator)",
+                                osp::plugin::ArpInlinePanel::cardRowArea().translated (arpPanel.getX(), arpPanel.getY()) });
+        return result;
     }
 }
