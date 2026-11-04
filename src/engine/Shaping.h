@@ -242,6 +242,26 @@ namespace shaping
         constexpr const char* n[echoDivisionCount] = { "1/16", "1/8T", "1/16D", "1/8", "1/4T", "1/8D", "1/4", "1/2T", "1/4D", "1/2", "1/2D", "1/1" };
         return n[std::clamp (index, 0, echoDivisionCount - 1)];
     }
+
+    /** PULSE's synced cycles (a lane's SYNC, ANDOR ANALOG's MOVEMENT rack): one rise and fall
+        every 1/16, 1/8T, 1/8, 1/4T, 1/4, 1/2, 1 bar, 2 bars or 4 bars (of 4/4). */
+    constexpr int pulseDivisionCount = 9;
+    inline double pulseDivisionQuarters (int index) noexcept
+    {
+        constexpr double q[pulseDivisionCount] = { 0.25, 1.0 / 3.0, 0.5, 2.0 / 3.0, 1.0, 2.0, 4.0, 8.0, 16.0 };
+        return q[std::clamp (index, 0, pulseDivisionCount - 1)];
+    }
+    inline const char* pulseDivisionName (int index) noexcept
+    {
+        constexpr const char* n[pulseDivisionCount] = { "1/16", "1/8T", "1/8", "1/4T", "1/4", "1/2", "1 bar", "2 bars", "4 bars" };
+        return n[std::clamp (index, 0, pulseDivisionCount - 1)];
+    }
+    /** A synced PULSE's rate at `bpm` (120 when the host gives none). */
+    inline double pulseSyncedHz (int index, double bpm) noexcept
+    {
+        const double tempo = bpm > 1.0 ? bpm : 120.0;
+        return tempo / 60.0 / pulseDivisionQuarters (index);
+    }
 }
 
 } // namespace osp

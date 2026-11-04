@@ -752,6 +752,17 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 
 ## NEXT
 
+- **The effects rack in ANDOR OSP's own plugin** (the rule on shared SPACE / ECHO / ARP
+  features). The rack host (`shared/andor-ui/Source/EffectRack.*`), its modules (built in
+  `MacroPopups.cpp` from the popovers' parts) and the frame's rack slot are shared and opt-in
+  (`ShellProduct::rackModules`); ANDOR ANALOG shows MOVEMENT's (Phase 1; ECHO and SPACE
+  follow). ANDOR OSP shows none, so its look and the visual parity stay exactly as they were.
+  To bring it to ANDOR OSP:
+  - add the keys beside its macro names and the rack to OspAudioProcessorEditor (the frame
+    already places it: `Parts::rack`, `rackShift`);
+  - save the rack's view state with OSP's session (as `arpOpen`);
+  - review the screenshots at 869 / 1448 / 1810 px and update OSP's own captures.
+
 - **Per-card arpeggiator in ANDOR OSP's own plugin** (the rule on shared SPACE / ECHO / ARP
   features). The shell's lanes and the ARP panel's PLAYS / LINK / EDIT are shared and in
   ANDOR ANALOG. Still to do in ANDOR OSP:

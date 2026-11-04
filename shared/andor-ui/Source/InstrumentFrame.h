@@ -156,6 +156,10 @@ namespace frame
         juce::Component* arpControl = nullptr;
         juce::Component* advanced = nullptr;
         juce::Component* headerMix = nullptr;
+        /** The effects rack (opt-in) and how far it pushes what is under it (its height
+            plus rackGap while a module is expanded; 0 without a rack: as before). */
+        juce::Component* rack = nullptr;
+        float rackShift = 0.0f;
     };
     /** Places the parts at the reference's places (the keyboard row and footer move down by
         the arpeggiator editor's height while it shows). */
@@ -167,7 +171,8 @@ namespace frame
 
     /** The housing, the identity, the keybed, the macro panel with its lights and the keys
         on the housing: everything the instrument paints under its components. */
-    void paint (juce::Graphics& g, juce::Component& content, const Identity& identity, bool arpShown, const MacroRow& macros);
+    void paint (juce::Graphics& g, juce::Component& content, const Identity& identity, bool arpShown, const MacroRow& macros,
+                float rackShift = 0.0f);
 
     /** A popover's card size in reference pixels (a panel laid out at a smaller unit is
         scaled up, so every popover's shell reads alike). */
@@ -186,7 +191,7 @@ namespace frame
     void animatePopoverOpening (MiniPanel& popup);
 
     /** The instrument's height in reference pixels (taller while the arpeggiator's editor shows). */
-    float instrumentHeight (bool arpShown) noexcept;
+    float instrumentHeight (bool arpShown, float rackShift = 0.0f) noexcept;
     /** Scales `content` (laid out at the reference size) uniformly into `editor`, centred:
         if a host keeps another window shape, the instrument still shows whole. */
     void fit (juce::Component& editor, juce::Component& content, float height);

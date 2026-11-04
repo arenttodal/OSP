@@ -1,5 +1,6 @@
 #pragma once
 
+#include "EffectRack.h"
 #include "ShapingPopups.h"
 
 namespace osp::plugin
@@ -18,5 +19,14 @@ const juce::StringArray& popupParameterIds (MacroPopup macro);
 std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, InstrumentHost& host);
 /** REIMAGINED (one per layer): the mode, its picture and its own two or three settings. */
 std::unique_ptr<MiniPanel> createReimaginedPopup (InstrumentHost& host, int layer);
+/** An effect's module for the effects rack (EffectRack.h), built from the same parts as its
+    popover; nullptr for a kind not built yet. */
+std::unique_ptr<rack::Module> createRackModule (rack::Kind kind, InstrumentHost& host);
+/** The MOVEMENT module's lane shown (tests), -1 for another module. */
+int rackMovementLane (const rack::Module& module);
+/** Tests and snapshots: SHAPER's editor widened across the rack (its magnifier). */
+void setRackMovementWide (rack::Module& module, bool wide);
+/** Tests: the MOVEMENT module's knobs' captions, in order ("AMOUNT SPEED PITCH TONE"). */
+juce::String rackMovementCaptions (const rack::Module& module);
 
 } // namespace osp::plugin

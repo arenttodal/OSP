@@ -340,8 +340,14 @@ void place (const Parts& parts, bool arpShown)
 
     // The arpeggiator's editor (when shown) takes the keyboard row's place; the row and the
     // footer move down by its height.
-    set (parts.arpPanel, at (layout::arpPanel));
-    const float shift = arpShown ? layout::arpShift : 0.0f;
+    // The effects rack (when it shows) sits between the macros and the arpeggiator: both
+    // the arpeggiator's editor and the keyboard row move down by its shift.
+    const float rackShift = parts.rack != nullptr ? parts.rackShift : 0.0f;
+    if (parts.rack != nullptr)
+        parts.rack->setBounds (at (juce::Rectangle<float> (layout::arpPanel.getX(), layout::rackTop, layout::arpPanel.getWidth(),
+                                                           std::max (0.0f, rackShift - layout::rackGap))));
+    set (parts.arpPanel, at (layout::arpPanel.translated (0.0f, rackShift)));
+    const float shift = (arpShown ? layout::arpShift : 0.0f) + rackShift;
     auto low = [&] (juce::Rectangle<float> r) { return at (r.translated (0.0f, shift)); };
 
     // Keyboard row and footer.
@@ -370,7 +376,7 @@ juce::Rectangle<int> sourceColumn (juce::Rectangle<int> area, int columns, int i
     return { area.getX() + index * (width + gap), area.getY(), width, area.getHeight() };
 }
 
-void paint (juce::Graphics& g, juce::Component& content, const Identity& identity, bool arpShown, const MacroRow& macros)
+void paint (juce::Graphics& g, juce::Component& content, const Identity& identity, bool arpShown, const MacroRow& macros, float rackShift)
 {
     using namespace design;
     draw::housing (g, content.getLocalBounds().toFloat());
@@ -399,7 +405,7 @@ void paint (juce::Graphics& g, juce::Component& content, const Identity& identit
     // The keyboard's frame: a quiet rim, the keys set into it. Ceramic: the keys sit in a
     // recess cut into the housing (rendered at the keybed's place: 2 px left and right, 3
     // above and 2 below the keys).
-    const auto keys = layout::keyboard.translated (0.0f, arpShown ? layout::arpShift : 0.0f);
+    const auto keys = layout::keyboard.translated (0.0f, (arpShown ? layout::arpShift : 0.0f) + rackShift);
     if (auto* pieces = skin::active(); pieces != nullptr
         && pieces->draw (g, "keybed", juce::Rectangle<float> (keys.getX() - 2.0f, keys.getY() - 3.0f, keys.getWidth() + 4.0f, keys.getHeight() + 5.0f)))
     {
@@ -497,9 +503,9 @@ void animatePopoverOpening (MiniPanel& popup)
     juce::Desktop::getInstance().getAnimator().animateComponent (&popup, final, 1.0f, 110, false, 1.0, 0.0);
 }
 
-float instrumentHeight (bool arpShown) noexcept
+float instrumentHeight (bool arpShown, float rackShift) noexcept
 {
-    return design::height + (arpShown ? design::layout::arpShift : 0.0f);
+    return design::height + (arpShown ? design::layout::arpShift : 0.0f) + rackShift;
 }
 
 void fit (juce::Component& editor, juce::Component& content, float height)

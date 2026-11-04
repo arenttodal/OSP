@@ -3,6 +3,7 @@
 #include "WellOverlay.h"
 #include "CardWellEditor.h"
 #include "Design.h"
+#include "EffectRack.h"
 #include "InstrumentFrame.h"
 #include "ShellEngine.h"
 
@@ -115,6 +116,10 @@ struct ProductInfo
         own PATTERN / RATE / OCTAVES while unlinked; the ARP panel shows them. Off: one
         arpeggiator for the instrument, as in ANDOR OSP. */
     bool cardArpeggiator = false;
+    /** The effects rack (osp::plugin::rack, opt-in): the modules a key beside their macro's
+        name expands between the macros and the arpeggiator (MOVEMENT, ECHO, SPACE). Empty:
+        no keys and no rack, as in ANDOR OSP. */
+    std::vector<osp::plugin::rack::Kind> rackModules;
     /** A card's knob slot, as a product sets it (cardControls): its own control (an empty
         ID), a product control, or hidden. */
     struct CardKnob

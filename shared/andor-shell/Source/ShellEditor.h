@@ -3,7 +3,9 @@
 #include "ArpSection.h"
 #include "EngineCard.h"
 #include "InstrumentFrame.h"
+#include "EffectRack.h"
 #include "KeyDnaEditor.h"
+#include "MacroPopups.h"
 #include "MainSections.h"
 #include "ModulationPanel.h"
 #include "OspLookAndFeel.h"
@@ -91,7 +93,12 @@ public:
     osp::plugin::EngineCard& engineCard (int layer) noexcept { return *cards[static_cast<std::size_t> (juce::jlimit (0, 2, layer))]; }
     osp::plugin::ModulationPanel& modulationPanel() noexcept { return modPanel; }
     void setArpExpanded (bool open);
-    float instrumentHeight() const noexcept { return osp::plugin::frame::instrumentHeight (arpShown); }
+    float instrumentHeight() const noexcept { return osp::plugin::frame::instrumentHeight (arpShown, rackShift()); }
+    /** The effects rack (the product's rackModules; tests and snapshots). */
+    osp::plugin::rack::Host& effectsRack() noexcept { return rack; }
+    /** The key beside a macro's name that expands its rack module, or nullptr. */
+    osp::plugin::rack::ExpandButton* rackKey (osp::plugin::rack::Kind kind) noexcept;
+    void setRackExpanded (osp::plugin::rack::Kind kind, bool open);
     /** The popovers: a macro's (0..5, when the product has one), Advanced, a layer's
         REIMAGINED (7 + layer, when the engine reads it), a modulation source's routes or
         larger curve (source 0 LFO 1 .. 3 ENV 2). */
@@ -192,6 +199,12 @@ private:
     osp::plugin::ArpControl arpButton { shell };
     osp::plugin::ArpInlinePanel arpPanel { shell };
     bool arpShown = false;
+    // The effects rack (opt-in: the product's rackModules) and the keys beside the macros.
+    osp::plugin::rack::Host rack { [this] (osp::plugin::rack::Kind kind) { return osp::plugin::createRackModule (kind, shell); } };
+    std::array<std::unique_ptr<osp::plugin::rack::ExpandButton>, osp::plugin::frame::macroCount> rackKeys;
+    float rackShift() const noexcept { return rack.height() > 0.0f ? rack.height() + osp::plugin::design::layout::rackGap : 0.0f; }
+    int rackMask() const;
+    void rackChanged();
     osp::plugin::ModulationOverlay modOverlay { shell, content };
     int modSelSource = -1, modSelSlot = -1;
     int disabledControls = 0;

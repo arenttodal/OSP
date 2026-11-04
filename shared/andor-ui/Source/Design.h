@@ -279,6 +279,10 @@ namespace layout
         keyboard row moves down by arpShift and the instrument grows by as much. */
     const R arpPanel { 35.0f, 908.0f, 1378.0f, 177.0f };
     constexpr float arpShift = 187.0f;
+    /** The effects rack (EffectRack.h, opt-in: ANDOR OSP has none), between the macros and
+        the arpeggiator when a module is expanded: everything under it moves down by its
+        height plus this gap, and the instrument grows by as much. */
+    constexpr float rackTop = 908.0f, rackGap = 10.0f;
 
     // Popups float centred over the instrument at the reference's place (SPACE: 607 x 610
     // at (420, 236)); taller ones grow upwards from the same foot.

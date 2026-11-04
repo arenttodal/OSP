@@ -412,6 +412,27 @@ public:
         is one undo step. */
     virtual ShaperPattern shaperCustomPattern() const = 0;
     virtual void setShaperCustomPattern (const ShaperPattern& pattern, bool undoable = true) = 0;
+    /** MOVEMENT's lanes (the effects rack's MOVEMENT module): lane 0 is MOVEMENT itself
+        (its parameters "movement.*", its depth the MOVEMENT macro); a product may add a
+        second, independent lane with its own parameters (the same names under its prefix).
+        By default there is one lane, and the lane-aware calls are lane 0's. */
+    struct MovementLane
+    {
+        juce::String prefix { "movement." };   ///< "movement." + "mode", "drift.speed", "shaper.custom" ...
+        juce::String onId;                     ///< the lane's ON switch (empty: always on)
+        juce::String levelId;                  ///< the lane's INTENSITY 0..100 % (empty: none, full)
+        juce::String syncId, phaseId;          ///< PULSE's SYNC, the pattern's PHASE (empty: none)
+        juce::String pulseDivisionId;          ///< PULSE's note value while synced (empty: none)
+    };
+    virtual int movementLaneCount() const noexcept { return 1; }
+    virtual MovementLane movementLane (int lane) const { juce::ignoreUnused (lane); return {}; }
+    virtual float laneShaperPhase (int lane) const noexcept { return lane == 0 ? shaperPhase() : -1.0f; }
+    virtual ShaperPattern laneShaperPattern (int lane) const { juce::ignoreUnused (lane); return shaperCustomPattern(); }
+    virtual void setLaneShaperPattern (int lane, const ShaperPattern& pattern, bool undoable = true)
+    {
+        juce::ignoreUnused (lane);
+        setShaperCustomPattern (pattern, undoable);
+    }
     /** The SHAPER editor's magnified view (a view setting saved with the session). */
     virtual bool shaperEditorLarge() const noexcept = 0;
     virtual void setShaperEditorLarge (bool large) noexcept = 0;

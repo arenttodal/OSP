@@ -3,6 +3,7 @@
 #include "Binding.h"
 #include "EngineCard.h"
 #include "Design.h"
+#include "EffectRack.h"
 #include "MacroPopups.h"
 #include "ShapingPopups.h"
 #include "SpacePresets.h"
@@ -28,7 +29,7 @@ namespace
 {
     constexpr double twoPi = 2.0 * std::numbers::pi;
 
-    float value (juce::AudioProcessorValueTreeState& state, const char* id)
+    float value (juce::AudioProcessorValueTreeState& state, const juce::String& id)
     {
         if (auto* p = state.getParameter (id))
             return p->convertFrom0to1 (p->getValue());
@@ -76,7 +77,7 @@ namespace
                 else
                 {
                     // Pictures designed for the smaller display draw at their own scale.
-                    const float k = visualScale;
+                    const float k = pictureScale;
                     g.addTransform (juce::AffineTransform::scale (k));
                     const auto v = juce::Rectangle<float> (r.getWidth() / k, r.getHeight() / k);
                     paintVisual (g, v.reduced (8.0f, 6.0f));
@@ -104,6 +105,13 @@ namespace
         void setIdentityColour (juce::Colour c)
         {
             identity = c;
+            repaint();
+        }
+        /** The scale a picture designed for the popovers' display draws at (the effects
+            rack's larger display draws it larger: its lines and captions in proportion). */
+        void setPictureScale (float k)
+        {
+            pictureScale = k;
             repaint();
         }
         /** Up to date at once (no fade): what a snapshot without a message loop sees. */
@@ -147,6 +155,7 @@ namespace
         }
         juce::Image previous;
         float fade = 0.0f;
+        float pictureScale = visualScale;
     };
 
     /** Remembers a few values; `differs` is true when any of them moved since last time. */
@@ -919,16 +928,42 @@ namespace
     //==========================================================================
     // MOVEMENT: what each mode does over time, from the bus' own formulas (SHAPER: the
     // pattern and the DSP's own playhead).
+    /** MOVEMENT's lane `index` (InstrumentHost::movementLane): its parameters' names and the
+        depth it plays at. Lane 0 is MOVEMENT itself ("movement.*", the MOVEMENT macro). */
+    struct Lane
+    {
+        Lane (InstrumentHost& host, int laneIndex) : index (laneIndex), ids (host.movementLane (laneIndex)) {}
+        int index;
+        InstrumentHost::MovementLane ids;
+        juce::String operator() (const char* suffix) const { return ids.prefix + suffix; }
+        /** 0..1: the MOVEMENT macro, times the lane's own INTENSITY when it has one. */
+        double depth (juce::AudioProcessorValueTreeState& s) const
+        {
+            double d = std::clamp (0.01 * value (s, "motion"), 0.0, 1.0);
+            if (ids.levelId.isNotEmpty())
+                d *= std::clamp (0.01 * value (s, ids.levelId), 0.0, 1.0);
+            return d;
+        }
+        /** PULSE's rate in Hz: free, or the synced note value at the host's tempo. */
+        double pulseHz (InstrumentHost& host) const
+        {
+            auto& s = host.apvts();
+            if (ids.syncId.isNotEmpty() && value (s, ids.syncId) >= 0.5f && ids.pulseDivisionId.isNotEmpty())
+                return shaping::pulseSyncedHz (juce::roundToInt (value (s, ids.pulseDivisionId)), host.hostTempo());
+            return shaping::pulseRateHz (0.01 * value (s, (*this) ("pulse.rate")));
+        }
+    };
+
     class MovementVisual final : public Visual
     {
     public:
-        explicit MovementVisual (InstrumentHost& p) : processor (p) {}
+        explicit MovementVisual (InstrumentHost& p, int laneIndex = 0) : processor (p), lane (p, laneIndex) {}
 
     private:
         bool animates() const override { return true; }
         bool changed() override
         {
-            const int mode = juce::roundToInt (value (processor.apvts(), "movement.mode"));
+            const int mode = juce::roundToInt (value (processor.apvts(), lane ("mode")));
             if (mode != shownMode && shownMode >= 0)
                 transition();
             shownMode = mode;
@@ -967,8 +1002,8 @@ namespace
         {
             using namespace palette;
             auto& s = processor.apvts();
-            const auto mode = static_cast<MovementMode> (std::clamp (juce::roundToInt (value (s, "movement.mode")), 0, 4));
-            const double amount = std::clamp (0.01 * value (s, "motion"), 0.0, 1.0);
+            const auto mode = static_cast<MovementMode> (std::clamp (juce::roundToInt (value (s, lane ("mode"))), 0, 4));
+            const double amount = lane.depth (s);
             const float depth = static_cast<float> (0.25 + 0.75 * amount);   // the knob's amount, still visible at 0
             const float mid = area.getCentreY(), half = area.getHeight() * 0.42f;
             // MOVEMENT's mineral blue for the movement itself; secondary lines a quiet stone.
@@ -981,10 +1016,10 @@ namespace
                 case MovementMode::drift:
                 {
                     // Slow, organic wander (the voices' shared value noise): pitch, tone, level.
-                    const double rate = shaping::driftSpeedHz (0.01 * value (s, "movement.drift.speed"));
+                    const double rate = shaping::driftSpeedHz (0.01 * value (s, lane ("drift.speed")));
                     // (Square roots: small settings still show.)
-                    const double pitch = std::sqrt (std::clamp (0.01 * value (s, "movement.drift.pitch"), 0.02, 1.0));
-                    const double tone = std::sqrt (std::clamp (0.01 * value (s, "movement.drift.tone"), 0.02, 1.0));
+                    const double pitch = std::sqrt (std::clamp (0.01 * value (s, lane ("drift.pitch")), 0.02, 1.0));
+                    const double tone = std::sqrt (std::clamp (0.01 * value (s, lane ("drift.tone")), 0.02, 1.0));
                     const double window = std::clamp (6.0 / rate, 6.0, 60.0);
                     trace (g, area, window, [rate] (double t) { return shaping::sharedWander (11, t, rate * 1.3) * 0.6; }, stone.withAlpha (0.35f), 1.0f, mid, half * depth);
                     trace (g, area, window, [rate, tone] (double t) { return tone * shaping::sharedWander (7, t, rate * 0.8); }, stone.withAlpha (0.7f), 1.4f, mid, half * depth);
@@ -996,8 +1031,8 @@ namespace
                 case MovementMode::tape:
                 {
                     // Wow (slow transport) above, flutter (fast capstan) below; WEAR roughens both.
-                    const double a = 0.01 * value (s, "movement.tape.wow"), b = 0.01 * value (s, "movement.tape.flutter");
-                    const double wear = 0.01 * value (s, "movement.tape.wear");
+                    const double a = 0.01 * value (s, lane ("tape.wow")), b = 0.01 * value (s, lane ("tape.flutter"));
+                    const double wear = 0.01 * value (s, lane ("tape.wear"));
                     const double wowHz = shaping::tapeWowHz (a), flutterHz = shaping::tapeFlutterHz (b);
                     auto rough = [wear] (double t) { return wear * 0.25 * shaping::sharedWander (19, t, 9.0); };
                     trace (g, area, 4.0, [wowHz, a, rough] (double t) { return (0.7 * std::sin (twoPi * wowHz * t) + 0.5 * shaping::sharedWander (5, t, 0.3)) * (0.3 + 0.7 * a) * 0.8 + rough (t); },
@@ -1011,9 +1046,9 @@ namespace
                 case MovementMode::chorus:
                 {
                     // Two delay taps moving in phase-offset sines: STEREO pulls them apart.
-                    const double rate = shaping::chorusRateHz (0.01 * value (s, "movement.chorus.rate"));
-                    const double width = std::log2 (shaping::chorusWidthMs (0.01 * value (s, "movement.chorus.width")) / 0.2) / std::log2 (90.0);
-                    const double stereo = 0.01 * value (s, "movement.chorus.stereo");
+                    const double rate = shaping::chorusRateHz (0.01 * value (s, lane ("chorus.rate")));
+                    const double width = std::log2 (shaping::chorusWidthMs (0.01 * value (s, lane ("chorus.width"))) / 0.2) / std::log2 (90.0);
+                    const double stereo = 0.01 * value (s, lane ("chorus.stereo"));
                     const double window = 2.5 / rate;
                     const float extent = half * static_cast<float> (0.25 + 0.75 * width) * depth;
                     trace (g, area, window, [rate, stereo] (double t) { return std::sin (twoPi * rate * t + std::numbers::pi * stereo); }, stone, 1.6f, mid, extent);
@@ -1025,9 +1060,9 @@ namespace
                 case MovementMode::pulse:
                 {
                     // The gain the bus applies: sine to rounded square by SHAPE, MOVEMENT's depth.
-                    const double rate = shaping::pulseRateHz (0.01 * value (s, "movement.pulse.rate"));
-                    const double k = 1.0 + 7.0 * 0.01 * value (s, "movement.pulse.shape");
-                    const double stereo = 0.01 * value (s, "movement.pulse.stereo");
+                    const double rate = lane.pulseHz (processor);
+                    const double k = 1.0 + 7.0 * 0.01 * value (s, lane ("pulse.shape"));
+                    const double stereo = 0.01 * value (s, lane ("pulse.stereo"));
                     const double norm = std::tanh (k), window = 3.0 / rate;
                     auto gain = [k, norm, amount] (double phase) {
                         const double y = std::tanh (k * std::sin (phase)) / norm;
@@ -1047,13 +1082,13 @@ namespace
                 {
                     // The pattern's contour (with SMOOTH), the step grid, and the DSP's own
                     // playhead (host-synchronised) with the step it is in.
-                    const int pattern = juce::roundToInt (value (s, "movement.shaper.pattern"));
-                    const double smooth = 0.01 * value (s, "movement.shaper.smooth");
+                    const int pattern = juce::roundToInt (value (s, lane ("shaper.pattern")));
+                    const double smooth = 0.01 * value (s, lane ("shaper.smooth"));
                     // DEPTH (the MOVEMENT macro): how far the level travels - the pattern's
                     // full range as a ghost, what DEPTH makes of it in front.
-                    const float depth = static_cast<float> (std::clamp (0.01 * value (s, "motion"), 0.0, 1.0));
+                    const float depth = static_cast<float> (lane.depth (s));
                     const auto span = RhythmicShaper::span (pattern, smooth);
-                    const float phase = processor.shaperPhase();
+                    const float phase = processor.laneShaperPhase (lane.index);
                     const float cell = area.getWidth() / RhythmicShaper::steps;
                     const int current = phase >= 0.0f ? std::min (RhythmicShaper::steps - 1, static_cast<int> (phase * RhythmicShaper::steps)) : -1;
                     for (int i = 0; i < RhythmicShaper::steps; ++i)
@@ -1104,6 +1139,7 @@ namespace
         }
 
         InstrumentHost& processor;
+        Lane lane;
         int shownMode = -1;
     };
 
@@ -1135,17 +1171,17 @@ namespace
     class ShaperEditor final : public Visual, public juce::SettableTooltipClient
     {
     public:
-        ShaperEditor (InstrumentHost& p, ShaperTool& t, bool isLarge) : processor (p), tool (t), large (isLarge)
+        ShaperEditor (InstrumentHost& p, ShaperTool& t, bool isLarge, int laneIndex = 0) : processor (p), lane (p, laneIndex), tool (t), large (isLarge)
         {
             setInterceptsMouseClicks (true, false);
             setTooltip (large ? "Draw the pattern: STEP sets each step's level (its shape from the brush), DRAW paints a free line"
                               : "Click or drag to set the steps (the magnifier opens the large editor)");
         }
 
-        bool custom() const { return value (processor.apvts(), "movement.shaper.custom") >= 0.5f; }
+        bool custom() const { return value (processor.apvts(), lane ("shaper.custom")) >= 0.5f; }
         ShaperPattern steps() const
         {
-            return custom() ? processor.shaperCustomPattern() : RhythmicShaper::patternSteps (juce::roundToInt (value (processor.apvts(), "movement.shaper.pattern")));
+            return custom() ? processor.laneShaperPattern (lane.index) : RhythmicShaper::patternSteps (juce::roundToInt (value (processor.apvts(), lane ("shaper.pattern"))));
         }
 
         void mouseDown (const juce::MouseEvent& e) override
@@ -1155,8 +1191,8 @@ namespace
             if (! custom())
             {
                 // Editing a library pattern: it becomes CUSTOM, starting from it.
-                processor.setShaperCustomPattern (working);
-                if (auto* c = processor.apvts().getParameter ("movement.shaper.custom"))
+                processor.setLaneShaperPattern (lane.index, working);
+                if (auto* c = processor.apvts().getParameter (lane ("shaper.custom")))
                     c->setValueNotifyingHost (1.0f);
             }
             last = e.position;
@@ -1229,7 +1265,7 @@ namespace
             if (! (pattern == working))
             {
                 working = pattern;
-                processor.setShaperCustomPattern (pattern);
+                processor.setLaneShaperPattern (lane.index, pattern);
                 repaint();
             }
         }
@@ -1240,10 +1276,10 @@ namespace
             auto& s = processor.apvts();
             const auto area = plotArea();
             const auto pattern = steps();
-            const double smooth = 0.01 * value (s, "movement.shaper.smooth");
-            const float depth = static_cast<float> (std::clamp (0.01 * value (s, "motion"), 0.0, 1.0));
+            const double smooth = 0.01 * value (s, lane ("shaper.smooth"));
+            const float depth = static_cast<float> (lane.depth (s));
             const auto span = RhythmicShaper::span (pattern, smooth);
-            const float phase = processor.shaperPhase();
+            const float phase = processor.laneShaperPhase (lane.index);
             const float cell = area.getWidth() / RhythmicShaper::steps;
             const int current = phase >= 0.0f ? std::min (RhythmicShaper::steps - 1, static_cast<int> (phase * RhythmicShaper::steps)) : -1;
             const bool editable = custom() || large;
@@ -1310,6 +1346,7 @@ namespace
         }
 
         InstrumentHost& processor;
+        Lane lane;
         ShaperTool& tool;
         bool large;
         ShaperPattern working {};
@@ -2352,6 +2389,418 @@ namespace
     };
 
     //==========================================================================
+    /**
+        MOVEMENT in the effects rack (rack::Kind::movement): a lane's every control in the
+        open on the left - the mode as tabs, the amount, the mode's own settings (SHAPER: its
+        pattern, rate and target as keys) - and its picture on the right at the size of the
+        modulation editors: the motion as it plays, or SHAPER's pattern editor (drawn on in
+        place; the magnifier widens it across the rack, its tools under it). Everything is
+        bound to the parameters, so automation, the popover and the rack always agree, and
+        collapsing it changes nothing.
+    */
+    class MovementRack final : public rack::Module
+    {
+    public:
+        explicit MovementRack (InstrumentHost& p) : processor (p), lane (p, 0)
+        {
+            magnifier.onClick = [this] {
+                wide = ! wide;
+                buildMode();
+            };
+            addChildComponent (magnifier);
+            buildLane();
+        }
+
+        juce::String title() const override { return "MOVEMENT"; }
+        juce::Colour accent() const override { return design::colour::macro (design::colour::Macro::movement); }
+        int bodyHeight() const override { return 206; }
+        void refresh() override
+        {
+            // The mode or PULSE's timing moved (automation, the popover, a preset): rebuilt
+            // here as well as on the control's own change, so the rack never shows stale keys.
+            if (builtMode != mode() || (builtMode == static_cast<int> (MovementMode::pulse) && builtSync != laneSynced()))
+                buildMode();
+        }
+        void settle() override
+        {
+            refresh();
+            if (visual != nullptr)
+                visual->settle();
+        }
+
+        /** The lane shown (0: MOVEMENT itself; 1: the product's second lane). */
+        int laneShown() const noexcept { return lane.index; }
+        void showLane (int index)
+        {
+            index = std::clamp (index, 0, processor.movementLaneCount() - 1);
+            if (index == lane.index)
+                return;
+            lane = Lane (processor, index);
+            buildLane();
+        }
+        /** Tests and snapshots: the parts. */
+        juce::Component* pictureComponent() const noexcept { return visual.get(); }
+        bool isWide() const noexcept { return wide; }
+        void setWide (bool shouldBeWide)
+        {
+            if (wide != shouldBeWide)
+                magnifier.onClick();
+        }
+        int controlCount() const noexcept { return static_cast<int> (knobs.size() + selectors.size()); }
+        juce::String captions() const
+        {
+            juce::StringArray c;
+            for (const auto& k : knobs)
+                c.add (k->captionText());
+            return c.joinIntoString (" ");
+        }
+
+        void resized() override { layout(); }
+
+        void paint (juce::Graphics& g) override
+        {
+            // Small captions over the keys that have no knob of their own.
+            g.setFont (type::popupLabel (11.0f));
+            g.setColour (design::colour::text.withAlpha (0.6f));
+            for (const auto& [caption, area] : keyCaptions)
+                g.drawText (caption, area, juce::Justification::centredLeft, false);
+        }
+
+    private:
+        static constexpr int margin = 22, leftWidth = 520, tabsHeight = 28, keyHeight = 26;
+        static juce::StringArray modeNames() { return { "DRIFT", "TAPE", "CHORUS", "PULSE", "SHAPER" }; }
+
+        int mode() const { return std::clamp (juce::roundToInt (value (processor.apvts(), lane ("mode"))), 0, 4); }
+        bool laneSynced() const { return lane.ids.syncId.isNotEmpty() && value (processor.apvts(), lane.ids.syncId) >= 0.5f; }
+
+        /** The lane changed: its mode tabs (they rebuild the rest when the mode moves). */
+        void buildLane()
+        {
+            auto& state = processor.apvts();
+            modeTabs = std::make_unique<SegmentedControl> (*state.getParameter (lane ("mode")), modeNames());
+            modeTabs->setAccent (accent());
+            modeTabs->setTooltip ("MOVEMENT's kind: DRIFT, TAPE, CHORUS, PULSE or the rhythmic SHAPER");
+            modeTabs->onChange = [this] (int) {
+                // (After the control's own repaint: the tabs stay, the rest is rebuilt.)
+                juce::Component::SafePointer<MovementRack> safe (this);
+                juce::MessageManager::callAsync ([safe] {
+                    if (safe != nullptr && safe->builtMode != safe->mode())
+                        safe->buildMode();
+                });
+            };
+            addAndMakeVisible (*modeTabs);
+            syncAttachment.reset();
+            if (lane.ids.syncId.isNotEmpty())
+                if (auto* sync = state.getParameter (lane.ids.syncId))
+                    syncAttachment = std::make_unique<juce::ParameterAttachment> (*sync, [this] (float) {
+                        juce::Component::SafePointer<MovementRack> safe (this);
+                        juce::MessageManager::callAsync ([safe] {
+                            if (safe != nullptr && safe->builtSync != safe->laneSynced() && safe->builtMode == static_cast<int> (MovementMode::pulse))
+                                safe->buildMode();
+                        });
+                    });
+            customAttachment.reset();
+            if (auto* custom = state.getParameter (lane ("shaper.custom")))
+                customAttachment = std::make_unique<juce::ParameterAttachment> (*custom, [this] (float) {
+                    for (auto& sel : selectors)
+                        sel->repaint();
+                });
+            buildMode();
+        }
+
+        MiniKnob& knob (const juce::String& id, const char* caption, MiniKnob::Formatter f)
+        {
+            auto k = std::make_unique<MiniKnob> (processor.apvts(), id, caption, std::move (f));
+            k->setArcColour (accent());
+            addAndMakeVisible (*k);
+            knobs.push_back (std::move (k));
+            return *knobs.back();
+        }
+        ValueSelector& selector (const juce::String& id, const juce::String& caption, const juce::String& tip)
+        {
+            selectors.push_back (std::make_unique<ValueSelector> (*processor.apvts().getParameter (id), juce::String()));
+            selectors.back()->setTooltip (tip);
+            selectorCaptions.add (caption);
+            addAndMakeVisible (*selectors.back());
+            return *selectors.back();
+        }
+
+        /** The mode's controls and picture. */
+        void buildMode()
+        {
+            knobs.clear();
+            selectors.clear();
+            selectorCaptions.clear();
+            toolbar.reset();
+            syncTabs.reset();
+            builtMode = mode();
+            builtSync = laneSynced();
+            const auto m = static_cast<MovementMode> (builtMode);
+            const bool shaper = m == MovementMode::shaper;
+            if (! shaper)
+                wide = false;
+            if (shaper)
+                visual = std::make_unique<ShaperEditor> (processor, tool, true, lane.index);
+            else
+                visual = std::make_unique<MovementVisual> (processor, lane.index);
+            visual->setIdentity (design::colour::Macro::movement);
+            if (! shaper)
+                visual->setPictureScale (1.45f);
+            addAndMakeVisible (*visual);
+            magnifier.setVisible (shaper);
+            magnifier.setExpanded (wide);
+            magnifier.toFront (false);
+
+            const auto percent = [] (double v) { return format::percent (v) + " %"; };
+            // The amount first: the MOVEMENT macro itself on lane 0 (one control, two places);
+            // a second lane's own INTENSITY (the macro scales both).
+            if (lane.ids.levelId.isNotEmpty())
+                knob (lane.ids.levelId, shaper ? "DEPTH" : "INTENSITY", percent);
+            else
+                knob ("motion", shaper ? "DEPTH" : "AMOUNT", percent);
+            switch (m)
+            {
+                case MovementMode::drift:
+                    knob (lane ("drift.speed"), "SPEED", [] (double v) { return format::hertz (shaping::driftSpeedHz (v * 0.01)); });
+                    knob (lane ("drift.pitch"), "PITCH", [] (double v) { return juce::String (shaping::driftPitchCents (v * 0.01), 1) + " c"; });
+                    knob (lane ("drift.tone"), "TONE", percent);
+                    break;
+                case MovementMode::tape:
+                    knob (lane ("tape.wow"), "WOW", [] (double v) { return format::hertz (shaping::tapeWowHz (v * 0.01)); });
+                    knob (lane ("tape.flutter"), "FLUTTER", [] (double v) { return format::hertz (shaping::tapeFlutterHz (v * 0.01)); });
+                    knob (lane ("tape.wear"), "WEAR", percent);
+                    break;
+                case MovementMode::chorus:
+                    knob (lane ("chorus.rate"), "RATE", [] (double v) { return format::hertz (shaping::chorusRateHz (v * 0.01)); });
+                    knob (lane ("chorus.width"), "WIDTH", [] (double v) { return format::milliseconds (shaping::chorusWidthMs (v * 0.01)); });
+                    knob (lane ("chorus.stereo"), "STEREO", percent);
+                    break;
+                case MovementMode::pulse:
+                    if (lane.ids.syncId.isNotEmpty())
+                    {
+                        syncTabs = std::make_unique<SegmentedControl> (*processor.apvts().getParameter (lane.ids.syncId), juce::StringArray { "FREE", "SYNC" });
+                        syncTabs->setAccent (accent());
+                        syncTabs->setTooltip ("PULSE's rate: free (Hz), or a note value at the host's tempo");
+                        addAndMakeVisible (*syncTabs);
+                    }
+                    if (builtSync && lane.ids.pulseDivisionId.isNotEmpty())
+                        selector (lane.ids.pulseDivisionId, "CYCLE", "One rise and fall every ... (at the host's tempo)");
+                    else
+                        knob (lane ("pulse.rate"), "RATE", [] (double v) { return format::hertz (shaping::pulseRateHz (v * 0.01)); });
+                    knob (lane ("pulse.shape"), "SHAPE", percent);
+                    knob (lane ("pulse.stereo"), "STEREO", percent);
+                    if (builtSync && lane.ids.phaseId.isNotEmpty())
+                        knob (lane.ids.phaseId, "PHASE", [] (double v) { return juce::String (juce::roundToInt (v * 3.6)) + juce::String::fromUTF8 ("\xc2\xb0"); });
+                    break;
+                case MovementMode::shaper:
+                {
+                    setUpPatternSelector (selector (lane ("shaper.pattern"), "PATTERN", "Pattern: a curated one, or CUSTOM (your own steps; draw on the display)"));
+                    selector (lane ("shaper.rate"), "RATE", "Rate (synced to the host tempo)");
+                    selector (lane ("shaper.target"), "TARGET", "What the pattern shapes: the volume, a low-pass filter, or both");
+                    knob (lane ("shaper.smooth"), "SMOOTH", percent);
+                    if (lane.ids.phaseId.isNotEmpty())
+                        knob (lane.ids.phaseId, "PHASE", [] (double v) { return juce::String (juce::roundToInt (v * 0.16)) + "/16"; });
+                    toolbar = std::make_unique<ShaperToolbar> (tool, accent());
+                    toolbar->onCopyFrom = [this] { copyFromMenu(); };
+                    toolbar->onClear = [this] { setCustom ([] { ShaperPattern p; for (auto& st : p) st = { 1.0f, 1.0f, StepShape::hold }; return p; }()); };
+                    toolbar->onSave = [this] { savePattern(); };
+                    toolbar->onLoad = [this] { loadMenu(); };
+                    toolbar->onToolChanged = [this] { if (visual != nullptr) visual->repaint(); };
+                    addAndMakeVisible (*toolbar);
+                    break;
+                }
+            }
+            for (auto& k : knobs)
+                k->setVisible (! wide);
+            for (auto& s : selectors)
+                s->setVisible (! wide);
+            if (syncTabs != nullptr)
+                syncTabs->setVisible (! wide);
+            modeTabs->setVisible (! wide);
+            layout();
+            repaint();
+        }
+
+        void layout()
+        {
+            keyCaptions.clear();
+            if (modeTabs == nullptr || visual == nullptr)
+                return;
+            auto body = getLocalBounds().reduced (margin, 0).withTrimmedBottom (14);
+            const bool shaper = builtMode == static_cast<int> (MovementMode::shaper);
+            if (wide)
+            {
+                // The pattern across the rack, its tools under it.
+                toolbar->setBounds (body.removeFromBottom (keyHeight));
+                body.removeFromBottom (8);
+                visual->setBounds (body);
+            }
+            else
+            {
+                auto left = body.removeFromLeft (leftWidth);
+                body.removeFromLeft (24);
+                if (toolbar != nullptr)
+                {
+                    toolbar->setBounds (body.removeFromBottom (keyHeight));
+                    body.removeFromBottom (8);
+                }
+                visual->setBounds (body);
+
+                modeTabs->setBounds (left.removeFromTop (tabsHeight));
+                left.removeFromTop (14);
+                // A row of keys (SHAPER's PATTERN RATE TARGET, PULSE's FREE/SYNC and CYCLE),
+                // each under its caption, then the knobs.
+                const bool keys = ! selectors.empty() || syncTabs != nullptr;
+                if (keys)
+                {
+                    auto row = left.removeFromTop (14 + keyHeight);
+                    const int count = static_cast<int> (selectors.size()) + (syncTabs != nullptr ? 1 : 0);
+                    const int cell = (row.getWidth() - 12 * (count - 1)) / std::max (1, count);
+                    int i = 0;
+                    auto place = [&] (juce::Component& c, const juce::String& caption) {
+                        auto r = row.removeFromLeft (cell);
+                        row.removeFromLeft (12);
+                        keyCaptions.push_back ({ caption, r.removeFromTop (14).toFloat() });
+                        c.setBounds (r);
+                        ++i;
+                    };
+                    if (syncTabs != nullptr)
+                        place (*syncTabs, "TIMING");
+                    for (std::size_t s = 0; s < selectors.size(); ++s)
+                        place (*selectors[s], selectorCaptions[static_cast<int> (s)]);
+                    left.removeFromTop (8);
+                }
+                const int cell = std::min (left.getWidth() / std::max (1, static_cast<int> (knobs.size())), 104);
+                auto line = left.removeFromTop (keys ? 84 : 112).withSizeKeepingCentre (cell * static_cast<int> (knobs.size()), keys ? 84 : 112);
+                for (auto& k : knobs)
+                    k->setBounds (line.removeFromLeft (cell));
+            }
+            magnifier.setBounds (juce::Rectangle<int> (20, 20).withPosition (visual->getRight() - 26, visual->getY() + 5));
+            magnifier.setVisible (shaper);
+            magnifier.toFront (false);
+        }
+
+        /** PATTERN also offers CUSTOM, a copy of any pattern to start from, and the saved ones. */
+        void setUpPatternSelector (ValueSelector& sel)
+        {
+            auto* customParam = processor.apvts().getParameter (lane ("shaper.custom"));
+            sel.textOverride = [customParam] { return customParam != nullptr && customParam->getValue() >= 0.5f ? juce::String ("CUSTOM") : juce::String(); };
+            sel.onPick = [customParam] (int) {
+                if (customParam != nullptr && customParam->getValue() >= 0.5f)
+                {
+                    customParam->beginChangeGesture();
+                    customParam->setValueNotifyingHost (0.0f);
+                    customParam->endChangeGesture();
+                }
+            };
+            juce::Component::SafePointer<MovementRack> safe (this);
+            sel.extraItems = [safe, customParam] (juce::PopupMenu& menu) {
+                menu.addSeparator();
+                menu.addItem ("CUSTOM", true, customParam != nullptr && customParam->getValue() >= 0.5f, [safe] { if (safe != nullptr) safe->setCustomOn(); });
+                const auto files = InstrumentHost::savedShaperPatterns();
+                if (! files.isEmpty())
+                {
+                    juce::PopupMenu saved;
+                    for (const auto& f : files)
+                        saved.addItem (f.getFileNameWithoutExtension(), [safe, f] { if (safe != nullptr) safe->loadFile (f); });
+                    menu.addSubMenu ("SAVED", saved);
+                }
+            };
+        }
+        void setCustomOn()
+        {
+            if (auto* c = processor.apvts().getParameter (lane ("shaper.custom")))
+            {
+                c->beginChangeGesture();
+                c->setValueNotifyingHost (1.0f);
+                c->endChangeGesture();
+            }
+            if (visual != nullptr)
+                visual->repaint();
+            for (auto& sel : selectors)
+                sel->repaint();
+        }
+        void setCustom (const ShaperPattern& pattern)
+        {
+            processor.undo().beginNewTransaction ("Shaper pattern");
+            processor.setLaneShaperPattern (lane.index, pattern);
+            setCustomOn();
+        }
+        void copyFromMenu()
+        {
+            juce::PopupMenu menu;
+            juce::Component::SafePointer<MovementRack> safe (this);
+            for (int i = 0; i < RhythmicShaper::patternCount; ++i)
+                menu.addItem (RhythmicShaper::patternName (i), [safe, i] { if (safe != nullptr) safe->setCustom (RhythmicShaper::patternSteps (i)); });
+            if (processor.movementLaneCount() > 1)
+            {
+                // The other lane's steps (its CUSTOM pattern or the library one it plays).
+                const int other = lane.index == 0 ? 1 : 0;
+                menu.addSeparator();
+                menu.addItem ("Lane " + juce::String::charToString (static_cast<juce::juce_wchar> ('A' + other)) + "'s pattern", [safe, other] {
+                    if (safe == nullptr)
+                        return;
+                    const Lane from (safe->processor, other);
+                    auto& s = safe->processor.apvts();
+                    const bool custom = value (s, from ("shaper.custom")) >= 0.5f;
+                    safe->setCustom (custom ? safe->processor.laneShaperPattern (other) : RhythmicShaper::patternSteps (juce::roundToInt (value (s, from ("shaper.pattern")))));
+                });
+            }
+            menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (toolbar.get()).withDeletionCheck (*this));
+        }
+        void loadMenu()
+        {
+            juce::PopupMenu menu;
+            juce::Component::SafePointer<MovementRack> safe (this);
+            const auto files = InstrumentHost::savedShaperPatterns();
+            for (const auto& f : files)
+                menu.addItem (f.getFileNameWithoutExtension(), [safe, f] { if (safe != nullptr) safe->loadFile (f); });
+            if (files.isEmpty())
+                menu.addItem ("No saved patterns yet", false, false, [] {});
+            menu.addSeparator();
+            menu.addItem ("Show folder", [] {
+                InstrumentHost::shaperPatternFolder().createDirectory();
+                InstrumentHost::shaperPatternFolder().revealToUser();
+            });
+            menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (toolbar.get()).withDeletionCheck (*this));
+        }
+        void loadFile (const juce::File& file)
+        {
+            if (const auto pattern = InstrumentHost::readShaperPatternFile (file))
+                setCustom (*pattern);
+        }
+        void savePattern()
+        {
+            auto* window = new juce::AlertWindow ("Save pattern", "A name for this SHAPER pattern:", juce::MessageBoxIconType::NoIcon);
+            window->addTextEditor ("name", "My pattern");
+            window->addButton ("Save", 1, juce::KeyPress (juce::KeyPress::returnKey));
+            window->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+            juce::Component::SafePointer<MovementRack> safe (this);
+            window->enterModalState (true, juce::ModalCallbackFunction::create ([safe, window] (int result) {
+                const auto name = juce::File::createLegalFileName (window->getTextEditorContents ("name").trim());
+                if (result == 1 && name.isNotEmpty() && safe != nullptr)
+                    InstrumentHost::writeShaperPatternFile (InstrumentHost::shaperPatternFolder().getChildFile (name + InstrumentHost::shaperPatternExtension),
+                                                            safe->processor.laneShaperPattern (safe->lane.index));
+            }), true);
+        }
+
+        InstrumentHost& processor;
+        Lane lane;
+        ShaperTool tool;
+        bool wide = false, builtSync = false;
+        int builtMode = -1;
+        std::unique_ptr<SegmentedControl> modeTabs, syncTabs;
+        std::unique_ptr<Visual> visual;
+        std::vector<std::unique_ptr<MiniKnob>> knobs;
+        std::vector<std::unique_ptr<ValueSelector>> selectors;
+        juce::StringArray selectorCaptions;
+        std::vector<std::pair<juce::String, juce::Rectangle<float>>> keyCaptions;
+        std::unique_ptr<ShaperToolbar> toolbar;
+        MagnifierButton magnifier;
+        std::unique_ptr<juce::ParameterAttachment> customAttachment, syncAttachment;
+    };
+
+    //==========================================================================
     /** ECHO: the machine beside the title, its repeats, then FREE / SYNC and the stereo
         picture, then TIME (a note value when synced, ms when free), FEEDBACK, TONE, AGE. */
     class EchoPanel final : public MacroPanel
@@ -3173,6 +3622,37 @@ namespace
 std::unique_ptr<MiniPanel> createReimaginedPopup (InstrumentHost& processor, int layer)
 {
     return std::make_unique<ReimaginedPanel> (processor, layer);
+}
+
+std::unique_ptr<rack::Module> createRackModule (rack::Kind kind, InstrumentHost& processor)
+{
+    switch (kind)
+    {
+        case rack::Kind::movement: return std::make_unique<MovementRack> (processor);
+        case rack::Kind::echo:
+        case rack::Kind::space: break;
+    }
+    return nullptr;
+}
+
+int rackMovementLane (const rack::Module& module)
+{
+    if (const auto* m = dynamic_cast<const MovementRack*> (&module))
+        return m->laneShown();
+    return -1;
+}
+
+void setRackMovementWide (rack::Module& module, bool wide)
+{
+    if (auto* m = dynamic_cast<MovementRack*> (&module))
+        m->setWide (wide);
+}
+
+juce::String rackMovementCaptions (const rack::Module& module)
+{
+    if (const auto* m = dynamic_cast<const MovementRack*> (&module))
+        return m->captions();
+    return {};
 }
 
 std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, InstrumentHost& processor)

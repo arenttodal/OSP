@@ -108,6 +108,8 @@ public:
     int lastPlayedNoteNumber() const noexcept override { return lastNote.load (std::memory_order_relaxed); }
     ArpView arpView() const noexcept override;
     bool cardArpeggiator() const noexcept override { return cardArp && ! referenceParity; }
+    /** The effects rack's modules (the product's; none in the visual regression's parity render). */
+    bool showsRack() const noexcept { return ! referenceParity && ! product().rackModules.empty(); }
     juce::String cardArpNamespace() const override { return productInfo().slug + "."; }
     void setArpViewCard (int shown) noexcept override { arpViewLane.store (std::clamp (shown, 0, 2), std::memory_order_relaxed); }
 
@@ -199,6 +201,9 @@ public:
     float modWheelPosition() const noexcept { return wheelShown.load (std::memory_order_relaxed); }
     bool arpEditorExpanded() const noexcept { return arpOpen.load(); }
     void setArpEditorExpanded (bool open) noexcept { arpOpen = open; }
+    /** The effects rack's expanded modules (bit `kind`; a view setting saved with the session). */
+    int rackExpanded() const noexcept { return rackOpen.load(); }
+    void setRackExpanded (int mask) noexcept { rackOpen = mask; }
     int modPanelTab() const noexcept { return modTab.load(); }
     void setModPanelTab (int tab) noexcept { modTab = std::clamp (tab, 0, 5); }
 
@@ -399,6 +404,7 @@ private:
 
     // View settings.
     std::atomic<bool> arpOpen { false }, shaperLarge { false };
+    std::atomic<int> rackOpen { 0 };
     std::atomic<int> modTab { 0 };
 
     // Presets.

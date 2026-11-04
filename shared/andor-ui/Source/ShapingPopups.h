@@ -30,6 +30,8 @@ public:
     void setCustomised (bool customised);
     bool isCustomised() const noexcept { return customised; }
     void setOpen (bool open);
+    /** The name's width as drawn (centred in the label): where a key beside it goes. */
+    float textWidth() const;
 
     void paint (juce::Graphics&) override;
     void mouseEnter (const juce::MouseEvent&) override { repaint(); }

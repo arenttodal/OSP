@@ -72,6 +72,11 @@ void MacroLabel::mouseUp (const juce::MouseEvent& e)
         onClick();
 }
 
+float MacroLabel::textWidth() const
+{
+    return juce::GlyphArrangement::getStringWidth (type::macroLabel (0.7f * static_cast<float> (getHeight())), text);
+}
+
 void MacroLabel::paint (juce::Graphics& g)
 {
     // The macro's name, restrained (medium, slightly tracked). Settings in use are shown

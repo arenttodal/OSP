@@ -1222,6 +1222,8 @@ std::unique_ptr<juce::XmlElement> ShellProcessor::stateXml() const
     auto* view = xml->createNewChildElement (viewType.toString());
     view->setAttribute ("arpOpen", arpOpen.load() ? 1 : 0);
     view->setAttribute ("shaperLarge", shaperLarge.load() ? 1 : 0);
+    if (! product().rackModules.empty())
+        view->setAttribute ("rack", rackOpen.load());
     view->setAttribute ("modTab", modTab.load());
     view->setAttribute ("editLayer", editLayer());
     view->setAttribute ("velToAmp", velToAmp.load() ? 1 : 0);
@@ -1309,6 +1311,7 @@ bool ShellProcessor::applyStateXml (const juce::XmlElement& xml)
     {
         arpOpen = view->getIntAttribute ("arpOpen") != 0;
         shaperLarge = view->getIntAttribute ("shaperLarge") != 0;
+        rackOpen = view->getIntAttribute ("rack", 0);
         setModPanelTab (view->getIntAttribute ("modTab"));
         setEditLayer (view->getIntAttribute ("editLayer"));
         velToAmp = view->getIntAttribute ("velToAmp", 1) != 0;
