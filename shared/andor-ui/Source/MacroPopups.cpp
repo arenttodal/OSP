@@ -3007,8 +3007,13 @@ namespace
                     p.values[n] = v;
                 presets.push_back (std::move (p));
             }
-            // SHAPER: library patterns at 1/16, both volume and filter.
-            for (const int pattern : { 3, 0, 6, 9 })
+            // SHAPER: every library pattern (the popover's PATTERN list) at 1/16, both volume and
+            // filter; THREE, the instrument's own, first.
+            std::vector<int> patterns { 3 };
+            for (int i = 0; i < RhythmicShaper::patternCount; ++i)
+                if (i != 3)
+                    patterns.push_back (i);
+            for (const int pattern : patterns)
             {
                 RackPreset p;
                 p.name = juce::String (RhythmicShaper::patternName (pattern)).toLowerCase().substring (0, 1).toUpperCase()
