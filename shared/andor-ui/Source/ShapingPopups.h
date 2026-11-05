@@ -107,6 +107,9 @@ public:
     void setOnDark (bool dark) { onDark = dark; repaint(); }
     /** Secondary controls: smaller type. */
     void setSmall (bool small) { compact = small; resized(); repaint(); }
+    /** The effects rack's cells: the caption a step stronger, so it reads at plugin size
+        (opt-in; the popovers' as ever). */
+    void setStrongCaption (bool strong) { strongCaption = strong; repaint(); }
     /** The popups' cell (SPACE's DECAY): caption, a ticked knob, the value in a box. */
     void setBoxed (bool shouldBeBoxed);
     /** The value arc (and a boxed knob's pointer) in this colour: its macro's identity. */
@@ -137,7 +140,7 @@ private:
     juce::String caption;
     Formatter formatter;
     bool horizontal;
-    bool onDark = false, compact = false, boxed = false;
+    bool onDark = false, compact = false, boxed = false, strongCaption = false;
     juce::Rectangle<float> valueBox() const;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
     std::vector<int> choiceOrder;
@@ -157,6 +160,8 @@ public:
     void setAccent (juce::Colour colour) { accent = colour; hasAccent = true; repaint(); }
     /** On a graphite display (an in-card editor): a graphite key, cream text. Opt-in. */
     void setOnDark (bool dark) { onDark = dark; repaint(); }
+    /** The effects rack's MODE: its value a little larger and darker (opt-in; off as ever). */
+    void setProminent (bool shouldBeProminent) { prominent = shouldBeProminent; repaint(); }
     int selected() const noexcept { return index; }
     std::function<void (int)> onChange;
     /** Shown instead of the value while it returns text (SHAPER: CUSTOM); no item is ticked then. */
@@ -180,7 +185,7 @@ private:
     juce::RangedAudioParameter& parameter;
     juce::String caption;
     int index = 0;
-    bool plain = false, hasAccent = false, onDark = false;
+    bool plain = false, hasAccent = false, onDark = false, prominent = false;
     juce::Colour accent;
     juce::ParameterAttachment attachment;
 };

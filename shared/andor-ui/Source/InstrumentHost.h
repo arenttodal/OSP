@@ -433,6 +433,19 @@ public:
         juce::ignoreUnused (lane);
         setShaperCustomPattern (pattern, undoable);
     }
+    /** The effects rack's presets: which one each module (and MOVEMENT lane) had chosen last,
+        by key ("space", "echo", "movementA" ...), as "factory:NAME" or "user:PATH"; a host
+        keeps it with the session. By default for as long as the host lives. */
+    virtual juce::String rackPresetMemory (const juce::String& key) const
+    {
+        const juce::ScopedLock lock (rackMemoryLock);
+        return rackMemory[key];
+    }
+    virtual void setRackPresetMemory (const juce::String& key, const juce::String& code)
+    {
+        const juce::ScopedLock lock (rackMemoryLock);
+        rackMemory.set (key, code);
+    }
     /** The SHAPER editor's magnified view (a view setting saved with the session). */
     virtual bool shaperEditorLarge() const noexcept = 0;
     virtual void setShaperEditorLarge (bool large) noexcept = 0;
@@ -473,6 +486,9 @@ protected:
     int resolveModTarget (int slot) const;
     /** Flushes the parameters into the state tree: a route change and its links are one undo step. */
     void commitRouteChange();
+    /** rackPresetMemory's (a host that saves it with the session reads and writes these). */
+    mutable juce::CriticalSection rackMemoryLock;
+    juce::StringPairArray rackMemory;
 };
 
 } // namespace osp::plugin

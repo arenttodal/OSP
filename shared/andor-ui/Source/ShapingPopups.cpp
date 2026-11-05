@@ -476,7 +476,7 @@ void MiniKnob::paint (juce::Graphics& g)
         return;
     }
     // Small knob cells (envelope, popovers): a light caption, the value a step stronger.
-    g.setColour (onDark ? captionColour : design::colour::text.withAlpha (captionHover ? 0.95f : 0.62f));
+    g.setColour (onDark ? captionColour : design::colour::text.withAlpha (captionHover ? 0.95f : (strongCaption ? 0.74f : 0.62f)));
     const auto captionFont = type::popupLabel (std::max (9.0f, (compact ? 0.14f : 0.155f) * h));
     g.setFont (captionFont);
     g.drawText (caption, juce::Rectangle<float> (r.getX(), r.getY(), r.getWidth(), 0.2f * h), juce::Justification::centred, false);
@@ -598,11 +598,24 @@ void ValueSelector::paint (juce::Graphics& g)
     }
     const auto box = r.reduced (1.0f, 1.0f);
     design::draw::button (g, box, 0.2f * box.getHeight(), false, hasKeyboardFocus (false) || isMouseOver(), design::colour::accent);
-    g.setColour (design::colour::text.withAlpha (0.9f));
-    g.setFont (type::popupValue (0.46f * box.getHeight()));
-    auto text = box.reduced (0.3f * box.getHeight(), 0.0f);
-    icons::draw (g, icons::Kind::chevronDown, text.removeFromRight (0.32f * box.getHeight()), design::colour::text.withAlpha (0.5f), 1.2f);
-    g.drawText (valueText.toUpperCase(), text, juce::Justification::centred, false);
+    g.setColour (design::colour::text.withAlpha (prominent ? 1.0f : 0.9f));
+    auto text = box.reduced ((prominent ? 0.22f : 0.3f) * box.getHeight(), 0.0f);
+    icons::draw (g, icons::Kind::chevronDown, text.removeFromRight (0.32f * box.getHeight()), design::colour::text.withAlpha (prominent ? 0.7f : 0.5f), 1.2f);
+    const auto shown = valueText.toUpperCase();
+    if (prominent)
+    {
+        // The larger type shrinks (down to 3/4) before it would clip a long choice (PING-PONG).
+        auto font = fonts::make (0.5f * box.getHeight(), fonts::Weight::medium, 0.06f);
+        const float full = font.getHeight();
+        while (font.getHeight() > 0.75f * full && juce::GlyphArrangement::getStringWidth (font, shown) > text.getWidth() - 2.0f)
+            font = fonts::make (font.getHeight() - 0.25f, fonts::Weight::medium, 0.06f);
+        g.setFont (font);
+    }
+    else
+    {
+        g.setFont (type::popupValue (0.46f * box.getHeight()));
+    }
+    g.drawText (shown, text, juce::Justification::centred, false);
 }
 
 void ValueSelector::mouseUp (const juce::MouseEvent& e)

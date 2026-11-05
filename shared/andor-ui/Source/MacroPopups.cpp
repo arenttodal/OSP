@@ -115,6 +115,13 @@ namespace
             pictureScale = k;
             repaint();
         }
+        /** The effects rack's picture: captions with their legends, values beside them, the
+            hierarchy of lines made plainer (opt-in; the popovers' pictures as ever). */
+        void setDetailed (bool shouldBeDetailed)
+        {
+            detailed = shouldBeDetailed;
+            repaint();
+        }
         /** Up to date at once (no fade): what a snapshot without a message loop sees. */
         void settle()
         {
@@ -125,6 +132,7 @@ namespace
 
     protected:
         juce::Colour identity { 0xffe8692a };
+        bool detailed = false;
         virtual void paintVisual (juce::Graphics&, juce::Rectangle<float> plot) = 0;
         /** Draws at the display's full size (otherwise scaled by visualScale). */
         virtual bool native() const { return false; }
@@ -648,7 +656,9 @@ namespace
             const double seconds = EchoDelay::timeSeconds (e, processor.hostTempo());
             const bool tape = e.type == EchoType::tape, ascend = e.type == EchoType::ascend;
 
-            const auto plot = juce::Rectangle<float>::leftTopRightBottom (bounds.getX() + 14.0f, bounds.getY() + 14.0f, bounds.getRight() - 10.0f, bounds.getBottom() - 5.0f);
+            // (The rack's picture: room for its captions above and below, L / R at the left.)
+            const auto plot = detailed ? juce::Rectangle<float>::leftTopRightBottom (bounds.getX() + 22.0f, bounds.getY() + 22.0f, bounds.getRight() - 12.0f, bounds.getBottom() - 18.0f)
+                                       : juce::Rectangle<float>::leftTopRightBottom (bounds.getX() + 14.0f, bounds.getY() + 14.0f, bounds.getRight() - 10.0f, bounds.getBottom() - 5.0f);
             const float mid = plot.getCentreY(), half = 0.5f * plot.getHeight();
             const double span = std::clamp (seconds * 7.5, 0.5, 6.0);
             auto xAt = [&] (double t) { return plot.getX() + static_cast<float> (t / span) * plot.getWidth(); };
@@ -664,12 +674,13 @@ namespace
             g.setColour (juce::Colours::white.withAlpha (0.07f));
             g.fillRect (juce::Rectangle<float> (plot.getX(), mid - 0.5f, plot.getWidth(), 1.0f));
 
-            g.setFont (fonts::make (9.0f, fonts::Weight::regular, 0.02f));
-            g.setColour (juce::Colour (0xff9aa09e).withAlpha (0.85f));
+            g.setFont (fonts::make (detailed ? 10.0f : 9.0f, fonts::Weight::regular, 0.02f));
+            g.setColour (juce::Colour (detailed ? 0xffc2c7c5 : 0xff9aa09e).withAlpha (0.85f));
             const auto ms = juce::String (juce::roundToInt (1000.0 * seconds)) + " ms";
+            const float captionY = bounds.getY() + (detailed ? 5.0f : 2.0f);
             g.drawText (e.sync ? juce::String (shaping::echoDivisionName (e.division)) + "  " + ms : ms,
-                        juce::Rectangle<float> (bounds.getX() + 10.0f, bounds.getY() + 2.0f, 160.0f, 11.0f), juce::Justification::centredLeft, false);
-            g.drawText ("FEEDBACK " + juce::String (juce::roundToInt (100.0 * e.feedback)) + " %", juce::Rectangle<float> (bounds.getRight() - 110.0f, bounds.getY() + 2.0f, 100.0f, 11.0f),
+                        juce::Rectangle<float> (bounds.getX() + 10.0f, captionY, 160.0f, 12.0f), juce::Justification::centredLeft, false);
+            g.drawText ("FEEDBACK " + juce::String (juce::roundToInt (100.0 * e.feedback)) + " %", juce::Rectangle<float> (bounds.getRight() - 130.0f, captionY, 120.0f, 12.0f),
                         juce::Justification::centredRight, false);
 
             // The sound itself at zero.
@@ -692,6 +703,9 @@ namespace
             double level = 1.0;
             const auto warm = ascend ? juce::Colour (0xffd6e4f0) : tape ? juce::Colour (0xffffb15c) : juce::Colour (0xffd9c38a);
             const int interval = ascend ? juce::roundToInt (12.0 * std::log2 (EchoDelay::intervalRatio (e.interval))) : 0;
+            // The rack's picture: each repeat's place and height, for the decay line through them.
+            std::vector<juce::Point<float>> peaks { { xAt (0.0), 0.92f * half } };
+            int repeats = 0;
             for (int n = 1; n <= 40; ++n)
             {
                 level = n == 1 ? 0.92 : level * fb;
@@ -700,14 +714,21 @@ namespace
                     break;
                 const float dark = std::clamp (static_cast<float> (n) * (0.07f + 0.08f * (1.0f - static_cast<float> (e.tone))) * (tape ? 0.8f : 1.1f), 0.0f, 0.85f);
                 const auto c = warm.interpolatedWith (identity, std::min (1.0f, 0.35f + 0.6f * dark)).withMultipliedBrightness (1.0f - 0.45f * dark);
-                const float h = half * 0.92f * static_cast<float> (std::sqrt (level));
-                const float width = (tape ? 2.2f + 0.3f * static_cast<float> (n) * static_cast<float> (e.age) : 2.0f);
+                // (The rack: the quiet repeats keep a readable height - still in order, still
+                // falling with the feedback - and are drawn a little wider.)
+                const float h = detailed ? half * std::min (0.92f, 0.22f + 0.7f * static_cast<float> (std::pow (level, 0.6)))
+                                         : half * 0.92f * static_cast<float> (std::sqrt (level));
+                const float width = (tape ? 2.2f + 0.3f * static_cast<float> (n) * static_cast<float> (e.age) : 2.0f) + (detailed ? 1.0f : 0.0f);
+                peaks.push_back ({ xAt (t), h });
+                ++repeats;
                 auto at = [&] (double time, float sign, bool both) {
                     const float x = xAt (time);
+                    // (The rack: the right channel's repeats a shade cooler than the left's.)
+                    const auto cc = detailed && ! both && sign < 0.0f ? c.interpolatedWith (juce::Colour (0xffbcd0e0), 0.3f) : c;
                     if (both)
-                        stroke (x, mid - h, mid + h, c, width);
+                        stroke (x, mid - h, mid + h, cc, width);
                     else
-                        stroke (x, mid, mid - sign * h, c, width);
+                        stroke (x, mid, mid - sign * h, cc, width);
                     if (tape && e.age > 0.05)
                     {
                         // Wow and flutter: faint ghosts either side.
@@ -745,19 +766,56 @@ namespace
                     const int semis = passes * interval;
                     if (const float x = xAt (t); semis != 0 && x + 14.0f < plot.getRight())
                     {
-                        g.setFont (fonts::make (8.0f, fonts::Weight::medium, 0.04f));
+                        g.setFont (fonts::make (detailed ? 9.5f : 8.0f, fonts::Weight::medium, 0.04f));
                         g.setColour (c.withAlpha (0.8f));
                         g.drawText ((semis > 0 ? "+" : "") + juce::String (semis), juce::Rectangle<float> (x + 3.0f, plot.getY() - 2.0f, 24.0f, 10.0f),
                                     juce::Justification::centredLeft, false);
                     }
                 }
             }
+            if (detailed && peaks.size() > 1)
+            {
+                // The decay: a quiet line through the repeats' tops (and, mirrored, their feet).
+                juce::Path upper, lower;
+                for (std::size_t i = 0; i < peaks.size(); ++i)
+                {
+                    const auto& pk = peaks[i];
+                    if (i == 0)
+                    {
+                        upper.startNewSubPath (pk.x, mid - pk.y);
+                        lower.startNewSubPath (pk.x, mid + pk.y);
+                    }
+                    else
+                    {
+                        upper.lineTo (pk.x, mid - pk.y);
+                        lower.lineTo (pk.x, mid + pk.y);
+                    }
+                }
+                juce::Path dashedUpper, dashedLower;
+                const float dashes[] { 3.0f, 3.0f };
+                juce::PathStrokeType line (1.0f);
+                line.createDashedStroke (dashedUpper, upper, dashes, 2);
+                line.createDashedStroke (dashedLower, lower, dashes, 2);
+                g.setColour (identity.withAlpha (0.45f));
+                g.fillPath (dashedUpper);
+                g.fillPath (dashedLower);
+                // What the decay is: the repeats heard and how much each falls.
+                const double fallDb = 20.0 * std::log10 (std::max (1.0e-3, fb));
+                g.setFont (fonts::make (10.0f, fonts::Weight::regular, 0.02f));
+                g.setColour (juce::Colour (0xffc2c7c5).withAlpha (0.8f));
+                g.drawText (juce::String (repeats) + (repeats == 1 ? " repeat" : " repeats") + juce::String::fromUTF8 ("  \xc2\xb7  ") + juce::String (fallDb, 1) + " dB each",
+                            juce::Rectangle<float> (bounds.getX() + 10.0f, bounds.getBottom() - 16.0f, 260.0f, 12.0f), juce::Justification::centredLeft, false);
+                if (ascend)
+                    g.drawText (e.motion == AscendMotion::steady ? "PITCH: each at the interval" : e.motion == AscendMotion::late ? "PITCH: rising from the 2nd" : "PITCH: rising",
+                                juce::Rectangle<float> (bounds.getRight() - 230.0f, bounds.getBottom() - 16.0f, 220.0f, 12.0f), juce::Justification::centredRight, false);
+            }
             if (e.stereo != EchoStereo::mono)
             {
-                g.setFont (fonts::make (8.0f, fonts::Weight::medium, 0.06f));
-                g.setColour (juce::Colour (0xff9aa09e).withAlpha (0.55f));
-                g.drawText ("L", juce::Rectangle<float> (plot.getX() - 10.0f, plot.getY(), 8.0f, 10.0f), juce::Justification::centred, false);
-                g.drawText ("R", juce::Rectangle<float> (plot.getX() - 10.0f, plot.getBottom() - 10.0f, 8.0f, 10.0f), juce::Justification::centred, false);
+                g.setFont (fonts::make (detailed ? 9.5f : 8.0f, fonts::Weight::medium, 0.06f));
+                g.setColour (juce::Colour (0xff9aa09e).withAlpha (detailed ? 0.8f : 0.55f));
+                const float lx = detailed ? plot.getX() - 16.0f : plot.getX() - 10.0f;
+                g.drawText ("L", juce::Rectangle<float> (lx, plot.getY(), 10.0f, 10.0f), juce::Justification::centred, false);
+                g.drawText ("R", juce::Rectangle<float> (lx, plot.getBottom() - 10.0f, 10.0f, 10.0f), juce::Justification::centred, false);
             }
         }
 
@@ -994,9 +1052,28 @@ namespace
 
         void caption (juce::Graphics& g, juce::Rectangle<float> area, const juce::String& text, juce::Colour colour, float y) const
         {
+            if (detailed)
+            {
+                // A legend: a short stroke of the line's own colour, then its name (and value).
+                g.setColour (colour);
+                g.fillRoundedRectangle (juce::Rectangle<float> (area.getX(), y + 5.0f, 10.0f, 2.0f), 1.0f);
+                g.setFont (type::annotation (9.5f));
+                g.setColour (colour.interpolatedWith (juce::Colours::white, 0.2f));
+                g.drawText (text, juce::Rectangle<float> (area.getX() + 14.0f, y, 180.0f, 12.0f), juce::Justification::centredLeft, false);
+                return;
+            }
             g.setColour (colour);
             g.setFont (type::annotation (9.0f));
             g.drawText (text, juce::Rectangle<float> (area.getX(), y, 120.0f, 11.0f), juce::Justification::centredLeft, false);
+        }
+        /** The rack's picture: what the lines move at, at the top right. */
+        void note (juce::Graphics& g, juce::Rectangle<float> area, const juce::String& text) const
+        {
+            if (! detailed)
+                return;
+            g.setFont (type::annotation (9.5f));
+            g.setColour (juce::Colour (0xffb8bdbb));
+            g.drawText (text, juce::Rectangle<float> (area.getRight() - 200.0f, area.getY(), 200.0f, 12.0f), juce::Justification::centredRight, false);
         }
 
         void paintVisual (juce::Graphics& g, juce::Rectangle<float> area) override
@@ -1022,11 +1099,24 @@ namespace
                     const double pitch = std::sqrt (std::clamp (0.01 * value (s, lane ("drift.pitch")), 0.02, 1.0));
                     const double tone = std::sqrt (std::clamp (0.01 * value (s, lane ("drift.tone")), 0.02, 1.0));
                     const double window = std::clamp (6.0 / rate, 6.0, 60.0);
-                    trace (g, area, window, [rate] (double t) { return shaping::sharedWander (11, t, rate * 1.3) * 0.6; }, stone.withAlpha (0.35f), 1.0f, mid, half * depth);
-                    trace (g, area, window, [rate, tone] (double t) { return tone * shaping::sharedWander (7, t, rate * 0.8); }, stone.withAlpha (0.7f), 1.4f, mid, half * depth);
-                    trace (g, area, window, [rate, pitch] (double t) { return pitch * shaping::sharedWander (3, t, rate); }, identity, 2.0f, mid, half * depth);
-                    caption (g, area, "PITCH", identity, area.getY());
-                    caption (g, area, "TONE", stone, area.getY() + 11.0f);
+                    const float swing = detailed ? 1.7f : 1.0f;   // (the rack: the wander over more of the height)
+                    if (! detailed)
+                        trace (g, area, window, [rate] (double t) { return shaping::sharedWander (11, t, rate * 1.3) * 0.6; }, stone.withAlpha (0.35f), 1.0f, mid, half * depth);
+                    // (The rack: TONE a quieter, thinner line under PITCH, the third, unnamed one left out.)
+                    trace (g, area, window, [rate, tone] (double t) { return tone * shaping::sharedWander (7, t, rate * 0.8); }, stone.withAlpha (detailed ? 0.8f : 0.7f),
+                           detailed ? 1.3f : 1.4f, mid, half * depth * swing);
+                    trace (g, area, window, [rate, pitch] (double t) { return pitch * shaping::sharedWander (3, t, rate); }, identity, detailed ? 2.4f : 2.0f, mid, half * depth * swing);
+                    if (detailed)
+                    {
+                        caption (g, area, "PITCH  " + juce::String (shaping::driftPitchCents (0.01 * value (s, lane ("drift.pitch"))), 1) + " c", identity, area.getY());
+                        caption (g, area, "TONE  " + juce::String (juce::roundToInt (value (s, lane ("drift.tone")))) + " %", stone, area.getY() + 14.0f);
+                        note (g, area, format::hertz (shaping::driftSpeedHz (0.01 * value (s, lane ("drift.speed")))));
+                    }
+                    else
+                    {
+                        caption (g, area, "PITCH", identity, area.getY());
+                        caption (g, area, "TONE", stone, area.getY() + 11.0f);
+                    }
                     break;
                 }
                 case MovementMode::tape:
@@ -1042,6 +1132,13 @@ namespace
                            stone, 1.2f, area.getY() + area.getHeight() * 0.76f, area.getHeight() * 0.18f * depth);
                     caption (g, area, "WOW  " + format::hertz (wowHz), identity, area.getY());
                     caption (g, area, "FLUTTER  " + format::hertz (flutterHz), stone, area.getY() + area.getHeight() * 0.5f);
+                    if (detailed)
+                    {
+                        // The two machines apart: a faint rule between them, WEAR at the top right.
+                        g.setColour (displayLine.withAlpha (0.6f));
+                        g.fillRect (juce::Rectangle<float> (area.getX(), area.getY() + area.getHeight() * 0.5f - 3.0f, area.getWidth(), 1.0f));
+                        note (g, area, "WEAR  " + juce::String (juce::roundToInt (100.0 * wear)) + " %");
+                    }
                     break;
                 }
                 case MovementMode::chorus:
@@ -1054,8 +1151,17 @@ namespace
                     const float extent = half * static_cast<float> (0.25 + 0.75 * width) * depth;
                     trace (g, area, window, [rate, stereo] (double t) { return std::sin (twoPi * rate * t + std::numbers::pi * stereo); }, stone, 1.6f, mid, extent);
                     trace (g, area, window, [rate] (double t) { return std::sin (twoPi * rate * t); }, identity, 1.8f, mid, extent);
-                    caption (g, area, "L", identity, area.getY());
-                    caption (g, area, "R", stone, area.getY() + 11.0f);
+                    if (detailed)
+                    {
+                        caption (g, area, "LEFT", identity, area.getY());
+                        caption (g, area, "RIGHT", stone, area.getY() + 14.0f);
+                        note (g, area, format::hertz (rate) + juce::String::fromUTF8 ("  \xc2\xb7  ") + format::milliseconds (shaping::chorusWidthMs (0.01 * value (s, lane ("chorus.width")))));
+                    }
+                    else
+                    {
+                        caption (g, area, "L", identity, area.getY());
+                        caption (g, area, "R", stone, area.getY() + 11.0f);
+                    }
                     break;
                 }
                 case MovementMode::pulse:
@@ -1069,14 +1175,22 @@ namespace
                         const double y = std::tanh (k * std::sin (phase)) / norm;
                         return 1.0 - std::max (0.35, amount) * 0.5 * (1.0 - y);
                     };
-                    const float bottom = area.getBottom(), height = area.getHeight() * 0.9f;
+                    const float bottom = area.getBottom(), height = area.getHeight() * (detailed ? 0.72f : 0.9f);   // (the rack: under its legends)
                     auto toTrace = [&] (double offset) {
                         return [=] (double t) { return 2.0 * gain (twoPi * rate * t + offset) - 1.0; };
                     };
                     if (stereo > 0.02)
                         trace (g, area, window, toTrace (std::numbers::pi * stereo), stone.withAlpha (0.7f), 1.3f, bottom - 0.5f * height, 0.5f * height);
                     trace (g, area, window, toTrace (0.0), identity, 2.0f, bottom - 0.5f * height, 0.5f * height);
-                    caption (g, area, format::hertz (rate), identity, area.getY());
+                    if (detailed)
+                    {
+                        caption (g, area, stereo > 0.02 ? "LEFT" : "LEVEL", identity, area.getY());
+                        if (stereo > 0.02)
+                            caption (g, area, "RIGHT", stone.withAlpha (0.85f), area.getY() + 14.0f);
+                        note (g, area, format::hertz (rate));
+                    }
+                    else
+                        caption (g, area, format::hertz (rate), identity, area.getY());
                     break;
                 }
                 case MovementMode::shaper:
@@ -2603,6 +2717,9 @@ namespace
     class RackPresetModel
     {
     public:
+        /** `memory`: where the host keeps which preset was chosen last (saved with the session,
+            so "NAME *" outlives the rack being closed and the instrument being reopened). */
+        RackPresetModel (InstrumentHost& h, juce::String memory) : host (h), memoryKey (std::move (memory)) {}
         virtual ~RackPresetModel() = default;
         virtual juce::String kind() const = 0;        ///< in a user preset's file ("andor.echo")
         virtual juce::String extension() const = 0;
@@ -2671,14 +2788,43 @@ namespace
         }
 
         /** The preset last chosen or saved (the bar's "NAME *" once edited). */
-        std::optional<RackPreset> last;
+        std::optional<RackPreset> lastChosen() const
+        {
+            const auto code = host.rackPresetMemory (memoryKey);
+            if (code != cachedCode)
+            {
+                cachedCode = code;
+                cached.reset();
+                if (code.startsWith ("factory:"))
+                {
+                    for (const auto& p : factory())
+                        if (p.name == code.fromFirstOccurrenceOf ("factory:", false, false))
+                            cached = p;
+                }
+                else if (code.startsWith ("user:"))
+                    cached = read (juce::File (code.fromFirstOccurrenceOf ("user:", false, false)));
+            }
+            return cached;
+        }
+        void setLastChosen (const std::optional<RackPreset>& p)
+        {
+            host.setRackPresetMemory (memoryKey, ! p.has_value() ? juce::String() : (p->isUser() ? "user:" + p->file.getFullPathName() : "factory:" + p->name));
+        }
+
+    protected:
+        InstrumentHost& host;
+        juce::String memoryKey;
+
+    private:
+        mutable juce::String cachedCode { "-" };
+        mutable std::optional<RackPreset> cached;
     };
 
     /** Values of host parameters by their IDs (SPACE's, ECHO's). */
     class ParameterPresetModel : public RackPresetModel
     {
     public:
-        ParameterPresetModel (InstrumentHost& h, juce::StringArray parameterIds) : host (h), ids (std::move (parameterIds)) {}
+        ParameterPresetModel (InstrumentHost& h, juce::String memory, juce::StringArray parameterIds) : RackPresetModel (h, std::move (memory)), ids (std::move (parameterIds)) {}
         RackPreset capture() const override
         {
             RackPreset p;
@@ -2708,7 +2854,6 @@ namespace
             auto* param = host.apvts().getParameter (id);
             return param != nullptr ? param->convertFrom0to1 (param->getDefaultValue()) : 0.0f;
         }
-        InstrumentHost& host;
         juce::StringArray ids;
     };
 
@@ -2717,7 +2862,7 @@ namespace
     class SpacePresetModel final : public ParameterPresetModel
     {
     public:
-        explicit SpacePresetModel (InstrumentHost& h) : ParameterPresetModel (h, spacepresets::parameterIds())
+        explicit SpacePresetModel (InstrumentHost& h) : ParameterPresetModel (h, "space", spacepresets::parameterIds())
         {
             for (const auto& preset : spacepresets::all())
             {
@@ -2756,7 +2901,7 @@ namespace
     {
     public:
         explicit EchoPresetModel (InstrumentHost& h)
-            : ParameterPresetModel (h, { "echo.type", "echo.sync", "echo.division", "echo.time", "echo.feedback", "echo.tone", "echo.age", "echo.stereo",
+            : ParameterPresetModel (h, "echo", { "echo.type", "echo.sync", "echo.division", "echo.time", "echo.feedback", "echo.tone", "echo.age", "echo.stereo",
                                          "echo.ascend.interval", "echo.ascend.motion" })
         {
             // (type, sync, division index, free ms, feedback %, tone %, age %, stereo, interval, motion)
@@ -2825,7 +2970,7 @@ namespace
     class MovementPresetModel final : public RackPresetModel
     {
     public:
-        MovementPresetModel (InstrumentHost& h, int laneIndex) : host (h), laneNumber (laneIndex)
+        MovementPresetModel (InstrumentHost& h, int laneIndex) : RackPresetModel (h, laneIndex == 0 ? "movementA" : "movementB"), laneNumber (laneIndex)
         {
             struct Row
             {
@@ -2937,7 +3082,6 @@ namespace
                     return id;
             return {};
         }
-        InstrumentHost& host;
         int laneNumber;
         std::vector<RackPreset> presets;
     };
@@ -2994,7 +3138,7 @@ namespace
             if (model == nullptr)
                 return;
             model->apply (p);
-            model->last = p;
+            model->setLastChosen (p);
             refreshText();
         }
         bool chooseNamed (const juce::String& name)
@@ -3022,8 +3166,9 @@ namespace
                 return;
             const int count = static_cast<int> (list.size());
             int from = -1;
+            const auto last = model->lastChosen();
             for (int i = 0; i < count; ++i)
-                if (model->matches (list[static_cast<std::size_t> (i)]) || (from < 0 && model->last.has_value() && list[static_cast<std::size_t> (i)].sameAs (*model->last)))
+                if (model->matches (list[static_cast<std::size_t> (i)]) || (from < 0 && last.has_value() && list[static_cast<std::size_t> (i)].sameAs (*last)))
                     from = i;
             choose (list[static_cast<std::size_t> (from < 0 ? (delta > 0 ? 0 : count - 1) : (from + delta + count) % count)]);
         }
@@ -3033,7 +3178,7 @@ namespace
                 return false;
             if (auto p = model->save (name.trim()))
             {
-                model->last = *p;
+                model->setLastChosen (*p);
                 refreshText();
                 return true;
             }
@@ -3064,10 +3209,25 @@ namespace
             g.setColour (colour::hairline.darker (0.1f));
             g.fillRect (juce::Rectangle<float> (leftArea().getRight(), r.getY() + 4.0f, 1.0f, r.getHeight() - 8.0f));
             g.fillRect (juce::Rectangle<float> (rightArea().getX() - 1.0f, r.getY() + 4.0f, 1.0f, r.getHeight() - 8.0f));
-            g.setFont (type::popupLabel (12.5f));
-            g.setColour (matched ? accent.darker (0.35f) : colour::text.withAlpha (0.85f));
-            g.drawText (shown, getLocalBounds().toFloat().withTrimmedLeft (leftArea().getWidth() + 4.0f).withTrimmedRight (rightArea().getWidth() + 4.0f),
-                        juce::Justification::centred, true);
+            const auto font = fonts::make (13.5f, fonts::Weight::medium, 0.03f);
+            g.setFont (font);
+            const auto area = getLocalBounds().toFloat().withTrimmedLeft (leftArea().getWidth() + 4.0f).withTrimmedRight (rightArea().getWidth() + 4.0f);
+            if (edited)
+            {
+                // The name as chosen, then a quiet asterisk: still that preset, edited.
+                const auto name = shown.dropLastCharacters (2);
+                const float w = juce::GlyphArrangement::getStringWidth (font, name), star = juce::GlyphArrangement::getStringWidth (font, " *");
+                const float x = area.getCentreX() - 0.5f * (w + star);
+                g.setColour (colour::text.withAlpha (0.9f));
+                g.drawText (name, juce::Rectangle<float> (x, area.getY(), w + 1.0f, area.getHeight()), juce::Justification::centredLeft, true);
+                g.setColour (accent.withAlpha (0.75f));
+                g.drawText (" *", juce::Rectangle<float> (x + w, area.getY(), star + 2.0f, area.getHeight()), juce::Justification::centredLeft, false);
+            }
+            else
+            {
+                g.setColour (matched ? accent.darker (0.4f) : colour::text.withAlpha (0.72f));
+                g.drawText (shown, area, juce::Justification::centred, true);
+            }
         }
         void mouseDown (const juce::MouseEvent& e) override
         {
@@ -3148,18 +3308,19 @@ namespace
                 menu.addItem ("(none saved yet)", false, false, [] {});
             menu.addSeparator();
             menu.addItem (juce::String::fromUTF8 ("Save preset\xe2\x80\xa6"), [safe] { if (safe != nullptr) safe->askName ("Save preset", "A name for these settings:", {}, false); });
-            if (model->last.has_value() && model->last->isUser())
+            if (const auto last = model->lastChosen(); last.has_value() && last->isUser())
             {
-                const auto name = model->last->name;
+                const auto name = last->name;
                 menu.addItem (juce::String::fromUTF8 ("Rename \xe2\x80\x9c") + name + juce::String::fromUTF8 ("\xe2\x80\x9d\xe2\x80\xa6"),
                               [safe, name] { if (safe != nullptr) safe->askName ("Rename preset", "A new name:", name, true); });
                 menu.addItem (juce::String::fromUTF8 ("Delete \xe2\x80\x9c") + name + juce::String::fromUTF8 ("\xe2\x80\x9d"), [safe] {
-                    if (safe != nullptr && safe->model != nullptr && safe->model->last.has_value())
-                    {
-                        safe->model->last->file.moveToTrash();
-                        safe->model->last.reset();
-                        safe->refreshText();
-                    }
+                    if (safe != nullptr && safe->model != nullptr)
+                        if (const auto chosen = safe->model->lastChosen(); chosen.has_value() && chosen->isUser())
+                        {
+                            chosen->file.moveToTrash();
+                            safe->model->setLastChosen (std::nullopt);
+                            safe->refreshText();
+                        }
                 });
             }
             menu.addItem ("Show folder", [safe] {
@@ -3205,13 +3366,14 @@ namespace
                 if (result != 1 || name.isEmpty() || safe == nullptr || safe->model == nullptr)
                     return;
                 auto& m = *safe->model;
-                if (rename && m.last.has_value() && m.last->isUser())
+                if (auto chosen = m.lastChosen(); rename && chosen.has_value() && chosen->isUser())
                 {
-                    const auto to = m.last->file.getSiblingFile (name + m.extension());
-                    if (m.last->file.moveFileTo (to))
+                    const auto to = chosen->file.getSiblingFile (name + m.extension());
+                    if (chosen->file.moveFileTo (to))
                     {
-                        m.last->file = to;
-                        m.last->name = name;
+                        chosen->file = to;
+                        chosen->name = name;
+                        m.setLastChosen (chosen);
                     }
                     safe->refreshText();
                 }
@@ -3236,11 +3398,12 @@ namespace
                 return;
             }
             const int m = model->mode();
-            matched = false;
+            matched = edited = false;
             // The last one chosen first (two presets may hold the same values), then the rest.
-            if (model->last.has_value() && model->modeOf (*model->last) == m && model->matches (*model->last))
+            const auto last = model->lastChosen();
+            if (last.has_value() && model->modeOf (*last) == m && model->matches (*last))
             {
-                shown = model->last->name;
+                shown = last->name;
                 matched = true;
                 return;
             }
@@ -3251,13 +3414,15 @@ namespace
                     matched = true;
                     return;
                 }
-            shown = model->last.has_value() && model->modeOf (*model->last) == m ? model->last->name + " *" : juce::String ("CUSTOM");
+            // Edited: the chosen one keeps its name, with a quiet asterisk; nothing chosen: CUSTOM.
+            edited = last.has_value() && model->modeOf (*last) == m;
+            shown = edited ? last->name + " *" : juce::String ("CUSTOM");
         }
 
         RackPresetModel* model = nullptr;
         juce::Colour accent;
         juce::String shown;
-        bool matched = false;
+        bool matched = false, edited = false;
         int hover = 0;
     };
 
@@ -3276,14 +3441,14 @@ namespace
         {
             const auto r = getLocalBounds().toFloat();
             const float h = r.getHeight();
-            control->setBounds (juce::Rectangle<float> (r.getWidth() - 10.0f, 24.0f).withCentre ({ r.getCentreX(), r.getY() + 0.48f * h }).getSmallestIntegerContainer());
+            control->setBounds (juce::Rectangle<float> (r.getWidth() - 8.0f, 26.0f).withCentre ({ r.getCentreX(), r.getY() + 0.48f * h }).getSmallestIntegerContainer());
         }
         void paint (juce::Graphics& g) override
         {
             // (MiniKnob's caption: the same type, colour and place.)
             const auto r = getLocalBounds().toFloat();
             const float h = r.getHeight();
-            g.setColour (design::colour::text.withAlpha (0.62f));
+            g.setColour (design::colour::text.withAlpha (0.74f));   // (MiniKnob's strong caption)
             g.setFont (type::popupLabel (std::max (9.0f, 0.155f * h)));
             g.drawText (caption, juce::Rectangle<float> (r.getX() - 6.0f, r.getY(), r.getWidth() + 12.0f, 0.2f * h), juce::Justification::centred, false);
         }
@@ -3357,6 +3522,7 @@ namespace
                 removeChildComponent (modeSelector.get());
             modeSelector = std::make_unique<ValueSelector> (*processor.apvts().getParameter (id), juce::String());
             modeSelector->setAccent (accent());
+            modeSelector->setProminent (true);
             modeSelector->setTooltip (tip);
             addAndMakeVisible (*modeSelector);
             return *modeSelector;
@@ -3367,6 +3533,7 @@ namespace
                 removeChildComponent (visual.get());
             visual = std::move (v);
             visual->setIdentity (identity);
+            visual->setDetailed (true);
             if (scaled)
                 visual->setPictureScale (1.1f);
             addAndMakeVisible (*visual);
@@ -3375,6 +3542,7 @@ namespace
         {
             auto k = std::make_unique<MiniKnob> (processor.apvts(), id, caption, std::move (f));
             k->setArcColour (accent());
+            k->setStrongCaption (true);
             auto& ref = *k;
             addAndMakeVisible (ref);
             cells.push_back (std::move (k));
@@ -3384,6 +3552,7 @@ namespace
         {
             auto selector = std::make_unique<ValueSelector> (*processor.apvts().getParameter (id), juce::String());
             selector->setTooltip (tip);
+            selector->setProminent (true);
             auto& ref = *selector;
             addCell (caption, std::move (selector));
             return ref;
@@ -3432,9 +3601,11 @@ namespace
                 return;
             }
             placeVisual (body.withLeft (rackcolumns::pictureLeft()).withRight (getWidth() - rackcolumns::pictureRightMargin));
-            // One row of equal cells, centred under the mode and the presets.
+            // One row of equal cells on a fixed pitch from the same first place in every module
+            // and mode (a mode with fewer controls leaves the rest of the row empty).
             const int n = static_cast<int> (cells.size());
-            auto line = left.withSizeKeepingCentre (n * cellWidth, std::min (left.getHeight(), cellHeight));
+            jassert (n * cellWidth <= left.getWidth());
+            auto line = left.withWidth (n * cellWidth).withSizeKeepingCentre (n * cellWidth, std::min (left.getHeight(), cellHeight)).withX (left.getX());
             for (auto& cell : cells)
             {
                 cell->setVisible (true);

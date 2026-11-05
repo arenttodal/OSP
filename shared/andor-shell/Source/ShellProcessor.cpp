@@ -1251,7 +1251,19 @@ std::unique_ptr<juce::XmlElement> ShellProcessor::stateXml() const
     view->setAttribute ("arpOpen", arpOpen.load() ? 1 : 0);
     view->setAttribute ("shaperLarge", shaperLarge.load() ? 1 : 0);
     if (! product().rackModules.empty())
+    {
         view->setAttribute ("rack", rackOpen.load());
+        // Which preset each rack module (each MOVEMENT lane) had chosen: its "NAME *" comes back.
+        const juce::ScopedLock lock (rackMemoryLock);
+        if (rackMemory.size() > 0)
+        {
+            auto* presets = view->createNewChildElement ("RackPresets");
+            for (int i = 0; i < rackMemory.size(); ++i)
+                if (rackMemory.getAllValues()[i].isNotEmpty())
+                    presets->setAttribute (juce::XmlElement::isValidXmlName (rackMemory.getAllKeys()[i]) ? rackMemory.getAllKeys()[i] : juce::String ("x"),
+                                           rackMemory.getAllValues()[i]);
+        }
+    }
     view->setAttribute ("modTab", modTab.load());
     view->setAttribute ("editLayer", editLayer());
     view->setAttribute ("velToAmp", velToAmp.load() ? 1 : 0);
@@ -1346,6 +1358,13 @@ bool ShellProcessor::applyStateXml (const juce::XmlElement& xml)
         arpOpen = view->getIntAttribute ("arpOpen") != 0;
         shaperLarge = view->getIntAttribute ("shaperLarge") != 0;
         rackOpen = view->getIntAttribute ("rack", 0);
+        {
+            const juce::ScopedLock lock (rackMemoryLock);
+            rackMemory.clear();
+            if (const auto* presets = view->getChildByName ("RackPresets"))
+                for (int i = 0; i < presets->getNumAttributes(); ++i)
+                    rackMemory.set (presets->getAttributeName (i), presets->getAttributeValue (i));
+        }
         setModPanelTab (view->getIntAttribute ("modTab"));
         setEditLayer (view->getIntAttribute ("editLayer"));
         velToAmp = view->getIntAttribute ("velToAmp", 1) != 0;
