@@ -199,6 +199,14 @@ private:
     std::array<std::unique_ptr<EngineCard>, OspAudioProcessor::numLayers> cards;
     DropZone dropZone;
     AddLayerTarget addTarget;
+    /** Live capture into a layer without a sound (the empty screen's Record..., the menu): its
+        CAPTURE page over the sources until the take arrives or it is closed. */
+    std::unique_ptr<CaptureEditor> newLayerCapture;
+    int newLayerCaptureTarget = 0;
+public:
+    void openNewLayerCapture();
+    CaptureEditor* newLayerCaptureComponent() noexcept { return newLayerCapture.get(); }
+private:
     SamplesPanel samplesPanel { ospProcessor };
     bool samplesShown = false;
     std::array<bool, OspAudioProcessor::numLayers> shownOccupied {};

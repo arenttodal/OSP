@@ -715,6 +715,17 @@ LoadResult loadAnalysedRecording (const AnalyseRequest& request, SampleStore& st
     auto cancelled = [cancel] { return cancel != nullptr && cancel->load(); };
     try
     {
+        // 0. A live take: written to its file first (never on the audio or message thread).
+        if (request.captured != nullptr)
+        {
+            std::string writeError;
+            request.file.getParentDirectory().createDirectory();
+            if (! io::writeAudioFile (toPath (request.file), *request.captured, io::SampleFormat::float32, writeError))
+            {
+                result.error = "cannot keep the take: " + writeError;
+                return result;
+            }
+        }
         // 1. The asset: hashed, kept in the store, decoded once (the analysis and both build
         //    stages use this one decode).
         const auto path = toPath (request.file);
@@ -725,9 +736,14 @@ LoadResult loadAnalysedRecording (const AnalyseRequest& request, SampleStore& st
             return result;
         }
         std::string error;
-        if (! store.import (request.file, *hash, error))
+        auto stored = store.import (request.file, *hash, error);
+        if (! stored)
             result.warnings.push_back (error);
-        auto decoded = io::loadAudioFile (path);
+        // A take lives in the store only (its first file was the store's way in).
+        const auto file = request.captured != nullptr && stored ? *stored : request.file;
+        if (request.captured != nullptr && stored && *stored != request.file)
+            request.file.deleteFile();
+        auto decoded = io::loadAudioFile (toPath (file));
         if (! decoded.ok)
         {
             result.error = decoded.error;
@@ -735,10 +751,11 @@ LoadResult loadAnalysedRecording (const AnalyseRequest& request, SampleStore& st
         }
         atlas::SourceAsset source;
         source.assetId = "src0";
-        source.origin = atlas::AssetOrigin::fileImport;
+        source.origin = request.origin;
+        source.captureId = request.captureId;
         source.contentHash = io::contentId (*hash);
-        source.fileName = request.file.getFileName().toStdString();
-        source.lastKnownPath = request.file.getFullPathName().toStdString();
+        source.fileName = request.captured != nullptr ? request.captureId : request.file.getFileName().toStdString();
+        source.lastKnownPath = file.getFullPathName().toStdString();
         source.sampleRate = decoded.audio.sampleRate;
         source.numChannels = std::min (decoded.audio.numChannels(), 2);
         source.numFrames = decoded.audio.numFrames();
@@ -808,7 +825,7 @@ LoadResult loadAnalysedRecording (const AnalyseRequest& request, SampleStore& st
         if (reason != nullptr)
         {
             LoadRequest single;
-            single.file = request.file;
+            single.file = file;   // (a take: its stored copy)
             auto fallback = loadInstrument (single, store, generation);
             fallback.warnings.insert (fallback.warnings.begin(), std::string ("kept as one sample: ") + reason);
             return fallback;

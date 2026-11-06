@@ -7,6 +7,7 @@
 #include "LoadedInstrument.h"
 #include "CardArpLanes.h"
 
+#include "audio/capture/CaptureBuffer.h"
 #include "engine/Arpeggiator.h"
 #include "engine/InstrumentEngine.h"
 #include "model/ModelExchange.h"
@@ -49,6 +50,8 @@ public:
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override {}
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
+    /** VST3: the audio input is a sidechain (an instrument's aux bus), not a main input. */
+    juce::VST3ClientExtensions* getVST3ClientExtensions() override;
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
     using AudioProcessor::processBlock;
 
@@ -178,6 +181,23 @@ public:
 
     /** What the arpeggiator's 16-step display shows (lock-free snapshot, any thread). */
     ArpView arpView() const noexcept override;
+    /**
+        Live capture: the audio input (a DAW's sidechain routed to OSP; the standalone app's
+        microphone or interface input) is kept in a ring of the last minute or so
+        (capture::CaptureBuffer, written by the audio thread only). RECORD / STOP and GRAB copy
+        a take out on the message thread; the loader thread writes it into the sample store and
+        maps its notes (analyseRecording) as the layer's instrument. Takes last 5..60 s.
+    */
+    bool liveCapture() const noexcept override { return true; }
+    CaptureView captureView() override;
+    int recordingLayer() const noexcept override { return takeStart >= 0 ? takeLayer : -1; }
+    bool startTake (int layer) override;
+    bool stopTake() override;
+    void cancelTake() override;
+    bool grabLast (double seconds, int layer) override;
+    /** Ends a running take that reached 60 s (the editor's timer; tests). */
+    void pollTake();
+
     /** The per-card arpeggiator (version hint 27): ARP plays some layers, the others hold the keys. */
     bool cardArpeggiator() const noexcept override { return true; }
     juce::String cardArpNamespace() const override { return {}; }
@@ -655,6 +675,16 @@ private:
     /** The per-card lanes and their view of this processor, on the heap (the processor may
         live on a stack: a host's, a test's). Made with the processor, prepared in prepareToPlay. */
     struct LaneHost;
+    // Live capture: the ring (prepared when an input is connected), whether the audio thread
+    // writes it, the running take (message thread).
+    capture::CaptureBuffer captureRing;
+    std::atomic<bool> captureLive { false };
+    std::int64_t takeStart = -1;
+    int takeLayer = 0;
+    int takeCount = 0;
+    float meterLevel = 0.0f;
+    bool keepTake (std::int64_t from, std::int64_t to, int layer, bool snapshot);
+    void startAnalysis (AnalyseRequest request, int layer);
     std::unique_ptr<plugin::CardArpLanes> lanes;
     std::unique_ptr<LaneHost> laneHost;
     std::atomic<int> arpViewCard { 0 };   ///< the card whose lane the ARP display shows

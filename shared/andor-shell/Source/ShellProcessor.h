@@ -109,6 +109,9 @@ public:
     int lastPlayedNoteNumber() const noexcept override { return lastNote.load (std::memory_order_relaxed); }
     ArpView arpView() const noexcept override;
     bool cardArpeggiator() const noexcept override { return cardArp && ! referenceParity; }
+    /** Live capture is ANDOR OSP's (a product has none yet); the parity render draws its REC
+        key as ANDOR OSP does, so the comparison sees only real differences. */
+    bool liveCapture() const noexcept override { return referenceParity; }
     juce::String cardArpNamespace() const override { return productInfo().slug + "."; }
     void setArpViewCard (int shown) noexcept override { arpViewLane.store (std::clamp (shown, 0, 2), std::memory_order_relaxed); }
 

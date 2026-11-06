@@ -407,6 +407,32 @@ public:
     /** The card (shown, 0 A .. 2 C) whose lane arpView() shows (the one the panel edits). */
     virtual void setArpViewCard (int shown) noexcept { juce::ignoreUnused (shown); }
 
+    // -- Live capture (a product opts in: ANDOR OSP) -----------------------------------------
+    /** What the CAPTURE page shows (message thread). */
+    struct CaptureView
+    {
+        bool connected = false;    ///< an input arrives (a DAW's sidechain, the app's input)
+        bool recording = false;    ///< RECORD is running
+        int layer = -1;            ///< the layer the running take is for
+        double seconds = 0.0;      ///< the running take's length so far
+        double available = 0.0;    ///< how much GRAB can reach back (up to 60 s)
+        float level = 0.0f;        ///< the input meter: the loudest sample lately, 0..1+
+        juce::String hint;         ///< how to connect an input when there is none
+    };
+    /** The REC key on each card and its CAPTURE page exist (false: as before). */
+    virtual bool liveCapture() const noexcept { return false; }
+    virtual CaptureView captureView() { return {}; }
+    /** The layer a take is being recorded for (-1: none). Cheap; any card may ask. */
+    virtual int recordingLayer() const noexcept { return -1; }
+    /** RECORD: a take for `layer` starts (a moment before now is kept). */
+    virtual bool startTake (int layer) { juce::ignoreUnused (layer); return false; }
+    /** STOP: the take is kept, its notes mapped, and it becomes the layer's instrument. */
+    virtual bool stopTake() { return false; }
+    /** Throws the running take away. */
+    virtual void cancelTake() {}
+    /** GRAB: the last `seconds` (5..60) that came in become the layer's instrument, as a take. */
+    virtual bool grabLast (double seconds, int layer) { juce::ignoreUnused (seconds, layer); return false; }
+
     // -- The macro popovers (MacroPopups.h) --------------------------------------------------
     /** The layer the interface edits (0 A, 1 B, 2 C). Any thread. */
     virtual int editLayer() const noexcept = 0;

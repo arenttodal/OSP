@@ -109,6 +109,11 @@ struct AnalyseRequest
     phrase::AnalysisSettings settings;
     double capacitySeconds = 300.0;
     int threads = 2;
+    /** Live capture: the take, written to `file` first (on the loader thread), then analysed
+        like any recording. Its atlas source records `origin` and `captureId`. */
+    std::shared_ptr<const AudioData> captured;
+    atlas::AssetOrigin origin = atlas::AssetOrigin::fileImport;
+    std::string captureId;
 };
 
 struct LoadResult

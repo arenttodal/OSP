@@ -748,7 +748,8 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 ## IN PROGRESS
 
 - Lab round 3 (Reimagined 3, violin).
-- DAW/host validation on a Mac.
+- DAW/host validation on a Mac (now including live capture's sidechain routing and the
+  standalone app's microphone input).
 
 ## NEXT
 
@@ -873,6 +874,51 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
     sets, and whose steps the display plays.
 - Evidence: ANDOR ANALOG's `[cardarp]` tests, its bindings test (all ten new parameters move
   the sound), and its screenshots `analog-arp-card-c` and `analog-arp-unlinked-b`.
+
+## ANDOR OSP: live capture into a chopped phrase (6 Nov 2026)
+
+- **What the musician does.** Each card has a REC key (beside EQ; a dot alone on narrow cards).
+  It opens the CAPTURE page in the card's display:
+  - the INPUT meter and a scrolling level picture of what arrives;
+  - RECORD / STOP: a take for this layer, a quarter second before the press kept, stopping
+    itself at 1:00 (the processor's timer, page open or not); DISCARD throws it away;
+  - GRAB LAST 10 / 20 / 30 / 60 s: what was just played, kept after the fact.
+  - A kept take is trimmed (silence before and after, a 50 ms lead-in and 250 ms tail kept),
+    stored, and MAP NOTES runs on it at once: it becomes the layer's notes (one undo step when
+    it replaces a sound). The page closes and the card shows the notes.
+  - An empty instrument has Record... beside Browse... and Load example; the header menu has
+    Record (into a new layer)... while a slot is free. The page covers the sources until the
+    take arrives.
+- **Inputs.** A stereo input bus named Sidechain: off by default in a plugin (the host routes a
+  track to it: VST3 reports it as an aux bus, `getPluginHasMainInput` false), on in the
+  standalone app (the chosen microphone or interface input; macOS asks for the microphone with
+  NSMicrophoneUsageDescription). The standalone app's feedback mute is lifted because OSP never
+  plays its input back: the instrument's render overwrites the shared buffer.
+- **How.** `audio/capture/CaptureBuffer` (pure C++): a ring of 64 s + 4 s margin, allocated in
+  prepareToPlay only while an input is connected (about 27 MB at 48 kHz). The audio thread only
+  writes it (memcpy and an atomic store); the message thread copies a take out by absolute
+  position, and a stretch that may have been overwritten is refused, never torn. The loader
+  thread writes the take into the sample store and analyses it (`AnalyseRequest::captured`,
+  origin `liveCapture` / `bufferSnapshot`, `captureId`).
+- **Shared code.** `InstrumentHost::liveCapture()` (false by default) and the capture calls;
+  the CAPTURE page, REC key and the drop zone's Record... are in shared/andor-ui. The shell has
+  no capture yet; its parity render draws the REC key and Record... as ANDOR OSP does, so the
+  visual regression stays exact.
+- **Evidence.**
+  - Unit `[capture]` (7 cases): exact positions across the wrap, overwritten stretches refused,
+    mono kept mono, the meter, a concurrent writer and reader (whole or refused), no allocation
+    in write, trimming.
+  - Plugin `[capture]` (8 cases):
+    - the bus layouts and VST3's aux bus; unconnected, the page says how to connect;
+    - the input is never heard;
+    - RECORD maps a four-note phrase onto B with its origin, trimmed, stored once;
+    - GRAB on a mono input keeps only what was just played; replacing it is one undo step;
+    - silence, DISCARD, the minute's limit, a new sample rate;
+    - no allocation on the audio thread;
+    - the card's REC key, the page's clicks, and recording from an empty instrument.
+  - Screenshots: `OSP_CAPTURE_SHOTS=<dir> osp_plugin_tests "[capture-shots]"`.
+- **Not verified yet:** routing a sidechain into OSP in Logic, Ableton and Reaper, and the
+  standalone app's microphone prompt, need a Mac.
 
 ## ANDOR OSP: the per-card arpeggiator (4 Nov 2026)
 

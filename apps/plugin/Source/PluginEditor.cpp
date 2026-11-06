@@ -4,6 +4,10 @@
 #include "core/PitchMath.h"
 #include "io/AudioFileIO.h"
 
+#if JucePlugin_Build_Standalone
+ #include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
+#endif
+
 #include <map>
 
 namespace osp::plugin
@@ -184,6 +188,14 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
 {
     setLookAndFeel (&lookAndFeel);
 
+   #if JucePlugin_Build_Standalone
+    // The standalone app mutes its input against feedback; OSP never plays its input back
+    // (live capture only keeps it), so the input is let through.
+    if (p.wrapperType == juce::AudioProcessor::wrapperType_Standalone)
+        if (auto* holder = juce::StandalonePluginHolder::getInstance())
+            holder->getMuteInputValue().setValue (false);
+   #endif
+
     // Header: the preset, the master volume and the menu (utilities live there).
     presetBar.onChange = [this] { updateStatus(); timerCallback(); };
     presetBar.onSaveStartingState = [this] { saveStartingState(); };
@@ -247,6 +259,8 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
         content.addChildComponent (*card);
     }
     dropZone.onBrowse = [this] { chooseFile (0, true); };
+    dropZone.setRecordShown (ospProcessor.liveCapture());
+    dropZone.onRecord = [this] { openNewLayerCapture(); };
     dropZone.onExample = [this] {
         ospProcessor.resetLayerControls (0);
         ospProcessor.loadExample (0);
@@ -633,6 +647,17 @@ void OspAudioProcessorEditor::layoutSources (bool animate)
     const auto density = columns <= 1 ? EngineLayoutDensity::hero : (columns == 2 ? EngineLayoutDensity::dual : EngineLayoutDensity::triple);
     dropZone.setVisible (count == 0);
     dropZone.setBounds (sourceArea);
+    if (newLayerCapture != nullptr)
+    {
+        // A take for a new layer: its CAPTURE page over the sources until the take arrives.
+        if (newLayerCaptureTarget < OspAudioProcessor::numLayers && ospProcessor.currentInstrument (newLayerCaptureTarget) != nullptr)
+            newLayerCapture.reset();
+        else
+        {
+            newLayerCapture->setBounds (sourceArea);
+            newLayerCapture->toFront (false);
+        }
+    }
     auto column = [&] (int i) { return frame::sourceColumn (sourceArea, columns, i); };
 
     auto& animator = juce::Desktop::getInstance().getAnimator();
@@ -948,6 +973,30 @@ void OspAudioProcessorEditor::showLayerMenu (int layer, juce::Component& target)
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (target).withDeletionCheck (*this));
 }
 
+void OspAudioProcessorEditor::openNewLayerCapture()
+{
+    // The first layer without a sound.
+    int target = 0;
+    while (target < OspAudioProcessor::numLayers && ospProcessor.currentInstrument (target) != nullptr)
+        ++target;
+    if (target >= OspAudioProcessor::numLayers)
+        return;
+    newLayerCaptureTarget = target;
+    newLayerCapture = std::make_unique<CaptureEditor> (ospProcessor, target);
+    juce::Component::SafePointer<OspAudioProcessorEditor> safe (this);
+    newLayerCapture->onClose = [safe] {
+        juce::MessageManager::callAsync ([safe] {
+            if (safe != nullptr)
+            {
+                safe->newLayerCapture.reset();
+                safe->layoutSources (false);
+            }
+        });
+    };
+    content.addAndMakeVisible (*newLayerCapture);
+    layoutSources (false);
+}
+
 void OspAudioProcessorEditor::showMenu()
 {
     juce::PopupMenu menu;
@@ -958,6 +1007,9 @@ void OspAudioProcessorEditor::showMenu()
                       [safe] { if (safe != nullptr) safe->chooseFile (-1, true); });
     if (count == 0)
         menu.addItem ("Load example", [safe] { if (safe != nullptr) { safe->ospProcessor.resetLayerControls (0); safe->ospProcessor.loadExample (0); } });
+    if (count < OspAudioProcessor::numLayers && ospProcessor.liveCapture())
+        menu.addItem (juce::String::fromUTF8 (count == 0 ? "Record\xe2\x80\xa6" : "Record into a new layer\xe2\x80\xa6"),
+                      [safe] { if (safe != nullptr) safe->openNewLayerCapture(); });
     if (ospProcessor.canRestoreRemovedLayer())
         menu.addItem ("Restore removed layer", [safe] { if (safe != nullptr) safe->ospProcessor.restoreRemovedLayer(), safe->timerCallback(); });
     if (ospProcessor.slotCount() > 0)

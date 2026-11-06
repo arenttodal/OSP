@@ -264,6 +264,7 @@ ShellEditor::ShellEditor (ShellProcessor& p)
                 cards[static_cast<std::size_t> (layer)]->setModeFitsName (true);
             }
     dropZone.onBrowse = [this] { chooseFile (-1); };
+    dropZone.setRecordShown (shell.liveCapture());   // (the parity render: as ANDOR OSP)
     content.addChildComponent (dropZone);
     content.addChildComponent (addTarget);
     if ((shell.product().hybridSampleDock || threeEngines()) && shell.hasHybridLayer())

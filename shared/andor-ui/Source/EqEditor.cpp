@@ -1653,3 +1653,248 @@ void SynthEditor::mouseExit (const juce::MouseEvent&)
 }
 
 } // namespace osp::plugin
+
+namespace osp::plugin
+{
+
+//==============================================================================
+// CAPTURE page
+
+namespace
+{
+    /** RECORD's red: an earthy one, beside the layers' own colours. */
+    const juce::Colour recordRed { 0xffcf5a43 };
+
+    juce::String clockText (double seconds)
+    {
+        seconds = std::max (0.0, seconds);
+        const int whole = static_cast<int> (seconds);
+        return juce::String (whole / 60) + ":" + juce::String (whole % 60).paddedLeft ('0', 2) + "." + juce::String (static_cast<int> ((seconds - whole) * 10.0));
+    }
+
+    float meterPosition (float level)
+    {
+        // -60 .. 0 dBFS across the meter.
+        const float db = level > 1.0e-6f ? 20.0f * std::log10 (level) : -120.0f;
+        return std::clamp ((db + 60.0f) / 60.0f, 0.0f, 1.0f);
+    }
+}
+
+CaptureEditor::CaptureEditor (InstrumentHost& p, int l) : host (p), layer (l)
+{
+    setTitle ("CAPTURE " + InstrumentHost::layerName (layer));
+    setTooltip ("CAPTURE: record what comes in at the input, or grab what you just played; the take becomes this layer's notes");
+    refresh();
+    startTimerHz (30);
+}
+
+CaptureEditor::~CaptureEditor() = default;
+
+juce::Rectangle<float> CaptureEditor::grabArea (int choice) const noexcept
+{
+    const float w = grabRow.getWidth() / static_cast<float> (grabChoices.size());
+    return grabRow.withWidth (w).translated (w * static_cast<float> (std::clamp (choice, 0, static_cast<int> (grabChoices.size()) - 1)), 0.0f);
+}
+
+void CaptureEditor::refresh()
+{
+    view = host.captureView();
+    std::move (history.begin() + 1, history.end(), history.begin());
+    history.back() = view.connected ? view.level : 0.0f;
+    repaint();
+}
+
+void CaptureEditor::resized()
+{
+    const float w = static_cast<float> (getWidth()), h = static_cast<float> (getHeight());
+    const float tw = juce::GlyphArrangement::getStringWidth (type::popupLabel (12.0f), "CAPTURE " + InstrumentHost::layerName (layer));
+    title = { 14.0f, 9.0f, tw + 34.0f, 24.0f };
+    closeArea = { w - 32.0f, 10.0f, 22.0f, 22.0f };
+    const float meterWidth = std::min (150.0f, std::max (60.0f, w - title.getRight() - 60.0f));
+    meter = { closeArea.getX() - 12.0f - meterWidth, 18.0f, meterWidth, 6.0f };
+
+    // The foot: RECORD (and DISCARD while a take runs), then GRAB LAST's four lengths.
+    const float y = h - 10.0f - 24.0f;
+    const bool narrow = w < 420.0f;
+    recordButton = { 14.0f, y, narrow ? 104.0f : 128.0f, 24.0f };
+    discardButton = { recordButton.getRight() + 8.0f, y, narrow ? 60.0f : 70.0f, 24.0f };
+    const float grabWidth = narrow ? 156.0f : 196.0f;
+    grabRow = { std::max (discardButton.getRight() + 16.0f, w - 14.0f - grabWidth), y, std::min (grabWidth, w - discardButton.getRight() - 30.0f), 24.0f };
+    picture = { 14.0f, 46.0f, w - 28.0f, std::max (20.0f, y - 22.0f - 46.0f) };
+}
+
+void CaptureEditor::paint (juce::Graphics& g)
+{
+    using namespace design;
+    const auto bounds = getLocalBounds().toFloat();
+    g.setColour (colour::wellA);
+    g.fillRoundedRectangle (bounds, 10.0f);
+    const auto accent = colour::identity (InstrumentHost::shownLayer (layer)).arc;
+    const bool mine = view.recording && view.layer == layer;
+
+    // The top row: the page's name, the input meter, close.
+    drawTabs (g, title, "CAPTURE " + InstrumentHost::layerName (layer), view.connected, {}, {}, false, layer, bounds.getRight());
+    g.setColour (light.withAlpha (0.08f));
+    g.fillRoundedRectangle (meter, 2.0f);
+    if (view.connected)
+    {
+        const float at = meterPosition (view.level);
+        g.setColour (view.level >= 0.99f ? recordRed : accent.withAlpha (0.9f));
+        g.fillRoundedRectangle (meter.withWidth (meter.getWidth() * at), 2.0f);
+    }
+    g.setFont (type::popupLabel (10.0f));
+    g.setColour (colour::wellText.brighter (0.1f));
+    g.drawText ("INPUT", meter.withX (meter.getX() - 44.0f).withWidth (38.0f).withSizeKeepingCentre (38.0f, 14.0f), juce::Justification::centredRight, false);
+    drawClose (g, closeArea);
+
+    // The picture: the input's level as it came in (newest at the right), a mirrored outline
+    // (red while recording). It keeps to the middle of the well: the hint sits above it.
+    const auto area = picture;
+    g.setColour (colour::wellGrid.withAlpha (0.6f));
+    hline (g, area.getX(), area.getRight(), area.getCentreY());
+    {
+        const float step = area.getWidth() / static_cast<float> (history.size() - 1);
+        const float reach = 0.32f * area.getHeight();
+        auto height = [&] (std::size_t i) { return reach * std::sqrt (std::clamp (history[i], 0.0f, 1.0f)); };
+        juce::Path outline;
+        outline.startNewSubPath (area.getX(), area.getCentreY());
+        for (std::size_t i = 0; i < history.size(); ++i)
+            outline.lineTo (area.getX() + step * static_cast<float> (i), area.getCentreY() - height (i));
+        for (std::size_t i = history.size(); i-- > 0;)
+            outline.lineTo (area.getX() + step * static_cast<float> (i), area.getCentreY() + height (i));
+        outline.closeSubPath();
+        const auto ink = view.recording ? recordRed : accent;
+        g.setGradientFill (juce::ColourGradient (ink.withAlpha (0.25f), area.getX(), 0.0f, ink.withAlpha (0.85f), area.getRight(), 0.0f, false));
+        g.fillPath (outline);
+    }
+    const bool narrow = getWidth() < 520;
+    if (! view.connected)
+        drawCornerNote (g, area, (narrow ? "No input: " : "No input. ") + view.hint);
+    else if (! view.recording)
+        drawCornerNote (g, area, narrow ? "Play, then GRAB or RECORD" : "Play, then GRAB what you played or RECORD a take: it becomes this layer's notes");
+    if (view.recording)
+    {
+        // The take's length in the top row, and how much of the minute it has used.
+        const auto clock = juce::Rectangle<float> (title.getRight() + 6.0f, title.getY(), std::max (40.0f, meter.getX() - 50.0f - title.getRight() - 12.0f), title.getHeight());
+        g.setFont (type::popupValue (15.0f));
+        g.setColour (recordRed.brighter (0.25f));
+        const juce::String text = clockText (view.seconds) + (mine ? (narrow ? juce::String() : juce::String (" / 1:00")) : " into " + InstrumentHost::layerName (view.layer));
+        g.drawText (text, clock, juce::Justification::centred, false);
+        const float used = static_cast<float> (std::clamp (view.seconds / 60.0, 0.0, 1.0));
+        g.setColour (light.withAlpha (0.08f));
+        g.fillRect (area.withTop (area.getBottom() - 2.0f));
+        g.setColour (recordRed);
+        g.fillRect (area.withTop (area.getBottom() - 2.0f).withWidth (area.getWidth() * used));
+    }
+
+    // RECORD / STOP, DISCARD, GRAB LAST.
+    const float dim = view.connected ? 1.0f : 0.4f;
+    g.setColour (rim);
+    g.drawRoundedRectangle (recordButton.reduced (0.5f), 4.0f, 1.0f);
+    if (hot == "record" && view.connected)
+    {
+        g.setColour (light.withAlpha (0.06f));
+        g.fillRoundedRectangle (recordButton.reduced (1.0f), 4.0f);
+    }
+    {
+        const auto glyph = juce::Rectangle<float> (9.0f, 9.0f).withCentre ({ recordButton.getX() + 16.0f, recordButton.getCentreY() });
+        g.setColour (recordRed.withAlpha (dim));
+        if (view.recording)
+            g.fillRect (glyph.reduced (0.5f));
+        else
+            g.fillEllipse (glyph);
+        g.setFont (type::popupLabel (10.5f));
+        g.setColour (light.withAlpha (0.9f * dim));
+        g.drawText (view.recording ? "STOP" : "RECORD", recordButton.withTrimmedLeft (26.0f), juce::Justification::centredLeft, false);
+    }
+    if (view.recording)
+    {
+        g.setColour (rim);
+        g.drawRoundedRectangle (discardButton.reduced (0.5f), 4.0f, 1.0f);
+        g.setFont (type::popupLabel (10.5f));
+        g.setColour (light.withAlpha (hot == "discard" ? 0.9f : 0.6f));
+        g.drawText ("DISCARD", discardButton, juce::Justification::centred, false);
+    }
+    g.setFont (type::popupLabel (10.0f));
+    g.setColour (colour::wellText.brighter (0.1f));
+    g.drawText ("GRAB LAST", grabRow.withY (grabRow.getY() - 15.0f).withHeight (13.0f), juce::Justification::centredLeft, false);
+    g.setColour (rim.withMultipliedAlpha (dim));
+    g.drawRoundedRectangle (grabRow.reduced (0.5f), 4.0f, 1.0f);
+    for (int i = 0; i < static_cast<int> (grabChoices.size()); ++i)
+    {
+        const auto cell = grabArea (i);
+        const bool reachable = view.connected && view.available >= 1.0;   // (a longer GRAB takes what there is)
+        if (hot == "grab" + juce::String (i) && reachable)
+        {
+            g.setColour (light.withAlpha (0.1f));
+            g.fillRoundedRectangle (cell.reduced (2.0f), 3.0f);
+        }
+        g.setFont (type::popupValue (11.5f));
+        g.setColour (light.withAlpha (reachable ? 0.85f : 0.3f));
+        g.drawText (juce::String (grabChoices[static_cast<std::size_t> (i)]) + " s", cell, juce::Justification::centred, false);
+    }
+}
+
+juce::String CaptureEditor::partAt (juce::Point<float> p) const
+{
+    if (closeArea.contains (p))
+        return "close";
+    if (recordButton.contains (p))
+        return "record";
+    if (view.recording && discardButton.contains (p))
+        return "discard";
+    for (int i = 0; i < static_cast<int> (grabChoices.size()); ++i)
+        if (grabArea (i).contains (p))
+            return "grab" + juce::String (i);
+    return {};
+}
+
+void CaptureEditor::mouseDown (const juce::MouseEvent& e)
+{
+    const auto part = partAt (e.position);
+    auto close = [this] {
+        if (onClose != nullptr)
+            onClose();
+    };
+    if (part == "close")
+        return close();
+    if (! view.connected)
+        return;
+    bool kept = false;
+    if (part == "record")
+    {
+        if (view.recording)
+            kept = host.stopTake();
+        else
+            host.startTake (layer);
+    }
+    else if (part == "discard")
+        host.cancelTake();
+    else if (part.startsWith ("grab"))
+        kept = host.grabLast (grabChoices[static_cast<std::size_t> (part.getTrailingIntValue())], layer);
+    refresh();
+    if (kept)
+        close();   // the layer shows its new notes
+}
+
+void CaptureEditor::mouseMove (const juce::MouseEvent& e)
+{
+    const auto now = partAt (e.position);
+    if (now != hot)
+    {
+        hot = now;
+        setMouseCursor (hot.isNotEmpty() ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+        repaint();
+    }
+}
+
+void CaptureEditor::mouseExit (const juce::MouseEvent&)
+{
+    if (hot.isNotEmpty())
+    {
+        hot = {};
+        repaint();
+    }
+}
+
+} // namespace osp::plugin
