@@ -1513,6 +1513,12 @@ EngineCard::EngineCard (InstrumentHost& p, int layer)
             setEqOpen (! isEqOpen());
     };
     addAndMakeVisible (eqButton);
+    if (processor.liveCapture())
+    {
+        recButton = std::make_unique<RecButton>();
+        recButton->onClick = [this] { setCaptureOpen (! isCaptureOpen()); };
+        addAndMakeVisible (*recButton);
+    }
     notesButton.onClick = [this] {
         if (onNotesToggle != nullptr)
             onNotesToggle (layerIndex, ! isNotesOpen());
@@ -1585,6 +1591,49 @@ EngineCard::EngineCard (InstrumentHost& p, int layer)
     addMouseListener (this, true);
     updateMode();
     refresh();
+}
+
+void RecButton::setRecording (bool on, float pulse)
+{
+    const float now = on ? pulse : 0.0f;
+    if (on != recording || std::abs (now - glow) > 0.02f)
+    {
+        recording = on;
+        glow = now;
+        repaint();
+    }
+}
+
+void RecButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
+{
+    using namespace design;
+    const auto r = getLocalBounds().toFloat().reduced (1.0f);
+    const bool open = getToggleState();
+    if (skin::drawnBySurface())
+    {
+        // Ceramic: the card draws the key (pressed in while open), as EQ.
+    }
+    else if (open || down)
+    {
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xffe2d9cc), 0.0f, r.getY(), juce::Colour (0xffebe4d9), 0.0f, r.getBottom(), false));
+        g.fillRoundedRectangle (r, 7.0f);
+        g.setColour (colour::hairline.darker (0.1f));
+        g.drawRoundedRectangle (r.reduced (0.5f), 7.0f, 1.0f);
+    }
+    else
+        draw::button (g, r, 7.0f, false, highlighted, colour::accent);
+    // The dot: quiet until a take runs for this layer, then red and breathing.
+    const bool narrow = r.getWidth() < 44.0f;
+    const auto dot = juce::Rectangle<float> (7.0f, 7.0f).withCentre ({ narrow ? r.getCentreX() : r.getX() + 12.5f, r.getCentreY() });
+    const juce::Colour red (0xffcf5a43);
+    g.setColour (recording ? red.withAlpha (0.55f + 0.45f * glow) : red.withAlpha (open ? 0.85f : 0.6f));
+    g.fillEllipse (dot);
+    if (! narrow)
+    {
+        g.setFont (type::button (13.0f));
+        g.setColour (colour::text.withAlpha (open || recording ? 0.92f : 0.62f));
+        g.drawText ("REC", r.withTrimmedLeft (18.0f), juce::Justification::centred, false);
+    }
 }
 
 void NotesButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
@@ -1705,7 +1754,8 @@ void EngineCard::updateWellOverlay()
 {
     if (wellOverlay == nullptr)
         return;
-    const bool wellTaken = eqEditor != nullptr || noteMap != nullptr || synthEditor != nullptr || (wellEditor != nullptr && wellEditor->isVisible());
+    const bool wellTaken = eqEditor != nullptr || noteMap != nullptr || synthEditor != nullptr || captureEditor != nullptr
+                           || (wellEditor != nullptr && wellEditor->isVisible());
     wellOverlay->setBounds (sourceDisplay.getBounds());
     wellOverlay->setVisible (sourceDisplay.isVisible() && ! wellTaken && (! isGranular() || wellOverlay->shownWhileGranular()));
     if (const int reserve = wellOverlay->rulerReserve(); reserve > 0)
@@ -1860,6 +1910,7 @@ void EngineCard::setWellEditorShown (bool shown)
         setEqOpen (false);
         setNotesOpen (false);
         setSynthOpen (false);
+        setCaptureOpen (false);
         showGranularControls (false, true);
         wellEditor->setBounds (sourceDisplay.getBounds());
         wellEditor->toFront (false);
@@ -2256,6 +2307,7 @@ void EngineCard::setEqOpen (bool open)
     }
     setNotesOpen (false);
     setSynthOpen (false);
+    setCaptureOpen (false);
     setWellEditorShown (false);
     showGranularControls (false);
     eqEditor = std::make_unique<EqEditor> (processor, layerIndex);
@@ -2415,6 +2467,7 @@ void EngineCard::setSynthOpen (bool open)
     }
     setEqOpen (false);
     setNotesOpen (false);
+    setCaptureOpen (false);
     setWellEditorShown (false);
     showGranularControls (false);
     synthEditor = std::make_unique<SynthEditor> (processor, layerIndex);
@@ -2427,6 +2480,37 @@ void EngineCard::setSynthOpen (bool open)
     };
     addAndMakeVisible (*synthEditor);
     synthEditor->setBounds (sourceDisplay.getBounds());
+    updateWellOverlay();
+    refresh();
+}
+
+void EngineCard::setCaptureOpen (bool open)
+{
+    if (open == isCaptureOpen() || recButton == nullptr)
+        return;
+    recButton->setToggleState (open, juce::dontSendNotification);
+    if (! open)
+    {
+        captureEditor.reset();
+        updateWellOverlay();
+        refresh();
+        return;
+    }
+    setEqOpen (false);
+    setNotesOpen (false);
+    setSynthOpen (false);
+    setWellEditorShown (false);
+    showGranularControls (false);
+    captureEditor = std::make_unique<CaptureEditor> (processor, layerIndex);
+    juce::Component::SafePointer<EngineCard> safe (this);
+    captureEditor->onClose = [safe] {
+        juce::MessageManager::callAsync ([safe] {
+            if (safe != nullptr)
+                safe->setCaptureOpen (false);
+        });
+    };
+    addAndMakeVisible (*captureEditor);
+    captureEditor->setBounds (sourceDisplay.getBounds());
     updateWellOverlay();
     refresh();
 }
@@ -2444,6 +2528,7 @@ void EngineCard::setNotesOpen (bool open)
     }
     setEqOpen (false);
     setSynthOpen (false);
+    setCaptureOpen (false);
     setWellEditorShown (false);
     showGranularControls (false);
     noteMap = std::make_unique<NoteMapEditor> (processor, layerIndex);
@@ -2480,9 +2565,16 @@ void EngineCard::setNotesOpen (bool open)
 void EngineCard::refresh()
 {
     eqButton.setActive (processor.layerEqSettings (layerIndex).audible());
+    if (recButton != nullptr)
+    {
+        // A take running for this layer: the dot breathes (about once a second).
+        const auto ms = juce::Time::getMillisecondCounter();
+        const float pulse = 0.5f + 0.5f * std::sin (static_cast<float> (ms % 1200u) / 1200.0f * juce::MathConstants<float>::twoPi);
+        recButton->setRecording (processor.recordingLayer() == layerIndex, pulse);
+    }
     if (synthChip != nullptr)
     {
-        synthChip->setVisible (! isEqOpen() && ! isNotesOpen() && ! isWellEditorShown() && ! isSynthOpen());   // (those cover the well)
+        synthChip->setVisible (! isEqOpen() && ! isNotesOpen() && ! isWellEditorShown() && ! isSynthOpen() && ! isCaptureOpen());   // (those cover the well)
         synthChip->refreshAudition();
     }
     if (eqEditor != nullptr)
@@ -2737,6 +2829,14 @@ void EngineCard::resized()
         notesButton.setBounds (at ({ static_cast<float> (eqButton.getX()) - 6.0f - notesWidth, 16.0f, notesWidth, 33.0f }));
         textArea.setRight (notesButton.getX() - 8);
     }
+    if (recButton != nullptr)
+    {
+        // REC: the same key, left of the others (narrow cards: its dot alone).
+        const float recWidth = triple ? 34.0f : 60.0f;
+        const float right = static_cast<float> (atlasLayer ? notesButton.getX() : eqButton.getX());
+        recButton->setBounds (at ({ right - 6.0f - recWidth, 16.0f, recWidth, 33.0f }));
+        textArea.setRight (std::max (textArea.getX(), recButton->getX() - 8));
+    }
     placeHeadingDoor();
 
     const float wellHeight = h - (triple ? 267.0f : 206.0f);
@@ -2749,6 +2849,8 @@ void EngineCard::resized()
         wellEditor->setBounds (sourceDisplay.getBounds());
     if (synthEditor != nullptr)
         synthEditor->setBounds (sourceDisplay.getBounds());
+    if (captureEditor != nullptr)
+        captureEditor->setBounds (sourceDisplay.getBounds());
     updateWellOverlay();
     placeMapPrompt();
     if (synthChip != nullptr)

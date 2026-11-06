@@ -25,7 +25,10 @@ juce_add_plugin(OSP_Plugin
     COPY_PLUGIN_AFTER_BUILD FALSE
     VST3_CATEGORIES Instrument Sampler
     AU_MAIN_TYPE kAudioUnitType_MusicDevice
-    MICROPHONE_PERMISSION_ENABLED FALSE)
+    # Live capture: the standalone app listens to the chosen audio input (kept in memory for
+    # RECORD and GRAB; nothing is written until a take is kept).
+    MICROPHONE_PERMISSION_ENABLED TRUE
+    MICROPHONE_PERMISSION_TEXT "OSP listens to your audio input so RECORD and GRAB can turn what you play into an instrument. Nothing is saved until you keep a take, and nothing leaves your computer.")
 
 # The interface (components, look, fonts, knob sprites, ceramic skin) is the shared ANDOR
 # interface in shared/andor-ui; OSP's own windows (editor, popovers, Library) stay here.

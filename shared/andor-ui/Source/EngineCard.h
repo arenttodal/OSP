@@ -254,6 +254,32 @@ private:
     bool review = false;
 };
 
+/** REC (live capture, a host with liveCapture()): opens the layer's CAPTURE page; its dot
+    turns red and pulses while a take for this layer is being recorded. Narrow cards: the dot. */
+class RecButton final : public juce::Button, public skin::KeyFace
+{
+public:
+    RecButton() : juce::Button ("REC")
+    {
+        setMouseCursor (juce::MouseCursor::PointingHandCursor);
+        setTooltip ("Record or grab from the audio input into this layer (it opens over the waveform)");
+        setTitle ("REC");
+    }
+    void setRecording (bool on, float pulse);
+    bool isRecording() const noexcept { return recording; }
+    void paintButton (juce::Graphics&, bool highlighted, bool down) override;
+    void buttonStateChanged() override { skin::repaintKey (*this); }
+    skin::KeyRole keyRole() const override { return skin::KeyRole::eq; }
+    skin::KeyState keyState() const override
+    {
+        return getToggleState() || isDown() ? skin::KeyState::pressed : isOver() ? skin::KeyState::hover : skin::KeyState::normal;
+    }
+
+private:
+    bool recording = false;
+    float glow = 0.0f;
+};
+
 /** "KEY DNA" at the end of the Granular hover strip (Phase 5): opens the layer's KEY DNA
     editor; a small light while the layer's KEY DNA is on. */
 class KeyDnaKey final : public juce::Component, public juce::SettableTooltipClient
@@ -457,6 +483,12 @@ public:
     bool isSynthOpen() const noexcept { return synthEditor != nullptr; }
     SynthEditor* synthEditorComponent() noexcept { return synthEditor.get(); }
 
+    /** The layer's CAPTURE page (its REC key; a host with liveCapture()), in the display's place. */
+    void setCaptureOpen (bool open);
+    bool isCaptureOpen() const noexcept { return captureEditor != nullptr; }
+    CaptureEditor* captureEditorComponent() noexcept { return captureEditor.get(); }
+    RecButton* recToggle() noexcept { return recButton.get(); }
+
     /** The layer's NOTE MAP (a Note Atlas layer only), in the display's place; the EQ and the
         NOTE MAP are never open together. */
     std::function<void (int, bool)> onNotesToggle;
@@ -508,6 +540,8 @@ private:
     } menuButton;
     std::array<std::unique_ptr<LayerKnob>, 5> knobs;   ///< START TUNE PAN LEVEL REIMAGINED
     std::unique_ptr<SynthEditor> synthEditor;          ///< the SYNTH page, while open
+    std::unique_ptr<RecButton> recButton;              ///< REC (a host with liveCapture(); null otherwise)
+    std::unique_ptr<CaptureEditor> captureEditor;      ///< the CAPTURE page, while open
     std::unique_ptr<SynthChip> synthChip;              ///< SYNTHESIZE in the well's corner (a host with hasSynthesize(); null otherwise)
     std::array<std::unique_ptr<ModifierButton>, 4> modifiers;
     LayerStateButton muteButton, soloButton;

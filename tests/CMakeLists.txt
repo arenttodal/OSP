@@ -35,6 +35,7 @@ add_executable(osp_tests
     unit/SynthesizeTests.cpp
     unit/SampleSetTests.cpp
     unit/FastNumericsTests.cpp
+    unit/CaptureBufferTests.cpp
     library/CatalogTests.cpp
     library/ImportTests.cpp
     library/PreviewTests.cpp

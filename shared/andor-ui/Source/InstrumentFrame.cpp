@@ -139,7 +139,19 @@ DropZone::DropZone()
         addAndMakeVisible (*b);
     browse.onClick = [this] { if (onBrowse != nullptr) onBrowse(); };
     example.onClick = [this] { if (onExample != nullptr) onExample(); };
+    addChildComponent (record);
+    record.setTooltip ("Record or grab from the audio input: the take becomes the instrument's notes");
+    record.onClick = [this] { if (onRecord != nullptr) onRecord(); };
     setTitle ("Drop a sound");
+}
+
+void DropZone::setRecordShown (bool shown)
+{
+    if (record.isVisible() != shown)
+    {
+        record.setVisible (shown);
+        resized();
+    }
 }
 
 void DropZone::setHighlight (bool on)
@@ -153,10 +165,13 @@ void DropZone::setHighlight (bool on)
 
 void DropZone::resized()
 {
-    auto r = getLocalBounds().withSizeKeepingCentre (260, 30).translated (0, 52);
+    const bool three = record.isVisible();
+    auto r = getLocalBounds().withSizeKeepingCentre (three ? 396 : 260, 30).translated (0, 52);
     browse.setBounds (r.removeFromLeft (124));
     r.removeFromLeft (12);
-    example.setBounds (r);
+    example.setBounds (r.removeFromLeft (124));
+    r.removeFromLeft (12);
+    record.setBounds (r);
 }
 
 void DropZone::paint (juce::Graphics& g)

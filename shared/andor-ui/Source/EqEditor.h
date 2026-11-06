@@ -175,6 +175,50 @@ private:
 };
 
 /**
+    Live capture's page (InstrumentHost::liveCapture): in a card's well (its REC key) or over an
+    empty instrument. What arrives at the input scrolls by as a level picture; RECORD starts a
+    take for this layer and STOP keeps it (a minute at most); GRAB LAST 10 / 20 / 30 / 60 s keeps
+    what was just played. A kept take becomes the layer's instrument, its notes mapped. Without
+    an input the page says how to connect one.
+*/
+class CaptureEditor final : public juce::Component, public juce::SettableTooltipClient, private juce::Timer
+{
+public:
+    CaptureEditor (InstrumentHost& processor, int layer);
+    ~CaptureEditor() override;
+
+    /** The page closes (its close cross, or a take was kept). */
+    std::function<void()> onClose;
+    static constexpr std::array<int, 4> grabChoices { 10, 20, 30, 60 };
+
+    /** Where each part sits (tests and the screenshots). */
+    juce::Rectangle<float> recordArea() const noexcept { return recordButton; }
+    juce::Rectangle<float> discardArea() const noexcept { return discardButton; }
+    juce::Rectangle<float> grabArea (int choice) const noexcept;
+    juce::Rectangle<float> pictureArea() const noexcept { return picture; }
+    /** Reads the input again (the page's timer; tests). */
+    void refresh();
+    const InstrumentHost::CaptureView& shownView() const noexcept { return view; }
+
+    void paint (juce::Graphics&) override;
+    void resized() override;
+    void mouseDown (const juce::MouseEvent&) override;
+    void mouseMove (const juce::MouseEvent&) override;
+    void mouseExit (const juce::MouseEvent&) override;
+
+private:
+    void timerCallback() override { refresh(); }
+    juce::String partAt (juce::Point<float>) const;
+
+    InstrumentHost& host;
+    int layer;
+    InstrumentHost::CaptureView view;
+    std::array<float, 360> history {};   ///< the input's level, 30 a second (12 s), newest last
+    juce::Rectangle<float> title, closeArea, meter, picture, recordButton, discardButton, grabRow;
+    juce::String hot;
+};
+
+/**
     A layer's EQ, opened over its waveform on the display's opaque graphite (graph first):
     a logarithmic frequency grid (20 Hz - 20 kHz) and +-18 dB, the EQ's exact response (the
     same section designs the audio runs), and the five bands. A band that is off is a small,

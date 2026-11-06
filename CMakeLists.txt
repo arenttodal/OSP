@@ -45,6 +45,7 @@ add_library(osp_dsp STATIC
     src/audio/voices/SamplerVoice.cpp
     src/audio/sampler/BaselineSampler.cpp
     src/audio/utility/TestSignals.cpp
+    src/audio/capture/CaptureBuffer.cpp
     src/analysis/Analyzer.cpp
     src/analysis/AnalysisFrames.cpp
     src/analysis/pitch/YinPitchTracker.cpp
