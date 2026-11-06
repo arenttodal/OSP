@@ -36,6 +36,14 @@ void copyMovementLane (InstrumentHost& host, int from, int to);
 void swapMovementLanes (InstrumentHost& host);
 /** Tests: show a lane in the MOVEMENT module. */
 void showRackMovementLane (rack::Module& module, int lane);
+/** Tests: the MOVEMENT rack's title row (its components' names), its lane's ON (bounds, a
+    click), the lanes' actions (A / B selector's menu; run one by index) and the presets' menu's. */
+juce::StringArray rackMovementTitleRow (const rack::Module& module);
+juce::Rectangle<int> rackMovementLaneSwitch (const rack::Module& module);
+void clickRackMovementLaneSwitch (rack::Module& module);
+juce::StringArray rackMovementLaneActions (rack::Module& module);
+void runRackMovementLaneAction (rack::Module& module, int index);
+juce::StringArray rackMovementPresetMenuExtras (const rack::Module& module);
 /** Tests and snapshots: SHAPER's editor widened across the rack (its magnifier). */
 void setRackMovementWide (rack::Module& module, bool wide);
 /** Tests: a module's presets bar - what it shows, choosing one by name, the arrows, saving
