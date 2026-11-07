@@ -1212,9 +1212,11 @@ void OspAudioProcessorEditor::selectModulation (int source, int slot)
 
 void OspAudioProcessorEditor::openModulationPopup (int which, int source)
 {
-    if (source > 3)
-        return;   // the wheel's routes are on its controls (no source page)
-    popupSource = juce::jlimit (0, 3, source);
+    // LFO 1 .. ENV 2, VEL and NOTE have pages (their curves, their routes); the wheel's
+    // routes are on its controls.
+    if (source < 0 || (source > 3 && modui::keyCurveIndex (source) < 0))
+        return;
+    popupSource = source;
     openPopup (which);
 }
 

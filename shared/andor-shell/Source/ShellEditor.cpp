@@ -364,6 +364,7 @@ ShellEditor::ShellEditor (ShellProcessor& p)
         modOverlay.onShowRoutes = [this] (int source) { openPopup (routesPopup, source); };
     }
     modPanel.onExpandCurve = [this] (int source) { openPopup (curvePopup, source); };
+    modPanel.setStableTabs (shell.stableModulationTabs());
     modPanel.onTabChanged = [this] (int tab) {
         shell.setModPanelTab (tab);
         selectModulation (modui::sourceOfTab (tab), -1);
@@ -857,9 +858,11 @@ void ShellEditor::openPopup (int which, int source)
     closePopup();
     if (which == routesPopup || which == curvePopup)
     {
-        if (source > 3)
-            return;   // the wheel's routes are on its controls
-        popupSource = juce::jlimit (0, 3, source);
+        // LFO 1 .. ENV 2, VEL and NOTE (their curves, their routes); the wheel's routes are on
+        // its controls.
+        if (source < 0 || (source > 3 && osp::plugin::modui::keyCurveIndex (source) < 0))
+            return;
+        popupSource = source;
         if (which == routesPopup)
         {
             auto routes = std::make_unique<ModRoutesPopup> (shell, popupSource);

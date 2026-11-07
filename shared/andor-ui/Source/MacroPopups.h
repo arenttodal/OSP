@@ -36,10 +36,13 @@ void copyMovementLane (InstrumentHost& host, int from, int to);
 void swapMovementLanes (InstrumentHost& host);
 /** Tests: show a lane in the MOVEMENT module. */
 void showRackMovementLane (rack::Module& module, int lane);
-/** Tests: the MOVEMENT rack's title row (its components' names), its lane's ON (bounds, a
+/** Tests: the MOVEMENT rack's title row (its components' names), its lane's power (bounds, a
     click), the lanes' actions (A / B selector's menu; run one by index) and the presets' menu's. */
 juce::StringArray rackMovementTitleRow (const rack::Module& module);
-juce::Rectangle<int> rackMovementLaneSwitch (const rack::Module& module);
+juce::Rectangle<int> rackMovementLaneSwitch (const rack::Module& module);   ///< the shown lane's power (title row)
+/** Tests: a rack module's layout for its mode (0 compact, 1 medium, 2 dense: how much of the
+    rack its controls take; the picture the rest, its right edge fixed). */
+int rackDensity (const rack::Module& module);
 void clickRackMovementLaneSwitch (rack::Module& module);
 juce::StringArray rackMovementLaneActions (rack::Module& module);
 void runRackMovementLaneAction (rack::Module& module, int index);

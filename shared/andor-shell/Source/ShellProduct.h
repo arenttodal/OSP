@@ -144,6 +144,10 @@ struct ProductInfo
         layer's source now (bits 0 LINK, 1 REVERSE, 2 LOOP, 3 FOLLOW; null: all). Off: ANDOR
         OSP's keys. */
     bool cardModifiersInWell = false;
+    /** The modulation panel's six tabs at fixed places whatever is selected (a reserved place
+        at the right for the route count; the larger curve editor's key inside the display:
+        ModulationPanel::setStableTabs). Off: ANDOR OSP's row. */
+    bool stableModulationTabs = false;
     std::function<int (int layer, osp::plugin::InstrumentHost&)> cardModifiersApplicable;
     /** The header MIX's end labels (three engines: the generator side against the hybrid,
         e.g. "A+B" and "C"). Empty: the layers' letters. */

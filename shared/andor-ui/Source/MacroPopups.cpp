@@ -2711,34 +2711,37 @@ namespace
         juce::Colour accent;
     };
 
-    /** The shown lane's ON, in the settings: a light and its word, no key around it. */
-    class LaneSwitch final : public juce::Button
+    /** The shown lane's power, on the title row beside A / B: a small round key as the
+        collapse key is, with the instrument's power mark (the EQ's), lit in the lane's colour
+        while the lane plays. */
+    class LanePower final : public juce::Button
     {
     public:
-        explicit LaneSwitch (juce::Colour colour) : juce::Button ("ON"), accent (colour)
+        explicit LanePower (juce::Colour colour) : juce::Button ("Lane power"), accent (colour)
         {
             setWantsKeyboardFocus (true);
             setMouseCursor (juce::MouseCursor::PointingHandCursor);
-            setClickingTogglesState (false);
+            setTitle ("Lane power");
         }
         void paintButton (juce::Graphics& g, bool highlighted, bool down) override
         {
-            const auto r = getLocalBounds().toFloat();
+            using namespace design;
+            const auto c = getLocalBounds().toFloat().reduced (1.0f);
+            g.setColour (juce::Colour (0x1a302418));
+            g.fillEllipse (c.translated (0.0f, 1.0f));
+            g.setGradientFill (juce::ColourGradient (colour::buttonTop, 0.0f, c.getY(), colour::buttonBottom, 0.0f, c.getBottom(), false));
+            g.fillEllipse (c);
+            const bool lit = highlighted || down || hasKeyboardFocus (true);
+            g.setColour (lit ? colour::text.withAlpha (0.45f) : colour::hairline.darker (0.12f));
+            g.drawEllipse (c.reduced (0.5f), 1.0f);
             const bool on = getToggleState();
-            const auto font = fonts::make (10.5f, fonts::Weight::medium, 0.06f);
-            const float w = juce::GlyphArrangement::getStringWidth (font, getButtonText());
-            // Right-aligned: the light, then the word, ending at the controls' right edge.
-            const auto text = juce::Rectangle<float> (r.getRight() - w - 1.0f, r.getY(), w + 1.0f, r.getHeight());
-            laneLight (g, { text.getX() - 8.0f, r.getCentreY() }, 6.0f, on, accent);
-            const bool hot = highlighted || down || hasKeyboardFocus (false);
-            g.setFont (font);
-            g.setColour (design::colour::textSecondary.darker (0.2f).withAlpha (hot ? 1.0f : 0.85f));
-            g.drawText (getButtonText(), text, juce::Justification::centredRight, false);
-            if (hot)
-            {
-                g.setColour (design::colour::text.withAlpha (0.4f));
-                g.fillRect (text.getX(), r.getCentreY() + 0.5f * font.getHeight() + 1.0f, w, 1.2f);
-            }
+            const auto centre = c.getCentre();
+            g.setColour (on ? accent.darker (0.15f) : colour::text.withAlpha (lit ? 0.6f : 0.38f));
+            juce::Path icon;
+            icon.addCentredArc (centre.x, centre.y + 0.8f, 5.6f, 5.6f, 0.0f, 0.65f, 2.0f * juce::MathConstants<float>::pi - 0.65f, true);
+            icon.startNewSubPath (centre.x, centre.y - 6.2f);
+            icon.lineTo (centre.x, centre.y - 0.6f);
+            g.strokePath (icon, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         }
 
     private:
@@ -2755,11 +2758,32 @@ namespace
         inline int pictureLeft() { return juce::roundToInt (design::layout::envelopeX + 11.0f - design::layout::arpPanel.getX()); }
         constexpr int pictureRightMargin = 19, leftMargin = 22, bottom = 12;
         /** The divider between the controls and the picture (as the macro panel's). */
-        inline void paintDivider (juce::Graphics& g, juce::Rectangle<int> body)
+        inline void paintDivider (juce::Graphics& g, juce::Rectangle<int> body, int x)
         {
             g.setColour (design::colour::divider);
-            g.fillRect (juce::Rectangle<float> (static_cast<float> (divider()), static_cast<float> (body.getY()) + 2.0f, 1.0f, static_cast<float> (body.getHeight()) - 4.0f));
+            g.fillRect (juce::Rectangle<float> (static_cast<float> (x), static_cast<float> (body.getY()) + 2.0f, 1.0f, static_cast<float> (body.getHeight()) - 4.0f));
         }
+        /** How much of the rack a mode's controls take, by how many there are: compact (up to
+            four), medium (five or six) or dense (more). The picture keeps its right edge and
+            takes the rest, so a mode with few controls has a wider picture. Decided by the mode
+            alone (its controls), so a value, a preset of the same mode or automation never
+            moves anything. */
+        enum class Density { compact, medium, dense };
+        inline Density densityFor (int controls) noexcept { return controls <= 4 ? Density::compact : (controls <= 6 ? Density::medium : Density::dense); }
+        /** The picture's share of the rack's width (from the controls' margin to its right
+            edge) in the compact and medium layouts; dense is the modulation window's column. */
+        constexpr float compactPictureShare = 0.53f, mediumPictureShare = 0.45f;
+        /** The picture's left edge for a density, in a module `width` wide. */
+        inline int pictureLeftFor (Density d, int width)
+        {
+            if (d == Density::dense)
+                return pictureLeft();
+            const int right = width - pictureRightMargin;
+            const float share = d == Density::compact ? compactPictureShare : mediumPictureShare;
+            return right - juce::roundToInt (share * static_cast<float> (right - leftMargin));
+        }
+        /** The divider before the picture (as far from it as the macros' divider is from theirs). */
+        inline int dividerFor (Density d, int width) { return pictureLeftFor (d, width) - (pictureLeft() - divider()); }
     }
 
     //==========================================================================
@@ -3585,7 +3609,7 @@ namespace
         void paint (juce::Graphics& g) override
         {
             if (! expanded())
-                rackcolumns::paintDivider (g, getLocalBounds().withTrimmedTop (titleOffset()).withTrimmedBottom (rackcolumns::bottom));
+                rackcolumns::paintDivider (g, getLocalBounds().withTrimmedTop (titleOffset()).withTrimmedBottom (rackcolumns::bottom), rackcolumns::dividerFor (density, getWidth()));
         }
 
         /** Tests: the cells' captions in order; the presets bar; the slots' places. */
@@ -3687,7 +3711,9 @@ namespace
             if (visual == nullptr)
                 return;
             auto body = getLocalBounds().withTrimmedTop (titleOffset()).withTrimmedBottom (rackcolumns::bottom);
-            auto left = body.withLeft (rackcolumns::leftMargin).withRight (rackcolumns::divider() - 20);
+            // The mode's layout (its controls' count): where the controls end and the picture starts.
+            density = rackcolumns::densityFor (static_cast<int> (cells.size()));
+            auto left = body.withLeft (rackcolumns::leftMargin).withRight (rackcolumns::dividerFor (density, getWidth()) - 20);
             auto top = left.removeFromTop (rowHeight);
             if (modeSelector != nullptr)
                 modeSelector->setBounds (top.removeFromLeft (selectorWidth));
@@ -3699,12 +3725,10 @@ namespace
                 for (auto& cell : cells)
                     cell->setVisible (false);
                 layoutExpanded (body.withTrimmedTop (rowHeight + rowGap).withLeft (rackcolumns::leftMargin).withRight (getWidth() - rackcolumns::pictureRightMargin));
-                // (the top row right of PRESET, over the wide editor, is free)
-                layoutAside (body.withLeft (rackcolumns::divider()).withRight (getWidth() - rackcolumns::pictureRightMargin).withHeight (rowHeight));
                 repaint();
                 return;
             }
-            placeVisual (body.withLeft (rackcolumns::pictureLeft()).withRight (getWidth() - rackcolumns::pictureRightMargin));
+            placeVisual (body.withLeft (rackcolumns::pictureLeftFor (density, getWidth())).withRight (getWidth() - rackcolumns::pictureRightMargin));
             // One row of equal cells on a fixed pitch from the same first place in every module
             // and mode (a mode with fewer controls leaves the rest of the row empty).
             const int n = static_cast<int> (cells.size());
@@ -3715,12 +3739,8 @@ namespace
                 cell->setVisible (true);
                 cell->setBounds (line.removeFromLeft (cellWidth));
             }
-            // (the controls row right of the last cell: under PRESET's right end, never a cell's)
-            layoutAside (line.withLeft (left.getX() + n * cellWidth).withRight (left.getRight()));
             repaint();
         }
-        /** The module's own small extra (MOVEMENT: its lane's ON) in what the layout leaves. */
-        virtual void layoutAside (juce::Rectangle<int> spare) { juce::ignoreUnused (spare); }
 
         InstrumentHost& processor;
         juce::String heading;
@@ -3729,6 +3749,11 @@ namespace
         std::unique_ptr<RackPresetBar> presetBar;
         std::unique_ptr<Visual> visual;
         std::vector<std::unique_ptr<juce::Component>> cells;
+        rackcolumns::Density density = rackcolumns::Density::dense;
+
+    public:
+        /** Tests: the shown mode's layout (0 compact, 1 medium, 2 dense). */
+        int densityIndex() const noexcept { return static_cast<int> (density); }
     };
 
     //==========================================================================
@@ -3736,8 +3761,7 @@ namespace
         MOVEMENT in the rack: a lane's MODE (DRIFT, TAPE, CHORUS, PULSE, SHAPER) and its PRESET,
         then that mode's controls only, the picture on the right. The title row has only the
         A / B selector at its right (each letter with its lane's light; its menu copies or swaps
-        the lanes, as the presets' menu does); the shown lane's ON sits discreetly at the end of
-        its controls. SHAPER's pattern is drawn on in place; its magnifier opens the precision
+        the lanes, as the presets' menu does), then the shown lane's power. SHAPER's pattern is drawn on in place; its magnifier opens the precision
         editor across the rack, with the brushes.
     */
     class MovementRack final : public UnifiedRack
@@ -3766,13 +3790,13 @@ namespace
                     addAndMakeVisible (*tab);
                     laneTabs.push_back (std::move (tab));
                 }
-            onSwitch = std::make_unique<LaneSwitch> (colour);
-            onSwitch->onClick = [this] {
+            power = std::make_unique<LanePower> (colour);
+            power->onClick = [this] {
                 if (lane.ids.onId.isNotEmpty())
                     setPlain (processor.apvts(), lane.ids.onId, laneOn (lane.index) ? 0.0f : 1.0f);
                 refresh();
             };
-            addChildComponent (*onSwitch);
+            addChildComponent (*power);
             buildLane();
         }
 
@@ -3781,7 +3805,13 @@ namespace
 
         void layoutTitleRow (juce::Rectangle<int> row) override
         {
-            // A and B at the right, before the collapse key: the last one nearest it.
+            // MOVEMENT  ...  A  B  (power)  (collapse): the shown lane's power nearest the
+            // collapse key, as round as it is; A and B before it.
+            if (power != nullptr)
+            {
+                power->setBounds (row.removeFromRight (26).withSizeKeepingCentre (26, 26));
+                row.removeFromRight (10);
+            }
             for (auto it = laneTabs.rbegin(); it != laneTabs.rend(); ++it)
             {
                 (*it)->setBounds (row.removeFromRight (tabWidth));
@@ -3807,10 +3837,9 @@ namespace
             if (lane.ids.onId.isNotEmpty())
             {
                 const bool on = laneOn (lane.index);
-                onSwitch->setToggleState (on, juce::dontSendNotification);
-                onSwitch->setTitle ("Lane " + letter + " on");
-                onSwitch->setTooltip (on ? "Lane " + letter + " plays (click: off; the other lane stays as it is)" : "Lane " + letter + " is off (click: on)");
-                onSwitch->repaint();
+                power->setToggleState (on, juce::dontSendNotification);
+                power->setTooltip (on ? "Lane " + letter + " plays (click: off; the other lane stays as it is)" : "Lane " + letter + " is off (click: on)");
+                power->repaint();
             }
         }
 
@@ -3824,8 +3853,8 @@ namespace
                     items.add (child->getTitle().isNotEmpty() ? child->getTitle() : child->getName());
             return items;
         }
-        juce::Rectangle<int> laneSwitchBounds() const { return onSwitch->isVisible() ? onSwitch->getBounds() : juce::Rectangle<int>(); }
-        void clickLaneSwitch() { onSwitch->onClick(); }
+        juce::Rectangle<int> laneSwitchBounds() const { return power->isVisible() ? power->getBounds() : juce::Rectangle<int>(); }
+        void clickLaneSwitch() { power->onClick(); }
         juce::StringArray laneActionNames()
         {
             juce::StringArray names;
@@ -3885,14 +3914,14 @@ namespace
                 });
             };
             presetBar->setModel (models[static_cast<std::size_t> (std::clamp (lane.index, 0, static_cast<int> (models.size()) - 1))].get());
-            onSwitch->setVisible (lane.ids.onId.isNotEmpty());
+            power->setVisible (lane.ids.onId.isNotEmpty());
             customAttachment.reset();
             if (auto* custom = processor.apvts().getParameter (lane ("shaper.custom")))
                 customAttachment = std::make_unique<juce::ParameterAttachment> (*custom, [this] (float) { repaint(); });
             builtMode = -1;
             buildMode();
             if (getParentComponent() != nullptr)
-                getParentComponent()->resized();   // (the title row: the lane shown)
+                getParentComponent()->resized();   // (the title row: the lane shown, its power)
             refresh();
         }
 
@@ -4010,16 +4039,6 @@ namespace
             const Lane x (processor, index);
             return x.ids.onId.isEmpty() || value (processor.apvts(), x.ids.onId) >= 0.5f;
         }
-        void layoutAside (juce::Rectangle<int> spare) override
-        {
-            if (onSwitch == nullptr)
-                return;
-            // The shown lane's ON: right-aligned at the controls' end, on the captions' line
-            // (or, over the wide editor, beside PRESET).
-            const int w = 44, h = 18;
-            const int y = expanded() ? spare.getCentreY() - h / 2 : spare.getY() + 1;
-            onSwitch->setBounds (spare.getRight() - w, y, w, h);
-        }
 
         /** PATTERN also offers CUSTOM, a copy of any pattern to start from, and the saved ones. */
         void setUpPatternSelector (ValueSelector& sel)
@@ -4132,7 +4151,7 @@ namespace
         MagnifierButton magnifier;
         std::unique_ptr<juce::ParameterAttachment> customAttachment;
         std::vector<std::unique_ptr<LaneTab>> laneTabs;
-        std::unique_ptr<LaneSwitch> onSwitch;
+        std::unique_ptr<LanePower> power;
     };
 
     /** ECHO: TAPE / BBD / ASCEND and its presets; TIME, FEEDBACK, TONE, AGE (ASCEND: CLOCK,
@@ -5195,6 +5214,13 @@ juce::StringArray rackMovementPresetMenuExtras (const rack::Module& module)
     if (const auto* m = dynamic_cast<const MovementRack*> (&module))
         return m->presetMenuExtras();
     return {};
+}
+
+int rackDensity (const rack::Module& module)
+{
+    if (const auto* m = dynamic_cast<const UnifiedRack*> (&module))
+        return m->densityIndex();
+    return -1;
 }
 
 void showRackMovementLane (rack::Module& module, int lane)

@@ -744,6 +744,11 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - Phase 1 plugin: see checklist above.
 - Synthetic ground-truth generators and a synthetic mini-corpus generator
   (`--generate-test-signals`), including deliberately broken/unsupported files.
+- Modulation panel: VEL's and NOTE's larger curve editor and routes popover open again (the
+  editor took LFO 1 .. ENV 2 only, so their expand key and "Edit curve..." did nothing).
+  Opt-in for products (ShellProduct::stableModulationTabs, ANDOR ANALOG): the six tabs at
+  fixed places, the route count in a reserved place, the expand key inside the display;
+  ANDOR OSP's own row is unchanged (pixel-identical).
 
 ## IN PROGRESS
 
