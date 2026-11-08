@@ -559,4 +559,82 @@ void paintDetents (juce::Graphics& g, juce::Rectangle<float> knob, int steps, in
     }
 }
 
+//==============================================================================
+PowerKey::PowerKey (juce::RangedAudioParameter& p, juce::UndoManager* undo, juce::Colour g)
+    : parameter (p), undoManager (undo), glow (g), attachment (p, [this] (float plain) {
+          const bool now = plain >= 0.5f;
+          if (now != on)
+          {
+              on = now;
+              repaint();
+              if (onChange != nullptr)
+                  onChange (on);
+          }
+      }, nullptr)
+{
+    setWantsKeyboardFocus (true);
+    setMouseClickGrabsKeyboardFocus (false);
+    setMouseCursor (juce::MouseCursor::PointingHandCursor);
+    setTitle (p.getName (64));
+    attachment.sendInitialUpdate();
+}
+
+void PowerKey::toggle()
+{
+    if (undoManager != nullptr)
+        undoManager->beginNewTransaction (parameter.getName (64));
+    attachment.setValueAsCompleteGesture (on ? 0.0f : 1.0f);
+}
+
+void PowerKey::paint (juce::Graphics& g)
+{
+    const auto r = getLocalBounds().toFloat().reduced (1.0f);
+    const auto c = r.getCentre();
+    // A ceramic key in a dark ring (the faceplate's bezel), a little raised.
+    g.setColour (juce::Colour (0x40000000));
+    g.fillEllipse (r.translated (0.0f, 1.0f));
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xff3a3532), c.x, r.getY(), juce::Colour (0xff1f1c1a), c.x, r.getBottom(), false));
+    g.fillEllipse (r);
+    const auto key = r.reduced (2.2f);
+    g.setGradientFill (juce::ColourGradient (palette::actuatorHi, c.x, key.getY(), palette::actuatorLo, c.x, key.getBottom(), false));
+    g.fillEllipse (key);
+    g.setColour (palette::actuatorEdge.darker (0.15f));
+    g.drawEllipse (key, 0.8f);
+    // The power glyph: an open ring and a stroke, lit while on.
+    const float rad = key.getWidth() * 0.26f;
+    juce::Path glyph;
+    glyph.addCentredArc (c.x, c.y + 0.4f, rad, rad, 0.0f, juce::MathConstants<float>::pi * 0.22f, juce::MathConstants<float>::pi * 1.78f, true);
+    glyph.startNewSubPath (c.x, c.y - rad - 1.2f);
+    glyph.lineTo (c.x, c.y - 0.2f);
+    g.setColour (on ? glow.darker (0.25f) : juce::Colour (0xff8d867c));
+    g.strokePath (glyph, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    if (hasKeyboardFocus (false))
+    {
+        g.setColour (palette::focus);
+        g.drawEllipse (r.expanded (0.5f), 1.0f);
+    }
+}
+
+void PowerKey::mouseUp (const juce::MouseEvent& e)
+{
+    if (getLocalBounds().contains (e.getPosition()) && ! e.mods.isPopupMenu())
+        toggle();
+}
+
+bool PowerKey::keyPressed (const juce::KeyPress& key)
+{
+    if (key == juce::KeyPress::spaceKey || key == juce::KeyPress::returnKey)
+    {
+        toggle();
+        return true;
+    }
+    return false;
+}
+
+std::unique_ptr<juce::AccessibilityHandler> PowerKey::createAccessibilityHandler()
+{
+    return std::make_unique<juce::AccessibilityHandler> (*this, juce::AccessibilityRole::toggleButton,
+                                                          juce::AccessibilityActions().addAction (juce::AccessibilityActionType::toggle, [this] { toggle(); }));
+}
+
 } // namespace osp::plugin::rackui

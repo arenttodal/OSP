@@ -200,6 +200,34 @@ private:
     bool quiet = false;
 };
 
+/**
+    The faceplate's power key (opt-in; ANDOR ANALOG's hardware racks): a small round ceramic
+    key with the power glyph, bound to an effect's ON (a bool parameter). Lit (the glyph in the
+    glow colour) while on; a click toggles it as one undoable gesture. 24 x 24.
+*/
+class PowerKey final : public juce::Component, public juce::SettableTooltipClient
+{
+public:
+    PowerKey (juce::RangedAudioParameter& parameter, juce::UndoManager* undo, juce::Colour glow);
+    bool isOn() const noexcept { return on; }
+    void toggle();
+    std::function<void (bool)> onChange;
+
+    void paint (juce::Graphics&) override;
+    void mouseUp (const juce::MouseEvent&) override;
+    bool keyPressed (const juce::KeyPress&) override;
+    void focusGained (FocusChangeType) override { repaint(); }
+    void focusLost (FocusChangeType) override { repaint(); }
+    std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override;
+
+private:
+    juce::RangedAudioParameter& parameter;
+    juce::UndoManager* undoManager;
+    juce::Colour glow;
+    bool on = false;
+    juce::ParameterAttachment attachment;
+};
+
 /** The detent marks of a stepped rate knob (the approved rate study): a short tick per
     step around the knob, the chosen one longer, in the module's colour. */
 void paintDetents (juce::Graphics& g, juce::Rectangle<float> knob, int steps, int chosen, juce::Colour accent);

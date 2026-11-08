@@ -7,7 +7,9 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include <array>
 #include <map>
+#include <optional>
 
 namespace osp::plugin::rack
 {
@@ -23,10 +25,22 @@ public:
     GraphFrame() { setInterceptsMouseClicks (false, false); }
     void paint (juce::Graphics&) final;
     virtual void refresh() {}
+    /** The glass's tint (opt-in; a hardware faceplate's graphite, warm or cool). Unset: the
+        approved #1c2528 to #192124, edge #343f43. */
+    void setGlass (juce::Colour top, juce::Colour bottom, juce::Colour edge)
+    {
+        glassTop = top;
+        glassBottom = bottom;
+        glassEdge = edge;
+        repaint();
+    }
 
 protected:
     /** Inside the frame (its 1 px edge excluded). */
     virtual void paintGraph (juce::Graphics&, juce::Rectangle<float> area) = 0;
+
+private:
+    juce::Colour glassTop { 0xff1c2528 }, glassBottom { 0xff192124 }, glassEdge { 0xff343f43 };
 };
 
 /**
@@ -74,6 +88,37 @@ public:
     juce::Rectangle<int> graphBounds() const;
     rackui::VerticalSwitch* headerSwitch() const noexcept { return power.get(); }
     juce::String status() const { return headerStatus != nullptr ? headerStatus() : juce::String(); }
+
+    /** The boutique hardware faceplate (opt-in; ANDOR ANALOG's racks; ANDOR OSP's racks never
+        set it): the module is drawn as a small instrument in the rack's slot - a ceramic
+        chassis with a hairline bezel and four screws, an enamel title rail (its LED following
+        the real ON, the title and a short subtitle, a product's part such as the preset
+        browser, the overflow key, the power key), a narrow band of stripes at the body's left
+        (the controls start after it) and the graph in a metal bezel on tinted glass. The
+        heights, the selector row and the cells' lines are the standard rack's: only the paint
+        and the left/right margins change. Interface only. */
+    struct Faceplate
+    {
+        juce::Colour enamel;                    ///< the title rail
+        std::array<juce::Colour, 3> stripes;    ///< the motif's bands, outermost first
+        juce::Colour glow;                      ///< the LED and the lit power glyph
+        juce::Colour glassTop { 0xff1c2528 }, glassBottom { 0xff192124 };
+        juce::String subtitle;                  ///< "DYNAMICS PROCESSOR"
+    };
+    void setFaceplate (const Faceplate& f);
+    bool hasFaceplate() const noexcept { return faceplate.has_value(); }
+    const std::optional<Faceplate>& faceplateStyle() const noexcept { return faceplate; }
+    /** Faceplate: the rail's own part (the preset browser), `width` wide, left of the overflow
+        key, and the overflow key's action (null: no key). */
+    void setRailComponent (std::unique_ptr<juce::Component> component, int width);
+    juce::Component* railComponent() const noexcept { return railPart.get(); }
+    void setOverflow (std::function<void (juce::Component& key)> onClick);
+    juce::Component* overflowKey() const noexcept { return overflow.get(); }
+    /** Faceplate: its power key (bound to the header switch's parameter), or null. */
+    rackui::PowerKey* powerKey() const noexcept { return powerKeyPart.get(); }
+    /** The chassis and the content's left edge (component coordinates; tests, subclasses). */
+    juce::Rectangle<int> chassisBounds() const;
+    int contentLeft() const;
 
     /** The standard rack (MOVEMENT / ECHO / SPACE's): body 172, the selector row 39 under the
         title, 8 px, the cells; the graph 4 px under the title, 160 high. */
@@ -164,6 +209,14 @@ private:
     std::vector<Selector> selectors;
     std::vector<int> navRules;   // (x of the rules between the pages, the sub-pages and the selectors)
     std::unique_ptr<rackui::VerticalSwitch> power;
+    std::unique_ptr<rackui::PowerKey> powerKeyPart;
+    std::optional<Faceplate> faceplate;
+    std::unique_ptr<juce::Component> railPart, overflow;
+    int railPartWidth = 0;
+    juce::String powerId;
+    juce::Rectangle<int> railTitleArea;
+    void paintFaceplate (juce::Graphics&);
+    int contentRightMargin() const;
     juce::String powerWord;
     juce::Rectangle<int> powerWordArea, statusArea;
     std::unique_ptr<GraphFrame> graphView;
