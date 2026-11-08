@@ -263,8 +263,9 @@ TEST_CASE ("plugin phase 5: a played note lights its own region, its read head i
     CHECK (keys[69].colour == osp::plugin::design::colour::forPitch (69));
     CHECK (osp::plugin::design::colour::forPitch (62) == osp::plugin::design::colour::forPitch (74));   // every D
     CHECK (osp::plugin::design::colour::forPitch (74) != osp::plugin::design::colour::forPitch (75));
-    // Earthy, natural colours: twelve different ones, none violet or purple (hue 0.66-0.95),
-    // none grey.
+    // Earthy, natural colours (Refined Core): twelve different ones, none violet or purple
+    // (hue 0.66-0.95), none grey (slate and sage are muted on purpose, but tinted). Neighbours
+    // a semitone apart are clearly different hues (one warm family, one cool).
     {
         std::set<juce::uint32> seen;
         for (int pc = 0; pc < 12; ++pc)
@@ -273,7 +274,10 @@ TEST_CASE ("plugin phase 5: a played note lights its own region, its read head i
             seen.insert (c.getARGB());
             INFO ("pitch class " << pc << ": hue " << c.getHue());
             CHECK ((c.getHue() < 0.66f || c.getHue() > 0.95f));
-            CHECK (c.getSaturation() > 0.2f);
+            CHECK (c.getSaturation() > 0.12f);
+            const auto next = osp::plugin::design::colour::forPitch (61 + pc);
+            const float apart = std::abs (c.getHue() - next.getHue());
+            CHECK (std::min (apart, 1.0f - apart) > 0.1f);
         }
         CHECK (seen.size() == 12);
     }

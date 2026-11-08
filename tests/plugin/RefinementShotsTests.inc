@@ -72,6 +72,19 @@ TEST_CASE ("plugin: UI refinement screenshots (OSP_REFINE_DIR)", "[.][refine-sho
     shoot ({ rec.file, pluck }, [&] (OspAudioProcessor& p, Editor& ui) { noteMap (p, ui, { 1 }); }, "01-notemap-2L-selected");
     shoot ({ rec.file, pluck, pad }, [&] (OspAudioProcessor& p, Editor& ui) { noteMap (p, ui, { 1 }); }, "01-notemap-3L-selected");
     shoot ({ rec.file, pluck, pad }, [&] (OspAudioProcessor& p, Editor& ui) { noteMap (p, ui, {}); }, "01-notemap-3L-none");
+    // ... a boundary being dragged (the selected note's end, held mid-drag), and a hover with two layers.
+    shoot ({ rec.file }, [&] (OspAudioProcessor& p, Editor& ui) {
+        auto* map = noteMap (p, ui, { 2 });
+        const auto r = map->regionBounds (p.currentInstrument (0)->atlas->notes[2].id);
+        const juce::Point<float> edge { r.getRight(), r.getCentreY() };
+        map->mouseMove (mouseAt (*map, edge, edge, false));
+        map->mouseDown (mouseAt (*map, edge, edge, false));
+        map->mouseDrag (mouseAt (*map, edge.translated (-18.0f, 0.0f), edge, true));
+    }, "01-notemap-1L-dragging");
+    shoot ({ rec.file, pluck }, [&] (OspAudioProcessor& p, Editor& ui) {
+        auto* map = noteMap (p, ui, { 1 });
+        hover (*map, map->regionBounds (p.currentInstrument (0)->atlas->notes[3].id).getCentre());
+    }, "01-notemap-2L-hover");
 
     // 02 Source header: an ordinary layer and a mapped one (NOTES), EQ open; 1, 2, 3 layers.
     shoot ({ rec.file }, [&] (OspAudioProcessor& p, Editor& ui) {
@@ -297,6 +310,26 @@ TEST_CASE ("plugin: UI refinement screenshots (OSP_REFINE_DIR)", "[.][refine-sho
         }
         ui.refreshNow();
     }, "08-imprint-chips-3L");
+
+    // 09 The SYNTH chip at 0 %, 42 % and 100 % (Imprint on at 100 %), in one, two and three cards.
+    auto chips = [] (OspAudioProcessor& p, Editor& ui, std::initializer_list<float> amounts, int imprintLayer) {
+        int l = 0;
+        for (const float a : amounts)
+            p.setParameterValue (osp::plugin::InstrumentHost::synthesizeId (l++), a);
+        if (imprintLayer >= 0)
+        {
+            p.setParameterValue (osp::plugin::InstrumentHost::synthParameterId (imprintLayer, "mode"), 1.0f);
+            p.setParameterValue (osp::plugin::InstrumentHost::synthParameterId (imprintLayer, "imprint"), 80.0f);
+        }
+        ui.refreshNow();
+    };
+    shoot ({ pad }, [&] (OspAudioProcessor& p, Editor& ui) { chips (p, ui, { 42.0f }, -1); }, "09-synth-chip-1L-42");
+    shoot ({ pad, pluck }, [&] (OspAudioProcessor& p, Editor& ui) { chips (p, ui, { 0.0f, 100.0f }, 1); }, "09-synth-chip-2L-0-100imprint");
+    shoot ({ pad, pluck, rec.file }, [&] (OspAudioProcessor& p, Editor& ui) { chips (p, ui, { 0.0f, 42.0f, 100.0f }, 2); }, "09-synth-chip-3L");
+    shoot ({ pad, pluck, rec.file }, [&] (OspAudioProcessor& p, Editor& ui) {
+        ui.setSize (1086, 814);
+        chips (p, ui, { 0.0f, 42.0f, 100.0f }, 2);
+    }, "09-synth-chip-3L-small");
 }
 
 TEST_CASE ("plugin: playback-mode selector screenshots (OSP_MODE_SHOTS)", "[.][mode-shots]")

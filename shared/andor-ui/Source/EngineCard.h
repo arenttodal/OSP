@@ -332,6 +332,8 @@ public:
     /** The label (opens the page) and the amount (the fader), in the chip's coordinates. */
     juce::Rectangle<float> labelArea() const;
     juce::Rectangle<float> amountArea() const;
+    /** The amount's part (px): "100%" and a little room either side. */
+    static constexpr float amountWidth = 38.0f;
     /** The audition menu's items, as shown (tests). */
     juce::PopupMenu auditionMenu();
     /** Repaints when the audition or the imprint changed (another source's menu, the page,

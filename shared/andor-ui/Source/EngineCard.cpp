@@ -678,11 +678,12 @@ void SourceDisplay::paint (juce::Graphics& g)
                 continue;
             const auto& n = instrument->atlas->notes[static_cast<std::size_t> (i)];
             const auto r = noteRegionBounds (n, plot);
+            // (Refined Core: a little more of its own hue, its edges brighter; never a new colour.)
             const auto tone = design::colour::forPitch (n.playKey());
-            g.setColour (tone.withAlpha (focused ? 0.34f : 0.24f));
-            g.fillRoundedRectangle (r, 4.0f);
-            g.setColour (tone.brighter (0.3f).withAlpha (0.95f));
-            g.drawRoundedRectangle (r.reduced (0.75f), 4.0f, 1.5f);
+            g.setColour (tone.withAlpha (design::colour::regionFillAlpha (tone, focused ? 0.36f : 0.3f)));
+            g.fillRoundedRectangle (r, 2.0f);
+            g.setColour (tone.brighter (0.35f).withAlpha (0.9f));
+            g.drawRoundedRectangle (r.reduced (0.6f), 2.0f, 1.2f);
         }
     }
     if (hasWave)
@@ -1046,11 +1047,13 @@ void SourceDisplay::paintNoteRegions (juce::Graphics& g, juce::Rectangle<float> 
         if (plays)
         {
             // Its pitch's colour, drawn once into the cached picture (no cost per frame).
+            // Refined Core: a muted translucent field in the pitch's colour (balanced so no hue
+            // reads brighter than the others) and a fine edge a shade lighter, behind the wave.
             const auto tone = design::colour::forPitch (n.playKey());
-            g.setColour (tone.withAlpha (0.2f * tint));
-            g.fillRoundedRectangle (r, 4.0f);
-            g.setColour (tone.withAlpha (0.6f * tint));
-            g.drawRoundedRectangle (r.reduced (0.5f), 4.0f, 1.0f);
+            g.setColour (tone.withAlpha (design::colour::regionFillAlpha (tone) * tint));
+            g.fillRoundedRectangle (r, 2.0f);
+            g.setColour (tone.brighter (0.25f).withAlpha (0.55f * tint));
+            g.drawRoundedRectangle (r.reduced (0.5f), 2.0f, 1.0f);
         }
         else
         {
@@ -2577,10 +2580,10 @@ bool SynthChip::imprinting() const
 
 juce::Rectangle<float> SynthChip::labelArea() const
 {
-    // The light, "SYNTH" and the chevron: as far as the chevron, and a little beyond it.
+    // The light, "SYNTH" and the chevron; the amount keeps a fixed share on the right, room
+    // for "100%" (so the label's end never moves with the number).
     const auto r = getLocalBounds().toFloat();
-    const float textWidth = juce::GlyphArrangement::getStringWidth (type::popupLabel (r.getWidth() < 90.0f ? 10.5f : 11.5f), "SYNTH");
-    return r.withWidth (std::min (r.getWidth() * 0.62f, 15.0f + textWidth + 12.0f));
+    return r.withWidth (std::max (r.getWidth() * 0.5f, r.getWidth() - amountWidth));
 }
 
 juce::Rectangle<float> SynthChip::amountArea() const
@@ -2677,7 +2680,7 @@ void SynthChip::paint (juce::Graphics& g)
         juce::Path cell;
         cell.addRoundedRectangle (r, 4.0f);
         g.reduceClipRegion (cell);
-        g.setColour (light.withAlpha (0.07f));
+        g.setColour (light.withAlpha (0.06f));
         g.fillRect (overLabel && ! dragging ? label : r.withTrimmedLeft (label.getWidth()));
         g.restoreState();
     }
@@ -2694,28 +2697,32 @@ void SynthChip::paint (juce::Graphics& g)
         const auto bar = r.reduced (4.0f, 0.0f).removeFromBottom (3.0f).withTrimmedBottom (1.0f);
         g.setColour (accent.withAlpha (0.9f));
         g.fillRoundedRectangle (bar.withWidth (std::max (1.5f, bar.getWidth() * a)), 1.0f);
-        const juce::Point<float> at { r.getX() + 8.5f, r.getCentreY() - 0.5f };
+        // The indicator, quieter than before: a 4 px light, or the imprint's small spectral
+        // curve (two resonances) at about the same weight.
+        const juce::Point<float> at { r.getX() + 8.0f, r.getCentreY() - 0.5f };
+        g.setColour (accent.withAlpha (0.85f));
         if (imprinting())
         {
-            // The imprint: a small spectral curve (two resonances), not the plain light.
+            const float k = 0.85f;
             juce::Path curve;
-            curve.startNewSubPath (at.x - 4.0f, at.y + 2.5f);
-            curve.cubicTo (at.x - 2.8f, at.y - 3.5f, at.x - 1.6f, at.y - 3.5f, at.x - 0.6f, at.y + 1.0f);
-            curve.cubicTo (at.x + 0.4f, at.y + 2.6f, at.x + 1.2f, at.y - 2.0f, at.x + 2.2f, at.y - 1.6f);
-            curve.cubicTo (at.x + 3.0f, at.y - 1.2f, at.x + 3.6f, at.y + 2.0f, at.x + 4.2f, at.y + 2.5f);
-            g.strokePath (curve, juce::PathStrokeType (1.3f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            curve.startNewSubPath (at.x - 4.0f * k, at.y + 2.5f * k);
+            curve.cubicTo (at.x - 2.8f * k, at.y - 3.5f * k, at.x - 1.6f * k, at.y - 3.5f * k, at.x - 0.6f * k, at.y + 1.0f * k);
+            curve.cubicTo (at.x + 0.4f * k, at.y + 2.6f * k, at.x + 1.2f * k, at.y - 2.0f * k, at.x + 2.2f * k, at.y - 1.6f * k);
+            curve.cubicTo (at.x + 3.0f * k, at.y - 1.2f * k, at.x + 3.6f * k, at.y + 2.0f * k, at.x + 4.2f * k, at.y + 2.5f * k);
+            g.strokePath (curve, juce::PathStrokeType (1.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         }
         else
-            g.fillEllipse (juce::Rectangle<float> (4.5f, 4.5f).withCentre (at));
+            g.fillEllipse (juce::Rectangle<float> (4.0f, 4.0f).withCentre (at));
     }
-    auto text = r.withTrimmedLeft (lit ? 15.0f : 7.0f).withTrimmedRight (7.0f).withTrimmedBottom (1.0f);
+    // The label: a little more room on its left, the chevron 6 px after the name.
     const auto font = type::popupLabel (r.getWidth() < 90.0f ? 10.5f : 11.5f);
     g.setFont (font);
+    const auto name = r.withTrimmedLeft (lit ? (imprinting() ? 16.0f : 14.5f) : 9.0f).withRight (label.getRight()).withTrimmedBottom (1.0f);
     g.setColour (light.withAlpha (hover || lit ? 0.95f : 0.62f));
-    g.drawText ("SYNTH", text, juce::Justification::centredLeft, false);
+    g.drawText ("SYNTH", name, juce::Justification::centredLeft, false);
     {
         // The chevron: the label opens the page.
-        const float x = text.getX() + juce::GlyphArrangement::getStringWidth (font, "SYNTH") + 4.0f, y = text.getCentreY();
+        const float x = name.getX() + juce::GlyphArrangement::getStringWidth (font, "SYNTH") + 6.0f, y = name.getCentreY();
         juce::Path chevron;
         chevron.startNewSubPath (x, y - 2.5f);
         chevron.lineTo (x + 2.5f, y);
@@ -2723,8 +2730,11 @@ void SynthChip::paint (juce::Graphics& g)
         g.setColour (light.withAlpha (overLabel ? 0.95f : (hover || lit ? 0.7f : 0.45f)));
         g.strokePath (chevron, juce::PathStrokeType (1.1f, juce::PathStrokeType::mitered, juce::PathStrokeType::rounded));
     }
+    // The amount, right-aligned in its own part ("42%": no space), so "0%" to "100%" share one
+    // right edge.
+    const auto number = r.withTrimmedLeft (label.getWidth()).withTrimmedRight (7.0f).withTrimmedBottom (1.0f);
     g.setColour (light.withAlpha (hover || lit ? 0.95f : 0.5f));
-    g.drawText (juce::String (juce::roundToInt (amount())) + " %", text, juce::Justification::centredRight, false);
+    g.drawText (juce::String (juce::roundToInt (amount())) + "%", number, juce::Justification::centredRight, false);
     if (host.synthAuditionBlend() != 0 || host.synthAuditionEnvelope() != 0)
     {
         // A development audition is on: a small amber corner (never seen in normal use).
