@@ -481,4 +481,132 @@ void PostProcessor::process (float* left, float* right, int numSamples) noexcept
     }
 }
 
+//==============================================================================
+// The routed chain's stages (customControl ...): process()'s own code for each stage, a run of
+// samples at a time. Kept beside process(), which stays as it was (the CLASSIC route).
+
+int PostProcessor::customControl (int maxSamples) noexcept
+{
+    if (countdown <= 0)
+    {
+        countdown = controlInterval;
+        updateCoefficients();
+    }
+    const int run = std::min (countdown, maxSamples);
+    countdown -= run;
+    return run;
+}
+
+void PostProcessor::customReimagined (float* left, float* right, int numSamples) noexcept
+{
+    for (int i = 0; i < numSamples; ++i)
+        reimaginedStage.process (left[i], right[i]);
+}
+
+void PostProcessor::customDrive (float* left, float* right, int numSamples) noexcept
+{
+    for (int i = 0; i < numSamples; ++i)
+        drive.process (left[i], right[i]);
+}
+
+void PostProcessor::customMovement (float* left, float* right, int numSamples) noexcept
+{
+    for (int i = 0; i < numSamples; ++i)
+    {
+        if (lanes)
+            processLanes (left[i], right[i]);
+        else
+            movement.process (left[i], right[i]);
+    }
+}
+
+void PostProcessor::customEcho (const float* left, const float* right, float* wetLeft, float* wetRight, int numSamples, float input) noexcept
+{
+    for (int i = 0; i < numSamples; ++i)
+    {
+        const float l = input * left[i], r = input * right[i];
+        echoLevel += (echoTarget - echoLevel) * spaceCoef;
+        float el = 0.0f, er = 0.0f;
+        if (echoLevel > 1.0e-5)
+        {
+            if (echoIdle)
+            {
+                echoIdle = false;
+                echo.reset();
+            }
+            if (echoAsleep && (l != 0.0f || r != 0.0f))
+                echoAsleep = false;
+            if (echoAsleep)
+                echo.skip();
+            else
+            {
+                echo.process (l, r, el, er);
+                echoAsleep = echo.silent();
+            }
+        }
+        else
+            echoIdle = true;
+        const auto echoGain = static_cast<float> (echoLevel);
+        wetLeft[i] = echoGain * el;
+        wetRight[i] = echoGain * er;
+    }
+}
+
+void PostProcessor::customSpace (const float* left, const float* right, float* wetLeft, float* wetRight, float* dryGain, int numSamples, float input) noexcept
+{
+    for (int i = 0; i < numSamples; ++i)
+    {
+        const float l = input * left[i], r = input * right[i];
+        wetLeft[i] = wetRight[i] = 0.0f;
+        dryGain[i] = 1.0f;
+        space += (spaceTarget - space) * spaceCoef;
+        if (space > 1.0e-5 || reverbFade > 0)
+        {
+            if (spaceIdle)
+            {
+                spaceIdle = false;
+                for (int slot = 0; slot < 2; ++slot)
+                    startSlot (slot);
+            }
+            const bool silentIn = l == 0.0f && r == 0.0f;
+            if (reverbAsleep && (! silentIn || reverbFade > 0))
+            {
+                reverbAsleep = false;
+                quietRun = 0;
+            }
+            if (reverbAsleep)
+            {
+                if (slotEngine[static_cast<std::size_t> (activeReverb)] == SpaceEngine::abyss)
+                    abysses[static_cast<std::size_t> (activeReverb)].skip();
+                else if (slotEngine[static_cast<std::size_t> (activeReverb)] == SpaceEngine::rooms)
+                    reverbs[static_cast<std::size_t> (activeReverb)].skip();
+            }
+            else
+            {
+                float wl, wr;
+                processSlot (activeReverb, l, r, wl, wr);
+                if (silentIn && reverbFade == 0 && std::abs (wl) < 1.0e-6f && std::abs (wr) < 1.0e-6f)
+                    reverbAsleep = ++quietRun >= sleepAfter;
+                else
+                    quietRun = 0;
+                if (reverbFade > 0)
+                {
+                    float ol, orr;
+                    processSlot (1 - activeReverb, l, r, ol, orr);
+                    const float w = static_cast<float> (reverbFade) / static_cast<float> (reverbFadeLength);
+                    wl += w * (ol - wl);
+                    wr += w * (orr - wr);
+                    --reverbFade;
+                }
+                const auto wet = static_cast<float> (space);
+                dryGain[i] = static_cast<float> (1.0 - 0.2 * std::min (1.0, space));
+                wetLeft[i] = wet * wl;
+                wetRight[i] = wet * wr;
+            }
+        }
+        else
+            spaceIdle = true;
+    }
+}
+
 } // namespace osp

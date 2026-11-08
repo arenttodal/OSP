@@ -89,6 +89,29 @@ public:
 
     static constexpr int maxPeaks = 3;
 
+    /**
+        A routed chain (opt-in: ANDOR ANALOG's FX routing, CUSTOM). The same processors as
+        process(), one stage at a time over a run of samples, so a product can put them in
+        another order. process() is not changed by any of this and is what plays until a
+        product calls these instead; a product calls either, never both in one block.
+
+        Per block: customControl() first, then each stage once over runs no longer than it
+        returns (the control-rate updates - SPACE's retuning and crossfades - happen there,
+        every 32 samples, as in process()). Each stage keeps its own smoothing, sleep and
+        crossfades exactly as process() does.
+          - customDrive / customMovement: in place (DRIVE untouched at 0, the lanes as set).
+          - customEcho: ECHO's wet alone, its level (the ECHO macro) applied - what process()
+            adds to its output. `input` scales what enters the delay (0: its tail drains).
+          - customSpace: SPACE's wet alone, its level applied, and the dry gain process() puts
+            on the dry signal (1 - 0.2 SPACE) per sample, so `dry * x + wet` is process()'s.
+    */
+    int customControl (int maxSamples) noexcept;
+    void customReimagined (float* left, float* right, int numSamples) noexcept;
+    void customDrive (float* left, float* right, int numSamples) noexcept;
+    void customMovement (float* left, float* right, int numSamples) noexcept;
+    void customEcho (const float* left, const float* right, float* wetLeft, float* wetRight, int numSamples, float input = 1.0f) noexcept;
+    void customSpace (const float* left, const float* right, float* wetLeft, float* wetRight, float* dryGain, int numSamples, float input = 1.0f) noexcept;
+
 private:
     void updateCoefficients() noexcept;
 
