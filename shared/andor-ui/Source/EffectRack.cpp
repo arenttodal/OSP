@@ -27,6 +27,8 @@ juce::String name (Kind kind)
         case Kind::movement: return "MOVEMENT";
         case Kind::echo: return "ECHO";
         case Kind::space: return "SPACE";
+        case Kind::filter: return "FILTER";
+        case Kind::morph: return "MORPH";
     }
     return {};
 }

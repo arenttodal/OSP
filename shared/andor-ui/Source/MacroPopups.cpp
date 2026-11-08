@@ -5,6 +5,7 @@
 #include "Design.h"
 #include "EffectRack.h"
 #include "MacroPopups.h"
+#include "RackControls.h"
 #include "ShapingPopups.h"
 #include "SpacePresets.h"
 
@@ -65,11 +66,21 @@ namespace
             // The reference's display (SPACE: 558 x 261): a deep slate well, rounded 9 px,
             // shaded under its top edge, a faint light line along its foot.
             const auto r = getLocalBounds().toFloat();
-            g.setGradientFill (juce::ColourGradient (juce::Colour (0xff1f2626), 0.0f, r.getY(), juce::Colour (0xff1a1e1f), 0.0f, r.getBottom(), false));
-            g.fillRoundedRectangle (r, radius);
-            g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.3f), 0.0f, r.getY(), juce::Colours::transparentBlack, 0.0f,
-                                                     r.getY() + 6.0f, false));
-            g.fillRoundedRectangle (r.withHeight (8.0f), radius);
+            // The effects rack's graph (approved): #1c2528 to #192124, radius 5, edge #343f43.
+            const float corner = detailed ? 5.0f : radius;
+            if (detailed)
+            {
+                g.setGradientFill (juce::ColourGradient (juce::Colour (0xff1c2528), 0.0f, r.getY(), juce::Colour (0xff192124), 0.0f, r.getBottom(), false));
+                g.fillRoundedRectangle (r, corner);
+            }
+            else
+            {
+                g.setGradientFill (juce::ColourGradient (juce::Colour (0xff1f2626), 0.0f, r.getY(), juce::Colour (0xff1a1e1f), 0.0f, r.getBottom(), false));
+                g.fillRoundedRectangle (r, radius);
+                g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.3f), 0.0f, r.getY(), juce::Colours::transparentBlack, 0.0f,
+                                                         r.getY() + 6.0f, false));
+                g.fillRoundedRectangle (r.withHeight (8.0f), radius);
+            }
             {
                 juce::Graphics::ScopedSaveState state (g);
                 g.reduceClipRegion (getLocalBounds().reduced (1));
@@ -84,8 +95,8 @@ namespace
                     paintVisual (g, v.reduced (8.0f, 6.0f));
                 }
             }
-            g.setColour (juce::Colour (0xff0b0e10));
-            g.drawRoundedRectangle (r.reduced (0.5f), radius, 1.0f);
+            g.setColour (detailed ? juce::Colour (0xff343f43) : juce::Colour (0xff0b0e10));
+            g.drawRoundedRectangle (r.reduced (0.5f), corner, 1.0f);
             if (fade > 0.0f && previous.isValid())
             {
                 g.setOpacity (fade);
@@ -2639,151 +2650,33 @@ void swapMovementLanes (InstrumentHost& host)
 namespace
 {
     //==========================================================================
-    /** A lane's light: lit in MOVEMENT's colour when the lane plays, a quiet grey when it is off
-        (unmistakably off, not a darker blue). */
-    inline void laneLight (juce::Graphics& g, juce::Point<float> centre, float size, bool on, juce::Colour accent)
-    {
-        if (on)
-            design::draw::led (g, centre, size, accent.withMultipliedBrightness (1.15f), 0.6f);
-        else
-            design::draw::led (g, centre, size, design::colour::hairline.darker (0.15f), 0.0f);
-    }
-
-    /** MOVEMENT's lane selector on the rack's title row: the lane's letter (A, B) after a small
-        light (the lane plays), the lane shown underlined as an open macro's name is. A click
-        shows that lane (it never switches a lane on or off); a right-click, or Shift+F10, offers
-        the lanes' actions (copy, swap). */
-    class LaneTab final : public juce::Button
-    {
-    public:
-        LaneTab (const juce::String& letter, juce::Colour colour) : juce::Button (letter), accent (colour)
-        {
-            setWantsKeyboardFocus (true);
-            setMouseCursor (juce::MouseCursor::PointingHandCursor);
-        }
-        std::function<bool()> lit;
-        std::function<void()> onMenu;
-        void mouseDown (const juce::MouseEvent& e) override
-        {
-            if (e.mods.isPopupMenu())
-            {
-                if (onMenu != nullptr)
-                    onMenu();
-                return;
-            }
-            juce::Button::mouseDown (e);
-        }
-        void mouseUp (const juce::MouseEvent& e) override
-        {
-            if (! e.mods.isPopupMenu())
-                juce::Button::mouseUp (e);
-        }
-        bool keyPressed (const juce::KeyPress& key) override
-        {
-            if (key == juce::KeyPress (juce::KeyPress::F10Key, juce::ModifierKeys::shiftModifier, 0) && onMenu != nullptr)
-            {
-                onMenu();
-                return true;
-            }
-            return juce::Button::keyPressed (key);
-        }
-        void paintButton (juce::Graphics& g, bool highlighted, bool down) override
-        {
-            const auto r = getLocalBounds().toFloat();
-            const bool shown = getToggleState();
-            const bool on = lit == nullptr || lit();
-            laneLight (g, { r.getX() + 4.0f, r.getCentreY() }, 5.5f, on, accent);
-            const auto font = fonts::make (13.5f, fonts::Weight::medium, 0.04f);
-            g.setFont (font);
-            const bool hot = highlighted || down || hasKeyboardFocus (false);
-            g.setColour (shown ? design::colour::text.withAlpha (0.95f) : design::colour::text.withAlpha (hot ? 0.7f : 0.42f));
-            const float w = juce::GlyphArrangement::getStringWidth (font, getButtonText());
-            const auto text = juce::Rectangle<float> (r.getX() + 11.0f, r.getY(), w + 2.0f, r.getHeight());
-            g.drawText (getButtonText(), text, juce::Justification::centredLeft, false);
-            if (shown || hot)
-            {
-                g.setColour (shown ? accent : design::colour::text.withAlpha (0.4f));
-                g.fillRect (text.getX(), r.getCentreY() + 0.5f * font.getHeight() + 1.0f, w, 1.2f);
-            }
-        }
-
-    private:
-        juce::Colour accent;
-    };
-
-    /** The shown lane's power, on the title row beside A / B: a small round key as the
-        collapse key is, with the instrument's power mark (the EQ's), lit in the lane's colour
-        while the lane plays. */
-    class LanePower final : public juce::Button
-    {
-    public:
-        explicit LanePower (juce::Colour colour) : juce::Button ("Lane power"), accent (colour)
-        {
-            setWantsKeyboardFocus (true);
-            setMouseCursor (juce::MouseCursor::PointingHandCursor);
-            setTitle ("Lane power");
-        }
-        void paintButton (juce::Graphics& g, bool highlighted, bool down) override
-        {
-            using namespace design;
-            const auto c = getLocalBounds().toFloat().reduced (1.0f);
-            g.setColour (juce::Colour (0x1a302418));
-            g.fillEllipse (c.translated (0.0f, 1.0f));
-            g.setGradientFill (juce::ColourGradient (colour::buttonTop, 0.0f, c.getY(), colour::buttonBottom, 0.0f, c.getBottom(), false));
-            g.fillEllipse (c);
-            const bool lit = highlighted || down || hasKeyboardFocus (true);
-            g.setColour (lit ? colour::text.withAlpha (0.45f) : colour::hairline.darker (0.12f));
-            g.drawEllipse (c.reduced (0.5f), 1.0f);
-            const bool on = getToggleState();
-            const auto centre = c.getCentre();
-            g.setColour (on ? accent.darker (0.15f) : colour::text.withAlpha (lit ? 0.6f : 0.38f));
-            juce::Path icon;
-            icon.addCentredArc (centre.x, centre.y + 0.8f, 5.6f, 5.6f, 0.0f, 0.65f, 2.0f * juce::MathConstants<float>::pi - 0.65f, true);
-            icon.startNewSubPath (centre.x, centre.y - 6.2f);
-            icon.lineTo (centre.x, centre.y - 0.6f);
-            g.strokePath (icon, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        }
-
-    private:
-        juce::Colour accent;
-    };
-
-    //==========================================================================
     /** The effects rack's columns (module coordinates, the module as wide as the rack): the
         picture exactly under the modulation window (its display's width, the same divider
         before it), the controls on the left. */
     namespace rackcolumns
     {
-        inline int divider() { return juce::roundToInt (design::layout::envelopeX - 10.0f - design::layout::arpPanel.getX()); }
-        inline int pictureLeft() { return juce::roundToInt (design::layout::envelopeX + 11.0f - design::layout::arpPanel.getX()); }
-        constexpr int pictureRightMargin = 19, leftMargin = 22, bottom = 12;
-        /** The divider between the controls and the picture (as the macro panel's). */
-        inline void paintDivider (juce::Graphics& g, juce::Rectangle<int> body, int x)
+        /** The approved rack (ANDOR_*_RACK_APPROVAL.html, 1392 px reference): its content
+            inset 20 px (19 padding + the 1 px border) on both sides; the controls' column a
+            fixed share of that width per module (MOVEMENT 57 %, ECHO 61 %, SPACE 68 %); a 17 px
+            gap, then the divider (1 px), 17 px, the graph to the right inset. The share is the
+            module's, never a mode's or a value's: the graph never moves while editing. */
+        constexpr int inset = 20, columnGap = 17, graphPad = 17, bottom = 12;
+        inline int dividerFor (float share, int width)
         {
-            g.setColour (design::colour::divider);
-            g.fillRect (juce::Rectangle<float> (static_cast<float> (x), static_cast<float> (body.getY()) + 2.0f, 1.0f, static_cast<float> (body.getHeight()) - 4.0f));
+            const int x0 = inset, x1 = width - inset;
+            return x0 + juce::roundToInt (share * static_cast<float> (x1 - x0)) + columnGap;
         }
-        /** How much of the rack a mode's controls take, by how many there are: compact (up to
-            four), medium (five or six) or dense (more). The picture keeps its right edge and
-            takes the rest, so a mode with few controls has a wider picture. Decided by the mode
-            alone (its controls), so a value, a preset of the same mode or automation never
-            moves anything. */
-        enum class Density { compact, medium, dense };
-        inline Density densityFor (int controls) noexcept { return controls <= 4 ? Density::compact : (controls <= 6 ? Density::medium : Density::dense); }
-        /** The picture's share of the rack's width (from the controls' margin to its right
-            edge) in the compact and medium layouts; dense is the modulation window's column. */
-        constexpr float compactPictureShare = 0.53f, mediumPictureShare = 0.45f;
-        /** The picture's left edge for a density, in a module `width` wide. */
-        inline int pictureLeftFor (Density d, int width)
+        inline int pictureLeftFor (float share, int width) { return dividerFor (share, width) + 1 + graphPad; }
+        /** The divider before the graph (approved: 1 px #cbc4b9, the content's height). */
+        inline void paintDivider (juce::Graphics& g, int x, float top, float bottomY)
         {
-            if (d == Density::dense)
-                return pictureLeft();
-            const int right = width - pictureRightMargin;
-            const float share = d == Density::compact ? compactPictureShare : mediumPictureShare;
-            return right - juce::roundToInt (share * static_cast<float> (right - leftMargin));
+            g.setColour (juce::Colour (0xffcbc4b9));
+            g.fillRect (juce::Rectangle<float> (static_cast<float> (x), top, 1.0f, bottomY - top));
         }
-        /** The divider before the picture (as far from it as the macros' divider is from theirs). */
-        inline int dividerFor (Density d, int width) { return pictureLeftFor (d, width) - (pictureLeft() - divider()); }
+        using Slot = rackui::Slot;
+        using rackui::slotWidth;
+        using rackui::slotGap;
+        using rackui::denseFrom;
     }
 
     //==========================================================================
@@ -3225,7 +3118,7 @@ namespace
         RackPresetBar (juce::Colour accentColour) : accent (accentColour)
         {
             setTitle ("Presets");
-            setTooltip ("Presets of this mode: click for the list (and to save your own), the arrows for the next or previous");
+            setTooltip ("Presets of this mode: click for the list, the arrows for the next or previous (save and manage: the key beside it)");
             setWantsKeyboardFocus (true);
             setMouseCursor (juce::MouseCursor::PointingHandCursor);
             startTimerHz (8);
@@ -3312,46 +3205,56 @@ namespace
 
         void paint (juce::Graphics& g) override
         {
-            // SPACE's bar (SpacePresetBar), its look kept.
-            using namespace design;
+            // The approved PRESET field (294 x 27): ‹ NAME ›, the arrows in 32 px wells with
+            // engraved dividers, the name 11 px semibold, an edited one with a quiet asterisk.
             refreshText();
-            const auto r = getLocalBounds().toFloat().reduced (0.5f);
-            g.setColour (colour::text.withAlpha (hover == 2 ? 0.07f : 0.04f));
+            const auto r = getLocalBounds().toFloat();
+            g.setColour (juce::Colour (0xffd4ccbf));
             g.fillRoundedRectangle (r, 5.0f);
-            g.setColour (hasKeyboardFocus (false) ? accent : colour::hairline.darker (0.1f));
-            g.drawRoundedRectangle (r, 5.0f, 1.0f);
-            auto arrow = [&g] (juce::Rectangle<float> a, bool left, bool lit) {
+            g.setColour (juce::Colour (0xffeae4db));
+            g.fillRoundedRectangle (r.reduced (1.0f), 4.0f);
+            g.setColour (juce::Colours::white.withAlpha (0.69f));
+            g.fillRect (juce::Rectangle<float> (r.getX() + 4.0f, r.getY() + 1.0f, r.getWidth() - 8.0f, 1.0f));
+            g.setColour (juce::Colour (0xffd4ccc0));
+            g.fillRect (juce::Rectangle<float> (leftArea().getRight(), r.getY() + 1.0f, 1.0f, r.getHeight() - 2.0f));
+            g.fillRect (juce::Rectangle<float> (rightArea().getX() - 1.0f, r.getY() + 1.0f, 1.0f, r.getHeight() - 2.0f));
+            auto arrow = [&g, this] (juce::Rectangle<float> a, bool left, bool lit) {
                 juce::Path path;
-                const auto c = a.getCentre();
-                path.startNewSubPath (c.x + (left ? 2.5f : -2.5f), c.y - 4.0f);
-                path.lineTo (c.x + (left ? -2.0f : 2.0f), c.y);
-                path.lineTo (c.x + (left ? 2.5f : -2.5f), c.y + 4.0f);
-                g.setColour (colour::text.withAlpha (lit ? 0.9f : 0.55f));
-                g.strokePath (path, juce::PathStrokeType (1.4f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+                const auto c = a.getCentre().translated (0.0f, 0.5f);
+                path.startNewSubPath (c.x + (left ? 2.5f : -2.5f), c.y - 5.0f);
+                path.lineTo (c.x + (left ? -2.5f : 2.5f), c.y);
+                path.lineTo (c.x + (left ? 2.5f : -2.5f), c.y + 5.0f);
+                g.setColour (juce::Colour (0xff78868e).withMultipliedBrightness (lit ? 0.8f : 1.0f));
+                g.strokePath (path, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+                juce::ignoreUnused (this);
             };
             arrow (leftArea(), true, hover == 1);
             arrow (rightArea(), false, hover == 3);
-            g.setColour (colour::hairline.darker (0.1f));
-            g.fillRect (juce::Rectangle<float> (leftArea().getRight(), r.getY() + 4.0f, 1.0f, r.getHeight() - 8.0f));
-            g.fillRect (juce::Rectangle<float> (rightArea().getX() - 1.0f, r.getY() + 4.0f, 1.0f, r.getHeight() - 8.0f));
-            const auto font = fonts::make (13.5f, fonts::Weight::medium, 0.03f);
+            const auto font = fonts::make (11.0f, fonts::Weight::semibold, 0.015f);
             g.setFont (font);
-            const auto area = getLocalBounds().toFloat().withTrimmedLeft (leftArea().getWidth() + 4.0f).withTrimmedRight (rightArea().getWidth() + 4.0f);
+            const auto area = r.withTrimmedLeft (leftArea().getWidth() + 7.0f).withTrimmedRight (rightArea().getWidth() + 7.0f);
+            const auto ink = juce::Colour (0xff607b8b).withMultipliedBrightness (hover == 2 ? 0.85f : 1.0f);
             if (edited)
             {
                 // The name as chosen, then a quiet asterisk: still that preset, edited.
-                const auto name = shown.dropLastCharacters (2);
-                const float w = juce::GlyphArrangement::getStringWidth (font, name), star = juce::GlyphArrangement::getStringWidth (font, " *");
+                auto name = shown.dropLastCharacters (2);
+                const float star = juce::GlyphArrangement::getStringWidth (font, " *");
+                const float w = std::min (juce::GlyphArrangement::getStringWidth (font, name), area.getWidth() - star - 2.0f);
                 const float x = area.getCentreX() - 0.5f * (w + star);
-                g.setColour (colour::text.withAlpha (0.9f));
+                g.setColour (ink);
                 g.drawText (name, juce::Rectangle<float> (x, area.getY(), w + 1.0f, area.getHeight()), juce::Justification::centredLeft, true);
-                g.setColour (accent.withAlpha (0.75f));
+                g.setColour (accent.darker (0.2f));
                 g.drawText (" *", juce::Rectangle<float> (x + w, area.getY(), star + 2.0f, area.getHeight()), juce::Justification::centredLeft, false);
             }
             else
             {
-                g.setColour (matched ? accent.darker (0.4f) : colour::text.withAlpha (0.72f));
+                g.setColour (matched ? ink : ink.withAlpha (0.8f));
                 g.drawText (shown, area, juce::Justification::centred, true);
+            }
+            if (hasKeyboardFocus (false))
+            {
+                g.setColour (rackui::palette::focus);
+                g.drawRoundedRectangle (r.expanded (2.0f), 7.0f, 2.0f);
             }
         }
         void mouseDown (const juce::MouseEvent& e) override
@@ -3431,7 +3334,39 @@ namespace
                 }
             if (! any)
                 menu.addItem ("(none saved yet)", false, false, [] {});
-            menu.addSeparator();
+            // The other modes' presets (choosing one changes the mode).
+            juce::PopupMenu others;
+            for (int other = 0; other < 8; ++other)
+            {
+                if (other == m)
+                    continue;
+                juce::PopupMenu sub;
+                bool has = false;
+                for (const auto& p : model->factory())
+                    if (model->modeOf (p) == other)
+                    {
+                        item (sub, p);
+                        has = true;
+                    }
+                if (has)
+                    others.addSubMenu (model->modeName (other), sub);
+            }
+            if (others.getNumItems() > 0)
+            {
+                menu.addSeparator();
+                menu.addSubMenu ("Other modes", others);
+            }
+            menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withDeletionCheck (*this));
+        }
+
+    public:
+        /** The preset actions ("···"): save, rename, delete, the folder, the module's own. */
+        juce::PopupMenu actionsMenu()
+        {
+            juce::PopupMenu menu;
+            if (model == nullptr)
+                return menu;
+            juce::Component::SafePointer<RackPresetBar> safe (this);
             menu.addItem (juce::String::fromUTF8 ("Save preset\xe2\x80\xa6"), [safe] { if (safe != nullptr) safe->askName ("Save preset", "A name for these settings:", {}, false); });
             if (const auto last = model->lastChosen(); last.has_value() && last->isUser())
             {
@@ -3455,31 +3390,15 @@ namespace
                     safe->model->folder().revealToUser();
                 }
             });
-            // The other modes' presets (choosing one changes the mode).
-            juce::PopupMenu others;
-            for (int other = 0; other < 8; ++other)
-            {
-                if (other == m)
-                    continue;
-                juce::PopupMenu sub;
-                bool has = false;
-                for (const auto& p : model->factory())
-                    if (model->modeOf (p) == other)
-                    {
-                        item (sub, p);
-                        has = true;
-                    }
-                if (has)
-                    others.addSubMenu (model->modeName (other), sub);
-            }
-            if (others.getNumItems() > 0)
-            {
-                menu.addSeparator();
-                menu.addSubMenu ("Other modes", others);
-            }
             model->addMenuItems (menu);
-            menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withDeletionCheck (*this));
+            return menu;
         }
+        void showActions (juce::Component& from)
+        {
+            actionsMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&from).withDeletionCheck (*this));
+        }
+
+    private:
         void askName (const juce::String& title, const juce::String& prompt, const juce::String& current, bool rename)
         {
             auto* window = new juce::AlertWindow (title, prompt, juce::MessageBoxIconType::NoIcon);
@@ -3507,8 +3426,8 @@ namespace
                     safe->saveAs (name);
             }), true);
         }
-        juce::Rectangle<float> leftArea() const { return getLocalBounds().toFloat().removeFromLeft (26.0f); }
-        juce::Rectangle<float> rightArea() const { return getLocalBounds().toFloat().removeFromRight (26.0f); }
+        juce::Rectangle<float> leftArea() const { return getLocalBounds().toFloat().removeFromLeft (32.0f); }
+        juce::Rectangle<float> rightArea() const { return getLocalBounds().toFloat().removeFromRight (32.0f); }
         void timerCallback() override
         {
             const auto before = shown;
@@ -3554,35 +3473,7 @@ namespace
 
     /** A control cell that is not a knob (a choice, FREE / SYNC): the knobs' caption over it,
         the key where a knob's dial is, so a row of cells reads as one. */
-    class RackKeyCell final : public juce::Component
-    {
-    public:
-        RackKeyCell (juce::String captionText, std::unique_ptr<juce::Component> key) : caption (std::move (captionText)), control (std::move (key))
-        {
-            addAndMakeVisible (*control);
-        }
-        const juce::String& captionText() const noexcept { return caption; }
-        juce::Component& key() noexcept { return *control; }
-        void resized() override
-        {
-            const auto r = getLocalBounds().toFloat();
-            const float h = r.getHeight();
-            control->setBounds (juce::Rectangle<float> (r.getWidth() - 8.0f, 26.0f).withCentre ({ r.getCentreX(), r.getY() + 0.48f * h }).getSmallestIntegerContainer());
-        }
-        void paint (juce::Graphics& g) override
-        {
-            // (MiniKnob's caption: the same type, colour and place.)
-            const auto r = getLocalBounds().toFloat();
-            const float h = r.getHeight();
-            g.setColour (design::colour::text.withAlpha (0.74f));   // (MiniKnob's strong caption)
-            g.setFont (type::popupLabel (std::max (9.0f, 0.155f * h)));
-            g.drawText (caption, juce::Rectangle<float> (r.getX() - 6.0f, r.getY(), r.getWidth() + 12.0f, 0.2f * h), juce::Justification::centred, false);
-        }
-
-    private:
-        juce::String caption;
-        std::unique_ptr<juce::Component> control;
-    };
+    using RackCell = rackui::Cell;
 
     //==========================================================================
     /** The modules' common part: the five slots at SPACE's geometry (rackcolumns). */
@@ -3593,6 +3484,8 @@ namespace
         {
             presetBar = std::make_unique<RackPresetBar> (design::colour::macro (macro));
             addAndMakeVisible (*presetBar);
+            presetActions.onClick = [this] { presetBar->showActions (presetActions); };
+            addAndMakeVisible (presetActions);
         }
 
         juce::String title() const override { return heading; }
@@ -3609,7 +3502,8 @@ namespace
         void paint (juce::Graphics& g) override
         {
             if (! expanded())
-                rackcolumns::paintDivider (g, getLocalBounds().withTrimmedTop (titleOffset()).withTrimmedBottom (rackcolumns::bottom), rackcolumns::dividerFor (density, getWidth()));
+                rackcolumns::paintDivider (g, rackcolumns::dividerFor (leftShare(), getWidth()), static_cast<float> (titleOffset() + 3),
+                                           static_cast<float> (getHeight() - 2));
         }
 
         /** Tests: the cells' captions in order; the presets bar; the slots' places. */
@@ -3620,7 +3514,7 @@ namespace
             {
                 if (auto* k = dynamic_cast<MiniKnob*> (cell.get()))
                     c.add (k->captionText());
-                else if (auto* key = dynamic_cast<RackKeyCell*> (cell.get()))
+                else if (auto* key = dynamic_cast<RackCell*> (cell.get()))
                     c.add (key->captionText());
             }
             return c.joinIntoString (" ");
@@ -3634,21 +3528,50 @@ namespace
                 case 3: return presetBar->getBounds();
                 case 4: return cells.empty() ? juce::Rectangle<int>() : cells.front()->getBounds();
                 case 5: return visual != nullptr ? visual->getBounds() : juce::Rectangle<int>();
+                case 6: return presetActions.getBounds();
                 default: return {};
             }
         }
+        /** Tests: every cell's bounds, in order. */
+        std::vector<juce::Rectangle<int>> cellBounds() const
+        {
+            std::vector<juce::Rectangle<int>> b;
+            for (const auto& cell : cells)
+                b.push_back (cell->getBounds());
+            return b;
+        }
+        /** Tests: the cell captioned `caption` (its control for a non-knob cell), or null. */
+        juce::Component* cellNamed (const juce::String& caption) const
+        {
+            for (const auto& cell : cells)
+            {
+                if (auto* k = dynamic_cast<MiniKnob*> (cell.get()); k != nullptr && k->captionText() == caption)
+                    return k;
+                if (auto* c = dynamic_cast<RackCell*> (cell.get()); c != nullptr && c->captionText() == caption)
+                    return &c->key();
+            }
+            return nullptr;
+        }
+        /** The layout family (0 standard, 1 dense: eight controls or more). */
+        bool dense() const noexcept { return static_cast<int> (cells.size()) >= rackcolumns::denseFrom; }
 
-        // SPACE's geometry: the reference for every module.
-        static constexpr int standardBody = 172, selectorWidth = 190, rowHeight = 26, rowGap = 8, cellWidth = 96, cellHeight = 104;
+        // The approved rack's rows (reference pixels): the selector row 39 under the title
+        // (its 27 px fields centred), 8 px, then the controls (103 px cells); the graph 160 px.
+        static constexpr int standardBody = 172, modeWidth = 165, presetWidth = 294, fieldHeight = 27, selectRow = 39, rowGap = 8, cellHeight = 112,
+                             graphHeight = 160, actionsWidth = 30;
+        static_assert (cellHeight == rackui::cellHeight);
 
     protected:
+        /** The controls' share of the content width (the approved column: per module). */
+        virtual float leftShare() const = 0;
+
         ValueSelector& setModeSelector (const juce::String& id, const juce::String& tip)
         {
             if (modeSelector != nullptr)
                 removeChildComponent (modeSelector.get());
             modeSelector = std::make_unique<ValueSelector> (*processor.apvts().getParameter (id), juce::String());
             modeSelector->setAccent (accent());
-            modeSelector->setProminent (true);
+            modeSelector->setRackStyle (ValueSelector::RackStyle::mode);
             modeSelector->setTooltip (tip);
             addAndMakeVisible (*modeSelector);
             return *modeSelector;
@@ -3664,37 +3587,57 @@ namespace
                 visual->setPictureScale (1.1f);
             addAndMakeVisible (*visual);
         }
+        /** A continuous ceramic knob (the approved cell: caption, 59 px knob, value). */
         MiniKnob& knob (const juce::String& id, const char* caption, MiniKnob::Formatter f)
         {
             auto k = std::make_unique<MiniKnob> (processor.apvts(), id, caption, std::move (f));
             k->setArcColour (accent());
-            k->setStrongCaption (true);
+            k->setRackMetrics (true);
             auto& ref = *k;
             addAndMakeVisible (ref);
             cells.push_back (std::move (k));
             return ref;
         }
-        ValueSelector& choiceCell (const juce::String& id, const juce::String& caption, const juce::String& tip)
+        /** A stepped rate (a choice parameter): the same knob with its detents marked. */
+        MiniKnob& steppedKnob (const juce::String& id, const char* caption, MiniKnob::Formatter f)
+        {
+            auto& k = knob (id, caption, std::move (f));
+            k.setDetents (true, accent());
+            return k;
+        }
+        /** A compact list (PATTERN, INTERVAL, MOTION): more than three, or long, choices. */
+        ValueSelector& listCell (const juce::String& id, const juce::String& caption, const juce::String& tip)
         {
             auto selector = std::make_unique<ValueSelector> (*processor.apvts().getParameter (id), juce::String());
             selector->setTooltip (tip);
-            selector->setProminent (true);
+            selector->setRackStyle (ValueSelector::RackStyle::option);
             auto& ref = *selector;
-            addCell (caption, std::move (selector));
+            addCell (caption, std::move (selector), RackCell::Kind::list);
             return ref;
         }
-        SegmentedControl& switchCell (const juce::String& id, const juce::String& caption, juce::StringArray items, const juce::String& tip)
+        /** A few short exclusive choices: the ceramic segmented switch. */
+        rackui::SegmentedSwitch& segmentCell (const juce::String& id, const juce::String& caption, std::vector<rackui::Position> positions, const juce::String& tip)
         {
-            auto segments = std::make_unique<SegmentedControl> (*processor.apvts().getParameter (id), std::move (items));
-            segments->setAccent (accent());
+            auto segments = std::make_unique<rackui::SegmentedSwitch> (*processor.apvts().getParameter (id), std::move (positions), &processor.undo(), accent());
             segments->setTooltip (tip);
             auto& ref = *segments;
-            addCell (caption, std::move (segments));
+            addCell (caption, std::move (segments), RackCell::Kind::segments);
             return ref;
         }
-        void addCell (const juce::String& caption, std::unique_ptr<juce::Component> control)
+        /** A real two- or three-state setting: the ceramic vertical switch. */
+        rackui::VerticalSwitch& switchCell (const juce::String& id, const juce::String& caption, std::vector<rackui::Position> positions, const juce::String& tip)
         {
-            auto cell = std::make_unique<RackKeyCell> (caption, std::move (control));
+            const bool three = positions.size() == 3;
+            auto key = std::make_unique<rackui::VerticalSwitch> (*processor.apvts().getParameter (id), std::move (positions), &processor.undo());
+            key->setTooltip (tip);
+            key->setTitle (caption);
+            auto& ref = *key;
+            addCell (caption, std::move (key), three ? RackCell::Kind::switch3 : RackCell::Kind::switch2);
+            return ref;
+        }
+        void addCell (const juce::String& caption, std::unique_ptr<juce::Component> control, RackCell::Kind kind)
+        {
+            auto cell = std::make_unique<RackCell> (caption, std::move (control), kind);
             addAndMakeVisible (*cell);
             cells.push_back (std::move (cell));
         }
@@ -3710,50 +3653,80 @@ namespace
         {
             if (visual == nullptr)
                 return;
-            auto body = getLocalBounds().withTrimmedTop (titleOffset()).withTrimmedBottom (rackcolumns::bottom);
-            // The mode's layout (its controls' count): where the controls end and the picture starts.
-            density = rackcolumns::densityFor (static_cast<int> (cells.size()));
-            auto left = body.withLeft (rackcolumns::leftMargin).withRight (rackcolumns::dividerFor (density, getWidth()) - 20);
-            auto top = left.removeFromTop (rowHeight);
+            const int width = getWidth(), x0 = rackcolumns::inset, top = titleOffset();
+            // MODE, PRESET (fixed widths: never stretched to the divider) and the preset actions.
+            const int fieldY = top + (selectRow - fieldHeight) / 2;
             if (modeSelector != nullptr)
-                modeSelector->setBounds (top.removeFromLeft (selectorWidth));
-            top.removeFromLeft (12);
-            presetBar->setBounds (top);
-            left.removeFromTop (rowGap);
+                modeSelector->setBounds (x0, fieldY, modeWidth, fieldHeight);
+            presetBar->setBounds (x0 + modeWidth + 12, fieldY, presetWidth, fieldHeight);
+            presetActions.setBounds (presetBar->getRight() + 12, fieldY, actionsWidth, fieldHeight);
+            const int controlsY = top + selectRow + rowGap;
             if (expanded())
             {
                 for (auto& cell : cells)
                     cell->setVisible (false);
-                layoutExpanded (body.withTrimmedTop (rowHeight + rowGap).withLeft (rackcolumns::leftMargin).withRight (getWidth() - rackcolumns::pictureRightMargin));
+                layoutExpanded (juce::Rectangle<int> (x0, controlsY, width - 2 * x0, getHeight() - rackcolumns::bottom - controlsY));
                 repaint();
                 return;
             }
-            placeVisual (body.withLeft (rackcolumns::pictureLeftFor (density, getWidth())).withRight (getWidth() - rackcolumns::pictureRightMargin));
-            // One row of equal cells on a fixed pitch from the same first place in every module
-            // and mode (a mode with fewer controls leaves the rest of the row empty).
-            const int n = static_cast<int> (cells.size());
-            jassert (n * cellWidth <= left.getWidth());
-            auto line = left.withWidth (n * cellWidth).withSizeKeepingCentre (n * cellWidth, std::min (left.getHeight(), cellHeight)).withX (left.getX());
+            const int pictureX = rackcolumns::pictureLeftFor (leftShare(), width);
+            placeVisual ({ pictureX, top + 4, width - rackcolumns::inset - pictureX, graphHeight });
+            // The controls: left-aligned from one origin on the approved slot widths; a mode with
+            // fewer leaves the rest of the column empty. (The family is the mode's: its count.)
+            const bool isDense = dense();
+            int x = x0;
             for (auto& cell : cells)
             {
+                auto slot = rackcolumns::Slot::knob;
+                if (auto* c = dynamic_cast<RackCell*> (cell.get()))
+                    slot = c->slot();
+                const int w = rackcolumns::slotWidth (slot, isDense);
                 cell->setVisible (true);
-                cell->setBounds (line.removeFromLeft (cellWidth));
+                cell->setBounds (x, controlsY, w, cellHeight);
+                x += w + rackcolumns::slotGap (isDense);
             }
+            jassert (x - rackcolumns::slotGap (isDense) <= rackcolumns::dividerFor (leftShare(), width) - rackcolumns::columnGap);
             repaint();
         }
+
+        /** The preset actions (approved "···" key beside PRESET): save, rename, delete, the folder,
+            and the module's own (MOVEMENT's lanes). */
+        class ActionsKey final : public juce::Button
+        {
+        public:
+            ActionsKey() : juce::Button ("Preset actions")
+            {
+                setTooltip ("Preset actions: save, rename, delete");
+                setMouseCursor (juce::MouseCursor::PointingHandCursor);
+                setWantsKeyboardFocus (true);
+                setMouseClickGrabsKeyboardFocus (false);
+            }
+            void paintButton (juce::Graphics& g, bool highlighted, bool down) override
+            {
+                const auto r = getLocalBounds().toFloat();
+                g.setColour (juce::Colour (0xffd2cbbf));
+                g.fillRoundedRectangle (r, 5.0f);
+                g.setColour (highlighted || down ? juce::Colour (0xfff2ece2) : juce::Colour (0xfff7f2ea));
+                g.fillRoundedRectangle (r.reduced (1.0f), 4.0f);
+                g.setColour (juce::Colour (0xff746e65));
+                for (int i = -1; i <= 1; ++i)
+                    g.fillEllipse (juce::Rectangle<float> (2.0f, 2.0f).withCentre ({ r.getCentreX() + 4.5f * static_cast<float> (i), r.getCentreY() }));
+                if (hasKeyboardFocus (false))
+                {
+                    g.setColour (rackui::palette::focus);
+                    g.drawRoundedRectangle (r.expanded (2.0f), 7.0f, 2.0f);
+                }
+            }
+        };
 
         InstrumentHost& processor;
         juce::String heading;
         design::colour::Macro identity;
         std::unique_ptr<ValueSelector> modeSelector;
         std::unique_ptr<RackPresetBar> presetBar;
+        ActionsKey presetActions;
         std::unique_ptr<Visual> visual;
         std::vector<std::unique_ptr<juce::Component>> cells;
-        rackcolumns::Density density = rackcolumns::Density::dense;
-
-    public:
-        /** Tests: the shown mode's layout (0 compact, 1 medium, 2 dense). */
-        int densityIndex() const noexcept { return static_cast<int> (density); }
     };
 
     //==========================================================================
@@ -3778,11 +3751,10 @@ namespace
                     onHeightChanged();
             };
             addChildComponent (magnifier);
-            const auto colour = accent();
             if (p.movementLaneCount() > 1)
                 for (int l = 0; l < 2; ++l)
                 {
-                    auto tab = std::make_unique<LaneTab> (l == 0 ? "A" : "B", colour);
+                    auto tab = std::make_unique<rackui::LaneKey> (l == 0 ? "A" : "B");
                     tab->setTitle (l == 0 ? "Lane A" : "Lane B");
                     tab->lit = [this, l] { return laneOn (l); };
                     tab->onClick = [this, l] { showLane (l); };
@@ -3790,35 +3762,43 @@ namespace
                     addAndMakeVisible (*tab);
                     laneTabs.push_back (std::move (tab));
                 }
-            power = std::make_unique<LanePower> (colour);
-            power->onClick = [this] {
-                if (lane.ids.onId.isNotEmpty())
-                    setPlain (processor.apvts(), lane.ids.onId, laneOn (lane.index) ? 0.0f : 1.0f);
-                refresh();
-            };
-            addChildComponent (*power);
             buildLane();
         }
 
         int bodyHeight() const override { return wide ? expandedBody : standardBody; }
+        float leftShare() const override { return 0.57f; }   // approved MOVEMENT column
         static constexpr int expandedBody = 268;
 
         void layoutTitleRow (juce::Rectangle<int> row) override
         {
-            // MOVEMENT  ...  A  B  (power)  (collapse): the shown lane's power nearest the
-            // collapse key, as round as it is; A and B before it.
+            // Approved: MOVEMENT ... [A][B]  ON (switch)  (collapse) - the lane keys 40 x 23, 2 px
+            // apart; 7 px; the word ON; 7 px; the shown lane's 16 x 26 switch; 8 px to collapse.
+            row = row.withSizeKeepingCentre (row.getWidth(), 30);
             if (power != nullptr)
             {
-                power->setBounds (row.removeFromRight (26).withSizeKeepingCentre (26, 26));
-                row.removeFromRight (10);
+                power->setBounds (row.removeFromRight (16).withSizeKeepingCentre (16, 26));
+                row.removeFromRight (7);
+                onWord = row.removeFromRight (onWordWidth);
+                row.removeFromRight (7);
             }
             for (auto it = laneTabs.rbegin(); it != laneTabs.rend(); ++it)
             {
-                (*it)->setBounds (row.removeFromRight (tabWidth));
-                row.removeFromRight (4);
+                (*it)->setBounds (row.removeFromRight (rackui::LaneKey::width).withSizeKeepingCentre (rackui::LaneKey::width, rackui::LaneKey::height));
+                row.removeFromRight (rackui::LaneKey::gap);
             }
         }
-        static constexpr int tabWidth = 28;
+        static constexpr int onWordWidth = 12;
+        void paint (juce::Graphics& g) override
+        {
+            UnifiedRack::paint (g);
+            if (power != nullptr && power->isVisible())
+            {
+                // The power's word (approved: 9 px, #777069), beside the switch.
+                g.setColour (juce::Colour (0xff777069));
+                g.setFont (fonts::make (9.0f, fonts::Weight::regular, 0.03f));
+                g.drawText ("ON", onWord, juce::Justification::centred, false);
+            }
+        }
         void refresh() override
         {
             if (builtMode != mode() || (builtMode == static_cast<int> (MovementMode::pulse) && builtSync != laneSynced()))
@@ -3834,12 +3814,10 @@ namespace
                                          + juce::String::fromUTF8 (" \xc2\xb7 Right-click to copy or swap lanes"));
                 laneTabs[l]->repaint();
             }
-            if (lane.ids.onId.isNotEmpty())
+            if (power != nullptr)
             {
                 const bool on = laneOn (lane.index);
-                power->setToggleState (on, juce::dontSendNotification);
                 power->setTooltip (on ? "Lane " + letter + " plays (click: off; the other lane stays as it is)" : "Lane " + letter + " is off (click: on)");
-                power->repaint();
             }
         }
 
@@ -3853,8 +3831,12 @@ namespace
                     items.add (child->getTitle().isNotEmpty() ? child->getTitle() : child->getName());
             return items;
         }
-        juce::Rectangle<int> laneSwitchBounds() const { return power->isVisible() ? power->getBounds() : juce::Rectangle<int>(); }
-        void clickLaneSwitch() { power->onClick(); }
+        juce::Rectangle<int> laneSwitchBounds() const { return power != nullptr && power->isVisible() ? power->getBounds() : juce::Rectangle<int>(); }
+        void clickLaneSwitch()
+        {
+            if (power != nullptr)
+                power->choose (power->positionIndex() == 0 ? 1 : 0);
+        }
         juce::StringArray laneActionNames()
         {
             juce::StringArray names;
@@ -3914,7 +3896,23 @@ namespace
                 });
             };
             presetBar->setModel (models[static_cast<std::size_t> (std::clamp (lane.index, 0, static_cast<int> (models.size()) - 1))].get());
-            power->setVisible (lane.ids.onId.isNotEmpty());
+            // The shown lane's power: the approved mini switch, bound to that lane's ON (ON up).
+            if (power != nullptr)
+                removeChildComponent (power.get());
+            power.reset();
+            if (lane.ids.onId.isNotEmpty())
+                if (auto* on = processor.apvts().getParameter (lane.ids.onId))
+                {
+                    power = std::make_unique<rackui::VerticalSwitch> (*on, std::vector<rackui::Position> { { "ON", "On", 1.0f }, { "OFF", "Off", 0.0f } }, &processor.undo(),
+                                                                      rackui::VerticalSwitch::Style::mini);
+                    power->setTitle ("Lane power");
+                    power->onChange = [this] (int) {
+                        for (auto& t : laneTabs)
+                            t->repaint();
+                        refresh();
+                    };
+                    addAndMakeVisible (*power);
+                }
             customAttachment.reset();
             if (auto* custom = processor.apvts().getParameter (lane ("shaper.custom")))
                 customAttachment = std::make_unique<juce::ParameterAttachment> (*custom, [this] (float) { repaint(); });
@@ -3963,23 +3961,45 @@ namespace
                     knob (lane ("chorus.stereo"), "STEREO", percent);
                     break;
                 case MovementMode::pulse:
+                {
+                    // INTENSITY, TIMING (FREE up, SYNC down), one RATE knob in the same place for
+                    // both - free in Hz, synced on the cycle's note values with detents - SHAPE,
+                    // STEREO, PHASE (acting on the tempo's grid, so live only while synced).
                     knob (level, "INTENSITY", percent);
                     if (lane.ids.syncId.isNotEmpty())
-                        switchCell (lane.ids.syncId, "TIMING", { "FREE", "SYNC" }, "PULSE's rate: free (Hz), or a note value at the host's tempo");
+                        switchCell (lane.ids.syncId, "TIMING", { { "FREE", "Free", 0.0f }, { "SYNC", "Sync", 1.0f } },
+                                    "PULSE's rate: free (Hz), or a note value at the host's tempo");
                     if (builtSync && lane.ids.pulseDivisionId.isNotEmpty())
-                        choiceCell (lane.ids.pulseDivisionId, "CYCLE", "One rise and fall every ... (at the host's tempo)");
+                    {
+                        auto* division = processor.apvts().getParameter (lane.ids.pulseDivisionId);
+                        steppedKnob (lane.ids.pulseDivisionId, "RATE", [division] (double v) {
+                            return division != nullptr ? division->getText (division->convertTo0to1 (static_cast<float> (v)), 16) : juce::String (v);
+                        });
+                    }
                     else
                         knob (lane ("pulse.rate"), "RATE", [] (double v) { return format::hertz (shaping::pulseRateHz (v * 0.01)); });
                     knob (lane ("pulse.shape"), "SHAPE", percent);
                     knob (lane ("pulse.stereo"), "STEREO", percent);
-                    if (builtSync && lane.ids.phaseId.isNotEmpty())   // (PHASE acts on the tempo's grid only)
-                        knob (lane.ids.phaseId, "PHASE", [] (double v) { return juce::String (juce::roundToInt (v * 3.6)) + juce::String::fromUTF8 ("\xc2\xb0"); });
+                    if (lane.ids.phaseId.isNotEmpty())
+                    {
+                        auto& phase = knob (lane.ids.phaseId, "PHASE", [] (double v) { return juce::String (juce::roundToInt (v * 3.6)) + juce::String::fromUTF8 ("\xc2\xb0"); });
+                        phase.setEnabled (builtSync);
+                        phase.setAlpha (builtSync ? 1.0f : 0.45f);
+                        phase.slider.setTooltip (builtSync ? "PHASE: where the cycle starts on the tempo's grid" : "PHASE acts on the tempo's grid: set TIMING to SYNC");
+                    }
                     break;
+                }
                 case MovementMode::shaper:
                 {
-                    setUpPatternSelector (choiceCell (lane ("shaper.pattern"), "PATTERN", "Pattern: a curated one, or CUSTOM (your own steps; draw on the display)"));
-                    choiceCell (lane ("shaper.rate"), "RATE", "Rate (synced to the host tempo)");
-                    choiceCell (lane ("shaper.target"), "TARGET", "What the pattern shapes: the volume, a low-pass filter, or both");
+                    // PATTERN (a compact list), RATE (stepped: the engine's divisions), TARGET
+                    // (VOL / FILTER / BOTH), DEPTH, SMOOTH, PHASE.
+                    setUpPatternSelector (listCell (lane ("shaper.pattern"), "PATTERN", "Pattern: a curated one, or CUSTOM (your own steps; draw on the display)"));
+                    auto* rate = processor.apvts().getParameter (lane ("shaper.rate"));
+                    steppedKnob (lane ("shaper.rate"), "RATE", [rate] (double v) {
+                        return rate != nullptr ? rate->getText (rate->convertTo0to1 (static_cast<float> (v)), 16) : juce::String (v);
+                    });
+                    segmentCell (lane ("shaper.target"), "TARGET", { { "VOL", "Volume", 0.0f }, { "FILTER", "Filter", 1.0f }, { "BOTH", "Both", 2.0f } },
+                                 "What the pattern shapes: the volume, a low-pass filter, or both");
                     knob (level, "DEPTH", percent);
                     knob (lane ("shaper.smooth"), "SMOOTH", percent);
                     if (lane.ids.phaseId.isNotEmpty())
@@ -4150,8 +4170,9 @@ namespace
         std::unique_ptr<ShaperToolbar> toolbar;
         MagnifierButton magnifier;
         std::unique_ptr<juce::ParameterAttachment> customAttachment;
-        std::vector<std::unique_ptr<LaneTab>> laneTabs;
-        std::unique_ptr<LanePower> power;
+        std::vector<std::unique_ptr<rackui::LaneKey>> laneTabs;
+        std::unique_ptr<rackui::VerticalSwitch> power;
+        juce::Rectangle<int> onWord;
     };
 
     /** ECHO: TAPE / BBD / ASCEND and its presets; TIME, FEEDBACK, TONE, AGE (ASCEND: CLOCK,
@@ -4159,6 +4180,7 @@ namespace
     class EchoRack final : public UnifiedRack
     {
     public:
+        float leftShare() const override { return 0.61f; }   // approved ECHO column
         explicit EchoRack (InstrumentHost& p) : UnifiedRack (p, "ECHO", design::colour::Macro::echo), model (p)
         {
             setModeSelector ("echo.type", "Tape echo, bucket-brigade (BBD) delay, or ASCEND: repeats an interval up (a pitch shifter in the loop)");
@@ -4180,8 +4202,10 @@ namespace
             clearCells();
             const auto percent = [] (double v) { return format::percent (v) + " %"; };
             const bool ascend = key / 2 == static_cast<int> (EchoType::ascend);
+            // TIME: one knob in one place - milliseconds when free, the note values (detents) when
+            // synced. AGE (BBD: its wear; its clock follows TIME) or ASCEND's CLOCK.
             if (key % 2 == 1)
-                knob ("echo.division", "TIME", [] (double v) { return juce::String (shaping::echoDivisionName (juce::roundToInt (v))); });
+                steppedKnob ("echo.division", "TIME", [] (double v) { return juce::String (shaping::echoDivisionName (juce::roundToInt (v))); });
             else
                 knob ("echo.time", "TIME", [] (double v) { return format::milliseconds (v); });
             knob ("echo.feedback", "FEEDBACK", percent);
@@ -4189,13 +4213,14 @@ namespace
             if (ascend)
             {
                 knob ("echo.age", "CLOCK", [] (double v) { return juce::String (EchoDelay::clockHz (0.01 * v) / 1000.0, 1) + " kHz"; });
-                choiceCell ("echo.ascend.interval", "INTERVAL", "How far each pass shifts the repeats: an octave up, a fifth, a fourth, or an octave down");
-                choiceCell ("echo.ascend.motion", "MOTION", "RISE: each repeat higher than the last. STEADY: every repeat at the interval. LATE: the first as played, then rising");
+                listCell ("echo.ascend.interval", "INTERVAL", "How far each pass shifts the repeats: an octave up, a fifth, a fourth, or an octave down");
+                listCell ("echo.ascend.motion", "MOTION", "RISE: each repeat higher than the last. STEADY: every repeat at the interval. LATE: the first as played, then rising");
             }
             else
                 knob ("echo.age", "AGE", percent);
-            switchCell ("echo.sync", "TIMING", { "FREE", "SYNC" }, "Free time in ms, or a note value synced to the host tempo");
-            choiceCell ("echo.stereo", "STEREO", "In the centre, alternating left and right, or two heads a little apart");
+            switchCell ("echo.sync", "TIMING", { { "FREE", "Free", 0.0f }, { "SYNC", "Sync", 1.0f } }, "Free time in ms, or a note value synced to the host tempo");
+            switchCell ("echo.stereo", "STEREO", { { "MONO", "Mono", 0.0f }, { "PING", "Ping-Pong", 1.0f }, { "WIDE", "Wide", 2.0f } },
+                        "In the centre, alternating left and right (Ping-Pong), or two heads a little apart");
             layout();
         }
 
@@ -4208,13 +4233,15 @@ namespace
     class SpaceRack final : public UnifiedRack
     {
     public:
+        float leftShare() const override { return 0.68f; }   // approved SPACE column
         explicit SpaceRack (InstrumentHost& p) : UnifiedRack (p, "SPACE", design::colour::Macro::space), model (p)
         {
             auto& m = setModeSelector ("space.type", "Room, hall, plate or spring - or ABYSS, VINTAGE or BLOOM, SPACE's other engines, and their variants");
+            // MODE names the room or the engine (approved: ABYSS); its variant is its preset's
+            // name and is chosen in this list's engine submenus.
             m.textOverride = [this] {
-                if (engine() == 0)
-                    return juce::String();
-                return spacepresets::describe (processor.apvts()).replace (" ", juce::String::fromUTF8 (" \xc2\xb7 "));
+                static const char* engines[] { "", "ABYSS", "VINTAGE", "BLOOM" };
+                return juce::String (engines[std::clamp (engine(), 0, 3)]);
             };
             m.extraItems = [this] (juce::PopupMenu& menu) {
                 juce::Component::SafePointer<SpaceRack> safe (this);
@@ -4283,7 +4310,8 @@ namespace
                     knob ("space.abyss.resonance", "RESONANCE", percent);
                     knob ("space.modulation", "MOD", percent);
                     knob ("space.width", "WIDTH", percent);
-                    knob ("space.abyss.freeze", "FREEZE", [] (double v) { return juce::String (v >= 0.5 ? "ON" : "OFF"); });
+                    switchCell ("space.abyss.freeze", "FREEZE", { { "ON", "On", 1.0f }, { "OFF", "Off", 0.0f } },
+                                "FREEZE: holds the tail as it is (nothing new enters, nothing fades)");
                     break;
                 case 2:   // VINTAGE
                     knob ("space.preDelay", "PRE-DELAY", ms);
@@ -4293,17 +4321,19 @@ namespace
                     knob ("space.vintage.diffusion", "DIFFUSION", percent);
                     knob ("space.modulation", "MOD", percent);
                     knob ("space.width", "WIDTH", percent);
-                    knob ("space.vintage.era", "ERA", [] (double v) { return juce::String (v >= 0.5 ? "LATER" : "EARLY"); });
+                    segmentCell ("space.vintage.era", "ERA", { { "EARLY", "Early", 0.0f }, { "LATER", "Later", 1.0f } },
+                                 "The early digital reverbs' grain, or the later ones' smoother tail");
                     break;
                 case 3:   // BLOOM
                     if (key % 2 == 1)
-                        knob ("space.bloom.division", "TIME", [] (double v) { return juce::String (shaping::echoDivisionName (juce::roundToInt (v))); });
+                        steppedKnob ("space.bloom.division", "TIME", [] (double v) { return juce::String (shaping::echoDivisionName (juce::roundToInt (v))); });
                     else
                         knob ("space.bloom.time", "TIME", ms);
                     knob ("space.bloom.diffusion", "DIFFUSION", percent);
                     knob ("space.decay", "DECAY", seconds);
                     knob ("space.damping", "DAMP", percent);
-                    knob ("space.bloom.sync", "SYNC", [] (double v) { return juce::String (v >= 0.5 ? "TEMPO" : "FREE"); });
+                    switchCell ("space.bloom.sync", "TIMING", { { "FREE", "Free", 0.0f }, { "SYNC", "Sync", 1.0f } },
+                                "BLOOM's time: free (ms), or a note value at the host's tempo");
                     knob ("space.size", "SIZE", percent);
                     knob ("space.modulation", "MOD", percent);
                     knob ("space.width", "WIDTH", percent);
@@ -5165,6 +5195,8 @@ std::unique_ptr<rack::Module> createRackModule (rack::Kind kind, InstrumentHost&
         case rack::Kind::movement: return std::make_unique<MovementRack> (processor);
         case rack::Kind::echo: return std::make_unique<EchoRack> (processor);
         case rack::Kind::space: return std::make_unique<SpaceRack> (processor);
+        case rack::Kind::filter:
+        case rack::Kind::morph: break;   // (a product's own: ShellProduct::productRacks)
     }
     return nullptr;
 }
@@ -5216,10 +5248,24 @@ juce::StringArray rackMovementPresetMenuExtras (const rack::Module& module)
     return {};
 }
 
+std::vector<juce::Rectangle<int>> rackCellBounds (const rack::Module& module)
+{
+    if (const auto* m = dynamic_cast<const UnifiedRack*> (&module))
+        return m->cellBounds();
+    return {};
+}
+
+juce::Component* rackCell (const rack::Module& module, const juce::String& caption)
+{
+    if (const auto* m = dynamic_cast<const UnifiedRack*> (&module))
+        return m->cellNamed (caption);
+    return nullptr;
+}
+
 int rackDensity (const rack::Module& module)
 {
     if (const auto* m = dynamic_cast<const UnifiedRack*> (&module))
-        return m->densityIndex();
+        return m->dense() ? 1 : 0;
     return -1;
 }
 

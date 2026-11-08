@@ -40,9 +40,13 @@ void showRackMovementLane (rack::Module& module, int lane);
     click), the lanes' actions (A / B selector's menu; run one by index) and the presets' menu's. */
 juce::StringArray rackMovementTitleRow (const rack::Module& module);
 juce::Rectangle<int> rackMovementLaneSwitch (const rack::Module& module);   ///< the shown lane's power (title row)
-/** Tests: a rack module's layout for its mode (0 compact, 1 medium, 2 dense: how much of the
-    rack its controls take; the picture the rest, its right edge fixed). */
+/** Tests: a rack module's layout family for its mode (0 standard, 1 dense: eight controls or
+    more - narrower slots, the knobs as large). */
 int rackDensity (const rack::Module& module);
+/** Tests: every control cell's bounds in order, and the control of the cell captioned `caption`
+    (a knob, or a cell's switch / list), or null. */
+std::vector<juce::Rectangle<int>> rackCellBounds (const rack::Module& module);
+juce::Component* rackCell (const rack::Module& module, const juce::String& caption);
 void clickRackMovementLaneSwitch (rack::Module& module);
 juce::StringArray rackMovementLaneActions (rack::Module& module);
 void runRackMovementLaneAction (rack::Module& module, int index);
