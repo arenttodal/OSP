@@ -110,6 +110,12 @@ public:
     /** The effects rack's cells: the caption a step stronger, so it reads at plugin size
         (opt-in; the popovers' as ever). */
     void setStrongCaption (bool strong) { strongCaption = strong; repaint(); }
+    /** The approved effects racks' cell (opt-in): caption 11 px in its 22 px line, a 59 px
+        knob under it, the value 13 px under that, in the approved colours. */
+    void setRackMetrics (bool rack);
+    /** A stepped rate (opt-in): a detent mark per step around the knob, the chosen one long,
+        in `accent` (the slider's range must be stepped: a choice parameter). */
+    void setDetents (bool show, juce::Colour accent);
     /** The popups' cell (SPACE's DECAY): caption, a ticked knob, the value in a box. */
     void setBoxed (bool shouldBeBoxed);
     /** The value arc (and a boxed knob's pointer) in this colour: its macro's identity. */
@@ -140,7 +146,8 @@ private:
     juce::String caption;
     Formatter formatter;
     bool horizontal;
-    bool onDark = false, compact = false, boxed = false, strongCaption = false;
+    bool onDark = false, compact = false, boxed = false, strongCaption = false, rackMetrics = false, detents = false;
+    juce::Colour detentAccent;
     juce::Rectangle<float> valueBox() const;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
     std::vector<int> choiceOrder;
@@ -162,6 +169,15 @@ public:
     void setOnDark (bool dark) { onDark = dark; repaint(); }
     /** The effects rack's MODE: its value a little larger and darker (opt-in; off as ever). */
     void setProminent (bool shouldBeProminent) { prominent = shouldBeProminent; repaint(); }
+    /** The approved effects racks' fields (opt-in): `mode` the MODE dropdown (165 x 27, 11 px),
+        `option` a cell's compact list (PATTERN, INTERVAL: 25 px, 10 px). */
+    enum class RackStyle
+    {
+        none,
+        mode,
+        option
+    };
+    void setRackStyle (RackStyle style) { rackStyle = style; repaint(); }
     int selected() const noexcept { return index; }
     std::function<void (int)> onChange;
     /** Shown instead of the value while it returns text (SHAPER: CUSTOM); no item is ticked then. */
@@ -186,6 +202,7 @@ private:
     juce::String caption;
     int index = 0;
     bool plain = false, hasAccent = false, onDark = false, prominent = false;
+    RackStyle rackStyle = RackStyle::none;
     juce::Colour accent;
     juce::ParameterAttachment attachment;
 };
