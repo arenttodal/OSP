@@ -95,6 +95,10 @@ protected:
     /** A short status beside the title (an empty string: none). */
     std::function<juce::String()> headerStatus;
     void setGraph (std::unique_ptr<GraphFrame> graph);
+    /** A rack whose subject changes (a product's FX rack showing one effect, then another):
+        its title and colour (the cells take the colour at their next build). */
+    void setHeading (const juce::String& title);
+    void setAccent (juce::Colour colour);
     GraphFrame* graph() const noexcept { return graphView.get(); }
 
     /** Builds the shown page's selectors and cells (the sub-page: subPage()). */
@@ -108,6 +112,8 @@ protected:
     rackui::SegmentedSwitch& selectorSegment (const juce::String& id, const juce::String& caption, std::vector<rackui::Position> positions, int width,
                                               const juce::String& tip, const juce::String& over = {});
     ValueSelector& selectorList (const juce::String& id, const juce::String& caption, int width, const juce::String& tip);
+    /** In build(): a product's own field in the selector row (a preset browser), 27 px high. */
+    juce::Component& selectorComponent (std::unique_ptr<juce::Component> control, const juce::String& caption, int width);
     /** In build(): the next cells form a group (a quiet divider before it; its caption, if any,
         small in the band over its first cell). `quiet`: a
         secondary group (configuration, not the sound's shaping): its captions and values a

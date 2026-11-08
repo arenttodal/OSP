@@ -122,7 +122,8 @@ struct ProductInfo
     std::vector<osp::plugin::rack::Kind> rackModules;
     /** Racks the product builds itself (opt-in; ANDOR ANALOG's FILTER and MORPH): the macro
         (its parameter ID) whose name opens it as the shared ones do, its kind, and how it is
-        built (osp::plugin::rack::ParameterRack). Empty: none, as in ANDOR OSP. */
+        built (osp::plugin::rack::ParameterRack). An empty macro: no macro opens it (the product's
+        own view does: ShellEditor::setRackExpanded). Empty: none, as in ANDOR OSP. */
     struct ProductRack
     {
         juce::String macroParameterId;

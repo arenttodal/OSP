@@ -5196,7 +5196,8 @@ std::unique_ptr<rack::Module> createRackModule (rack::Kind kind, InstrumentHost&
         case rack::Kind::echo: return std::make_unique<EchoRack> (processor);
         case rack::Kind::space: return std::make_unique<SpaceRack> (processor);
         case rack::Kind::filter:
-        case rack::Kind::morph: break;   // (a product's own: ShellProduct::productRacks)
+        case rack::Kind::morph:
+        case rack::Kind::fx: break;   // (a product's own: ShellProduct::productRacks)
     }
     return nullptr;
 }

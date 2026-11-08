@@ -110,6 +110,8 @@ public:
     bool cardArpeggiator() const noexcept override { return cardArp && ! referenceParity; }
     /** The effects rack's modules (the product's; none in the visual regression's parity render). */
     bool showsRack() const noexcept { return ! referenceParity && (! product().rackModules.empty() || ! product().productRacks.empty()); }
+    /** The product's other view of the sources' area and its icon (not in the parity render). */
+    bool showsSourceView() const noexcept { return ! referenceParity && product().sourceAreaView.create != nullptr; }
     /** The cards' modifiers in their wells (the product's choice; not in the parity render). */
     bool modifiersInWell() const noexcept { return ! referenceParity && product().cardModifiersInWell; }
     bool stableModulationTabs() const noexcept { return ! referenceParity && product().stableModulationTabs; }

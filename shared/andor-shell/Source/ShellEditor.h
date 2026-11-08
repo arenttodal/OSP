@@ -109,7 +109,7 @@ public:
     /** The rack module a macro (its parameter ID) opens: the product's own, or a shared one the
         product lists (rackModules), if any. */
     std::optional<osp::plugin::rack::Kind> rackKindForMacro (const juce::String& parameterId) const;
-    bool hasRack (osp::plugin::rack::Kind kind) const noexcept { return rackMacro (kind) >= 0; }
+    bool hasRack (osp::plugin::rack::Kind kind) const noexcept;
     /** A macro's name (tests: its clicks, its context menu). */
     osp::plugin::MacroLabel* macroLabel (int macro) noexcept { return macro >= 0 && macro < osp::plugin::frame::macroCount ? macros[static_cast<std::size_t> (macro)].label.get() : nullptr; }
     void setRackExpanded (osp::plugin::rack::Kind kind, bool open);

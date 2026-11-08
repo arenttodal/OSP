@@ -213,6 +213,31 @@ ValueSelector& ParameterRack::selectorList (const juce::String& id, const juce::
     return ref;
 }
 
+void ParameterRack::setHeading (const juce::String& t)
+{
+    heading = t;
+    if (auto* parent = getParentComponent())
+        parent->repaint();
+}
+
+void ParameterRack::setAccent (juce::Colour c)
+{
+    accentColour = c;
+    builtKey = -1;
+    if (auto* parent = getParentComponent())
+        parent->repaint();
+}
+
+juce::Component& ParameterRack::selectorComponent (std::unique_ptr<juce::Component> control, const juce::String& caption, int width)
+{
+    control->setSize (width, 27);
+    control->setTitle (caption);
+    auto& ref = *control;
+    addAndMakeVisible (ref);
+    selectors.push_back ({ caption, std::move (control), {} });
+    return ref;
+}
+
 void ParameterRack::setGraph (std::unique_ptr<GraphFrame> g)
 {
     if (graphView != nullptr)

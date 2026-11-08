@@ -282,7 +282,7 @@ ShellEditor::ShellEditor (ShellProcessor& p)
     };
     content.addChildComponent (headerMix);
     // The product's other view of the sources' area (opt-in): its icon beside SAVE.
-    if (shell.product().sourceAreaView.create != nullptr)
+    if (shell.showsSourceView())
     {
         sourceViewButton.setTooltip (shell.product().sourceAreaView.tooltip);
         sourceViewButton.setTitle (shell.product().sourceAreaView.tooltip);
@@ -443,7 +443,7 @@ void ShellEditor::layoutInstrument()
     }
     parts.sourceTrim = sourceTrim();
     frame::place (parts, arpShown);
-    if (shell.product().sourceAreaView.create != nullptr)
+    if (shell.showsSourceView())
     {
         // The icon beside SAVE, on its centre line (12 px from it), and MIX moved right by as
         // much, narrower by as much (it centres itself), clear of VOLUME.
@@ -506,7 +506,7 @@ bool ShellEditor::threeEngines() const
 
 void ShellEditor::setSourceViewShown (bool shown)
 {
-    if (shell.product().sourceAreaView.create == nullptr || shown == sourceViewOpen)
+    if (! shell.showsSourceView() || shown == sourceViewOpen)
         return;
     if (shown && sourceView == nullptr)
     {
@@ -1184,6 +1184,20 @@ std::unique_ptr<rack::Module> ShellEditor::createRackModule (rack::Kind kind)
         if (r.kind == kind && r.create != nullptr)
             return r.create (shell);
     return osp::plugin::createRackModule (kind, shell);
+}
+
+bool ShellEditor::hasRack (rack::Kind kind) const noexcept
+{
+    if (rackMacro (kind) >= 0)
+        return true;
+    // A product's rack that no macro opens (ShellProduct::ProductRack with no macro: its own view
+    // opens it, as ANDOR ANALOG's FX ROUTING opens its effects' racks).
+    if (! shell.showsRack())
+        return false;
+    for (const auto& r : shell.product().productRacks)
+        if (r.kind == kind && r.macroParameterId.isEmpty())
+            return true;
+    return false;
 }
 
 int ShellEditor::rackMacro (rack::Kind kind) const noexcept
