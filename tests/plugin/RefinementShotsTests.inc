@@ -298,3 +298,65 @@ TEST_CASE ("plugin: UI refinement screenshots (OSP_REFINE_DIR)", "[.][refine-sho
         ui.refreshNow();
     }, "08-imprint-chips-3L");
 }
+
+TEST_CASE ("plugin: playback-mode selector screenshots (OSP_MODE_SHOTS)", "[.][mode-shots]")
+{
+    // On demand: OSP_MODE_SHOTS=<folder> osp_plugin_tests "[mode-shots]". The source headers in
+    // one, two and three layers (A One Shot, B Granular, C One Shot), 1x and 2x, both window
+    // sizes for three; and, where the selector offers it, its menu open.
+    const char* dir = std::getenv ("OSP_MODE_SHOTS");
+    if (dir == nullptr)
+        return;
+    TempDir tmp;
+    const ScopedEnvironment storeDir ("OSP_SAMPLE_STORE", tmp.dir.getChildFile ("store").getFullPathName());
+    const ScopedEnvironment library ("OSP_LIBRARY_DIR", tmp.dir.getChildFile ("library").getFullPathName());
+    const ScopedEnvironment documents ("OSP_DOCUMENTS_DIR", tmp.dir.getChildFile ("documents").getFullPathName());
+    const ScopedLook ceramic (skin::Look::ceramic);
+    auto save = [dir] (const juce::Image& image, const juce::String& name) {
+        juce::FileOutputStream out (juce::File (dir).getChildFile (name));
+        out.setPosition (0);
+        out.truncate();
+        juce::PNGImageFormat().writeImageToStream (image, out);
+    };
+    const auto pad = writeSource (tmp.dir, "pad.wav", testsignals::vowel (midiToHz (60), 2.4, 48000.0, 3));
+    const auto pluck = writeSource (tmp.dir, "pluck.wav", testsignals::pluck (220.0, 2.4, 48000.0, 4));
+    const auto low = writeSource (tmp.dir, "low.wav", testsignals::vowel (midiToHz (48), 2.4, 48000.0, 5));
+    using Editor = osp::plugin::OspAudioProcessorEditor;
+    auto shoot = [&] (std::vector<juce::File> files, juce::Point<int> size, bool openMenu, const juce::String& name) {
+        OspAudioProcessor p;
+        std::unique_ptr<juce::AudioProcessorEditor> e (p.createEditorIfNeeded());
+        auto* ui = dynamic_cast<Editor*> (e.get());
+        REQUIRE (ui != nullptr);
+        juce::Array<juce::File> list;
+        for (const auto& f : files)
+            list.add (f);
+        p.addLayers (list);
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        if (files.size() > 1)
+            p.setParameterValue (osp::plugin::InstrumentHost::layerParameterId (1, "sourceMode"), 1.0f);
+        e->setSize (size.x, size.y);
+        ui->refreshNow();
+        ui->refreshNow();
+        // Open: the menu below B's selector, as its window places it (drawn into the editor:
+        // no menu window can open headless).
+        std::unique_ptr<juce::Component> menu;
+        if (auto* selector = ui->engineCard (1).modeSelector(); openMenu && selector != nullptr)
+        {
+            menu = selector->createMenuPicture();
+            const auto below = e->getLocalArea (selector, selector->getLocalBounds()).getBottomLeft();
+            menu->setTopLeftPosition (std::min (below.x, e->getWidth() - menu->getWidth() - 8), below.y - 3);
+            e->addAndMakeVisible (*menu);
+        }
+        for (const float scale : { 1.0f, 2.0f })
+            save (e->createComponentSnapshot (e->getLocalBounds(), true, scale), name + (scale > 1.5f ? "@2x.png" : "@1x.png"));
+        if (menu != nullptr)
+            e->removeChildComponent (menu.get());
+    };
+    shoot ({ pad }, { 1448, 1086 }, false, "mode-1L");
+    shoot ({ pad, pluck }, { 1448, 1086 }, false, "mode-2L");
+    shoot ({ pad, pluck, low }, { 1448, 1086 }, false, "mode-3L");
+    shoot ({ pad, pluck, low }, { 1086, 814 }, false, "mode-3L-small");
+    shoot ({ pad, pluck }, { 1448, 1086 }, true, "mode-2L-menu");
+    shoot ({ pad, pluck, low }, { 1086, 814 }, true, "mode-3L-small-menu");
+}

@@ -147,6 +147,38 @@ namespace icons
             }
         }
     }
+
+    void drawOneShotIcon (juce::Graphics& g, juce::Rectangle<float> area, juce::Colour colour, float stroke)
+    {
+        // A start marker, then the sound running forward from it: | --->, on a 16-unit grid.
+        const float s = std::min (area.getWidth(), area.getHeight()), u = s / 16.0f;
+        const auto o = area.withSizeKeepingCentre (s, s).getTopLeft();
+        auto at = [o, u] (float x, float y) { return juce::Point<float> (o.x + x * u, o.y + y * u); };
+        juce::Path p;
+        p.startNewSubPath (at (2.6f, 3.4f));
+        p.lineTo (at (2.6f, 12.6f));
+        p.startNewSubPath (at (6.0f, 8.0f));
+        p.lineTo (at (13.9f, 8.0f));
+        p.startNewSubPath (at (10.6f, 4.7f));
+        p.lineTo (at (13.9f, 8.0f));
+        p.lineTo (at (10.6f, 11.3f));
+        g.setColour (colour);
+        g.strokePath (p, juce::PathStrokeType (stroke, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    }
+
+    void drawGranularIcon (juce::Graphics& g, juce::Rectangle<float> area, juce::Colour colour)
+    {
+        // Six grains, uneven in place and size: a small cloud, balanced but not symmetric (no
+        // star, no sparkle). Their ink matches the arrow's at the same size.
+        const float s = std::min (area.getWidth(), area.getHeight()), u = s / 16.0f;
+        const auto o = area.withSizeKeepingCentre (s, s).getTopLeft();
+        struct Grain { float x, y, r; };
+        static constexpr Grain grains[] { { 3.2f, 9.3f, 1.5f }, { 6.4f, 4.5f, 1.25f }, { 7.6f, 12.0f, 1.75f },
+                                          { 10.5f, 7.6f, 1.45f }, { 13.2f, 3.9f, 1.05f }, { 13.4f, 11.3f, 1.25f } };
+        g.setColour (colour);
+        for (const auto& grain : grains)
+            g.fillEllipse (juce::Rectangle<float> (2.0f * grain.r * u, 2.0f * grain.r * u).withCentre ({ o.x + grain.x * u, o.y + grain.y * u }));
+    }
 }
 
 namespace
@@ -1401,9 +1433,72 @@ void ModifierButton::paint (juce::Graphics& g)
 }
 
 //==============================================================================
+namespace
+{
+    /** One mode in the selector's menu: its symbol, its name, a muted line on what it does, a
+        check by the active one; the menu's own colours, type and highlight. */
+    class ModeMenuItem final : public juce::PopupMenu::CustomComponent
+    {
+    public:
+        ModeMenuItem (int m, juce::String n, juce::String d, bool active)
+            : juce::PopupMenu::CustomComponent (true), mode (m), name (std::move (n)), description (std::move (d)), ticked (active)
+        {
+            setTitle (name);
+            setDescription (description);
+        }
+
+        void getIdealSize (int& width, int& height) override
+        {
+            width = 236;
+            height = 44;
+        }
+
+        void paint (juce::Graphics& g) override
+        {
+            const auto r = getLocalBounds().toFloat();
+            if (isItemHighlighted())
+            {
+                g.setColour (findColour (juce::PopupMenu::highlightedBackgroundColourId));
+                g.fillRoundedRectangle (r.reduced (3.0f, 1.0f), 4.0f);
+            }
+            const auto ink = findColour (juce::PopupMenu::textColourId);
+            const auto icon = juce::Rectangle<float> (14.0f, r.getCentreY() - 8.0f, 16.0f, 16.0f);
+            if (mode == 1)
+                icons::drawGranularIcon (g, icon, ink.withAlpha (0.88f));
+            else
+                icons::drawOneShotIcon (g, icon, ink.withAlpha (0.88f));
+            auto text = r.withTrimmedLeft (42.0f).withTrimmedRight (34.0f);
+            const float top = r.getCentreY() - 15.0f;
+            g.setColour (ink);
+            g.setFont (getLookAndFeel().getPopupMenuFont());
+            g.drawText (name, text.withY (top).withHeight (17.0f), juce::Justification::centredLeft, true);
+            g.setColour (findColour (juce::PopupMenu::headerTextColourId));
+            g.setFont (fonts::make (11.5f, fonts::Weight::regular));
+            g.drawText (description, text.withY (top + 17.0f).withHeight (14.0f), juce::Justification::centredLeft, true);
+            if (ticked)
+            {
+                // The active mode: a fine check at the right.
+                const auto c = juce::Point<float> (r.getRight() - 19.0f, r.getCentreY());
+                juce::Path tick;
+                tick.startNewSubPath (c.translated (-4.5f, 0.2f));
+                tick.lineTo (c.translated (-1.4f, 3.3f));
+                tick.lineTo (c.translated (4.5f, -3.6f));
+                g.setColour (ink.withAlpha (0.85f));
+                g.strokePath (tick, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            }
+        }
+
+    private:
+        int mode;
+        juce::String name, description;
+        bool ticked;
+    };
+}
+
 ModeSelector::ModeSelector (juce::RangedAudioParameter& p)
     : attachment (p, [this] (float v) {
           current = v >= 0.5f ? 1 : 0;
+          describe();
           repaint();
           if (onChange != nullptr)
               onChange (current);
@@ -1413,6 +1508,25 @@ ModeSelector::ModeSelector (juce::RangedAudioParameter& p)
     binding::tag (*this, p.getParameterID());
     setMouseCursor (juce::MouseCursor::PointingHandCursor);
     setTitle (p.getName (64));
+    setWantsKeyboardFocus (true);
+    setMouseClickGrabsKeyboardFocus (false);
+    describe();
+}
+
+void ModeSelector::describe()
+{
+    // The symbol carries no words: the tooltip and the accessible description say the mode.
+    const auto said = "Playback mode: " + modeName (current);
+    setDescription (said);
+    setTooltip (iconOnly() || namedTooltip.isEmpty() ? said : namedTooltip);
+    if (auto* handler = getAccessibilityHandler())
+        handler->notifyAccessibilityEvent (juce::AccessibilityEvent::valueChanged);
+}
+
+void ModeSelector::setNamedTooltip (const juce::String& text)
+{
+    namedTooltip = text;
+    describe();
 }
 
 void ModeSelector::choose (int mode)
@@ -1426,6 +1540,7 @@ void ModeSelector::setFirstModeName (const juce::String& name)
     if (name.isNotEmpty() && name != firstModeName)
     {
         firstModeName = name;
+        describe();
         repaint();
     }
 }
@@ -1435,6 +1550,7 @@ void ModeSelector::setFitsName (bool fit)
     if (fit != fitted)
     {
         fitted = fit;
+        describe();
         repaint();
     }
 }
@@ -1448,25 +1564,130 @@ float ModeSelector::fittedWidth() const
     return std::ceil (2.0f + 15.0f + name + 8.0f + 14.0f + 9.0f);
 }
 
+juce::PopupMenu ModeSelector::createMenu()
+{
+    juce::PopupMenu menu;
+    juce::Component::SafePointer<ModeSelector> safe (this);
+    for (int m = 0; m < 2; ++m)
+    {
+        auto pick = [safe, m] { if (safe != nullptr) safe->choose (m); };
+        if (iconOnly())
+        {
+            juce::PopupMenu::Item item (modeName (m));
+            item.itemID = m + 1;
+            item.isTicked = current == m;
+            item.customComponent = new ModeMenuItem (m, modeName (m), modeDescription (m), current == m);
+            item.action = pick;
+            menu.addItem (std::move (item));
+        }
+        else
+            menu.addItem (modeName (m), true, current == m, pick);
+    }
+    return menu;
+}
+
+void ModeSelector::showMenu (juce::Component* parent)
+{
+    auto options = juce::PopupMenu::Options().withTargetComponent (this).withDeletionCheck (*this);
+    if (! iconOnly())
+        options = options.withMinimumWidth (getWidth());
+    if (parent != nullptr)
+        options = options.withParentComponent (parent);
+    createMenu().showMenuAsync (options);
+}
+
+std::unique_ptr<juce::Component> ModeSelector::createMenuPicture()
+{
+    class Picture final : public juce::Component
+    {
+    public:
+        void paint (juce::Graphics& g) override { getLookAndFeel().drawPopupMenuBackground (g, getWidth(), getHeight()); }
+        juce::OwnedArray<juce::Component> items;
+    };
+    auto picture = std::make_unique<Picture>();
+    const int border = getLookAndFeel().getPopupMenuBorderSize();
+    int y = border, width = 0;
+    for (int m = 0; m < 2; ++m)
+    {
+        auto* item = new ModeMenuItem (m, modeName (m), modeDescription (m), current == m);
+        picture->items.add (item);
+        int w = 0, h = 0;
+        item->getIdealSize (w, h);
+        item->setBounds (border, y, w, h);
+        picture->addAndMakeVisible (item);
+        y += h;
+        width = std::max (width, w);
+    }
+    picture->setSize (width + 2 * border, y + border);
+    picture->setInterceptsMouseClicks (false, false);
+    picture->setComponentID ("modeMenuPicture");
+    return picture;
+}
+
 void ModeSelector::mouseUp (const juce::MouseEvent& e)
 {
     if (! getLocalBounds().contains (e.getPosition()))
         return;
-    juce::PopupMenu menu;
-    juce::Component::SafePointer<ModeSelector> safe (this);
-    menu.addItem (firstModeName, true, current == 0, [safe] { if (safe != nullptr) safe->choose (0); });
-    menu.addItem ("Granular", true, current == 1, [safe] { if (safe != nullptr) safe->choose (1); });
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMinimumWidth (getWidth()).withDeletionCheck (*this));
+    showMenu();
+}
+
+bool ModeSelector::keyPressed (const juce::KeyPress& key)
+{
+    // As a menu button: Return, Space or Down opens the menu (its keys then choose).
+    if (key == juce::KeyPress::returnKey || key == juce::KeyPress::spaceKey || key == juce::KeyPress::downKey)
+    {
+        showMenu();
+        return true;
+    }
+    return false;
+}
+
+std::unique_ptr<juce::AccessibilityHandler> ModeSelector::createAccessibilityHandler()
+{
+    // A pop-up button: its title is the parameter, its value the mode, pressing opens the menu.
+    class Value final : public juce::AccessibilityTextValueInterface
+    {
+    public:
+        explicit Value (ModeSelector& s) : selector (s) {}
+        bool isReadOnly() const override { return true; }
+        juce::String getCurrentValueAsString() const override { return selector.modeName (selector.mode()); }
+        void setValueAsString (const juce::String&) override {}
+
+    private:
+        ModeSelector& selector;
+    };
+    return std::make_unique<juce::AccessibilityHandler> (
+        *this, juce::AccessibilityRole::popupMenu,
+        juce::AccessibilityActions().addAction (juce::AccessibilityActionType::press, [this] { showMenu(); })
+                                    .addAction (juce::AccessibilityActionType::showMenu, [this] { showMenu(); }),
+        juce::AccessibilityHandler::Interfaces { std::make_unique<Value> (*this) });
 }
 
 void ModeSelector::paint (juce::Graphics& g)
 {
     // A compact source property (157 x 41 in the reference): the key's body as tall as NOTES
-    // and EQ (keyArea), its name and a quiet chevron.
+    // and EQ (keyArea), its name and a quiet chevron. ANDOR OSP's: the mode's symbol instead of
+    // its name, in a small key (42 px).
     const auto r = keyArea (getLocalBounds().toFloat()).reduced (1.0f);
     const float k = getHeight() / 41.0f;
     if (! skin::drawnBySurface())   // ceramic: the card draws the key
         design::draw::button (g, r, 7.0f * k, false, isMouseOver(), design::colour::accent);
+    if (iconOnly())
+    {
+        // The symbol (16 px) and the chevron (9 px), 3 px apart, centred as a pair; the pair
+        // sits 0.5 px left so the chevron's lighter ink does not pull it right.
+        const float icon = 16.0f * k, chevron = 9.0f * k, gap = 3.0f * k;
+        const float x = r.getCentreX() - 0.5f * (icon + gap + chevron) - 0.5f * k;
+        const auto symbol = juce::Rectangle<float> (x, r.getCentreY() - 0.5f * icon, icon, icon);
+        const auto ink = design::colour::text.withAlpha (isMouseOver() ? 0.95f : 0.84f);
+        if (current == 1)
+            icons::drawGranularIcon (g, symbol, ink);
+        else
+            icons::drawOneShotIcon (g, symbol, ink, 1.4f * k);
+        icons::draw (g, icons::Kind::chevronDown, juce::Rectangle<float> (symbol.getRight() + gap, r.getCentreY() - 0.5f * chevron, chevron, chevron),
+                     design::colour::text.withAlpha (0.5f), 1.2f * k);
+        return;
+    }
     // Quiet: the waveform is the hero, the mode only a property of it.
     g.setColour (design::colour::text.withAlpha (0.88f));
     g.setFont (type::sourceMode (0.88f * k));
@@ -1502,7 +1723,7 @@ EngineCard::EngineCard (InstrumentHost& p, int layer)
     if (auto* param = processor.apvts().getParameter (InstrumentHost::layerParameterId (layer, "sourceMode")))
     {
         mode = std::make_unique<ModeSelector> (*param);
-        mode->setTooltip ("Layer " + InstrumentHost::layerName (layer) + ": play the recording through, or as a cloud of grains");
+        mode->setNamedTooltip ("Layer " + InstrumentHost::layerName (layer) + ": play the recording through, or as a cloud of grains");
         mode->onChange = [this] (int) { updateMode(); };
         addAndMakeVisible (*mode);
     }
@@ -1871,9 +2092,10 @@ juce::Rectangle<int> EngineCard::headingBounds() const
 
 void EngineCard::setFirstModeName (const juce::String& name)
 {
+    const bool wasIcon = mode != nullptr && mode->iconOnly();
     if (mode != nullptr)
         mode->setFirstModeName (name);
-    if (mode != nullptr && mode->fitsName())
+    if (mode != nullptr && (mode->fitsName() || wasIcon != mode->iconOnly()))
         resized();
 }
 
@@ -2899,7 +3121,11 @@ void EngineCard::resized()
     muteButton.setBounds (at ({ 77.0f, 10.0f, 27.0f, 21.0f }));
     soloButton.setBounds (at ({ 77.0f, 32.0f, 27.0f, 21.0f }));
     menuButton.setBounds (at ({ w - 51.0f, 14.0f, 30.0f, 36.0f }));
-    const float modeWidth = mode != nullptr && mode->fitsName() ? std::min (mode->fittedWidth(), triple ? 128.0f : 157.0f) : (triple ? 128.0f : 157.0f);
+    // The mode: ANDOR OSP's symbol key (small: the name beside the badge gets the room back),
+    // or a product's named key, fitted to its names or at the reference width.
+    const float modeWidth = mode != nullptr && mode->iconOnly() ? (triple ? ModeSelector::iconWidthNarrow : ModeSelector::iconWidth)
+                          : mode != nullptr && mode->fitsName() ? std::min (mode->fittedWidth(), triple ? 128.0f : 157.0f)
+                                                                : (triple ? 128.0f : 157.0f);
     if (mode != nullptr)
         mode->setBounds (at ({ w - 62.0f - modeWidth, 12.0f, modeWidth, 41.0f }));
     // EQ: a small key left of the mode (the name gives it the room).

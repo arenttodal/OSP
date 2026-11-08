@@ -8010,3 +8010,4 @@ TEST_CASE ("plugin: full-range modulation - 100 % reaches the knob's end; older 
 #include "SynthesizeTests.inc"
 #include "CardArpTests.inc"
 #include "CaptureTests.inc"
+#include "ModeSelectorTests.inc"
