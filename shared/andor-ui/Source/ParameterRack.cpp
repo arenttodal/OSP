@@ -20,46 +20,49 @@ void GraphFrame::paint (juce::Graphics& g)
 }
 
 //==============================================================================
-/** The page selector: low-profile words, the shown one in the full text colour and underlined
-    in the module's colour (the modulation panel's tabs' manner). */
+/** Page words: low-profile, the shown one in the full text colour and underlined in the
+    module's colour (the modulation panel's tabs' manner); sub-pages a step smaller. */
 class ParameterRack::PageTabs final : public juce::Component
 {
 public:
-    PageTabs (ParameterRack& o, juce::StringArray n) : owner (o), names (std::move (n))
+    PageTabs (juce::StringArray n, juce::Colour a, bool small, std::function<int()> get, std::function<void (int)> set)
+        : names (std::move (n)), accent (a), secondary (small), shownIndex (std::move (get)), choose (std::move (set))
     {
         setWantsKeyboardFocus (true);
         setMouseClickGrabsKeyboardFocus (false);
         setMouseCursor (juce::MouseCursor::PointingHandCursor);
-        setTitle ("Pages");
     }
-    static juce::Font font() { return fonts::make (11.0f, fonts::Weight::medium, 0.06f); }
+    juce::Font font() const { return fonts::make (secondary ? 10.0f : 11.0f, fonts::Weight::medium, 0.06f); }
+    float gap() const { return secondary ? 16.0f : 22.0f; }
     int preferredWidth() const
     {
         float w = 0.0f;
         for (const auto& n : names)
-            w += juce::GlyphArrangement::getStringWidth (font(), n) + 22.0f;
-        return juce::roundToInt (w);
+            w += juce::GlyphArrangement::getStringWidth (font(), n) + gap();
+        return juce::roundToInt (w - gap() + 2.0f);
     }
     juce::Rectangle<float> tab (int i) const
     {
         float x = 0.0f;
         for (int k = 0; k < i; ++k)
-            x += juce::GlyphArrangement::getStringWidth (font(), names[k]) + 22.0f;
-        return { x, 0.0f, juce::GlyphArrangement::getStringWidth (font(), names[i]) + 22.0f, static_cast<float> (getHeight()) };
+            x += juce::GlyphArrangement::getStringWidth (font(), names[k]) + gap();
+        return { x, 0.0f, juce::GlyphArrangement::getStringWidth (font(), names[i]) + 2.0f, static_cast<float> (getHeight()) };
     }
+    const juce::StringArray& words() const noexcept { return names; }
     void paint (juce::Graphics& g) override
     {
         g.setFont (font());
+        const int shown = shownIndex();
         for (int i = 0; i < names.size(); ++i)
         {
             const auto t = tab (i);
-            const bool shown = i == owner.currentPage;
-            g.setColour (shown ? juce::Colour (0xff3e3d3a) : juce::Colour (0xff8a847b).withAlpha (i == hover ? 1.0f : 0.9f));
-            g.drawText (names[i], t.withTrimmedRight (22.0f), juce::Justification::centredLeft, false);
-            if (shown)
+            const bool on = i == shown;
+            g.setColour (on ? juce::Colour (0xff3e3d3a) : juce::Colour (0xff8a847b).withAlpha (i == hover ? 1.0f : 0.9f));
+            g.drawText (names[i], t, juce::Justification::centredLeft, false);
+            if (on)
             {
-                g.setColour (owner.accentColour);
-                g.fillRoundedRectangle (t.withTrimmedRight (22.0f).withY (t.getBottom() - 5.0f).withHeight (2.0f), 1.0f);
+                g.setColour (accent);
+                g.fillRoundedRectangle (t.withTrimmedRight (2.0f).withY (t.getCentreY() + 0.5f * font().getHeight() + 2.0f).withHeight (secondary ? 1.5f : 2.0f), 1.0f);
             }
         }
         if (hasKeyboardFocus (false))
@@ -71,8 +74,8 @@ public:
     void mouseDown (const juce::MouseEvent& e) override
     {
         for (int i = 0; i < names.size(); ++i)
-            if (tab (i).contains (e.position))
-                owner.showPage (i);
+            if (tab (i).expanded (0.5f * gap(), 0.0f).contains (e.position))
+                choose (i);
     }
     void mouseMove (const juce::MouseEvent& e) override
     {
@@ -94,9 +97,9 @@ public:
     bool keyPressed (const juce::KeyPress& key) override
     {
         if (key == juce::KeyPress::leftKey)
-            owner.showPage (std::max (0, owner.currentPage - 1));
+            choose (std::max (0, shownIndex() - 1));
         else if (key == juce::KeyPress::rightKey)
-            owner.showPage (std::min (names.size() - 1, owner.currentPage + 1));
+            choose (std::min (names.size() - 1, shownIndex() + 1));
         else
             return false;
         return true;
@@ -105,30 +108,45 @@ public:
     void focusLost (FocusChangeType) override { repaint(); }
 
 private:
-    ParameterRack& owner;
     juce::StringArray names;
+    juce::Colour accent;
+    bool secondary;
+    std::function<int()> shownIndex;
+    std::function<void (int)> choose;
     int hover = -1;
 };
 
 //==============================================================================
-ParameterRack::ParameterRack (InstrumentHost& h, juce::String t, juce::Colour a, float leftShare, int rowCount)
-    : host (h), heading (std::move (t)), accentColour (a), share (leftShare), rows (std::max (1, rowCount))
+ParameterRack::ParameterRack (InstrumentHost& h, juce::String t, juce::Colour a, float leftShare)
+    : host (h), heading (std::move (t)), accentColour (a), share (leftShare)
 {
 }
 
 ParameterRack::~ParameterRack() = default;
 
-int ParameterRack::bodyHeight() const
-{
-    return selectRow + rowGap + rows * (groupBand + rackui::cellHeight + 2) + 4;
-}
-
 void ParameterRack::setPages (juce::StringArray names, int* memory)
 {
     pageMemory = memory;
     currentPage = memory != nullptr ? juce::jlimit (0, names.size() - 1, *memory) : 0;
-    pageTabs = std::make_unique<PageTabs> (*this, std::move (names));
+    pageTabs = std::make_unique<PageTabs> (std::move (names), accentColour, false, [this] { return currentPage; }, [this] (int p) { showPage (p); });
+    pageTabs->setTitle ("Pages");
     addAndMakeVisible (*pageTabs);
+}
+
+void ParameterRack::setSubPages (int page, juce::StringArray names, int* memory)
+{
+    auto tabs = std::make_unique<PageTabs> (std::move (names), accentColour, true, [this] { return subPage(); }, [this] (int s) { showSubPage (s); });
+    tabs->setTitle ("Sub-pages");
+    addChildComponent (*tabs);
+    subTabs[page] = { std::move (tabs), memory };
+}
+
+int ParameterRack::subPage() const noexcept
+{
+    const auto it = subTabs.find (currentPage);
+    if (it == subTabs.end() || it->second.second == nullptr)
+        return 0;
+    return juce::jlimit (0, it->second.first->words().size() - 1, *it->second.second);
 }
 
 void ParameterRack::showPage (int p)
@@ -138,8 +156,15 @@ void ParameterRack::showPage (int p)
     currentPage = p;
     if (pageMemory != nullptr)
         *pageMemory = p;
-    if (pageTabs != nullptr)
-        pageTabs->repaint();
+    rebuild();
+}
+
+void ParameterRack::showSubPage (int s)
+{
+    const auto it = subTabs.find (currentPage);
+    if (it == subTabs.end() || it->second.second == nullptr || *it->second.second == s)
+        return;
+    *it->second.second = s;
     rebuild();
 }
 
@@ -170,6 +195,19 @@ rackui::SegmentedSwitch& ParameterRack::selectorSegment (const juce::String& id,
     return ref;
 }
 
+ValueSelector& ParameterRack::selectorList (const juce::String& id, const juce::String& caption, int width, const juce::String& tip)
+{
+    auto list = std::make_unique<ValueSelector> (*host.apvts().getParameter (id), juce::String());
+    list->setRackStyle (ValueSelector::RackStyle::option);
+    list->setTooltip (tip);
+    list->setTitle (caption);
+    list->setSize (width, 27);
+    auto& ref = *list;
+    addAndMakeVisible (ref);
+    selectors.emplace_back (caption, std::move (list));
+    return ref;
+}
+
 void ParameterRack::setGraph (std::unique_ptr<GraphFrame> g)
 {
     if (graphView != nullptr)
@@ -178,23 +216,17 @@ void ParameterRack::setGraph (std::unique_ptr<GraphFrame> g)
     addAndMakeVisible (*graphView);
 }
 
-void ParameterRack::row()
-{
-    ++buildingRow;
-    jassert (buildingRow < rows);
-}
-
 void ParameterRack::group (const juce::String& caption)
 {
-    groups.push_back ({ caption, buildingRow, {} });
+    groups.push_back ({ caption, {} });
 }
 
 void ParameterRack::add (std::unique_ptr<juce::Component> cell, rackui::Slot slot)
 {
     addAndMakeVisible (*cell);
-    if (groups.empty() || groups.back().row != buildingRow)
-        groups.push_back ({ {}, buildingRow, {} });
-    cells.push_back ({ std::move (cell), buildingRow, static_cast<int> (groups.size()) - 1, slot });
+    if (groups.empty())
+        groups.push_back ({ {}, {} });
+    cells.push_back ({ std::move (cell), static_cast<int> (groups.size()) - 1, slot });
 }
 
 MiniKnob& ParameterRack::knob (const juce::String& id, const juce::String& caption, MiniKnob::Formatter f)
@@ -247,22 +279,31 @@ rackui::VerticalSwitch& ParameterRack::switchCell (const juce::String& id, const
     return ref;
 }
 
+int ParameterRack::currentKey() const
+{
+    return (currentPage * 16 + subPage()) * 1000 + buildKey();
+}
+
 void ParameterRack::rebuild()
 {
     for (auto& c : cells)
         removeChildComponent (c.cell.get());
     cells.clear();
+    for (auto& s : selectors)
+        removeChildComponent (s.second.get());
+    selectors.clear();
     groups.clear();
-    buildingRow = 0;
-    builtKey = currentPage * 1000 + buildKey();
+    builtKey = currentKey();
     build (currentPage);
+    for (auto& [page, tabs] : subTabs)
+        tabs.first->setVisible (page == currentPage);
     layout();
     repaint();
 }
 
 void ParameterRack::refresh()
 {
-    if (currentPage * 1000 + buildKey() != builtKey)
+    if (currentKey() != builtKey)
         rebuild();
     if (graphView != nullptr)
         graphView->refresh();
@@ -287,7 +328,7 @@ void ParameterRack::resized()
 
 void ParameterRack::layoutTitleRow (juce::Rectangle<int> row)
 {
-    // ... [status]  ON (switch)  (collapse): as MOVEMENT's power.
+    // ... [status]  ON (switch)  (collapse): as MOVEMENT's lane power.
     row = row.withSizeKeepingCentre (row.getWidth(), 30);
     if (power != nullptr)
     {
@@ -299,68 +340,74 @@ void ParameterRack::layoutTitleRow (juce::Rectangle<int> row)
     statusArea = row.withTrimmedLeft (4);
 }
 
+int ParameterRack::dividerX() const
+{
+    return rackui::Cell::contentInset + juce::roundToInt (share * static_cast<float> (getWidth() - 2 * rackui::Cell::contentInset)) + rackui::Cell::columnGap;
+}
+
 void ParameterRack::layout()
 {
-    const int width = getWidth(), x0 = 20, top = titleOffset();
-    const int divider = x0 + juce::roundToInt (share * static_cast<float> (width - 40)) + 17;
-    const int pictureX = divider + 18;
-    // The selector row: the pages, then the captioned selectors.
+    const int width = getWidth(), x0 = rackui::Cell::contentInset, top = titleOffset();
+    const int divider = dividerX();
+    // The selector row: the pages, the shown page's sub-pages, its selectors (caption before).
     int x = x0;
     const int fieldY = top + (selectRow - 27) / 2;
     if (pageTabs != nullptr)
     {
         pageTabs->setBounds (x, fieldY, pageTabs->preferredWidth(), 27);
-        x = pageTabs->getRight() + 18;
+        x = pageTabs->getRight() + 22;
     }
+    if (const auto it = subTabs.find (currentPage); it != subTabs.end())
+    {
+        it->second.first->setBounds (x, fieldY, it->second.first->preferredWidth(), 27);
+        x = it->second.first->getRight() + 22;
+    }
+    const auto captionFont = fonts::make (9.0f, fonts::Weight::medium, 0.06f);
     for (auto& [caption, control] : selectors)
     {
-        const int captionWidth = juce::roundToInt (juce::GlyphArrangement::getStringWidth (fonts::make (9.0f, fonts::Weight::medium, 0.06f), caption)) + 8;
-        x += captionWidth;
+        if (caption.isNotEmpty())
+            x += juce::roundToInt (juce::GlyphArrangement::getStringWidth (captionFont, caption)) + 7;
         control->setTopLeftPosition (x, fieldY);
-        x = control->getRight() + 18;
+        x = control->getRight() + 16;
     }
-    // The rows: one slot family for the module (dense when a row holds eight or more).
-    int most = 0;
-    for (int r = 0; r < rows; ++r)
-        most = std::max (most, static_cast<int> (std::count_if (cells.begin(), cells.end(), [r] (const Placed& p) { return p.row == r; })));
-    const bool dense = most >= rackui::denseFrom;
+    jassert (x - 16 <= divider - rackui::Cell::columnGap);
+    // One row of cells on the standard lines; one slot family for the page.
+    const bool dense = static_cast<int> (cells.size()) >= rackui::denseFrom;
     for (auto& g : groups)
         g.span = {};
-    for (int r = 0; r < rows; ++r)
+    const int y = top + selectRow + rowGap;
+    int cx = x0, lastGroup = -1;
+    for (auto& p : cells)
     {
-        const int y = top + selectRow + rowGap + r * (groupBand + rackui::cellHeight + 2) + groupBand;
-        int cx = x0, lastGroup = -1;
-        for (auto& p : cells)
-        {
-            if (p.row != r)
-                continue;
-            if (lastGroup >= 0 && p.group != lastGroup)
-                cx += 20 - rackui::slotGap (dense);   // a group's gap (its divider in the middle)
-            const int w = rackui::slotWidth (p.slot, dense);
-            p.cell->setBounds (cx, y, w, rackui::cellHeight);
-            auto& span = groups[static_cast<std::size_t> (p.group)].span;
-            span = span.isEmpty() ? p.cell->getBounds() : span.getUnion (p.cell->getBounds());
-            cx += w + rackui::slotGap (dense);
-            lastGroup = p.group;
-        }
-        jassert (cx - rackui::slotGap (dense) <= divider - 17);
+        if (lastGroup >= 0 && p.group != lastGroup)
+            cx += 20 - rackui::slotGap (dense);   // a group's gap (its divider in the middle)
+        const int w = rackui::slotWidth (p.slot, dense);
+        p.cell->setBounds (cx, y, w, rackui::cellHeight);
+        auto& span = groups[static_cast<std::size_t> (p.group)].span;
+        span = span.isEmpty() ? p.cell->getBounds() : span.getUnion (p.cell->getBounds());
+        cx += w + rackui::slotGap (dense);
+        lastGroup = p.group;
     }
+    jassert (cx - rackui::slotGap (dense) <= divider - rackui::Cell::columnGap);
     if (graphView != nullptr)
-        graphView->setBounds (pictureX, top + 4, width - 20 - pictureX, getHeight() - bottomMargin - (top + 4));
+    {
+        const int pictureX = divider + 1 + rackui::Cell::columnGap;
+        graphView->setBounds (pictureX, top + 4, width - x0 - pictureX, graphHeight);
+    }
 }
 
 void ParameterRack::paint (juce::Graphics& g)
 {
-    const int width = getWidth();
-    const int divider = 20 + juce::roundToInt (share * static_cast<float> (width - 40)) + 17;
+    // The divider (as the effects racks').
     g.setColour (juce::Colour (0xffcbc4b9));
-    g.fillRect (juce::Rectangle<float> (static_cast<float> (divider), static_cast<float> (titleOffset() + 3), 1.0f, static_cast<float> (getHeight() - titleOffset() - 5)));
+    g.fillRect (juce::Rectangle<float> (static_cast<float> (dividerX()), static_cast<float> (titleOffset() + 3), 1.0f, static_cast<float> (getHeight() - titleOffset() - 5)));
     // The selectors' captions (inline, before each).
     g.setFont (fonts::make (9.0f, fonts::Weight::medium, 0.06f));
     g.setColour (rackui::palette::caption);
     for (auto& [caption, control] : selectors)
-        g.drawText (caption, juce::Rectangle<int> (control->getX() - 200, control->getY(), 196, control->getHeight()), juce::Justification::centredRight, false);
-    // The groups: a small caption over each, a subdued divider between them.
+        if (caption.isNotEmpty())
+            g.drawText (caption, juce::Rectangle<int> (control->getX() - 200, control->getY(), 193, control->getHeight()), juce::Justification::centredRight, false);
+    // The groups: a quiet divider between them; a caption (if any) small in the band over the cells.
     for (std::size_t i = 0; i < groups.size(); ++i)
     {
         const auto& gr = groups[i];
@@ -369,14 +416,14 @@ void ParameterRack::paint (juce::Graphics& g)
         if (gr.caption.isNotEmpty())
         {
             g.setColour (juce::Colour (0xff8c857b));
-            g.setFont (fonts::make (9.0f, fonts::Weight::medium, 0.08f));
-            g.drawText (gr.caption, gr.span.withY (gr.span.getY() - groupBand).withHeight (groupBand).withTrimmedLeft (4), juce::Justification::centredLeft, false);
+            g.setFont (fonts::make (8.5f, fonts::Weight::medium, 0.08f));
+            g.drawText (gr.caption, juce::Rectangle<int> (gr.span.getX() + 4, gr.span.getY() - 11, gr.span.getWidth(), 10), juce::Justification::centredLeft, false);
         }
-        if (i > 0 && groups[i - 1].row == gr.row && ! groups[i - 1].span.isEmpty())
+        if (i > 0 && ! groups[i - 1].span.isEmpty())
         {
             const float x = 0.5f * static_cast<float> (groups[i - 1].span.getRight() + gr.span.getX());
             g.setColour (juce::Colour (0xffddd5c9));
-            g.fillRect (juce::Rectangle<float> (x, static_cast<float> (gr.span.getY() - groupBand + 2), 1.0f, static_cast<float> (gr.span.getHeight() + groupBand - 14)));
+            g.fillRect (juce::Rectangle<float> (x, static_cast<float> (gr.span.getY() + 4), 1.0f, static_cast<float> (gr.span.getHeight() - 16)));
         }
     }
     if (power != nullptr)

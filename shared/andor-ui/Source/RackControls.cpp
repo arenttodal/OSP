@@ -512,13 +512,15 @@ void Cell::resized()
     const int w = getWidth();
     switch (kind)
     {
-        case Kind::list: control->setBounds (juce::roundToInt (0.03f * static_cast<float> (w)), 40, juce::roundToInt (0.94f * static_cast<float> (w)), 25); break;
-        case Kind::segments: control->setBounds (0, 42, w, 27); break;
+        case Kind::list: control->setBounds (juce::Rectangle<int> (juce::roundToInt (0.94f * static_cast<float> (w)), 25).withCentre ({ w / 2, controlCentre })); break;
+        case Kind::segments: control->setBounds (juce::Rectangle<int> (w, 27).withCentre ({ w / 2, controlCentre })); break;
         case Kind::switch2:
         case Kind::switch3:
         {
+            // The track's centre on the centreline (the switch keeps its track centred in itself).
             const auto size = VerticalSwitch::preferredSize (kind == Kind::switch2 ? 2 : 3, VerticalSwitch::Style::slot);
-            control->setBounds (juce::Rectangle<int> (size.x, size.y).withCentre ({ w / 2, 29 + 79 / 2 }));
+            control->setBounds (juce::Rectangle<int> (size.x, size.y).withCentre ({ w / 2, controlCentre }));
+            jassert (std::abs (control->getY() + static_cast<VerticalSwitch&> (*control).trackBounds().getCentreY() - static_cast<float> (controlCentre)) < 1.0f);
             break;
         }
     }
@@ -529,7 +531,7 @@ void Cell::paint (juce::Graphics& g)
     // (a rack knob's caption: the same type, colour and place)
     g.setColour (palette::caption);
     g.setFont (fonts::make (11.0f, fonts::Weight::medium, 0.055f));
-    g.drawText (caption, juce::Rectangle<float> (-6.0f, 0.0f, static_cast<float> (getWidth()) + 12.0f, 18.0f), juce::Justification::centred, false);
+    g.drawText (caption, juce::Rectangle<float> (-6.0f, 0.0f, static_cast<float> (getWidth()) + 12.0f, static_cast<float> (captionHeight)), juce::Justification::centred, false);
 }
 
 //==============================================================================

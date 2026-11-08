@@ -2660,7 +2660,7 @@ namespace
             fixed share of that width per module (MOVEMENT 57 %, ECHO 61 %, SPACE 68 %); a 17 px
             gap, then the divider (1 px), 17 px, the graph to the right inset. The share is the
             module's, never a mode's or a value's: the graph never moves while editing. */
-        constexpr int inset = 20, columnGap = 17, graphPad = 17, bottom = 12;
+        constexpr int inset = rackui::Cell::contentInset, columnGap = rackui::Cell::columnGap, graphPad = rackui::Cell::columnGap, bottom = 12;
         inline int dividerFor (float share, int width)
         {
             const int x0 = inset, x1 = width - inset;

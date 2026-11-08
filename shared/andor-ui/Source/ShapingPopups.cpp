@@ -454,7 +454,7 @@ void MiniKnob::resized()
     if (rackMetrics)
     {
         // Approved: the caption's line 18 + 4, the knob 59 (1 px under it), the value under.
-        slider.setBounds (juce::Rectangle<int> (59, 59).withCentre ({ getLocalBounds().getCentreX(), 23 + 30 }));
+        slider.setBounds (juce::Rectangle<int> (rackui::knobSize, rackui::knobSize).withCentre ({ getLocalBounds().getCentreX(), rackui::controlCentre }));
         return;
     }
     const float side = (compact ? 0.5f : 0.55f) * h;
@@ -501,7 +501,7 @@ void MiniKnob::paint (juce::Graphics& g)
         // The approved rack cell: 11 px caption (tracked), 13 px value, their own colours.
         g.setColour (captionHover ? rackui::palette::caption.darker (0.5f) : rackui::palette::caption);
         g.setFont (fonts::make (11.0f, fonts::Weight::medium, 0.055f));
-        g.drawText (caption, juce::Rectangle<float> (r.getX() - 6.0f, r.getY(), r.getWidth() + 12.0f, 18.0f), juce::Justification::centred, false);
+        g.drawText (caption, juce::Rectangle<float> (r.getX() - 6.0f, r.getY(), r.getWidth() + 12.0f, static_cast<float> (rackui::captionHeight)), juce::Justification::centred, false);
         if (detents)
         {
             const double interval = slider.getInterval();
@@ -511,7 +511,7 @@ void MiniKnob::paint (juce::Graphics& g)
         }
         g.setColour (rackui::palette::value);
         g.setFont (fonts::make (13.0f, fonts::Weight::medium, 0.01f));
-        g.drawText (value, juce::Rectangle<float> (r.getX() - 6.0f, static_cast<float> (slider.getBottom()) + 3.0f, r.getWidth() + 12.0f, 18.0f), juce::Justification::centred, false);
+        g.drawText (value, juce::Rectangle<float> (r.getX() - 6.0f, r.getY() + static_cast<float> (rackui::valueTop), r.getWidth() + 12.0f, 18.0f), juce::Justification::centred, false);
         return;
     }
     // Small knob cells (envelope, popovers): a light caption, the value a step stronger.

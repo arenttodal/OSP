@@ -158,10 +158,15 @@ enum class Slot
 int slotWidth (Slot slot, bool dense) noexcept;
 inline int slotGap (bool dense) noexcept { return dense ? 5 : 7; }
 constexpr int denseFrom = 8, cellHeight = 112;
+/** A rack cell's three lines (reference pixels from the cell's top), the same in every cell of
+    every rack: the caption in its 18 px line; one control centreline - a knob's centre, a vertical
+    switch's TRACK centre (its labels around it), a segmented or list key's centre; the value's
+    line under the knob. */
+constexpr int captionHeight = 18, controlCentre = 59, knobSize = 59, valueTop = 92;
 
-/** A rack cell that is not a knob: its caption (as a rack knob's) over its control, placed as
-    the approved rack places it - a compact list 25 px high 40 px down, a segmented switch 27 px
-    42 px down, a vertical switch centred in its 79 px band 29 px down. */
+/** A rack cell that is not a knob: its caption (as a rack knob's) over its control, the control
+    centred on the cell's control centreline (a vertical switch by its track, its labels above
+    and below or beside it). */
 class Cell final : public juce::Component
 {
 public:
@@ -173,6 +178,9 @@ public:
         switch3
     };
     Cell (juce::String caption, std::unique_ptr<juce::Component> control, Kind kind);
+    /** The approved rack's horizontal frame: the content 20 px in from each side, the 17 px gap
+        before the graph's divider and after it. */
+    static constexpr int contentInset = 20, columnGap = 17;
     const juce::String& captionText() const noexcept { return caption; }
     juce::Component& key() noexcept { return *control; }
     Kind cellKind() const noexcept { return kind; }
