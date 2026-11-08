@@ -10,10 +10,13 @@
 #include "core/Fft.h"
 #include "core/PitchMath.h"
 #include "core/Prng.h"
+#include "engine/InstrumentBuilder.h"
+#include "engine/InstrumentEngine.h"
 #include "engine/SpectralImprint.h"
 #include "engine/SynthVoice.h"
 #include "io/AudioFileIO.h"
 #include "support/AllocationCounter.h"
+#include "support/TestHelpers.h"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -677,4 +680,257 @@ TEST_CASE ("imprint research: experiments A, B and C on the stand-in references"
         }
     }
     SUCCEED();
+}
+
+// -- In the instrument (S2.3): the voice's oscillator through its model's profile ------------
+
+namespace
+{
+    EngineSettings plainEngine (double synthesize)
+    {
+        EngineSettings s;
+        s.macros.life = 0.0;
+        s.macros.space = 0.0;
+        s.macros.motion = 0.0;
+        s.macros.reimagined = 0.0;
+        s.shaping = Shaping::neutral();
+        s.adsr.releaseSeconds = 0.1;
+        s.layer[0].synthesize = synthesize;
+        return s;
+    }
+
+    synth::Settings imprintPage (double amount, double motion)
+    {
+        synth::Settings s;
+        s.mode = synth::Mode::imprint;
+        s.imprint = amount;
+        s.motion = motion;
+        return s;
+    }
+
+    std::shared_ptr<InstrumentModel> modelOf (const AudioData& audio)
+    {
+        return instrument::buildComplete (audio, test::analyse (audio), {}, false);
+    }
+
+    /** One note held for `seconds` (released 0.3 s before the end), left channel, as audio. */
+    AudioData playNote (const std::function<void (InstrumentEngine&)>& setUp, const EngineSettings& settings, int note, double seconds,
+                        int block = 256)
+    {
+        InstrumentEngine e;
+        e.prepare (rate, block, settings);
+        setUp (e);
+        std::vector<float> l (static_cast<std::size_t> (block)), r (static_cast<std::size_t> (block));
+        auto out = AudioData::allocate (1, static_cast<std::int64_t> (seconds * rate), rate);
+        auto& x = out.channels[0];
+        e.noteOn (note, 100);
+        bool released = false;
+        for (std::size_t done = 0; done < x.size(); done += static_cast<std::size_t> (block))
+        {
+            if (! released && static_cast<double> (done) >= (seconds - 0.3) * rate)
+            {
+                e.noteOff (note);
+                released = true;
+            }
+            const auto n = std::min (static_cast<std::size_t> (block), x.size() - done);
+            float* ch[2] = { l.data(), r.data() };
+            e.render (ch, 2, static_cast<int> (n));
+            std::copy (l.begin(), l.begin() + static_cast<std::ptrdiff_t> (n), x.begin() + static_cast<std::ptrdiff_t> (done));
+        }
+        return out;
+    }
+
+    /** How much what the imprint changed follows a body: the correlation, over the harmonics
+        (150 Hz .. 8 kHz, each octave weighing the same, tilts removed), of the imprinted sound's
+        harmonic energies less the plain oscillator's with the body's own response. */
+    double colourFollows (const AudioData& coloured, const AudioData& plain, const Body& body, double f0)
+    {
+        const auto a = harmonicDb (coloured, f0), b = harmonicDb (plain, f0);
+        std::vector<std::array<double, 4>> points;   // w, log2 hz, change, body
+        for (std::size_t k = 0; k < std::min (a.size(), b.size()); ++k)
+        {
+            const double hz = static_cast<double> (k + 1) * f0;
+            if (hz >= 150.0)
+                points.push_back ({ 1.0 / static_cast<double> (k + 1), std::log2 (hz), a[k] - b[k], body.dbAt (hz) });
+        }
+        auto detrended = [&points] (std::size_t column) {
+            double sw = 0.0, sx = 0.0, sy = 0.0, sxx = 0.0, sxy = 0.0;
+            for (const auto& p : points)
+            {
+                sw += p[0]; sx += p[0] * p[1]; sy += p[0] * p[column]; sxx += p[0] * p[1] * p[1]; sxy += p[0] * p[1] * p[column];
+            }
+            const double slope = (sw * sxy - sx * sy) / (sw * sxx - sx * sx), icpt = (sy - slope * sx) / sw;
+            std::vector<double> r;
+            for (const auto& p : points)
+                r.push_back (p[column] - (icpt + slope * p[1]));
+            return r;
+        };
+        const auto x = detrended (2), y = detrended (3);
+        double xy = 0.0, xx = 0.0, yy = 0.0;
+        for (std::size_t i = 0; i < x.size(); ++i)
+        {
+            xy += points[i][0] * x[i] * y[i];
+            xx += points[i][0] * x[i] * x[i];
+            yy += points[i][0] * y[i] * y[i];
+        }
+        return xy / std::sqrt (std::max (1.0e-20, xx * yy));
+    }
+
+    AudioData playModel (const InstrumentModel& m, EngineSettings settings, const synth::Settings& page, int note, double seconds)
+    {
+        settings.layer[0].synth = page;
+        return playNote ([&m] (InstrumentEngine& e) { e.setModel (&m); }, settings, note, seconds);
+    }
+}
+
+TEST_CASE ("imprint engine: Analog, IMPRINT 0 and SYNTH 0 play exactly as before", "[unit][imprint][imprint-engine]")
+{
+    const auto vowel = bowedStandIn (midiToHz (64), 2.0, vowelBody, -24.0, false, 21);
+    const auto m = modelOf (vowel);
+    REQUIRE (m->imprint != nullptr);
+    REQUIRE (m->imprint->valid);
+    const auto s1 = playModel (*m, plainEngine (0.6), synth::Settings {}, 64, 1.5);
+    // Analog with IMPRINT and MOTION set (they wait for Imprint), and Imprint at IMPRINT 0.
+    auto analogSet = imprintPage (1.0, 1.0);
+    analogSet.mode = synth::Mode::analog;
+    CHECK (playModel (*m, plainEngine (0.6), analogSet, 64, 1.5).channels[0] == s1.channels[0]);
+    CHECK (playModel (*m, plainEngine (0.6), imprintPage (0.0, 0.7), 64, 1.5).channels[0] == s1.channels[0]);
+    // SYNTH 0: Imprint at full changes nothing (the oscillator, and so the imprint, never run).
+    const auto off = playModel (*m, plainEngine (0.0), synth::Settings {}, 64, 1.5);
+    CHECK (playModel (*m, plainEngine (0.0), imprintPage (1.0, 1.0), 64, 1.5).channels[0] == off.channels[0]);
+    // A model without a profile (a provisional one, or nothing usable in it) plays Analog.
+    auto bare = std::make_shared<InstrumentModel> (*m);
+    bare->imprint = nullptr;
+    CHECK (playModel (*bare, plainEngine (0.6), imprintPage (1.0, 0.5), 64, 1.5).channels[0] == s1.channels[0]);
+    auto unusable = std::make_shared<InstrumentModel> (*m);
+    unusable->imprint = std::make_shared<const imprint::Profile>();
+    CHECK (playModel (*unusable, plainEngine (0.6), imprintPage (1.0, 0.5), 64, 1.5).channels[0] == s1.channels[0]);
+}
+
+TEST_CASE ("imprint engine: Imprint brings the recording's body to the oscillator, at its level", "[unit][imprint][imprint-engine]")
+{
+    struct Case { const char* name; AudioData audio; const Body& body; int note; double closer; };
+    // (How much closer: the stand-ins' measurements, docs/research/synthesize/s2-imprint-research.md.)
+    const std::vector<Case> cases {
+        { "nyckelharpa", bowedStandIn (midiToHz (62), 3.0, nyckelharpaBody, -24.0, false, 22), nyckelharpaBody, 62, 0.05 },
+        { "cello", bowedStandIn (midiToHz (48), 3.0, celloBody, -28.0, true, 23), celloBody, 48, 1.0 },
+    };
+    for (const auto& c : cases)
+    {
+        const auto m = modelOf (c.audio);
+        REQUIRE (m->imprint->valid);
+        // SYNTH 100 %: the oscillator alone, Analog against Imprint (static, then moving).
+        const auto analog = playModel (*m, plainEngine (1.0), synth::Settings {}, c.note, 2.5);
+        const auto still = playModel (*m, plainEngine (1.0), imprintPage (1.0, 0.0), c.note, 2.5);
+        const auto moving = playModel (*m, plainEngine (1.0), imprintPage (1.0, 0.7), c.note, 2.5);
+        const double hz = midiToHz (c.note);
+        const double dAnalog = shapeDistance (analog, c.audio, hz), dStill = shapeDistance (still, c.audio, hz),
+                     dMoving = shapeDistance (moving, c.audio, hz);
+        const double follows = colourFollows (still, analog, c.body, hz);
+        INFO (c.name << ": distance Analog " << dAnalog << ", Imprint " << dStill << ", moving " << dMoving << "; follows the body "
+                     << follows);
+        CHECK (dStill < dAnalog - c.closer);
+        CHECK (dMoving < dAnalog - c.closer);
+        CHECK (follows > 0.3);   // (the whole envelope: the body, and the source behind it)
+        // Levelled to the oscillator's own loudness (the held part).
+        const double level = rmsDb (still, 0.5, 2.0) - rmsDb (analog, 0.5, 2.0);
+        INFO ("level " << level << " dB");
+        CHECK (std::abs (level) < 1.5);
+        CHECK (std::abs (measuredPitchHz (still) / hz - 1.0) < 0.003);
+    }
+}
+
+TEST_CASE ("imprint engine: switching Analog / Imprint, IMPRINT and MOTION live is click-free; nothing allocates",
+           "[unit][imprint][imprint-engine]")
+{
+    const auto vowel = bowedStandIn (midiToHz (57), 4.0, vowelBody, -24.0, false, 24);
+    const auto m = modelOf (vowel);
+    auto settings = plainEngine (1.0);
+    InstrumentEngine e;
+    e.prepare (rate, 256, settings);
+    e.setModel (m.get());
+    std::vector<float> l (256), r (256), out;
+    std::vector<float> largestStep;
+    out.reserve (static_cast<std::size_t> (200 * 256));
+    largestStep.reserve (12);
+    auto run = [&] (int blocks) {
+        float step = 0.0f;
+        for (int b = 0; b < blocks; ++b)
+        {
+            float* ch[2] = { l.data(), r.data() };
+            e.render (ch, 2, 256);
+            for (int i = 0; i < 256; ++i)
+            {
+                if (! out.empty())
+                    step = std::max (step, std::abs (l[static_cast<std::size_t> (i)] - out.back()));
+                out.push_back (l[static_cast<std::size_t> (i)]);
+            }
+        }
+        largestStep.push_back (step);
+    };
+    int allocations = 0;
+    {
+        test::AllocationScope scope;
+        for (int note : { 45, 52, 57, 64 })
+            e.noteOn (note, 100);
+        run (10);                                     // 0: the notes starting
+        run (20);                                     // 1: steady, Analog
+        e.setLayerSynth (0, imprintPage (1.0, 0.0));  // 2: Imprint in
+        run (20);
+        e.setLayerSynth (0, imprintPage (1.0, 1.0));  // 3: MOTION up
+        run (20);
+        e.setLayerSynth (0, imprintPage (0.3, 1.0));  // 4: IMPRINT down
+        run (20);
+        e.setLayerSynth (0, synth::Settings {});      // 5: back to Analog
+        run (20);
+        allocations = scope.count();
+    }
+    CHECK (allocations == 0);
+    for (float v : out)
+        REQUIRE (std::isfinite (v));
+    INFO ("largest steps: steady " << largestStep[1] << ", Imprint in " << largestStep[2] << ", motion " << largestStep[3] << ", amount "
+                                   << largestStep[4] << ", Analog " << largestStep[5]);
+    for (std::size_t k = 2; k <= 5; ++k)
+        CHECK (largestStep[k] < 1.8f * largestStep[1]);
+}
+
+TEST_CASE ("imprint engine: each set member colours with its own profile; Granular too", "[unit][imprint][imprint-engine]")
+{
+    // Two members with different bodies (an Atlas has one per note region, built the same way).
+    const auto low = bowedStandIn (midiToHz (48), 2.0, celloBody, -28.0, false, 25);
+    const auto high = bowedStandIn (midiToHz (72), 2.0, nyckelharpaBody, -24.0, false, 26);
+    const auto lowAnalysis = test::analyse (low), highAnalysis = test::analyse (high);
+    const auto set = instrument::buildSet ({ { &low, &lowAnalysis, "low" }, { &high, &highAnalysis, "high" } }, {}, {}, true);
+    REQUIRE (set.members.size() == 2);
+    for (const auto& member : set.members)
+    {
+        REQUIRE (member.model->imprint != nullptr);
+        CHECK (member.model->imprint->valid);
+    }
+    CHECK (set.members[0].model->imprint->staticDb != set.members[1].model->imprint->staticDb);
+    for (int note : { 48, 72 })
+    {
+        auto settings = plainEngine (1.0);
+        auto withSet = [&set] (InstrumentEngine& e) { e.setInstrumentSet (&set); };
+        const auto analog = playNote (withSet, settings, note, 2.0);
+        settings.layer[0].synth = imprintPage (1.0, 0.0);
+        const auto coloured = playNote (withSet, settings, note, 2.0);
+        const auto& own = note == 48 ? celloBody : nyckelharpaBody;
+        const auto& other = note == 48 ? nyckelharpaBody : celloBody;
+        const double hz = midiToHz (note);
+        const double followsOwn = colourFollows (coloured, analog, own, hz), followsOther = colourFollows (coloured, analog, other, hz);
+        INFO ("note " << note << ": follows its own member's body " << followsOwn << ", the other's " << followsOther);
+        CHECK (followsOwn > 0.3);
+        CHECK (followsOwn > followsOther + 0.8);
+    }
+    // Granular: the oscillator (per voice, not per grain) is coloured the same way.
+    const auto m = modelOf (low);
+    auto settings = plainEngine (0.8);
+    settings.sourceMode[0] = SourceMode::granular;
+    const auto analog = playModel (*m, settings, synth::Settings {}, 48, 2.0);
+    const auto coloured = playModel (*m, settings, imprintPage (1.0, 0.5), 48, 2.0);
+    CHECK (analog.channels[0] != coloured.channels[0]);
+    for (float v : coloured.channels[0])
+        REQUIRE (std::isfinite (v));
+    CHECK (std::abs (rmsDb (coloured, 0.5, 1.5) - rmsDb (analog, 0.5, 1.5)) < 2.0);
 }

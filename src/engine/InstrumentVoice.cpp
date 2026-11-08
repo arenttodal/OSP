@@ -27,6 +27,7 @@ void InstrumentVoice::prepare (double outputSampleRate, const AdsrSettings& adsr
     sinc = interpolator;
     shapingState = shaping;
     synthVoice.prepare (outputSampleRate);
+    imprintShaper.prepare (outputSampleRate);
     charFilter.prepare (outputSampleRate);
     if (shaping == nullptr)
         charFilter.setParameters (FilterType::off, 1000.0, 0.0, 0.0, 0.0); // a bare voice: no CHARACTER stage
@@ -88,6 +89,9 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     synthSampleGain = 1.0f;
     synthGain = synthSampleStep = synthGainStep = 0.0f;
     synthVoice.stop();
+    // Imprint: this note's model's descriptor (an Atlas member's own); kept for the note's life.
+    imprintProfile = currentModel->imprint != nullptr && currentModel->imprint->valid ? currentModel->imprint.get() : nullptr;
+    imprintClock = 0;
     {
         // The oscillator at 100 % as loud as this recording's typical level (an Atlas member by
         // its own): halfway in dB between its loudest 20 ms and its body's median, at most 6 dB
@@ -1552,6 +1556,8 @@ void InstrumentVoice::synthControl (int samplesToNext) noexcept
         // SHAPE: the layer's, unless the development audition chose Follow for every source.
         const auto shape = synthEnvelope == synth::Envelope::follow || synthSettingsLive == nullptr ? synthEnvelope : synthSettingsLive->shape;
         synthVoice.start (synthSeed, std::clamp (synthVelocity, 1, 127) / 127.0, shape);
+        imprintShaper.reset();
+        imprintClock = 0;
         if (released)
             synthVoice.release();
         synthAmountNow = 0.0;
@@ -1593,6 +1599,38 @@ void InstrumentVoice::synthControl (int samplesToNext) noexcept
         synthPitchHz *= synthTrackRatio * synthRootCorrection;
     }
     synthVoice.setPitch (synthPitchHz, *synthSettingsLive);
+    imprintControl (samplesToNext);
+}
+
+void InstrumentVoice::imprintControl (int samplesToNext) noexcept
+{
+    // IMPRINT: Analog (or IMPRINT 0) never touches the shaper, so S1's arithmetic stays exact; a
+    // change to either fades the colour in or out (~25 ms) and the shaper steps aside at 0.
+    const auto& s = *synthSettingsLive;
+    // The note's own time (MOTION's frames), kept while Analog plays too: Imprint switched on
+    // mid-note joins the recording where the note is, not at its attack.
+    const auto clock = imprintClock;
+    imprintClock += samplesToNext;
+    if (imprintProfile == nullptr || (! s.imprinting() && ! imprintShaper.active()))
+        return;
+    const double amount = s.imprinting() ? std::clamp (s.imprint, 0.0, 1.0) : 0.0;
+    // MOTION: the recording's own frames, the attack in order, then back and forth through its
+    // sustain at the recording's pace (no seam; its release is never replayed while held).
+    double framePosition = -1.0;
+    const auto& p = *imprintProfile;
+    if (s.motion > 0.0 && p.frameCount() > 0)
+    {
+        const double f = static_cast<double> (clock) / sampleRate / p.frameSeconds;
+        if (f < p.sustainBegin)
+            framePosition = f;
+        else
+        {
+            const double span = std::max (1, p.sustainEnd - p.sustainBegin - 1);
+            const double u = std::fmod (f - p.sustainBegin, 2.0 * span);
+            framePosition = p.sustainBegin + (u < span ? u : 2.0 * span - u);
+        }
+    }
+    imprintShaper.setTarget (p, amount, framePosition, s.motion, synthPitchHz, imprint::defaultFormantFollow, samplesToNext);
 }
 
 double InstrumentVoice::recordedPitchRatio() const noexcept
@@ -1619,7 +1657,10 @@ void InstrumentVoice::mixSynth (float& l, float& r) noexcept
 {
     synthSampleGain += synthSampleStep;
     synthGain += synthGainStep;
-    const float y = synthVoice.next (0.5f * (std::abs (l) + std::abs (r))) * std::max (0.0f, synthGain) * synthLevel;
+    float osc = synthVoice.next (0.5f * (std::abs (l) + std::abs (r)));
+    if (imprintShaper.active())
+        osc = imprintShaper.process (osc);
+    const float y = osc * std::max (0.0f, synthGain) * synthLevel;
     l = l * synthSampleGain + y;
     r = r * synthSampleGain + y;
 }

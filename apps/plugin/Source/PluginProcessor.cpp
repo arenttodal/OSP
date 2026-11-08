@@ -86,6 +86,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
     // The per-card arpeggiator (version hint 27; arp.link, arp.cardA ..), as every three-engine
     // product has it: LINK and every card by default, the one arpeggiator exactly as before.
     addCardArpParameters (layout, {});
+    // The spectral imprint on the SYNTH page (version hint 28): Analog, 0 and 0 by default.
+    addImprintParameters (layout);
     return layout;
 }
 
@@ -345,6 +347,8 @@ OspAudioProcessor::OspAudioProcessor()
         lp.synthesize = parameters.getRawParameterValue (layerParameterId (layer, "synthesize"));
         for (int i = 0; i < synthParameterNames().size(); ++i)
             lp.synth[static_cast<std::size_t> (i)] = parameters.getRawParameterValue (synthParameterId (layer, synthParameterNames()[i]));
+        for (int i = 0; i < imprintParameterNames().size(); ++i)
+            lp.imprint[static_cast<std::size_t> (i)] = parameters.getRawParameterValue (synthParameterId (layer, imprintParameterNames()[i]));
     }
     grainBudgetParam = parameters.getRawParameterValue (ids::grainBudget);
     for (int layer = 0; layer < numLayers; ++layer)
@@ -682,7 +686,8 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
         std::array<float, 6> synthRaw {};
         for (std::size_t i = 0; i < synthRaw.size(); ++i)
             synthRaw[i] = lp.synth[i]->load();
-        const auto synthPage = synthSettingsFrom (synthRaw);
+        auto synthPage = synthSettingsFrom (synthRaw);
+        applyImprintSettings (synthPage, { lp.imprint[0]->load(), lp.imprint[1]->load(), lp.imprint[2]->load() });
         engineSettings.layer[static_cast<std::size_t> (layer)].synth = synthPage;
         engine.setLayerSynth (layer, synthPage);
     }

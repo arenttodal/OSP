@@ -1,4 +1,5 @@
 #include "engine/InstrumentBuilder.h"
+#include "engine/SpectralImprint.h"
 
 #include "analysis/reimagined/ReimaginedAnalyzer.h"
 #include "analysis/transient/TransientSeparation.h"
@@ -169,6 +170,9 @@ std::shared_ptr<InstrumentModel> addContinuation (const InstrumentModel& base, c
     model->dynamics = calibrateDynamics (model->character, model->analysis);
     model->reimagined = std::make_shared<const ReimaginedAnalysis> (
         analyseReimagined (audio, model->analysis, model->original.continuation, model->original.source->startFrame()));
+    // SYNTH Imprint's descriptor: this audio's own envelope, at rest and over time.
+    model->imprint = std::make_shared<const imprint::Profile> (
+        imprint::analyse (audio, model->analysis.pitch.detected ? model->analysis.pitch.fundamentalHz : midiToHz (model->rootMidi)));
     return model;
 }
 

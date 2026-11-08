@@ -72,6 +72,35 @@ synth::Settings InstrumentHost::synthSettingsFrom (const std::array<float, 6>& r
     return s;
 }
 
+const juce::StringArray& InstrumentHost::imprintParameterNames()
+{
+    static const juce::StringArray names { "mode", "imprint", "motion" };
+    return names;
+}
+
+void InstrumentHost::applyImprintSettings (synth::Settings& s, const std::array<float, 3>& raw) noexcept
+{
+    s.mode = std::lround (raw[0]) == 1 ? synth::Mode::imprint : synth::Mode::analog;
+    s.imprint = std::clamp (static_cast<double> (raw[1]) / 100.0, 0.0, 1.0);
+    s.motion = std::clamp (static_cast<double> (raw[2]) / 100.0, 0.0, 1.0);
+}
+
+void InstrumentHost::addImprintParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout)
+{
+    auto id28 = [] (const juce::String& id) { return juce::ParameterID { id, 28 }; };
+    auto percent = juce::AudioParameterFloatAttributes().withLabel ("%").withStringFromValueFunction (
+        [] (float v, int) { return juce::String (juce::roundToInt (v)) + " %"; });
+    const juce::NormalisableRange<float> unit (0.0f, 100.0f, 0.1f);
+    for (int layer = 0; layer < numLayers; ++layer)
+    {
+        const auto name = "Layer " + layerName (layer) + " Synth ";
+        layout.add (std::make_unique<juce::AudioParameterChoice> (id28 (synthParameterId (layer, "mode")), name + "Mode",
+                                                                  juce::StringArray { "Analog", "Imprint" }, 0));
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id28 (synthParameterId (layer, "imprint")), name + "Imprint", unit, 0.0f, percent));
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id28 (synthParameterId (layer, "motion")), name + "Motion", unit, 0.0f, percent));
+    }
+}
+
 void InstrumentHost::addCardArpParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, const juce::String& ns)
 {
     auto id = [] (const juce::String& s) { return juce::ParameterID { s, 27 }; };

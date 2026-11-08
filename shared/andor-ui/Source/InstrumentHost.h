@@ -96,6 +96,14 @@ public:
     /** The page's values as the engine takes them, from the six parameters' raw values in
         synthParameterNames() order (real-time safe). */
     static synth::Settings synthSettingsFrom (const std::array<float, 6>& raw) noexcept;
+    /** The spectral imprint's parameters (version hint 28), on the SYNTH page: "layerA.synth.mode"
+        (Analog / Imprint), .imprint and .motion (0..100 %). Analog, 0 and 0 by default, so every
+        session from before plays its oscillator exactly as it did. */
+    static const juce::StringArray& imprintParameterNames();   ///< mode, imprint, motion
+    /** Their values into `s` (real-time safe), from the raw values in imprintParameterNames() order. */
+    static void applyImprintSettings (synth::Settings& s, const std::array<float, 3>& raw) noexcept;
+    /** Appends them (ANDOR OSP's layout, after its per-card arpeggiator: nothing before moves). */
+    static void addImprintParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout);
     /** DAMPEN's parameters in their order: enabled, mode, amount, frequency, cutoff. */
     static const juce::StringArray& dampenParameterNames();
     static const juce::StringArray& eqParameterNames();   ///< enabled, hp.enabled, hp.frequency, ... in order
@@ -133,6 +141,11 @@ public:
     virtual std::optional<double> rootOverride (int layer = -1) const = 0;
     /** Heard in the mix: SOLO wins (only soloed layers are heard), else MUTE decides. */
     bool isLayerHeard (int layer) const;
+    /** The spectral imprint a layer's source can lay on its oscillator (the SYNTH page says so):
+        none (no source), preparing (the source still building), ready, or unavailable (no
+        usable spectral envelope: the voices play Analog). Message thread. */
+    enum class ImprintState { none, preparing, ready, unavailable };
+    ImprintState imprintState (int layer) const;
     /** SOLO this layer alone (alt-click on S). */
     void soloOnly (int layer);
     /** What a layer's voices are doing, for its display (lock-free, any thread). */

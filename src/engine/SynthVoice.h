@@ -39,6 +39,13 @@ enum class Envelope : std::uint8_t
 /** The oscillator's waveform (SYNTH page: WAVE). Saw is S1's. */
 enum class Wave : std::uint8_t { saw, square, triangle, sine };
 
+/** The oscillator's character (SYNTH page: ANALOG | IMPRINT; Phase S2 spectral imprint). */
+enum class Mode : std::uint8_t
+{
+    analog,   ///< S1's oscillator exactly
+    imprint   ///< the same oscillator, coloured by the recording's spectral envelope (IMPRINT, MOTION)
+};
+
 /** What the oscillator's pitch follows (SYNTH page: PITCH). */
 enum class PitchSource : std::uint8_t
 {
@@ -61,6 +68,12 @@ struct Settings
     double tone = 0.5;           ///< 0 dark .. 1 bright: the low-pass from 1/4 to 4 x S1's cutoff
     Envelope shape = Envelope::gate;
     PitchSource pitch = PitchSource::keys;
+    Mode mode = Mode::analog;
+    double imprint = 0.0;        ///< 0..1: how much of the recording's spectral envelope (Imprint only)
+    double motion = 0.0;         ///< 0..1: how much it moves through the recording's own frames (Imprint only)
+
+    /** The imprint is heard (Imprint mode and an amount above 0). */
+    bool imprinting() const noexcept { return mode == Mode::imprint && imprint > 0.0; }
 
     bool operator== (const Settings&) const = default;
 };

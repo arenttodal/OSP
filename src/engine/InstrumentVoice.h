@@ -16,6 +16,7 @@
 #include "engine/TapeFrameEngine.h"
 #include "engine/ToyboxEngine.h"
 #include "engine/ShelfFilter.h"
+#include "engine/SpectralImprint.h"
 #include "engine/SynthVoice.h"
 #include "model/ContinuationModel.h"
 #include "model/InstrumentModel.h"
@@ -341,6 +342,11 @@ private:
     bool synthHoldsVoice() noexcept;
     const synth::Settings* synthSettingsLive = nullptr;
     double synthTrackRatio = 1.0;   ///< PITCH Recording: the recording's pitch here re its root (smoothed)
+    // SYNTH Imprint (Phase S2): the recording's spectral envelope on the oscillator.
+    imprint::Shaper imprintShaper;
+    const imprint::Profile* imprintProfile = nullptr;   ///< the note's model's (null: Analog)
+    std::int64_t imprintClock = 0;   ///< samples since the oscillator started (the frames' time)
+    void imprintControl (int samplesToNext) noexcept;
     /** PITCH Recording: the recording's pitch at the read position over the pitch it is played
         as (its root), from the analysis' pitch track; 0 when unvoiced or out of reach. */
     double recordedPitchRatio() const noexcept;

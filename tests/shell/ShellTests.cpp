@@ -243,10 +243,19 @@ TEST_CASE ("shell: the parameter schema is ANDOR OSP's, unchanged; the product's
     }
     CHECK (orderKept);
     // ANDOR OSP's schema, less its own per-card arpeggiator (arp.link, arp.cardA ..): a product
-    // that has one keeps it in its own namespace (InstrumentHost::addCardArpParameters).
+    // that has one keeps it in its own namespace (InstrumentHost::addCardArpParameters). Less
+    // its spectral imprint too (layerA.synth.mode / .imprint / .motion): ANDOR OSP's SYNTH page.
     auto ospBase = parameterschema::ospGolden ("osp-parameter-schema.txt");
+    auto ospOnly = [] (const juce::String& line) {
+        if (line.startsWith ("arp.link ") || line.startsWith ("arp.card"))
+            return true;
+        for (const auto& name : osp::plugin::InstrumentHost::imprintParameterNames())
+            if (line.startsWith ("layer") && line.upToFirstOccurrenceOf (" ", false, false).endsWith (".synth." + name))
+                return true;
+        return false;
+    };
     for (int i = ospBase.size(); --i >= 0;)
-        if (ospBase[i].startsWith ("arp.link ") || ospBase[i].startsWith ("arp.card"))
+        if (ospOnly (ospBase[i]))
             ospBase.remove (i);
     parameterschema::compareListings (base.joinIntoString ("\n") + "\n", ospBase);
 #ifdef ANDOR_PRODUCT_SCHEMA_GOLDEN

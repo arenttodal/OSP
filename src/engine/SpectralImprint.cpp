@@ -243,7 +243,7 @@ BandLayout BandLayout::make (int count, bool perceptual, double lowHz, double hi
 }
 
 //==============================================================================
-void Shaper::prepare (double rate, int count, bool perceptual)
+void Shaper::prepare (double rate, int count, bool perceptual) noexcept
 {
     sampleRate = rate > 0.0 ? rate : 48000.0;
     bandLayout = BandLayout::make (count, perceptual, 80.0, std::min (12000.0, 0.42 * sampleRate));
@@ -256,7 +256,7 @@ void Shaper::prepare (double rate, int count, bool perceptual)
     // gives the gains that make the cascade meet a target at the centres (the accurate
     // graphic-equaliser method). Inverted once here.
     constexpr double prototype = 12.0;
-    std::vector<double> m (static_cast<std::size_t> (bands * bands)), inv (static_cast<std::size_t> (bands * bands), 0.0);
+    std::array<double, BandLayout::maxBands * BandLayout::maxBands> m {}, inv {};   // (no heap: a voice prepares it)
     for (int i = 0; i < bands; ++i)
         for (int j = 0; j < bands; ++j)
             m[static_cast<std::size_t> (i * bands + j)] = bellDb (bandLayout.hz[static_cast<std::size_t> (i)], g[static_cast<std::size_t> (j)],
@@ -291,7 +291,7 @@ void Shaper::prepare (double rate, int count, bool perceptual)
                 }
             }
     }
-    std::copy (inv.begin(), inv.end(), solve.begin());
+    solve = inv;
     reset();
 }
 

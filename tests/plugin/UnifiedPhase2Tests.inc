@@ -157,8 +157,8 @@ TEST_CASE ("plugin: Phase 2's parameters are appended and neutral; the modulatio
     // Thirteen parameters, in order: per layer SCATTER, PAN, WINDOW, KEY DNA AMOUNT; the budget.
     // Only the routes' second destinations (version 21, MIX modulation), each layer's
     // SYNTHESIZE (version 22), its SYNTH page and SPACE's ABYSS (version 23) and SPACE's VINTAGE
-    // and BLOOM (version 24), ABYSS's variant (25), ECHO's ASCEND (26) and the per-card
-    // arpeggiator (27) come after them.
+    // and BLOOM (version 24), ABYSS's variant (25), ECHO's ASCEND (26), the per-card
+    // arpeggiator (27) and each layer's spectral imprint (28) come after them.
     juce::StringArray expected;
     for (int l = 0; l < 3; ++l)
         for (const char* n : { "granular.scatter", "granular.pan", "granular.window", "keyDna.amount" })
@@ -179,6 +179,9 @@ TEST_CASE ("plugin: Phase 2's parameters are appended and neutral; the modulatio
                             "arp.link", "arp.cardA", "arp.cardB", "arp.cardC", "arp.cardB.pattern", "arp.cardB.rate",   // (version 27)
                             "arp.cardB.octaves", "arp.cardC.pattern", "arp.cardC.rate", "arp.cardC.octaves" })
         expected.add (id);
+    for (int l = 0; l < 3; ++l)   // (version 28)
+        for (const auto& name : osp::plugin::InstrumentHost::imprintParameterNames())
+            expected.add (osp::plugin::InstrumentHost::synthParameterId (l, name));
     REQUIRE (all.size() > expected.size());
     for (int i = 0; i < expected.size(); ++i)
     {

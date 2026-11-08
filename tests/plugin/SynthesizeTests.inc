@@ -727,3 +727,65 @@ TEST_CASE ("plugin SPACE engines in ANDOR OSP: the popover's screenshots (OSP_SP
         ui->closePopup();
     }
 }
+
+TEST_CASE ("plugin imprint: mode, IMPRINT and MOTION per source (hint 28) at Analog; heard, saved, older sessions Analog", "[plugin][synthesize][imprint]")
+{
+    using osp::plugin::InstrumentHost;
+    TempDir tmp;
+    OspAudioProcessor p;
+    loadLayers (p, tmp.dir, 2);
+    for (int l = 0; l < 3; ++l)
+        for (const auto& name : InstrumentHost::imprintParameterNames())
+        {
+            auto* param = p.parameters.getParameter (InstrumentHost::synthParameterId (l, name));
+            REQUIRE (param != nullptr);
+            CHECK (param->getVersionHint() == 28);
+            CHECK (p.parameterValue (InstrumentHost::synthParameterId (l, name)) == 0.0f);
+        }
+    CHECK (p.imprintState (0) == InstrumentHost::ImprintState::ready);
+    CHECK (p.imprintState (2) == InstrumentHost::ImprintState::none);
+    p.setParameterValue (synthId (0), 80.0f);
+    const auto analog = audioHash (renderHeld (p, chord8, 1.2));
+    // Analog keeps S1 exactly, whatever IMPRINT and MOTION hold; Imprint at 0 too.
+    p.setParameterValue (InstrumentHost::synthParameterId (0, "imprint"), 90.0f);
+    p.setParameterValue (InstrumentHost::synthParameterId (0, "motion"), 40.0f);
+    CHECK (audioHash (renderHeld (p, chord8, 1.2)) == analog);
+    p.setParameterValue (InstrumentHost::synthParameterId (0, "mode"), 1.0f);
+    const auto imprinted = renderHeld (p, chord8, 1.2);
+    CHECK (audioHash (imprinted) != analog);
+    CHECK (finite (imprinted));
+    CHECK (audioHash (renderHeld (p, chord8, 1.2)) == audioHash (imprinted));   // deterministic
+    juce::MemoryBlock state;
+    p.getStateInformation (state);
+    {
+        OspAudioProcessor reopened;
+        reopened.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+        REQUIRE (reopened.waitForLoads (30000));
+        reopened.pollLoads();
+        CHECK (reopened.parameterValue (InstrumentHost::synthParameterId (0, "mode")) == Approx (1.0f));
+        CHECK (reopened.parameterValue (InstrumentHost::synthParameterId (0, "imprint")) == Approx (90.0f));
+        CHECK (reopened.parameterValue (InstrumentHost::synthParameterId (0, "motion")) == Approx (40.0f));
+        CHECK (reopened.parameterValue (InstrumentHost::synthParameterId (1, "mode")) == 0.0f);
+        CHECK (audioHash (renderHeld (reopened, chord8, 1.2)) == audioHash (imprinted));
+    }
+    // A session from before the imprint (no mode / imprint / motion in it) opens as Analog.
+    auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
+    REQUIRE (xml != nullptr);
+    for (auto* child = xml->getFirstChildElement(); child != nullptr;)
+    {
+        auto* next = child->getNextElement();
+        const auto id = child->getStringAttribute ("id");
+        if (id.endsWith (".synth.mode") || id.endsWith (".synth.imprint") || id.endsWith (".synth.motion"))
+            xml->removeChildElement (child, true);
+        child = next;
+    }
+    juce::MemoryBlock old;
+    juce::AudioProcessor::copyXmlToBinary (*xml, old);
+    OspAudioProcessor older;
+    older.setStateInformation (old.getData(), static_cast<int> (old.getSize()));
+    REQUIRE (older.waitForLoads (30000));
+    older.pollLoads();
+    CHECK (older.parameterValue (InstrumentHost::synthParameterId (0, "mode")) == 0.0f);
+    CHECK (older.parameterValue (InstrumentHost::synthParameterId (0, "imprint")) == 0.0f);
+    CHECK (audioHash (renderHeld (older, chord8, 1.2)) == analog);
+}

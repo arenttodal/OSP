@@ -516,6 +516,31 @@ bool InstrumentHost::isLayerHeard (int layer) const
     return anySolo ? parameterValue (layerParameterId (layer, "solo")) >= 0.5f : parameterValue (layerParameterId (layer, "mute")) < 0.5f;
 }
 
+InstrumentHost::ImprintState InstrumentHost::imprintState (int layer) const
+{
+    const auto instrument = currentInstrument (layer);
+    const bool loading = loadState (layer) == LoadState::loading;
+    if (instrument == nullptr)
+        return loading ? ImprintState::preparing : ImprintState::none;
+    // Any of its models (a set's or an Atlas' members each have their own): one that carries a
+    // usable profile is enough, since the voices fall back to Analog note by note.
+    bool built = false;
+    auto look = [&built] (const std::shared_ptr<const InstrumentModel>& model) {
+        if (model == nullptr || model->imprint == nullptr)
+            return false;
+        built = true;
+        return model->imprint->valid;
+    };
+    if (look (instrument->model))
+        return ImprintState::ready;
+    if (instrument->set != nullptr)
+        for (const auto& member : instrument->set->members)
+            if (look (member.model))
+                return ImprintState::ready;
+    // Not built yet (the first, provisional model plays while the full one builds).
+    return ! built && loading ? ImprintState::preparing : ImprintState::unavailable;
+}
+
 void InstrumentHost::soloOnly (int layer)
 {
     for (int l = 0; l < numLayers; ++l)

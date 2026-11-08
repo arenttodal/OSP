@@ -132,5 +132,6 @@ namespace osp::plugin::ids
     inline const juce::String grainBudget = "grainBudget";
     // MIX modulation (version hint 21): mod.routeN.destExt. SYNTHESIZE (version hint 22): per
     // layer layerA.synthesize, 0..100 % (0: off, bit-identical). The SYNTH page (version hint
-    // 23): per layer layerA.synth.wave / .octave / .detune / .tone / .shape / .pitch.
+    // 23): per layer layerA.synth.wave / .octave / .detune / .tone / .shape / .pitch. The spectral
+    // imprint (version hint 28, ANDOR OSP's layout after arp.*): layerA.synth.mode / .imprint / .motion.
 }
