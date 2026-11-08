@@ -518,7 +518,11 @@ void Cell::resized()
         case Kind::switch3:
         {
             // The track's centre on the centreline (the switch keeps its track centred in itself).
-            const auto size = VerticalSwitch::preferredSize (kind == Kind::switch2 ? 2 : 3, VerticalSwitch::Style::slot);
+            // A two-position switch spans the cell, so a longer label above or below it
+            // ("MORPH ONLY") has room; its track and labels stay centred where they were.
+            auto size = VerticalSwitch::preferredSize (kind == Kind::switch2 ? 2 : 3, VerticalSwitch::Style::slot);
+            if (kind == Kind::switch2)
+                size.x = std::max (size.x, w);
             control->setBounds (juce::Rectangle<int> (size.x, size.y).withCentre ({ w / 2, controlCentre }));
             jassert (std::abs (control->getY() + static_cast<VerticalSwitch&> (*control).trackBounds().getCentreY() - static_cast<float> (controlCentre)) < 1.0f);
             break;

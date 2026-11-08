@@ -33,8 +33,8 @@ public:
         setMouseClickGrabsKeyboardFocus (false);
         setMouseCursor (juce::MouseCursor::PointingHandCursor);
     }
-    juce::Font font() const { return secondary ? fonts::make (10.0f, fonts::Weight::regular, 0.06f) : fonts::make (11.0f, fonts::Weight::medium, 0.06f); }
-    float gap() const { return secondary ? 14.0f : 22.0f; }
+    juce::Font font() const { return fonts::make (secondary ? 10.0f : 11.0f, fonts::Weight::medium, 0.06f); }
+    float gap() const { return secondary ? 16.0f : 22.0f; }
     int preferredWidth() const
     {
         float w = 0.0f;
@@ -58,8 +58,8 @@ public:
         {
             const auto t = tab (i);
             const bool on = i == shown;
-            const auto shownColour = secondary ? juce::Colour (0xff5d5a54) : juce::Colour (0xff3e3d3a);
-            const auto restColour = secondary ? juce::Colour (0xffa59e94) : juce::Colour (0xff8a847b);
+            const auto shownColour = secondary ? rackui::palette::value : juce::Colour (0xff3e3d3a);
+            const auto restColour = secondary ? rackui::palette::quietCaption : juce::Colour (0xff8a847b);
             g.setColour (on ? shownColour : (i == hover ? restColour.darker (0.25f) : restColour));
             g.drawText (names[i], t, juce::Justification::centredLeft, false);
             if (on)
@@ -126,6 +126,8 @@ ParameterRack::ParameterRack (InstrumentHost& h, juce::String t, juce::Colour a,
 }
 
 ParameterRack::~ParameterRack() = default;
+
+juce::Font ParameterRack::selectorCaptionFont() { return fonts::make (9.5f, fonts::Weight::medium, 0.06f); }
 
 void ParameterRack::setPages (juce::StringArray names, int* memory)
 {
@@ -377,9 +379,9 @@ void ParameterRack::layout()
     const int fieldY = top + (selectRow - 27) / 2;
     navRules.clear();
     auto rule = [this, &x] {
-        x += 11;
+        x += 14;
         navRules.push_back (x);
-        x += 12;
+        x += 15;
     };
     if (pageTabs != nullptr)
     {
@@ -388,12 +390,13 @@ void ParameterRack::layout()
     }
     if (const auto it = subTabs.find (currentPage); it != subTabs.end())
     {
-        rule();
+        // The sub-pages: set apart from the pages by space alone (no border).
+        x += 28;
         it->second.first->setBounds (x, fieldY, it->second.first->preferredWidth(), 27);
         x = it->second.first->getRight();
     }
-    const auto captionFont = fonts::make (9.0f, fonts::Weight::medium, 0.06f);
-    auto captionWidth = [&captionFont] (const juce::String& c) { return c.isEmpty() ? 0 : juce::roundToInt (juce::GlyphArrangement::getStringWidth (captionFont, c)) + 7; };
+    const auto captionFont = selectorCaptionFont();
+    auto captionWidth = [&captionFont] (const juce::String& c) { return c.isEmpty() ? 0 : juce::roundToInt (juce::GlyphArrangement::getStringWidth (captionFont, c)) + 6; };
     bool first = true;
     for (auto& s : selectors)
     {
@@ -404,9 +407,9 @@ void ParameterRack::layout()
         first = false;
         x += captionWidth (s.caption);
         s.control->setTopLeftPosition (x, fieldY);
-        x = s.control->getRight() + 16;
+        x = s.control->getRight() + 14;
     }
-    jassert (x - 16 <= divider - rackui::Cell::columnGap);
+    jassert (x - 14 <= divider - rackui::Cell::columnGap);
     // One row of cells on the standard lines; one slot family for the page.
     const bool dense = static_cast<int> (cells.size()) >= rackui::denseFrom;
     for (auto& g : groups)
@@ -416,7 +419,7 @@ void ParameterRack::layout()
     for (auto& p : cells)
     {
         if (lastGroup >= 0 && p.group != lastGroup)
-            cx += 20 - rackui::slotGap (dense);   // a group's gap (its divider in the middle)
+            cx += groupGap - rackui::slotGap (dense);   // a group's gap (its divider in the middle)
         const int w = rackui::slotWidth (p.slot, dense);
         p.cell->setBounds (cx, y, w, rackui::cellHeight);
         auto& span = groups[static_cast<std::size_t> (p.group)].span;
@@ -451,7 +454,7 @@ void ParameterRack::paint (juce::Graphics& g)
     g.setColour (juce::Colour (0xffcbc4b9));
     g.fillRect (juce::Rectangle<float> (static_cast<float> (dividerX()), static_cast<float> (titleOffset() + 3), 1.0f, static_cast<float> (getHeight() - titleOffset() - 5)));
     // The selectors' captions (inline, before each).
-    g.setFont (fonts::make (9.0f, fonts::Weight::medium, 0.06f));
+    g.setFont (selectorCaptionFont());
     g.setColour (rackui::palette::caption);
     for (auto& s : selectors)
         if (s.caption.isNotEmpty())
@@ -468,18 +471,11 @@ void ParameterRack::paint (juce::Graphics& g)
             continue;
         if (gr.caption.isNotEmpty())
         {
-            // The caption, then a hairline to the group's end: what belongs together.
-            const auto font = fonts::make (8.5f, fonts::Weight::medium, 0.08f);
-            const juce::Rectangle<float> band (static_cast<float> (gr.span.getX() + 4), static_cast<float> (gr.span.getY() - 11), static_cast<float> (gr.span.getWidth() - 8), 10.0f);
-            g.setColour (gr.quiet ? juce::Colour (0xffa29b91) : juce::Colour (0xff8c857b));
-            g.setFont (font);
-            g.drawText (gr.caption, band, juce::Justification::centredLeft, true);
-            const float after = band.getX() + juce::GlyphArrangement::getStringWidth (font, gr.caption) + 7.0f;
-            if (after < band.getRight() - 8.0f)
-            {
-                g.setColour (juce::Colour (0xffe0d8cc));
-                g.fillRect (juce::Rectangle<float> (after, band.getCentreY(), band.getRight() - after, 1.0f));
-            }
+            // A quiet caption over the group's first cell (no rule: the divider and the gap
+            // already say where it ends).
+            g.setColour (gr.quiet ? rackui::palette::quietCaption : juce::Colour (0xff8c857b));
+            g.setFont (fonts::make (9.0f, fonts::Weight::medium, 0.08f));
+            g.drawText (gr.caption, juce::Rectangle<int> (gr.span.getX() + 4, gr.span.getY() - 12, gr.span.getWidth() - 8, 11), juce::Justification::centredLeft, true);
         }
         if (i > 0 && ! groups[i - 1].span.isEmpty())
         {

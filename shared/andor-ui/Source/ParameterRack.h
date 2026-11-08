@@ -39,7 +39,8 @@ protected:
 
     The selector row holds four ranks, each told apart at a glance: the pages (primary: 11 px
     words, the shown one dark and underlined in the module's colour), the shown page's sub-pages
-    (secondary: 10 px, lighter, a hairline underline), then, after a quiet rule, the page's
+    (secondary: 10 px, lighter, a 1 px underline; set apart by space, no border), then, after a
+    quiet rule, the page's
     contextual settings (captioned segmented switches or lists: fields, not words); the cells
     below are the sound's controls. A subclass builds a page's cells
     and selectors in build(); the module rebuilds only when the page, the sub-page or buildKey()
@@ -77,6 +78,11 @@ public:
     /** The standard rack (MOVEMENT / ECHO / SPACE's): body 172, the selector row 39 under the
         title, 8 px, the cells; the graph 4 px under the title, 160 high. */
     static constexpr int standardBody = 172, selectRow = 39, rowGap = 8, graphHeight = 160;
+    /** Between two groups of cells (their divider in the middle): wider than a slot's gap, so
+        each group reads as its own section. */
+    static constexpr int groupGap = 28;
+    /** The selector row's captions (TYPE, METHOD): one style for every rack. */
+    static juce::Font selectorCaptionFont();
 
 protected:
     /** The pages (FILTER / VOICE / PAIR): low-profile words in the selector row, the shown one
@@ -103,7 +109,7 @@ protected:
                                               const juce::String& tip, const juce::String& over = {});
     ValueSelector& selectorList (const juce::String& id, const juce::String& caption, int width, const juce::String& tip);
     /** In build(): the next cells form a group (a quiet divider before it; its caption, if any,
-        small in the band over its cells, a hairline after it to the group's end). `quiet`: a
+        small in the band over its first cell). `quiet`: a
         secondary group (configuration, not the sound's shaping): its captions and values a
         step lighter. */
     void group (const juce::String& caption, bool quiet = false);
