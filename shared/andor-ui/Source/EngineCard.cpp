@@ -2328,9 +2328,9 @@ void EngineCard::setEqOpen (bool open)
     updateWellOverlay();
 }
 
-SynthChip::SynthChip (InstrumentHost& processor, int layer)
+SynthChip::SynthChip (InstrumentHost& processor, int l)
     : juce::Slider (juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::NoTextBox),
-      host (processor), accent (palette::layer (InstrumentHost::shownLayer (layer)))
+      host (processor), layer (l), accent (palette::layer (InstrumentHost::shownLayer (l)))
 {
     const auto id = InstrumentHost::synthesizeId (layer);
     binding::tag (*this, id);
@@ -2339,11 +2339,31 @@ SynthChip::SynthChip (InstrumentHost& processor, int layer)
     setMouseCursor (juce::MouseCursor::UpDownLeftRightResizeCursor);
     setTitle ("Layer " + InstrumentHost::layerName (layer) + " Synthesize");
     setTooltip ("SYNTHESIZE: blend a warm analog oscillator, playing this source's own notes, into its sound.\n"
-                "Click for its page (wave, octave, detune, tone, shape, pitch). Drag to set (Alt: fine), double-click for 0.");
+                "Click SYNTH for its page (Analog or Imprint, wave, octave, detune, tone, shape, pitch). "
+                "Drag the amount to set it (Alt: fine), double-click it for 0.");
     attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (processor.apvts(), id, *this);
     setDoubleClickReturnValue (true, 0.0);
     getProperties().set ("modField", true);   // a modulation target drawn as a field (an underline), not a ring
     onValueChange = [this] { repaint(); };
+}
+
+bool SynthChip::imprinting() const
+{
+    return host.parameterValue (InstrumentHost::synthParameterId (layer, "mode")) >= 0.5f
+           && host.parameterValue (InstrumentHost::synthParameterId (layer, "imprint")) > 0.0f;
+}
+
+juce::Rectangle<float> SynthChip::labelArea() const
+{
+    // The light, "SYNTH" and the chevron: as far as the chevron, and a little beyond it.
+    const auto r = getLocalBounds().toFloat();
+    const float textWidth = juce::GlyphArrangement::getStringWidth (type::popupLabel (r.getWidth() < 90.0f ? 10.5f : 11.5f), "SYNTH");
+    return r.withWidth (std::min (r.getWidth() * 0.62f, 15.0f + textWidth + 12.0f));
+}
+
+juce::Rectangle<float> SynthChip::amountArea() const
+{
+    return getLocalBounds().toFloat().withTrimmedLeft (labelArea().getWidth());
 }
 
 juce::PopupMenu SynthChip::auditionMenu()
@@ -2371,52 +2391,116 @@ void SynthChip::mouseDown (const juce::MouseEvent& e)
         auditionMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
         return;
     }
-    juce::Slider::mouseDown (e);
+    pressedLabel = labelArea().contains (e.position);
+    if (! pressedLabel)
+        juce::Slider::mouseDown (e);   // the amount: the fader
+}
+
+void SynthChip::mouseDrag (const juce::MouseEvent& e)
+{
+    if (! pressedLabel)
+        juce::Slider::mouseDrag (e);
 }
 
 void SynthChip::mouseUp (const juce::MouseEvent& e)
 {
+    if (pressedLabel)
+    {
+        // The label is a button: a click on it (released on it) opens the page at once.
+        pressedLabel = false;
+        if (! e.mods.isPopupMenu() && labelArea().contains (e.position) && ! e.mouseWasDraggedSinceMouseDown() && onOpenPage != nullptr)
+            onOpenPage();
+        return;
+    }
     juce::Slider::mouseUp (e);
-    if (! e.mods.isPopupMenu() && ! e.mouseWasDraggedSinceMouseDown() && e.getNumberOfClicks() == 1)
-        startTimer (juce::MouseEvent::getDoubleClickTimeout() + 20);
 }
 
 void SynthChip::mouseDoubleClick (const juce::MouseEvent& e)
 {
-    stopTimer();   // a double-click returns the amount to 0, it does not open the page
-    juce::Slider::mouseDoubleClick (e);
+    if (! labelArea().contains (e.position))
+        juce::Slider::mouseDoubleClick (e);   // the amount back to 0
+}
+
+void SynthChip::mouseMove (const juce::MouseEvent& e)
+{
+    juce::Slider::mouseMove (e);
+    const bool now = labelArea().contains (e.position);
+    if (now != overLabel)
+    {
+        overLabel = now;
+        setMouseCursor (now ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::UpDownLeftRightResizeCursor);
+        repaint();
+    }
 }
 
 void SynthChip::paint (juce::Graphics& g)
 {
     using namespace design;
-    // KEY DNA's hairline cell on graphite: lighter under the pointer; in use, the layer's
-    // small light by the name and a thin bar along the foot showing how much.
+    // KEY DNA's hairline cell on graphite. Two parts: the label (a button to the page) and the
+    // amount (the fader), each lighter under the pointer; in use, the layer's small light by the
+    // name (the imprint's curve while it colours the oscillator) and a thin bar showing how much.
     const auto r = getLocalBounds().toFloat().reduced (0.5f);
     const bool hover = isMouseOverOrDragging();
+    const bool dragging = isMouseButtonDown() && ! pressedLabel;
     const float a = std::clamp (amount() / 100.0f, 0.0f, 1.0f);
     const bool lit = a > 0.0f;
     const juce::Colour light (0xffeee8dd);
     g.setColour (colour::wellA.withAlpha (0.82f));   // legible over the waveform
     g.fillRoundedRectangle (r, 4.0f);
+    const auto label = labelArea().reduced (0.5f).withY (r.getY()).withHeight (r.getHeight());
     if (hover)
     {
-        g.setColour (light.withAlpha (0.06f));
-        g.fillRoundedRectangle (r, 4.0f);
+        // The part under the pointer (the fader while it is being dragged).
+        g.saveState();
+        juce::Path cell;
+        cell.addRoundedRectangle (r, 4.0f);
+        g.reduceClipRegion (cell);
+        g.setColour (light.withAlpha (0.07f));
+        g.fillRect (overLabel && ! dragging ? label : r.withTrimmedLeft (label.getWidth()));
+        g.restoreState();
     }
     g.setColour (light.withAlpha (lit || hover ? 0.28f : 0.16f));
     g.drawRoundedRectangle (r.reduced (0.5f), 4.0f, 1.0f);
+    if (hover)
+    {
+        // The seam between the two parts, only while the pointer is on the chip.
+        g.setColour (light.withAlpha (0.14f));
+        g.fillRect (juce::Rectangle<float> (label.getRight() - 0.5f, r.getY() + 4.0f, 1.0f, r.getHeight() - 8.0f));
+    }
     if (lit)
     {
         const auto bar = r.reduced (4.0f, 0.0f).removeFromBottom (3.0f).withTrimmedBottom (1.0f);
         g.setColour (accent.withAlpha (0.9f));
         g.fillRoundedRectangle (bar.withWidth (std::max (1.5f, bar.getWidth() * a)), 1.0f);
-        g.fillEllipse (juce::Rectangle<float> (4.5f, 4.5f).withCentre ({ r.getX() + 8.5f, r.getCentreY() - 0.5f }));
+        const juce::Point<float> at { r.getX() + 8.5f, r.getCentreY() - 0.5f };
+        if (imprinting())
+        {
+            // The imprint: a small spectral curve (two resonances), not the plain light.
+            juce::Path curve;
+            curve.startNewSubPath (at.x - 4.0f, at.y + 2.5f);
+            curve.cubicTo (at.x - 2.8f, at.y - 3.5f, at.x - 1.6f, at.y - 3.5f, at.x - 0.6f, at.y + 1.0f);
+            curve.cubicTo (at.x + 0.4f, at.y + 2.6f, at.x + 1.2f, at.y - 2.0f, at.x + 2.2f, at.y - 1.6f);
+            curve.cubicTo (at.x + 3.0f, at.y - 1.2f, at.x + 3.6f, at.y + 2.0f, at.x + 4.2f, at.y + 2.5f);
+            g.strokePath (curve, juce::PathStrokeType (1.3f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        }
+        else
+            g.fillEllipse (juce::Rectangle<float> (4.5f, 4.5f).withCentre (at));
     }
     auto text = r.withTrimmedLeft (lit ? 15.0f : 7.0f).withTrimmedRight (7.0f).withTrimmedBottom (1.0f);
-    g.setFont (type::popupLabel (r.getWidth() < 90.0f ? 10.5f : 11.5f));
+    const auto font = type::popupLabel (r.getWidth() < 90.0f ? 10.5f : 11.5f);
+    g.setFont (font);
     g.setColour (light.withAlpha (hover || lit ? 0.95f : 0.62f));
     g.drawText ("SYNTH", text, juce::Justification::centredLeft, false);
+    {
+        // The chevron: the label opens the page.
+        const float x = text.getX() + juce::GlyphArrangement::getStringWidth (font, "SYNTH") + 4.0f, y = text.getCentreY();
+        juce::Path chevron;
+        chevron.startNewSubPath (x, y - 2.5f);
+        chevron.lineTo (x + 2.5f, y);
+        chevron.lineTo (x, y + 2.5f);
+        g.setColour (light.withAlpha (overLabel ? 0.95f : (hover || lit ? 0.7f : 0.45f)));
+        g.strokePath (chevron, juce::PathStrokeType (1.1f, juce::PathStrokeType::mitered, juce::PathStrokeType::rounded));
+    }
     g.setColour (light.withAlpha (hover || lit ? 0.95f : 0.5f));
     g.drawText (juce::String (juce::roundToInt (amount())) + " %", text, juce::Justification::centredRight, false);
     if (host.synthAuditionBlend() != 0 || host.synthAuditionEnvelope() != 0)
@@ -2856,7 +2940,7 @@ void EngineCard::resized()
     if (synthChip != nullptr)
     {
         // SYNTHESIZE in the ruler band's top-right corner (the ruler's labels keep clear of it).
-        const float chipWidth = triple ? 92.0f : 96.0f;   // ("SYNTH" and "100 %" apart in a narrow card)
+        const float chipWidth = triple ? 104.0f : 108.0f;   // ("SYNTH", its chevron and "100 %" apart in a narrow card)
         const auto well = sourceDisplay.getBounds().toFloat();
         synthChip->setBounds (at ({ well.getRight() - 8.0f - chipWidth, well.getY() + 6.0f, chipWidth, 20.0f }));
         sourceDisplay.setRulerReserve (static_cast<int> (chipWidth) + 12);

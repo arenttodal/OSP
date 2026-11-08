@@ -934,3 +934,52 @@ TEST_CASE ("imprint engine: each set member colours with its own profile; Granul
         REQUIRE (std::isfinite (v));
     CHECK (std::abs (rmsDb (coloured, 0.5, 1.5) - rmsDb (analog, 0.5, 1.5)) < 2.0);
 }
+
+TEST_CASE ("imprint engine: CPU of SYNTH 100 % Analog against Imprint at 1 / 8 / 16 / 32 voices, Granular", "[.][imprintbench]")
+{
+    // On demand: osp_tests "[imprintbench]". The engine alone, 48 kHz, 256-sample blocks, notes
+    // held; % of real time (median of 5) with SYNTH 0, SYNTH 100 % Analog, Imprint static
+    // (MOTION 0) and Imprint moving (MOTION 50 %).
+    const auto audio = bowedStandIn (midiToHz (60), 3.0, celloBody, -28.0, false, 31);
+    const auto m = modelOf (audio);
+    struct Scenario { const char* name; int voices; bool granular; };
+    const Scenario scenarios[] = { { "1 voice", 1, false }, { "8 voices", 8, false }, { "16 voices", 16, false },
+                                   { "32 voices", 32, false }, { "8 voices Granular", 8, true } };
+    std::printf ("%-20s %10s %10s %10s %10s %14s\n", "scenario", "off", "Analog", "Imprint", "moving", "per voice (ns)");
+    for (const auto& sc : scenarios)
+    {
+        std::array<double, 4> cost {};
+        for (std::size_t k = 0; k < cost.size(); ++k)
+        {
+            std::vector<double> runs;
+            for (int run = 0; run < 5; ++run)
+            {
+                auto settings = plainEngine (k == 0 ? 0.0 : 1.0);
+                settings.polyphony = 32;
+                if (k >= 2)
+                    settings.layer[0].synth = imprintPage (1.0, k == 3 ? 0.5 : 0.0);
+                if (sc.granular)
+                    settings.sourceMode[0] = SourceMode::granular;
+                InstrumentEngine e;
+                e.prepare (rate, 256, settings);
+                e.setModel (m.get());
+                for (int v = 0; v < sc.voices; ++v)
+                    e.noteOn (36 + (v * 7) % 48, 100);
+                std::vector<float> l (256), r (256);
+                float* ch[2] = { l.data(), r.data() };
+                e.render (ch, 2, 256);
+                const int blocks = static_cast<int> (2.0 * rate / 256.0);
+                const auto t0 = std::chrono::steady_clock::now();
+                for (int b = 0; b < blocks; ++b)
+                    e.render (ch, 2, 256);
+                const double seconds = std::chrono::duration<double> (std::chrono::steady_clock::now() - t0).count();
+                runs.push_back (100.0 * seconds / (blocks * 256.0 / rate));
+            }
+            std::sort (runs.begin(), runs.end());
+            cost[k] = runs[2];
+        }
+        // The imprint's own cost per sounding voice per sample (moving against Analog).
+        const double perVoice = (cost[3] - cost[1]) / 100.0 / rate / sc.voices * 1.0e9;
+        std::printf ("%-20s %9.3f%% %9.3f%% %9.3f%% %9.3f%% %14.0f\n", sc.name, cost[0], cost[1], cost[2], cost[3], perVoice);
+    }
+}

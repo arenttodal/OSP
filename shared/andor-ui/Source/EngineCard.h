@@ -301,30 +301,39 @@ private:
 
 /**
     SYNTHESIZE (Phase S1) in a source's well: a slim graphite fader in the ruler's top-right
-    corner, in the KEY DNA key's hairline vocabulary. "SYNTH" and the amount; while it is above
-    0 a small light in the layer's colour and a thin bar show how much. Drag (up or right) or
-    turn the wheel to set it, Alt for fine; double-click returns it to 0. It takes no room from
-    the card: the well's ruler leaves its corner free (SourceDisplay::setRulerReserve).
+    corner, in the KEY DNA key's hairline vocabulary, in two parts. The label ("SYNTH" and a
+    small chevron) opens the SYNTH page with one click. The amount, on the right, is the fader:
+    drag (up or right) or turn the wheel to set it, Alt for fine; double-click returns it to 0.
+    While it is above 0 a small light in the layer's colour and a thin bar show how much; with
+    the spectral imprint on (Imprint, IMPRINT above 0) the light is the imprint's small curve.
+    It takes no room from the card: the well's ruler leaves its corner free
+    (SourceDisplay::setRulerReserve).
 */
-class SynthChip final : public juce::Slider, private juce::Timer
+class SynthChip final : public juce::Slider
 {
 public:
     SynthChip (InstrumentHost& processor, int layer);
-    ~SynthChip() override { stopTimer(); }
     void paint (juce::Graphics&) override;
-    /** Right-click (or Ctrl-click): the development audition menu (blend law, envelope). */
+    /** Right-click (or Ctrl-click): the development audition menu (blend law, envelope). A
+        press on the label is the page's, not the fader's. */
     void mouseDown (const juce::MouseEvent&) override;
-    /** A click without a drag opens the SYNTH page (after the double-click time, so a
-        double-click still returns the amount to 0). */
+    void mouseDrag (const juce::MouseEvent&) override;
+    /** A click on the label opens the SYNTH page. */
     void mouseUp (const juce::MouseEvent&) override;
+    /** On the amount: back to 0. */
     void mouseDoubleClick (const juce::MouseEvent&) override;
+    void mouseMove (const juce::MouseEvent&) override;
     std::function<void()> onOpenPage;
+    /** The label (opens the page) and the amount (the fader), in the chip's coordinates. */
+    juce::Rectangle<float> labelArea() const;
+    juce::Rectangle<float> amountArea() const;
     /** The audition menu's items, as shown (tests). */
     juce::PopupMenu auditionMenu();
-    /** Repaints when the audition changed (from another source's menu): the UI timer. */
+    /** Repaints when the audition or the imprint changed (another source's menu, the page,
+        automation): the UI timer. */
     void refreshAudition()
     {
-        const int now = host.synthAuditionBlend() | (host.synthAuditionEnvelope() << 8);
+        const int now = host.synthAuditionBlend() | (host.synthAuditionEnvelope() << 8) | (imprinting() ? 1 << 16 : 0);
         if (now != shownAudition)
         {
             shownAudition = now;
@@ -332,19 +341,22 @@ public:
         }
     }
     void mouseEnter (const juce::MouseEvent& e) override { juce::Slider::mouseEnter (e); repaint(); }
-    void mouseExit (const juce::MouseEvent& e) override { juce::Slider::mouseExit (e); repaint(); }
+    void mouseExit (const juce::MouseEvent& e) override
+    {
+        juce::Slider::mouseExit (e);
+        overLabel = false;
+        repaint();
+    }
     /** The amount, 0..100 %. */
     float amount() const noexcept { return static_cast<float> (getValue()); }
+    /** The spectral imprint colours this source's oscillator (Imprint, IMPRINT above 0). */
+    bool imprinting() const;
 
 private:
-    void timerCallback() override
-    {
-        stopTimer();
-        if (onOpenPage != nullptr)
-            onOpenPage();
-    }
     InstrumentHost& host;
+    int layer = 0;
     int shownAudition = 0;
+    bool pressedLabel = false, overLabel = false;
     juce::Colour accent;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
 };

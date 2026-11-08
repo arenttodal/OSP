@@ -789,3 +789,98 @@ TEST_CASE ("plugin imprint: mode, IMPRINT and MOTION per source (hint 28) at Ana
     CHECK (older.parameterValue (InstrumentHost::synthParameterId (0, "imprint")) == 0.0f);
     CHECK (audioHash (renderHeld (older, chord8, 1.2)) == analog);
 }
+
+TEST_CASE ("plugin imprint: the chip's label opens the page, its amount is the fader; the page's ANALOG | IMPRINT, IMPRINT and MOTION",
+           "[plugin][synthesize][imprint][ui]")
+{
+    using osp::plugin::InstrumentHost;
+    TempDir tmp;
+    OspAudioProcessor p;
+    loadLayers (p, tmp.dir, 3);
+    std::unique_ptr<juce::AudioProcessorEditor> e (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (e.get());
+    REQUIRE (ui != nullptr);
+    auto event = [] (juce::Component& c, juce::Point<float> at, int clicks = 1) {
+        auto source = juce::Desktop::getInstance().getMainMouseSource();
+        const auto now = juce::Time::getCurrentTime();
+        return juce::MouseEvent (source, at, {}, juce::MouseInputSource::defaultPressure, 0.0f, 0.0f, 0.0f, 0.0f, &c, &c, now, at, now, clicks, false);
+    };
+    for (const auto& size : { std::pair<int, int> { 1448, 1086 }, { 1086, 814 } })
+    {
+        e->setSize (size.first, size.second);
+        ui->refreshNow();
+        auto& card = ui->engineCard (1);
+        auto* chip = card.synthesizeControl();
+        REQUIRE (chip != nullptr);
+        // Two parts: the label (with its chevron) and the amount, side by side, the whole chip.
+        const auto label = chip->labelArea(), amount = chip->amountArea();
+        CHECK_FALSE (label.isEmpty());
+        CHECK_FALSE (amount.isEmpty());
+        CHECK_FALSE (label.intersects (amount));
+        CHECK (label.getWidth() + amount.getWidth() == Approx (chip->getLocalBounds().toFloat().getWidth()));
+        CHECK (amount.getWidth() >= 30.0f);   // ("100 %" and room to grab)
+        // A click on the amount sets nothing and opens nothing; a double-click there returns it to 0.
+        chip->setValue (40.0, juce::sendNotificationSync);
+        chip->mouseDown (event (*chip, amount.getCentre()));
+        chip->mouseUp (event (*chip, amount.getCentre()));
+        CHECK_FALSE (card.isSynthOpen());
+        CHECK (p.parameterValue (synthId (1)) == Approx (40.0f));
+        chip->mouseDoubleClick (event (*chip, label.getCentre(), 2));   // (not on the label)
+        CHECK (p.parameterValue (synthId (1)) == Approx (40.0f));
+        chip->mouseDoubleClick (event (*chip, amount.getCentre(), 2));
+        CHECK (p.parameterValue (synthId (1)) == 0.0f);
+        chip->setValue (40.0, juce::sendNotificationSync);
+        // A click on the label opens the page at once; the amount is untouched.
+        chip->mouseDown (event (*chip, label.getCentre()));
+        chip->mouseUp (event (*chip, label.getCentre()));
+        REQUIRE (card.isSynthOpen());
+        CHECK (p.parameterValue (synthId (1)) == Approx (40.0f));
+        auto* page = card.synthEditorComponent();
+        REQUIRE (page != nullptr);
+        ui->refreshNow();
+        // ANALOG | IMPRINT on the top row, beside the name, clear of AMOUNT and close.
+        const auto mode = page->choiceArea ("mode");
+        CHECK_FALSE (mode.isEmpty());
+        CHECK (page->getLocalBounds().toFloat().contains (mode));
+        CHECK (mode.getBottom() <= page->waveArea().getY());
+        for (auto* child : page->getChildren())
+            if (child->isVisible())
+                CHECK_FALSE (child->getBounds().toFloat().intersects (mode));
+        CHECK (page->imprintFieldArea().isEmpty());   // Analog: no IMPRINT or MOTION
+        const auto analogWave = page->shownWave();
+        // IMPRINT: one undo step; IMPRINT and MOTION appear, clear of every other control.
+        p.undo().clearUndoHistory();
+        page->choose ("mode", 1);
+        p.parameters.copyState();
+        CHECK (p.parameterValue (InstrumentHost::synthParameterId (1, "mode")) == Approx (1.0f));
+        CHECK (p.undo().getUndoDescription() == "SYNTH B mode");
+        page->refresh();
+        const auto imprintArea = page->imprintFieldArea(), motionArea = page->motionFieldArea();
+        REQUIRE_FALSE (imprintArea.isEmpty());
+        REQUIRE_FALSE (motionArea.isEmpty());
+        CHECK_FALSE (imprintArea.intersects (motionArea));
+        for (const auto& r : { imprintArea, motionArea })
+        {
+            CHECK (page->getLocalBounds().toFloat().contains (r));
+            CHECK_FALSE (page->waveArea().intersects (r));
+            for (const auto* name : { "mode", "wave", "octave", "shape", "pitch" })
+                CHECK_FALSE (page->choiceArea (name).intersects (r));
+        }
+        if (size.first == 1448)
+            CHECK (page->waveArea().getHeight() > 40.0f);   // (the smallest card gives its picture to the controls)
+        CHECK (page->imprintStatus().isEmpty());   // the source's imprint is ready
+        CHECK (page->shownWave() == analogWave);    // IMPRINT 0: the oscillator as it was
+        p.setParameterValue (InstrumentHost::synthParameterId (1, "imprint"), 100.0f);
+        page->refresh();
+        CHECK (page->shownWave() != analogWave);    // the wave through the recording's colour
+        REQUIRE (p.undo().undo());   // (the mode)
+        page->refresh();
+        CHECK (p.parameterValue (InstrumentHost::synthParameterId (1, "mode")) == 0.0f);
+        CHECK (page->imprintFieldArea().isEmpty());
+        CHECK (page->shownWave() == analogWave);
+        card.setSynthOpen (false);
+        p.setParameterValue (InstrumentHost::synthParameterId (1, "imprint"), 0.0f);
+        chip->setValue (0.0, juce::sendNotificationSync);
+        ui->refreshNow();
+    }
+}

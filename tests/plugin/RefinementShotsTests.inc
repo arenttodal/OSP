@@ -267,4 +267,34 @@ TEST_CASE ("plugin: UI refinement screenshots (OSP_REFINE_DIR)", "[.][refine-sho
         page (p, ui, { { "wave", 3.0f } });
     }, "07-synth-page-3L");
     shoot ({ pad }, [&] (OspAudioProcessor& p, Editor& ui) { page (p, ui, { { "wave", 2.0f } }); }, "07-synth-page-off-1L");
+
+    // 08 SYNTHESIS S2, the spectral imprint: IMPRINT and MOTION beside the controls (one card),
+    // on the first row (two), on a row of their own (three; the small window gives them the
+    // picture's room); the chip with the imprint's curve.
+    shoot ({ pad }, [&] (OspAudioProcessor& p, Editor& ui) {
+        synth (p, { 60.0f });
+        page (p, ui, { { "mode", 1.0f }, { "imprint", 80.0f }, { "motion", 40.0f } });
+    }, "08-imprint-page-1L");
+    shoot ({ pad, pluck }, [&] (OspAudioProcessor& p, Editor& ui) {
+        synth (p, { 60.0f, 0.0f });
+        page (p, ui, { { "mode", 1.0f }, { "imprint", 100.0f }, { "motion", 0.0f } });
+    }, "08-imprint-page-2L");
+    shoot ({ pad, pluck, rec.file }, [&] (OspAudioProcessor& p, Editor& ui) {
+        synth (p, { 60.0f, 0.0f, 0.0f });
+        page (p, ui, { { "mode", 1.0f }, { "imprint", 70.0f }, { "motion", 50.0f } });
+    }, "08-imprint-page-3L");
+    shoot ({ pad, pluck, rec.file }, [&] (OspAudioProcessor& p, Editor& ui) {
+        ui.setSize (1086, 814);
+        synth (p, { 60.0f, 0.0f, 0.0f });
+        page (p, ui, { { "mode", 1.0f }, { "imprint", 70.0f }, { "motion", 50.0f } });
+    }, "08-imprint-page-3L-small");
+    shoot ({ pad, pluck, rec.file }, [&] (OspAudioProcessor& p, Editor& ui) {
+        synth (p, { 45.0f, 70.0f, 0.0f });
+        for (int l = 0; l < 2; ++l)
+        {
+            p.setParameterValue (osp::plugin::InstrumentHost::synthParameterId (l, "mode"), 1.0f);
+            p.setParameterValue (osp::plugin::InstrumentHost::synthParameterId (l, "imprint"), l == 0 ? 80.0f : 0.0f);
+        }
+        ui.refreshNow();
+    }, "08-imprint-chips-3L");
 }

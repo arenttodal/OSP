@@ -673,6 +673,25 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       note colours (regions, NOTE MAP, keyboard strip) are earth and plant pigments, warm for
       the even pitch classes and green / teal for the odd ones, no violets.
 
+## Milestone: SYNTHESIS S2 — the spectral imprint (docs/research/synthesize/s2-imprint-*.md)
+
+- [x] S2.0 audit and code map (`s2-imprint-audit.md`); rollback checkpoint 6e5f503.
+- [x] S2.1 three experiments on stand-in references (static, time-varying, real-time vocoder;
+      16/24/32 bands): B (time-varying) chosen, MOTION 0 being A (`s2-imprint-research.md`).
+- [x] S2.2 the descriptor `imprint::Profile` (`model/ImprintProfile.h`) in every
+      `InstrumentModel` (each set and Atlas member its own), built in `addContinuation`.
+- [x] S2.3 the voice: a 24-band shaper on the oscillator, only in Imprint with IMPRINT above
+      0; Analog, IMPRINT 0 and SYNTH 0 are sample-identical to S1.
+- [x] S2.4 per layer `layerX.synth.mode` / `.imprint` / `.motion` (version hint 28, appended
+      after `arp.*`); older sessions open as Analog; `InstrumentHost::imprintState`.
+- [x] S2.5-S2.6 the SYNTH chip in two parts (SYNTH › opens the page; the amount drags, wheels,
+      Alt fine, double-click 0; the imprint's curve as its light) and the page's ANALOG | IMPRINT,
+      IMPRINT and MOTION in one, two and three cards (`08-imprint-*` screenshots).
+- [x] S2.7 regression and CPU (`s2-imprint-results.md`). Tests `[imprint]`, `[imprint-engine]`,
+      `[plugin][imprint]`.
+- [ ] Musical review of real recordings in the development build (S2.8 report:
+      `s2-imprint-results.md`).
+
 ## Milestone: ANDOR Instrument Shell extensions for ANDOR ANALOG (a synthesizer)
 
 - [x] Opt-in extension points (HANDOFF.md, "What a product may add"): product parameters after
