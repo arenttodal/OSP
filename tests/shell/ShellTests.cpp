@@ -242,7 +242,22 @@ TEST_CASE ("shell: the parameter schema is ANDOR OSP's, unchanged; the product's
         (isOwn ? own : base).add (line);
     }
     CHECK (orderKept);
-    parameterschema::checkAgainstGolden (base.joinIntoString ("\n") + "\n", "osp-parameter-schema.txt");
+    // ANDOR OSP's schema, less its own per-card arpeggiator (arp.link, arp.cardA ..): a product
+    // that has one keeps it in its own namespace (InstrumentHost::addCardArpParameters). Less
+    // its spectral imprint too (layerA.synth.mode / .imprint / .motion): ANDOR OSP's SYNTH page.
+    auto ospBase = parameterschema::ospGolden ("osp-parameter-schema.txt");
+    auto ospOnly = [] (const juce::String& line) {
+        if (line.startsWith ("arp.link ") || line.startsWith ("arp.card"))
+            return true;
+        for (const auto& name : osp::plugin::InstrumentHost::imprintParameterNames())
+            if (line.startsWith ("layer") && line.upToFirstOccurrenceOf (" ", false, false).endsWith (".synth." + name))
+                return true;
+        return false;
+    };
+    for (int i = ospBase.size(); --i >= 0;)
+        if (ospOnly (ospBase[i]))
+            ospBase.remove (i);
+    parameterschema::compareListings (base.joinIntoString ("\n") + "\n", ospBase);
 #ifdef ANDOR_PRODUCT_SCHEMA_GOLDEN
     REQUIRE_FALSE (own.isEmpty());
     parameterschema::checkAgainstGoldenFile (own.joinIntoString ("\n") + "\n", juce::File (ANDOR_PRODUCT_SCHEMA_GOLDEN));
@@ -653,7 +668,7 @@ TEST_CASE ("shell: the interface is ANDOR OSP's, pixel for pixel outside the app
     // every pixel outside the masks must be exactly ANDOR OSP's.
     constexpr int tolerance = 0;
     juce::StringArray report { "# Visual regression: " + andor::shell::productInfo().name + " vs ANDOR OSP", "",
-                               "Tolerance: " + juce::String (tolerance) + " (exact), masks: identity, preset-name, status-line. Rendered with ANDOR OSP's materials (a product's own finish is its identity: see shipped/).", "",
+                               "Tolerance: " + juce::String (tolerance) + " (exact), masks: identity, preset-name, status-line (and, with the ARP panel open, arp-cards). Rendered with ANDOR OSP's materials (a product's own finish is its identity: see shipped/).", "",
                                "| State | Differing pixels outside the masks | Inside the masks (allowed) |", "|---|---|---|" };
     int failures = 0;
     for (const auto& name : visualstates::names())
@@ -664,7 +679,7 @@ TEST_CASE ("shell: the interface is ANDOR OSP's, pixel for pixel outside the app
         REQUIRE (a.isValid());
         REQUIRE (b.isValid());
         const float scale = name.endsWith ("@2x") ? 2.0f : (name.startsWith ("04-window-") ? static_cast<float> (a.getWidth()) / osp::plugin::design::width : 1.0f);
-        const auto masks = visualstates::masks (name == "09-arp-open" ? osp::plugin::design::layout::arpShift : 0.0f);
+        const auto masks = name == "09-arp-open" ? visualstates::masks (osp::plugin::design::layout::arpShift, true) : visualstates::masks();
         int inMasks = 0;
         Difference where;
         const int differing = compareImages (a, b, masks, scale, tolerance, output.getChildFile ("diff/" + name + ".png"), inMasks, where);

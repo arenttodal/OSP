@@ -26,6 +26,7 @@ add_executable(osp_tests
     unit/DynamicsTests.cpp
     unit/AbyssReverbTests.cpp
     unit/VintageBloomTests.cpp
+    unit/EchoAscendTests.cpp
     unit/PostProcessorTests.cpp
     unit/DriveProcessorTests.cpp
     unit/ArpeggiatorTests.cpp
@@ -34,6 +35,8 @@ add_executable(osp_tests
     unit/SynthesizeTests.cpp
     unit/SampleSetTests.cpp
     unit/FastNumericsTests.cpp
+    unit/CaptureBufferTests.cpp
+    unit/ImprintTests.cpp
     library/CatalogTests.cpp
     library/ImportTests.cpp
     library/PreviewTests.cpp

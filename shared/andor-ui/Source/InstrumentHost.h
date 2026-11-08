@@ -96,6 +96,14 @@ public:
     /** The page's values as the engine takes them, from the six parameters' raw values in
         synthParameterNames() order (real-time safe). */
     static synth::Settings synthSettingsFrom (const std::array<float, 6>& raw) noexcept;
+    /** The spectral imprint's parameters (version hint 28), on the SYNTH page: "layerA.synth.mode"
+        (Analog / Imprint), .imprint and .motion (0..100 %). Analog, 0 and 0 by default, so every
+        session from before plays its oscillator exactly as it did. */
+    static const juce::StringArray& imprintParameterNames();   ///< mode, imprint, motion
+    /** Their values into `s` (real-time safe), from the raw values in imprintParameterNames() order. */
+    static void applyImprintSettings (synth::Settings& s, const std::array<float, 3>& raw) noexcept;
+    /** Appends them (ANDOR OSP's layout, after its per-card arpeggiator: nothing before moves). */
+    static void addImprintParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout);
     /** DAMPEN's parameters in their order: enabled, mode, amount, frequency, cutoff. */
     static const juce::StringArray& dampenParameterNames();
     static const juce::StringArray& eqParameterNames();   ///< enabled, hp.enabled, hp.frequency, ... in order
@@ -133,6 +141,11 @@ public:
     virtual std::optional<double> rootOverride (int layer = -1) const = 0;
     /** Heard in the mix: SOLO wins (only soloed layers are heard), else MUTE decides. */
     bool isLayerHeard (int layer) const;
+    /** The spectral imprint a layer's source can lay on its oscillator (the SYNTH page says so):
+        none (no source), preparing (the source still building), ready, or unavailable (no
+        usable spectral envelope: the voices play Analog). Message thread. */
+    enum class ImprintState { none, preparing, ready, unavailable };
+    ImprintState imprintState (int layer) const;
     /** SOLO this layer alone (alt-click on S). */
     void soloOnly (int layer);
     /** What a layer's voices are doing, for its display (lock-free, any thread). */
@@ -393,6 +406,45 @@ public:
         bool active = false;
     };
     virtual ArpView arpView() const noexcept = 0;
+    /** The per-card arpeggiator (a three-engine product's): the ARP panel then shows which
+        cards it plays, LINK, and each card's own settings (ANDOR OSP and every three-engine
+        product that opts in). False: one arpeggiator. */
+    virtual bool cardArpeggiator() const noexcept { return false; }
+    /** Its parameters' namespace (the product's, "analog."): ids::arpLink (ns) ... */
+    virtual juce::String cardArpNamespace() const { return {}; }
+    /** The per-card arpeggiator's parameters (version hint 27), in namespace `ns` (ANDOR OSP:
+        "", so arp.link, arp.cardA ..; a shell product: its own, "analog."): LINK and every
+        card arpeggiated by default (the one arpeggiator, exactly as before); B's and C's own
+        PATTERN / RATE / OCTAVES start as A's defaults. One definition for OSP and the shell. */
+    static void addCardArpParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, const juce::String& ns);
+    /** The card (shown, 0 A .. 2 C) whose lane arpView() shows (the one the panel edits). */
+    virtual void setArpViewCard (int shown) noexcept { juce::ignoreUnused (shown); }
+
+    // -- Live capture (a product opts in: ANDOR OSP) -----------------------------------------
+    /** What the CAPTURE page shows (message thread). */
+    struct CaptureView
+    {
+        bool connected = false;    ///< an input arrives (a DAW's sidechain, the app's input)
+        bool recording = false;    ///< RECORD is running
+        int layer = -1;            ///< the layer the running take is for
+        double seconds = 0.0;      ///< the running take's length so far
+        double available = 0.0;    ///< how much GRAB can reach back (up to 60 s)
+        float level = 0.0f;        ///< the input meter: the loudest sample lately, 0..1+
+        juce::String hint;         ///< how to connect an input when there is none
+    };
+    /** The REC key on each card and its CAPTURE page exist (false: as before). */
+    virtual bool liveCapture() const noexcept { return false; }
+    virtual CaptureView captureView() { return {}; }
+    /** The layer a take is being recorded for (-1: none). Cheap; any card may ask. */
+    virtual int recordingLayer() const noexcept { return -1; }
+    /** RECORD: a take for `layer` starts (a moment before now is kept). */
+    virtual bool startTake (int layer) { juce::ignoreUnused (layer); return false; }
+    /** STOP: the take is kept, its notes mapped, and it becomes the layer's instrument. */
+    virtual bool stopTake() { return false; }
+    /** Throws the running take away. */
+    virtual void cancelTake() {}
+    /** GRAB: the last `seconds` (5..60) that came in become the layer's instrument, as a take. */
+    virtual bool grabLast (double seconds, int layer) { juce::ignoreUnused (seconds, layer); return false; }
 
     // -- The macro popovers (MacroPopups.h) --------------------------------------------------
     /** The layer the interface edits (0 A, 1 B, 2 C). Any thread. */

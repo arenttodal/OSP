@@ -78,6 +78,7 @@ namespace osp::plugin::ids
     inline const juce::String abyssGravity = "space.abyss.gravity";
     inline const juce::String abyssFreeze = "space.abyss.freeze";
     inline const juce::String abyssResonance = "space.abyss.resonance";
+    inline const juce::String abyssVariant = "space.abyss.variant";       ///< (version hint 25)
     inline const juce::String vintageVariant = "space.vintage.variant";   ///< (version hint 24)
     inline const juce::String vintageEra = "space.vintage.era";
     inline const juce::String vintageDiffusion = "space.vintage.diffusion";
@@ -95,6 +96,8 @@ namespace osp::plugin::ids
     inline const juce::String echoTone = "echo.tone";
     inline const juce::String echoAge = "echo.age";
     inline const juce::String echoStereo = "echo.stereo";
+    inline const juce::String echoInterval = "echo.ascend.interval";     ///< ASCEND (version hint 26)
+    inline const juce::String echoMotion = "echo.ascend.motion";         ///< ASCEND (version hint 26)
     inline const juce::String shaperCustom = "movement.shaper.custom";
     // DRIVE (version hint 14): the macro that took DYNAMICS' place on the panel. DYNAMICS keeps
     // its own IDs (and lives in Advanced now); never reuse one for the other.
@@ -110,6 +113,13 @@ namespace osp::plugin::ids
     inline const juce::String arpOctaves = "arp.octaves";
     inline const juce::String arpSwing = "arp.swing";   // version hint 16
     inline const juce::String arpVelocity = "arp.velocity";   // version hint 19
+    /** The per-card arpeggiator's (a three-engine product's, added by the shell in the
+        product's namespace `ns`, e.g. "analog."; not ANDOR OSP's): LINK, whether a card (shown
+        0 A .. 2 C) plays the arpeggio, and a card's own setting while unlinked ("pattern",
+        "rate", "octaves"; card A's are ANDOR OSP's arp.*). */
+    inline juce::String arpLink (const juce::String& ns) { return ns + "arp.link"; }
+    inline juce::String arpCard (const juce::String& ns, int shown) { return ns + "arp.card" + juce::String::charToString (static_cast<juce::juce_wchar> ('A' + juce::jlimit (0, 2, shown))); }
+    inline juce::String arpCardSetting (const juce::String& ns, int shown, const juce::String& name) { return shown <= 0 ? "arp." + name : arpCard (ns, shown) + "." + name; }
     // A/B layers (stable: never rename). Per layer: layerA.sourceMode, layerA.granular.position, ...
     inline const juce::String blend = "ab.blend";
     // Adaptive 1-3 layers (version hint 7): the three-layer mix position and the envelope's D and S.
@@ -122,5 +132,6 @@ namespace osp::plugin::ids
     inline const juce::String grainBudget = "grainBudget";
     // MIX modulation (version hint 21): mod.routeN.destExt. SYNTHESIZE (version hint 22): per
     // layer layerA.synthesize, 0..100 % (0: off, bit-identical). The SYNTH page (version hint
-    // 23): per layer layerA.synth.wave / .octave / .detune / .tone / .shape / .pitch.
+    // 23): per layer layerA.synth.wave / .octave / .detune / .tone / .shape / .pitch. The spectral
+    // imprint (version hint 28, ANDOR OSP's layout after arp.*): layerA.synth.mode / .imprint / .motion.
 }

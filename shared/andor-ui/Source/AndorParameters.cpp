@@ -72,6 +72,50 @@ synth::Settings InstrumentHost::synthSettingsFrom (const std::array<float, 6>& r
     return s;
 }
 
+const juce::StringArray& InstrumentHost::imprintParameterNames()
+{
+    static const juce::StringArray names { "mode", "imprint", "motion" };
+    return names;
+}
+
+void InstrumentHost::applyImprintSettings (synth::Settings& s, const std::array<float, 3>& raw) noexcept
+{
+    s.mode = std::lround (raw[0]) == 1 ? synth::Mode::imprint : synth::Mode::analog;
+    s.imprint = std::clamp (static_cast<double> (raw[1]) / 100.0, 0.0, 1.0);
+    s.motion = std::clamp (static_cast<double> (raw[2]) / 100.0, 0.0, 1.0);
+}
+
+void InstrumentHost::addImprintParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout)
+{
+    auto id28 = [] (const juce::String& id) { return juce::ParameterID { id, 28 }; };
+    auto percent = juce::AudioParameterFloatAttributes().withLabel ("%").withStringFromValueFunction (
+        [] (float v, int) { return juce::String (juce::roundToInt (v)) + " %"; });
+    const juce::NormalisableRange<float> unit (0.0f, 100.0f, 0.1f);
+    for (int layer = 0; layer < numLayers; ++layer)
+    {
+        const auto name = "Layer " + layerName (layer) + " Synth ";
+        layout.add (std::make_unique<juce::AudioParameterChoice> (id28 (synthParameterId (layer, "mode")), name + "Mode",
+                                                                  juce::StringArray { "Analog", "Imprint" }, 0));
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id28 (synthParameterId (layer, "imprint")), name + "Imprint", unit, 0.0f, percent));
+        layout.add (std::make_unique<juce::AudioParameterFloat> (id28 (synthParameterId (layer, "motion")), name + "Motion", unit, 0.0f, percent));
+    }
+}
+
+void InstrumentHost::addCardArpParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, const juce::String& ns)
+{
+    auto id = [] (const juce::String& s) { return juce::ParameterID { s, 27 }; };
+    layout.add (std::make_unique<juce::AudioParameterBool> (id (ids::arpLink (ns)), "Arp Link", true));
+    for (int c = 0; c < 3; ++c)
+        layout.add (std::make_unique<juce::AudioParameterBool> (id (ids::arpCard (ns, c)), "Arp Card " + juce::String::charToString (static_cast<juce::juce_wchar> ('A' + c)), true));
+    for (int c = 1; c < 3; ++c)
+    {
+        const auto name = "Arp Card " + juce::String::charToString (static_cast<juce::juce_wchar> ('A' + c)) + " ";
+        layout.add (std::make_unique<juce::AudioParameterChoice> (id (ids::arpCardSetting (ns, c, "pattern")), name + "Pattern", arpPatternNames(), 0));
+        layout.add (std::make_unique<juce::AudioParameterChoice> (id (ids::arpCardSetting (ns, c, "rate")), name + "Rate", arpRateNames(), 1));
+        layout.add (std::make_unique<juce::AudioParameterInt> (id (ids::arpCardSetting (ns, c, "octaves")), name + "Octaves", 1, 4, 1));
+    }
+}
+
 juce::AudioProcessorValueTreeState::ParameterLayout InstrumentHost::createParameterLayout()
 {
     using Range = juce::NormalisableRange<float>;
@@ -329,7 +373,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout InstrumentHost::createParame
         layout.add (std::make_unique<juce::AudioParameterFloat> (id12 (ids::spaceHighCut), "Space High Cut", skewedRange (1000.0f, 20000.0f, 5000.0f),
                                                                  static_cast<float> (d12.spaceHighCutHz), hz12));
         layout.add (std::make_unique<juce::AudioParameterFloat> (id12 (ids::echo), "Echo", unit, 0.0f, percent));
-        layout.add (std::make_unique<juce::AudioParameterChoice> (id12 (ids::echoType), "Echo Type", juce::StringArray { "Tape", "BBD" }, static_cast<int> (d12.echoType)));
+        layout.add (std::make_unique<juce::AudioParameterChoice> (id12 (ids::echoType), "Echo Type", juce::StringArray { "Tape", "BBD", "Ascend" }, static_cast<int> (d12.echoType)));
         layout.add (std::make_unique<juce::AudioParameterBool> (id12 (ids::echoSync), "Echo Sync", d12.echoSync));
         juce::StringArray divisions;
         for (int i = 0; i < shaping::echoDivisionCount; ++i)
@@ -596,6 +640,23 @@ juce::AudioProcessorValueTreeState::ParameterLayout InstrumentHost::createParame
         layout.add (std::make_unique<juce::AudioParameterFloat> (id24 (ids::bloomTime), "Bloom Time", skewedRange (20.0f, 1500.0f, 300.0f),
                                                                  static_cast<float> (d24.bloomTimeMs), juce::AudioParameterFloatAttributes().withLabel ("ms")));
         layout.add (std::make_unique<juce::AudioParameterFloat> (id24 (ids::bloomDiffusion), "Bloom Diffusion", unit, static_cast<float> (100.0 * d24.bloomDiffusion), percent));
+    }
+    {
+        // ABYSS's variants (version hint 25), appended so nothing before moves. DEEP by default:
+        // ABYSS as it was.
+        auto id25 = [] (const juce::String& id) { return juce::ParameterID { id, 25 }; };
+        layout.add (std::make_unique<juce::AudioParameterChoice> (id25 (ids::abyssVariant), "Abyss Variant", juce::StringArray { "Deep", "Dark", "Inverse", "Endless" },
+                                                                  static_cast<int> (Shaping {}.abyssVariant)));
+    }
+    {
+        // ECHO's ASCEND (version hint 26): its own controls, appended so nothing before moves.
+        // (echo.type gained the ASCEND choice after TAPE and BBD, as space.engine gained its.)
+        auto id26 = [] (const juce::String& id) { return juce::ParameterID { id, 26 }; };
+        const Shaping d26;
+        layout.add (std::make_unique<juce::AudioParameterChoice> (id26 (ids::echoInterval), "Echo Ascend Interval", juce::StringArray { "+12", "+7", "+5", "-12" },
+                                                                  static_cast<int> (d26.echoInterval)));
+        layout.add (std::make_unique<juce::AudioParameterChoice> (id26 (ids::echoMotion), "Echo Ascend Motion", juce::StringArray { "Rise", "Steady", "Late" },
+                                                                  static_cast<int> (d26.echoMotion)));
     }
     return layout;
 }

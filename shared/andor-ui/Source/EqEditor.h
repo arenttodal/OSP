@@ -129,8 +129,11 @@ private:
     on the display's graphite: the oscillator's own wave drawn large (as it sounds after its
     tone filter, so WAVE, TONE, OCTAVE and DETUNE are seen), and below it the few choices:
     WAVE (saw, square, triangle, sine), OCTAVE (-2 .. +1), DETUNE (cents), TONE, SHAPE (Held |
-    Follow) and PITCH (Keys | Recording). The top row: the page's name, AMOUNT (the chip's
-    value) and close. Every control is a host parameter (automation, undo, sessions).
+    Follow) and PITCH (Keys | Recording). The top row: the page's name, ANALOG | IMPRINT,
+    AMOUNT (the chip's value) and close. Imprint (SYNTHESIS S2) lays the recording's own spectral
+    envelope on the oscillator: IMPRINT (how much) and MOTION (how much it moves as the recording
+    did) join the controls, and the wave is drawn through it. Every control is a host parameter
+    (automation, undo, sessions).
 */
 class SynthEditor final : public juce::Component, public juce::SettableTooltipClient, private juce::Timer
 {
@@ -139,10 +142,10 @@ public:
     ~SynthEditor() override;
 
     std::function<void()> onClose;
-    /** Re-reads the parameters and redraws the wave when they changed. */
+    /** Re-reads the parameters (and the source's imprint) and redraws the wave when they changed. */
     void refresh();
 
-    /** Where each choice sits (tests and the screenshots): "wave", "octave", "shape", "pitch". */
+    /** Where each choice sits (tests and the screenshots): "mode", "wave", "octave", "shape", "pitch". */
     juce::Rectangle<float> choiceArea (const juce::String& name) const;
     /** Picks part `index` of a choice, as a click there does (one undo step). */
     void choose (const juce::String& name, int index);
@@ -150,6 +153,12 @@ public:
     bool isTwoRows() const noexcept { return twoRows; }
     /** The drawn wave (normalised samples), as painted. */
     const std::vector<float>& shownWave() const noexcept { return wave; }
+    /** IMPRINT and MOTION (shown in Imprint mode), where they sit; empty in Analog. */
+    juce::Rectangle<float> imprintFieldArea() const noexcept { return imprintShown() ? imprintArea : juce::Rectangle<float>(); }
+    juce::Rectangle<float> motionFieldArea() const noexcept { return imprintShown() ? motionArea : juce::Rectangle<float>(); }
+    bool imprintShown() const noexcept { return shown[7] >= 0.5f; }
+    /** What the page says about the source's imprint in Imprint mode (empty: nothing to say). */
+    juce::String imprintStatus() const;
 
     void paint (juce::Graphics&) override;
     void resized() override;
@@ -159,19 +168,69 @@ public:
 
 private:
     void timerCallback() override { refresh(); }
-    std::array<float, 7> signature() const;
+    /** The six page parameters, AMOUNT, then mode, IMPRINT and MOTION. */
+    std::array<float, 10> signature() const;
     void computeWave();
+    void layOut();
     int choiceCount (const juce::String& name) const;
 
     InstrumentHost& ospProcessor;
     int layer;
-    std::unique_ptr<EqValueField> amountField, detuneField, toneField;
+    std::unique_ptr<EqValueField> amountField, detuneField, toneField, imprintField, motionField;
     juce::Rectangle<float> title, closeArea, amountCaption;
-    juce::Rectangle<float> waveChoice, octaveChoice, shapeChoice, pitchChoice, detuneArea, toneArea;
-    std::array<float, 7> shown {};
+    juce::Rectangle<float> modeChoice, waveChoice, octaveChoice, shapeChoice, pitchChoice, detuneArea, toneArea, imprintArea, motionArea, statusArea;
+    std::array<float, 10> shown {};
+    /** The source whose imprint the wave shows (kept, so its profile stays alive), and its state. */
+    std::shared_ptr<const LoadedInstrument> shownInstrument;
+    InstrumentHost::ImprintState shownState = InstrumentHost::ImprintState::none;
     std::vector<float> wave;
     juce::String hot;
-    bool twoRows = false;
+    bool twoRows = false, amountCaptionShown = true;
+    float footTop = 0.0f;   ///< where the controls along the foot begin (the wave above them)
+};
+
+/**
+    Live capture's page (InstrumentHost::liveCapture): in a card's well (its REC key) or over an
+    empty instrument. What arrives at the input scrolls by as a level picture; RECORD starts a
+    take for this layer and STOP keeps it (a minute at most); GRAB LAST 10 / 20 / 30 / 60 s keeps
+    what was just played. A kept take becomes the layer's instrument, its notes mapped. Without
+    an input the page says how to connect one.
+*/
+class CaptureEditor final : public juce::Component, public juce::SettableTooltipClient, private juce::Timer
+{
+public:
+    CaptureEditor (InstrumentHost& processor, int layer);
+    ~CaptureEditor() override;
+
+    /** The page closes (its close cross, or a take was kept). */
+    std::function<void()> onClose;
+    static constexpr std::array<int, 4> grabChoices { 10, 20, 30, 60 };
+
+    /** Where each part sits (tests and the screenshots). */
+    juce::Rectangle<float> recordArea() const noexcept { return recordButton; }
+    juce::Rectangle<float> discardArea() const noexcept { return discardButton; }
+    juce::Rectangle<float> grabArea (int choice) const noexcept;
+    juce::Rectangle<float> pictureArea() const noexcept { return picture; }
+    /** Reads the input again (the page's timer; tests). */
+    void refresh();
+    const InstrumentHost::CaptureView& shownView() const noexcept { return view; }
+
+    void paint (juce::Graphics&) override;
+    void resized() override;
+    void mouseDown (const juce::MouseEvent&) override;
+    void mouseMove (const juce::MouseEvent&) override;
+    void mouseExit (const juce::MouseEvent&) override;
+
+private:
+    void timerCallback() override { refresh(); }
+    juce::String partAt (juce::Point<float>) const;
+
+    InstrumentHost& host;
+    int layer;
+    InstrumentHost::CaptureView view;
+    std::array<float, 360> history {};   ///< the input's level, 30 a second (12 s), newest last
+    juce::Rectangle<float> title, closeArea, meter, picture, recordButton, discardButton, grabRow;
+    juce::String hot;
 };
 
 /**

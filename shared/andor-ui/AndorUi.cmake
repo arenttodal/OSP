@@ -20,6 +20,7 @@ set(ANDOR_UI_SOURCES
     ${ANDOR_UI_DIR}/Source/EngineCard.cpp
     ${ANDOR_UI_DIR}/Source/MainSections.cpp
     ${ANDOR_UI_DIR}/Source/ArpSection.cpp
+    ${ANDOR_UI_DIR}/Source/CardArpLanes.cpp
     ${ANDOR_UI_DIR}/Source/ModulationPanel.cpp
     ${ANDOR_UI_DIR}/Source/EqEditor.cpp
     ${ANDOR_UI_DIR}/Source/NoteMapEditor.cpp

@@ -51,13 +51,17 @@ class DropZone final : public juce::Component
 {
 public:
     DropZone();
-    std::function<void()> onBrowse, onExample;
+    std::function<void()> onBrowse, onExample, onRecord;
     void setHighlight (bool on);
+    /** Live capture (a host with liveCapture()): a third button, Record..., opens the CAPTURE page. */
+    void setRecordShown (bool shown);
+    juce::Button& recordButton() noexcept { return record; }
     void paint (juce::Graphics&) override;
     void resized() override;
 
 private:
-    juce::TextButton browse { juce::String::fromUTF8 ("Browse\xe2\x80\xa6") }, example { "Load example" };
+    juce::TextButton browse { juce::String::fromUTF8 ("Browse\xe2\x80\xa6") }, example { "Load example" },
+        record { juce::String::fromUTF8 ("Record\xe2\x80\xa6") };
     bool highlight = false;
 };
 

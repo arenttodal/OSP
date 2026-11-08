@@ -25,6 +25,22 @@ namespace osp
             anti-alias and reconstruction filters around the line; the repeats are
             soft-clipped, darker and grainier than tape, and AGE adds the slow chorus
             those pedals put on their repeats.
+      ASCEND a pitch shifter inside the loop (an original design on the textbook dual-head
+            shifter): the line is written through a CLOCK (a sample-rate reducer, 13 kHz
+            down to 7 kHz as AGE - shown as CLOCK - rises: grain, not fizz, through a
+            half-clock anti-alias filter before the hold and a reconstruction filter
+            after); each read passes TONE's low-pass (2 .. 5 kHz) and then two read heads
+            180 degrees apart that sweep a short window (TIME / 8, held within 30 .. 50 ms)
+            at the interval's speed, Hann-crossfaded so the pair sums flat. Where a head
+            jumps back it lands where the waveform lines up with the other head (a short
+            correlation search, at most 15 ms): spliced in phase, the interval stays in tune
+            for every partial instead of drifting by up to a grain's rate. INTERVAL picks
+            +12, +7, +5 or -12 semitones; MOTION where the shifter sits: RISE (the output
+            and the loop both shifted: the first repeat is up, each next one higher),
+            STEADY (the output shifted, the loop not: every repeat the interval up) or
+            LATE (the loop shifted, the output not: the first repeat as played, then
+            climbing). FEEDBACK reaches a loop gain of 0.85 (a soft ceiling on every
+            write); there is no wow.
 
     TIME is synced to the host tempo (1/16 .. 1 bar, dotted and triplet) or free (ms).
     STEREO: MONO in the centre, PING-PONG alternating sides, WIDE two heads a little apart.
@@ -44,6 +60,8 @@ public:
         double tone = 0.5;
         double age = 0.35;
         EchoStereo stereo = EchoStereo::pingPong;
+        AscendInterval interval = AscendInterval::octaveUp;
+        AscendMotion motion = AscendMotion::rise;
 
         static Settings from (const Shaping& s) noexcept;
     };
@@ -56,6 +74,12 @@ public:
     void setTempo (double bpm) noexcept;
     /** The delay time the settings ask for at a tempo, in seconds (capped at maxSeconds). */
     static double timeSeconds (const Settings& settings, double bpm) noexcept;
+    /** ASCEND: the shifter's speed ratio for an interval (2 for +12). */
+    static double intervalRatio (AscendInterval interval) noexcept;
+    /** ASCEND: the CLOCK (Hz) AGE sets (13 kHz at 0, 7 kHz at 1). */
+    static double clockHz (double age) noexcept;
+    /** ASCEND: the shifter's window (seconds) for a delay time: TIME / 8 within 30 .. 50 ms. */
+    static double shifterWindow (double delaySeconds) noexcept;
 
     /** Wet output only (the repeats). */
     void process (float inL, float inR, float& outL, float& outR) noexcept;
@@ -87,9 +111,25 @@ private:
         Svf lowCut, highCut, highCut2, antiAlias, antiAlias2;
         float bump = 0.0f;
         float last = 0.0f;
+        // ASCEND
+        Line shifter;
+        Svf clockFilter, reconstruction;
+        float held = 0.0f, toneState = 0.0f;
+        std::array<double, 2> headDelay { 0.0, 0.0 };   ///< samples
+    };
+    /** One channel's read: what it plays (out) and what goes back into the loop (back). */
+    struct Tap
+    {
+        float out = 0.0f, back = 0.0f;
     };
 
     float shape (Channel& c, float x) noexcept;
+    Tap tap (Channel& c, double delay) noexcept;
+    void write (Channel& c, float x) noexcept;
+    float shift (Channel& c, float x, bool wrapA, bool wrapB) noexcept;
+    /** A head's new start (samples) when it jumps back: the point in the search span where
+        the waveform lines up best with what the other head is playing. */
+    double splice (const Channel& c, double otherDelay) const noexcept;
     double advanceModulation() noexcept;
     void updateCoefficients() noexcept;
 
@@ -109,6 +149,12 @@ private:
     int countdown = 0;
     float gLowCut = 0.01f, gHighCut = 0.3f, gAlias = 0.3f, bumpCoef = 0.01f, drive = 1.0f;
     int quietRun = 0, sleepAfter = 1;
+    // ASCEND: the clock's phase (shared by both sides), the heads' phase, window and ratio.
+    double clockPhase = 0.0, clockStep = 0.2, headPhase = 0.0, window = 2000.0, windowTarget = 2000.0, ratio = 2.0;
+    float gClock = 0.3f, gReconstruction = 0.3f, toneCoef = 0.3f;
+    int searchSpan = 720, searchLength = 240;
+    bool spliceA = false, spliceB = false;   ///< a head jumps back this sample
+    float ascendGain = 0.9f;   ///< ASCEND's level against TAPE's at the same send (measured)
 };
 
 } // namespace osp

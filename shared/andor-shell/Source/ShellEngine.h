@@ -137,6 +137,11 @@ public:
     {
         juce::ignoreUnused (arpeggiating, played);
     }
+    /** Audio thread, before process(): the per-card arpeggiator's lanes are in use, and each
+        note's MIDI channel names the cards (as the product shows them, A B C) it sounds on:
+        channel = 1 + mask (bit 0 A, bit 1 B, bit 2 C). False: every note sounds on every card
+        (the channels mean nothing). Only products with three engines are asked. */
+    virtual void setCardRouting (bool on) noexcept { juce::ignoreUnused (on); }
     /** The modulation sources' live values (the panel's meters and moving dots). Any thread. */
     virtual osp::InstrumentEngine::ModView modulationView() const noexcept { return {}; }
 

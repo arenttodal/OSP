@@ -2,6 +2,7 @@
 #include "Binding.h"
 
 #include "OspLookAndFeel.h"
+#include "engine/SpectralImprint.h"
 
 #include <cmath>
 #include <map>
@@ -1388,7 +1389,8 @@ SynthEditor::SynthEditor (InstrumentHost& p, int l) : ospProcessor (p), layer (l
 {
     binding::tag (*this, InstrumentHost::synthParameterId (l, "*") + " " + InstrumentHost::synthesizeId (l));
     setTitle ("SYNTH " + InstrumentHost::layerName (layer));
-    setTooltip ("SYNTH: the analog oscillator blended into this source. Its wave is drawn as it sounds");
+    setTooltip ("SYNTH: the analog oscillator blended into this source. Its wave is drawn as it sounds; "
+                "IMPRINT lays the recording's own body on it");
     auto make = [this] (const juce::String& id) {
         auto f = std::make_unique<EqValueField> (ospProcessor, id);
         f->setColour (design::colour::identity (layer).arc);
@@ -1398,6 +1400,10 @@ SynthEditor::SynthEditor (InstrumentHost& p, int l) : ospProcessor (p), layer (l
     amountField = make (InstrumentHost::synthesizeId (layer));
     detuneField = make (InstrumentHost::synthParameterId (layer, "detune"));
     toneField = make (InstrumentHost::synthParameterId (layer, "tone"));
+    imprintField = make (InstrumentHost::synthParameterId (layer, "imprint"));
+    motionField = make (InstrumentHost::synthParameterId (layer, "motion"));
+    imprintField->setTooltip ("IMPRINT: how much of the recording's own spectral envelope (its body, formants, bow or breath) colours the oscillator");
+    motionField->setTooltip ("MOTION: 0 holds the recording's average colour; higher follows it as it changed through the note");
     refresh();
     startTimerHz (15);   // automation, undo, the chip: the page follows its parameters
 }
@@ -1407,47 +1413,91 @@ SynthEditor::~SynthEditor()
     stopTimer();
 }
 
-std::array<float, 7> SynthEditor::signature() const
+std::array<float, 10> SynthEditor::signature() const
 {
-    std::array<float, 7> v {};
+    std::array<float, 10> v {};
     int i = 0;
     for (const auto& name : InstrumentHost::synthParameterNames())
         v[static_cast<std::size_t> (i++)] = ospProcessor.parameterValue (InstrumentHost::synthParameterId (layer, name));
     v[6] = ospProcessor.parameterValue (InstrumentHost::synthesizeId (layer));
+    i = 7;
+    for (const auto& name : InstrumentHost::imprintParameterNames())
+        v[static_cast<std::size_t> (i++)] = ospProcessor.parameterValue (InstrumentHost::synthParameterId (layer, name));
     return v;
 }
 
 void SynthEditor::refresh()
 {
     const auto now = signature();
-    if (now == shown && ! wave.empty())
+    const auto instrument = ospProcessor.currentInstrument (layer);
+    const auto state = ospProcessor.imprintState (layer);
+    if (now == shown && instrument == shownInstrument && state == shownState && ! wave.empty())
         return;
+    const bool modeChanged = (now[7] >= 0.5f) != (shown[7] >= 0.5f) || wave.empty();
     shown = now;
+    shownInstrument = instrument;
+    shownState = state;
     computeWave();
+    if (modeChanged)
+        layOut();
     repaint();
+}
+
+juce::String SynthEditor::imprintStatus() const
+{
+    if (! imprintShown())
+        return {};
+    switch (shownState)
+    {
+        case InstrumentHost::ImprintState::preparing: return juce::String::fromUTF8 ("Preparing spectral imprint\xe2\x80\xa6");
+        case InstrumentHost::ImprintState::unavailable: return juce::String::fromUTF8 ("Imprint unavailable \xe2\x80\x94 playing Analog");
+        case InstrumentHost::ImprintState::none:
+        case InstrumentHost::ImprintState::ready: break;
+    }
+    return {};
 }
 
 void SynthEditor::computeWave()
 {
     // The oscillator itself (message thread, a few milliseconds of it): settled, then four
-    // cycles of A3 at this page's settings.
+    // cycles of A3 at this page's settings; in Imprint, through the source's own imprint (its
+    // average colour: MOTION moves it in time, which one still picture cannot show).
     std::array<float, 6> raw {};
     std::copy_n (shown.begin(), 6, raw.begin());
     auto settings = InstrumentHost::synthSettingsFrom (raw);
+    InstrumentHost::applyImprintSettings (settings, { shown[7], shown[8], shown[9] });
     settings.pitch = synth::PitchSource::keys;
     settings.shape = synth::Envelope::gate;
+    const imprint::Profile* profile = nullptr;
+    if (settings.imprinting() && shownInstrument != nullptr && shownInstrument->model != nullptr && shownInstrument->model->imprint != nullptr
+        && shownInstrument->model->imprint->valid)
+        profile = shownInstrument->model->imprint.get();
     synth::Voice v;
     v.prepare (pictureRate);
     v.start (1, 0.8, synth::Envelope::gate);
     v.setPitch (pictureHz, settings);
-    for (int i = 0; i < static_cast<int> (0.15 * pictureRate); ++i)
-        v.next (0.0f);
+    auto shaper = std::make_unique<imprint::Shaper>();
+    if (profile != nullptr)
+    {
+        shaper->prepare (pictureRate);
+        shaper->reset();
+    }
+    constexpr int control = 32;
+    auto next = [&] (int i) {
+        if (profile != nullptr && i % control == 0)
+            shaper->setTarget (*profile, settings.imprint, -1.0, 0.0, pictureHz, imprint::defaultFormantFollow, control);
+        const float x = v.next (0.0f);
+        return profile != nullptr && shaper->active() ? shaper->process (x) : x;
+    };
+    int i = 0;
+    for (; i < static_cast<int> (0.15 * pictureRate); ++i)
+        next (i);
     const auto n = static_cast<std::size_t> (pictureCycles * pictureRate / pictureHz);
     wave.assign (n, 0.0f);
     float peak = 1.0e-6f;
     for (auto& x : wave)
     {
-        x = v.next (0.0f);
+        x = next (i++);
         peak = std::max (peak, std::abs (x));
     }
     for (auto& x : wave)
@@ -1461,6 +1511,8 @@ int SynthEditor::choiceCount (const juce::String& name) const
 
 juce::Rectangle<float> SynthEditor::choiceArea (const juce::String& name) const
 {
+    if (name == "mode")
+        return modeChoice;
     if (name == "wave")
         return waveChoice;
     if (name == "octave")
@@ -1481,8 +1533,7 @@ void SynthEditor::choose (const juce::String& name, int index)
     const float value = name == "octave" ? static_cast<float> (synth::Settings::minOctave + index) : static_cast<float> (index);
     if (juce::exactlyEqual (ospProcessor.parameterValue (InstrumentHost::synthParameterId (layer, name)), value))
         return;
-    static const std::map<juce::String, const char*> names { { "wave", "wave" }, { "octave", "octave" }, { "shape", "shape" }, { "pitch", "pitch" } };
-    ospProcessor.undo().beginNewTransaction ("SYNTH " + InstrumentHost::layerName (layer) + " " + juce::String (names.at (name)));
+    ospProcessor.undo().beginNewTransaction ("SYNTH " + InstrumentHost::layerName (layer) + " " + name);
     param->beginChangeGesture();
     param->setValueNotifyingHost (param->convertTo0to1 (value));
     param->endChangeGesture();
@@ -1491,11 +1542,16 @@ void SynthEditor::choose (const juce::String& name, int index)
 
 juce::Rectangle<float> SynthEditor::waveArea() const
 {
-    const float bottom = twoRows ? 2.0f * 44.0f + 8.0f : 44.0f + 8.0f;
-    return getLocalBounds().toFloat().withTrimmedLeft (14.0f).withTrimmedRight (14.0f).withTrimmedTop (46.0f).withTrimmedBottom (bottom);
+    const auto r = getLocalBounds().toFloat().withTrimmedLeft (14.0f).withTrimmedRight (14.0f).withTrimmedTop (46.0f);
+    return r.withBottom (std::max (r.getY(), footTop - 8.0f));
 }
 
 void SynthEditor::resized()
+{
+    layOut();
+}
+
+void SynthEditor::layOut()
 {
     const float w = static_cast<float> (getWidth()), h = static_cast<float> (getHeight());
     const float tw = juce::GlyphArrangement::getStringWidth (type::popupLabel (12.0f), "SYNTH " + InstrumentHost::layerName (layer));
@@ -1504,32 +1560,76 @@ void SynthEditor::resized()
     const auto amount = juce::Rectangle<float> (closeArea.getX() - 10.0f - 58.0f, 9.0f, 58.0f, 24.0f);
     amountCaption = amount.withX (amount.getX() - 58.0f).withWidth (54.0f);
     amountField->setBounds (amount.getSmallestIntegerContainer());
+    // ANALOG | IMPRINT beside the name; in the narrowest card AMOUNT's caption gives it room.
+    modeChoice = { title.getRight() + 8.0f, 9.0f, w < 420.0f ? 112.0f : 128.0f, 24.0f };
+    amountCaptionShown = modeChoice.getRight() + 8.0f <= amountCaption.getX() + 8.0f;
 
-    // The six controls along the foot: one row when they fit, else two (three cards).
+    // The controls along the foot: one row when they fit, else two (three cards); in Imprint,
+    // IMPRINT and MOTION after them, where there is room, else on a row of their own above.
+    const bool imprinting = imprintShown();
     const float waveW = 120.0f, octaveW = 112.0f, fieldW = 58.0f, shapeW = 104.0f, pitchW = 120.0f, gap = 12.0f;
+    const float room = w - 28.0f;
+    const float pair = 2.0f * (fieldW + gap);
     const float full = waveW + octaveW + 2.0f * fieldW + shapeW + pitchW + 5.0f * gap;
-    twoRows = full > w - 28.0f;
-    float x = 14.0f, y = h - 10.0f - 24.0f;
-    if (twoRows)
-        y -= 44.0f;
+    const float firstRow = waveW + octaveW + fieldW + 2.0f * gap, secondRow = fieldW + shapeW + pitchW + 2.0f * gap;
+    enum class Place { none, afterAll, afterFirst, afterSecond, ownRow };
+    Place place = Place::none;
+    twoRows = full > room;
+    if (imprinting)
+    {
+        if (! twoRows && full + pair <= room)
+            place = Place::afterAll;
+        else
+        {
+            twoRows = true;
+            place = firstRow + pair <= room ? Place::afterFirst : secondRow + pair <= room ? Place::afterSecond : Place::ownRow;
+        }
+    }
+    const int rows = (twoRows ? 2 : 1) + (place == Place::ownRow ? 1 : 0);
+    float x = 14.0f, y = h - 10.0f - 24.0f - 44.0f * static_cast<float> (rows - 1);
+    footTop = y - 15.0f;   // (the captions above the first row)
     auto take = [&x, &y, gap] (float width) {
         const juce::Rectangle<float> r (x, y, width, 24.0f);
         x += width + gap;
         return r;
     };
+    auto newRow = [&x, &y] {
+        x = 14.0f;
+        y += 44.0f;
+    };
+    auto takePair = [&] {
+        imprintArea = take (fieldW);
+        motionArea = take (fieldW);
+        statusArea = { x, y - 15.0f, std::max (0.0f, w - 14.0f - x), 39.0f };
+    };
+    if (place == Place::ownRow)
+    {
+        takePair();
+        newRow();
+    }
     waveChoice = take (waveW);
     octaveChoice = take (octaveW);
     detuneArea = take (fieldW);
+    if (place == Place::afterFirst)
+        takePair();
     if (twoRows)
-    {
-        x = 14.0f;
-        y += 44.0f;
-    }
+        newRow();
     toneArea = take (fieldW);
     shapeChoice = take (shapeW);
     pitchChoice = take (pitchW);
+    if (place == Place::afterAll || place == Place::afterSecond)
+        takePair();
+    if (! imprinting)
+        imprintArea = motionArea = statusArea = {};
     detuneField->setBounds (detuneArea.getSmallestIntegerContainer());
     toneField->setBounds (toneArea.getSmallestIntegerContainer());
+    imprintField->setVisible (imprinting);
+    motionField->setVisible (imprinting);
+    if (imprinting)
+    {
+        imprintField->setBounds (imprintArea.getSmallestIntegerContainer());
+        motionField->setBounds (motionArea.getSmallestIntegerContainer());
+    }
 }
 
 void SynthEditor::paint (juce::Graphics& g)
@@ -1541,11 +1641,15 @@ void SynthEditor::paint (juce::Graphics& g)
     const bool heard = shown[6] > 0.0f;
     const auto accent = colour::identity (layer).arc;
 
-    // The wave, as the oscillator sounds (dashed while the amount is 0).
+    // The wave, as the oscillator sounds (dashed while the amount is 0). In the smallest card
+    // with Imprint's row there is no room left for it.
     const auto area = waveArea();
-    g.setColour (colour::wellGrid.withAlpha (0.6f));
-    hline (g, area.getX(), area.getRight(), area.getCentreY());
-    if (! wave.empty())
+    if (area.getHeight() >= 24.0f)
+    {
+        g.setColour (colour::wellGrid.withAlpha (0.6f));
+        hline (g, area.getX(), area.getRight(), area.getCentreY());
+    }
+    if (! wave.empty() && area.getHeight() >= 24.0f)
     {
         juce::Path line;
         const float amp = 0.36f * area.getHeight();   // (clear of the corner note)
@@ -1570,13 +1674,15 @@ void SynthEditor::paint (juce::Graphics& g)
         }
     }
 
-    // The top row: the page's name, AMOUNT, close.
+    // The top row: the page's name, ANALOG | IMPRINT, AMOUNT, close.
     drawTabs (g, title, "SYNTH " + InstrumentHost::layerName (layer), heard, {}, {}, false, layer, bounds.getRight());
+    drawSegments (g, modeChoice, { "ANALOG", "IMPRINT" }, imprintShown() ? 1 : 0, false);
     g.setFont (type::popupLabel (10.5f));
     g.setColour (colour::wellText.brighter (0.1f));
-    g.drawText ("AMOUNT", amountCaption, juce::Justification::centredRight, false);
+    if (amountCaptionShown)
+        g.drawText ("AMOUNT", amountCaption, juce::Justification::centredRight, false);
     drawClose (g, closeArea);
-    if (! heard)
+    if (! heard && area.getHeight() >= 24.0f)
         drawCornerNote (g, area, "SYNTH is at 0 %: raise AMOUNT to hear the oscillator");
 
     // The controls.
@@ -1606,6 +1712,19 @@ void SynthEditor::paint (juce::Graphics& g)
     drawCaption (g, toneArea, "TONE");
     drawCaption (g, shapeChoice, "SHAPE");
     drawCaption (g, pitchChoice, "PITCH");
+    if (imprintShown())
+    {
+        drawCaption (g, imprintArea, "IMPRINT");
+        drawCaption (g, motionArea, "MOTION");
+        const auto status = imprintStatus();
+        if (status.isNotEmpty() && statusArea.getWidth() > 40.0f)
+        {
+            // The source's imprint is not there (yet): the oscillator plays Analog meanwhile.
+            g.setFont (type::popupLabel (10.0f));
+            g.setColour (colour::wellText.brighter (0.1f));
+            g.drawFittedText (status, statusArea.withTrimmedTop (15.0f).toNearestInt(), juce::Justification::centredLeft, 2, 1.0f);
+        }
+    }
 }
 
 void SynthEditor::mouseDown (const juce::MouseEvent& e)
@@ -1617,7 +1736,7 @@ void SynthEditor::mouseDown (const juce::MouseEvent& e)
             onClose();
         return;
     }
-    for (const auto* name : { "wave", "octave", "shape", "pitch" })
+    for (const auto* name : { "mode", "wave", "octave", "shape", "pitch" })
     {
         const auto area = choiceArea (name);
         if (area.contains (p))
@@ -1632,7 +1751,7 @@ void SynthEditor::mouseDown (const juce::MouseEvent& e)
 void SynthEditor::mouseMove (const juce::MouseEvent& e)
 {
     juce::String now;
-    for (const auto* name : { "wave", "octave", "shape", "pitch" })
+    for (const auto* name : { "mode", "wave", "octave", "shape", "pitch" })
         if (choiceArea (name).contains (e.position))
             now = name;
     if (now != hot)
@@ -1644,6 +1763,251 @@ void SynthEditor::mouseMove (const juce::MouseEvent& e)
 }
 
 void SynthEditor::mouseExit (const juce::MouseEvent&)
+{
+    if (hot.isNotEmpty())
+    {
+        hot = {};
+        repaint();
+    }
+}
+
+} // namespace osp::plugin
+
+namespace osp::plugin
+{
+
+//==============================================================================
+// CAPTURE page
+
+namespace
+{
+    /** RECORD's red: an earthy one, beside the layers' own colours. */
+    const juce::Colour recordRed { 0xffcf5a43 };
+
+    juce::String clockText (double seconds)
+    {
+        seconds = std::max (0.0, seconds);
+        const int whole = static_cast<int> (seconds);
+        return juce::String (whole / 60) + ":" + juce::String (whole % 60).paddedLeft ('0', 2) + "." + juce::String (static_cast<int> ((seconds - whole) * 10.0));
+    }
+
+    float meterPosition (float level)
+    {
+        // -60 .. 0 dBFS across the meter.
+        const float db = level > 1.0e-6f ? 20.0f * std::log10 (level) : -120.0f;
+        return std::clamp ((db + 60.0f) / 60.0f, 0.0f, 1.0f);
+    }
+}
+
+CaptureEditor::CaptureEditor (InstrumentHost& p, int l) : host (p), layer (l)
+{
+    setTitle ("CAPTURE " + InstrumentHost::layerName (layer));
+    setTooltip ("CAPTURE: record what comes in at the input, or grab what you just played; the take becomes this layer's notes");
+    refresh();
+    startTimerHz (30);
+}
+
+CaptureEditor::~CaptureEditor() = default;
+
+juce::Rectangle<float> CaptureEditor::grabArea (int choice) const noexcept
+{
+    const float w = grabRow.getWidth() / static_cast<float> (grabChoices.size());
+    return grabRow.withWidth (w).translated (w * static_cast<float> (std::clamp (choice, 0, static_cast<int> (grabChoices.size()) - 1)), 0.0f);
+}
+
+void CaptureEditor::refresh()
+{
+    view = host.captureView();
+    std::move (history.begin() + 1, history.end(), history.begin());
+    history.back() = view.connected ? view.level : 0.0f;
+    repaint();
+}
+
+void CaptureEditor::resized()
+{
+    const float w = static_cast<float> (getWidth()), h = static_cast<float> (getHeight());
+    const float tw = juce::GlyphArrangement::getStringWidth (type::popupLabel (12.0f), "CAPTURE " + InstrumentHost::layerName (layer));
+    title = { 14.0f, 9.0f, tw + 34.0f, 24.0f };
+    closeArea = { w - 32.0f, 10.0f, 22.0f, 22.0f };
+    const float meterWidth = std::min (150.0f, std::max (60.0f, w - title.getRight() - 60.0f));
+    meter = { closeArea.getX() - 12.0f - meterWidth, 18.0f, meterWidth, 6.0f };
+
+    // The foot: RECORD (and DISCARD while a take runs), then GRAB LAST's four lengths.
+    const float y = h - 10.0f - 24.0f;
+    const bool narrow = w < 420.0f;
+    recordButton = { 14.0f, y, narrow ? 104.0f : 128.0f, 24.0f };
+    discardButton = { recordButton.getRight() + 8.0f, y, narrow ? 60.0f : 70.0f, 24.0f };
+    const float grabWidth = narrow ? 156.0f : 196.0f;
+    grabRow = { std::max (discardButton.getRight() + 16.0f, w - 14.0f - grabWidth), y, std::min (grabWidth, w - discardButton.getRight() - 30.0f), 24.0f };
+    picture = { 14.0f, 46.0f, w - 28.0f, std::max (20.0f, y - 22.0f - 46.0f) };
+}
+
+void CaptureEditor::paint (juce::Graphics& g)
+{
+    using namespace design;
+    const auto bounds = getLocalBounds().toFloat();
+    g.setColour (colour::wellA);
+    g.fillRoundedRectangle (bounds, 10.0f);
+    const auto accent = colour::identity (InstrumentHost::shownLayer (layer)).arc;
+    const bool mine = view.recording && view.layer == layer;
+
+    // The top row: the page's name, the input meter, close.
+    drawTabs (g, title, "CAPTURE " + InstrumentHost::layerName (layer), view.connected, {}, {}, false, layer, bounds.getRight());
+    g.setColour (light.withAlpha (0.08f));
+    g.fillRoundedRectangle (meter, 2.0f);
+    if (view.connected)
+    {
+        const float at = meterPosition (view.level);
+        g.setColour (view.level >= 0.99f ? recordRed : accent.withAlpha (0.9f));
+        g.fillRoundedRectangle (meter.withWidth (meter.getWidth() * at), 2.0f);
+    }
+    g.setFont (type::popupLabel (10.0f));
+    g.setColour (colour::wellText.brighter (0.1f));
+    g.drawText ("INPUT", meter.withX (meter.getX() - 44.0f).withWidth (38.0f).withSizeKeepingCentre (38.0f, 14.0f), juce::Justification::centredRight, false);
+    drawClose (g, closeArea);
+
+    // The picture: the input's level as it came in (newest at the right), a mirrored outline
+    // (red while recording). It keeps to the middle of the well: the hint sits above it.
+    const auto area = picture;
+    g.setColour (colour::wellGrid.withAlpha (0.6f));
+    hline (g, area.getX(), area.getRight(), area.getCentreY());
+    {
+        const float step = area.getWidth() / static_cast<float> (history.size() - 1);
+        const float reach = 0.32f * area.getHeight();
+        auto height = [&] (std::size_t i) { return reach * std::sqrt (std::clamp (history[i], 0.0f, 1.0f)); };
+        juce::Path outline;
+        outline.startNewSubPath (area.getX(), area.getCentreY());
+        for (std::size_t i = 0; i < history.size(); ++i)
+            outline.lineTo (area.getX() + step * static_cast<float> (i), area.getCentreY() - height (i));
+        for (std::size_t i = history.size(); i-- > 0;)
+            outline.lineTo (area.getX() + step * static_cast<float> (i), area.getCentreY() + height (i));
+        outline.closeSubPath();
+        const auto ink = view.recording ? recordRed : accent;
+        g.setGradientFill (juce::ColourGradient (ink.withAlpha (0.25f), area.getX(), 0.0f, ink.withAlpha (0.85f), area.getRight(), 0.0f, false));
+        g.fillPath (outline);
+    }
+    const bool narrow = getWidth() < 520;
+    if (! view.connected)
+        drawCornerNote (g, area, (narrow ? "No input: " : "No input. ") + view.hint);
+    else if (! view.recording)
+        drawCornerNote (g, area, narrow ? "Play, then GRAB or RECORD" : "Play, then GRAB what you played or RECORD a take: it becomes this layer's notes");
+    if (view.recording)
+    {
+        // The take's length in the top row, and how much of the minute it has used.
+        const auto clock = juce::Rectangle<float> (title.getRight() + 6.0f, title.getY(), std::max (40.0f, meter.getX() - 50.0f - title.getRight() - 12.0f), title.getHeight());
+        g.setFont (type::popupValue (15.0f));
+        g.setColour (recordRed.brighter (0.25f));
+        const juce::String text = clockText (view.seconds) + (mine ? (narrow ? juce::String() : juce::String (" / 1:00")) : " into " + InstrumentHost::layerName (view.layer));
+        g.drawText (text, clock, juce::Justification::centred, false);
+        const float used = static_cast<float> (std::clamp (view.seconds / 60.0, 0.0, 1.0));
+        g.setColour (light.withAlpha (0.08f));
+        g.fillRect (area.withTop (area.getBottom() - 2.0f));
+        g.setColour (recordRed);
+        g.fillRect (area.withTop (area.getBottom() - 2.0f).withWidth (area.getWidth() * used));
+    }
+
+    // RECORD / STOP, DISCARD, GRAB LAST.
+    const float dim = view.connected ? 1.0f : 0.4f;
+    g.setColour (rim);
+    g.drawRoundedRectangle (recordButton.reduced (0.5f), 4.0f, 1.0f);
+    if (hot == "record" && view.connected)
+    {
+        g.setColour (light.withAlpha (0.06f));
+        g.fillRoundedRectangle (recordButton.reduced (1.0f), 4.0f);
+    }
+    {
+        const auto glyph = juce::Rectangle<float> (9.0f, 9.0f).withCentre ({ recordButton.getX() + 16.0f, recordButton.getCentreY() });
+        g.setColour (recordRed.withAlpha (dim));
+        if (view.recording)
+            g.fillRect (glyph.reduced (0.5f));
+        else
+            g.fillEllipse (glyph);
+        g.setFont (type::popupLabel (10.5f));
+        g.setColour (light.withAlpha (0.9f * dim));
+        g.drawText (view.recording ? "STOP" : "RECORD", recordButton.withTrimmedLeft (26.0f), juce::Justification::centredLeft, false);
+    }
+    if (view.recording)
+    {
+        g.setColour (rim);
+        g.drawRoundedRectangle (discardButton.reduced (0.5f), 4.0f, 1.0f);
+        g.setFont (type::popupLabel (10.5f));
+        g.setColour (light.withAlpha (hot == "discard" ? 0.9f : 0.6f));
+        g.drawText ("DISCARD", discardButton, juce::Justification::centred, false);
+    }
+    g.setFont (type::popupLabel (10.0f));
+    g.setColour (colour::wellText.brighter (0.1f));
+    g.drawText ("GRAB LAST", grabRow.withY (grabRow.getY() - 15.0f).withHeight (13.0f), juce::Justification::centredLeft, false);
+    g.setColour (rim.withMultipliedAlpha (dim));
+    g.drawRoundedRectangle (grabRow.reduced (0.5f), 4.0f, 1.0f);
+    for (int i = 0; i < static_cast<int> (grabChoices.size()); ++i)
+    {
+        const auto cell = grabArea (i);
+        const bool reachable = view.connected && view.available >= 1.0;   // (a longer GRAB takes what there is)
+        if (hot == "grab" + juce::String (i) && reachable)
+        {
+            g.setColour (light.withAlpha (0.1f));
+            g.fillRoundedRectangle (cell.reduced (2.0f), 3.0f);
+        }
+        g.setFont (type::popupValue (11.5f));
+        g.setColour (light.withAlpha (reachable ? 0.85f : 0.3f));
+        g.drawText (juce::String (grabChoices[static_cast<std::size_t> (i)]) + " s", cell, juce::Justification::centred, false);
+    }
+}
+
+juce::String CaptureEditor::partAt (juce::Point<float> p) const
+{
+    if (closeArea.contains (p))
+        return "close";
+    if (recordButton.contains (p))
+        return "record";
+    if (view.recording && discardButton.contains (p))
+        return "discard";
+    for (int i = 0; i < static_cast<int> (grabChoices.size()); ++i)
+        if (grabArea (i).contains (p))
+            return "grab" + juce::String (i);
+    return {};
+}
+
+void CaptureEditor::mouseDown (const juce::MouseEvent& e)
+{
+    const auto part = partAt (e.position);
+    auto close = [this] {
+        if (onClose != nullptr)
+            onClose();
+    };
+    if (part == "close")
+        return close();
+    if (! view.connected)
+        return;
+    bool kept = false;
+    if (part == "record")
+    {
+        if (view.recording)
+            kept = host.stopTake();
+        else
+            host.startTake (layer);
+    }
+    else if (part == "discard")
+        host.cancelTake();
+    else if (part.startsWith ("grab"))
+        kept = host.grabLast (grabChoices[static_cast<std::size_t> (part.getTrailingIntValue())], layer);
+    refresh();
+    if (kept)
+        close();   // the layer shows its new notes
+}
+
+void CaptureEditor::mouseMove (const juce::MouseEvent& e)
+{
+    const auto now = partAt (e.position);
+    if (now != hot)
+    {
+        hot = now;
+        setMouseCursor (hot.isNotEmpty() ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+        repaint();
+    }
+}
+
+void CaptureEditor::mouseExit (const juce::MouseEvent&)
 {
     if (hot.isNotEmpty())
     {

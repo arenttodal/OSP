@@ -62,11 +62,33 @@ namespace
     };
 }
 
+/** The shared per-card lanes' view of this processor (osp::plugin::CardArpLanes::Host). */
+struct OspAudioProcessor::LaneHost final : plugin::CardArpLanes::Host
+{
+    explicit LaneHost (OspAudioProcessor& p) : owner (p) {}
+    Arpeggiator& mainArpeggiator() noexcept override { return owner.arpeggiator; }
+    Arpeggiator::Settings arpSettings() noexcept override { return owner.arpSettings(); }
+    const juce::MidiBuffer& runArpeggiator (const juce::MidiBuffer& midi, int numSamples, const HostTiming& timing) noexcept override
+    {
+        return owner.runArpeggiator (midi, numSamples, timing);
+    }
+    void lanesRearranged() noexcept override { owner.arpModOctaves = 0; }
+    void setCardRouting (bool on) noexcept override { owner.engine.setCardRouting (on); }
+    void publishArpDisplay() noexcept override { owner.publishArpDisplay(); }
+    OspAudioProcessor& owner;
+};
+
 juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLayout()
 {
     // The ANDOR parameter schema (shared with every product built from the ANDOR Instrument
     // Shell): ANDOR OSP's own, frozen (tests/plugin/golden/osp-parameter-schema.txt).
-    return createParameterLayout();
+    auto layout = createParameterLayout();
+    // The per-card arpeggiator (version hint 27; arp.link, arp.cardA ..), as every three-engine
+    // product has it: LINK and every card by default, the one arpeggiator exactly as before.
+    addCardArpParameters (layout, {});
+    // The spectral imprint on the SYNTH page (version hint 28): Analog, 0 and 0 by default.
+    addImprintParameters (layout);
+    return layout;
 }
 
 const juce::StringArray& OspAudioProcessor::layerStateNames()
@@ -200,10 +222,17 @@ private:
 };
 
 OspAudioProcessor::OspAudioProcessor()
-    : AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
+    : AudioProcessor (BusesProperties()
+                          // Live capture's input: a sidechain in a DAW (off until routed), the
+                          // microphone or interface input in the standalone app (on).
+                          .withInput ("Sidechain", juce::AudioChannelSet::stereo(),
+                                      juce::PluginHostType::getPluginLoadedAs() == juce::AudioProcessor::wrapperType_Standalone)
+                          .withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
       parameters (*this, &undoManager, "OSP", createLayout()),
       store (SampleStore::defaultDirectory())
 {
+    lanes = std::make_unique<CardArpLanes>();
+    laneHost = std::make_unique<LaneHost> (*this);
     attackParam = parameters.getRawParameterValue (ids::attack);
     releaseParam = parameters.getRawParameterValue (ids::release);
     gainParam = parameters.getRawParameterValue (ids::gain);
@@ -274,6 +303,16 @@ OspAudioProcessor::OspAudioProcessor()
     pitchCharacterParam = parameters.getRawParameterValue (ids::pitchCharacter);
     sustainParam = parameters.getRawParameterValue (ids::sustain);
     seedParam = parameters.getRawParameterValue (ids::seed);
+    arpLinkParam = parameters.getRawParameterValue (ids::arpLink ({}));
+    for (int card = 0; card < 3; ++card)
+        arpCardParams[static_cast<std::size_t> (card)] = parameters.getRawParameterValue (ids::arpCard ({}, card));
+    for (int card = 1; card < 3; ++card)
+    {
+        const auto i = static_cast<std::size_t> (card - 1);
+        arpLanePatternParams[i] = parameters.getRawParameterValue (ids::arpCardSetting ({}, card, "pattern"));
+        arpLaneRateParams[i] = parameters.getRawParameterValue (ids::arpCardSetting ({}, card, "rate"));
+        arpLaneOctavesParams[i] = parameters.getRawParameterValue (ids::arpCardSetting ({}, card, "octaves"));
+    }
     mpeParam = parameters.getRawParameterValue (ids::mpe);
     for (int i = 0; i < numShapingParams; ++i)
         shapingParams[static_cast<std::size_t> (i)] = parameters.getRawParameterValue (shapingIds()[i]);
@@ -308,6 +347,8 @@ OspAudioProcessor::OspAudioProcessor()
         lp.synthesize = parameters.getRawParameterValue (layerParameterId (layer, "synthesize"));
         for (int i = 0; i < synthParameterNames().size(); ++i)
             lp.synth[static_cast<std::size_t> (i)] = parameters.getRawParameterValue (synthParameterId (layer, synthParameterNames()[i]));
+        for (int i = 0; i < imprintParameterNames().size(); ++i)
+            lp.imprint[static_cast<std::size_t> (i)] = parameters.getRawParameterValue (synthParameterId (layer, imprintParameterNames()[i]));
     }
     grainBudgetParam = parameters.getRawParameterValue (ids::grainBudget);
     for (int layer = 0; layer < numLayers; ++layer)
@@ -360,7 +401,20 @@ OspAudioProcessor::~OspAudioProcessor()
 bool OspAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
     const auto out = layouts.getMainOutputChannelSet();
-    return out == juce::AudioChannelSet::stereo() || out == juce::AudioChannelSet::mono();
+    const auto in = layouts.getMainInputChannelSet();
+    return (out == juce::AudioChannelSet::stereo() || out == juce::AudioChannelSet::mono())
+           && (in.isDisabled() || in == juce::AudioChannelSet::stereo() || in == juce::AudioChannelSet::mono());
+}
+
+juce::VST3ClientExtensions* OspAudioProcessor::getVST3ClientExtensions()
+{
+    // An instrument's input is a sidechain (kAux): hosts offer it as one, never as the main input.
+    struct Extensions final : juce::VST3ClientExtensions
+    {
+        bool getPluginHasMainInput() const override { return false; }
+    };
+    static Extensions extensions;
+    return &extensions;
 }
 
 void OspAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
@@ -384,6 +438,18 @@ void OspAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     // never grows it (MidiBuffer stores 4 bytes of header plus the message per event).
     arpeggiator.prepare (sampleRate);
     arpMidi.ensureSize (static_cast<std::size_t> (Arpeggiator::maxEvents + 4096) * 16);
+    lanes->prepare (sampleRate);   // (the per-card lanes: everything starts over)
+    engine.setCardRouting (false);
+    // Live capture: the ring exists only while an input is connected (about 27 MB at 48 kHz).
+    // A take still running is thrown away (its positions belonged to the previous ring).
+    const bool connected = getTotalNumInputChannels() > 0;
+    captureLive.store (false, std::memory_order_release);
+    takeStart = -1;
+    if (connected)
+        captureRing.prepare (sampleRate, capture::maxTakeSeconds + capture::ringMarginSeconds);
+    else
+        captureRing.release();
+    captureLive.store (connected, std::memory_order_release);
     previewMidi.ensureSize (4096 * 16);
     preview.prepare (sampleRate);
     previewKeysActive = false;
@@ -620,7 +686,8 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
         std::array<float, 6> synthRaw {};
         for (std::size_t i = 0; i < synthRaw.size(); ++i)
             synthRaw[i] = lp.synth[i]->load();
-        const auto synthPage = synthSettingsFrom (synthRaw);
+        auto synthPage = synthSettingsFrom (synthRaw);
+        applyImprintSettings (synthPage, { lp.imprint[0]->load(), lp.imprint[1]->load(), lp.imprint[2]->load() });
         engineSettings.layer[static_cast<std::size_t> (layer)].synth = synthPage;
         engine.setLayerSynth (layer, synthPage);
     }
@@ -736,6 +803,8 @@ const juce::StringArray& OspAudioProcessor::shapingIds()
         ids::spaceEngine, ids::abyssGravity, ids::abyssFreeze, ids::abyssResonance,
         ids::vintageVariant, ids::vintageEra, ids::vintageDiffusion,
         ids::bloomVariant, ids::bloomSync, ids::bloomDivision, ids::bloomTime, ids::bloomDiffusion,
+        ids::abyssVariant,
+        ids::echoInterval, ids::echoMotion,
     };
     jassert (list.size() == numShapingParams);
     return list;
@@ -791,7 +860,7 @@ Shaping OspAudioProcessor::shapingFromParameters() const noexcept
     s.spaceWidth = 0.01 * v (41);
     s.spaceLowCutHz = v (42);
     s.spaceHighCutHz = v (43);
-    s.echoType = static_cast<EchoType> (index (44, 2));
+    s.echoType = static_cast<EchoType> (index (44, 3));
     s.echoSync = v (45) >= 0.5;
     s.echoDivision = index (46, shaping::echoDivisionCount);
     s.echoTimeMs = v (47);
@@ -815,6 +884,9 @@ Shaping OspAudioProcessor::shapingFromParameters() const noexcept
     s.bloomDivision = index (65, shaping::echoDivisionCount);
     s.bloomTimeMs = v (66);
     s.bloomDiffusion = 0.01 * v (67);
+    s.abyssVariant = static_cast<AbyssVariant> (index (68, 4));
+    s.echoInterval = static_cast<AscendInterval> (index (69, 4));
+    s.echoMotion = static_cast<AscendMotion> (index (70, 3));
     for (std::size_t i = 0; i < s.shaper.customSteps.size(); ++i)
     {
         auto& step = s.shaper.customSteps[i];
@@ -1310,6 +1382,12 @@ void OspAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
     juce::ScopedNoDenormals noDenormals;
     const int numSamples = buffer.getNumSamples();
 
+    // Live capture: the input is kept (never heard: the instrument's render overwrites the
+    // buffer it shares with the output).
+    if (captureLive.load (std::memory_order_acquire))
+        if (const auto input = getBusBuffer (buffer, true, 0); input.getNumChannels() > 0)
+            captureRing.write (input.getArrayOfReadPointers(), input.getNumChannels(), numSamples);
+
     keyboardState.processNextMidiBuffer (midi, 0, numSamples, true);
     swapInstrumentIfPending();
     swapKeyDnaIfPending();
@@ -1343,6 +1421,7 @@ void OspAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
             {
                 engine.resetPerformance();
                 arpeggiator.restartPattern();   // and the arpeggiator's pattern and RANDOM choices
+                lanes->restartPatterns();       // (and every card's own lane)
             }
             hostWasPlaying = transportRunning;
         }
@@ -1362,7 +1441,7 @@ void OspAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
         }
     }
     applyParameters (false);
-    const auto& notes = runArpeggiator (midi, numSamples, timing);
+    const auto& notes = runCardArpeggiators (midi, numSamples, timing);
 
     const int outChannels = std::min (buffer.getNumChannels(), 2);
     auto* const* channels = buffer.getArrayOfWritePointers();
@@ -1392,10 +1471,45 @@ void OspAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
     activeVoices.store (engine.musicalVoiceCount(), std::memory_order_relaxed);
 }
 
-const juce::MidiBuffer& OspAudioProcessor::runArpeggiator (const juce::MidiBuffer& midi, int numSamples, const HostTiming& timing) noexcept
+const juce::MidiBuffer& OspAudioProcessor::runCardArpeggiators (const juce::MidiBuffer& midi, int numSamples, const HostTiming& timing) noexcept
+{
+    // The shared lanes (plugin::CardArpLanes, as every three-engine product runs them). Under
+    // MPE (each member channel is a note) or MONO (one held-key stack) the channels cannot name
+    // cards: LINK with every card, the one arpeggiator (a switch ends the lanes' notes cleanly).
+    plugin::CardArpLanes::Controls c;
+    c.enabled = arpEnabledParam->load() >= 0.5f;
+    c.seed = static_cast<std::uint64_t> (std::max (1.0f, seedParam->load()));
+    if (! engine.isMpe() && ! engineSettings.mono)
+    {
+        c.link = arpLinkParam->load() >= 0.5f;
+        c.cards = 0;
+        for (int card = 0; card < 3; ++card)
+            if (arpCardParams[static_cast<std::size_t> (card)]->load() >= 0.5f)
+                c.cards = static_cast<std::uint8_t> (c.cards | (1 << card));
+        for (std::size_t i = 0; i < 2; ++i)
+        {
+            c.pattern[i] = juce::roundToInt (arpLanePatternParams[i]->load());
+            c.rate[i] = juce::roundToInt (arpLaneRateParams[i]->load());
+            c.octaves[i] = juce::roundToInt (arpLaneOctavesParams[i]->load());
+        }
+    }
+    const auto& out = lanes->process (*laneHost, midi, numSamples, timing, c);
+    if (lanes->active())
+    {
+        // VEL and NOTE on the shared stages follow the player's keys, not the lanes' notes
+        // (the one arpeggiator does the same in runArpeggiator).
+        engine.setExternalInputNotes (true);
+        for (const auto metadata : midi)
+            if (const auto m = metadata.getMessage(); m.isNoteOn())
+                engine.setInputNote (m.getNoteNumber(), m.getVelocity());
+    }
+    return out;
+}
+
+Arpeggiator::Settings OspAudioProcessor::arpSettings() noexcept
 {
     Arpeggiator::Settings settings;
-    settings.enabled = arpEnabledParam->load() >= 0.5f;
+    settings.enabled = arpEnabledParam->load() >= 0.5f && ! lanes->forceArpOff();
     settings.pattern = static_cast<ArpPattern> (std::clamp (juce::roundToInt (arpPatternParam->load()), 0, arp::patternCount - 1));
     settings.rate = static_cast<ArpRate> (std::clamp (juce::roundToInt (arpRateParam->load()), 0, arp::rateCount - 1));
     settings.gate = arpGateParam->load() / 100.0;
@@ -1403,6 +1517,12 @@ const juce::MidiBuffer& OspAudioProcessor::runArpeggiator (const juce::MidiBuffe
     settings.swing = arpSwingParam->load() / 100.0;
     settings.velocityScale = arpVelocityParam->load() / 100.0;
     applyArpModulation (settings);
+    return settings;
+}
+
+const juce::MidiBuffer& OspAudioProcessor::runArpeggiator (const juce::MidiBuffer& midi, int numSamples, const HostTiming& timing) noexcept
+{
+    const auto settings = arpSettings();
     arpeggiator.setSeed (static_cast<std::uint64_t> (std::max (1.0f, seedParam->load())));
     arpeggiator.beginBlock (settings, timing, numSamples);
     // VEL and NOTE on the shared stages follow the player's keys, not the arpeggiator's.
@@ -1513,7 +1633,8 @@ void OspAudioProcessor::applyArpModulation (Arpeggiator::Settings& settings) noe
 void OspAudioProcessor::publishArpDisplay() noexcept
 {
     Arpeggiator::Display display;
-    arpeggiator.display (display);
+    // Unlinked lanes: the card the panel edits (A's is the arpeggiator's own).
+    lanes->displayed (*laneHost, arpViewCard.load (std::memory_order_relaxed)).display (display);
     for (int i = 0; i < Arpeggiator::displaySteps; ++i)
     {
         arpDisplayLow[static_cast<std::size_t> (i)].store (display.low[static_cast<std::size_t> (i)], std::memory_order_relaxed);
@@ -1661,10 +1782,15 @@ void OspAudioProcessor::loadAtlas (const atlas::NoteAtlas& atlas, int layer, con
 
 void OspAudioProcessor::analyseRecording (const juce::File& file, int layer, const phrase::AnalysisSettings& settings)
 {
-    const auto index = resolve (layer);
     AnalyseRequest request;
     request.file = file;
     request.settings = settings;
+    startAnalysis (std::move (request), layer);
+}
+
+void OspAudioProcessor::startAnalysis (AnalyseRequest request, int layer)
+{
+    const auto index = resolve (layer);
     request.capacitySeconds = atlasCapacityFor (static_cast<int> (index));
     request.threads = atlasThreads;
     auto& target = layers[index];
@@ -1686,6 +1812,119 @@ void OspAudioProcessor::analyseRecording (const juce::File& file, int layer, con
         pushResult (std::move (result), l);   // a cancelled one too: the layer stops showing ANALYSING
         --pendingLoads;
     });
+}
+
+//==============================================================================
+// Live capture
+
+namespace
+{
+    constexpr double takePreRollSeconds = 0.25;   ///< RECORD keeps this much from before the press
+    constexpr double minGrabSeconds = 5.0;
+}
+
+InstrumentHost::CaptureView OspAudioProcessor::captureView()
+{
+    CaptureView view;
+    view.connected = captureLive.load (std::memory_order_acquire) && captureRing.isPrepared();
+    if (view.connected)
+    {
+        // The meter falls about 20 dB a second between the input's peaks (the page's timer).
+        meterLevel = std::max (meterLevel * 0.79f, captureRing.takePeak());
+        view.level = meterLevel;
+        const auto rate = captureRing.sampleRate();
+        view.available = std::min (capture::maxTakeSeconds, static_cast<double> (captureRing.position() - captureRing.oldestSafe()) / rate);
+        if (takeStart >= 0)
+        {
+            view.recording = true;
+            view.layer = takeLayer;
+            view.seconds = static_cast<double> (captureRing.position() - takeStart) / rate - takePreRollSeconds;
+        }
+    }
+    else
+        view.hint = wrapperType == wrapperType_Standalone ? "Choose an audio input in Settings (the menu: Audio / MIDI settings)"
+                                                          : "Route a track to OSP's sidechain input in your DAW";
+    return view;
+}
+
+bool OspAudioProcessor::startTake (int layer)
+{
+    if (! captureLive.load (std::memory_order_acquire) || ! captureRing.isPrepared())
+    {
+        showMessage ("CAPTURE: no input is connected");
+        return false;
+    }
+    const auto preRoll = static_cast<std::int64_t> (takePreRollSeconds * captureRing.sampleRate());
+    takeStart = std::max (captureRing.oldestSafe(), captureRing.position() - preRoll);
+    takeLayer = static_cast<int> (resolve (layer));
+    showMessage ("Recording into " + layerName (takeLayer) + "...");
+    return true;
+}
+
+bool OspAudioProcessor::stopTake()
+{
+    if (takeStart < 0)
+        return false;
+    // (Stopped late, past what the ring keeps: the take keeps its last minute.)
+    const auto from = std::max (takeStart, captureRing.oldestSafe());
+    takeStart = -1;
+    const auto rate = captureRing.sampleRate();
+    const auto to = std::min (captureRing.position(), from + static_cast<std::int64_t> ((capture::maxTakeSeconds + takePreRollSeconds) * rate));
+    return keepTake (from, to, takeLayer, false);
+}
+
+void OspAudioProcessor::cancelTake()
+{
+    if (takeStart >= 0)
+        showMessage ("Take discarded");
+    takeStart = -1;
+}
+
+void OspAudioProcessor::pollTake()
+{
+    if (takeStart >= 0 && captureView().seconds >= capture::maxTakeSeconds)
+        stopTake();   // a take lasts at most a minute
+}
+
+bool OspAudioProcessor::grabLast (double seconds, int layer)
+{
+    if (! captureLive.load (std::memory_order_acquire) || ! captureRing.isPrepared())
+    {
+        showMessage ("CAPTURE: no input is connected");
+        return false;
+    }
+    const auto rate = captureRing.sampleRate();
+    const auto to = captureRing.position();
+    const auto want = static_cast<std::int64_t> (std::clamp (seconds, minGrabSeconds, capture::maxTakeSeconds) * rate);
+    const auto from = std::max (captureRing.oldestSafe(), to - want);
+    return keepTake (from, to, static_cast<int> (resolve (layer)), true);
+}
+
+bool OspAudioProcessor::keepTake (std::int64_t from, std::int64_t to, int layer, bool snapshot)
+{
+    AudioData take;
+    if (! captureRing.copy (from, to, take))
+    {
+        showMessage ("CAPTURE: nothing to keep yet");
+        return false;
+    }
+    auto trimmed = capture::trimTake (take);
+    if (trimmed.isEmpty())
+    {
+        showMessage ("CAPTURE: nothing was heard on the input");
+        return false;
+    }
+    // The take's name: when it was made (a capture's title in the atlas; not part of any sound).
+    const auto id = juce::Time::getCurrentTime().formatted ("take-%Y%m%d-%H%M%S") + "-" + juce::String (++takeCount);
+    AnalyseRequest request;
+    request.file = store.directory().getChildFile ("takes").getChildFile (id + ".wav");
+    request.captured = std::make_shared<const AudioData> (std::move (trimmed));
+    request.origin = snapshot ? atlas::AssetOrigin::bufferSnapshot : atlas::AssetOrigin::liveCapture;
+    request.captureId = id.toStdString();
+    startAnalysis (std::move (request), layer);
+    userLoadNames[layers[static_cast<std::size_t> (layer)].latestLoadId.load()] = (snapshot ? "Grab into " : "Record into ") + layerName (layer);
+    showMessage ((snapshot ? "Grabbed into " : "Recorded into ") + layerName (layer) + ": mapping its notes...");
+    return true;
 }
 
 void OspAudioProcessor::cancelAnalysis (int layer)
@@ -2495,6 +2734,8 @@ void OspAudioProcessor::suggestGranularPosition (int index, const LoadedInstrume
 
 void OspAudioProcessor::timerCallback()
 {
+    pollTake();   // a take stops itself at a minute, whether its page is open or not
+
     // DYNAMICS' SOFT / LINEAR / HARD (kept for compatibility) sets the VEL curve when moved.
     if (const int dyn = juce::roundToInt (parameterValue (ids::dynamicsCurve)); dyn != shownDynamicsCurve)
     {

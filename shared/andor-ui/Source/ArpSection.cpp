@@ -1,4 +1,5 @@
 #include "ArpSection.h"
+#include "AndorParameters.h"
 #include "Binding.h"
 
 #include "OspLookAndFeel.h"
@@ -311,15 +312,14 @@ ArpInlinePanel::ArpInlinePanel (InstrumentHost& p)
           repaint();
       }, &p.undo()),
       patternAttachment (parameter (p, "arp.pattern"), [this] (float v) {
-          pattern = juce::jlimit (0, arp::patternCount - 1, juce::roundToInt (v));
-          updatePreview();
-          revealSelected();
-          repaint();
+          cardPattern[0] = juce::jlimit (0, arp::patternCount - 1, juce::roundToInt (v));
+          if (editCard == 0)
+              showEditedCard();
       }, &p.undo()),
       octavesAttachment (parameter (p, "arp.octaves"), [this] (float v) {
-          octaveCount = juce::jlimit (arp::minOctaves, arp::maxOctaves, juce::roundToInt (v));
-          updatePreview();
-          repaint();
+          cardOctaves[0] = juce::jlimit (arp::minOctaves, arp::maxOctaves, juce::roundToInt (v));
+          if (editCard == 0)
+              showEditedCard();
       }, &p.undo()),
       rate (p.apvts(), "arp.rate", "RATE", [] (double v) {
           const auto& order = rateOrder();
@@ -342,11 +342,96 @@ ArpInlinePanel::ArpInlinePanel (InstrumentHost& p)
         knob->slider.getProperties().set ("paramId", id);   // a modulation drop target
         addAndMakeVisible (*knob);
     }
+    cards = p.cardArpeggiator() && p.apvts().getParameter (ids::arpLink (p.cardArpNamespace())) != nullptr;
+    if (cards)
+    {
+        cardAttachments.push_back (std::make_unique<juce::ParameterAttachment> (parameter (p, ids::arpLink (p.cardArpNamespace())), [this] (float v) {
+            linked = v >= 0.5f;
+            if (linked && editCard != 0)
+                setEditCard (0);
+            repaint();
+        }, &p.undo()));
+        for (int c = 0; c < 3; ++c)
+            cardAttachments.push_back (std::make_unique<juce::ParameterAttachment> (parameter (p, ids::arpCard (p.cardArpNamespace(), c)), [this, c] (float v) {
+                cardOn[static_cast<std::size_t> (c)] = v >= 0.5f;
+                repaint();
+            }, &p.undo()));
+        for (int c = 1; c < 3; ++c)
+        {
+            const auto i = static_cast<std::size_t> (c - 1);
+            lanePattern[i] = std::make_unique<juce::ParameterAttachment> (parameter (p, ids::arpCardSetting (p.cardArpNamespace(), c, "pattern")), [this, c] (float v) {
+                cardPattern[static_cast<std::size_t> (c)] = juce::jlimit (0, arp::patternCount - 1, juce::roundToInt (v));
+                if (editCard == c)
+                    showEditedCard();
+            }, &p.undo());
+            laneOctaves[i] = std::make_unique<juce::ParameterAttachment> (parameter (p, ids::arpCardSetting (p.cardArpNamespace(), c, "octaves")), [this, c] (float v) {
+                cardOctaves[static_cast<std::size_t> (c)] = juce::jlimit (arp::minOctaves, arp::maxOctaves, juce::roundToInt (v));
+                if (editCard == c)
+                    showEditedCard();
+            }, &p.undo());
+            const auto rateId = ids::arpCardSetting (p.cardArpNamespace(), c, "rate");
+            laneRate[i] = std::make_unique<MiniKnob> (p.apvts(), rateId, "RATE", [] (double v) {
+                const auto& order = rateOrder();
+                const int position = juce::jlimit (0, static_cast<int> (order.size()) - 1, juce::roundToInt (v));
+                return InstrumentHost::arpRateNames()[order[static_cast<std::size_t> (position)]];
+            });
+            laneRate[i]->setChoiceOrder (parameter (p, rateId), rateOrder(), &p.undo());
+            laneRate[i]->slider.setTooltip (rate.slider.getTooltip());
+            laneRate[i]->setArcColour (design::colour::accent);
+            addChildComponent (*laneRate[i]);
+        }
+        for (auto& a : cardAttachments)
+            a->sendInitialUpdate();
+        for (int i = 0; i < 2; ++i)
+        {
+            lanePattern[static_cast<std::size_t> (i)]->sendInitialUpdate();
+            laneOctaves[static_cast<std::size_t> (i)]->sendInitialUpdate();
+        }
+    }
     enabledAttachment.sendInitialUpdate();
     patternAttachment.sendInitialUpdate();
     octavesAttachment.sendInitialUpdate();
     shown.current = -1;
     updatePreview();
+}
+
+void ArpInlinePanel::showEditedCard()
+{
+    // The card being edited: its pattern, octaves and RATE knob (A's are the arpeggiator's own).
+    const auto c = static_cast<std::size_t> (editCard);
+    pattern = cardPattern[c];
+    octaveCount = cardOctaves[c];
+    rate.setVisible (editCard == 0);
+    for (int i = 0; i < 2; ++i)
+        if (laneRate[static_cast<std::size_t> (i)] != nullptr)
+            laneRate[static_cast<std::size_t> (i)]->setVisible (editCard == i + 1);
+    updatePreview();
+    revealSelected();
+    repaint();
+}
+
+void ArpInlinePanel::setEditCard (int shown)
+{
+    const int next = cards && ! linked ? juce::jlimit (0, 2, shown) : 0;
+    if (next == editCard)
+        return;
+    editCard = next;
+    ospProcessor.setArpViewCard (editCard);
+    showEditedCard();
+}
+
+void ArpInlinePanel::toggleCard (int shown)
+{
+    if (! cards)
+        return;
+    auto& a = *cardAttachments[static_cast<std::size_t> (1 + juce::jlimit (0, 2, shown))];
+    a.setValueAsCompleteGesture (cardOn[static_cast<std::size_t> (juce::jlimit (0, 2, shown))] ? 0.0f : 1.0f);
+}
+
+void ArpInlinePanel::toggleLink()
+{
+    if (cards)
+        cardAttachments.front()->setValueAsCompleteGesture (linked ? 0.0f : 1.0f);
 }
 
 ArpInlinePanel::~ArpInlinePanel() = default;
@@ -420,6 +505,21 @@ void ArpInlinePanel::resized()
     gate.setBounds (juce::Rectangle<float> (knobW, knobH).withCentre ({ 1115.0f, knobTop + 0.5f * knobH }).getSmallestIntegerContainer());
     swing.setBounds (juce::Rectangle<float> (knobW, knobH).withCentre ({ 1215.0f, knobTop + 0.5f * knobH }).getSmallestIntegerContainer());
     velocity.setBounds (juce::Rectangle<float> (knobW, knobH).withCentre ({ 1315.0f, knobTop + 0.5f * knobH }).getSmallestIntegerContainer());
+    for (auto& k : laneRate)
+        if (k != nullptr)
+            k->setBounds (rate.getBounds());
+    if (cards)
+    {
+        // The title row, after ARPEGGIATOR: PLAYS A B C, LINK; unlinked, EDIT A | B | C.
+        const float y = 27.0f, h = 22.0f;
+        playsCaption = { 196.0f, y - 0.5f * h, 50.0f, h };
+        for (int c = 0; c < 3; ++c)
+            cardChips[static_cast<std::size_t> (c)] = { 248.0f + 30.0f * static_cast<float> (c), y - 0.5f * h, 26.0f, h };
+        linkChip = { 346.0f, y - 0.5f * h, 52.0f, h };
+        editCaption = { 418.0f, y - 0.5f * h, 40.0f, h };
+        for (int c = 0; c < 3; ++c)
+            editTabs[static_cast<std::size_t> (c)] = { 460.0f + 28.0f * static_cast<float> (c), y - 0.5f * h, 28.0f, h };
+    }
     revealSelected();
 }
 
@@ -475,12 +575,20 @@ void ArpInlinePanel::revealSelected()
 
 void ArpInlinePanel::choosePattern (int which)
 {
-    patternAttachment.setValueAsCompleteGesture (static_cast<float> (juce::jlimit (0, arp::patternCount - 1, which)));
+    const auto v = static_cast<float> (juce::jlimit (0, arp::patternCount - 1, which));
+    if (editCard == 0)
+        patternAttachment.setValueAsCompleteGesture (v);
+    else
+        lanePattern[static_cast<std::size_t> (editCard - 1)]->setValueAsCompleteGesture (v);
 }
 
 void ArpInlinePanel::chooseOctaves (int octaves)
 {
-    octavesAttachment.setValueAsCompleteGesture (static_cast<float> (juce::jlimit (arp::minOctaves, arp::maxOctaves, octaves)));
+    const auto v = static_cast<float> (juce::jlimit (arp::minOctaves, arp::maxOctaves, octaves));
+    if (editCard == 0)
+        octavesAttachment.setValueAsCompleteGesture (v);
+    else
+        laneOctaves[static_cast<std::size_t> (editCard - 1)]->setValueAsCompleteGesture (v);
 }
 
 void ArpInlinePanel::paint (juce::Graphics& g)
@@ -509,6 +617,69 @@ void ArpInlinePanel::paint (juce::Graphics& g)
     paintField (g);
     paintList (g);
     paintOctaves (g);
+    if (cards)
+        paintCards (g);
+}
+
+void ArpInlinePanel::paintCards (juce::Graphics& g)
+{
+    using namespace design;
+    const float dim = enabled ? 1.0f : 0.55f;
+    g.setFont (type::popupLabel (12.5f));
+    g.setColour (colour::text.withAlpha (0.62f * dim));
+    g.drawText ("PLAYS", playsCaption, juce::Justification::centredRight, false);
+    for (int c = 0; c < 3; ++c)
+    {
+        // A card's own colour when the arpeggio plays it; a plain key when it holds the keys.
+        const auto chip = cardChips[static_cast<std::size_t> (c)];
+        const bool on = cardOn[static_cast<std::size_t> (c)];
+        const auto identity = palette::layer (c);
+        draw::button (g, chip, 5.0f, on, hover == 20 + c, identity);
+        if (on)
+        {
+            g.setColour (identity.withAlpha (0.3f * dim));
+            g.fillRoundedRectangle (chip.reduced (1.5f), 4.0f);
+        }
+        g.setFont (type::controlValue (0.86f));
+        g.setColour (on ? identity.darker (0.45f).withMultipliedAlpha (dim) : colour::text.withAlpha (0.55f * dim));
+        g.drawText (juce::String::charToString (static_cast<juce::juce_wchar> ('A' + c)), chip, juce::Justification::centred, false);
+    }
+    draw::button (g, linkChip, 5.0f, linked, hover == 24, colour::accent);
+    g.setFont (type::popupLabel (12.0f));
+    g.setColour (linked ? colour::accent.darker (0.35f).withMultipliedAlpha (dim) : colour::text.withAlpha (0.7f * dim));
+    g.drawText ("LINK", linkChip, juce::Justification::centred, false);
+    if (linked)
+        return;
+    g.setFont (type::popupLabel (12.5f));
+    g.setColour (colour::text.withAlpha (0.62f * dim));
+    g.drawText ("EDIT", editCaption, juce::Justification::centredRight, false);
+    // A segmented control: the card whose PATTERN, RATE and OCTAVES are shown.
+    const auto all = editTabs[0].getUnion (editTabs[2]);
+    g.setColour (colour::hairline.darker (0.1f));
+    g.drawRoundedRectangle (all.reduced (0.5f), 5.0f, 1.0f);
+    for (int c = 0; c < 3; ++c)
+    {
+        const auto tab = editTabs[static_cast<std::size_t> (c)];
+        const bool chosen = c == editCard;
+        if (chosen)
+        {
+            g.setColour (palette::layer (c).withAlpha (0.28f));
+            g.fillRoundedRectangle (tab.reduced (1.5f), 4.0f);
+        }
+        else if (hover == 25 + c)
+        {
+            g.setColour (colour::text.withAlpha (0.06f));
+            g.fillRoundedRectangle (tab.reduced (1.5f), 4.0f);
+        }
+        if (c > 0)
+        {
+            g.setColour (colour::hairline.darker (0.1f));
+            g.fillRect (juce::Rectangle<float> (tab.getX() - 0.5f, tab.getY() + 4.0f, 1.0f, tab.getHeight() - 8.0f));
+        }
+        g.setFont (type::controlValue (0.86f));
+        g.setColour (colour::text.withAlpha ((chosen ? 0.95f : 0.6f) * dim));
+        g.drawText (juce::String::charToString (static_cast<juce::juce_wchar> ('A' + c)), tab, juce::Justification::centred, false);
+    }
 }
 
 namespace
@@ -717,6 +888,18 @@ void ArpInlinePanel::mouseMove (const juce::MouseEvent& e)
     for (int o = arp::minOctaves; o <= arp::maxOctaves; ++o)
         if (octaveKeyArea (o).contains (e.position))
             now = 10 + o;
+    if (cards)
+    {
+        for (int c = 0; c < 3; ++c)
+        {
+            if (cardChips[static_cast<std::size_t> (c)].contains (e.position))
+                now = 20 + c;
+            if (! linked && editTabs[static_cast<std::size_t> (c)].contains (e.position))
+                now = 25 + c;
+        }
+        if (linkChip.contains (e.position))
+            now = 24;
+    }
     const int row = rowAt (e.position);
     if (now != hover || row != hoverRow)
     {
@@ -725,6 +908,8 @@ void ArpInlinePanel::mouseMove (const juce::MouseEvent& e)
         setMouseCursor (hover != 0 || hoverRow >= 0 ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
         updateField();   // the picture previews the style under the pointer
         repaint (list.getUnion (octaveKeys).getUnion (collapse).getSmallestIntegerContainer().expanded (3));
+        if (cards)
+            repaint (playsCaption.getUnion (editTabs[2]).getSmallestIntegerContainer().expanded (3));
     }
 }
 
@@ -759,6 +944,27 @@ void ArpInlinePanel::mouseDown (const juce::MouseEvent& e)
             chooseOctaves (o);
             return;
         }
+    if (cards)
+    {
+        for (int c = 0; c < 3; ++c)
+        {
+            if (cardChips[static_cast<std::size_t> (c)].contains (e.position))
+            {
+                toggleCard (c);
+                return;
+            }
+            if (! linked && editTabs[static_cast<std::size_t> (c)].contains (e.position))
+            {
+                setEditCard (c);
+                return;
+            }
+        }
+        if (linkChip.contains (e.position))
+        {
+            toggleLink();
+            return;
+        }
+    }
     if (collapse.contains (e.position) && onCollapse != nullptr)
         onCollapse();
 }

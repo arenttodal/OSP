@@ -11,8 +11,25 @@
 namespace andor::shell
 {
 
+
 using osp::plugin::InstrumentHost;
 using osp::plugin::LoadedInstrument;
+
+/** The shared per-card lanes' view of this processor (osp::plugin::CardArpLanes::Host). */
+struct ShellProcessor::LaneHost final : osp::plugin::CardArpLanes::Host
+{
+    explicit LaneHost (ShellProcessor& p) : owner (p) {}
+    osp::Arpeggiator& mainArpeggiator() noexcept override { return owner.arpeggiator; }
+    osp::Arpeggiator::Settings arpSettings() noexcept override { return owner.arpSettings(); }
+    const juce::MidiBuffer& runArpeggiator (const juce::MidiBuffer& midi, int numSamples, const osp::HostTiming& timing) noexcept override
+    {
+        return owner.runArpeggiator (midi, numSamples, timing);
+    }
+    void lanesRearranged() noexcept override { owner.arpModOctaves = 0; }
+    void setCardRouting (bool on) noexcept override { owner.engine->setCardRouting (on); }
+    void publishArpDisplay() noexcept override { owner.publishArpDisplay(); }
+    ShellProcessor& owner;
+};
 
 namespace
 {
@@ -54,6 +71,8 @@ namespace
         // destination list, which the layout below is made with.
         osp::mod::setProductDestinations (productInfo().modulationDestinations);
         auto layout = InstrumentHost::createParameterLayout();
+        if (productInfo().cardArpeggiator)
+            InstrumentHost::addCardArpParameters (layout, productInfo().slug + ".");   // (in the product's namespace)
         if (productInfo().addParameters != nullptr)
             productInfo().addParameters (layout);
         return layout;
@@ -104,6 +123,21 @@ ShellProcessor::ShellProcessor (std::unique_ptr<Engine> productEngine)
     arpSwingParam = parameters.getRawParameterValue (osp::plugin::ids::arpSwing);
     arpVelocityParam = parameters.getRawParameterValue (osp::plugin::ids::arpVelocity);
     seedParam = parameters.getRawParameterValue (osp::plugin::ids::seed);
+    cardArp = arpBound && productInfo().cardArpeggiator && parameters.getRawParameterValue (osp::plugin::ids::arpLink (productInfo().slug + ".")) != nullptr;
+    if (cardArp)
+    {
+        lanes = std::make_unique<osp::plugin::CardArpLanes>();
+        laneHost = std::make_unique<LaneHost> (*this);
+        cardLinkParam = parameters.getRawParameterValue (osp::plugin::ids::arpLink (productInfo().slug + "."));
+        for (int c = 0; c < 3; ++c)
+            cardOnParams[static_cast<std::size_t> (c)] = parameters.getRawParameterValue (osp::plugin::ids::arpCard (productInfo().slug + ".", c));
+        for (int c = 1; c < 3; ++c)
+        {
+            lanePatternParams[static_cast<std::size_t> (c - 1)] = parameters.getRawParameterValue (osp::plugin::ids::arpCardSetting (productInfo().slug + ".", c, "pattern"));
+            laneRateParams[static_cast<std::size_t> (c - 1)] = parameters.getRawParameterValue (osp::plugin::ids::arpCardSetting (productInfo().slug + ".", c, "rate"));
+            laneOctavesParams[static_cast<std::size_t> (c - 1)] = parameters.getRawParameterValue (osp::plugin::ids::arpCardSetting (productInfo().slug + ".", c, "octaves"));
+        }
+    }
     modBound = osp::plugin::binding::anyBound ({ modRouteId (0, "source") }, bound);
     for (int i = 0; i < 2; ++i)
     {
@@ -160,6 +194,8 @@ void ShellProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     // The arpeggiator's MIDI: room for any realistic block, so the audio thread never grows it.
     arpeggiator.prepare (sampleRate);
     arpMidi.ensureSize (static_cast<std::size_t> (osp::Arpeggiator::maxEvents + 4096) * 16);
+    if (cardArp)
+        lanes->prepare (sampleRate);
     shaperGenerationSeen = 0;   // the prepared engine is given the pattern, curves and modulation again
     curveGenerationSeen.fill (0);
     modDirty = true;
@@ -260,7 +296,11 @@ void ShellProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
     // A bounce from the same position plays the same arpeggio: its pattern and RANDOM's
     // choices start over whenever the transport starts.
     if (performance.playing && ! hostWasPlaying)
+    {
         arpeggiator.restartPattern();
+        if (lanes != nullptr)
+            lanes->restartPatterns();
+    }
     hostWasPlaying = performance.playing;
 
     // SHAPER CUSTOM: a changed pattern reaches the engine before the block.
@@ -313,8 +353,8 @@ void ShellProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
     timing.ppq = performance.ppq;
     timing.numerator = performance.numerator;
     timing.denominator = performance.denominator;
-    const auto& notes = runArpeggiator (midi, buffer.getNumSamples(), timing);
-    engine->setPlayedKeys (arpeggiator.isEnabled(), midi);
+    const auto& notes = cardArp ? runCardArpeggiators (midi, buffer.getNumSamples(), timing) : runArpeggiator (midi, buffer.getNumSamples(), timing);
+    engine->setPlayedKeys (arpeggiator.isEnabled() || (lanes != nullptr && lanes->active()), midi);
     engine->process (buffer, notes, performance);
 }
 
@@ -401,12 +441,12 @@ double ShellProcessor::steppedArpRatio (double multiplier) noexcept
     return best;
 }
 
-const juce::MidiBuffer& ShellProcessor::runArpeggiator (const juce::MidiBuffer& midi, int numSamples, const osp::HostTiming& timing) noexcept
+osp::Arpeggiator::Settings ShellProcessor::arpSettings() noexcept
 {
-    // ANDOR OSP's arpeggiator as its processor runs it (OspAudioProcessor::runArpeggiator).
+    // ANDOR OSP's settings, moved by the ARP destinations (as its processor reads them).
     using namespace osp;
     Arpeggiator::Settings settings;
-    settings.enabled = arpEnabledParam->load() >= 0.5f;
+    settings.enabled = arpEnabledParam->load() >= 0.5f && ! (lanes != nullptr && lanes->forceArpOff());
     settings.pattern = static_cast<ArpPattern> (std::clamp (juce::roundToInt (arpPatternParam->load()), 0, arp::patternCount - 1));
     settings.rate = static_cast<ArpRate> (std::clamp (juce::roundToInt (arpRateParam->load()), 0, arp::rateCount - 1));
     settings.gate = arpGateParam->load() / 100.0;
@@ -439,6 +479,14 @@ const juce::MidiBuffer& ShellProcessor::runArpeggiator (const juce::MidiBuffer& 
         else
             arpModOctaves = 0;
     }
+    return settings;
+}
+
+const juce::MidiBuffer& ShellProcessor::runArpeggiator (const juce::MidiBuffer& midi, int numSamples, const osp::HostTiming& timing) noexcept
+{
+    // ANDOR OSP's arpeggiator as its processor runs it (OspAudioProcessor::runArpeggiator).
+    using namespace osp;
+    auto settings = arpSettings();
     arpeggiator.setSeed (static_cast<std::uint64_t> (std::max (1.0f, seedParam->load())));
     arpeggiator.beginBlock (settings, timing, numSamples);
 
@@ -496,10 +544,32 @@ const juce::MidiBuffer& ShellProcessor::runArpeggiator (const juce::MidiBuffer& 
     return arpMidi;
 }
 
+const juce::MidiBuffer& ShellProcessor::runCardArpeggiators (const juce::MidiBuffer& midi, int numSamples, const osp::HostTiming& timing) noexcept
+{
+    // The shared lanes (osp::plugin::CardArpLanes, as ANDOR OSP's processor runs them), from
+    // this product's parameters.
+    osp::plugin::CardArpLanes::Controls c;
+    c.enabled = arpEnabledParam->load() >= 0.5f;
+    c.link = cardLinkParam->load() >= 0.5f;
+    c.cards = 0;
+    for (int card = 0; card < 3; ++card)
+        if (cardOnParams[static_cast<std::size_t> (card)]->load() >= 0.5f)
+            c.cards = static_cast<std::uint8_t> (c.cards | (1 << card));
+    for (std::size_t i = 0; i < 2; ++i)
+    {
+        c.pattern[i] = juce::roundToInt (lanePatternParams[i]->load());
+        c.rate[i] = juce::roundToInt (laneRateParams[i]->load());
+        c.octaves[i] = juce::roundToInt (laneOctavesParams[i]->load());
+    }
+    c.seed = static_cast<std::uint64_t> (std::max (1.0f, seedParam->load()));
+    return lanes->process (*laneHost, midi, numSamples, timing, c);
+}
+
 void ShellProcessor::publishArpDisplay() noexcept
 {
     osp::Arpeggiator::Display display;
-    arpeggiator.display (display);
+    // Unlinked lanes: the card the panel edits (A's is the arpeggiator's own).
+    (cardArp ? lanes->displayed (*laneHost, arpViewLane.load (std::memory_order_relaxed)) : arpeggiator).display (display);
     for (std::size_t i = 0; i < arpDisplayLow.size(); ++i)
     {
         arpDisplayLow[i].store (display.low[i], std::memory_order_relaxed);

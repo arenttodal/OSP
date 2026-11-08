@@ -673,6 +673,37 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       note colours (regions, NOTE MAP, keyboard strip) are earth and plant pigments, warm for
       the even pitch classes and green / teal for the odd ones, no violets.
 
+## Milestone: SYNTHESIS S2 — the spectral imprint (docs/research/synthesize/s2-imprint-*.md)
+
+- [x] S2.0 audit and code map (`s2-imprint-audit.md`); rollback checkpoint 6e5f503.
+- [x] S2.1 three experiments on stand-in references (static, time-varying, real-time vocoder;
+      16/24/32 bands): B (time-varying) chosen, MOTION 0 being A (`s2-imprint-research.md`).
+- [x] S2.2 the descriptor `imprint::Profile` (`model/ImprintProfile.h`) in every
+      `InstrumentModel` (each set and Atlas member its own), built in `addContinuation`.
+- [x] S2.3 the voice: a 24-band shaper on the oscillator, only in Imprint with IMPRINT above
+      0; Analog, IMPRINT 0 and SYNTH 0 are sample-identical to S1.
+- [x] S2.4 per layer `layerX.synth.mode` / `.imprint` / `.motion` (version hint 28, appended
+      after `arp.*`); older sessions open as Analog; `InstrumentHost::imprintState`.
+- [x] S2.5-S2.6 the SYNTH chip in two parts (SYNTH › opens the page; the amount drags, wheels,
+      Alt fine, double-click 0; the imprint's curve as its light) and the page's ANALOG | IMPRINT,
+      IMPRINT and MOTION in one, two and three cards (`08-imprint-*` screenshots).
+- [x] S2.7 regression and CPU (`s2-imprint-results.md`). Tests `[imprint]`, `[imprint-engine]`,
+      `[plugin][imprint]`.
+- [ ] Musical review of real recordings in the development build (S2.8 report:
+      `s2-imprint-results.md`).
+
+## ANDOR OSP: the playback-mode selector as symbols (8 Nov 2026)
+
+- [x] The source header's ONE SHOT / GRANULAR key is a small symbol key (42 px, 40 in three
+      cards): a start marker and forward arrow, or a small uneven cloud of grains, and a quiet
+      chevron (`icons::drawOneShotIcon` / `drawGranularIcon`, vector paths). Its menu names both
+      modes with their symbols, a line on what each does and a check by the active one. Tooltip
+      and accessible description "Playback mode: One Shot / Granular"; a pop-up button for
+      assistive technology; Return, Space or Down opens it. Presentation only: `layerX.sourceMode`,
+      its values, automation, sessions and the sound unchanged. A product that names its first
+      mode (ANDOR ANALOG's generator) keeps its named key. Tests `[mode-selector]`; screenshots
+      `OSP_MODE_SHOTS=<dir> osp_plugin_tests "[mode-shots]"`.
+
 ## Milestone: ANDOR Instrument Shell extensions for ANDOR ANALOG (a synthesizer)
 
 - [x] Opt-in extension points (HANDOFF.md, "What a product may add"): product parameters after
@@ -748,7 +779,8 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 ## IN PROGRESS
 
 - Lab round 3 (Reimagined 3, violin).
-- DAW/host validation on a Mac.
+- DAW/host validation on a Mac (now including live capture's sidechain routing and the
+  standalone app's microphone input).
 
 ## NEXT
 
@@ -791,6 +823,167 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
     short-word grain, repeats on the beat at two tempi, diffusion's crest factor, decay,
     stability, determinism, no allocation, level matched to HALL); engine switches never click.
   - CPU: VINTAGE about 0.75x, BLOOM about 0.64x HALL.
+- **ABYSS's variants: built.** `space.abyss.variant` (version hint 25): DEEP / DARK / INVERSE /
+  ENDLESS, as the ABYSS popover's tabs (FREEZE moved to its second row).
+  - DEEP is ABYSS as it was, bit-identical.
+  - DARK: lower band corners and a much darker tail.
+  - INVERSE: GRAVITY's rising window always on and longer, and a faster loop: it swells in.
+  - ENDLESS: 6x the reverberation time, more motion.
+  - Each variant is level-matched to HALL. Evidence: the variants test in `[abyss]` (DARK's
+    tail much darker, INVERSE peaks at 1.65 s, ENDLESS's RT60 5.7x DEEP's, every variant
+    within 0.01 dB of HALL and stable at the extremes).
+
+## ECHO: ASCEND (3 Nov 2026)
+
+- **ASCEND: built.** ECHO's third machine (`echo.type` gained ASCEND after TAPE and BBD), an
+  original design in the spirit of an octave-up delay pedal: a pitch shifter inside the
+  delay's loop.
+  - The loop, in order:
+    - CLOCK: the line is written through a sample-rate reducer, 13 kHz down to 7 kHz. It
+      has a half-clock anti-alias filter before the hold and a reconstruction filter after.
+    - TONE's low-pass (2 .. 5 kHz), placed before the shifter.
+    - The shifter: two heads 180 degrees apart sweep a window of TIME / 8 (held within
+      30 .. 50 ms), Hann-crossfaded.
+  - The aligned splice. Where a head jumps back, it lands at the point in a 15 ms span
+    where the waveform best lines up with the other head (coarse and then exact
+    correlation).
+    - Without it, the textbook dual-head shifter drifted by up to a grain's rate: about
+      -25 cents on an A, different for every note, so partials went out of tune.
+    - With it, every note tested is within 8 cents of a true octave.
+  - New parameters (`echo.ascend.interval`, `echo.ascend.motion`, version hint 26):
+    - INTERVAL: +12 / +7 / +5 / -12.
+    - MOTION:
+      - RISE: the output and the loop are both shifted. The first repeat is up, and each
+        next one is higher.
+      - STEADY: only the output is shifted. Every repeat is at the interval.
+      - LATE: only the loop is shifted. The first repeat is as played, then climbing (the
+        spec as first drawn).
+  - Existing controls on ASCEND:
+    - AGE is shown and works as CLOCK.
+    - FEEDBACK reaches a loop gain of 0.85, with a soft ceiling on every write.
+    - There is no wow.
+  - The popover: TIME / FEEDBACK / TONE / CLOCK, plus a second row (INTERVAL, MOTION) only
+    on ASCEND. TAPE's and BBD's layout is unchanged. The picture labels each repeat's pitch.
+  - Existing sessions: TAPE and BBD are untouched.
+  - Evidence: the `[ascend]` tests:
+    - the octave, two octaves, STEADY and LATE pitches;
+    - +7 / +5 / -12;
+    - in tune across seven notes;
+    - TONE darkens;
+    - level within 30 % of TAPE's (measured 0.95 .. 1.02 from 200 Hz up);
+    - stable at FEEDBACK 100 % in every motion, interval and stereo picture;
+    - deterministic, and silent in silence.
+  - CPU: about 1.3 % of a core at 48 kHz (TAPE about 0.5 .. 0.8 %).
+
+## Shell: the per-card arpeggiator (3 Nov 2026)
+
+- **Built (opt-in: `ProductInfo::cardArpeggiator`, a three-engine product; ANDOR OSP has it
+  too since 4 Nov, below).** The shell adds, in the product's namespace (`analog.`), `arp.link` and `arp.cardA` /
+  `arp.cardB` / `arp.cardC` (which cards play the arpeggio; the others hold the keys), and B's
+  and C's own PATTERN / RATE / OCTAVES (`arp.cardB.*`, `arp.cardC.*`), all version hint 27.
+  ANDOR OSP's own copies are unprefixed (`arp.link` ..), so the shell's schema test compares
+  against OSP's golden less them. The defaults (LINK, every card)
+  are the one arpeggiator, exactly as before: old sessions and presets play unchanged.
+- How it plays (`plugin::CardArpLanes`, shared by `ShellProcessor` and `OspAudioProcessor`):
+  - With LINK on and every card in it (or the arpeggiator off), the one arpeggiator runs as
+    before.
+  - Otherwise up to three lanes run, each an arpeggiator playing some cards. LINK gives one
+    lane for the cards in it; unlinked gives one per card, B and C on their own settings, with
+    GATE / SWING / VELOCITY and the ARP destinations shared.
+  - The cards left out hold the keys as played, with their own sustain pedal; the engine's
+    pedal would hold the arpeggio too.
+  - Each note's MIDI channel names its cards (1 + mask) for the engine
+    (`Engine::setCardRouting`).
+  - Unlinked lanes' random patterns have their own seeds derived from the stored one.
+  - A change of cards or LINK mid-performance ends what sounds and plays the keys still
+    down into the new lanes, so no note is ever left hanging.
+- The ARP panel (`InstrumentHost::cardArpeggiator`; the visual regression masks the row,
+  `arp-cards`, for products with one arpeggiator):
+  - PLAYS A B C, each lit in its card's colour;
+  - LINK;
+  - unlinked, EDIT A | B | C, which picks whose PATTERN, RATE and OCTAVES the panel shows and
+    sets, and whose steps the display plays.
+- Evidence: ANDOR ANALOG's `[cardarp]` tests, its bindings test (all ten new parameters move
+  the sound), and its screenshots `analog-arp-card-c` and `analog-arp-unlinked-b`.
+
+## ANDOR OSP: live capture into a chopped phrase (6 Nov 2026)
+
+- **What the musician does.** Each card has a REC key (beside EQ; a dot alone on narrow cards).
+  It opens the CAPTURE page in the card's display:
+  - the INPUT meter and a scrolling level picture of what arrives;
+  - RECORD / STOP: a take for this layer, a quarter second before the press kept, stopping
+    itself at 1:00 (the processor's timer, page open or not); DISCARD throws it away;
+  - GRAB LAST 10 / 20 / 30 / 60 s: what was just played, kept after the fact.
+  - A kept take is trimmed (silence before and after, a 50 ms lead-in and 250 ms tail kept),
+    stored, and MAP NOTES runs on it at once: it becomes the layer's notes (one undo step when
+    it replaces a sound). The page closes and the card shows the notes.
+  - An empty instrument has Record... beside Browse... and Load example; the header menu has
+    Record (into a new layer)... while a slot is free. The page covers the sources until the
+    take arrives.
+- **Inputs.** A stereo input bus named Sidechain: off by default in a plugin (the host routes a
+  track to it: VST3 reports it as an aux bus, `getPluginHasMainInput` false), on in the
+  standalone app (the chosen microphone or interface input; macOS asks for the microphone with
+  NSMicrophoneUsageDescription). The standalone app's feedback mute is lifted because OSP never
+  plays its input back: the instrument's render overwrites the shared buffer.
+- **How.** `audio/capture/CaptureBuffer` (pure C++): a ring of 64 s + 4 s margin, allocated in
+  prepareToPlay only while an input is connected (about 27 MB at 48 kHz). The audio thread only
+  writes it (memcpy and an atomic store); the message thread copies a take out by absolute
+  position, and a stretch that may have been overwritten is refused, never torn. The loader
+  thread writes the take into the sample store and analyses it (`AnalyseRequest::captured`,
+  origin `liveCapture` / `bufferSnapshot`, `captureId`).
+- **Shared code.** `InstrumentHost::liveCapture()` (false by default) and the capture calls;
+  the CAPTURE page, REC key and the drop zone's Record... are in shared/andor-ui. The shell has
+  no capture yet; its parity render draws the REC key and Record... as ANDOR OSP does, so the
+  visual regression stays exact.
+- **Evidence.**
+  - Unit `[capture]` (7 cases): exact positions across the wrap, overwritten stretches refused,
+    mono kept mono, the meter, a concurrent writer and reader (whole or refused), no allocation
+    in write, trimming.
+  - Plugin `[capture]` (8 cases):
+    - the bus layouts and VST3's aux bus; unconnected, the page says how to connect;
+    - the input is never heard;
+    - RECORD maps a four-note phrase onto B with its origin, trimmed, stored once;
+    - GRAB on a mono input keeps only what was just played; replacing it is one undo step;
+    - silence, DISCARD, the minute's limit, a new sample rate;
+    - no allocation on the audio thread;
+    - the card's REC key, the page's clicks, and recording from an empty instrument.
+  - Screenshots: `OSP_CAPTURE_SHOTS=<dir> osp_plugin_tests "[capture-shots]"`.
+- **Not verified yet:** routing a sidechain into OSP in Logic, Ableton and Reaper, and the
+  standalone app's microphone prompt, need a Mac.
+
+## ANDOR OSP: the per-card arpeggiator (4 Nov 2026)
+
+- **Shared lanes.** The lane logic moved out of `ShellProcessor` into
+  `shared/andor-ui/Source/CardArpLanes.{h,cpp}`. The shell and `OspAudioProcessor` both run it
+  through a small `CardArpLanes::Host` adapter (their arpeggiator, its settings, the engine's
+  card routing, the display), so the two instruments cannot drift apart.
+- **Layer masks in the engine.** `InstrumentEngine::setCardRouting`: on, a note's MIDI channel
+  names its layers (channel = 1 + mask, bit 0 A .. bit 2 C) and a note-off ends only its own
+  channel's voices. The event index is spent either way, so each layer's randomness does not
+  depend on which others a note plays. Off (the default) is bit-identical to before.
+- **Parameters** (version hint 27, appended; `InstrumentHost::addCardArpParameters (layout, "")`):
+  `arp.link`, `arp.cardA/B/C`, `arp.cardB/C.pattern/rate/octaves`. The defaults (LINK, every card)
+  are the one arpeggiator. A session without them opens there, so it plays exactly as before.
+- **Fallbacks.** Under MPE (each member channel is a note) and MONO (one held-key stack), the
+  channels cannot name layers, so OSP runs the one arpeggiator on every layer. A switch in or
+  out of either ends the lanes' notes cleanly.
+- **Panel.** OSP's ARP panel shows PLAYS / LINK / EDIT (`cardArpeggiator()` is true). The
+  display follows the card being edited.
+- **Fixed on the way:** `Arpeggiator::ensureSequence` used `std::stable_sort`, which allocates
+  a temporary buffer on the audio thread (both instruments). It is now an insertion sort with
+  the same order and no allocation.
+- **Evidence:**
+  - `[card-arp]` engine tests: a channel plays only its layers, and a note-off ends only its
+    own; routing off is sample-identical whatever the channel.
+  - Plugin `[card-arp]` tests:
+    - recall, and an old session opening as the one arpeggiator;
+    - LINK plus every card is sample-identical to the arpeggiator;
+    - each card heard: one card arpeggiates while the other holds the key;
+    - unlinked lanes on their own rate;
+    - nothing hangs after rapid changes with the pedal, or after a panic;
+    - MPE and MONO fall back;
+    - no allocation in any arrangement.
+  - The shell suites and ANDOR ANALOG's `[cardarp]` tests run against the shared lanes.
 
 ## BLOCKERS
 

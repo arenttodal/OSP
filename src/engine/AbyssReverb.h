@@ -59,16 +59,21 @@ public:
         double gravity = 0.0;     ///< -1..1
         bool freeze = false;
         double resonance = 0.0;   ///< 0..1
+        AbyssVariant variant = AbyssVariant::deep;
 
         static Settings from (const Shaping& s) noexcept;
-        /** SIZE differs: the network's lengths change (crossfade to a new instance). */
+        /** SIZE or the variant differ: the network's lengths or voicing change (crossfade to a new instance). */
         bool structurallyDifferent (const Settings& other) const noexcept;
     };
 
     /** SIZE's length factor (0.35 at 0 %, 1 at 50 %, 2.5 at 100 %). */
     static double sizeFactor (double size) noexcept;
-    /** The mid reverberation time GRAVITY makes of DECAY (seconds). */
-    static double effectiveDecay (double decaySeconds, double gravity) noexcept;
+    /** The mid reverberation time GRAVITY (and the variant) make of DECAY (seconds). */
+    static double effectiveDecay (double decaySeconds, double gravity, AbyssVariant variant = AbyssVariant::deep) noexcept;
+    /** How much of the input reaches the network through GRAVITY's rising window (0..1). */
+    static double windowShare (double gravity, AbyssVariant variant) noexcept;
+    /** GRAVITY's window (seconds, before SIZE). */
+    static double windowLength (AbyssVariant variant) noexcept;
 
     void prepare (double sampleRate);
     void reset() noexcept;
@@ -162,6 +167,7 @@ private:
 
     float width = 1.0f, widthTarget = 1.0f;
     float outputGain = 1.46f;   ///< (as loud as HALL at the same send: measured)
+    float variantGain = 1.0f;   ///< each variant's own level against DEEP's (measured)
     float dcL = 0.0f, dcR = 0.0f, dcCoef = 0.001f;
     std::uint32_t guards = 0;
 };

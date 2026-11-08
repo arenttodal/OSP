@@ -119,9 +119,25 @@ public:
     /** The pattern as the list shows it ("Up", "Pinky Up/Down", ...). */
     static juce::String patternLabel (int pattern);
 
-    /** One host gesture each, as a click does. */
+    /** One host gesture each, as a click does (the card being edited: A unless unlinked). */
     void choosePattern (int pattern);
     void chooseOctaves (int octaves);
+
+    /** The per-card arpeggiator (InstrumentHost::cardArpeggiator): on the title row, PLAYS
+        A B C (the cards the arpeggio plays; the others hold the keys) and LINK; unlinked,
+        EDIT A | B | C chooses whose PATTERN, RATE and OCTAVES the panel shows and sets
+        (GATE, SWING and VELOCITY are shared). Absent in a product with one arpeggiator. */
+    bool showsCards() const noexcept { return cards; }
+    void toggleCard (int shown);
+    void toggleLink();
+    void setEditCard (int shown);
+    int editedCard() const noexcept { return editCard; }
+    juce::Rectangle<float> cardChipArea (int shown) const { return cardChips[static_cast<std::size_t> (juce::jlimit (0, 2, shown))]; }
+    juce::Rectangle<float> linkArea() const { return linkChip; }
+    juce::Rectangle<float> editTabArea (int shown) const { return editTabs[static_cast<std::size_t> (juce::jlimit (0, 2, shown))]; }
+    /** Everything the per-card controls draw (PLAYS .. EDIT C), in panel coordinates: where a
+        product with one arpeggiator differs from ANDOR OSP (the visual regression's mask). */
+    static juce::Rectangle<float> cardRowArea() noexcept { return { 190.0f, 12.0f, 360.0f, 30.0f }; }
 
     /** Places of the parts (tests, snapshots). */
     juce::Rectangle<float> displayArea() const { return steps; }
@@ -145,6 +161,8 @@ private:
     void paintField (juce::Graphics&);
     void paintList (juce::Graphics&);
     void paintOctaves (juce::Graphics&);
+    void paintCards (juce::Graphics&);
+    void showEditedCard();
     void updatePreview();
     void updateField();
     void scrollTo (int first);
@@ -157,6 +175,16 @@ private:
     bool enabled = false;
     int pattern = 0, octaveCount = 1;
     InstrumentHost::ArpView shown;
+    // The per-card arpeggiator.
+    bool cards = false, linked = true;
+    int editCard = 0;
+    std::array<bool, 3> cardOn { true, true, true };
+    std::array<int, 3> cardPattern {}, cardOctaves { 1, 1, 1 };
+    std::vector<std::unique_ptr<juce::ParameterAttachment>> cardAttachments;   ///< LINK, the three cards
+    std::array<std::unique_ptr<juce::ParameterAttachment>, 2> lanePattern, laneOctaves;   ///< B's and C's
+    std::array<std::unique_ptr<MiniKnob>, 2> laneRate;
+    std::array<juce::Rectangle<float>, 3> cardChips {}, editTabs {};
+    juce::Rectangle<float> playsCaption, linkChip, editCaption;
     Arpeggiator::Display preview;   ///< the pattern on a C major chord, while nothing is held
     Arpeggiator::Display fieldSteps; ///< the picture: the style on C E G B, one octave
     int fieldShown = -1;

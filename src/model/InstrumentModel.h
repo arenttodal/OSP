@@ -2,6 +2,7 @@
 
 #include "model/AnalysisData.h"
 #include "model/ContinuationModel.h"
+#include "model/ImprintProfile.h"
 #include "model/PlaybackPreparation.h"
 #include "model/PlaybackSource.h"
 #include "model/ReimaginedAnalysis.h"
@@ -115,6 +116,11 @@ struct InstrumentModel
     /** REIMAGINED's TAPE FRAME and MOSAIC data (stage 2 on; null before: those modes then
         play the plain recording). Shared, immutable. */
     std::shared_ptr<const ReimaginedAnalysis> reimagined;
+
+    /** SYNTH Imprint's descriptor of this model's own audio (stage 2 on; an Atlas member has its
+        own). Null before, or invalid for silence: the oscillator then stays Analog. Shared,
+        immutable. */
+    std::shared_ptr<const imprint::Profile> imprint;
 
     PitchLayer original;               ///< offset 0
     std::vector<PitchLayer> anchors;   ///< natural-character register anchors (offset != 0), may be empty

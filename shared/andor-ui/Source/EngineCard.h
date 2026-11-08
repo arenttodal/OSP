@@ -26,6 +26,11 @@ namespace icons
 {
     enum class Kind { link, reverse, loop, follow, dots, chevronDown, chevronLeft, chevronRight, heart, heartFilled, plus, cassette };
     void draw (juce::Graphics&, Kind, juce::Rectangle<float> area, juce::Colour colour, float stroke = 1.5f);
+    /** The playback modes as symbols (the mode selector and its menu), drawn in a square `area`
+        (16 px at the reference): One Shot, a start marker and a forward arrow; Granular, a small
+        uneven cloud of grains. Equal visual weight at the same size and stroke. */
+    void drawOneShotIcon (juce::Graphics&, juce::Rectangle<float> area, juce::Colour colour, float stroke = 1.4f);
+    void drawGranularIcon (juce::Graphics&, juce::Rectangle<float> area, juce::Colour colour);
 }
 
 /**
@@ -254,6 +259,32 @@ private:
     bool review = false;
 };
 
+/** REC (live capture, a host with liveCapture()): opens the layer's CAPTURE page; its dot
+    turns red and pulses while a take for this layer is being recorded. Narrow cards: the dot. */
+class RecButton final : public juce::Button, public skin::KeyFace
+{
+public:
+    RecButton() : juce::Button ("REC")
+    {
+        setMouseCursor (juce::MouseCursor::PointingHandCursor);
+        setTooltip ("Record or grab from the audio input into this layer (it opens over the waveform)");
+        setTitle ("REC");
+    }
+    void setRecording (bool on, float pulse);
+    bool isRecording() const noexcept { return recording; }
+    void paintButton (juce::Graphics&, bool highlighted, bool down) override;
+    void buttonStateChanged() override { skin::repaintKey (*this); }
+    skin::KeyRole keyRole() const override { return skin::KeyRole::eq; }
+    skin::KeyState keyState() const override
+    {
+        return getToggleState() || isDown() ? skin::KeyState::pressed : isOver() ? skin::KeyState::hover : skin::KeyState::normal;
+    }
+
+private:
+    bool recording = false;
+    float glow = 0.0f;
+};
+
 /** "KEY DNA" at the end of the Granular hover strip (Phase 5): opens the layer's KEY DNA
     editor; a small light while the layer's KEY DNA is on. */
 class KeyDnaKey final : public juce::Component, public juce::SettableTooltipClient
@@ -275,30 +306,39 @@ private:
 
 /**
     SYNTHESIZE (Phase S1) in a source's well: a slim graphite fader in the ruler's top-right
-    corner, in the KEY DNA key's hairline vocabulary. "SYNTH" and the amount; while it is above
-    0 a small light in the layer's colour and a thin bar show how much. Drag (up or right) or
-    turn the wheel to set it, Alt for fine; double-click returns it to 0. It takes no room from
-    the card: the well's ruler leaves its corner free (SourceDisplay::setRulerReserve).
+    corner, in the KEY DNA key's hairline vocabulary, in two parts. The label ("SYNTH" and a
+    small chevron) opens the SYNTH page with one click. The amount, on the right, is the fader:
+    drag (up or right) or turn the wheel to set it, Alt for fine; double-click returns it to 0.
+    While it is above 0 a small light in the layer's colour and a thin bar show how much; with
+    the spectral imprint on (Imprint, IMPRINT above 0) the light is the imprint's small curve.
+    It takes no room from the card: the well's ruler leaves its corner free
+    (SourceDisplay::setRulerReserve).
 */
-class SynthChip final : public juce::Slider, private juce::Timer
+class SynthChip final : public juce::Slider
 {
 public:
     SynthChip (InstrumentHost& processor, int layer);
-    ~SynthChip() override { stopTimer(); }
     void paint (juce::Graphics&) override;
-    /** Right-click (or Ctrl-click): the development audition menu (blend law, envelope). */
+    /** Right-click (or Ctrl-click): the development audition menu (blend law, envelope). A
+        press on the label is the page's, not the fader's. */
     void mouseDown (const juce::MouseEvent&) override;
-    /** A click without a drag opens the SYNTH page (after the double-click time, so a
-        double-click still returns the amount to 0). */
+    void mouseDrag (const juce::MouseEvent&) override;
+    /** A click on the label opens the SYNTH page. */
     void mouseUp (const juce::MouseEvent&) override;
+    /** On the amount: back to 0. */
     void mouseDoubleClick (const juce::MouseEvent&) override;
+    void mouseMove (const juce::MouseEvent&) override;
     std::function<void()> onOpenPage;
+    /** The label (opens the page) and the amount (the fader), in the chip's coordinates. */
+    juce::Rectangle<float> labelArea() const;
+    juce::Rectangle<float> amountArea() const;
     /** The audition menu's items, as shown (tests). */
     juce::PopupMenu auditionMenu();
-    /** Repaints when the audition changed (from another source's menu): the UI timer. */
+    /** Repaints when the audition or the imprint changed (another source's menu, the page,
+        automation): the UI timer. */
     void refreshAudition()
     {
-        const int now = host.synthAuditionBlend() | (host.synthAuditionEnvelope() << 8);
+        const int now = host.synthAuditionBlend() | (host.synthAuditionEnvelope() << 8) | (imprinting() ? 1 << 16 : 0);
         if (now != shownAudition)
         {
             shownAudition = now;
@@ -306,24 +346,33 @@ public:
         }
     }
     void mouseEnter (const juce::MouseEvent& e) override { juce::Slider::mouseEnter (e); repaint(); }
-    void mouseExit (const juce::MouseEvent& e) override { juce::Slider::mouseExit (e); repaint(); }
+    void mouseExit (const juce::MouseEvent& e) override
+    {
+        juce::Slider::mouseExit (e);
+        overLabel = false;
+        repaint();
+    }
     /** The amount, 0..100 %. */
     float amount() const noexcept { return static_cast<float> (getValue()); }
+    /** The spectral imprint colours this source's oscillator (Imprint, IMPRINT above 0). */
+    bool imprinting() const;
 
 private:
-    void timerCallback() override
-    {
-        stopTimer();
-        if (onOpenPage != nullptr)
-            onOpenPage();
-    }
     InstrumentHost& host;
+    int layer = 0;
     int shownAudition = 0;
+    bool pressedLabel = false, overLabel = false;
     juce::Colour accent;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
 };
 
-/** ONE SHOT / GRANULAR as a compact selector with a menu. */
+/**
+    ONE SHOT / GRANULAR as a compact selector with a menu. ANDOR OSP's: the active mode's symbol
+    and a quiet chevron in a small key (iconOnly()); its menu names both modes with their symbols,
+    a line on what each does and a check by the active one. A product that names the first mode
+    otherwise, or fits the key to the names (a generator's "Regular" / "Granular"), keeps the
+    named key and plain menu, exactly as before.
+*/
 class ModeSelector final : public juce::Component, public juce::SettableTooltipClient, public skin::KeyFace
 {
 public:
@@ -338,11 +387,30 @@ public:
     bool fitsName() const noexcept { return fitted; }
     /** The width that fits the longer name (px, at the reference 41 px height). */
     float fittedWidth() const;
+    /** The symbol selector (ANDOR OSP's modes under their own names, not fitted to them). */
+    bool iconOnly() const noexcept { return ! fitted && firstModeName == "One Shot"; }
+    /** The symbol selector's width (px at the reference): a small key, not a button. */
+    static constexpr float iconWidth = 42.0f, iconWidthNarrow = 40.0f;
+    /** The tooltip of the named key (a product's); the symbol selector says its mode. */
+    void setNamedTooltip (const juce::String& text);
+    /** The modes' menu as the selector shows it (tests read its items). */
+    juce::PopupMenu createMenu();
+    /** Opens the menu below the selector (a click does this); `parent`: a component to hold it
+        (the screenshots), else its own window as before. */
+    void showMenu (juce::Component* parent = nullptr);
+    /** The menu as it looks open, as a plain component (its background, border and the same
+        items), for screenshots where no menu window can open (headless). */
+    std::unique_ptr<juce::Component> createMenuPicture();
+    /** A mode's name and what it does, as the menu says them. */
+    juce::String modeName (int mode) const { return mode == 1 ? juce::String ("Granular") : firstModeName; }
+    static juce::String modeDescription (int mode) { return mode == 1 ? "Resynthesize as a grain cloud" : "Play the original recording"; }
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override { skin::repaintKey (*this); }
     void mouseUp (const juce::MouseEvent&) override;
     void mouseEnter (const juce::MouseEvent&) override { skin::repaintKey (*this); }
     void mouseExit (const juce::MouseEvent&) override { skin::repaintKey (*this); }
+    bool keyPressed (const juce::KeyPress&) override;
+    std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override;
     skin::KeyRole keyRole() const override { return skin::KeyRole::mode; }
     skin::KeyState keyState() const override { return isMouseButtonDown() ? skin::KeyState::pressed : isMouseOver() ? skin::KeyState::hover : skin::KeyState::normal; }
     /** The key's body: as tall as NOTES and EQ beside it (33 px), on their centre line; the
@@ -352,8 +420,11 @@ public:
 
 private:
     void choose (int mode);
+    /** The tooltip and accessible description after a change of mode or presentation. */
+    void describe();
     int current = 0;
     juce::String firstModeName { "One Shot" };
+    juce::String namedTooltip;
     bool fitted = false;
     juce::ParameterAttachment attachment;
 };
@@ -396,6 +467,8 @@ public:
     void setReimaginedOpen (bool open);
     /** SYNTHESIZE's control (null when the host has none). */
     SynthChip* synthesizeControl() noexcept { return synthChip.get(); }
+    /** The playback-mode selector (null without the parameter). */
+    ModeSelector* modeSelector() noexcept { return mode.get(); }
 
     /** A generator's card: START's knob becomes one of the product's own controls (its
         parameter and name); a click on the name calls `onCaptionClick` (null: none). The card
@@ -457,6 +530,12 @@ public:
     bool isSynthOpen() const noexcept { return synthEditor != nullptr; }
     SynthEditor* synthEditorComponent() noexcept { return synthEditor.get(); }
 
+    /** The layer's CAPTURE page (its REC key; a host with liveCapture()), in the display's place. */
+    void setCaptureOpen (bool open);
+    bool isCaptureOpen() const noexcept { return captureEditor != nullptr; }
+    CaptureEditor* captureEditorComponent() noexcept { return captureEditor.get(); }
+    RecButton* recToggle() noexcept { return recButton.get(); }
+
     /** The layer's NOTE MAP (a Note Atlas layer only), in the display's place; the EQ and the
         NOTE MAP are never open together. */
     std::function<void (int, bool)> onNotesToggle;
@@ -508,6 +587,8 @@ private:
     } menuButton;
     std::array<std::unique_ptr<LayerKnob>, 5> knobs;   ///< START TUNE PAN LEVEL REIMAGINED
     std::unique_ptr<SynthEditor> synthEditor;          ///< the SYNTH page, while open
+    std::unique_ptr<RecButton> recButton;              ///< REC (a host with liveCapture(); null otherwise)
+    std::unique_ptr<CaptureEditor> captureEditor;      ///< the CAPTURE page, while open
     std::unique_ptr<SynthChip> synthChip;              ///< SYNTHESIZE in the well's corner (a host with hasSynthesize(); null otherwise)
     std::array<std::unique_ptr<ModifierButton>, 4> modifiers;
     LayerStateButton muteButton, soloButton;

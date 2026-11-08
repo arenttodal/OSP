@@ -271,6 +271,7 @@ namespace
             if (watch.differs ({ static_cast<double> (type), value (state, "space.decay"), value (state, "space"), value (state, "space.preDelay"),
                                  value (state, "space.size"), value (state, "space.damping"), value (state, "space.width"), static_cast<double> (getWidth()),
                                  abyss ? value (state, "space.abyss.gravity") : 0.0, abyss ? value (state, "space.abyss.freeze") : 0.0,
+                                 abyss ? value (state, "space.abyss.variant") : 0.0,
                                  engine == 3 ? value (state, "space.bloom.sync") : 0.0, engine == 3 ? value (state, "space.bloom.division") : 0.0,
                                  engine == 3 ? value (state, "space.bloom.time") : 0.0, engine == 3 ? value (state, "space.bloom.diffusion") : 0.0,
                                  engine == 3 && tempo != nullptr ? tempo() : 0.0 }))
@@ -355,6 +356,7 @@ namespace
             const int engine = juce::roundToInt (value (state, "space.engine"));
             const bool abyss = engine == 1, vintage = engine == 2, bloom = engine == 3;
             const double gravity = abyss ? 0.01 * value (state, "space.abyss.gravity") : 0.0;
+            const auto abyssVariant = static_cast<AbyssVariant> (std::clamp (juce::roundToInt (value (state, "space.abyss.variant")), 0, 3));
             const bool frozen = abyss && value (state, "space.abyss.freeze") >= 0.5;
             // VINTAGE draws as the room its variant is voiced after; BLOOM as a hall's cloud
             // with its repeats over it.
@@ -381,17 +383,18 @@ namespace
                 portrait.erCount = 0;
                 portrait.erLevel = 0.0f;
                 portrait.diffusionMs = 12.0;
-                portrait.damping = static_cast<float> (std::clamp (0.1 + 0.6 * settings.damping + 0.25 * std::max (0.0, gravity), 0.0, 1.0));
+                portrait.damping = static_cast<float> (std::clamp (0.1 + 0.6 * settings.damping + 0.25 * std::max (0.0, gravity)
+                                                                       + (abyss && abyssVariant == AbyssVariant::dark ? 0.35 : 0.0), 0.0, 1.0));
                 portrait.width = static_cast<float> (std::clamp (settings.width, 0.0, 1.0));
             }
             // A fixed time axis for the type (its longest DECAY fills it); DECAY sets how far
             // the tail reaches along it, so turning the knob lengthens or shortens the tail.
             // ABYSS: an axis that fits the tail GRAVITY makes (10 s at least), the whole of it
             // while FROZEN.
-            const double abyssTail = AbyssReverb::effectiveDecay (decay, gravity) * 1.25;
+            const double abyssTail = AbyssReverb::effectiveDecay (decay, gravity, abyssVariant) * 1.25;
             const double span = abyss ? std::max (10.0, 5.0 * std::ceil (abyssTail * 1.1 / 5.0)) : hi * 1.25;
             const double tailEnd = abyss ? (frozen ? span : abyssTail) : decay * 1.25;   // drawn to -75 dB
-            const double swell = abyss ? 0.9 * std::sqrt (AbyssReverb::sizeFactor (settings.size)) : 0.0;   // GRAVITY's window
+            const double swell = abyss ? AbyssReverb::windowLength (abyssVariant) * std::sqrt (AbyssReverb::sizeFactor (settings.size)) : 0.0;   // GRAVITY's window
             const float W = bounds.getWidth(), H = bounds.getHeight();
             // Sizes follow the display (the popover's is small): strokes, dots and counts.
             const float k = juce::jlimit (0.3f, 1.0f, H / 261.0f), dot = std::sqrt (k);
@@ -402,7 +405,7 @@ namespace
 
             // Grid: five rows, a line every second (or the step that fits) and four between.
             double step = 2.0;
-            for (double c : { 0.1, 0.25, 0.5, 1.0, 2.0 })
+            for (double c : { 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 30.0, 60.0 })   // (ENDLESS reaches minutes)
                 if (span / c <= 6.0)
                 {
                     step = c;
@@ -436,7 +439,7 @@ namespace
                     // Natural (or held), and below GRAVITY 0 the swell through its window.
                     const double fill = 1.0 - std::exp (-(t - onset) / build);
                     const double natural = frozen ? 0.85 * fill : std::pow (std::max (0.0, 1.0 - t / tailEnd), 1.4) * fill;
-                    const double u = t - onset, inverse = std::max (0.0, -gravity);
+                    const double u = t - onset, inverse = AbyssReverb::windowShare (gravity, abyssVariant);
                     const double rise = u < swell ? (u / swell) * (u / swell) : (frozen ? 0.85 : std::pow (std::max (0.0, 1.0 - (u - swell) / tailEnd), 1.4));
                     return ((1.0 - inverse) * natural + inverse * rise) * amount;
                 }
@@ -601,7 +604,8 @@ namespace
     // ECHO: the sound and its repeats along time - each repeat a stroke as loud as the
     // feedback leaves it, darker for every pass through the machine; PING-PONG alternates
     // left (up) and right (down), WIDE splits two heads. TAPE's repeats smear (wow and
-    // flutter), BBD's speckle (the clock's grain).
+    // flutter), BBD's speckle (the clock's grain). ASCEND's repeats are paler and carry their
+    // pitch (+12, +24 ..), speckled by its CLOCK.
     class EchoVisual final : public Visual
     {
     public:
@@ -613,7 +617,8 @@ namespace
         {
             return watch.differs ({ value (state, "echo.type"), value (state, "echo.sync"), value (state, "echo.division"), value (state, "echo.time"),
                                     value (state, "echo.feedback"), value (state, "echo.tone"), value (state, "echo.age"), value (state, "echo.stereo"),
-                                    value (state, "echo"), static_cast<double> (processor.hostTempo()) });
+                                    value (state, "echo"), static_cast<double> (processor.hostTempo()),
+                                    value (state, "echo.ascend.interval"), value (state, "echo.ascend.motion") });
         }
 
         void paintVisual (juce::Graphics& g, juce::Rectangle<float> bounds) override
@@ -627,8 +632,10 @@ namespace
             e.tone = 0.01 * value (state, "echo.tone");
             e.age = 0.01 * value (state, "echo.age");
             e.stereo = static_cast<EchoStereo> (juce::roundToInt (value (state, "echo.stereo")));
+            e.interval = static_cast<AscendInterval> (std::clamp (juce::roundToInt (value (state, "echo.ascend.interval")), 0, 3));
+            e.motion = static_cast<AscendMotion> (std::clamp (juce::roundToInt (value (state, "echo.ascend.motion")), 0, 2));
             const double seconds = EchoDelay::timeSeconds (e, processor.hostTempo());
-            const bool tape = e.type == EchoType::tape;
+            const bool tape = e.type == EchoType::tape, ascend = e.type == EchoType::ascend;
 
             const auto plot = juce::Rectangle<float>::leftTopRightBottom (bounds.getX() + 14.0f, bounds.getY() + 14.0f, bounds.getRight() - 10.0f, bounds.getBottom() - 5.0f);
             const float mid = plot.getCentreY(), half = 0.5f * plot.getHeight();
@@ -670,9 +677,10 @@ namespace
 
             // The repeats: level after n passes (the loop saturates near 100 %), darker each time.
             Prng grain (Prng::deriveSeed (0x6563686full, static_cast<std::uint64_t> (e.type), 0));
-            const double fb = std::min (0.98, e.feedback * (tape ? 1.04 : 1.03));
+            const double fb = std::min (0.98, e.feedback * (ascend ? 0.85 : tape ? 1.04 : 1.03));
             double level = 1.0;
-            const auto warm = tape ? juce::Colour (0xffffb15c) : juce::Colour (0xffd9c38a);
+            const auto warm = ascend ? juce::Colour (0xffd6e4f0) : tape ? juce::Colour (0xffffb15c) : juce::Colour (0xffd9c38a);
+            const int interval = ascend ? juce::roundToInt (12.0 * std::log2 (EchoDelay::intervalRatio (e.interval))) : 0;
             for (int n = 1; n <= 40; ++n)
             {
                 level = n == 1 ? 0.92 : level * fb;
@@ -718,6 +726,19 @@ namespace
                         at (t, 1.0f, false);
                         at (seconds * 1.06 * n + 0.004, -1.0f, false);
                         break;
+                }
+                if (ascend && n <= 5)
+                {
+                    // The repeat's pitch against the played note.
+                    const int passes = e.motion == AscendMotion::steady ? 1 : e.motion == AscendMotion::late ? n - 1 : n;
+                    const int semis = passes * interval;
+                    if (const float x = xAt (t); semis != 0 && x + 14.0f < plot.getRight())
+                    {
+                        g.setFont (fonts::make (8.0f, fonts::Weight::medium, 0.04f));
+                        g.setColour (c.withAlpha (0.8f));
+                        g.drawText ((semis > 0 ? "+" : "") + juce::String (semis), juce::Rectangle<float> (x + 3.0f, plot.getY() - 2.0f, 24.0f, 10.0f),
+                                    juce::Justification::centredLeft, false);
+                    }
                 }
             }
             if (e.stereo != EchoStereo::mono)
@@ -1774,7 +1795,8 @@ namespace
     /** SPACE: the room, its EQ on the display (drag the corners), then its shape. The header's
         list picks a room or one of SPACE's other engines; the popover keeps its size.
           ROOMS    the four rooms as tabs; PRE-DELAY, SIZE, DECAY, DAMP; MOD, WIDTH, LOW / HIGH CUT.
-          ABYSS    FLOW / FREEZE; PRE-DELAY, SIZE, DECAY, DAMP; GRAVITY, RESONANCE, MOD, WIDTH.
+          ABYSS    DEEP / DARK / INVERSE / ENDLESS; PRE-DELAY, SIZE, DECAY, DAMP; GRAVITY, RESONANCE,
+                   MOD, WIDTH, FREEZE.
           VINTAGE  HALL / PLATE / CHAMBER / ROOM; PRE-DELAY, SIZE, DECAY, DAMP; DIFFUSION, MOD,
                    WIDTH, ERA.
           BLOOM    CLEAN / VINTAGE / TAPE / WASH; TIME (a division synced, ms free), DIFFUSION,
@@ -1847,7 +1869,8 @@ namespace
             {
                 case 1:   // ABYSS
                 {
-                    tabs ("space.abyss.freeze", { "FLOW", "FREEZE" }, "FREEZE holds the space as it is (still moving); FLOW lets it decay again");
+                    tabs ("space.abyss.variant", { "DEEP", "DARK", "INVERSE", "ENDLESS" },
+                          "DEEP: the vast space. DARK: a thick, dark body. INVERSE: it swells in. ENDLESS: it hardly ends");
                     knob (false, "space.preDelay", "PRE-DELAY", ms);
                     knob (false, "space.size", "SIZE", percent);
                     knob (false, "space.decay", "DECAY", seconds);
@@ -1859,6 +1882,8 @@ namespace
                     knob (true, "space.abyss.resonance", "RESONANCE", percent);
                     knob (true, "space.modulation", "MOD", percent);
                     knob (true, "space.width", "WIDTH", percent);
+                    knob (true, "space.abyss.freeze", "FREEZE", [] (double v) { return juce::String (v >= 0.5 ? "ON" : "OFF"); })
+                        .slider.setTooltip ("FREEZE holds the space as it is (still moving); off, it decays again");
                     break;
                 }
                 case 2:   // VINTAGE
@@ -2173,7 +2198,12 @@ namespace
     public:
         explicit EchoPanel (InstrumentHost& p) : MacroPanel (p, "ECHO", 286, 86, design::colour::Macro::echo)
         {
-            mode ("echo.type", "Tape echo or bucket-brigade (BBD) delay");
+            auto& m = mode ("echo.type", "Tape echo, bucket-brigade (BBD) delay, or ASCEND: repeats an interval up (a pitch shifter in the loop)");
+            m.onChange = [this] (int) {
+                build();
+                if (onSizeChanged != nullptr)
+                    onSizeChanged();
+            };
             setVisual (std::make_unique<EchoVisual> (p));
             sync = std::make_unique<SegmentedControl> (*p.apvts().getParameter ("echo.sync"), juce::StringArray { "FREE", "SYNC" });
             sync->setAccent (accent);
@@ -2189,7 +2219,18 @@ namespace
 
         juce::Point<int> cardSize() const override
         {
-            return { panelWidth, headerTop + visualHeight + gap + tabsHeight + 6 + cellHeight + bottom };
+            return { panelWidth, headerTop + visualHeight + gap + tabsHeight + 6 + cellHeight + bottom + (secondaryRow.empty() ? 0 : 2 + secondaryCellHeight) };
+        }
+
+        /** Tests: the knobs' captions as built (TIME .. AGE, CLOCK for ASCEND, its row after). */
+        juce::StringArray captionsForTest() const
+        {
+            juce::StringArray c;
+            for (auto* k : primaryRow)
+                c.add (k->captionText());
+            for (auto* k : secondaryRow)
+                c.add (k->captionText());
+            return c;
         }
 
     private:
@@ -2197,14 +2238,31 @@ namespace
         {
             knobs.clear();
             primaryRow.clear();
+            secondaryRow.clear();
             const auto percent = [] (double v) { return format::percent (v) + " %"; };
+            const bool ascend = juce::roundToInt (value (processor.apvts(), "echo.type")) == static_cast<int> (EchoType::ascend);
             if (sync->selected() == 1)
                 knob (false, "echo.division", "TIME", [] (double v) { return juce::String (shaping::echoDivisionName (juce::roundToInt (v))); });
             else
                 knob (false, "echo.time", "TIME", [] (double v) { return format::milliseconds (v); });
             knob (false, "echo.feedback", "FEEDBACK", percent);
             knob (false, "echo.tone", "TONE", percent);
-            knob (false, "echo.age", "AGE", percent);
+            if (ascend)
+            {
+                // AGE is ASCEND's CLOCK: the rate its loop is held at (13 kHz .. 7 kHz).
+                knob (false, "echo.age", "CLOCK", [] (double v) { return juce::String (EchoDelay::clockHz (0.01 * v) / 1000.0, 1) + " kHz"; })
+                    .slider.setTooltip ("CLOCK: the rate the repeats are held at - lower is grainier");
+                knob (true, "echo.ascend.interval", "INTERVAL", [] (double v) {
+                    static const char* names[] = { "+12", "+7", "+5", "-12" };
+                    return juce::String (names[std::clamp (juce::roundToInt (v), 0, 3)]);
+                }).slider.setTooltip ("How far each pass shifts the repeats: an octave up, a fifth, a fourth, or an octave down");
+                knob (true, "echo.ascend.motion", "MOTION", [] (double v) {
+                    static const char* names[] = { "RISE", "STEADY", "LATE" };
+                    return juce::String (names[std::clamp (juce::roundToInt (v), 0, 2)]);
+                }).slider.setTooltip ("RISE: each repeat higher than the last. STEADY: every repeat at the interval. LATE: the first repeat as played, then rising");
+            }
+            else
+                knob (false, "echo.age", "AGE", percent);
             resized();
         }
 
@@ -2218,6 +2276,11 @@ namespace
             stereo->setBounds (row.withTrimmedLeft (4));
             area.removeFromTop (6);
             layoutRow (primaryRow, area.removeFromTop (cellHeight));
+            if (! secondaryRow.empty())
+            {
+                area.removeFromTop (2);
+                layoutRow (secondaryRow, area.removeFromTop (secondaryCellHeight));
+            }
         }
 
         std::unique_ptr<SegmentedControl> sync, stereo;
@@ -3014,9 +3077,10 @@ const juce::StringArray& popupParameterIds (MacroPopup macro)
                                            "space.modulation", "space.width", "space.lowCut", "space.highCut",
                                            "space.engine", "space.abyss.gravity", "space.abyss.freeze", "space.abyss.resonance",
                                            "space.vintage.variant", "space.vintage.era", "space.vintage.diffusion", "space.bloom.variant",
-                                           "space.bloom.sync", "space.bloom.division", "space.bloom.time", "space.bloom.diffusion" };
+                                           "space.bloom.sync", "space.bloom.division", "space.bloom.time", "space.bloom.diffusion",
+                                           "space.abyss.variant" };
     static const juce::StringArray echo { "echo.type", "echo.sync", "echo.division", "echo.time", "echo.feedback",
-                                          "echo.tone", "echo.age", "echo.stereo" };
+                                          "echo.tone", "echo.age", "echo.stereo", "echo.ascend.interval", "echo.ascend.motion" };
     switch (macro)
     {
         case MacroPopup::life: return life;

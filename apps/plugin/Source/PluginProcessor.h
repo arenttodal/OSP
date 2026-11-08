@@ -5,7 +5,9 @@
 #include "InstrumentHost.h"
 #include "LibraryService.h"
 #include "LoadedInstrument.h"
+#include "CardArpLanes.h"
 
+#include "audio/capture/CaptureBuffer.h"
 #include "engine/Arpeggiator.h"
 #include "engine/InstrumentEngine.h"
 #include "model/ModelExchange.h"
@@ -48,6 +50,8 @@ public:
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override {}
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
+    /** VST3: the audio input is a sidechain (an instrument's aux bus), not a main input. */
+    juce::VST3ClientExtensions* getVST3ClientExtensions() override;
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
     using AudioProcessor::processBlock;
 
@@ -177,6 +181,27 @@ public:
 
     /** What the arpeggiator's 16-step display shows (lock-free snapshot, any thread). */
     ArpView arpView() const noexcept override;
+    /**
+        Live capture: the audio input (a DAW's sidechain routed to OSP; the standalone app's
+        microphone or interface input) is kept in a ring of the last minute or so
+        (capture::CaptureBuffer, written by the audio thread only). RECORD / STOP and GRAB copy
+        a take out on the message thread; the loader thread writes it into the sample store and
+        maps its notes (analyseRecording) as the layer's instrument. Takes last 5..60 s.
+    */
+    bool liveCapture() const noexcept override { return true; }
+    CaptureView captureView() override;
+    int recordingLayer() const noexcept override { return takeStart >= 0 ? takeLayer : -1; }
+    bool startTake (int layer) override;
+    bool stopTake() override;
+    void cancelTake() override;
+    bool grabLast (double seconds, int layer) override;
+    /** Ends a running take that reached 60 s (the editor's timer; tests). */
+    void pollTake();
+
+    /** The per-card arpeggiator (version hint 27): ARP plays some layers, the others hold the keys. */
+    bool cardArpeggiator() const noexcept override { return true; }
+    juce::String cardArpNamespace() const override { return {}; }
+    void setArpViewCard (int shown) noexcept override { arpViewCard.store (std::clamp (shown, 0, 2), std::memory_order_relaxed); }
 
     // A/B source layers (numLayers, layerName, layerParameterId: InstrumentHost). Everything
     // below that takes a `layer` acts on the layer being edited when it is -1 (the A/B tabs choose it).
@@ -632,6 +657,13 @@ private:
     /** The arpeggiator stage: from the block's incoming MIDI to the notes the engine plays
         (the incoming buffer itself while it is off, otherwise its own preallocated one). */
     const juce::MidiBuffer& runArpeggiator (const juce::MidiBuffer& midi, int numSamples, const HostTiming& timing) noexcept;
+    /** The per-card arpeggiator (plugin::CardArpLanes, shared with every three-engine product):
+        the one arpeggiator (runArpeggiator) while LINK holds every card, the arpeggiator is
+        off, or MPE / MONO is on; else up to three lanes, each playing some layers. */
+    const juce::MidiBuffer& runCardArpeggiators (const juce::MidiBuffer& midi, int numSamples, const HostTiming& timing) noexcept;
+    /** ARP's settings as the arpeggiator reads them (ARP destinations included; off while the
+        lanes leave no card to arpeggiate). */
+    Arpeggiator::Settings arpSettings() noexcept;
     void publishArpDisplay() noexcept;
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createLayout();
@@ -640,6 +672,22 @@ private:
     EngineSettings engineSettings;
     Arpeggiator arpeggiator;
     juce::MidiBuffer arpMidi;   ///< preallocated in prepareToPlay
+    /** The per-card lanes and their view of this processor, on the heap (the processor may
+        live on a stack: a host's, a test's). Made with the processor, prepared in prepareToPlay. */
+    struct LaneHost;
+    // Live capture: the ring (prepared when an input is connected), whether the audio thread
+    // writes it, the running take (message thread).
+    capture::CaptureBuffer captureRing;
+    std::atomic<bool> captureLive { false };
+    std::int64_t takeStart = -1;
+    int takeLayer = 0;
+    int takeCount = 0;
+    float meterLevel = 0.0f;
+    bool keepTake (std::int64_t from, std::int64_t to, int layer, bool snapshot);
+    void startAnalysis (AnalyseRequest request, int layer);
+    std::unique_ptr<plugin::CardArpLanes> lanes;
+    std::unique_ptr<LaneHost> laneHost;
+    std::atomic<int> arpViewCard { 0 };   ///< the card whose lane the ARP display shows
     std::array<std::atomic<int>, Arpeggiator::displaySteps> arpDisplayLow {}, arpDisplayHigh {};
     std::atomic<int> arpDisplayCurrent { -1 };
     std::atomic<bool> arpDisplayActive { false };
@@ -721,6 +769,10 @@ private:
     std::atomic<float>* pitchCharacterParam = nullptr;
     std::atomic<float>* sustainParam = nullptr;
     std::atomic<float>* seedParam = nullptr;
+    // The per-card arpeggiator (version hint 27).
+    std::atomic<float>* arpLinkParam = nullptr;
+    std::array<std::atomic<float>*, 3> arpCardParams {};
+    std::array<std::atomic<float>*, 2> arpLanePatternParams {}, arpLaneRateParams {}, arpLaneOctavesParams {};
     std::atomic<float>* mpeParam = nullptr;
     // A/B layers: blend, then per layer source mode and POS, SIZE, DENS, TUNE, SPREAD.
     std::atomic<float>* blendParam = nullptr;
@@ -749,6 +801,7 @@ private:
         std::atomic<float>* keyDnaAmount = nullptr;
         std::atomic<float>* synthesize = nullptr;   ///< SYNTHESIZE 0..100 % (hint 22)
         std::array<std::atomic<float>*, 6> synth {};   ///< the SYNTH page (hint 23), synthParameterNames() order
+        std::array<std::atomic<float>*, 3> imprint {};   ///< its spectral imprint (hint 28), imprintParameterNames() order
     };
     std::atomic<float>* grainBudgetParam = nullptr;
     std::atomic<int> synthAudition { 0 };   ///< SYNTHESIZE's development audition (blend | envelope << 8); never saved
@@ -769,7 +822,7 @@ private:
     float lastDecay = -1.0f, lastSustainLevel = -1.0f;
     std::array<LayerParams, numLayers> layerParams;
     // Shaping system v1.0 (the macro popups), in the order of shapingIds().
-    static constexpr int numShapingParams = 68;
+    static constexpr int numShapingParams = 71;
     std::array<std::atomic<float>*, numShapingParams> shapingParams {};
     std::array<float, numShapingParams> lastShaping {};
     Shaping shapingFromParameters() const noexcept;
