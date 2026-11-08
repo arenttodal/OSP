@@ -21,7 +21,8 @@ void GraphFrame::paint (juce::Graphics& g)
 
 //==============================================================================
 /** Page words: low-profile, the shown one in the full text colour and underlined in the
-    module's colour (the modulation panel's tabs' manner); sub-pages a step smaller. */
+    module's colour (the modulation panel's tabs' manner). Sub-pages are a rank below, and look
+    it: a step smaller, lighter in both states, a hairline underline in the same place. */
 class ParameterRack::PageTabs final : public juce::Component
 {
 public:
@@ -32,8 +33,8 @@ public:
         setMouseClickGrabsKeyboardFocus (false);
         setMouseCursor (juce::MouseCursor::PointingHandCursor);
     }
-    juce::Font font() const { return fonts::make (secondary ? 10.0f : 11.0f, fonts::Weight::medium, 0.06f); }
-    float gap() const { return secondary ? 16.0f : 22.0f; }
+    juce::Font font() const { return secondary ? fonts::make (10.0f, fonts::Weight::regular, 0.06f) : fonts::make (11.0f, fonts::Weight::medium, 0.06f); }
+    float gap() const { return secondary ? 14.0f : 22.0f; }
     int preferredWidth() const
     {
         float w = 0.0f;
@@ -57,12 +58,14 @@ public:
         {
             const auto t = tab (i);
             const bool on = i == shown;
-            g.setColour (on ? juce::Colour (0xff3e3d3a) : juce::Colour (0xff8a847b).withAlpha (i == hover ? 1.0f : 0.9f));
+            const auto shownColour = secondary ? juce::Colour (0xff5d5a54) : juce::Colour (0xff3e3d3a);
+            const auto restColour = secondary ? juce::Colour (0xffa59e94) : juce::Colour (0xff8a847b);
+            g.setColour (on ? shownColour : (i == hover ? restColour.darker (0.25f) : restColour));
             g.drawText (names[i], t, juce::Justification::centredLeft, false);
             if (on)
             {
-                g.setColour (accent);
-                g.fillRoundedRectangle (t.withTrimmedRight (2.0f).withY (t.getCentreY() + 0.5f * font().getHeight() + 2.0f).withHeight (secondary ? 1.5f : 2.0f), 1.0f);
+                g.setColour (secondary ? accent.withAlpha (0.8f) : accent);
+                g.fillRoundedRectangle (t.withTrimmedRight (2.0f).withY (t.getCentreY() + 0.5f * font().getHeight() + 2.0f).withHeight (secondary ? 1.0f : 2.0f), secondary ? 0.5f : 1.0f);
             }
         }
         if (hasKeyboardFocus (false))
@@ -183,7 +186,7 @@ void ParameterRack::setHeaderSwitch (const juce::String& id, const juce::String&
 }
 
 rackui::SegmentedSwitch& ParameterRack::selectorSegment (const juce::String& id, const juce::String& caption, std::vector<rackui::Position> positions, int width,
-                                                          const juce::String& tip)
+                                                          const juce::String& tip, const juce::String& over)
 {
     auto seg = std::make_unique<rackui::SegmentedSwitch> (*host.apvts().getParameter (id), std::move (positions), &host.undo(), accentColour);
     seg->setTooltip (tip);
@@ -191,7 +194,7 @@ rackui::SegmentedSwitch& ParameterRack::selectorSegment (const juce::String& id,
     seg->setSize (width, 27);
     auto& ref = *seg;
     addAndMakeVisible (ref);
-    selectors.emplace_back (caption, std::move (seg));
+    selectors.push_back ({ caption, std::move (seg), over });
     return ref;
 }
 
@@ -204,7 +207,7 @@ ValueSelector& ParameterRack::selectorList (const juce::String& id, const juce::
     list->setSize (width, 27);
     auto& ref = *list;
     addAndMakeVisible (ref);
-    selectors.emplace_back (caption, std::move (list));
+    selectors.push_back ({ caption, std::move (list), {} });
     return ref;
 }
 
@@ -216,16 +219,35 @@ void ParameterRack::setGraph (std::unique_ptr<GraphFrame> g)
     addAndMakeVisible (*graphView);
 }
 
-void ParameterRack::group (const juce::String& caption)
+void ParameterRack::group (const juce::String& caption, bool quiet)
 {
-    groups.push_back ({ caption, {} });
+    groups.push_back ({ caption, {}, quiet });
+}
+
+namespace
+{
+    juce::String captionOf (const juce::Component& c)
+    {
+        if (auto* k = dynamic_cast<const MiniKnob*> (&c))
+            return k->captionText();
+        if (auto* cell = dynamic_cast<const rackui::Cell*> (&c))
+            return cell->captionText();
+        return {};
+    }
 }
 
 void ParameterRack::add (std::unique_ptr<juce::Component> cell, rackui::Slot slot)
 {
     addAndMakeVisible (*cell);
     if (groups.empty())
-        groups.push_back ({ {}, {} });
+        groups.push_back ({ {}, {}, false });
+    if (groups.back().quiet)
+    {
+        if (auto* k = dynamic_cast<MiniKnob*> (cell.get()))
+            k->setQuiet (true);
+        else if (auto* c = dynamic_cast<rackui::Cell*> (cell.get()))
+            c->setQuiet (true);
+    }
     cells.push_back ({ std::move (cell), static_cast<int> (groups.size()) - 1, slot });
 }
 
@@ -290,7 +312,7 @@ void ParameterRack::rebuild()
         removeChildComponent (c.cell.get());
     cells.clear();
     for (auto& s : selectors)
-        removeChildComponent (s.second.get());
+        removeChildComponent (s.control.get());
     selectors.clear();
     groups.clear();
     builtKey = currentKey();
@@ -349,26 +371,40 @@ void ParameterRack::layout()
 {
     const int width = getWidth(), x0 = rackui::Cell::contentInset, top = titleOffset();
     const int divider = dividerX();
-    // The selector row: the pages, the shown page's sub-pages, its selectors (caption before).
+    // The selector row: the pages, the shown page's sub-pages, its selectors (caption before),
+    // a quiet rule between each rank.
     int x = x0;
     const int fieldY = top + (selectRow - 27) / 2;
+    navRules.clear();
+    auto rule = [this, &x] {
+        x += 11;
+        navRules.push_back (x);
+        x += 12;
+    };
     if (pageTabs != nullptr)
     {
         pageTabs->setBounds (x, fieldY, pageTabs->preferredWidth(), 27);
-        x = pageTabs->getRight() + 22;
+        x = pageTabs->getRight();
     }
     if (const auto it = subTabs.find (currentPage); it != subTabs.end())
     {
+        rule();
         it->second.first->setBounds (x, fieldY, it->second.first->preferredWidth(), 27);
-        x = it->second.first->getRight() + 22;
+        x = it->second.first->getRight();
     }
     const auto captionFont = fonts::make (9.0f, fonts::Weight::medium, 0.06f);
-    for (auto& [caption, control] : selectors)
+    auto captionWidth = [&captionFont] (const juce::String& c) { return c.isEmpty() ? 0 : juce::roundToInt (juce::GlyphArrangement::getStringWidth (captionFont, c)) + 7; };
+    bool first = true;
+    for (auto& s : selectors)
     {
-        if (caption.isNotEmpty())
-            x += juce::roundToInt (juce::GlyphArrangement::getStringWidth (captionFont, caption)) + 7;
-        control->setTopLeftPosition (x, fieldY);
-        x = control->getRight() + 16;
+        if (s.over.isNotEmpty())
+            continue;
+        if (first && x > x0)
+            rule();
+        first = false;
+        x += captionWidth (s.caption);
+        s.control->setTopLeftPosition (x, fieldY);
+        x = s.control->getRight() + 16;
     }
     jassert (x - 16 <= divider - rackui::Cell::columnGap);
     // One row of cells on the standard lines; one slot family for the page.
@@ -389,6 +425,19 @@ void ParameterRack::layout()
         lastGroup = p.group;
     }
     jassert (cx - rackui::slotGap (dense) <= divider - rackui::Cell::columnGap);
+    // A selector of one control: over that cell, centred (in the row, away from the navigation).
+    for (auto& s : selectors)
+    {
+        if (s.over.isEmpty())
+            continue;
+        for (auto& p : cells)
+            if (captionOf (*p.cell) == s.over)
+            {
+                const int w = captionWidth (s.caption) + s.control->getWidth();
+                const int left = juce::jmin (p.cell->getBounds().getCentreX() - w / 2, divider - rackui::Cell::columnGap - w);
+                s.control->setTopLeftPosition (left + captionWidth (s.caption), fieldY);
+            }
+    }
     if (graphView != nullptr)
     {
         const int pictureX = divider + 1 + rackui::Cell::columnGap;
@@ -404,9 +453,13 @@ void ParameterRack::paint (juce::Graphics& g)
     // The selectors' captions (inline, before each).
     g.setFont (fonts::make (9.0f, fonts::Weight::medium, 0.06f));
     g.setColour (rackui::palette::caption);
-    for (auto& [caption, control] : selectors)
-        if (caption.isNotEmpty())
-            g.drawText (caption, juce::Rectangle<int> (control->getX() - 200, control->getY(), 193, control->getHeight()), juce::Justification::centredRight, false);
+    for (auto& s : selectors)
+        if (s.caption.isNotEmpty())
+            g.drawText (s.caption, juce::Rectangle<int> (s.control->getX() - 200, s.control->getY(), 193, s.control->getHeight()), juce::Justification::centredRight, false);
+    // The rules between the ranks of the selector row (pages | sub-pages | settings).
+    g.setColour (juce::Colour (0xffd8d0c4));
+    for (const int rx : navRules)
+        g.fillRect (juce::Rectangle<float> (static_cast<float> (rx), static_cast<float> (titleOffset() + selectRow / 2 - 7), 1.0f, 14.0f));
     // The groups: a quiet divider between them; a caption (if any) small in the band over the cells.
     for (std::size_t i = 0; i < groups.size(); ++i)
     {
@@ -415,9 +468,18 @@ void ParameterRack::paint (juce::Graphics& g)
             continue;
         if (gr.caption.isNotEmpty())
         {
-            g.setColour (juce::Colour (0xff8c857b));
-            g.setFont (fonts::make (8.5f, fonts::Weight::medium, 0.08f));
-            g.drawText (gr.caption, juce::Rectangle<int> (gr.span.getX() + 4, gr.span.getY() - 11, gr.span.getWidth(), 10), juce::Justification::centredLeft, false);
+            // The caption, then a hairline to the group's end: what belongs together.
+            const auto font = fonts::make (8.5f, fonts::Weight::medium, 0.08f);
+            const juce::Rectangle<float> band (static_cast<float> (gr.span.getX() + 4), static_cast<float> (gr.span.getY() - 11), static_cast<float> (gr.span.getWidth() - 8), 10.0f);
+            g.setColour (gr.quiet ? juce::Colour (0xffa29b91) : juce::Colour (0xff8c857b));
+            g.setFont (font);
+            g.drawText (gr.caption, band, juce::Justification::centredLeft, true);
+            const float after = band.getX() + juce::GlyphArrangement::getStringWidth (font, gr.caption) + 7.0f;
+            if (after < band.getRight() - 8.0f)
+            {
+                g.setColour (juce::Colour (0xffe0d8cc));
+                g.fillRect (juce::Rectangle<float> (after, band.getCentreY(), band.getRight() - after, 1.0f));
+            }
         }
         if (i > 0 && ! groups[i - 1].span.isEmpty())
         {
@@ -471,9 +533,9 @@ juce::Component* ParameterRack::cellNamed (const juce::String& caption) const
         if (auto* c = dynamic_cast<rackui::Cell*> (p.cell.get()); c != nullptr && c->captionText() == caption)
             return &c->key();
     }
-    for (const auto& [name, control] : selectors)
-        if (name == caption)
-            return control.get();
+    for (const auto& s : selectors)
+        if (s.caption == caption)
+            return s.control.get();
     return nullptr;
 }
 

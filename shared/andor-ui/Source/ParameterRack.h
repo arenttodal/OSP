@@ -37,8 +37,11 @@ protected:
     in the module's column. What does not fit one row is split into pages (and a page into
     sub-pages): an interface choice, never a parameter, and never a taller rack.
 
-    The selector row holds the page words, the shown page's sub-page words, then the page's own
-    compact selectors (captioned segmented switches or lists). A subclass builds a page's cells
+    The selector row holds four ranks, each told apart at a glance: the pages (primary: 11 px
+    words, the shown one dark and underlined in the module's colour), the shown page's sub-pages
+    (secondary: 10 px, lighter, a hairline underline), then, after a quiet rule, the page's
+    contextual settings (captioned segmented switches or lists: fields, not words); the cells
+    below are the sound's controls. A subclass builds a page's cells
     and selectors in build(); the module rebuilds only when the page, the sub-page or buildKey()
     changes (a mode), so a value, a preset or automation never moves anything.
 */
@@ -93,13 +96,17 @@ protected:
     /** What the cells depend on besides the pages (a mode): a change rebuilds them. */
     virtual int buildKey() const { return 0; }
 
-    /** In build(): the page's compact selectors in the selector row (a small caption before). */
+    /** In build(): the page's compact selectors in the selector row (a small caption before),
+        after the navigation and a quiet rule. `over`: instead, placed over the cell captioned so
+        (a setting of that one control, in the row above it, away from the navigation). */
     rackui::SegmentedSwitch& selectorSegment (const juce::String& id, const juce::String& caption, std::vector<rackui::Position> positions, int width,
-                                              const juce::String& tip);
+                                              const juce::String& tip, const juce::String& over = {});
     ValueSelector& selectorList (const juce::String& id, const juce::String& caption, int width, const juce::String& tip);
     /** In build(): the next cells form a group (a quiet divider before it; its caption, if any,
-        small in the band over its cells). */
-    void group (const juce::String& caption);
+        small in the band over its cells, a hairline after it to the group's end). `quiet`: a
+        secondary group (configuration, not the sound's shaping): its captions and values a
+        step lighter. */
+    void group (const juce::String& caption, bool quiet = false);
     MiniKnob& knob (const juce::String& id, const juce::String& caption, MiniKnob::Formatter f);
     MiniKnob& steppedKnob (const juce::String& id, const juce::String& caption, MiniKnob::Formatter f);
     ValueSelector& listCell (const juce::String& id, const juce::String& caption, const juce::String& tip);
@@ -120,6 +127,13 @@ private:
     {
         juce::String caption;
         juce::Rectangle<int> span;
+        bool quiet = false;
+    };
+    struct Selector
+    {
+        juce::String caption;
+        std::unique_ptr<juce::Component> control;
+        juce::String over;   // (placed over this cell; empty: in the row)
     };
     class PageTabs;
     void add (std::unique_ptr<juce::Component> cell, rackui::Slot slot);
@@ -135,7 +149,8 @@ private:
     int* pageMemory = nullptr;
     std::unique_ptr<PageTabs> pageTabs;
     std::map<int, std::pair<std::unique_ptr<PageTabs>, int*>> subTabs;
-    std::vector<std::pair<juce::String, std::unique_ptr<juce::Component>>> selectors;
+    std::vector<Selector> selectors;
+    std::vector<int> navRules;   // (x of the rules between the pages, the sub-pages and the selectors)
     std::unique_ptr<rackui::VerticalSwitch> power;
     juce::String powerWord;
     juce::Rectangle<int> powerWordArea, statusArea;

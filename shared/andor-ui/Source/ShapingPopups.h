@@ -116,6 +116,9 @@ public:
     /** A stepped rate (opt-in): a detent mark per step around the knob, the chosen one long,
         in `accent` (the slider's range must be stepped: a choice parameter). */
     void setDetents (bool show, juce::Colour accent);
+    /** A rack's secondary setting (opt-in): its caption and value a step quieter. */
+    void setQuiet (bool q) { quiet = q; repaint(); }
+    bool isQuiet() const noexcept { return quiet; }
     /** The popups' cell (SPACE's DECAY): caption, a ticked knob, the value in a box. */
     void setBoxed (bool shouldBeBoxed);
     /** The value arc (and a boxed knob's pointer) in this colour: its macro's identity. */
@@ -146,7 +149,7 @@ private:
     juce::String caption;
     Formatter formatter;
     bool horizontal;
-    bool onDark = false, compact = false, boxed = false, strongCaption = false, rackMetrics = false, detents = false;
+    bool onDark = false, compact = false, boxed = false, strongCaption = false, rackMetrics = false, detents = false, quiet = false;
     juce::Colour detentAccent;
     juce::Rectangle<float> valueBox() const;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;

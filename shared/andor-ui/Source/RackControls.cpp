@@ -529,7 +529,7 @@ void Cell::resized()
 void Cell::paint (juce::Graphics& g)
 {
     // (a rack knob's caption: the same type, colour and place)
-    g.setColour (palette::caption);
+    g.setColour (quiet ? palette::quietCaption : palette::caption);
     g.setFont (fonts::make (11.0f, fonts::Weight::medium, 0.055f));
     g.drawText (caption, juce::Rectangle<float> (-6.0f, 0.0f, static_cast<float> (getWidth()) + 12.0f, static_cast<float> (captionHeight)), juce::Justification::centred, false);
 }

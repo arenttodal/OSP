@@ -39,6 +39,8 @@ namespace palette
     const juce::Colour laneActiveFill { 0xffd9e5ea }, laneActiveEdge { 0xff8cabbc }, laneActiveText { 0xff3b5868 };
     const juce::Colour ledLive { 0xff6798b2 }, ledOff { 0xffb8b2a9 };
     const juce::Colour focus { 0xff90adbf };
+    /** A secondary setting's caption and value: a step quieter than the sound-shaping ones. */
+    const juce::Colour quietCaption { 0xff9a948b }, quietValue { 0xff75716b };
     /** A module's active segment: MOVEMENT's approved tint, the same lightness and
         saturation in another module's hue (ECHO teal, SPACE violet, FILTER green, MORPH copper). */
     juce::Colour activeFill (juce::Colour accent);
@@ -185,6 +187,9 @@ public:
     juce::Component& key() noexcept { return *control; }
     Kind cellKind() const noexcept { return kind; }
     Slot slot() const noexcept;
+    /** A secondary setting: its caption a step quieter. */
+    void setQuiet (bool q) { quiet = q; repaint(); }
+    bool isQuiet() const noexcept { return quiet; }
     void resized() override;
     void paint (juce::Graphics&) override;
 
@@ -192,6 +197,7 @@ private:
     juce::String caption;
     std::unique_ptr<juce::Component> control;
     Kind kind;
+    bool quiet = false;
 };
 
 /** The detent marks of a stepped rate knob (the approved rate study): a short tick per
