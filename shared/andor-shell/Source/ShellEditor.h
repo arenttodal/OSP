@@ -100,6 +100,9 @@ public:
     osp::plugin::rack::Host& effectsRack() noexcept { return rack; }
     /** The macro (0..5) whose name opens a rack module (a double-click), or -1. */
     int rackMacro (osp::plugin::rack::Kind kind) const noexcept;
+    /** The rack module a macro (its parameter ID) opens: the product's own, or a shared one the
+        product lists (rackModules), if any. */
+    std::optional<osp::plugin::rack::Kind> rackKindForMacro (const juce::String& parameterId) const;
     bool hasRack (osp::plugin::rack::Kind kind) const noexcept { return rackMacro (kind) >= 0; }
     /** A macro's name (tests: its clicks, its context menu). */
     osp::plugin::MacroLabel* macroLabel (int macro) noexcept { return macro >= 0 && macro < osp::plugin::frame::macroCount ? macros[static_cast<std::size_t> (macro)].label.get() : nullptr; }
@@ -210,7 +213,8 @@ private:
     osp::plugin::ArpInlinePanel arpPanel { shell };
     bool arpShown = false;
     // The effects rack (opt-in: the product's rackModules), opened from the macros' names.
-    osp::plugin::rack::Host rack { [this] (osp::plugin::rack::Kind kind) { return osp::plugin::createRackModule (kind, shell); } };
+    osp::plugin::rack::Host rack { [this] (osp::plugin::rack::Kind kind) { return createRackModule (kind); } };
+    std::unique_ptr<osp::plugin::rack::Module> createRackModule (osp::plugin::rack::Kind kind);
     std::array<std::optional<osp::plugin::rack::Kind>, osp::plugin::frame::macroCount> rackOfMacro {};
     float rackShift() const noexcept { return rack.height() > 0.0f ? rack.height() + osp::plugin::design::layout::rackGap : 0.0f; }
     int rackMask() const;

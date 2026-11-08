@@ -120,6 +120,16 @@ struct ProductInfo
         name expands between the macros and the arpeggiator (MOVEMENT, ECHO, SPACE). Empty:
         no keys and no rack, as in ANDOR OSP. */
     std::vector<osp::plugin::rack::Kind> rackModules;
+    /** Racks the product builds itself (opt-in; ANDOR ANALOG's FILTER and MORPH): the macro
+        (its parameter ID) whose name opens it as the shared ones do, its kind, and how it is
+        built (osp::plugin::rack::ParameterRack). Empty: none, as in ANDOR OSP. */
+    struct ProductRack
+    {
+        juce::String macroParameterId;
+        osp::plugin::rack::Kind kind;
+        std::function<std::unique_ptr<osp::plugin::rack::Module> (osp::plugin::InstrumentHost&)> create;
+    };
+    std::vector<ProductRack> productRacks;
     /** MOVEMENT's lanes (InstrumentHost::movementLane), lane 0 first: a product with a second
         lane lists both (the shell keeps the second lane's SHAPER CUSTOM pattern with the
         session and gives it to the engine: Engine::setLaneShaperPattern). Empty: one lane,

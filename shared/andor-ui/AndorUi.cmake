@@ -23,6 +23,7 @@ set(ANDOR_UI_SOURCES
     ${ANDOR_UI_DIR}/Source/SpacePresets.cpp
     ${ANDOR_UI_DIR}/Source/EffectRack.cpp
     ${ANDOR_UI_DIR}/Source/RackControls.cpp
+    ${ANDOR_UI_DIR}/Source/ParameterRack.cpp
     ${ANDOR_UI_DIR}/Source/ModulationPanel.cpp
     ${ANDOR_UI_DIR}/Source/EqEditor.cpp
     ${ANDOR_UI_DIR}/Source/NoteMapEditor.cpp

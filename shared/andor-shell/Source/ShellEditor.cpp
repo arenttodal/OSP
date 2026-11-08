@@ -300,9 +300,7 @@ ShellEditor::ShellEditor (ShellProcessor& p)
     // The effects rack (opt-in): no mark on the row - the macro's name opens its module on a
     // double-click, a right-click offers the popover or the module, Enter opens it.
     for (std::size_t i = 0; i < macros.size(); ++i)
-        if (const auto kind = rack::kindForMacro (shell.macroSpecs()[i].parameterId);
-            kind.has_value() && shell.showsRack() && macros[i].label != nullptr
-            && std::find (shell.product().rackModules.begin(), shell.product().rackModules.end(), *kind) != shell.product().rackModules.end())
+        if (const auto kind = rackKindForMacro (shell.macroSpecs()[i].parameterId); kind.has_value() && shell.showsRack() && macros[i].label != nullptr)
         {
             rackOfMacro[i] = *kind;
             const auto k = *kind;
@@ -1082,6 +1080,25 @@ void ShellEditor::setArpExpanded (bool open)
     frame::applyWindowShape (*this, instrumentHeight(), true);
     placeKeyDna();
     content.repaint();
+}
+
+std::optional<rack::Kind> ShellEditor::rackKindForMacro (const juce::String& parameterId) const
+{
+    for (const auto& r : shell.product().productRacks)
+        if (r.macroParameterId == parameterId)
+            return r.kind;
+    if (const auto kind = rack::kindForMacro (parameterId);
+        kind.has_value() && std::find (shell.product().rackModules.begin(), shell.product().rackModules.end(), *kind) != shell.product().rackModules.end())
+        return kind;
+    return std::nullopt;
+}
+
+std::unique_ptr<rack::Module> ShellEditor::createRackModule (rack::Kind kind)
+{
+    for (const auto& r : shell.product().productRacks)
+        if (r.kind == kind && r.create != nullptr)
+            return r.create (shell);
+    return osp::plugin::createRackModule (kind, shell);
 }
 
 int ShellEditor::rackMacro (rack::Kind kind) const noexcept

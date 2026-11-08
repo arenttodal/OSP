@@ -1250,7 +1250,7 @@ std::unique_ptr<juce::XmlElement> ShellProcessor::stateXml() const
     auto* view = xml->createNewChildElement (viewType.toString());
     view->setAttribute ("arpOpen", arpOpen.load() ? 1 : 0);
     view->setAttribute ("shaperLarge", shaperLarge.load() ? 1 : 0);
-    if (! product().rackModules.empty())
+    if (! product().rackModules.empty() || ! product().productRacks.empty())
     {
         view->setAttribute ("rack", rackOpen.load());
         // Which preset each rack module (each MOVEMENT lane) had chosen: its "NAME *" comes back.

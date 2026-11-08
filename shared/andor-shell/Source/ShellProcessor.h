@@ -109,7 +109,7 @@ public:
     ArpView arpView() const noexcept override;
     bool cardArpeggiator() const noexcept override { return cardArp && ! referenceParity; }
     /** The effects rack's modules (the product's; none in the visual regression's parity render). */
-    bool showsRack() const noexcept { return ! referenceParity && ! product().rackModules.empty(); }
+    bool showsRack() const noexcept { return ! referenceParity && (! product().rackModules.empty() || ! product().productRacks.empty()); }
     /** The cards' modifiers in their wells (the product's choice; not in the parity render). */
     bool modifiersInWell() const noexcept { return ! referenceParity && product().cardModifiersInWell; }
     bool stableModulationTabs() const noexcept { return ! referenceParity && product().stableModulationTabs; }
