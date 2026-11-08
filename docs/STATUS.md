@@ -673,6 +673,18 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       note colours (regions, NOTE MAP, keyboard strip) are earth and plant pigments, warm for
       the even pitch classes and green / teal for the odd ones, no violets.
 
+## ANDOR OSP: the playback-mode selector as symbols (8 Nov 2026)
+
+- [x] The source header's ONE SHOT / GRANULAR key is a small symbol key (42 px, 40 in three
+      cards): a start marker and forward arrow, or a small uneven cloud of grains, and a quiet
+      chevron (`icons::drawOneShotIcon` / `drawGranularIcon`, vector paths). Its menu names both
+      modes with their symbols, a line on what each does and a check by the active one. Tooltip
+      and accessible description "Playback mode: One Shot / Granular"; a pop-up button for
+      assistive technology; Return, Space or Down opens it. Presentation only: `layerX.sourceMode`,
+      its values, automation, sessions and the sound unchanged. A product that names its first
+      mode (ANDOR ANALOG's generator) keeps its named key. Tests `[mode-selector]`; screenshots
+      `OSP_MODE_SHOTS=<dir> osp_plugin_tests "[mode-shots]"`.
+
 ## Milestone: ANDOR Instrument Shell extensions for ANDOR ANALOG (a synthesizer)
 
 - [x] Opt-in extension points (HANDOFF.md, "What a product may add"): product parameters after

@@ -26,6 +26,11 @@ namespace icons
 {
     enum class Kind { link, reverse, loop, follow, dots, chevronDown, chevronLeft, chevronRight, heart, heartFilled, plus, cassette };
     void draw (juce::Graphics&, Kind, juce::Rectangle<float> area, juce::Colour colour, float stroke = 1.5f);
+    /** The playback modes as symbols (the mode selector and its menu), drawn in a square `area`
+        (16 px at the reference): One Shot, a start marker and a forward arrow; Granular, a small
+        uneven cloud of grains. Equal visual weight at the same size and stroke. */
+    void drawOneShotIcon (juce::Graphics&, juce::Rectangle<float> area, juce::Colour colour, float stroke = 1.4f);
+    void drawGranularIcon (juce::Graphics&, juce::Rectangle<float> area, juce::Colour colour);
 }
 
 /**
@@ -335,7 +340,13 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
 };
 
-/** ONE SHOT / GRANULAR as a compact selector with a menu. */
+/**
+    ONE SHOT / GRANULAR as a compact selector with a menu. ANDOR OSP's: the active mode's symbol
+    and a quiet chevron in a small key (iconOnly()); its menu names both modes with their symbols,
+    a line on what each does and a check by the active one. A product that names the first mode
+    otherwise, or fits the key to the names (a generator's "Regular" / "Granular"), keeps the
+    named key and plain menu, exactly as before.
+*/
 class ModeSelector final : public juce::Component, public juce::SettableTooltipClient, public skin::KeyFace
 {
 public:
@@ -350,11 +361,30 @@ public:
     bool fitsName() const noexcept { return fitted; }
     /** The width that fits the longer name (px, at the reference 41 px height). */
     float fittedWidth() const;
+    /** The symbol selector (ANDOR OSP's modes under their own names, not fitted to them). */
+    bool iconOnly() const noexcept { return ! fitted && firstModeName == "One Shot"; }
+    /** The symbol selector's width (px at the reference): a small key, not a button. */
+    static constexpr float iconWidth = 42.0f, iconWidthNarrow = 40.0f;
+    /** The tooltip of the named key (a product's); the symbol selector says its mode. */
+    void setNamedTooltip (const juce::String& text);
+    /** The modes' menu as the selector shows it (tests read its items). */
+    juce::PopupMenu createMenu();
+    /** Opens the menu below the selector (a click does this); `parent`: a component to hold it
+        (the screenshots), else its own window as before. */
+    void showMenu (juce::Component* parent = nullptr);
+    /** The menu as it looks open, as a plain component (its background, border and the same
+        items), for screenshots where no menu window can open (headless). */
+    std::unique_ptr<juce::Component> createMenuPicture();
+    /** A mode's name and what it does, as the menu says them. */
+    juce::String modeName (int mode) const { return mode == 1 ? juce::String ("Granular") : firstModeName; }
+    static juce::String modeDescription (int mode) { return mode == 1 ? "Resynthesize as a grain cloud" : "Play the original recording"; }
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override { skin::repaintKey (*this); }
     void mouseUp (const juce::MouseEvent&) override;
     void mouseEnter (const juce::MouseEvent&) override { skin::repaintKey (*this); }
     void mouseExit (const juce::MouseEvent&) override { skin::repaintKey (*this); }
+    bool keyPressed (const juce::KeyPress&) override;
+    std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override;
     skin::KeyRole keyRole() const override { return skin::KeyRole::mode; }
     skin::KeyState keyState() const override { return isMouseButtonDown() ? skin::KeyState::pressed : isMouseOver() ? skin::KeyState::hover : skin::KeyState::normal; }
     /** The key's body: as tall as NOTES and EQ beside it (33 px), on their centre line; the
@@ -364,8 +394,11 @@ public:
 
 private:
     void choose (int mode);
+    /** The tooltip and accessible description after a change of mode or presentation. */
+    void describe();
     int current = 0;
     juce::String firstModeName { "One Shot" };
+    juce::String namedTooltip;
     bool fitted = false;
     juce::ParameterAttachment attachment;
 };
@@ -408,6 +441,8 @@ public:
     void setReimaginedOpen (bool open);
     /** SYNTHESIZE's control (null when the host has none). */
     SynthChip* synthesizeControl() noexcept { return synthChip.get(); }
+    /** The playback-mode selector (null without the parameter). */
+    ModeSelector* modeSelector() noexcept { return mode.get(); }
 
     /** A generator's card: START's knob becomes one of the product's own controls (its
         parameter and name); a click on the name calls `onCaptionClick` (null: none). The card
