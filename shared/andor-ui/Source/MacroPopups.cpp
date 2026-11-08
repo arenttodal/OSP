@@ -3501,10 +3501,34 @@ namespace
         void resized() override { layout(); }
         void paint (juce::Graphics& g) override
         {
+            if (plate != nullptr)
+            {
+                // The hardware faceplate (opt-in): its subtitle kept clear of the rail's parts.
+                float limit = static_cast<float> (getWidth());
+                for (auto* c : getChildren())
+                    if (c->isVisible() && c->getBottom() <= titleOffset() + 1 && c->getX() > 200)
+                        limit = std::min (limit, static_cast<float> (c->getX()));
+                rack::hardware::paint (g, getLocalBounds(), titleOffset(), *plate, heading, processingActive(),
+                                       visual != nullptr && ! expanded() ? visual->getBounds() : juce::Rectangle<int>(), limit - 14.0f);
+            }
             if (! expanded())
-                rackcolumns::paintDivider (g, rackcolumns::dividerFor (leftShare(), getWidth()), static_cast<float> (titleOffset() + 3),
-                                           static_cast<float> (getHeight() - 2));
+                rackcolumns::paintDivider (g, dividerX(), static_cast<float> (titleOffset() + 3), static_cast<float> (getHeight() - 2));
         }
+        /** The product's hardware faceplate (opt-in; ANDOR ANALOG's): the preset browser and its
+            actions go into the rail, the controls start after the stripes. Null: as approved. */
+        void wearFaceplate (const rack::Faceplate* f)
+        {
+            plate = f;
+            if (plate != nullptr)
+            {
+                presetActions.onRail = true;
+                lightWatch.rack = this;
+                lightWatch.startTimerHz (8);
+            }
+            resized();
+        }
+        bool hasFaceplate() const noexcept { return plate != nullptr; }
+        void layoutTitleRow (juce::Rectangle<int> row) override { layoutRail (row); }
 
         /** Tests: the cells' captions in order; the presets bar; the slots' places. */
         juce::String captions() const
@@ -3564,6 +3588,30 @@ namespace
     protected:
         /** The controls' share of the content width (the approved column: per module). */
         virtual float leftShare() const = 0;
+        /** What the faceplate's LED shows: the module plays (its macro above 0). */
+        virtual bool processingActive() const { return true; }
+        /** Faceplate: the preset browser and its actions at the rail's right; returns what is
+            left of the row (a module's own title-row parts go there). */
+        juce::Rectangle<int> layoutRail (juce::Rectangle<int> row)
+        {
+            if (plate == nullptr)
+                return row;
+            row = row.withSizeKeepingCentre (row.getWidth(), 26);
+            presetActions.setBounds (row.removeFromRight (actionsWidth).withSizeKeepingCentre (actionsWidth, 22));
+            row.removeFromRight (8);
+            presetBar->setBounds (row.removeFromRight (railPresetWidth).withSizeKeepingCentre (railPresetWidth, 24));
+            row.removeFromRight (16);
+            return row;
+        }
+        static constexpr int railPresetWidth = 236;
+        int contentX() const noexcept { return plate != nullptr ? rack::hardware::contentLeft : rackcolumns::inset; }
+        int contentRightMargin() const noexcept { return plate != nullptr ? rack::hardware::contentRightMargin : rackcolumns::inset; }
+        int dividerX() const
+        {
+            const int x0 = contentX(), x1 = getWidth() - contentRightMargin();
+            return x0 + juce::roundToInt (leftShare() * static_cast<float> (x1 - x0)) + rackcolumns::columnGap;
+        }
+        const rack::Faceplate* plate = nullptr;
 
         ValueSelector& setModeSelector (const juce::String& id, const juce::String& tip)
         {
@@ -3653,24 +3701,31 @@ namespace
         {
             if (visual == nullptr)
                 return;
-            const int width = getWidth(), x0 = rackcolumns::inset, top = titleOffset();
-            // MODE, PRESET (fixed widths: never stretched to the divider) and the preset actions.
+            const int width = getWidth(), x0 = contentX(), top = titleOffset();
+            // MODE, PRESET (fixed widths: never stretched to the divider) and the preset actions
+            // (with a faceplate, PRESET and its actions are in the rail: layoutRail).
             const int fieldY = top + (selectRow - fieldHeight) / 2;
             if (modeSelector != nullptr)
                 modeSelector->setBounds (x0, fieldY, modeWidth, fieldHeight);
-            presetBar->setBounds (x0 + modeWidth + 12, fieldY, presetWidth, fieldHeight);
-            presetActions.setBounds (presetBar->getRight() + 12, fieldY, actionsWidth, fieldHeight);
+            if (plate == nullptr)
+            {
+                presetBar->setBounds (x0 + modeWidth + 12, fieldY, presetWidth, fieldHeight);
+                presetActions.setBounds (presetBar->getRight() + 12, fieldY, actionsWidth, fieldHeight);
+            }
             const int controlsY = top + selectRow + rowGap;
             if (expanded())
             {
                 for (auto& cell : cells)
                     cell->setVisible (false);
-                layoutExpanded (juce::Rectangle<int> (x0, controlsY, width - 2 * x0, getHeight() - rackcolumns::bottom - controlsY));
+                layoutExpanded (juce::Rectangle<int> (x0, controlsY, width - x0 - contentRightMargin(), getHeight() - rackcolumns::bottom - controlsY));
                 repaint();
                 return;
             }
-            const int pictureX = rackcolumns::pictureLeftFor (leftShare(), width);
-            placeVisual ({ pictureX, top + 4, width - rackcolumns::inset - pictureX, graphHeight });
+            const int pictureX = dividerX() + 1 + rackcolumns::graphPad;
+            if (plate != nullptr)
+                placeVisual ({ pictureX, top + 7, width - contentRightMargin() - pictureX, graphHeight - 4 });   // (room for its bezel)
+            else
+                placeVisual ({ pictureX, top + 4, width - rackcolumns::inset - pictureX, graphHeight });
             // The controls: left-aligned from one origin on the approved slot widths; a mode with
             // fewer leaves the rest of the column empty. (The family is the mode's: its count.)
             const bool isDense = dense();
@@ -3685,7 +3740,7 @@ namespace
                 cell->setBounds (x, controlsY, w, cellHeight);
                 x += w + rackcolumns::slotGap (isDense);
             }
-            jassert (x - rackcolumns::slotGap (isDense) <= rackcolumns::dividerFor (leftShare(), width) - rackcolumns::columnGap);
+            jassert (x - rackcolumns::slotGap (isDense) <= dividerX() - rackcolumns::columnGap);
             repaint();
         }
 
@@ -3701,9 +3756,17 @@ namespace
                 setWantsKeyboardFocus (true);
                 setMouseClickGrabsKeyboardFocus (false);
             }
+            bool onRail = false;   // (the faceplate's rail: light dots on the enamel)
             void paintButton (juce::Graphics& g, bool highlighted, bool down) override
             {
                 const auto r = getLocalBounds().toFloat();
+                if (onRail)
+                {
+                    g.setColour (juce::Colour (0xfff3eadb).withAlpha (highlighted || down || hasKeyboardFocus (false) ? 1.0f : 0.78f));
+                    for (int i = -1; i <= 1; ++i)
+                        g.fillEllipse (juce::Rectangle<float> (3.0f, 3.0f).withCentre ({ r.getCentreX() + 5.5f * static_cast<float> (i), r.getCentreY() }));
+                    return;
+                }
                 g.setColour (juce::Colour (0xffd2cbbf));
                 g.fillRoundedRectangle (r, 5.0f);
                 g.setColour (highlighted || down ? juce::Colour (0xfff2ece2) : juce::Colour (0xfff7f2ea));
@@ -3718,6 +3781,21 @@ namespace
                 }
             }
         };
+
+        /** Faceplate: the LED follows what plays (repainted when it changes). */
+        struct LightWatch final : juce::Timer
+        {
+            UnifiedRack* rack = nullptr;
+            bool shown = true;
+            void timerCallback() override
+            {
+                if (rack != nullptr && rack->processingActive() != shown)
+                {
+                    shown = ! shown;
+                    rack->repaint (0, 0, 120, rack->titleOffset());
+                }
+            }
+        } lightWatch;
 
         InstrumentHost& processor;
         juce::String heading;
@@ -3767,12 +3845,15 @@ namespace
 
         int bodyHeight() const override { return wide ? expandedBody : standardBody; }
         float leftShare() const override { return 0.57f; }   // approved MOVEMENT column
+        bool processingActive() const override { return processor.parameterValue ("motion") > 0.0f; }
         static constexpr int expandedBody = 268;
 
         void layoutTitleRow (juce::Rectangle<int> row) override
         {
             // Approved: MOVEMENT ... [A][B]  ON (switch)  (collapse) - the lane keys 40 x 23, 2 px
             // apart; 7 px; the word ON; 7 px; the shown lane's 16 x 26 switch; 8 px to collapse.
+            // (With a faceplate the preset browser takes the rail's right first.)
+            row = layoutRail (row);
             row = row.withSizeKeepingCentre (row.getWidth(), 30);
             if (power != nullptr)
             {
@@ -3793,8 +3874,8 @@ namespace
             UnifiedRack::paint (g);
             if (power != nullptr && power->isVisible())
             {
-                // The power's word (approved: 9 px, #777069), beside the switch.
-                g.setColour (juce::Colour (0xff777069));
+                // The power's word (approved: 9 px, #777069), beside the switch (cream on a rail).
+                g.setColour (hasFaceplate() ? juce::Colour (0xfff3eadb) : juce::Colour (0xff777069));
                 g.setFont (fonts::make (9.0f, fonts::Weight::regular, 0.03f));
                 g.drawText ("ON", onWord, juce::Justification::centred, false);
             }
@@ -4181,6 +4262,7 @@ namespace
     {
     public:
         float leftShare() const override { return 0.61f; }   // approved ECHO column
+        bool processingActive() const override { return processor.parameterValue ("echo") > 0.0f; }
         explicit EchoRack (InstrumentHost& p) : UnifiedRack (p, "ECHO", design::colour::Macro::echo), model (p)
         {
             setModeSelector ("echo.type", "Tape echo, bucket-brigade (BBD) delay, or ASCEND: repeats an interval up (a pitch shifter in the loop)");
@@ -4234,6 +4316,7 @@ namespace
     {
     public:
         float leftShare() const override { return 0.68f; }   // approved SPACE column
+        bool processingActive() const override { return processor.parameterValue ("space") > 0.0f; }
         explicit SpaceRack (InstrumentHost& p) : UnifiedRack (p, "SPACE", design::colour::Macro::space), model (p)
         {
             auto& m = setModeSelector ("space.type", "Room, hall, plate or spring - or ABYSS, VINTAGE or BLOOM, SPACE's other engines, and their variants");
@@ -5192,9 +5275,24 @@ std::unique_ptr<rack::Module> createRackModule (rack::Kind kind, InstrumentHost&
 {
     switch (kind)
     {
-        case rack::Kind::movement: return std::make_unique<MovementRack> (processor);
-        case rack::Kind::echo: return std::make_unique<EchoRack> (processor);
-        case rack::Kind::space: return std::make_unique<SpaceRack> (processor);
+        case rack::Kind::movement:
+        {
+            auto m = std::make_unique<MovementRack> (processor);
+            m->wearFaceplate (processor.rackFaceplate (static_cast<int> (kind)));
+            return m;
+        }
+        case rack::Kind::echo:
+        {
+            auto m = std::make_unique<EchoRack> (processor);
+            m->wearFaceplate (processor.rackFaceplate (static_cast<int> (kind)));
+            return m;
+        }
+        case rack::Kind::space:
+        {
+            auto m = std::make_unique<SpaceRack> (processor);
+            m->wearFaceplate (processor.rackFaceplate (static_cast<int> (kind)));
+            return m;
+        }
         case rack::Kind::filter:
         case rack::Kind::morph:
         case rack::Kind::fx: break;   // (a product's own: ShellProduct::productRacks)

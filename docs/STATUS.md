@@ -749,6 +749,12 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
   Opt-in for products (ShellProduct::stableModulationTabs, ANDOR ANALOG): the six tabs at
   fixed places, the route count in a reserved place, the expand key inside the display;
   ANDOR OSP's own row is unchanged (pixel-identical).
+- Hardware rack faceplates (shared, opt-in; ANDOR ANALOG's FX Rack V2): `rack::Faceplate` and
+  `rack::hardware::paint` (RackFaceplate.h) - ceramic chassis, enamel rail with title and
+  subtitle, LED, stripes, graphite glass - worn by `ParameterRack` and, through
+  `InstrumentHost::rackFaceplate` / `ProductInfo::rackFaceplates`, by the MOVEMENT, ECHO and
+  SPACE racks (`UnifiedRack::wearFaceplate`: preset and actions in the rail, LED = the macro
+  playing). Without a faceplate (ANDOR OSP, the parity render) nothing changes: 0 px.
 
 ## IN PROGRESS
 

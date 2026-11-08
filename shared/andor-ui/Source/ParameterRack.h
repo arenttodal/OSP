@@ -3,6 +3,7 @@
 #include "EffectRack.h"
 #include "InstrumentHost.h"
 #include "RackControls.h"
+#include "RackFaceplate.h"
 #include "ShapingPopups.h"
 
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -97,14 +98,7 @@ public:
         (the controls start after it) and the graph in a metal bezel on tinted glass. The
         heights, the selector row and the cells' lines are the standard rack's: only the paint
         and the left/right margins change. Interface only. */
-    struct Faceplate
-    {
-        juce::Colour enamel;                    ///< the title rail
-        std::array<juce::Colour, 3> stripes;    ///< the motif's bands, outermost first
-        juce::Colour glow;                      ///< the LED and the lit power glyph
-        juce::Colour glassTop { 0xff1c2528 }, glassBottom { 0xff192124 };
-        juce::String subtitle;                  ///< "DYNAMICS PROCESSOR"
-    };
+    using Faceplate = rack::Faceplate;
     void setFaceplate (const Faceplate& f);
     bool hasFaceplate() const noexcept { return faceplate.has_value(); }
     const std::optional<Faceplate>& faceplateStyle() const noexcept { return faceplate; }
@@ -145,6 +139,10 @@ protected:
     void setHeading (const juce::String& title);
     void setAccent (juce::Colour colour);
     GraphFrame* graph() const noexcept { return graphView.get(); }
+
+    /** Faceplate: what its LED shows (default: the power key's ON, or lit without one). A
+        rack without an ON of its own (a macro's effect) shows whether it plays. */
+    virtual bool faceplateLit() const { return powerKeyPart == nullptr || powerKeyPart->isOn(); }
 
     /** Builds the shown page's selectors and cells (the sub-page: subPage()). */
     virtual void build (int page) = 0;

@@ -112,6 +112,15 @@ public:
     bool showsRack() const noexcept { return ! referenceParity && (! product().rackModules.empty() || ! product().productRacks.empty()); }
     /** The product's other view of the sources' area and its icon (not in the parity render). */
     bool showsSourceView() const noexcept { return ! referenceParity && product().sourceAreaView.create != nullptr; }
+    /** A shared rack's faceplate: the product's (not in the parity render). */
+    const osp::plugin::rack::Faceplate* rackFaceplate (int kind) const noexcept override
+    {
+        if (referenceParity)
+            return nullptr;
+        const auto& m = product().rackFaceplates;
+        const auto it = m.find (static_cast<osp::plugin::rack::Kind> (kind));
+        return it != m.end() ? &it->second : nullptr;
+    }
     /** The cards' modifiers in their wells (the product's choice; not in the parity render). */
     bool modifiersInWell() const noexcept { return ! referenceParity && product().cardModifiersInWell; }
     bool stableModulationTabs() const noexcept { return ! referenceParity && product().stableModulationTabs; }

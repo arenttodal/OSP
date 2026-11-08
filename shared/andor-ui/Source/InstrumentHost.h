@@ -1,6 +1,7 @@
 #pragma once
 
 #include "LoadedInstrument.h"
+#include "RackFaceplate.h"
 
 #include "analysis/phrase/PhraseAnalysis.h"
 #include "engine/Arpeggiator.h"
@@ -369,6 +370,13 @@ public:
     /** The mix as it plays (with any MIX modulation) for the header's live node; an engine that
         does not blend layers this way says it is not modulated. */
     virtual InstrumentEngine::LiveMix liveMix() const noexcept { return {}; }
+    /** The hardware faceplate a shared rack module (rack::Kind, as an int) wears (opt-in; null:
+        none, as in ANDOR OSP). Interface only. */
+    virtual const rack::Faceplate* rackFaceplate (int kind) const noexcept
+    {
+        juce::ignoreUnused (kind);
+        return nullptr;
+    }
     virtual int modControllerNumber (int slot) const noexcept = 0;
     virtual void setModControllerNumber (int slot, int controller) noexcept = 0;
     virtual void learnModController (int slot) noexcept = 0;

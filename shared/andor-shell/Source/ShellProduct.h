@@ -8,6 +8,7 @@
 #include "ShellEngine.h"
 
 #include <array>
+#include <map>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -141,6 +142,9 @@ struct ProductInfo
         std::function<std::unique_ptr<juce::Component> (osp::plugin::InstrumentHost&)> create;
     };
     SourceAreaView sourceAreaView;
+    /** The shared rack modules' hardware faceplates (opt-in; ANDOR ANALOG's), by rack::Kind;
+        empty: the approved racks as they are (ANDOR OSP). Interface only. */
+    std::map<osp::plugin::rack::Kind, osp::plugin::rack::Faceplate> rackFaceplates;
     /** MOVEMENT's lanes (InstrumentHost::movementLane), lane 0 first: a product with a second
         lane lists both (the shell keeps the second lane's SHAPER CUSTOM pattern with the
         session and gives it to the engine: Engine::setLaneShaperPattern). Empty: one lane,
