@@ -130,6 +130,16 @@ struct ProductInfo
         std::function<std::unique_ptr<osp::plugin::rack::Module> (osp::plugin::InstrumentHost&)> create;
     };
     std::vector<ProductRack> productRacks;
+    /** Another view of the sources' area (opt-in; ANDOR ANALOG's FX ROUTING): a small borderless
+        icon (a branching path) beside the header's SAVE toggles it; while it is shown it takes
+        the cards' place - the header, macros, racks, modulation and keyboard stay where they are.
+        It is interface only (showing it never changes the sound). Unset: no icon, as in ANDOR OSP. */
+    struct SourceAreaView
+    {
+        juce::String tooltip;   ///< "FX Routing"
+        std::function<std::unique_ptr<juce::Component> (osp::plugin::InstrumentHost&)> create;
+    };
+    SourceAreaView sourceAreaView;
     /** MOVEMENT's lanes (InstrumentHost::movementLane), lane 0 first: a product with a second
         lane lists both (the shell keeps the second lane's SHAPER CUSTOM pattern with the
         session and gives it to the engine: Engine::setLaneShaperPattern). Empty: one lane,

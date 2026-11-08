@@ -281,6 +281,15 @@ ShellEditor::ShellEditor (ShellProcessor& p)
         modOverlay.contextMenu (modui::mixTargetId).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&headerMix));
     };
     content.addChildComponent (headerMix);
+    // The product's other view of the sources' area (opt-in): its icon beside SAVE.
+    if (shell.product().sourceAreaView.create != nullptr)
+    {
+        sourceViewButton.setTooltip (shell.product().sourceAreaView.tooltip);
+        sourceViewButton.setTitle (shell.product().sourceAreaView.tooltip);
+        sourceViewButton.setClickingTogglesState (false);
+        sourceViewButton.onClick = [this] { setSourceViewShown (! sourceViewOpen); };
+        content.addAndMakeVisible (sourceViewButton);
+    }
 
     // The six macros (the product's): names and knobs as ANDOR OSP's.
     const bool macroPopovers = shell.product().macroPopover != nullptr;
@@ -434,6 +443,17 @@ void ShellEditor::layoutInstrument()
     }
     parts.sourceTrim = sourceTrim();
     frame::place (parts, arpShown);
+    if (shell.product().sourceAreaView.create != nullptr)
+    {
+        // The icon beside SAVE, on its centre line (12 px from it), and MIX moved right by as
+        // much, narrower by as much (it centres itself), clear of VOLUME.
+        const auto save = savePresetButton.getBounds();
+        sourceViewButton.setBounds (juce::Rectangle<int> (30, 30).withCentre ({ save.getRight() + 12 + 15, save.getCentreY() }));
+        const auto mix = headerMix.getBounds();
+        const int shift = sourceViewButton.getRight() + 15 - mix.getX();
+        if (shift > 0)
+            headerMix.setBounds (mix.withTrimmedLeft (shift));
+    }
     modOverlay.setBounds (content.getLocalBounds());
     sourceArea = frame::sourceArea (sourceTrim());
     shownCount = -1;
@@ -484,8 +504,73 @@ bool ShellEditor::threeEngines() const
     return shell.product().threeEngines.enabled && shell.hasHybridLayer();
 }
 
+void ShellEditor::setSourceViewShown (bool shown)
+{
+    if (shell.product().sourceAreaView.create == nullptr || shown == sourceViewOpen)
+        return;
+    if (shown && sourceView == nullptr)
+    {
+        sourceView = shell.product().sourceAreaView.create (shell);
+        if (sourceView == nullptr)
+            return;
+        content.addChildComponent (*sourceView);
+    }
+    sourceViewOpen = shown;
+    sourceViewButton.setToggleState (shown, juce::dontSendNotification);
+    sourceViewButton.repaint();
+    shownCount = -1;
+    layoutSources();
+    if (shown && sourceView != nullptr)
+        sourceView->grabKeyboardFocus();
+}
+
+void ShellEditor::SourceViewButton::paintButton (juce::Graphics& g, bool over, bool down)
+{
+    // Borderless: a branching path (two inputs joining), tinted while its view is shown.
+    const auto r = getLocalBounds().toFloat();
+    const bool on = getToggleState();
+    if (on || over || down)
+    {
+        g.setColour (on ? juce::Colour (0x2bb4cab5) : juce::Colour (0x90ded9cf));
+        g.fillRoundedRectangle (r.reduced (1.0f), 5.0f);
+    }
+    const float s = 20.0f / 24.0f;
+    const auto o = r.getCentre() - juce::Point<float> (12.0f * s, 12.0f * s);
+    auto at = [&] (float x, float y) { return o + juce::Point<float> (x * s, y * s); };
+    juce::Path p;
+    for (const auto c : { at (5, 5), at (19, 12), at (5, 19) })
+        p.addEllipse (juce::Rectangle<float> (4.0f * s, 4.0f * s).withCentre (c));
+    p.startNewSubPath (at (7, 5));
+    p.lineTo (at (11, 5));
+    p.cubicTo (at (13, 5), at (13, 12), at (17, 12));
+    p.startNewSubPath (at (7, 19));
+    p.lineTo (at (11, 19));
+    p.cubicTo (at (13, 19), at (13, 12), at (17, 12));
+    g.setColour (on ? juce::Colour (0xff477767) : (over ? juce::Colour (0xff395e58) : juce::Colour (0xff727872)));
+    g.strokePath (p, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    if (hasKeyboardFocus (false))
+    {
+        g.setColour (juce::Colour (0xff88a8af));
+        g.drawRoundedRectangle (r.reduced (0.5f), 5.0f, 1.5f);
+    }
+}
+
 void ShellEditor::layoutSources()
 {
+    if (sourceView != nullptr)
+        sourceView->setVisible (sourceViewOpen);
+    if (sourceViewOpen && sourceView != nullptr)
+    {
+        // The product's view in the cards' place (the sound is the same either way).
+        for (auto& card : cards)
+            card->setVisible (false);
+        sampleDock.setVisible (false);
+        dropZone.setVisible (false);
+        addTarget.setVisible (false);
+        sourceView->setBounds (sourceArea);
+        shownCount = -1;   // (the cards are laid out afresh when it closes)
+        return;
+    }
     if (threeEngines())
     {
         // Three engines: every card, always, at equal widths, in the product's order; the

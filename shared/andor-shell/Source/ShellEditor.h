@@ -93,6 +93,12 @@ public:
     osp::plugin::EngineCard& engineCard (int layer) noexcept { return *cards[static_cast<std::size_t> (juce::jlimit (0, 2, layer))]; }
     osp::plugin::ModulationPanel& modulationPanel() noexcept { return modPanel; }
     void setArpExpanded (bool open);
+    /** The product's other view of the sources' area (ShellProduct::sourceAreaView): shown in
+        the cards' place, or the cards again. Interface only. */
+    void setSourceViewShown (bool shown);
+    bool sourceViewShown() const noexcept { return sourceViewOpen; }
+    juce::Component* sourceViewComponent() const noexcept { return sourceView.get(); }
+    juce::Button& sourceViewToggle() noexcept { return sourceViewButton; }
     float instrumentHeight() const noexcept { return osp::plugin::frame::instrumentHeight (arpShown, rackShift(), sourceTrim()); }
     /** The source cards' trim (their modifiers in the well: nothing kept under the knobs). */
     float sourceTrim() const noexcept { return shell.modifiersInWell() ? osp::plugin::EngineCard::footTrim : 0.0f; }
@@ -180,6 +186,15 @@ private:
     osp::plugin::HeaderMenuButton menuButton;
     osp::plugin::SavePresetButton savePresetButton;
     osp::plugin::HeaderMix headerMix { shell };
+    /** The product's other view of the sources' area (ShellProduct::sourceAreaView) and its icon. */
+    struct SourceViewButton final : juce::Button
+    {
+        SourceViewButton() : juce::Button ("FX Routing") {}
+        void paintButton (juce::Graphics&, bool over, bool down) override;
+    };
+    SourceViewButton sourceViewButton;
+    std::unique_ptr<juce::Component> sourceView;
+    bool sourceViewOpen = false;
 
     // Sources
     juce::Rectangle<int> sourceArea;
