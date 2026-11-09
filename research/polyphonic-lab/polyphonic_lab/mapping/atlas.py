@@ -10,6 +10,12 @@ Each source is identified as OSP identifies assets, by the SHA-256 of the file's
 found through `relativePath` (relative to the atlas file), so the folder can move. The atlas uses
 only fields OSP already reads; nothing about it is specific to the lab.
 
+Selection (`include`)
+    curated   the default: only the best notes, spread out, stretched so every key of the piano
+              range sounds (mapping/curate.py)
+    best      one take of every detected key
+    all       every usable take (round robin)
+
 Mappings
     original  every included note on its own key; FILL lets the keys between borrow the nearest
               recorded note (up to `max_transpose` semitones). A playable instrument.
@@ -21,12 +27,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+
+import numpy as np
 import shutil
 from pathlib import Path
 
 from .. import __version__
 from ..audio import content_id
 from ..extraction.outputs import load_extraction
+from .curate import CurateConfig, curate, stretch_to_cover
 from .prepare import PreparedNote, prepare, select
 
 ATLAS_FORMAT = "andor.noteAtlas"
@@ -61,12 +70,20 @@ def atlas_note(i: int, p: PreparedNote, method: str, assigned_key: int = -1, var
 
 
 def export_atlas(extraction_dir: Path, out: Path, name: str = "instrument", mapping: str = "original",
-                 include: str = "best", fill: bool = True, max_transpose: float = 12.0) -> dict:
+                 include: str = "curated", fill: bool = True, max_transpose: float | None = None,
+                 curate_cfg: CurateConfig | None = None) -> dict:
+    """include: "curated" (the best notes, spread out; see curate.py), "best" (one take per key)
+    or "all". max_transpose None: curated stretches so that no key of the piano range is silent,
+    the others reach 12 semitones."""
     if mapping not in ("original", "compact"):
         raise ValueError("mapping must be 'original' or 'compact'")
+    if include not in ("curated", "best", "all"):
+        raise ValueError("include must be 'curated', 'best' or 'all'")
     ex = load_extraction(extraction_dir)
     root = Path(ex["_root"])
-    notes = select(prepare(ex), include)
+    notes = curate(prepare(ex), ex, curate_cfg) if include == "curated" else select(prepare(ex), include)
+    if max_transpose is None:
+        max_transpose = stretch_to_cover(sorted({n.root_midi for n in notes if n.included})) if include == "curated" else 12.0
     if not any(n.included for n in notes):
         raise ValueError(f"{extraction_dir}: no usable note to put in an atlas")
     out = Path(out)
@@ -95,7 +112,9 @@ def export_atlas(extraction_dir: Path, out: Path, name: str = "instrument", mapp
             variation[p.root_midi] = v + 1
         anotes.append(atlas_note(i, p, method, keys.get(id(p), -1), v))
         sidecar_notes.append({"atlasNote": f"n{i:04d}", "extractedNote": p.id, "name": p.name, "included": p.included,
-                              "excludedBecause": p.excluded_because, "score": round(p.score, 4), **p.extra})
+                              "excludedBecause": p.excluded_because, "score": round(p.score, 4),
+                              **{k: (round(v, 4) if isinstance(v, float) and np.isfinite(v) else (None if isinstance(v, float) else v))
+                                 for k, v in p.extra.items()}})
     settings = {"extraction": ex.get("settings"), "method": ex["method"], "residual": ex.get("residualStrategy"),
                 "mapping": mapping, "include": include}
     digest = hashlib.sha256(json.dumps(settings, sort_keys=True, default=str).encode()).hexdigest()[:16]
@@ -115,4 +134,5 @@ def export_atlas(extraction_dir: Path, out: Path, name: str = "instrument", mapp
     }
     (out / f"{name}.osp-poly.json").write_text(json.dumps(sidecar, indent=1) + "\n")
     return {"atlas": str(atlas_path), "notes": len(anotes), "included": sum(1 for n in notes if n.included),
+            "maxTransposeSemitones": float(max_transpose),
             "keys": sorted({(a["assignedKey"] if a["assignedKey"] >= 0 else a["rootMidi"]) for a in anotes if a["included"]})}

@@ -91,3 +91,25 @@ def test_osp_renders_the_exported_atlas(c_major_extraction, tmp_path):
     assert rr["rendered"], rr
     for name, e in rr["renders"].items():
         assert e["exit"] == 0 and e["peakDbfs"] > -60.0 and e["finite"], (name, e)
+
+
+def test_curated_keeps_the_best_spread_out_and_covers_the_keyboard(c_major_extraction, tmp_path):
+    from polyphonic_lab.mapping.curate import stretch_to_cover
+    r = export_atlas(c_major_extraction, tmp_path / "cur", "cur", include="curated")
+    atlas = json.loads((tmp_path / "cur" / "cur.andoratlas").read_text())
+    assert r["keys"] == [60, 64, 67]                                  # all three are clean, in tune and 3+ apart
+    assert atlas["mapping"]["fill"] and atlas["mapping"]["maxTransposeSemitones"] == stretch_to_cover([60, 64, 67]) == 41   # G4 up to C8
+    side = json.loads((tmp_path / "cur" / "cur.osp-poly.json").read_text())
+    assert all({"ownership", "tuning", "stability", "harmonicity", "length", "level"} <= set(n["quality"]) for n in side["notes"])
+    tight = export_atlas(c_major_extraction, tmp_path / "tight", "t", include="curated",
+                         curate_cfg=__import__("polyphonic_lab.mapping.curate", fromlist=["CurateConfig"]).CurateConfig(spacing=5))
+    assert len(tight["keys"]) == 1                                   # the best of the three; the others are 3 and 4 away
+    excluded = [n for n in json.loads((tmp_path / "tight" / "t.osp-poly.json").read_text())["notes"] if not n["included"]]
+    assert len(excluded) == 2 and all("scores higher within 5 semitones" in n["excludedBecause"] for n in excluded)
+
+
+def test_stretch_to_cover_leaves_no_key_silent():
+    from polyphonic_lab.mapping.curate import stretch_to_cover
+    assert stretch_to_cover([60]) == 48          # A0 is 39 below, C8 48 above
+    assert stretch_to_cover([21, 108]) == 43
+    assert stretch_to_cover([]) == 0.0

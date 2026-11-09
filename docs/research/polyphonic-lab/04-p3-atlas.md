@@ -183,6 +183,28 @@ cd research/polyphonic-lab
 Starting commit of the lab: c49d77f. P0 is 8308f0a, P1 is 87463f6, **P2 and P3 are 8da975f**
 (branch `claude/polyphonic-lab`).
 
+## After the review: curated selection (the new default)
+
+**The owner's verdict on four real loops:** "fine, not realistic". The goal is *some* playable
+instrument derived from the recording, not a faithful split. So `export-atlas` and `build` now
+default to `--include curated` (`mapping/curate.py`):
+
+- every note is scored from its own audio: ownership, tuning, pitch stability, harmonicity,
+  ringing length and level;
+- clearly bad notes are dropped;
+- the best are kept, at least 3 semitones apart, at most 12;
+- FILL is stretched so that every key from A0 to C8 sounds.
+
+| Recording (the owner's, not committed) | Notes before | After | Reach |
+|---|---|---|---|
+| piano one-shot | 4 | 3 | 31 semitones |
+| Rhodes loop | 19 | 8 | 27 |
+| organ loop | 18 | 8 | 41 |
+| full hip-hop mix | 33 | 9 | 38 |
+
+Every key from 21 to 108 sounds through OSP's renderer: finite, −33 to −53 dBFS. The plugin load,
+export and re-import check passes for all four.
+
 ## What comes next (only after the review)
 
 Not started, per the spec's mandatory stop:

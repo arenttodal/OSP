@@ -46,6 +46,17 @@ portable instrument and re-imports it (the hidden Catch2 test `[poly-lab-import]
 (`cmake -B build-plugin -G Ninja -DOSP_BUILD_PLUGIN=ON && cmake --build build-plugin`); without it they
 are skipped and say so. `OSP_RESEARCH_RENDERER` / `OSP_PLUGIN_TESTS` point at other builds.
 
+## Which notes become the instrument
+
+`export-atlas` / `build` default to `--include curated`: not every detected note, but the best few,
+spread out and stretched so every key from A0 to C8 sounds. Each extracted note is scored on
+ownership, tuning, pitch stability, harmonicity, ringing length and level
+(`polyphonic_lab/mapping/curate.py`). Clearly bad ones are dropped (more than 25 cents off, too
+short, 30 dB under the loudest, not harmonic, or under 35 % of the best score). The rest are taken
+best first, at least `--spacing` (3) semitones apart, at most `--max-notes` (12). Dropped notes stay
+in the atlas, switched off, with the reason in the sidecar, so the NOTE MAP can bring them back.
+`--include best` (one take per detected key) and `--include all` remain.
+
 ## Testing it
 
 **1. In the OSP app (no Python needed).** `--plugin-check` also leaves a portable instrument,

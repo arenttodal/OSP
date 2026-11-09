@@ -103,8 +103,11 @@ def _extract(args) -> int:
 
 def _export_atlas(args) -> int:
     from .mapping.atlas import export_atlas
-    r = export_atlas(Path(args.extraction), Path(args.out), args.name, args.mapping, args.include, not args.no_fill, args.max_transpose)
-    print(f"wrote {r['atlas']}: {r['included']} of {r['notes']} notes included, keys {r['keys']}")
+    from .mapping.curate import CurateConfig
+    r = export_atlas(Path(args.extraction), Path(args.out), args.name, args.mapping, args.include, not args.no_fill, args.max_transpose,
+                     CurateConfig(spacing=args.spacing, max_notes=args.max_notes))
+    print(f"wrote {r['atlas']}: {r['included']} of {r['notes']} notes included, keys {r['keys']}, "
+          f"each reaching {r['maxTransposeSemitones']:g} semitones")
     code = 0
     if args.render:
         from .mapping.render import render_demos
@@ -215,9 +218,12 @@ def main(argv: list[str] | None = None) -> int:
     a.add_argument("--out", required=True)
     a.add_argument("--name", default="instrument")
     a.add_argument("--mapping", choices=["original", "compact"], default="original")
-    a.add_argument("--include", choices=["best", "all"], default="best", help="one take per key, or every usable take (round robin)")
+    a.add_argument("--include", choices=["curated", "best", "all"], default="curated",
+                   help="curated: the best notes, spread out and stretched over the keyboard; best: one take per key; all: every take")
+    a.add_argument("--spacing", type=int, default=3, help="(curated) semitones between kept notes")
+    a.add_argument("--max-notes", type=int, default=12, help="(curated) at most this many notes")
     a.add_argument("--no-fill", action="store_true", help="(original) keys without a note stay silent")
-    a.add_argument("--max-transpose", type=float, default=12.0)
+    a.add_argument("--max-transpose", type=float, default=None, help="FILL reach (default: curated covers A0-C8, others 12)")
     a.add_argument("--render", action="store_true", help="play demo MIDI through OSP's research-renderer")
     a.add_argument("--mode", choices=["oneshot", "granular"], default="oneshot")
     a.add_argument("--plugin-check", action="store_true", help="load, play, export and re-import it in the OSP plugin (osp_plugin_tests)")
@@ -233,7 +239,7 @@ def main(argv: list[str] | None = None) -> int:
     bu.add_argument("--residual", choices=["none", "conservative", "standard", "generous"])
     bu.add_argument("--name", default="instrument")
     bu.add_argument("--mapping", choices=["original", "compact"], default="original")
-    bu.add_argument("--include", choices=["best", "all"], default="best")
+    bu.add_argument("--include", choices=["curated", "best", "all"], default="curated")
     bu.add_argument("--render", action="store_true")
     bu.add_argument("--mode", choices=["oneshot", "granular"], default="oneshot")
     bu.add_argument("--plugin-check", action="store_true")
