@@ -792,6 +792,32 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       `WellOverlay`: controls revealed in a card's well by the pointer). ANDOR OSP and the
       parity render use none of them. Proof: OSP suites and design capture.
 
+## Research: Polyphonic Instrument Extraction Lab, P0–P3 (9 Nov 2026; branch claude/polyphonic-lab)
+
+Research only (`research/polyphonic-lab`, Python). The plugin is unchanged; the only C++ added is a
+test file. Reports are in `docs/research/polyphonic-lab/`. **Stopped after P3 for the first
+playable-instrument review**, as the spec requires.
+
+- [x] P0: audit of the Note Atlas import route; a deterministic synthetic corpus (24 fixtures,
+  stems, manifests) (`01-p0-corpus.md`)
+- [x] P1: transcription (`02-p1-transcription.md`)
+  - ground truth, a deterministic harmonic detector, and Basic Pitch (its own environment)
+  - chords F1 0.944, median onset error 5.3 ms
+- [x] P2: per-note extraction, methods A, B and C (`03-p2-extraction.md`)
+  - harmonic templates with inharmonicity, harmonic NMF with Wiener masks, attack allocation
+  - notes + residual = mixture within 1e-16
+  - C-major chord: C 12.7 dB, E 20.3 dB, G 12.1 dB SI-SDR, within 0.5 dB of the oracle mask
+- [x] P3: Note Atlas export, renders by OSP's engine, plugin load / export / re-import
+  (`04-p3-atlas.md`)
+  - The first milestone works: a C-major recording becomes C, E and G samples and a playable OSP
+    instrument.
+  - It plays chords that were never recorded through FILL. Its re-import is bit-identical.
+  - `[plugin][poly-lab]` runs in ctest; `[.poly-lab-import]` is hidden.
+- [ ] Review (the user): listen to the milestone material. No human listening has happened yet.
+- [ ] Decide on the held-note swell: OSP's continuation loops a fading piano note's body (+10 dB
+  when a key is held past the recording). This is outside the prototype's scope.
+- [ ] Then, and only then: real recordings, P5 (voices and strings), the gospel recording.
+
 ## DONE
 
 - Pure C++20 DSP/analysis library (`osp_dsp`) independent of JUCE; JUCE used for file

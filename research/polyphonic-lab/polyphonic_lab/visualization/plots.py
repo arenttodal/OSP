@@ -79,3 +79,35 @@ def bar_chart(labels: list[str], series: dict[str, list[float]], path: str | Pat
     fig.savefig(path)
     plt.close(fig)
     return path
+
+
+def mask_panels(ex, path: str | Path, fmax: float = 5000.0) -> Path:
+    """The mixture's spectrogram and each note's mask (method A/B) under it, log frequency."""
+    from ..stft import Stft as _Stft
+    res = ex.mask_result
+    st = _Stft(8192, 512, ex.sr)
+    S = np.abs(st.forward(ex.mixture))
+    t = st.times(len(ex.mixture))
+    f = st.freqs()
+    keep = (f >= 40) & (f <= fmax)
+    panels = [("mixture (dB)", 20 * np.log10(S[keep] / (S.max() + 1e-12) + 1e-9), "magma", -80, 0)]
+    for tpl, m in zip(ex.templates, res.note_masks):
+        panels.append((f"{tpl.event.name} mask", m[keep], "viridis", 0, 1))
+    panels.append(("residual mask", res.residual_mask[keep], "viridis", 0, 1))
+    panels = panels[:9]
+    fig, axes = plt.subplots(len(panels), 1, figsize=(10, 1.7 * len(panels) + 0.6), dpi=100, sharex=True)
+    for ax, (title, data, cmap, lo, hi) in zip(np.atleast_1d(axes), panels):
+        ax.pcolormesh(t, f[keep], data, shading="auto", cmap=cmap, vmin=lo, vmax=hi)
+        ax.set_yscale("log")
+        ax.set_ylim(40, fmax)
+        ax.set_ylabel("Hz", fontsize=7)
+        ax.tick_params(labelsize=7)
+        ax.set_title(title, fontsize=8, loc="left")
+    np.atleast_1d(axes)[-1].set_xlabel("seconds")
+    fig.suptitle(f"method {ex.method} ({ex.residual_strategy} residual)", fontsize=9)
+    fig.tight_layout()
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path)
+    plt.close(fig)
+    return path
