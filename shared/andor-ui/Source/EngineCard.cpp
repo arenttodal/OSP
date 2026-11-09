@@ -1571,9 +1571,10 @@ ModeSelector::ModeSelector (juce::RangedAudioParameter& p)
 void ModeSelector::describe()
 {
     // The symbol carries no words: the tooltip and the accessible description say the mode.
-    const auto said = "Playback mode: " + modeName (current);
+    const auto said = toggle ? juce::String (current == 1 ? "Granular: on (the oscillator as a grain cloud)" : "Granular: off (click to play the oscillator as a grain cloud)")
+                             : "Playback mode: " + modeName (current);
     setDescription (said);
-    setTooltip (iconOnly() || namedTooltip.isEmpty() ? said : namedTooltip);
+    setTooltip (toggle || iconOnly() || namedTooltip.isEmpty() ? said : namedTooltip);
     if (auto* handler = getAccessibilityHandler())
         handler->notifyAccessibilityEvent (juce::AccessibilityEvent::valueChanged);
 }
@@ -1596,6 +1597,18 @@ void ModeSelector::setFirstModeName (const juce::String& name)
     {
         firstModeName = name;
         describe();
+        repaint();
+    }
+}
+
+void ModeSelector::setToggle (bool on, juce::Colour litInk)
+{
+    toggleInk = litInk;
+    if (on != toggle)
+    {
+        toggle = on;
+        describe();
+        skin::repaintKey (*this);
         repaint();
     }
 }
@@ -1683,13 +1696,24 @@ void ModeSelector::mouseUp (const juce::MouseEvent& e)
 {
     if (! getLocalBounds().contains (e.getPosition()))
         return;
+    if (toggle)
+    {
+        choose (current == 1 ? 0 : 1);   // (one gesture on the parameter, undoable)
+        skin::repaintKey (*this);
+        return;
+    }
     showMenu();
 }
 
 bool ModeSelector::keyPressed (const juce::KeyPress& key)
 {
     // As a menu button: Return, Space or Down opens the menu (its keys then choose).
-    if (key == juce::KeyPress::returnKey || key == juce::KeyPress::spaceKey || key == juce::KeyPress::downKey)
+    if (toggle && (key == juce::KeyPress::returnKey || key == juce::KeyPress::spaceKey))
+    {
+        choose (current == 1 ? 0 : 1);
+        return true;
+    }
+    if (! toggle && (key == juce::KeyPress::returnKey || key == juce::KeyPress::spaceKey || key == juce::KeyPress::downKey))
     {
         showMenu();
         return true;
@@ -1713,7 +1737,7 @@ std::unique_ptr<juce::AccessibilityHandler> ModeSelector::createAccessibilityHan
     };
     return std::make_unique<juce::AccessibilityHandler> (
         *this, juce::AccessibilityRole::popupMenu,
-        juce::AccessibilityActions().addAction (juce::AccessibilityActionType::press, [this] { showMenu(); })
+        juce::AccessibilityActions().addAction (juce::AccessibilityActionType::press, [this] { if (toggle) choose (current == 1 ? 0 : 1); else showMenu(); })
                                     .addAction (juce::AccessibilityActionType::showMenu, [this] { showMenu(); }),
         juce::AccessibilityHandler::Interfaces { std::make_unique<Value> (*this) });
 }
@@ -1727,6 +1751,16 @@ void ModeSelector::paint (juce::Graphics& g)
     const float k = getHeight() / 41.0f;
     if (! skin::drawnBySurface())   // ceramic: the card draws the key
         design::draw::button (g, r, 7.0f * k, false, isMouseOver(), design::colour::accent);
+    if (toggle)
+    {
+        // The grain cloud alone (18 px), centred: lit in the layer's colour while on, a quiet
+        // ink while off (as EQ's word beside it).
+        const float icon = 18.0f * k;
+        const auto symbol = juce::Rectangle<float> (icon, icon).withCentre (r.getCentre());
+        const auto ink = current == 1 ? toggleInk : design::colour::text.withAlpha (isMouseOver() ? 0.8f : 0.55f);
+        icons::drawGranularIcon (g, symbol, ink);
+        return;
+    }
     if (iconOnly())
     {
         // The symbol (16 px) and the chevron (9 px), 3 px apart, centred as a pair; the pair
@@ -2141,6 +2175,14 @@ void EngineCard::setFirstModeName (const juce::String& name)
         mode->setFirstModeName (name);
     if (mode != nullptr && (mode->fitsName() || wasIcon != mode->iconOnly()))
         resized();
+}
+
+void EngineCard::setModeToggle (bool on)
+{
+    if (mode == nullptr || mode->isToggle() == on)
+        return;
+    mode->setToggle (on, design::colour::identity (InstrumentHost::shownLayer (layerIndex)).arc);
+    resized();
 }
 
 void EngineCard::setModeFitsName (bool fit)
@@ -3041,7 +3083,7 @@ void EngineCard::resized()
     menuButton.setBounds (at ({ w - 51.0f, 14.0f, 30.0f, 36.0f }));
     // The mode: ANDOR OSP's symbol key (small: the name beside the badge gets the room back),
     // or a product's named key, fitted to its names or at the reference width.
-    const float modeWidth = mode != nullptr && mode->iconOnly() ? (triple ? ModeSelector::iconWidthNarrow : ModeSelector::iconWidth)
+    const float modeWidth = mode != nullptr && (mode->iconOnly() || mode->isToggle()) ? (triple ? ModeSelector::iconWidthNarrow : ModeSelector::iconWidth)
                           : mode != nullptr && mode->fitsName() ? std::min (mode->fittedWidth(), triple ? 128.0f : 157.0f)
                                                                 : (triple ? 128.0f : 157.0f);
     if (mode != nullptr)

@@ -259,9 +259,13 @@ ShellEditor::ShellEditor (ShellProcessor& p)
         for (int layer = 0; layer < ShellProcessor::numLayers; ++layer)
             if (shell.isGeneratorLayer (layer))
             {
-                // Each oscillator card's selector: the product's name, only as wide as it needs.
+                // Each oscillator card's selector: the product's name, only as wide as it needs
+                // (or, opt-in, a GRANULAR on / off key: the oscillator plays as it is unless lit).
                 cards[static_cast<std::size_t> (layer)]->setFirstModeName (name);
-                cards[static_cast<std::size_t> (layer)]->setModeFitsName (true);
+                if (shell.product().generatorGranularToggle)
+                    cards[static_cast<std::size_t> (layer)]->setModeToggle (true);
+                else
+                    cards[static_cast<std::size_t> (layer)]->setModeFitsName (true);
             }
     dropZone.onBrowse = [this] { chooseFile (-1); };
     content.addChildComponent (dropZone);

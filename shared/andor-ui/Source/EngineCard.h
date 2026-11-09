@@ -362,7 +362,12 @@ public:
     /** The width that fits the longer name (px, at the reference 41 px height). */
     float fittedWidth() const;
     /** The symbol selector (ANDOR OSP's modes under their own names, not fitted to them). */
-    bool iconOnly() const noexcept { return ! fitted && firstModeName == "One Shot"; }
+    bool iconOnly() const noexcept { return ! toggle && ! fitted && firstModeName == "One Shot"; }
+    /** Opt-in (ANDOR ANALOG's oscillators): GRANULAR as an on / off key, the grain cloud alone
+        (no chevron, no menu), lit in `litInk` while the layer plays grains; a click or Return /
+        Space toggles it. Off: the selector with its menu. */
+    void setToggle (bool on, juce::Colour litInk);
+    bool isToggle() const noexcept { return toggle; }
     /** The symbol selector's width (px at the reference): a small key, not a button. */
     static constexpr float iconWidth = 42.0f, iconWidthNarrow = 40.0f;
     /** The tooltip of the named key (a product's); the symbol selector says its mode. */
@@ -386,7 +391,11 @@ public:
     bool keyPressed (const juce::KeyPress&) override;
     std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override;
     skin::KeyRole keyRole() const override { return skin::KeyRole::mode; }
-    skin::KeyState keyState() const override { return isMouseButtonDown() ? skin::KeyState::pressed : isMouseOver() ? skin::KeyState::hover : skin::KeyState::normal; }
+    skin::KeyState keyState() const override
+    {
+        // (the toggle: pressed in while on, as EQ while open)
+        return isMouseButtonDown() || (toggle && current == 1) ? skin::KeyState::pressed : isMouseOver() ? skin::KeyState::hover : skin::KeyState::normal;
+    }
     /** The key's body: as tall as NOTES and EQ beside it (33 px), on their centre line; the
         whole 41 px stays the hit area. */
     juce::Rectangle<float> keyArea (juce::Rectangle<float> bounds) const override { return bounds.withSizeKeepingCentre (bounds.getWidth(), std::min (bounds.getHeight(), bodyHeight)); }
@@ -399,7 +408,8 @@ private:
     int current = 0;
     juce::String firstModeName { "One Shot" };
     juce::String namedTooltip;
-    bool fitted = false;
+    bool fitted = false, toggle = false;
+    juce::Colour toggleInk;
     juce::ParameterAttachment attachment;
 };
 
@@ -493,6 +503,8 @@ public:
     /** Opt-in: the mode selector only as wide as its names need (ModeSelector::setFitsName);
         the name beside it gets the room. Without it the card is exactly as before. */
     void setModeFitsName (bool fit);
+    /** The mode as ModeSelector's GRANULAR on / off key, lit in the layer's colour (opt-in). */
+    void setModeToggle (bool on);
 
     /** A product's own editor in the waveform's place (opt-in; see CardWellEditor). The card
         owns it and lays it out exactly over the display; shown, it replaces the waveform (the

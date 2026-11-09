@@ -201,6 +201,9 @@ struct ProductInfo
     /** A generator's card names its first source mode this (its menu and selector) instead
         of ANDOR OSP's "One Shot" (a synthesizer's "Standard"). Empty: "One Shot", as before. */
     juce::String generatorModeName;
+    /** The oscillator cards' mode as a GRANULAR on / off key, the grain cloud lit in the layer's
+        colour while on (opt-in: generatorModeName is then unused there). Off: the named key. */
+    bool generatorGranularToggle = false;
     /** The product's own materials (opt-in): its finish (the accent family, ceramic tones)
         and rendered pieces of its own (its housing's wood, its badge) in place of ANDOR OSP's,
         for every instance of the product. Unset: ANDOR OSP's, exactly. Interface only. */
