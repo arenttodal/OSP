@@ -253,6 +253,79 @@ void paint (juce::Graphics& g, juce::Rectangle<int> local, int titleOffset, cons
 }
 
 
+SaveKey::SaveKey (std::function<void()> f) : action (std::move (f))
+{
+    setMouseCursor (juce::MouseCursor::PointingHandCursor);
+    setWantsKeyboardFocus (true);
+    setMouseClickGrabsKeyboardFocus (false);
+    setTitle ("Save preset");
+    setTooltip (juce::String::fromUTF8 ("Save preset\xe2\x80\xa6"));
+}
+
+void SaveKey::paint (juce::Graphics& g)
+{
+    // A small disk in the rail's cream, as the overflow key's dots: the body, its shutter, its
+    // label; a faint disc under it on hover or focus.
+    const auto c = getLocalBounds().toFloat().getCentre();
+    const bool lit = hover || hasKeyboardFocus (false);
+    if (lit)
+    {
+        g.setColour (juce::Colours::white.withAlpha (0.12f));
+        g.fillEllipse (juce::Rectangle<float> (22.0f, 22.0f).withCentre (c));
+    }
+    const auto ink = juce::Colour (0xfff3eadb).withAlpha (lit ? 1.0f : 0.78f);
+    const auto body = juce::Rectangle<float> (12.0f, 12.0f).withCentre (c);
+    juce::Path disk;
+    disk.startNewSubPath (body.getX() + 1.6f, body.getY());
+    disk.lineTo (body.getRight() - 2.6f, body.getY());
+    disk.lineTo (body.getRight(), body.getY() + 2.6f);
+    disk.lineTo (body.getRight(), body.getBottom() - 1.6f);
+    disk.quadraticTo (body.getRight(), body.getBottom(), body.getRight() - 1.6f, body.getBottom());
+    disk.lineTo (body.getX() + 1.6f, body.getBottom());
+    disk.quadraticTo (body.getX(), body.getBottom(), body.getX(), body.getBottom() - 1.6f);
+    disk.lineTo (body.getX(), body.getY() + 1.6f);
+    disk.quadraticTo (body.getX(), body.getY(), body.getX() + 1.6f, body.getY());
+    disk.closeSubPath();
+    g.setColour (ink);
+    g.strokePath (disk, juce::PathStrokeType (1.3f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    g.fillRect (juce::Rectangle<float> (body.getX() + 3.2f, body.getY() + 1.0f, 5.0f, 3.2f));                    // the shutter
+    g.drawRect (juce::Rectangle<float> (body.getX() + 2.6f, body.getBottom() - 5.0f, body.getWidth() - 5.2f, 4.2f), 1.1f);   // the label
+}
+
+void SaveKey::mouseEnter (const juce::MouseEvent&)
+{
+    hover = true;
+    repaint();
+}
+
+void SaveKey::mouseExit (const juce::MouseEvent&)
+{
+    hover = false;
+    repaint();
+}
+
+void SaveKey::mouseUp (const juce::MouseEvent& e)
+{
+    if (getLocalBounds().contains (e.getPosition()))
+        trigger();
+}
+
+bool SaveKey::keyPressed (const juce::KeyPress& k)
+{
+    if (k == juce::KeyPress::spaceKey || k == juce::KeyPress::returnKey)
+    {
+        trigger();
+        return true;
+    }
+    return false;
+}
+
+std::unique_ptr<juce::AccessibilityHandler> SaveKey::createAccessibilityHandler()
+{
+    return std::make_unique<juce::AccessibilityHandler> (*this, juce::AccessibilityRole::button,
+                                                          juce::AccessibilityActions().addAction (juce::AccessibilityActionType::press, [this] { trigger(); }));
+}
+
 OverflowKey::OverflowKey (std::function<void (juce::Component&)> f) : action (std::move (f))
 {
     setMouseCursor (juce::MouseCursor::PointingHandCursor);

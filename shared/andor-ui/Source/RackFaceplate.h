@@ -75,6 +75,28 @@ namespace hardware
     void paint (juce::Graphics& g, juce::Rectangle<int> local, int titleOffset, const Faceplate& f, const juce::String& title, bool lit,
                 juce::Rectangle<int> graph, float subtitleLimit);
 
+    /** The rail's save key (left of the overflow key, beside the preset browser): a small disk;
+        `action` saves the current settings as a preset (the browser's own Save). */
+    class SaveKey final : public juce::Component, public juce::SettableTooltipClient
+    {
+    public:
+        explicit SaveKey (std::function<void()> action);
+        void paint (juce::Graphics&) override;
+        void mouseEnter (const juce::MouseEvent&) override;
+        void mouseExit (const juce::MouseEvent&) override;
+        void mouseUp (const juce::MouseEvent&) override;
+        bool keyPressed (const juce::KeyPress&) override;
+        void focusGained (FocusChangeType) override { repaint(); }
+        void focusLost (FocusChangeType) override { repaint(); }
+        std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override;
+        /** What a click does (tests). */
+        void trigger() { if (action != nullptr) action(); }
+
+    private:
+        std::function<void()> action;
+        bool hover = false;
+    };
+
     /** The rail's overflow key: three dots; `action` gets the key (to anchor a menu). */
     class OverflowKey final : public juce::Component, public juce::SettableTooltipClient
     {

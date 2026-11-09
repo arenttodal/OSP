@@ -3402,6 +3402,12 @@ namespace
         {
             actionsMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&from).withDeletionCheck (*this));
         }
+        /** The save key's action: a name for these settings, then saved. */
+        void promptSave()
+        {
+            if (model != nullptr)
+                askName ("Save preset", "A name for these settings:", {}, false);
+        }
 
     private:
         void askName (const juce::String& title, const juce::String& prompt, const juce::String& current, bool rename)
@@ -3793,6 +3799,11 @@ namespace
             if (plate != nullptr)
             {
                 presetActions.onRail = true;
+                if (railSave == nullptr)
+                {
+                    railSave = std::make_unique<rack::hardware::SaveKey> ([this] { presetBar->promptSave(); });
+                    addAndMakeVisible (*railSave);
+                }
                 lightWatch.rack = this;
                 lightWatch.startTimerHz (8);
                 if (plate->enamelBody)
@@ -3837,6 +3848,7 @@ namespace
                 case 4: return cells.empty() ? juce::Rectangle<int>() : cells.front()->getBounds();
                 case 5: return visual != nullptr ? visual->getBounds() : juce::Rectangle<int>();
                 case 6: return presetActions.getBounds();
+                case 7: return railSave != nullptr ? railSave->getBounds() : juce::Rectangle<int>();
                 default: return {};
             }
         }
@@ -3885,7 +3897,15 @@ namespace
                 return row;
             row = row.withSizeKeepingCentre (row.getWidth(), 26);
             presetActions.setBounds (row.removeFromRight (actionsWidth).withSizeKeepingCentre (actionsWidth, 22));
-            row.removeFromRight (8);
+            row.removeFromRight (2);
+            // The save key: beside the preset browser, left of its actions (as a DAW's header).
+            if (railSave != nullptr)
+            {
+                railSave->setBounds (row.removeFromRight (26).withSizeKeepingCentre (26, 24));
+                row.removeFromRight (4);
+            }
+            else
+                row.removeFromRight (6);
             presetBar->setBounds (row.removeFromRight (railPresetWidth).withSizeKeepingCentre (railPresetWidth, 24));
             row.removeFromRight (16);
             return row;
@@ -4164,6 +4184,7 @@ namespace
         std::unique_ptr<ValueSelector> modeSelector;
         std::unique_ptr<RackPresetBar> presetBar;
         ActionsKey presetActions;
+        std::unique_ptr<rack::hardware::SaveKey> railSave;   ///< (faceplate rails: the save key)
         std::unique_ptr<Visual> visual;
         std::vector<std::unique_ptr<juce::Component>> cells;
         std::unique_ptr<TapeDeck> deck;

@@ -108,6 +108,9 @@ public:
     juce::Component* railComponent() const noexcept { return railPart.get(); }
     void setOverflow (std::function<void (juce::Component& key)> onClick);
     juce::Component* overflowKey() const noexcept { return overflow.get(); }
+    /** The rail's save key (left of the overflow key): saves the settings as a preset. */
+    void setSaveAction (std::function<void()> onClick);
+    juce::Component* saveKey() const noexcept { return save.get(); }
     /** Faceplate: its power key (bound to the header switch's parameter), or null. */
     rackui::PowerKey* powerKey() const noexcept { return powerKeyPart.get(); }
     /** The chassis and the content's left edge (component coordinates; tests, subclasses). */
@@ -210,6 +213,7 @@ private:
     std::unique_ptr<rackui::PowerKey> powerKeyPart;
     std::optional<Faceplate> faceplate;
     std::unique_ptr<juce::Component> railPart, overflow;
+    std::unique_ptr<hardware::SaveKey> save;
     int railPartWidth = 0;
     juce::String powerId;
     juce::Rectangle<int> railTitleArea;

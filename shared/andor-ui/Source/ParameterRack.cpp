@@ -177,6 +177,19 @@ void ParameterRack::setOverflow (std::function<void (juce::Component&)> onClick)
     }
 }
 
+void ParameterRack::setSaveAction (std::function<void()> onClick)
+{
+    if (save != nullptr)
+        removeChildComponent (save.get());
+    save.reset();
+    if (onClick != nullptr)
+    {
+        save = std::make_unique<hardware::SaveKey> (std::move (onClick));
+        addAndMakeVisible (*save);
+    }
+    resized();
+}
+
 juce::Rectangle<int> ParameterRack::chassisBounds() const
 {
     return faceplate ? hardware::measures (*faceplate).chassis (getLocalBounds()) : hardware::chassis (getLocalBounds());
@@ -474,7 +487,13 @@ void ParameterRack::layoutTitleRow (juce::Rectangle<int> row)
         if (overflow != nullptr)
         {
             overflow->setBounds (row.removeFromRight (26).withSizeKeepingCentre (26, 22));
-            row.removeFromRight (8);
+            row.removeFromRight (save != nullptr ? 2 : 8);
+        }
+        if (save != nullptr)
+        {
+            // (beside the preset browser, left of the overflow key: as a DAW's device header)
+            save->setBounds (row.removeFromRight (26).withSizeKeepingCentre (26, 24));
+            row.removeFromRight (6);
         }
         if (railPart != nullptr)
         {
