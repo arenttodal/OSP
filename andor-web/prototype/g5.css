@@ -1,0 +1,55 @@
+/* Gallery C — E: the instrument with its features open around it as floating bubbles. */
+.e-stage {
+  display: grid; margin-top: clamp(22px, 3.2vh, 40px);
+  grid-template-columns: minmax(230px, 1fr) minmax(0, 2.4fr) minmax(230px, 1fr);
+  grid-template-areas: "b1 obj b3" "b2 obj b4" "b5 b6 listen";
+  column-gap: clamp(20px, 2.4vw, 36px); row-gap: clamp(16px, 2vw, 24px); align-items: start;
+}
+.e-object { grid-area: obj; align-self: center; }
+.e-bubbles, .e-cell { display: contents; }
+.e-listen { grid-area: listen; align-self: end; padding-bottom: 6px; }
+.e-listen .ac__note { font-size: 0.75rem; }
+.g5 .ga--bare { display: block; }
+.g5 .ga--bare .ga-wall { width: 100%; }
+/* The notes' fade-in rule from g3 also applies to the markers; keep it. */
+
+/* The bubble: a soft rounded plate with the genuine popover resting on it */
+.bub { position: relative; display: grid; gap: 8px; padding: 16px 16px 18px; border-radius: 28px;
+  background: linear-gradient(180deg, #f3f2ed, #eceae4); box-shadow: 0 0 0 1px rgba(36, 39, 35, 0.04), 0 18px 40px -26px rgba(46, 38, 28, 0.35);
+  transition: transform var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out); }
+.bub__head { display: flex; align-items: center; gap: 9px; padding-inline: 4px; }
+.bub__title { margin: 0; font-size: 0.75rem; flex: 1; min-width: 0; }
+.bub__btn { all: unset; cursor: pointer; color: var(--text); }
+.bub__btn::after { content: ""; position: absolute; inset: 0; border-radius: 28px; z-index: 3; } /* the whole card is the hit area, above the image */
+.bub { border-radius: 28px; }
+.bub__btn:focus-visible::after { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent-strong); border-radius: 28px; }
+.bub__line { margin: 0; padding-inline: 4px; font-size: 0.8125rem; line-height: 1.4; color: var(--text-2); }
+.bub__plate { margin-top: 4px; border-radius: 18px; background: radial-gradient(80% 90% at 50% 20%, #fbfaf7, #f0eee8); padding: 12px; display: grid; place-items: center; }
+.bub__media { width: 100%; }
+.bub__media .pm__object { border-radius: 12px; box-shadow: 0 0 0 1px rgba(36, 39, 35, 0.07), 0 14px 30px -18px rgba(46, 38, 28, 0.45); }
+.bub--wide .bub__media .pm__object { border-radius: 8px; }
+.bub:hover { transform: translateY(-3px); box-shadow: 0 0 0 1px rgba(36, 39, 35, 0.06), 0 26px 50px -26px rgba(46, 38, 28, 0.45); }
+.bub:hover .ga-open { background: var(--text); color: var(--bg); }
+
+/* Entrance: bubbles open one after another once the instrument has settled */
+.js .g5 .bub { opacity: 0; transform: translate3d(0, 10px, 0) scale(0.97); }
+.js .g5.is-in .bub { opacity: 1; transform: none; transition: opacity var(--dur-3) var(--ease-out), transform var(--dur-3) var(--ease-out); transition-delay: calc(1100ms + var(--k) * 110ms); }
+.js .g5.is-in .bub:hover { transform: translateY(-3px); transition-delay: 0ms; }
+@media (prefers-reduced-motion: reduce) { .js .g5 .bub { opacity: 1 !important; transform: none !important; transition: none !important; } }
+
+/* Tablet: the instrument first, the bubbles in two columns beneath */
+@media (max-width: 1100px) {
+  .e-stage { grid-template-columns: 1fr 1fr; grid-template-areas: "obj obj" "b1 b3" "b2 b4" "b6 b6" "b5 listen"; }
+  .e-listen { align-self: start; }
+}
+
+/* Phones: a row of bubbles to swipe through, in its own scroller (never the page) */
+@media (max-width: 640px) {
+  .e-stage { display: block; }
+  .e-bubbles { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain;
+    margin: 20px calc(-1 * var(--gutter)) 0; padding: 4px var(--gutter) 18px; scroll-padding-inline: var(--gutter); scrollbar-width: none; }
+  .e-bubbles::-webkit-scrollbar { display: none; }
+  .e-cell { display: block; flex: 0 0 min(80vw, 320px); scroll-snap-align: start; }
+  .e-cell .bub { height: 100%; align-content: start; }
+  .e-listen { margin-top: 18px; }
+}

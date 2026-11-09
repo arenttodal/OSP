@@ -1,5 +1,21 @@
 # Hero concepts — Gate H
 
+## Round 3b (9 Nov 2026): E · open bubbles
+
+Owner: a version where the deep dives don't need a click. They float next to the feature titles
+as smaller bubbles, already open on the front page, and clicking one opens the full modal.
+
+`g5.html`: the three-layer instrument in the centre, with six floating bubbles around it on one
+grid. Left: 1 Your recording (the real drop area), 2 LIFE. Right: 3 SYNTH + IMPRINT (the Imprint
+page), 4 REIMAGINED (MOSAIC). Beneath: 5 SPACE, 6 Keyboard + arpeggiator (the arp panel with the
+keyboard), then the player. Each bubble is a soft rounded plate with the genuine popover or panel,
+a number matching the marker on the instrument, a title and one line. The whole card is one
+button (stretched hit area) that opens `FeatureModal` at that feature, as do the markers. The
+bubbles open in sequence after the instrument settles. Tablet: two columns beneath the
+instrument. Phones: a swipeable snap row in its own scroller (the page never scrolls sideways).
+QA: 7 widths clean; E checks (six bubbles open, bubble and marker open the modal, focus returns,
+phone row, bottom sheet) pass with the full suite (37/37).
+
 ## Round 3 (9 Nov 2026): Gallery C, chosen, in two versions
 
 Owner: go with C, use B's header area and no subheading, show the app with three layers (not a

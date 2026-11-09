@@ -12,7 +12,7 @@ const EDITOR = { w: 1448, h: 1086 };
  * bounds the capture test writes). With `onOpen`, notes and markers are buttons that open a deep
  * dive. Below 1000 px the notes become numbered markers on the image and a legend underneath.
  */
-export function AnnotatedObject({ asset, notes, sizes, onOpen }: { asset: string; notes: Annotation[]; sizes: string; onOpen?: (id: string, trigger: HTMLElement) => void }) {
+export function AnnotatedObject({ asset, notes, sizes, onOpen, bare = false }: { asset: string; notes: Annotation[]; sizes: string; onOpen?: (id: string, trigger: HTMLElement) => void; /** markers only: no side notes, no legend */ bare?: boolean }) {
   const room = useRef<HTMLDivElement>(null);
   const interactive = !!onOpen;
 
@@ -60,8 +60,8 @@ export function AnnotatedObject({ asset, notes, sizes, onOpen }: { asset: string
   );
 
   return (
-    <div ref={room} className={`ga ${interactive ? 'ga--interactive' : ''}`}>
-      {side('left')}
+    <div ref={room} className={`ga ${interactive ? 'ga--interactive' : ''} ${bare ? 'ga--bare' : ''}`}>
+      {!bare && side('left')}
       <div className="g-wall ga-wall">
         <div className="g-spot" aria-hidden="true" />
         <div className="ga-frame">
@@ -78,8 +78,8 @@ export function AnnotatedObject({ asset, notes, sizes, onOpen }: { asset: string
           ))}
         </div>
       </div>
-      {side('right')}
-      {interactive ? (
+      {!bare && side('right')}
+      {bare ? null : interactive ? (
         <ol className="ga-legend ga-legend--buttons" aria-label="Look closer">
           {notes.map((a) => (
             <li key={a.n}><button type="button" onClick={open(a.id)} aria-haspopup="dialog"><span className="ga-num" aria-hidden="true">{a.n}</span><span>{a.title}</span><span className="ga-open" aria-hidden="true">+</span></button></li>

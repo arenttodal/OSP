@@ -513,6 +513,42 @@
         900
       ],
       "approval": "concept"
+    },
+    {
+      "id": "bub-recording",
+      "master": "web-00-empty@2x.png",
+      "crop": {
+        "x": 474,
+        "y": 304,
+        "w": 500,
+        "h": 178
+      },
+      "use": "Bubble: your recording",
+      "alt": "The drop area of ANDOR OSP: Drop a sound, one tonal recording is enough, with Browse, Load example and Record buttons.",
+      "widths": [
+        480,
+        720,
+        1000
+      ],
+      "approval": "concept"
+    },
+    {
+      "id": "bub-synth",
+      "master": "web-03-synth-3-imprint@2x.png",
+      "crop": {
+        "x": 50,
+        "y": 189,
+        "w": 640,
+        "h": 321
+      },
+      "use": "Bubble: SYNTH + IMPRINT",
+      "alt": "The SYNTH page in Imprint mode: the oscillator cycle shaped by the recording, with wave, octave, detune and tone controls.",
+      "widths": [
+        480,
+        720,
+        1280
+      ],
+      "approval": "concept"
     }
   ]
 }

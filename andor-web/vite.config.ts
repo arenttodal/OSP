@@ -21,6 +21,7 @@ export default defineConfig({
         g2: resolve(__dirname, 'g2.html'),
         g3: resolve(__dirname, 'g3.html'),
         g4: resolve(__dirname, 'g4.html'),
+        g5: resolve(__dirname, 'g5.html'),
       },
     },
   },

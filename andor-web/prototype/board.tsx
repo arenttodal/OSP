@@ -9,8 +9,9 @@ const shots = import.meta.glob('./board/*.webp', { eager: true, query: '?url', i
 const shot = (name: string) => shots[`./board/${name}.webp`];
 
 const ROUND3 = [
-  { id: 'g3', href: 'g3.html', name: 'Version 1 · Notes', tone: 'Chosen direction · B header · three layers', line: 'Gallery C with edition B’s header and no subheading. The real three-layer instrument, notes pinned to its controls and a strip of real numbers beneath.' },
-  { id: 'g4', href: 'g4.html', name: 'Version 2 · Deep dive', tone: 'Chosen direction · rounded modals', line: 'Each numbered part opens a rounded modal with the real controls behind it: LIFE’s page, the five REIMAGINED modes, SYNTH and IMPRINT, SPACE and the arpeggiator. A bottom sheet on phones.' },
+  { id: 'g5', href: 'g5.html', name: 'E · Open bubbles', tone: 'Newest · features open around the instrument', line: 'The deep dives are already open on the page: soft floating bubbles beside the instrument, each holding the real popover or panel (the drop area, LIFE, SYNTH + IMPRINT, REIMAGINED, SPACE, the arpeggiator). Click a bubble or a marker for the full modal. A swipeable row on phones.' },
+  { id: 'g3', href: 'g3.html', name: 'C · Notes', tone: 'Chosen direction · B header · three layers', line: 'Gallery C with edition B’s header and no subheading. The real three-layer instrument, notes pinned to its controls and a strip of real numbers beneath.' },
+  { id: 'g4', href: 'g4.html', name: 'D · Deep dive', tone: 'Chosen direction · rounded modals', line: 'Each numbered part opens a rounded modal with the real controls behind it: LIFE’s page, the five REIMAGINED modes, SYNTH and IMPRINT, SPACE and the arpeggiator. A bottom sheet on phones.' },
 ];
 
 const EDITIONS = [
@@ -34,7 +35,7 @@ function Board() {
       </header>
       <main className="container">
         <h1 className="t-section board-title">The Gallery, <span className="quiet">in context.</span></h1>
-        <p className="board-rec"><span className="t-mono">Round 3 · your direction</span> Gallery C with edition B’s header, no subheading and the three-layer instrument, in two versions: notes, or deep-dive modals. Rounds 2 and 1 are kept below for comparison.</p>
+        <p className="board-rec"><span className="t-mono">Round 3 · your direction</span> Gallery C with edition B’s header, no subheading and the three-layer instrument, in three versions: E with the features open as bubbles, C with notes, D with deep-dive modals. Rounds 2 and 1 are kept below for comparison.</p>
         <p className="t-lede board-lede">Every product image is a genuine capture of the current build (c49d77f), or a studio render with that capture as its face. Round-2 editions use a straight capture; H1 uses the render.</p>
         <div className="board-grid">
           {ROUND3.map((c) => (
@@ -58,7 +59,7 @@ function Board() {
                 {shot('g4-modal-mobile') && <img className="board-mob" src={shot('g4-modal-mobile')} width={390} height={844} alt="" loading="lazy" />}
               </a>
               <div className="board-meta">
-                <p className="t-mono">Version 2 · a modal open</p>
+                <p className="t-mono">D and E · a modal open</p>
                 <h2 className="t-feature">REIMAGINED, up close</h2>
                 <p>The real MOSAIC popover, with tabs for all five modes. On phones the same content arrives as a bottom sheet.</p>
               </div>

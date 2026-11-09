@@ -3,7 +3,7 @@ import React from 'react';
 /** Prototype-only navigation between concepts. Hidden with ?clean (for screenshots). */
 export function ReviewBar({ current }: { current: string }) {
   if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('clean')) return null;
-  const items = [['./', 'Board'], ['g1.html', 'A'], ['g2.html', 'B'], ['g3.html', 'C'], ['g4.html', 'D'], ['h1.html', 'H1'], ['h2.html', 'H2'], ['h3.html', 'H3']];
+  const items = [['./', 'Board'], ['g1.html', 'A'], ['g2.html', 'B'], ['g3.html', 'C'], ['g4.html', 'D'], ['g5.html', 'E'], ['h1.html', 'H1'], ['h2.html', 'H2'], ['h3.html', 'H3']];
   return (
     <nav aria-label="Concept review" style={{ position: 'fixed', left: 12, bottom: 12, zIndex: 100, display: 'flex', gap: 2, padding: 3, borderRadius: 999, background: 'rgba(36,39,35,0.86)', backdropFilter: 'blur(8px)', fontSize: 12, fontFamily: 'var(--font-mono)' }}>
       {items.map(([href, label]) => (

@@ -86,8 +86,36 @@ check('Deep dive (phone): bottom sheet, full width', sheet.w === sheet.vw && she
 check('Deep dive (phone): no horizontal overflow', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
 await page.close();
 
+
+// Version E: open bubbles; a click opens the full modal
+page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+await page.goto(url('g5.html'));
+await page.waitForTimeout(3000);
+check('E: six bubbles already open on the page', (await page.$$eval('.bub', (b) => b.filter((x) => getComputedStyle(x).opacity === '1').length)) === 6);
+{ const b = await (await page.$('.bub:has(.bub__btn:text("LIFE")) .bub__plate')).boundingBox(); await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2); } // click the image, as a user would
+await page.waitForTimeout(400);
+check('E: clicking the LIFE bubble opens the LIFE modal', (await title()) === 'LIFE');
+await page.keyboard.press('Escape');
+await page.waitForTimeout(200);
+check('E: focus returns to the LIFE bubble', await page.evaluate(() => document.activeElement?.textContent?.startsWith('LIFE')));
+await page.click('.ga-dot:nth-of-type(4)');
+await page.waitForTimeout(400);
+check('E: marker 4 opens REIMAGINED', (await title()) === 'REIMAGINED');
+await page.keyboard.press('Escape');
+await page.close();
+page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+await page.goto(url('g5.html'));
+await page.waitForTimeout(3000);
+const row = await page.$eval('.e-bubbles', (el) => ({ scroll: el.scrollWidth > el.clientWidth, overflow: getComputedStyle(el).overflowX }));
+check('E (phone): bubbles form a swipeable row', row.scroll && row.overflow === 'auto', JSON.stringify(row));
+check('E (phone): the page itself does not scroll sideways', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+{ const b = await (await page.$('.bub:has(.bub__btn:text("Your recording")) .bub__plate')).boundingBox(); await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2); }
+await page.waitForTimeout(400);
+check('E (phone): tapping a bubble opens the bottom sheet', (await title()) === 'Your recording');
+await page.close();
+
 // Reduced motion: settled immediately
-for (const p of ['h1.html', 'h2.html', 'h3.html', 'g1.html', 'g2.html', 'g3.html', 'g4.html']) {
+for (const p of ['h1.html', 'h2.html', 'h3.html', 'g1.html', 'g2.html', 'g3.html', 'g4.html', 'g5.html']) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
   const t = await ctx.newPage();
   await t.goto(url(p));

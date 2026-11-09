@@ -1652,6 +1652,114 @@
           }
         ]
       }
+    },
+    "bub-recording": {
+      "id": "bub-recording",
+      "alt": "The drop area of ANDOR OSP: Drop a sound, one tonal recording is enough, with Browse, Load example and Record buttons.",
+      "use": "Bubble: your recording",
+      "width": 1000,
+      "height": 356,
+      "aspect": 2.80899,
+      "priority": false,
+      "approval": "concept",
+      "master": "web-00-empty@2x.png",
+      "treatment": null,
+      "crop": {
+        "x": 474,
+        "y": 304,
+        "w": 500,
+        "h": 178
+      },
+      "files": {
+        "avif": [
+          {
+            "width": 480,
+            "height": 171,
+            "file": "bub-recording-480.avif"
+          },
+          {
+            "width": 720,
+            "height": 256,
+            "file": "bub-recording-720.avif"
+          },
+          {
+            "width": 1000,
+            "height": 356,
+            "file": "bub-recording-1000.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 480,
+            "height": 171,
+            "file": "bub-recording-480.webp"
+          },
+          {
+            "width": 720,
+            "height": 256,
+            "file": "bub-recording-720.webp"
+          },
+          {
+            "width": 1000,
+            "height": 356,
+            "file": "bub-recording-1000.webp"
+          }
+        ]
+      }
+    },
+    "bub-synth": {
+      "id": "bub-synth",
+      "alt": "The SYNTH page in Imprint mode: the oscillator cycle shaped by the recording, with wave, octave, detune and tone controls.",
+      "use": "Bubble: SYNTH + IMPRINT",
+      "width": 1280,
+      "height": 642,
+      "aspect": 1.99377,
+      "priority": false,
+      "approval": "concept",
+      "master": "web-03-synth-3-imprint@2x.png",
+      "treatment": null,
+      "crop": {
+        "x": 50,
+        "y": 189,
+        "w": 640,
+        "h": 321
+      },
+      "files": {
+        "avif": [
+          {
+            "width": 480,
+            "height": 241,
+            "file": "bub-synth-480.avif"
+          },
+          {
+            "width": 720,
+            "height": 361,
+            "file": "bub-synth-720.avif"
+          },
+          {
+            "width": 1280,
+            "height": 642,
+            "file": "bub-synth-1280.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 480,
+            "height": 241,
+            "file": "bub-synth-480.webp"
+          },
+          {
+            "width": 720,
+            "height": 361,
+            "file": "bub-synth-720.webp"
+          },
+          {
+            "width": 1280,
+            "height": 642,
+            "file": "bub-synth-1280.webp"
+          }
+        ]
+      }
     }
   }
 }
