@@ -8,6 +8,12 @@ import { Wordmark } from '../components/interactive/SiteHeader';
 const shots = import.meta.glob('./board/*.webp', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
 const shot = (name: string) => shots[`./board/${name}.webp`];
 
+const EDITIONS = [
+  { id: 'A', href: 'g1.html', name: 'Gallery A · Quiet', tone: 'Inter Display · centred · placards', line: 'The museum composition, now all sans with a two-tone title. Both placards carry content: what OSP is on the left, the object label and listening on the right.' },
+  { id: 'B', href: 'g2.html', name: 'Gallery B · Panel', tone: 'Geist · framed panel · pill navigation', line: 'Closest to your references. A softly lit panel with pill navigation, a large centred title, a mono statement lower left and the actions lower right.' },
+  { id: 'C', href: 'g3.html', name: 'Gallery C · Context', tone: 'Inter Tight · annotated object · facts', line: 'The object with its labels. Notes pinned to real controls (the recording, LIFE, SYNTH + IMPRINT, REIMAGINED, the keyboard) and a strip of real numbers beneath. Numbered markers and a legend on phones.' },
+];
+
 const CONCEPTS = [
   { id: 'H1', rec: true, href: 'h1.html', name: 'The Instrument', line: 'The object is the hero. A studio render of the real interface stands beside two-tone type, with its genuine states (one layer, three layers, IMPRINT) as a contact sheet.', tone: 'Light · asymmetric · tactile depth' },
   { id: 'H2', href: 'h2.html', name: 'The Sound', line: 'The page opens on the recording itself: the waveform alone in the dark (first image). The frame then pulls back on the same genuine capture, and the instrument is around it (second image).', tone: 'Dark · cinematic · one matched cut' },
@@ -22,9 +28,26 @@ function Board() {
         <p className="t-mono">Gate H · hero directions · concept</p>
       </header>
       <main className="container">
-        <h1 className="t-section board-title">Three openings for <span className="quiet">ANDOR OSP.</span></h1>
-        <p className="board-rec"><span className="t-mono">Recommendation</span> H1, The Instrument: the strongest product presentation and the most distinctive opening, and the direct answer to the depth in your references. H2 is the alternative if studio renders are not accepted (decision D-04).</p>
-        <p className="t-lede board-lede">Every product image is a genuine capture of the current build (c49d77f), or a studio render with that capture as its face. Open each concept at full size and on a phone.</p>
+        <h1 className="t-section board-title">The Gallery, <span className="quiet">in three editions.</span></h1>
+        <p className="board-rec"><span className="t-mono">Round 2 · your direction</span> The Gallery without the serif, in three editions. Open each at full size and on a phone. Round 1 (H1–H3) is kept below for comparison.</p>
+        <p className="t-lede board-lede">Every product image is a genuine capture of the current build (c49d77f), or a studio render with that capture as its face. Round-2 editions use a straight capture; H1 uses the render.</p>
+        <div className="board-grid">
+          {EDITIONS.map((c) => (
+            <article key={c.id} className="board-card">
+              <a href={c.href} className="board-shots" aria-label={`Open ${c.name}`}>
+                <img className="board-desk" src={shot(`g${'ABC'.indexOf(c.id) + 1}-desktop`)} width={1200} height={750} alt="" loading="lazy" />
+                <img className="board-mob" src={shot(`g${'ABC'.indexOf(c.id) + 1}-mobile`)} width={390} height={844} alt="" loading="lazy" />
+              </a>
+              <div className="board-meta">
+                <p className="t-mono">{c.tone}</p>
+                <h2 className="t-feature">{c.name}</h2>
+                <p>{c.line}</p>
+                <a className="btn btn-secondary btn-small" href={c.href}>Open edition {c.id}</a>
+              </div>
+            </article>
+          ))}
+        </div>
+        <h2 className="t-feature board-round">Round 1 · three directions</h2>
         <div className="board-grid">
           {CONCEPTS.map((c) => (
             <article key={c.id} className="board-card">
@@ -34,7 +57,7 @@ function Board() {
                 {shot(`${c.id.toLowerCase()}-mobile`) && <img className="board-mob" src={shot(`${c.id.toLowerCase()}-mobile`)} width={390} height={844} alt="" loading="lazy" />}
               </a>
               <div className="board-meta">
-                <p className="t-mono">{c.id} · {c.tone}{(c as any).rec ? ' · recommended' : ''}</p>
+                <p className="t-mono">{c.id} · {c.tone}{c.id === 'H3' ? ' · chosen direction' : ''}</p>
                 <h2 className="t-feature">{c.name}</h2>
                 <p>{c.line}</p>
                 <a className="btn btn-secondary btn-small" href={c.href}>Open {c.id}</a>

@@ -14,3 +14,4 @@
 .board-rec { margin: 28px 0 0; max-width: 62ch; padding: 18px 20px; border-radius: 12px; background: var(--bg-elev); box-shadow: 0 0 0 1px var(--border); }
 .board-rec .t-mono { display: block; color: var(--accent-strong); margin-bottom: 6px; }
 .board-desk--frame { margin-bottom: 14px; }
+.board-round { margin-top: 120px; padding-top: 28px; border-top: 1px solid var(--border); color: var(--text-2); }

@@ -1,0 +1,46 @@
+/* Gallery B — Panel (Geist). A framed, softly lit panel on a warm grey ground. */
+.g2 { --g-font: "Geist Variable", var(--font-sans); --g2-ground: #e6e4de; --g2-panel: #f6f5f1; --g2-pill: #e8e6e0;
+  background: var(--g2-ground); padding: clamp(8px, 1vw, 14px); }
+.g2-panel { background:
+    radial-gradient(60% 55% at 50% 62%, #fdfcf9 0%, rgba(253, 252, 249, 0) 70%), var(--g2-panel);
+  border-radius: clamp(20px, 2.2vw, 30px); overflow: clip; box-shadow: 0 0 0 1px rgba(36, 39, 35, 0.05); }
+
+/* Header: pill navigation left, wordmark centred, waitlist pill right */
+.g2-header .site-header__bar { position: relative; height: 72px; padding-inline: clamp(14px, 1.6vw, 22px); max-width: none; }
+.g2-header .site-nav { flex: 1; gap: 6px; }
+.g2-header .site-nav a:not(.btn) { padding: 8px 16px; border-radius: var(--radius-pill); background: var(--g2-pill); color: var(--text); font-size: 0.875rem; }
+.g2-header .site-nav a:not(.btn):hover { background: #dfddd6; }
+.g2-header .site-nav .btn { margin-left: auto; border-color: transparent; background: var(--g2-pill); }
+.g2-header .site-header__bar > span:first-child { position: absolute; left: 50%; translate: -50% 0; }
+.g2-header .wordmark { font-size: 1.25rem; }
+@media (max-width: 860px) {
+  .g2-header .site-header__bar > span:first-child { position: static; translate: none; }
+}
+
+/* Title: large, centred, two-tone within the line */
+.g2-hero { padding: clamp(12px, 2.6vh, 36px) clamp(16px, 2.4vw, 40px) clamp(24px, 4vh, 48px); }
+.g2-title { text-align: center; font-size: clamp(2.875rem, 1.6rem + 4.1vw, 6.25rem); font-weight: 540; letter-spacing: -0.05em; line-height: 0.96; }
+
+/* The room: statement | object | actions, all on the object's baseline */
+.g2-room { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(0, 2.6fr) minmax(220px, 1fr); gap: clamp(20px, 2.6vw, 40px); align-items: end; margin-top: clamp(20px, 3.4vh, 40px); }
+.g2-wall { width: min(100%, calc((100svh - 400px) * 1.3333)); justify-self: center; }
+.g2-mono { margin: 0 0 14px; font-size: 1rem; letter-spacing: 0.01em; line-height: 1.25; color: var(--text); }
+.g2-lede { margin: 0; font-size: var(--type-small); line-height: 1.5; color: var(--text-2); max-width: 30ch; }
+.g2-actions { display: grid; justify-items: end; gap: 22px; }
+.g2-listen { width: 100%; max-width: 300px; }
+.g2-listen .ac__note { font-size: 0.75rem; }
+
+@media (max-width: 900px) {
+  .g2-room { grid-template-columns: 1fr 1fr; grid-template-areas: "wall wall" "left right"; align-items: start; }
+  .g2-wall { grid-area: wall; width: 100%; }
+  .g2-statement { grid-area: left; }
+  .g2-actions { grid-area: right; }
+}
+@media (max-width: 640px) {
+  .g2-title { font-size: clamp(2.6rem, 12.6vw, 3.5rem); }
+  .g2-room { grid-template-columns: 1fr; grid-template-areas: "left" "wall" "right"; gap: 22px; }
+  .g2-statement { text-align: center; }
+  .g2-lede { margin-inline: auto; }
+  .g2-actions { justify-items: start; }
+  .g2-listen { max-width: none; }
+}

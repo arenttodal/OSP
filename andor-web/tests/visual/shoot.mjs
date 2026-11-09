@@ -15,7 +15,7 @@ const out = path.join(root, 'tests/visual/out');
 fs.mkdirSync(out, { recursive: true });
 const args = process.argv.slice(2);
 const scale = args.includes('--scale') ? Number(args[args.indexOf('--scale') + 1]) : 1;
-const pages = args.filter((a) => /^(h\d|index)$/.test(a));
+const pages = args.filter((a) => /^([hg]\d|index)$/.test(a));
 const PAGES = pages.length ? pages : ['h1', 'h2', 'h3'];
 const WIDTHS = [[1440, 900], [1280, 800], [1024, 768], [768, 1024], [390, 844], [375, 667], [320, 568]];
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.webp': 'image/webp', '.avif': 'image/avif', '.png': 'image/png', '.woff2': 'font/woff2', '.woff': 'font/woff', '.json': 'application/json' };
@@ -50,7 +50,7 @@ for (const page of PAGES) {
     } else await tab.waitForTimeout(page === 'h2' ? 4200 : 3000);
     const m = await tab.evaluate(() => {
       const vis = (el) => { if (!el) return 0; const r = el.getBoundingClientRect(); const ih = Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0)); const iw = Math.max(0, Math.min(r.right, innerWidth) - Math.max(r.left, 0)); return r.width * r.height ? +((ih * iw) / (r.width * r.height)).toFixed(2) : 0; };
-      const prod = [...document.querySelectorAll('.h1-object--active, .h2-object, .h3-object')][0];
+      const prod = [...document.querySelectorAll('.h1-object--active, .h2-object, .h3-object, .g-object')][0];
       const cta = document.querySelector('.btn-pair');
       const h1 = document.querySelector('h1');
       const pr = prod?.getBoundingClientRect();

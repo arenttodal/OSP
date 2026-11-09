@@ -1,5 +1,26 @@
 # Hero concepts — Gate H
 
+## Round 2 (9 Nov 2026): The Gallery in three editions
+
+Owner feedback on round 1: prefers **The Gallery**, without the serif. Wanted to see it in three
+editions: one with a font closer to the references (or Open Sans, Inter or similar), and one with
+more context around the object instead of an empty left side.
+
+| Edition | Page | Typeface | What changes |
+|---|---|---|---|
+| **A · Quiet** | `g1.html` | Inter Display (Inter's optical size axis, variable, OFL) | Round 1's museum composition in sans with a two-tone title. The left placard now carries content: kicker, lede, three short points and the CTA. |
+| **B · Panel** | `g2.html` | **Geist** (variable, OFL): the closest free neo-grotesk to the Teenage Engineering references | A framed, softly lit panel on a warm grey ground. Pill navigation, the wordmark centred, a large centred title with a two-tone first word, a mono statement lower left, actions and the player lower right. |
+| **C · Context** | `g3.html` | Inter Tight (the system face) | The annotated object. Five notes are pinned to real controls in the capture (the recording, LIFE, SYNTH + IMPRINT, REIMAGINED, the keyboard), each with a hairline to the exact point. A strip of real numbers sits beneath (1 recording, 3 layers, 5 REIMAGINED modes, 6 macros, 4 SPACE engines, 16 modulation routes), with the player beside it. On phones: numbered markers on the image plus a legend. Screen readers get the legend at every width. |
+
+All three share `prototype/gallery/gallery.css`. QA at 7 widths each: no overflow, no errors, no
+missing media, CLS ≤ 0.0006. The CTA is visible in the first viewport everywhere except B at
+375×667 / 320×568 and A at 768×1024. Reduced motion settles at once.
+
+Annotation accuracy: note points are 1x editor coordinates of the controls in the capture. Lines
+are measured against the untransformed frame, and the notes fade in after the object settles.
+
+Round 1 follows for reference.
+
 Three distinct compositions with one shared design system. Each one is a working page
 (`h1.html`, `h2.html`, `h3.html`) with art-directed mobile layouts. All product imagery is
 genuine: captures of the editor at `c49d77f`, or a studio render with that capture as its face.

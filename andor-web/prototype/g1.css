@@ -1,0 +1,31 @@
+/* Gallery A — Quiet (Inter Display through optical sizing). */
+.g1 { --g-font: "Inter Variable", var(--font-sans); font-optical-sizing: auto; }
+.g1-hero { padding-bottom: clamp(56px, 8vw, 120px); }
+.g1-head { text-align: center; padding-top: clamp(16px, 4vh, 52px); }
+.g1-title { font-size: clamp(2.875rem, 1.75rem + 3.4vw, 5.25rem); font-weight: 560; letter-spacing: -0.045em; }
+.g1-room {
+  display: grid; grid-template-columns: minmax(200px, 1fr) minmax(0, 3fr) minmax(200px, 1fr);
+  gap: clamp(24px, 3vw, 48px); align-items: end; margin-top: clamp(28px, 4.5vh, 56px);
+}
+.g1-placard { padding-bottom: 4px; }
+.g1-kicker { color: var(--text-muted); margin: 0 0 14px; font-size: 0.75rem; padding-top: 14px; border-top: 1px solid var(--text); }
+.g1-lede { margin: 0; font-size: 1.0625rem; line-height: 1.45; letter-spacing: -0.01em; font-weight: 500; max-width: 22ch; }
+.g1-points { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 10px; font-size: var(--type-small); color: var(--text-2); line-height: 1.45; max-width: 26ch; }
+.g1-points strong { color: var(--text); font-weight: 560; }
+.g1-ctas { margin-top: 24px; }
+.g1-listen { margin-top: 26px; }
+.g1-listen .ac__note { font-size: 0.8125rem; }
+
+@media (max-width: 900px) {
+  .g1-room { grid-template-columns: 1fr 1fr; grid-template-areas: "wall wall" "left right"; align-items: start; }
+  .g1 .g-wall { grid-area: wall; }
+  .g1-placard--left { grid-area: left; }
+  .g1-placard--right { grid-area: right; }
+}
+@media (max-width: 640px) {
+  .g1-title { font-size: clamp(2.6rem, 12.4vw, 3.4rem); }
+  .g1-room { grid-template-columns: 1fr; grid-template-areas: "left" "wall" "right"; gap: 28px; margin-top: 20px; }
+  .g1-placard--left { order: -1; }
+  .g1-points { display: none; }
+  .g1 .g-wall { margin-inline: calc(-0.5 * var(--gutter)); }
+}

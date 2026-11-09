@@ -1,0 +1,65 @@
+/* Gallery C — Context (Inter Tight). The object with its labels. */
+.g3-hero { padding-bottom: clamp(48px, 7vw, 104px); }
+.g3-head { text-align: center; padding-top: clamp(12px, 3vh, 40px); }
+.g3-title { font-size: clamp(2.875rem, 1.75rem + 3.2vw, 5rem); }
+.g3-intro { display: flex; align-items: center; justify-content: center; gap: clamp(20px, 3vw, 40px); margin-top: clamp(18px, 2.6vh, 28px); flex-wrap: wrap; }
+.g3-lede { margin: 0; font-size: var(--type-lede); line-height: 1.4; color: var(--text-2); max-width: 30ch; text-align: left; }
+.g3-ctas { display: flex; align-items: center; gap: 22px; }
+.g3-room { margin-top: clamp(24px, 3.4vh, 44px); }
+
+/* Annotated object: notes | object | notes */
+.ga { display: grid; grid-template-columns: minmax(190px, 1fr) minmax(0, 2.7fr) minmax(190px, 1fr); column-gap: clamp(28px, 3.4vw, 56px); align-items: stretch; }
+.ga-wall { width: min(100%, calc((100svh - 330px) * 1.3333)); justify-self: center; align-self: center; }
+.ga-frame { position: relative; z-index: 1; }
+.ga-side { position: relative; z-index: 3; pointer-events: none; }
+.ga-note { position: absolute; top: var(--top, 0); translate: 0 -0.62em; width: 100%; }
+.ga-side--left .ga-note { text-align: right; }
+.ga-note__title { position: relative; margin: 0; font-size: 0.75rem; color: var(--text); display: flex; align-items: center; gap: 8px; }
+.ga-side--left .ga-note__title { justify-content: flex-end; }
+/* The leader: from the title to the exact point on the capture */
+.ga-note__title::after { content: ""; position: absolute; top: 50%; height: 1px; width: var(--len, 0); background: color-mix(in srgb, var(--text) 70%, transparent); box-shadow: 0 0 0 1px rgba(252, 251, 248, 0.45); }
+.ga-side--left .ga-note__title::after { left: calc(100% + 10px); width: calc(var(--len, 0px) - 10px); }
+.ga-side--right .ga-note__title::after { right: calc(100% + 10px); width: calc(var(--len, 0px) - 10px); }
+.ga-note__text { margin: 6px 0 0; font-size: var(--type-small); line-height: 1.45; color: var(--text-2); }
+.ga-side--left .ga-note__text { margin-left: auto; max-width: 25ch; }
+.ga-side--right .ga-note__text { max-width: 25ch; }
+.ga-num { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--text); color: var(--bg); font-family: var(--font-mono); font-size: 0.625rem; font-weight: 500; letter-spacing: 0; }
+.ga-dot { position: absolute; width: 0; height: 0; z-index: 2; }
+.ga-dot::before { content: ""; position: absolute; left: -7px; top: -7px; width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--text); background: rgba(252, 251, 248, 0.55); box-shadow: 0 0 0 3px rgba(252, 251, 248, 0.5); }
+.ga-dot span { display: none; }
+.ga-legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } /* read by assistive tech at every width */
+
+/* Facts */
+.g3-strip { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); gap: clamp(24px, 4vw, 64px); align-items: start; margin-top: clamp(40px, 6vh, 72px); padding-top: 22px; border-top: 1px solid var(--text); }
+.g3-facts { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px; margin: 0; }
+.g3-fact dt { font-size: clamp(1.75rem, 1.2rem + 1.4vw, 2.75rem); font-weight: 480; letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums; }
+.g3-fact dd { margin: 8px 0 0; font-size: 0.8125rem; line-height: 1.35; color: var(--text-2); max-width: 16ch; }
+.g3-listen .ac__note { font-size: 0.75rem; }
+
+/* Small screens: numbered markers on the image, the legend beneath */
+@media (max-width: 1000px) {
+  .ga { grid-template-columns: 1fr; }
+  .ga-side { display: none; }
+  .ga-wall { width: 100%; }
+  .ga-dot::before { left: -11px; top: -11px; width: 22px; height: 22px; background: var(--text); border-color: var(--bg); box-shadow: 0 2px 6px rgba(36, 39, 35, 0.3); }
+  .ga-dot span { display: grid; place-items: center; position: absolute; left: -11px; top: -11px; width: 22px; height: 22px; color: var(--bg); font-family: var(--font-mono); font-size: 0.6875rem; }
+  .ga-legend { position: static; width: auto; height: auto; overflow: visible; clip: auto; white-space: normal; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 24px; list-style: none; margin: 28px 0 0; padding: 0; }
+  .ga-legend li { display: flex; gap: 10px; font-size: var(--type-small); line-height: 1.45; color: var(--text-2); }
+  .ga-legend strong { color: var(--text); font-weight: 560; }
+  .ga-legend .ga-num { flex: none; margin-top: 1px; }
+  .g3-strip { grid-template-columns: 1fr; }
+  .g3-facts { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 22px; }
+}
+@media (max-width: 560px) {
+  .g3-title { font-size: clamp(2.6rem, 12.4vw, 3.4rem); }
+  .g3-intro { flex-direction: column; align-items: flex-start; text-align: left; }
+  .g3-lede { text-align: left; }
+  .g3-head { text-align: left; }
+  .ga-legend { grid-template-columns: 1fr; }
+  .g3-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* The notes arrive last, once the object has settled into its light */
+.js .g3 .ga-dot, .js .g3 .ga-side { opacity: 0; }
+.js .g3.is-in .ga-dot, .js .g3.is-in .ga-side { opacity: 1; transition: opacity var(--dur-3) var(--ease-out) 1500ms; }
+@media (prefers-reduced-motion: reduce) { .js .g3 .ga-dot, .js .g3 .ga-side { opacity: 1 !important; transition: none !important; } }

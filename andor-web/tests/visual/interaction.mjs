@@ -47,12 +47,12 @@ check('Focus returns to the menu button', await page.evaluate(() => document.act
 await page.close();
 
 // Reduced motion: settled immediately
-for (const p of ['h1.html', 'h2.html', 'h3.html']) {
+for (const p of ['h1.html', 'h2.html', 'h3.html', 'g1.html', 'g2.html', 'g3.html']) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
   const t = await ctx.newPage();
   await t.goto(url(p));
   await t.waitForTimeout(150);
-  const o = await t.evaluate(() => { const el = document.querySelector('.h1-object--active, .h2-object, .h3-object'); const s = getComputedStyle(el); return { o: s.opacity, tr: s.transform }; });
+  const o = await t.evaluate(() => { const el = document.querySelector('.h1-object--active, .h2-object, .h3-object, .g-object'); const s = getComputedStyle(el); return { o: s.opacity, tr: s.transform }; });
   check(`Reduced motion ${p}: product settled at once`, o.o === '1' && (o.tr === 'none' || o.tr === 'matrix(1, 0, 0, 1, 0, 0)'), JSON.stringify(o));
   await ctx.close();
 }
