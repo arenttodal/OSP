@@ -3,6 +3,7 @@
 
 #include "AndorParameters.h"
 #include "Binding.h"
+#include "ParameterFactory.h"
 #include "KeyDnaState.h"
 
 #include <algorithm>
@@ -60,9 +61,15 @@ namespace
     const juce::Identifier sourcesType ("Sources"), layerType ("Layer"), viewType ("View"), curvesType ("Curves"), shaperType ("Shaper"), keyDnaType ("KeyDna");
     const juce::Identifier shaperBType ("ShaperB");
 
-    /** ANDOR OSP's schema, then the product's own parameters (ProductInfo::addParameters). */
-    juce::AudioProcessorValueTreeState::ParameterLayout productParameterLayout()
+    /** ANDOR OSP's schema, then the product's own parameters (ProductInfo::addParameters).
+        Only the parameters the engine reads (`bound`) are offered to the host for automation:
+        the rest do nothing in this product (the bindings tests prove them inert), so a DAW's
+        automation lists leave them out. IDs, order and saved state are unchanged. */
+    juce::AudioProcessorValueTreeState::ParameterLayout productParameterLayout (const juce::StringArray& bound)
     {
+        const osp::plugin::parameters::ScopedAutomatableFilter automatable ([&bound] (const juce::String& id) {
+            return osp::plugin::binding::anyBound ({ id }, bound);
+        });
         // The product's own modulation destinations come after ANDOR OSP's in the routes'
         // destination list, which the layout below is made with.
         osp::mod::setProductDestinations (productInfo().modulationDestinations);
@@ -72,15 +79,15 @@ namespace
             // The per-card arpeggiator: every card arpeggiated and linked by default (the one
             // arpeggiator, exactly as before); B's and C's own settings start as A's defaults.
             auto id = [] (const juce::String& s) { return juce::ParameterID { s, 27 }; };
-            layout.add (std::make_unique<juce::AudioParameterBool> (id (osp::plugin::ids::arpLink (productInfo().slug + ".")), "Arp Link", true));
+            layout.add (osp::plugin::parameters::make<juce::AudioParameterBool> (id (osp::plugin::ids::arpLink (productInfo().slug + ".")), "Arp Link", true));
             for (int c = 0; c < 3; ++c)
-                layout.add (std::make_unique<juce::AudioParameterBool> (id (osp::plugin::ids::arpCard (productInfo().slug + ".", c)), "Arp Card " + juce::String::charToString (static_cast<juce::juce_wchar> ('A' + c)), true));
+                layout.add (osp::plugin::parameters::make<juce::AudioParameterBool> (id (osp::plugin::ids::arpCard (productInfo().slug + ".", c)), "Arp Card " + juce::String::charToString (static_cast<juce::juce_wchar> ('A' + c)), true));
             for (int c = 1; c < 3; ++c)
             {
                 const auto name = "Arp Card " + juce::String::charToString (static_cast<juce::juce_wchar> ('A' + c)) + " ";
-                layout.add (std::make_unique<juce::AudioParameterChoice> (id (osp::plugin::ids::arpCardSetting (productInfo().slug + ".", c, "pattern")), name + "Pattern", InstrumentHost::arpPatternNames(), 0));
-                layout.add (std::make_unique<juce::AudioParameterChoice> (id (osp::plugin::ids::arpCardSetting (productInfo().slug + ".", c, "rate")), name + "Rate", InstrumentHost::arpRateNames(), 1));
-                layout.add (std::make_unique<juce::AudioParameterInt> (id (osp::plugin::ids::arpCardSetting (productInfo().slug + ".", c, "octaves")), name + "Octaves", 1, 4, 1));
+                layout.add (osp::plugin::parameters::make<juce::AudioParameterChoice> (id (osp::plugin::ids::arpCardSetting (productInfo().slug + ".", c, "pattern")), name + "Pattern", InstrumentHost::arpPatternNames(), 0));
+                layout.add (osp::plugin::parameters::make<juce::AudioParameterChoice> (id (osp::plugin::ids::arpCardSetting (productInfo().slug + ".", c, "rate")), name + "Rate", InstrumentHost::arpRateNames(), 1));
+                layout.add (osp::plugin::parameters::make<juce::AudioParameterInt> (id (osp::plugin::ids::arpCardSetting (productInfo().slug + ".", c, "octaves")), name + "Octaves", 1, 4, 1));
             }
         }
         if (productInfo().addParameters != nullptr)
@@ -104,7 +111,7 @@ namespace
 //==============================================================================
 ShellProcessor::ShellProcessor (std::unique_ptr<Engine> productEngine)
     : AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
-      parameters (*this, &undoManager, productInfo().stateType, productParameterLayout()),
+      parameters (*this, &undoManager, productInfo().stateType, productParameterLayout (productEngine->boundParameters())),
       engine (std::move (productEngine))
 {
     jassert (engine != nullptr);
