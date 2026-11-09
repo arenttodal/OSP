@@ -42,3 +42,11 @@ __pycache__/
 # Rendered controls: masters, atlases and previews are regenerated (tools/blender-assets/README.md)
 /tools/blender-assets/output/
 __pycache__/
+
+# Polyphonic Instrument Extraction Lab: its environment and generated audio, renders and runs.
+/research/polyphonic-lab/.venv/
+/research/polyphonic-lab/.venv-basic-pitch/
+/research/polyphonic-lab/output/
+/research/polyphonic-lab/**/__pycache__/
+/research/polyphonic-lab/.pytest_cache/
+/research/polyphonic-lab/*.egg-info/

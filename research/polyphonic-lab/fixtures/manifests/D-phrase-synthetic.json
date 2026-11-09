@@ -1,0 +1,287 @@
+{
+ "schema": "osp-poly.fixture/1",
+ "id": "D-phrase-synthetic",
+ "class": "D",
+ "family": "piano",
+ "complexity": "phrase",
+ "description": "C - Am - F - G with a melody, timing within +-15 ms, varied velocities",
+ "input": {
+  "path": "corpus/D-phrase-synthetic/mix.wav",
+  "sha256": "ee346fc5b8dd148c760c44305b5e577d722f918de95b9b774ab45faf443fbeb0",
+  "sampleRate": 48000,
+  "channels": 1,
+  "frames": 249600,
+  "durationSeconds": 5.2
+ },
+ "groundTruth": {
+  "notes": [
+   {
+    "id": "note-0001",
+    "pitch_midi": 48,
+    "pitch_hz": 130.8128,
+    "name": "C3",
+    "onset_seconds": 0.1,
+    "offset_seconds": 1.05,
+    "sound_end_seconds": 1.4375,
+    "velocity": 0.55,
+    "instrument": "piano",
+    "stem": {
+     "path": "corpus/D-phrase-synthetic/stems/note-0001_C3.wav",
+     "sha256": "f8e70521dd690078ba09420e8ef7a4f17ac01fa3c7c4ec31854d4e0aaa94a44e"
+    }
+   },
+   {
+    "id": "note-0002",
+    "pitch_midi": 55,
+    "pitch_hz": 195.9977,
+    "name": "G3",
+    "onset_seconds": 0.112,
+    "offset_seconds": 1.05,
+    "sound_end_seconds": 1.4549,
+    "velocity": 0.6000000000000001,
+    "instrument": "piano",
+    "stem": {
+     "path": "corpus/D-phrase-synthetic/stems/note-0002_G3.wav",
+     "sha256": "287cca069d13f26fdc515997b30bc304b49ba00781dd15484b75f5ba9965f676"
+    }
+   },
+   {
+    "id": "note-0003",
+    "pitch_midi": 64,
+    "pitch_hz": 329.6276,
+    "name": "E4",
+    "onset_seconds": 0.092,
+    "offset_seconds": 1.05,
+    "sound_end_seconds": 1.385,
+    "velocity": 0.65,
+    "instrument": "piano",
+    "stem": {
+     "path": "corpus/D-phrase-synthetic/stems/note-0003_E4.wav",
+     "sha256": "92563c557f0083dafddb866f405d40515e2a4bc58637d37698d594f38157d47c"
+    }
+   },
+   {
+    "id": "note-0004",
+    "pitch_midi": 57,
+    "pitch_hz": 220.0,
+    "name": "A3",
+    "onset_seconds": 1.112,
+    "offset_seconds": 2.05,
+    "sound_end_seconds": 2.4267,
+    "velocity": 0.6000000000000001,
+    "instrument": "piano",
+    "stem": {
+     "path": "corpus/D-phrase-synthetic/stems/note-0004_A3.wav",
+     "sha256": "6de68cb3bb94f818e4db2115269e9c519c17ea35ce1b4171cb80ce87318e7eb4"
+    }
+   },
+   {
+    "id": "note-0005",
+    "pitch_midi": 60,
+    "pitch_hz": 261.6256,
+    "name": "C4",
+    "onset_seconds": 1.092,
+    "offset_seconds": 2.05,
+    "sound_end_seconds": 2.397,
+    "velocity": 0.65,
+    "instrument": "piano",
+    "stem": {
+     "path": "corpus/D-phrase-synthetic/stems/note-0005_C4.wav",
+     "sha256": "3df97687a3a22bf4e78f9b6c3d3f583593f5f50e7d961a107200e568db94333e"
+    }
+   },
+   {
+    "id": "note-0006",
+    "pitch_midi": 64,
+    "pitch_hz": 329.6276,
+    "name": "E4",
+    "onset_seconds": 1.115,
+    "offset_seconds": 2.05,
+    "sound_end_seconds": 2.4211,
+    "velocity": 0.55,
+    "instrument": "piano",
+    "stem": {
+     "path": "corpus/D-phrase-synthetic/stems/note-0006_E4.wav",
+     "sha256": "1d7646b9f3a7fe9091047dae2f2de08ca239a3ff782e4fd00764f3c0654b0467"
+    }
+   },
+   {
+    "id": "note-0007",
+    "pitch_midi": 65,
+    "pitch_hz": 349.2282,
+    "name": "F4",
+    "onset_seconds": 2.092,
+    "offset_seconds": 3.05,
+    "sound_end_seconds": 3.4123,
+    "velocity": 0.65,
+    "instrument": "piano",
+    "stem": {
+     "path": "corpus/D-phrase-synthetic/stems/note-0007_F4.wav",
+     "sha256": "8ccc6110b61dcd8ff10a2d63e3c45f36bc1342ce0fff424bb5d0a4c8d0c6edbb"
+    }
+   },
+   {
+    "id": "note-0008",
+    "pitch_midi": 57,
+    "pitch_hz": 220.0,
+    "name": "A3",
+    "onset_seconds": 2.115,
+    "offset_seconds": 3.05,
+    "sound_end_seconds": 3.4402,
+    "velocity": 0.55,
+    "instrument": "piano",
+    "stem": {
+     "path": "corpus/D-phrase-synthetic/stems/note-0008_A3.wav",
+     "sha256": "288a18097235f197f70115a16cac17786fc6a4c6ae423d4ab6e82fc75bc2cfa6"
+    }
+   },
+   {
+    "id": "note-0009",
+    "pitch_midi": 60,
+    "pitch_hz": 261.6256,
+    "name": "C4",
+    "onset_seconds": 2.0900000000000003,
+    "offset_seconds": 3.05,
+    "sound_end_seconds": 3.4192,
+    "velocity": 0.6000000000000001,
+    "instrument": "piano",
+    "stem": {
+     "path": "corpus/D-phrase-synthetic/stems/note-0009_C4.wav",
+     "sha256": "eb00318cc4ed48ad7fede6b8f6cece1053865499a6d8b84542cd5114796ab30c"
+    }
+   },
+   {
+    "id": "note-0010",
+    "pitch_midi": 43,
+    "pitch_hz": 97.9989,
+    "name": "G2",
+    "onset_seconds": 3.115,
+    "offset_seconds": 4.05,
+    "sound_end_seconds": 4.8595,
+    "velocity": 0.55,
+    "instrument": "piano",
+    "stem": {
+     "path": "corpus/D-phrase-synthetic/stems/note-0010_G2.wav",
+     "sha256": "8d0e8d4e46f91115c423c5c96b69f03c537ebb727472261807be976e5bfa52f0"
+    }
+   },
+   {
+    "id": "note-0011",
+    "pitch_midi": 59,
+    "pitch_hz": 246.9417,
+    "name": "B3",
+    "onset_seconds": 3.0900000000000003,
+    "offset_seconds": 4.05,
+    "sound_end_seconds": 4.429,
+    "velocity": 0.6000000000000001,
+    "instrument": "piano",
+    "stem": {
+     "path": "corpus/D-phrase-synthetic/stems/note-0011_B3.wav",
+     "sha256": "c80b4d3218b6061c8c68baf83920bb27195530a1d8ba5c5d7ae69f56c1c2efb3"
+    }
+   },
+   {
+    "id": "note-0012",
+    "pitch_midi": 62,
+    "pitch_hz": 293.6648,
+    "name": "D4",
+    "onset_seconds": 3.106,
+    "offset_seconds": 4.05,
+    "sound_end_seconds": 4.4135,
+    "velocity": 0.65,
+    "instrument": "piano",
+    "stem": {
+     "path": "corpus/D-phrase-synthetic/stems/note-0012_D4.wav",
+     "sha256": "97e69a4e5d8d3644ca62c8d0a39fc8237f47905a63315de14aa79e0f6d6a23df"
+    }
+   },
+   {
+    "id": "note-0013",
+    "pitch_midi": 79,
+    "pitch_hz": 783.9909,
+    "name": "G5",
+    "onset_seconds": 0.6,
+    "offset_seconds": 1.1,
+    "sound_end_seconds": 1.4176,
+    "velocity": 0.8,
+    "instrument": "piano",
+    "stem": {
+     "path": "corpus/D-phrase-synthetic/stems/note-0013_G5.wav",
+     "sha256": "670517984cea2080d2f59f07dedf16be51ddfe649d4cd27396af2ac10c08e159"
+    }
+   },
+   {
+    "id": "note-0014",
+    "pitch_midi": 76,
+    "pitch_hz": 659.2551,
+    "name": "E5",
+    "onset_seconds": 1.612,
+    "offset_seconds": 2.1,
+    "sound_end_seconds": 2.4461,
+    "velocity": 0.77,
+    "instrument": "piano",
+    "stem": {
+     "path": "corpus/D-phrase-synthetic/stems/note-0014_E5.wav",
+     "sha256": "82af0955bb57e59ff7f11601f2324196bd638c97a14da061534064cdd8d3460b"
+    }
+   },
+   {
+    "id": "note-0015",
+    "pitch_midi": 72,
+    "pitch_hz": 523.2511,
+    "name": "C5",
+    "onset_seconds": 2.342,
+    "offset_seconds": 2.85,
+    "sound_end_seconds": 3.242,
+    "velocity": 0.74,
+    "instrument": "piano",
+    "stem": {
+     "path": "corpus/D-phrase-synthetic/stems/note-0015_C5.wav",
+     "sha256": "a3ab8227e09e2456385ace20b5e15625f87eb19679f40f6a4f72ae3e1575269d"
+    }
+   },
+   {
+    "id": "note-0016",
+    "pitch_midi": 74,
+    "pitch_hz": 587.3295,
+    "name": "D5",
+    "onset_seconds": 2.615,
+    "offset_seconds": 3.1,
+    "sound_end_seconds": 3.443,
+    "velocity": 0.7100000000000001,
+    "instrument": "piano",
+    "stem": {
+     "path": "corpus/D-phrase-synthetic/stems/note-0016_D5.wav",
+     "sha256": "e4863e7903820de2934964296ff3094cfaae442fa0a466ef0943b93a3c82e844"
+    }
+   },
+   {
+    "id": "note-0017",
+    "pitch_midi": 71,
+    "pitch_hz": 493.8833,
+    "name": "B4",
+    "onset_seconds": 3.5900000000000003,
+    "offset_seconds": 4.3999999999999995,
+    "sound_end_seconds": 4.7564,
+    "velocity": 0.68,
+    "instrument": "piano",
+    "stem": {
+     "path": "corpus/D-phrase-synthetic/stems/note-0017_B4.wav",
+     "sha256": "943a93216f14e0892f26726b30b243ac4f7d0724dd00286b5deb65f1fd7132e8"
+    }
+   }
+  ],
+  "residualStem": null,
+  "pedal": false,
+  "offsetMeaning": "offset_seconds is the key release; sound_end_seconds where the stem falls 60 dB below its peak"
+ },
+ "expectedFailures": [
+  "synthetic stand-in: a recorded performance (Fixture D proper) is pending"
+ ],
+ "provenance": {
+  "license": "Generated by the lab's synthesiser (polyphonic_lab/fixtures/synth.py) in this repository; no third-party audio.",
+  "generator": "polyphonic_lab.fixtures.synth",
+  "labVersion": "0.1.0",
+  "seed": 20261109
+ }
+}
