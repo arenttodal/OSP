@@ -761,6 +761,13 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
   (`hardware::measures`), `PowerKey::Style::slide` (a horizontal ON), MOVEMENT's lane power as a
   slide, `Materials::macros` (a product's macro identities; SPACE's reverb tint follows it), the
   shell telling the host when an engine's latency changes. ANDOR OSP sets none of it: 0 px.
+- Enamel faceplate (shared, opt-in; ANDOR ANALOG's V5 Patterned Hardware):
+  `rack::Faceplate::enamelBody` makes the whole face the device's enamel. That covers the body
+  and a deeper rail. A product motif painter replaces the stripes, the face gets four corner
+  bolts and a 17 px title, and the glass sits in a deeper enamel bezel. `rackui::Ink`
+  (`inkFor` / `setInk`) is the face's ink, which the cells read for captions, values,
+  switches, tabs, rules and the deck readout. ANDOR OSP sets none of it, so it renders 0 px
+  different.
 - TAPE deck (shared, opt-in; ANDOR ANALOG's ROUTING + TAPE V4): `rack::Faceplate::tapeDeck`
   shows ECHO's TAPE and MOVEMENT's TAPE as a light reel deck in the same 214 px rack (knobs
   left, `TapeDeck` reels / head / readout in the middle, the display smaller on the right,
@@ -788,6 +795,11 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
     (the frame already places it: `Parts::rack`, `rackShift`);
   - save the rack's view state with OSP's session (as `arpOpen`);
   - review the screenshots at 869 / 1448 / 1810 px and update OSP's own captures.
+
+- **The enamel faceplate (V5) in ANDOR OSP** (the rule on shared ECHO / SPACE features): shared
+  and opt-in through the rack faceplate. It arrives with the effects rack: give OSP's ECHO /
+  MOVEMENT / SPACE faceplates `enamelBody`, a motif painter and an ink in OSP's own palette,
+  then review 869 / 1448 / 1810 px.
 
 - **The TAPE deck in ANDOR OSP** (the rule on shared ECHO features). It is shared
   (`MacroPopups.cpp`: `TapeDeck`, `UnifiedRack::setDeck`) and opt-in by the rack faceplate,
