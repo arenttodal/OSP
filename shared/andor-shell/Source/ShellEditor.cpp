@@ -343,6 +343,7 @@ ShellEditor::ShellEditor (ShellProcessor& p)
     content.addAndMakeVisible (advancedButton);
     arpButton.onToggleEditor = [this] { setArpExpanded (! arpShown); };
     arpPanel.onCollapse = [this] { setArpExpanded (false); };
+    arpPanel.setCrossClose (shell.product().crossCloseKeys);
     content.addAndMakeVisible (arpButton);
     content.addChildComponent (arpPanel);
     content.addChildComponent (rack);
@@ -448,12 +449,26 @@ void ShellEditor::layoutInstrument()
     {
         // The icon beside SAVE, on its centre line (12 px from it), and MIX moved right by as
         // much, narrower by as much (it centres itself), clear of VOLUME.
-        const auto save = savePresetButton.getBounds();
-        sourceViewButton.setBounds (juce::Rectangle<int> (30, 30).withCentre ({ save.getRight() + 12 + 15, save.getCentreY() }));
-        const auto mix = headerMix.getBounds();
-        const int shift = sourceViewButton.getRight() + 15 - mix.getX();
-        if (shift > 0)
-            headerMix.setBounds (mix.withTrimmedLeft (shift));
+        auto save = savePresetButton.getBounds();
+        if (! shell.product().headerMix)
+        {
+            // No MIX: [ preset bar ][ SAVE ][ ROUTING ] as one group of keys on one centre
+            // line, 8 px apart, the bar taking MIX's room up to VOLUME (28 px clear of it).
+            const int gap = 8, key = save.getWidth();
+            const int right = volume.getX() - 28;
+            sourceViewButton.setBounds (save.withX (right - key));
+            save = save.withX (right - key - gap - key);
+            savePresetButton.setBounds (save);
+            presetBar.setBounds (presetBar.getBounds().withRight (save.getX() - gap));
+        }
+        else
+        {
+            sourceViewButton.setBounds (juce::Rectangle<int> (30, 30).withCentre ({ save.getRight() + 12 + 15, save.getCentreY() }));
+            const auto mix = headerMix.getBounds();
+            const int shift = sourceViewButton.getRight() + 15 - mix.getX();
+            if (shift > 0)
+                headerMix.setBounds (mix.withTrimmedLeft (shift));
+        }
     }
     modOverlay.setBounds (content.getLocalBounds());
     sourceArea = frame::sourceArea (sourceTrim());
@@ -527,16 +542,21 @@ void ShellEditor::setSourceViewShown (bool shown)
 
 void ShellEditor::SourceViewButton::paintButton (juce::Graphics& g, bool over, bool down)
 {
-    // Borderless: a branching path (two inputs joining), tinted while its view is shown.
+    // A header key as SAVE (its face, its icon size and ink): a branching path, two inputs
+    // joining; the path green while its view is shown.
+    using namespace osp::plugin::design;
     const auto r = getLocalBounds().toFloat();
     const bool on = getToggleState();
-    if (on || over || down)
+    const float k = r.getHeight() / 48.0f;
+    if (! osp::plugin::skin::drawnBySurface())   // ceramic: the housing draws the key
+        draw::raised (g, r.reduced (0.5f), 9.0f * k, colour::cardTop, colour::cardBottom, 0.9f);
+    if (on)
     {
-        g.setColour (on ? juce::Colour (0x2bb4cab5) : juce::Colour (0x90ded9cf));
-        g.fillRoundedRectangle (r.reduced (1.0f), 5.0f);
+        g.setColour (juce::Colour (0x24b4cab5));
+        g.fillRoundedRectangle (r.reduced (5.0f * k), 6.0f * k);
     }
-    const float s = 20.0f / 24.0f;
-    const auto o = r.getCentre() - juce::Point<float> (12.0f * s, 12.0f * s);
+    const float s = 27.0f * k / 24.0f;
+    const auto o = r.getCentre() - juce::Point<float> (12.0f * s, 12.0f * s) + juce::Point<float> (0.0f, down ? 0.5f : 0.0f);
     auto at = [&] (float x, float y) { return o + juce::Point<float> (x * s, y * s); };
     juce::Path p;
     for (const auto c : { at (5, 5), at (19, 12), at (5, 19) })
@@ -547,12 +567,12 @@ void ShellEditor::SourceViewButton::paintButton (juce::Graphics& g, bool over, b
     p.startNewSubPath (at (7, 19));
     p.lineTo (at (11, 19));
     p.cubicTo (at (13, 19), at (13, 12), at (17, 12));
-    g.setColour (on ? juce::Colour (0xff477767) : (over ? juce::Colour (0xff395e58) : juce::Colour (0xff727872)));
-    g.strokePath (p, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    g.setColour (on ? juce::Colour (0xff477767) : colour::text.withAlpha (over || down ? 0.85f : 0.6f));
+    g.strokePath (p, juce::PathStrokeType (1.5f * k, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     if (hasKeyboardFocus (false))
     {
         g.setColour (juce::Colour (0xff88a8af));
-        g.drawRoundedRectangle (r.reduced (0.5f), 5.0f, 1.5f);
+        g.drawRoundedRectangle (r.reduced (1.5f), 9.0f * k, 1.5f);
     }
 }
 
@@ -604,7 +624,7 @@ void ShellEditor::layoutSources()
         }
         if (dockOverlay != nullptr)
             dockOverlay->setBounds (sampleDock.getLocalBounds().reduced (14).withTrimmedTop (sampleDock.headerBounds().getBottom()));
-        headerMix.setLayers ({ true, hybrid, false });   // the analog side against the hybrid
+        headerMix.setLayers ({ true, hybrid && shell.product().headerMix, false });   // the analog side against the hybrid (none: no MIX)
         headerMix.setEndLabels (shell.product().mixEndLabels[0], shell.product().mixEndLabels[1]);
         updateFocus();
         applyBindings();
@@ -654,6 +674,8 @@ void ShellEditor::layoutSources()
         addTarget.setBounds (frame::sourceColumn (sourceArea, columns, col));
         addTarget.setLetter (InstrumentHost::layerName (count));
     }
+    if (! shell.product().headerMix)
+        occupied = { true, false, false };   // (no MIX: nothing to balance in the header)
     headerMix.setLayers (occupied);
     if (isReimaginedPopup (popupIndex))
     {

@@ -180,6 +180,11 @@ struct ProductInfo
     /** The header MIX's end labels (three engines: the generator side against the hybrid,
         e.g. "A+B" and "C"). Empty: the layers' letters. */
     std::array<juce::String, 2> mixEndLabels;
+    /** The header's MIX (off: none - the cards' own levels balance them; the preset bar takes
+        its room, SAVE and the source view's key after it). On: ANDOR OSP's header. */
+    bool headerMix = true;
+    /** The ARPEGGIATOR's collapse as the racks' borderless X (off: the round chevron key). */
+    bool crossCloseKeys = false;
     /** Controls in a card's well, revealed by the pointer (opt-in): one per storage layer
         (null: none; see osp::plugin::WellOverlay). Remade when wellOverlayKey changes (a
         model, a source type), so its controls always match what plays. */
