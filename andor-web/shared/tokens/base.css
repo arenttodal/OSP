@@ -1,0 +1,116 @@
+/* Base layer: fonts, reset, grid, buttons, header, reveal motion. Framer equivalents are noted in
+   docs/DESIGN_SYSTEM.md; nothing here is product-specific. */
+@import "@fontsource-variable/inter-tight/wght.css";
+@import "@fontsource/eb-garamond/latin-400.css";
+@import "@fontsource/eb-garamond/latin-400-italic.css";
+@import "@fontsource/geist-mono/latin-400.css";
+@import "@fontsource/geist-mono/latin-500.css";
+@import "./tokens.css";
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--type-body);
+  line-height: var(--leading-body);
+  font-feature-settings: "ss01" 0, "cv11" 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  overflow-x: clip;
+}
+img, picture, svg, video { display: block; max-width: 100%; }
+button { font: inherit; color: inherit; }
+a { color: inherit; }
+:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--radius-s); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Theme scopes: contrast changes apply to the whole component */
+.theme-dark {
+  --bg: var(--dark-bg); --bg-2: var(--dark-elev); --bg-elev: var(--dark-elev);
+  --text: var(--dark-text); --text-2: var(--dark-text-2); --text-muted: var(--dark-muted);
+  --accent-strong: var(--dark-accent); --text-quiet: var(--dark-quiet); --border: var(--dark-border); --border-strong: #7d897e;
+  --focus-ring: 0 0 0 2px var(--dark-bg), 0 0 0 4px var(--dark-accent);
+  background: var(--bg); color: var(--text);
+}
+
+/* Layout */
+.container { width: 100%; max-width: calc(var(--content-max) + 2 * var(--gutter)); margin-inline: auto; padding-inline: var(--gutter); }
+.grid { display: grid; grid-template-columns: repeat(var(--columns), minmax(0, 1fr)); column-gap: var(--col-gap); }
+
+/* Type roles */
+.t-hero { font-size: var(--type-hero); line-height: var(--leading-tight); letter-spacing: var(--track-hero); font-weight: 480; margin: 0; text-wrap: balance; }
+.t-section { font-size: var(--type-section); line-height: var(--leading-heading); letter-spacing: var(--track-section); font-weight: 480; margin: 0; }
+.t-feature { font-size: var(--type-feature); line-height: 1.12; letter-spacing: -0.02em; font-weight: 500; margin: 0; }
+.t-lede { font-size: var(--type-lede); line-height: 1.45; color: var(--text-2); margin: 0; text-wrap: pretty; }
+.t-label { font-size: var(--type-label); letter-spacing: var(--track-label); text-transform: uppercase; font-weight: 560; color: var(--text-muted); }
+.t-mono { font-family: var(--font-mono); font-size: 0.8125rem; letter-spacing: 0.02em; text-transform: uppercase; font-weight: 500; }
+.quiet { color: var(--text-quiet); }
+.t-serif { font-family: var(--font-serif); font-weight: 400; letter-spacing: -0.01em; }
+
+/* Buttons */
+.btn {
+  --h: 48px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  min-height: var(--h); padding: 0 22px; border-radius: var(--radius-pill);
+  font-size: 0.9375rem; font-weight: 560; letter-spacing: -0.005em; text-decoration: none; white-space: nowrap;
+  border: 1px solid transparent; cursor: pointer;
+  transition: background-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out),
+              border-color var(--dur-1) var(--ease-out), transform var(--dur-1) var(--ease-out);
+}
+.btn:active { transform: translateY(1px) scale(0.99); }
+.btn-primary { background: var(--text); color: var(--bg); }
+.btn-primary:hover { background: color-mix(in srgb, var(--text) 86%, var(--accent)); }
+.btn-secondary { background: transparent; color: var(--text); border-color: var(--border-strong); }
+.btn-secondary:hover { background: color-mix(in srgb, var(--text) 6%, transparent); border-color: var(--text); }
+.btn-small { --h: 40px; padding: 0 16px; font-size: 0.875rem; }
+.btn .icon { width: 14px; height: 14px; flex: none; }
+/* The pill + arrow pair: an outline pill names the action, the ink circle carries it. */
+.btn-pair { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; color: var(--text); }
+.btn-pair .pill { display: inline-flex; align-items: center; min-height: 56px; padding: 0 30px; border-radius: var(--radius-pill); border: 1px solid var(--text); font-size: 1rem; font-weight: 520; letter-spacing: -0.005em; transition: background-color var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out); }
+.btn-pair .orb { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; background: var(--text); color: var(--bg); transition: transform var(--dur-2) var(--ease-out); }
+.btn-pair .orb svg { width: 18px; height: 18px; }
+.btn-pair:hover .pill { background: var(--text); color: var(--bg); }
+.btn-pair:hover .orb { transform: rotate(45deg); }
+.btn-pair:focus-visible { box-shadow: none; }
+.btn-pair:focus-visible .pill, .btn-pair:focus-visible .orb { box-shadow: var(--focus-ring); }
+.link { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.22em; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); }
+.link:hover { text-decoration-color: currentColor; }
+
+/* Header */
+.site-header { position: relative; z-index: 20; }
+.site-header__bar { display: flex; align-items: center; justify-content: space-between; height: 76px; }
+.wordmark { display: inline-flex; align-items: baseline; gap: 0.12em; font-size: 1.125rem; letter-spacing: 0.01em; text-decoration: none; line-height: 1; }
+.wordmark b { font-weight: 760; letter-spacing: 0.02em; }
+.wordmark span { font-weight: 300; }
+.wordmark i { font-style: normal; font-weight: 300; color: var(--text-muted); }
+.site-nav { display: flex; align-items: center; gap: clamp(20px, 2.4vw, 36px); }
+.site-nav a:not(.btn) { font-size: 0.9375rem; font-weight: 500; text-decoration: none; color: var(--text-2); padding: 10px 0; transition: color var(--dur-1); }
+.site-nav a:not(.btn):hover, .site-nav a[aria-current="page"] { color: var(--text); }
+.menu-button { display: none; width: var(--touch); height: var(--touch); border-radius: var(--radius-pill); border: 1px solid var(--border); background: transparent; align-items: center; justify-content: center; cursor: pointer; }
+.menu-sheet { position: fixed; inset: 0; z-index: 50; background: var(--bg); padding: 0 var(--gutter); display: flex; flex-direction: column; }
+.menu-sheet nav { display: flex; flex-direction: column; gap: 4px; margin-top: 24px; }
+.menu-sheet nav a { font-size: 2rem; letter-spacing: -0.02em; font-weight: 480; text-decoration: none; padding: 8px 0; }
+@media (max-width: 860px) {
+  .site-nav { display: none; }
+  .menu-button { display: inline-flex; }
+  .site-header__bar { height: 64px; }
+}
+
+/* Entrance choreography (CSS-only; transform/opacity so nothing shifts layout).
+   Elements start hidden only once JS marks the document ready, so no-JS shows everything. */
+.js .reveal { opacity: 0; transform: translate3d(0, 14px, 0); }
+.js .is-in .reveal, .js .reveal.is-in {
+  opacity: 1; transform: none;
+  transition: opacity var(--dur-3) var(--ease-out), transform var(--dur-3) var(--ease-out);
+  transition-delay: calc(var(--i, 0) * var(--stagger) + var(--d, 0ms));
+}
+.js .line-mask { display: block; overflow: hidden; padding-bottom: 0.08em; margin-bottom: -0.08em; }
+.js .line-mask > span { display: block; transform: translate3d(0, 105%, 0); }
+.js .is-in .line-mask > span { transform: none; transition: transform var(--dur-4) var(--ease-out); transition-delay: calc(var(--i, 0) * var(--stagger) + var(--d, 0ms)); }
+@media (prefers-reduced-motion: reduce) {
+  .js .reveal, .js .line-mask > span { opacity: 1 !important; transform: none !important; transition: none !important; }
+}

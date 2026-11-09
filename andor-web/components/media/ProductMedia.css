@@ -1,0 +1,31 @@
+.pm { position: relative; margin: 0; }
+.pm img { width: 100%; height: auto; user-select: none; }
+.pm__object { position: relative; transform-origin: 50% 100%; will-change: transform; }
+
+/* Straight-on capture: the interface as manufactured, a hairline edge and a quiet shadow. */
+.pm--capture .pm__object { border-radius: 7px; overflow: hidden; box-shadow: 0 0 0 1px rgba(36, 39, 35, 0.08), var(--shadow-object); }
+
+/* Studio: the object under warm overhead light, lifted off the surface with a contact shadow.
+   The lighting is a soft wash over the image (a photographic treatment, not interface). */
+.pm--studio .pm__object { border-radius: 7px; overflow: hidden; box-shadow: 0 0 0 1px rgba(36, 39, 35, 0.07), var(--shadow-object); }
+.pm--studio .pm__object::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(120% 70% at 30% -10%, rgba(255, 249, 238, 0.22), transparent 60%),
+    linear-gradient(180deg, rgba(255, 252, 245, 0.06), rgba(60, 44, 30, 0.07));
+  mix-blend-mode: soft-light;
+}
+.pm__contact {
+  position: absolute; left: 6%; right: 6%; bottom: -3.5%; height: 9%; z-index: -1;
+  background: radial-gradient(50% 50% at 50% 50%, rgba(52, 40, 28, 0.34), rgba(52, 40, 28, 0) 70%);
+  filter: blur(12px);
+}
+
+/* Detail crop: a cut from the capture, framed like a print. */
+.pm--detail .pm__object { border-radius: 4px; overflow: hidden; box-shadow: 0 0 0 1px rgba(36, 39, 35, 0.08); }
+
+.pm--error { display: grid; place-items: center; background: repeating-linear-gradient(135deg, var(--bg-2) 0 10px, var(--bg) 10px 20px); border: 1px dashed var(--border-strong); border-radius: 8px; }
+.pm__error-text { font-size: var(--type-small); color: var(--text-2); padding: 12px; text-align: center; }
+
+/* Object: a studio render with its own baked contact shadow; no frame, no CSS shadow. */
+.pm--object .pm__object { border-radius: 0; }

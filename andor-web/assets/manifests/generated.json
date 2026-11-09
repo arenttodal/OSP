@@ -1,0 +1,1025 @@
+{
+  "schemaVersion": 1,
+  "product": {
+    "name": "ANDOR OSP",
+    "commit": "c49d77f",
+    "branch": "claude/charming-lovelace-n25fte (contains claude/synth-imprint @ 02465c7)",
+    "look": "ceramic"
+  },
+  "assets": {
+    "object-1l": {
+      "id": "object-1l",
+      "alt": "ANDOR OSP presented as an object, standing at an angle: one recording loaded, a chord held.",
+      "use": "H1 hero object",
+      "width": 2496,
+      "height": 1845,
+      "aspect": 1.35285,
+      "priority": true,
+      "approval": "concept",
+      "master": "object-1l.png",
+      "treatment": "Studio render (tools/render-object.py --view stand): the genuine capture is the face (emission, exact colours); the slab sides are textured from the capture's own teak cheek. No controls or hardware added.",
+      "crop": null,
+      "files": {
+        "avif": [
+          {
+            "width": 720,
+            "height": 532,
+            "file": "object-1l-720.avif"
+          },
+          {
+            "width": 1080,
+            "height": 798,
+            "file": "object-1l-1080.avif"
+          },
+          {
+            "width": 1600,
+            "height": 1183,
+            "file": "object-1l-1600.avif"
+          },
+          {
+            "width": 2200,
+            "height": 1626,
+            "file": "object-1l-2200.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 720,
+            "height": 532,
+            "file": "object-1l-720.webp"
+          },
+          {
+            "width": 1080,
+            "height": 798,
+            "file": "object-1l-1080.webp"
+          },
+          {
+            "width": 1600,
+            "height": 1183,
+            "file": "object-1l-1600.webp"
+          },
+          {
+            "width": 2200,
+            "height": 1626,
+            "file": "object-1l-2200.webp"
+          }
+        ]
+      }
+    },
+    "object-3l": {
+      "id": "object-3l",
+      "alt": "ANDOR OSP presented as an object with three layers loaded.",
+      "use": "H1 state: three layers",
+      "width": 2496,
+      "height": 1845,
+      "aspect": 1.35285,
+      "priority": false,
+      "approval": "concept",
+      "master": "object-3l.png",
+      "treatment": "Studio render (tools/render-object.py --view stand): the genuine capture is the face (emission, exact colours); the slab sides are textured from the capture's own teak cheek. No controls or hardware added.",
+      "crop": null,
+      "files": {
+        "avif": [
+          {
+            "width": 720,
+            "height": 532,
+            "file": "object-3l-720.avif"
+          },
+          {
+            "width": 1080,
+            "height": 798,
+            "file": "object-3l-1080.avif"
+          },
+          {
+            "width": 1600,
+            "height": 1183,
+            "file": "object-3l-1600.avif"
+          },
+          {
+            "width": 2200,
+            "height": 1626,
+            "file": "object-3l-2200.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 720,
+            "height": 532,
+            "file": "object-3l-720.webp"
+          },
+          {
+            "width": 1080,
+            "height": 798,
+            "file": "object-3l-1080.webp"
+          },
+          {
+            "width": 1600,
+            "height": 1183,
+            "file": "object-3l-1600.webp"
+          },
+          {
+            "width": 2200,
+            "height": 1626,
+            "file": "object-3l-2200.webp"
+          }
+        ]
+      }
+    },
+    "object-imprint": {
+      "id": "object-imprint",
+      "alt": "ANDOR OSP presented as an object with the SYNTH page open in IMPRINT mode.",
+      "use": "H1 state: IMPRINT",
+      "width": 2496,
+      "height": 1845,
+      "aspect": 1.35285,
+      "priority": false,
+      "approval": "concept",
+      "master": "object-imprint.png",
+      "treatment": "Studio render (tools/render-object.py --view stand): the genuine capture is the face (emission, exact colours); the slab sides are textured from the capture's own teak cheek. No controls or hardware added.",
+      "crop": null,
+      "files": {
+        "avif": [
+          {
+            "width": 720,
+            "height": 532,
+            "file": "object-imprint-720.avif"
+          },
+          {
+            "width": 1080,
+            "height": 798,
+            "file": "object-imprint-1080.avif"
+          },
+          {
+            "width": 1600,
+            "height": 1183,
+            "file": "object-imprint-1600.avif"
+          },
+          {
+            "width": 2200,
+            "height": 1626,
+            "file": "object-imprint-2200.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 720,
+            "height": 532,
+            "file": "object-imprint-720.webp"
+          },
+          {
+            "width": 1080,
+            "height": 798,
+            "file": "object-imprint-1080.webp"
+          },
+          {
+            "width": 1600,
+            "height": 1183,
+            "file": "object-imprint-1600.webp"
+          },
+          {
+            "width": 2200,
+            "height": 1626,
+            "file": "object-imprint-2200.webp"
+          }
+        ]
+      }
+    },
+    "osp-hero-1l": {
+      "id": "osp-hero-1l",
+      "alt": "ANDOR OSP with one recording loaded: a large waveform display, five source knobs, six macro knobs and a keyboard with a chord held.",
+      "use": "Hero (H1, H2 reveal, H3)",
+      "width": 4344,
+      "height": 3258,
+      "aspect": 1.33333,
+      "priority": true,
+      "approval": "concept",
+      "master": "web-01-hero-1L@3x.png",
+      "crop": null,
+      "files": {
+        "avif": [
+          {
+            "width": 720,
+            "height": 540,
+            "file": "osp-hero-1l-720.avif"
+          },
+          {
+            "width": 1080,
+            "height": 810,
+            "file": "osp-hero-1l-1080.avif"
+          },
+          {
+            "width": 1600,
+            "height": 1200,
+            "file": "osp-hero-1l-1600.avif"
+          },
+          {
+            "width": 2400,
+            "height": 1800,
+            "file": "osp-hero-1l-2400.avif"
+          },
+          {
+            "width": 3200,
+            "height": 2400,
+            "file": "osp-hero-1l-3200.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 720,
+            "height": 540,
+            "file": "osp-hero-1l-720.webp"
+          },
+          {
+            "width": 1080,
+            "height": 810,
+            "file": "osp-hero-1l-1080.webp"
+          },
+          {
+            "width": 1600,
+            "height": 1200,
+            "file": "osp-hero-1l-1600.webp"
+          },
+          {
+            "width": 2400,
+            "height": 1800,
+            "file": "osp-hero-1l-2400.webp"
+          },
+          {
+            "width": 3200,
+            "height": 2400,
+            "file": "osp-hero-1l-3200.webp"
+          }
+        ]
+      }
+    },
+    "osp-hero-3l": {
+      "id": "osp-hero-3l",
+      "alt": "ANDOR OSP with three layers: a sung vowel, a granular pluck and a low vowel with IMPRINT synthesis.",
+      "use": "Hero alternate; Layering",
+      "width": 4344,
+      "height": 3258,
+      "aspect": 1.33333,
+      "priority": false,
+      "approval": "concept",
+      "master": "web-01-hero-3L@3x.png",
+      "crop": null,
+      "files": {
+        "avif": [
+          {
+            "width": 720,
+            "height": 540,
+            "file": "osp-hero-3l-720.avif"
+          },
+          {
+            "width": 1080,
+            "height": 810,
+            "file": "osp-hero-3l-1080.avif"
+          },
+          {
+            "width": 1600,
+            "height": 1200,
+            "file": "osp-hero-3l-1600.avif"
+          },
+          {
+            "width": 2400,
+            "height": 1800,
+            "file": "osp-hero-3l-2400.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 720,
+            "height": 540,
+            "file": "osp-hero-3l-720.webp"
+          },
+          {
+            "width": 1080,
+            "height": 810,
+            "file": "osp-hero-3l-1080.webp"
+          },
+          {
+            "width": 1600,
+            "height": 1200,
+            "file": "osp-hero-3l-1600.webp"
+          },
+          {
+            "width": 2400,
+            "height": 1800,
+            "file": "osp-hero-3l-2400.webp"
+          }
+        ]
+      }
+    },
+    "osp-hero-2l": {
+      "id": "osp-hero-2l",
+      "alt": "ANDOR OSP with two layers loaded side by side.",
+      "use": "Layering",
+      "width": 4344,
+      "height": 3258,
+      "aspect": 1.33333,
+      "priority": false,
+      "approval": "concept",
+      "master": "web-01-hero-2L@3x.png",
+      "crop": null,
+      "files": {
+        "avif": [
+          {
+            "width": 720,
+            "height": 540,
+            "file": "osp-hero-2l-720.avif"
+          },
+          {
+            "width": 1080,
+            "height": 810,
+            "file": "osp-hero-2l-1080.avif"
+          },
+          {
+            "width": 1600,
+            "height": 1200,
+            "file": "osp-hero-2l-1600.avif"
+          },
+          {
+            "width": 2400,
+            "height": 1800,
+            "file": "osp-hero-2l-2400.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 720,
+            "height": 540,
+            "file": "osp-hero-2l-720.webp"
+          },
+          {
+            "width": 1080,
+            "height": 810,
+            "file": "osp-hero-2l-1080.webp"
+          },
+          {
+            "width": 1600,
+            "height": 1200,
+            "file": "osp-hero-2l-1600.webp"
+          },
+          {
+            "width": 2400,
+            "height": 1800,
+            "file": "osp-hero-2l-2400.webp"
+          }
+        ]
+      }
+    },
+    "osp-empty": {
+      "id": "osp-empty",
+      "alt": "ANDOR OSP before a sound is loaded, inviting you to drop a sound.",
+      "use": "First Note Story: before",
+      "width": 2896,
+      "height": 2172,
+      "aspect": 1.33333,
+      "priority": false,
+      "approval": "concept",
+      "master": "web-00-empty@2x.png",
+      "crop": null,
+      "files": {
+        "avif": [
+          {
+            "width": 720,
+            "height": 540,
+            "file": "osp-empty-720.avif"
+          },
+          {
+            "width": 1080,
+            "height": 810,
+            "file": "osp-empty-1080.avif"
+          },
+          {
+            "width": 1600,
+            "height": 1200,
+            "file": "osp-empty-1600.avif"
+          },
+          {
+            "width": 2400,
+            "height": 1800,
+            "file": "osp-empty-2400.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 720,
+            "height": 540,
+            "file": "osp-empty-720.webp"
+          },
+          {
+            "width": 1080,
+            "height": 810,
+            "file": "osp-empty-1080.webp"
+          },
+          {
+            "width": 1600,
+            "height": 1200,
+            "file": "osp-empty-1600.webp"
+          },
+          {
+            "width": 2400,
+            "height": 1800,
+            "file": "osp-empty-2400.webp"
+          }
+        ]
+      }
+    },
+    "osp-imprint": {
+      "id": "osp-imprint",
+      "alt": "The SYNTH page in IMPRINT mode, showing the oscillator cycle shaped by the recording's spectral body.",
+      "use": "SYNTH + IMPRINT",
+      "width": 2896,
+      "height": 2172,
+      "aspect": 1.33333,
+      "priority": false,
+      "approval": "concept",
+      "master": "web-03-synth-3-imprint@2x.png",
+      "crop": null,
+      "files": {
+        "avif": [
+          {
+            "width": 720,
+            "height": 540,
+            "file": "osp-imprint-720.avif"
+          },
+          {
+            "width": 1080,
+            "height": 810,
+            "file": "osp-imprint-1080.avif"
+          },
+          {
+            "width": 1600,
+            "height": 1200,
+            "file": "osp-imprint-1600.avif"
+          },
+          {
+            "width": 2400,
+            "height": 1800,
+            "file": "osp-imprint-2400.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 720,
+            "height": 540,
+            "file": "osp-imprint-720.webp"
+          },
+          {
+            "width": 1080,
+            "height": 810,
+            "file": "osp-imprint-1080.webp"
+          },
+          {
+            "width": 1600,
+            "height": 1200,
+            "file": "osp-imprint-1600.webp"
+          },
+          {
+            "width": 2400,
+            "height": 1800,
+            "file": "osp-imprint-2400.webp"
+          }
+        ]
+      }
+    },
+    "osp-analog": {
+      "id": "osp-analog",
+      "alt": "The SYNTH page in ANALOG mode with a sawtooth cycle.",
+      "use": "SYNTH + IMPRINT",
+      "width": 2896,
+      "height": 2172,
+      "aspect": 1.33333,
+      "priority": false,
+      "approval": "concept",
+      "master": "web-03-synth-2-analog@2x.png",
+      "crop": null,
+      "files": {
+        "avif": [
+          {
+            "width": 720,
+            "height": 540,
+            "file": "osp-analog-720.avif"
+          },
+          {
+            "width": 1080,
+            "height": 810,
+            "file": "osp-analog-1080.avif"
+          },
+          {
+            "width": 1600,
+            "height": 1200,
+            "file": "osp-analog-1600.avif"
+          },
+          {
+            "width": 2400,
+            "height": 1800,
+            "file": "osp-analog-2400.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 720,
+            "height": 540,
+            "file": "osp-analog-720.webp"
+          },
+          {
+            "width": 1080,
+            "height": 810,
+            "file": "osp-analog-1080.webp"
+          },
+          {
+            "width": 1600,
+            "height": 1200,
+            "file": "osp-analog-1600.webp"
+          },
+          {
+            "width": 2400,
+            "height": 1800,
+            "file": "osp-analog-2400.webp"
+          }
+        ]
+      }
+    },
+    "osp-reimagined-mosaic": {
+      "id": "osp-reimagined-mosaic",
+      "alt": "The REIMAGINED popover in MOSAIC mode over the waveform.",
+      "use": "REIMAGINED",
+      "width": 2896,
+      "height": 2172,
+      "aspect": 1.33333,
+      "priority": false,
+      "approval": "concept",
+      "master": "web-02-reimagined-4-mosaic@2x.png",
+      "crop": null,
+      "files": {
+        "avif": [
+          {
+            "width": 720,
+            "height": 540,
+            "file": "osp-reimagined-mosaic-720.avif"
+          },
+          {
+            "width": 1080,
+            "height": 810,
+            "file": "osp-reimagined-mosaic-1080.avif"
+          },
+          {
+            "width": 1600,
+            "height": 1200,
+            "file": "osp-reimagined-mosaic-1600.avif"
+          },
+          {
+            "width": 2400,
+            "height": 1800,
+            "file": "osp-reimagined-mosaic-2400.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 720,
+            "height": 540,
+            "file": "osp-reimagined-mosaic-720.webp"
+          },
+          {
+            "width": 1080,
+            "height": 810,
+            "file": "osp-reimagined-mosaic-1080.webp"
+          },
+          {
+            "width": 1600,
+            "height": 1200,
+            "file": "osp-reimagined-mosaic-1600.webp"
+          },
+          {
+            "width": 2400,
+            "height": 1800,
+            "file": "osp-reimagined-mosaic-2400.webp"
+          }
+        ]
+      }
+    },
+    "crop-display": {
+      "id": "crop-display",
+      "alt": "The dark waveform display of ANDOR OSP with a recording and five playheads.",
+      "use": "H2 opening frame (matched cut into osp-hero-1l)",
+      "width": 4047,
+      "height": 963,
+      "aspect": 4.20249,
+      "priority": true,
+      "approval": "concept",
+      "master": "web-01-hero-1L@3x.png",
+      "crop": {
+        "x": 50,
+        "y": 189,
+        "w": 1349,
+        "h": 321
+      },
+      "files": {
+        "avif": [
+          {
+            "width": 720,
+            "height": 171,
+            "file": "crop-display-720.avif"
+          },
+          {
+            "width": 1080,
+            "height": 257,
+            "file": "crop-display-1080.avif"
+          },
+          {
+            "width": 1600,
+            "height": 381,
+            "file": "crop-display-1600.avif"
+          },
+          {
+            "width": 2400,
+            "height": 571,
+            "file": "crop-display-2400.avif"
+          },
+          {
+            "width": 3200,
+            "height": 761,
+            "file": "crop-display-3200.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 720,
+            "height": 171,
+            "file": "crop-display-720.webp"
+          },
+          {
+            "width": 1080,
+            "height": 257,
+            "file": "crop-display-1080.webp"
+          },
+          {
+            "width": 1600,
+            "height": 381,
+            "file": "crop-display-1600.webp"
+          },
+          {
+            "width": 2400,
+            "height": 571,
+            "file": "crop-display-2400.webp"
+          },
+          {
+            "width": 3200,
+            "height": 761,
+            "file": "crop-display-3200.webp"
+          }
+        ]
+      }
+    },
+    "crop-macros": {
+      "id": "crop-macros",
+      "alt": "The six ceramic macro knobs: LIFE, DRIVE, CHARACTER, MOVEMENT, ECHO and SPACE.",
+      "use": "Detail gallery: macro knobs",
+      "width": 2700,
+      "height": 588,
+      "aspect": 4.59184,
+      "priority": false,
+      "approval": "concept",
+      "master": "web-01-hero-1L@3x.png",
+      "crop": {
+        "x": 40,
+        "y": 700,
+        "w": 900,
+        "h": 196
+      },
+      "files": {
+        "avif": [
+          {
+            "width": 720,
+            "height": 157,
+            "file": "crop-macros-720.avif"
+          },
+          {
+            "width": 1080,
+            "height": 235,
+            "file": "crop-macros-1080.avif"
+          },
+          {
+            "width": 1600,
+            "height": 348,
+            "file": "crop-macros-1600.avif"
+          },
+          {
+            "width": 2400,
+            "height": 523,
+            "file": "crop-macros-2400.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 720,
+            "height": 157,
+            "file": "crop-macros-720.webp"
+          },
+          {
+            "width": 1080,
+            "height": 235,
+            "file": "crop-macros-1080.webp"
+          },
+          {
+            "width": 1600,
+            "height": 348,
+            "file": "crop-macros-1600.webp"
+          },
+          {
+            "width": 2400,
+            "height": 523,
+            "file": "crop-macros-2400.webp"
+          }
+        ]
+      }
+    },
+    "crop-knob-life": {
+      "id": "crop-knob-life",
+      "alt": "The LIFE macro knob, a ceramic dial with a terracotta arc.",
+      "use": "Detail gallery: single knob",
+      "width": 456,
+      "height": 576,
+      "aspect": 0.79167,
+      "priority": false,
+      "approval": "concept",
+      "master": "web-01-hero-1L@3x.png",
+      "crop": {
+        "x": 52,
+        "y": 704,
+        "w": 152,
+        "h": 192
+      },
+      "files": {
+        "avif": [
+          {
+            "width": 360,
+            "height": 455,
+            "file": "crop-knob-life-360.avif"
+          },
+          {
+            "width": 456,
+            "height": 576,
+            "file": "crop-knob-life-456.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 360,
+            "height": 455,
+            "file": "crop-knob-life-360.webp"
+          },
+          {
+            "width": 456,
+            "height": 576,
+            "file": "crop-knob-life-456.webp"
+          }
+        ]
+      }
+    },
+    "crop-keybed": {
+      "id": "crop-keybed",
+      "alt": "The keyboard with an open C major seventh chord held.",
+      "use": "Detail gallery: keybed",
+      "width": 4140,
+      "height": 336,
+      "aspect": 12.32143,
+      "priority": false,
+      "approval": "concept",
+      "master": "web-01-hero-1L@3x.png",
+      "crop": {
+        "x": 36,
+        "y": 908,
+        "w": 1380,
+        "h": 112
+      },
+      "files": {
+        "avif": [
+          {
+            "width": 720,
+            "height": 58,
+            "file": "crop-keybed-720.avif"
+          },
+          {
+            "width": 1080,
+            "height": 88,
+            "file": "crop-keybed-1080.avif"
+          },
+          {
+            "width": 1600,
+            "height": 130,
+            "file": "crop-keybed-1600.avif"
+          },
+          {
+            "width": 2400,
+            "height": 195,
+            "file": "crop-keybed-2400.avif"
+          },
+          {
+            "width": 3200,
+            "height": 260,
+            "file": "crop-keybed-3200.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 720,
+            "height": 58,
+            "file": "crop-keybed-720.webp"
+          },
+          {
+            "width": 1080,
+            "height": 88,
+            "file": "crop-keybed-1080.webp"
+          },
+          {
+            "width": 1600,
+            "height": 130,
+            "file": "crop-keybed-1600.webp"
+          },
+          {
+            "width": 2400,
+            "height": 195,
+            "file": "crop-keybed-2400.webp"
+          },
+          {
+            "width": 3200,
+            "height": 260,
+            "file": "crop-keybed-3200.webp"
+          }
+        ]
+      }
+    },
+    "crop-teak": {
+      "id": "crop-teak",
+      "alt": "The ANDOR/OSP logotype beside the teak side panel.",
+      "use": "Detail gallery: timber frame and logotype",
+      "width": 1260,
+      "height": 900,
+      "aspect": 1.4,
+      "priority": false,
+      "approval": "concept",
+      "master": "web-01-hero-1L@3x.png",
+      "crop": {
+        "x": 0,
+        "y": 0,
+        "w": 420,
+        "h": 300
+      },
+      "files": {
+        "avif": [
+          {
+            "width": 540,
+            "height": 386,
+            "file": "crop-teak-540.avif"
+          },
+          {
+            "width": 800,
+            "height": 571,
+            "file": "crop-teak-800.avif"
+          },
+          {
+            "width": 1260,
+            "height": 900,
+            "file": "crop-teak-1260.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 540,
+            "height": 386,
+            "file": "crop-teak-540.webp"
+          },
+          {
+            "width": 800,
+            "height": 571,
+            "file": "crop-teak-800.webp"
+          },
+          {
+            "width": 1260,
+            "height": 900,
+            "file": "crop-teak-1260.webp"
+          }
+        ]
+      }
+    },
+    "crop-imprint-display": {
+      "id": "crop-imprint-display",
+      "alt": "The IMPRINT oscillator cycle on the dark display.",
+      "use": "SYNTH + IMPRINT detail",
+      "width": 2698,
+      "height": 642,
+      "aspect": 4.20249,
+      "priority": false,
+      "approval": "concept",
+      "master": "web-03-synth-3-imprint@2x.png",
+      "crop": {
+        "x": 50,
+        "y": 189,
+        "w": 1349,
+        "h": 321
+      },
+      "files": {
+        "avif": [
+          {
+            "width": 720,
+            "height": 171,
+            "file": "crop-imprint-display-720.avif"
+          },
+          {
+            "width": 1080,
+            "height": 257,
+            "file": "crop-imprint-display-1080.avif"
+          },
+          {
+            "width": 1600,
+            "height": 381,
+            "file": "crop-imprint-display-1600.avif"
+          },
+          {
+            "width": 2400,
+            "height": 571,
+            "file": "crop-imprint-display-2400.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 720,
+            "height": 171,
+            "file": "crop-imprint-display-720.webp"
+          },
+          {
+            "width": 1080,
+            "height": 257,
+            "file": "crop-imprint-display-1080.webp"
+          },
+          {
+            "width": 1600,
+            "height": 381,
+            "file": "crop-imprint-display-1600.webp"
+          },
+          {
+            "width": 2400,
+            "height": 571,
+            "file": "crop-imprint-display-2400.webp"
+          }
+        ]
+      }
+    },
+    "crop-mosaic-popover": {
+      "id": "crop-mosaic-popover",
+      "alt": "The MOSAIC popover: its harmonic fingerprint, DETAIL and MOTION knobs, and model.",
+      "use": "REIMAGINED detail",
+      "width": 572,
+      "height": 396,
+      "aspect": 1.44444,
+      "priority": false,
+      "approval": "concept",
+      "master": "web-02-reimagined-4-mosaic@2x.png",
+      "crop": {
+        "x": 962,
+        "y": 310,
+        "w": 286,
+        "h": 198
+      },
+      "files": {
+        "avif": [
+          {
+            "width": 360,
+            "height": 249,
+            "file": "crop-mosaic-popover-360.avif"
+          },
+          {
+            "width": 540,
+            "height": 374,
+            "file": "crop-mosaic-popover-540.avif"
+          },
+          {
+            "width": 572,
+            "height": 396,
+            "file": "crop-mosaic-popover-572.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 360,
+            "height": 249,
+            "file": "crop-mosaic-popover-360.webp"
+          },
+          {
+            "width": 540,
+            "height": 374,
+            "file": "crop-mosaic-popover-540.webp"
+          },
+          {
+            "width": 572,
+            "height": 396,
+            "file": "crop-mosaic-popover-572.webp"
+          }
+        ]
+      }
+    }
+  }
+}

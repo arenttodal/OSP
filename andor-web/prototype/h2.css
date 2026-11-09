@@ -1,0 +1,56 @@
+/* H2 — The Sound. Dark, cinematic: the recording first, then the instrument around it. */
+.h2 { min-height: 100vh; background:
+  radial-gradient(70% 60% at 72% 46%, rgba(208, 138, 99, 0.10), transparent 70%),
+  var(--dark-bg); }
+.h2-hero {
+  display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--col-gap);
+  align-items: center; min-height: calc(100svh - 76px); padding-block: clamp(24px, 4vh, 56px) clamp(40px, 7vh, 88px);
+  grid-template-areas: "copy copy copy copy copy stage stage stage stage stage stage stage" "listen listen listen listen listen stage stage stage stage stage stage stage";
+  grid-template-rows: auto auto;
+}
+.h2-copy { grid-area: copy; align-self: end; position: relative; z-index: 2; }
+.h2-eyebrow { color: var(--dark-muted); margin: 0 0 22px; }
+.h2-title { font-size: clamp(2.875rem, 1.6rem + 3.6vw, 5.5rem); }
+.h2-italic { font-style: italic; color: var(--dark-text-2); font-size: 1.04em; letter-spacing: -0.015em; line-height: 0.98; }
+.h2-lede { margin-top: 26px; max-width: 30ch; color: var(--dark-text-2); }
+.h2-ctas { display: flex; align-items: center; gap: 26px; margin-top: 34px; flex-wrap: wrap; }
+.h2 .btn-pair .pill { border-color: var(--dark-text); }
+.h2-hear { font-weight: 520; text-decoration: none; display: inline-flex; align-items: center; gap: 10px; min-height: 44px; }
+.h2-hear::before { content: ""; width: 0; height: 0; border-left: 8px solid currentColor; border-top: 5px solid transparent; border-bottom: 5px solid transparent; }
+.h2-hear:hover { color: var(--dark-accent); }
+.h2-listen { grid-area: listen; align-self: start; margin-top: 40px; max-width: 420px; }
+
+/* The stage reaches the right edge of the viewport. */
+.h2-stage { grid-area: stage; position: relative; margin-right: calc(-1 * var(--gutter)); align-self: center; }
+.h2-zoom { position: relative; overflow: hidden; border-radius: 4px 0 0 4px; padding: 28px 0 48px 28px; }
+.h2-object { width: 112%; transform-origin: var(--origin); transition: transform 1700ms var(--ease-soft), opacity 700ms var(--ease-out); }
+.h2-object .pm__object { box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 40px 90px -30px rgba(0, 0, 0, 0.75), 0 12px 30px -12px rgba(0, 0, 0, 0.5); }
+.h2-caption { margin: 0 0 0 28px; color: var(--dark-muted); font-size: 0.75rem; opacity: 0; transition: opacity var(--dur-3) var(--ease-out) 1500ms; }
+
+/* Phases (JS present). Before entry: nothing; sound: the display alone; instrument: settled. */
+.js .h2 .h2-object { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(var(--zoom)); }
+.js .h2.is-sound.is-in .h2-object { opacity: 1; transform: translate(var(--dx), var(--dy)) scale(var(--zoom)); }
+.js .h2.is-instrument.is-in .h2-object { opacity: 1; transform: none; }
+.js .h2.is-instrument.is-in .h2-caption { opacity: 1; }
+.js .h2 .h2-listen { opacity: 0; transition: opacity var(--dur-3) var(--ease-out) 900ms; }
+.js .h2.is-instrument.is-in .h2-listen { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .js .h2 .h2-object, .js .h2 .h2-listen, .js .h2 .h2-caption { opacity: 1 !important; transform: none !important; transition: none !important; }
+}
+
+/* Tablet and mobile: a vertical story, the stage edge to edge. */
+@media (max-width: 1023px) {
+  .h2-object { width: 100%; }
+  .h2-hero { grid-template-areas: "copy" "stage" "listen"; grid-template-columns: 1fr; min-height: 0; padding-top: 12px; }
+  .h2-copy { align-self: start; }
+  .h2-stage { margin-inline: calc(-1 * var(--gutter)); margin-top: 36px; }
+  .h2-zoom { padding: 16px 0 32px; }
+  .h2-caption { margin-left: var(--gutter); }
+  .h2-listen { margin-top: 28px; max-width: none; }
+  .h2-object .pm__object { border-radius: 0; }
+}
+@media (max-width: 480px) {
+  .h2-ctas { gap: 18px; }
+  .h2 .btn-pair .pill { min-height: 52px; padding: 0 24px; }
+  .h2 .btn-pair .orb { width: 52px; height: 52px; }
+}

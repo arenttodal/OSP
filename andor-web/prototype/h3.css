@@ -1,0 +1,54 @@
+/* H3 — The Gallery. A quiet wall, one lit object, a serif title, placards. */
+.h3 { background: linear-gradient(180deg, var(--bg) 0%, #f2f0ea 62%, var(--bg-2) 100%); }
+.h3-hero { overflow-x: clip; padding-bottom: clamp(56px, 8vw, 120px); }
+.h3-head { text-align: center; padding-top: clamp(16px, 4.2vh, 56px); }
+.h3-title { font-size: clamp(2.875rem, 1.9rem + 3.3vw, 5.25rem); line-height: 1.0; letter-spacing: -0.022em; font-weight: 400; margin: 0; text-wrap: balance; }
+.h3-title em { font-style: italic; color: var(--text-2); }
+.h3-room {
+  display: grid; grid-template-columns: minmax(180px, 1fr) minmax(0, 3.2fr) minmax(180px, 1fr);
+  gap: clamp(24px, 3vw, 48px); align-items: end; margin-top: clamp(28px, 4.5vh, 56px);
+}
+.h3-wall { position: relative; }
+.h3-spot { position: absolute; inset: -16% -18% -6%; z-index: 0; pointer-events: none;
+  background: radial-gradient(52% 58% at 50% 42%, rgba(255, 253, 248, 0.95), rgba(255, 253, 248, 0) 72%); }
+.h3-object { position: relative; z-index: 1; }
+.h3-placard { padding-bottom: 6px; }
+.h3-placard--left { justify-self: start; }
+.h3-lede { font-size: var(--type-body); line-height: 1.5; color: var(--text-2); margin: 0 0 22px; max-width: 24ch; }
+.h3 .btn-pair .pill { min-height: 48px; padding: 0 22px; font-size: 0.9375rem; }
+.h3 .btn-pair .orb { width: 48px; height: 48px; }
+.h3-label { margin: 0; padding-top: 14px; border-top: 1px solid var(--text); }
+.h3-label dt { margin-bottom: 6px; }
+.h3-label dd { margin: 0; font-family: var(--font-serif); font-size: 1.1875rem; line-height: 1.3; }
+.h3-label .h3-label__meta { font-family: var(--font-sans); font-size: var(--type-small); color: var(--text-2); margin-top: 6px; line-height: 1.4; }
+.h3-listen { margin-top: 26px; }
+.h3-listen .ac__note { font-size: 0.8125rem; }
+
+/* The prints */
+.h3-prints { display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: clamp(20px, 3vw, 48px); align-items: end; padding-bottom: var(--section-space); }
+.h3-print { margin: 0; }
+.h3-print figcaption { margin-top: 14px; font-size: var(--type-small); color: var(--text-2); line-height: 1.45; max-width: 36ch; }
+.h3-print strong { color: var(--text); font-weight: 560; }
+.h3-num { font-size: 1.05rem; color: var(--text); }
+
+/* Entrance: the object rises into its light */
+.js .h3 .h3-object { opacity: 0; transform: translate3d(0, 18px, 0) scale(0.985); }
+.js .h3.is-in .h3-object { opacity: 1; transform: none; transition: opacity var(--dur-5) var(--ease-soft) 280ms, transform var(--dur-5) var(--ease-soft) 280ms; }
+.js .h3 .h3-spot { opacity: 0; }
+.js .h3.is-in .h3-spot { opacity: 1; transition: opacity 1800ms var(--ease-out) 120ms; }
+@media (prefers-reduced-motion: reduce) { .js .h3 .h3-object, .js .h3 .h3-spot { opacity: 1 !important; transform: none !important; transition: none !important; } }
+
+@media (max-width: 900px) {
+  .h3-room { grid-template-columns: 1fr 1fr; grid-template-areas: "wall wall" "left right"; align-items: start; }
+  .h3-wall { grid-area: wall; }
+  .h3-placard--left { grid-area: left; }
+  .h3-placard--right { grid-area: right; }
+}
+@media (max-width: 640px) {
+  .h3-title { font-size: clamp(2.6rem, 12vw, 3.4rem); }
+  .h3-title .line-mask:last-child > span { max-width: 9.5ch; margin-inline: auto; }
+  .h3-room { grid-template-columns: 1fr; grid-template-areas: "wall" "left" "right"; gap: 32px; }
+  .h3-wall { margin-inline: calc(-0.5 * var(--gutter)); }
+  .h3-prints { grid-template-columns: 1fr; }
+  .h3-print--2 { order: -1; }
+}

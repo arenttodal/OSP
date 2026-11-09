@@ -1,0 +1,73 @@
+# Hero concepts — Gate H
+
+Three distinct compositions with one shared design system. Each one is a working page
+(`h1.html`, `h2.html`, `h3.html`) with art-directed mobile layouts. All product imagery is
+genuine: captures of the editor at `c49d77f`, or a studio render with that capture as its face.
+
+## H1 — The Instrument (recommended)
+- **Idea.** The instrument as a manufactured object. A studio render stands to the right with
+  real depth: the face is the exact capture, and the sides carry the interface's own teak. The
+  type sits to the left in two tones. A contact sheet beside the object shows its real states:
+  one layer, three layers, IMPRINT.
+- **Desktop.** Mono eyebrow with the two-disc mark → "A single sound." (ink) / "Somewhere entirely
+  new." (quiet) → lede → ButtonPair → compact player. The object is sized by viewport height and
+  anchored by its own right edge, so its shadow runs under the copy.
+- **Mobile.** Type and CTA first. Then the object at 150 % width, centred on the instrument
+  itself, then the state thumbnails in a row, then the player.
+- **Motion.** Masked line rise → the object rises and settles (1.4 s, soft ease) → states and
+  player arrive. The states crossfade in 520 ms.
+- **Risk.** Needs decision D-04 (accept presentation renders). Without it, the concept loses its depth.
+
+## H2 — The Sound
+- **Idea.** Sound first. The page opens on a close-up of the recording's waveform, alone in the
+  dark. After 1.5 s the frame pulls back on the same capture (a matched cut, 1.7 s), and the
+  instrument is around it. Time-based and played once; no scroll-jacking.
+- **Desktop.** Copy left: Inter Tight line plus Garamond italic line, "Hear it" beside the
+  ButtonPair. The stage on the right bleeds off the edge, with a mono caption stating the real
+  state captured.
+- **Mobile.** The same cut, edge to edge, under the copy.
+- **Risk.** The settled frame is a flat capture, so the still image is less distinctive than the
+  motion. LCP lands later (~0.9 s locally) because the image fades in.
+
+## H3 — The Gallery
+- **Idea.** Museum restraint. A centred serif title and one object lit like a print. Placards to
+  either side: the lede and CTA on the left; the object label and player on the right. Three real
+  details hang below (LIFE knob, teak logotype, MOSAIC).
+- **Risk.** At this restraint the object is ~735 px wide on desktop: elegant but less immediate.
+  On short phones (≤ 667 px tall) the CTA falls just below the fold.
+
+## Comparative evaluation (plan §31, 1–10)
+
+| Criterion | H1 | H2 | H3 |
+|---|---|---|---|
+| Distinctiveness | **9** | 8 | 7 |
+| Art direction | **8.5** | 8 | 7.5 |
+| Typography | 8 | **8.5** | 8.5 |
+| Product presentation | **9** | 7.5 | 7 |
+| Motion | 7.5 | **9** | 7 |
+| Musical storytelling | 6 | **7** | 6 |
+| Responsiveness | **8.5** | 8 | 8 |
+| Accessibility | 9 | 9 | 9 |
+| Performance | 8.5 | 8 | **9** |
+| Brand cohesion | **9** | 8 | 8 |
+
+Musical storytelling is capped for all three until real recordings exist. No concept reaches the
+launch bar (≥ 9 on art direction **and** product presentation) yet. For H1 the remaining gap is:
+(1) real recordings, re-captured, (2) a final art-direction pass on the eyebrow/mark and the player
+placement, (3) a lighting pass on the render (a slightly warmer key, an EP-133-like rim on the teak).
+
+## Measured (prototype, Chromium)
+- 7 widths × 3 concepts: no horizontal overflow, no console errors, no missing media; CLS
+  ≤ 0.029; headline and product in the first viewport everywhere; CTA in view everywhere except
+  H3 at 375×667 and 320×568.
+- First load: H1 550 KB / 482 KB (desktop @2x / mobile @3x), H2 518 KB, H3 427 / 385 KB.
+- Interactions: state switcher (pointer + arrows), menu (modal, Escape, focus return), CTA anchor,
+  and reduced motion (settled immediately) all pass. Audio component: 13/13 functional checks.
+- Contrast: 25/25 token pairings pass AA.
+
+## Recommendation
+**H1, The Instrument.** It makes the product desirable within the opening viewport, which is the
+hero's first goal. It is the most distinctive, and it answers your references directly. It also
+gives the rest of the site a vocabulary: the object, its states, and the tactile depth. If you
+don't accept studio renders (D-04), choose **H2**. Its opening frame is pure genuine capture and
+its motion carries the story.

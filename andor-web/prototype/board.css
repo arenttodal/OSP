@@ -1,0 +1,16 @@
+.board { padding-bottom: 120px; }
+.board-head { display: flex; justify-content: space-between; align-items: center; height: 76px; }
+.board-head .t-mono { color: var(--text-muted); margin: 0; }
+.board-title { margin-top: 48px; max-width: 18ch; }
+.board-lede { margin-top: 18px; max-width: 58ch; }
+.board-grid { display: grid; gap: 72px; margin-top: 64px; }
+.board-card { display: grid; grid-template-columns: 2fr 1fr; gap: 40px; align-items: end; }
+.board-shots { position: relative; display: block; padding-right: 9%; }
+.board-desk { width: 100%; height: auto; border-radius: 10px; box-shadow: 0 0 0 1px rgba(36,39,35,.08), var(--shadow-object); }
+.board-mob { position: absolute; right: 0; bottom: -24px; width: 22%; height: auto; border-radius: 16px; box-shadow: 0 0 0 1px rgba(36,39,35,.1), var(--shadow-object); }
+.board-meta .t-mono { color: var(--text-muted); margin: 0 0 10px; }
+.board-meta p:not(.t-mono) { color: var(--text-2); margin: 12px 0 22px; max-width: 40ch; }
+@media (max-width: 860px) { .board-card { grid-template-columns: 1fr; } }
+.board-rec { margin: 28px 0 0; max-width: 62ch; padding: 18px 20px; border-radius: 12px; background: var(--bg-elev); box-shadow: 0 0 0 1px var(--border); }
+.board-rec .t-mono { display: block; color: var(--accent-strong); margin-bottom: 6px; }
+.board-desk--frame { margin-bottom: 14px; }

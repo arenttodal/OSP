@@ -1,0 +1,75 @@
+/* H1 — The Instrument. Light, asymmetric: type left, the object standing right, its states beside. */
+.h1 { background: radial-gradient(60% 70% at 70% 52%, #fdfcf9 0%, rgba(253, 252, 249, 0) 70%), var(--bg); }
+.h1-hero {
+  position: relative;
+  display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--col-gap);
+  align-items: center; min-height: calc(100svh - 76px); padding-block: 8px clamp(32px, 5vh, 64px);
+}
+.h1-copy { grid-column: 1 / span 5; position: relative; z-index: 2; }
+.h1-eyebrow { display: flex; align-items: center; gap: 12px; margin: 0 0 26px; color: var(--text-2); }
+/* The brand mark: two discs, terracotta and ceramic, like a held and a released key */
+.h1-mark { width: 30px; height: 18px; position: relative; flex: none; }
+.h1-mark::before, .h1-mark::after { content: ""; position: absolute; top: 0; width: 18px; height: 18px; border-radius: 50%; }
+.h1-mark::before { left: 0; background: var(--accent); }
+.h1-mark::after { left: 11px; background: var(--bg-elev); box-shadow: 0 0 0 1px rgba(36, 39, 35, 0.12), 0 2px 5px rgba(46, 38, 28, 0.18); }
+.h1-title { font-size: clamp(2.875rem, 1.75rem + 3.4vw, 5.5rem); font-weight: 500; }
+.h1-lede { margin-top: 28px; max-width: 30ch; }
+.h1-ctas { margin-top: 34px; }
+.h1-listen { margin-top: clamp(36px, 6vh, 64px); max-width: 400px; padding-top: 22px; border-top: 1px solid var(--border); }
+
+/* The stage: sized by the viewport's height (the standing object is tall) and anchored by the
+   object's own right edge, which sits at 82 % of the render; its soft shadow may run under the copy. */
+.h1-hero { --stage-h: min(calc(100svh - 110px), 880px, 64vw); --stage-w: calc(var(--stage-h) * 1.3528); --states-w: 112px; }
+.h1-stage { position: absolute; top: 50%; right: calc(var(--gutter) + var(--states-w) - 0.18 * var(--stage-w)); width: var(--stage-w); height: var(--stage-h);
+  translate: 0 -50%; display: grid; z-index: 1; pointer-events: none; }
+.h1-object { grid-area: 1 / 1; opacity: 0; transition: opacity var(--dur-3) var(--ease-in-out); }
+.h1-object--active { opacity: 1; }
+.h1-object img { width: 100%; height: 100%; object-fit: contain; }
+
+/* The states column, like a contact sheet of the same instrument */
+.h1-states { grid-column: 12; justify-self: end; display: flex; flex-direction: column; gap: 14px; position: relative; z-index: 2; }
+.h1-state { display: grid; justify-items: center; gap: 8px; padding: 0; border: 0; background: none; cursor: pointer; color: var(--text-2); }
+.h1-thumb { width: 92px; height: 92px; border-radius: 22px; background: var(--bg-elev); display: grid; place-items: center; padding: 10px;
+  box-shadow: 0 0 0 1px rgba(36, 39, 35, 0.06), 0 8px 20px -10px rgba(46, 38, 28, 0.25); transition: box-shadow var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+.h1-thumb img { width: 100%; height: 100%; object-fit: contain; }
+.h1-state:hover .h1-thumb { transform: translateY(-2px); }
+.h1-state[aria-checked="true"] { color: var(--text); }
+.h1-state[aria-checked="true"] .h1-thumb { box-shadow: 0 0 0 1.5px var(--text), 0 10px 24px -10px rgba(46, 38, 28, 0.3); }
+.h1-state:focus-visible { box-shadow: none; }
+.h1-state:focus-visible .h1-thumb { box-shadow: var(--focus-ring); }
+.h1-state__label { font-size: 0.6875rem; }
+
+/* Entrance: the object rises and settles after the type */
+.js .h1 .h1-stage { opacity: 0; transform: translate3d(2%, 4%, 0) scale(0.965); }
+.js .h1.is-in .h1-stage { opacity: 1; transform: none; transition: opacity var(--dur-4) var(--ease-soft) 380ms, transform var(--dur-5) var(--ease-soft) 380ms; }
+@media (prefers-reduced-motion: reduce) { .js .h1 .h1-stage { opacity: 1 !important; transform: none !important; transition: none !important; } .h1-object { transition: none; } }
+
+/* Compact desktop: a little less type, the same composition */
+@media (max-width: 1279px) and (min-width: 1024px) {
+  .h1-hero { --stage-h: min(calc(100svh - 110px), 54vw); --states-w: 96px; }
+  .h1-copy { grid-column: 1 / span 4; }
+  .h1-title { font-size: clamp(2.875rem, 1rem + 3.9vw, 4.25rem); }
+  .h1-thumb { width: 76px; height: 76px; border-radius: 18px; }
+}
+
+/* Tablet and mobile: copy, then the object large and bleeding, then its states in a row */
+@media (max-width: 1023px) {
+  .h1-hero { grid-template-columns: 1fr; min-height: 0; padding-top: 16px; }
+  .h1-copy { grid-column: 1; }
+  .h1-stage { position: relative; top: auto; right: auto; translate: none; grid-column: 1; height: auto; aspect-ratio: 1.3528;
+    width: min(150vw, 1100px); margin: 12px 0 0 calc(50% - 0.53 * min(150vw, 1100px)); }
+  .h1-states { grid-column: 1; flex-direction: row; justify-self: center; gap: 12px; margin-top: 8px; }
+  .h1-thumb { width: 72px; height: 72px; border-radius: 18px; padding: 8px; }
+  .h1-listen { order: 4; }
+  .h1-copy { display: contents; }
+  .h1-copy > * { grid-column: 1; }
+  .h1-eyebrow { order: 0; } .h1-title { order: 1; } .h1-lede { order: 2; } .h1-ctas { order: 3; }
+  .h1-stage { order: 5; } .h1-states { order: 6; } .h1-listen { order: 7; max-width: none; }
+}
+@media (max-width: 480px) {
+  .h1-title { font-size: clamp(2.6rem, 12.6vw, 3.4rem); }
+  .h1-lede { margin-top: 20px; }
+  .h1-ctas { margin-top: 26px; }
+  .h1 .btn-pair .pill { min-height: 52px; padding: 0 26px; }
+  .h1 .btn-pair .orb { width: 52px; height: 52px; }
+}

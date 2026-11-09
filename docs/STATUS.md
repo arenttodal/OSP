@@ -734,6 +734,17 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       mode (ANDOR ANALOG's generator) keeps its named key. Tests `[mode-selector]`; screenshots
       `OSP_MODE_SHOTS=<dir> osp_plugin_tests "[mode-shots]"`.
 
+## Website: genuine captures for the ANDOR OSP site (9 Nov 2026)
+
+- [x] Hidden test `[web-capture]` (`tests/plugin/WebCaptureTests.inc`): the real editor (ceramic) in
+      the states the website shows - hero in 1/2/3 layers with a chord held (processor run 0.6 s, so
+      playheads are real), empty, the five REIMAGINED popovers, SYNTH sample/analog/IMPRINT/IMPRINT+MOTION,
+      granular, SPACE, ECHO - at 1x/2x (hero 3x). `OSP_WEB_CAPTURE=<dir>`; `OSP_WEB_SOURCES="a;b;c"`
+      re-takes them with real recordings. Presentation only: nothing in the plugin changed.
+- [ ] Granular controls strip and the ECHO popover did not stage in the capture (see
+      `andor-web/docs/PHASE0_AUDIT.md` §5).
+- Website work lives in `andor-web/` (components, asset pipeline, docs, hero concepts at Gate H).
+
 ## Milestone: ANDOR Instrument Shell extensions for ANDOR ANALOG (a synthesizer)
 
 - [x] Opt-in extension points (HANDOFF.md, "What a product may add"): product parameters after

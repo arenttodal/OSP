@@ -1,0 +1,291 @@
+{
+  "schemaVersion": 1,
+  "notes": "Every product image on the ANDOR website is listed here. Masters are produced by the hidden [web-capture] test in tests/plugin/WebCaptureTests.inc of the OSP repository (real editor, ceramic look) and are not committed; run tools/capture.sh to regenerate them. Crops are in 1x editor coordinates (1448 x 1086) and are cut from the highest-resolution master.",
+  "product": {
+    "name": "ANDOR OSP",
+    "commit": "c49d77f",
+    "branch": "claude/charming-lovelace-n25fte (contains claude/synth-imprint @ 02465c7)",
+    "look": "ceramic"
+  },
+  "sourceAudio": {
+    "status": "stand-in",
+    "description": "Deterministic synthetic test signals (A: vowel C4, B: pluck A3, C: vowel C3) from src/audio/utility/TestSignals. They are NOT recordings. Every capture must be re-shot with the approved demo recording(s) via OSP_WEB_SOURCES before launch."
+  },
+  "assets": [
+    {
+      "id": "object-1l",
+      "masterDir": "renders",
+      "master": "object-1l.png",
+      "trim": true,
+      "use": "H1 hero object",
+      "alt": "ANDOR OSP presented as an object, standing at an angle: one recording loaded, a chord held.",
+      "widths": [
+        720,
+        1080,
+        1600,
+        2200
+      ],
+      "priority": true,
+      "approval": "concept",
+      "treatment": "Studio render (tools/render-object.py --view stand): the genuine capture is the face (emission, exact colours); the slab sides are textured from the capture's own teak cheek. No controls or hardware added."
+    },
+    {
+      "id": "object-3l",
+      "masterDir": "renders",
+      "master": "object-3l.png",
+      "trim": true,
+      "use": "H1 state: three layers",
+      "alt": "ANDOR OSP presented as an object with three layers loaded.",
+      "widths": [
+        720,
+        1080,
+        1600,
+        2200
+      ],
+      "approval": "concept",
+      "treatment": "Studio render (tools/render-object.py --view stand): the genuine capture is the face (emission, exact colours); the slab sides are textured from the capture's own teak cheek. No controls or hardware added."
+    },
+    {
+      "id": "object-imprint",
+      "masterDir": "renders",
+      "master": "object-imprint.png",
+      "trim": true,
+      "use": "H1 state: IMPRINT",
+      "alt": "ANDOR OSP presented as an object with the SYNTH page open in IMPRINT mode.",
+      "widths": [
+        720,
+        1080,
+        1600,
+        2200
+      ],
+      "approval": "concept",
+      "treatment": "Studio render (tools/render-object.py --view stand): the genuine capture is the face (emission, exact colours); the slab sides are textured from the capture's own teak cheek. No controls or hardware added."
+    },
+    {
+      "id": "osp-hero-1l",
+      "master": "web-01-hero-1L@3x.png",
+      "use": "Hero (H1, H2 reveal, H3)",
+      "alt": "ANDOR OSP with one recording loaded: a large waveform display, five source knobs, six macro knobs and a keyboard with a chord held.",
+      "widths": [
+        720,
+        1080,
+        1600,
+        2400,
+        3200
+      ],
+      "priority": true,
+      "approval": "concept"
+    },
+    {
+      "id": "osp-hero-3l",
+      "master": "web-01-hero-3L@3x.png",
+      "use": "Hero alternate; Layering",
+      "alt": "ANDOR OSP with three layers: a sung vowel, a granular pluck and a low vowel with IMPRINT synthesis.",
+      "widths": [
+        720,
+        1080,
+        1600,
+        2400
+      ],
+      "approval": "concept"
+    },
+    {
+      "id": "osp-hero-2l",
+      "master": "web-01-hero-2L@3x.png",
+      "use": "Layering",
+      "alt": "ANDOR OSP with two layers loaded side by side.",
+      "widths": [
+        720,
+        1080,
+        1600,
+        2400
+      ],
+      "approval": "concept"
+    },
+    {
+      "id": "osp-empty",
+      "master": "web-00-empty@2x.png",
+      "use": "First Note Story: before",
+      "alt": "ANDOR OSP before a sound is loaded, inviting you to drop a sound.",
+      "widths": [
+        720,
+        1080,
+        1600,
+        2400
+      ],
+      "approval": "concept"
+    },
+    {
+      "id": "osp-imprint",
+      "master": "web-03-synth-3-imprint@2x.png",
+      "use": "SYNTH + IMPRINT",
+      "alt": "The SYNTH page in IMPRINT mode, showing the oscillator cycle shaped by the recording's spectral body.",
+      "widths": [
+        720,
+        1080,
+        1600,
+        2400
+      ],
+      "approval": "concept"
+    },
+    {
+      "id": "osp-analog",
+      "master": "web-03-synth-2-analog@2x.png",
+      "use": "SYNTH + IMPRINT",
+      "alt": "The SYNTH page in ANALOG mode with a sawtooth cycle.",
+      "widths": [
+        720,
+        1080,
+        1600,
+        2400
+      ],
+      "approval": "concept"
+    },
+    {
+      "id": "osp-reimagined-mosaic",
+      "master": "web-02-reimagined-4-mosaic@2x.png",
+      "use": "REIMAGINED",
+      "alt": "The REIMAGINED popover in MOSAIC mode over the waveform.",
+      "widths": [
+        720,
+        1080,
+        1600,
+        2400
+      ],
+      "approval": "concept"
+    },
+    {
+      "id": "crop-display",
+      "master": "web-01-hero-1L@3x.png",
+      "crop": {
+        "x": 50,
+        "y": 189,
+        "w": 1349,
+        "h": 321
+      },
+      "use": "H2 opening frame (matched cut into osp-hero-1l)",
+      "alt": "The dark waveform display of ANDOR OSP with a recording and five playheads.",
+      "widths": [
+        720,
+        1080,
+        1600,
+        2400,
+        3200
+      ],
+      "priority": true,
+      "approval": "concept"
+    },
+    {
+      "id": "crop-macros",
+      "master": "web-01-hero-1L@3x.png",
+      "crop": {
+        "x": 40,
+        "y": 700,
+        "w": 900,
+        "h": 196
+      },
+      "use": "Detail gallery: macro knobs",
+      "alt": "The six ceramic macro knobs: LIFE, DRIVE, CHARACTER, MOVEMENT, ECHO and SPACE.",
+      "widths": [
+        720,
+        1080,
+        1600,
+        2400
+      ],
+      "approval": "concept"
+    },
+    {
+      "id": "crop-knob-life",
+      "master": "web-01-hero-1L@3x.png",
+      "crop": {
+        "x": 52,
+        "y": 704,
+        "w": 152,
+        "h": 192
+      },
+      "use": "Detail gallery: single knob",
+      "alt": "The LIFE macro knob, a ceramic dial with a terracotta arc.",
+      "widths": [
+        360,
+        540,
+        800
+      ],
+      "approval": "concept"
+    },
+    {
+      "id": "crop-keybed",
+      "master": "web-01-hero-1L@3x.png",
+      "crop": {
+        "x": 36,
+        "y": 908,
+        "w": 1380,
+        "h": 112
+      },
+      "use": "Detail gallery: keybed",
+      "alt": "The keyboard with an open C major seventh chord held.",
+      "widths": [
+        720,
+        1080,
+        1600,
+        2400,
+        3200
+      ],
+      "approval": "concept"
+    },
+    {
+      "id": "crop-teak",
+      "master": "web-01-hero-1L@3x.png",
+      "crop": {
+        "x": 0,
+        "y": 0,
+        "w": 420,
+        "h": 300
+      },
+      "use": "Detail gallery: timber frame and logotype",
+      "alt": "The ANDOR/OSP logotype beside the teak side panel.",
+      "widths": [
+        540,
+        800,
+        1260
+      ],
+      "approval": "concept"
+    },
+    {
+      "id": "crop-imprint-display",
+      "master": "web-03-synth-3-imprint@2x.png",
+      "crop": {
+        "x": 50,
+        "y": 189,
+        "w": 1349,
+        "h": 321
+      },
+      "use": "SYNTH + IMPRINT detail",
+      "alt": "The IMPRINT oscillator cycle on the dark display.",
+      "widths": [
+        720,
+        1080,
+        1600,
+        2400
+      ],
+      "approval": "concept"
+    },
+    {
+      "id": "crop-mosaic-popover",
+      "master": "web-02-reimagined-4-mosaic@2x.png",
+      "crop": {
+        "x": 962,
+        "y": 310,
+        "w": 286,
+        "h": 198
+      },
+      "use": "REIMAGINED detail",
+      "alt": "The MOSAIC popover: its harmonic fingerprint, DETAIL and MOTION knobs, and model.",
+      "widths": [
+        360,
+        540,
+        800
+      ],
+      "approval": "concept"
+    }
+  ]
+}

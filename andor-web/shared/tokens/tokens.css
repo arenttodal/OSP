@@ -1,0 +1,82 @@
+/* ANDOR design tokens, v1 (Phase 1). Source of truth for the Framer styles of the same names.
+   Contrast ratios are measured by tests/accessibility/contrast.mjs; see docs/DESIGN_SYSTEM.md. */
+
+:root {
+  /* Colour: light surfaces (dark type) */
+  --bg: #f7f6f2;               /* Background / Primary */
+  --bg-2: #edebe5;             /* Background / Secondary */
+  --bg-elev: #fcfbf8;          /* Background / Elevated */
+  --text: #242723;             /* Text / Primary            14.0:1 on --bg */
+  --text-2: #5c635a;           /* Text / Secondary (refined from #626960)  5.7:1 on --bg, 5.2:1 on --bg-2 */
+  --text-muted: #656c63;       /* Text / Muted (refined from #737A70, which failed AA at 4.1:1)  5.0:1 / 4.5:1 */
+  --accent: #bd653d;           /* Accent / Terracotta: graphics, rules, large type only (3.8:1) */
+  --accent-strong: #a4532e;    /* Accent for text and fills under white type (5.0:1 on --bg; white 5.5:1) */
+  --text-quiet: #878c83;       /* two-tone headlines only: large type (>= 24 px), 3.1:1 */
+  --border: #d8d9d1;           /* Border / Subtle: decorative only */
+  --border-strong: #858c82;    /* Control outlines (3.0:1+ against light surfaces) */
+
+  /* Colour: dark surfaces (light type) */
+  --dark-bg: #222924;
+  --dark-elev: #303a32;
+  --dark-text: #f4f1e9;        /* 13.2:1 on --dark-bg */
+  --dark-text-2: #c4cec1;      /* 9.2:1 */
+  --dark-muted: #9aa597;       /* 5.8:1 on --dark-bg, 4.6:1 on --dark-elev */
+  --dark-accent: #d08a63;      /* terracotta lifted for dark surfaces, 5.3:1 */
+  --dark-quiet: #7f897f;       /* two-tone headlines on dark, 4.1:1 */
+  --dark-border: #49554b;
+
+  /* Product display colours sampled from the OSP interface (never used for site text) */
+  --osp-display: #1d2321;
+  --osp-ceramic: #f1ebe1;
+  --osp-teak: #b8784a;
+
+  /* Typography */
+  --font-sans: "Inter Tight Variable", "Inter Tight", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace; /* technical labels */
+  --font-serif: "EB Garamond", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  /* Fluid between 375 px and 1440 px viewports: clamp(mobile, …, desktop) */
+  --type-hero: clamp(2.875rem, 1.95rem + 3.95vw, 6rem);        /* 46 → 96 px */
+  --type-section: clamp(2.125rem, 1.6rem + 2.25vw, 4rem);      /* 34 → 64 px */
+  --type-feature: clamp(1.6875rem, 1.45rem + 1vw, 2.5rem);     /* 27 → 40 px */
+  --type-lede: clamp(1.0625rem, 0.98rem + 0.36vw, 1.3125rem);  /* 17 → 21 px */
+  --type-body: clamp(0.9375rem, 0.9rem + 0.18vw, 1.0625rem);   /* 15 → 17 px */
+  --type-small: 0.875rem;                                      /* 14 px */
+  --type-label: 0.75rem;                                       /* 12 px */
+  --track-hero: -0.038em;
+  --track-section: -0.03em;
+  --track-label: 0.08em;
+  --leading-tight: 1.02;
+  --leading-heading: 1.08;
+  --leading-body: 1.55;
+
+  /* Layout */
+  --content-max: 1360px;
+  --gutter: clamp(20px, 5.6vw, 80px);  /* 20–24 mobile, 32–48 tablet, 64–80 desktop */
+  --columns: 12;
+  --col-gap: clamp(12px, 1.7vw, 24px);
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px; --space-5: 24px;
+  --space-6: 32px; --space-7: 48px; --space-8: 64px; --space-9: 96px; --space-10: 128px; --space-11: 160px;
+  --section-space: clamp(88px, 10vw, 160px);
+  --radius-s: 6px; --radius-m: 10px; --radius-l: 16px; --radius-pill: 999px;
+  --touch: 44px;
+
+  /* Motion: one vocabulary for the whole site */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);      /* arrivals */
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);   /* state changes */
+  --ease-soft: cubic-bezier(0.33, 0, 0.15, 1);     /* product emergence */
+  --dur-1: 160ms;  /* hover, press */
+  --dur-2: 280ms;  /* control state */
+  --dur-3: 520ms;  /* text reveal */
+  --dur-4: 900ms;  /* product emergence */
+  --dur-5: 1400ms; /* hero settle */
+  --stagger: 90ms;
+
+  /* Elevation: warm, low, studio-lit (no blue glows) */
+  --shadow-object:
+    0 1px 1px rgba(46, 38, 28, 0.06),
+    0 6px 14px -6px rgba(46, 38, 28, 0.16),
+    0 28px 60px -22px rgba(46, 38, 28, 0.28),
+    0 70px 120px -50px rgba(46, 38, 28, 0.30);
+  --shadow-panel: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 10px 30px -14px rgba(46, 38, 28, 0.22);
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent-strong);
+}
