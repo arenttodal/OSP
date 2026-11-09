@@ -8,8 +8,10 @@ import { Wordmark } from '../components/interactive/SiteHeader';
 const shots = import.meta.glob('./board/*.webp', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
 const shot = (name: string) => shots[`./board/${name}.webp`];
 
+const PAGE = { id: 'osp', href: 'osp.html', name: 'ANDOR OSP · the landing page', tone: 'Hero E approved · every section', line: 'Hero E, then a statement pause, First Note (capture, play, transform), Sounds, REIMAGINED, SYNTH + IMPRINT, layers and granular, the instrument details, deeper features, technical details, waitlist, questions and footer. All product imagery is genuine.' };
+
 const ROUND3 = [
-  { id: 'g5', href: 'g5.html', name: 'E · Open bubbles', tone: 'Newest · features open around the instrument', line: 'The deep dives are already open on the page: soft floating bubbles beside the instrument, each holding the real popover or panel (the drop area, LIFE, SYNTH + IMPRINT, REIMAGINED, SPACE, the arpeggiator). Click a bubble or a marker for the full modal. A swipeable row on phones.' },
+  { id: 'g5', href: 'g5.html', name: 'E · Open bubbles', tone: 'Approved at Gate H', line: 'The deep dives are already open on the page: soft floating bubbles beside the instrument, each holding the real popover or panel (the drop area, LIFE, SYNTH + IMPRINT, REIMAGINED, SPACE, the arpeggiator). Click a bubble or a marker for the full modal. A swipeable row on phones.' },
   { id: 'g3', href: 'g3.html', name: 'C · Notes', tone: 'Chosen direction · B header · three layers', line: 'Gallery C with edition B’s header and no subheading. The real three-layer instrument, notes pinned to its controls and a strip of real numbers beneath.' },
   { id: 'g4', href: 'g4.html', name: 'D · Deep dive', tone: 'Chosen direction · rounded modals', line: 'Each numbered part opens a rounded modal with the real controls behind it: LIFE’s page, the five REIMAGINED modes, SYNTH and IMPRINT, SPACE and the arpeggiator. A bottom sheet on phones.' },
 ];
@@ -34,9 +36,24 @@ function Board() {
         <p className="t-mono">Gate H · hero directions · concept</p>
       </header>
       <main className="container">
-        <h1 className="t-section board-title">The Gallery, <span className="quiet">in context.</span></h1>
-        <p className="board-rec"><span className="t-mono">Round 3 · your direction</span> Gallery C with edition B’s header, no subheading and the three-layer instrument, in three versions: E with the features open as bubbles, C with notes, D with deep-dive modals. Rounds 2 and 1 are kept below for comparison.</p>
+        <h1 className="t-section board-title">ANDOR OSP, <span className="quiet">the whole page.</span></h1>
+        <p className="board-rec"><span className="t-mono">Gate H passed · hero E</span> The full landing page is built around the approved hero. The hero rounds are kept below for reference.</p>
         <p className="t-lede board-lede">Every product image is a genuine capture of the current build (c49d77f), or a studio render with that capture as its face. Round-2 editions use a straight capture; H1 uses the render.</p>
+        <div className="board-grid">
+          <article className="board-card">
+            <a href={PAGE.href} className="board-shots" aria-label={`Open ${PAGE.name}`}>
+              <img className="board-desk" src={shot('osp-desktop')} width={1200} height={750} alt="" loading="lazy" />
+              <img className="board-mob" src={shot('osp-mobile')} width={390} height={844} alt="" loading="lazy" />
+            </a>
+            <div className="board-meta">
+              <p className="t-mono">{PAGE.tone}</p>
+              <h2 className="t-feature">{PAGE.name}</h2>
+              <p>{PAGE.line}</p>
+              <a className="btn btn-primary btn-small" href={PAGE.href}>Open the landing page</a>
+            </div>
+          </article>
+        </div>
+        <h2 className="t-feature board-round">Round 3 · Gallery C, three versions</h2>
         <div className="board-grid">
           {ROUND3.map((c) => (
             <article key={c.id} className="board-card">

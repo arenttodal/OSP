@@ -50,6 +50,7 @@
     margin: 20px calc(-1 * var(--gutter)) 0; padding: 4px var(--gutter) 18px; scroll-padding-inline: var(--gutter); scrollbar-width: none; }
   .e-bubbles::-webkit-scrollbar { display: none; }
   .e-cell { display: block; flex: 0 0 min(80vw, 320px); scroll-snap-align: start; }
-  .e-cell .bub { height: 100%; align-content: start; }
+  .e-cell { align-self: flex-start; }
+  .e-cell .bub { align-content: start; }
   .e-listen { margin-top: 18px; }
 }

@@ -221,4 +221,129 @@ TEST_CASE ("plugin: website captures (OSP_WEB_CAPTURE)", "[.][web-capture]")
         set (p, Host::synthParameterId (2, "mode"), 1.0f);
         set (p, Host::synthParameterId (2, "imprint"), 80.0f);
     }, "web-08-hero-3L-bounds");
+
+    // 09 The remaining sections' states, each with the bounds of the part the site crops.
+    auto boundsOf = [&] (Editor& ui, juce::Component* c) { return rectVar (ui.getLocalArea (c, c->getLocalBounds())); };
+    // Granular: one source as a cloud of grains with its controls shown.
+    mark = [&] (Editor& ui, juce::DynamicObject& m) { m.setProperty ("card", boundsOf (ui, &ui.engineCard (0))); };
+    shoot ({ 1, { 1448, 1086 }, { 2.0f }, chord }, [&] (OspAudioProcessor& p, Editor& ui) {
+        set (p, "layerA.sourceMode", 1.0f);
+        set (p, "layerA.granular.size", 180.0f);
+        set (p, "layerA.granular.density", 22.0f);
+        set (p, "layerA.granular.spread", 45.0f);
+        set (p, "layerA.granular.scatter", 3.0f);
+        ui.refreshNow();
+        ui.engineCard (0).showGranularControls (true, true);
+    }, "web-09-granular-1L");
+    // ECHO with ASCEND (the popover, the way the design capture opens it).
+    mark = popupBounds;
+    shoot ({ 1, { 1448, 1086 }, { 3.0f }, chord }, [&] (OspAudioProcessor& p, Editor& ui) {
+        set (p, "echo", 40.0f);
+        set (p, "echo.type", 2.0f);
+        ui.refreshNow();
+        ui.openPopup (Editor::echoPopup);
+    }, "web-09-echo");
+    // The modulation panel on LFO 1.
+    mark = [&] (Editor& ui, juce::DynamicObject& m) { m.setProperty ("mod", boundsOf (ui, &ui.modulationPanel())); };
+    shoot ({ 1, { 1448, 1086 }, { 3.0f }, chord }, [&] (OspAudioProcessor&, Editor& ui) { ui.modulationPanel().showTab (2); }, "web-09-modulation");
+    // KEY DNA: SIZE with a falling curve and variation, keys held.
+    mark = [&] (Editor& ui, juce::DynamicObject& m) { if (auto* d = ui.keyDnaWindow()) m.setProperty ("keydna", boundsOf (ui, d)); };
+    shoot ({ 1, { 1448, 1086 }, { 2.0f }, {} }, [&] (OspAudioProcessor& p, Editor& ui) {
+        p.setParameterValue ("layerA.sourceMode", 1.0f);
+        auto dna = p.keyDnaSettings (0);
+        dna.enabled = true;
+        dna[keydna::Param::size].variation = 0.45;
+        dna[keydna::Param::size].curveDepth = 0.7;
+        dna[keydna::Param::position].variation = 0.3;
+        p.setKeyDnaSettings (0, dna, "KEY DNA", true);
+        mod::Curve c;
+        c.count = 3;
+        c.points[0] = { 0.0f, 0.85f, 0.0f };
+        c.points[1] = { 0.55f, 0.45f, 0.3f };
+        c.points[2] = { 1.0f, 0.15f, 0.0f };
+        p.setKeyDnaCurve (0, keydna::Param::size, c, true);
+        ui.refreshNow();
+        ui.openKeyDna (0);
+        if (auto* d = ui.keyDnaWindow())
+            d->showParameter (keydna::Param::size);
+        p.keyboardState.noteOn (1, 60, 0.8f);
+        p.keyboardState.noteOn (1, 64, 0.8f);
+    }, "web-09-keydna");
+    // The Library with the three sounds.
+    shoot ({ 3, { 1448, 1086 }, { 2.0f }, {} }, [&] (OspAudioProcessor&, Editor& ui) { ui.openLibrary(); }, "web-09-library");
+
+    // NOTE MAP (Note Atlas): a recorded phrase mapped into its notes, one selected.
+    {
+        const auto rec = phraseRecording (tmp.dir, "web-phrase.wav", { 69, 74, 77, 81, 74, 79 });
+        OspAudioProcessor p;
+        std::unique_ptr<juce::AudioProcessorEditor> e (p.createEditorIfNeeded());
+        auto* ui = dynamic_cast<Editor*> (e.get());
+        REQUIRE (ui != nullptr);
+        juce::Array<juce::File> list;
+        list.add (rec.file);
+        p.addLayers (list);
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        e->setSize (1448, 1086);
+        voiced (p);
+        p.mapNotes (0);
+        settleEdits (p);
+        p.dismissMapNotesPrompt (1);
+        p.dismissMapNotesPrompt (2);
+        ui->refreshNow();
+        ui->engineCard (0).onNotesToggle (0, true);
+        if (auto* map = ui->engineCard (0).noteMapComponent())
+        {
+            map->refresh();
+            map->select ({ p.currentInstrument (0)->atlas->notes[2].id });
+        }
+        ui->refreshNow();
+        juce::DynamicObject::Ptr marks (new juce::DynamicObject());
+        marks->setProperty ("card", rectVar (ui->getLocalArea (&ui->engineCard (0), ui->engineCard (0).getLocalBounds())));
+        out.getChildFile ("web-09-notemap.json").replaceWithText (juce::JSON::toString (juce::var (marks.get()), false));
+        save (e->createComponentSnapshot (e->getLocalBounds(), true, 2.0f), "web-09-notemap@2x.png");
+    }
+
+    // Live Capture: the card's REC page with an input connected, a phrase played in, recording.
+    {
+        OspAudioProcessor p;
+        juce::Array<juce::File> list;
+        list.add (src[0]);
+        p.addLayers (list);
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        std::unique_ptr<juce::AudioProcessorEditor> e (p.createEditorIfNeeded());
+        auto* ui = dynamic_cast<Editor*> (e.get());
+        REQUIRE (ui != nullptr);
+        e->setSize (1448, 1086);
+        voiced (p);
+        ui->refreshNow();
+        auto& card = ui->engineCard (0);
+        card.setCaptureOpen (true);
+        auto* page = card.captureEditorComponent();
+        REQUIRE (page != nullptr);
+        page->refresh();
+        connectInput (p);
+        const auto phrase = capturePhrase ({ 69, 74, 77, 81 }, 0.3);
+        const int perTick = static_cast<int> (captureRate / 30.0);
+        auto feed = [&] (std::int64_t from, std::int64_t to) {
+            for (std::int64_t at = from; at + perTick <= to; at += perTick)
+            {
+                AudioData slice = AudioData::allocate (2, perTick, captureRate);
+                for (int ch = 0; ch < 2; ++ch)
+                    std::copy_n (phrase.channels[static_cast<std::size_t> (ch)].begin() + at, perTick, slice.channels[static_cast<std::size_t> (ch)].begin());
+                feedInput (p, slice, perTick);
+                page->refresh();
+            }
+        };
+        feed (0, phrase.numFrames());
+        p.startTake (0);
+        feed (0, phrase.numFrames() / 2);
+        ui->refreshNow();
+        juce::DynamicObject::Ptr marks (new juce::DynamicObject());
+        marks->setProperty ("card", rectVar (ui->getLocalArea (&card, card.getLocalBounds())));
+        out.getChildFile ("web-09-capture.json").replaceWithText (juce::JSON::toString (juce::var (marks.get()), false));
+        save (e->createComponentSnapshot (e->getLocalBounds(), true, 2.0f), "web-09-capture@2x.png");
+        p.cancelTake();
+    }
 }

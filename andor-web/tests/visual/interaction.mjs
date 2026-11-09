@@ -114,8 +114,40 @@ await page.waitForTimeout(400);
 check('E (phone): tapping a bubble opens the bottom sheet', (await title()) === 'Your recording');
 await page.close();
 
+
+// The landing page (osp.html): sections and their controls
+page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+await page.goto(url('osp.html'));
+await page.waitForTimeout(2500);
+const anchors = await page.$$eval('a[href^="#"]', (as) => as.map((a) => a.getAttribute('href')).filter((h) => h.length > 1));
+const missing = await page.evaluate((hs) => hs.filter((h) => !document.querySelector(h)), [...new Set(anchors)]);
+check('OSP: every in-page link has a target', missing.length === 0, missing.join(' '));
+const cur = (sel) => page.$eval(`${sel} .is-current`, (el) => el.dataset.asset);
+await page.click('#reimagined [role="tab"]:has-text("Tape Frame")');
+check('OSP: REIMAGINED switches to Tape Frame', (await cur('#reimagined')) === 'dd-reimagined-tape-frame');
+await page.keyboard.press('ArrowDown');
+check('OSP: REIMAGINED arrow key moves to Toybox', (await cur('#reimagined')) === 'dd-reimagined-toybox');
+await page.click('#synth [role="tab"]:has-text("Analog")');
+check('OSP: SYNTH shows the Analog card', (await cur('#synth')) === 'syn-card-analog');
+await page.keyboard.press('End');
+check('OSP: SYNTH End key reaches Imprint + Motion', (await cur('#synth')) === 'syn-card-motion');
+await page.click('#layers [role="tab"]:has-text("One sound")');
+check('OSP: Layers shows one layer', (await cur('#layers .layers__stage')) === 'osp-hero-1l');
+await page.click('#sounds .deck__arrow[aria-label="Next example"]');
+check('OSP: sound deck moves to the next example', (await page.$eval('#sounds .deck__card.is-current .deck__name', (el) => el.textContent)) === 'Analog synth');
+await page.click('#faq summary >> nth=0');
+check('OSP: FAQ opens an answer', await page.$eval('#faq details', (d) => d.open));
+await page.fill('#wait-email', 'test@example.com');
+await page.click('#waitlist button[type="submit"]');
+check('OSP: waitlist says honestly that nothing was sent', /nothing was sent/.test(await page.$eval('.wait__done', (el) => el.textContent)));
+await page.click('.bub:has(.bub__btn:text("SPACE")) .bub__head');
+await page.waitForTimeout(300);
+check('OSP: hero bubble opens its modal', (await title()) === 'SPACE');
+await page.keyboard.press('Escape');
+await page.close();
+
 // Reduced motion: settled immediately
-for (const p of ['h1.html', 'h2.html', 'h3.html', 'g1.html', 'g2.html', 'g3.html', 'g4.html', 'g5.html']) {
+for (const p of ['h1.html', 'h2.html', 'h3.html', 'g1.html', 'g2.html', 'g3.html', 'g4.html', 'g5.html', 'osp.html']) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
   const t = await ctx.newPage();
   await t.goto(url(p));

@@ -5,8 +5,9 @@
 | Gate | State | Evidence |
 |---|---|---|
 | G0 Foundation | **Done, with one blocker** (no recordings) | `docs/PHASE0_AUDIT.md` |
-| G1 Visual direction | **Awaiting owner** | Three hero concepts; `docs/HERO_CONCEPTS.md` |
-| H Hero approval | Awaiting owner | — |
+| G1 Visual direction | **Done**: Gallery C, no serif, B's header, three layers | `docs/HERO_CONCEPTS.md` rounds 2–3 |
+| H Hero approval | **Approved: E (open bubbles)**, 9 Nov 2026 | `g5.html`, `prototype/osp/Hero.tsx` |
+| Landing page | **Built, awaiting review** | `osp.html`, `docs/PAGE.md` |
 
 ## Decisions made autonomously (routine)
 

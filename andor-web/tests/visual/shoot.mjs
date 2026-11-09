@@ -15,7 +15,7 @@ const out = path.join(root, 'tests/visual/out');
 fs.mkdirSync(out, { recursive: true });
 const args = process.argv.slice(2);
 const scale = args.includes('--scale') ? Number(args[args.indexOf('--scale') + 1]) : 1;
-const pages = args.filter((a) => /^([hg]\d|index)$/.test(a));
+const pages = args.filter((a) => /^([hg]\d|index|osp)$/.test(a));
 const PAGES = pages.length ? pages : ['h1', 'h2', 'h3'];
 const WIDTHS = [[1440, 900], [1280, 800], [1024, 768], [768, 1024], [390, 844], [375, 667], [320, 568]];
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.webp': 'image/webp', '.avif': 'image/avif', '.png': 'image/png', '.woff2': 'font/woff2', '.woff': 'font/woff', '.json': 'application/json' };

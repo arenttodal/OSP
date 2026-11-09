@@ -3,13 +3,13 @@
 Custom components, asset pipeline, tests and documentation for the ANDOR OSP website. Framer
 holds the page layout (see `docs/FRAMER.md`). This folder is isolated from the plugin's DSP code.
 
-**Current stage:** Phase 0 and Phase 1 done. Three hero concepts await approval at **Gate H**
-(`docs/HERO_CONCEPTS.md`). Nothing beyond the hero is built until a direction is approved.
+**Current stage:** hero E approved at Gate H; the full landing page is built (`osp.html`,
+`docs/PAGE.md`). Waiting on recordings, the waitlist provider and the Framer route.
 
 ## Run
 ```sh
 npm install
-npm run dev            # http://localhost:5173 (board), /h1.html, /h2.html, /h3.html
+npm run dev            # http://localhost:5173 (board), /osp.html (landing page), /g5.html (hero E), /h1–h3, /g1–g4
 npm run build          # static prototype in dist/
 npm test               # contrast + audio functional test + visual QA at 7 widths
 ```

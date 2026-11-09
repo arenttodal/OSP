@@ -6,7 +6,7 @@ import path from 'node:path';
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
 const server = await preview({ root, configFile: root + '/vite.config.ts', preview: { port: 4821 }, logLevel: 'error' });
 const b = await chromium.launch();
-for (const p of ['h1', 'h2', 'h3']) for (const [w, h] of [[1440, 900], [390, 844]]) {
+for (const p of (process.argv.slice(2).length ? process.argv.slice(2) : ['h1', 'h2', 'h3'])) for (const [w, h] of [[1440, 900], [390, 844]]) {
   const ctx = await b.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: w < 800 ? 3 : 2 });
   const t = await ctx.newPage();
   let bytes = 0, img = 0;

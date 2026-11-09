@@ -45,3 +45,10 @@ popup's editor bounds), `web-07-arp-3L` (three layers, arp on, panel open, edito
 `web-08-hero-3L-bounds` (every component's bounds). Assets `dd-*` are crops of these for the
 deep-dive modals: `dd-recording-empty/-loaded`, `dd-life`, `dd-space`, `dd-synth-analog/-imprint/-motion`,
 `dd-reimagined-<mode>` ×5, `dd-arp`.
+
+## Landing-page additions
+Captures `web-09-granular-1L` (granular controls shown), `web-09-echo` (ASCEND popover),
+`web-09-modulation` (LFO 1), `web-09-keydna`, `web-09-notemap`, `web-09-capture` (recording) and
+`web-09-library`, each with bounds JSON. The library capture is unused: a fresh test profile has
+no presets. Assets: `bub-recording`, `bub-synth`, `syn-card-*` ×4, `gran-card`, `feat-notemap`,
+`feat-capture`, `feat-keydna`, `det-mod`.
