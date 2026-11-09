@@ -587,6 +587,7 @@ PackResult exportPack (Catalog& catalog, const std::filesystem::path& storeDir, 
     m.description = cleanText (request.description, 4000, true);
     m.license = cleanText (request.license, 20000, true);
     m.requiresPlugin = pluginVersion;
+    m.factory = request.factory;
     if (! validPackId (m.id) || m.name.empty() || ! validVersion (m.version))
     {
         result.error = "the pack needs a name, an id (a-z, 0-9, '.', '_', '-') and a version (1.0.0)";

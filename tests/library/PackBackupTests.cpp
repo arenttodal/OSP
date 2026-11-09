@@ -526,6 +526,82 @@ TEST_CASE ("library packs: factory packs install apart from user data, update, a
     CHECK (p.catalog->asset (mine.assetId)->origin == Origin::user);
 }
 
+TEST_CASE ("library packs: a publisher's factory export installs from the plugin's folder; an ordinary export never does", "[unit][library][packs]")
+{
+    // The publisher's Library: a collection of presets and their sounds.
+    Place maker ("publisher");
+    const auto pad = maker.sound ("Pad Warm", tone (220.0, 1.2, 3), "original");
+    const auto keys = maker.sound ("Keys Soft", tone (330.0, 0.8, 4), "original");
+    const auto hymn = maker.preset ("Warm Hymn", { pad.contentHash });
+    const auto glass = maker.preset ("Glass Keys", { keys.contentHash });
+    const auto collection = *maker.catalog->createCollection ("Core");
+    for (const auto& id : { hymn, glass })
+        REQUIRE (maker.catalog->addToCollection (collection, id));
+    SearchQuery inCollection;
+    inCollection.collection = collection;
+    PackExport request;
+    for (const auto& asset : maker.catalog->search (inCollection))
+        request.assetIds.push_back (asset.id);
+    request.id = "com.evenant.osp.core";
+    request.name = "OSP Core";
+    request.version = "1.0.0";
+    request.creator = "Evenant";
+    request.license = "Licensed for use in music with OSP.";
+
+    // Without the factory mark (the default): an ordinary pack, as every export made before.
+    const auto shipped = maker.dir / "Bundle" / "Resources" / "Factory";
+    std::filesystem::create_directories (shipped);
+    auto made = exportPack (*maker.catalog, maker.store, request, shipped / "ordinary.osppack", "1.0.0");
+    INFO (made.error);
+    REQUIRE (made.ok);
+    CHECK_FALSE (made.manifest.factory);
+    std::string why;
+    CHECK_FALSE (parsePackManifest (*ArchiveReader (shipped / "ordinary.osppack").readText ("manifest.json", 1 << 20), why)->factory);
+
+    // A musician's Library with presets of their own.
+    Place user ("musician");
+    const auto mine = user.sound ("My Voice", tone (180.0, 0.8, 5));
+    const auto myPreset = user.preset ("My Preset", { mine.contentHash });
+    CHECK (installFactoryPacks (*user.catalog, shipped, user.packPlaces()).empty());   // not factory: never installed from the bundle
+    CHECK (user.count (Origin::factory) == 0);
+
+    // With the mark: installed at startup into the Factory folder, apart from the user's data.
+    std::filesystem::remove (shipped / "ordinary.osppack");
+    request.factory = true;
+    made = exportPack (*maker.catalog, maker.store, request, shipped / "core.osppack", "1.0.0");
+    INFO (made.error);
+    REQUIRE (made.ok);
+    CHECK (made.manifest.factory);
+    auto results = installFactoryPacks (*user.catalog, shipped, user.packPlaces());
+    REQUIRE (results.size() == 1);
+    INFO (results[0].error);
+    REQUIRE (results[0].ok);
+    CHECK (results[0].presets == 2);
+    CHECK (results[0].sounds == 2);
+    REQUIRE (user.catalog->pack ("com.evenant.osp.core"));
+    const auto packHymn = user.catalog->assetForPackKey ("com.evenant.osp.core", hymn);
+    REQUIRE (packHymn);
+    CHECK (user.catalog->asset (*packHymn)->origin == Origin::factory);
+    CHECK (std::filesystem::path (user.catalog->preset (*packHymn)->file).parent_path() == user.factory / "com.evenant.osp.core" / "Presets");
+    // The user's own preset and sound are untouched, and nothing went into their folders.
+    CHECK (user.catalog->asset (myPreset)->origin == Origin::user);
+    CHECK (user.catalog->asset (mine.assetId)->origin == Origin::user);
+    CHECK_FALSE (user.catalog->asset (myPreset)->trashed);
+    CHECK (std::filesystem::is_empty (user.packs));
+    // The next start-up: nothing new, nothing done.
+    CHECK (installFactoryPacks (*user.catalog, shipped, user.packPlaces()).empty());
+    // A later version (same id) updates in place.
+    request.version = "1.1.0";
+    std::filesystem::remove (shipped / "core.osppack");
+    REQUIRE (exportPack (*maker.catalog, maker.store, request, shipped / "core.osppack", "1.0.0").ok);
+    results = installFactoryPacks (*user.catalog, shipped, user.packPlaces());
+    REQUIRE (results.size() == 1);
+    CHECK (results[0].upgraded);
+    CHECK (user.catalog->assetForPackKey ("com.evenant.osp.core", hymn) == packHymn);
+    CHECK (user.catalog->pack ("com.evenant.osp.core")->version == "1.1.0");
+    CHECK (user.catalog->asset (myPreset)->origin == Origin::user);
+}
+
 //==============================================================================
 
 TEST_CASE ("library backup: a whole Library backed up and restored on another machine, identities kept", "[unit][library][backup]")

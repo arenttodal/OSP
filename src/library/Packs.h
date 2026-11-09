@@ -98,6 +98,10 @@ struct PackExport
     std::vector<std::string> assetIds;
     std::string id, name, version = "1.0.0", creator, description, license;
     bool confirmUnknownRights = false;
+    /** A factory pack: it ships inside the plugin (Contents/Resources/Factory) and installs at
+        startup into <Library>/Factory. Only for the publisher's own built-in sounds; ordinary
+        packs (expansions, a user's share) leave it false. */
+    bool factory = false;
 };
 PackResult exportPack (Catalog& catalog, const std::filesystem::path& storeDir, const PackExport& request, const std::filesystem::path& out,
                        const std::string& pluginVersion);
