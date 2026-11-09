@@ -38,3 +38,10 @@ Regenerate everything: `andor-web/tools/capture.sh` (see the script header), the
 
 Ownership: all GUI imagery is the owner's product. Fonts: Inter Tight, EB Garamond and Geist Mono
 are all SIL Open Font License.
+
+## Round 3 additions
+Captures `web-06-life`, `web-06-space`, `web-06-reimagined-1…5` (3x, each with a `.json` of the
+popup's editor bounds), `web-07-arp-3L` (three layers, arp on, panel open, editor grown) and
+`web-08-hero-3L-bounds` (every component's bounds). Assets `dd-*` are crops of these for the
+deep-dive modals: `dd-recording-empty/-loaded`, `dd-life`, `dd-space`, `dd-synth-analog/-imprint/-motion`,
+`dd-reimagined-<mode>` ×5, `dd-arp`.

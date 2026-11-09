@@ -1020,6 +1020,638 @@
           }
         ]
       }
+    },
+    "dd-recording-empty": {
+      "id": "dd-recording-empty",
+      "alt": "ANDOR OSP before a sound is loaded: a large drop area that says Drop a sound.",
+      "use": "Deep dive: your recording (before)",
+      "width": 2752,
+      "height": 1044,
+      "aspect": 2.63602,
+      "priority": false,
+      "approval": "concept",
+      "master": "web-00-empty@2x.png",
+      "treatment": null,
+      "crop": {
+        "x": 36,
+        "y": 128,
+        "w": 1376,
+        "h": 522
+      },
+      "files": {
+        "avif": [
+          {
+            "width": 600,
+            "height": 228,
+            "file": "dd-recording-empty-600.avif"
+          },
+          {
+            "width": 900,
+            "height": 341,
+            "file": "dd-recording-empty-900.avif"
+          },
+          {
+            "width": 1300,
+            "height": 493,
+            "file": "dd-recording-empty-1300.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 600,
+            "height": 228,
+            "file": "dd-recording-empty-600.webp"
+          },
+          {
+            "width": 900,
+            "height": 341,
+            "file": "dd-recording-empty-900.webp"
+          },
+          {
+            "width": 1300,
+            "height": 493,
+            "file": "dd-recording-empty-1300.webp"
+          }
+        ]
+      }
+    },
+    "dd-recording-loaded": {
+      "id": "dd-recording-loaded",
+      "alt": "Three loaded layers, each with its own waveform display and controls.",
+      "use": "Deep dive: your recording (after)",
+      "width": 4131,
+      "height": 1575,
+      "aspect": 2.62286,
+      "priority": false,
+      "approval": "concept",
+      "master": "web-01-hero-3L@3x.png",
+      "treatment": null,
+      "crop": {
+        "x": 35,
+        "y": 127,
+        "w": 1377,
+        "h": 525
+      },
+      "files": {
+        "avif": [
+          {
+            "width": 600,
+            "height": 229,
+            "file": "dd-recording-loaded-600.avif"
+          },
+          {
+            "width": 900,
+            "height": 343,
+            "file": "dd-recording-loaded-900.avif"
+          },
+          {
+            "width": 1300,
+            "height": 496,
+            "file": "dd-recording-loaded-1300.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 600,
+            "height": 229,
+            "file": "dd-recording-loaded-600.webp"
+          },
+          {
+            "width": 900,
+            "height": 343,
+            "file": "dd-recording-loaded-900.webp"
+          },
+          {
+            "width": 1300,
+            "height": 496,
+            "file": "dd-recording-loaded-1300.webp"
+          }
+        ]
+      }
+    },
+    "dd-life": {
+      "id": "dd-life",
+      "alt": "The LIFE popover: mode Natural, a performance curve, CHARACTER, TAKES, ORDER, PITCH, TONE and ATTACK.",
+      "use": "Deep dive: LIFE",
+      "width": 792,
+      "height": 636,
+      "aspect": 1.24528,
+      "priority": false,
+      "approval": "concept",
+      "master": "web-06-life@3x.png",
+      "treatment": null,
+      "crop": {
+        "x": 16,
+        "y": 485,
+        "w": 264,
+        "h": 212
+      },
+      "files": {
+        "avif": [
+          {
+            "width": 600,
+            "height": 482,
+            "file": "dd-life-600.avif"
+          },
+          {
+            "width": 792,
+            "height": 636,
+            "file": "dd-life-792.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 600,
+            "height": 482,
+            "file": "dd-life-600.webp"
+          },
+          {
+            "width": 792,
+            "height": 636,
+            "file": "dd-life-792.webp"
+          }
+        ]
+      }
+    },
+    "dd-space": {
+      "id": "dd-space",
+      "alt": "The SPACE popover: Room, Hall, Plate and Spring, a decay picture with low and high cut, and its controls.",
+      "use": "Deep dive: SPACE",
+      "width": 888,
+      "height": 819,
+      "aspect": 1.08425,
+      "priority": false,
+      "approval": "concept",
+      "master": "web-06-space@3x.png",
+      "treatment": null,
+      "crop": {
+        "x": 710,
+        "y": 424,
+        "w": 296,
+        "h": 273
+      },
+      "files": {
+        "avif": [
+          {
+            "width": 600,
+            "height": 553,
+            "file": "dd-space-600.avif"
+          },
+          {
+            "width": 888,
+            "height": 819,
+            "file": "dd-space-888.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 600,
+            "height": 553,
+            "file": "dd-space-600.webp"
+          },
+          {
+            "width": 888,
+            "height": 819,
+            "file": "dd-space-888.webp"
+          }
+        ]
+      }
+    },
+    "dd-synth-analog": {
+      "id": "dd-synth-analog",
+      "alt": "The SYNTH page in Analog mode: a saw cycle, with wave, octave, detune, tone, shape and pitch controls.",
+      "use": "Deep dive: SYNTH (analog)",
+      "width": 2698,
+      "height": 642,
+      "aspect": 4.20249,
+      "priority": false,
+      "approval": "concept",
+      "master": "web-03-synth-2-analog@2x.png",
+      "treatment": null,
+      "crop": {
+        "x": 50,
+        "y": 189,
+        "w": 1349,
+        "h": 321
+      },
+      "files": {
+        "avif": [
+          {
+            "width": 600,
+            "height": 143,
+            "file": "dd-synth-analog-600.avif"
+          },
+          {
+            "width": 900,
+            "height": 214,
+            "file": "dd-synth-analog-900.avif"
+          },
+          {
+            "width": 1300,
+            "height": 309,
+            "file": "dd-synth-analog-1300.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 600,
+            "height": 143,
+            "file": "dd-synth-analog-600.webp"
+          },
+          {
+            "width": 900,
+            "height": 214,
+            "file": "dd-synth-analog-900.webp"
+          },
+          {
+            "width": 1300,
+            "height": 309,
+            "file": "dd-synth-analog-1300.webp"
+          }
+        ]
+      }
+    },
+    "dd-synth-imprint": {
+      "id": "dd-synth-imprint",
+      "alt": "The SYNTH page in Imprint mode: the oscillator cycle shaped by the recording, IMPRINT at 85 %.",
+      "use": "Deep dive: SYNTH (imprint)",
+      "width": 2698,
+      "height": 642,
+      "aspect": 4.20249,
+      "priority": false,
+      "approval": "concept",
+      "master": "web-03-synth-3-imprint@2x.png",
+      "treatment": null,
+      "crop": {
+        "x": 50,
+        "y": 189,
+        "w": 1349,
+        "h": 321
+      },
+      "files": {
+        "avif": [
+          {
+            "width": 600,
+            "height": 143,
+            "file": "dd-synth-imprint-600.avif"
+          },
+          {
+            "width": 900,
+            "height": 214,
+            "file": "dd-synth-imprint-900.avif"
+          },
+          {
+            "width": 1300,
+            "height": 309,
+            "file": "dd-synth-imprint-1300.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 600,
+            "height": 143,
+            "file": "dd-synth-imprint-600.webp"
+          },
+          {
+            "width": 900,
+            "height": 214,
+            "file": "dd-synth-imprint-900.webp"
+          },
+          {
+            "width": 1300,
+            "height": 309,
+            "file": "dd-synth-imprint-1300.webp"
+          }
+        ]
+      }
+    },
+    "dd-synth-motion": {
+      "id": "dd-synth-motion",
+      "alt": "The SYNTH page in Imprint mode with MOTION at 60 %.",
+      "use": "Deep dive: SYNTH (imprint + motion)",
+      "width": 2698,
+      "height": 642,
+      "aspect": 4.20249,
+      "priority": false,
+      "approval": "concept",
+      "master": "web-03-synth-4-imprint-motion@2x.png",
+      "treatment": null,
+      "crop": {
+        "x": 50,
+        "y": 189,
+        "w": 1349,
+        "h": 321
+      },
+      "files": {
+        "avif": [
+          {
+            "width": 600,
+            "height": 143,
+            "file": "dd-synth-motion-600.avif"
+          },
+          {
+            "width": 900,
+            "height": 214,
+            "file": "dd-synth-motion-900.avif"
+          },
+          {
+            "width": 1300,
+            "height": 309,
+            "file": "dd-synth-motion-1300.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 600,
+            "height": 143,
+            "file": "dd-synth-motion-600.webp"
+          },
+          {
+            "width": 900,
+            "height": 214,
+            "file": "dd-synth-motion-900.webp"
+          },
+          {
+            "width": 1300,
+            "height": 309,
+            "file": "dd-synth-motion-1300.webp"
+          }
+        ]
+      }
+    },
+    "dd-arp": {
+      "id": "dd-arp",
+      "alt": "The arpeggiator panel above the keyboard: which layers it plays, sixteen steps, the pattern, rate, octaves, gate, swing and velocity.",
+      "use": "Deep dive: arpeggiator",
+      "width": 2756,
+      "height": 620,
+      "aspect": 4.44516,
+      "priority": false,
+      "approval": "concept",
+      "master": "web-07-arp-3L@2x.png",
+      "treatment": null,
+      "crop": {
+        "x": 35,
+        "y": 908,
+        "w": 1378,
+        "h": 310
+      },
+      "files": {
+        "avif": [
+          {
+            "width": 600,
+            "height": 135,
+            "file": "dd-arp-600.avif"
+          },
+          {
+            "width": 900,
+            "height": 202,
+            "file": "dd-arp-900.avif"
+          },
+          {
+            "width": 1300,
+            "height": 292,
+            "file": "dd-arp-1300.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 600,
+            "height": 135,
+            "file": "dd-arp-600.webp"
+          },
+          {
+            "width": 900,
+            "height": 202,
+            "file": "dd-arp-900.webp"
+          },
+          {
+            "width": 1300,
+            "height": 292,
+            "file": "dd-arp-1300.webp"
+          }
+        ]
+      }
+    },
+    "dd-reimagined-kaleidoscope": {
+      "id": "dd-reimagined-kaleidoscope",
+      "alt": "The REIMAGINED popover in KALEIDOSCOPE mode, with its picture and its two controls.",
+      "use": "Deep dive: REIMAGINED KALEIDOSCOPE",
+      "width": 798,
+      "height": 558,
+      "aspect": 1.43011,
+      "priority": false,
+      "approval": "concept",
+      "master": "web-06-reimagined-1-kaleidoscope@3x.png",
+      "treatment": null,
+      "crop": {
+        "x": 972,
+        "y": 315,
+        "w": 266,
+        "h": 186
+      },
+      "files": {
+        "avif": [
+          {
+            "width": 600,
+            "height": 420,
+            "file": "dd-reimagined-kaleidoscope-600.avif"
+          },
+          {
+            "width": 798,
+            "height": 558,
+            "file": "dd-reimagined-kaleidoscope-798.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 600,
+            "height": 420,
+            "file": "dd-reimagined-kaleidoscope-600.webp"
+          },
+          {
+            "width": 798,
+            "height": 558,
+            "file": "dd-reimagined-kaleidoscope-798.webp"
+          }
+        ]
+      }
+    },
+    "dd-reimagined-tape-frame": {
+      "id": "dd-reimagined-tape-frame",
+      "alt": "The REIMAGINED popover in TAPE FRAME mode, with its picture and its two controls.",
+      "use": "Deep dive: REIMAGINED TAPE FRAME",
+      "width": 798,
+      "height": 558,
+      "aspect": 1.43011,
+      "priority": false,
+      "approval": "concept",
+      "master": "web-06-reimagined-2-tape-frame@3x.png",
+      "treatment": null,
+      "crop": {
+        "x": 972,
+        "y": 315,
+        "w": 266,
+        "h": 186
+      },
+      "files": {
+        "avif": [
+          {
+            "width": 600,
+            "height": 420,
+            "file": "dd-reimagined-tape-frame-600.avif"
+          },
+          {
+            "width": 798,
+            "height": 558,
+            "file": "dd-reimagined-tape-frame-798.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 600,
+            "height": 420,
+            "file": "dd-reimagined-tape-frame-600.webp"
+          },
+          {
+            "width": 798,
+            "height": 558,
+            "file": "dd-reimagined-tape-frame-798.webp"
+          }
+        ]
+      }
+    },
+    "dd-reimagined-toybox": {
+      "id": "dd-reimagined-toybox",
+      "alt": "The REIMAGINED popover in TOYBOX mode, with its picture and its two controls.",
+      "use": "Deep dive: REIMAGINED TOYBOX",
+      "width": 798,
+      "height": 558,
+      "aspect": 1.43011,
+      "priority": false,
+      "approval": "concept",
+      "master": "web-06-reimagined-3-toybox@3x.png",
+      "treatment": null,
+      "crop": {
+        "x": 972,
+        "y": 315,
+        "w": 266,
+        "h": 186
+      },
+      "files": {
+        "avif": [
+          {
+            "width": 600,
+            "height": 420,
+            "file": "dd-reimagined-toybox-600.avif"
+          },
+          {
+            "width": 798,
+            "height": 558,
+            "file": "dd-reimagined-toybox-798.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 600,
+            "height": 420,
+            "file": "dd-reimagined-toybox-600.webp"
+          },
+          {
+            "width": 798,
+            "height": 558,
+            "file": "dd-reimagined-toybox-798.webp"
+          }
+        ]
+      }
+    },
+    "dd-reimagined-mosaic": {
+      "id": "dd-reimagined-mosaic",
+      "alt": "The REIMAGINED popover in MOSAIC mode, with its picture and its two controls.",
+      "use": "Deep dive: REIMAGINED MOSAIC",
+      "width": 798,
+      "height": 558,
+      "aspect": 1.43011,
+      "priority": false,
+      "approval": "concept",
+      "master": "web-06-reimagined-4-mosaic@3x.png",
+      "treatment": null,
+      "crop": {
+        "x": 972,
+        "y": 315,
+        "w": 266,
+        "h": 186
+      },
+      "files": {
+        "avif": [
+          {
+            "width": 600,
+            "height": 420,
+            "file": "dd-reimagined-mosaic-600.avif"
+          },
+          {
+            "width": 798,
+            "height": 558,
+            "file": "dd-reimagined-mosaic-798.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 600,
+            "height": 420,
+            "file": "dd-reimagined-mosaic-600.webp"
+          },
+          {
+            "width": 798,
+            "height": 558,
+            "file": "dd-reimagined-mosaic-798.webp"
+          }
+        ]
+      }
+    },
+    "dd-reimagined-mirage": {
+      "id": "dd-reimagined-mirage",
+      "alt": "The REIMAGINED popover in MIRAGE mode, with its picture and its two controls.",
+      "use": "Deep dive: REIMAGINED MIRAGE",
+      "width": 798,
+      "height": 558,
+      "aspect": 1.43011,
+      "priority": false,
+      "approval": "concept",
+      "master": "web-06-reimagined-5-mirage@3x.png",
+      "treatment": null,
+      "crop": {
+        "x": 972,
+        "y": 315,
+        "w": 266,
+        "h": 186
+      },
+      "files": {
+        "avif": [
+          {
+            "width": 600,
+            "height": 420,
+            "file": "dd-reimagined-mirage-600.avif"
+          },
+          {
+            "width": 798,
+            "height": 558,
+            "file": "dd-reimagined-mirage-798.avif"
+          }
+        ],
+        "webp": [
+          {
+            "width": 600,
+            "height": 420,
+            "file": "dd-reimagined-mirage-600.webp"
+          },
+          {
+            "width": 798,
+            "height": 558,
+            "file": "dd-reimagined-mirage-798.webp"
+          }
+        ]
+      }
     }
   }
 }

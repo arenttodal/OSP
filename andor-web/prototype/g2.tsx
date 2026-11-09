@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import '../shared/tokens/base.css';
 import '@fontsource-variable/geist';
 import './gallery/gallery.css';
+import './gallery/panel-header.css';
 import './g2.css';
 import { SiteHeader } from '../components/interactive/SiteHeader';
 import { ProductMedia } from '../components/media/ProductMedia';
@@ -23,7 +24,7 @@ function GalleryPanel() {
   return (
     <div ref={scope} className={`g g2 ${entered ? 'is-in' : ''}`}>
       <div className="g2-panel">
-        <SiteHeader revealClass="reveal" wordmark="brand" className="g2-header" />
+        <SiteHeader revealClass="reveal" wordmark="brand" className="panel-header g2-header" />
         <main id="top">
           <section className="g-hero g2-hero" aria-labelledby="g2-title">
             <h1 id="g2-title" className="g-title g2-title">

@@ -741,6 +741,8 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       playheads are real), empty, the five REIMAGINED popovers, SYNTH sample/analog/IMPRINT/IMPRINT+MOTION,
       granular, SPACE, ECHO - at 1x/2x (hero 3x). `OSP_WEB_CAPTURE=<dir>`; `OSP_WEB_SOURCES="a;b;c"`
       re-takes them with real recordings. Presentation only: nothing in the plugin changed.
+      Also: the LIFE, SPACE and five REIMAGINED popovers at 3x and the arpeggiator panel (three layers)
+      with their exact bounds as JSON, and every component's bounds for the three-layer hero.
 - [ ] Granular controls strip and the ECHO popover did not stage in the capture (see
       `andor-web/docs/PHASE0_AUDIT.md` §5).
 - Website work lives in `andor-web/` (components, asset pipeline, docs, hero concepts at Gate H).

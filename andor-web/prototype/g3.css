@@ -52,7 +52,7 @@
 }
 @media (max-width: 560px) {
   .g3-title { font-size: clamp(2.6rem, 12.4vw, 3.4rem); }
-  .g3-intro { flex-direction: column; align-items: flex-start; text-align: left; }
+  .g3-intro { justify-content: flex-start; }
   .g3-lede { text-align: left; }
   .g3-head { text-align: left; }
   .ga-legend { grid-template-columns: 1fr; }

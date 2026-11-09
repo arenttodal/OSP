@@ -5,17 +5,8 @@
     radial-gradient(60% 55% at 50% 62%, #fdfcf9 0%, rgba(253, 252, 249, 0) 70%), var(--g2-panel);
   border-radius: clamp(20px, 2.2vw, 30px); overflow: clip; box-shadow: 0 0 0 1px rgba(36, 39, 35, 0.05); }
 
-/* Header: pill navigation left, wordmark centred, waitlist pill right */
-.g2-header .site-header__bar { position: relative; height: 72px; padding-inline: clamp(14px, 1.6vw, 22px); max-width: none; }
-.g2-header .site-nav { flex: 1; gap: 6px; }
-.g2-header .site-nav a:not(.btn) { padding: 8px 16px; border-radius: var(--radius-pill); background: var(--g2-pill); color: var(--text); font-size: 0.875rem; }
-.g2-header .site-nav a:not(.btn):hover { background: #dfddd6; }
-.g2-header .site-nav .btn { margin-left: auto; border-color: transparent; background: var(--g2-pill); }
-.g2-header .site-header__bar > span:first-child { position: absolute; left: 50%; translate: -50% 0; }
-.g2-header .wordmark { font-size: 1.25rem; }
-@media (max-width: 860px) {
-  .g2-header .site-header__bar > span:first-child { position: static; translate: none; }
-}
+/* Header: the shared panel header (gallery/panel-header.css), fitted to the panel's edge */
+.g2-header .site-header__bar { padding-inline: clamp(14px, 1.6vw, 22px); max-width: none; }
 
 /* Title: large, centred, two-tone within the line */
 .g2-hero { padding: clamp(12px, 2.6vh, 36px) clamp(16px, 2.4vw, 40px) clamp(24px, 4vh, 48px); }

@@ -1,5 +1,23 @@
 # Hero concepts — Gate H
 
+## Round 3 (9 Nov 2026): Gallery C, chosen, in two versions
+
+Owner: go with C, use B's header area and no subheading, show the app with three layers (not a
+single oscillator/sound), and add a version where the features open rounded deep-dive modals,
+with LIFE's macro controls, the REIMAGINED modes, SYNTH/IMPRINT, and the arpeggiator on the keyboard.
+
+| Version | Page | What it is |
+|---|---|---|
+| **1 · Notes** | `g3.html` | B's panel header (pill navigation, centred ANDOR wordmark, pill waitlist), title with no subheading, then Explore OSP and Hear it. The real three-layer capture, five notes pinned to measured component bounds, and the facts strip with the player. |
+| **2 · Deep dive** | `g4.html` | The same hero, with six numbered parts as buttons: Your recording, LIFE, SYNTH + IMPRINT, REIMAGINED, SPACE, Keyboard + arpeggiator. Each opens `FeatureModal`: a rounded sheet with the genuine popover or panel, tabs where there are several states (5 REIMAGINED modes; Analog / Imprint / Imprint + Motion; Before / Three layers), facts and prev/next. Desktop: popover beside text. Phones: a bottom sheet. |
+
+Evidence: notes pin to `web-08-hero-3L-bounds.json`, the component bounds of the real editor.
+Modal media are crops of new captures `web-06-*` (LIFE, SPACE and the five REIMAGINED popovers at
+3x, cut to their card from recorded bounds) and `web-07-arp-3L` (the arpeggiator with the
+keyboard). QA: 7 widths × 2 pages clean, with the CTA in view at every width; 13 deep-dive
+interaction checks (marker, tabs, arrow keys, next/prev, Escape + focus return, backdrop, phone
+legend, bottom sheet) plus reduced motion pass.
+
 ## Round 2 (9 Nov 2026): The Gallery in three editions
 
 Owner feedback on round 1: prefers **The Gallery**, without the serif. Wanted to see it in three

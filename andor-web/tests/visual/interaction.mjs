@@ -46,8 +46,48 @@ check('Escape closes the menu', (await page.$('[role="dialog"]')) === null);
 check('Focus returns to the menu button', await page.evaluate(() => document.activeElement?.classList.contains('menu-button')));
 await page.close();
 
+
+// Gallery deep dive: markers open the modal; tabs, next/prev, Escape and focus return
+page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+await page.goto(url('g4.html'));
+await page.waitForTimeout(2600);
+await page.click('.ga-dot:nth-of-type(2)');
+await page.waitForTimeout(400);
+const title = () => page.$eval('dialog.fm[open] #fm-title', (el) => el.textContent).catch(() => null);
+check('Deep dive: marker 2 opens LIFE', (await title()) === 'LIFE');
+check('Deep dive: LIFE shows its real popover', (await page.$eval('dialog.fm .fm__media.is-current', (el) => el.dataset.asset)) === 'dd-life');
+await page.click('.fm__step:last-of-type');
+await page.click('.fm__step:last-of-type');
+check('Deep dive: next/next reaches REIMAGINED', (await title()) === 'REIMAGINED');
+check('Deep dive: REIMAGINED has five mode tabs', (await page.$$eval('.fm__tabs [role="tab"]', (t) => t.length)) === 5);
+await page.click('.fm__tabs [role="tab"]:nth-child(4)');
+check('Deep dive: MOSAIC tab shows the MOSAIC capture', (await page.$eval('.fm__media.is-current', (el) => el.dataset.asset)) === 'dd-reimagined-mosaic');
+await page.keyboard.press('ArrowRight');
+check('Deep dive: arrow key moves to MIRAGE', (await page.$eval('.fm__media.is-current', (el) => el.dataset.asset)) === 'dd-reimagined-mirage');
+await page.keyboard.press('Escape');
+await page.waitForTimeout(200);
+check('Deep dive: Escape closes the modal', (await page.$('dialog.fm[open]')) === null);
+check('Deep dive: focus returns to marker 2', await page.evaluate(() => document.activeElement?.classList.contains('ga-dot')));
+await page.click('.ga-note__btn >> text=Keyboard');
+await page.waitForTimeout(300);
+check('Deep dive: keyboard note opens the arpeggiator', (await page.$eval('.fm__media.is-current', (el) => el.dataset.asset)) === 'dd-arp');
+await page.mouse.click(10, 10);
+await page.waitForTimeout(200);
+check('Deep dive: backdrop click closes', (await page.$('dialog.fm[open]')) === null);
+await page.close();
+page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+await page.goto(url('g4.html'));
+await page.waitForTimeout(2600);
+await page.tap('.ga-legend--buttons li:nth-child(3) button');
+await page.waitForTimeout(400);
+check('Deep dive (phone): legend opens SYNTH + IMPRINT', (await title()) === 'SYNTH + IMPRINT');
+const sheet = await page.$eval('.fm__sheet', (el) => { const r = el.getBoundingClientRect(); return { w: Math.round(r.width), bottom: Math.round(r.bottom), vw: innerWidth, vh: innerHeight }; });
+check('Deep dive (phone): bottom sheet, full width', sheet.w === sheet.vw && sheet.bottom === sheet.vh, JSON.stringify(sheet));
+check('Deep dive (phone): no horizontal overflow', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+await page.close();
+
 // Reduced motion: settled immediately
-for (const p of ['h1.html', 'h2.html', 'h3.html', 'g1.html', 'g2.html', 'g3.html']) {
+for (const p of ['h1.html', 'h2.html', 'h3.html', 'g1.html', 'g2.html', 'g3.html', 'g4.html']) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
   const t = await ctx.newPage();
   await t.goto(url(p));

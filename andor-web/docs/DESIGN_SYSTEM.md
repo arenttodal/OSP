@@ -96,3 +96,17 @@ WebP `srcset` are generated per asset. Only the hero image is `fetchpriority="hi
 The header takes a `wordmark` variant (`brand` = ANDOR, `product` = ANDOR/OSP, matching the
 plugin's own logotype). Tokens are product-neutral. A future ANDOR ANALOG page reuses every
 component with its own asset ids and content records.
+
+## 8. Added in round 3
+
+- **Panel header** (`prototype/gallery/panel-header.css`, class `panel-header` on `SiteHeader`):
+  grey pills for navigation and the waitlist CTA, wordmark centred; collapses to the standard
+  mobile menu below 860 px.
+- **FeatureModal** (`components/interactive/FeatureModal.tsx`): the deep-dive sheet on native
+  `<dialog>`, radius 30 px (phones: a 26 px bottom sheet). Native focus trap, Escape, backdrop
+  close, focus returns to the trigger. Tabs are an ARIA tablist with arrow keys. Media `popover`
+  (sits beside the text from 860 px) or `panel` (full width). Content is data (`DeepDive`), so it
+  maps to a Framer CMS collection.
+- **Annotated object** (`prototype/gallery/Annotated.tsx`): notes at real component positions with
+  measured hairlines; interactive mode turns markers into 44 px buttons and the phone legend into
+  a list of buttons.

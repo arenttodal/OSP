@@ -8,6 +8,11 @@ import { Wordmark } from '../components/interactive/SiteHeader';
 const shots = import.meta.glob('./board/*.webp', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
 const shot = (name: string) => shots[`./board/${name}.webp`];
 
+const ROUND3 = [
+  { id: 'g3', href: 'g3.html', name: 'Version 1 · Notes', tone: 'Chosen direction · B header · three layers', line: 'Gallery C with edition B’s header and no subheading. The real three-layer instrument, notes pinned to its controls and a strip of real numbers beneath.' },
+  { id: 'g4', href: 'g4.html', name: 'Version 2 · Deep dive', tone: 'Chosen direction · rounded modals', line: 'Each numbered part opens a rounded modal with the real controls behind it: LIFE’s page, the five REIMAGINED modes, SYNTH and IMPRINT, SPACE and the arpeggiator. A bottom sheet on phones.' },
+];
+
 const EDITIONS = [
   { id: 'A', href: 'g1.html', name: 'Gallery A · Quiet', tone: 'Inter Display · centred · placards', line: 'The museum composition, now all sans with a two-tone title. Both placards carry content: what OSP is on the left, the object label and listening on the right.' },
   { id: 'B', href: 'g2.html', name: 'Gallery B · Panel', tone: 'Geist · framed panel · pill navigation', line: 'Closest to your references. A softly lit panel with pill navigation, a large centred title, a mono statement lower left and the actions lower right.' },
@@ -28,15 +33,45 @@ function Board() {
         <p className="t-mono">Gate H · hero directions · concept</p>
       </header>
       <main className="container">
-        <h1 className="t-section board-title">The Gallery, <span className="quiet">in three editions.</span></h1>
-        <p className="board-rec"><span className="t-mono">Round 2 · your direction</span> The Gallery without the serif, in three editions. Open each at full size and on a phone. Round 1 (H1–H3) is kept below for comparison.</p>
+        <h1 className="t-section board-title">The Gallery, <span className="quiet">in context.</span></h1>
+        <p className="board-rec"><span className="t-mono">Round 3 · your direction</span> Gallery C with edition B’s header, no subheading and the three-layer instrument, in two versions: notes, or deep-dive modals. Rounds 2 and 1 are kept below for comparison.</p>
         <p className="t-lede board-lede">Every product image is a genuine capture of the current build (c49d77f), or a studio render with that capture as its face. Round-2 editions use a straight capture; H1 uses the render.</p>
+        <div className="board-grid">
+          {ROUND3.map((c) => (
+            <article key={c.id} className="board-card">
+              <a href={c.href} className="board-shots" aria-label={`Open ${c.name}`}>
+                <img className="board-desk" src={shot(`${c.id}-desktop`)} width={1200} height={750} alt="" loading="lazy" />
+                <img className="board-mob" src={shot(`${c.id}-mobile`)} width={390} height={844} alt="" loading="lazy" />
+              </a>
+              <div className="board-meta">
+                <p className="t-mono">{c.tone}</p>
+                <h2 className="t-feature">{c.name}</h2>
+                <p>{c.line}</p>
+                <a className="btn btn-secondary btn-small" href={c.href}>Open {c.name.split(' · ')[0]}</a>
+              </div>
+            </article>
+          ))}
+          {shot('g4-modal') && (
+            <article className="board-card">
+              <a href="g4.html" className="board-shots" aria-label="Open the deep-dive version">
+                <img className="board-desk" src={shot('g4-modal')} width={1200} height={750} alt="" loading="lazy" />
+                {shot('g4-modal-mobile') && <img className="board-mob" src={shot('g4-modal-mobile')} width={390} height={844} alt="" loading="lazy" />}
+              </a>
+              <div className="board-meta">
+                <p className="t-mono">Version 2 · a modal open</p>
+                <h2 className="t-feature">REIMAGINED, up close</h2>
+                <p>The real MOSAIC popover, with tabs for all five modes. On phones the same content arrives as a bottom sheet.</p>
+              </div>
+            </article>
+          )}
+        </div>
+        <h2 className="t-feature board-round">Round 2 · three editions</h2>
         <div className="board-grid">
           {EDITIONS.map((c) => (
             <article key={c.id} className="board-card">
               <a href={c.href} className="board-shots" aria-label={`Open ${c.name}`}>
-                <img className="board-desk" src={shot(`g${'ABC'.indexOf(c.id) + 1}-desktop`)} width={1200} height={750} alt="" loading="lazy" />
-                <img className="board-mob" src={shot(`g${'ABC'.indexOf(c.id) + 1}-mobile`)} width={390} height={844} alt="" loading="lazy" />
+                <img className="board-desk" src={shot(`g${'ABC'.indexOf(c.id) + 1}-desktop${c.id === 'C' ? '-r2' : ''}`)} width={1200} height={750} alt="" loading="lazy" />
+                <img className="board-mob" src={shot(`g${'ABC'.indexOf(c.id) + 1}-mobile${c.id === 'C' ? '-r2' : ''}`)} width={390} height={844} alt="" loading="lazy" />
               </a>
               <div className="board-meta">
                 <p className="t-mono">{c.tone}</p>

@@ -1,0 +1,61 @@
+/* Feature deep dive: a large rounded sheet on a warm, softly blurred backdrop. */
+.fm { padding: 0; border: 0; background: transparent; max-width: none; max-height: none; width: 100%; height: 100%; color: var(--text); overflow: hidden; }
+.fm::backdrop { background: rgba(34, 41, 36, 0.38); backdrop-filter: blur(6px); }
+.fm[open] { display: grid; place-items: center; }
+.fm__sheet {
+  width: min(1040px, calc(100vw - 48px)); max-height: calc(100svh - 48px); overflow: auto; overscroll-behavior: contain;
+  background: var(--bg-elev); border-radius: 30px; padding: clamp(22px, 3vw, 40px);
+  box-shadow: 0 0 0 1px rgba(36, 39, 35, 0.06), 0 40px 120px -30px rgba(20, 24, 21, 0.55);
+  display: grid; gap: 22px;
+  animation: fm-in var(--dur-3) var(--ease-out);
+}
+@keyframes fm-in { from { opacity: 0; transform: translateY(14px) scale(0.98); } }
+.fm::backdrop { animation: fm-fade var(--dur-2) var(--ease-out); }
+@keyframes fm-fade { from { opacity: 0; } }
+.fm__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.fm__kicker { margin: 0 0 10px; color: var(--text-muted); display: flex; align-items: center; gap: 10px; font-size: 0.75rem; }
+.fm__num { display: inline-grid; place-items: center; min-width: 20px; height: 20px; border-radius: 10px; background: var(--text); color: var(--bg); font-size: 0.6875rem; }
+.fm__title { margin: 0; font-size: clamp(1.75rem, 1.3rem + 1.6vw, 2.75rem); font-weight: 500; letter-spacing: -0.035em; line-height: 1.04; }
+.fm__close { flex: none; width: 48px; height: 48px; border-radius: 50%; border: 0; background: var(--bg-2); color: var(--text); display: grid; place-items: center; cursor: pointer; transition: background-color var(--dur-1); }
+.fm__close:hover { background: #e3e1da; }
+.fm__close svg { width: 18px; height: 18px; }
+
+.fm__tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.fm__tabs button { min-height: 40px; padding: 0 16px; border-radius: var(--radius-pill); border: 0; background: var(--bg-2); color: var(--text-2); font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.04em; text-transform: uppercase; cursor: pointer; transition: background-color var(--dur-2) var(--ease-in-out), color var(--dur-2) var(--ease-in-out); }
+.fm__tabs button:hover { color: var(--text); }
+.fm__tabs button[aria-selected="true"] { background: var(--text); color: var(--bg); }
+
+/* The stage: a ceramic plate the genuine capture sits on; views crossfade in place */
+.fm__stage { display: grid; place-items: center; border-radius: 22px; background: radial-gradient(70% 80% at 50% 30%, #fdfcf9, var(--bg-2)); padding: clamp(18px, 3vw, 40px); }
+.fm__media { grid-area: 1 / 1; opacity: 0; visibility: hidden; transition: opacity var(--dur-3) var(--ease-in-out), visibility 0s linear var(--dur-3); width: 100%; }
+.fm__media.is-current { opacity: 1; visibility: visible; transition: opacity var(--dur-3) var(--ease-in-out); }
+.fm__stage--popover .fm__media { max-width: 420px; }
+.fm__stage--popover .pm__object { border-radius: 14px; box-shadow: 0 0 0 1px rgba(36, 39, 35, 0.08), 0 24px 50px -24px rgba(46, 38, 28, 0.45); }
+.fm__stage--panel .pm__object { border-radius: 10px; box-shadow: 0 0 0 1px rgba(36, 39, 35, 0.1), 0 18px 40px -22px rgba(46, 38, 28, 0.4); }
+
+.fm__copy { display: grid; gap: 12px; max-width: 68ch; align-content: start; }
+.fm__main { display: grid; gap: 22px; }
+/* A compact popover sits beside its text on wide screens, so the sheet stays within one screen */
+@media (min-width: 860px) {
+  .fm__main--popover { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: center; gap: clamp(24px, 3vw, 44px); }
+  .fm__main--popover .fm__stage { min-height: 360px; }
+}
+.fm__body { margin: 0; font-size: var(--type-lede); line-height: 1.45; letter-spacing: -0.01em; }
+.fm__note { margin: 0; font-size: var(--type-small); color: var(--text-2); line-height: 1.5; }
+.fm__facts { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.fm__facts li { padding: 7px 12px; border-radius: var(--radius-pill); background: var(--bg-2); font-size: 0.6875rem; color: var(--text-2); }
+
+.fm__foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 18px; border-top: 1px solid var(--border); }
+.fm__step { min-height: 44px; border: 0; background: none; padding: 0; cursor: pointer; font-weight: 520; color: var(--text-2); }
+.fm__step:hover { color: var(--text); }
+.fm__count { color: var(--text-muted); font-size: 0.75rem; }
+
+/* Phones: a sheet from the bottom edge */
+@media (max-width: 640px) {
+  .fm[open] { place-items: end center; }
+  .fm__sheet { width: 100vw; max-height: 92svh; border-radius: 26px 26px 0 0; padding: 20px 18px calc(18px + env(safe-area-inset-bottom, 0px)); gap: 18px; animation-name: fm-up; }
+  @keyframes fm-up { from { transform: translateY(40px); opacity: 0; } }
+  .fm__close { width: 44px; height: 44px; }
+  .fm__step { font-size: 0.875rem; }
+}
+@media (prefers-reduced-motion: reduce) { .fm__sheet, .fm::backdrop { animation: none; } .fm__media { transition: none; } }

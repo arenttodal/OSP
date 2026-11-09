@@ -57,6 +57,15 @@ TEST_CASE ("plugin: website captures (OSP_WEB_CAPTURE)", "[.][web-capture]")
         set (p, "echo", 18.0f);
         set (p, "space", 46.0f);
     };
+    // Optional: what to measure after the final refresh (editor-space bounds), saved as <name>.json
+    // so the website can crop a popup or panel exactly.
+    std::function<void (Editor&, juce::DynamicObject&)> mark;
+    auto rectVar = [] (juce::Rectangle<int> r) {
+        auto* o = new juce::DynamicObject();
+        o->setProperty ("x", r.getX()); o->setProperty ("y", r.getY());
+        o->setProperty ("w", r.getWidth()); o->setProperty ("h", r.getHeight());
+        return juce::var (o);
+    };
     auto shoot = [&] (const Shot& shot, const std::function<void (OspAudioProcessor&, Editor&)>& setUp, const juce::String& name) {
         OspAudioProcessor p;
         std::unique_ptr<juce::AudioProcessorEditor> e (p.createEditorIfNeeded());
@@ -90,6 +99,14 @@ TEST_CASE ("plugin: website captures (OSP_WEB_CAPTURE)", "[.][web-capture]")
         }
         ui->refreshNow();
         ui->refreshNow();
+        if (mark)
+        {
+            juce::DynamicObject::Ptr marks (new juce::DynamicObject());
+            marks->setProperty ("editor", rectVar (e->getLocalBounds()));
+            mark (*ui, *marks);
+            out.getChildFile (name + ".json").replaceWithText (juce::JSON::toString (juce::var (marks.get()), false));
+            mark = nullptr;
+        }
         for (const float scale : shot.scales)
             save (e->createComponentSnapshot (e->getLocalBounds(), true, scale),
                   name + "@" + juce::String (juce::roundToInt (scale)) + "x.png");
@@ -158,4 +175,50 @@ TEST_CASE ("plugin: website captures (OSP_WEB_CAPTURE)", "[.][web-capture]")
         set (p, "echo.type", 2.0f);   // ASCEND
         ui.openPopup (Editor::echoPopup);
     }, "web-05-echo-ascend");
+
+    // 06 Deep-dive popovers for the website's feature modals, each with its exact bounds.
+    auto popupBounds = [&] (Editor& ui, juce::DynamicObject& m) {
+        if (auto* panel = ui.openPopupPanel())
+            m.setProperty ("popup", rectVar (ui.getLocalArea (panel, panel->getLocalBounds())));
+    };
+    mark = popupBounds;
+    shoot ({ 1, { 1448, 1086 }, { 3.0f }, chord }, [&] (OspAudioProcessor&, Editor& ui) { ui.openPopup (0); }, "web-06-life");
+    mark = popupBounds;
+    shoot ({ 1, { 1448, 1086 }, { 3.0f }, chord }, [&] (OspAudioProcessor&, Editor& ui) { ui.openPopup (4); }, "web-06-space");
+    for (int m = 0; m < 5; ++m)
+    {
+        mark = popupBounds;
+        shoot ({ 1, { 1448, 1086 }, { 3.0f }, chord }, [&, m] (OspAudioProcessor& p, Editor& ui) {
+            set (p, "layerA.reimagined.mode", static_cast<float> (m));
+            set (p, "reimagined", 60.0f);
+            ui.refreshNow();
+            ui.openPopup (Editor::reimaginedPopup);
+        }, "web-06-reimagined-" + juce::String (m + 1) + "-" + modes[m]);
+    }
+
+    // 07 The arpeggiator: three layers, the arp on and its panel open (the window grows).
+    mark = [&] (Editor& ui, juce::DynamicObject& m) {
+        auto& arp = ui.arpInlinePanel();
+        m.setProperty ("arp", rectVar (ui.getLocalArea (&arp, arp.getLocalBounds())));
+    };
+    shoot ({ 3, { 1448, 1086 }, { 2.0f }, chord }, [&] (OspAudioProcessor& p, Editor& ui) {
+        set (p, Host::layerParameterId (1, "sourceMode"), 1.0f);
+        set (p, "arp.enabled", 1.0f);
+        set (p, "arp.pattern", 1.0f);
+        set (p, "arp.rate", 2.0f);
+        set (p, "arp.octaves", 2.0f);
+        set (p, "arp.swing", 18.0f);
+        ui.setArpExpanded (true);
+        ui.setSize (1448, juce::roundToInt (ui.instrumentHeight()));
+    }, "web-07-arp-3L");
+
+    // 08 The three-layer hero again, with every component's bounds (the site pins notes to them).
+    mark = [&] (Editor& ui, juce::DynamicObject& m) { m.setProperty ("components", designcapture::bounds (ui)); };
+    shoot ({ 3, { 1448, 1086 }, { 1.0f }, chord }, [&] (OspAudioProcessor& p, Editor&) {
+        set (p, "reimagined", 24.0f);
+        set (p, Host::layerParameterId (1, "sourceMode"), 1.0f);
+        set (p, Host::synthesizeId (2), 45.0f);
+        set (p, Host::synthParameterId (2, "mode"), 1.0f);
+        set (p, Host::synthParameterId (2, "imprint"), 80.0f);
+    }, "web-08-hero-3L-bounds");
 }

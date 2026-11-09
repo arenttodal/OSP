@@ -286,6 +286,233 @@
         800
       ],
       "approval": "concept"
+    },
+    {
+      "id": "dd-recording-empty",
+      "master": "web-00-empty@2x.png",
+      "crop": {
+        "x": 36,
+        "y": 128,
+        "w": 1376,
+        "h": 522
+      },
+      "use": "Deep dive: your recording (before)",
+      "alt": "ANDOR OSP before a sound is loaded: a large drop area that says Drop a sound.",
+      "widths": [
+        600,
+        900,
+        1300
+      ],
+      "approval": "concept"
+    },
+    {
+      "id": "dd-recording-loaded",
+      "master": "web-01-hero-3L@3x.png",
+      "crop": {
+        "x": 35,
+        "y": 127,
+        "w": 1377,
+        "h": 525
+      },
+      "use": "Deep dive: your recording (after)",
+      "alt": "Three loaded layers, each with its own waveform display and controls.",
+      "widths": [
+        600,
+        900,
+        1300
+      ],
+      "approval": "concept"
+    },
+    {
+      "id": "dd-life",
+      "master": "web-06-life@3x.png",
+      "crop": {
+        "x": 16,
+        "y": 485,
+        "w": 264,
+        "h": 212
+      },
+      "use": "Deep dive: LIFE",
+      "alt": "The LIFE popover: mode Natural, a performance curve, CHARACTER, TAKES, ORDER, PITCH, TONE and ATTACK.",
+      "widths": [
+        600,
+        900
+      ],
+      "approval": "concept"
+    },
+    {
+      "id": "dd-space",
+      "master": "web-06-space@3x.png",
+      "crop": {
+        "x": 710,
+        "y": 424,
+        "w": 296,
+        "h": 273
+      },
+      "use": "Deep dive: SPACE",
+      "alt": "The SPACE popover: Room, Hall, Plate and Spring, a decay picture with low and high cut, and its controls.",
+      "widths": [
+        600,
+        900
+      ],
+      "approval": "concept"
+    },
+    {
+      "id": "dd-synth-analog",
+      "master": "web-03-synth-2-analog@2x.png",
+      "crop": {
+        "x": 50,
+        "y": 189,
+        "w": 1349,
+        "h": 321
+      },
+      "use": "Deep dive: SYNTH (analog)",
+      "alt": "The SYNTH page in Analog mode: a saw cycle, with wave, octave, detune, tone, shape and pitch controls.",
+      "widths": [
+        600,
+        900,
+        1300
+      ],
+      "approval": "concept"
+    },
+    {
+      "id": "dd-synth-imprint",
+      "master": "web-03-synth-3-imprint@2x.png",
+      "crop": {
+        "x": 50,
+        "y": 189,
+        "w": 1349,
+        "h": 321
+      },
+      "use": "Deep dive: SYNTH (imprint)",
+      "alt": "The SYNTH page in Imprint mode: the oscillator cycle shaped by the recording, IMPRINT at 85 %.",
+      "widths": [
+        600,
+        900,
+        1300
+      ],
+      "approval": "concept"
+    },
+    {
+      "id": "dd-synth-motion",
+      "master": "web-03-synth-4-imprint-motion@2x.png",
+      "crop": {
+        "x": 50,
+        "y": 189,
+        "w": 1349,
+        "h": 321
+      },
+      "use": "Deep dive: SYNTH (imprint + motion)",
+      "alt": "The SYNTH page in Imprint mode with MOTION at 60 %.",
+      "widths": [
+        600,
+        900,
+        1300
+      ],
+      "approval": "concept"
+    },
+    {
+      "id": "dd-arp",
+      "master": "web-07-arp-3L@2x.png",
+      "crop": {
+        "x": 35,
+        "y": 908,
+        "w": 1378,
+        "h": 310
+      },
+      "use": "Deep dive: arpeggiator",
+      "alt": "The arpeggiator panel above the keyboard: which layers it plays, sixteen steps, the pattern, rate, octaves, gate, swing and velocity.",
+      "widths": [
+        600,
+        900,
+        1300
+      ],
+      "approval": "concept"
+    },
+    {
+      "id": "dd-reimagined-kaleidoscope",
+      "master": "web-06-reimagined-1-kaleidoscope@3x.png",
+      "crop": {
+        "x": 972,
+        "y": 315,
+        "w": 266,
+        "h": 186
+      },
+      "use": "Deep dive: REIMAGINED KALEIDOSCOPE",
+      "alt": "The REIMAGINED popover in KALEIDOSCOPE mode, with its picture and its two controls.",
+      "widths": [
+        600,
+        900
+      ],
+      "approval": "concept"
+    },
+    {
+      "id": "dd-reimagined-tape-frame",
+      "master": "web-06-reimagined-2-tape-frame@3x.png",
+      "crop": {
+        "x": 972,
+        "y": 315,
+        "w": 266,
+        "h": 186
+      },
+      "use": "Deep dive: REIMAGINED TAPE FRAME",
+      "alt": "The REIMAGINED popover in TAPE FRAME mode, with its picture and its two controls.",
+      "widths": [
+        600,
+        900
+      ],
+      "approval": "concept"
+    },
+    {
+      "id": "dd-reimagined-toybox",
+      "master": "web-06-reimagined-3-toybox@3x.png",
+      "crop": {
+        "x": 972,
+        "y": 315,
+        "w": 266,
+        "h": 186
+      },
+      "use": "Deep dive: REIMAGINED TOYBOX",
+      "alt": "The REIMAGINED popover in TOYBOX mode, with its picture and its two controls.",
+      "widths": [
+        600,
+        900
+      ],
+      "approval": "concept"
+    },
+    {
+      "id": "dd-reimagined-mosaic",
+      "master": "web-06-reimagined-4-mosaic@3x.png",
+      "crop": {
+        "x": 972,
+        "y": 315,
+        "w": 266,
+        "h": 186
+      },
+      "use": "Deep dive: REIMAGINED MOSAIC",
+      "alt": "The REIMAGINED popover in MOSAIC mode, with its picture and its two controls.",
+      "widths": [
+        600,
+        900
+      ],
+      "approval": "concept"
+    },
+    {
+      "id": "dd-reimagined-mirage",
+      "master": "web-06-reimagined-5-mirage@3x.png",
+      "crop": {
+        "x": 972,
+        "y": 315,
+        "w": 266,
+        "h": 186
+      },
+      "use": "Deep dive: REIMAGINED MIRAGE",
+      "alt": "The REIMAGINED popover in MIRAGE mode, with its picture and its two controls.",
+      "widths": [
+        600,
+        900
+      ],
+      "approval": "concept"
     }
   ]
 }

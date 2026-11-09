@@ -1,0 +1,13 @@
+/* Edition B's header, shared: pill navigation left, wordmark centred, waitlist pill right. */
+.panel-header { --pill: #e8e6e0; --pill-hover: #dfddd6; }
+.panel-header .site-header__bar { position: relative; height: 72px; }
+.panel-header .site-nav { flex: 1; gap: 6px; }
+.panel-header .site-nav a:not(.btn) { padding: 8px 16px; border-radius: var(--radius-pill); background: var(--pill); color: var(--text); font-size: 0.875rem; }
+.panel-header .site-nav a:not(.btn):hover { background: var(--pill-hover); }
+.panel-header .site-nav .btn { margin-left: auto; border-color: transparent; background: var(--pill); }
+.panel-header .site-nav .btn:hover { background: var(--pill-hover); }
+.panel-header .site-header__bar > span:first-child { position: absolute; left: 50%; translate: -50% 0; }
+.panel-header .wordmark { font-size: 1.25rem; }
+@media (max-width: 860px) {
+  .panel-header .site-header__bar > span:first-child { position: static; translate: none; }
+}
