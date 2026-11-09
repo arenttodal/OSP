@@ -768,6 +768,10 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
   (`inkFor` / `setInk`) is the face's ink, which the cells read for captions, values,
   switches, tabs, rules and the deck readout. ANDOR OSP sets none of it, so it renders 0 px
   different.
+- Rack rail save key and full-width graph (shared, opt-in; ANDOR ANALOG): `rack::hardware::SaveKey`
+  sits beside the preset browser on faceplate rails (UnifiedRack's; `ParameterRack::setSaveAction`).
+  `ParameterRack::setFullWidthGraph` makes the graph the whole body, with no cells and no divider
+  (ANALOG's graphic EQ). ANDOR OSP uses neither: 0 px.
 - TAPE deck (shared, opt-in; ANDOR ANALOG's ROUTING + TAPE V4): `rack::Faceplate::tapeDeck`
   shows ECHO's TAPE and MOVEMENT's TAPE as a light reel deck in the same 214 px rack (knobs
   left, `TapeDeck` reels / head / readout in the middle, the display smaller on the right,

@@ -177,6 +177,13 @@ void ParameterRack::setOverflow (std::function<void (juce::Component&)> onClick)
     }
 }
 
+void ParameterRack::setFullWidthGraph (bool full)
+{
+    fullWidthGraph = full;
+    resized();
+    repaint();
+}
+
 void ParameterRack::setSaveAction (std::function<void()> onClick)
 {
     if (save != nullptr)
@@ -595,7 +602,9 @@ void ParameterRack::layout()
     if (graphView != nullptr)
     {
         const int pictureX = divider + 1 + rackui::Cell::columnGap;
-        if (faceplate && faceplate->fullBleed)
+        if (fullWidthGraph)
+            graphView->setBounds (16, top + 7, width - 32, getHeight() - top - 7 - 16);   // (the whole body: the graph is the module)
+        else if (faceplate && faceplate->fullBleed)
             graphView->setBounds (pictureX, top + 7, width - contentRightMargin() - pictureX, std::max (graphHeight - 4, getHeight() - top - 7 - 16));   // (the face's own bottom margin)
         else if (faceplate)
             graphView->setBounds (pictureX, top + 7, width - contentRightMargin() - pictureX, graphHeight - 4);   // (room for its bezel)
@@ -616,9 +625,10 @@ void ParameterRack::paint (juce::Graphics& g)
     if (faceplate)
         paintFaceplate (g);
     const auto ink = rackui::inkFor (*this);   // (V5: an enamel face's ink)
-    // The divider (as the effects racks').
+    // The divider (as the effects racks'; none when the graph is the module).
     g.setColour (ink ? ink->rule : juce::Colour (0xffcbc4b9));
-    g.fillRect (juce::Rectangle<float> (static_cast<float> (dividerX()), static_cast<float> (titleOffset() + 3), 1.0f, static_cast<float> (getHeight() - titleOffset() - 5)));
+    if (! fullWidthGraph)
+        g.fillRect (juce::Rectangle<float> (static_cast<float> (dividerX()), static_cast<float> (titleOffset() + 3), 1.0f, static_cast<float> (getHeight() - titleOffset() - 5)));
     // The selectors' captions (inline, before each).
     g.setFont (selectorCaptionFont());
     g.setColour (ink ? ink->caption : rackui::palette::caption);

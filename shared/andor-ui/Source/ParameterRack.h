@@ -108,6 +108,9 @@ public:
     juce::Component* railComponent() const noexcept { return railPart.get(); }
     void setOverflow (std::function<void (juce::Component& key)> onClick);
     juce::Component* overflowKey() const noexcept { return overflow.get(); }
+    /** The graph IS the module (opt-in; ANDOR ANALOG's graphic EQ): it takes the body's whole
+        width and height under the rail - no cells, no divider; its controls are its own overlays. */
+    void setFullWidthGraph (bool full);
     /** The rail's save key (left of the overflow key): saves the settings as a preset. */
     void setSaveAction (std::function<void()> onClick);
     juce::Component* saveKey() const noexcept { return save.get(); }
@@ -214,6 +217,7 @@ private:
     std::optional<Faceplate> faceplate;
     std::unique_ptr<juce::Component> railPart, overflow;
     std::unique_ptr<hardware::SaveKey> save;
+    bool fullWidthGraph = false;
     int railPartWidth = 0;
     juce::String powerId;
     juce::Rectangle<int> railTitleArea;
