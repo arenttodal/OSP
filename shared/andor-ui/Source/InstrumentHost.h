@@ -414,6 +414,10 @@ public:
     virtual int editLayer() const noexcept = 0;
     /** The host's tempo in BPM (120 when it gives none): ECHO's synced picture. Any thread. */
     virtual float hostTempo() const noexcept = 0;
+    /** The instrument's output peak over the last block (linear, read-only telemetry from the
+        audio thread; any thread), or -1 when this host does not measure it. Displays use it
+        to rest in silence (a tape deck's reels), never to change the sound. */
+    virtual float outputPeak() const noexcept { return -1.0f; }
     /** MOVEMENT SHAPER's playhead, 0..1 of its bar (lock-free, for the picture). */
     virtual float shaperPhase() const noexcept = 0;
     /** SHAPER's CUSTOM pattern (saved with the session; message thread). An undoable change

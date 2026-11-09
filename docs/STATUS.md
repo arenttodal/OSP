@@ -761,6 +761,12 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
   (`hardware::measures`), `PowerKey::Style::slide` (a horizontal ON), MOVEMENT's lane power as a
   slide, `Materials::macros` (a product's macro identities; SPACE's reverb tint follows it), the
   shell telling the host when an engine's latency changes. ANDOR OSP sets none of it: 0 px.
+- TAPE deck (shared, opt-in; ANDOR ANALOG's ROUTING + TAPE V4): `rack::Faceplate::tapeDeck`
+  shows ECHO's TAPE and MOVEMENT's TAPE as a light reel deck in the same 214 px rack (knobs
+  left, `TapeDeck` reels / head / readout in the middle, the display smaller on the right,
+  marked PREDICTED; ECHO's TIMING / STEREO as segmented keys on the same parameters).
+  `InstrumentHost::outputPeak()` (default -1; `ShellProcessor` publishes the last block's peak,
+  read-only telemetry) lets the reels rest in silence. ANDOR OSP sets no faceplate: 0 px.
 
 ## IN PROGRESS
 
@@ -782,6 +788,13 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
     (the frame already places it: `Parts::rack`, `rackShift`);
   - save the rack's view state with OSP's session (as `arpOpen`);
   - review the screenshots at 869 / 1448 / 1810 px and update OSP's own captures.
+
+- **The TAPE deck in ANDOR OSP** (the rule on shared ECHO features). It is shared
+  (`MacroPopups.cpp`: `TapeDeck`, `UnifiedRack::setDeck`) and opt-in by the rack faceplate,
+  which ANDOR OSP's plugin does not use yet. It comes with the effects rack above: when OSP's
+  plugin shows the rack, give its ECHO / MOVEMENT modules a faceplate with `tapeDeck` (or a
+  plain-rack flag for the deck alone), publish the output peak from OspAudioProcessor
+  (`InstrumentHost::outputPeak`), and review the 869 / 1448 / 1810 px captures.
 
 - **Per-card arpeggiator in ANDOR OSP's own plugin** (the rule on shared SPACE / ECHO / ARP
   features). The shell's lanes and the ARP panel's PLAYS / LINK / EDIT are shared and in

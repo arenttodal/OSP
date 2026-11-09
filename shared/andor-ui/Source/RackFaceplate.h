@@ -24,6 +24,10 @@ struct Faceplate
         own edges (the host draws no panel around it: Host::setFullBleed), narrower stripes,
         quieter screws, the rail's parts on one centre line. False: the V2 inset chassis. */
     bool fullBleed = false;
+    /** V4 (opt-in): the TAPE modes (ECHO's tape echo, MOVEMENT's wow and flutter) as a light
+        reel deck - the knobs left, two reels and the head in the middle, a small display right.
+        False: the TAPE modes as every other mode. */
+    bool tapeDeck = false;
 };
 
 namespace hardware

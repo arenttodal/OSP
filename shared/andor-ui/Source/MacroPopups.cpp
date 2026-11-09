@@ -3482,6 +3482,228 @@ namespace
 
     //==========================================================================
     /** The modules' common part: the five slots at SPACE's geometry (rackcolumns). */
+    //==========================================================================
+    /**
+        V4's TAPE deck (opt-in: rack::Faceplate::tapeDeck): two light reels, the tape around two
+        guides and the head, a readout between the reels. One drawing for ECHO's tape echo and
+        MOVEMENT's wow and flutter; what it reads and how the reels turn is each module's own
+        (Reading). The reels turn only while the module plays and the instrument sounds (the
+        host's output peak: tails included); they ease to rest in silence. Nothing here is a
+        transport: no position, no elapsed time. Animated only while showing.
+    */
+    class TapeDeck final : public juce::Component, private juce::Timer
+    {
+    public:
+        struct Reading
+        {
+            juce::String value, unit, note;   ///< "1/8D" / "375 ms" / "SYNC"
+            bool noteLit = false;
+            int ticks = 0, tick = -1;         ///< the sync divisions row (tick: the chosen one)
+            double radiansPerSecond = 0.0;    ///< the take-up reel's speed while playing
+            double wowHz = 0.0, wowDepth = 0.0, flutterHz = 0.0, flutterDepth = 0.0;   ///< MOVEMENT: the speed's own wobble
+            bool active = false;              ///< the module plays (its macro, its power)
+        };
+        using Reader = std::function<Reading()>;
+
+        TapeDeck (InstrumentHost& h, Reader r, juce::Colour accentColour) : host (h), reader (std::move (r)), accent (accentColour)
+        {
+            setInterceptsMouseClicks (false, false);
+            startTimerHz (4);
+        }
+        ~TapeDeck() override { stopTimer(); }
+
+        /** Tests and stills: the reels' angle and speed (a snapshot draws them at rest). */
+        double reelAngle() const noexcept { return angle; }
+        double reelSpeed() const noexcept { return speed; }
+        /** Advances the reels by `seconds` (the timer's step; tests drive it directly). */
+        void advance (double seconds)
+        {
+            const auto r = reader();
+            const float peak = host.outputPeak();
+            const bool sounding = peak < 0.0f || peak > 3.0e-4f;   // (unknown, or above -70 dBFS)
+            double target = r.active && sounding ? r.radiansPerSecond : 0.0;
+            clock += seconds;
+            if (target > 0.0 && (r.wowDepth > 0.0 || r.flutterDepth > 0.0))
+                target *= 1.0 + r.wowDepth * std::sin (juce::MathConstants<double>::twoPi * r.wowHz * clock)
+                          + r.flutterDepth * std::sin (juce::MathConstants<double>::twoPi * r.flutterHz * clock);
+            speed += (target - speed) * (1.0 - std::exp (-seconds / 0.35));   // (eases to rest)
+            if (std::abs (speed) < 1.0e-3 && target == 0.0)
+                speed = 0.0;
+            angle = std::fmod (angle + speed * seconds, juce::MathConstants<double>::twoPi);
+            deviation = r.radiansPerSecond > 0.0 && target > 0.0 ? target / r.radiansPerSecond - 1.0 : 0.0;
+        }
+
+        void paint (juce::Graphics& g) override
+        {
+            const auto r = reader();
+            const auto b = getLocalBounds().toFloat();
+            // The reels: as large as the deck allows (84 - 106 px at the canonical size).
+            const float d = juce::jlimit (60.0f, 106.0f, std::min (b.getHeight() - 30.0f, 0.36f * b.getWidth()));
+            const float cy = b.getY() + 10.0f + 0.5f * d;
+            const float lx = b.getX() + 0.27f * b.getWidth(), rx = b.getRight() - 0.27f * b.getWidth();
+            const float supply = 0.43f, takeUp = 0.31f;   // (the tape packs' radii, of d)
+
+            // The tape: from the supply pack, under a guide, across the head, a guide, up to the
+            // take-up pack (drawn first: the reels' flanges sit over it).
+            const float guideY = cy + 0.5f * d + 10.0f, headY = guideY + 2.0f;
+            const auto guideL = juce::Point<float> (lx + 0.36f * d, guideY), guideR = juce::Point<float> (rx - 0.36f * d, guideY);
+            const auto headC = juce::Point<float> (b.getCentreX(), headY);
+            juce::Path tape;
+            tape.startNewSubPath (lx - supply * d * 0.25f, cy + supply * d * 0.97f);
+            tape.quadraticTo (lx + 0.1f * d, guideY + 5.0f, guideL.x, guideL.y + 5.0f);
+            tape.lineTo (headC.x, headC.y + 7.0f);
+            tape.lineTo (guideR.x, guideR.y + 5.0f);
+            tape.quadraticTo (rx - 0.1f * d, guideY + 5.0f, rx + takeUp * d * 0.25f, cy + takeUp * d * 0.97f);
+            g.setColour (juce::Colour (0xff6e6450));
+            g.strokePath (tape, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+
+            paintReel (g, { lx, cy }, d, supply, angle * takeUp / supply);
+            paintReel (g, { rx, cy }, d, takeUp, angle);
+
+            for (const auto& gp : { guideL, guideR })
+            {
+                const auto post = juce::Rectangle<float> (11.0f, 11.0f).withCentre (gp.translated (0.0f, 5.0f));
+                g.setColour (juce::Colour (0x1f2a1d12));
+                g.fillEllipse (post.translated (0.0f, 1.2f));
+                g.setColour (juce::Colour (0xfff4eee4));
+                g.fillEllipse (post);
+                g.setColour (juce::Colour (0xffb9ab95));
+                g.drawEllipse (post.reduced (0.5f), 1.0f);
+                g.setColour (juce::Colour (0xff6c6458));
+                g.fillEllipse (post.withSizeKeepingCentre (3.0f, 3.0f));
+            }
+            // The head: a champagne block, its gap lit amber while the tape runs.
+            const auto head = juce::Rectangle<float> (30.0f, 15.0f).withCentre (headC.translated (0.0f, 5.0f));
+            g.setColour (juce::Colour (0x1f2a1d12));
+            g.fillRoundedRectangle (head.translated (0.0f, 1.5f), 3.0f);
+            g.setGradientFill (juce::ColourGradient (juce::Colour (0xffefe6d6), 0.0f, head.getY(), juce::Colour (0xffd8ccb8), 0.0f, head.getBottom(), false));
+            g.fillRoundedRectangle (head, 3.0f);
+            g.setColour (juce::Colour (0xffb3a48d));
+            g.drawRoundedRectangle (head.reduced (0.5f), 3.0f, 1.0f);
+            const bool running = speed > 0.05;
+            g.setColour (running ? juce::Colour (0xffe0883a) : juce::Colour (0xffa1968a));
+            g.fillRect (juce::Rectangle<float> (head.getCentreX() - 0.75f, head.getY() + 3.0f, 1.5f, head.getHeight() - 6.0f));
+
+            // The readout between the reels: the value large, its unit, the divisions under it.
+            const auto mid = juce::Rectangle<float> (lx + 0.5f * d + 6.0f, cy - 0.5f * d, rx - lx - d - 12.0f, d);
+            g.setColour (juce::Colour (0xff34383a));
+            g.setFont (fonts::make (19.0f, fonts::Weight::semibold, 0.02f));
+            g.drawFittedText (r.value, mid.withHeight (24.0f).translated (0.0f, 6.0f).getSmallestIntegerContainer(), juce::Justification::centred, 1, 0.8f);
+            g.setColour (juce::Colour (0xff7a7268));
+            g.setFont (fonts::make (11.0f, fonts::Weight::medium, 0.03f));
+            g.drawFittedText (r.unit, mid.withTrimmedTop (31.0f).withHeight (14.0f).getSmallestIntegerContainer(), juce::Justification::centred, 1, 0.85f);
+            if (r.note.isNotEmpty())
+            {
+                const auto f = fonts::make (9.5f, fonts::Weight::semibold, 0.08f);
+                const float tw = juce::GlyphArrangement::getStringWidth (f, r.note);
+                const auto noteRow = juce::Rectangle<float> (tw + 12.0f, 12.0f).withCentre ({ mid.getCentreX(), mid.getY() + 53.0f });
+                g.setColour (r.noteLit ? juce::Colour (0xffe0883a) : juce::Colour (0xffb7ada0));
+                g.fillEllipse (juce::Rectangle<float> (5.0f, 5.0f).withCentre ({ noteRow.getX() + 2.5f, noteRow.getCentreY() }));
+                g.setColour (juce::Colour (0xff7a7268));
+                g.setFont (f);
+                g.drawText (r.note, noteRow.withTrimmedLeft (9.0f), juce::Justification::centredLeft, false);
+            }
+            if (r.ticks > 1)
+            {
+                // The sync divisions (ECHO), or the speed's deviation (MOVEMENT, -1 when none).
+                const float w = std::min (mid.getWidth() - 8.0f, 9.0f * static_cast<float> (r.ticks));
+                const float x0 = mid.getCentreX() - 0.5f * w, step = w / static_cast<float> (r.ticks - 1), ty = mid.getY() + 70.0f;
+                int lit = r.tick;
+                if (lit < 0)
+                    lit = juce::jlimit (0, r.ticks - 1, juce::roundToInt (0.5f * static_cast<float> (r.ticks - 1) * (1.0f + juce::jlimit (-1.0f, 1.0f, static_cast<float> (deviation) * 6.0f))));
+                for (int i = 0; i < r.ticks; ++i)
+                {
+                    const bool on = i == lit;
+                    g.setColour (on ? juce::Colour (0xffe0883a) : juce::Colour (0xffc4b9aa));
+                    g.fillRoundedRectangle (juce::Rectangle<float> (on ? 2.4f : 1.4f, on ? 11.0f : 7.0f).withCentre ({ x0 + step * static_cast<float> (i), ty }), 0.7f);
+                }
+            }
+        }
+
+    private:
+        void paintReel (juce::Graphics& g, juce::Point<float> c, float d, float pack, double turn) const
+        {
+            const auto disc = juce::Rectangle<float> (d, d).withCentre (c);
+            // Shadow, the tape pack under the flange, the flange (ivory) with three windows.
+            g.setColour (juce::Colour (0x1c2a1d12));
+            g.fillEllipse (disc.translated (0.0f, 2.5f));
+            g.setGradientFill (juce::ColourGradient (juce::Colour (0xfff8f3ea), disc.getX(), disc.getY(), juce::Colour (0xffe6dccd), disc.getRight(), disc.getBottom(), false));
+            g.fillEllipse (disc);
+            g.setColour (juce::Colour (0xffc6b8a2));
+            g.drawEllipse (disc.reduced (0.6f), 1.2f);
+            g.setColour (juce::Colour (0xffd9cdbb));
+            g.drawEllipse (disc.reduced (3.5f), 0.8f);
+            const float inner = 0.17f * d, outer = 0.43f * d;
+            for (int w = 0; w < 3; ++w)
+            {
+                const float a0 = static_cast<float> (turn) + juce::MathConstants<float>::twoPi * static_cast<float> (w) / 3.0f;
+                juce::Path window;
+                window.addCentredArc (c.x, c.y, outer, outer, 0.0f, a0 - 0.55f, a0 + 0.55f, true);
+                window.addCentredArc (c.x, c.y, inner, inner, 0.0f, a0 + 0.42f, a0 - 0.42f, false);
+                window.closeSubPath();
+                g.setColour (juce::Colour (0xffa09787));   // (the opening: earthy grey)
+                g.fillPath (window);
+                {
+                    // The tape pack seen through it (warm olive), out to its radius.
+                    juce::Graphics::ScopedSaveState clip (g);
+                    g.reduceClipRegion (window);
+                    g.setColour (juce::Colour (0xff786d58));
+                    g.fillEllipse (juce::Rectangle<float> (2.0f * pack * d, 2.0f * pack * d).withCentre (c));
+                    g.setColour (juce::Colour (0x22ffffff));
+                    g.drawEllipse (juce::Rectangle<float> (2.0f * pack * d, 2.0f * pack * d).withCentre (c).reduced (0.5f), 1.0f);
+                }
+                g.setColour (juce::Colour (0x40000000));
+                g.strokePath (window, juce::PathStrokeType (0.8f));
+            }
+            // The hub: warm metal, the spindle, three keys.
+            const auto hub = juce::Rectangle<float> (0.27f * d, 0.27f * d).withCentre (c);
+            g.setGradientFill (juce::ColourGradient (juce::Colour (0xffe6d9c1), hub.getX(), hub.getY(), juce::Colour (0xffb09f80), hub.getRight(), hub.getBottom(), false));
+            g.fillEllipse (hub);
+            g.setColour (juce::Colour (0xff9d8d70));
+            g.drawEllipse (hub.reduced (0.5f), 1.0f);
+            g.setColour (juce::Colour (0xff5a5348));
+            g.fillEllipse (juce::Rectangle<float> (0.08f * d, 0.08f * d).withCentre (c));
+            for (int k = 0; k < 3; ++k)
+            {
+                const float a = static_cast<float> (turn) + juce::MathConstants<float>::twoPi * (static_cast<float> (k) / 3.0f + 1.0f / 6.0f);
+                const auto from = c.getPointOnCircumference (0.055f * d, a), to = c.getPointOnCircumference (0.115f * d, a);
+                g.drawLine ({ from, to }, 1.3f);
+            }
+        }
+
+        void timerCallback() override
+        {
+            // 30 fps while showing (and moving or about to); a still frame otherwise.
+            const bool showing = isShowing();
+            if (showing != wasShowing)
+            {
+                wasShowing = showing;
+                startTimerHz (showing ? 30 : 4);
+            }
+            if (! showing)
+                return;
+            const double before = speed;
+            advance (1.0 / 30.0);
+            if (speed != 0.0 || before != 0.0)
+                repaint();
+            else if (const auto r = reader(); r.value != shownValue || r.unit != shownUnit || r.tick != shownTick)
+            {
+                shownValue = r.value;
+                shownUnit = r.unit;
+                shownTick = r.tick;
+                repaint();
+            }
+        }
+
+        InstrumentHost& host;
+        Reader reader;
+        juce::Colour accent;
+        double angle = 0.0, speed = 0.0, clock = 0.0, deviation = 0.0;
+        bool wasShowing = false;
+        juce::String shownValue, shownUnit;
+        int shownTick = -2;
+    };
+
     class UnifiedRack : public rack::Module
     {
     public:
@@ -3516,9 +3738,29 @@ namespace
                 rack::hardware::paint (g, getLocalBounds(), titleOffset(), *plate, heading, processingActive(),
                                        visual != nullptr && ! expanded() ? visual->getBounds() : juce::Rectangle<int>(), limit - 14.0f);
             }
+            if (deck != nullptr && deck->isVisible() && ! expanded())
+            {
+                // The deck's three regions: two quiet rules; the display's caption over it
+                // (what it shows is predicted from the settings, not metered).
+                for (const int x : deckDividers)
+                    rackcolumns::paintDivider (g, x, static_cast<float> (titleOffset() + 12), static_cast<float> (getHeight() - 22));
+                if (visual != nullptr)
+                {
+                    const auto v = visual->getBounds();
+                    g.setColour (rackui::palette::caption);
+                    g.setFont (fonts::make (10.5f, fonts::Weight::medium, 0.07f));
+                    g.drawText (deckCaption(), juce::Rectangle<int> (v.getX(), v.getY() - 20, v.getWidth(), 16), juce::Justification::centredLeft, false);
+                    g.setColour (rackui::palette::quietCaption);
+                    g.setFont (fonts::make (9.5f, fonts::Weight::regular, 0.04f));
+                    g.drawText ("PREDICTED", juce::Rectangle<int> (v.getX(), v.getY() - 20, v.getWidth(), 16), juce::Justification::centredRight, false);
+                }
+                return;
+            }
             if (! expanded())
                 rackcolumns::paintDivider (g, dividerX(), static_cast<float> (titleOffset() + 3), static_cast<float> (getHeight() - 2));
         }
+        /** Tests: the TAPE deck (V4, opt-in), or null. */
+        TapeDeck* tapeDeck() const noexcept { return deck.get(); }
         /** The product's hardware faceplate (opt-in; ANDOR ANALOG's): the preset browser and its
             actions go into the rail, the controls start after the stripes. Null: as approved. */
         void wearFaceplate (const rack::Faceplate* f)
@@ -3549,6 +3791,8 @@ namespace
                 else if (auto* key = dynamic_cast<RackCell*> (cell.get()))
                     c.add (key->captionText());
             }
+            for (const auto& k : deckKeys)
+                c.add (k.caption);
             return c.joinIntoString (" ");
         }
         RackPresetBar& presets() noexcept { return *presetBar; }
@@ -3582,6 +3826,9 @@ namespace
                 if (auto* c = dynamic_cast<RackCell*> (cell.get()); c != nullptr && c->captionText() == caption)
                     return &c->key();
             }
+            for (const auto& k : deckKeys)
+                if (k.caption == caption)
+                    return k.control.get();
             return nullptr;
         }
         /** The layout family (0 standard, 1 dense: eight controls or more). */
@@ -3697,7 +3944,43 @@ namespace
             addAndMakeVisible (*cell);
             cells.push_back (std::move (cell));
         }
-        void clearCells() { cells.clear(); }
+        void clearCells()
+        {
+            cells.clear();
+            deckKeys.clear();
+        }
+
+        /** The TAPE deck (V4, opt-in by the faceplate): shown with its reader, or removed. */
+        bool deckWanted() const noexcept { return plate != nullptr && plate->tapeDeck; }
+        void setDeck (TapeDeck::Reader reader)
+        {
+            if (reader == nullptr)
+            {
+                if (deck != nullptr)
+                    removeChildComponent (deck.get());
+                deck.reset();
+                return;
+            }
+            if (deck != nullptr)
+                removeChildComponent (deck.get());
+            deck = std::make_unique<TapeDeck> (processor, std::move (reader), accent());
+            addAndMakeVisible (*deck);
+            deck->toBack();
+        }
+        /** The deck's own small choices (ECHO's FREE / SYNC, MONO / PING / WIDE): a ceramic
+            segmented switch in the deck's top row, on the same parameter as the cell it replaces. */
+        rackui::SegmentedSwitch& deckSegments (const juce::String& id, const juce::String& caption, std::vector<rackui::Position> positions, const juce::String& tip)
+        {
+            auto segments = std::make_unique<rackui::SegmentedSwitch> (*processor.apvts().getParameter (id), std::move (positions), &processor.undo(), accent());
+            segments->setTooltip (tip);
+            segments->setTitle (caption);
+            auto& ref = *segments;
+            addAndMakeVisible (ref);
+            deckKeys.push_back ({ caption, std::move (segments) });
+            return ref;
+        }
+        /** The deck display's caption ("REPEATS", "SPEED"). */
+        virtual juce::String deckCaption() const { return {}; }
 
         /** An expanded precision editor (SHAPER's) is open: the module lays itself out. */
         virtual bool expanded() const { return false; }
@@ -3726,6 +4009,42 @@ namespace
                 for (auto& cell : cells)
                     cell->setVisible (false);
                 layoutExpanded (juce::Rectangle<int> (x0, controlsY, width - x0 - contentRightMargin(), getHeight() - rackcolumns::bottom - controlsY));
+                repaint();
+                return;
+            }
+            if (deck != nullptr)
+            {
+                // The TAPE deck: the knobs left (27 - 32 %, the dense slots), the reels in the
+                // middle (33 - 39 %), the small display right; one substrate, two quiet rules.
+                const int x1 = width - contentRightMargin(), w = x1 - x0;
+                const int leftEnd = x0 + juce::roundToInt (0.29f * static_cast<float> (w));
+                const int deckEnd = x0 + juce::roundToInt (0.66f * static_cast<float> (w));
+                deckDividers = { leftEnd + rackcolumns::columnGap, deckEnd + rackcolumns::columnGap };
+                int x = x0;
+                for (auto& cell : cells)
+                {
+                    auto slotKind = rackcolumns::Slot::knob;
+                    if (auto* c = dynamic_cast<RackCell*> (cell.get()))
+                        slotKind = c->slot();
+                    const int cw = rackcolumns::slotWidth (slotKind, true);
+                    cell->setVisible (true);
+                    cell->setBounds (x, controlsY, cw, cellHeight);
+                    x += cw + rackcolumns::slotGap (true);
+                }
+                const int deckX = deckDividers[0] + 1 + rackcolumns::graphPad, deckRight = deckDividers[1] - rackcolumns::graphPad;
+                const int bottomY = getHeight() - 16;
+                // Its own small choices in its top row (the selector row's centre line).
+                const int keyY = top + (selectRow - 24) / 2;
+                if (! deckKeys.empty())
+                    deckKeys.front().control->setBounds (deckX, keyY, 108, 24);
+                if (deckKeys.size() > 1)
+                    deckKeys[1].control->setBounds (deckRight - 156, keyY, 156, 24);
+                const int deckTop = deckKeys.empty() ? top + 8 : top + selectRow - 2;
+                deck->setBounds (deckX, deckTop, deckRight - deckX, bottomY - deckTop);
+                // The display: about 320 x 120, centred in its column under its caption.
+                const int rx = deckDividers[1] + 1 + rackcolumns::graphPad, rw = x1 - rx;
+                const int dw = std::min (rw, 336), dh = std::min (122, bottomY - (top + 32));
+                visual->setBounds (rx + (rw - dw) / 2, top + 32, dw, dh);
                 repaint();
                 return;
             }
@@ -3815,6 +4134,14 @@ namespace
         ActionsKey presetActions;
         std::unique_ptr<Visual> visual;
         std::vector<std::unique_ptr<juce::Component>> cells;
+        std::unique_ptr<TapeDeck> deck;
+        struct DeckKey
+        {
+            juce::String caption;
+            std::unique_ptr<juce::Component> control;
+        };
+        std::vector<DeckKey> deckKeys;
+        std::array<int, 2> deckDividers {};
     };
 
     //==========================================================================
@@ -4150,9 +4477,37 @@ namespace
                     break;
                 }
             }
+            // V4's TAPE deck (opt-in): the reels' speed wobbles as WOW and FLUTTER move the tape.
+            if (deckWanted() && m == MovementMode::tape)
+                setDeck ([this] { return deckReading(); });
+            else
+                setDeck (nullptr);
             magnifier.setVisible (shaper);
             layout();
             magnifier.toFront (false);
+        }
+        juce::String deckCaption() const override { return juce::String::fromUTF8 ("SPEED  \xc2\xb7  WOW / FLUTTER"); }
+        TapeDeck::Reading deckReading() const
+        {
+            auto& s = processor.apvts();
+            const double a = 0.01 * value (s, lane ("tape.wow")), b = 0.01 * value (s, lane ("tape.flutter"));
+            const double wear = 0.01 * value (s, lane ("tape.wear"));
+            const juce::String level = lane.ids.levelId.isNotEmpty() ? lane.ids.levelId : juce::String ("motion");
+            const double intensity = 0.01 * value (s, level);
+            const double wowHz = shaping::tapeWowHz (a), flutterHz = shaping::tapeFlutterHz (b);
+            TapeDeck::Reading r;
+            r.value = format::hertz (wowHz);
+            r.unit = "wow";
+            r.note = "FLUTTER " + format::hertz (flutterHz);
+            r.noteLit = wear > 0.0;   // (WEAR roughens it: the display shows how much)
+            r.ticks = 9;   // (the speed's deviation, live)
+            r.radiansPerSecond = 2.6;
+            r.wowHz = wowHz;
+            r.flutterHz = flutterHz;
+            r.wowDepth = 0.2 * a * intensity;
+            r.flutterDepth = 0.04 * b * intensity;
+            r.active = processingActive() && laneOn (lane.index) && intensity > 0.0;
+            return r;
         }
 
         void placeVisual (juce::Rectangle<int> column) override
@@ -4352,10 +4707,61 @@ namespace
             }
             else
                 knob ("echo.age", "AGE", percent);
-            switchCell ("echo.sync", "TIMING", { { "FREE", "Free", 0.0f }, { "SYNC", "Sync", 1.0f } }, "Free time in ms, or a note value synced to the host tempo");
-            switchCell ("echo.stereo", "STEREO", { { "MONO", "Mono", 0.0f }, { "PING", "Ping-Pong", 1.0f }, { "WIDE", "Wide", 2.0f } },
-                        "In the centre, alternating left and right (Ping-Pong), or two heads a little apart");
+            const juce::String timingTip ("Free time in ms, or a note value synced to the host tempo");
+            const juce::String stereoTip ("In the centre, alternating left and right (Ping-Pong), or two heads a little apart");
+            if (deckWanted() && key / 2 == static_cast<int> (EchoType::tape))
+            {
+                // V4's TAPE deck (opt-in): the same TIMING and STEREO in the deck's top row.
+                deckSegments ("echo.sync", "TIMING", { { "FREE", "Free", 0.0f }, { "SYNC", "Sync", 1.0f } }, timingTip);
+                deckSegments ("echo.stereo", "STEREO", { { "MONO", "Mono", 0.0f }, { "PING", "Ping-Pong", 1.0f }, { "WIDE", "Wide", 2.0f } }, stereoTip);
+                setDeck ([this] { return deckReading(); });
+            }
+            else
+            {
+                setDeck (nullptr);
+                switchCell ("echo.sync", "TIMING", { { "FREE", "Free", 0.0f }, { "SYNC", "Sync", 1.0f } }, timingTip);
+                switchCell ("echo.stereo", "STEREO", { { "MONO", "Mono", 0.0f }, { "PING", "Ping-Pong", 1.0f }, { "WIDE", "Wide", 2.0f } }, stereoTip);
+            }
             layout();
+        }
+        void faceplateChanged() override
+        {
+            built = -1;   // (the TAPE deck is the faceplate's choice)
+            refresh();
+        }
+        juce::String deckCaption() const override { return "REPEATS"; }
+        /** The deck's readout: the time (the division and its ms at the host's tempo when
+            synced), the tape's speed from it (a longer delay, a slower tape). */
+        TapeDeck::Reading deckReading() const
+        {
+            EchoDelay::Settings e;
+            e.type = EchoType::tape;
+            e.sync = value (processor.apvts(), "echo.sync") >= 0.5f;
+            e.division = juce::roundToInt (value (processor.apvts(), "echo.division"));
+            e.timeMs = value (processor.apvts(), "echo.time");
+            const double bpm = static_cast<double> (processor.hostTempo());
+            const double seconds = std::max (1.0e-3, EchoDelay::timeSeconds (e, bpm));
+            TapeDeck::Reading r;
+            const auto ms = juce::String (juce::roundToInt (1000.0 * seconds)) + " ms";
+            if (e.sync)
+            {
+                r.value = shaping::echoDivisionName (e.division);
+                r.unit = ms + juce::String::fromUTF8 (" \xc2\xb7 ") + juce::String (juce::roundToInt (bpm)) + " BPM";
+                r.note = "SYNC";
+                r.noteLit = true;
+                if (auto* division = processor.apvts().getParameter ("echo.division"))
+                    r.ticks = std::max (2, division->getNumSteps());
+                r.tick = e.division;
+            }
+            else
+            {
+                r.value = ms;
+                r.unit = "free time";
+                r.note = "FREE";
+            }
+            r.radiansPerSecond = std::clamp (1.6 / seconds, 0.8, 9.0);
+            r.active = processingActive();
+            return r;
         }
 
         EchoPresetModel model;
@@ -5480,6 +5886,30 @@ juce::Rectangle<int> rackSlot (const rack::Module& module, int slot)
     if (const auto* m = dynamic_cast<const UnifiedRack*> (&module))
         return m->slot (slot);
     return {};
+}
+
+bool rackTapeDeckShown (const rack::Module& module)
+{
+    const auto* m = dynamic_cast<const UnifiedRack*> (&module);
+    return m != nullptr && m->tapeDeck() != nullptr && m->tapeDeck()->isVisible();
+}
+
+juce::Rectangle<int> rackTapeDeckBounds (const rack::Module& module)
+{
+    const auto* m = dynamic_cast<const UnifiedRack*> (&module);
+    return m != nullptr && m->tapeDeck() != nullptr ? m->tapeDeck()->getBounds() : juce::Rectangle<int>();
+}
+
+double rackTapeDeckSpeed (const rack::Module& module)
+{
+    const auto* m = dynamic_cast<const UnifiedRack*> (&module);
+    return m != nullptr && m->tapeDeck() != nullptr ? m->tapeDeck()->reelSpeed() : 0.0;
+}
+
+void advanceRackTapeDeck (rack::Module& module, double seconds)
+{
+    if (auto* m = dynamic_cast<UnifiedRack*> (&module); m != nullptr && m->tapeDeck() != nullptr)
+        m->tapeDeck()->advance (seconds);
 }
 
 void setRackPresetFolderForTest (const juce::File& folder)

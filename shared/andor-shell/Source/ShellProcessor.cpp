@@ -386,6 +386,7 @@ void ShellProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
     if (! arpBound)
     {
         engine->process (buffer, midi, performance);
+        outputPeakValue.store (buffer.getMagnitude (0, buffer.getNumSamples()), std::memory_order_relaxed);   // (read-only telemetry)
         return;
     }
     osp::HostTiming timing;
@@ -398,6 +399,7 @@ void ShellProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
     const auto& notes = cardArp ? runCardArpeggiators (midi, buffer.getNumSamples(), timing) : runArpeggiator (midi, buffer.getNumSamples(), timing);
     engine->setPlayedKeys (arpeggiator.isEnabled() || laneConfig != 0, midi);
     engine->process (buffer, notes, performance);
+    outputPeakValue.store (buffer.getMagnitude (0, buffer.getNumSamples()), std::memory_order_relaxed);   // (read-only telemetry)
 }
 
 void ShellProcessor::applyModulation() noexcept

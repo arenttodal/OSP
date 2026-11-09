@@ -132,6 +132,7 @@ public:
     // InstrumentHost: the macro popovers
     int editLayer() const noexcept override { return editLayerIndex.load(); }
     float hostTempo() const noexcept override { return tempo.load (std::memory_order_relaxed); }
+    float outputPeak() const noexcept override { return outputPeakValue.load (std::memory_order_relaxed); }
     float shaperPhase() const noexcept override { return engine->shaperPhase(); }
     int movementLaneCount() const noexcept override { return std::max (1, static_cast<int> (product().movementLanes.size())); }
     MovementLane movementLane (int lane) const override
@@ -300,6 +301,7 @@ private:
     void beginKeyDnaGesture (int layer);
     void swapKeyDnaIfPending() noexcept;
     std::atomic<int> editLayerIndex { 0 };
+    std::atomic<float> outputPeakValue { 0.0f };   ///< the last block's output peak (telemetry only)
 
     std::unique_ptr<osp::plugin::SampleStore> store;
     juce::ThreadPool loaderPool { 1 };

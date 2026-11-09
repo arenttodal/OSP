@@ -63,6 +63,12 @@ juce::StringArray rackPresetNames (rack::Module& module);
 /** Tests: a module's slot (2 MODE, 3 PRESET, 4 the first control cell, 5 the picture), in its
     own coordinates. */
 juce::Rectangle<int> rackSlot (const rack::Module& module, int slot);
+/** Tests: V4's TAPE deck (opt-in by the faceplate) - shown, its bounds, its reels' speed
+    (rad/s), and a step of its animation (what its timer does, `seconds` at a time). */
+bool rackTapeDeckShown (const rack::Module& module);
+juce::Rectangle<int> rackTapeDeckBounds (const rack::Module& module);
+double rackTapeDeckSpeed (const rack::Module& module);
+void advanceRackTapeDeck (rack::Module& module, double seconds);
 /** Tests: user presets saved under this folder instead of Documents/ANDOR. */
 void setRackPresetFolderForTest (const juce::File& folder);
 /** Tests: a module's knobs' captions, in order (MOVEMENT "INTENSITY SPEED PITCH TONE", ECHO, SPACE). */
