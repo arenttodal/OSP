@@ -3753,8 +3753,7 @@ namespace
             }
             if (deck != nullptr && deck->isVisible() && ! expanded())
             {
-                // The deck's three regions: two quiet rules; the display's caption over it
-                // (what it shows is predicted from the settings, not metered).
+                // The deck's three regions: two quiet rules.
                 const auto ink = rackui::inkFor (*this);
                 for (const int x : deckDividers)
                 {
@@ -3765,16 +3764,6 @@ namespace
                     }
                     else
                         rackcolumns::paintDivider (g, x, static_cast<float> (titleOffset() + 12), static_cast<float> (getHeight() - 22));
-                }
-                if (visual != nullptr)
-                {
-                    const auto v = visual->getBounds();
-                    g.setColour (ink ? ink->caption : rackui::palette::caption);
-                    g.setFont (fonts::make (10.5f, fonts::Weight::medium, 0.07f));
-                    g.drawText (deckCaption(), juce::Rectangle<int> (v.getX(), v.getY() - 20, v.getWidth(), 16), juce::Justification::centredLeft, false);
-                    g.setColour (ink ? ink->quiet : rackui::palette::quietCaption);
-                    g.setFont (fonts::make (9.5f, fonts::Weight::regular, 0.04f));
-                    g.drawText ("PREDICTED", juce::Rectangle<int> (v.getX(), v.getY() - 20, v.getWidth(), 16), juce::Justification::centredRight, false);
                 }
                 return;
             }
@@ -4031,8 +4020,6 @@ namespace
             deckKeys.push_back ({ caption, std::move (segments) });
             return ref;
         }
-        /** The deck display's caption ("REPEATS", "SPEED"). */
-        virtual juce::String deckCaption() const { return {}; }
 
         /** An expanded precision editor (SHAPER's) is open: the module lays itself out. */
         virtual bool expanded() const { return false; }
@@ -4093,10 +4080,9 @@ namespace
                     deckKeys[1].control->setBounds (deckRight - 156, keyY, 156, 24);
                 const int deckTop = deckKeys.empty() ? top + 8 : top + selectRow - 2;
                 deck->setBounds (deckX, deckTop, deckRight - deckX, bottomY - deckTop);
-                // The display: about 320 x 120, centred in its column under its caption.
-                const int rx = deckDividers[1] + 1 + rackcolumns::graphPad, rw = x1 - rx;
-                const int dw = std::min (rw, 336), dh = std::min (122, bottomY - (top + 32));
-                visual->setBounds (rx + (rw - dw) / 2, top + 32, dw, dh);
+                // The display: its whole column, as tall as SPACE's graph (no caption over it).
+                const int rx = deckDividers[1] + 1 + rackcolumns::graphPad;
+                visual->setBounds (rx, top + 7, x1 - rx, bottomY - (top + 7));
                 repaint();
                 return;
             }
@@ -4539,7 +4525,6 @@ namespace
             layout();
             magnifier.toFront (false);
         }
-        juce::String deckCaption() const override { return juce::String::fromUTF8 ("SPEED  \xc2\xb7  WOW / FLUTTER"); }
         TapeDeck::Reading deckReading() const
         {
             auto& s = processor.apvts();
@@ -4782,7 +4767,6 @@ namespace
             built = -1;   // (the TAPE deck is the faceplate's choice)
             refresh();
         }
-        juce::String deckCaption() const override { return "REPEATS"; }
         /** The deck's readout: the time (the division and its ms at the host's tempo when
             synced), the tape's speed from it (a longer delay, a slower tape). */
         TapeDeck::Reading deckReading() const
