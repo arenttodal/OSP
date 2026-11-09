@@ -692,6 +692,36 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - [ ] Musical review of real recordings in the development build (S2.8 report:
       `s2-imprint-results.md`).
 
+## ANDOR OSP: SYNTH chip and Refined Core region colours (8 Nov 2026)
+
+- [x] SYNTH chip, presentation only (interactions and hit areas as before, tested):
+  - The amount keeps a fixed 38 px part on the right, so "100%" has room and the number is
+    right-aligned on one edge. Percentages now read "42%", without the space.
+  - The label has 2 px more on its left and 6 px before the chevron.
+  - The light is 4 px, and the imprint curve is drawn at 85 % of its size.
+  - Hover is quieter (6 %), with the seam between the two parts shown only on hover.
+- [x] Note colours, Refined Core: `design::colour::forPitch` stays one colour per pitch class
+  (the meaning is unchanged). The palette is new:
+  - C ember `#C97B2E`, C# deep teal `#527B78`, D bronze `#A78667`, D# slate `#73868B`,
+    E rust `#9A614D`, F sage `#84917D`;
+  - F# to B are a lighter shade of each family;
+  - the even pitch classes are warm and the odd ones cool, as before.
+
+  The card's regions, the NOTE MAP and the keyboard's light strip share it.
+- [x] Regions:
+  - Card: a translucent field at `regionFillAlpha` (base 28 %, balanced by brightness to
+    0.82–1.22×), with a 1 px edge a shade lighter and 2 px corners. Sounding notes are
+    stronger (30–36 %) with a 1.2 px edge.
+  - NOTE MAP:
+    - the same fields behind a bone/ivory waveform (`#E8E3DA`; 40 % normal, 52 % hovered,
+      86 % selected) instead of the layer colour;
+    - hovered: its own hue brighter, with tinted edges;
+    - selected: stronger fill, a bronze-ivory outline (`#BE9B77`) and ivory handles; the
+      dragged one is brightest;
+    - warm neutral boundaries.
+  - Geometry, hit areas and editing are unchanged. Screenshots: `01-notemap-1L-dragging`,
+    `01-notemap-2L-hover` and `09-synth-chip-*` in `[refine-shots]`.
+
 ## ANDOR OSP: the playback-mode selector as symbols (8 Nov 2026)
 
 - [x] The source header's ONE SHOT / GRANULAR key is a small symbol key (42 px, 40 in three

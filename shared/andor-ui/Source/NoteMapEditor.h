@@ -129,6 +129,8 @@ private:
     bool isConflict (const std::string& id) const;
     double sampleRate() const;
     std::int64_t sourceFrames() const;
+    /** The notes' colour fields (their pitch's Refined Core colour), behind the waveform. */
+    void paintRegionFields (juce::Graphics&, juce::Rectangle<float> graph);
     void paintWave (juce::Graphics&, juce::Rectangle<float> graph);
     void paintRegions (juce::Graphics&, juce::Rectangle<float> graph);
     void paintInspector (juce::Graphics&);

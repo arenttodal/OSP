@@ -2,7 +2,9 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include <algorithm>
 #include <array>
+#include <cmath>
 
 namespace osp::plugin
 {
@@ -183,30 +185,42 @@ namespace colour
         return ids[static_cast<std::size_t> (juce::jlimit (0, 2, layer))];
     }
     /** A mapped note's colour (Note Atlas regions, the NOTE MAP, the keyboard's light strip):
-        one colour per pitch class, so every E (any octave) wears the same one. Earth and plant
-        pigments, no violets: the even pitch classes (C D E F# G# A#) warm (rust, ochre,
-        rosewood, burnt orange, sand, terracotta), the odd ones (C# D# F G A B) green and teal
-        (sea slate, moss, pine teal, olive, deep teal, forest). A semitone or a fifth always
-        changes parity, so neighbours on the keyboard and on the circle of fifths are always
-        one warm and one cool, and a scale wears both. */
+        one colour per pitch class, so every E (any octave) wears the same one. The Refined Core
+        palette: six muted earth and mineral families from ANDOR's own materials (ember, deep
+        teal, bronze, slate, rust, sage), the even pitch classes (C D E F# G# A#) warm and the
+        odd ones (C# D# F G A B) cool, the second six a lighter shade of the first. A semitone or
+        a fifth always changes parity, so neighbours on the keyboard and on the circle of fifths
+        are always one warm and one cool, and C to F reads ember, teal, bronze, slate, rust, sage. */
     inline juce::Colour forPitch (int midiNote)
     {
         static const std::array<juce::Colour, 12> byPitchClass { {
-            juce::Colour (0xffbf5a3f),   // C   rust
-            juce::Colour (0xff6a93a3),   // C#  sea slate
-            juce::Colour (0xffd6a64f),   // D   ochre
-            juce::Colour (0xff86a35f),   // D#  moss
-            juce::Colour (0xffb9705f),   // E   rosewood
-            juce::Colour (0xff4f9486),   // F   pine teal
-            juce::Colour (0xffde8f46),   // F#  burnt orange
-            juce::Colour (0xffa2a85c),   // G   olive
-            juce::Colour (0xffcbb571),   // G#  sand
-            juce::Colour (0xff3f8d97),   // A   deep teal
-            juce::Colour (0xffcc7449),   // A#  terracotta
-            juce::Colour (0xff62956b),   // B   forest
+            juce::Colour (0xffc97b2e),   // C   ember
+            juce::Colour (0xff527b78),   // C#  deep teal
+            juce::Colour (0xffa78667),   // D   bronze
+            juce::Colour (0xff73868b),   // D#  slate
+            juce::Colour (0xff9a614d),   // E   rust
+            juce::Colour (0xff84917d),   // F   sage
+            juce::Colour (0xffcb9150),   // F#  light ember
+            juce::Colour (0xff5f8e89),   // G   light teal
+            juce::Colour (0xffb59a78),   // G#  light bronze
+            juce::Colour (0xff7e959c),   // A   light slate
+            juce::Colour (0xffab735b),   // A#  light rust
+            juce::Colour (0xff97a38d),   // B   light sage
         } };
         return byPitchClass[static_cast<std::size_t> (((midiNote % 12) + 12) % 12)];
     }
+    /** How strongly a region's colour is laid over the graphite well (its fill's alpha for a
+        base of about 0.28): brighter colours a little less, darker a little more, so no one
+        pitch's region reads much lighter than the others. */
+    inline float regionFillAlpha (juce::Colour c, float base = 0.28f)
+    {
+        const float brightness = std::max (0.2f, c.getPerceivedBrightness());
+        return base * std::clamp (std::sqrt (0.55f / brightness), 0.82f, 1.22f);
+    }
+    /** The bone/ivory of a waveform drawn over the regions, the selected region's restrained
+        bronze-ivory outline. */
+    const juce::Colour regionWave { 0xffe8e3da };
+    const juce::Colour regionSelected { 0xffbe9b77 };
 
     // Controls.
     const juce::Colour knobCapTop { 0xfff8f3ea };

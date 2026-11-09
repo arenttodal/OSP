@@ -878,6 +878,28 @@ void NoteMapEditor::resized()
 }
 
 //==============================================================================
+void NoteMapEditor::paintRegionFields (juce::Graphics& g, juce::Rectangle<float> graph)
+{
+    // Each included note's pitch colour as a muted translucent field behind the waveform (as on
+    // the card): hovered a little stronger, selected stronger again, always its own hue. A
+    // left-out note has none (it recedes).
+    using namespace design;
+    g.saveState();
+    g.reduceClipRegion (graph.getSmallestIntegerContainer());
+    for (const auto* n : shownNotes())
+    {
+        const auto r = regionBounds (n->id);
+        if (r.isEmpty() || ! n->included)
+            continue;
+        const bool isSelected = std::find (selected.begin(), selected.end(), n->id) != selected.end();
+        const bool hot = hover.noteId == n->id;
+        const auto tone = colour::forPitch (n->playKey());
+        g.setColour (tone.withAlpha (colour::regionFillAlpha (tone, isSelected ? 0.38f : (hot ? 0.34f : 0.28f))));
+        g.fillRect (r.withTrimmedTop (std::max (0.0f, graph.getY() + 18.0f - r.getY())));
+    }
+    g.restoreState();
+}
+
 void NoteMapEditor::paintWave (juce::Graphics& g, juce::Rectangle<float> graph)
 {
     using namespace design;
@@ -907,9 +929,10 @@ void NoteMapEditor::paintWave (juce::Graphics& g, juce::Rectangle<float> graph)
         if (r.isEmpty())
             continue;
         const bool isSelected = std::find (selected.begin(), selected.end(), n->id) != selected.end();
-        spans.push_back ({ r.getX(), r.getRight(), ! n->included ? 0.2f : (isSelected ? 0.95f : (hover.noteId == n->id ? 0.56f : 0.42f)) });
+        spans.push_back ({ r.getX(), r.getRight(), ! n->included ? 0.2f : (isSelected ? 0.86f : (hover.noteId == n->id ? 0.52f : 0.4f)) });
     }
-    const auto wave = colour::identity (layer).wave;
+    // Bone/ivory over the notes' colours (never a colour of its own, so every hue stays readable).
+    const auto wave = colour::regionWave;
     for (int c = 0; c < columns; ++c)
     {
         const auto f0 = static_cast<double> (view.getStart()) + static_cast<double> (view.getLength()) * c / columns;
@@ -924,7 +947,7 @@ void NoteMapEditor::paintWave (juce::Graphics& g, juce::Rectangle<float> graph)
         }
         auto shape = [maxAbs, half] (float a) { return half * std::pow (std::clamp (std::abs (a) / maxAbs, 0.0f, 1.0f), 0.85f); };
         const float x = graph.getX() + static_cast<float> (c);
-        float alpha = 0.3f;   // between notes: the recording, not a note
+        float alpha = 0.32f;   // between notes: the recording, not a note
         for (const auto& span : spans)
             if (x + 0.5f >= span.x0 && x + 0.5f <= span.x1)
                 alpha = span.alpha;
@@ -936,7 +959,6 @@ void NoteMapEditor::paintWave (juce::Graphics& g, juce::Rectangle<float> graph)
 void NoteMapEditor::paintRegions (juce::Graphics& g, juce::Rectangle<float> graph)
 {
     using namespace design;
-    const auto& id = colour::identity (layer);
     g.saveState();
     g.reduceClipRegion (graph.getSmallestIntegerContainer());
     const auto notes = shownNotes();
@@ -952,7 +974,7 @@ void NoteMapEditor::paintRegions (juce::Graphics& g, juce::Rectangle<float> grap
                 if (std::none_of (edges.begin(), edges.end(), [x] (float e) { return std::abs (e - x) < 1.5f; }))
                     edges.push_back (x);
         }
-        g.setColour (light.withAlpha (0.13f));
+        g.setColour (colour::regionWave.withAlpha (0.16f));   // fine, warm neutral
         for (const float x : edges)
             vline (g, x, graph.getY() + 18.0f, graph.getBottom());
     }
@@ -965,17 +987,19 @@ void NoteMapEditor::paintRegions (juce::Graphics& g, juce::Rectangle<float> grap
         const bool hot = hover.noteId == n->id;
         if (isSelected && n->included)
         {
-            // The one selected state: a low layer-coloured field, its two edges in the layer's
-            // colour, and a narrow handle on each (the hit area is wider than what is drawn).
-            g.setColour (id.wave.withAlpha (0.07f));
-            g.fillRect (r);
-            g.setColour (id.wave.withAlpha (0.9f));
+            // The one selected state: its own colour a little stronger (paintRegionFields), a
+            // restrained bronze-ivory outline with its two edges clear, and a narrow handle on
+            // each (the hit area is wider than what is drawn); the edge being dragged brightest.
+            g.setColour (colour::regionSelected.withAlpha (0.55f));
+            hline (g, r.getX(), r.getRight(), r.getY() + 0.5f);
+            hline (g, r.getX(), r.getRight(), r.getBottom() - 0.5f);
+            g.setColour (colour::regionSelected.withAlpha (0.95f));
             for (const float x : { r.getX(), r.getRight() })
                 vline (g, x, r.getY(), r.getBottom(), 1.5f);
-            g.setColour (light);
             for (const float x : { r.getX(), r.getRight() })
             {
                 const bool grabbed = hover.noteId == n->id && hover.edge == (x == r.getX() ? Edge::start : Edge::end);
+                g.setColour (grabbed ? colour::regionWave : colour::regionWave.withAlpha (0.85f));
                 g.fillRoundedRectangle (juce::Rectangle<float> (grabbed ? 3.0f : 2.0f, 20.0f).withCentre ({ x, r.getCentreY() }), 1.0f);
             }
         }
@@ -987,9 +1011,8 @@ void NoteMapEditor::paintRegions (juce::Graphics& g, juce::Rectangle<float> grap
         }
         else if (hot)
         {
-            g.setColour (light.withAlpha (0.03f));
-            g.fillRect (r);
-            g.setColour (light.withAlpha (0.24f));
+            // Hovered: brighter in its own hue (paintRegionFields), its edges a shade of it.
+            g.setColour (colour::forPitch (n->playKey()).brighter (0.5f).withAlpha (0.55f));
             for (const float x : { r.getX(), r.getRight() })
                 vline (g, x, r.getY(), r.getBottom());
         }
@@ -999,7 +1022,7 @@ void NoteMapEditor::paintRegions (juce::Graphics& g, juce::Rectangle<float> grap
             const float s0 = std::max (r.getX() + 3.0f, xForFrame (n->sustain.start)), s1 = std::min (r.getRight() - 3.0f, xForFrame (n->sustain.end));
             if (s1 > s0 + 1.0f)
             {
-                g.setColour (isSelected ? id.wave.withAlpha (0.6f) : light.withAlpha (0.12f));
+                g.setColour (isSelected ? colour::regionSelected.withAlpha (0.6f) : light.withAlpha (0.12f));
                 hline (g, s0, s1, r.getBottom() - 5.0f);
             }
         }
@@ -1246,6 +1269,7 @@ void NoteMapEditor::paint (juce::Graphics& g)
             }
         }
     }
+    paintRegionFields (g, graph);
     paintWave (g, graph);
     paintRegions (g, graph);
     if (atlas == nullptr || shownNotes().empty())
