@@ -213,6 +213,15 @@ public:
     void toggle();
     std::function<void (bool)> onChange;
 
+    /** V3 (opt-in, a full-bleed faceplate's rail): a horizontal ceramic slide instead of the
+        round key - the word ON, then a 30 x 16 track whose thumb sits right (lit) while on,
+        left while off. The same parameter, gesture, undo and keyboard. */
+    enum class Style { key, slide };
+    void setStyle (Style s) { style = s; repaint(); }
+    Style currentStyle() const noexcept { return style; }
+    /** The slide's size (its word included), reference pixels. */
+    static constexpr int slideWidth = 52, slideHeight = 20, trackWidth = 30, trackHeight = 16;
+
     void paint (juce::Graphics&) override;
     void mouseUp (const juce::MouseEvent&) override;
     bool keyPressed (const juce::KeyPress&) override;
@@ -225,7 +234,9 @@ private:
     juce::UndoManager* undoManager;
     juce::Colour glow;
     bool on = false;
+    Style style = Style::key;
     juce::ParameterAttachment attachment;
+    void paintSlide (juce::Graphics&);
 };
 
 /** The detent marks of a stepped rate knob (the approved rate study): a short tick per

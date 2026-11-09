@@ -123,6 +123,8 @@ public:
     }
     /** The cards' modifiers in their wells (the product's choice; not in the parity render). */
     bool modifiersInWell() const noexcept { return ! referenceParity && product().cardModifiersInWell; }
+    /** The rack is its modules' faces (the product's choice; not in the parity render). */
+    bool fullBleedRacks() const noexcept { return ! referenceParity && product().fullBleedRacks; }
     bool stableModulationTabs() const noexcept { return ! referenceParity && product().stableModulationTabs; }
     juce::String cardArpNamespace() const override { return productInfo().slug + "."; }
     void setArpViewCard (int shown) noexcept override { arpViewLane.store (std::clamp (shown, 0, 2), std::memory_order_relaxed); }

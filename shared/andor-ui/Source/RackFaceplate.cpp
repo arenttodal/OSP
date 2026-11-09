@@ -7,11 +7,18 @@ namespace osp::plugin::rack::hardware
 void paint (juce::Graphics& g, juce::Rectangle<int> local, int titleOffset, const Faceplate& f, const juce::String& heading, bool lit,
             juce::Rectangle<int> graph, float subtitleLimit)
 {
-    const auto chassis = hardware::chassis (local).toFloat();
+    const auto& m = measures (f);
+    const bool bleed = f.fullBleed;
+    const auto chassis = m.chassis (local).toFloat();
+    const float chassisRadius = m.radius;
     const float railBottom = static_cast<float> (titleOffset);
-    // The chassis: a soft shadow, warm ceramic, a hairline bezel and a light inner edge.
-    g.setColour (juce::Colour (0x26000000));
-    g.fillRoundedRectangle (chassis.translated (0.0f, 1.6f), chassisRadius);
+    // The chassis: warm ceramic, a hairline bezel and a light inner edge (inset: its own soft
+    // shadow; full bleed: the rack's shadow is the host's, outside these bounds).
+    if (! bleed)
+    {
+        g.setColour (juce::Colour (0x26000000));
+        g.fillRoundedRectangle (chassis.translated (0.0f, 1.6f), chassisRadius);
+    }
     g.setGradientFill (juce::ColourGradient (juce::Colour (0xfff7f0e5), 0.0f, chassis.getY(), juce::Colour (0xffece2d3), 0.0f, chassis.getBottom(), false));
     g.fillRoundedRectangle (chassis, chassisRadius);
     juce::Path shape;
@@ -29,12 +36,13 @@ void paint (juce::Graphics& g, juce::Rectangle<int> local, int titleOffset, cons
         g.fillRect (rail.withTop (rail.getBottom() - 1.0f));
         g.setColour (juce::Colours::white.withAlpha (0.35f));
         g.fillRect (rail.withTop (rail.getBottom()).withHeight (1.0f));
-        // The stripes: three bands sweeping from under the rail down the body's left edge.
+        // The stripes: three bands sweeping from under the rail down the body's left edge
+        // (full bleed: a narrow signature, 22 px at the top, leaning out of the face).
         const float x0 = chassis.getX(), top = railBottom, bottom = chassis.getBottom();
         for (int i = 0; i < 3; ++i)
         {
-            const float w = 11.0f, off = static_cast<float> (i) * 13.5f;
-            const float topL = x0 + 10.0f + off, botL = x0 - 12.0f + off;
+            const float w = bleed ? 5.0f : 11.0f, off = static_cast<float> (i) * (bleed ? 7.0f : 13.5f);
+            const float topL = x0 + (bleed ? 3.0f : 10.0f) + off, botL = x0 + (bleed ? -9.0f : -12.0f) + off;
             juce::Path band;
             band.startNewSubPath (topL, top);
             band.lineTo (topL + w, top);
@@ -46,27 +54,35 @@ void paint (juce::Graphics& g, juce::Rectangle<int> local, int titleOffset, cons
             g.fillPath (band);
         }
     }
-    g.setColour (juce::Colour (0xffc9bca9));
+    // One outline (full bleed: the rack's only one).
+    g.setColour (bleed ? juce::Colour (0xffbdb09c) : juce::Colour (0xffc9bca9));
     g.drawRoundedRectangle (chassis.reduced (0.5f), chassisRadius, 1.0f);
-    g.setColour (juce::Colours::white.withAlpha (0.45f));
-    g.drawRoundedRectangle (chassis.reduced (1.6f).withTrimmedTop (railBottom - chassis.getY()), chassisRadius - 1.5f, 0.8f);
-    // Screws: four, in the corners.
-    auto screw = [&g] (juce::Point<float> c, bool onEnamel) {
-        const auto r = juce::Rectangle<float> (6.4f, 6.4f).withCentre (c);
+    if (! bleed)
+    {
+        g.setColour (juce::Colours::white.withAlpha (0.45f));
+        g.drawRoundedRectangle (chassis.reduced (1.6f).withTrimmedTop (railBottom - chassis.getY()), chassisRadius - 1.5f, 0.8f);
+    }
+    // Screws: four in the corners (full bleed: two, at the foot, smaller and quieter).
+    const float screwSize = bleed ? 5.0f : 6.4f, screwIn = bleed ? 6.5f : 7.5f;
+    auto screw = [&g, screwSize] (juce::Point<float> c, bool onEnamel) {
+        const auto r = juce::Rectangle<float> (screwSize, screwSize).withCentre (c);
         g.setGradientFill (juce::ColourGradient (juce::Colour (onEnamel ? 0xffcfc6b8 : 0xffe9e2d6), r.getX(), r.getY(), juce::Colour (0xff8f8678), r.getRight(), r.getBottom(), false));
         g.fillEllipse (r);
         g.setColour (juce::Colour (0x66000000));
         g.drawEllipse (r, 0.6f);
         g.setColour (juce::Colour (0xaa4d473f));
-        g.drawLine (c.x - 2.0f, c.y + 1.2f, c.x + 2.0f, c.y - 1.2f, 0.9f);
+        g.drawLine (c.x - 0.31f * screwSize, c.y + 0.19f * screwSize, c.x + 0.31f * screwSize, c.y - 0.19f * screwSize, 0.9f);
     };
-    screw ({ chassis.getX() + 7.5f, chassis.getY() + 7.5f }, true);
-    screw ({ chassis.getRight() - 7.5f, chassis.getY() + 7.5f }, true);
-    screw ({ chassis.getX() + 7.5f, chassis.getBottom() - 7.5f }, false);
-    screw ({ chassis.getRight() - 7.5f, chassis.getBottom() - 7.5f }, false);
+    if (! bleed)   // (full bleed: the rail's corners hold the LED and the X, no screws)
+    {
+        screw ({ chassis.getX() + screwIn, chassis.getY() + screwIn }, true);
+        screw ({ chassis.getRight() - screwIn, chassis.getY() + screwIn }, true);
+    }
+    screw ({ chassis.getX() + screwIn, chassis.getBottom() - screwIn }, false);
+    screw ({ chassis.getRight() - screwIn, chassis.getBottom() - screwIn }, false);
     // The LED (the effect's real ON), the title and its subtitle.
     const float railMid = 0.5f * (chassis.getY() + railBottom);
-    const juce::Point<float> led (chassis.getX() + 25.0f, railMid);
+    const juce::Point<float> led (chassis.getX() + (bleed ? 22.0f : 25.0f), railMid);
     g.setColour (juce::Colours::black.withAlpha (0.35f));
     g.fillEllipse (juce::Rectangle<float> (11.0f, 11.0f).withCentre (led));
     if (lit)

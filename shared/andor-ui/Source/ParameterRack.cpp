@@ -138,6 +138,8 @@ void ParameterRack::setFaceplate (const Faceplate& f)
         if (auto* p = host.apvts().getParameter (powerId))
         {
             powerKeyPart = std::make_unique<rackui::PowerKey> (*p, &host.undo(), f.glow);
+            if (f.fullBleed)
+                powerKeyPart->setStyle (rackui::PowerKey::Style::slide);
             powerKeyPart->onChange = [this] (bool) { repaint(); };
             addAndMakeVisible (*powerKeyPart);
         }
@@ -174,17 +176,17 @@ void ParameterRack::setOverflow (std::function<void (juce::Component&)> onClick)
 
 juce::Rectangle<int> ParameterRack::chassisBounds() const
 {
-    return hardware::chassis (getLocalBounds());
+    return faceplate ? hardware::measures (*faceplate).chassis (getLocalBounds()) : hardware::chassis (getLocalBounds());
 }
 
 int ParameterRack::contentLeft() const
 {
-    return faceplate ? hardware::contentLeft : rackui::Cell::contentInset;
+    return faceplate ? hardware::measures (*faceplate).contentLeft() : rackui::Cell::contentInset;
 }
 
 int ParameterRack::contentRightMargin() const
 {
-    return faceplate ? hardware::contentRightMargin : rackui::Cell::contentInset;
+    return faceplate ? hardware::measures (*faceplate).contentRightMargin() : rackui::Cell::contentInset;
 }
 
 juce::Font ParameterRack::selectorCaptionFont() { return fonts::make (9.5f, fonts::Weight::medium, 0.06f); }
@@ -241,6 +243,8 @@ void ParameterRack::setHeaderSwitch (const juce::String& id, const juce::String&
         if (auto* p = host.apvts().getParameter (id))
         {
             powerKeyPart = std::make_unique<rackui::PowerKey> (*p, &host.undo(), faceplate->glow);
+            if (faceplate->fullBleed)
+                powerKeyPart->setStyle (rackui::PowerKey::Style::slide);
             powerKeyPart->setTooltip (tip);
             powerKeyPart->onChange = [this] (bool) { repaint(); };
             addAndMakeVisible (*powerKeyPart);
@@ -458,8 +462,11 @@ void ParameterRack::layoutTitleRow (juce::Rectangle<int> row)
         row = row.withSizeKeepingCentre (row.getWidth(), 26);
         if (powerKeyPart != nullptr)
         {
-            powerKeyPart->setBounds (row.removeFromRight (24).withSizeKeepingCentre (24, 24));
-            row.removeFromRight (8);
+            if (powerKeyPart->currentStyle() == rackui::PowerKey::Style::slide)
+                powerKeyPart->setBounds (row.removeFromRight (rackui::PowerKey::slideWidth).withSizeKeepingCentre (rackui::PowerKey::slideWidth, rackui::PowerKey::slideHeight));
+            else
+                powerKeyPart->setBounds (row.removeFromRight (24).withSizeKeepingCentre (24, 24));
+            row.removeFromRight (faceplate->fullBleed ? 12 : 8);
         }
         if (overflow != nullptr)
         {
@@ -566,7 +573,9 @@ void ParameterRack::layout()
     if (graphView != nullptr)
     {
         const int pictureX = divider + 1 + rackui::Cell::columnGap;
-        if (faceplate)
+        if (faceplate && faceplate->fullBleed)
+            graphView->setBounds (pictureX, top + 7, width - contentRightMargin() - pictureX, std::max (graphHeight - 4, getHeight() - top - 7 - 16));   // (the face's own bottom margin)
+        else if (faceplate)
             graphView->setBounds (pictureX, top + 7, width - contentRightMargin() - pictureX, graphHeight - 4);   // (room for its bezel)
         else
             graphView->setBounds (pictureX, top + 4, width - x0 - pictureX, graphHeight);

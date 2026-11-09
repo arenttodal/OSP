@@ -268,6 +268,17 @@ void raisedChildren (juce::Graphics& g, juce::Component& parent)
     for (auto* child : parent.getChildren())
         if (const auto* face = dynamic_cast<const skin::SurfaceFace*> (child); face != nullptr && child->isVisible())
         {
+            if (face->surfaceShadowOnly())
+            {
+                // Its own face: one restrained shadow under it, nothing drawn over its area.
+                const auto r = child->getBounds().toFloat();
+                const float radius = face->surfaceRadius();
+                g.setColour (juce::Colour (0x0c2a1d12));
+                g.fillRoundedRectangle (r.translated (0.0f, 3.0f).expanded (1.0f, 0.5f), radius + 1.0f);
+                g.setColour (juce::Colour (0x142a1d12));
+                g.fillRoundedRectangle (r.translated (0.0f, 1.2f), radius);
+                continue;
+            }
             // As the face fades and moves with its component (a layer settling in).
             bool card = false;
             const auto r = child->getBounds().toFloat();

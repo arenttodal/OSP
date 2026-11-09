@@ -346,6 +346,7 @@ ShellEditor::ShellEditor (ShellProcessor& p)
     content.addAndMakeVisible (arpButton);
     content.addChildComponent (arpPanel);
     content.addChildComponent (rack);
+    rack.setFullBleed (shell.fullBleedRacks());
     for (int k = 0; k < rack::kindCount; ++k)
         if ((shell.rackExpanded() & (1 << k)) != 0 && hasRack (static_cast<rack::Kind> (k)))
             rack.setShown (static_cast<rack::Kind> (k), true);

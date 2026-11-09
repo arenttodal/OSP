@@ -586,8 +586,51 @@ void PowerKey::toggle()
     attachment.setValueAsCompleteGesture (on ? 0.0f : 1.0f);
 }
 
+void PowerKey::paintSlide (juce::Graphics& g)
+{
+    // The word (cream on the enamel, dimmer while off), then the track and its thumb.
+    const auto r = getLocalBounds().toFloat();
+    const auto track = juce::Rectangle<float> (static_cast<float> (trackWidth), static_cast<float> (trackHeight))
+                           .withCentre ({ r.getRight() - 0.5f * static_cast<float> (trackWidth) - 1.0f, r.getCentreY() });
+    g.setColour (juce::Colour (0xfff3eadb).withAlpha (on ? 0.95f : 0.6f));
+    g.setFont (fonts::make (8.5f, fonts::Weight::semibold, 0.08f));
+    g.drawText (on ? "ON" : "OFF", juce::Rectangle<float> (r.getX(), r.getY(), track.getX() - r.getX() - 4.0f, r.getHeight()), juce::Justification::centredRight, false);
+    const float rad = 0.5f * track.getHeight();
+    // The track: a recess in the enamel (dark), the glow's tint along it while on.
+    g.setColour (juce::Colour (0x33000000));
+    g.fillRoundedRectangle (track.translated (0.0f, 0.8f), rad);
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xff2b2724), 0.0f, track.getY(), juce::Colour (0xff1c1917), 0.0f, track.getBottom(), false));
+    g.fillRoundedRectangle (track, rad);
+    if (on)
+    {
+        g.setColour (glow.withAlpha (0.55f));
+        g.fillRoundedRectangle (track.reduced (2.0f), rad - 2.0f);
+    }
+    g.setColour (juce::Colours::white.withAlpha (0.22f));
+    g.drawRoundedRectangle (track.reduced (0.5f), rad - 0.5f, 0.8f);
+    // The thumb: ceramic, right while on, left while off (not colour alone).
+    const float d = track.getHeight() - 3.0f;
+    const auto thumb = juce::Rectangle<float> (d, d).withCentre ({ on ? track.getRight() - 1.5f - 0.5f * d : track.getX() + 1.5f + 0.5f * d, track.getCentreY() });
+    g.setColour (juce::Colour (0x55000000));
+    g.fillEllipse (thumb.translated (0.0f, 0.9f));
+    g.setGradientFill (juce::ColourGradient (palette::actuatorHi, thumb.getCentreX(), thumb.getY(), palette::actuatorLo, thumb.getCentreX(), thumb.getBottom(), false));
+    g.fillEllipse (thumb);
+    g.setColour (palette::actuatorEdge.darker (0.15f));
+    g.drawEllipse (thumb, 0.7f);
+    if (hasKeyboardFocus (false))
+    {
+        g.setColour (palette::focus);
+        g.drawRoundedRectangle (track.expanded (1.5f), rad + 1.5f, 1.0f);
+    }
+}
+
 void PowerKey::paint (juce::Graphics& g)
 {
+    if (style == Style::slide)
+    {
+        paintSlide (g);
+        return;
+    }
     const auto r = getLocalBounds().toFloat().reduced (1.0f);
     const auto c = r.getCentre();
     // A ceramic key in a dark ring (the faceplate's bezel), a little raised.
@@ -633,8 +676,23 @@ bool PowerKey::keyPressed (const juce::KeyPress& key)
 
 std::unique_ptr<juce::AccessibilityHandler> PowerKey::createAccessibilityHandler()
 {
-    return std::make_unique<juce::AccessibilityHandler> (*this, juce::AccessibilityRole::toggleButton,
-                                                          juce::AccessibilityActions().addAction (juce::AccessibilityActionType::toggle, [this] { toggle(); }));
+    // A toggle that reports its state (screen readers: "on" / "off", not only the action).
+    struct Handler final : public juce::AccessibilityHandler
+    {
+        explicit Handler (PowerKey& k)
+            : juce::AccessibilityHandler (k, juce::AccessibilityRole::toggleButton,
+                                          juce::AccessibilityActions().addAction (juce::AccessibilityActionType::toggle, [&k] { k.toggle(); })),
+              key (k)
+        {
+        }
+        juce::AccessibleState getCurrentState() const override
+        {
+            auto state = juce::AccessibilityHandler::getCurrentState().withCheckable();
+            return key.isOn() ? state.withChecked() : state;
+        }
+        PowerKey& key;
+    };
+    return std::make_unique<Handler> (*this);
 }
 
 } // namespace osp::plugin::rackui

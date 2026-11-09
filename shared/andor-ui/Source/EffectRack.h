@@ -79,6 +79,13 @@ public:
     /** Several modules at once (stacked in the order they were expanded), or one: expanding
         a module collapses the other (the default). */
     void setStacking (bool allowMultiple) { stacking = allowMultiple; }
+    /** V3 (opt-in; ANDOR ANALOG's): the module is the rack's whole face - no panel, title or
+        divider of the host's around it (only its shadow), the module given the host's full
+        height (the same 214 px), the collapse key a borderless X on the rail's centre line.
+        Off (ANDOR OSP): as before, pixel for pixel. */
+    void setFullBleed (bool bleed);
+    bool fullBleed() const noexcept { return bleedFace; }
+    bool surfaceShadowOnly() const override { return bleedFace; }
 
     void toggle (Kind kind) { setShown (kind, ! isShown (kind)); }
     void setShown (Kind kind, bool shown);
@@ -116,7 +123,7 @@ private:
 
     Factory factory;
     std::vector<Slot> slots;
-    bool stacking = false;
+    bool stacking = false, bleedFace = false;
 };
 
 } // namespace osp::plugin::rack

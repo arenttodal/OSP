@@ -145,6 +145,9 @@ struct ProductInfo
     /** The shared rack modules' hardware faceplates (opt-in; ANDOR ANALOG's), by rack::Kind;
         empty: the approved racks as they are (ANDOR OSP). Interface only. */
     std::map<osp::plugin::rack::Kind, osp::plugin::rack::Faceplate> rackFaceplates;
+    /** V3 (opt-in): the rack's module is its whole face (rack::Host::setFullBleed): no panel
+        around the faceplates, a borderless X to close. Off: the approved rack (ANDOR OSP). */
+    bool fullBleedRacks = false;
     /** MOVEMENT's lanes (InstrumentHost::movementLane), lane 0 first: a product with a second
         lane lists both (the shell keeps the second lane's SHAPER CUSTOM pattern with the
         session and gives it to the engine: Engine::setLaneShaperPattern). Empty: one lane,

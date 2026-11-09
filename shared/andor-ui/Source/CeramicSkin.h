@@ -226,6 +226,9 @@ public:
     virtual float surfaceRadius() const = 0;
     /** A card (the cards' colours) or a panel (the panels'). */
     virtual bool surfaceIsCard() const = 0;
+    /** Only a soft shadow under it, no surface (a component that is its own face: an opted-in
+        full-bleed rack). */
+    virtual bool surfaceShadowOnly() const { return false; }
 };
 /** A key's state changed: repaints it with the room its shadow needs. */
 void repaintKey (juce::Component&);

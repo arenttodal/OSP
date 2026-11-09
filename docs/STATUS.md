@@ -755,6 +755,12 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
   `InstrumentHost::rackFaceplate` / `ProductInfo::rackFaceplates`, by the MOVEMENT, ECHO and
   SPACE racks (`UnifiedRack::wearFaceplate`: preset and actions in the rail, LED = the macro
   playing). Without a faceplate (ANDOR OSP, the parity render) nothing changes: 0 px.
+- Full-bleed racks (shared, opt-in; ANDOR ANALOG's FX Rack V3): `rack::Host::setFullBleed` (no
+  panel around the module, the module the rack's whole 214 px, one shadow via
+  `SurfaceFace::surfaceShadowOnly`, the collapse key a borderless X), `Faceplate::fullBleed`
+  (`hardware::measures`), `PowerKey::Style::slide` (a horizontal ON), MOVEMENT's lane power as a
+  slide, `Materials::macros` (a product's macro identities; SPACE's reverb tint follows it), the
+  shell telling the host when an engine's latency changes. ANDOR OSP sets none of it: 0 px.
 
 ## IN PROGRESS
 

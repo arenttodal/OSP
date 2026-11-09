@@ -20,11 +20,15 @@ struct Faceplate
     juce::Colour glow;                      ///< the LED and lit marks
     juce::Colour glassTop { 0xff1c2528 }, glassBottom { 0xff192124 };
     juce::String subtitle;                  ///< "DYNAMICS PROCESSOR"
+    /** V3 (opt-in): the faceplate IS the rack's face - its enamel and ceramic reach the rack's
+        own edges (the host draws no panel around it: Host::setFullBleed), narrower stripes,
+        quieter screws, the rail's parts on one centre line. False: the V2 inset chassis. */
+    bool fullBleed = false;
 };
 
 namespace hardware
 {
-    // Its measures (reference pixels, module coordinates).
+    // The inset (V2) chassis' measures (reference pixels, module coordinates).
     constexpr int chassisInsetX = 12, chassisTop = 3, chassisBottomGap = 3, motifWidth = 38, motifGap = 14;
     constexpr int contentLeft = chassisInsetX + motifWidth + motifGap, contentRightMargin = chassisInsetX + 12;
     constexpr float chassisRadius = 7.0f;
@@ -32,6 +36,25 @@ namespace hardware
     {
         return local.withTrimmedLeft (chassisInsetX).withTrimmedRight (chassisInsetX).withTrimmedTop (chassisTop).withTrimmedBottom (chassisBottomGap);
     }
+
+    /** A faceplate's measures: the inset chassis (V2) or the full-bleed face (V3). */
+    struct Measures
+    {
+        int insetX, top, bottomGap, motifWidth, motifGap, rightPad;
+        float radius;
+        int contentLeft() const noexcept { return insetX + motifWidth + motifGap; }
+        int contentRightMargin() const noexcept { return insetX + rightPad; }
+        juce::Rectangle<int> chassis (juce::Rectangle<int> local) const
+        {
+            return local.withTrimmedLeft (insetX).withTrimmedRight (insetX).withTrimmedTop (top).withTrimmedBottom (bottomGap);
+        }
+    };
+    /** Full bleed: the stripes 22 px, 16 px to the content, 16 px right; the panels' radius. */
+    constexpr Measures insetMeasures { chassisInsetX, chassisTop, chassisBottomGap, motifWidth, motifGap, 12, chassisRadius };
+    constexpr Measures bleedMeasures { 0, 0, 0, 22, 16, 16, 13.0f };
+    inline const Measures& measures (const Faceplate& f) noexcept { return f.fullBleed ? bleedMeasures : insetMeasures; }
+    /** The rail's centre line (module coordinates): every part of the rail sits on it. */
+    inline int railCentre (const Faceplate& f, int titleOffset) noexcept { return (measures (f).top + titleOffset) / 2; }
 
     /** Draws the faceplate under a module's children: `titleOffset` is the rail's bottom, `lit`
         the LED, `graph` the glass (its bezel drawn around it; empty: none), the subtitle kept

@@ -485,8 +485,13 @@ namespace
             auto tint = [&] (double t) {
                 const float p = static_cast<float> (std::pow (std::clamp (t / tailEnd, 0.0, 1.0), 1.0 - 0.45 * portrait.damping));
                 // Warm onset, rose, SPACE's mauve, then a cool blue-grey.
-                static const juce::Colour stops[] = { juce::Colour (0xffff8a2c), juce::Colour (0xffffa24c), juce::Colour (0xfff5bfa0),
-                                                      juce::Colour (0xffe9c8cf), juce::Colour (0xffcdbbd2), juce::Colour (0xffb2aac4), juce::Colour (0xff8fa4b8) };
+                static const juce::Colour approved[] = { juce::Colour (0xffff8a2c), juce::Colour (0xffffa24c), juce::Colour (0xfff5bfa0),
+                                                         juce::Colour (0xffe9c8cf), juce::Colour (0xffcdbbd2), juce::Colour (0xffb2aac4), juce::Colour (0xff8fa4b8) };
+                // A product with its own SPACE identity (ANDOR ANALOG's spore): the cool half
+                // through aged stone and spore instead of rose and lavender.
+                static const juce::Colour spore[] = { juce::Colour (0xffff8a2c), juce::Colour (0xffffa24c), juce::Colour (0xfff2c49e),
+                                                      juce::Colour (0xffe1d9c3), juce::Colour (0xffcfd0c1), juce::Colour (0xffb0b6a3), juce::Colour (0xff8fa4b8) };
+                const auto* stops = design::detail::materials.macros[static_cast<std::size_t> (design::colour::Macro::space)].getAlpha() != 0 ? spore : approved;
                 static const float at[] = { 0.0f, 0.1f, 0.25f, 0.45f, 0.65f, 0.82f, 1.0f };
                 for (int i = 1; i < 7; ++i)
                     if (p <= at[i])
@@ -3525,9 +3530,12 @@ namespace
                 lightWatch.rack = this;
                 lightWatch.startTimerHz (8);
             }
+            faceplateChanged();
             resized();
         }
         bool hasFaceplate() const noexcept { return plate != nullptr; }
+        /** A module whose own parts depend on the faceplate (MOVEMENT's lane power). */
+        virtual void faceplateChanged() {}
         void layoutTitleRow (juce::Rectangle<int> row) override { layoutRail (row); }
 
         /** Tests: the cells' captions in order; the presets bar; the slots' places. */
@@ -3604,8 +3612,8 @@ namespace
             return row;
         }
         static constexpr int railPresetWidth = 236;
-        int contentX() const noexcept { return plate != nullptr ? rack::hardware::contentLeft : rackcolumns::inset; }
-        int contentRightMargin() const noexcept { return plate != nullptr ? rack::hardware::contentRightMargin : rackcolumns::inset; }
+        int contentX() const noexcept { return plate != nullptr ? rack::hardware::measures (*plate).contentLeft() : rackcolumns::inset; }
+        int contentRightMargin() const noexcept { return plate != nullptr ? rack::hardware::measures (*plate).contentRightMargin() : rackcolumns::inset; }
         int dividerX() const
         {
             const int x0 = contentX(), x1 = getWidth() - contentRightMargin();
@@ -3722,7 +3730,9 @@ namespace
                 return;
             }
             const int pictureX = dividerX() + 1 + rackcolumns::graphPad;
-            if (plate != nullptr)
+            if (plate != nullptr && plate->fullBleed)
+                placeVisual ({ pictureX, top + 7, width - contentRightMargin() - pictureX, std::max (graphHeight - 4, getHeight() - top - 7 - 16) });   // (the face's own bottom margin)
+            else if (plate != nullptr)
                 placeVisual ({ pictureX, top + 7, width - contentRightMargin() - pictureX, graphHeight - 4 });   // (room for its bezel)
             else
                 placeVisual ({ pictureX, top + 4, width - rackcolumns::inset - pictureX, graphHeight });
@@ -3855,6 +3865,12 @@ namespace
             // (With a faceplate the preset browser takes the rail's right first.)
             row = layoutRail (row);
             row = row.withSizeKeepingCentre (row.getWidth(), 30);
+            if (powerSlide != nullptr)
+            {
+                // Full bleed: the horizontal slide (its word inside) on the rail's centre line.
+                powerSlide->setBounds (row.removeFromRight (rackui::PowerKey::slideWidth).withSizeKeepingCentre (rackui::PowerKey::slideWidth, rackui::PowerKey::slideHeight));
+                row.removeFromRight (12);
+            }
             if (power != nullptr)
             {
                 power->setBounds (row.removeFromRight (16).withSizeKeepingCentre (16, 26));
@@ -3895,10 +3911,14 @@ namespace
                                          + juce::String::fromUTF8 (" \xc2\xb7 Right-click to copy or swap lanes"));
                 laneTabs[l]->repaint();
             }
-            if (power != nullptr)
+            if (power != nullptr || powerSlide != nullptr)
             {
                 const bool on = laneOn (lane.index);
-                power->setTooltip (on ? "Lane " + letter + " plays (click: off; the other lane stays as it is)" : "Lane " + letter + " is off (click: on)");
+                const auto tip = on ? "Lane " + letter + " plays (click: off; the other lane stays as it is)" : "Lane " + letter + " is off (click: on)";
+                if (power != nullptr)
+                    power->setTooltip (tip);
+                if (powerSlide != nullptr)
+                    powerSlide->setTooltip (tip);
             }
         }
 
@@ -3912,9 +3932,16 @@ namespace
                     items.add (child->getTitle().isNotEmpty() ? child->getTitle() : child->getName());
             return items;
         }
-        juce::Rectangle<int> laneSwitchBounds() const { return power != nullptr && power->isVisible() ? power->getBounds() : juce::Rectangle<int>(); }
+        juce::Rectangle<int> laneSwitchBounds() const
+        {
+            if (powerSlide != nullptr && powerSlide->isVisible())
+                return powerSlide->getBounds();
+            return power != nullptr && power->isVisible() ? power->getBounds() : juce::Rectangle<int>();
+        }
         void clickLaneSwitch()
         {
+            if (powerSlide != nullptr)
+                powerSlide->toggle();
             if (power != nullptr)
                 power->choose (power->positionIndex() == 0 ? 1 : 0);
         }
@@ -3966,6 +3993,11 @@ namespace
         bool laneSynced() const { return lane.ids.syncId.isNotEmpty() && value (processor.apvts(), lane.ids.syncId) >= 0.5f; }
         bool expanded() const override { return wide; }
 
+        void faceplateChanged() override
+        {
+            if (plate != nullptr && plate->fullBleed && powerSlide == nullptr)
+                buildLane();   // (the lane's power as the rail's slide)
+        }
         void buildLane()
         {
             auto& m = setModeSelector (lane ("mode"), "MOVEMENT's kind: DRIFT, TAPE, CHORUS, PULSE or the rhythmic SHAPER (each keeps its own settings)");
@@ -3981,7 +4013,26 @@ namespace
             if (power != nullptr)
                 removeChildComponent (power.get());
             power.reset();
-            if (lane.ids.onId.isNotEmpty())
+            if (powerSlide != nullptr)
+                removeChildComponent (powerSlide.get());
+            powerSlide.reset();
+            if (lane.ids.onId.isNotEmpty() && plate != nullptr && plate->fullBleed)
+            {
+                // Full bleed: the lane's ON as the rail's horizontal slide (the same parameter).
+                if (auto* on = processor.apvts().getParameter (lane.ids.onId))
+                {
+                    powerSlide = std::make_unique<rackui::PowerKey> (*on, &processor.undo(), plate->glow);
+                    powerSlide->setStyle (rackui::PowerKey::Style::slide);
+                    powerSlide->setTitle ("Lane power");
+                    powerSlide->onChange = [this] (bool) {
+                        for (auto& t : laneTabs)
+                            t->repaint();
+                        refresh();
+                    };
+                    addAndMakeVisible (*powerSlide);
+                }
+            }
+            else if (lane.ids.onId.isNotEmpty())
                 if (auto* on = processor.apvts().getParameter (lane.ids.onId))
                 {
                     power = std::make_unique<rackui::VerticalSwitch> (*on, std::vector<rackui::Position> { { "ON", "On", 1.0f }, { "OFF", "Off", 0.0f } }, &processor.undo(),
@@ -4253,6 +4304,7 @@ namespace
         std::unique_ptr<juce::ParameterAttachment> customAttachment;
         std::vector<std::unique_ptr<rackui::LaneKey>> laneTabs;
         std::unique_ptr<rackui::VerticalSwitch> power;
+        std::unique_ptr<rackui::PowerKey> powerSlide;   ///< (full bleed: the rail's slide instead)
         juce::Rectangle<int> onWord;
     };
 

@@ -56,9 +56,30 @@ public:
         setMouseCursor (juce::MouseCursor::PointingHandCursor);
         setTooltip ("Collapse " + name (kind) + " (the settings stay as they are)");
     }
+    /** Full bleed: a borderless X on the enamel (closes the view only). */
+    bool cross = false;
     void paintButton (juce::Graphics& g, bool highlighted, bool down) override
     {
         using namespace design;
+        if (cross)
+        {
+            const auto c = getLocalBounds().toFloat().getCentre();
+            const bool lit = highlighted || down || hasKeyboardFocus (true);
+            if (lit)
+            {
+                g.setColour (juce::Colours::white.withAlpha (down ? 0.16f : 0.10f));
+                g.fillEllipse (juce::Rectangle<float> (24.0f, 24.0f).withCentre (c));
+            }
+            const float a = 4.6f;
+            juce::Path x;
+            x.startNewSubPath (c.x - a, c.y - a);
+            x.lineTo (c.x + a, c.y + a);
+            x.startNewSubPath (c.x + a, c.y - a);
+            x.lineTo (c.x - a, c.y + a);
+            g.setColour (juce::Colour (0xfff3eadb).withAlpha (lit ? 1.0f : 0.82f));
+            g.strokePath (x, juce::PathStrokeType (1.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            return;
+        }
         const auto c = getLocalBounds().toFloat().reduced (1.0f);
         g.setColour (juce::Colour (0x1a302418));
         g.fillEllipse (c.translated (0.0f, 1.0f));
@@ -77,6 +98,17 @@ Host::Host (Factory f) : factory (std::move (f))
 }
 
 Host::~Host() = default;
+
+void Host::setFullBleed (bool bleed)
+{
+    if (bleed == bleedFace)
+        return;
+    bleedFace = bleed;
+    for (auto& s : slots)
+        s.collapse->cross = bleed;
+    resized();
+    repaint();
+}
 
 void Host::setShown (Kind kind, bool shown)
 {
@@ -166,6 +198,22 @@ void Host::resized()
         auto& s = slots[i];
         if (i > 0)
             y += divider;
+        if (bleedFace)
+        {
+            // The module is the face (its rail from the top edge): the X's 30 px target 10 px
+            // from the right, on the rail's centre line; the module's parts left of it.
+            s.collapse->cross = true;
+            const int centre = titleHeight / 2;
+            s.collapse->setBounds (getWidth() - 10 - 30, y + centre - 15, 30, 30);
+            s.titleArea = { 0, y, 0, titleHeight };
+            s.module->setTitleOffset (titleHeight);
+            const bool last = i + 1 == slots.size();
+            s.module->setBounds (0, y, getWidth(), titleHeight + s.module->bodyHeight() + (last ? bottomMargin : 0));
+            s.module->layoutTitleRow (juce::Rectangle<int> (200, 0, s.collapse->getX() - 6 - 200, titleHeight));
+            s.collapse->toFront (false);
+            y += titleHeight + s.module->bodyHeight();
+            continue;
+        }
         auto title = juce::Rectangle<int> (0, y, getWidth(), titleHeight).reduced (22, 0);
         s.collapse->setBounds (title.removeFromRight (26).withSizeKeepingCentre (26, 26).translated (0, 2));
         s.titleArea = title.removeFromLeft (160);
@@ -182,6 +230,8 @@ void Host::resized()
 void Host::paint (juce::Graphics& g)
 {
     using namespace design;
+    if (bleedFace)
+        return;   // (the modules are the face)
     const auto r = getLocalBounds().toFloat();
     if (! skin::drawnBySurface())   // ceramic: the housing draws the panel (its shadow falls there)
         draw::raised (g, r, layout::panelRadius, colour::panelTop, colour::panelBottom);
