@@ -126,6 +126,10 @@ public:
     /** The rack is its modules' faces (the product's choice; not in the parity render). */
     bool fullBleedRacks() const noexcept { return ! referenceParity && product().fullBleedRacks; }
     bool stableModulationTabs() const noexcept { return ! referenceParity && product().stableModulationTabs; }
+    // (the header's MIX, the ARPEGGIATOR's X, the GRANULAR key: the product's, never in parity)
+    bool headerMixShown() const noexcept { return referenceParity || product().headerMix; }
+    bool crossCloseKeys() const noexcept { return ! referenceParity && product().crossCloseKeys; }
+    bool generatorGranularToggle() const noexcept { return ! referenceParity && product().generatorGranularToggle; }
     juce::String cardArpNamespace() const override { return productInfo().slug + "."; }
     void setArpViewCard (int shown) noexcept override { arpViewLane.store (std::clamp (shown, 0, 2), std::memory_order_relaxed); }
 

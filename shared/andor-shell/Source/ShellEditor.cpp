@@ -262,7 +262,7 @@ ShellEditor::ShellEditor (ShellProcessor& p)
                 // Each oscillator card's selector: the product's name, only as wide as it needs
                 // (or, opt-in, a GRANULAR on / off key: the oscillator plays as it is unless lit).
                 cards[static_cast<std::size_t> (layer)]->setFirstModeName (name);
-                if (shell.product().generatorGranularToggle)
+                if (shell.generatorGranularToggle())
                     cards[static_cast<std::size_t> (layer)]->setModeToggle (true);
                 else
                     cards[static_cast<std::size_t> (layer)]->setModeFitsName (true);
@@ -347,7 +347,7 @@ ShellEditor::ShellEditor (ShellProcessor& p)
     content.addAndMakeVisible (advancedButton);
     arpButton.onToggleEditor = [this] { setArpExpanded (! arpShown); };
     arpPanel.onCollapse = [this] { setArpExpanded (false); };
-    arpPanel.setCrossClose (shell.product().crossCloseKeys);
+    arpPanel.setCrossClose (shell.crossCloseKeys());
     content.addAndMakeVisible (arpButton);
     content.addChildComponent (arpPanel);
     content.addChildComponent (rack);
@@ -454,7 +454,7 @@ void ShellEditor::layoutInstrument()
         // The icon beside SAVE, on its centre line (12 px from it), and MIX moved right by as
         // much, narrower by as much (it centres itself), clear of VOLUME.
         auto save = savePresetButton.getBounds();
-        if (! shell.product().headerMix)
+        if (! shell.headerMixShown())
         {
             // No MIX: [ preset bar ][ SAVE ][ ROUTING ] as one group of keys on one centre
             // line, 8 px apart, the bar taking MIX's room up to VOLUME (28 px clear of it).
@@ -628,7 +628,7 @@ void ShellEditor::layoutSources()
         }
         if (dockOverlay != nullptr)
             dockOverlay->setBounds (sampleDock.getLocalBounds().reduced (14).withTrimmedTop (sampleDock.headerBounds().getBottom()));
-        headerMix.setLayers ({ true, hybrid && shell.product().headerMix, false });   // the analog side against the hybrid (none: no MIX)
+        headerMix.setLayers ({ true, hybrid && shell.headerMixShown(), false });   // the analog side against the hybrid (none: no MIX)
         headerMix.setEndLabels (shell.product().mixEndLabels[0], shell.product().mixEndLabels[1]);
         updateFocus();
         applyBindings();
@@ -678,7 +678,7 @@ void ShellEditor::layoutSources()
         addTarget.setBounds (frame::sourceColumn (sourceArea, columns, col));
         addTarget.setLetter (InstrumentHost::layerName (count));
     }
-    if (! shell.product().headerMix)
+    if (! shell.headerMixShown())
         occupied = { true, false, false };   // (no MIX: nothing to balance in the header)
     headerMix.setLayers (occupied);
     if (isReimaginedPopup (popupIndex))
