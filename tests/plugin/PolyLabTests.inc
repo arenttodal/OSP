@@ -5,7 +5,8 @@
 //   [poly-lab]         a hand-written atlas in the exporter's exact JSON layout plays, fills the
 //                      keys between, and survives a portable-instrument export and import;
 //   [.poly-lab-import] (hidden) the lab's real output: OSP_POLY_ATLAS names an .andoratlas,
-//                      OSP_POLY_OUT a folder for the renders and a JSON summary. Run by
+//                      OSP_POLY_OUT a folder for the renders, a JSON summary and the
+//                      portable instrument (<atlas name>.ospinstrument). Run by
 //                      `osp-poly build ... --plugin-check` or by hand:
 //                      OSP_POLY_ATLAS=... OSP_POLY_OUT=... osp_plugin_tests "[poly-lab-import]"
 // Included at the end of PluginProcessorTests.cpp (uses Phase 2/3 helpers).
@@ -148,7 +149,8 @@ TEST_CASE ("plugin: the polyphonic lab's own atlas through the plugin (OSP_POLY_
     summary->setProperty ("atlas", atlasFile.getFullPathName());
     summary->setProperty ("validationErrors", static_cast<int> (report.errors.size()));
     summary->setProperty ("validationWarnings", static_cast<int> (report.warnings.size()));
-    const auto package = tmp.dir.getChildFile ("lab.ospinstrument");
+    // Kept in OSP_POLY_OUT: the portable instrument the app opens (Import instrument...).
+    const auto package = out.getChildFile (atlasFile.getFileNameWithoutExtension() + ".ospinstrument");
     juce::String chordHash;
     {
         const ScopedEnvironment storeDir ("OSP_SAMPLE_STORE", tmp.dir.getChildFile ("store-a").getFullPathName());

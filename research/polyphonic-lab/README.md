@@ -46,6 +46,39 @@ portable instrument and re-imports it (the hidden Catch2 test `[poly-lab-import]
 (`cmake -B build-plugin -G Ninja -DOSP_BUILD_PLUGIN=ON && cmake --build build-plugin`); without it they
 are skipped and say so. `OSP_RESEARCH_RENDERER` / `OSP_PLUGIN_TESTS` point at other builds.
 
+## Testing it
+
+**1. In the OSP app (no Python needed).** `--plugin-check` also leaves a portable instrument,
+`<out>/plugin/<name>.ospinstrument`. In OSP: menu → **Open instrument file…** → choose it. It plays
+like any other atlas instrument; the NOTE MAP shows the extracted notes.
+
+**2. The lab on your Mac** (Python 3.11+; the renders and the plugin check also need the repository
+built):
+
+```bash
+cmake -B build-plugin -G Ninja -DOSP_BUILD_PLUGIN=ON && cmake --build build-plugin   # once
+cd research/polyphonic-lab
+python3 -m venv .venv && .venv/bin/pip install -r requirements.lock && .venv/bin/pip install -e ".[test]"
+.venv/bin/pytest -q                                  # the lab's tests
+.venv/bin/osp-poly corpus generate                   # the synthetic corpus
+.venv/bin/osp-poly build output/corpus/B-chord-C-major/mix.wav --manifest fixtures/manifests/B-chord-C-major.json \
+    --out output/milestone-c-major --render --plugin-check
+```
+
+`requirements.lock` was pinned on Linux; if a pin has no wheel for your Mac, `pip install -e .`
+resolves current versions instead.
+
+**3. Your own recording** (it stays on your machine; nothing is uploaded or committed):
+
+```bash
+.venv/bin/osp-poly build ~/Music/chord.wav --out output/mine --render --plugin-check --name my-chord
+```
+
+Then open `output/mine/instrument/plugin/my-chord.ospinstrument` in OSP. Everything so far is tuned
+and measured on a synthetic piano: expect real recordings (room, pedal, other instruments) to
+detect and separate less cleanly. Read `output/mine/detect/detected-notes.png` and
+`output/mine/extraction/masks.png` to see what it found.
+
 ## Layout
 
 | Path | What |
