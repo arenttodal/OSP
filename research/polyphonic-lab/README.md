@@ -30,6 +30,8 @@ deterministically from code, so no audio is committed.
 ```bash
 .venv/bin/osp-poly corpus generate              # render every fixture (mixes + isolated stems) and its manifest
 .venv/bin/osp-poly corpus validate              # hashes, formats, stems = mix; summary, spectrograms, evaluation manifest
+.venv/bin/osp-poly detect <wav> --method harmonic|basic-pitch|ground-truth [--manifest m.json] --out <dir>
+.venv/bin/osp-poly benchmark transcription [--sweep] --out <dir>
 .venv/bin/pytest -q                             # the lab's tests
 ```
 

@@ -1,0 +1,20 @@
+# The harmonic detector's baseline for piano (8192-point window, 512 hop at 48 kHz).
+detector:
+  harmonic:
+    n_fft: 8192
+    hop: 512
+    midi_min: 28
+    midi_max: 100
+    max_polyphony: 6
+    partials: 24
+    tolerance_cents: 35
+    cancel_floor: 0.6
+    contained_ratio: 0.5
+    ghost_ratio: 0.45
+    relative_stop: 0.18
+    absolute_floor_db: -42
+    on_db: -32
+    off_db: -40
+extraction:
+  n_fft: 8192
+  hop: 512
