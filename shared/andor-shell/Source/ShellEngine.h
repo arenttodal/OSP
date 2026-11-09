@@ -55,7 +55,8 @@ public:
     virtual void attachParameters (juce::AudioProcessorValueTreeState& parameters) { juce::ignoreUnused (parameters); }
     virtual void release() {}
     /** The output's delay in samples after prepare() (oversampling filters): the shell
-        reports it to the host. */
+        reports it to the host, and again whenever it changes (polled on the message thread,
+        20 Hz: any thread may call this). */
     virtual int latencySamples() const { return 0; }
 
     /** An engine that makes its own sound (a synthesizer's oscillators) and plays no

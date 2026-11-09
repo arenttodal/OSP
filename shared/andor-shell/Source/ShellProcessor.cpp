@@ -1165,6 +1165,11 @@ void ShellProcessor::timerCallback()
 {
     if (ampEnvelopeTouchPending.exchange (false) && productInfo().ampEnvelopeTouched != nullptr)
         productInfo().ampEnvelopeTouched (*this);
+    // An engine whose latency moves while it plays (a product's routed effects): the host is
+    // told here, on the message thread (an engine with a fixed latency never changes it).
+    if (engine != nullptr)
+        if (const int latency = engine->latencySamples(); latency != getLatencySamples())
+            setLatencySamples (latency);
     std::deque<Finished> done;
     {
         const std::lock_guard<std::mutex> lock (resultsMutex);
