@@ -180,8 +180,8 @@ cd research/polyphonic-lab
     --manifest fixtures/manifests/D-phrase-synthetic.json --out output/example-phrase --render --plugin-check
 ```
 
-Starting commit of the lab: c49d77f. P0 is 8308f0a, P1 is 87463f6. P2 and P3 are in the commit
-named in `docs/STATUS.md` (branch `claude/polyphonic-lab`).
+Starting commit of the lab: c49d77f. P0 is 8308f0a, P1 is 87463f6, **P2 and P3 are 8da975f**
+(branch `claude/polyphonic-lab`).
 
 ## What comes next (only after the review)
 

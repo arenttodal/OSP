@@ -206,7 +206,7 @@ tests:
 
 ## Reproduce
 
-Commit: see the P3 report (P2 and P3 land in one commit). Then:
+Commit: **8da975f** (P2 and P3 together, branch `claude/polyphonic-lab`). Then:
 
 ```bash
 cd research/polyphonic-lab

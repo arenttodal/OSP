@@ -796,7 +796,8 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 
 Research only (`research/polyphonic-lab`, Python). The plugin is unchanged; the only C++ added is a
 test file. Reports are in `docs/research/polyphonic-lab/`. **Stopped after P3 for the first
-playable-instrument review**, as the spec requires.
+playable-instrument review**, as the spec requires. Commits: P0 8308f0a, P1 87463f6, P2 and P3
+8da975f.
 
 - [x] P0: audit of the Note Atlas import route; a deterministic synthetic corpus (24 fixtures,
   stems, manifests) (`01-p0-corpus.md`)
