@@ -4,9 +4,134 @@
 namespace osp::plugin::rack::hardware
 {
 
+namespace
+{
+    /** V5 PATTERNED HARDWARE: one enamel machine - the body and the rail the same material
+        (the rail a step deeper), the device's motif behind the controls' left, four small
+        machined bolts, the graph's glass in a dark enamel bezel. */
+    void paintEnamel (juce::Graphics& g, juce::Rectangle<int> local, int titleOffset, const Faceplate& f, const juce::String& heading, bool lit,
+                      juce::Rectangle<int> graph, float subtitleLimit)
+    {
+        const auto face = local.toFloat();
+        const float radius = bleedMeasures.radius;
+        const float railBottom = static_cast<float> (titleOffset);
+        juce::Path shape;
+        shape.addRoundedRectangle (face, radius);
+        {
+            juce::Graphics::ScopedSaveState clip (g);
+            g.reduceClipRegion (shape);
+            // The body: matte enamel, a whisper of light from above, a satin grain.
+            g.setGradientFill (juce::ColourGradient (f.body.brighter (0.05f), 0.0f, railBottom, f.body.darker (0.07f), 0.0f, face.getBottom(), false));
+            g.fillRect (face);
+            for (float gy = railBottom + 2.0f; gy < face.getBottom(); gy += 3.0f)
+            {
+                g.setColour ((static_cast<int> (gy) % 2 == 0 ? juce::Colours::white : juce::Colours::black).withAlpha (0.018f));
+                g.fillRect (juce::Rectangle<float> (face.getX(), gy, face.getWidth(), 1.0f));
+            }
+            // The motif: the body's left (about a sixth of it), fading into the enamel.
+            if (f.motif != nullptr)
+            {
+                const auto zone = juce::Rectangle<float> (face.getX(), railBottom + 1.0f, std::max (160.0f, 0.19f * face.getWidth()), face.getBottom() - railBottom - 1.0f);
+                // (full strength over its first half, then fading out in narrow steps: no seam)
+                const int steps = 12;
+                const float solid = 0.5f * zone.getWidth(), stepW = (zone.getWidth() - solid) / static_cast<float> (steps);
+                for (int i = -1; i < steps; ++i)
+                {
+                    const auto strip = i < 0 ? zone.withWidth (solid) : juce::Rectangle<float> (zone.getX() + solid + stepW * static_cast<float> (i), zone.getY(), stepW, zone.getHeight());
+                    juce::Graphics::ScopedSaveState zoneClip (g);
+                    g.reduceClipRegion (strip.getSmallestIntegerContainer());
+                    const float opacity = i < 0 ? 1.0f : 1.0f - (static_cast<float> (i) + 0.5f) / static_cast<float> (steps);
+                    g.beginTransparencyLayer (opacity);
+                    f.motif (g, zone);
+                    g.endTransparencyLayer();
+                }
+            }
+            // The rail: the same enamel, deeper; a seam of light under it.
+            const auto rail = juce::Rectangle<float> (face.getX(), face.getY(), face.getWidth(), railBottom - face.getY());
+            g.setGradientFill (juce::ColourGradient (f.enamel.brighter (0.08f), 0.0f, rail.getY(), f.enamel.darker (0.08f), 0.0f, rail.getBottom(), false));
+            g.fillRect (rail);
+            g.setColour (juce::Colours::white.withAlpha (0.10f));
+            g.fillRect (rail.withHeight (1.0f).translated (0.0f, 1.0f));
+            g.setColour (juce::Colours::black.withAlpha (0.20f));
+            g.fillRect (rail.withTop (rail.getBottom() - 1.0f));
+            g.setColour (juce::Colours::white.withAlpha (0.12f));
+            g.fillRect (rail.withTop (rail.getBottom()).withHeight (1.0f));
+        }
+        g.setColour (f.body.darker (0.45f));
+        g.drawRoundedRectangle (face.reduced (0.5f), radius, 1.0f);
+        g.setColour (juce::Colours::white.withAlpha (0.10f));
+        g.drawRoundedRectangle (face.reduced (1.5f).withTrimmedTop (railBottom - face.getY()), radius - 1.0f, 0.8f);
+        // Four bolts, machined, small, at one inset (the rail's corners clear of the LED and X).
+        const float boltSize = 5.5f, inset = 8.5f;
+        auto bolt = [&g, &f, boltSize] (juce::Point<float> c, bool onRail) {
+            const auto base = onRail ? f.enamel : f.body;
+            const auto r = juce::Rectangle<float> (boltSize, boltSize).withCentre (c);
+            g.setColour (juce::Colours::black.withAlpha (0.28f));
+            g.fillEllipse (r.translated (0.0f, 0.8f).expanded (0.4f));
+            g.setGradientFill (juce::ColourGradient (base.brighter (0.55f), r.getX(), r.getY(), base.darker (0.55f), r.getRight(), r.getBottom(), false));
+            g.fillEllipse (r);
+            g.setColour (base.darker (0.75f).withAlpha (0.8f));
+            g.drawEllipse (r, 0.6f);
+            g.drawLine (c.x - 0.30f * boltSize, c.y + 0.18f * boltSize, c.x + 0.30f * boltSize, c.y - 0.18f * boltSize, 0.9f);
+        };
+        bolt ({ face.getX() + inset, face.getY() + inset }, true);
+        bolt ({ face.getRight() - inset, face.getY() + inset }, true);
+        bolt ({ face.getX() + inset, face.getBottom() - inset }, false);
+        bolt ({ face.getRight() - inset, face.getBottom() - inset }, false);
+        // The LED (what plays), the title, its descriptor.
+        const float railMid = 0.5f * (face.getY() + railBottom);
+        const juce::Point<float> led (face.getX() + 24.0f, railMid);
+        g.setColour (juce::Colours::black.withAlpha (0.35f));
+        g.fillEllipse (juce::Rectangle<float> (11.0f, 11.0f).withCentre (led));
+        if (lit)
+        {
+            g.setGradientFill (juce::ColourGradient (f.glow.withAlpha (0.45f), led.x, led.y, f.glow.withAlpha (0.0f), led.x + 10.0f, led.y, true));
+            g.fillEllipse (juce::Rectangle<float> (20.0f, 20.0f).withCentre (led));
+        }
+        g.setGradientFill (juce::ColourGradient (lit ? f.glow.brighter (0.4f) : f.enamel.darker (0.3f), led.x - 1.5f, led.y - 1.5f,
+                                                 lit ? f.glow : f.enamel.darker (0.6f), led.x + 3.0f, led.y + 3.0f, true));
+        g.fillEllipse (juce::Rectangle<float> (7.5f, 7.5f).withCentre (led));
+        const auto titleFont = fonts::make (17.0f, fonts::Weight::bold, 0.08f);
+        const float titleX = led.x + 15.0f;
+        const float titleW = juce::GlyphArrangement::getStringWidth (titleFont, heading) + 4.0f;
+        g.setColour (juce::Colour (0xfff7eedf));
+        g.setFont (titleFont);
+        g.drawText (heading, juce::Rectangle<float> (titleX, face.getY(), titleW + 4.0f, railBottom - face.getY()), juce::Justification::centredLeft, false);
+        if (f.subtitle.isNotEmpty())
+        {
+            const float sx = titleX + titleW + 16.0f;
+            if (subtitleLimit > sx + 40.0f)
+            {
+                g.setColour (juce::Colour (0xfff7eedf).withAlpha (0.7f));
+                g.setFont (fonts::make (9.5f, fonts::Weight::medium, 0.3f));
+                g.drawText (f.subtitle, juce::Rectangle<float> (sx, face.getY(), subtitleLimit - sx, railBottom - face.getY()).translated (0.0f, 0.5f), juce::Justification::centredLeft, true);
+            }
+        }
+        // The graph's bezel: the enamel, deeper, around the glass.
+        if (! graph.isEmpty())
+        {
+            const auto glass = graph.toFloat();
+            const auto rim = glass.expanded (4.0f);
+            g.setColour (juce::Colours::black.withAlpha (0.22f));
+            g.fillRoundedRectangle (rim.translated (0.0f, 1.0f), 8.0f);
+            g.setGradientFill (juce::ColourGradient (f.body.darker (0.30f), 0.0f, rim.getY(), f.body.darker (0.52f), 0.0f, rim.getBottom(), false));
+            g.fillRoundedRectangle (rim, 8.0f);
+            g.setColour (juce::Colours::white.withAlpha (0.14f));
+            g.drawRoundedRectangle (rim.reduced (0.6f), 7.5f, 0.7f);
+            g.setColour (juce::Colour (0xff15110d));
+            g.fillRoundedRectangle (glass.expanded (1.0f), 6.0f);
+        }
+    }
+}
+
 void paint (juce::Graphics& g, juce::Rectangle<int> local, int titleOffset, const Faceplate& f, const juce::String& heading, bool lit,
             juce::Rectangle<int> graph, float subtitleLimit)
 {
+    if (f.enamelBody)
+    {
+        paintEnamel (g, local, titleOffset, f, heading, lit, graph, subtitleLimit);
+        return;
+    }
     const auto& m = measures (f);
     const bool bleed = f.fullBleed;
     const auto chassis = m.chassis (local).toFloat();

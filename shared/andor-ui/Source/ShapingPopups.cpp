@@ -499,7 +499,11 @@ void MiniKnob::paint (juce::Graphics& g)
     if (rackMetrics)
     {
         // The approved rack cell: 11 px caption (tracked), 13 px value, their own colours.
-        g.setColour (captionHover ? rackui::palette::caption.darker (0.5f) : (quiet ? rackui::palette::quietCaption : rackui::palette::caption));
+        const auto ink = rackui::inkFor (*this);   // (V5: an enamel face's)
+        if (ink)
+            g.setColour (captionHover ? ink->value : (quiet ? ink->quiet : ink->caption));
+        else
+            g.setColour (captionHover ? rackui::palette::caption.darker (0.5f) : (quiet ? rackui::palette::quietCaption : rackui::palette::caption));
         g.setFont (fonts::make (11.0f, fonts::Weight::medium, 0.055f));
         g.drawText (caption, juce::Rectangle<float> (r.getX() - 6.0f, r.getY(), r.getWidth() + 12.0f, static_cast<float> (rackui::captionHeight)), juce::Justification::centred, false);
         if (detents)
@@ -509,7 +513,7 @@ void MiniKnob::paint (juce::Graphics& g)
             const int chosen = interval > 0.0 ? juce::roundToInt ((slider.getValue() - slider.getMinimum()) / interval) : 0;
             rackui::paintDetents (g, slider.getBounds().toFloat().reduced (2.0f), steps, chosen, detentAccent);
         }
-        g.setColour (quiet ? rackui::palette::quietValue : rackui::palette::value);
+        g.setColour (ink ? (quiet ? ink->quiet : ink->value) : (quiet ? rackui::palette::quietValue : rackui::palette::value));
         g.setFont (fonts::make (13.0f, fonts::Weight::medium, 0.01f));
         g.drawText (value, juce::Rectangle<float> (r.getX() - 6.0f, r.getY() + static_cast<float> (rackui::valueTop), r.getWidth() + 12.0f, 18.0f), juce::Justification::centred, false);
         return;

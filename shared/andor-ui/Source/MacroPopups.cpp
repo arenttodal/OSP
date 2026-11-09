@@ -3586,10 +3586,11 @@ namespace
 
             // The readout between the reels: the value large, its unit, the divisions under it.
             const auto mid = juce::Rectangle<float> (lx + 0.5f * d + 6.0f, cy - 0.5f * d, rx - lx - d - 12.0f, d);
-            g.setColour (juce::Colour (0xff34383a));
+            const auto ink = rackui::inkFor (*this);   // (V5: on an enamel face)
+            g.setColour (ink ? ink->value : juce::Colour (0xff34383a));
             g.setFont (fonts::make (19.0f, fonts::Weight::semibold, 0.02f));
             g.drawFittedText (r.value, mid.withHeight (24.0f).translated (0.0f, 6.0f).getSmallestIntegerContainer(), juce::Justification::centred, 1, 0.8f);
-            g.setColour (juce::Colour (0xff7a7268));
+            g.setColour (ink ? ink->caption : juce::Colour (0xff7a7268));
             g.setFont (fonts::make (11.0f, fonts::Weight::medium, 0.03f));
             g.drawFittedText (r.unit, mid.withTrimmedTop (31.0f).withHeight (14.0f).getSmallestIntegerContainer(), juce::Justification::centred, 1, 0.85f);
             if (r.note.isNotEmpty())
@@ -3599,7 +3600,7 @@ namespace
                 const auto noteRow = juce::Rectangle<float> (tw + 12.0f, 12.0f).withCentre ({ mid.getCentreX(), mid.getY() + 53.0f });
                 g.setColour (r.noteLit ? juce::Colour (0xffe0883a) : juce::Colour (0xffb7ada0));
                 g.fillEllipse (juce::Rectangle<float> (5.0f, 5.0f).withCentre ({ noteRow.getX() + 2.5f, noteRow.getCentreY() }));
-                g.setColour (juce::Colour (0xff7a7268));
+                g.setColour (ink ? ink->caption : juce::Colour (0xff7a7268));
                 g.setFont (f);
                 g.drawText (r.note, noteRow.withTrimmedLeft (9.0f), juce::Justification::centredLeft, false);
             }
@@ -3614,7 +3615,7 @@ namespace
                 for (int i = 0; i < r.ticks; ++i)
                 {
                     const bool on = i == lit;
-                    g.setColour (on ? juce::Colour (0xffe0883a) : juce::Colour (0xffc4b9aa));
+                    g.setColour (on ? juce::Colour (0xffe0883a) : (ink ? ink->quiet : juce::Colour (0xffc4b9aa)));
                     g.fillRoundedRectangle (juce::Rectangle<float> (on ? 2.4f : 1.4f, on ? 11.0f : 7.0f).withCentre ({ x0 + step * static_cast<float> (i), ty }), 0.7f);
                 }
             }
@@ -3716,7 +3717,13 @@ namespace
         }
 
         juce::String title() const override { return heading; }
-        juce::Colour accent() const override { return design::colour::macro (identity); }
+        juce::Colour accent() const override
+        {
+            // (V5: on an enamel face, the knobs' arcs in the face's own ink)
+            if (plate != nullptr && plate->enamelBody && ! plate->arc.isTransparent())
+                return plate->arc;
+            return design::colour::macro (identity);
+        }
         int bodyHeight() const override { return standardBody; }
         void settle() override
         {
@@ -3742,22 +3749,39 @@ namespace
             {
                 // The deck's three regions: two quiet rules; the display's caption over it
                 // (what it shows is predicted from the settings, not metered).
+                const auto ink = rackui::inkFor (*this);
                 for (const int x : deckDividers)
-                    rackcolumns::paintDivider (g, x, static_cast<float> (titleOffset() + 12), static_cast<float> (getHeight() - 22));
+                {
+                    if (ink)
+                    {
+                        g.setColour (ink->rule);
+                        g.fillRect (juce::Rectangle<float> (static_cast<float> (x), static_cast<float> (titleOffset() + 12), 1.0f, static_cast<float> (getHeight() - 22 - titleOffset() - 12)));
+                    }
+                    else
+                        rackcolumns::paintDivider (g, x, static_cast<float> (titleOffset() + 12), static_cast<float> (getHeight() - 22));
+                }
                 if (visual != nullptr)
                 {
                     const auto v = visual->getBounds();
-                    g.setColour (rackui::palette::caption);
+                    g.setColour (ink ? ink->caption : rackui::palette::caption);
                     g.setFont (fonts::make (10.5f, fonts::Weight::medium, 0.07f));
                     g.drawText (deckCaption(), juce::Rectangle<int> (v.getX(), v.getY() - 20, v.getWidth(), 16), juce::Justification::centredLeft, false);
-                    g.setColour (rackui::palette::quietCaption);
+                    g.setColour (ink ? ink->quiet : rackui::palette::quietCaption);
                     g.setFont (fonts::make (9.5f, fonts::Weight::regular, 0.04f));
                     g.drawText ("PREDICTED", juce::Rectangle<int> (v.getX(), v.getY() - 20, v.getWidth(), 16), juce::Justification::centredRight, false);
                 }
                 return;
             }
             if (! expanded())
-                rackcolumns::paintDivider (g, dividerX(), static_cast<float> (titleOffset() + 3), static_cast<float> (getHeight() - 2));
+            {
+                if (const auto ink = rackui::inkFor (*this))
+                {
+                    g.setColour (ink->rule);   // (V5: the divider in the face's ink)
+                    g.fillRect (juce::Rectangle<float> (static_cast<float> (dividerX()), static_cast<float> (titleOffset() + 3), 1.0f, static_cast<float> (getHeight() - titleOffset() - 5)));
+                }
+                else
+                    rackcolumns::paintDivider (g, dividerX(), static_cast<float> (titleOffset() + 3), static_cast<float> (getHeight() - 2));
+            }
         }
         /** Tests: the TAPE deck (V4, opt-in), or null. */
         TapeDeck* tapeDeck() const noexcept { return deck.get(); }
@@ -3771,8 +3795,16 @@ namespace
                 presetActions.onRail = true;
                 lightWatch.rack = this;
                 lightWatch.startTimerHz (8);
+                if (plate->enamelBody)
+                    rackui::setInk (*this, { plate->ink, plate->ink.withAlpha (1.0f), plate->inkQuiet, plate->ink.withAlpha (0.2f) });
             }
             faceplateChanged();
+            // (the cells already built take the face's arc)
+            for (auto& cell : cells)
+                if (auto* k = dynamic_cast<MiniKnob*> (cell.get()))
+                    k->setArcColour (accent());
+            if (modeSelector != nullptr)
+                modeSelector->setAccent (accent());
             resized();
         }
         bool hasFaceplate() const noexcept { return plate != nullptr; }

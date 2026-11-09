@@ -28,6 +28,15 @@ struct Faceplate
         reel deck - the knobs left, two reels and the head in the middle, a small display right.
         False: the TAPE modes as every other mode. */
     bool tapeDeck = false;
+    /** V5 PATTERNED HARDWARE (opt-in): the whole face is the enamel - its body as well as its
+        rail (`enamel`, a step deeper) - with the device's own `motif` drawn behind the controls'
+        left in place of the stripes, four small corner bolts, and the cells' text in `ink`
+        (they read it from the module: rackui::inkFor). Graphs keep their own dark glass. */
+    bool enamelBody = false;
+    juce::Colour body;                                      ///< the body's enamel
+    juce::Colour ink { 0xfff3eadb }, inkQuiet { 0xb8f3eadb };   ///< captions and values on it
+    juce::Colour arc;                                       ///< knob arcs on it (transparent: the module's accent)
+    std::function<void (juce::Graphics&, juce::Rectangle<float> zone)> motif;   ///< the device's motif (its zone: the body's left)
 };
 
 namespace hardware

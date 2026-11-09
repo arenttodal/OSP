@@ -58,8 +58,9 @@ public:
         {
             const auto t = tab (i);
             const bool on = i == shown;
-            const auto shownColour = secondary ? rackui::palette::value : juce::Colour (0xff3e3d3a);
-            const auto restColour = secondary ? rackui::palette::quietCaption : juce::Colour (0xff8a847b);
+            const auto ink = rackui::inkFor (*this);   // (V5: on an enamel face)
+            const auto shownColour = ink ? ink->value : (secondary ? rackui::palette::value : juce::Colour (0xff3e3d3a));
+            const auto restColour = ink ? ink->quiet : (secondary ? rackui::palette::quietCaption : juce::Colour (0xff8a847b));
             g.setColour (on ? shownColour : (i == hover ? restColour.darker (0.25f) : restColour));
             g.drawText (names[i], t, juce::Justification::centredLeft, false);
             if (on)
@@ -130,6 +131,8 @@ ParameterRack::~ParameterRack() = default;
 void ParameterRack::setFaceplate (const Faceplate& f)
 {
     faceplate = f;
+    if (f.enamelBody)
+        rackui::setInk (*this, { f.ink, f.ink.withAlpha (1.0f), f.inkQuiet, f.ink.withAlpha (0.2f) });   // (V5: the cells' text on the enamel)
     if (power != nullptr && powerId.isNotEmpty())
     {
         // The header switch becomes the power key (the same parameter).
@@ -593,17 +596,18 @@ void ParameterRack::paint (juce::Graphics& g)
 {
     if (faceplate)
         paintFaceplate (g);
+    const auto ink = rackui::inkFor (*this);   // (V5: an enamel face's ink)
     // The divider (as the effects racks').
-    g.setColour (juce::Colour (0xffcbc4b9));
+    g.setColour (ink ? ink->rule : juce::Colour (0xffcbc4b9));
     g.fillRect (juce::Rectangle<float> (static_cast<float> (dividerX()), static_cast<float> (titleOffset() + 3), 1.0f, static_cast<float> (getHeight() - titleOffset() - 5)));
     // The selectors' captions (inline, before each).
     g.setFont (selectorCaptionFont());
-    g.setColour (rackui::palette::caption);
+    g.setColour (ink ? ink->caption : rackui::palette::caption);
     for (auto& s : selectors)
         if (s.caption.isNotEmpty())
             g.drawText (s.caption, juce::Rectangle<int> (s.control->getX() - 200, s.control->getY(), 193, s.control->getHeight()), juce::Justification::centredRight, false);
     // The rules between the ranks of the selector row (pages | sub-pages | settings).
-    g.setColour (juce::Colour (0xffd8d0c4));
+    g.setColour (ink ? ink->rule : juce::Colour (0xffd8d0c4));
     for (const int rx : navRules)
         g.fillRect (juce::Rectangle<float> (static_cast<float> (rx), static_cast<float> (titleOffset() + selectRow / 2 - 7), 1.0f, 14.0f));
     // The groups: a quiet divider between them; a caption (if any) small in the band over the cells.
@@ -616,14 +620,14 @@ void ParameterRack::paint (juce::Graphics& g)
         {
             // A quiet caption over the group's first cell (no rule: the divider and the gap
             // already say where it ends).
-            g.setColour (gr.quiet ? rackui::palette::quietCaption : juce::Colour (0xff8c857b));
+            g.setColour (ink ? ink->quiet : (gr.quiet ? rackui::palette::quietCaption : juce::Colour (0xff8c857b)));
             g.setFont (fonts::make (9.0f, fonts::Weight::medium, 0.08f));
             g.drawText (gr.caption, juce::Rectangle<int> (gr.span.getX() + 4, gr.span.getY() - 12, gr.span.getWidth() - 8, 11), juce::Justification::centredLeft, true);
         }
         if (i > 0 && ! groups[i - 1].span.isEmpty())
         {
             const float x = 0.5f * static_cast<float> (groups[i - 1].span.getRight() + gr.span.getX());
-            g.setColour (juce::Colour (0xffddd5c9));
+            g.setColour (ink ? ink->rule : juce::Colour (0xffddd5c9));
             g.fillRect (juce::Rectangle<float> (x, static_cast<float> (gr.span.getY() + 4), 1.0f, static_cast<float> (gr.span.getHeight() - 16)));
         }
     }

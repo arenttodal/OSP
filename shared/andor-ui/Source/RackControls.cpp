@@ -240,7 +240,10 @@ void VerticalSwitch::paint (juce::Graphics& g)
     {
         const bool active = i == shown;
         g.setFont (labelFont (active));
-        g.setColour (active ? palette::switchActive : (two ? palette::switchLabelTwo : palette::switchLabel));
+        if (const auto ink = inkFor (*this))
+            g.setColour (active ? ink->value : ink->quiet);   // (V5: on an enamel face)
+        else
+            g.setColour (active ? palette::switchActive : (two ? palette::switchLabelTwo : palette::switchLabel));
         g.drawText (positions[static_cast<std::size_t> (i)].label, labelBounds (i), two ? juce::Justification::centred : juce::Justification::centredLeft, false);
     }
     if (hasKeyboardFocus (false))
@@ -485,6 +488,29 @@ bool LaneKey::keyPressed (const juce::KeyPress& key)
 }
 
 //==============================================================================
+std::optional<Ink> inkFor (const juce::Component& c)
+{
+    for (auto* p = &c; p != nullptr; p = p->getParentComponent())
+    {
+        const auto& props = p->getProperties();
+        if (props.contains ("rackInk.caption"))
+        {
+            auto colour = [&props] (const char* key) { return juce::Colour (static_cast<juce::uint32> (static_cast<juce::int64> (props[key]))); };
+            return Ink { colour ("rackInk.caption"), colour ("rackInk.value"), colour ("rackInk.quiet"), colour ("rackInk.rule") };
+        }
+    }
+    return std::nullopt;
+}
+
+void setInk (juce::Component& module, const Ink& ink)
+{
+    auto& props = module.getProperties();
+    props.set ("rackInk.caption", static_cast<juce::int64> (ink.caption.getARGB()));
+    props.set ("rackInk.value", static_cast<juce::int64> (ink.value.getARGB()));
+    props.set ("rackInk.quiet", static_cast<juce::int64> (ink.quiet.getARGB()));
+    props.set ("rackInk.rule", static_cast<juce::int64> (ink.rule.getARGB()));
+}
+
 int slotWidth (Slot slot, bool dense) noexcept
 {
     switch (slot)
@@ -533,7 +559,10 @@ void Cell::resized()
 void Cell::paint (juce::Graphics& g)
 {
     // (a rack knob's caption: the same type, colour and place)
-    g.setColour (quiet ? palette::quietCaption : palette::caption);
+    if (const auto ink = inkFor (*this))
+        g.setColour (quiet ? ink->quiet : ink->caption);   // (V5: on an enamel face)
+    else
+        g.setColour (quiet ? palette::quietCaption : palette::caption);
     g.setFont (fonts::make (11.0f, fonts::Weight::medium, 0.055f));
     g.drawText (caption, juce::Rectangle<float> (-6.0f, 0.0f, static_cast<float> (getWidth()) + 12.0f, static_cast<float> (captionHeight)), juce::Justification::centred, false);
 }

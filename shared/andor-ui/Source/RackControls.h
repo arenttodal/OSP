@@ -4,6 +4,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include <functional>
+#include <optional>
 #include <vector>
 
 namespace osp::plugin::rackui
@@ -46,6 +47,16 @@ namespace palette
     juce::Colour activeFill (juce::Colour accent);
     juce::Colour activeText (juce::Colour accent);
 }
+
+/** V5 PATTERNED HARDWARE (opt-in): the ink of the face a control sits on - an enamel
+    faceplate's - read from its module (the nearest parent that set one); nothing on the
+    approved ceramic, where every control keeps its approved colours. */
+struct Ink
+{
+    juce::Colour caption, value, quiet, rule;
+};
+std::optional<Ink> inkFor (const juce::Component& c);
+void setInk (juce::Component& module, const Ink& ink);
 
 /**
     The ceramic miniature slide switch: a dark recessed slot and a raised warm-ivory
