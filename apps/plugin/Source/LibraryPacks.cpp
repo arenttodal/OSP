@@ -4,6 +4,7 @@
 
 #include "LibraryCapture.h"
 #include "LibraryPlaces.h"
+#include "library/Archive.h"
 
 namespace osp::plugin
 {
@@ -235,40 +236,211 @@ void LibraryPanel::openPacksSheet()
 
 void LibraryPanel::exportCollectionAsPack (const std::string& collectionId, const juce::String& name, const juce::File& out, bool confirmRights)
 {
+    library::PackExport fields;
+    fields.id = packIdFor (name);
+    fields.name = name.toStdString();
+    fields.confirmUnknownRights = confirmRights;
+    exportCollection (collectionId, std::move (fields), out);
+}
+
+void LibraryPanel::exportCollection (const std::string& collectionId, library::PackExport fields, const juce::File& out)
+{
     juce::Component::SafePointer<LibraryPanel> safe (this);
     setStatus (juce::String::fromUTF8 ("Making the pack\xe2\x80\xa6"));
     processor.libraryService().requestBackground<library::PackResult> (
-        [collectionId, name, path = pathOf (out), confirmRights] (library::Catalog& c) {
-            library::PackExport request;
+        [collectionId, fields, path = pathOf (out)] (library::Catalog& c) {
+            auto request = fields;
             library::SearchQuery q;
             q.collection = collectionId;
             q.limit = 100000;
             for (const auto& a : c.search (q))
                 request.assetIds.push_back (a.id);
-            request.id = packIdFor (name);
-            request.name = name.toStdString();
-            request.confirmUnknownRights = confirmRights;
             return library::exportPack (c, packPlaces().storeDir, request, path, JucePlugin_VersionString);
         },
-        [safe, collectionId, name, out] (library::PackResult done) {
+        [safe, collectionId, fields, out] (library::PackResult done) {
             if (safe == nullptr)
                 return;
             if (done.ok)
             {
-                safe->setStatus ("Saved the pack " + out.getFileName() + ": " + counts (done)
+                safe->setStatus ("Saved the " + juce::String (done.manifest.factory ? "factory pack " : "pack ") + out.getFileName() + " (" + juce::String (done.manifest.id) + " "
+                                 + juce::String (done.manifest.version) + "): " + counts (done)
                                  + (done.notes.empty() ? juce::String() : ". " + juce::String (done.notes.front())));
                 return;
             }
             if (juce::String (done.error).contains ("no known rights"))
             {
-                safe->choose (juce::String (done.error) + ".", { "I may share them", "Cancel" }, [safe, collectionId, name, out] (int choice) {
-                    if (safe != nullptr && choice == 0)
-                        safe->exportCollectionAsPack (collectionId, name, out, true);
+                safe->choose (juce::String (done.error) + ".", { "I may share them", "Cancel" }, [safe, collectionId, fields, out] (int choice) {
+                    if (safe == nullptr || choice != 0)
+                        return;
+                    auto confirmed = fields;
+                    confirmed.confirmUnknownRights = true;
+                    safe->exportCollection (collectionId, std::move (confirmed), out);
                 });
                 return;
             }
             safe->setStatus ("The pack was not made: " + juce::String (done.error));
         });
+}
+
+//==============================================================================
+// Publishing: a pack with the publisher's own id, version and licence.
+
+namespace
+{
+    /** What was last published from a collection, so the next version starts from it. */
+    juce::File publishingFile (const std::string& collectionId)
+    {
+        const auto dir = juce::File (juce::String (library::Catalog::defaultFile().parent_path().string())).getChildFile ("Publishing");
+        return dir.getChildFile (juce::File::createLegalFileName (juce::String (collectionId)) + ".json");
+    }
+
+    /** "1.2.3" -> "1.2.4": the next version after one already published. */
+    juce::String nextVersion (const juce::String& version)
+    {
+        auto parts = juce::StringArray::fromTokens (version, ".", {});
+        if (parts.isEmpty() || ! parts[parts.size() - 1].containsOnly ("0123456789"))
+            return version;
+        parts.set (parts.size() - 1, juce::String (parts[parts.size() - 1].getIntValue() + 1));
+        return parts.joinIntoString (".");
+    }
+}
+
+class LibraryPanel::PublishSheet final : public LibraryPanel::Sheet
+{
+public:
+    PublishSheet (LibraryPanel& p, std::string collection, const juce::String& collectionName)
+        : Sheet (p, "Publish " + collectionName + " as a pack", { 680, 600 }), collectionId (std::move (collection))
+    {
+        const auto remembered = juce::JSON::parse (publishingFile (collectionId));
+        const auto get = [&remembered] (const char* key, const juce::String& fallback) {
+            const auto v = remembered.getProperty (key, {}).toString();
+            return v.isEmpty() ? fallback : v;
+        };
+        const auto last = remembered.getProperty ("version", {}).toString();
+        id.setText (get ("id", "com.yourname." + juce::String (packIdFor (collectionName)).fromFirstOccurrenceOf ("user.", false, false).upToLastOccurrenceOf (".", false, false)), false);
+        name.setText (get ("name", collectionName), false);
+        version.setText (last.isEmpty() ? juce::String ("1.0.0") : nextVersion (last), false);
+        creator.setText (get ("creator", {}), false);
+        licence.setText (get ("license", {}), false);
+        description.setText (get ("description", {}), false);
+        factory.setToggleState (static_cast<bool> (remembered.getProperty ("factory", false)), juce::dontSendNotification);
+        id.setTitle ("Pack id");
+        name.setTitle ("Pack name");
+        version.setTitle ("Version");
+        creator.setTitle ("Creator");
+        licence.setTitle ("Licence");
+        description.setTitle ("Description");
+        licence.setMultiLine (true, true);
+        licence.setReturnKeyStartsNewLine (true);
+        description.setMultiLine (true, true);
+        description.setReturnKeyStartsNewLine (true);
+        creator.setTextToShowWhenEmpty ("Who made it (shown before installing)", design::colour::textMicro);
+        licence.setTextToShowWhenEmpty ("The licence, shown before installing", design::colour::textMicro);
+        description.setTextToShowWhenEmpty ("What is in it (optional)", design::colour::textMicro);
+        factory.setButtonText ("Factory pack: built into OSP's installer, installed at startup (the core sounds only)");
+        cancel.onClick = [this] { panel.closeSheet(); };
+        publish.onClick = [this] { commit(); };
+        publish.setTitle ("Publish the pack");
+        for (auto* c : std::initializer_list<juce::Component*> { &id, &name, &version, &creator, &licence, &description, &factory, &cancel, &publish })
+            addAndMakeVisible (c);
+    }
+    void paintContent (juce::Graphics& g) override
+    {
+        g.setColour (design::colour::textMicro);
+        g.setFont (type::popupLabel (12.0f));
+        for (const auto& [text, c] : std::initializer_list<std::pair<const char*, juce::Component*>> {
+                 { "PACK ID (KEEP IT FOR EVERY VERSION)", &id }, { "NAME", &name }, { "VERSION", &version }, { "CREATOR", &creator }, { "LICENCE", &licence }, { "DESCRIPTION", &description } })
+            g.drawText (text, c->getX(), c->getY() - 18, 360, 16, juce::Justification::centredLeft);
+        if (problem.isNotEmpty())
+        {
+            g.setColour (design::colour::text);
+            g.setFont (type::micro (13.0f));
+            g.drawFittedText (problem, publish.getX() - 420, publish.getY(), 400, publish.getHeight(), juce::Justification::centredLeft, 2);
+        }
+    }
+    void resized() override
+    {
+        auto r = content().withTrimmedTop (18);
+        auto row = r.removeFromTop (32);
+        id.setBounds (row.removeFromLeft (row.getWidth() - 160));
+        row.removeFromLeft (16);
+        version.setBounds (row);
+        r.removeFromTop (26);
+        row = r.removeFromTop (32);
+        name.setBounds (row.removeFromLeft (row.getWidth() / 2 - 8));
+        row.removeFromLeft (16);
+        creator.setBounds (row);
+        r.removeFromTop (26);
+        licence.setBounds (r.removeFromTop (96));
+        r.removeFromTop (26);
+        description.setBounds (r.removeFromTop (64));
+        r.removeFromTop (12);
+        factory.setBounds (r.removeFromTop (26));
+        auto buttons = r.removeFromBottom (40);
+        publish.setBounds (buttons.removeFromRight (170));
+        buttons.removeFromRight (8);
+        cancel.setBounds (buttons.removeFromRight (110));
+    }
+    void visibilityChanged() override
+    {
+        if (isVisible())
+            id.grabKeyboardFocus();
+    }
+
+private:
+    void commit()
+    {
+        library::PackExport fields;
+        fields.id = id.getText().trim().toLowerCase().toStdString();
+        fields.name = name.getText().trim().toStdString();
+        fields.version = version.getText().trim().toStdString();
+        fields.creator = creator.getText().trim().toStdString();
+        fields.license = licence.getText().trim().toStdString();
+        fields.description = description.getText().trim().toStdString();
+        fields.factory = factory.getToggleState();
+        if (! library::validPackId (fields.id) || fields.name.empty() || ! library::validVersion (fields.version))
+        {
+            problem = "Needs an id (a-z, 0-9, '.', '_', '-'), a name and a version such as 1.0.0.";
+            repaint();
+            return;
+        }
+        // Remembered for the next version (the version field then suggests the one after).
+        auto* remembered = new juce::DynamicObject();
+        remembered->setProperty ("id", juce::String (fields.id));
+        remembered->setProperty ("name", juce::String (fields.name));
+        remembered->setProperty ("version", juce::String (fields.version));
+        remembered->setProperty ("creator", juce::String (fields.creator));
+        remembered->setProperty ("license", juce::String (fields.license));
+        remembered->setProperty ("description", juce::String (fields.description));
+        remembered->setProperty ("factory", fields.factory);
+        const juce::var memo (remembered);
+        const auto fileName = juce::File::createLegalFileName (juce::String (fields.name) + " " + juce::String (fields.version)) + ".osppack";
+        juce::Component::SafePointer<LibraryPanel> safe (&panel);
+        const auto collection = collectionId;
+        panel.closeSheet();
+        safe->chooser = std::make_unique<juce::FileChooser> ("Publish " + juce::String (fields.name) + " as a pack",
+                                                             juce::File::getSpecialLocation (juce::File::userDesktopDirectory).getChildFile (fileName), "*.osppack");
+        safe->chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+                                    [safe, collection, fields, memo] (const juce::FileChooser& fc) {
+                                        if (safe == nullptr || fc.getResult() == juce::File())
+                                            return;
+                                        const auto memoFile = publishingFile (collection);
+                                        memoFile.getParentDirectory().createDirectory();
+                                        memoFile.replaceWithText (juce::JSON::toString (memo));
+                                        safe->exportCollection (collection, fields, fc.getResult().withFileExtension ("osppack"));
+                                    });
+    }
+
+    std::string collectionId;
+    juce::TextEditor id, name, version, creator, licence, description;
+    juce::ToggleButton factory;
+    juce::TextButton cancel { "Cancel" }, publish { juce::String::fromUTF8 ("Publish\xe2\x80\xa6") };
+    juce::String problem;
+};
+
+void LibraryPanel::openPublishSheet (const std::string& collectionId, const juce::String& name)
+{
+    showSheet (std::make_unique<PublishSheet> (*this, collectionId, name), "publish");
 }
 
 //==============================================================================

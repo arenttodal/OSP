@@ -453,6 +453,10 @@ public:
                         safe->exportCollectionAsPack (id, name, fc.getResult().withFileExtension ("osppack"));
                 });
             });
+            menu.addItem (juce::String::fromUTF8 ("Publish as pack (id, version, licence)\xe2\x80\xa6"), [safe, id, name] {
+                if (safe != nullptr)
+                    safe->openPublishSheet (id, name);
+            });
             menu.addItem ("Delete collection (its sounds stay)", [safe, id] {
                 if (safe != nullptr)
                 {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "PluginProcessor.h"
+#include "library/Packs.h"
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -146,7 +147,13 @@ public:
     void restoreBackup (const juce::File& folder);
     /** Stage 10: a collection as a pack (asks about sounds of unknown rights). */
     void exportCollectionAsPack (const std::string& collectionId, const juce::String& name, const juce::File& out, bool confirmRights = false);
-    /** The sheet showing now (empty: none) - "save", "settings", "missing", "prompt", "choice",
+    /** A collection published as a pack the publisher names: its id, version, creator and
+        licence (remembered per collection), and whether it is a factory pack. Expansion packs
+        for sale, and the core pack built into OSP's installer, are made here. */
+    void openPublishSheet (const std::string& collectionId, const juce::String& name);
+    /** The export behind both: `fields` carries everything but the records. */
+    void exportCollection (const std::string& collectionId, library::PackExport fields, const juce::File& out);
+    /** The sheet showing now (empty: none) - "save", "settings", "missing", "prompt", "choice", "publish",
         "scan", "trim". */
     juce::String openSheetName() const;
     juce::Component* sheet() const noexcept { return sheetComponent.get(); }
@@ -171,6 +178,7 @@ public:
     class ScanSheet;
     class TrimSheet;
     class PacksSheet;
+    class PublishSheet;
     class Detail;
     class Inspector;
     class Tray;
@@ -182,6 +190,7 @@ private:
     friend class ScanSheet;
     friend class TrimSheet;
     friend class PacksSheet;
+    friend class PublishSheet;
     friend class Results;
     friend class Detail;
     friend class Inspector;

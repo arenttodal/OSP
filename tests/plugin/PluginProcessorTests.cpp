@@ -1966,6 +1966,115 @@ TEST_CASE ("plugin: Library packs and backup - export a pack and a backup on one
     }
 }
 
+TEST_CASE ("plugin: Library publishing - a collection published with the publisher's id and version as a factory pack; it installs at startup beside the user's own presets", "[plugin][library][library-packs]")
+{
+    TempDir tmp;
+    const auto shipped = tmp.dir.getChildFile ("Bundle/Resources/Factory");
+    REQUIRE (shipped.createDirectory());
+    const auto core = shipped.getChildFile ("OSP Core 1.0.0.osppack");
+    // The publisher's machine: a preset in a collection, published from the Library window.
+    {
+        const ScopedEnvironment library ("OSP_LIBRARY_DIR", tmp.dir.getChildFile ("maker/library").getFullPathName());
+        const ScopedEnvironment documents ("OSP_DOCUMENTS_DIR", tmp.dir.getChildFile ("maker/documents").getFullPathName());
+        const ScopedEnvironment store ("OSP_SAMPLE_STORE", tmp.dir.getChildFile ("maker/store").getFullPathName());
+        const auto file = writeSource (tmp.dir, "Glass Bell C5.wav", testsignals::pluck (midiToHz (72), 0.8, 48000.0, 6));
+        OspAudioProcessor p;
+        p.prepareToPlay (48000.0, 256);
+        loadAndWait (p, file);
+        OspAudioProcessor::presetFolder().createDirectory();
+        REQUIRE (p.savePreset (OspAudioProcessor::presetFolder().getChildFile ("Bell Song.osppreset")));
+        REQUIRE (p.libraryService().waitUntilIdle (10000));
+        std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+        auto* ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (editor.get());
+        REQUIRE (ui != nullptr);
+        editor->setSize (1448, 1086);
+        ui->openLibrary();
+        auto* panel = ui->libraryWindow();
+        REQUIRE (panel != nullptr);
+        REQUIRE (panel->settle());
+        std::string collection;
+        p.libraryService().runAndWait ([&] (osp::library::Catalog& c) {
+            osp::library::SearchQuery q;
+            q.text = "bell song";
+            q.type = osp::library::AssetType::preset;
+            collection = *c.createCollection ("Core");
+            c.addToCollection (collection, c.search (q).at (0).id);
+            // The recording came from a drive: its rights are cleared before it is shipped.
+            q.text = "glass bell";
+            q.type = osp::library::AssetType::sound;
+            c.setProvenance (c.sound (c.search (q).at (0).id)->contentHash, "original");
+        });
+        // The sheet: the publisher's fields, checked before anything is written.
+        panel->openPublishSheet (collection, "Core");
+        REQUIRE (panel->settle());
+        REQUIRE (panel->openSheetName() == "publish");
+        auto* id = findTitled<juce::TextEditor> (*panel->sheet(), "Pack id");
+        auto* version = findTitled<juce::TextEditor> (*panel->sheet(), "Version");
+        REQUIRE (id != nullptr);
+        REQUIRE (version != nullptr);
+        CHECK (version->getText() == "1.0.0");
+        id->setText ("Not a valid id!", false);
+        auto* publish = findTitled<juce::TextButton> (*panel->sheet(), "Publish the pack");
+        REQUIRE (publish != nullptr);
+        publish->onClick();
+        CHECK (panel->openSheetName() == "publish");   // refused: the sheet stays, nothing is written
+        CHECK_FALSE (core.existsAsFile());
+        panel->closeSheet();
+        // What the sheet's Publish hands on, after the save dialog.
+        osp::library::PackExport fields;
+        fields.id = "com.evenant.osp.core";
+        fields.name = "OSP Core";
+        fields.version = "1.0.0";
+        fields.creator = "Evenant";
+        fields.license = "Licensed for making music with OSP.";
+        fields.factory = true;
+        panel->exportCollection (collection, fields, core);
+        REQUIRE (panel->settle (30000));
+        INFO (panel->statusText());
+        REQUIRE (core.existsAsFile());
+        CHECK (panel->statusText().contains ("factory pack"));
+        CHECK (panel->statusText().contains ("com.evenant.osp.core 1.0.0"));
+        ui->closeLibrary();
+    }
+    // A musician's machine with a preset of their own: OSP starts with the core pack in its bundle.
+    {
+        const ScopedEnvironment library ("OSP_LIBRARY_DIR", tmp.dir.getChildFile ("user/library").getFullPathName());
+        const ScopedEnvironment documents ("OSP_DOCUMENTS_DIR", tmp.dir.getChildFile ("user/documents").getFullPathName());
+        const ScopedEnvironment store ("OSP_SAMPLE_STORE", tmp.dir.getChildFile ("user/store").getFullPathName());
+        const auto mine = OspAudioProcessor::presetFolder().getChildFile ("My Own.osppreset");
+        {
+            OspAudioProcessor p;
+            p.prepareToPlay (48000.0, 256);
+            OspAudioProcessor::presetFolder().createDirectory();
+            REQUIRE (p.savePreset (mine));
+            REQUIRE (p.libraryService().waitUntilIdle (10000));
+        }
+        juce::MemoryBlock before;
+        REQUIRE (mine.loadFileAsData (before));
+        const auto presetsBefore = OspAudioProcessor::presetFolder().findChildFiles (juce::File::findFiles, true).size();
+        const ScopedEnvironment bundle ("OSP_FACTORY_PACKS_DIR", shipped.getFullPathName());
+        OspAudioProcessor r;
+        REQUIRE (r.libraryService().waitUntilIdle (30000));
+        bool installed = false;
+        int factoryPresets = 0;
+        r.libraryService().runAndWait ([&] (osp::library::Catalog& c) {
+            installed = c.pack ("com.evenant.osp.core").has_value() && c.pack ("com.evenant.osp.core")->version == "1.0.0";
+            osp::library::SearchQuery q;
+            q.origin = osp::library::Origin::factory;
+            q.type = osp::library::AssetType::preset;
+            factoryPresets = c.count (q);
+        });
+        CHECK (installed);
+        CHECK (factoryPresets == 1);
+        CHECK (juce::File (juce::String (osp::library::Catalog::defaultFile().parent_path().string())).getChildFile ("Factory/com.evenant.osp.core/Presets").isDirectory());
+        // The musician's own preset folder is exactly as it was.
+        juce::MemoryBlock after;
+        REQUIRE (mine.loadFileAsData (after));
+        CHECK (after == before);
+        CHECK (OspAudioProcessor::presetFolder().findChildFiles (juce::File::findFiles, true).size() == presetsBefore);
+    }
+}
+
 TEST_CASE ("plugin: a portable instrument is untrusted - nothing lands outside the store, damaged sounds are refused", "[plugin][security]")
 {
     TempDir tmp;
