@@ -26,6 +26,7 @@ Method B -- harmonic NMF (one component per partial), then Wiener masks.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 import numpy as np
@@ -52,9 +53,27 @@ class MaskConfig:
     eps: float = 1e-12
 
 
+class LazyMasks(Sequence):
+    """One mask per note, made when asked for: a recording with a hundred notes would otherwise
+    hold a hundred full-size spectrograms at once (16 s, 113 notes: about 5 GB)."""
+
+    def __init__(self, make, count: int):
+        self._make, self._count = make, count
+
+    def __len__(self) -> int:
+        return self._count
+
+    def __getitem__(self, i):
+        if isinstance(i, slice):
+            return [self[j] for j in range(*i.indices(self._count))]
+        if not -self._count <= i < self._count:
+            raise IndexError(i)
+        return self._make(i % self._count)
+
+
 @dataclass
 class MaskResult:
-    note_masks: list[np.ndarray]    # each (bins, frames)
+    note_masks: Sequence            # each (bins, frames); a list or LazyMasks
     residual_mask: np.ndarray
     windows: list[tuple[int, int]]  # each note's activity (frames, end exclusive)
     activations: list[np.ndarray] | None = None   # (partials, frames) per note (method B)
@@ -130,17 +149,20 @@ def simple_harmonic(mag: np.ndarray, times: np.ndarray, bin_hz: float, templates
     cfg = cfg or MaskConfig()
     n_bins, n_frames = mag.shape
     windows = activity_windows(templates, times, cfg)
-    combs = []
-    for t, (a, b) in zip(templates, windows):
-        comb = np.asarray(partial_kernels(t, n_bins, bin_hz, cfg).max(axis=1).todense()).ravel()
-        m = np.zeros((n_bins, n_frames))
-        m[:, a:b] = comb[:, None]
-        combs.append(m)
-    total = np.sum(combs, axis=0) if combs else np.zeros((n_bins, n_frames))
+    combs = [np.asarray(partial_kernels(t, n_bins, bin_hz, cfg).max(axis=1).todense()).ravel() for t in templates]
+    total = np.zeros((n_bins, n_frames))
+    for comb, (a, b) in zip(combs, windows):
+        total[:, a:b] += comb[:, None]
     scale = np.maximum(total, 1.0)
-    notes = [c / scale for c in combs]
+
+    def make(i):
+        a, b = windows[i]
+        m = np.zeros((n_bins, n_frames))
+        m[:, a:b] = combs[i][:, None] / scale[:, a:b]
+        return m
+
     residual = 1.0 - (total / scale)
-    return MaskResult(notes, np.clip(residual, 0.0, 1.0), windows, info={"method": "A"})
+    return MaskResult(LazyMasks(make, len(templates)), np.clip(residual, 0.0, 1.0), windows, info={"method": "A"})
 
 
 def _smoothness(H: list[np.ndarray], templates: list[NoteTemplate], windows, bin_hz: float, cfg: MaskConfig) -> dict:
@@ -239,25 +261,25 @@ def harmonic_nmf(mag: np.ndarray, times: np.ndarray, bin_hz: float, templates: l
     info = _smoothness(Hn, templates, windows, bin_hz, cfg) if cfg.smoothness else {"collisions": 0}
     # Wiener masks on power
     gain = RESIDUAL_GAIN[cfg.residual]
-    note_pow = []
-    for K, h in zip(kernels, Hn):
-        note_pow.append(np.asarray((K @ h)) ** 2)
+    note_pow = lambda i: np.asarray(kernels[i] @ Hn[i]) ** 2
+    claim = np.zeros_like(mag)
+    for i in range(len(kernels)):
+        claim += note_pow(i)
     res_pow = (gain * (bands @ Hr)) ** 2
-    total = np.sum(note_pow, axis=0) + res_pow if note_pow else res_pow
-    floor = cfg.eps
-    denom = total + floor
-    notes = [p / denom for p in note_pow]
-    residual = 1.0 - np.sum(notes, axis=0) if notes else np.ones_like(mag)
+    denom = claim + res_pow + cfg.eps
     if cfg.residual == "none":
         # nothing goes to the residual where a note is active and has any claim
-        claim = np.sum(note_pow, axis=0)
         has = claim > 1e-6 * (np.max(claim) + cfg.eps)
-        notes = [np.where(has, p / np.maximum(claim, cfg.eps), m) for p, m in zip(note_pow, notes)]
-        residual = 1.0 - np.sum(notes, axis=0)
+        divisor = np.where(has, np.maximum(claim, cfg.eps), denom)
+    else:
+        divisor = denom
+    residual = 1.0 - claim / divisor
+    del claim, denom
+    make = lambda i: note_pow(i) / divisor
     residual = np.clip(residual, 0.0, 1.0)
     info.update({"method": "B", "components": int(n_comp), "iterations": cfg.iterations, "residual": cfg.residual,
                  "klDivergence": float(_kl(V, W @ H + cfg.eps))})
-    return MaskResult(notes, residual, windows, activations=Hn, info=info)
+    return MaskResult(LazyMasks(make, len(kernels)), residual, windows, activations=Hn, info=info)
 
 
 def _kl(V: np.ndarray, WH: np.ndarray) -> float:
@@ -266,10 +288,11 @@ def _kl(V: np.ndarray, WH: np.ndarray) -> float:
 
 def check_masks(res: MaskResult, atol: float = 1e-9) -> dict:
     """Finite, within [0, 1], and summing to one (the consistency the reconstruction relies on)."""
-    stack = res.note_masks + [res.residual_mask]
-    s = np.sum(stack, axis=0)
-    return {
-        "finite": bool(all(np.all(np.isfinite(m)) for m in stack)),
-        "inRange": bool(all(np.min(m) >= -atol and np.max(m) <= 1 + atol for m in stack)),
-        "sumMaxError": float(np.max(np.abs(s - 1.0))),
-    }
+    s = res.residual_mask.copy()
+    finite, in_range = True, True
+    for m in [res.residual_mask, *res.note_masks]:
+        finite &= bool(np.all(np.isfinite(m)))
+        in_range &= bool(np.min(m) >= -atol and np.max(m) <= 1 + atol)
+    for m in res.note_masks:
+        s += m
+    return {"finite": finite, "inRange": in_range, "sumMaxError": float(np.max(np.abs(s - 1.0)))}

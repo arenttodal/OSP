@@ -275,7 +275,7 @@ def detect(audio: np.ndarray, sr: int, cfg: HarmonicConfig | None = None) -> lis
                 f1 = max(f0 + 1, s0 + int((b1 - t0) / hop_s))
                 seg = a[f0:f1]
                 c = cents[i, f0:f1][seg > 0]
-                events.append(NoteEvent(id="", pitch_midi=int(key), onset_seconds=round(b0, 4), offset_seconds=round(b1, 4),
+                events.append(NoteEvent(id="", pitch_midi=int(key), onset_seconds=round(max(0.0, b0), 4), offset_seconds=round(b1, 4),
                                         pitch_hz=midi_to_hz(key + (float(np.median(c)) / 100 if len(c) else 0.0)),
                                         velocity_estimate=float(np.clip((seg.max() / file_max) ** 0.5, 0, 1)) if len(seg) else 0.0,
                                         confidence=float(np.clip(np.mean(seg > 0) * min(1.0, (b1 - b0) / 0.3), 0, 1)) if len(seg) else 0.0,
