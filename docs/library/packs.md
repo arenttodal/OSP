@@ -131,8 +131,13 @@ Factory packs are packs with `"factory": true`, shipped in the plugin bundle's
 installs any that are new or newer, in the background (`installFactoryPacks`). Their records
 are origin Factory, and their files live in `<Library>/Factory`, apart from user data. Their
 updates follow the rules above, so they never damage user content. A non-factory pack in
-that folder is ignored. No factory pack ships yet: there is no authorised factory audio to
-put in one (D-20).
+that folder is ignored.
+
+The build puts them there: every `*.osppack` in `OSP_FACTORY_PACKS_DIR` (CMake; default
+`packaging/factory-packs/`, not committed) is copied into each plugin bundle's
+`Contents/Resources/Factory` (`cmake/CopyFactoryPacks.cmake`). With no pack in that folder
+the bundles are exactly as before. No factory pack ships yet: the owner chooses the Core
+set (50-100 presets, `docs/release/SOUND_PACKS_SPEC.md`).
 
 ## Making a pack
 
@@ -146,6 +151,22 @@ distribution rights are unknown (found on a drive) are named, and the export sto
 the user confirms they may share them. The confirmation is recorded, the same rule as a
 portable instrument meant for sharing (Stage 3). Sounds that came with another pack are
 noted: their licence decides whether they may be shared.
+
+## Publishing a pack (expansions and the Core pack)
+
+Right-click a collection → **Publish as pack (id, version, licence)…** makes a pack whose id
+and version the publisher chooses, so later versions update it in place:
+
+- **Pack id** (`com.evenant.osp.dusty-keys`): kept for every version.
+- **Version:** the sheet suggests the next one after the last published.
+- **Creator, licence, description:** shown before installing.
+- **Factory pack:** for the Core pack built into the installer only
+  (`PackExport::factory`; off by default, so every other export is unchanged).
+
+The fields are remembered per collection in `<Library>/Publishing/<collection>.json`.
+Publish every version from the same collection in the same Library: item uids come from
+its records, and they are what keeps a customer's edits through an update. The same rights
+question as an ordinary export applies. How packs are sold: `docs/release/SOUND_PACKS_SPEC.md`.
 
 ## Tests
 
@@ -166,6 +187,9 @@ The unit tests (`[unit][library][packs]`) cover:
   the packs folder.
 - **Factory packs**: installed and updated from a folder; non-factory ones are ignored;
   user content is unchanged.
+- **Publishing**: an export without the factory mark is never installed from the plugin's
+  folder; with it, it installs into `<Library>/Factory`, updates in place under the same id,
+  and leaves the user's presets and sounds alone.
 
 The plugin test (`[plugin][library-packs]`), through the real window:
 
@@ -173,3 +197,6 @@ The plugin test (`[plugin][library-packs]`), through the real window:
 - install it in a second Library with confirmation;
 - the Packs scope and sheet;
 - a factory pack installed at plugin startup into `<Library>/Factory`.
+- a collection published as a factory pack (the sheet refuses an invalid id; the publisher's
+  id and version), installed at startup beside a musician's own preset, which stays
+  byte-identical.

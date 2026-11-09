@@ -1042,6 +1042,27 @@ playable-instrument review**, as the spec requires. Commits: P0 8308f0a, P1 8746
     - no allocation in any arrangement.
   - The shell suites and ANDOR ANALOG's `[cardarp]` tests run against the shared lanes.
 
+## ANDOR OSP: sound packs - publishing, the Core pack in the installer (9 Nov 2026)
+
+Decision (owner): one installer with a Core factory pack of 50-100 presets; instruments and
+styles as expansion packs, sold as `.osppack` downloads from the Evenant website. Spec and
+the case for website-first over an in-app store: `docs/release/SOUND_PACKS_SPEC.md`.
+
+- [x] `PackExport::factory` (off by default: every earlier export is unchanged).
+- [x] Library: **Publish as pack (id, version, licence)…** on a collection; fields remembered
+      per collection, the next version suggested.
+- [x] Build: every `*.osppack` in `OSP_FACTORY_PACKS_DIR` (default `packaging/factory-packs/`,
+      git-ignored) goes into each bundle's `Contents/Resources/Factory`. With no pack the
+      bundles are exactly as before (checked: no copy step in the build, VST3 `Resources`
+      holds only `moduleinfo.json`); with one, it lands where the plugin installs from.
+- [x] Tests: `[unit][library][packs]` (factory export installs from the plugin's folder,
+      updates in place, user content untouched); `[plugin][library-packs]` (publishing
+      through the window, installed at startup beside a musician's preset, which stays
+      byte-identical).
+- [ ] Owner: choose the Core set and publish it; the first expansions.
+- [ ] Drop or double-click a `.osppack` to install it (phase 1, small).
+- [ ] "More sounds" catalogue from the website's `packs.json` (phase 2).
+
 ## BLOCKERS
 
 - DAW testing (Logic, Ableton, Reaper) needs a Mac; CI covers build, tests and auval.
