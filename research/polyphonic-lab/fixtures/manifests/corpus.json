@@ -1,0 +1,149 @@
+{
+ "schema": "osp-poly.corpus/1",
+ "fixtures": [
+  {
+   "id": "A-single-C4",
+   "manifest": "A-single-C4.json",
+   "class": "A",
+   "family": "piano"
+  },
+  {
+   "id": "A-single-E4",
+   "manifest": "A-single-E4.json",
+   "class": "A",
+   "family": "piano"
+  },
+  {
+   "id": "A-single-G4",
+   "manifest": "A-single-G4.json",
+   "class": "A",
+   "family": "piano"
+  },
+  {
+   "id": "A-single-C5",
+   "manifest": "A-single-C5.json",
+   "class": "A",
+   "family": "piano"
+  },
+  {
+   "id": "A-single-C2",
+   "manifest": "A-single-C2.json",
+   "class": "A",
+   "family": "piano"
+  },
+  {
+   "id": "A-single-C4-soft",
+   "manifest": "A-single-C4-soft.json",
+   "class": "A",
+   "family": "piano"
+  },
+  {
+   "id": "A-single-C4-short",
+   "manifest": "A-single-C4-short.json",
+   "class": "A",
+   "family": "piano"
+  },
+  {
+   "id": "B-chord-C-major",
+   "manifest": "B-chord-C-major.json",
+   "class": "B",
+   "family": "piano"
+  },
+  {
+   "id": "B-chord-A-minor",
+   "manifest": "B-chord-A-minor.json",
+   "class": "B",
+   "family": "piano"
+  },
+  {
+   "id": "B-chord-C-major7",
+   "manifest": "B-chord-C-major7.json",
+   "class": "B",
+   "family": "piano"
+  },
+  {
+   "id": "B-chord-D-minor7",
+   "manifest": "B-chord-D-minor7.json",
+   "class": "B",
+   "family": "piano"
+  },
+  {
+   "id": "B-chord-close-C-D-E",
+   "manifest": "B-chord-close-C-D-E.json",
+   "class": "B",
+   "family": "piano"
+  },
+  {
+   "id": "B-chord-wide-C2-G3-E4-C6",
+   "manifest": "B-chord-wide-C2-G3-E4-C6.json",
+   "class": "B",
+   "family": "piano"
+  },
+  {
+   "id": "C-two-together",
+   "manifest": "C-two-together.json",
+   "class": "C",
+   "family": "piano"
+  },
+  {
+   "id": "C-two-150ms",
+   "manifest": "C-two-150ms.json",
+   "class": "C",
+   "family": "piano"
+  },
+  {
+   "id": "C-sustain-then-entry",
+   "manifest": "C-sustain-then-entry.json",
+   "class": "C",
+   "family": "piano"
+  },
+  {
+   "id": "C-repeated-G4",
+   "manifest": "C-repeated-G4.json",
+   "class": "C",
+   "family": "piano"
+  },
+  {
+   "id": "C-melody-over-chord",
+   "manifest": "C-melody-over-chord.json",
+   "class": "C",
+   "family": "piano"
+  },
+  {
+   "id": "D-phrase-synthetic",
+   "manifest": "D-phrase-synthetic.json",
+   "class": "D",
+   "family": "piano"
+  },
+  {
+   "id": "E-pedal-arpeggio",
+   "manifest": "E-pedal-arpeggio.json",
+   "class": "E",
+   "family": "piano"
+  },
+  {
+   "id": "F-organ-C-major",
+   "manifest": "F-organ-C-major.json",
+   "class": "F",
+   "family": "organ"
+  },
+  {
+   "id": "F-guitar-E-major",
+   "manifest": "F-guitar-E-major.json",
+   "class": "F",
+   "family": "guitar"
+  },
+  {
+   "id": "F-strings-A-minor",
+   "manifest": "F-strings-A-minor.json",
+   "class": "F",
+   "family": "strings"
+  },
+  {
+   "id": "F-voices-A-major",
+   "manifest": "F-voices-A-major.json",
+   "class": "F",
+   "family": "voice"
+  }
+ ]
+}

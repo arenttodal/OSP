@@ -1,0 +1,8 @@
+# Finer time steps (256 hop): onsets and offsets resolved twice as finely, twice the analysis cost.
+detector:
+  harmonic:
+    n_fft: 8192
+    hop: 256
+extraction:
+  n_fft: 8192
+  hop: 256
