@@ -28,9 +28,15 @@ cp -R "$artefacts/AU/OSP.component" "$stage/au/"
 cp -R "$artefacts/VST3/OSP.vst3" "$stage/vst3/"
 cp -R "$artefacts/Standalone/OSP.app" "$stage/app/"
 
-for bundle in "$stage/au/OSP.component" "$stage/vst3/OSP.vst3" "$stage/app/OSP.app"; do
+for bundle in "$stage/au/OSP.component" "$stage/vst3/OSP.vst3"; do
     codesign --force --deep --options runtime --timestamp --sign "$OSP_APP_IDENTITY" "$bundle"
 done
+# The standalone records from the audio input (live capture): the hardened runtime needs the
+# audio-input entitlement, or the notarised app is refused the microphone.
+codesign --force --deep --options runtime --timestamp --entitlements "$root/packaging/macos/OSP-Standalone.entitlements" \
+         --sign "$OSP_APP_IDENTITY" "$stage/app/OSP.app"
+codesign --display --entitlements - "$stage/app/OSP.app" | grep -q "device.audio-input" \
+    || { echo "OSP.app is missing the audio-input entitlement" >&2; exit 1; }
 
 pkgbuild --root "$stage/au" --install-location "/Library/Audio/Plug-Ins/Components" \
          --identifier com.osp.instrument.au --version "$version" "$stage/osp-au.pkg"

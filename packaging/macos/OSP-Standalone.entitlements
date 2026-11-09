@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- OSP's standalone app under the hardened runtime: live capture records from the audio
+     input (apps/plugin/CMakeLists.txt: MICROPHONE_PERMISSION_ENABLED). Without this
+     entitlement a notarised app is refused the microphone. Plug-ins take the host's. -->
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+</dict>
+</plist>
