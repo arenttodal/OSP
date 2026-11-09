@@ -90,3 +90,31 @@ if(OSP_BUILD_TESTS)
         ENVIRONMENT "ANDOR_VISUAL_REFERENCE_DIR=${CMAKE_BINARY_DIR}/andor-visual-regression/osp"
         FIXTURES_SETUP andor_visual_reference)
 endif()
+
+# Factory packs: the core sounds and presets built into the installer (docs/library/packs.md,
+# "Publishing"). Every *.osppack in OSP_FACTORY_PACKS_DIR is copied into each plugin bundle's
+# Contents/Resources/Factory, and the plugin installs it into <Library>/Factory at startup.
+# With no pack in the folder (the default, and every build before this step) nothing is
+# added and the bundles are exactly as before.
+set(OSP_FACTORY_PACKS_DIR "${PROJECT_SOURCE_DIR}/packaging/factory-packs" CACHE PATH "Folder of factory packs (*.osppack) built into the plugin")
+file(GLOB OSP_FACTORY_PACKS CONFIGURE_DEPENDS "${OSP_FACTORY_PACKS_DIR}/*.osppack")
+if(OSP_FACTORY_PACKS)
+    foreach(format IN LISTS OSP_PLUGIN_FORMATS)
+        # Bundles only: macOS (all three) and the VST3 elsewhere. A Windows or Linux standalone
+        # is a bare executable with no Contents folder to carry them.
+        if(NOT APPLE AND NOT format STREQUAL "VST3")
+            continue()
+        endif()
+        set(target OSP_Plugin_${format})
+        set(bundle_arg "")
+        if(APPLE)
+            set(bundle_arg "-DBUNDLE=$<TARGET_BUNDLE_DIR:${target}>")
+        endif()
+        add_custom_command(TARGET ${target} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} "-DSOURCE=${OSP_FACTORY_PACKS_DIR}" "-DDEST=$<TARGET_FILE_DIR:${target}>/../Resources/Factory" ${bundle_arg}
+                    -P "${PROJECT_SOURCE_DIR}/cmake/CopyFactoryPacks.cmake"
+            VERBATIM)
+    endforeach()
+    list(LENGTH OSP_FACTORY_PACKS osp_factory_pack_count)
+    message(STATUS "OSP: ${osp_factory_pack_count} factory pack(s) from ${OSP_FACTORY_PACKS_DIR}")
+endif()

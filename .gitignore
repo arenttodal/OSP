@@ -50,3 +50,6 @@ __pycache__/
 /research/polyphonic-lab/**/__pycache__/
 /research/polyphonic-lab/.pytest_cache/
 /research/polyphonic-lab/*.egg-info/
+
+# Factory packs: large, licensed audio; kept with the release, copied in before a build
+/packaging/factory-packs/*.osppack
