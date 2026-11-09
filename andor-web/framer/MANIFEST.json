@@ -1,0 +1,14 @@
+{
+  "bundle": "andor-web framer bundle v1.0.0",
+  "builtFrom": "0643031",
+  "files": {
+    "ANDOR_AudioController.tsx": "61bf14aae87f62e0",
+    "ANDOR_Tokens.tsx": "87ea716b7ca3cb46",
+    "AnnotatedInstrument.tsx": "c48b48d19c2eb96f",
+    "AudioComparison.tsx": "12316a6aafa0657d",
+    "DeepDive.tsx": "2e50d310c38605b4",
+    "FAQ.tsx": "10d3bd40e2f0fd4f",
+    "SoundDeck.tsx": "8794a3b0aee4cf5e",
+    "ViewSwitcher.tsx": "590ec18b35387be3"
+  }
+}

@@ -3,8 +3,8 @@
 Custom components, asset pipeline, tests and documentation for the ANDOR OSP website. Framer
 holds the page layout (see `docs/FRAMER.md`). This folder is isolated from the plugin's DSP code.
 
-**Current stage:** hero E approved at Gate H; the full landing page is built (`osp.html`,
-`docs/PAGE.md`). Waiting on recordings, the waitlist provider and the Framer route.
+**Current stage:** hero E approved; the landing page is built (`osp.html`, `docs/PAGE.md`); the
+Framer code components and build guide are ready (`framer/`, `docs/FRAMER_BUILD_GUIDE.md`).
 
 ## Run
 ```sh
@@ -16,8 +16,9 @@ npm test               # contrast + audio functional test + visual QA at 7 width
 
 ## Layout
 ```
-docs/          MASTER_SPEC, PHASE0_AUDIT, DESIGN_SYSTEM, HERO_CONCEPTS, ASSET_MANIFEST,
-               CONTENT_MODEL, QA_CHECKLIST, FRAMER, DECISIONS
+docs/          MASTER_SPEC, PHASE0_AUDIT, DESIGN_SYSTEM, HERO_CONCEPTS, PAGE, ASSET_MANIFEST,
+               CONTENT_MODEL, QA_CHECKLIST, FRAMER_BUILD_GUIDE, FRAMER_CONTENT, DECISIONS
+framer/        Framer code components (paste into Framer; see FRAMER_BUILD_GUIDE §4) + MANIFEST.json
 components/    audio/ (AudioComparison, GlobalAudioController) · media/ (ProductMedia) ·
                interactive/ (SiteHeader)
 shared/        tokens/ (tokens.css, base.css) · types/ · content/ · utilities/

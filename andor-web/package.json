@@ -6,7 +6,11 @@
     "dev": "vite",
     "build": "tsc -p . && vite build",
     "assets": "node tools/build-assets.mjs",
-    "test": "node tests/accessibility/contrast.mjs && node tests/audio/audio.test.mjs && vite build && node tests/visual/shoot.mjs"
+    "test": "node tests/accessibility/contrast.mjs && node tests/audio/audio.test.mjs && vite build && node tests/visual/shoot.mjs && npm run framer:verify && npm run framer:test",
+    "framer:check": "node tools/framer-check.mjs",
+    "framer:verify": "node tools/framer-check.mjs --verify",
+    "framer:test": "tsc -p tests/framer/tsconfig.json && node tests/framer/framer.test.mjs",
+    "peaks": "node tools/peaks.mjs"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",

@@ -2,3 +2,4 @@ node_modules/
 dist/
 assets/source/
 tests/visual/out/
+framer-upload/

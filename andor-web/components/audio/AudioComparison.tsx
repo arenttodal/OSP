@@ -84,7 +84,11 @@ export function AudioComparison({ demo, theme = 'light', layout = 'compact', cla
     setStatus((s) => (s === 'playing' ? 'ready' : s));
   }, [currentTime, stopGraph, uid]);
 
-  useEffect(() => GlobalAudioController.register(uid, pause), [uid, pause]);
+  // Register once, with a stable pointer to the latest pause: re-registering whenever `pause`
+  // changes would clear the controller's active player mid-playback and break exclusivity.
+  const pauseRef = useRef(pause);
+  pauseRef.current = pause;
+  useEffect(() => GlobalAudioController.register(uid, () => pauseRef.current()), [uid]);
   useEffect(() => () => { abort.current?.abort(); stopGraph(); GlobalAudioController.release(uid); }, [stopGraph, uid]);
 
   const tick = useCallback(() => {

@@ -8,6 +8,7 @@
 | G1 Visual direction | **Done**: Gallery C, no serif, B's header, three layers | `docs/HERO_CONCEPTS.md` rounds 2–3 |
 | H Hero approval | **Approved: E (open bubbles)**, 9 Nov 2026 | `g5.html`, `prototype/osp/Hero.tsx` |
 | Landing page | **Built, awaiting review** | `osp.html`, `docs/PAGE.md` |
+| Framer handoff | **Ready**: 8 code files, build guide, content appendix, upload pack | `framer/`, `docs/FRAMER_BUILD_GUIDE.md` |
 
 ## Decisions made autonomously (routine)
 
@@ -20,6 +21,8 @@
 | D-06 | Fonts self-hosted via @fontsource; Geist Mono added for technical labels | Owner references; no third-party font requests; free licences (OFL) |
 | D-07 | Prototypes built in React + Vite as Framer-portable code; Framer layout is the later implementation | No Framer access from this environment (see Q-02) |
 | D-08 | Audio player built on Web Audio with all variants started on one clock; gain crossfade on switch | Guarantees sample-aligned switching with position preserved; memory ≈ 20 MB for three 18 s stereo files, acceptable on mobile, re-measure with final files |
+| D-10 | Framer route (a): code components + guide, applied by the owner or the Chrome extension | Keeps account credentials out of this environment (owner chose this) |
+| D-11 | Audio players register once with a stable pause pointer | Re-registering on every `pause` change cleared the active player and broke exclusivity (found by the Framer harness) |
 | D-09 | Hero player shows an honest pending state instead of any placeholder audio | Plan: audio controls must play real recordings; none exist |
 
 ## Decisions that need the owner
