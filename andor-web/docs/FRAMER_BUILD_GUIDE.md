@@ -279,11 +279,12 @@ Page name **OSP**, path `/`. Fill ANDOR/bg. Section IDs (for anchors) as named b
 ### 7.12 Footer (dark)
 - Brand on the left: "ANDOR" and "Instruments made from the sounds you love."
 - Four link columns:
-  - Instruments: ANDOR OSP → `#top`; ANDOR ANALOG **soon**.
-  - On this page: Sounds, REIMAGINED, SYNTH + IMPRINT, Questions.
-  - Support: Installation, Documentation, Contact, all **soon**.
-  - Legal: Privacy, Terms, Licence, all **soon**.
-- "Soon" items are plain text, not links, until the pages exist.
+  - Instruments: ANDOR OSP → `/`; ANDOR ANALOG **soon** (plain text, not a link).
+  - On this page: Sounds, REIMAGINED, SYNTH + IMPRINT, Questions (`/#sounds` etc. so they work
+    from every page).
+  - Support: Installation → `/installation`, Documentation → `/documentation`, Contact → `/contact`.
+  - Legal: Privacy → `/privacy`, Terms → `/terms`, Licence → `/licence`.
+- Make the footer a native component so the six support and legal pages (§13) share it.
 - Fine print: "© 2026 ANDOR. ANDOR OSP is in development; pictures show the current development build."
 
 ## 8. Motion
@@ -344,3 +345,38 @@ For each example:
   1024–1440 heights 700–1000.
 - **Header.** The prototype's header shares React code with the page. In Framer it is a native
   component, so keep its text and links in step by hand.
+
+## 13. Support and legal pages
+Six native pages, one template. The text lives in the repo, in `content/pages/*.md` (Markdown with a
+small frontmatter: `title`, `kicker`, `summary`, and `draft` on the legal pages). The prototype
+renders the same files (`installation.html` … `licence.html`).
+
+| Page | Framer path | Group |
+|---|---|---|
+| Installation | `/installation` | Support |
+| Documentation | `/documentation` | Support |
+| Contact | `/contact` | Support |
+| Privacy | `/privacy` | Legal |
+| Terms | `/terms` | Legal |
+| Licence | `/licence` | Legal |
+
+**Template** (make the first page, then duplicate it):
+- Site Header (the Support pill current on all six) and the footer component.
+- Hero: kicker (Mono Label), title (Section), summary (Lede, max 46ch). Top padding 120/80/48.
+- Two columns, 3 : 9, gap 80 (one column below 900 px):
+  - **Side** (sticky, top 24): the group's three pages as a link list, the current one on an
+    Elevated fill; under it "On this page" with one link per `##` heading (anchor = the heading
+    in lower case with dashes, e.g. `#who-is-responsible`). On phones: the three pages as pills,
+    "On this page" as a folded accordion.
+- **Body**: Framer's Rich Text, max width 70ch, body size, line height 1.65.
+  - `##` → H2 at 22–28 px with a hairline above.
+  - Tables become a Rich Text table, or a stack of two-line rows on phones.
+  - The licence texts are code blocks: Mono, 13 px, Secondary fill, wrap on.
+- Paste each page's Markdown into Rich Text (Framer converts headings, lists, links, tables and
+  code when pasted as Markdown; check tables by eye). Links in the files are written as Framer paths
+  (`/contact`, `/installation#uninstall`).
+
+**Before publishing anything but staging:** every `[[…]]` is a placeholder the owner must fill
+(the prototype highlights them and counts them per page), and the three legal pages carry
+"Draft for legal review. Not in force." They need a lawyer's review before they go live. Remove the
+draft note only then.

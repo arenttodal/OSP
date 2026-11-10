@@ -9,6 +9,7 @@
 | H Hero approval | **Approved: E (open bubbles)**, 9 Nov 2026 | `g5.html`, `prototype/osp/Hero.tsx` |
 | Landing page | **Built, awaiting review** | `osp.html`, `docs/PAGE.md` |
 | Framer handoff | **Ready**: 8 code files, build guide, content appendix, upload pack | `framer/`, `docs/FRAMER_BUILD_GUIDE.md` |
+| Support + legal pages | **Drafted**; legal pages need legal review and owner details | `content/pages/`, `installation.html` … `licence.html`, guide §13 |
 
 ## Decisions made autonomously (routine)
 
@@ -23,6 +24,8 @@
 | D-08 | Audio player built on Web Audio with all variants started on one clock; gain crossfade on switch | Guarantees sample-aligned switching with position preserved; memory ≈ 20 MB for three 18 s stereo files, acceptable on mobile, re-measure with final files |
 | D-10 | Framer route (a): code components + guide, applied by the owner or the Chrome extension | Keeps account credentials out of this environment (owner chose this) |
 | D-11 | Audio players register once with a stable pause pointer | Re-registering on every `pause` change cleared the active player and broke exclusivity (found by the Framer harness) |
+| D-12 | Support and legal text lives in Markdown (`content/pages/`), rendered by the prototype and pasted into Framer Rich Text; `[[…]]` marks owner input and is highlighted on the page | One source for both; gaps stay visible instead of being guessed |
+| D-13 | Privacy text states what the code does: no network code (`JUCE_USE_CURL=0`, no sockets), microphone only while REC is open, all files local; no commercial terms written (no prices, refunds, seat counts) | Plan rule: no invented commercial facts; every claim checked in the repo |
 | D-09 | Hero player shows an honest pending state instead of any placeholder audio | Plan: audio controls must play real recordings; none exist |
 
 ## Decisions that need the owner
@@ -34,3 +37,10 @@
 | **Q-02** | Framer: this cloud session cannot open framer.com (and editing needs your signed-in browser). Options: (a) after hero approval, I produce the Framer build guide + code components and you or the Chrome extension apply them; (b) allow framer.com hosts here and grant a Framer API/plugin route. | (a) — keeps your account credentials out of this environment |
 | Q-03 | Söhne licence instead of Inter Tight? | Not needed; Inter Tight passes rendering tests. Revisit only if you want the premium cut |
 | Q-04 | Waitlist provider (MailerLite is connected to this workspace; no account changes made) | Decide at Phase 7 |
+| **L-01** | Company legal name, registered address, organisation/VAT number; support, press and privacy emails; response time | Needed on Contact, Privacy, Terms, Licence |
+| **L-02** | Governing law and venue; supervisory authority; children's age limit | Your country's (EU/EEA: GDPR applies either way) |
+| **L-03** | Licence terms: computers per licence, transfer allowed, what updates include | Decide with pricing; the draft leaves them open |
+| **L-04** | JUCE licence tier for a closed-source release (JUCE 8 is AGPLv3 or commercial) | Confirm the commercial tier before release; named in the Licence notices |
+| **L-05** | Manufacturer name shown in DAWs: the plugin currently reports `OSP` (`COMPANY_NAME`), so Logic lists it under "OSP" | Change to "ANDOR" in the plugin build before release, then fill Installation |
+| **L-06** | Hosting, mailing and analytics providers, and log/list retention periods | Framer hosting; mailing provider per Q-04; prefer no analytics or a cookieless one |
+| **L-07** | A lawyer's review of Privacy, Terms and Licence before they go live | Required; they are drafts |

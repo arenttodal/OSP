@@ -20,7 +20,7 @@ Built after Gate H (hero E approved, 9 Nov 2026). Source: `prototype/osp/` (`mai
 | 9 | Technical | `#tech` | — | — | — |
 | 10 | Waitlist | `#waitlist` | — | form; says nothing was sent (no provider yet) | — |
 | 11 | FAQ | `#faq` | — | native `<details>` | — |
-| 12 | Footer | — | — | in-page links; unbuilt pages marked "soon", not linked | — |
+| 12 | Footer | — | — | in-page links; links to the six support and legal pages; ANALOG "soon" | — |
 
 ## Claims and their evidence
 

@@ -6,7 +6,7 @@
     "dev": "vite",
     "build": "tsc -p . && vite build",
     "assets": "node tools/build-assets.mjs",
-    "test": "node tests/accessibility/contrast.mjs && node tests/audio/audio.test.mjs && vite build && node tests/visual/shoot.mjs && npm run framer:verify && npm run framer:test",
+    "test": "node tests/accessibility/contrast.mjs && node tests/audio/audio.test.mjs && vite build && node tests/visual/shoot.mjs && node tests/visual/pages.mjs && npm run framer:verify && npm run framer:test",
     "framer:check": "node tools/framer-check.mjs",
     "framer:verify": "node tools/framer-check.mjs --verify",
     "framer:test": "tsc -p tests/framer/tsconfig.json && node tests/framer/framer.test.mjs",
@@ -26,6 +26,7 @@
     "@fontsource-variable/inter-tight": "^5.1.0",
     "@fontsource/eb-garamond": "^5.1.0",
     "@fontsource/geist-mono": "^5.1.0",
+    "marked": "^14.1.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

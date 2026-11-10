@@ -302,16 +302,17 @@ export function Faq() {
   );
 }
 
-export function Footer() {
+/** Site footer. `home` prefixes in-page links when the footer sits on another page. */
+export function Footer({ home = '' }: { home?: string }) {
   return (
     <footer className="foot theme-dark">
       <div className="container foot__grid">
-        <div className="foot__brand"><Wordmark variant="brand" /><p>Instruments made from the sounds you love.</p></div>
+        <div className="foot__brand"><Wordmark variant="brand" href={home ? home : '#top'} /><p>Instruments made from the sounds you love.</p></div>
         <nav aria-label="Footer" className="foot__cols">
-          <div><p className="t-mono">Instruments</p><a href="#top">ANDOR OSP</a><span>ANDOR ANALOG <em>soon</em></span></div>
-          <div><p className="t-mono">On this page</p><a href="#sounds">Sounds</a><a href="#reimagined">REIMAGINED</a><a href="#synth">SYNTH + IMPRINT</a><a href="#faq">Questions</a></div>
-          <div><p className="t-mono">Support</p><span>Installation <em>soon</em></span><span>Documentation <em>soon</em></span><span>Contact <em>soon</em></span></div>
-          <div><p className="t-mono">Legal</p><span>Privacy <em>soon</em></span><span>Terms <em>soon</em></span><span>Licence <em>soon</em></span></div>
+          <div><p className="t-mono">Instruments</p><a href={home ? home : '#top'}>ANDOR OSP</a><span>ANDOR ANALOG <em>soon</em></span></div>
+          <div><p className="t-mono">{home ? 'ANDOR OSP' : 'On this page'}</p><a href={`${home}#sounds`}>Sounds</a><a href={`${home}#reimagined`}>REIMAGINED</a><a href={`${home}#synth`}>SYNTH + IMPRINT</a><a href={`${home}#faq`}>Questions</a></div>
+          <div><p className="t-mono">Support</p><a href="installation.html">Installation</a><a href="documentation.html">Documentation</a><a href="contact.html">Contact</a></div>
+          <div><p className="t-mono">Legal</p><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="licence.html">Licence</a></div>
         </nav>
         <p className="foot__fine">© 2026 ANDOR. ANDOR OSP is in development; pictures show the current development build.</p>
       </div>

@@ -53,6 +53,20 @@ function Board() {
             </div>
           </article>
         </div>
+        <div className="board-grid">
+          <article className="board-card">
+            <a href="installation.html" className="board-shots" aria-label="Open the support and legal pages">
+              <img className="board-desk" src={shot('pages-desktop')} width={1200} height={750} alt="" loading="lazy" />
+              <img className="board-mob" src={shot('pages-mobile')} width={390} height={844} alt="" loading="lazy" />
+            </a>
+            <div className="board-meta">
+              <p className="t-mono">Drafts · highlighted items need the owner</p>
+              <h2 className="t-feature">Support and legal pages</h2>
+              <p>Installation, Documentation and Contact; Privacy, Terms and Licence (with the third-party notices). One template, the landing page’s header and footer. The legal pages are drafts for legal review.</p>
+              <a className="btn btn-secondary btn-small" href="installation.html">Open Support</a> <a className="btn btn-secondary btn-small" href="privacy.html">Open Legal</a>
+            </div>
+          </article>
+        </div>
         <h2 className="t-feature board-round">Round 3 · Gallery C, three versions</h2>
         <div className="board-grid">
           {ROUND3.map((c) => (

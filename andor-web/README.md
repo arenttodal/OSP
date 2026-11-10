@@ -9,22 +9,23 @@ Framer code components and build guide are ready (`framer/`, `docs/FRAMER_BUILD_
 ## Run
 ```sh
 npm install
-npm run dev            # http://localhost:5173 (board), /osp.html (landing page), /g5.html (hero E), /h1–h3, /g1–g4
+npm run dev            # http://localhost:5173 (board), /osp.html (landing page), /g5.html (hero E), /installation.html etc., /h1–h3, /g1–g4
 npm run build          # static prototype in dist/
-npm test               # contrast + audio functional test + visual QA at 7 widths
+npm test               # contrast + audio functional test + visual QA at 7 widths + page/link checks
 ```
 
 ## Layout
 ```
 docs/          MASTER_SPEC, PHASE0_AUDIT, DESIGN_SYSTEM, HERO_CONCEPTS, PAGE, ASSET_MANIFEST,
                CONTENT_MODEL, QA_CHECKLIST, FRAMER_BUILD_GUIDE, FRAMER_CONTENT, DECISIONS
+content/       pages/: support and legal pages in Markdown ([[…]] = owner to fill in)
 framer/        Framer code components (paste into Framer; see FRAMER_BUILD_GUIDE §4) + MANIFEST.json
 components/    audio/ (AudioComparison, GlobalAudioController) · media/ (ProductMedia) ·
                interactive/ (SiteHeader)
 shared/        tokens/ (tokens.css, base.css) · types/ · content/ · utilities/
 assets/        manifests/ (assets.json → generated.json) · optimized/ (committed) · source/ (git-ignored masters)
 tools/         capture.sh (real editor captures) · render-object.py (studio renders) · build-assets.mjs
-prototype/     hero concept pages and the concept board
+prototype/     hero concept pages, the landing page (osp/), support and legal pages (pages/), the board
 tests/         accessibility/ · audio/ (harness + generated tone fixtures, test-only) · visual/
 ```
 
