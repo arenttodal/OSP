@@ -346,6 +346,16 @@ ShellEditor::ShellEditor (ShellProcessor& p)
     };
     content.addAndMakeVisible (advancedButton);
     arpButton.onToggleEditor = [this] { setArpExpanded (! arpShown); };
+    if (shell.arpCompanionShown())
+    {
+        arpButton.setSecondRow (shell.product().arpCompanion.name, shell.product().arpCompanion.enabledParameterId);
+        arpButton.onSecondRow = [this] {
+            if (popupIndex == arpCompanionPopup)
+                closePopup();
+            else
+                openPopup (arpCompanionPopup);
+        };
+    }
     arpPanel.onCollapse = [this] { setArpExpanded (false); };
     arpPanel.setCrossClose (shell.crossCloseKeys());
     content.addAndMakeVisible (arpButton);
@@ -999,6 +1009,8 @@ void ShellEditor::openPopup (int which, int source)
         popup = shell.product().generatorHeaderPopover (shell);
     else if (which == hybridHeaderPopup && shell.product().hybridHeaderPopover != nullptr && cards[ShellProcessor::hybridLayer]->hasHeadingDoor())
         popup = shell.product().hybridHeaderPopover (shell);
+    else if (which == arpCompanionPopup && arpButton.hasSecondRow() && shell.product().arpCompanion.popover != nullptr)
+        popup = shell.product().arpCompanion.popover (shell);
     if (popup == nullptr)
         return;
     popupIndex = which;
@@ -1022,6 +1034,8 @@ void ShellEditor::openPopup (int which, int source)
         cards[0]->setHeadingOpen (true);
     if (which == hybridHeaderPopup)
         cards[ShellProcessor::hybridLayer]->setHeadingOpen (true);
+    if (which == arpCompanionPopup)
+        arpButton.setSecondRowOpen (true);
     applyBindings();   // the popover's controls follow the engine's bindings too
     if (isShowing())
         grabKeyboardFocus();
@@ -1059,6 +1073,12 @@ void ShellEditor::positionPopup()
         const auto anchor = content.getLocalArea (&card, card.headingBounds()).toFloat();
         at = { anchor.getX() - 14.0f, anchor.getBottom() + 8.0f };
     }
+    else if (popupIndex == arpCompanionPopup)
+    {
+        // Above the housing, its left edge with the housing's (placePopover keeps it inside).
+        const auto anchor = arpButton.getBounds().toFloat();
+        at = { anchor.getX(), anchor.getY() - 10.0f - size.y };
+    }
     else
         at = frame::modulationPopoverOrigin (modPanel.getBounds().toFloat(), size);
     frame::placePopover (*popup, content, at);
@@ -1080,6 +1100,8 @@ void ShellEditor::closePopup()
         cards[0]->setHeadingOpen (false);
     if (popupIndex == hybridHeaderPopup)
         cards[ShellProcessor::hybridLayer]->setHeadingOpen (false);
+    if (popupIndex == arpCompanionPopup)
+        arpButton.setSecondRowOpen (false);
     juce::Desktop::getInstance().getAnimator().cancelAnimation (popup.get(), false);
     popup.reset();
     popupIndex = -1;
@@ -1158,6 +1180,9 @@ void ShellEditor::mouseDownAnywhere (juce::Component* c)
         return;
     if (c != this && ! isParentOf (c))
         return;   // a click in the popover's own menus
+    if (c == &arpButton && popupIndex == arpCompanionPopup
+        && arpButton.secondRowArea().contains (arpButton.getLocalPoint (nullptr, juce::Desktop::getMousePosition().toFloat())))
+        return;   // (its own row: the row opened it, or switches its instrument with it open)
     int pressed = -1;
     for (int i = 0; i < frame::macroCount; ++i)
         if (c == macros[static_cast<std::size_t> (i)].label.get())

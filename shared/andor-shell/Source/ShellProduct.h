@@ -204,6 +204,16 @@ struct ProductInfo
     /** The oscillator cards' mode as a GRANULAR on / off key, the grain cloud lit in the layer's
         colour while on (opt-in: generatorModeName is then unused there). Off: the named key. */
     bool generatorGranularToggle = false;
+    /** A second instrument in the arpeggiator's housing (opt-in): the housing stacks two rows
+        of the same size, "arp" above and this name below, each with its power light and
+        chevron (no pattern / rate inset). The lower light switches `enabledParameterId`; the
+        rest of its row opens `popover` above the housing. Empty name: ANDOR OSP's housing. */
+    struct ArpCompanion
+    {
+        juce::String name, enabledParameterId;
+        std::function<std::unique_ptr<osp::plugin::MiniPanel> (osp::plugin::InstrumentHost&)> popover;
+    };
+    ArpCompanion arpCompanion;
     /** The product's own materials (opt-in): its finish (the accent family, ceramic tones)
         and rendered pieces of its own (its housing's wood, its badge) in place of ANDOR OSP's,
         for every instance of the product. Unset: ANDOR OSP's, exactly. Interface only. */

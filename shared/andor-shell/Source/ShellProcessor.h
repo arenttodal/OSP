@@ -130,6 +130,7 @@ public:
     bool headerMixShown() const noexcept { return referenceParity || product().headerMix; }
     bool crossCloseKeys() const noexcept { return ! referenceParity && product().crossCloseKeys; }
     bool generatorGranularToggle() const noexcept { return ! referenceParity && product().generatorGranularToggle; }
+    bool arpCompanionShown() const noexcept { return ! referenceParity && product().arpCompanion.name.isNotEmpty(); }
     juce::String cardArpNamespace() const override { return productInfo().slug + "."; }
     void setArpViewCard (int shown) noexcept override { arpViewLane.store (std::clamp (shown, 0, 2), std::memory_order_relaxed); }
 

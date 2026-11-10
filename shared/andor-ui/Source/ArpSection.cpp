@@ -80,13 +80,103 @@ void ArpControl::refresh()
 juce::Rectangle<float> ArpControl::lightArea() const
 {
     const auto r = getLocalBounds().toFloat();
+    if (hasSecondRow())   // (stacked: the upper half, centred in it)
+        return { r.getX() + 4.0f, r.getY() + 1.0f, 26.0f, 0.5f * r.getHeight() - 1.0f };
     return { r.getX() + 4.0f, r.getY() + 3.0f, 26.0f, 0.5f * r.getHeight() - 2.0f };
 }
 
 juce::Rectangle<float> ArpControl::chevronArea() const
 {
     const auto r = getLocalBounds().toFloat();
+    if (hasSecondRow())
+        return { r.getRight() - 26.0f, r.getY() + 1.0f, 22.0f, 0.5f * r.getHeight() - 1.0f };
     return { r.getRight() - 26.0f, r.getY() + 3.0f, 22.0f, 0.5f * r.getHeight() - 2.0f };
+}
+
+void ArpControl::setSecondRow (const juce::String& name, const juce::String& enabledParameterId)
+{
+    secondName = name;
+    secondAttachment.reset();
+    secondEnabled = false;
+    if (name.isNotEmpty())
+        if (auto* param = ospProcessor.apvts().getParameter (enabledParameterId))
+        {
+            secondAttachment = std::make_unique<juce::ParameterAttachment> (*param, [this] (float v) {
+                secondEnabled = v >= 0.5f;
+                repaint();
+            }, &ospProcessor.undo());
+            secondAttachment->sendInitialUpdate();
+        }
+    setTooltip (name.isEmpty() ? "The light switches the arpeggiator on and off; click the card for its settings"
+                               : "Each light switches its instrument on and off; click a row for its settings");
+    repaint();
+}
+
+void ArpControl::setSecondRowOpen (bool open)
+{
+    if (secondOpen != open)
+    {
+        secondOpen = open;
+        repaint();
+    }
+}
+
+juce::Rectangle<float> ArpControl::secondRowArea() const
+{
+    const auto r = getLocalBounds().toFloat();
+    return r.withTrimmedTop (0.5f * r.getHeight());
+}
+
+juce::Rectangle<float> ArpControl::secondLightArea() const
+{
+    const auto row = secondRowArea();
+    return { row.getX() + 4.0f, row.getY(), 26.0f, row.getHeight() - 1.0f };
+}
+
+int ArpControl::hoverAt (juce::Point<float> at) const
+{
+    if (! hasSecondRow())
+        return lightArea().contains (at) ? 1 : 2;
+    if (secondRowArea().contains (at))
+        return secondLightArea().contains (at) ? 3 : 4;
+    return lightArea().contains (at) ? 1 : 2;
+}
+
+void ArpControl::paintLight (juce::Graphics& g, juce::Point<float> c, bool on, bool hovered, const char* onPiece, const char* offPiece)
+{
+    using namespace design;
+    if (auto* pieces = skin::active())
+    {
+        if (on)
+        {
+            g.setColour (colour::accent.withAlpha (hovered ? 0.3f : 0.22f));
+            g.fillEllipse (juce::Rectangle<float> (19.0f, 19.0f).withCentre (c));
+        }
+        if (pieces->draw (g, on ? onPiece : offPiece, juce::Rectangle<float> (11.0f, 11.0f).withCentre (c)))
+        {
+            if (! on && hovered)
+            {
+                g.setColour (colour::text.withAlpha (0.35f));
+                g.drawEllipse (juce::Rectangle<float> (13.0f, 13.0f).withCentre (c), 1.0f);
+            }
+            return;
+        }
+    }
+    if (on)
+    {
+        g.setColour (colour::accent.withAlpha (hovered ? 0.3f : 0.22f));
+        g.fillEllipse (juce::Rectangle<float> (19.0f, 19.0f).withCentre (c));
+        g.setColour (colour::accent);
+        g.fillEllipse (juce::Rectangle<float> (12.0f, 12.0f).withCentre (c));
+        g.setColour (juce::Colour (0xfffff1e2));
+        g.fillEllipse (juce::Rectangle<float> (6.0f, 6.0f).withCentre (c));
+        return;
+    }
+    const auto lens = juce::Rectangle<float> (11.0f, 11.0f).withCentre (c);
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xff8d8a85), lens.getX(), lens.getY(), juce::Colour (0xff5f5c58), lens.getRight(), lens.getBottom(), false));
+    g.fillEllipse (lens);
+    g.setColour (hovered ? colour::text.withAlpha (0.5f) : colour::edgeShade);
+    g.drawEllipse (lens.expanded (0.5f), 1.0f);
 }
 
 void ArpControl::paint (juce::Graphics& g)
@@ -95,6 +185,26 @@ void ArpControl::paint (juce::Graphics& g)
     const auto r = getLocalBounds().toFloat();
     if (! skin::drawnBySurface())   // ceramic: the housing draws the key
         draw::raised (g, r.reduced (1.0f), 10.0f, colour::panelTop, colour::panelBottom);
+    if (hasSecondRow())
+    {
+        // Stacked: two rows of the same height, each its light, its lowercase name and its
+        // chevron; a hairline between them; no inset.
+        auto row = [&] (juce::Rectangle<float> light, juce::Rectangle<float> chevronBox, const juce::String& name, bool on, bool open,
+                        bool lightHovered, bool rowHovered, const char* onPiece, const char* offPiece) {
+            paintLight (g, light.getCentre(), on, lightHovered, onPiece, offPiece);
+            g.setFont (fonts::make (16.0f, fonts::Weight::semibold, 0.04f));
+            g.setColour (colour::text.withAlpha (on ? 0.95f : 0.8f));
+            g.drawText (name, juce::Rectangle<float> (light.getRight() + 2.0f, light.getY(), chevronBox.getX() - light.getRight() - 2.0f, light.getHeight()),
+                        juce::Justification::centredLeft, false);
+            chevron (g, chevronBox.getCentre(), 4.0f, 2.6f, open, rowHovered ? colour::text : colour::text.withAlpha (0.75f), 1.5f);
+        };
+        row (lightArea(), chevronArea(), "arp", enabled, expanded, hover == 1, hover == 2, "led-arp-on", "led-arp-off");
+        const auto lower = secondRowArea();
+        g.setColour (colour::hairline.withAlpha (0.8f));
+        g.fillRect (juce::Rectangle<float> (r.getX() + 10.0f, lower.getY() - 0.5f, r.getWidth() - 20.0f, 1.0f));
+        row (secondLightArea(), chevronArea().withY (lower.getY()), secondName, secondEnabled, secondOpen, hover == 3, hover == 4, "led-arp-on", "led-arp-off");
+        return;
+    }
 
     // The light: an orange ring with a lit centre when on, a grey lens when off. Ceramic: a
     // rendered lens (graphite when off, the accent lit when on; its glow stays drawn).
@@ -171,7 +281,7 @@ void ArpControl::paint (juce::Graphics& g)
 
 void ArpControl::mouseMove (const juce::MouseEvent& e)
 {
-    const int now = lightArea().contains (e.position) ? 1 : 2;
+    const int now = hoverAt (e.position);
     if (now != hover)
     {
         hover = now;
@@ -193,6 +303,14 @@ void ArpControl::toggleEnabled()
 
 void ArpControl::mouseDown (const juce::MouseEvent& e)
 {
+    if (const int at = hoverAt (e.position); at >= 3)
+    {
+        if (at == 3 && secondAttachment != nullptr)
+            secondAttachment->setValueAsCompleteGesture (secondEnabled ? 0.0f : 1.0f);
+        else if (at == 4 && onSecondRow != nullptr)
+            onSecondRow();
+        return;
+    }
     if (lightArea().contains (e.position))
         toggleEnabled();
     else if (onToggleEditor != nullptr)
