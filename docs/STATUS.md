@@ -832,6 +832,40 @@ playable-instrument review**, as the spec requires. Commits: P0 8308f0a, P1 8746
 - Phase 1 plugin: see checklist above.
 - Synthetic ground-truth generators and a synthetic mini-corpus generator
   (`--generate-test-signals`), including deliberately broken/unsupported files.
+- Modulation panel: VEL's and NOTE's larger curve editor and routes popover open again (the
+  editor took LFO 1 .. ENV 2 only, so their expand key and "Edit curve..." did nothing).
+  Opt-in for products (ShellProduct::stableModulationTabs, ANDOR ANALOG): the six tabs at
+  fixed places, the route count in a reserved place, the expand key inside the display;
+  ANDOR OSP's own row is unchanged (pixel-identical).
+- Hardware rack faceplates (shared, opt-in; ANDOR ANALOG's FX Rack V2): `rack::Faceplate` and
+  `rack::hardware::paint` (RackFaceplate.h) - ceramic chassis, enamel rail with title and
+  subtitle, LED, stripes, graphite glass - worn by `ParameterRack` and, through
+  `InstrumentHost::rackFaceplate` / `ProductInfo::rackFaceplates`, by the MOVEMENT, ECHO and
+  SPACE racks (`UnifiedRack::wearFaceplate`: preset and actions in the rail, LED = the macro
+  playing). Without a faceplate (ANDOR OSP, the parity render) nothing changes: 0 px.
+- Full-bleed racks (shared, opt-in; ANDOR ANALOG's FX Rack V3): `rack::Host::setFullBleed` (no
+  panel around the module, the module the rack's whole 214 px, one shadow via
+  `SurfaceFace::surfaceShadowOnly`, the collapse key a borderless X), `Faceplate::fullBleed`
+  (`hardware::measures`), `PowerKey::Style::slide` (a horizontal ON), MOVEMENT's lane power as a
+  slide, `Materials::macros` (a product's macro identities; SPACE's reverb tint follows it), the
+  shell telling the host when an engine's latency changes. ANDOR OSP sets none of it: 0 px.
+- Enamel faceplate (shared, opt-in; ANDOR ANALOG's V5 Patterned Hardware):
+  `rack::Faceplate::enamelBody` makes the whole face the device's enamel. That covers the body
+  and a deeper rail. A product motif painter replaces the stripes, the face gets four corner
+  bolts and a 17 px title, and the glass sits in a deeper enamel bezel. `rackui::Ink`
+  (`inkFor` / `setInk`) is the face's ink, which the cells read for captions, values,
+  switches, tabs, rules and the deck readout. ANDOR OSP sets none of it, so it renders 0 px
+  different.
+- Rack rail save key and full-width graph (shared, opt-in; ANDOR ANALOG): `rack::hardware::SaveKey`
+  sits beside the preset browser on faceplate rails (UnifiedRack's; `ParameterRack::setSaveAction`).
+  `ParameterRack::setFullWidthGraph` makes the graph the whole body, with no cells and no divider
+  (ANALOG's graphic EQ). ANDOR OSP uses neither: 0 px.
+- TAPE deck (shared, opt-in; ANDOR ANALOG's ROUTING + TAPE V4): `rack::Faceplate::tapeDeck`
+  shows ECHO's TAPE and MOVEMENT's TAPE as a light reel deck in the same 214 px rack (knobs
+  left, `TapeDeck` reels / head / readout in the middle, the display smaller on the right,
+  marked PREDICTED; ECHO's TIMING / STEREO as segmented keys on the same parameters).
+  `InstrumentHost::outputPeak()` (default -1; `ShellProcessor` publishes the last block's peak,
+  read-only telemetry) lets the reels rest in silence. ANDOR OSP sets no faceplate: 0 px.
 
 ## IN PROGRESS
 
@@ -840,6 +874,40 @@ playable-instrument review**, as the spec requires. Commits: P0 8308f0a, P1 8746
   standalone app's microphone input).
 
 ## NEXT
+
+- **The effects rack in ANDOR OSP's own plugin** (the rule on shared SPACE / ECHO / ARP
+  features). The rack host (`shared/andor-ui/Source/EffectRack.*`), its modules (built in
+  `MacroPopups.cpp` from the popovers' parts) and the frame's rack slot are shared and opt-in
+  (`ShellProduct::rackModules`); ANDOR ANALOG shows MOVEMENT's (with its two lanes:
+  `PostProcessor::setMovementLanes`), ECHO's and SPACE's. ANDOR OSP shows none, so its look
+  and the visual parity stay exactly as they were; its MOVEMENT stays one lane (every golden
+  unchanged).
+  To bring it to ANDOR OSP:
+  - give its macro names the rack actions (MacroLabel::setRackActions: a double-click opens
+    the module, a right-click offers both, Enter) and add the rack to OspAudioProcessorEditor
+    (the frame already places it: `Parts::rack`, `rackShift`);
+  - save the rack's view state with OSP's session (as `arpOpen`);
+  - review the screenshots at 869 / 1448 / 1810 px and update OSP's own captures.
+
+- **The enamel faceplate (V5) in ANDOR OSP** (the rule on shared ECHO / SPACE features): shared
+  and opt-in through the rack faceplate. It arrives with the effects rack: give OSP's ECHO /
+  MOVEMENT / SPACE faceplates `enamelBody`, a motif painter and an ink in OSP's own palette,
+  then review 869 / 1448 / 1810 px.
+
+- **The TAPE deck in ANDOR OSP** (the rule on shared ECHO features). It is shared
+  (`MacroPopups.cpp`: `TapeDeck`, `UnifiedRack::setDeck`) and opt-in by the rack faceplate,
+  which ANDOR OSP's plugin does not use yet. It comes with the effects rack above: when OSP's
+  plugin shows the rack, give its ECHO / MOVEMENT modules a faceplate with `tapeDeck` (or a
+  plain-rack flag for the deck alone), publish the output peak from OspAudioProcessor
+  (`InstrumentHost::outputPeak`), and review the 869 / 1448 / 1810 px captures.
+
+- **Per-card arpeggiator in ANDOR OSP's own plugin** (the rule on shared SPACE / ECHO / ARP
+  features). The shell's lanes and the ARP panel's PLAYS / LINK / EDIT are shared and in
+  ANDOR ANALOG. Still to do in ANDOR OSP:
+  - share the lane logic between the shell and OspAudioProcessor;
+  - give InstrumentEngine a layer mask per note (it already starts a voice per layer);
+  - opt OSP's panel in;
+  - leave old sessions identical.
 
 - Lab round 1 scored and acted on (docs/reports/lab-1.md). Round 2 in the lab: Reimagined 2,
   Sustain 2, Dynamics 2, Multi-sample 2.
@@ -931,6 +999,30 @@ playable-instrument review**, as the spec requires. Commits: P0 8308f0a, P1 8746
     - stable at FEEDBACK 100 % in every motion, interval and stereo picture;
     - deterministic, and silent in silence.
   - CPU: about 1.3 % of a core at 48 kHz (TAPE about 0.5 .. 0.8 %).
+
+## SPACE presets (3 Nov 2026)
+
+- **Built (shared: ANDOR OSP and ANDOR ANALOG).** SPACE's row of four tabs (redundant with
+  the header's list on ROOMS) is now a presets bar: `‹ NAME ›`.
+  - The arrows step through the presets.
+  - The name opens them by category: ROOMS, HALLS, PLATES, SPRINGS, ABYSS, VINTAGE, BLOOM
+    (38 to start; `shared/andor-ui/Source/SpacePresets`).
+  - ABYSS's, VINTAGE's and BLOOM's variants moved into the header's list, as submenus of
+    their engines; the header shows "ABYSS · DARK".
+- A preset is values for the parameters SPACE already has, nothing else.
+  - Choosing one sets every SPACE parameter (one undo step).
+  - Sessions and patches store the parameters as ever: everything made before plays as it
+    did.
+  - The bar works its name out from the values: the preset they match; the last one chosen
+    with " *" while SPACE is still of its kind; else what is set ("ABYSS DARK").
+  - A new instrument is "Concert Hall" (SPACE's defaults).
+- Evidence: `[presets]`:
+  - every preset is recognised by its values and names its engine;
+  - edited, " *" or what is set;
+  - the bar is in every engine's popover;
+  - a session from before is named by what it plays.
+  - ANDOR ANALOG's three-engine screenshots show the bar on every engine.
+- To do: voice each preset by ear (they are starting points); user presets later.
 
 ## Shell: the per-card arpeggiator (3 Nov 2026)
 

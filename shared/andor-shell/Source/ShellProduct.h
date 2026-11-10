@@ -3,10 +3,12 @@
 #include "WellOverlay.h"
 #include "CardWellEditor.h"
 #include "Design.h"
+#include "EffectRack.h"
 #include "InstrumentFrame.h"
 #include "ShellEngine.h"
 
 #include <array>
+#include <map>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -115,6 +117,42 @@ struct ProductInfo
         own PATTERN / RATE / OCTAVES while unlinked; the ARP panel shows them. Off: one
         arpeggiator for the instrument, as in ANDOR OSP. */
     bool cardArpeggiator = false;
+    /** The effects rack (osp::plugin::rack, opt-in): the modules a key beside their macro's
+        name expands between the macros and the arpeggiator (MOVEMENT, ECHO, SPACE). Empty:
+        no keys and no rack, as in ANDOR OSP. */
+    std::vector<osp::plugin::rack::Kind> rackModules;
+    /** Racks the product builds itself (opt-in; ANDOR ANALOG's FILTER and MORPH): the macro
+        (its parameter ID) whose name opens it as the shared ones do, its kind, and how it is
+        built (osp::plugin::rack::ParameterRack). An empty macro: no macro opens it (the product's
+        own view does: ShellEditor::setRackExpanded). Empty: none, as in ANDOR OSP. */
+    struct ProductRack
+    {
+        juce::String macroParameterId;
+        osp::plugin::rack::Kind kind;
+        std::function<std::unique_ptr<osp::plugin::rack::Module> (osp::plugin::InstrumentHost&)> create;
+    };
+    std::vector<ProductRack> productRacks;
+    /** Another view of the sources' area (opt-in; ANDOR ANALOG's FX ROUTING): a small borderless
+        icon (a branching path) beside the header's SAVE toggles it; while it is shown it takes
+        the cards' place - the header, macros, racks, modulation and keyboard stay where they are.
+        It is interface only (showing it never changes the sound). Unset: no icon, as in ANDOR OSP. */
+    struct SourceAreaView
+    {
+        juce::String tooltip;   ///< "FX Routing"
+        std::function<std::unique_ptr<juce::Component> (osp::plugin::InstrumentHost&)> create;
+    };
+    SourceAreaView sourceAreaView;
+    /** The shared rack modules' hardware faceplates (opt-in; ANDOR ANALOG's), by rack::Kind;
+        empty: the approved racks as they are (ANDOR OSP). Interface only. */
+    std::map<osp::plugin::rack::Kind, osp::plugin::rack::Faceplate> rackFaceplates;
+    /** V3 (opt-in): the rack's module is its whole face (rack::Host::setFullBleed): no panel
+        around the faceplates, a borderless X to close. Off: the approved rack (ANDOR OSP). */
+    bool fullBleedRacks = false;
+    /** MOVEMENT's lanes (InstrumentHost::movementLane), lane 0 first: a product with a second
+        lane lists both (the shell keeps the second lane's SHAPER CUSTOM pattern with the
+        session and gives it to the engine: Engine::setLaneShaperPattern). Empty: one lane,
+        MOVEMENT itself, as in ANDOR OSP. */
+    std::vector<osp::plugin::InstrumentHost::MovementLane> movementLanes;
     /** A card's knob slot, as a product sets it (cardControls): its own control (an empty
         ID), a product control, or hidden. */
     struct CardKnob
@@ -129,9 +167,24 @@ struct ProductInfo
     /** Whether a card shows its four modifier keys (LINK REVERSE LOOP FOLLOW): a product hides
         them where they mean nothing (an oscillator). Unset: shown, as in ANDOR OSP. */
     std::function<bool (int layer, osp::plugin::InstrumentHost&)> cardModifiersShown;
+    /** The modifiers as a compact row of icon keys in the dark well (top-left) instead of the
+        keys under the knobs (EngineCard::setModifiersInWell), and which of them apply to a
+        layer's source now (bits 0 LINK, 1 REVERSE, 2 LOOP, 3 FOLLOW; null: all). Off: ANDOR
+        OSP's keys. */
+    bool cardModifiersInWell = false;
+    /** The modulation panel's six tabs at fixed places whatever is selected (a reserved place
+        at the right for the route count; the larger curve editor's key inside the display:
+        ModulationPanel::setStableTabs). Off: ANDOR OSP's row. */
+    bool stableModulationTabs = false;
+    std::function<int (int layer, osp::plugin::InstrumentHost&)> cardModifiersApplicable;
     /** The header MIX's end labels (three engines: the generator side against the hybrid,
         e.g. "A+B" and "C"). Empty: the layers' letters. */
     std::array<juce::String, 2> mixEndLabels;
+    /** The header's MIX (off: none - the cards' own levels balance them; the preset bar takes
+        its room, SAVE and the source view's key after it). On: ANDOR OSP's header. */
+    bool headerMix = true;
+    /** The ARPEGGIATOR's collapse as the racks' borderless X (off: the round chevron key). */
+    bool crossCloseKeys = false;
     /** Controls in a card's well, revealed by the pointer (opt-in): one per storage layer
         (null: none; see osp::plugin::WellOverlay). Remade when wellOverlayKey changes (a
         model, a source type), so its controls always match what plays. */
@@ -148,6 +201,9 @@ struct ProductInfo
     /** A generator's card names its first source mode this (its menu and selector) instead
         of ANDOR OSP's "One Shot" (a synthesizer's "Standard"). Empty: "One Shot", as before. */
     juce::String generatorModeName;
+    /** The oscillator cards' mode as a GRANULAR on / off key, the grain cloud lit in the layer's
+        colour while on (opt-in: generatorModeName is then unused there). Off: the named key. */
+    bool generatorGranularToggle = false;
     /** The product's own materials (opt-in): its finish (the accent family, ceramic tones)
         and rendered pieces of its own (its housing's wood, its badge) in place of ANDOR OSP's,
         for every instance of the product. Unset: ANDOR OSP's, exactly. Interface only. */

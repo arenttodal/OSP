@@ -131,6 +131,14 @@ public:
     void toggleCard (int shown);
     void toggleLink();
     void setEditCard (int shown);
+    /** The collapse key as the racks' borderless X (opt-in; ANDOR ANALOG's): the same size and
+        stroke, 25 px from the right edge. Off: ANDOR OSP's round chevron key. */
+    void setCrossClose (bool cross)
+    {
+        crossClose = cross;
+        resized();
+        repaint();
+    }
     int editedCard() const noexcept { return editCard; }
     juce::Rectangle<float> cardChipArea (int shown) const { return cardChips[static_cast<std::size_t> (juce::jlimit (0, 2, shown))]; }
     juce::Rectangle<float> linkArea() const { return linkChip; }
@@ -177,6 +185,7 @@ private:
     InstrumentHost::ArpView shown;
     // The per-card arpeggiator.
     bool cards = false, linked = true;
+    bool crossClose = false;
     int editCard = 0;
     std::array<bool, 3> cardOn { true, true, true };
     std::array<int, 3> cardPattern {}, cardOctaves { 1, 1, 1 };

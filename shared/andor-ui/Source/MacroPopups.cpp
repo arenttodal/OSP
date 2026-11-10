@@ -3,8 +3,11 @@
 #include "Binding.h"
 #include "EngineCard.h"
 #include "Design.h"
+#include "EffectRack.h"
 #include "MacroPopups.h"
+#include "RackControls.h"
 #include "ShapingPopups.h"
+#include "SpacePresets.h"
 
 #include "core/Prng.h"
 #include "engine/InstrumentEngine.h"
@@ -17,6 +20,7 @@
 #include "engine/SpaceReverb.h"
 
 #include <cmath>
+#include <map>
 #include <complex>
 #include <numbers>
 
@@ -27,7 +31,7 @@ namespace
 {
     constexpr double twoPi = 2.0 * std::numbers::pi;
 
-    float value (juce::AudioProcessorValueTreeState& state, const char* id)
+    float value (juce::AudioProcessorValueTreeState& state, const juce::String& id)
     {
         if (auto* p = state.getParameter (id))
             return p->convertFrom0to1 (p->getValue());
@@ -62,11 +66,21 @@ namespace
             // The reference's display (SPACE: 558 x 261): a deep slate well, rounded 9 px,
             // shaded under its top edge, a faint light line along its foot.
             const auto r = getLocalBounds().toFloat();
-            g.setGradientFill (juce::ColourGradient (juce::Colour (0xff1f2626), 0.0f, r.getY(), juce::Colour (0xff1a1e1f), 0.0f, r.getBottom(), false));
-            g.fillRoundedRectangle (r, radius);
-            g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.3f), 0.0f, r.getY(), juce::Colours::transparentBlack, 0.0f,
-                                                     r.getY() + 6.0f, false));
-            g.fillRoundedRectangle (r.withHeight (8.0f), radius);
+            // The effects rack's graph (approved): #1c2528 to #192124, radius 5, edge #343f43.
+            const float corner = detailed ? 5.0f : radius;
+            if (detailed)
+            {
+                g.setGradientFill (juce::ColourGradient (juce::Colour (0xff1c2528), 0.0f, r.getY(), juce::Colour (0xff192124), 0.0f, r.getBottom(), false));
+                g.fillRoundedRectangle (r, corner);
+            }
+            else
+            {
+                g.setGradientFill (juce::ColourGradient (juce::Colour (0xff1f2626), 0.0f, r.getY(), juce::Colour (0xff1a1e1f), 0.0f, r.getBottom(), false));
+                g.fillRoundedRectangle (r, radius);
+                g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.3f), 0.0f, r.getY(), juce::Colours::transparentBlack, 0.0f,
+                                                         r.getY() + 6.0f, false));
+                g.fillRoundedRectangle (r.withHeight (8.0f), radius);
+            }
             {
                 juce::Graphics::ScopedSaveState state (g);
                 g.reduceClipRegion (getLocalBounds().reduced (1));
@@ -75,14 +89,14 @@ namespace
                 else
                 {
                     // Pictures designed for the smaller display draw at their own scale.
-                    const float k = visualScale;
+                    const float k = pictureScale;
                     g.addTransform (juce::AffineTransform::scale (k));
                     const auto v = juce::Rectangle<float> (r.getWidth() / k, r.getHeight() / k);
                     paintVisual (g, v.reduced (8.0f, 6.0f));
                 }
             }
-            g.setColour (juce::Colour (0xff0b0e10));
-            g.drawRoundedRectangle (r.reduced (0.5f), radius, 1.0f);
+            g.setColour (detailed ? juce::Colour (0xff343f43) : juce::Colour (0xff0b0e10));
+            g.drawRoundedRectangle (r.reduced (0.5f), corner, 1.0f);
             if (fade > 0.0f && previous.isValid())
             {
                 g.setOpacity (fade);
@@ -105,6 +119,20 @@ namespace
             identity = c;
             repaint();
         }
+        /** The scale a picture designed for the popovers' display draws at (the effects
+            rack's larger display draws it larger: its lines and captions in proportion). */
+        void setPictureScale (float k)
+        {
+            pictureScale = k;
+            repaint();
+        }
+        /** The effects rack's picture: captions with their legends, values beside them, the
+            hierarchy of lines made plainer (opt-in; the popovers' pictures as ever). */
+        void setDetailed (bool shouldBeDetailed)
+        {
+            detailed = shouldBeDetailed;
+            repaint();
+        }
         /** Up to date at once (no fade): what a snapshot without a message loop sees. */
         void settle()
         {
@@ -115,6 +143,7 @@ namespace
 
     protected:
         juce::Colour identity { 0xffe8692a };
+        bool detailed = false;
         virtual void paintVisual (juce::Graphics&, juce::Rectangle<float> plot) = 0;
         /** Draws at the display's full size (otherwise scaled by visualScale). */
         virtual bool native() const { return false; }
@@ -146,6 +175,7 @@ namespace
         }
         juce::Image previous;
         float fade = 0.0f;
+        float pictureScale = visualScale;
     };
 
     /** Remembers a few values; `differs` is true when any of them moved since last time. */
@@ -455,8 +485,13 @@ namespace
             auto tint = [&] (double t) {
                 const float p = static_cast<float> (std::pow (std::clamp (t / tailEnd, 0.0, 1.0), 1.0 - 0.45 * portrait.damping));
                 // Warm onset, rose, SPACE's mauve, then a cool blue-grey.
-                static const juce::Colour stops[] = { juce::Colour (0xffff8a2c), juce::Colour (0xffffa24c), juce::Colour (0xfff5bfa0),
-                                                      juce::Colour (0xffe9c8cf), juce::Colour (0xffcdbbd2), juce::Colour (0xffb2aac4), juce::Colour (0xff8fa4b8) };
+                static const juce::Colour approved[] = { juce::Colour (0xffff8a2c), juce::Colour (0xffffa24c), juce::Colour (0xfff5bfa0),
+                                                         juce::Colour (0xffe9c8cf), juce::Colour (0xffcdbbd2), juce::Colour (0xffb2aac4), juce::Colour (0xff8fa4b8) };
+                // A product with its own SPACE identity (ANDOR ANALOG's spore): the cool half
+                // through aged stone and spore instead of rose and lavender.
+                static const juce::Colour spore[] = { juce::Colour (0xffff8a2c), juce::Colour (0xffffa24c), juce::Colour (0xfff2c49e),
+                                                      juce::Colour (0xffe1d9c3), juce::Colour (0xffcfd0c1), juce::Colour (0xffb0b6a3), juce::Colour (0xff8fa4b8) };
+                const auto* stops = design::detail::materials.macros[static_cast<std::size_t> (design::colour::Macro::space)].getAlpha() != 0 ? spore : approved;
                 static const float at[] = { 0.0f, 0.1f, 0.25f, 0.45f, 0.65f, 0.82f, 1.0f };
                 for (int i = 1; i < 7; ++i)
                     if (p <= at[i])
@@ -637,7 +672,9 @@ namespace
             const double seconds = EchoDelay::timeSeconds (e, processor.hostTempo());
             const bool tape = e.type == EchoType::tape, ascend = e.type == EchoType::ascend;
 
-            const auto plot = juce::Rectangle<float>::leftTopRightBottom (bounds.getX() + 14.0f, bounds.getY() + 14.0f, bounds.getRight() - 10.0f, bounds.getBottom() - 5.0f);
+            // (The rack's picture: room for its captions above and below, L / R at the left.)
+            const auto plot = detailed ? juce::Rectangle<float>::leftTopRightBottom (bounds.getX() + 22.0f, bounds.getY() + 22.0f, bounds.getRight() - 12.0f, bounds.getBottom() - 18.0f)
+                                       : juce::Rectangle<float>::leftTopRightBottom (bounds.getX() + 14.0f, bounds.getY() + 14.0f, bounds.getRight() - 10.0f, bounds.getBottom() - 5.0f);
             const float mid = plot.getCentreY(), half = 0.5f * plot.getHeight();
             const double span = std::clamp (seconds * 7.5, 0.5, 6.0);
             auto xAt = [&] (double t) { return plot.getX() + static_cast<float> (t / span) * plot.getWidth(); };
@@ -653,12 +690,13 @@ namespace
             g.setColour (juce::Colours::white.withAlpha (0.07f));
             g.fillRect (juce::Rectangle<float> (plot.getX(), mid - 0.5f, plot.getWidth(), 1.0f));
 
-            g.setFont (fonts::make (9.0f, fonts::Weight::regular, 0.02f));
-            g.setColour (juce::Colour (0xff9aa09e).withAlpha (0.85f));
+            g.setFont (fonts::make (detailed ? 10.0f : 9.0f, fonts::Weight::regular, 0.02f));
+            g.setColour (juce::Colour (detailed ? 0xffc2c7c5 : 0xff9aa09e).withAlpha (0.85f));
             const auto ms = juce::String (juce::roundToInt (1000.0 * seconds)) + " ms";
+            const float captionY = bounds.getY() + (detailed ? 5.0f : 2.0f);
             g.drawText (e.sync ? juce::String (shaping::echoDivisionName (e.division)) + "  " + ms : ms,
-                        juce::Rectangle<float> (bounds.getX() + 10.0f, bounds.getY() + 2.0f, 160.0f, 11.0f), juce::Justification::centredLeft, false);
-            g.drawText ("FEEDBACK " + juce::String (juce::roundToInt (100.0 * e.feedback)) + " %", juce::Rectangle<float> (bounds.getRight() - 110.0f, bounds.getY() + 2.0f, 100.0f, 11.0f),
+                        juce::Rectangle<float> (bounds.getX() + 10.0f, captionY, 160.0f, 12.0f), juce::Justification::centredLeft, false);
+            g.drawText ("FEEDBACK " + juce::String (juce::roundToInt (100.0 * e.feedback)) + " %", juce::Rectangle<float> (bounds.getRight() - 130.0f, captionY, 120.0f, 12.0f),
                         juce::Justification::centredRight, false);
 
             // The sound itself at zero.
@@ -681,6 +719,9 @@ namespace
             double level = 1.0;
             const auto warm = ascend ? juce::Colour (0xffd6e4f0) : tape ? juce::Colour (0xffffb15c) : juce::Colour (0xffd9c38a);
             const int interval = ascend ? juce::roundToInt (12.0 * std::log2 (EchoDelay::intervalRatio (e.interval))) : 0;
+            // The rack's picture: each repeat's place and height, for the decay line through them.
+            std::vector<juce::Point<float>> peaks { { xAt (0.0), 0.92f * half } };
+            int repeats = 0;
             for (int n = 1; n <= 40; ++n)
             {
                 level = n == 1 ? 0.92 : level * fb;
@@ -689,14 +730,21 @@ namespace
                     break;
                 const float dark = std::clamp (static_cast<float> (n) * (0.07f + 0.08f * (1.0f - static_cast<float> (e.tone))) * (tape ? 0.8f : 1.1f), 0.0f, 0.85f);
                 const auto c = warm.interpolatedWith (identity, std::min (1.0f, 0.35f + 0.6f * dark)).withMultipliedBrightness (1.0f - 0.45f * dark);
-                const float h = half * 0.92f * static_cast<float> (std::sqrt (level));
-                const float width = (tape ? 2.2f + 0.3f * static_cast<float> (n) * static_cast<float> (e.age) : 2.0f);
+                // (The rack: the quiet repeats keep a readable height - still in order, still
+                // falling with the feedback - and are drawn a little wider.)
+                const float h = detailed ? half * std::min (0.92f, 0.22f + 0.7f * static_cast<float> (std::pow (level, 0.6)))
+                                         : half * 0.92f * static_cast<float> (std::sqrt (level));
+                const float width = (tape ? 2.2f + 0.3f * static_cast<float> (n) * static_cast<float> (e.age) : 2.0f) + (detailed ? 1.0f : 0.0f);
+                peaks.push_back ({ xAt (t), h });
+                ++repeats;
                 auto at = [&] (double time, float sign, bool both) {
                     const float x = xAt (time);
+                    // (The rack: the right channel's repeats a shade cooler than the left's.)
+                    const auto cc = detailed && ! both && sign < 0.0f ? c.interpolatedWith (juce::Colour (0xffbcd0e0), 0.3f) : c;
                     if (both)
-                        stroke (x, mid - h, mid + h, c, width);
+                        stroke (x, mid - h, mid + h, cc, width);
                     else
-                        stroke (x, mid, mid - sign * h, c, width);
+                        stroke (x, mid, mid - sign * h, cc, width);
                     if (tape && e.age > 0.05)
                     {
                         // Wow and flutter: faint ghosts either side.
@@ -734,19 +782,56 @@ namespace
                     const int semis = passes * interval;
                     if (const float x = xAt (t); semis != 0 && x + 14.0f < plot.getRight())
                     {
-                        g.setFont (fonts::make (8.0f, fonts::Weight::medium, 0.04f));
+                        g.setFont (fonts::make (detailed ? 9.5f : 8.0f, fonts::Weight::medium, 0.04f));
                         g.setColour (c.withAlpha (0.8f));
                         g.drawText ((semis > 0 ? "+" : "") + juce::String (semis), juce::Rectangle<float> (x + 3.0f, plot.getY() - 2.0f, 24.0f, 10.0f),
                                     juce::Justification::centredLeft, false);
                     }
                 }
             }
+            if (detailed && peaks.size() > 1)
+            {
+                // The decay: a quiet line through the repeats' tops (and, mirrored, their feet).
+                juce::Path upper, lower;
+                for (std::size_t i = 0; i < peaks.size(); ++i)
+                {
+                    const auto& pk = peaks[i];
+                    if (i == 0)
+                    {
+                        upper.startNewSubPath (pk.x, mid - pk.y);
+                        lower.startNewSubPath (pk.x, mid + pk.y);
+                    }
+                    else
+                    {
+                        upper.lineTo (pk.x, mid - pk.y);
+                        lower.lineTo (pk.x, mid + pk.y);
+                    }
+                }
+                juce::Path dashedUpper, dashedLower;
+                const float dashes[] { 3.0f, 3.0f };
+                juce::PathStrokeType line (1.0f);
+                line.createDashedStroke (dashedUpper, upper, dashes, 2);
+                line.createDashedStroke (dashedLower, lower, dashes, 2);
+                g.setColour (identity.withAlpha (0.45f));
+                g.fillPath (dashedUpper);
+                g.fillPath (dashedLower);
+                // What the decay is: the repeats heard and how much each falls.
+                const double fallDb = 20.0 * std::log10 (std::max (1.0e-3, fb));
+                g.setFont (fonts::make (10.0f, fonts::Weight::regular, 0.02f));
+                g.setColour (juce::Colour (0xffc2c7c5).withAlpha (0.8f));
+                g.drawText (juce::String (repeats) + (repeats == 1 ? " repeat" : " repeats") + juce::String::fromUTF8 ("  \xc2\xb7  ") + juce::String (fallDb, 1) + " dB each",
+                            juce::Rectangle<float> (bounds.getX() + 10.0f, bounds.getBottom() - 16.0f, 260.0f, 12.0f), juce::Justification::centredLeft, false);
+                if (ascend)
+                    g.drawText (e.motion == AscendMotion::steady ? "PITCH: each at the interval" : e.motion == AscendMotion::late ? "PITCH: rising from the 2nd" : "PITCH: rising",
+                                juce::Rectangle<float> (bounds.getRight() - 230.0f, bounds.getBottom() - 16.0f, 220.0f, 12.0f), juce::Justification::centredRight, false);
+            }
             if (e.stereo != EchoStereo::mono)
             {
-                g.setFont (fonts::make (8.0f, fonts::Weight::medium, 0.06f));
-                g.setColour (juce::Colour (0xff9aa09e).withAlpha (0.55f));
-                g.drawText ("L", juce::Rectangle<float> (plot.getX() - 10.0f, plot.getY(), 8.0f, 10.0f), juce::Justification::centred, false);
-                g.drawText ("R", juce::Rectangle<float> (plot.getX() - 10.0f, plot.getBottom() - 10.0f, 8.0f, 10.0f), juce::Justification::centred, false);
+                g.setFont (fonts::make (detailed ? 9.5f : 8.0f, fonts::Weight::medium, 0.06f));
+                g.setColour (juce::Colour (0xff9aa09e).withAlpha (detailed ? 0.8f : 0.55f));
+                const float lx = detailed ? plot.getX() - 16.0f : plot.getX() - 10.0f;
+                g.drawText ("L", juce::Rectangle<float> (lx, plot.getY(), 10.0f, 10.0f), juce::Justification::centred, false);
+                g.drawText ("R", juce::Rectangle<float> (lx, plot.getBottom() - 10.0f, 10.0f, 10.0f), juce::Justification::centred, false);
             }
         }
 
@@ -918,16 +1003,42 @@ namespace
     //==========================================================================
     // MOVEMENT: what each mode does over time, from the bus' own formulas (SHAPER: the
     // pattern and the DSP's own playhead).
+    /** MOVEMENT's lane `index` (InstrumentHost::movementLane): its parameters' names and the
+        depth it plays at. Lane 0 is MOVEMENT itself ("movement.*", the MOVEMENT macro). */
+    struct Lane
+    {
+        Lane (InstrumentHost& host, int laneIndex) : index (laneIndex), ids (host.movementLane (laneIndex)) {}
+        int index;
+        InstrumentHost::MovementLane ids;
+        juce::String operator() (const char* suffix) const { return ids.prefix + suffix; }
+        /** 0..1: the MOVEMENT macro, times the lane's own INTENSITY when it has one. */
+        double depth (juce::AudioProcessorValueTreeState& s) const
+        {
+            double d = std::clamp (0.01 * value (s, "motion"), 0.0, 1.0);
+            if (ids.levelId.isNotEmpty())
+                d *= std::clamp (0.01 * value (s, ids.levelId), 0.0, 1.0);
+            return d;
+        }
+        /** PULSE's rate in Hz: free, or the synced note value at the host's tempo. */
+        double pulseHz (InstrumentHost& host) const
+        {
+            auto& s = host.apvts();
+            if (ids.syncId.isNotEmpty() && value (s, ids.syncId) >= 0.5f && ids.pulseDivisionId.isNotEmpty())
+                return shaping::pulseSyncedHz (juce::roundToInt (value (s, ids.pulseDivisionId)), host.hostTempo());
+            return shaping::pulseRateHz (0.01 * value (s, (*this) ("pulse.rate")));
+        }
+    };
+
     class MovementVisual final : public Visual
     {
     public:
-        explicit MovementVisual (InstrumentHost& p) : processor (p) {}
+        explicit MovementVisual (InstrumentHost& p, int laneIndex = 0) : processor (p), lane (p, laneIndex) {}
 
     private:
         bool animates() const override { return true; }
         bool changed() override
         {
-            const int mode = juce::roundToInt (value (processor.apvts(), "movement.mode"));
+            const int mode = juce::roundToInt (value (processor.apvts(), lane ("mode")));
             if (mode != shownMode && shownMode >= 0)
                 transition();
             shownMode = mode;
@@ -957,17 +1068,36 @@ namespace
 
         void caption (juce::Graphics& g, juce::Rectangle<float> area, const juce::String& text, juce::Colour colour, float y) const
         {
+            if (detailed)
+            {
+                // A legend: a short stroke of the line's own colour, then its name (and value).
+                g.setColour (colour);
+                g.fillRoundedRectangle (juce::Rectangle<float> (area.getX(), y + 5.0f, 10.0f, 2.0f), 1.0f);
+                g.setFont (type::annotation (9.5f));
+                g.setColour (colour.interpolatedWith (juce::Colours::white, 0.2f));
+                g.drawText (text, juce::Rectangle<float> (area.getX() + 14.0f, y, 180.0f, 12.0f), juce::Justification::centredLeft, false);
+                return;
+            }
             g.setColour (colour);
             g.setFont (type::annotation (9.0f));
             g.drawText (text, juce::Rectangle<float> (area.getX(), y, 120.0f, 11.0f), juce::Justification::centredLeft, false);
+        }
+        /** The rack's picture: what the lines move at, at the top right. */
+        void note (juce::Graphics& g, juce::Rectangle<float> area, const juce::String& text) const
+        {
+            if (! detailed)
+                return;
+            g.setFont (type::annotation (9.5f));
+            g.setColour (juce::Colour (0xffb8bdbb));
+            g.drawText (text, juce::Rectangle<float> (area.getRight() - 200.0f, area.getY(), 200.0f, 12.0f), juce::Justification::centredRight, false);
         }
 
         void paintVisual (juce::Graphics& g, juce::Rectangle<float> area) override
         {
             using namespace palette;
             auto& s = processor.apvts();
-            const auto mode = static_cast<MovementMode> (std::clamp (juce::roundToInt (value (s, "movement.mode")), 0, 4));
-            const double amount = std::clamp (0.01 * value (s, "motion"), 0.0, 1.0);
+            const auto mode = static_cast<MovementMode> (std::clamp (juce::roundToInt (value (s, lane ("mode"))), 0, 4));
+            const double amount = lane.depth (s);
             const float depth = static_cast<float> (0.25 + 0.75 * amount);   // the knob's amount, still visible at 0
             const float mid = area.getCentreY(), half = area.getHeight() * 0.42f;
             // MOVEMENT's mineral blue for the movement itself; secondary lines a quiet stone.
@@ -980,23 +1110,36 @@ namespace
                 case MovementMode::drift:
                 {
                     // Slow, organic wander (the voices' shared value noise): pitch, tone, level.
-                    const double rate = shaping::driftSpeedHz (0.01 * value (s, "movement.drift.speed"));
+                    const double rate = shaping::driftSpeedHz (0.01 * value (s, lane ("drift.speed")));
                     // (Square roots: small settings still show.)
-                    const double pitch = std::sqrt (std::clamp (0.01 * value (s, "movement.drift.pitch"), 0.02, 1.0));
-                    const double tone = std::sqrt (std::clamp (0.01 * value (s, "movement.drift.tone"), 0.02, 1.0));
+                    const double pitch = std::sqrt (std::clamp (0.01 * value (s, lane ("drift.pitch")), 0.02, 1.0));
+                    const double tone = std::sqrt (std::clamp (0.01 * value (s, lane ("drift.tone")), 0.02, 1.0));
                     const double window = std::clamp (6.0 / rate, 6.0, 60.0);
-                    trace (g, area, window, [rate] (double t) { return shaping::sharedWander (11, t, rate * 1.3) * 0.6; }, stone.withAlpha (0.35f), 1.0f, mid, half * depth);
-                    trace (g, area, window, [rate, tone] (double t) { return tone * shaping::sharedWander (7, t, rate * 0.8); }, stone.withAlpha (0.7f), 1.4f, mid, half * depth);
-                    trace (g, area, window, [rate, pitch] (double t) { return pitch * shaping::sharedWander (3, t, rate); }, identity, 2.0f, mid, half * depth);
-                    caption (g, area, "PITCH", identity, area.getY());
-                    caption (g, area, "TONE", stone, area.getY() + 11.0f);
+                    const float swing = detailed ? 1.7f : 1.0f;   // (the rack: the wander over more of the height)
+                    if (! detailed)
+                        trace (g, area, window, [rate] (double t) { return shaping::sharedWander (11, t, rate * 1.3) * 0.6; }, stone.withAlpha (0.35f), 1.0f, mid, half * depth);
+                    // (The rack: TONE a quieter, thinner line under PITCH, the third, unnamed one left out.)
+                    trace (g, area, window, [rate, tone] (double t) { return tone * shaping::sharedWander (7, t, rate * 0.8); }, stone.withAlpha (detailed ? 0.8f : 0.7f),
+                           detailed ? 1.3f : 1.4f, mid, half * depth * swing);
+                    trace (g, area, window, [rate, pitch] (double t) { return pitch * shaping::sharedWander (3, t, rate); }, identity, detailed ? 2.4f : 2.0f, mid, half * depth * swing);
+                    if (detailed)
+                    {
+                        caption (g, area, "PITCH  " + juce::String (shaping::driftPitchCents (0.01 * value (s, lane ("drift.pitch"))), 1) + " c", identity, area.getY());
+                        caption (g, area, "TONE  " + juce::String (juce::roundToInt (value (s, lane ("drift.tone")))) + " %", stone, area.getY() + 14.0f);
+                        note (g, area, format::hertz (shaping::driftSpeedHz (0.01 * value (s, lane ("drift.speed")))));
+                    }
+                    else
+                    {
+                        caption (g, area, "PITCH", identity, area.getY());
+                        caption (g, area, "TONE", stone, area.getY() + 11.0f);
+                    }
                     break;
                 }
                 case MovementMode::tape:
                 {
                     // Wow (slow transport) above, flutter (fast capstan) below; WEAR roughens both.
-                    const double a = 0.01 * value (s, "movement.tape.wow"), b = 0.01 * value (s, "movement.tape.flutter");
-                    const double wear = 0.01 * value (s, "movement.tape.wear");
+                    const double a = 0.01 * value (s, lane ("tape.wow")), b = 0.01 * value (s, lane ("tape.flutter"));
+                    const double wear = 0.01 * value (s, lane ("tape.wear"));
                     const double wowHz = shaping::tapeWowHz (a), flutterHz = shaping::tapeFlutterHz (b);
                     auto rough = [wear] (double t) { return wear * 0.25 * shaping::sharedWander (19, t, 9.0); };
                     trace (g, area, 4.0, [wowHz, a, rough] (double t) { return (0.7 * std::sin (twoPi * wowHz * t) + 0.5 * shaping::sharedWander (5, t, 0.3)) * (0.3 + 0.7 * a) * 0.8 + rough (t); },
@@ -1005,54 +1148,78 @@ namespace
                            stone, 1.2f, area.getY() + area.getHeight() * 0.76f, area.getHeight() * 0.18f * depth);
                     caption (g, area, "WOW  " + format::hertz (wowHz), identity, area.getY());
                     caption (g, area, "FLUTTER  " + format::hertz (flutterHz), stone, area.getY() + area.getHeight() * 0.5f);
+                    if (detailed)
+                    {
+                        // The two machines apart: a faint rule between them, WEAR at the top right.
+                        g.setColour (displayLine.withAlpha (0.6f));
+                        g.fillRect (juce::Rectangle<float> (area.getX(), area.getY() + area.getHeight() * 0.5f - 3.0f, area.getWidth(), 1.0f));
+                        note (g, area, "WEAR  " + juce::String (juce::roundToInt (100.0 * wear)) + " %");
+                    }
                     break;
                 }
                 case MovementMode::chorus:
                 {
                     // Two delay taps moving in phase-offset sines: STEREO pulls them apart.
-                    const double rate = shaping::chorusRateHz (0.01 * value (s, "movement.chorus.rate"));
-                    const double width = std::log2 (shaping::chorusWidthMs (0.01 * value (s, "movement.chorus.width")) / 0.2) / std::log2 (90.0);
-                    const double stereo = 0.01 * value (s, "movement.chorus.stereo");
+                    const double rate = shaping::chorusRateHz (0.01 * value (s, lane ("chorus.rate")));
+                    const double width = std::log2 (shaping::chorusWidthMs (0.01 * value (s, lane ("chorus.width"))) / 0.2) / std::log2 (90.0);
+                    const double stereo = 0.01 * value (s, lane ("chorus.stereo"));
                     const double window = 2.5 / rate;
                     const float extent = half * static_cast<float> (0.25 + 0.75 * width) * depth;
                     trace (g, area, window, [rate, stereo] (double t) { return std::sin (twoPi * rate * t + std::numbers::pi * stereo); }, stone, 1.6f, mid, extent);
                     trace (g, area, window, [rate] (double t) { return std::sin (twoPi * rate * t); }, identity, 1.8f, mid, extent);
-                    caption (g, area, "L", identity, area.getY());
-                    caption (g, area, "R", stone, area.getY() + 11.0f);
+                    if (detailed)
+                    {
+                        caption (g, area, "LEFT", identity, area.getY());
+                        caption (g, area, "RIGHT", stone, area.getY() + 14.0f);
+                        note (g, area, format::hertz (rate) + juce::String::fromUTF8 ("  \xc2\xb7  ") + format::milliseconds (shaping::chorusWidthMs (0.01 * value (s, lane ("chorus.width")))));
+                    }
+                    else
+                    {
+                        caption (g, area, "L", identity, area.getY());
+                        caption (g, area, "R", stone, area.getY() + 11.0f);
+                    }
                     break;
                 }
                 case MovementMode::pulse:
                 {
                     // The gain the bus applies: sine to rounded square by SHAPE, MOVEMENT's depth.
-                    const double rate = shaping::pulseRateHz (0.01 * value (s, "movement.pulse.rate"));
-                    const double k = 1.0 + 7.0 * 0.01 * value (s, "movement.pulse.shape");
-                    const double stereo = 0.01 * value (s, "movement.pulse.stereo");
+                    const double rate = lane.pulseHz (processor);
+                    const double k = 1.0 + 7.0 * 0.01 * value (s, lane ("pulse.shape"));
+                    const double stereo = 0.01 * value (s, lane ("pulse.stereo"));
                     const double norm = std::tanh (k), window = 3.0 / rate;
                     auto gain = [k, norm, amount] (double phase) {
                         const double y = std::tanh (k * std::sin (phase)) / norm;
                         return 1.0 - std::max (0.35, amount) * 0.5 * (1.0 - y);
                     };
-                    const float bottom = area.getBottom(), height = area.getHeight() * 0.9f;
+                    const float bottom = area.getBottom(), height = area.getHeight() * (detailed ? 0.72f : 0.9f);   // (the rack: under its legends)
                     auto toTrace = [&] (double offset) {
                         return [=] (double t) { return 2.0 * gain (twoPi * rate * t + offset) - 1.0; };
                     };
                     if (stereo > 0.02)
                         trace (g, area, window, toTrace (std::numbers::pi * stereo), stone.withAlpha (0.7f), 1.3f, bottom - 0.5f * height, 0.5f * height);
                     trace (g, area, window, toTrace (0.0), identity, 2.0f, bottom - 0.5f * height, 0.5f * height);
-                    caption (g, area, format::hertz (rate), identity, area.getY());
+                    if (detailed)
+                    {
+                        caption (g, area, stereo > 0.02 ? "LEFT" : "LEVEL", identity, area.getY());
+                        if (stereo > 0.02)
+                            caption (g, area, "RIGHT", stone.withAlpha (0.85f), area.getY() + 14.0f);
+                        note (g, area, format::hertz (rate));
+                    }
+                    else
+                        caption (g, area, format::hertz (rate), identity, area.getY());
                     break;
                 }
                 case MovementMode::shaper:
                 {
                     // The pattern's contour (with SMOOTH), the step grid, and the DSP's own
                     // playhead (host-synchronised) with the step it is in.
-                    const int pattern = juce::roundToInt (value (s, "movement.shaper.pattern"));
-                    const double smooth = 0.01 * value (s, "movement.shaper.smooth");
+                    const int pattern = juce::roundToInt (value (s, lane ("shaper.pattern")));
+                    const double smooth = 0.01 * value (s, lane ("shaper.smooth"));
                     // DEPTH (the MOVEMENT macro): how far the level travels - the pattern's
                     // full range as a ghost, what DEPTH makes of it in front.
-                    const float depth = static_cast<float> (std::clamp (0.01 * value (s, "motion"), 0.0, 1.0));
+                    const float depth = static_cast<float> (lane.depth (s));
                     const auto span = RhythmicShaper::span (pattern, smooth);
-                    const float phase = processor.shaperPhase();
+                    const float phase = processor.laneShaperPhase (lane.index);
                     const float cell = area.getWidth() / RhythmicShaper::steps;
                     const int current = phase >= 0.0f ? std::min (RhythmicShaper::steps - 1, static_cast<int> (phase * RhythmicShaper::steps)) : -1;
                     for (int i = 0; i < RhythmicShaper::steps; ++i)
@@ -1103,6 +1270,7 @@ namespace
         }
 
         InstrumentHost& processor;
+        Lane lane;
         int shownMode = -1;
     };
 
@@ -1134,17 +1302,17 @@ namespace
     class ShaperEditor final : public Visual, public juce::SettableTooltipClient
     {
     public:
-        ShaperEditor (InstrumentHost& p, ShaperTool& t, bool isLarge) : processor (p), tool (t), large (isLarge)
+        ShaperEditor (InstrumentHost& p, ShaperTool& t, bool isLarge, int laneIndex = 0) : processor (p), lane (p, laneIndex), tool (t), large (isLarge)
         {
             setInterceptsMouseClicks (true, false);
             setTooltip (large ? "Draw the pattern: STEP sets each step's level (its shape from the brush), DRAW paints a free line"
                               : "Click or drag to set the steps (the magnifier opens the large editor)");
         }
 
-        bool custom() const { return value (processor.apvts(), "movement.shaper.custom") >= 0.5f; }
+        bool custom() const { return value (processor.apvts(), lane ("shaper.custom")) >= 0.5f; }
         ShaperPattern steps() const
         {
-            return custom() ? processor.shaperCustomPattern() : RhythmicShaper::patternSteps (juce::roundToInt (value (processor.apvts(), "movement.shaper.pattern")));
+            return custom() ? processor.laneShaperPattern (lane.index) : RhythmicShaper::patternSteps (juce::roundToInt (value (processor.apvts(), lane ("shaper.pattern"))));
         }
 
         void mouseDown (const juce::MouseEvent& e) override
@@ -1154,8 +1322,8 @@ namespace
             if (! custom())
             {
                 // Editing a library pattern: it becomes CUSTOM, starting from it.
-                processor.setShaperCustomPattern (working);
-                if (auto* c = processor.apvts().getParameter ("movement.shaper.custom"))
+                processor.setLaneShaperPattern (lane.index, working);
+                if (auto* c = processor.apvts().getParameter (lane ("shaper.custom")))
                     c->setValueNotifyingHost (1.0f);
             }
             last = e.position;
@@ -1228,7 +1396,7 @@ namespace
             if (! (pattern == working))
             {
                 working = pattern;
-                processor.setShaperCustomPattern (pattern);
+                processor.setLaneShaperPattern (lane.index, pattern);
                 repaint();
             }
         }
@@ -1239,10 +1407,10 @@ namespace
             auto& s = processor.apvts();
             const auto area = plotArea();
             const auto pattern = steps();
-            const double smooth = 0.01 * value (s, "movement.shaper.smooth");
-            const float depth = static_cast<float> (std::clamp (0.01 * value (s, "motion"), 0.0, 1.0));
+            const double smooth = 0.01 * value (s, lane ("shaper.smooth"));
+            const float depth = static_cast<float> (lane.depth (s));
             const auto span = RhythmicShaper::span (pattern, smooth);
-            const float phase = processor.shaperPhase();
+            const float phase = processor.laneShaperPhase (lane.index);
             const float cell = area.getWidth() / RhythmicShaper::steps;
             const int current = phase >= 0.0f ? std::min (RhythmicShaper::steps - 1, static_cast<int> (phase * RhythmicShaper::steps)) : -1;
             const bool editable = custom() || large;
@@ -1309,6 +1477,7 @@ namespace
         }
 
         InstrumentHost& processor;
+        Lane lane;
         ShaperTool& tool;
         bool large;
         ShaperPattern working {};
@@ -1733,7 +1902,7 @@ namespace
 
         juce::Point<int> cardSize() const override
         {
-            int h = headerTop + visualHeight + gap + (modeTabs != nullptr ? tabsHeight + 6 : 0) + cellHeight + bottom;
+            int h = headerTop + visualHeight + gap + (modeTabs != nullptr || modeRow != nullptr ? tabsHeight + 6 : 0) + cellHeight + bottom;
             if (! secondaryRow.empty())
                 h += 2 + secondaryCellHeight;
             return { panelWidth, h };
@@ -1755,9 +1924,9 @@ namespace
             if (visual != nullptr)
                 visual->setBounds (area.removeFromTop (visualHeight));
             area.removeFromTop (gap);
-            if (modeTabs != nullptr)
+            if (auto* row = modeTabs != nullptr ? static_cast<juce::Component*> (modeTabs.get()) : modeRow.get())
             {
-                modeTabs->setBounds (area.removeFromTop (tabsHeight));
+                row->setBounds (area.removeFromTop (tabsHeight));
                 area.removeFromTop (6);
             }
             layoutRow (primaryRow, area.removeFromTop (cellHeight));
@@ -1786,21 +1955,153 @@ namespace
         bool ownColour = false;
         std::unique_ptr<ValueSelector> modeSelector;
         std::unique_ptr<SegmentedControl> modeTabs;
+        std::unique_ptr<juce::Component> modeRow;   ///< in the tabs' place (SPACE: its presets)
         std::unique_ptr<Visual> visual;
         std::vector<std::unique_ptr<MiniKnob>> knobs;
         std::vector<MiniKnob*> primaryRow, secondaryRow;
     };
 
     //==========================================================================
+    /** SPACE's presets in the tabs' place: < NAME > (the arrows step through them, the name
+        opens them by category). The name is worked out from the values (spacepresets): the
+        preset they match, the last one chosen with " *" once edited, else what is set. */
+    class SpacePresetBar final : public juce::Component, public juce::SettableTooltipClient, private juce::Timer
+    {
+    public:
+        SpacePresetBar (InstrumentHost& p, juce::Colour accentColour) : host (p), accent (accentColour)
+        {
+            setTitle ("SPACE presets");
+            setTooltip ("SPACE's presets: click for the list by category, the arrows for the next or previous");
+            setMouseCursor (juce::MouseCursor::PointingHandCursor);
+            refreshText();
+            startTimerHz (8);
+        }
+
+        /** What the bar shows now (tests). */
+        juce::String text() const { return shown; }
+        void choose (int index)
+        {
+            const auto& all = spacepresets::all();
+            if (index < 0 || index >= static_cast<int> (all.size()))
+                return;
+            spacepresets::apply (host.apvts(), all[static_cast<std::size_t> (index)], &host.undo());
+            last = index;
+            refreshText();
+        }
+        void step (int delta)
+        {
+            const int count = static_cast<int> (spacepresets::all().size());
+            const int from = current >= 0 ? current : last;
+            choose (from < 0 ? (delta > 0 ? 0 : count - 1) : (from + delta + count) % count);
+        }
+        void showMenu()
+        {
+            const auto& all = spacepresets::all();
+            juce::PopupMenu menu;
+            juce::Component::SafePointer<SpacePresetBar> safe (this);
+            for (const auto& category : spacepresets::categories())
+            {
+                juce::PopupMenu sub;
+                bool ticked = false;
+                for (int i = 0; i < static_cast<int> (all.size()); ++i)
+                    if (category == all[static_cast<std::size_t> (i)].category)
+                    {
+                        sub.addItem (all[static_cast<std::size_t> (i)].name, true, i == current, [safe, i] { if (safe != nullptr) safe->choose (i); });
+                        ticked = ticked || i == current;
+                    }
+                menu.addSubMenu (category, sub, true, nullptr, ticked);
+            }
+            menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
+        }
+
+        void paint (juce::Graphics& g) override
+        {
+            using namespace design;
+            // (The values may have moved since the timer last looked: what is drawn is now.)
+            current = spacepresets::matching (host.apvts());
+            if (current >= 0)
+                last = current;
+            shown = spacepresets::barText (host.apvts(), last);
+            const auto r = getLocalBounds().toFloat().reduced (0.5f);
+            g.setColour (colour::text.withAlpha (hover == 2 ? 0.07f : 0.04f));
+            g.fillRoundedRectangle (r, 5.0f);
+            g.setColour (colour::hairline.darker (0.1f));
+            g.drawRoundedRectangle (r, 5.0f, 1.0f);
+            auto arrow = [&g, this] (juce::Rectangle<float> a, bool left, bool lit) {
+                juce::Path path;
+                const auto c = a.getCentre();
+                path.startNewSubPath (c.x + (left ? 2.5f : -2.5f), c.y - 4.0f);
+                path.lineTo (c.x + (left ? -2.0f : 2.0f), c.y);
+                path.lineTo (c.x + (left ? 2.5f : -2.5f), c.y + 4.0f);
+                g.setColour (colour::text.withAlpha (lit ? 0.9f : 0.55f));
+                g.strokePath (path, juce::PathStrokeType (1.4f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            };
+            arrow (leftArea(), true, hover == 1);
+            arrow (rightArea(), false, hover == 3);
+            g.setColour (colour::hairline.darker (0.1f));
+            g.fillRect (juce::Rectangle<float> (leftArea().getRight(), r.getY() + 4.0f, 1.0f, r.getHeight() - 8.0f));
+            g.fillRect (juce::Rectangle<float> (rightArea().getX() - 1.0f, r.getY() + 4.0f, 1.0f, r.getHeight() - 8.0f));
+            g.setFont (type::popupLabel (12.5f));
+            g.setColour (current >= 0 ? accent.darker (0.35f) : colour::text.withAlpha (0.85f));
+            g.drawText (shown, getLocalBounds().toFloat().withTrimmedLeft (leftArea().getWidth() + 4.0f).withTrimmedRight (rightArea().getWidth() + 4.0f),
+                        juce::Justification::centred, true);
+        }
+
+        void mouseDown (const juce::MouseEvent& e) override
+        {
+            if (leftArea().contains (e.position))
+                step (-1);
+            else if (rightArea().contains (e.position))
+                step (1);
+            else
+                showMenu();
+        }
+        void mouseMove (const juce::MouseEvent& e) override
+        {
+            const int now = leftArea().contains (e.position) ? 1 : (rightArea().contains (e.position) ? 3 : 2);
+            if (now != hover)
+            {
+                hover = now;
+                repaint();
+            }
+        }
+        void mouseExit (const juce::MouseEvent&) override
+        {
+            hover = 0;
+            repaint();
+        }
+
+    private:
+        juce::Rectangle<float> leftArea() const { return getLocalBounds().toFloat().removeFromLeft (26.0f); }
+        juce::Rectangle<float> rightArea() const { return getLocalBounds().toFloat().removeFromRight (26.0f); }
+        void timerCallback() override { refreshText(); }
+        void refreshText()
+        {
+            current = spacepresets::matching (host.apvts());
+            if (current >= 0)
+                last = current;
+            if (const auto next = spacepresets::barText (host.apvts(), last); next != shown)
+            {
+                shown = next;
+                repaint();
+            }
+        }
+
+        InstrumentHost& host;
+        juce::Colour accent;
+        juce::String shown;
+        int current = -1, last = -1, hover = 0;
+    };
+
+    //==========================================================================
     /** SPACE: the room, its EQ on the display (drag the corners), then its shape. The header's
-        list picks a room or one of SPACE's other engines; the popover keeps its size.
-          ROOMS    the four rooms as tabs; PRE-DELAY, SIZE, DECAY, DAMP; MOD, WIDTH, LOW / HIGH CUT.
-          ABYSS    DEEP / DARK / INVERSE / ENDLESS; PRE-DELAY, SIZE, DECAY, DAMP; GRAVITY, RESONANCE,
-                   MOD, WIDTH, FREEZE.
-          VINTAGE  HALL / PLATE / CHAMBER / ROOM; PRE-DELAY, SIZE, DECAY, DAMP; DIFFUSION, MOD,
-                   WIDTH, ERA.
-          BLOOM    CLEAN / VINTAGE / TAPE / WASH; TIME (a division synced, ms free), DIFFUSION,
-                   DECAY, DAMP; SYNC, SIZE, MOD, WIDTH.
+        list picks a room or one of SPACE's other engines and its variant (ABYSS DEEP / DARK /
+        INVERSE / ENDLESS, VINTAGE HALL / PLATE / CHAMBER / ROOM, BLOOM CLEAN / VINTAGE / TAPE /
+        WASH); under the display the presets bar (SpacePresetBar); the popover keeps its size.
+          ROOMS    PRE-DELAY, SIZE, DECAY, DAMP; MOD, WIDTH, LOW / HIGH CUT.
+          ABYSS    PRE-DELAY, SIZE, DECAY, DAMP; GRAVITY, RESONANCE, MOD, WIDTH, FREEZE.
+          VINTAGE  PRE-DELAY, SIZE, DECAY, DAMP; DIFFUSION, MOD, WIDTH, ERA.
+          BLOOM    TIME (a division synced, ms free), DIFFUSION, DECAY, DAMP; SYNC, SIZE, MOD, WIDTH.
         Off ROOMS, LOW / HIGH CUT stay on the display's corners. */
     class SpacePanel final : public MacroPanel
     {
@@ -1813,41 +2114,74 @@ namespace
               syncAttachment (*p.apvts().getParameter ("space.bloom.sync"), [this] (float) {
                   juce::Component::SafePointer<SpacePanel> safe (this);   // (SYNC is itself a knob here: rebuilt after its gesture)
                   juce::MessageManager::callAsync ([safe] { if (safe != nullptr) safe->build(); });
-              })
+              }),
+              typeAttachment (*p.apvts().getParameter ("space.type"), [this] (float) {
+                  for (auto& k : knobs)
+                      k->repaint();   // (ROOMS' DECAY readout follows the type's range)
+              }),
+              variantAttachments { juce::ParameterAttachment (*p.apvts().getParameter ("space.abyss.variant"), [this] (float) { repaintMode(); }),
+                                   juce::ParameterAttachment (*p.apvts().getParameter ("space.vintage.variant"), [this] (float) { repaintMode(); }),
+                                   juce::ParameterAttachment (*p.apvts().getParameter ("space.bloom.variant"), [this] (float) { repaintMode(); }) }
         {
-            auto& m = mode ("space.type", "Room, hall, plate or spring - or ABYSS, VINTAGE or BLOOM, SPACE's other engines");
+            auto& m = mode ("space.type", "Room, hall, plate or spring - or ABYSS, VINTAGE or BLOOM, SPACE's other engines, and their variants");
             m.textOverride = [this] {
-                static const char* names[] = { "", "ABYSS", "VINTAGE", "BLOOM" };
-                return juce::String (names[std::clamp (engine(), 0, 3)]);
+                if (engine() == 0)
+                    return juce::String();
+                return spacepresets::describe (processor.apvts()).replace (" ", juce::String::fromUTF8 (" \xc2\xb7 "));
             };
             m.extraItems = [this] (juce::PopupMenu& menu) {
                 juce::Component::SafePointer<SpacePanel> safe (this);
                 menu.addSeparator();
+                static const std::array<juce::StringArray, 3> variants { juce::StringArray { "Deep", "Dark", "Inverse", "Endless" },
+                                                                         juce::StringArray { "Hall", "Plate", "Chamber", "Room" },
+                                                                         juce::StringArray { "Clean", "Vintage", "Tape", "Wash" } };
+                static const char* variantIds[] { "space.abyss.variant", "space.vintage.variant", "space.bloom.variant" };
                 int index = 1;
                 for (const char* name : { "Abyss", "Vintage", "Bloom" })
                 {
-                    menu.addItem (name, true, engine() == index, [safe, index] { if (safe != nullptr) safe->setEngine (index); });
+                    juce::PopupMenu sub;
+                    const int now = juce::roundToInt (value (processor.apvts(), variantIds[index - 1]));
+                    for (int v = 0; v < 4; ++v)
+                        sub.addItem (variants[static_cast<std::size_t> (index - 1)][v], true, engine() == index && now == v,
+                                     [safe, index, v] { if (safe != nullptr) safe->setEngine (index, v); });
+                    menu.addSubMenu (name, sub, true, nullptr, engine() == index);
                     ++index;
                 }
             };
             m.onPick = [this] (int) { setEngine (0); };   // a room leaves the other engines
             setVisual (std::make_unique<SpaceVisual> (p.apvts(), [&p] { return static_cast<double> (p.hostTempo()); }));
+            modeRow = std::make_unique<SpacePresetBar> (p, accent);
+            addAndMakeVisible (*modeRow);
             build();
         }
+
+        /** Tests: the presets bar. */
+        SpacePresetBar& presetBar() { return *static_cast<SpacePresetBar*> (modeRow.get()); }
 
         /** Tests: what the popover is built for now (engine * 2 + BLOOM's SYNC). */
         int builtFor() const noexcept { return built; }
 
     private:
         int engine() const { return juce::roundToInt (value (processor.apvts(), "space.engine")); }
-        void setEngine (int e)
+        void setEngine (int e, int variant = -1)
         {
-            if (auto* param = processor.apvts().getParameter ("space.engine"); param != nullptr && juce::roundToInt (param->convertFrom0to1 (param->getValue())) != e)
-            {
-                param->beginChangeGesture();
-                param->setValueNotifyingHost (param->convertTo0to1 (static_cast<float> (e)));
-                param->endChangeGesture();
-            }
+            auto set = [this] (const char* id, int v) {
+                if (auto* param = processor.apvts().getParameter (id); param != nullptr && juce::roundToInt (param->convertFrom0to1 (param->getValue())) != v)
+                {
+                    param->beginChangeGesture();
+                    param->setValueNotifyingHost (param->convertTo0to1 (static_cast<float> (v)));
+                    param->endChangeGesture();
+                }
+            };
+            static const char* variantIds[] { "space.abyss.variant", "space.vintage.variant", "space.bloom.variant" };
+            if (variant >= 0 && e >= 1 && e <= 3)
+                set (variantIds[e - 1], variant);
+            set ("space.engine", e);
+        }
+        void repaintMode()
+        {
+            if (modeSelector != nullptr)
+                modeSelector->repaint();
         }
 
         void build()
@@ -1869,8 +2203,6 @@ namespace
             {
                 case 1:   // ABYSS
                 {
-                    tabs ("space.abyss.variant", { "DEEP", "DARK", "INVERSE", "ENDLESS" },
-                          "DEEP: the vast space. DARK: a thick, dark body. INVERSE: it swells in. ENDLESS: it hardly ends");
                     knob (false, "space.preDelay", "PRE-DELAY", ms);
                     knob (false, "space.size", "SIZE", percent);
                     knob (false, "space.decay", "DECAY", seconds);
@@ -1888,7 +2220,6 @@ namespace
                 }
                 case 2:   // VINTAGE
                 {
-                    tabs ("space.vintage.variant", { "HALL", "PLATE", "CHAMBER", "ROOM" }, "VINTAGE's voicings: a hall, a plate, a chamber or a room");
                     knob (false, "space.preDelay", "PRE-DELAY", ms);
                     knob (false, "space.size", "SIZE", percent);
                     knob (false, "space.decay", "DECAY", seconds);
@@ -1902,7 +2233,6 @@ namespace
                 }
                 case 3:   // BLOOM
                 {
-                    tabs ("space.bloom.variant", { "CLEAN", "VINTAGE", "TAPE", "WASH" }, "BLOOM's loop: clean, a bucket brigade, tape, or a wash");
                     if (sync)
                         knob (false, "space.bloom.division", "TIME", [] (double v) { return juce::String (shaping::echoDivisionName (juce::roundToInt (v))); });
                     else
@@ -1918,12 +2248,11 @@ namespace
                 }
                 default:   // ROOMS
                 {
-                    auto& types = tabs ("space.type", { "ROOM", "HALL", "PLATE", "SPRING" }, "Room, hall (after the Berlin concert halls), plate or spring");
                     auto* typeParam = processor.apvts().getParameter ("space.type");
                     knob (false, "space.preDelay", "PRE-DELAY", ms);
                     knob (false, "space.size", "SIZE", percent);
                     // The readout shows the decay the chosen type actually uses (each type has its own range).
-                    auto& decay = knob (false, "space.decay", "DECAY", [typeParam] (double v) {
+                    knob (false, "space.decay", "DECAY", [typeParam] (double v) {
                         double lo = 0.2, hi = 8.0;
                         if (typeParam != nullptr)
                             shaping::decayRange (static_cast<SpaceType> (juce::roundToInt (typeParam->convertFrom0to1 (typeParam->getValue()))), lo, hi);
@@ -1934,7 +2263,6 @@ namespace
                     knob (true, "space.width", "WIDTH", percent);
                     knob (true, "space.lowCut", "LOW CUT", [] (double v) { return format::hertz (v); });
                     knob (true, "space.highCut", "HIGH CUT", [] (double v) { return format::hertz (v); });
-                    types.onChange = [&decay] (int) { decay.repaint(); };
                     break;
                 }
             }
@@ -1942,7 +2270,8 @@ namespace
             repaint();
         }
 
-        juce::ParameterAttachment engineAttachment, syncAttachment;
+        juce::ParameterAttachment engineAttachment, syncAttachment, typeAttachment;
+        std::array<juce::ParameterAttachment, 3> variantAttachments;
         int built = -1;
     };
 
@@ -2188,6 +2517,2429 @@ namespace
         MagnifierButton magnifier;
         std::unique_ptr<ShaperToolbar> toolbar;
         juce::ParameterAttachment customAttachment;
+    };
+
+    //==========================================================================
+    // MOVEMENT's lanes as data: everything a lane plays (its mode, every mode's settings, its
+    // INTENSITY, SYNC, CYCLE and PHASE, its CUSTOM steps), by name, so a lane can be copied to
+    // the other, swapped with it, or saved and loaded as a MOVEMENT preset that touches
+    // nothing else of the instrument.
+    const juce::StringArray& laneSettingNames()
+    {
+        static const juce::StringArray names { "mode", "drift.speed", "drift.pitch", "drift.tone", "tape.wow", "tape.flutter", "tape.wear",
+                                               "chorus.rate", "chorus.width", "chorus.stereo", "pulse.rate", "pulse.shape", "pulse.stereo",
+                                               "shaper.pattern", "shaper.rate", "shaper.target", "shaper.smooth", "shaper.custom" };
+        return names;
+    }
+
+    struct LaneSnapshot
+    {
+        std::map<juce::String, float> values;   ///< plain values by name ("mode", "level", ...)
+        ShaperPattern pattern {};
+        bool on = true;
+    };
+
+    /** The lane's own names besides MOVEMENT's settings: "level", "sync", "pulse.division", "phase". */
+    std::vector<std::pair<juce::String, juce::String>> laneExtras (const InstrumentHost::MovementLane& ids)
+    {
+        return { { "level", ids.levelId }, { "sync", ids.syncId }, { "pulse.division", ids.pulseDivisionId }, { "phase", ids.phaseId } };
+    }
+
+    LaneSnapshot readLane (InstrumentHost& host, int laneIndex)
+    {
+        const Lane lane (host, laneIndex);
+        auto& s = host.apvts();
+        LaneSnapshot snap;
+        for (const auto& name : laneSettingNames())
+            if (s.getParameter (lane.ids.prefix + name) != nullptr)
+                snap.values[name] = value (s, lane.ids.prefix + name);
+        for (const auto& [name, id] : laneExtras (lane.ids))
+            if (id.isNotEmpty() && s.getParameter (id) != nullptr)
+                snap.values[name] = value (s, id);
+        snap.pattern = host.laneShaperPattern (laneIndex);
+        snap.on = lane.ids.onId.isEmpty() || value (s, lane.ids.onId) >= 0.5f;
+        return snap;
+    }
+
+    void setPlain (juce::AudioProcessorValueTreeState& s, const juce::String& id, float plain)
+    {
+        if (auto* p = s.getParameter (id))
+        {
+            p->beginChangeGesture();
+            p->setValueNotifyingHost (p->convertTo0to1 (plain));
+            p->endChangeGesture();
+        }
+    }
+
+    /** Writes `snap` into the lane (the SHAPER steps an undoable step of their own); its ON
+        too when `withOn`. Names the lane lacks are skipped (a preset from a richer lane). */
+    void writeLane (InstrumentHost& host, int laneIndex, const LaneSnapshot& snap, bool withOn)
+    {
+        const Lane lane (host, laneIndex);
+        auto& s = host.apvts();
+        for (const auto& name : laneSettingNames())
+            if (const auto it = snap.values.find (name); it != snap.values.end())
+                setPlain (s, lane.ids.prefix + name, it->second);
+        for (const auto& [name, id] : laneExtras (lane.ids))
+            if (const auto it = snap.values.find (name); id.isNotEmpty() && it != snap.values.end())
+                setPlain (s, id, it->second);
+        host.setLaneShaperPattern (laneIndex, snap.pattern);
+        if (withOn && lane.ids.onId.isNotEmpty())
+            setPlain (s, lane.ids.onId, snap.on ? 1.0f : 0.0f);
+    }
+
+    constexpr const char* movementPresetExtension = ".andormovement";
+}   // namespace
+
+juce::File movementPresetFolder()
+{
+    return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("ANDOR/Movement Presets");
+}
+
+juce::Array<juce::File> savedMovementPresets()
+{
+    auto files = movementPresetFolder().findChildFiles (juce::File::findFiles, false, juce::String ("*") + movementPresetExtension);
+    files.sort();
+    return files;
+}
+
+bool writeMovementPreset (InstrumentHost& host, int lane, const juce::File& file)
+{
+    const auto snap = readLane (host, lane);
+    auto* root = new juce::DynamicObject();
+    root->setProperty ("schemaVersion", 1);
+    root->setProperty ("kind", "andor.movement");
+    auto* settings = new juce::DynamicObject();
+    for (const auto& [name, plain] : snap.values)
+        settings->setProperty (juce::Identifier (name), plain);
+    root->setProperty ("settings", juce::var (settings));
+    root->setProperty ("pattern", InstrumentHost::encodeShaperPattern (snap.pattern));
+    file.getParentDirectory().createDirectory();
+    return file.replaceWithText (juce::JSON::toString (juce::var (root)));
+}
+
+bool readMovementPreset (InstrumentHost& host, int lane, const juce::File& file)
+{
+    const auto parsed = juce::JSON::parse (file.loadFileAsString());
+    if (! parsed.isObject() || parsed["kind"].toString() != "andor.movement")
+        return false;
+    LaneSnapshot snap;
+    if (auto* settings = parsed["settings"].getDynamicObject())
+        for (const auto& property : settings->getProperties())
+            snap.values[property.name.toString()] = static_cast<float> (static_cast<double> (property.value));
+    snap.pattern = InstrumentHost::decodeShaperPattern (parsed["pattern"].toString()).value_or (RhythmicShaper::patternSteps (ShaperParams().pattern));
+    snap.on = true;   // (loading into a lane that is off: it plays)
+    host.undo().beginNewTransaction ("Load MOVEMENT preset");
+    writeLane (host, lane, snap, true);
+    return true;
+}
+
+void copyMovementLane (InstrumentHost& host, int from, int to)
+{
+    if (from == to || std::max (from, to) >= host.movementLaneCount())
+        return;
+    host.undo().beginNewTransaction ("Copy MOVEMENT lane");
+    writeLane (host, to, readLane (host, from), false);
+}
+
+void swapMovementLanes (InstrumentHost& host)
+{
+    if (host.movementLaneCount() < 2)
+        return;
+    const auto a = readLane (host, 0), b = readLane (host, 1);
+    host.undo().beginNewTransaction ("Swap MOVEMENT lanes");
+    writeLane (host, 0, b, true);
+    writeLane (host, 1, a, true);
+}
+
+namespace
+{
+    //==========================================================================
+    /** The effects rack's columns (module coordinates, the module as wide as the rack): the
+        picture exactly under the modulation window (its display's width, the same divider
+        before it), the controls on the left. */
+    namespace rackcolumns
+    {
+        /** The approved rack (ANDOR_*_RACK_APPROVAL.html, 1392 px reference): its content
+            inset 20 px (19 padding + the 1 px border) on both sides; the controls' column a
+            fixed share of that width per module (MOVEMENT 57 %, ECHO 61 %, SPACE 68 %); a 17 px
+            gap, then the divider (1 px), 17 px, the graph to the right inset. The share is the
+            module's, never a mode's or a value's: the graph never moves while editing. */
+        constexpr int inset = rackui::Cell::contentInset, columnGap = rackui::Cell::columnGap, graphPad = rackui::Cell::columnGap, bottom = 12;
+        inline int dividerFor (float share, int width)
+        {
+            const int x0 = inset, x1 = width - inset;
+            return x0 + juce::roundToInt (share * static_cast<float> (x1 - x0)) + columnGap;
+        }
+        inline int pictureLeftFor (float share, int width) { return dividerFor (share, width) + 1 + graphPad; }
+        /** The divider before the graph (approved: 1 px #cbc4b9, the content's height). */
+        inline void paintDivider (juce::Graphics& g, int x, float top, float bottomY)
+        {
+            g.setColour (juce::Colour (0xffcbc4b9));
+            g.fillRect (juce::Rectangle<float> (static_cast<float> (x), top, 1.0f, bottomY - top));
+        }
+        using Slot = rackui::Slot;
+        using rackui::slotWidth;
+        using rackui::slotGap;
+        using rackui::denseFrom;
+    }
+
+    //==========================================================================
+    // The effects rack's modules - MOVEMENT, ECHO and SPACE - built on one structure, SPACE's:
+    //   1 the heading (the host draws it) and the module's own compact actions beside it,
+    //   2 MODE: the algorithm, a selector at the left,
+    //   3 PRESET: the presets of that mode, ‹ NAME ›, beside it,
+    //   4 the controls of that mode: one row of equal cells (knobs, or keys under a caption),
+    //   5 the picture, in the modulation window's column behind the same divider.
+    // Their presets follow one set of rules (RackPresetBar).
+
+    /** One preset of a rack module: values by the module's own names, SHAPER steps maybe. */
+    struct RackPreset
+    {
+        juce::String category, name;
+        std::map<juce::String, float> values;
+        std::optional<ShaperPattern> pattern;
+        juce::File file;   ///< a user preset's file (none: a factory one)
+        bool isUser() const { return file != juce::File(); }
+        bool sameAs (const RackPreset& other) const { return name == other.name && file == other.file; }
+    };
+
+    /** Tests: where user presets are saved instead of Documents/ANDOR (empty: there). */
+    juce::File& rackPresetFolderOverride()
+    {
+        static juce::File folder;
+        return folder;
+    }
+
+    /** What a module's presets are made of, and how they meet its parameters. */
+    class RackPresetModel
+    {
+    public:
+        /** `memory`: where the host keeps which preset was chosen last (saved with the session,
+            so "NAME *" outlives the rack being closed and the instrument being reopened). */
+        RackPresetModel (InstrumentHost& h, juce::String memory) : host (h), memoryKey (std::move (memory)) {}
+        virtual ~RackPresetModel() = default;
+        virtual juce::String kind() const = 0;        ///< in a user preset's file ("andor.echo")
+        virtual juce::String extension() const = 0;
+        virtual juce::String folderName() const = 0;  ///< under Documents/ANDOR
+        virtual int mode() const = 0;
+        virtual int modeOf (const RackPreset&) const = 0;
+        virtual juce::String modeName (int mode) const = 0;
+        virtual const std::vector<RackPreset>& factory() const = 0;
+        /** The settings now, as a user preset stores them. */
+        virtual RackPreset capture() const = 0;
+        /** Sets the preset's settings (this effect, this lane only). */
+        virtual void apply (const RackPreset&) = 0;
+        virtual bool matches (const RackPreset&) const = 0;
+        /** More of the module's actions at the end of the presets' menu (MOVEMENT: its lanes'). */
+        virtual void addMenuItems (juce::PopupMenu& menu) { juce::ignoreUnused (menu); }
+
+        juce::File folder() const
+        {
+            if (rackPresetFolderOverride() != juce::File())
+                return rackPresetFolderOverride().getChildFile (folderName());
+            return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("ANDOR").getChildFile (folderName());
+        }
+        std::vector<RackPreset> user() const
+        {
+            std::vector<RackPreset> list;
+            auto files = folder().findChildFiles (juce::File::findFiles, false, "*" + extension());
+            files.sort();
+            for (const auto& f : files)
+                if (auto p = read (f))
+                    list.push_back (std::move (*p));
+            return list;
+        }
+        std::optional<RackPreset> read (const juce::File& file) const
+        {
+            const auto parsed = juce::JSON::parse (file.loadFileAsString());
+            if (! parsed.isObject() || parsed["kind"].toString() != kind())
+                return std::nullopt;
+            RackPreset p;
+            p.category = "YOURS";
+            p.name = file.getFileNameWithoutExtension();
+            p.file = file;
+            if (auto* settings = parsed["settings"].getDynamicObject())
+                for (const auto& property : settings->getProperties())
+                    p.values[property.name.toString()] = static_cast<float> (static_cast<double> (property.value));
+            if (parsed.hasProperty ("pattern"))
+                p.pattern = InstrumentHost::decodeShaperPattern (parsed["pattern"].toString());
+            return p;
+        }
+        std::optional<RackPreset> save (const juce::String& name) const
+        {
+            auto p = capture();
+            p.name = name;
+            p.category = "YOURS";
+            p.file = folder().getChildFile (juce::File::createLegalFileName (name) + extension());
+            auto* root = new juce::DynamicObject();
+            root->setProperty ("schemaVersion", 1);
+            root->setProperty ("kind", kind());
+            auto* settings = new juce::DynamicObject();
+            for (const auto& [key, plain] : p.values)
+                settings->setProperty (juce::Identifier (key), plain);
+            root->setProperty ("settings", juce::var (settings));
+            if (p.pattern.has_value())
+                root->setProperty ("pattern", InstrumentHost::encodeShaperPattern (*p.pattern));
+            p.file.getParentDirectory().createDirectory();
+            if (! p.file.replaceWithText (juce::JSON::toString (juce::var (root))))
+                return std::nullopt;
+            return p;
+        }
+
+        /** The preset last chosen or saved (the bar's "NAME *" once edited). */
+        std::optional<RackPreset> lastChosen() const
+        {
+            const auto code = host.rackPresetMemory (memoryKey);
+            if (code != cachedCode)
+            {
+                cachedCode = code;
+                cached.reset();
+                if (code.startsWith ("factory:"))
+                {
+                    for (const auto& p : factory())
+                        if (p.name == code.fromFirstOccurrenceOf ("factory:", false, false))
+                            cached = p;
+                }
+                else if (code.startsWith ("user:"))
+                    cached = read (juce::File (code.fromFirstOccurrenceOf ("user:", false, false)));
+            }
+            return cached;
+        }
+        void setLastChosen (const std::optional<RackPreset>& p)
+        {
+            host.setRackPresetMemory (memoryKey, ! p.has_value() ? juce::String() : (p->isUser() ? "user:" + p->file.getFullPathName() : "factory:" + p->name));
+        }
+
+    protected:
+        InstrumentHost& host;
+        juce::String memoryKey;
+
+    private:
+        mutable juce::String cachedCode { "-" };
+        mutable std::optional<RackPreset> cached;
+    };
+
+    /** Values of host parameters by their IDs (SPACE's, ECHO's). */
+    class ParameterPresetModel : public RackPresetModel
+    {
+    public:
+        ParameterPresetModel (InstrumentHost& h, juce::String memory, juce::StringArray parameterIds) : RackPresetModel (h, std::move (memory)), ids (std::move (parameterIds)) {}
+        RackPreset capture() const override
+        {
+            RackPreset p;
+            for (const auto& id : ids)
+                if (host.apvts().getParameter (id) != nullptr)
+                    p.values[id] = value (host.apvts(), id);
+            return p;
+        }
+        void apply (const RackPreset& p) override
+        {
+            host.undo().beginNewTransaction ("Preset " + p.name);
+            for (const auto& [id, plain] : p.values)
+                if (ids.contains (id))
+                    setPlain (host.apvts(), id, plain);
+        }
+        bool matches (const RackPreset& p) const override
+        {
+            for (const auto& [id, plain] : p.values)
+                if (auto* param = host.apvts().getParameter (id); param != nullptr && std::abs (param->convertTo0to1 (plain) - param->getValue()) > 1.5e-3f)
+                    return false;
+            return ! p.values.empty();
+        }
+
+    protected:
+        float defaultOf (const juce::String& id) const
+        {
+            auto* param = host.apvts().getParameter (id);
+            return param != nullptr ? param->convertFrom0to1 (param->getDefaultValue()) : 0.0f;
+        }
+        juce::StringArray ids;
+    };
+
+    /** SPACE: its presets (spacepresets, each with every other SPACE parameter at its default)
+        and the musician's own; the mode is the engine (ROOMS, ABYSS, VINTAGE, BLOOM). */
+    class SpacePresetModel final : public ParameterPresetModel
+    {
+    public:
+        explicit SpacePresetModel (InstrumentHost& h) : ParameterPresetModel (h, "space", spacepresets::parameterIds())
+        {
+            for (const auto& preset : spacepresets::all())
+            {
+                RackPreset p;
+                p.category = preset.category;
+                p.name = preset.name;
+                for (const auto& id : ids)
+                    p.values[id] = defaultOf (id);
+                for (const auto& [id, plain] : preset.values)
+                    p.values[id] = plain;
+                presets.push_back (std::move (p));
+            }
+        }
+        juce::String kind() const override { return "andor.space"; }
+        juce::String extension() const override { return ".andorspace"; }
+        juce::String folderName() const override { return "Space Presets"; }
+        int mode() const override { return juce::roundToInt (value (host.apvts(), "space.engine")); }
+        int modeOf (const RackPreset& p) const override
+        {
+            const auto it = p.values.find ("space.engine");
+            return it != p.values.end() ? juce::roundToInt (it->second) : 0;
+        }
+        juce::String modeName (int m) const override
+        {
+            static const char* names[] { "ROOMS", "ABYSS", "VINTAGE", "BLOOM" };
+            return names[std::clamp (m, 0, 3)];
+        }
+        const std::vector<RackPreset>& factory() const override { return presets; }
+
+    private:
+        std::vector<RackPreset> presets;
+    };
+
+    /** ECHO: a few starting points for each machine (TAPE, BBD, ASCEND) and the musician's own. */
+    class EchoPresetModel final : public ParameterPresetModel
+    {
+    public:
+        explicit EchoPresetModel (InstrumentHost& h)
+            : ParameterPresetModel (h, "echo", { "echo.type", "echo.sync", "echo.division", "echo.time", "echo.feedback", "echo.tone", "echo.age", "echo.stereo",
+                                         "echo.ascend.interval", "echo.ascend.motion" })
+        {
+            // (type, sync, division index, free ms, feedback %, tone %, age %, stereo, interval, motion)
+            struct Row
+            {
+                const char* name;
+                float type, sync, division, ms, feedback, tone, age, stereo, interval, motion;
+            };
+            static const Row rows[] {
+                { "Dotted Eighth", 0, 1, 5, 375, 45, 50, 35, 1, 0, 0 },   // (the instrument's own default)
+                { "Slapback", 0, 0, 5, 110, 12, 55, 30, 0, 0, 0 },
+                { "Worn Loop", 0, 1, 6, 375, 68, 32, 78, 2, 0, 0 },
+                { "Dub Wash", 0, 1, 8, 375, 82, 30, 55, 1, 0, 0 },
+                { "Bucket Eighths", 1, 1, 3, 375, 40, 45, 35, 1, 0, 0 },
+                { "Short Doubler", 1, 0, 3, 32, 10, 60, 50, 2, 0, 0 },
+                { "Dark Repeats", 1, 1, 6, 375, 58, 22, 70, 2, 0, 0 },
+                { "Bucket Slap", 1, 0, 3, 85, 18, 55, 25, 0, 0, 0 },
+                { "Octave Rise", 2, 1, 5, 375, 50, 55, 35, 1, 0, 0 },
+                { "Fifth Steps", 2, 1, 3, 375, 45, 50, 30, 1, 1, 1 },
+                { "Shimmer Late", 2, 1, 6, 375, 62, 60, 30, 2, 0, 2 },
+                { "Falling Octave", 2, 1, 5, 375, 48, 40, 40, 1, 3, 0 },
+            };
+            for (const auto& r : rows)
+            {
+                RackPreset p;
+                p.name = r.name;
+                p.values = { { "echo.type", r.type }, { "echo.sync", r.sync }, { "echo.division", r.division }, { "echo.time", r.ms },
+                             { "echo.feedback", r.feedback }, { "echo.tone", r.tone }, { "echo.age", r.age }, { "echo.stereo", r.stereo },
+                             { "echo.ascend.interval", r.interval }, { "echo.ascend.motion", r.motion } };
+                if (r.sync >= 0.5f)
+                    p.values.erase ("echo.time");   // (synced: the free time is not part of it)
+                else
+                    p.values.erase ("echo.division");
+                if (r.type < 1.5f)
+                {
+                    p.values.erase ("echo.ascend.interval");   // (only ASCEND has them)
+                    p.values.erase ("echo.ascend.motion");
+                }
+                p.category = modeName (juce::roundToInt (r.type));
+                presets.push_back (std::move (p));
+            }
+        }
+        juce::String kind() const override { return "andor.echo"; }
+        juce::String extension() const override { return ".andorecho"; }
+        juce::String folderName() const override { return "Echo Presets"; }
+        int mode() const override { return juce::roundToInt (value (host.apvts(), "echo.type")); }
+        int modeOf (const RackPreset& p) const override
+        {
+            const auto it = p.values.find ("echo.type");
+            return it != p.values.end() ? juce::roundToInt (it->second) : 0;
+        }
+        juce::String modeName (int m) const override
+        {
+            static const char* names[] { "TAPE", "BBD", "ASCEND" };
+            return names[std::clamp (m, 0, 2)];
+        }
+        const std::vector<RackPreset>& factory() const override { return presets; }
+
+    private:
+        std::vector<RackPreset> presets;
+    };
+
+    /** A MOVEMENT lane: its mode, every mode's settings, INTENSITY, SYNC, CYCLE, PHASE and its
+        SHAPER steps, by name - so a preset loads into whichever lane it is chosen in, and only
+        there. The musician's own share the format of writeMovementPreset. */
+    /** MOVEMENT's lane actions, from the A / B selector's menu and the presets' menu. */
+    void addLaneActions (juce::PopupMenu& menu, InstrumentHost& host)
+    {
+        if (host.movementLaneCount() < 2)
+            return;
+        auto* h = &host;
+        menu.addItem (juce::String::fromUTF8 ("Copy lane A \xe2\x96\xb8 lane B"), [h] { copyMovementLane (*h, 0, 1); });
+        menu.addItem (juce::String::fromUTF8 ("Copy lane B \xe2\x96\xb8 lane A"), [h] { copyMovementLane (*h, 1, 0); });
+        menu.addItem ("Swap lanes A and B", [h] { swapMovementLanes (*h); });
+    }
+
+    class MovementPresetModel final : public RackPresetModel
+    {
+    public:
+        MovementPresetModel (InstrumentHost& h, int laneIndex) : RackPresetModel (h, laneIndex == 0 ? "movementA" : "movementB"), laneNumber (laneIndex)
+        {
+            struct Row
+            {
+                int mode;
+                const char* name;
+                std::vector<std::pair<const char*, float>> values;
+            };
+            // Each mode's starting points; the first is the instrument's own default.
+            const std::vector<Row> rows {
+                { 0, "Gentle Drift", { { "drift.speed", 70 }, { "drift.pitch", 25 }, { "drift.tone", 40 } } },
+                { 0, "Wander", { { "drift.speed", 45 }, { "drift.pitch", 55 }, { "drift.tone", 50 } } },
+                { 0, "Seasick", { { "drift.speed", 30 }, { "drift.pitch", 90 }, { "drift.tone", 70 } } },
+                { 0, "Shiver", { { "drift.speed", 92 }, { "drift.pitch", 15 }, { "drift.tone", 20 } } },
+                { 1, "Cassette", { { "tape.wow", 50 }, { "tape.flutter", 35 }, { "tape.wear", 35 } } },
+                { 1, "Worn Reel", { { "tape.wow", 60 }, { "tape.flutter", 50 }, { "tape.wear", 75 } } },
+                { 1, "Warped", { { "tape.wow", 85 }, { "tape.flutter", 30 }, { "tape.wear", 55 } } },
+                { 1, "Clean Deck", { { "tape.wow", 25 }, { "tape.flutter", 20 }, { "tape.wear", 10 } } },
+                { 2, "Ensemble", { { "chorus.rate", 45 }, { "chorus.width", 60 }, { "chorus.stereo", 60 } } },
+                { 2, "Slow Sweep", { { "chorus.rate", 20 }, { "chorus.width", 75 }, { "chorus.stereo", 80 } } },
+                { 2, "Fast Shimmer", { { "chorus.rate", 75 }, { "chorus.width", 35 }, { "chorus.stereo", 50 } } },
+                { 2, "Wide Doubler", { { "chorus.rate", 35 }, { "chorus.width", 50 }, { "chorus.stereo", 100 } } },
+                { 3, "Soft Tremolo", { { "pulse.rate", 55 }, { "pulse.shape", 30 }, { "pulse.stereo", 30 }, { "sync", 0 } } },
+                { 3, "Choppy", { { "pulse.rate", 75 }, { "pulse.shape", 90 }, { "pulse.stereo", 0 }, { "sync", 0 } } },
+                { 3, "Stereo Swirl", { { "pulse.rate", 40 }, { "pulse.shape", 20 }, { "pulse.stereo", 100 }, { "sync", 0 } } },
+                { 3, "Quarter Pulse", { { "pulse.shape", 60 }, { "pulse.stereo", 0 }, { "sync", 1 }, { "pulse.division", 4 }, { "phase", 0 } } },
+            };
+            for (const auto& r : rows)
+            {
+                RackPreset p;
+                p.name = r.name;
+                p.category = modeName (r.mode);
+                p.values["mode"] = static_cast<float> (r.mode);
+                for (const auto& [n, v] : r.values)
+                    p.values[n] = v;
+                presets.push_back (std::move (p));
+            }
+            // SHAPER: every library pattern (the popover's PATTERN list) at 1/16, both volume and
+            // filter; THREE, the instrument's own, first.
+            std::vector<int> patterns { 3 };
+            for (int i = 0; i < RhythmicShaper::patternCount; ++i)
+                if (i != 3)
+                    patterns.push_back (i);
+            for (const int pattern : patterns)
+            {
+                RackPreset p;
+                p.name = juce::String (RhythmicShaper::patternName (pattern)).toLowerCase().substring (0, 1).toUpperCase()
+                         + juce::String (RhythmicShaper::patternName (pattern)).toLowerCase().substring (1);
+                p.category = modeName (4);
+                p.values = { { "mode", 4.0f }, { "shaper.pattern", static_cast<float> (pattern) }, { "shaper.rate", 3.0f }, { "shaper.target", 2.0f },
+                             { "shaper.smooth", 30.0f }, { "shaper.custom", 0.0f } };
+                presets.push_back (std::move (p));
+            }
+        }
+        juce::String kind() const override { return "andor.movement"; }
+        void addMenuItems (juce::PopupMenu& menu) override
+        {
+            if (host.movementLaneCount() < 2)
+                return;
+            menu.addSeparator();
+            addLaneActions (menu, host);
+        }
+        juce::String extension() const override { return movementPresetExtension; }
+        juce::String folderName() const override { return "Movement Presets"; }
+        int mode() const override { return juce::roundToInt (value (host.apvts(), Lane (host, laneNumber) ("mode"))); }
+        int modeOf (const RackPreset& p) const override
+        {
+            const auto it = p.values.find ("mode");
+            return it != p.values.end() ? juce::roundToInt (it->second) : 0;
+        }
+        juce::String modeName (int m) const override
+        {
+            static const char* names[] { "DRIFT", "TAPE", "CHORUS", "PULSE", "SHAPER" };
+            return names[std::clamp (m, 0, 4)];
+        }
+        const std::vector<RackPreset>& factory() const override { return presets; }
+        RackPreset capture() const override
+        {
+            const auto snap = readLane (host, laneNumber);
+            RackPreset p;
+            p.values = snap.values;
+            p.pattern = snap.pattern;
+            return p;
+        }
+        void apply (const RackPreset& p) override
+        {
+            // Only what the preset names (a factory one: its mode's own settings); its lane plays.
+            host.undo().beginNewTransaction ("MOVEMENT preset " + p.name);
+            const Lane lane (host, laneNumber);
+            auto& s = host.apvts();
+            for (const auto& [n, plain] : p.values)
+                if (const auto id = idOf (lane, n); id.isNotEmpty())
+                    setPlain (s, id, plain);
+            if (p.pattern.has_value())
+                host.setLaneShaperPattern (laneNumber, *p.pattern);
+            if (lane.ids.onId.isNotEmpty())
+                setPlain (s, lane.ids.onId, 1.0f);
+        }
+        bool matches (const RackPreset& p) const override
+        {
+            const Lane lane (host, laneNumber);
+            for (const auto& [n, plain] : p.values)
+            {
+                const auto id = idOf (lane, n);
+                auto* param = id.isNotEmpty() ? host.apvts().getParameter (id) : nullptr;
+                if (param != nullptr && std::abs (param->convertTo0to1 (plain) - param->getValue()) > 1.5e-3f)
+                    return false;
+            }
+            const auto custom = p.values.find ("shaper.custom");
+            if (p.pattern.has_value() && custom != p.values.end() && custom->second >= 0.5f && ! (host.laneShaperPattern (laneNumber) == *p.pattern))
+                return false;
+            return ! p.values.empty();
+        }
+
+    private:
+        static juce::String idOf (const Lane& lane, const juce::String& n)
+        {
+            if (laneSettingNames().contains (n))
+                return lane (n.toRawUTF8());
+            for (const auto& [name, id] : laneExtras (lane.ids))
+                if (name == n)
+                    return id;
+            return {};
+        }
+        int laneNumber;
+        std::vector<RackPreset> presets;
+    };
+
+    //==========================================================================
+    /**
+        PRESET: ‹ NAME › - the presets of the mode the module is in (its factory ones, then the
+        musician's own); the arrows step through them, the name opens them (with SAVE, RENAME,
+        DELETE and the folder, and the other modes' presets). It shows the preset the settings
+        match, the last one chosen with " *" once edited (in its mode), else CUSTOM. Choosing one
+        sets that effect's (that lane's) settings only. SPACE's popover keeps its own bar.
+    */
+    class RackPresetBar final : public juce::Component, public juce::SettableTooltipClient, private juce::Timer
+    {
+    public:
+        RackPresetBar (juce::Colour accentColour) : accent (accentColour)
+        {
+            setTitle ("Presets");
+            setTooltip ("Presets of this mode: click for the list, the arrows for the next or previous (save and manage: the key beside it)");
+            setWantsKeyboardFocus (true);
+            setMouseCursor (juce::MouseCursor::PointingHandCursor);
+            startTimerHz (8);
+        }
+        void setModel (RackPresetModel* m)
+        {
+            model = m;
+            refreshText();
+            repaint();
+        }
+        RackPresetModel* presetModel() const noexcept { return model; }
+
+        /** What the bar shows now (worked out from the values now). */
+        juce::String text()
+        {
+            refreshText();
+            return shown;
+        }
+        std::vector<RackPreset> relevant() const
+        {
+            std::vector<RackPreset> list;
+            if (model == nullptr)
+                return list;
+            const int m = model->mode();
+            for (const auto& p : model->factory())
+                if (model->modeOf (p) == m)
+                    list.push_back (p);
+            for (auto& p : model->user())
+                if (model->modeOf (p) == m)
+                    list.push_back (std::move (p));
+            return list;
+        }
+        void choose (const RackPreset& p)
+        {
+            if (model == nullptr)
+                return;
+            model->apply (p);
+            model->setLastChosen (p);
+            refreshText();
+        }
+        bool chooseNamed (const juce::String& name)
+        {
+            if (model == nullptr)
+                return false;
+            for (const auto& p : model->factory())
+                if (p.name == name)
+                {
+                    choose (p);
+                    return true;
+                }
+            for (const auto& p : model->user())
+                if (p.name == name)
+                {
+                    choose (p);
+                    return true;
+                }
+            return false;
+        }
+        void step (int delta)
+        {
+            const auto list = relevant();
+            if (list.empty())
+                return;
+            const int count = static_cast<int> (list.size());
+            int from = -1;
+            const auto last = model->lastChosen();
+            for (int i = 0; i < count; ++i)
+                if (model->matches (list[static_cast<std::size_t> (i)]) || (from < 0 && last.has_value() && list[static_cast<std::size_t> (i)].sameAs (*last)))
+                    from = i;
+            choose (list[static_cast<std::size_t> (from < 0 ? (delta > 0 ? 0 : count - 1) : (from + delta + count) % count)]);
+        }
+        bool saveAs (const juce::String& name)
+        {
+            if (model == nullptr || name.trim().isEmpty())
+                return false;
+            if (auto p = model->save (name.trim()))
+            {
+                model->setLastChosen (*p);
+                refreshText();
+                return true;
+            }
+            return false;
+        }
+
+        void paint (juce::Graphics& g) override
+        {
+            // The approved PRESET field (294 x 27): ‹ NAME ›, the arrows in 32 px wells with
+            // engraved dividers, the name 11 px semibold, an edited one with a quiet asterisk.
+            refreshText();
+            const auto r = getLocalBounds().toFloat();
+            g.setColour (juce::Colour (0xffd4ccbf));
+            g.fillRoundedRectangle (r, 5.0f);
+            g.setColour (juce::Colour (0xffeae4db));
+            g.fillRoundedRectangle (r.reduced (1.0f), 4.0f);
+            g.setColour (juce::Colours::white.withAlpha (0.69f));
+            g.fillRect (juce::Rectangle<float> (r.getX() + 4.0f, r.getY() + 1.0f, r.getWidth() - 8.0f, 1.0f));
+            g.setColour (juce::Colour (0xffd4ccc0));
+            g.fillRect (juce::Rectangle<float> (leftArea().getRight(), r.getY() + 1.0f, 1.0f, r.getHeight() - 2.0f));
+            g.fillRect (juce::Rectangle<float> (rightArea().getX() - 1.0f, r.getY() + 1.0f, 1.0f, r.getHeight() - 2.0f));
+            auto arrow = [&g, this] (juce::Rectangle<float> a, bool left, bool lit) {
+                juce::Path path;
+                const auto c = a.getCentre().translated (0.0f, 0.5f);
+                path.startNewSubPath (c.x + (left ? 2.5f : -2.5f), c.y - 5.0f);
+                path.lineTo (c.x + (left ? -2.5f : 2.5f), c.y);
+                path.lineTo (c.x + (left ? 2.5f : -2.5f), c.y + 5.0f);
+                g.setColour (juce::Colour (0xff78868e).withMultipliedBrightness (lit ? 0.8f : 1.0f));
+                g.strokePath (path, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+                juce::ignoreUnused (this);
+            };
+            arrow (leftArea(), true, hover == 1);
+            arrow (rightArea(), false, hover == 3);
+            const auto font = fonts::make (11.0f, fonts::Weight::semibold, 0.015f);
+            g.setFont (font);
+            const auto area = r.withTrimmedLeft (leftArea().getWidth() + 7.0f).withTrimmedRight (rightArea().getWidth() + 7.0f);
+            const auto ink = juce::Colour (0xff607b8b).withMultipliedBrightness (hover == 2 ? 0.85f : 1.0f);
+            if (edited)
+            {
+                // The name as chosen, then a quiet asterisk: still that preset, edited.
+                auto name = shown.dropLastCharacters (2);
+                const float star = juce::GlyphArrangement::getStringWidth (font, " *");
+                const float w = std::min (juce::GlyphArrangement::getStringWidth (font, name), area.getWidth() - star - 2.0f);
+                const float x = area.getCentreX() - 0.5f * (w + star);
+                g.setColour (ink);
+                g.drawText (name, juce::Rectangle<float> (x, area.getY(), w + 1.0f, area.getHeight()), juce::Justification::centredLeft, true);
+                g.setColour (accent.darker (0.2f));
+                g.drawText (" *", juce::Rectangle<float> (x + w, area.getY(), star + 2.0f, area.getHeight()), juce::Justification::centredLeft, false);
+            }
+            else
+            {
+                g.setColour (matched ? ink : ink.withAlpha (0.8f));
+                g.drawText (shown, area, juce::Justification::centred, true);
+            }
+            if (hasKeyboardFocus (false))
+            {
+                g.setColour (rackui::palette::focus);
+                g.drawRoundedRectangle (r.expanded (2.0f), 7.0f, 2.0f);
+            }
+        }
+        void mouseDown (const juce::MouseEvent& e) override
+        {
+            if (leftArea().contains (e.position))
+                step (-1);
+            else if (rightArea().contains (e.position))
+                step (1);
+            else
+                showMenu();
+        }
+        bool keyPressed (const juce::KeyPress& key) override
+        {
+            if (key == juce::KeyPress::leftKey || key == juce::KeyPress::rightKey)
+            {
+                step (key == juce::KeyPress::leftKey ? -1 : 1);
+                return true;
+            }
+            if (key == juce::KeyPress::returnKey || key == juce::KeyPress::spaceKey)
+            {
+                showMenu();
+                return true;
+            }
+            return false;
+        }
+        void focusGained (FocusChangeType) override { repaint(); }
+        void focusLost (FocusChangeType) override { repaint(); }
+        void mouseMove (const juce::MouseEvent& e) override
+        {
+            const int now = leftArea().contains (e.position) ? 1 : (rightArea().contains (e.position) ? 3 : 2);
+            if (now != hover)
+            {
+                hover = now;
+                repaint();
+            }
+        }
+        void mouseExit (const juce::MouseEvent&) override
+        {
+            hover = 0;
+            repaint();
+        }
+
+    private:
+        void showMenu()
+        {
+            if (model == nullptr)
+                return;
+            juce::PopupMenu menu;
+            juce::Component::SafePointer<RackPresetBar> safe (this);
+            const int m = model->mode();
+            auto item = [safe, this] (juce::PopupMenu& into, const RackPreset& p) {
+                into.addItem (p.name, true, model->matches (p), [safe, p] { if (safe != nullptr) safe->choose (p); });
+            };
+            // This mode's: by category when it has several (SPACE's ROOMS), else in a list.
+            juce::StringArray categories;
+            for (const auto& p : model->factory())
+                if (model->modeOf (p) == m)
+                    categories.addIfNotAlreadyThere (p.category);
+            for (const auto& category : categories)
+            {
+                juce::PopupMenu sub;
+                for (const auto& p : model->factory())
+                    if (model->modeOf (p) == m && p.category == category)
+                        item (categories.size() > 1 ? sub : menu, p);
+                if (categories.size() > 1)
+                    menu.addSubMenu (category, sub);
+            }
+            const auto mine = model->user();
+            menu.addSeparator();
+            menu.addSectionHeader ("YOUR " + model->modeName (m) + " PRESETS");
+            bool any = false;
+            for (const auto& p : mine)
+                if (model->modeOf (p) == m)
+                {
+                    item (menu, p);
+                    any = true;
+                }
+            if (! any)
+                menu.addItem ("(none saved yet)", false, false, [] {});
+            // The other modes' presets (choosing one changes the mode).
+            juce::PopupMenu others;
+            for (int other = 0; other < 8; ++other)
+            {
+                if (other == m)
+                    continue;
+                juce::PopupMenu sub;
+                bool has = false;
+                for (const auto& p : model->factory())
+                    if (model->modeOf (p) == other)
+                    {
+                        item (sub, p);
+                        has = true;
+                    }
+                if (has)
+                    others.addSubMenu (model->modeName (other), sub);
+            }
+            if (others.getNumItems() > 0)
+            {
+                menu.addSeparator();
+                menu.addSubMenu ("Other modes", others);
+            }
+            menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withDeletionCheck (*this));
+        }
+
+    public:
+        /** The preset actions ("···"): save, rename, delete, the folder, the module's own. */
+        juce::PopupMenu actionsMenu()
+        {
+            juce::PopupMenu menu;
+            if (model == nullptr)
+                return menu;
+            juce::Component::SafePointer<RackPresetBar> safe (this);
+            menu.addItem (juce::String::fromUTF8 ("Save preset\xe2\x80\xa6"), [safe] { if (safe != nullptr) safe->askName ("Save preset", "A name for these settings:", {}, false); });
+            if (const auto last = model->lastChosen(); last.has_value() && last->isUser())
+            {
+                const auto name = last->name;
+                menu.addItem (juce::String::fromUTF8 ("Rename \xe2\x80\x9c") + name + juce::String::fromUTF8 ("\xe2\x80\x9d\xe2\x80\xa6"),
+                              [safe, name] { if (safe != nullptr) safe->askName ("Rename preset", "A new name:", name, true); });
+                menu.addItem (juce::String::fromUTF8 ("Delete \xe2\x80\x9c") + name + juce::String::fromUTF8 ("\xe2\x80\x9d"), [safe] {
+                    if (safe != nullptr && safe->model != nullptr)
+                        if (const auto chosen = safe->model->lastChosen(); chosen.has_value() && chosen->isUser())
+                        {
+                            chosen->file.moveToTrash();
+                            safe->model->setLastChosen (std::nullopt);
+                            safe->refreshText();
+                        }
+                });
+            }
+            menu.addItem ("Show folder", [safe] {
+                if (safe != nullptr && safe->model != nullptr)
+                {
+                    safe->model->folder().createDirectory();
+                    safe->model->folder().revealToUser();
+                }
+            });
+            model->addMenuItems (menu);
+            return menu;
+        }
+        void showActions (juce::Component& from)
+        {
+            actionsMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&from).withDeletionCheck (*this));
+        }
+        /** The save key's action: a name for these settings, then saved. */
+        void promptSave()
+        {
+            if (model != nullptr)
+                askName ("Save preset", "A name for these settings:", {}, false);
+        }
+
+    private:
+        void askName (const juce::String& title, const juce::String& prompt, const juce::String& current, bool rename)
+        {
+            auto* window = new juce::AlertWindow (title, prompt, juce::MessageBoxIconType::NoIcon);
+            window->addTextEditor ("name", current.isNotEmpty() ? current : juce::String ("My preset"));
+            window->addButton (rename ? "Rename" : "Save", 1, juce::KeyPress (juce::KeyPress::returnKey));
+            window->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+            juce::Component::SafePointer<RackPresetBar> safe (this);
+            window->enterModalState (true, juce::ModalCallbackFunction::create ([safe, window, rename] (int result) {
+                const auto name = juce::File::createLegalFileName (window->getTextEditorContents ("name").trim());
+                if (result != 1 || name.isEmpty() || safe == nullptr || safe->model == nullptr)
+                    return;
+                auto& m = *safe->model;
+                if (auto chosen = m.lastChosen(); rename && chosen.has_value() && chosen->isUser())
+                {
+                    const auto to = chosen->file.getSiblingFile (name + m.extension());
+                    if (chosen->file.moveFileTo (to))
+                    {
+                        chosen->file = to;
+                        chosen->name = name;
+                        m.setLastChosen (chosen);
+                    }
+                    safe->refreshText();
+                }
+                else
+                    safe->saveAs (name);
+            }), true);
+        }
+        juce::Rectangle<float> leftArea() const { return getLocalBounds().toFloat().removeFromLeft (32.0f); }
+        juce::Rectangle<float> rightArea() const { return getLocalBounds().toFloat().removeFromRight (32.0f); }
+        void timerCallback() override
+        {
+            const auto before = shown;
+            refreshText();
+            if (shown != before)
+                repaint();
+        }
+        void refreshText()
+        {
+            if (model == nullptr)
+            {
+                shown = {};
+                return;
+            }
+            const int m = model->mode();
+            matched = edited = false;
+            // The last one chosen first (two presets may hold the same values), then the rest.
+            const auto last = model->lastChosen();
+            if (last.has_value() && model->modeOf (*last) == m && model->matches (*last))
+            {
+                shown = last->name;
+                matched = true;
+                return;
+            }
+            for (const auto& p : relevant())
+                if (model->matches (p))
+                {
+                    shown = p.name;
+                    matched = true;
+                    return;
+                }
+            // Edited: the chosen one keeps its name, with a quiet asterisk; nothing chosen: CUSTOM.
+            edited = last.has_value() && model->modeOf (*last) == m;
+            shown = edited ? last->name + " *" : juce::String ("CUSTOM");
+        }
+
+        RackPresetModel* model = nullptr;
+        juce::Colour accent;
+        juce::String shown;
+        bool matched = false, edited = false;
+        int hover = 0;
+    };
+
+    /** A control cell that is not a knob (a choice, FREE / SYNC): the knobs' caption over it,
+        the key where a knob's dial is, so a row of cells reads as one. */
+    using RackCell = rackui::Cell;
+
+    //==========================================================================
+    /** The modules' common part: the five slots at SPACE's geometry (rackcolumns). */
+    //==========================================================================
+    /**
+        V4's TAPE deck (opt-in: rack::Faceplate::tapeDeck): two light reels, the tape around two
+        guides and the head, a readout between the reels. One drawing for ECHO's tape echo and
+        MOVEMENT's wow and flutter; what it reads and how the reels turn is each module's own
+        (Reading). The reels turn only while the module plays and the instrument sounds (the
+        host's output peak: tails included); they ease to rest in silence. Nothing here is a
+        transport: no position, no elapsed time. Animated only while showing.
+    */
+    class TapeDeck final : public juce::Component, private juce::Timer
+    {
+    public:
+        struct Reading
+        {
+            juce::String value, unit, note;   ///< "1/8D" / "375 ms" / "SYNC"
+            bool noteLit = false;
+            int ticks = 0, tick = -1;         ///< the sync divisions row (tick: the chosen one)
+            double radiansPerSecond = 0.0;    ///< the take-up reel's speed while playing
+            double wowHz = 0.0, wowDepth = 0.0, flutterHz = 0.0, flutterDepth = 0.0;   ///< MOVEMENT: the speed's own wobble
+            bool active = false;              ///< the module plays (its macro, its power)
+        };
+        using Reader = std::function<Reading()>;
+
+        TapeDeck (InstrumentHost& h, Reader r, juce::Colour accentColour) : host (h), reader (std::move (r)), accent (accentColour)
+        {
+            setInterceptsMouseClicks (false, false);
+            startTimerHz (4);
+        }
+        ~TapeDeck() override { stopTimer(); }
+
+        /** Tests and stills: the reels' angle and speed (a snapshot draws them at rest). */
+        double reelAngle() const noexcept { return angle; }
+        double reelSpeed() const noexcept { return speed; }
+        /** Advances the reels by `seconds` (the timer's step; tests drive it directly). */
+        void advance (double seconds)
+        {
+            const auto r = reader();
+            const float peak = host.outputPeak();
+            const bool sounding = peak < 0.0f || peak > 3.0e-4f;   // (unknown, or above -70 dBFS)
+            double target = r.active && sounding ? r.radiansPerSecond : 0.0;
+            clock += seconds;
+            if (target > 0.0 && (r.wowDepth > 0.0 || r.flutterDepth > 0.0))
+                target *= 1.0 + r.wowDepth * std::sin (juce::MathConstants<double>::twoPi * r.wowHz * clock)
+                          + r.flutterDepth * std::sin (juce::MathConstants<double>::twoPi * r.flutterHz * clock);
+            speed += (target - speed) * (1.0 - std::exp (-seconds / 0.35));   // (eases to rest)
+            if (std::abs (speed) < 1.0e-3 && target == 0.0)
+                speed = 0.0;
+            angle = std::fmod (angle + speed * seconds, juce::MathConstants<double>::twoPi);
+            deviation = r.radiansPerSecond > 0.0 && target > 0.0 ? target / r.radiansPerSecond - 1.0 : 0.0;
+        }
+
+        void paint (juce::Graphics& g) override
+        {
+            const auto r = reader();
+            const auto b = getLocalBounds().toFloat();
+            // The reels: as large as the deck allows (84 - 106 px at the canonical size).
+            const float d = juce::jlimit (60.0f, 106.0f, std::min (b.getHeight() - 30.0f, 0.36f * b.getWidth()));
+            const float cy = b.getY() + 10.0f + 0.5f * d;
+            const float lx = b.getX() + 0.27f * b.getWidth(), rx = b.getRight() - 0.27f * b.getWidth();
+            const float supply = 0.43f, takeUp = 0.31f;   // (the tape packs' radii, of d)
+
+            // The tape: from the supply pack, under a guide, across the head, a guide, up to the
+            // take-up pack (drawn first: the reels' flanges sit over it).
+            const float guideY = cy + 0.5f * d + 10.0f, headY = guideY + 2.0f;
+            const auto guideL = juce::Point<float> (lx + 0.36f * d, guideY), guideR = juce::Point<float> (rx - 0.36f * d, guideY);
+            const auto headC = juce::Point<float> (b.getCentreX(), headY);
+            juce::Path tape;
+            tape.startNewSubPath (lx - supply * d * 0.25f, cy + supply * d * 0.97f);
+            tape.quadraticTo (lx + 0.1f * d, guideY + 5.0f, guideL.x, guideL.y + 5.0f);
+            tape.lineTo (headC.x, headC.y + 7.0f);
+            tape.lineTo (guideR.x, guideR.y + 5.0f);
+            tape.quadraticTo (rx - 0.1f * d, guideY + 5.0f, rx + takeUp * d * 0.25f, cy + takeUp * d * 0.97f);
+            g.setColour (juce::Colour (0xff6e6450));
+            g.strokePath (tape, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+
+            paintReel (g, { lx, cy }, d, supply, angle * takeUp / supply);
+            paintReel (g, { rx, cy }, d, takeUp, angle);
+
+            for (const auto& gp : { guideL, guideR })
+            {
+                const auto post = juce::Rectangle<float> (11.0f, 11.0f).withCentre (gp.translated (0.0f, 5.0f));
+                g.setColour (juce::Colour (0x1f2a1d12));
+                g.fillEllipse (post.translated (0.0f, 1.2f));
+                g.setColour (juce::Colour (0xfff4eee4));
+                g.fillEllipse (post);
+                g.setColour (juce::Colour (0xffb9ab95));
+                g.drawEllipse (post.reduced (0.5f), 1.0f);
+                g.setColour (juce::Colour (0xff6c6458));
+                g.fillEllipse (post.withSizeKeepingCentre (3.0f, 3.0f));
+            }
+            // The head: a champagne block, its gap lit amber while the tape runs.
+            const auto head = juce::Rectangle<float> (30.0f, 15.0f).withCentre (headC.translated (0.0f, 5.0f));
+            g.setColour (juce::Colour (0x1f2a1d12));
+            g.fillRoundedRectangle (head.translated (0.0f, 1.5f), 3.0f);
+            g.setGradientFill (juce::ColourGradient (juce::Colour (0xffefe6d6), 0.0f, head.getY(), juce::Colour (0xffd8ccb8), 0.0f, head.getBottom(), false));
+            g.fillRoundedRectangle (head, 3.0f);
+            g.setColour (juce::Colour (0xffb3a48d));
+            g.drawRoundedRectangle (head.reduced (0.5f), 3.0f, 1.0f);
+            const bool running = speed > 0.05;
+            g.setColour (running ? juce::Colour (0xffe0883a) : juce::Colour (0xffa1968a));
+            g.fillRect (juce::Rectangle<float> (head.getCentreX() - 0.75f, head.getY() + 3.0f, 1.5f, head.getHeight() - 6.0f));
+
+            // The readout between the reels: the value large, its unit, the divisions under it.
+            const auto mid = juce::Rectangle<float> (lx + 0.5f * d + 6.0f, cy - 0.5f * d, rx - lx - d - 12.0f, d);
+            const auto ink = rackui::inkFor (*this);   // (V5: on an enamel face)
+            g.setColour (ink ? ink->value : juce::Colour (0xff34383a));
+            g.setFont (fonts::make (19.0f, fonts::Weight::semibold, 0.02f));
+            g.drawFittedText (r.value, mid.withHeight (24.0f).translated (0.0f, 6.0f).getSmallestIntegerContainer(), juce::Justification::centred, 1, 0.8f);
+            g.setColour (ink ? ink->caption : juce::Colour (0xff7a7268));
+            g.setFont (fonts::make (11.0f, fonts::Weight::medium, 0.03f));
+            g.drawFittedText (r.unit, mid.withTrimmedTop (31.0f).withHeight (14.0f).getSmallestIntegerContainer(), juce::Justification::centred, 1, 0.85f);
+            if (r.note.isNotEmpty())
+            {
+                const auto f = fonts::make (9.5f, fonts::Weight::semibold, 0.08f);
+                const float tw = juce::GlyphArrangement::getStringWidth (f, r.note);
+                const auto noteRow = juce::Rectangle<float> (tw + 12.0f, 12.0f).withCentre ({ mid.getCentreX(), mid.getY() + 53.0f });
+                g.setColour (r.noteLit ? juce::Colour (0xffe0883a) : juce::Colour (0xffb7ada0));
+                g.fillEllipse (juce::Rectangle<float> (5.0f, 5.0f).withCentre ({ noteRow.getX() + 2.5f, noteRow.getCentreY() }));
+                g.setColour (ink ? ink->caption : juce::Colour (0xff7a7268));
+                g.setFont (f);
+                g.drawText (r.note, noteRow.withTrimmedLeft (9.0f), juce::Justification::centredLeft, false);
+            }
+            if (r.ticks > 1)
+            {
+                // The sync divisions (ECHO), or the speed's deviation (MOVEMENT, -1 when none).
+                const float w = std::min (mid.getWidth() - 8.0f, 9.0f * static_cast<float> (r.ticks));
+                const float x0 = mid.getCentreX() - 0.5f * w, step = w / static_cast<float> (r.ticks - 1), ty = mid.getY() + 70.0f;
+                int lit = r.tick;
+                if (lit < 0)
+                    lit = juce::jlimit (0, r.ticks - 1, juce::roundToInt (0.5f * static_cast<float> (r.ticks - 1) * (1.0f + juce::jlimit (-1.0f, 1.0f, static_cast<float> (deviation) * 6.0f))));
+                for (int i = 0; i < r.ticks; ++i)
+                {
+                    const bool on = i == lit;
+                    g.setColour (on ? juce::Colour (0xffe0883a) : (ink ? ink->quiet : juce::Colour (0xffc4b9aa)));
+                    g.fillRoundedRectangle (juce::Rectangle<float> (on ? 2.4f : 1.4f, on ? 11.0f : 7.0f).withCentre ({ x0 + step * static_cast<float> (i), ty }), 0.7f);
+                }
+            }
+        }
+
+    private:
+        void paintReel (juce::Graphics& g, juce::Point<float> c, float d, float pack, double turn) const
+        {
+            const auto disc = juce::Rectangle<float> (d, d).withCentre (c);
+            // Shadow, the tape pack under the flange, the flange (ivory) with three windows.
+            g.setColour (juce::Colour (0x1c2a1d12));
+            g.fillEllipse (disc.translated (0.0f, 2.5f));
+            g.setGradientFill (juce::ColourGradient (juce::Colour (0xfff8f3ea), disc.getX(), disc.getY(), juce::Colour (0xffe6dccd), disc.getRight(), disc.getBottom(), false));
+            g.fillEllipse (disc);
+            g.setColour (juce::Colour (0xffc6b8a2));
+            g.drawEllipse (disc.reduced (0.6f), 1.2f);
+            g.setColour (juce::Colour (0xffd9cdbb));
+            g.drawEllipse (disc.reduced (3.5f), 0.8f);
+            const float inner = 0.17f * d, outer = 0.43f * d;
+            for (int w = 0; w < 3; ++w)
+            {
+                const float a0 = static_cast<float> (turn) + juce::MathConstants<float>::twoPi * static_cast<float> (w) / 3.0f;
+                juce::Path window;
+                window.addCentredArc (c.x, c.y, outer, outer, 0.0f, a0 - 0.55f, a0 + 0.55f, true);
+                window.addCentredArc (c.x, c.y, inner, inner, 0.0f, a0 + 0.42f, a0 - 0.42f, false);
+                window.closeSubPath();
+                g.setColour (juce::Colour (0xffa09787));   // (the opening: earthy grey)
+                g.fillPath (window);
+                {
+                    // The tape pack seen through it (warm olive), out to its radius.
+                    juce::Graphics::ScopedSaveState clip (g);
+                    g.reduceClipRegion (window);
+                    g.setColour (juce::Colour (0xff786d58));
+                    g.fillEllipse (juce::Rectangle<float> (2.0f * pack * d, 2.0f * pack * d).withCentre (c));
+                    g.setColour (juce::Colour (0x22ffffff));
+                    g.drawEllipse (juce::Rectangle<float> (2.0f * pack * d, 2.0f * pack * d).withCentre (c).reduced (0.5f), 1.0f);
+                }
+                g.setColour (juce::Colour (0x40000000));
+                g.strokePath (window, juce::PathStrokeType (0.8f));
+            }
+            // The hub: warm metal, the spindle, three keys.
+            const auto hub = juce::Rectangle<float> (0.27f * d, 0.27f * d).withCentre (c);
+            g.setGradientFill (juce::ColourGradient (juce::Colour (0xffe6d9c1), hub.getX(), hub.getY(), juce::Colour (0xffb09f80), hub.getRight(), hub.getBottom(), false));
+            g.fillEllipse (hub);
+            g.setColour (juce::Colour (0xff9d8d70));
+            g.drawEllipse (hub.reduced (0.5f), 1.0f);
+            g.setColour (juce::Colour (0xff5a5348));
+            g.fillEllipse (juce::Rectangle<float> (0.08f * d, 0.08f * d).withCentre (c));
+            for (int k = 0; k < 3; ++k)
+            {
+                const float a = static_cast<float> (turn) + juce::MathConstants<float>::twoPi * (static_cast<float> (k) / 3.0f + 1.0f / 6.0f);
+                const auto from = c.getPointOnCircumference (0.055f * d, a), to = c.getPointOnCircumference (0.115f * d, a);
+                g.drawLine ({ from, to }, 1.3f);
+            }
+        }
+
+        void timerCallback() override
+        {
+            // 30 fps while showing (and moving or about to); a still frame otherwise.
+            const bool showing = isShowing();
+            if (showing != wasShowing)
+            {
+                wasShowing = showing;
+                startTimerHz (showing ? 30 : 4);
+            }
+            if (! showing)
+                return;
+            const double before = speed;
+            advance (1.0 / 30.0);
+            if (speed != 0.0 || before != 0.0)
+                repaint();
+            else if (const auto r = reader(); r.value != shownValue || r.unit != shownUnit || r.tick != shownTick)
+            {
+                shownValue = r.value;
+                shownUnit = r.unit;
+                shownTick = r.tick;
+                repaint();
+            }
+        }
+
+        InstrumentHost& host;
+        Reader reader;
+        juce::Colour accent;
+        double angle = 0.0, speed = 0.0, clock = 0.0, deviation = 0.0;
+        bool wasShowing = false;
+        juce::String shownValue, shownUnit;
+        int shownTick = -2;
+    };
+
+    class UnifiedRack : public rack::Module
+    {
+    public:
+        UnifiedRack (InstrumentHost& p, juce::String name, design::colour::Macro macro) : processor (p), heading (std::move (name)), identity (macro)
+        {
+            presetBar = std::make_unique<RackPresetBar> (design::colour::macro (macro));
+            addAndMakeVisible (*presetBar);
+            presetActions.onClick = [this] { presetBar->showActions (presetActions); };
+            addAndMakeVisible (presetActions);
+        }
+
+        juce::String title() const override { return heading; }
+        juce::Colour accent() const override
+        {
+            // (V5: on an enamel face, the knobs' arcs in the face's own ink)
+            if (plate != nullptr && plate->enamelBody && ! plate->arc.isTransparent())
+                return plate->arc;
+            return design::colour::macro (identity);
+        }
+        int bodyHeight() const override { return standardBody; }
+        void settle() override
+        {
+            refresh();
+            if (visual != nullptr)
+                visual->settle();
+            presetBar->repaint();
+        }
+        void resized() override { layout(); }
+        void paint (juce::Graphics& g) override
+        {
+            if (plate != nullptr)
+            {
+                // The hardware faceplate (opt-in): its subtitle kept clear of the rail's parts.
+                float limit = static_cast<float> (getWidth());
+                for (auto* c : getChildren())
+                    if (c->isVisible() && c->getBottom() <= titleOffset() + 1 && c->getX() > 200)
+                        limit = std::min (limit, static_cast<float> (c->getX()));
+                rack::hardware::paint (g, getLocalBounds(), titleOffset(), *plate, heading, processingActive(),
+                                       visual != nullptr && ! expanded() ? visual->getBounds() : juce::Rectangle<int>(), limit - 14.0f);
+            }
+            if (deck != nullptr && deck->isVisible() && ! expanded())
+            {
+                // The deck's three regions: two quiet rules.
+                const auto ink = rackui::inkFor (*this);
+                for (const int x : deckDividers)
+                {
+                    if (ink)
+                    {
+                        g.setColour (ink->rule);
+                        g.fillRect (juce::Rectangle<float> (static_cast<float> (x), static_cast<float> (titleOffset() + 12), 1.0f, static_cast<float> (getHeight() - 22 - titleOffset() - 12)));
+                    }
+                    else
+                        rackcolumns::paintDivider (g, x, static_cast<float> (titleOffset() + 12), static_cast<float> (getHeight() - 22));
+                }
+                return;
+            }
+            if (! expanded())
+            {
+                if (const auto ink = rackui::inkFor (*this))
+                {
+                    g.setColour (ink->rule);   // (V5: the divider in the face's ink)
+                    g.fillRect (juce::Rectangle<float> (static_cast<float> (dividerX()), static_cast<float> (titleOffset() + 3), 1.0f, static_cast<float> (getHeight() - titleOffset() - 5)));
+                }
+                else
+                    rackcolumns::paintDivider (g, dividerX(), static_cast<float> (titleOffset() + 3), static_cast<float> (getHeight() - 2));
+            }
+        }
+        /** Tests: the TAPE deck (V4, opt-in), or null. */
+        TapeDeck* tapeDeck() const noexcept { return deck.get(); }
+        /** The product's hardware faceplate (opt-in; ANDOR ANALOG's): the preset browser and its
+            actions go into the rail, the controls start after the stripes. Null: as approved. */
+        void wearFaceplate (const rack::Faceplate* f)
+        {
+            plate = f;
+            if (plate != nullptr)
+            {
+                presetActions.onRail = true;
+                if (railSave == nullptr)
+                {
+                    railSave = std::make_unique<rack::hardware::SaveKey> ([this] { presetBar->promptSave(); });
+                    addAndMakeVisible (*railSave);
+                }
+                lightWatch.rack = this;
+                lightWatch.startTimerHz (8);
+                if (plate->enamelBody)
+                    rackui::setInk (*this, { plate->ink, plate->ink.withAlpha (1.0f), plate->inkQuiet, plate->ink.withAlpha (0.2f) });
+            }
+            faceplateChanged();
+            // (the cells already built take the face's arc)
+            for (auto& cell : cells)
+                if (auto* k = dynamic_cast<MiniKnob*> (cell.get()))
+                    k->setArcColour (accent());
+            if (modeSelector != nullptr)
+                modeSelector->setAccent (accent());
+            resized();
+        }
+        bool hasFaceplate() const noexcept { return plate != nullptr; }
+        /** A module whose own parts depend on the faceplate (MOVEMENT's lane power). */
+        virtual void faceplateChanged() {}
+        void layoutTitleRow (juce::Rectangle<int> row) override { layoutRail (row); }
+
+        /** Tests: the cells' captions in order; the presets bar; the slots' places. */
+        juce::String captions() const
+        {
+            juce::StringArray c;
+            for (const auto& cell : cells)
+            {
+                if (auto* k = dynamic_cast<MiniKnob*> (cell.get()))
+                    c.add (k->captionText());
+                else if (auto* key = dynamic_cast<RackCell*> (cell.get()))
+                    c.add (key->captionText());
+            }
+            for (const auto& k : deckKeys)
+                c.add (k.caption);
+            return c.joinIntoString (" ");
+        }
+        RackPresetBar& presets() noexcept { return *presetBar; }
+        juce::Rectangle<int> slot (int index) const
+        {
+            switch (index)
+            {
+                case 2: return modeSelector != nullptr ? modeSelector->getBounds() : juce::Rectangle<int>();
+                case 3: return presetBar->getBounds();
+                case 4: return cells.empty() ? juce::Rectangle<int>() : cells.front()->getBounds();
+                case 5: return visual != nullptr ? visual->getBounds() : juce::Rectangle<int>();
+                case 6: return presetActions.getBounds();
+                case 7: return railSave != nullptr ? railSave->getBounds() : juce::Rectangle<int>();
+                default: return {};
+            }
+        }
+        /** Tests: every cell's bounds, in order. */
+        std::vector<juce::Rectangle<int>> cellBounds() const
+        {
+            std::vector<juce::Rectangle<int>> b;
+            for (const auto& cell : cells)
+                b.push_back (cell->getBounds());
+            return b;
+        }
+        /** Tests: the cell captioned `caption` (its control for a non-knob cell), or null. */
+        juce::Component* cellNamed (const juce::String& caption) const
+        {
+            for (const auto& cell : cells)
+            {
+                if (auto* k = dynamic_cast<MiniKnob*> (cell.get()); k != nullptr && k->captionText() == caption)
+                    return k;
+                if (auto* c = dynamic_cast<RackCell*> (cell.get()); c != nullptr && c->captionText() == caption)
+                    return &c->key();
+            }
+            for (const auto& k : deckKeys)
+                if (k.caption == caption)
+                    return k.control.get();
+            return nullptr;
+        }
+        /** The layout family (0 standard, 1 dense: eight controls or more). */
+        bool dense() const noexcept { return static_cast<int> (cells.size()) >= rackcolumns::denseFrom; }
+
+        // The approved rack's rows (reference pixels): the selector row 39 under the title
+        // (its 27 px fields centred), 8 px, then the controls (103 px cells); the graph 160 px.
+        static constexpr int standardBody = 172, modeWidth = 165, presetWidth = 294, fieldHeight = 27, selectRow = 39, rowGap = 8, cellHeight = 112,
+                             graphHeight = 160, actionsWidth = 30;
+        static_assert (cellHeight == rackui::cellHeight);
+
+    protected:
+        /** The controls' share of the content width (the approved column: per module). */
+        virtual float leftShare() const = 0;
+        /** What the faceplate's LED shows: the module plays (its macro above 0). */
+        virtual bool processingActive() const { return true; }
+        /** Faceplate: the preset browser and its actions at the rail's right; returns what is
+            left of the row (a module's own title-row parts go there). */
+        juce::Rectangle<int> layoutRail (juce::Rectangle<int> row)
+        {
+            if (plate == nullptr)
+                return row;
+            row = row.withSizeKeepingCentre (row.getWidth(), 26);
+            presetActions.setBounds (row.removeFromRight (actionsWidth).withSizeKeepingCentre (actionsWidth, 22));
+            row.removeFromRight (2);
+            // The save key: beside the preset browser, left of its actions (as a DAW's header).
+            if (railSave != nullptr)
+            {
+                railSave->setBounds (row.removeFromRight (26).withSizeKeepingCentre (26, 24));
+                row.removeFromRight (4);
+            }
+            else
+                row.removeFromRight (6);
+            presetBar->setBounds (row.removeFromRight (railPresetWidth).withSizeKeepingCentre (railPresetWidth, 24));
+            row.removeFromRight (16);
+            return row;
+        }
+        static constexpr int railPresetWidth = 236;
+        int contentX() const noexcept { return plate != nullptr ? rack::hardware::measures (*plate).contentLeft() : rackcolumns::inset; }
+        int contentRightMargin() const noexcept { return plate != nullptr ? rack::hardware::measures (*plate).contentRightMargin() : rackcolumns::inset; }
+        int dividerX() const
+        {
+            const int x0 = contentX(), x1 = getWidth() - contentRightMargin();
+            return x0 + juce::roundToInt (leftShare() * static_cast<float> (x1 - x0)) + rackcolumns::columnGap;
+        }
+        const rack::Faceplate* plate = nullptr;
+
+        ValueSelector& setModeSelector (const juce::String& id, const juce::String& tip)
+        {
+            if (modeSelector != nullptr)
+                removeChildComponent (modeSelector.get());
+            modeSelector = std::make_unique<ValueSelector> (*processor.apvts().getParameter (id), juce::String());
+            modeSelector->setAccent (accent());
+            modeSelector->setRackStyle (ValueSelector::RackStyle::mode);
+            modeSelector->setTooltip (tip);
+            addAndMakeVisible (*modeSelector);
+            return *modeSelector;
+        }
+        void setVisual (std::unique_ptr<Visual> v, bool scaled = true)
+        {
+            if (visual != nullptr)
+                removeChildComponent (visual.get());
+            visual = std::move (v);
+            visual->setIdentity (identity);
+            visual->setDetailed (true);
+            if (scaled)
+                visual->setPictureScale (1.1f);
+            addAndMakeVisible (*visual);
+        }
+        /** A continuous ceramic knob (the approved cell: caption, 59 px knob, value). */
+        MiniKnob& knob (const juce::String& id, const char* caption, MiniKnob::Formatter f)
+        {
+            auto k = std::make_unique<MiniKnob> (processor.apvts(), id, caption, std::move (f));
+            k->setArcColour (accent());
+            k->setRackMetrics (true);
+            auto& ref = *k;
+            addAndMakeVisible (ref);
+            cells.push_back (std::move (k));
+            return ref;
+        }
+        /** A stepped rate (a choice parameter): the same knob with its detents marked. */
+        MiniKnob& steppedKnob (const juce::String& id, const char* caption, MiniKnob::Formatter f)
+        {
+            auto& k = knob (id, caption, std::move (f));
+            k.setDetents (true, accent());
+            return k;
+        }
+        /** A compact list (PATTERN, INTERVAL, MOTION): more than three, or long, choices. */
+        ValueSelector& listCell (const juce::String& id, const juce::String& caption, const juce::String& tip)
+        {
+            auto selector = std::make_unique<ValueSelector> (*processor.apvts().getParameter (id), juce::String());
+            selector->setTooltip (tip);
+            selector->setRackStyle (ValueSelector::RackStyle::option);
+            auto& ref = *selector;
+            addCell (caption, std::move (selector), RackCell::Kind::list);
+            return ref;
+        }
+        /** A few short exclusive choices: the ceramic segmented switch. */
+        rackui::SegmentedSwitch& segmentCell (const juce::String& id, const juce::String& caption, std::vector<rackui::Position> positions, const juce::String& tip)
+        {
+            auto segments = std::make_unique<rackui::SegmentedSwitch> (*processor.apvts().getParameter (id), std::move (positions), &processor.undo(), accent());
+            segments->setTooltip (tip);
+            auto& ref = *segments;
+            addCell (caption, std::move (segments), RackCell::Kind::segments);
+            return ref;
+        }
+        /** A real two- or three-state setting: the ceramic vertical switch. */
+        rackui::VerticalSwitch& switchCell (const juce::String& id, const juce::String& caption, std::vector<rackui::Position> positions, const juce::String& tip)
+        {
+            const bool three = positions.size() == 3;
+            auto key = std::make_unique<rackui::VerticalSwitch> (*processor.apvts().getParameter (id), std::move (positions), &processor.undo());
+            key->setTooltip (tip);
+            key->setTitle (caption);
+            auto& ref = *key;
+            addCell (caption, std::move (key), three ? RackCell::Kind::switch3 : RackCell::Kind::switch2);
+            return ref;
+        }
+        void addCell (const juce::String& caption, std::unique_ptr<juce::Component> control, RackCell::Kind kind)
+        {
+            auto cell = std::make_unique<RackCell> (caption, std::move (control), kind);
+            addAndMakeVisible (*cell);
+            cells.push_back (std::move (cell));
+        }
+        void clearCells()
+        {
+            cells.clear();
+            deckKeys.clear();
+        }
+
+        /** The TAPE deck (V4, opt-in by the faceplate): shown with its reader, or removed. */
+        bool deckWanted() const noexcept { return plate != nullptr && plate->tapeDeck; }
+        void setDeck (TapeDeck::Reader reader)
+        {
+            if (reader == nullptr)
+            {
+                if (deck != nullptr)
+                    removeChildComponent (deck.get());
+                deck.reset();
+                return;
+            }
+            if (deck != nullptr)
+                removeChildComponent (deck.get());
+            deck = std::make_unique<TapeDeck> (processor, std::move (reader), accent());
+            addAndMakeVisible (*deck);
+            deck->toBack();
+        }
+        /** The deck's own small choices (ECHO's FREE / SYNC, MONO / PING / WIDE): a ceramic
+            segmented switch in the deck's top row, on the same parameter as the cell it replaces. */
+        rackui::SegmentedSwitch& deckSegments (const juce::String& id, const juce::String& caption, std::vector<rackui::Position> positions, const juce::String& tip)
+        {
+            auto segments = std::make_unique<rackui::SegmentedSwitch> (*processor.apvts().getParameter (id), std::move (positions), &processor.undo(), accent());
+            segments->setTooltip (tip);
+            segments->setTitle (caption);
+            auto& ref = *segments;
+            addAndMakeVisible (ref);
+            deckKeys.push_back ({ caption, std::move (segments) });
+            return ref;
+        }
+
+        /** An expanded precision editor (SHAPER's) is open: the module lays itself out. */
+        virtual bool expanded() const { return false; }
+        virtual void layoutExpanded (juce::Rectangle<int>) {}
+        /** The picture's place (the column; a module may put something over it). */
+        virtual void placeVisual (juce::Rectangle<int> column) { visual->setBounds (column); }
+
+        void layout()
+        {
+            if (visual == nullptr)
+                return;
+            const int width = getWidth(), x0 = contentX(), top = titleOffset();
+            // MODE, PRESET (fixed widths: never stretched to the divider) and the preset actions
+            // (with a faceplate, PRESET and its actions are in the rail: layoutRail).
+            const int fieldY = top + (selectRow - fieldHeight) / 2;
+            if (modeSelector != nullptr)
+                modeSelector->setBounds (x0, fieldY, modeWidth, fieldHeight);
+            if (plate == nullptr)
+            {
+                presetBar->setBounds (x0 + modeWidth + 12, fieldY, presetWidth, fieldHeight);
+                presetActions.setBounds (presetBar->getRight() + 12, fieldY, actionsWidth, fieldHeight);
+            }
+            const int controlsY = top + selectRow + rowGap;
+            if (expanded())
+            {
+                for (auto& cell : cells)
+                    cell->setVisible (false);
+                layoutExpanded (juce::Rectangle<int> (x0, controlsY, width - x0 - contentRightMargin(), getHeight() - rackcolumns::bottom - controlsY));
+                repaint();
+                return;
+            }
+            if (deck != nullptr)
+            {
+                // The TAPE deck: the knobs left (27 - 32 %, the dense slots), the reels in the
+                // middle (33 - 39 %), the small display right; one substrate, two quiet rules.
+                const int x1 = width - contentRightMargin(), w = x1 - x0;
+                const int leftEnd = x0 + juce::roundToInt (0.29f * static_cast<float> (w));
+                const int deckEnd = x0 + juce::roundToInt (0.66f * static_cast<float> (w));
+                deckDividers = { leftEnd + rackcolumns::columnGap, deckEnd + rackcolumns::columnGap };
+                int x = x0;
+                for (auto& cell : cells)
+                {
+                    auto slotKind = rackcolumns::Slot::knob;
+                    if (auto* c = dynamic_cast<RackCell*> (cell.get()))
+                        slotKind = c->slot();
+                    const int cw = rackcolumns::slotWidth (slotKind, true);
+                    cell->setVisible (true);
+                    cell->setBounds (x, controlsY, cw, cellHeight);
+                    x += cw + rackcolumns::slotGap (true);
+                }
+                const int deckX = deckDividers[0] + 1 + rackcolumns::graphPad, deckRight = deckDividers[1] - rackcolumns::graphPad;
+                const int bottomY = getHeight() - 16;
+                // Its own small choices in its top row (the selector row's centre line).
+                const int keyY = top + (selectRow - 24) / 2;
+                if (! deckKeys.empty())
+                    deckKeys.front().control->setBounds (deckX, keyY, 108, 24);
+                if (deckKeys.size() > 1)
+                    deckKeys[1].control->setBounds (deckRight - 156, keyY, 156, 24);
+                const int deckTop = deckKeys.empty() ? top + 8 : top + selectRow - 2;
+                deck->setBounds (deckX, deckTop, deckRight - deckX, bottomY - deckTop);
+                // The display: its whole column, as tall as SPACE's graph (no caption over it).
+                const int rx = deckDividers[1] + 1 + rackcolumns::graphPad;
+                visual->setBounds (rx, top + 7, x1 - rx, bottomY - (top + 7));
+                repaint();
+                return;
+            }
+            const int pictureX = dividerX() + 1 + rackcolumns::graphPad;
+            if (plate != nullptr && plate->fullBleed)
+                placeVisual ({ pictureX, top + 7, width - contentRightMargin() - pictureX, std::max (graphHeight - 4, getHeight() - top - 7 - 16) });   // (the face's own bottom margin)
+            else if (plate != nullptr)
+                placeVisual ({ pictureX, top + 7, width - contentRightMargin() - pictureX, graphHeight - 4 });   // (room for its bezel)
+            else
+                placeVisual ({ pictureX, top + 4, width - rackcolumns::inset - pictureX, graphHeight });
+            // The controls: left-aligned from one origin on the approved slot widths; a mode with
+            // fewer leaves the rest of the column empty. (The family is the mode's: its count.)
+            const bool isDense = dense();
+            int x = x0;
+            for (auto& cell : cells)
+            {
+                auto slot = rackcolumns::Slot::knob;
+                if (auto* c = dynamic_cast<RackCell*> (cell.get()))
+                    slot = c->slot();
+                const int w = rackcolumns::slotWidth (slot, isDense);
+                cell->setVisible (true);
+                cell->setBounds (x, controlsY, w, cellHeight);
+                x += w + rackcolumns::slotGap (isDense);
+            }
+            jassert (x - rackcolumns::slotGap (isDense) <= dividerX() - rackcolumns::columnGap);
+            repaint();
+        }
+
+        /** The preset actions (approved "···" key beside PRESET): save, rename, delete, the folder,
+            and the module's own (MOVEMENT's lanes). */
+        class ActionsKey final : public juce::Button
+        {
+        public:
+            ActionsKey() : juce::Button ("Preset actions")
+            {
+                setTooltip ("Preset actions: save, rename, delete");
+                setMouseCursor (juce::MouseCursor::PointingHandCursor);
+                setWantsKeyboardFocus (true);
+                setMouseClickGrabsKeyboardFocus (false);
+            }
+            bool onRail = false;   // (the faceplate's rail: light dots on the enamel)
+            void paintButton (juce::Graphics& g, bool highlighted, bool down) override
+            {
+                const auto r = getLocalBounds().toFloat();
+                if (onRail)
+                {
+                    g.setColour (juce::Colour (0xfff3eadb).withAlpha (highlighted || down || hasKeyboardFocus (false) ? 1.0f : 0.78f));
+                    for (int i = -1; i <= 1; ++i)
+                        g.fillEllipse (juce::Rectangle<float> (3.0f, 3.0f).withCentre ({ r.getCentreX() + 5.5f * static_cast<float> (i), r.getCentreY() }));
+                    return;
+                }
+                g.setColour (juce::Colour (0xffd2cbbf));
+                g.fillRoundedRectangle (r, 5.0f);
+                g.setColour (highlighted || down ? juce::Colour (0xfff2ece2) : juce::Colour (0xfff7f2ea));
+                g.fillRoundedRectangle (r.reduced (1.0f), 4.0f);
+                g.setColour (juce::Colour (0xff746e65));
+                for (int i = -1; i <= 1; ++i)
+                    g.fillEllipse (juce::Rectangle<float> (2.0f, 2.0f).withCentre ({ r.getCentreX() + 4.5f * static_cast<float> (i), r.getCentreY() }));
+                if (hasKeyboardFocus (false))
+                {
+                    g.setColour (rackui::palette::focus);
+                    g.drawRoundedRectangle (r.expanded (2.0f), 7.0f, 2.0f);
+                }
+            }
+        };
+
+        /** Faceplate: the LED follows what plays (repainted when it changes). */
+        struct LightWatch final : juce::Timer
+        {
+            UnifiedRack* rack = nullptr;
+            bool shown = true;
+            void timerCallback() override
+            {
+                if (rack != nullptr && rack->processingActive() != shown)
+                {
+                    shown = ! shown;
+                    rack->repaint (0, 0, 120, rack->titleOffset());
+                }
+            }
+        } lightWatch;
+
+        InstrumentHost& processor;
+        juce::String heading;
+        design::colour::Macro identity;
+        std::unique_ptr<ValueSelector> modeSelector;
+        std::unique_ptr<RackPresetBar> presetBar;
+        ActionsKey presetActions;
+        std::unique_ptr<rack::hardware::SaveKey> railSave;   ///< (faceplate rails: the save key)
+        std::unique_ptr<Visual> visual;
+        std::vector<std::unique_ptr<juce::Component>> cells;
+        std::unique_ptr<TapeDeck> deck;
+        struct DeckKey
+        {
+            juce::String caption;
+            std::unique_ptr<juce::Component> control;
+        };
+        std::vector<DeckKey> deckKeys;
+        std::array<int, 2> deckDividers {};
+    };
+
+    //==========================================================================
+    /**
+        MOVEMENT in the rack: a lane's MODE (DRIFT, TAPE, CHORUS, PULSE, SHAPER) and its PRESET,
+        then that mode's controls only, the picture on the right. The title row has only the
+        A / B selector at its right (each letter with its lane's light; its menu copies or swaps
+        the lanes, as the presets' menu does), then the shown lane's power. SHAPER's pattern is drawn on in place; its magnifier opens the precision
+        editor across the rack, with the brushes.
+    */
+    class MovementRack final : public UnifiedRack
+    {
+    public:
+        explicit MovementRack (InstrumentHost& p) : UnifiedRack (p, "MOVEMENT", design::colour::Macro::movement), lane (p, 0)
+        {
+            for (int l = 0; l < p.movementLaneCount(); ++l)
+                models.push_back (std::make_unique<MovementPresetModel> (p, l));
+            magnifier.onClick = [this] {
+                wide = ! wide;
+                buildMode();
+                if (onHeightChanged != nullptr)
+                    onHeightChanged();
+            };
+            addChildComponent (magnifier);
+            if (p.movementLaneCount() > 1)
+                for (int l = 0; l < 2; ++l)
+                {
+                    auto tab = std::make_unique<rackui::LaneKey> (l == 0 ? "A" : "B");
+                    tab->setTitle (l == 0 ? "Lane A" : "Lane B");
+                    tab->lit = [this, l] { return laneOn (l); };
+                    tab->onClick = [this, l] { showLane (l); };
+                    tab->onMenu = [this, l] { laneMenu (l); };
+                    addAndMakeVisible (*tab);
+                    laneTabs.push_back (std::move (tab));
+                }
+            buildLane();
+        }
+
+        int bodyHeight() const override { return wide ? expandedBody : standardBody; }
+        float leftShare() const override { return 0.57f; }   // approved MOVEMENT column
+        bool processingActive() const override { return processor.parameterValue ("motion") > 0.0f; }
+        static constexpr int expandedBody = 268;
+
+        void layoutTitleRow (juce::Rectangle<int> row) override
+        {
+            // Approved: MOVEMENT ... [A][B]  ON (switch)  (collapse) - the lane keys 40 x 23, 2 px
+            // apart; 7 px; the word ON; 7 px; the shown lane's 16 x 26 switch; 8 px to collapse.
+            // (With a faceplate the preset browser takes the rail's right first.)
+            row = layoutRail (row);
+            row = row.withSizeKeepingCentre (row.getWidth(), 30);
+            if (powerSlide != nullptr)
+            {
+                // Full bleed: the horizontal slide (its word inside) on the rail's centre line.
+                powerSlide->setBounds (row.removeFromRight (rackui::PowerKey::slideWidth).withSizeKeepingCentre (rackui::PowerKey::slideWidth, rackui::PowerKey::slideHeight));
+                row.removeFromRight (12);
+            }
+            if (power != nullptr)
+            {
+                power->setBounds (row.removeFromRight (16).withSizeKeepingCentre (16, 26));
+                row.removeFromRight (7);
+                onWord = row.removeFromRight (onWordWidth);
+                row.removeFromRight (7);
+            }
+            for (auto it = laneTabs.rbegin(); it != laneTabs.rend(); ++it)
+            {
+                (*it)->setBounds (row.removeFromRight (rackui::LaneKey::width).withSizeKeepingCentre (rackui::LaneKey::width, rackui::LaneKey::height));
+                row.removeFromRight (rackui::LaneKey::gap);
+            }
+        }
+        static constexpr int onWordWidth = 12;
+        void paint (juce::Graphics& g) override
+        {
+            UnifiedRack::paint (g);
+            if (power != nullptr && power->isVisible())
+            {
+                // The power's word (approved: 9 px, #777069), beside the switch (cream on a rail).
+                g.setColour (hasFaceplate() ? juce::Colour (0xfff3eadb) : juce::Colour (0xff777069));
+                g.setFont (fonts::make (9.0f, fonts::Weight::regular, 0.03f));
+                g.drawText ("ON", onWord, juce::Justification::centred, false);
+            }
+        }
+        void refresh() override
+        {
+            if (builtMode != mode() || (builtMode == static_cast<int> (MovementMode::pulse) && builtSync != laneSynced()))
+                buildMode();
+            const juce::String letter = lane.index == 0 ? "A" : "B";
+            for (std::size_t l = 0; l < laneTabs.size(); ++l)
+            {
+                const int index = static_cast<int> (l);
+                const juce::String name = index == 0 ? "Lane A" : "Lane B";
+                laneTabs[l]->setToggleState (index == lane.index, juce::dontSendNotification);
+                laneTabs[l]->setTooltip (name + (laneOn (index) ? " (on)" : " (off)")
+                                         + (index == 0 ? ": MOVEMENT itself" : ": a second MOVEMENT after A")
+                                         + juce::String::fromUTF8 (" \xc2\xb7 Right-click to copy or swap lanes"));
+                laneTabs[l]->repaint();
+            }
+            if (power != nullptr || powerSlide != nullptr)
+            {
+                const bool on = laneOn (lane.index);
+                const auto tip = on ? "Lane " + letter + " plays (click: off; the other lane stays as it is)" : "Lane " + letter + " is off (click: on)";
+                if (power != nullptr)
+                    power->setTooltip (tip);
+                if (powerSlide != nullptr)
+                    powerSlide->setTooltip (tip);
+            }
+        }
+
+        int laneShown() const noexcept { return lane.index; }
+        /** Tests: what the title row shows (the components in it, by name), the ON, the menu. */
+        juce::StringArray titleRowItems() const
+        {
+            juce::StringArray items;
+            for (auto* child : getChildren())
+                if (child->isVisible() && child->getY() < titleOffset())
+                    items.add (child->getTitle().isNotEmpty() ? child->getTitle() : child->getName());
+            return items;
+        }
+        juce::Rectangle<int> laneSwitchBounds() const
+        {
+            if (powerSlide != nullptr && powerSlide->isVisible())
+                return powerSlide->getBounds();
+            return power != nullptr && power->isVisible() ? power->getBounds() : juce::Rectangle<int>();
+        }
+        void clickLaneSwitch()
+        {
+            if (powerSlide != nullptr)
+                powerSlide->toggle();
+            if (power != nullptr)
+                power->choose (power->positionIndex() == 0 ? 1 : 0);
+        }
+        juce::StringArray laneActionNames()
+        {
+            juce::StringArray names;
+            const auto menu = laneActions();
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                if (it.getItem().text.isNotEmpty())
+                    names.add (it.getItem().text);
+            return names;
+        }
+        void runLaneAction (int index)
+        {
+            int i = 0;
+            const auto menu = laneActions();
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                if (it.getItem().text.isNotEmpty() && i++ == index && it.getItem().action != nullptr)
+                    it.getItem().action();
+        }
+        juce::StringArray presetMenuExtras() const
+        {
+            juce::PopupMenu menu;
+            juce::StringArray names;
+            if (auto* m = presetBar->presetModel())
+                m->addMenuItems (menu);
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                if (it.getItem().text.isNotEmpty())
+                    names.add (it.getItem().text);
+            return names;
+        }
+        void showLane (int index)
+        {
+            index = std::clamp (index, 0, processor.movementLaneCount() - 1);
+            if (index == lane.index)
+                return;
+            lane = Lane (processor, index);
+            buildLane();
+        }
+        bool isWide() const noexcept { return wide; }
+        void setWide (bool shouldBeWide)
+        {
+            if (wide != shouldBeWide)
+                magnifier.onClick();
+        }
+
+    private:
+        int mode() const { return std::clamp (juce::roundToInt (value (processor.apvts(), lane ("mode"))), 0, 4); }
+        bool laneSynced() const { return lane.ids.syncId.isNotEmpty() && value (processor.apvts(), lane.ids.syncId) >= 0.5f; }
+        bool expanded() const override { return wide; }
+
+        void faceplateChanged() override
+        {
+            if (plate != nullptr && plate->fullBleed && powerSlide == nullptr)
+                buildLane();   // (the lane's power as the rail's slide)
+        }
+        void buildLane()
+        {
+            auto& m = setModeSelector (lane ("mode"), "MOVEMENT's kind: DRIFT, TAPE, CHORUS, PULSE or the rhythmic SHAPER (each keeps its own settings)");
+            m.onChange = [this] (int) {
+                juce::Component::SafePointer<MovementRack> safe (this);
+                juce::MessageManager::callAsync ([safe] {
+                    if (safe != nullptr && safe->builtMode != safe->mode())
+                        safe->buildMode();
+                });
+            };
+            presetBar->setModel (models[static_cast<std::size_t> (std::clamp (lane.index, 0, static_cast<int> (models.size()) - 1))].get());
+            // The shown lane's power: the approved mini switch, bound to that lane's ON (ON up).
+            if (power != nullptr)
+                removeChildComponent (power.get());
+            power.reset();
+            if (powerSlide != nullptr)
+                removeChildComponent (powerSlide.get());
+            powerSlide.reset();
+            if (lane.ids.onId.isNotEmpty() && plate != nullptr && plate->fullBleed)
+            {
+                // Full bleed: the lane's ON as the rail's horizontal slide (the same parameter).
+                if (auto* on = processor.apvts().getParameter (lane.ids.onId))
+                {
+                    powerSlide = std::make_unique<rackui::PowerKey> (*on, &processor.undo(), plate->glow);
+                    powerSlide->setStyle (rackui::PowerKey::Style::slide);
+                    powerSlide->setTitle ("Lane power");
+                    powerSlide->onChange = [this] (bool) {
+                        for (auto& t : laneTabs)
+                            t->repaint();
+                        refresh();
+                    };
+                    addAndMakeVisible (*powerSlide);
+                }
+            }
+            else if (lane.ids.onId.isNotEmpty())
+                if (auto* on = processor.apvts().getParameter (lane.ids.onId))
+                {
+                    power = std::make_unique<rackui::VerticalSwitch> (*on, std::vector<rackui::Position> { { "ON", "On", 1.0f }, { "OFF", "Off", 0.0f } }, &processor.undo(),
+                                                                      rackui::VerticalSwitch::Style::mini);
+                    power->setTitle ("Lane power");
+                    power->onChange = [this] (int) {
+                        for (auto& t : laneTabs)
+                            t->repaint();
+                        refresh();
+                    };
+                    addAndMakeVisible (*power);
+                }
+            customAttachment.reset();
+            if (auto* custom = processor.apvts().getParameter (lane ("shaper.custom")))
+                customAttachment = std::make_unique<juce::ParameterAttachment> (*custom, [this] (float) { repaint(); });
+            builtMode = -1;
+            buildMode();
+            if (getParentComponent() != nullptr)
+                getParentComponent()->resized();   // (the title row: the lane shown, its power)
+            refresh();
+        }
+
+        void buildMode()
+        {
+            clearCells();
+            toolbar.reset();
+            builtMode = mode();
+            builtSync = laneSynced();
+            const auto m = static_cast<MovementMode> (builtMode);
+            const bool shaper = m == MovementMode::shaper;
+            if (! shaper)
+                wide = false;
+            if (shaper)
+                setVisual (std::make_unique<ShaperEditor> (processor, tool, true, lane.index), false);
+            else
+                setVisual (std::make_unique<MovementVisual> (processor, lane.index));
+            magnifier.setExpanded (wide);
+            const auto percent = [] (double v) { return format::percent (v) + " %"; };
+            const juce::String level = lane.ids.levelId.isNotEmpty() ? lane.ids.levelId : juce::String ("motion");
+            switch (m)
+            {
+                case MovementMode::drift:
+                    knob (level, "INTENSITY", percent);
+                    knob (lane ("drift.speed"), "SPEED", [] (double v) { return format::hertz (shaping::driftSpeedHz (v * 0.01)); });
+                    knob (lane ("drift.pitch"), "PITCH", [] (double v) { return juce::String (shaping::driftPitchCents (v * 0.01), 1) + " c"; });
+                    knob (lane ("drift.tone"), "TONE", percent);
+                    break;
+                case MovementMode::tape:
+                    knob (level, "INTENSITY", percent);
+                    knob (lane ("tape.wow"), "WOW", [] (double v) { return format::hertz (shaping::tapeWowHz (v * 0.01)); });
+                    knob (lane ("tape.flutter"), "FLUTTER", [] (double v) { return format::hertz (shaping::tapeFlutterHz (v * 0.01)); });
+                    knob (lane ("tape.wear"), "WEAR", percent);
+                    break;
+                case MovementMode::chorus:
+                    knob (level, "INTENSITY", percent);
+                    knob (lane ("chorus.rate"), "RATE", [] (double v) { return format::hertz (shaping::chorusRateHz (v * 0.01)); });
+                    knob (lane ("chorus.width"), "WIDTH", [] (double v) { return format::milliseconds (shaping::chorusWidthMs (v * 0.01)); });
+                    knob (lane ("chorus.stereo"), "STEREO", percent);
+                    break;
+                case MovementMode::pulse:
+                {
+                    // INTENSITY, TIMING (FREE up, SYNC down), one RATE knob in the same place for
+                    // both - free in Hz, synced on the cycle's note values with detents - SHAPE,
+                    // STEREO, PHASE (acting on the tempo's grid, so live only while synced).
+                    knob (level, "INTENSITY", percent);
+                    if (lane.ids.syncId.isNotEmpty())
+                        switchCell (lane.ids.syncId, "TIMING", { { "FREE", "Free", 0.0f }, { "SYNC", "Sync", 1.0f } },
+                                    "PULSE's rate: free (Hz), or a note value at the host's tempo");
+                    if (builtSync && lane.ids.pulseDivisionId.isNotEmpty())
+                    {
+                        auto* division = processor.apvts().getParameter (lane.ids.pulseDivisionId);
+                        steppedKnob (lane.ids.pulseDivisionId, "RATE", [division] (double v) {
+                            return division != nullptr ? division->getText (division->convertTo0to1 (static_cast<float> (v)), 16) : juce::String (v);
+                        });
+                    }
+                    else
+                        knob (lane ("pulse.rate"), "RATE", [] (double v) { return format::hertz (shaping::pulseRateHz (v * 0.01)); });
+                    knob (lane ("pulse.shape"), "SHAPE", percent);
+                    knob (lane ("pulse.stereo"), "STEREO", percent);
+                    if (lane.ids.phaseId.isNotEmpty())
+                    {
+                        auto& phase = knob (lane.ids.phaseId, "PHASE", [] (double v) { return juce::String (juce::roundToInt (v * 3.6)) + juce::String::fromUTF8 ("\xc2\xb0"); });
+                        phase.setEnabled (builtSync);
+                        phase.setAlpha (builtSync ? 1.0f : 0.45f);
+                        phase.slider.setTooltip (builtSync ? "PHASE: where the cycle starts on the tempo's grid" : "PHASE acts on the tempo's grid: set TIMING to SYNC");
+                    }
+                    break;
+                }
+                case MovementMode::shaper:
+                {
+                    // PATTERN (a compact list), RATE (stepped: the engine's divisions), TARGET
+                    // (VOL / FILTER / BOTH), DEPTH, SMOOTH, PHASE.
+                    setUpPatternSelector (listCell (lane ("shaper.pattern"), "PATTERN", "Pattern: a curated one, or CUSTOM (your own steps; draw on the display)"));
+                    auto* rate = processor.apvts().getParameter (lane ("shaper.rate"));
+                    steppedKnob (lane ("shaper.rate"), "RATE", [rate] (double v) {
+                        return rate != nullptr ? rate->getText (rate->convertTo0to1 (static_cast<float> (v)), 16) : juce::String (v);
+                    });
+                    segmentCell (lane ("shaper.target"), "TARGET", { { "VOL", "Volume", 0.0f }, { "FILTER", "Filter", 1.0f }, { "BOTH", "Both", 2.0f } },
+                                 "What the pattern shapes: the volume, a low-pass filter, or both");
+                    knob (level, "DEPTH", percent);
+                    knob (lane ("shaper.smooth"), "SMOOTH", percent);
+                    if (lane.ids.phaseId.isNotEmpty())
+                        knob (lane.ids.phaseId, "PHASE", [] (double v) { return juce::String (juce::roundToInt (v * 0.16)) + "/16"; });
+                    if (wide)
+                    {
+                        // The precision editor's brushes and actions.
+                        toolbar = std::make_unique<ShaperToolbar> (tool, accent());
+                        toolbar->onCopyFrom = [this] { copyFromMenu(); };
+                        toolbar->onClear = [this] { setCustom ([] { ShaperPattern p; for (auto& st : p) st = { 1.0f, 1.0f, StepShape::hold }; return p; }()); };
+                        toolbar->onSave = [this] { savePattern(); };
+                        toolbar->onLoad = [this] { loadMenu(); };
+                        toolbar->onToolChanged = [this] { if (visual != nullptr) visual->repaint(); };
+                        addAndMakeVisible (*toolbar);
+                    }
+                    break;
+                }
+            }
+            // V4's TAPE deck (opt-in): the reels' speed wobbles as WOW and FLUTTER move the tape.
+            if (deckWanted() && m == MovementMode::tape)
+                setDeck ([this] { return deckReading(); });
+            else
+                setDeck (nullptr);
+            magnifier.setVisible (shaper);
+            layout();
+            magnifier.toFront (false);
+        }
+        TapeDeck::Reading deckReading() const
+        {
+            auto& s = processor.apvts();
+            const double a = 0.01 * value (s, lane ("tape.wow")), b = 0.01 * value (s, lane ("tape.flutter"));
+            const double wear = 0.01 * value (s, lane ("tape.wear"));
+            const juce::String level = lane.ids.levelId.isNotEmpty() ? lane.ids.levelId : juce::String ("motion");
+            const double intensity = 0.01 * value (s, level);
+            const double wowHz = shaping::tapeWowHz (a), flutterHz = shaping::tapeFlutterHz (b);
+            TapeDeck::Reading r;
+            r.value = format::hertz (wowHz);
+            r.unit = "wow";
+            r.note = "FLUTTER " + format::hertz (flutterHz);
+            r.noteLit = wear > 0.0;   // (WEAR roughens it: the display shows how much)
+            r.ticks = 9;   // (the speed's deviation, live)
+            r.radiansPerSecond = 2.6;
+            r.wowHz = wowHz;
+            r.flutterHz = flutterHz;
+            r.wowDepth = 0.2 * a * intensity;
+            r.flutterDepth = 0.04 * b * intensity;
+            r.active = processingActive() && laneOn (lane.index) && intensity > 0.0;
+            return r;
+        }
+
+        void placeVisual (juce::Rectangle<int> column) override
+        {
+            visual->setBounds (column);
+            magnifier.setBounds (juce::Rectangle<int> (20, 20).withPosition (column.getRight() - 26, column.getY() + 5));
+            magnifier.toFront (false);
+        }
+        void layoutExpanded (juce::Rectangle<int> area) override
+        {
+            // The precision editor: the pattern across the rack, its brushes under it.
+            if (toolbar != nullptr)
+            {
+                toolbar->setBounds (area.removeFromBottom (24));
+                area.removeFromBottom (8);
+            }
+            visual->setBounds (area);
+            magnifier.setBounds (juce::Rectangle<int> (20, 20).withPosition (area.getRight() - 26, area.getY() + 5));
+            magnifier.toFront (false);
+        }
+
+        /** The lanes' actions (the A / B selector's menu): copy, swap; nothing else changes. */
+        juce::PopupMenu laneActions()
+        {
+            juce::PopupMenu menu;
+            addLaneActions (menu, processor);
+            return menu;
+        }
+        void laneMenu (int fromTab)
+        {
+            juce::Component* target = fromTab >= 0 && fromTab < static_cast<int> (laneTabs.size()) ? laneTabs[static_cast<std::size_t> (fromTab)].get() : static_cast<juce::Component*> (this);
+            laneActions().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (target).withDeletionCheck (*this));
+        }
+        bool laneOn (int index) const
+        {
+            const Lane x (processor, index);
+            return x.ids.onId.isEmpty() || value (processor.apvts(), x.ids.onId) >= 0.5f;
+        }
+
+        /** PATTERN also offers CUSTOM, a copy of any pattern to start from, and the saved ones. */
+        void setUpPatternSelector (ValueSelector& sel)
+        {
+            auto* customParam = processor.apvts().getParameter (lane ("shaper.custom"));
+            sel.textOverride = [customParam] { return customParam != nullptr && customParam->getValue() >= 0.5f ? juce::String ("CUSTOM") : juce::String(); };
+            sel.onPick = [customParam] (int) {
+                if (customParam != nullptr && customParam->getValue() >= 0.5f)
+                {
+                    customParam->beginChangeGesture();
+                    customParam->setValueNotifyingHost (0.0f);
+                    customParam->endChangeGesture();
+                }
+            };
+            juce::Component::SafePointer<MovementRack> safe (this);
+            sel.extraItems = [safe, customParam] (juce::PopupMenu& menu) {
+                menu.addSeparator();
+                menu.addItem ("CUSTOM", true, customParam != nullptr && customParam->getValue() >= 0.5f, [safe] { if (safe != nullptr) safe->setCustomOn(); });
+                const auto files = InstrumentHost::savedShaperPatterns();
+                if (! files.isEmpty())
+                {
+                    juce::PopupMenu saved;
+                    for (const auto& f : files)
+                        saved.addItem (f.getFileNameWithoutExtension(), [safe, f] { if (safe != nullptr) safe->loadFile (f); });
+                    menu.addSubMenu ("SAVED", saved);
+                }
+            };
+        }
+        void setCustomOn()
+        {
+            if (auto* c = processor.apvts().getParameter (lane ("shaper.custom")))
+            {
+                c->beginChangeGesture();
+                c->setValueNotifyingHost (1.0f);
+                c->endChangeGesture();
+            }
+            if (visual != nullptr)
+                visual->repaint();
+            repaint();
+        }
+        void setCustom (const ShaperPattern& pattern)
+        {
+            processor.undo().beginNewTransaction ("Shaper pattern");
+            processor.setLaneShaperPattern (lane.index, pattern);
+            setCustomOn();
+        }
+        void copyFromMenu()
+        {
+            juce::PopupMenu menu;
+            juce::Component::SafePointer<MovementRack> safe (this);
+            for (int i = 0; i < RhythmicShaper::patternCount; ++i)
+                menu.addItem (RhythmicShaper::patternName (i), [safe, i] { if (safe != nullptr) safe->setCustom (RhythmicShaper::patternSteps (i)); });
+            if (processor.movementLaneCount() > 1)
+            {
+                const int other = lane.index == 0 ? 1 : 0;
+                menu.addSeparator();
+                menu.addItem ("Lane " + juce::String::charToString (static_cast<juce::juce_wchar> ('A' + other)) + "'s pattern", [safe, other] {
+                    if (safe == nullptr)
+                        return;
+                    const Lane from (safe->processor, other);
+                    auto& s = safe->processor.apvts();
+                    const bool custom = value (s, from ("shaper.custom")) >= 0.5f;
+                    safe->setCustom (custom ? safe->processor.laneShaperPattern (other) : RhythmicShaper::patternSteps (juce::roundToInt (value (s, from ("shaper.pattern")))));
+                });
+            }
+            menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (toolbar.get()).withDeletionCheck (*this));
+        }
+        void loadMenu()
+        {
+            juce::PopupMenu menu;
+            juce::Component::SafePointer<MovementRack> safe (this);
+            const auto files = InstrumentHost::savedShaperPatterns();
+            for (const auto& f : files)
+                menu.addItem (f.getFileNameWithoutExtension(), [safe, f] { if (safe != nullptr) safe->loadFile (f); });
+            if (files.isEmpty())
+                menu.addItem ("No saved patterns yet", false, false, [] {});
+            menu.addSeparator();
+            menu.addItem ("Show folder", [] {
+                InstrumentHost::shaperPatternFolder().createDirectory();
+                InstrumentHost::shaperPatternFolder().revealToUser();
+            });
+            menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (toolbar.get()).withDeletionCheck (*this));
+        }
+        void loadFile (const juce::File& file)
+        {
+            if (const auto pattern = InstrumentHost::readShaperPatternFile (file))
+                setCustom (*pattern);
+        }
+        void savePattern()
+        {
+            auto* window = new juce::AlertWindow ("Save pattern", "A name for this SHAPER pattern:", juce::MessageBoxIconType::NoIcon);
+            window->addTextEditor ("name", "My pattern");
+            window->addButton ("Save", 1, juce::KeyPress (juce::KeyPress::returnKey));
+            window->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+            juce::Component::SafePointer<MovementRack> safe (this);
+            window->enterModalState (true, juce::ModalCallbackFunction::create ([safe, window] (int result) {
+                const auto name = juce::File::createLegalFileName (window->getTextEditorContents ("name").trim());
+                if (result == 1 && name.isNotEmpty() && safe != nullptr)
+                    InstrumentHost::writeShaperPatternFile (InstrumentHost::shaperPatternFolder().getChildFile (name + InstrumentHost::shaperPatternExtension),
+                                                            safe->processor.laneShaperPattern (safe->lane.index));
+            }), true);
+        }
+
+        Lane lane;
+        std::vector<std::unique_ptr<MovementPresetModel>> models;
+        ShaperTool tool;
+        bool wide = false, builtSync = false;
+        int builtMode = -1;
+        std::unique_ptr<ShaperToolbar> toolbar;
+        MagnifierButton magnifier;
+        std::unique_ptr<juce::ParameterAttachment> customAttachment;
+        std::vector<std::unique_ptr<rackui::LaneKey>> laneTabs;
+        std::unique_ptr<rackui::VerticalSwitch> power;
+        std::unique_ptr<rackui::PowerKey> powerSlide;   ///< (full bleed: the rail's slide instead)
+        juce::Rectangle<int> onWord;
+    };
+
+    /** ECHO: TAPE / BBD / ASCEND and its presets; TIME, FEEDBACK, TONE, AGE (ASCEND: CLOCK,
+        INTERVAL, MOTION), then FREE / SYNC and the stereo picture as compact keys; the repeats. */
+    class EchoRack final : public UnifiedRack
+    {
+    public:
+        float leftShare() const override { return 0.61f; }   // approved ECHO column
+        bool processingActive() const override { return processor.parameterValue ("echo") > 0.0f; }
+        explicit EchoRack (InstrumentHost& p) : UnifiedRack (p, "ECHO", design::colour::Macro::echo), model (p)
+        {
+            setModeSelector ("echo.type", "Tape echo, bucket-brigade (BBD) delay, or ASCEND: repeats an interval up (a pitch shifter in the loop)");
+            presetBar->setModel (&model);
+            setVisual (std::make_unique<EchoVisual> (p));
+            refresh();
+        }
+        void refresh() override
+        {
+            const int key = juce::roundToInt (value (processor.apvts(), "echo.type")) * 2 + (value (processor.apvts(), "echo.sync") >= 0.5f ? 1 : 0);
+            if (key != built)
+                build (key);
+        }
+
+    private:
+        void build (int key)
+        {
+            built = key;
+            clearCells();
+            const auto percent = [] (double v) { return format::percent (v) + " %"; };
+            const bool ascend = key / 2 == static_cast<int> (EchoType::ascend);
+            // TIME: one knob in one place - milliseconds when free, the note values (detents) when
+            // synced. AGE (BBD: its wear; its clock follows TIME) or ASCEND's CLOCK.
+            if (key % 2 == 1)
+                steppedKnob ("echo.division", "TIME", [] (double v) { return juce::String (shaping::echoDivisionName (juce::roundToInt (v))); });
+            else
+                knob ("echo.time", "TIME", [] (double v) { return format::milliseconds (v); });
+            knob ("echo.feedback", "FEEDBACK", percent);
+            knob ("echo.tone", "TONE", percent);
+            if (ascend)
+            {
+                knob ("echo.age", "CLOCK", [] (double v) { return juce::String (EchoDelay::clockHz (0.01 * v) / 1000.0, 1) + " kHz"; });
+                listCell ("echo.ascend.interval", "INTERVAL", "How far each pass shifts the repeats: an octave up, a fifth, a fourth, or an octave down");
+                listCell ("echo.ascend.motion", "MOTION", "RISE: each repeat higher than the last. STEADY: every repeat at the interval. LATE: the first as played, then rising");
+            }
+            else
+                knob ("echo.age", "AGE", percent);
+            const juce::String timingTip ("Free time in ms, or a note value synced to the host tempo");
+            const juce::String stereoTip ("In the centre, alternating left and right (Ping-Pong), or two heads a little apart");
+            if (deckWanted() && key / 2 == static_cast<int> (EchoType::tape))
+            {
+                // V4's TAPE deck (opt-in): the same TIMING and STEREO in the deck's top row.
+                deckSegments ("echo.sync", "TIMING", { { "FREE", "Free", 0.0f }, { "SYNC", "Sync", 1.0f } }, timingTip);
+                deckSegments ("echo.stereo", "STEREO", { { "MONO", "Mono", 0.0f }, { "PING", "Ping-Pong", 1.0f }, { "WIDE", "Wide", 2.0f } }, stereoTip);
+                setDeck ([this] { return deckReading(); });
+            }
+            else
+            {
+                setDeck (nullptr);
+                switchCell ("echo.sync", "TIMING", { { "FREE", "Free", 0.0f }, { "SYNC", "Sync", 1.0f } }, timingTip);
+                switchCell ("echo.stereo", "STEREO", { { "MONO", "Mono", 0.0f }, { "PING", "Ping-Pong", 1.0f }, { "WIDE", "Wide", 2.0f } }, stereoTip);
+            }
+            layout();
+        }
+        void faceplateChanged() override
+        {
+            built = -1;   // (the TAPE deck is the faceplate's choice)
+            refresh();
+        }
+        /** The deck's readout: the time (the division and its ms at the host's tempo when
+            synced), the tape's speed from it (a longer delay, a slower tape). */
+        TapeDeck::Reading deckReading() const
+        {
+            EchoDelay::Settings e;
+            e.type = EchoType::tape;
+            e.sync = value (processor.apvts(), "echo.sync") >= 0.5f;
+            e.division = juce::roundToInt (value (processor.apvts(), "echo.division"));
+            e.timeMs = value (processor.apvts(), "echo.time");
+            const double bpm = static_cast<double> (processor.hostTempo());
+            const double seconds = std::max (1.0e-3, EchoDelay::timeSeconds (e, bpm));
+            TapeDeck::Reading r;
+            const auto ms = juce::String (juce::roundToInt (1000.0 * seconds)) + " ms";
+            if (e.sync)
+            {
+                r.value = shaping::echoDivisionName (e.division);
+                r.unit = ms + juce::String::fromUTF8 (" \xc2\xb7 ") + juce::String (juce::roundToInt (bpm)) + " BPM";
+                r.note = "SYNC";
+                r.noteLit = true;
+                if (auto* division = processor.apvts().getParameter ("echo.division"))
+                    r.ticks = std::max (2, division->getNumSteps());
+                r.tick = e.division;
+            }
+            else
+            {
+                r.value = ms;
+                r.unit = "free time";
+                r.note = "FREE";
+            }
+            r.radiansPerSecond = std::clamp (1.6 / seconds, 0.8, 9.0);
+            r.active = processingActive();
+            return r;
+        }
+
+        EchoPresetModel model;
+        int built = -1;
+    };
+
+    /** SPACE (the reference): the room or engine and its variant, its presets, every knob of
+        the engine, and the decay picture whose handles set PRE-DELAY and DECAY. */
+    class SpaceRack final : public UnifiedRack
+    {
+    public:
+        float leftShare() const override { return 0.68f; }   // approved SPACE column
+        bool processingActive() const override { return processor.parameterValue ("space") > 0.0f; }
+        explicit SpaceRack (InstrumentHost& p) : UnifiedRack (p, "SPACE", design::colour::Macro::space), model (p)
+        {
+            auto& m = setModeSelector ("space.type", "Room, hall, plate or spring - or ABYSS, VINTAGE or BLOOM, SPACE's other engines, and their variants");
+            // MODE names the room or the engine (approved: ABYSS); its variant is its preset's
+            // name and is chosen in this list's engine submenus.
+            m.textOverride = [this] {
+                static const char* engines[] { "", "ABYSS", "VINTAGE", "BLOOM" };
+                return juce::String (engines[std::clamp (engine(), 0, 3)]);
+            };
+            m.extraItems = [this] (juce::PopupMenu& menu) {
+                juce::Component::SafePointer<SpaceRack> safe (this);
+                menu.addSeparator();
+                static const std::array<juce::StringArray, 3> variants { juce::StringArray { "Deep", "Dark", "Inverse", "Endless" },
+                                                                         juce::StringArray { "Hall", "Plate", "Chamber", "Room" },
+                                                                         juce::StringArray { "Clean", "Vintage", "Tape", "Wash" } };
+                static const char* variantIds[] { "space.abyss.variant", "space.vintage.variant", "space.bloom.variant" };
+                int index = 1;
+                for (const char* name : { "Abyss", "Vintage", "Bloom" })
+                {
+                    juce::PopupMenu sub;
+                    const int now = juce::roundToInt (value (processor.apvts(), variantIds[index - 1]));
+                    for (int v = 0; v < 4; ++v)
+                        sub.addItem (variants[static_cast<std::size_t> (index - 1)][v], true, engine() == index && now == v,
+                                     [safe, index, v] { if (safe != nullptr) safe->setEngine (index, v); });
+                    menu.addSubMenu (name, sub, true, nullptr, engine() == index);
+                    ++index;
+                }
+            };
+            m.onPick = [this] (int) { setEngine (0); };
+            presetBar->setModel (&model);
+            setVisual (std::make_unique<SpaceVisual> (p.apvts(), [&p] { return static_cast<double> (p.hostTempo()); }));
+            refresh();
+        }
+        void refresh() override
+        {
+            const int which = engine();
+            const bool sync = value (processor.apvts(), "space.bloom.sync") >= 0.5f;
+            const int key = which * 2 + (which == 3 && sync ? 1 : 0);
+            if (key != built)
+                build (key);
+            if (modeSelector != nullptr)
+                modeSelector->repaint();
+        }
+
+    private:
+        int engine() const { return juce::roundToInt (value (processor.apvts(), "space.engine")); }
+        void setEngine (int e, int variant = -1)
+        {
+            static const char* variantIds[] { "space.abyss.variant", "space.vintage.variant", "space.bloom.variant" };
+            if (variant >= 0 && e >= 1 && e <= 3)
+                setPlain (processor.apvts(), variantIds[e - 1], static_cast<float> (variant));
+            if (juce::roundToInt (value (processor.apvts(), "space.engine")) != e)
+                setPlain (processor.apvts(), "space.engine", static_cast<float> (e));
+            refresh();
+        }
+        void build (int key)
+        {
+            built = key;
+            clearCells();
+            const auto ms = [] (double v) { return format::milliseconds (v); };
+            const auto percent = [] (double v) { return format::percent (v) + " %"; };
+            const auto seconds = [] (double v) { return juce::String (std::clamp (v, 0.2, 8.0), 1) + " s"; };
+            switch (key / 2)
+            {
+                case 1:   // ABYSS
+                    knob ("space.preDelay", "PRE-DELAY", ms);
+                    knob ("space.size", "SIZE", percent);
+                    knob ("space.decay", "DECAY", seconds);
+                    knob ("space.damping", "DAMP", percent);
+                    knob ("space.abyss.gravity", "GRAVITY", [] (double v) {
+                        const int r = juce::roundToInt (v);
+                        return (r > 0 ? juce::String ("+") : juce::String()) + juce::String (r) + " %";
+                    });
+                    knob ("space.abyss.resonance", "RESONANCE", percent);
+                    knob ("space.modulation", "MOD", percent);
+                    knob ("space.width", "WIDTH", percent);
+                    switchCell ("space.abyss.freeze", "FREEZE", { { "ON", "On", 1.0f }, { "OFF", "Off", 0.0f } },
+                                "FREEZE: holds the tail as it is (nothing new enters, nothing fades)");
+                    break;
+                case 2:   // VINTAGE
+                    knob ("space.preDelay", "PRE-DELAY", ms);
+                    knob ("space.size", "SIZE", percent);
+                    knob ("space.decay", "DECAY", seconds);
+                    knob ("space.damping", "DAMP", percent);
+                    knob ("space.vintage.diffusion", "DIFFUSION", percent);
+                    knob ("space.modulation", "MOD", percent);
+                    knob ("space.width", "WIDTH", percent);
+                    segmentCell ("space.vintage.era", "ERA", { { "EARLY", "Early", 0.0f }, { "LATER", "Later", 1.0f } },
+                                 "The early digital reverbs' grain, or the later ones' smoother tail");
+                    break;
+                case 3:   // BLOOM
+                    if (key % 2 == 1)
+                        steppedKnob ("space.bloom.division", "TIME", [] (double v) { return juce::String (shaping::echoDivisionName (juce::roundToInt (v))); });
+                    else
+                        knob ("space.bloom.time", "TIME", ms);
+                    knob ("space.bloom.diffusion", "DIFFUSION", percent);
+                    knob ("space.decay", "DECAY", seconds);
+                    knob ("space.damping", "DAMP", percent);
+                    switchCell ("space.bloom.sync", "TIMING", { { "FREE", "Free", 0.0f }, { "SYNC", "Sync", 1.0f } },
+                                "BLOOM's time: free (ms), or a note value at the host's tempo");
+                    knob ("space.size", "SIZE", percent);
+                    knob ("space.modulation", "MOD", percent);
+                    knob ("space.width", "WIDTH", percent);
+                    break;
+                default:   // ROOMS
+                {
+                    auto* typeParam = processor.apvts().getParameter ("space.type");
+                    knob ("space.preDelay", "PRE-DELAY", ms);
+                    knob ("space.size", "SIZE", percent);
+                    knob ("space.decay", "DECAY", [typeParam] (double v) {
+                        double lo = 0.2, hi = 8.0;
+                        if (typeParam != nullptr)
+                            shaping::decayRange (static_cast<SpaceType> (juce::roundToInt (typeParam->convertFrom0to1 (typeParam->getValue()))), lo, hi);
+                        return juce::String (std::clamp (v, lo, hi), 1) + " s";
+                    });
+                    knob ("space.damping", "DAMP", percent);
+                    knob ("space.modulation", "MOD", percent);
+                    knob ("space.width", "WIDTH", percent);
+                    knob ("space.lowCut", "LOW CUT", [] (double v) { return format::hertz (v); });
+                    knob ("space.highCut", "HIGH CUT", [] (double v) { return format::hertz (v); });
+                    break;
+                }
+            }
+            layout();
+        }
+
+        SpacePresetModel model;
+        int built = -1;
     };
 
     //==========================================================================
@@ -3012,6 +5764,194 @@ namespace
 std::unique_ptr<MiniPanel> createReimaginedPopup (InstrumentHost& processor, int layer)
 {
     return std::make_unique<ReimaginedPanel> (processor, layer);
+}
+
+std::unique_ptr<rack::Module> createRackModule (rack::Kind kind, InstrumentHost& processor)
+{
+    switch (kind)
+    {
+        case rack::Kind::movement:
+        {
+            auto m = std::make_unique<MovementRack> (processor);
+            m->wearFaceplate (processor.rackFaceplate (static_cast<int> (kind)));
+            return m;
+        }
+        case rack::Kind::echo:
+        {
+            auto m = std::make_unique<EchoRack> (processor);
+            m->wearFaceplate (processor.rackFaceplate (static_cast<int> (kind)));
+            return m;
+        }
+        case rack::Kind::space:
+        {
+            auto m = std::make_unique<SpaceRack> (processor);
+            m->wearFaceplate (processor.rackFaceplate (static_cast<int> (kind)));
+            return m;
+        }
+        case rack::Kind::filter:
+        case rack::Kind::morph:
+        case rack::Kind::fx: break;   // (a product's own: ShellProduct::productRacks)
+    }
+    return nullptr;
+}
+
+int rackMovementLane (const rack::Module& module)
+{
+    if (const auto* m = dynamic_cast<const MovementRack*> (&module))
+        return m->laneShown();
+    return -1;
+}
+
+juce::StringArray rackMovementTitleRow (const rack::Module& module)
+{
+    if (const auto* m = dynamic_cast<const MovementRack*> (&module))
+        return m->titleRowItems();
+    return {};
+}
+
+juce::Rectangle<int> rackMovementLaneSwitch (const rack::Module& module)
+{
+    if (const auto* m = dynamic_cast<const MovementRack*> (&module))
+        return m->laneSwitchBounds();
+    return {};
+}
+
+void clickRackMovementLaneSwitch (rack::Module& module)
+{
+    if (auto* m = dynamic_cast<MovementRack*> (&module))
+        m->clickLaneSwitch();
+}
+
+juce::StringArray rackMovementLaneActions (rack::Module& module)
+{
+    if (auto* m = dynamic_cast<MovementRack*> (&module))
+        return m->laneActionNames();
+    return {};
+}
+
+void runRackMovementLaneAction (rack::Module& module, int index)
+{
+    if (auto* m = dynamic_cast<MovementRack*> (&module))
+        m->runLaneAction (index);
+}
+
+juce::StringArray rackMovementPresetMenuExtras (const rack::Module& module)
+{
+    if (const auto* m = dynamic_cast<const MovementRack*> (&module))
+        return m->presetMenuExtras();
+    return {};
+}
+
+std::vector<juce::Rectangle<int>> rackCellBounds (const rack::Module& module)
+{
+    if (const auto* m = dynamic_cast<const UnifiedRack*> (&module))
+        return m->cellBounds();
+    return {};
+}
+
+juce::Component* rackCell (const rack::Module& module, const juce::String& caption)
+{
+    if (const auto* m = dynamic_cast<const UnifiedRack*> (&module))
+        return m->cellNamed (caption);
+    return nullptr;
+}
+
+int rackDensity (const rack::Module& module)
+{
+    if (const auto* m = dynamic_cast<const UnifiedRack*> (&module))
+        return m->dense() ? 1 : 0;
+    return -1;
+}
+
+void showRackMovementLane (rack::Module& module, int lane)
+{
+    if (auto* m = dynamic_cast<MovementRack*> (&module))
+        m->showLane (lane);
+}
+
+void setRackMovementWide (rack::Module& module, bool wide)
+{
+    if (auto* m = dynamic_cast<MovementRack*> (&module))
+        m->setWide (wide);
+}
+
+juce::String rackMovementCaptions (const rack::Module& module)
+{
+    if (const auto* m = dynamic_cast<const UnifiedRack*> (&module))
+        return m->captions();
+    return {};
+}
+
+juce::String rackPresetText (rack::Module& module)
+{
+    if (auto* m = dynamic_cast<UnifiedRack*> (&module))
+        return m->presets().text();
+    return {};
+}
+
+bool rackPresetChoose (rack::Module& module, const juce::String& name)
+{
+    if (auto* m = dynamic_cast<UnifiedRack*> (&module))
+        return m->presets().chooseNamed (name);
+    return false;
+}
+
+void rackPresetStep (rack::Module& module, int delta)
+{
+    if (auto* m = dynamic_cast<UnifiedRack*> (&module))
+        m->presets().step (delta);
+}
+
+bool rackPresetSave (rack::Module& module, const juce::String& name)
+{
+    if (auto* m = dynamic_cast<UnifiedRack*> (&module))
+        return m->presets().saveAs (name);
+    return false;
+}
+
+juce::StringArray rackPresetNames (rack::Module& module)
+{
+    juce::StringArray names;
+    if (auto* m = dynamic_cast<UnifiedRack*> (&module))
+        for (const auto& p : m->presets().relevant())
+            names.add (p.name);
+    return names;
+}
+
+juce::Rectangle<int> rackSlot (const rack::Module& module, int slot)
+{
+    if (const auto* m = dynamic_cast<const UnifiedRack*> (&module))
+        return m->slot (slot);
+    return {};
+}
+
+bool rackTapeDeckShown (const rack::Module& module)
+{
+    const auto* m = dynamic_cast<const UnifiedRack*> (&module);
+    return m != nullptr && m->tapeDeck() != nullptr && m->tapeDeck()->isVisible();
+}
+
+juce::Rectangle<int> rackTapeDeckBounds (const rack::Module& module)
+{
+    const auto* m = dynamic_cast<const UnifiedRack*> (&module);
+    return m != nullptr && m->tapeDeck() != nullptr ? m->tapeDeck()->getBounds() : juce::Rectangle<int>();
+}
+
+double rackTapeDeckSpeed (const rack::Module& module)
+{
+    const auto* m = dynamic_cast<const UnifiedRack*> (&module);
+    return m != nullptr && m->tapeDeck() != nullptr ? m->tapeDeck()->reelSpeed() : 0.0;
+}
+
+void advanceRackTapeDeck (rack::Module& module, double seconds)
+{
+    if (auto* m = dynamic_cast<UnifiedRack*> (&module); m != nullptr && m->tapeDeck() != nullptr)
+        m->tapeDeck()->advance (seconds);
+}
+
+void setRackPresetFolderForTest (const juce::File& folder)
+{
+    rackPresetFolderOverride() = folder;
 }
 
 std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, InstrumentHost& processor)

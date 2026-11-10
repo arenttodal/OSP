@@ -259,9 +259,13 @@ ShellEditor::ShellEditor (ShellProcessor& p)
         for (int layer = 0; layer < ShellProcessor::numLayers; ++layer)
             if (shell.isGeneratorLayer (layer))
             {
-                // Each oscillator card's selector: the product's name, only as wide as it needs.
+                // Each oscillator card's selector: the product's name, only as wide as it needs
+                // (or, opt-in, a GRANULAR on / off key: the oscillator plays as it is unless lit).
                 cards[static_cast<std::size_t> (layer)]->setFirstModeName (name);
-                cards[static_cast<std::size_t> (layer)]->setModeFitsName (true);
+                if (shell.generatorGranularToggle())
+                    cards[static_cast<std::size_t> (layer)]->setModeToggle (true);
+                else
+                    cards[static_cast<std::size_t> (layer)]->setModeFitsName (true);
             }
     dropZone.onBrowse = [this] { chooseFile (-1); };
     dropZone.setRecordShown (shell.liveCapture());   // (the parity render: as ANDOR OSP)
@@ -282,6 +286,15 @@ ShellEditor::ShellEditor (ShellProcessor& p)
         modOverlay.contextMenu (modui::mixTargetId).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&headerMix));
     };
     content.addChildComponent (headerMix);
+    // The product's other view of the sources' area (opt-in): its icon beside SAVE.
+    if (shell.showsSourceView())
+    {
+        sourceViewButton.setTooltip (shell.product().sourceAreaView.tooltip);
+        sourceViewButton.setTitle (shell.product().sourceAreaView.tooltip);
+        sourceViewButton.setClickingTogglesState (false);
+        sourceViewButton.onClick = [this] { setSourceViewShown (! sourceViewOpen); };
+        content.addAndMakeVisible (sourceViewButton);
+    }
 
     // The six macros (the product's): names and knobs as ANDOR OSP's.
     const bool macroPopovers = shell.product().macroPopover != nullptr;
@@ -298,6 +311,20 @@ ShellEditor::ShellEditor (ShellProcessor& p)
                 openPopup (static_cast<int> (i));
             };
     }
+    // The effects rack (opt-in): no mark on the row - the macro's name opens its module on a
+    // double-click, a right-click offers the popover or the module, Enter opens it.
+    for (std::size_t i = 0; i < macros.size(); ++i)
+        if (const auto kind = rackKindForMacro (shell.macroSpecs()[i].parameterId); kind.has_value() && shell.showsRack() && macros[i].label != nullptr)
+        {
+            rackOfMacro[i] = *kind;
+            const auto k = *kind;
+            const int macro = static_cast<int> (i);
+            juce::Component::SafePointer<ShellEditor> safe (this);
+            macros[i].label->setRackActions ([this, k] { toggleRackFromLabel (k); }, [safe, macro, k] {
+                if (safe != nullptr)
+                    safe->rackLabelMenu (macro, k).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (safe->macros[static_cast<std::size_t> (macro)].label.get()));
+            });
+        }
     content.addAndMakeVisible (modPanel);
 
     content.addAndMakeVisible (pitchWheel);
@@ -321,8 +348,18 @@ ShellEditor::ShellEditor (ShellProcessor& p)
     content.addAndMakeVisible (advancedButton);
     arpButton.onToggleEditor = [this] { setArpExpanded (! arpShown); };
     arpPanel.onCollapse = [this] { setArpExpanded (false); };
+    arpPanel.setCrossClose (shell.crossCloseKeys());
     content.addAndMakeVisible (arpButton);
     content.addChildComponent (arpPanel);
+    content.addChildComponent (rack);
+    rack.setFullBleed (shell.fullBleedRacks());
+    for (int k = 0; k < rack::kindCount; ++k)
+        if ((shell.rackExpanded() & (1 << k)) != 0 && hasRack (static_cast<rack::Kind> (k)))
+            rack.setShown (static_cast<rack::Kind> (k), true);
+    for (std::size_t i = 0; i < macros.size(); ++i)
+        if (rackOfMacro[i].has_value())
+            macros[i].label->setRackOpen (rack.isShown (*rackOfMacro[i]));
+    rack.onLayoutChanged = [this] { rackChanged(); };   // (after: the window is laid out below)
     arpShown = shell.arpEditorExpanded();
     arpButton.setExpanded (arpShown);
     arpPanel.setVisible (arpShown);
@@ -341,6 +378,7 @@ ShellEditor::ShellEditor (ShellProcessor& p)
         modOverlay.onShowRoutes = [this] (int source) { openPopup (routesPopup, source); };
     }
     modPanel.onExpandCurve = [this] (int source) { openPopup (curvePopup, source); };
+    modPanel.setStableTabs (shell.stableModulationTabs());
     modPanel.onTabChanged = [this] (int tab) {
         shell.setModPanelTab (tab);
         selectModulation (modui::sourceOfTab (tab), -1);
@@ -351,7 +389,7 @@ ShellEditor::ShellEditor (ShellProcessor& p)
 
     juce::Desktop::getInstance().addGlobalMouseListener (&outsideClicks);
 
-    content.onPaint = [this] (juce::Graphics& g) { frame::paint (g, content, shell.product().identity, arpShown, macros); };
+    content.onPaint = [this] (juce::Graphics& g) { frame::paint (g, content, shell.product().identity, arpShown, macros, rackShift(), sourceTrim()); };
     addAndMakeVisible (content);
     layoutInstrument();
     setResizable (true, true);
@@ -405,9 +443,40 @@ void ShellEditor::layoutInstrument()
     parts.arpControl = &arpButton;
     parts.advanced = &advancedButton;
     parts.headerMix = &headerMix;
+    if (shell.showsRack())
+    {
+        parts.rack = &rack;
+        parts.rackShift = rackShift();
+    }
+    parts.sourceTrim = sourceTrim();
     frame::place (parts, arpShown);
+    if (shell.showsSourceView())
+    {
+        // The icon beside SAVE, on its centre line (12 px from it), and MIX moved right by as
+        // much, narrower by as much (it centres itself), clear of VOLUME.
+        auto save = savePresetButton.getBounds();
+        if (! shell.headerMixShown())
+        {
+            // No MIX: [ preset bar ][ SAVE ][ ROUTING ] as one group of keys on one centre
+            // line, 8 px apart, the bar taking MIX's room up to VOLUME (28 px clear of it).
+            const int gap = 8, key = save.getWidth();
+            const int right = volume.getX() - 28;
+            sourceViewButton.setBounds (save.withX (right - key));
+            save = save.withX (right - key - gap - key);
+            savePresetButton.setBounds (save);
+            presetBar.setBounds (presetBar.getBounds().withRight (save.getX() - gap));
+        }
+        else
+        {
+            sourceViewButton.setBounds (juce::Rectangle<int> (30, 30).withCentre ({ save.getRight() + 12 + 15, save.getCentreY() }));
+            const auto mix = headerMix.getBounds();
+            const int shift = sourceViewButton.getRight() + 15 - mix.getX();
+            if (shift > 0)
+                headerMix.setBounds (mix.withTrimmedLeft (shift));
+        }
+    }
     modOverlay.setBounds (content.getLocalBounds());
-    sourceArea = frame::sourceArea();
+    sourceArea = frame::sourceArea (sourceTrim());
     shownCount = -1;
     layoutSources();
 }
@@ -456,8 +525,78 @@ bool ShellEditor::threeEngines() const
     return shell.product().threeEngines.enabled && shell.hasHybridLayer();
 }
 
+void ShellEditor::setSourceViewShown (bool shown)
+{
+    if (! shell.showsSourceView() || shown == sourceViewOpen)
+        return;
+    if (shown && sourceView == nullptr)
+    {
+        sourceView = shell.product().sourceAreaView.create (shell);
+        if (sourceView == nullptr)
+            return;
+        content.addChildComponent (*sourceView);
+    }
+    sourceViewOpen = shown;
+    sourceViewButton.setToggleState (shown, juce::dontSendNotification);
+    sourceViewButton.repaint();
+    shownCount = -1;
+    layoutSources();
+    if (shown && sourceView != nullptr)
+        sourceView->grabKeyboardFocus();
+}
+
+void ShellEditor::SourceViewButton::paintButton (juce::Graphics& g, bool over, bool down)
+{
+    // A header key as SAVE (its face, its icon size and ink): a branching path, two inputs
+    // joining; the path green while its view is shown.
+    using namespace osp::plugin::design;
+    const auto r = getLocalBounds().toFloat();
+    const bool on = getToggleState();
+    const float k = r.getHeight() / 48.0f;
+    if (! osp::plugin::skin::drawnBySurface())   // ceramic: the housing draws the key
+        draw::raised (g, r.reduced (0.5f), 9.0f * k, colour::cardTop, colour::cardBottom, 0.9f);
+    if (on)
+    {
+        g.setColour (juce::Colour (0x24b4cab5));
+        g.fillRoundedRectangle (r.reduced (5.0f * k), 6.0f * k);
+    }
+    const float s = 27.0f * k / 24.0f;
+    const auto o = r.getCentre() - juce::Point<float> (12.0f * s, 12.0f * s) + juce::Point<float> (0.0f, down ? 0.5f : 0.0f);
+    auto at = [&] (float x, float y) { return o + juce::Point<float> (x * s, y * s); };
+    juce::Path p;
+    for (const auto c : { at (5, 5), at (19, 12), at (5, 19) })
+        p.addEllipse (juce::Rectangle<float> (4.0f * s, 4.0f * s).withCentre (c));
+    p.startNewSubPath (at (7, 5));
+    p.lineTo (at (11, 5));
+    p.cubicTo (at (13, 5), at (13, 12), at (17, 12));
+    p.startNewSubPath (at (7, 19));
+    p.lineTo (at (11, 19));
+    p.cubicTo (at (13, 19), at (13, 12), at (17, 12));
+    g.setColour (on ? juce::Colour (0xff477767) : colour::text.withAlpha (over || down ? 0.85f : 0.6f));
+    g.strokePath (p, juce::PathStrokeType (1.5f * k, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    if (hasKeyboardFocus (false))
+    {
+        g.setColour (juce::Colour (0xff88a8af));
+        g.drawRoundedRectangle (r.reduced (1.5f), 9.0f * k, 1.5f);
+    }
+}
+
 void ShellEditor::layoutSources()
 {
+    if (sourceView != nullptr)
+        sourceView->setVisible (sourceViewOpen);
+    if (sourceViewOpen && sourceView != nullptr)
+    {
+        // The product's view in the cards' place (the sound is the same either way).
+        for (auto& card : cards)
+            card->setVisible (false);
+        sampleDock.setVisible (false);
+        dropZone.setVisible (false);
+        addTarget.setVisible (false);
+        sourceView->setBounds (sourceArea);
+        shownCount = -1;   // (the cards are laid out afresh when it closes)
+        return;
+    }
     if (threeEngines())
     {
         // Three engines: every card, always, at equal widths, in the product's order; the
@@ -490,7 +629,7 @@ void ShellEditor::layoutSources()
         }
         if (dockOverlay != nullptr)
             dockOverlay->setBounds (sampleDock.getLocalBounds().reduced (14).withTrimmedTop (sampleDock.headerBounds().getBottom()));
-        headerMix.setLayers ({ true, hybrid, false });   // the analog side against the hybrid
+        headerMix.setLayers ({ true, hybrid && shell.headerMixShown(), false });   // the analog side against the hybrid (none: no MIX)
         headerMix.setEndLabels (shell.product().mixEndLabels[0], shell.product().mixEndLabels[1]);
         updateFocus();
         applyBindings();
@@ -540,6 +679,8 @@ void ShellEditor::layoutSources()
         addTarget.setBounds (frame::sourceColumn (sourceArea, columns, col));
         addTarget.setLetter (InstrumentHost::layerName (count));
     }
+    if (! shell.headerMixShown())
+        occupied = { true, false, false };   // (no MIX: nothing to balance in the header)
     headerMix.setLayers (occupied);
     if (isReimaginedPopup (popupIndex))
     {
@@ -828,9 +969,11 @@ void ShellEditor::openPopup (int which, int source)
     closePopup();
     if (which == routesPopup || which == curvePopup)
     {
-        if (source > 3)
-            return;   // the wheel's routes are on its controls
-        popupSource = juce::jlimit (0, 3, source);
+        // LFO 1 .. ENV 2, VEL and NOTE (their curves, their routes); the wheel's routes are on
+        // its controls.
+        if (source < 0 || (source > 3 && osp::plugin::modui::keyCurveIndex (source) < 0))
+            return;
+        popupSource = source;
         if (which == routesPopup)
         {
             auto routes = std::make_unique<ModRoutesPopup> (shell, popupSource);
@@ -1052,6 +1195,100 @@ void ShellEditor::setArpExpanded (bool open)
     content.repaint();
 }
 
+std::optional<rack::Kind> ShellEditor::rackKindForMacro (const juce::String& parameterId) const
+{
+    for (const auto& r : shell.product().productRacks)
+        if (r.macroParameterId == parameterId)
+            return r.kind;
+    if (const auto kind = rack::kindForMacro (parameterId);
+        kind.has_value() && std::find (shell.product().rackModules.begin(), shell.product().rackModules.end(), *kind) != shell.product().rackModules.end())
+        return kind;
+    return std::nullopt;
+}
+
+std::unique_ptr<rack::Module> ShellEditor::createRackModule (rack::Kind kind)
+{
+    for (const auto& r : shell.product().productRacks)
+        if (r.kind == kind && r.create != nullptr)
+            return r.create (shell);
+    return osp::plugin::createRackModule (kind, shell);
+}
+
+bool ShellEditor::hasRack (rack::Kind kind) const noexcept
+{
+    if (rackMacro (kind) >= 0)
+        return true;
+    // A product's rack that no macro opens (ShellProduct::ProductRack with no macro: its own view
+    // opens it, as ANDOR ANALOG's FX ROUTING opens its effects' racks).
+    if (! shell.showsRack())
+        return false;
+    for (const auto& r : shell.product().productRacks)
+        if (r.kind == kind && r.macroParameterId.isEmpty())
+            return true;
+    return false;
+}
+
+int ShellEditor::rackMacro (rack::Kind kind) const noexcept
+{
+    for (std::size_t i = 0; i < rackOfMacro.size(); ++i)
+        if (rackOfMacro[i] == kind)
+            return static_cast<int> (i);
+    return -1;
+}
+
+void ShellEditor::toggleRackFromLabel (rack::Kind kind)
+{
+    // (A popover in the way closes; a press that closed it must not count later.)
+    closedByLabelPress = -1;
+    closePopup();
+    setRackExpanded (kind, ! rack.isShown (kind));
+}
+
+juce::PopupMenu ShellEditor::rackLabelMenu (int macro, rack::Kind kind)
+{
+    juce::PopupMenu menu;
+    juce::Component::SafePointer<ShellEditor> safe (this);
+    if (shell.product().macroPopover != nullptr)
+        menu.addItem ("Quick Settings", [safe, macro] {
+            if (safe != nullptr)
+            {
+                safe->closedByLabelPress = -1;
+                safe->openPopup (macro);
+            }
+        });
+    menu.addItem (rack.isShown (kind) ? "Close Rack" : "Open Rack", [safe, kind] { if (safe != nullptr) safe->toggleRackFromLabel (kind); });
+    return menu;
+}
+
+int ShellEditor::rackMask() const
+{
+    int mask = 0;
+    for (const auto kind : rack.shownKinds())
+        mask |= 1 << static_cast<int> (kind);
+    return mask;
+}
+
+void ShellEditor::setRackExpanded (rack::Kind kind, bool open)
+{
+    if (open && ! hasRack (kind))
+        return;
+    rack.setShown (kind, open);   // (rackChanged follows)
+}
+
+void ShellEditor::rackChanged()
+{
+    // A view change only: the window grows or shrinks by the rack, nothing sounds different.
+    shell.setRackExpanded (rackMask());
+    for (std::size_t i = 0; i < macros.size(); ++i)
+        if (rackOfMacro[i].has_value())
+            macros[i].label->setRackOpen (rack.isShown (*rackOfMacro[i]));
+    rack.settle();
+    layoutInstrument();
+    frame::applyWindowShape (*this, instrumentHeight(), true);
+    placeKeyDna();
+    content.repaint();
+}
+
 void ShellEditor::openKeyDna (int layer)
 {
     // As ANDOR OSP's editor opens it.
@@ -1191,6 +1428,9 @@ void ShellEditor::refreshCardExtensions()
         }
         if (product.cardModifiersShown != nullptr)
             card.setModifiersShown (product.cardModifiersShown (l, shell));
+        card.setModifiersInWell (shell.modifiersInWell());
+        if (shell.modifiersInWell() && product.cardModifiersApplicable != nullptr)
+            card.setModifiersApplicable (product.cardModifiersApplicable (l, shell));
         if (product.wellOverlay != nullptr)
         {
             const auto key = product.wellOverlayKey != nullptr ? product.wellOverlayKey (l, shell) : juce::String ("-");
@@ -1264,6 +1504,15 @@ void ShellEditor::timerCallback()
     updateStatus();
     if (shell.arpEditorExpanded() != arpShown)
         setArpExpanded (shell.arpEditorExpanded());
+    if (shell.showsRack())
+    {
+        // A session recalled with another rack open (the view setting it saved).
+        if (const int wanted = shell.rackExpanded(); wanted != rackMask())
+            for (int k = 0; k < rack::kindCount; ++k)
+                if (hasRack (static_cast<rack::Kind> (k)))
+                    rack.setShown (static_cast<rack::Kind> (k), (wanted & (1 << k)) != 0);
+        rack.refresh();
+    }
     arpButton.refresh();
     if (arpShown)
         arpPanel.refresh();

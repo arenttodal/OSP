@@ -3,6 +3,7 @@
 
 #include "AndorParameters.h"
 #include "Binding.h"
+#include "ParameterFactory.h"
 #include "KeyDnaState.h"
 
 #include <algorithm>
@@ -62,17 +63,35 @@ namespace
         osp::ShaperPattern from, to;
     };
 
-    const juce::Identifier sourcesType ("Sources"), layerType ("Layer"), viewType ("View"), curvesType ("Curves"), shaperType ("Shaper"), keyDnaType ("KeyDna");
-
-    /** ANDOR OSP's schema, then the product's own parameters (ProductInfo::addParameters). */
-    juce::AudioProcessorValueTreeState::ParameterLayout productParameterLayout()
+    /** The second MOVEMENT lane's pattern, one undo step. */
+    struct LaneShaperAction final : juce::UndoableAction
     {
+        LaneShaperAction (ShellProcessor& p, int l, const osp::ShaperPattern& a, const osp::ShaperPattern& b) : processor (p), lane (l), from (a), to (b) {}
+        bool perform() override { processor.setLaneShaperPattern (lane, to, false); return true; }
+        bool undo() override { processor.setLaneShaperPattern (lane, from, false); return true; }
+        ShellProcessor& processor;
+        int lane;
+        osp::ShaperPattern from, to;
+    };
+
+    const juce::Identifier sourcesType ("Sources"), layerType ("Layer"), viewType ("View"), curvesType ("Curves"), shaperType ("Shaper"), keyDnaType ("KeyDna");
+    const juce::Identifier shaperBType ("ShaperB");
+
+    /** ANDOR OSP's schema, then the product's own parameters (ProductInfo::addParameters).
+        Only the parameters the engine reads (`bound`) are offered to the host for automation:
+        the rest do nothing in this product (the bindings tests prove them inert), so a DAW's
+        automation lists leave them out. IDs, order and saved state are unchanged. */
+    juce::AudioProcessorValueTreeState::ParameterLayout productParameterLayout (const juce::StringArray& bound)
+    {
+        const osp::plugin::parameters::ScopedAutomatableFilter automatable ([&bound] (const juce::String& id) {
+            return osp::plugin::binding::anyBound ({ id }, bound);
+        });
         // The product's own modulation destinations come after ANDOR OSP's in the routes'
         // destination list, which the layout below is made with.
         osp::mod::setProductDestinations (productInfo().modulationDestinations);
         auto layout = InstrumentHost::createParameterLayout();
         if (productInfo().cardArpeggiator)
-            InstrumentHost::addCardArpParameters (layout, productInfo().slug + ".");   // (in the product's namespace)
+            InstrumentHost::addCardArpParameters (layout, productInfo().slug + ".");   // (in the product's namespace; parameters::make, so the automation filter applies)
         if (productInfo().addParameters != nullptr)
             productInfo().addParameters (layout);
         return layout;
@@ -94,7 +113,7 @@ namespace
 //==============================================================================
 ShellProcessor::ShellProcessor (std::unique_ptr<Engine> productEngine)
     : AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
-      parameters (*this, &undoManager, productInfo().stateType, productParameterLayout()),
+      parameters (*this, &undoManager, productInfo().stateType, productParameterLayout (productEngine->boundParameters())),
       engine (std::move (productEngine))
 {
     jassert (engine != nullptr);
@@ -159,6 +178,7 @@ ShellProcessor::ShellProcessor (std::unique_ptr<Engine> productEngine)
     for (std::size_t i = 0; i < ccNumbers.size(); ++i)
         ccNumbers[i].store (defaultControllers[i]);
     publishShaperPattern();
+    publishShaperPatternB();
     for (int i = 0; i < modCurveCount; ++i)
         publishCurve (i);
     store = std::make_unique<osp::plugin::SampleStore> (sampleStoreFolder());
@@ -197,6 +217,7 @@ void ShellProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     if (cardArp)
         lanes->prepare (sampleRate);
     shaperGenerationSeen = 0;   // the prepared engine is given the pattern, curves and modulation again
+    shaperGenerationSeenB = 0;
     curveGenerationSeen.fill (0);
     modDirty = true;
     setLatencySamples (engine->latencySamples());
@@ -316,6 +337,18 @@ void ShellProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
         }
         engine->setShaperPattern (pattern);
     }
+    if (const auto generation = shaperGenerationB.load (std::memory_order_acquire); generation != shaperGenerationSeenB)
+    {
+        shaperGenerationSeenB = generation;
+        osp::ShaperPattern pattern;
+        for (std::size_t i = 0; i < pattern.size(); ++i)
+        {
+            pattern[i].start = shaperStepsB[3 * i].load (std::memory_order_relaxed);
+            pattern[i].end = shaperStepsB[3 * i + 1].load (std::memory_order_relaxed);
+            pattern[i].shape = static_cast<osp::StepShape> (std::clamp (static_cast<int> (shaperStepsB[3 * i + 2].load (std::memory_order_relaxed)), 0, 5));
+        }
+        engine->setLaneShaperPattern (1, pattern);
+    }
     for (int c = 0; c < modCurveCount; ++c)
     {
         const auto index = static_cast<std::size_t> (c);
@@ -344,6 +377,7 @@ void ShellProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
     if (! arpBound)
     {
         engine->process (buffer, midi, performance);
+        outputPeakValue.store (buffer.getMagnitude (0, buffer.getNumSamples()), std::memory_order_relaxed);   // (read-only telemetry)
         return;
     }
     osp::HostTiming timing;
@@ -356,6 +390,7 @@ void ShellProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
     const auto& notes = cardArp ? runCardArpeggiators (midi, buffer.getNumSamples(), timing) : runArpeggiator (midi, buffer.getNumSamples(), timing);
     engine->setPlayedKeys (arpeggiator.isEnabled() || (lanes != nullptr && lanes->active()), midi);
     engine->process (buffer, notes, performance);
+    outputPeakValue.store (buffer.getMagnitude (0, buffer.getNumSamples()), std::memory_order_relaxed);   // (read-only telemetry)
 }
 
 void ShellProcessor::applyModulation() noexcept
@@ -891,6 +926,11 @@ void ShellProcessor::timerCallback()
 {
     if (ampEnvelopeTouchPending.exchange (false) && productInfo().ampEnvelopeTouched != nullptr)
         productInfo().ampEnvelopeTouched (*this);
+    // An engine whose latency moves while it plays (a product's routed effects): the host is
+    // told here, on the message thread (an engine with a fixed latency never changes it).
+    if (engine != nullptr)
+        if (const int latency = engine->latencySamples(); latency != getLatencySamples())
+            setLatencySamples (latency);
     std::deque<Finished> done;
     {
         const std::lock_guard<std::mutex> lock (resultsMutex);
@@ -954,6 +994,8 @@ std::unique_ptr<juce::XmlElement> ShellProcessor::stateXml() const
         xml->createNewChildElement (curvesType.toString())->setAttribute ("value", encodeModulationCurves (curves));
     }
     xml->createNewChildElement (shaperType.toString())->setAttribute ("value", encodeShaperPattern (shaperCustomPattern()));
+    if (movementLaneCount() > 1)
+        xml->createNewChildElement (shaperBType.toString())->setAttribute ("value", encodeShaperPattern (laneShaperPattern (1)));
     if (engine->hasKeyDna())
     {
         // KEY DNA: ANDOR OSP's own tree (schema 1), so a profile reopens exactly.
@@ -974,6 +1016,20 @@ std::unique_ptr<juce::XmlElement> ShellProcessor::stateXml() const
     auto* view = xml->createNewChildElement (viewType.toString());
     view->setAttribute ("arpOpen", arpOpen.load() ? 1 : 0);
     view->setAttribute ("shaperLarge", shaperLarge.load() ? 1 : 0);
+    if (! product().rackModules.empty() || ! product().productRacks.empty())
+    {
+        view->setAttribute ("rack", rackOpen.load());
+        // Which preset each rack module (each MOVEMENT lane) had chosen: its "NAME *" comes back.
+        const juce::ScopedLock lock (rackMemoryLock);
+        if (rackMemory.size() > 0)
+        {
+            auto* presets = view->createNewChildElement ("RackPresets");
+            for (int i = 0; i < rackMemory.size(); ++i)
+                if (rackMemory.getAllValues()[i].isNotEmpty())
+                    presets->setAttribute (juce::XmlElement::isValidXmlName (rackMemory.getAllKeys()[i]) ? rackMemory.getAllKeys()[i] : juce::String ("x"),
+                                           rackMemory.getAllValues()[i]);
+        }
+    }
     view->setAttribute ("modTab", modTab.load());
     view->setAttribute ("editLayer", editLayer());
     view->setAttribute ("velToAmp", velToAmp.load() ? 1 : 0);
@@ -1057,10 +1113,24 @@ bool ShellProcessor::applyStateXml (const juce::XmlElement& xml)
         const auto decoded = shaper != nullptr ? decodeShaperPattern (shaper->getStringAttribute ("value")) : std::nullopt;
         setShaperCustomPattern (decoded.value_or (osp::RhythmicShaper::patternSteps (osp::ShaperParams().pattern)), false);
     }
+    if (movementLaneCount() > 1)
+    {
+        const auto* shaper = xml.getChildByName (shaperBType);
+        const auto decoded = shaper != nullptr ? decodeShaperPattern (shaper->getStringAttribute ("value")) : std::nullopt;
+        setLaneShaperPattern (1, decoded.value_or (osp::RhythmicShaper::patternSteps (osp::ShaperParams().pattern)), false);
+    }
     if (auto* view = xml.getChildByName (viewType))
     {
         arpOpen = view->getIntAttribute ("arpOpen") != 0;
         shaperLarge = view->getIntAttribute ("shaperLarge") != 0;
+        rackOpen = view->getIntAttribute ("rack", 0);
+        {
+            const juce::ScopedLock lock (rackMemoryLock);
+            rackMemory.clear();
+            if (const auto* presets = view->getChildByName ("RackPresets"))
+                for (int i = 0; i < presets->getNumAttributes(); ++i)
+                    rackMemory.set (presets->getAttributeName (i), presets->getAttributeValue (i));
+        }
         setModPanelTab (view->getIntAttribute ("modTab"));
         setEditLayer (view->getIntAttribute ("editLayer"));
         velToAmp = view->getIntAttribute ("velToAmp", 1) != 0;
@@ -1262,6 +1332,8 @@ void ShellProcessor::resetSettings()
     if (auto links = parameters.state.getChildWithName (modLinksTreeType()); links.isValid())
         parameters.state.removeChild (links, nullptr);
     setShaperCustomPattern (osp::RhythmicShaper::patternSteps (osp::ShaperParams().pattern), false);
+    if (movementLaneCount() > 1)
+        setLaneShaperPattern (1, osp::RhythmicShaper::patternSteps (osp::ShaperParams().pattern), false);
     engine->restoreState (juce::XmlElement (productInfo().stateType), sampleStoreFolder());   // (none of its own)
     if (productInfo().threeEngines.enabled && isGenerator())
         centreHybridMix();   // (three engines: the MIX in the middle, every card heard)
@@ -1384,6 +1456,48 @@ void ShellProcessor::publishShaperPattern() noexcept
         shaperSteps[3 * i + 2].store (static_cast<float> (pattern[i].shape), std::memory_order_relaxed);
     }
     shaperGeneration.fetch_add (1, std::memory_order_release);
+}
+
+osp::ShaperPattern ShellProcessor::laneShaperPattern (int lane) const
+{
+    if (lane <= 0)
+        return shaperCustomPattern();
+    const juce::ScopedLock lock (shaperLock);
+    return shaperPatternB;
+}
+
+void ShellProcessor::setLaneShaperPattern (int lane, const osp::ShaperPattern& pattern, bool undoable)
+{
+    if (lane <= 0)
+    {
+        setShaperCustomPattern (pattern, undoable);
+        return;
+    }
+    const auto before = laneShaperPattern (lane);
+    if (before == pattern)
+        return;
+    if (undoable)
+    {
+        undoManager.perform (new LaneShaperAction (*this, lane, before, pattern));
+        return;
+    }
+    {
+        const juce::ScopedLock lock (shaperLock);
+        shaperPatternB = pattern;
+    }
+    publishShaperPatternB();
+}
+
+void ShellProcessor::publishShaperPatternB() noexcept
+{
+    const auto pattern = laneShaperPattern (1);
+    for (std::size_t i = 0; i < pattern.size(); ++i)
+    {
+        shaperStepsB[3 * i].store (std::clamp (pattern[i].start, 0.0f, 1.0f), std::memory_order_relaxed);
+        shaperStepsB[3 * i + 1].store (std::clamp (pattern[i].end, 0.0f, 1.0f), std::memory_order_relaxed);
+        shaperStepsB[3 * i + 2].store (static_cast<float> (pattern[i].shape), std::memory_order_relaxed);
+    }
+    shaperGenerationB.fetch_add (1, std::memory_order_release);
 }
 
 int ShellProcessor::recentVelocityAt (int index) const noexcept

@@ -112,13 +112,45 @@ public:
     /** Live capture is ANDOR OSP's (a product has none yet); the parity render draws its REC
         key as ANDOR OSP does, so the comparison sees only real differences. */
     bool liveCapture() const noexcept override { return referenceParity; }
+    /** The effects rack's modules (the product's; none in the visual regression's parity render). */
+    bool showsRack() const noexcept { return ! referenceParity && (! product().rackModules.empty() || ! product().productRacks.empty()); }
+    /** The product's other view of the sources' area and its icon (not in the parity render). */
+    bool showsSourceView() const noexcept { return ! referenceParity && product().sourceAreaView.create != nullptr; }
+    /** A shared rack's faceplate: the product's (not in the parity render). */
+    const osp::plugin::rack::Faceplate* rackFaceplate (int kind) const noexcept override
+    {
+        if (referenceParity)
+            return nullptr;
+        const auto& m = product().rackFaceplates;
+        const auto it = m.find (static_cast<osp::plugin::rack::Kind> (kind));
+        return it != m.end() ? &it->second : nullptr;
+    }
+    /** The cards' modifiers in their wells (the product's choice; not in the parity render). */
+    bool modifiersInWell() const noexcept { return ! referenceParity && product().cardModifiersInWell; }
+    /** The rack is its modules' faces (the product's choice; not in the parity render). */
+    bool fullBleedRacks() const noexcept { return ! referenceParity && product().fullBleedRacks; }
+    bool stableModulationTabs() const noexcept { return ! referenceParity && product().stableModulationTabs; }
+    // (the header's MIX, the ARPEGGIATOR's X, the GRANULAR key: the product's, never in parity)
+    bool headerMixShown() const noexcept { return referenceParity || product().headerMix; }
+    bool crossCloseKeys() const noexcept { return ! referenceParity && product().crossCloseKeys; }
+    bool generatorGranularToggle() const noexcept { return ! referenceParity && product().generatorGranularToggle; }
     juce::String cardArpNamespace() const override { return productInfo().slug + "."; }
     void setArpViewCard (int shown) noexcept override { arpViewLane.store (std::clamp (shown, 0, 2), std::memory_order_relaxed); }
 
     // InstrumentHost: the macro popovers
     int editLayer() const noexcept override { return editLayerIndex.load(); }
     float hostTempo() const noexcept override { return tempo.load (std::memory_order_relaxed); }
+    float outputPeak() const noexcept override { return outputPeakValue.load (std::memory_order_relaxed); }
     float shaperPhase() const noexcept override { return engine->shaperPhase(); }
+    int movementLaneCount() const noexcept override { return std::max (1, static_cast<int> (product().movementLanes.size())); }
+    MovementLane movementLane (int lane) const override
+    {
+        const auto& lanes = product().movementLanes;
+        return lane >= 0 && lane < static_cast<int> (lanes.size()) ? lanes[static_cast<std::size_t> (lane)] : MovementLane {};
+    }
+    float laneShaperPhase (int lane) const noexcept override { return engine->laneShaperPhase (lane); }
+    osp::ShaperPattern laneShaperPattern (int lane) const override;
+    void setLaneShaperPattern (int lane, const osp::ShaperPattern& pattern, bool undoable = true) override;
     osp::ShaperPattern shaperCustomPattern() const override;
     void setShaperCustomPattern (const osp::ShaperPattern& pattern, bool undoable = true) override;
     bool shaperEditorLarge() const noexcept override { return shaperLarge.load(); }
@@ -203,6 +235,9 @@ public:
     float modWheelPosition() const noexcept { return wheelShown.load (std::memory_order_relaxed); }
     bool arpEditorExpanded() const noexcept { return arpOpen.load(); }
     void setArpEditorExpanded (bool open) noexcept { arpOpen = open; }
+    /** The effects rack's expanded modules (bit `kind`; a view setting saved with the session). */
+    int rackExpanded() const noexcept { return rackOpen.load(); }
+    void setRackExpanded (int mask) noexcept { rackOpen = mask; }
     int modPanelTab() const noexcept { return modTab.load(); }
     void setModPanelTab (int tab) noexcept { modTab = std::clamp (tab, 0, 5); }
 
@@ -274,6 +309,7 @@ private:
     void beginKeyDnaGesture (int layer);
     void swapKeyDnaIfPending() noexcept;
     std::atomic<int> editLayerIndex { 0 };
+    std::atomic<float> outputPeakValue { 0.0f };   ///< the last block's output peak (telemetry only)
 
     std::unique_ptr<osp::plugin::SampleStore> store;
     juce::ThreadPool loaderPool { 1 };
@@ -367,6 +403,12 @@ private:
     std::atomic<std::uint32_t> shaperGeneration { 1 };
     std::uint32_t shaperGenerationSeen = 0;   ///< audio thread
     void publishShaperPattern() noexcept;
+    // The second MOVEMENT lane's SHAPER CUSTOM (a product with lanes), the same way.
+    osp::ShaperPattern shaperPatternB = osp::RhythmicShaper::patternSteps (osp::ShaperParams().pattern);
+    std::array<std::atomic<float>, 3 * osp::RhythmicShaper::steps> shaperStepsB {};
+    std::atomic<std::uint32_t> shaperGenerationB { 1 };
+    std::uint32_t shaperGenerationSeenB = 0;   ///< audio thread
+    void publishShaperPatternB() noexcept;
     std::atomic<float> tempo { 120.0f };
 
     // Live displays and the wheels.
@@ -390,6 +432,7 @@ private:
 
     // View settings.
     std::atomic<bool> arpOpen { false }, shaperLarge { false };
+    std::atomic<int> rackOpen { 0 };
     std::atomic<int> modTab { 0 };
 
     // Presets.

@@ -207,6 +207,8 @@ public:
     /** Where the key's body is drawn within its bounds (the surface's coordinates): a key
         may keep a taller hit area than the body it shows (the source header's mode). */
     virtual juce::Rectangle<float> keyArea (juce::Rectangle<float> bounds) const { return bounds; }
+    /** False: the key draws itself (one set in a dark well), the surface leaves it alone. */
+    virtual bool keyOnSurface() const { return true; }
 };
 
 /** The A1 key of every visible child of `surface` that is a KeyFace, at its bounds. */
@@ -224,6 +226,9 @@ public:
     virtual float surfaceRadius() const = 0;
     /** A card (the cards' colours) or a panel (the panels'). */
     virtual bool surfaceIsCard() const = 0;
+    /** Only a soft shadow under it, no surface (a component that is its own face: an opted-in
+        full-bleed rack). */
+    virtual bool surfaceShadowOnly() const { return false; }
 };
 /** A key's state changed: repaints it with the room its shadow needs. */
 void repaintKey (juce::Component&);

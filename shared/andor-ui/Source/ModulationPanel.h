@@ -73,13 +73,20 @@ namespace modui
     Compact (the AMP / ENV / LFO panel): a slim label, no hints; the full editor opens in a
     popover. A right-click (or a click on the polarity tag) asks for the context menu.
 */
-class ModCurveView final : public juce::Component
+class ModCurveView final : public juce::Component, public juce::SettableTooltipClient
 {
 public:
     explicit ModCurveView (InstrumentHost& processor);
     void setSource (int source);
     int source() const noexcept { return sourceIndex; }
     void setCompact (bool shouldBeCompact);
+    /** Opt-in: the larger editor's key inside the display (compact, an editable curve), at its
+        top-right corner: the panel's tab row then keeps no key of its own. */
+    void setExpandable (bool shouldOfferExpand);
+    /** The expand key (empty when not offered). */
+    juce::Rectangle<float> expandArea() const;
+    /** The expand key was clicked. */
+    std::function<void()> onExpand;
     /** Follows the parameters and the playhead (editor timer). */
     void refresh();
     bool isEditable() const;
@@ -97,6 +104,8 @@ public:
 
     juce::Rectangle<float> plotArea() const;
     juce::Rectangle<float> resetArea() const;
+    /** The slim label line at the display's top (compact), or the larger one. */
+    juce::Rectangle<float> labelLine() const;
     juce::Rectangle<float> polarityArea() const;
 
 private:
@@ -113,7 +122,7 @@ private:
 
     InstrumentHost& ospProcessor;
     int sourceIndex = 0;
-    bool compact = false;
+    bool compact = false, expandable = false, hoverExpand = false;
     mod::Curve curve, before;
     int dragPoint = -1, dragSegment = -1, hoverPoint = -1;
     float dragStartTension = 0.0f;
@@ -211,6 +220,12 @@ public:
     std::function<void (int source)> onShowRoutes;    ///< the route count was clicked
     std::function<void (int source)> onExpandCurve;   ///< the expand key (an editable curve)
 
+    /** Opt-in (ANDOR OSP keeps its row as it is): the six tabs at fixed places whatever is
+        selected, the routes' count or the curve's editability - the right end is a reserved
+        place for the route count, and the larger editor's key is inside the display. */
+    void setStableTabs (bool shouldBeStable);
+    bool hasStableTabs() const noexcept { return stableTabs; }
+
     void refresh();
     int tab() const noexcept { return currentTab; }
     void showTab (int tab);
@@ -268,7 +283,7 @@ private:
     bool pressedSocket = false;
     juce::Rectangle<float> routesKey, expandKey;
     std::array<int, 2 * mod::sourceCount> shownRouteCounts {};   ///< active routes per source, then all routes
-    bool shownEditable = false;
+    bool shownEditable = false, stableTabs = false;
     juce::Point<float> pressAt;
 };
 

@@ -80,6 +80,8 @@ public:
     void setBottomInset (int pixels);
     /** The ruler's labels keep clear of this many pixels at the top-right (a control sits there). */
     void setRulerReserve (int pixels);
+    /** ... and of this many at the top-left (the modifiers' row in the well). */
+    void setRulerLeftReserve (int pixels);
     /** A short display: the granular strip floats over the waveform on a translucent band of this height. */
     void setOverlayBand (int pixels);
 
@@ -136,7 +138,7 @@ private:
     View view;
     std::vector<Dot> grains, heads;
     juce::String dropLabel;
-    int bottomInset = 0, overlayBand = 0, rulerReserve = 0;
+    int bottomInset = 0, overlayBand = 0, rulerReserve = 0, rulerLeftReserve = 0;
     juce::Image cache;
     bool cacheDirty = true;
     juce::Image backdrop;
@@ -197,19 +199,29 @@ public:
     ModifierButton (juce::RangedAudioParameter& parameter, icons::Kind icon, juce::Colour onColour);
     void setSuppressed (bool suppressed, const juce::String& why);
     bool isOn() const noexcept { return on; }
+    /** A small icon key in a dark well (EngineCard::setModifiersInWell): graphite, drawn by
+        itself, and reachable from the keyboard (space or return toggles it). Opt-in. */
+    void setInWell (bool inWell);
+    bool isInWell() const noexcept { return inWell; }
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override { skin::repaintKey (*this); }
     void mouseUp (const juce::MouseEvent&) override;
     void mouseEnter (const juce::MouseEvent&) override { skin::repaintKey (*this); }
     void mouseExit (const juce::MouseEvent&) override { skin::repaintKey (*this); }
+    bool keyPressed (const juce::KeyPress&) override;
+    void focusGained (FocusChangeType) override { repaint(); }
+    void focusLost (FocusChangeType) override { repaint(); }
     skin::KeyRole keyRole() const override { return skin::KeyRole::modifier; }
     skin::KeyState keyState() const override;
+    bool keyOnSurface() const override { return ! inWell; }
+    /** One toggle (a click, or space / return), as a host gesture. */
+    void toggle();
 
 private:
     icons::Kind icon;
     juce::Colour onColour;
     juce::String tip;
-    bool on = false, suppressed = false;
+    bool on = false, suppressed = false, inWell = false;
     juce::ParameterAttachment attachment;
 };
 
@@ -390,7 +402,12 @@ public:
     /** The width that fits the longer name (px, at the reference 41 px height). */
     float fittedWidth() const;
     /** The symbol selector (ANDOR OSP's modes under their own names, not fitted to them). */
-    bool iconOnly() const noexcept { return ! fitted && firstModeName == "One Shot"; }
+    bool iconOnly() const noexcept { return ! toggle && ! fitted && firstModeName == "One Shot"; }
+    /** Opt-in (ANDOR ANALOG's oscillators): GRANULAR as an on / off key, the grain cloud alone
+        (no chevron, no menu), lit in `litInk` while the layer plays grains; a click or Return /
+        Space toggles it. Off: the selector with its menu. */
+    void setToggle (bool on, juce::Colour litInk);
+    bool isToggle() const noexcept { return toggle; }
     /** The symbol selector's width (px at the reference): a small key, not a button. */
     static constexpr float iconWidth = 42.0f, iconWidthNarrow = 40.0f;
     /** The tooltip of the named key (a product's); the symbol selector says its mode. */
@@ -414,7 +431,11 @@ public:
     bool keyPressed (const juce::KeyPress&) override;
     std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override;
     skin::KeyRole keyRole() const override { return skin::KeyRole::mode; }
-    skin::KeyState keyState() const override { return isMouseButtonDown() ? skin::KeyState::pressed : isMouseOver() ? skin::KeyState::hover : skin::KeyState::normal; }
+    skin::KeyState keyState() const override
+    {
+        // (the toggle: pressed in while on, as EQ while open)
+        return isMouseButtonDown() || (toggle && current == 1) ? skin::KeyState::pressed : isMouseOver() ? skin::KeyState::hover : skin::KeyState::normal;
+    }
     /** The key's body: as tall as NOTES and EQ beside it (33 px), on their centre line; the
         whole 41 px stays the hit area. */
     juce::Rectangle<float> keyArea (juce::Rectangle<float> bounds) const override { return bounds.withSizeKeepingCentre (bounds.getWidth(), std::min (bounds.getHeight(), bodyHeight)); }
@@ -427,7 +448,8 @@ private:
     int current = 0;
     juce::String firstModeName { "One Shot" };
     juce::String namedTooltip;
-    bool fitted = false;
+    bool fitted = false, toggle = false;
+    juce::Colour toggleInk;
     juce::ParameterAttachment attachment;
 };
 
@@ -486,6 +508,18 @@ public:
     /** The four modifier keys (LINK REVERSE LOOP FOLLOW) shown, or hidden for a source they
         mean nothing to (a product's oscillator, its noise). Shown by default. */
     void setModifiersShown (bool shown);
+    /** The modifiers as a compact row of icon keys at the top-left of the dark well instead
+        of the keys under the knobs (a product's choice; ANDOR OSP keeps its keys). The card's
+        own foot is then free, as on a card without them. */
+    void setModifiersInWell (bool inWell);
+    /** Which of the four apply to the source now (LINK REVERSE LOOP FOLLOW, bits 0..3): the
+        others are not shown. All by default. */
+    void setModifiersApplicable (int mask);
+    /** How much shorter a narrow card is than the reference's with its modifiers in the well
+        (reference pixels): the band under its knobs that it no longer keeps. */
+    static constexpr float footTrim = 64.0f;
+    /** Tests: modifier `index`'s key (0 LINK .. 3 FOLLOW), or nullptr. */
+    ModifierButton* modifierKey (int index) const noexcept { return index >= 0 && index < 4 ? modifiers[static_cast<std::size_t> (index)].get() : nullptr; }
     /** Controls revealed in the well by the pointer (ProductInfo::wellOverlay); null: none.
         Hidden while the EQ, the note map or the in-card editor take the well. */
     void setWellOverlay (std::unique_ptr<WellOverlay> overlay);
@@ -509,6 +543,8 @@ public:
     /** Opt-in: the mode selector only as wide as its names need (ModeSelector::setFitsName);
         the name beside it gets the room. Without it the card is exactly as before. */
     void setModeFitsName (bool fit);
+    /** The mode as ModeSelector's GRANULAR on / off key, lit in the layer's colour (opt-in). */
+    void setModeToggle (bool on);
 
     /** A product's own editor in the waveform's place (opt-in; see CardWellEditor). The card
         owns it and lays it out exactly over the display; shown, it replaces the waveform (the
@@ -593,6 +629,9 @@ private:
     std::unique_ptr<CaptureEditor> captureEditor;      ///< the CAPTURE page, while open
     std::unique_ptr<SynthChip> synthChip;              ///< SYNTHESIZE in the well's corner (a host with hasSynthesize(); null otherwise)
     std::array<std::unique_ptr<ModifierButton>, 4> modifiers;
+    bool modifiersShown = true, modifiersInWell = false;
+    int modifiersApplicable = 0xf;
+    void updateModifiers();
     LayerStateButton muteButton, soloButton;
     bool shownHeard = true;
     std::array<std::unique_ptr<MiniKnob>, 5> granularKnobs;
