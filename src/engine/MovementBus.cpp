@@ -67,7 +67,9 @@ void MovementBus::setTargets (const Shaping& newSettings, double newAmount) noex
     settings = newSettings;
     amountTarget = std::clamp (newAmount, 0.0, 1.0);
     driftNoise.setRate (std::max (0.05, shaping::driftSpeedHz (settings.driftSpeed)), sampleRate);
-    shaper.setParams (settings.shaper);
+    auto shaperParams = settings.shaper;
+    shaperParams.phaseOffset = std::clamp (settings.movementPhase, 0.0, 1.0);
+    shaper.setParams (shaperParams);
 }
 
 float MovementBus::readLine (const std::vector<float>& line, double delaySamples) const noexcept
@@ -159,9 +161,19 @@ void MovementBus::render (MovementMode m, float inL, float inR, float& outL, flo
         }
         case MovementMode::pulse:
         {
-            const double rate = shaping::pulseRateHz (settings.pulseRate);
             const double c = std::clamp (settings.pulseStereo, 0.0, 1.0);
-            pulsePhase += twoPi * rate / sampleRate;
+            if (! settings.pulseSync)
+                pulsePhase += twoPi * shaping::pulseRateHz (settings.pulseRate) / sampleRate;
+            else if (shaper.clockRunning())
+            {
+                // SYNC: one cycle per note value, locked to the host's (or the local) clock,
+                // moved by PHASE; the clock is SHAPER's, so the two lanes' grids agree.
+                const double cycles = shaper.clockQuarterNotes() / shaping::pulseDivisionQuarters (settings.pulseDivision)
+                                      + std::clamp (settings.movementPhase, 0.0, 1.0);
+                pulsePhase = twoPi * (cycles - std::floor (cycles));
+            }
+            else
+                pulsePhase += twoPi * shaping::pulseSyncedHz (settings.pulseDivision, shaper.tempo()) / sampleRate;
             const double kk = 1.0 + 7.0 * std::clamp (settings.pulseShape, 0.0, 1.0); // SHAPE: sine -> rounded square
             const double norm = std::tanh (kk);
             const double yl = std::tanh (kk * std::sin (pulsePhase)) / norm;

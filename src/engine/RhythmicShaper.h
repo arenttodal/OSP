@@ -31,6 +31,7 @@ struct ShaperParams
     double smooth = 0.3;                          ///< 0 = crisp edges .. 1 = flowing
     bool custom = false;                          ///< play `customSteps` instead of the library pattern
     ShaperPattern customSteps {};                 ///< CUSTOM (the musician's own; empty = all open)
+    double phaseOffset = 0.0;                     ///< PHASE: 0..1 of the cycle the pattern is moved by (0: as before)
 };
 
 /**
@@ -99,11 +100,16 @@ public:
 
     /** Where the pattern is (0..1), for the display; -1 while the clock is idle. */
     float displayPhase() const noexcept { return running ? static_cast<float> (phase) : -1.0f; }
+    /** The clock (quarter notes: the host's while it plays, else the local one) and
+        whether it runs: PULSE's SYNC follows it. */
+    double clockQuarterNotes() const noexcept { return ppqNow; }
+    bool clockRunning() const noexcept { return running; }
+    double tempo() const noexcept { return host.valid && host.bpm > 1.0 ? host.bpm : 120.0; }
 
 private:
     /** The pattern as designed (its floors included), before it is stretched. */
     static float raw (const ShaperPattern& steps, double phase, double smooth) noexcept;
-    double cyclePhase (double quarterNotes, ShaperRate rate) const noexcept;
+    double cyclePhase (double quarterNotes, ShaperRate rate, double offset) const noexcept;
 
     double sampleRate = 48000.0;
     ShaperParams params, previous;

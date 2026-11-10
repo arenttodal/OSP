@@ -7493,7 +7493,7 @@ TEST_CASE ("plugin: EQ per layer - default off, recall, isolation, automation", 
         REQUIRE (xml != nullptr);
         std::vector<juce::XmlElement*> eqParams;
         for (auto* e : xml->getChildIterator())
-            if (e->getStringAttribute ("id").contains (".eq."))
+            if (e->getStringAttribute ("id").startsWith ("layer") && e->getStringAttribute ("id").contains (".eq."))   // (not the FX library's fx.eq.*)
                 eqParams.push_back (e);
         CHECK (eqParams.size() == 57);
         for (auto* e : eqParams)
@@ -8119,5 +8119,9 @@ TEST_CASE ("plugin: full-range modulation - 100 % reaches the knob's end; older 
 #include "SynthesizeTests.inc"
 #include "CardArpTests.inc"
 #include "CaptureTests.inc"
+#include "SpacePresetTests.inc"
+#include "RackControlsTests.inc"
 #include "ModeSelectorTests.inc"
 #include "PolyLabTests.inc"
+#include "FxSharedTests.inc"
+#include "FxOspTests.inc"

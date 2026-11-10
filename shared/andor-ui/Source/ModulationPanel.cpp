@@ -387,6 +387,28 @@ void ModCurveView::setCompact (bool c)
     repaint();
 }
 
+void ModCurveView::setExpandable (bool e)
+{
+    expandable = e;
+    repaint();
+}
+
+juce::Rectangle<float> ModCurveView::labelLine() const
+{
+    if (! compact)
+        return getLocalBounds().toFloat().reduced (18.0f, 0.0f).withHeight (36.0f);
+    // (the expand key's corner kept free, whichever source: the labels never move)
+    return getLocalBounds().toFloat().reduced (12.0f, 0.0f).withY (2.0f).withHeight (15.0f).withTrimmedRight (expandable ? 18.0f : 0.0f);
+}
+
+juce::Rectangle<float> ModCurveView::expandArea() const
+{
+    if (! expandable || ! compact || ! isEditable())
+        return {};
+    const auto r = getLocalBounds().toFloat();
+    return { r.getRight() - 24.0f, 1.0f, 17.0f, 17.0f };
+}
+
 juce::Rectangle<float> ModCurveView::plotArea() const
 {
     if (compact)
@@ -401,7 +423,7 @@ juce::Rectangle<float> ModCurveView::polarityArea() const
     if (! compact || sourceIndex >= 2)
         return {};
     const auto r = getLocalBounds().toFloat();
-    return { r.getRight() - 92.0f, 2.0f, 84.0f, 15.0f };
+    return { r.getRight() - 92.0f - (expandable ? 18.0f : 0.0f), 2.0f, 84.0f, 15.0f };
 }
 
 juce::Rectangle<float> ModCurveView::resetArea() const
@@ -548,6 +570,20 @@ void ModCurveView::paint (juce::Graphics& g)
         g.drawRoundedRectangle (reset.reduced (0.5f), 5.0f, 1.0f);
         g.drawText ("RESET", reset, juce::Justification::centred, false);
     }
+    if (const auto e = expandArea(); ! e.isEmpty())
+    {
+        // The larger editor: the tab row's two corner marks, quiet in the display's corner.
+        const auto m = e.reduced (4.5f);
+        g.setColour (colour::wellText.brighter (hoverExpand ? 0.8f : 0.3f).withAlpha (hoverExpand ? 1.0f : 0.75f));
+        juce::Path p;
+        p.startNewSubPath (m.getX(), m.getY() + 3.5f);
+        p.lineTo (m.getX(), m.getY());
+        p.lineTo (m.getX() + 3.5f, m.getY());
+        p.startNewSubPath (m.getRight() - 3.5f, m.getBottom());
+        p.lineTo (m.getRight(), m.getBottom());
+        p.lineTo (m.getRight(), m.getBottom() - 3.5f);
+        g.strokePath (p, juce::PathStrokeType (1.2f));
+    }
 }
 
 void ModCurveView::paintLfo (juce::Graphics& g, juce::Rectangle<float> plot, juce::Colour colour)
@@ -604,8 +640,7 @@ void ModCurveView::paintLfo (juce::Graphics& g, juce::Rectangle<float> plot, juc
     // Labels: what it is, how fast, how it runs (compact: one slim line inside the display).
     g.setFont (type::popupLabel (compact ? 10.5f : 12.5f));
     g.setColour (colour);
-    const auto top = compact ? getLocalBounds().toFloat().reduced (12.0f, 0.0f).withY (2.0f).withHeight (15.0f)
-                             : getLocalBounds().toFloat().reduced (18.0f, 0.0f).withHeight (36.0f);
+    const auto top = labelLine();
     g.drawText (juce::String (sourceLabels[static_cast<std::size_t> (sourceIndex)]) + "  " + mod::lfoShapeName (s.shape), top, juce::Justification::centredLeft, false);
     const juce::String rate = s.sync ? juce::String (mod::syncName (s.division)) : format::hertz (s.rateHz);
     const char* modes[] { "FREE", "RETRIG", "ONE SHOT" };
@@ -630,8 +665,7 @@ void ModCurveView::paintEnvelope (juce::Graphics& g, juce::Rectangle<float> plot
 {
     using namespace design;
     const auto s = envSettings (ospProcessor, sourceIndex - 2);
-    const auto top = compact ? getLocalBounds().toFloat().reduced (12.0f, 0.0f).withY (2.0f).withHeight (15.0f)
-                             : getLocalBounds().toFloat().reduced (18.0f, 0.0f).withHeight (36.0f);
+    const auto top = labelLine();
     g.setFont (type::popupLabel (compact ? 10.5f : 12.5f));
     g.setColour (colour);
     g.drawText (juce::String (sourceLabels[static_cast<std::size_t> (sourceIndex)]) + (s.oneShotCurve ? "  ONE SHOT" : "  ADSR"), top, juce::Justification::centredLeft, false);
@@ -763,8 +797,7 @@ void ModCurveView::paintKey (juce::Graphics& g, juce::Rectangle<float> plot, juc
     g.setColour (colour);
     g.strokePath (line, juce::PathStrokeType (1.8f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
-    const auto top = compact ? getLocalBounds().toFloat().reduced (12.0f, 0.0f).withY (2.0f).withHeight (15.0f)
-                             : getLocalBounds().toFloat().reduced (18.0f, 0.0f).withHeight (36.0f);
+    const auto top = labelLine();
     g.setFont (type::popupLabel (compact ? 10.5f : 12.5f));
     g.setColour (colour);
     const int preset = mod::matchingPreset (curve);
@@ -822,28 +855,38 @@ void ModCurveView::paintCurvePoints (juce::Graphics& g, juce::Colour colour)
 
 void ModCurveView::mouseMove (const juce::MouseEvent& e)
 {
-    int now = isEditable() ? pointAt (e.position) : -1;
+    const bool overExpand = expandArea().contains (e.position);
+    int now = isEditable() && ! overExpand ? pointAt (e.position) : -1;
     if (now < 0 && polarityArea().contains (e.position))
         now = -2;   // the polarity tag
-    setMouseCursor (now == -2 ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
-    if (now != hoverPoint)
+    setMouseCursor (now == -2 || overExpand ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+    setTooltip (overExpand ? "Open the larger curve editor" : juce::String());
+    if (now != hoverPoint || overExpand != hoverExpand)
     {
         hoverPoint = now;
+        hoverExpand = overExpand;
         repaint();
     }
 }
 
 void ModCurveView::mouseExit (const juce::MouseEvent&)
 {
-    if (hoverPoint != -1)
+    if (hoverPoint != -1 || hoverExpand)
     {
         hoverPoint = -1;
+        hoverExpand = false;
         repaint();
     }
 }
 
 void ModCurveView::mouseDown (const juce::MouseEvent& e)
 {
+    if (! e.mods.isPopupMenu() && expandArea().contains (e.position))
+    {
+        if (onExpand != nullptr)
+            onExpand();
+        return;
+    }
     if (e.mods.isPopupMenu() || polarityArea().contains (e.position))
     {
         if (onContextMenu != nullptr)
@@ -921,7 +964,7 @@ void ModCurveView::mouseUp (const juce::MouseEvent&)
 
 void ModCurveView::mouseDoubleClick (const juce::MouseEvent& e)
 {
-    if (! isEditable() || ! plotArea().expanded (6.0f).contains (e.position))
+    if (! isEditable() || ! plotArea().expanded (6.0f).contains (e.position) || expandArea().contains (e.position))
         return;
     auto next = ospProcessor.modulationCurve (curveIndex());
     curve = next;
@@ -1300,6 +1343,10 @@ ModulationPanel::ModulationPanel (InstrumentHost& p) : ospProcessor (p), amp (p.
         addChildComponent (*keyPages[k]);
     }
     juce::Component::SafePointer<ModulationPanel> safe (this);
+    curve.onExpand = [safe] {
+        if (safe != nullptr && safe->onExpandCurve != nullptr && safe->selectedSource() >= 0)
+            safe->onExpandCurve (safe->selectedSource());
+    };
     curve.onContextMenu = [safe] {
         if (safe != nullptr && safe->selectedSource() >= 0)
             safe->sourceMenu (safe->selectedSource()).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&safe->curve));
@@ -1353,6 +1400,14 @@ juce::Rectangle<float> ModulationPanel::socketArea (int t) const
     return sockets[static_cast<std::size_t> (juce::jlimit (0, modui::tabCount - 1, t))];
 }
 
+void ModulationPanel::setStableTabs (bool s)
+{
+    stableTabs = s;
+    curve.setExpandable (s);
+    layoutTabs();
+    strip.repaint();
+}
+
 void ModulationPanel::layoutTabs()
 {
     // Small, quiet words across the panel's title line; the right end for the shown
@@ -1367,7 +1422,7 @@ void ModulationPanel::layoutTabs()
         const auto text = n == 0 ? juce::String ("+ ROUTE") : juce::String (n) + (n == 1 ? " ROUTE" : " ROUTES");
         const float w = juce::GlyphArrangement::getStringWidth (fonts::make (11.5f, fonts::Weight::medium, 0.08f), text) + 10.0f;
         routesKey = { right - w, 3.0f, w, 18.0f };
-        if (curve.isEditable())
+        if (curve.isEditable() && ! stableTabs)
             expandKey = { routesKey.getX() - 26.0f, 3.0f, 18.0f, 18.0f };
     }
     // The words with room between them (each source with its drag socket after the name);
@@ -1381,7 +1436,14 @@ void ModulationPanel::layoutTabs()
                                                + (modui::sourceOfTab (t) >= 0 ? socketWidth : 0.0f);
         total += widths[static_cast<std::size_t> (t)];
     }
-    const float limit = (expandKey.isEmpty() ? (routesKey.isEmpty() ? right : routesKey.getX()) : expandKey.getX()) - 10.0f;
+    float limit = (expandKey.isEmpty() ? (routesKey.isEmpty() ? right : routesKey.getX()) : expandKey.getX()) - 10.0f;
+    if (stableTabs)
+    {
+        // A place at the right end reserved for the route count whatever is shown (as wide
+        // as the widest count), so the words never move.
+        const float reserved = juce::GlyphArrangement::getStringWidth (fonts::make (11.5f, fonts::Weight::medium, 0.08f), "88 ROUTES") + 10.0f;
+        limit = right - reserved - 10.0f;
+    }
     const float gap = std::clamp ((limit - 12.0f - total) / static_cast<float> (modui::tabCount - 1), 8.0f, 22.0f);
     float x = 16.0f;
     for (int t = 0; t < modui::tabCount; ++t)

@@ -70,6 +70,8 @@ void InstrumentEngine::prepare (double outputSampleRate, int maximumBlockSize, c
     if (config.reimaginedRouting == ReimaginedRouting::perLayer)
         post.setReimagined (0.0);
     post.prepare (outputSampleRate, maximumBlockSize, config.seed);
+    fxRouter.prepare (outputSampleRate, maximumBlockSize);
+    fxMonoRight.assign (static_cast<std::size_t> (std::max (1, maximumBlockSize)), 0.0f);
     for (std::size_t l = 0; l < slots.size(); ++l)   // each layer's formants wander their own way
         slots[l].reimagined.prepare (outputSampleRate, Prng::deriveSeed (config.seed, 0x7265696dull, l));
     for (auto& slot : slots)
@@ -173,6 +175,7 @@ void InstrumentEngine::resetPerformance() noexcept
     // Tape and drift randomness and reverb tails restart too: a bounce from the same
     // position repeats exactly.
     post.reset();
+    fxRouter.reset();
     resetLayerStages();
 }
 
@@ -930,6 +933,7 @@ void InstrumentEngine::reset() noexcept
         slot.eq.reset();
     }
     post.reset();
+    fxRouter.reset();
     resetLayerStages();
 }
 
@@ -1418,7 +1422,18 @@ void InstrumentEngine::renderBlock (float* const* output, int numChannels, int n
         post.setModel (main >= 0 ? slots[static_cast<std::size_t> (main)].model : nullptr);
     }
     post.setVoicesActive (activeVoiceCount() > 0);
-    post.process (left, right, numSamples);
+    // The post stage through the FX router: CLASSIC is post.process (left, right, numSamples)
+    // itself. A CUSTOM route on a mono output plays in stereo (its lanes need two channels),
+    // then folds to the one.
+    if (mono && fxCustomWanted.load (std::memory_order_relaxed) && numSamples <= static_cast<int> (fxMonoRight.size()))
+    {
+        std::memcpy (fxMonoRight.data(), left, sizeof (float) * static_cast<std::size_t> (numSamples));
+        fxRouter.process (post, left, fxMonoRight.data(), numSamples);
+        for (int i = 0; i < numSamples; ++i)
+            left[i] = 0.5f * (left[i] + fxMonoRight[static_cast<std::size_t> (i)]);
+    }
+    else
+        fxRouter.process (post, left, right, numSamples);
     publishGrains();
     for (int ch = 0; ch < std::min (numChannels, 2); ++ch)
         for (int i = 0; i < numSamples; ++i)

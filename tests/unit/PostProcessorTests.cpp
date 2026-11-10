@@ -10,6 +10,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
+#include <functional>
 #include <complex>
 #include <numbers>
 
@@ -802,4 +803,109 @@ TEST_CASE ("shaper: CUSTOM plays the musician's steps", "[unit][shaper]")
     copy.customSteps = RhythmicShaper::patternSteps (lib.pattern);
     for (int i = 0; i < 64; ++i)
         CHECK (RhythmicShaper::evaluate (copy, i / 64.0) == Approx (RhythmicShaper::evaluate (lib, i / 64.0)));
+}
+
+TEST_CASE ("post: MOVEMENT's lanes - lane A alone is the one MOVEMENT bit for bit, lane B adds its own after it", "[unit][post][movement][lanes]")
+{
+    const auto audio = testsignals::vowel (220.0, 2.0, 48000.0, 1);
+    auto run = [&audio] (const std::function<void (PostProcessor&, Shaping&)>& setUp) {
+        PostProcessor post;
+        post.prepare (48000.0, 256);
+        Shaping s = Shaping::neutral();
+        s.movementMode = MovementMode::chorus;
+        setUp (post, s);
+        Macros m;
+        m.character = 0.5;
+        m.space = 0.0;
+        m.reimagined = 0.0;
+        m.motion = 0.8;
+        post.setMacros (m);
+        post.reset();
+        return process (post, audio);
+    };
+    const auto one = run ([] (PostProcessor& p, Shaping& s) { p.setShaping (s); });
+    Shaping laneB = Shaping::neutral();
+    laneB.movementMode = MovementMode::pulse;
+    const auto aOnly = run ([&laneB] (PostProcessor& p, Shaping& s) {
+        p.setShaping (s);
+        p.setMovementLanes (true, 1.0, false, 1.0, laneB);
+    });
+    CHECK (aOnly.channels[0] == one.channels[0]);
+    CHECK (aOnly.channels[1] == one.channels[1]);
+    const auto both = run ([&laneB] (PostProcessor& p, Shaping& s) {
+        p.setShaping (s);
+        p.setMovementLanes (true, 1.0, true, 1.0, laneB);
+    });
+    CHECK (both.channels[0] != one.channels[0]);
+    // Lane A off and lane B at 0 %: the dry sound.
+    const auto none = run ([&laneB] (PostProcessor& p, Shaping& s) {
+        p.setShaping (s);
+        p.setMovementLanes (false, 1.0, true, 0.0, laneB);
+    });
+    double d = 0.0;
+    for (std::size_t i = 0; i < none.channels[0].size(); ++i)
+        d = std::max (d, static_cast<double> (std::abs (none.channels[0][i] - audio.channels[0][i])));
+    CHECK (d < 1.0e-4);
+}
+
+TEST_CASE ("post: a second CHORUS lane after the first does not build the level up", "[unit][post][movement][lanes]")
+{
+    const auto audio = testsignals::vowel (110.0, 3.0, 48000.0, 1);
+    auto rms = [] (const AudioData& x) {
+        double e = 0.0;
+        const std::size_t from = x.channels[0].size() / 3;
+        for (std::size_t i = from; i < x.channels[0].size(); ++i)
+            e += static_cast<double> (x.channels[0][i]) * x.channels[0][i];
+        return std::sqrt (e / static_cast<double> (x.channels[0].size() - from));
+    };
+    auto run = [&audio] (bool second) {
+        PostProcessor post;
+        post.prepare (48000.0, 256);
+        Shaping s = Shaping::neutral();
+        s.movementMode = MovementMode::chorus;
+        post.setShaping (s);
+        post.setMovementLanes (true, 1.0, second, 1.0, s);
+        Macros m;
+        m.character = 0.5;
+        m.space = 0.0;
+        m.reimagined = 0.0;
+        m.motion = 1.0;
+        post.setMacros (m);
+        post.reset();
+        return process (post, audio);
+    };
+    const double one = rms (run (false)), two = rms (run (true));
+    CHECK (20.0 * std::log10 (two / one) < 1.0);
+}
+
+TEST_CASE ("post: SHAPER's PHASE moves the pattern; PULSE's SYNC follows the tempo", "[unit][post][movement][lanes]")
+{
+    // PHASE 0 is exactly as before; another PHASE moves the pattern.
+    ShaperParams params;
+    RhythmicShaper a, b;
+    a.prepare (48000.0);
+    b.prepare (48000.0);
+    a.setParams (params);
+    params.phaseOffset = 0.5;
+    b.setParams (params);
+    HostTiming t;
+    t.valid = t.playing = true;
+    t.bpm = 120.0;
+    a.setTiming (t);
+    b.setTiming (t);
+    bool differs = false;
+    for (int i = 0; i < 24000; ++i)
+    {
+        a.tick();
+        b.tick();
+        float al = 1.0f, ar = 1.0f, bl = 1.0f, br = 1.0f;
+        a.process (al, ar, 1.0);
+        b.process (bl, br, 1.0);
+        differs = differs || std::abs (al - bl) > 1.0e-3f;
+    }
+    CHECK (differs);
+    CHECK (std::abs (a.displayPhase() - std::fmod (b.displayPhase() + 0.5f, 1.0f)) < 1.0e-3f);
+    // PULSE synced to 1/4 at 120 BPM: 2 Hz.
+    CHECK (shaping::pulseSyncedHz (4, 120.0) == Approx (2.0));
+    CHECK (shaping::pulseSyncedHz (6, 90.0) == Approx (90.0 / 60.0 / 4.0));
 }

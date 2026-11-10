@@ -3,7 +3,10 @@
 #include "ArpSection.h"
 #include "EngineCard.h"
 #include "InstrumentFrame.h"
+#include "EffectRack.h"
+#include "FxRouting.h"
 #include "KeyDnaEditor.h"
+#include "MacroPopups.h"
 #include "MainSections.h"
 #include "ModulationPanel.h"
 #include "OspLookAndFeel.h"
@@ -91,7 +94,31 @@ public:
     osp::plugin::EngineCard& engineCard (int layer) noexcept { return *cards[static_cast<std::size_t> (juce::jlimit (0, 2, layer))]; }
     osp::plugin::ModulationPanel& modulationPanel() noexcept { return modPanel; }
     void setArpExpanded (bool open);
-    float instrumentHeight() const noexcept { return osp::plugin::frame::instrumentHeight (arpShown); }
+    /** The product's other view of the sources' area (ShellProduct::sourceAreaView): shown in
+        the cards' place, or the cards again. Interface only. */
+    void setSourceViewShown (bool shown);
+    bool sourceViewShown() const noexcept { return sourceViewOpen; }
+    juce::Component* sourceViewComponent() const noexcept { return sourceView.get(); }
+    juce::Button& sourceViewToggle() noexcept { return sourceViewButton; }
+    float instrumentHeight() const noexcept { return osp::plugin::frame::instrumentHeight (arpShown, rackShift(), sourceTrim()); }
+    /** The source cards' trim (their modifiers in the well: nothing kept under the knobs). */
+    float sourceTrim() const noexcept { return shell.modifiersInWell() ? osp::plugin::EngineCard::footTrim : 0.0f; }
+    /** The effects rack (the product's rackModules; tests and snapshots). */
+    osp::plugin::rack::Host& effectsRack() noexcept { return rack; }
+    /** The macro (0..5) whose name opens a rack module (a double-click), or -1. */
+    int rackMacro (osp::plugin::rack::Kind kind) const noexcept;
+    /** The rack module a macro (its parameter ID) opens: the product's own, or a shared one the
+        product lists (rackModules), if any. */
+    std::optional<osp::plugin::rack::Kind> rackKindForMacro (const juce::String& parameterId) const;
+    bool hasRack (osp::plugin::rack::Kind kind) const noexcept;
+    /** A macro's name (tests: its clicks, its context menu). */
+    osp::plugin::MacroLabel* macroLabel (int macro) noexcept { return macro >= 0 && macro < osp::plugin::frame::macroCount ? macros[static_cast<std::size_t> (macro)].label.get() : nullptr; }
+    void setRackExpanded (osp::plugin::rack::Kind kind, bool open);
+    /** A double-click on the macro's name: its rack opens (another one closes) or closes, and
+        a popover in the way closes. */
+    void toggleRackFromLabel (osp::plugin::rack::Kind kind);
+    /** A right-click on the name (or the keyboard's menu key): Quick Settings, Open / Close Rack. */
+    juce::PopupMenu rackLabelMenu (int macro, osp::plugin::rack::Kind kind);
     /** The popovers: a macro's (0..5, when the product has one), Advanced, a layer's
         REIMAGINED (7 + layer, when the engine reads it), a modulation source's routes or
         larger curve (source 0 LFO 1 .. 3 ENV 2). */
@@ -160,6 +187,11 @@ private:
     osp::plugin::HeaderMenuButton menuButton;
     osp::plugin::SavePresetButton savePresetButton;
     osp::plugin::HeaderMix headerMix { shell };
+    /** The product's other view of the sources' area (ShellProduct::sourceAreaView) and its icon. */
+    using SourceViewButton = osp::plugin::RoutingKey;   // (shared: ANDOR OSP shows the same key)
+    SourceViewButton sourceViewButton;
+    std::unique_ptr<juce::Component> sourceView;
+    bool sourceViewOpen = false;
 
     // Sources
     juce::Rectangle<int> sourceArea;
@@ -192,6 +224,13 @@ private:
     osp::plugin::ArpControl arpButton { shell };
     osp::plugin::ArpInlinePanel arpPanel { shell };
     bool arpShown = false;
+    // The effects rack (opt-in: the product's rackModules), opened from the macros' names.
+    osp::plugin::rack::Host rack { [this] (osp::plugin::rack::Kind kind) { return createRackModule (kind); } };
+    std::unique_ptr<osp::plugin::rack::Module> createRackModule (osp::plugin::rack::Kind kind);
+    std::array<std::optional<osp::plugin::rack::Kind>, osp::plugin::frame::macroCount> rackOfMacro {};
+    float rackShift() const noexcept { return rack.height() > 0.0f ? rack.height() + osp::plugin::design::layout::rackGap : 0.0f; }
+    int rackMask() const;
+    void rackChanged();
     osp::plugin::ModulationOverlay modOverlay { shell, content };
     int modSelSource = -1, modSelSlot = -1;
     int disabledControls = 0;

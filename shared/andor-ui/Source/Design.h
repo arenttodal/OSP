@@ -63,6 +63,9 @@ struct Materials
         the shared pack's of the same name; null: none. Must outlive the process (BinaryData). */
     const void* pack = nullptr;
     size_t packSize = 0;
+    /** The six macros' identities (colour::macro), when a product sets its own (alpha 0: ANDOR
+        OSP's mineral palette). LIFE, DRIVE, CHARACTER, MOVEMENT, SPACE, ECHO. */
+    std::array<juce::Colour, 6> macros {};
 
     /** ANDOR OSP's own. */
     static Materials osp()
@@ -158,6 +161,8 @@ namespace colour
     enum class Macro { life, drive, character, movement, space, echo };
     inline juce::Colour macro (Macro m)
     {
+        if (const auto own = detail::materials.macros[static_cast<std::size_t> (m)]; own.getAlpha() != 0)
+            return own;   // (the product's own: ANDOR ANALOG's spore SPACE)
         static const std::array<juce::Colour, 6> colours { juce::Colour (0xffbe7552), juce::Colour (0xffb5843a), juce::Colour (0xff7b8d69),
                                                            juce::Colour (0xff73899c), juce::Colour (0xff96839d), juce::Colour (0xff5c9490) };
         return colours[static_cast<std::size_t> (m)];
@@ -293,6 +298,10 @@ namespace layout
         keyboard row moves down by arpShift and the instrument grows by as much. */
     const R arpPanel { 35.0f, 908.0f, 1378.0f, 177.0f };
     constexpr float arpShift = 187.0f;
+    /** The effects rack (EffectRack.h, opt-in: ANDOR OSP has none), between the macros and
+        the arpeggiator when a module is expanded: everything under it moves down by its
+        height plus this gap, and the instrument grows by as much. */
+    constexpr float rackTop = 908.0f, rackGap = 10.0f;
 
     // Popups float centred over the instrument at the reference's place (SPACE: 607 x 610
     // at (420, 236)); taller ones grow upwards from the same foot.

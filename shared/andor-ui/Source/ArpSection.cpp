@@ -492,7 +492,7 @@ void ArpInlinePanel::resized()
     // its list; then RATE, the OCTAVES keys, GATE and SWING, captions level with each other.
     const auto r = getLocalBounds().toFloat();
     title = { 26.0f, 14.0f, 300.0f, 26.0f };
-    collapse = juce::Rectangle<float> (30.0f, 30.0f).withCentre ({ r.getRight() - 34.0f, 28.0f });
+    collapse = juce::Rectangle<float> (30.0f, 30.0f).withCentre ({ r.getRight() - (crossClose ? 25.0f : 34.0f), 28.0f });
     numbers = { 57.0f, 50.0f, 480.0f, 18.0f };
     steps = { 57.0f, 72.0f, 480.0f, 84.0f };
     patternCaption = { 562.0f, 50.0f, 150.0f, 18.0f };
@@ -601,7 +601,25 @@ void ArpInlinePanel::paint (juce::Graphics& g)
     g.setFont (type::panelHeader());
     g.drawText ("ARPEGGIATOR", title, juce::Justification::centredLeft, false);
 
-    // Collapse: a small round button with an up chevron.
+    // Collapse: a small round button with an up chevron (or, opt-in, the racks' X).
+    if (crossClose)
+    {
+        const auto c = collapse.getCentre();
+        if (hover == 3)
+        {
+            g.setColour (colour::text.withAlpha (0.07f));
+            g.fillEllipse (juce::Rectangle<float> (24.0f, 24.0f).withCentre (c));
+        }
+        const float a = 4.6f;
+        juce::Path x;
+        x.startNewSubPath (c.x - a, c.y - a);
+        x.lineTo (c.x + a, c.y + a);
+        x.startNewSubPath (c.x + a, c.y - a);
+        x.lineTo (c.x - a, c.y + a);
+        g.setColour (colour::text.withAlpha (hover == 3 ? 1.0f : 0.8f));
+        g.strokePath (x, juce::PathStrokeType (1.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    }
+    else
     {
         const auto c = collapse;
         g.setColour (juce::Colour (0x1a302418));

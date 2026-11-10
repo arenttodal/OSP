@@ -11,6 +11,7 @@
 #include "engine/ReimaginedEngine.h"
 #include "engine/ReimaginedModes.h"
 #include "engine/Shaping.h"
+#include "engine/fx/FxEngine.h"
 #include "model/InstrumentModel.h"
 #include "model/InstrumentSet.h"
 
@@ -513,6 +514,20 @@ public:
         it, the 65 % default -> all of it, 100 % -> about 1.5x). */
     double levelRangeDb() const noexcept { return config.velocityRangeDb * (0.15 + 1.31 * std::clamp (config.macros.dynamics, 0.0, 1.0)); }
 
+    /** FX routing. Message thread: the route to play (null or CLASSIC: the original chain, bit
+        for bit); its new effects' settings are set from the audio thread (setFxSettings, by
+        value, no allocation). fxRouting() gives the router itself (impulses, meters, latency). */
+    void setFxGraph (std::shared_ptr<const fx::CompiledGraph> graph)
+    {
+        fxCustomWanted.store (graph != nullptr && graph->graph.custom, std::memory_order_relaxed);
+        fxRouter.setGraph (std::move (graph));
+    }
+    void setFxSettings (const fx::Settings& settings) noexcept { fxRouter.setSettings (settings); }
+    fx::FxEngine& fxRouting() noexcept { return fxRouter; }
+    const fx::FxEngine& fxRouting() const noexcept { return fxRouter; }
+    /** Samples the CUSTOM route adds (0 in CLASSIC). */
+    int fxLatencySamples() const noexcept { return fxRouter.latencySamples(); }
+
     /** For tests: the voice slots (read-only). */
     const InstrumentVoice& voiceAt (int index) const noexcept { return voices[static_cast<std::size_t> (index)]; }
     static constexpr int voiceSlots() noexcept { return totalSlots; }
@@ -647,6 +662,12 @@ private:
     double pitchRatio = 1.0;
     void publishGrains() noexcept;
     PostProcessor post;
+    /** FX routing (shared with ANDOR Analog, src/engine/fx): CLASSIC (no route, or a CLASSIC one)
+        calls post.process exactly as before; a CUSTOM route plays the original four and the
+        new effects in its own order. */
+    fx::FxEngine fxRouter;
+    std::atomic<bool> fxCustomWanted { false };   ///< the last route handed in is CUSTOM (mono output: a stereo pass)
+    std::vector<float> fxMonoRight;               ///< mono output under a CUSTOM route: the right channel it needs
     bool mpe = false;
     bool cardRouting = false;
     std::array<double, 17> channelBendRatio {};   ///< index 1..16
