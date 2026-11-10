@@ -4,6 +4,7 @@
 #include "EngineCard.h"
 #include "InstrumentFrame.h"
 #include "EffectRack.h"
+#include "FxRouting.h"
 #include "KeyDnaEditor.h"
 #include "MacroPopups.h"
 #include "MainSections.h"
@@ -187,18 +188,7 @@ private:
     osp::plugin::SavePresetButton savePresetButton;
     osp::plugin::HeaderMix headerMix { shell };
     /** The product's other view of the sources' area (ShellProduct::sourceAreaView) and its icon. */
-    struct SourceViewButton final : juce::Button, osp::plugin::skin::KeyFace
-    {
-        SourceViewButton() : juce::Button ("FX Routing") {}
-        void paintButton (juce::Graphics&, bool over, bool down) override;
-        void buttonStateChanged() override { osp::plugin::skin::repaintKey (*this); }
-        // (a header key, as SAVE: the same face, size and centre line)
-        osp::plugin::skin::KeyRole keyRole() const override { return osp::plugin::skin::KeyRole::preset; }
-        osp::plugin::skin::KeyState keyState() const override
-        {
-            return isDown() ? osp::plugin::skin::KeyState::pressed : isOver() ? osp::plugin::skin::KeyState::hover : osp::plugin::skin::KeyState::normal;
-        }
-    };
+    using SourceViewButton = osp::plugin::RoutingKey;   // (shared: ANDOR OSP shows the same key)
     SourceViewButton sourceViewButton;
     std::unique_ptr<juce::Component> sourceView;
     bool sourceViewOpen = false;

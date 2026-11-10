@@ -5,9 +5,11 @@
 #include "EffectRack.h"
 #include "EngineCard.h"
 #include "FxRack.h"
+#include "FxRouting.h"
 #include "InstrumentFrame.h"
 #include "KeyDnaEditor.h"
 #include "LibraryPanel.h"
+#include "MacroPopups.h"
 #include "MainSections.h"
 #include "ModulationPanel.h"
 #include "OspLookAndFeel.h"
@@ -118,9 +120,19 @@ public:
     /** The FX library's rack (shared with ANDOR ANALOG; the routing view opens it): below the
         source area, the window growing by its height, as ANALOG's. Nothing shows - and nothing
         moves - until an effect is opened. */
-    bool hasRack (rack::Kind kind) const noexcept override { return kind == rack::Kind::fx; }
+    bool hasRack (rack::Kind kind) const noexcept override
+    {
+        return kind == rack::Kind::fx || kind == rack::Kind::movement || kind == rack::Kind::echo || kind == rack::Kind::space;
+    }
     void setRackExpanded (rack::Kind kind, bool open) override;
     rack::Host& effectsRack() noexcept { return racks; }
+
+    /** FX ROUTING (shared with ANDOR ANALOG): its key beside SAVE, its view in the source cards'
+        place. A view only: opening it changes nothing that sounds. */
+    void setSourceViewShown (bool shown) override;
+    bool sourceViewShown() const noexcept { return routingOpen; }
+    juce::Component* sourceViewComponent() const noexcept { return routingView.get(); }
+    juce::Button& sourceViewToggle() noexcept { return routingKey; }
     ArpInlinePanel& arpInlinePanel() noexcept { return arpPanel; }
     ArpControl& arpControl() noexcept { return arpButton; }
 
@@ -226,7 +238,10 @@ private:
     DropTarget dragTarget;
 
     // The FX library's rack (opt-in view: empty until an effect is opened).
-    rack::Host racks { [this] (rack::Kind kind) { return kind == rack::Kind::fx ? createFxRack (ospProcessor) : nullptr; } };
+    rack::Host racks { [this] (rack::Kind kind) { return kind == rack::Kind::fx ? createFxRack (ospProcessor) : createRackModule (kind, ospProcessor); } };
+    RoutingKey routingKey;
+    std::unique_ptr<juce::Component> routingView;
+    bool routingOpen = false;
     float rackShift() const noexcept { return racks.height() > 0.0f ? racks.height() + design::layout::rackGap : 0.0f; }
     void rackChanged();
 

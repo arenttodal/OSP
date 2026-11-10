@@ -17,12 +17,15 @@ namespace osp::plugin
 */
 std::unique_ptr<osp::plugin::rack::Module> createFxRack (osp::plugin::InstrumentHost& host);
 
-/** What opens and closes rack modules: the editor (ANDOR OSP's, the Instrument Shell's). */
+/** What opens and closes rack modules and the routing view: the editor (ANDOR OSP's, the
+    Instrument Shell's). */
 struct RackOpener
 {
     virtual ~RackOpener() = default;
     virtual bool hasRack (rack::Kind kind) const noexcept = 0;
     virtual void setRackExpanded (rack::Kind kind, bool open) = 0;
+    /** The source area's other view (the FX routing) on or off: off shows the cards again. */
+    virtual void setSourceViewShown (bool shown) = 0;
 };
 /** Shows `id`'s rack (the original four: their own racks where the editor has them, DRIVE its
     popover). */

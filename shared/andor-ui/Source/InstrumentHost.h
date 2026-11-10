@@ -418,6 +418,19 @@ public:
         juce::ignoreUnused (slot);
         return nullptr;
     }
+    /** Called (message thread) whenever the route changes: an edit, an undo, a session or a
+        preset (the routing view follows it). The host calls it from setFxRoute. */
+    std::function<void()> onFxRouteChanged;
+    /** The routing view's ENGINE MIXER: one row per card, each with its letter (0 A, 1 B, 2 C:
+        the card's colour), its name, what it plays and its LEVEL parameter (the card's own). */
+    struct FxMixerCard
+    {
+        int letter = 0;
+        juce::String name, kind, levelId;
+    };
+    virtual std::vector<FxMixerCard> fxMixerCards() const { return {}; }
+    /** A second MOVEMENT lane's parameter prefix (ANALOG's "analog.movement.b."; empty: none). */
+    virtual juce::String fxMovementSecondLanePrefix() const { return {}; }
     virtual int modControllerNumber (int slot) const noexcept = 0;
     virtual void setModControllerNumber (int slot, int controller) noexcept = 0;
     virtual void learnModController (int slot) noexcept = 0;

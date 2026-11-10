@@ -5,6 +5,7 @@
 // Included at the end of PluginProcessorTests.cpp (after FxSharedTests.inc).
 
 #include "FxRack.h"
+#include "FxRouting.h"
 #include "engine/fx/Effects.h"
 
 namespace
@@ -131,9 +132,17 @@ TEST_CASE ("fx osp: the FX rack opens below the sources and closes back to the s
     const auto closedHeight = ui->instrumentHeight();
     const auto closedSize = e->getBounds();
     CHECK (ui->hasRack (osp::plugin::rack::Kind::fx));
-    CHECK_FALSE (ui->hasRack (osp::plugin::rack::Kind::space));
-    // The original four open nothing here (OSP's popovers are their quick view).
-    osp::plugin::openFxRack (*ui, { osp::fx::Type::space, 0 });
+    CHECK (ui->hasRack (osp::plugin::rack::Kind::space));
+    CHECK_FALSE (ui->hasRack (osp::plugin::rack::Kind::filter));
+    // SPACE, ECHO and MOVEMENT open their own racks (as in ANDOR ANALOG), in their enamel.
+    for (const auto type : { osp::fx::Type::space, osp::fx::Type::echo, osp::fx::Type::movement })
+    {
+        osp::plugin::openFxRack (*ui, { type, 0 });
+        CHECK (ui->instrumentHeight() > closedHeight);
+    }
+    CHECK (p.rackFaceplate (static_cast<int> (osp::plugin::rack::Kind::space)) != nullptr);
+    for (const auto kind : { osp::plugin::rack::Kind::space, osp::plugin::rack::Kind::echo, osp::plugin::rack::Kind::movement })
+        ui->setRackExpanded (kind, false);
     CHECK (ui->instrumentHeight() == closedHeight);
     osp::plugin::openFxRack (*ui, { osp::fx::Type::eq, 0 });
     CHECK (ui->effectsRack().isShown (osp::plugin::rack::Kind::fx));
@@ -146,6 +155,122 @@ TEST_CASE ("fx osp: the FX rack opens below the sources and closes back to the s
     ui->setRackExpanded (osp::plugin::rack::Kind::fx, false);
     CHECK (ui->instrumentHeight() == closedHeight);
     CHECK (e->getBounds() == closedSize);
+}
+
+TEST_CASE ("fx osp: the routing key shows the routing view in the cards' place, and back", "[plugin][fx][routing]")
+{
+    using Editor = osp::plugin::OspAudioProcessorEditor;
+    TempDir tmp;
+    const ScopedEnvironment storeDir ("OSP_SAMPLE_STORE", tmp.dir.getChildFile ("store").getFullPathName());
+    const ScopedEnvironment library ("OSP_LIBRARY_DIR", tmp.dir.getChildFile ("library").getFullPathName());
+    OspAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> e (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<Editor*> (e.get());
+    REQUIRE (ui != nullptr);
+    juce::Array<juce::File> list;
+    list.add (writeSource (tmp.dir, "pad.wav", testsignals::vowel (midiToHz (60), 1.5, 48000.0, 3)));
+    list.add (writeSource (tmp.dir, "pluck.wav", testsignals::pluck (220.0, 1.5, 48000.0, 4)));
+    p.addLayers (list);
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    ui->refreshNow();
+    const auto height = ui->instrumentHeight();
+    // The key sits beside SAVE, on its centre line.
+    auto& key = ui->sourceViewToggle();
+    CHECK (key.isVisible());
+    CHECK_FALSE (ui->sourceViewShown());
+    key.onClick();   // (a click: triggerClick would post it)
+    REQUIRE (ui->sourceViewShown());
+    auto* view = dynamic_cast<osp::plugin::FxRoutingView*> (ui->sourceViewComponent());
+    REQUIRE (view != nullptr);
+    CHECK (view->isVisible());
+    CHECK_FALSE (ui->engineCard (0).isVisible());
+    CHECK (ui->instrumentHeight() == height);   // (a view of the same area: the window keeps its size)
+    // The ENGINE MIXER: one row per loaded layer, each knob the layer's own LEVEL.
+    REQUIRE (view->mixerRowCount() == 2);
+    auto* levelB = view->levelKnob (1);
+    REQUIRE (levelB != nullptr);
+    levelB->setValue (-6.0, juce::sendNotificationSync);
+    CHECK (p.parameterValue ("layerB.level") == Catch::Approx (-6.0f).margin (0.05f));
+    // CLASSIC to start; an edit makes it CUSTOM, as one undoable step.
+    CHECK_FALSE (p.fxRoute().custom);
+    REQUIRE (view->insertNew (osp::fx::Type::eq));
+    CHECK (p.fxRoute().custom);
+    CHECK (osp::fx::contains (p.fxRoute(), { osp::fx::Type::eq, 0 }));
+    p.undo().undo();
+    CHECK_FALSE (osp::fx::contains (p.fxRoute(), { osp::fx::Type::eq, 0 }));
+    view->restoreOriginal();
+    CHECK_FALSE (p.fxRoute().custom);
+    // A double-click's editor: SPACE opens its own rack below the sources.
+    view->openEditor ({ osp::fx::Type::space, 0 });
+    CHECK (ui->effectsRack().isShown (osp::plugin::rack::Kind::space));
+    ui->setRackExpanded (osp::plugin::rack::Kind::space, false);
+    // Back to the cards (the key again, or Esc).
+    key.onClick();   // (a click: triggerClick would post it)
+    CHECK_FALSE (ui->sourceViewShown());
+    CHECK (ui->engineCard (0).isVisible());
+    CHECK (ui->instrumentHeight() == height);
+}
+
+TEST_CASE ("fx osp: routing view and rack screenshots (OSP_FX_SHOTS)", "[.][fx-routing-shots]")
+{
+    // On demand: OSP_FX_SHOTS=<folder> osp_plugin_tests "[fx-routing-shots]". Two layers; the
+    // routing view CLASSIC, then a CUSTOM chain; SPACE, ECHO and MOVEMENT racks.
+    const char* dir = std::getenv ("OSP_FX_SHOTS");
+    if (dir == nullptr)
+        return;
+    TempDir tmp;
+    const ScopedEnvironment storeDir ("OSP_SAMPLE_STORE", tmp.dir.getChildFile ("store").getFullPathName());
+    const ScopedEnvironment library ("OSP_LIBRARY_DIR", tmp.dir.getChildFile ("library").getFullPathName());
+    const ScopedEnvironment documents ("OSP_DOCUMENTS_DIR", tmp.dir.getChildFile ("documents").getFullPathName());
+    const ScopedLook ceramic (skin::Look::ceramic);
+    auto save = [dir] (const juce::Image& image, const juce::String& name) {
+        juce::FileOutputStream out (juce::File (dir).getChildFile (name));
+        out.setPosition (0);
+        out.truncate();
+        juce::PNGImageFormat().writeImageToStream (image, out);
+    };
+    using Editor = osp::plugin::OspAudioProcessorEditor;
+    OspAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> e (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<Editor*> (e.get());
+    REQUIRE (ui != nullptr);
+    juce::Array<juce::File> list;
+    list.add (writeSource (tmp.dir, "Warm Pad.wav", testsignals::vowel (midiToHz (60), 2.4, 48000.0, 3)));
+    list.add (writeSource (tmp.dir, "Glass Pluck.wav", testsignals::pluck (220.0, 2.4, 48000.0, 4)));
+    p.addLayers (list);
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    p.setPlayConfigDetails (0, 2, 48000.0, 256);
+    p.prepareToPlay (48000.0, 256);
+    auto shoot = [&] (const juce::String& name) {
+        ui->refreshNow();
+        save (e->createComponentSnapshot (e->getLocalBounds(), true, 1.0f), name + ".png");
+    };
+    shoot ("routing-00-cards");
+    ui->setSourceViewShown (true);
+    shoot ("routing-01-classic");
+    auto* view = dynamic_cast<osp::plugin::FxRoutingView*> (ui->sourceViewComponent());
+    REQUIRE (view != nullptr);
+    view->insertNew (osp::fx::Type::eq);
+    view->insertNew (osp::fx::Type::compressor);
+    view->insertNew (osp::fx::Type::retro);
+    shoot ("routing-02-custom");
+    view->showLibrary (true);
+    shoot ("routing-03-library");
+    view->showLibrary (false);
+    view->openEditor ({ osp::fx::Type::space, 0 });
+    shoot ("routing-04-space-rack");
+    ui->setRackExpanded (osp::plugin::rack::Kind::space, false);
+    view->openEditor ({ osp::fx::Type::echo, 0 });
+    shoot ("routing-05-echo-rack");
+    ui->setRackExpanded (osp::plugin::rack::Kind::echo, false);
+    view->openEditor ({ osp::fx::Type::movement, 0 });
+    shoot ("routing-06-movement-rack");
+    ui->setRackExpanded (osp::plugin::rack::Kind::movement, false);
+    view->openEditor ({ osp::fx::Type::compressor, 0 });
+    shoot ("routing-07-compressor-rack");
+    p.releaseResources();
 }
 
 TEST_CASE ("fx osp: FX rack screenshots for the design review (OSP_FX_SHOTS)", "[.][fx-shots]")

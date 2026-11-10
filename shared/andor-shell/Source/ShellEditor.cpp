@@ -545,41 +545,6 @@ void ShellEditor::setSourceViewShown (bool shown)
         sourceView->grabKeyboardFocus();
 }
 
-void ShellEditor::SourceViewButton::paintButton (juce::Graphics& g, bool over, bool down)
-{
-    // A header key as SAVE (its face, its icon size and ink): a branching path, two inputs
-    // joining; the path green while its view is shown.
-    using namespace osp::plugin::design;
-    const auto r = getLocalBounds().toFloat();
-    const bool on = getToggleState();
-    const float k = r.getHeight() / 48.0f;
-    if (! osp::plugin::skin::drawnBySurface())   // ceramic: the housing draws the key
-        draw::raised (g, r.reduced (0.5f), 9.0f * k, colour::cardTop, colour::cardBottom, 0.9f);
-    if (on)
-    {
-        g.setColour (juce::Colour (0x24b4cab5));
-        g.fillRoundedRectangle (r.reduced (5.0f * k), 6.0f * k);
-    }
-    const float s = 27.0f * k / 24.0f;
-    const auto o = r.getCentre() - juce::Point<float> (12.0f * s, 12.0f * s) + juce::Point<float> (0.0f, down ? 0.5f : 0.0f);
-    auto at = [&] (float x, float y) { return o + juce::Point<float> (x * s, y * s); };
-    juce::Path p;
-    for (const auto c : { at (5, 5), at (19, 12), at (5, 19) })
-        p.addEllipse (juce::Rectangle<float> (4.0f * s, 4.0f * s).withCentre (c));
-    p.startNewSubPath (at (7, 5));
-    p.lineTo (at (11, 5));
-    p.cubicTo (at (13, 5), at (13, 12), at (17, 12));
-    p.startNewSubPath (at (7, 19));
-    p.lineTo (at (11, 19));
-    p.cubicTo (at (13, 19), at (13, 12), at (17, 12));
-    g.setColour (on ? juce::Colour (0xff477767) : colour::text.withAlpha (over || down ? 0.85f : 0.6f));
-    g.strokePath (p, juce::PathStrokeType (1.5f * k, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-    if (hasKeyboardFocus (false))
-    {
-        g.setColour (juce::Colour (0xff88a8af));
-        g.drawRoundedRectangle (r.reduced (1.5f), 9.0f * k, 1.5f);
-    }
-}
 
 void ShellEditor::layoutSources()
 {

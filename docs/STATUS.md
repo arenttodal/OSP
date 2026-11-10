@@ -848,9 +848,19 @@ the shared rack (done) and OSP's routing view and mixer (not started).
   FX rack below the sources (full bleed, as ANALOG's); nothing shows until an effect opens, and
   closing it gives back the very same window (design captures byte-identical but for MOVEMENT's
   live LFO, which differs from run to run).
-- [ ] GATE design approval of the shared rack in OSP (screenshots: OSP_FX_SHOTS).
-- [ ] After approval: OSP's routing view in the source area (the key beside SAVE, as ANALOG's),
-  its ENGINE MIXER on `layerA/B/C.level`, route undo, quick popovers.
+- [x] GATE design approval of the shared rack in OSP (approved 10 Nov 2026), with the SPACE
+  presets bar the merge brought; SPACE / ECHO / MOVEMENT to open full racks as in ANALOG.
+- [x] R1 FX ROUTING shared (`shared/andor-ui/Source/FxRouting.*`): ANALOG's view with its engine
+  calls replaced by host hooks (route, `onFxRouteChanged`, `fxMixerCards`, a second MOVEMENT
+  lane's prefix) and `RackOpener::setSourceViewShown`. The header key (`RoutingKey`) is shared
+  too: the Instrument Shell draws the same class (products pixel-identical).
+- [x] R2 ANDOR OSP: the key beside SAVE (SAVE's size, 8 px after it, as ANALOG's; MIX moves
+  right by as much), the view in the cards' place (the window keeps its size); its ENGINE
+  MIXER has a row per loaded layer (the sound's name, its playback mode, its LEVEL - the card's
+  own parameter). Every edit is one undoable step and makes the route CUSTOM.
+- [x] R3 SPACE, ECHO and MOVEMENT open their full racks in OSP (the shared EffectRack modules)
+  wearing ANALOG's enamel faceplates (`OspAudioProcessor::rackFaceplate`; OSP's popovers are
+  untouched); DRIVE keeps its popover as in ANALOG. The macros' names do not open racks (yet).
 
 ## DONE
 

@@ -368,6 +368,12 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     content.addChildComponent (racks);
     racks.setFullBleed (true);
     racks.onLayoutChanged = [this] { rackChanged(); };
+    // FX ROUTING: its key beside SAVE (as ANDOR ANALOG's), its view in the cards' place.
+    routingKey.setTooltip ("FX Routing");
+    routingKey.setTitle ("FX Routing");
+    routingKey.setClickingTogglesState (false);
+    routingKey.onClick = [this] { setSourceViewShown (! routingOpen); };
+    content.addAndMakeVisible (routingKey);
     addAndMakeVisible (content);
     layoutInstrument();
     setResizable (true, true);
@@ -629,8 +635,40 @@ int OspAudioProcessorEditor::visibleCardCount() const
     return n;
 }
 
+void OspAudioProcessorEditor::setSourceViewShown (bool shown)
+{
+    if (shown == routingOpen)
+        return;
+    if (shown && routingView == nullptr)
+    {
+        routingView = createFxRoutingView (ospProcessor);
+        content.addChildComponent (*routingView);
+    }
+    routingOpen = shown;
+    routingKey.setToggleState (shown, juce::dontSendNotification);
+    routingKey.repaint();
+    shownCount = -1;
+    layoutSources (false);
+    if (shown && routingView != nullptr)
+        routingView->grabKeyboardFocus();
+}
+
 void OspAudioProcessorEditor::layoutSources (bool animate)
 {
+    if (routingView != nullptr)
+        routingView->setVisible (routingOpen);
+    if (routingOpen && routingView != nullptr)
+    {
+        // The routing view in the cards' place (the sound is the same either way).
+        for (auto& card : cards)
+            card->setVisible (false);
+        dropZone.setVisible (false);
+        addTarget.setVisible (false);
+        routingView->setBounds (sourceArea);
+        routingView->toFront (false);
+        shownCount = -1;   // (the cards are laid out afresh when it closes)
+        return;
+    }
     std::array<bool, OspAudioProcessor::numLayers> occupied {};
     int count = 0;
     // A card per slot: the layers with sounds and the empty slots kept for new ones.
@@ -1393,6 +1431,15 @@ void OspAudioProcessorEditor::layoutInstrument()
     parts.rack = &racks;
     parts.rackShift = rackShift();
     frame::place (parts, arpShown);
+    {
+        // FX ROUTING's key as ANDOR ANALOG's: SAVE's size, 8 px after it on its centre line (one
+        // group of keys); MIX moved right by as much, narrower by as much (it centres itself).
+        const auto save = savePresetButton.getBounds();
+        routingKey.setBounds (save.withX (save.getRight() + 8));
+        const auto mix = headerMix.getBounds();
+        if (const int shift = routingKey.getRight() + 15 - mix.getX(); shift > 0)
+            headerMix.setBounds (mix.withTrimmedLeft (shift));
+    }
 
     modOverlay.setBounds (content.getLocalBounds());
     sourceArea = frame::sourceArea();

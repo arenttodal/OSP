@@ -185,8 +185,10 @@ public:
     bool setFxRoute (const fx::Graph& route) override;
     const fx::Processor* fxProcessor (fx::InstanceId id) const noexcept override { return fxPrepared ? engine.fxRouting().processor (id) : nullptr; }
     std::shared_ptr<const fx::Impulse> fxConvolutionImpulse (int slot) const override { return fxPrepared ? engine.fxRouting().impulse (slot) : nullptr; }
-    /** Called (message thread) whenever the route changes: an edit, a session or a preset. */
-    std::function<void()> onFxRouteChanged;
+    std::vector<FxMixerCard> fxMixerCards() const override;
+    /** The MOVEMENT, ECHO and SPACE racks wear their devices' identities (ANDOR ANALOG's V5
+        enamel, the same as their routing tiles); OSP's popovers are untouched. */
+    const rack::Faceplate* rackFaceplate (int kind) const noexcept override;
     /** Builds the impulse each CONVOLUTION needs when its settings or the rate changed (message
         thread: prepareToPlay and the timer). */
     void updateConvolutionImpulses();

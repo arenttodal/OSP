@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "engine/fx/Effects.h"
+#include "FxIdentity.h"
 #include "AndorParameters.h"
 #include "ValueFormat.h"
 #include "KeyDnaState.h"
@@ -4237,6 +4238,48 @@ bool OspAudioProcessor::setFxRoute (const fx::Graph& next)
     if (onFxRouteChanged != nullptr)
         onFxRouteChanged();
     return true;
+}
+
+const rack::Faceplate* OspAudioProcessor::rackFaceplate (int kind) const noexcept
+{
+    static const auto faceplates = [] {
+        std::map<int, rack::Faceplate> f;
+        auto movement = faceplateFromIdentity (visualIdentityFor (fx::Type::movement));
+        auto echo = faceplateFromIdentity (visualIdentityFor (fx::Type::echo));
+        auto space = faceplateFromIdentity (visualIdentityFor (fx::Type::space));
+        movement.tapeDeck = echo.tapeDeck = true;   // (the TAPE modes as a light reel deck, as ANALOG's)
+        f[static_cast<int> (rack::Kind::movement)] = movement;
+        f[static_cast<int> (rack::Kind::echo)] = echo;
+        f[static_cast<int> (rack::Kind::space)] = space;
+        return f;
+    }();
+    const auto it = faceplates.find (kind);
+    return it != faceplates.end() ? &it->second : nullptr;
+}
+
+std::vector<InstrumentHost::FxMixerCard> OspAudioProcessor::fxMixerCards() const
+{
+    // The routing view's ENGINE MIXER: the loaded layers (A alone when none is), each with its
+    // sound's name, its playback mode and its own LEVEL (the card's knob).
+    std::vector<FxMixerCard> cards;
+    for (int layer = 0; layer < numLayers; ++layer)
+    {
+        if (! isLayerOccupied (layer) && ! (layer == 0 && ! isLayerOccupied (1) && ! isLayerOccupied (2)))
+            continue;
+        FxMixerCard card;
+        card.letter = layer;
+        juce::String name;
+        if (const auto instrument = currentInstrument (layer); instrument != nullptr)
+            name = juce::File::createFileWithoutCheckingPath (juce::String (instrument->filename)).getFileNameWithoutExtension();
+        card.name = name.isNotEmpty() ? name : juce::String ("Layer ") + layerName (layer);
+        if (auto* mode = parameters.getParameter (layerParameterId (layer, "sourceMode")); mode != nullptr && isLayerOccupied (layer))
+            card.kind = mode->getCurrentValueAsText();
+        else
+            card.kind = "Empty";
+        card.levelId = layerParameterId (layer, "level");
+        cards.push_back (card);
+    }
+    return cards;
 }
 
 void OspAudioProcessor::updateConvolutionImpulses()
