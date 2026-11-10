@@ -364,6 +364,10 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     // The instrument is laid out once at the reference size (design::width x height) and
     // scaled as a whole: proportions never drift between sizes.
     content.onPaint = [this] (juce::Graphics& g) { paintInstrument (g); };
+    // The FX library's rack: hidden until the routing view opens an effect.
+    content.addChildComponent (racks);
+    racks.setFullBleed (true);
+    racks.onLayoutChanged = [this] { rackChanged(); };
     addAndMakeVisible (content);
     layoutInstrument();
     setResizable (true, true);
@@ -1211,7 +1215,7 @@ void OspAudioProcessorEditor::paint (juce::Graphics& g)
 void OspAudioProcessorEditor::paintInstrument (juce::Graphics& g)
 {
     // The shared ANDOR frame with OSP's identity (ANDOR/OSP, One Shot Performer).
-    frame::paint (g, content, frame::Identity {}, arpShown, macros);
+    frame::paint (g, content, frame::Identity {}, arpShown, macros, rackShift());
 }
 
 void OspAudioProcessorEditor::resized()
@@ -1242,6 +1246,24 @@ void OspAudioProcessorEditor::setArpExpanded (bool open)
     positionPopup();
     placeLibrary();
     content.repaint();
+}
+
+void OspAudioProcessorEditor::setRackExpanded (rack::Kind kind, bool open)
+{
+    if (open && ! hasRack (kind))
+        return;
+    racks.setShown (kind, open);   // (rackChanged follows)
+}
+
+void OspAudioProcessorEditor::rackChanged()
+{
+    // A view change only: the window grows or shrinks by the rack, nothing sounds different.
+    layoutInstrument();
+    applyWindowShape (true);
+    positionPopup();
+    placeLibrary();
+    content.repaint();
+    racks.settle();
 }
 
 void OspAudioProcessorEditor::applyWindowShape (bool resizeWindow)
@@ -1368,6 +1390,8 @@ void OspAudioProcessorEditor::layoutInstrument()
     parts.arpControl = &arpButton;
     parts.advanced = &advancedButton;
     parts.headerMix = &headerMix;
+    parts.rack = &racks;
+    parts.rackShift = rackShift();
     frame::place (parts, arpShown);
 
     modOverlay.setBounds (content.getLocalBounds());

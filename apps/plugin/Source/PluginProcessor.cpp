@@ -1,4 +1,5 @@
 #include "PluginProcessor.h"
+#include "engine/fx/Effects.h"
 #include "AndorParameters.h"
 #include "ValueFormat.h"
 #include "KeyDnaState.h"
@@ -88,6 +89,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
     addCardArpParameters (layout, {});
     // The spectral imprint on the SYNTH page (version hint 28): Analog, 0 and 0 by default.
     addImprintParameters (layout);
+    // The FX library (shared with ANDOR ANALOG): ten effects in pool slots, `fx.<type>.<n>.*`
+    // (version hint 30), appended after everything above. Inaudible until a CUSTOM route plays
+    // them (every session and preset from before keeps CLASSIC, the original chain).
+    fxparams::addTo (layout, {}, 30, 30);
     return layout;
 }
 
@@ -233,6 +238,7 @@ OspAudioProcessor::OspAudioProcessor()
 {
     lanes = std::make_unique<CardArpLanes>();
     laneHost = std::make_unique<LaneHost> (*this);
+    fxReader.attach (parameters, fxParameterPrefix());
     attackParam = parameters.getRawParameterValue (ids::attack);
     releaseParam = parameters.getRawParameterValue (ids::release);
     gainParam = parameters.getRawParameterValue (ids::gain);
@@ -423,7 +429,14 @@ void OspAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     // values so smoothing never begins from a previous session's state.
     lastMacroParam.fill (-1.0f);
     applyParameters (true);
+    // The FX library's settings before prepare: every effect starts at them, not gliding from
+    // its defaults.
+    fxReader.read (fxSettings);
+    engine.setFxSettings (fxSettings);
     engine.prepare (sampleRate, samplesPerBlock, engineSettings);
+    fxPrepared = true;
+    updateConvolutionImpulses();
+    setLatencySamples (engine.fxLatencySamples());
     for (int layer = 0; layer < numLayers; ++layer)
     {
         const auto* playing = layers[static_cast<std::size_t> (layer)].playing;
@@ -1389,6 +1402,9 @@ void OspAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
             captureRing.write (input.getArrayOfReadPointers(), input.getNumChannels(), numSamples);
 
     keyboardState.processNextMidiBuffer (midi, 0, numSamples, true);
+    // The FX library's settings (a copy; no allocation): heard only through a CUSTOM route.
+    fxReader.read (fxSettings);
+    engine.setFxSettings (fxSettings);
     swapInstrumentIfPending();
     swapKeyDnaIfPending();
     routePreviewKeys (midi);
@@ -2736,6 +2752,16 @@ void OspAudioProcessor::timerCallback()
 {
     pollTake();   // a take stops itself at a minute, whether its page is open or not
 
+    // The FX library: the graphs and impulses the audio thread let go, the CONVOLUTION impulses
+    // its settings now ask for, and the route's latency (it moves only with the route; the
+    // host is told here, on the message thread).
+    if (fxPrepared)
+    {
+        updateConvolutionImpulses();
+        if (const int latency = engine.fxLatencySamples(); latency != getLatencySamples())
+            setLatencySamples (latency);
+    }
+
     // DYNAMICS' SOFT / LINEAR / HARD (kept for compatibility) sets the VEL curve when moved.
     if (const int dyn = juce::roundToInt (parameterValue (ids::dynamicsCurve)); dyn != shownDynamicsCurve)
     {
@@ -3085,6 +3111,15 @@ std::unique_ptr<juce::XmlElement> OspAudioProcessor::createStateXml()
         stateTree.removeChild (stateTree.getChildWithName (tree.getType()), nullptr);
         stateTree.appendChild (tree, nullptr);
     }
+    // The FX route, only once it is CUSTOM (absent: CLASSIC, as every session and preset from
+    // before is).
+    if (const auto route = fxRoute(); route.custom)
+    {
+        juce::ValueTree fxTree ("FxRouting");
+        fxTree.setProperty ("schema", fx::Graph::schema, nullptr);
+        fxTree.setProperty ("graph", juce::String (fx::toText (route)), nullptr);
+        stateTree.appendChild (fxTree, nullptr);
+    }
     return stateTree.createXml();
 }
 
@@ -3183,6 +3218,8 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml, bool setting
         stateTree.removeChild (tree, nullptr);
     const auto keyDnaTree = stateTree.getChildWithName ("KeyDna");
     stateTree.removeChild (keyDnaTree, nullptr);
+    const auto fxRouteTree = stateTree.getChildWithName ("FxRouting");
+    stateTree.removeChild (fxRouteTree, nullptr);
     const int savedVersion = static_cast<int> (stateTree.getProperty ("stateVersion", 1));
     // Made before per-layer Reimagined (no routing saved): the legacy shared stage, exactly.
     perLayerReimagined = savedVersion >= 8 && stateTree.getProperty ("reimaginedRouting", "legacyGlobal").toString() == "perLayer";
@@ -3408,6 +3445,20 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml, bool setting
         keyDnaGestureStart = {};
         for (int layer = 0; layer < numLayers; ++layer)
             setKeyDnaSettings (layer, dna[static_cast<std::size_t> (layer)]);
+    }
+
+    // The FX route: the session's, or (absent or unreadable) CLASSIC - always set, so a
+    // session without one also leaves the previous one's route.
+    {
+        auto saved = fx::classicGraph();
+        if (fxRouteTree.isValid())
+        {
+            fx::Graph read;
+            if (fx::fromText (fxRouteTree["graph"].toString().toStdString(), read))
+                saved = read;
+        }
+        if (! setFxRoute (saved))
+            setFxRoute (fx::classicGraph());
     }
 
     if (settingsOnly)
@@ -4154,7 +4205,65 @@ juce::AudioProcessorEditor* OspAudioProcessor::createEditor()
     return new OspAudioProcessorEditor (*this);
 }
 
+//==============================================================================
+// The FX library (shared with ANDOR ANALOG).
+
+juce::File OspAudioProcessor::fxUserFolder() const
+{
+    return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory).getChildFile ("ANDOR").getChildFile ("ANDOR OSP");
+}
+
+fx::Graph OspAudioProcessor::fxRoute() const
+{
+    const std::lock_guard<std::mutex> lock (fxRouteMutex);
+    return fxRouteNow;
+}
+
+bool OspAudioProcessor::setFxRoute (const fx::Graph& next)
+{
+    std::shared_ptr<const fx::CompiledGraph> compiled;
+    {
+        const std::lock_guard<std::mutex> lock (fxRouteMutex);
+        if (next.custom)
+        {
+            compiled = fx::compile (next, ++fxRouteGeneration);
+            if (compiled == nullptr)
+                return false;
+        }
+        fxRouteNow = next;
+    }
+    engine.setFxGraph (std::move (compiled));   // (null: CLASSIC)
+    engine.fxRouting().collectGarbage();
+    if (onFxRouteChanged != nullptr)
+        onFxRouteChanged();
+    return true;
+}
+
+void OspAudioProcessor::updateConvolutionImpulses()
+{
+    if (! fxPrepared)
+        return;
+    const std::lock_guard<std::mutex> lock (impulseMutex);
+    fx::Settings now;
+    fxReader.read (now);
+    auto& router = engine.fxRouting();
+    for (int slot = 0; slot < static_cast<int> (impulseKeys.size()); ++slot)
+    {
+        const auto& c = now.conv[static_cast<std::size_t> (slot)];
+        const ImpulseKey key { std::clamp (c.impulse, 0, fx::Impulse::factoryCount - 1), c.decaySeconds, c.size, c.reverse, c.normalize, router.rate() };
+        auto& last = impulseKeys[static_cast<std::size_t> (slot)];
+        if (key == last && router.impulse (slot) != nullptr)
+            continue;
+        last = key;
+        // (The factory impulses are designed at the rate they play at: no resampling.)
+        router.setImpulse (slot, fx::Impulse::make (fx::Impulse::factory (key.impulse, key.rate), key.rate, c, key.rate, ++impulseGeneration,
+                                                    fx::Impulse::factoryName (key.impulse)));
+    }
+    router.collectGarbage();
+}
+
 } // namespace osp::plugin
+
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {

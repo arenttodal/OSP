@@ -390,6 +390,34 @@ public:
         juce::ignoreUnused (kind);
         return nullptr;
     }
+
+    // The FX library (engine/fx; opt-in, shared with ANDOR ANALOG): its route, its effects'
+    // live processors and the parameters' prefix. A host without it plays the original chain
+    // and shows no FX rack or routing view.
+    virtual bool hasFxLibrary() const noexcept { return false; }
+    /** The FX parameters' ID prefix before "fx." ("" for ANDOR OSP, "analog." for ANALOG). */
+    virtual juce::String fxParameterPrefix() const { return {}; }
+    /** Where the user's FX presets and chains live (ANALOG: <user data>/ANDOR/ANDOR Analog). */
+    virtual juce::File fxUserFolder() const { return {}; }
+    /** Message thread: the route playing, and a new one (false: refused, nothing changes). */
+    virtual fx::Graph fxRoute() const { return fx::classicGraph(); }
+    virtual bool setFxRoute (const fx::Graph& route)
+    {
+        juce::ignoreUnused (route);
+        return false;
+    }
+    /** A new effect's processor (its meters and graphs; null for the original four or before
+        prepare), and the impulse a CONVOLUTION slot plays (null: none yet). */
+    virtual const fx::Processor* fxProcessor (fx::InstanceId id) const noexcept
+    {
+        juce::ignoreUnused (id);
+        return nullptr;
+    }
+    virtual std::shared_ptr<const fx::Impulse> fxConvolutionImpulse (int slot) const
+    {
+        juce::ignoreUnused (slot);
+        return nullptr;
+    }
     virtual int modControllerNumber (int slot) const noexcept = 0;
     virtual void setModControllerNumber (int slot, int controller) noexcept = 0;
     virtual void learnModController (int slot) noexcept = 0;

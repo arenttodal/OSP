@@ -2,7 +2,9 @@
 
 #include "ArpSection.h"
 #include "Design.h"
+#include "EffectRack.h"
 #include "EngineCard.h"
+#include "FxRack.h"
 #include "InstrumentFrame.h"
 #include "KeyDnaEditor.h"
 #include "LibraryPanel.h"
@@ -56,6 +58,7 @@ private:
 */
 class OspAudioProcessorEditor final : public juce::AudioProcessorEditor,
                                       public juce::FileDragAndDropTarget,
+                                      public RackOpener,
                                       private juce::Timer
 {
 public:
@@ -110,7 +113,14 @@ public:
     void setArpExpanded (bool open);
     bool isArpExpanded() const noexcept { return arpShown; }
     /** The instrument's height in reference pixels (taller while the arpeggiator's editor shows). */
-    float instrumentHeight() const noexcept { return frame::instrumentHeight (arpShown); }
+    float instrumentHeight() const noexcept { return frame::instrumentHeight (arpShown, rackShift()); }
+
+    /** The FX library's rack (shared with ANDOR ANALOG; the routing view opens it): below the
+        source area, the window growing by its height, as ANALOG's. Nothing shows - and nothing
+        moves - until an effect is opened. */
+    bool hasRack (rack::Kind kind) const noexcept override { return kind == rack::Kind::fx; }
+    void setRackExpanded (rack::Kind kind, bool open) override;
+    rack::Host& effectsRack() noexcept { return racks; }
     ArpInlinePanel& arpInlinePanel() noexcept { return arpPanel; }
     ArpControl& arpControl() noexcept { return arpButton; }
 
@@ -214,6 +224,11 @@ private:
     int shownCount = -1;
     bool dragging = false;
     DropTarget dragTarget;
+
+    // The FX library's rack (opt-in view: empty until an effect is opened).
+    rack::Host racks { [this] (rack::Kind kind) { return kind == rack::Kind::fx ? createFxRack (ospProcessor) : nullptr; } };
+    float rackShift() const noexcept { return racks.height() > 0.0f ? racks.height() + design::layout::rackGap : 0.0f; }
+    void rackChanged();
 
     // Mix, macros, envelope
     HeaderMix headerMix { ospProcessor };   ///< MIX in the header (two or three layers)

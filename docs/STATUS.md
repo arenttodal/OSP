@@ -819,6 +819,39 @@ playable-instrument review**, as the spec requires. Commits: P0 8308f0a, P1 8746
   when a key is held past the recording). This is outside the prototype's scope.
 - [ ] Then, and only then: real recordings, P5 (voices and strings), the gospel recording.
 
+## Shared FX library in ANDOR OSP (10 Nov 2026; branch claude/shared-fx, draft PR)
+
+ANDOR ANALOG's mixer and FX (routing graph, ten new effects, their racks) moving into the shared
+code so both instruments run one implementation (docs/research/shared-fx/). ANALOG keeps its own
+copy (pin adf8ed6) until after its launch, then repoints. A **design approval gate** sits between
+the shared rack (done) and OSP's routing view and mixer (not started).
+
+- [x] M1 the two OSP lines reunited (merge of claude/space-presets adf8ed6, with analog-release):
+  every suite green; the one visible change is the shared SPACE presets bar in the SPACE / ECHO /
+  MOVEMENT popovers (for the design review).
+- [x] M3/M4 `src/engine/fx` (osp::fx, pure C++20): FxGraph, the FxEngine router, the ten effects.
+  InstrumentEngine plays its post stage through the router; with no route or CLASSIC it calls
+  PostProcessor::process itself - 55 research-renderer renders byte-identical before and after,
+  no golden changed. A CUSTOM route on a mono output runs in stereo and folds down. Tests:
+  ANALOG's effect / RETRO / graph tests ported, `FxRouteTests` (ANALOG's route cases through
+  OSP's engine, mono, no allocation).
+- [x] M5 `shared/andor-ui/Source/FxParameters.*`: the specs, product prefix and hints as
+  arguments; built with `analog.` / 28 / 29 they are ANALOG's 379 schema lines exactly (test
+  against a copy of its golden). InstrumentHost FX hooks (hasFxLibrary, route, processors,
+  impulses, prefix, user folder), off by default (other products unchanged).
+- [x] M6 FxIdentity, FxPresets and FxRack shared (`shared/andor-ui/Source/Fx*`): ANALOG's code
+  with its engine calls replaced by the host hooks and `RackOpener` (the editor that opens racks).
+- [x] M7 ANDOR OSP: `fx.<type>.<n>.*` parameters (version hint 30, the 379 appended after
+  everything; schema golden +379 lines, nothing else), the reader each block, the route saved as
+  an `FxRouting` child only when CUSTOM (absent: CLASSIC; no state-version bump), latency to the
+  host, CONVOLUTION impulses, user presets in `<user data>/ANDOR/ANDOR OSP`. The editor hosts the
+  FX rack below the sources (full bleed, as ANALOG's); nothing shows until an effect opens, and
+  closing it gives back the very same window (design captures byte-identical but for MOVEMENT's
+  live LFO, which differs from run to run).
+- [ ] GATE design approval of the shared rack in OSP (screenshots: OSP_FX_SHOTS).
+- [ ] After approval: OSP's routing view in the source area (the key beside SAVE, as ANALOG's),
+  its ENGINE MIXER on `layerA/B/C.level`, route undo, quick popovers.
+
 ## DONE
 
 - Pure C++20 DSP/analysis library (`osp_dsp`) independent of JUCE; JUCE used for file
@@ -884,8 +917,9 @@ playable-instrument review**, as the spec requires. Commits: P0 8308f0a, P1 8746
   unchanged).
   To bring it to ANDOR OSP:
   - give its macro names the rack actions (MacroLabel::setRackActions: a double-click opens
-    the module, a right-click offers both, Enter) and add the rack to OspAudioProcessorEditor
-    (the frame already places it: `Parts::rack`, `rackShift`);
+    the module, a right-click offers both, Enter) and list MOVEMENT / ECHO / SPACE in the
+    editor's rack host (OspAudioProcessorEditor already hosts one for the FX library's rack:
+    `racks`, `hasRack`, `setRackExpanded`);
   - save the rack's view state with OSP's session (as `arpOpen`);
   - review the screenshots at 869 / 1448 / 1810 px and update OSP's own captures.
 
