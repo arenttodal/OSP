@@ -13,8 +13,6 @@
 namespace osp::plugin
 {
 
-namespace fonts = osp::plugin::fonts;
-namespace rackui = osp::plugin::rackui;
 using fx::InstanceId;
 using fx::Type;
 using osp::plugin::MiniKnob;

@@ -299,6 +299,32 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
             }
             openPopup (index);
         };
+        // SPACE, ECHO and MOVEMENT (as in ANDOR ANALOG): no mark on the row - the name opens the
+        // full rack on a double-click, a right-click offers the popover or the rack, Enter opens
+        // it. A single click still opens the popover.
+        if (const auto kind = rack::kindForMacro (macroSpecs[i].parameterId); kind.has_value() && knob.label != nullptr)
+        {
+            rackOfMacro[i] = *kind;
+            const auto k = *kind;
+            juce::Component::SafePointer<OspAudioProcessorEditor> safe (this);
+            knob.label->setRackActions ([this, k] { toggleRackFromLabel (k); }, [safe, index, k, i] {
+                if (safe == nullptr)
+                    return;
+                juce::PopupMenu menu;
+                menu.addItem ("Quick Settings", [safe, index] {
+                    if (safe != nullptr)
+                    {
+                        safe->closedByLabelPress = -1;
+                        safe->openPopup (index);
+                    }
+                });
+                menu.addItem (safe->racks.isShown (k) ? "Close Rack" : "Open Rack", [safe, k] {
+                    if (safe != nullptr)
+                        safe->toggleRackFromLabel (k);
+                });
+                menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (safe->macros[i].label.get()));
+            });
+        }
     }
     content.addAndMakeVisible (modPanel);
 
@@ -1293,9 +1319,20 @@ void OspAudioProcessorEditor::setRackExpanded (rack::Kind kind, bool open)
     racks.setShown (kind, open);   // (rackChanged follows)
 }
 
+void OspAudioProcessorEditor::toggleRackFromLabel (rack::Kind kind)
+{
+    // (A popover in the way closes; a press that closed it must not count later.)
+    closedByLabelPress = -1;
+    closePopup();
+    setRackExpanded (kind, ! racks.isShown (kind));
+}
+
 void OspAudioProcessorEditor::rackChanged()
 {
     // A view change only: the window grows or shrinks by the rack, nothing sounds different.
+    for (std::size_t i = 0; i < macros.size(); ++i)
+        if (rackOfMacro[i].has_value() && macros[i].label != nullptr)
+            macros[i].label->setRackOpen (racks.isShown (*rackOfMacro[i]));
     layoutInstrument();
     applyWindowShape (true);
     positionPopup();

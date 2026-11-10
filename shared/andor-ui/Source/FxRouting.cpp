@@ -10,7 +10,6 @@
 namespace osp::plugin
 {
 
-namespace fonts = osp::plugin::fonts;
 using fx::InstanceId;
 using fx::Type;
 

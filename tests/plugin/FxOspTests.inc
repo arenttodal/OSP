@@ -212,6 +212,38 @@ TEST_CASE ("fx osp: the routing key shows the routing view in the cards' place, 
     CHECK (ui->instrumentHeight() == height);
 }
 
+TEST_CASE ("fx osp: SPACE, ECHO and MOVEMENT's names open their racks; a click still opens the popover", "[plugin][fx][routing]")
+{
+    using Editor = osp::plugin::OspAudioProcessorEditor;
+    OspAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> e (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<Editor*> (e.get());
+    REQUIRE (ui != nullptr);
+    const auto height = ui->instrumentHeight();
+    const auto specs = osp::plugin::frame::ospMacroSpecs();
+    int opened = 0;
+    for (std::size_t i = 0; i < specs.size(); ++i)
+    {
+        auto* label = ui->macroRow()[i].label.get();
+        REQUIRE (label != nullptr);
+        const auto kind = osp::plugin::rack::kindForMacro (specs[i].parameterId);
+        if (! kind.has_value())
+            continue;
+        // Enter on the focused name (a double-click's action): the rack opens, the name says so.
+        REQUIRE (label->keyPressed (juce::KeyPress (juce::KeyPress::returnKey)));
+        CHECK (ui->effectsRack().isShown (*kind));
+        CHECK (label->isRackOpen());
+        CHECK (ui->instrumentHeight() > height);
+        // Again: it closes.
+        ui->toggleRackFromLabel (*kind);
+        CHECK_FALSE (ui->effectsRack().isShown (*kind));
+        CHECK_FALSE (label->isRackOpen());
+        ++opened;
+    }
+    CHECK (opened == 3);
+    CHECK (ui->instrumentHeight() == height);
+}
+
 TEST_CASE ("fx osp: routing view and rack screenshots (OSP_FX_SHOTS)", "[.][fx-routing-shots]")
 {
     // On demand: OSP_FX_SHOTS=<folder> osp_plugin_tests "[fx-routing-shots]". Two layers; the

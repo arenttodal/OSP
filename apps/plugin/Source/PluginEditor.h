@@ -244,6 +244,12 @@ private:
     bool routingOpen = false;
     float rackShift() const noexcept { return racks.height() > 0.0f ? racks.height() + design::layout::rackGap : 0.0f; }
     void rackChanged();
+    std::array<std::optional<rack::Kind>, frame::macroCount> rackOfMacro {};
+public:
+    /** A double-click on SPACE's, ECHO's or MOVEMENT's name: its rack opens (or closes). */
+    void toggleRackFromLabel (rack::Kind kind);
+    frame::MacroRow& macroRow() noexcept { return macros; }
+private:
 
     // Mix, macros, envelope
     HeaderMix headerMix { ospProcessor };   ///< MIX in the header (two or three layers)

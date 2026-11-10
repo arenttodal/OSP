@@ -860,7 +860,10 @@ the shared rack (done) and OSP's routing view and mixer (not started).
   own parameter). Every edit is one undoable step and makes the route CUSTOM.
 - [x] R3 SPACE, ECHO and MOVEMENT open their full racks in OSP (the shared EffectRack modules)
   wearing ANALOG's enamel faceplates (`OspAudioProcessor::rackFaceplate`; OSP's popovers are
-  untouched); DRIVE keeps its popover as in ANALOG. The macros' names do not open racks (yet).
+  untouched); DRIVE keeps its popover as in ANALOG.
+- [x] R4 the macros' names open the same racks (as ANALOG's): a double-click (or Enter) on
+  SPACE, ECHO or MOVEMENT opens or closes its rack, a right-click offers Quick Settings or the
+  rack, and a single click still opens the popover (once a double-click can no longer follow).
 
 ## DONE
 
@@ -926,10 +929,7 @@ the shared rack (done) and OSP's routing view and mixer (not started).
   and the visual parity stay exactly as they were; its MOVEMENT stays one lane (every golden
   unchanged).
   To bring it to ANDOR OSP:
-  - give its macro names the rack actions (MacroLabel::setRackActions: a double-click opens
-    the module, a right-click offers both, Enter) and list MOVEMENT / ECHO / SPACE in the
-    editor's rack host (OspAudioProcessorEditor already hosts one for the FX library's rack:
-    `racks`, `hasRack`, `setRackExpanded`);
+  - done (Shared FX R3/R4): the macros' names open the racks, OSP's editor hosts them;
   - save the rack's view state with OSP's session (as `arpOpen`);
   - review the screenshots at 869 / 1448 / 1810 px and update OSP's own captures.
 
