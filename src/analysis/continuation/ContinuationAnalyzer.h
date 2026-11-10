@@ -42,6 +42,14 @@ ContinuationModel analyseContinuation (const AudioData& audio,
                                        const ContinuationOptions& options = {});
 
 /**
+    Pedal Loop 1.0: the regions a One Shot note may loop over under the sustain pedal
+    (PedalLoopModel). `continuation` is the source's own (its best loop comes first when it
+    can sustain). Offline only; never throws (silence, noise, a click: invalid with a reason).
+    analyseContinuation() fills ContinuationModel::pedal with it.
+*/
+PedalLoopModel analysePedalLoops (const AudioData& audio, const AnalysisData& analysis, const ContinuationModel& continuation);
+
+/**
     Re-aligns every jump of `base` for another buffer with the same timing (a register
     anchor rendered with duration preserved). Phase differs between buffers, so each
     jump's destination is re-searched locally and its correlation re-measured.

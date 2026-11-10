@@ -378,9 +378,126 @@ namespace
 ContinuationModel analyseContinuation (const AudioData& audio, const AnalysisData& analysis, const ContinuationOptions& options)
 {
     auto model = analyseOnce (audio, analysis, options);
-    if (! options.forceLoop || model.canSustain || model.reason == "silent")
-        return model;
-    return forcedLoop (audio, analysis, std::move (model), options.minRegionSeconds);
+    if (options.forceLoop && ! model.canSustain && model.reason != "silent")
+        model = forcedLoop (audio, analysis, std::move (model), options.minRegionSeconds);
+    model.pedal = analysePedalLoops (audio, analysis, model);
+    return model;
+}
+
+PedalLoopModel analysePedalLoops (const AudioData& audio, const AnalysisData& analysis, const ContinuationModel& continuation)
+{
+    PedalLoopModel pedal;
+    const double sr = audio.sampleRate;
+    const auto frames = audio.numFrames();
+    if (audio.isEmpty() || sr <= 0.0 || frames < static_cast<std::int64_t> (0.15 * sr))
+    {
+        pedal.reason = "too short";
+        return pedal;
+    }
+    // The level in 10 ms blocks (dBFS): where the sound ends, each region's level, and what a
+    // late pedal matches.
+    const auto mono = audio.mixToMono();
+    const auto block = std::max<std::int64_t> (1, static_cast<std::int64_t> (0.01 * sr));
+    double loudestDb = -120.0;
+    for (std::int64_t b = 0; b + block <= frames; b += block)
+    {
+        double sum = 0.0;
+        for (std::int64_t i = b; i < b + block; ++i)
+            sum += static_cast<double> (mono[static_cast<std::size_t> (i)]) * mono[static_cast<std::size_t> (i)];
+        const double db = 10.0 * std::log10 (std::max (1.0e-12, sum / static_cast<double> (block)));
+        pedal.levelDb.push_back (static_cast<float> (db));
+        loudestDb = std::max (loudestDb, db);
+    }
+    pedal.levelHopFrames = static_cast<double> (block);
+    if (loudestDb < -90.0)
+    {
+        pedal.reason = "silent";
+        return pedal;
+    }
+    std::size_t last = 0;
+    for (std::size_t b = 0; b < pedal.levelDb.size(); ++b)
+        if (pedal.levelDb[b] > loudestDb - 30.0)
+            last = b;
+    pedal.soundEndFrame = std::min (static_cast<double> (frames), static_cast<double> (last + 1) * static_cast<double> (block));
+
+    const auto& env = analysis.envelope;
+    const double onset = std::clamp (env.onsetSeconds, 0.0, audio.durationSeconds());
+    // Past the attack: the note's own start is heard once, never looped.
+    const double bodyStart = (onset + std::clamp (env.attackSeconds, 0.005, 0.5) + 0.06) * sr;
+    const double bodyEnd = pedal.soundEndFrame - 0.03 * sr;
+    const double periodSec = analysis.pitch.detected ? 1.0 / std::max (analysis.pitch.fundamentalHz, 30.0) : 0.005;
+    const int maxLag = static_cast<int> (std::clamp (1.2 * periodSec, 0.002, 0.012) * sr);
+    auto levelOver = [&] (double from, double to) {
+        const auto a = static_cast<std::size_t> (std::max (0.0, from) / pedal.levelHopFrames);
+        const auto b = std::min (pedal.levelDb.size(), static_cast<std::size_t> (std::max (0.0, to) / pedal.levelHopFrames) + 1);
+        double sum = 0.0;
+        int n = 0;
+        for (auto i = a; i < b; ++i, ++n)
+            sum += std::pow (10.0, pedal.levelDb[i] / 10.0);
+        return n > 0 ? static_cast<float> (10.0 * std::log10 (std::max (1.0e-12, sum / n))) : -120.0f;
+    };
+
+    // The trend over a region: 50 ms at each end (a decay is negative).
+    auto trendOf = [&] (const PedalLoopRegion& r) {
+        const double edge = std::min (0.05 * sr, 0.25 * (r.endFrame - r.startFrame));
+        return std::clamp (levelOver (r.endFrame - edge, r.endFrame) - levelOver (r.startFrame, r.startFrame + edge), -24.0f, 24.0f);
+    };
+    // A source that sustains: its continuation's best loop is the first region.
+    if (continuation.canSustain && ! continuation.jumps.empty())
+    {
+        const int best = continuation.bestLoop >= 0 ? continuation.bestLoop : 0;
+        const auto& j = continuation.jumps[static_cast<std::size_t> (best)];
+        PedalLoopRegion r;
+        r.startFrame = j.toFrame;
+        r.endFrame = j.fromFrame + j.crossfadeFrames;
+        r.crossfadeFrames = j.crossfadeFrames;
+        r.correlation = j.correlation;
+        if (r.endFrame - r.startFrame > 0.08 * sr && r.endFrame <= static_cast<double> (frames))
+        {
+            r.levelDb = levelOver (r.startFrame, r.endFrame);
+            r.trendDb = trendOf (r);
+            pedal.regions.push_back (r);
+        }
+    }
+
+    // Short regions along the rest of the body (the whole body of a decaying source): a pedal
+    // pressed at any point finds one just ahead, close in level and timbre to the note.
+    const double minLen = 0.12 * sr;
+    const double after = pedal.regions.empty() ? bodyStart : std::max (bodyStart, pedal.regions.back().endFrame);
+    const double span = bodyEnd - after;
+    if (span >= minLen)
+    {
+        // 0.4 s, or a third of a short body (so a late pedal still finds one near).
+        const double target = std::clamp (std::min (0.4 * sr, span / 3.0), minLen, span);
+        const int room = PedalLoopModel::maxRegions - static_cast<int> (pedal.regions.size());
+        const int count = std::clamp (static_cast<int> (span / target), 1, std::max (1, room));
+        const double spacing = count > 1 ? (span - target) / (count - 1) : 0.0;
+        for (int k = 0; k < count && static_cast<int> (pedal.regions.size()) < PedalLoopModel::maxRegions; ++k)
+        {
+            const double start = after + k * spacing;
+            double end = start + target;
+            // A fast decay: shorter, so the jump never steps more than 6 dB.
+            while (end - start > minLen && pedal.levelAt (start) - pedal.levelAt (end - 0.01 * sr) > 6.0f)
+                end -= 0.02 * sr;
+            const double length = end - start;
+            const int xfade = static_cast<int> (std::clamp (std::min (crossfadeSecondsFor (analysis) * sr, 0.3 * length), 0.004 * sr, 0.08 * sr));
+            const auto from = static_cast<std::int64_t> (end) - xfade;
+            const auto [to, corr] = alignDestination (audio, from, static_cast<std::int64_t> (start), xfade, maxLag);
+            if (static_cast<double> (to) < bodyStart - maxLag || static_cast<double> (from - to) < 0.5 * minLen)
+                continue;
+            PedalLoopRegion r;
+            r.startFrame = static_cast<double> (to);
+            r.endFrame = end;
+            r.crossfadeFrames = xfade;
+            r.correlation = static_cast<float> (std::clamp (corr, 0.0, 1.0));
+            r.levelDb = levelOver (r.startFrame, r.endFrame);
+            r.trendDb = trendOf (r);
+            pedal.regions.push_back (r);
+        }
+    }
+    pedal.valid = ! pedal.regions.empty();
+    pedal.reason = pedal.valid ? (continuation.canSustain ? "continuation loop" : "body loops") : "no stable body to loop";
+    return pedal;
 }
 
 namespace
@@ -750,6 +867,14 @@ ContinuationModel refineContinuationForLayer (const ContinuationModel& base, con
         refine (j);
     for (auto& e : model.graftExits)
         refine (e);
+    // Pedal Loop: the same regions, each Forward jump re-aligned on this buffer.
+    for (auto& r : model.pedal.regions)
+    {
+        auto j = r.jump();
+        refine (j);
+        r.startFrame = j.toFrame;
+        r.correlation = j.correlation;
+    }
     return model;
 }
 

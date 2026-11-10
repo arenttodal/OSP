@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -33,6 +34,64 @@ enum class ContinuationStrategy
 
 const char* toString (ContinuationStrategy strategy) noexcept;
 bool parseContinuationStrategy (const std::string& text, ContinuationStrategy& out) noexcept;
+
+/**
+    Pedal Loop 1.0 (docs/research/pedal-loop): one place in the body of a recording where a One
+    Shot note may loop while the sustain pedal is down. Forward plays [start, end) and jumps from
+    `end - crossfadeFrames` back to `start` (the destination aligned on the waveform); Ping-Pong
+    turns at `end` and at `start`. Source frames; no audio is copied.
+*/
+struct PedalLoopRegion
+{
+    double startFrame = 0.0;
+    double endFrame = 0.0;
+    double crossfadeFrames = 0.0;   ///< Forward's jump crossfade
+    float correlation = 0.0f;       ///< of that jump's windows, 0..1
+    float levelDb = -120.0f;        ///< RMS over the region, dBFS (as recorded)
+    /** The region's level trend, end minus start (dB; a decay is negative). Forward compensates
+        it while looping, so a jump lands at the level the note had (no pulse each pass);
+        shorter fluctuations stay. */
+    float trendDb = 0.0f;
+
+    /** Forward's jump: leaves at end - crossfade, lands at start. */
+    ContinuationJump jump() const noexcept
+    {
+        ContinuationJump j;
+        j.fromFrame = endFrame - crossfadeFrames;
+        j.toFrame = startFrame;
+        j.crossfadeFrames = crossfadeFrames;
+        j.correlation = correlation;
+        j.score = correlation * correlation;
+        return j;
+    }
+};
+
+/**
+    Every Pedal Loop region of a source, built offline beside the continuation (immutable
+    afterwards). A source that sustains offers its continuation's best loop first; a decaying
+    one (a piano, a pluck) a few short regions along its decay, so a pedal pressed late loops
+    near where the note is. Invalid (`reason` says why): the note plays as it would without
+    the pedal loop.
+*/
+struct PedalLoopModel
+{
+    static constexpr int maxRegions = 8;
+    bool valid = false;
+    std::string reason = "not analysed";
+    std::vector<PedalLoopRegion> regions;   ///< by startFrame; ends increase
+    double soundEndFrame = 0.0;             ///< the last 10 ms within 30 dB of the loudest
+    double levelHopFrames = 0.0;            ///< `levelDb` spacing
+    std::vector<float> levelDb;             ///< the source's level (10 ms blocks), for late arming
+
+    /** The source's level (dBFS) around `frame` (-120 outside). */
+    float levelAt (double frame) const noexcept
+    {
+        if (levelHopFrames <= 0.0 || levelDb.empty() || frame < 0.0)
+            return -120.0f;
+        const auto i = static_cast<std::size_t> (frame / levelHopFrames);
+        return i < levelDb.size() ? levelDb[i] : -120.0f;
+    }
+};
 
 /**
     How a source continues after its recorded material runs out (spec §36–43).
@@ -69,6 +128,9 @@ struct ContinuationModel
     /** Movement measured in the stable region; drives subtle drift (strategy D, MOTION). */
     double levelFluctuationDb = 0.0;
     double pitchFluctuationCents = 0.0;
+
+    /** Pedal Loop 1.0: where a One Shot note may loop under the sustain pedal. */
+    PedalLoopModel pedal;
 
     bool hasJumps() const noexcept { return canSustain && backstop >= 0 && ! jumps.empty(); }
 };
