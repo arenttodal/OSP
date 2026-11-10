@@ -8121,3 +8121,4 @@ TEST_CASE ("plugin: full-range modulation - 100 % reaches the knob's end; older 
 #include "CaptureTests.inc"
 #include "ModeSelectorTests.inc"
 #include "PolyLabTests.inc"
+#include "PedalLoopPluginTests.inc"

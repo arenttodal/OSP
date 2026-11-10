@@ -403,6 +403,18 @@ public:
     /** The menu as it looks open, as a plain component (its background, border and the same
         items), for screenshots where no menu window can open (headless). */
     std::unique_ptr<juce::Component> createMenuPicture();
+    /** PEDAL LOOP (ANDOR OSP): the layer's choice parameter, a section of this menu under the
+        modes (NORMAL, FORWARD, PING-PONG, each with its line, a check by the active one). It
+        applies to One Shot: in Granular it shows inactive and keeps its choice. `note`: a muted
+        line when the recording has no loop to offer (empty: none). Without it, the menu is as before. */
+    void setPedalLoop (juce::RangedAudioParameter& parameter, std::function<juce::String()> note);
+    bool hasPedalLoop() const noexcept { return pedalAttachment != nullptr; }
+    int pedalLoopMode() const noexcept { return pedalCurrent; }
+    static juce::String pedalLoopName (int m) { return m == 2 ? "Ping-Pong" : (m == 1 ? "Forward" : "Normal"); }
+    static juce::String pedalLoopDescription (int m)
+    {
+        return m == 2 ? "Hold a forward/reverse loop" : (m == 1 ? "Hold a forward loop" : "Standard sustain pedal");
+    }
     /** A mode's name and what it does, as the menu says them. */
     juce::String modeName (int mode) const { return mode == 1 ? juce::String ("Granular") : firstModeName; }
     static juce::String modeDescription (int mode) { return mode == 1 ? "Resynthesize as a grain cloud" : "Play the original recording"; }
@@ -429,6 +441,9 @@ private:
     juce::String namedTooltip;
     bool fitted = false;
     juce::ParameterAttachment attachment;
+    std::unique_ptr<juce::ParameterAttachment> pedalAttachment;
+    int pedalCurrent = 0;
+    std::function<juce::String()> pedalNote;
 };
 
 /**
@@ -571,6 +586,8 @@ public:
 
 private:
     void updateMode();
+    /** PEDAL LOOP's muted line: whether this layer's recording(s) can loop (empty: they can). */
+    juce::String pedalLoopNote() const;
     bool granularShown = false;
 
     InstrumentHost& processor;

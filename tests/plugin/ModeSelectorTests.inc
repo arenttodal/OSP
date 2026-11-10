@@ -47,7 +47,7 @@ TEST_CASE ("plugin mode selector: the symbol key, its menu, choosing, undo, auto
     };
     {
         const auto menu = items (selector->createMenu());
-        REQUIRE (menu.size() == 2);
+        REQUIRE (menu.size() == 7);   // the modes, then PEDAL LOOP's section (PedalLoopPluginTests.inc)
         CHECK (menu[0].text == "One Shot");
         CHECK (menu[1].text == "Granular");
         CHECK (menu[0].isTicked);

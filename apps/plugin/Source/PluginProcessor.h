@@ -800,6 +800,8 @@ private:
         std::array<std::atomic<float>*, 3> grainOptions {};   ///< SCATTER, PAN, WINDOW (hint 20)
         std::atomic<float>* keyDnaAmount = nullptr;
         std::atomic<float>* synthesize = nullptr;   ///< SYNTHESIZE 0..100 % (hint 22)
+        std::atomic<float>* pedalLoop = nullptr;    ///< PEDAL LOOP: 0 Normal, 1 Forward, 2 Ping-Pong (hint 29)
+        float lastPedalLoop = -1.0f;
         std::array<std::atomic<float>*, 6> synth {};   ///< the SYNTH page (hint 23), synthParameterNames() order
         std::array<std::atomic<float>*, 3> imprint {};   ///< its spectral imprint (hint 28), imprintParameterNames() order
     };

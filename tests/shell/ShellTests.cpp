@@ -249,6 +249,9 @@ TEST_CASE ("shell: the parameter schema is ANDOR OSP's, unchanged; the product's
     auto ospOnly = [] (const juce::String& line) {
         if (line.startsWith ("arp.link ") || line.startsWith ("arp.card"))
             return true;
+        // ANDOR OSP's PEDAL LOOP (layerA.pedalLoop ..): its One Shot cards' sustain-pedal loop.
+        if (line.startsWith ("layer") && line.upToFirstOccurrenceOf (" ", false, false).endsWith (".pedalLoop"))
+            return true;
         for (const auto& name : osp::plugin::InstrumentHost::imprintParameterNames())
             if (line.startsWith ("layer") && line.upToFirstOccurrenceOf (" ", false, false).endsWith (".synth." + name))
                 return true;

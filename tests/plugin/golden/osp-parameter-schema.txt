@@ -432,3 +432,6 @@ layerB.synth.motion v28 float "Layer B Synth Motion" label="%" range=0.0000..100
 layerC.synth.mode v28 choice "Layer C Synth Mode" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=Analog|Analog|Imprint [Analog|Imprint]
 layerC.synth.imprint v28 float "Layer C Synth Imprint" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0 %|50 %|100 %
 layerC.synth.motion v28 float "Layer C Synth Motion" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0 %|50 %|100 %
+layerA.pedalLoop v29 choice "Layer A Pedal Loop" label="" range=0.0000..2.0000/1.0000 skew=1.00000 default=0.0000 steps=3 texts=Normal|Forward|Ping-Pong [Normal|Forward|Ping-Pong]
+layerB.pedalLoop v29 choice "Layer B Pedal Loop" label="" range=0.0000..2.0000/1.0000 skew=1.00000 default=0.0000 steps=3 texts=Normal|Forward|Ping-Pong [Normal|Forward|Ping-Pong]
+layerC.pedalLoop v29 choice "Layer C Pedal Loop" label="" range=0.0000..2.0000/1.0000 skew=1.00000 default=0.0000 steps=3 texts=Normal|Forward|Ping-Pong [Normal|Forward|Ping-Pong]

@@ -104,6 +104,11 @@ public:
     static void applyImprintSettings (synth::Settings& s, const std::array<float, 3>& raw) noexcept;
     /** Appends them (ANDOR OSP's layout, after its per-card arpeggiator: nothing before moves). */
     static void addImprintParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout);
+    /** PEDAL LOOP (Pedal Loop 1.0, version hint 29): "layerA.pedalLoop" .. C, a choice of Normal,
+        Forward, Ping-Pong; Normal by default, so every session from before keeps its pedal.
+        Appended after the imprint's (ANDOR OSP's layout; nothing before moves). */
+    static void addPedalLoopParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout);
+    static juce::String pedalLoopParameterId (int layer);
     /** DAMPEN's parameters in their order: enabled, mode, amount, frequency, cutoff. */
     static const juce::StringArray& dampenParameterNames();
     static const juce::StringArray& eqParameterNames();   ///< enabled, hp.enabled, hp.frequency, ... in order
