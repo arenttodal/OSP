@@ -474,6 +474,8 @@ TEST_CASE ("shell: presets and sessions save and reload; another product's state
         p.setParameterValue ("attack", 120.0f);
         REQUIRE (p.assignModulation (osp::mod::Source::lfo1, osp::mod::Dest::levelA, 40.0f).slot >= 0);
         preset = p.presetFolder().getChildFile ("Soft Pluck");
+        // (Documents is the real one: a file an earlier run left would already be listed)
+        preset.withFileExtension (andor::shell::productInfo().presetExtension).deleteFile();
         const auto factory = p.presetList().size();   // a product's factory presets, if it has any
         REQUIRE (p.savePreset (preset));
         preset = preset.withFileExtension (andor::shell::productInfo().presetExtension);
@@ -520,6 +522,7 @@ TEST_CASE ("shell: presets and sessions save and reload; another product's state
         s.setStateInformation (foreign.getData(), static_cast<int> (foreign.getSize()));
         CHECK (s.parameterValue ("attack") == Approx (33.0f).margin (0.5f));
     }
+    preset.deleteFile();   // (the musician's folder as it was)
 }
 
 TEST_CASE ("shell: the interface binds what the engine reads and disables the rest", "[shell][editor]")
