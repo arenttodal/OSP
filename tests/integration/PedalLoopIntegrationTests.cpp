@@ -8,6 +8,7 @@
 #include "engine/InstrumentBuilder.h"
 #include "engine/InstrumentEngine.h"
 #include "research/AtlasFixtures.h"
+#include "support/AllocationCounter.h"
 #include "support/TestHelpers.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -142,4 +143,46 @@ TEST_CASE ("pedal loop: with SYNTH (Imprint) the oscillator carries on through t
     engine.setSustainPedal (false);
     run (engine, 1.5);
     CHECK (engine.activeVoiceCount() == 0);
+}
+
+TEST_CASE ("pedal loop: no heap allocation while notes loop, turn, arm late, leave and the pedal is pumped", "[integration][pedal-loop][realtime]")
+{
+    auto audio = testsignals::pluck (220.0, 2.0, rate, 5, 0.7);
+    testsignals::applyFades (audio, 0.0, 0.8);
+    const auto model = instrument::buildComplete (audio, test::analyse (audio), {}, false);
+    for (const auto mode : { PedalLoopMode::forward, PedalLoopMode::pingPong })
+    {
+        EngineSettings s;
+        s.layer[0].pedalLoop = mode;
+        InstrumentEngine engine;
+        engine.prepare (rate, 64, s);   // (allocates: before the scope)
+        engine.setModel (model.get(), 0);
+        std::vector<float> l (64), r (64);
+        float* ch[2] = { l.data(), r.data() };
+        int allocations = -1;
+        {
+            test::AllocationScope scope;
+            engine.setSustainPedal (true);
+            for (const int n : { 57, 60, 64 })
+                engine.noteOn (n, 100);
+            bool down = true;
+            for (int b = 0; b < static_cast<int> (6.0 * rate / 64); ++b)
+            {
+                if (b == static_cast<int> (0.5 * rate / 64))
+                    for (const int n : { 57, 60, 64 })
+                        engine.noteOff (n);
+                if (b > static_cast<int> (3.0 * rate / 64) && b % 7 == 0)
+                    engine.setSustainPedal (down = ! down);
+                if (b == static_cast<int> (1.9 * rate / 64))
+                    engine.noteOn (69, 90);   // a note whose pedal comes late (pumped below)
+                engine.render (ch, 2, 64);
+            }
+            engine.setSustainPedal (false);
+            engine.allNotesOff();
+            engine.render (ch, 2, 64);
+            allocations = scope.count();
+        }
+        INFO ("mode " << static_cast<int> (mode));
+        CHECK (allocations == 0);
+    }
 }
