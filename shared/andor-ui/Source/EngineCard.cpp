@@ -1498,8 +1498,9 @@ namespace
     class ModeMenuItem final : public juce::PopupMenu::CustomComponent
     {
     public:
-        ModeMenuItem (int m, juce::String n, juce::String d, bool active)
-            : juce::PopupMenu::CustomComponent (true), mode (m), name (std::move (n)), description (std::move (d)), ticked (active)
+        /** `m`: 0 One Shot, 1 Granular (their symbols), -1 a setting without one (PEDAL LOOP). */
+        ModeMenuItem (int m, juce::String n, juce::String d, bool active, bool enabled = true)
+            : juce::PopupMenu::CustomComponent (true), mode (m), name (std::move (n)), description (std::move (d)), ticked (active), live (enabled)
         {
             setTitle (name);
             setDescription (description);
@@ -1519,18 +1520,19 @@ namespace
                 g.setColour (findColour (juce::PopupMenu::highlightedBackgroundColourId));
                 g.fillRoundedRectangle (r.reduced (3.0f, 1.0f), 4.0f);
             }
-            const auto ink = findColour (juce::PopupMenu::textColourId);
+            // (Inactive: the same item, quieter - PEDAL LOOP while Granular plays.)
+            const auto ink = findColour (juce::PopupMenu::textColourId).withMultipliedAlpha (live ? 1.0f : 0.45f);
             const auto icon = juce::Rectangle<float> (14.0f, r.getCentreY() - 8.0f, 16.0f, 16.0f);
             if (mode == 1)
                 icons::drawGranularIcon (g, icon, ink.withAlpha (0.88f));
-            else
+            else if (mode == 0)
                 icons::drawOneShotIcon (g, icon, ink.withAlpha (0.88f));
             auto text = r.withTrimmedLeft (42.0f).withTrimmedRight (34.0f);
             const float top = r.getCentreY() - 15.0f;
             g.setColour (ink);
             g.setFont (getLookAndFeel().getPopupMenuFont());
             g.drawText (name, text.withY (top).withHeight (17.0f), juce::Justification::centredLeft, true);
-            g.setColour (findColour (juce::PopupMenu::headerTextColourId));
+            g.setColour (findColour (juce::PopupMenu::headerTextColourId).withMultipliedAlpha (live ? 1.0f : 0.45f));
             g.setFont (fonts::make (11.5f, fonts::Weight::regular));
             g.drawText (description, text.withY (top + 17.0f).withHeight (14.0f), juce::Justification::centredLeft, true);
             if (ticked)
@@ -1549,7 +1551,7 @@ namespace
     private:
         int mode;
         juce::String name, description;
-        bool ticked;
+        bool ticked, live;
     };
 }
 
@@ -1654,7 +1656,36 @@ juce::PopupMenu ModeSelector::createMenu()
         else
             menu.addItem (modeName (m), true, current == m, pick);
     }
+    if (pedalAttachment != nullptr)
+    {
+        // PEDAL LOOP: what the sustain pedal does to One Shot notes; inactive (choice kept) in Granular.
+        const bool oneShot = current == 0;
+        menu.addSeparator();
+        menu.addSectionHeader ("PEDAL LOOP");
+        for (int m = 0; m < 3; ++m)
+        {
+            juce::PopupMenu::Item item (pedalLoopName (m));
+            item.itemID = 11 + m;
+            item.isTicked = pedalCurrent == m;
+            item.isEnabled = oneShot;
+            item.customComponent = new ModeMenuItem (-1, pedalLoopName (m), pedalLoopDescription (m), pedalCurrent == m, oneShot);
+            item.action = [safe, m] {
+                if (safe != nullptr && safe->pedalAttachment != nullptr && m != safe->pedalCurrent)
+                    safe->pedalAttachment->setValueAsCompleteGesture (static_cast<float> (m));
+            };
+            menu.addItem (std::move (item));
+        }
+        if (const auto note = pedalNote != nullptr ? pedalNote() : juce::String(); oneShot && note.isNotEmpty())
+            menu.addItem (juce::PopupMenu::Item (note).setEnabled (false));
+    }
     return menu;
+}
+
+void ModeSelector::setPedalLoop (juce::RangedAudioParameter& p, std::function<juce::String()> note)
+{
+    pedalNote = std::move (note);
+    pedalAttachment = std::make_unique<juce::ParameterAttachment> (p, [this] (float v) { pedalCurrent = std::clamp (static_cast<int> (std::lround (v)), 0, 2); });
+    pedalAttachment->sendInitialUpdate();
 }
 
 void ModeSelector::showMenu (juce::Component* parent)
@@ -1688,6 +1719,44 @@ std::unique_ptr<juce::Component> ModeSelector::createMenuPicture()
         picture->addAndMakeVisible (item);
         y += h;
         width = std::max (width, w);
+    }
+    if (pedalAttachment != nullptr)
+    {
+        // PEDAL LOOP's section as the menu draws it: a separator, its header, the three choices.
+        class Drawn final : public juce::Component
+        {
+        public:
+            Drawn (bool sep, juce::String t) : separator (sep), text (std::move (t)) {}
+            void paint (juce::Graphics& g) override
+            {
+                if (separator)
+                    getLookAndFeel().drawPopupMenuItem (g, getLocalBounds(), true, true, false, false, false, {}, {}, nullptr, nullptr);
+                else
+                    getLookAndFeel().drawPopupMenuSectionHeader (g, getLocalBounds(), text);
+            }
+            bool separator;
+            juce::String text;
+        };
+        const bool oneShot = current == 0;
+        for (const bool separator : { true, false })
+        {
+            auto* d = new Drawn (separator, "PEDAL LOOP");
+            picture->items.add (d);
+            const int h = separator ? 8 : 24;
+            d->setBounds (border, y, width, h);
+            picture->addAndMakeVisible (d);
+            y += h;
+        }
+        for (int m = 0; m < 3; ++m)
+        {
+            auto* item = new ModeMenuItem (-1, pedalLoopName (m), pedalLoopDescription (m), pedalCurrent == m, oneShot);
+            picture->items.add (item);
+            int w = 0, h = 0;
+            item->getIdealSize (w, h);
+            item->setBounds (border, y, width, h);
+            picture->addAndMakeVisible (item);
+            y += h;
+        }
     }
     picture->setSize (width + 2 * border, y + border);
     picture->setInterceptsMouseClicks (false, false);
@@ -1804,6 +1873,29 @@ void EngineCard::MenuDots::paintButton (juce::Graphics& g, bool highlighted, boo
         g.fillEllipse (juce::Rectangle<float> (d, d).withCentre (r.getCentre().translated (0.0f, static_cast<float> (i) * gap)));
 }
 
+juce::String EngineCard::pedalLoopNote() const
+{
+    const auto loaded = processor.currentInstrument (layerIndex);
+    if (loaded == nullptr)
+        return {};
+    auto usable = [] (const std::shared_ptr<const InstrumentModel>& m) {
+        // (Before its continuation is analysed a recording has no loop yet: no message.)
+        return m == nullptr || m->stage < InstrumentModel::Stage::continued || m->original.continuation.pedal.valid;
+    };
+    if (loaded->set != nullptr && ! loaded->set->members.empty())
+    {
+        int without = 0;
+        for (const auto& member : loaded->set->members)
+            without += usable (member.model) ? 0 : 1;
+        const int all = static_cast<int> (loaded->set->members.size());
+        if (without == 0)
+            return {};
+        return without == all ? juce::String ("No suitable loop found for these recordings")
+                              : "No suitable loop for " + juce::String (without) + " of " + juce::String (all) + " recordings";
+    }
+    return usable (loaded->model) ? juce::String() : juce::String ("No suitable loop found for this recording");
+}
+
 EngineCard::EngineCard (InstrumentHost& p, int layer)
     : processor (p), layerIndex (layer), muteButton (p, layer, false), soloButton (p, layer, true)
 {
@@ -1818,6 +1910,9 @@ EngineCard::EngineCard (InstrumentHost& p, int layer)
         mode->setNamedTooltip ("Layer " + InstrumentHost::layerName (layer) + ": play the recording through, or as a cloud of grains");
         mode->onChange = [this] (int) { updateMode(); };
         addAndMakeVisible (*mode);
+        // PEDAL LOOP (ANDOR OSP): a section of the mode's menu; nothing on the card itself.
+        if (auto* pedal = processor.apvts().getParameter (InstrumentHost::pedalLoopParameterId (layer)))
+            mode->setPedalLoop (*pedal, [this] { return pedalLoopNote(); });
     }
     eqButton.onClick = [this] {
         if (onEqToggle != nullptr)

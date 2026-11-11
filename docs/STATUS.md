@@ -1199,6 +1199,30 @@ the case for website-first over an in-app store: `docs/release/SOUND_PACKS_SPEC.
 - [ ] Drop or double-click a `.osppack` to install it (phase 1, small).
 - [ ] "More sounds" catalogue from the website's `packs.json` (phase 2).
 
+## ANDOR OSP: Pedal Loop 1.0 (10 Nov 2026; merged with the shared FX into the default line 11 Nov 2026)
+
+Merged at the user's request: the parameters now follow the FX library's (version hint 31,
+was 29), the default sound stays byte-identical (the 55 research-renderer references), and
+every suite is green with both features.
+
+
+The sustain pedal can hold a One Shot note in a loop: per layer **PEDAL LOOP** Normal / Forward /
+Ping-Pong (`layerA..C.pedalLoop`, version hint 31, Normal by default). Reports and measurements:
+`docs/research/pedal-loop/` (00-audit .. 07-release-review).
+
+- [x] Loop regions analysed offline beside the continuation (`ContinuationModel::pedal`): a
+      sustaining source's best loop first; up to 8 short regions along a decaying source's body;
+      levels and trend for late arming and Forward's trend compensation.
+- [x] Per-voice state (off / armed / looping) on the continuation's crossfade machinery: Forward
+      jumps; Ping-Pong turns with an 8 ms mirror crossfade, linear gains (chosen by measurement
+      over reflection, 4 / 15 ms and equal power); late arming matched in level; exits that read on
+      into the recording; the latest pedal state wins. Normal: nothing new runs.
+- [x] Host parameters, sessions (older ones open on Normal), the mode menu's PEDAL LOOP section
+      (no control on the card), the "No suitable loop" line.
+- [x] Tests `[pedal-loop]` (unit, integration, plugin); `research-renderer --pedal-loop-lab`
+      (212 renders: stand-ins and two recordings, all finite).
+- [ ] Owner listening with real recordings (piano, nyckelharpa, vocal, a chord): 06-listening.md.
+
 ## BLOCKERS
 
 - DAW testing (Logic, Ableton, Reaper) needs a Mac; CI covers build, tests and auval.

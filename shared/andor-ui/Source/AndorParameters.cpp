@@ -102,6 +102,18 @@ void InstrumentHost::addImprintParameters (juce::AudioProcessorValueTreeState::P
     }
 }
 
+juce::String InstrumentHost::pedalLoopParameterId (int layer)
+{
+    return layerParameterId (layer, "pedalLoop");
+}
+
+void InstrumentHost::addPedalLoopParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout)
+{
+    for (int layer = 0; layer < numLayers; ++layer)
+        layout.add (parameters::make<juce::AudioParameterChoice> (juce::ParameterID { pedalLoopParameterId (layer), 31 }, "Layer " + layerName (layer) + " Pedal Loop",
+                                                                  juce::StringArray { "Normal", "Forward", "Ping-Pong" }, 0));
+}
+
 void InstrumentHost::addCardArpParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, const juce::String& ns)
 {
     auto id = [] (const juce::String& s) { return juce::ParameterID { s, 27 }; };

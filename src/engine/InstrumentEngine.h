@@ -79,6 +79,9 @@ struct LayerSettings
     double synthesize = 0.0;
     /** The SYNTH page (Phase S2): wave, octave, detune, tone, shape, pitch. Defaults: S1. */
     synth::Settings synth;
+    /** PEDAL LOOP (One Shot): what the sustain pedal does to this layer's notes. Normal: the
+        pedal as it always was. A new mode applies to notes started afterwards. */
+    PedalLoopMode pedalLoop = PedalLoopMode::normal;
 };
 
 /**
@@ -162,6 +165,12 @@ struct EngineSettings
         the plugin uses the defaults). Apply to notes started afterwards. */
     synth::Blend synthBlend = synth::Blend::hybrid;
     synth::Envelope synthEnvelope = synth::Envelope::gate;
+    /** PEDAL LOOP's Ping-Pong turnaround (internal; chosen by measurement, docs/research/
+        pedal-loop/02-pingpong.md): a mirror crossfade this long (0: a plain reflection), and the
+        correlation its gains assume (1: linear gains - both streams read the same sample at the
+        crossfade's middle, so linear keeps the level with no dip). */
+    double pedalTurnSeconds = 0.008;
+    float pedalTurnCorrelation = 1.0f;
 };
 
 /**

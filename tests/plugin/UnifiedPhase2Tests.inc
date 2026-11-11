@@ -158,7 +158,7 @@ TEST_CASE ("plugin: Phase 2's parameters are appended and neutral; the modulatio
     // Only the routes' second destinations (version 21, MIX modulation), each layer's
     // SYNTHESIZE (version 22), its SYNTH page and SPACE's ABYSS (version 23) and SPACE's VINTAGE
     // and BLOOM (version 24), ABYSS's variant (25), ECHO's ASCEND (26), the per-card
-    // arpeggiator (27) and each layer's spectral imprint (28) come after them.
+    // arpeggiator (27), each layer's spectral imprint (28) and its PEDAL LOOP (29) come after them.
     juce::StringArray expected;
     for (int l = 0; l < 3; ++l)
         for (const char* n : { "granular.scatter", "granular.pan", "granular.window", "keyDna.amount" })
@@ -186,6 +186,8 @@ TEST_CASE ("plugin: Phase 2's parameters are appended and neutral; the modulatio
         for (int slot = 0; slot < osp::fx::capacity[static_cast<std::size_t> (t)]; ++slot)
             for (const auto& spec : osp::plugin::fxparams::specsOf (static_cast<osp::fx::Type> (t)))
                 expected.add (osp::plugin::fxparams::idOf ({}, { static_cast<osp::fx::Type> (t), slot }, spec.name));
+    for (int l = 0; l < 3; ++l)   // (version 31: PEDAL LOOP)
+        expected.add (osp::plugin::InstrumentHost::pedalLoopParameterId (l));
     REQUIRE (all.size() > expected.size());
     for (int i = 0; i < expected.size(); ++i)
     {

@@ -8125,3 +8125,4 @@ TEST_CASE ("plugin: full-range modulation - 100 % reaches the knob's end; older 
 #include "PolyLabTests.inc"
 #include "FxSharedTests.inc"
 #include "FxOspTests.inc"
+#include "PedalLoopPluginTests.inc"

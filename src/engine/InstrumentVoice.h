@@ -27,6 +27,15 @@
 namespace osp
 {
 
+/** PEDAL LOOP (Pedal Loop 1.0, docs/research/pedal-loop): what the sustain pedal does to a
+    One Shot note. Saved as a choice index: append only. */
+enum class PedalLoopMode
+{
+    normal,    ///< the sustain pedal as it always was
+    forward,   ///< the pedal holds the note in a forward loop
+    pingPong   ///< the pedal holds the note in a forward/reverse loop
+};
+
 struct InstrumentVoiceStart
 {
     const InstrumentModel* model = nullptr;
@@ -71,6 +80,12 @@ struct InstrumentVoiceStart
     /** SPEED: how fast the note moves through its recording, pitch kept (1: as recorded,
         the plain read; 0.3..2). Not in Granular or REIMAGINED modes. */
     double speed = 1.0;
+    /** PEDAL LOOP of the layer as the note starts (kept for the note's life). */
+    PedalLoopMode pedalLoop = PedalLoopMode::normal;
+    /** Ping-Pong's turnaround: a mirror crossfade this long (seconds of source; 0: a plain
+        reflection), and the correlation its gains assume. */
+    double pedalTurnSeconds = 0.008;
+    float pedalTurnCorrelation = 1.0f;
 };
 
 /**
@@ -96,6 +111,10 @@ public:
     /** Mono glide into a fresh note: it starts at `fromNote`'s pitch and slides to its own. */
     void glideFrom (int fromNote, double seconds) noexcept;
     void release() noexcept;
+    /** PEDAL LOOP: the sustain pedal went down or up while this note's key is held (or the
+        note started under it). Normal mode: nothing. The latest call wins; a transition
+        already crossfading finishes first. */
+    void setPedal (bool down) noexcept;
     void beginFastFade (int fadeSamples) noexcept;
     void kill() noexcept;
 
@@ -193,6 +212,15 @@ public:
     const InstrumentModel* model() const noexcept { return currentModel; }
     float currentLevel() const noexcept { return envelope.level() * baseGain * fadeGain; }
 
+    /** PEDAL LOOP diagnostics (tests, the lab): the mode this note plays with (Normal when
+        the note cannot loop), whether it loops now, its read direction and region. */
+    PedalLoopMode pedalLoopMode() const noexcept { return pedalMode; }
+    bool pedalLooping() const noexcept { return pedalState == PedalState::looping; }
+    bool pedalArmed() const noexcept { return pedalState != PedalState::off; }
+    double readDirection() const noexcept { return direction * ppDir; }
+    double readHead() const noexcept { return position; }
+    int pedalRegionIndex() const noexcept { return pedalState != PedalState::off ? pedalRegion : -1; }
+    float pedalGain() const noexcept { return loopGain; }
     /** Diagnostics for tests: how many continuation jumps / grafts this note made. */
     int jumpCount() const noexcept { return jumpsTaken; }
     bool hasGrafted() const noexcept { return grafted; }
@@ -260,6 +288,38 @@ private:
     bool holdForTail = false;
     int jumpsTaken = 0;
     Prng rng;
+
+    // PEDAL LOOP (Pedal Loop 1.0). One compact state per voice; the loop rides the
+    // continuation's crossfade machinery (pending / beginCrossfade). Normal: all idle, the
+    // read exactly as before (ppDir and xDir stay 1).
+    enum class PedalState : std::uint8_t { off, armed, looping };
+    PedalLoopMode pedalMode = PedalLoopMode::normal;
+    PedalState pedalState = PedalState::off;
+    bool pedalWanted = false;         ///< the latest pedal state for this note
+    int pedalRegion = -1;
+    double ppDir = 1.0;               ///< read direction multiplier (-1: Ping-Pong reading back)
+    double xDir = 1.0;                ///< the incoming crossfade stream's (ppDir takes it at the end)
+    double pendingXDir = 1.0;
+    bool pendingIsPedal = false, xIsPedal = false;
+    bool xEndsLoop = false;           ///< this pedal crossfade leaves the loop
+    float loopGain = 1.0f;            ///< a late pedal's level match on the looped audio (1: none)
+    float trendOut = 1.0f, trendIn = 1.0f;   ///< Forward's trend compensation at the read / the incoming read
+    float trendGainAt (double pos) const noexcept;
+    float xInGain = 1.0f, pendingInGain = 1.0f;
+    double lateResume = -1.0;         ///< where a late-armed loop gives the read back
+    double pedalTurnFrames = 0.0;     ///< Ping-Pong's turnaround crossfade (source frames; 0: reflect)
+    float pedalTurnCorrelation = 1.0f;
+    void pedalUpdate() noexcept;      ///< brings the state to pedalWanted (not while crossfading)
+    void pedalArm() noexcept;
+    void pedalDisarm() noexcept;
+    bool schedulePedal() noexcept;    ///< the loop's next turn or jump (true: pedal owns the read)
+    void startPedalCrossfade (double from, double to, double frames, float correlation, double incomingDir, float inGain, bool endsLoop) noexcept;
+    void finishPedalCrossfade() noexcept;
+    void reflectPedal() noexcept;     ///< Ping-Pong without a turnaround crossfade
+    double pedalTurnFor (const PedalLoopRegion& r) const noexcept
+    {
+        return std::min (pedalTurnFrames, 0.25 * (r.endFrame - r.startFrame));
+    }
 
     // Shape
     NoteShape shape;

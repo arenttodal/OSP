@@ -94,6 +94,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
     // (version hint 30), appended after everything above. Inaudible until a CUSTOM route plays
     // them (every session and preset from before keeps CLASSIC, the original chain).
     fxparams::addTo (layout, {}, 30, 30);
+    // PEDAL LOOP (Pedal Loop 1.0, version hint 31; after the FX library's): Normal by default, the pedal as it was.
+    addPedalLoopParameters (layout);
     return layout;
 }
 
@@ -352,6 +354,7 @@ OspAudioProcessor::OspAudioProcessor()
                             parameters.getRawParameterValue (layerParameterId (layer, "granular.window")) };
         lp.keyDnaAmount = parameters.getRawParameterValue (layerParameterId (layer, "keyDna.amount"));
         lp.synthesize = parameters.getRawParameterValue (layerParameterId (layer, "synthesize"));
+        lp.pedalLoop = parameters.getRawParameterValue (pedalLoopParameterId (layer));
         for (int i = 0; i < synthParameterNames().size(); ++i)
             lp.synth[static_cast<std::size_t> (i)] = parameters.getRawParameterValue (synthParameterId (layer, synthParameterNames()[i]));
         for (int i = 0; i < imprintParameterNames().size(); ++i)
@@ -638,9 +641,11 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
         std::array<float, 15> modes {};
         for (std::size_t i = 0; i < modes.size(); ++i)
             modes[i] = lp.modes[i]->load();
+        const float pedalLoop = lp.pedalLoop != nullptr ? lp.pedalLoop->load() : 0.0f;
         if (force || controls != lp.lastControls || ! juce::exactlyEqual (ownReimagined, lp.lastReimagined) || modes != lp.lastModes
-            || audible != lp.lastAudible)
+            || audible != lp.lastAudible || ! juce::exactlyEqual (pedalLoop, lp.lastPedalLoop))
         {
+            lp.lastPedalLoop = pedalLoop;
             lp.lastControls = controls;
             lp.lastAudible = audible;
             lp.lastReimagined = ownReimagined;
@@ -653,6 +658,7 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
             ls.reverse = controls[5] >= 0.5f;
             ls.loop = controls[6] >= 0.5f;
             ls.follow = controls[7] >= 0.5f;
+            ls.pedalLoop = static_cast<PedalLoopMode> (std::clamp (static_cast<int> (std::lround (pedalLoop)), 0, 2));
             ls.audible = audible;
             ls.eq = lp.eqSettings;
             ls.reimagined = ownReimagined < 0.0f ? -1.0 : 0.01 * ownReimagined;   // A follows the instrument's amount

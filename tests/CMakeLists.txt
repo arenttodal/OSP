@@ -24,6 +24,7 @@ add_executable(osp_tests
     unit/CharacterFilterTests.cpp
     unit/PerformanceTests.cpp
     unit/DynamicsTests.cpp
+    unit/PedalLoopTests.cpp
     unit/AbyssReverbTests.cpp
     unit/VintageBloomTests.cpp
     unit/EchoAscendTests.cpp
@@ -58,6 +59,7 @@ add_executable(osp_tests
     integration/GrainPhase2Tests.cpp
     integration/AtlasSetTests.cpp
     integration/AtlasShortSustainTests.cpp
+    integration/PedalLoopIntegrationTests.cpp
     integration/AtlasStagedTests.cpp
     integration/GrainBudgetStressTests.cpp
     integration/EngineSlotTests.cpp

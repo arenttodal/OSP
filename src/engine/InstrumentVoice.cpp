@@ -163,6 +163,15 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     fadeStep = 0.0f;
     hasPending = false;
     crossfading = false;
+    pedalMode = PedalLoopMode::normal;   // (eligibility at the end of start)
+    pedalState = PedalState::off;
+    pedalWanted = false;
+    pedalRegion = -1;
+    ppDir = xDir = pendingXDir = 1.0;
+    pendingIsPedal = xIsPedal = xEndsLoop = false;
+    loopGain = xInGain = pendingInGain = 1.0f;
+    trendOut = trendIn = 1.0f;
+    lateResume = -1.0;
     graftPending = false;
     grafted = false;
     holdForTail = false;
@@ -358,6 +367,18 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     scheduleNextJump();
     startModeEngine (params);
     startStretch (params.note);   // (after the mode engine: a REIMAGINED mode keeps its own read)
+    // PEDAL LOOP: One Shot notes read forward through the voice's own path, on a recording with
+    // a loop region. FORWARD where the layer's LOOP already holds the note changes nothing (the
+    // continuation walk is the better forward loop); Ping-Pong under SPEED plays as Forward.
+    pedalMode = params.pedalLoop;
+    if (granularMode || modeEngine != nullptr || direction < 0.0 || ! cont->pedal.valid)
+        pedalMode = PedalLoopMode::normal;
+    if (pedalMode == PedalLoopMode::pingPong && stretching)
+        pedalMode = PedalLoopMode::forward;
+    if (pedalMode == PedalLoopMode::forward && strategy != ContinuationStrategy::off)
+        pedalMode = PedalLoopMode::normal;
+    pedalTurnFrames = std::max (0.0, params.pedalTurnSeconds) * src.sampleRate();
+    pedalTurnCorrelation = std::clamp (params.pedalTurnCorrelation, 0.0f, 1.0f);
     if (granularMode)
     {
         if (modeEngine != nullptr)
@@ -400,6 +421,17 @@ void InstrumentVoice::release() noexcept
         // No new grains; the playing ones finish under the release envelope.
         granularSource.stopSpawning();
         doubleSource.stopSpawning();
+        envelope.noteOff();
+        return;
+    }
+
+    // PEDAL LOOP: the loop stops (forward on into the recording) and the envelope releases;
+    // no graft (the note ends where it is, not in another part of the recording).
+    if (pedalState != PedalState::off)
+    {
+        pedalWanted = false;
+        if (! crossfading)
+            pedalDisarm();
         envelope.noteOff();
         return;
     }
@@ -489,6 +521,8 @@ void InstrumentVoice::kill() noexcept
     fadeGain = 1.0f;
     crossfading = false;
     hasPending = false;
+    pedalState = PedalState::off;
+    pedalWanted = false;
     envelope.reset();
 }
 
@@ -497,11 +531,17 @@ void InstrumentVoice::scheduleNextJump() noexcept
     hasPending = false;
     pendingIndex = -1;
     pendingIsGraft = false;
+    // (A jump of the walk or a graft is never the pedal loop's: schedulePedal sets these again.)
+    pendingIsPedal = false;
+    pendingXDir = 1.0;
+    pendingInGain = 1.0f;
     if (graftPending)
     {
         scheduleGraft();
         return;
     }
+    if (pedalState != PedalState::off && schedulePedal())
+        return;
     if (strategy == ContinuationStrategy::off || grafted)
         return;
 
@@ -629,7 +669,24 @@ void InstrumentVoice::beginCrossfade() noexcept
 {
     crossfading = true;
     xIsGraft = pendingIsGraft;
-    xPosition = pending.toFrame + (position - pending.fromFrame);
+    xIsPedal = pendingIsPedal;
+    if (xIsPedal)
+    {
+        // The incoming stream may read the other way (a Ping-Pong turnaround): it starts as far
+        // past its landing point, in its own direction, as the read is past the leaving point.
+        xDir = pendingXDir;
+        xInGain = pendingInGain;
+        xPosition = pending.toFrame + direction * xDir * std::abs (position - pending.fromFrame);
+        if (! xEndsLoop)
+            pedalState = PedalState::looping;
+    }
+    else
+    {
+        xPosition = pending.toFrame + (position - pending.fromFrame);
+        xDir = 1.0;
+        xInGain = 1.0f;
+    }
+    pendingIsPedal = false;
     xProgress = 0.0;
     xLength = std::max (1.0, pending.crossfadeFrames);
     xCorrelation = pending.correlation;
@@ -649,6 +706,234 @@ void InstrumentVoice::beginCrossfade() noexcept
         tailEndPosition = soundEnd;
     }
     ++jumpsTaken;
+}
+
+//==============================================================================
+// PEDAL LOOP (Pedal Loop 1.0, docs/research/pedal-loop)
+//
+// One state per voice: off (as without the pedal loop), armed (the read goes on to the loop
+// point ahead), looping. Every move between them is a crossfade on the continuation's own
+// machinery (pending / beginCrossfade), so the read never jumps unblended:
+//   - Forward: the region's jump (end - crossfade -> start), scheduled after every pass.
+//   - Ping-Pong: at each end, a short mirror crossfade: the read carries on to the turning point
+//     while the incoming stream leaves it the other way, both reading the same audio (at the
+//     crossfade's middle, the same sample); or, with no turnaround time, a plain reflection.
+//   - A late pedal (the read past every loop point): a bounded crossfade from here into the
+//     last region, its level matched to where the note was.
+//   - Leaving (pedal up): Forward reads on into the recording (no splice); Ping-Pong reading back
+//     turns forward where it is; a late loop crossfades back to where it found the recording.
+// The latest pedal state wins: a change during a crossfade is taken when it ends.
+
+void InstrumentVoice::setPedal (bool down) noexcept
+{
+    if (! active || released || pedalMode == PedalLoopMode::normal)
+        return;
+    pedalWanted = down;
+    if (! crossfading)
+        pedalUpdate();
+}
+
+void InstrumentVoice::pedalUpdate() noexcept
+{
+    if (crossfading || pedalMode == PedalLoopMode::normal)
+        return;
+    if (pedalWanted && ! released && pedalState == PedalState::off)
+        pedalArm();
+    else if (! pedalWanted && pedalState != PedalState::off)
+        pedalDisarm();
+}
+
+void InstrumentVoice::pedalArm() noexcept
+{
+    const auto& model = cont->pedal;
+    const auto& regions = model.regions;
+    const int count = static_cast<int> (regions.size());
+    if (count == 0)
+        return;
+    loopGain = 1.0f;
+    lateResume = -1.0;
+    // The first region whose loop point is still ahead: the note plays on to it.
+    for (int k = 0; k < count; ++k)
+    {
+        const auto& r = regions[static_cast<std::size_t> (k)];
+        const double leave = pedalMode == PedalLoopMode::forward ? r.endFrame - r.crossfadeFrames : r.endFrame - pedalTurnFor (r);
+        if (position < leave)
+        {
+            pedalRegion = k;
+            pedalState = PedalState::armed;
+            scheduleNextJump();
+            return;
+        }
+    }
+    // Late: the read is past every loop point. A bounded crossfade into the last region, at the
+    // level the note has here; too close to the end of the recording, nothing (a note that has
+    // ended is never brought back).
+    const auto& r = regions.back();
+    const auto& src = *layer->source;
+    const double rate = src.sampleRate();
+    const double room = static_cast<double> (src.numFrames()) - position - static_cast<double> (sinc->maxReach()) - 2.0;
+    double len = std::min (0.05 * rate, room);
+    len = std::min (len, 0.5 * (r.endFrame - r.startFrame - r.crossfadeFrames));
+    if (len < 0.002 * rate)
+        return;
+    pedalRegion = count - 1;
+    pedalState = PedalState::armed;
+    const float gain = std::clamp (dbToLinear (static_cast<double> (model.levelAt (position) - r.levelDb)), 0.02f, 1.0f);
+    lateResume = position + len;
+    if (pedalMode == PedalLoopMode::forward)
+        startPedalCrossfade (position, r.startFrame, len, 0.0f, 1.0, gain, false);
+    else
+        startPedalCrossfade (position, r.endFrame, len, 0.0f, -1.0, gain, false);
+}
+
+void InstrumentVoice::pedalDisarm() noexcept
+{
+    const auto& src = *layer->source;
+    const double rate = src.sampleRate();
+    const double reach = static_cast<double> (sinc->maxReach()) + 2.0;
+    if (pedalState == PedalState::looping && lateResume >= 0.0)
+    {
+        // Back to the recording where the late pedal found it, at its own level.
+        const double len = std::min (0.03 * rate, static_cast<double> (src.numFrames()) - lateResume - reach);
+        if (len >= 0.002 * rate)
+        {
+            startPedalCrossfade (position, lateResume, len, 0.0f, 1.0, 1.0f, true);
+            return;
+        }
+    }
+    if (pedalState == PedalState::looping && ppDir < 0.0)
+    {
+        // Reading back: turn forward where the read is (both streams leave the same sample).
+        const double len = std::min (0.015 * rate, std::max (1.0, position - reach));
+        startPedalCrossfade (position, position, len, pedalTurnCorrelation, 1.0, loopGain, true);
+        return;
+    }
+    // Forward (or not looping yet): the read simply goes on into the recording.
+    pedalState = PedalState::off;
+    pedalRegion = -1;
+    lateResume = -1.0;
+    hasPending = false;
+    scheduleNextJump();
+}
+
+bool InstrumentVoice::schedulePedal() noexcept
+{
+    const auto& regions = cont->pedal.regions;
+    if (pedalRegion < 0 || pedalRegion >= static_cast<int> (regions.size()))
+    {
+        pedalState = PedalState::off;
+        return false;
+    }
+    const auto& r = regions[static_cast<std::size_t> (pedalRegion)];
+    hasPending = false;
+    pendingIndex = -1;
+    pendingIsGraft = false;
+    pendingInGain = loopGain;
+    xEndsLoop = false;
+    if (pedalMode == PedalLoopMode::forward)
+    {
+        pending = r.jump();
+        pendingXDir = 1.0;
+        pendingIsPedal = true;
+        hasPending = true;
+        return true;
+    }
+    const double turn = pedalTurnFor (r);
+    if (turn < 1.0)
+        return true;   // a plain reflection (render)
+    pending.crossfadeFrames = turn;
+    pending.correlation = pedalTurnCorrelation;
+    pending.score = 0.0f;
+    if (ppDir > 0.0)
+    {
+        pending.fromFrame = r.endFrame - turn;
+        pending.toFrame = r.endFrame;
+        pendingXDir = -1.0;
+    }
+    else
+    {
+        pending.fromFrame = r.startFrame + turn;
+        pending.toFrame = r.startFrame;
+        pendingXDir = 1.0;
+    }
+    pendingIsPedal = true;
+    hasPending = true;
+    return true;
+}
+
+void InstrumentVoice::startPedalCrossfade (double from, double to, double frames, float correlation, double incomingDir, float inGain, bool endsLoop) noexcept
+{
+    pending.fromFrame = from;
+    pending.toFrame = to;
+    pending.crossfadeFrames = std::max (1.0, frames);
+    pending.correlation = correlation;
+    pending.score = 0.0f;
+    pendingIndex = -1;
+    pendingIsGraft = false;
+    pendingIsPedal = true;
+    pendingXDir = incomingDir;
+    pendingInGain = inGain;
+    xEndsLoop = endsLoop;
+    hasPending = true;
+    beginCrossfade();
+}
+
+void InstrumentVoice::finishPedalCrossfade() noexcept
+{
+    position = xPosition;
+    ppDir = xDir;
+    loopGain = xInGain;
+    trendOut = trendIn;   // (the read is where the incoming stream was)
+    if (xEndsLoop)
+    {
+        trendOut = trendIn = 1.0f;
+        xEndsLoop = false;
+        pedalState = PedalState::off;
+        pedalRegion = -1;
+        lateResume = -1.0;
+        ppDir = 1.0;
+    }
+}
+
+float InstrumentVoice::trendGainAt (double pos) const noexcept
+{
+    const auto& regions = cont->pedal.regions;
+    if (pedalRegion < 0 || pedalRegion >= static_cast<int> (regions.size()))
+        return 1.0f;
+    const auto& r = regions[static_cast<std::size_t> (pedalRegion)];
+    // The region's trend taken out: the level it has where the jump leaves, everywhere in it
+    // (0 dB there, so the loop starts without a step).
+    const double length = std::max (1.0, r.endFrame - r.startFrame);
+    const double frac = std::clamp ((pos - r.startFrame) / length, 0.0, 1.0);
+    const double leave = std::clamp ((r.endFrame - r.crossfadeFrames - r.startFrame) / length, 0.0, 1.0);
+    return dbToLinear (static_cast<double> (r.trendDb) * (leave - frac));
+}
+
+void InstrumentVoice::reflectPedal() noexcept
+{
+    const auto& regions = cont->pedal.regions;
+    if (pedalRegion < 0 || pedalRegion >= static_cast<int> (regions.size()))
+        return;
+    const auto& r = regions[static_cast<std::size_t> (pedalRegion)];
+    const double lo = r.startFrame, hi = r.endFrame;
+    // Overshoot folds back (twice at most for any sane step; then the middle, never outside).
+    for (int n = 0; n < 4; ++n)
+    {
+        if (position > hi)
+        {
+            position = 2.0 * hi - position;
+            ppDir = -1.0;
+            pedalState = PedalState::looping;
+        }
+        else if (ppDir < 0.0 && position < lo)
+        {
+            position = 2.0 * lo - position;
+            ppDir = 1.0;
+        }
+        else
+            return;
+    }
+    position = 0.5 * (lo + hi);
 }
 
 void InstrumentVoice::updateCharacter (bool immediate) noexcept
@@ -1085,6 +1370,11 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
             }
             if (synthAmountLive != nullptr)
                 synthControl (controlInterval);
+            if (pedalMode == PedalLoopMode::forward && pedalState == PedalState::looping)
+            {
+                trendOut = trendGainAt (position);
+                trendIn = crossfading && xIsPedal ? trendGainAt (xPosition) : trendOut;
+            }
         }
 
         if (sourceEnded)
@@ -1104,7 +1394,7 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
         }
         else
         {
-            if (! crossfading && hasPending && (direction > 0.0 ? position >= pending.fromFrame : position <= pending.fromFrame))
+            if (! crossfading && hasPending && (direction * ppDir > 0.0 ? position >= pending.fromFrame : position <= pending.fromFrame))
                 beginCrossfade();
 
             if (tailEndPosition > 0.0 && position >= tailEndPosition && fadeRemaining == 0)
@@ -1170,7 +1460,7 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
                 stretchRead (l, r);
                 if (crossfading)
                 {
-                    xPosition += direction * currentStep * stretchSpeed;
+                    xPosition += direction * xDir * currentStep * stretchSpeed;
                     xProgress += currentStep * stretchSpeed;
                 }
             }
@@ -1182,10 +1472,21 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
                     float l2, r2, gOut, gIn;
                     readFrame (xPosition, currentStep, l2, r2);
                     crossfadeGains (static_cast<float> (xProgress / xLength), xCorrelation, gOut, gIn);
+                    if (xIsPedal)
+                    {
+                        gOut *= loopGain * trendOut;
+                        gIn *= xInGain * trendIn;
+                    }
                     l = l * gOut + l2 * gIn;
                     r = r * gOut + r2 * gIn;
-                    xPosition += direction * currentStep;
+                    xPosition += direction * xDir * currentStep;
                     xProgress += currentStep;
+                }
+                else if (loopGain != 1.0f || trendOut != 1.0f)
+                {
+                    // A late pedal's loop, matched to where the note was; Forward's trend.
+                    l *= loopGain * trendOut;
+                    r *= loopGain * trendOut;
                 }
             }
             if (dAmount > 0.0f)
@@ -1213,7 +1514,9 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
             if (stretching)
                 position += direction * currentStep * stretchSpeed;
             else
-                position += direction * currentStep;
+                position += direction * ppDir * currentStep;
+            if (pedalMode == PedalLoopMode::pingPong && pedalState != PedalState::off && ! crossfading && ! hasPending)
+                reflectPedal();   // (no turnaround crossfade scheduled: a plain reflection)
             if (tRemaining > 0)
             {
                 const auto& native = *currentModel->original.transient;
@@ -1280,8 +1583,15 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
             if (crossfading && xProgress >= xLength)
             {
                 crossfading = false;
-                position = xPosition;
-                scheduleNextJump();
+                if (xIsPedal)
+                    finishPedalCrossfade();
+                else
+                    position = xPosition;
+                // PEDAL LOOP: the pedal may have moved during the crossfade (the latest wins).
+                if (pedalMode != PedalLoopMode::normal)
+                    pedalUpdate();
+                if (! crossfading)
+                    scheduleNextJump();
             }
         }
 

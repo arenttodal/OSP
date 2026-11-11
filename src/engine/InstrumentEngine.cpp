@@ -866,6 +866,9 @@ void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int
     params.synthBlend = config.synthBlend;
     params.synthEnvelope = config.synthEnvelope;
     params.synthSettings = &slots[context].synthLive;
+    params.pedalLoop = layerSettings.pedalLoop;
+    params.pedalTurnSeconds = config.pedalTurnSeconds;
+    params.pedalTurnCorrelation = config.pedalTurnCorrelation;
     if (params.sourceMode == SourceMode::granular)
     {
         granularLife (params.shape, note, eventIndex);
@@ -878,6 +881,8 @@ void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int
         params.grainGate = &grainGate;
     }
     slot->start (params);
+    if (pedalDown)
+        slot->setPedal (true);   // PEDAL LOOP: armed from its first sample (Normal: nothing)
 }
 
 void InstrumentEngine::noteOff (int note, int channel) noexcept
@@ -905,10 +910,15 @@ void InstrumentEngine::setSustainPedal (bool down) noexcept
 {
     pedalDown = down;
     modRuntime.setPedal (down);
-    if (! down)
-        for (auto& voice : voices)
-            if (voice.isActive() && voice.isHeldByPedal())
-                voice.release();
+    for (auto& voice : voices)
+    {
+        if (! voice.isActive())
+            continue;
+        if (! down && voice.isHeldByPedal())
+            voice.release();
+        else if (! voice.isReleased())
+            voice.setPedal (down);   // PEDAL LOOP on keys still held (Normal: nothing)
+    }
 }
 
 void InstrumentEngine::allNotesOff() noexcept
