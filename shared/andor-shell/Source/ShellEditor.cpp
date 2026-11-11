@@ -291,7 +291,10 @@ ShellEditor::ShellEditor (ShellProcessor& p)
         sourceViewButton.setTooltip (shell.product().sourceAreaView.tooltip);
         sourceViewButton.setTitle (shell.product().sourceAreaView.tooltip);
         sourceViewButton.setClickingTogglesState (false);
-        sourceViewButton.onClick = [this] { setSourceViewShown (! sourceViewOpen); };
+        sourceViewButton.onClick = [this] {
+            setSourceViewShown (! sourceViewOpen);
+            learnAction (andor::learn::actions::sourceViewToggled, "routing.button");
+        };
         content.addAndMakeVisible (sourceViewButton);
     }
 
@@ -319,7 +322,10 @@ ShellEditor::ShellEditor (ShellProcessor& p)
             const auto k = *kind;
             const int macro = static_cast<int> (i);
             juce::Component::SafePointer<ShellEditor> safe (this);
-            macros[i].label->setRackActions ([this, k] { toggleRackFromLabel (k); }, [safe, macro, k] {
+            macros[i].label->setRackActions ([this, k] {
+                toggleRackFromLabel (k);
+                learnAction (andor::learn::actions::rackToggled, "rack." + rack::name (k).toLowerCase());
+            }, [safe, macro, k] {
                 if (safe != nullptr)
                     safe->rackLabelMenu (macro, k).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (safe->macros[static_cast<std::size_t> (macro)].label.get()));
             });
@@ -345,7 +351,10 @@ ShellEditor::ShellEditor (ShellProcessor& p)
         openPopup (advancedPopup);
     };
     content.addAndMakeVisible (advancedButton);
-    arpButton.onToggleEditor = [this] { setArpExpanded (! arpShown); };
+    arpButton.onToggleEditor = [this] {
+        setArpExpanded (! arpShown);
+        learnAction (arpShown ? andor::learn::actions::arpPanelOpened : andor::learn::actions::arpPanelClosed, "arp.panel");
+    };
     arpPanel.onCollapse = [this] { setArpExpanded (false); };
     arpPanel.setCrossClose (shell.crossCloseKeys());
     content.addAndMakeVisible (arpButton);
@@ -400,12 +409,16 @@ ShellEditor::ShellEditor (ShellProcessor& p)
     // A pinned in-card editor is open when the window opens.
     if (hasWellEditor() && shell.wellViewState().pinned)
         showWellEditor (true);
+    // ANDOR Learn (opt-in): nothing is created for a product without a catalog.
+    if (shell.learnEnabled())
+        createLearn();
     startTimerHz (30);
 }
 
 ShellEditor::~ShellEditor()
 {
     stopTimer();
+    learn.reset();
     juce::Desktop::getInstance().removeGlobalMouseListener (&outsideClicks);
     for (auto& card : cards)
         juce::Desktop::getInstance().getAnimator().cancelAnimation (card.get(), false);
@@ -853,6 +866,8 @@ void ShellEditor::showMenu()
     menu.addSeparator();
     menu.addItem ("Undo", shell.undoManager.canUndo(), false, [this] { shell.undoManager.undo(); });
     menu.addItem ("Redo", shell.undoManager.canRedo(), false, [this] { shell.undoManager.redo(); });
+    if (learn != nullptr)
+        learn->addMenuItems (menu);   // Learn ANDOR..., Learn mode (the product's opt-in)
     menu.addSeparator();
     const auto engine = shell.engineDescription();
     menu.addItem (juce::String ("Engine: ") + engine.name + (engine.diagnostic ? " (diagnostic)" : ""), false, false, [] {});
@@ -882,6 +897,9 @@ void ShellEditor::choosePresetFile (bool save)
 
 bool ShellEditor::keyPressed (const juce::KeyPress& key)
 {
+    // Escape closes Learn's note, browser or mode first; then the popover, as before.
+    if (learn != nullptr && learn->keyPressed (key))
+        return true;
     if (key == juce::KeyPress::escapeKey && popup != nullptr)
     {
         closePopup();
@@ -1255,7 +1273,13 @@ juce::PopupMenu ShellEditor::rackLabelMenu (int macro, rack::Kind kind)
                 safe->openPopup (macro);
             }
         });
-    menu.addItem (rack.isShown (kind) ? "Close Rack" : "Open Rack", [safe, kind] { if (safe != nullptr) safe->toggleRackFromLabel (kind); });
+    menu.addItem (rack.isShown (kind) ? "Close Rack" : "Open Rack", [safe, kind] {
+        if (safe != nullptr)
+        {
+            safe->toggleRackFromLabel (kind);
+            safe->learnAction (andor::learn::actions::rackToggled, "rack." + rack::name (kind).toLowerCase());
+        }
+    });
     return menu;
 }
 
@@ -1521,6 +1545,155 @@ void ShellEditor::timerCallback()
     modOverlay.refresh();
     if (popup != nullptr)
         popup->refreshContent();
+    if (learn != nullptr)
+        learn->tick();   // (returns at once while Learn shows nothing)
+}
+
+//==============================================================================
+// ANDOR Learn (ProductInfo::learn)
+
+void ShellEditor::learnAction (const juce::String& actionId, const juce::String& targetId, const juce::String& parameterId)
+{
+    // Called only from the handlers of the musician's own clicks and keys.
+    if (learn != nullptr)
+        learn->userAction (actionId, targetId, parameterId, andor::learn::Origin::userPointer);
+}
+
+void ShellEditor::createLearn()
+{
+    using andor::learn::Target;
+    const auto& descriptor = *shell.product().learn;
+    andor::learn::EditorHooks hooks;
+    hooks.content = &content;
+    hooks.menuAnchor = [this] { return menuButton.getBounds(); };
+    hooks.closePopovers = [this] { closePopup(); };
+    hooks.showing = [this] { return isShowing(); };
+    hooks.parameterValue = [this] (const juce::String& id) -> std::optional<float> {
+        if (auto* p = shell.parameters.getParameter (id))
+            return p->convertFrom0to1 (p->getValue());
+        return std::nullopt;
+    };
+    hooks.hasCapability = [this, &descriptor] (const juce::String& capability) {
+        return descriptor.hasCapability != nullptr && descriptor.hasCapability (capability, shell);
+    };
+    learn = std::make_unique<andor::learn::LearnController> (descriptor.catalog(), std::move (hooks));
+    auto& targets = learn->targets();
+
+    // The shell's own targets: the header, the sources, the macros, modulation, the keyboard
+    // row and the arpeggiator. Locators are called each time (nothing raw is kept).
+    targets.add ({ "header.preset", [this] { return static_cast<juce::Component*> (&presetBar); }, {}, {}, {}, true });
+    targets.add ({ "header.menu", [this] { return static_cast<juce::Component*> (&menuButton); } });
+    for (int layer = 0; layer < InstrumentHost::numLayers; ++layer)
+        targets.add ({ "source.card." + InstrumentHost::shownLayerName (layer), [this, layer] { return static_cast<juce::Component*> (cards[static_cast<std::size_t> (layer)].get()); },
+                       {}, {}, {}, true });
+    targets.add ({ "sources", [this] { return static_cast<juce::Component*> (&content); }, [this] (juce::Component&) {
+                      juce::Rectangle<int> all;
+                      for (auto& c : cards)
+                          if (c->isVisible())
+                              all = all.isEmpty() ? c->getBounds() : all.getUnion (c->getBounds());
+                      return sourceViewOpen ? juce::Rectangle<int>() : all;
+                  } });
+    for (int i = 0; i < frame::macroCount; ++i)
+    {
+        // A macro: its name and its knob (touches on the knob are the musician's).
+        auto& m = macros[static_cast<std::size_t> (i)];
+        targets.add ({ "macro." + juce::String (i), [&m] { return static_cast<juce::Component*> (&m.slider); }, [this, &m] (juce::Component& knob) {
+                          auto r = m.slider.getBounds();
+                          if (m.label != nullptr)
+                              r = r.getUnion (m.label->getBounds());
+                          return knob.getLocalArea (&content, r);
+                      },
+                       shell.product().macroPopover != nullptr ? std::function<bool()> ([this, i] { openPopup (i); return popup != nullptr; }) : std::function<bool()>(), {}, true, true });
+    }
+    targets.add ({ "macros", [this] { return static_cast<juce::Component*> (&content); }, [this] (juce::Component&) {
+                      juce::Rectangle<int> all;
+                      for (auto& m : macros)
+                      {
+                          auto r = m.slider.getBounds();
+                          if (m.label != nullptr)
+                              r = r.getUnion (m.label->getBounds());
+                          all = all.isEmpty() ? r : all.getUnion (r);
+                      }
+                      return all;
+                  } });
+    targets.add ({ "mod.panel", [this] { return static_cast<juce::Component*> (&modPanel); }, {}, {}, {}, true });
+    targets.add ({ "keyboard", [this] { return static_cast<juce::Component*> (&keyboard); }, {}, {}, {}, true });
+    targets.add ({ "advanced", [this] { return static_cast<juce::Component*> (&advancedButton); }, {},
+                   [this] { openPopup (advancedPopup); return popup != nullptr; }, {}, true });
+
+    // The arpeggiator: the card by the keyboard, its light, the panel and its parts.
+    auto expandArp = [this] {
+        setArpExpanded (true);
+        return arpShown;
+    };
+    auto arpArea = [] (std::function<juce::Rectangle<float> (osp::plugin::ArpInlinePanel&)> part) {
+        return [part] (juce::Component& c) { return part (static_cast<osp::plugin::ArpInlinePanel&> (c)).getSmallestIntegerContainer(); };
+    };
+    auto panel = [this] { return static_cast<juce::Component*> (&arpPanel); };
+    targets.add ({ "arp.control", [this] { return static_cast<juce::Component*> (&arpButton); }, {}, expandArp, {}, true });
+    targets.add ({ "arp.enable", [this] { return static_cast<juce::Component*> (&arpButton); },
+                   [this] (juce::Component&) { return arpButton.lightArea().expanded (4.0f).getSmallestIntegerContainer(); } });
+    targets.add ({ "arp.panel", panel, {}, expandArp, {}, true });
+    targets.addState ("arp.panel.open", [this] { return arpShown; });
+    targets.add ({ "arp.pattern", panel, arpArea ([] (auto& p) { return p.patternFieldArea().getUnion (p.patternListArea()); }), [this] {
+                      setArpExpanded (true);
+                      arpPanel.setEditCard (0);   // A's (the arpeggiator's own) pattern
+                      return arpShown;
+                  },
+                   [this] { return arpPanel.editedCard() == 0; } });
+    targets.add ({ "arp.rate", panel, [this] (juce::Component&) { return arpPanel.shownRateKnob().getBounds(); }, [this] {
+                      setArpExpanded (true);
+                      arpPanel.setEditCard (0);
+                      return arpShown;
+                  },
+                   [this] { return arpPanel.editedCard() == 0; } });
+    if (arpPanel.showsCards())
+    {
+        targets.add ({ "arp.cards", panel, arpArea ([] (auto& p) { return p.cardChipArea (0).getUnion (p.cardChipArea (1)).getUnion (p.cardChipArea (2)); }), expandArp });
+        targets.add ({ "arp.link", panel, arpArea ([] (auto& p) { return p.linkArea(); }), expandArp });
+        // B's own pattern and rate: shown once unlinked and B is the card being edited.
+        targets.add ({ "arp.card.B.edit", panel, [this] (juce::Component&) {
+                          return arpPanel.editTabArea (1).getUnion (arpPanel.patternFieldArea()).getUnion (arpPanel.patternListArea()).getSmallestIntegerContainer()
+                              .getUnion (arpPanel.shownRateKnob().getBounds());
+                      },
+                       [this] {
+                           setArpExpanded (true);
+                           arpPanel.setEditCard (1);   // a view setting (the card edited), never the sound
+                           return arpPanel.editedCard() == 1;
+                       },
+                       [this] { return arpPanel.showsCards() && ! arpPanel.isLinked() && arpPanel.editedCard() == 1; } });
+    }
+    arpButton.onLearnAction = [this] (const juce::String& action, const juce::String& parameterId) { learnAction (action, "arp.enable", parameterId); };
+    arpPanel.onLearnAction = [this] (const juce::String& action, const juce::String& parameterId) { learnAction (action, "arp.panel", parameterId); };
+
+    // The racks and the source view's key (where the product has them).
+    if (shell.showsRack())
+    {
+        targets.add ({ "rack.area", [this] { return static_cast<juce::Component*> (&rack); }, {}, {}, [this] { return rack.height() > 0.0f; }, true });
+        for (int k = 0; k < rack::kindCount; ++k)
+            if (const auto kind = static_cast<rack::Kind> (k); hasRack (kind))
+            {
+                const auto id = "rack." + rack::name (kind).toLowerCase();
+                targets.add ({ id, [this] { return static_cast<juce::Component*> (&rack); }, {}, [this, kind] {
+                                  setRackExpanded (kind, true);
+                                  return rack.isShown (kind);
+                              },
+                               [this, kind] { return rack.isShown (kind) && rack.height() > 0.0f; } });
+                targets.addState (id + ".open", [this, kind] { return rack.isShown (kind); });
+            }
+    }
+    if (shell.showsSourceView())
+    {
+        targets.add ({ "routing.button", [this] { return static_cast<juce::Component*> (&sourceViewButton); }, {}, [this] {
+                          setSourceViewShown (true);
+                          return sourceViewOpen;
+                      },
+                       {}, true });
+        targets.addState ("sourceView.open", [this] { return sourceViewOpen; });
+    }
+    if (descriptor.registerTargets != nullptr)
+        descriptor.registerTargets (targets, *this);
+    learn->finishSetup();
 }
 
 } // namespace andor::shell

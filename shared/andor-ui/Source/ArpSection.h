@@ -27,6 +27,10 @@ public:
     explicit ArpControl (InstrumentHost& processor);
 
     std::function<void()> onToggleEditor;
+    /** ANDOR Learn (opt-in, null by default): the musician's committed gesture on the light,
+        reported from its own click handler after the parameter was written (action ID and the
+        parameter it wrote). Never called for automation, presets or toggleEnabled() itself. */
+    std::function<void (const juce::String& actionId, const juce::String& parameterId)> onLearnAction;
     void setExpanded (bool open);
     /** What a click on the light does: arp.enabled on <-> off (one host gesture). */
     void toggleEnabled();
@@ -101,6 +105,11 @@ public:
     std::function<void()> onCollapse;
     /** A right-click on OCTAVES (ARP OCTAVES as a modulation destination). */
     std::function<void()> onOctavesMenu;
+    /** ANDOR Learn (opt-in, null by default): a musician's committed gesture in the panel (a
+        pattern, an octave key, a card, LINK, an EDIT tab, a RATE knob turned), reported from the
+        handler that made it, after its attachment wrote the parameter. The programmatic calls
+        (choosePattern, toggleCard ...) and parameter callbacks never report. */
+    std::function<void (const juce::String& actionId, const juce::String& parameterId)> onLearnAction;
 
     /** Pulls the scheduler's step display and the parameters (editor timer, ~30 Hz). */
     void refresh();
@@ -140,6 +149,9 @@ public:
         repaint();
     }
     int editedCard() const noexcept { return editCard; }
+    bool isLinked() const noexcept { return linked; }
+    /** The RATE knob shown now (the edited card's). */
+    juce::Component& shownRateKnob() noexcept;
     juce::Rectangle<float> cardChipArea (int shown) const { return cardChips[static_cast<std::size_t> (juce::jlimit (0, 2, shown))]; }
     juce::Rectangle<float> linkArea() const { return linkChip; }
     juce::Rectangle<float> editTabArea (int shown) const { return editTabs[static_cast<std::size_t> (juce::jlimit (0, 2, shown))]; }

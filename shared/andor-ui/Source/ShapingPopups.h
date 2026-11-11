@@ -141,6 +141,10 @@ public:
         small chevron and a pointer, and brightens on hover. */
     std::function<void()> onCaptionClick;
     juce::Rectangle<float> captionArea() const;
+    /** With a choice order (setChoiceOrder): the musician moved the knob (a drag step, the
+        wheel, a double-click, an accessibility value), after the parameter was written. The
+        attachment's own updates (automation, presets) never call it. Null by default. */
+    std::function<void()> onUserChange;
 
     juce::Slider slider { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::NoTextBox };
 

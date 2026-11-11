@@ -17,6 +17,7 @@
 # at configure time. tools/create_andor_instrument.py writes the entry and the product.
 
 include(${CMAKE_CURRENT_LIST_DIR}/../andor-ui/AndorUi.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/../andor-learn/AndorLearn.cmake)
 set(ANDOR_SHELL_DIR ${CMAKE_CURRENT_LIST_DIR})
 
 # Every ANDOR plugin's identifiers (andor-design-system/product-registry.json).
@@ -102,9 +103,10 @@ function(andor_add_instrument target)
         ${ANDOR_SHELL_DIR}/Source/ShellProcessor.cpp
         ${ANDOR_SHELL_DIR}/Source/ShellEditor.cpp
         ${ANDOR_SHELL_DIR}/Source/DiagnosticEngine.cpp
+        ${ANDOR_LEARN_SOURCES}
         ${A_SOURCES}
         ${OSP_IO_SOURCES})
-    target_include_directories(${target} PRIVATE ${PROJECT_SOURCE_DIR}/src ${ANDOR_SHELL_DIR}/Source ${CMAKE_CURRENT_SOURCE_DIR}/Source)
+    target_include_directories(${target} PRIVATE ${PROJECT_SOURCE_DIR}/src ${ANDOR_SHELL_DIR}/Source ${ANDOR_LEARN_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/Source)
     # The same JUCE configuration as ANDOR OSP's.
     target_compile_definitions(${target} PUBLIC
         JUCE_WEB_BROWSER=0
@@ -138,7 +140,7 @@ function(andor_add_instrument_tests target test_name)
         return()
     endif()
     cmake_parse_arguments(T "" "GOLDEN" "SOURCES" ${ARGN})
-    add_executable(${test_name} ${PROJECT_SOURCE_DIR}/tests/shell/ShellTests.cpp ${T_SOURCES})
+    add_executable(${test_name} ${PROJECT_SOURCE_DIR}/tests/shell/ShellTests.cpp ${PROJECT_SOURCE_DIR}/tests/shell/LearnTests.cpp ${T_SOURCES})
     target_include_directories(${test_name} PRIVATE
         ${PROJECT_SOURCE_DIR}/src
         ${PROJECT_SOURCE_DIR}/tests

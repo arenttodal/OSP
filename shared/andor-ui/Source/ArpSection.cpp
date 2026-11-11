@@ -194,7 +194,11 @@ void ArpControl::toggleEnabled()
 void ArpControl::mouseDown (const juce::MouseEvent& e)
 {
     if (lightArea().contains (e.position))
+    {
         toggleEnabled();
+        if (onLearnAction != nullptr)
+            onLearnAction ("arp.enabled.changed", "arp.enabled");
+    }
     else if (onToggleEditor != nullptr)
         onToggleEditor();
 }
@@ -333,6 +337,10 @@ ArpInlinePanel::ArpInlinePanel (InstrumentHost& p)
     binding::tag (*this, "arp.*");
     setTitle ("Arpeggiator settings");
     rate.setChoiceOrder (parameter (p, "arp.rate"), rateOrder(), &p.undo());
+    rate.onUserChange = [this] {
+        if (onLearnAction != nullptr)
+            onLearnAction ("arp.rate.changed", "arp.rate");
+    };
     rate.slider.setTooltip ("Step length, from 1/4 dotted (slowest) to 1/32 (fastest)");
     velocity.slider.setTooltip ("The arpeggiated notes' velocity: 100 % plays them as the keys were played");
     const std::array<std::pair<MiniKnob*, const char*>, 4> knobs { { { &rate, "arp.rate" }, { &gate, "arp.gate" }, { &swing, "arp.swing" }, { &velocity, "arp.velocity" } } };
@@ -376,6 +384,10 @@ ArpInlinePanel::ArpInlinePanel (InstrumentHost& p)
                 return InstrumentHost::arpRateNames()[order[static_cast<std::size_t> (position)]];
             });
             laneRate[i]->setChoiceOrder (parameter (p, rateId), rateOrder(), &p.undo());
+            laneRate[i]->onUserChange = [this, rateId] {
+                if (onLearnAction != nullptr)
+                    onLearnAction ("arp.rate.changed", rateId);
+            };
             laneRate[i]->slider.setTooltip (rate.slider.getTooltip());
             laneRate[i]->setArcColour (design::colour::accent);
             addChildComponent (*laneRate[i]);
@@ -435,6 +447,13 @@ void ArpInlinePanel::toggleLink()
 }
 
 ArpInlinePanel::~ArpInlinePanel() = default;
+
+juce::Component& ArpInlinePanel::shownRateKnob() noexcept
+{
+    if (editCard > 0 && laneRate[static_cast<std::size_t> (editCard - 1)] != nullptr)
+        return *laneRate[static_cast<std::size_t> (editCard - 1)];
+    return rate;
+}
 
 void ArpInlinePanel::updatePreview()
 {
@@ -944,6 +963,11 @@ void ArpInlinePanel::mouseExit (const juce::MouseEvent&)
 
 void ArpInlinePanel::mouseDown (const juce::MouseEvent& e)
 {
+    // (ANDOR Learn: each gesture is reported after it wrote its parameter.)
+    auto report = [this] (const char* action, const juce::String& parameterId) {
+        if (onLearnAction != nullptr)
+            onLearnAction (action, parameterId);
+    };
     // OCTAVES' keys are not a knob: their right-click asks for the control's modulation menu.
     if (e.mods.isPopupMenu() && octaveKeys.getUnion (octaveCaption).contains (e.position))
     {
@@ -954,12 +978,14 @@ void ArpInlinePanel::mouseDown (const juce::MouseEvent& e)
     if (const int row = rowAt (e.position); row >= 0)
     {
         choosePattern (listOrder()[static_cast<std::size_t> (row)]);
+        report ("arp.pattern.changed", editCard == 0 ? juce::String ("arp.pattern") : ids::arpCardSetting (ospProcessor.cardArpNamespace(), editCard, "pattern"));
         return;
     }
     for (int o = arp::minOctaves; o <= arp::maxOctaves; ++o)
         if (octaveKeyArea (o).contains (e.position))
         {
             chooseOctaves (o);
+            report ("arp.octaves.changed", editCard == 0 ? juce::String ("arp.octaves") : ids::arpCardSetting (ospProcessor.cardArpNamespace(), editCard, "octaves"));
             return;
         }
     if (cards)
@@ -969,17 +995,20 @@ void ArpInlinePanel::mouseDown (const juce::MouseEvent& e)
             if (cardChips[static_cast<std::size_t> (c)].contains (e.position))
             {
                 toggleCard (c);
+                report ("arp.card.toggled", ids::arpCard (ospProcessor.cardArpNamespace(), c));
                 return;
             }
             if (! linked && editTabs[static_cast<std::size_t> (c)].contains (e.position))
             {
                 setEditCard (c);
+                report ("arp.edit.selected", {});
                 return;
             }
         }
         if (linkChip.contains (e.position))
         {
             toggleLink();
+            report ("arp.link.changed", ids::arpLink (ospProcessor.cardArpNamespace()));
             return;
         }
     }

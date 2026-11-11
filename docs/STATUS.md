@@ -743,6 +743,21 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       `WellOverlay`: controls revealed in a card's well by the pointer). ANDOR OSP and the
       parity render use none of them. Proof: OSP suites and design capture.
 
+## ANDOR Learn V1 in the shell (branch feature/andor-learn-v1, 11 Nov 2026)
+
+- **What it is.** `shared/andor-learn`: guided lessons, a contextual Learn mode, a topic browser,
+  a one-time invitation and per-user progress for shell products. The authoring guide is
+  `shared/andor-learn/README.md`.
+- **Opt-in.** `ProductInfo::learn` turns it on. Without it, nothing is created, nothing is in
+  the menu and nothing is drawn.
+- **Shared ARP UI.** It gains opt-in `onLearnAction` hooks (null by default) and `MiniKnob`
+  gains `onUserChange`, so ANDOR OSP's plugin is unchanged.
+- **Completion.** Only a user event from a control's own gesture handler can complete a step,
+  and the parameter is then checked against its value before the gesture. Automation, presets,
+  undo and programmatic calls never complete one.
+- **Tests.** `tests/shell/LearnTests.cpp` runs in every product's test program.
+- **First consumer.** ANDOR Analog (docs/LEARN_V1.md there).
+
 ## DONE
 
 - Pure C++20 DSP/analysis library (`osp_dsp`) independent of JUCE; JUCE used for file
@@ -797,6 +812,15 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - DAW/host validation on a Mac.
 
 ## NEXT
+
+- **ANDOR Learn in ANDOR OSP's own plugin.** ANDOR OSP's plugin uses its own editor, not
+  ShellEditor, so it has no Learn yet. The plan:
+  - give OspAudioProcessorEditor a LearnController with the same hooks (content, menu anchor,
+    parameter values, the editor's timer calling `tick()`);
+  - register its targets (preset, cards, macros, ARP: the shared ARP hooks already report);
+  - write `osp.first-sound`, `osp.keydna`, `osp.continuation`, `osp.reimagined` and
+    `osp.layering` as declarative lessons;
+  - review the 869 / 1448 / 1810 px captures. No runner or overlay code is duplicated.
 
 - **The effects rack in ANDOR OSP's own plugin** (the rule on shared SPACE / ECHO / ARP
   features). The rack host (`shared/andor-ui/Source/EffectRack.*`), its modules (built in

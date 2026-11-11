@@ -371,6 +371,9 @@ void MiniKnob::setChoiceOrder (juce::RangedAudioParameter& p, std::vector<int> o
         else
             orderedAttachment->setValueAsCompleteGesture (index);
         repaint();
+        // (Only a musician moves the slider: the attachment sets it without notification.)
+        if (onUserChange != nullptr)
+            onUserChange();
     };
     orderedAttachment->sendInitialUpdate();
 }

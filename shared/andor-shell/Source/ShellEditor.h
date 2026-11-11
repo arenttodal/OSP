@@ -5,6 +5,7 @@
 #include "InstrumentFrame.h"
 #include "EffectRack.h"
 #include "KeyDnaEditor.h"
+#include "LearnController.h"
 #include "MacroPopups.h"
 #include "MainSections.h"
 #include "ModulationPanel.h"
@@ -147,6 +148,18 @@ public:
     /** For tests: the controls shown disabled because the engine does not read their parameters. */
     int disabledControlCount() const noexcept { return disabledControls; }
 
+    /** ANDOR Learn (ProductInfo::learn): its controller, or nullptr (the product has none). */
+    andor::learn::LearnController* learnController() noexcept { return learn.get(); }
+    // The parts a product's Learn targets point at (ProductInfo::LearnDescriptor::registerTargets).
+    osp::plugin::ArpControl& arpControl() noexcept { return arpButton; }
+    osp::plugin::ArpInlinePanel& arpInlinePanel() noexcept { return arpPanel; }
+    bool arpExpanded() const noexcept { return arpShown; }
+    juce::Component& keyboardComponent() noexcept { return keyboard; }
+    juce::Component& presetBarComponent() noexcept { return presetBar; }
+    juce::Component& advancedComponent() noexcept { return advancedButton; }
+    juce::Component& menuComponent() noexcept { return menuButton; }
+    juce::Slider* macroKnob (int macro) noexcept { return macro >= 0 && macro < osp::plugin::frame::macroCount ? &macros[static_cast<std::size_t> (macro)].slider : nullptr; }
+
 private:
     void timerCallback() override;
     void layoutInstrument();
@@ -166,6 +179,10 @@ private:
     void positionPopup();
     int dropLayerAt (juce::Point<int> editorPoint) const;
     void mouseDownAnywhere (juce::Component* clicked);
+    /** ANDOR Learn: builds the controller and the shell's targets (the product opted in). */
+    void createLearn();
+    /** A musician's committed gesture, for Learn (nothing without a controller). */
+    void learnAction (const juce::String& actionId, const juce::String& targetId, const juce::String& parameterId = {});
 
     struct OutsideClickWatcher final : juce::MouseListener
     {
@@ -256,6 +273,9 @@ private:
     int closedByLabelPress = -1;   ///< a press on an open popover's own door closes it (and must not reopen it)
     OutsideClickWatcher outsideClicks { *this };
     std::unique_ptr<juce::FileChooser> chooser;
+    /** ANDOR Learn (opt-in): absent unless the product has a catalog. Its layers, while shown,
+        are children of `content` (declared after it, so they go first). */
+    std::unique_ptr<andor::learn::LearnController> learn;
     juce::TooltipWindow tooltips { this, 700 };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ShellEditor)
