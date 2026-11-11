@@ -329,7 +329,20 @@ juce::Image Pieces::composed (const Piece& p, int pw, int ph, float physicalScal
     const int dstX[4] = { 0, juce::roundToInt (l), std::max (juce::roundToInt (l), pw - juce::roundToInt (r)), pw };
     const int dstY[4] = { 0, juce::roundToInt (t), std::max (juce::roundToInt (t), ph - juce::roundToInt (b)), ph };
 
+    // A piece with no stretchable centre (a lamp: its insets meet in the middle) is one image,
+    // resampled whole. Sliced, its four quarters were each resampled on their own, and at a
+    // fractional display scale (1.8x, 2.5x) their edges met as a light cross through it.
+    // (At whole scales the slices fall on whole pixels: the same pixels either way.)
+    const bool solid = p.insets[0] + p.insets[2] >= p.rect.getWidth() - 1.0e-3f && p.insets[1] + p.insets[3] >= p.rect.getHeight() - 1.0e-3f;
     juce::Image out (juce::Image::ARGB, pw, ph, true, juce::SoftwareImageType());
+    if (solid)
+    {
+        juce::Graphics g (out);
+        const auto whole = resampleArea (source, source.getBounds().toFloat(), pw, ph);
+        if (whole.isValid())
+            g.drawImageAt (whole, 0, 0);
+    }
+    else
     {
         juce::Graphics g (out);
         for (int row = 0; row < 3; ++row)
@@ -393,6 +406,15 @@ bool Pieces::draw (juce::Graphics& g, const juce::String& name, juce::Rectangle<
         const auto image = composed (*p, rw, rh, scale, face);
         if (! image.isValid())
             return false;
+        if (p->insets[0] + p->insets[2] >= p->rect.getWidth() - 1.0e-3f && p->insets[1] + p->insets[3] >= p->rect.getHeight() - 1.0e-3f)
+        {
+            // (a lamp: no centre to stretch - drawn whole, never as seamed quarters)
+            juce::Graphics::ScopedSaveState state (g);
+            g.setOpacity (opacity);
+            g.setImageResamplingQuality (juce::Graphics::mediumResamplingQuality);
+            g.drawImage (image, outer);
+            return true;
+        }
         const float sx[4] = { 0.0f, (p->margin + p->insets[0]) * scale, static_cast<float> (rw) - (p->margin + p->insets[2]) * scale, static_cast<float> (rw) };
         const float sy[4] = { 0.0f, (p->margin + p->insets[1]) * scale, static_cast<float> (rh) - (p->margin + p->insets[3]) * scale, static_cast<float> (rh) };
         const float dx[4] = { outer.getX(), outer.getX() + sx[1] / scale, outer.getRight() - (static_cast<float> (rw) - sx[2]) / scale, outer.getRight() };

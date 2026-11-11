@@ -1248,6 +1248,9 @@ void ShellEditor::mouseDownAnywhere (juce::Component* c)
         return;
     if (c != this && ! isParentOf (c))
         return;   // a click in the popover's own menus
+    if (popupIndex == anchoredPopup && popupAnchor != nullptr && (c == popupAnchor.getComponent() || popupAnchor->isParentOf (c)))
+        return;   // (its anchor: it opened the panel in this very press - JUCE tells this watcher after the
+                  // key - or closes it itself; closing here too shut every anchored panel as it opened)
     if (c == &arpButton && popupIndex == arpCompanionPopup
         && arpButton.secondRowArea().contains (arpButton.getLocalPoint (nullptr, juce::Desktop::getMousePosition().toFloat())))
         return;   // (its own row: the row opened it, or switches its instrument with it open)

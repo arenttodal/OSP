@@ -791,6 +791,17 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
   `InstrumentHost::outputPeak()` (default -1; `ShellProcessor` publishes the last block's peak,
   read-only telemetry) lets the reels rest in silence. ANDOR OSP sets no faceplate: 0 px.
 
+- Two shared fixes (11 Nov 2026, from ANDOR ANALOG's first Mac test):
+  - **An anchored popover no longer closes in the click that opens it.** JUCE tells the
+    editor's outside-click watcher after the key has opened its panel, and the watcher closed
+    it at once (SATELLITE's, ANDOR ANALOG's RHYTHM and every `openAnchoredPopover` key opening
+    on mouse-down). `ShellEditor::mouseDownAnywhere` now leaves the panel's own anchor alone.
+    ANDOR ANALOG's tests now replay the watcher after each press.
+  - **Lamps have no seam cross at fractional display scales.** A skin piece whose insets meet
+    (no centre to stretch: the arp lights, the macro LEDs) was composed from four quarters,
+    each resampled alone. At 1.8× and 2.5× they met as a light cross. Such a piece is now
+    resampled whole. At whole scales the pixels are the same either way.
+
 ## IN PROGRESS
 
 - Lab round 3 (Reimagined 3, violin).
