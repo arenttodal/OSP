@@ -73,6 +73,7 @@ namespace
         // The product's own modulation destinations come after ANDOR OSP's in the routes'
         // destination list, which the layout below is made with.
         osp::mod::setProductDestinations (productInfo().modulationDestinations);
+        osp::mod::setOfferedSourceCount (productInfo().rhythmSource ? osp::mod::sourceCount : osp::mod::baseSourceCount);
         auto layout = InstrumentHost::createParameterLayout();
         if (productInfo().cardArpeggiator)
         {

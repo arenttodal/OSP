@@ -22,7 +22,7 @@ namespace
 
     // ENV is today's ENV 1; ENV 2 has no tab any more (its routes still play).
     const std::array<const char*, mod::sourceCount> sourceLabels { "LFO 1", "LFO 2", "ENV", "ENV 2 (legacy)", "MOD WHEEL", "VEL", "NOTE",
-                                                                   "CC 1", "CC 2", "CC 3", "CC 4", "PRESSURE" };
+                                                                   "CC 1", "CC 2", "CC 3", "CC 4", "PRESSURE", "C RHYTHM" };
 
     juce::String sourceParameter (int source, const juce::String& name)
     {
@@ -123,7 +123,8 @@ namespace modui
         static const std::array<juce::Colour, mod::sourceCount> colours {
             juce::Colour (0xff7f9a7a), juce::Colour (0xff7189a3), juce::Colour (0xffc49548), juce::Colour (0xffb06a4f), juce::Colour (0xff8c7f72),
             juce::Colour (0xffb8798c), juce::Colour (0xff5f8e94),
-            juce::Colour (0xff9a8a6a), juce::Colour (0xff8a7f98), juce::Colour (0xff7d9184), juce::Colour (0xff9c7f74), juce::Colour (0xffa0785c)
+            juce::Colour (0xff9a8a6a), juce::Colour (0xff8a7f98), juce::Colour (0xff7d9184), juce::Colour (0xff9c7f74), juce::Colour (0xffa0785c),
+            juce::Colour (0xff8fae8b)   // C RHYTHM: card C's sage
         };
         return colours[static_cast<std::size_t> (juce::jlimit (0, mod::sourceCount - 1, source))];
     }
@@ -192,7 +193,7 @@ namespace modui
             out.push_back (mod::slot::env2);
         if (forDepth)
             out.push_back (mod::slot::modWheel);
-        for (int s = mod::slot::vel; s < mod::sourceCount; ++s)
+        for (int s = mod::slot::vel; s < mod::offeredSourceCount(); ++s)
             out.push_back (s);
         return out;
     }

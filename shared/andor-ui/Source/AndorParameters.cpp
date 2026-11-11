@@ -452,7 +452,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout InstrumentHost::createParame
             layout.add (parameters::make<juce::AudioParameterFloat> (id17 (modEnvId (i, "length")), n + "Length", skewed (10.0f, 20000.0f, 1000.0f), 1000.0f, ms));
         }
         juce::StringArray sources { "None" };
-        for (int i = 1; i <= mod::sourceCount; ++i)
+        for (int i = 1; i <= mod::offeredSourceCount(); ++i)   // (ANDOR OSP's twelve; a product's own after them)
             sources.add (mod::sourceName (static_cast<mod::Source> (i)));
         for (int r = 0; r < mod::maxRoutes; ++r)
         {
