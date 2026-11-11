@@ -10,6 +10,7 @@
 #include "ModulationPanel.h"
 #include "OspLookAndFeel.h"
 #include "ShellProcessor.h"
+#include "UserMacroBank.h"
 
 #include <juce_audio_utils/juce_audio_utils.h>
 
@@ -156,6 +157,27 @@ public:
     int disabledControlCount() const noexcept { return disabledControls; }
     /** A macro's knob (tests: its look, e.g. the arc a macro switch dims), or nullptr. */
     juce::Slider* macroSlider (int macro) noexcept { return macro >= 0 && macro < osp::plugin::frame::macroCount ? &macros[static_cast<std::size_t> (macro)].slider : nullptr; }
+    // USER MACROS V1.1 (opt-in: ProductInfo::userMacros). The bank shown is presentation only:
+    // both banks always sound.
+    int macroBankShown() const noexcept { return bankShown; }
+    void showMacroBank (int bank);
+    osp::plugin::MacroBankTab* macroBankTab() noexcept { return bankTab.get(); }
+    osp::plugin::frame::MacroKnob* userMacroKnob (int macro) noexcept;
+    osp::plugin::MacroLens* userMacroLens (int macro) noexcept;
+    osp::plugin::MacroAssignOverlay& macroAssignOverlay() noexcept { return assignOverlay; }
+    /** A USER macro's assignments' panel, anchored over its name (`select`: the row shown first). */
+    void openUserMacroPanel (int macro, const juce::String& select = {});
+    /** The panel's + Add Assignment: the next click on a control the macro may move assigns it. */
+    void beginUserMacroPick (int macro);
+    void cancelUserMacroAssign();
+    /** Renaming in place (a double-click on the name): its field, or null. */
+    void startUserMacroRename (int macro);
+    juce::TextEditor* userMacroRenameField() noexcept { return renameField.get(); }
+    /** Names, lenses and arcs brought up to date (an edit, undo, a preset). */
+    void refreshUserMacros();
+    /** Tests: the lens drag as the gesture does it (screen points), and a control's right-click menu. */
+    void dragUserMacroLens (int macro, juce::Point<int> from, juce::Point<int> to, bool cancel = false);
+    juce::PopupMenu controlContextMenu (const juce::String& parameterId) { return modOverlay.contextMenu (parameterId); }
     /** A macro's on / off lamp (ProductInfo::macroSwitches), or nullptr. */
     osp::plugin::MacroSwitchLamp* macroSwitch (int macro) noexcept;
 
@@ -254,6 +276,21 @@ private:
     int rackMask() const;
     void rackChanged();
     std::vector<std::pair<int, std::unique_ptr<osp::plugin::MacroSwitchLamp>>> macroLamps;   ///< (macro, lamp)
+    // USER MACROS
+    void setUpUserMacros();
+    void placeUserMacros();
+    void collectAssignTargets();
+    void updateUserMacroArcs();
+    void userMacroLabelMenu (int macro);
+    juce::Colour userMacroColour (int macro) const;
+    std::unique_ptr<osp::plugin::MacroBankTab> bankTab;
+    osp::plugin::frame::MacroRow userRow;
+    std::array<std::unique_ptr<osp::plugin::MacroLens>, 6> lenses;
+    osp::plugin::MacroAssignOverlay assignOverlay;
+    std::unique_ptr<juce::TextEditor> renameField;
+    int bankShown = 0, renaming = -1, dragMacro = -1, pickMacro = -1, panelMacro = -1, arcsMacro = -1;
+    bool anchorAbove = false;   ///< the anchored popover opens above its anchor (a USER macro's name)
+    std::uint64_t userMacroRevision = 0;
     void placeMacroLamps();
     void dimMacroArc (int macro, bool on);
     osp::plugin::ModulationOverlay modOverlay { shell, content };

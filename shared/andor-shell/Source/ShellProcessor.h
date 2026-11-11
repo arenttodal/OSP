@@ -131,6 +131,12 @@ public:
     bool crossCloseKeys() const noexcept { return ! referenceParity && product().crossCloseKeys; }
     /** The macros' own on / off lamps (the product's; never in the parity render). */
     bool showsMacroSwitches() const noexcept { return ! referenceParity && ! product().macroSwitches.empty(); }
+    // USER MACROS: the product's (never in the parity render).
+    const ProductInfo::UserMacros* userMacros() const noexcept { return ! referenceParity && product().userMacros ? &*product().userMacros : nullptr; }
+    /** The macro bank shown (0 CORE, 1 USER): an interface preference in Interface.xml, never
+        the sound, never a preset. Message thread. */
+    int macroBank() const;
+    void setMacroBank (int bank);
     // SHAPER DNA: the product's (never in the parity render).
     juce::String shaperDnaParameterId() const override { return ! referenceParity && product().shaperDna ? product().shaperDna->parameterId : juce::String(); }
     std::unique_ptr<osp::plugin::MiniPanel> createShaperDnaPanel() override
@@ -280,6 +286,7 @@ private:
     std::unique_ptr<Engine> engine;
     Engine::Description description;
     mutable std::optional<osp::plugin::CardWellEditor::ViewState> wellView;   ///< (read from Interface.xml when first asked)
+    mutable std::optional<int> bankShown;   ///< (read from Interface.xml when first asked)
     juce::StringArray bound;
     juce::String generatorName;
     std::array<osp::plugin::frame::MacroSpec, osp::plugin::frame::macroCount> macros;

@@ -19,6 +19,7 @@ set(ANDOR_UI_SOURCES
     ${ANDOR_UI_DIR}/Source/MacroPopups.cpp
     ${ANDOR_UI_DIR}/Source/EngineCard.cpp
     ${ANDOR_UI_DIR}/Source/MainSections.cpp
+    ${ANDOR_UI_DIR}/Source/UserMacroBank.cpp
     ${ANDOR_UI_DIR}/Source/ArpSection.cpp
     ${ANDOR_UI_DIR}/Source/SpacePresets.cpp
     ${ANDOR_UI_DIR}/Source/EffectRack.cpp

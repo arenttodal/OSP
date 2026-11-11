@@ -1450,6 +1450,36 @@ void ShellProcessor::setWellViewState (const osp::plugin::CardWellEditor::ViewSt
     xml.writeTo (interfaceFile());
 }
 
+int ShellProcessor::macroBank() const
+{
+    if (! bankShown.has_value())
+    {
+        int b = 0;   // (a new musician starts on CORE)
+        if (const auto xml = juce::XmlDocument::parse (interfaceFile()); xml != nullptr && xml->hasTagName ("Interface"))
+            if (const auto* bank = xml->getChildByName ("MacroBank"))
+                b = bank->getStringAttribute ("shown") == "user" ? 1 : 0;
+        bankShown = b;
+    }
+    return *bankShown;
+}
+
+void ShellProcessor::setMacroBank (int bank)
+{
+    bank = bank == 1 ? 1 : 0;
+    if (macroBank() == bank)
+        return;
+    bankShown = bank;
+    juce::XmlElement xml ("Interface");
+    if (const auto old = juce::XmlDocument::parse (interfaceFile()); old != nullptr && old->hasTagName ("Interface"))
+        xml = *old;
+    auto* node = xml.getChildByName ("MacroBank");
+    if (node == nullptr)
+        node = xml.createNewChildElement ("MacroBank");
+    node->setAttribute ("shown", bank == 1 ? "user" : "core");
+    interfaceFile().getParentDirectory().createDirectory();
+    xml.writeTo (interfaceFile());
+}
+
 juce::File ShellProcessor::sampleStoreFolder() const
 {
     if (const auto overridden = folderFromEnvironment ("ANDOR_SAMPLE_STORE"); overridden != juce::File())

@@ -398,6 +398,9 @@ public:
     /** A destination's right-click menu: its routes (select, bypass, depth to 0, remove),
         "Assign <source>" for every source the rules allow, "Remove All Assignments". */
     juce::PopupMenu contextMenu (const juce::String& parameterId);
+    /** Appends a product's items to a destination's menu (opt-in; null: the menu as ever).
+        ANDOR ANALOG's USER macros: Assign to USER. */
+    std::function<void (juce::PopupMenu&, const juce::String& parameterId)> extendContextMenu;
     /** Assigns through the processor's one path (source 0..4); selects the route, or shows why
         it could not be made. Returns the route's slot, -1 when refused. */
     int assign (int source, mod::Dest dest);

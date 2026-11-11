@@ -238,6 +238,35 @@ struct ProductInfo
         std::function<juce::String (osp::plugin::InstrumentHost&)> note;
     };
     std::optional<ShaperDna> shaperDna;
+    /** USER MACROS V1.1 (opt-in; ANDOR ANALOG): a second bank of six macros in the six knobs'
+        places, chosen by a tiny CORE | USER tab on the macro panel's top edge (an interface
+        preference, never the sound). The product owns what they move: its six parameters, the
+        names it shows, which controls a macro may move, making an assignment, and the
+        assignments' panel. Unset: no tab, as in ANDOR OSP. */
+    struct UserMacros
+    {
+        std::array<juce::String, 6> parameterIds;
+        std::function<juce::String (osp::plugin::InstrumentHost&, int macro)> name;
+        std::function<void (osp::plugin::InstrumentHost&, int macro, const juce::String& name)> rename;
+        /** Its active assignments (its lens lights while it has any). */
+        std::function<int (osp::plugin::InstrumentHost&, int macro)> activeCount;
+        /** The parameter IDs it moves (shown as thin arcs while its name is hovered or its panel open). */
+        std::function<juce::StringArray (osp::plugin::InstrumentHost&, int macro)> targets;
+        /** Whether a USER macro may move this parameter (continuous, real-time safe). */
+        std::function<bool (osp::plugin::InstrumentHost&, const juce::String& parameterId)> eligible;
+        /** A neutral assignment (undoable; an existing one is kept). False: refused. */
+        std::function<bool (osp::plugin::InstrumentHost&, int macro, const juce::String& parameterId)> assign;
+        /** Removes all its assignments (undoable). */
+        std::function<void (osp::plugin::InstrumentHost&, int macro)> clear;
+        /** Its assignments' panel (`select`: the assignment shown first, may be empty). */
+        std::function<std::unique_ptr<osp::plugin::MiniPanel> (osp::plugin::InstrumentHost&, int macro, const juce::String& select)> panel;
+        /** A control's display name ("FILTER / RESONANCE") for the drag's label. */
+        std::function<juce::String (osp::plugin::InstrumentHost&, const juce::String& parameterId)> targetName;
+        /** Changes whenever the names or assignments change (an edit, undo, a preset): the editor
+            refreshes its names and lenses when it moves. */
+        std::function<std::uint64_t (osp::plugin::InstrumentHost&)> revision;
+    };
+    std::optional<UserMacros> userMacros;
 };
 
 /** Defined by the product (Product.cpp). */

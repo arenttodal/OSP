@@ -2573,6 +2573,8 @@ juce::PopupMenu ModulationOverlay::contextMenu (const juce::String& parameterId)
     }
     menu.addSeparator();
     menu.addSubMenu ("MIDI Controllers", modui::controllerMenu (p));
+    if (extendContextMenu != nullptr)
+        extendContextMenu (menu, parameterId);
     return menu;
 }
 

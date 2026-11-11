@@ -1002,6 +1002,23 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
     a SPACE / ECHO / ARP feature, and nothing is planned for OSP's own engine yet.
   - Evidence: ANDOR ANALOG's `[shaperdna]` tests and `docs/SHAPER_DNA_V1.md`.
 
+- **USER MACROS hooks (shared, opt-in; ANDOR ANALOG's USER MACROS V1.1).**
+  - `ProductInfo::userMacros`: a product's six USER parameter IDs and its callbacks (names,
+    rename, targets, eligibility, assign, clear, its panel, a revision counter).
+  - `UserMacroBank.h`:
+    - `MacroBankTab`: CORE and USER as two small folder tabs on the macro panel's top-left edge;
+    - `MacroLens`: the drag handle on a USER knob's light;
+    - `MacroAssignOverlay`: rings while assigning, arcs on mapped controls, the pick banner.
+  - The shell:
+    - a second, hidden macro row in CORE's places (USER 1..6 in visual order);
+    - the bank shown is kept in `Interface.xml` (`MacroBank`), never in a preset;
+    - pick mode and Escape;
+    - "Assign to USER" through `ModulationOverlay::extendContextMenu`.
+  - All of it is off unless a product asks, and never in the parity render. ANDOR OSP has no
+    tab, no USER parameters and the same pixels.
+  - Not a SPACE / ECHO / ARP feature. ANDOR OSP's macros stay its six.
+  - Evidence: ANDOR ANALOG's `[usermacro]` tests and `docs/USER_MACROS_V1_1.md`.
+
 ## BLOCKERS
 
 - DAW testing (Logic, Ableton, Reaper) needs a Mac; CI covers build, tests and auval.

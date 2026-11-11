@@ -337,6 +337,7 @@ ShellEditor::ShellEditor (ShellProcessor& p)
                 content.addAndMakeVisible (*lamp);
                 macroLamps.emplace_back (macro, std::move (lamp));
             }
+    setUpUserMacros();
     content.addAndMakeVisible (modPanel);
 
     content.addAndMakeVisible (pitchWheel);
@@ -411,7 +412,7 @@ ShellEditor::ShellEditor (ShellProcessor& p)
 
     juce::Desktop::getInstance().addGlobalMouseListener (&outsideClicks);
 
-    content.onPaint = [this] (juce::Graphics& g) { frame::paint (g, content, shell.product().identity, arpShown, macros, rackShift(), sourceTrim()); };
+    content.onPaint = [this] (juce::Graphics& g) { frame::paint (g, content, shell.product().identity, arpShown, bankShown == 1 ? userRow : macros, rackShift(), sourceTrim()); };
     addAndMakeVisible (content);
     layoutInstrument();
     setResizable (true, true);
@@ -446,6 +447,8 @@ void ShellEditor::resized()
 {
     frame::fit (*this, content, instrumentHeight());
     modOverlay.setBounds (content.getLocalBounds());
+    if (bankTab != nullptr)
+        assignOverlay.setBounds (content.getLocalBounds());   // (USER's rings and banner: the whole instrument)
 }
 
 void ShellEditor::layoutInstrument()
@@ -498,6 +501,7 @@ void ShellEditor::layoutInstrument()
         }
     }
     placeMacroLamps();
+    placeUserMacros();
     modOverlay.setBounds (content.getLocalBounds());
     sourceArea = frame::sourceArea (sourceTrim());
     shownCount = -1;
@@ -906,6 +910,11 @@ void ShellEditor::choosePresetFile (bool save)
 
 bool ShellEditor::keyPressed (const juce::KeyPress& key)
 {
+    if (key == juce::KeyPress::escapeKey && (pickMacro >= 0 || dragMacro >= 0))
+    {
+        cancelUserMacroAssign();
+        return true;
+    }
     if (key == juce::KeyPress::escapeKey && popup != nullptr)
     {
         closePopup();
@@ -1094,9 +1103,10 @@ void ShellEditor::positionPopup()
     }
     else if (popupIndex == anchoredPopup && popupAnchor != nullptr)
     {
-        // Under its anchor, right edges aligned (placePopover keeps it inside the instrument).
+        // Under its anchor, right edges aligned (placePopover keeps it inside the instrument); a
+        // USER macro's panel above its name, its left edge with the name's (as the macros' own).
         const auto anchor = content.getLocalArea (popupAnchor.getComponent(), popupAnchor->getLocalBounds()).toFloat();
-        at = { anchor.getRight() + 14.0f - size.x, anchor.getBottom() + 8.0f };
+        at = anchorAbove ? juce::Point<float> { anchor.getX() - 14.0f, anchor.getY() - 10.0f - size.y } : juce::Point<float> { anchor.getRight() + 14.0f - size.x, anchor.getBottom() + 8.0f };
     }
     else if (popupIndex == arpCompanionPopup)
     {
@@ -1131,6 +1141,8 @@ void ShellEditor::closePopup()
     {
         content.removeChildComponent (&popupBackdrop);
         popupAnchor = nullptr;
+        anchorAbove = false;
+        panelMacro = -1;
     }
     juce::Desktop::getInstance().getAnimator().cancelAnimation (popup.get(), false);
     popup.reset();
@@ -1547,6 +1559,7 @@ void ShellEditor::refreshCardExtensions()
 
 void ShellEditor::timerCallback()
 {
+    updateUserMacroArcs();
     refreshCardExtensions();
     layoutSources();
     updateHybridDoor();
@@ -1639,6 +1652,408 @@ void ShellEditor::dimMacroArc (int macro, bool on)
     const auto shown = on ? colour : colour.interpolatedWith (design::colour::hairline, 0.62f);
     slider.getProperties().set ("arc", static_cast<juce::int64> (shown.getARGB()));
     slider.repaint();
+}
+
+//==============================================================================
+// USER MACROS V1.1 (ProductInfo::userMacros)
+
+juce::Colour ShellEditor::userMacroColour (int macro) const
+{
+    return design::colour::macro (std::clamp (macro, 0, frame::macroCount - 1));
+}
+
+void ShellEditor::setUpUserMacros()
+{
+    const auto* um = shell.userMacros();
+    if (um == nullptr)
+        return;
+    // The second bank: six knobs in the very places of the first (the same knob, colours and
+    // light), hidden until USER is chosen. Their names open their assignments; a double-click
+    // renames; a right-click offers both. Their lenses are grab handles.
+    for (std::size_t i = 0; i < userRow.size(); ++i)
+    {
+        const int macro = static_cast<int> (i);
+        frame::MacroSpec spec { um->parameterIds[i], um->name != nullptr ? um->name (shell, macro) : "MACRO " + juce::String (macro + 1),
+                                "User macro " + juce::String (macro + 1) + ": click for its assignments, double-click to rename" };
+        frame::setUpMacro (userRow[i], macro, spec, shell.parameters, content, true);
+        userRow[i].slider.setTitle ("User Macro " + juce::String (macro + 1));
+        userRow[i].label->onClick = [this, macro] {
+            if (closedByLabelPress == 100 + macro)
+            {
+                closedByLabelPress = -1;
+                return;
+            }
+            openUserMacroPanel (macro);
+        };
+        juce::Component::SafePointer<ShellEditor> safe (this);
+        userRow[i].label->setRackActions ([safe, macro] { if (safe != nullptr) safe->startUserMacroRename (macro); },
+                                          [safe, macro] { if (safe != nullptr) safe->userMacroLabelMenu (macro); });
+        auto lens = std::make_unique<MacroLens>();
+        lens->onClick = [this, macro] { openUserMacroPanel (macro); };
+        lens->onDragMove = [this, macro] (juce::Point<int> screen) {
+            if (dragMacro != macro)
+            {
+                closePopup();
+                dragMacro = macro;
+                collectAssignTargets();
+                assignOverlay.beginDrag (userMacroColour (macro), shell.userMacros()->name (shell, macro));
+            }
+            assignOverlay.pointAt (content.getLocalPoint (nullptr, screen).toFloat());
+        };
+        lens->onDragEnd = [this, macro] (juce::Point<int> screen, bool cancelled) {
+            const auto id = cancelled ? juce::String() : assignOverlay.controlAt (content.getLocalPoint (nullptr, screen).toFloat());
+            dragMacro = -1;
+            assignOverlay.stop();
+            if (id.isNotEmpty() && shell.userMacros()->assign (shell, macro, id))
+                openUserMacroPanel (macro, id);   // (made neutral; its range in the panel)
+            refreshUserMacros();
+        };
+        content.addChildComponent (*lens);
+        lenses[i] = std::move (lens);
+    }
+    bankTab = std::make_unique<MacroBankTab>();
+    bankTab->onChange = [this] (int bank) { showMacroBank (bank); };
+    content.addAndMakeVisible (*bankTab);
+    // Over everything while assigning (it takes clicks only when picking, only on a target).
+    assignOverlay.onPicked = [this] (const juce::String& id) {
+        const int macro = pickMacro;
+        pickMacro = -1;
+        assignOverlay.stop();
+        if (macro >= 0 && shell.userMacros()->assign (shell, macro, id))
+            openUserMacroPanel (macro, id);
+        refreshUserMacros();
+    };
+    assignOverlay.onCancel = [this] { cancelUserMacroAssign(); };
+    content.addAndMakeVisible (assignOverlay);
+    // A control's right-click menu: Assign to USER (its existing items unchanged, first).
+    modOverlay.extendContextMenu = [this] (juce::PopupMenu& menu, const juce::String& id) {
+        const auto* u = shell.userMacros();
+        if (u == nullptr || u->eligible == nullptr || ! u->eligible (shell, id))
+            return;
+        juce::PopupMenu sub;
+        for (int m = 0; m < 6; ++m)
+        {
+            const bool has = u->targets != nullptr && u->targets (shell, m).contains (id);
+            sub.addItem (u->name (shell, m), true, has, [this, m, id] {
+                showMacroBank (1);   // (the macro it now has: shown)
+                if (shell.userMacros()->assign (shell, m, id))
+                    openUserMacroPanel (m, id);
+                refreshUserMacros();
+            });
+        }
+        menu.addSeparator();
+        menu.addSubMenu ("Assign to USER", sub);
+    };
+    showMacroBank (shell.macroBank());
+    refreshUserMacros();
+}
+
+void ShellEditor::placeUserMacros()
+{
+    if (bankTab == nullptr)
+        return;
+    // USER 1..6 read left to right: each takes the place of the CORE knob in its column (CORE's
+    // data order is not its visual order - ECHO and SPACE sit swapped).
+    std::array<std::size_t, frame::macroCount> column {};
+    for (std::size_t i = 0; i < column.size(); ++i)
+        column[i] = i;
+    std::sort (column.begin(), column.end(), [this] (std::size_t a, std::size_t b) {
+        return macros[a].slider.getX() < macros[b].slider.getX();
+    });
+    for (std::size_t i = 0; i < userRow.size(); ++i)
+    {
+        const auto& place = macros[column[i]];
+        if (userRow[i].label != nullptr && place.label != nullptr)
+            userRow[i].label->setBounds (place.label->getBounds());
+        userRow[i].slider.setBounds (place.slider.getBounds());
+        // The lens: where the frame draws the light under the knob (its centre 65 below the
+        // knob's), a 22-unit target.
+        const auto knob = place.slider.getBounds().toFloat();
+        lenses[i]->setBounds (juce::Rectangle<float> (22.0f, 22.0f).withCentre ({ knob.getCentreX(), knob.getCentreY() + 65.0f }).toNearestInt());
+    }
+    // CORE and USER: two folder tabs rising from the macro panel's top-left edge (nothing below
+    // them moves; their targets are larger than drawn).
+    const auto panel = design::layout::macroPanel.translated (0.0f, -sourceTrim());
+    bankTab->setBounds (MacroBankTab::boundsFor (panel).toNearestInt());
+    bankTab->setPanel (panel, design::layout::panelRadius);
+    assignOverlay.setBounds (content.getLocalBounds());
+    assignOverlay.toFront (false);
+}
+
+osp::plugin::frame::MacroKnob* ShellEditor::userMacroKnob (int macro) noexcept
+{
+    return bankTab != nullptr && macro >= 0 && macro < frame::macroCount ? &userRow[static_cast<std::size_t> (macro)] : nullptr;
+}
+
+osp::plugin::MacroLens* ShellEditor::userMacroLens (int macro) noexcept
+{
+    return bankTab != nullptr && macro >= 0 && macro < frame::macroCount ? lenses[static_cast<std::size_t> (macro)].get() : nullptr;
+}
+
+void ShellEditor::showMacroBank (int bank)
+{
+    if (bankTab == nullptr)
+        return;
+    bank = bank == 1 ? 1 : 0;
+    const bool changed = bank != bankShown;
+    bankShown = bank;
+    bankTab->setBank (bank);
+    shell.setMacroBank (bank);
+    if (changed)
+    {
+        cancelUserMacroAssign();
+        if (popupIndex == anchoredPopup && panelMacro >= 0)
+            closePopup();
+        if (renameField != nullptr)
+            renameField.reset();
+        renaming = -1;
+    }
+    // Presentation only: the knobs shown change, the sound never does.
+    for (std::size_t i = 0; i < macros.size(); ++i)
+    {
+        const bool core = bank == 0;
+        macros[i].slider.setVisible (core);
+        if (macros[i].label != nullptr)
+            macros[i].label->setVisible (core);
+        userRow[i].slider.setVisible (! core);
+        if (userRow[i].label != nullptr)
+            userRow[i].label->setVisible (! core);
+        lenses[i]->setVisible (! core);
+    }
+    for (auto& [macro, lamp] : macroLamps)
+        lamp->setVisible (bank == 0);
+    content.repaint();
+}
+
+void ShellEditor::refreshUserMacros()
+{
+    const auto* um = shell.userMacros();
+    if (um == nullptr)
+        return;
+    for (std::size_t i = 0; i < userRow.size(); ++i)
+    {
+        const int macro = static_cast<int> (i);
+        const auto name = um->name (shell, macro);
+        if (auto* label = userRow[i].label.get())
+        {
+            if (label->getTitle() != name)
+            {
+                // (the label's text is its own: a new one in its place, its handlers as before)
+                auto onClick = label->onClick;
+                const auto bounds = label->getBounds();
+                const bool visible = label->isVisible();
+                userRow[i].label = std::make_unique<MacroLabel> (name, true, false);
+                userRow[i].label->setAccent (userMacroColour (macro));
+                userRow[i].label->setTooltip ("User macro " + juce::String (macro + 1) + ": click for its assignments, double-click to rename");
+                userRow[i].label->onClick = onClick;
+                juce::Component::SafePointer<ShellEditor> safe (this);
+                userRow[i].label->setRackActions ([safe, macro] { if (safe != nullptr) safe->startUserMacroRename (macro); },
+                                                  [safe, macro] { if (safe != nullptr) safe->userMacroLabelMenu (macro); });
+                binding::tag (*userRow[i].label, um->parameterIds[i]);
+                content.addChildComponent (*userRow[i].label);
+                userRow[i].label->setBounds (bounds);
+                userRow[i].label->setVisible (visible);
+                assignOverlay.toFront (false);
+            }
+            const bool lit = um->activeCount != nullptr && um->activeCount (shell, macro) > 0;
+            if (userRow[i].label->isCustomised() != lit)
+                userRow[i].label->setCustomised (lit);   // (its lens lights while it moves something)
+            userRow[i].label->setOpen (panelMacro == macro);
+        }
+        lenses[i]->setTooltip ("Drag to assign " + name);
+        userRow[i].slider.setTitle ("User Macro " + juce::String (macro + 1) + " (" + name + ")");
+    }
+    arcsMacro = -2;   // (the arcs recollected at the next tick)
+    content.repaint();
+}
+
+void ShellEditor::openUserMacroPanel (int macro, const juce::String& select)
+{
+    const auto* um = shell.userMacros();
+    if (um == nullptr || um->panel == nullptr || macro < 0 || macro >= frame::macroCount)
+        return;
+    cancelUserMacroAssign();
+    auto panel = um->panel (shell, macro, select);
+    if (panel == nullptr)
+        return;
+    auto* anchor = userRow[static_cast<std::size_t> (macro)].label.get();
+    openAnchoredPopover (std::move (panel), *anchor);
+    if (popupIndex == anchoredPopup)
+    {
+        anchorAbove = true;
+        panelMacro = macro;
+        positionPopup();
+    }
+    refreshUserMacros();
+}
+
+void ShellEditor::collectAssignTargets()
+{
+    // Every control on screen a USER macro may move (the product decides), front-most last.
+    const auto* um = shell.userMacros();
+    std::vector<MacroAssignOverlay::Control> found;
+    std::function<void (juce::Component&)> walk = [&] (juce::Component& c) {
+        for (auto* child : c.getChildren())
+        {
+            if (child == &assignOverlay || child == &modOverlay || ! child->isVisible())
+                continue;
+            if (auto* slider = dynamic_cast<juce::Slider*> (child))
+            {
+                juce::String id = slider->getProperties()["paramId"].toString();
+                if (id.isEmpty())
+                    id = binding::tagsOf (*slider)[0];
+                const bool own = std::find (um->parameterIds.begin(), um->parameterIds.end(), id) != um->parameterIds.end();
+                if (id.isNotEmpty() && ! own && um->eligible != nullptr && um->eligible (shell, id))
+                {
+                    const auto name = um->targetName != nullptr ? um->targetName (shell, id) : slider->getTitle();
+                    found.push_back ({ id, name, content.getLocalArea (slider, slider->getLocalBounds()).toFloat() });
+                }
+            }
+            walk (*child);
+        }
+    };
+    if (um != nullptr)
+        walk (content);
+    assignOverlay.setControls (std::move (found));
+}
+
+void ShellEditor::beginUserMacroPick (int macro)
+{
+    const auto* um = shell.userMacros();
+    if (um == nullptr || macro < 0 || macro >= frame::macroCount)
+        return;
+    closePopup();   // (the panel folds away while a control is chosen; it comes back after)
+    pickMacro = macro;
+    collectAssignTargets();
+    const auto panel = design::layout::macroPanel.translated (0.0f, -sourceTrim());
+    assignOverlay.beginPick (userMacroColour (macro), um->name (shell, macro), panel);
+    assignOverlay.toFront (false);
+}
+
+void ShellEditor::cancelUserMacroAssign()
+{
+    if (dragMacro >= 0)
+        if (auto* lens = lenses[static_cast<std::size_t> (dragMacro)].get())
+            lens->cancelDrag();
+    dragMacro = -1;
+    pickMacro = -1;
+    if (assignOverlay.mode() == MacroAssignOverlay::Mode::drag || assignOverlay.mode() == MacroAssignOverlay::Mode::pick)
+        assignOverlay.stop();
+}
+
+void ShellEditor::dragUserMacroLens (int macro, juce::Point<int> from, juce::Point<int> to, bool cancel)
+{
+    auto* lens = userMacroLens (macro);
+    if (lens == nullptr || lens->onDragMove == nullptr)
+        return;
+    lens->onDragMove (from);
+    lens->onDragMove (to);
+    lens->onDragEnd (to, cancel);
+}
+
+void ShellEditor::updateUserMacroArcs()
+{
+    // While a USER macro's name is hovered or its panel is open: thin arcs on what it moves.
+    const auto* um = shell.userMacros();
+    if (um != nullptr && um->revision != nullptr)
+        if (const auto now = um->revision (shell); now != userMacroRevision)
+        {
+            userMacroRevision = now;   // (an undo, a preset, a session: names and lenses follow)
+            refreshUserMacros();
+        }
+    if (um == nullptr || bankShown != 1 || dragMacro >= 0 || pickMacro >= 0)
+    {
+        if (arcsMacro >= 0 && assignOverlay.mode() == MacroAssignOverlay::Mode::show)
+            assignOverlay.stop();
+        arcsMacro = -1;
+        return;
+    }
+    int shown = panelMacro;
+    for (std::size_t i = 0; i < userRow.size() && shown < 0; ++i)
+        if (userRow[i].label != nullptr && userRow[i].label->isMouseOver())
+            shown = static_cast<int> (i);
+    if (shown == arcsMacro)
+        return;
+    arcsMacro = shown;
+    if (shown < 0)
+    {
+        assignOverlay.stop();
+        return;
+    }
+    collectAssignTargets();
+    std::vector<juce::String> ids;
+    if (um->targets != nullptr)
+        for (const auto& id : um->targets (shell, shown))
+            ids.push_back (id);
+    assignOverlay.show (std::move (ids), userMacroColour (shown));
+}
+
+void ShellEditor::startUserMacroRename (int macro)
+{
+    const auto* um = shell.userMacros();
+    if (um == nullptr || um->rename == nullptr || macro < 0 || macro >= frame::macroCount)
+        return;
+    closePopup();
+    auto* label = userRow[static_cast<std::size_t> (macro)].label.get();
+    renaming = macro;
+    renameField = std::make_unique<juce::TextEditor> ("Rename user macro");
+    renameField->setTitle ("Rename user macro " + juce::String (macro + 1));
+    renameField->setJustification (juce::Justification::centred);
+    renameField->setFont (type::macroLabel (0.7f * static_cast<float> (label->getHeight())));
+    renameField->setInputRestrictions (24);
+    renameField->setText (um->name (shell, macro), false);
+    renameField->setColour (juce::TextEditor::backgroundColourId, palette::ivory);
+    renameField->setColour (juce::TextEditor::textColourId, palette::text);
+    renameField->setColour (juce::TextEditor::outlineColourId, design::colour::hairline);
+    renameField->setColour (juce::TextEditor::focusedOutlineColourId, userMacroColour (macro));
+    content.addAndMakeVisible (*renameField);
+    renameField->setBounds (label->getBounds().expanded (4, 2));
+    renameField->selectAll();
+    auto commit = [this] (bool keep) {
+        if (renameField == nullptr || renaming < 0)
+            return;
+        const int m = renaming;
+        const auto text = renameField->getText();
+        renaming = -1;
+        juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<ShellEditor> (this)] { if (safe != nullptr) safe->renameField.reset(); });
+        if (keep && shell.userMacros()->rename != nullptr)
+            shell.userMacros()->rename (shell, m, text);
+        refreshUserMacros();
+    };
+    renameField->onReturnKey = [commit] { commit (true); };
+    renameField->onEscapeKey = [commit] { commit (false); };
+    renameField->onFocusLost = [commit] { commit (true); };
+    if (isShowing())
+        renameField->grabKeyboardFocus();
+}
+
+void ShellEditor::userMacroLabelMenu (int macro)
+{
+    const auto* um = shell.userMacros();
+    if (um == nullptr)
+        return;
+    juce::PopupMenu menu;
+    juce::Component::SafePointer<ShellEditor> safe (this);
+    menu.addItem ("Edit Assignments", [safe, macro] { if (safe != nullptr) safe->openUserMacroPanel (macro); });
+    menu.addItem ("Rename", [safe, macro] { if (safe != nullptr) safe->startUserMacroRename (macro); });
+    menu.addSeparator();
+    const bool any = um->targets != nullptr && ! um->targets (shell, macro).isEmpty();
+    menu.addItem ("Clear Assignments", any, false, [safe, macro] {
+        if (safe == nullptr)
+            return;
+        auto options = juce::MessageBoxOptions().withIconType (juce::MessageBoxIconType::QuestionIcon)
+                           .withTitle ("Clear assignments")
+                           .withMessage ("Remove every assignment of " + safe->shell.userMacros()->name (safe->shell, macro) + "? (Undo brings them back.)")
+                           .withButton ("Clear").withButton ("Cancel").withAssociatedComponent (safe.getComponent());
+        juce::AlertWindow::showAsync (options, [safe, macro] (int result) {
+            if (safe != nullptr && result == 1)
+            {
+                safe->shell.userMacros()->clear (safe->shell, macro);
+                safe->refreshUserMacros();
+            }
+        });
+    });
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (userRow[static_cast<std::size_t> (macro)].label.get()));
 }
 
 } // namespace andor::shell
