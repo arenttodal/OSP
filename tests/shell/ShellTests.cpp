@@ -249,6 +249,10 @@ TEST_CASE ("shell: the parameter schema is ANDOR OSP's, unchanged; the product's
     auto ospOnly = [] (const juce::String& line) {
         if (line.startsWith ("arp.link ") || line.startsWith ("arp.card"))
             return true;
+        // The FX library's parameters (fx.<type>.<n>.*): a product that has the library keeps
+        // them in its own namespace (ANDOR ANALOG: analog.fx.*).
+        if (line.startsWith ("fx."))
+            return true;
         // ANDOR OSP's PEDAL LOOP (layerA.pedalLoop ..): its One Shot cards' sustain-pedal loop.
         if (line.startsWith ("layer") && line.upToFirstOccurrenceOf (" ", false, false).endsWith (".pedalLoop"))
             return true;

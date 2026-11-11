@@ -19,27 +19,49 @@ namespace osp::plugin
     popup. Whether the settings differ from the defaults is kept here (isCustomised) for
     the LED the editor draws under the knob.
 */
-class MacroLabel final : public juce::Component, public juce::SettableTooltipClient
+class MacroLabel final : public juce::Component, public juce::SettableTooltipClient, private juce::Timer
 {
 public:
     MacroLabel (juce::String text, bool opensPopup, bool twoWay = false);
 
     std::function<void()> onClick;
+    /** A macro whose effect also has a rack (EffectRack.h), with no mark of its own on the
+        row: a double-click opens or closes the rack (`rack`), a right-click offers both
+        (`menu`), Enter opens the rack while the name has the keyboard's focus. A click then
+        opens the popover only once a double-click can no longer follow (the system's
+        double-click interval, a cancellable deferral), so a double-click never flashes the
+        popover first. Without it a click acts at once, as before. */
+    void setRackActions (std::function<void()> rack, std::function<void()> menu);
+    /** The rack is open: the name keeps the open underline (as while its popover is open). */
+    void setRackOpen (bool open);
+    bool isRackOpen() const noexcept { return rackOpen; }
+    /** Tests: a click waits for a possible double-click; act on it now as the timer would. */
+    bool isClickPending() const noexcept { return clickPending; }
+    void flushPendingClick() { timerCallback(); }
     /** The macro's identity colour (its small light and the open underline). */
     void setAccent (juce::Colour colour) { accent = colour; repaint(); }
     void setCustomised (bool customised);
     bool isCustomised() const noexcept { return customised; }
     void setOpen (bool open);
+    /** The name's width as drawn (centred in the label): where a key beside it goes. */
+    float textWidth() const;
 
     void paint (juce::Graphics&) override;
     void mouseEnter (const juce::MouseEvent&) override { repaint(); }
     void mouseExit (const juce::MouseEvent&) override { repaint(); }
+    void mouseDown (const juce::MouseEvent&) override;
     void mouseUp (const juce::MouseEvent&) override;
+    void mouseDoubleClick (const juce::MouseEvent&) override;
+    bool keyPressed (const juce::KeyPress&) override;
+    void focusGained (FocusChangeType) override { repaint(); }
+    void focusLost (FocusChangeType) override { repaint(); }
 
 private:
+    void timerCallback() override;
     juce::String text;
     bool opensPopup, twoWay;
-    bool customised = false, open = false;
+    bool customised = false, open = false, rackOpen = false, clickPending = false, swallowUp = false;
+    std::function<void()> onRack, onMenu;
     juce::Colour accent { 0xffe8692a };
 };
 
@@ -85,6 +107,18 @@ public:
     void setOnDark (bool dark) { onDark = dark; repaint(); }
     /** Secondary controls: smaller type. */
     void setSmall (bool small) { compact = small; resized(); repaint(); }
+    /** The effects rack's cells: the caption a step stronger, so it reads at plugin size
+        (opt-in; the popovers' as ever). */
+    void setStrongCaption (bool strong) { strongCaption = strong; repaint(); }
+    /** The approved effects racks' cell (opt-in): caption 11 px in its 22 px line, a 59 px
+        knob under it, the value 13 px under that, in the approved colours. */
+    void setRackMetrics (bool rack);
+    /** A stepped rate (opt-in): a detent mark per step around the knob, the chosen one long,
+        in `accent` (the slider's range must be stepped: a choice parameter). */
+    void setDetents (bool show, juce::Colour accent);
+    /** A rack's secondary setting (opt-in): its caption and value a step quieter. */
+    void setQuiet (bool q) { quiet = q; repaint(); }
+    bool isQuiet() const noexcept { return quiet; }
     /** The popups' cell (SPACE's DECAY): caption, a ticked knob, the value in a box. */
     void setBoxed (bool shouldBeBoxed);
     /** The value arc (and a boxed knob's pointer) in this colour: its macro's identity. */
@@ -115,7 +149,8 @@ private:
     juce::String caption;
     Formatter formatter;
     bool horizontal;
-    bool onDark = false, compact = false, boxed = false;
+    bool onDark = false, compact = false, boxed = false, strongCaption = false, rackMetrics = false, detents = false, quiet = false;
+    juce::Colour detentAccent;
     juce::Rectangle<float> valueBox() const;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
     std::vector<int> choiceOrder;
@@ -135,6 +170,17 @@ public:
     void setAccent (juce::Colour colour) { accent = colour; hasAccent = true; repaint(); }
     /** On a graphite display (an in-card editor): a graphite key, cream text. Opt-in. */
     void setOnDark (bool dark) { onDark = dark; repaint(); }
+    /** The effects rack's MODE: its value a little larger and darker (opt-in; off as ever). */
+    void setProminent (bool shouldBeProminent) { prominent = shouldBeProminent; repaint(); }
+    /** The approved effects racks' fields (opt-in): `mode` the MODE dropdown (165 x 27, 11 px),
+        `option` a cell's compact list (PATTERN, INTERVAL: 25 px, 10 px). */
+    enum class RackStyle
+    {
+        none,
+        mode,
+        option
+    };
+    void setRackStyle (RackStyle style) { rackStyle = style; repaint(); }
     int selected() const noexcept { return index; }
     std::function<void (int)> onChange;
     /** Shown instead of the value while it returns text (SHAPER: CUSTOM); no item is ticked then. */
@@ -158,7 +204,8 @@ private:
     juce::RangedAudioParameter& parameter;
     juce::String caption;
     int index = 0;
-    bool plain = false, hasAccent = false, onDark = false;
+    bool plain = false, hasAccent = false, onDark = false, prominent = false;
+    RackStyle rackStyle = RackStyle::none;
     juce::Colour accent;
     juce::ParameterAttachment attachment;
 };

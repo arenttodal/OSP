@@ -67,6 +67,14 @@ add_library(osp_dsp STATIC
     src/engine/InstrumentBuilder.cpp
     src/engine/PerformanceEngine.cpp
     src/engine/PostProcessor.cpp
+    src/engine/fx/FxGraph.cpp
+    src/engine/fx/FxEngine.cpp
+    src/engine/fx/FxProcessors.cpp
+    src/engine/fx/FxTone.cpp
+    src/engine/fx/FxDynamics.cpp
+    src/engine/fx/FxModulation.cpp
+    src/engine/fx/FxSpectral.cpp
+    src/engine/fx/FxRetro.cpp
     src/engine/ReimaginedStage.cpp
     src/engine/TapeFrameEngine.cpp
     src/engine/ToyboxEngine.cpp

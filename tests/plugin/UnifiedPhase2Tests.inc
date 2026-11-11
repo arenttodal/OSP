@@ -182,7 +182,11 @@ TEST_CASE ("plugin: Phase 2's parameters are appended and neutral; the modulatio
     for (int l = 0; l < 3; ++l)   // (version 28)
         for (const auto& name : osp::plugin::InstrumentHost::imprintParameterNames())
             expected.add (osp::plugin::InstrumentHost::synthParameterId (l, name));
-    for (int l = 0; l < 3; ++l)   // (version 29: PEDAL LOOP)
+    for (int t = 4; t < osp::fx::typeCount; ++t)   // (version 30: the FX library, fx.<type>.<n>.*)
+        for (int slot = 0; slot < osp::fx::capacity[static_cast<std::size_t> (t)]; ++slot)
+            for (const auto& spec : osp::plugin::fxparams::specsOf (static_cast<osp::fx::Type> (t)))
+                expected.add (osp::plugin::fxparams::idOf ({}, { static_cast<osp::fx::Type> (t), slot }, spec.name));
+    for (int l = 0; l < 3; ++l)   // (version 31: PEDAL LOOP)
         expected.add (osp::plugin::InstrumentHost::pedalLoopParameterId (l));
     REQUIRE (all.size() > expected.size());
     for (int i = 0; i < expected.size(); ++i)

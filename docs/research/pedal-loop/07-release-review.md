@@ -76,7 +76,7 @@ The design and every decision are in 00–06.
 
 - Do not merge the PR. Nothing reaches OSP's default branch until it is merged.
 - After a merge, revert the three feature commits:
-  - The parameters are appended (version hint 29). A build without them ignores them in sessions, and the notes play Normal.
+  - The parameters are appended (version hint 31, after the FX library's). A build without them ignores them in sessions, and the notes play Normal.
   - The schema golden reverts with them.
 
 ## 8. Musical review: how to try it

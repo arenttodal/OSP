@@ -29,6 +29,10 @@ add_executable(osp_tests
     unit/VintageBloomTests.cpp
     unit/EchoAscendTests.cpp
     unit/PostProcessorTests.cpp
+    unit/FxGraphTests.cpp
+    unit/FxEffectTests.cpp
+    unit/FxRetroTests.cpp
+    unit/FxRouteTests.cpp
     unit/DriveProcessorTests.cpp
     unit/ArpeggiatorTests.cpp
     unit/ModulationTests.cpp

@@ -18,7 +18,7 @@
 
 - **`layerA.pedalLoop`, `layerB.pedalLoop`, `layerC.pedalLoop`:**
   - a choice of Normal / Forward / Ping-Pong;
-  - **version hint 29**, appended after the imprint's (`InstrumentHost::addPedalLoopParameters`);
+  - **version hint 31**, appended after the FX library's (it was 29, after the imprint's, before the merge with the shared FX) (`InstrumentHost::addPedalLoopParameters`);
   - **default Normal**.
 - `tests/plugin/golden/osp-parameter-schema.txt` grows by these three lines only (an intentional append; IDs 0–433 unchanged).
 - The `[phase2]` tail check lists them.

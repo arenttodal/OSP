@@ -1,6 +1,7 @@
 #pragma once
 
 #include "LoadedInstrument.h"
+#include "RackFaceplate.h"
 
 #include "analysis/phrase/PhraseAnalysis.h"
 #include "engine/Arpeggiator.h"
@@ -104,7 +105,7 @@ public:
     static void applyImprintSettings (synth::Settings& s, const std::array<float, 3>& raw) noexcept;
     /** Appends them (ANDOR OSP's layout, after its per-card arpeggiator: nothing before moves). */
     static void addImprintParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout);
-    /** PEDAL LOOP (Pedal Loop 1.0, version hint 29): "layerA.pedalLoop" .. C, a choice of Normal,
+    /** PEDAL LOOP (Pedal Loop 1.0, version hint 31): "layerA.pedalLoop" .. C, a choice of Normal,
         Forward, Ping-Pong; Normal by default, so every session from before keeps its pedal.
         Appended after the imprint's (ANDOR OSP's layout; nothing before moves). */
     static void addPedalLoopParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout);
@@ -387,6 +388,54 @@ public:
     /** The mix as it plays (with any MIX modulation) for the header's live node; an engine that
         does not blend layers this way says it is not modulated. */
     virtual InstrumentEngine::LiveMix liveMix() const noexcept { return {}; }
+    /** The hardware faceplate a shared rack module (rack::Kind, as an int) wears (opt-in; null:
+        none, as in ANDOR OSP). Interface only. */
+    virtual const rack::Faceplate* rackFaceplate (int kind) const noexcept
+    {
+        juce::ignoreUnused (kind);
+        return nullptr;
+    }
+
+    // The FX library (engine/fx; opt-in, shared with ANDOR ANALOG): its route, its effects'
+    // live processors and the parameters' prefix. A host without it plays the original chain
+    // and shows no FX rack or routing view.
+    virtual bool hasFxLibrary() const noexcept { return false; }
+    /** The FX parameters' ID prefix before "fx." ("" for ANDOR OSP, "analog." for ANALOG). */
+    virtual juce::String fxParameterPrefix() const { return {}; }
+    /** Where the user's FX presets and chains live (ANALOG: <user data>/ANDOR/ANDOR Analog). */
+    virtual juce::File fxUserFolder() const { return {}; }
+    /** Message thread: the route playing, and a new one (false: refused, nothing changes). */
+    virtual fx::Graph fxRoute() const { return fx::classicGraph(); }
+    virtual bool setFxRoute (const fx::Graph& route)
+    {
+        juce::ignoreUnused (route);
+        return false;
+    }
+    /** A new effect's processor (its meters and graphs; null for the original four or before
+        prepare), and the impulse a CONVOLUTION slot plays (null: none yet). */
+    virtual const fx::Processor* fxProcessor (fx::InstanceId id) const noexcept
+    {
+        juce::ignoreUnused (id);
+        return nullptr;
+    }
+    virtual std::shared_ptr<const fx::Impulse> fxConvolutionImpulse (int slot) const
+    {
+        juce::ignoreUnused (slot);
+        return nullptr;
+    }
+    /** Called (message thread) whenever the route changes: an edit, an undo, a session or a
+        preset (the routing view follows it). The host calls it from setFxRoute. */
+    std::function<void()> onFxRouteChanged;
+    /** The routing view's ENGINE MIXER: one row per card, each with its letter (0 A, 1 B, 2 C:
+        the card's colour), its name, what it plays and its LEVEL parameter (the card's own). */
+    struct FxMixerCard
+    {
+        int letter = 0;
+        juce::String name, kind, levelId;
+    };
+    virtual std::vector<FxMixerCard> fxMixerCards() const { return {}; }
+    /** A second MOVEMENT lane's parameter prefix (ANALOG's "analog.movement.b."; empty: none). */
+    virtual juce::String fxMovementSecondLanePrefix() const { return {}; }
     virtual int modControllerNumber (int slot) const noexcept = 0;
     virtual void setModControllerNumber (int slot, int controller) noexcept = 0;
     virtual void learnModController (int slot) noexcept = 0;
@@ -456,12 +505,50 @@ public:
     virtual int editLayer() const noexcept = 0;
     /** The host's tempo in BPM (120 when it gives none): ECHO's synced picture. Any thread. */
     virtual float hostTempo() const noexcept = 0;
+    /** The instrument's output peak over the last block (linear, read-only telemetry from the
+        audio thread; any thread), or -1 when this host does not measure it. Displays use it
+        to rest in silence (a tape deck's reels), never to change the sound. */
+    virtual float outputPeak() const noexcept { return -1.0f; }
     /** MOVEMENT SHAPER's playhead, 0..1 of its bar (lock-free, for the picture). */
     virtual float shaperPhase() const noexcept = 0;
     /** SHAPER's CUSTOM pattern (saved with the session; message thread). An undoable change
         is one undo step. */
     virtual ShaperPattern shaperCustomPattern() const = 0;
     virtual void setShaperCustomPattern (const ShaperPattern& pattern, bool undoable = true) = 0;
+    /** MOVEMENT's lanes (the effects rack's MOVEMENT module): lane 0 is MOVEMENT itself
+        (its parameters "movement.*", its depth the MOVEMENT macro); a product may add a
+        second, independent lane with its own parameters (the same names under its prefix).
+        By default there is one lane, and the lane-aware calls are lane 0's. */
+    struct MovementLane
+    {
+        juce::String prefix { "movement." };   ///< "movement." + "mode", "drift.speed", "shaper.custom" ...
+        juce::String onId;                     ///< the lane's ON switch (empty: always on)
+        juce::String levelId;                  ///< the lane's INTENSITY 0..100 % (empty: none, full)
+        juce::String syncId, phaseId;          ///< PULSE's SYNC, the pattern's PHASE (empty: none)
+        juce::String pulseDivisionId;          ///< PULSE's note value while synced (empty: none)
+    };
+    virtual int movementLaneCount() const noexcept { return 1; }
+    virtual MovementLane movementLane (int lane) const { juce::ignoreUnused (lane); return {}; }
+    virtual float laneShaperPhase (int lane) const noexcept { return lane == 0 ? shaperPhase() : -1.0f; }
+    virtual ShaperPattern laneShaperPattern (int lane) const { juce::ignoreUnused (lane); return shaperCustomPattern(); }
+    virtual void setLaneShaperPattern (int lane, const ShaperPattern& pattern, bool undoable = true)
+    {
+        juce::ignoreUnused (lane);
+        setShaperCustomPattern (pattern, undoable);
+    }
+    /** The effects rack's presets: which one each module (and MOVEMENT lane) had chosen last,
+        by key ("space", "echo", "movementA" ...), as "factory:NAME" or "user:PATH"; a host
+        keeps it with the session. By default for as long as the host lives. */
+    virtual juce::String rackPresetMemory (const juce::String& key) const
+    {
+        const juce::ScopedLock lock (rackMemoryLock);
+        return rackMemory[key];
+    }
+    virtual void setRackPresetMemory (const juce::String& key, const juce::String& code)
+    {
+        const juce::ScopedLock lock (rackMemoryLock);
+        rackMemory.set (key, code);
+    }
     /** The SHAPER editor's magnified view (a view setting saved with the session). */
     virtual bool shaperEditorLarge() const noexcept = 0;
     virtual void setShaperEditorLarge (bool large) noexcept = 0;
@@ -502,6 +589,9 @@ protected:
     int resolveModTarget (int slot) const;
     /** Flushes the parameters into the state tree: a route change and its links are one undo step. */
     void commitRouteChange();
+    /** rackPresetMemory's (a host that saves it with the session reads and writes these). */
+    mutable juce::CriticalSection rackMemoryLock;
+    juce::StringPairArray rackMemory;
 };
 
 } // namespace osp::plugin

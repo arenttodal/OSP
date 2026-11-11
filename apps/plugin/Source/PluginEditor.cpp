@@ -299,6 +299,32 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
             }
             openPopup (index);
         };
+        // SPACE, ECHO and MOVEMENT (as in ANDOR ANALOG): no mark on the row - the name opens the
+        // full rack on a double-click, a right-click offers the popover or the rack, Enter opens
+        // it. A single click still opens the popover.
+        if (const auto kind = rack::kindForMacro (macroSpecs[i].parameterId); kind.has_value() && knob.label != nullptr)
+        {
+            rackOfMacro[i] = *kind;
+            const auto k = *kind;
+            juce::Component::SafePointer<OspAudioProcessorEditor> safe (this);
+            knob.label->setRackActions ([this, k] { toggleRackFromLabel (k); }, [safe, index, k, i] {
+                if (safe == nullptr)
+                    return;
+                juce::PopupMenu menu;
+                menu.addItem ("Quick Settings", [safe, index] {
+                    if (safe != nullptr)
+                    {
+                        safe->closedByLabelPress = -1;
+                        safe->openPopup (index);
+                    }
+                });
+                menu.addItem (safe->racks.isShown (k) ? "Close Rack" : "Open Rack", [safe, k] {
+                    if (safe != nullptr)
+                        safe->toggleRackFromLabel (k);
+                });
+                menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (safe->macros[i].label.get()));
+            });
+        }
     }
     content.addAndMakeVisible (modPanel);
 
@@ -364,6 +390,16 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     // The instrument is laid out once at the reference size (design::width x height) and
     // scaled as a whole: proportions never drift between sizes.
     content.onPaint = [this] (juce::Graphics& g) { paintInstrument (g); };
+    // The FX library's rack: hidden until the routing view opens an effect.
+    content.addChildComponent (racks);
+    racks.setFullBleed (true);
+    racks.onLayoutChanged = [this] { rackChanged(); };
+    // FX ROUTING: its key beside SAVE (as ANDOR ANALOG's), its view in the cards' place.
+    routingKey.setTooltip ("FX Routing");
+    routingKey.setTitle ("FX Routing");
+    routingKey.setClickingTogglesState (false);
+    routingKey.onClick = [this] { setSourceViewShown (! routingOpen); };
+    content.addAndMakeVisible (routingKey);
     addAndMakeVisible (content);
     layoutInstrument();
     setResizable (true, true);
@@ -625,8 +661,40 @@ int OspAudioProcessorEditor::visibleCardCount() const
     return n;
 }
 
+void OspAudioProcessorEditor::setSourceViewShown (bool shown)
+{
+    if (shown == routingOpen)
+        return;
+    if (shown && routingView == nullptr)
+    {
+        routingView = createFxRoutingView (ospProcessor);
+        content.addChildComponent (*routingView);
+    }
+    routingOpen = shown;
+    routingKey.setToggleState (shown, juce::dontSendNotification);
+    routingKey.repaint();
+    shownCount = -1;
+    layoutSources (false);
+    if (shown && routingView != nullptr)
+        routingView->grabKeyboardFocus();
+}
+
 void OspAudioProcessorEditor::layoutSources (bool animate)
 {
+    if (routingView != nullptr)
+        routingView->setVisible (routingOpen);
+    if (routingOpen && routingView != nullptr)
+    {
+        // The routing view in the cards' place (the sound is the same either way).
+        for (auto& card : cards)
+            card->setVisible (false);
+        dropZone.setVisible (false);
+        addTarget.setVisible (false);
+        routingView->setBounds (sourceArea);
+        routingView->toFront (false);
+        shownCount = -1;   // (the cards are laid out afresh when it closes)
+        return;
+    }
     std::array<bool, OspAudioProcessor::numLayers> occupied {};
     int count = 0;
     // A card per slot: the layers with sounds and the empty slots kept for new ones.
@@ -1211,7 +1279,7 @@ void OspAudioProcessorEditor::paint (juce::Graphics& g)
 void OspAudioProcessorEditor::paintInstrument (juce::Graphics& g)
 {
     // The shared ANDOR frame with OSP's identity (ANDOR/OSP, One Shot Performer).
-    frame::paint (g, content, frame::Identity {}, arpShown, macros);
+    frame::paint (g, content, frame::Identity {}, arpShown, macros, rackShift());
 }
 
 void OspAudioProcessorEditor::resized()
@@ -1244,6 +1312,35 @@ void OspAudioProcessorEditor::setArpExpanded (bool open)
     content.repaint();
 }
 
+void OspAudioProcessorEditor::setRackExpanded (rack::Kind kind, bool open)
+{
+    if (open && ! hasRack (kind))
+        return;
+    racks.setShown (kind, open);   // (rackChanged follows)
+}
+
+void OspAudioProcessorEditor::toggleRackFromLabel (rack::Kind kind)
+{
+    // (A popover in the way closes; a press that closed it must not count later.)
+    closedByLabelPress = -1;
+    closePopup();
+    setRackExpanded (kind, ! racks.isShown (kind));
+}
+
+void OspAudioProcessorEditor::rackChanged()
+{
+    // A view change only: the window grows or shrinks by the rack, nothing sounds different.
+    for (std::size_t i = 0; i < macros.size(); ++i)
+        if (rackOfMacro[i].has_value() && macros[i].label != nullptr)
+            macros[i].label->setRackOpen (racks.isShown (*rackOfMacro[i]));
+    layoutInstrument();
+    applyWindowShape (true);
+    positionPopup();
+    placeLibrary();
+    content.repaint();
+    racks.settle();
+}
+
 void OspAudioProcessorEditor::applyWindowShape (bool resizeWindow)
 {
     frame::applyWindowShape (*this, instrumentHeight(), resizeWindow);
@@ -1264,9 +1361,11 @@ void OspAudioProcessorEditor::selectModulation (int source, int slot)
 
 void OspAudioProcessorEditor::openModulationPopup (int which, int source)
 {
-    if (source > 3)
-        return;   // the wheel's routes are on its controls (no source page)
-    popupSource = juce::jlimit (0, 3, source);
+    // LFO 1 .. ENV 2, VEL and NOTE have pages (their curves, their routes); the wheel's
+    // routes are on its controls.
+    if (source < 0 || (source > 3 && modui::keyCurveIndex (source) < 0))
+        return;
+    popupSource = source;
     openPopup (which);
 }
 
@@ -1366,7 +1465,18 @@ void OspAudioProcessorEditor::layoutInstrument()
     parts.arpControl = &arpButton;
     parts.advanced = &advancedButton;
     parts.headerMix = &headerMix;
+    parts.rack = &racks;
+    parts.rackShift = rackShift();
     frame::place (parts, arpShown);
+    {
+        // FX ROUTING's key as ANDOR ANALOG's: SAVE's size, 8 px after it on its centre line (one
+        // group of keys); MIX moved right by as much, narrower by as much (it centres itself).
+        const auto save = savePresetButton.getBounds();
+        routingKey.setBounds (save.withX (save.getRight() + 8));
+        const auto mix = headerMix.getBounds();
+        if (const int shift = routingKey.getRight() + 15 - mix.getX(); shift > 0)
+            headerMix.setBounds (mix.withTrimmedLeft (shift));
+    }
 
     modOverlay.setBounds (content.getLocalBounds());
     sourceArea = frame::sourceArea();

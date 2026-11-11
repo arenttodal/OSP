@@ -6,6 +6,7 @@
 #include "LibraryService.h"
 #include "LoadedInstrument.h"
 #include "CardArpLanes.h"
+#include "FxParameters.h"
 
 #include "audio/capture/CaptureBuffer.h"
 #include "engine/Arpeggiator.h"
@@ -172,6 +173,25 @@ public:
     // Off by default (older sessions open with it off and sound as they did).
     InstrumentEngine::ModView modulationView() const noexcept override { return engine.modulationView(); }
     InstrumentEngine::LiveMix liveMix() const noexcept override { return engine.liveMix(); }
+
+    // The FX library (shared with ANDOR ANALOG; engine/fx, shared/andor-ui Fx*): ten more
+    // effects and a route. Its parameters are `fx.<type>.<n>.<name>` (version hint 30). The
+    // route is saved only once it is CUSTOM (an `FxRouting` child; absent: CLASSIC, the
+    // original chain bit for bit - every session and preset from before).
+    bool hasFxLibrary() const noexcept override { return true; }
+    juce::String fxParameterPrefix() const override { return {}; }
+    juce::File fxUserFolder() const override;
+    fx::Graph fxRoute() const override;
+    bool setFxRoute (const fx::Graph& route) override;
+    const fx::Processor* fxProcessor (fx::InstanceId id) const noexcept override { return fxPrepared ? engine.fxRouting().processor (id) : nullptr; }
+    std::shared_ptr<const fx::Impulse> fxConvolutionImpulse (int slot) const override { return fxPrepared ? engine.fxRouting().impulse (slot) : nullptr; }
+    std::vector<FxMixerCard> fxMixerCards() const override;
+    /** The MOVEMENT, ECHO and SPACE racks wear their devices' identities (ANDOR ANALOG's V5
+        enamel, the same as their routing tiles); OSP's popovers are untouched. */
+    const rack::Faceplate* rackFaceplate (int kind) const noexcept override;
+    /** Builds the impulse each CONVOLUTION needs when its settings or the rate changed (message
+        thread: prepareToPlay and the timer). */
+    void updateConvolutionImpulses();
     /** The CC 1-4 sources' controller numbers (0..119; default 2, 11, 16, 17), saved with the
         session. Learn: the next controller that moves is taken for the slot (-1: none). */
     int modControllerNumber (int slot) const noexcept override;
@@ -670,6 +690,25 @@ private:
 
     InstrumentEngine engine;
     EngineSettings engineSettings;
+    // The FX library: its parameters' reader (audio thread: read each block), the route (message
+    // thread; a host may save from another thread) and the CONVOLUTION impulses built so far.
+    osp::plugin::fxparams::Reader fxReader;
+    fx::Settings fxSettings;
+    mutable std::mutex fxRouteMutex;
+    fx::Graph fxRouteNow = fx::classicGraph();
+    std::uint64_t fxRouteGeneration = 1;
+    std::atomic<bool> fxPrepared { false };
+    struct ImpulseKey
+    {
+        int impulse = -1;
+        float decaySeconds = 0.0f, size = 0.0f;
+        bool reverse = false, normalize = false;
+        double rate = 0.0;
+        bool operator== (const ImpulseKey&) const = default;
+    };
+    std::mutex impulseMutex;
+    std::array<ImpulseKey, fx::capacity[static_cast<std::size_t> (fx::Type::convolution)]> impulseKeys {};
+    std::uint64_t impulseGeneration = 0;
     Arpeggiator arpeggiator;
     juce::MidiBuffer arpMidi;   ///< preallocated in prepareToPlay
     /** The per-card lanes and their view of this processor, on the heap (the processor may
