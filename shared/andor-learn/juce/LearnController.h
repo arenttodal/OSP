@@ -71,6 +71,8 @@ public:
     bool startLesson (const juce::String& lessonId);
     void openBrowser();
     void closeBrowser();
+    /** A lesson chosen in the browser: resumed where it was left (in progress), else from the start. */
+    void chooseLesson (juce::String lessonId);
     void setLearnMode (bool on);
     bool learnMode() const noexcept { return inspecting; }
     void inspect (const juce::String& targetId);

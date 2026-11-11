@@ -233,7 +233,13 @@ bool Browser::keyPressed (const juce::KeyPress& key)
     }
     if ((key == juce::KeyPress::returnKey || key == juce::KeyPress::spaceKey) && focused >= 0 && onChoose != nullptr)
     {
-        onChoose (items[static_cast<std::size_t> (focused)].lessonId);
+        // A copy, after this key returns: choosing closes (deletes) the browser.
+        const auto id = items[static_cast<std::size_t> (focused)].lessonId;
+        juce::Component::SafePointer<Browser> safe (this);
+        juce::MessageManager::callAsync ([safe, id] {
+            if (safe != nullptr && safe->onChoose != nullptr)
+                safe->onChoose (id);
+        });
         return true;
     }
     return false;

@@ -206,23 +206,27 @@ void LearnController::openBrowser()
     {
         browserPanel = std::make_unique<Browser>();
         browserPanel->onClose = [this] { closeBrowser(); };
-        browserPanel->onChoose = [this] (const juce::String& id) {
-            const auto* lesson = lessonRunner.catalog().findLesson (id);
-            if (lesson == nullptr)
-                return;
-            const int from = resumeStep (*lesson);
-            closeBrowser();
-            ensureLayers();
-            if (hooks.closePopovers != nullptr)
-                hooks.closePopovers();
-            if (lessonRunner.start (id, from))
-                showNote (NoteKind::lesson);
-        };
+        browserPanel->onChoose = [this] (const juce::String& chosen) { chooseLesson (chosen); };
         hooks.content->addAndMakeVisible (*browserPanel);
     }
     browserPanel->setRows (browserRows());
     lessonRunner.setBrowsing (true);
     layoutNow();
+}
+
+void LearnController::chooseLesson (juce::String lessonId)
+{
+    // (By value: closing the browser destroys the row and the callback that named it.)
+    const auto* lesson = lessonRunner.catalog().findLesson (lessonId);
+    if (lesson == nullptr)
+        return;
+    const int from = resumeStep (*lesson);
+    closeBrowser();
+    ensureLayers();
+    if (hooks.closePopovers != nullptr)
+        hooks.closePopovers();
+    if (lessonRunner.start (lessonId, from))
+        showNote (NoteKind::lesson);
 }
 
 void LearnController::closeBrowser()
