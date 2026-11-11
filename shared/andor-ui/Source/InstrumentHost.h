@@ -447,6 +447,11 @@ public:
     /** Why DNA cannot play just now (e.g. MOVEMENT is not on MAIN), for the key's tooltip; empty
         when it can. */
     virtual juce::String shaperDnaNote() const { return {}; }
+    /** SATELLITE (opt-in; ANDOR ANALOG's): each card's own stereo motion. The parameter that
+        switches card 0..2's motion, or empty (ANDOR OSP: no SATELLITE key in the ARP editor). */
+    virtual juce::String satelliteParameterId (int /*card*/) const { return {}; }
+    /** SATELLITE's panel, showing card 0..2 (none by default: InstrumentHost.cpp). */
+    virtual std::unique_ptr<MiniPanel> createSatellitePanel (int card);
     virtual MovementLane movementLane (int lane) const { juce::ignoreUnused (lane); return {}; }
     virtual float laneShaperPhase (int lane) const noexcept { return lane == 0 ? shaperPhase() : -1.0f; }
     virtual ShaperPattern laneShaperPattern (int lane) const { juce::ignoreUnused (lane); return shaperCustomPattern(); }

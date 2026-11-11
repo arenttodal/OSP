@@ -685,4 +685,9 @@ std::unique_ptr<MiniPanel> InstrumentHost::createShaperDnaPanel()
     return nullptr;   // (SHAPER DNA is a product's: ANDOR OSP has none)
 }
 
+std::unique_ptr<MiniPanel> InstrumentHost::createSatellitePanel (int)
+{
+    return nullptr;   // (SATELLITE is a product's: ANDOR OSP has none yet)
+}
+
 } // namespace osp::plugin

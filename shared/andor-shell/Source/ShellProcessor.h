@@ -143,6 +143,14 @@ public:
     {
         return ! referenceParity && product().shaperDna && product().shaperDna->panel != nullptr ? product().shaperDna->panel (*this) : nullptr;
     }
+    juce::String satelliteParameterId (int card) const override
+    {
+        return ! referenceParity && product().satellite && product().satellite->parameterId != nullptr ? product().satellite->parameterId (card) : juce::String();
+    }
+    std::unique_ptr<osp::plugin::MiniPanel> createSatellitePanel (int card) override
+    {
+        return ! referenceParity && product().satellite && product().satellite->panel != nullptr ? product().satellite->panel (*this, card) : nullptr;
+    }
     juce::String shaperDnaNote() const override
     {
         return ! referenceParity && product().shaperDna && product().shaperDna->note != nullptr ? product().shaperDna->note (const_cast<ShellProcessor&> (*this)) : juce::String();

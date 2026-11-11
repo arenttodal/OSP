@@ -238,6 +238,14 @@ struct ProductInfo
         std::function<juce::String (osp::plugin::InstrumentHost&)> note;
     };
     std::optional<ShaperDna> shaperDna;
+    /** SATELLITE (opt-in; ANDOR ANALOG): each card's own stereo motion, switched and opened from
+        the arpeggiator's editor (the per-card arpeggiator's title row). */
+    struct Satellite
+    {
+        std::function<juce::String (int card)> parameterId;   ///< the card's ON parameter
+        std::function<std::unique_ptr<osp::plugin::MiniPanel> (osp::plugin::InstrumentHost&, int card)> panel;
+    };
+    std::optional<Satellite> satellite;
     /** USER MACROS V1.1 (opt-in; ANDOR ANALOG): a second bank of six macros in the six knobs'
         places, chosen by a tiny CORE | USER tab on the macro panel's top edge (an interface
         preference, never the sound). The product owns what they move: its six parameters, the
