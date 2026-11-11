@@ -131,6 +131,16 @@ public:
     bool crossCloseKeys() const noexcept { return ! referenceParity && product().crossCloseKeys; }
     /** The macros' own on / off lamps (the product's; never in the parity render). */
     bool showsMacroSwitches() const noexcept { return ! referenceParity && ! product().macroSwitches.empty(); }
+    // SHAPER DNA: the product's (never in the parity render).
+    juce::String shaperDnaParameterId() const override { return ! referenceParity && product().shaperDna ? product().shaperDna->parameterId : juce::String(); }
+    std::unique_ptr<osp::plugin::MiniPanel> createShaperDnaPanel() override
+    {
+        return ! referenceParity && product().shaperDna && product().shaperDna->panel != nullptr ? product().shaperDna->panel (*this) : nullptr;
+    }
+    juce::String shaperDnaNote() const override
+    {
+        return ! referenceParity && product().shaperDna && product().shaperDna->note != nullptr ? product().shaperDna->note (const_cast<ShellProcessor&> (*this)) : juce::String();
+    }
     bool generatorGranularToggle() const noexcept { return ! referenceParity && product().generatorGranularToggle; }
     bool arpCompanionShown() const noexcept { return ! referenceParity && product().arpCompanion.name.isNotEmpty(); }
     juce::String cardArpNamespace() const override { return productInfo().slug + "."; }

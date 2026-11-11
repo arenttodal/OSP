@@ -21,6 +21,8 @@
 namespace osp::plugin
 {
 
+class MiniPanel;
+
 /**
     What the shared ANDOR interface (shared/andor-ui) needs from the instrument it shows: the
     parameter state, the A/B/C sources, presets, modulation and a few live displays. ANDOR OSP's
@@ -437,6 +439,14 @@ public:
         juce::String pulseDivisionId;          ///< PULSE's note value while synced (empty: none)
     };
     virtual int movementLaneCount() const noexcept { return 1; }
+    /** SHAPER DNA (opt-in; ANDOR ANALOG's): MOVEMENT lane A's SHAPER per note. The rack's SHAPER
+        then shows a small DNA key beside its magnifier: its light switches this bool parameter,
+        its name opens the product's panel (anchored to it). Empty: no key (ANDOR OSP). */
+    virtual juce::String shaperDnaParameterId() const { return {}; }
+    virtual std::unique_ptr<MiniPanel> createShaperDnaPanel();   ///< (none by default: InstrumentHost.cpp)
+    /** Why DNA cannot play just now (e.g. MOVEMENT is not on MAIN), for the key's tooltip; empty
+        when it can. */
+    virtual juce::String shaperDnaNote() const { return {}; }
     virtual MovementLane movementLane (int lane) const { juce::ignoreUnused (lane); return {}; }
     virtual float laneShaperPhase (int lane) const noexcept { return lane == 0 ? shaperPhase() : -1.0f; }
     virtual ShaperPattern laneShaperPattern (int lane) const { juce::ignoreUnused (lane); return shaperCustomPattern(); }

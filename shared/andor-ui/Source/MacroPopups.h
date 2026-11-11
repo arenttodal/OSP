@@ -51,6 +51,10 @@ void clickRackMovementLaneSwitch (rack::Module& module);
 juce::StringArray rackMovementLaneActions (rack::Module& module);
 void runRackMovementLaneAction (rack::Module& module, int index);
 juce::StringArray rackMovementPresetMenuExtras (const rack::Module& module);
+/** Tests: SHAPER DNA's key on the MOVEMENT rack (null: none, or not shown by this product), and a
+    click on its light (switches DNA) or its name (opens the product's panel). */
+juce::Component* rackShaperDnaKey (const rack::Module& module);
+void clickRackShaperDnaKey (rack::Module& module, bool light);
 /** Tests and snapshots: SHAPER's editor widened across the rack (its magnifier). */
 void setRackMovementWide (rack::Module& module, bool wide);
 /** Tests: a module's presets bar - what it shows, choosing one by name, the arrows, saving

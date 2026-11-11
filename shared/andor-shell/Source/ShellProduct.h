@@ -228,6 +228,16 @@ struct ProductInfo
         juce::String parameterId, tooltip;
     };
     std::vector<MacroSwitch> macroSwitches;
+    /** SHAPER DNA (opt-in; ANDOR ANALOG): MOVEMENT lane A's SHAPER per note. Its switch (a bool
+        parameter of the product's), its panel (opened from the rack's DNA key) and why it cannot
+        play just now (the key's tooltip; empty when it can). Unset: no key, as in ANDOR OSP. */
+    struct ShaperDna
+    {
+        juce::String parameterId;
+        std::function<std::unique_ptr<osp::plugin::MiniPanel> (osp::plugin::InstrumentHost&)> panel;
+        std::function<juce::String (osp::plugin::InstrumentHost&)> note;
+    };
+    std::optional<ShaperDna> shaperDna;
 };
 
 /** Defined by the product (Product.cpp). */

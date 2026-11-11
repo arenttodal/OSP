@@ -1,5 +1,6 @@
 #include "InstrumentHost.h"
 #include "AndorParameters.h"
+#include "ShapingPopups.h"
 
 #include "engine/Dampen.h"
 
@@ -677,6 +678,11 @@ std::optional<ShaperPattern> InstrumentHost::readShaperPatternFile (const juce::
                 step.shape = static_cast<StepShape> (k);
     }
     return pattern;
+}
+
+std::unique_ptr<MiniPanel> InstrumentHost::createShaperDnaPanel()
+{
+    return nullptr;   // (SHAPER DNA is a product's: ANDOR OSP has none)
 }
 
 } // namespace osp::plugin
