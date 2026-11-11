@@ -953,7 +953,8 @@ TEST_CASE ("mod: new sources are appended - saved route sources keep their meani
     CHECK (static_cast<int> (mod::Source::env2) == 4);
     CHECK (static_cast<int> (mod::Source::modWheel) == 5);
     CHECK (static_cast<int> (mod::Source::vel) == 6);
-    CHECK (static_cast<int> (mod::Source::pressure) == mod::sourceCount);
+    CHECK (static_cast<int> (mod::Source::pressure) == mod::baseSourceCount);   // (ANDOR OSP's twelve)
+    CHECK (static_cast<int> (mod::Source::cRhythm) == mod::sourceCount);        // (a product's, after them)
     CHECK (mod::sourceIndex (mod::Source::vel) == mod::slot::vel);
     CHECK (mod::sourceIndex (mod::Source::note) == mod::slot::note);
     CHECK (mod::sourceIndex (mod::Source::cc1) == mod::slot::cc1);
