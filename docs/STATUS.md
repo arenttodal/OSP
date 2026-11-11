@@ -987,6 +987,21 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
   - In ANDOR OSP the list is empty and the parity render never shows one: OSP is pixel-identical.
   - Evidence: ANDOR ANALOG's `[analog][morph][ui]` test and `docs/screenshots/morph-lamp`.
 
+- **SHAPER DNA hooks (shared, opt-in; ANDOR ANALOG's SHAPER DNA V1).**
+  - `MovementBus::setShaperHandoff` / `PostProcessor::setShaperHandoff`:
+    - lane A's SHAPER hands its share of one gate to a product's per-note shaping over 40 ms;
+    - `RhythmicShaper::process`'s `share` gives gain^share and share of the filter's octaves.
+  - `InstrumentHost::shaperDnaParameterId / createShaperDnaPanel / shaperDnaNote`, through
+    `ProductInfo::shaperDna`: the MOVEMENT rack's SHAPER shows a small DNA key beside its
+    magnifier (lane A only).
+  - `AnchoredPopoverHost`: the shell opens a product's panel anchored to a component, over a
+    backdrop that swallows the closing click.
+  - All of it is off by default and never in the parity render. ANDOR OSP keeps a single,
+    whole-mix SHAPER, exactly as before.
+  - ANDOR OSP has no per-note voice stage of this kind, so DNA is ANDOR ANALOG's alone. It is not
+    a SPACE / ECHO / ARP feature, and nothing is planned for OSP's own engine yet.
+  - Evidence: ANDOR ANALOG's `[shaperdna]` tests and `docs/SHAPER_DNA_V1.md`.
+
 ## BLOCKERS
 
 - DAW testing (Logic, Ableton, Reaper) needs a Mac; CI covers build, tests and auval.
