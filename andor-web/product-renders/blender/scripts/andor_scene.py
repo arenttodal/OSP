@@ -163,22 +163,35 @@ def face_material():
     L.new(uv.outputs[0], tex.inputs[0]); L.new(uv.outputs[0], msk.inputs[0])
 
     bsdf = n.new("ShaderNodeBsdfPrincipled")
-    L.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
+    # A screen is light under glass, not paint: on displays the pixels emit and barely reflect.
+    dim = n.new("ShaderNodeMix"); dim.data_type = "RGBA"; dim.blend_type = "MIX"
+    L.new(msk.outputs["Color"], dim.inputs[0])
+    L.new(tex.outputs["Color"], dim.inputs[6])
+    dim.inputs[7].default_value = (0.004, 0.004, 0.004, 1)
+    L.new(dim.outputs[2], bsdf.inputs["Base Color"])
     # Ceramic: satin (0.42); display glass: smooth with a clear coat.
     rough = n.new("ShaderNodeMapRange")
     L.new(msk.outputs["Color"], rough.inputs["Value"])
     rough.inputs["To Min"].default_value = 0.5
     rough.inputs["To Max"].default_value = 0.22
     L.new(rough.outputs[0], bsdf.inputs["Roughness"])
-    bsdf.inputs["Specular IOR Level"].default_value = 0.3
-    L.new(msk.outputs["Color"], bsdf.inputs["Coat Weight"])
+    # Displays: the coat carries the reflections; the base layer's own specular is dropped so the
+    # glass stays as deep as the editor draws it.
+    spec = n.new("ShaderNodeMapRange")
+    L.new(msk.outputs["Color"], spec.inputs["Value"])
+    spec.inputs["To Min"].default_value = 0.3
+    spec.inputs["To Max"].default_value = 0.0
+    L.new(spec.outputs[0], bsdf.inputs["Specular IOR Level"])
+    coat = n.new("ShaderNodeMath"); coat.operation = "MULTIPLY"; coat.inputs[1].default_value = 0.7
+    L.new(msk.outputs["Color"], coat.inputs[0])
+    L.new(coat.outputs[0], bsdf.inputs["Coat Weight"])
     bsdf.inputs["Coat Roughness"].default_value = 0.035
     bsdf.inputs["Coat IOR"].default_value = 1.5
     # Screens emit their own light; ceramic only a whisper (keeps labels legible in shade).
     em = n.new("ShaderNodeMapRange")
     L.new(msk.outputs["Color"], em.inputs["Value"])
     em.inputs["To Min"].default_value = 0.03
-    em.inputs["To Max"].default_value = 1.15
+    em.inputs["To Max"].default_value = 1.7
     L.new(tex.outputs["Color"], bsdf.inputs["Emission Color"])
     L.new(em.outputs[0], bsdf.inputs["Emission Strength"])
     # Fine ceramic imperfection: a very low bump from noise (not on the glass).
@@ -484,7 +497,7 @@ if args.variant == "alpha":
         o.hide_render = True
     catcher = prism("Shadow catcher", -2, -2, 2, 2, 0.01, -0.01, 0.0, MAT_TRAY, MAT_TRAY, product=False)
     catcher.is_shadow_catcher = True
-    bpy.context.view_layer.use_pass_shadow_catcher = True
+    bpy.context.view_layer.cycles.use_pass_shadow_catcher = True
 
 # ---------------------------------------------------------------------------------------------
 # Lights: key softbox upper left, broad fill opposite, narrow rim behind/above, glass card.
@@ -582,6 +595,11 @@ if args.out:
         fo.format.file_format = "PNG"
         fo.format.color_mode = "RGB"
         fo.format.color_depth = "16"
+        # The shadow pass is a multiplier (1 = no shadow): write it without the view transform.
+        fo.format.color_management = "OVERRIDE"
+        fo.format.view_settings.view_transform = "Standard"
+        fo.format.view_settings.look = "None"
+        fo.format.view_settings.exposure = 0.0
         fo.file_slots[0].path = os.path.splitext(os.path.basename(out))[0] + "_shadow_"
         ct.links.new(rl.outputs["Shadow Catcher"], fo.inputs[0])
     scene.render.filepath = out
