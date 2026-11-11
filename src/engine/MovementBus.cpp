@@ -37,6 +37,7 @@ void MovementBus::prepare (double rate, std::uint64_t seed)
 
 void MovementBus::reset() noexcept
 {
+    renderGain = ampNow = 1.0f;
     std::fill (lineL.begin(), lineL.end(), 0.0f);
     std::fill (lineR.begin(), lineR.end(), 0.0f);
     write = 0;
@@ -90,6 +91,7 @@ float MovementBus::readLine (const std::vector<float>& line, double delaySamples
 
 void MovementBus::render (MovementMode m, float inL, float inR, float& outL, float& outR) noexcept
 {
+    renderGain = 1.0f;   // (the modes that only move pitch or time leave the level)
     const double x = amount;
     const double msToSamples = 0.001 * sampleRate;
     switch (m)
@@ -178,8 +180,11 @@ void MovementBus::render (MovementMode m, float inL, float inR, float& outL, flo
             const double norm = std::tanh (kk);
             const double yl = std::tanh (kk * std::sin (pulsePhase)) / norm;
             const double yr = std::tanh (kk * std::sin (pulsePhase + std::numbers::pi * c)) / norm;
-            outL = inL * static_cast<float> (1.0 - x * 0.5 * (1.0 - yl));
-            outR = inR * static_cast<float> (1.0 - x * 0.5 * (1.0 - yr));
+            const auto gl = static_cast<float> (1.0 - x * 0.5 * (1.0 - yl));
+            const auto gr = static_cast<float> (1.0 - x * 0.5 * (1.0 - yr));
+            outL = inL * gl;
+            outR = inR * gr;
+            renderGain = 0.5f * (gl + gr);
             return;
         }
         case MovementMode::shaper:
@@ -187,7 +192,10 @@ void MovementBus::render (MovementMode m, float inL, float inR, float& outL, flo
             outL = inL;
             outR = inR;
             if (x > 1.0e-5 || amountTarget > 0.0)
+            {
                 shaper.process (outL, outR, x);   // MOVEMENT is the depth; at zero, an exact bypass
+                renderGain = static_cast<float> (shaper.volumeGain());
+            }
             return;
         }
     }
@@ -204,6 +212,7 @@ void MovementBus::process (float& left, float& right) noexcept
 
     float l, r;
     render (mode, left, right, l, r);
+    ampNow = renderGain;
     if (fadeRemaining > 0)
     {
         float pl, pr;
@@ -211,6 +220,7 @@ void MovementBus::process (float& left, float& right) noexcept
         const float w = static_cast<float> (fadeRemaining) / static_cast<float> (fadeLength);
         l += w * (pl - l);
         r += w * (pr - r);
+        ampNow += w * (renderGain - ampNow);
         --fadeRemaining;
     }
     left = l;

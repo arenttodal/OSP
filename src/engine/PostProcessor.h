@@ -112,7 +112,29 @@ public:
     void customEcho (const float* left, const float* right, float* wetLeft, float* wetRight, int numSamples, float input = 1.0f) noexcept;
     void customSpace (const float* left, const float* right, float* wetLeft, float* wetRight, float* dryGain, int numSamples, float input = 1.0f) noexcept;
 
+    /** MOVEMENT's level gain, sample by sample, written into `buffer` (opt-in; null by default:
+        nothing is written and nothing changes). Each sample MOVEMENT processes (process() or
+        customMovement()) writes the next entry, up to `capacity`: PULSE's tremolo and SHAPER's
+        VOL (both lanes multiplied), 1 for DRIFT, TAPE and CHORUS. ANDOR ANALOG multiplies its
+        SUB, which never enters the effects, by it, so the sub pulses and gates with the rest.
+        The caller fills the buffer with 1 first (a route without MOVEMENT writes nothing). */
+    void beginMovementTrace (float* buffer, int capacity) noexcept
+    {
+        trace = buffer;
+        traceCapacity = capacity;
+        traceCursor = 0;
+    }
+    void endMovementTrace() noexcept { trace = nullptr; }
+
 private:
+    float* trace = nullptr;
+    int traceCapacity = 0, traceCursor = 0;
+    float laneGain = 1.0f;   ///< both lanes' level gain at the last processLanes
+    void writeTrace() noexcept
+    {
+        if (trace != nullptr && traceCursor < traceCapacity)
+            trace[traceCursor++] = lanes ? laneGain : movement.amplitude();
+    }
     void updateCoefficients() noexcept;
 
     double sampleRate = 48000.0;

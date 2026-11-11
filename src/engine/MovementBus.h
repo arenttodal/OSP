@@ -38,6 +38,10 @@ public:
     /** The movement settings (every mode's own) and the MOVEMENT amount. */
     void setTargets (const Shaping& settings, double amount) noexcept;
     void process (float& left, float& right) noexcept;
+    /** The level gain the last process() applied (PULSE's tremolo, SHAPER's VOL, mono: the two
+        sides' mean), 1 for the modes that move pitch or time (DRIFT, TAPE, CHORUS). Read-only:
+        ANDOR ANALOG multiplies its SUB, which never enters MOVEMENT, by it. */
+    float amplitude() const noexcept { return ampNow; }
 
     // SHAPER's clock (fed once per block / on note-ons by the engine).
     void setTiming (const HostTiming& timing) noexcept { shaper.setTiming (timing); }
@@ -87,6 +91,7 @@ private:
 
     // Modulation state
     double wowPhase = 0.0, flutterPhase = 0.0, chorusPhase = 0.0, pulsePhase = 0.0;
+    float renderGain = 1.0f, ampNow = 1.0f;   ///< amplitude(): the mode's level gain
     Noise wowNoise, flutterNoise, wearLevel, wearTone, driftNoise;
     float tapeLowL = 0.0f, tapeLowR = 0.0f, chorusLowL = 0.0f, chorusLowR = 0.0f;
 };

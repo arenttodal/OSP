@@ -97,6 +97,10 @@ public:
     void tick() noexcept;
     /** Shapes one sample at depth `amount` (0..1, the MOVEMENT macro). */
     void process (float& left, float& right, double amount) noexcept;
+    /** VOL's present gain (0..1): what process() multiplies the level by (1 while FILTER is the
+        only target). A product sums a signal that skips the shaper (ANDOR ANALOG's SUB) with
+        this, so it pulses with the rest. */
+    double volumeGain() const noexcept { return gain; }
 
     /** Where the pattern is (0..1), for the display; -1 while the clock is idle. */
     float displayPhase() const noexcept { return running ? static_cast<float> (phase) : -1.0f; }
