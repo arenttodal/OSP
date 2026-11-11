@@ -798,6 +798,23 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 
 ## NEXT
 
+- **SATELLITE in ANDOR OSP's own plugin** (the rule on shared ARP features). The motion
+  (`src/engine/SatelliteMotion.h`) and the arpeggiator editor's SATELLITE key
+  (`ArpSection`: `SatelliteKey`) are shared and opt-in. ANDOR ANALOG supplies the per-voice DSP
+  and the panel (`ShellProduct::satellite`). ANDOR OSP shows no key and its look is unchanged.
+  It needs the per-card arpeggiator in ANDOR OSP first (below). Then:
+  - apply the motion at OspAudioProcessor's layer voices' pan, the same equal-power law;
+  - add `InstrumentHost::satelliteParameterId` / `createSatellitePanel` to OSP's processor;
+  - review the 869 / 1448 / 1810 px captures.
+
+- **C RHYTHM in ANDOR OSP** (shared modulation, not a SPACE / ECHO / ARP feature). The source
+  is appended to `osp::mod::Source` and offered only when a product asks
+  (`ProductInfo::rhythmSource`). ANDOR OSP keeps its twelve sources and its golden is
+  unchanged (tested). Should ANDOR OSP want it, it needs:
+  - its own loop analysis and player (ANDOR ANALOG's are in its `dsp/rhythm`; they could move
+    to `src/analysis` and `src/audio` unchanged: pure C++);
+  - a schema bump for the route-source list.
+
 - **The effects rack in ANDOR OSP's own plugin** (the rule on shared SPACE / ECHO / ARP
   features). The rack host (`shared/andor-ui/Source/EffectRack.*`), its modules (built in
   `MacroPopups.cpp` from the popovers' parts) and the frame's rack slot are shared and opt-in
