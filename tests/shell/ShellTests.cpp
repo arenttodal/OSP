@@ -236,6 +236,20 @@ TEST_CASE ("shell: the parameter schema is ANDOR OSP's, unchanged; the product's
             juce::AudioParameterChoice asOsp ({ id, ranged->getVersionHint() }, ranged->getName (128), ospChoices, 0);
             line = parameterschema::describe (&asOsp);
         }
+        if (id.startsWith ("mod.route") && id.endsWith (".source"))
+        {
+            // A product's own sources (C RHYTHM, when it asks for it) follow ANDOR OSP's twelve:
+            // those are checked, and the rest of the choice as ANDOR OSP's.
+            auto* choice = dynamic_cast<juce::AudioParameterChoice*> (ranged);
+            REQUIRE (choice != nullptr);
+            REQUIRE (choice->choices.size() == osp::mod::offeredSourceCount() + 1);
+            for (int i = osp::mod::baseSourceCount + 1; i < choice->choices.size(); ++i)
+                CHECK (choice->choices[i] == osp::mod::sourceName (static_cast<osp::mod::Source> (i)));
+            juce::StringArray ospChoices (choice->choices);
+            ospChoices.removeRange (osp::mod::baseSourceCount + 1, choice->choices.size() - osp::mod::baseSourceCount - 1);
+            juce::AudioParameterChoice asOsp ({ id, ranged->getVersionHint() }, ranged->getName (128), ospChoices, 0);
+            line = parameterschema::describe (&asOsp);
+        }
         const bool isOwn = line.startsWith (prefix);
         orderKept = orderKept && (isOwn || ! ownStarted);
         ownStarted = ownStarted || isOwn;

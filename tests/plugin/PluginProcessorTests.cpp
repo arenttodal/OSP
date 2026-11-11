@@ -5946,6 +5946,12 @@ TEST_CASE ("plugin: MODULATION parameters, routes, recall, older sessions, curve
         // the route-destination choice stays at 75 entries so saved automation keeps its meaning.
         CHECK (OspAudioProcessor::modDestinationNames().size() == mod::hostDestCount);
         CHECK (mod::hostDestCount < mod::destCount);
+        // The sources: ANDOR OSP's twelve (C RHYTHM, ANDOR ANALOG's thirteenth, not offered):
+        // the route-source choice stays at 13 entries (+ None), its automation as it was.
+        auto* source = dynamic_cast<juce::AudioParameterChoice*> (fresh.parameters.getParameter (OspAudioProcessor::modRouteId (0, "source")));
+        REQUIRE (source != nullptr);
+        CHECK (source->choices.size() == mod::baseSourceCount + 1);
+        CHECK_FALSE (source->choices.contains ("C RHYTHM"));
     }
     auto make = [&] {
         auto p = std::make_unique<OspAudioProcessor>();
