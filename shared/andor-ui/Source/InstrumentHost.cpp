@@ -704,4 +704,9 @@ std::optional<ShaperPattern> InstrumentHost::readShaperPatternFile (const juce::
     return pattern;
 }
 
+std::unique_ptr<MiniPanel> InstrumentHost::createSatellitePanel (int)
+{
+    return nullptr;   // (none by default: a product that moves its cards supplies its panel)
+}
+
 } // namespace osp::plugin

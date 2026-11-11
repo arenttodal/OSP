@@ -393,6 +393,13 @@ ArpInlinePanel::ArpInlinePanel (InstrumentHost& p)
     octavesAttachment.sendInitialUpdate();
     shown.current = -1;
     updatePreview();
+    if (cards && p.satelliteParameterId (0).isNotEmpty())
+    {
+        // SATELLITE (a product's opt-in): after EDIT A | B | C on the title row.
+        satellite = std::make_unique<SatelliteKey> (p);
+        satellite->editedCard = [this] { return linked ? 0 : editCard; };
+        addAndMakeVisible (*satellite);
+    }
 }
 
 void ArpInlinePanel::showEditedCard()
@@ -477,6 +484,8 @@ void ArpInlinePanel::updateField()
 
 void ArpInlinePanel::refresh()
 {
+    if (satellite != nullptr)
+        satellite->refresh();
     const auto now = ospProcessor.arpView();
     if (now.active != shown.active || now.current != shown.current || now.low != shown.low || now.high != shown.high)
     {
@@ -519,6 +528,8 @@ void ArpInlinePanel::resized()
         editCaption = { 418.0f, y - 0.5f * h, 40.0f, h };
         for (int c = 0; c < 3; ++c)
             editTabs[static_cast<std::size_t> (c)] = { 460.0f + 28.0f * static_cast<float> (c), y - 0.5f * h, 28.0f, h };
+        if (satellite != nullptr)
+            satellite->setBounds (juce::Rectangle<float> (566.0f, y - 0.5f * h, 118.0f, h).getSmallestIntegerContainer());
     }
     revealSelected();
 }
@@ -1003,4 +1014,152 @@ void ArpInlinePanel::mouseWheelMove (const juce::MouseEvent& e, const juce::Mous
     }
 }
 
+
+//==============================================================================
+SatelliteKey::SatelliteKey (InstrumentHost& h) : host (h)
+{
+    setTitle ("Satellite");
+    setDescription ("Each card's own stereo motion: the light switches it, the name opens its panel");
+    setTooltip ("SATELLITE: each card moves in the stereo field on its own (the light switches it, the name opens it)");
+    setWantsKeyboardFocus (true);
+    setMouseClickGrabsKeyboardFocus (false);
+    setMouseCursor (juce::MouseCursor::PointingHandCursor);
+    shownOn = anyOn();
+}
+
+bool SatelliteKey::anyOn() const
+{
+    for (int card = 0; card < 3; ++card)
+        if (auto* p = host.apvts().getParameter (host.satelliteParameterId (card)); p != nullptr && p->getValue() >= 0.5f)
+            return true;
+    return false;
+}
+
+bool SatelliteKey::isOpen() const
+{
+    const auto* owner = findParentComponentOfClass<AnchoredPopoverHost>();
+    return owner != nullptr && owner->anchoredPopoverOpenFrom (*this);
+}
+
+void SatelliteKey::toggle()
+{
+    // One undo step: every card's light that changes.
+    int mask = 0;
+    for (int card = 0; card < 3; ++card)
+        if (auto* p = host.apvts().getParameter (host.satelliteParameterId (card)); p != nullptr && p->getValue() >= 0.5f)
+            mask |= 1 << card;
+    int next = 0;
+    if (mask != 0)
+        remembered = mask;   // (off: all of them, remembered)
+    else
+        next = remembered != 0 ? remembered : 1 << juce::jlimit (0, 2, editedCard != nullptr ? editedCard() : 0);
+    host.undo().beginNewTransaction ("Satellite");
+    for (int card = 0; card < 3; ++card)
+        if (auto* p = host.apvts().getParameter (host.satelliteParameterId (card)))
+        {
+            const float v = (next & (1 << card)) != 0 ? 1.0f : 0.0f;
+            if ((p->getValue() >= 0.5f) != (v >= 0.5f))
+            {
+                p->beginChangeGesture();
+                p->setValueNotifyingHost (v);
+                p->endChangeGesture();
+            }
+        }
+    refresh();
+}
+
+void SatelliteKey::openPanel()
+{
+    auto* owner = findParentComponentOfClass<AnchoredPopoverHost>();
+    if (owner == nullptr)
+        return;
+    if (owner->anchoredPopoverOpenFrom (*this))
+    {
+        owner->closeAnchoredPopover();   // (the key again closes it)
+        refresh();
+        return;
+    }
+    if (auto panel = host.createSatellitePanel (juce::jlimit (0, 2, editedCard != nullptr ? editedCard() : 0)))
+        owner->openAnchoredPopover (std::move (panel), *this);
+    refresh();
+}
+
+void SatelliteKey::refresh()
+{
+    const bool on = anyOn(), open = isOpen();
+    if (on != shownOn || open != shownOpen)
+    {
+        shownOn = on;
+        shownOpen = open;
+        repaint();
+    }
+}
+
+void SatelliteKey::mouseDown (const juce::MouseEvent& e)
+{
+    if (e.mods.isPopupMenu())
+        return;
+    if (lightArea().contains (e.getPosition()))
+        toggle();
+    else
+        openPanel();
+}
+
+bool SatelliteKey::keyPressed (const juce::KeyPress& key)
+{
+    if (key == juce::KeyPress::spaceKey)
+    {
+        toggle();
+        return true;
+    }
+    if (key == juce::KeyPress::returnKey)
+    {
+        openPanel();
+        return true;
+    }
+    return false;
+}
+
+void SatelliteKey::paint (juce::Graphics& g)
+{
+    using namespace design;
+    const auto r = getLocalBounds().toFloat();
+    const bool hover = isMouseOver (true);
+    const auto mouse = getMouseXYRelative();
+    const bool overLight = hover && lightArea().contains (mouse);
+    // The light: a small lens, lit (the accent, a soft glow) or dark (a hairline ring).
+    const auto light = juce::Rectangle<float> (8.0f, 8.0f).withCentre (lightArea().toFloat().getCentre());
+    if (shownOn)
+    {
+        g.setColour (colour::accent.withAlpha (0.22f));
+        g.fillEllipse (light.expanded (3.0f));
+        g.setColour (colour::accent);
+        g.fillEllipse (light);
+    }
+    else
+    {
+        g.setColour (colour::text.withAlpha (overLight ? 0.16f : 0.08f));
+        g.fillEllipse (light);
+        g.setColour (colour::hairline.darker (overLight ? 0.35f : 0.15f));
+        g.drawEllipse (light.reduced (0.5f), 1.0f);
+    }
+    // The name and its chevron (down: closed; up: its panel open).
+    auto label = r.withTrimmedLeft (static_cast<float> (getHeight())).withTrimmedRight (14.0f);
+    g.setFont (type::popupLabel (12.0f));
+    g.setColour (colour::text.withAlpha (shownOn ? 0.92f : ((hover && ! overLight) ? 0.85f : 0.7f)));
+    g.drawText ("SATELLITE", label, juce::Justification::centredLeft, false);
+    const float cx = r.getRight() - 8.0f, cy = r.getCentreY();
+    juce::Path chevron;
+    const float d = shownOpen ? -2.5f : 2.5f;
+    chevron.startNewSubPath (cx - 4.0f, cy - d);
+    chevron.lineTo (cx, cy + d);
+    chevron.lineTo (cx + 4.0f, cy - d);
+    g.setColour (colour::text.withAlpha (0.6f));
+    g.strokePath (chevron, juce::PathStrokeType (1.3f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    if (hasKeyboardFocus (false))
+    {
+        g.setColour (colour::accent.withAlpha (0.6f));
+        g.drawRoundedRectangle (r.reduced (0.5f), 5.0f, 1.0f);
+    }
+}
 } // namespace osp::plugin

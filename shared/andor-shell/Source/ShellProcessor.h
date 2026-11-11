@@ -136,6 +136,15 @@ public:
     // (the header's MIX, the ARPEGGIATOR's X, the GRANULAR key: the product's, never in parity)
     bool headerMixShown() const noexcept { return referenceParity || product().headerMix; }
     bool crossCloseKeys() const noexcept { return ! referenceParity && product().crossCloseKeys; }
+    // SATELLITE: the product's (never in the parity render).
+    juce::String satelliteParameterId (int card) const override
+    {
+        return ! referenceParity && product().satellite && product().satellite->parameterId != nullptr ? product().satellite->parameterId (card) : juce::String();
+    }
+    std::unique_ptr<osp::plugin::MiniPanel> createSatellitePanel (int card) override
+    {
+        return ! referenceParity && product().satellite && product().satellite->panel != nullptr ? product().satellite->panel (*this, card) : nullptr;
+    }
     bool generatorGranularToggle() const noexcept { return ! referenceParity && product().generatorGranularToggle; }
     juce::String cardArpNamespace() const override { return productInfo().slug + "."; }
     void setArpViewCard (int shown) noexcept override { arpViewLane.store (std::clamp (shown, 0, 2), std::memory_order_relaxed); }

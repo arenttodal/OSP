@@ -208,6 +208,14 @@ struct ProductInfo
         and rendered pieces of its own (its housing's wood, its badge) in place of ANDOR OSP's,
         for every instance of the product. Unset: ANDOR OSP's, exactly. Interface only. */
     std::optional<osp::plugin::design::Materials> materials;
+    /** SATELLITE (opt-in; ANDOR ANALOG): each card's own stereo motion, switched and opened from
+        the arpeggiator's editor (the per-card arpeggiator's title row). */
+    struct Satellite
+    {
+        std::function<juce::String (int card)> parameterId;   ///< the card's ON parameter
+        std::function<std::unique_ptr<osp::plugin::MiniPanel> (osp::plugin::InstrumentHost&, int card)> panel;
+    };
+    std::optional<Satellite> satellite;
 };
 
 /** Defined by the product (Product.cpp). */

@@ -21,6 +21,8 @@
 namespace osp::plugin
 {
 
+class MiniPanel;   // (ShapingPopups.h: a product's small panels, SATELLITE's)
+
 /**
     What the shared ANDOR interface (shared/andor-ui) needs from the instrument it shows: the
     parameter state, the A/B/C sources, presets, modulation and a few live displays. ANDOR OSP's
@@ -534,6 +536,11 @@ public:
         juce::String pulseDivisionId;          ///< PULSE's note value while synced (empty: none)
     };
     virtual int movementLaneCount() const noexcept { return 1; }
+    /** SATELLITE: each card's own stereo motion (the per-card arpeggiator's companion). The
+        parameter that switches card 0..2's motion, or empty (no SATELLITE key in the ARP editor). */
+    virtual juce::String satelliteParameterId (int /*card*/) const { return {}; }
+    /** SATELLITE's panel, showing card 0..2 (none by default: InstrumentHost.cpp). */
+    virtual std::unique_ptr<MiniPanel> createSatellitePanel (int card);
     virtual MovementLane movementLane (int lane) const { juce::ignoreUnused (lane); return {}; }
     virtual float laneShaperPhase (int lane) const noexcept { return lane == 0 ? shaperPhase() : -1.0f; }
     virtual ShaperPattern laneShaperPattern (int lane) const { juce::ignoreUnused (lane); return shaperCustomPattern(); }

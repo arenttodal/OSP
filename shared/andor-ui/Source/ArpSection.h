@@ -89,6 +89,43 @@ private:
     stacked keys, and GATE and SWING as the instrument's small knobs. No power switch: the light
     by the keyboard is the only one.
 */
+/**
+    SATELLITE's key on the per-card arpeggiator's title row (opt-in: a product that answers
+    InstrumentHost::satelliteParameterId; ANDOR ANALOG). Two targets, as SUB's row: the light
+    switches the motion (some card on: all off, remembering which; none on: those again, or the
+    card being edited), the name and its chevron open the panel - opening never switches it on,
+    switching never opens it. A restrained light, no badge. Keyboard: Space switches, Return opens.
+*/
+class SatelliteKey final : public juce::Component, public juce::SettableTooltipClient
+{
+public:
+    explicit SatelliteKey (InstrumentHost& host);
+
+    /** The card the panel opens on (the one being edited). */
+    std::function<int()> editedCard;
+    bool anyOn() const;
+    bool isOpen() const;
+    /** The light's part (local): a click there switches, anywhere else opens. */
+    juce::Rectangle<int> lightArea() const { return getLocalBounds().withWidth (getHeight()); }
+    void toggle();
+    void openPanel();
+    /** Repaints when the light or the panel changed (the editor's refresh). */
+    void refresh();
+
+    void paint (juce::Graphics&) override;
+    void mouseDown (const juce::MouseEvent&) override;
+    void mouseEnter (const juce::MouseEvent&) override { repaint(); }
+    void mouseExit (const juce::MouseEvent&) override { repaint(); }
+    bool keyPressed (const juce::KeyPress&) override;
+    void focusGained (FocusChangeType) override { repaint(); }
+    void focusLost (FocusChangeType) override { repaint(); }
+
+private:
+    InstrumentHost& host;
+    int remembered = 0;   ///< the cards switched off by the light (bit per card)
+    bool shownOn = false, shownOpen = false;
+};
+
 class ArpInlinePanel final : public juce::Component, public skin::SurfaceFace
 {
 public:
@@ -146,6 +183,8 @@ public:
     /** Everything the per-card controls draw (PLAYS .. EDIT C), in panel coordinates: where a
         product with one arpeggiator differs from ANDOR OSP (the visual regression's mask). */
     static juce::Rectangle<float> cardRowArea() noexcept { return { 190.0f, 12.0f, 360.0f, 30.0f }; }
+    /** SATELLITE's key (a product's opt-in), or null. */
+    SatelliteKey* satelliteKey() noexcept { return satellite.get(); }
 
     /** Places of the parts (tests, snapshots). */
     juce::Rectangle<float> displayArea() const { return steps; }
@@ -193,6 +232,7 @@ private:
     std::array<std::unique_ptr<juce::ParameterAttachment>, 2> lanePattern, laneOctaves;   ///< B's and C's
     std::array<std::unique_ptr<MiniKnob>, 2> laneRate;
     std::array<juce::Rectangle<float>, 3> cardChips {}, editTabs {};
+    std::unique_ptr<SatelliteKey> satellite;
     juce::Rectangle<float> playsCaption, linkChip, editCaption;
     Arpeggiator::Display preview;   ///< the pattern on a C major chord, while nothing is held
     Arpeggiator::Display fieldSteps; ///< the picture: the style on C E G B, one octave
