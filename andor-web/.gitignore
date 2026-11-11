@@ -3,3 +3,7 @@ dist/
 assets/source/
 tests/visual/out/
 framer-upload/
+product-renders/blender/textures/
+*.blend
+*.blend1
+product-renders/renders/**/*_16bit.png
