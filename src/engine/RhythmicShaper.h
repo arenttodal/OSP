@@ -95,8 +95,12 @@ public:
 
     /** Advances the clock by one sample (call every sample, whatever the mode). */
     void tick() noexcept;
-    /** Shapes one sample at depth `amount` (0..1, the MOVEMENT macro). */
-    void process (float& left, float& right, double amount) noexcept;
+    /** Shapes one sample at depth `amount` (0..1, the MOVEMENT macro). `share` (0..1, 1 by
+        default: exactly as always) is this stage's part of the shaping while it is handed over
+        to another (ANDOR ANALOG's SHAPER DNA): its gain is gain^share and its filter closes by
+        share of the octaves, so the two stages together give the whole gate - never twice it,
+        never open - whatever the hand-over's position. */
+    void process (float& left, float& right, double amount, double share = 1.0) noexcept;
     /** VOL's present gain (0..1): what process() multiplies the level by (1 while FILTER is the
         only target). A product sums a signal that skips the shaper (ANDOR ANALOG's SUB) with
         this, so it pulses with the rest. */

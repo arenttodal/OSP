@@ -71,6 +71,11 @@ public:
         movementB.setVoicesActive (active);
     }
     float shaperPhase() const noexcept { return movement.shaperPhase(); }
+    /** MOVEMENT lane A's SHAPER handed over to a product's per-note shaping (opt-in; false by
+        default, as in ANDOR OSP: MovementBus::setShaperHandoff). Lane B is never handed over.
+        CLASSIC (process()) and CUSTOM (customMovement()) both run lane A, so both follow it. */
+    void setShaperHandoff (bool handedOver) noexcept { movement.setShaperHandoff (handedOver); }
+    double shaperHandoff() const noexcept { return movement.shaperHandoff(); }
     /** A lane's SHAPER playhead (0 MOVEMENT, 1 the second lane), -1 when idle. */
     float shaperPhase (int lane) const noexcept { return lane == 0 ? movement.shaperPhase() : movementB.shaperPhase(); }
 

@@ -330,7 +330,7 @@ double RhythmicShaper::cyclePhase (double quarterNotes, ShaperRate rate, double 
     return p - std::floor (p);
 }
 
-void RhythmicShaper::process (float& left, float& right, double amount) noexcept
+void RhythmicShaper::process (float& left, float& right, double amount, double share) noexcept
 {
     amount = std::clamp (amount, 0.0, 1.0);
     // Depth per target, crossfaded over ~40 ms when the target changes.
@@ -354,8 +354,13 @@ void RhythmicShaper::process (float& left, float& right, double amount) noexcept
     // Targets: VOL dips the level by the pattern; FILTER closes up to ~5.6 octaves, with
     // a curve that makes 25 % a gentle top-end articulation and 50 % clearly rhythmic.
     const double closed = 1.0 - shape;
-    const double gainTarget = 1.0 - amount * volumeDepth * closed;
-    const double octTarget = filterDepth * std::pow (amount, 0.8) * closed * std::log2 (openHz / 380.0);
+    double gainTarget = 1.0 - amount * volumeDepth * closed;
+    double octTarget = filterDepth * std::pow (amount, 0.8) * closed * std::log2 (openHz / 380.0);
+    if (share != 1.0)
+    {
+        gainTarget = std::pow (std::max (0.0, gainTarget), share);   // (handed over: this stage's part)
+        octTarget *= share;
+    }
     // Anti-click: never a jump, even at SMOOTH 0 (2 ms).
     gain += (gainTarget - gain) * rampCoef;
     closeOctaves += (octTarget - closeOctaves) * rampCoef;
