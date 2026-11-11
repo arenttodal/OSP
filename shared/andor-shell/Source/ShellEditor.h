@@ -148,6 +148,10 @@ public:
     SampleDock& recordingDock() noexcept { return sampleDock; }
     /** For tests: the controls shown disabled because the engine does not read their parameters. */
     int disabledControlCount() const noexcept { return disabledControls; }
+    /** A macro's knob (tests: its look, e.g. the arc a macro switch dims), or nullptr. */
+    juce::Slider* macroSlider (int macro) noexcept { return macro >= 0 && macro < osp::plugin::frame::macroCount ? &macros[static_cast<std::size_t> (macro)].slider : nullptr; }
+    /** A macro's on / off lamp (ProductInfo::macroSwitches), or nullptr. */
+    osp::plugin::MacroSwitchLamp* macroSwitch (int macro) noexcept;
 
 private:
     void timerCallback() override;
@@ -243,6 +247,9 @@ private:
     float rackShift() const noexcept { return rack.height() > 0.0f ? rack.height() + osp::plugin::design::layout::rackGap : 0.0f; }
     int rackMask() const;
     void rackChanged();
+    std::vector<std::pair<int, std::unique_ptr<osp::plugin::MacroSwitchLamp>>> macroLamps;   ///< (macro, lamp)
+    void placeMacroLamps();
+    void dimMacroArc (int macro, bool on);
     osp::plugin::ModulationOverlay modOverlay { shell, content };
     int modSelSource = -1, modSelSlot = -1;
     int disabledControls = 0;

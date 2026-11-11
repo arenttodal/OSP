@@ -129,6 +129,8 @@ public:
     // (the header's MIX, the ARPEGGIATOR's X, the GRANULAR key: the product's, never in parity)
     bool headerMixShown() const noexcept { return referenceParity || product().headerMix; }
     bool crossCloseKeys() const noexcept { return ! referenceParity && product().crossCloseKeys; }
+    /** The macros' own on / off lamps (the product's; never in the parity render). */
+    bool showsMacroSwitches() const noexcept { return ! referenceParity && ! product().macroSwitches.empty(); }
     bool generatorGranularToggle() const noexcept { return ! referenceParity && product().generatorGranularToggle; }
     bool arpCompanionShown() const noexcept { return ! referenceParity && product().arpCompanion.name.isNotEmpty(); }
     juce::String cardArpNamespace() const override { return productInfo().slug + "."; }

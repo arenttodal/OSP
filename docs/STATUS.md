@@ -977,6 +977,16 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 - Evidence: ANDOR ANALOG's `[cardarp]` tests, its bindings test (all ten new parameters move
   the sound), and its screenshots `analog-arp-card-c` and `analog-arp-unlinked-b`.
 
+- **A macro's own on / off lamp (shared, opt-in: `ProductInfo::macroSwitches`).**
+  - `MacroSwitchLamp` (`MainSections.h`) is a tiny ring-and-dot button left of a macro's name, on
+    its centre line. It is about 14 px drawn, with a 26 px target.
+  - A click, Return or Space toggles it; each toggle is one host gesture and can be undone.
+  - The tooltip is the product's.
+  - While off, the macro's knob arc is dimmed; the value is untouched.
+  - ANDOR ANALOG uses it for MORPH.
+  - In ANDOR OSP the list is empty and the parity render never shows one: OSP is pixel-identical.
+  - Evidence: ANDOR ANALOG's `[analog][morph][ui]` test and `docs/screenshots/morph-lamp`.
+
 ## BLOCKERS
 
 - DAW testing (Logic, Ableton, Reaper) needs a Mac; CI covers build, tests and auval.

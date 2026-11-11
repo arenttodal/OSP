@@ -218,6 +218,16 @@ struct ProductInfo
         and rendered pieces of its own (its housing's wood, its badge) in place of ANDOR OSP's,
         for every instance of the product. Unset: ANDOR OSP's, exactly. Interface only. */
     std::optional<osp::plugin::design::Materials> materials;
+    /** A macro's own on / off as a tiny lamp beside its name (opt-in; ANDOR ANALOG's MORPH): the
+        macro (0..5, data order), a bool parameter of the product's, and the lamp's tooltip. While
+        off, the macro's knob shows its colour arc dimmed (its value untouched). Empty: no lamp,
+        as in ANDOR OSP. Interface only. */
+    struct MacroSwitch
+    {
+        int macro = -1;
+        juce::String parameterId, tooltip;
+    };
+    std::vector<MacroSwitch> macroSwitches;
 };
 
 /** Defined by the product (Product.cpp). */

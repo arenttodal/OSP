@@ -324,6 +324,19 @@ ShellEditor::ShellEditor (ShellProcessor& p)
                     safe->rackLabelMenu (macro, k).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (safe->macros[static_cast<std::size_t> (macro)].label.get()));
             });
         }
+    // A macro's own on / off (opt-in): a tiny lamp beside its name; off dims the knob's arc.
+    if (shell.showsMacroSwitches())
+        for (const auto& sw : shell.product().macroSwitches)
+            if (auto* parameter = shell.parameters.getParameter (sw.parameterId); parameter != nullptr && sw.macro >= 0 && sw.macro < frame::macroCount)
+            {
+                auto lamp = std::make_unique<MacroSwitchLamp> (*parameter, design::colour::macro (sw.macro), &shell.undoManager);
+                lamp->setTooltip (sw.tooltip);
+                const int macro = sw.macro;
+                lamp->onStateChange = [this, macro] (bool on) { dimMacroArc (macro, on); };
+                dimMacroArc (macro, lamp->isOn());
+                content.addAndMakeVisible (*lamp);
+                macroLamps.emplace_back (macro, std::move (lamp));
+            }
     content.addAndMakeVisible (modPanel);
 
     content.addAndMakeVisible (pitchWheel);
@@ -484,6 +497,7 @@ void ShellEditor::layoutInstrument()
                 headerMix.setBounds (mix.withTrimmedLeft (shift));
         }
     }
+    placeMacroLamps();
     modOverlay.setBounds (content.getLocalBounds());
     sourceArea = frame::sourceArea (sourceTrim());
     shownCount = -1;
@@ -1546,6 +1560,43 @@ void ShellEditor::timerCallback()
     modOverlay.refresh();
     if (popup != nullptr)
         popup->refreshContent();
+}
+
+//==============================================================================
+// The macros' own on / off lamps (ProductInfo::macroSwitches)
+
+MacroSwitchLamp* ShellEditor::macroSwitch (int macro) noexcept
+{
+    for (auto& [m, lamp] : macroLamps)
+        if (m == macro)
+            return lamp.get();
+    return nullptr;
+}
+
+void ShellEditor::placeMacroLamps()
+{
+    // Immediately left of the name, on its centre line: the name and knob stay exactly where
+    // the macro row puts them (the lamp takes no room of theirs).
+    for (auto& [macro, lamp] : macroLamps)
+    {
+        auto* label = macros[static_cast<std::size_t> (macro)].label.get();
+        if (label == nullptr)
+            continue;
+        const auto r = label->getBounds().toFloat();
+        constexpr float target = 26.0f, gap = 4.0f;
+        const float centreX = r.getCentreX() - 0.5f * label->textWidth() - gap - 7.0f;
+        lamp->setBounds (juce::Rectangle<float> (target, target).withCentre ({ centreX, r.getCentreY() }).toNearestInt());
+    }
+}
+
+void ShellEditor::dimMacroArc (int macro, bool on)
+{
+    // Off: the knob's colour arc fades (its value and the knob itself as they are).
+    auto& slider = macros[static_cast<std::size_t> (macro)].slider;
+    const auto colour = design::colour::macro (macro);
+    const auto shown = on ? colour : colour.interpolatedWith (design::colour::hairline, 0.62f);
+    slider.getProperties().set ("arc", static_cast<juce::int64> (shown.getARGB()));
+    slider.repaint();
 }
 
 } // namespace andor::shell

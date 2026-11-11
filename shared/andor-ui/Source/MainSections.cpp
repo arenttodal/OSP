@@ -1259,4 +1259,81 @@ void Wheel::setInUse (bool used)
     }
 }
 
+//==============================================================================
+MacroSwitchLamp::MacroSwitchLamp (juce::RangedAudioParameter& parameter, juce::Colour c, juce::UndoManager* undo)
+    : colour (c), attachment (parameter, [this] (float v) {
+          const bool now = v >= 0.5f;
+          if (now == on)
+              return;
+          on = now;
+          repaint();
+          if (onStateChange != nullptr)
+              onStateChange (on);
+      }, undo)
+{
+    setWantsKeyboardFocus (true);
+    setMouseClickGrabsKeyboardFocus (false);
+    setMouseCursor (juce::MouseCursor::PointingHandCursor);
+    setTitle (parameter.getName (64));
+    attachment.sendInitialUpdate();
+}
+
+void MacroSwitchLamp::toggle()
+{
+    attachment.setValueAsCompleteGesture (on ? 0.0f : 1.0f);
+}
+
+juce::Rectangle<float> MacroSwitchLamp::ringArea() const
+{
+    // About 14 of the reference's px, centred in a larger (invisible) target.
+    const float d = std::min (14.0f, 0.56f * static_cast<float> (std::min (getWidth(), getHeight())));
+    return juce::Rectangle<float> (d, d).withCentre (getLocalBounds().toFloat().getCentre());
+}
+
+void MacroSwitchLamp::paint (juce::Graphics& g)
+{
+    // Gentle: a hairline ring and a small dot; on, the dot takes the macro's colour with a soft
+    // halo (as the racks' status lights); off, both stay muted.
+    const auto ring = ringArea();
+    const bool hover = isMouseOver();
+    if (on)
+    {
+        g.setColour (colour.withAlpha (0.16f));
+        g.fillEllipse (ring.expanded (2.0f));
+    }
+    g.setColour (juce::Colours::white.withAlpha (0.55f));
+    g.fillEllipse (ring.reduced (0.5f));
+    g.setColour (design::colour::hairline.darker (hover ? 0.28f : 0.14f));
+    g.drawEllipse (ring.reduced (0.5f), 1.0f);
+    const auto dot = ring.reduced (ring.getWidth() * 0.3f);
+    g.setColour (on ? colour : design::colour::hairline.darker (0.18f));
+    g.fillEllipse (dot);
+    if (on)
+    {
+        g.setColour (juce::Colours::white.withAlpha (0.35f));
+        g.fillEllipse (dot.reduced (dot.getWidth() * 0.32f).translated (-0.4f, -0.5f));
+    }
+    if (hasKeyboardFocus (false))
+    {
+        g.setColour (colour.withAlpha (0.6f));
+        g.drawEllipse (ring.expanded (2.5f), 1.0f);
+    }
+}
+
+void MacroSwitchLamp::mouseUp (const juce::MouseEvent& e)
+{
+    if (! e.mods.isPopupMenu() && getLocalBounds().contains (e.getPosition()))
+        toggle();
+}
+
+bool MacroSwitchLamp::keyPressed (const juce::KeyPress& key)
+{
+    if (key.getKeyCode() == juce::KeyPress::returnKey || key.getKeyCode() == juce::KeyPress::spaceKey)
+    {
+        toggle();
+        return true;
+    }
+    return false;
+}
+
 } // namespace osp::plugin

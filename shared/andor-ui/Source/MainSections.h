@@ -249,6 +249,36 @@ private:
     int dragHandle = -1;
 };
 
+/**
+    A macro's own on / off, as a tiny lamp beside its name (opt-in: ShellProduct::macroSwitches;
+    ANDOR ANALOG's MORPH). A ring with a dot: muted while off, softly lit in the macro's colour
+    while on. A real button (click, Return or Space; one host gesture, undoable) with a larger
+    invisible target than it shows. It switches a bool parameter and nothing else.
+*/
+class MacroSwitchLamp final : public juce::Component, public juce::SettableTooltipClient
+{
+public:
+    MacroSwitchLamp (juce::RangedAudioParameter& parameter, juce::Colour colour, juce::UndoManager* undo);
+    /** The switch moved (any source: a click, automation, a preset): the editor dims the knob. */
+    std::function<void (bool on)> onStateChange;
+    bool isOn() const noexcept { return on; }
+    void toggle();
+    /** The lamp's visible ring (local coordinates; the component is its larger click target). */
+    juce::Rectangle<float> ringArea() const;
+    void paint (juce::Graphics&) override;
+    void mouseUp (const juce::MouseEvent&) override;
+    void mouseEnter (const juce::MouseEvent&) override { repaint(); }
+    void mouseExit (const juce::MouseEvent&) override { repaint(); }
+    bool keyPressed (const juce::KeyPress&) override;
+    void focusGained (FocusChangeType) override { repaint(); }
+    void focusLost (FocusChangeType) override { repaint(); }
+
+private:
+    juce::Colour colour;
+    juce::ParameterAttachment attachment;
+    bool on = false;
+};
+
 /** A performance wheel beside the keyboard: PITCH springs back to the centre, MOD stays. */
 class Wheel final : public juce::Component, public juce::SettableTooltipClient
 {
