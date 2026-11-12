@@ -647,7 +647,7 @@ void ArpInlinePanel::resized()
         for (int c = 0; c < 3; ++c)
             editTabs[static_cast<std::size_t> (c)] = { 460.0f + 28.0f * static_cast<float> (c), y - 0.5f * h, 28.0f, h };
         if (satellite != nullptr)
-            satellite->setBounds (juce::Rectangle<float> (566.0f, y - 0.5f * h, 118.0f, h).getSmallestIntegerContainer());
+            satellite->setBounds (juce::Rectangle<float> (566.0f, y - 0.5f * h, static_cast<float> (satellite->preferredWidth()), h).getSmallestIntegerContainer());
     }
     revealSelected();
 }
@@ -1238,6 +1238,12 @@ bool SatelliteKey::keyPressed (const juce::KeyPress& key)
     return false;
 }
 
+int SatelliteKey::preferredWidth() const
+{
+    const float nameWidth = juce::GlyphArrangement::getStringWidth (type::popupLabel (12.0f), name());
+    return static_cast<int> (std::ceil (nameX + nameWidth + chevronGap + 2.0f * chevronHalf + rightMargin));
+}
+
 void SatelliteKey::paint (juce::Graphics& g)
 {
     using namespace design;
@@ -1246,7 +1252,7 @@ void SatelliteKey::paint (juce::Graphics& g)
     const auto mouse = getMouseXYRelative();
     const bool overLight = hover && lightArea().contains (mouse);
     // The light: a small lens, lit (the accent, a soft glow) or dark (a hairline ring).
-    const auto light = juce::Rectangle<float> (8.0f, 8.0f).withCentre (lightArea().toFloat().getCentre());
+    const auto light = juce::Rectangle<float> (8.0f, 8.0f).withCentre ({ lightCentreX, r.getCentreY() });
     if (shownOn)
     {
         g.setColour (colour::accent.withAlpha (0.22f));
@@ -1262,11 +1268,13 @@ void SatelliteKey::paint (juce::Graphics& g)
         g.drawEllipse (light.reduced (0.5f), 1.0f);
     }
     // The name and its chevron (down: closed; up: its panel open).
-    auto label = r.withTrimmedLeft (static_cast<float> (getHeight())).withTrimmedRight (14.0f);
-    g.setFont (type::popupLabel (12.0f));
+    const auto font = type::popupLabel (12.0f);
+    const float nameWidth = juce::GlyphArrangement::getStringWidth (font, name());
+    g.setFont (font);
     g.setColour (colour::text.withAlpha (shownOn ? 0.92f : ((hover && ! overLight) ? 0.85f : 0.7f)));
-    g.drawText ("SATELLITE", label, juce::Justification::centredLeft, false);
-    const float cx = r.getRight() - 8.0f, cy = r.getCentreY();
+    g.drawText (name(), juce::Rectangle<float> (nameX, r.getY(), std::ceil (nameWidth) + 2.0f, r.getHeight()), juce::Justification::centredLeft, false);
+    // The chevron right after the name (the same rhythm as the light before it), not at the edge.
+    const float cx = nameX + nameWidth + chevronGap + chevronHalf, cy = r.getCentreY();
     juce::Path chevron;
     const float d = shownOpen ? -2.5f : 2.5f;
     chevron.startNewSubPath (cx - 4.0f, cy - d);

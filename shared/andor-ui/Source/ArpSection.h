@@ -125,7 +125,9 @@ public:
     bool anyOn() const;
     bool isOpen() const;
     /** The light's part (local): a click there switches, anywhere else opens. */
-    juce::Rectangle<int> lightArea() const { return getLocalBounds().withWidth (getHeight()); }
+    juce::Rectangle<int> lightArea() const { return getLocalBounds().withWidth (lightPartWidth); }
+    /** Its width: the light, the name and the chevron at even spacing (the name's own width). */
+    int preferredWidth() const;
     void toggle();
     void openPanel();
     /** Repaints when the light or the panel changed (the editor's refresh). */
@@ -140,6 +142,11 @@ public:
     void focusLost (FocusChangeType) override { repaint(); }
 
 private:
+    // Its spacing (px): the light's centre, the name's start, the gap to the chevron, the
+    // chevron's half width, the right margin. Light to name and name to chevron: one rhythm.
+    static constexpr float lightCentreX = 9.0f, nameX = 21.0f, chevronGap = 9.0f, chevronHalf = 4.0f, rightMargin = 7.0f;
+    static constexpr int lightPartWidth = 17;   ///< (to midway between the light and the name)
+    juce::String name() const { return "SATELLITE"; }
     InstrumentHost& host;
     int remembered = 0;   ///< the cards switched off by the light (bit per card)
     bool shownOn = false, shownOpen = false;
