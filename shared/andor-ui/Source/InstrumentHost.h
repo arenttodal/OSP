@@ -377,6 +377,15 @@ public:
         juce::ignoreUnused (kind);
         return nullptr;
     }
+    /** The parameter a shared rack module (rack::Kind, as an int) shows as its own MIX knob,
+        the last of its row (opt-in; empty: none). ANDOR OSP and ANALOG set how much of ECHO and
+        SPACE plays with the macro above the rack, so their racks carry no such knob; a host
+        without that macro names the parameter here (0..100 %) and the rack edits it. */
+    virtual juce::String rackAmountParameter (int kind) const
+    {
+        juce::ignoreUnused (kind);
+        return {};
+    }
     virtual int modControllerNumber (int slot) const noexcept = 0;
     virtual void setModControllerNumber (int slot, int controller) noexcept = 0;
     virtual void learnModController (int slot) noexcept = 0;

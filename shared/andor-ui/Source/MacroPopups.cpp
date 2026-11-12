@@ -3905,7 +3905,24 @@ namespace
         int dividerX() const
         {
             const int x0 = contentX(), x1 = getWidth() - contentRightMargin();
-            return x0 + juce::roundToInt (leftShare() * static_cast<float> (x1 - x0)) + rackcolumns::columnGap;
+            int column = juce::roundToInt (leftShare() * static_cast<float> (x1 - x0));
+            if (hasAmountKnob)
+            {
+                // The opt-in MIX knob is one cell more than the approved column was drawn for:
+                // where the row would pass the divider, the column grows by what is missing
+                // (the picture gives it up; a few pixels in the densest modes, none elsewhere).
+                const bool isDense = dense();
+                int row = 0;
+                for (const auto& cell : cells)
+                {
+                    auto slot = rackcolumns::Slot::knob;
+                    if (auto* c = dynamic_cast<RackCell*> (cell.get()))
+                        slot = c->slot();
+                    row += rackcolumns::slotWidth (slot, isDense) + rackcolumns::slotGap (isDense);
+                }
+                column = std::max (column, row - rackcolumns::slotGap (isDense));
+            }
+            return x0 + column + rackcolumns::columnGap;
         }
         const rack::Faceplate* plate = nullptr;
 
@@ -3989,7 +4006,20 @@ namespace
         {
             cells.clear();
             deckKeys.clear();
+            hasAmountKnob = false;
         }
+        /** The module's own MIX knob, where the host names its parameter (opt-in:
+            InstrumentHost::rackAmountParameter; ANDOR OSP and ANALOG use the macro above the
+            rack and show none). */
+        void amountKnob (rack::Kind kind)
+        {
+            const auto id = processor.rackAmountParameter (static_cast<int> (kind));
+            if (id.isEmpty() || processor.apvts().getParameter (id) == nullptr)
+                return;
+            knob (id, "MIX", [] (double v) { return format::percent (v) + " %"; });
+            hasAmountKnob = true;
+        }
+        bool hasAmountKnob = false;
 
         /** The TAPE deck (V4, opt-in by the faceplate): shown with its reader, or removed. */
         bool deckWanted() const noexcept { return plate != nullptr && plate->tapeDeck; }
@@ -4056,7 +4086,8 @@ namespace
                 // The TAPE deck: the knobs left (27 - 32 %, the dense slots), the reels in the
                 // middle (33 - 39 %), the small display right; one substrate, two quiet rules.
                 const int x1 = width - contentRightMargin(), w = x1 - x0;
-                const int leftEnd = x0 + juce::roundToInt (0.29f * static_cast<float> (w));
+                const int leftEnd = x0 + juce::roundToInt (0.29f * static_cast<float> (w))
+                                    + (hasAmountKnob ? rackcolumns::slotWidth (rackcolumns::Slot::knob, true) + rackcolumns::slotGap (true) : 0);
                 const int deckEnd = x0 + juce::roundToInt (0.66f * static_cast<float> (w));
                 deckDividers = { leftEnd + rackcolumns::columnGap, deckEnd + rackcolumns::columnGap };
                 int x = x0;
@@ -4745,6 +4776,7 @@ namespace
             }
             else
                 knob ("echo.age", "AGE", percent);
+            amountKnob (rack::Kind::echo);
             const juce::String timingTip ("Free time in ms, or a note value synced to the host tempo");
             const juce::String stereoTip ("In the centre, alternating left and right (Ping-Pong), or two heads a little apart");
             if (deckWanted() && key / 2 == static_cast<int> (EchoType::tape))
@@ -4935,6 +4967,7 @@ namespace
                     break;
                 }
             }
+            amountKnob (rack::Kind::space);
             layout();
         }
 
@@ -5949,10 +5982,12 @@ void advanceRackTapeDeck (rack::Module& module, double seconds)
         m->tapeDeck()->advance (seconds);
 }
 
-void setRackPresetFolderForTest (const juce::File& folder)
+void setRackPresetFolder (const juce::File& folder)
 {
     rackPresetFolderOverride() = folder;
 }
+
+void setRackPresetFolderForTest (const juce::File& folder) { setRackPresetFolder (folder); }
 
 std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, InstrumentHost& processor)
 {

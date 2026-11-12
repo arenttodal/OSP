@@ -743,6 +743,26 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       `WellOverlay`: controls revealed in a card's well by the pointer). ANDOR OSP and the
       parity render use none of them. Proof: OSP suites and design capture.
 
+## Shared racks: two opt-ins for a product whose rack is the whole device (12 Nov 2026)
+
+For ANDOR Modular (a patch has any number of echoes and spaces, each a module with a rack of
+its own and no macro above it). Both are off by default: ANDOR OSP and ANDOR ANALOG do not use
+them and are pixel-identical (`[design-capture]`, the shell's and the products' visual
+regressions).
+
+- `InstrumentHost::rackAmountParameter (kind)`: the parameter (0..100 %) the ECHO or SPACE
+  rack shows as its own **MIX** knob, the last knob of its row. Empty (the default): none, as
+  before, where the amount is the macro above the rack. With the knob the control column
+  grows by what the extra cell needs where the row would pass the divider (the densest modes;
+  the tape deck's knob column by one slot).
+- `setRackPresetFolder (folder)`: where the racks' user presets live, for a product that
+  keeps its own (the default stays Documents/ANDOR; `setRackPresetFolderForTest` is the same
+  call).
+
+Neither is a SPACE / ECHO / ARP feature of its own: nothing new to ship in OSP or ANALOG.
+Exercised by ANDOR Modular's product tests (MIX present and fitting in every ECHO machine,
+free and synced, with the tape deck, and in every SPACE engine; bound both ways).
+
 ## DONE
 
 - Pure C++20 DSP/analysis library (`osp_dsp`) independent of JUCE; JUCE used for file

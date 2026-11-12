@@ -69,6 +69,10 @@ bool rackTapeDeckShown (const rack::Module& module);
 juce::Rectangle<int> rackTapeDeckBounds (const rack::Module& module);
 double rackTapeDeckSpeed (const rack::Module& module);
 void advanceRackTapeDeck (rack::Module& module, double seconds);
+/** Where the racks' user presets live: `<folder>/Space Presets`, `Echo Presets`, `Movement
+    Presets` (an empty file: Documents/ANDOR, the family's, the default). For a product that
+    keeps presets of its own; set once, before a rack is shown (message thread). */
+void setRackPresetFolder (const juce::File& folder);
 /** Tests: user presets saved under this folder instead of Documents/ANDOR. */
 void setRackPresetFolderForTest (const juce::File& folder);
 /** Tests: a module's knobs' captions, in order (MOVEMENT "INTENSITY SPEED PITCH TONE", ECHO, SPACE). */
