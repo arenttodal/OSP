@@ -847,8 +847,10 @@ void ShellEditor::fileDragMove (const juce::StringArray& files, int x, int y)
     for (const auto& f : files)
         audio = audio || juce::File (f).hasFileExtension ("wav;aif;aiff;flac");
     // Only where the drop would land shows it: an owner's part, or the cards' own targets.
-    const bool cards = owner == nullptr && audio;
-    dragLayer = cards ? dropLayerAt ({ x, y }) : -1;
+    const bool emptyIgnored = shell.hasAuxStrip() && shell.product().auxStrip->emptyDropsIgnored;
+    dragLayer = owner == nullptr && audio ? dropLayerAt ({ x, y }) : -1;
+    // (empty space ignored: only a card under the pointer shows a target)
+    const bool cards = owner == nullptr && audio && (! emptyIgnored || dragLayer >= 0);
     dropZone.setHighlight (cards);
     sampleDock.setHighlight (cards);   // (a hybrid product: any drop on the cards loads the recording)
     addTarget.setHighlight (cards && dragLayer < 0);
@@ -886,11 +888,12 @@ void ShellEditor::filesDropped (const juce::StringArray& files, int x, int y)
     for (const auto& f : files)
         if (juce::File (f).hasFileExtension ("wav;aif;aiff;flac"))
             list.add (juce::File (f));
-    if (list.isEmpty())
+    const bool emptyIgnored = shell.hasAuxStrip() && shell.product().auxStrip->emptyDropsIgnored;
+    if (list.isEmpty() || (layer < 0 && emptyIgnored))
     {
         shownCount = -1;
         timerCallback();
-        return;   // (nothing this editor can load: nothing changes)
+        return;   // (nothing this editor can load, or empty space where the product ignores it)
     }
     if (layer >= 0)
         shell.loadFile (list.getFirst(), layer);

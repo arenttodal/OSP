@@ -838,6 +838,8 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
     that owns drops, consumed (never a card's too);
   - `LayerStateButton` for a product source's own M / S parameter;
   - `ShellEditor::cardDisplayBounds`, which the strip aligns its zones to.
+  - `AuxStrip::emptyDropsIgnored`: a file dropped on empty space (neither a card nor an owner)
+    does nothing in a product that asks for it (ANDOR ANALOG).
 
   It is a source, not a SPACE / ECHO / ARP feature. ANDOR OSP sets none and is unchanged: no menu
   item, no view attribute, no room (the shell test `[aux]`; the OSP captures). Should ANDOR OSP
