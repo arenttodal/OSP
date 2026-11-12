@@ -412,6 +412,16 @@ ShellEditor::ShellEditor (ShellProcessor& p)
 
     juce::Desktop::getInstance().addGlobalMouseListener (&outsideClicks);
 
+    // The product's AUX strip (opt-in): as the session left it (a view setting).
+    if (shell.hasAuxStrip() && shell.auxStripShown())
+    {
+        auxStrip = shell.product().auxStrip->create (shell);
+        if (auxStrip != nullptr)
+        {
+            content.addAndMakeVisible (*auxStrip, content.getIndexOfChildComponent (&modOverlay));   // (under the overlay)
+            auxShownApplied = true;
+        }
+    }
     content.onPaint = [this] (juce::Graphics& g) { frame::paint (g, content, shell.product().identity, arpShown, bankShown == 1 ? userRow : macros, rackShift(), sourceTrim()); };
     addAndMakeVisible (content);
     layoutInstrument();
@@ -503,7 +513,14 @@ void ShellEditor::layoutInstrument()
     placeMacroLamps();
     placeUserMacros();
     modOverlay.setBounds (content.getLocalBounds());
-    sourceArea = frame::sourceArea (sourceTrim());
+    sourceArea = frame::sourceArea (cardTrim());   // (the cards keep their place: only what is under them moves)
+    if (auxStrip != nullptr)
+    {
+        auxStrip->setVisible (auxShownApplied);
+        if (auxShownApplied)
+            auxStrip->setBounds (sourceArea.getX(), sourceArea.getBottom() + juce::roundToInt (auxGap), sourceArea.getWidth(),
+                                 juce::roundToInt (shell.product().auxStrip->height));
+    }
     shownCount = -1;
     layoutSources();
 }
@@ -879,6 +896,13 @@ void ShellEditor::showMenu()
     menu.addItem ("Init", [this] { shell.initPatch(); timerCallback(); });
     menu.addItem ("Reset settings", [this] { shell.resetSettings(); timerCallback(); });
     menu.addSeparator();
+    if (shell.hasAuxStrip())
+    {
+        const auto& name = shell.product().auxStrip->name;
+        const bool shown = shell.auxStripShown();
+        menu.addItem ((shown ? "Hide " : "Show ") + name, [this, shown] { setAuxStripShown (! shown); });
+        menu.addSeparator();
+    }
     menu.addItem ("Undo", shell.undoManager.canUndo(), false, [this] { shell.undoManager.undo(); });
     menu.addItem ("Redo", shell.undoManager.canRedo(), false, [this] { shell.undoManager.redo(); });
     menu.addSeparator();
@@ -923,6 +947,11 @@ bool ShellEditor::keyPressed (const juce::KeyPress& key)
     if (key == juce::KeyPress::escapeKey && isWellEditorShown())
     {
         toggleWellEditor();   // (as its heading: back to the waveform)
+        return true;
+    }
+    if (key == juce::KeyPress::escapeKey && shell.showsRack() && rack.isShown (rack::Kind::aux))
+    {
+        setRackExpanded (rack::Kind::aux, false);   // (the AUX rack: one level at a time)
         return true;
     }
     if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'Z')
@@ -1285,6 +1314,37 @@ void ShellEditor::mouseDownAnywhere (juce::Component* c)
     closePopup();
 }
 
+void ShellEditor::setAuxStripShown (bool shown)
+{
+    if (! shell.hasAuxStrip())
+        return;
+    shell.setAuxStripShown (shown);
+    applyAuxStrip();
+}
+
+void ShellEditor::applyAuxStrip()
+{
+    // A view change only: the window grows or shrinks by the strip's room, nothing sounds
+    // different (hiding it never mutes D, never unloads what it plays).
+    const bool want = shell.auxStripShown();
+    if (want == auxShownApplied)
+        return;
+    if (want && auxStrip == nullptr)
+    {
+        auxStrip = shell.product().auxStrip->create (shell);
+        if (auxStrip == nullptr)
+            return;
+        content.addChildComponent (*auxStrip, content.getIndexOfChildComponent (&modOverlay));
+    }
+    auxShownApplied = want;
+    if (! want && rack.isShown (rack::Kind::aux))
+        setRackExpanded (rack::Kind::aux, false);   // (its rack goes with it)
+    layoutInstrument();
+    frame::applyWindowShape (*this, instrumentHeight(), true);
+    placeKeyDna();
+    content.repaint();
+}
+
 void ShellEditor::setArpExpanded (bool open)
 {
     shell.setArpEditorExpanded (open);
@@ -1611,6 +1671,8 @@ void ShellEditor::timerCallback()
     updateStatus();
     if (shell.arpEditorExpanded() != arpShown)
         setArpExpanded (shell.arpEditorExpanded());
+    if (shell.hasAuxStrip() && shell.auxStripShown() != auxShownApplied)
+        applyAuxStrip();   // (a session recalled, or the strip's own Hide AUX)
     if (shell.showsRack())
     {
         // A session recalled with another rack open (the view setting it saved).

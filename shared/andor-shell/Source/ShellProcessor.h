@@ -112,6 +112,11 @@ public:
     bool showsRack() const noexcept { return ! referenceParity && (! product().rackModules.empty() || ! product().productRacks.empty()); }
     /** The product's other view of the sources' area and its icon (not in the parity render). */
     bool showsSourceView() const noexcept { return ! referenceParity && product().sourceAreaView.create != nullptr; }
+    /** The product's AUX strip (ShellProduct::auxStrip), and whether it is shown (a view
+        setting: saved with the session, kept as it is when a preset loads). */
+    bool hasAuxStrip() const noexcept { return ! referenceParity && product().auxStrip.has_value() && product().auxStrip->create != nullptr; }
+    bool auxStripShown() const noexcept { return hasAuxStrip() && auxOpen.load(); }
+    void setAuxStripShown (bool shown) noexcept { auxOpen = shown; }
     /** A shared rack's faceplate: the product's (not in the parity render). */
     const osp::plugin::rack::Faceplate* rackFaceplate (int kind) const noexcept override
     {
@@ -471,6 +476,8 @@ private:
     // View settings.
     std::atomic<bool> arpOpen { false }, shaperLarge { false };
     std::atomic<int> rackOpen { 0 };
+    std::atomic<bool> auxOpen { false };
+    bool applyingPreset = false;   ///< (loadPreset: the view's AUX strip stays as it is)
     std::atomic<int> modTab { 0 };
 
     // Presets.

@@ -640,6 +640,48 @@ namespace
     }
 }
 
+TEST_CASE ("shell: the AUX strip is a product's opt-in view; without it nothing changes", "[shell][editor][aux]")
+{
+    ShellProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<ShellEditor*> (editor.get());
+    REQUIRE (ui != nullptr);
+    ui->refreshNow();
+    const float height = ui->instrumentHeight();
+    const int modY = ui->modulationPanel().getY();
+    juce::MemoryBlock session;
+    p.getStateInformation (session);
+    const auto xml = juce::AudioProcessor::getXmlFromBinary (session.getData(), static_cast<int> (session.getSize()));
+    REQUIRE (xml != nullptr);
+    const auto* view = xml->getChildByName ("View");
+    REQUIRE (view != nullptr);
+    if (! p.hasAuxStrip())
+    {
+        // (ANDOR OSP and every product without one: no strip, no view setting, no room)
+        CHECK_FALSE (view->hasAttribute ("auxShown"));
+        ui->setAuxStripShown (true);
+        CHECK (ui->auxStripComponent() == nullptr);
+        CHECK (ui->auxShift() == 0.0f);
+        CHECK (ui->sourceTrim() == ui->cardTrim());
+        CHECK (ui->instrumentHeight() == Approx (height));
+        return;
+    }
+    // A product with one: hidden by default; shown, everything under the cards moves down by its
+    // room and the window grows by as much; hidden, every place returns.
+    CHECK (view->hasAttribute ("auxShown"));
+    CHECK_FALSE (p.auxStripShown());
+    const auto card = ui->engineCard (0).getBounds();
+    ui->setAuxStripShown (true);
+    REQUIRE (ui->auxStripComponent() != nullptr);
+    CHECK (ui->auxShift() > 0.0f);
+    CHECK (ui->engineCard (0).getBounds() == card);
+    CHECK (ui->modulationPanel().getY() == modY + juce::roundToInt (ui->auxShift()));
+    CHECK (ui->instrumentHeight() == Approx (height + ui->auxShift()));
+    ui->setAuxStripShown (false);
+    CHECK (ui->modulationPanel().getY() == modY);
+    CHECK (ui->instrumentHeight() == Approx (height));
+}
+
 TEST_CASE ("shell: the interface is ANDOR OSP's, pixel for pixel outside the approved dynamic regions", "[.][visual-regression]")
 {
     const char* referenceEnv = std::getenv ("ANDOR_VISUAL_REFERENCE_DIR");

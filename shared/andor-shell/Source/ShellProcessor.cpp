@@ -1279,6 +1279,8 @@ std::unique_ptr<juce::XmlElement> ShellProcessor::stateXml() const
                                            rackMemory.getAllValues()[i]);
         }
     }
+    if (hasAuxStrip())
+        view->setAttribute ("auxShown", auxOpen.load() ? 1 : 0);
     view->setAttribute ("modTab", modTab.load());
     view->setAttribute ("editLayer", editLayer());
     view->setAttribute ("velToAmp", velToAmp.load() ? 1 : 0);
@@ -1380,6 +1382,8 @@ bool ShellProcessor::applyStateXml (const juce::XmlElement& xml)
                 for (int i = 0; i < presets->getNumAttributes(); ++i)
                     rackMemory.set (presets->getAttributeName (i), presets->getAttributeValue (i));
         }
+        if (hasAuxStrip() && ! applyingPreset)
+            auxOpen = view->getIntAttribute ("auxShown") != 0;   // (a preset never shows or hides it)
         setModPanelTab (view->getIntAttribute ("modTab"));
         setEditLayer (view->getIntAttribute ("editLayer"));
         velToAmp = view->getIntAttribute ("velToAmp", 1) != 0;
@@ -1507,6 +1511,7 @@ bool ShellProcessor::loadPreset (const juce::File& file)
     if (xml == nullptr)
         return false;
     rememberPreviousState (file.getFileNameWithoutExtension());
+    const juce::ScopedValueSetter<bool> asPreset (applyingPreset, true);
     if (! applyStateXml (*xml))
         return false;
     lastPresetFile = file;
@@ -1526,6 +1531,7 @@ bool ShellProcessor::restorePreviousState()
         return false;
     const auto state = std::move (previousState);
     previousStateLabel.clear();
+    const juce::ScopedValueSetter<bool> asPreset (applyingPreset, true);   // (as a preset: the view stays)
     return applyStateXml (*state);
 }
 

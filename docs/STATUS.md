@@ -825,6 +825,18 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 
 ## NEXT
 
+- **AUX strip (shell, opt-in; ANDOR ANALOG's D / AUX, analog `docs/aux/AUX_REPORT.md`).**
+  `ProductInfo::auxStrip` adds an optional strip under the source cards:
+  - "Show / Hide AUX" in the main menu;
+  - `<View auxShown>` kept with the session, never with a preset;
+  - everything under the cards moves down by its room (`ShellEditor::auxShift`, the cards' own
+    `cardTrim` unchanged);
+  - `rack::Kind::aux` for its rack, and Escape closing that rack.
+
+  It is a source, not a SPACE / ECHO / ARP feature. ANDOR OSP sets none and is unchanged: no menu
+  item, no view attribute, no room (the shell test `[aux]`; the OSP captures). Should ANDOR OSP
+  want a fourth source, it needs a product strip and an engine bus of its own.
+
 - **SATELLITE in ANDOR OSP's own plugin** (the rule on shared ARP features). The motion
   (`src/engine/SatelliteMotion.h`) and the arpeggiator editor's SATELLITE key
   (`ArpSection`: `SatelliteKey`) are shared and opt-in. ANDOR ANALOG supplies the per-voice DSP

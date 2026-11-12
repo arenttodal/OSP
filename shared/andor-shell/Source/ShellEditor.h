@@ -94,6 +94,7 @@ public:
     osp::plugin::EngineCard& engineCard (int layer) noexcept { return *cards[static_cast<std::size_t> (juce::jlimit (0, 2, layer))]; }
     osp::plugin::ModulationPanel& modulationPanel() noexcept { return modPanel; }
     void setArpExpanded (bool open);
+    void applyAuxStrip();
     /** The product's other view of the sources' area (ShellProduct::sourceAreaView): shown in
         the cards' place, or the cards again. Interface only. */
     void setSourceViewShown (bool shown);
@@ -102,7 +103,18 @@ public:
     juce::Button& sourceViewToggle() noexcept { return sourceViewButton; }
     float instrumentHeight() const noexcept { return osp::plugin::frame::instrumentHeight (arpShown, rackShift(), sourceTrim()); }
     /** The source cards' trim (their modifiers in the well: nothing kept under the knobs). */
-    float sourceTrim() const noexcept { return shell.modifiersInWell() ? osp::plugin::EngineCard::footTrim : 0.0f; }
+    float cardTrim() const noexcept { return shell.modifiersInWell() ? osp::plugin::EngineCard::footTrim : 0.0f; }
+    /** How far everything under the cards moves up: the cards' trim, less the AUX strip's room
+        while it is shown (negative: down). */
+    float sourceTrim() const noexcept { return cardTrim() - auxShift(); }
+    /** The product's AUX strip (ShellProduct::auxStrip): shown or hidden (a view change only;
+        the window grows or shrinks by its room). */
+    void setAuxStripShown (bool shown);
+    bool auxStripShown() const noexcept { return auxShownApplied; }
+    juce::Component* auxStripComponent() const noexcept { return auxStrip.get(); }
+    /** The room the AUX strip takes while shown: its height and the gap above it. */
+    float auxShift() const noexcept { return auxShownApplied ? shell.product().auxStrip->height + auxGap : 0.0f; }
+    static constexpr float auxGap = 18.0f;   ///< (as far below the cards as the macros' tabs were)
     /** The effects rack (the product's rackModules; tests and snapshots). */
     osp::plugin::rack::Host& effectsRack() noexcept { return rack; }
     /** The macro (0..5) whose name opens a rack module (a double-click), or -1. */
@@ -242,6 +254,8 @@ private:
     };
     SourceViewButton sourceViewButton;
     std::unique_ptr<juce::Component> sourceView;
+    std::unique_ptr<juce::Component> auxStrip;   ///< (ShellProduct::auxStrip; made when first shown)
+    bool auxShownApplied = false;
     bool sourceViewOpen = false;
 
     // Sources

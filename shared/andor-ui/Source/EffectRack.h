@@ -32,9 +32,10 @@ enum class Kind
     space,
     filter,   ///< a product's own (ShellProduct::productRacks): ANDOR ANALOG's FILTER
     morph,    ///< a product's own: ANDOR ANALOG's MORPH
-    fx        ///< a product's own, opened from its view rather than a macro: ANDOR ANALOG's FX library
+    fx,       ///< a product's own, opened from its view rather than a macro: ANDOR ANALOG's FX library
+    aux       ///< a product's own, opened from its AUX strip (ShellProduct::auxStrip): ANDOR ANALOG's D
 };
-static constexpr int kindCount = 6;
+static constexpr int kindCount = 7;
 juce::String name (Kind kind);
 /** The module a macro's parameter opens ("motion" MOVEMENT, "echo", "space"), if any. */
 std::optional<Kind> kindForMacro (const juce::String& parameterId);

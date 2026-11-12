@@ -148,6 +148,19 @@ struct ProductInfo
         std::function<std::unique_ptr<juce::Component> (osp::plugin::InstrumentHost&)> create;
     };
     SourceAreaView sourceAreaView;
+    /** An optional strip under the source cards (opt-in; ANDOR ANALOG's D / AUX). The main menu
+        shows or hides it ("Show AUX" / "Hide AUX"); while shown everything under the cards (the
+        macros, the modulation panel, the racks, the arpeggiator, the keyboard) moves down by its
+        height and gap, and the window grows by as much. The cards keep their places and size.
+        Interface only: showing or hiding it never changes the sound. Its visibility is a view
+        setting kept with the session, never with a preset. Unset: none (ANDOR OSP). */
+    struct AuxStrip
+    {
+        float height = 76.0f;   ///< design px
+        juce::String name = "AUX";
+        std::function<std::unique_ptr<juce::Component> (osp::plugin::InstrumentHost&)> create;
+    };
+    std::optional<AuxStrip> auxStrip;
     /** The shared rack modules' hardware faceplates (opt-in; ANDOR ANALOG's), by rack::Kind;
         empty: the approved racks as they are (ANDOR OSP). Interface only. */
     std::map<osp::plugin::rack::Kind, osp::plugin::rack::Faceplate> rackFaceplates;
