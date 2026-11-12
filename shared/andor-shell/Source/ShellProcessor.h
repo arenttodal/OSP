@@ -151,6 +151,7 @@ public:
     {
         return ! referenceParity && product().satellite && product().satellite->panel != nullptr ? product().satellite->panel (*this, card) : nullptr;
     }
+    juce::String unpitchedSourceName (int) const override { return referenceParity ? juce::String() : product().unpitchedSourceName; }
     juce::String shaperDnaNote() const override
     {
         return ! referenceParity && product().shaperDna && product().shaperDna->note != nullptr ? product().shaperDna->note (const_cast<ShellProcessor&> (*this)) : juce::String();

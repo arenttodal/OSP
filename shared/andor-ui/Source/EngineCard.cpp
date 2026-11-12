@@ -2922,7 +2922,7 @@ void EngineCard::refresh()
             notesButton.setNeedsReview (status == "Needs review");
         }
         else if (! loading && instrument != nullptr)
-            text = {};
+            text = ! instrument->analysis.pitch.detected && ! processor.rootOverride (layerIndex) ? processor.unpitchedSourceName (layerIndex) : juce::String();
         if (text != fileText)
         {
             fileText = text;
@@ -2935,7 +2935,8 @@ void EngineCard::refresh()
     if (const auto overrideMidi = processor.rootOverride (layerIndex))
         root = midiNoteName (static_cast<int> (std::lround (*overrideMidi)));
     else if (instrument != nullptr && instrument->atlas == nullptr)   // an atlas has a root per note (the NOTE MAP)
-        root = instrument->analysis.pitch.detected ? juce::String (instrument->analysis.pitch.noteName) : juce::String ("?");
+        root = instrument->analysis.pitch.detected ? juce::String (instrument->analysis.pitch.noteName)
+                                                   : (processor.unpitchedSourceName (layerIndex).isNotEmpty() ? juce::String() : juce::String ("?"));   // (a product's name: in the file line)
     if (root != rootText)
     {
         rootText = root;

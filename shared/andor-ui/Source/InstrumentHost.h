@@ -447,6 +447,10 @@ public:
     /** Why DNA cannot play just now (e.g. MOVEMENT is not on MAIN), for the key's tooltip; empty
         when it can. */
     virtual juce::String shaperDnaNote() const { return {}; }
+    /** A recording in which no pitch was found (a drum loop, rain): the name its card's header
+        shows, in the source-name type (as a generated source's "OSC 1"), instead of the root's
+        "?". Empty: "?" (ANDOR OSP's). */
+    virtual juce::String unpitchedSourceName (int /*layer*/) const { return {}; }
     /** SATELLITE (opt-in; ANDOR ANALOG's): each card's own stereo motion. The parameter that
         switches card 0..2's motion, or empty (ANDOR OSP: no SATELLITE key in the ARP editor). */
     virtual juce::String satelliteParameterId (int /*card*/) const { return {}; }

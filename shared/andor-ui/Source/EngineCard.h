@@ -514,6 +514,9 @@ public:
     CardWellEditor* wellEditorComponent() noexcept { return wellEditor.get(); }
     void setWellEditorShown (bool shown);
     bool isWellEditorShown() const noexcept { return wellEditor != nullptr && wellEditor->isVisible(); }
+    /** The header as drawn (tests): the root (large) and the name line beside it. */
+    const juce::String& headerRoot() const noexcept { return rootText; }
+    const juce::String& headerName() const noexcept { return fileText; }
 
     /** The layer's EQ over its waveform (a view setting: the EQ keeps playing either way). */
     std::function<void (int, bool)> onEqToggle;        ///< its EQ button (the editor keeps one open at a time)

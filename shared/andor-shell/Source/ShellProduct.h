@@ -120,6 +120,9 @@ struct ProductInfo
     /** C RHYTHM as a modulation source (ANDOR ANALOG's RHYTHMIC MORPH): the routes' source list
         and the panel offer it after ANDOR OSP's twelve. */
     bool rhythmSource = false;
+    /** A card's recording with no pitch found: its header's name instead of "?" (InstrumentHost::
+        unpitchedSourceName; ANDOR ANALOG: "HYBRID"). Empty: "?". */
+    juce::String unpitchedSourceName;
     /** The effects rack (osp::plugin::rack, opt-in): the modules a key beside their macro's
         name expands between the macros and the arpeggiator (MOVEMENT, ECHO, SPACE). Empty:
         no keys and no rack, as in ANDOR OSP. */
