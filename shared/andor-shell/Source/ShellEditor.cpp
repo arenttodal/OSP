@@ -1239,6 +1239,17 @@ void ShellEditor::toggleWellEditor()
 
 void ShellEditor::mouseDownAnywhere (juce::Component* c)
 {
+    if (chosenMacro >= 0 && c != nullptr && c != &modOverlay)
+    {
+        bool own = false;
+        for (auto& row : userRow)
+            own = own || c == &row.slider || row.slider.isParentOf (c) || (row.label != nullptr && c == row.label.get());
+        if (! own)
+        {
+            chosenMacro = -1;   // (a click elsewhere: back to the quiet arcs)
+            updateUserMacroArcs();
+        }
+    }
     if (popup == nullptr)
     {
         closedByLabelPress = -1;
@@ -1728,25 +1739,68 @@ void ShellEditor::setUpUserMacros()
     };
     assignOverlay.onCancel = [this] { cancelUserMacroAssign(); };
     content.addAndMakeVisible (assignOverlay);
-    // A control's right-click menu: Assign to USER (its existing items unchanged, first).
-    modOverlay.extendContextMenu = [this] (juce::PopupMenu& menu, const juce::String& id) {
+    // A control's right-click menu: its existing items unchanged, first; then its macros
+    // (Assign to Macro, and for an assigned control its range, removal, details).
+    modOverlay.extendContextMenu = [this] (juce::PopupMenu& menu, const juce::String& id) { addUserMacroItems (menu, id); };
+    // The halos draw the USER macros' ranges in their own vocabulary (docs/MACRO_DESTINATION_FIRST.md).
+    modOverlay.macroEligible = [this] (const juce::String& id) {
         const auto* u = shell.userMacros();
-        if (u == nullptr || u->eligible == nullptr || ! u->eligible (shell, id))
-            return;
-        juce::PopupMenu sub;
-        for (int m = 0; m < 6; ++m)
-        {
-            const bool has = u->targets != nullptr && u->targets (shell, m).contains (id);
-            sub.addItem (u->name (shell, m), true, has, [this, m, id] {
-                showMacroBank (1);   // (the macro it now has: shown)
-                if (shell.userMacros()->assign (shell, m, id))
-                    openUserMacroPanel (m, id);
-                refreshUserMacros();
-            });
-        }
-        menu.addSeparator();
-        menu.addSubMenu ("Assign to USER", sub);
+        return u != nullptr && u->eligible != nullptr && u->eligible (shell, id);
     };
+    modOverlay.anyMacroArcs = [this] {
+        const auto* u = shell.userMacros();
+        if (u == nullptr || u->targets == nullptr)
+            return false;
+        for (int m = 0; m < frame::macroCount; ++m)
+            if (! u->targets (shell, m).isEmpty())
+                return true;
+        return false;
+    };
+    modOverlay.macroArcs = [this] (const juce::String& id) {
+        std::vector<osp::plugin::ModulationOverlay::MacroArc> arcs;
+        const auto* u = shell.userMacros();
+        if (u == nullptr || u->ranges == nullptr)
+            return arcs;
+        for (const auto& r : u->ranges (shell, id))
+        {
+            osp::plugin::ModulationOverlay::MacroArc a;
+            a.macro = r.macro;
+            a.colour = userMacroColour (r.macro);
+            a.name = userMacroTitle (r.macro);
+            a.atMin = r.atMin;
+            a.atMax = r.atMax;
+            a.now = r.now;
+            a.base = r.base;
+            a.macroValue = r.macroValue;
+            a.enabled = r.enabled;
+            arcs.push_back (a);
+        }
+        return arcs;
+    };
+    modOverlay.macroOffset = [this] (const juce::String& id) {
+        const auto* u = shell.userMacros();
+        return u != nullptr && u->offsetNow != nullptr ? u->offsetNow (shell, id) : 0.0f;
+    };
+    modOverlay.editMacroRange = [this] (int m, const juce::String& id, int end, float position, osp::plugin::ModulationOverlay::MacroEdit phase) {
+        const auto* u = shell.userMacros();
+        if (u == nullptr || u->editRange == nullptr)
+            return;
+        u->editRange (shell, m, id, end, position, static_cast<int> (phase));
+        if (phase == osp::plugin::ModulationOverlay::MacroEdit::begin && m != modOverlay.macroFocus())
+            setChosenUserMacro (m);   // (editing it: its controls shown)
+        if (phase == osp::plugin::ModulationOverlay::MacroEdit::commit || phase == osp::plugin::ModulationOverlay::MacroEdit::cancel)
+            refreshUserMacros();
+    };
+    modOverlay.resetMacroEnd = [this] (int m, const juce::String& id, int end) {
+        if (const auto* u = shell.userMacros(); u != nullptr && u->resetEnd != nullptr)
+            u->resetEnd (shell, m, id, end);
+    };
+    // Touching a USER knob chooses its macro (its controls' rings shown while it moves them).
+    for (std::size_t i = 0; i < userRow.size(); ++i)
+    {
+        const int macro = static_cast<int> (i);
+        userRow[i].slider.onDragStart = [this, macro] { setChosenUserMacro (macro); };
+    }
     showMacroBank (shell.macroBank());
     refreshUserMacros();
 }
@@ -1811,6 +1865,8 @@ void ShellEditor::showMacroBank (int bank)
             renameField.reset();
         renaming = -1;
     }
+    if (bank == 0)
+        chosenMacro = -1;
     // Presentation only: the knobs shown change, the sound never does.
     for (std::size_t i = 0; i < macros.size(); ++i)
     {
@@ -1966,29 +2022,115 @@ void ShellEditor::updateUserMacroArcs()
         }
     if (um == nullptr || bankShown != 1 || dragMacro >= 0 || pickMacro >= 0)
     {
-        if (arcsMacro >= 0 && assignOverlay.mode() == MacroAssignOverlay::Mode::show)
-            assignOverlay.stop();
         arcsMacro = -1;
+        modOverlay.setMacroFocus (-1);
         return;
     }
+    // The focused macro: its panel open, else its name hovered, else the one chosen (from a
+    // control's menu, a handle, its knob). Its controls' halos show its ranges, handles live.
     int shown = panelMacro;
     for (std::size_t i = 0; i < userRow.size() && shown < 0; ++i)
         if (userRow[i].label != nullptr && userRow[i].label->isMouseOver())
             shown = static_cast<int> (i);
-    if (shown == arcsMacro)
-        return;
-    arcsMacro = shown;
     if (shown < 0)
+        shown = chosenMacro;
+    arcsMacro = shown;
+    modOverlay.setMacroFocus (shown);
+}
+
+void ShellEditor::setChosenUserMacro (int macro)
+{
+    chosenMacro = macro >= 0 && macro < frame::macroCount ? macro : -1;
+    if (chosenMacro >= 0 && bankShown != 1)
+        showMacroBank (1);
+    updateUserMacroArcs();
+}
+
+juce::String ShellEditor::userMacroMenuName (int macro) const
+{
+    // "Macro 1", or "Macro 1 - BRIGHTNESS" once named (the macro's own name, as on its knob).
+    const auto* u = shell.userMacros();
+    const auto name = u != nullptr && u->name != nullptr ? u->name (const_cast<ShellProcessor&> (shell), macro) : juce::String();
+    const auto number = "Macro " + juce::String (macro + 1);
+    return name.isEmpty() || name.equalsIgnoreCase (number) ? number : number + juce::String::fromUTF8 (" \xe2\x80\x94 ") + name;
+}
+
+juce::String ShellEditor::userMacroTitle (int macro) const
+{
+    const auto* u = shell.userMacros();
+    const auto name = u != nullptr && u->name != nullptr ? u->name (const_cast<ShellProcessor&> (shell), macro) : juce::String();
+    const auto number = "MACRO " + juce::String (macro + 1);
+    return name.isEmpty() || name.equalsIgnoreCase (number) ? number : number + juce::String::fromUTF8 (" \xc2\xb7 ") + name;
+}
+
+void ShellEditor::addUserMacroItems (juce::PopupMenu& menu, const juce::String& id)
+{
+    const auto* u = shell.userMacros();
+    if (u == nullptr || u->eligible == nullptr || ! u->eligible (shell, id))
+        return;   // (not a control a macro may move: no misleading item)
+    juce::Component::SafePointer<ShellEditor> safe (this);
+    std::vector<int> assigned;
+    if (u->targets != nullptr)
+        for (int m = 0; m < frame::macroCount; ++m)
+            if (u->targets (shell, m).contains (id))
+                assigned.push_back (m);
+    menu.addSeparator();
+    juce::PopupMenu choose;
+    for (int m = 0; m < frame::macroCount; ++m)
     {
-        assignOverlay.stop();
-        return;
+        const bool has = std::find (assigned.begin(), assigned.end(), m) != assigned.end();
+        choose.addItem (userMacroMenuName (m), true, has, [safe, m, id] {
+            if (safe == nullptr)
+                return;
+            // Assigned at once, with a visible range around where the control sits (no jump);
+            // its macro chosen, so its range is on the knob, ready to drag.
+            if (safe->shell.userMacros()->assign (safe->shell, m, id))
+                safe->setChosenUserMacro (m);
+            safe->refreshUserMacros();
+        });
     }
-    collectAssignTargets();
-    std::vector<juce::String> ids;
-    if (um->targets != nullptr)
-        for (const auto& id : um->targets (shell, shown))
-            ids.push_back (id);
-    assignOverlay.show (std::move (ids), userMacroColour (shown));
+    menu.addSubMenu ("Assign to Macro", choose);
+    if (assigned.empty())
+        return;
+    // Per assigned macro (one: plain items; several: one submenu each way).
+    auto perMacro = [&] (const juce::String& title, std::function<void (int)> action) {
+        if (assigned.size() == 1)
+        {
+            const int m = assigned.front();
+            menu.addItem (title, [safe, m, action] { if (safe != nullptr) action (m); });
+            return;
+        }
+        juce::PopupMenu sub;
+        for (const int m : assigned)
+            sub.addItem (userMacroMenuName (m), [safe, m, action] { if (safe != nullptr) action (m); });
+        menu.addSubMenu (title, sub);
+    };
+    perMacro ("Edit Macro Range", [this] (int m) { setChosenUserMacro (m); });
+    perMacro ("Reset Macro Range", [this, id] (int m) {
+        if (const auto* um = shell.userMacros(); um != nullptr && um->resetRange != nullptr)
+            um->resetRange (shell, m, id);
+        setChosenUserMacro (m);
+    });
+    perMacro ("Show Macro Assignment Details", [this, id] (int m) {
+        showMacroBank (1);
+        openUserMacroPanel (m, id);
+    });
+    for (const int m : assigned)
+        menu.addItem ("Remove from " + userMacroMenuName (m), [safe, m, id] {
+            if (safe == nullptr)
+                return;
+            if (const auto* um = safe->shell.userMacros(); um != nullptr && um->unassign != nullptr)
+                um->unassign (safe->shell, m, id);
+            safe->refreshUserMacros();
+        });
+    if (assigned.size() > 1)
+        menu.addItem ("Remove All Macro Assignments", [safe, id] {
+            if (safe == nullptr)
+                return;
+            if (const auto* um = safe->shell.userMacros(); um != nullptr && um->unassignAll != nullptr)
+                um->unassignAll (safe->shell, id);
+            safe->refreshUserMacros();
+        });
 }
 
 void ShellEditor::startUserMacroRename (int macro)

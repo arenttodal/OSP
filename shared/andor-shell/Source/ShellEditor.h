@@ -178,6 +178,13 @@ public:
     /** Tests: the lens drag as the gesture does it (screen points), and a control's right-click menu. */
     void dragUserMacroLens (int macro, juce::Point<int> from, juce::Point<int> to, bool cancel = false);
     juce::PopupMenu controlContextMenu (const juce::String& parameterId) { return modOverlay.contextMenu (parameterId); }
+    /** The halos (tests: macro ranges, handles, readouts). */
+    osp::plugin::ModulationOverlay& modulationOverlay() noexcept { return modOverlay; }
+    /** A USER macro chosen from a control (right-click "Assign to Macro", "Edit Macro Range") or
+        by touching its knob: its controls' rings stay shown until another is chosen or a click
+        lands elsewhere (-1: none). */
+    void setChosenUserMacro (int macro);
+    int chosenUserMacro() const noexcept { return chosenMacro; }
     /** A macro's on / off lamp (ProductInfo::macroSwitches), or nullptr. */
     osp::plugin::MacroSwitchLamp* macroSwitch (int macro) noexcept;
 
@@ -291,6 +298,10 @@ private:
     int bankShown = 0, renaming = -1, dragMacro = -1, pickMacro = -1, panelMacro = -1, arcsMacro = -1;
     bool anchorAbove = false;   ///< the anchored popover opens above its anchor (a USER macro's name)
     std::uint64_t userMacroRevision = 0;
+    int chosenMacro = -1;
+    juce::String userMacroMenuName (int macro) const;
+    juce::String userMacroTitle (int macro) const;
+    void addUserMacroItems (juce::PopupMenu& menu, const juce::String& parameterId);
     void placeMacroLamps();
     void dimMacroArc (int macro, bool on);
     osp::plugin::ModulationOverlay modOverlay { shell, content };

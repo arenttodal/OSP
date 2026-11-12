@@ -444,6 +444,53 @@ public:
     /** While a source is dragged: what a drop there would make (or why not). */
     juce::String dragTip() const;
 
+    //==========================================================================================
+    /** MACRO RANGES (opt-in; ANDOR ANALOG's USER macros). A macro's assignment on a control is
+        drawn in the halos' own vocabulary: quietly (a thin arc in the macro's colour, outside a
+        modulation route's ring) until its macro is focused - chosen, its name hovered, its
+        panel open - or the control is hovered with no route of its own; then it is the ring:
+        its range from where macro 0 % puts the control to where 100 % does (the 0 % end a
+        hollow handle, the 100 % end a filled one: its direction), where it is now, and a
+        readout. Dragging a handle along the ring (Shift: fine) sets that end; Escape cancels.
+        Positions are the knob's travel (0..1, the parameter's normalised value, as drawn). With
+        none of these set: the overlay exactly as before (ANDOR OSP). */
+    struct MacroArc
+    {
+        int macro = -1;
+        juce::Colour colour;
+        juce::String name;               ///< "MACRO 1 · BRIGHTNESS"
+        float atMin = 0.0f, atMax = 0.0f;   ///< the control (knob travel) at macro 0 % and 100 %
+        float now = 0.0f;                ///< where this assignment puts it now (its own offset on the base)
+        float base = 0.0f;               ///< the control's own value (the knob)
+        float macroValue = 0.0f;         ///< the macro now (0..1)
+        bool enabled = true;
+    };
+    enum class MacroEdit { begin, move, commit, cancel };
+    std::function<std::vector<MacroArc> (const juce::String& parameterId)> macroArcs;
+    /** Whether a macro may move this control (it is walked, and right-clicks reach its menu). */
+    std::function<bool (const juce::String& parameterId)> macroEligible;
+    /** Whether any assignment exists (the controls are walked only then). */
+    std::function<bool()> anyMacroArcs;
+    /** The macros' sum on a control now (normalised): modulation applies after it, so a
+        route's sweep starts there (the engine's order). */
+    std::function<float (const juce::String& parameterId)> macroOffset;
+    /** A handle dragged: `end` 0 (macro 0 %) or 1 (100 %) to `position` (knob travel). */
+    std::function<void (int macro, const juce::String& parameterId, int end, float position, MacroEdit)> editMacroRange;
+    /** A handle double-clicked: that end back to the control's own value. */
+    std::function<void (int macro, const juce::String& parameterId, int end)> resetMacroEnd;
+    /** The focused macro (-1: none): its controls' rings shown, their handles live. */
+    void setMacroFocus (int macro);
+    int macroFocus() const noexcept { return focusMacro; }
+    // Tests: what is drawn, and where a handle is (root coordinates; (0, 0): none).
+    std::vector<MacroArc> macroArcsOf (const juce::String& parameterId) const;
+    juce::Point<float> macroHandle (const juce::String& parameterId, int macro, int end) const;
+    /** The macro whose range is the ring of this control now (-1: none). */
+    int primaryMacro (const juce::String& parameterId) const;
+    bool isEditingMacro() const noexcept { return macroEditMacro >= 0; }
+    juce::StringArray macroReadout (const juce::String& parameterId) const;
+    bool keyPressed (const juce::KeyPress&) override;
+    void mouseDoubleClick (const juce::MouseEvent&) override;
+
     void paint (juce::Graphics&) override;
     bool hitTest (int x, int y) override;
     void mouseMove (const juce::MouseEvent&) override;
@@ -465,6 +512,7 @@ private:
         float start = 0.0f, end = 0.0f;   ///< the knob's angles
         juce::Rectangle<float> area;      ///< in the root's coordinates
         bool field = false;               ///< a value field (EQ): an underline instead of a ring
+        bool macroOnly = false;           ///< walked for its macro ranges only (no modulation destination)
         juce::Rectangle<float> avoid;     ///< a caption the ring breaks around (root coordinates)
         /** What lies over this control (an open popover above its own part of the window):
             its halo is not drawn there and cannot be grabbed there. Root coordinates. */
@@ -509,6 +557,18 @@ private:
     juce::Rectangle<float> readoutArea (const Target& t) const;
     juce::Rectangle<int> repaintArea (const Target& t) const;
     void paintHalo (juce::Graphics&, const Target& t, int index);
+    std::vector<MacroArc> arcsOf (const Target& t) const;
+    /** The arc drawn as this control's ring now (index into arcs), or -1. */
+    int primaryArc (const Target& t, int index, const std::vector<MacroArc>& arcs) const;
+    void paintMacroRing (juce::Graphics&, const Target& t, int index, const MacroArc& arc);
+    void paintMacroAccents (juce::Graphics&, const Target& t, const std::vector<MacroArc>& arcs, int except, float radius);
+    juce::StringArray macroLines (const Target& t, const MacroArc& arc) const;
+    float knobPositionAt (const Target& t, juce::Point<float> p) const;
+    float baseOf (const Target& t) const;
+    juce::StringArray readoutLines (const Target& t, int index) const;
+    int focusMacro = -1;
+    int macroEditMacro = -1, macroEditTarget = -1, macroEditEnd = -1;
+    float macroEditFrom = 0.0f, macroEditRaw = 0.0f;
 
     InstrumentHost& ospProcessor;
     juce::Component& root;

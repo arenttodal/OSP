@@ -2009,9 +2009,11 @@ void ModulationOverlay::collect (juce::Component& c)
         if (auto* slider = dynamic_cast<juce::Slider*> (child))
         {
             const auto id = slider->getProperties()["paramId"].toString();
-            if (id.isNotEmpty() && ! modui::destinationsShownBy (id).empty())
+            const bool destination = id.isNotEmpty() && ! modui::destinationsShownBy (id).empty();
+            if (destination || (id.isNotEmpty() && macroEligible != nullptr && macroEligible (id)))
             {
                 Target t;
+                t.macroOnly = ! destination;
                 t.slider = slider;
                 t.parameterId = id;
                 const auto area = root.getLocalArea (slider, slider->getLocalBounds()).toFloat();
@@ -2100,9 +2102,9 @@ float ModulationOverlay::positionOf (const Target& t, double offset, mod::Dest d
         return arpRatePosition (static_cast<double> (mod::destInfo (dest).span) * offset);
     // A product's own control: its knob's whole travel (the engine moves it the same way).
     if (mod::isProductDest (dest))
-        return std::clamp (param->getValue() + static_cast<float> (mod::destInfo (dest).span * offset), 0.0f, 1.0f);
+        return std::clamp (baseOf (t) + static_cast<float> (mod::destInfo (dest).span * offset), 0.0f, 1.0f);
     const auto& range = param->getNormalisableRange();
-    const double base = param->convertFrom0to1 (param->getValue());
+    const double base = param->convertFrom0to1 (baseOf (t));   // (after the macros: the engine's order)
     const double x = mod::destInfo (dest).span * offset;
     const double length = static_cast<double> (range.end - range.start);
     double value = base;
@@ -2142,7 +2144,7 @@ ModulationOverlay::Sweep ModulationOverlay::sweepOf (const Target& t, const Inst
 {
     Sweep s;
     auto* param = ospProcessor.apvts().getParameter (t.parameterId);
-    s.base = r.route.dest == mod::Dest::arpRate ? arpRatePosition (0.0) : (param != nullptr ? param->getValue() : 0.0f);
+    s.base = r.route.dest == mod::Dest::arpRate ? arpRatePosition (0.0) : (param != nullptr ? baseOf (t) : 0.0f);
     const int source = mod::sourceIndex (r.route.source);
     const double d = r.route.depth;
     const bool bipolar = isBipolarSource (ospProcessor, source);
@@ -2277,7 +2279,7 @@ std::vector<juce::Rectangle<float>> ModulationOverlay::haloCovers (const juce::S
 float ModulationOverlay::haloRadius (const juce::String& id) const
 {
     const auto* t = find (id);
-    return t != nullptr && ! routesOf (*t).empty() ? t->radius : 0.0f;
+    return t != nullptr && (! routesOf (*t).empty() || ! arcsOf (*t).empty()) ? t->radius : 0.0f;
 }
 
 int ModulationOverlay::haloRoute (const juce::String& id) const
@@ -2348,7 +2350,8 @@ juce::StringArray ModulationOverlay::haloReadout (const juce::String& id) const
 
 juce::Rectangle<float> ModulationOverlay::readoutArea (const Target& t) const
 {
-    const float lines = static_cast<float> (std::max (4, haloReadout (t.parameterId).size()));
+    const auto index = static_cast<int> (&t - targets.data());
+    const float lines = static_cast<float> (std::max (4, (index >= 0 && index < static_cast<int> (targets.size()) ? readoutLines (t, index) : haloReadout (t.parameterId)).size()));
     const float w = 176.0f, h = 10.0f + 15.0f * lines;
     const auto bounds = getLocalBounds().toFloat().reduced (6.0f);
     float x = t.centre.x + t.radius + 12.0f;
@@ -2377,7 +2380,8 @@ void ModulationOverlay::refresh()
     view = ospProcessor.modulationView();
     targets.clear();
     // Walk the instrument only when something could be drawn (a route, a drag).
-    if (! routes.empty() || dragSource >= 0 || before > 0 || shownRings > 0)
+    const bool macros = anyMacroArcs != nullptr && anyMacroArcs();
+    if (! routes.empty() || dragSource >= 0 || before > 0 || shownRings > 0 || macros)
         collectAll();
     if (hover >= static_cast<int> (targets.size()))
         hover = -1;
@@ -2387,7 +2391,7 @@ void ModulationOverlay::refresh()
     for (std::size_t i = 0; i < targets.size(); ++i)
     {
         const auto& t = targets[i];
-        if (dragSource >= 0 || ! routesOf (t).empty())
+        if (dragSource >= 0 || ! routesOf (t).empty() || (macros && ! arcsOf (t).empty()))
             areas.push_back (repaintArea (t));
         if (static_cast<int> (i) == hover || static_cast<int> (i) == editTarget)
             areas.push_back (readoutArea (t).expanded (2.0f).getSmallestIntegerContainer());
@@ -2449,7 +2453,7 @@ int ModulationOverlay::targetAt (juce::Point<float> p, bool includeBody, bool an
             continue;
         if (anyControl && (t.field ? t.area.expanded (2.0f).contains (p) : t.centre.getDistanceFrom (p) <= std::max (t.bodyRadius, 0.5f * std::min (t.area.getWidth(), t.area.getHeight()))))
             return i;
-        if (t.field || routesOf (t).empty())
+        if (t.field || (routesOf (t).empty() && arcsOf (t).empty()))
             continue;
         const float d = t.centre.getDistanceFrom (p);
         if (d >= t.radius - 5.0f && d <= t.radius + 9.0f)
@@ -2473,7 +2477,10 @@ juce::PopupMenu ModulationOverlay::contextMenu (const juce::String& parameterId)
     auto& p = ospProcessor;
     juce::Component::SafePointer<ModulationOverlay> safe (this);
     const auto list = routesOf (t);
-    menu.addSectionHeader ("MODULATION");
+    // (a control only a product's macro may move: no empty MODULATION heading)
+    const bool modulatable = ! list.empty() || modui::destinationFor (parameterId, false) != mod::Dest::none || modui::destinationFor (parameterId, true) != mod::Dest::none;
+    if (modulatable)
+        menu.addSectionHeader ("MODULATION");
     for (const auto* r : list)
     {
         const int slot = r->slot, source = mod::sourceIndex (r->route.source);
@@ -2887,9 +2894,38 @@ void ModulationOverlay::paintHalo (juce::Graphics& g, const Target& t, int index
         return t.centre.getPointOnCircumference (radius, t.start + juce::jlimit (0.0f, 1.0f, position) * (t.end - t.start));
     };
     const auto list = routesOf (t);
+    const auto arcs = arcsOf (t);
+    // A macro's range as the ring (focused, edited, or hovered with no route): the routes and
+    // the other macros then quietly outside it.
+    if (const int primary = primaryArc (t, index, arcs); primary >= 0)
+    {
+        std::optional<juce::Graphics::ScopedSaveState> clip;
+        if (! t.avoid.isEmpty() && ! t.field)
+        {
+            clip.emplace (g);
+            g.excludeClipRegion (t.avoid.getSmallestIntegerContainer());
+        }
+        if (! t.field)
+            for (const auto* r : list)
+            {
+                const auto o = sweepOf (t, *r);
+                arc (t.radius + 6.5f, o.lo, o.hi, 1.6f, modui::sourceColour (mod::sourceIndex (r->route.source)).withAlpha (r->state == mod::RouteState::active ? 0.45f : 0.2f));
+            }
+        paintMacroAccents (g, t, arcs, primary, t.radius + (list.empty() ? 6.5f : 11.0f));
+        clip.reset();
+        paintMacroRing (g, t, index, arcs[static_cast<std::size_t> (primary)]);
+        return;
+    }
     const auto* main = emphasised (t);
     if (main == nullptr)
+    {
+        // Macros only, none focused: quiet arcs on the ring itself.
+        paintMacroAccents (g, t, arcs, -1, t.radius);
         return;
+    }
+    // (macros beside a route: just outside its ring and its other routes)
+    if (! arcs.empty())
+        paintMacroAccents (g, t, arcs, -1, t.radius + (list.size() > 1 ? 11.0f : 6.5f));
     const bool editing = index == editTarget;
     const bool hovered = index == hover || editing;
     const int source = mod::sourceIndex (main->route.source);
@@ -3128,7 +3164,7 @@ void ModulationOverlay::paint (juce::Graphics& g)
             paintDragTarget (g, t, static_cast<int> (i), dropHit);
             continue;
         }
-        if (routesOf (t).empty())
+        if (routesOf (t).empty() && arcsOf (t).empty())
             continue;
         ++rings;
         // Only what this repaint touches (a moving read head repaints a thin strip).
@@ -3192,6 +3228,27 @@ void ModulationOverlay::mouseDown (const juce::MouseEvent& e)
     if (index < 0)
         return;
     const auto& t = targets[static_cast<std::size_t> (index)];
+    if (! e.mods.isPopupMenu() && editMacroRange != nullptr)
+    {
+        // A macro's ring: the nearer handle of its range follows the pointer along the ring.
+        const auto arcs = arcsOf (t);
+        if (const int primary = primaryArc (t, index, arcs); primary >= 0 && ! t.field)
+        {
+            const auto& a = arcs[static_cast<std::size_t> (primary)];
+            const float raw = knobPositionAt (t, e.position);
+            macroEditEnd = std::abs (raw - a.atMax) <= std::abs (raw - a.atMin) ? 1 : 0;
+            macroEditMacro = a.macro;
+            macroEditTarget = index;
+            macroEditFrom = macroEditEnd == 1 ? a.atMax : a.atMin;
+            macroEditRaw = raw;
+            hover = index;
+            editMacroRange (a.macro, t.parameterId, macroEditEnd, macroEditFrom, MacroEdit::begin);
+            setWantsKeyboardFocus (true);
+            grabKeyboardFocus();
+            refresh();
+            return;
+        }
+    }
     if (e.mods.isPopupMenu())
     {
         noticeAnchor = t.area;
@@ -3244,6 +3301,16 @@ void ModulationOverlay::mouseDown (const juce::MouseEvent& e)
 
 void ModulationOverlay::mouseDrag (const juce::MouseEvent& e)
 {
+    if (macroEditMacro >= 0 && macroEditTarget >= 0 && macroEditTarget < static_cast<int> (targets.size()))
+    {
+        const auto& t = targets[static_cast<std::size_t> (macroEditTarget)];
+        const float raw = knobPositionAt (t, e.position);
+        const float position = juce::jlimit (0.0f, 1.0f, macroEditFrom + (e.mods.isShiftDown() ? 0.2f : 1.0f) * (raw - macroEditRaw));
+        if (editMacroRange != nullptr)
+            editMacroRange (macroEditMacro, t.parameterId, macroEditEnd, position, MacroEdit::move);
+        refresh();
+        return;
+    }
     if (editParameter == nullptr)
         return;
     // Up deepens, down reduces and goes through zero to the other way; the same route the
@@ -3256,6 +3323,16 @@ void ModulationOverlay::mouseDrag (const juce::MouseEvent& e)
 
 void ModulationOverlay::mouseUp (const juce::MouseEvent& e)
 {
+    if (macroEditMacro >= 0)
+    {
+        if (editMacroRange != nullptr && macroEditTarget >= 0 && macroEditTarget < static_cast<int> (targets.size()))
+            editMacroRange (macroEditMacro, targets[static_cast<std::size_t> (macroEditTarget)].parameterId, macroEditEnd, 0.0f, MacroEdit::commit);
+        macroEditMacro = macroEditTarget = macroEditEnd = -1;
+        setWantsKeyboardFocus (false);
+        hover = targetAt (e.position, e.mods.isAltDown());
+        refresh();
+        return;
+    }
     if (editParameter != nullptr)
         editParameter->endChangeGesture();
     editParameter = nullptr;
@@ -3263,6 +3340,286 @@ void ModulationOverlay::mouseUp (const juce::MouseEvent& e)
     editTarget = -1;
     hover = targetAt (e.position, e.mods.isAltDown());
     refresh();
+}
+
+//==============================================================================
+// Macro ranges (opt-in)
+
+float ModulationOverlay::baseOf (const Target& t) const
+{
+    auto* param = ospProcessor.apvts().getParameter (t.parameterId);
+    if (param == nullptr)
+        return 0.0f;
+    const float offset = macroOffset != nullptr ? macroOffset (t.parameterId) : 0.0f;
+    return std::clamp (param->getValue() + offset, 0.0f, 1.0f);
+}
+
+std::vector<ModulationOverlay::MacroArc> ModulationOverlay::arcsOf (const Target& t) const
+{
+    if (macroArcs == nullptr)
+        return {};
+    return macroArcs (t.parameterId);
+}
+
+std::vector<ModulationOverlay::MacroArc> ModulationOverlay::macroArcsOf (const juce::String& id) const
+{
+    return macroArcs != nullptr ? macroArcs (id) : std::vector<MacroArc> {};
+}
+
+int ModulationOverlay::primaryArc (const Target& t, int index, const std::vector<MacroArc>& arcs) const
+{
+    if (arcs.empty() || dragSource >= 0)
+        return -1;
+    auto indexOf = [&arcs] (int macro) {
+        for (std::size_t i = 0; i < arcs.size(); ++i)
+            if (arcs[i].macro == macro)
+                return static_cast<int> (i);
+        return -1;
+    };
+    if (index == macroEditTarget && macroEditMacro >= 0)
+        return indexOf (macroEditMacro);
+    if (focusMacro >= 0)
+        if (const int i = indexOf (focusMacro); i >= 0)
+            return i;
+    // Hovered, with no route of its own to show: its (first) macro's range.
+    if (index == hover && editTarget < 0 && routesOf (t).empty())
+        return 0;
+    return -1;
+}
+
+int ModulationOverlay::primaryMacro (const juce::String& id) const
+{
+    const auto* t = find (id);
+    if (t == nullptr)
+        return -1;
+    const auto arcs = arcsOf (*t);
+    const int i = primaryArc (*t, static_cast<int> (t - targets.data()), arcs);
+    return i >= 0 ? arcs[static_cast<std::size_t> (i)].macro : -1;
+}
+
+void ModulationOverlay::setMacroFocus (int macro)
+{
+    if (macro == focusMacro)
+        return;
+    focusMacro = macro;
+    if (focusMacro >= 0 && targets.empty())
+        collectAll();
+    for (const auto& a : shownAreas)
+        repaint (a);
+    for (const auto& t : targets)
+        if (! arcsOf (t).empty())
+            repaint (repaintArea (t).getUnion (readoutArea (t).expanded (2.0f).getSmallestIntegerContainer()));
+}
+
+juce::Point<float> ModulationOverlay::macroHandle (const juce::String& id, int macro, int end) const
+{
+    const auto* t = find (id);
+    if (t == nullptr || t->field)
+        return {};
+    for (const auto& a : arcsOf (*t))
+        if (a.macro == macro)
+            return t->centre.getPointOnCircumference (t->radius, t->start + juce::jlimit (0.0f, 1.0f, end == 1 ? a.atMax : a.atMin) * (t->end - t->start));
+    return {};
+}
+
+float ModulationOverlay::knobPositionAt (const Target& t, juce::Point<float> p) const
+{
+    // The angle round the knob (clockwise from 12 o'clock, as the ring is drawn), into the
+    // knob's travel; the dead zone below splits to the nearer end.
+    const auto d = p - t.centre;
+    const float a0 = std::atan2 (d.x, -d.y);
+    const float twoPi = juce::MathConstants<float>::twoPi;
+    const float gap = 0.5f * (t.start + t.end) + juce::MathConstants<float>::pi;
+    float a = gap - std::fmod (std::fmod (gap - a0, twoPi) + twoPi, twoPi);
+    if (a > gap - 1.0e-4f)
+        a -= twoPi;
+    return juce::jlimit (0.0f, 1.0f, (a - t.start) / (t.end - t.start));
+}
+
+juce::StringArray ModulationOverlay::macroLines (const Target& t, const MacroArc& a) const
+{
+    juce::StringArray lines;
+    auto* param = ospProcessor.apvts().getParameter (t.parameterId);
+    if (param == nullptr)
+        return lines;
+    lines.add (a.name + (a.enabled ? juce::String() : juce::String ("  (bypassed)")));
+    lines.add (juce::String::fromUTF8 ("At 0 % \xe2\x86\x92 ") + valueText (*param, a.atMin));
+    lines.add (juce::String::fromUTF8 ("At 100 % \xe2\x86\x92 ") + valueText (*param, a.atMax));
+    lines.add ("Now " + valueText (*param, a.now) + "  (" + juce::String (juce::roundToInt (100.0f * a.macroValue)) + " %)");
+    return lines;
+}
+
+juce::StringArray ModulationOverlay::macroReadout (const juce::String& id) const
+{
+    const auto* t = find (id);
+    if (t == nullptr)
+        return {};
+    const auto arcs = arcsOf (*t);
+    const int i = primaryArc (*t, static_cast<int> (t - targets.data()), arcs);
+    return i >= 0 ? macroLines (*t, arcs[static_cast<std::size_t> (i)]) : juce::StringArray {};
+}
+
+juce::StringArray ModulationOverlay::readoutLines (const Target& t, int index) const
+{
+    const auto arcs = arcsOf (t);
+    if (const int i = primaryArc (t, index, arcs); i >= 0)
+        return macroLines (t, arcs[static_cast<std::size_t> (i)]);
+    return haloReadout (t.parameterId);
+}
+
+void ModulationOverlay::paintMacroAccents (juce::Graphics& g, const Target& t, const std::vector<MacroArc>& arcs, int except, float radius)
+{
+    // Assigned, not focused: a thin arc in each macro's colour over its range, quiet (a
+    // bypassed one fainter), stacked outward when several macros share the control.
+    float r = radius;
+    for (std::size_t i = 0; i < arcs.size(); ++i)
+    {
+        if (static_cast<int> (i) == except)
+            continue;
+        const auto& a = arcs[i];
+        const auto c = a.colour.withAlpha (a.enabled ? 0.6f : 0.25f);
+        if (t.field)
+        {
+            const auto bar = juce::Rectangle<float> (t.area.getX() + 3.0f, t.area.getBottom() + 5.0f + 3.0f * static_cast<float> (i), t.area.getWidth() - 6.0f, 1.5f);
+            const float lo = std::min (a.atMin, a.atMax), hi = std::max (a.atMin, a.atMax);
+            g.setColour (c);
+            g.fillRect (juce::Rectangle<float> (bar.getX() + lo * bar.getWidth(), bar.getY(), std::max (2.0f, (hi - lo) * bar.getWidth()), bar.getHeight()));
+            continue;
+        }
+        juce::Path p;
+        const float a0 = t.start + juce::jlimit (0.0f, 1.0f, a.atMin) * (t.end - t.start);
+        const float a1 = t.start + juce::jlimit (0.0f, 1.0f, a.atMax) * (t.end - t.start);
+        if (std::abs (a1 - a0) < 0.03f)
+            p.addCentredArc (t.centre.x, t.centre.y, r, r, 0.0f, a0 - 0.035f, a0 + 0.035f, true);
+        else
+            p.addCentredArc (t.centre.x, t.centre.y, r, r, 0.0f, std::min (a0, a1), std::max (a0, a1), true);
+        g.setColour (c);
+        g.strokePath (p, juce::PathStrokeType (1.8f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        r += 4.0f;
+    }
+}
+
+void ModulationOverlay::paintMacroRing (juce::Graphics& g, const Target& t, int index, const MacroArc& m)
+{
+    using namespace design;
+    const bool editing = index == macroEditTarget;
+    const bool hovered = index == hover || editing;
+    const auto c = m.colour.darker (0.08f);
+    if (t.field)
+    {
+        const auto bar = juce::Rectangle<float> (t.area.getX() + 3.0f, t.area.getBottom() + 2.0f, t.area.getWidth() - 6.0f, 2.0f);
+        g.setColour (c.withAlpha (0.25f));
+        g.fillRect (bar);
+        const float lo = std::min (m.atMin, m.atMax), hi = std::max (m.atMin, m.atMax);
+        g.setColour (c.withAlpha (m.enabled ? 0.9f : 0.4f));
+        g.fillRect (juce::Rectangle<float> (bar.getX() + lo * bar.getWidth(), bar.getY(), std::max (2.0f, (hi - lo) * bar.getWidth()), bar.getHeight()));
+        g.fillRect (juce::Rectangle<float> (bar.getX() + m.now * bar.getWidth() - 1.0f, bar.getY() - 2.0f, 2.0f, bar.getHeight() + 4.0f));
+        return;
+    }
+    auto arc = [&g, &t] (float radius, float from, float to, float width, juce::Colour colour) {
+        juce::Path p;
+        const float a0 = t.start + juce::jlimit (0.0f, 1.0f, from) * (t.end - t.start);
+        const float a1 = t.start + juce::jlimit (0.0f, 1.0f, to) * (t.end - t.start);
+        if (std::abs (a1 - a0) < 0.03f)
+            p.addCentredArc (t.centre.x, t.centre.y, radius, radius, 0.0f, a0 - 0.035f, a0 + 0.035f, true);
+        else
+            p.addCentredArc (t.centre.x, t.centre.y, radius, radius, 0.0f, std::min (a0, a1), std::max (a0, a1), true);
+        g.setColour (colour);
+        g.strokePath (p, juce::PathStrokeType (width, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    };
+    auto pointAt = [&t] (float position) {
+        return t.centre.getPointOnCircumference (t.radius, t.start + juce::jlimit (0.0f, 1.0f, position) * (t.end - t.start));
+    };
+    {
+        std::optional<juce::Graphics::ScopedSaveState> clipped;
+        if (! t.avoid.isEmpty())
+        {
+            clipped.emplace (g);
+            g.excludeClipRegion (t.avoid.getSmallestIntegerContainer());
+        }
+        // As a selected route: a soft glow along the knob's travel; hovered, the guide track.
+        if (hovered)
+            arc (t.radius, 0.0f, 1.0f, 2.4f, colour::textSecondary.withAlpha (0.3f));
+        else
+            arc (t.radius, 0.0f, 1.0f, 9.0f, c.withAlpha (0.12f));
+        const float width = editing ? 6.5f : (hovered ? 5.5f : 4.5f);
+        arc (t.radius, m.atMin, m.atMax, width, m.enabled ? (hovered ? c.brighter (0.12f) : c.withAlpha (0.92f)) : c.withAlpha (0.35f));
+        if (! editing)
+        {
+            const auto at = pointAt (m.now);
+            g.setColour (juce::Colours::white.withAlpha (0.92f));
+            g.fillEllipse (juce::Rectangle<float> (width + 2.5f, width + 2.5f).withCentre (at));
+            g.setColour (c.darker (0.25f));
+            g.fillEllipse (juce::Rectangle<float> (width - 1.0f, width - 1.0f).withCentre (at));
+        }
+    }
+    // Its two ends: 0 % hollow, 100 % filled (the direction), live while focused or hovered.
+    for (const int end : { 0, 1 })
+    {
+        const auto at = pointAt (end == 1 ? m.atMax : m.atMin);
+        const bool grabbed = editing && end == macroEditEnd;
+        const float r = grabbed ? 7.5f : 6.0f;
+        g.setColour (juce::Colour (0x33302418));
+        g.fillEllipse (juce::Rectangle<float> (2.0f * r, 2.0f * r).withCentre (at.translated (0.0f, 1.0f)));
+        g.setColour (end == 1 ? c : colour::panelTop);
+        g.fillEllipse (juce::Rectangle<float> (2.0f * r, 2.0f * r).withCentre (at));
+        g.setColour (end == 1 ? juce::Colours::white.withAlpha (0.85f) : c);
+        if (end == 1)
+            g.fillEllipse (juce::Rectangle<float> (3.0f, 3.0f).withCentre (at));
+        else
+            g.drawEllipse (juce::Rectangle<float> (2.0f * r - 2.0f, 2.0f * r - 2.0f).withCentre (at), 2.0f);
+    }
+    if (hovered)
+    {
+        const auto box = readoutArea (t);
+        juce::Path card;
+        card.addRoundedRectangle (box, 7.0f);
+        CachedShadow (juce::Colour (0x22302418), 6, { 0, 2 }).drawForPath (g, card);
+        g.setColour (juce::Colour (0xf41c2122));
+        g.fillPath (card);
+        const auto lines = macroLines (t, m);
+        auto row = box.reduced (10.0f, 5.0f).withHeight (15.0f);
+        for (int i = 0; i < lines.size(); ++i)
+        {
+            g.setFont (i == 0 ? type::popupLabel (11.5f) : type::popupValue (12.0f));
+            g.setColour (i == 0 ? m.colour.brighter (0.45f) : juce::Colour (0xffeee8dd).withAlpha (i == 3 ? 0.78f : 1.0f));
+            g.drawFittedText (lines[i], row.getSmallestIntegerContainer(), juce::Justification::centredLeft, 1, 0.85f);
+            row.translate (0.0f, 15.0f);
+        }
+    }
+}
+
+bool ModulationOverlay::keyPressed (const juce::KeyPress& key)
+{
+    if (key == juce::KeyPress::escapeKey && macroEditMacro >= 0)
+    {
+        if (editMacroRange != nullptr && macroEditTarget >= 0 && macroEditTarget < static_cast<int> (targets.size()))
+            editMacroRange (macroEditMacro, targets[static_cast<std::size_t> (macroEditTarget)].parameterId, macroEditEnd, macroEditFrom, MacroEdit::cancel);
+        macroEditMacro = macroEditTarget = macroEditEnd = -1;
+        setWantsKeyboardFocus (false);
+        refresh();
+        return true;
+    }
+    return false;
+}
+
+void ModulationOverlay::mouseDoubleClick (const juce::MouseEvent& e)
+{
+    // A macro handle double-clicked: that end back to the control's own value.
+    if (resetMacroEnd == nullptr)
+        return;
+    const int index = targetAt (e.position, false);
+    if (index < 0)
+        return;
+    const auto& t = targets[static_cast<std::size_t> (index)];
+    const auto arcs = arcsOf (t);
+    if (const int primary = primaryArc (t, index, arcs); primary >= 0 && ! t.field)
+    {
+        const auto& a = arcs[static_cast<std::size_t> (primary)];
+        const float raw = knobPositionAt (t, e.position);
+        resetMacroEnd (a.macro, t.parameterId, std::abs (raw - a.atMax) <= std::abs (raw - a.atMin) ? 1 : 0);
+        refresh();
+    }
 }
 
 } // namespace osp::plugin

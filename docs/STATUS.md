@@ -802,6 +802,22 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
     each resampled alone. At 1.8× and 2.5× they met as a light cross. Such a piece is now
     resampled whole. At whole scales the pixels are the same either way.
 
+- **Macro ranges on the halos** (shared, opt-in; ANDOR ANALOG's USER macros,
+  its docs/MACRO_DESTINATION_FIRST.md).
+  - `ModulationOverlay` can draw a product's macro assignments in its own vocabulary:
+    - a quiet arc in the macro's colour;
+    - the focused macro's range as the ring, with 0 % (hollow) and 100 % (filled) handles that
+      drag along the ring (Shift: fine; Escape: cancel), the marker and the readout.
+  - Hooks: `macroArcs`, `macroEligible`, `anyMacroArcs`, `macroOffset` (a route's sweep starts
+    after the macros), `editMacroRange`, `resetMacroEnd`, `setMacroFocus`.
+  - A control with no modulation destination can be walked for them. Its menu then has no empty
+    MODULATION heading.
+  - `ProductInfo::UserMacros` gained ranges / offsetNow / editRange / resetEnd / resetRange /
+    unassign / unassignAll.
+  - `ShellEditor`: "Assign to Macro" with the macros' names and checkmarks, plus the assigned
+    items. The chosen macro's rings replace `MacroAssignOverlay`'s show mode.
+  - ANDOR OSP sets none of it: 0 px, its tests unchanged.
+
 ## IN PROGRESS
 
 - Lab round 3 (Reimagined 3, violin).
