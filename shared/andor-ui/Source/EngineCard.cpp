@@ -1326,8 +1326,22 @@ void LayerKnob::paint (juce::Graphics& g)
 
 //==============================================================================
 //==============================================================================
+LayerStateButton::LayerStateButton (InstrumentHost& p, const juce::String& parameterId, bool isSolo, juce::Colour soloColour, const juce::String& sourceName)
+    : processor (p), layer (-1), solo (isSolo), soloLed (soloColour),
+      attachment (*p.apvts().getParameter (parameterId), [this] (float v) {
+          on = v >= 0.5f;
+          skin::repaintKey (*this);
+      })
+{
+    attachment.sendInitialUpdate();
+    binding::tag (*this, parameterId);
+    setTooltip (solo ? "Solo " + sourceName + ": hear only the soloed sources" : "Mute " + sourceName);
+    setTitle (solo ? "Solo " + sourceName : "Mute " + sourceName);
+    setMouseCursor (juce::MouseCursor::PointingHandCursor);
+}
+
 LayerStateButton::LayerStateButton (InstrumentHost& p, int l, bool isSolo)
-    : processor (p), layer (l), solo (isSolo),
+    : processor (p), layer (l), solo (isSolo), soloLed (design::colour::identity (InstrumentHost::shownLayer (l)).led),
       attachment (*p.apvts().getParameter (InstrumentHost::layerParameterId (l, isSolo ? "solo" : "mute")), [this] (float v) {
           on = v >= 0.5f;
           skin::repaintKey (*this);
@@ -1346,11 +1360,10 @@ void LayerStateButton::paint (juce::Graphics& g)
     using namespace design;
     const auto r = getLocalBounds().toFloat().reduced (1.0f);
     const bool hot = isMouseOver();
-    const auto& id = colour::identity (InstrumentHost::shownLayer (layer));
     if (on)
     {
         // SOLO glows in the layer's own colour, MUTE is a dark, pressed key.
-        const auto fill = solo ? id.led : juce::Colour (0xff4a4f52);
+        const auto fill = solo ? soloLed : juce::Colour (0xff4a4f52);
         g.setColour (fill.darker (0.25f));
         g.fillRoundedRectangle (r, 4.0f);
         g.setGradientFill (juce::ColourGradient (fill.brighter (0.1f), 0.0f, r.getY(), fill.darker (0.1f), 0.0f, r.getBottom(), false));
@@ -1371,7 +1384,7 @@ void LayerStateButton::mouseUp (const juce::MouseEvent& e)
 {
     if (! getLocalBounds().contains (e.getPosition()))
         return;
-    if (solo && e.mods.isAltDown())
+    if (solo && e.mods.isAltDown() && layer >= 0)
     {
         processor.soloOnly (layer);
         return;

@@ -231,6 +231,9 @@ class LayerStateButton final : public juce::Component, public juce::SettableTool
 {
 public:
     LayerStateButton (InstrumentHost& processor, int layer, bool solo);
+    /** Opt-in: a product source's own MUTE or SOLO (ANDOR ANALOG's D / AUX), bound to its own
+        bool parameter: the same key, sizes and states; SOLO lit in `soloColour`. */
+    LayerStateButton (InstrumentHost& processor, const juce::String& parameterId, bool solo, juce::Colour soloColour, const juce::String& sourceName);
     bool isOn() const noexcept { return on; }
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override { skin::repaintKey (*this); }
@@ -242,8 +245,9 @@ public:
 
 private:
     InstrumentHost& processor;
-    int layer;
+    int layer;   ///< -1: a product source (no alt-click solo-only)
     bool solo, on = false;
+    juce::Colour soloLed;
     juce::ParameterAttachment attachment;
 };
 

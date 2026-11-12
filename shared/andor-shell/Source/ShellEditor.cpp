@@ -514,15 +514,19 @@ void ShellEditor::layoutInstrument()
     placeUserMacros();
     modOverlay.setBounds (content.getLocalBounds());
     sourceArea = frame::sourceArea (cardTrim());   // (the cards keep their place: only what is under them moves)
-    if (auxStrip != nullptr)
-    {
-        auxStrip->setVisible (auxShownApplied);
-        if (auxShownApplied)
-            auxStrip->setBounds (sourceArea.getX(), sourceArea.getBottom() + juce::roundToInt (auxGap), sourceArea.getWidth(),
-                                 juce::roundToInt (shell.product().auxStrip->height));
-    }
     shownCount = -1;
     layoutSources();
+    if (auxStrip != nullptr)
+    {
+        // (after the cards: the strip's zones align to their wells)
+        auxStrip->setVisible (auxShownApplied);
+        if (auxShownApplied)
+        {
+            auxStrip->setBounds (sourceArea.getX(), sourceArea.getBottom() + juce::roundToInt (auxGap), sourceArea.getWidth(),
+                                 juce::roundToInt (shell.product().auxStrip->height));
+            auxStrip->resized();
+        }
+    }
 }
 
 //==============================================================================
@@ -780,6 +784,10 @@ int ShellEditor::dropLayerAt (juce::Point<int> editorPoint) const
 
 bool ShellEditor::isInterestedInFileDrag (const juce::StringArray& files)
 {
+    // A product with parts that own drops (the AUX strip): every drag is the editor's to route,
+    // so a file the owner cannot take is refused there, never passed on to a card.
+    if (shell.hasAuxStrip())
+        return true;
     if (shell.isGenerator() && ! shell.hasHybridLayer())
         return false;   // it makes its own sound: there is nowhere to drop a recording
     for (const auto& f : files)
@@ -788,47 +796,116 @@ bool ShellEditor::isInterestedInFileDrag (const juce::StringArray& files)
     return false;
 }
 
-void ShellEditor::fileDragEnter (const juce::StringArray&, int x, int y)
+osp::plugin::DropOwner* ShellEditor::dropOwnerAt (juce::Point<int> editorPoint, juce::Point<int>& local)
+{
+    // The topmost part under the pointer (the overlays above everything are not parts), then up
+    // its parents: the first DropOwner owns the drop.
+    const auto at = content.getLocalPoint (this, editorPoint);
+    for (int i = content.getNumChildComponents(); --i >= 0;)
+    {
+        auto* child = content.getChildComponent (i);
+        if (child == &modOverlay || child == &assignOverlay || ! child->isVisible() || ! child->getBounds().contains (at))
+            continue;
+        auto* c = child->getComponentAt (child->getLocalPoint (&content, at));
+        for (auto* p = c != nullptr ? c : child; p != nullptr && p != &content; p = p->getParentComponent())
+            if (auto* owner = dynamic_cast<osp::plugin::DropOwner*> (p))
+            {
+                local = p->getLocalPoint (&content, at);
+                return owner;
+            }
+        return nullptr;   // (the topmost part there owns nothing: the editor's rules)
+    }
+    return nullptr;
+}
+
+void ShellEditor::setDropHover (osp::plugin::DropOwner* owner, const juce::StringArray& files)
+{
+    auto* previous = dynamic_cast<osp::plugin::DropOwner*> (hoverOwner.getComponent());
+    if (previous == owner)
+        return;
+    if (previous != nullptr)
+        previous->dropHover (files, false);
+    hoverOwner = dynamic_cast<juce::Component*> (owner);
+    if (owner != nullptr)
+        owner->dropHover (files, true);
+}
+
+void ShellEditor::fileDragEnter (const juce::StringArray& files, int x, int y)
 {
     dragging = true;
-    dragLayer = dropLayerAt ({ x, y });
+    fileDragMove (files, x, y);
     shownCount = -1;
     layoutSources();
-    dropZone.setHighlight (true);
-    sampleDock.setHighlight (true);   // (a hybrid product: any drop loads the recording)
 }
 
-void ShellEditor::fileDragMove (const juce::StringArray&, int x, int y)
+void ShellEditor::fileDragMove (const juce::StringArray& files, int x, int y)
 {
-    dragLayer = dropLayerAt ({ x, y });
-    addTarget.setHighlight (dragLayer < 0);
+    juce::Point<int> local;
+    auto* owner = dropOwnerAt ({ x, y }, local);
+    setDropHover (owner, files);
+    bool audio = false;
+    for (const auto& f : files)
+        audio = audio || juce::File (f).hasFileExtension ("wav;aif;aiff;flac");
+    // Only where the drop would land shows it: an owner's part, or the cards' own targets.
+    const bool cards = owner == nullptr && audio;
+    dragLayer = cards ? dropLayerAt ({ x, y }) : -1;
+    dropZone.setHighlight (cards);
+    sampleDock.setHighlight (cards);   // (a hybrid product: any drop on the cards loads the recording)
+    addTarget.setHighlight (cards && dragLayer < 0);
 }
 
-void ShellEditor::fileDragExit (const juce::StringArray&)
+void ShellEditor::fileDragExit (const juce::StringArray& files)
 {
+    setDropHover (nullptr, files);
     dragging = false;
     dropZone.setHighlight (false);
     sampleDock.setHighlight (false);
+    addTarget.setHighlight (false);
     shownCount = -1;
     layoutSources();
 }
 
 void ShellEditor::filesDropped (const juce::StringArray& files, int x, int y)
 {
-    const int layer = dropLayerAt ({ x, y });
+    juce::Point<int> local;
+    auto* owner = dropOwnerAt ({ x, y }, local);
+    setDropHover (nullptr, files);
     dragging = false;
     dropZone.setHighlight (false);
     sampleDock.setHighlight (false);
+    addTarget.setHighlight (false);
+    if (owner != nullptr)
+    {
+        owner->dropFiles (files, local);   // (its own, consumed: never a card's as well)
+        shownCount = -1;
+        layoutSources();
+        return;
+    }
+    const int layer = dropLayerAt ({ x, y });
     juce::Array<juce::File> list;
     for (const auto& f : files)
         if (juce::File (f).hasFileExtension ("wav;aif;aiff;flac"))
             list.add (juce::File (f));
-    if (layer >= 0 && ! list.isEmpty())
+    if (list.isEmpty())
+    {
+        shownCount = -1;
+        timerCallback();
+        return;   // (nothing this editor can load: nothing changes)
+    }
+    if (layer >= 0)
         shell.loadFile (list.getFirst(), layer);
     else
         shell.addLayers (list);
     shownCount = -1;
     timerCallback();
+}
+
+juce::Rectangle<int> ShellEditor::cardDisplayBounds (int layer)
+{
+    auto& card = engineCard (layer);
+    if (! card.isVisible())
+        return {};
+    return content.getLocalArea (&card.display(), card.display().getLocalBounds());
 }
 
 void ShellEditor::chooseFile (int layer)

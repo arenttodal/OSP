@@ -833,6 +833,12 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
     `cardTrim` unchanged);
   - `rack::Kind::aux` for its rack, and Escape closing that rack.
 
+  Addendum 03 (all opt-in; ANDOR OSP unchanged):
+  - `osp::plugin::DropOwner`: the shell's editor gives a file drop to the part under the pointer
+    that owns drops, consumed (never a card's too);
+  - `LayerStateButton` for a product source's own M / S parameter;
+  - `ShellEditor::cardDisplayBounds`, which the strip aligns its zones to.
+
   It is a source, not a SPACE / ECHO / ARP feature. ANDOR OSP sets none and is unchanged: no menu
   item, no view attribute, no room (the shell test `[aux]`; the OSP captures). Should ANDOR OSP
   want a fourth source, it needs a product strip and an engine bus of its own.

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ArpSection.h"
+#include "DropOwner.h"
 #include "EngineCard.h"
 #include "InstrumentFrame.h"
 #include "EffectRack.h"
@@ -112,6 +113,9 @@ public:
     void setAuxStripShown (bool shown);
     bool auxStripShown() const noexcept { return auxShownApplied; }
     juce::Component* auxStripComponent() const noexcept { return auxStrip.get(); }
+    /** A card's dark well (its source display) in the instrument's coordinates (the AUX strip's
+        content aligns to it); empty: none shown. */
+    juce::Rectangle<int> cardDisplayBounds (int layer);
     /** The room the AUX strip takes while shown: its height and the gap above it. */
     float auxShift() const noexcept { return auxShownApplied ? shell.product().auxStrip->height + auxGap : 0.0f; }
     static constexpr float auxGap = 18.0f;   ///< (as far below the cards as the macros' tabs were)
@@ -276,6 +280,11 @@ private:
     bool threeEngines() const;
     bool dragging = false;
     int dragLayer = -1;
+    /** The drop owner (osp::plugin::DropOwner) under `editorPoint`, and the point in its own
+        coordinates; null: none there (the editor's own rules). */
+    osp::plugin::DropOwner* dropOwnerAt (juce::Point<int> editorPoint, juce::Point<int>& local);
+    void setDropHover (osp::plugin::DropOwner* owner, const juce::StringArray& files);
+    juce::Component::SafePointer<juce::Component> hoverOwner;   ///< (the owner showing a drop target)
 
     // Macros, modulation, keyboard row
     osp::plugin::frame::MacroRow macros;
