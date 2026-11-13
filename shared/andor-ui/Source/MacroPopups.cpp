@@ -5766,6 +5766,11 @@ std::unique_ptr<MiniPanel> createReimaginedPopup (InstrumentHost& processor, int
     return std::make_unique<ReimaginedPanel> (processor, layer);
 }
 
+double characterResponseDb (int type, double f, double fc, double resonance, double tiltDb)
+{
+    return CharacterVisual::responseDb (static_cast<FilterType> (std::clamp (type, 0, 5)), f, fc, resonance, tiltDb);
+}
+
 std::unique_ptr<rack::Module> createRackModule (rack::Kind kind, InstrumentHost& processor)
 {
     switch (kind)

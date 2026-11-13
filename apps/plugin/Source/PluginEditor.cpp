@@ -256,6 +256,9 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
             }
             openPopup (reimaginedPopup + l);
         };
+        // The modifiers as a compact row of keys in the display's top-left (ANDOR ANALOG's).
+        card->setModifiersInWell (true);
+        card->setFootTrimmed (false);
         content.addChildComponent (*card);
     }
     dropZone.onBrowse = [this] { chooseFile (0, true); };
@@ -299,10 +302,10 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
             }
             openPopup (index);
         };
-        // SPACE, ECHO and MOVEMENT (as in ANDOR ANALOG): no mark on the row - the name opens the
-        // full rack on a double-click, a right-click offers the popover or the rack, Enter opens
-        // it. A single click still opens the popover.
-        if (const auto kind = rack::kindForMacro (macroSpecs[i].parameterId); kind.has_value() && knob.label != nullptr)
+        // DRIVE, CHARACTER, MOVEMENT, ECHO and SPACE (as ANDOR ANALOG's macros): no mark on the
+        // row - the name opens the full rack on a double-click, a right-click offers the popover
+        // or the rack, Enter opens it. A single click still opens the popover.
+        if (const auto kind = macroRackKind (macroSpecs[i].parameterId); kind.has_value() && knob.label != nullptr)
         {
             rackOfMacro[i] = *kind;
             const auto k = *kind;
@@ -318,7 +321,7 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
                         safe->openPopup (index);
                     }
                 });
-                menu.addItem (safe->racks.isShown (k) ? "Close Rack" : "Open Rack", [safe, k] {
+                menu.addItem (safe->isMacroRackOpen (k) ? "Close Rack" : "Open Rack", [safe, k] {
                     if (safe != nullptr)
                         safe->toggleRackFromLabel (k);
                 });
@@ -681,6 +684,22 @@ void OspAudioProcessorEditor::setSourceViewShown (bool shown)
 
 void OspAudioProcessorEditor::layoutSources (bool animate)
 {
+    // Three cards: the row the modifiers had under the knobs is gone (they are in the
+    // displays), so the cards are that much shorter and the window with them, as the ARP
+    // editor resizes it. One or two: nothing to trim (the keys sat beside the knobs).
+    if (const float trim = ospProcessor.slotCount() >= 3 ? EngineCard::footTrim : 0.0f; trim != cardTrim)
+    {
+        cardTrim = trim;
+        for (auto& card : cards)
+            card->setFootTrimmed (trim > 0.0f);
+        shownCount = -1;
+        layoutInstrument();   // (lays the sources out again, at the new trim)
+        applyWindowShape (true);
+        positionPopup();
+        placeLibrary();
+        content.repaint();
+        return;
+    }
     if (routingView != nullptr)
         routingView->setVisible (routingOpen);
     if (routingOpen && routingView != nullptr)
@@ -1279,7 +1298,7 @@ void OspAudioProcessorEditor::paint (juce::Graphics& g)
 void OspAudioProcessorEditor::paintInstrument (juce::Graphics& g)
 {
     // The shared ANDOR frame with OSP's identity (ANDOR/OSP, One Shot Performer).
-    frame::paint (g, content, frame::Identity {}, arpShown, macros, rackShift());
+    frame::paint (g, content, frame::Identity {}, arpShown, macros, rackShift(), sourceTrim());
 }
 
 void OspAudioProcessorEditor::resized()
@@ -1319,11 +1338,37 @@ void OspAudioProcessorEditor::setRackExpanded (rack::Kind kind, bool open)
     racks.setShown (kind, open);   // (rackChanged follows)
 }
 
+std::optional<rack::Kind> OspAudioProcessorEditor::macroRackKind (const juce::String& parameterId)
+{
+    // MOVEMENT, ECHO and SPACE: the shared racks; CHARACTER: its own (the voice filter's face,
+    // as ANDOR ANALOG's FILTER); DRIVE: the FX rack's DRIVE (as the routing view opens it).
+    if (parameterId == "character")
+        return rack::Kind::filter;
+    if (parameterId == "drive")
+        return rack::Kind::fx;
+    return rack::kindForMacro (parameterId);
+}
+
+bool OspAudioProcessorEditor::isMacroRackOpen (rack::Kind kind) const
+{
+    if (kind == rack::Kind::fx)   // (DRIVE's: the FX rack showing DRIVE, not another effect)
+        return racks.isShown (kind) && fxRackShown().type == fx::Type::drive;
+    return racks.isShown (kind);
+}
+
 void OspAudioProcessorEditor::toggleRackFromLabel (rack::Kind kind)
 {
     // (A popover in the way closes; a press that closed it must not count later.)
     closedByLabelPress = -1;
     closePopup();
+    if (kind == rack::Kind::fx)
+    {
+        if (isMacroRackOpen (kind))
+            setRackExpanded (kind, false);
+        else
+            openFxRack (*this, { fx::Type::drive, 0 });   // (another effect's rack swaps to DRIVE)
+        return;
+    }
     setRackExpanded (kind, ! racks.isShown (kind));
 }
 
@@ -1332,7 +1377,7 @@ void OspAudioProcessorEditor::rackChanged()
     // A view change only: the window grows or shrinks by the rack, nothing sounds different.
     for (std::size_t i = 0; i < macros.size(); ++i)
         if (rackOfMacro[i].has_value() && macros[i].label != nullptr)
-            macros[i].label->setRackOpen (racks.isShown (*rackOfMacro[i]));
+            macros[i].label->setRackOpen (isMacroRackOpen (*rackOfMacro[i]));
     layoutInstrument();
     applyWindowShape (true);
     positionPopup();
@@ -1467,6 +1512,7 @@ void OspAudioProcessorEditor::layoutInstrument()
     parts.headerMix = &headerMix;
     parts.rack = &racks;
     parts.rackShift = rackShift();
+    parts.sourceTrim = sourceTrim();
     frame::place (parts, arpShown);
     {
         // FX ROUTING's key as ANDOR ANALOG's: SAVE's size, 8 px after it on its centre line (one
@@ -1479,7 +1525,7 @@ void OspAudioProcessorEditor::layoutInstrument()
     }
 
     modOverlay.setBounds (content.getLocalBounds());
-    sourceArea = frame::sourceArea();
+    sourceArea = frame::sourceArea (sourceTrim());
     layoutSources (false);
 }
 

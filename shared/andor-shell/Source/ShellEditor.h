@@ -102,7 +102,14 @@ public:
     juce::Button& sourceViewToggle() noexcept { return sourceViewButton; }
     float instrumentHeight() const noexcept { return osp::plugin::frame::instrumentHeight (arpShown, rackShift(), sourceTrim()); }
     /** The source cards' trim (their modifiers in the well: nothing kept under the knobs). */
-    float sourceTrim() const noexcept { return shell.modifiersInWell() ? osp::plugin::EngineCard::footTrim : 0.0f; }
+    float sourceTrim() const noexcept
+    {
+        if (! shell.modifiersInWell())
+            return 0.0f;
+        // (ANDOR OSP's rule in reference parity: only three cards had a row under the knobs.)
+        return ! shell.trimsOnlyWithThreeCards() || shell.slotCount() >= 3 ? osp::plugin::EngineCard::footTrim : 0.0f;
+    }
+    float shownTrim = -1.0f;   ///< the trim the window was last shaped for
     /** The effects rack (the product's rackModules; tests and snapshots). */
     osp::plugin::rack::Host& effectsRack() noexcept { return rack; }
     /** The macro (0..5) whose name opens a rack module (a double-click), or -1. */

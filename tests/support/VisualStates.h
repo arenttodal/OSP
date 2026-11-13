@@ -111,12 +111,14 @@ namespace visualstates
         load (*p, 3);
         shoot (*editor, ui, "03-three-layers");
         shoot (*editor, ui, "03-three-layers@2x", 2.0f);
+        // (The window keeps the instrument's own shape, as a host's does: three cards are
+        // EngineCard::footTrim shorter, so a fixed 1086 would letterbox them.)
         for (const int width : { 869, 1810 })
         {
-            editor->setSize (width, juce::roundToInt (static_cast<float> (width) * 1086.0f / 1448.0f));
+            editor->setSize (width, juce::roundToInt (static_cast<float> (width) * ui.instrumentHeight() / 1448.0f));
             shoot (*editor, ui, "04-window-" + juce::String (width));
         }
-        editor->setSize (1448, 1086);
+        editor->setSize (1448, juce::roundToInt (ui.instrumentHeight()));
         const char* tabs[] = { "amp", "env", "lfo1", "lfo2", "vel", "note" };
         for (int t = 0; t < 6; ++t)
         {
@@ -159,7 +161,10 @@ namespace visualstates
         juce::String name, why;
         juce::Rectangle<float> area;
     };
-    inline std::vector<Mask> masks (float arpShift = 0.0f, bool arpOpen = false)
+    /** `sourceTrim`: how much shorter the cards are (three cards with their modifiers in the
+        well: EngineCard::footTrim); what is under them, the status line and the ARP panel's row,
+        is that much higher. */
+    inline std::vector<Mask> masks (float arpShift = 0.0f, bool arpOpen = false, float sourceTrim = 0.0f)
     {
         using namespace osp::plugin::design::layout;
         // The identity: "ANDOR" + the product word, and the tagline under it (from the
@@ -168,7 +173,7 @@ namespace visualstates
         // The preset's name inside the bar (each product's presets are its own).
         const auto presetName = presetBar.reduced (46.0f, 4.0f);
         // The footer's status line (it names the engine; the sounds' stages differ).
-        const auto statusLine = status.translated (0.0f, arpShift).expanded (2.0f, 2.0f);
+        const auto statusLine = status.translated (0.0f, arpShift - sourceTrim).expanded (2.0f, 2.0f);
         // FX ROUTING's key after SAVE and the header MIX it moves right (ANDOR OSP and products
         // with the routing view; a product without one draws neither there).
         const auto routingKey = juce::Rectangle<float>::leftTopRightBottom (savePreset.getRight() + 2.0f, savePreset.getY() - 4.0f,
@@ -181,7 +186,7 @@ namespace visualstates
         // per card; a product with one engine (or one arpeggiator) draws nothing there.
         if (arpOpen)
             result.push_back ({ "arp-cards", "the per-card arpeggiator's row (absent with one arpeggiator)",
-                                osp::plugin::ArpInlinePanel::cardRowArea().translated (arpPanel.getX(), arpPanel.getY()) });
+                                osp::plugin::ArpInlinePanel::cardRowArea().translated (arpPanel.getX(), arpPanel.getY() - sourceTrim) });
         return result;
     }
 }
