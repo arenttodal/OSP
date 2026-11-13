@@ -865,6 +865,24 @@ the shared rack (done) and OSP's routing view and mixer (not started).
   SPACE, ECHO or MOVEMENT opens or closes its rack, a right-click offers Quick Settings or the
   rack, and a single click still opens the popover (once a double-click can no longer follow).
 
+## ANDOR OSP: macro racks and the cards' playback keys (13 Nov 2026)
+
+- [x] DRIVE's and CHARACTER's names open racks, as ANDOR ANALOG's macros do.
+  - DRIVE opens the FX rack's DRIVE page.
+  - CHARACTER opens a new shared `CharacterRack` (rack::Kind::filter). It is built as ANALOG's
+    FILTER rack is, with the voice filter's enamel, TYPE, CHARACTER, MIN, MAX, RESO, DRIVE and
+    the ENVELOPE group (ENV, ATTACK, DECAY), and the popover's response as its graph.
+- [x] LINK / REVERSE / LOOP / FOLLOW moved into each card's display, as ANALOG OSC C's: the
+  shared `EngineCard::setModifiersInWell`, small graphite keys in the top-left of the ruler
+  band.
+  - With three cards, the 64 px row they had under the knobs is gone
+    (`EngineCard::footTrim`): the cards, and the window, are that much shorter, and the macros,
+    envelope and keyboard sit that much higher. The display keeps its height.
+  - With one or two cards the keys sat beside the knobs, so no row is freed. The window keeps
+    its height and the knob row takes the card's width.
+  - The shell's reference parity follows the same rule (`ShellProcessor::trimsOnlyWithThreeCards`),
+    and a product's own setting is unchanged (ANALOG: in the well, always trimmed).
+
 ## DONE
 
 - Pure C++20 DSP/analysis library (`osp_dsp`) independent of JUCE; JUCE used for file

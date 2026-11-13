@@ -686,7 +686,11 @@ TEST_CASE ("shell: the interface is ANDOR OSP's, pixel for pixel outside the app
         REQUIRE (a.isValid());
         REQUIRE (b.isValid());
         const float scale = name.endsWith ("@2x") ? 2.0f : (name.startsWith ("04-window-") ? static_cast<float> (a.getWidth()) / osp::plugin::design::width : 1.0f);
-        const auto masks = name == "09-arp-open" ? visualstates::masks (osp::plugin::design::layout::arpShift, true) : visualstates::masks();
+        // (From 03 on, three cards: shorter by EngineCard::footTrim, their modifiers in the
+        // displays, ANDOR OSP's and so the parity render's.)
+        const bool threeCards = ! name.startsWith ("00-") && ! name.startsWith ("01-") && ! name.startsWith ("02-");
+        const float trim = threeCards ? osp::plugin::EngineCard::footTrim : 0.0f;
+        const auto masks = name == "09-arp-open" ? visualstates::masks (osp::plugin::design::layout::arpShift, true, trim) : visualstates::masks (0.0f, false, trim);
         int inMasks = 0;
         Difference where;
         const int differing = compareImages (a, b, masks, scale, tolerance, output.getChildFile ("diff/" + name + ".png"), inMasks, where);
