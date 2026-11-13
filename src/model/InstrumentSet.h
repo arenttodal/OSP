@@ -98,6 +98,16 @@ struct InstrumentSet
     /** SPEED (Note Atlas sets): every note's playback rate through its recording, pitch kept
         (1 = as recorded). File sets keep 1. */
     double speed = 1.0;
+    /** Automatic multi-sample mapping (docs/research/multisample-mapping). Both default to the
+        original behaviour, so sets saved before it keep their sound; files imported together
+        since then set `cycleTakes` and clear `loudnessLayers`.
+        `cycleTakes`: the takes of a (group, velocity layer) play in a strict cycle in take order
+        (else a seeded random take, never the previous one). `loudnessLayers`: a loudness gap
+        (>= 4.5 dB) splits velocity layers when the names carry no dynamics words (else only
+        dynamics words make layers and louder or softer performances are takes, numbered in
+        file order). */
+    bool cycleTakes = false;
+    bool loudnessLayers = true;
     /** Whether a key can be left silent (a set from an atlas with a finite reach or no fill,
         or one that leaves notes that cannot loop out). */
     bool restrictsKeys() const noexcept { return ! fill || std::isfinite (fillLimitSemitones) || loopSelects; }

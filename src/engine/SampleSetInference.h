@@ -26,13 +26,28 @@ struct SetAssignment
 };
 
 /**
+    How a set is inferred (docs/research/multisample-mapping). The defaults are the original
+    rules, which sets saved before automatic mapping keep; `automatic()` is what files imported
+    together get since: takes cycle in file order and only dynamics words make velocity layers.
+    Stored on the set (InstrumentSet::cycleTakes / loudnessLayers).
+*/
+struct SetInferenceOptions
+{
+    bool cycleTakes = false;
+    bool loudnessLayers = true;
+    static SetInferenceOptions automatic() noexcept { return { true, false }; }
+    static SetInferenceOptions of (const InstrumentSet& set) noexcept { return { set.cycleTakes, set.loudnessLayers }; }
+};
+
+/**
     Sample-set intelligence (spec §47): turns several dropped recordings into one
     instrument without any mapping.
 
     1. Pitch groups: recordings whose roots are within half a semitone belong together.
     2. Inside a group: dynamics words in file names (pp, mf, ff, soft, hard, ...) define
-       velocity layers; otherwise a loudness gap of >= 4.5 dB splits layers; anything
-       else is a round-robin take. A take much longer or shorter than its group is an
+       velocity layers; otherwise a loudness gap of >= 4.5 dB splits layers (unless
+       `options.loudnessLayers` is off); anything else is a round-robin take (numbered in
+       input order with `options.cycleTakes`). A take much longer or shorter than its group is an
        alternate articulation (kept, not used for ordinary notes).
     3. Register model (spec §28): brightness relative to F0 as a function of pitch,
        fitted over the groups, so notes between and beyond the anchors get a plausible
@@ -41,7 +56,8 @@ struct SetAssignment
     Every decision keeps a confidence. Assignments from the user override the inference.
     Offline only (allocates).
 */
-InstrumentSet inferSampleSet (const std::vector<SetInput>& inputs, const std::vector<SetAssignment>& assignments = {});
+InstrumentSet inferSampleSet (const std::vector<SetInput>& inputs, const std::vector<SetAssignment>& assignments = {},
+                              const SetInferenceOptions& options = {});
 
 /**
     The set's derived figures from its members' places (each member's pitch group, layer, take

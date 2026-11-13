@@ -66,7 +66,8 @@ namespace instrument
         real recordings are the register).
     */
     InstrumentSet buildSet (const std::vector<SetSource>& sources, const InstrumentBuildOptions& options,
-                            const std::vector<SetAssignment>& assignments, bool withContinuation);
+                            const std::vector<SetAssignment>& assignments, bool withContinuation,
+                            const SetInferenceOptions& setOptions = {});
 
     /** Body resonances and resonator tuning for CHARACTER / Reimagined (spec §22, §46). */
     void findResonances (InstrumentModel& model, const AudioData& audio);

@@ -29,6 +29,8 @@
 #include "research/TestSignalSet.h"
 #include "research/UnifiedScenes.h"
 
+#include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <fstream>
 #include <iostream>
@@ -109,6 +111,13 @@ NOTE ATLAS (Phase 3; docs/research/unified-andor/phase-3-report.md)
         --stage-a: the instrument as Stage A publishes it (Phase 4: playable, no continuation yet).
   --write-atlas-fixtures <dir>                writes the synthetic test atlases (WAV + .andoratlas)
 
+MULTI-SAMPLE INSTRUMENT (docs/research/multisample-mapping)
+  --multisample <dir> (--midi <file.mid> | --fixture <name>) --output <out.wav>
+        [--mode oneshot|granular] [--config <f>] [--seed <n>] [--block-size <n>] [--legacy-mapping] [--print-members]
+        Every audio file in <dir> as one instrument, mapped as the plugin maps files imported together
+        (natural name order, nearest root, takes cycle, only dynamics words make velocity layers);
+        prints the mapping. --legacy-mapping: the original rules. --print-members: the file each note plays.
+
 PHRASE ANALYSIS (Phase 4; ported from ANDOR Lab, docs/research/unified-andor/phase-4-report.md)
   --phrase-analyze <file> [--output-atlas <f.andoratlas>] [--output-contour <f.csv>] [--backend yin|yin-viterbi]
         [--detection fewer|normal|more] [--min-note <s>] [--auto-tuning]
@@ -151,7 +160,7 @@ struct Args
     }
 };
 
-const std::set<std::string> flagOptions = { "--help", "--version", "--benchmark", "--no-audio", "--strict", "--no-retrigger", "--no-fill", "--as-recorded", "--stage-a",
+const std::set<std::string> flagOptions = { "--help", "--version", "--benchmark", "--no-audio", "--strict", "--no-retrigger", "--no-fill", "--as-recorded", "--stage-a", "--legacy-mapping", "--print-members",
                                             "--stress", "--verbose", "--auto-tuning", "--phrase-eval" };
 
 std::optional<Args> parseArgs (int argc, char** argv, std::string& error)
@@ -857,6 +866,156 @@ int commandAtlas (const Args& args)
     return exitOk;
 }
 
+/** Natural file-name order, as the plugin sorts files imported together (C4_2 before C4_10). */
+bool naturalLess (const std::string& a, const std::string& b)
+{
+    std::size_t i = 0, j = 0;
+    while (i < a.size() && j < b.size())
+    {
+        const auto ca = static_cast<unsigned char> (a[i]), cb = static_cast<unsigned char> (b[j]);
+        if (std::isdigit (ca) && std::isdigit (cb))
+        {
+            std::size_t ei = i, ej = j;
+            while (ei < a.size() && std::isdigit (static_cast<unsigned char> (a[ei])))
+                ++ei;
+            while (ej < b.size() && std::isdigit (static_cast<unsigned char> (b[ej])))
+                ++ej;
+            const auto na = std::stoull (a.substr (i, std::min<std::size_t> (ei - i, 18))), nb = std::stoull (b.substr (j, std::min<std::size_t> (ej - j, 18)));
+            if (na != nb)
+                return na < nb;
+            i = ei;
+            j = ej;
+            continue;
+        }
+        const auto la = std::tolower (ca), lb = std::tolower (cb);
+        if (la != lb)
+            return la < lb;
+        ++i;
+        ++j;
+    }
+    return a.size() - i < b.size() - j;
+}
+
+int commandMultiSample (const Args& args)
+{
+    if (! args.has ("--output"))
+        return fail (exitUsage, "--output <file.wav> is required");
+    if (args.has ("--midi") == args.has ("--fixture"))
+        return fail (exitUsage, "give exactly one of --midi <file> or --fixture <name>");
+    std::string error;
+    auto config = configFromArgs (args, error);
+    if (! config)
+        return fail (exitUsage, error);
+    config->engine = EngineId::instrument;
+    if (args.get ("--mode", "oneshot") == "granular")
+        config->engineSettings.sourceMode[0] = SourceMode::granular;
+
+    // The recordings: every audio file in the folder, in natural name order (as the plugin).
+    const fs::path dir = args.get ("--multisample");
+    std::vector<fs::path> files;
+    std::error_code ec;
+    for (const auto& entry : fs::directory_iterator (dir, ec))
+    {
+        auto ext = entry.path().extension().string();
+        std::transform (ext.begin(), ext.end(), ext.begin(), [] (unsigned char c) { return static_cast<char> (std::tolower (c)); });
+        if (entry.is_regular_file() && (ext == ".wav" || ext == ".aif" || ext == ".aiff" || ext == ".flac"))
+            files.push_back (entry.path());
+    }
+    if (ec || files.empty())
+        return fail (exitInput, "no audio files in " + dir.string());
+    std::sort (files.begin(), files.end(), [] (const fs::path& a, const fs::path& b) { return naturalLess (a.filename().string(), b.filename().string()); });
+    std::vector<AnalysedSource> sources;
+    std::vector<std::string> names;
+    for (const auto& f : files)
+    {
+        auto loaded = loadAndAnalyse (f);
+        if (! loaded.ok)
+        {
+            std::cerr << "skipped " << f.filename().string() << ": " << loaded.error << "\n";
+            continue;
+        }
+        sources.push_back (std::move (loaded));
+        names.push_back (f.filename().string());
+    }
+    std::vector<instrument::SetSource> inputs;
+    for (std::size_t i = 0; i < sources.size(); ++i)
+        inputs.push_back ({ &sources[i].audio, &sources[i].analysis, names[i] });
+    InstrumentBuildOptions options;
+    options.interpolationZeroCrossings = config->engineSettings.interpolationZeroCrossings;
+    options.seed = config->engineSettings.seed;
+    // --legacy-mapping: the original rules (what a set saved before automatic mapping keeps).
+    const auto policy = args.has ("--legacy-mapping") ? SetInferenceOptions {} : SetInferenceOptions::automatic();
+    const auto set = instrument::buildSet (inputs, options, {}, true, policy);
+    if (! set.isValid())
+        return fail (exitProcessing, "the files could not be combined into an instrument");
+    if (config->sampleRate <= 0.0)
+        config->sampleRate = set.members[static_cast<std::size_t> (set.primary)].model->original.source->sampleRate();
+
+    // The mapping, for the report: each root, its layers and takes, and the keys it plays.
+    std::cout << "multisample " << dir.filename().string() << ": " << set.members.size() << " files, " << set.groups.size() << " roots ("
+              << (set.cycleTakes ? "takes cycle" : "takes random") << ", " << (set.loudnessLayers ? "loudness layers" : "named layers only") << ")\n";
+    for (std::size_t g = 0; g < set.groups.size(); ++g)
+    {
+        int low = 128, high = -1;
+        for (int note = 0; note < 128; ++note)
+            if (set.groupFor (note) == static_cast<int> (g))
+                low = std::min (low, note), high = std::max (high, note);
+        const auto& group = set.groups[g];
+        std::cout << "  root " << json::round (group.rootMidi, 2) << " (" << midiNoteName (static_cast<int> (std::lround (group.rootMidi))) << ") keys "
+                  << low << "-" << high << ", " << group.layers << " layer(s):";
+        for (int id : group.members)
+        {
+            const auto& m = set.members[static_cast<std::size_t> (id)];
+            std::cout << " " << m.filename << " [" << toString (m.role) << " L" << m.layer << " T" << m.take << "]";
+        }
+        std::cout << "\n";
+    }
+
+    MidiSequence sequence;
+    if (args.has ("--midi"))
+    {
+        auto midi = io::readMidiFile (args.get ("--midi"), error);
+        if (! midi)
+            return fail (exitInput, error);
+        sequence = std::move (*midi);
+    }
+    else
+    {
+        auto fixture = fixtures::byName (args.get ("--fixture"), static_cast<int> (std::lround (set.groups.front().rootMidi)));
+        if (! fixture)
+            return fail (exitUsage, "unknown fixture '" + args.get ("--fixture") + "'");
+        sequence = std::move (*fixture);
+    }
+    // Which file each note plays, in order (the engine's own choice, one note-on after another).
+    if (args.has ("--print-members"))
+    {
+        InstrumentEngine probe;
+        probe.prepare (config->sampleRate, 256, config->engineSettings);
+        probe.setInstrumentSet (&set);
+        std::vector<float> l (256), r (256);
+        float* ch[2] = { l.data(), r.data() };
+        std::vector<MidiEvent> ons;
+        for (const auto& e : sequence.events)
+            if (e.type == MidiEvent::Type::noteOn && e.value > 0)
+                ons.push_back (e);
+        std::sort (ons.begin(), ons.end(), [] (const MidiEvent& a, const MidiEvent& b) { return a.timeSeconds < b.timeSeconds; });
+        for (const auto& e : ons)
+        {
+            const int index = probe.memberFor (e.note, e.value, probe.noteOnCount());
+            std::cout << "  " << midiNoteName (e.note) << " -> " << (index >= 0 ? set.members[static_cast<std::size_t> (index)].filename : std::string ("(silent)")) << "\n";
+            probe.noteOn (e.note, e.value);
+            probe.render (ch, 2, 256);
+            probe.noteOff (e.note);
+            probe.render (ch, 2, 256);
+        }
+    }
+    const auto output = renderSet (set, sequence, *config);
+    if (! io::writeAudioFile (args.get ("--output"), output.audio, io::SampleFormat::float32, error))
+        return fail (exitProcessing, error);
+    std::cout << "wrote " << args.get ("--output") << "\n";
+    return exitOk;
+}
+
 int commandWriteAtlasFixtures (const Args& args)
 {
     const fs::path dir = args.get ("--write-atlas-fixtures");
@@ -1504,6 +1663,8 @@ int main (int argc, char** argv)
             return commandUnified (args);
         if (args.has ("--atlas"))
             return commandAtlas (args);
+        if (args.has ("--multisample"))
+            return commandMultiSample (args);
         if (args.has ("--phrase-analyze"))
             return commandPhraseAnalyze (args);
         if (args.has ("--phrase-eval"))

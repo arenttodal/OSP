@@ -24,11 +24,16 @@ OSP grows with what you give it, up to three sounds (layers **A**, **B**, **C**)
   place appears beside them; drop there to add it. Dropping onto a card says
   **REPLACE A** (or B, C) and replaces that layer's sound (its root goes back to
   automatic; its controls stay). With three layers you can only replace.
-- **Drop several files at once**: each becomes its own layer (up to three; if you drop
-  more, OSP says how many were left out). **Drop a folder** to make ONE multi-sample sound
-  from all its files (pitches, velocity layers and round robins are sorted out for you;
-  the card's **⋮ → Samples** shows and corrects the result).
-- **⋮ → Add layer…** does the same from a file browser.
+- **Drop several files at once** (or a folder): they become ONE multi-sample sound in the
+  place you drop them - a new layer beside the cards, or the card you drop on (only that
+  card changes). Each file plays from its own pitch and every key from C-1 to G9 plays the
+  nearest one (between two, the lower). Several takes of one note alternate in turn, in
+  file-name order (`C4_01`, `C4_02`, … then `C4_01` again), and a key filled from that note
+  alternates them too. Takes that are only louder or softer stay takes. Velocity layers come
+  from dynamics words in the names (pp, mf, ff, soft, hard, …). The card's **⋮ → Samples**
+  shows and corrects the result. Sessions saved before this keep the sound they had.
+- **⋮ → Add layer…** does the same from a file browser: one file is one layer, several
+  files are one multi-sample layer.
 - **Remove** a layer from its card's **⋮** menu (it asks once more). The layers after it
   move up (A + C never stays: it becomes A + B). **⋮ → Restore removed layer** brings it
   back.

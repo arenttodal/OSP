@@ -931,8 +931,10 @@ void OspAudioProcessorEditor::filesDropped (const juce::StringArray& files, int 
     dragging = false;
     showDropTarget ({});
 
-    // Loose files are one sound each; a folder is one multi-sample sound.
-    juce::Array<juce::File> loose, folder;
+    // Everything dropped together - loose files, a folder's files, or both - is ONE sound in
+    // the source it lands on: one file plays alone, several become one multi-sample instrument
+    // mapped by their detected roots (docs/research/multisample-mapping).
+    juce::Array<juce::File> dropped;
     for (const auto& f : files)
     {
         const juce::File file (f);
@@ -940,34 +942,27 @@ void OspAudioProcessorEditor::filesDropped (const juce::StringArray& files, int 
         {
             for (const auto& entry : juce::RangedDirectoryIterator (file, false, "*", juce::File::findFiles))
                 if (isAudioFile (entry.getFile()))
-                    folder.add (entry.getFile());
+                    dropped.add (entry.getFile());
         }
         else if (isAudioFile (file))
-            loose.add (file);
+            dropped.add (file);
     }
     switch (target.kind)
     {
         case DropTarget::Kind::empty:
         case DropTarget::Kind::add:
-            if (! folder.isEmpty())
-                ospProcessor.setEditLayer (std::max (0, ospProcessor.addLayerSet (folder)));
-            if (! loose.isEmpty())
+            if (dropped.size() == 1)
             {
                 const int first = target.kind == DropTarget::Kind::add ? target.layer : ospProcessor.firstFreeLayer();
-                if (ospProcessor.addLayers (loose, first) > 0 && folder.isEmpty())
+                if (ospProcessor.addLayers (dropped, first) > 0)
                     ospProcessor.setEditLayer (std::max (0, first));
             }
+            else if (! dropped.isEmpty())
+                ospProcessor.setEditLayer (std::max (0, ospProcessor.addLayerSet (dropped)));
             break;
         case DropTarget::Kind::replace:
-            if (! folder.isEmpty())
-                ospProcessor.replaceLayer (folder, target.layer);
-            else if (! loose.isEmpty())
-            {
-                ospProcessor.replaceLayer ({ loose.getFirst() }, target.layer);
-                loose.remove (0);
-            }
-            if (! folder.isEmpty() || ! loose.isEmpty())
-                ospProcessor.addLayers (loose);   // the rest become new layers while there is room
+            if (! dropped.isEmpty())
+                ospProcessor.replaceLayer (dropped, target.layer);
             ospProcessor.setEditLayer (target.layer);
             break;
         case DropTarget::Kind::none:
@@ -1217,7 +1212,7 @@ void OspAudioProcessorEditor::choosePresetFile (bool save, bool instrument)
 
 void OspAudioProcessorEditor::chooseFile (int layer, bool addAsNewLayer)
 {
-    chooser = std::make_unique<juce::FileChooser> (addAsNewLayer ? "Choose sounds (each becomes a layer)" : "Choose a sound", juce::File(),
+    chooser = std::make_unique<juce::FileChooser> (addAsNewLayer ? "Choose sounds" : "Choose a sound", juce::File(),
                                                    "*.wav;*.wave;*.aif;*.aiff;*.aifc;*.flac");
     chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
                               | juce::FileBrowserComponent::canSelectMultipleItems,
@@ -1228,7 +1223,10 @@ void OspAudioProcessorEditor::chooseFile (int layer, bool addAsNewLayer)
                                       files.add (f);
                               if (files.isEmpty())
                                   return;
-                              if (addAsNewLayer)
+                              // As a drop: one file is one sound, several are one multi-sample sound.
+                              if (addAsNewLayer && files.size() > 1)
+                                  ospProcessor.setEditLayer (std::max (0, ospProcessor.addLayerSet (files)));
+                              else if (addAsNewLayer)
                               {
                                   const int first = ospProcessor.firstFreeLayer();
                                   if (ospProcessor.addLayers (files) > 0)

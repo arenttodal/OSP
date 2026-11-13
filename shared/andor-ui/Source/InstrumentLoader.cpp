@@ -418,7 +418,7 @@ LoadResult loadInstrumentSet (const SetLoadRequest& request, SampleStore& store,
             sources.push_back ({ &one.audio, &one.analysis, one.filename });
         InstrumentBuildOptions options;
         options.interpolationZeroCrossings = playbackZeroCrossings;
-        auto set = std::make_shared<InstrumentSet> (instrument::buildSet (sources, options, request.assignments, true));
+        auto set = std::make_shared<InstrumentSet> (instrument::buildSet (sources, options, request.assignments, true, request.policy));
         if (! set->isValid())
         {
             result.error = "the files could not be combined into an instrument";
@@ -894,7 +894,7 @@ LoadResult reassignInstrumentSet (const LoadedInstrument& base, const std::vecto
     auto instrument = std::make_shared<LoadedInstrument> (base);
     instrument->generation = generation;
     instrument->assignments = assignments;
-    auto set = std::make_shared<InstrumentSet> (inferSampleSet (inputs, assignments));
+    auto set = std::make_shared<InstrumentSet> (inferSampleSet (inputs, assignments, SetInferenceOptions::of (*base.set)));
     // Keep member identities aligned with the (unchanged) member order.
     instrument->set = std::move (set);
     result.instrument = std::move (instrument);
