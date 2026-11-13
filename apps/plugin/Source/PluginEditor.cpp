@@ -299,10 +299,10 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
             }
             openPopup (index);
         };
-        // SPACE, ECHO and MOVEMENT (as in ANDOR ANALOG): no mark on the row - the name opens the
-        // full rack on a double-click, a right-click offers the popover or the rack, Enter opens
-        // it. A single click still opens the popover.
-        if (const auto kind = rack::kindForMacro (macroSpecs[i].parameterId); kind.has_value() && knob.label != nullptr)
+        // DRIVE, CHARACTER, MOVEMENT, ECHO and SPACE (as ANDOR ANALOG's macros): no mark on the
+        // row - the name opens the full rack on a double-click, a right-click offers the popover
+        // or the rack, Enter opens it. A single click still opens the popover.
+        if (const auto kind = macroRackKind (macroSpecs[i].parameterId); kind.has_value() && knob.label != nullptr)
         {
             rackOfMacro[i] = *kind;
             const auto k = *kind;
@@ -318,7 +318,7 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
                         safe->openPopup (index);
                     }
                 });
-                menu.addItem (safe->racks.isShown (k) ? "Close Rack" : "Open Rack", [safe, k] {
+                menu.addItem (safe->isMacroRackOpen (k) ? "Close Rack" : "Open Rack", [safe, k] {
                     if (safe != nullptr)
                         safe->toggleRackFromLabel (k);
                 });
@@ -1319,11 +1319,37 @@ void OspAudioProcessorEditor::setRackExpanded (rack::Kind kind, bool open)
     racks.setShown (kind, open);   // (rackChanged follows)
 }
 
+std::optional<rack::Kind> OspAudioProcessorEditor::macroRackKind (const juce::String& parameterId)
+{
+    // MOVEMENT, ECHO and SPACE: the shared racks; CHARACTER: its own (the voice filter's face,
+    // as ANDOR ANALOG's FILTER); DRIVE: the FX rack's DRIVE (as the routing view opens it).
+    if (parameterId == "character")
+        return rack::Kind::filter;
+    if (parameterId == "drive")
+        return rack::Kind::fx;
+    return rack::kindForMacro (parameterId);
+}
+
+bool OspAudioProcessorEditor::isMacroRackOpen (rack::Kind kind) const
+{
+    if (kind == rack::Kind::fx)   // (DRIVE's: the FX rack showing DRIVE, not another effect)
+        return racks.isShown (kind) && fxRackShown().type == fx::Type::drive;
+    return racks.isShown (kind);
+}
+
 void OspAudioProcessorEditor::toggleRackFromLabel (rack::Kind kind)
 {
     // (A popover in the way closes; a press that closed it must not count later.)
     closedByLabelPress = -1;
     closePopup();
+    if (kind == rack::Kind::fx)
+    {
+        if (isMacroRackOpen (kind))
+            setRackExpanded (kind, false);
+        else
+            openFxRack (*this, { fx::Type::drive, 0 });   // (another effect's rack swaps to DRIVE)
+        return;
+    }
     setRackExpanded (kind, ! racks.isShown (kind));
 }
 
@@ -1332,7 +1358,7 @@ void OspAudioProcessorEditor::rackChanged()
     // A view change only: the window grows or shrinks by the rack, nothing sounds different.
     for (std::size_t i = 0; i < macros.size(); ++i)
         if (rackOfMacro[i].has_value() && macros[i].label != nullptr)
-            macros[i].label->setRackOpen (racks.isShown (*rackOfMacro[i]));
+            macros[i].label->setRackOpen (isMacroRackOpen (*rackOfMacro[i]));
     layoutInstrument();
     applyWindowShape (true);
     positionPopup();

@@ -133,7 +133,8 @@ TEST_CASE ("fx osp: the FX rack opens below the sources and closes back to the s
     const auto closedSize = e->getBounds();
     CHECK (ui->hasRack (osp::plugin::rack::Kind::fx));
     CHECK (ui->hasRack (osp::plugin::rack::Kind::space));
-    CHECK_FALSE (ui->hasRack (osp::plugin::rack::Kind::filter));
+    CHECK (ui->hasRack (osp::plugin::rack::Kind::filter));   // (CHARACTER's)
+    CHECK_FALSE (ui->hasRack (osp::plugin::rack::Kind::morph));   // (ANDOR ANALOG's own)
     // SPACE, ECHO and MOVEMENT open their own racks (as in ANDOR ANALOG), in their enamel.
     for (const auto type : { osp::fx::Type::space, osp::fx::Type::echo, osp::fx::Type::movement })
     {
@@ -212,36 +213,50 @@ TEST_CASE ("fx osp: the routing key shows the routing view in the cards' place, 
     CHECK (ui->instrumentHeight() == height);
 }
 
-TEST_CASE ("fx osp: SPACE, ECHO and MOVEMENT's names open their racks; a click still opens the popover", "[plugin][fx][routing]")
+TEST_CASE ("fx osp: DRIVE, CHARACTER, MOVEMENT, ECHO and SPACE's names open their racks; LIFE's none", "[plugin][fx][routing]")
 {
     using Editor = osp::plugin::OspAudioProcessorEditor;
+    using Kind = osp::plugin::rack::Kind;
     OspAudioProcessor p;
     std::unique_ptr<juce::AudioProcessorEditor> e (p.createEditorIfNeeded());
     auto* ui = dynamic_cast<Editor*> (e.get());
     REQUIRE (ui != nullptr);
     const auto height = ui->instrumentHeight();
     const auto specs = osp::plugin::frame::ospMacroSpecs();
-    int opened = 0;
+    juce::StringArray opened;
     for (std::size_t i = 0; i < specs.size(); ++i)
     {
         auto* label = ui->macroRow()[i].label.get();
         REQUIRE (label != nullptr);
-        const auto kind = osp::plugin::rack::kindForMacro (specs[i].parameterId);
+        const auto kind = Editor::macroRackKind (specs[i].parameterId);
         if (! kind.has_value())
+        {
+            CHECK (specs[i].parameterId == "life");
             continue;
+        }
         // Enter on the focused name (a double-click's action): the rack opens, the name says so.
         REQUIRE (label->keyPressed (juce::KeyPress (juce::KeyPress::returnKey)));
-        CHECK (ui->effectsRack().isShown (*kind));
+        CHECK (ui->isMacroRackOpen (*kind));
         CHECK (label->isRackOpen());
         CHECK (ui->instrumentHeight() > height);
+        if (*kind == Kind::fx)
+            CHECK (osp::plugin::fxRackShown() == osp::fx::InstanceId { osp::fx::Type::drive, 0 });   // DRIVE's hardware rack
         // Again: it closes.
         ui->toggleRackFromLabel (*kind);
-        CHECK_FALSE (ui->effectsRack().isShown (*kind));
+        CHECK_FALSE (ui->isMacroRackOpen (*kind));
         CHECK_FALSE (label->isRackOpen());
-        ++opened;
+        opened.add (specs[i].parameterId);
     }
-    CHECK (opened == 3);
+    CHECK (opened.size() == 5);
+    CHECK (opened.contains ("drive"));
+    CHECK (opened.contains ("character"));
     CHECK (ui->instrumentHeight() == height);
+    // DRIVE's name while another effect's rack shows: the rack swaps to DRIVE (not closed).
+    osp::plugin::openFxRack (*ui, { osp::fx::Type::eq, 0 });
+    CHECK_FALSE (ui->isMacroRackOpen (Kind::fx));
+    ui->toggleRackFromLabel (Kind::fx);
+    CHECK (ui->isMacroRackOpen (Kind::fx));
+    ui->setRackExpanded (Kind::fx, false);
 }
 
 TEST_CASE ("fx osp: routing view and rack screenshots (OSP_FX_SHOTS)", "[.][fx-routing-shots]")
@@ -302,6 +317,11 @@ TEST_CASE ("fx osp: routing view and rack screenshots (OSP_FX_SHOTS)", "[.][fx-r
     ui->setRackExpanded (osp::plugin::rack::Kind::movement, false);
     view->openEditor ({ osp::fx::Type::compressor, 0 });
     shoot ("routing-07-compressor-rack");
+    ui->setSourceViewShown (false);
+    ui->toggleRackFromLabel (osp::plugin::rack::Kind::filter);
+    shoot ("routing-08-character-rack");
+    ui->toggleRackFromLabel (osp::plugin::rack::Kind::fx);
+    shoot ("routing-09-drive-rack");
     p.releaseResources();
 }
 

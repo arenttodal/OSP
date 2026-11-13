@@ -4,6 +4,7 @@
 #include "Design.h"
 #include "EffectRack.h"
 #include "EngineCard.h"
+#include "CharacterRack.h"
 #include "FxRack.h"
 #include "FxRouting.h"
 #include "InstrumentFrame.h"
@@ -122,7 +123,8 @@ public:
         moves - until an effect is opened. */
     bool hasRack (rack::Kind kind) const noexcept override
     {
-        return kind == rack::Kind::fx || kind == rack::Kind::movement || kind == rack::Kind::echo || kind == rack::Kind::space;
+        return kind == rack::Kind::fx || kind == rack::Kind::movement || kind == rack::Kind::echo || kind == rack::Kind::space
+            || kind == rack::Kind::filter;
     }
     void setRackExpanded (rack::Kind kind, bool open) override;
     rack::Host& effectsRack() noexcept { return racks; }
@@ -238,7 +240,13 @@ private:
     DropTarget dragTarget;
 
     // The FX library's rack (opt-in view: empty until an effect is opened).
-    rack::Host racks { [this] (rack::Kind kind) { return kind == rack::Kind::fx ? createFxRack (ospProcessor) : createRackModule (kind, ospProcessor); } };
+    rack::Host racks { [this] (rack::Kind kind) {
+        if (kind == rack::Kind::fx)
+            return createFxRack (ospProcessor);
+        if (kind == rack::Kind::filter)
+            return createCharacterRack (ospProcessor);   // (CHARACTER: OSP has no other filter rack)
+        return createRackModule (kind, ospProcessor);
+    } };
     RoutingKey routingKey;
     std::unique_ptr<juce::Component> routingView;
     bool routingOpen = false;
@@ -246,8 +254,11 @@ private:
     void rackChanged();
     std::array<std::optional<rack::Kind>, frame::macroCount> rackOfMacro {};
 public:
-    /** A double-click on SPACE's, ECHO's or MOVEMENT's name: its rack opens (or closes). */
+    /** A double-click on a macro's name (DRIVE, CHARACTER, MOVEMENT, ECHO, SPACE): its rack
+        opens (or closes). The macro's rack (DRIVE: the FX rack's DRIVE). */
     void toggleRackFromLabel (rack::Kind kind);
+    static std::optional<rack::Kind> macroRackKind (const juce::String& parameterId);
+    bool isMacroRackOpen (rack::Kind kind) const;
     frame::MacroRow& macroRow() noexcept { return macros; }
 private:
 

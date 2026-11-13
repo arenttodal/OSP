@@ -22,6 +22,9 @@ std::unique_ptr<MiniPanel> createReimaginedPopup (InstrumentHost& host, int laye
 /** An effect's module for the effects rack (EffectRack.h), built from the same parts as its
     popover; nullptr for a kind not built yet. */
 std::unique_ptr<rack::Module> createRackModule (rack::Kind kind, InstrumentHost& host);
+/** CHARACTER's filter response (dB) at f: the CharacterFilter designs, as its popover and its
+    rack draw them (type: FilterType as an int; cutoff fc in Hz; resonance 0..0.9; TILT's dB). */
+double characterResponseDb (int type, double f, double fc, double resonance, double tiltDb);
 /** The MOVEMENT module's lane shown (tests), -1 for another module. */
 int rackMovementLane (const rack::Module& module);
 /** MOVEMENT presets: one lane's settings (mode, every mode's own, INTENSITY, SYNC, CYCLE,
