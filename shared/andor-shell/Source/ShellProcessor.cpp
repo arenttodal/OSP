@@ -110,8 +110,18 @@ namespace
 }
 
 //==============================================================================
+juce::AudioProcessor::BusesProperties ShellProcessor::shellBuses()
+{
+    // Stereo out; a product's external input (opt-in) as a stereo bus, off until the host
+    // routes something to it.
+    auto buses = BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true);
+    if (const auto& name = productInfo().externalInputName; name.isNotEmpty())
+        buses = buses.withInput (name, juce::AudioChannelSet::stereo(), false);
+    return buses;
+}
+
 ShellProcessor::ShellProcessor (std::unique_ptr<Engine> productEngine)
-    : AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
+    : AudioProcessor (shellBuses()),
       parameters (*this, &undoManager, productInfo().stateType, productParameterLayout (productEngine->boundParameters())),
       engine (std::move (productEngine))
 {
@@ -209,6 +219,14 @@ ShellProcessor::~ShellProcessor()
 void ShellProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     engine->prepare (sampleRate, samplesPerBlock, parameters);
+    // The external input's copy: any block the host may hand over (it may exceed the announced
+    // size: processBlock copies at most this much and gives the engine as much).
+    if (productInfo().externalInputName.isNotEmpty())
+    {
+        const auto room = static_cast<std::size_t> (std::max (8192, 2 * samplesPerBlock));
+        externalLeft.assign (room, 0.0f);
+        externalRight.assign (room, 0.0f);
+    }
     // The arpeggiator's MIDI: room for any realistic block, so the audio thread never grows it.
     arpeggiator.prepare (sampleRate);
     arpMidi.ensureSize (static_cast<std::size_t> (osp::Arpeggiator::maxEvents + 4096) * 16);
@@ -254,7 +272,24 @@ void ShellProcessor::releaseResources()
 bool ShellProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
     const auto out = layouts.getMainOutputChannelSet();
-    return out == juce::AudioChannelSet::stereo() || out == juce::AudioChannelSet::mono();
+    if (out != juce::AudioChannelSet::stereo() && out != juce::AudioChannelSet::mono())
+        return false;
+    // The external input (a product's opt-in): off, mono or stereo. None without one.
+    for (const auto& in : layouts.inputBuses)
+        if (! in.isDisabled() && in != juce::AudioChannelSet::mono() && in != juce::AudioChannelSet::stereo())
+            return false;
+    return productInfo().externalInputName.isNotEmpty() || layouts.inputBuses.isEmpty()
+           || std::all_of (layouts.inputBuses.begin(), layouts.inputBuses.end(), [] (const auto& in) { return in.isDisabled(); });
+}
+
+juce::VST3ClientExtensions* ShellProcessor::getVST3ClientExtensions()
+{
+    return productInfo().externalInputName.isNotEmpty() ? &externalInputExtensions : nullptr;
+}
+
+bool ShellProcessor::hasExternalInput() const
+{
+    return productInfo().externalInputName.isNotEmpty() && getBusCount (true) > 0;
 }
 
 void ShellProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
@@ -389,6 +424,33 @@ void ShellProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
     }
     if (modBound)
         applyModulation();
+
+    // The external input (a product's opt-in): copied out of the host's buffer before anything
+    // is written - input and output channels may share it - and handed to the engine. A bus the
+    // host keeps off (or none) gives nothing: never the output's stale contents.
+    if (productInfo().externalInputName.isNotEmpty())
+    {
+        Engine::ExternalInput in;
+        in.busExists = getBusCount (true) > 0;
+        const auto* bus = in.busExists ? getBus (true, 0) : nullptr;
+        in.busEnabled = bus != nullptr && bus->isEnabled() && bus->getNumberOfChannels() > 0;
+        const int n = std::min (buffer.getNumSamples(), static_cast<int> (externalLeft.size()));
+        if (in.busEnabled && n > 0)
+        {
+            const auto view = bus->getBusBuffer (buffer);
+            in.channels = std::min (2, view.getNumChannels());
+            if (in.channels > 0)
+            {
+                std::copy (view.getReadPointer (0), view.getReadPointer (0) + n, externalLeft.begin());
+                const float* r = view.getReadPointer (in.channels > 1 ? 1 : 0);
+                std::copy (r, r + n, externalRight.begin());
+                in.left = externalLeft.data();
+                in.right = externalRight.data();
+                in.samples = n;
+            }
+        }
+        engine->setExternalInput (in);
+    }
 
     buffer.clear();
     if (! arpBound)

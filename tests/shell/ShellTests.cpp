@@ -782,3 +782,25 @@ TEST_CASE ("shell: opening the arpeggiator (a taller instrument) never asks for 
     CHECK (fittedWindowWidth (1448, 0, tall) == 1448);      // (no screen to ask: unchanged)
     CHECK (fittedWindowWidth (1448, 100, tall) == 480);     // (never under 480)
 }
+
+TEST_CASE ("shell: an external audio input is a product's opt-in; without one the plugin is output-only, as ever", "[shell][buses]")
+{
+    ShellProcessor p;
+    if (andor::shell::productInfo().externalInputName.isEmpty())
+    {
+        // (ANDOR OSP's products: no input bus, no VST3 extension, no input layout taken)
+        CHECK (p.getBusCount (true) == 0);
+        CHECK (p.getVST3ClientExtensions() == nullptr);
+        CHECK_FALSE (p.hasExternalInput());
+        juce::AudioProcessor::BusesLayout withInput;
+        withInput.outputBuses.add (juce::AudioChannelSet::stereo());
+        withInput.inputBuses.add (juce::AudioChannelSet::stereo());
+        CHECK_FALSE (p.checkBusesLayoutSupported (withInput));
+        return;
+    }
+    // A product with one (ANDOR ANALOG): one input, off by default; an auxiliary VST3 bus.
+    REQUIRE (p.getBusCount (true) == 1);
+    CHECK_FALSE (p.getBus (true, 0)->isEnabledByDefault());
+    REQUIRE (p.getVST3ClientExtensions() != nullptr);
+    CHECK_FALSE (p.getVST3ClientExtensions()->getPluginHasMainInput());
+}

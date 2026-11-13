@@ -47,6 +47,11 @@ public:
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
     using AudioProcessor::processBlock;
+    /** VST3: a product's external input (ProductInfo::externalInputName) is an auxiliary
+        (sidechain) bus, never a main input - the plugin stays an instrument. */
+    juce::VST3ClientExtensions* getVST3ClientExtensions() override;
+    /** Whether this product has an external audio input bus at all (and the host kept it). */
+    bool hasExternalInput() const;
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
     const juce::String getName() const override { return productInfo().name; }
@@ -284,6 +289,14 @@ public:
     juce::MidiKeyboardState keyboardState;
 
 private:
+    static BusesProperties shellBuses();
+    struct ExternalInputExtensions final : public juce::VST3ClientExtensions
+    {
+        bool getPluginHasMainInput() const override { return false; }
+    } externalInputExtensions;
+    /** The external input, copied before the output is written (prepareToPlay sizes them). */
+    std::vector<float> externalLeft, externalRight;
+
     void timerCallback() override;
     int resolve (int layer) const noexcept { return std::clamp (layer < 0 ? editLayer() : layer, 0, numLayers - 1); }
     void enqueueLoad (osp::plugin::LoadRequest request, int layer);

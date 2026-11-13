@@ -106,6 +106,23 @@ public:
         (the on-screen wheels arrive only here, at the block's start). */
     virtual void process (juce::AudioBuffer<float>& buffer, const juce::MidiBuffer& midi, const Performance& performance) noexcept = 0;
 
+    /** The block's external audio (ProductInfo::externalInputName; null pointers: none). Valid
+        for the process() call that follows only: the shell copies the host's input before the
+        output is written, so these never alias the output. `busEnabled`: the host routes
+        something to the bus (it may still be silent); `channels` 1 (left = right) or 2. */
+    struct ExternalInput
+    {
+        const float* left = nullptr;
+        const float* right = nullptr;
+        int channels = 0;
+        int samples = 0;
+        bool busEnabled = false;
+        bool busExists = false;   ///< the host kept the bus at all
+    };
+    /** Audio thread, right before process(): this block's external input (every block while a
+        product has one; nothing otherwise). */
+    virtual void setExternalInput (const ExternalInput& input) noexcept { juce::ignoreUnused (input); }
+
     /** Audio thread, before process(): MOVEMENT SHAPER's CUSTOM pattern changed (the
         musician's 16 steps; given once after prepare() and on every change). */
     virtual void setShaperPattern (const osp::ShaperPattern& pattern) noexcept { juce::ignoreUnused (pattern); }

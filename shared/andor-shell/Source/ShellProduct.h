@@ -164,6 +164,12 @@ struct ProductInfo
         bool emptyDropsIgnored = false;
     };
     std::optional<AuxStrip> auxStrip;
+    /** An external audio input (opt-in; ANDOR ANALOG's AUX D LIVE INPUT): one host-provided
+        input bus, mono or stereo, off until the host routes audio to it - a VST3 auxiliary
+        (sidechain) bus, never a main input, so the plugin stays an instrument with MIDI in and
+        stereo out. Its audio reaches the engine through Engine::setExternalInput, captured
+        before the output is written. Empty name: none (ANDOR OSP: output only, unchanged). */
+    juce::String externalInputName;
     /** The shared rack modules' hardware faceplates (opt-in; ANDOR ANALOG's), by rack::Kind;
         empty: the approved racks as they are (ANDOR OSP). Interface only. */
     std::map<osp::plugin::rack::Kind, osp::plugin::rack::Faceplate> rackFaceplates;
