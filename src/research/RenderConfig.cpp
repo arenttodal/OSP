@@ -389,6 +389,11 @@ std::optional<RenderConfig> loadRenderConfig (const std::filesystem::path& path,
                 sy.tone = std::clamp (json::getDouble (sj, "tone", 0.5), 0.0, 1.0);
                 sy.shape = json::getString (sj, "shape", "held") == "follow" ? synth::Envelope::follow : synth::Envelope::gate;
                 sy.pitch = json::getString (sj, "pitch", "keys") == "recording" ? synth::PitchSource::recording : synth::PitchSource::keys;
+                // IMPRINT (Phase S2 spectral imprint): "mode": "analog" | "imprint", "imprint": 0..1,
+                // "motion": 0..1; absent fields keep ANALOG.
+                sy.mode = json::getString (sj, "mode", "analog") == "imprint" ? synth::Mode::imprint : synth::Mode::analog;
+                sy.imprint = std::clamp (json::getDouble (sj, "imprint", sy.imprint), 0.0, 1.0);
+                sy.motion = std::clamp (json::getDouble (sj, "motion", sy.motion), 0.0, 1.0);
             }
             // KEY DNA (Granular): "keyDna": { "enabled": true, "amount": 1, "individuality": 0.3,
             // "seed": 7, "size": { "depth": 0.5, "variation": 0.2, "curve": [[0, 0.2], [1, 0.8]] }, ... }

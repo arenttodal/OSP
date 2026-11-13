@@ -2268,8 +2268,17 @@ void OspAudioProcessor::loadFiles (const juce::Array<juce::File>& files, int lay
         loadFile (files.getFirst(), layer);
         return;
     }
+    // Files imported together are one instrument, mapped automatically
+    // (docs/research/multisample-mapping): in natural file-name order (C4_2 before C4_10),
+    // whatever order the drop or the file system gave, so the takes' cycle is repeatable.
+    auto sorted = files;
+    std::sort (sorted.begin(), sorted.end(), [] (const juce::File& a, const juce::File& b) {
+        const int byName = a.getFileName().compareNatural (b.getFileName());
+        return byName != 0 ? byName < 0 : a.getFullPathName() < b.getFullPathName();
+    });
     SetLoadRequest request;
-    for (const auto& f : files)
+    request.policy = SetInferenceOptions::automatic();
+    for (const auto& f : sorted)
     {
         LoadRequest r;
         r.file = f;
@@ -3167,6 +3176,12 @@ juce::ValueTree OspAudioProcessor::instrumentTree (int layer)
         // Multi-sample sessions: every member file plus the user's corrections. The set is
         // re-inferred from the (cached) analyses on recall.
         juce::ValueTree setTree ("Set");
+        // The mapping policy (docs/analysis-schema.md, "Set"): written only when it is not the
+        // original one, so a set saved before automatic mapping saves exactly as it did.
+        if (instrument->set->cycleTakes)
+            setTree.setProperty ("cycleTakes", true, nullptr);
+        if (! instrument->set->loudnessLayers)
+            setTree.setProperty ("loudnessLayers", false, nullptr);
         for (const auto& member : instrument->memberFiles)
         {
             juce::ValueTree m ("Member");
@@ -3520,6 +3535,9 @@ void OspAudioProcessor::recallInstrument (const juce::ValueTree& tree, int layer
     if (setTree.isValid() && setTree.getNumChildren() > 0)
     {
         SetLoadRequest request;
+        // No policy stored: a set saved before automatic mapping, which keeps its sound.
+        request.policy.cycleTakes = static_cast<bool> (setTree.getProperty ("cycleTakes", false));
+        request.policy.loudnessLayers = static_cast<bool> (setTree.getProperty ("loudnessLayers", true));
         for (const auto& child : setTree)
         {
             if (child.hasType ("Member"))

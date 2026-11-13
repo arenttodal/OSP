@@ -72,6 +72,9 @@ struct SetLoadRequest
 {
     std::vector<LoadRequest> files;          ///< one entry per file (file or hash/originalPath/filename)
     std::vector<SetAssignment> assignments;  ///< user corrections from the Samples inspector
+    /** How the set is inferred: files imported together get SetInferenceOptions::automatic();
+        a saved set its stored policy (none stored: the original rules). */
+    SetInferenceOptions policy;
 };
 
 /**

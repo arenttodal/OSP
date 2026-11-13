@@ -411,6 +411,22 @@ int InstrumentEngine::memberFor (int note, int velocity, std::uint64_t eventInde
         return candidates[0];
     const auto key = static_cast<std::size_t> ((groupIndex % 64) * 8 + std::min (chosenLayer, 7));
     const int previous = slots[which].take[key];
+    if (set->cycleTakes)
+    {
+        // A strict round robin (docs/research/multisample-mapping): the next take after the
+        // previous one in take order, then the first again. Each (source, group, velocity layer)
+        // keeps its own place, so other notes never move it and a bounce repeats exactly.
+        int next = -1, first = -1;
+        for (int i = 0; i < count; ++i)
+        {
+            const int t = set->members[static_cast<std::size_t> (candidates[i])].take;
+            if (first < 0 || t < set->members[static_cast<std::size_t> (candidates[first])].take)
+                first = i;
+            if (t > previous && (next < 0 || t < set->members[static_cast<std::size_t> (candidates[next])].take))
+                next = i;
+        }
+        return candidates[next >= 0 ? next : first];
+    }
     Prng rng (Prng::deriveSeed (config.seed, eventIndex, static_cast<std::uint64_t> (note) + 0x7272));
     for (int attempt = 0; attempt < 8; ++attempt)
     {

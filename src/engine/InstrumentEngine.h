@@ -219,6 +219,10 @@ public:
     void setInstrumentSet (const InstrumentSet* set, int layer = 0) noexcept
     {
         auto& slot = slots[layerIndex (layer)];
+        // A newly loaded set whose takes cycle starts its cycles at the first take (the
+        // original random pick keeps its state, as it always did).
+        if (set != slot.set && set != nullptr && set->cycleTakes)
+            slot.take.fill (-1);
         slot.set = set;
         slot.model = set != nullptr && set->isValid() ? set->members[static_cast<std::size_t> (set->primary)].model.get() : nullptr;
     }

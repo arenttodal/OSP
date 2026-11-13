@@ -1223,6 +1223,36 @@ Ping-Pong (`layerA..C.pedalLoop`, version hint 31, Normal by default). Reports a
       (212 renders: stand-ins and two recordings, all finite).
 - [ ] Owner listening with real recordings (piano, nyckelharpa, vocal, a chord): 06-listening.md.
 
+## ANDOR OSP: automatic multi-sample mapping (13 Nov 2026)
+
+Several one-shot files dropped together (or chosen with **Add layer…** / **Replace sound…**)
+are ONE instrument in the source they land on. That is a new source on an empty instrument or
+on the ADD place, or only the card dropped on. Audit, measured reproduction and report:
+`docs/research/multisample-mapping/` (`00-audit.md`, `01-report.md`).
+
+- Already present and unchanged:
+  - nearest root, ties to the lower, the whole keyboard 0–127 for file sets;
+  - octaves kept apart;
+  - the acoustic root of plucks;
+  - dynamics-word velocity layers;
+  - the Note Atlas FILL limits;
+  - a folder drop as one sound.
+- New:
+  - several loose files are one set;
+  - natural file-name order;
+  - a strict round-robin cycle in file order per (source, root, velocity layer), starting at
+    take 01 and independent of other notes (filled keys share their root's cycle);
+  - unlabeled louder or softer takes stay round robins.
+
+  The policy is stored on the set (`InstrumentSet::cycleTakes` / `loudnessLayers`, optional
+  properties of the session's `Set` tree). A session saved before has no policy and keeps the
+  original rules (random never-repeat pick, ≥ 4.5 dB loudness layers), so it sounds as it did.
+- Headless: `research-renderer --multisample <dir>` (`--print-members`, `--legacy-mapping`).
+  Render configs take `"mode": "imprint"`, `"imprint"` and `"motion"` in a layer's `"synth"`.
+  The demo is synthetic violin pizzicato (`make_demo.py`, no recorded audio).
+- Tests: `[multisample]`, 9 core and 5 plugin cases. The 55-render engine-C bit-exact matrix
+  is byte-identical. Full suites green: core `ctest` 5/5, plugin tree `ctest` 10/10 (OSP plugin, shell visual reference, memo lab, the example products, unit, integration, regression).
+
 ## BLOCKERS
 
 - DAW testing (Logic, Ableton, Reaper) needs a Mac; CI covers build, tests and auval.

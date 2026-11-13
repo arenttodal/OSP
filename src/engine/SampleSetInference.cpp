@@ -91,9 +91,11 @@ SetMember makeSetMember (std::shared_ptr<const InstrumentModel> model, std::stri
     return m;
 }
 
-InstrumentSet inferSampleSet (const std::vector<SetInput>& inputs, const std::vector<SetAssignment>& assignments)
+InstrumentSet inferSampleSet (const std::vector<SetInput>& inputs, const std::vector<SetAssignment>& assignments, const SetInferenceOptions& options)
 {
     InstrumentSet set;
+    set.cycleTakes = options.cycleTakes;
+    set.loudnessLayers = options.loudnessLayers;
     for (const auto& in : inputs)
     {
         if (in.model == nullptr || ! in.model->isValid())
@@ -128,6 +130,11 @@ InstrumentSet inferSampleSet (const std::vector<SetInput>& inputs, const std::ve
         set.groups.back().members.push_back (index);
         set.members[static_cast<std::size_t> (index)].pitchGroup = static_cast<int> (set.groups.size()) - 1;
     }
+    // Cycled takes play in input (file name) order, not in the order their detected roots
+    // happen to sort.
+    if (options.cycleTakes)
+        for (auto& group : set.groups)
+            std::sort (group.members.begin(), group.members.end());
 
     // 2. Roles inside each group.
     for (auto& group : set.groups)
@@ -184,7 +191,7 @@ InstrumentSet inferSampleSet (const std::vector<SetInput>& inputs, const std::ve
         for (std::size_t i = 1; i < ranked.size(); ++i)
         {
             const double gap = ranked[i].first - ranked[i - 1].first;
-            if ((useNames && gap > 0.25) || (! useNames && gap >= 4.5))
+            if ((useNames && gap > 0.25) || (! useNames && options.loudnessLayers && gap >= 4.5))
                 ++layer;
             layerOf[i] = layer;
         }
