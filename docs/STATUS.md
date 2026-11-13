@@ -849,6 +849,17 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
   layout. Off screen nothing changes (the captures; shell test `[window]` on
   `frame::fittedWindowWidth`). Owner test: a real Mac screen in a DAW.
 
+  Right-click menus reach the knob's press (both instruments): `ModulationOverlay` also listens to
+  its root's presses, so a plain right-click on a destination or macro-eligible knob opens its menu
+  in a host (the host gave the press to the knob, which has none; control-click worked). Tests
+  `[rightclick]` in both.
+
+  External audio input (opt-in; ANDOR ANALOG's AUX D LIVE INPUT, analog
+  `docs/aux/ADDENDUM_05.md`): `ProductInfo::externalInputName` adds one input bus, off by
+  default, a VST3 auxiliary (sidechain) bus (`getVST3ClientExtensions`), copied before the output
+  is written and handed to `Engine::setExternalInput`. ANDOR OSP sets none: output only, unchanged
+  (shell test `[buses]`).
+
   It is a source, not a SPACE / ECHO / ARP feature. ANDOR OSP sets none and is unchanged: no menu
   item, no view attribute, no room (the shell test `[aux]`; the OSP captures). Should ANDOR OSP
   want a fourth source, it needs a product strip and an engine bus of its own.
