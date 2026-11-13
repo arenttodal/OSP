@@ -8017,3 +8017,45 @@ TEST_CASE ("plugin: full-range modulation - 100 % reaches the knob's end; older 
 #include "SpacePresetTests.inc"
 #include "RackControlsTests.inc"
 #include "ModeSelectorTests.inc"
+
+TEST_CASE ("plugin: a plain right-click on a knob itself (the press a host gives the knob, not the halo overlay) opens its modulation menu", "[ui][andor-ui][rightclick]")
+{
+    // A host gives a press to the component under the last mouse move: the overlay claims one
+    // only while a popup modifier is already down when hovering (control-click), so a plain
+    // right-click reached the knob, which has no menu. The overlay now hears its root's presses.
+    OspAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> base (p.createEditorIfNeeded());
+    auto* editor = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (base.get());
+    REQUIRE (editor != nullptr);
+    editor->refreshNow();
+    juce::Slider* space = nullptr;
+    std::function<void (juce::Component&)> walk = [&] (juce::Component& c) {
+        for (auto* child : c.getChildren())
+        {
+            if (auto* s = dynamic_cast<juce::Slider*> (child); s != nullptr && space == nullptr && child->isVisible() && s->getProperties()["paramId"].toString() == "space")
+                space = s;
+            walk (*child);
+        }
+    };
+    walk (*editor);
+    REQUIRE (space != nullptr);
+    auto& overlay = editor->modulationOverlay();
+    juce::PopupMenu shown;
+    int menus = 0;
+    overlay.showMenuForTest = [&] (juce::PopupMenu& m) { shown = m; ++menus; };
+    auto press = [] (juce::Component& on, juce::ModifierKeys mods) {
+        const auto at = on.getLocalBounds().getCentre().toFloat();
+        return juce::MouseEvent (juce::Desktop::getInstance().getMainMouseSource(), at, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, &on, &on,
+                                 juce::Time::getCurrentTime(), at, juce::Time::getCurrentTime(), 1, false);
+    };
+    CHECK_FALSE (overlay.rightClickedControl (press (*space, juce::ModifierKeys (juce::ModifierKeys::leftButtonModifier))));
+    CHECK (overlay.rightClickedControl (press (*space, juce::ModifierKeys (juce::ModifierKeys::rightButtonModifier))));
+    REQUIRE (menus == 1);
+    bool assign = false;
+    for (juce::PopupMenu::MenuItemIterator it (shown, true); it.next();)
+        assign = assign || it.getItem().text.startsWith ("Assign ");
+    CHECK (assign);
+    // (the overlay's own press is its mouseDown's: never a second menu from here)
+    CHECK_FALSE (overlay.rightClickedControl (press (overlay, juce::ModifierKeys (juce::ModifierKeys::rightButtonModifier))));
+    CHECK (menus == 1);
+}

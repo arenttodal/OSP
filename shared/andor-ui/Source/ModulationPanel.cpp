@@ -1957,6 +1957,54 @@ ModulationOverlay::ModulationOverlay (InstrumentHost& p, juce::Component& r) : o
 {
     setInterceptsMouseClicks (true, false);
     setTitle ("Modulation halos");
+    // (a right-click on a control under the overlay: its menu - see rightClickedControl)
+    root.addMouseListener (&controlClicks, true);
+    listenedRoot = &root;
+}
+
+ModulationOverlay::~ModulationOverlay()
+{
+    if (listenedRoot != nullptr)
+        listenedRoot->removeMouseListener (&controlClicks);
+}
+
+void ModulationOverlay::showMenu (juce::PopupMenu& menu)
+{
+    if (showMenuForTest != nullptr)
+        showMenuForTest (menu);
+    else
+        menu.showMenuAsync (juce::PopupMenu::Options().withDeletionCheck (*this));
+}
+
+bool ModulationOverlay::rightClickedControl (const juce::MouseEvent& e)
+{
+    if (! e.mods.isPopupMenu() || e.eventComponent == nullptr || e.eventComponent == this || isParentOf (e.eventComponent))
+        return false;   // (the overlay's own press: its mouseDown opens the menu)
+    auto* slider = dynamic_cast<juce::Slider*> (e.eventComponent);
+    if (slider == nullptr)
+        slider = e.eventComponent->findParentComponentOfClass<juce::Slider>();
+    if (slider == nullptr)
+        return false;   // (not a control: whatever was pressed keeps its own right-click)
+    auto indexOf = [this, slider] {
+        for (std::size_t i = 0; i < targets.size(); ++i)
+            if (targets[i].slider.getComponent() == slider)
+                return static_cast<int> (i);
+        return -1;
+    };
+    int index = indexOf();
+    if (index < 0)
+    {
+        collectAll();   // (walked now: nothing may be modulated yet)
+        index = indexOf();
+    }
+    if (index < 0)
+        return false;   // (not a destination, nor macro-eligible: no menu, as before)
+    // (the press reached this control, so it is the one on top - a popover's own knob included)
+    const auto& t = targets[static_cast<std::size_t> (index)];
+    noticeAnchor = t.area;
+    auto menu = contextMenu (t.parameterId);
+    showMenu (menu);
+    return true;
 }
 
 void ModulationOverlay::collectAll()
@@ -3272,7 +3320,7 @@ void ModulationOverlay::mouseDown (const juce::MouseEvent& e)
         }
         else
             menu = contextMenu (t.parameterId);
-        menu.showMenuAsync (juce::PopupMenu::Options().withDeletionCheck (*this));
+        showMenu (menu);
         return;
     }
     // The halo edits the route it shows - or, while one of its depth routes is selected,

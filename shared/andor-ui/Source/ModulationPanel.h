@@ -369,6 +369,7 @@ class ModulationOverlay final : public juce::Component
 {
 public:
     ModulationOverlay (InstrumentHost& processor, juce::Component& root);
+    ~ModulationOverlay() override;
 
     /** A route or source chosen here (a halo pressed, "Select"): the editor's one selection. */
     std::function<void (int source, int slot)> onSelect;
@@ -499,7 +500,27 @@ public:
     void mouseDrag (const juce::MouseEvent&) override;
     void mouseUp (const juce::MouseEvent&) override;
 
+    /** A right-click (or control-click) pressed on a control under the overlay: when that
+        control is one of its destinations (or macro-eligible), its menu opens - the same menu a
+        right-click on the overlay itself opens. The overlay claims a press only while a popup
+        modifier is down at hover time (its hitTest), but a host decides who gets a press from
+        the last mouse move, before the button is known: a plain right-click on a knob went to
+        the knob, which has no menu. So the overlay also listens to its root's presses (here).
+        Returns whether a menu was opened. */
+    bool rightClickedControl (const juce::MouseEvent& e);
+    /** Tests: shows a control's menu here instead of on screen (null: on screen). */
+    std::function<void (juce::PopupMenu&)> showMenuForTest;
+
 private:
+    struct ControlClicks final : public juce::MouseListener
+    {
+        explicit ControlClicks (ModulationOverlay& o) : owner (o) {}
+        void mouseDown (const juce::MouseEvent& e) override { owner.rightClickedControl (e); }
+        ModulationOverlay& owner;
+    };
+    ControlClicks controlClicks { *this };
+    juce::Component::SafePointer<juce::Component> listenedRoot;
+    void showMenu (juce::PopupMenu& menu);
     /** ARP RATE's knob position (0..1) for its step sped up by `octaves` (its own order). */
     float arpRatePosition (double octaves) const;
     struct Target
