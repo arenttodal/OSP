@@ -259,6 +259,63 @@ TEST_CASE ("fx osp: DRIVE, CHARACTER, MOVEMENT, ECHO and SPACE's names open thei
     ui->setRackExpanded (Kind::fx, false);
 }
 
+TEST_CASE ("osp cards: LINK REVERSE LOOP FOLLOW sit in the display's top-left; three cards lose the row under the knobs", "[plugin][card-modifiers]")
+{
+    using Editor = osp::plugin::OspAudioProcessorEditor;
+    TempDir tmp;
+    const ScopedEnvironment storeDir ("OSP_SAMPLE_STORE", tmp.dir.getChildFile ("store").getFullPathName());
+    const ScopedEnvironment library ("OSP_LIBRARY_DIR", tmp.dir.getChildFile ("library").getFullPathName());
+    OspAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> e (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<Editor*> (e.get());
+    REQUIRE (ui != nullptr);
+    const auto full = ui->instrumentHeight();
+    auto addOne = [&] (const char* name, int seed) {
+        juce::Array<juce::File> list;
+        list.add (writeSource (tmp.dir, name, testsignals::pluck (220.0, 1.0, 48000.0, seed)));
+        p.addLayers (list);
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        ui->refreshNow();
+    };
+    auto checkCard = [&] (int layer) {
+        auto& card = ui->engineCard (layer);
+        const auto display = card.display().getBounds();
+        for (int k = 0; k < 4; ++k)
+        {
+            auto* key = card.modifierKey (k);
+            REQUIRE (key != nullptr);
+            CHECK (key->isInWell());
+            // Inside the display, in its upper band (the ruler's), left of the SYNTH chip.
+            CHECK (display.contains (key->getBounds()));
+            CHECK (key->getY() - display.getY() < 16);
+            CHECK (key->getRight() < display.getCentreX());
+        }
+    };
+    addOne ("a.wav", 4);
+    checkCard (0);
+    CHECK (ui->sourceTrim() == 0.0f);
+    CHECK (ui->instrumentHeight() == full);   // (one card: its keys sat beside the knobs; nothing moves)
+    const auto displayOne = ui->engineCard (0).display().getHeight();
+    addOne ("b.wav", 5);
+    checkCard (1);
+    CHECK (ui->instrumentHeight() == full);
+    addOne ("c.wav", 6);
+    checkCard (2);
+    // Three: the row under the knobs is gone, the instrument that much shorter.
+    CHECK (ui->sourceTrim() == osp::plugin::EngineCard::footTrim);
+    CHECK (ui->instrumentHeight() == full - osp::plugin::EngineCard::footTrim);
+    juce::ignoreUnused (displayOne);
+    // A key still toggles its parameter (LOOP, layer A), and space does too.
+    auto* loop = ui->engineCard (0).modifierKey (2);
+    const auto loopId = osp::plugin::InstrumentHost::layerParameterId (0, "loop");
+    const float before = p.parameterValue (loopId);
+    REQUIRE (loop->keyPressed (juce::KeyPress (juce::KeyPress::spaceKey)));
+    CHECK (p.parameterValue (loopId) != before);
+    REQUIRE (loop->keyPressed (juce::KeyPress (juce::KeyPress::spaceKey)));
+    CHECK (p.parameterValue (loopId) == before);
+}
+
 TEST_CASE ("fx osp: routing view and rack screenshots (OSP_FX_SHOTS)", "[.][fx-routing-shots]")
 {
     // On demand: OSP_FX_SHOTS=<folder> osp_plugin_tests "[fx-routing-shots]". Two layers; the
@@ -378,4 +435,49 @@ TEST_CASE ("fx osp: FX rack screenshots for the design review (OSP_FX_SHOTS)", "
     ui->setRackExpanded (osp::plugin::rack::Kind::fx, false);
     shoot ("fx-99-closed-again");
     p.releaseResources();
+}
+
+TEST_CASE ("osp cards: modifier screenshots (OSP_CARD_SHOTS)", "[.][card-modifier-shots]")
+{
+    // On demand: OSP_CARD_SHOTS=<folder> osp_plugin_tests "[card-modifier-shots]". One card with
+    // SYNTH active; three cards at the narrowest window (869 px) and at 1448.
+    const char* dir = std::getenv ("OSP_CARD_SHOTS");
+    if (dir == nullptr)
+        return;
+    TempDir tmp;
+    const ScopedEnvironment storeDir ("OSP_SAMPLE_STORE", tmp.dir.getChildFile ("store").getFullPathName());
+    const ScopedEnvironment library ("OSP_LIBRARY_DIR", tmp.dir.getChildFile ("library").getFullPathName());
+    const ScopedEnvironment documents ("OSP_DOCUMENTS_DIR", tmp.dir.getChildFile ("documents").getFullPathName());
+    const ScopedLook ceramic (skin::Look::ceramic);
+    auto save = [dir] (const juce::Image& image, const juce::String& name) {
+        juce::FileOutputStream out (juce::File (dir).getChildFile (name));
+        out.setPosition (0);
+        out.truncate();
+        juce::PNGImageFormat().writeImageToStream (image, out);
+    };
+    using Editor = osp::plugin::OspAudioProcessorEditor;
+    OspAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> e (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<Editor*> (e.get());
+    REQUIRE (ui != nullptr);
+    auto add = [&] (const char* name, AudioData audio) {
+        juce::Array<juce::File> list;
+        list.add (writeSource (tmp.dir, name, audio));
+        p.addLayers (list);
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        ui->refreshNow();
+    };
+    auto shoot = [&] (int width, const juce::String& name) {
+        e->setSize (width, juce::roundToInt (static_cast<float> (width) * ui->instrumentHeight() / 1448.0f));
+        ui->refreshNow();
+        save (e->createComponentSnapshot (e->getLocalBounds(), true, 1.0f), name + ".png");
+    };
+    add ("pad.wav", testsignals::vowel (midiToHz (60), 2.4, 48000.0, 3));
+    p.setParameterValue (osp::plugin::InstrumentHost::synthesizeId (0), 60.0f);
+    shoot (1448, "cards-1L-synth");
+    add ("pluck.wav", testsignals::pluck (220.0, 2.4, 48000.0, 4));
+    add ("low.wav", testsignals::vowel (midiToHz (48), 2.4, 48000.0, 5));
+    shoot (1448, "cards-3L-1448");
+    shoot (869, "cards-3L-869");
 }

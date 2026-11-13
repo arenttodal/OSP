@@ -2139,6 +2139,14 @@ void EngineCard::setModifiersInWell (bool inWell)
     resized();
 }
 
+void EngineCard::setFootTrimmed (bool trimmed)
+{
+    if (footTrimmed == trimmed)
+        return;
+    footTrimmed = trimmed;
+    resized();
+}
+
 void EngineCard::setModifiersApplicable (int mask)
 {
     if (modifiersApplicable == mask)
@@ -3393,7 +3401,7 @@ void EngineCard::resized()
     // With the modifiers in the well (a product's choice) a narrow card keeps nothing under
     // its knobs: the shell makes the card that much shorter (frame::Parts::sourceTrim,
     // EngineCard::footTrim), so the well keeps its height and the knobs sit at the foot.
-    const float footFreed = triple && modifiersInWell ? footTrim : 0.0f;
+    const float footFreed = triple && modifiersInWell && footTrimmed ? footTrim : 0.0f;
     const float wellHeight = h - (triple ? 267.0f : 206.0f) + footFreed;
     sourceDisplay.setBounds (at ({ 16.0f, 63.0f, w - 32.0f, wellHeight }));
     if (eqEditor != nullptr)

@@ -256,23 +256,30 @@ TEST_CASE ("plugin: ceramic keys are drawn by their surface and follow their sta
     REQUIRE (modifier != nullptr);
     const bool wasOn = modifier->isOn();
     CHECK (modifier->keyState() == (wasOn ? skin::KeyState::active : skin::KeyState::normal));
-    // On: the warm face, drawn by the card (the button itself draws only its icon).
-    auto faceAt = [&] {
+    // On: the key warms (ANDOR OSP's keys sit in the display, ANDOR ANALOG's: a warm outline
+    // and icon on graphite; under the knobs they were a peach face on ivory).
+    auto shotOf = [&] {
         ui->refreshNow();
         const auto area = editor->getLocalArea (modifier, modifier->getLocalBounds());
-        const auto shot = editor->createComponentSnapshot (area, true, 1.0f);
-        return shot.getPixelAt (6, shot.getHeight() / 2);
+        return editor->createComponentSnapshot (area, true, 1.0f);
     };
-    const auto before = faceAt();
+    auto warmth = [] (juce::Colour c) { return static_cast<int> (c.getRed()) - static_cast<int> (c.getBlue()); };
+    auto warmest = [&] (const juce::Image& shot) {
+        int most = -255;
+        for (int y = 0; y < shot.getHeight(); ++y)
+            for (int x = 0; x < shot.getWidth(); ++x)
+                most = std::max (most, warmth (shot.getPixelAt (x, y)));
+        return most;
+    };
+    const auto before = shotOf();
     modifier->mouseUp (juce::MouseEvent (juce::Desktop::getInstance().getMainMouseSource(), { 5.0f, 5.0f }, {}, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
                                          modifier, modifier, juce::Time::getCurrentTime(), { 5.0f, 5.0f }, juce::Time::getCurrentTime(), 1, false));
     p.pollLoads();
     CHECK (modifier->isOn() != wasOn);
-    const auto after = faceAt();
-    // The active face is peach: redder than it is blue, against the neutral ivory.
-    auto warmth = [] (juce::Colour c) { return static_cast<int> (c.getRed()) - static_cast<int> (c.getBlue()); };
-    CHECK (std::abs (warmth (after) - warmth (before)) >= 10);
-    CHECK (warmth (modifier->isOn() ? after : before) > warmth (modifier->isOn() ? before : after));
+    const auto after = shotOf();
+    CHECK (modifier->isInWell());
+    const int warmOn = warmest (modifier->isOn() ? after : before), warmOff = warmest (modifier->isOn() ? before : after);
+    CHECK (warmOn >= warmOff + 20);
 }
 
 TEST_CASE ("plugin: the look changes looks only: parameters, state and sound are untouched", "[plugin][ceramic]")

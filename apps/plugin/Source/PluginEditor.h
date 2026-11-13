@@ -116,7 +116,12 @@ public:
     void setArpExpanded (bool open);
     bool isArpExpanded() const noexcept { return arpShown; }
     /** The instrument's height in reference pixels (taller while the arpeggiator's editor shows). */
-    float instrumentHeight() const noexcept { return frame::instrumentHeight (arpShown, rackShift()); }
+    float instrumentHeight() const noexcept { return frame::instrumentHeight (arpShown, rackShift(), sourceTrim()); }
+    /** LINK / REVERSE / LOOP / FOLLOW sit in each card's display (as ANDOR ANALOG's): with three
+        cards the row they had under the knobs is gone, the cards that much shorter and
+        everything under them that much higher (EngineCard::footTrim); with one or two they had
+        no row of their own (they sat beside the knobs), so nothing moves. */
+    float sourceTrim() const noexcept { return cardTrim; }
 
     /** The FX library's rack (shared with ANDOR ANALOG; the routing view opens it): below the
         source area, the window growing by its height, as ANALOG's. Nothing shows - and nothing
@@ -251,6 +256,7 @@ private:
     std::unique_ptr<juce::Component> routingView;
     bool routingOpen = false;
     float rackShift() const noexcept { return racks.height() > 0.0f ? racks.height() + design::layout::rackGap : 0.0f; }
+    float cardTrim = 0.0f;
     void rackChanged();
     std::array<std::optional<rack::Kind>, frame::macroCount> rackOfMacro {};
 public:

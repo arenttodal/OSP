@@ -195,6 +195,10 @@ ShellEditor::ShellEditor (ShellProcessor& p)
     {
         auto& card = cards[static_cast<std::size_t> (layer)];
         card = std::make_unique<EngineCard> (shell, layer);
+        // The modifiers: in the display's top-left (a product's choice, and reference parity:
+        // ANDOR OSP's) or under the knobs; a generator's cards are set again with its extensions.
+        card->setModifiersInWell (shell.modifiersInWell());
+        card->setFootTrimmed (sourceTrim() > 0.0f);
         card->onFocus = [this] (int l) {
             shell.setEditLayer (l);
             updateFocus();
@@ -548,6 +552,20 @@ void ShellEditor::setSourceViewShown (bool shown)
 
 void ShellEditor::layoutSources()
 {
+    // The trim follows the cards' count (reference parity: ANDOR OSP's rule); a change lays the
+    // instrument out again and reshapes the window, as ANDOR OSP's editor does.
+    if (const float trim = sourceTrim(); shownTrim >= 0.0f && trim != shownTrim)
+    {
+        shownTrim = trim;
+        for (auto& card : cards)
+            card->setFootTrimmed (trim > 0.0f);
+        shownCount = -1;
+        layoutInstrument();
+        frame::applyWindowShape (*this, instrumentHeight(), true);
+        content.repaint();
+        return;
+    }
+    shownTrim = sourceTrim();
     if (sourceView != nullptr)
         sourceView->setVisible (sourceViewOpen);
     if (sourceViewOpen && sourceView != nullptr)
@@ -1394,6 +1412,7 @@ void ShellEditor::refreshCardExtensions()
         if (product.cardModifiersShown != nullptr)
             card.setModifiersShown (product.cardModifiersShown (l, shell));
         card.setModifiersInWell (shell.modifiersInWell());
+        card.setFootTrimmed (sourceTrim() > 0.0f);
         if (shell.modifiersInWell() && product.cardModifiersApplicable != nullptr)
             card.setModifiersApplicable (product.cardModifiersApplicable (l, shell));
         if (product.wellOverlay != nullptr)
