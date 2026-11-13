@@ -5,6 +5,9 @@
 #include "EngineCard.h"   // icons
 #include "OspLookAndFeel.h"
 
+#include <algorithm>
+#include <cmath>
+
 namespace osp::plugin
 {
 
@@ -523,19 +526,92 @@ void fit (juce::Component& editor, juce::Component& content, float height)
     content.setTransform (juce::AffineTransform::scale (k).translated (x, y));
 }
 
+namespace
+{
+    const juce::Identifier preferredWidth { "andorPreferredWidth" };   ///< the width chosen before the screen narrowed it
+    const juce::Identifier narrowedTo { "andorNarrowedTo" };           ///< the width it was narrowed to
+
+    /** The screen's room for the editor's height (0: no screen to ask - headless, or not
+        shown yet: nothing is limited). */
+    int screenRoom (juce::AudioProcessorEditor& editor)
+    {
+        if (! editor.isShowing() || editor.getPeer() == nullptr)
+            return 0;
+        const auto* display = juce::Desktop::getInstance().getDisplays().getDisplayForRect (editor.getScreenBounds());
+        if (display == nullptr)
+            return 0;
+        // (the host's window keeps its title bar and its own plugin header above the editor)
+        return std::max (0, display->userArea.getHeight() - 96);
+    }
+}
+
+int fittedWindowWidth (int chosen, int room, float height) noexcept
+{
+    if (room <= 0 || height <= 0.0f)
+        return chosen;
+    const int fits = static_cast<int> (std::floor (static_cast<float> (room) * design::width / height));
+    return fits >= chosen ? chosen : std::max (480, fits);
+}
+
+ScreenFit::ScreenFit (juce::AudioProcessorEditor& e, std::function<float()> instrumentHeight) : editor (e), height (std::move (instrumentHeight))
+{
+    editor.addComponentListener (this);
+}
+
+ScreenFit::~ScreenFit()
+{
+    editor.removeComponentListener (this);
+}
+
+void ScreenFit::check()
+{
+    if (done || ! editor.isShowing() || editor.getPeer() == nullptr)
+        return;
+    done = true;
+    // (after the host has placed it: once it settles, never in the middle of its own setup)
+    juce::Component::SafePointer<juce::AudioProcessorEditor> safe (&editor);
+    juce::MessageManager::callAsync ([safe, h = height] {
+        if (safe != nullptr && h != nullptr)
+            applyWindowShape (*safe, h(), true);
+    });
+}
+
 void applyWindowShape (juce::AudioProcessorEditor& editor, float height, bool resize)
 {
     // The window keeps the instrument's proportions: the same width range as always, the
-    // height following the instrument (taller with the arpeggiator's editor shown).
+    // height following the instrument (taller with the arpeggiator's editor or a rack shown).
+    // It never asks for more than the screen holds: a host clamps such a window, and its
+    // constraints then leave the editor wider than the window - cut off at the side. So a
+    // taller instrument narrows the window to fit the screen (the instrument scaled down, whole),
+    // and the width chosen before comes back once it fits again.
     const float h = height;
-    editor.setResizeLimits (869, juce::roundToInt (869.0f * h / design::width), 1810, juce::roundToInt (1810.0f * h / design::width));
+    const int room = screenRoom (editor);
+    const int minimumWidth = std::min (869, fittedWindowWidth (869, room, h));
+    editor.setResizeLimits (minimumWidth, juce::roundToInt (static_cast<float> (minimumWidth) * h / design::width), 1810,
+                            juce::roundToInt (1810.0f * h / design::width));
     if (auto* windowShape = editor.getConstrainer())
         windowShape->setFixedAspectRatio (static_cast<double> (design::width / h));
     if (resize)
     {
-        const int newHeight = juce::roundToInt (static_cast<float> (editor.getWidth()) * h / design::width);
-        if (newHeight != editor.getHeight())
-            editor.setSize (editor.getWidth(), newHeight);
+        auto& props = editor.getProperties();
+        // (resized by hand since it was narrowed: that width is the one chosen now)
+        if (props.contains (preferredWidth) && static_cast<int> (props[narrowedTo]) != editor.getWidth())
+            props.remove (preferredWidth);
+        const int chosen = props.contains (preferredWidth) ? static_cast<int> (props[preferredWidth]) : editor.getWidth();
+        const int width = fittedWindowWidth (chosen, room, h);
+        if (width < chosen)
+        {
+            props.set (preferredWidth, chosen);   // (narrowed for the screen: remembered)
+            props.set (narrowedTo, width);
+        }
+        else
+        {
+            props.remove (preferredWidth);
+            props.remove (narrowedTo);
+        }
+        const int newHeight = juce::roundToInt (static_cast<float> (width) * h / design::width);
+        if (width != editor.getWidth() || newHeight != editor.getHeight())
+            editor.setSize (width, newHeight);
         else
             editor.resized();
     }

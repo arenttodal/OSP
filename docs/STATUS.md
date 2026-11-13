@@ -841,6 +841,14 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
   - `AuxStrip::emptyDropsIgnored`: a file dropped on empty space (neither a card nor an owner)
     does nothing in a product that asks for it (ANDOR ANALOG).
 
+  The window fits its screen (both instruments, not opt-in; analog `docs/aux/ADDENDUM_04.md`):
+  `frame::applyWindowShape` never asks for more height than the screen holds when the
+  arpeggiator or a rack makes the instrument taller (a host clamped such a window and left the
+  editor cut off at the side). It narrows to the widest that fits, the instrument whole, and the
+  chosen width comes back once it fits; `frame::ScreenFit` fits an editor first shown with a tall
+  layout. Off screen nothing changes (the captures; shell test `[window]` on
+  `frame::fittedWindowWidth`). Owner test: a real Mac screen in a DAW.
+
   It is a source, not a SPACE / ECHO / ARP feature. ANDOR OSP sets none and is unchanged: no menu
   item, no view attribute, no room (the shell test `[aux]`; the OSP captures). Should ANDOR OSP
   want a fourth source, it needs a product strip and an engine bus of its own.

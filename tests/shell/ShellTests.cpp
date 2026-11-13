@@ -755,3 +755,30 @@ int main (int argc, char* argv[])
     base.deleteRecursively();
     return result;
 }
+
+TEST_CASE ("shell: opening the arpeggiator (a taller instrument) never asks for a window taller than the screen - it narrows to fit, whole", "[shell][editor][window]")
+{
+    ShellProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<ShellEditor*> (editor.get());
+    REQUIRE (ui != nullptr);
+    // Off screen (headless, or not shown yet): nothing is limited - the old behaviour, exactly.
+    editor->setSize (1448, juce::roundToInt (1448.0f * ui->instrumentHeight() / osp::plugin::design::width));
+    ui->setArpExpanded (true);
+    CHECK (editor->getWidth() == 1448);
+    CHECK (editor->getHeight() == juce::roundToInt (1448.0f * ui->instrumentHeight() / osp::plugin::design::width));
+    ui->setArpExpanded (false);
+    CHECK (editor->getWidth() == 1448);
+    // On a screen, the rule: a window whose height the screen cannot hold narrows to the widest
+    // that fits (the instrument whole, scaled down); one that fits keeps its width.
+    using osp::plugin::frame::fittedWindowWidth;
+    const float tall = ui->instrumentHeight() + 400.0f;   // (say, a rack and the arpeggiator open)
+    const int room = 900;
+    const int narrowed = fittedWindowWidth (1448, room, tall);
+    CHECK (narrowed < 1448);
+    CHECK (static_cast<float> (narrowed) * tall / osp::plugin::design::width <= static_cast<float> (room));
+    CHECK (static_cast<float> (narrowed + 1) * tall / osp::plugin::design::width > static_cast<float> (room));
+    CHECK (fittedWindowWidth (1448, 4000, tall) == 1448);   // (a tall screen: unchanged)
+    CHECK (fittedWindowWidth (1448, 0, tall) == 1448);      // (no screen to ask: unchanged)
+    CHECK (fittedWindowWidth (1448, 100, tall) == 480);     // (never under 480)
+}

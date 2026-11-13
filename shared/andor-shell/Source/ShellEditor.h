@@ -354,6 +354,7 @@ private:
     OutsideClickWatcher outsideClicks { *this };
     std::unique_ptr<juce::FileChooser> chooser;
     juce::TooltipWindow tooltips { this, 700 };
+    osp::plugin::frame::ScreenFit screenFit { *this, [this] { return instrumentHeight(); } };   ///< (first shown: fitted to its screen)
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ShellEditor)
 };

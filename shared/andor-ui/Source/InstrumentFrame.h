@@ -202,6 +202,29 @@ namespace frame
     /** The window keeps the instrument's proportions (869..1810 px wide); `resize` also takes
         the height that goes with the current width. */
     void applyWindowShape (juce::AudioProcessorEditor& editor, float height, bool resize);
+    /** The window's width for an instrument `height` tall (reference pixels): the one chosen,
+        unless the screen's room (pixels for the editor; 0 or less: no screen to ask) cannot
+        hold the height that goes with it - then the widest that fits, never under 480. */
+    int fittedWindowWidth (int chosen, int screenRoom, float height) noexcept;
+
+    /** Owned by an editor: the first time it is shown on a screen, its window is fitted to that
+        screen (applyWindowShape) - a session reopened with a tall layout (the arpeggiator or a
+        rack open) never opens taller than the screen. Off screen it does nothing. */
+    class ScreenFit final : private juce::ComponentListener
+    {
+    public:
+        ScreenFit (juce::AudioProcessorEditor& editor, std::function<float()> instrumentHeight);
+        ~ScreenFit() override;
+
+    private:
+        void componentParentHierarchyChanged (juce::Component&) override { check(); }
+        void componentVisibilityChanged (juce::Component&) override { check(); }
+        void check();
+
+        juce::AudioProcessorEditor& editor;
+        std::function<float()> height;
+        bool done = false;
+    };
 }
 
 } // namespace osp::plugin

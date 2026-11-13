@@ -246,6 +246,7 @@ private:
     int popupIndex = -1;
     int closedByLabelPress = -1;     // a press on an open popup's own label closes it (and must not reopen it)
     OutsideClickWatcher outsideClicks { *this };
+    frame::ScreenFit screenFit { *this, [this] { return instrumentHeight(); } };   ///< (first shown: fitted to its screen)
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OspAudioProcessorEditor)
 };
