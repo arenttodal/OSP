@@ -3272,7 +3272,10 @@ void ModulationOverlay::mouseExit (const juce::MouseEvent&)
 
 void ModulationOverlay::mouseDown (const juce::MouseEvent& e)
 {
-    const int index = targetAt (e.position, e.mods.isAltDown());
+    // A right-click: any destination under it, modulated or not - the same test hitTest made
+    // when it claimed this press (a host's right-click reaches the overlay itself, so an
+    // unmodulated knob must find its menu here, not only through rightClickedControl).
+    const int index = targetAt (e.position, e.mods.isAltDown(), e.mods.isPopupMenu());
     if (index < 0)
         return;
     const auto& t = targets[static_cast<std::size_t> (index)];

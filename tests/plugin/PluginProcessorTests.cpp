@@ -8059,3 +8059,48 @@ TEST_CASE ("plugin: a plain right-click on a knob itself (the press a host gives
     CHECK_FALSE (overlay.rightClickedControl (press (overlay, juce::ModifierKeys (juce::ModifierKeys::rightButtonModifier))));
     CHECK (menus == 1);
 }
+
+TEST_CASE ("plugin: a real right-click on an unmodulated knob, claimed by the halo overlay, opens its menu", "[ui][andor-ui][rightclick]")
+{
+    // Reproduced with a real right-click in a standalone app: with the right button down the
+    // overlay's hitTest claims the press (any destination counts for a popup), but its mouseDown
+    // looked only for modulated knobs, so an unmodulated one opened nothing. Routed here as JUCE
+    // routes a press: the component under the point while the button is down, then its handler.
+    OspAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> base (p.createEditorIfNeeded());
+    auto* editor = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (base.get());
+    REQUIRE (editor != nullptr);
+    editor->setVisible (true);
+    editor->refreshNow();
+    juce::Slider* space = nullptr;
+    std::function<void (juce::Component&)> walk = [&] (juce::Component& c) {
+        for (auto* child : c.getChildren())
+        {
+            if (auto* s = dynamic_cast<juce::Slider*> (child); s != nullptr && space == nullptr && child->isVisible() && s->getProperties()["paramId"].toString() == "space")
+                space = s;
+            walk (*child);
+        }
+    };
+    walk (*editor);
+    REQUIRE (space != nullptr);
+    auto& overlay = editor->modulationOverlay();
+    juce::PopupMenu shown;
+    int menus = 0;
+    overlay.showMenuForTest = [&] (juce::PopupMenu& m) { shown = m; ++menus; };
+    const auto saved = juce::ModifierKeys::currentModifiers;
+    juce::ModifierKeys::currentModifiers = juce::ModifierKeys (juce::ModifierKeys::rightButtonModifier);
+    const auto inEditor = editor->getLocalPoint (space, space->getLocalBounds().getCentre());
+    CHECK (editor->getComponentAt (inEditor) == &overlay);
+    const auto at = overlay.getLocalPoint (editor, inEditor).toFloat();
+    const juce::MouseEvent e (juce::Desktop::getInstance().getMainMouseSource(), at, juce::ModifierKeys (juce::ModifierKeys::rightButtonModifier),
+                              1.0f, 0.0f, 0.0f, 0.0f, 0.0f, &overlay, &overlay, juce::Time::getCurrentTime(), at, juce::Time::getCurrentTime(), 1, false);
+    overlay.mouseDown (e);
+    juce::ModifierKeys::currentModifiers = saved;
+    REQUIRE (menus == 1);
+    bool assign = false;
+    for (juce::PopupMenu::MenuItemIterator it (shown, true); it.next();)
+        assign = assign || it.getItem().text.startsWith ("Assign ");
+    CHECK (assign);
+    CHECK_FALSE (overlay.rightClickedControl (e));   // (never a second menu)
+    CHECK (menus == 1);
+}

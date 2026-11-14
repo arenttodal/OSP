@@ -852,7 +852,11 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
   Right-click menus reach the knob's press (both instruments): `ModulationOverlay` also listens to
   its root's presses, so a plain right-click on a destination or macro-eligible knob opens its menu
   in a host (the host gave the press to the knob, which has none; control-click worked). Tests
-  `[rightclick]` in both.
+  `[rightclick]` in both. Second fix: with the right button down the overlay itself claims the
+  press (its hitTest counts any destination for a popup), but its mouseDown looked only for
+  modulated knobs, so an unmodulated knob opened nothing - found with a real right-click in
+  ANDOR Analog's standalone. mouseDown now uses the same test; `[rightclick]` routes the press as
+  JUCE does (the component under the point while the button is down) in both instruments.
 
   External audio input (opt-in; ANDOR ANALOG's AUX D LIVE INPUT, analog
   `docs/aux/ADDENDUM_05.md`): `ProductInfo::externalInputName` adds one input bus, off by
