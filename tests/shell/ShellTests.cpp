@@ -756,31 +756,32 @@ int main (int argc, char* argv[])
     return result;
 }
 
-TEST_CASE ("shell: opening the arpeggiator (a taller instrument) never asks for a window taller than the screen - it narrows to fit, whole", "[shell][editor][window]")
+TEST_CASE ("shell: opening the arpeggiator (a taller instrument) never changes the window's width; past the screen it stops growing and the instrument scales, whole", "[shell][editor][window]")
 {
     ShellProcessor p;
     std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
     auto* ui = dynamic_cast<ShellEditor*> (editor.get());
     REQUIRE (ui != nullptr);
-    // Off screen (headless, or not shown yet): nothing is limited - the old behaviour, exactly.
-    editor->setSize (1448, juce::roundToInt (1448.0f * ui->instrumentHeight() / osp::plugin::design::width));
-    ui->setArpExpanded (true);
-    CHECK (editor->getWidth() == 1448);
-    CHECK (editor->getHeight() == juce::roundToInt (1448.0f * ui->instrumentHeight() / osp::plugin::design::width));
-    ui->setArpExpanded (false);
-    CHECK (editor->getWidth() == 1448);
-    // On a screen, the rule: a window whose height the screen cannot hold narrows to the widest
-    // that fits (the instrument whole, scaled down); one that fits keeps its width.
-    using osp::plugin::frame::fittedWindowWidth;
+    // Off screen (headless, or not shown yet): the height that goes with the width, the width kept.
+    for (const int width : { 1448, 1200, 900 })
+    {
+        INFO (width);
+        editor->setSize (width, juce::roundToInt (static_cast<float> (width) * ui->instrumentHeight() / osp::plugin::design::width));
+        ui->setArpExpanded (true);
+        CHECK (editor->getWidth() == width);
+        CHECK (editor->getHeight() == juce::roundToInt (static_cast<float> (width) * ui->instrumentHeight() / osp::plugin::design::width));
+        ui->setArpExpanded (false);
+        CHECK (editor->getWidth() == width);
+        CHECK (editor->getHeight() == juce::roundToInt (static_cast<float> (width) * ui->instrumentHeight() / osp::plugin::design::width));
+    }
+    // On a screen, the rule: the height that goes with the width, but never past the screen's
+    // room (the instrument then scales down inside the window, whole); the width is never asked.
+    using osp::plugin::frame::fittedWindowHeight;
     const float tall = ui->instrumentHeight() + 400.0f;   // (say, a rack and the arpeggiator open)
-    const int room = 900;
-    const int narrowed = fittedWindowWidth (1448, room, tall);
-    CHECK (narrowed < 1448);
-    CHECK (static_cast<float> (narrowed) * tall / osp::plugin::design::width <= static_cast<float> (room));
-    CHECK (static_cast<float> (narrowed + 1) * tall / osp::plugin::design::width > static_cast<float> (room));
-    CHECK (fittedWindowWidth (1448, 4000, tall) == 1448);   // (a tall screen: unchanged)
-    CHECK (fittedWindowWidth (1448, 0, tall) == 1448);      // (no screen to ask: unchanged)
-    CHECK (fittedWindowWidth (1448, 100, tall) == 480);     // (never under 480)
+    const int natural = juce::roundToInt (1448.0f * tall / osp::plugin::design::width);
+    CHECK (fittedWindowHeight (1448, 900, tall) == 900);        // (capped at the screen)
+    CHECK (fittedWindowHeight (1448, 4000, tall) == natural);   // (a tall screen: the natural height)
+    CHECK (fittedWindowHeight (1448, 0, tall) == natural);      // (no screen to ask: the natural height)
 }
 
 TEST_CASE ("shell: an external audio input is a product's opt-in; without one the plugin is output-only, as ever", "[shell][buses]")

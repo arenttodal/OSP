@@ -199,17 +199,19 @@ namespace frame
     /** Scales `content` (laid out at the reference size) uniformly into `editor`, centred:
         if a host keeps another window shape, the instrument still shows whole. */
     void fit (juce::Component& editor, juce::Component& content, float height);
-    /** The window keeps the instrument's proportions (869..1810 px wide); `resize` also takes
-        the height that goes with the current width. */
+    /** The window's width is the musician's alone (the corner, 869..1810 px): nothing opened or
+        closed ever changes it. `resize` takes the height that goes with that width - taller with
+        the arpeggiator, a rack or a strip shown - but never more than the screen holds: then the
+        instrument scales down inside the window (whole, centred), and the width stays. */
     void applyWindowShape (juce::AudioProcessorEditor& editor, float height, bool resize);
-    /** The window's width for an instrument `height` tall (reference pixels): the one chosen,
-        unless the screen's room (pixels for the editor; 0 or less: no screen to ask) cannot
-        hold the height that goes with it - then the widest that fits, never under 480. */
-    int fittedWindowWidth (int chosen, int screenRoom, float height) noexcept;
+    /** The window's height for `width` and an instrument `height` tall (reference pixels): the
+        height that goes with the width, or the screen's room (pixels for the editor; 0 or less:
+        no screen to ask) if that is less. */
+    int fittedWindowHeight (int width, int screenRoom, float height) noexcept;
 
     /** Owned by an editor: the first time it is shown on a screen, its window is fitted to that
         screen (applyWindowShape) - a session reopened with a tall layout (the arpeggiator or a
-        rack open) never opens taller than the screen. Off screen it does nothing. */
+        rack open) never opens taller than the screen; its width stays. Off screen it does nothing. */
     class ScreenFit final : private juce::ComponentListener
     {
     public:
