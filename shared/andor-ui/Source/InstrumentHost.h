@@ -369,6 +369,24 @@ public:
     static const juce::Identifier& modLinksTreeType();
     /** The sources' live values for the display (lock-free). */
     virtual InstrumentEngine::ModView modulationView() const noexcept = 0;
+    /** Universal modulation-aware visual feedback: what the sound engine plays for
+        `parameterId` now - in the parameter's own plain units, after modulation, macros, the
+        DSP's mapping and clamping (a per-voice one: the representative voice's) - with the span
+        it covered over the last UI frame or two (fast modulation shows as its range). False:
+        the engine has no value of its own for it now; draw the stored value (then what plays).
+        Never written back to the parameter. Message thread. None by default. */
+    struct EffectiveValue
+    {
+        float value = 0.0f, low = 0.0f, high = 0.0f;
+    };
+    virtual bool effectiveValue (const juce::String& parameterId, EffectiveValue& out) const
+    {
+        juce::ignoreUnused (parameterId, out);
+        return false;
+    }
+    /** The value a picture draws for `parameterId`: the effective one when the engine has it,
+        else the stored one (plain units). `state` is the host's own (its processor). */
+    static float shownValue (juce::AudioProcessorValueTreeState& state, const juce::String& parameterId);
     /** The mix as it plays (with any MIX modulation) for the header's live node; an engine that
         does not blend layers this way says it is not modulated. */
     virtual InstrumentEngine::LiveMix liveMix() const noexcept { return {}; }

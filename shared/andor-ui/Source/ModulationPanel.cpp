@@ -2007,10 +2007,25 @@ bool ModulationOverlay::rightClickedControl (const juce::MouseEvent& e)
     return true;
 }
 
+bool ModulationOverlay::engineNow (const juce::String& parameterId, float& position, float& low, float& high) const
+{
+    InstrumentHost::EffectiveValue v;
+    auto* param = ospProcessor.apvts().getParameter (parameterId);
+    if (param == nullptr || ! ospProcessor.effectiveValue (parameterId, v))
+        return false;
+    position = param->convertTo0to1 (v.value);
+    low = param->convertTo0to1 (v.low);
+    high = param->convertTo0to1 (v.high);
+    return true;
+}
+
 float ModulationOverlay::livePosition (const juce::String& parameterId)
 {
     if (routes.empty() && ! (anyMacroArcs != nullptr && anyMacroArcs()))
         return -1.0f;   // (nothing moves any control: the set value, and no walk at 30 Hz)
+    // What the engine plays, when it says (its own sum, mapping and clamps); else mirrored.
+    if (float at = 0.0f, low = 0.0f, high = 0.0f; engineNow (parameterId, at, low, high))
+        return at;
     const auto* t = find (parameterId);
     if (t == nullptr && targets.empty())
     {
@@ -3009,7 +3024,18 @@ void ModulationOverlay::paintHalo (juce::Graphics& g, const Target& t, int index
     const int source = mod::sourceIndex (main->route.source);
     const auto c = modui::sourceColour (source).darker (0.08f);
     const bool live = main->state == mod::RouteState::active;
-    const auto s = sweepOf (t, *main);
+    auto s = sweepOf (t, *main);
+    // The live dot: what the engine plays (every route summed, USER macros and clamps
+    // included) when it says so - with the span it covered since the last frame, a fast
+    // modulation shows as the stretch it sweeps, never as one aliased point.
+    float spanLow = 0.0f, spanHigh = 0.0f;
+    bool span = false;
+    if (float at = 0.0f; main->state == mod::RouteState::active && engineNow (t.parameterId, at, spanLow, spanHigh))
+    {
+        s.now = at;
+        s.nowKnown = true;
+        span = spanHigh - spanLow > 0.015f;
+    }
     const auto* meta = selectedDepthRoute (t);   // its amount is what this halo edits now
     const auto mc = s.metaSource >= 0 ? modui::sourceColour (s.metaSource).darker (0.1f) : c;
 
@@ -3080,6 +3106,8 @@ void ModulationOverlay::paintHalo (juce::Graphics& g, const Target& t, int index
     }
     if (s.nowKnown && ! editing)
     {
+        if (span)
+            arc (t.radius, spanLow, spanHigh, width + 1.5f, juce::Colours::white.withAlpha (0.28f));
         const auto at = pointAt (t.radius, s.now);
         g.setColour (juce::Colours::white.withAlpha (0.92f));
         g.fillEllipse (juce::Rectangle<float> (width + 2.5f, width + 2.5f).withCentre (at));

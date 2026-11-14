@@ -168,6 +168,7 @@ public:
     // Off by default (older sessions open with it off and sound as they did).
     InstrumentEngine::ModView modulationView() const noexcept override { return engine.modulationView(); }
     InstrumentEngine::LiveMix liveMix() const noexcept override { return engine.liveMix(); }
+    bool effectiveValue (const juce::String& parameterId, EffectiveValue& out) const override;
     /** The CC 1-4 sources' controller numbers (0..119; default 2, 11, 16, 17), saved with the
         session. Learn: the next controller that moves is taken for the slot (-1: none). */
     int modControllerNumber (int slot) const noexcept override;

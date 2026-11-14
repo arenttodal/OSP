@@ -1,5 +1,6 @@
 #pragma once
 
+#include "AndorParameters.h"
 #include "InstrumentHost.h"
 #include "InstrumentLoader.h"
 #include "ShellProduct.h"
@@ -98,6 +99,38 @@ public:
     osp::mod::Curve modulationCurve (int index) const override;
     void setModulationCurve (int index, const osp::mod::Curve& curve, bool undoable = true) override;
     osp::InstrumentEngine::ModView modulationView() const noexcept override { return engine->modulationView(); }
+    /** The header MIX's live node: the A/B mix as the engine plays it (its effective `ab.blend`),
+        the triangle's x / y as stored (a product's engine moves only the blend). Not modulated
+        while the engine publishes no blend of its own. */
+    osp::InstrumentEngine::LiveMix liveMix() const noexcept override
+    {
+        try
+        {
+            EffectiveValue v;
+            if (! effectiveValue (osp::plugin::ids::blend, v))
+                return {};
+            osp::InstrumentEngine::LiveMix m;
+            m.blend = v.value;
+            if (const auto* x = parameters.getRawParameterValue (osp::plugin::ids::mixX))
+                m.x = x->load();
+            if (const auto* y = parameters.getRawParameterValue (osp::plugin::ids::mixY))
+                m.y = y->load();
+            m.modulated = true;
+            return m;
+        }
+        catch (...)
+        {
+            return {};
+        }
+    }
+    bool effectiveValue (const juce::String& parameterId, EffectiveValue& out) const override
+    {
+        osp::EffectiveValues::Reading r;
+        if (! engine->effectiveValue (parameterId, r))
+            return false;
+        out = { r.value, r.low, r.high };
+        return true;
+    }
     int modControllerNumber (int slot) const noexcept override;
     void setModControllerNumber (int slot, int controller) noexcept override;
     void learnModController (int slot) noexcept override { ccLearn.store (slot, std::memory_order_release); }

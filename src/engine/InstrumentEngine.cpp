@@ -950,11 +950,44 @@ void InstrumentEngine::setModulation (const mod::Settings& settings) noexcept
     }
 }
 
+void InstrumentEngine::publishEffective (const Macros& m) noexcept
+{
+    // What the shared stages were just given (setMacros), in the parameters' percent.
+    const double life = std::clamp (config.macros.life + modLifeOffset, 0.0, 1.0);
+    const std::array<double, static_cast<std::size_t> (EffectiveSlot::count)> values { life, m.drive, m.character, m.motion, m.space, m.echo };
+    for (std::size_t i = 0; i < values.size(); ++i)
+        effective.publish (static_cast<int> (i), static_cast<float> (100.0 * values[i]));
+    for (std::size_t l = 0; l < 3 && l < modEqOffset.size(); ++l)
+    {
+        const int first = static_cast<int> (EffectiveSlot::eqFirst) + 4 * static_cast<int> (l);
+        const auto& o = modEqOffset[l];
+        if (o[0] == 0.0 && o[1] == 0.0 && o[2] == 0.0 && o[3] == 0.0)
+        {
+            for (int k = 0; k < 4; ++k)
+                effective.clear (first + k);
+            continue;
+        }
+        const auto eq = effectiveEq (l);
+        effective.publish (first, static_cast<float> (eq.bands[static_cast<std::size_t> (eq::Band::bell)].frequencyHz));
+        effective.publish (first + 1, static_cast<float> (eq.bands[static_cast<std::size_t> (eq::Band::bell)].gainDb));
+        effective.publish (first + 2, static_cast<float> (eq.bands[static_cast<std::size_t> (eq::Band::lowShelf)].gainDb));
+        effective.publish (first + 3, static_cast<float> (eq.bands[static_cast<std::size_t> (eq::Band::highShelf)].gainDb));
+    }
+}
+
+void InstrumentEngine::clearEffective() noexcept
+{
+    for (int i = 0; i < static_cast<int> (EffectiveSlot::count); ++i)
+        effective.clear (i);
+}
+
 void InstrumentEngine::applyGlobalModulation (int samples) noexcept
 {
     modRuntime.advanceGlobal (samples, sampleRate);
+    effective.beginBlock (samples, sampleRate);
     if (! modRuntime.compiled.anyGlobalDest)
     {
+        clearEffective();
         modArpOffset.fill (0.0);
         modArpRouted.fill (false);
         modMixOffset.fill (0.0);
@@ -999,6 +1032,7 @@ void InstrumentEngine::applyGlobalModulation (int samples) noexcept
     modMixRouted = c.has (mod::Dest::mixPosition) || c.has (mod::Dest::mixTowardsC);
     modMixOffset = { offset (mod::Dest::mixPosition), offset (mod::Dest::mixTowardsC) };
     modGlobalApplied = true;
+    publishEffective (m);
 }
 
 double InstrumentEngine::arpModulation (mod::Dest d) const noexcept

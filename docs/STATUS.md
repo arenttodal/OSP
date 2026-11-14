@@ -890,6 +890,19 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
   (InstrumentHost::stepLayerEqSpectrum / paintLayerEqSpectrum; none in ANDOR OSP here - its
   own card EQ spectrum is on the default line).
 
+  Universal modulation-aware visual feedback (docs/EFFECTIVE_VALUES.md): a picture draws what
+  the DSP plays. `osp::EffectiveValues` (src/engine) is a fixed, lock-free table published by
+  the audio thread (a sequence lock per slot, with the span covered over a UI frame);
+  `InstrumentHost::effectiveValue` reads it; `InstrumentHost::shownValue` is what the pictures
+  draw (MacroPopups' `value()`; `stored()` for presets, lane copies and snapshots); the halos'
+  live dot and `livePosition` take the engine's sum (every route, clamps) with a faint span
+  trail; the card EQ draws the engine's `effectiveEq`; the shell builds `liveMix()` from the
+  engine's blend. ANDOR OSP publishes its six macros and each layer's EQ while a route moves
+  them. Tests `[effective]`: SHAPER modulated to 80 % is pixel-identical to a hand-set 80 %;
+  the knob is never written back. Unmodulated, every picture is as before. OPEN (listed in
+  the doc): ANDOR OSP's per-voice destinations (CUTOFF / RESONANCE, grains, START, DAMPEN,
+  envelope times) keep the UI mirror until the engine publishes a representative voice.
+
   AUX arpeggiator follower (opt-in; ANDOR ANALOG's D ARP, analog `docs/aux/D_ARP_FOLLOWER.md`):
   `ProductInfo::arpFollower` adds one more listener at the per-card arpeggiator's delivery
   (`ShellProcessor::runArpFollower`, after `runCardArpeggiators`; `Engine::setAuxNotes`). It

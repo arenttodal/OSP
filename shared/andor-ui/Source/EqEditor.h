@@ -237,7 +237,7 @@ private:
     std::unique_ptr<EqValueField> frequencyField, gainField, qField;
     juce::Rectangle<float> titleArea, nameArea, slopeArea, bandSwitchArea, resetArea, closeArea, dampenTab;
     std::unique_ptr<DampenEditor> dampenPage;
-    std::array<double, 4> modulationOffsets() const;   ///< bell octaves, bell dB, low shelf dB, high shelf dB (global LFOs now)
+    std::array<double, 4> modulationOffsets (const eq::Settings& base) const;   ///< bell octaves, bell dB, low shelf dB, high shelf dB: what the engine plays against `base`
     eq::Settings effective() const;                     ///< what is heard now (the settings plus modulation)
 };
 

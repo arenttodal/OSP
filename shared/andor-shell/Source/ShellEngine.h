@@ -170,6 +170,16 @@ public:
     virtual void setAuxNotes (const juce::MidiBuffer* notes) noexcept { juce::ignoreUnused (notes); }
     /** The modulation sources' live values (the panel's meters and moving dots). Any thread. */
     virtual osp::InstrumentEngine::ModView modulationView() const noexcept { return {}; }
+    /** Universal modulation-aware visual feedback (InstrumentHost::effectiveValue): what the
+        engine plays for `parameterId` now, in its plain units, after modulation, macros and its
+        own mapping (a per-voice one: the representative voice's), with the span it covered.
+        False: no value of its own now (the pictures draw the stored value). Message thread;
+        read lock-free from what the audio thread published (osp::EffectiveValues). */
+    virtual bool effectiveValue (const juce::String& parameterId, osp::EffectiveValues::Reading& out) const
+    {
+        juce::ignoreUnused (parameterId, out);
+        return false;
+    }
 
     /** MOVEMENT SHAPER's playhead, 0..1 of its bar, for its picture (0: none). Any thread. */
     virtual float shaperPhase() const noexcept { return 0.0f; }

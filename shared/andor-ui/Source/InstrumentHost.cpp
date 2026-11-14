@@ -34,6 +34,16 @@ namespace
     std::array<int, 3> shownOfStorage { 0, 1, 2 };
 }
 
+float InstrumentHost::shownValue (juce::AudioProcessorValueTreeState& state, const juce::String& parameterId)
+{
+    if (const auto* host = dynamic_cast<const InstrumentHost*> (&state.processor))
+        if (EffectiveValue v; host->effectiveValue (parameterId, v))
+            return v.value;
+    if (auto* p = state.getParameter (parameterId))
+        return p->convertFrom0to1 (p->getValue());
+    return 0.0f;
+}
+
 int InstrumentHost::shownLayer (int layer)
 {
     return shownOfStorage[static_cast<std::size_t> (std::clamp (layer, 0, 2))];

@@ -512,6 +512,10 @@ public:
         the set value after the macros, plus every active route whose source is known now - a
         per-voice source needs a sounding note). Below 0: not a control the overlay knows. */
     float livePosition (const juce::String& parameterId);
+    /** Where the engine plays `parameterId` now as a knob position (0..1) - every route, USER
+        macro and clamp included (InstrumentHost::effectiveValue) - with the span it covered
+        over the last frame. False: the engine has no value of its own for it. */
+    bool engineNow (const juce::String& parameterId, float& position, float& low, float& high) const;
     /** Tests: shows a control's menu here instead of on screen (null: on screen). */
     std::function<void (juce::PopupMenu&)> showMenuForTest;
 

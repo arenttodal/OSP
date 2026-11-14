@@ -2,6 +2,7 @@
 
 #include "audio/envelopes/Adsr.h"
 #include "audio/pitch/SincInterpolator.h"
+#include "engine/EffectiveValues.h"
 #include "engine/InstrumentVoice.h"
 #include "engine/KeyDna.h"
 #include "engine/LayerEq.h"
@@ -435,6 +436,24 @@ public:
         return { liveMixValue[0].load (std::memory_order_relaxed), liveMixValue[1].load (std::memory_order_relaxed),
                  liveMixValue[2].load (std::memory_order_relaxed), liveMixModulated.load (std::memory_order_relaxed) };
     }
+    /** The shared stages' macros as they play (universal modulation-aware visual feedback):
+        LIFE, DRIVE, CHARACTER, MOVEMENT, SPACE, ECHO after their global modulation, clamped as
+        the stages take them, in the parameters' units (percent); and each layer's EQ as it
+        plays (effectiveEq: its bell's frequency and gain, its shelves' gains). Active only while a route
+        moves one of the shared stages; otherwise the pictures draw the stored values (which are
+        then what plays). Lock-free, any thread. */
+    enum class EffectiveSlot
+    {
+        life,
+        drive,
+        character,
+        motion,
+        space,
+        echo,
+        eqFirst,                    ///< then per layer: bell frequency (Hz), bell gain, low shelf, high shelf (dB)
+        count = eqFirst + 3 * 4
+    };
+    const EffectiveValues& effectiveValues() const noexcept { return effective; }
     /** What the modulation display shows: the global LFOs, and the newest sounding voice's
         poly LFOs and envelopes (lock-free, any thread). */
     struct ModView
@@ -603,6 +622,9 @@ private:
     mod::Runtime modRuntime;
     std::array<double, 3> modReimaginedOffset {};   ///< global LFOs on each layer's REIMAGINED
     double modLifeOffset = 0.0;
+    EffectiveValues effective;   ///< (published by applyGlobalModulation)
+    void publishEffective (const Macros& m) noexcept;
+    void clearEffective() noexcept;
     std::array<dampen::Settings, 3> layerDampen {};
     std::array<keydna::Settings, 3> layerKeyDna {};         ///< setLayerKeyDna's settings (AMOUNT apart)
     std::array<keydna::Table, 3> layerKeyDnaOwned {};       ///< setLayerKeyDna's profiles

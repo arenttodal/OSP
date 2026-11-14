@@ -31,7 +31,15 @@ namespace
 {
     constexpr double twoPi = 2.0 * std::numbers::pi;
 
+    /** What the pictures draw: the value the DSP plays (modulation included) when the engine
+        publishes it, else the stored one - so a modulated control moves its picture as turning
+        it by hand would (InstrumentHost::shownValue). The knobs keep the stored value. */
     float value (juce::AudioProcessorValueTreeState& state, const juce::String& id)
+    {
+        return InstrumentHost::shownValue (state, id);
+    }
+    /** The stored value (what a preset, a copy or a snapshot keeps: never a modulated one). */
+    float stored (juce::AudioProcessorValueTreeState& state, const juce::String& id)
     {
         if (auto* p = state.getParameter (id))
             return p->convertFrom0to1 (p->getValue());
@@ -57,6 +65,7 @@ namespace
         Visual()
         {
             setInterceptsMouseClicks (false, false);
+            setComponentID ("picture");   // (tests find the picture alone: knobs aside)
             startTimerHz (30);
         }
         ~Visual() override { stopTimer(); }
@@ -2663,12 +2672,12 @@ namespace
         LaneSnapshot snap;
         for (const auto& name : laneSettingNames())
             if (s.getParameter (lane.ids.prefix + name) != nullptr)
-                snap.values[name] = value (s, lane.ids.prefix + name);
+                snap.values[name] = stored (s, lane.ids.prefix + name);
         for (const auto& [name, id] : laneExtras (lane.ids))
             if (id.isNotEmpty() && s.getParameter (id) != nullptr)
-                snap.values[name] = value (s, id);
+                snap.values[name] = stored (s, id);
         snap.pattern = host.laneShaperPattern (laneIndex);
-        snap.on = lane.ids.onId.isEmpty() || value (s, lane.ids.onId) >= 0.5f;
+        snap.on = lane.ids.onId.isEmpty() || stored (s, lane.ids.onId) >= 0.5f;
         return snap;
     }
 
@@ -2941,7 +2950,7 @@ namespace
             RackPreset p;
             for (const auto& id : ids)
                 if (host.apvts().getParameter (id) != nullptr)
-                    p.values[id] = value (host.apvts(), id);
+                    p.values[id] = stored (host.apvts(), id);
             return p;
         }
         void apply (const RackPreset& p) override
@@ -4772,8 +4781,8 @@ namespace
                         return;
                     const Lane from (safe->processor, other);
                     auto& s = safe->processor.apvts();
-                    const bool custom = value (s, from ("shaper.custom")) >= 0.5f;
-                    safe->setCustom (custom ? safe->processor.laneShaperPattern (other) : RhythmicShaper::patternSteps (juce::roundToInt (value (s, from ("shaper.pattern")))));
+                    const bool custom = stored (s, from ("shaper.custom")) >= 0.5f;
+                    safe->setCustom (custom ? safe->processor.laneShaperPattern (other) : RhythmicShaper::patternSteps (juce::roundToInt (stored (s, from ("shaper.pattern")))));
                 });
             }
             menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (toolbar.get()).withDeletionCheck (*this));
