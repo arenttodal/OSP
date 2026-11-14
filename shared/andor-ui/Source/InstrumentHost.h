@@ -388,6 +388,12 @@ public:
     /** The mix as it plays (with any MIX modulation) for the header's live node; an engine that
         does not blend layers this way says it is not modulated. */
     virtual InstrumentEngine::LiveMix liveMix() const noexcept { return {}; }
+    /** The engine's live telemetry, read only (lock-free taps the audio thread fills): the
+        CHARACTER rack's graph follows the sounding voices' filter (characterTap), a card's EQ
+        draws its layer's spectrum (layerEqSpectrum). nullptr where a product has none: the
+        CHARACTER graph then shows the settings (and a silent preview when they are edited), the
+        card EQ no spectrum. */
+    virtual const InstrumentEngine* telemetryEngine() const noexcept { return nullptr; }
     /** The hardware faceplate a shared rack module (rack::Kind, as an int) wears (opt-in; null:
         none, as in ANDOR OSP). Interface only. */
     virtual const rack::Faceplate* rackFaceplate (int kind) const noexcept

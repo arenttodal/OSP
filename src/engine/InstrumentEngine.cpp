@@ -11,7 +11,7 @@
 namespace osp
 {
 
-InstrumentEngine::InstrumentEngine() : voices (static_cast<std::size_t> (totalSlots)) {}
+InstrumentEngine::InstrumentEngine() : characterTaps (new CharacterTap[static_cast<std::size_t> (totalSlots)]), eqTaps (std::make_unique<std::array<fx::SpectrumTap, 2 * EngineSettings::layers>>()), voices (static_cast<std::size_t> (totalSlots)) {}
 
 void InstrumentEngine::prepare (double outputSampleRate, int maximumBlockSize, const EngineSettings& settings)
 {
@@ -1194,6 +1194,7 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
         modRuntime.advanceGlobal (numSamples, sampleRate);
         renderBlock (output, numChannels, numSamples);
         publishModulation();
+        publishCharacterTaps();
         return;
     }
     for (std::size_t l = 0; l < modRuntime.layerLevelDb.size(); ++l)
@@ -1215,6 +1216,21 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
         done += n;
     }
     publishModulation();
+    publishCharacterTaps();
+}
+
+void InstrumentEngine::publishCharacterTaps() noexcept
+{
+    // Once a block: what each voice's CHARACTER filter used (a voice that ended: once more,
+    // inactive). Telemetry only.
+    for (int i = 0; i < totalSlots; ++i)
+    {
+        auto& tap = characterTaps[static_cast<std::size_t> (i)];
+        CharacterTap::Snapshot s;
+        const bool sounding = voices[static_cast<std::size_t> (i)].characterView (s);
+        if (sounding || tap.isActive())
+            tap.write (s);
+    }
 }
 
 void InstrumentEngine::renderBlock (float* const* output, int numChannels, int numSamples) noexcept
@@ -1418,8 +1434,16 @@ void InstrumentEngine::renderBlock (float* const* output, int numChannels, int n
             }
             if (layerStage)
                 runLayerStage (slot, bl.data(), br.data(), n, mono);
+            // The card EQ's spectrum (telemetry: the samples are only read): what goes in, then
+            // what comes out.
+            auto& eqIn = (*eqTaps)[static_cast<std::size_t> (layer * 2)];
+            auto& eqOut = (*eqTaps)[static_cast<std::size_t> (layer * 2 + 1)];
+            for (int i = 0; i < n; ++i)
+                eqIn.push (bl[static_cast<std::size_t> (i)], mono ? bl[static_cast<std::size_t> (i)] : br[static_cast<std::size_t> (i)]);
             if (eqOn)
                 slot.eq.process (bl.data(), br.data(), n, mono);
+            for (int i = 0; i < n; ++i)
+                eqOut.push (bl[static_cast<std::size_t> (i)], mono ? bl[static_cast<std::size_t> (i)] : br[static_cast<std::size_t> (i)]);
             for (int i = 0; i < n; ++i)
             {
                 const float gl = l0 == l1 ? l0 : l0 + (l1 - l0) * static_cast<float> (i + 1) / static_cast<float> (n);

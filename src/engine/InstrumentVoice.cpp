@@ -326,6 +326,7 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
         envelopeScale = shape.filterEnvelopeScale;
         filterEnv = 0.0;
         filterEnvAttacking = true;
+        tapEnvPeak = 0.0;
         filterEnvStep = static_cast<double> (controlInterval) / (std::max (0.0005, s.envAttackSeconds) * sampleRate);
         // Back to the knob's position by the end of DECAY (exponential, ~1 % left).
         filterEnvDecay = std::exp (-4.6 * static_cast<double> (controlInterval) / (std::max (0.02, s.envDecaySeconds) * sampleRate));
@@ -970,6 +971,11 @@ void InstrumentVoice::updateCharacter (bool immediate) noexcept
                                            : std::clamp (charOctaves + modCutoff * (rangeHiOctaves - rangeLoOctaves), std::min (rangeLoOctaves, rangeHiOctaves),
                                                          std::max (rangeLoOctaves, rangeHiOctaves));
     const double octaves = travel + env + velocityOctaves + driftTone;
+    // Telemetry only (CharacterTap): nothing below reads it.
+    tapBaseOctaves = travel + velocityOctaves + driftTone;
+    tapDepthOctaves = shaping::envelopeOctaves (s.envAmount) * envelopeScale;
+    tapCutoffOctaves = octaves;
+    tapEnvPeak = std::max (tapEnvPeak, filterEnv);
     // TILT: the knob rotates dark <-> bright (+-12 dB), the envelope and velocity lean it.
     const double tiltDb = (std::clamp (shapingState->character, 0.0, 1.0) - 0.5) * 24.0 + 3.0 * (env + velocityOctaves + driftTone);
     const double resonance = modResonance != 0.0 ? std::clamp (s.resonance + modResonance, 0.0, 1.0) : s.resonance;

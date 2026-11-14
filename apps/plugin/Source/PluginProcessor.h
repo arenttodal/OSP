@@ -173,6 +173,7 @@ public:
     // Off by default (older sessions open with it off and sound as they did).
     InstrumentEngine::ModView modulationView() const noexcept override { return engine.modulationView(); }
     InstrumentEngine::LiveMix liveMix() const noexcept override { return engine.liveMix(); }
+    const InstrumentEngine* telemetryEngine() const noexcept override { return &engine; }
 
     // The FX library (shared with ANDOR ANALOG; engine/fx, shared/andor-ui Fx*): ten more
     // effects and a route. Its parameters are `fx.<type>.<n>.<name>` (version hint 30). The

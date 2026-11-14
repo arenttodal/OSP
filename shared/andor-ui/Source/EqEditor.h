@@ -2,6 +2,7 @@
 
 #include "CeramicSkin.h"
 #include "Design.h"
+#include "EqSpectrum.h"
 #include "InstrumentHost.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -248,7 +249,8 @@ public:
     EqEditor (InstrumentHost& processor, int layer);
 
     std::function<void()> onClose;
-    /** Follows the parameters and the modulation (editor timer); repaints only on change. */
+    /** Follows the parameters, the modulation and the layer's spectrum (editor timer); repaints
+        only on change. */
     void refresh();
     /** EQ | DAMPEN: the overlay's two pages (a view setting). */
     void showDampen (bool show);
@@ -261,6 +263,8 @@ public:
     /** The band's node / marker centre (tests drive the mouse there). */
     juce::Point<float> nodePosition (int band) const;
     juce::Rectangle<float> graphArea() const;
+    /** The output's spectrum now (dB; the floor when nothing has played): tests. */
+    float spectrumPeakDb() const noexcept { return spectrum.peakDb(); }
     juce::Rectangle<float> powerArea() const;
     float xForHz (double hz) const;
     double hzForX (float x) const;
@@ -296,6 +300,7 @@ private:
     std::unique_ptr<EqValueField> frequencyField, gainField, qField;
     juce::Rectangle<float> titleArea, nameArea, slopeArea, bandSwitchArea, resetArea, closeArea, dampenTab;
     std::unique_ptr<DampenEditor> dampenPage;
+    EqSpectrum spectrum;   ///< what plays through the layer's EQ (the routing EQUALIZER rack's analyser)
     std::array<double, 4> modulationOffsets() const;   ///< bell octaves, bell dB, low shelf dB, high shelf dB (global LFOs now)
     eq::Settings effective() const;                     ///< what is heard now (the settings plus modulation)
 };

@@ -1271,6 +1271,36 @@ on the ADD place, or only the card dropped on. Audit, measured reproduction and 
 - Tests: `[multisample]`, 9 core and 5 plugin cases. The 55-render engine-C bit-exact matrix
   is byte-identical. Full suites green: core `ctest` 5/5, plugin tree `ctest` 10/10 (OSP plugin, shell visual reference, memo lab, the example products, unit, integration, regression).
 
+## ANDOR OSP: the CHARACTER rack's graph moves; the card EQ shows the spectrum (14 Nov 2026)
+
+- **CHARACTER rack graph, as ANDOR ANALOG's FILTER graph.**
+  - LIVE: it follows the most recent sounding voice's filter (a newer note takes over; the
+    followed one is kept through its release). The cutoff is the one the voice uses:
+    CHARACTER, its routes, velocity, drift and the envelope. The base is drawn muted, the
+    envelope's peak dashed, with BASE / NOW / PEAK figures and the A / D stage lit.
+  - PREVIEW: an edit to CHARACTER, its range or its envelope with nothing playing runs a
+    silent C4 through the same AD envelope.
+  - IDLE: the knobs.
+  - The drawn cutoff eases over ~45 ms (drawing only).
+  - Engine telemetry: `CharacterTap`, one per voice slot, a lock-free sequence-counted
+    snapshot the audio thread writes once a block from the voice's last control update. It
+    changes nothing a voice plays: no allocation, no lock.
+  - The curve now stays inside its plot (it used to dip into the frequency labels).
+- **Card EQ spectrum.** Each source card's EQ draws the routing page's EQUALIZER rack spectrum
+  behind its curve: the layer's output filled, its input a quiet line.
+  - It is the same analyser, not a copy: `EqSpectrum` (shared/andor-ui) is now what both
+    draw.
+  - The engine gives each layer's EQ the two `fx::SpectrumTap`s the EQUALIZER has (around
+    `eq::Processor::process`, EQ on or off; telemetry only, audio unchanged).
+- Both reach the editor through one read-only host hook, `InstrumentHost::telemetryEngine()`
+  (nullptr in the shell products: their card EQs and graphs are unchanged).
+- Tests: `[character-graph]` (idle, preview rise and decay, live note / stage / peak, a live
+  CHARACTER turn, easing, back to idle) and `[card-eq-spectrum]` (floor, rising while a note
+  plays, the same reading as the shared analyser, the fall). On demand:
+  `[character-graph-shots]`, `[card-eq-spectrum-shots]`.
+- NEXT: ANDOR ANALOG's card EQs (the shell's) can show the spectrum once its host returns its
+  engine's layer taps.
+
 ## BLOCKERS
 
 - DAW testing (Logic, Ableton, Reaper) needs a Mac; CI covers build, tests and auval.

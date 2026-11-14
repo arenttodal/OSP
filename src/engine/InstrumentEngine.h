@@ -11,10 +11,12 @@
 #include "engine/ReimaginedEngine.h"
 #include "engine/ReimaginedModes.h"
 #include "engine/Shaping.h"
+#include "engine/fx/Effects.h"
 #include "engine/fx/FxEngine.h"
 #include "model/InstrumentModel.h"
 #include "model/InstrumentSet.h"
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cstdint>
@@ -226,6 +228,15 @@ public:
         slot.set = set;
         slot.model = set != nullptr && set->isValid() ? set->members[static_cast<std::size_t> (set->primary)].model.get() : nullptr;
     }
+    /** CHARACTER's live telemetry (read only, any thread): one tap per voice slot. */
+    /** The layer's EQ spectrum taps (read only, any thread): its input (`output` false) or its
+        output, the layer's signal before LEVEL and PAN, whether or not the EQ is on. */
+    const fx::SpectrumTap& layerEqSpectrum (int layer, bool output) const noexcept
+    {
+        return (*eqTaps)[static_cast<std::size_t> (layerIndex (layer) * 2 + (output ? 1 : 0))];
+    }
+    static constexpr int characterTapCount() noexcept { return totalSlots; }
+    const CharacterTap& characterTap (int slot) const noexcept { return characterTaps[static_cast<std::size_t> (std::clamp (slot, 0, totalSlots - 1))]; }
     bool isSetInUse (const InstrumentSet* set) const noexcept;
     void killVoicesUsing (const InstrumentSet* set) noexcept;
     const InstrumentModel* model (int layer = 0) const noexcept { return slots[layerIndex (layer)].model; }
@@ -630,6 +641,12 @@ private:
     double sampleRate = 48000.0;
     ShapingState liveShaping;            ///< read by every voice at control rate
     std::unique_ptr<SincInterpolator> interpolator;
+    /** CHARACTER's telemetry, one tap per voice slot (publishCharacterTaps, once a block). */
+    std::unique_ptr<CharacterTap[]> characterTaps;
+    /** Each layer's EQ: what goes in and what comes out (the card EQ's spectrum; telemetry,
+        [layer * 2] in, [layer * 2 + 1] out), on the heap (4096 samples each). */
+    std::unique_ptr<std::array<fx::SpectrumTap, 2 * EngineSettings::layers>> eqTaps;
+    void publishCharacterTaps() noexcept;
     std::vector<InstrumentVoice> voices;   ///< totalSlots, allocated once in the constructor (too big for a stack: ~1.5 MB)
     std::array<Slot, EngineSettings::layers> slots;
     std::size_t context = 0;   ///< the layer a note-on is being prepared for

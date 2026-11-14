@@ -1,5 +1,7 @@
 #pragma once
 
+#include "engine/CharacterTap.h"
+
 #include "audio/envelopes/Adsr.h"
 #include "audio/pitch/SincInterpolator.h"
 #include "core/Prng.h"
@@ -191,6 +193,26 @@ public:
         expressionBrightDb = brightnessDb;
     }
     std::uint64_t startOrder() const noexcept { return order; }
+    /** CHARACTER as this voice's filter uses it now (the rack's live graph). False when the
+        voice is idle or plays without CHARACTER. */
+    bool characterView (CharacterTap::Snapshot& out) const noexcept
+    {
+        if (! active || shapingState == nullptr)
+            return false;
+        out.active = true;
+        out.released = released;
+        out.note = currentNote;
+        out.layer = voiceLayer;
+        out.stage = filterEnvAttacking ? 1 : (filterEnv > 0.01 ? 2 : 0);
+        out.order = order;
+        out.velocity = static_cast<float> (synthVelocity) / 127.0f;
+        out.baseOctaves = static_cast<float> (tapBaseOctaves);
+        out.depthOctaves = static_cast<float> (tapDepthOctaves);
+        out.env = static_cast<float> (filterEnv);
+        out.envPeak = static_cast<float> (tapEnvPeak);
+        out.cutoffOctaves = static_cast<float> (tapCutoffOctaves);
+        return true;
+    }
     /** The largest |left| + |right| this voice added since the last call (before the layer's
         mix gain), then reset: how loud it is, for retiring voices nobody can hear. */
     float takeOutputPeak() noexcept
@@ -477,6 +499,8 @@ private:
     double filterEnv = 0.0, filterEnvStep = 1.0, filterEnvDecay = 0.0;
     bool filterEnvAttacking = true;
     double velocityOctaves = 0.0, envelopeScale = 1.0;
+    // CHARACTER's telemetry (CharacterTap): what the last control update used.
+    double tapBaseOctaves = 0.0, tapDepthOctaves = 0.0, tapCutoffOctaves = 0.0, tapEnvPeak = 0.0;
     double driftTone = 0.0, driftToneTarget = 0.0;
     void updateCharacter (bool immediate) noexcept;
 
