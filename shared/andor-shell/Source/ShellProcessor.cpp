@@ -1398,6 +1398,11 @@ bool ShellProcessor::applyStateXml (const juce::XmlElement& xml)
     engine->restoreState (xml, sampleStoreFolder());
     for (int l = 0; l < numLayers; ++l)
         clearLayer (l);
+    // A hybrid product's recording is gone until the state's own sources load again: its engine
+    // is told, as when the musician removes it (else it still believed one was there, and an
+    // empty card read as nothing at all - shown as the empty dock).
+    if (hasHybridLayer())
+        engine->sourcePublished (hybridLayer, nullptr);
     if (auto* sources = xml.getChildByName (sourcesType))
         for (auto* e : sources->getChildWithTagNameIterator (layerType.toString()))
         {
