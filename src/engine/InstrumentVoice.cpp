@@ -34,6 +34,7 @@ void InstrumentVoice::prepare (double outputSampleRate, const AdsrSettings& adsr
     // CHARACTER follows the knob within ~10 ms (control rate one-pole).
     charSmoothing = 1.0 - std::exp (-static_cast<double> (controlInterval) / (0.010 * outputSampleRate));
     keyDnaSmoothing = 1.0 - std::exp (-static_cast<double> (controlInterval) / (0.030 * outputSampleRate));
+    satRearCoef = static_cast<float> (1.0 - std::exp (-2.0 * 3.14159265358979323846 * 2200.0 / outputSampleRate));   // (ORBIT's rear: darker near 2 kHz)
     adsrSettings = adsr;
     envelope.prepare (outputSampleRate, adsr);
     tapeFrameEngine.prepare (outputSampleRate);
@@ -206,6 +207,10 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     const float p = std::clamp (shape.pan, -1.0f, 1.0f);
     panLeft = std::min (1.0f, 1.0f - p);
     panRight = std::min (1.0f, 1.0f + p);
+    panNow = p;
+    satellite = params.satellite;
+    satNoteX = params.satelliteNoteX;
+    satRearL = satRearR = 0.0f;
 
     driftLevel = driftLevelTarget = 0.0;
     driftCentsValue = driftCentsTarget = 0.0;
@@ -982,6 +987,45 @@ void InstrumentVoice::updateCharacter (bool immediate) noexcept
     charFilter.setParameters (s.filterType, std::exp2 (octaves), resonance, s.drive, tiltDb);
 }
 
+void InstrumentVoice::prepareSatellite() noexcept
+{
+    // SATELLITE: this render's place gains (the layer's motion glides across the chunk; BOUNCE
+    // with NOTE: this note's own side). Inactive: the original output, untouched.
+    satOn = satellite != nullptr && satellite->active;
+    if (! satOn)
+        return;
+    const auto& s = *satellite;
+    const float x0 = s.bounceNote ? s.amount * satNoteX : s.x0;
+    const float x1 = s.bounceNote ? s.amount * satNoteX : s.x1;
+    osp::satellite::gains (x0, satL0, satR0);
+    osp::satellite::gains (x1, satL1, satR1);
+    satRear0 = s.rear0;
+    satRear1 = s.rear1;
+}
+
+void InstrumentVoice::satelliteOut (float lg, float rg, float* left, float* right, int at, float t) noexcept
+{
+    // The voice's own pan (WIDTH scales it towards the layer's travelling place), times the
+    // place's equal-power gains; ORBIT's far half a little quieter and darker.
+    float pL = panLeft, pR = panRight;
+    if (satellite->width < 1.0f)
+    {
+        const float p = panNow * satellite->width;
+        pL = std::min (1.0f, 1.0f - p);
+        pR = std::min (1.0f, 1.0f + p);
+    }
+    const float rear = satRear0 + t * (satRear1 - satRear0);
+    satRearL += satRearCoef * (lg - satRearL);
+    satRearR += satRearCoef * (rg - satRearR);
+    if (rear > 1.0e-4f)
+    {
+        lg = (1.0f - 0.3f * rear) * (lg + 0.65f * rear * (satRearL - lg));
+        rg = (1.0f - 0.3f * rear) * (rg + 0.65f * rear * (satRearR - rg));
+    }
+    left[at] += lg * pL * (satL0 + t * (satL1 - satL0));
+    right[at] += rg * pR * (satR0 + t * (satR1 - satR0));
+}
+
 void InstrumentVoice::updateDampen (bool immediate) noexcept
 {
     // amount = curve[note] x AMOUNT (plus its routes), glided over ~10 ms; switched off it
@@ -1195,6 +1239,7 @@ void InstrumentVoice::updateControl() noexcept
             const float p = std::clamp (shape.pan + static_cast<float> (driftPanValue), -1.0f, 1.0f);
             panLeft = std::min (1.0f, 1.0f - p);
             panRight = std::min (1.0f, 1.0f + p);
+            panNow = p;
         }
     }
 
@@ -1205,6 +1250,7 @@ void InstrumentVoice::updateControl() noexcept
         const float p = std::clamp (shape.pan + drifted + modPan, -1.0f, 1.0f);
         panLeft = std::min (1.0f, 1.0f - p);
         panRight = std::min (1.0f, 1.0f + p);
+        panNow = p;
         modPanApplied = modPan != 0.0f;
     }
     if (shapingState != nullptr)
@@ -1345,6 +1391,7 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
     if (! active)
         return;
     synthRootCorrection = rootCorrection;
+    prepareSatellite();
     if (modeEngine != nullptr)
     {
         renderMode (left, right, numSamples, pitchRatio);
@@ -1642,8 +1689,13 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
         outputPeak = std::max (outputPeak, std::abs (lg) + std::abs (rg));
         if (stereoOutput)
         {
-            left[i] += lg * panLeft;
-            right[i] += rg * panRight;
+            if (satOn)
+                satelliteOut (lg, rg, left, right, i, static_cast<float> (i + 1) / static_cast<float> (numSamples));
+            else
+            {
+                left[i] += lg * panLeft;
+                right[i] += rg * panRight;
+            }
         }
         else
         {
@@ -1841,8 +1893,13 @@ void InstrumentVoice::renderMode (float* left, float* right, int numSamples, dou
             outputPeak = std::max (outputPeak, std::abs (lg) + std::abs (rg));
             if (stereoOutput)
             {
-                left[at] += lg * panLeft;
-                right[at] += rg * panRight;
+                if (satOn)
+                    satelliteOut (lg, rg, left, right, at, static_cast<float> (at + 1) / static_cast<float> (numSamples));
+                else
+                {
+                    left[at] += lg * panLeft;
+                    right[at] += rg * panRight;
+                }
             }
             else
                 left[at] += 0.5f * (l + r) * g;

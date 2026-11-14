@@ -10,6 +10,7 @@
 #include "engine/PostProcessor.h"
 #include "engine/ReimaginedEngine.h"
 #include "engine/ReimaginedModes.h"
+#include "engine/SatelliteLive.h"
 #include "engine/Shaping.h"
 #include "engine/fx/Effects.h"
 #include "engine/fx/FxEngine.h"
@@ -84,6 +85,9 @@ struct LayerSettings
     /** PEDAL LOOP (One Shot): what the sustain pedal does to this layer's notes. Normal: the
         pedal as it always was. A new mode applies to notes started afterwards. */
     PedalLoopMode pedalLoop = PedalLoopMode::normal;
+    /** SATELLITE: the layer's own stereo motion (src/engine/SatelliteMotion.h; off by default,
+        and off the layer's voices take their original path, bit for bit). */
+    satellite::Settings satellite;
 };
 
 /**
@@ -235,6 +239,15 @@ public:
     {
         return (*eqTaps)[static_cast<std::size_t> (layerIndex (layer) * 2 + (output ? 1 : 0))];
     }
+    /** SATELLITE's place now (read only, any thread; the panel's marker): the layer's position
+        -1 .. +1 and ORBIT's rear 0 .. 1, false while the layer does not move. */
+    bool satelliteView (int layer, float& x, float& rear) const noexcept
+    {
+        const auto l = layerIndex (layer);
+        x = satShownX[l].load (std::memory_order_relaxed);
+        rear = satShownRear[l].load (std::memory_order_relaxed);
+        return (satShownLive.load (std::memory_order_relaxed) & (1 << l)) != 0;
+    }
     static constexpr int characterTapCount() noexcept { return totalSlots; }
     const CharacterTap& characterTap (int slot) const noexcept { return characterTaps[static_cast<std::size_t> (std::clamp (slot, 0, totalSlots - 1))]; }
     bool isSetInUse (const InstrumentSet* set) const noexcept;
@@ -298,6 +311,8 @@ public:
     }
     /** A layer's EQ alone (the rest of its settings unchanged). */
     void setLayerEq (int layer, const eq::Settings& settings) noexcept { config.layer[layerIndex (layer)].eq = settings; }
+    /** SATELLITE (the layer's own stereo motion): applies from the next chunk, gliding on / off over 20 ms. */
+    void setLayerSatellite (int layer, const satellite::Settings& settings) noexcept { config.layer[layerIndex (layer)].satellite = settings; }
     /** A layer's DAMPEN (each of its notes, by key; live). Bypassed until set. */
     void setLayerDampen (int layer, const dampen::Settings& settings) noexcept { layerDampen[layerIndex (layer)] = settings; }
     const dampen::Settings& layerDampenSettings (int layer) const noexcept { return layerDampen[layerIndex (layer)]; }
@@ -422,6 +437,7 @@ public:
     /** The host's musical time at the start of the next block (MOVEMENT's SHAPER syncs to it). */
     void setHostTiming (const HostTiming& timing) noexcept
     {
+        hostTiming = timing;
         post.setTiming (timing);
         modRuntime.setTiming (timing);
     }
@@ -602,6 +618,9 @@ private:
         eq::Processor eq;                       ///< the layer's EQ (LayerSettings::eq, plus modulation)
         double synthesizeLive = 0.0;            ///< SYNTHESIZE, read by the layer's voices at control rate
         synth::Settings synthLive;              ///< the SYNTH page, read by the layer's voices at control rate
+        SatelliteLive satelliteLive;            ///< SATELLITE for this chunk, read by the layer's voices
+        double satAmount = 0.0, satX = 0.0, satRear = 0.0, satFreeCycle = 0.0;
+        int satNotes = 0;                       ///< BOUNCE + NOTE: the layer's notes so far (their sides alternate)
     };
     /** The layer's EQ as heard: its settings with the global LFOs' routes added. */
     eq::Settings effectiveEq (std::size_t layer) const noexcept;
@@ -642,6 +661,16 @@ private:
     ShapingState liveShaping;            ///< read by every voice at control rate
     std::unique_ptr<SincInterpolator> interpolator;
     /** CHARACTER's telemetry, one tap per voice slot (publishCharacterTaps, once a block). */
+    // SATELLITE's clock (as SHAPER DNA's in ANDOR ANALOG): the host's quarter notes while the
+    // transport runs; stopped, a local clock started by a note and kept while anything sounds.
+    HostTiming hostTiming;
+    int satSamplesIntoBlock = 0;
+    bool satLocalRunning = false, satPendingStart = false;
+    double satLocalPpq = 0.0;
+    int satIdle = 0, satLiveMask = 0;
+    std::array<std::atomic<float>, EngineSettings::layers> satShownX {}, satShownRear {};
+    std::atomic<int> satShownLive { 0 };
+    void updateSatellite (int count) noexcept;
     std::unique_ptr<CharacterTap[]> characterTaps;
     /** Each layer's EQ: what goes in and what comes out (the card EQ's spectrum; telemetry,
         [layer * 2] in, [layer * 2 + 1] out), on the heap (4096 samples each). */

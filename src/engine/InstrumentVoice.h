@@ -1,6 +1,7 @@
 #pragma once
 
 #include "engine/CharacterTap.h"
+#include "engine/SatelliteLive.h"
 
 #include "audio/envelopes/Adsr.h"
 #include "audio/pitch/SincInterpolator.h"
@@ -84,6 +85,10 @@ struct InstrumentVoiceStart
     double speed = 1.0;
     /** PEDAL LOOP of the layer as the note starts (kept for the note's life). */
     PedalLoopMode pedalLoop = PedalLoopMode::normal;
+    /** SATELLITE of the layer (InstrumentEngine's, read each render), and with BOUNCE + NOTE
+        this note's side (-1 .. +1, kept for its life). */
+    const SatelliteLive* satellite = nullptr;
+    float satelliteNoteX = 0.0f;
     /** Ping-Pong's turnaround: a mirror crossfade this long (seconds of source; 0: a plain
         reflection), and the correlation its gains assume. */
     double pedalTurnSeconds = 0.008;
@@ -499,6 +504,16 @@ private:
     double filterEnv = 0.0, filterEnvStep = 1.0, filterEnvDecay = 0.0;
     bool filterEnvAttacking = true;
     double velocityOctaves = 0.0, envelopeScale = 1.0;
+    // SATELLITE (SatelliteLive): the layer's motion at the voice's output, its own pan kept
+    // (scaled by WIDTH), ORBIT's rear cue (a level and a darkening, each channel's own state).
+    const SatelliteLive* satellite = nullptr;
+    float satNoteX = 0.0f, panNow = 0.0f, satRearCoef = 0.25f;
+    float satRearL = 0.0f, satRearR = 0.0f;
+    float satL0 = 1.0f, satL1 = 1.0f, satR0 = 1.0f, satR1 = 1.0f;   ///< this render's gains (voice pan x place)
+    float satRear0 = 0.0f, satRear1 = 0.0f;
+    bool satOn = false;
+    void prepareSatellite() noexcept;
+    void satelliteOut (float lg, float rg, float* left, float* right, int at, float t) noexcept;
     // CHARACTER's telemetry (CharacterTap): what the last control update used.
     double tapBaseOctaves = 0.0, tapDepthOctaves = 0.0, tapCutoffOctaves = 0.0, tapEnvPeak = 0.0;
     double driftTone = 0.0, driftToneTarget = 0.0;

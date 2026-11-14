@@ -188,6 +188,9 @@ TEST_CASE ("plugin: Phase 2's parameters are appended and neutral; the modulatio
                 expected.add (osp::plugin::fxparams::idOf ({}, { static_cast<osp::fx::Type> (t), slot }, spec.name));
     for (int l = 0; l < 3; ++l)   // (version 31: PEDAL LOOP)
         expected.add (osp::plugin::InstrumentHost::pedalLoopParameterId (l));
+    for (int l = 0; l < 3; ++l)   // (version 32: SATELLITE)
+        for (const auto* field : osp::plugin::InstrumentHost::satelliteFields())
+            expected.add (osp::plugin::InstrumentHost::satelliteFieldId (l, field));
     REQUIRE (all.size() > expected.size());
     for (int i = 0; i < expected.size(); ++i)
     {

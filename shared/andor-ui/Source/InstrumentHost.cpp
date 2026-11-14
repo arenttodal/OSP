@@ -1,4 +1,5 @@
 #include "InstrumentHost.h"
+#include "ShapingPopups.h"
 #include "AndorParameters.h"
 
 #include "engine/Dampen.h"

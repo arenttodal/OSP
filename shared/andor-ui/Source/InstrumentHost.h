@@ -111,6 +111,12 @@ public:
         Forward, Ping-Pong; Normal by default, so every session from before keeps its pedal.
         Appended after the imprint's (ANDOR OSP's layout; nothing before moves). */
     static void addPedalLoopParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout);
+    /** SATELLITE (each layer's own stereo motion; ANDOR ANALOG's ranges, defaults and texts):
+        `layerX.satellite.<field>`, fields enabled, mode, sync, division, rate, depth, width, phase,
+        offset, retrigger. Every layer off by default (and in every session from before). */
+    static void addSatelliteParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, int versionHint);
+    static juce::String satelliteFieldId (int layer, const char* field);
+    static const std::array<const char*, 10>& satelliteFields();
     static juce::String pedalLoopParameterId (int layer);
     /** DAMPEN's parameters in their order: enabled, mode, amount, frequency, cutoff. */
     static const juce::StringArray& dampenParameterNames();
@@ -541,6 +547,14 @@ public:
     virtual juce::String satelliteParameterId (int /*card*/) const { return {}; }
     /** SATELLITE's panel, showing card 0..2 (none by default: InstrumentHost.cpp). */
     virtual std::unique_ptr<MiniPanel> createSatellitePanel (int card);
+    /** Where the audio has card 0..2 now (SATELLITE's panel marker): -1 .. +1 across and ORBIT's
+        rear 0 .. 1; false while the card does not move. */
+    virtual bool satelliteView (int card, float& x, float& rear) const
+    {
+        juce::ignoreUnused (card);
+        x = rear = 0.0f;
+        return false;
+    }
     virtual MovementLane movementLane (int lane) const { juce::ignoreUnused (lane); return {}; }
     virtual float laneShaperPhase (int lane) const noexcept { return lane == 0 ? shaperPhase() : -1.0f; }
     virtual ShaperPattern laneShaperPattern (int lane) const { juce::ignoreUnused (lane); return shaperCustomPattern(); }

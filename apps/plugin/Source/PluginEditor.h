@@ -60,6 +60,7 @@ private:
     again closes it).
 */
 class OspAudioProcessorEditor final : public juce::AudioProcessorEditor,
+                                       public AnchoredPopoverHost,
                                       public juce::FileDragAndDropTarget,
                                       public RackOpener,
                                       private juce::Timer
@@ -90,6 +91,10 @@ public:
     static constexpr int routesPopup = 11; ///< a modulation source's routes (the panel's route count)
     static constexpr int curvePopup = 12;  ///< the larger curve editor (CUSTOM LFO, ONE SHOT envelope)
     static constexpr int lastPopup = curvePopup;
+    static constexpr int anchoredPopup = 13;   ///< a panel anchored to a component (SATELLITE's, from the arpeggiator's key)
+    void openAnchoredPopover (std::unique_ptr<MiniPanel> panel, juce::Component& anchor) override;
+    bool anchoredPopoverOpenFrom (const juce::Component& anchor) const override;
+    void closeAnchoredPopover() override;
     /** The macro (index into the macro row's data order: LIFE..SPACE, ECHO) a popup belongs to, or -1. */
     static int macroOfPopup (int popup) noexcept { return popup >= 0 && popup < 5 ? popup : (popup == echoPopup ? 5 : -1); }
     static int popupOfMacro (int macro) noexcept { return macro < 5 ? macro : echoPopup; }
@@ -305,6 +310,17 @@ private:
     std::unique_ptr<KeyDnaEditor> keyDnaPanel;
     void placeLibrary();
     int popupIndex = -1;
+    void presentPopup (int which);
+    juce::Component::SafePointer<juce::Component> popupAnchor;   ///< anchoredPopup's anchor
+    struct PopupBackdrop final : juce::Component
+    {
+        std::function<void()> onPress;
+        void mouseDown (const juce::MouseEvent&) override
+        {
+            if (onPress != nullptr)
+                onPress();
+        }
+    } popupBackdrop;
     int closedByLabelPress = -1;     // a press on an open popup's own label closes it (and must not reopen it)
     OutsideClickWatcher outsideClicks { *this };
 

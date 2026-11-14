@@ -171,6 +171,8 @@ void InstrumentEngine::resetPerformance() noexcept
     {
         slot.take.fill (-1);
         slot.performance.reset (config.seed);
+        slot.satFreeCycle = 0.0;
+        slot.satNotes = 0;
     }
     // Tape and drift randomness and reverb tails restart too: a bounce from the same
     // position repeats exactly.
@@ -883,6 +885,12 @@ void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int
     params.synthEnvelope = config.synthEnvelope;
     params.synthSettings = &slots[context].synthLive;
     params.pedalLoop = layerSettings.pedalLoop;
+    // SATELLITE: the layer's motion; with BOUNCE + NOTE each new note takes the other side.
+    params.satellite = &slots[context].satelliteLive;
+    satPendingStart = true;
+    if (const auto st = layerSettings.satellite.sanitised();
+        st.enabled && st.mode == satellite::Mode::bounce && st.retrigger == satellite::Retrigger::note)
+        params.satelliteNoteX = static_cast<float> (satellite::notePlace (st, slots[context].satNotes++));
     params.pedalTurnSeconds = config.pedalTurnSeconds;
     params.pedalTurnCorrelation = config.pedalTurnCorrelation;
     if (params.sourceMode == SourceMode::granular)
@@ -1187,6 +1195,7 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
 {
     if (numChannels <= 0 || numSamples <= 0)
         return;
+    satSamplesIntoBlock = 0;   // (SATELLITE's clock: sample-accurate from the block's start)
     applyGrainBudget();
     if (! modRuntime.compiled.any)
     {
@@ -1217,6 +1226,110 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
     }
     publishModulation();
     publishCharacterTaps();
+}
+
+void InstrumentEngine::updateSatellite (int count) noexcept
+{
+    // Once a chunk, before the voices render: each layer's place (as ANDOR ANALOG's
+    // Synth::updateSatellite). With every layer off and its glide done: nothing to do, and the
+    // voices take their original path.
+    bool wanted = false;
+    for (int l = 0; l < EngineSettings::layers; ++l)
+        wanted = wanted || config.layer[static_cast<std::size_t> (l)].satellite.enabled || slots[static_cast<std::size_t> (l)].satAmount > 0.0;
+    if (! wanted)
+    {
+        if (satLiveMask != 0)
+        {
+            for (auto& slot : slots)
+                slot.satelliteLive.active = false;
+            satLiveMask = 0;
+            satShownLive.store (0, std::memory_order_relaxed);
+        }
+        satPendingStart = false;
+        satSamplesIntoBlock += count;
+        return;
+    }
+
+    // The clock: the host's quarter notes while the transport runs (sample-accurate from the
+    // block's start); stopped, a local clock started by a note and kept while anything sounds
+    // (stopped and silent for 1.5 s, the paths hold still - nothing pretends to move).
+    const double bpm = hostTiming.valid && hostTiming.bpm > 1.0 ? hostTiming.bpm : 120.0;
+    double q = 0.0;
+    bool clockRuns = false;
+    if (hostTiming.valid && hostTiming.playing)
+    {
+        q = hostTiming.ppq + static_cast<double> (satSamplesIntoBlock) / sampleRate * bpm / 60.0;
+        clockRuns = true;
+        satLocalRunning = false;
+    }
+    else
+    {
+        if (satPendingStart && ! satLocalRunning)
+        {
+            satLocalRunning = true;
+            satLocalPpq = 0.0;
+            satIdle = 0;
+        }
+        q = satLocalPpq;
+        clockRuns = satLocalRunning;
+        if (satLocalRunning)
+        {
+            satLocalPpq += bpm / (60.0 * sampleRate) * count;
+            bool sounding = false;
+            for (const auto& v : voices)
+                sounding = sounding || v.isActive();
+            satIdle = sounding ? 0 : satIdle + count;
+            if (satIdle > static_cast<int> (1.5 * sampleRate))
+                satLocalRunning = false;
+        }
+    }
+    satPendingStart = false;
+    satSamplesIntoBlock += count;
+
+    const double seconds = static_cast<double> (count) / sampleRate;
+    const double rampStep = seconds / 0.02;                      // on / off: 20 ms
+    const double glide = 1.0 - std::exp (-seconds / 0.006);     // the path's own smoothing: 6 ms
+    int live = 0;
+    for (std::size_t l = 0; l < static_cast<std::size_t> (EngineSettings::layers); ++l)
+    {
+        auto& slot = slots[l];
+        auto& out = slot.satelliteLive;
+        const auto st = config.layer[l].satellite.sanitised();
+        slot.satAmount = st.enabled ? std::min (1.0, slot.satAmount + rampStep) : std::max (0.0, slot.satAmount - rampStep);
+        if (st.timing == satellite::Timing::free && clockRuns)
+        {
+            slot.satFreeCycle += st.rateHz * seconds;
+            slot.satFreeCycle -= std::floor (slot.satFreeCycle);
+        }
+        if (slot.satAmount <= 0.0)
+        {
+            slot.satX = slot.satRear = 0.0;
+            out = {};
+            continue;
+        }
+        const bool justStarted = ! out.active;
+        live |= 1 << l;
+        const double cycle = st.timing == satellite::Timing::sync ? satellite::syncCycle (st, q) : slot.satFreeCycle + st.phase;
+        auto target = satellite::pointAt (st, cycle);
+        const bool bounceNote = st.mode == satellite::Mode::bounce && st.retrigger == satellite::Retrigger::note;
+        if (bounceNote)
+            target = {};   // (each note carries its own side; the layer's path rests at the centre)
+        slot.satX += (target.x - slot.satX) * glide;
+        slot.satRear += (target.rear - slot.satRear) * glide;
+        const auto x1 = static_cast<float> (slot.satAmount * slot.satX), rear1 = static_cast<float> (slot.satAmount * slot.satRear);
+        out.x0 = justStarted ? x1 : out.x1;   // (just started: no sweep from wherever it last was)
+        out.rear0 = justStarted ? rear1 : out.rear1;
+        out.x1 = x1;
+        out.rear1 = rear1;
+        out.amount = static_cast<float> (slot.satAmount);
+        out.width = static_cast<float> (1.0 + slot.satAmount * (st.width - 1.0));
+        out.bounceNote = bounceNote;
+        out.active = true;
+        satShownX[l].store (x1, std::memory_order_relaxed);
+        satShownRear[l].store (rear1, std::memory_order_relaxed);
+    }
+    satLiveMask = live;
+    satShownLive.store (live, std::memory_order_relaxed);
 }
 
 void InstrumentEngine::publishCharacterTaps() noexcept
@@ -1270,6 +1383,7 @@ void InstrumentEngine::renderBlock (float* const* output, int numChannels, int n
     for (int done = 0; done < numSamples;)
     {
         const int n = std::min (bufferSize, numSamples - done);
+        updateSatellite (n);
         if (modMixRouted)
         {
             // MIX modulation: along A -> B (two layers: the blend; three: the triangle's A -> B

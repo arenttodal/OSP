@@ -1301,6 +1301,53 @@ on the ADD place, or only the card dropped on. Audit, measured reproduction and 
 - NEXT: ANDOR ANALOG's card EQs (the shell's) can show the spectrum once its host returns its
   engine's layer taps.
 
+## ANDOR OSP: SATELLITE, each layer's own stereo motion (14 Nov 2026)
+
+ANDOR ANALOG's SATELLITE, the per-card arpeggiator's companion, is now in ANDOR OSP. This was
+the plan noted under NEXT on `feature/satellite-rhythm`. Shared parts:
+- the motion (`src/engine/SatelliteMotion.h`);
+- the arpeggiator's SATELLITE key (`ArpSection`: `SatelliteKey`);
+- `AnchoredPopoverHost` (ShapingPopups.h, both editors);
+- the panel, moved out of ANDOR ANALOG into `shared/andor-ui/Source/SatellitePanel` (the product
+  names its parameters; the marker reads `InstrumentHost::satelliteView`);
+- `MacroSwitchLamp`.
+
+Only those were taken from that branch. Its USER MACROS, SHAPER DNA and macro-lamp hooks stay
+there.
+
+- **Engine.** A layer's voices are always that layer's: ANDOR ANALOG's "a voice of one card
+  moves whole", exact, with no twin filters.
+  - Per chunk, the layer's place uses the shared paths:
+    - PAN, ORBIT with its rear cue (−3 dB and a darkening near 2.2 kHz), BOUNCE, BOUNCE + NOTE
+      held per voice;
+    - SYNC on the host's quarter notes, or a local clock started by a note; FREE at
+      0.02–10 Hz;
+    - 6 ms path smoothing, a 20 ms glide on and off.
+  - Each voice applies it at its pan: its own pan (scaled by WIDTH) times the place's
+    equal-power gains, interpolated across the chunk.
+  - No allocation, no lock.
+  - With every layer off and its glide done, the voices take the original path, bit for bit.
+- **Plugin.** `layerX.satellite.{enabled, mode, sync, division, rate, depth, width, phase,
+  offset, retrigger}` use ANDOR ANALOG's ranges, defaults and texts, appended at version hint 32.
+  The schema golden gains exactly these 30 lines.
+  - Sessions from before open with every layer still (tested by stripping the parameters).
+  - The panel opens anchored under the key, or above it where there is no room.
+- **Effects after the layers.** SPACE, ECHO and REIMAGINED's KALEIDOSCOPE still spread what
+  they receive. Hard right therefore keeps what they put on the left (as in ANDOR ANALOG,
+  whose effects follow its voices too).
+- **Tests.**
+  - `[satellite]`, unit, 7 cases: off bit for bit, the place, PAN's rate, SYNC, ORBIT's cue,
+    BOUNCE + NOTE, off returning exactly with no jump, determinism, the marker.
+  - `[satellite]`, plugin, 2 cases: the key, the panel, contextual controls, the audio,
+    recall, older sessions.
+  - On demand: `[satellite-shots]` (869 / 1448).
+  - The shell: its parity render masks the key's place (`arp-satellite`,
+    `ArpInlinePanel::satelliteKeyArea`). Its schema check counts `layerX.satellite.*` as ANDOR
+    OSP's own (a product with SATELLITE keeps its own namespace, as ANDOR ANALOG's
+    `analog.satellite.*`). The Phase 2 tail test pins version 32.
+- NEXT: ANDOR ANALOG can drop its own copy of the panel for the shared one (its
+  `params::satelliteId` as the `idOf`).
+
 ## BLOCKERS
 
 - DAW testing (Logic, Ableton, Reaper) needs a Mac; CI covers build, tests and auval.

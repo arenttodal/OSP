@@ -985,6 +985,11 @@ void ShellEditor::openPopup (int which, int source)
         popup = shell.product().hybridHeaderPopover (shell);
     if (popup == nullptr)
         return;
+    presentPopup (which);
+}
+
+void ShellEditor::presentPopup (int which)
+{
     popupIndex = which;
     juce::Component::SafePointer<ShellEditor> safe (this);
     popup->onClose = [safe] { juce::MessageManager::callAsync ([safe] { if (safe != nullptr) safe->closePopup(); }); };
@@ -1043,6 +1048,12 @@ void ShellEditor::positionPopup()
         const auto anchor = content.getLocalArea (&card, card.headingBounds()).toFloat();
         at = { anchor.getX() - 14.0f, anchor.getBottom() + 8.0f };
     }
+    else if (popupIndex == anchoredPopup && popupAnchor != nullptr)
+    {
+        // Under its anchor, right edges aligned (placePopover keeps it inside the instrument).
+        const auto anchor = content.getLocalArea (popupAnchor.getComponent(), popupAnchor->getLocalBounds()).toFloat();
+        at = { anchor.getRight() + 14.0f - size.x, anchor.getBottom() + 8.0f };
+    }
     else
         at = frame::modulationPopoverOrigin (modPanel.getBounds().toFloat(), size);
     frame::placePopover (*popup, content, at);
@@ -1064,9 +1075,40 @@ void ShellEditor::closePopup()
         cards[0]->setHeadingOpen (false);
     if (popupIndex == hybridHeaderPopup)
         cards[ShellProcessor::hybridLayer]->setHeadingOpen (false);
+    if (popupIndex == anchoredPopup)
+    {
+        content.removeChildComponent (&popupBackdrop);
+        popupAnchor = nullptr;
+    }
     juce::Desktop::getInstance().getAnimator().cancelAnimation (popup.get(), false);
     popup.reset();
     popupIndex = -1;
+}
+
+void ShellEditor::openAnchoredPopover (std::unique_ptr<osp::plugin::MiniPanel> panel, juce::Component& anchor)
+{
+    closePopup();
+    if (panel == nullptr || ! isParentOf (&anchor))
+        return;
+    popup = std::move (panel);
+    popupAnchor = &anchor;
+    // The backdrop: the click that closes the panel goes nowhere else.
+    juce::Component::SafePointer<ShellEditor> safe (this);
+    popupBackdrop.onPress = [safe] { juce::MessageManager::callAsync ([safe] { if (safe != nullptr) safe->closePopup(); }); };
+    popupBackdrop.setBounds (content.getLocalBounds());
+    content.addAndMakeVisible (popupBackdrop);
+    presentPopup (anchoredPopup);
+}
+
+bool ShellEditor::anchoredPopoverOpenFrom (const juce::Component& anchor) const
+{
+    return popup != nullptr && popupIndex == anchoredPopup && popupAnchor.getComponent() == &anchor;
+}
+
+void ShellEditor::closeAnchoredPopover()
+{
+    if (popupIndex == anchoredPopup)
+        closePopup();
 }
 
 //==============================================================================

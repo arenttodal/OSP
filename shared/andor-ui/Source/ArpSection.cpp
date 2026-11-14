@@ -1,4 +1,5 @@
 #include "ArpSection.h"
+#include "ShapingPopups.h"
 #include "AndorParameters.h"
 #include "Binding.h"
 

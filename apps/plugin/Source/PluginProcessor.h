@@ -174,6 +174,10 @@ public:
     InstrumentEngine::ModView modulationView() const noexcept override { return engine.modulationView(); }
     InstrumentEngine::LiveMix liveMix() const noexcept override { return engine.liveMix(); }
     const InstrumentEngine* telemetryEngine() const noexcept override { return &engine; }
+    // SATELLITE: each layer's own stereo motion (the per-card arpeggiator's companion).
+    juce::String satelliteParameterId (int card) const override { return satelliteFieldId (card, "enabled"); }
+    std::unique_ptr<MiniPanel> createSatellitePanel (int card) override;
+    bool satelliteView (int card, float& x, float& rear) const override { return engine.satelliteView (card, x, rear); }
 
     // The FX library (shared with ANDOR ANALOG; engine/fx, shared/andor-ui Fx*): ten more
     // effects and a route. Its parameters are `fx.<type>.<n>.<name>` (version hint 30). The
@@ -841,6 +845,7 @@ private:
         std::atomic<float>* keyDnaAmount = nullptr;
         std::atomic<float>* synthesize = nullptr;   ///< SYNTHESIZE 0..100 % (hint 22)
         std::atomic<float>* pedalLoop = nullptr;    ///< PEDAL LOOP: 0 Normal, 1 Forward, 2 Ping-Pong (hint 29)
+        std::array<std::atomic<float>*, 10> satellite {};   ///< SATELLITE's fields (satelliteFields(), hint 32)
         float lastPedalLoop = -1.0f;
         std::array<std::atomic<float>*, 6> synth {};   ///< the SYNTH page (hint 23), synthParameterNames() order
         std::array<std::atomic<float>*, 3> imprint {};   ///< its spectral imprint (hint 28), imprintParameterNames() order

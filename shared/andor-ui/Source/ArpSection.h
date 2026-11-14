@@ -183,6 +183,9 @@ public:
     /** Everything the per-card controls draw (PLAYS .. EDIT C), in panel coordinates: where a
         product with one arpeggiator differs from ANDOR OSP (the visual regression's mask). */
     static juce::Rectangle<float> cardRowArea() noexcept { return { 190.0f, 12.0f, 360.0f, 30.0f }; }
+    /** Where SATELLITE's key sits on the title row (a product's opt-in), in panel coordinates:
+        the visual regression's mask between a product with SATELLITE and one without. */
+    static juce::Rectangle<float> satelliteKeyArea() noexcept { return { 562.0f, 12.0f, 126.0f, 30.0f }; }
     /** SATELLITE's key (a product's opt-in), or null. */
     SatelliteKey* satelliteKey() noexcept { return satellite.get(); }
 
