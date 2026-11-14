@@ -372,6 +372,15 @@ public:
     /** The mix as it plays (with any MIX modulation) for the header's live node; an engine that
         does not blend layers this way says it is not modulated. */
     virtual InstrumentEngine::LiveMix liveMix() const noexcept { return {}; }
+    /** A card's EQ spectrum (opt-in, a product's: ANDOR ANALOG's; message thread): one analysis
+        step for the layer's EQ editor while it shows (true: what it draws moved), and its
+        drawing behind the EQ's curve in `plot` (`hzForX` the graph's own axis). Nothing by
+        default: ANDOR OSP's card EQ exactly as before. */
+    virtual bool stepLayerEqSpectrum (int layer) { juce::ignoreUnused (layer); return false; }
+    virtual void paintLayerEqSpectrum (int layer, juce::Graphics& g, juce::Rectangle<float> plot, const std::function<double (float)>& hzForX)
+    {
+        juce::ignoreUnused (layer, g, plot, hzForX);
+    }
     /** The hardware faceplate a shared rack module (rack::Kind, as an int) wears (opt-in; null:
         none, as in ANDOR OSP). Interface only. */
     virtual const rack::Faceplate* rackFaceplate (int kind) const noexcept

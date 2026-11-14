@@ -178,6 +178,12 @@ public:
     float hostTempo() const noexcept override { return tempo.load (std::memory_order_relaxed); }
     float outputPeak() const noexcept override { return outputPeakValue.load (std::memory_order_relaxed); }
     float shaperPhase() const noexcept override { return engine->shaperPhase(); }
+    bool stepLayerEqSpectrum (int layer) override { return ! referenceParity && engine->stepLayerEqSpectrum (layer); }
+    void paintLayerEqSpectrum (int layer, juce::Graphics& g, juce::Rectangle<float> plot, const std::function<double (float)>& hzForX) override
+    {
+        if (! referenceParity)
+            engine->paintLayerEqSpectrum (layer, g, plot, hzForX);
+    }
     int movementLaneCount() const noexcept override { return std::max (1, static_cast<int> (product().movementLanes.size())); }
     MovementLane movementLane (int lane) const override
     {

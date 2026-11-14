@@ -430,6 +430,9 @@ void EqEditor::refresh()
 {
     if (dampenShown())
         dampenPage->refresh();
+    // The spectrum of what plays through the card's EQ (a product's; none in ANDOR OSP).
+    else if (ospProcessor.stepLayerEqSpectrum (layer))
+        repaint (graphArea().expanded (2.0f).getSmallestIntegerContainer());
     const auto now = ospProcessor.layerEqSettings (layer);
     const auto offsets = modulationOffsets();
     bool moved = false;
@@ -592,6 +595,9 @@ void EqEditor::paint (juce::Graphics& g)
                         juce::Justification::centredRight, false);
         }
     }
+
+    // The spectrum behind the curve (a product's: the card's output filled, its input a line).
+    ospProcessor.paintLayerEqSpectrum (layer, g, graph, [this] (float x) { return hzForX (x); });
 
     // The selected band's own shape, faint, in its colour.
     const double rate = sampleRate();

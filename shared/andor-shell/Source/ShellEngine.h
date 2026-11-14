@@ -235,6 +235,13 @@ public:
         takes itself (a product's: ANDOR ANALOG's card C while its second layer is shown). True:
         taken, the shell loads nothing. False (the default): the shell loads it as ever. Message
         thread. */
+    /** A card's EQ spectrum (InstrumentHost::stepLayerEqSpectrum / paintLayerEqSpectrum): none
+        by default. Message thread. */
+    virtual bool stepLayerEqSpectrum (int layer) { juce::ignoreUnused (layer); return false; }
+    virtual void paintLayerEqSpectrum (int layer, juce::Graphics& g, juce::Rectangle<float> plot, const std::function<double (float)>& hzForX)
+    {
+        juce::ignoreUnused (layer, g, plot, hzForX);
+    }
     virtual bool takeRecording (int layer, const juce::File& file, const juce::File& storeFolder)
     {
         juce::ignoreUnused (layer, file, storeFolder);
