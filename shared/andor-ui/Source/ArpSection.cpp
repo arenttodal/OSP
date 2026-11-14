@@ -187,18 +187,19 @@ void ArpControl::paint (juce::Graphics& g)
         draw::raised (g, r.reduced (1.0f), 10.0f, colour::panelTop, colour::panelBottom);
     if (hasSecondRow())
     {
-        // Stacked: two rows of the same height, each its light, its lowercase name and its
-        // chevron; a hairline between them; no inset.
+        // Stacked: two rows of the same height, each its light, its name in capitals (ARP, the
+        // companion's as the product gives it: SUB) and its chevron; a hairline between them;
+        // no inset. (Only a product with a companion stacks; ANDOR OSP's single key is unchanged.)
         auto row = [&] (juce::Rectangle<float> light, juce::Rectangle<float> chevronBox, const juce::String& name, bool on, bool open,
                         bool lightHovered, bool rowHovered, const char* onPiece, const char* offPiece) {
             paintLight (g, light.getCentre(), on, lightHovered, onPiece, offPiece);
-            g.setFont (fonts::make (16.0f, fonts::Weight::semibold, 0.04f));
+            g.setFont (fonts::make (13.5f, fonts::Weight::semibold, 0.1f));
             g.setColour (colour::text.withAlpha (on ? 0.95f : 0.8f));
             g.drawText (name, juce::Rectangle<float> (light.getRight() + 2.0f, light.getY(), chevronBox.getX() - light.getRight() - 2.0f, light.getHeight()),
                         juce::Justification::centredLeft, false);
             chevron (g, chevronBox.getCentre(), 4.0f, 2.6f, open, rowHovered ? colour::text : colour::text.withAlpha (0.75f), 1.5f);
         };
-        row (lightArea(), chevronArea(), "arp", enabled, expanded, hover == 1, hover == 2, "led-arp-on", "led-arp-off");
+        row (lightArea(), chevronArea(), "ARP", enabled, expanded, hover == 1, hover == 2, "led-arp-on", "led-arp-off");
         const auto lower = secondRowArea();
         g.setColour (colour::hairline.withAlpha (0.8f));
         g.fillRect (juce::Rectangle<float> (r.getX() + 10.0f, lower.getY() - 0.5f, r.getWidth() - 20.0f, 1.0f));
