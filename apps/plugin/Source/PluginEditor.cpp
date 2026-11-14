@@ -1685,6 +1685,9 @@ void OspAudioProcessorEditor::timerCallback()
     // hidden when a recalled session says so.
     if (ospProcessor.arpEditorExpanded() != arpShown)
         setArpExpanded (ospProcessor.arpEditorExpanded());
+    // The open racks follow the sound (CHARACTER's graph its voices' filter, the others what
+    // they draw live), as the shell's editor does on every tick.
+    racks.refresh();
     arpButton.refresh();
     if (arpShown)
         arpPanel.refresh();
