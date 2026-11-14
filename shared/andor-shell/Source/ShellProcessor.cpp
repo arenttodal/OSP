@@ -1087,6 +1087,8 @@ void ShellProcessor::loadFile (const juce::File& file, int layer)
     if (hasHybridLayer())
     {
         juce::ignoreUnused (layer);
+        if (engine->takeRecording (hybridLayer, file, sampleStoreFolder()))
+            return;   // (the engine's own place for it: ANDOR ANALOG's card C second layer)
         const bool added = ! isLayerOccupied (hybridLayer);
         osp::plugin::LoadRequest request;
         request.file = file;

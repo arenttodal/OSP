@@ -231,6 +231,15 @@ public:
     /** The engine's source on a layer is a stand-in (an empty slot's invitation): its caption
         ("ADD SAMPLE\nDROP OR BROWSE"), its picture drawn faint. Empty: a real source. */
     virtual juce::String engineSourcePlaceholder (int layer) const { juce::ignoreUnused (layer); return {}; }
+    /** A recording dropped on a card (or chosen for it from the shell's own menu) that the engine
+        takes itself (a product's: ANDOR ANALOG's card C while its second layer is shown). True:
+        taken, the shell loads nothing. False (the default): the shell loads it as ever. Message
+        thread. */
+    virtual bool takeRecording (int layer, const juce::File& file, const juce::File& storeFolder)
+    {
+        juce::ignoreUnused (layer, file, storeFolder);
+        return false;
+    }
     /** A generator's further layers (opt-in, ProductInfo::threeEngines): what it generates on
         `layer` (its card's name, e.g. "OSC 2"; the picture is sourcePicture's), or empty.
         Layer 0's is generatorName(). Message thread. */
