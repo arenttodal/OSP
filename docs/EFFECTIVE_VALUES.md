@@ -63,7 +63,7 @@ is one and the stored value otherwise.
 
 | Engine | What it publishes |
 |---|---|
-| ANDOR OSP (`InstrumentEngine`) | LIFE, DRIVE, CHARACTER, MOVEMENT, SPACE, ECHO: the macros exactly as the shared stages take them (`post.setMacros`). Each layer's EQ as `effectiveEq` plays it: bell frequency and gain, low-shelf gain, high-shelf gain. Active only while a route reaches a shared stage. |
+| ANDOR OSP (`InstrumentEngine`) | LIFE, DRIVE, CHARACTER, MOVEMENT, SPACE, ECHO: the macros exactly as the shared stages take them (`post.setMacros`). Each layer's EQ as `effectiveEq` plays it: bell frequency and gain, low-shelf gain, high-shelf gain. Active only while a route reaches a shared stage. **Per voice:** each layer's grain POSITION, SPREAD and START as its newest sounding note plays them. START is the value taken at note on, as the DSP takes it. |
 | ANDOR Analog (`AnalogEngine::publishEffective`) | **Global:** every parameter whose block value (`raw`, after USER macros and the global routes) differs from the knob. This covers MOVEMENT, DRIVE, SPACE, ECHO, the MIX (`ab.blend`), every global product destination and every USER macro target. **Per voice:** each product voice destination as the representative voice plays it (the newest sounding voice, as the modulation display shows it), mapped through the same `Reader::move` that `moveControl` uses. Silent: per-voice values are inactive, so the pictures draw the knob. |
 | Shell (`ShellProcessor`) | Passes these through (`Engine::effectiveValue`). `liveMix()` is built from the engine's `ab.blend`, so the header MIX node now lives in Analog too. |
 
@@ -94,7 +94,7 @@ Status key:
 | Both | AMP envelope picture | attack, decay, sustain, release | UI mirror (`livePosition`) | engine first (`livePosition`), mirror otherwise. The amp ADSR are ANDOR OSP voice destinations that neither engine publishes yet: OPEN. |
 | OSP / Analog | Header MIX live node | ab.blend | OSP live (`liveMix`); Analog never | **FIXED** in Analog (`ShellProcessor::liveMix`) |
 | Both | ARP step display | arp.rate, gate, swing | live steps (actual events) | **LIVE** |
-| Both | Granular grain dots, read heads | grain position, spread … | live dots; band stored | dots **LIVE**. The position band in OSP: OPEN. In Analog the grain controls are ANDOR OSP layer destinations: OPEN. |
+| Both | Granular grain dots, read heads, POSITION band, START | grain position, spread, start | live dots; band and START stored | dots **LIVE**. Band and START **FIXED** in OSP: the newest note per layer (`publishVoiceEffective`); START as taken at note on. Test `[plugin][effective][voice]`. In Analog the grain controls are ANDOR OSP layer destinations: OPEN. |
 | Analog | SATELLITE, C RHYTHM, AUX displays, SUB, FX library graphs | (not modulation destinations) | stored plus live telemetry | **N/A** |
 | Both | MOD panel curves (LFO / ENV shapes) | mod.lfoN.*, mod.envN.* | shape stored, playhead live | shape is a modulation-source setting. Modulating ENV1/2 times: OPEN. |
 
@@ -106,6 +106,7 @@ Status key:
 | OSP | `[plugin][effective][shaper]` | SHAPER at a hand-set 80 % and at a stored 20 % plus the mod wheel's 60 % are pixel-identical; a hand-set 20 % differs. The knob stays at 20 %. An LFO sweep moves the picture frame after frame, and the reported span covers it. |
 | Analog | `[analog][effective][shaper]` | The same for MOVEMENT lanes A and B (B at its own INTENSITY 70 %), in the rack. |
 | Analog | `[analog][effective]` | LFO sweep: span reported; the knob never written back; the saved state keeps the knob. Two routes summed, stopping at 100 % where MOVEMENT clamps; opposite polarity. |
+| OSP | `[plugin][effective][voice]` | Layer A's grain POSITION (20 % plus 30 % from the wheel plays 50 %) and START taken at note on; once the note has faded, the knobs again. The knob is never written. |
 | Analog | `[analog][effective][voice]` | OSC 1 WIDTH per voice (mod wheel, product destination): the card waveform equals the hand-set width; with no voice sounding it shows the stored width. |
 
 ## Real-time and cost
@@ -128,12 +129,12 @@ already repaint at the editor's 30 Hz only while they change or animate.
 
 ## OPEN (not done in this pass, and why)
 
-- **ANDOR OSP per-voice destinations** have no published value yet. That needs a
-  representative-voice snapshot in `InstrumentEngine`. Affected:
+- **The remaining ANDOR OSP per-voice destinations** have no published value yet. Grain
+  POSITION, SPREAD and START are published from each layer's newest sounding voice
+  (`publishVoiceEffective`); the same snapshot can be extended to the rest. Still affected:
   - the CHARACTER picture's CUTOFF and RESONANCE;
-  - grain position, spread, size and density;
+  - grain size and density;
   - layer level, pan and tune;
-  - START;
   - DAMPEN;
   - the amp and modulation envelope times.
 

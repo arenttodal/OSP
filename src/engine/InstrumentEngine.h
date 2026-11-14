@@ -451,7 +451,8 @@ public:
         space,
         echo,
         eqFirst,                    ///< then per layer: bell frequency (Hz), bell gain, low shelf, high shelf (dB)
-        count = eqFirst + 3 * 4
+        voiceFirst = eqFirst + 3 * 4,   ///< then per layer, its newest sounding voice's: grain POSITION, SPREAD, START (percent)
+        count = voiceFirst + 3 * 3
     };
     const EffectiveValues& effectiveValues() const noexcept { return effective; }
     /** What the modulation display shows: the global LFOs, and the newest sounding voice's
@@ -624,6 +625,7 @@ private:
     double modLifeOffset = 0.0;
     EffectiveValues effective;   ///< (published by applyGlobalModulation)
     void publishEffective (const Macros& m) noexcept;
+    void publishVoiceEffective() noexcept;
     void clearEffective() noexcept;
     std::array<dampen::Settings, 3> layerDampen {};
     std::array<keydna::Settings, 3> layerKeyDna {};         ///< setLayerKeyDna's settings (AMOUNT apart)

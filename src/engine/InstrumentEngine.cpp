@@ -975,6 +975,37 @@ void InstrumentEngine::publishEffective (const Macros& m) noexcept
     }
 }
 
+void InstrumentEngine::publishVoiceEffective() noexcept
+{
+    // Per layer, its newest sounding voice (as the modulation display picks one): grain POSITION
+    // and SPREAD as that note plays them, START as it took it at note on - in the knobs'
+    // percent, so the card draws them as the knobs set there. No voice, no route: the knobs.
+    const auto& c = modRuntime.compiled;
+    for (int l = 0; l < 3; ++l)
+    {
+        const InstrumentVoice* newest = nullptr;
+        if (c.anyVoiceDest)
+            for (const auto& voice : voices)
+                if (voice.isActive() && voice.modulationRunning() && voice.layerIndex() == l && (newest == nullptr || voice.startOrder() > newest->startOrder()))
+                    newest = &voice;
+        auto layerDest = [l] (mod::Dest a) { return static_cast<mod::Dest> (static_cast<int> (a) + l); };
+        const auto i = static_cast<std::size_t> (l);
+        const int first = static_cast<int> (EffectiveSlot::voiceFirst) + 3 * l;
+        if (newest != nullptr && c.has (layerDest (mod::Dest::grainPositionA)))
+            effective.publish (first, static_cast<float> (100.0 * (config.granular[i].position + newest->grainPositionModulation())));
+        else
+            effective.clear (first);
+        if (newest != nullptr && c.has (layerDest (mod::Dest::grainSpreadA)))
+            effective.publish (first + 1, static_cast<float> (100.0 * std::clamp (config.granular[i].spread + newest->grainSpreadModulation(), 0.0, 1.0)));
+        else
+            effective.clear (first + 1);
+        if (newest != nullptr && c.has (layerDest (mod::Dest::startA)))
+            effective.publish (first + 2, static_cast<float> (100.0 * std::clamp (config.layer[i].start + newest->startModulation(), 0.0, 1.0)));
+        else
+            effective.clear (first + 2);
+    }
+}
+
 void InstrumentEngine::clearEffective() noexcept
 {
     for (int i = 0; i < static_cast<int> (EffectiveSlot::count); ++i)
@@ -1194,6 +1225,7 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
         modRuntime.advanceGlobal (numSamples, sampleRate);
         renderBlock (output, numChannels, numSamples);
         publishModulation();
+        publishVoiceEffective();
         return;
     }
     for (std::size_t l = 0; l < modRuntime.layerLevelDb.size(); ++l)
@@ -1215,6 +1247,7 @@ void InstrumentEngine::render (float* const* output, int numChannels, int numSam
         done += n;
     }
     publishModulation();
+    publishVoiceEffective();
 }
 
 void InstrumentEngine::renderBlock (float* const* output, int numChannels, int numSamples) noexcept

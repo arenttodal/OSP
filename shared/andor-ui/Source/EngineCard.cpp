@@ -2963,12 +2963,15 @@ void EngineCard::refresh()
         repaint (sourceDisplay.getBounds());
     }
 
-    refreshGrains (processor.parameterValue (InstrumentHost::layerParameterId (layerIndex, "start")));
+    // (what plays: START as the newest note took it, when the engine publishes it)
+    refreshGrains (InstrumentHost::shownValue (processor.apvts(), InstrumentHost::layerParameterId (layerIndex, "start")));
 }
 
 void EngineCard::refreshGrains (float startPercent)
 {
-    auto value = [this] (const char* name) { return processor.parameterValue (InstrumentHost::layerParameterId (layerIndex, name)); };
+    // The band draws what the newest note plays (POSITION and SPREAD moved by its routes) when
+    // the engine publishes it, else the knobs - as turning the knobs there would draw it.
+    auto value = [this] (const char* name) { return InstrumentHost::shownValue (processor.apvts(), InstrumentHost::layerParameterId (layerIndex, name)); };
     SourceDisplay::View view;
     view.granular = value ("sourceMode") >= 0.5f;
     view.start = 0.01f * startPercent;

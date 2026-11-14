@@ -170,3 +170,43 @@ TEST_CASE ("effective values: MOVEMENT SHAPER draws the depth that plays - modul
     CHECK (high <= 100.0f);
     CHECK (pictureChanges >= 6);
 }
+
+TEST_CASE ("effective values: per voice - layer A's grain POSITION and START as the newest note plays them; released, the knobs", "[plugin][effective][voice]")
+{
+    TempDir tmp;
+    const ScopedEnvironment library ("OSP_LIBRARY_DIR", tmp.dir.getChildFile ("library").getFullPathName());
+    const ScopedEnvironment documents ("OSP_DOCUMENTS_DIR", tmp.dir.getChildFile ("documents").getFullPathName());
+    const auto a = writeSource (tmp.dir, "first.wav", testsignals::vowel (midiToHz (57), 2.0, 48000.0, 3));
+    OspAudioProcessor p;
+    p.loadFile (a, 0);
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    p.prepareToPlay (48000.0, 256);
+    const auto position = OspAudioProcessor::layerParameterId (0, "granular.position");
+    const auto start = OspAudioProcessor::layerParameterId (0, "start");
+    p.setParameterValue (OspAudioProcessor::layerParameterId (0, "sourceMode"), 1.0f);   // Granular
+    p.setParameterValue (position, 20.0f);
+    p.setParameterValue (start, 10.0f);
+    p.assignModulation (mod::Source::modWheel, mod::Dest::grainPositionA, 30.0f);
+    p.assignModulation (mod::Source::modWheel, mod::Dest::startA, 20.0f);
+    p.setScreenModWheel (1.0f);
+    effectiveRun (p, 30);   // (a note held from the first block)
+    osp::plugin::InstrumentHost::EffectiveValue v;
+    REQUIRE (p.effectiveValue (position, v));
+    CHECK (v.value == Approx (50.0f).margin (0.5));   // 20 % + the wheel's 30 %
+    REQUIRE (p.effectiveValue (start, v));
+    CHECK (v.value >= 10.0f);   // (taken at note on: as far as the wheel had glided then)
+    CHECK (p.parameters.getParameter (position)->convertFrom0to1 (p.parameters.getParameter (position)->getValue()) == Approx (20.0f));
+    // Released and silent: no note of its own - the knobs are drawn.
+    juce::AudioBuffer<float> buffer (2, 256);
+    for (int i = 0; i < 400; ++i)
+    {
+        juce::MidiBuffer midi;
+        if (i == 0)
+            midi.addEvent (juce::MidiMessage::allNotesOff (1), 0);
+        buffer.clear();
+        p.processBlock (buffer, midi);
+    }
+    CHECK_FALSE (p.effectiveValue (position, v));
+    CHECK_FALSE (p.effectiveValue (start, v));
+}

@@ -3935,6 +3935,10 @@ bool OspAudioProcessor::effectiveValue (const juce::String& parameterId, Effecti
             m.emplace (eqParameterId (l, bell + ".gain"), first + 1);
             m.emplace (eqParameterId (l, low + ".gain"), first + 2);
             m.emplace (eqParameterId (l, high + ".gain"), first + 3);
+            const int voice = static_cast<int> (Slot::voiceFirst) + 3 * l;
+            m.emplace (layerParameterId (l, "granular.position"), voice);
+            m.emplace (layerParameterId (l, "granular.spread"), voice + 1);
+            m.emplace (layerParameterId (l, "start"), voice + 2);
         }
         return m;
     }();
