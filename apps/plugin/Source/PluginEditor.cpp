@@ -556,6 +556,20 @@ void OspAudioProcessorEditor::openPopup (int which)
         popup = std::make_unique<ModCurvePopup> (ospProcessor, popupSource);
     else
         popup = createMacroPopup (static_cast<MacroPopup> (macroOfPopup (which)), ospProcessor);
+    presentPopup (which);
+    if (const int m = macroOfPopup (which); m >= 0)
+        macros[static_cast<std::size_t> (m)].label->setOpen (true);
+    if (reimagined)
+        cards[static_cast<std::size_t> (which - reimaginedPopup)]->setReimaginedOpen (true);
+    if (keepAdvanced)
+    {
+        ospProcessor.setAdvancedOpen (true);
+        advancedButton.setToggleState (true, juce::dontSendNotification);
+    }
+}
+
+void OspAudioProcessorEditor::presentPopup (int which)
+{
     popupIndex = which;
     popup->onSizeChanged = [this] { positionPopup(); };
     juce::Component::SafePointer<OspAudioProcessorEditor> safe (this);
@@ -566,15 +580,6 @@ void OspAudioProcessorEditor::openPopup (int which)
     modOverlay.toFront (false);
     positionPopup();
     frame::animatePopoverOpening (*popup);
-    if (const int m = macroOfPopup (which); m >= 0)
-        macros[static_cast<std::size_t> (m)].label->setOpen (true);
-    if (reimagined)
-        cards[static_cast<std::size_t> (which - reimaginedPopup)]->setReimaginedOpen (true);
-    if (keepAdvanced)
-    {
-        ospProcessor.setAdvancedOpen (true);
-        advancedButton.setToggleState (true, juce::dontSendNotification);
-    }
     if (isShowing())
         grabKeyboardFocus(); // Escape closes it
 }
@@ -592,9 +597,40 @@ void OspAudioProcessorEditor::closePopup()
         ospProcessor.setAdvancedOpen (false);
         advancedButton.setToggleState (false, juce::dontSendNotification);
     }
+    if (popupIndex == anchoredPopup)
+    {
+        content.removeChildComponent (&popupBackdrop);
+        popupAnchor = nullptr;
+    }
     juce::Desktop::getInstance().getAnimator().cancelAnimation (popup.get(), false);
     popup.reset();
     popupIndex = -1;
+}
+
+void OspAudioProcessorEditor::openAnchoredPopover (std::unique_ptr<MiniPanel> panel, juce::Component& anchor)
+{
+    closePopup();
+    if (panel == nullptr || ! isParentOf (&anchor))
+        return;
+    popup = std::move (panel);
+    popupAnchor = &anchor;
+    // The backdrop: the click that closes the panel goes nowhere else.
+    juce::Component::SafePointer<OspAudioProcessorEditor> safe (this);
+    popupBackdrop.onPress = [safe] { juce::MessageManager::callAsync ([safe] { if (safe != nullptr) safe->closePopup(); }); };
+    popupBackdrop.setBounds (content.getLocalBounds());
+    content.addAndMakeVisible (popupBackdrop);
+    presentPopup (anchoredPopup);
+}
+
+bool OspAudioProcessorEditor::anchoredPopoverOpenFrom (const juce::Component& anchor) const
+{
+    return popup != nullptr && popupIndex == anchoredPopup && popupAnchor.getComponent() == &anchor;
+}
+
+void OspAudioProcessorEditor::closeAnchoredPopover()
+{
+    if (popupIndex == anchoredPopup)
+        closePopup();
 }
 
 void OspAudioProcessorEditor::positionPopup()
@@ -624,6 +660,17 @@ void OspAudioProcessorEditor::positionPopup()
         const auto at = frame::modulationPopoverOrigin (modPanel.getBounds().toFloat(), size);
         x = at.x;
         y = at.y;
+    }
+    else if (popupIndex == anchoredPopup && popupAnchor != nullptr)
+    {
+        // Under its anchor, right edges aligned; above it where there is no room below (the
+        // arpeggiator's title row sits low in the window). placePopover keeps it inside.
+        const auto anchor = content.getLocalArea (popupAnchor.getComponent(), popupAnchor->getLocalBounds()).toFloat();
+        x = anchor.getRight() + 14.0f - size.x;
+        y = anchor.getBottom() + 8.0f;
+        const float visibleBottom = content.getLocalArea (this, getLocalBounds()).toFloat().getBottom();
+        if (y + size.y > visibleBottom - 8.0f)
+            y = anchor.getY() - 8.0f - size.y;
     }
     else if (popupIndex == mixPopup)
     {

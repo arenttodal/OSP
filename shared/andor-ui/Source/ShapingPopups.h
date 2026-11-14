@@ -257,6 +257,21 @@ protected:
     juce::String title, subtitle;
 };
 
+/**
+    Whatever shows the popovers (ANDOR OSP's editor, the shell's) and can open a panel anchored to
+    a component inside it (SATELLITE's from the arpeggiator's key): placed under the anchor, kept
+    inside, closed as every popover is (Escape, a click elsewhere, its anchor again). A component
+    finds it with findParentComponentOfClass.
+*/
+struct AnchoredPopoverHost
+{
+    virtual ~AnchoredPopoverHost() = default;
+    virtual void openAnchoredPopover (std::unique_ptr<MiniPanel> panel, juce::Component& anchor) = 0;
+    /** The anchored popover is open, opened from `anchor`. */
+    virtual bool anchoredPopoverOpenFrom (const juce::Component& anchor) const = 0;
+    virtual void closeAnchoredPopover() = 0;
+};
+
 namespace format
 {
     juce::String percent (double v);

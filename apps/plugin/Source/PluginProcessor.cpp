@@ -7,6 +7,7 @@
 
 #include "LibraryPlaces.h"
 #include "PluginEditor.h"
+#include "SatellitePanel.h"
 
 #include "audio/utility/TestSignals.h"
 #include "core/PitchMath.h"
@@ -96,6 +97,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
     fxparams::addTo (layout, {}, 30, 30);
     // PEDAL LOOP (Pedal Loop 1.0, version hint 31; after the FX library's): Normal by default, the pedal as it was.
     addPedalLoopParameters (layout);
+    // SATELLITE (version hint 32; after PEDAL LOOP): each layer's own stereo motion, the per-card
+    // arpeggiator's companion as in ANDOR ANALOG. Every layer off: the voices exactly as before.
+    addSatelliteParameters (layout, 32);
     return layout;
 }
 
@@ -355,6 +359,8 @@ OspAudioProcessor::OspAudioProcessor()
         lp.keyDnaAmount = parameters.getRawParameterValue (layerParameterId (layer, "keyDna.amount"));
         lp.synthesize = parameters.getRawParameterValue (layerParameterId (layer, "synthesize"));
         lp.pedalLoop = parameters.getRawParameterValue (pedalLoopParameterId (layer));
+        for (std::size_t i = 0; i < satelliteFields().size(); ++i)
+            lp.satellite[i] = parameters.getRawParameterValue (satelliteFieldId (layer, satelliteFields()[i]));
         for (int i = 0; i < synthParameterNames().size(); ++i)
             lp.synth[static_cast<std::size_t> (i)] = parameters.getRawParameterValue (synthParameterId (layer, synthParameterNames()[i]));
         for (int i = 0; i < imprintParameterNames().size(); ++i)
@@ -672,8 +678,31 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
             rs.mirage = { 0.01 * modes[12], 0.01 * modes[13], static_cast<MirageTone> (std::clamp (pick (14), 0, 1)) };
             ls.synthesize = 0.01 * lp.synthesize->load();
             ls.synth = engineSettings.layer[static_cast<std::size_t> (layer)].synth;   // (set below, every block)
+            ls.satellite = engineSettings.layer[static_cast<std::size_t> (layer)].satellite;   // (set below, every block)
             engineSettings.layer[static_cast<std::size_t> (layer)] = ls;
             engine.setLayerSettings (layer, ls);
+        }
+        {
+            // SATELLITE: the layer's motion (its 20 ms glide on and off is the engine's).
+            auto v = [&lp] (std::size_t i) { return static_cast<double> (lp.satellite[i]->load()); };
+            satellite::Settings st;
+            st.enabled = v (0) >= 0.5;
+            st.mode = static_cast<satellite::Mode> (juce::roundToInt (v (1)));
+            st.timing = static_cast<satellite::Timing> (juce::roundToInt (v (2)));
+            st.division = juce::roundToInt (v (3));
+            st.rateHz = v (4);
+            st.depth = v (5) / 100.0;
+            st.width = v (6) / 100.0;
+            st.phase = v (7) / 360.0;
+            st.offset = v (8) / 100.0;
+            st.retrigger = static_cast<satellite::Retrigger> (juce::roundToInt (v (9)));
+            st = st.sanitised();
+            auto& current = engineSettings.layer[static_cast<std::size_t> (layer)].satellite;
+            if (force || ! (st == current))
+            {
+                current = st;
+                engine.setLayerSatellite (layer, st);
+            }
         }
         std::array<float, 9> now { lp.mode->load(), lp.granular[0]->load(), lp.granular[1]->load(), lp.granular[2]->load(),
                                    lp.granular[3]->load(), lp.granular[4]->load(), lp.grainOptions[0]->load(), lp.grainOptions[1]->load(),
@@ -4327,6 +4356,12 @@ void OspAudioProcessor::updateConvolutionImpulses()
                                                     fx::Impulse::factoryName (key.impulse)));
     }
     router.collectGarbage();
+}
+
+std::unique_ptr<MiniPanel> OspAudioProcessor::createSatellitePanel (int card)
+{
+    // The shared panel (ANDOR ANALOG's), on each layer's own `layerX.satellite.*`.
+    return std::make_unique<SatellitePanel> (*this, [] (int c, const char* field) { return satelliteFieldId (c, field); }, card);
 }
 
 } // namespace osp::plugin

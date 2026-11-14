@@ -307,6 +307,32 @@ with the project. Projects from before the arpeggiator open with it off and soun
 they did. **Advanced** is the card under ARP (the whole width: the MOD button there is gone,
 the modulation tabs are always in the envelope panel).
 
+### SATELLITE: each layer moves in the stereo field
+
+**SATELLITE**, on the arpeggiator's title row (after PLAYS and LINK), moves each layer (A, B, C)
+around the stereo field on its own, so three arpeggiated layers can circle, sweep or ping-pong
+apart. It works with or without the arpeggiator.
+
+- **The light** switches it. With any layer moving, it stops them all and remembers which. With
+  none moving, it starts those again (or the layer being edited).
+- **The name** opens its panel. A / B / C choose whose settings it shows (choosing never
+  switches a layer); the small light at the panel's right switches the shown layer. The display
+  draws the path, and its dot is where the sound is now.
+
+| Setting | What it does |
+|---|---|
+| **PAN / ORBIT / BOUNCE** | PAN: side to side. ORBIT: round, a little quieter and darker as it passes behind. BOUNCE: from one side to the other |
+| **SYNC / FREE** | SYNC: one cycle every 4 bars … 1/32 at the host's tempo. FREE: its own RATE, 0.02–10 Hz |
+| **CYCLE / NOTE** (BOUNCE only) | CYCLE keeps time; NOTE puts each new note on the other side and keeps it there (a ping-pong arpeggio) |
+| **DEPTH** | how far it travels (0: it stays at OFFSET) |
+| **WIDTH** | the layer's own stereo spread around its moving place (0: one point) |
+| **PHASE** | where in its cycle it starts (stagger the layers) |
+| **OFFSET** | the centre of its travel |
+
+It never leaves the panorama and never jumps (it glides on and off over 20 ms). SPACE, ECHO and
+the other effects after the layers still spread what they receive. Projects from before
+SATELLITE open with every layer still and sound exactly as they did.
+
 ## MODULATION
 
 Modulation lives in the envelope panel beside the macros. Its small tabs are **AMP** (the

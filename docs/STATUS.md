@@ -1271,6 +1271,83 @@ on the ADD place, or only the card dropped on. Audit, measured reproduction and 
 - Tests: `[multisample]`, 9 core and 5 plugin cases. The 55-render engine-C bit-exact matrix
   is byte-identical. Full suites green: core `ctest` 5/5, plugin tree `ctest` 10/10 (OSP plugin, shell visual reference, memo lab, the example products, unit, integration, regression).
 
+## ANDOR OSP: the CHARACTER rack's graph moves; the card EQ shows the spectrum (14 Nov 2026)
+
+- **CHARACTER rack graph, as ANDOR ANALOG's FILTER graph.**
+  - LIVE: it follows the most recent sounding voice's filter (a newer note takes over; the
+    followed one is kept through its release). The cutoff is the one the voice uses:
+    CHARACTER, its routes, velocity, drift and the envelope. The base is drawn muted, the
+    envelope's peak dashed, with BASE / NOW / PEAK figures and the A / D stage lit.
+  - PREVIEW: an edit to CHARACTER, its range or its envelope with nothing playing runs a
+    silent C4 through the same AD envelope.
+  - IDLE: the knobs.
+  - The drawn cutoff eases over ~45 ms (drawing only).
+  - Engine telemetry: `CharacterTap`, one per voice slot, a lock-free sequence-counted
+    snapshot the audio thread writes once a block from the voice's last control update. It
+    changes nothing a voice plays: no allocation, no lock.
+  - The curve now stays inside its plot (it used to dip into the frequency labels).
+- **Card EQ spectrum.** Each source card's EQ draws the routing page's EQUALIZER rack spectrum
+  behind its curve: the layer's output filled, its input a quiet line.
+  - It is the same analyser, not a copy: `EqSpectrum` (shared/andor-ui) is now what both
+    draw.
+  - The engine gives each layer's EQ the two `fx::SpectrumTap`s the EQUALIZER has (around
+    `eq::Processor::process`, EQ on or off; telemetry only, audio unchanged).
+- Both reach the editor through one read-only host hook, `InstrumentHost::telemetryEngine()`
+  (nullptr in the shell products: their card EQs and graphs are unchanged).
+- Tests: `[character-graph]` (idle, preview rise and decay, live note / stage / peak, a live
+  CHARACTER turn, easing, back to idle) and `[card-eq-spectrum]` (floor, rising while a note
+  plays, the same reading as the shared analyser, the fall). On demand:
+  `[character-graph-shots]`, `[card-eq-spectrum-shots]`.
+- NEXT: ANDOR ANALOG's card EQs (the shell's) can show the spectrum once its host returns its
+  engine's layer taps.
+
+## ANDOR OSP: SATELLITE, each layer's own stereo motion (14 Nov 2026)
+
+ANDOR ANALOG's SATELLITE, the per-card arpeggiator's companion, is now in ANDOR OSP. This was
+the plan noted under NEXT on `feature/satellite-rhythm`. Shared parts:
+- the motion (`src/engine/SatelliteMotion.h`);
+- the arpeggiator's SATELLITE key (`ArpSection`: `SatelliteKey`);
+- `AnchoredPopoverHost` (ShapingPopups.h, both editors);
+- the panel, moved out of ANDOR ANALOG into `shared/andor-ui/Source/SatellitePanel` (the product
+  names its parameters; the marker reads `InstrumentHost::satelliteView`);
+- `MacroSwitchLamp`.
+
+Only those were taken from that branch. Its USER MACROS, SHAPER DNA and macro-lamp hooks stay
+there.
+
+- **Engine.** A layer's voices are always that layer's: ANDOR ANALOG's "a voice of one card
+  moves whole", exact, with no twin filters.
+  - Per chunk, the layer's place uses the shared paths:
+    - PAN, ORBIT with its rear cue (−3 dB and a darkening near 2.2 kHz), BOUNCE, BOUNCE + NOTE
+      held per voice;
+    - SYNC on the host's quarter notes, or a local clock started by a note; FREE at
+      0.02–10 Hz;
+    - 6 ms path smoothing, a 20 ms glide on and off.
+  - Each voice applies it at its pan: its own pan (scaled by WIDTH) times the place's
+    equal-power gains, interpolated across the chunk.
+  - No allocation, no lock.
+  - With every layer off and its glide done, the voices take the original path, bit for bit.
+- **Plugin.** `layerX.satellite.{enabled, mode, sync, division, rate, depth, width, phase,
+  offset, retrigger}` use ANDOR ANALOG's ranges, defaults and texts, appended at version hint 32.
+  The schema golden gains exactly these 30 lines.
+  - Sessions from before open with every layer still (tested by stripping the parameters).
+  - The panel opens anchored under the key, or above it where there is no room.
+- **Effects after the layers.** SPACE, ECHO and REIMAGINED's KALEIDOSCOPE still spread what
+  they receive. Hard right therefore keeps what they put on the left (as in ANDOR ANALOG,
+  whose effects follow its voices too).
+- **Tests.**
+  - `[satellite]`, unit, 7 cases: off bit for bit, the place, PAN's rate, SYNC, ORBIT's cue,
+    BOUNCE + NOTE, off returning exactly with no jump, determinism, the marker.
+  - `[satellite]`, plugin, 2 cases: the key, the panel, contextual controls, the audio,
+    recall, older sessions.
+  - On demand: `[satellite-shots]` (869 / 1448).
+  - The shell: its parity render masks the key's place (`arp-satellite`,
+    `ArpInlinePanel::satelliteKeyArea`). Its schema check counts `layerX.satellite.*` as ANDOR
+    OSP's own (a product with SATELLITE keeps its own namespace, as ANDOR ANALOG's
+    `analog.satellite.*`). The Phase 2 tail test pins version 32.
+- NEXT: ANDOR ANALOG can drop its own copy of the panel for the shared one (its
+  `params::satelliteId` as the `idOf`).
+
 ## BLOCKERS
 
 - DAW testing (Logic, Ableton, Reaper) needs a Mac; CI covers build, tests and auval.

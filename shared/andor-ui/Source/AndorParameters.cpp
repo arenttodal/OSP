@@ -1,4 +1,5 @@
 #include "AndorParameters.h"
+#include "engine/SatelliteMotion.h"
 #include "InstrumentHost.h"
 #include "ParameterFactory.h"
 #include "ValueFormat.h"
@@ -112,6 +113,60 @@ void InstrumentHost::addPedalLoopParameters (juce::AudioProcessorValueTreeState:
     for (int layer = 0; layer < numLayers; ++layer)
         layout.add (parameters::make<juce::AudioParameterChoice> (juce::ParameterID { pedalLoopParameterId (layer), 31 }, "Layer " + layerName (layer) + " Pedal Loop",
                                                                   juce::StringArray { "Normal", "Forward", "Ping-Pong" }, 0));
+}
+
+juce::String InstrumentHost::satelliteFieldId (int layer, const char* field)
+{
+    return layerParameterId (layer, juce::String ("satellite.") + field);
+}
+
+const std::array<const char*, 10>& InstrumentHost::satelliteFields()
+{
+    static const std::array<const char*, 10> fields { "enabled", "mode", "sync", "division", "rate", "depth", "width", "phase", "offset", "retrigger" };
+    return fields;
+}
+
+void InstrumentHost::addSatelliteParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, int versionHint)
+{
+    // ANDOR ANALOG's SATELLITE parameters (its analog.satellite.*), the same ranges, defaults,
+    // choices and texts. Append-only: IDs, ranges and choice orders frozen once shipped.
+    namespace sat = osp::satellite;
+    const sat::Settings d;
+    auto id = [versionHint] (const juce::String& name) { return juce::ParameterID { name, versionHint }; };
+    using Choice = juce::AudioParameterChoice;
+    using Float = juce::AudioParameterFloat;
+    juce::StringArray divisions;
+    for (const auto& division : sat::divisions)
+        divisions.add (division.name);
+    juce::NormalisableRange<float> rateRange (static_cast<float> (sat::minRateHz), static_cast<float> (sat::maxRateHz), 0.001f);
+    rateRange.setSkewForCentre (0.45f);
+    auto hzText = [] (float hz, int) { return hz < 1.0f ? juce::String (hz, 2) + " Hz" : juce::String (hz, 1) + " Hz"; };
+    auto percentText = [] (float v, int) { return juce::String (juce::roundToInt (v)) + " %"; };
+    auto degreeText = [] (float deg, int) { return juce::String (juce::roundToInt (deg)) + juce::String (juce::CharPointer_UTF8 ("\xc2\xb0")); };
+    auto placeText = [] (float v, int) {
+        const int n = juce::roundToInt (v);
+        return n == 0 ? juce::String ("C") : (n < 0 ? "L " : "R ") + juce::String (std::abs (n));
+    };
+    for (int layer = 0; layer < numLayers; ++layer)
+    {
+        const juce::String name = "Layer " + layerName (layer) + " Satellite";
+        auto f = [layer] (const char* field) { return satelliteFieldId (layer, field); };
+        layout.add (parameters::make<juce::AudioParameterBool> (id (f ("enabled")), name + " On", d.enabled));
+        layout.add (parameters::make<Choice> (id (f ("mode")), name + " Mode", juce::StringArray { "PAN", "ORBIT", "BOUNCE" }, static_cast<int> (d.mode)));
+        layout.add (parameters::make<Choice> (id (f ("sync")), name + " Timing", juce::StringArray { "SYNC", "FREE" }, static_cast<int> (d.timing)));
+        layout.add (parameters::make<Choice> (id (f ("division")), name + " Division", divisions, d.division));
+        layout.add (parameters::make<Float> (id (f ("rate")), name + " Rate", rateRange, static_cast<float> (d.rateHz),
+                                             juce::AudioParameterFloatAttributes().withLabel ("Hz").withStringFromValueFunction (hzText)));
+        layout.add (parameters::make<Float> (id (f ("depth")), name + " Depth", juce::NormalisableRange<float> (0.0f, 100.0f, 0.1f), static_cast<float> (100.0 * d.depth),
+                                             juce::AudioParameterFloatAttributes().withLabel ("%").withStringFromValueFunction (percentText)));
+        layout.add (parameters::make<Float> (id (f ("width")), name + " Width", juce::NormalisableRange<float> (0.0f, 100.0f, 0.1f), static_cast<float> (100.0 * d.width),
+                                             juce::AudioParameterFloatAttributes().withLabel ("%").withStringFromValueFunction (percentText)));
+        layout.add (parameters::make<Float> (id (f ("phase")), name + " Phase", juce::NormalisableRange<float> (0.0f, 360.0f, 0.1f), static_cast<float> (360.0 * d.phase),
+                                             juce::AudioParameterFloatAttributes().withStringFromValueFunction (degreeText)));
+        layout.add (parameters::make<Float> (id (f ("offset")), name + " Offset", juce::NormalisableRange<float> (-100.0f, 100.0f, 0.1f), static_cast<float> (100.0 * d.offset),
+                                             juce::AudioParameterFloatAttributes().withStringFromValueFunction (placeText)));
+        layout.add (parameters::make<Choice> (id (f ("retrigger")), name + " Bounce", juce::StringArray { "CYCLE", "NOTE" }, static_cast<int> (d.retrigger)));
+    }
 }
 
 void InstrumentHost::addCardArpParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, const juce::String& ns)

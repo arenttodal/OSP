@@ -1,5 +1,6 @@
 #include "EqEditor.h"
 #include "Binding.h"
+#include "FxIdentity.h"
 
 #include "OspLookAndFeel.h"
 #include "engine/SpectralImprint.h"
@@ -431,6 +432,10 @@ void EqEditor::refresh()
 {
     if (dampenShown())
         dampenPage->refresh();
+    // The spectrum of what plays through the layer's EQ (its input and output taps).
+    if (const auto* engine = ospProcessor.telemetryEngine(); engine != nullptr && ! dampenShown())
+        if (spectrum.analyse (engine->layerEqSpectrum (layer, false), engine->layerEqSpectrum (layer, true)))
+            repaint (graphArea().expanded (2.0f).getSmallestIntegerContainer());
     const auto now = ospProcessor.layerEqSettings (layer);
     const auto offsets = modulationOffsets();
     bool moved = false;
@@ -594,8 +599,12 @@ void EqEditor::paint (juce::Graphics& g)
         }
     }
 
-    // The selected band's own shape, faint, in its colour.
+    // The spectrum behind the curve: the routing EQUALIZER rack's own (EqSpectrum), in its ink -
+    // the layer's output filled, its input a quiet line.
     const double rate = sampleRate();
+    spectrum.paint (g, graph, [this] (float x) { return hzForX (x); }, rate, juce::Colour (0xff8d8c86), visualIdentityFor (fx::Type::eq).motifInk);
+
+    // The selected band's own shape, faint, in its colour.
     if (selected >= 0 && shown.bands[static_cast<std::size_t> (selected)].enabled)
     {
         const auto band = static_cast<eq::Band> (selected);

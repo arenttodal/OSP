@@ -1,4 +1,5 @@
 #include "InstrumentHost.h"
+#include "ShapingPopups.h"
 #include "AndorParameters.h"
 
 #include "engine/Dampen.h"
@@ -702,6 +703,11 @@ std::optional<ShaperPattern> InstrumentHost::readShaperPatternFile (const juce::
                 step.shape = static_cast<StepShape> (k);
     }
     return pattern;
+}
+
+std::unique_ptr<MiniPanel> InstrumentHost::createSatellitePanel (int)
+{
+    return nullptr;   // (none by default: a product that moves its cards supplies its panel)
 }
 
 } // namespace osp::plugin

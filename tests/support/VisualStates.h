@@ -187,6 +187,10 @@ namespace visualstates
         if (arpOpen)
             result.push_back ({ "arp-cards", "the per-card arpeggiator's row (absent with one arpeggiator)",
                                 osp::plugin::ArpInlinePanel::cardRowArea().translated (arpPanel.getX(), arpPanel.getY() - sourceTrim) });
+        // SATELLITE's key after the per-card row (ANDOR OSP and products that move their cards).
+        if (arpOpen)
+            result.push_back ({ "arp-satellite", "SATELLITE's key on the arpeggiator's title row (absent without SATELLITE)",
+                                osp::plugin::ArpInlinePanel::satelliteKeyArea().translated (arpPanel.getX(), arpPanel.getY() - sourceTrim) });
         return result;
     }
 }

@@ -68,7 +68,7 @@ private:
     are all there; every control whose parameter the product's engine does not read is shown
     disabled (Engine::boundParameters), and a diagnostic engine says what it is in the footer.
 */
-class ShellEditor final : public juce::AudioProcessorEditor, public juce::FileDragAndDropTarget, private juce::Timer
+class ShellEditor final : public juce::AudioProcessorEditor, public juce::FileDragAndDropTarget, public osp::plugin::AnchoredPopoverHost, private juce::Timer
 {
 public:
     explicit ShellEditor (ShellProcessor&);
@@ -130,7 +130,13 @@ public:
         REIMAGINED (7 + layer, when the engine reads it), a modulation source's routes or
         larger curve (source 0 LFO 1 .. 3 ENV 2). */
     static constexpr int advancedPopup = 6, reimaginedPopup = 7, routesPopup = 11, curvePopup = 12, startControlPopup = 13, generatorHeaderPopup = 14,
-                         hybridHeaderPopup = 15;
+                         hybridHeaderPopup = 15, anchoredPopup = 16;
+    // A product's panel anchored to a component (SATELLITE's from the arpeggiator's key): placed
+    // under it, over a transparent backdrop that takes the click which closes it (that click
+    // reaches no control). Escape closes it too.
+    void openAnchoredPopover (std::unique_ptr<osp::plugin::MiniPanel> panel, juce::Component& anchor) override;
+    bool anchoredPopoverOpenFrom (const juce::Component& anchor) const override;
+    void closeAnchoredPopover() override;
     void openPopup (int which, int source = 0);
     void closePopup();
     static constexpr bool isReimaginedPopup (int which) noexcept { return which >= reimaginedPopup && which < reimaginedPopup + osp::plugin::InstrumentHost::numLayers; }
@@ -250,6 +256,17 @@ private:
     void updateHybridDoor();
     bool hybridDoorSet = false;
     int popupIndex = -1, popupSource = 0;
+    void presentPopup (int which);
+    juce::Component::SafePointer<juce::Component> popupAnchor;   ///< anchoredPopup's anchor
+    struct PopupBackdrop final : juce::Component
+    {
+        std::function<void()> onPress;
+        void mouseDown (const juce::MouseEvent&) override
+        {
+            if (onPress != nullptr)
+                onPress();
+        }
+    } popupBackdrop;
     int closedByLabelPress = -1;   ///< a press on an open popover's own door closes it (and must not reopen it)
     OutsideClickWatcher outsideClicks { *this };
     std::unique_ptr<juce::FileChooser> chooser;

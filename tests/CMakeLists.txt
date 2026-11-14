@@ -34,6 +34,7 @@ add_executable(osp_tests
     unit/FxRetroTests.cpp
     unit/FxRouteTests.cpp
     unit/MultiSampleMappingTests.cpp
+    unit/SatelliteTests.cpp
     unit/DriveProcessorTests.cpp
     unit/ArpeggiatorTests.cpp
     unit/ModulationTests.cpp
