@@ -1918,6 +1918,41 @@ void ShellEditor::createLearn()
     }
     arpButton.onLearnAction = [this] (const juce::String& action, const juce::String& parameterId) { learnAction (action, "arp.enable", parameterId); };
     arpPanel.onLearnAction = [this] (const juce::String& action, const juce::String& parameterId) { learnAction (action, "arp.panel", parameterId); };
+    // The arpeggiator's companion row (a product's: ANDOR ANALOG's SUB).
+    if (shell.arpCompanionShown())
+        targets.add ({ "arp.companion", [this] { return static_cast<juce::Component*> (&arpButton); },
+                       [this] (juce::Component&) { return arpButton.secondRowArea().getSmallestIntegerContainer(); }, {}, {}, true });
+    // A macro's own on / off lamp (a product's: ANDOR ANALOG's MORPH). Touches report
+    // "macro.N.switch.touched".
+    for (auto& [macro, lamp] : macroLamps)
+    {
+        auto* l = lamp.get();
+        targets.add ({ "macro." + juce::String (macro) + ".switch", [l] { return static_cast<juce::Component*> (l); }, {}, {}, {}, false, true });
+    }
+    // USER macros (a product's): the CORE | USER tab (a click reports "macroBank.changed"), the six
+    // USER knobs (touches: "usermacro.N.touched"; Show me selects USER, an interface preference),
+    // and an assignment made from a control's menu ("usermacro.assigned").
+    if (bankTab != nullptr)
+    {
+        targets.add ({ "macros.bank", [this] { return static_cast<juce::Component*> (bankTab.get()); }, {}, {}, {}, true });
+        targets.addState ("macros.bank.user", [this] { return bankShown == 1; });
+        for (int i = 0; i < frame::macroCount; ++i)
+            targets.add ({ "usermacro." + juce::String (i),
+                           [this, i] { return bankShown == 1 ? static_cast<juce::Component*> (&userRow[static_cast<std::size_t> (i)].slider) : nullptr; }, {},
+                           [this] {
+                               showMacroBank (1);
+                               return bankShown == 1;
+                           },
+                           {}, false, true });
+    }
+    // The AUX strip (a product's: ANDOR ANALOG's D). Show me shows it (a view setting); touches
+    // on it report "aux.strip.touched".
+    if (shell.hasAuxStrip())
+        targets.add ({ "aux.strip", [this] { return auxShownApplied ? auxStrip.get() : nullptr; }, {}, [this] {
+                          setAuxStripShown (true);
+                          return auxShownApplied;
+                      },
+                       {}, true, true });
 
     // The racks and the source view's key (where the product has them).
     if (shell.showsRack())
@@ -2044,7 +2079,10 @@ void ShellEditor::setUpUserMacros()
         lenses[i] = std::move (lens);
     }
     bankTab = std::make_unique<MacroBankTab>();
-    bankTab->onChange = [this] (int bank) { showMacroBank (bank); };
+    bankTab->onChange = [this] (int bank) {
+        showMacroBank (bank);
+        learnAction ("macroBank.changed", "macros.bank");   // (a click on CORE / USER: the musician's)
+    };
     content.addAndMakeVisible (*bankTab);
     // Over everything while assigning (it takes clicks only when picking, only on a target).
     assignOverlay.onPicked = [this] (const juce::String& id) {
@@ -2405,7 +2443,10 @@ void ShellEditor::addUserMacroItems (juce::PopupMenu& menu, const juce::String& 
             // Assigned at once, with a visible range around where the control sits (no jump);
             // its macro chosen, so its range is on the knob, ready to drag.
             if (safe->shell.userMacros()->assign (safe->shell, m, id))
+            {
                 safe->setChosenUserMacro (m);
+                safe->learnAction ("usermacro.assigned", "macros", id);   // (chosen from the menu: the musician's)
+            }
             safe->refreshUserMacros();
         });
     }
