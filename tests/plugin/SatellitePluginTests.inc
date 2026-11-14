@@ -165,7 +165,7 @@ TEST_CASE ("satellite: a layer's place is heard; saved and recalled; a session f
     p.setStateInformation (old.getData(), static_cast<int> (old.getSize()));
     for (int layer = 0; layer < 3; ++layer)
         CHECK (satValue (p, layer, "enabled") < 0.5f);
-    CHECK (satValue (p, 0, "offset") == Approx (0.0f));
+    CHECK (satValue (p, 0, "offset") == Approx (0.0f).margin (0.01));   // (normalisation rounding: 1.5e-6 on Apple Silicon)
 }
 
 TEST_CASE ("satellite: screenshots (OSP_SATELLITE_SHOTS)", "[.][satellite-shots]")
