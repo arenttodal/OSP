@@ -173,3 +173,39 @@ TEST_CASE ("character graph: screenshots (OSP_CHARACTER_SHOTS)", "[.][character-
     shoot ("character-3-live-decay");
     p.releaseResources();
 }
+
+TEST_CASE ("character graph: the editor's own refresh drives it (a played note moves the open rack)", "[plugin][character-graph]")
+{
+    // Through the editor's timer, as in the plugin: no test hook on the graph. (The first
+    // version moved only when a test advanced it; the editor never refreshed the rack.)
+    using Mode = osp::plugin::CharacterGraphState::Mode;
+    TempDir tmp;
+    const ScopedEnvironment storeDir ("OSP_SAMPLE_STORE", tmp.dir.getChildFile ("store").getFullPathName());
+    OspAudioProcessor p;
+    loadAndWait (p, writeSource (tmp.dir, "vowel.wav", testsignals::vowel (midiToHz (60), 2.0, 48000.0, 4)));
+    std::unique_ptr<juce::AudioProcessorEditor> e (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (e.get());
+    REQUIRE (ui != nullptr);
+    setPlain (p, "character", 30.0f);
+    setPlain (p, "character.envAmount", 60.0f);
+    setPlain (p, "character.envAttack", 200.0f);
+    setPlain (p, "character.envDecay", 400.0f);
+    ui->toggleRackFromLabel (osp::plugin::rack::Kind::filter);
+    auto* module = ui->effectsRack().module (osp::plugin::rack::Kind::filter);
+    REQUIRE (module != nullptr);
+    ui->refreshNow();
+    const auto rest = osp::plugin::characterGraphState (*module);
+    REQUIRE (rest.has_value());
+    p.prepareToPlay (48000.0, 256);
+    juce::AudioBuffer<float> buffer (2, 256);
+    juce::MidiBuffer on;
+    on.addEvent (juce::MidiMessage::noteOn (1, 60, static_cast<juce::uint8> (100)), 0);
+    runBlocks (p, buffer, 20, on);   // ~107 ms into ATTACK
+    ui->refreshNow();
+    const auto live = osp::plugin::characterGraphState (*module);
+    REQUIRE (live.has_value());
+    CHECK (live->mode == Mode::live);
+    CHECK (live->note == 60);
+    CHECK (live->nowHz > rest->baseHz * 1.5);   // the envelope has the cutoff up
+    p.releaseResources();
+}

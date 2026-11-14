@@ -1286,6 +1286,10 @@ on the ADD place, or only the card dropped on. Audit, measured reproduction and 
     snapshot the audio thread writes once a block from the voice's last control update. It
     changes nothing a voice plays: no allocation, no lock.
   - The curve now stays inside its plot (it used to dip into the frequency labels).
+  - Fix (14 Nov, after the first Mac test): OSP's editor never refreshed its racks on its timer
+    (only on open / close), so the graph did not move in the plugin. `racks.refresh()` now runs
+    on every tick, as in the shell's editor. Test: `[character-graph]` "the editor's own refresh
+    drives it", which fails without the line.
 - **Card EQ spectrum.** Each source card's EQ draws the routing page's EQUALIZER rack spectrum
   behind its curve: the layer's output filled, its input a quiet line.
   - It is the same analyser, not a copy: `EqSpectrum` (shared/andor-ui) is now what both
