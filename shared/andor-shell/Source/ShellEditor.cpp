@@ -398,6 +398,7 @@ ShellEditor::ShellEditor (ShellProcessor& p)
         modPanel.onDragEnd = [this] (int source, juce::Point<int> screen) { dropModulation (source, content.getLocalPoint (nullptr, screen).toFloat()); };
         modPanel.onShowRoutes = [this] (int source) { openPopup (routesPopup, source); };
         modOverlay.onSelect = [this] (int source, int slot) { selectModulation (source, slot); };
+        modPanel.ampEnvelope().livePosition = [this] (const juce::String& id) { return modOverlay.livePosition (id); };
         modOverlay.onShowRoutes = [this] (int source) { openPopup (routesPopup, source); };
     }
     modPanel.onExpandCurve = [this] (int source) { openPopup (curvePopup, source); };
@@ -1769,6 +1770,7 @@ void ShellEditor::timerCallback()
         modPanel.showTab (shell.modPanelTab());
     modPanel.refresh();
     modOverlay.refresh();
+    modPanel.ampEnvelope().refreshLive();   // (its picture follows A D S R's modulation)
     if (popup != nullptr)
         popup->refreshContent();
 }
@@ -2162,7 +2164,9 @@ void ShellEditor::updateUserMacroArcs()
             userMacroRevision = now;   // (an undo, a preset, a session: names and lenses follow)
             refreshUserMacros();
         }
-    if (um == nullptr || bankShown != 1 || dragMacro >= 0 || pickMacro >= 0)
+    // (on either tab: a macro chosen from a control's menu or its halo shows its ranges where
+    // the musician is - the tab changes only when they click it)
+    if (um == nullptr || dragMacro >= 0 || pickMacro >= 0)
     {
         arcsMacro = -1;
         modOverlay.setMacroFocus (-1);
@@ -2182,9 +2186,9 @@ void ShellEditor::updateUserMacroArcs()
 
 void ShellEditor::setChosenUserMacro (int macro)
 {
+    // Never switches the macro tab: assigning from a menu or dragging a range on a halo keeps
+    // the tab the musician chose (only a click on CORE / USER changes it).
     chosenMacro = macro >= 0 && macro < frame::macroCount ? macro : -1;
-    if (chosenMacro >= 0 && bankShown != 1)
-        showMacroBank (1);
     updateUserMacroArcs();
 }
 

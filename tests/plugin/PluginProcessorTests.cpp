@@ -8104,3 +8104,57 @@ TEST_CASE ("plugin: a real right-click on an unmodulated knob, claimed by the ha
     CHECK_FALSE (overlay.rightClickedControl (e));   // (never a second menu)
     CHECK (menus == 1);
 }
+
+TEST_CASE ("plugin: the AMP envelope's picture follows A D S R's modulation (VEL on DECAY) while a note sounds", "[ui][andor-ui][mod][ampenv]")
+{
+    // Shared with ANDOR ANALOG: the picture draws the shape the newest note plays (the halos'
+    // reading), the set shape dashed under it; nothing sounding: exactly the set picture.
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "a.wav", testsignals::pluck (midiToHz (60), 2.0, 48000.0, 5));
+    OspAudioProcessor p;
+    p.initPatch();
+    REQUIRE (p.addLayers ({ a }) == 1);
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    p.setParameterValue ("sustainLevel", 0.0f);
+    std::unique_ptr<juce::AudioProcessorEditor> base (p.createEditorIfNeeded());
+    auto* editor = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (base.get());
+    REQUIRE (editor != nullptr);
+    editor->setVisible (true);
+    auto& amp = editor->modulationPanel().ampEnvelope();
+    auto snapshot = [&] {
+        editor->refreshNow();
+        return amp.createComponentSnapshot (amp.getLocalBounds(), true, 1.0f);
+    };
+    auto pixels = [] (const juce::Image& x, const juce::Image& y) {
+        int differing = 0;
+        for (int j = 0; j < x.getHeight(); ++j)
+            for (int i = 0; i < x.getWidth(); ++i)
+                differing += x.getPixelAt (i, j) != y.getPixelAt (i, j) ? 1 : 0;
+        return differing;
+    };
+    p.prepareToPlay (48000.0, 512);
+    juce::AudioBuffer<float> buffer (2, 512);
+    auto run = [&] (juce::MidiBuffer midi, int blocks) {
+        for (int i = 0; i < blocks; ++i)
+        {
+            p.processBlock (buffer, midi);
+            midi.clear();
+        }
+    };
+    run ({}, 2);
+    const auto set = snapshot();
+    REQUIRE (p.addModulationRoute (mod::Source::vel, mod::Dest::ampDecay, 30.0f) >= 0);
+    run ({}, 2);
+    CHECK (pixels (set, snapshot()) == 0);
+    juce::MidiBuffer on;
+    on.addEvent (juce::MidiMessage::noteOn (1, 60, static_cast<juce::uint8> (100)), 0);
+    run (on, 4);
+    editor->refreshNow();
+    CHECK (editor->modulationOverlay().livePosition ("decay") > p.apvts().getParameter ("decay")->getValue() + 0.02f);
+    CHECK (pixels (set, snapshot()) > 50);
+    juce::MidiBuffer off;
+    off.addEvent (juce::MidiMessage::noteOff (1, 60), 0);
+    run (off, 400);
+    CHECK (pixels (set, snapshot()) == 0);
+}

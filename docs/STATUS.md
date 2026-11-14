@@ -858,6 +858,14 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
   ANDOR Analog's standalone. mouseDown now uses the same test; `[rightclick]` routes the press as
   JUCE does (the component under the point while the button is down) in both instruments.
 
+  The AMP envelope's picture follows A D S R's modulation (both instruments): `EnvelopePanel::
+  livePosition` (set by the editor from `ModulationOverlay::livePosition`, the halos' own sum of
+  active routes and macros) draws the shape the newest note plays, the set shape dashed under it
+  with the handles; with nothing sounding or routed the picture is the set one, pixel for pixel
+  (`[ampenv]` in both). ANDOR ANALOG's macro tab no longer switches to USER on an assignment
+  or a halo range drag (the shell's `setChosenUserMacro`; the halos show the chosen macro on
+  either tab).
+
   External audio input (opt-in; ANDOR ANALOG's AUX D LIVE INPUT, analog
   `docs/aux/ADDENDUM_05.md`): `ProductInfo::externalInputName` adds one input bus, off by
   default, a VST3 auxiliary (sidechain) bus (`getVST3ClientExtensions`), copied before the output

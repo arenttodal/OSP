@@ -2007,6 +2007,36 @@ bool ModulationOverlay::rightClickedControl (const juce::MouseEvent& e)
     return true;
 }
 
+float ModulationOverlay::livePosition (const juce::String& parameterId)
+{
+    if (routes.empty() && ! (anyMacroArcs != nullptr && anyMacroArcs()))
+        return -1.0f;   // (nothing moves any control: the set value, and no walk at 30 Hz)
+    const auto* t = find (parameterId);
+    if (t == nullptr && targets.empty())
+    {
+        collectAll();   // (nothing collected yet: walked once, now)
+        t = find (parameterId);
+    }
+    if (t == nullptr)
+        return -1.0f;
+    // As the engine sums it: the routes' offsets in the destination's own terms, then clamped.
+    double offset = 0.0;
+    mod::Dest dest = mod::Dest::none;
+    for (const auto* r : routesOf (*t))
+    {
+        if (r->state != mod::RouteState::active || r->isDepth())
+            continue;
+        bool known = false;
+        const double v = valueNow (mod::sourceIndex (r->route.source), r->route.dest, known);
+        if (! known)
+            continue;
+        const double depth = depthRoutesOf (r->slot).empty() ? r->route.depth : effectiveDepth (r->slot);
+        offset += depth * v;
+        dest = r->route.dest;
+    }
+    return dest == mod::Dest::none ? baseOf (*t) : positionOf (*t, offset, dest);
+}
+
 void ModulationOverlay::collectAll()
 {
     collect (root);

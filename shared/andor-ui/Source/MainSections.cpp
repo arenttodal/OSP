@@ -937,9 +937,34 @@ EnvelopePanel::Shape EnvelopePanel::shape() const
     return { v ("attack"), v ("decay"), 0.01f * v ("sustainLevel"), v ("release") };
 }
 
-std::array<juce::Point<float>, 3> EnvelopePanel::handles() const
+EnvelopePanel::Shape EnvelopePanel::liveShape() const
 {
-    const auto s = shape();
+    if (livePosition == nullptr)
+        return shape();
+    auto v = [this] (const char* id) {
+        auto* p = state.getParameter (id);
+        if (p == nullptr)
+            return 0.0f;
+        const float live = livePosition (id);
+        return p->convertFrom0to1 (live >= 0.0f ? std::clamp (live, 0.0f, 1.0f) : p->getValue());
+    };
+    return { v ("attack"), v ("decay"), 0.01f * v ("sustainLevel"), v ("release") };
+}
+
+void EnvelopePanel::refreshLive()
+{
+    if (livePosition == nullptr)
+        return;
+    const auto now = liveShape();
+    if (! (now == shownLive))
+    {
+        shownLive = now;
+        repaint (graph);
+    }
+}
+
+std::array<juce::Point<float>, 3> EnvelopePanel::handlesOf (const Shape& s) const
+{
     const auto r = graph.toFloat().reduced (12.0f, 10.0f);
     const float w = r.getWidth();
     const float peakX = r.getX() + 0.27f * w * timeShare (s.attack, attackMax);
@@ -985,20 +1010,38 @@ void EnvelopePanel::paint (juce::Graphics& g)
     }
     const auto r = well.reduced (12.0f, 10.0f);
     const auto h = handles();
-    const float holdEnd = h[1].x + 0.16f * r.getWidth();
-    juce::Path curve;
-    curve.startNewSubPath (r.getX(), r.getBottom());
-    curve.lineTo (h[0]);
-    // Decay and release fall exponentially: drawn as curves.
-    curve.quadraticTo (h[0].x + 0.15f * (h[1].x - h[0].x), h[1].y, h[1].x, h[1].y);
-    curve.lineTo (holdEnd, h[1].y);
-    curve.quadraticTo (holdEnd + 0.15f * (h[2].x - holdEnd), h[2].y, h[2].x, h[2].y);
+    auto curveOf = [&r] (const std::array<juce::Point<float>, 3>& k) {
+        const float holdEnd = k[1].x + 0.16f * r.getWidth();
+        juce::Path c;
+        c.startNewSubPath (r.getX(), r.getBottom());
+        c.lineTo (k[0]);
+        // Decay and release fall exponentially: drawn as curves.
+        c.quadraticTo (k[0].x + 0.15f * (k[1].x - k[0].x), k[1].y, k[1].x, k[1].y);
+        c.lineTo (holdEnd, k[1].y);
+        c.quadraticTo (holdEnd + 0.15f * (k[2].x - holdEnd), k[2].y, k[2].x, k[2].y);
+        return c;
+    };
+    // Modulated (a route or a macro moving A, D, S or R): the curve is the shape the voices
+    // play now, and the set shape stays as a thin line under it, carrying the handles (the knobs
+    // and the handles edit the set values, as the halos' knobs do). Unmodulated: as before.
+    const auto set = shape();
+    const auto live = liveShape();
+    const bool moved = ! (live == set);
+    const auto curve = curveOf (moved ? handlesOf (live) : h);
     juce::Path fill (curve);
     fill.lineTo (r.getX(), r.getBottom());
     fill.closeSubPath();
     const float faint = note.isEmpty() ? 1.0f : 0.35f;   // (a note: the envelope is not what plays)
     g.setGradientFill (juce::ColourGradient (colour::accent.withAlpha (0.38f * faint), 0.0f, r.getY(), colour::accent.withAlpha (0.05f * faint), 0.0f, r.getBottom(), false));
     g.fillPath (fill);
+    if (moved)
+    {
+        juce::Path dashed;
+        const float dashes[] = { 4.0f, 4.0f };
+        juce::PathStrokeType (1.2f).createDashedStroke (dashed, curveOf (h), dashes, 2);
+        g.setColour (colour::accent.withAlpha (0.55f * faint));
+        g.fillPath (dashed);
+    }
     g.setColour (colour::accent.withMultipliedAlpha (faint));
     g.strokePath (curve, juce::PathStrokeType (2.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     if (note.isNotEmpty())

@@ -232,14 +232,28 @@ public:
         }
     }
 
+    /** Where a knob is now with its modulation (its parameter's 0..1; below 0: unknown, the set
+        value is drawn). Set by the editor from the halos' own reading (ModulationOverlay::
+        livePosition). Null (the default): the picture shows the set values only. */
+    std::function<float (const juce::String& parameterId)> livePosition;
+    /** Asked by the editor's timer after the halos refreshed: repaints the picture when the
+        modulated shape moved. While nothing modulates A, D, S or R the picture is exactly the
+        set one. */
+    void refreshLive();
+
 private:
     struct Shape
     {
         float attack, decay, sustain, release;   // ms, ms, 0..1, ms
+        bool operator== (const Shape&) const = default;
     };
     Shape shape() const;
+    /** The shape the voices play now (each value moved by its modulation), else shape(). */
+    Shape liveShape() const;
     /** Where the three handles are (attack peak, decay/sustain, release end). */
-    std::array<juce::Point<float>, 3> handles() const;
+    std::array<juce::Point<float>, 3> handles() const { return handlesOf (shape()); }
+    std::array<juce::Point<float>, 3> handlesOf (const Shape&) const;
+    Shape shownLive {};
     float timeToX (float ms, float from, float span) const;
     juce::AudioProcessorValueTreeState& state;
     std::array<std::unique_ptr<MiniKnob>, 4> knobs;

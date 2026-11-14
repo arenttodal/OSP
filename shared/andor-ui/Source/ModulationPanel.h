@@ -508,6 +508,10 @@ public:
         the knob, which has no menu. So the overlay also listens to its root's presses (here).
         Returns whether a menu was opened. */
     bool rightClickedControl (const juce::MouseEvent& e);
+    /** Where a control is now with its modulation, as the halos read it (its parameter's 0..1:
+        the set value after the macros, plus every active route whose source is known now - a
+        per-voice source needs a sounding note). Below 0: not a control the overlay knows. */
+    float livePosition (const juce::String& parameterId);
     /** Tests: shows a control's menu here instead of on screen (null: on screen). */
     std::function<void (juce::PopupMenu&)> showMenuForTest;
 

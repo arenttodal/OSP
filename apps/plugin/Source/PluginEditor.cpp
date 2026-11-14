@@ -341,6 +341,7 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
         selectModulation (source, slot);
     };
     modOverlay.onSelect = [this] (int source, int slot) { selectModulation (source, slot); };
+    modPanel.ampEnvelope().livePosition = [this] (const juce::String& id) { return modOverlay.livePosition (id); };
     modOverlay.onShowRoutes = [this] (int source) { openModulationPopup (routesPopup, source); };
     modPanel.showTab (ospProcessor.modPanelTab());
     content.addAndMakeVisible (modOverlay);   // last: above everything (popups bring it back up)
@@ -1442,6 +1443,7 @@ void OspAudioProcessorEditor::timerCallback()
         modPanel.showTab (ospProcessor.modPanelTab());   // a recalled session
     modPanel.refresh();
     modOverlay.refresh();
+    modPanel.ampEnvelope().refreshLive();   // (its picture follows A D S R's modulation)
     if (popup != nullptr)
         popup->refreshContent();
     bool wheelInUse = false;
