@@ -162,6 +162,12 @@ public:
         channel = 1 + mask (bit 0 A, bit 1 B, bit 2 C). False: every note sounds on every card
         (the channels mean nothing). Only products with three engines are asked. */
     virtual void setCardRouting (bool on) noexcept { juce::ignoreUnused (on); }
+    /** Audio thread, before process() (ProductInfo::arpFollower only): the notes the follower
+        plays this block - one arpeggiator lane's notes on channel 1, with the block's other
+        channel messages - or, for one block after it stops following, the ending of those and
+        the keys still down. Null: the follower plays the musician's keys (as before). Valid
+        until process() returns. */
+    virtual void setAuxNotes (const juce::MidiBuffer* notes) noexcept { juce::ignoreUnused (notes); }
     /** The modulation sources' live values (the panel's meters and moving dots). Any thread. */
     virtual osp::InstrumentEngine::ModView modulationView() const noexcept { return {}; }
 

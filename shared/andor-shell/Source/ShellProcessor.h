@@ -417,6 +417,20 @@ private:
     void trackOutput (const juce::MidiBuffer& out) noexcept;
     void releaseSounding (juce::MidiBuffer& out) noexcept;
     void publishArpDisplay() noexcept;
+    /** ProductInfo::arpFollower (after the lanes ran this block): the follower's notes, or
+        null while it plays the keys. */
+    const juce::MidiBuffer* runArpFollower (const juce::MidiBuffer& midi, int numSamples, const osp::HostTiming& timing) noexcept;
+    osp::Arpeggiator::Settings followerSettings (int lane) const noexcept;
+    bool arpFollowerOn = false;
+    std::atomic<float>* followerOnParam = nullptr;
+    std::atomic<float>* followerLaneParam = nullptr;
+    std::atomic<float>* followerPowerParam = nullptr;
+    std::atomic<float>* followerModeParam = nullptr;
+    std::uint32_t followerModes = 0;                  ///< bit per mode index that follows
+    std::atomic<bool> followerFlush { false };        ///< a state was loaded: start over
+    osp::Arpeggiator::Settings blockArpSettings;      ///< this block's arpSettings() (audio thread)
+    std::uint8_t blockLanesRan = 0, lastLanesRan = 0; ///< bit per lane that ran (0: `arpeggiator`)
+    bool blockLanesRestarted = false;                 ///< the lanes started over this block
     /** ARP RATE's Stepped mode: the musical ratio nearest a speed (as ANDOR OSP's). */
     static double steppedArpRatio (double multiplier) noexcept;
     bool arpBound = false;
@@ -452,6 +466,15 @@ private:
         std::array<std::array<std::uint8_t, 128>, 16> passChannel {};   ///< the channel a held key sounds on (0: none)
         std::array<std::array<bool, 128>, 16> passSustained {};         ///< released under the pedal
         std::array<std::array<bool, 128>, 16> soundingOut {};           ///< what the engine was given, by channel
+        /** ProductInfo::arpFollower: its own copy of the lane it follows (a copy of that lane
+            whenever the lane runs, so the two play the same notes at the same samples). */
+        struct Follower
+        {
+            osp::Arpeggiator arp;
+            juce::MidiBuffer out;
+            std::array<std::uint8_t, 128> sounding {};   ///< notes on, not yet ended (channel 1)
+            int key = 0;                                 ///< 0: the keys; else 1 + lane + 3 x mode
+        } follower;
     };
     std::unique_ptr<CardLanes> lanes;
     std::atomic<int> arpViewLane { 0 };           ///< the lane the ARP display shows

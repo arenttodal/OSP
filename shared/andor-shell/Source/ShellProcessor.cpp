@@ -141,6 +141,9 @@ ShellProcessor::ShellProcessor (std::unique_ptr<Engine> productEngine)
     }
     description = engine->describe();
     bound = engine->boundParameters();
+    // The AUX follower's two are read here, by the shell (not the engine): its controls are live.
+    if (const auto& follower = productInfo().arpFollower)
+        bound.addArray ({ follower->enabledParameterId, follower->laneParameterId });
     generatorName = engine->generatorName();
     arpBound = osp::plugin::binding::anyBound ({ osp::plugin::ids::arpEnabled }, bound);
     arpEnabledParam = parameters.getRawParameterValue (osp::plugin::ids::arpEnabled);
@@ -163,6 +166,19 @@ ShellProcessor::ShellProcessor (std::unique_ptr<Engine> productEngine)
             lanePatternParams[static_cast<std::size_t> (c - 1)] = parameters.getRawParameterValue (osp::plugin::ids::arpCardSetting (productInfo().slug + ".", c, "pattern"));
             laneRateParams[static_cast<std::size_t> (c - 1)] = parameters.getRawParameterValue (osp::plugin::ids::arpCardSetting (productInfo().slug + ".", c, "rate"));
             laneOctavesParams[static_cast<std::size_t> (c - 1)] = parameters.getRawParameterValue (osp::plugin::ids::arpCardSetting (productInfo().slug + ".", c, "octaves"));
+        }
+        // The AUX follower (opt-in): its four parameters, every one the product's own.
+        if (const auto& follower = productInfo().arpFollower)
+        {
+            followerOnParam = parameters.getRawParameterValue (follower->enabledParameterId);
+            followerLaneParam = parameters.getRawParameterValue (follower->laneParameterId);
+            followerPowerParam = parameters.getRawParameterValue (follower->powerParameterId);
+            followerModeParam = parameters.getRawParameterValue (follower->modeParameterId);
+            for (const int mode : follower->followingModes)
+                if (mode >= 0 && mode < 32)
+                    followerModes |= 1u << static_cast<unsigned> (mode);
+            arpFollowerOn = followerOnParam != nullptr && followerLaneParam != nullptr && followerPowerParam != nullptr && followerModeParam != nullptr;
+            jassert (arpFollowerOn);   // (a product names parameters it has)
         }
     }
     modBound = osp::plugin::binding::anyBound ({ modRouteId (0, "source") }, bound);
@@ -249,6 +265,13 @@ void ShellProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
         for (auto& row : lanes->soundingOut)
             row.fill (false);
         pedalDown = false;
+        auto& f = lanes->follower;
+        f.arp.prepare (sampleRate);
+        f.out.ensureSize (static_cast<std::size_t> (osp::Arpeggiator::maxEvents + 4096 + 3 * 128 + 16) * 16);
+        f.sounding.fill (0);
+        f.key = 0;
+        blockLanesRan = lastLanesRan = 0;
+        blockLanesRestarted = false;
     }
     shaperGenerationSeen = 0;   // the prepared engine is given the pattern, curves and modulation again
     shaperGenerationSeenB = 0;
@@ -371,8 +394,11 @@ void ShellProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
     {
         arpeggiator.restartPattern();
         if (lanes != nullptr)
+        {
             for (auto& a : lanes->laneArps)
                 a.restartPattern();
+            lanes->follower.arp.restartPattern();   // (with the lane it follows: still the same notes)
+        }
     }
     hostWasPlaying = performance.playing;
 
@@ -468,6 +494,8 @@ void ShellProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
     timing.denominator = performance.denominator;
     const auto& notes = cardArp ? runCardArpeggiators (midi, buffer.getNumSamples(), timing) : runArpeggiator (midi, buffer.getNumSamples(), timing);
     engine->setPlayedKeys (arpeggiator.isEnabled() || laneConfig != 0, midi);
+    if (arpFollowerOn)
+        engine->setAuxNotes (runArpFollower (midi, buffer.getNumSamples(), timing));
     engine->process (buffer, notes, performance);
     outputPeakValue.store (buffer.getMagnitude (0, buffer.getNumSamples()), std::memory_order_relaxed);   // (read-only telemetry)
 }
@@ -593,6 +621,7 @@ osp::Arpeggiator::Settings ShellProcessor::arpSettings() noexcept
         else
             arpModOctaves = 0;
     }
+    blockArpSettings = settings;   // (the AUX follower plays lane A with exactly these)
     return settings;
 }
 
@@ -701,6 +730,7 @@ const juce::MidiBuffer& ShellProcessor::runCardArpeggiators (const juce::MidiBuf
     const bool laned = on && toggled != 0 && ! (link && toggled == 7);
     const int config = laned ? (link ? 0x100 : 0x200) | toggled : 0;
     const bool changed = config != laneConfig;
+    blockLanesRestarted = changed;
 
     // The keys (always followed, so a change of lanes can play them again).
     auto followKeys = [this] (const juce::MidiMessage& m) {
@@ -724,6 +754,7 @@ const juce::MidiBuffer& ShellProcessor::runCardArpeggiators (const juce::MidiBuf
             followKeys (metadata.getMessage());
         engine->setCardRouting (false);
         const auto& out = runArpeggiator (midi, numSamples, timing);
+        blockLanesRan = arpeggiator.isEnabled() ? 1 : 0;
         trackOutput (out);
         return out;
     }
@@ -757,6 +788,7 @@ const juce::MidiBuffer& ShellProcessor::runCardArpeggiators (const juce::MidiBuf
             lanes->legacyInput.addEvent (metadata.getMessage(), metadata.samplePosition);
         }
         const auto& out = runArpeggiator (lanes->legacyInput, numSamples, timing);
+        blockLanesRan = arpeggiator.isEnabled() ? 1 : 0;
         for (const auto metadata : out)
             lanes->laneMidi.addEvent (metadata.getMessage(), metadata.samplePosition);
         trackOutput (lanes->laneMidi);
@@ -775,6 +807,10 @@ const juce::MidiBuffer& ShellProcessor::runCardArpeggiators (const juce::MidiBuf
             if ((toggled & (1 << c)) != 0)
                 laneMask[static_cast<std::size_t> (c)] = static_cast<std::uint8_t> (1 << c);
     passMask = static_cast<std::uint8_t> (~toggled & 7);
+    blockLanesRan = 0;
+    for (int lane = 0; lane < 3; ++lane)
+        if (laneMask[static_cast<std::size_t> (lane)] != 0)
+            blockLanesRan = static_cast<std::uint8_t> (blockLanesRan | (1 << lane));
 
     auto laneArp = [this] (int lane) -> Arpeggiator& { return lane == 0 ? arpeggiator : lanes->laneArps[static_cast<std::size_t> (lane - 1)]; };
     const auto base = arpSettings();
@@ -908,6 +944,153 @@ const juce::MidiBuffer& ShellProcessor::runCardArpeggiators (const juce::MidiBuf
     trackOutput (lanes->laneMidi);
     publishArpDisplay();
     return lanes->laneMidi;
+}
+
+osp::Arpeggiator::Settings ShellProcessor::followerSettings (int lane) const noexcept
+{
+    // As runCardArpeggiators gives its lanes: A (or LINK) the arpeggiator's own settings, B and
+    // C their PATTERN / RATE / OCTAVES - always playing (the card's own arpeggio may be off).
+    using namespace osp;
+    auto settings = blockArpSettings;
+    settings.enabled = true;
+    if (lane > 0)
+    {
+        const auto i = static_cast<std::size_t> (lane - 1);
+        settings.pattern = static_cast<ArpPattern> (std::clamp (juce::roundToInt (lanePatternParams[i]->load()), 0, arp::patternCount - 1));
+        settings.rate = static_cast<ArpRate> (std::clamp (juce::roundToInt (laneRateParams[i]->load()), 0, arp::rateCount - 1));
+        settings.octaves = std::clamp (juce::roundToInt (laneOctavesParams[i]->load()), arp::minOctaves, arp::maxOctaves);
+        settings.octavesAtCycle = false;
+    }
+    return settings;
+}
+
+const juce::MidiBuffer* ShellProcessor::runArpFollower (const juce::MidiBuffer& midi, int numSamples, const osp::HostTiming& timing) noexcept
+{
+    // A listener at the lanes' delivery: it never changes what the cards were given. While the
+    // lane it follows runs, the follower is a copy of that lane's arpeggiator (taken the block
+    // it starts), fed the same keys - so it plays the same notes at the same samples; while the
+    // lane is idle (its card's arpeggio off) it runs on its own with that lane's settings.
+    using namespace osp;
+    auto& f = lanes->follower;
+    const int mode = juce::roundToInt (followerModeParam->load());
+    const bool following = followerOnParam->load() >= 0.5f && arpEnabledParam->load() >= 0.5f && followerPowerParam->load() >= 0.5f
+                           && mode >= 0 && mode < 32 && ((followerModes >> static_cast<unsigned> (mode)) & 1u) != 0;
+    const int lane = cardLinkParam->load() >= 0.5f ? 0 : std::clamp (juce::roundToInt (followerLaneParam->load()), 0, 2);
+    const int key = following ? 1 + lane + 3 * mode : 0;
+    const bool flush = followerFlush.exchange (false, std::memory_order_acq_rel);
+    const bool laneRan = ((blockLanesRan >> lane) & 1) != 0;
+    const bool laneStarted = laneRan && ((lastLanesRan >> lane) & 1) == 0;
+    lastLanesRan = blockLanesRan;
+    const bool restart = key != f.key || (key != 0 && (flush || blockLanesRestarted || laneStarted));
+    if (! restart && key == 0)
+        return nullptr;   // the keys, as before
+
+    const int last = std::max (0, numSamples - 1);
+    f.out.clear();
+    auto addNotes = [&f] (const Arpeggiator& a) {
+        // Its notes on channel 1 (its pedal is its own: the follower's would hold every note).
+        for (int i = 0; i < a.numEvents(); ++i)
+        {
+            const auto& e = a.event (i);
+            auto& count = f.sounding[e.note & 127];
+            if (e.kind == Arpeggiator::Event::Kind::noteOn)
+            {
+                f.out.addEvent (juce::MidiMessage::noteOn (1, e.note, e.velocity), e.offset);
+                count = static_cast<std::uint8_t> (std::min (255, count + 1));
+            }
+            else if (e.kind == Arpeggiator::Event::Kind::noteOff && count > 0)
+            {
+                f.out.addEvent (juce::MidiMessage::noteOff (1, e.note), e.offset);
+                --count;
+            }
+        }
+    };
+    auto feed = [last] (Arpeggiator& a, const juce::MidiMessage& m, int samplePosition) {
+        const int offset = std::clamp (samplePosition, 0, last);
+        if (m.isNoteOn())
+            a.noteOn (offset, m.getNoteNumber(), m.getVelocity(), m.getChannel());
+        else if (m.isNoteOff())
+            a.noteOff (offset, m.getNoteNumber(), m.getChannel());
+        else if (m.isSustainPedalOn() || m.isSustainPedalOff())
+            a.sustainPedal (offset, m.isSustainPedalOn());
+        else if (m.isAllNotesOff() || m.isAllSoundOff())
+            a.allNotesOff (offset);
+        else
+            return false;
+        return ! (m.isAllNotesOff() || m.isAllSoundOff());   // (those pass on as well)
+    };
+    auto seedFor = [this] (int l) {
+        const auto seed = static_cast<std::uint64_t> (std::max (1.0f, seedParam->load()));
+        return l == 0 ? seed : Prng::deriveSeed (seed, static_cast<std::uint64_t> (l), 0x4c616e65);
+    };
+
+    if (restart)
+    {
+        // Whatever the follower's instrument was given ends: the follower's notes, the keys it
+        // was playing, its pedal - then All Notes Off (nothing can hang through a change).
+        for (int n = 0; n < 128; ++n)
+            for (auto& count = f.sounding[static_cast<std::size_t> (n)]; count > 0; --count)
+                f.out.addEvent (juce::MidiMessage::noteOff (1, n), 0);
+        if (f.key == 0)
+            for (int ch = 0; ch < 16; ++ch)
+                for (int n = 0; n < 128; ++n)
+                    if (lanes->heldKeys[static_cast<std::size_t> (ch)][static_cast<std::size_t> (n)] > 0)
+                        f.out.addEvent (juce::MidiMessage::noteOff (ch + 1, n), 0);
+        f.out.addEvent (juce::MidiMessage::controllerEvent (1, 64, 0), 0);
+        f.out.addEvent (juce::MidiMessage::allNotesOff (1), 0);
+        f.key = key;
+        if (key == 0)
+        {
+            // Back to the keys: the ones still down (and the pedal) sound again, then the block.
+            if (pedalDown)
+                f.out.addEvent (juce::MidiMessage::controllerEvent (1, 64, 127), 0);
+            for (int ch = 0; ch < 16; ++ch)
+                for (int n = 0; n < 128; ++n)
+                    if (const int v = lanes->heldKeys[static_cast<std::size_t> (ch)][static_cast<std::size_t> (n)]; v > 0)
+                        f.out.addEvent (juce::MidiMessage::noteOn (ch + 1, n, static_cast<juce::uint8> (v)), 0);
+            for (const auto metadata : midi)
+                f.out.addEvent (metadata.getMessage(), metadata.samplePosition);
+            return &f.out;
+        }
+        if (laneRan)
+        {
+            // The lane plays: the follower becomes it (as it stands after this block) and plays
+            // what it played this block. (Notes it began before now are not the follower's.)
+            f.arp = lane == 0 ? arpeggiator : lanes->laneArps[static_cast<std::size_t> (lane - 1)];
+            addNotes (f.arp);
+            for (const auto metadata : midi)
+                if (const auto m = metadata.getMessage(); ! (m.isNoteOnOrOff() || m.isSustainPedalOn() || m.isSustainPedalOff()))
+                    f.out.addEvent (m, metadata.samplePosition);
+            return &f.out;
+        }
+        // The lane is idle: the follower starts its own from the keys down now.
+        f.arp.reset();
+        f.arp.setSeed (seedFor (lane));
+        f.arp.beginBlock (followerSettings (lane), timing, numSamples);
+        for (int ch = 0; ch < 16; ++ch)
+            for (int n = 0; n < 128; ++n)
+                if (const int v = lanes->heldKeys[static_cast<std::size_t> (ch)][static_cast<std::size_t> (n)]; v > 0)
+                    f.arp.noteOn (0, n, v, ch + 1);
+        if (pedalDown)
+            f.arp.sustainPedal (0, true);
+        // (this block's own keys are already in heldKeys: they are not fed twice)
+        for (const auto metadata : midi)
+            if (const auto m = metadata.getMessage(); ! (m.isNoteOnOrOff() || m.isSustainPedalOn() || m.isSustainPedalOff()))
+                f.out.addEvent (m, metadata.samplePosition);
+        f.arp.endBlock();
+        addNotes (f.arp);
+        return &f.out;
+    }
+
+    // Following: the lane's settings, the block's keys, the lane's notes.
+    f.arp.setSeed (seedFor (lane));
+    f.arp.beginBlock (followerSettings (lane), timing, numSamples);
+    for (const auto metadata : midi)
+        if (! feed (f.arp, metadata.getMessage(), metadata.samplePosition))
+            f.out.addEvent (metadata.getMessage(), metadata.samplePosition);   // bends, wheels, pressure, CCs, All Notes Off
+    f.arp.endBlock();
+    addNotes (f.arp);
+    return &f.out;
 }
 
 void ShellProcessor::publishArpDisplay() noexcept
@@ -1403,6 +1586,7 @@ bool ShellProcessor::applyStateXml (const juce::XmlElement& xml)
     // empty card read as nothing at all - shown as the empty dock).
     if (hasHybridLayer())
         engine->sourcePublished (hybridLayer, nullptr);
+    followerFlush.store (true, std::memory_order_release);   // (the AUX follower starts over: no note of the old state hangs)
     if (auto* sources = xml.getChildByName (sourcesType))
         for (auto* e : sources->getChildWithTagNameIterator (layerType.toString()))
         {

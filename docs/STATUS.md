@@ -890,6 +890,18 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
   (InstrumentHost::stepLayerEqSpectrum / paintLayerEqSpectrum; none in ANDOR OSP here - its
   own card EQ spectrum is on the default line).
 
+  AUX arpeggiator follower (opt-in; ANDOR ANALOG's D ARP, analog `docs/aux/D_ARP_FOLLOWER.md`):
+  `ProductInfo::arpFollower` adds one more listener at the per-card arpeggiator's delivery
+  (`ShellProcessor::runArpFollower`, after `runCardArpeggiators`; `Engine::setAuxNotes`). It
+  plays exactly one lane - LINK's shared pattern, or with LINK off card A, B or C's, generated
+  even while that card's own arpeggio is off - as a copy of that lane's arpeggiator taken the
+  block the lane starts (fixed-size arrays: no allocation), so the notes and samples are the
+  lane's. What the cards are given is unchanged. Any change of lane, mode, power, the
+  arpeggiator or a state load ends what it played (note-offs, pedal off, All Notes Off). Its two
+  parameters are read by the shell, so they count as bound. ANDOR OSP sets none: nothing runs.
+  NEXT (shared ARP rule): ANDOR OSP has no AUX source to follow with; the follower ships there
+  with an AUX source, if ANDOR OSP ever gains one - until then the gap is this one.
+
   External audio input (opt-in; ANDOR ANALOG's AUX D LIVE INPUT, analog
   `docs/aux/ADDENDUM_05.md`): `ProductInfo::externalInputName` adds one input bus, off by
   default, a VST3 auxiliary (sidechain) bus (`getVST3ClientExtensions`), copied before the output

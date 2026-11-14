@@ -354,6 +354,20 @@ struct ProductInfo
         Unset: no menu item, no invitation, no event, nothing drawn (ANDOR OSP and every
         other product exactly as before). */
     std::optional<LearnDescriptor> learn;
+    /** The AUX arpeggiator follower (opt-in; ANDOR ANALOG's AUX D): one more listener at the
+        per-card arpeggiator's delivery, playing exactly one lane's stream - LINK on: the shared
+        pattern; LINK off: card A, B or C's (`laneParameterId`, 0 1 2), generated even while that
+        card's own arpeggio is off - without changing anything the cards are given. Followed
+        only while `enabledParameterId` is on, the arpeggiator itself is on, `powerParameterId`
+        is on and `modeParameterId` is one of `followingModes`; otherwise the engine is given
+        nothing (setAuxNotes (nullptr)) and plays the keys as before. Needs the per-card
+        arpeggiator (ProductInfo::cardArpeggiator). Unset: nothing runs (ANDOR OSP). */
+    struct ArpFollower
+    {
+        juce::String enabledParameterId, laneParameterId, powerParameterId, modeParameterId;
+        std::vector<int> followingModes;   ///< the mode parameter's indices (0 .. 31) that follow
+    };
+    std::optional<ArpFollower> arpFollower;
 };
 
 /** Defined by the product (Product.cpp). */
