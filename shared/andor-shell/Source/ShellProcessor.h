@@ -166,6 +166,8 @@ public:
     {
         return ! referenceParity && product().shaperDna && product().shaperDna->note != nullptr ? product().shaperDna->note (const_cast<ShellProcessor&> (*this)) : juce::String();
     }
+    /** ANDOR Learn (the product's opt-in; never in the parity render). */
+    bool learnEnabled() const noexcept { return ! referenceParity && product().learn.has_value() && product().learn->catalog != nullptr; }
     bool generatorGranularToggle() const noexcept { return ! referenceParity && product().generatorGranularToggle; }
     bool arpCompanionShown() const noexcept { return ! referenceParity && product().arpCompanion.name.isNotEmpty(); }
     juce::String cardArpNamespace() const override { return productInfo().slug + "."; }
