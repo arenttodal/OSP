@@ -881,6 +881,15 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
   or a halo range drag (the shell's `setChosenUserMacro`; the halos show the chosen macro on
   either tab).
 
+  14 Nov (feature/aux-live-input): ANDOR Learn V1 merged (shell targets for SUB's row, macro
+  lamps, USER macros and the AUX strip; events macroBank.changed, usermacro.assigned).
+  `Engine::takeRecording` (a product's card may take a dropped recording: ANDOR Analog's C2). A
+  state load tells a hybrid engine its recording is gone. The window's width is the
+  musician's alone (frame::applyWindowShape: the height follows, capped at the screen; the
+  instrument scales inside; fittedWindowHeight) - both instruments. Card EQ spectrum hooks
+  (InstrumentHost::stepLayerEqSpectrum / paintLayerEqSpectrum; none in ANDOR OSP here - its
+  own card EQ spectrum is on the default line).
+
   External audio input (opt-in; ANDOR ANALOG's AUX D LIVE INPUT, analog
   `docs/aux/ADDENDUM_05.md`): `ProductInfo::externalInputName` adds one input bus, off by
   default, a VST3 auxiliary (sidechain) bus (`getVST3ClientExtensions`), copied before the output
