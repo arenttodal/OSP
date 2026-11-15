@@ -31,7 +31,15 @@ namespace
 {
     constexpr double twoPi = 2.0 * std::numbers::pi;
 
+    /** What the pictures draw: the value the DSP plays (modulation included) when the engine
+        publishes it, else the stored one - so a modulated control moves its picture as turning
+        it by hand would (InstrumentHost::shownValue). The knobs keep the stored value. */
     float value (juce::AudioProcessorValueTreeState& state, const juce::String& id)
+    {
+        return InstrumentHost::shownValue (state, id);
+    }
+    /** The stored value (what a preset, a copy or a snapshot keeps: never a modulated one). */
+    float stored (juce::AudioProcessorValueTreeState& state, const juce::String& id)
     {
         if (auto* p = state.getParameter (id))
             return p->convertFrom0to1 (p->getValue());
@@ -57,6 +65,7 @@ namespace
         Visual()
         {
             setInterceptsMouseClicks (false, false);
+            setComponentID ("picture");   // (tests find the picture alone: knobs aside)
             startTimerHz (30);
         }
         ~Visual() override { stopTimer(); }
@@ -1612,6 +1621,117 @@ namespace
         bool expanded = false;
     };
 
+    /**
+        SHAPER DNA's key on the rack's SHAPER display (opt-in: InstrumentHost::shaperDnaParameterId),
+        beside the magnifier and no taller: a small light that switches DNA (one gesture,
+        undoable), and the word with a small chevron that opens the product's panel. Restrained:
+        neutral text while off, a muted sage light while on.
+    */
+    class ShaperDnaKey final : public juce::Component, public juce::SettableTooltipClient
+    {
+    public:
+        ShaperDnaKey (InstrumentHost& h, juce::RangedAudioParameter& parameter)
+            : host (h), attachment (parameter, [this] (float v) { on = v >= 0.5f; repaint(); }, &h.undo())
+        {
+            setMouseCursor (juce::MouseCursor::PointingHandCursor);
+            setTitle ("Shaper DNA");
+            setWantsKeyboardFocus (true);
+            setMouseClickGrabsKeyboardFocus (false);
+            attachment.sendInitialUpdate();
+            refreshTooltip();
+        }
+        bool isOn() const noexcept { return on; }
+        /** The light's part (local): a click there switches DNA, anywhere else opens the panel. */
+        juce::Rectangle<int> lightArea() const { return getLocalBounds().withWidth (getHeight()); }
+        void toggle() { attachment.setValueAsCompleteGesture (on ? 0.0f : 1.0f); }
+        void openPanel()
+        {
+            auto* owner = findParentComponentOfClass<AnchoredPopoverHost>();
+            if (owner == nullptr)
+                return;
+            if (owner->anchoredPopoverOpenFrom (*this))
+            {
+                owner->closeAnchoredPopover();   // (the key again closes it, as a macro's name does)
+                return;
+            }
+            if (auto panel = host.createShaperDnaPanel())
+                owner->openAnchoredPopover (std::move (panel), *this);
+        }
+        void refreshTooltip()
+        {
+            const auto note = host.shaperDnaNote();
+            setTooltip (note.isNotEmpty() ? note : juce::String ("Different Shaper rhythms for individual notes"));
+        }
+        void paint (juce::Graphics& g) override
+        {
+            // The magnifier's own plate (graphite, rounded): one family of keys on the display.
+            const auto r = getLocalBounds().toFloat().reduced (2.0f);
+            g.setColour (juce::Colour (0xff1a1e1f).withAlpha (0.8f));
+            g.fillRoundedRectangle (r.expanded (1.0f), 4.0f);
+            const bool hover = isMouseOver();
+            const auto light = lightArea().toFloat().reduced (0.36f * static_cast<float> (getHeight()));
+            const auto sage = juce::Colour (0xff8fae8b);
+            if (on)
+            {
+                g.setColour (sage.withAlpha (0.22f));
+                g.fillEllipse (light.expanded (2.0f));
+                g.setColour (sage);
+                g.fillEllipse (light);
+            }
+            else
+            {
+                g.setColour (juce::Colour (0xffd9dcd8).withAlpha (0.45f));
+                g.drawEllipse (light, 1.0f);
+            }
+            auto text = getLocalBounds().toFloat().withTrimmedLeft (static_cast<float> (lightArea().getWidth()) - 3.0f).withTrimmedRight (11.0f);
+            g.setColour (juce::Colour (0xffd9dcd8).withAlpha (on || hover ? 0.95f : 0.62f));
+            g.setFont (type::popupLabel (0.48f * static_cast<float> (getHeight())));
+            g.drawText ("DNA", text, juce::Justification::centredLeft, false);
+            // The chevron: the panel.
+            const float cx = static_cast<float> (getWidth()) - 8.5f, cy = 0.5f * static_cast<float> (getHeight());
+            juce::Path chevron;
+            chevron.startNewSubPath (cx - 2.5f, cy - 1.2f);
+            chevron.lineTo (cx, cy + 1.3f);
+            chevron.lineTo (cx + 2.5f, cy - 1.2f);
+            g.strokePath (chevron, juce::PathStrokeType (1.1f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            if (hasKeyboardFocus (false))
+            {
+                g.setColour (sage.withAlpha (0.7f));
+                g.drawRoundedRectangle (r.expanded (1.0f), 4.0f, 1.0f);
+            }
+        }
+        void mouseEnter (const juce::MouseEvent&) override { refreshTooltip(); repaint(); }
+        void mouseExit (const juce::MouseEvent&) override { repaint(); }
+        void mouseUp (const juce::MouseEvent& e) override
+        {
+            if (! getLocalBounds().contains (e.getPosition()) || e.mods.isPopupMenu())
+                return;
+            if (lightArea().contains (e.getPosition()))
+                toggle();
+            else
+                openPanel();
+        }
+        bool keyPressed (const juce::KeyPress& key) override
+        {
+            if (key.getKeyCode() == juce::KeyPress::spaceKey)
+            {
+                toggle();
+                return true;
+            }
+            if (key.getKeyCode() == juce::KeyPress::returnKey)
+            {
+                openPanel();
+                return true;
+            }
+            return false;
+        }
+
+    private:
+        InstrumentHost& host;
+        juce::ParameterAttachment attachment;
+        bool on = false;
+    };
+
     //==========================================================================
     // LIFE: a cloud of possible performances - the same note's contour as it might be played
     // again. LIFE spreads them (pitch: height, tone: colour, attack: onset shape); the
@@ -1866,6 +1986,7 @@ namespace
             modeSelector->setPlain (true);
             modeSelector->setAccent (accent);
             modeSelector->setTooltip (tooltip);
+            binding::tag (*modeSelector, id);   // (ANDOR Learn finds it by its parameter)
             addAndMakeVisible (*modeSelector);
             return *modeSelector;
         }
@@ -2552,12 +2673,12 @@ namespace
         LaneSnapshot snap;
         for (const auto& name : laneSettingNames())
             if (s.getParameter (lane.ids.prefix + name) != nullptr)
-                snap.values[name] = value (s, lane.ids.prefix + name);
+                snap.values[name] = stored (s, lane.ids.prefix + name);
         for (const auto& [name, id] : laneExtras (lane.ids))
             if (id.isNotEmpty() && s.getParameter (id) != nullptr)
-                snap.values[name] = value (s, id);
+                snap.values[name] = stored (s, id);
         snap.pattern = host.laneShaperPattern (laneIndex);
-        snap.on = lane.ids.onId.isEmpty() || value (s, lane.ids.onId) >= 0.5f;
+        snap.on = lane.ids.onId.isEmpty() || stored (s, lane.ids.onId) >= 0.5f;
         return snap;
     }
 
@@ -2830,7 +2951,7 @@ namespace
             RackPreset p;
             for (const auto& id : ids)
                 if (host.apvts().getParameter (id) != nullptr)
-                    p.values[id] = value (host.apvts(), id);
+                    p.values[id] = stored (host.apvts(), id);
             return p;
         }
         void apply (const RackPreset& p) override
@@ -4205,6 +4326,13 @@ namespace
                     onHeightChanged();
             };
             addChildComponent (magnifier);
+            // SHAPER DNA (the product's, opt-in): its key beside the magnifier, lane A's SHAPER only.
+            if (const auto id = p.shaperDnaParameterId(); id.isNotEmpty())
+                if (auto* parameter = p.apvts().getParameter (id))
+                {
+                    dnaKey = std::make_unique<ShaperDnaKey> (p, *parameter);
+                    addChildComponent (*dnaKey);
+                }
             if (p.movementLaneCount() > 1)
                 for (int l = 0; l < 2; ++l)
                 {
@@ -4522,8 +4650,12 @@ namespace
             else
                 setDeck (nullptr);
             magnifier.setVisible (shaper);
+            if (dnaKey != nullptr)
+                dnaKey->setVisible (shaper && lane.index == 0);   // (lane B is a lane of its own: no DNA)
             layout();
             magnifier.toFront (false);
+            if (dnaKey != nullptr)
+                dnaKey->toFront (false);
         }
         TapeDeck::Reading deckReading() const
         {
@@ -4553,6 +4685,11 @@ namespace
             visual->setBounds (column);
             magnifier.setBounds (juce::Rectangle<int> (20, 20).withPosition (column.getRight() - 26, column.getY() + 5));
             magnifier.toFront (false);
+            if (dnaKey != nullptr)
+            {
+                dnaKey->setBounds (juce::Rectangle<int> (48, 20).withPosition (magnifier.getX() - 52, column.getY() + 5));
+                dnaKey->toFront (false);
+            }
         }
         void layoutExpanded (juce::Rectangle<int> area) override
         {
@@ -4645,8 +4782,8 @@ namespace
                         return;
                     const Lane from (safe->processor, other);
                     auto& s = safe->processor.apvts();
-                    const bool custom = value (s, from ("shaper.custom")) >= 0.5f;
-                    safe->setCustom (custom ? safe->processor.laneShaperPattern (other) : RhythmicShaper::patternSteps (juce::roundToInt (value (s, from ("shaper.pattern")))));
+                    const bool custom = stored (s, from ("shaper.custom")) >= 0.5f;
+                    safe->setCustom (custom ? safe->processor.laneShaperPattern (other) : RhythmicShaper::patternSteps (juce::roundToInt (stored (s, from ("shaper.pattern")))));
                 });
             }
             menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (toolbar.get()).withDeletionCheck (*this));
@@ -4694,6 +4831,10 @@ namespace
         int builtMode = -1;
         std::unique_ptr<ShaperToolbar> toolbar;
         MagnifierButton magnifier;
+        std::unique_ptr<ShaperDnaKey> dnaKey;   ///< SHAPER DNA's key (the product's; null: none)
+    public:
+        ShaperDnaKey* shaperDnaKey() const noexcept { return dnaKey.get(); }
+    private:
         std::unique_ptr<juce::ParameterAttachment> customAttachment;
         std::vector<std::unique_ptr<rackui::LaneKey>> laneTabs;
         std::unique_ptr<rackui::VerticalSwitch> power;
@@ -5118,6 +5259,7 @@ namespace
             {
                 selectors.push_back (std::make_unique<ValueSelector> (*state.getParameter (keys[i].first), captions[i]));
                 selectors.back()->setTooltip (keys[i].second);
+                binding::tag (*selectors.back(), keys[i].first);
                 addAndMakeVisible (*selectors.back());
             }
             newTakes = std::make_unique<NewTakesButton> (*state.getParameter ("life.takesSeed"));
@@ -5874,6 +6016,20 @@ void showRackMovementLane (rack::Module& module, int lane)
         m->showLane (lane);
 }
 
+juce::Component* rackShaperDnaKey (const rack::Module& module)
+{
+    if (const auto* m = dynamic_cast<const MovementRack*> (&module))
+        return m->shaperDnaKey();
+    return nullptr;
+}
+
+void clickRackShaperDnaKey (rack::Module& module, bool light)
+{
+    if (const auto* m = dynamic_cast<const MovementRack*> (&module))
+        if (auto* key = m->shaperDnaKey())
+            light ? key->toggle() : key->openPanel();
+}
+
 void setRackMovementWide (rack::Module& module, bool wide)
 {
     if (auto* m = dynamic_cast<MovementRack*> (&module))
@@ -5982,7 +6138,7 @@ std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, InstrumentHost& p
         }
         case MacroPopup::character:
         {
-            auto popup = std::make_unique<MacroPanel> (processor, "CHARACTER", 262, 58, design::colour::Macro::character);
+            auto popup = std::make_unique<MacroPanel> (processor, processor.characterName(), 262, 58, design::colour::Macro::character);
             popup->mode ("character.type", "Filter type");
             popup->setVisual (std::make_unique<CharacterVisual> (processor));
             popup->knob (false, "character.min", "MIN", [] (double v) { return format::hertz (v); });

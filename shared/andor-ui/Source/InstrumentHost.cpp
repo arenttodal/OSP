@@ -1,6 +1,7 @@
 #include "InstrumentHost.h"
 #include "ShapingPopups.h"
 #include "AndorParameters.h"
+#include "ShapingPopups.h"
 
 #include "engine/Dampen.h"
 
@@ -32,6 +33,16 @@ mod::Curve InstrumentHost::keyDnaCurve (int layer, keydna::Param param) const
 namespace
 {
     std::array<int, 3> shownOfStorage { 0, 1, 2 };
+}
+
+float InstrumentHost::shownValue (juce::AudioProcessorValueTreeState& state, const juce::String& parameterId)
+{
+    if (const auto* host = dynamic_cast<const InstrumentHost*> (&state.processor))
+        if (EffectiveValue v; host->effectiveValue (parameterId, v))
+            return v.value;
+    if (auto* p = state.getParameter (parameterId))
+        return p->convertFrom0to1 (p->getValue());
+    return 0.0f;
 }
 
 int InstrumentHost::shownLayer (int layer)
@@ -372,7 +383,7 @@ juce::String InstrumentHost::depthModulationRefusal (mod::Source source, int tar
         return "There is no modulation route here: drop on the knob to make one";
     const auto& target = probe.routes[static_cast<std::size_t> (targetSlot)];
     const juce::String name (mod::sourceName (source));
-    const auto route = juce::String (mod::sourceName (target.source)) + juce::String::fromUTF8 (" \xe2\x86\x92 ") + mod::destInfo (target.dest).name;
+    const auto route = juce::String (mod::sourceName (target.source)) + juce::String::fromUTF8 (" \xe2\x86\x92 ") + destName (target.dest);
     switch (mod::depthRule (probe, source, targetSlot))
     {
         case mod::DepthRule::ok: return {};
@@ -436,7 +447,7 @@ InstrumentHost::ModAssignResult InstrumentHost::assignModulation (mod::Source so
         result.error = "Nothing to assign";
         return result;
     }
-    const juce::String pair = juce::String (mod::sourceName (source)) + " cannot reach " + mod::destInfo (dest).name;
+    const juce::String pair = juce::String (mod::sourceName (source)) + " cannot reach " + destName (dest);
     if (dest == mod::Dest::routeDepth)
     {
         result.error = "A route's depth is modulated from its halo";
@@ -709,5 +720,21 @@ std::unique_ptr<MiniPanel> InstrumentHost::createSatellitePanel (int)
 {
     return nullptr;   // (none by default: a product that moves its cards supplies its panel)
 }
+
+juce::String InstrumentHost::destName (mod::Dest dest) const
+{
+    const juce::String name (mod::destInfo (dest).name);
+    const auto own = characterName();
+    if (own != "CHARACTER" && name.startsWith ("CHARACTER"))
+        return own + name.substring (9);
+    return name;
+}
+
+std::unique_ptr<MiniPanel> InstrumentHost::createShaperDnaPanel()
+{
+    return nullptr;   // (SHAPER DNA is a product's: ANDOR OSP has none)
+}
+
+
 
 } // namespace osp::plugin

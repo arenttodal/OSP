@@ -695,6 +695,7 @@ void KeyDnaEditor::mouseDown (const juce::MouseEvent& e)
         recompute();
         host.setKeyDnaSettings (layerIndex, s, s.enabled ? "KEY DNA on" : "KEY DNA off", true);
         repaint();
+        userEdit ("power");
         return;
     }
     if (randomize.contains (p))
@@ -727,6 +728,7 @@ void KeyDnaEditor::mouseDown (const juce::MouseEvent& e)
         if (tabs[static_cast<std::size_t> (i)].contains (p))
         {
             showParameter (static_cast<keydna::Param> (i));
+            userEdit ("tab");
             return;
         }
     if (const auto* f = fieldAt (p))
@@ -857,12 +859,23 @@ void KeyDnaEditor::mouseDrag (const juce::MouseEvent& e)
     repaint();
 }
 
+void KeyDnaEditor::userEdit (const juce::String& what)
+{
+    // (From the musician's own press only; the shown parameter tells which: "depth.pos".)
+    if (onUserEdit != nullptr)
+        onUserEdit (what == "power" || what == "amount" || what == "individuality" || what == "seed" ? what
+                                                                                                    : what + "." + juce::String (keydna::paramId (shownParam)));
+}
+
 void KeyDnaEditor::mouseUp (const juce::MouseEvent&)
 {
     if (std::exchange (drawArmed, false))
     {
         if (std::exchange (drawingKeys, false))
+        {
             host.setKeyDnaSettings (layerIndex, settings, "KEY DNA " + juce::String (keydna::paramName (shownParam)) + " keys", true);
+            userEdit ("keys");
+        }
         strokeKey = -1;
         repaint();
         return;
@@ -875,13 +888,17 @@ void KeyDnaEditor::mouseUp (const juce::MouseEvent&)
                 amountParameter->endChangeGesture();
         }
         else if (! juce::exactlyEqual (value (dragField->name), dragFrom))
+        {
             setValue (dragField->name, value (dragField->name), true);
+            userEdit (dragField->name);
+        }
     }
     else if (dragging)
     {
         host.setKeyDnaCurve (layerIndex, shownParam, curve, true);
         settings = host.keyDnaSettings (layerIndex);
         recompute();
+        userEdit ("curve");
     }
     dragging = false;
     dragField = nullptr;

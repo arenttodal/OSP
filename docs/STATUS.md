@@ -883,6 +883,21 @@ the shared rack (done) and OSP's routing view and mixer (not started).
   - The shell's reference parity follows the same rule (`ShellProcessor::trimsOnlyWithThreeCards`),
     and a product's own setting is unchanged (ANALOG: in the well, always trimmed).
 
+## ANDOR Learn V1 in the shell (branch feature/andor-learn-v1, 11 Nov 2026)
+
+- **What it is.** `shared/andor-learn`: guided lessons, a contextual Learn mode, a topic browser,
+  a one-time invitation and per-user progress for shell products. The authoring guide is
+  `shared/andor-learn/README.md`.
+- **Opt-in.** `ProductInfo::learn` turns it on. Without it, nothing is created, nothing is in
+  the menu and nothing is drawn.
+- **Shared ARP UI.** It gains opt-in `onLearnAction` hooks (null by default) and `MiniKnob`
+  gains `onUserChange`, so ANDOR OSP's plugin is unchanged.
+- **Completion.** Only a user event from a control's own gesture handler can complete a step,
+  and the parameter is then checked against its value before the gesture. Automation, presets,
+  undo and programmatic calls never complete one.
+- **Tests.** `tests/shell/LearnTests.cpp` runs in every product's test program.
+- **First consumer.** ANDOR Analog (docs/LEARN_V1.md there).
+
 ## DONE
 
 - Pure C++20 DSP/analysis library (`osp_dsp`) independent of JUCE; JUCE used for file
@@ -931,6 +946,33 @@ the shared rack (done) and OSP's routing view and mixer (not started).
   `InstrumentHost::outputPeak()` (default -1; `ShellProcessor` publishes the last block's peak,
   read-only telemetry) lets the reels rest in silence. ANDOR OSP sets no faceplate: 0 px.
 
+- Two shared fixes (11 Nov 2026, from ANDOR ANALOG's first Mac test):
+  - **An anchored popover no longer closes in the click that opens it.** JUCE tells the
+    editor's outside-click watcher after the key has opened its panel, and the watcher closed
+    it at once (SATELLITE's, ANDOR ANALOG's RHYTHM and every `openAnchoredPopover` key opening
+    on mouse-down). `ShellEditor::mouseDownAnywhere` now leaves the panel's own anchor alone.
+    ANDOR ANALOG's tests now replay the watcher after each press.
+  - **Lamps have no seam cross at fractional display scales.** A skin piece whose insets meet
+    (no centre to stretch: the arp lights, the macro LEDs) was composed from four quarters,
+    each resampled alone. At 1.8× and 2.5× they met as a light cross. Such a piece is now
+    resampled whole. At whole scales the pixels are the same either way.
+
+- **Macro ranges on the halos** (shared, opt-in; ANDOR ANALOG's USER macros,
+  its docs/MACRO_DESTINATION_FIRST.md).
+  - `ModulationOverlay` can draw a product's macro assignments in its own vocabulary:
+    - a quiet arc in the macro's colour;
+    - the focused macro's range as the ring, with 0 % (hollow) and 100 % (filled) handles that
+      drag along the ring (Shift: fine; Escape: cancel), the marker and the readout.
+  - Hooks: `macroArcs`, `macroEligible`, `anyMacroArcs`, `macroOffset` (a route's sweep starts
+    after the macros), `editMacroRange`, `resetMacroEnd`, `setMacroFocus`.
+  - A control with no modulation destination can be walked for them. Its menu then has no empty
+    MODULATION heading.
+  - `ProductInfo::UserMacros` gained ranges / offsetNow / editRange / resetEnd / resetRange /
+    unassign / unassignAll.
+  - `ShellEditor`: "Assign to Macro" with the macros' names and checkmarks, plus the assigned
+    items. The chosen macro's rings replace `MacroAssignOverlay`'s show mode.
+  - ANDOR OSP sets none of it: 0 px, its tests unchanged.
+
 ## IN PROGRESS
 
 - Lab round 3 (Reimagined 3, violin).
@@ -939,6 +981,157 @@ the shared rack (done) and OSP's routing view and mixer (not started).
 
 ## NEXT
 
+- **AUX strip (shell, opt-in; ANDOR ANALOG's D / AUX, analog `docs/aux/AUX_REPORT.md`).**
+  `ProductInfo::auxStrip` adds an optional strip under the source cards:
+  - "Show / Hide AUX" in the main menu;
+  - `<View auxShown>` kept with the session, never with a preset;
+  - everything under the cards moves down by its room (`ShellEditor::auxShift`, the cards' own
+    `cardTrim` unchanged);
+  - `rack::Kind::aux` for its rack, and Escape closing that rack.
+
+  Addendum 03 (all opt-in; ANDOR OSP unchanged):
+  - `osp::plugin::DropOwner`: the shell's editor gives a file drop to the part under the pointer
+    that owns drops, consumed (never a card's too);
+  - `LayerStateButton` for a product source's own M / S parameter;
+  - `ShellEditor::cardDisplayBounds`, which the strip aligns its zones to.
+  - `AuxStrip::emptyDropsIgnored`: a file dropped on empty space (neither a card nor an owner)
+    does nothing in a product that asks for it (ANDOR ANALOG).
+
+  The window fits its screen (both instruments, not opt-in; analog `docs/aux/ADDENDUM_04.md`):
+  `frame::applyWindowShape` never asks for more height than the screen holds when the
+  arpeggiator or a rack makes the instrument taller (a host clamped such a window and left the
+  editor cut off at the side). It narrows to the widest that fits, the instrument whole, and the
+  chosen width comes back once it fits; `frame::ScreenFit` fits an editor first shown with a tall
+  layout. Off screen nothing changes (the captures; shell test `[window]` on
+  `frame::fittedWindowWidth`). Owner test: a real Mac screen in a DAW.
+
+  Right-click menus reach the knob's press (both instruments): `ModulationOverlay` also listens to
+  its root's presses, so a plain right-click on a destination or macro-eligible knob opens its menu
+  in a host (the host gave the press to the knob, which has none; control-click worked). Tests
+  `[rightclick]` in both. Second fix: with the right button down the overlay itself claims the
+  press (its hitTest counts any destination for a popup), but its mouseDown looked only for
+  modulated knobs, so an unmodulated knob opened nothing - found with a real right-click in
+  ANDOR Analog's standalone. mouseDown now uses the same test; `[rightclick]` routes the press as
+  JUCE does (the component under the point while the button is down) in both instruments.
+
+  The AMP envelope's picture follows A D S R's modulation (both instruments): `EnvelopePanel::
+  livePosition` (set by the editor from `ModulationOverlay::livePosition`, the halos' own sum of
+  active routes and macros) draws the shape the newest note plays, the set shape dashed under it
+  with the handles; with nothing sounding or routed the picture is the set one, pixel for pixel
+  (`[ampenv]` in both). ANDOR ANALOG's macro tab no longer switches to USER on an assignment
+  or a halo range drag (the shell's `setChosenUserMacro`; the halos show the chosen macro on
+  either tab).
+
+  14 Nov (feature/aux-live-input): ANDOR Learn V1 merged (shell targets for SUB's row, macro
+  lamps, USER macros and the AUX strip; events macroBank.changed, usermacro.assigned).
+  `Engine::takeRecording` (a product's card may take a dropped recording: ANDOR Analog's C2). A
+  state load tells a hybrid engine its recording is gone. The window's width is the
+  musician's alone (frame::applyWindowShape: the height follows, capped at the screen; the
+  instrument scales inside; fittedWindowHeight) - both instruments. Card EQ spectrum hooks
+  (InstrumentHost::stepLayerEqSpectrum / paintLayerEqSpectrum; none in ANDOR OSP here - its
+  own card EQ spectrum is on the default line).
+
+  Vertical-only expansion, fixed width (the owner's layout spec, 15 Nov): opening or closing a
+  rack, the arpeggiator or a strip changes only the window's height - never its width, the
+  instrument's scale or anything's horizontal place. `frame::applyWindowShape` no longer sets
+  a fixed aspect ratio (a host could answer a taller window with another width); the editor's
+  constrainer (`ScreenFit::Shape`) makes a width change (the corner, a host) take the height
+  that goes with it - an even zoom - and keeps a height-only change (no taller than the
+  instrument). `frame::fit` scales by the window's width only: the window as tall as the
+  instrument is placed exactly as before (pixel-identical); shorter - capped at the screen, a
+  host that refused, a dragged bottom edge - the instrument stays at the top-left at the same
+  scale and scrolls (`frame::Overflow`: a slim vertical bar, the wheel where no knob takes it);
+  taller - top-left, the surround below. Never shrunk, never centred, no side margins. Tests
+  `[window][geometry]` (every shell product): each rack, rack to rack, the arpeggiator, a
+  strip, all together, 100 cycles - width, cards, macros unchanged, the keyboard lower by the
+  section only, back on closing; a refused height scrolls at the same scale; the constrainer.
+  Refined (the owner's clarification, 15 Nov): the window always grows first, and scrolling is
+  only the last resort. The constrainer answers every resize with the instrument's full height
+  (never an old, shorter height kept). A host that first reports the old size while it
+  negotiates is not taken as a refusal: `frame::Overflow` waits (`settleDelayMs`, no bar,
+  unscrolled), asks for the full height once more, and only a window still short after that
+  scrolls (`settleNow` steps it in tests). A shrink answered with the old, taller size is asked
+  again too. The screen's own limit scrolls at once (the window already stands at its room;
+  `overrideScreenRoom` in tests). Tests `[window][geometry][host]` with a stand-in host window:
+  SPACE + ARP + the strip opened together grow the window to the whole instrument and closing
+  shrinks it (a granting host); a host reporting the old size first never shows a bar and ends
+  at the full height; a refusing host is asked twice, then scrolls at the same width and scale;
+  a short screen scrolls at once. Real DAWs: UNVERIFIED (OWNER TEST).
+
+  ANDOR Learn 2.0 (shared/andor-learn; ANDOR ANALOG's `docs/LEARN_2.md`, 15 Nov): Learn as an
+  interactive manual. Changes:
+  - One **Learn** menu entry: Tutorials..., Toggle Info (was "Learn mode"), Reset Tutorials...
+    (asks first; clears lesson records only), and Restore Previous Sound while one is kept.
+  - A quieter browser: START HERE / LESSONS, a description per row, the time, "Resume · Step n
+    of N" or a check; keys; it re-reads progress on opening.
+  - The note: label + STEP n OF N, a status line ("ARP is already on." + Continue; a check and
+    what changed once done), one primary key and Back. **Skip is gone** (`LessonRunner::skip`
+    and `StepStatus::skipped` removed; a finished lesson had every task done or already so; a
+    resumed one counts from where it began).
+  - A green outline (2 px, soft glow, padded, corners matched) on the exact control, with a
+    connector when the note sits apart; scored placement (right / left / above / below, never
+    on the target, avoiding the step's other controls and the panel the control is in, inside
+    the visible part of a scrolled editor, the target scrolled into view).
+  - Readiness: `Step::requirements` block a step while what it needs is missing (the note
+    names it, outlines and offers the fix, and the lesson's example); a preparation step (Use
+    Current Sound / Load Example Sound).
+  - Example sounds: `LearnDescriptor::exampleState`; `ShellProcessor::loadLearnExample` keeps
+    the whole sound first, `restoreLearnSound` brings it back; never on X, never unasked.
+  - Exact targets: `binding::findControl` finds a control by the parameter it edits
+    (`ParameterRack` marks its knobs, switches and selectors: no visual change); new shell
+    targets `arp.on`, `arp.opener`, `arp.plays.A/B/C`, `arp.edit.A/B/C`, `arp.card.B.pattern` /
+    `.rate`, `macro.N.knob` / `.label`, `usermacro.N.label`; states `arp.edit.B`,
+    `rack.any.open`; registry values (`addValue`: a product's number compared like a parameter);
+    events `control.menu.opened` (a control's right-click), `usermacro.range.changed` (a halo end
+    committed).
+  - Progress: records other than complete / in-progress (an earlier build's skipped) read as
+    new; in-progress resumes by stable step ID across revisions; complete stays.
+  ANDOR OSP's own plugin had no Learn then (it has now: below); its editor and captures were unchanged
+  (4 / 4 shards). Tests: `[learn][unit]` (no Skip, requirements and preparation, a dropdown's
+  late choice, legacy records), and the product suites (ANDOR ANALOG: 23 Learn cases).
+
+  Universal modulation-aware visual feedback (docs/EFFECTIVE_VALUES.md): a picture draws what
+  the DSP plays. `osp::EffectiveValues` (src/engine) is a fixed, lock-free table published by
+  the audio thread (a sequence lock per slot, with the span covered over a UI frame);
+  `InstrumentHost::effectiveValue` reads it; `InstrumentHost::shownValue` is what the pictures
+  draw (MacroPopups' `value()`; `stored()` for presets, lane copies and snapshots); the halos'
+  live dot and `livePosition` take the engine's sum (every route, clamps) with a faint span
+  trail; the card EQ draws the engine's `effectiveEq`; the shell builds `liveMix()` from the
+  engine's blend. ANDOR OSP publishes its six macros and each layer's EQ while a route moves
+  them. Tests `[effective]`: SHAPER modulated to 80 % is pixel-identical to a hand-set 80 %;
+  the knob is never written back. Unmodulated, every picture is as before. OPEN (listed in
+  the doc): ANDOR OSP's per-voice destinations (CUTOFF / RESONANCE, grains, START, DAMPEN,
+  envelope times) keep the UI mirror until the engine publishes a representative voice.
+
+  AUX arpeggiator follower (opt-in; ANDOR ANALOG's D ARP, analog `docs/aux/D_ARP_FOLLOWER.md`):
+  `ProductInfo::arpFollower` adds one more listener at the per-card arpeggiator's delivery
+  (`ShellProcessor::runArpFollower`, after `runCardArpeggiators`; `Engine::setAuxNotes`). It
+  plays exactly one lane - LINK's shared pattern, or with LINK off card A, B or C's, generated
+  even while that card's own arpeggio is off - as a copy of that lane's arpeggiator taken the
+  block the lane starts (fixed-size arrays: no allocation), so the notes and samples are the
+  lane's. What the cards are given is unchanged. Any change of lane, mode, power, the
+  arpeggiator or a state load ends what it played (note-offs, pedal off, All Notes Off). Its two
+  parameters are read by the shell, so they count as bound. ANDOR OSP sets none: nothing runs.
+  NEXT (shared ARP rule): ANDOR OSP has no AUX source to follow with; the follower ships there
+  with an AUX source, if ANDOR OSP ever gains one - until then the gap is this one.
+
+  External audio input (opt-in; ANDOR ANALOG's AUX D LIVE INPUT, analog
+  `docs/aux/ADDENDUM_05.md`): `ProductInfo::externalInputName` adds one input bus, off by
+  default, a VST3 auxiliary (sidechain) bus (`getVST3ClientExtensions`), copied before the output
+  is written and handed to `Engine::setExternalInput`. ANDOR OSP sets none: output only, unchanged
+  (shell test `[buses]`).
+
+  It is a source, not a SPACE / ECHO / ARP feature. ANDOR OSP sets none and is unchanged: no menu
+  item, no view attribute, no room (the shell test `[aux]`; the OSP captures). Should ANDOR OSP
+  want a fourth source, it needs a product strip and an engine bus of its own.
+
+- **C RHYTHM in ANDOR OSP** (shared modulation, not a SPACE / ECHO / ARP feature). The source
+  is appended to `osp::mod::Source` and offered only when a product asks
+  (`ProductInfo::rhythmSource`). ANDOR OSP keeps its twelve sources and its golden is
+  unchanged (tested). Should ANDOR OSP want it, it needs:
+  - its own loop analysis and player (ANDOR ANALOG's are in its `dsp/rhythm`; they could move
+    to `src/analysis` and `src/audio` unchanged: pure C++);
+  - a schema bump for the route-source list.
 - **The effects rack in ANDOR OSP's own plugin** (the rule on shared SPACE / ECHO / ARP
   features). The rack host (`shared/andor-ui/Source/EffectRack.*`), its modules (built in
   `MacroPopups.cpp` from the popovers' parts) and the frame's rack slot are shared and opt-in
@@ -1305,6 +1498,63 @@ on the ADD place, or only the card dropped on. Audit, measured reproduction and 
 - NEXT: ANDOR ANALOG's card EQs (the shell's) can show the spectrum once its host returns its
   engine's layer taps.
 
+## SYNTH defaults: SHAPE FOLLOW, IMPRINT and MOTION 100 % (15 Nov 2026, state 15)
+
+- **SHAPE** (`layerX.synth.shape`) now defaults to FOLLOW, so the synthesizer's level follows the
+  recording.
+- **IMPRINT** and **MOTION** (`layerX.synth.imprint`, `.motion`) now default to 100 %, so turning
+  IMPRINT on is heard at once.
+- **Older sessions and presets** (state below 15, factory ones included) open with every layer's
+  SHAPE as FOLLOW. IMPRINT and MOTION at 0 %, the old default, open as 100 %; values above 0 are
+  kept.
+- **Not migrated: HELD saved after this change.** A preset saved now with HELD keeps HELD.
+- **Audible change.** A session that played SYNTH with HELD now plays it with FOLLOW. Renders
+  with SYNTH off are unchanged.
+- **Schema golden.** It follows the new defaults: three SHAPE lines and six IMPRINT / MOTION
+  lines.
+
+## ANDOR Learn 2.0 in ANDOR OSP's own plugin (15 Nov 2026, branch claude/osp-learn-2)
+
+- **What.** Learn 2.0, the shared framework (`shared/andor-learn`) that ANDOR ANALOG uses, now
+  runs on `OspAudioProcessorEditor` through an OSP adapter (`apps/plugin/Source/OspLearn.cpp`).
+  OSP has no copy or parallel version.
+  - It has 11 lessons for the recording-to-instrument workflow and 32 Info topics.
+  - Each lesson but Quick Start opens with a set-up step: Use Current Sound or Load Example
+    Sound.
+  - Step requirements (a playable sound, Granular, two layers, a sample set) block a step with a
+    reason and the control that fixes it.
+  - It ships synthetic tutorial sounds, Restore Previous Sound and per-user progress under `osp`.
+
+  The report, the target inventory and the editorial checks are in `docs/learn/osp-learn.md`.
+- **The merge.** OSP's `feature/aux-live-input` (Learn 2.0, user macros, effective values, the
+  shell's inline arpeggiator lanes and follower) is merged into OSP's line.
+  - The shell takes that line's version.
+  - OSP's processor keeps its own `CardArpLanes` and SATELLITE.
+  - This branch replaces `claude/osp-learn`: its V1 extensions are dropped in favour of 2.0's.
+- **One shared addition:** `ParameterGestureBridge`. It reports gestures of OSP's own controls as
+  `param:<id>`. It is not used by the shell, so ANDOR ANALOG is unchanged.
+- **Tests.** `osp_plugin_tests "[learn]"` (8 cases, 438 assertions) passes, and so does the
+  shell's Learn 2.0 `[learn]`. `[learn-shots]` renders every step (182 images).
+- **No sound change.** Learn adds no parameter and no DSP change.
+- **Not done.** No DAW pass. The tutorial sounds have not been listened to. ANDOR ANALOG has not
+  been rebuilt against this branch.
+
+## ANDOR OSP: SATELLITE opens on its key; CHARACTER is called FILTER (15 Nov 2026)
+
+- **SATELLITE's panel opens.** It used to close in the press that opened it: JUCE tells the
+  editor's outside-click watcher after the key has opened its panel. OSP's editor and the
+  shell's now leave the anchored panel's own key alone (ANDOR ANALOG's d99f5d8). A press
+  elsewhere still closes it. `[satellite]` replays the watcher after each press; it failed
+  before the fix.
+- **Lamps without a seam cross** (the same Analog commit): a skin piece with no centre to
+  stretch is resampled whole at fractional display scales.
+- **FILTER.** ANDOR OSP's macro row (`frame::ospMacroSpecs`) names the `character` macro
+  FILTER. Its rack, popover and the modulation names follow it through
+  `InstrumentHost::characterName()` (FILTER CUTOFF, FILTER RESONANCE). The shell takes the
+  name from the product's macro row, so the example product matches OSP (its visual
+  regression stays at 0 px). Unchanged: the parameter IDs (`character`, `character.*`), the
+  host's parameter names ("Character ...") and every saved session.
+
 ## ANDOR OSP: SATELLITE, each layer's own stereo motion (14 Nov 2026)
 
 ANDOR ANALOG's SATELLITE, the per-card arpeggiator's companion, is now in ANDOR OSP. This was
@@ -1351,6 +1601,47 @@ there.
     `analog.satellite.*`). The Phase 2 tail test pins version 32.
 - NEXT: ANDOR ANALOG can drop its own copy of the panel for the shared one (its
   `params::satelliteId` as the `idOf`).
+- **A macro's own on / off lamp (shared, opt-in: `ProductInfo::macroSwitches`).**
+  - `MacroSwitchLamp` (`MainSections.h`) is a tiny ring-and-dot button left of a macro's name, on
+    its centre line. It is about 14 px drawn, with a 26 px target.
+  - A click, Return or Space toggles it; each toggle is one host gesture and can be undone.
+  - The tooltip is the product's.
+  - While off, the macro's knob arc is dimmed; the value is untouched.
+  - ANDOR ANALOG uses it for MORPH.
+  - In ANDOR OSP the list is empty and the parity render never shows one: OSP is pixel-identical.
+  - Evidence: ANDOR ANALOG's `[analog][morph][ui]` test and `docs/screenshots/morph-lamp`.
+
+- **SHAPER DNA hooks (shared, opt-in; ANDOR ANALOG's SHAPER DNA V1).**
+  - `MovementBus::setShaperHandoff` / `PostProcessor::setShaperHandoff`:
+    - lane A's SHAPER hands its share of one gate to a product's per-note shaping over 40 ms;
+    - `RhythmicShaper::process`'s `share` gives gain^share and share of the filter's octaves.
+  - `InstrumentHost::shaperDnaParameterId / createShaperDnaPanel / shaperDnaNote`, through
+    `ProductInfo::shaperDna`: the MOVEMENT rack's SHAPER shows a small DNA key beside its
+    magnifier (lane A only).
+  - `AnchoredPopoverHost`: the shell opens a product's panel anchored to a component, over a
+    backdrop that swallows the closing click.
+  - All of it is off by default and never in the parity render. ANDOR OSP keeps a single,
+    whole-mix SHAPER, exactly as before.
+  - ANDOR OSP has no per-note voice stage of this kind, so DNA is ANDOR ANALOG's alone. It is not
+    a SPACE / ECHO / ARP feature, and nothing is planned for OSP's own engine yet.
+  - Evidence: ANDOR ANALOG's `[shaperdna]` tests and `docs/SHAPER_DNA_V1.md`.
+
+- **USER MACROS hooks (shared, opt-in; ANDOR ANALOG's USER MACROS V1.1).**
+  - `ProductInfo::userMacros`: a product's six USER parameter IDs and its callbacks (names,
+    rename, targets, eligibility, assign, clear, its panel, a revision counter).
+  - `UserMacroBank.h`:
+    - `MacroBankTab`: CORE and USER as two small folder tabs on the macro panel's top-left edge;
+    - `MacroLens`: the drag handle on a USER knob's light;
+    - `MacroAssignOverlay`: rings while assigning, arcs on mapped controls, the pick banner.
+  - The shell:
+    - a second, hidden macro row in CORE's places (USER 1..6 in visual order);
+    - the bank shown is kept in `Interface.xml` (`MacroBank`), never in a preset;
+    - pick mode and Escape;
+    - "Assign to USER" through `ModulationOverlay::extendContextMenu`.
+  - All of it is off unless a product asks, and never in the parity render. ANDOR OSP has no
+    tab, no USER parameters and the same pixels.
+  - Not a SPACE / ECHO / ARP feature. ANDOR OSP's macros stay its six.
+  - Evidence: ANDOR ANALOG's `[usermacro]` tests and `docs/USER_MACROS_V1_1.md`.
 
 ## BLOCKERS
 

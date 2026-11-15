@@ -1,4 +1,5 @@
 #include "PluginProcessor.h"
+#include "TutorialSounds.h"
 #include "engine/fx/Effects.h"
 #include "FxIdentity.h"
 #include "AndorParameters.h"
@@ -2356,6 +2357,73 @@ void OspAudioProcessor::loadExample (int layer)
     loadFile (file, layer);
 }
 
+bool OspAudioProcessor::loadTutorialExample (const juce::String& exampleId)
+{
+    const auto example = tutorial::fromId (exampleId);
+    if (! example.has_value() || pendingLoads.load() > 0)
+        return false;
+    juce::String error;
+    const auto files = tutorial::files (*example, error);
+    if (files.isEmpty())
+        return false;
+    // The musician's whole instrument first (restorable), then a clean one with the example.
+    auto before = createStateXml();
+    if (before == nullptr)
+        return false;
+    for (int layer = 0; layer < numLayers; ++layer)
+        if (isLayerOccupied (layer))
+            clearLayer (layer);
+    keptSlotCount = 0;
+    removedLayer.reset();
+    setEditLayer (0);
+    resetSettings();
+    if (*example == tutorial::Example::pluckSet)
+    {
+        tutorialLayers = 1;
+        addLayerSet (files);   // one multi-sample layer, mapped as a dropped folder is
+    }
+    else
+    {
+        std::vector<Audition::LayerLoad> sounds;
+        for (int i = 0; i < files.size() && i < numLayers; ++i)
+        {
+            Audition::LayerLoad load;
+            load.layer = i;
+            load.file = files[i];
+            load.filename = files[i].getFileName();
+            load.originalPath = files[i].getFullPathName();
+            sounds.push_back (load);
+        }
+        tutorialLayers = static_cast<int> (sounds.size());
+        loadLibrarySounds (sounds, tutorialStateLabel());
+    }
+    previousState = std::move (before);   // (what the loads above kept was the cleared state)
+    previousStateLabel = tutorialStateLabel();
+    presetNameOverride = "Tutorial";
+    presetIsProgram = false;
+    lastPresetFile = juce::File();
+    lastStartingStateFile = juce::File();
+    return true;
+}
+
+bool OspAudioProcessor::tutorialExampleReady() const
+{
+    if (tutorialLayers <= 0 || pendingLoads.load() > 0)
+        return false;
+    for (int layer = 0; layer < tutorialLayers; ++layer)
+        if (loadState (layer) != LoadState::ready || currentInstrument (layer) == nullptr)
+            return false;
+    return true;
+}
+
+bool OspAudioProcessor::tutorialExampleFailed() const
+{
+    for (int layer = 0; layer < tutorialLayers; ++layer)
+        if (loadState (layer) == LoadState::failed)
+            return true;
+    return false;
+}
+
 void OspAudioProcessor::publishEmpty (std::size_t index)
 {
     auto& target = layers[index];
@@ -3485,6 +3553,19 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml, bool setting
         // (Unlimited), while new sessions start from the benchmarked budget.
         setParameterValue (ids::grainBudget, 0.0f);
     }
+    if (savedVersion < 15)
+    {
+        // SYNTH (state 15): every layer's SHAPE opens as FOLLOW, existing presets included, and
+        // IMPRINT / MOTION left at their old default (0 %) take the new one (100 %), so turning
+        // IMPRINT on is heard at once. A value somebody set (above 0) is kept.
+        for (int layer = 0; layer < numLayers; ++layer)
+        {
+            setParameterValue (synthParameterId (layer, "shape"), 1.0f);
+            for (const auto* name : { "imprint", "motion" })
+                if (auto* p = parameters.getParameter (synthParameterId (layer, name)); p != nullptr && p->convertFrom0to1 (p->getValue()) <= 0.0f)
+                    setParameterValue (synthParameterId (layer, name), 100.0f);
+        }
+    }
     // KEY DNA: the session's (absent before 13: none). Always published, so a session without
     // it also clears the previous one's.
     {
@@ -4362,6 +4443,38 @@ std::unique_ptr<MiniPanel> OspAudioProcessor::createSatellitePanel (int card)
 {
     // The shared panel (ANDOR ANALOG's), on each layer's own `layerX.satellite.*`.
     return std::make_unique<SatellitePanel> (*this, [] (int c, const char* field) { return satelliteFieldId (c, field); }, card);
+}
+
+bool OspAudioProcessor::effectiveValue (const juce::String& parameterId, EffectiveValue& out) const
+{
+    // The shared stages' macros and the layers' EQ as the engine plays them
+    // (InstrumentEngine::EffectiveSlot): the IDs, once.
+    using Slot = InstrumentEngine::EffectiveSlot;
+    static const std::map<juce::String, int> slots = [] {
+        std::map<juce::String, int> m { { "life", static_cast<int> (Slot::life) }, { "drive", static_cast<int> (Slot::drive) },
+                                        { "character", static_cast<int> (Slot::character) }, { "motion", static_cast<int> (Slot::motion) },
+                                        { "space", static_cast<int> (Slot::space) }, { "echo", static_cast<int> (Slot::echo) } };
+        for (int l = 0; l < 3; ++l)
+        {
+            const int first = static_cast<int> (Slot::eqFirst) + 4 * l;
+            const juce::String bell (eqBandKey (eq::Band::bell)), low (eqBandKey (eq::Band::lowShelf)), high (eqBandKey (eq::Band::highShelf));
+            m.emplace (eqParameterId (l, bell + ".frequency"), first);
+            m.emplace (eqParameterId (l, bell + ".gain"), first + 1);
+            m.emplace (eqParameterId (l, low + ".gain"), first + 2);
+            m.emplace (eqParameterId (l, high + ".gain"), first + 3);
+            const int voice = static_cast<int> (Slot::voiceFirst) + 3 * l;
+            m.emplace (layerParameterId (l, "granular.position"), voice);
+            m.emplace (layerParameterId (l, "granular.spread"), voice + 1);
+            m.emplace (layerParameterId (l, "start"), voice + 2);
+        }
+        return m;
+    }();
+    const auto it = slots.find (parameterId);
+    EffectiveValues::Reading r;
+    if (it == slots.end() || ! engine.effectiveValues().read (it->second, r))
+        return false;
+    out = { r.value, r.low, r.high };
+    return true;
 }
 
 } // namespace osp::plugin

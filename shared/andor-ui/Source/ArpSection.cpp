@@ -81,13 +81,103 @@ void ArpControl::refresh()
 juce::Rectangle<float> ArpControl::lightArea() const
 {
     const auto r = getLocalBounds().toFloat();
+    if (hasSecondRow())   // (stacked: the upper half, centred in it)
+        return { r.getX() + 4.0f, r.getY() + 1.0f, 26.0f, 0.5f * r.getHeight() - 1.0f };
     return { r.getX() + 4.0f, r.getY() + 3.0f, 26.0f, 0.5f * r.getHeight() - 2.0f };
 }
 
 juce::Rectangle<float> ArpControl::chevronArea() const
 {
     const auto r = getLocalBounds().toFloat();
+    if (hasSecondRow())
+        return { r.getRight() - 26.0f, r.getY() + 1.0f, 22.0f, 0.5f * r.getHeight() - 1.0f };
     return { r.getRight() - 26.0f, r.getY() + 3.0f, 22.0f, 0.5f * r.getHeight() - 2.0f };
+}
+
+void ArpControl::setSecondRow (const juce::String& name, const juce::String& enabledParameterId)
+{
+    secondName = name;
+    secondAttachment.reset();
+    secondEnabled = false;
+    if (name.isNotEmpty())
+        if (auto* param = ospProcessor.apvts().getParameter (enabledParameterId))
+        {
+            secondAttachment = std::make_unique<juce::ParameterAttachment> (*param, [this] (float v) {
+                secondEnabled = v >= 0.5f;
+                repaint();
+            }, &ospProcessor.undo());
+            secondAttachment->sendInitialUpdate();
+        }
+    setTooltip (name.isEmpty() ? "The light switches the arpeggiator on and off; click the card for its settings"
+                               : "Each light switches its instrument on and off; click a row for its settings");
+    repaint();
+}
+
+void ArpControl::setSecondRowOpen (bool open)
+{
+    if (secondOpen != open)
+    {
+        secondOpen = open;
+        repaint();
+    }
+}
+
+juce::Rectangle<float> ArpControl::secondRowArea() const
+{
+    const auto r = getLocalBounds().toFloat();
+    return r.withTrimmedTop (0.5f * r.getHeight());
+}
+
+juce::Rectangle<float> ArpControl::secondLightArea() const
+{
+    const auto row = secondRowArea();
+    return { row.getX() + 4.0f, row.getY(), 26.0f, row.getHeight() - 1.0f };
+}
+
+int ArpControl::hoverAt (juce::Point<float> at) const
+{
+    if (! hasSecondRow())
+        return lightArea().contains (at) ? 1 : 2;
+    if (secondRowArea().contains (at))
+        return secondLightArea().contains (at) ? 3 : 4;
+    return lightArea().contains (at) ? 1 : 2;
+}
+
+void ArpControl::paintLight (juce::Graphics& g, juce::Point<float> c, bool on, bool hovered, const char* onPiece, const char* offPiece)
+{
+    using namespace design;
+    if (auto* pieces = skin::active())
+    {
+        if (on)
+        {
+            g.setColour (colour::accent.withAlpha (hovered ? 0.3f : 0.22f));
+            g.fillEllipse (juce::Rectangle<float> (19.0f, 19.0f).withCentre (c));
+        }
+        if (pieces->draw (g, on ? onPiece : offPiece, juce::Rectangle<float> (11.0f, 11.0f).withCentre (c)))
+        {
+            if (! on && hovered)
+            {
+                g.setColour (colour::text.withAlpha (0.35f));
+                g.drawEllipse (juce::Rectangle<float> (13.0f, 13.0f).withCentre (c), 1.0f);
+            }
+            return;
+        }
+    }
+    if (on)
+    {
+        g.setColour (colour::accent.withAlpha (hovered ? 0.3f : 0.22f));
+        g.fillEllipse (juce::Rectangle<float> (19.0f, 19.0f).withCentre (c));
+        g.setColour (colour::accent);
+        g.fillEllipse (juce::Rectangle<float> (12.0f, 12.0f).withCentre (c));
+        g.setColour (juce::Colour (0xfffff1e2));
+        g.fillEllipse (juce::Rectangle<float> (6.0f, 6.0f).withCentre (c));
+        return;
+    }
+    const auto lens = juce::Rectangle<float> (11.0f, 11.0f).withCentre (c);
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xff8d8a85), lens.getX(), lens.getY(), juce::Colour (0xff5f5c58), lens.getRight(), lens.getBottom(), false));
+    g.fillEllipse (lens);
+    g.setColour (hovered ? colour::text.withAlpha (0.5f) : colour::edgeShade);
+    g.drawEllipse (lens.expanded (0.5f), 1.0f);
 }
 
 void ArpControl::paint (juce::Graphics& g)
@@ -96,6 +186,27 @@ void ArpControl::paint (juce::Graphics& g)
     const auto r = getLocalBounds().toFloat();
     if (! skin::drawnBySurface())   // ceramic: the housing draws the key
         draw::raised (g, r.reduced (1.0f), 10.0f, colour::panelTop, colour::panelBottom);
+    if (hasSecondRow())
+    {
+        // Stacked: two rows of the same height, each its light, its name in capitals (ARP, the
+        // companion's as the product gives it: SUB) and its chevron; a hairline between them;
+        // no inset. (Only a product with a companion stacks; ANDOR OSP's single key is unchanged.)
+        auto row = [&] (juce::Rectangle<float> light, juce::Rectangle<float> chevronBox, const juce::String& name, bool on, bool open,
+                        bool lightHovered, bool rowHovered, const char* onPiece, const char* offPiece) {
+            paintLight (g, light.getCentre(), on, lightHovered, onPiece, offPiece);
+            g.setFont (fonts::make (13.5f, fonts::Weight::semibold, 0.1f));
+            g.setColour (colour::text.withAlpha (on ? 0.95f : 0.8f));
+            g.drawText (name, juce::Rectangle<float> (light.getRight() + 2.0f, light.getY(), chevronBox.getX() - light.getRight() - 2.0f, light.getHeight()),
+                        juce::Justification::centredLeft, false);
+            chevron (g, chevronBox.getCentre(), 4.0f, 2.6f, open, rowHovered ? colour::text : colour::text.withAlpha (0.75f), 1.5f);
+        };
+        row (lightArea(), chevronArea(), "ARP", enabled, expanded, hover == 1, hover == 2, "led-arp-on", "led-arp-off");
+        const auto lower = secondRowArea();
+        g.setColour (colour::hairline.withAlpha (0.8f));
+        g.fillRect (juce::Rectangle<float> (r.getX() + 10.0f, lower.getY() - 0.5f, r.getWidth() - 20.0f, 1.0f));
+        row (secondLightArea(), chevronArea().withY (lower.getY()), secondName, secondEnabled, secondOpen, hover == 3, hover == 4, "led-arp-on", "led-arp-off");
+        return;
+    }
 
     // The light: an orange ring with a lit centre when on, a grey lens when off. Ceramic: a
     // rendered lens (graphite when off, the accent lit when on; its glow stays drawn).
@@ -172,7 +283,7 @@ void ArpControl::paint (juce::Graphics& g)
 
 void ArpControl::mouseMove (const juce::MouseEvent& e)
 {
-    const int now = lightArea().contains (e.position) ? 1 : 2;
+    const int now = hoverAt (e.position);
     if (now != hover)
     {
         hover = now;
@@ -194,8 +305,20 @@ void ArpControl::toggleEnabled()
 
 void ArpControl::mouseDown (const juce::MouseEvent& e)
 {
+    if (const int at = hoverAt (e.position); at >= 3)
+    {
+        if (at == 3 && secondAttachment != nullptr)
+            secondAttachment->setValueAsCompleteGesture (secondEnabled ? 0.0f : 1.0f);
+        else if (at == 4 && onSecondRow != nullptr)
+            onSecondRow();
+        return;
+    }
     if (lightArea().contains (e.position))
+    {
         toggleEnabled();
+        if (onLearnAction != nullptr)
+            onLearnAction ("arp.enabled.changed", "arp.enabled");
+    }
     else if (onToggleEditor != nullptr)
         onToggleEditor();
 }
@@ -334,6 +457,10 @@ ArpInlinePanel::ArpInlinePanel (InstrumentHost& p)
     binding::tag (*this, "arp.*");
     setTitle ("Arpeggiator settings");
     rate.setChoiceOrder (parameter (p, "arp.rate"), rateOrder(), &p.undo());
+    rate.onUserChange = [this] {
+        if (onLearnAction != nullptr)
+            onLearnAction ("arp.rate.changed", "arp.rate");
+    };
     rate.slider.setTooltip ("Step length, from 1/4 dotted (slowest) to 1/32 (fastest)");
     velocity.slider.setTooltip ("The arpeggiated notes' velocity: 100 % plays them as the keys were played");
     const std::array<std::pair<MiniKnob*, const char*>, 4> knobs { { { &rate, "arp.rate" }, { &gate, "arp.gate" }, { &swing, "arp.swing" }, { &velocity, "arp.velocity" } } };
@@ -377,6 +504,10 @@ ArpInlinePanel::ArpInlinePanel (InstrumentHost& p)
                 return InstrumentHost::arpRateNames()[order[static_cast<std::size_t> (position)]];
             });
             laneRate[i]->setChoiceOrder (parameter (p, rateId), rateOrder(), &p.undo());
+            laneRate[i]->onUserChange = [this, rateId] {
+                if (onLearnAction != nullptr)
+                    onLearnAction ("arp.rate.changed", rateId);
+            };
             laneRate[i]->slider.setTooltip (rate.slider.getTooltip());
             laneRate[i]->setArcColour (design::colour::accent);
             addChildComponent (*laneRate[i]);
@@ -443,6 +574,13 @@ void ArpInlinePanel::toggleLink()
 }
 
 ArpInlinePanel::~ArpInlinePanel() = default;
+
+juce::Component& ArpInlinePanel::shownRateKnob() noexcept
+{
+    if (editCard > 0 && laneRate[static_cast<std::size_t> (editCard - 1)] != nullptr)
+        return *laneRate[static_cast<std::size_t> (editCard - 1)];
+    return rate;
+}
 
 void ArpInlinePanel::updatePreview()
 {
@@ -530,7 +668,7 @@ void ArpInlinePanel::resized()
         for (int c = 0; c < 3; ++c)
             editTabs[static_cast<std::size_t> (c)] = { 460.0f + 28.0f * static_cast<float> (c), y - 0.5f * h, 28.0f, h };
         if (satellite != nullptr)
-            satellite->setBounds (juce::Rectangle<float> (566.0f, y - 0.5f * h, 118.0f, h).getSmallestIntegerContainer());
+            satellite->setBounds (juce::Rectangle<float> (566.0f, y - 0.5f * h, static_cast<float> (satellite->preferredWidth()), h).getSmallestIntegerContainer());
     }
     revealSelected();
 }
@@ -956,6 +1094,11 @@ void ArpInlinePanel::mouseExit (const juce::MouseEvent&)
 
 void ArpInlinePanel::mouseDown (const juce::MouseEvent& e)
 {
+    // (ANDOR Learn: each gesture is reported after it wrote its parameter.)
+    auto report = [this] (const char* action, const juce::String& parameterId) {
+        if (onLearnAction != nullptr)
+            onLearnAction (action, parameterId);
+    };
     // OCTAVES' keys are not a knob: their right-click asks for the control's modulation menu.
     if (e.mods.isPopupMenu() && octaveKeys.getUnion (octaveCaption).contains (e.position))
     {
@@ -966,12 +1109,14 @@ void ArpInlinePanel::mouseDown (const juce::MouseEvent& e)
     if (const int row = rowAt (e.position); row >= 0)
     {
         choosePattern (listOrder()[static_cast<std::size_t> (row)]);
+        report ("arp.pattern.changed", editCard == 0 ? juce::String ("arp.pattern") : ids::arpCardSetting (ospProcessor.cardArpNamespace(), editCard, "pattern"));
         return;
     }
     for (int o = arp::minOctaves; o <= arp::maxOctaves; ++o)
         if (octaveKeyArea (o).contains (e.position))
         {
             chooseOctaves (o);
+            report ("arp.octaves.changed", editCard == 0 ? juce::String ("arp.octaves") : ids::arpCardSetting (ospProcessor.cardArpNamespace(), editCard, "octaves"));
             return;
         }
     if (cards)
@@ -981,17 +1126,20 @@ void ArpInlinePanel::mouseDown (const juce::MouseEvent& e)
             if (cardChips[static_cast<std::size_t> (c)].contains (e.position))
             {
                 toggleCard (c);
+                report ("arp.card.toggled", ids::arpCard (ospProcessor.cardArpNamespace(), c));
                 return;
             }
             if (! linked && editTabs[static_cast<std::size_t> (c)].contains (e.position))
             {
                 setEditCard (c);
+                report ("arp.edit.selected", {});
                 return;
             }
         }
         if (linkChip.contains (e.position))
         {
             toggleLink();
+            report ("arp.link.changed", ids::arpLink (ospProcessor.cardArpNamespace()));
             return;
         }
     }
@@ -1121,6 +1269,12 @@ bool SatelliteKey::keyPressed (const juce::KeyPress& key)
     return false;
 }
 
+int SatelliteKey::preferredWidth() const
+{
+    const float nameWidth = juce::GlyphArrangement::getStringWidth (type::popupLabel (12.0f), name());
+    return static_cast<int> (std::ceil (nameX + nameWidth + chevronGap + 2.0f * chevronHalf + rightMargin));
+}
+
 void SatelliteKey::paint (juce::Graphics& g)
 {
     using namespace design;
@@ -1129,7 +1283,7 @@ void SatelliteKey::paint (juce::Graphics& g)
     const auto mouse = getMouseXYRelative();
     const bool overLight = hover && lightArea().contains (mouse);
     // The light: a small lens, lit (the accent, a soft glow) or dark (a hairline ring).
-    const auto light = juce::Rectangle<float> (8.0f, 8.0f).withCentre (lightArea().toFloat().getCentre());
+    const auto light = juce::Rectangle<float> (8.0f, 8.0f).withCentre ({ lightCentreX, r.getCentreY() });
     if (shownOn)
     {
         g.setColour (colour::accent.withAlpha (0.22f));
@@ -1145,11 +1299,13 @@ void SatelliteKey::paint (juce::Graphics& g)
         g.drawEllipse (light.reduced (0.5f), 1.0f);
     }
     // The name and its chevron (down: closed; up: its panel open).
-    auto label = r.withTrimmedLeft (static_cast<float> (getHeight())).withTrimmedRight (14.0f);
-    g.setFont (type::popupLabel (12.0f));
+    const auto font = type::popupLabel (12.0f);
+    const float nameWidth = juce::GlyphArrangement::getStringWidth (font, name());
+    g.setFont (font);
     g.setColour (colour::text.withAlpha (shownOn ? 0.92f : ((hover && ! overLight) ? 0.85f : 0.7f)));
-    g.drawText ("SATELLITE", label, juce::Justification::centredLeft, false);
-    const float cx = r.getRight() - 8.0f, cy = r.getCentreY();
+    g.drawText (name(), juce::Rectangle<float> (nameX, r.getY(), std::ceil (nameWidth) + 2.0f, r.getHeight()), juce::Justification::centredLeft, false);
+    // The chevron right after the name (the same rhythm as the light before it), not at the edge.
+    const float cx = nameX + nameWidth + chevronGap + chevronHalf, cy = r.getCentreY();
     juce::Path chevron;
     const float d = shownOpen ? -2.5f : 2.5f;
     chevron.startNewSubPath (cx - 4.0f, cy - d);

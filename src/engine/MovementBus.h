@@ -38,11 +38,23 @@ public:
     /** The movement settings (every mode's own) and the MOVEMENT amount. */
     void setTargets (const Shaping& settings, double amount) noexcept;
     void process (float& left, float& right) noexcept;
+    /** The level gain the last process() applied (PULSE's tremolo, SHAPER's VOL, mono: the two
+        sides' mean), 1 for the modes that move pitch or time (DRIFT, TAPE, CHORUS). Read-only:
+        ANDOR ANALOG multiplies its SUB, which never enters MOVEMENT, by it. */
+    float amplitude() const noexcept { return ampNow; }
 
     // SHAPER's clock (fed once per block / on note-ons by the engine).
     void setTiming (const HostTiming& timing) noexcept { shaper.setTiming (timing); }
     void noteStarted() noexcept { shaper.noteStarted(); }
     void setVoicesActive (bool active) noexcept { shaper.setVoicesActive (active); }
+    /** SHAPER's handoff (opt-in, false by default: nothing changes): a product that shapes
+        each note itself (ANDOR ANALOG's SHAPER DNA) hands this bus's SHAPER over. Its share
+        of the shaping glides to zero over 40 ms (and back when released; RhythmicShaper's
+        `share`): the product's notes take the rest, so the two together always give one gate,
+        never two and never none, and the hand-over never clicks. Only SHAPER: DRIFT, TAPE, CHORUS and
+        PULSE are untouched. The clock keeps running (the display, PULSE's SYNC). */
+    void setShaperHandoff (bool handedOver) noexcept { handoffTarget = handedOver ? 1.0 : 0.0; }
+    double shaperHandoff() const noexcept { return handoff; }
     /** SHAPER's pattern position (0..1) for the display, -1 when idle or not in SHAPER. */
     float shaperPhase() const noexcept { return mode == MovementMode::shaper ? shaper.displayPhase() : -1.0f; }
 
@@ -79,6 +91,7 @@ private:
     MovementMode mode = MovementMode::drift, previousMode = MovementMode::drift;
     int fadeRemaining = 0, fadeLength = 1;
     double amountTarget = 0.0, amount = 0.0, amountCoef = 0.001;
+    double handoffTarget = 0.0, handoff = 0.0, handoffStep = 0.001;   ///< SHAPER handed over: 0 .. 1, linear over 40 ms
     Shaping settings;
     RhythmicShaper shaper;
 
@@ -87,6 +100,7 @@ private:
 
     // Modulation state
     double wowPhase = 0.0, flutterPhase = 0.0, chorusPhase = 0.0, pulsePhase = 0.0;
+    float renderGain = 1.0f, ampNow = 1.0f;   ///< amplitude(): the mode's level gain
     Noise wowNoise, flutterNoise, wearLevel, wearTone, driftNoise;
     float tapeLowL = 0.0f, tapeLowR = 0.0f, chorusLowL = 0.0f, chorusLowR = 0.0f;
 };

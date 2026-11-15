@@ -106,6 +106,23 @@ public:
         (the on-screen wheels arrive only here, at the block's start). */
     virtual void process (juce::AudioBuffer<float>& buffer, const juce::MidiBuffer& midi, const Performance& performance) noexcept = 0;
 
+    /** The block's external audio (ProductInfo::externalInputName; null pointers: none). Valid
+        for the process() call that follows only: the shell copies the host's input before the
+        output is written, so these never alias the output. `busEnabled`: the host routes
+        something to the bus (it may still be silent); `channels` 1 (left = right) or 2. */
+    struct ExternalInput
+    {
+        const float* left = nullptr;
+        const float* right = nullptr;
+        int channels = 0;
+        int samples = 0;
+        bool busEnabled = false;
+        bool busExists = false;   ///< the host kept the bus at all
+    };
+    /** Audio thread, right before process(): this block's external input (every block while a
+        product has one; nothing otherwise). */
+    virtual void setExternalInput (const ExternalInput& input) noexcept { juce::ignoreUnused (input); }
+
     /** Audio thread, before process(): MOVEMENT SHAPER's CUSTOM pattern changed (the
         musician's 16 steps; given once after prepare() and on every change). */
     virtual void setShaperPattern (const osp::ShaperPattern& pattern) noexcept { juce::ignoreUnused (pattern); }
@@ -145,8 +162,24 @@ public:
         channel = 1 + mask (bit 0 A, bit 1 B, bit 2 C). False: every note sounds on every card
         (the channels mean nothing). Only products with three engines are asked. */
     virtual void setCardRouting (bool on) noexcept { juce::ignoreUnused (on); }
+    /** Audio thread, before process() (ProductInfo::arpFollower only): the notes the follower
+        plays this block - one arpeggiator lane's notes on channel 1, with the block's other
+        channel messages - or, for one block after it stops following, the ending of those and
+        the keys still down. Null: the follower plays the musician's keys (as before). Valid
+        until process() returns. */
+    virtual void setAuxNotes (const juce::MidiBuffer* notes) noexcept { juce::ignoreUnused (notes); }
     /** The modulation sources' live values (the panel's meters and moving dots). Any thread. */
     virtual osp::InstrumentEngine::ModView modulationView() const noexcept { return {}; }
+    /** Universal modulation-aware visual feedback (InstrumentHost::effectiveValue): what the
+        engine plays for `parameterId` now, in its plain units, after modulation, macros and its
+        own mapping (a per-voice one: the representative voice's), with the span it covered.
+        False: no value of its own now (the pictures draw the stored value). Message thread;
+        read lock-free from what the audio thread published (osp::EffectiveValues). */
+    virtual bool effectiveValue (const juce::String& parameterId, osp::EffectiveValues::Reading& out) const
+    {
+        juce::ignoreUnused (parameterId, out);
+        return false;
+    }
 
     /** MOVEMENT SHAPER's playhead, 0..1 of its bar, for its picture (0: none). Any thread. */
     virtual float shaperPhase() const noexcept { return 0.0f; }
@@ -214,6 +247,22 @@ public:
     /** The engine's source on a layer is a stand-in (an empty slot's invitation): its caption
         ("ADD SAMPLE\nDROP OR BROWSE"), its picture drawn faint. Empty: a real source. */
     virtual juce::String engineSourcePlaceholder (int layer) const { juce::ignoreUnused (layer); return {}; }
+    /** A recording dropped on a card (or chosen for it from the shell's own menu) that the engine
+        takes itself (a product's: ANDOR ANALOG's card C while its second layer is shown). True:
+        taken, the shell loads nothing. False (the default): the shell loads it as ever. Message
+        thread. */
+    /** A card's EQ spectrum (InstrumentHost::stepLayerEqSpectrum / paintLayerEqSpectrum): none
+        by default. Message thread. */
+    virtual bool stepLayerEqSpectrum (int layer) { juce::ignoreUnused (layer); return false; }
+    virtual void paintLayerEqSpectrum (int layer, juce::Graphics& g, juce::Rectangle<float> plot, const std::function<double (float)>& hzForX)
+    {
+        juce::ignoreUnused (layer, g, plot, hzForX);
+    }
+    virtual bool takeRecording (int layer, const juce::File& file, const juce::File& storeFolder)
+    {
+        juce::ignoreUnused (layer, file, storeFolder);
+        return false;
+    }
     /** A generator's further layers (opt-in, ProductInfo::threeEngines): what it generates on
         `layer` (its card's name, e.g. "OSC 2"; the picture is sourcePicture's), or empty.
         Layer 0's is generatorName(). Message thread. */

@@ -384,19 +384,19 @@ layerA.synth.wave v23 choice "Layer A Synth Wave" label="" range=0.0000..3.0000/
 layerA.synth.octave v23 int "Layer A Synth Octave" label="" range=-2.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=4 texts=-2|0|1
 layerA.synth.detune v23 float "Layer A Synth Detune" label="cents" range=0.0000..50.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0.0 c|25.0 c|50.0 c
 layerA.synth.tone v23 float "Layer A Synth Tone" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=50.0000 steps=2147483647 texts=0 %|50 %|100 %
-layerA.synth.shape v23 choice "Layer A Synth Shape" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=Held|Held|Follow [Held|Follow]
+layerA.synth.shape v23 choice "Layer A Synth Shape" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=1.0000 steps=2 texts=Held|Held|Follow [Held|Follow]
 layerA.synth.pitch v23 choice "Layer A Synth Pitch" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=Keys|Keys|Recording [Keys|Recording]
 layerB.synth.wave v23 choice "Layer B Synth Wave" label="" range=0.0000..3.0000/1.0000 skew=1.00000 default=0.0000 steps=4 texts=Saw|Triangle|Sine [Saw|Square|Triangle|Sine]
 layerB.synth.octave v23 int "Layer B Synth Octave" label="" range=-2.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=4 texts=-2|0|1
 layerB.synth.detune v23 float "Layer B Synth Detune" label="cents" range=0.0000..50.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0.0 c|25.0 c|50.0 c
 layerB.synth.tone v23 float "Layer B Synth Tone" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=50.0000 steps=2147483647 texts=0 %|50 %|100 %
-layerB.synth.shape v23 choice "Layer B Synth Shape" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=Held|Held|Follow [Held|Follow]
+layerB.synth.shape v23 choice "Layer B Synth Shape" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=1.0000 steps=2 texts=Held|Held|Follow [Held|Follow]
 layerB.synth.pitch v23 choice "Layer B Synth Pitch" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=Keys|Keys|Recording [Keys|Recording]
 layerC.synth.wave v23 choice "Layer C Synth Wave" label="" range=0.0000..3.0000/1.0000 skew=1.00000 default=0.0000 steps=4 texts=Saw|Triangle|Sine [Saw|Square|Triangle|Sine]
 layerC.synth.octave v23 int "Layer C Synth Octave" label="" range=-2.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=4 texts=-2|0|1
 layerC.synth.detune v23 float "Layer C Synth Detune" label="cents" range=0.0000..50.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0.0 c|25.0 c|50.0 c
 layerC.synth.tone v23 float "Layer C Synth Tone" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=50.0000 steps=2147483647 texts=0 %|50 %|100 %
-layerC.synth.shape v23 choice "Layer C Synth Shape" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=Held|Held|Follow [Held|Follow]
+layerC.synth.shape v23 choice "Layer C Synth Shape" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=1.0000 steps=2 texts=Held|Held|Follow [Held|Follow]
 layerC.synth.pitch v23 choice "Layer C Synth Pitch" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=Keys|Keys|Recording [Keys|Recording]
 space.engine v23 choice "Space Engine" label="" range=0.0000..3.0000/1.0000 skew=1.00000 default=0.0000 steps=4 texts=Rooms|Vintage|Bloom [Rooms|Abyss|Vintage|Bloom]
 space.abyss.gravity v23 float "Abyss Gravity" label="%" range=-100.0000..100.0000/0.0000 skew=1.00000 default=0.0000 steps=2147483647 texts=-100 %|0 %|+100 %
@@ -424,14 +424,14 @@ arp.cardC.pattern v27 choice "Arp Card C Pattern" label="" range=0.0000..17.0000
 arp.cardC.rate v27 choice "Arp Card C Rate" label="" range=0.0000..9.0000/1.0000 skew=1.00000 default=1.0000 steps=10 texts=1/4|1/4D|1/16T [1/4|1/8|1/16|1/32|1/4D|1/8D|1/16D|1/4T|1/8T|1/16T]
 arp.cardC.octaves v27 int "Arp Card C Octaves" label="" range=1.0000..4.0000/1.0000 skew=1.00000 default=1.0000 steps=4 texts=1|2|4
 layerA.synth.mode v28 choice "Layer A Synth Mode" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=Analog|Analog|Imprint [Analog|Imprint]
-layerA.synth.imprint v28 float "Layer A Synth Imprint" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0 %|50 %|100 %
-layerA.synth.motion v28 float "Layer A Synth Motion" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0 %|50 %|100 %
+layerA.synth.imprint v28 float "Layer A Synth Imprint" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=100.0000 steps=2147483647 texts=0 %|50 %|100 %
+layerA.synth.motion v28 float "Layer A Synth Motion" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=100.0000 steps=2147483647 texts=0 %|50 %|100 %
 layerB.synth.mode v28 choice "Layer B Synth Mode" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=Analog|Analog|Imprint [Analog|Imprint]
-layerB.synth.imprint v28 float "Layer B Synth Imprint" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0 %|50 %|100 %
-layerB.synth.motion v28 float "Layer B Synth Motion" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0 %|50 %|100 %
+layerB.synth.imprint v28 float "Layer B Synth Imprint" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=100.0000 steps=2147483647 texts=0 %|50 %|100 %
+layerB.synth.motion v28 float "Layer B Synth Motion" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=100.0000 steps=2147483647 texts=0 %|50 %|100 %
 layerC.synth.mode v28 choice "Layer C Synth Mode" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=Analog|Analog|Imprint [Analog|Imprint]
-layerC.synth.imprint v28 float "Layer C Synth Imprint" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0 %|50 %|100 %
-layerC.synth.motion v28 float "Layer C Synth Motion" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0 %|50 %|100 %
+layerC.synth.imprint v28 float "Layer C Synth Imprint" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=100.0000 steps=2147483647 texts=0 %|50 %|100 %
+layerC.synth.motion v28 float "Layer C Synth Motion" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=100.0000 steps=2147483647 texts=0 %|50 %|100 %
 fx.spread.1.on v30 bool "FX STEREO SPREAD 1 On" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=1.0000 steps=2 texts=Off|On|On
 fx.spread.1.mix v30 float "FX STEREO SPREAD 1 Mix" label="%" range=0.0000..100.0000/0.0000 skew=1.00000 default=50.0000 steps=2147483647 texts=0 %|50 %|100 %
 fx.spread.1.output v30 float "FX STEREO SPREAD 1 Output" label="dB" range=-18.0000..12.0000/0.0000 skew=1.22036 default=0.0000 steps=2147483647 texts=-18.0 dB|-1.0 dB|+12.0 dB

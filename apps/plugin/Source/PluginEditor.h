@@ -16,6 +16,7 @@
 #include "OspLookAndFeel.h"
 #include "PluginProcessor.h"
 #include "ShapingPopups.h"
+#include "LearnController.h"
 
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -33,6 +34,16 @@ class SamplesPanel final : public juce::Component
 public:
     explicit SamplesPanel (OspAudioProcessor& processor);
     void setInstrument (std::shared_ptr<const LoadedInstrument> instrument, int layer);
+    /** ANDOR Learn: a row's choice the musician made ("role", "root", "layer"). */
+    std::function<void (const juce::String& what)> onUserEdit;
+    /** ANDOR Learn and tests: the first file's role, root or velocity-layer list (nullptr: none). */
+    juce::Component* firstRowControl (const juce::String& which)
+    {
+        for (auto& r : rows)
+            if (! r->isHeader)
+                return which == "role" ? static_cast<juce::Component*> (&r->role) : which == "root" ? static_cast<juce::Component*> (&r->root) : &r->layer;
+        return nullptr;
+    }
     void paint (juce::Graphics&) override;
     void resized() override;
 
@@ -72,6 +83,14 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
     bool keyPressed (const juce::KeyPress& key) override;
+    /** A wheel no knob took scrolls the instrument while the window is shorter than it. */
+    void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override
+    {
+        if (! overflow.scrollBy (wheel))
+            AudioProcessorEditor::mouseWheelMove (e, wheel);
+    }
+    /** Tests: the window shorter than the instrument - it scrolls, at the same scale. */
+    frame::Overflow& instrumentOverflow() noexcept { return overflow; }
 
     bool isInterestedInFileDrag (const juce::StringArray& files) override;
     void fileDragEnter (const juce::StringArray& files, int x, int y) override;
@@ -177,6 +196,15 @@ public:
     void closeKeyDna();
     KeyDnaEditor* keyDnaWindow() noexcept { return keyDnaPanel.get(); }
     OspKeyboard& keyboardComponent() noexcept { return keyboard; }
+
+    /** ANDOR Learn (shared/andor-learn, as ANDOR ANALOG's): the menu's LEARN section, the
+        lessons, Info and the per-user progress. Nothing is shown until the musician asks. */
+    andor::learn::LearnController* learnController() noexcept { return learn.get(); }
+    /** A committed user gesture that is not a parameter (a popover opened, a tab chosen, a file
+        dropped): reported to Learn from the click's own handler, never from a callback. */
+    void learnAction (const juce::String& actionId, const juce::String& targetId = {});
+    /** Tests: the parameter-gesture bridge (a knob's gesture as JUCE delivers it). */
+    andor::learn::ParameterGestureBridge* learnGestureBridge() noexcept { return learnGestures.get(); }
     const std::array<OspKeyboard::KeyTint, 128>& keyboardTints() const noexcept { return keyTints; }
 
 private:
@@ -220,6 +248,8 @@ private:
     /** The instrument at the reference size, scaled to the window as one piece. Declared
         before every child so it outlives them. */
     frame::Content content;
+    /** A window shorter than the instrument: a vertical scroll bar, never a smaller instrument. */
+    frame::Overflow overflow { *this };
 
     // Header
     PresetBar presetBar { ospProcessor };
@@ -323,6 +353,15 @@ private:
     } popupBackdrop;
     int closedByLabelPress = -1;     // a press on an open popup's own label closes it (and must not reopen it)
     OutsideClickWatcher outsideClicks { *this };
+    frame::ScreenFit screenFit { *this, [this] { return instrumentHeight(); } };   ///< (first shown: fitted to its screen)
+
+    // ANDOR Learn (OspLearn.cpp registers the targets; it reads the members it points at).
+    friend struct OspLearnTargets;
+    std::unique_ptr<andor::learn::LearnController> learn;
+    std::unique_ptr<andor::learn::ParameterGestureBridge> learnGestures;
+    int learnNotesSeen = -1;   ///< the processor's played-note count Learn has seen
+    void createLearn();
+    void tickLearn();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OspAudioProcessorEditor)
 };

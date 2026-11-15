@@ -30,6 +30,7 @@ juce::String name (Kind kind)
         case Kind::filter: return "FILTER";
         case Kind::morph: return "MORPH";
         case Kind::fx: return "FX";
+        case Kind::aux: return "AUX";
     }
     return {};
 }

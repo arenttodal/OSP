@@ -6,6 +6,7 @@
 #include "EffectRack.h"
 #include "InstrumentFrame.h"
 #include "ShellEngine.h"
+#include "LessonTypes.h"
 
 #include <array>
 #include <map>
@@ -14,8 +15,36 @@
 #include <optional>
 #include <vector>
 
+namespace andor::learn
+{
+class TargetRegistry;
+}
+
 namespace andor::shell
 {
+
+class ShellEditor;
+
+/**
+    ANDOR Learn (opt-in, shared/andor-learn): a product's guided lessons and its Learn mode
+    help. The shell registers its own targets (preset bar, cards, macros, modulation, keyboard,
+    Advanced, the arpeggiator, the racks, the source view's key) and then calls registerTargets
+    for the product's own. Interface only: no parameter, no state, no sound.
+*/
+struct LearnDescriptor
+{
+    /** The catalog (immutable data: lessons, help regions). */
+    std::function<andor::learn::Catalog()> catalog;
+    /** The product's own targets and states (null: the shell's only). */
+    std::function<void (andor::learn::TargetRegistry&, ShellEditor&)> registerTargets;
+    /** Whether the product has a capability a lesson needs (null: none). */
+    std::function<bool (const juce::String& capability, osp::plugin::InstrumentHost&)> hasCapability;
+    /** A lesson's example sound (Lesson::exampleId) as the product's whole saved state, built
+        from the product's own bundled material (no outside files, no third-party instruments,
+        no sidechain); null: no example by that ID. Loaded only on the musician's choice, the
+        sound before it kept for Restore Previous Sound. */
+    std::function<std::unique_ptr<juce::XmlElement> (const juce::String& exampleId, osp::plugin::InstrumentHost&)> exampleState;
+};
 
 /**
     What makes a product built from the ANDOR Instrument Shell itself: its identity and
@@ -117,6 +146,12 @@ struct ProductInfo
         own PATTERN / RATE / OCTAVES while unlinked; the ARP panel shows them. Off: one
         arpeggiator for the instrument, as in ANDOR OSP. */
     bool cardArpeggiator = false;
+    /** C RHYTHM as a modulation source (ANDOR ANALOG's RHYTHMIC MORPH): the routes' source list
+        and the panel offer it after ANDOR OSP's twelve. */
+    bool rhythmSource = false;
+    /** A card's recording with no pitch found: its header's name instead of "?" (InstrumentHost::
+        unpitchedSourceName; ANDOR ANALOG: "HYBRID"). Empty: "?". */
+    juce::String unpitchedSourceName;
     /** The effects rack (osp::plugin::rack, opt-in): the modules a key beside their macro's
         name expands between the macros and the arpeggiator (MOVEMENT, ECHO, SPACE). Empty:
         no keys and no rack, as in ANDOR OSP. */
@@ -142,6 +177,28 @@ struct ProductInfo
         std::function<std::unique_ptr<juce::Component> (osp::plugin::InstrumentHost&)> create;
     };
     SourceAreaView sourceAreaView;
+    /** An optional strip under the source cards (opt-in; ANDOR ANALOG's D / AUX). The main menu
+        shows or hides it ("Show AUX" / "Hide AUX"); while shown everything under the cards (the
+        macros, the modulation panel, the racks, the arpeggiator, the keyboard) moves down by its
+        height and gap, and the window grows by as much. The cards keep their places and size.
+        Interface only: showing or hiding it never changes the sound. Its visibility is a view
+        setting kept with the session, never with a preset. Unset: none (ANDOR OSP). */
+    struct AuxStrip
+    {
+        float height = 76.0f;   ///< design px
+        juce::String name = "AUX";
+        std::function<std::unique_ptr<juce::Component> (osp::plugin::InstrumentHost&)> create;
+        /** A file dropped on neither a card nor a part that owns drops (empty space) does
+            nothing (ANDOR ANALOG). Off: it is added as a layer, as ANDOR OSP does. */
+        bool emptyDropsIgnored = false;
+    };
+    std::optional<AuxStrip> auxStrip;
+    /** An external audio input (opt-in; ANDOR ANALOG's AUX D LIVE INPUT): one host-provided
+        input bus, mono or stereo, off until the host routes audio to it - a VST3 auxiliary
+        (sidechain) bus, never a main input, so the plugin stays an instrument with MIDI in and
+        stereo out. Its audio reaches the engine through Engine::setExternalInput, captured
+        before the output is written. Empty name: none (ANDOR OSP: output only, unchanged). */
+    juce::String externalInputName;
     /** The shared rack modules' hardware faceplates (opt-in; ANDOR ANALOG's), by rack::Kind;
         empty: the approved racks as they are (ANDOR OSP). Interface only. */
     std::map<osp::plugin::rack::Kind, osp::plugin::rack::Faceplate> rackFaceplates;
@@ -204,10 +261,40 @@ struct ProductInfo
     /** The oscillator cards' mode as a GRANULAR on / off key, the grain cloud lit in the layer's
         colour while on (opt-in: generatorModeName is then unused there). Off: the named key. */
     bool generatorGranularToggle = false;
+    /** A second instrument in the arpeggiator's housing (opt-in): the housing stacks two rows
+        of the same size, "arp" above and this name below, each with its power light and
+        chevron (no pattern / rate inset). The lower light switches `enabledParameterId`; the
+        rest of its row opens `popover` above the housing. Empty name: ANDOR OSP's housing. */
+    struct ArpCompanion
+    {
+        juce::String name, enabledParameterId;
+        std::function<std::unique_ptr<osp::plugin::MiniPanel> (osp::plugin::InstrumentHost&)> popover;
+    };
+    ArpCompanion arpCompanion;
     /** The product's own materials (opt-in): its finish (the accent family, ceramic tones)
         and rendered pieces of its own (its housing's wood, its badge) in place of ANDOR OSP's,
         for every instance of the product. Unset: ANDOR OSP's, exactly. Interface only. */
     std::optional<osp::plugin::design::Materials> materials;
+    /** A macro's own on / off as a tiny lamp beside its name (opt-in; ANDOR ANALOG's MORPH): the
+        macro (0..5, data order), a bool parameter of the product's, and the lamp's tooltip. While
+        off, the macro's knob shows its colour arc dimmed (its value untouched). Empty: no lamp,
+        as in ANDOR OSP. Interface only. */
+    struct MacroSwitch
+    {
+        int macro = -1;
+        juce::String parameterId, tooltip;
+    };
+    std::vector<MacroSwitch> macroSwitches;
+    /** SHAPER DNA (opt-in; ANDOR ANALOG): MOVEMENT lane A's SHAPER per note. Its switch (a bool
+        parameter of the product's), its panel (opened from the rack's DNA key) and why it cannot
+        play just now (the key's tooltip; empty when it can). Unset: no key, as in ANDOR OSP. */
+    struct ShaperDna
+    {
+        juce::String parameterId;
+        std::function<std::unique_ptr<osp::plugin::MiniPanel> (osp::plugin::InstrumentHost&)> panel;
+        std::function<juce::String (osp::plugin::InstrumentHost&)> note;
+    };
+    std::optional<ShaperDna> shaperDna;
     /** SATELLITE (opt-in; ANDOR ANALOG): each card's own stereo motion, switched and opened from
         the arpeggiator's editor (the per-card arpeggiator's title row). */
     struct Satellite
@@ -216,6 +303,76 @@ struct ProductInfo
         std::function<std::unique_ptr<osp::plugin::MiniPanel> (osp::plugin::InstrumentHost&, int card)> panel;
     };
     std::optional<Satellite> satellite;
+    /** USER MACROS V1.1 (opt-in; ANDOR ANALOG): a second bank of six macros in the six knobs'
+        places, chosen by a tiny CORE | USER tab on the macro panel's top edge (an interface
+        preference, never the sound). The product owns what they move: its six parameters, the
+        names it shows, which controls a macro may move, making an assignment, and the
+        assignments' panel. Unset: no tab, as in ANDOR OSP. */
+    struct UserMacros
+    {
+        std::array<juce::String, 6> parameterIds;
+        std::function<juce::String (osp::plugin::InstrumentHost&, int macro)> name;
+        std::function<void (osp::plugin::InstrumentHost&, int macro, const juce::String& name)> rename;
+        /** Its active assignments (its lens lights while it has any). */
+        std::function<int (osp::plugin::InstrumentHost&, int macro)> activeCount;
+        /** The parameter IDs it moves (shown as thin arcs while its name is hovered or its panel open). */
+        std::function<juce::StringArray (osp::plugin::InstrumentHost&, int macro)> targets;
+        /** Whether a USER macro may move this parameter (continuous, real-time safe). */
+        std::function<bool (osp::plugin::InstrumentHost&, const juce::String& parameterId)> eligible;
+        /** A neutral assignment (undoable; an existing one is kept). False: refused. */
+        std::function<bool (osp::plugin::InstrumentHost&, int macro, const juce::String& parameterId)> assign;
+        /** Removes all its assignments (undoable). */
+        std::function<void (osp::plugin::InstrumentHost&, int macro)> clear;
+        /** Its assignments' panel (`select`: the assignment shown first, may be empty). */
+        std::function<std::unique_ptr<osp::plugin::MiniPanel> (osp::plugin::InstrumentHost&, int macro, const juce::String& select)> panel;
+        /** A control's display name ("FILTER / RESONANCE") for the drag's label. */
+        std::function<juce::String (osp::plugin::InstrumentHost&, const juce::String& parameterId)> targetName;
+        /** Changes whenever the names or assignments change (an edit, undo, a preset): the editor
+            refreshes its names and lenses when it moves. */
+        std::function<std::uint64_t (osp::plugin::InstrumentHost&)> revision;
+
+        // Destination-first editing (the halos; docs/MACRO_DESTINATION_FIRST.md). Positions are the
+        // control's normalised value (its knob's travel).
+        struct Range
+        {
+            int macro = -1;
+            float atMin = 0.0f, atMax = 0.0f;   ///< the control at the macro's 0 % and 100 % (this assignment alone)
+            float now = 0.0f, base = 0.0f, macroValue = 0.0f;
+            bool enabled = true;
+        };
+        /** A control's assignments as the engine applies them (empty: none). */
+        std::function<std::vector<Range> (osp::plugin::InstrumentHost&, const juce::String& parameterId)> ranges;
+        /** The macros' sum on a control now (normalised; modulation starts there). */
+        std::function<float (osp::plugin::InstrumentHost&, const juce::String& parameterId)> offsetNow;
+        /** A range end dragged on the halo (phase 0 begin, 1 move, 2 commit: one undo step, 3 cancel). */
+        std::function<void (osp::plugin::InstrumentHost&, int macro, const juce::String& parameterId, int end, float position, int phase)> editRange;
+        /** One end back to the control's own value (undoable). */
+        std::function<void (osp::plugin::InstrumentHost&, int macro, const juce::String& parameterId, int end)> resetEnd;
+        /** A visible default range again, around the control's value (undoable). */
+        std::function<void (osp::plugin::InstrumentHost&, int macro, const juce::String& parameterId)> resetRange;
+        /** Removes one assignment / all of a control's (undoable; the control keeps its own value). */
+        std::function<void (osp::plugin::InstrumentHost&, int macro, const juce::String& parameterId)> unassign;
+        std::function<void (osp::plugin::InstrumentHost&, const juce::String& parameterId)> unassignAll;
+    };
+    std::optional<UserMacros> userMacros;
+    /** ANDOR Learn (opt-in): guided lessons and Learn mode, two items in the header menu.
+        Unset: no menu item, no invitation, no event, nothing drawn (ANDOR OSP and every
+        other product exactly as before). */
+    std::optional<LearnDescriptor> learn;
+    /** The AUX arpeggiator follower (opt-in; ANDOR ANALOG's AUX D): one more listener at the
+        per-card arpeggiator's delivery, playing exactly one lane's stream - LINK on: the shared
+        pattern; LINK off: card A, B or C's (`laneParameterId`, 0 1 2), generated even while that
+        card's own arpeggio is off - without changing anything the cards are given. Followed
+        only while `enabledParameterId` is on, the arpeggiator itself is on, `powerParameterId`
+        is on and `modeParameterId` is one of `followingModes`; otherwise the engine is given
+        nothing (setAuxNotes (nullptr)) and plays the keys as before. Needs the per-card
+        arpeggiator (ProductInfo::cardArpeggiator). Unset: nothing runs (ANDOR OSP). */
+    struct ArpFollower
+    {
+        juce::String enabledParameterId, laneParameterId, powerParameterId, modeParameterId;
+        std::vector<int> followingModes;   ///< the mode parameter's indices (0 .. 31) that follow
+    };
+    std::optional<ArpFollower> arpFollower;
 };
 
 /** Defined by the product (Product.cpp). */

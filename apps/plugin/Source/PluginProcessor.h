@@ -174,6 +174,8 @@ public:
     InstrumentEngine::ModView modulationView() const noexcept override { return engine.modulationView(); }
     InstrumentEngine::LiveMix liveMix() const noexcept override { return engine.liveMix(); }
     const InstrumentEngine* telemetryEngine() const noexcept override { return &engine; }
+    /** ANDOR OSP names its CHARACTER macro FILTER (display only; the IDs keep "character"). */
+    juce::String characterName() const override { return "FILTER"; }
     // SATELLITE: each layer's own stereo motion (the per-card arpeggiator's companion).
     juce::String satelliteParameterId (int card) const override { return satelliteFieldId (card, "enabled"); }
     std::unique_ptr<MiniPanel> createSatellitePanel (int card) override;
@@ -197,6 +199,7 @@ public:
     /** Builds the impulse each CONVOLUTION needs when its settings or the rate changed (message
         thread: prepareToPlay and the timer). */
     void updateConvolutionImpulses();
+    bool effectiveValue (const juce::String& parameterId, EffectiveValue& out) const override;
     /** The CC 1-4 sources' controller numbers (0..119; default 2, 11, 16, 17), saved with the
         session. Learn: the next controller that moves is taken for the slot (-1: none). */
     int modControllerNumber (int slot) const noexcept override;
@@ -243,6 +246,17 @@ public:
     /** Samples inspector correction: pin one file's role/layer and rebuild the set. */
     void reassignSample (const std::string& filename, SampleRole role, int velocityLayer, std::optional<double> rootMidi = std::nullopt);
     void loadExample (int layer = -1);
+    /** ANDOR Learn: loads a tutorial example (TutorialSounds: "bowed", "pluck", "voice",
+        "layered", "pluckSet") as a new instrument, after keeping the whole current state so
+        "Restore previous sound" brings it back. Only on the musician's choice in a lesson.
+        False: nothing changed (unknown example, a file not written, or a load under way). */
+    bool loadTutorialExample (const juce::String& exampleId);
+    /** The example asked for last has every layer loaded and playable / has failed. */
+    bool tutorialExampleReady() const;
+    bool tutorialExampleFailed() const;
+    /** The state kept before a tutorial example is still the one restorePreviousState() brings back. */
+    bool canRestoreBeforeTutorial() const noexcept { return previousState != nullptr && previousStateLabel == tutorialStateLabel(); }
+    static juce::String tutorialStateLabel() { return "Before the tutorial example"; }
     /** Empties a layer (it then contributes silence). */
     void clearLayer (int layer = -1);
     /**
@@ -499,8 +513,11 @@ public:
         14: the unified engine's Phase 3: a layer can hold a Note Atlas (its `Instrument` tree's
             `Atlas` child: the atlas JSON, own schemaVersion; the audio stays in the sample store,
             referenced by hash), and the grain budget's policy (`grainBudgetPolicy`; absent, i.e.
-            any older session: `shared`, Phase 2's; new sessions `bounded`, never above the budget). */
-    static constexpr int stateVersion = 14;
+            any older session: `shared`, Phase 2's; new sessions `bounded`, never above the budget).
+        15: SYNTH's defaults: SHAPE FOLLOW, IMPRINT and MOTION 100 %. Older sessions and presets
+            open with every layer's SHAPE as FOLLOW, and IMPRINT / MOTION at 0 % (the old default)
+            as 100 %; values above 0 are kept. */
+    static constexpr int stateVersion = 15;
 
     /** KEY DNA (message thread): a layer's per-key identity. Its profile (all 128 keys) is
         computed here and handed to the audio thread through a ModelExchange; new notes take
@@ -759,6 +776,7 @@ private:
     std::mutex resultsMutex;               // loader <-> message thread only, never audio
     std::deque<Finished> finishedLoads;
     std::atomic<int> pendingLoads { 0 };
+    int tutorialLayers = 0;   ///< the layers the last tutorial example loads (0: none asked)
     std::atomic<bool> closing { false };   // set by the destructor: no further load stages
     std::atomic<std::uint64_t> nextGeneration { 1 };
     juce::String lastMessage;

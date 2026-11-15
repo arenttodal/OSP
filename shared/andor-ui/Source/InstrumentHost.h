@@ -393,6 +393,24 @@ public:
     static const juce::Identifier& modLinksTreeType();
     /** The sources' live values for the display (lock-free). */
     virtual InstrumentEngine::ModView modulationView() const noexcept = 0;
+    /** Universal modulation-aware visual feedback: what the sound engine plays for
+        `parameterId` now - in the parameter's own plain units, after modulation, macros, the
+        DSP's mapping and clamping (a per-voice one: the representative voice's) - with the span
+        it covered over the last UI frame or two (fast modulation shows as its range). False:
+        the engine has no value of its own for it now; draw the stored value (then what plays).
+        Never written back to the parameter. Message thread. None by default. */
+    struct EffectiveValue
+    {
+        float value = 0.0f, low = 0.0f, high = 0.0f;
+    };
+    virtual bool effectiveValue (const juce::String& parameterId, EffectiveValue& out) const
+    {
+        juce::ignoreUnused (parameterId, out);
+        return false;
+    }
+    /** The value a picture draws for `parameterId`: the effective one when the engine has it,
+        else the stored one (plain units). `state` is the host's own (its processor). */
+    static float shownValue (juce::AudioProcessorValueTreeState& state, const juce::String& parameterId);
     /** The mix as it plays (with any MIX modulation) for the header's live node; an engine that
         does not blend layers this way says it is not modulated. */
     virtual InstrumentEngine::LiveMix liveMix() const noexcept { return {}; }
@@ -402,6 +420,22 @@ public:
         CHARACTER graph then shows the settings (and a silent preview when they are edited), the
         card EQ no spectrum. */
     virtual const InstrumentEngine* telemetryEngine() const noexcept { return nullptr; }
+
+    /** What the product calls its CHARACTER macro, the filter (ANDOR OSP: FILTER). Display only:
+        the parameter IDs, the host's parameter names and saved state keep "character". */
+    virtual juce::String characterName() const { return "CHARACTER"; }
+    /** A modulation destination's name as this product shows it (its CHARACTER ones under
+        characterName(): FILTER CUTOFF in ANDOR OSP). */
+    juce::String destName (mod::Dest dest) const;
+    /** A card's EQ spectrum (opt-in, a product's: ANDOR ANALOG's; message thread): one analysis
+        step for the layer's EQ editor while it shows (true: what it draws moved), and its
+        drawing behind the EQ's curve in `plot` (`hzForX` the graph's own axis). Nothing by
+        default: ANDOR OSP's card EQ exactly as before. */
+    virtual bool stepLayerEqSpectrum (int layer) { juce::ignoreUnused (layer); return false; }
+    virtual void paintLayerEqSpectrum (int layer, juce::Graphics& g, juce::Rectangle<float> plot, const std::function<double (float)>& hzForX)
+    {
+        juce::ignoreUnused (layer, g, plot, hzForX);
+    }
     /** The hardware faceplate a shared rack module (rack::Kind, as an int) wears (opt-in; null:
         none, as in ANDOR OSP). Interface only. */
     virtual const rack::Faceplate* rackFaceplate (int kind) const noexcept
@@ -542,8 +576,20 @@ public:
         juce::String pulseDivisionId;          ///< PULSE's note value while synced (empty: none)
     };
     virtual int movementLaneCount() const noexcept { return 1; }
-    /** SATELLITE: each card's own stereo motion (the per-card arpeggiator's companion). The
-        parameter that switches card 0..2's motion, or empty (no SATELLITE key in the ARP editor). */
+    /** SHAPER DNA (opt-in; ANDOR ANALOG's): MOVEMENT lane A's SHAPER per note. The rack's SHAPER
+        then shows a small DNA key beside its magnifier: its light switches this bool parameter,
+        its name opens the product's panel (anchored to it). Empty: no key (ANDOR OSP). */
+    virtual juce::String shaperDnaParameterId() const { return {}; }
+    virtual std::unique_ptr<MiniPanel> createShaperDnaPanel();   ///< (none by default: InstrumentHost.cpp)
+    /** Why DNA cannot play just now (e.g. MOVEMENT is not on MAIN), for the key's tooltip; empty
+        when it can. */
+    virtual juce::String shaperDnaNote() const { return {}; }
+    /** A recording in which no pitch was found (a drum loop, rain): the name its card's header
+        shows, in the source-name type (as a generated source's "OSC 1"), instead of the root's
+        "?". Empty: "?" (ANDOR OSP's). */
+    virtual juce::String unpitchedSourceName (int /*layer*/) const { return {}; }
+    /** SATELLITE (opt-in; ANDOR ANALOG's): each card's own stereo motion. The parameter that
+        switches card 0..2's motion, or empty (ANDOR OSP: no SATELLITE key in the ARP editor). */
     virtual juce::String satelliteParameterId (int /*card*/) const { return {}; }
     /** SATELLITE's panel, showing card 0..2 (none by default: InstrumentHost.cpp). */
     virtual std::unique_ptr<MiniPanel> createSatellitePanel (int card);

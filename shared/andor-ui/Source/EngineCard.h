@@ -231,6 +231,9 @@ class LayerStateButton final : public juce::Component, public juce::SettableTool
 {
 public:
     LayerStateButton (InstrumentHost& processor, int layer, bool solo);
+    /** Opt-in: a product source's own MUTE or SOLO (ANDOR ANALOG's D / AUX), bound to its own
+        bool parameter: the same key, sizes and states; SOLO lit in `soloColour`. */
+    LayerStateButton (InstrumentHost& processor, const juce::String& parameterId, bool solo, juce::Colour soloColour, const juce::String& sourceName);
     bool isOn() const noexcept { return on; }
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override { skin::repaintKey (*this); }
@@ -242,8 +245,9 @@ public:
 
 private:
     InstrumentHost& processor;
-    int layer;
+    int layer;   ///< -1: a product source (no alt-click solo-only)
     bool solo, on = false;
+    juce::Colour soloLed;
     juce::ParameterAttachment attachment;
 };
 
@@ -499,6 +503,13 @@ public:
     std::function<void (int)> onReimagined;            ///< its REIMAGINED name (the mode popover)
     std::function<void (int)> onKeyDna;                ///< the KEY DNA key in the Granular strip
     KeyDnaKey& keyDnaToggle() noexcept { return keyDnaKey; }
+    /** ANDOR Learn and tests: the card's own controls. `cardKnob`: START TUNE PAN LEVEL REIMAGINED
+        (0..4); `granularKnob`: the granular strip's POS SIZE DENS TUNE SPREAD (0..4). */
+    juce::Component* cardKnob (int index) const noexcept { return index >= 0 && index < 5 ? knobs[static_cast<std::size_t> (index)].get() : nullptr; }
+    juce::Component* granularKnob (int index) const noexcept { return index >= 0 && index < 5 ? granularKnobs[static_cast<std::size_t> (index)].get() : nullptr; }
+    juce::Component& muteKey() noexcept { return muteButton; }
+    juce::Component& soloKey() noexcept { return soloButton; }
+    juce::Component& layerMenuKey() noexcept { return menuButton; }   ///< the card's menu key
     /** The REIMAGINED name, in this card's coordinates (the popover's anchor). */
     juce::Rectangle<int> reimaginedLabelBounds() const;
     /** Whether the REIMAGINED name is the door of a component (a click on it toggles the popover). */
@@ -573,6 +584,9 @@ public:
     CardWellEditor* wellEditorComponent() noexcept { return wellEditor.get(); }
     void setWellEditorShown (bool shown);
     bool isWellEditorShown() const noexcept { return wellEditor != nullptr && wellEditor->isVisible(); }
+    /** The header as drawn (tests): the root (large) and the name line beside it. */
+    const juce::String& headerRoot() const noexcept { return rootText; }
+    const juce::String& headerName() const noexcept { return fileText; }
 
     /** The layer's EQ over its waveform (a view setting: the EQ keeps playing either way). */
     std::function<void (int, bool)> onEqToggle;        ///< its EQ button (the editor keeps one open at a time)

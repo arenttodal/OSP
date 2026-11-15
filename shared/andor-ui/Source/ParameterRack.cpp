@@ -1,4 +1,5 @@
 #include "ParameterRack.h"
+#include "Binding.h"
 #include "OspLookAndFeel.h"
 
 namespace osp::plugin::rack
@@ -281,6 +282,7 @@ void ParameterRack::setHeaderSwitch (const juce::String& id, const juce::String&
         power->setTitle (heading + " on");
         power->setTooltip (tip);
         power->onChange = [this] (int) { repaint(); };
+        binding::markControl (*power, id);   // (ANDOR Learn finds the exact control)
         powerWord = word;
         addAndMakeVisible (*power);
     }
@@ -293,6 +295,7 @@ rackui::SegmentedSwitch& ParameterRack::selectorSegment (const juce::String& id,
     seg->setTooltip (tip);
     seg->setTitle (caption);
     seg->setSize (width, 27);
+    binding::markControl (*seg, id);
     auto& ref = *seg;
     addAndMakeVisible (ref);
     selectors.push_back ({ caption, std::move (seg), over });
@@ -306,6 +309,7 @@ ValueSelector& ParameterRack::selectorList (const juce::String& id, const juce::
     list->setTooltip (tip);
     list->setTitle (caption);
     list->setSize (width, 27);
+    binding::markControl (*list, id);
     auto& ref = *list;
     addAndMakeVisible (ref);
     selectors.push_back ({ caption, std::move (list), {} });
@@ -384,6 +388,7 @@ MiniKnob& ParameterRack::knob (const juce::String& id, const juce::String& capti
     auto k = std::make_unique<MiniKnob> (host.apvts(), id, caption, std::move (f));
     k->setArcColour (accentColour);
     k->setRackMetrics (true);
+    binding::markControl (*k, id);
     auto& ref = *k;
     add (std::move (k), rackui::Slot::knob);
     return ref;
@@ -401,6 +406,7 @@ ValueSelector& ParameterRack::listCell (const juce::String& id, const juce::Stri
     auto selector = std::make_unique<ValueSelector> (*host.apvts().getParameter (id), juce::String());
     selector->setTooltip (tip);
     selector->setRackStyle (ValueSelector::RackStyle::option);
+    binding::markControl (*selector, id);
     auto& ref = *selector;
     add (std::make_unique<rackui::Cell> (caption, std::move (selector), rackui::Cell::Kind::list), rackui::Slot::knob);
     return ref;
@@ -412,6 +418,7 @@ rackui::SegmentedSwitch& ParameterRack::segmentCell (const juce::String& id, con
     auto seg = std::make_unique<rackui::SegmentedSwitch> (*host.apvts().getParameter (id), std::move (positions), &host.undo(), accentColour);
     seg->setTooltip (tip);
     seg->setTitle (caption);
+    binding::markControl (*seg, id);
     auto& ref = *seg;
     add (std::make_unique<rackui::Cell> (caption, std::move (seg), rackui::Cell::Kind::segments), slot);
     return ref;
@@ -423,6 +430,7 @@ rackui::VerticalSwitch& ParameterRack::switchCell (const juce::String& id, const
     auto key = std::make_unique<rackui::VerticalSwitch> (*host.apvts().getParameter (id), std::move (positions), &host.undo());
     key->setTooltip (tip);
     key->setTitle (caption);
+    binding::markControl (*key, id);
     auto& ref = *key;
     add (std::make_unique<rackui::Cell> (caption, std::move (key), three ? rackui::Cell::Kind::switch3 : rackui::Cell::Kind::switch2),
          three ? rackui::Slot::wide : rackui::Slot::slim);

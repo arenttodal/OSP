@@ -141,6 +141,10 @@ public:
         small chevron and a pointer, and brightens on hover. */
     std::function<void()> onCaptionClick;
     juce::Rectangle<float> captionArea() const;
+    /** With a choice order (setChoiceOrder): the musician moved the knob (a drag step, the
+        wheel, a double-click, an accessibility value), after the parameter was written. The
+        attachment's own updates (automation, presets) never call it. Null by default. */
+    std::function<void()> onUserChange;
 
     juce::Slider slider { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::NoTextBox };
 
@@ -259,9 +263,9 @@ protected:
 
 /**
     Whatever shows the popovers (ANDOR OSP's editor, the shell's) and can open a panel anchored to
-    a component inside it (SATELLITE's from the arpeggiator's key): placed under the anchor, kept
-    inside, closed as every popover is (Escape, a click elsewhere, its anchor again). A component
-    finds it with findParentComponentOfClass.
+    a component inside it (SATELLITE's from the arpeggiator's key, SHAPER DNA from its rack key):
+    placed by the anchor, kept inside, closed as every popover is (Escape, a click elsewhere, its
+    anchor again). A component finds it with findParentComponentOfClass.
 */
 struct AnchoredPopoverHost
 {

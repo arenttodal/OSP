@@ -252,10 +252,12 @@ void PostProcessor::processLanes (float& l, float& r) noexcept
     };
     glide (laneA);
     glide (laneB);
+    laneGain = 1.0f;
     if (laneA.mix > 0.0)
     {
         float al = l, ar = r;
         movement.process (al, ar);
+        laneGain = 1.0f + static_cast<float> (laneA.mix) * (movement.amplitude() - 1.0f);
         if (laneA.mix >= 1.0)
         {
             l = al;
@@ -272,6 +274,7 @@ void PostProcessor::processLanes (float& l, float& r) noexcept
     {
         float bl = l, br = r;
         movementB.process (bl, br);
+        laneGain *= 1.0f + static_cast<float> (laneB.mix) * (movementB.amplitude() - 1.0f);
         // The guard: TAPE and CHORUS after lane A never raise the level (slow, at most -6 dB).
         double target = 1.0;
         if (laneBSettings.movementMode == MovementMode::tape || laneBSettings.movementMode == MovementMode::chorus)
@@ -398,6 +401,7 @@ void PostProcessor::process (float* left, float* right, int numSamples) noexcept
             processLanes (l, r);
         else
             movement.process (l, r);
+        writeTrace();
 
         // ECHO as a send, in parallel with SPACE (each hears the dry sound only).
         echoLevel += (echoTarget - echoLevel) * spaceCoef;
@@ -517,6 +521,7 @@ void PostProcessor::customMovement (float* left, float* right, int numSamples) n
             processLanes (left[i], right[i]);
         else
             movement.process (left[i], right[i]);
+        writeTrace();
     }
 }
 

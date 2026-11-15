@@ -131,7 +131,7 @@ namespace frame
     {
         juce::String parameterId, name, hint;
     };
-    /** ANDOR OSP's macro row: LIFE, DRIVE, CHARACTER, MOVEMENT, SPACE, ECHO (data order). */
+    /** ANDOR OSP's macro row: LIFE, DRIVE, FILTER (the `character` parameter), MOVEMENT, SPACE, ECHO (data order). */
     std::array<MacroSpec, macroCount> ospMacroSpecs();
     /** Sets a macro up as ANDOR OSP's (identity colour `index` on its ring, the ivory sprite,
         the value bubble, a modulation drop target) and adds it to `content`. */
@@ -178,9 +178,11 @@ namespace frame
     juce::Rectangle<int> sourceColumn (juce::Rectangle<int> area, int columns, int index);
 
     /** The housing, the identity, the keybed, the macro panel with its lights and the keys
-        on the housing: everything the instrument paints under its components. */
+        on the housing: everything the instrument paints under its components. `housingBase`:
+        the instrument's height with no inline section open (draw::housing: what is above the
+        housing's foot stays the same pixels whatever opens); 0: the content's own height. */
     void paint (juce::Graphics& g, juce::Component& content, const Identity& identity, bool arpShown, const MacroRow& macros,
-                float rackShift = 0.0f, float sourceTrim = 0.0f);
+                float rackShift = 0.0f, float sourceTrim = 0.0f, float housingBase = 0.0f);
 
     /** A popover's card size in reference pixels (a panel laid out at a smaller unit is
         scaled up, so every popover's shell reads alike). */
@@ -200,12 +202,117 @@ namespace frame
 
     /** The instrument's height in reference pixels (taller while the arpeggiator's editor shows). */
     float instrumentHeight (bool arpShown, float rackShift = 0.0f, float sourceTrim = 0.0f) noexcept;
-    /** Scales `content` (laid out at the reference size) uniformly into `editor`, centred:
-        if a host keeps another window shape, the instrument still shows whole. */
-    void fit (juce::Component& editor, juce::Component& content, float height);
-    /** The window keeps the instrument's proportions (869..1810 px wide); `resize` also takes
-        the height that goes with the current width. */
+    /** The last resort for a window shorter than the instrument: a slim vertical scroll bar at
+        the editor's right edge and the instrument scrolled under it - never scaled down, never
+        moved sideways, never a horizontal bar. Owned by an editor; hidden while all fits.
+
+        The window itself always grows first (applyWindowShape asks for the full height). The bar
+        appears only when that is impossible:
+        - the screen has no more room (the window already stands at the screen's height): at once;
+        - the host keeps a shorter window: only once the resize has been negotiated. A host may
+          answer a resize with the old size first (a VST3 host reading the size it was told
+          before, a host settling its own window); so the bar waits (`settleDelayMs`), asks for
+          the full height once more, waits again, and only a window still short then is taken
+          as the host's refusal. While it waits, the instrument stays at the top, unscrolled. */
+    class Overflow final : private juce::ScrollBar::Listener,
+                           private juce::Timer
+    {
+    public:
+        explicit Overflow (juce::Component& editor);
+        ~Overflow() override;
+        /** (fit) The instrument is `contentHeight` editor pixels tall in a `visibleHeight` window. */
+        void update (float contentHeight, float visibleHeight);
+        /** How far the instrument is scrolled up (editor pixels). */
+        float offset() const noexcept { return scrolled; }
+        /** A wheel the instrument did not take (none of its knobs): scrolls while it overflows. */
+        bool scrollBy (const juce::MouseWheelDetails& wheel);
+        /** Scrolls (while it overflows) so editor pixels `top`..`bottom` of the instrument, as
+            if unscrolled, are in view. False: nothing to scroll. */
+        bool scrollToShow (float top, float bottom);
+        bool overflowing() const noexcept { return bar.isVisible(); }
+        /** A shorter window whose resize is still being negotiated (no bar yet). */
+        bool settling() const noexcept { return isTimerRunning(); }
+        /** The negotiation's next step now (what its timer does): ask for the full height again,
+            or - asked once already - take the host's answer and show the bar. */
+        void settleNow();
+        juce::ScrollBar& scrollBar() noexcept { return bar; }
+        /** The editor lays itself out again (its resized()). */
+        std::function<void()> onScroll;
+
+        static constexpr int settleDelayMs = 300;
+
+    private:
+        void scrollBarMoved (juce::ScrollBar*, double newRangeStart) override;
+        void timerCallback() override { settleNow(); }
+        void showBar();
+        juce::Component& editor;
+        juce::ScrollBar bar { true };
+        float scrolled = 0.0f, content = 0.0f, visible = 0.0f;
+        // The episode being negotiated (the instrument's and the window's heights) and how far.
+        float episodeContent = -1.0f, episodeVisible = -1.0f;
+        bool askedAgain = false, refused = false, asking = false;
+    };
+
+    /** For tests (no screen to ask headless): the screen's room for the editor's height, in
+        pixels, as if it stood on such a screen. 0: none (the default; a real screen is asked). */
+    void overrideScreenRoom (int pixels) noexcept;
+
+    /** Places `content` (laid out at the reference size) in `editor`. Its scale is the window's
+        width over the reference width - the musician's zoom - and nothing else: opening a rack,
+        the arpeggiator or a strip never shrinks or re-centres it. The window as tall as the
+        instrument (within a pixel): exactly as it always was. Shorter: the instrument at the
+        top-left at that scale, scrolled by `overflow` (none: cut at the bottom). Taller (a host
+        that kept an old height): at the top-left, the surround under it. */
+    void fit (juce::Component& editor, juce::Component& content, float height, Overflow* overflow = nullptr);
+    /** The window's width is the musician's alone (the corner, 869..1810 px): nothing opened or
+        closed ever changes it, and no aspect ratio is imposed that a host could answer with a
+        new width. `resize` takes the height that goes with that width - taller with the
+        arpeggiator, a rack or a strip shown - but never more than the screen holds: then the
+        window stops there and the instrument scrolls (Overflow), at the same scale. */
     void applyWindowShape (juce::AudioProcessorEditor& editor, float height, bool resize);
+    /** The window's height for `width` and an instrument `height` tall (reference pixels): the
+        height that goes with the width, or the screen's room (pixels for the editor; 0 or less:
+        no screen to ask) if that is less. */
+    int fittedWindowHeight (int width, int screenRoom, float height) noexcept;
+
+    /** Owned by an editor: the first time it is shown on a screen, its window is fitted to that
+        screen (applyWindowShape) - a session reopened with a tall layout (the arpeggiator or a
+        rack open) never opens taller than the screen; its width stays. Off screen it does nothing. */
+    class ScreenFit final : private juce::ComponentListener
+    {
+    public:
+        ScreenFit (juce::AudioProcessorEditor& editor, std::function<float()> instrumentHeight);
+        ~ScreenFit() override;
+
+        /** The editor's window shape (its constrainer, installed here), for the corner and the
+            host alike: the width 869..1810 px; a change of width (the corner, a host's resize)
+            takes the height that goes with it - the instrument's proportions, so dragging the
+            corner zooms the whole instrument evenly; a change of height alone is answered with
+            the instrument's full height too (never capped at an old height; never shorter
+            than the instrument by choice - the window grows, it does not scroll). No fixed
+            aspect ratio: a taller instrument can never be answered with another width. */
+        class Shape final : public juce::ComponentBoundsConstrainer
+        {
+        public:
+            Shape (juce::AudioProcessorEditor& editor, std::function<float()> instrumentHeight);
+            void checkBounds (juce::Rectangle<int>& bounds, const juce::Rectangle<int>& previous, const juce::Rectangle<int>& limits, bool top, bool left,
+                              bool bottom, bool right) override;
+
+        private:
+            juce::AudioProcessorEditor& editor;
+            std::function<float()> height;
+        };
+
+    private:
+        void componentParentHierarchyChanged (juce::Component&) override { check(); }
+        void componentVisibilityChanged (juce::Component&) override { check(); }
+        void check();
+
+        juce::AudioProcessorEditor& editor;
+        std::function<float()> height;
+        Shape shape;
+        bool done = false;
+    };
 }
 
 } // namespace osp::plugin

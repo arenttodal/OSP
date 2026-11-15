@@ -121,6 +121,8 @@ public:
     void addSelectedToTray (int slot);
     void commitTray();
     void openSaveSheet();
+    /** ANDOR Learn: the Save... key (it opens the save sheet). */
+    juce::Component& saveKey() noexcept { return saveButton; }
     void openSettingsSheet();
     void openMissingSheet();
     /** Stage 6: choose folders to scan, follow a scan (view F). */

@@ -27,6 +27,10 @@ public:
     explicit ArpControl (InstrumentHost& processor);
 
     std::function<void()> onToggleEditor;
+    /** ANDOR Learn (opt-in, null by default): the musician's committed gesture on the light,
+        reported from its own click handler after the parameter was written (action ID and the
+        parameter it wrote). Never called for automation, presets or toggleEnabled() itself. */
+    std::function<void (const juce::String& actionId, const juce::String& parameterId)> onLearnAction;
     void setExpanded (bool open);
     /** What a click on the light does: arp.enabled on <-> off (one host gesture). */
     void toggleEnabled();
@@ -37,6 +41,20 @@ public:
     void mouseMove (const juce::MouseEvent&) override;
     void mouseExit (const juce::MouseEvent&) override;
     void mouseDown (const juce::MouseEvent&) override;
+
+    /** A second instrument in the same housing (opt-in, a product's): two rows of the same
+        height, each a power light, its lowercase name and a chevron ("arp" above, `name`
+        below), and no pattern / rate inset. The lower light switches `enabledParameterId`;
+        the rest of the lower row calls onSecondRow. Empty name: ANDOR OSP's card, exactly. */
+    void setSecondRow (const juce::String& name, const juce::String& enabledParameterId);
+    std::function<void()> onSecondRow;
+    /** The lower row's chevron points up while its popover is open. */
+    void setSecondRowOpen (bool open);
+    bool hasSecondRow() const noexcept { return secondName.isNotEmpty(); }
+    bool isSecondRowOn() const noexcept { return secondEnabled; }
+    /** The lower row (stacked only): its light, and the whole row. */
+    juce::Rectangle<float> secondLightArea() const;
+    juce::Rectangle<float> secondRowArea() const;
 
     juce::Rectangle<float> lightArea() const;
     juce::Rectangle<float> chevronArea() const;
@@ -51,7 +69,12 @@ private:
     juce::ParameterAttachment enabledAttachment;
     bool enabled = false, expanded = false;
     juce::String status;
-    int hover = 0;   ///< 1 the light, 2 the rest of the card
+    int hover = 0;   ///< 1 the light, 2 the rest of the card (stacked: of the upper row), 3 the lower light, 4 the rest of the lower row
+    juce::String secondName;
+    std::unique_ptr<juce::ParameterAttachment> secondAttachment;
+    bool secondEnabled = false, secondOpen = false;
+    void paintLight (juce::Graphics&, juce::Point<float> centre, bool on, bool hovered, const char* onPiece, const char* offPiece);
+    int hoverAt (juce::Point<float>) const;
 };
 
 /** "Advanced" and "MOD ›" as raised half cards under the arpeggiator's, pressed in while
@@ -106,7 +129,9 @@ public:
     bool anyOn() const;
     bool isOpen() const;
     /** The light's part (local): a click there switches, anywhere else opens. */
-    juce::Rectangle<int> lightArea() const { return getLocalBounds().withWidth (getHeight()); }
+    juce::Rectangle<int> lightArea() const { return getLocalBounds().withWidth (lightPartWidth); }
+    /** Its width: the light, the name and the chevron at even spacing (the name's own width). */
+    int preferredWidth() const;
     void toggle();
     void openPanel();
     /** Repaints when the light or the panel changed (the editor's refresh). */
@@ -121,6 +146,11 @@ public:
     void focusLost (FocusChangeType) override { repaint(); }
 
 private:
+    // Its spacing (px): the light's centre, the name's start, the gap to the chevron, the
+    // chevron's half width, the right margin. Light to name and name to chevron: one rhythm.
+    static constexpr float lightCentreX = 9.0f, nameX = 21.0f, chevronGap = 9.0f, chevronHalf = 4.0f, rightMargin = 7.0f;
+    static constexpr int lightPartWidth = 17;   ///< (to midway between the light and the name)
+    juce::String name() const { return "SATELLITE"; }
     InstrumentHost& host;
     int remembered = 0;   ///< the cards switched off by the light (bit per card)
     bool shownOn = false, shownOpen = false;
@@ -138,6 +168,11 @@ public:
     std::function<void()> onCollapse;
     /** A right-click on OCTAVES (ARP OCTAVES as a modulation destination). */
     std::function<void()> onOctavesMenu;
+    /** ANDOR Learn (opt-in, null by default): a musician's committed gesture in the panel (a
+        pattern, an octave key, a card, LINK, an EDIT tab, a RATE knob turned), reported from the
+        handler that made it, after its attachment wrote the parameter. The programmatic calls
+        (choosePattern, toggleCard ...) and parameter callbacks never report. */
+    std::function<void (const juce::String& actionId, const juce::String& parameterId)> onLearnAction;
 
     /** Pulls the scheduler's step display and the parameters (editor timer, ~30 Hz). */
     void refresh();
@@ -177,6 +212,9 @@ public:
         repaint();
     }
     int editedCard() const noexcept { return editCard; }
+    bool isLinked() const noexcept { return linked; }
+    /** The RATE knob shown now (the edited card's). */
+    juce::Component& shownRateKnob() noexcept;
     juce::Rectangle<float> cardChipArea (int shown) const { return cardChips[static_cast<std::size_t> (juce::jlimit (0, 2, shown))]; }
     juce::Rectangle<float> linkArea() const { return linkChip; }
     juce::Rectangle<float> editTabArea (int shown) const { return editTabs[static_cast<std::size_t> (juce::jlimit (0, 2, shown))]; }

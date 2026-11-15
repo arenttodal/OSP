@@ -399,18 +399,29 @@ int EqEditor::bandAt (juce::Point<float> p) const
     return best;
 }
 
-std::array<double, 4> EqEditor::modulationOffsets() const
+std::array<double, 4> EqEditor::modulationOffsets (const eq::Settings& base) const
 {
-    // The global LFOs' routes to this layer's EQ, now (as the engine adds them).
+    // What the engine plays (InstrumentHost::effectiveValue: its own sum of the routes, its
+    // envelopes, its clamps), as offsets from the stored bands. Nothing published - no route,
+    // or an engine that does not move its EQ - nothing moves the curve.
     std::array<double, 4> o {};
-    const auto view = ospProcessor.modulationView();
-    const std::array<mod::Dest, 4> dests { layerDest (mod::Dest::eqBellFrequencyA, layer), layerDest (mod::Dest::eqBellGainA, layer),
-                                           layerDest (mod::Dest::eqLowShelfGainA, layer), layerDest (mod::Dest::eqHighShelfGainA, layer) };
-    for (const auto& r : ospProcessor.modulationRoutes())
-        if (r.state == mod::RouteState::active)
-            for (std::size_t i = 0; i < dests.size(); ++i)
-                if (r.route.dest == dests[i])
-                    o[i] += mod::destInfo (dests[i]).span * r.route.depth * view.value[static_cast<std::size_t> (mod::sourceIndex (r.route.source))];
+    auto played = [this] (eq::Band band, const char* name, double& v) {
+        InstrumentHost::EffectiveValue e;
+        if (! ospProcessor.effectiveValue (InstrumentHost::eqParameterId (layer, juce::String (InstrumentHost::eqBandKey (band)) + "." + name), e))
+            return false;
+        v = e.value;
+        return true;
+    };
+    const auto& bands = base.bands;
+    const auto& bell = bands[static_cast<std::size_t> (eq::Band::bell)];
+    if (double v = 0.0; played (eq::Band::bell, "frequency", v))
+        o[0] = std::log2 (std::max (1.0, v) / std::max (1.0, bell.frequencyHz));
+    if (double v = 0.0; played (eq::Band::bell, "gain", v))
+        o[1] = v - bell.gainDb;
+    if (double v = 0.0; played (eq::Band::lowShelf, "gain", v))
+        o[2] = v - bands[static_cast<std::size_t> (eq::Band::lowShelf)].gainDb;
+    if (double v = 0.0; played (eq::Band::highShelf, "gain", v))
+        o[3] = v - bands[static_cast<std::size_t> (eq::Band::highShelf)].gainDb;
     return o;
 }
 
@@ -419,7 +430,8 @@ eq::Settings EqEditor::effective() const
     auto s = shown;
     const auto& o = shownModulation;
     auto& bell = s.bands[static_cast<std::size_t> (eq::Band::bell)];
-    bell.frequencyHz = std::clamp (bell.frequencyHz * std::exp2 (o[0]), 20.0, 20000.0);
+    const auto range = eq::frequencyRange (eq::Band::bell);   // (as the engine clamps it)
+    bell.frequencyHz = std::clamp (bell.frequencyHz * std::exp2 (o[0]), range.minHz, range.maxHz);
     bell.gainDb = std::clamp (bell.gainDb + o[1], -eq::maxGainDb, eq::maxGainDb);
     auto& low = s.bands[static_cast<std::size_t> (eq::Band::lowShelf)];
     low.gainDb = std::clamp (low.gainDb + o[2], -eq::maxGainDb, eq::maxGainDb);
@@ -432,12 +444,17 @@ void EqEditor::refresh()
 {
     if (dampenShown())
         dampenPage->refresh();
-    // The spectrum of what plays through the layer's EQ (its input and output taps).
-    if (const auto* engine = ospProcessor.telemetryEngine(); engine != nullptr && ! dampenShown())
+    // The spectrum of what plays through the layer's EQ: ANDOR OSP's from its engine's taps
+    // (the routing EQUALIZER rack's analyser), else a product's own (none by default).
+    else if (const auto* engine = ospProcessor.telemetryEngine(); engine != nullptr)
+    {
         if (spectrum.analyse (engine->layerEqSpectrum (layer, false), engine->layerEqSpectrum (layer, true)))
             repaint (graphArea().expanded (2.0f).getSmallestIntegerContainer());
+    }
+    else if (ospProcessor.stepLayerEqSpectrum (layer))
+        repaint (graphArea().expanded (2.0f).getSmallestIntegerContainer());
     const auto now = ospProcessor.layerEqSettings (layer);
-    const auto offsets = modulationOffsets();
+    const auto offsets = modulationOffsets (now);
     bool moved = false;
     for (std::size_t i = 0; i < offsets.size(); ++i)
         moved = moved || std::abs (offsets[i] - shownModulation[i]) > 1.0e-4;
@@ -599,8 +616,9 @@ void EqEditor::paint (juce::Graphics& g)
         }
     }
 
-    // The spectrum behind the curve: the routing EQUALIZER rack's own (EqSpectrum), in its ink -
-    // the layer's output filled, its input a quiet line.
+    // The spectrum behind the curve: ANDOR OSP's the routing EQUALIZER rack's own (EqSpectrum),
+    // in its ink - the layer's output filled, its input a quiet line; a product's own otherwise.
+    ospProcessor.paintLayerEqSpectrum (layer, g, graph, [this] (float x) { return hzForX (x); });
     const double rate = sampleRate();
     spectrum.paint (g, graph, [this] (float x) { return hzForX (x); }, rate, juce::Colour (0xff8d8c86), visualIdentityFor (fx::Type::eq).motifInk);
 

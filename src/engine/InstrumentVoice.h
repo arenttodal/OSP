@@ -141,6 +141,12 @@ public:
     void setHeldByPedal (bool held) noexcept { heldByPedal = held; }
     int note() const noexcept { return currentNote; }
     int layerIndex() const noexcept { return voiceLayer; }
+    /** Universal modulation-aware visual feedback: this note's own moves now (shares of the
+        knobs' travel; 0: none) - grain POSITION and SPREAD as it plays them, START as it took it
+        at note on. */
+    double grainPositionModulation() const noexcept { return modStarted ? modGrainPosition : 0.0; }
+    double grainSpreadModulation() const noexcept { return modStarted ? modGrainSpread : 0.0; }
+    double startModulation() const noexcept { return modStartOffset; }
     /** The engine's modulation (routes, global LFOs); this voice runs its own poly sources. */
     void setModulation (const mod::Runtime* runtime) noexcept { modRuntime = runtime; }
     const mod::VoiceState& modulationState() const noexcept { return modState; }

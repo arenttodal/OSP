@@ -98,8 +98,8 @@ void InstrumentHost::addImprintParameters (juce::AudioProcessorValueTreeState::P
         const auto name = "Layer " + layerName (layer) + " Synth ";
         layout.add (parameters::make<juce::AudioParameterChoice> (id28 (synthParameterId (layer, "mode")), name + "Mode",
                                                                   juce::StringArray { "Analog", "Imprint" }, 0));
-        layout.add (parameters::make<juce::AudioParameterFloat> (id28 (synthParameterId (layer, "imprint")), name + "Imprint", unit, 0.0f, percent));
-        layout.add (parameters::make<juce::AudioParameterFloat> (id28 (synthParameterId (layer, "motion")), name + "Motion", unit, 0.0f, percent));
+        layout.add (parameters::make<juce::AudioParameterFloat> (id28 (synthParameterId (layer, "imprint")), name + "Imprint", unit, 100.0f, percent));
+        layout.add (parameters::make<juce::AudioParameterFloat> (id28 (synthParameterId (layer, "motion")), name + "Motion", unit, 100.0f, percent));
     }
 }
 
@@ -563,7 +563,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout InstrumentHost::createParame
             layout.add (parameters::make<juce::AudioParameterFloat> (id17 (modEnvId (i, "length")), n + "Length", skewed (10.0f, 20000.0f, 1000.0f), 1000.0f, ms));
         }
         juce::StringArray sources { "None" };
-        for (int i = 1; i <= mod::sourceCount; ++i)
+        for (int i = 1; i <= mod::offeredSourceCount(); ++i)   // (ANDOR OSP's twelve; a product's own after them)
             sources.add (mod::sourceName (static_cast<mod::Source> (i)));
         for (int r = 0; r < mod::maxRoutes; ++r)
         {
@@ -684,7 +684,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout InstrumentHost::createParame
             layout.add (parameters::make<juce::AudioParameterFloat> (id23 (synthParameterId (layer, "tone")), name + "Tone",
                                                                      juce::NormalisableRange<float> (0.0f, 100.0f, 0.1f), 50.0f, tone));
             layout.add (parameters::make<juce::AudioParameterChoice> (id23 (synthParameterId (layer, "shape")), name + "Shape",
-                                                                      juce::StringArray { "Held", "Follow" }, 0));
+                                                                      juce::StringArray { "Held", "Follow" }, 1));   // FOLLOW by default (state 15)
             layout.add (parameters::make<juce::AudioParameterChoice> (id23 (synthParameterId (layer, "pitch")), name + "Pitch",
                                                                       juce::StringArray { "Keys", "Recording" }, 0));
         }
