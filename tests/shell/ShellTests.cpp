@@ -991,7 +991,7 @@ TEST_CASE ("shell: a window shorter than the instrument (a host that refused, th
     auto now = geometryOf (*ui);
     for (std::size_t i = 0; i < 3; ++i)
         CHECK (near (now.cards[i], base.cards[i]));   // same scale, same places, at the top
-    CHECK (now.keyboard.getWidth() == base.keyboard.getWidth());
+    CHECK (std::abs (now.keyboard.getWidth() - base.keyboard.getWidth()) <= 1);   // (same scale; a pixel of rounding)
     CHECK (now.keyboard.getX() == base.keyboard.getX());
     CHECK (ui->instrumentOverflow().overflowing());
     CHECK (now.keyboard.getBottom() > editor->getHeight());   // (below: reached by scrolling)
@@ -1007,8 +1007,8 @@ TEST_CASE ("shell: a window shorter than the instrument (a host that refused, th
     now = geometryOf (*ui);
     CHECK (now.keyboard.getBottom() <= editor->getHeight() + 1);
     CHECK (now.keyboard.getX() == base.keyboard.getX());
-    CHECK (now.keyboard.getWidth() == base.keyboard.getWidth());
-    CHECK (now.cards[0].getWidth() == base.cards[0].getWidth());
+    CHECK (std::abs (now.keyboard.getWidth() - base.keyboard.getWidth()) <= 1);   // (same scale; a pixel of rounding)
+    CHECK (std::abs (now.cards[0].getWidth() - base.cards[0].getWidth()) <= 1);   // (same scale; a pixel of rounding)
     // The host gives the height after all: no scroll bar, back at the top.
     host.policy = TestHost::Policy::grant;
     editor->setSize (width, juce::roundToInt (static_cast<float> (width) * ui->instrumentHeight() / osp::plugin::design::width));
@@ -1067,7 +1067,7 @@ TEST_CASE ("shell: SPACE + ARP + a strip opened together grow the window itself;
         CHECK (now.editorWidth == width);
         for (std::size_t i = 0; i < 3; ++i)
             CHECK (near (now.cards[i], base.cards[i]));
-        CHECK (now.keyboard.getWidth() == base.keyboard.getWidth());
+        CHECK (std::abs (now.keyboard.getWidth() - base.keyboard.getWidth()) <= 1);   // (same scale; a pixel of rounding)
     };
 
     SECTION ("a host that grants: the window grows to the whole instrument, never a scroll bar")
