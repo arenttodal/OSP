@@ -32,7 +32,7 @@ from mathutils import Euler, Vector
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:]
 p = argparse.ArgumentParser()
-p.add_argument("--camera", default="B", choices=["A", "B", "macros", "display", "corner", "hero_A", "hero_B", "knob", "small", "module", "corner_back"])
+p.add_argument("--camera", default="B", choices=["A", "B", "macros", "display", "corner", "hero_A", "hero_B", "knob", "knob_low", "small", "module", "corner_back", "corner_fl", "corner_br"])
 p.add_argument("--stage", default="neutral", choices=["neutral", "dark"])
 p.add_argument("--variant", default="shaded", choices=["shaded", "clay", "alpha"])
 p.add_argument("--res", type=int, nargs=2, default=[2000, 1500])
@@ -45,9 +45,13 @@ p.add_argument("--view", default="AgX")
 p.add_argument("--look", default="AgX - Punchy")
 p.add_argument("--exposure", type=float, default=None)
 p.add_argument("--border", type=float, nargs=4)
-p.add_argument("--knob", default="approved", choices=["pass2", "shallow", "shallow_fluted", "mid", "approved"],
+p.add_argument("--knob", default="hd", choices=["pass2", "shallow", "shallow_fluted", "mid", "approved", "hd"],
                help="knob geometry: pass 2's, the approved profile shallow (0.15 D) plain or finely fluted, or the approved spec (11 mm on 28 mm)")
-p.add_argument("--frame-h", type=float, default=16.0, help="timber height in mm (fascia test: 16, 14.4, 12.8)")
+p.add_argument("--hd", type=float, default=0.30,
+               help="--knob hd: the official profile with only its total height changed, as H/D (D = 28 mm); pass 3.5 lock: 0.30")
+p.add_argument("--flute-depth", type=float, default=0.252, help="--knob hd: flute depth in mm (official 0.42; round 1 E 0.252)")
+p.add_argument("--frame-h", type=float, default=14.4, help="timber height in mm (pass 3.5 lock: 14.4; round 1 test: 16, 14.4, 12.8)")
+p.add_argument("--report", help="write a JSON geometry report of the knobs and frame here")
 args = p.parse_args(argv)
 
 TEX = os.path.abspath(args.textures)
@@ -686,6 +690,13 @@ if args.knob in ("shallow", "shallow_fluted"):
     KG.update(height=4.2, bevelWidth=0.7, topCurvature=0.25, bevelSegments=8)
     KG["skirt"] = dict(KG["skirt"], height=0.9, gap=0.3)
     KG["flutes"] = dict(KG["flutes"], depth=0.15, fadeIn=0.6, topFade=0.4) if args.knob == "shallow_fluted" else dict(KG["flutes"], count=0, depth=0.0)
+elif args.knob == "hd":
+    # Pass 3.5: the official profile, regenerated with only the total height changed (mounting
+    # plane to the crown's top, base ring included: the generator's own convention), and the
+    # finer flutes of round 1 E. Diameter, taper, crown, bevel, edge round, base ring, groove
+    # and the indicator stay official.
+    KG["height"] = args.hd * KG["diameter"]
+    KG["flutes"] = dict(KG["flutes"], depth=args.flute_depth)
 elif args.knob == "mid":
     # The approved profile at 0.25 D (7 mm): between the spec (0.39 D) and the brief (0.11-0.17 D);
     # a crisper 0.9 mm bevel, a 0.4 mm crown, flutes 0.009 D.
@@ -746,7 +757,11 @@ def approved_knob(name, u, v, r_px, angle, samples):
     o.location = (ex(u), ey(v), surface_top(u, v))
     o.rotation_euler = (0, 0, -angle)          # editor angle: clockwise from 12 o'clock; +Y is the pointer
     me.materials.append(M_KNOB_APPROVED)
+    KNOB_LOG.append((o, u, v, r_px, angle, verts, info, s))
     return o
+
+
+KNOB_LOG = []
 
 
 if args.knob == "pass2":
@@ -756,6 +771,75 @@ else:
     M_KNOB_APPROVED = mat_knob()
     for i, k in enumerate(GEO["knobs"]):
         approved_knob(f"Knob {k['kind']} {i:02d}", k["c"][0], k["c"][1], k["r"], k["angle"], 1440 if k["kind"] == "macro" else 480)
+
+def flute_count(verts, info):
+    """Ridges counted on the ring of the profile nearest mid-sidewall (local maxima of radius)."""
+    zmid = info["zb"] + 0.5 * (info["edgeZ"] - info["zb"])
+    zs = sorted({round(v[2], 6) for v in verts})
+    z = min(zs, key=lambda q: abs(q - zmid))
+    ring = [v for v in verts if abs(v[2] - z) < 1e-6]
+    ring.sort(key=lambda v: math.atan2(v[1], v[0]))
+    rad = [math.hypot(v[0], v[1]) for v in ring]
+    n = len(rad)
+    return sum(1 for i in range(n) if rad[i] > rad[i - 1] and rad[i] >= rad[(i + 1) % n]) if n else 0
+
+
+def geometry_report(path):
+    knobs = []
+    macro_centres = [(k[1], k[2]) for k in KNOB_LOG if k[3] > 40]
+    for o, u, v, r_px, angle, verts, info, s in KNOB_LOG:
+        zmax = max(q[2] for q in verts)
+        rmax = max(math.hypot(q[0], q[1]) for q in verts)
+        kind = "macro" if r_px > 40 else ("layer" if r_px > 25 else "mini")
+        mount = surface_top(u, v)
+        entry = {
+            "kind": kind, "centre_px": [u, v], "pointer_angle_rad": angle,
+            "design_mm": {"cap_diameter_D": 2 * info["rb"], "overall_height": round(zmax, 4), "H_over_D": round(zmax / (2 * info["rb"]), 4),
+                          "upper_face_radius": round(info["rt"], 4), "base_ring_diameter": round(2 * rmax, 4),
+                          "bevel_width": KG["bevelWidth"], "crown": KG["topCurvature"], "edge_round": KG.get("edgeRound"),
+                          "groove_top_z": round(info["zb"], 4), "flute_depth": KG["flutes"]["depth"]},
+            "flutes_counted": flute_count(verts, info) if KG["flutes"]["count"] else 0,
+            "scale_scene_per_design": round(s, 6),
+            "scene_mm": {"cap_diameter": round(2 * info["rb"] * s * 1000, 3), "overall_height": round(zmax * s * 1000, 3),
+                         "base_ring_diameter": round(2 * rmax * s * 1000, 3)},
+            "mounting_plane_m": round(mount, 6), "object_base_m": round(o.location.z, 6),
+            "base_gap_mm": round((o.location.z - mount) * 1000, 4),
+            "bbox_product_mm": {"x": [round((ex(u) - rmax * s) * 1000, 2), round((ex(u) + rmax * s) * 1000, 2)],
+                                "y": [round((ey(v) - rmax * s) * 1000, 2), round((ey(v) + rmax * s) * 1000, 2)],
+                                "z": [round(mount * 1000, 3), round((mount + zmax * s) * 1000, 3)]},
+        }
+        if kind == "macro":
+            ring_px = rmax * s / PX
+            others = [c for c in macro_centres if c != (u, v)]
+            entry["clearance_px"] = {
+                "to_neighbour_knob": round(min(math.hypot(c[0] - u, c[1] - v) for c in others) - 2 * ring_px, 2),
+                "to_lens_led": round(abs(883 - v) - ring_px - 4.5, 2),
+                "to_macro_panel_bottom_edge": round(896.5 - (v + ring_px), 2),
+            }
+        knobs.append(entry)
+    rails = {}
+    for name in ("Teak front fascia", "Teak back rail", "Teak side rail L", "Teak side rail R"):
+        o = bpy.data.objects[name]
+        zs = [vv.co.z for vv in o.data.vertices]
+        rails[name] = {"z_min_mm": round(min(zs) * 1000, 3), "z_max_mm": round(max(zs) * 1000, 3)}
+    macro = [k for k in knobs if k["kind"] == "macro"]
+    checks = {
+        "six_macros": len(macro) == 6,
+        "macro_diameter_identical": len({k["design_mm"]["cap_diameter_D"] for k in macro}) == 1,
+        "macro_height_identical": len({k["design_mm"]["overall_height"] for k in macro}) == 1,
+        "all_knobs_seated_on_their_surface": all(abs(k["base_gap_mm"]) < 1e-6 for k in knobs),
+        "flutes_48": all(k["flutes_counted"] in (0, 48) for k in knobs),
+        "rails_same_height": len({(r["z_min_mm"], r["z_max_mm"]) for r in rails.values()}) == 1,
+        "macro_clearances_positive": all(min(k["clearance_px"].values()) > 0 for k in macro),
+    }
+    rep_ = {"variant": args.knob, "hd": args.hd if args.knob == "hd" else None, "frame_h_mm": args.frame_h,
+            "knob_config_design_mm": KG, "checks": checks, "rails": rails, "knobs": knobs}
+    json.dump(rep_, open(path, "w"), indent=1)
+    print("report", path, checks)
+
+
+if args.report and args.knob != "pass2":
+    geometry_report(args.report)
 
 if CLAY:
     for o in PRODUCT.objects:
@@ -949,7 +1033,11 @@ CAMS = {
     "display": dict(yaw=-20, pitch=42, dist=0.30, lens=100, target=prod(723, 330, REF_PANEL_TOP + CARD_H), fstop=8),
     "corner": dict(yaw=38, pitch=66, dist=0.26, lens=100, target=prod(1390, 1050, REF_FRAME_TOP * 0.6), fstop=8),
     "corner_back": dict(yaw=-150, pitch=62, dist=0.26, lens=100, target=prod(40, 30, REF_FRAME_TOP * 0.6), fstop=8),
+    "corner_fl": dict(yaw=-38, pitch=66, dist=0.26, lens=100, target=prod(58, 1050, REF_FRAME_TOP * 0.6), fstop=8),
+    "corner_br": dict(yaw=150, pitch=62, dist=0.26, lens=100, target=prod(1408, 30, REF_FRAME_TOP * 0.6), fstop=8),
     "knob": dict(yaw=-20, pitch=52, dist=0.21, lens=100, target=prod(493, 818, REF_PANEL_TOP + 4 * MM), fstop=11),
+    # pass 3.5: the same knobs from a lower elevation (22 deg above the panel) to read the sidewall
+    "knob_low": dict(yaw=-20, pitch=68, dist=0.21, lens=100, target=prod(493, 818, REF_PANEL_TOP + 4 * MM), fstop=11),
     "small": dict(yaw=-20, pitch=50, dist=0.17, lens=100, target=prod(723, 520, REF_PANEL_TOP + CARD_H + 2 * MM), fstop=11),
     "module": dict(yaw=-24, pitch=55, dist=0.20, lens=100, target=prod(60, 640, REF_PANEL_TOP + CARD_H), fstop=11),
 }
