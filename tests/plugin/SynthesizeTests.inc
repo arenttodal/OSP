@@ -204,6 +204,8 @@ TEST_CASE ("plugin synthesize: a One Shot that ends while held keeps its oscilla
     REQUIRE (p.waitForLoads (30000));
     p.pollLoads();
     p.setParameterValue ("layerA.loop", 0.0f);
+    for (int l = 0; l < 3; ++l)
+        p.setParameterValue (osp::plugin::InstrumentHost::synthParameterId (l, "shape"), 0.0f);   // HELD (FOLLOW is the default since state 15)
     p.prepareToPlay (48000.0, 256);
     auto held = [&p] {
         return renderBlocks (p, 4.0, [] (int b, juce::MidiBuffer& m) {
@@ -330,6 +332,7 @@ TEST_CASE ("plugin synthesize: the development audition (blend law, envelope) is
     loadLayers (p, tmp.dir, 1);
     CHECK (p.synthAuditionBlend() == 0);
     CHECK (p.synthAuditionEnvelope() == 0);
+    p.setParameterValue (osp::plugin::InstrumentHost::synthParameterId (0, "shape"), 0.0f);   // HELD: the audition's FOLLOW differs from it
     const auto plain = audioHash (renderHeld (p, chord8, 1.0));
     p.setParameterValue (synthId (0), 50.0f);
     const auto hybrid = audioHash (renderHeld (p, chord8, 1.0));
@@ -740,7 +743,8 @@ TEST_CASE ("plugin imprint: mode, IMPRINT and MOTION per source (hint 28) at Ana
             auto* param = p.parameters.getParameter (InstrumentHost::synthParameterId (l, name));
             REQUIRE (param != nullptr);
             CHECK (param->getVersionHint() == 28);
-            CHECK (p.parameterValue (InstrumentHost::synthParameterId (l, name)) == 0.0f);
+            // (mode: ANALOG; IMPRINT and MOTION: 100 % since state 15)
+            CHECK (p.parameterValue (InstrumentHost::synthParameterId (l, name)) == (juce::String (name) == "mode" ? 0.0f : 100.0f));
         }
     CHECK (p.imprintState (0) == InstrumentHost::ImprintState::ready);
     CHECK (p.imprintState (2) == InstrumentHost::ImprintState::none);
@@ -870,6 +874,8 @@ TEST_CASE ("plugin imprint: the chip's label opens the page, its amount is the f
         if (size.first == 1448)
             CHECK (page->waveArea().getHeight() > 40.0f);   // (the smallest card gives its picture to the controls)
         CHECK (page->imprintStatus().isEmpty());   // the source's imprint is ready
+        p.setParameterValue (InstrumentHost::synthParameterId (1, "imprint"), 0.0f);   // (100 % by default)
+        page->refresh();
         CHECK (page->shownWave() == analogWave);    // IMPRINT 0: the oscillator as it was
         p.setParameterValue (InstrumentHost::synthParameterId (1, "imprint"), 100.0f);
         page->refresh();
