@@ -1,5 +1,10 @@
 # Status
 
+> **15 Nov 2026:** `ParameterRack::customCell` (opt-in, shared): a product can place its own
+> read-only cell in a rack row. ANDOR Analog uses it for MORPH TO D's source and state (GLOBAL
+> MORPH 2.0). ANDOR OSP never calls it and is unchanged: 4 / 4 plugin-test shards and the example
+> product pass.
+
 _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in the plugin, listening test pending; overnight run working through Phases 4–8._
 
 ## Milestone checklist — Phase 0: research harness + baseline engine
