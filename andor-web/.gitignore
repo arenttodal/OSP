@@ -7,3 +7,4 @@ product-renders/blender/textures/
 *.blend
 *.blend1
 product-renders/renders/**/*_16bit.png
+product-renders/renders/*.zip
