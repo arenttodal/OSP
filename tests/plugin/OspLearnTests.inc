@@ -128,7 +128,7 @@ TEST_CASE ("learn: OSP's own plugin has the shared Learn, idle until asked; its 
     INFO (rig.learn.problems().joinIntoString ("\n"));
     CHECK (rig.learn.isUsable());
     CHECK (rig.learn.catalog().productId == "osp");
-    CHECK (rig.learn.catalog().lessons.size() == 11);
+    CHECK (rig.learn.catalog().lessons.size() == 12);
     CHECK (rig.learn.catalog().help.size() >= 30);
     // Idle: no note, no browser, no ring (nothing of Learn's in the editor).
     CHECK_FALSE (rig.learn.isActive());

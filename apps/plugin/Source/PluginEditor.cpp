@@ -163,6 +163,9 @@ void OspAudioProcessorEditor::mouseDownAnywhere (juce::Component* c)
     if (popupIndex == anchoredPopup && popupAnchor != nullptr && (c == popupAnchor.getComponent() || popupAnchor->isParentOf (c)))
         return;   // (its anchor: it opened the panel in this very press - JUCE tells this watcher after the
                   // key - or closes it itself; closing here too shut SATELLITE's panel as it opened)
+    if (c == &arpButton && popupIndex == subPopup
+        && arpButton.secondRowArea().contains (arpButton.getLocalPoint (nullptr, juce::Desktop::getMousePosition().toFloat())))
+        return;   // (SUB's own row: it opened the panel, or switches SUB with it open)
     int pressed = -1;
     for (int i = 0; i < static_cast<int> (macros.size()); ++i)
         if (c == macros[static_cast<std::size_t> (i)].label.get())
@@ -355,6 +358,14 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     };
     content.addAndMakeVisible (advancedButton);
     arpButton.onToggleEditor = [this] { setArpExpanded (! arpShown); };
+    // SUB: the housing's second row (its light switches SUB, the row opens its panel above).
+    arpButton.setSecondRow ("SUB", OspAudioProcessor::subFieldId ("enabled"));
+    arpButton.onSecondRow = [this] {
+        if (popupIndex == subPopup)
+            closePopup();
+        else
+            openPopup (subPopup);
+    };
     arpPanel.onCollapse = [this] { setArpExpanded (false); };
     arpPanel.onOctavesMenu = [this] {
         modOverlay.contextMenu ("arp.octaves").showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&arpPanel));
@@ -543,6 +554,13 @@ void OspAudioProcessorEditor::openPopup (int which)
 {
     const bool keepAdvanced = which == advancedPopup;
     closePopup();
+    if (which == subPopup)
+    {
+        popup = ospProcessor.createSubPanel();
+        presentPopup (subPopup);
+        arpButton.setSecondRowOpen (true);
+        return;
+    }
     if (which < 0 || which > lastPopup || (which >= reimaginedPopup + OspAudioProcessor::numLayers && which < echoPopup))
         return;
     const bool reimagined = which >= reimaginedPopup && which < reimaginedPopup + OspAudioProcessor::numLayers;
@@ -606,6 +624,8 @@ void OspAudioProcessorEditor::closePopup()
         ospProcessor.setAdvancedOpen (false);
         advancedButton.setToggleState (false, juce::dontSendNotification);
     }
+    if (popupIndex == subPopup)
+        arpButton.setSecondRowOpen (false);
     if (popupIndex == anchoredPopup)
     {
         content.removeChildComponent (&popupBackdrop);
@@ -680,6 +700,14 @@ void OspAudioProcessorEditor::positionPopup()
         const float visibleBottom = content.getLocalArea (this, getLocalBounds()).toFloat().getBottom();
         if (y + size.y > visibleBottom - 8.0f)
             y = anchor.getY() - 8.0f - size.y;
+    }
+    else if (popupIndex == subPopup)
+    {
+        // Above the arpeggiator's housing, its left edge with the housing's (placePopover keeps
+        // it inside), as in ANDOR ANALOG.
+        const auto anchor = arpButton.getBounds().toFloat();
+        x = anchor.getX();
+        y = anchor.getY() - 10.0f - size.y;
     }
     else if (popupIndex == mixPopup)
     {

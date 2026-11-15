@@ -449,6 +449,30 @@ static Catalog ospCatalog()
     }
     {
         Lesson l;
+        l.id = "osp.sub";
+        l.title = "SUB: a bass under your keys";
+        l.description = "Add a sub-bass that follows the keys you hold.";
+        l.minutes = 2;
+        l.exampleId = "bowed";
+        auto open = step ("open", "osp.sub.row", "Open SUB", "SUB shares the arpeggiator's key beside the keyboard. Click SUB, the key's lower row, to open its settings.",
+                          Completion::action ({ "sub.opened" }, Condition::state ("osp.popup.sub.open")).withAlreadyDone (Condition::state ("osp.popup.sub.open"), "Already open"));
+        open.revealOnEnter = false;
+        l.steps.push_back (open);
+        l.steps.push_back (step ("on", "osp.sub.enable", "Switch it on", "Click SUB's light to switch it on. It plays one or two octaves below each key you hold.",
+                                 setTo ("sub.enabled", 1.0f, "Already on")));
+        l.steps.push_back (step ("play", "osp.keyboard", "Hold a chord", "Hold a few low notes. SUB follows the keys you hold, even while the arpeggiator plays them in turn, and it is never sent to ECHO or SPACE.",
+                                 Completion::action ({ "note.played" }, Condition::equals ("sub.enabled", 1.0f))));
+        l.steps.push_back (step ("level", "osp.sub.level", "Set its level", "LEVEL sets how loud SUB plays under the sound.", edited ("sub.level")));
+        l.steps.push_back (step ("range", "osp.sub.range", "Choose its keys",
+                                 "SUB plays only the keys inside the lit range. Drag either end on the keyboard, or the range itself to move it. With TAPER, higher keys play quieter.",
+                                 Completion::action ({ param ("sub.lowKey"), param ("sub.highKey") }, Condition::state ("osp.popup.sub.open"))));
+        l.completionText = "SUB adds a sub-bass under the keys you hold. It follows FILTER's low-pass and MOVEMENT's PULSE and SHAPER, and stays out of ECHO and SPACE.";
+        // (SUB plays without a recording: the set-up only offers one to hear it under.)
+        setUp (l, {}, "SUB plays under any sound, or on its own: use your current sound, or the bowed example.");
+        c.lessons.push_back (l);
+    }
+    {
+        Lesson l;
         l.id = "osp.modulation";
         l.title = "Modulation";
         l.description = "Make a control move by itself.";
@@ -572,6 +596,8 @@ static Catalog ospCatalog()
     help ("osp.macro.echo", "ECHO", "Repeats of the sound (TAPE, BBD or ASCEND). The knob sets how loud they are; 0 % is off.", "osp.sound");
     help ("osp.macro.space", "SPACE", "Reverb: the knob sets how much. Click the name for ROOM, HALL, PLATE, SPRING and the other spaces.", "osp.sound");
     help ("osp.arp.control", "ARP", "Plays the notes you hold as a repeating pattern. The light switches it on; the rest of the key opens its settings.", "osp.arp");
+    help ("osp.sub.row", "SUB", "A sub-bass one or two octaves below the keys you hold, added after the effects. The light switches it on; the row opens WAVE, GRIT, LEVEL and its key range.",
+          "osp.sub");
     help ("osp.mod.panel", "AMP, ENV, LFO", "AMP shapes each note's volume (A D S R). ENV and LFO 1 / 2 are movements you connect to controls by dragging their tab onto a knob.",
           "osp.modulation");
     help ("osp.mod.halo", "Modulation ring", "The coloured ring shows how far a source moves this control. Drag it to change the depth; right-click for more.", "osp.modulation");
@@ -693,7 +719,24 @@ struct OspLearnTargets
         auto expandArp = [&e] { e.setArpExpanded (true); return e.arpShown; };
         auto panel = [&e] { return static_cast<juce::Component*> (&e.arpPanel); };
         auto ownCard = [&e] { return ! e.arpPanel.showsCards() || e.arpPanel.isLinked() || e.arpPanel.editedCard() == 0; };
-        t.add ({ "osp.arp.control", comp (e.arpButton), {}, {}, {}, true });
+        // (ARP is the housing's upper row while SUB has the lower one.)
+        t.add ({ "osp.arp.control", comp (e.arpButton),
+                 [&e] (juce::Component& c) {
+                     auto r = c.getLocalBounds();
+                     return e.arpButton.hasSecondRow() ? r.removeFromTop (r.getHeight() / 2) : r;
+                 },
+                 {}, {}, true });
+        // SUB: the housing's lower row, its light, and its panel's controls (by parameter).
+        t.add ({ "osp.sub.row", comp (e.arpButton), [&e] (juce::Component&) { return e.arpButton.secondRowArea().getSmallestIntegerContainer(); } });
+        t.add ({ "osp.sub.enable", comp (e.arpButton), [&e] (juce::Component&) { return e.arpButton.secondLightArea().expanded (2.0f).getSmallestIntegerContainer(); } });
+        auto inSub = [&e] (const juce::String& parameterId) {
+            return Target::Locator ([&e, parameterId] {
+                return e.popupIndex == OspAudioProcessorEditor::subPopup && e.popup != nullptr ? findTagged (e.popup.get(), parameterId) : nullptr;
+            });
+        };
+        auto openSub = [&e] { e.openPopup (OspAudioProcessorEditor::subPopup); return e.popupIndex == OspAudioProcessorEditor::subPopup; };
+        t.add ({ "osp.sub.level", inSub (InstrumentHost::subFieldId ("level")), {}, openSub });
+        t.add ({ "osp.sub.range", inSub (InstrumentHost::subFieldId ("lowKey")), {}, openSub });
         t.add ({ "osp.arp.enable", comp (e.arpButton), [&e] (juce::Component&) { return e.arpButton.lightArea().expanded (4.0f).getSmallestIntegerContainer(); } });
         t.add ({ "osp.arp.panel", panel, {}, expandArp });
         t.add ({ "osp.arp.pattern", panel, [&e] (juce::Component&) { return e.arpPanel.patternFieldArea().getUnion (e.arpPanel.patternListArea()).getSmallestIntegerContainer(); },
@@ -810,6 +853,7 @@ struct OspLearnTargets
         t.addState ("osp.keydna.open", [&e] { return e.keyDnaPanel != nullptr; });
         t.addState ("osp.keydna.enabled", [&p] { return p.keyDnaSettings (p.editLayer()).enabled; });
         t.addState ("osp.arp.panel.open", [&e] { return e.arpShown; });
+        t.addState ("osp.popup.sub.open", [&e] { return e.popupIndex == OspAudioProcessorEditor::subPopup; });
         t.addState ("osp.mod.tab.lfo1", [&e] { return e.modPanel.tab() == 2; });
         t.addState ("osp.mod.lfo1.routed", [&p] {
             for (const auto& r : p.modulationRoutes())
@@ -921,6 +965,13 @@ void OspAudioProcessorEditor::createLearn()
     arpButton.onToggleEditor = [this, toggle] {
         toggle();
         learnAction (arpShown ? andor::learn::actions::arpPanelOpened : andor::learn::actions::arpPanelClosed, "osp.arp.control");
+    };
+    auto subRow = arpButton.onSecondRow;
+    arpButton.onSecondRow = [this, subRow] {
+        if (subRow != nullptr)
+            subRow();
+        if (popupIndex == subPopup)
+            learnAction ("sub.opened", "osp.sub.row");
     };
     arpButton.onLearnAction = [this] (const juce::String& action, const juce::String& parameterId) {
         if (learn != nullptr)

@@ -110,6 +110,7 @@ to presets or sessions (progress is a per-user file), and no DSP file changed.
 | Playing and shaping | LIFE: natural variation (`osp.life`) | LIFE 0 %, LIFE up, open, PITCH, TONE, ATTACK, TAKES | pluck | a sound |
 | | KEY DNA (`osp.keydna`) | Granular, open, what it does, on, POS depth, SIZE or DENS, AMOUNT | bowed | a sound; Granular after its step |
 | | Arpeggiator (`osp.arp`) | open, on, PATTERN, RATE, OCTAVES, GATE | pluck | a sound |
+| | SUB (`osp.sub`, added with SUB: docs/sub/osp-sub.md) | open (the housing's SUB row), on (its light), hold a chord, LEVEL, range | bowed | none (SUB plays without a recording) |
 | | Modulation (`osp.modulation`) | LFO 1 tab, SHAPE (SINE), RATE, connect (drag), depth (ring), listen | bowed | a sound |
 | | Shape the sound (`osp.sound`) | FILTER, DRIVE, MOVEMENT (open), a movement, ECHO, SPACE, compare | bowed | a sound |
 | Managing sounds | Presets and instruments (`osp.presets`) | Library, what a preset keeps, Save…, Export instrument…, Open instrument file… | bowed | a sound |
@@ -135,7 +136,6 @@ playback key.
 - Analog's per-card PLAYS / LINK. They exist in OSP's arpeggiator, but the specification keeps
   them out.
 - SHAPER DNA.
-- SUB (queued: it is not in OSP yet).
 
 ## Control-target inventory
 

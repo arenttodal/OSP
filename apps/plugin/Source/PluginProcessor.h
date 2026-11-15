@@ -179,6 +179,9 @@ public:
     // SATELLITE: each layer's own stereo motion (the per-card arpeggiator's companion).
     juce::String satelliteParameterId (int card) const override { return satelliteFieldId (card, "enabled"); }
     std::unique_ptr<MiniPanel> createSatellitePanel (int card) override;
+    /** SUB's panel (the shared V7 popover) on `sub.*`; it lights the keys held now (the
+        keyboard state before the arpeggiator: what SUB plays). Message thread. */
+    std::unique_ptr<MiniPanel> createSubPanel();
     bool satelliteView (int card, float& x, float& rear) const override { return engine.satelliteView (card, x, rear); }
 
     // The FX library (shared with ANDOR ANALOG; engine/fx, shared/andor-ui Fx*): ten more
@@ -790,6 +793,7 @@ private:
     std::atomic<float>* velocityRangeParam = nullptr;
     std::atomic<float>* fineTuneParam = nullptr;
     std::atomic<float>* bendRangeParam = nullptr;
+    std::array<std::atomic<float>*, 10> subParams {};   ///< SUB (subFields() order, version hint 33)
     std::atomic<float>* lifeParam = nullptr;
     std::atomic<float>* dynamicsParam = nullptr;
     std::atomic<float>* characterParam = nullptr;

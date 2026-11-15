@@ -9,6 +9,7 @@
 #include "LibraryPlaces.h"
 #include "PluginEditor.h"
 #include "SatellitePanel.h"
+#include "SubPanel.h"
 
 #include "audio/utility/TestSignals.h"
 #include "core/PitchMath.h"
@@ -101,6 +102,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
     // SATELLITE (version hint 32; after PEDAL LOOP): each layer's own stereo motion, the per-card
     // arpeggiator's companion as in ANDOR ANALOG. Every layer off: the voices exactly as before.
     addSatelliteParameters (layout, 32);
+    // SUB (version hint 33; after SATELLITE): ANDOR ANALOG's sub oscillator, `sub.*`. Off by
+    // default and in every session from before: the output exactly as before.
+    addSubParameters (layout, 33, [] (const char* field) { return subFieldId (field); });
     return layout;
 }
 
@@ -253,6 +257,8 @@ OspAudioProcessor::OspAudioProcessor()
     velocityRangeParam = parameters.getRawParameterValue (ids::velocityRange);
     fineTuneParam = parameters.getRawParameterValue (ids::fineTune);
     bendRangeParam = parameters.getRawParameterValue (ids::bendRange);
+    for (std::size_t i = 0; i < subFields().size(); ++i)
+        subParams[i] = parameters.getRawParameterValue (subFieldId (subFields()[i]));
     lifeParam = parameters.getRawParameterValue (ids::life);
     dynamicsParam = parameters.getRawParameterValue (ids::dynamics);
     characterParam = parameters.getRawParameterValue (ids::character);
@@ -487,6 +493,14 @@ namespace
 
 void OspAudioProcessor::applyParameters (bool force) noexcept
 {
+    {
+        // SUB: compared with what it plays, so nothing is redone while nothing moves.
+        std::array<float, 10> raw {};
+        for (std::size_t i = 0; i < raw.size(); ++i)
+            raw[i] = subParams[i]->load();
+        engine.setSub (subSettingsFrom (raw));
+        engine.setSubBendRange (static_cast<double> (bendRangeParam->load()));
+    }
     const float attack = attackParam->load();
     const float release = releaseParam->load();
     const float decay = decayParam->load();
@@ -1485,6 +1499,7 @@ void OspAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
         if (changed (pitch, lastScreenPitch))
         {
             lastScreenPitch = pitch;
+            engine.setSubBend (pitch);
             handleMidi (juce::MidiMessage::pitchWheel (1, juce::jlimit (0, 16383, 8192 + juce::roundToInt (pitch * 8191.0f))));
         }
         if (changed (mod, lastScreenMod))
@@ -1508,11 +1523,33 @@ void OspAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
         position = end;
     };
 
+    // SUB plays the keys the musician holds (the MIDI before the arpeggiator), sample-accurately
+    // beside the notes the cards play; on the same sample its key comes first. It hears the keys
+    // even while off (it renders nothing then), so turning it on under a held chord plays it.
+    auto subIt = midi.begin();
+    auto feedSubTo = [&] (int end) {
+        for (; subIt != midi.end(); ++subIt)
+        {
+            const auto metadata = *subIt;
+            const int at = std::clamp (metadata.samplePosition, 0, numSamples);
+            if (at > end)
+                break;
+            const auto m = metadata.getMessage();
+            // (MPE: a member channel's bend is its own note's, not the sub's.)
+            if (m.isPitchWheel() && engine.isMpe() && m.getChannel() != 1)
+                continue;
+            renderTo (at);
+            engine.handleSubMidi (m.getRawData(), m.getRawDataSize());
+        }
+    };
     for (const auto metadata : notes)
     {
-        renderTo (std::clamp (metadata.samplePosition, 0, numSamples));
+        const int at = std::clamp (metadata.samplePosition, 0, numSamples);
+        feedSubTo (at);
+        renderTo (at);
         handleMidi (metadata.getMessage());
     }
+    feedSubTo (numSamples);
     renderTo (numSamples);
     // The Library's preview: after the instrument and its effects (dry), into the same output.
     if (outChannels > 0)
@@ -4437,6 +4474,12 @@ void OspAudioProcessor::updateConvolutionImpulses()
                                                     fx::Impulse::factoryName (key.impulse)));
     }
     router.collectGarbage();
+}
+
+std::unique_ptr<MiniPanel> OspAudioProcessor::createSubPanel()
+{
+    return std::make_unique<SubPanel> (*this, subview::Ids::from ([] (const char* field) { return subFieldId (field); }),
+                                       [this] (int key) { return keyboardState.isNoteOnForChannels (0xffff, key); });
 }
 
 std::unique_ptr<MiniPanel> OspAudioProcessor::createSatellitePanel (int card)

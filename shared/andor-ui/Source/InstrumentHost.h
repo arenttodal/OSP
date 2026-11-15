@@ -117,6 +117,16 @@ public:
     static void addSatelliteParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, int versionHint);
     static juce::String satelliteFieldId (int layer, const char* field);
     static const std::array<const char*, 10>& satelliteFields();
+    /** SUB (ANDOR ANALOG's sub oscillator; its ranges, defaults, choices and texts): fields
+        enabled, wave, octave, grit, level, lowKey, highKey, response, taperStart, taperSlope.
+        `idOf` names each (ANDOR OSP: subFieldId, "sub.<field>"; ANDOR ANALOG: "analog.sub.<field>").
+        Off by default, and in every session from before (missing IDs load their defaults). */
+    using SubIdOf = std::function<juce::String (const char* field)>;
+    static void addSubParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, int versionHint, const SubIdOf& idOf);
+    static juce::String subFieldId (const char* field) { return juce::String ("sub.") + field; }
+    static const std::array<const char*, 10>& subFields();
+    /** SUB's settings from its parameters' raw values in subFields() order (real-time safe). */
+    static sub::SubSettings subSettingsFrom (const std::array<float, 10>& raw) noexcept;
     static juce::String pedalLoopParameterId (int layer);
     /** DAMPEN's parameters in their order: enabled, mode, amount, frequency, cutoff. */
     static const juce::StringArray& dampenParameterNames();

@@ -67,6 +67,7 @@ add_library(osp_dsp STATIC
     src/engine/InstrumentBuilder.cpp
     src/engine/PerformanceEngine.cpp
     src/engine/PostProcessor.cpp
+    src/engine/sub/SubOsc.cpp
     src/engine/fx/FxGraph.cpp
     src/engine/fx/FxEngine.cpp
     src/engine/fx/FxProcessors.cpp

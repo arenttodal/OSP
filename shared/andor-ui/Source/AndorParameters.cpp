@@ -169,6 +169,57 @@ void InstrumentHost::addSatelliteParameters (juce::AudioProcessorValueTreeState:
     }
 }
 
+const std::array<const char*, 10>& InstrumentHost::subFields()
+{
+    static const std::array<const char*, 10> fields { "enabled", "wave", "octave", "grit", "level", "lowKey", "highKey", "response", "taperStart", "taperSlope" };
+    return fields;
+}
+
+void InstrumentHost::addSubParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, int versionHint, const SubIdOf& idOf)
+{
+    // ANDOR ANALOG's SUB parameters (addSubTo): the same names, ranges, defaults, choices and
+    // texts. Append-only: IDs, ranges and choice orders frozen once shipped.
+    using Attributes = juce::AudioParameterFloatAttributes;
+    const sub::SubSettings d;
+    auto id = [&] (const char* field) { return juce::ParameterID { idOf (field), versionHint }; };
+    auto keyText = [] (int key, int) { return juce::MidiMessage::getMidiNoteName (key, true, true, 4); };
+    auto percentText = [] (float v, int) { return juce::String (juce::roundToInt (v)) + " %"; };
+    layout.add (parameters::make<juce::AudioParameterBool> (id ("enabled"), "Sub On", d.enabled));
+    layout.add (parameters::make<juce::AudioParameterChoice> (id ("wave"), "Sub Wave", juce::StringArray { "SINE", "TRIANGLE", "SQUARE", "SAW" }, static_cast<int> (d.wave)));
+    layout.add (parameters::make<juce::AudioParameterChoice> (id ("octave"), "Sub Octave", juce::StringArray { "-1", "-2" }, d.octave <= -2 ? 1 : 0));
+    layout.add (parameters::make<juce::AudioParameterFloat> (id ("grit"), "Sub Grit", juce::NormalisableRange<float> (0.0f, 100.0f, 0.1f), static_cast<float> (100.0 * d.grit),
+                                                             Attributes().withLabel ("%").withStringFromValueFunction (percentText)));
+    layout.add (parameters::make<juce::AudioParameterFloat> (id ("level"), "Sub Level", juce::NormalisableRange<float> (-48.0f, 0.0f, 0.1f), static_cast<float> (d.levelDb),
+                                                             Attributes().withLabel ("dB").withStringFromValueFunction ([] (float v, int) { return juce::String (v, 1) + " dB"; })));
+    auto key = [&] (const char* field, const juce::String& title, int value) {
+        layout.add (parameters::make<juce::AudioParameterInt> (id (field), title, 0, 127, value, juce::AudioParameterIntAttributes().withStringFromValueFunction (keyText)));
+    };
+    key ("lowKey", "Sub Low Key", d.lowKey);
+    key ("highKey", "Sub High Key", d.highKey);
+    layout.add (parameters::make<juce::AudioParameterChoice> (id ("response"), "Sub Response", juce::StringArray { "FLAT", "TAPER" }, d.taper ? 1 : 0));
+    key ("taperStart", "Sub Taper Start", d.taperStart);
+    layout.add (parameters::make<juce::AudioParameterFloat> (id ("taperSlope"), "Sub Taper Slope", juce::NormalisableRange<float> (0.0f, 12.0f, 0.1f), static_cast<float> (d.taperDbPerOctave),
+                                                             Attributes().withLabel ("dB/oct").withStringFromValueFunction ([] (float v, int) { return juce::String (v, 1) + " dB/oct"; })));
+}
+
+sub::SubSettings InstrumentHost::subSettingsFrom (const std::array<float, 10>& raw) noexcept
+{
+    // (ANDOR ANALOG's Reader: the same mapping.)
+    auto index = [&raw] (std::size_t i, int count) { return std::clamp (static_cast<int> (std::lround (raw[i])), 0, count - 1); };
+    sub::SubSettings s;
+    s.enabled = raw[0] >= 0.5f;
+    s.wave = static_cast<sub::SubSettings::Wave> (index (1, 4));
+    s.octave = index (2, 2) == 0 ? -1 : -2;
+    s.grit = 0.01 * static_cast<double> (raw[3]);
+    s.levelDb = static_cast<double> (raw[4]);
+    s.lowKey = std::clamp (static_cast<int> (std::lround (raw[5])), 0, 127);
+    s.highKey = std::max (s.lowKey, std::clamp (static_cast<int> (std::lround (raw[6])), 0, 127));
+    s.taper = index (7, 2) == 1;
+    s.taperStart = std::clamp (static_cast<int> (std::lround (raw[8])), 0, 127);
+    s.taperDbPerOctave = static_cast<double> (raw[9]);
+    return s;
+}
+
 void InstrumentHost::addCardArpParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, const juce::String& ns)
 {
     auto id = [] (const juce::String& s) { return juce::ParameterID { s, 27 }; };
