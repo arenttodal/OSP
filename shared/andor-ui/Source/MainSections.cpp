@@ -1127,7 +1127,23 @@ Wheel::Wheel (juce::String c, bool spring, std::function<void (float)> move) : c
 
 juce::Rectangle<float> Wheel::slot() const
 {
-    return getLocalBounds().toFloat().withHeight (88.0f);   // reference: 36 x 88, its caption below
+    return { sidePad, 0.0f, wheelWidth, wheelHeight };   // reference: 36 x 88, its caption below
+}
+
+juce::Rectangle<float> Wheel::captionText() const
+{
+    // The word as drawn (MOD's centred together with its socket).
+    const auto font = fonts::make (12.5f, fonts::Weight::medium, 0.06f);
+    const float textWidth = juce::GlyphArrangement::getStringWidth (font, caption);
+    const float total = textWidth + (assignable ? 13.0f : 0.0f);
+    const float left = 0.5f * (static_cast<float> (getWidth()) - total);
+    return { left, wheelHeight, textWidth + 1.0f, 18.0f };
+}
+
+juce::Point<float> Wheel::socketCentre() const
+{
+    const auto text = captionText();
+    return { text.getRight() - 1.0f + 8.5f, wheelHeight + 9.0f };
 }
 
 void Wheel::setValue (float newValue)
@@ -1148,25 +1164,65 @@ void Wheel::setAssignable (juce::Colour colour)
 
 juce::Rectangle<float> Wheel::socketArea() const
 {
-    // The caption's line under the wheel: the word and its socket.
-    return { 0.0f, 88.0f, static_cast<float> (getWidth()), static_cast<float> (getHeight()) - 88.0f };
+    // The caption's line under the wheel: the word and (MOD) its socket, a little margin round
+    // them - a bounded region, so neither the word nor the socket is ever cut off.
+    auto area = captionText();
+    if (assignable)
+        area = area.getUnion (juce::Rectangle<float> (10.0f, 10.0f).withCentre (socketCentre()));
+    return area.expanded (3.0f, 0.0f).withHeight (std::max (18.0f, static_cast<float> (getHeight()) - wheelHeight)).getIntersection (getLocalBounds().toFloat());
+}
+
+bool Wheel::hitTest (int x, int y)
+{
+    const juce::Point<float> p (static_cast<float> (x) + 0.5f, static_cast<float> (y) + 0.5f);
+    return slot().contains (p) || socketArea().contains (p);
+}
+
+void Wheel::setCaptionOpen (bool open)
+{
+    if (open != captionOpen)
+    {
+        captionOpen = open;
+        repaint();
+    }
+}
+
+void Wheel::setCaptionAccent (juce::Colour accent)
+{
+    captionAccent = accent;
+    repaint();
 }
 
 void Wheel::mouseMove (const juce::MouseEvent& e)
 {
-    const bool over = assignable && socketArea().contains (e.position);
-    if (over != overSocket)
+    const bool inCaption = (assignable || onCaptionClick != nullptr) && socketArea().contains (e.position);
+    const bool onSocket = inCaption && assignable && juce::Rectangle<float> (12.0f, 12.0f).withCentre (socketCentre()).contains (e.position);
+    if (inCaption != overCaption || onSocket != overSocket)
     {
-        overSocket = over;
-        setMouseCursor (over ? juce::MouseCursor::DraggingHandCursor : juce::MouseCursor::UpDownResizeCursor);
+        overCaption = inCaption;
+        overSocket = onSocket || (inCaption && assignable && onCaptionClick == nullptr);
+        // The caption is a door (a pointing hand, as a macro's name); the socket a cable's end.
+        setMouseCursor (overSocket ? juce::MouseCursor::DraggingHandCursor
+                                   : (inCaption ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::UpDownResizeCursor));
+        repaint();
+    }
+}
+
+void Wheel::mouseExit (const juce::MouseEvent&)
+{
+    if (overCaption || overSocket)
+    {
+        overCaption = overSocket = false;
+        setMouseCursor (juce::MouseCursor::UpDownResizeCursor);
         repaint();
     }
 }
 
 void Wheel::mouseDown (const juce::MouseEvent& e)
 {
-    cabling = assignable && socketArea().contains (e.position);
-    if (cabling)
+    captionPress = (assignable || onCaptionClick != nullptr) && socketArea().contains (e.position);
+    cabling = false;
+    if (captionPress)
         return;
     dragging = true;
     dragStart = value;
@@ -1174,12 +1230,17 @@ void Wheel::mouseDown (const juce::MouseEvent& e)
 
 void Wheel::mouseDrag (const juce::MouseEvent& e)
 {
-    if (cabling)
+    if (captionPress)
     {
-        if (e.getDistanceFromDragStart() >= 3 && onSourceDrag != nullptr)
+        // A drag of 3 px or more from the caption is a cable (MOD); less is still a click.
+        if (assignable && e.getDistanceFromDragStart() >= 3)
+            cabling = true;
+        if (cabling && onSourceDrag != nullptr)
             onSourceDrag (e.getScreenPosition());
         return;
     }
+    if (! dragging)
+        return;
     const float travel = slot().getHeight() * (springBack ? 0.5f : 1.0f);
     value = std::clamp (dragStart - static_cast<float> (e.getDistanceFromDragStartY()) / std::max (1.0f, travel), springBack ? -1.0f : 0.0f, 1.0f);
     if (onMove != nullptr)
@@ -1189,13 +1250,22 @@ void Wheel::mouseDrag (const juce::MouseEvent& e)
 
 void Wheel::mouseUp (const juce::MouseEvent& e)
 {
-    if (cabling)
+    if (captionPress)
     {
-        cabling = false;
-        if (e.getDistanceFromDragStart() >= 3 && onSourceDrop != nullptr)
-            onSourceDrop (e.getScreenPosition());
+        captionPress = false;
+        const bool moved = e.getDistanceFromDragStart() >= 3;
+        if (cabling)
+        {
+            cabling = false;
+            if (onSourceDrop != nullptr)
+                onSourceDrop (e.getScreenPosition());
+        }
+        else if (! moved && onCaptionClick != nullptr && socketArea().contains (e.position))
+            onCaptionClick();
         return;
     }
+    if (! dragging)
+        return;
     dragging = false;
     if (springBack)
     {
@@ -1274,19 +1344,24 @@ void Wheel::paint (juce::Graphics& g)
         g.setColour (juce::Colours::white.withAlpha (springBack ? 0.22f : 0.1f));
         g.fillRect (lit.withHeight (1.0f).reduced (1.5f, 0.0f));
     }
-    g.setColour (colour::text.withAlpha (0.8f));
+    // The caption: a door to the wheel's settings (when it has them) - darker, underlined
+    // under the pointer and while they are open (as a macro's name).
+    const bool door = onCaptionClick != nullptr;
+    const bool doorLit = door && ((overCaption && ! overSocket) || captionOpen || captionPress);
+    g.setColour (doorLit ? juce::Colours::black : colour::text.withAlpha (0.8f));
     const auto font = fonts::make (12.5f, fonts::Weight::medium, 0.06f);
     g.setFont (font);
-    if (! assignable)
+    const auto text = captionText();
+    g.drawText (caption, text, juce::Justification::centredLeft, false);
+    if (doorLit)
     {
-        g.drawText (caption, juce::Rectangle<float> (-12.0f, 88.0f, static_cast<float> (getWidth()) + 24.0f, 18.0f), juce::Justification::centred, false);
-        return;
+        g.setColour (captionOpen ? captionAccent : colour::text.withAlpha (0.5f));
+        g.fillRect (text.getX(), text.getCentreY() + font.getHeight() * 0.5f + 1.0f, text.getWidth() - 1.0f, 1.2f);
     }
-    // MOD and its patch socket (the sources' assignment glyph), together centred under the wheel.
-    const float textWidth = juce::GlyphArrangement::getStringWidth (font, caption);
-    const float left = 0.5f * (static_cast<float> (getWidth()) - (textWidth + 13.0f));
-    g.drawText (caption, juce::Rectangle<float> (left, 88.0f, textWidth + 1.0f, 18.0f), juce::Justification::centredLeft, false);
-    const juce::Point<float> c (left + textWidth + 8.5f, 97.0f);
+    if (! assignable)
+        return;
+    // MOD's patch socket (the sources' assignment glyph), centred with the word under the wheel.
+    const auto c = socketCentre();
     g.setColour (socket.withAlpha (overSocket ? 0.95f : 0.6f));
     g.drawEllipse (juce::Rectangle<float> (8.4f, 8.4f).withCentre (c), 1.25f);
     if (inUse)

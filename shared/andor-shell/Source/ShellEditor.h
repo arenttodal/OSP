@@ -150,7 +150,8 @@ public:
         REIMAGINED (7 + layer, when the engine reads it), a modulation source's routes or
         larger curve (source 0 LFO 1 .. 3 ENV 2). */
     static constexpr int advancedPopup = 6, reimaginedPopup = 7, routesPopup = 11, curvePopup = 12, startControlPopup = 13, generatorHeaderPopup = 14,
-                         hybridHeaderPopup = 15, arpCompanionPopup = 16, anchoredPopup = 17;
+                         hybridHeaderPopup = 15, arpCompanionPopup = 16, anchoredPopup = 17,
+                         pitchWheelPopup = 18, modWheelPopup = 19;
     // A product's panel anchored to a component (SHAPER DNA from its rack key): placed beside it,
     // over a transparent backdrop that takes the click which closes it (that click reaches no
     // control). Escape closes it too.
@@ -161,6 +162,9 @@ public:
     void closePopup();
     static constexpr bool isReimaginedPopup (int which) noexcept { return which >= reimaginedPopup && which < reimaginedPopup + osp::plugin::InstrumentHost::numLayers; }
     int openPopupIndex() const noexcept { return popupIndex; }
+    /** The keyboard row's wheels (tests: their captions open PITCH BEND and MOD WHEEL). */
+    osp::plugin::Wheel& pitchBendWheel() noexcept { return pitchWheel; }
+    osp::plugin::Wheel& modulationWheel() noexcept { return modWheel; }
     osp::plugin::MiniPanel* openPopupPanel() noexcept { return popup.get(); }
     /** For tests: the arpeggiator's housing (and its second row, ProductInfo::arpCompanion). */
     osp::plugin::ArpControl& arpHousing() noexcept { return arpButton; }

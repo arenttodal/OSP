@@ -1,5 +1,6 @@
 #include "PluginEditor.h"
 #include "MacroPopups.h"
+#include "WheelPopups.h"
 
 #include "core/PitchMath.h"
 #include "io/AudioFileIO.h"
@@ -171,6 +172,9 @@ void OspAudioProcessorEditor::mouseDownAnywhere (juce::Component* c)
             if (card.reimaginedLabelBounds().contains (at))
                 pressed = reimaginedPopup + l;
         }
+    for (auto [wheel, which] : { std::pair<Wheel*, int> { &pitchWheel, pitchWheelPopup }, { &modWheel, modWheelPopup } })
+        if (c == wheel && wheel->captionArea().contains (wheel->getLocalPoint (nullptr, juce::Desktop::getMousePosition().toFloat())))
+            pressed = which;
     closedByLabelPress = pressed == popupIndex ? pressed : -1;
     closePopup();
 }
@@ -290,6 +294,22 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
 
     content.addAndMakeVisible (pitchWheel);
     content.addAndMakeVisible (modWheel);
+    // The wheels' captions are doors to their settings (as a macro's name): PITCH to the bend's
+    // RANGE, MOD to its VIBRATO. A press that just closed the popover does not reopen it.
+    pitchWheel.setCaptionAccent (juce::Colour (0xffcd5a1e));
+    modWheel.setCaptionAccent (modui::sourceColour (4));
+    for (auto [wheel, which] : { std::pair<Wheel*, int> { &pitchWheel, pitchWheelPopup }, { &modWheel, modWheelPopup } })
+        wheel->onCaptionClick = [this, which] {
+            if (closedByLabelPress == which)
+            {
+                closedByLabelPress = -1;
+                return;
+            }
+            if (popupIndex == which)
+                closePopup();
+            else
+                openPopup (which);
+        };
     frame::setUpKeyboard (keyboard);
     keyboard.tintOf = [this] (int note) { return keyTints[static_cast<std::size_t> (std::clamp (note, 0, 127))]; };
     content.addAndMakeVisible (keyboard);
@@ -297,7 +317,7 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     frame::setUpStatusLabel (statusLabel);
     content.addAndMakeVisible (statusLabel);
     advancedButton.setTitle ("Advanced settings");
-    advancedButton.setTooltip ("Tuning, bend range, voices, pitch character, dynamics (how touch changes the sound), MPE, variation seed");
+    advancedButton.setTooltip ("Tuning, voices, pitch character, dynamics (how touch changes the sound), MPE, variation seed");
     advancedButton.onClick = [this] {
         if (closedByLabelPress == advancedPopup)
         {
@@ -503,6 +523,10 @@ void OspAudioProcessorEditor::openPopup (int which)
     }
     else if (which == curvePopup)
         popup = std::make_unique<ModCurvePopup> (ospProcessor, popupSource);
+    else if (which == pitchWheelPopup)
+        popup = createPitchBendPopup (ospProcessor);
+    else if (which == modWheelPopup)
+        popup = createModWheelPopup (ospProcessor, defaultVibratoSources(), [this] { return ospProcessor.modWheelPosition(); });
     else
         popup = createMacroPopup (static_cast<MacroPopup> (macroOfPopup (which)), ospProcessor);
     popupIndex = which;
@@ -519,6 +543,10 @@ void OspAudioProcessorEditor::openPopup (int which)
         macros[static_cast<std::size_t> (m)].label->setOpen (true);
     if (reimagined)
         cards[static_cast<std::size_t> (which - reimaginedPopup)]->setReimaginedOpen (true);
+    if (which == pitchWheelPopup)
+        pitchWheel.setCaptionOpen (true);
+    if (which == modWheelPopup)
+        modWheel.setCaptionOpen (true);
     if (keepAdvanced)
     {
         ospProcessor.setAdvancedOpen (true);
@@ -536,6 +564,10 @@ void OspAudioProcessorEditor::closePopup()
         macros[static_cast<std::size_t> (m)].label->setOpen (false);
     if (popupIndex >= reimaginedPopup && popupIndex < reimaginedPopup + OspAudioProcessor::numLayers)
         cards[static_cast<std::size_t> (popupIndex - reimaginedPopup)]->setReimaginedOpen (false);
+    if (popupIndex == pitchWheelPopup)
+        pitchWheel.setCaptionOpen (false);
+    if (popupIndex == modWheelPopup)
+        modWheel.setCaptionOpen (false);
     if (popupIndex == advancedPopup)
     {
         ospProcessor.setAdvancedOpen (false);
@@ -571,6 +603,13 @@ void OspAudioProcessorEditor::positionPopup()
     else if (popupIndex == routesPopup || popupIndex == curvePopup)
     {
         const auto at = frame::modulationPopoverOrigin (modPanel.getBounds().toFloat(), size);
+        x = at.x;
+        y = at.y;
+    }
+    else if (popupIndex == pitchWheelPopup || popupIndex == modWheelPopup)
+    {
+        auto& wheel = popupIndex == pitchWheelPopup ? pitchWheel : modWheel;
+        const auto at = frame::wheelPopoverOrigin (content.getLocalArea (&wheel, wheel.captionArea()), size);
         x = at.x;
         y = at.y;
     }

@@ -210,6 +210,12 @@ OspAudioProcessor::OspAudioProcessor()
     velocityRangeParam = parameters.getRawParameterValue (ids::velocityRange);
     fineTuneParam = parameters.getRawParameterValue (ids::fineTune);
     bendRangeParam = parameters.getRawParameterValue (ids::bendRange);
+    {
+        const std::array<juce::String, 10> vibratoIds { ids::vibratoEnabled, ids::vibratoDepth, ids::vibratoRate, ids::vibratoDelay, ids::vibratoRise,
+                                                        ids::vibratoControl, ids::vibratoAmount, ids::vibratoSourceA, ids::vibratoSourceB, ids::vibratoSourceC };
+        for (std::size_t i = 0; i < vibratoIds.size(); ++i)
+            vibratoParams[i] = parameters.getRawParameterValue (vibratoIds[i]);
+    }
     lifeParam = parameters.getRawParameterValue (ids::life);
     dynamicsParam = parameters.getRawParameterValue (ids::dynamics);
     characterParam = parameters.getRawParameterValue (ids::character);
@@ -498,6 +504,20 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
     engine.setSeed (static_cast<std::uint64_t> (std::max (1.0f, seedParam->load())));
 
     engine.setPitchOffsetSemitones (pitchBendSemitones + fineTuneParam->load() / 100.0);
+    {
+        // The MOD WHEEL's VIBRATO (per voice, read at control rate).
+        auto read = [this] (std::size_t i) { return vibratoParams[i]->load (std::memory_order_relaxed); };
+        vibrato::Settings v;
+        v.enabled = read (0) >= 0.5f;
+        v.depthCents = read (1);
+        v.rateHz = read (2);
+        v.delaySeconds = read (3) / 1000.0;
+        v.riseSeconds = read (4) / 1000.0;
+        v.control = static_cast<vibrato::Control> (std::clamp (juce::roundToInt (read (5)), 0, 2));
+        v.amount = read (6) / 100.0;
+        v.sources = { read (7) >= 0.5f, read (8) >= 0.5f, read (9) >= 0.5f, false };
+        engine.setVibrato (v);
+    }
 
     // Layers: the mix, root corrections, layer controls, source modes and granular settings.
     // Also kept in engineSettings: prepare() must start from the current values, never ramp to them.

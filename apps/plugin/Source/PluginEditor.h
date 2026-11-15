@@ -91,7 +91,9 @@ public:
     static constexpr int echoPopup = 10;   ///< the sixth macro (it came after the others' numbers)
     static constexpr int routesPopup = 11; ///< a modulation source's routes (the panel's route count)
     static constexpr int curvePopup = 12;  ///< the larger curve editor (CUSTOM LFO, ONE SHOT envelope)
-    static constexpr int lastPopup = curvePopup;
+    static constexpr int pitchWheelPopup = 13;   ///< PITCH BEND (a click on the PITCH caption)
+    static constexpr int modWheelPopup = 14;     ///< MOD WHEEL's VIBRATO (a click on the MOD caption)
+    static constexpr int lastPopup = modWheelPopup;
     /** The macro (index into the macro row's data order: LIFE..SPACE, ECHO) a popup belongs to, or -1. */
     static int macroOfPopup (int popup) noexcept { return popup >= 0 && popup < 5 ? popup : (popup == echoPopup ? 5 : -1); }
     static int popupOfMacro (int macro) noexcept { return macro < 5 ? macro : echoPopup; }
@@ -131,6 +133,7 @@ public:
     int selectedModulationSource() const noexcept { return modSelSource; }
     int selectedModulationRoute() const noexcept { return modSelSlot; }
     Wheel& modulationWheel() noexcept { return modWheel; }
+    Wheel& pitchBendWheel() noexcept { return pitchWheel; }
     AdvancedCardButton& advancedSettingsButton() noexcept { return advancedButton; }
     HeaderMix& headerMixControl() noexcept { return headerMix; }
     EngineCard& engineCard (int layer) noexcept { return *cards[static_cast<std::size_t> (juce::jlimit (0, 2, layer))]; }

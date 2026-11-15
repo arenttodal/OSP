@@ -33,6 +33,7 @@ add_executable(osp_tests
     unit/ModulationTests.cpp
     unit/LayerEqTests.cpp
     unit/SynthesizeTests.cpp
+    unit/VibratoTests.cpp
     unit/SampleSetTests.cpp
     unit/FastNumericsTests.cpp
     library/CatalogTests.cpp

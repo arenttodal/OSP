@@ -394,7 +394,7 @@ TEST_CASE ("synthesize: SYNTH amount is a modulation destination (LFO, envelope,
     CHECK (toneLevel (run (&lfo), octaveUp, 0.2, 0.9) < 1.0e-4);
     // The destination's description.
     CHECK (mod::destInfo (mod::Dest::synthAmountB).layer == 1);
-    CHECK (mod::extendedChoiceOf (mod::Dest::synthAmountC) == static_cast<int> (mod::extendedDests.size()));
+    CHECK (mod::extendedChoiceOf (mod::Dest::synthAmountC) == 8);   // (its place in the append-only list)
 }
 
 TEST_CASE ("synthesize: block size, automation while held, chords and no allocation", "[unit][synth]")

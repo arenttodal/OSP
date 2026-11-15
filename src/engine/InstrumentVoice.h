@@ -17,6 +17,7 @@
 #include "engine/ToyboxEngine.h"
 #include "engine/ShelfFilter.h"
 #include "engine/SynthVoice.h"
+#include "engine/Vibrato.h"
 #include "model/ContinuationModel.h"
 #include "model/InstrumentModel.h"
 
@@ -122,6 +123,10 @@ public:
     double startModulation() const noexcept { return modStartOffset; }
     /** The engine's modulation (routes, global LFOs); this voice runs its own poly sources. */
     void setModulation (const mod::Runtime* runtime) noexcept { modRuntime = runtime; }
+    /** The MOD WHEEL's VIBRATO settings (the engine's, read at control rate; null: none). */
+    void setVibrato (const vibrato::Settings* settings) noexcept { vibratoSettings = settings; }
+    /** The vibrato's pitch offset now (cents), for tests and the display. */
+    double vibratoCents() const noexcept { return vibratoVoice.cents(); }
     const mod::VoiceState& modulationState() const noexcept { return modState; }
     bool modulationRunning() const noexcept { return modStarted; }
     bool isGranular() const noexcept { return granularMode; }
@@ -400,6 +405,10 @@ private:
     double keyDnaAmountApplied = 1.0;
     double keyDnaSmoothing = 1.0;
     double modDampenAmount = 0.0, modDampenShelf = 0.0, modDampenCutoff = 0.0;
+    double modVibratoDepth = 0.0, modVibratoAmount = 0.0;   ///< VIBRATO DEPTH (cents) and AMOUNT routes
+    // VIBRATO (per note): the engine's settings, this note's phase and age.
+    const vibrato::Settings* vibratoSettings = nullptr;
+    vibrato::Voice vibratoVoice;
     AdsrSettings noteAdsr {};   ///< the envelope as this note took it (ATTACK, DECAY at note-on)
     double appliedSustain = -1.0;
     /** Starts, advances (or stops) the voice's modulation and gathers its offsets. */

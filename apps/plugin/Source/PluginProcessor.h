@@ -681,6 +681,8 @@ private:
     std::atomic<float>* velocityRangeParam = nullptr;
     std::atomic<float>* fineTuneParam = nullptr;
     std::atomic<float>* bendRangeParam = nullptr;
+    /** VIBRATO (enabled, depth, rate, delay, rise, control, amount, sources A-C). */
+    std::array<std::atomic<float>*, 10> vibratoParams {};
     std::atomic<float>* lifeParam = nullptr;
     std::atomic<float>* dynamicsParam = nullptr;
     std::atomic<float>* characterParam = nullptr;

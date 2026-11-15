@@ -3,6 +3,7 @@
 
 #include "CeramicSkin.h"
 #include "EngineCard.h"   // icons
+#include "MainSections.h"   // Wheel
 #include "OspLookAndFeel.h"
 
 #include <algorithm>
@@ -356,8 +357,10 @@ void place (const Parts& parts, bool arpShown)
     auto low = [&] (juce::Rectangle<float> r) { return at (r.translated (0.0f, shift)); };
 
     // Keyboard row and footer.
-    set (parts.pitchWheel, low (layout::pitchWheel.withHeight (115.0f)));
-    set (parts.modWheel, low (layout::modWheel.withHeight (115.0f)));
+    // (Each wheel's component is wider than the wheel by Wheel::sidePad either side: its caption
+    // - MOD with its socket - is wider than the wheel and is never cut off.)
+    set (parts.pitchWheel, low (layout::pitchWheel.withHeight (115.0f).expanded (Wheel::sidePad, 0.0f)));
+    set (parts.modWheel, low (layout::modWheel.withHeight (115.0f).expanded (Wheel::sidePad, 0.0f)));
     if (parts.keyboard != nullptr)
     {
         parts.keyboard->setBounds (low (layout::keyboard));
@@ -484,6 +487,13 @@ juce::Point<float> macroPopoverOrigin (juce::Rectangle<float> label, juce::Point
 juce::Point<float> advancedPopoverOrigin (juce::Rectangle<float> key, juce::Point<float> size)
 {
     return { key.getRight() - size.x, key.getY() - 8.0f - size.y };
+}
+
+juce::Point<float> wheelPopoverOrigin (juce::Rectangle<float> caption, juce::Point<float> size)
+{
+    // Its left edge a little left of the caption's (the wheels sit near the instrument's left
+    // edge: placePopover keeps it inside), 10 px above.
+    return { caption.getX() - 14.0f, caption.getY() - 10.0f - size.y };
 }
 
 void placePopover (MiniPanel& popup, const juce::Component& content, juce::Point<float> at)

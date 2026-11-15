@@ -32,6 +32,7 @@ void InstrumentEngine::prepare (double outputSampleRate, int maximumBlockSize, c
     {
         voice.prepare (sampleRate, config.adsr, interpolator.get(), &liveShaping);
         voice.setModulation (&modRuntime);
+        voice.setVibrato (&vibratoSettings);
     }
     outputGain = static_cast<float> (dbToGain (config.outputGainDb));
     bufferSize = std::max (16, maximumBlockSize);

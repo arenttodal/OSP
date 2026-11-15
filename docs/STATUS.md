@@ -1,5 +1,20 @@
 # Status
 
+> **15 Nov 2026, the wheels' settings (both instruments, shared):**
+> - PITCH and MOD under the wheels are now doors, like a macro's name. A click opens their
+>   popover above the caption; a drag of 3 px or more from MOD still makes a modulation cable.
+> - The captions are no longer clipped: each wheel's component is 7 px wider on either side,
+>   and the wheel itself is drawn where it always was.
+> - PITCH BEND holds RANGE (`bendRange`, unchanged), which moved out of Advanced.
+> - MOD WHEEL holds VIBRATO (`src/engine/Vibrato.h`): per note, DELAY then RISE, DEPTH in
+>   cents, RATE, and CONTROL (MOD WHEEL / ALWAYS ON / ASSIGNED, AMOUNT 0 by default), plus
+>   the sources.
+> - New parameters `vibrato.*` (version hint 28) are off by default, and off is
+>   bit-identical. VIBRATO DEPTH and AMOUNT are appended to `destExt`.
+> - ANDOR Analog ships it too (OSC 1, OSC 2, card C pitched, and SUB as its own source).
+> - Intentional pixel change in both products: the PITCH and MOD captions, previously clipped,
+>   are now drawn whole.
+
 > **15 Nov 2026:** `ParameterRack::customCell` (opt-in, shared): a product can place its own
 > read-only cell in a rack row. ANDOR Analog uses it for MORPH TO D's source and state (GLOBAL
 > MORPH 2.0). ANDOR OSP never calls it and is unchanged: 4 / 4 plugin-test shards and the example
