@@ -98,8 +98,8 @@ void InstrumentHost::addImprintParameters (juce::AudioProcessorValueTreeState::P
         const auto name = "Layer " + layerName (layer) + " Synth ";
         layout.add (parameters::make<juce::AudioParameterChoice> (id28 (synthParameterId (layer, "mode")), name + "Mode",
                                                                   juce::StringArray { "Analog", "Imprint" }, 0));
-        layout.add (parameters::make<juce::AudioParameterFloat> (id28 (synthParameterId (layer, "imprint")), name + "Imprint", unit, 0.0f, percent));
-        layout.add (parameters::make<juce::AudioParameterFloat> (id28 (synthParameterId (layer, "motion")), name + "Motion", unit, 0.0f, percent));
+        layout.add (parameters::make<juce::AudioParameterFloat> (id28 (synthParameterId (layer, "imprint")), name + "Imprint", unit, 100.0f, percent));
+        layout.add (parameters::make<juce::AudioParameterFloat> (id28 (synthParameterId (layer, "motion")), name + "Motion", unit, 100.0f, percent));
     }
 }
 
@@ -684,7 +684,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout InstrumentHost::createParame
             layout.add (parameters::make<juce::AudioParameterFloat> (id23 (synthParameterId (layer, "tone")), name + "Tone",
                                                                      juce::NormalisableRange<float> (0.0f, 100.0f, 0.1f), 50.0f, tone));
             layout.add (parameters::make<juce::AudioParameterChoice> (id23 (synthParameterId (layer, "shape")), name + "Shape",
-                                                                      juce::StringArray { "Held", "Follow" }, 0));
+                                                                      juce::StringArray { "Held", "Follow" }, 1));   // FOLLOW by default (state 15)
             layout.add (parameters::make<juce::AudioParameterChoice> (id23 (synthParameterId (layer, "pitch")), name + "Pitch",
                                                                       juce::StringArray { "Keys", "Recording" }, 0));
         }

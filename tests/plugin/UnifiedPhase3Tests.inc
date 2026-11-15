@@ -148,7 +148,7 @@ TEST_CASE ("plugin: an atlas session saves the atlas, not the audio, and reopens
     {
         auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
         REQUIRE (xml != nullptr);
-        CHECK (xml->getIntAttribute ("stateVersion") == 14);
+        CHECK (xml->getIntAttribute ("stateVersion") == OspAudioProcessor::stateVersion);
         CHECK (xml->getStringAttribute ("grainBudgetPolicy") == "bounded");
         const auto* b = xml->getChildByName ("InstrumentB");
         REQUIRE (b != nullptr);

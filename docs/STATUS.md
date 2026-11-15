@@ -1498,6 +1498,21 @@ on the ADD place, or only the card dropped on. Audit, measured reproduction and 
 - NEXT: ANDOR ANALOG's card EQs (the shell's) can show the spectrum once its host returns its
   engine's layer taps.
 
+## SYNTH defaults: SHAPE FOLLOW, IMPRINT and MOTION 100 % (15 Nov 2026, state 15)
+
+- **SHAPE** (`layerX.synth.shape`) now defaults to FOLLOW, so the synthesizer's level follows the
+  recording.
+- **IMPRINT** and **MOTION** (`layerX.synth.imprint`, `.motion`) now default to 100 %, so turning
+  IMPRINT on is heard at once.
+- **Older sessions and presets** (state below 15, factory ones included) open with every layer's
+  SHAPE as FOLLOW. IMPRINT and MOTION at 0 %, the old default, open as 100 %; values above 0 are
+  kept.
+- **Not migrated: HELD saved after this change.** A preset saved now with HELD keeps HELD.
+- **Audible change.** A session that played SYNTH with HELD now plays it with FOLLOW. Renders
+  with SYNTH off are unchanged.
+- **Schema golden.** It follows the new defaults: three SHAPE lines and six IMPRINT / MOTION
+  lines.
+
 ## ANDOR Learn 2.0 in ANDOR OSP's own plugin (15 Nov 2026, branch claude/osp-learn-2)
 
 - **What.** Learn 2.0, the shared framework (`shared/andor-learn`) that ANDOR ANALOG uses, now
