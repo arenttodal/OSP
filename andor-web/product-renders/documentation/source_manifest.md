@@ -1,49 +1,42 @@
-# Source manifest
+# Source manifest (pass 2)
 
-## The instrument (genuine)
+## Interface sources (genuine)
 
 | Source | What it gives | Where |
 |---|---|---|
-| `web-01-hero-3L@3x.png` | The real ANDOR OSP editor, three layers, 4344 × 3258 (3× of 1448 × 1086), captured headlessly by the hidden test `[web-capture]` at OSP commit `c49d77f` | `assets/source/captures/` (regenerate with `tools/capture.sh`) |
-| `web-08-hero-3L-bounds.json` | Every component's bounds in the same state (knob centres, displays) | same |
-| Luminance profiles of the capture | Frame geometry: tray, raised panel `x 34.3–1412.3, y 19–1071.5` (r 7 px), teak cheeks `x 3–25 / 1423–1445, y 13–1076` | `blender/textures/geometry.json` (written by `prep_textures.py`) |
+| `web-10-hero-3L-nocaps@4x.png` | The real ANDOR OSP editor, three layers, 5792 × 4344 (4× of 1448 × 1086), with every knob's ticks and arcs but **no cap**. It's identical to `web-01-hero-3L` everywhere else (a re-take of 01 is byte-identical). It uses a test-only switch, `design::draw::captureWithoutCaps`, in the OSP repo (default off, never set by the plugin) | `assets/source/captures/` (regenerate with `tools/capture.sh`, OSP test `[web-capture]`) |
+| `web-10-hero-3L-nocaps.json` | Each knob's centre, cap radius and pointer angle, computed exactly as `drawRotarySlider` does (macro r 46.48 px, layer 26.06, envelope 20.0) | same |
+| `web-08-hero-3L-bounds.json` | Every component's bounds: cards, buttons, displays, keyboard | same |
+| `geometry.json` | All of the above, plus measured frame edges and the 36 black keys found in the capture | `blender/textures/` (written by `prep_textures.py`) |
 
-Every interface pixel in a render is the capture. Nothing is redrawn.
+## The layers
 
-| Part | How it is made | Source |
+| Layer | Parts | Made from |
 |---|---|---|
-| Face (tray + panel top) | The capture, projected down the face normal | capture |
-| Raised ceramic panel | A 1.2 mm rounded slab at the measured bounds; top = capture, edge = ceramic | measured |
-| 25 knob caps (6 macro, 15 layer, 4 envelope) | Revolved caps at the measured centres and radii (47 / 28 / 19 px); tops = capture (so pointers, values and arcs are exactly the editor's); macro skirts knurled (48 ridges, as drawn) | bounds JSON + measured radii |
-| Knob shadows | The editor's own drawn shadows, kept in the face texture. The caps cast no second shadow | capture |
-| Teak cheeks | Full-depth end cheeks at the drawn width and length; wood = the editor's own teak pixels (`teak_strip.png`), grain along the length on every face | capture |
-| Displays | Same pixels; a mask from the display bounds gives them glass (clear coat) and their own glow | bounds JSON |
+| **A housing** | teak front fascia and back rail (full width, grain along x), side rails between them (grain along y), butt joints with real 0.7 mm bevels; a ceramic tray inside; a dark 2 mm plinth inset 3 mm | frame edges measured from the capture; teak = the editor's own cheek pixels |
+| **B ceramic** | the panel (seated 1 mm below the timber), the three layer cards and the macro/envelope panel (raised 1.2 mm), real bevels | component bounds |
+| **C displays** | four wells, 0.85 mm deep, cut into the cards (Boolean); dark bezel walls; the screen on the well floor | `SourceDisplay` bounds + the measured envelope screen |
+| **D controls** | 25 knobs (collar for base clearance, cylindrical skirt, knurled on the macros, rounded rim, groove on layer/envelope knobs, shallow dome, inlaid charcoal indicator at the editor's pointer angle); 31 buttons, the preset bar, ARP and Advanced raised 0.8–1.3 mm; key bed + 36 black keys | knob JSON; bounds; detected keys |
+| **E artwork** | everything else: type, scales, ticks, arcs, waveforms, button icons | the capture, projected down the face normal onto the tops of B, C and D |
 
-## Approximations (documented)
+All the knobs are modelled. None of the editor's drawn caps or drawn knob shadows remain, so there's no
+double shading. The knobs cast their own shadows.
 
-- **Scale** 400 × 300 × 24 mm is a visualisation scale, not a hardware dimension.
-- **Cheeks** run flush to the outer edge; the editor draws a 3 px (0.8 mm) strip of tray outside them.
-- **Body sides, underside, knob sides** are not in any screenshot: plain ceramic in colours sampled from
-  the capture's frame and knob rims.
-- **Buttons, keys, wheels, sliders** stay flat (part of the face texture). Only knobs are raised.
-- **Waveforms** in the capture are deterministic stand-in test signals, as on the site. Re-capture with
-  approved recordings (`OSP_WEB_SOURCES`) before any public use.
-- The **teak** is colour-matched (+18 % saturation, −28 % value) so that through AgX it renders close to
-  the capture's teak; see `materials.md`.
+## Approximations
 
-## Reference (not stored in the repository)
+- **Scale:** 400 × 300 mm face, 18 mm tall (16 mm timber plus the plinth). This is a visualisation scale.
+- **Continuous timber frame (owner's direction):** the editor draws teak only on the left and right, with the
+  ceramic tray at the top and bottom. Pass 2 frames all four sides in teak, as briefed, and keeps the side
+  rails' drawn width (25 px). The front and back rails take the drawn tray margin.
+- **Not in any screenshot:** knob sides and the collar, the housing walls, the plinth and the end grain. Colours
+  are sampled from the capture or are neutral darks.
+- **Buttons** are raised slabs with their own artwork on top. The editor's 1–2 px drawn contact shadow stays
+  around them (too faint to read as a second shadow).
+- **Waveforms** are deterministic stand-in signals; re-capture with approved recordings before public use.
 
-A Limo Series "Il Granello" Instagram Story ad supplied by the owner, cropped to remove the Instagram
-interface for study. It is someone else's advertisement, so it is kept out of the repo. Only its
-qualities were taken, never its controls, text, logo, layout or headline placement.
+## Reference
 
-| Quality | In the reference | In the ANDOR render |
-|---|---|---|
-| Product bounding box | slab ≈ 1.6 : 1, bleeds off the left edge, ≈ 49 % of frame height | OSP 4 : 3, whole, ≈ 86 % of frame width, ≈ 37 % of height |
-| Camera | three-quarter, face fairly frontal, receding to the right | 75 mm, 27° off the face normal, turned 24°; product turned −9° in its plane |
-| Housing thickness | visible along the bottom and right edges | 24 mm walls, visible along the front and right (teak) |
-| Shadow | very soft, barely visible | soft shadow on the floor 28 cm below, lower right |
-| Materials | matte warm ivory, glossy dark screen, matte dark knobs | satin ceramic (0.5), coated glass displays, ceramic knobs (0.34) |
-| Background | dark warm-brown diagonal bands, strongly blurred | dark plank floor (peat, walnut, brown, bronze inlays) crossing the product's tilt, f/9 |
-| Hierarchy | logo → title → tagline → product → CTA | wordmark → two-line headline → product → space for a CTA |
-| Text-safe regions | top 8–30 %, bottom 82–90 % | top 13–33 %, CTA at 78–85 %; Stories UI zones (top 13 %, bottom 18 %) kept clear |
+The Limo Series "Il Granello" Instagram Story ad (owner-supplied). It is not stored in the repository.
+Only its qualities were studied: dimensional enclosure, raised knobs, dark glass, layered surfaces, soft
+light on bevels, an elevated three-quarter camera and a restrained dark set. No controls, text, logo or
+layout were taken.

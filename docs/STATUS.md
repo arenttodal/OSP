@@ -747,7 +747,13 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       The include now sits last in PluginProcessorTests.cpp (it uses the capture and atlas helpers).
 - [ ] Granular controls strip and the ECHO popover did not stage in the capture (see
       `andor-web/docs/PHASE0_AUDIT.md` §5).
-- Website work lives in `andor-web/` (components, asset pipeline, docs, hero concepts at Gate H).
+- [x] Product renders (15 Nov 2026): shot 10 `web-10-hero-3L-nocaps` (1x/3x/4x) is the three-layer
+      hero with every knob's ticks and arcs but no cap, plus each knob's centre, cap radius and
+      pointer angle (JSON), so the Blender model's 3D knobs stand on a clean panel. It uses a
+      test-only switch, `design::draw::captureWithoutCaps` (Design.cpp, default false, never set by
+      the plugin): shipped pixels unchanged; a re-take of `web-01-hero-3L` is byte-identical.
+- Website work lives in `andor-web/` (components, asset pipeline, docs, hero concepts at Gate H,
+  product renders in `andor-web/product-renders/`).
 
 ## Milestone: ANDOR Instrument Shell extensions for ANDOR ANALOG (a synthesizer)
 

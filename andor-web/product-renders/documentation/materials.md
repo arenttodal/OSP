@@ -1,23 +1,23 @@
-# Materials
+# Materials (pass 2)
 
-| Material | Used on | Build |
+| Material | On | Build |
 |---|---|---|
-| **OSP Face (capture)** | tray top, panel top, knob tops | Principled. Base = the capture (sRGB, cubic), projected from the product root's object space. Roughness 0.50 ceramic → 0.22 on displays. **Displays are light under glass, not paint:** there the base colour drops to near-black, the base specular to 0, and the pixels are emitted (× 1.7) under a clear coat (weight 0.7, roughness 0.035). This keeps the screens as deep as the editor draws them (a lit dark albedo was lifted to slate grey by AgX). Ceramic emits a whisper (× 0.03) so labels stay legible in shade; fine noise bump on ceramic only |
-| **Ceramic Ivory** | panel edge | Principled, sRGB 232 224 211, roughness 0.40 ± 0.05 (noise), micro bump |
-| **Ceramic Tray** | body walls, underside | sRGB 214 203 189 (sampled from the capture's frame), roughness 0.46 |
-| **Ceramic Knob** | knob skirts | sRGB 236 230 219 (knob rims), roughness 0.34 |
-| **ANDOR Teak (capture)** | cheeks, all faces | the editor's teak pixels; u from x (top) or z (sides), v along the length, mirrored; saturation ×1.18, value ×0.72 so it renders like the capture through AgX; roughness 0.55–0.72 from the grain; grain bump |
-| **Backdrop 0–7** | floor planks | dark dielectrics (peat charcoal, deep warm brown, muted walnut), roughness 0.30–0.52, fine groove bump along the plank; two 6 mm dark-bronze metallic inlays |
+| **OSP Face (capture)** | the tops of the panel, cards, buttons, key bed and black keys | Lit ceramic, **no emission**. Base = the 4× capture (sRGB, cubic), projected from object space. Roughness 0.48, specular 0.22, a 0.05 glaze coat, very fine micro-bump |
+| **OSP Display (capture)** | the well floors | A screen is light under glass: near-black base, no base specular, the pixels emitted ×1.7, clear coat 0.45 (roughness 0.03) |
+| **Display bezel** | well walls | satin near-black |
+| **Ceramic ivory / card / tray** | panel edges, card edges, housing tray | colours sampled from the capture's panel (228 220 206), card (252 246 236) and tray (222 213 198) |
+| **Ceramic knob** | knob caps | sRGB 245 241 233, roughness 0.30, coat 0.25 (the glaze) |
+| **Knob collar / indicator** | base clearance, pointer inlay | warm dark (52 47 42), charcoal (40 38 36) |
+| **ANDOR Teak** | frame | The editor's own teak pixels (both cheeks, stacked to 583 mm so the grain does not repeat on a rail). Long grain runs along each rail's length on its top and long faces, from its own offset; the rail ends show darker, rougher end grain. Saturation ×1.12 and value ×0.74 bring it close to the capture under AgX: the front fascia measures 183 137 104 against the capture's 189 136 101. Roughness 0.48–0.62 follows the grain; oiled, coat 0.08 |
+| **Plinth** | underside | dark warm charcoal, satin |
 
-No metal is used on the instrument: nothing in OSP's design is metal. No screws, vents, ports or
-cables were added.
+Nothing in OSP is metal, so the instrument has no metal: no screws, vents or ports.
 
-## Colour check (render vs capture)
+## Lessons from pass 2's diagnostics
 
-Flat areas sampled in the hero render against the same areas of the capture:
-
-| Area | Capture (sRGB) | Render | Note |
-|---|---|---|---|
-| Display background (layer B) | 32 40 43 | 34 42 43 | matched after making the displays emissive |
-| Ceramic panel, lit side | 233 225 211 | ≈ 221 216 210 | intentional: lit by the key with falloff, AgX Punchy |
-| Teak cheek top | 189 136 101 | warm brown, slightly darker on the shaded faces | colour-matched in the shader |
+- **Screens veiled grey.** The well floor sat below the panel top, so the panel showed through. The cards are
+  now 1.2 mm thick, which keeps the floor inside the card.
+- **Logo washed out.** This was the rim strip's reflection near the camera's mirror angle. The rim now sits
+  behind-left, so it traces the timber without veiling the glaze. Tested by zeroing the glaze specular.
+- **Glass reflecting the bright studio.** A black flag is visible only in reflections, as a photographer would
+  set one. A weak strip card adds one band of reflection.

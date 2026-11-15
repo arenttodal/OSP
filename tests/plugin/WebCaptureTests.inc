@@ -6,6 +6,9 @@
 // with real recordings (the approved demo sources), so the same shots can be re-taken for launch.
 // Included after RefinementShotsTests.inc (its helpers: writeSource, TempDir, ScopedLook).
 
+// Test-only switch defined in shared/andor-ui/Source/Design.cpp (shot 10): knobs without caps.
+namespace osp::plugin::design::draw { extern bool captureWithoutCaps; }
+
 TEST_CASE ("plugin: website captures (OSP_WEB_CAPTURE)", "[.][web-capture]")
 {
     const char* dir = std::getenv ("OSP_WEB_CAPTURE");
@@ -345,5 +348,64 @@ TEST_CASE ("plugin: website captures (OSP_WEB_CAPTURE)", "[.][web-capture]")
         out.getChildFile ("web-09-capture.json").replaceWithText (juce::JSON::toString (juce::var (marks.get()), false));
         save (e->createComponentSnapshot (e->getLocalBounds(), true, 2.0f), "web-09-capture@2x.png");
         p.cancelTake();
+    }
+
+    // 10 The three-layer hero again for the product renders' physical knobs: every knob's ticks
+    // and arcs but no cap (a test-only switch in design::draw::knob), plus each knob's centre,
+    // cap radius and pointer angle in editor coordinates, computed as drawRotarySlider does, so a
+    // 3D cap can stand exactly where and as the editor draws it, on a clean panel.
+    {
+        struct NoCaps
+        {
+            NoCaps() { osp::plugin::design::draw::captureWithoutCaps = true; }
+            ~NoCaps() { osp::plugin::design::draw::captureWithoutCaps = false; }
+        };
+        mark = [&] (Editor& ui, juce::DynamicObject& m) {
+            juce::Array<juce::var> knobs;
+            std::function<void (juce::Component&)> walk = [&] (juce::Component& parent) {
+                for (auto* child : parent.getChildren())
+                {
+                    // (isShowing() is false off the desktop: visible here means visible up to the editor.)
+                    auto visibleInEditor = [&ui] (juce::Component* c) {
+                        for (; c != nullptr && c != &ui; c = c->getParentComponent())
+                            if (! c->isVisible())
+                                return false;
+                        return c == &ui;
+                    };
+                    if (auto* s = dynamic_cast<juce::Slider*> (child); s != nullptr && visibleInEditor (s) && s->isRotary())
+                    {
+                        const auto& props = s->getProperties();
+                        const bool mini = static_cast<bool> (props["mini"]);
+                        const bool ticks = ! mini && ! static_cast<bool> (props["noTicks"]);
+                        const bool popup = static_cast<bool> (props["popup"]);
+                        const auto b = ui.getLocalArea (s, s->getLocalBounds()).toFloat();
+                        const float side = std::min (b.getWidth(), b.getHeight());
+                        const float r = popup ? 0.5f * side / 1.36f : 0.5f * side / (ticks ? 1.42f : 1.2f);
+                        const auto rp = s->getRotaryParameters();
+                        const auto pos = static_cast<float> (s->valueToProportionOfLength (s->getValue()));
+                        auto* k = new juce::DynamicObject();
+                        k->setProperty ("x", b.getCentreX());
+                        k->setProperty ("y", b.getCentreY());
+                        k->setProperty ("r", r);
+                        k->setProperty ("angle", rp.startAngleRadians + pos * (rp.endAngleRadians - rp.startAngleRadians));
+                        k->setProperty ("ticks", ticks);
+                        k->setProperty ("mini", mini);
+                        k->setProperty ("w", b.getWidth());
+                        knobs.add (juce::var (k));
+                    }
+                    walk (*child);
+                }
+            };
+            walk (ui);
+            m.setProperty ("knobs", knobs);
+        };
+        const NoCaps noCaps;
+        shoot ({ 3, { 1448, 1086 }, { 1.0f, 3.0f, 4.0f }, chord }, [&] (OspAudioProcessor& p, Editor&) {
+            set (p, "reimagined", 24.0f);
+            set (p, Host::layerParameterId (1, "sourceMode"), 1.0f);
+            set (p, Host::synthesizeId (2), 45.0f);
+            set (p, Host::synthParameterId (2, "mode"), 1.0f);
+            set (p, Host::synthParameterId (2, "imprint"), 80.0f);
+        }, "web-10-hero-3L-nocaps");
     }
 }

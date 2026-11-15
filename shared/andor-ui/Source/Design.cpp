@@ -432,6 +432,11 @@ juce::Colour reimagined (float position)
 namespace osp::plugin::design::draw
 {
 
+// Test hook for the website's product renders only ([web-capture]): when set, knobs draw their
+// ticks and arcs but no cap, so a 3D cap can stand on a clean panel. Never set by the plugin, so
+// every shipped pixel is unchanged. Declared where it is used (tests/plugin/WebCaptureTests.inc).
+bool captureWithoutCaps = false;
+
 void knob (juce::Graphics& g, juce::Point<float> c, float r, float position, const KnobStyle& style)
 {
     using namespace colour;
@@ -497,6 +502,9 @@ void knob (juce::Graphics& g, juce::Point<float> c, float r, float position, con
             g.strokePath (value, juce::PathStrokeType (arcWidth, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         }
     }
+
+    if (captureWithoutCaps)
+        return;
 
     // A rendered cap: its own light, shadow and indicator, at the same radius.
     if (style.sprite != nullptr && style.sprite->isValid() && ! style.graphite)
