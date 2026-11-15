@@ -65,7 +65,7 @@ WELL = 0.85 * MM                   # display recess (floor stays above the panel
 KEYBED_TOP = PANEL_TOP + 1.0 * MM
 BLACK_TOP = KEYBED_TOP + 2.2 * MM
 KNOB_H = {"macro": 8.0 * MM, "layer": 5.5 * MM, "mini": 4.5 * MM}
-FLOAT = {"neutral": 0.09, "dark": 0.28}[args.stage]
+FLOAT = {"neutral": 0.055, "dark": 0.28}[args.stage]
 
 
 def lin(c):
@@ -722,7 +722,7 @@ scene.world = world
 world.use_nodes = True
 bg = world.node_tree.nodes["Background"]
 bg.inputs["Color"].default_value = (0.32, 0.30, 0.28, 1) if args.stage == "neutral" else (0.020, 0.018, 0.016, 1)
-bg.inputs["Strength"].default_value = 0.18 if args.stage == "neutral" else 0.12
+bg.inputs["Strength"].default_value = 0.10 if args.stage == "neutral" else 0.12
 
 
 # --- cameras ---------------------------------------------------------------------------------
@@ -749,7 +749,7 @@ CAMS = {
     "A": dict(yaw=-24, pitch=27, dist=1.16, lens=75, target=T, fstop=11),               # pass 1's angle
     "B": dict(yaw=-24, pitch=54, dist=1.30, lens=85, target=T, fstop=11),               # elevated three-quarter
     "hero_A": dict(yaw=-24, pitch=27, dist=1.12, lens=75, target=T, fstop=9, shift=(0, 0.07), fit="HORIZONTAL"),   # = pass 1
-    "hero_B": dict(yaw=-24, pitch=54, dist=1.06, lens=85, target=T, fstop=9, shift=(0, 0.05), fit="HORIZONTAL"),
+    "hero_B": dict(yaw=-24, pitch=54, dist=1.16, lens=85, target=T, fstop=9, shift=(-0.035, 0.05), fit="HORIZONTAL"),
     "macros": dict(yaw=-18, pitch=50, dist=0.64, lens=85, target=prod(493, 812, CARD_TOP + 4 * MM), fstop=11),
     "display": dict(yaw=-20, pitch=42, dist=0.30, lens=100, target=prod(723, 330, CARD_TOP), fstop=8),
     "corner": dict(yaw=38, pitch=66, dist=0.26, lens=100, target=prod(1390, 1050, FRAME_TOP * 0.6), fstop=8),
