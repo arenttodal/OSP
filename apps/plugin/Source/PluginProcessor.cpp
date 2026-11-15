@@ -663,10 +663,12 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
         for (std::size_t i = 0; i < modes.size(); ++i)
             modes[i] = lp.modes[i]->load();
         const float pedalLoop = lp.pedalLoop != nullptr ? lp.pedalLoop->load() : 0.0f;
+        const int loopFallback = layers[static_cast<std::size_t> (layer)].loopFallback.load() ? 1 : 0;
         if (force || controls != lp.lastControls || ! juce::exactlyEqual (ownReimagined, lp.lastReimagined) || modes != lp.lastModes
-            || audible != lp.lastAudible || ! juce::exactlyEqual (pedalLoop, lp.lastPedalLoop))
+            || audible != lp.lastAudible || ! juce::exactlyEqual (pedalLoop, lp.lastPedalLoop) || loopFallback != lp.lastLoopFallback)
         {
             lp.lastPedalLoop = pedalLoop;
+            lp.lastLoopFallback = loopFallback;
             lp.lastControls = controls;
             lp.lastAudible = audible;
             lp.lastReimagined = ownReimagined;
@@ -678,6 +680,7 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
             ls.levelDb = controls[3];
             ls.reverse = controls[5] >= 0.5f;
             ls.loop = controls[6] >= 0.5f;
+            ls.fallbackLoop = loopFallback == 1;
             ls.follow = controls[7] >= 0.5f;
             ls.pedalLoop = static_cast<PedalLoopMode> (std::clamp (static_cast<int> (std::lround (pedalLoop)), 0, 2));
             ls.audible = audible;
@@ -2588,6 +2591,7 @@ OspAudioProcessor::LayerSnapshot OspAudioProcessor::captureLayer (int layer) con
     const auto& slot = layers[static_cast<std::size_t> (layer)];
     snapshot.latestByLoad = slot.latestByLoad;
     snapshot.lastPublishedLoad = slot.lastPublishedLoad;
+    snapshot.loopFallback = slot.loopFallback.load();
     return snapshot;
 }
 
@@ -2612,6 +2616,7 @@ void OspAudioProcessor::applyLayer (int layer, const LayerSnapshot& snapshot)
     setRootOverride (snapshot.rootOverride, layer);
     republish (snapshot.instrument, layer);
     slot.lastPublishedLoad = snapshot.lastPublishedLoad;
+    slot.loopFallback.store (snapshot.loopFallback);
     slot.lastLoadFailed = false;
     slot.state = LoadState::ready;
 }
@@ -3017,6 +3022,9 @@ void OspAudioProcessor::timerCallback()
                 }
                 else if (loadId != layer.lastPublishedLoad)
                 {
+                    // A new sound the user chose: LOOP's fallback holds its short notes.
+                    if (userLoads.count (loadId) > 0)
+                        layer.loopFallback.store (true);
                     // A new sound on this layer: into the Library (its history when the user chose it).
                     libraryHub->soundLoaded (*result.instrument, static_cast<int> (index), userLoads.count (loadId) > 0);
                     // A new sample (not a later stage of the same one): undoable if the user asked for it.
@@ -3222,6 +3230,12 @@ std::unique_ptr<juce::XmlElement> OspAudioProcessor::createStateXml()
     stateTree.setProperty ("modTab", modTab.load(), nullptr);              // UI only, never audio
     stateTree.setProperty ("modTabs", 6, nullptr);                         // ... in the six-tab order
     stateTree.setProperty ("program", currentProgram, nullptr);
+    {
+        juce::String fallback;
+        for (const auto& l : layers)
+            fallback << (l.loopFallback.load() ? "1" : "0");
+        stateTree.setProperty ("loopFallback", fallback, nullptr);
+    }
 
     stateTree.setProperty ("editLayer", editLayer(), nullptr);
     stateTree.setProperty ("keptSlots", keptSlotCount.load(), nullptr);
@@ -3377,6 +3391,19 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml, bool setting
     const auto fxRouteTree = stateTree.getChildWithName ("FxRouting");
     stateTree.removeChild (fxRouteTree, nullptr);
     const int savedVersion = static_cast<int> (stateTree.getProperty ("stateVersion", 1));
+    // LOOP's fallback for short notes: the session's, per layer. Saved before it existed: off
+    // for every layer that holds a saved sound (it plays as it did), on for the others.
+    {
+        const auto saved = stateTree.getProperty ("loopFallback").toString();
+        for (std::size_t l = 0; l < layers.size(); ++l)
+        {
+            const auto& tree = layerTrees[l];
+            const bool holdsSound = tree.isValid() && (tree.hasProperty ("contentHash") || tree.getChildWithName ("Set").isValid() || tree.getChildWithName ("Atlas").isValid());
+            const bool on = saved.length() > static_cast<int> (l) ? saved[static_cast<int> (l)] == '1' : (savedVersion >= 16 || ! holdsSound);
+            layers[l].loopFallback.store (on);
+        }
+        stateTree.removeProperty ("loopFallback", nullptr);
+    }
     // Made before per-layer Reimagined (no routing saved): the legacy shared stage, exactly.
     perLayerReimagined = savedVersion >= 8 && stateTree.getProperty ("reimaginedRouting", "legacyGlobal").toString() == "perLayer";
     stateTree.removeProperty ("reimaginedRouting", nullptr);

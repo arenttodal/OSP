@@ -519,8 +519,14 @@ public:
             any older session: `shared`, Phase 2's; new sessions `bounded`, never above the budget).
         15: SYNTH's defaults: SHAPE FOLLOW, IMPRINT and MOTION 100 %. Older sessions and presets
             open with every layer's SHAPE as FOLLOW, and IMPRINT / MOTION at 0 % (the old default)
-            as 100 %; values above 0 are kept. */
-    static constexpr int stateVersion = 15;
+            as 100 %; values above 0 are kept.
+        16: LOOP's fallback for short notes (`loopFallback`, one 0/1 per layer). Absent, i.e. a
+            session or preset saved before it: off for every layer that holds a saved sound, so
+            it plays as it did; a sound loaded later (and every new session) has it on. */
+    static constexpr int stateVersion = 16;
+    /** LOOP's fallback for short notes on `layer` (on, but off for the sounds of a session saved
+        before it; tests). */
+    bool loopFallback (int layer) const noexcept { return layers[static_cast<std::size_t> (std::clamp (layer, 0, numLayers - 1))].loopFallback.load(); }
 
     /** KEY DNA (message thread): a layer's per-key identity. Its profile (all 128 keys) is
         computed here and handed to the audio thread through a ModelExchange; new notes take
@@ -601,6 +607,9 @@ private:
         // Undo of sample loads: the latest instrument of every recent load. Message thread.
         std::map<std::uint64_t, std::shared_ptr<const LoadedInstrument>> latestByLoad;
         std::uint64_t lastPublishedLoad = 0;
+        /** LOOP's fallback for short notes (InstrumentEngine LayerSettings::fallbackLoop): on for
+            every sound but those of a session saved before it (state version 16). */
+        std::atomic<bool> loopFallback { true };
         float autoPosition = -1.0f;                      // POS set from the analysis (granular), until the user moves it
         std::uint64_t autoPositionLoad = 0;
         // Phase 5 (message thread): the atlas's decoded sources (for its edits), the edits
@@ -681,6 +690,7 @@ private:
         juce::NamedValueSet values;   ///< granular + layer control parameters by name
         std::map<std::uint64_t, std::shared_ptr<const LoadedInstrument>> latestByLoad;
         std::uint64_t lastPublishedLoad = 0;
+        bool loopFallback = true;
     };
     LayerSnapshot captureLayer (int layer) const;
     void applyLayer (int layer, const LayerSnapshot& snapshot);
@@ -869,6 +879,7 @@ private:
         std::atomic<float>* pedalLoop = nullptr;    ///< PEDAL LOOP: 0 Normal, 1 Forward, 2 Ping-Pong (hint 29)
         std::array<std::atomic<float>*, 10> satellite {};   ///< SATELLITE's fields (satelliteFields(), hint 32)
         float lastPedalLoop = -1.0f;
+        int lastLoopFallback = -1;
         std::array<std::atomic<float>*, 6> synth {};   ///< the SYNTH page (hint 23), synthParameterNames() order
         std::array<std::atomic<float>*, 3> imprint {};   ///< its spectral imprint (hint 28), imprintParameterNames() order
     };

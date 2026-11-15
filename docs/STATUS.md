@@ -1521,6 +1521,29 @@ on the ADD place, or only the card dropped on. Audit, measured reproduction and 
 - **Schema golden.** It follows the new defaults: three SHAPE lines and six IMPRINT / MOTION
   lines.
 
+## LOOP holds short notes (15 Nov 2026, branch claude/osp-short-loop)
+
+- **The problem.** With LOOP on, a short sustained recording played once: the continuation
+  analysis found no loop in a body shorter than 0.5 s.
+- **The fix.** LOOP falls back to Note Atlas's forced loop, one crossfaded loop over the note's
+  body (`fallbackLoop`, `PitchLayer::fallbackContinuation`), built in the background with the
+  continuation.
+  - Only for short notes: "too short", "stable region too short" or "no body after the attack".
+  - Never for struck or plucked notes, which still play once.
+  - The natural continuation always wins when it exists.
+- **Compatibility** (state version 16, the musician's choice):
+  - Sessions and presets saved before keep their sounds as they played (`loopFallback` off for
+    each layer that holds a saved sound); re-saving keeps that.
+  - A sound loaded later, and every new session, has the fallback.
+- **No change elsewhere.** The engine default is off, so the research renderer, baselines A/B
+  and every golden render are unchanged.
+- **Tests.** `osp_tests "[short-loop]"` (the duration matrix; held, once, LOOP off;
+  bit-identical for long notes) and `osp_plugin_tests "[short-loop]"` (the session policy end to
+  end) pass. `[short-loop-renders]` makes before / after renders.
+- **Measured.** Short notes now hold at their level for 3 s (before: -69 dB by 1 s). The seam
+  steps and level wobble match a natural loop's. Report: `docs/research/short-loop.md`.
+- **Not done.** No listening on real short recordings.
+
 ## SUB in ANDOR OSP (15 Nov 2026, branch claude/osp-sub)
 
 - **What.** ANDOR ANALOG's SUB (sub oscillator V6, popover V7) in ANDOR OSP. It plays one or two

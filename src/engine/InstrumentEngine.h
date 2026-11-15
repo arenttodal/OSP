@@ -65,6 +65,11 @@ struct LayerSettings
     double levelDb = 0.0;         ///< LEVEL trim before the mix (-48 = silent .. +6)
     bool reverse = false;         ///< REVERSE: One Shot reads backwards, grains read backwards
     bool loop = true;             ///< LOOP (One Shot): sustain by the recording's own loops; off: play it once
+    /** With LOOP: a short note the analysis cannot loop holds on its fallback loop
+        (PitchLayer::fallbackContinuation). Off (the default: the research renderer, the
+        baselines and every golden): it plays once, as before the fallback existed. ANDOR OSP
+        turns it on for every sound but those of sessions saved before it. */
+    bool fallbackLoop = false;
     bool follow = true;           ///< FOLLOW: keep the recording's own loudness contour (off: flatten it)
     /** Heard in the mix (MUTE / SOLO). An unheard layer ramps to silence; its held notes
         wait for it to come back, released ones end (as at LEVEL -48). */

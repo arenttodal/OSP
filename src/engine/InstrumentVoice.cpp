@@ -105,6 +105,9 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     }
     keyDnaAmountApplied = keyDnaAmountLive != nullptr ? std::clamp (*keyDnaAmountLive, 0.0, 1.0) : 1.0;
     // Granular voices never read the recording through: no continuation jumps or grafts.
+    // LOOP's fallback: a short note with no loop of its own holds on one loop over its body.
+    if (! cont->canSustain && params.fallbackLoop && params.strategy != ContinuationStrategy::off && ! granularMode && layer->fallbackContinuation.canSustain)
+        cont = &layer->fallbackContinuation;
     strategy = cont->canSustain && ! granularMode ? params.strategy : ContinuationStrategy::off;
     releaseGraftEnabled = params.releaseGraft;
     // REVERSE reads from the end of the sound back to its start. The continuation walk

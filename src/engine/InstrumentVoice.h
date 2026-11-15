@@ -50,6 +50,9 @@ struct InstrumentVoiceStart
     std::uint64_t startOrder = 0;
     NoteShape shape;
     ContinuationStrategy strategy = ContinuationStrategy::multiLoop;
+    /** LOOP's fallback: a short note with no loop of its own holds on the layer's
+        fallbackContinuation (when there is one). */
+    bool fallbackLoop = false;
     bool releaseGraft = true;
     int layerIndex = 0;                         ///< A/B layer (0 = A, 1 = B)
     SourceMode sourceMode = SourceMode::oneShot;

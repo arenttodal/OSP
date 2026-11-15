@@ -881,6 +881,7 @@ void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int
     const auto& layerSettings = config.layer[context];
     // LOOP off: the layer plays its recording once (Sustain in Advanced still applies to all).
     params.strategy = layerSettings.loop ? config.continuation : ContinuationStrategy::off;
+    params.fallbackLoop = layerSettings.loop && layerSettings.fallbackLoop;
     params.releaseGraft = config.releaseGraft;
     params.layerIndex = layerNumber;
     params.sourceMode = config.sourceMode[context];

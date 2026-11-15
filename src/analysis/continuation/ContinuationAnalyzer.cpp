@@ -375,6 +375,31 @@ namespace
     }
 }
 
+bool wantsFallbackLoop (const ContinuationModel& natural, const AnalysisData& analysis) noexcept
+{
+    if (natural.canSustain)
+        return false;
+    const bool shortNote = natural.reason == "too short" || natural.reason == "stable region too short" || natural.reason == "no body after the attack";
+    // Struck or plucked: a fast attack, then a steady fall. It plays once, short or long.
+    const auto& env = analysis.envelope;
+    const bool struck = env.attackSeconds < 0.03 && env.decaySlopeDbPerSecond < -10.0;
+    return shortNote && ! struck;
+}
+
+ContinuationModel fallbackLoop (const AudioData& audio, const AnalysisData& analysis, const ContinuationModel& natural)
+{
+    if (! wantsFallbackLoop (natural, analysis) || audio.isEmpty() || audio.sampleRate <= 0.0)
+    {
+        ContinuationModel none = natural;
+        none.canSustain = false;
+        return none;
+    }
+    auto model = forcedLoop (audio, analysis, natural, fallbackLoopMinSeconds);
+    if (! model.canSustain)
+        model.reason = natural.reason;   // (no loop fits: the note keeps its own reason)
+    return model;
+}
+
 ContinuationModel analyseContinuation (const AudioData& audio, const AnalysisData& analysis, const ContinuationOptions& options)
 {
     auto model = analyseOnce (audio, analysis, options);

@@ -42,6 +42,19 @@ ContinuationModel analyseContinuation (const AudioData& audio,
                                        const ContinuationOptions& options = {});
 
 /**
+    LOOP's fallback for short notes (Note Atlas's forced loop, offered to every One Shot layer):
+    when the analysis finds no loop only because the note is short ("too short", "stable region
+    too short", "no body after the attack") and it is not struck (a pluck's fast attack and
+    steady decay: it plays once, as a long pluck does), one crossfaded loop over the note's body,
+    aligned on its waveform, holds it. The result's canSustain says whether there is one; it is
+    false (with the natural reason kept) for every other note. The natural model's other fields
+    (the pedal's regions among them) are kept. Offline only.
+*/
+inline constexpr double fallbackLoopMinSeconds = 0.1;   ///< the shortest body the fallback loops (Note Atlas's)
+bool wantsFallbackLoop (const ContinuationModel& natural, const AnalysisData& analysis) noexcept;
+ContinuationModel fallbackLoop (const AudioData& audio, const AnalysisData& analysis, const ContinuationModel& natural);
+
+/**
     Pedal Loop 1.0: the regions a One Shot note may loop over under the sustain pedal
     (PedalLoopModel). `continuation` is the source's own (its best loop comes first when it
     can sustain). Offline only; never throws (silence, noise, a click: invalid with a reason).
