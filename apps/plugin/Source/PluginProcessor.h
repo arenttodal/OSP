@@ -512,8 +512,11 @@ public:
         14: the unified engine's Phase 3: a layer can hold a Note Atlas (its `Instrument` tree's
             `Atlas` child: the atlas JSON, own schemaVersion; the audio stays in the sample store,
             referenced by hash), and the grain budget's policy (`grainBudgetPolicy`; absent, i.e.
-            any older session: `shared`, Phase 2's; new sessions `bounded`, never above the budget). */
-    static constexpr int stateVersion = 14;
+            any older session: `shared`, Phase 2's; new sessions `bounded`, never above the budget).
+        15: SYNTH's defaults: SHAPE FOLLOW, IMPRINT and MOTION 100 %. Older sessions and presets
+            open with every layer's SHAPE as FOLLOW, and IMPRINT / MOTION at 0 % (the old default)
+            as 100 %; values above 0 are kept. */
+    static constexpr int stateVersion = 15;
 
     /** KEY DNA (message thread): a layer's per-key identity. Its profile (all 128 keys) is
         computed here and handed to the audio thread through a ModelExchange; new notes take

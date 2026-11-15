@@ -3553,6 +3553,19 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml, bool setting
         // (Unlimited), while new sessions start from the benchmarked budget.
         setParameterValue (ids::grainBudget, 0.0f);
     }
+    if (savedVersion < 15)
+    {
+        // SYNTH (state 15): every layer's SHAPE opens as FOLLOW, existing presets included, and
+        // IMPRINT / MOTION left at their old default (0 %) take the new one (100 %), so turning
+        // IMPRINT on is heard at once. A value somebody set (above 0) is kept.
+        for (int layer = 0; layer < numLayers; ++layer)
+        {
+            setParameterValue (synthParameterId (layer, "shape"), 1.0f);
+            for (const auto* name : { "imprint", "motion" })
+                if (auto* p = parameters.getParameter (synthParameterId (layer, name)); p != nullptr && p->convertFrom0to1 (p->getValue()) <= 0.0f)
+                    setParameterValue (synthParameterId (layer, name), 100.0f);
+        }
+    }
     // KEY DNA: the session's (absent before 13: none). Always published, so a session without
     // it also clears the previous one's.
     {

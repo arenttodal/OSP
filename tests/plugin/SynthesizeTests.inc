@@ -786,7 +786,8 @@ TEST_CASE ("plugin imprint: mode, IMPRINT and MOTION per source (hint 28) at Ana
     REQUIRE (older.waitForLoads (30000));
     older.pollLoads();
     CHECK (older.parameterValue (InstrumentHost::synthParameterId (0, "mode")) == 0.0f);
-    CHECK (older.parameterValue (InstrumentHost::synthParameterId (0, "imprint")) == 0.0f);
+    // (IMPRINT's default is 100 % since state 15; in Analog it is not heard.)
+    CHECK (older.parameterValue (InstrumentHost::synthParameterId (0, "imprint")) == 100.0f);
     CHECK (audioHash (renderHeld (older, chord8, 1.2)) == analog);
 }
 
