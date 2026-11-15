@@ -218,7 +218,7 @@ TEST_CASE ("shell: the parameter schema is ANDOR OSP's, unchanged; the product's
     const auto& productDests = andor::shell::productInfo().modulationDestinations;
     CHECK (osp::mod::productDestCount() == static_cast<int> (productDests.size()));
     juce::StringArray base, own;
-    bool ownStarted = false, orderKept = true;
+    bool ownStarted = false, orderKept = true, vibratoSeen = false;
     for (auto* parameter : p.getParameters())
     {
         auto* ranged = dynamic_cast<juce::RangedAudioParameter*> (parameter);
@@ -252,7 +252,14 @@ TEST_CASE ("shell: the parameter schema is ANDOR OSP's, unchanged; the product's
             line = parameterschema::describe (&asOsp);
         }
         const bool isOwn = line.startsWith (prefix);
-        orderKept = orderKept && (isOwn || ! ownStarted);
+        // ANDOR OSP's parameters added after products shipped (the MOD WHEEL's vibrato.*) come
+        // after the product's own, so none of a product's moves; the rest of ANDOR OSP's before.
+        const bool appendedAfterProducts = id.startsWith ("vibrato.");
+        orderKept = orderKept && (isOwn || ! ownStarted || appendedAfterProducts);
+        if (appendedAfterProducts)
+            vibratoSeen = true;
+        else
+            orderKept = orderKept && ! vibratoSeen;   // (and those really last)
         ownStarted = ownStarted || isOwn;
         (isOwn ? own : base).add (line);
     }
