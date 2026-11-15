@@ -1772,6 +1772,34 @@ bool ShellProcessor::loadPreset (const juce::File& file)
     return true;
 }
 
+bool ShellProcessor::loadLearnExample (const juce::XmlElement& example)
+{
+    auto kept = stateXml();
+    if (kept == nullptr || kept->getChildByName (parameters.state.getType()) == nullptr)
+        return false;   // (the sound now could not be kept: no example, no promise of Restore)
+    const juce::ScopedValueSetter<bool> asPreset (applyingPreset, true);   // (as a preset: the view stays)
+    if (! applyStateXml (example))
+    {
+        applyStateXml (*kept);
+        return false;
+    }
+    if (learnKept == nullptr)
+        learnKept = std::move (kept);   // the musician's own sound, never an earlier example
+    undoManager.clearUndoHistory();
+    return true;
+}
+
+bool ShellProcessor::restoreLearnSound()
+{
+    if (learnKept == nullptr)
+        return false;
+    const auto kept = std::move (learnKept);
+    const juce::ScopedValueSetter<bool> asPreset (applyingPreset, true);
+    const bool ok = applyStateXml (*kept);
+    undoManager.clearUndoHistory();
+    return ok;
+}
+
 void ShellProcessor::rememberPreviousState (const juce::String& label)
 {
     previousState = stateXml();

@@ -30,11 +30,23 @@ struct EditorHooks
     std::function<std::optional<float> (const juce::String&)> parameterValue;
     /** The product has a capability (lessons for absent features are not offered). */
     std::function<bool (const juce::String&)> hasCapability;
+    /** The part of `content` the musician can see now (the editor may be scrolled); empty:
+        all of it. Notes and the browser stay inside it. */
+    std::function<juce::Rectangle<int>()> visibleArea;
+    /** Scrolls the editor so this rectangle (in `content`) is in view (a scrolled editor only). */
+    std::function<void (juce::Rectangle<int>)> scrollIntoView;
+    /** Loads a lesson's example sound, keeping the whole sound before it for Restore. False:
+        nothing was loaded and nothing changed. Only ever called on the musician's choice. */
+    std::function<bool (const juce::String& exampleId)> loadExample;
+    /** The sound before the last example is kept and can be restored. */
+    std::function<bool()> canRestoreSound;
+    /** Restores the sound kept before the last example (and forgets it). False: not restored. */
+    std::function<bool()> restoreSound;
 };
 
 /**
     ANDOR Learn for one editor: the lesson runner, the targets, the per-user progress, and the
-    temporary teaching layer (focus ring, note, Learn mode regions, browser, invitation).
+    temporary teaching layer (the green outline, note, Info regions, browser, invitation).
 
     Nothing is added to the editor until the musician asks for it (or the one-time invitation
     appears): while idle there is no child component, no timer of its own (the editor's tick
@@ -57,26 +69,35 @@ public:
     const juce::StringArray& problems() const noexcept { return setupProblems; }
 
     // The editor's hooks.
-    /** The two items (and the Learn submenu) for the header menu. */
+    /** The header menu's one Learn entry: a submenu with Tutorials..., Toggle Info and
+        Reset Tutorials... (and Restore Previous Sound while a sound kept before an example
+        can be restored). */
     void addMenuItems (juce::PopupMenu&);
     /** A control's committed gesture (see actions::). Only user origins can complete steps. */
     void userAction (const juce::String& actionId, const juce::String& targetId, const juce::String& parameterId, Origin);
     void userAction (const LearnEvent&);
-    /** Escape: the note first, then the browser, then Learn mode. False: not Learn's key. */
+    /** Escape: the note first, then the browser, then Info. False: not Learn's key. */
     bool keyPressed (const juce::KeyPress&);
     /** The editor's timer: the invitation's schedule, the overlay following its targets. */
     void tick();
 
     // What the musician can do (also the tests' entry points).
-    bool startLesson (const juce::String& lessonId);
+    /** Starts a lesson (at a step: tests, screenshots and a resumed lesson). */
+    bool startLesson (const juce::String& lessonId, int fromStep = 0);
     void openBrowser();
     void closeBrowser();
     /** A lesson chosen in the browser: resumed where it was left (in progress), else from the start. */
     void chooseLesson (juce::String lessonId);
+    /** Info (Toggle Info): point to or click an area to read about it. Never changes the sound. */
     void setLearnMode (bool on);
     bool learnMode() const noexcept { return inspecting; }
     void inspect (const juce::String& targetId);
+    /** Reset Tutorials... : asks first (Cancel / Reset Tutorials). */
+    void confirmResetProgress();
+    /** Forgets the lessons' progress (the confirmed reset). Sounds and presets are untouched. */
     void resetProgress();
+    /** Restores the sound kept before an example (the menu's item, the completion note's key). */
+    bool restorePreviousSound();
     /** Shows the invitation now (tests; the editor's schedule calls it once). */
     void showInvitation();
     /** A note's key, by its action ID (as its click does). */
@@ -94,7 +115,7 @@ public:
     /** The watcher of a target's touches (Target::watchTouches), or nullptr. Tests deliver the
         mouse events the operating system would (headless editors have no window). */
     TouchWatcher* touchWatcher (const juce::String& targetId) const;
-    enum class NoteKind { none, lesson, help, invitation, complete };
+    enum class NoteKind { none, lesson, help, invitation, complete, confirmReset };
     NoteKind noteKind() const noexcept { return shownNote; }
     const juce::String& inspectedTarget() const noexcept { return helpTarget; }
     bool isActive() const noexcept;
@@ -107,6 +128,7 @@ private:
     bool state (const juce::String&) override;
     bool targetReady (const juce::String&) override;
     bool reveal (const juce::String&) override;
+    bool loadExample (const juce::String&) override;
 
     void ensureLayers();
     void releaseLayersIfIdle();
@@ -115,6 +137,9 @@ private:
     void hideNote();
     void placeNote (std::optional<juce::Rectangle<int>> anchor);
     void placeBelowMenu (juce::Component&);
+    juce::Rectangle<int> visibleBounds() const;
+    std::vector<juce::Rectangle<int>> keepClearAreas() const;
+    juce::String currentTargetId() const;
     void updateRegions();
     void raise();
     void persist (const Lesson&, int stepIndex, bool finished, bool allStepsDone);
@@ -143,6 +168,8 @@ private:
     juce::String noteSignature, helpTarget, hoverTarget;
     bool inspecting = false;
     bool invitationPending = false, invitationClaimed = false;
+    bool exampleFailed = false;
+    juce::String lastScrolledTarget;
     int showingTicks = 0;
 };
 

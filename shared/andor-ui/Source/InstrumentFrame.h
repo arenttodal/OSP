@@ -222,6 +222,9 @@ namespace frame
         float offset() const noexcept { return scrolled; }
         /** A wheel the instrument did not take (none of its knobs): scrolls while it overflows. */
         bool scrollBy (const juce::MouseWheelDetails& wheel);
+        /** Scrolls (while it overflows) so editor pixels `top`..`bottom` of the instrument, as
+            if unscrolled, are in view. False: nothing to scroll. */
+        bool scrollToShow (float top, float bottom);
         bool overflowing() const noexcept { return bar.isVisible(); }
         /** A shorter window whose resize is still being negotiated (no bar yet). */
         bool settling() const noexcept { return isTimerRunning(); }

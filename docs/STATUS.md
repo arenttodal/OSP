@@ -917,6 +917,38 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
   at the full height; a refusing host is asked twice, then scrolls at the same width and scale;
   a short screen scrolls at once. Real DAWs: UNVERIFIED (OWNER TEST).
 
+  ANDOR Learn 2.0 (shared/andor-learn; ANDOR ANALOG's `docs/LEARN_2.md`, 15 Nov): Learn as an
+  interactive manual. Changes:
+  - One **Learn** menu entry: Tutorials..., Toggle Info (was "Learn mode"), Reset Tutorials...
+    (asks first; clears lesson records only), and Restore Previous Sound while one is kept.
+  - A quieter browser: START HERE / LESSONS, a description per row, the time, "Resume · Step n
+    of N" or a check; keys; it re-reads progress on opening.
+  - The note: label + STEP n OF N, a status line ("ARP is already on." + Continue; a check and
+    what changed once done), one primary key and Back. **Skip is gone** (`LessonRunner::skip`
+    and `StepStatus::skipped` removed; a finished lesson had every task done or already so; a
+    resumed one counts from where it began).
+  - A green outline (2 px, soft glow, padded, corners matched) on the exact control, with a
+    connector when the note sits apart; scored placement (right / left / above / below, never
+    on the target, avoiding the step's other controls and the panel the control is in, inside
+    the visible part of a scrolled editor, the target scrolled into view).
+  - Readiness: `Step::requirements` block a step while what it needs is missing (the note
+    names it, outlines and offers the fix, and the lesson's example); a preparation step (Use
+    Current Sound / Load Example Sound).
+  - Example sounds: `LearnDescriptor::exampleState`; `ShellProcessor::loadLearnExample` keeps
+    the whole sound first, `restoreLearnSound` brings it back; never on X, never unasked.
+  - Exact targets: `binding::findControl` finds a control by the parameter it edits
+    (`ParameterRack` marks its knobs, switches and selectors: no visual change); new shell
+    targets `arp.on`, `arp.opener`, `arp.plays.A/B/C`, `arp.edit.A/B/C`, `arp.card.B.pattern` /
+    `.rate`, `macro.N.knob` / `.label`, `usermacro.N.label`; states `arp.edit.B`,
+    `rack.any.open`; registry values (`addValue`: a product's number compared like a parameter);
+    events `control.menu.opened` (a control's right-click), `usermacro.range.changed` (a halo end
+    committed).
+  - Progress: records other than complete / in-progress (an earlier build's skipped) read as
+    new; in-progress resumes by stable step ID across revisions; complete stays.
+  ANDOR OSP's own plugin still has no Learn (NEXT below); its editor and captures are unchanged
+  (4 / 4 shards). Tests: `[learn][unit]` (no Skip, requirements and preparation, a dropdown's
+  late choice, legacy records), and the product suites (ANDOR ANALOG: 23 Learn cases).
+
   Universal modulation-aware visual feedback (docs/EFFECTIVE_VALUES.md): a picture draws what
   the DSP plays. `osp::EffectiveValues` (src/engine) is a fixed, lock-free table published by
   the audio thread (a sequence lock per slot, with the span covered over a UI frame);
@@ -969,7 +1001,8 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
     to `src/analysis` and `src/audio` unchanged: pure C++);
   - a schema bump for the route-source list.
 - **ANDOR Learn in ANDOR OSP's own plugin.** ANDOR OSP's plugin uses its own editor, not
-  ShellEditor, so it has no Learn yet. The plan:
+  ShellEditor, so it has no Learn yet (Learn 2.0's foundations - requirements, examples, exact
+  targets by parameter, the scored placement - are all in the shared module, ready for it). The plan:
   - give OspAudioProcessorEditor a LearnController with the same hooks (content, menu anchor,
     parameter values, the editor's timer calling `tick()`);
   - register its targets (preset, cards, macros, ARP: the shared ARP hooks already report);

@@ -694,6 +694,21 @@ bool Overflow::scrollBy (const juce::MouseWheelDetails& wheel)
     return true;
 }
 
+bool Overflow::scrollToShow (float top, float bottom)
+{
+    if (! overflowing())
+        return false;
+    const float before = scrolled;
+    if (top < scrolled)
+        scrolled = top;
+    else if (bottom > scrolled + visible)
+        scrolled = bottom - visible;
+    scrolled = std::clamp (scrolled, 0.0f, std::max (0.0f, content - visible));
+    if (scrolled != before && onScroll != nullptr)
+        onScroll();
+    return scrolled != before;
+}
+
 void Overflow::scrollBarMoved (juce::ScrollBar*, double newRangeStart)
 {
     scrolled = std::clamp (static_cast<float> (newRangeStart), 0.0f, std::max (0.0f, content - visible));

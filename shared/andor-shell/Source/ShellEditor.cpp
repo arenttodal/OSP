@@ -1834,6 +1834,24 @@ void ShellEditor::createLearn()
     hooks.hasCapability = [this, &descriptor] (const juce::String& capability) {
         return descriptor.hasCapability != nullptr && descriptor.hasCapability (capability, shell);
     };
+    // What is in view of a scrolled editor (the host kept it short), and bringing a lesson's
+    // control into view there.
+    hooks.visibleArea = [this] { return content.getLocalArea (this, getLocalBounds()); };
+    hooks.scrollIntoView = [this] (juce::Rectangle<int> r) {
+        if (! overflow.overflowing())
+            return;
+        const auto onEditor = getLocalArea (&content, r).toFloat();
+        overflow.scrollToShow (onEditor.getY() + overflow.offset(), onEditor.getBottom() + overflow.offset());
+    };
+    // A lesson's example sound (only on the musician's choice; the sound before it kept).
+    hooks.loadExample = [this, &descriptor] (const juce::String& id) {
+        if (descriptor.exampleState == nullptr)
+            return false;
+        const auto example = descriptor.exampleState (id, shell);
+        return example != nullptr && shell.loadLearnExample (*example);
+    };
+    hooks.canRestoreSound = [this] { return shell.canRestoreLearnSound(); };
+    hooks.restoreSound = [this] { return shell.restoreLearnSound(); };
     learn = std::make_unique<andor::learn::LearnController> (descriptor.catalog(), std::move (hooks));
     auto& targets = learn->targets();
 
@@ -1862,6 +1880,13 @@ void ShellEditor::createLearn()
                           return knob.getLocalArea (&content, r);
                       },
                        shell.product().macroPopover != nullptr ? std::function<bool()> ([this, i] { openPopup (i); return popup != nullptr; }) : std::function<bool()>(), {}, true, true });
+    }
+    for (int i = 0; i < frame::macroCount; ++i)
+    {
+        // Exact parts of a macro: its knob alone, its name alone.
+        auto& m = macros[static_cast<std::size_t> (i)];
+        targets.add ({ "macro." + juce::String (i) + ".knob", [&m] { return static_cast<juce::Component*> (&m.slider); } });
+        targets.add ({ "macro." + juce::String (i) + ".label", [&m] { return static_cast<juce::Component*> (m.label.get()); } });
     }
     targets.add ({ "macros", [this] { return static_cast<juce::Component*> (&content); }, [this] (juce::Component&) {
                       juce::Rectangle<int> all;
@@ -1905,8 +1930,28 @@ void ShellEditor::createLearn()
                       return arpShown;
                   },
                    [this] { return arpPanel.editedCard() == 0; } });
+    // The arpeggiator's ON light alone (the panel's own switch is the same light on the card).
+    targets.add ({ "arp.on", [this] { return static_cast<juce::Component*> (&arpButton); },
+                   [this] (juce::Component&) { return arpButton.lightArea().expanded (4.0f).getSmallestIntegerContainer(); } });
     if (arpPanel.showsCards())
     {
+        // PLAYS: each card's own key; EDIT: each card's tab; B's own PATTERN and RATE.
+        static const char* letters[] { "A", "B", "C" };
+        for (int card = 0; card < 3; ++card)
+        {
+            targets.add ({ juce::String ("arp.plays.") + letters[card], panel, arpArea ([card] (auto& p) { return p.cardChipArea (card); }), expandArp });
+            targets.add ({ juce::String ("arp.edit.") + letters[card], panel, arpArea ([card] (auto& p) { return p.editTabArea (card); }), expandArp,
+                           [this] { return arpPanel.showsCards() && ! arpPanel.isLinked(); } });
+        }
+        auto showB = [this] {
+            setArpExpanded (true);
+            arpPanel.setEditCard (1);   // a view setting (the card edited), never the sound
+            return arpPanel.editedCard() == 1;
+        };
+        auto editingB = [this] { return arpPanel.showsCards() && ! arpPanel.isLinked() && arpPanel.editedCard() == 1; };
+        targets.addState ("arp.edit.B", editingB);
+        targets.add ({ "arp.card.B.pattern", panel, arpArea ([] (auto& p) { return p.patternFieldArea().getUnion (p.patternListArea()); }), showB, editingB });
+        targets.add ({ "arp.card.B.rate", panel, [this] (juce::Component&) { return arpPanel.shownRateKnob().getBounds(); }, showB, editingB });
         targets.add ({ "arp.cards", panel, arpArea ([] (auto& p) { return p.cardChipArea (0).getUnion (p.cardChipArea (1)).getUnion (p.cardChipArea (2)); }), expandArp });
         targets.add ({ "arp.link", panel, arpArea ([] (auto& p) { return p.linkArea(); }), expandArp });
         // B's own pattern and rate: shown once unlinked and B is the card being edited.
@@ -1925,8 +1970,19 @@ void ShellEditor::createLearn()
     arpPanel.onLearnAction = [this] (const juce::String& action, const juce::String& parameterId) { learnAction (action, "arp.panel", parameterId); };
     // The arpeggiator's companion row (a product's: ANDOR ANALOG's SUB).
     if (shell.arpCompanionShown())
+    {
         targets.add ({ "arp.companion", [this] { return static_cast<juce::Component*> (&arpButton); },
                        [this] (juce::Component&) { return arpButton.secondRowArea().getSmallestIntegerContainer(); }, {}, {}, true });
+        // The ARP row alone (its opener), beside the companion's.
+        targets.add ({ "arp.opener", [this] { return static_cast<juce::Component*> (&arpButton); }, [this] (juce::Component&) {
+                          auto all = arpButton.getLocalBounds();
+                          const auto second = arpButton.secondRowArea().getSmallestIntegerContainer();
+                          return second.isEmpty() ? all : all.withBottom (second.getY());
+                      },
+                       expandArp });
+    }
+    else
+        targets.add ({ "arp.opener", [this] { return static_cast<juce::Component*> (&arpButton); }, {}, expandArp });
     // A macro's own on / off lamp (a product's: ANDOR ANALOG's MORPH). Touches report
     // "macro.N.switch.touched".
     for (auto& [macro, lamp] : macroLamps)
@@ -1941,6 +1997,13 @@ void ShellEditor::createLearn()
     {
         targets.add ({ "macros.bank", [this] { return static_cast<juce::Component*> (bankTab.get()); }, {}, {}, {}, true });
         targets.addState ("macros.bank.user", [this] { return bankShown == 1; });
+        for (int i = 0; i < frame::macroCount; ++i)
+            targets.add ({ "usermacro." + juce::String (i) + ".label",
+                           [this, i] { return bankShown == 1 ? static_cast<juce::Component*> (userRow[static_cast<std::size_t> (i)].label.get()) : nullptr; }, {},
+                           [this] {
+                               showMacroBank (1);
+                               return bankShown == 1;
+                           } });
         for (int i = 0; i < frame::macroCount; ++i)
             targets.add ({ "usermacro." + juce::String (i),
                            [this, i] { return bankShown == 1 ? static_cast<juce::Component*> (&userRow[static_cast<std::size_t> (i)].slider) : nullptr; }, {},
@@ -1963,6 +2026,7 @@ void ShellEditor::createLearn()
     if (shell.showsRack())
     {
         targets.add ({ "rack.area", [this] { return static_cast<juce::Component*> (&rack); }, {}, {}, [this] { return rack.height() > 0.0f; }, true });
+        targets.addState ("rack.any.open", [this] { return rack.height() > 0.0f; });
         for (int k = 0; k < rack::kindCount; ++k)
             if (const auto kind = static_cast<rack::Kind> (k); hasRack (kind))
             {
@@ -2102,7 +2166,10 @@ void ShellEditor::setUpUserMacros()
     content.addAndMakeVisible (assignOverlay);
     // A control's right-click menu: its existing items unchanged, first; then its macros
     // (Assign to Macro, and for an assigned control its range, removal, details).
-    modOverlay.extendContextMenu = [this] (juce::PopupMenu& menu, const juce::String& id) { addUserMacroItems (menu, id); };
+    modOverlay.extendContextMenu = [this] (juce::PopupMenu& menu, const juce::String& id) {
+        addUserMacroItems (menu, id);
+        learnAction ("control.menu.opened", "control", id);   // (a right-click on that control: the musician's)
+    };
     // The halos draw the USER macros' ranges in their own vocabulary (docs/MACRO_DESTINATION_FIRST.md).
     modOverlay.macroEligible = [this] (const juce::String& id) {
         const auto* u = shell.userMacros();
@@ -2151,6 +2218,8 @@ void ShellEditor::setUpUserMacros()
             setChosenUserMacro (m);   // (editing it: its controls shown)
         if (phase == osp::plugin::ModulationOverlay::MacroEdit::commit || phase == osp::plugin::ModulationOverlay::MacroEdit::cancel)
             refreshUserMacros();
+        if (phase == osp::plugin::ModulationOverlay::MacroEdit::commit)
+            learnAction ("usermacro.range.changed", "macros", id);   // (an end dragged on the halo)
     };
     modOverlay.resetMacroEnd = [this] (int m, const juce::String& id, int end) {
         if (const auto* u = shell.userMacros(); u != nullptr && u->resetEnd != nullptr)

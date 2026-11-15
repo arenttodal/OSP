@@ -294,6 +294,18 @@ public:
     void pollLoads() { timerCallback(); }
     juce::String statusMessage() const;
 
+    /** ANDOR Learn: loads a lesson's example sound (a whole state, as a preset loads: the view
+        stays), first keeping the complete sound playing now - every parameter, the cards'
+        recordings (by their stored files), the macros and their assignments, D - so Restore
+        brings it back. A second example keeps the sound from before the first. Nothing is
+        written to a preset file, the host's tracks or its routing. False: not loaded, nothing
+        changed (the kept sound is re-applied if the example failed half way). Message thread. */
+    bool loadLearnExample (const juce::XmlElement& example);
+    /** The sound from before an example is kept (in this instance, until restored or closed). */
+    bool canRestoreLearnSound() const noexcept { return learnKept != nullptr; }
+    /** Brings back the sound kept before the example, then forgets it. False: none kept. */
+    bool restoreLearnSound();
+
     // Presets and files
     /** Documents/<product's preset folder> (env ANDOR_DOCUMENTS_DIR overrides, for tests). */
     juce::File documentsFolder() const;
@@ -561,6 +573,7 @@ private:
     juce::File lastPresetFile;
     std::unique_ptr<juce::XmlElement> previousState;
     juce::String previousStateLabel;
+    std::unique_ptr<juce::XmlElement> learnKept;   ///< (ANDOR Learn: the sound from before an example)
     mutable juce::StringArray favouriteNames;
     mutable bool favouritesLoaded = false;
 

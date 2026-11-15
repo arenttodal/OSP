@@ -24,8 +24,8 @@ struct CatalogChecks
 
 /** Every problem found (empty: valid). Duplicate lesson, step or help IDs, lessons without
     steps, user-action steps without accepted actions, unknown targets / states / parameters,
-    help that starts an unknown lesson, an unknown quick start. Lessons are linear (Next,
-    Back, Skip), so there are no loops to find. */
+    help that starts an unknown lesson, an unknown quick start, requirements that cannot say
+    what is missing. Lessons are linear (Next, Back), so there are no loops to find. */
 juce::StringArray validate (const Catalog&, const CatalogChecks& = {});
 
 /** The catalog with only the lessons whose capability the product has (a lesson for a

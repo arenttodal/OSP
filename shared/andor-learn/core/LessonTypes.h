@@ -62,7 +62,8 @@ struct Condition
         parameterEquals,    ///< equals `value` (within half a step)
         state,              ///< a registered UI state is true
         all,
-        any
+        any,
+        negation            ///< its one term does not hold
     };
     Kind kind = Kind::always;
     juce::String id;
@@ -75,6 +76,7 @@ struct Condition
     static Condition state (juce::String stateId) { return { Kind::state, std::move (stateId), 0.0f, {} }; }
     static Condition all (std::vector<Condition> t) { return { Kind::all, {}, 0.0f, std::move (t) }; }
     static Condition any (std::vector<Condition> t) { return { Kind::any, {}, 0.0f, std::move (t) }; }
+    static Condition isNot (Condition c) { return { Kind::negation, {}, 0.0f, { std::move (c) } }; }
 
     /** The parameters it reads (snapshotted when a step begins). */
     void collectParameters (juce::StringArray& into) const
@@ -103,9 +105,17 @@ struct Completion
     };
     Kind kind = Kind::manual;
     juce::StringArray actions;
+    /** Only an event about this parameter counts (the right-click on OSC 1 LEVEL, not any
+        control's menu); empty: any. */
+    juce::String parameterId;
     Condition postcondition;
-    /** Already true when the step begins (the arpeggiator is on): the note offers
-        "<alreadyLabel> · Continue" instead of making the task impossible. */
+    /** The control opens a menu: its choice arrives after the touch (a dropdown). The step then
+        waits a little for the postcondition (only steps that say so: elsewhere a touch that
+        changed nothing completes nothing, whatever follows). */
+    bool choiceFollows = false;
+    /** Already true when the step begins (the arpeggiator is on): the note says so in a small
+        status line (`alreadyLabel`, a sentence: "The arpeggiator is already open.") and offers
+        Continue, instead of making the task impossible or asking for it again. */
     std::optional<Condition> alreadyDone;
     juce::String alreadyLabel;
 
@@ -118,6 +128,19 @@ struct Completion
         c.postcondition = std::move (post);
         return c;
     }
+    /** `when` already holds: `status` ("The arpeggiator is already open.") and Continue. */
+    Completion viaMenu() const
+    {
+        auto c = *this;
+        c.choiceFollows = true;
+        return c;
+    }
+    Completion forParameter (juce::String id) const
+    {
+        auto c = *this;
+        c.parameterId = std::move (id);
+        return c;
+    }
     Completion withAlreadyDone (Condition when, juce::String label) const
     {
         auto c = *this;
@@ -127,33 +150,72 @@ struct Completion
     }
 };
 
+/**
+    Something a step needs before its task can be done or its sound heard: card C able to play,
+    the MORPH rack open, the arpeggiator off, audio arriving at the sidechain. Checked on the
+    real state while the step shows; while it fails, the step cannot complete (nor can Next or
+    Continue move on), and the note says what is missing, highlights where to fix it and offers
+    the fix - never Skip. The musician fixes it; nothing is changed for them.
+*/
+struct Requirement
+{
+    juce::String id;               ///< "hybrid.C.ready" (a name for tests and logs)
+    Condition holds;               ///< what must be true
+    juce::String title, body;      ///< "A sound is needed" / what is missing and how to fix it
+    juce::String targetId;         ///< the control that fixes it (highlighted; empty: none)
+    juce::String fixLabel;         ///< a key that opens `targetId` ("Open Rack", "Choose Source"; empty: none)
+    bool offerExample = true;      ///< offer Load Example Sound (when the lesson has one)
+};
+
 struct Step
 {
     juce::String id, title, body;
-    juce::String targetId;         ///< what the note points at (empty: no target, centred)
+    juce::String targetId;         ///< the exact control the note points at (empty: no target, centred)
     juce::String unavailableBody;  ///< said while the target cannot be shown (empty: a generic line)
+    juce::String revealLabel;      ///< the key that opens a hidden target ("Open Rack"; empty: "Open")
+    juce::String doneText;         ///< the status line once done ("OSC 1 now plays sustained notes.")
     Completion completion;
     bool optional = false;
     /** The step opens what its target needs when it begins (the ARP panel for PATTERN). Off
-        when opening it is the task itself: the note's "Show me" does it instead. */
+        when opening it is the task itself: the note's reveal key does it instead. */
     bool revealOnEnter = true;
-    /** Said instead of `body` while this holds (MORPH with nothing playable in card C). */
+    /** Said instead of `body` while this holds. */
     std::optional<Condition> variantWhen;
     juce::String variantBody;
+    /** What the step needs (checked live; see Requirement). */
+    std::vector<Requirement> requirements;
+    /** The lesson's preparation ("Set up the lesson"): its requirements are the sound the
+        lesson needs. Met: Use Current Sound first (Continue at once). Not met: what is missing,
+        and Load Example Sound first. Never blocks: later steps check their own. */
+    bool preparation = false;
+    /** Other targets the note must not cover while this step shows (controls the task uses). */
+    juce::StringArray keepClear;
+    /** Done, it moves straight on (a right-click whose menu is open: Next could not be pressed
+        without closing it). */
+    bool advanceWhenDone = false;
+    /** The target is outlined (off: the note only sits by it - while the instruction is about a
+        menu item the outline cannot reach). */
+    bool outlineTarget = true;
 };
 
 struct Lesson
 {
     juce::String id;          ///< "analog.arp.basics" (stable: progress is kept under it)
     int revision = 1;
-    juce::String title;       ///< "Make a moving pattern"
-    juce::String group;       ///< the browser's group ("Arpeggiator")
+    juce::String title;       ///< "Make an arpeggio"
+    juce::String description; ///< the browser's line under the title ("Turn held notes into a repeating pattern")
+    juce::String group;       ///< the note's small label ("ARPEGGIATOR")
     juce::String capability;  ///< required product capability (empty: none)
     int minutes = 0;          ///< an estimate for the browser (0: none shown)
+    /** A bundled example sound for this lesson (the product's; empty: none). Loaded only when
+        the musician asks; the sound before it is kept and can be restored. */
+    juce::String exampleId;
+    /** What the completion note says. */
+    juce::String completionText;
     std::vector<Step> steps;
 };
 
-/** Contextual help for a region in Learn mode. */
+/** Contextual help for a region (Info). */
 struct HelpTopic
 {
     juce::String targetId;

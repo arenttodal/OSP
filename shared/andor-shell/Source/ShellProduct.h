@@ -39,6 +39,11 @@ struct LearnDescriptor
     std::function<void (andor::learn::TargetRegistry&, ShellEditor&)> registerTargets;
     /** Whether the product has a capability a lesson needs (null: none). */
     std::function<bool (const juce::String& capability, osp::plugin::InstrumentHost&)> hasCapability;
+    /** A lesson's example sound (Lesson::exampleId) as the product's whole saved state, built
+        from the product's own bundled material (no outside files, no third-party instruments,
+        no sidechain); null: no example by that ID. Loaded only on the musician's choice, the
+        sound before it kept for Restore Previous Sound. */
+    std::function<std::unique_ptr<juce::XmlElement> (const juce::String& exampleId, osp::plugin::InstrumentHost&)> exampleState;
 };
 
 /**

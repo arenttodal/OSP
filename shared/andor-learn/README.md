@@ -1,12 +1,19 @@
-# ANDOR Learn: guided lessons and Learn mode for shell products
+# ANDOR Learn: guided lessons and Info for shell products
 
 ANDOR Learn adds a temporary teaching layer to a product built from the ANDOR Instrument Shell:
 
-- short **lessons** the musician does with the real controls;
-- a contextual **Learn mode** (click an area to have it explained);
-- a **topic browser**;
+- short **lessons** the musician does with the real controls, each step outlining the exact
+  control in green and checking the real state before it moves on;
+- **Info** (Toggle Info: point to or click an area to read about it);
+- a **lesson browser** (Tutorials...);
 - a **one-time invitation**;
-- **per-user progress**.
+- **per-user progress**;
+- optional **example sounds** a lesson can offer, loaded only on the musician's choice, with the
+  sound before them kept for **Restore Previous Sound**.
+
+The menu has one entry, **Learn**, holding **Tutorials...**, **Toggle Info** and
+**Reset Tutorials...** (and **Restore Previous Sound** while one is kept). There is no Skip: the X
+exits, Back goes back, Next / Continue move on once the task is done or already so.
 
 It is native JUCE: no web view, no network, no analytics, no synthetic clicks or notes, and no parameter. A product without a catalog (ANDOR OSP's shell products by default) is exactly as before: no menu item, no invitation, no component and no event.
 
@@ -21,17 +28,23 @@ It is native JUCE: no web view, no network, no analytics, no synthetic clicks or
 | Action IDs | `core/ActionEvents.h` | The IDs the shared interface reports |
 | Targets | `juce/LearnTargetRegistry.*` | Semantic target → locator, part, reveal, readiness; named UI states |
 | Touches | `juce/LearnActionBridge.*` | `TouchWatcher`: a mouse listener reporting a control's touches as user events, holding the baseline while pressed |
-| Overlay | `juce/LearnOverlay.*` | `HighlightLayer` (paint-only, never intercepts), `Note` (the ceramic note), `HitRegion` (Learn mode only) |
-| Browser | `juce/LearnBrowser.*` | The topic chooser |
+| Overlay | `juce/LearnOverlay.*` | `HighlightLayer` (the green outline and connector; paint-only, never intercepts), `Note` (the ceramic note: label, STEP n OF N, title, text, status line, keys), `HitRegion` (Info only) |
+| Browser | `juce/LearnBrowser.*` | The lesson browser (START HERE, LESSONS, Resume / check) |
 | Controller | `juce/LearnController.*` | One per editor: wires everything; created by `ShellEditor` only when `ProductInfo::learn` is set |
 
 ### How a step completes
 
 A step completes only when all of these hold:
 
-1. a **user-origin event** of its own generation arrives;
-2. the event is among the step's **accepted actions**;
-3. the step's **postcondition** holds afterwards.
+1. everything it **requires** holds (`Step::requirements`: real readiness - a playable source,
+   audio arriving, a rack open); while one fails the step is **blocked**: the note says what is
+   missing, outlines the control that fixes it and offers the fix (and the lesson's example, if
+   it has one) - never Skip;
+2. a **user-origin event** of its own generation arrives (for a `parameterId` step, about that
+   control);
+3. the event is among the step's **accepted actions**;
+4. the step's **postcondition** holds afterwards (a dropdown's step, `viaMenu()`, waits a little
+   for the menu's choice that follows the click).
 
 The baseline of a "changed" postcondition follows the parameter while no gesture is under way. So automation, a preset or undo between gestures never counts as the musician's change.
 
@@ -67,7 +80,7 @@ The baseline of a "changed" postcondition follows the parameter while no gesture
    t.add ({ "my.part", [e] { return e->sourceViewComponent(); },            // part of it
             [e] (juce::Component& c) { return dynamic_cast<MyView&> (c).partBounds(); },
             [e] { e->setSourceViewShown (true); return e->sourceViewShown(); },   // reveal: navigation only
-            {}, /* Learn mode region */ true, /* report touches */ true });
+            {}, /* Info region */ true, /* report touches */ true });
    t.addState ("my.view.open", [e] { return /* a UI state */ true; });
    ```
 
@@ -85,12 +98,25 @@ The baseline of a "changed" postcondition follows the parameter while no gesture
    ```
 
    - **`Completion::manual()`** is an explanation step: the musician presses Next.
-   - **`withAlreadyDone (condition, "Already on")`** offers Continue when the task is already done.
-   - **`revealOnEnter = false`** when opening the target is the task itself: Show me opens it instead.
+   - **`withAlreadyDone (condition, "ARP is already on.")`**: a status line and Continue when the
+     task is already done (a sentence, never inside a key).
+   - **`doneText`**: the status line once done ("OSC 1 now plays sustained notes.").
+   - **`requirements`**: what the step needs (see above); **`preparation`**: the lesson's "Set
+     up the lesson" step (Use Current Sound / Load Example Sound; `Lesson::exampleId`).
+   - **`revealOnEnter = false`** when opening the target is the task itself; `revealLabel` names
+     the key that opens a hidden target ("Open Rack", "Show AUX").
+   - **`keepClear`**: other controls the note must not cover; **`outlineTarget = false`** when the
+     instruction is about a menu item the outline cannot reach; **`advanceWhenDone`** when the
+     task opens a menu (Next would close it).
    - **`unavailableBody`** is what the note says while the target cannot be shown.
-   - **`variantWhen` / `variantBody`** give an alternative text for a state (nothing to play, say).
 
-6. **Write help** for Learn mode: `HelpTopic { targetId, title, body, lessonId }`. With no lesson, there is no Start button.
+6. **Write help** for Info: `HelpTopic { targetId, title, body, lessonId }`. With no lesson, there is no Start button.
+
+   Exact targets: a control can be found by the parameter it edits
+   (`osp::plugin::binding::findControl (root, parameterId)`: a rack's knob, switch or selector,
+   a card dial, a macro knob, a tagged strip control); a part of one by its own area
+   (`SegmentedSwitch::segmentBounds`). Never a fixed rectangle, never a whole rack or card for one
+   control.
 
 7. **Test.** `tests/shell/LearnTests.cpp` runs with every product: the catalog must be valid against the editor's targets, and Learn must be idle until asked. Add product tests that drive the real controls (see ANDOR Analog's `product/tests/AnalogLearnTests.cpp`).
 
@@ -98,8 +124,8 @@ The baseline of a "changed" postcondition follows the parameter while no gesture
 
 ## Rules
 
-- **Interface only.** Reveals open panels, select tabs and show views; they never write a parameter. A test drives every lesson's Show me, Skip, Back and Close and checks every parameter is unchanged.
+- **Interface only.** Reveals open panels, select tabs and show views; they never write a parameter. The one exception is an example sound, loaded only when the musician chooses Load Example Sound, with the complete sound before it kept for Restore (X never restores or replaces anything). A test drives every lesson step's keys and checks every parameter is unchanged.
 - **Message thread only.** Nothing touches the audio thread. Learn adds no timer of its own (the editor's existing one calls `tick()`, which returns at once while idle) and no child component until something is shown.
-- **Gone when closed.** Closing the note, the browser or Learn mode removes their components.
-- **Escape order:** the note, then the browser, then Learn mode, then the editor's popover.
+- **Gone when closed.** Closing the note, the browser or Info removes their components.
+- **Escape order:** the note, then the browser, then Info, then the editor's popover.
 - **Never advertise unshipped features.** Gate lessons by capability.
