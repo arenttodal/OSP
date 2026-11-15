@@ -31,6 +31,12 @@ namespace
                 for (const auto& t : c.terms)
                     checkCondition (t, checks, where, problems);
                 break;
+            case Condition::Kind::negation:
+                if (c.terms.size() != 1)
+                    problems.add (where + ": a negation needs exactly one term");
+                for (const auto& t : c.terms)
+                    checkCondition (t, checks, where, problems);
+                break;
         }
     }
 } // namespace
@@ -77,6 +83,22 @@ juce::StringArray validate (const Catalog& catalog, const CatalogChecks& checks)
                 if (step.variantBody.isEmpty())
                     problems.add (where + ": a variant without its text");
             }
+            for (const auto& r : step.requirements)
+            {
+                const auto rw = where + " (needs " + r.id + ")";
+                checkCondition (r.holds, checks, rw, problems);
+                if (r.title.isEmpty() || r.body.isEmpty())
+                    problems.add (rw + ": a requirement must say what is missing (title and text)");
+                if (r.targetId.isNotEmpty() && checks.targetKnown != nullptr && ! checks.targetKnown (r.targetId))
+                    problems.add (rw + ": unknown target " + r.targetId);
+                if (r.fixLabel.isNotEmpty() && r.targetId.isEmpty())
+                    problems.add (rw + ": a fix key with nothing to open");
+            }
+            for (const auto& t : step.keepClear)
+                if (checks.targetKnown != nullptr && ! checks.targetKnown (t))
+                    problems.add (where + ": unknown target to keep clear " + t);
+            if (step.preparation && lesson.exampleId.isEmpty())
+                problems.add (where + ": a preparation step in a lesson with no example sound");
         }
     }
     for (const auto& help : catalog.help)

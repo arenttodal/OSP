@@ -1,7 +1,6 @@
 #include "LearnController.h"
 
 #include <algorithm>
-#include <cmath>
 
 namespace andor::learn
 {
@@ -43,7 +42,7 @@ void LearnController::finishSetup()
     CatalogChecks checks;
     checks.targetKnown = [this] (const juce::String& id) { return registry.contains (id); };
     checks.stateKnown = [this] (const juce::String& id) { return registry.hasState (id); };
-    checks.parameterKnown = [this] (const juce::String& id) { return hooks.parameterValue != nullptr && hooks.parameterValue (id).has_value(); };
+    checks.parameterKnown = [this] (const juce::String& id) { return registry.hasValue (id) || (hooks.parameterValue != nullptr && hooks.parameterValue (id).has_value()); };
     setupProblems = validate (offered, checks);
     usable = setupProblems.isEmpty();
     if (! usable)
@@ -79,27 +78,33 @@ void LearnController::addMenuItems (juce::PopupMenu& menu)
         menu.addItem ("Learn (unavailable)", false, false, [] {});
         return;
     }
-    // The same section in every ANDOR product: LEARN, Tutorials..., Toggle Info, Reset Tutorials...
+    // One entry: Learn, with Tutorials..., Toggle Info and Reset Tutorials... inside.
     juce::WeakReference<LearnController> weak (this);
-    menu.addSectionHeader ("LEARN");
-    menu.addItem ("Tutorials" + ellipsis(), [weak] {
+    juce::PopupMenu sub;
+    sub.addSectionHeader ("LEARN");
+    sub.addItem ("Tutorials" + ellipsis(), [weak] {
         if (weak != nullptr)
             weak->openBrowser();
     });
-    menu.addItem ("Toggle Info", true, inspecting, [weak] {
+    sub.addItem ("Toggle Info", true, inspecting, [weak] {
         if (weak != nullptr)
             weak->setLearnMode (! weak->inspecting);
     });
-    if (hooks.canRestore != nullptr && hooks.canRestore())
-        menu.addItem ("Restore Sound Before Tutorial", [weak] {
+    if (hooks.canRestoreSound != nullptr && hooks.canRestoreSound())
+    {
+        // (while the sound kept before an example can still be brought back)
+        sub.addSeparator();
+        sub.addItem ("Restore Previous Sound", [weak] {
             if (weak != nullptr)
                 weak->restorePreviousSound();
         });
-    menu.addSeparator();
-    menu.addItem ("Reset Tutorials" + ellipsis(), [weak] {
+    }
+    sub.addSeparator();
+    sub.addItem ("Reset Tutorials" + ellipsis(), [weak] {
         if (weak != nullptr)
-            weak->askToResetProgress();
+            weak->confirmResetProgress();
     });
+    menu.addSubMenu ("Learn", sub);
 }
 
 void LearnController::userAction (const juce::String& actionId, const juce::String& targetId, const juce::String& parameterId, Origin origin)
@@ -164,8 +169,6 @@ void LearnController::tick()
     }
     if (! isActive())
         return;
-    if (shownNote == NoteKind::preparing)
-        updatePreparing();
     // Controls rebuilt since (a routing view created on demand) are watched again.
     for (auto& w : watchers)
         if (const auto* t = registry.find (w->targetId()))
@@ -181,7 +184,7 @@ bool LearnController::isActive() const noexcept
 }
 
 //==============================================================================
-bool LearnController::startLesson (const juce::String& lessonId)
+bool LearnController::startLesson (const juce::String& lessonId, int fromStep)
 {
     if (! usable || lessonRunner.catalog().findLesson (lessonId) == nullptr)
         return false;
@@ -191,147 +194,11 @@ bool LearnController::startLesson (const juce::String& lessonId)
     if (hooks.closePopovers != nullptr)
         hooks.closePopovers();
     ensureLayers();
-    return beginLesson (lessonId, 0);
-}
-
-bool LearnController::startLessonAt (const juce::String& lessonId, int stepIndex)
-{
-    if (! usable || lessonRunner.catalog().findLesson (lessonId) == nullptr)
-        return false;
-    closeBrowser();
-    if (inspecting)
-        setLearnMode (false);
-    if (hooks.closePopovers != nullptr)
-        hooks.closePopovers();
-    ensureLayers();
-    return beginLesson (lessonId, stepIndex);
-}
-
-bool LearnController::beginLesson (const juce::String& lessonId, int fromStep)
-{
-    const auto* lesson = lessonRunner.catalog().findLesson (lessonId);
-    if (lesson == nullptr)
-        return false;
-    const auto& prep = lesson->preparation;
-    const bool ready = ! prep.ready.has_value() || conditionHolds (*prep.ready);
-    const bool canLoad = prep.exampleId.isNotEmpty() && hooks.loadExample != nullptr;
-    if (! ready || (canLoad && prep.offerExampleWhen.has_value() && conditionHolds (*prep.offerExampleWhen)))
-    {
-        // Ask first: the musician's sound is never replaced without their choice.
-        preparingLesson = lessonId;
-        preparingStep = fromStep;
-        prepareFailed = false;
-        showNote (NoteKind::prepare);
-        return true;
-    }
+    exampleFailed = false;
     if (! lessonRunner.start (lessonId, fromStep))
         return false;
     showNote (NoteKind::lesson);
     return true;
-}
-
-bool LearnController::conditionHolds (const Condition& c)
-{
-    switch (c.kind)
-    {
-        case Condition::Kind::always: return true;
-        case Condition::Kind::parameterChanged: return false;   // (no baseline before a lesson)
-        case Condition::Kind::parameterEquals:
-        {
-            const auto v = parameterValue (c.id);
-            return v.has_value() && std::abs (*v - c.value) < 0.5f;
-        }
-        case Condition::Kind::state: return state (c.id);
-        case Condition::Kind::all:
-            for (const auto& t : c.terms)
-                if (! conditionHolds (t))
-                    return false;
-            return ! c.terms.empty();
-        case Condition::Kind::any:
-            for (const auto& t : c.terms)
-                if (conditionHolds (t))
-                    return true;
-            return false;
-    }
-    return false;
-}
-
-void LearnController::loadExampleFor (const juce::String& lessonId)
-{
-    const auto* lesson = lessonRunner.catalog().findLesson (lessonId);
-    if (lesson == nullptr || hooks.loadExample == nullptr)
-        return;
-    prepareFailed = ! hooks.loadExample (lesson->preparation.exampleId);
-    exampleLoaded = exampleLoaded || ! prepareFailed;
-    preparingTicks = 0;
-    showNote (prepareFailed ? NoteKind::prepare : NoteKind::preparing);
-}
-
-void LearnController::updatePreparing()
-{
-    // The lesson begins once the example is really playable (loaded and analysed), never on
-    // the request alone.
-    const auto* lesson = lessonRunner.catalog().findLesson (preparingLesson);
-    if (lesson == nullptr)
-    {
-        hideNote();
-        return;
-    }
-    ++preparingTicks;
-    if (hooks.exampleFailed != nullptr && hooks.exampleFailed())
-    {
-        prepareFailed = true;
-        showNote (NoteKind::prepare);
-        return;
-    }
-    const auto& prep = lesson->preparation;
-    if ((! prep.ready.has_value() || conditionHolds (*prep.ready)) && (hooks.exampleReady == nullptr || hooks.exampleReady()))
-    {
-        const auto id = preparingLesson;
-        preparingLesson = {};
-        if (lessonRunner.start (id, preparingStep))
-            showNote (NoteKind::lesson);
-        else
-            hideNote();
-    }
-}
-
-bool LearnController::restorePreviousSound()
-{
-    exampleLoaded = false;
-    if (hooks.canRestore == nullptr || ! hooks.canRestore() || hooks.restore == nullptr)
-        return false;
-    return hooks.restore();
-}
-
-void LearnController::offerRestoreIfExample()
-{
-    // Closing a tutorial never restores by itself (the musician may want what they made); it
-    // asks, once, while the sound from before the example can really be restored.
-    if (! exampleLoaded || hooks.canRestore == nullptr || ! hooks.canRestore())
-        return;
-    ensureLayers();
-    showNote (NoteKind::restoreOffer);
-}
-
-juce::String LearnController::productName() const
-{
-    return hooks.productName.isNotEmpty() ? hooks.productName : juce::String ("this instrument");
-}
-
-void LearnController::askToResetProgress()
-{
-    if (! usable)
-        return;
-    if (lessonRunner.inTour())
-        lessonRunner.close();
-    closeBrowser();
-    if (inspecting)
-        setLearnMode (false);
-    if (hooks.closePopovers != nullptr)
-        hooks.closePopovers();
-    ensureLayers();
-    showNote (NoteKind::confirmReset);
 }
 
 void LearnController::openBrowser()
@@ -355,9 +222,13 @@ void LearnController::openBrowser()
         browserPanel->onChoose = [this] (const juce::String& chosen) { chooseLesson (chosen); };
         hooks.content->addAndMakeVisible (*browserPanel);
     }
+    progress = progressStore.read();   // (another instance of the plugin may have moved on)
     browserPanel->setRows (browserRows());
     lessonRunner.setBrowsing (true);
     layoutNow();
+    // The arrow keys and Return go to the list while it is open (Escape still closes it).
+    if (browserPanel->isShowing())
+        browserPanel->grabKeyboardFocus();
 }
 
 void LearnController::chooseLesson (juce::String lessonId)
@@ -371,7 +242,9 @@ void LearnController::chooseLesson (juce::String lessonId)
     ensureLayers();
     if (hooks.closePopovers != nullptr)
         hooks.closePopovers();
-    beginLesson (lessonId, from);
+    exampleFailed = false;
+    if (lessonRunner.start (lessonId, from))
+        showNote (NoteKind::lesson);
 }
 
 void LearnController::closeBrowser()
@@ -398,7 +271,10 @@ void LearnController::setLearnMode (bool on)
         ensureLayers();
         inspecting = true;
         bannerNote = std::make_unique<Note>();
-        bannerNote->setContent ({}, "Info", "Click a control to learn what it does" + dot() + "Esc to exit", {}, false);
+        Note::Content banner;
+        banner.title = "Info";
+        banner.body = "Point to an area to outline it; click it to read about it." + dot() + "Esc to exit";
+        bannerNote->setContent (std::move (banner));
         bannerNote->onAction = [this] (const juce::String&) { setLearnMode (false); };
         hooks.content->addAndMakeVisible (*bannerNote);
         lessonRunner.setInspecting (true);
@@ -429,12 +305,35 @@ void LearnController::inspect (const juce::String& targetId)
     showNote (NoteKind::help);
 }
 
+void LearnController::confirmResetProgress()
+{
+    if (! usable)
+        return;
+    if (lessonRunner.inTour())
+        lessonRunner.close();
+    closeBrowser();
+    if (inspecting)
+        setLearnMode (false);
+    if (hooks.closePopovers != nullptr)
+        hooks.closePopovers();
+    ensureLayers();
+    showNote (NoteKind::confirmReset);
+}
+
 void LearnController::resetProgress()
 {
+    // The lessons' records only: no tutorial starts, no sound or preset changes.
     progressStore.reset();
     progress = progressStore.read();
     if (browserPanel != nullptr)
         browserPanel->setRows (browserRows());
+}
+
+bool LearnController::restorePreviousSound()
+{
+    if (hooks.canRestoreSound == nullptr || ! hooks.canRestoreSound() || hooks.restoreSound == nullptr)
+        return false;
+    return hooks.restoreSound();
 }
 
 void LearnController::showInvitation()
@@ -471,56 +370,32 @@ void LearnController::noteAction (const juce::String& id)
                 lessonRunner.back();
             else if (id == "continue")
                 lessonRunner.continueAlreadyDone();
+            else if (id == "current")
+                lessonRunner.useCurrentSound();
+            else if (id == "example")
+            {
+                // The musician chose it: the sound before it is kept (Restore Previous Sound).
+                exampleFailed = ! lessonRunner.loadExample();
+                noteSignature = {};
+                refreshNote();
+            }
             else if (id == "showme")
                 lessonRunner.showMe();
+            else if (id == "fix")
+                lessonRunner.revealRequirement();
             else if (id == "close")
             {
+                // X: out at once. Nothing is restored or replaced (Restore stays in the menu).
                 lessonRunner.close();
                 hideNote();
-                offerRestoreIfExample();
             }
-            break;
-        case NoteKind::prepare:
-            if (id == "loadexample")
-                loadExampleFor (preparingLesson);
-            else if (id == "usemine")
-            {
-                const auto lessonId = preparingLesson;
-                preparingLesson = {};
-                if (lessonRunner.start (lessonId, preparingStep))
-                    showNote (NoteKind::lesson);
-                else
-                    hideNote();
-            }
-            else
-            {
-                preparingLesson = {};
-                hideNote();
-            }
-            break;
-        case NoteKind::preparing:
-            preparingLesson = {};
-            hideNote();   // (the example goes on loading; the previous sound stays restorable)
-            offerRestoreIfExample();
-            break;
-        case NoteKind::restoreOffer:
-            hideNote();
-            if (id == "restore")
-                restorePreviousSound();
-            else
-                exampleLoaded = false;   // (kept: not asked again; the menu still offers it)
-            break;
-        case NoteKind::confirmReset:
-            hideNote();
-            if (id == "reset")
-                resetProgress();
             break;
         case NoteKind::help:
             if (id.startsWith ("start:"))
                 startLesson (id.fromFirstOccurrenceOf ("start:", false, false));
             else if (id == "open")
             {
-                // The controls are for using: Learn mode steps aside first.
+                // The controls are for using: Info steps aside first.
                 const auto target = helpTarget;
                 setLearnMode (false);
                 registry.reveal (target);
@@ -543,11 +418,16 @@ void LearnController::noteAction (const juce::String& id)
                 openBrowser();
             break;
         case NoteKind::complete:
+            if (id == "restore")
+                restorePreviousSound();
             hideNote();
             if (id == "browse")
                 openBrowser();
-            else if (id == "restore")
-                restorePreviousSound();
+            break;
+        case NoteKind::confirmReset:
+            hideNote();
+            if (id == "reset")
+                resetProgress();
             break;
         case NoteKind::none:
             break;
@@ -576,17 +456,20 @@ void LearnController::hideNote()
     notePanel.reset();
     shownNote = NoteKind::none;
     noteSignature = {};
+    lastScrolledTarget = {};
     if (ring != nullptr)
+    {
         ring->setTarget (std::nullopt, false);
+        ring->setConnector (std::nullopt);
+    }
 }
 
 void LearnController::refreshNote()
 {
     if (notePanel == nullptr)
         return;
-    juce::String meta, title, body;
-    std::vector<Note::Action> keys;
-    bool done = false;
+    Note::Content c;
+    auto& keys = c.actions;
     if (shownNote == NoteKind::lesson)
     {
         const auto state = lessonRunner.state();
@@ -598,6 +481,9 @@ void LearnController::refreshNote()
             return;
         }
     }
+    auto nextKey = [this] {
+        return lessonRunner.isLastStep() ? Note::Action { "finish", "Finish", true } : Note::Action { "next", "Next", true };
+    };
     switch (shownNote)
     {
         case NoteKind::lesson:
@@ -605,30 +491,77 @@ void LearnController::refreshNote()
             const auto* lesson = lessonRunner.lesson();
             const auto* step = lessonRunner.step();
             const int i = lessonRunner.stepIndex(), n = static_cast<int> (lesson->steps.size());
-            meta = lesson->title.toUpperCase() + "   " + juce::String (i + 1) + " / " + juce::String (n);
-            title = step->title;
-            body = lessonRunner.currentBody();
+            c.meta = (lesson->group.isNotEmpty() ? lesson->group : lesson->title).toUpperCase();
+            c.step = "STEP " + juce::String (i + 1) + " OF " + juce::String (n);
             const auto state = lessonRunner.state();
-            const auto* target = registry.find (step->targetId);
-            const bool canShow = target != nullptr && target->reveal != nullptr;
-            // No Skip: X closes, Back revisits, Continue follows a read explanation or a task
-            // done (or already so). A task is never passed over.
+            const bool hasExample = lesson->exampleId.isNotEmpty();
             if (i > 0)
                 keys.push_back ({ "back", "Back", false });
-            if (state == LessonRunner::State::tourShowing)
-                keys.push_back ({ lessonRunner.isLastStep() ? "finish" : "next", lessonRunner.isLastStep() ? "Finish" : "Continue", true });
-            else if (state == LessonRunner::State::stepComplete)
+            if (step->preparation)
             {
-                done = true;
-                keys.push_back ({ lessonRunner.isLastStep() ? "finish" : "next", lessonRunner.isLastStep() ? "Finish" : "Continue", true });
+                // Set up the lesson: the current sound, or the lesson's example.
+                c.title = step->title;
+                c.body = step->body;
+                if (lessonRunner.preparationReady())
+                {
+                    c.status = "Your current sound is ready for this lesson.";
+                    keys.push_back ({ "example", "Load Example Sound", false });
+                    keys.push_back ({ "current", "Use Current Sound", true });
+                }
+                else
+                {
+                    if (const auto* missing = lessonRunner.unmetRequirement())
+                        c.status = missing->body;
+                    keys.push_back ({ "current", "Use Current Sound", false });
+                    keys.push_back ({ "example", "Load Example Sound", true });
+                }
+            }
+            else if (state == LessonRunner::State::blocked)
+            {
+                // Something the step needs is missing: say what, point at the fix, offer it.
+                const auto* missing = lessonRunner.unmetRequirement();
+                c.title = missing != nullptr ? missing->title : step->title;
+                c.body = missing != nullptr ? missing->body : step->body;
+                const bool example = missing != nullptr && missing->offerExample && hasExample;
+                if (missing != nullptr && missing->fixLabel.isNotEmpty())
+                    keys.push_back ({ "fix", missing->fixLabel, ! example });
+                if (example)
+                    keys.push_back ({ "example", "Load Example Sound", true });
             }
             else
             {
-                if (canShow && lessonRunner.lessonReady() && (! step->revealOnEnter || state == LessonRunner::State::paused))
-                    keys.push_back ({ "showme", "Show me", false });
-                if (lessonRunner.canContinue())
-                    keys.push_back ({ "continue", (step->completion.alreadyLabel.isNotEmpty() ? step->completion.alreadyLabel : juce::String ("Already done")) + dot() + "Continue", true });
+                c.title = step->title;
+                c.body = lessonRunner.currentBody();
+                const auto* target = registry.find (step->targetId);
+                const bool canShow = target != nullptr && target->reveal != nullptr;
+                const auto revealLabel = step->revealLabel.isNotEmpty() ? step->revealLabel : juce::String ("Open");
+                if (state == LessonRunner::State::tourShowing)
+                    keys.push_back (nextKey());
+                else if (state == LessonRunner::State::stepComplete)
+                {
+                    c.done = true;
+                    c.status = step->doneText.isNotEmpty() ? step->doneText : juce::String ("Done.");
+                    keys.push_back (nextKey());
+                }
+                else if (lessonRunner.canContinue())
+                {
+                    // Already so: a status line, and Continue (never a sentence in a key).
+                    c.status = step->completion.alreadyLabel.isNotEmpty() ? step->completion.alreadyLabel : juce::String ("This is already set.");
+                    keys.push_back ({ "continue", "Continue", true });
+                }
+                else if (state == LessonRunner::State::paused)
+                {
+                    c.title = "Open the controls";
+                    c.body = step->unavailableBody.isNotEmpty() ? step->unavailableBody
+                                                                : juce::String ("The control for this step is inside the closed rack. Open the rack to continue.");
+                    if (canShow)
+                        keys.push_back ({ "showme", revealLabel, true });
+                }
+                else if (canShow && ! step->revealOnEnter && ! registry.ready (step->targetId, *hooks.content))
+                    keys.push_back ({ "showme", revealLabel, false });
             }
+            if (exampleFailed)
+                c.status = juce::String::fromUTF8 ("The example sound couldn\xe2\x80\x99t be loaded. Your sound hasn\xe2\x80\x99t changed.");
             break;
         }
         case NoteKind::help:
@@ -639,116 +572,68 @@ void LearnController::refreshNote()
                 hideNote();
                 return;
             }
-            meta = "INFO";
-            title = help->title;
-            body = help->body;
+            c.meta = "INFO";
+            c.title = help->title;
+            c.body = help->body;
             const auto* target = registry.find (helpTarget);
             if (target != nullptr && target->reveal != nullptr)
-                keys.push_back ({ "open", "Open controls", false });
+                keys.push_back ({ "open", "Open Controls", false });
             keys.push_back ({ "close", "Close", help->lessonId.isEmpty() });
             if (help->lessonId.isNotEmpty())
-                keys.push_back ({ "start:" + help->lessonId, "Start lesson", true });
+                keys.push_back ({ "start:" + help->lessonId, "Start Lesson", true });
             break;
         }
         case NoteKind::invitation:
-            title = "Find your sound.";
-            body = "Learn the instrument as you play.";
+            c.title = "Learn ANDOR";
+            c.body = "Explore the main controls or follow a short lesson using the instrument itself.";
             if (! lessonRunner.catalog().lessons.empty())
             {
+                keys.push_back ({ "notnow", "Not Now", false });
+                keys.push_back ({ "browse", "Tutorials", false });
                 const auto quick = lessonRunner.catalog().quickStartLessonId;
                 const auto* first = lessonRunner.catalog().findLesson (quick.isNotEmpty() ? quick : lessonRunner.catalog().lessons.front().id);
-                keys.push_back ({ "notnow", "Not now", false });
-                keys.push_back ({ "browse", "Tutorials", false });
                 keys.push_back ({ "quickstart", quick.isNotEmpty() ? juce::String ("Quick Start") : first->title, true });
             }
             else
-                keys.push_back ({ "notnow", "Not now", true });
+                keys.push_back ({ "notnow", "Not Now", true });
             break;
         case NoteKind::complete:
         {
             const auto* lesson = lessonRunner.lesson();
-            meta = lesson != nullptr ? lesson->title.toUpperCase() : juce::String();
-            title = "Lesson complete";
-            body = lesson != nullptr && lesson->completion.isNotEmpty()
-                       ? lesson->completion
-                       : juce::String::fromUTF8 ("Your sound stays as you left it. More lessons are under Tutorials\xe2\x80\xa6 in the menu.");
-            keys.push_back ({ "browse", "Tutorials", false });
-            if (hooks.canRestore != nullptr && hooks.canRestore())
-                keys.push_back ({ "restore", "Restore previous sound", false });
-            keys.push_back ({ "close", "Close", true });
-            break;
-        }
-        case NoteKind::prepare:
-        {
-            const auto* lesson = lessonRunner.catalog().findLesson (preparingLesson);
-            if (lesson == nullptr)
+            c.meta = lesson != nullptr ? (lesson->group.isNotEmpty() ? lesson->group : lesson->title).toUpperCase() : juce::String();
+            c.title = "Lesson complete";
+            c.body = lesson != nullptr && lesson->completionText.isNotEmpty()
+                         ? lesson->completionText
+                         : juce::String::fromUTF8 ("You\xe2\x80\x99ve finished this lesson. Choose another tutorial or return to the instrument.");
+            if (lesson != nullptr && lesson->exampleId.isNotEmpty() && hooks.canRestoreSound != nullptr && hooks.canRestoreSound())
             {
-                hideNote();
-                return;
-            }
-            const auto& prep = lesson->preparation;
-            const bool ready = ! prep.ready.has_value() || conditionHolds (*prep.ready);
-            const bool canLoad = prep.exampleId.isNotEmpty() && hooks.loadExample != nullptr;
-            const auto example = prep.exampleName.isNotEmpty() ? prep.exampleName : juce::String ("the example");
-            meta = lesson->title.toUpperCase();
-            if (prepareFailed)
-            {
-                title = "The example could not be loaded";
-                body = "Your sound is unchanged. You can load a recording of your own and start the lesson again.";
-                keys.push_back ({ "close", "Close", true });
-                break;
-            }
-            title = ready ? "Use your sound or an example?" : "Before this lesson";
-            body = ready ? "The lesson works with the sound you have. " + example + " is prepared for it."
-                         : (prep.needs.isNotEmpty() ? prep.needs : juce::String ("This lesson needs a different sound."));
-            if (canLoad)
-                body << " Loading " << example << " keeps your current sound so you can restore it afterwards.";
-            if (ready)
-            {
-                keys.push_back ({ "loadexample", "Load " + example, false });
-                keys.push_back ({ "usemine", "Use my sound", true });
+                // The lesson played on its example: keep it, or bring back the sound from before.
+                keys.push_back ({ "restore", "Restore Previous Sound", false });
+                keys.push_back ({ "keep", "Keep Example Sound", true });
             }
             else
             {
-                keys.push_back ({ "close", "Not now", ! canLoad });
-                if (canLoad)
-                    keys.push_back ({ "loadexample", "Load " + example, true });
+                keys.push_back ({ "browse", "Tutorials", false });
+                keys.push_back ({ "close", "Close", true });
             }
             break;
         }
-        case NoteKind::preparing:
-        {
-            const auto* lesson = lessonRunner.catalog().findLesson (preparingLesson);
-            meta = lesson != nullptr ? lesson->title.toUpperCase() : juce::String();
-            title = "Preparing the example";
-            body = juce::String::fromUTF8 ("Loading and analysing the recording\xe2\x80\xa6 The lesson starts when it can be played.");
-            keys.push_back ({ "close", "Cancel", false });
-            break;
-        }
-        case NoteKind::restoreOffer:
-            meta = "TUTORIAL";
-            title = "Keep the example sound?";
-            body = "The tutorial example replaced your sound. Your previous sound was kept and can be restored now, or later from the menu.";
-            keys.push_back ({ "restore", "Restore previous sound", false });
-            keys.push_back ({ "keep", "Keep this sound", true });
-            break;
         case NoteKind::confirmReset:
-            meta = "LEARN";
-            title = "Reset tutorials?";
-            body = "Every lesson of " + productName() + " starts again as not started. Your sound and settings are not changed.";
+            c.title = "Reset tutorial progress?";
+            c.body = juce::String::fromUTF8 ("This clears your completed lessons and lets you start them again. Your sounds and presets won\xe2\x80\x99t be changed.");
             keys.push_back ({ "cancel", "Cancel", false });
-            keys.push_back ({ "reset", "Reset", true });
+            keys.push_back ({ "reset", "Reset Tutorials", true });
             break;
         case NoteKind::none:
             return;
     }
-    juce::String signature = meta + "|" + title + "|" + body + "|" + (done ? "1" : "0");
+    juce::String signature = c.meta + "|" + c.step + "|" + c.title + "|" + c.body + "|" + c.status + "|" + (c.done ? "1" : "0");
     for (const auto& k : keys)
-        signature << "|" << k.id << ":" << k.label;
+        signature << "|" << k.id << ":" << k.label << (k.primary ? "*" : "");
     if (signature == noteSignature)
         return;
     noteSignature = signature;
-    notePanel->setContent (meta, title, body, std::move (keys), done);
+    notePanel->setContent (std::move (c));
 }
 
 //==============================================================================
@@ -871,6 +756,51 @@ void LearnController::raise()
         w->toFront (false);
 }
 
+juce::Rectangle<int> LearnController::visibleBounds() const
+{
+    auto area = contentBounds();
+    if (hooks.visibleArea != nullptr)
+    {
+        const auto shown = hooks.visibleArea().getIntersection (area);
+        if (! shown.isEmpty())
+            area = shown;
+    }
+    return area;
+}
+
+juce::String LearnController::currentTargetId() const
+{
+    // The exact control the musician needs now: what fixes a missing requirement, else the step's.
+    if (shownNote != NoteKind::lesson || ! lessonRunner.inTour())
+        return {};
+    if (lessonRunner.state() == LessonRunner::State::blocked)
+        if (const auto* missing = lessonRunner.unmetRequirement())
+            return missing->targetId;
+    if (lessonRunner.state() == LessonRunner::State::paused)
+        return {};
+    if (const auto* s = lessonRunner.step())
+        return s->targetId;
+    return {};
+}
+
+std::vector<juce::Rectangle<int>> LearnController::keepClearAreas() const
+{
+    std::vector<juce::Rectangle<int>> out;
+    if (shownNote != NoteKind::lesson || ! lessonRunner.inTour())
+        return out;
+    const auto* s = lessonRunner.step();
+    if (s == nullptr)
+        return out;
+    for (const auto& id : s->keepClear)
+        if (const auto r = registry.boundsIn (id, *hooks.content))
+            out.push_back (*r);
+    for (const auto& r : s->requirements)
+        if (r.targetId.isNotEmpty())
+            if (const auto b = registry.boundsIn (r.targetId, *hooks.content))
+                out.push_back (*b);
+    return out;
+}
+
 void LearnController::layoutNow()
 {
     if (hooks.content == nullptr || ! isActive())
@@ -883,16 +813,23 @@ void LearnController::layoutNow()
         ring->setBounds (area);
     if (bannerNote != nullptr)
     {
-        // A quiet instruction at the foot of the instrument, out of the way of the header.
+        // A quiet line at the foot of what is in view, out of the way of the header.
+        const auto shown = visibleBounds();
         const auto size = bannerNote->preferredSize();
-        bannerNote->setBounds (area.getCentreX() - size.x / 2, area.getBottom() - size.y - 4, size.x, size.y);
+        bannerNote->setBounds (shown.getCentreX() - size.x / 2, shown.getBottom() - size.y - 4, size.x, size.y);
     }
     std::optional<juce::Rectangle<int>> target;
     bool quiet = false;
-    if (shownNote == NoteKind::lesson && lessonRunner.inTour() && lessonRunner.state() != LessonRunner::State::paused)
+    if (const auto id = currentTargetId(); id.isNotEmpty())
     {
-        if (const auto* s = lessonRunner.step(); s != nullptr && s->targetId.isNotEmpty())
-            target = registry.boundsIn (s->targetId, *hooks.content);
+        target = registry.boundsIn (id, *hooks.content);
+        // A control below the visible part of a scrolled editor is brought into view once.
+        if (target.has_value() && id != lastScrolledTarget && hooks.scrollIntoView != nullptr && ! visibleBounds().contains (*target))
+        {
+            lastScrolledTarget = id;
+            hooks.scrollIntoView (target->expanded (40));
+            target = registry.boundsIn (id, *hooks.content);
+        }
     }
     else if (shownNote == NoteKind::help)
         target = registry.boundsIn (helpTarget, *hooks.content);
@@ -901,22 +838,33 @@ void LearnController::layoutNow()
         target = registry.boundsIn (hoverTarget, *hooks.content);
         quiet = true;
     }
+    // (A step about a menu item places its note by the control without outlining it.)
+    const bool outline = ! (shownNote == NoteKind::lesson && lessonRunner.inTour() && lessonRunner.state() != LessonRunner::State::blocked
+                            && lessonRunner.step() != nullptr && ! lessonRunner.step()->outlineTarget);
     if (ring != nullptr)
-        ring->setTarget (target, quiet);
+        ring->setTarget (outline ? target : std::nullopt, quiet);
     if (notePanel != nullptr)
     {
-        if (shownNote != NoteKind::lesson && shownNote != NoteKind::help)
-            placeBelowMenu (*notePanel);   // (the invitation, completion, preparation and confirmations)
+        if (shownNote == NoteKind::invitation || shownNote == NoteKind::complete || shownNote == NoteKind::confirmReset)
+            placeBelowMenu (*notePanel);
         else
             placeNote (target);
     }
+    if (ring != nullptr && (notePanel == nullptr || shownNote != NoteKind::lesson))
+        ring->setConnector (std::nullopt);
     if (browserPanel != nullptr)
+    {
+        // As tall as the list, no taller than the room under the menu (it scrolls inside).
+        const auto shown = visibleBounds();
+        const auto anchor = hooks.menuAnchor != nullptr ? hooks.menuAnchor() : juce::Rectangle<int> (shown.getRight() - 40, shown.getY() + 20, 30, 30);
+        browserPanel->setMaximumHeight (std::max (200, shown.getBottom() - anchor.getBottom() - 4));
         placeBelowMenu (*browserPanel);
+    }
 }
 
 void LearnController::placeBelowMenu (juce::Component& c)
 {
-    const auto area = contentBounds().reduced (4);
+    const auto area = visibleBounds().reduced (4);
     const auto anchor = hooks.menuAnchor != nullptr ? hooks.menuAnchor() : juce::Rectangle<int> (area.getRight() - 40, area.getY() + 20, 30, 30);
     const int m = Note::margin;
     auto r = juce::Rectangle<int> (anchor.getRight() - c.getWidth() + m, anchor.getBottom() + 6 - m, c.getWidth(), c.getHeight());
@@ -926,54 +874,123 @@ void LearnController::placeBelowMenu (juce::Component& c)
 void LearnController::placeNote (std::optional<juce::Rectangle<int>> anchor)
 {
     auto& note = *notePanel;
-    const auto area = contentBounds().reduced (4);
+    const auto area = visibleBounds().reduced (4);
     const int w = note.getWidth(), h = note.getHeight(), m = Note::margin;
     if (! anchor.has_value())
     {
         // No target (or it is not showing): under the header, centred.
         note.setBounds (juce::Rectangle<int> (area.getCentreX() - w / 2, area.getY() + 96 - m, w, h).constrainedWithin (area));
+        if (ring != nullptr)
+            ring->setConnector (std::nullopt);
         return;
     }
+    // Scored placement: beside the target on each side (right, left, above, below - in that
+    // order of preference), each slid along its side to stay inside the editor. A card that
+    // would cover the target (with its outline) is out; covering the other controls the step
+    // uses costs a lot; the distance to the target costs a little; then the preference order.
     const auto t = *anchor;
-    // The side with room: below, above, right, left; the card never covers its target.
-    const std::array<juce::Rectangle<int>, 4> candidates { {
-        { t.getCentreX() - w / 2, t.getBottom() + noteGap - m, w, h },
-        { t.getCentreX() - w / 2, t.getY() - noteGap - h + m, w, h },
-        { t.getRight() + noteGap - m, t.getCentreY() - h / 2, w, h },
-        { t.getX() - noteGap - w + m, t.getCentreY() - h / 2, w, h },
-    } };
-    const auto avoid = t.expanded (4);
-    for (const auto& c : candidates)
+    const int pad = juce::roundToInt (HighlightLayer::padding) + 4;
+    const auto forbidden = t.expanded (pad);
+    const auto keep = keepClearAreas();
+    // A small control inside a larger panel (a key of the ARP panel, a segment of a switch): the
+    // rest of that panel holds the controls the next steps need - the note prefers to sit
+    // outside it. (A full-component target has no container: nothing extra to avoid.)
+    std::optional<juce::Rectangle<int>> container;
+    if (const auto id = currentTargetId(); id.isNotEmpty())
+        container = registry.containerIn (id, *hooks.content);
+
+    struct Candidate
     {
-        const auto inside = c.constrainedWithin (area);
-        // Sliding along its side to stay inside is fine; crossing onto the target is not.
-        if (! inside.reduced (m).intersects (avoid) && area.contains (inside))
+        juce::Rectangle<int> bounds;
+        float bias;
+    };
+    std::vector<Candidate> candidates;
+    const int gap = noteGap + pad;
+    auto along = [&] (juce::Rectangle<int> r, bool horizontal) {
+        // Centred on the target, and aligned with either of its edges.
+        if (horizontal)
+            return std::array<juce::Rectangle<int>, 3> { r, r.withY (t.getY() - m), r.withY (t.getBottom() - h + m) };
+        return std::array<juce::Rectangle<int>, 3> { r, r.withX (t.getX() - m), r.withX (t.getRight() - w + m) };
+    };
+    for (const auto& r : along ({ t.getRight() + gap - m, t.getCentreY() - h / 2, w, h }, true))
+        candidates.push_back ({ r, 0.0f });
+    for (const auto& r : along ({ t.getX() - gap - w + m, t.getCentreY() - h / 2, w, h }, true))
+        candidates.push_back ({ r, 8.0f });
+    for (const auto& r : along ({ t.getCentreX() - w / 2, t.getY() - gap - h + m, w, h }, false))
+        candidates.push_back ({ r, 16.0f });
+    for (const auto& r : along ({ t.getCentreX() - w / 2, t.getBottom() + gap - m, w, h }, false))
+        candidates.push_back ({ r, 24.0f });
+    auto cardOf = [m] (juce::Rectangle<int> r) { return r.reduced (m); };
+    auto distance = [] (juce::Rectangle<int> a, juce::Rectangle<int> b) {
+        const int dx = std::max ({ 0, b.getX() - a.getRight(), a.getX() - b.getRight() });
+        const int dy = std::max ({ 0, b.getY() - a.getBottom(), a.getY() - b.getBottom() });
+        return std::sqrt (static_cast<float> (dx * dx + dy * dy));
+    };
+    std::optional<juce::Rectangle<int>> best;
+    float bestScore = 1.0e9f;
+    for (const auto& cand : candidates)
+    {
+        const auto inside = cand.bounds.constrainedWithin (area);
+        if (! area.contains (inside))
+            continue;   // (larger than the editor's room)
+        const auto card = cardOf (inside);
+        if (card.intersects (forbidden))
+            continue;   // never over the control the musician needs
+        float score = cand.bias + distance (card, t) * 0.6f;
+        for (const auto& k : keep)
+            if (const auto overlap = card.getIntersection (k); ! overlap.isEmpty())
+                score += 400.0f + 0.05f * static_cast<float> (overlap.getWidth() * overlap.getHeight());
+        if (container.has_value())
+            if (const auto overlap = card.getIntersection (*container); ! overlap.isEmpty())
+                score += 0.004f * static_cast<float> (overlap.getWidth() * overlap.getHeight());
+        if (score < bestScore)
         {
-            note.setBounds (inside);
-            return;
+            bestScore = score;
+            best = inside;
         }
     }
-    // No side has room (a large target): the corner of the window farthest from its centre.
-    const auto corner = juce::Rectangle<int> (t.getCentreX() < area.getCentreX() ? area.getRight() - w : area.getX(),
-                                              t.getCentreY() < area.getCentreY() ? area.getBottom() - h : area.getY(), w, h);
-    note.setBounds (corner);
+    if (! best.has_value())
+    {
+        // Nowhere beside it (a large target): where it covers least of it, joined by a connector.
+        float leastOverlap = 1.0e12f;
+        for (const auto& cand : candidates)
+        {
+            const auto inside = cand.bounds.constrainedWithin (area);
+            const auto o = cardOf (inside).getIntersection (forbidden);
+            const float covered = static_cast<float> (o.getWidth()) * static_cast<float> (o.getHeight());
+            if (covered < leastOverlap)
+            {
+                leastOverlap = covered;
+                best = inside;
+            }
+        }
+    }
+    note.setBounds (*best);
+    // A connector when the card sits apart from its target (more than a short gap away).
+    if (ring != nullptr)
+    {
+        const auto card = cardOf (*best).toFloat();
+        const auto outline = t.toFloat().expanded (HighlightLayer::padding);
+        if (distance (card.toNearestInt(), outline.toNearestInt()) > static_cast<float> (gap + 14))
+        {
+            auto nearestOn = [] (juce::Rectangle<float> r, juce::Point<float> p) {
+                return juce::Point<float> (juce::jlimit (r.getX(), r.getRight(), p.x), juce::jlimit (r.getY(), r.getBottom(), p.y));
+            };
+            const auto from = nearestOn (card, outline.getCentre());
+            const auto to = nearestOn (outline, from);
+            ring->setConnector (juce::Line<float> (from, to));
+        }
+        else
+            ring->setConnector (std::nullopt);
+    }
 }
 
 //==============================================================================
 void LearnController::persist (const Lesson& lesson, int stepIndex, bool finished, bool allStepsDone)
 {
+    // There is no Skip: a finished lesson had every task done or already so (Continue).
     juce::String resumeAt;
-    if (finished && ! allStepsDone)
-    {
-        // Finished with skipped tasks: resume at the first one skipped.
-        for (int s = 0; s < static_cast<int> (lesson.steps.size()); ++s)
-            if (lessonRunner.lesson() == &lesson && lessonRunner.status (s) == LessonRunner::StepStatus::skipped)
-            {
-                resumeAt = lesson.steps[static_cast<std::size_t> (s)].id;
-                break;
-            }
-    }
-    else if (! finished && stepIndex >= 0 && stepIndex < static_cast<int> (lesson.steps.size()))
+    if (! finished && stepIndex >= 0 && stepIndex < static_cast<int> (lesson.steps.size()))
         resumeAt = lesson.steps[static_cast<std::size_t> (stepIndex)].id;
     const auto id = lesson.id;
     const int revision = lesson.revision;
@@ -987,8 +1004,8 @@ void LearnController::persist (const Lesson& lesson, int stepIndex, bool finishe
             p.lastStep = {};
             return;
         }
-        if (p.status == "complete" && p.revision == revision)
-            return;   // a lesson once completed stays completed
+        if (p.status == "complete")
+            return;   // a lesson once completed stays completed (replaying it never undoes that)
         p.revision = revision;
         p.status = "in-progress";
         p.completedAt = {};
@@ -999,8 +1016,10 @@ void LearnController::persist (const Lesson& lesson, int stepIndex, bool finishe
 
 int LearnController::resumeStep (const Lesson& lesson) const
 {
+    // Resumed at the same step (by its stable ID, whichever revision left it there); a lesson
+    // revised since, without that step, starts from the beginning.
     const auto it = progress.lessons.find (lesson.id);
-    if (it == progress.lessons.end() || it->second.status != "in-progress" || it->second.revision != lesson.revision)
+    if (it == progress.lessons.end() || it->second.status != "in-progress")
         return 0;
     for (int s = 0; s < static_cast<int> (lesson.steps.size()); ++s)
         if (lesson.steps[static_cast<std::size_t> (s)].id == it->second.lastStep)
@@ -1011,15 +1030,26 @@ int LearnController::resumeStep (const Lesson& lesson) const
 std::vector<Browser::Row> LearnController::browserRows() const
 {
     std::vector<Browser::Row> rows;
+    const auto quick = lessonRunner.catalog().quickStartLessonId;
     for (const auto& lesson : lessonRunner.catalog().lessons)
     {
         Browser::Row row;
         row.lessonId = lesson.id;
         row.title = lesson.title;
-        row.group = lesson.group;
+        row.description = lesson.description;
         row.minutes = lesson.minutes;
-        if (const auto it = progress.lessons.find (lesson.id); it != progress.lessons.end() && it->second.revision == lesson.revision)
-            row.status = it->second.status == "complete" ? Browser::Row::Status::complete : Browser::Row::Status::inProgress;
+        row.stepCount = static_cast<int> (lesson.steps.size());
+        row.featured = lesson.id == quick;
+        if (const auto it = progress.lessons.find (lesson.id); it != progress.lessons.end())
+        {
+            if (it->second.status == "complete")
+                row.status = Browser::Row::Status::complete;
+            else if (const int at = resumeStep (lesson); at > 0)
+            {
+                row.status = Browser::Row::Status::inProgress;
+                row.resumeStep = at;
+            }
+        }
         rows.push_back (row);
     }
     return rows;
@@ -1028,6 +1058,8 @@ std::vector<Browser::Row> LearnController::browserRows() const
 //==============================================================================
 std::optional<float> LearnController::parameterValue (const juce::String& id)
 {
+    if (const auto v = registry.value (id))
+        return v;   // (a product's own value, not a parameter)
     return hooks.parameterValue != nullptr ? hooks.parameterValue (id) : std::nullopt;
 }
 
@@ -1044,6 +1076,11 @@ bool LearnController::targetReady (const juce::String& id)
 bool LearnController::reveal (const juce::String& id)
 {
     return registry.reveal (id);
+}
+
+bool LearnController::loadExample (const juce::String& exampleId)
+{
+    return hooks.loadExample != nullptr && hooks.loadExample (exampleId);
 }
 
 } // namespace andor::learn

@@ -199,6 +199,7 @@ public:
     /** Builds the impulse each CONVOLUTION needs when its settings or the rate changed (message
         thread: prepareToPlay and the timer). */
     void updateConvolutionImpulses();
+    bool effectiveValue (const juce::String& parameterId, EffectiveValue& out) const override;
     /** The CC 1-4 sources' controller numbers (0..119; default 2, 11, 16, 17), saved with the
         session. Learn: the next controller that moves is taken for the slot (-1: none). */
     int modControllerNumber (int slot) const noexcept override;

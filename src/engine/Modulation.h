@@ -66,15 +66,25 @@ enum class Source : std::uint8_t
     vel,
     note,
     cc1, cc2, cc3, cc4,
-    pressure
+    pressure,
+    /** Appended (ANDOR ANALOG's RHYTHMIC MORPH): card C's rhythm, 0..1, one global value the
+        product sets each control period (Runtime::setRhythm). Offered only by a product that
+        asks (setOfferedSourceCount): ANDOR OSP's route lists and panel keep their twelve. */
+    cRhythm
 };
-constexpr int sourceCount = 12;   ///< lfo1 .. pressure
+constexpr int sourceCount = 13;       ///< lfo1 .. cRhythm
+constexpr int baseSourceCount = 12;   ///< lfo1 .. pressure: what ANDOR OSP offers
 constexpr int ccSlots = 4;
 /** Where the sources sit in a value array (sourceIndex). */
 namespace slot
 {
-    constexpr int lfo1 = 0, lfo2 = 1, env1 = 2, env2 = 3, modWheel = 4, vel = 5, note = 6, cc1 = 7, pressure = 11;
+    constexpr int lfo1 = 0, lfo2 = 1, env1 = 2, env2 = 3, modWheel = 4, vel = 5, note = 6, cc1 = 7, pressure = 11, cRhythm = 12;
 }
+/** The sources this instrument offers in its route lists and panel (baseSourceCount, or
+    sourceCount for a product with C RHYTHM). Set before the parameter layout is made, as the
+    product's destinations are. */
+void setOfferedSourceCount (int count) noexcept;
+int offeredSourceCount() noexcept;
 inline int sourceIndex (Source s) noexcept { return static_cast<int> (s) - 1; }
 const char* sourceName (Source s) noexcept;   ///< "LFO 1", "ENV 2"
 
@@ -567,6 +577,7 @@ struct Runtime
     float modWheelTarget = 0.0f, modWheelNow = 0.0f;
     std::array<float, ccSlots> ccTarget {}, ccNow {};
     float pressureTarget = 0.0f, pressureNow = 0.0f;
+    float rhythmNow = 0.0f;   ///< C RHYTHM (the product's, already shaped: no glide here)
     int inputNote = 60, inputVelocity = 100;   ///< the shared stages' VEL and NOTE (setInputNote)
     /** The layers' LEVEL (dB) and TUNE (semitones) knobs: a route takes them to their ends,
         never past (the engine keeps them current while routes run). */
@@ -587,6 +598,8 @@ struct Runtime
     /** A CC slot's controller moved (0..1); channel pressure (0..1). */
     void setController (int slotIndex, float value) noexcept;
     void setPressure (float value) noexcept;
+    /** C RHYTHM's value now, 0..1 (the product's rhythm, shaped by it). */
+    void setRhythm (float value) noexcept { rhythmNow = value < 0.0f ? 0.0f : (value > 1.0f ? 1.0f : value); }
     /** The input key the shared stages' VEL and NOTE follow (the most recently pressed: the
         player's key, before an arpeggiator). Velocity 1..127. */
     void setInputNote (int note, int velocity) noexcept;

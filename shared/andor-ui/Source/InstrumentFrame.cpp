@@ -5,6 +5,9 @@
 #include "EngineCard.h"   // icons
 #include "OspLookAndFeel.h"
 
+#include <algorithm>
+#include <cmath>
+
 namespace osp::plugin
 {
 
@@ -394,10 +397,11 @@ juce::Rectangle<int> sourceColumn (juce::Rectangle<int> area, int columns, int i
     return { area.getX() + index * (width + gap), area.getY(), width, area.getHeight() };
 }
 
-void paint (juce::Graphics& g, juce::Component& content, const Identity& identity, bool arpShown, const MacroRow& macros, float rackShift, float sourceTrim)
+void paint (juce::Graphics& g, juce::Component& content, const Identity& identity, bool arpShown, const MacroRow& macros, float rackShift, float sourceTrim,
+            float housingBase)
 {
     using namespace design;
-    draw::housing (g, content.getLocalBounds().toFloat());
+    draw::housing (g, content.getLocalBounds().toFloat(), housingBase);
     // Ceramic: the source cards and the arpeggiator's panel, drawn here so their shadows
     // fall on the housing.
     draw::raisedChildren (g, content);
@@ -526,31 +530,277 @@ float instrumentHeight (bool arpShown, float rackShift, float sourceTrim) noexce
     return design::height + (arpShown ? design::layout::arpShift : 0.0f) + rackShift - sourceTrim;
 }
 
-void fit (juce::Component& editor, juce::Component& content, float height)
+void fit (juce::Component& editor, juce::Component& content, float height, Overflow* overflow)
 {
-    // Scaled uniformly to fit: if a host keeps the old window shape (it refused the resize),
-    // the instrument still shows whole, with a margin, never cut off.
     const float w = design::width, h = height;
-    const float k = std::min (static_cast<float> (editor.getWidth()) / w, static_cast<float> (editor.getHeight()) / h);
-    const float x = 0.5f * (static_cast<float> (editor.getWidth()) - w * k);
-    const float y = 0.5f * (static_cast<float> (editor.getHeight()) - h * k);
+    const float ew = static_cast<float> (editor.getWidth()), eh = static_cast<float> (editor.getHeight());
     content.setBounds (0, 0, static_cast<int> (w), static_cast<int> (h));
-    content.setTransform (juce::AffineTransform::scale (k).translated (x, y));
+    // The musician's zoom: the window's width over the reference's. The instrument at that scale.
+    const float k = ew > 0.0f ? ew / w : 1.0f;
+    const float tall = h * k;
+    if (std::abs (eh - tall) <= 1.0f || ew <= 0.0f || eh <= 0.0f)
+    {
+        // The window as tall as the instrument (the normal case: the height follows the width,
+        // rounded): placed exactly as it always was.
+        if (overflow != nullptr)
+            overflow->update (eh, eh);   // (it fits: nothing to scroll or negotiate)
+        const float fitted = ew > 0.0f && eh > 0.0f ? std::min (ew / w, eh / h) : 1.0f;
+        content.setTransform (juce::AffineTransform::scale (fitted).translated (0.5f * (ew - w * fitted), 0.5f * (eh - h * fitted)));
+        return;
+    }
+    // Shorter (scrolled) or taller (the surround under it): at the top-left, never scaled to fit,
+    // never centred sideways.
+    if (overflow != nullptr)
+        overflow->update (tall, eh);
+    const float y = overflow != nullptr ? -overflow->offset() : 0.0f;
+    content.setTransform (juce::AffineTransform::scale (k).translated (0.0f, y));
+}
+
+namespace
+{
+    int screenRoomOverride = 0;
+
+    /** The screen's room for the editor's height (0: no screen to ask - headless, or not
+        shown yet: nothing is limited). */
+    int screenRoom (juce::Component& editor)
+    {
+        if (screenRoomOverride > 0)
+            return screenRoomOverride;
+        if (! editor.isShowing() || editor.getPeer() == nullptr)
+            return 0;
+        const auto* display = juce::Desktop::getInstance().getDisplays().getDisplayForRect (editor.getScreenBounds());
+        if (display == nullptr)
+            return 0;
+        // (the host's window keeps its title bar and its own plugin header above the editor)
+        return std::max (0, display->userArea.getHeight() - 96);
+    }
+}
+
+void overrideScreenRoom (int pixels) noexcept
+{
+    screenRoomOverride = std::max (0, pixels);
+}
+
+Overflow::Overflow (juce::Component& e) : editor (e)
+{
+    bar.setAutoHide (false);
+    bar.addListener (this);
+    bar.setTitle ("Scroll the instrument");
+    editor.addChildComponent (bar);
+}
+
+Overflow::~Overflow()
+{
+    bar.removeListener (this);
+}
+
+void Overflow::update (float contentHeight, float visibleHeight)
+{
+    content = contentHeight;
+    visible = visibleHeight;
+    if (asking)
+        return;   // (our own request is being answered: settleNow looks at the answer)
+    const bool over = contentHeight > visibleHeight + 1.0f;
+    const bool mismatch = std::abs (contentHeight - visibleHeight) > 1.0f;
+    if (! mismatch)
+    {
+        // The window is the instrument's height: nothing to negotiate.
+        scrolled = 0.0f;
+        bar.setVisible (false);
+        stopTimer();
+        episodeContent = episodeVisible = -1.0f;
+        askedAgain = refused = false;
+        return;
+    }
+    // A new mismatch (another instrument height, another window height): negotiated afresh.
+    if (std::abs (contentHeight - episodeContent) > 1.0f || std::abs (visibleHeight - episodeVisible) > 1.0f)
+    {
+        episodeContent = contentHeight;
+        episodeVisible = visibleHeight;
+        askedAgain = refused = false;
+    }
+    if (! over)
+    {
+        // Taller than the instrument (a host that answered a smaller window with the old size):
+        // asked once more to shrink; kept as it is (the surround below) if it will not.
+        scrolled = 0.0f;
+        bar.setVisible (false);
+        if (! askedAgain && ! isTimerRunning())
+            startTimer (settleDelayMs);
+        return;
+    }
+    // The screen is the limit (the window already stands at its full room): scroll at once.
+    const int room = screenRoom (editor);
+    const bool screenLimited = room > 0 && visibleHeight >= static_cast<float> (room) - 1.0f;
+    if (! screenLimited && ! refused)
+    {
+        // The host has not said no yet: wait for its answer, unscrolled, no bar.
+        scrolled = 0.0f;
+        bar.setVisible (false);
+        if (! isTimerRunning())
+            startTimer (settleDelayMs);
+        return;
+    }
+    stopTimer();
+    showBar();
+}
+
+void Overflow::settleNow()
+{
+    stopTimer();
+    if (! (std::abs (content - visible) > 1.0f))
+        return;
+    if (! askedAgain)
+    {
+        // Ask once more for the instrument's height (capped at the screen's room).
+        const int room = screenRoom (editor);
+        int wanted = juce::roundToInt (content);
+        if (room > 0)
+            wanted = std::min (wanted, room);
+        if (wanted != editor.getHeight())
+        {
+            const juce::ScopedValueSetter<bool> answering (asking, true);
+            editor.setSize (editor.getWidth(), wanted);
+        }
+        if (std::abs (content - visible) <= 1.0f)
+        {
+            update (content, visible);   // (granted: all settled)
+            return;
+        }
+        // Answered with another size again: one more wait, then the answer stands.
+        episodeContent = content;
+        episodeVisible = visible;
+        askedAgain = true;
+        refused = false;
+        startTimer (settleDelayMs);
+        update (content, visible);
+        return;
+    }
+    // Asked twice and still not the instrument's height: the host's answer stands. Shorter: only
+    // now does the instrument scroll. Taller: the surround below it.
+    refused = true;
+    if (onScroll != nullptr)
+        onScroll();
+    else
+        update (content, visible);
+}
+
+void Overflow::showBar()
+{
+    const float contentHeight = content, visibleHeight = visible;
+    scrolled = std::clamp (scrolled, 0.0f, contentHeight - visibleHeight);
+    bar.setRangeLimits (0.0, static_cast<double> (contentHeight), juce::dontSendNotification);
+    bar.setCurrentRange (static_cast<double> (scrolled), static_cast<double> (visibleHeight), juce::dontSendNotification);
+    const int thickness = 10;
+    bar.setBounds (editor.getWidth() - thickness, 0, thickness, editor.getHeight());
+    bar.setVisible (true);
+    bar.toFront (false);
+}
+
+bool Overflow::scrollBy (const juce::MouseWheelDetails& wheel)
+{
+    if (! overflowing())
+        return false;
+    const float step = 0.25f * visible;
+    const float before = scrolled;
+    scrolled = std::clamp (scrolled - (wheel.isReversed ? -wheel.deltaY : wheel.deltaY) * step, 0.0f, std::max (0.0f, content - visible));
+    if (scrolled != before && onScroll != nullptr)
+        onScroll();
+    return true;
+}
+
+bool Overflow::scrollToShow (float top, float bottom)
+{
+    if (! overflowing())
+        return false;
+    const float before = scrolled;
+    if (top < scrolled)
+        scrolled = top;
+    else if (bottom > scrolled + visible)
+        scrolled = bottom - visible;
+    scrolled = std::clamp (scrolled, 0.0f, std::max (0.0f, content - visible));
+    if (scrolled != before && onScroll != nullptr)
+        onScroll();
+    return scrolled != before;
+}
+
+void Overflow::scrollBarMoved (juce::ScrollBar*, double newRangeStart)
+{
+    scrolled = std::clamp (static_cast<float> (newRangeStart), 0.0f, std::max (0.0f, content - visible));
+    if (onScroll != nullptr)
+        onScroll();
+}
+
+int fittedWindowHeight (int width, int room, float height) noexcept
+{
+    const int natural = juce::roundToInt (static_cast<float> (width) * height / design::width);
+    return room > 0 ? std::min (natural, room) : natural;
+}
+
+ScreenFit::ScreenFit (juce::AudioProcessorEditor& e, std::function<float()> instrumentHeight)
+    : editor (e), height (instrumentHeight), shape (e, instrumentHeight)
+{
+    editor.addComponentListener (this);
+    editor.setConstrainer (&shape);   // (before setResizable: the corner then uses it too)
+}
+
+ScreenFit::Shape::Shape (juce::AudioProcessorEditor& e, std::function<float()> instrumentHeight) : editor (e), height (std::move (instrumentHeight))
+{
+    setSizeLimits (869, 200, 1810, 8000);
+}
+
+void ScreenFit::Shape::checkBounds (juce::Rectangle<int>& bounds, const juce::Rectangle<int>& previous, const juce::Rectangle<int>& limits, bool top, bool left,
+                                    bool bottom, bool right)
+{
+    ComponentBoundsConstrainer::checkBounds (bounds, previous, limits, top, left, bottom, right);
+    const float h = height != nullptr ? height() : design::height;
+    const int fitted = fittedWindowHeight (bounds.getWidth(), screenRoom (editor), h);
+    // Whatever was asked - a new width (a zoom) or a height alone - the answer is the height
+    // that goes with the width: the whole instrument, never an old height kept, never an
+    // empty band under it. (Only a host that then keeps a shorter window makes it scroll.)
+    bounds.setHeight (fitted);
+    if (top && bounds.getHeight() != previous.getHeight() && ! bottom)
+        bounds.setY (previous.getBottom() - bounds.getHeight());
+}
+
+ScreenFit::~ScreenFit()
+{
+    editor.removeComponentListener (this);
+}
+
+void ScreenFit::check()
+{
+    if (done || ! editor.isShowing() || editor.getPeer() == nullptr)
+        return;
+    done = true;
+    // (after the host has placed it: once it settles, never in the middle of its own setup)
+    juce::Component::SafePointer<juce::AudioProcessorEditor> safe (&editor);
+    juce::MessageManager::callAsync ([safe, h = height] {
+        if (safe != nullptr && h != nullptr)
+            applyWindowShape (*safe, h(), true);
+    });
 }
 
 void applyWindowShape (juce::AudioProcessorEditor& editor, float height, bool resize)
 {
-    // The window keeps the instrument's proportions: the same width range as always, the
-    // height following the instrument (taller with the arpeggiator's editor shown).
+    // The width is the musician's (the corner): never changed here, and no aspect ratio is set
+    // that a host could answer with a new width. The height follows the instrument (taller
+    // with the arpeggiator's editor, a rack or a strip shown), but never past the screen - a
+    // host clamps such a window. There the window stops and the instrument scrolls (Overflow)
+    // at the same scale; once it fits again the window grows back to it.
     const float h = height;
-    editor.setResizeLimits (869, juce::roundToInt (869.0f * h / design::width), 1810, juce::roundToInt (1810.0f * h / design::width));
+    const int room = screenRoom (editor);
+    const int width = editor.getWidth() > 0 ? editor.getWidth() : 1086;
+    const int newHeight = resize ? fittedWindowHeight (width, room, h) : editor.getHeight();
     if (auto* windowShape = editor.getConstrainer())
-        windowShape->setFixedAspectRatio (static_cast<double> (design::width / h));
+    {
+        windowShape->setFixedAspectRatio (0.0);
+        windowShape->setSizeLimits (std::min (869, width), 200, 1810, 8000);
+    }
     if (resize)
     {
-        const int newHeight = juce::roundToInt (static_cast<float> (editor.getWidth()) * h / design::width);
-        if (newHeight != editor.getHeight())
-            editor.setSize (editor.getWidth(), newHeight);
+        if (newHeight != editor.getHeight() || width != editor.getWidth())
+            editor.setSize (width, newHeight);
         else
             editor.resized();
     }

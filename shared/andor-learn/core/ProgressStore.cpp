@@ -80,7 +80,9 @@ ProgressData ProgressStore::fromJson (const juce::var& v, const juce::String& pr
             p.status = l.getProperty ("status", {}).toString();
             p.completedAt = l.getProperty ("completedAt", {}).toString();
             p.lastStep = l.getProperty ("lastStep", {}).toString();
-            if (p.status.isNotEmpty())
+            // Only the two states a lesson can be in. Anything else (an earlier build's record of a
+            // skipped lesson, say) is not progress: the lesson reads as new, never as done.
+            if (p.status == "complete" || p.status == "in-progress")
                 d.lessons[entry.name.toString()] = p;
         }
     return d;
@@ -141,11 +143,9 @@ bool ProgressStore::update (const std::function<void (ProgressData&)>& change)
 
 bool ProgressStore::reset()
 {
-    return update ([] (ProgressData& d) {
-        d.lessons.clear();
-        d.firstInviteSeen = false;
-        d.learnModeEnabled = false;
-    });
+    // Reset Tutorials: the lessons' records only. The invitation stays answered (nothing starts
+    // or asks again by itself) and Info keeps its setting.
+    return update ([] (ProgressData& d) { d.lessons.clear(); });
 }
 
 bool ProgressStore::claimInvitation (const juce::String& productId)

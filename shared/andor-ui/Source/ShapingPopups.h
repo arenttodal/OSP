@@ -263,9 +263,9 @@ protected:
 
 /**
     Whatever shows the popovers (ANDOR OSP's editor, the shell's) and can open a panel anchored to
-    a component inside it (SATELLITE's from the arpeggiator's key): placed under the anchor, kept
-    inside, closed as every popover is (Escape, a click elsewhere, its anchor again). A component
-    finds it with findParentComponentOfClass.
+    a component inside it (SATELLITE's from the arpeggiator's key, SHAPER DNA from its rack key):
+    placed by the anchor, kept inside, closed as every popover is (Escape, a click elsewhere, its
+    anchor again). A component finds it with findParentComponentOfClass.
 */
 struct AnchoredPopoverHost
 {

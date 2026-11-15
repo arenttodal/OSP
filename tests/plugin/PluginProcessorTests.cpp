@@ -6055,6 +6055,12 @@ TEST_CASE ("plugin: MODULATION parameters, routes, recall, older sessions, curve
         // the route-destination choice stays at 75 entries so saved automation keeps its meaning.
         CHECK (OspAudioProcessor::modDestinationNames().size() == mod::hostDestCount);
         CHECK (mod::hostDestCount < mod::destCount);
+        // The sources: ANDOR OSP's twelve (C RHYTHM, ANDOR ANALOG's thirteenth, not offered):
+        // the route-source choice stays at 13 entries (+ None), its automation as it was.
+        auto* source = dynamic_cast<juce::AudioParameterChoice*> (fresh.parameters.getParameter (OspAudioProcessor::modRouteId (0, "source")));
+        REQUIRE (source != nullptr);
+        CHECK (source->choices.size() == mod::baseSourceCount + 1);
+        CHECK_FALSE (source->choices.contains ("C RHYTHM"));
     }
     auto make = [&] {
         auto p = std::make_unique<OspAudioProcessor>();
@@ -8131,3 +8137,145 @@ TEST_CASE ("plugin: full-range modulation - 100 % reaches the knob's end; older 
 #include "CardEqSpectrumTests.inc"
 #include "SatellitePluginTests.inc"
 #include "OspLearnTests.inc"
+#include "EffectiveVisualTests.inc"
+
+TEST_CASE ("plugin: a plain right-click on a knob itself (the press a host gives the knob, not the halo overlay) opens its modulation menu", "[ui][andor-ui][rightclick]")
+{
+    // A host gives a press to the component under the last mouse move: the overlay claims one
+    // only while a popup modifier is already down when hovering (control-click), so a plain
+    // right-click reached the knob, which has no menu. The overlay now hears its root's presses.
+    OspAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> base (p.createEditorIfNeeded());
+    auto* editor = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (base.get());
+    REQUIRE (editor != nullptr);
+    editor->refreshNow();
+    juce::Slider* space = nullptr;
+    std::function<void (juce::Component&)> walk = [&] (juce::Component& c) {
+        for (auto* child : c.getChildren())
+        {
+            if (auto* s = dynamic_cast<juce::Slider*> (child); s != nullptr && space == nullptr && child->isVisible() && s->getProperties()["paramId"].toString() == "space")
+                space = s;
+            walk (*child);
+        }
+    };
+    walk (*editor);
+    REQUIRE (space != nullptr);
+    auto& overlay = editor->modulationOverlay();
+    juce::PopupMenu shown;
+    int menus = 0;
+    overlay.showMenuForTest = [&] (juce::PopupMenu& m) { shown = m; ++menus; };
+    auto press = [] (juce::Component& on, juce::ModifierKeys mods) {
+        const auto at = on.getLocalBounds().getCentre().toFloat();
+        return juce::MouseEvent (juce::Desktop::getInstance().getMainMouseSource(), at, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, &on, &on,
+                                 juce::Time::getCurrentTime(), at, juce::Time::getCurrentTime(), 1, false);
+    };
+    CHECK_FALSE (overlay.rightClickedControl (press (*space, juce::ModifierKeys (juce::ModifierKeys::leftButtonModifier))));
+    CHECK (overlay.rightClickedControl (press (*space, juce::ModifierKeys (juce::ModifierKeys::rightButtonModifier))));
+    REQUIRE (menus == 1);
+    bool assign = false;
+    for (juce::PopupMenu::MenuItemIterator it (shown, true); it.next();)
+        assign = assign || it.getItem().text.startsWith ("Assign ");
+    CHECK (assign);
+    // (the overlay's own press is its mouseDown's: never a second menu from here)
+    CHECK_FALSE (overlay.rightClickedControl (press (overlay, juce::ModifierKeys (juce::ModifierKeys::rightButtonModifier))));
+    CHECK (menus == 1);
+}
+
+TEST_CASE ("plugin: a real right-click on an unmodulated knob, claimed by the halo overlay, opens its menu", "[ui][andor-ui][rightclick]")
+{
+    // Reproduced with a real right-click in a standalone app: with the right button down the
+    // overlay's hitTest claims the press (any destination counts for a popup), but its mouseDown
+    // looked only for modulated knobs, so an unmodulated one opened nothing. Routed here as JUCE
+    // routes a press: the component under the point while the button is down, then its handler.
+    OspAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> base (p.createEditorIfNeeded());
+    auto* editor = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (base.get());
+    REQUIRE (editor != nullptr);
+    editor->setVisible (true);
+    editor->refreshNow();
+    juce::Slider* space = nullptr;
+    std::function<void (juce::Component&)> walk = [&] (juce::Component& c) {
+        for (auto* child : c.getChildren())
+        {
+            if (auto* s = dynamic_cast<juce::Slider*> (child); s != nullptr && space == nullptr && child->isVisible() && s->getProperties()["paramId"].toString() == "space")
+                space = s;
+            walk (*child);
+        }
+    };
+    walk (*editor);
+    REQUIRE (space != nullptr);
+    auto& overlay = editor->modulationOverlay();
+    juce::PopupMenu shown;
+    int menus = 0;
+    overlay.showMenuForTest = [&] (juce::PopupMenu& m) { shown = m; ++menus; };
+    const auto saved = juce::ModifierKeys::currentModifiers;
+    juce::ModifierKeys::currentModifiers = juce::ModifierKeys (juce::ModifierKeys::rightButtonModifier);
+    const auto inEditor = editor->getLocalPoint (space, space->getLocalBounds().getCentre());
+    CHECK (editor->getComponentAt (inEditor) == &overlay);
+    const auto at = overlay.getLocalPoint (editor, inEditor).toFloat();
+    const juce::MouseEvent e (juce::Desktop::getInstance().getMainMouseSource(), at, juce::ModifierKeys (juce::ModifierKeys::rightButtonModifier),
+                              1.0f, 0.0f, 0.0f, 0.0f, 0.0f, &overlay, &overlay, juce::Time::getCurrentTime(), at, juce::Time::getCurrentTime(), 1, false);
+    overlay.mouseDown (e);
+    juce::ModifierKeys::currentModifiers = saved;
+    REQUIRE (menus == 1);
+    bool assign = false;
+    for (juce::PopupMenu::MenuItemIterator it (shown, true); it.next();)
+        assign = assign || it.getItem().text.startsWith ("Assign ");
+    CHECK (assign);
+    CHECK_FALSE (overlay.rightClickedControl (e));   // (never a second menu)
+    CHECK (menus == 1);
+}
+
+TEST_CASE ("plugin: the AMP envelope's picture follows A D S R's modulation (VEL on DECAY) while a note sounds", "[ui][andor-ui][mod][ampenv]")
+{
+    // Shared with ANDOR ANALOG: the picture draws the shape the newest note plays (the halos'
+    // reading), the set shape dashed under it; nothing sounding: exactly the set picture.
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "a.wav", testsignals::pluck (midiToHz (60), 2.0, 48000.0, 5));
+    OspAudioProcessor p;
+    p.initPatch();
+    REQUIRE (p.addLayers ({ a }) == 1);
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    p.setParameterValue ("sustainLevel", 0.0f);
+    std::unique_ptr<juce::AudioProcessorEditor> base (p.createEditorIfNeeded());
+    auto* editor = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (base.get());
+    REQUIRE (editor != nullptr);
+    editor->setVisible (true);
+    auto& amp = editor->modulationPanel().ampEnvelope();
+    auto snapshot = [&] {
+        editor->refreshNow();
+        return amp.createComponentSnapshot (amp.getLocalBounds(), true, 1.0f);
+    };
+    auto pixels = [] (const juce::Image& x, const juce::Image& y) {
+        int differing = 0;
+        for (int j = 0; j < x.getHeight(); ++j)
+            for (int i = 0; i < x.getWidth(); ++i)
+                differing += x.getPixelAt (i, j) != y.getPixelAt (i, j) ? 1 : 0;
+        return differing;
+    };
+    p.prepareToPlay (48000.0, 512);
+    juce::AudioBuffer<float> buffer (2, 512);
+    auto run = [&] (juce::MidiBuffer midi, int blocks) {
+        for (int i = 0; i < blocks; ++i)
+        {
+            p.processBlock (buffer, midi);
+            midi.clear();
+        }
+    };
+    run ({}, 2);
+    const auto set = snapshot();
+    REQUIRE (p.addModulationRoute (mod::Source::vel, mod::Dest::ampDecay, 30.0f) >= 0);
+    run ({}, 2);
+    CHECK (pixels (set, snapshot()) == 0);
+    juce::MidiBuffer on;
+    on.addEvent (juce::MidiMessage::noteOn (1, 60, static_cast<juce::uint8> (100)), 0);
+    run (on, 4);
+    editor->refreshNow();
+    CHECK (editor->modulationOverlay().livePosition ("decay") > p.apvts().getParameter ("decay")->getValue() + 0.02f);
+    CHECK (pixels (set, snapshot()) > 50);
+    juce::MidiBuffer off;
+    off.addEvent (juce::MidiMessage::noteOff (1, 60), 0);
+    run (off, 400);
+    CHECK (pixels (set, snapshot()) == 0);
+}

@@ -42,6 +42,20 @@ public:
     void mouseExit (const juce::MouseEvent&) override;
     void mouseDown (const juce::MouseEvent&) override;
 
+    /** A second instrument in the same housing (opt-in, a product's): two rows of the same
+        height, each a power light, its lowercase name and a chevron ("arp" above, `name`
+        below), and no pattern / rate inset. The lower light switches `enabledParameterId`;
+        the rest of the lower row calls onSecondRow. Empty name: ANDOR OSP's card, exactly. */
+    void setSecondRow (const juce::String& name, const juce::String& enabledParameterId);
+    std::function<void()> onSecondRow;
+    /** The lower row's chevron points up while its popover is open. */
+    void setSecondRowOpen (bool open);
+    bool hasSecondRow() const noexcept { return secondName.isNotEmpty(); }
+    bool isSecondRowOn() const noexcept { return secondEnabled; }
+    /** The lower row (stacked only): its light, and the whole row. */
+    juce::Rectangle<float> secondLightArea() const;
+    juce::Rectangle<float> secondRowArea() const;
+
     juce::Rectangle<float> lightArea() const;
     juce::Rectangle<float> chevronArea() const;
     /** The inset's text, "UP · 1/8". */
@@ -55,7 +69,12 @@ private:
     juce::ParameterAttachment enabledAttachment;
     bool enabled = false, expanded = false;
     juce::String status;
-    int hover = 0;   ///< 1 the light, 2 the rest of the card
+    int hover = 0;   ///< 1 the light, 2 the rest of the card (stacked: of the upper row), 3 the lower light, 4 the rest of the lower row
+    juce::String secondName;
+    std::unique_ptr<juce::ParameterAttachment> secondAttachment;
+    bool secondEnabled = false, secondOpen = false;
+    void paintLight (juce::Graphics&, juce::Point<float> centre, bool on, bool hovered, const char* onPiece, const char* offPiece);
+    int hoverAt (juce::Point<float>) const;
 };
 
 /** "Advanced" and "MOD ›" as raised half cards under the arpeggiator's, pressed in while
@@ -110,7 +129,9 @@ public:
     bool anyOn() const;
     bool isOpen() const;
     /** The light's part (local): a click there switches, anywhere else opens. */
-    juce::Rectangle<int> lightArea() const { return getLocalBounds().withWidth (getHeight()); }
+    juce::Rectangle<int> lightArea() const { return getLocalBounds().withWidth (lightPartWidth); }
+    /** Its width: the light, the name and the chevron at even spacing (the name's own width). */
+    int preferredWidth() const;
     void toggle();
     void openPanel();
     /** Repaints when the light or the panel changed (the editor's refresh). */
@@ -125,6 +146,11 @@ public:
     void focusLost (FocusChangeType) override { repaint(); }
 
 private:
+    // Its spacing (px): the light's centre, the name's start, the gap to the chevron, the
+    // chevron's half width, the right margin. Light to name and name to chevron: one rhythm.
+    static constexpr float lightCentreX = 9.0f, nameX = 21.0f, chevronGap = 9.0f, chevronHalf = 4.0f, rightMargin = 7.0f;
+    static constexpr int lightPartWidth = 17;   ///< (to midway between the light and the name)
+    juce::String name() const { return "SATELLITE"; }
     InstrumentHost& host;
     int remembered = 0;   ///< the cards switched off by the light (bit per card)
     bool shownOn = false, shownOpen = false;

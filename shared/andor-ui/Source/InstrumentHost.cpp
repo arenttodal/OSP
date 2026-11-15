@@ -1,6 +1,7 @@
 #include "InstrumentHost.h"
 #include "ShapingPopups.h"
 #include "AndorParameters.h"
+#include "ShapingPopups.h"
 
 #include "engine/Dampen.h"
 
@@ -32,6 +33,16 @@ mod::Curve InstrumentHost::keyDnaCurve (int layer, keydna::Param param) const
 namespace
 {
     std::array<int, 3> shownOfStorage { 0, 1, 2 };
+}
+
+float InstrumentHost::shownValue (juce::AudioProcessorValueTreeState& state, const juce::String& parameterId)
+{
+    if (const auto* host = dynamic_cast<const InstrumentHost*> (&state.processor))
+        if (EffectiveValue v; host->effectiveValue (parameterId, v))
+            return v.value;
+    if (auto* p = state.getParameter (parameterId))
+        return p->convertFrom0to1 (p->getValue());
+    return 0.0f;
 }
 
 int InstrumentHost::shownLayer (int layer)
@@ -718,5 +729,12 @@ juce::String InstrumentHost::destName (mod::Dest dest) const
         return own + name.substring (9);
     return name;
 }
+
+std::unique_ptr<MiniPanel> InstrumentHost::createShaperDnaPanel()
+{
+    return nullptr;   // (SHAPER DNA is a product's: ANDOR OSP has none)
+}
+
+
 
 } // namespace osp::plugin

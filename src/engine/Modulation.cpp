@@ -3,6 +3,7 @@
 #include "core/Prng.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <numbers>
 
@@ -25,6 +26,7 @@ const char* sourceName (Source s) noexcept
         case Source::cc3: return "CC 3";
         case Source::cc4: return "CC 4";
         case Source::pressure: return "PRESSURE";
+        case Source::cRhythm: return "C RHYTHM";
         case Source::none: break;
     }
     return "-";
@@ -229,6 +231,21 @@ namespace
         static ProductRegistry r;
         return r;
     }
+}
+
+namespace
+{
+    std::atomic<int> offeredSources { baseSourceCount };
+}
+
+void setOfferedSourceCount (int count) noexcept
+{
+    offeredSources.store (count < baseSourceCount ? baseSourceCount : (count > sourceCount ? sourceCount : count), std::memory_order_relaxed);
+}
+
+int offeredSourceCount() noexcept
+{
+    return offeredSources.load (std::memory_order_relaxed);
 }
 
 void setProductDestinations (const std::vector<ProductDest>& destinations)
@@ -462,6 +479,7 @@ bool isPolySource (const Settings& settings, Source source) noexcept
         case Source::cc3:
         case Source::cc4:
         case Source::pressure:
+        case Source::cRhythm:
         case Source::none: break;
     }
     return false;
@@ -867,6 +885,7 @@ void Runtime::advanceGlobal (int samples, double sampleRate) noexcept
     for (std::size_t i = 0; i < ccNow.size(); ++i)
         globalValue[static_cast<std::size_t> (slot::cc1) + i] = ccNow[i];
     globalValue[slot::pressure] = pressureNow;
+    globalValue[slot::cRhythm] = rhythmNow;
     sharedValue = globalValue;
     sharedValue[slot::vel] = velocityValue (inputVelocity);
     sharedValue[slot::note] = noteValue (inputNote);
@@ -1068,7 +1087,7 @@ void VoiceState::advance (const Runtime& runtime, double seconds) noexcept
     // This note's VEL and NOTE (held for its life), and the global controllers.
     values[slot::vel] = runtime.velocityValue (velocity);
     values[slot::note] = runtime.noteValue (note);
-    for (int i = slot::cc1; i <= slot::pressure; ++i)
+    for (int i = slot::cc1; i <= slot::cRhythm; ++i)   // (the controllers, pressure and C RHYTHM: one value for every note)
         values[static_cast<std::size_t> (i)] = runtime.globalValue[static_cast<std::size_t> (i)];
     for (std::size_t i = 0; i < env.size(); ++i)
     {

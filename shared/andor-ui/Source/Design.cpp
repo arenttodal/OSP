@@ -185,7 +185,58 @@ juce::Colour surround()
     return colour::backdropTop;
 }
 
-void housing (juce::Graphics& g, juce::Rectangle<float> bounds)
+namespace
+{
+    void housingAt (juce::Graphics& g, juce::Rectangle<float> bounds);
+}
+
+void housing (juce::Graphics& g, juce::Rectangle<float> bounds, float baseHeight)
+{
+    const float full = bounds.getHeight();
+    if (baseHeight <= 0.0f || baseHeight >= full - 0.5f)
+    {
+        housingAt (g, bounds);   // (as it always was)
+        return;
+    }
+    // Taller than its base: the base exactly as it is above its foot, the foot moved down by
+    // the extra height, and the room between filled with the band just above the foot, mirrored
+    // back and forth (continuous at every seam; the wood's grain and the body's shading never
+    // stretched).
+    float foot = (height - layout::housing.getBottom()) + 2.0f * layout::housingRadius + 12.0f;
+    if (auto* pieces = skin::active())
+        if (const auto* p = pieces->find ("housing"))
+            foot = std::max (foot, p->insets[3] + p->margin + 2.0f);
+    const float extra = full - baseHeight;
+    const float cut = std::floor (baseHeight - foot);
+    const auto base = bounds.withHeight (baseHeight);
+    const float x = bounds.getX(), w = bounds.getWidth(), top = bounds.getY();
+    {
+        juce::Graphics::ScopedSaveState state (g);
+        g.reduceClipRegion (juce::Rectangle<float> (x, top, w, cut).getSmallestIntegerContainer());
+        housingAt (g, base);
+    }
+    {
+        juce::Graphics::ScopedSaveState state (g);
+        g.reduceClipRegion (juce::Rectangle<float> (x, top + cut + extra, w, foot + 2.0f).getSmallestIntegerContainer());
+        housingAt (g, base.translated (0.0f, extra));
+    }
+    const float band = std::max (8.0f, std::min (160.0f, cut - 160.0f));
+    bool flip = true;
+    for (float y = cut; y < cut + extra; y += band, flip = ! flip)
+    {
+        const float h = std::min (band, cut + extra - y);
+        juce::Graphics::ScopedSaveState state (g);
+        g.reduceClipRegion (juce::Rectangle<float> (x, top + y, w, h).getSmallestIntegerContainer());
+        // Flipped: the row `cut - d` shows at `y + d`; straight: `cut - band + d` at `y + d`.
+        g.addTransform (flip ? juce::AffineTransform::scale (1.0f, -1.0f).translated (0.0f, 2.0f * top + y + cut)
+                             : juce::AffineTransform::translation (0.0f, y - (cut - band)));
+        housingAt (g, base);
+    }
+}
+
+namespace
+{
+void housingAt (juce::Graphics& g, juce::Rectangle<float> bounds)
 {
     using namespace colour;
     // Ceramic: the rendered surround, housing and teak cheeks (taller with the arpeggiator's
@@ -220,6 +271,8 @@ void housing (juce::Graphics& g, juce::Rectangle<float> bounds)
     g.setColour (housingRim.withAlpha (0.55f));
     g.strokePath (body, juce::PathStrokeType (1.0f));
 }
+
+} // namespace
 
 void raised (juce::Graphics& g, juce::Rectangle<float> r, float radius, juce::Colour top, juce::Colour bottom, float shadow)
 {

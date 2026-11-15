@@ -4432,6 +4432,38 @@ std::unique_ptr<MiniPanel> OspAudioProcessor::createSatellitePanel (int card)
     return std::make_unique<SatellitePanel> (*this, [] (int c, const char* field) { return satelliteFieldId (c, field); }, card);
 }
 
+bool OspAudioProcessor::effectiveValue (const juce::String& parameterId, EffectiveValue& out) const
+{
+    // The shared stages' macros and the layers' EQ as the engine plays them
+    // (InstrumentEngine::EffectiveSlot): the IDs, once.
+    using Slot = InstrumentEngine::EffectiveSlot;
+    static const std::map<juce::String, int> slots = [] {
+        std::map<juce::String, int> m { { "life", static_cast<int> (Slot::life) }, { "drive", static_cast<int> (Slot::drive) },
+                                        { "character", static_cast<int> (Slot::character) }, { "motion", static_cast<int> (Slot::motion) },
+                                        { "space", static_cast<int> (Slot::space) }, { "echo", static_cast<int> (Slot::echo) } };
+        for (int l = 0; l < 3; ++l)
+        {
+            const int first = static_cast<int> (Slot::eqFirst) + 4 * l;
+            const juce::String bell (eqBandKey (eq::Band::bell)), low (eqBandKey (eq::Band::lowShelf)), high (eqBandKey (eq::Band::highShelf));
+            m.emplace (eqParameterId (l, bell + ".frequency"), first);
+            m.emplace (eqParameterId (l, bell + ".gain"), first + 1);
+            m.emplace (eqParameterId (l, low + ".gain"), first + 2);
+            m.emplace (eqParameterId (l, high + ".gain"), first + 3);
+            const int voice = static_cast<int> (Slot::voiceFirst) + 3 * l;
+            m.emplace (layerParameterId (l, "granular.position"), voice);
+            m.emplace (layerParameterId (l, "granular.spread"), voice + 1);
+            m.emplace (layerParameterId (l, "start"), voice + 2);
+        }
+        return m;
+    }();
+    const auto it = slots.find (parameterId);
+    EffectiveValues::Reading r;
+    if (it == slots.end() || ! engine.effectiveValues().read (it->second, r))
+        return false;
+    out = { r.value, r.low, r.high };
+    return true;
+}
+
 } // namespace osp::plugin
 
 

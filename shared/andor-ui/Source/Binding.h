@@ -36,6 +36,45 @@ inline bool matches (const juce::String& a, const juce::String& b)
     return aAll ? pb.startsWith (pa) : pa.startsWith (pb);
 }
 
+/**
+    The parameter a single control edits, for finding that exact control (ANDOR Learn points at
+    it): "andorControl" (a rack's knob, switch or selector), "paramId" (a card dial, a macro
+    knob, an arpeggiator knob) or a one-ID "andorParams" tag (an AUX strip control). Changes
+    nothing in how the control looks or behaves.
+*/
+inline const juce::Identifier controlProperty { "andorControl" };
+
+inline void markControl (juce::Component& control, const juce::String& parameterId)
+{
+    control.getProperties().set (controlProperty, parameterId);
+}
+
+/** Whether `c` is the control that edits `parameterId`. */
+inline bool isControlFor (const juce::Component& c, const juce::String& parameterId)
+{
+    const auto& props = c.getProperties();
+    if (props[controlProperty].toString() == parameterId || props["paramId"].toString() == parameterId)
+        return true;
+    const auto tags = props[property].toString();
+    return tags == parameterId;
+}
+
+/** The visible control under `root` that edits `parameterId` (the first in paint order), or
+    nullptr. A hidden one (a closed panel, another page) is never returned. */
+inline juce::Component* findControl (juce::Component& root, const juce::String& parameterId)
+{
+    for (auto* child : root.getChildren())
+    {
+        if (! child->isVisible())
+            continue;
+        if (isControlFor (*child, parameterId))
+            return child;
+        if (auto* found = findControl (*child, parameterId))
+            return found;
+    }
+    return nullptr;
+}
+
 /** Whether any of `tags` is among `bound`. */
 inline bool anyBound (const juce::StringArray& tags, const juce::StringArray& bound)
 {

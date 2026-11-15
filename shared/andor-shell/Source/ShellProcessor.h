@@ -1,6 +1,6 @@
 #pragma once
 
-#include "CardArpLanes.h"
+#include "AndorParameters.h"
 #include "InstrumentHost.h"
 #include "InstrumentLoader.h"
 #include "ShellProduct.h"
@@ -48,6 +48,11 @@ public:
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
     using AudioProcessor::processBlock;
+    /** VST3: a product's external input (ProductInfo::externalInputName) is an auxiliary
+        (sidechain) bus, never a main input - the plugin stays an instrument. */
+    juce::VST3ClientExtensions* getVST3ClientExtensions() override;
+    /** Whether this product has an external audio input bus at all (and the host kept it). */
+    bool hasExternalInput() const;
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
     const juce::String getName() const override { return productInfo().name; }
@@ -94,6 +99,38 @@ public:
     osp::mod::Curve modulationCurve (int index) const override;
     void setModulationCurve (int index, const osp::mod::Curve& curve, bool undoable = true) override;
     osp::InstrumentEngine::ModView modulationView() const noexcept override { return engine->modulationView(); }
+    /** The header MIX's live node: the A/B mix as the engine plays it (its effective `ab.blend`),
+        the triangle's x / y as stored (a product's engine moves only the blend). Not modulated
+        while the engine publishes no blend of its own. */
+    osp::InstrumentEngine::LiveMix liveMix() const noexcept override
+    {
+        try
+        {
+            EffectiveValue v;
+            if (! effectiveValue (osp::plugin::ids::blend, v))
+                return {};
+            osp::InstrumentEngine::LiveMix m;
+            m.blend = v.value;
+            if (const auto* x = parameters.getRawParameterValue (osp::plugin::ids::mixX))
+                m.x = x->load();
+            if (const auto* y = parameters.getRawParameterValue (osp::plugin::ids::mixY))
+                m.y = y->load();
+            m.modulated = true;
+            return m;
+        }
+        catch (...)
+        {
+            return {};
+        }
+    }
+    bool effectiveValue (const juce::String& parameterId, EffectiveValue& out) const override
+    {
+        osp::EffectiveValues::Reading r;
+        if (! engine->effectiveValue (parameterId, r))
+            return false;
+        out = { r.value, r.low, r.high };
+        return true;
+    }
     int modControllerNumber (int slot) const noexcept override;
     void setModControllerNumber (int slot, int controller) noexcept override;
     void learnModController (int slot) noexcept override { ccLearn.store (slot, std::memory_order_release); }
@@ -109,13 +146,15 @@ public:
     int lastPlayedNoteNumber() const noexcept override { return lastNote.load (std::memory_order_relaxed); }
     ArpView arpView() const noexcept override;
     bool cardArpeggiator() const noexcept override { return cardArp && ! referenceParity; }
-    /** Live capture is ANDOR OSP's (a product has none yet); the parity render draws its REC
-        key as ANDOR OSP does, so the comparison sees only real differences. */
-    bool liveCapture() const noexcept override { return referenceParity; }
     /** The effects rack's modules (the product's; none in the visual regression's parity render). */
     bool showsRack() const noexcept { return ! referenceParity && (! product().rackModules.empty() || ! product().productRacks.empty()); }
     /** The product's other view of the sources' area and its icon (not in the parity render). */
     bool showsSourceView() const noexcept { return ! referenceParity && product().sourceAreaView.create != nullptr; }
+    /** The product's AUX strip (ShellProduct::auxStrip), and whether it is shown (a view
+        setting: saved with the session, kept as it is when a preset loads). */
+    bool hasAuxStrip() const noexcept { return ! referenceParity && product().auxStrip.has_value() && product().auxStrip->create != nullptr; }
+    bool auxStripShown() const noexcept { return hasAuxStrip() && auxOpen.load(); }
+    void setAuxStripShown (bool shown) noexcept { auxOpen = shown; }
     /** A shared rack's faceplate: the product's (not in the parity render). */
     const osp::plugin::rack::Faceplate* rackFaceplate (int kind) const noexcept override
     {
@@ -130,13 +169,29 @@ public:
     /** The cards are shorter by EngineCard::footTrim only while three show (ANDOR OSP's rule,
         so reference parity follows it); a product with its modifiers in the well: always. */
     bool trimsOnlyWithThreeCards() const noexcept { return referenceParity; }
+    /** Live capture is ANDOR OSP's (a product has none yet); the parity render draws its REC
+        key as ANDOR OSP does, so the comparison sees only real differences. */
+    bool liveCapture() const noexcept override { return referenceParity; }
     /** The rack is its modules' faces (the product's choice; not in the parity render). */
     bool fullBleedRacks() const noexcept { return ! referenceParity && product().fullBleedRacks; }
     bool stableModulationTabs() const noexcept { return ! referenceParity && product().stableModulationTabs; }
     // (the header's MIX, the ARPEGGIATOR's X, the GRANULAR key: the product's, never in parity)
     bool headerMixShown() const noexcept { return referenceParity || product().headerMix; }
     bool crossCloseKeys() const noexcept { return ! referenceParity && product().crossCloseKeys; }
-    // SATELLITE: the product's (never in the parity render).
+    /** The macros' own on / off lamps (the product's; never in the parity render). */
+    bool showsMacroSwitches() const noexcept { return ! referenceParity && ! product().macroSwitches.empty(); }
+    // USER MACROS: the product's (never in the parity render).
+    const ProductInfo::UserMacros* userMacros() const noexcept { return ! referenceParity && product().userMacros ? &*product().userMacros : nullptr; }
+    /** The macro bank shown (0 CORE, 1 USER): an interface preference in Interface.xml, never
+        the sound, never a preset. Message thread. */
+    int macroBank() const;
+    void setMacroBank (int bank);
+    // SHAPER DNA: the product's (never in the parity render).
+    juce::String shaperDnaParameterId() const override { return ! referenceParity && product().shaperDna ? product().shaperDna->parameterId : juce::String(); }
+    std::unique_ptr<osp::plugin::MiniPanel> createShaperDnaPanel() override
+    {
+        return ! referenceParity && product().shaperDna && product().shaperDna->panel != nullptr ? product().shaperDna->panel (*this) : nullptr;
+    }
     juce::String satelliteParameterId (int card) const override
     {
         return ! referenceParity && product().satellite && product().satellite->parameterId != nullptr ? product().satellite->parameterId (card) : juce::String();
@@ -145,9 +200,15 @@ public:
     {
         return ! referenceParity && product().satellite && product().satellite->panel != nullptr ? product().satellite->panel (*this, card) : nullptr;
     }
+    juce::String unpitchedSourceName (int) const override { return referenceParity ? juce::String() : product().unpitchedSourceName; }
+    juce::String shaperDnaNote() const override
+    {
+        return ! referenceParity && product().shaperDna && product().shaperDna->note != nullptr ? product().shaperDna->note (const_cast<ShellProcessor&> (*this)) : juce::String();
+    }
     /** ANDOR Learn (the product's opt-in; never in the parity render). */
     bool learnEnabled() const noexcept { return ! referenceParity && product().learn.has_value() && product().learn->catalog != nullptr; }
     bool generatorGranularToggle() const noexcept { return ! referenceParity && product().generatorGranularToggle; }
+    bool arpCompanionShown() const noexcept { return ! referenceParity && product().arpCompanion.name.isNotEmpty(); }
     juce::String cardArpNamespace() const override { return productInfo().slug + "."; }
     void setArpViewCard (int shown) noexcept override { arpViewLane.store (std::clamp (shown, 0, 2), std::memory_order_relaxed); }
 
@@ -156,6 +217,12 @@ public:
     float hostTempo() const noexcept override { return tempo.load (std::memory_order_relaxed); }
     float outputPeak() const noexcept override { return outputPeakValue.load (std::memory_order_relaxed); }
     float shaperPhase() const noexcept override { return engine->shaperPhase(); }
+    bool stepLayerEqSpectrum (int layer) override { return ! referenceParity && engine->stepLayerEqSpectrum (layer); }
+    void paintLayerEqSpectrum (int layer, juce::Graphics& g, juce::Rectangle<float> plot, const std::function<double (float)>& hzForX) override
+    {
+        if (! referenceParity)
+            engine->paintLayerEqSpectrum (layer, g, plot, hzForX);
+    }
     int movementLaneCount() const noexcept override { return std::max (1, static_cast<int> (product().movementLanes.size())); }
     MovementLane movementLane (int lane) const override
     {
@@ -242,6 +309,18 @@ public:
     void pollLoads() { timerCallback(); }
     juce::String statusMessage() const;
 
+    /** ANDOR Learn: loads a lesson's example sound (a whole state, as a preset loads: the view
+        stays), first keeping the complete sound playing now - every parameter, the cards'
+        recordings (by their stored files), the macros and their assignments, D - so Restore
+        brings it back. A second example keeps the sound from before the first. Nothing is
+        written to a preset file, the host's tracks or its routing. False: not loaded, nothing
+        changed (the kept sound is re-applied if the example failed half way). Message thread. */
+    bool loadLearnExample (const juce::XmlElement& example);
+    /** The sound from before an example is kept (in this instance, until restored or closed). */
+    bool canRestoreLearnSound() const noexcept { return learnKept != nullptr; }
+    /** Brings back the sound kept before the example, then forgets it. False: none kept. */
+    bool restoreLearnSound();
+
     // Presets and files
     /** Documents/<product's preset folder> (env ANDOR_DOCUMENTS_DIR overrides, for tests). */
     juce::File documentsFolder() const;
@@ -278,6 +357,14 @@ public:
     juce::MidiKeyboardState keyboardState;
 
 private:
+    static BusesProperties shellBuses();
+    struct ExternalInputExtensions final : public juce::VST3ClientExtensions
+    {
+        bool getPluginHasMainInput() const override { return false; }
+    } externalInputExtensions;
+    /** The external input, copied before the output is written (prepareToPlay sizes them). */
+    std::vector<float> externalLeft, externalRight;
+
     void timerCallback() override;
     int resolve (int layer) const noexcept { return std::clamp (layer < 0 ? editLayer() : layer, 0, numLayers - 1); }
     void enqueueLoad (osp::plugin::LoadRequest request, int layer);
@@ -294,6 +381,7 @@ private:
     std::unique_ptr<Engine> engine;
     Engine::Description description;
     mutable std::optional<osp::plugin::CardWellEditor::ViewState> wellView;   ///< (read from Interface.xml when first asked)
+    mutable std::optional<int> bankShown;   ///< (read from Interface.xml when first asked)
     juce::StringArray bound;
     juce::String generatorName;
     std::array<osp::plugin::frame::MacroSpec, osp::plugin::frame::macroCount> macros;
@@ -386,7 +474,23 @@ private:
         an arpeggiator playing some cards, and the held keys on the others. */
     const juce::MidiBuffer& runCardArpeggiators (const juce::MidiBuffer& midi, int numSamples, const osp::HostTiming& timing) noexcept;
     osp::Arpeggiator::Settings arpSettings() noexcept;
+    void trackOutput (const juce::MidiBuffer& out) noexcept;
+    void releaseSounding (juce::MidiBuffer& out) noexcept;
     void publishArpDisplay() noexcept;
+    /** ProductInfo::arpFollower (after the lanes ran this block): the follower's notes, or
+        null while it plays the keys. */
+    const juce::MidiBuffer* runArpFollower (const juce::MidiBuffer& midi, int numSamples, const osp::HostTiming& timing) noexcept;
+    osp::Arpeggiator::Settings followerSettings (int lane) const noexcept;
+    bool arpFollowerOn = false;
+    std::atomic<float>* followerOnParam = nullptr;
+    std::atomic<float>* followerLaneParam = nullptr;
+    std::atomic<float>* followerPowerParam = nullptr;
+    std::atomic<float>* followerModeParam = nullptr;
+    std::uint32_t followerModes = 0;                  ///< bit per mode index that follows
+    std::atomic<bool> followerFlush { false };        ///< a state was loaded: start over
+    osp::Arpeggiator::Settings blockArpSettings;      ///< this block's arpSettings() (audio thread)
+    std::uint8_t blockLanesRan = 0, lastLanesRan = 0; ///< bit per lane that ran (0: `arpeggiator`)
+    bool blockLanesRestarted = false;                 ///< the lanes started over this block
     /** ARP RATE's Stepped mode: the musical ratio nearest a speed (as ANDOR OSP's). */
     static double steppedArpRatio (double multiplier) noexcept;
     bool arpBound = false;
@@ -402,17 +506,37 @@ private:
     std::atomic<float>* arpSwingParam = nullptr;
     std::atomic<float>* arpVelocityParam = nullptr;
     std::atomic<float>* seedParam = nullptr;
-    // The per-card lanes (audio thread; osp::plugin::CardArpLanes, shared with ANDOR OSP's
-    // processor). Lane 0 is `arpeggiator` (card A, or the linked cards).
+    // The per-card lanes (audio thread). Lane 0 is `arpeggiator` (card A, or the linked cards).
     bool cardArp = false, referenceParity = false;
     std::atomic<float>* cardLinkParam = nullptr;
     std::array<std::atomic<float>*, 3> cardOnParams {};
     std::array<std::atomic<float>*, 2> lanePatternParams {}, laneRateParams {}, laneOctavesParams {};
-    struct LaneHost;
-    /** The lanes and their host adapter, on the heap (allocated with the parameters, never on
-        the audio thread, only for a product that opts in): a processor on a stack stays small. */
-    std::unique_ptr<osp::plugin::CardArpLanes> lanes;
-    std::unique_ptr<LaneHost> laneHost;
+    std::array<std::uint8_t, 3> laneMask {};      ///< the cards each lane plays (0: idle)
+    std::uint8_t passMask = 0;                    ///< the cards that hold the keys
+    int laneConfig = 0;                           ///< 0: the one arpeggiator; else LINK and the cards
+    bool forceArpOff = false;                     ///< no card plays the arpeggio: the keys as played
+    bool pedalDown = false;
+    /** The lanes' larger state, on the heap (allocated with the parameters, never on the
+        audio thread): a processor on a stack (a host's, a test's) stays small. */
+    struct CardLanes
+    {
+        std::array<osp::Arpeggiator, 2> laneArps;     ///< cards B and C, unlinked
+        juce::MidiBuffer laneMidi, legacyInput;
+        std::array<std::array<std::uint8_t, 128>, 16> heldKeys {};      ///< velocity of each key down, by channel
+        std::array<std::array<std::uint8_t, 128>, 16> passChannel {};   ///< the channel a held key sounds on (0: none)
+        std::array<std::array<bool, 128>, 16> passSustained {};         ///< released under the pedal
+        std::array<std::array<bool, 128>, 16> soundingOut {};           ///< what the engine was given, by channel
+        /** ProductInfo::arpFollower: its own copy of the lane it follows (a copy of that lane
+            whenever the lane runs, so the two play the same notes at the same samples). */
+        struct Follower
+        {
+            osp::Arpeggiator arp;
+            juce::MidiBuffer out;
+            std::array<std::uint8_t, 128> sounding {};   ///< notes on, not yet ended (channel 1)
+            int key = 0;                                 ///< 0: the keys; else 1 + lane + 3 x mode
+        } follower;
+    };
+    std::unique_ptr<CardLanes> lanes;
     std::atomic<int> arpViewLane { 0 };           ///< the lane the ARP display shows
     std::array<std::atomic<int>, osp::Arpeggiator::displaySteps> arpDisplayLow {}, arpDisplayHigh {};
     std::atomic<int> arpDisplayCurrent { -1 };
@@ -456,12 +580,15 @@ private:
     // View settings.
     std::atomic<bool> arpOpen { false }, shaperLarge { false };
     std::atomic<int> rackOpen { 0 };
+    std::atomic<bool> auxOpen { false };
+    bool applyingPreset = false;   ///< (loadPreset: the view's AUX strip stays as it is)
     std::atomic<int> modTab { 0 };
 
     // Presets.
     juce::File lastPresetFile;
     std::unique_ptr<juce::XmlElement> previousState;
     juce::String previousStateLabel;
+    std::unique_ptr<juce::XmlElement> learnKept;   ///< (ANDOR Learn: the sound from before an example)
     mutable juce::StringArray favouriteNames;
     mutable bool favouritesLoaded = false;
 

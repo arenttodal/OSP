@@ -48,6 +48,11 @@ public:
     void add (Target);
     /** A named UI state a lesson can require ("arp.panel.open"). */
     void addState (const juce::String& id, std::function<bool()> query);
+    /** A named value a lesson can compare as it compares a parameter (Condition::changed /
+        equals): something the product has that is not a parameter (the effect chain's order). */
+    void addValue (const juce::String& id, std::function<float()> read);
+    std::optional<float> value (const juce::String& id) const;
+    bool hasValue (const juce::String& id) const { return values.count (id) != 0; }
 
     const Target* find (const juce::String& id) const;
     bool contains (const juce::String& id) const { return find (id) != nullptr; }
@@ -59,6 +64,10 @@ public:
         at once, never stored), or nothing while it is not shown inside `space`. */
     std::optional<juce::Rectangle<int>> boundsIn (const juce::String& id, juce::Component& space) const;
     bool ready (const juce::String& id, juce::Component& space) const { return boundsIn (id, space).has_value(); }
+    /** The nearest panel around the target that is noticeably larger than it (the ARP panel
+        around a key, the rack around a segment or knob, the card around its LEVEL) and smaller
+        than half of `space`: the note prefers not to cover it. Nothing if there is none. */
+    std::optional<juce::Rectangle<int>> containerIn (const juce::String& id, juce::Component& space) const;
     bool reveal (const juce::String& id) const;
 
     /** `c` and each of its parents up to `space` are visible. */
@@ -67,6 +76,7 @@ public:
 private:
     std::vector<Target> targets;
     std::map<juce::String, std::function<bool()>> states;
+    std::map<juce::String, std::function<float()>> values;
 };
 
 } // namespace andor::learn

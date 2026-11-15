@@ -300,8 +300,8 @@ private:
     std::unique_ptr<EqValueField> frequencyField, gainField, qField;
     juce::Rectangle<float> titleArea, nameArea, slopeArea, bandSwitchArea, resetArea, closeArea, dampenTab;
     std::unique_ptr<DampenEditor> dampenPage;
-    EqSpectrum spectrum;   ///< what plays through the layer's EQ (the routing EQUALIZER rack's analyser)
-    std::array<double, 4> modulationOffsets() const;   ///< bell octaves, bell dB, low shelf dB, high shelf dB (global LFOs now)
+    EqSpectrum spectrum;   ///< what plays through the layer's EQ (ANDOR OSP: the routing EQUALIZER rack's analyser)
+    std::array<double, 4> modulationOffsets (const eq::Settings& base) const;   ///< bell octaves, bell dB, low shelf dB, high shelf dB: what the engine plays against `base`
     eq::Settings effective() const;                     ///< what is heard now (the settings plus modulation)
 };
 

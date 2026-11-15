@@ -20,6 +20,19 @@ void TargetRegistry::addState (const juce::String& id, std::function<bool()> que
     states[id] = std::move (query);
 }
 
+void TargetRegistry::addValue (const juce::String& id, std::function<float()> read)
+{
+    values[id] = std::move (read);
+}
+
+std::optional<float> TargetRegistry::value (const juce::String& id) const
+{
+    const auto it = values.find (id);
+    if (it == values.end() || it->second == nullptr)
+        return std::nullopt;
+    return it->second();
+}
+
 const Target* TargetRegistry::find (const juce::String& id) const
 {
     for (const auto& t : targets)
@@ -64,6 +77,32 @@ std::optional<juce::Rectangle<int>> TargetRegistry::boundsIn (const juce::String
     if (r.isEmpty())
         return std::nullopt;
     return r;
+}
+
+std::optional<juce::Rectangle<int>> TargetRegistry::containerIn (const juce::String& id, juce::Component& space) const
+{
+    // The nearest enclosing panel noticeably larger than the control (the ARP panel around one
+    // of its keys, the rack around a knob or a segment, the card around its LEVEL), and smaller
+    // than half of `space` (never a whole section).
+    const auto target = boundsIn (id, space);
+    const auto* t = find (id);
+    if (! target.has_value() || t == nullptr)
+        return std::nullopt;
+    auto* c = t->component();
+    if (c == nullptr || ! shownWithin (*c, space))
+        return std::nullopt;
+    const auto targetArea = static_cast<double> (target->getWidth()) * target->getHeight();
+    const auto spaceArea = static_cast<double> (space.getWidth()) * space.getHeight();
+    for (auto* p = t->area != nullptr ? c : c->getParentComponent(); p != nullptr && p != &space; p = p->getParentComponent())
+    {
+        const auto r = space.getLocalArea (p, p->getLocalBounds());
+        const auto area = static_cast<double> (r.getWidth()) * r.getHeight();
+        if (area >= 0.5 * spaceArea)
+            return std::nullopt;
+        if (area >= 6.0 * targetArea)
+            return r;
+    }
+    return std::nullopt;
 }
 
 bool TargetRegistry::reveal (const juce::String& id) const

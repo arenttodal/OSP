@@ -19,7 +19,7 @@ void LessonRunner::setCatalog (Catalog c)
 bool LessonRunner::inTour() const noexcept
 {
     return current == State::tourPreparing || current == State::tourShowing || current == State::waitingForAction || current == State::stepComplete
-        || current == State::paused;
+        || current == State::paused || current == State::blocked;
 }
 
 const Step* LessonRunner::step() const noexcept
@@ -45,11 +45,11 @@ bool LessonRunner::allDone() const noexcept
 {
     if (active == nullptr)
         return false;
-    for (std::size_t s = 0; s < statuses.size(); ++s)
+    // From where this tour began (a resumed lesson's earlier steps were done before), every
+    // task was done or already so - there is no way past one otherwise.
+    for (std::size_t s = static_cast<std::size_t> (std::max (0, startedAt)); s < statuses.size(); ++s)
     {
         // The summary (a final explanation) counts as done once Finish is pressed.
-        if (statuses[s] == StepStatus::skipped)
-            return false;
         if (statuses[s] == StepStatus::pending && active->steps[s].completion.kind == Completion::Kind::userAction && ! active->steps[s].optional)
             return false;
     }
@@ -64,6 +64,8 @@ bool LessonRunner::start (const juce::String& lessonId, int fromStep)
     if (inTour())
         close();
     active = lesson;
+    loadedExample = false;
+    startedAt = fromStep;
     statuses.assign (lesson->steps.size(), StepStatus::pending);
     enterStep (fromStep);
     return true;
@@ -84,7 +86,7 @@ void LessonRunner::enterStep (int s)
     index = s;
     ++gen;   // events of the previous step are stale from here
     gesture = false;
-    armed = false;
+    pendingTicks = 0;
     current = State::tourPreparing;
     const auto* st = step();
     snapshot.clear();
@@ -92,6 +94,8 @@ void LessonRunner::enterStep (int s)
     st->completion.postcondition.collectParameters (parameters);
     if (st->completion.alreadyDone.has_value())
         st->completion.alreadyDone->collectParameters (parameters);
+    for (const auto& r : st->requirements)
+        r.holds.collectParameters (parameters);
     for (const auto& id : parameters)
         if (const auto v = host.parameterValue (id))
             snapshot[id] = *v;
@@ -101,24 +105,28 @@ void LessonRunner::enterStep (int s)
         host.reveal (st->targetId);
     current = settledState();
     beforePause = current;
-    if (! lessonReady() || (st->targetId.isNotEmpty() && ! host.targetReady (st->targetId)))
+    if (! st->preparation && unmetRequirement() != nullptr)
+        current = State::blocked;   // (what it needs first: the note says what, and where)
+    else if (st->targetId.isNotEmpty() && ! host.targetReady (st->targetId))
         current = State::paused;
     changed();
 }
 
-bool LessonRunner::lessonReady() const
+const Requirement* LessonRunner::unmetRequirement() const
 {
-    return active == nullptr || ! active->preparation.ready.has_value() || holds (*active->preparation.ready);
+    const auto* st = step();
+    if (st == nullptr)
+        return nullptr;
+    for (const auto& r : st->requirements)
+        if (! holds (r.holds))
+            return &r;
+    return nullptr;
 }
 
-void LessonRunner::complete()
+bool LessonRunner::preparationReady() const
 {
-    statuses[static_cast<std::size_t> (index)] = StepStatus::done;
-    current = State::stepComplete;
-    beforePause = current;
-    armed = false;
-    ++gen;   // the same event can never complete another step
-    changed();
+    const auto* st = step();
+    return st != nullptr && st->preparation && unmetRequirement() == nullptr;
 }
 
 bool LessonRunner::holds (const Condition& c) const
@@ -151,6 +159,8 @@ bool LessonRunner::holds (const Condition& c) const
                 if (holds (t))
                     return true;
             return false;
+        case Condition::Kind::negation:
+            return c.terms.size() == 1 && ! holds (c.terms.front());
     }
     return false;
 }
@@ -162,17 +172,29 @@ bool LessonRunner::handle (const LearnEvent& e)
     const auto* st = step();
     if (st == nullptr || st->completion.kind != Completion::Kind::userAction || ! st->completion.actions.contains (e.actionId))
         return false;
+    if (st->completion.parameterId.isNotEmpty() && e.parameterId != st->completion.parameterId)
+        return false;   // (another control's)
+    if (unmetRequirement() != nullptr)
+        return false;
     if (! holds (st->completion.postcondition))
     {
-        // An action whose result comes later (a recording loading): armed in this step only.
-        if (st->completion.awaitResult && ! armed)
-        {
-            armed = true;
-            changed();
-        }
+        // The touch opened a menu whose choice comes later (a dropdown): the step waits a
+        // little for it, its baseline held still meanwhile.
+        if (st->completion.choiceFollows)
+            pendingTicks = pendingTouchTicks;
         return false;
     }
-    complete();
+    pendingTicks = 0;
+    statuses[static_cast<std::size_t> (index)] = StepStatus::done;
+    current = State::stepComplete;
+    beforePause = current;
+    ++gen;   // the same event can never complete another step
+    if (st->advanceWhenDone && ! isLastStep())
+    {
+        enterStep (index + 1);
+        return true;
+    }
+    changed();
     return true;
 }
 
@@ -181,7 +203,7 @@ bool LessonRunner::canContinue() const
     const auto* st = step();
     if (st == nullptr || (current != State::waitingForAction && current != State::paused) || ! st->completion.alreadyDone.has_value())
         return false;
-    return holds (*st->completion.alreadyDone);
+    return unmetRequirement() == nullptr && holds (*st->completion.alreadyDone);
 }
 
 juce::String LessonRunner::currentBody() const
@@ -189,17 +211,21 @@ juce::String LessonRunner::currentBody() const
     const auto* st = step();
     if (st == nullptr)
         return {};
-    if (current == State::paused && ! lessonReady())
-        return active->preparation.needs.isNotEmpty() ? active->preparation.needs
-                                                      : juce::String::fromUTF8 ("This lesson needs the sound it was prepared for.");
     if (current == State::paused)
         return st->unavailableBody.isNotEmpty() ? st->unavailableBody
                                                 : juce::String::fromUTF8 ("This control isn\xe2\x80\x99t showing right now. Show me opens it.");
-    if (armed && current == State::waitingForAction && st->completion.awaitingBody.isNotEmpty())
-        return st->completion.awaitingBody;
     if (st->variantWhen.has_value() && holds (*st->variantWhen))
         return st->variantBody;
     return st->body;
+}
+
+void LessonRunner::finishTour()
+{
+    current = State::tourComplete;
+    ++gen;
+    if (onProgress != nullptr)
+        onProgress (*active, index, true, allDone());
+    changed();
 }
 
 void LessonRunner::next()
@@ -210,11 +236,7 @@ void LessonRunner::next()
         statuses[static_cast<std::size_t> (index)] = StepStatus::done;
     if (isLastStep())
     {
-        current = State::tourComplete;
-        ++gen;
-        if (onProgress != nullptr)
-            onProgress (*active, index, true, allDone());
-        changed();
+        finishTour();
         return;
     }
     enterStep (index + 1);
@@ -227,24 +249,6 @@ void LessonRunner::back()
     enterStep (index - 1);
 }
 
-void LessonRunner::skip()
-{
-    if (! inTour())
-        return;
-    if (statuses[static_cast<std::size_t> (index)] == StepStatus::pending)
-        statuses[static_cast<std::size_t> (index)] = StepStatus::skipped;
-    if (isLastStep())
-    {
-        current = State::tourComplete;
-        ++gen;
-        if (onProgress != nullptr)
-            onProgress (*active, index, true, allDone());
-        changed();
-        return;
-    }
-    enterStep (index + 1);
-}
-
 bool LessonRunner::continueAlreadyDone()
 {
     if (! canContinue())
@@ -252,14 +256,43 @@ bool LessonRunner::continueAlreadyDone()
     statuses[static_cast<std::size_t> (index)] = StepStatus::continued;
     if (isLastStep())
     {
-        current = State::tourComplete;
-        ++gen;
-        if (onProgress != nullptr)
-            onProgress (*active, index, true, allDone());
-        changed();
+        finishTour();
         return true;
     }
     enterStep (index + 1);
+    return true;
+}
+
+bool LessonRunner::useCurrentSound()
+{
+    const auto* st = step();
+    if (st == nullptr || ! st->preparation || ! inTour())
+        return false;
+    statuses[static_cast<std::size_t> (index)] = StepStatus::done;
+    if (isLastStep())
+        finishTour();
+    else
+        enterStep (index + 1);
+    return true;
+}
+
+bool LessonRunner::loadExample()
+{
+    const auto* st = step();
+    if (st == nullptr || active == nullptr || active->exampleId.isEmpty() || ! inTour())
+        return false;
+    if (! host.loadExample (active->exampleId))
+        return false;   // (nothing was changed: the note says it stays as it is)
+    loadedExample = true;
+    // The example replaced every parameter: the step's baseline follows it (a load is never the
+    // musician's change of a control).
+    for (auto& [id, value] : snapshot)
+        if (const auto now = host.parameterValue (id))
+            value = *now;
+    if (st->preparation)
+        return useCurrentSound();
+    update();
+    changed();
     return true;
 }
 
@@ -269,6 +302,17 @@ bool LessonRunner::showMe()
     if (! inTour() || st == nullptr || st->targetId.isEmpty())
         return false;
     const bool shown = host.reveal (st->targetId);
+    update();
+    changed();
+    return shown;
+}
+
+bool LessonRunner::revealRequirement()
+{
+    const auto* r = unmetRequirement();
+    if (! inTour() || r == nullptr || r->targetId.isEmpty())
+        return false;
+    const bool shown = host.reveal (r->targetId);
     update();
     changed();
     return shown;
@@ -289,34 +333,64 @@ void LessonRunner::close()
 void LessonRunner::update()
 {
     const auto* st = step();
-    if (st == nullptr)
+    if (st == nullptr || ! inTour())
         return;
-    // (A step can pause while its result comes: a dropped file hides the drop zone it points at.)
-    if (armed && (current == State::waitingForAction || current == State::paused) && holds (st->completion.postcondition))
+    if (pendingTicks > 0 && current == State::waitingForAction)
     {
-        complete();   // the armed action's result has arrived (in its own step)
-        return;
+        // The musician's touch is still being answered (a menu item chosen after the click).
+        --pendingTicks;
+        if (unmetRequirement() == nullptr && holds (st->completion.postcondition))
+        {
+            pendingTicks = 0;
+            statuses[static_cast<std::size_t> (index)] = StepStatus::done;
+            current = State::stepComplete;
+            beforePause = current;
+            ++gen;
+            changed();
+            return;
+        }
     }
-    if (! gesture && ! armed && (current == State::waitingForAction || current == State::paused))
+    if (! gesture && pendingTicks == 0 && (current == State::waitingForAction || current == State::paused || current == State::blocked))
         for (auto& [id, value] : snapshot)
             if (const auto now = host.parameterValue (id))
                 value = *now;
-    const bool ready = lessonReady();
-    if (st->targetId.isEmpty() && ready && current != State::paused)
+    // What the step needs, checked on the real state each tick: missing, it waits for the fix
+    // (blocked); fixed, it carries on where it was.
+    if (! st->preparation && current != State::stepComplete)
+    {
+        const bool missing = unmetRequirement() != nullptr;
+        if (missing && current != State::blocked)
+        {
+            beforePause = current;
+            current = State::blocked;
+            changed();
+            return;
+        }
+        if (! missing && current == State::blocked)
+        {
+            current = settledState();
+            if (st->targetId.isNotEmpty() && ! host.targetReady (st->targetId))
+                current = State::paused;
+            changed();
+            return;
+        }
+        if (missing)
+            return;
+    }
+    if (st->targetId.isEmpty())
         return;
-    const bool shown = ready && (st->targetId.isEmpty() || host.targetReady (st->targetId));
     if (current == State::tourShowing || current == State::waitingForAction)
     {
-        if (! shown)
+        if (! host.targetReady (st->targetId))
         {
             beforePause = current;
             current = State::paused;
             changed();
         }
     }
-    else if (current == State::paused && shown)
+    else if (current == State::paused && host.targetReady (st->targetId))
     {
-        current = beforePause == State::paused ? settledState() : beforePause;
+        current = beforePause == State::paused || beforePause == State::blocked ? settledState() : beforePause;
         changed();
     }
 }

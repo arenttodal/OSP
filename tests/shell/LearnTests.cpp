@@ -71,6 +71,7 @@ namespace
         l.steps.push_back (step ("change", "Change", "Change the rate.", "rate", Completion::action ({ "rate.changed" }, Condition::changed ("rate"))));
         l.steps.push_back (step ("cards", "Cards", "A off, B on.", "cards",
                                  Completion::action ({ "card.toggled" }, Condition::all ({ Condition::equals ("cardA", 0.0f), Condition::equals ("cardB", 1.0f) }))));
+        l.steps.push_back (step ("choose", "Choose", "Choose a mode.", "rate", Completion::action ({ "mode.touched" }, Condition::equals ("mode", 2.0f)).viaMenu()));
         l.steps.push_back (step ("done", "Done", "Finished.", "", Completion::manual()));
         c.lessons.push_back (l);
         Lesson other;
@@ -86,10 +87,19 @@ namespace
 
     struct FakeHost final : RunnerHost
     {
-        std::map<juce::String, float> values { { "rate", 3.0f }, { "cardA", 1.0f }, { "cardB", 1.0f } };
+        std::map<juce::String, float> values { { "rate", 3.0f }, { "cardA", 1.0f }, { "cardB", 1.0f }, { "mode", 0.0f } };
         std::map<juce::String, bool> states { { "panel.open", false } };
         std::map<juce::String, bool> visible { { "panel", true }, { "rate", true }, { "cards", true } };
         juce::StringArray revealed;
+        std::map<juce::String, float> exampleLoads;
+        bool loadExample (const juce::String&) override
+        {
+            if (exampleLoads.empty())
+                return false;
+            for (const auto& [id, v] : exampleLoads)
+                values[id] = v;
+            return true;
+        }
         std::optional<float> parameterValue (const juce::String& id) override
         {
             const auto it = values.find (id);
@@ -123,7 +133,7 @@ TEST_CASE ("learn: catalog validation finds every authoring mistake", "[learn][u
     CatalogChecks checks;
     checks.targetKnown = [] (const juce::String& id) { return id == "panel" || id == "rate" || id == "cards"; };
     checks.stateKnown = [] (const juce::String& id) { return id == "panel.open"; };
-    checks.parameterKnown = [] (const juce::String& id) { return id == "rate" || id == "cardA" || id == "cardB"; };
+    checks.parameterKnown = [] (const juce::String& id) { return id == "rate" || id == "cardA" || id == "cardB" || id == "mode"; };
     CHECK (validate (c, checks).isEmpty());
 
     auto broken = c;
@@ -233,7 +243,7 @@ TEST_CASE ("learn: a parameter changed by automation before the gesture cannot p
     CHECK (r.handle (userEvent (r, "rate.changed")));
 }
 
-TEST_CASE ("learn: skip, back, continue, pause and close", "[learn][unit]")
+TEST_CASE ("learn: no Skip - Back, Continue when already so, pause and close", "[learn][unit]")
 {
     FakeHost host;
     LessonRunner r (host);
@@ -246,22 +256,22 @@ TEST_CASE ("learn: skip, back, continue, pause and close", "[learn][unit]")
     CHECK (r.canContinue());
     CHECK (r.continueAlreadyDone());
     CHECK (r.status (1) == LessonRunner::StepStatus::continued);
-    // Skip marks skipped and moves on.
+    // A task step cannot be passed without doing it: Next does nothing (there is no Skip).
     REQUIRE (r.stepIndex() == 2);
-    r.skip();
-    CHECK (r.status (2) == LessonRunner::StepStatus::skipped);
-    CHECK (r.stepIndex() == 3);
+    r.next();
+    CHECK (r.stepIndex() == 2);
+    CHECK (r.state() == LessonRunner::State::waitingForAction);
     // Back returns without restoring anything; the step's task is asked again.
     host.values["rate"] = 7.0f;
     r.back();
-    CHECK (r.stepIndex() == 2);
+    CHECK (r.stepIndex() == 1);
     CHECK (juce::exactlyEqual (host.values["rate"], 7.0f));
-    CHECK (r.status (2) == LessonRunner::StepStatus::pending);
-    // A target that disappears pauses the step; Show me brings it back.
+    CHECK (r.status (1) == LessonRunner::StepStatus::pending);
+    REQUIRE (r.continueAlreadyDone());
+    // A target that disappears pauses the step; the reveal key brings it back.
     host.visible["rate"] = false;
     r.update();
     CHECK (r.state() == LessonRunner::State::paused);
-    CHECK (r.currentBody().contains ("Show me"));
     CHECK_FALSE (r.handle (userEvent (r, "rate.changed")));   // nothing to click while paused
     CHECK (r.showMe());
     CHECK (r.state() == LessonRunner::State::waitingForAction);
@@ -272,15 +282,100 @@ TEST_CASE ("learn: skip, back, continue, pause and close", "[learn][unit]")
     CHECK (std::get<0> (reports[0]) == "test.basics");
     CHECK (std::get<1> (reports[0]) == 2);
     CHECK_FALSE (std::get<2> (reports[0]));
-    // Finishing with a skipped task is not "all done".
+    // Finishing means every task was done or already so.
     REQUIRE (r.start ("test.basics", 3));
-    r.skip();
+    host.values["cardA"] = 0.0f;
+    CHECK (r.handle (userEvent (r, "card.toggled")));
+    r.next();
+    host.values["mode"] = 2.0f;
+    CHECK (r.handle (userEvent (r, "mode.touched")));
+    r.next();
     r.next();
     REQUIRE (r.state() == LessonRunner::State::tourComplete);
     CHECK (std::get<2> (reports.back()));
-    CHECK_FALSE (std::get<3> (reports.back()));
+    CHECK (std::get<3> (reports.back()));
     CHECK_FALSE (r.start ("no.such.lesson"));
     CHECK_FALSE (r.start ("test.basics", 99));
+}
+
+TEST_CASE ("learn: requirements - a step blocks until what it needs is there; preparation offers the example", "[learn][unit]")
+{
+    FakeHost host;
+    host.values["sound"] = 0.0f;
+    host.values["morph"] = 0.0f;
+    LessonRunner r (host);
+    Catalog c;
+    c.productId = "learntest";
+    Lesson l;
+    l.id = "test.needs";
+    l.title = "Needs";
+    l.exampleId = "test.example";
+    Requirement playable;
+    playable.id = "sound.ready";
+    playable.holds = Condition::equals ("sound", 1.0f);
+    playable.title = "A sound is needed";
+    playable.body = "Load one.";
+    auto prepare = step ("prepare", "Prepare", "Use the current sound, or load an example.", "", Completion::manual());
+    prepare.preparation = true;
+    prepare.requirements = { playable };
+    auto listen = step ("listen", "Listen", "Turn MORPH.", "rate", Completion::action ({ "morph.touched" }, Condition::changed ("morph")));
+    listen.requirements = { playable };
+    l.steps = { prepare, listen, step ("end", "End", "Done.", "", Completion::manual()) };
+    c.lessons.push_back (l);
+    r.setCatalog (c);
+    REQUIRE (r.start ("test.needs"));
+    // The preparation never blocks: it says what is missing and offers both choices.
+    CHECK (r.state() == LessonRunner::State::tourShowing);
+    CHECK_FALSE (r.preparationReady());
+    REQUIRE (r.unmetRequirement() != nullptr);
+    CHECK (r.unmetRequirement()->id == "sound.ready");
+    // Use Current Sound moves on - and the next step blocks on the missing sound: no event, no
+    // Next, no Continue completes it.
+    CHECK (r.useCurrentSound());
+    CHECK (r.stepIndex() == 1);
+    CHECK (r.state() == LessonRunner::State::blocked);
+    host.values["morph"] = 0.5f;
+    CHECK_FALSE (r.handle (userEvent (r, "morph.touched")));
+    r.next();
+    CHECK (r.stepIndex() == 1);
+    // The example (the musician's choice) makes it playable: the step carries on; the load
+    // itself is never the musician's change of a control.
+    host.exampleLoads = { { "sound", 1.0f }, { "morph", 0.2f } };
+    CHECK (r.loadExample());
+    CHECK (r.exampleLoaded());
+    CHECK (r.state() == LessonRunner::State::waitingForAction);
+    CHECK_FALSE (r.handle (userEvent (r, "morph.touched")));   // (the load moved it, not a gesture)
+    host.values["morph"] = 0.7f;
+    CHECK (r.handle (userEvent (r, "morph.touched")));
+    // Fixed by hand instead (Back, then forward again): also fine.
+    r.back();
+    CHECK (r.preparationReady());
+}
+
+TEST_CASE ("learn: a dropdown's choice completes the step that touched it (the menu answers after the click)", "[learn][unit]")
+{
+    FakeHost host;
+    LessonRunner r (host);
+    r.setCatalog (testCatalog());
+    REQUIRE (r.start ("test.basics", 4));
+    // The click opens the menu: nothing has changed yet.
+    CHECK_FALSE (r.handle (userEvent (r, "mode.touched")));
+    // The item is chosen a moment later: the next tick completes the step.
+    host.values["mode"] = 2.0f;
+    r.update();
+    CHECK (r.state() == LessonRunner::State::stepComplete);
+    // Without a touch, the same choice (automation) completes nothing.
+    host.values["mode"] = 0.0f;
+    REQUIRE (r.start ("test.basics", 4));
+    host.values["mode"] = 2.0f;
+    r.update();
+    CHECK (r.state() == LessonRunner::State::waitingForAction);
+    // And a step whose control is no menu never waits: a touch that changed nothing is spent.
+    REQUIRE (r.start ("test.basics", 2));
+    CHECK_FALSE (r.handle (userEvent (r, "rate.changed")));
+    host.values["rate"] = 8.0f;
+    r.update();
+    CHECK (r.state() == LessonRunner::State::waitingForAction);
 }
 
 TEST_CASE ("learn: progress is per user and per product, written safely, corrupt files tolerated", "[learn][unit]")
@@ -313,10 +408,20 @@ TEST_CASE ("learn: progress is per user and per product, written safely, corrupt
     REQUIRE (a.update ([] (ProgressData& d) { d.firstInviteSeen = true; }));
     CHECK (a.file().withFileExtension ("corrupt").existsAsFile());
     CHECK (a.read().firstInviteSeen);
-    // Reset forgets lessons and the invitation, nothing else of the product's.
+    // Reset Tutorials forgets the lessons' records only: the invitation stays answered.
+    REQUIRE (a.update ([] (ProgressData& d) { d.lessons["analog.arp.basics"] = { 1, "complete", "2026-11-10T00:00:00Z", {} }; }));
     REQUIRE (a.reset());
     CHECK (a.read().lessons.empty());
-    CHECK_FALSE (a.read().firstInviteSeen);
+    CHECK (a.read().firstInviteSeen);
+    // An earlier build's record of a lesson in another state (skipped) is not progress.
+    a.file().replaceWithText (R"({ "schema": 1, "product": "analog", "lessons": {
+        "analog.quickstart": { "revision": 2, "status": "skipped", "lastStep": "aux" },
+        "analog.arp.basics": { "revision": 1, "status": "in-progress", "lastStep": "rate" },
+        "analog.morph.basics": { "revision": 2, "status": "complete" } } })");
+    const auto legacy = a.read();
+    CHECK (legacy.lessons.count ("analog.quickstart") == 0);
+    CHECK (legacy.lessons.at ("analog.arp.basics").lastStep == "rate");
+    CHECK (legacy.lessons.at ("analog.morph.basics").status == "complete");
     // One invitation per product in a process.
     CHECK (ProgressStore::claimInvitation ("x"));
     CHECK_FALSE (ProgressStore::claimInvitation ("x"));

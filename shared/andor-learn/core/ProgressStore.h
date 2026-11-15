@@ -52,7 +52,7 @@ public:
     ProgressData read() const;
     /** Applies `change` to the latest data and writes it. False if the write failed. */
     bool update (const std::function<void (ProgressData&)>& change);
-    /** Forgets every lesson's progress and the invitation (Reset learning progress). */
+    /** Forgets every lesson's progress (Reset Tutorials); the invitation and Info stay as they are. */
     bool reset();
 
     /** For tests: the JSON written for some data. */

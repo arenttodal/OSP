@@ -388,6 +388,7 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
         selectModulation (source, slot);
     };
     modOverlay.onSelect = [this] (int source, int slot) { selectModulation (source, slot); };
+    modPanel.ampEnvelope().livePosition = [this] (const juce::String& id) { return modOverlay.livePosition (id); };
     modOverlay.onShowRoutes = [this] (int source) { openModulationPopup (routesPopup, source); };
     modPanel.showTab (ospProcessor.modPanelTab());
     content.addAndMakeVisible (modOverlay);   // last: above everything (popups bring it back up)
@@ -408,6 +409,7 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     routingKey.onClick = [this] { setSourceViewShown (! routingOpen); };
     content.addAndMakeVisible (routingKey);
     addAndMakeVisible (content);
+    overflow.onScroll = [this] { resized(); };
     layoutInstrument();
     setResizable (true, true);
     applyWindowShape (false);
@@ -1365,12 +1367,14 @@ void OspAudioProcessorEditor::paint (juce::Graphics& g)
 void OspAudioProcessorEditor::paintInstrument (juce::Graphics& g)
 {
     // The shared ANDOR frame with OSP's identity (ANDOR/OSP, One Shot Performer).
-    frame::paint (g, content, frame::Identity {}, arpShown, macros, rackShift(), sourceTrim());
+    // (The housing keeps its height; what the arpeggiator and the racks add is room under it, as
+    // the shell's editor draws it.)
+    frame::paint (g, content, frame::Identity {}, arpShown, macros, rackShift(), sourceTrim(), design::height - sourceTrim());
 }
 
 void OspAudioProcessorEditor::resized()
 {
-    frame::fit (*this, content, instrumentHeight());
+    frame::fit (*this, content, instrumentHeight(), &overflow);
     modOverlay.setBounds (content.getLocalBounds());
 }
 
@@ -1718,6 +1722,7 @@ void OspAudioProcessorEditor::timerCallback()
         modPanel.showTab (ospProcessor.modPanelTab());   // a recalled session
     modPanel.refresh();
     modOverlay.refresh();
+    modPanel.ampEnvelope().refreshLive();   // (its picture follows A D S R's modulation)
     if (popup != nullptr)
         popup->refreshContent();
     bool wheelInUse = false;

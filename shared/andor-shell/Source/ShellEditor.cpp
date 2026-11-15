@@ -335,6 +335,20 @@ ShellEditor::ShellEditor (ShellProcessor& p)
                     safe->rackLabelMenu (macro, k).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (safe->macros[static_cast<std::size_t> (macro)].label.get()));
             });
         }
+    // A macro's own on / off (opt-in): a tiny lamp beside its name; off dims the knob's arc.
+    if (shell.showsMacroSwitches())
+        for (const auto& sw : shell.product().macroSwitches)
+            if (auto* parameter = shell.parameters.getParameter (sw.parameterId); parameter != nullptr && sw.macro >= 0 && sw.macro < frame::macroCount)
+            {
+                auto lamp = std::make_unique<MacroSwitchLamp> (*parameter, design::colour::macro (sw.macro), &shell.undoManager);
+                lamp->setTooltip (sw.tooltip);
+                const int macro = sw.macro;
+                lamp->onStateChange = [this, macro] (bool on) { dimMacroArc (macro, on); };
+                dimMacroArc (macro, lamp->isOn());
+                content.addAndMakeVisible (*lamp);
+                macroLamps.emplace_back (macro, std::move (lamp));
+            }
+    setUpUserMacros();
     content.addAndMakeVisible (modPanel);
 
     content.addAndMakeVisible (pitchWheel);
@@ -360,6 +374,16 @@ ShellEditor::ShellEditor (ShellProcessor& p)
         setArpExpanded (! arpShown);
         learnAction (arpShown ? andor::learn::actions::arpPanelOpened : andor::learn::actions::arpPanelClosed, "arp.panel");
     };
+    if (shell.arpCompanionShown())
+    {
+        arpButton.setSecondRow (shell.product().arpCompanion.name, shell.product().arpCompanion.enabledParameterId);
+        arpButton.onSecondRow = [this] {
+            if (popupIndex == arpCompanionPopup)
+                closePopup();
+            else
+                openPopup (arpCompanionPopup);
+        };
+    }
     arpPanel.onCollapse = [this] { setArpExpanded (false); };
     arpPanel.setCrossClose (shell.crossCloseKeys());
     content.addAndMakeVisible (arpButton);
@@ -388,6 +412,7 @@ ShellEditor::ShellEditor (ShellProcessor& p)
         modPanel.onDragEnd = [this] (int source, juce::Point<int> screen) { dropModulation (source, content.getLocalPoint (nullptr, screen).toFloat()); };
         modPanel.onShowRoutes = [this] (int source) { openPopup (routesPopup, source); };
         modOverlay.onSelect = [this] (int source, int slot) { selectModulation (source, slot); };
+        modPanel.ampEnvelope().livePosition = [this] (const juce::String& id) { return modOverlay.livePosition (id); };
         modOverlay.onShowRoutes = [this] (int source) { openPopup (routesPopup, source); };
     }
     modPanel.onExpandCurve = [this] (int source) { openPopup (curvePopup, source); };
@@ -402,8 +427,23 @@ ShellEditor::ShellEditor (ShellProcessor& p)
 
     juce::Desktop::getInstance().addGlobalMouseListener (&outsideClicks);
 
-    content.onPaint = [this] (juce::Graphics& g) { frame::paint (g, content, shell.product().identity, arpShown, macros, rackShift(), sourceTrim()); };
+    // The product's AUX strip (opt-in): as the session left it (a view setting).
+    if (shell.hasAuxStrip() && shell.auxStripShown())
+    {
+        auxStrip = shell.product().auxStrip->create (shell);
+        if (auxStrip != nullptr)
+        {
+            content.addAndMakeVisible (*auxStrip, content.getIndexOfChildComponent (&modOverlay));   // (under the overlay)
+            auxShownApplied = true;
+        }
+    }
+    // (the housing's base: the instrument with no inline section open - a rack, the arpeggiator
+    // or the strip adds room below its unchanged upper part)
+    content.onPaint = [this] (juce::Graphics& g) {
+        frame::paint (g, content, shell.product().identity, arpShown, bankShown == 1 ? userRow : macros, rackShift(), sourceTrim(), design::height - cardTrim());
+    };
     addAndMakeVisible (content);
+    overflow.onScroll = [this] { resized(); };
     layoutInstrument();
     setResizable (true, true);
     frame::applyWindowShape (*this, instrumentHeight(), false);
@@ -439,8 +479,10 @@ void ShellEditor::paint (juce::Graphics& g)
 
 void ShellEditor::resized()
 {
-    frame::fit (*this, content, instrumentHeight());
+    frame::fit (*this, content, instrumentHeight(), &overflow);
     modOverlay.setBounds (content.getLocalBounds());
+    if (bankTab != nullptr)
+        assignOverlay.setBounds (content.getLocalBounds());   // (USER's rings and banner: the whole instrument)
 }
 
 void ShellEditor::layoutInstrument()
@@ -492,10 +534,23 @@ void ShellEditor::layoutInstrument()
                 headerMix.setBounds (mix.withTrimmedLeft (shift));
         }
     }
+    placeMacroLamps();
+    placeUserMacros();
     modOverlay.setBounds (content.getLocalBounds());
-    sourceArea = frame::sourceArea (sourceTrim());
+    sourceArea = frame::sourceArea (cardTrim());   // (the cards keep their place: only what is under them moves)
     shownCount = -1;
     layoutSources();
+    if (auxStrip != nullptr)
+    {
+        // (after the cards: the strip's zones align to their wells)
+        auxStrip->setVisible (auxShownApplied);
+        if (auxShownApplied)
+        {
+            auxStrip->setBounds (sourceArea.getX(), sourceArea.getBottom() + juce::roundToInt (auxGap), sourceArea.getWidth(),
+                                 juce::roundToInt (shell.product().auxStrip->height));
+            auxStrip->resized();
+        }
+    }
 }
 
 //==============================================================================
@@ -732,6 +787,10 @@ int ShellEditor::dropLayerAt (juce::Point<int> editorPoint) const
 
 bool ShellEditor::isInterestedInFileDrag (const juce::StringArray& files)
 {
+    // A product with parts that own drops (the AUX strip): every drag is the editor's to route,
+    // so a file the owner cannot take is refused there, never passed on to a card.
+    if (shell.hasAuxStrip())
+        return true;
     if (shell.isGenerator() && ! shell.hasHybridLayer())
         return false;   // it makes its own sound: there is nowhere to drop a recording
     for (const auto& f : files)
@@ -740,47 +799,119 @@ bool ShellEditor::isInterestedInFileDrag (const juce::StringArray& files)
     return false;
 }
 
-void ShellEditor::fileDragEnter (const juce::StringArray&, int x, int y)
+osp::plugin::DropOwner* ShellEditor::dropOwnerAt (juce::Point<int> editorPoint, juce::Point<int>& local)
+{
+    // The topmost part under the pointer (the overlays above everything are not parts), then up
+    // its parents: the first DropOwner owns the drop.
+    const auto at = content.getLocalPoint (this, editorPoint);
+    for (int i = content.getNumChildComponents(); --i >= 0;)
+    {
+        auto* child = content.getChildComponent (i);
+        if (child == &modOverlay || child == &assignOverlay || ! child->isVisible() || ! child->getBounds().contains (at))
+            continue;
+        auto* c = child->getComponentAt (child->getLocalPoint (&content, at));
+        for (auto* p = c != nullptr ? c : child; p != nullptr && p != &content; p = p->getParentComponent())
+            if (auto* owner = dynamic_cast<osp::plugin::DropOwner*> (p))
+            {
+                local = p->getLocalPoint (&content, at);
+                return owner;
+            }
+        return nullptr;   // (the topmost part there owns nothing: the editor's rules)
+    }
+    return nullptr;
+}
+
+void ShellEditor::setDropHover (osp::plugin::DropOwner* owner, const juce::StringArray& files)
+{
+    auto* previous = dynamic_cast<osp::plugin::DropOwner*> (hoverOwner.getComponent());
+    if (previous == owner)
+        return;
+    if (previous != nullptr)
+        previous->dropHover (files, false);
+    hoverOwner = dynamic_cast<juce::Component*> (owner);
+    if (owner != nullptr)
+        owner->dropHover (files, true);
+}
+
+void ShellEditor::fileDragEnter (const juce::StringArray& files, int x, int y)
 {
     dragging = true;
-    dragLayer = dropLayerAt ({ x, y });
+    fileDragMove (files, x, y);
     shownCount = -1;
     layoutSources();
-    dropZone.setHighlight (true);
-    sampleDock.setHighlight (true);   // (a hybrid product: any drop loads the recording)
 }
 
-void ShellEditor::fileDragMove (const juce::StringArray&, int x, int y)
+void ShellEditor::fileDragMove (const juce::StringArray& files, int x, int y)
 {
-    dragLayer = dropLayerAt ({ x, y });
-    addTarget.setHighlight (dragLayer < 0);
+    juce::Point<int> local;
+    auto* owner = dropOwnerAt ({ x, y }, local);
+    setDropHover (owner, files);
+    bool audio = false;
+    for (const auto& f : files)
+        audio = audio || juce::File (f).hasFileExtension ("wav;aif;aiff;flac");
+    // Only where the drop would land shows it: an owner's part, or the cards' own targets.
+    const bool emptyIgnored = shell.hasAuxStrip() && shell.product().auxStrip->emptyDropsIgnored;
+    dragLayer = owner == nullptr && audio ? dropLayerAt ({ x, y }) : -1;
+    // (empty space ignored: only a card under the pointer shows a target)
+    const bool cards = owner == nullptr && audio && (! emptyIgnored || dragLayer >= 0);
+    dropZone.setHighlight (cards);
+    sampleDock.setHighlight (cards);   // (a hybrid product: any drop on the cards loads the recording)
+    addTarget.setHighlight (cards && dragLayer < 0);
 }
 
-void ShellEditor::fileDragExit (const juce::StringArray&)
+void ShellEditor::fileDragExit (const juce::StringArray& files)
 {
+    setDropHover (nullptr, files);
     dragging = false;
     dropZone.setHighlight (false);
     sampleDock.setHighlight (false);
+    addTarget.setHighlight (false);
     shownCount = -1;
     layoutSources();
 }
 
 void ShellEditor::filesDropped (const juce::StringArray& files, int x, int y)
 {
-    const int layer = dropLayerAt ({ x, y });
+    juce::Point<int> local;
+    auto* owner = dropOwnerAt ({ x, y }, local);
+    setDropHover (nullptr, files);
     dragging = false;
     dropZone.setHighlight (false);
     sampleDock.setHighlight (false);
+    addTarget.setHighlight (false);
+    if (owner != nullptr)
+    {
+        owner->dropFiles (files, local);   // (its own, consumed: never a card's as well)
+        shownCount = -1;
+        layoutSources();
+        return;
+    }
+    const int layer = dropLayerAt ({ x, y });
     juce::Array<juce::File> list;
     for (const auto& f : files)
         if (juce::File (f).hasFileExtension ("wav;aif;aiff;flac"))
             list.add (juce::File (f));
-    if (layer >= 0 && ! list.isEmpty())
+    const bool emptyIgnored = shell.hasAuxStrip() && shell.product().auxStrip->emptyDropsIgnored;
+    if (list.isEmpty() || (layer < 0 && emptyIgnored))
+    {
+        shownCount = -1;
+        timerCallback();
+        return;   // (nothing this editor can load, or empty space where the product ignores it)
+    }
+    if (layer >= 0)
         shell.loadFile (list.getFirst(), layer);
     else
         shell.addLayers (list);
     shownCount = -1;
     timerCallback();
+}
+
+juce::Rectangle<int> ShellEditor::cardDisplayBounds (int layer)
+{
+    auto& card = engineCard (layer);
+    if (! card.isVisible())
+        return {};
+    return content.getLocalArea (&card.display(), card.display().getLocalBounds());
 }
 
 void ShellEditor::chooseFile (int layer)
@@ -848,6 +979,13 @@ void ShellEditor::showMenu()
     menu.addItem ("Init", [this] { shell.initPatch(); timerCallback(); });
     menu.addItem ("Reset settings", [this] { shell.resetSettings(); timerCallback(); });
     menu.addSeparator();
+    if (shell.hasAuxStrip())
+    {
+        const auto& name = shell.product().auxStrip->name;
+        const bool shown = shell.auxStripShown();
+        menu.addItem ((shown ? "Hide " : "Show ") + name, [this, shown] { setAuxStripShown (! shown); });
+        menu.addSeparator();
+    }
     menu.addItem ("Undo", shell.undoManager.canUndo(), false, [this] { shell.undoManager.undo(); });
     menu.addItem ("Redo", shell.undoManager.canRedo(), false, [this] { shell.undoManager.redo(); });
     if (learn != nullptr)
@@ -881,7 +1019,13 @@ void ShellEditor::choosePresetFile (bool save)
 
 bool ShellEditor::keyPressed (const juce::KeyPress& key)
 {
-    // Escape closes Learn's note, browser or mode first; then the popover, as before.
+    // An assignment under way (a USER macro being dragged or picked) is cancelled first; then
+    // Escape closes Learn's note, browser or mode; then the popover, as before.
+    if (key == juce::KeyPress::escapeKey && (pickMacro >= 0 || dragMacro >= 0))
+    {
+        cancelUserMacroAssign();
+        return true;
+    }
     if (learn != nullptr && learn->keyPressed (key))
         return true;
     if (key == juce::KeyPress::escapeKey && popup != nullptr)
@@ -892,6 +1036,11 @@ bool ShellEditor::keyPressed (const juce::KeyPress& key)
     if (key == juce::KeyPress::escapeKey && isWellEditorShown())
     {
         toggleWellEditor();   // (as its heading: back to the waveform)
+        return true;
+    }
+    if (key == juce::KeyPress::escapeKey && shell.showsRack() && rack.isShown (rack::Kind::aux))
+    {
+        setRackExpanded (rack::Kind::aux, false);   // (the AUX rack: one level at a time)
         return true;
     }
     if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'Z')
@@ -1001,6 +1150,8 @@ void ShellEditor::openPopup (int which, int source)
         popup = shell.product().generatorHeaderPopover (shell);
     else if (which == hybridHeaderPopup && shell.product().hybridHeaderPopover != nullptr && cards[ShellProcessor::hybridLayer]->hasHeadingDoor())
         popup = shell.product().hybridHeaderPopover (shell);
+    else if (which == arpCompanionPopup && arpButton.hasSecondRow() && shell.product().arpCompanion.popover != nullptr)
+        popup = shell.product().arpCompanion.popover (shell);
     if (popup == nullptr)
         return;
     presentPopup (which);
@@ -1029,6 +1180,8 @@ void ShellEditor::presentPopup (int which)
         cards[0]->setHeadingOpen (true);
     if (which == hybridHeaderPopup)
         cards[ShellProcessor::hybridLayer]->setHeadingOpen (true);
+    if (which == arpCompanionPopup)
+        arpButton.setSecondRowOpen (true);
     applyBindings();   // the popover's controls follow the engine's bindings too
     if (isShowing())
         grabKeyboardFocus();
@@ -1068,9 +1221,16 @@ void ShellEditor::positionPopup()
     }
     else if (popupIndex == anchoredPopup && popupAnchor != nullptr)
     {
-        // Under its anchor, right edges aligned (placePopover keeps it inside the instrument).
+        // Under its anchor, right edges aligned (placePopover keeps it inside the instrument); a
+        // USER macro's panel above its name, its left edge with the name's (as the macros' own).
         const auto anchor = content.getLocalArea (popupAnchor.getComponent(), popupAnchor->getLocalBounds()).toFloat();
-        at = { anchor.getRight() + 14.0f - size.x, anchor.getBottom() + 8.0f };
+        at = anchorAbove ? juce::Point<float> { anchor.getX() - 14.0f, anchor.getY() - 10.0f - size.y } : juce::Point<float> { anchor.getRight() + 14.0f - size.x, anchor.getBottom() + 8.0f };
+    }
+    else if (popupIndex == arpCompanionPopup)
+    {
+        // Above the housing, its left edge with the housing's (placePopover keeps it inside).
+        const auto anchor = arpButton.getBounds().toFloat();
+        at = { anchor.getX(), anchor.getY() - 10.0f - size.y };
     }
     else
         at = frame::modulationPopoverOrigin (modPanel.getBounds().toFloat(), size);
@@ -1093,10 +1253,14 @@ void ShellEditor::closePopup()
         cards[0]->setHeadingOpen (false);
     if (popupIndex == hybridHeaderPopup)
         cards[ShellProcessor::hybridLayer]->setHeadingOpen (false);
+    if (popupIndex == arpCompanionPopup)
+        arpButton.setSecondRowOpen (false);
     if (popupIndex == anchoredPopup)
     {
         content.removeChildComponent (&popupBackdrop);
         popupAnchor = nullptr;
+        anchorAbove = false;
+        panelMacro = -1;
     }
     juce::Desktop::getInstance().getAnimator().cancelAnimation (popup.get(), false);
     popup.reset();
@@ -1193,6 +1357,17 @@ void ShellEditor::toggleWellEditor()
 
 void ShellEditor::mouseDownAnywhere (juce::Component* c)
 {
+    if (chosenMacro >= 0 && c != nullptr && c != &modOverlay)
+    {
+        bool own = false;
+        for (auto& row : userRow)
+            own = own || c == &row.slider || row.slider.isParentOf (c) || (row.label != nullptr && c == row.label.get());
+        if (! own)
+        {
+            chosenMacro = -1;   // (a click elsewhere: back to the quiet arcs)
+            updateUserMacroArcs();
+        }
+    }
     if (popup == nullptr)
     {
         closedByLabelPress = -1;
@@ -1205,6 +1380,9 @@ void ShellEditor::mouseDownAnywhere (juce::Component* c)
     if (popupIndex == anchoredPopup && popupAnchor != nullptr && (c == popupAnchor.getComponent() || popupAnchor->isParentOf (c)))
         return;   // (its anchor: it opened the panel in this very press - JUCE tells this watcher after the
                   // key - or closes it itself; closing here too shut every anchored panel as it opened)
+    if (c == &arpButton && popupIndex == arpCompanionPopup
+        && arpButton.secondRowArea().contains (arpButton.getLocalPoint (nullptr, juce::Desktop::getMousePosition().toFloat())))
+        return;   // (its own row: the row opened it, or switches its instrument with it open)
     int pressed = -1;
     for (int i = 0; i < frame::macroCount; ++i)
         if (c == macros[static_cast<std::size_t> (i)].label.get())
@@ -1223,6 +1401,37 @@ void ShellEditor::mouseDownAnywhere (juce::Component* c)
         pressed = hybridHeaderPopup;
     closedByLabelPress = pressed == popupIndex ? pressed : -1;
     closePopup();
+}
+
+void ShellEditor::setAuxStripShown (bool shown)
+{
+    if (! shell.hasAuxStrip())
+        return;
+    shell.setAuxStripShown (shown);
+    applyAuxStrip();
+}
+
+void ShellEditor::applyAuxStrip()
+{
+    // A view change only: the window grows or shrinks by the strip's room, nothing sounds
+    // different (hiding it never mutes D, never unloads what it plays).
+    const bool want = shell.auxStripShown();
+    if (want == auxShownApplied)
+        return;
+    if (want && auxStrip == nullptr)
+    {
+        auxStrip = shell.product().auxStrip->create (shell);
+        if (auxStrip == nullptr)
+            return;
+        content.addChildComponent (*auxStrip, content.getIndexOfChildComponent (&modOverlay));
+    }
+    auxShownApplied = want;
+    if (! want && rack.isShown (rack::Kind::aux))
+        setRackExpanded (rack::Kind::aux, false);   // (its rack goes with it)
+    layoutInstrument();
+    frame::applyWindowShape (*this, instrumentHeight(), true);
+    placeKeyDna();
+    content.repaint();
 }
 
 void ShellEditor::setArpExpanded (bool open)
@@ -1520,6 +1729,7 @@ void ShellEditor::refreshCardExtensions()
 
 void ShellEditor::timerCallback()
 {
+    updateUserMacroArcs();
     refreshCardExtensions();
     layoutSources();
     updateHybridDoor();
@@ -1557,6 +1767,8 @@ void ShellEditor::timerCallback()
     updateStatus();
     if (shell.arpEditorExpanded() != arpShown)
         setArpExpanded (shell.arpEditorExpanded());
+    if (shell.hasAuxStrip() && shell.auxStripShown() != auxShownApplied)
+        applyAuxStrip();   // (a session recalled, or the strip's own Hide AUX)
     if (shell.showsRack())
     {
         // A session recalled with another rack open (the view setting it saved).
@@ -1573,6 +1785,7 @@ void ShellEditor::timerCallback()
         modPanel.showTab (shell.modPanelTab());
     modPanel.refresh();
     modOverlay.refresh();
+    modPanel.ampEnvelope().refreshLive();   // (its picture follows A D S R's modulation)
     if (popup != nullptr)
         popup->refreshContent();
     if (learn != nullptr)
@@ -1606,6 +1819,24 @@ void ShellEditor::createLearn()
     hooks.hasCapability = [this, &descriptor] (const juce::String& capability) {
         return descriptor.hasCapability != nullptr && descriptor.hasCapability (capability, shell);
     };
+    // What is in view of a scrolled editor (the host kept it short), and bringing a lesson's
+    // control into view there.
+    hooks.visibleArea = [this] { return content.getLocalArea (this, getLocalBounds()); };
+    hooks.scrollIntoView = [this] (juce::Rectangle<int> r) {
+        if (! overflow.overflowing())
+            return;
+        const auto onEditor = getLocalArea (&content, r).toFloat();
+        overflow.scrollToShow (onEditor.getY() + overflow.offset(), onEditor.getBottom() + overflow.offset());
+    };
+    // A lesson's example sound (only on the musician's choice; the sound before it kept).
+    hooks.loadExample = [this, &descriptor] (const juce::String& id) {
+        if (descriptor.exampleState == nullptr)
+            return false;
+        const auto example = descriptor.exampleState (id, shell);
+        return example != nullptr && shell.loadLearnExample (*example);
+    };
+    hooks.canRestoreSound = [this] { return shell.canRestoreLearnSound(); };
+    hooks.restoreSound = [this] { return shell.restoreLearnSound(); };
     learn = std::make_unique<andor::learn::LearnController> (descriptor.catalog(), std::move (hooks));
     auto& targets = learn->targets();
 
@@ -1634,6 +1865,13 @@ void ShellEditor::createLearn()
                           return knob.getLocalArea (&content, r);
                       },
                        shell.product().macroPopover != nullptr ? std::function<bool()> ([this, i] { openPopup (i); return popup != nullptr; }) : std::function<bool()>(), {}, true, true });
+    }
+    for (int i = 0; i < frame::macroCount; ++i)
+    {
+        // Exact parts of a macro: its knob alone, its name alone.
+        auto& m = macros[static_cast<std::size_t> (i)];
+        targets.add ({ "macro." + juce::String (i) + ".knob", [&m] { return static_cast<juce::Component*> (&m.slider); } });
+        targets.add ({ "macro." + juce::String (i) + ".label", [&m] { return static_cast<juce::Component*> (m.label.get()); } });
     }
     targets.add ({ "macros", [this] { return static_cast<juce::Component*> (&content); }, [this] (juce::Component&) {
                       juce::Rectangle<int> all;
@@ -1677,8 +1915,28 @@ void ShellEditor::createLearn()
                       return arpShown;
                   },
                    [this] { return arpPanel.editedCard() == 0; } });
+    // The arpeggiator's ON light alone (the panel's own switch is the same light on the card).
+    targets.add ({ "arp.on", [this] { return static_cast<juce::Component*> (&arpButton); },
+                   [this] (juce::Component&) { return arpButton.lightArea().expanded (4.0f).getSmallestIntegerContainer(); } });
     if (arpPanel.showsCards())
     {
+        // PLAYS: each card's own key; EDIT: each card's tab; B's own PATTERN and RATE.
+        static const char* letters[] { "A", "B", "C" };
+        for (int card = 0; card < 3; ++card)
+        {
+            targets.add ({ juce::String ("arp.plays.") + letters[card], panel, arpArea ([card] (auto& p) { return p.cardChipArea (card); }), expandArp });
+            targets.add ({ juce::String ("arp.edit.") + letters[card], panel, arpArea ([card] (auto& p) { return p.editTabArea (card); }), expandArp,
+                           [this] { return arpPanel.showsCards() && ! arpPanel.isLinked(); } });
+        }
+        auto showB = [this] {
+            setArpExpanded (true);
+            arpPanel.setEditCard (1);   // a view setting (the card edited), never the sound
+            return arpPanel.editedCard() == 1;
+        };
+        auto editingB = [this] { return arpPanel.showsCards() && ! arpPanel.isLinked() && arpPanel.editedCard() == 1; };
+        targets.addState ("arp.edit.B", editingB);
+        targets.add ({ "arp.card.B.pattern", panel, arpArea ([] (auto& p) { return p.patternFieldArea().getUnion (p.patternListArea()); }), showB, editingB });
+        targets.add ({ "arp.card.B.rate", panel, [this] (juce::Component&) { return arpPanel.shownRateKnob().getBounds(); }, showB, editingB });
         targets.add ({ "arp.cards", panel, arpArea ([] (auto& p) { return p.cardChipArea (0).getUnion (p.cardChipArea (1)).getUnion (p.cardChipArea (2)); }), expandArp });
         targets.add ({ "arp.link", panel, arpArea ([] (auto& p) { return p.linkArea(); }), expandArp });
         // B's own pattern and rate: shown once unlinked and B is the card being edited.
@@ -1695,11 +1953,65 @@ void ShellEditor::createLearn()
     }
     arpButton.onLearnAction = [this] (const juce::String& action, const juce::String& parameterId) { learnAction (action, "arp.enable", parameterId); };
     arpPanel.onLearnAction = [this] (const juce::String& action, const juce::String& parameterId) { learnAction (action, "arp.panel", parameterId); };
+    // The arpeggiator's companion row (a product's: ANDOR ANALOG's SUB).
+    if (shell.arpCompanionShown())
+    {
+        targets.add ({ "arp.companion", [this] { return static_cast<juce::Component*> (&arpButton); },
+                       [this] (juce::Component&) { return arpButton.secondRowArea().getSmallestIntegerContainer(); }, {}, {}, true });
+        // The ARP row alone (its opener), beside the companion's.
+        targets.add ({ "arp.opener", [this] { return static_cast<juce::Component*> (&arpButton); }, [this] (juce::Component&) {
+                          auto all = arpButton.getLocalBounds();
+                          const auto second = arpButton.secondRowArea().getSmallestIntegerContainer();
+                          return second.isEmpty() ? all : all.withBottom (second.getY());
+                      },
+                       expandArp });
+    }
+    else
+        targets.add ({ "arp.opener", [this] { return static_cast<juce::Component*> (&arpButton); }, {}, expandArp });
+    // A macro's own on / off lamp (a product's: ANDOR ANALOG's MORPH). Touches report
+    // "macro.N.switch.touched".
+    for (auto& [macro, lamp] : macroLamps)
+    {
+        auto* l = lamp.get();
+        targets.add ({ "macro." + juce::String (macro) + ".switch", [l] { return static_cast<juce::Component*> (l); }, {}, {}, {}, false, true });
+    }
+    // USER macros (a product's): the CORE | USER tab (a click reports "macroBank.changed"), the six
+    // USER knobs (touches: "usermacro.N.touched"; Show me selects USER, an interface preference),
+    // and an assignment made from a control's menu ("usermacro.assigned").
+    if (bankTab != nullptr)
+    {
+        targets.add ({ "macros.bank", [this] { return static_cast<juce::Component*> (bankTab.get()); }, {}, {}, {}, true });
+        targets.addState ("macros.bank.user", [this] { return bankShown == 1; });
+        for (int i = 0; i < frame::macroCount; ++i)
+            targets.add ({ "usermacro." + juce::String (i) + ".label",
+                           [this, i] { return bankShown == 1 ? static_cast<juce::Component*> (userRow[static_cast<std::size_t> (i)].label.get()) : nullptr; }, {},
+                           [this] {
+                               showMacroBank (1);
+                               return bankShown == 1;
+                           } });
+        for (int i = 0; i < frame::macroCount; ++i)
+            targets.add ({ "usermacro." + juce::String (i),
+                           [this, i] { return bankShown == 1 ? static_cast<juce::Component*> (&userRow[static_cast<std::size_t> (i)].slider) : nullptr; }, {},
+                           [this] {
+                               showMacroBank (1);
+                               return bankShown == 1;
+                           },
+                           {}, false, true });
+    }
+    // The AUX strip (a product's: ANDOR ANALOG's D). Show me shows it (a view setting); touches
+    // on it report "aux.strip.touched".
+    if (shell.hasAuxStrip())
+        targets.add ({ "aux.strip", [this] { return auxShownApplied ? auxStrip.get() : nullptr; }, {}, [this] {
+                          setAuxStripShown (true);
+                          return auxShownApplied;
+                      },
+                       {}, true, true });
 
     // The racks and the source view's key (where the product has them).
     if (shell.showsRack())
     {
         targets.add ({ "rack.area", [this] { return static_cast<juce::Component*> (&rack); }, {}, {}, [this] { return rack.height() > 0.0f; }, true });
+        targets.addState ("rack.any.open", [this] { return rack.height() > 0.0f; });
         for (int k = 0; k < rack::kindCount; ++k)
             if (const auto kind = static_cast<rack::Kind> (k); hasRack (kind))
             {
@@ -1724,6 +2036,589 @@ void ShellEditor::createLearn()
     if (descriptor.registerTargets != nullptr)
         descriptor.registerTargets (targets, *this);
     learn->finishSetup();
+}
+
+//==============================================================================
+// The macros' own on / off lamps (ProductInfo::macroSwitches)
+
+MacroSwitchLamp* ShellEditor::macroSwitch (int macro) noexcept
+{
+    for (auto& [m, lamp] : macroLamps)
+        if (m == macro)
+            return lamp.get();
+    return nullptr;
+}
+
+void ShellEditor::placeMacroLamps()
+{
+    // Immediately left of the name, on its centre line: the name and knob stay exactly where
+    // the macro row puts them (the lamp takes no room of theirs).
+    for (auto& [macro, lamp] : macroLamps)
+    {
+        auto* label = macros[static_cast<std::size_t> (macro)].label.get();
+        if (label == nullptr)
+            continue;
+        const auto r = label->getBounds().toFloat();
+        constexpr float target = 26.0f, gap = 4.0f;
+        const float centreX = r.getCentreX() - 0.5f * label->textWidth() - gap - 7.0f;
+        lamp->setBounds (juce::Rectangle<float> (target, target).withCentre ({ centreX, r.getCentreY() }).toNearestInt());
+    }
+}
+
+void ShellEditor::dimMacroArc (int macro, bool on)
+{
+    // Off: the knob's colour arc fades (its value and the knob itself as they are).
+    auto& slider = macros[static_cast<std::size_t> (macro)].slider;
+    const auto colour = design::colour::macro (macro);
+    const auto shown = on ? colour : colour.interpolatedWith (design::colour::hairline, 0.62f);
+    slider.getProperties().set ("arc", static_cast<juce::int64> (shown.getARGB()));
+    slider.repaint();
+}
+
+//==============================================================================
+// USER MACROS V1.1 (ProductInfo::userMacros)
+
+juce::Colour ShellEditor::userMacroColour (int macro) const
+{
+    return design::colour::macro (std::clamp (macro, 0, frame::macroCount - 1));
+}
+
+void ShellEditor::setUpUserMacros()
+{
+    const auto* um = shell.userMacros();
+    if (um == nullptr)
+        return;
+    // The second bank: six knobs in the very places of the first (the same knob, colours and
+    // light), hidden until USER is chosen. Their names open their assignments; a double-click
+    // renames; a right-click offers both. Their lenses are grab handles.
+    for (std::size_t i = 0; i < userRow.size(); ++i)
+    {
+        const int macro = static_cast<int> (i);
+        frame::MacroSpec spec { um->parameterIds[i], um->name != nullptr ? um->name (shell, macro) : "MACRO " + juce::String (macro + 1),
+                                "User macro " + juce::String (macro + 1) + ": click for its assignments, double-click to rename" };
+        frame::setUpMacro (userRow[i], macro, spec, shell.parameters, content, true);
+        userRow[i].slider.setTitle ("User Macro " + juce::String (macro + 1));
+        userRow[i].label->onClick = [this, macro] {
+            if (closedByLabelPress == 100 + macro)
+            {
+                closedByLabelPress = -1;
+                return;
+            }
+            openUserMacroPanel (macro);
+        };
+        juce::Component::SafePointer<ShellEditor> safe (this);
+        userRow[i].label->setRackActions ([safe, macro] { if (safe != nullptr) safe->startUserMacroRename (macro); },
+                                          [safe, macro] { if (safe != nullptr) safe->userMacroLabelMenu (macro); });
+        auto lens = std::make_unique<MacroLens>();
+        lens->onClick = [this, macro] { openUserMacroPanel (macro); };
+        lens->onDragMove = [this, macro] (juce::Point<int> screen) {
+            if (dragMacro != macro)
+            {
+                closePopup();
+                dragMacro = macro;
+                collectAssignTargets();
+                assignOverlay.beginDrag (userMacroColour (macro), shell.userMacros()->name (shell, macro));
+            }
+            assignOverlay.pointAt (content.getLocalPoint (nullptr, screen).toFloat());
+        };
+        lens->onDragEnd = [this, macro] (juce::Point<int> screen, bool cancelled) {
+            const auto id = cancelled ? juce::String() : assignOverlay.controlAt (content.getLocalPoint (nullptr, screen).toFloat());
+            dragMacro = -1;
+            assignOverlay.stop();
+            if (id.isNotEmpty() && shell.userMacros()->assign (shell, macro, id))
+                openUserMacroPanel (macro, id);   // (made neutral; its range in the panel)
+            refreshUserMacros();
+        };
+        content.addChildComponent (*lens);
+        lenses[i] = std::move (lens);
+    }
+    bankTab = std::make_unique<MacroBankTab>();
+    bankTab->onChange = [this] (int bank) {
+        showMacroBank (bank);
+        learnAction ("macroBank.changed", "macros.bank");   // (a click on CORE / USER: the musician's)
+    };
+    content.addAndMakeVisible (*bankTab);
+    // Over everything while assigning (it takes clicks only when picking, only on a target).
+    assignOverlay.onPicked = [this] (const juce::String& id) {
+        const int macro = pickMacro;
+        pickMacro = -1;
+        assignOverlay.stop();
+        if (macro >= 0 && shell.userMacros()->assign (shell, macro, id))
+            openUserMacroPanel (macro, id);
+        refreshUserMacros();
+    };
+    assignOverlay.onCancel = [this] { cancelUserMacroAssign(); };
+    content.addAndMakeVisible (assignOverlay);
+    // A control's right-click menu: its existing items unchanged, first; then its macros
+    // (Assign to Macro, and for an assigned control its range, removal, details).
+    modOverlay.extendContextMenu = [this] (juce::PopupMenu& menu, const juce::String& id) {
+        addUserMacroItems (menu, id);
+        learnAction ("control.menu.opened", "control", id);   // (a right-click on that control: the musician's)
+    };
+    // The halos draw the USER macros' ranges in their own vocabulary (docs/MACRO_DESTINATION_FIRST.md).
+    modOverlay.macroEligible = [this] (const juce::String& id) {
+        const auto* u = shell.userMacros();
+        return u != nullptr && u->eligible != nullptr && u->eligible (shell, id);
+    };
+    modOverlay.anyMacroArcs = [this] {
+        const auto* u = shell.userMacros();
+        if (u == nullptr || u->targets == nullptr)
+            return false;
+        for (int m = 0; m < frame::macroCount; ++m)
+            if (! u->targets (shell, m).isEmpty())
+                return true;
+        return false;
+    };
+    modOverlay.macroArcs = [this] (const juce::String& id) {
+        std::vector<osp::plugin::ModulationOverlay::MacroArc> arcs;
+        const auto* u = shell.userMacros();
+        if (u == nullptr || u->ranges == nullptr)
+            return arcs;
+        for (const auto& r : u->ranges (shell, id))
+        {
+            osp::plugin::ModulationOverlay::MacroArc a;
+            a.macro = r.macro;
+            a.colour = userMacroColour (r.macro);
+            a.name = userMacroTitle (r.macro);
+            a.atMin = r.atMin;
+            a.atMax = r.atMax;
+            a.now = r.now;
+            a.base = r.base;
+            a.macroValue = r.macroValue;
+            a.enabled = r.enabled;
+            arcs.push_back (a);
+        }
+        return arcs;
+    };
+    modOverlay.macroOffset = [this] (const juce::String& id) {
+        const auto* u = shell.userMacros();
+        return u != nullptr && u->offsetNow != nullptr ? u->offsetNow (shell, id) : 0.0f;
+    };
+    modOverlay.editMacroRange = [this] (int m, const juce::String& id, int end, float position, osp::plugin::ModulationOverlay::MacroEdit phase) {
+        const auto* u = shell.userMacros();
+        if (u == nullptr || u->editRange == nullptr)
+            return;
+        u->editRange (shell, m, id, end, position, static_cast<int> (phase));
+        if (phase == osp::plugin::ModulationOverlay::MacroEdit::begin && m != modOverlay.macroFocus())
+            setChosenUserMacro (m);   // (editing it: its controls shown)
+        if (phase == osp::plugin::ModulationOverlay::MacroEdit::commit || phase == osp::plugin::ModulationOverlay::MacroEdit::cancel)
+            refreshUserMacros();
+        if (phase == osp::plugin::ModulationOverlay::MacroEdit::commit)
+            learnAction ("usermacro.range.changed", "macros", id);   // (an end dragged on the halo)
+    };
+    modOverlay.resetMacroEnd = [this] (int m, const juce::String& id, int end) {
+        if (const auto* u = shell.userMacros(); u != nullptr && u->resetEnd != nullptr)
+            u->resetEnd (shell, m, id, end);
+    };
+    // Touching a USER knob chooses its macro (its controls' rings shown while it moves them).
+    for (std::size_t i = 0; i < userRow.size(); ++i)
+    {
+        const int macro = static_cast<int> (i);
+        userRow[i].slider.onDragStart = [this, macro] { setChosenUserMacro (macro); };
+    }
+    showMacroBank (shell.macroBank());
+    refreshUserMacros();
+}
+
+void ShellEditor::placeUserMacros()
+{
+    if (bankTab == nullptr)
+        return;
+    // USER 1..6 read left to right: each takes the place of the CORE knob in its column (CORE's
+    // data order is not its visual order - ECHO and SPACE sit swapped).
+    std::array<std::size_t, frame::macroCount> column {};
+    for (std::size_t i = 0; i < column.size(); ++i)
+        column[i] = i;
+    std::sort (column.begin(), column.end(), [this] (std::size_t a, std::size_t b) {
+        return macros[a].slider.getX() < macros[b].slider.getX();
+    });
+    for (std::size_t i = 0; i < userRow.size(); ++i)
+    {
+        const auto& place = macros[column[i]];
+        if (userRow[i].label != nullptr && place.label != nullptr)
+            userRow[i].label->setBounds (place.label->getBounds());
+        userRow[i].slider.setBounds (place.slider.getBounds());
+        // The lens: where the frame draws the light under the knob (its centre 65 below the
+        // knob's), a 22-unit target.
+        const auto knob = place.slider.getBounds().toFloat();
+        lenses[i]->setBounds (juce::Rectangle<float> (22.0f, 22.0f).withCentre ({ knob.getCentreX(), knob.getCentreY() + 65.0f }).toNearestInt());
+    }
+    // CORE and USER: two folder tabs rising from the macro panel's top-left edge (nothing below
+    // them moves; their targets are larger than drawn).
+    const auto panel = design::layout::macroPanel.translated (0.0f, -sourceTrim());
+    bankTab->setBounds (MacroBankTab::boundsFor (panel).toNearestInt());
+    bankTab->setPanel (panel, design::layout::panelRadius);
+    assignOverlay.setBounds (content.getLocalBounds());
+    assignOverlay.toFront (false);
+}
+
+osp::plugin::frame::MacroKnob* ShellEditor::userMacroKnob (int macro) noexcept
+{
+    return bankTab != nullptr && macro >= 0 && macro < frame::macroCount ? &userRow[static_cast<std::size_t> (macro)] : nullptr;
+}
+
+osp::plugin::MacroLens* ShellEditor::userMacroLens (int macro) noexcept
+{
+    return bankTab != nullptr && macro >= 0 && macro < frame::macroCount ? lenses[static_cast<std::size_t> (macro)].get() : nullptr;
+}
+
+void ShellEditor::showMacroBank (int bank)
+{
+    if (bankTab == nullptr)
+        return;
+    bank = bank == 1 ? 1 : 0;
+    const bool changed = bank != bankShown;
+    bankShown = bank;
+    bankTab->setBank (bank);
+    shell.setMacroBank (bank);
+    if (changed)
+    {
+        cancelUserMacroAssign();
+        if (popupIndex == anchoredPopup && panelMacro >= 0)
+            closePopup();
+        if (renameField != nullptr)
+            renameField.reset();
+        renaming = -1;
+    }
+    if (bank == 0)
+        chosenMacro = -1;
+    // Presentation only: the knobs shown change, the sound never does.
+    for (std::size_t i = 0; i < macros.size(); ++i)
+    {
+        const bool core = bank == 0;
+        macros[i].slider.setVisible (core);
+        if (macros[i].label != nullptr)
+            macros[i].label->setVisible (core);
+        userRow[i].slider.setVisible (! core);
+        if (userRow[i].label != nullptr)
+            userRow[i].label->setVisible (! core);
+        lenses[i]->setVisible (! core);
+    }
+    for (auto& [macro, lamp] : macroLamps)
+        lamp->setVisible (bank == 0);
+    content.repaint();
+}
+
+void ShellEditor::refreshUserMacros()
+{
+    const auto* um = shell.userMacros();
+    if (um == nullptr)
+        return;
+    for (std::size_t i = 0; i < userRow.size(); ++i)
+    {
+        const int macro = static_cast<int> (i);
+        const auto name = um->name (shell, macro);
+        if (auto* label = userRow[i].label.get())
+        {
+            if (label->getTitle() != name)
+            {
+                // (the label's text is its own: a new one in its place, its handlers as before)
+                auto onClick = label->onClick;
+                const auto bounds = label->getBounds();
+                const bool visible = label->isVisible();
+                userRow[i].label = std::make_unique<MacroLabel> (name, true, false);
+                userRow[i].label->setAccent (userMacroColour (macro));
+                userRow[i].label->setTooltip ("User macro " + juce::String (macro + 1) + ": click for its assignments, double-click to rename");
+                userRow[i].label->onClick = onClick;
+                juce::Component::SafePointer<ShellEditor> safe (this);
+                userRow[i].label->setRackActions ([safe, macro] { if (safe != nullptr) safe->startUserMacroRename (macro); },
+                                                  [safe, macro] { if (safe != nullptr) safe->userMacroLabelMenu (macro); });
+                binding::tag (*userRow[i].label, um->parameterIds[i]);
+                content.addChildComponent (*userRow[i].label);
+                userRow[i].label->setBounds (bounds);
+                userRow[i].label->setVisible (visible);
+                assignOverlay.toFront (false);
+            }
+            const bool lit = um->activeCount != nullptr && um->activeCount (shell, macro) > 0;
+            if (userRow[i].label->isCustomised() != lit)
+                userRow[i].label->setCustomised (lit);   // (its lens lights while it moves something)
+            userRow[i].label->setOpen (panelMacro == macro);
+        }
+        lenses[i]->setTooltip ("Drag to assign " + name);
+        userRow[i].slider.setTitle ("User Macro " + juce::String (macro + 1) + " (" + name + ")");
+    }
+    arcsMacro = -2;   // (the arcs recollected at the next tick)
+    content.repaint();
+}
+
+void ShellEditor::openUserMacroPanel (int macro, const juce::String& select)
+{
+    const auto* um = shell.userMacros();
+    if (um == nullptr || um->panel == nullptr || macro < 0 || macro >= frame::macroCount)
+        return;
+    cancelUserMacroAssign();
+    auto panel = um->panel (shell, macro, select);
+    if (panel == nullptr)
+        return;
+    auto* anchor = userRow[static_cast<std::size_t> (macro)].label.get();
+    openAnchoredPopover (std::move (panel), *anchor);
+    if (popupIndex == anchoredPopup)
+    {
+        anchorAbove = true;
+        panelMacro = macro;
+        positionPopup();
+    }
+    refreshUserMacros();
+}
+
+void ShellEditor::collectAssignTargets()
+{
+    // Every control on screen a USER macro may move (the product decides), front-most last.
+    const auto* um = shell.userMacros();
+    std::vector<MacroAssignOverlay::Control> found;
+    std::function<void (juce::Component&)> walk = [&] (juce::Component& c) {
+        for (auto* child : c.getChildren())
+        {
+            if (child == &assignOverlay || child == &modOverlay || ! child->isVisible())
+                continue;
+            if (auto* slider = dynamic_cast<juce::Slider*> (child))
+            {
+                juce::String id = slider->getProperties()["paramId"].toString();
+                if (id.isEmpty())
+                    id = binding::tagsOf (*slider)[0];
+                const bool own = std::find (um->parameterIds.begin(), um->parameterIds.end(), id) != um->parameterIds.end();
+                if (id.isNotEmpty() && ! own && um->eligible != nullptr && um->eligible (shell, id))
+                {
+                    const auto name = um->targetName != nullptr ? um->targetName (shell, id) : slider->getTitle();
+                    found.push_back ({ id, name, content.getLocalArea (slider, slider->getLocalBounds()).toFloat() });
+                }
+            }
+            walk (*child);
+        }
+    };
+    if (um != nullptr)
+        walk (content);
+    assignOverlay.setControls (std::move (found));
+}
+
+void ShellEditor::beginUserMacroPick (int macro)
+{
+    const auto* um = shell.userMacros();
+    if (um == nullptr || macro < 0 || macro >= frame::macroCount)
+        return;
+    closePopup();   // (the panel folds away while a control is chosen; it comes back after)
+    pickMacro = macro;
+    collectAssignTargets();
+    const auto panel = design::layout::macroPanel.translated (0.0f, -sourceTrim());
+    assignOverlay.beginPick (userMacroColour (macro), um->name (shell, macro), panel);
+    assignOverlay.toFront (false);
+}
+
+void ShellEditor::cancelUserMacroAssign()
+{
+    if (dragMacro >= 0)
+        if (auto* lens = lenses[static_cast<std::size_t> (dragMacro)].get())
+            lens->cancelDrag();
+    dragMacro = -1;
+    pickMacro = -1;
+    if (assignOverlay.mode() == MacroAssignOverlay::Mode::drag || assignOverlay.mode() == MacroAssignOverlay::Mode::pick)
+        assignOverlay.stop();
+}
+
+void ShellEditor::dragUserMacroLens (int macro, juce::Point<int> from, juce::Point<int> to, bool cancel)
+{
+    auto* lens = userMacroLens (macro);
+    if (lens == nullptr || lens->onDragMove == nullptr)
+        return;
+    lens->onDragMove (from);
+    lens->onDragMove (to);
+    lens->onDragEnd (to, cancel);
+}
+
+void ShellEditor::updateUserMacroArcs()
+{
+    // While a USER macro's name is hovered or its panel is open: thin arcs on what it moves.
+    const auto* um = shell.userMacros();
+    if (um != nullptr && um->revision != nullptr)
+        if (const auto now = um->revision (shell); now != userMacroRevision)
+        {
+            userMacroRevision = now;   // (an undo, a preset, a session: names and lenses follow)
+            refreshUserMacros();
+        }
+    // (on either tab: a macro chosen from a control's menu or its halo shows its ranges where
+    // the musician is - the tab changes only when they click it)
+    if (um == nullptr || dragMacro >= 0 || pickMacro >= 0)
+    {
+        arcsMacro = -1;
+        modOverlay.setMacroFocus (-1);
+        return;
+    }
+    // The focused macro: its panel open, else its name hovered, else the one chosen (from a
+    // control's menu, a handle, its knob). Its controls' halos show its ranges, handles live.
+    int shown = panelMacro;
+    for (std::size_t i = 0; i < userRow.size() && shown < 0; ++i)
+        if (userRow[i].label != nullptr && userRow[i].label->isMouseOver())
+            shown = static_cast<int> (i);
+    if (shown < 0)
+        shown = chosenMacro;
+    arcsMacro = shown;
+    modOverlay.setMacroFocus (shown);
+}
+
+void ShellEditor::setChosenUserMacro (int macro)
+{
+    // Never switches the macro tab: assigning from a menu or dragging a range on a halo keeps
+    // the tab the musician chose (only a click on CORE / USER changes it).
+    chosenMacro = macro >= 0 && macro < frame::macroCount ? macro : -1;
+    updateUserMacroArcs();
+}
+
+juce::String ShellEditor::userMacroMenuName (int macro) const
+{
+    // "Macro 1", or "Macro 1 - BRIGHTNESS" once named (the macro's own name, as on its knob).
+    const auto* u = shell.userMacros();
+    const auto name = u != nullptr && u->name != nullptr ? u->name (const_cast<ShellProcessor&> (shell), macro) : juce::String();
+    const auto number = "Macro " + juce::String (macro + 1);
+    return name.isEmpty() || name.equalsIgnoreCase (number) ? number : number + juce::String::fromUTF8 (" \xe2\x80\x94 ") + name;
+}
+
+juce::String ShellEditor::userMacroTitle (int macro) const
+{
+    const auto* u = shell.userMacros();
+    const auto name = u != nullptr && u->name != nullptr ? u->name (const_cast<ShellProcessor&> (shell), macro) : juce::String();
+    const auto number = "MACRO " + juce::String (macro + 1);
+    return name.isEmpty() || name.equalsIgnoreCase (number) ? number : number + juce::String::fromUTF8 (" \xc2\xb7 ") + name;
+}
+
+void ShellEditor::addUserMacroItems (juce::PopupMenu& menu, const juce::String& id)
+{
+    const auto* u = shell.userMacros();
+    if (u == nullptr || u->eligible == nullptr || ! u->eligible (shell, id))
+        return;   // (not a control a macro may move: no misleading item)
+    juce::Component::SafePointer<ShellEditor> safe (this);
+    std::vector<int> assigned;
+    if (u->targets != nullptr)
+        for (int m = 0; m < frame::macroCount; ++m)
+            if (u->targets (shell, m).contains (id))
+                assigned.push_back (m);
+    menu.addSeparator();
+    juce::PopupMenu choose;
+    for (int m = 0; m < frame::macroCount; ++m)
+    {
+        const bool has = std::find (assigned.begin(), assigned.end(), m) != assigned.end();
+        choose.addItem (userMacroMenuName (m), true, has, [safe, m, id] {
+            if (safe == nullptr)
+                return;
+            // Assigned at once, with a visible range around where the control sits (no jump);
+            // its macro chosen, so its range is on the knob, ready to drag.
+            if (safe->shell.userMacros()->assign (safe->shell, m, id))
+            {
+                safe->setChosenUserMacro (m);
+                safe->learnAction ("usermacro.assigned", "macros", id);   // (chosen from the menu: the musician's)
+            }
+            safe->refreshUserMacros();
+        });
+    }
+    menu.addSubMenu ("Assign to Macro", choose);
+    if (assigned.empty())
+        return;
+    // Per assigned macro (one: plain items; several: one submenu each way).
+    auto perMacro = [&] (const juce::String& title, std::function<void (int)> action) {
+        if (assigned.size() == 1)
+        {
+            const int m = assigned.front();
+            menu.addItem (title, [safe, m, action] { if (safe != nullptr) action (m); });
+            return;
+        }
+        juce::PopupMenu sub;
+        for (const int m : assigned)
+            sub.addItem (userMacroMenuName (m), [safe, m, action] { if (safe != nullptr) action (m); });
+        menu.addSubMenu (title, sub);
+    };
+    perMacro ("Edit Macro Range", [this] (int m) { setChosenUserMacro (m); });
+    perMacro ("Reset Macro Range", [this, id] (int m) {
+        if (const auto* um = shell.userMacros(); um != nullptr && um->resetRange != nullptr)
+            um->resetRange (shell, m, id);
+        setChosenUserMacro (m);
+    });
+    perMacro ("Show Macro Assignment Details", [this, id] (int m) {
+        showMacroBank (1);
+        openUserMacroPanel (m, id);
+    });
+    for (const int m : assigned)
+        menu.addItem ("Remove from " + userMacroMenuName (m), [safe, m, id] {
+            if (safe == nullptr)
+                return;
+            if (const auto* um = safe->shell.userMacros(); um != nullptr && um->unassign != nullptr)
+                um->unassign (safe->shell, m, id);
+            safe->refreshUserMacros();
+        });
+    if (assigned.size() > 1)
+        menu.addItem ("Remove All Macro Assignments", [safe, id] {
+            if (safe == nullptr)
+                return;
+            if (const auto* um = safe->shell.userMacros(); um != nullptr && um->unassignAll != nullptr)
+                um->unassignAll (safe->shell, id);
+            safe->refreshUserMacros();
+        });
+}
+
+void ShellEditor::startUserMacroRename (int macro)
+{
+    const auto* um = shell.userMacros();
+    if (um == nullptr || um->rename == nullptr || macro < 0 || macro >= frame::macroCount)
+        return;
+    closePopup();
+    auto* label = userRow[static_cast<std::size_t> (macro)].label.get();
+    renaming = macro;
+    renameField = std::make_unique<juce::TextEditor> ("Rename user macro");
+    renameField->setTitle ("Rename user macro " + juce::String (macro + 1));
+    renameField->setJustification (juce::Justification::centred);
+    renameField->setFont (type::macroLabel (0.7f * static_cast<float> (label->getHeight())));
+    renameField->setInputRestrictions (24);
+    renameField->setText (um->name (shell, macro), false);
+    renameField->setColour (juce::TextEditor::backgroundColourId, palette::ivory);
+    renameField->setColour (juce::TextEditor::textColourId, palette::text);
+    renameField->setColour (juce::TextEditor::outlineColourId, design::colour::hairline);
+    renameField->setColour (juce::TextEditor::focusedOutlineColourId, userMacroColour (macro));
+    content.addAndMakeVisible (*renameField);
+    renameField->setBounds (label->getBounds().expanded (4, 2));
+    renameField->selectAll();
+    auto commit = [this] (bool keep) {
+        if (renameField == nullptr || renaming < 0)
+            return;
+        const int m = renaming;
+        const auto text = renameField->getText();
+        renaming = -1;
+        juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<ShellEditor> (this)] { if (safe != nullptr) safe->renameField.reset(); });
+        if (keep && shell.userMacros()->rename != nullptr)
+            shell.userMacros()->rename (shell, m, text);
+        refreshUserMacros();
+    };
+    renameField->onReturnKey = [commit] { commit (true); };
+    renameField->onEscapeKey = [commit] { commit (false); };
+    renameField->onFocusLost = [commit] { commit (true); };
+    if (isShowing())
+        renameField->grabKeyboardFocus();
+}
+
+void ShellEditor::userMacroLabelMenu (int macro)
+{
+    const auto* um = shell.userMacros();
+    if (um == nullptr)
+        return;
+    juce::PopupMenu menu;
+    juce::Component::SafePointer<ShellEditor> safe (this);
+    menu.addItem ("Edit Assignments", [safe, macro] { if (safe != nullptr) safe->openUserMacroPanel (macro); });
+    menu.addItem ("Rename", [safe, macro] { if (safe != nullptr) safe->startUserMacroRename (macro); });
+    menu.addSeparator();
+    const bool any = um->targets != nullptr && ! um->targets (shell, macro).isEmpty();
+    menu.addItem ("Clear Assignments", any, false, [safe, macro] {
+        if (safe == nullptr)
+            return;
+        auto options = juce::MessageBoxOptions().withIconType (juce::MessageBoxIconType::QuestionIcon)
+                           .withTitle ("Clear assignments")
+                           .withMessage ("Remove every assignment of " + safe->shell.userMacros()->name (safe->shell, macro) + "? (Undo brings them back.)")
+                           .withButton ("Clear").withButton ("Cancel").withAssociatedComponent (safe.getComponent());
+        juce::AlertWindow::showAsync (options, [safe, macro] (int result) {
+            if (safe != nullptr && result == 1)
+            {
+                safe->shell.userMacros()->clear (safe->shell, macro);
+                safe->refreshUserMacros();
+            }
+        });
+    });
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (userRow[static_cast<std::size_t> (macro)].label.get()));
 }
 
 } // namespace andor::shell

@@ -67,17 +67,85 @@ namespace
         return Completion::action ({ param (parameterId) }, Condition::equals (parameterId, value)).withAlreadyDone (Condition::equals (parameterId, value), already);
     }
 
-    andor::learn::Preparation needsSound (const juce::String& example, bool offerAlways)
+    using andor::learn::Requirement;
+
+    /** The edited layer has a recording, loaded and playable. */
+    Requirement soundReady()
     {
-        andor::learn::Preparation p;
-        p.ready = Condition::state ("osp.source.ready");
-        p.needs = "This lesson needs a recording on the layer you are editing, loaded and ready to play.";
-        p.exampleId = example;
-        if (const auto e = tutorial::fromId (example))
-            p.exampleName = tutorial::nameOf (*e);
-        if (offerAlways)
-            p.offerExampleWhen = Condition::always();
-        return p;
+        Requirement r;
+        r.id = "osp.sound";
+        r.holds = Condition::state ("osp.source.ready");
+        r.title = "A recording is needed";
+        r.body = juce::String::fromUTF8 ("This step plays the recording on the layer you are editing. Load one (drag an audio file onto OSP, or Browse\xe2\x80\xa6), or load the lesson's example sound.");
+        r.targetId = "osp.source.dropZone";
+        return r;
+    }
+
+    Requirement granular()
+    {
+        Requirement r;
+        r.id = "osp.granular";
+        r.holds = Condition::state ("osp.source.granular");
+        r.title = "Granular is needed";
+        r.body = "This control belongs to Granular playback. Choose Granular on the layer's playback key (the symbol key at the top right of the card).";
+        r.targetId = "osp.source.mode";
+        r.offerExample = false;
+        return r;
+    }
+
+    Requirement twoLayers()
+    {
+        Requirement r;
+        r.id = "osp.layers";
+        r.holds = Condition::state ("osp.layers.two");
+        r.title = "A second recording is needed";
+        r.body = juce::String::fromUTF8 ("Open the \xe2\x80\xa2\xe2\x80\xa2\xe2\x80\xa2 menu and choose Add layer\xe2\x80\xa6, or drag a second file beside the card: ADD LAYER appears while you drag.");
+        r.targetId = "osp.header.menu";
+        return r;
+    }
+
+    Requirement sampleSet()
+    {
+        Requirement r;
+        r.id = "osp.set";
+        r.holds = Condition::state ("osp.source.set");
+        r.title = "Several recordings are needed";
+        r.body = "This step needs several recordings loaded together as one sound on this layer. Drop a folder of recordings on a layer, or load the pluck set.";
+        return r;
+    }
+
+    /** The lesson's set-up: its sound first (the current one, or the example). */
+    Step prepare (std::vector<Requirement> needs, juce::String body)
+    {
+        Step s;
+        s.id = "setup";
+        s.title = "Set up the lesson";
+        s.body = std::move (body);
+        s.preparation = true;
+        s.requirements = std::move (needs);
+        return s;
+    }
+
+    /** Every step after the set-up checks what it needs on the real state. */
+    void require (Lesson& l, std::vector<Requirement> needs, int fromStep = 1)
+    {
+        for (int i = fromStep; i < static_cast<int> (l.steps.size()); ++i)
+            for (const auto& r : needs)
+                l.steps[static_cast<std::size_t> (i)].requirements.push_back (r);
+    }
+
+    /** A lesson's set-up step first (what it needs), then every step checks it. */
+    void setUp (Lesson& l, std::vector<Requirement> needs, juce::String body)
+    {
+        l.steps.insert (l.steps.begin(), prepare (needs, std::move (body)));
+        require (l, std::move (needs));
+    }
+
+    void requireOn (Lesson& l, const juce::StringArray& stepIds, const Requirement& r)
+    {
+        for (auto& st : l.steps)
+            if (stepIds.contains (st.id))
+                st.requirements.push_back (r);
     }
 
     juce::StringArray routeDepthActions()
@@ -104,18 +172,15 @@ static Catalog ospCatalog()
         Lesson l;
         l.id = "osp.quickstart";
         l.title = "Quick Start";
-        l.group = "Start here";
-        l.summary = "Turn a recording into a playable instrument.";
+        l.description = "Turn a recording into a playable instrument.";
         l.minutes = 3;
-        l.preparation.exampleId = "bowed";
-        l.preparation.exampleName = tutorial::nameOf (tutorial::Example::bowed);
-        l.preparation.offerExampleWhen = ready;   // (a sound is loaded: use it, or the example)
-        auto load = step ("load", "osp.source.dropZone", "Load a recording",
-                          juce::String::fromUTF8 ("Drag an audio file onto the empty sound area, or click Browse\xe2\x80\xa6 to choose one. One tonal recording is enough."),
-                          Completion::action ({ "source.load.requested" }, ready)
-                              .waitingForResult (juce::String::fromUTF8 ("Loading and analysing the recording\xe2\x80\xa6 This step completes when it can be played."))
-                              .withAlreadyDone (ready, "Loaded"));
-        load.unavailableBody = "A recording is already loaded on this layer. Continue to play it.";
+        l.exampleId = "bowed";
+        // The first step is the set-up: a recording loaded and playable (checked on the real
+        // state: a dropped file counts once it has loaded and been analysed), or the example.
+        auto load = prepare ({ soundReady() },
+                             juce::String::fromUTF8 ("Drag an audio file onto the empty sound area, or click Browse\xe2\x80\xa6 to choose one. One tonal recording is enough. Or load the example sound."));
+        load.title = "Load a recording";
+        load.targetId = "osp.source.dropZone";
         l.steps.push_back (load);
         l.steps.push_back (step ("play", "osp.keyboard", "Play it from the keyboard",
                                  "Play a few notes on your MIDI keyboard or on the keyboard at the bottom of OSP. The recording is pitched to each note you play.",
@@ -133,17 +198,17 @@ static Catalog ospCatalog()
                           Completion::action ({ param (reimaginedToken) }, Condition::equals (reimaginedToken, 0.0f))
                               .withAlreadyDone (Condition::equals (reimaginedToken, 0.0f), "Already at 0 %"));
         l.steps.push_back (back);
-        l.completion = "You have made a playable instrument from one recording. The next lessons change how it plays, add variation and combine sounds.";
+        l.completionText = "You have made a playable instrument from one recording. The next lessons change how it plays, add variation and combine sounds.";
+        require (l, { soundReady() });
         c.lessons.push_back (l);
     }
     {
         Lesson l;
         l.id = "osp.playback";
         l.title = "One Shot & Granular";
-        l.group = "Working with recordings";
-        l.summary = "Two ways of playing the same recording.";
+        l.description = "Two ways of playing the same recording.";
         l.minutes = 4;
-        l.preparation = needsSound ("bowed", false);
+        l.exampleId = "bowed";
         const auto mode = editedLayerToken + ".sourceMode";
         l.steps.push_back (step ("selector", "osp.source.mode", "The playback key",
                                  "The symbol key at the top right of the card, beside EQ, chooses how OSP plays this layer: One Shot or Granular. Click it to see both."));
@@ -166,17 +231,18 @@ static Catalog ospCatalog()
         l.steps.push_back (step ("compare", "osp.source.mode", "Compare the two",
                                  "Switch between One Shot and Granular and play the same notes. The recording stays the same; only the way it is played changes, from the next note on.",
                                  edited (mode)));
-        l.completion = "One Shot plays through the recording; Granular builds the sound from overlapping grains. Each layer has its own playback mode.";
+        l.completionText = "One Shot plays through the recording; Granular builds the sound from overlapping grains. Each layer has its own playback mode.";
+        setUp (l, { soundReady() }, "This lesson plays a recording on the layer you are editing: use your current sound, or the bowed example.");
+        requireOn (l, { "pos", "size", "dens", "spread" }, granular());
         c.lessons.push_back (l);
     }
     {
         Lesson l;
         l.id = "osp.reimagined";
         l.title = "REIMAGINED";
-        l.group = "Working with recordings";
-        l.summary = "Transform a recording while keeping its character.";
+        l.description = "Transform a recording while keeping its character.";
         l.minutes = 5;
-        l.preparation = needsSound ("bowed", false);
+        l.exampleId = "bowed";
         const auto modeId = editedLayerToken + ".reimagined.mode";
         l.steps.push_back (step ("find", "osp.source.reimagined", "Find REIMAGINED",
                                  "Each layer has its own REIMAGINED knob. At 0 % the layer plays without it; turning it up brings in the mode chosen for the layer."));
@@ -202,25 +268,22 @@ static Catalog ospCatalog()
         }
         l.steps.push_back (step ("amount", "osp.source.reimagined", "Set the amount",
                                  "Keep the mode you like and set how much of it you hear with REIMAGINED. Each layer has its own mode and amount.", edited (reimaginedToken)));
-        l.completion = "REIMAGINED offers five ways to transform the same recording. Changing the mode never reloads or alters the recording itself.";
+        l.completionText = "REIMAGINED offers five ways to transform the same recording. Changing the mode never reloads or alters the recording itself.";
+        setUp (l, { soundReady() }, "This lesson transforms a tonal recording: use your current sound, or the bowed example.");
         c.lessons.push_back (l);
     }
     {
         Lesson l;
         l.id = "osp.layers";
         l.title = "Layering sounds";
-        l.group = "Working with recordings";
-        l.summary = "Combine two or three recordings in one instrument.";
+        l.description = "Combine two or three recordings in one instrument.";
         l.minutes = 4;
-        l.preparation = needsSound ("layered", false);
-        l.preparation.offerExampleWhen = Condition::state ("osp.layers.fewerThanTwo");
-        l.preparation.exampleName = tutorial::nameOf (tutorial::Example::layered);
+        l.exampleId = "layered";
         const auto two = Condition::state ("osp.layers.two");
+        // (The second recording: the step waits, blocked, until two layers can play.)
         auto add = step ("add", "osp.header.menu", "Add another recording",
-                         juce::String::fromUTF8 ("Open the \xe2\x80\xa2\xe2\x80\xa2\xe2\x80\xa2 menu and choose Add layer\xe2\x80\xa6, or drag a second file beside the card: ADD LAYER appears while you drag."),
-                         Completion::action ({ "source.load.requested" }, two)
-                             .waitingForResult (juce::String::fromUTF8 ("Loading the second recording\xe2\x80\xa6"))
-                             .withAlreadyDone (two, "Two layers loaded"));
+                         "Both recordings are loaded and play as layers A and B. Continue to hear them together.");
+        add.requirements.push_back (twoLayers());
         l.steps.push_back (add);
         l.steps.push_back (step ("play", "osp.keyboard", "Play both", "Play a note. The layers sound together, each from its own recording.",
                                  Completion::action ({ "note.played" }, two)));
@@ -239,20 +302,18 @@ static Catalog ospCatalog()
                                  Completion::action ({ param ("layerB.sourceMode") }, differ).withAlreadyDone (differ, "Already different")));
         l.steps.push_back (step ("third", "osp.header.menu", "A third layer",
                                  "OSP holds up to three layers. Add a third recording the same way whenever you want a richer instrument."));
-        l.completion = "Each layer has its own recording and its own playback controls. Together they play as one instrument.";
+        l.completionText = "Each layer has its own recording and its own playback controls. Together they play as one instrument.";
+        setUp (l, { soundReady() }, "This lesson starts from one recording and adds a second. The example loads two contrasting sounds at once.");
+        requireOn (l, { "play", "balance", "solo", "unsolo", "tune", "modes" }, twoLayers());
         c.lessons.push_back (l);
     }
     {
         Lesson l;
         l.id = "osp.multisample";
         l.title = "Multi-sample instruments";
-        l.group = "Working with recordings";
-        l.summary = "Build one instrument from several recordings.";
+        l.description = "Build one instrument from several recordings.";
         l.minutes = 4;
-        l.preparation.ready = Condition::state ("osp.source.set");
-        l.preparation.needs = "This lesson needs several recordings loaded together as one sound on this layer. Drop a folder of recordings on a layer, or use the pluck set.";
-        l.preparation.exampleId = "pluckSet";
-        l.preparation.exampleName = tutorial::nameOf (tutorial::Example::pluckSet);
+        l.exampleId = "pluckSet";
         l.steps.push_back (step ("set", "osp.source.card", "One sound from many files",
                                  "Files dropped together, or a folder, become one sound on one layer. OSP sorts them by their detected pitch."));
         l.steps.push_back (step ("play", "osp.keyboard", "Play across the keyboard",
@@ -275,17 +336,17 @@ static Catalog ospCatalog()
                          "Layer 1 to 4 is the velocity layer: files of one pitch played at different strengths. OSP makes layers from dynamics words in the names, such as pp, mf or ff.");
         vel.unavailableBody = root.unavailableBody;
         l.steps.push_back (vel);
-        l.completion = "A multi-sample sound gives OSP a recording near every note. Samples shows how each file is used, and lets you correct it.";
+        l.completionText = "A multi-sample sound gives OSP a recording near every note. Samples shows how each file is used, and lets you correct it.";
+        setUp (l, { sampleSet() }, "This lesson needs several recordings loaded as one sound: a folder dropped on a layer, or the pluck set example.");
         c.lessons.push_back (l);
     }
     {
         Lesson l;
         l.id = "osp.life";
         l.title = "LIFE: natural variation";
-        l.group = "Playing and shaping";
-        l.summary = "Make repeated notes less identical.";
+        l.description = "Make repeated notes less identical.";
         l.minutes = 4;
-        l.preparation = needsSound ("pluck", true);
+        l.exampleId = "pluck";
         l.steps.push_back (step ("zero", "osp.macro.life", "Repeat a note", "Turn LIFE to 0 % and play the same note several times. Each repeat is performed the same way.",
                                  setTo ("life", 0.0f, "LIFE is at 0 %")));
         l.steps.push_back (step ("raise", "osp.macro.life", "Turn LIFE up",
@@ -312,17 +373,17 @@ static Catalog ospCatalog()
                            edited ("life.takes"));
         takes.unavailableBody = closed;
         l.steps.push_back (takes);
-        l.completion = "LIFE varies how each note is performed. With one recording it does not create new recordings: it plays the same one a little differently each time.";
+        l.completionText = "LIFE varies how each note is performed. With one recording it does not create new recordings: it plays the same one a little differently each time.";
+        setUp (l, { soundReady() }, "LIFE is easiest to hear on short, repeated notes: use your current sound, or the plucked example.");
         c.lessons.push_back (l);
     }
     {
         Lesson l;
         l.id = "osp.keydna";
         l.title = "KEY DNA";
-        l.group = "Playing and shaping";
-        l.summary = "Give each key its own granular character.";
+        l.description = "Give each key its own granular character.";
         l.minutes = 4;
-        l.preparation = needsSound ("bowed", false);
+        l.exampleId = "bowed";
         l.steps.push_back (step ("granular", "osp.source.mode", "Switch to Granular",
                                  "KEY DNA belongs to Granular playback. Choose Granular on this layer's playback key.",
                                  setTo (editedLayerToken + ".sourceMode", 1.0f, "Already Granular")));
@@ -354,17 +415,18 @@ static Catalog ospCatalog()
                             edited (editedLayerToken + ".keyDna.amount"));
         amount.unavailableBody = closed;
         l.steps.push_back (amount);
-        l.completion = "KEY DNA varies the granular sound from key to key. The recording and its One Shot playback are left as they are.";
+        l.completionText = "KEY DNA varies the granular sound from key to key. The recording and its One Shot playback are left as they are.";
+        setUp (l, { soundReady() }, "KEY DNA shapes Granular playback of a recording: use your current sound, or the bowed example.");
+        requireOn (l, { "open", "what", "on", "position", "other", "amount" }, granular());
         c.lessons.push_back (l);
     }
     {
         Lesson l;
         l.id = "osp.arp";
         l.title = "Arpeggiator";
-        l.group = "Playing and shaping";
-        l.summary = "Play held notes as a repeating pattern.";
+        l.description = "Play held notes as a repeating pattern.";
         l.minutes = 3;
-        l.preparation = needsSound ("pluck", false);
+        l.exampleId = "pluck";
         auto open = step ("open", "osp.arp.control", "Open ARP", "Click ARP beside the keyboard to open the arpeggiator.",
                           Completion::action ({ andor::learn::actions::arpPanelOpened }, Condition::state ("osp.arp.panel.open"))
                               .withAlreadyDone (Condition::state ("osp.arp.panel.open"), "Already open"));
@@ -381,17 +443,17 @@ static Catalog ospCatalog()
                                  Completion::action ({ andor::learn::actions::arpOctavesChanged, param ("arp.octaves") }, Condition::changed ("arp.octaves"))));
         l.steps.push_back (step ("gate", "osp.arp.gate", "Change the note length", "GATE sets how long each note is held before it is released, as a share of the step.",
                                  edited ("arp.gate")));
-        l.completion = "The arpeggiator turns the notes you hold into a repeating sequence. The recording itself is not changed.";
+        l.completionText = "The arpeggiator turns the notes you hold into a repeating sequence. The recording itself is not changed.";
+        setUp (l, { soundReady() }, "The arpeggiator plays the notes you hold: use your current sound, or the plucked example.");
         c.lessons.push_back (l);
     }
     {
         Lesson l;
         l.id = "osp.modulation";
         l.title = "Modulation";
-        l.group = "Playing and shaping";
-        l.summary = "Make a control move by itself.";
+        l.description = "Make a control move by itself.";
         l.minutes = 4;
-        l.preparation = needsSound ("bowed", false);
+        l.exampleId = "bowed";
         const auto onLfo = Condition::state ("osp.mod.tab.lfo1");
         auto tab = step ("tab", "osp.mod.lfo1", "Select LFO 1",
                          "Click LFO 1 in the modulation panel. An LFO is a slow, repeating movement that can move other controls.",
@@ -414,17 +476,17 @@ static Catalog ospCatalog()
                                  Completion::action (routeDepthActions(), Condition::state ("osp.mod.lfo1.routed"))));
         l.steps.push_back (step ("listen", "osp.mod.halo", "Watch and listen",
                                  "Play a note. The ring moves as LFO 1 changes the setting, while the knob keeps its own position."));
-        l.completion = "Modulation moves a setting while you play. Other sources, such as ENV, VEL and the mod wheel, connect to controls the same way.";
+        l.completionText = "Modulation moves a setting while you play. Other sources, such as ENV, VEL and the mod wheel, connect to controls the same way.";
+        setUp (l, { soundReady() }, "Modulation moves a control while you play: use your current sound, or the bowed example.");
         c.lessons.push_back (l);
     }
     {
         Lesson l;
         l.id = "osp.sound";
         l.title = "Shape the sound";
-        l.group = "Playing and shaping";
-        l.summary = "The filter, saturation, movement, echo and space.";
+        l.description = "The filter, saturation, movement, echo and space.";
         l.minutes = 4;
-        l.preparation = needsSound ("bowed", true);
+        l.exampleId = "bowed";
         l.steps.push_back (step ("filter", "osp.macro.filter", "FILTER",
                                  "FILTER sets the cutoff of the voices' filter, between its MIN and MAX. Lower it while you play to hear the sound grow darker.", edited ("character")));
         l.steps.push_back (step ("drive", "osp.macro.drive", "DRIVE",
@@ -444,17 +506,17 @@ static Catalog ospCatalog()
         l.steps.push_back (step ("space", "osp.macro.space", "SPACE",
                                  "SPACE places the sound in a reverb; the knob sets how much. Click SPACE to choose ROOM, HALL, PLATE, SPRING and more.", edited ("space")));
         l.steps.push_back (step ("compare", "osp.macros", "Compare", "Turn the effects down one at a time to hear what each one adds. None of them changes the recording itself."));
-        l.completion = "These controls shape the sound after it is played. Each name opens more settings; a double-click on DRIVE, FILTER, MOVEMENT, ECHO or SPACE opens its full rack.";
+        l.completionText = "These controls shape the sound after it is played. Each name opens more settings; a double-click on DRIVE, FILTER, MOVEMENT, ECHO or SPACE opens its full rack.";
+        setUp (l, { soundReady() }, "These controls shape any sound: use your current one, or the bowed example.");
         c.lessons.push_back (l);
     }
     {
         Lesson l;
         l.id = "osp.presets";
         l.title = "Presets and instruments";
-        l.group = "Managing sounds";
-        l.summary = "Keep a sound, and move it to another computer.";
+        l.description = "Keep a sound, and move it to another computer.";
         l.minutes = 3;
-        l.preparation = needsSound ("bowed", false);
+        l.exampleId = "bowed";
         auto open = step ("library", "osp.header.preset", "Open the Library",
                           juce::String::fromUTF8 ("Click the preset name and choose Open Library\xe2\x80\xa6, or press Cmd+L (Ctrl+L). The Library holds your presets, templates and sounds."),
                           Completion::action ({ "library.opened" }, Condition::state ("osp.library.open")).withAlreadyDone (Condition::state ("osp.library.open"), "Already open"));
@@ -473,7 +535,8 @@ static Catalog ospCatalog()
                                  juce::String::fromUTF8 ("To move a sound to another computer, choose Export instrument\xe2\x80\xa6 in the \xe2\x80\xa2\xe2\x80\xa2\xe2\x80\xa2 menu. It writes one .ospinstrument file holding the settings and copies of the recordings.")));
         l.steps.push_back (step ("open", "osp.header.menu", "Open it again",
                                  juce::String::fromUTF8 ("Open instrument file\xe2\x80\xa6 in the same menu brings an exported instrument back, recordings included. The sound you had before can be restored from the preset name's menu.")));
-        l.completion = "Presets keep your settings and point to recordings on this computer. Exported instruments carry the recordings with them.";
+        l.completionText = "Presets keep your settings and point to recordings on this computer. Exported instruments carry the recordings with them.";
+        setUp (l, { soundReady() }, "Saving needs a sound to save: use your current one, or the bowed example.");
         c.lessons.push_back (l);
     }
 
@@ -764,7 +827,6 @@ void OspAudioProcessorEditor::createLearn()
 {
     andor::learn::EditorHooks hooks;
     hooks.content = &content;
-    hooks.productName = "ANDOR OSP";
     hooks.menuAnchor = [this] { return menuButton.getBounds(); };
     hooks.closePopovers = [this] { closePopup(); };
     hooks.showing = [this] { return isShowing(); };
@@ -787,10 +849,8 @@ void OspAudioProcessorEditor::createLearn()
         timerCallback();
         return ok;
     };
-    hooks.exampleReady = [this] { return ospProcessor.tutorialExampleReady(); };
-    hooks.exampleFailed = [this] { return ospProcessor.tutorialExampleFailed(); };
-    hooks.canRestore = [this] { return ospProcessor.canRestoreBeforeTutorial(); };
-    hooks.restore = [this] {
+    hooks.canRestoreSound = [this] { return ospProcessor.canRestoreBeforeTutorial(); };
+    hooks.restoreSound = [this] {
         const bool ok = ospProcessor.restorePreviousState();
         presetBar.refresh();
         timerCallback();

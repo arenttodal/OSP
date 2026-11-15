@@ -143,11 +143,17 @@ TEST_CASE ("learn: OSP's own plugin has the shared Learn, idle until asked; its 
     CHECK (menuHas (menu, "Reset Tutorials" + dots));
     CHECK_FALSE (menuHas (menu, "Learn mode"));
     CHECK_FALSE (menuHas (menu, "Learn ANDOR" + dots));
-    // The groups, in the browser's order.
-    juce::StringArray groups;
+    // Every lesson: a line for the browser, a completion text, and (all but Quick Start) a set-up
+    // step first; none is offered a Skip (Learn 2.0 has none).
     for (const auto& l : rig.learn.catalog().lessons)
-        groups.addIfNotAlreadyThere (l.group);
-    CHECK (groups == juce::StringArray ({ "Start here", "Working with recordings", "Playing and shaping", "Managing sounds" }));
+    {
+        INFO (l.id);
+        CHECK (l.description.isNotEmpty());
+        CHECK (l.completionText.isNotEmpty());
+        CHECK (l.exampleId.isNotEmpty());
+        REQUIRE_FALSE (l.steps.empty());
+        CHECK (l.steps.front().preparation);
+    }
 }
 
 TEST_CASE ("learn: Quick Start, end to end, only the musician's own actions complete it", "[plugin][learn]")
@@ -155,9 +161,12 @@ TEST_CASE ("learn: Quick Start, end to end, only the musician's own actions comp
     LearnRig rig;
     REQUIRE (rig.learn.startLesson ("osp.quickstart"));
     rig.tick();
-    // An empty instrument: the lesson starts at once, at the drop zone (no Card A pretended).
+    // An empty instrument: the set-up step, at the drop zone (no Card A pretended), its sound
+    // not ready yet: Load Example Sound first.
     REQUIRE (rig.learn.noteKind() == LearnNote::lesson);
-    CHECK (rig.stepId() == "load");
+    CHECK (rig.stepId() == "setup");
+    CHECK_FALSE (rig.learn.runner().preparationReady());
+    CHECK (rig.learn.note()->actionIds().contains ("example"));
     REQUIRE (rig.learn.highlight() != nullptr);
     REQUIRE (rig.learn.highlight()->target().has_value());
     // No Skip, anywhere.
@@ -172,12 +181,11 @@ TEST_CASE ("learn: Quick Start, end to end, only the musician's own actions comp
     REQUIRE (zone.has_value());
     const auto at = rig.ui.getLocalPoint (&content, zone->getCentre());
     rig.ui.filesDropped ({ files[0].getFullPathName() }, at.x, at.y);
-    CHECK_FALSE (rig.stepDone());
     rig.waitLoaded();
-    for (int i = 0; i < 3 && ! rig.stepDone(); ++i)
-        rig.tick();
-    REQUIRE (rig.stepDone());
-    rig.next();
+    rig.tick();
+    CHECK (rig.learn.runner().preparationReady());   // (ready only once it has loaded and been analysed)
+    rig.learn.noteAction ("current");
+    rig.tick();
     CHECK (rig.stepId() == "play");
     rig.playNote();
     REQUIRE (rig.stepDone());
@@ -220,54 +228,59 @@ TEST_CASE ("learn: Quick Start, end to end, only the musician's own actions comp
 TEST_CASE ("learn: a lesson that needs a sound asks first, loads the example only when chosen, and restores", "[plugin][learn]")
 {
     LearnRig rig;
-    // The musician's own state first: a recording and a setting of theirs.
+    // The musician's own state first: a recording and settings of theirs.
     juce::String error;
     const auto mine = osp::plugin::tutorial::files (osp::plugin::tutorial::Example::voice, error);
     REQUIRE (mine.size() == 1);
     rig.p.loadFile (mine[0], 0);
     rig.waitLoaded();
     rig.automate ("space", 77.0f);
-    rig.automate ("layerA.sourceMode", 1.0f);   // Granular: the multi-sample lesson still needs a set
-    // The multi-sample lesson: this sound is not a set, so it asks (nothing changed yet).
+    rig.automate ("layerA.sourceMode", 1.0f);
+    // The multi-sample lesson: this sound is not a set; its set-up says so (nothing changed yet).
     const auto before = rig.parameterValues();
     REQUIRE (rig.learn.startLesson ("osp.multisample"));
     rig.tick();
-    REQUIRE (rig.learn.noteKind() == LearnNote::prepare);
-    CHECK (rig.learn.note()->actionIds().contains ("loadexample"));
+    REQUIRE (rig.learn.noteKind() == LearnNote::lesson);
+    CHECK (rig.stepId() == "setup");
+    CHECK_FALSE (rig.learn.runner().preparationReady());
+    CHECK (rig.learn.note()->actionIds().contains ("example"));
     CHECK (rig.parameterValues() == before);
-    CHECK (rig.p.currentInstrument (0) != nullptr);
-    // Not now: nothing loaded, nothing restorable.
+    // X: nothing loaded, nothing restorable.
     rig.learn.noteAction ("close");
     rig.tick();
     CHECK_FALSE (rig.p.canRestoreBeforeTutorial());
     CHECK (rig.parameterValues() == before);
-    // Again, and Load: the whole state is kept first, the lesson waits until it can be played.
+    // Use Current Sound: the next step waits, blocked, saying what is missing.
     REQUIRE (rig.learn.startLesson ("osp.multisample"));
     rig.tick();
-    rig.learn.noteAction ("loadexample");
-    CHECK (rig.p.canRestoreBeforeTutorial());   // (kept before anything was replaced)
-    CHECK (rig.learn.noteKind() == LearnNote::preparing);
+    rig.learn.noteAction ("current");
+    rig.tick();
+    CHECK (rig.learn.runner().state() == andor::learn::LessonRunner::State::blocked);
+    // Load Example Sound: the whole state is kept first; the lesson waits until it plays.
+    rig.learn.noteAction ("example");
+    CHECK (rig.p.canRestoreBeforeTutorial());
     rig.waitLoaded();
-    for (int i = 0; i < 4 && rig.learn.noteKind() != LearnNote::lesson; ++i)
-        rig.tick();
-    REQUIRE (rig.learn.noteKind() == LearnNote::lesson);
-    CHECK (rig.stepId() == "set");
+    rig.tick();
+    rig.tick();
+    CHECK (rig.learn.runner().state() != andor::learn::LessonRunner::State::blocked);
     const auto inst = rig.p.currentInstrument (0);
     REQUIRE (inst != nullptr);
     REQUIRE (inst->set != nullptr);
     CHECK (inst->set->members.size() == 8);
     CHECK (rig.p.parameterValue ("space") != 77.0f);   // a clean instrument for the lesson
-    // Closing offers the restore (never silently): restoring brings the musician's sound back.
+    // X never restores; the menu's Restore Previous Sound does.
     rig.learn.noteAction ("close");
     rig.tick();
-    REQUIRE (rig.learn.noteKind() == LearnNote::restoreOffer);
-    rig.learn.noteAction ("restore");
+    CHECK (rig.p.currentInstrument (0)->set != nullptr);
+    juce::PopupMenu menu;
+    rig.learn.addMenuItems (menu);
+    CHECK (menuHas (menu, "Restore Previous Sound"));
+    REQUIRE (rig.learn.restorePreviousSound());
     rig.waitLoaded();
     CHECK (rig.p.parameterValue ("space") == Catch::Approx (77.0f).margin (0.01));
     CHECK (rig.p.parameterValue ("layerA.sourceMode") == Catch::Approx (1.0f));
     REQUIRE (rig.p.currentInstrument (0) != nullptr);
     CHECK (rig.p.currentInstrument (0)->set == nullptr);
-    CHECK_FALSE (rig.learn.isActive());
 }
 
 TEST_CASE ("learn: every lesson's navigation (Show me, Back, Continue, X) never changes the sound", "[plugin][learn]")
@@ -284,18 +297,12 @@ TEST_CASE ("learn: every lesson's navigation (Show me, Back, Continue, X) never 
         INFO (lesson.id);
         REQUIRE (rig.learn.startLesson (lesson.id));
         rig.tick();
-        if (rig.learn.noteKind() == LearnNote::prepare)
+        REQUIRE (rig.learn.noteKind() == LearnNote::lesson);
+        if (rig.stepId() == "setup")
         {
-            if (rig.learn.note()->actionIds().contains ("usemine"))
-                rig.learn.noteAction ("usemine");
-            else
-            {
-                rig.learn.noteAction ("close");   // (needs another sound: not loaded here)
-                continue;
-            }
+            rig.learn.noteAction ("current");   // (never the example here: nothing may change)
             rig.tick();
         }
-        REQUIRE (rig.learn.noteKind() == LearnNote::lesson);
         for (int s = 0; s < static_cast<int> (lesson.steps.size()); ++s)
         {
             auto ids = rig.learn.note() != nullptr ? rig.learn.note()->actionIds() : juce::StringArray();
@@ -312,8 +319,6 @@ TEST_CASE ("learn: every lesson's navigation (Show me, Back, Continue, X) never 
         }
         rig.learn.noteAction ("close");
         rig.tick();
-        if (rig.learn.noteKind() == LearnNote::restoreOffer)
-            rig.learn.noteAction ("keep");
         rig.ui.closePopup();
         rig.tick();
     }
@@ -349,10 +354,7 @@ TEST_CASE ("learn: the ring is the real control and the note stays clear of it, 
                 if (lesson.steps[static_cast<std::size_t> (s)].id == c.step)
                     index = s;
             REQUIRE (index >= 0);
-            REQUIRE (rig.learn.startLessonAt (c.lesson, index));
-            rig.tick();
-            if (rig.learn.noteKind() == LearnNote::prepare)
-                rig.learn.noteAction ("usemine");
+            REQUIRE (rig.learn.startLesson (c.lesson, index));
             rig.tick();
             REQUIRE (rig.learn.noteKind() == LearnNote::lesson);
             rig.learn.noteAction ("showme");
@@ -381,7 +383,7 @@ TEST_CASE ("learn: Reset Tutorials asks, then resets OSP's lessons only; Escape 
     andor::learn::ProgressStore analog ("analog");
     REQUIRE (analog.update ([] (andor::learn::ProgressData& d) { d.lessons["analog.arp.basics"].status = "complete"; }));
     REQUIRE (rig.learn.store().update ([] (andor::learn::ProgressData& d) { d.lessons["osp.arp"].status = "complete"; }));
-    rig.learn.askToResetProgress();
+    rig.learn.confirmResetProgress();
     rig.tick();
     REQUIRE (rig.learn.noteKind() == LearnNote::confirmReset);
     CHECK (rig.learn.store().read().lessons.count ("osp.arp") == 1);   // (asked, not done)
@@ -411,7 +413,6 @@ TEST_CASE ("learn: Toggle Info explains the control clicked, only where it is sh
     rig.tick();
     REQUIRE (rig.learn.noteKind() == LearnNote::help);
     CHECK (rig.learn.note()->titleText() == "FILTER");
-    CHECK (rig.learn.note()->metaText() == "INFO");
     rig.learn.setLearnMode (false);
     rig.tick();
     CHECK_FALSE (rig.learn.isActive());
@@ -469,22 +470,22 @@ TEST_CASE ("learn: screenshots of every lesson step (OSP_LEARN_SHOTS)", "[.][lea
             rig.tick();
             shoot (*rig.editor, "02-info-filter-" + w);
             rig.learn.setLearnMode (false);
-            rig.learn.askToResetProgress();
+            rig.learn.confirmResetProgress();
             rig.tick();
             shoot (*rig.editor, "03-reset-confirm-" + w);
             rig.learn.noteAction ("cancel");
             REQUIRE (rig.learn.startLesson ("osp.multisample"));
             rig.tick();
-            shoot (*rig.editor, "04-prepare-" + w);
-            rig.learn.noteAction ("loadexample");
+            shoot (*rig.editor, "04-setup-" + w);
+            rig.learn.noteAction ("current");
             rig.tick();
-            shoot (*rig.editor, "05-preparing-" + w);
+            shoot (*rig.editor, "05-blocked-" + w);
+            rig.learn.noteAction ("example");
             rig.waitLoaded();
             rig.tick();
-            rig.learn.noteAction ("close");
             rig.tick();
-            shoot (*rig.editor, "06-restore-offer-" + w);
-            rig.learn.noteAction ("keep");
+            shoot (*rig.editor, "06-example-loaded-" + w);
+            rig.learn.noteAction ("close");
             rig.tick();
         }
         int lessonNumber = 10;
@@ -504,30 +505,24 @@ TEST_CASE ("learn: screenshots of every lesson step (OSP_LEARN_SHOTS)", "[.][lea
                 // The sound the lesson works on (Quick Start's first step: the empty instrument).
                 if (! (lesson.id == "osp.quickstart" && s == 0) && rig.p.occupiedLayerCount() == 0)
                 {
-                    const auto example = lesson.preparation.exampleId.isNotEmpty() ? lesson.preparation.exampleId : juce::String ("bowed");
+                    const auto example = lesson.exampleId.isNotEmpty() ? lesson.exampleId : juce::String ("bowed");
                     REQUIRE (rig.p.loadTutorialExample (example));
                     rig.waitLoaded();
                 }
                 // What the musician would have done by this step.
-                if ((lesson.id == "osp.playback" && s >= 3 && s < 7) || (lesson.id == "osp.keydna" && s >= 1))
+                if ((lesson.id == "osp.playback" && juce::StringArray { "pos", "size", "dens", "spread" }.contains (st.id))
+                    || (lesson.id == "osp.keydna" && st.id != "setup" && st.id != "granular"))
                     rig.userSet ("layerA.sourceMode", 1.0f);
-                if (lesson.id == "osp.modulation" && s >= 4 && ! rig.learn.targets().state ("osp.mod.lfo1.routed"))
+                if (lesson.id == "osp.modulation" && (st.id == "depth" || st.id == "listen") && ! rig.learn.targets().state ("osp.mod.lfo1.routed"))
                     rig.p.assignModulation (mod::Source::lfo1, osp::plugin::modui::destinationFor ("character", false), 50.0f);
-                if (lesson.id == "osp.keydna" && s >= 4 && ! rig.p.keyDnaSettings (0).enabled)
+                if (lesson.id == "osp.keydna" && juce::StringArray { "position", "other", "amount" }.contains (st.id) && ! rig.p.keyDnaSettings (0).enabled)
                 {
                     auto k = rig.p.keyDnaSettings (0);
                     k.enabled = true;
                     rig.p.setKeyDnaSettings (0, k, "test", false);
                 }
-                REQUIRE (rig.learn.startLessonAt (lesson.id, s));
+                REQUIRE (rig.learn.startLesson (lesson.id, s));
                 rig.tick();
-                if (rig.learn.noteKind() == LearnNote::prepare)
-                {
-                    rig.learn.noteAction (rig.learn.note()->actionIds().contains ("usemine") ? "usemine" : "loadexample");
-                    rig.waitLoaded();
-                    rig.tick();
-                    rig.tick();
-                }
                 if (rig.learn.note() != nullptr && rig.learn.note()->actionIds().contains ("showme"))
                     rig.learn.noteAction ("showme");
                 rig.tick();
@@ -535,8 +530,6 @@ TEST_CASE ("learn: screenshots of every lesson step (OSP_LEARN_SHOTS)", "[.][lea
                 shoot (*rig.editor, prefix + "-" + juce::String (s + 1).paddedLeft ('0', 2) + "-" + st.id + "-" + w);
                 rig.learn.noteAction ("close");
                 rig.tick();
-                if (rig.learn.noteKind() == LearnNote::restoreOffer)
-                    rig.learn.noteAction ("keep");
                 rig.ui.closePopup();
                 rig.ui.closeKeyDna();
                 rig.ui.closeLibrary();

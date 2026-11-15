@@ -1,7 +1,5 @@
 #include "LearnOverlay.h"
 
-#include <utility>
-
 #include "Design.h"
 #include "OspLookAndFeel.h"
 
@@ -23,10 +21,25 @@ void HighlightLayer::setTarget (std::optional<juce::Rectangle<int>> target, bool
 {
     if (target == ring && quiet == quietRing)
         return;
-    auto dirty = ring.value_or (juce::Rectangle<int>()).expanded (12);
+    auto dirty = ring.value_or (juce::Rectangle<int>()).expanded (16);
     ring = target;
     quietRing = quiet;
-    dirty = dirty.getUnion (ring.value_or (juce::Rectangle<int>()).expanded (12));
+    dirty = dirty.getUnion (ring.value_or (juce::Rectangle<int>()).expanded (16));
+    repaint (dirty);
+}
+
+void HighlightLayer::setConnector (std::optional<juce::Line<float>> line)
+{
+    auto same = [] (const std::optional<juce::Line<float>>& a, const std::optional<juce::Line<float>>& b) {
+        return a.has_value() == b.has_value() && (! a.has_value() || (a->getStart() == b->getStart() && a->getEnd() == b->getEnd()));
+    };
+    if (same (line, link))
+        return;
+    auto area = [] (const std::optional<juce::Line<float>>& l) {
+        return l.has_value() ? juce::Rectangle<float> (l->getStart(), l->getEnd()).expanded (8.0f).getSmallestIntegerContainer() : juce::Rectangle<int>();
+    };
+    const auto dirty = area (link).getUnion (area (line));
+    link = line;
     repaint (dirty);
 }
 
@@ -34,21 +47,36 @@ void HighlightLayer::paint (juce::Graphics& g)
 {
     if (! ring.has_value())
         return;
-    // The ANDOR Learn highlight: a green ring just outside the control with a soft glow around
-    // it (widening, fading strokes), then a crisp 1.5 px line. The control itself stays as it
-    // is (nothing drawn over it). Info's hover outline is the same green, quieter.
-    const auto r = ring->toFloat().expanded (4.0f);
-    const auto green = juce::Colour (0xff35b264);
+    // The exact control, outlined just outside its bounds: a soft green glow, then a 2 px line;
+    // the corners follow the control's size (a round key keeps a round outline). The control
+    // itself is left as it is.
+    const auto green = colour();
+    const auto r = ring->toFloat().expanded (padding);
+    const float radius = std::min (9.0f, 0.5f * std::min (r.getWidth(), r.getHeight()));
     juce::Path shape;
-    shape.addRoundedRectangle (r, 9.0f);
-    if (! quietRing)
-        for (const auto& [width, alpha] : { std::pair { 14.0f, 0.05f }, std::pair { 9.0f, 0.08f }, std::pair { 5.0f, 0.14f } })
-        {
-            g.setColour (green.withAlpha (alpha));
-            g.strokePath (shape, juce::PathStrokeType (width));
-        }
-    g.setColour (green.withAlpha (quietRing ? 0.6f : 1.0f));
-    g.strokePath (shape, juce::PathStrokeType (quietRing ? 1.0f : 1.5f));
+    shape.addRoundedRectangle (r, radius);
+    if (quietRing)
+    {
+        g.setColour (green.withAlpha (0.12f));
+        g.strokePath (shape, juce::PathStrokeType (5.0f));
+        g.setColour (green.withAlpha (0.7f));
+        g.strokePath (shape, juce::PathStrokeType (1.0f));
+        return;
+    }
+    g.setColour (green.withAlpha (0.10f));
+    g.strokePath (shape, juce::PathStrokeType (10.0f));
+    g.setColour (green.withAlpha (0.22f));
+    g.strokePath (shape, juce::PathStrokeType (5.0f));
+    g.setColour (green);
+    g.strokePath (shape, juce::PathStrokeType (2.0f));
+    if (link.has_value())
+    {
+        // The connector: a fine line from the note to the outline, a small dot where it lands.
+        g.setColour (green.withAlpha (0.85f));
+        g.drawLine (*link, 1.5f);
+        const auto end = link->getEnd();
+        g.fillEllipse (juce::Rectangle<float> (7.0f, 7.0f).withCentre (end));
+    }
 }
 
 //==============================================================================
@@ -67,7 +95,7 @@ public:
 
     int preferredWidth() const
     {
-        return juce::roundToInt (juce::GlyphArrangement::getStringWidth (type::popupLabel (11.5f), getButtonText())) + 22;
+        return juce::roundToInt (juce::GlyphArrangement::getStringWidth (type::popupLabel (11.5f), getButtonText())) + 24;
     }
     bool keyPressed (const juce::KeyPress& key) override
     {
@@ -112,8 +140,10 @@ public:
 namespace
 {
     constexpr float pad = 16.0f;
-    constexpr float metaHeight = 16.0f, titleHeight = 22.0f, keyHeight = 26.0f, doneHeight = 18.0f;
+    constexpr float metaHeight = 16.0f, titleHeight = 22.0f, keyHeight = 26.0f;
     juce::Font bodyFont() { return fonts::make (12.5f, fonts::Weight::regular, 0.0f); }
+    juce::Font statusFont() { return fonts::make (11.5f, fonts::Weight::medium, 0.0f); }
+    constexpr float tickRoom = 18.0f;
 } // namespace
 
 Note::Note()
@@ -127,13 +157,21 @@ Note::~Note() = default;
 
 void Note::setContent (const juce::String& m, const juce::String& t, const juce::String& b, std::vector<Action> a, bool d)
 {
-    meta = m;
-    title = t;
-    body = b;
-    done = d;
-    actions = std::move (a);
+    Content c;
+    c.meta = m;
+    c.title = t;
+    c.body = b;
+    c.done = d;
+    c.status = d ? juce::String ("Done.") : juce::String();
+    c.actions = std::move (a);
+    setContent (std::move (c));
+}
+
+void Note::setContent (Content c)
+{
+    content = std::move (c);
     keys.clear();
-    for (const auto& action : actions)
+    for (const auto& action : content.actions)
     {
         auto key = std::make_unique<Key> (action);
         const auto id = action.id;
@@ -148,40 +186,46 @@ void Note::setContent (const juce::String& m, const juce::String& t, const juce:
         addAndMakeVisible (*key);
         keys.push_back (std::move (key));
     }
-    setDescription (title + ". " + body);
+    setDescription (content.title + ". " + content.body + (content.status.isNotEmpty() ? " " + content.status : juce::String()));
     const auto size = preferredSize();
     setSize (size.x, size.y);
     resized();
     repaint();
 }
 
-juce::TextLayout Note::layoutBody (float width) const
+juce::TextLayout Note::layoutText (const juce::String& text, juce::Font font, juce::Colour colour, float width) const
 {
-    juce::AttributedString text;
-    text.append (body, bodyFont(), design::colour::textSecondary);
-    text.setLineSpacing (2.0f);
+    juce::AttributedString a;
+    a.append (text, font, colour);
+    a.setLineSpacing (3.0f);
     juce::TextLayout layout;
-    layout.createLayout (text, width);
+    layout.createLayout (a, width);
     return layout;
 }
 
-int Note::bodyHeight() const
+int Note::textHeight (const juce::String& text, juce::Font font) const
 {
-    if (body.isEmpty())
+    if (text.isEmpty())
         return 0;
-    return juce::roundToInt (std::ceil (layoutBody (static_cast<float> (cardWidth) - 2.0f * pad).getHeight()));
+    return juce::roundToInt (std::ceil (layoutText (text, font, juce::Colours::black, static_cast<float> (cardWidth) - 2.0f * pad).getHeight()));
 }
 
 juce::Point<int> Note::preferredSize() const
 {
     float h = pad;
-    if (meta.isNotEmpty())
-        h += metaHeight;
-    h += titleHeight + 4.0f + static_cast<float> (bodyHeight());
-    if (done)
-        h += doneHeight + 4.0f;
-    if (! actions.empty())
-        h += 12.0f + keyHeight;
+    if (content.meta.isNotEmpty() || content.step.isNotEmpty())
+        h += metaHeight + 2.0f;
+    h += titleHeight + 4.0f + static_cast<float> (textHeight (content.body, bodyFont()));
+    if (content.status.isNotEmpty())
+    {
+        juce::AttributedString a;
+        a.append (content.status, statusFont());
+        juce::TextLayout l;
+        l.createLayout (a, static_cast<float> (cardWidth) - 2.0f * pad - (content.done ? tickRoom : 0.0f));
+        h += 10.0f + std::ceil (l.getHeight());
+    }
+    if (! content.actions.empty())
+        h += 14.0f + keyHeight;
     h += pad - 2.0f;
     return { cardWidth + 2 * margin, juce::roundToInt (h) + 2 * margin };
 }
@@ -222,36 +266,45 @@ void Note::paint (juce::Graphics& g)
 
     float y = r.getY() + pad;
     const float x = r.getX() + pad, w = r.getWidth() - 2.0f * pad;
-    if (meta.isNotEmpty())
+    if (content.meta.isNotEmpty() || content.step.isNotEmpty())
     {
+        // The lesson's small label on the left, the step count on the right (clear of the cross).
         g.setColour (design::colour::textMicro);
         g.setFont (type::popupTitle (10.0f));
-        g.drawText (meta, juce::Rectangle<float> (x, y - 2.0f, w - 24.0f, metaHeight), juce::Justification::centredLeft, true);
-        y += metaHeight;
+        const auto line = juce::Rectangle<float> (x, y - 2.0f, w - 28.0f, metaHeight);
+        g.drawText (content.meta, line, juce::Justification::centredLeft, true);
+        g.drawText (content.step, line, juce::Justification::centredRight, false);
+        y += metaHeight + 2.0f;
     }
     g.setColour (design::colour::text);
     g.setFont (fonts::make (15.0f, fonts::Weight::medium, 0.0f));
-    g.drawText (title, juce::Rectangle<float> (x, y, w - (meta.isEmpty() ? 24.0f : 0.0f), titleHeight), juce::Justification::centredLeft, true);
+    const bool titleBesideClose = content.meta.isEmpty() && content.step.isEmpty();
+    g.drawText (content.title, juce::Rectangle<float> (x, y, w - (titleBesideClose ? 28.0f : 0.0f), titleHeight), juce::Justification::centredLeft, true);
     y += titleHeight + 4.0f;
-    if (body.isNotEmpty())
+    if (content.body.isNotEmpty())
     {
-        const auto layout = layoutBody (w);
+        const auto layout = layoutText (content.body, bodyFont(), design::colour::textSecondary, w);
         layout.draw (g, { x, y, w, layout.getHeight() });
-        y += static_cast<float> (bodyHeight());
+        y += static_cast<float> (textHeight (content.body, bodyFont()));
     }
-    if (done)
+    if (content.status.isNotEmpty())
     {
-        // The task is done: a quiet check, the accent's colour.
-        y += 4.0f;
-        const auto mark = juce::Rectangle<float> (x, y + 3.0f, 12.0f, 12.0f);
-        juce::Path tick;
-        tick.startNewSubPath (mark.getX() + 1.5f, mark.getCentreY());
-        tick.lineTo (mark.getX() + 4.8f, mark.getBottom() - 2.0f);
-        tick.lineTo (mark.getRight() - 1.0f, mark.getY() + 2.0f);
-        g.setColour (design::colour::accent);
-        g.strokePath (tick, juce::PathStrokeType (1.8f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        g.setFont (type::popupLabel (11.5f));
-        g.drawText ("Done", juce::Rectangle<float> (x + 18.0f, y, w - 18.0f, doneHeight), juce::Justification::centredLeft, false);
+        // The status: a quiet line under the text - with a check once the task is done.
+        y += 10.0f;
+        float tx = x;
+        if (content.done)
+        {
+            const auto mark = juce::Rectangle<float> (x, y + 2.0f, 12.0f, 12.0f);
+            juce::Path tick;
+            tick.startNewSubPath (mark.getX() + 1.5f, mark.getCentreY());
+            tick.lineTo (mark.getX() + 4.8f, mark.getBottom() - 2.0f);
+            tick.lineTo (mark.getRight() - 1.0f, mark.getY() + 2.0f);
+            g.setColour (HighlightLayer::colour().darker (0.25f));
+            g.strokePath (tick, juce::PathStrokeType (1.8f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            tx += tickRoom;
+        }
+        const auto layout = layoutText (content.status, statusFont(), content.done ? design::colour::text : design::colour::textSecondary, w - (tx - x));
+        layout.draw (g, { tx, y, w - (tx - x), layout.getHeight() });
     }
     // The close cross (thin, as the popovers').
     const auto c = closeArea().reduced (6.0f);
@@ -295,9 +348,17 @@ void Note::mouseExit (const juce::MouseEvent&)
 juce::StringArray Note::actionIds() const
 {
     juce::StringArray ids;
-    for (const auto& a : actions)
+    for (const auto& a : content.actions)
         ids.add (a.id);
     return ids;
+}
+
+juce::StringArray Note::actionLabels() const
+{
+    juce::StringArray labels;
+    for (const auto& a : content.actions)
+        labels.add (a.label);
+    return labels;
 }
 
 juce::Button* Note::button (const juce::String& actionId) const

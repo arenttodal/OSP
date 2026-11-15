@@ -1,50 +1,56 @@
 # ANDOR Learn in ANDOR OSP
 
-_15 Nov 2026. Branch `claude/osp-learn`._
+_15 Nov 2026. Branch `claude/osp-learn-2` (supersedes `claude/osp-learn`, which built on V1)._
 
-ANDOR OSP's own plugin (`OspAudioProcessorEditor`) now has the shared ANDOR Learn: the menu's
-LEARN section, the lesson browser, the ceramic notes, the green highlight, the progress store and
-Info. It reuses `shared/andor-learn`, ANDOR ANALOG's framework. The editor is not migrated to the
-shell: a small adapter, `apps/plugin/Source/OspLearn.cpp`, provides the lessons, targets, states,
-hooks and examples.
+ANDOR OSP's own plugin (`OspAudioProcessorEditor`) now uses **ANDOR Learn 2.0**, the shared
+framework in `shared/andor-learn` that ANDOR ANALOG uses. OSP has no copy or parallel version of
+it. The editor is not migrated to the shell. A small adapter, `apps/plugin/Source/OspLearn.cpp`,
+gives the shared controller OSP's lessons, targets, states, readiness checks, example sounds and
+Info.
 
-## Gate 0: what existed
+## Gate 0: what existed, and the merge
 
-- **Latest shared Learn.** No "Learn 2.0" is pushed in either repository.
-  - The shared framework on every branch is V1 (`49cfb6e`) plus one fix (`52cd128`). It lives in
-    OSP's `feature/andor-learn-v1` and in the branch ANDOR ANALOG pins (`feature/aux-live-input`).
-  - ANDOR ANALOG's later Learn commits (`0310e99`, `20a7814`, `3e3d305`) change only its own
-    lessons and screenshots.
-- **The merge.** This branch merges `feature/andor-learn-v1` into OSP's line. The conflicts were
-  beside SATELLITE in `ShellProduct.h`, `ShellProcessor.h` and STATUS; both sides were kept.
-- **The extension.** The behaviour the specification asks for (no Skip, the Tutorials / Toggle Info
-  / Reset Tutorials menu, example preparation with restore, the green highlight) did not exist in
-  V1, so it was added to the shared code (below).
+- **Learn 2.0** is on OSP's `feature/aux-live-input` (`da0e75c`, the line ANDOR ANALOG pins at
+  `be5f45f`). This branch merges that line, up to `938344d`, into OSP's default line.
+- **What the merge brought besides Learn 2.0:**
+  - the shell's inline card arpeggiator lanes and arpeggiator follower (from that line);
+  - user macros (`UserMacroBank`), effective-value displays (`src/engine/EffectiveValues.h`) and
+    their tests.
+- **Conflicts.**
+  - The shell files take that line's version.
+  - OSP's own processor keeps its `CardArpLanes` and SATELLITE.
+  - `InstrumentHost` keeps both sides' additions.
+  - The FILTER display name and the SATELLITE click fix are kept on both sides.
+- **The V1 extensions are gone.** `claude/osp-learn` had added Learn behaviour to V1: no Skip, the
+  new menu, preparation, restore and the green outline. Learn 2.0 does all of that itself, so
+  those changes were dropped in favour of 2.0's.
+- **One shared addition stays:** `ParameterGestureBridge` (below). ANDOR ANALOG does not use it,
+  and it changes nothing there.
 
-## Shared framework changes (`shared/andor-learn`, used by ANDOR ANALOG too)
+## Learn 2.0 as OSP uses it
 
-| Change | Where |
+| Learn 2.0 piece | In OSP |
 |---|---|
-| Menu: a **LEARN** section with **Tutorials…**, **Toggle Info**, a separator, then **Reset Tutorials…**. "Restore Sound Before Tutorial" appears while a tutorial example's previous sound can be restored. The old "Learn ANDOR… / Learn mode / Learn ▸ Reset learning progress" are gone. | `LearnController::addMenuItems` |
-| **Reset Tutorials…** asks first, with a ceramic confirmation (Cancel / Reset), and resets only this product's file. | `askToResetProgress`, `NoteKind::confirmReset` |
-| **No Skip.** X closes, Back revisits, and Continue (the old Next) follows a read explanation or a done task. "Already done · Continue" covers a task that was already satisfied. `LessonRunner::skip()` stays for API compatibility but no key reaches it. | `refreshNote` |
-| **Results that arrive later.** `Completion::waitingForResult()`: an accepted action arms the step, which completes in that step once its postcondition holds. This covers a dropped file loading and analysing. It also completes while the step is paused, because the dropped file hides the drop zone. | `LessonRunner::handle / update` |
-| **Lesson readiness.** `Lesson::preparation`: `ready` (checked before the lesson and while it runs; the lesson pauses with `needs`), `exampleId` / `exampleName`, `offerExampleWhen`. | `LessonTypes.h`, `LessonRunner::lessonReady` |
-| **Example preparation**, only on the musician's choice. The notes are "Before this lesson" (Not now / Load …), "Use your sound or an example?" (Load … / Use my sound), "Preparing the example" (the lesson starts when the example is playable) and "The example could not be loaded". | `beginLesson`, `loadExampleFor`, `updatePreparing` |
-| **Restore.** Closing a lesson whose example was loaded asks "Keep the example sound?" (Restore previous sound / Keep this sound); it never restores silently. The completion note and the menu offer the restore while the product says it is possible. | `offerRestoreIfExample`, `EditorHooks::canRestore / restore` |
-| **Parameter gestures as user actions.** `ParameterGestureBridge` reports a gesture of the editor's own controls (begin…end) as `param:<id>`. Host automation, preset recall, undo and the processor's own changes set values without a gesture, so they report nothing. Message thread only. | `LearnActionBridge.*`, `actions::parameterEdited` |
-| **The highlight** is green (`#35b264`) with a soft glow: three widening, fading strokes, then a crisp 1.5 px line. Info's hover outline is the same green, quieter. | `HighlightLayer::paint` |
-| Browser title **TUTORIALS**; the Info banner reads "Info · Click a control to learn what it does · Esc to exit"; the help notes' meta line is "INFO". | `LearnBrowser`, `LearnController` |
-| `startLessonAt (lesson, step)`: starts at a step through its preparation (tests, snapshots). | `LearnController` |
-| `EditorHooks`: `productName`, `loadExample`, `exampleReady`, `exampleFailed`, `canRestore`, `restore` (all optional; without them no example is offered). | `LearnController.h` |
+| Menu: one **Learn** submenu (Tutorials…, Toggle Info, Restore Previous Sound while possible, Reset Tutorials…) | added to the ••• menu by `LearnController::addMenuItems` |
+| No Skip. X closes and never restores; Back; Next / Continue once the task is done or already so | unchanged |
+| `Step::requirements` block a step with a reason, the control that fixes it (outlined) and the lesson's example | `soundReady()`, `granular()`, `twoLayers()`, `sampleSet()` |
+| Set-up step: **Use Current Sound** / **Load Example Sound** | every lesson but Quick Start (`setUp`), whose first step is the load itself |
+| `Lesson::exampleId` and `EditorHooks::loadExample / canRestoreSound / restoreSound` | `OspAudioProcessor::loadTutorialExample`, `canRestoreBeforeTutorial`, `restorePreviousState` |
+| `Completion::viaMenu()` for dropdown choices | the playback key, REIMAGINED and MOVEMENT modes, LFO SHAPE, ARP PATTERN |
+| Green outline, ceramic notes, TUTORIALS browser, Info, per-user progress (`osp.json`) | unchanged |
+
+**`ParameterGestureBridge`** (`LearnActionBridge.*`, shared, used only by OSP so far). OSP's
+editor is not the shell, so the shell's touch reporting does not reach its controls. The bridge
+reports a gesture of the editor's own controls (begin…end) as `param:<id>`, on the message thread.
+Host automation, preset recall, undo and the processor's own changes set values without a
+gesture, so they report nothing. The adapter also reports the edited layer's `layer{L}.…` alias
+(below) for each such gesture.
 
 **ANDOR ANALOG compatibility.**
-- The shell's `LearnTests.cpp` passes in every shell product (`andor_example_tests "[learn]"`,
-  7 cases, 97 assertions).
-- ANDOR ANALOG pins OSP's `feature/aux-live-input`, so it is unchanged until its pin moves. When
-  it moves to a commit with these changes, its own Learn tests will need updating where they
-  expect the old Skip key, the old menu labels or "Browse lessons".
-- The shell editor's menu now shows the new section.
+- The shell's own Learn tests (`tests/shell/LearnTests.cpp`, Learn 2.0's) run unchanged in every
+  shell product.
+- ANDOR ANALOG pins `feature/aux-live-input`, so this branch changes nothing for it until its pin
+  moves. The only shared Learn file changed is the bridge: an addition, not used by the shell.
 - **Not done here:** building ANDOR ANALOG against this branch.
 
 ## Shared UI changes (all opt-in or inert for other callers)
@@ -94,19 +100,26 @@ to presets or sessions (progress is a per-user file), and no DSP file changed.
 
 ## The curriculum
 
-| Group | Lesson (id) | Steps | Example |
-|---|---|---|---|
-| Start here | Quick Start (`osp.quickstart`) | load (waits for the analysis), play, START, LEVEL, REIMAGINED, back to 0 % | bowed (offered when a sound is loaded) |
-| Working with recordings | One Shot & Granular (`osp.playback`) | the playback key, One Shot, Granular, POS, SIZE, DENS, SPREAD, compare | bowed |
-| | REIMAGINED (`osp.reimagined`) | find, open (label), KALEIDOSCOPE, TAPE FRAME, TOYBOX, MOSAIC, MIRAGE, amount | bowed |
-| | Layering sounds (`osp.layers`) | add (waits), play, B's LEVEL, S on, S off, B's TUNE, different modes, a third layer | layered |
-| | Multi-sample instruments (`osp.multisample`) | one sound from many files, play across, open Samples, root, takes and roles, velocity layers | pluck set (needed) |
-| Playing and shaping | LIFE: natural variation (`osp.life`) | LIFE 0 %, LIFE up, open, PITCH, TONE, ATTACK, TAKES | pluck (offered) |
-| | KEY DNA (`osp.keydna`) | Granular, open, what it does, on, POS depth, SIZE or DENS, AMOUNT | bowed |
-| | Arpeggiator (`osp.arp`) | open, on, PATTERN, RATE, OCTAVES, GATE | pluck |
-| | Modulation (`osp.modulation`) | LFO 1 tab, SHAPE (SINE), RATE, connect (drag), depth (ring), listen | bowed |
-| | Shape the sound (`osp.sound`) | FILTER, DRIVE, MOVEMENT (open), a movement, ECHO, SPACE, compare | bowed (offered) |
-| Managing sounds | Presets and instruments (`osp.presets`) | Library, what a preset keeps, Save…, Export instrument…, Open instrument file… | bowed |
+| Group | Lesson (id) | Steps (after the set-up step) | Example | Required |
+|---|---|---|---|---|
+| Start here | Quick Start (`osp.quickstart`) | load (its set-up: waits for the analysis), play, START, LEVEL, REIMAGINED, back to 0 % | bowed | a playable sound |
+| Working with recordings | One Shot & Granular (`osp.playback`) | the playback key, One Shot, Granular, POS, SIZE, DENS, SPREAD, compare | bowed | a sound; Granular for POS…SPREAD |
+| | REIMAGINED (`osp.reimagined`) | find, open (label), KALEIDOSCOPE, TAPE FRAME, TOYBOX, MOSAIC, MIRAGE, amount | bowed | a sound |
+| | Layering sounds (`osp.layers`) | add (waits), play, B's LEVEL, S on, S off, B's TUNE, different modes, a third layer | layered | a sound; two layers after "add" |
+| | Multi-sample instruments (`osp.multisample`) | one sound from many files, play across, open Samples, root, takes and roles, velocity layers | pluck set | a multi-sample layer |
+| Playing and shaping | LIFE: natural variation (`osp.life`) | LIFE 0 %, LIFE up, open, PITCH, TONE, ATTACK, TAKES | pluck | a sound |
+| | KEY DNA (`osp.keydna`) | Granular, open, what it does, on, POS depth, SIZE or DENS, AMOUNT | bowed | a sound; Granular after its step |
+| | Arpeggiator (`osp.arp`) | open, on, PATTERN, RATE, OCTAVES, GATE | pluck | a sound |
+| | Modulation (`osp.modulation`) | LFO 1 tab, SHAPE (SINE), RATE, connect (drag), depth (ring), listen | bowed | a sound |
+| | Shape the sound (`osp.sound`) | FILTER, DRIVE, MOVEMENT (open), a movement, ECHO, SPACE, compare | bowed | a sound |
+| Managing sounds | Presets and instruments (`osp.presets`) | Library, what a preset keeps, Save…, Export instrument…, Open instrument file… | bowed | a sound |
+
+**Set-up and requirements.** Every lesson but Quick Start opens with a set-up step: **Use
+Current Sound** or **Load Example Sound**. Nothing is loaded unless the musician chooses it. A
+later step whose requirement fails (no sound, not Granular, fewer than two layers, not a set) is
+blocked. Its note says what is missing and outlines the control that fixes it, where there is
+one. It also offers the example, except for Granular, which is one click on the layer's own
+playback key.
 
 **Completion rules.**
 - Every task step needs a user-origin action, either a parameter gesture or a control's own click
@@ -130,7 +143,7 @@ Every target is a locator called each time it is needed (nothing raw is stored),
 against current component bounds.
 
 | Target | Component (bounds) | Shown when | Reveal |
-|---|---|---|---|
+|---|---|---|---|---|
 | `osp.header.preset` / `.menu` / `.mix` | preset bar / ••• key / header MIX | always / always / two layers | — |
 | `osp.source.dropZone` | the empty drop zone | no layer | — |
 | `osp.source.card` | the edited layer's card | a layer | — |
@@ -204,37 +217,43 @@ line). The main checks:
 
 ## Tests
 
-`osp_plugin_tests "[learn]"`: 8 cases, 367 assertions, all passing.
+`osp_plugin_tests "[learn]"`: 8 cases, 438 assertions, all passing.
 
-- **Catalog.** It is valid against the editor's targets, has 11 lessons and at least 30 Info
-  topics, groups in order, and the new menu labels (the old ones are absent). Learn is idle (no
-  component) until asked.
+- **Catalog.**
+  - It is valid against the editor's targets.
+  - It has 11 lessons and at least 30 Info topics, with the groups in order.
+  - The menu has Learn 2.0's labels.
+  - Learn is idle (no component) until asked.
 - **Quick Start, end to end.**
-  - It starts at the drop zone on an empty instrument, with no Skip key.
-  - A real `filesDropped` arms the load step, which completes only after the file has loaded
-    and analysed.
+  - On an empty instrument it starts at its set-up step at the drop zone, with no Skip key.
+  - A real `filesDropped` reports the drop. The step completes only once the recording has loaded
+    and been analysed.
   - A processed note completes "play".
-  - Host automation does not complete START; the musician's gesture does.
+  - Host automation and a preset recall do not complete START; the musician's gesture does.
   - LEVEL and REIMAGINED complete through the edited-layer tokens (A's REIMAGINED ID included).
   - "Back to 0 %" needs exactly 0.
   - Progress is "complete" under `osp`, with nothing to restore.
-- **Preparation and restore.**
-  - The musician's sound is Granular with SPACE at 77 %. The multi-sample lesson asks first, and
-    "Not now" changes nothing.
-  - "Load" keeps the state before anything is replaced, waits for the set (8 members), and gives
+- **Set-up and restore.**
+  - The musician's sound is Granular with SPACE at 77 %. The multi-sample lesson's set-up step
+    says the sound is not a set and changes nothing.
+  - X there leaves nothing to restore.
+  - **Use Current Sound** blocks the next step and says what is missing.
+  - **Load Example Sound** keeps the whole state first, waits for the set (8 members), and gives
     the lesson a clean instrument.
-  - Closing offers the restore. Restoring brings back the voice, SPACE 77 % and Granular.
-- **Navigation never changes the sound.** Every lesson is driven with Show me, Continue and Back,
-  then X. Every parameter afterwards is identical, and nothing is restorable.
-- **Geometry** at 869, 1086 and 1448 px (START, POS, ARP RATE, FILTER, LIFE): the ring equals the
-  real control's bounds, the note does not overlap the control and stays inside the window.
+  - X does not restore. The menu's **Restore Previous Sound** brings back the voice, SPACE 77 %
+    and Granular.
+- **Navigation never changes the sound.** Every lesson is driven with Use Current Sound, Show me,
+  Continue and Back, then X. Every parameter afterwards is identical, and nothing is restorable.
+- **Geometry** at 869, 1086 and 1448 px (START, POS, ARP RATE, FILTER, LIFE): the outline equals
+  the real control's bounds, and the note does not overlap the control and stays inside the window.
 - **Reset Tutorials** asks, then resets only OSP's file (ANDOR ANALOG's file is untouched).
   Escape closes the note before the editor's popover.
-- **Info** shows no card regions on an empty instrument; FILTER's help reads "FILTER" / "INFO".
+- **Info** shows no card regions on an empty instrument. FILTER's help reads "FILTER" / "INFO".
 - **Tutorial sounds** are written once and are byte-identical when regenerated (same seed).
 
 `[learn-shots]` (hidden; `OSP_LEARN_SHOTS=<dir>`) renders every step of every lesson at 1086 and
-869 px, plus the browser, Info, the reset confirmation, preparation and the restore offer.
+869 px, plus the browser, Info, the reset confirmation, a set-up step, a blocked step and a
+loaded example (182 images).
 `docs/learn/screenshots/` keeps the 1086 px set and a few 869 px ones, as JPEG.
 
 ## Not verified
