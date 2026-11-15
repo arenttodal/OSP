@@ -402,6 +402,13 @@ public:
         CHARACTER graph then shows the settings (and a silent preview when they are edited), the
         card EQ no spectrum. */
     virtual const InstrumentEngine* telemetryEngine() const noexcept { return nullptr; }
+
+    /** What the product calls its CHARACTER macro, the filter (ANDOR OSP: FILTER). Display only:
+        the parameter IDs, the host's parameter names and saved state keep "character". */
+    virtual juce::String characterName() const { return "CHARACTER"; }
+    /** A modulation destination's name as this product shows it (its CHARACTER ones under
+        characterName(): FILTER CUTOFF in ANDOR OSP). */
+    juce::String destName (mod::Dest dest) const;
     /** The hardware faceplate a shared rack module (rack::Kind, as an int) wears (opt-in; null:
         none, as in ANDOR OSP). Interface only. */
     virtual const rack::Faceplate* rackFaceplate (int kind) const noexcept

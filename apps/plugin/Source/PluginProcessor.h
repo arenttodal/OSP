@@ -174,6 +174,8 @@ public:
     InstrumentEngine::ModView modulationView() const noexcept override { return engine.modulationView(); }
     InstrumentEngine::LiveMix liveMix() const noexcept override { return engine.liveMix(); }
     const InstrumentEngine* telemetryEngine() const noexcept override { return &engine; }
+    /** ANDOR OSP names its CHARACTER macro FILTER (display only; the IDs keep "character"). */
+    juce::String characterName() const override { return "FILTER"; }
     // SATELLITE: each layer's own stereo motion (the per-card arpeggiator's companion).
     juce::String satelliteParameterId (int card) const override { return satelliteFieldId (card, "enabled"); }
     std::unique_ptr<MiniPanel> createSatellitePanel (int card) override;

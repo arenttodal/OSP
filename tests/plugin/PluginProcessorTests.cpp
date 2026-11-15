@@ -7141,7 +7141,7 @@ TEST_CASE ("plugin: META-MODULATION - halos take sources: drop, right-click, rea
 
     // No halo yet: the whole control is the control (there is no depth to target).
     editor->dragModulation (0, centre + juce::Point<float> (0.0f, 30.0f));
-    CHECK (overlay.dragTip() == "LFO 1" + arrow + "CHARACTER");
+    CHECK (overlay.dragTip() == "LFO 1" + arrow + "FILTER");
     editor->dragModulation (-1, {});
 
     // ENV 1 -> CHARACTER (each note's filter) at +40 %.
@@ -7158,7 +7158,7 @@ TEST_CASE ("plugin: META-MODULATION - halos take sources: drop, right-click, rea
     CHECK (overlay.hitAt (halo).halo());
     CHECK (overlay.hitAt (halo).slot == envSlot);
     editor->dragModulation (0, centre);
-    CHECK (overlay.dragTip() == "LFO 1" + arrow + "CHARACTER");
+    CHECK (overlay.dragTip() == "LFO 1" + arrow + "FILTER");
     snapshot ("meta-02-drag-body.png");
     const int lfoSlot = editor->dropModulation (0, centre);
     REQUIRE (lfoSlot >= 0);
@@ -7168,7 +7168,7 @@ TEST_CASE ("plugin: META-MODULATION - halos take sources: drop, right-click, rea
     editor->selectModulation (2, envSlot);
     editor->refreshNow();
     editor->dragModulation (0, halo);
-    CHECK (overlay.dragTip() == "LFO 1" + arrow + "ENV 1 / CHARACTER CUTOFF DEPTH");
+    CHECK (overlay.dragTip() == "LFO 1" + arrow + "ENV / FILTER CUTOFF DEPTH");
     snapshot ("meta-01-drag-halo.png");
     // ENV 1 on its own route's depth: refused, and the tooltip says why before the drop.
     editor->dragModulation (2, halo);
@@ -7185,7 +7185,7 @@ TEST_CASE ("plugin: META-MODULATION - halos take sources: drop, right-click, rea
     CHECK (route (metaSlot).route.target == envSlot);
     CHECK (depthOf (metaSlot) == Approx (20.0f));
     CHECK (p.modulationRoutes().size() == 2);   // no LFO 1 -> CHARACTER was made
-    CHECK (modui::routeTitle (p, route (metaSlot)) == "LFO 1" + arrow + "DEPTH OF ENV 1" + arrow + "CHARACTER CUTOFF");   // its name in LFO 1's routes
+    CHECK (modui::routeTitle (p, route (metaSlot)) == "LFO 1" + arrow + "DEPTH OF ENV" + arrow + "FILTER CUTOFF");   // its name in LFO 1's routes
     editor->selectModulation (2, envSlot);
     double lo = 9.0, hi = -9.0;
     for (int i = 0; i < 60; ++i)
@@ -7317,7 +7317,7 @@ TEST_CASE ("plugin: META-MODULATION - halos take sources: drop, right-click, rea
     CHECK (both.slot == -1);
     CHECK (both.routes.size() == 2);
     const auto chooser = overlay.depthChooser (0, both.routes);
-    CHECK (hasItem (chooser, "ENV 1" + arrow + "CHARACTER CUTOFF  +40%"));
+    CHECK (hasItem (chooser, "ENV" + arrow + "FILTER CUTOFF  +40%"));
     writeMenu (chooser, "meta-08-chooser.png");
     snapshot ("meta-09-three-routes.png");
     p.removeModulationRoute (env2Slot);

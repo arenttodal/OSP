@@ -355,7 +355,7 @@ namespace
     class CharacterRack final : public ParameterRack
     {
     public:
-        explicit CharacterRack (InstrumentHost& h) : ParameterRack (h, "CHARACTER", design::colour::macro (design::colour::Macro::character), 0.68f)
+        explicit CharacterRack (InstrumentHost& h) : ParameterRack (h, h.characterName(), design::colour::macro (design::colour::Macro::character), 0.68f)
         {
             // ANDOR ANALOG's FILTER rack's face: the voice filter's own sage enamel and its
             // resonant motif (synthIdentity), the graph's glass from the identity.
@@ -374,7 +374,7 @@ namespace
         void build (int) override
         {
             selectorList ("character.type", "TYPE", 96, "The filter: LP24 (four-pole low-pass), LP12, HP12, BP12, or a TILT of the whole spectrum");
-            knob ("character", "CHARACTER", percentText());
+            knob ("character", host.characterName(), percentText());
             knob ("character.min", "MIN", hertzText());
             knob ("character.max", "MAX", hertzText());
             knob ("character.resonance", "RESO", percentText());

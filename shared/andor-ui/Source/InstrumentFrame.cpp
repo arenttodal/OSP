@@ -269,7 +269,7 @@ std::array<MacroSpec, macroCount> ospMacroSpecs()
 {
     return { { { "life", "LIFE", "Life: how differently each note is performed" },
                { "drive", "DRIVE", "Drive: saturation, from a little warmth to beautiful breakup (tube, tape or crunch)" },
-               { "character", "CHARACTER", "Character: the tonal shape (filter)" },
+               { "character", "FILTER", "Filter: the knob moves the cutoff between MIN and MAX; click FILTER for its type (LP24, LP12, HP12, BP12, TILT), resonance and envelope" },
                { "motion", "MOVEMENT", "Movement: how the sound changes through time" },
                { "space", "SPACE", "Space: the room it plays in" },
                { "echo", "ECHO", "Echo: repeats of the sound, from a tape echo or a bucket-brigade delay" } } };

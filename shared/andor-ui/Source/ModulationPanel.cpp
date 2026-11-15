@@ -138,14 +138,14 @@ namespace modui
         const auto arrow = juce::String::fromUTF8 (" \xe2\x86\x92 ");
         const auto lead = withSource ? juce::String (sourceLabel (mod::sourceIndex (info.route.source))) + arrow : juce::String::fromUTF8 ("\xe2\x86\x92 ");
         if (! info.isDepth())
-            return lead + mod::destInfo (info.route.dest).name;
+            return lead + p.destName (info.route.dest);
         juce::String target = "(its route is gone)";
         if (info.route.target >= 0 && info.route.target < mod::maxRoutes)
         {
             const auto probe = p.modulationProbe();
             const auto& t = probe.routes[static_cast<std::size_t> (info.route.target)];
             if (t.source != mod::Source::none && t.dest != mod::Dest::none)
-                target = juce::String (sourceLabel (mod::sourceIndex (t.source))) + arrow + mod::destInfo (t.dest).name;
+                target = juce::String (sourceLabel (mod::sourceIndex (t.source))) + arrow + p.destName (t.dest);
         }
         return lead + "DEPTH OF " + target;
     }
@@ -1880,7 +1880,7 @@ juce::PopupMenu ModRoutesPopup::addMenu()
     juce::Component::SafePointer<ModRoutesPopup> safe (this);
     const auto source = static_cast<mod::Source> (sourceIndex + 1);
     auto add = [&] (juce::PopupMenu& sub, mod::Dest d) {
-        sub.addItem (mod::destInfo (d).name, ospProcessor.canModulate (source, d), false, [safe, source, d] {
+        sub.addItem (ospProcessor.destName (d), ospProcessor.canModulate (source, d), false, [safe, source, d] {
             if (safe == nullptr)
                 return;
             const int slot = safe->ospProcessor.addModulationRoute (source, d, 50.0f);
@@ -2511,7 +2511,7 @@ juce::PopupMenu ModulationOverlay::contextMenu (const juce::String& parameterId)
                     safe->onShowRoutes (source);
             });
         }
-        const auto title = juce::String (modui::sourceLabel (source)) + juce::String::fromUTF8 (" \xe2\x86\x92 ") + mod::destInfo (r->route.dest).name + "  "
+        const auto title = juce::String (modui::sourceLabel (source)) + juce::String::fromUTF8 (" \xe2\x86\x92 ") + p.destName (r->route.dest) + "  "
                            + signedPercent (100.0 * r->route.depth);
         menu.addSubMenu (title, items);
     }
@@ -2802,12 +2802,12 @@ juce::String ModulationOverlay::dragTip() const
         const auto refusal = ospProcessor.depthModulationRefusal (static_cast<mod::Source> (dragSource + 1), hit.slot);
         if (refusal.isNotEmpty())
             return refusal;
-        return source + arrow + modui::sourceLabel (mod::sourceIndex (r->route.source)) + " / " + mod::destInfo (r->route.dest).name + " DEPTH";
+        return source + arrow + modui::sourceLabel (mod::sourceIndex (r->route.source)) + " / " + ospProcessor.destName (r->route.dest) + " DEPTH";
     }
     const auto dest = modui::destinationFor (hit.parameterId, modui::isPerVoice (ospProcessor, dragSource));
     if (dest == mod::Dest::none || ! ospProcessor.canModulate (static_cast<mod::Source> (dragSource + 1), dest))
         return {};
-    return source + arrow + mod::destInfo (dest).name;
+    return source + arrow + ospProcessor.destName (dest);
 }
 
 juce::Rectangle<float> ModulationOverlay::dragTipArea() const

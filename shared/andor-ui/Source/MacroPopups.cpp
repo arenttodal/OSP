@@ -5982,7 +5982,7 @@ std::unique_ptr<MiniPanel> createMacroPopup (MacroPopup macro, InstrumentHost& p
         }
         case MacroPopup::character:
         {
-            auto popup = std::make_unique<MacroPanel> (processor, "CHARACTER", 262, 58, design::colour::Macro::character);
+            auto popup = std::make_unique<MacroPanel> (processor, processor.characterName(), 262, 58, design::colour::Macro::character);
             popup->mode ("character.type", "Filter type");
             popup->setVisual (std::make_unique<CharacterVisual> (processor));
             popup->knob (false, "character.min", "MIN", [] (double v) { return format::hertz (v); });

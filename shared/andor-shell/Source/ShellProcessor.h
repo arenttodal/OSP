@@ -207,6 +207,15 @@ public:
     /** The macro row as the editor shows it: the product's (ProductInfo::macros), or ANDOR
         OSP's own while showReferenceMacros() is on. */
     const std::array<osp::plugin::frame::MacroSpec, osp::plugin::frame::macroCount>& macroSpecs() const noexcept { return macros; }
+    /** The `character` macro's name as the product's macro row shows it (ANDOR OSP's row:
+        FILTER), so its rack, popover and modulation names say the same. */
+    juce::String characterName() const override
+    {
+        for (const auto& m : macros)
+            if (m.parameterId == "character")
+                return m.name;
+        return InstrumentHost::characterName();
+    }
     /** The visual regression's parity render only: ANDOR OSP's macro names and parameters,
         so a product that renames its macros is compared with ANDOR OSP where nothing else
         differs. Call before the editor opens. */

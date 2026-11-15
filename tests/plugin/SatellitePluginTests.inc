@@ -77,6 +77,7 @@ TEST_CASE ("satellite: the key on the arpeggiator's title row switches and opens
 
     // The name: the panel, anchored under the key; opening never switches.
     key->openPanel();
+    ui->mouseDownAnywhere (key);   // (then the editor's outside-click watcher, as JUCE delivers a press)
     CHECK (ui->openPopupIndex() == Editor::anchoredPopup);
     CHECK (key->isOpen());
     auto* panel = dynamic_cast<osp::plugin::SatellitePanel*> (ui->openPopupPanel());
@@ -110,8 +111,15 @@ TEST_CASE ("satellite: the key on the arpeggiator's title row switches and opens
     panel->refreshContent();
     CHECK (panel->rateKnob().isVisible());
     CHECK (panel->bounceControl().isVisible());
-    // The key again closes it.
+    // The key again closes it (its press reaches the watcher too, which leaves it to the key).
     key->openPanel();
+    ui->mouseDownAnywhere (key);
+    CHECK (ui->openPopupIndex() < 0);
+    // A press elsewhere in the editor still closes it.
+    key->openPanel();
+    ui->mouseDownAnywhere (key);
+    REQUIRE (ui->openPopupIndex() == Editor::anchoredPopup);
+    ui->mouseDownAnywhere (&arp);
     CHECK (ui->openPopupIndex() < 0);
 }
 

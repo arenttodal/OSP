@@ -131,7 +131,7 @@ namespace frame
     {
         juce::String parameterId, name, hint;
     };
-    /** ANDOR OSP's macro row: LIFE, DRIVE, CHARACTER, MOVEMENT, SPACE, ECHO (data order). */
+    /** ANDOR OSP's macro row: LIFE, DRIVE, FILTER (the `character` parameter), MOVEMENT, SPACE, ECHO (data order). */
     std::array<MacroSpec, macroCount> ospMacroSpecs();
     /** Sets a macro up as ANDOR OSP's (identity colour `index` on its ring, the ivory sprite,
         the value bubble, a modulation drop target) and adds it to `content`. */

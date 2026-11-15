@@ -1305,6 +1305,22 @@ on the ADD place, or only the card dropped on. Audit, measured reproduction and 
 - NEXT: ANDOR ANALOG's card EQs (the shell's) can show the spectrum once its host returns its
   engine's layer taps.
 
+## ANDOR OSP: SATELLITE opens on its key; CHARACTER is called FILTER (15 Nov 2026)
+
+- **SATELLITE's panel opens.** It used to close in the press that opened it: JUCE tells the
+  editor's outside-click watcher after the key has opened its panel. OSP's editor and the
+  shell's now leave the anchored panel's own key alone (ANDOR ANALOG's d99f5d8). A press
+  elsewhere still closes it. `[satellite]` replays the watcher after each press; it failed
+  before the fix.
+- **Lamps without a seam cross** (the same Analog commit): a skin piece with no centre to
+  stretch is resampled whole at fractional display scales.
+- **FILTER.** ANDOR OSP's macro row (`frame::ospMacroSpecs`) names the `character` macro
+  FILTER. Its rack, popover and the modulation names follow it through
+  `InstrumentHost::characterName()` (FILTER CUTOFF, FILTER RESONANCE). The shell takes the
+  name from the product's macro row, so the example product matches OSP (its visual
+  regression stays at 0 px). Unchanged: the parameter IDs (`character`, `character.*`), the
+  host's parameter names ("Character ...") and every saved session.
+
 ## ANDOR OSP: SATELLITE, each layer's own stereo motion (14 Nov 2026)
 
 ANDOR ANALOG's SATELLITE, the per-card arpeggiator's companion, is now in ANDOR OSP. This was

@@ -1184,6 +1184,9 @@ void ShellEditor::mouseDownAnywhere (juce::Component* c)
         return;
     if (c != this && ! isParentOf (c))
         return;   // a click in the popover's own menus
+    if (popupIndex == anchoredPopup && popupAnchor != nullptr && (c == popupAnchor.getComponent() || popupAnchor->isParentOf (c)))
+        return;   // (its anchor: it opened the panel in this very press - JUCE tells this watcher after the
+                  // key - or closes it itself; closing here too shut every anchored panel as it opened)
     int pressed = -1;
     for (int i = 0; i < frame::macroCount; ++i)
         if (c == macros[static_cast<std::size_t> (i)].label.get())

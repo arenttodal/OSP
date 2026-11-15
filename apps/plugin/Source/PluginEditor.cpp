@@ -159,6 +159,9 @@ void OspAudioProcessorEditor::mouseDownAnywhere (juce::Component* c)
     // there would delete the control whose menu item is being chosen, before its choice arrives.
     if (c != this && ! isParentOf (c))
         return;
+    if (popupIndex == anchoredPopup && popupAnchor != nullptr && (c == popupAnchor.getComponent() || popupAnchor->isParentOf (c)))
+        return;   // (its anchor: it opened the panel in this very press - JUCE tells this watcher after the
+                  // key - or closes it itself; closing here too shut SATELLITE's panel as it opened)
     int pressed = -1;
     for (int i = 0; i < static_cast<int> (macros.size()); ++i)
         if (c == macros[static_cast<std::size_t> (i)].label.get())
@@ -288,7 +291,7 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     content.addChildComponent (headerMix);
 
     // The six macros: a name with settings behind it (click: its popup) over its knob.
-    const auto macroSpecs = frame::ospMacroSpecs();
+    const auto macroSpecs = frame::ospMacroSpecs();   // (FILTER: the `character` parameter)
     for (std::size_t i = 0; i < macros.size(); ++i)
     {
         auto& knob = macros[i];
