@@ -272,6 +272,9 @@ TEST_CASE ("shell: the parameter schema is ANDOR OSP's, unchanged; the product's
         // (ANDOR ANALOG: analog.satellite.*).
         if (line.startsWith ("layer") && line.upToFirstOccurrenceOf (" ", false, false).contains (".satellite."))
             return true;
+        // SUB (sub.*): a product that has it keeps it in its own namespace (ANDOR ANALOG: analog.sub.*).
+        if (line.startsWith ("sub."))
+            return true;
         // ANDOR OSP's PEDAL LOOP (layerA.pedalLoop ..): its One Shot cards' sustain-pedal loop.
         if (line.startsWith ("layer") && line.upToFirstOccurrenceOf (" ", false, false).endsWith (".pedalLoop"))
             return true;
