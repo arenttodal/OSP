@@ -904,6 +904,18 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
   `[window][geometry]` (every shell product): each rack, rack to rack, the arpeggiator, a
   strip, all together, 100 cycles - width, cards, macros unchanged, the keyboard lower by the
   section only, back on closing; a refused height scrolls at the same scale; the constrainer.
+  Refined (the owner's clarification, 15 Nov): the window always grows first, and scrolling is
+  only the last resort. The constrainer answers every resize with the instrument's full height
+  (never an old, shorter height kept). A host that first reports the old size while it
+  negotiates is not taken as a refusal: `frame::Overflow` waits (`settleDelayMs`, no bar,
+  unscrolled), asks for the full height once more, and only a window still short after that
+  scrolls (`settleNow` steps it in tests). A shrink answered with the old, taller size is asked
+  again too. The screen's own limit scrolls at once (the window already stands at its room;
+  `overrideScreenRoom` in tests). Tests `[window][geometry][host]` with a stand-in host window:
+  SPACE + ARP + the strip opened together grow the window to the whole instrument and closing
+  shrinks it (a granting host); a host reporting the old size first never shows a bar and ends
+  at the full height; a refusing host is asked twice, then scrolls at the same width and scale;
+  a short screen scrolls at once. Real DAWs: UNVERIFIED (OWNER TEST).
 
   Universal modulation-aware visual feedback (docs/EFFECTIVE_VALUES.md): a picture draws what
   the DSP plays. `osp::EffectiveValues` (src/engine) is a fixed, lock-free table published by

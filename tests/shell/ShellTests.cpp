@@ -836,6 +836,49 @@ namespace
         return std::abs (a.getX() - b.getX()) <= tolerance && std::abs (a.getY() - b.getY()) <= tolerance
                && std::abs (a.getWidth() - b.getWidth()) <= tolerance && std::abs (a.getHeight() - b.getHeight()) <= tolerance;
     }
+
+    /** A host's window around the editor, as a plugin wrapper holds it: each resize the editor
+        asks for is answered by `policy` - granted, answered first with the old size and granted
+        when asked again, or always refused (the window kept at its old height). */
+    struct TestHost final : juce::Component
+    {
+        enum class Policy { grant, oldSizeFirst, refuse };
+
+        explicit TestHost (juce::Component& e) : editor (e)
+        {
+            addAndMakeVisible (editor);
+            granted = editor.getHeight();
+        }
+        ~TestHost() override { removeChildComponent (&editor); }
+
+        void childBoundsChanged (juce::Component*) override
+        {
+            if (answering)
+                return;
+            const int asked = editor.getHeight();
+            if (asked == granted)
+                return;
+            ++requests;
+            bool give = policy == Policy::grant;
+            if (policy == Policy::oldSizeFirst)
+            {
+                give = asked == answeredOnce;   // (the second request for the same height)
+                answeredOnce = asked;
+            }
+            if (give)
+            {
+                granted = asked;
+                return;
+            }
+            const juce::ScopedValueSetter<bool> inside (answering, true);
+            editor.setSize (editor.getWidth(), granted);   // (the old size reported back)
+        }
+
+        juce::Component& editor;
+        Policy policy = Policy::grant;
+        int granted = 0, requests = 0, answeredOnce = -1;
+        bool answering = false;
+    };
 }
 
 TEST_CASE ("shell: vertical-only expansion - racks, the arpeggiator and a strip change only the height; nothing above moves, nothing shrinks", "[shell][editor][window][geometry]")
@@ -936,10 +979,15 @@ TEST_CASE ("shell: a window shorter than the instrument (a host that refused, th
     const int width = 1200;
     editor->setSize (width, juce::roundToInt (static_cast<float> (width) * ui->instrumentHeight() / osp::plugin::design::width));
     const auto base = geometryOf (*ui);
+    TestHost host (*editor);
+    host.policy = TestHost::Policy::refuse;   // (the host keeps the old height)
     ui->setArpExpanded (true);
     ui->setRackExpanded (osp::plugin::rack::Kind::space, true);
-    // The host keeps the old height (it refused the taller window).
-    editor->setSize (width, base.editorHeight);
+    // Negotiated first (asked again), and only then taken as a refusal: the bar appears.
+    CHECK (editor->getHeight() == base.editorHeight);
+    CHECK_FALSE (ui->instrumentOverflow().overflowing());
+    ui->instrumentOverflow().settleNow();
+    ui->instrumentOverflow().settleNow();
     auto now = geometryOf (*ui);
     for (std::size_t i = 0; i < 3; ++i)
         CHECK (near (now.cards[i], base.cards[i]));   // same scale, same places, at the top
@@ -962,12 +1010,14 @@ TEST_CASE ("shell: a window shorter than the instrument (a host that refused, th
     CHECK (now.keyboard.getWidth() == base.keyboard.getWidth());
     CHECK (now.cards[0].getWidth() == base.cards[0].getWidth());
     // The host gives the height after all: no scroll bar, back at the top.
+    host.policy = TestHost::Policy::grant;
     editor->setSize (width, juce::roundToInt (static_cast<float> (width) * ui->instrumentHeight() / osp::plugin::design::width));
     CHECK_FALSE (ui->instrumentOverflow().overflowing());
+    CHECK_FALSE (ui->instrumentOverflow().settling());
     CHECK (near (geometryOf (*ui).cards[0], base.cards[0]));
 
-    // The window's shape: a new width takes the height that goes with it (an even zoom); a
-    // height alone stays (never taller than the instrument); no aspect ratio is imposed.
+    // The window's shape: whatever is asked - a new width or a height alone - is answered with
+    // the height that goes with the width (the whole instrument); no aspect ratio is imposed.
     auto* shape = editor->getConstrainer();
     REQUIRE (shape != nullptr);
     CHECK (shape->getFixedAspectRatio() == 0.0);
@@ -979,10 +1029,110 @@ TEST_CASE ("shell: a window shorter than the instrument (a host that refused, th
     auto shorter = before.withHeight (before.getHeight() - 200);
     shape->checkBounds (shorter, before, {}, false, false, true, false);
     CHECK (shorter.getWidth() == before.getWidth());
-    CHECK (shorter.getHeight() == before.getHeight() - 200);
+    CHECK (shorter.getHeight() == before.getHeight());   // (never capped short: the full height)
     auto taller = before.withHeight (before.getHeight() + 300);
     shape->checkBounds (taller, before, {}, false, false, true, false);
     CHECK (taller.getHeight() == before.getHeight());   // (no empty space under the instrument)
     ui->setRackExpanded (osp::plugin::rack::Kind::space, false);
     ui->setArpExpanded (false);
+}
+
+TEST_CASE ("shell: SPACE + ARP + a strip opened together grow the window itself; only a host's negotiated refusal or the screen makes it scroll", "[shell][editor][window][geometry][host]")
+{
+    ShellProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<ShellEditor*> (editor.get());
+    REQUIRE (ui != nullptr);
+    const int width = 1200;
+    auto fitted = [&] { return juce::roundToInt (static_cast<float> (width) * ui->instrumentHeight() / osp::plugin::design::width); };
+    editor->setSize (width, fitted());
+    const auto base = geometryOf (*ui);
+    TestHost host (*editor);
+    auto& overflow = ui->instrumentOverflow();
+    auto openAll = [&] {
+        ui->setRackExpanded (osp::plugin::rack::Kind::space, true);
+        ui->setArpExpanded (true);
+        if (p.hasAuxStrip())
+            ui->setAuxStripShown (true);
+    };
+    auto closeAll = [&] {
+        if (p.hasAuxStrip())
+            ui->setAuxStripShown (false);
+        ui->setArpExpanded (false);
+        ui->setRackExpanded (osp::plugin::rack::Kind::space, false);
+    };
+    auto sameWidthAndScale = [&] (const char* what) {
+        INFO (what);
+        const auto now = geometryOf (*ui);
+        CHECK (now.editorWidth == width);
+        for (std::size_t i = 0; i < 3; ++i)
+            CHECK (near (now.cards[i], base.cards[i]));
+        CHECK (now.keyboard.getWidth() == base.keyboard.getWidth());
+    };
+
+    SECTION ("a host that grants: the window grows to the whole instrument, never a scroll bar")
+    {
+        openAll();
+        CHECK (editor->getHeight() == fitted());
+        CHECK (editor->getHeight() > base.editorHeight);
+        CHECK (host.granted == fitted());
+        CHECK_FALSE (overflow.overflowing());
+        CHECK_FALSE (overflow.settling());
+        sameWidthAndScale ("granted");
+        closeAll();
+        CHECK (editor->getHeight() == base.editorHeight);   // (closing shrinks the window again)
+        CHECK_FALSE (overflow.overflowing());
+    }
+    SECTION ("a host that first reports the old size: no scroll bar while it settles; asked again, it grows")
+    {
+        host.policy = TestHost::Policy::oldSizeFirst;
+        openAll();
+        CHECK (editor->getHeight() < fitted());   // (the old size, for now)
+        CHECK (overflow.settling());
+        CHECK_FALSE (overflow.overflowing());     // (not taken as a refusal)
+        overflow.settleNow();                     // (the negotiation goes on: asked again)
+        CHECK (editor->getHeight() == fitted());
+        CHECK_FALSE (overflow.overflowing());
+        CHECK_FALSE (overflow.settling());
+        sameWidthAndScale ("after negotiating");
+        closeAll();   // (a smaller window, answered first with the old, taller size ...)
+        CHECK (overflow.settling());
+        CHECK_FALSE (overflow.overflowing());
+        overflow.settleNow();   // (... asked again: it shrinks)
+        CHECK (editor->getHeight() == base.editorHeight);
+        CHECK_FALSE (overflow.settling());
+    }
+    SECTION ("a host that refuses: asked twice, then scrolled - the width and scale kept")
+    {
+        host.policy = TestHost::Policy::refuse;
+        openAll();
+        CHECK (overflow.settling());
+        CHECK_FALSE (overflow.overflowing());
+        overflow.settleNow();
+        CHECK (host.requests >= 2);               // (asked again before giving up)
+        CHECK_FALSE (overflow.overflowing());
+        overflow.settleNow();
+        CHECK (overflow.overflowing());
+        CHECK (editor->getHeight() == base.editorHeight);
+        sameWidthAndScale ("refused");
+        host.policy = TestHost::Policy::grant;
+        closeAll();
+        CHECK_FALSE (overflow.overflowing());
+    }
+    SECTION ("a screen too short for all of it: the window stops at the screen, the instrument scrolls at once")
+    {
+        struct Screen
+        {
+            explicit Screen (int room) { osp::plugin::frame::overrideScreenRoom (room); }
+            ~Screen() { osp::plugin::frame::overrideScreenRoom (0); }
+        } screen (base.editorHeight + 100);
+        openAll();
+        CHECK (editor->getHeight() == base.editorHeight + 100);
+        CHECK (overflow.overflowing());
+        CHECK_FALSE (overflow.settling());
+        sameWidthAndScale ("screen");
+        closeAll();
+        CHECK (editor->getHeight() == base.editorHeight);
+        CHECK_FALSE (overflow.overflowing());
+    }
 }

@@ -198,11 +198,20 @@ namespace frame
 
     /** The instrument's height in reference pixels (taller while the arpeggiator's editor shows). */
     float instrumentHeight (bool arpShown, float rackShift = 0.0f, float sourceTrim = 0.0f) noexcept;
-    /** A window shorter than the instrument (the host refused the height, the screen has no
-        more room, the musician dragged the bottom edge up): a slim vertical scroll bar at the
-        editor's right edge and the instrument scrolled under it - never scaled down, never
-        moved sideways, never a horizontal bar. Owned by an editor; hidden while all fits. */
-    class Overflow final : private juce::ScrollBar::Listener
+    /** The last resort for a window shorter than the instrument: a slim vertical scroll bar at
+        the editor's right edge and the instrument scrolled under it - never scaled down, never
+        moved sideways, never a horizontal bar. Owned by an editor; hidden while all fits.
+
+        The window itself always grows first (applyWindowShape asks for the full height). The bar
+        appears only when that is impossible:
+        - the screen has no more room (the window already stands at the screen's height): at once;
+        - the host keeps a shorter window: only once the resize has been negotiated. A host may
+          answer a resize with the old size first (a VST3 host reading the size it was told
+          before, a host settling its own window); so the bar waits (`settleDelayMs`), asks for
+          the full height once more, waits again, and only a window still short then is taken
+          as the host's refusal. While it waits, the instrument stays at the top, unscrolled. */
+    class Overflow final : private juce::ScrollBar::Listener,
+                           private juce::Timer
     {
     public:
         explicit Overflow (juce::Component& editor);
@@ -214,16 +223,32 @@ namespace frame
         /** A wheel the instrument did not take (none of its knobs): scrolls while it overflows. */
         bool scrollBy (const juce::MouseWheelDetails& wheel);
         bool overflowing() const noexcept { return bar.isVisible(); }
+        /** A shorter window whose resize is still being negotiated (no bar yet). */
+        bool settling() const noexcept { return isTimerRunning(); }
+        /** The negotiation's next step now (what its timer does): ask for the full height again,
+            or - asked once already - take the host's answer and show the bar. */
+        void settleNow();
         juce::ScrollBar& scrollBar() noexcept { return bar; }
         /** The editor lays itself out again (its resized()). */
         std::function<void()> onScroll;
 
+        static constexpr int settleDelayMs = 300;
+
     private:
         void scrollBarMoved (juce::ScrollBar*, double newRangeStart) override;
+        void timerCallback() override { settleNow(); }
+        void showBar();
         juce::Component& editor;
         juce::ScrollBar bar { true };
         float scrolled = 0.0f, content = 0.0f, visible = 0.0f;
+        // The episode being negotiated (the instrument's and the window's heights) and how far.
+        float episodeContent = -1.0f, episodeVisible = -1.0f;
+        bool askedAgain = false, refused = false, asking = false;
     };
+
+    /** For tests (no screen to ask headless): the screen's room for the editor's height, in
+        pixels, as if it stood on such a screen. 0: none (the default; a real screen is asked). */
+    void overrideScreenRoom (int pixels) noexcept;
 
     /** Places `content` (laid out at the reference size) in `editor`. Its scale is the window's
         width over the reference width - the musician's zoom - and nothing else: opening a rack,
@@ -255,8 +280,9 @@ namespace frame
         /** The editor's window shape (its constrainer, installed here), for the corner and the
             host alike: the width 869..1810 px; a change of width (the corner, a host's resize)
             takes the height that goes with it - the instrument's proportions, so dragging the
-            corner zooms the whole instrument evenly; a change of height alone (a bottom edge)
-            stays as it is, no taller than the instrument (shorter: it scrolls). No fixed
+            corner zooms the whole instrument evenly; a change of height alone is answered with
+            the instrument's full height too (never capped at an old height; never shorter
+            than the instrument by choice - the window grows, it does not scroll). No fixed
             aspect ratio: a taller instrument can never be answered with another width. */
         class Shape final : public juce::ComponentBoundsConstrainer
         {
