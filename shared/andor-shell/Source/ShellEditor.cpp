@@ -1276,8 +1276,7 @@ void ShellEditor::positionPopup()
         at = { anchor.getX(), anchor.getY() - 10.0f - size.y };
     }
     else if (popupIndex == pitchWheelPopup || popupIndex == modWheelPopup)
-        at = frame::wheelPopoverOrigin (content.getLocalArea (popupIndex == pitchWheelPopup ? &pitchWheel : &modWheel,
-                                                              (popupIndex == pitchWheelPopup ? pitchWheel : modWheel).captionArea()), size);
+        at = frame::wheelPopoverOrigin ((popupIndex == pitchWheelPopup ? pitchWheel : modWheel).getBounds().toFloat(), size);
     else
         at = frame::modulationPopoverOrigin (modPanel.getBounds().toFloat(), size);
     frame::placePopover (*popup, content, at);

@@ -74,7 +74,7 @@ namespace
             g.fillRoundedRectangle (slot.withSizeKeepingCentre (8.0f, 0.3f * slot.getHeight()), 2.0f);
             g.setFont (fonts::label (9.5f));
             g.setColour (palette::textDim);
-            const auto text = range < 0.5f ? juce::String ("no bend") : "+" + juce::String (juce::roundToInt (range)) + " st";
+            const auto text = range < 0.5f ? juce::String ("no bend") : juce::String::fromUTF8 ("\xc2\xb1") + juce::String (juce::roundToInt (range)) + " st";
             g.drawText (text, ladder.withHeight (12.0f).translated (0.0f, std::max (0.0f, mid - reach - 14.0f - ladder.getY())).reduced (4.0f, 0.0f),
                         juce::Justification::centredRight, false);
         }

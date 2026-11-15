@@ -8232,6 +8232,13 @@ TEST_CASE ("plugin: the wheels' captions - never clipped, a click opens their se
     modw.mouseDrag (event (modw, bodyAt.translated (0.0f, -60.0f), bodyAt, true));
     modw.mouseUp (event (modw, bodyAt.translated (0.0f, -60.0f), bodyAt, true));
     CHECK (editor->openPopupIndex() == -1);
+    {
+        // (The processor takes the screen wheel at its next block.)
+        p.prepareToPlay (48000.0, 512);
+        juce::AudioBuffer<float> buffer (2, 512);
+        juce::MidiBuffer midi;
+        p.processBlock (buffer, midi);
+    }
     CHECK (p.modWheelPosition() > 0.5f);
 
     // Rapid clicks: open, close, open... always one popover or none, never stale.

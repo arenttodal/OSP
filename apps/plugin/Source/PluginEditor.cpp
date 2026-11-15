@@ -609,7 +609,7 @@ void OspAudioProcessorEditor::positionPopup()
     else if (popupIndex == pitchWheelPopup || popupIndex == modWheelPopup)
     {
         auto& wheel = popupIndex == pitchWheelPopup ? pitchWheel : modWheel;
-        const auto at = frame::wheelPopoverOrigin (content.getLocalArea (&wheel, wheel.captionArea()), size);
+        const auto at = frame::wheelPopoverOrigin (wheel.getBounds().toFloat(), size);
         x = at.x;
         y = at.y;
     }

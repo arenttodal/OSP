@@ -489,11 +489,12 @@ juce::Point<float> advancedPopoverOrigin (juce::Rectangle<float> key, juce::Poin
     return { key.getRight() - size.x, key.getY() - 8.0f - size.y };
 }
 
-juce::Point<float> wheelPopoverOrigin (juce::Rectangle<float> caption, juce::Point<float> size)
+juce::Point<float> wheelPopoverOrigin (juce::Rectangle<float> wheel, juce::Point<float> size)
 {
-    // Its left edge a little left of the caption's (the wheels sit near the instrument's left
-    // edge: placePopover keeps it inside), 10 px above.
-    return { caption.getX() - 14.0f, caption.getY() - 10.0f - size.y };
+    // Above the whole wheel (it stays in view and playable while its settings are open), its
+    // left edge a little left of the wheel's (the wheels sit near the instrument's left edge:
+    // placePopover keeps it inside), 10 px clear.
+    return { wheel.getX() - 7.0f, wheel.getY() - 10.0f - size.y };
 }
 
 void placePopover (MiniPanel& popup, const juce::Component& content, juce::Point<float> at)
