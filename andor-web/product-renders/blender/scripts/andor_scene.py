@@ -32,7 +32,7 @@ from mathutils import Euler, Vector
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:]
 p = argparse.ArgumentParser()
-p.add_argument("--camera", default="B", choices=["A", "B", "macros", "display", "corner", "hero_A", "hero_B"])
+p.add_argument("--camera", default="B", choices=["A", "B", "macros", "display", "corner", "hero_A", "hero_B", "knob", "small", "module", "corner_back"])
 p.add_argument("--stage", default="neutral", choices=["neutral", "dark"])
 p.add_argument("--variant", default="shaded", choices=["shaded", "clay", "alpha"])
 p.add_argument("--res", type=int, nargs=2, default=[2000, 1500])
@@ -45,6 +45,9 @@ p.add_argument("--view", default="AgX")
 p.add_argument("--look", default="AgX - Punchy")
 p.add_argument("--exposure", type=float, default=None)
 p.add_argument("--border", type=float, nargs=4)
+p.add_argument("--knob", default="approved", choices=["pass2", "shallow", "shallow_fluted", "mid", "approved"],
+               help="knob geometry: pass 2's, the approved profile shallow (0.15 D) plain or finely fluted, or the approved spec (11 mm on 28 mm)")
+p.add_argument("--frame-h", type=float, default=16.0, help="timber height in mm (fascia test: 16, 14.4, 12.8)")
 args = p.parse_args(argv)
 
 TEX = os.path.abspath(args.textures)
@@ -56,15 +59,21 @@ W = 0.400
 PX = W / EW
 H = EH * PX
 MM = 0.001
-PLINTH_H = 2.0 * MM          # dark base, inset 3 mm
-FRAME_TOP = PLINTH_H + 16.0 * MM   # timber: 16 mm tall (5 % of the 300 mm depth of the face)
-TRAY_TOP = FRAME_TOP - 2.4 * MM    # layer A: the ceramic tray inside the frame
-PANEL_TOP = FRAME_TOP - 1.0 * MM   # layer B: the panel, seated 1 mm below the timber
-CARD_TOP = PANEL_TOP + 1.2 * MM    # raised cards (thick enough to hold the display wells)
-WELL = 0.85 * MM                   # display recess (floor stays above the panel)
-KEYBED_TOP = PANEL_TOP + 1.0 * MM
-BLACK_TOP = KEYBED_TOP + 2.2 * MM
-KNOB_H = {"macro": 8.0 * MM, "layer": 5.5 * MM, "mini": 4.5 * MM}
+# Pass 3: heights follow OSP's own approved design (design-lab direction 09, controls.json), which
+# is drawn at 0.31 mm per editor px. DMM converts its millimetres to this scene's scale.
+DMM = (PX / 0.00031) * MM
+PLINTH_H = 2.0 * MM                  # dark base, inset 3 mm
+FRAME_TOP = PLINTH_H + args.frame_h * MM   # timber height (pass 2: 16 mm)
+PANEL_TOP = FRAME_TOP - 1.5 * DMM    # the housing: teak stands 1.5 mm proud of it (trim.teak)
+TRAY_TOP = PANEL_TOP - 1.2 * MM      # layer A: the tray band between panel and timber
+CARD_H, CARD_BEVEL = 0.9 * DMM, 0.42 * DMM      # cards (spec 0.9 / 0.55; bevel crisper, brief 3.2)
+MPANEL_H, MPANEL_BEVEL = 0.6 * DMM, 0.36 * DMM  # macro panel D3 (spec 0.6 / 0.5)
+CARD_TOP = PANEL_TOP + CARD_H
+WELL, WELL_LIP, WELL_GROW = 0.6 * DMM, 0.32 * DMM, 1.6   # bezel pockets (geometry.bezel)
+KEYBED_DEPTH = 1.2 * DMM             # the keybed is a pocket in the housing (geometry.keybed)
+KEYBED_TOP = PANEL_TOP - KEYBED_DEPTH
+BLACK_TOP = KEYBED_TOP + 2.2 * MM    # black keys: as pass 2 above the white keys
+KNOB_H = {"macro": 8.0 * MM, "layer": 5.5 * MM, "mini": 4.5 * MM}   # pass 2 knob only
 FLOAT = {"neutral": 0.055, "dark": 0.28}[args.stage]
 
 
@@ -383,6 +392,31 @@ def slab(name, x0, y0, x1, y1, r, z0, z1, mats, bevel=0.0, seg=8, coll=PRODUCT, 
     return o
 
 
+def prism_poly(name, pts, z0, z1, mats, bevel=0.0, coll=PRODUCT):
+    """A straight prism over a convex polygon (metres, product space, counter-clockwise)."""
+    me = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    lo = [bm.verts.new((x, y, z0)) for x, y in pts]
+    hi = [bm.verts.new((x, y, z1)) for x, y in pts]
+    bm.faces.new(list(reversed(lo)))
+    bm.faces.new(hi)
+    n = len(pts)
+    for i in range(n):
+        bm.faces.new((lo[i], lo[(i + 1) % n], hi[(i + 1) % n], hi[i]))
+    bm.to_mesh(me)
+    bm.free()
+    o = obj(name, me, coll, parent=coll is PRODUCT)
+    for m in mats:
+        me.materials.append(m)
+    if bevel > 0:
+        b = o.modifiers.new("Bevel", "BEVEL")
+        b.width, b.segments, b.limit_method = bevel, 4, "ANGLE"
+        b.angle_limit = math.radians(30)
+        b.harden_normals = True
+        o.modifiers.new("Normals", "WEIGHTED_NORMAL").keep_sharp = True
+    return o
+
+
 def bake(o, classify):
     """Apply modifiers, then give every polygon a material index from classify(centre, normal)."""
     deps = bpy.context.evaluated_depsgraph_get()
@@ -405,10 +439,15 @@ def top_side(top_z, eps=0.0002):
 cx0, cx1 = GEO["frame"]["cheek_x"]
 by, fy = GEO["frame"]["back_y"], GEO["frame"]["front_y"]
 WOOD_BEVEL = 0.7 * MM
-front = slab("Teak front fascia", ex(0), ey(EH), ex(EW), ey(fy), 0, PLINTH_H, FRAME_TOP, [M_TEAK_X], bevel=WOOD_BEVEL, seg=1)
-back = slab("Teak back rail", ex(0), ey(by), ex(EW), ey(0), 0, PLINTH_H, FRAME_TOP, [M_TEAK_X], bevel=WOOD_BEVEL, seg=1)
-left = slab("Teak side rail L", ex(0), ey(fy), ex(cx0), ey(by), 0, PLINTH_H, FRAME_TOP, [M_TEAK_Y], bevel=WOOD_BEVEL, seg=1)
-right = slab("Teak side rail R", ex(cx1), ey(fy), ex(EW), ey(by), 0, PLINTH_H, FRAME_TOP, [M_TEAK_Y2], bevel=WOOD_BEVEL, seg=1)
+# Pass 3: one construction at all four corners: mitred joints (each rail runs to the diagonal
+# from the outer corner to the inner corner), so the grain of every rail runs along it to the
+# joint and no end grain shows. A fine bevel on every edge gives the joint its hairline.
+O = [(ex(0), ey(0)), (ex(EW), ey(0)), (ex(EW), ey(EH)), (ex(0), ey(EH))]          # outer: TL TR BR BL
+I = [(ex(cx0), ey(by)), (ex(cx1), ey(by)), (ex(cx1), ey(fy)), (ex(cx0), ey(fy))]  # inner
+front = prism_poly("Teak front fascia", [O[3], O[2], I[2], I[3]], PLINTH_H, FRAME_TOP, [M_TEAK_X], bevel=WOOD_BEVEL)
+back = prism_poly("Teak back rail", [I[0], I[1], O[1], O[0]], PLINTH_H, FRAME_TOP, [M_TEAK_X], bevel=WOOD_BEVEL)
+left = prism_poly("Teak side rail L", [O[0], O[3], I[3], I[0]], PLINTH_H, FRAME_TOP, [M_TEAK_Y], bevel=WOOD_BEVEL)
+right = prism_poly("Teak side rail R", [I[1], I[2], O[2], O[1]], PLINTH_H, FRAME_TOP, [M_TEAK_Y2], bevel=WOOD_BEVEL)
 for o in (front, back, left, right):
     bake(o, lambda c, n: 0)
 tray = slab("Ceramic tray", ex(cx0) - 0.5 * MM, ey(fy) - 0.5 * MM, ex(cx1) + 0.5 * MM, ey(by) + 0.5 * MM, 0, PLINTH_H + 1 * MM, TRAY_TOP, [M_TRAY])
@@ -417,9 +456,16 @@ bake(plinth, lambda c, n: 0)
 
 # --- layer B: ceramic panel and cards; layer C: display wells -------------------------------
 x0, y0, x1, y1 = GEO["panel"]["rect"]
+KB = GEO["keyboard"]["bed"]
+KB_POCKET = (146, 910, 1300, 1016)       # geometry.keybed (146, 910, 1154, 106), radius 6
+kb_cut = slab("Keybed cutter", ex(KB_POCKET[0]), ey(KB_POCKET[3]), ex(KB_POCKET[2]), ey(KB_POCKET[1]), 6 * PX,
+              KEYBED_TOP, PANEL_TOP + 2 * MM, [M_BEZEL], seg=6)
+kb_cut.hide_render = kb_cut.hide_viewport = True
 panel = slab("Ceramic panel", ex(x0), ey(y1), ex(x1), ey(y0), GEO["panel"]["radius"] * PX, TRAY_TOP - 0.5 * MM, PANEL_TOP,
-             [M_FACE, M_PANEL_SIDE], bevel=0.45 * MM, seg=8)
-bake(panel, top_side(PANEL_TOP))
+             [M_FACE, M_PANEL_SIDE], bevel=0.45 * MM, seg=8, cutters=[kb_cut], bevel_segments=3)
+# the pocket's floor carries the white keys (the capture); its walls are ceramic
+bake(panel, lambda c, n: 0 if n.z > 0.9 else 1)
+bpy.data.objects.remove(kb_cut)
 
 
 def inside(x, y, rect, pad=0.0):
@@ -429,21 +475,28 @@ def inside(x, y, rect, pad=0.0):
 DISPLAYS = GEO["displays"]
 for i, cd in enumerate(GEO["cards"]):
     a0, b0, a1, b1 = cd["rect"]
+    macro_panel = (b1 - b0) < 300
+    height, bevel, radius = (MPANEL_H, MPANEL_BEVEL, 13) if macro_panel else (CARD_H, CARD_BEVEL, 16)
+    top_z = PANEL_TOP + height
     wells = [d for d in DISPLAYS if inside(d[0], d[1], cd["rect"]) and inside(d[2], d[3], cd["rect"])]
+    depth = min(WELL, height - 0.08 * MM)    # the floor always stays above the housing
     cutters = []
     for j, d in enumerate(wells):
-        c = slab(f"Well cutter {i}.{j}", ex(d[0]), ey(d[3]), ex(d[2]), ey(d[1]), 8 * PX, CARD_TOP - WELL, CARD_TOP + 2 * MM, [M_BEZEL], seg=8)
+        g = WELL_GROW
+        wr = 12 if macro_panel else 9          # bezel-r12 (envelope), bezel-r9 (sources)
+        c = slab(f"Well cutter {i}.{j}", ex(d[0] - g), ey(d[3] + g), ex(d[2] + g), ey(d[1] - g), (wr + g) * PX,
+                 top_z - depth, top_z + 2 * MM, [M_BEZEL], seg=8)
         c.hide_render = True
         c.hide_viewport = True
         cutters.append(c)
-    card = slab(f"Ceramic card {i}", ex(a0), ey(b1), ex(a1), ey(b0), cd["radius"] * PX, PANEL_TOP - 0.3 * MM, CARD_TOP,
-                [M_FACE, M_CARD_SIDE, M_DISPLAY, M_BEZEL], bevel=0.4 * MM, seg=8, cutters=cutters, bevel_segments=3)
+    card = slab(f"Ceramic card {i}", ex(a0), ey(b1), ex(a1), ey(b0), radius * PX, PANEL_TOP - 0.3 * MM, top_z,
+                [M_FACE, M_CARD_SIDE, M_DISPLAY, M_BEZEL], bevel=min(bevel, WELL_LIP), seg=10, cutters=cutters, bevel_segments=3)
 
-    def classify(c, n, wells=wells):
+    def classify(c, n, wells=wells, top_z=top_z):
         u, v = c.x / PX + EW / 2, EH / 2 - c.y / PX
-        in_well = any(inside(u, v, d, 1.5) for d in wells)
+        in_well = any(inside(u, v, d, WELL_GROW + 0.5) for d in wells)
         if n.z > 0.9:
-            if c.z > CARD_TOP - 0.0002:
+            if c.z > top_z - 0.0002:
                 return 0
             return 2 if in_well else 0
         return 3 if in_well else 1
@@ -455,24 +508,76 @@ for i, cd in enumerate(GEO["cards"]):
 def surface_top(u, v):
     for cd in GEO["cards"]:
         if inside(u, v, cd["rect"]):
-            return CARD_TOP
+            return PANEL_TOP + (MPANEL_H if (cd["rect"][3] - cd["rect"][1]) < 300 else CARD_H)
     return PANEL_TOP
 
 
 # --- layer D: buttons, keys, knobs -----------------------------------------------------------
+# A1 keys (controls.json buttons.A1, emphasis): height 0.8 mm x the role's emphasis; corner
+# radius per role (skin/pieces.py). Bevel kept to a third of the height so the top stays planar.
+EMPH = {"ModifierButton": 1.0, "ModeSelector": 0.8, "EqButton": 0.8, "RecButton": 0.8, "LayerStateButton": 0.6,
+        "AdvancedCardButton": 0.8, "ArpControl": 0.9, "PresetBar": 0.7, "SavePresetButton": 0.7}
+RADIUS = {"ModifierButton": 7, "ModeSelector": 7, "EqButton": 6, "RecButton": 6, "LayerStateButton": 4,
+          "AdvancedCardButton": 7, "ArpControl": 10, "PresetBar": 12, "SavePresetButton": 10}
+SIDE_MATS = {}
 for i, bt in enumerate(GEO["buttons"]):
     a0, b0, a1, b1 = bt["rect"]
     base = surface_top((a0 + a1) / 2, (b0 + b1) / 2)
-    top = base + bt["lift_mm"] * MM
-    side = mat_solid(f"Button side {i}", tuple(bt["side_rgb"]), 0.4)
-    o = slab(f"Button {bt['kind']} {i}", ex(a0), ey(b1), ex(a1), ey(b0), bt["radius"] * PX, base - 0.3 * MM, top,
-             [M_FACE, side], bevel=0.35 * MM, seg=6)
+    h = 0.8 * EMPH.get(bt["kind"], 0.8) * DMM
+    top = base + h
+    key = tuple(bt["side_rgb"])
+    if key not in SIDE_MATS:
+        SIDE_MATS[key] = mat_solid(f"Key side {len(SIDE_MATS)}", key, 0.36)
+    o = slab(f"Key {bt['kind']} {i}", ex(a0), ey(b1), ex(a1), ey(b0), RADIUS.get(bt["kind"], bt["radius"]) * PX, base - 0.2 * MM, top,
+             [M_FACE, SIDE_MATS[key]], bevel=0.34 * h, seg=8, bevel_segments=3)
     bake(o, top_side(top))
 
+# Layer badges A/B/C (skin/pieces.py): 47 x 43 px, radius 7, 0.7 mm, on each card.
+BADGE = {"A": (196, 86, 31), "B": (77, 97, 118), "C": (100, 128, 107)}
+for j, (letter, rgb) in enumerate(BADGE.items()):
+    a0, b0 = 56 + 463 * j, 137
+    h = 0.7 * DMM
+    top = PANEL_TOP + CARD_H + h
+    o = slab(f"Badge {letter}", ex(a0), ey(b0 + 43), ex(a0 + 47), ey(b0), 7 * PX, PANEL_TOP + CARD_H - 0.2 * MM, top,
+             [M_FACE, mat_solid(f"Badge {letter} side", rgb, 0.4)], bevel=0.34 * h, seg=6, bevel_segments=3)
+    bake(o, top_side(top))
+
+# Lens LEDs under the macros (geometry.macroLedY 883, diameter 9 px, 0.75 mm): CHARACTER lit.
+MACRO_LED = [(128, (190, 117, 82)), (274, (181, 132, 58)), (420, (123, 141, 105)), (566, (115, 137, 156)), (712, (92, 148, 144)), (858, (150, 131, 157))]
+for j, (x, rgb) in enumerate(MACRO_LED):
+    nt = NT(f"Lens LED {j}")
+    b = nt.principled()
+    b.inputs["Base Color"].default_value = (*lin(rgb), 1)
+    b.inputs["Roughness"].default_value = 0.12
+    b.inputs["Coat Weight"].default_value = 1.0
+    b.inputs["Coat Roughness"].default_value = 0.02
+    b.inputs["Subsurface Weight"].default_value = 0.3
+    if j == 2:
+        b.inputs["Emission Color"].default_value = (*lin(rgb), 1)
+        b.inputs["Emission Strength"].default_value = 1.2
+    m = nt.finish(b.outputs[0])
+    r = 4.5 * PX
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=32, ring_count=16, radius=1)
+    led = bpy.context.active_object
+    bpy.context.scene.collection.objects.unlink(led)
+    PRODUCT.objects.link(led)
+    led.name = f"Lens LED {j}"
+    led.parent = root
+    led.scale = (r, r, 0.75 * DMM)
+    led.location = (ex(x), ey(883), PANEL_TOP + MPANEL_H - 0.75 * DMM * 0.15)
+    led.data.materials.append(m)
+    for poly in led.data.polygons:
+        poly.use_smooth = True
+
+# C1 ivory fader cap (14 x 22 px, radius 4, 2.0 mm, three grip grooves) on the T3 metal guide.
+rail_m = mat_solid("T3 guide (warm brushed aluminium)", (149, 140, 126), 0.4, spec=0.5, metal=1.0, bump=0)
+o = slab("T3 guide", ex(1155.4), ey(81.6), ex(1338.6), ey(78.4), 1.6 * PX, PANEL_TOP - 0.2 * MM, PANEL_TOP + 0.6 * DMM, [rail_m], bevel=0.2 * DMM, seg=4)
+bake(o, lambda c, n: 0)
+fh = 2.0 * DMM
+o = slab("C1 fader cap", ex(1285), ey(91), ex(1299), ey(69), 4 * PX, PANEL_TOP, PANEL_TOP + fh, [M_FACE, M_KNOB], bevel=0.3 * fh, seg=6, bevel_segments=3)
+bake(o, top_side(PANEL_TOP + fh))
+
 kb = GEO["keyboard"]
-a0, b0, a1, b1 = kb["bed"]
-o = slab("Key bed", ex(a0), ey(b1), ex(a1), ey(b0), 3 * PX, PANEL_TOP - 0.3 * MM, KEYBED_TOP, [M_FACE, M_CARD_SIDE], bevel=0.3 * MM, seg=4)
-bake(o, top_side(KEYBED_TOP))
 for i, k in enumerate(kb["black"]):
     o = slab(f"Black key {i:02d}", ex(k[0]), ey(k[3]), ex(k[2]), ey(k[1]), 1.6 * PX, KEYBED_TOP - 0.2 * MM, BLACK_TOP,
              [M_FACE, M_KEY_SIDE], bevel=0.45 * MM, seg=3)
@@ -563,8 +668,94 @@ def knob(name, u, v, r_px, angle, kind):
     return o
 
 
-for i, k in enumerate(GEO["knobs"]):
-    knob(f"Knob {k['kind']} {i:02d}", k["c"][0], k["c"][1], k["r"], k["angle"], k["kind"])
+# --- the approved knob (tools/blender-assets: config/macro-knob.json, osp_assets/geometry.py) -
+# Pass 3 builds every knob from OSP's own generator, the same profile the editor's knob sprites
+# are rendered from (all knobs in the editor use that one cap, scaled). Variants for Test 01:
+#   approved        the spec: 28 mm, 11 mm high (0.39 D), 7 % taper, 1.5 mm bevel, 0.55 mm crown,
+#                   48 flutes 0.42 mm deep, 1.4 mm base ring behind a 0.35 mm groove
+#   shallow         the same profile at 0.15 D (4.2 mm), 0.7 mm bevel, 0.25 mm crown, no flutes
+#   shallow_fluted  as shallow, with 48 fine flutes 0.15 mm deep (0.005 D)
+#   mid             the approved profile at 0.25 D (7 mm), 0.9 mm bevel, flutes 0.26 mm (0.009 D)
+import copy
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../tools/blender-assets")))
+from osp_assets import geometry as knobgeo   # noqa: E402
+
+APPROVED = json.load(open(os.path.join(os.path.dirname(__file__), "../../../../tools/blender-assets/config/macro-knob.json")))
+KG = copy.deepcopy(APPROVED["geometry"])
+if args.knob in ("shallow", "shallow_fluted"):
+    KG.update(height=4.2, bevelWidth=0.7, topCurvature=0.25, bevelSegments=8)
+    KG["skirt"] = dict(KG["skirt"], height=0.9, gap=0.3)
+    KG["flutes"] = dict(KG["flutes"], depth=0.15, fadeIn=0.6, topFade=0.4) if args.knob == "shallow_fluted" else dict(KG["flutes"], count=0, depth=0.0)
+elif args.knob == "mid":
+    # The approved profile at 0.25 D (7 mm): between the spec (0.39 D) and the brief (0.11-0.17 D);
+    # a crisper 0.9 mm bevel, a 0.4 mm crown, flutes 0.009 D.
+    KG.update(height=7.0, bevelWidth=0.9, topCurvature=0.4, bevelSegments=8)
+    KG["skirt"] = dict(KG["skirt"], height=1.1, gap=0.3)
+    KG["flutes"] = dict(KG["flutes"], depth=0.26, fadeIn=0.9, topFade=0.45)
+IND = APPROVED["indicator"]
+_, KINFO = knobgeo.knob_profile(KG)
+
+
+def mat_knob():
+    """Satin Ivory (materials/ivory.json), with the engraved charcoal indicator drawn exactly on
+    the cap in its own space (mm; +Y is the pointer), so it is flush, crisp and never floats."""
+    nt = NT("Knob satin ivory (approved)")
+    tc = nt.n("ShaderNodeTexCoord")
+    p = nt.n("ShaderNodeSeparateXYZ")
+    nt.link(tc.outputs["Object"], p.inputs[0])
+    halfw = 0.5 * IND["width"]
+    r0, r1 = IND["from"] * KINFO["rt"], KINFO["rt"] - 0.65 * KG["bevelWidth"]
+    inx = nt.math("LESS_THAN", nt.math("ABSOLUTE", p.outputs[0]), halfw)
+    iny = nt.math("MULTIPLY", nt.math("GREATER_THAN", p.outputs[1], r0), nt.math("LESS_THAN", p.outputs[1], r1))
+    onz = nt.math("GREATER_THAN", p.outputs[2], KINFO["edgeZ"] - 0.2)
+    mask = nt.math("MULTIPLY", nt.math("MULTIPLY", inx, iny), onz)
+    b = nt.principled()
+    col = nt.n("ShaderNodeMix")
+    col.data_type = "RGBA"
+    nt.link(mask, col.inputs[0])
+    col.inputs[6].default_value = (*lin((236, 232, 224)), 1)     # #ece8e0 satin-ivory
+    col.inputs[7].default_value = (*lin((38, 35, 31)), 1)        # #26231f charcoal ink
+    nt.link(col.outputs[2], b.inputs["Base Color"])
+    rough = nt.math("MULTIPLY_ADD", mask, 0.72 - 0.34, 0.34)
+    nt.link(rough, b.inputs["Roughness"])
+    b.inputs["Specular IOR Level"].default_value = 0.5
+    coat = nt.math("MULTIPLY_ADD", mask, -0.18, 0.18)
+    nt.link(coat, b.inputs["Coat Weight"])
+    b.inputs["Coat Roughness"].default_value = 0.22
+    # engraved: the line sits a hair below the surface (bump only; depth 0.22 mm in the spec)
+    noise = nt.n("ShaderNodeTexNoise", Scale=900.0, Detail=2.0)
+    nt.link(tc.outputs["Object"], noise.inputs["Vector"])
+    h = nt.math("MULTIPLY_ADD", noise.outputs["Fac"], 0.02, nt.math("MULTIPLY", mask, -1.0))
+    bump = nt.n("ShaderNodeBump", Strength=0.6, Distance=0.0002)
+    nt.link(h, bump.inputs["Height"])
+    nt.link(bump.outputs[0], b.inputs["Normal"])
+    return nt.finish(b.outputs[0])
+
+
+def approved_knob(name, u, v, r_px, angle, samples):
+    g = dict(KG, angularSamples=samples)
+    verts, faces, info = knobgeo.build_knob_mesh(g)
+    me = bpy.data.meshes.new(name)
+    me.from_pydata(verts, [], faces)
+    me.update()
+    for poly in me.polygons:
+        poly.use_smooth = True
+    o = obj(name, me)
+    s = (r_px * PX) / info["outer"]            # the editor's body radius = the base ring's outer radius
+    o.scale = (s, s, s)
+    o.location = (ex(u), ey(v), surface_top(u, v))
+    o.rotation_euler = (0, 0, -angle)          # editor angle: clockwise from 12 o'clock; +Y is the pointer
+    me.materials.append(M_KNOB_APPROVED)
+    return o
+
+
+if args.knob == "pass2":
+    for i, k in enumerate(GEO["knobs"]):
+        knob(f"Knob {k['kind']} {i:02d}", k["c"][0], k["c"][1], k["r"], k["angle"], k["kind"])
+else:
+    M_KNOB_APPROVED = mat_knob()
+    for i, k in enumerate(GEO["knobs"]):
+        approved_knob(f"Knob {k['kind']} {i:02d}", k["c"][0], k["c"][1], k["r"], k["angle"], 1440 if k["kind"] == "macro" else 480)
 
 if CLAY:
     for o in PRODUCT.objects:
@@ -576,11 +767,15 @@ if CLAY:
 ROT = {"A": -9.0, "hero_A": -9.0}.get(args.camera, -11.0)
 root.location = (0, 0, FLOAT)
 root.rotation_euler = (0, 0, math.radians(ROT))
-TARGET = Vector((0, 0, FLOAT + PANEL_TOP))
+# Camera targets use the 16 mm timber's heights, so the fascia-height test never moves a camera.
+REF_FRAME_TOP = PLINTH_H + 16.0 * MM
+REF_PANEL_TOP = REF_FRAME_TOP - 1.5 * DMM
+TARGET = Vector((0, 0, FLOAT + REF_PANEL_TOP))
 
 
-def prod(u, v, z=PANEL_TOP):
+def prod(u, v, z=None):
     """Editor px -> world point on the instrument."""
+    z = REF_PANEL_TOP if z is None else z
     pnt = Vector((ex(u), ey(v), 0))
     pnt.rotate(Euler((0, 0, math.radians(ROT))))
     return Vector((pnt.x, pnt.y, FLOAT + z))
@@ -750,9 +945,13 @@ CAMS = {
     "B": dict(yaw=-24, pitch=54, dist=1.30, lens=85, target=T, fstop=11),               # elevated three-quarter
     "hero_A": dict(yaw=-24, pitch=27, dist=1.12, lens=75, target=T, fstop=9, shift=(0, 0.07), fit="HORIZONTAL"),   # = pass 1
     "hero_B": dict(yaw=-24, pitch=54, dist=1.16, lens=85, target=T, fstop=9, shift=(-0.035, 0.05), fit="HORIZONTAL"),
-    "macros": dict(yaw=-18, pitch=50, dist=0.64, lens=85, target=prod(493, 812, CARD_TOP + 4 * MM), fstop=11),
-    "display": dict(yaw=-20, pitch=42, dist=0.30, lens=100, target=prod(723, 330, CARD_TOP), fstop=8),
-    "corner": dict(yaw=38, pitch=66, dist=0.26, lens=100, target=prod(1390, 1050, FRAME_TOP * 0.6), fstop=8),
+    "macros": dict(yaw=-18, pitch=50, dist=0.64, lens=85, target=prod(493, 812, REF_PANEL_TOP + CARD_H + 4 * MM), fstop=11),
+    "display": dict(yaw=-20, pitch=42, dist=0.30, lens=100, target=prod(723, 330, REF_PANEL_TOP + CARD_H), fstop=8),
+    "corner": dict(yaw=38, pitch=66, dist=0.26, lens=100, target=prod(1390, 1050, REF_FRAME_TOP * 0.6), fstop=8),
+    "corner_back": dict(yaw=-150, pitch=62, dist=0.26, lens=100, target=prod(40, 30, REF_FRAME_TOP * 0.6), fstop=8),
+    "knob": dict(yaw=-20, pitch=52, dist=0.21, lens=100, target=prod(493, 818, REF_PANEL_TOP + 4 * MM), fstop=11),
+    "small": dict(yaw=-20, pitch=50, dist=0.17, lens=100, target=prod(723, 520, REF_PANEL_TOP + CARD_H + 2 * MM), fstop=11),
+    "module": dict(yaw=-24, pitch=55, dist=0.20, lens=100, target=prod(60, 640, REF_PANEL_TOP + CARD_H), fstop=11),
 }
 scene.camera = camera("Camera " + args.camera, **CAMS[args.camera])
 
