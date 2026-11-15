@@ -78,6 +78,16 @@ public:
 
     void paint (juce::Graphics&) override;
     void resized() override;
+    /** A wheel no knob took scrolls the instrument while the window is shorter than it. */
+    void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override
+    {
+        if (! overflow.scrollBy (wheel))
+            AudioProcessorEditor::mouseWheelMove (e, wheel);
+    }
+    /** Tests: the window shorter than the instrument - it scrolls, at the same scale. */
+    osp::plugin::frame::Overflow& instrumentOverflow() noexcept { return overflow; }
+    /** Tests: the instrument (its components are its children, laid out at the reference size). */
+    juce::Component& instrumentContent() noexcept { return content; }
     bool keyPressed (const juce::KeyPress& key) override;
 
     bool isInterestedInFileDrag (const juce::StringArray& files) override;
@@ -253,6 +263,7 @@ private:
     const bool modulationBound;
 
     osp::plugin::frame::Content content;   // before every child: it outlives them
+    osp::plugin::frame::Overflow overflow { *this };   ///< a window shorter than the instrument: it scrolls
 
     // Header
     osp::plugin::PresetBar presetBar { shell };

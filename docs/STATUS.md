@@ -890,6 +890,21 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
   (InstrumentHost::stepLayerEqSpectrum / paintLayerEqSpectrum; none in ANDOR OSP here - its
   own card EQ spectrum is on the default line).
 
+  Vertical-only expansion, fixed width (the owner's layout spec, 15 Nov): opening or closing a
+  rack, the arpeggiator or a strip changes only the window's height - never its width, the
+  instrument's scale or anything's horizontal place. `frame::applyWindowShape` no longer sets
+  a fixed aspect ratio (a host could answer a taller window with another width); the editor's
+  constrainer (`ScreenFit::Shape`) makes a width change (the corner, a host) take the height
+  that goes with it - an even zoom - and keeps a height-only change (no taller than the
+  instrument). `frame::fit` scales by the window's width only: the window as tall as the
+  instrument is placed exactly as before (pixel-identical); shorter - capped at the screen, a
+  host that refused, a dragged bottom edge - the instrument stays at the top-left at the same
+  scale and scrolls (`frame::Overflow`: a slim vertical bar, the wheel where no knob takes it);
+  taller - top-left, the surround below. Never shrunk, never centred, no side margins. Tests
+  `[window][geometry]` (every shell product): each rack, rack to rack, the arpeggiator, a
+  strip, all together, 100 cycles - width, cards, macros unchanged, the keyboard lower by the
+  section only, back on closing; a refused height scrolls at the same scale; the constrainer.
+
   Universal modulation-aware visual feedback (docs/EFFECTIVE_VALUES.md): a picture draws what
   the DSP plays. `osp::EffectiveValues` (src/engine) is a fixed, lock-free table published by
   the audio thread (a sequence lock per slot, with the span covered over a UI frame);

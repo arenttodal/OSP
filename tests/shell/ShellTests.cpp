@@ -20,6 +20,7 @@
 #include <catch2/catch_session.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <array>
 #include <cstdlib>
 #include <filesystem>
 
@@ -756,7 +757,7 @@ int main (int argc, char* argv[])
     return result;
 }
 
-TEST_CASE ("shell: opening the arpeggiator (a taller instrument) never changes the window's width; past the screen it stops growing and the instrument scales, whole", "[shell][editor][window]")
+TEST_CASE ("shell: opening the arpeggiator (a taller instrument) never changes the window's width; past the screen it stops growing and the instrument scrolls", "[shell][editor][window]")
 {
     ShellProcessor p;
     std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
@@ -775,7 +776,7 @@ TEST_CASE ("shell: opening the arpeggiator (a taller instrument) never changes t
         CHECK (editor->getHeight() == juce::roundToInt (static_cast<float> (width) * ui->instrumentHeight() / osp::plugin::design::width));
     }
     // On a screen, the rule: the height that goes with the width, but never past the screen's
-    // room (the instrument then scales down inside the window, whole); the width is never asked.
+    // room (the instrument then scrolls, at the same scale); the width is never asked.
     using osp::plugin::frame::fittedWindowHeight;
     const float tall = ui->instrumentHeight() + 400.0f;   // (say, a rack and the arpeggiator open)
     const int natural = juce::roundToInt (1448.0f * tall / osp::plugin::design::width);
@@ -804,4 +805,184 @@ TEST_CASE ("shell: an external audio input is a product's opt-in; without one th
     CHECK_FALSE (p.getBus (true, 0)->isEnabledByDefault());
     REQUIRE (p.getVST3ClientExtensions() != nullptr);
     CHECK_FALSE (p.getVST3ClientExtensions()->getPluginHasMainInput());
+}
+
+namespace
+{
+    /** Where the instrument's main parts sit in the editor (pixels: the window's own). */
+    struct Geometry
+    {
+        int editorWidth = 0, editorHeight = 0;
+        std::array<juce::Rectangle<int>, 3> cards {};
+        juce::Rectangle<int> macro, keyboard;
+    };
+
+    Geometry geometryOf (ShellEditor& ui)
+    {
+        Geometry g;
+        g.editorWidth = ui.getWidth();
+        g.editorHeight = ui.getHeight();
+        auto onEditor = [&ui] (juce::Component& c) { return ui.getLocalArea (&c, c.getLocalBounds()); };
+        for (int i = 0; i < 3; ++i)
+            g.cards[static_cast<std::size_t> (i)] = onEditor (ui.engineCard (i));
+        if (auto* knob = ui.macroKnob (0))
+            g.macro = onEditor (*knob);
+        g.keyboard = onEditor (ui.keyboardComponent());
+        return g;
+    }
+
+    bool near (const juce::Rectangle<int>& a, const juce::Rectangle<int>& b, int tolerance = 1)
+    {
+        return std::abs (a.getX() - b.getX()) <= tolerance && std::abs (a.getY() - b.getY()) <= tolerance
+               && std::abs (a.getWidth() - b.getWidth()) <= tolerance && std::abs (a.getHeight() - b.getHeight()) <= tolerance;
+    }
+}
+
+TEST_CASE ("shell: vertical-only expansion - racks, the arpeggiator and a strip change only the height; nothing above moves, nothing shrinks", "[shell][editor][window][geometry]")
+{
+    ShellProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<ShellEditor*> (editor.get());
+    REQUIRE (ui != nullptr);
+    using osp::plugin::rack::Kind;
+    const int width = 1200;
+    auto fitted = [&] { return juce::roundToInt (static_cast<float> (width) * ui->instrumentHeight() / osp::plugin::design::width); };
+    editor->setSize (width, fitted());
+    const auto base = geometryOf (*ui);
+    const float scale = static_cast<float> (width) / osp::plugin::design::width;
+
+    // Each inline section: the width, the cards and the macros exactly where they were; the
+    // keyboard as wide, lower by the section's height only; closed, everything back.
+    // (`macroShift`: a section inserted above the macro row - a strip under the cards - moves
+    // the macros down by its height alone; every other section sits under them.)
+    auto checkOpen = [&] (const juce::String& what, float shiftReference, float macroShift = 0.0f) {
+        INFO (what);
+        const auto now = geometryOf (*ui);
+        CHECK (now.editorWidth == width);
+        CHECK (now.editorHeight == fitted());
+        for (std::size_t i = 0; i < 3; ++i)
+            CHECK (near (now.cards[i], base.cards[i]));
+        CHECK (near (now.macro, base.macro.translated (0, juce::roundToInt (macroShift * scale))));
+        CHECK (std::abs (now.keyboard.getX() - base.keyboard.getX()) <= 1);
+        CHECK (std::abs (now.keyboard.getWidth() - base.keyboard.getWidth()) <= 1);
+        CHECK (std::abs (static_cast<float> (now.keyboard.getY() - base.keyboard.getY()) - shiftReference * scale) <= 1.5f);
+        CHECK_FALSE (ui->instrumentOverflow().overflowing());
+    };
+    auto checkBase = [&] (const juce::String& what) {
+        INFO (what);
+        const auto now = geometryOf (*ui);
+        CHECK (now.editorWidth == base.editorWidth);
+        CHECK (now.editorHeight == base.editorHeight);
+        for (std::size_t i = 0; i < 3; ++i)
+            CHECK (near (now.cards[i], base.cards[i]));
+        CHECK (near (now.macro, base.macro));
+        CHECK (near (now.keyboard, base.keyboard));
+    };
+
+    const float baseHeight = ui->instrumentHeight();
+    for (const auto kind : { Kind::movement, Kind::echo, Kind::space, Kind::filter, Kind::morph })
+    {
+        ui->setRackExpanded (kind, true);
+        checkOpen ("rack " + osp::plugin::rack::name (kind), ui->instrumentHeight() - baseHeight);
+        ui->setRackExpanded (kind, false);
+        checkBase ("closed " + osp::plugin::rack::name (kind));
+    }
+    // One rack for another: only the rack's own height difference (none for equal heights).
+    ui->setRackExpanded (Kind::echo, true);
+    const float echoHeight = ui->instrumentHeight();
+    const int echoWindow = editor->getHeight();
+    ui->setRackExpanded (Kind::space, true);
+    if (std::abs (ui->instrumentHeight() - echoHeight) < 0.5f)
+        CHECK (editor->getHeight() == echoWindow);
+    checkOpen ("echo -> space", ui->instrumentHeight() - baseHeight);
+    ui->setRackExpanded (Kind::space, false);
+    ui->setRackExpanded (Kind::echo, false);
+    checkBase ("after switching");
+
+    // The arpeggiator, with and without a rack; a strip (a product's), with both.
+    ui->setArpExpanded (true);
+    checkOpen ("arpeggiator", ui->instrumentHeight() - baseHeight);
+    ui->setRackExpanded (Kind::space, true);
+    checkOpen ("arpeggiator + space", ui->instrumentHeight() - baseHeight);
+    if (p.hasAuxStrip())
+    {
+        const float without = ui->instrumentHeight();
+        ui->setAuxStripShown (true);
+        checkOpen ("arpeggiator + space + strip", ui->instrumentHeight() - baseHeight, ui->instrumentHeight() - without);
+        ui->setAuxStripShown (false);
+    }
+    ui->setRackExpanded (Kind::space, false);
+    checkOpen ("arpeggiator again", ui->instrumentHeight() - baseHeight);
+    ui->setArpExpanded (false);
+    checkBase ("all closed");
+
+    // A hundred quick cycles: no drift in width, scale, height or places.
+    for (int i = 0; i < 100; ++i)
+    {
+        ui->setRackExpanded (i % 2 == 0 ? Kind::space : Kind::echo, true);
+        ui->setArpExpanded (i % 3 == 0);
+        ui->setRackExpanded (i % 2 == 0 ? Kind::space : Kind::echo, false);
+    }
+    ui->setArpExpanded (false);
+    checkBase ("after 100 cycles");
+}
+
+TEST_CASE ("shell: a window shorter than the instrument (a host that refused, the screen's room) scrolls; the instrument is never scaled down or moved sideways", "[shell][editor][window][geometry]")
+{
+    ShellProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<ShellEditor*> (editor.get());
+    REQUIRE (ui != nullptr);
+    const int width = 1200;
+    editor->setSize (width, juce::roundToInt (static_cast<float> (width) * ui->instrumentHeight() / osp::plugin::design::width));
+    const auto base = geometryOf (*ui);
+    ui->setArpExpanded (true);
+    ui->setRackExpanded (osp::plugin::rack::Kind::space, true);
+    // The host keeps the old height (it refused the taller window).
+    editor->setSize (width, base.editorHeight);
+    auto now = geometryOf (*ui);
+    for (std::size_t i = 0; i < 3; ++i)
+        CHECK (near (now.cards[i], base.cards[i]));   // same scale, same places, at the top
+    CHECK (now.keyboard.getWidth() == base.keyboard.getWidth());
+    CHECK (now.keyboard.getX() == base.keyboard.getX());
+    CHECK (ui->instrumentOverflow().overflowing());
+    CHECK (now.keyboard.getBottom() > editor->getHeight());   // (below: reached by scrolling)
+    // Scrolled to the bottom: the keyboard comes into view, still as wide, not moved sideways.
+    juce::MouseWheelDetails down;
+    down.deltaX = 0.0f;
+    down.deltaY = -1.0f;
+    down.isReversed = false;
+    down.isSmooth = false;
+    down.isInertial = false;
+    for (int i = 0; i < 20; ++i)
+        ui->instrumentOverflow().scrollBy (down);
+    now = geometryOf (*ui);
+    CHECK (now.keyboard.getBottom() <= editor->getHeight() + 1);
+    CHECK (now.keyboard.getX() == base.keyboard.getX());
+    CHECK (now.keyboard.getWidth() == base.keyboard.getWidth());
+    CHECK (now.cards[0].getWidth() == base.cards[0].getWidth());
+    // The host gives the height after all: no scroll bar, back at the top.
+    editor->setSize (width, juce::roundToInt (static_cast<float> (width) * ui->instrumentHeight() / osp::plugin::design::width));
+    CHECK_FALSE (ui->instrumentOverflow().overflowing());
+    CHECK (near (geometryOf (*ui).cards[0], base.cards[0]));
+
+    // The window's shape: a new width takes the height that goes with it (an even zoom); a
+    // height alone stays (never taller than the instrument); no aspect ratio is imposed.
+    auto* shape = editor->getConstrainer();
+    REQUIRE (shape != nullptr);
+    CHECK (shape->getFixedAspectRatio() == 0.0);
+    const auto before = editor->getBounds();
+    auto zoomed = before.withWidth (1000);
+    shape->checkBounds (zoomed, before, {}, false, false, true, true);
+    CHECK (zoomed.getWidth() == 1000);
+    CHECK (zoomed.getHeight() == juce::roundToInt (1000.0f * ui->instrumentHeight() / osp::plugin::design::width));
+    auto shorter = before.withHeight (before.getHeight() - 200);
+    shape->checkBounds (shorter, before, {}, false, false, true, false);
+    CHECK (shorter.getWidth() == before.getWidth());
+    CHECK (shorter.getHeight() == before.getHeight() - 200);
+    auto taller = before.withHeight (before.getHeight() + 300);
+    shape->checkBounds (taller, before, {}, false, false, true, false);
+    CHECK (taller.getHeight() == before.getHeight());   // (no empty space under the instrument)
+    ui->setRackExpanded (osp::plugin::rack::Kind::space, false);
+    ui->setArpExpanded (false);
 }

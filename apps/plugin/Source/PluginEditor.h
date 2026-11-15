@@ -65,6 +65,14 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
     bool keyPressed (const juce::KeyPress& key) override;
+    /** A wheel no knob took scrolls the instrument while the window is shorter than it. */
+    void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override
+    {
+        if (! overflow.scrollBy (wheel))
+            AudioProcessorEditor::mouseWheelMove (e, wheel);
+    }
+    /** Tests: the window shorter than the instrument - it scrolls, at the same scale. */
+    frame::Overflow& instrumentOverflow() noexcept { return overflow; }
 
     bool isInterestedInFileDrag (const juce::StringArray& files) override;
     void fileDragEnter (const juce::StringArray& files, int x, int y) override;
@@ -186,6 +194,8 @@ private:
     /** The instrument at the reference size, scaled to the window as one piece. Declared
         before every child so it outlives them. */
     frame::Content content;
+    /** A window shorter than the instrument: a vertical scroll bar, never a smaller instrument. */
+    frame::Overflow overflow { *this };
 
     // Header
     PresetBar presetBar { ospProcessor };

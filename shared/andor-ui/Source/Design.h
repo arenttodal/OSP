@@ -324,8 +324,13 @@ namespace draw
 {
     /** The colour around the instrument when the window's shape differs from the layout's. */
     juce::Colour surround();
-    /** The housing: the instrument's body on its surround, with a broad quiet shadow. */
-    void housing (juce::Graphics&, juce::Rectangle<float> bounds);
+    /** The housing: the instrument's body on its surround, with a broad quiet shadow.
+        `baseHeight` (reference px; 0: `bounds`' own): the instrument's height with no inline
+        section open. Taller than that (a rack, the arpeggiator, a strip), the base housing is
+        drawn exactly as it is, its foot moved down, and the room between filled with the
+        housing's own middle, mirrored - never stretched - so everything above the foot is the
+        same pixels whatever is open. */
+    void housing (juce::Graphics&, juce::Rectangle<float> bounds, float baseHeight = 0.0f);
     /** A raised card or panel: soft contact shadow, vertical light, 1 px lit top edge. */
     void raised (juce::Graphics&, juce::Rectangle<float> r, float radius, juce::Colour top, juce::Colour bottom, float shadow = 1.0f);
     /** Ceramic: the raised face of every visible child of `parent` that is a

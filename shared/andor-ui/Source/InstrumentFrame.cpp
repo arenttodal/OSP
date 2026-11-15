@@ -382,10 +382,11 @@ juce::Rectangle<int> sourceColumn (juce::Rectangle<int> area, int columns, int i
     return { area.getX() + index * (width + gap), area.getY(), width, area.getHeight() };
 }
 
-void paint (juce::Graphics& g, juce::Component& content, const Identity& identity, bool arpShown, const MacroRow& macros, float rackShift, float sourceTrim)
+void paint (juce::Graphics& g, juce::Component& content, const Identity& identity, bool arpShown, const MacroRow& macros, float rackShift, float sourceTrim,
+            float housingBase)
 {
     using namespace design;
-    draw::housing (g, content.getLocalBounds().toFloat());
+    draw::housing (g, content.getLocalBounds().toFloat(), housingBase);
     // Ceramic: the source cards and the arpeggiator's panel, drawn here so their shadows
     // fall on the housing.
     draw::raisedChildren (g, content);
@@ -514,16 +515,82 @@ float instrumentHeight (bool arpShown, float rackShift, float sourceTrim) noexce
     return design::height + (arpShown ? design::layout::arpShift : 0.0f) + rackShift - sourceTrim;
 }
 
-void fit (juce::Component& editor, juce::Component& content, float height)
+void fit (juce::Component& editor, juce::Component& content, float height, Overflow* overflow)
 {
-    // Scaled uniformly to fit: if a host keeps the old window shape (it refused the resize),
-    // the instrument still shows whole, with a margin, never cut off.
     const float w = design::width, h = height;
-    const float k = std::min (static_cast<float> (editor.getWidth()) / w, static_cast<float> (editor.getHeight()) / h);
-    const float x = 0.5f * (static_cast<float> (editor.getWidth()) - w * k);
-    const float y = 0.5f * (static_cast<float> (editor.getHeight()) - h * k);
+    const float ew = static_cast<float> (editor.getWidth()), eh = static_cast<float> (editor.getHeight());
     content.setBounds (0, 0, static_cast<int> (w), static_cast<int> (h));
-    content.setTransform (juce::AffineTransform::scale (k).translated (x, y));
+    // The musician's zoom: the window's width over the reference's. The instrument at that scale.
+    const float k = ew > 0.0f ? ew / w : 1.0f;
+    const float tall = h * k;
+    if (std::abs (eh - tall) <= 1.0f || ew <= 0.0f || eh <= 0.0f)
+    {
+        // The window as tall as the instrument (the normal case: the height follows the width,
+        // rounded): placed exactly as it always was.
+        if (overflow != nullptr)
+            overflow->update (0.0f, eh);
+        const float fitted = ew > 0.0f && eh > 0.0f ? std::min (ew / w, eh / h) : 1.0f;
+        content.setTransform (juce::AffineTransform::scale (fitted).translated (0.5f * (ew - w * fitted), 0.5f * (eh - h * fitted)));
+        return;
+    }
+    // Shorter (scrolled) or taller (the surround under it): at the top-left, never scaled to fit,
+    // never centred sideways.
+    if (overflow != nullptr)
+        overflow->update (tall, eh);
+    const float y = overflow != nullptr ? -overflow->offset() : 0.0f;
+    content.setTransform (juce::AffineTransform::scale (k).translated (0.0f, y));
+}
+
+Overflow::Overflow (juce::Component& e) : editor (e)
+{
+    bar.setAutoHide (false);
+    bar.addListener (this);
+    bar.setTitle ("Scroll the instrument");
+    editor.addChildComponent (bar);
+}
+
+Overflow::~Overflow()
+{
+    bar.removeListener (this);
+}
+
+void Overflow::update (float contentHeight, float visibleHeight)
+{
+    content = contentHeight;
+    visible = visibleHeight;
+    const bool over = contentHeight > visibleHeight + 1.0f;
+    if (! over)
+    {
+        scrolled = 0.0f;
+        bar.setVisible (false);
+        return;
+    }
+    scrolled = std::clamp (scrolled, 0.0f, contentHeight - visibleHeight);
+    bar.setRangeLimits (0.0, static_cast<double> (contentHeight), juce::dontSendNotification);
+    bar.setCurrentRange (static_cast<double> (scrolled), static_cast<double> (visibleHeight), juce::dontSendNotification);
+    const int thickness = 10;
+    bar.setBounds (editor.getWidth() - thickness, 0, thickness, editor.getHeight());
+    bar.setVisible (true);
+    bar.toFront (false);
+}
+
+bool Overflow::scrollBy (const juce::MouseWheelDetails& wheel)
+{
+    if (! overflowing())
+        return false;
+    const float step = 0.25f * visible;
+    const float before = scrolled;
+    scrolled = std::clamp (scrolled - (wheel.isReversed ? -wheel.deltaY : wheel.deltaY) * step, 0.0f, std::max (0.0f, content - visible));
+    if (scrolled != before && onScroll != nullptr)
+        onScroll();
+    return true;
+}
+
+void Overflow::scrollBarMoved (juce::ScrollBar*, double newRangeStart)
+{
+    scrolled = std::clamp (static_cast<float> (newRangeStart), 0.0f, std::max (0.0f, content - visible));
+    if (onScroll != nullptr)
+        onScroll();
 }
 
 namespace
@@ -548,9 +615,30 @@ int fittedWindowHeight (int width, int room, float height) noexcept
     return room > 0 ? std::min (natural, room) : natural;
 }
 
-ScreenFit::ScreenFit (juce::AudioProcessorEditor& e, std::function<float()> instrumentHeight) : editor (e), height (std::move (instrumentHeight))
+ScreenFit::ScreenFit (juce::AudioProcessorEditor& e, std::function<float()> instrumentHeight)
+    : editor (e), height (instrumentHeight), shape (e, instrumentHeight)
 {
     editor.addComponentListener (this);
+    editor.setConstrainer (&shape);   // (before setResizable: the corner then uses it too)
+}
+
+ScreenFit::Shape::Shape (juce::AudioProcessorEditor& e, std::function<float()> instrumentHeight) : editor (e), height (std::move (instrumentHeight))
+{
+    setSizeLimits (869, 200, 1810, 8000);
+}
+
+void ScreenFit::Shape::checkBounds (juce::Rectangle<int>& bounds, const juce::Rectangle<int>& previous, const juce::Rectangle<int>& limits, bool top, bool left,
+                                    bool bottom, bool right)
+{
+    ComponentBoundsConstrainer::checkBounds (bounds, previous, limits, top, left, bottom, right);
+    const float h = height != nullptr ? height() : design::height;
+    const int fitted = fittedWindowHeight (bounds.getWidth(), screenRoom (editor), h);
+    if (bounds.getWidth() != previous.getWidth())
+        bounds.setHeight (fitted);   // a new width (a zoom): the height that goes with it
+    else
+        bounds.setHeight (std::clamp (bounds.getHeight(), std::min (200, fitted), fitted));   // a height alone: kept, never taller than the instrument
+    if (top && bounds.getHeight() != previous.getHeight() && ! bottom)
+        bounds.setY (previous.getBottom() - bounds.getHeight());
 }
 
 ScreenFit::~ScreenFit()
@@ -573,23 +661,20 @@ void ScreenFit::check()
 
 void applyWindowShape (juce::AudioProcessorEditor& editor, float height, bool resize)
 {
-    // The width is the musician's (the corner): never changed here. The height follows the
-    // instrument (taller with the arpeggiator's editor, a rack or a strip shown), but never past
-    // the screen - a host clamps such a window and its constraints would leave the editor cut
-    // off. There the instrument scales down inside the window instead (fit: whole, centred),
-    // and the window keeps its width; once it fits again it is full size.
+    // The width is the musician's (the corner): never changed here, and no aspect ratio is set
+    // that a host could answer with a new width. The height follows the instrument (taller
+    // with the arpeggiator's editor, a rack or a strip shown), but never past the screen - a
+    // host clamps such a window. There the window stops and the instrument scrolls (Overflow)
+    // at the same scale; once it fits again the window grows back to it.
     const float h = height;
     const int room = screenRoom (editor);
     const int width = editor.getWidth() > 0 ? editor.getWidth() : 1086;
     const int newHeight = resize ? fittedWindowHeight (width, room, h) : editor.getHeight();
-    const bool capped = resize && newHeight < juce::roundToInt (static_cast<float> (width) * h / design::width);
-    // The corner keeps the window's shape as it is now: the instrument's proportions, or the
-    // screen-capped shape while capped (dragging then scales both, the instrument whole).
-    const double ratio = capped && newHeight > 0 ? static_cast<double> (width) / static_cast<double> (newHeight) : static_cast<double> (design::width / h);
-    const int minimumWidth = std::min (869, width);
-    editor.setResizeLimits (minimumWidth, juce::roundToInt (static_cast<double> (minimumWidth) / ratio), 1810, juce::roundToInt (1810.0 / ratio));
     if (auto* windowShape = editor.getConstrainer())
-        windowShape->setFixedAspectRatio (ratio);
+    {
+        windowShape->setFixedAspectRatio (0.0);
+        windowShape->setSizeLimits (std::min (869, width), 200, 1810, 8000);
+    }
     if (resize)
     {
         if (newHeight != editor.getHeight() || width != editor.getWidth())

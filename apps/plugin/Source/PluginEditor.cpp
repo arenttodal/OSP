@@ -352,6 +352,7 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     // scaled as a whole: proportions never drift between sizes.
     content.onPaint = [this] (juce::Graphics& g) { paintInstrument (g); };
     addAndMakeVisible (content);
+    overflow.onScroll = [this] { resized(); };
     layoutInstrument();
     setResizable (true, true);
     applyWindowShape (false);
@@ -1160,12 +1161,12 @@ void OspAudioProcessorEditor::paint (juce::Graphics& g)
 void OspAudioProcessorEditor::paintInstrument (juce::Graphics& g)
 {
     // The shared ANDOR frame with OSP's identity (ANDOR/OSP, One Shot Performer).
-    frame::paint (g, content, frame::Identity {}, arpShown, macros);
+    frame::paint (g, content, frame::Identity {}, arpShown, macros, 0.0f, 0.0f, design::height);   // (the arpeggiator adds room under an unchanged housing)
 }
 
 void OspAudioProcessorEditor::resized()
 {
-    frame::fit (*this, content, instrumentHeight());
+    frame::fit (*this, content, instrumentHeight(), &overflow);
     modOverlay.setBounds (content.getLocalBounds());
 }
 

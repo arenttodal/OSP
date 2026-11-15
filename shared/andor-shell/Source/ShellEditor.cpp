@@ -432,8 +432,13 @@ ShellEditor::ShellEditor (ShellProcessor& p)
             auxShownApplied = true;
         }
     }
-    content.onPaint = [this] (juce::Graphics& g) { frame::paint (g, content, shell.product().identity, arpShown, bankShown == 1 ? userRow : macros, rackShift(), sourceTrim()); };
+    // (the housing's base: the instrument with no inline section open - a rack, the arpeggiator
+    // or the strip adds room below its unchanged upper part)
+    content.onPaint = [this] (juce::Graphics& g) {
+        frame::paint (g, content, shell.product().identity, arpShown, bankShown == 1 ? userRow : macros, rackShift(), sourceTrim(), design::height - cardTrim());
+    };
     addAndMakeVisible (content);
+    overflow.onScroll = [this] { resized(); };
     layoutInstrument();
     setResizable (true, true);
     frame::applyWindowShape (*this, instrumentHeight(), false);
@@ -469,7 +474,7 @@ void ShellEditor::paint (juce::Graphics& g)
 
 void ShellEditor::resized()
 {
-    frame::fit (*this, content, instrumentHeight());
+    frame::fit (*this, content, instrumentHeight(), &overflow);
     modOverlay.setBounds (content.getLocalBounds());
     if (bankTab != nullptr)
         assignOverlay.setBounds (content.getLocalBounds());   // (USER's rings and banner: the whole instrument)
