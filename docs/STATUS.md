@@ -12,8 +12,9 @@
 > - New parameters `vibrato.*` (version hint 28) are off by default, and off is
 >   bit-identical. VIBRATO DEPTH and AMOUNT are appended to `destExt`.
 > - ANDOR Analog ships it too (OSC 1, OSC 2, card C pitched, and SUB as its own source).
-> - Intentional pixel change in both products: the PITCH and MOD captions, previously clipped,
->   are now drawn whole.
+> - Verified: osp_tests (481, plus the 4 vibrato cases), the plugin tests (4 / 4 shards, 169
+>   cases, the new wheels case included) and the example product (24) pass. The visual
+>   references (OSP's, the example's and Analog's) pass unchanged.
 
 > **15 Nov 2026:** `ParameterRack::customCell` (opt-in, shared): a product can place its own
 > read-only cell in a rack row. ANDOR Analog uses it for MORPH TO D's source and state (GLOBAL
