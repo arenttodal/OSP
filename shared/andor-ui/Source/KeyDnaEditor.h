@@ -40,6 +40,10 @@ public:
     ~KeyDnaEditor() override;
 
     std::function<void()> onClose;
+    /** An edit the musician committed with the pointer (ANDOR Learn): "power", "tab.<param>",
+        "depth.<param>", "variation.<param>", "curve.<param>", "keys.<param>", "individuality".
+        AMOUNT is a host parameter (its gesture says so). Null: nothing is reported. */
+    std::function<void (const juce::String& what)> onUserEdit;
     /** Where a key is drawn, in this component's coordinates (the real keyboard's key; empty
         when it is not shown), and whether it is held. Unset: the keys spread evenly. */
     std::function<juce::Rectangle<float> (int note)> keyBounds;
@@ -78,6 +82,7 @@ public:
     bool keyPressed (const juce::KeyPress&) override;
 
 private:
+    void userEdit (const juce::String& what);
     struct Field
     {
         juce::String name, caption;

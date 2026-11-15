@@ -16,6 +16,7 @@
 #include "OspLookAndFeel.h"
 #include "PluginProcessor.h"
 #include "ShapingPopups.h"
+#include "LearnController.h"
 
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -33,6 +34,16 @@ class SamplesPanel final : public juce::Component
 public:
     explicit SamplesPanel (OspAudioProcessor& processor);
     void setInstrument (std::shared_ptr<const LoadedInstrument> instrument, int layer);
+    /** ANDOR Learn: a row's choice the musician made ("role", "root", "layer"). */
+    std::function<void (const juce::String& what)> onUserEdit;
+    /** ANDOR Learn and tests: the first file's role, root or velocity-layer list (nullptr: none). */
+    juce::Component* firstRowControl (const juce::String& which)
+    {
+        for (auto& r : rows)
+            if (! r->isHeader)
+                return which == "role" ? static_cast<juce::Component*> (&r->role) : which == "root" ? static_cast<juce::Component*> (&r->root) : &r->layer;
+        return nullptr;
+    }
     void paint (juce::Graphics&) override;
     void resized() override;
 
@@ -177,6 +188,15 @@ public:
     void closeKeyDna();
     KeyDnaEditor* keyDnaWindow() noexcept { return keyDnaPanel.get(); }
     OspKeyboard& keyboardComponent() noexcept { return keyboard; }
+
+    /** ANDOR Learn (shared/andor-learn, as ANDOR ANALOG's): the menu's LEARN section, the
+        lessons, Info and the per-user progress. Nothing is shown until the musician asks. */
+    andor::learn::LearnController* learnController() noexcept { return learn.get(); }
+    /** A committed user gesture that is not a parameter (a popover opened, a tab chosen, a file
+        dropped): reported to Learn from the click's own handler, never from a callback. */
+    void learnAction (const juce::String& actionId, const juce::String& targetId = {});
+    /** Tests: the parameter-gesture bridge (a knob's gesture as JUCE delivers it). */
+    andor::learn::ParameterGestureBridge* learnGestureBridge() noexcept { return learnGestures.get(); }
     const std::array<OspKeyboard::KeyTint, 128>& keyboardTints() const noexcept { return keyTints; }
 
 private:
@@ -323,6 +343,14 @@ private:
     } popupBackdrop;
     int closedByLabelPress = -1;     // a press on an open popup's own label closes it (and must not reopen it)
     OutsideClickWatcher outsideClicks { *this };
+
+    // ANDOR Learn (OspLearn.cpp registers the targets; it reads the members it points at).
+    friend struct OspLearnTargets;
+    std::unique_ptr<andor::learn::LearnController> learn;
+    std::unique_ptr<andor::learn::ParameterGestureBridge> learnGestures;
+    int learnNotesSeen = -1;   ///< the processor's played-note count Learn has seen
+    void createLearn();
+    void tickLearn();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OspAudioProcessorEditor)
 };

@@ -245,6 +245,17 @@ public:
     /** Samples inspector correction: pin one file's role/layer and rebuild the set. */
     void reassignSample (const std::string& filename, SampleRole role, int velocityLayer, std::optional<double> rootMidi = std::nullopt);
     void loadExample (int layer = -1);
+    /** ANDOR Learn: loads a tutorial example (TutorialSounds: "bowed", "pluck", "voice",
+        "layered", "pluckSet") as a new instrument, after keeping the whole current state so
+        "Restore previous sound" brings it back. Only on the musician's choice in a lesson.
+        False: nothing changed (unknown example, a file not written, or a load under way). */
+    bool loadTutorialExample (const juce::String& exampleId);
+    /** The example asked for last has every layer loaded and playable / has failed. */
+    bool tutorialExampleReady() const;
+    bool tutorialExampleFailed() const;
+    /** The state kept before a tutorial example is still the one restorePreviousState() brings back. */
+    bool canRestoreBeforeTutorial() const noexcept { return previousState != nullptr && previousStateLabel == tutorialStateLabel(); }
+    static juce::String tutorialStateLabel() { return "Before the tutorial example"; }
     /** Empties a layer (it then contributes silence). */
     void clearLayer (int layer = -1);
     /**
@@ -761,6 +772,7 @@ private:
     std::mutex resultsMutex;               // loader <-> message thread only, never audio
     std::deque<Finished> finishedLoads;
     std::atomic<int> pendingLoads { 0 };
+    int tutorialLayers = 0;   ///< the layers the last tutorial example loads (0: none asked)
     std::atomic<bool> closing { false };   // set by the destructor: no further load stages
     std::atomic<std::uint64_t> nextGeneration { 1 };
     juce::String lastMessage;

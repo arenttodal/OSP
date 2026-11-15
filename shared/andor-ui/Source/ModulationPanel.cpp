@@ -1006,6 +1006,7 @@ ModSourcePage::ModSourcePage (InstrumentHost& p, int s) : ospProcessor (p), sour
         scope->setTooltip ("Global: one movement for the instrument. Poly: each note its own");
         for (auto* c : { shape.get(), mode.get(), scope.get() })
             addAndMakeVisible (c);
+        binding::tag (*shape, sourceParameter (source, "shape"));   // (ANDOR Learn finds it by its parameter)
         // RATE: one knob in Hz, or (synced) over the musical divisions; its caption chooses.
         knobs.push_back (makeKnob ("rate", "RATE", [] (double v) { return format::hertz (v); }));
         division = makeKnob ("division", "RATE", [] (double v) { return juce::String (mod::syncName (juce::roundToInt (v))); });

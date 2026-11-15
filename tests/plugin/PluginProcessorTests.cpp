@@ -8130,3 +8130,4 @@ TEST_CASE ("plugin: full-range modulation - 100 % reaches the knob's end; older 
 #include "CharacterGraphTests.inc"
 #include "CardEqSpectrumTests.inc"
 #include "SatellitePluginTests.inc"
+#include "OspLearnTests.inc"

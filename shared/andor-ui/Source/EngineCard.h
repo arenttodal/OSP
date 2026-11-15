@@ -499,6 +499,13 @@ public:
     std::function<void (int)> onReimagined;            ///< its REIMAGINED name (the mode popover)
     std::function<void (int)> onKeyDna;                ///< the KEY DNA key in the Granular strip
     KeyDnaKey& keyDnaToggle() noexcept { return keyDnaKey; }
+    /** ANDOR Learn and tests: the card's own controls. `cardKnob`: START TUNE PAN LEVEL REIMAGINED
+        (0..4); `granularKnob`: the granular strip's POS SIZE DENS TUNE SPREAD (0..4). */
+    juce::Component* cardKnob (int index) const noexcept { return index >= 0 && index < 5 ? knobs[static_cast<std::size_t> (index)].get() : nullptr; }
+    juce::Component* granularKnob (int index) const noexcept { return index >= 0 && index < 5 ? granularKnobs[static_cast<std::size_t> (index)].get() : nullptr; }
+    juce::Component& muteKey() noexcept { return muteButton; }
+    juce::Component& soloKey() noexcept { return soloButton; }
+    juce::Component& layerMenuKey() noexcept { return menuButton; }   ///< the card's menu key
     /** The REIMAGINED name, in this card's coordinates (the popover's anchor). */
     juce::Rectangle<int> reimaginedLabelBounds() const;
     /** Whether the REIMAGINED name is the door of a component (a click on it toggles the popover). */

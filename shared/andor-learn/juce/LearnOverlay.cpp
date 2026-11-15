@@ -1,5 +1,7 @@
 #include "LearnOverlay.h"
 
+#include <utility>
+
 #include "Design.h"
 #include "OspLookAndFeel.h"
 
@@ -32,15 +34,20 @@ void HighlightLayer::paint (juce::Graphics& g)
 {
     if (! ring.has_value())
         return;
-    // A modest ring just outside the control: a soft halo, then a 1.5 px accent line. The
-    // control itself stays as it is (nothing drawn over it).
+    // The ANDOR Learn highlight: a green ring just outside the control with a soft glow around
+    // it (widening, fading strokes), then a crisp 1.5 px line. The control itself stays as it
+    // is (nothing drawn over it). Info's hover outline is the same green, quieter.
     const auto r = ring->toFloat().expanded (4.0f);
-    const auto accent = design::colour::accent;
+    const auto green = juce::Colour (0xff35b264);
     juce::Path shape;
     shape.addRoundedRectangle (r, 9.0f);
-    g.setColour (accent.withAlpha (quietRing ? 0.10f : 0.16f));
-    g.strokePath (shape, juce::PathStrokeType (6.0f));
-    g.setColour (accent.withAlpha (quietRing ? 0.55f : 0.95f));
+    if (! quietRing)
+        for (const auto& [width, alpha] : { std::pair { 14.0f, 0.05f }, std::pair { 9.0f, 0.08f }, std::pair { 5.0f, 0.14f } })
+        {
+            g.setColour (green.withAlpha (alpha));
+            g.strokePath (shape, juce::PathStrokeType (width));
+        }
+    g.setColour (green.withAlpha (quietRing ? 0.6f : 1.0f));
     g.strokePath (shape, juce::PathStrokeType (quietRing ? 1.0f : 1.5f));
 }
 

@@ -1,9 +1,9 @@
-# ANDOR Learn: guided lessons and Learn mode for shell products
+# ANDOR Learn: guided lessons and Info for ANDOR products
 
 ANDOR Learn adds a temporary teaching layer to a product built from the ANDOR Instrument Shell:
 
 - short **lessons** the musician does with the real controls;
-- a contextual **Learn mode** (click an area to have it explained);
+- a contextual **Info** mode (Toggle Info, then click a control to have it explained; called Learn mode in the code);
 - a **topic browser**;
 - a **one-time invitation**;
 - **per-user progress**.
@@ -84,7 +84,8 @@ The baseline of a "changed" postcondition follows the parameter while no gesture
    s.completion = Completion::action ({ "arp.rate.changed" }, Condition::changed ("arp.rate"));
    ```
 
-   - **`Completion::manual()`** is an explanation step: the musician presses Next.
+   - **`Completion::manual()`** is an explanation step: the musician presses Continue.
+   - **`waitingForResult (text)`** arms the step on its action and completes it once the result holds (a file loading).
    - **`withAlreadyDone (condition, "Already on")`** offers Continue when the task is already done.
    - **`revealOnEnter = false`** when opening the target is the task itself: Show me opens it instead.
    - **`unavailableBody`** is what the note says while the target cannot be shown.
@@ -94,12 +95,24 @@ The baseline of a "changed" postcondition follows the parameter while no gesture
 
 7. **Test.** `tests/shell/LearnTests.cpp` runs with every product: the catalog must be valid against the editor's targets, and Learn must be idle until asked. Add product tests that drive the real controls (see ANDOR Analog's `product/tests/AnalogLearnTests.cpp`).
 
-   `LearnTests.cpp` also holds a test-only sample catalog (`testCatalog`). ANDOR OSP's own plugin does not use the shell editor; bringing Learn there is planned in `docs/STATUS.md` (NEXT).
+   `LearnTests.cpp` also holds a test-only sample catalog (`testCatalog`). ANDOR OSP's own plugin does not use the shell editor; it has its own adapter (`apps/plugin/Source/OspLearn.cpp`).
 
 ## Rules
 
-- **Interface only.** Reveals open panels, select tabs and show views; they never write a parameter. A test drives every lesson's Show me, Skip, Back and Close and checks every parameter is unchanged.
+- **Interface only.** Reveals open panels, select tabs and show views; they never write a parameter. A test drives every lesson's Show me, Continue, Back and Close and checks every parameter is unchanged.
 - **Message thread only.** Nothing touches the audio thread. Learn adds no timer of its own (the editor's existing one calls `tick()`, which returns at once while idle) and no child component until something is shown.
 - **Gone when closed.** Closing the note, the browser or Learn mode removes their components.
-- **Escape order:** the note, then the browser, then Learn mode, then the editor's popover.
+- **Escape order:** the note, then the browser, then Info, then the editor's popover.
+- **No Skip.** X closes, Back revisits, Continue follows a read explanation or a done (or already
+  done) task.
+- **One menu in every product:** a LEARN section with Tutorials..., Toggle Info and Reset
+  Tutorials... (it asks first and resets only this product's file).
+- **Never change the musician's sound without asking.** A lesson that needs a sound declares a
+  `Preparation` (`ready`, `needs`, `exampleId`); the musician chooses "Load ..." or "Use my sound".
+  The product's `EditorHooks::loadExample` keeps the whole previous state first; closing then
+  offers "Restore previous sound" (never automatic).
+- **Parameter edits:** `ParameterGestureBridge` reports the editor's own gestures as
+  `param:<id>` (automation, presets and undo make none).
+- **Products without the shell** (ANDOR OSP's own plugin) create a `LearnController` with their
+  own `EditorHooks` and targets: `apps/plugin/Source/OspLearn.cpp` and `docs/learn/osp-learn.md`.
 - **Never advertise unshipped features.** Gate lessons by capability.

@@ -99,9 +99,10 @@ void SamplesPanel::setInstrument (std::shared_ptr<const LoadedInstrument> instru
                     root = static_cast<double> (rootPtr->getSelectedId() - 2);
                 ospProcessor.reassignSample (filename, static_cast<SampleRole> (rolePtr->getSelectedId() - 1), layerPtr->getSelectedId() - 1, root);
             };
-            row->role.onChange = apply;
-            row->layer.onChange = apply;
-            row->root.onChange = apply;
+            // (A combo box's change: only the musician's choice; the rows are filled silently.)
+            row->role.onChange = [this, apply] { apply(); if (onUserEdit != nullptr) onUserEdit ("role"); };
+            row->layer.onChange = [this, apply] { apply(); if (onUserEdit != nullptr) onUserEdit ("layer"); };
+            row->root.onChange = [this, apply] { apply(); if (onUserEdit != nullptr) onUserEdit ("root"); };
             for (juce::Component* c : { static_cast<juce::Component*> (&row->name), static_cast<juce::Component*> (&row->info),
                                         static_cast<juce::Component*> (&row->role), static_cast<juce::Component*> (&row->layer),
                                         static_cast<juce::Component*> (&row->root) })
@@ -417,6 +418,7 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
 
     if (ospProcessor.advancedOpen())
         openPopup (advancedPopup);
+    createLearn();   // (nothing is shown until the musician asks)
     timerCallback();
     startTimerHz (30);   // grains and read heads move at the display rate
 }
@@ -424,6 +426,8 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
 OspAudioProcessorEditor::~OspAudioProcessorEditor()
 {
     stopTimer();
+    learnGestures.reset();
+    learn.reset();   // (before the components it points at)
     juce::Desktop::getInstance().removeGlobalMouseListener (&outsideClicks);
     for (auto& card : cards)
         juce::Desktop::getInstance().getAnimator().cancelAnimation (card.get(), false);
@@ -997,6 +1001,8 @@ void OspAudioProcessorEditor::filesDropped (const juce::StringArray& files, int 
         else if (isAudioFile (file))
             dropped.add (file);
     }
+    if (! dropped.isEmpty() && target.kind != DropTarget::Kind::none)
+        learnAction ("source.load.requested", "osp.source.dropZone");   // (the result is checked once it has loaded)
     switch (target.kind)
     {
         case DropTarget::Kind::empty:
@@ -1087,6 +1093,8 @@ void OspAudioProcessorEditor::addLayerSection (juce::PopupMenu& menu, int layer,
         safe->samplesPanel.setVisible (safe->samplesShown);
         safe->samplesPanel.setInstrument (safe->ospProcessor.currentInstrument (layer), layer);
         safe->updateFocus();
+        if (safe->samplesShown)
+            safe->learnAction ("samples.opened", "osp.samples");
     });
     // Removing a loaded sound asks once more (a sub-menu), and can be restored from the menu.
     juce::PopupMenu confirm;
@@ -1187,7 +1195,7 @@ void OspAudioProcessorEditor::showMenu()
         });
         return list;
     };
-    menu.addItem (juce::String::fromUTF8 ("Library\xe2\x80\xa6"), [safe] { if (safe != nullptr) safe->openLibrary(); });
+    menu.addItem (juce::String::fromUTF8 ("Library\xe2\x80\xa6"), [safe] { if (safe != nullptr) { safe->openLibrary(); safe->learnAction ("library.opened", "osp.library"); } });
     menu.addSubMenu ("Presets", browse (OspAudioProcessor::presetFolder(), OspAudioProcessor::presetExtension, false));
     menu.addItem ("Open preset file...", [safe] { if (safe != nullptr) safe->choosePresetFile (false, false); });
     menu.addSeparator();
@@ -1210,6 +1218,8 @@ void OspAudioProcessorEditor::showMenu()
                       });
     menu.addSubMenu ("Interface size", size);
     menu.addItem ("Advanced settings", [safe] { if (safe != nullptr) safe->openPopup (advancedPopup); });
+    if (learn != nullptr)
+        learn->addMenuItems (menu);   // LEARN: Tutorials..., Toggle Info, Reset Tutorials...
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (menuButton).withDeletionCheck (*this));
 }
 
@@ -1256,6 +1266,8 @@ void OspAudioProcessorEditor::choosePresetFile (bool save, bool instrument)
         else
             ok = save ? ospProcessor.savePreset (file) : ospProcessor.loadPreset (file);
         ospProcessor.showMessage (ok ? (save ? "Saved " : "Opened ") + file.getFileName() : (error.isEmpty() ? "Could not open " + file.getFileName() : error));
+        if (ok)
+            learnAction (instrument ? (save ? "instrument.exported" : "instrument.opened") : (save ? "preset.saved" : "preset.opened"), "osp.header.menu");
         timerCallback();
     });
 }
@@ -1273,6 +1285,7 @@ void OspAudioProcessorEditor::chooseFile (int layer, bool addAsNewLayer)
                                       files.add (f);
                               if (files.isEmpty())
                                   return;
+                              learnAction ("source.load.requested", "osp.source.dropZone");
                               // As a drop: one file is one sound, several are one multi-sample sound.
                               if (addAsNewLayer && files.size() > 1)
                                   ospProcessor.setEditLayer (std::max (0, ospProcessor.addLayerSet (files)));
@@ -1290,6 +1303,9 @@ void OspAudioProcessorEditor::chooseFile (int layer, bool addAsNewLayer)
 
 bool OspAudioProcessorEditor::keyPressed (const juce::KeyPress& key)
 {
+    // Escape closes Learn's note, browser or Info first; then the popover, as before.
+    if (learn != nullptr && learn->keyPressed (key))
+        return true;
     if (key == juce::KeyPress::escapeKey && popup != nullptr)
     {
         // Closed asynchronously: the key may have come through one of the popup's children.
@@ -1303,7 +1319,10 @@ bool OspAudioProcessorEditor::keyPressed (const juce::KeyPress& key)
         if (libraryPanel != nullptr)
             closeLibrary();
         else
+        {
             openLibrary();
+            learnAction ("library.opened", "osp.library");
+        }
         return true;
     }
     if (command && key.getModifiers().isAltDown() && (key.getKeyCode() == 'G' || key.getKeyCode() == 'g'))
@@ -1705,6 +1724,7 @@ void OspAudioProcessorEditor::timerCallback()
     for (const auto& route : ospProcessor.modulationRoutes())
         wheelInUse = wheelInUse || (route.route.source == mod::Source::modWheel && route.state == mod::RouteState::active);
     modWheel.setInUse (wheelInUse);
+    tickLearn();
 }
 
 } // namespace osp::plugin

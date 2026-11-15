@@ -30,6 +30,21 @@ struct EditorHooks
     std::function<std::optional<float> (const juce::String&)> parameterValue;
     /** The product has a capability (lessons for absent features are not offered). */
     std::function<bool (const juce::String&)> hasCapability;
+    /** The product's name in notes ("ANDOR OSP"). */
+    juce::String productName;
+
+    // Lesson examples (Preparation::exampleId), all optional: without them no example is offered.
+    /** Keeps the current sound (so it can be restored), then starts loading the example. False:
+        nothing was changed (unknown example, or the sound could not be kept). */
+    std::function<bool (const juce::String& exampleId)> loadExample;
+    /** The example finished loading and is playable (with Preparation::ready, the lesson's own). */
+    std::function<bool()> exampleReady;
+    /** The example failed to load. */
+    std::function<bool()> exampleFailed;
+    /** The sound from before a tutorial example can be restored now. */
+    std::function<bool()> canRestore;
+    /** Restores it. */
+    std::function<bool()> restore;
 };
 
 /**
@@ -69,6 +84,8 @@ public:
 
     // What the musician can do (also the tests' entry points).
     bool startLesson (const juce::String& lessonId);
+    /** Starts a lesson at one of its steps (tests, snapshots), through its preparation as Start does. */
+    bool startLessonAt (const juce::String& lessonId, int step);
     void openBrowser();
     void closeBrowser();
     /** A lesson chosen in the browser: resumed where it was left (in progress), else from the start. */
@@ -77,6 +94,12 @@ public:
     bool learnMode() const noexcept { return inspecting; }
     void inspect (const juce::String& targetId);
     void resetProgress();
+    /** Reset Tutorials...: asks first (a ceramic confirmation), then resets this product's lessons only. */
+    void askToResetProgress();
+    /** The sound from before a tutorial example, back (when the product can). */
+    bool restorePreviousSound();
+    /** The lesson waiting for its preparation (the example loading), or empty. */
+    const juce::String& preparingLessonId() const noexcept { return preparingLesson; }
     /** Shows the invitation now (tests; the editor's schedule calls it once). */
     void showInvitation();
     /** A note's key, by its action ID (as its click does). */
@@ -94,7 +117,7 @@ public:
     /** The watcher of a target's touches (Target::watchTouches), or nullptr. Tests deliver the
         mouse events the operating system would (headless editors have no window). */
     TouchWatcher* touchWatcher (const juce::String& targetId) const;
-    enum class NoteKind { none, lesson, help, invitation, complete };
+    enum class NoteKind { none, lesson, help, invitation, complete, prepare, preparing, restoreOffer, confirmReset };
     NoteKind noteKind() const noexcept { return shownNote; }
     const juce::String& inspectedTarget() const noexcept { return helpTarget; }
     bool isActive() const noexcept;
@@ -108,6 +131,12 @@ private:
     bool targetReady (const juce::String&) override;
     bool reveal (const juce::String&) override;
 
+    bool beginLesson (const juce::String& lessonId, int fromStep);
+    bool conditionHolds (const Condition&);
+    void loadExampleFor (const juce::String& lessonId);
+    void updatePreparing();
+    void offerRestoreIfExample();
+    juce::String productName() const;
     void ensureLayers();
     void releaseLayersIfIdle();
     void refreshNote();
@@ -144,6 +173,9 @@ private:
     bool inspecting = false;
     bool invitationPending = false, invitationClaimed = false;
     int showingTicks = 0;
+    juce::String preparingLesson;
+    int preparingStep = 0, preparingTicks = 0;
+    bool prepareFailed = false, exampleLoaded = false;
 };
 
 } // namespace andor::learn

@@ -1329,6 +1329,28 @@ on the ADD place, or only the card dropped on. Audit, measured reproduction and 
 - NEXT: ANDOR ANALOG's card EQs (the shell's) can show the spectrum once its host returns its
   engine's layer taps.
 
+## ANDOR Learn in ANDOR OSP's own plugin (15 Nov 2026, branch claude/osp-learn)
+
+- **What.** The shared Learn (`shared/andor-learn`, ANDOR ANALOG's) on `OspAudioProcessorEditor`,
+  through an OSP adapter (`apps/plugin/Source/OspLearn.cpp`). It has 11 lessons for the
+  recording-to-instrument workflow and 32 Info topics, plus exact targets, readiness, synthetic
+  tutorial sounds with "Restore previous sound", and per-user progress under `osp`. The report,
+  the target inventory and the editorial checks are in `docs/learn/osp-learn.md`.
+- **Shared changes, which reach ANDOR ANALOG when its pin moves:**
+  - the LEARN menu (Tutorials..., Toggle Info, Reset Tutorials...);
+  - no Skip;
+  - Continue;
+  - steps that wait for a result;
+  - lesson preparation and restore;
+  - `ParameterGestureBridge`;
+  - the green highlight with a glow.
+  ANDOR ANALOG's own Learn tests will need their Skip and menu expectations updated then.
+- **Tests.** `osp_plugin_tests "[learn]"` (8 cases) and the shell's `[learn]` (7) pass.
+  `[learn-shots]` renders every step.
+- **No sound change.** Learn adds no parameter and no DSP change.
+- **Not done.** No DAW pass. The tutorial sounds have not been listened to. ANDOR ANALOG has not
+  been rebuilt against the shared changes.
+
 ## ANDOR OSP: SATELLITE opens on its key; CHARACTER is called FILTER (15 Nov 2026)
 
 - **SATELLITE's panel opens.** It used to close in the press that opened it: JUCE tells the

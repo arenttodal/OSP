@@ -26,4 +26,6 @@ namespace andor::learn::actions
     /** A control watched for touches (Target::watchTouches): "<targetId>.touched" after a
         press, drag, wheel or double-click on it. */
     inline juce::String touched (const juce::String& targetId) { return targetId + ".touched"; }
+    /** A parameter edited with the editor's own control (ParameterGestureBridge): its gesture ended. */
+    inline juce::String parameterEdited (const juce::String& parameterId) { return "param:" + parameterId; }
 } // namespace andor::learn::actions

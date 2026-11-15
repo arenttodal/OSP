@@ -19,7 +19,7 @@ Browser::Browser()
 {
     setWantsKeyboardFocus (true);
     setMouseClickGrabsKeyboardFocus (false);
-    setTitle ("Learn ANDOR");
+    setTitle ("Tutorials");
 }
 
 juce::String Browser::statusText (Row::Status s)
@@ -121,7 +121,7 @@ void Browser::paint (juce::Graphics& g)
 
     g.setColour (design::colour::text.withAlpha (0.85f));
     g.setFont (type::popupTitle (13.0f));
-    g.drawText ("LEARN ANDOR", juce::Rectangle<float> (r.getX() + pad, r.getY() + 12.0f, r.getWidth() - 60.0f, 20.0f), juce::Justification::centredLeft, false);
+    g.drawText ("TUTORIALS", juce::Rectangle<float> (r.getX() + pad, r.getY() + 12.0f, r.getWidth() - 60.0f, 20.0f), juce::Justification::centredLeft, false);
     const auto c = closeArea().reduced (6.0f);
     g.setColour (design::colour::text.withAlpha (closeHover ? 0.85f : 0.45f));
     g.drawLine (c.getX(), c.getY(), c.getRight(), c.getBottom(), 1.2f);

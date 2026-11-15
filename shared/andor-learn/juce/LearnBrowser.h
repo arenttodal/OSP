@@ -9,7 +9,7 @@ namespace andor::learn
 {
 
 /**
-    The topic chooser (Learn ANDOR...): the same ceramic note as a lesson's, a title and tidy
+    The topic chooser (Tutorials...): the same ceramic note as a lesson's, a title and tidy
     one-line rows, each a lesson's name, a small time estimate and its progress (Not started,
     In progress, or a check). Grouped by topic; only lessons the product has are listed.
     Arrow keys move, Return starts, Escape closes (through the controller).

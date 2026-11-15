@@ -1,4 +1,5 @@
 #include "PluginProcessor.h"
+#include "TutorialSounds.h"
 #include "engine/fx/Effects.h"
 #include "FxIdentity.h"
 #include "AndorParameters.h"
@@ -2354,6 +2355,73 @@ void OspAudioProcessor::loadExample (int layer)
         io::writeAudioFile (std::filesystem::path (file.getFullPathName().toStdString()), audio, io::SampleFormat::pcm24, error);
     }
     loadFile (file, layer);
+}
+
+bool OspAudioProcessor::loadTutorialExample (const juce::String& exampleId)
+{
+    const auto example = tutorial::fromId (exampleId);
+    if (! example.has_value() || pendingLoads.load() > 0)
+        return false;
+    juce::String error;
+    const auto files = tutorial::files (*example, error);
+    if (files.isEmpty())
+        return false;
+    // The musician's whole instrument first (restorable), then a clean one with the example.
+    auto before = createStateXml();
+    if (before == nullptr)
+        return false;
+    for (int layer = 0; layer < numLayers; ++layer)
+        if (isLayerOccupied (layer))
+            clearLayer (layer);
+    keptSlotCount = 0;
+    removedLayer.reset();
+    setEditLayer (0);
+    resetSettings();
+    if (*example == tutorial::Example::pluckSet)
+    {
+        tutorialLayers = 1;
+        addLayerSet (files);   // one multi-sample layer, mapped as a dropped folder is
+    }
+    else
+    {
+        std::vector<Audition::LayerLoad> sounds;
+        for (int i = 0; i < files.size() && i < numLayers; ++i)
+        {
+            Audition::LayerLoad load;
+            load.layer = i;
+            load.file = files[i];
+            load.filename = files[i].getFileName();
+            load.originalPath = files[i].getFullPathName();
+            sounds.push_back (load);
+        }
+        tutorialLayers = static_cast<int> (sounds.size());
+        loadLibrarySounds (sounds, tutorialStateLabel());
+    }
+    previousState = std::move (before);   // (what the loads above kept was the cleared state)
+    previousStateLabel = tutorialStateLabel();
+    presetNameOverride = "Tutorial";
+    presetIsProgram = false;
+    lastPresetFile = juce::File();
+    lastStartingStateFile = juce::File();
+    return true;
+}
+
+bool OspAudioProcessor::tutorialExampleReady() const
+{
+    if (tutorialLayers <= 0 || pendingLoads.load() > 0)
+        return false;
+    for (int layer = 0; layer < tutorialLayers; ++layer)
+        if (loadState (layer) != LoadState::ready || currentInstrument (layer) == nullptr)
+            return false;
+    return true;
+}
+
+bool OspAudioProcessor::tutorialExampleFailed() const
+{
+    for (int layer = 0; layer < tutorialLayers; ++layer)
+        if (loadState (layer) == LoadState::failed)
+            return true;
+    return false;
 }
 
 void OspAudioProcessor::publishEmpty (std::size_t index)

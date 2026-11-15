@@ -1,6 +1,7 @@
 #include "LearnController.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace andor::learn
 {
@@ -78,21 +79,27 @@ void LearnController::addMenuItems (juce::PopupMenu& menu)
         menu.addItem ("Learn (unavailable)", false, false, [] {});
         return;
     }
+    // The same section in every ANDOR product: LEARN, Tutorials..., Toggle Info, Reset Tutorials...
     juce::WeakReference<LearnController> weak (this);
-    menu.addItem ("Learn ANDOR" + ellipsis(), [weak] {
+    menu.addSectionHeader ("LEARN");
+    menu.addItem ("Tutorials" + ellipsis(), [weak] {
         if (weak != nullptr)
             weak->openBrowser();
     });
-    menu.addItem ("Learn mode", true, inspecting, [weak] {
+    menu.addItem ("Toggle Info", true, inspecting, [weak] {
         if (weak != nullptr)
             weak->setLearnMode (! weak->inspecting);
     });
-    juce::PopupMenu sub;
-    sub.addItem ("Reset learning progress", [weak] {
+    if (hooks.canRestore != nullptr && hooks.canRestore())
+        menu.addItem ("Restore Sound Before Tutorial", [weak] {
+            if (weak != nullptr)
+                weak->restorePreviousSound();
+        });
+    menu.addSeparator();
+    menu.addItem ("Reset Tutorials" + ellipsis(), [weak] {
         if (weak != nullptr)
-            weak->resetProgress();
+            weak->askToResetProgress();
     });
-    menu.addSubMenu ("Learn", sub);
 }
 
 void LearnController::userAction (const juce::String& actionId, const juce::String& targetId, const juce::String& parameterId, Origin origin)
@@ -157,6 +164,8 @@ void LearnController::tick()
     }
     if (! isActive())
         return;
+    if (shownNote == NoteKind::preparing)
+        updatePreparing();
     // Controls rebuilt since (a routing view created on demand) are watched again.
     for (auto& w : watchers)
         if (const auto* t = registry.find (w->targetId()))
@@ -182,10 +191,147 @@ bool LearnController::startLesson (const juce::String& lessonId)
     if (hooks.closePopovers != nullptr)
         hooks.closePopovers();
     ensureLayers();
-    if (! lessonRunner.start (lessonId))
+    return beginLesson (lessonId, 0);
+}
+
+bool LearnController::startLessonAt (const juce::String& lessonId, int stepIndex)
+{
+    if (! usable || lessonRunner.catalog().findLesson (lessonId) == nullptr)
+        return false;
+    closeBrowser();
+    if (inspecting)
+        setLearnMode (false);
+    if (hooks.closePopovers != nullptr)
+        hooks.closePopovers();
+    ensureLayers();
+    return beginLesson (lessonId, stepIndex);
+}
+
+bool LearnController::beginLesson (const juce::String& lessonId, int fromStep)
+{
+    const auto* lesson = lessonRunner.catalog().findLesson (lessonId);
+    if (lesson == nullptr)
+        return false;
+    const auto& prep = lesson->preparation;
+    const bool ready = ! prep.ready.has_value() || conditionHolds (*prep.ready);
+    const bool canLoad = prep.exampleId.isNotEmpty() && hooks.loadExample != nullptr;
+    if (! ready || (canLoad && prep.offerExampleWhen.has_value() && conditionHolds (*prep.offerExampleWhen)))
+    {
+        // Ask first: the musician's sound is never replaced without their choice.
+        preparingLesson = lessonId;
+        preparingStep = fromStep;
+        prepareFailed = false;
+        showNote (NoteKind::prepare);
+        return true;
+    }
+    if (! lessonRunner.start (lessonId, fromStep))
         return false;
     showNote (NoteKind::lesson);
     return true;
+}
+
+bool LearnController::conditionHolds (const Condition& c)
+{
+    switch (c.kind)
+    {
+        case Condition::Kind::always: return true;
+        case Condition::Kind::parameterChanged: return false;   // (no baseline before a lesson)
+        case Condition::Kind::parameterEquals:
+        {
+            const auto v = parameterValue (c.id);
+            return v.has_value() && std::abs (*v - c.value) < 0.5f;
+        }
+        case Condition::Kind::state: return state (c.id);
+        case Condition::Kind::all:
+            for (const auto& t : c.terms)
+                if (! conditionHolds (t))
+                    return false;
+            return ! c.terms.empty();
+        case Condition::Kind::any:
+            for (const auto& t : c.terms)
+                if (conditionHolds (t))
+                    return true;
+            return false;
+    }
+    return false;
+}
+
+void LearnController::loadExampleFor (const juce::String& lessonId)
+{
+    const auto* lesson = lessonRunner.catalog().findLesson (lessonId);
+    if (lesson == nullptr || hooks.loadExample == nullptr)
+        return;
+    prepareFailed = ! hooks.loadExample (lesson->preparation.exampleId);
+    exampleLoaded = exampleLoaded || ! prepareFailed;
+    preparingTicks = 0;
+    showNote (prepareFailed ? NoteKind::prepare : NoteKind::preparing);
+}
+
+void LearnController::updatePreparing()
+{
+    // The lesson begins once the example is really playable (loaded and analysed), never on
+    // the request alone.
+    const auto* lesson = lessonRunner.catalog().findLesson (preparingLesson);
+    if (lesson == nullptr)
+    {
+        hideNote();
+        return;
+    }
+    ++preparingTicks;
+    if (hooks.exampleFailed != nullptr && hooks.exampleFailed())
+    {
+        prepareFailed = true;
+        showNote (NoteKind::prepare);
+        return;
+    }
+    const auto& prep = lesson->preparation;
+    if ((! prep.ready.has_value() || conditionHolds (*prep.ready)) && (hooks.exampleReady == nullptr || hooks.exampleReady()))
+    {
+        const auto id = preparingLesson;
+        preparingLesson = {};
+        if (lessonRunner.start (id, preparingStep))
+            showNote (NoteKind::lesson);
+        else
+            hideNote();
+    }
+}
+
+bool LearnController::restorePreviousSound()
+{
+    exampleLoaded = false;
+    if (hooks.canRestore == nullptr || ! hooks.canRestore() || hooks.restore == nullptr)
+        return false;
+    return hooks.restore();
+}
+
+void LearnController::offerRestoreIfExample()
+{
+    // Closing a tutorial never restores by itself (the musician may want what they made); it
+    // asks, once, while the sound from before the example can really be restored.
+    if (! exampleLoaded || hooks.canRestore == nullptr || ! hooks.canRestore())
+        return;
+    ensureLayers();
+    showNote (NoteKind::restoreOffer);
+}
+
+juce::String LearnController::productName() const
+{
+    return hooks.productName.isNotEmpty() ? hooks.productName : juce::String ("this instrument");
+}
+
+void LearnController::askToResetProgress()
+{
+    if (! usable)
+        return;
+    if (lessonRunner.inTour())
+        lessonRunner.close();
+    closeBrowser();
+    if (inspecting)
+        setLearnMode (false);
+    if (hooks.closePopovers != nullptr)
+        hooks.closePopovers();
+    ensureLayers();
+    showNote (NoteKind::confirmReset);
 }
 
 void LearnController::openBrowser()
@@ -225,8 +371,7 @@ void LearnController::chooseLesson (juce::String lessonId)
     ensureLayers();
     if (hooks.closePopovers != nullptr)
         hooks.closePopovers();
-    if (lessonRunner.start (lessonId, from))
-        showNote (NoteKind::lesson);
+    beginLesson (lessonId, from);
 }
 
 void LearnController::closeBrowser()
@@ -253,7 +398,7 @@ void LearnController::setLearnMode (bool on)
         ensureLayers();
         inspecting = true;
         bannerNote = std::make_unique<Note>();
-        bannerNote->setContent ({}, "Learn mode", "Click an area to learn" + dot() + "Esc to exit", {}, false);
+        bannerNote->setContent ({}, "Info", "Click a control to learn what it does" + dot() + "Esc to exit", {}, false);
         bannerNote->onAction = [this] (const juce::String&) { setLearnMode (false); };
         hooks.content->addAndMakeVisible (*bannerNote);
         lessonRunner.setInspecting (true);
@@ -324,8 +469,6 @@ void LearnController::noteAction (const juce::String& id)
                 lessonRunner.next();
             else if (id == "back")
                 lessonRunner.back();
-            else if (id == "skip")
-                lessonRunner.skip();
             else if (id == "continue")
                 lessonRunner.continueAlreadyDone();
             else if (id == "showme")
@@ -334,7 +477,43 @@ void LearnController::noteAction (const juce::String& id)
             {
                 lessonRunner.close();
                 hideNote();
+                offerRestoreIfExample();
             }
+            break;
+        case NoteKind::prepare:
+            if (id == "loadexample")
+                loadExampleFor (preparingLesson);
+            else if (id == "usemine")
+            {
+                const auto lessonId = preparingLesson;
+                preparingLesson = {};
+                if (lessonRunner.start (lessonId, preparingStep))
+                    showNote (NoteKind::lesson);
+                else
+                    hideNote();
+            }
+            else
+            {
+                preparingLesson = {};
+                hideNote();
+            }
+            break;
+        case NoteKind::preparing:
+            preparingLesson = {};
+            hideNote();   // (the example goes on loading; the previous sound stays restorable)
+            offerRestoreIfExample();
+            break;
+        case NoteKind::restoreOffer:
+            hideNote();
+            if (id == "restore")
+                restorePreviousSound();
+            else
+                exampleLoaded = false;   // (kept: not asked again; the menu still offers it)
+            break;
+        case NoteKind::confirmReset:
+            hideNote();
+            if (id == "reset")
+                resetProgress();
             break;
         case NoteKind::help:
             if (id.startsWith ("start:"))
@@ -367,6 +546,8 @@ void LearnController::noteAction (const juce::String& id)
             hideNote();
             if (id == "browse")
                 openBrowser();
+            else if (id == "restore")
+                restorePreviousSound();
             break;
         case NoteKind::none:
             break;
@@ -430,20 +611,21 @@ void LearnController::refreshNote()
             const auto state = lessonRunner.state();
             const auto* target = registry.find (step->targetId);
             const bool canShow = target != nullptr && target->reveal != nullptr;
+            // No Skip: X closes, Back revisits, Continue follows a read explanation or a task
+            // done (or already so). A task is never passed over.
             if (i > 0)
                 keys.push_back ({ "back", "Back", false });
             if (state == LessonRunner::State::tourShowing)
-                keys.push_back ({ lessonRunner.isLastStep() ? "finish" : "next", lessonRunner.isLastStep() ? "Finish" : "Next", true });
+                keys.push_back ({ lessonRunner.isLastStep() ? "finish" : "next", lessonRunner.isLastStep() ? "Finish" : "Continue", true });
             else if (state == LessonRunner::State::stepComplete)
             {
                 done = true;
-                keys.push_back ({ lessonRunner.isLastStep() ? "finish" : "next", lessonRunner.isLastStep() ? "Finish" : "Next", true });
+                keys.push_back ({ lessonRunner.isLastStep() ? "finish" : "next", lessonRunner.isLastStep() ? "Finish" : "Continue", true });
             }
             else
             {
-                if (canShow && (! step->revealOnEnter || state == LessonRunner::State::paused))
+                if (canShow && lessonRunner.lessonReady() && (! step->revealOnEnter || state == LessonRunner::State::paused))
                     keys.push_back ({ "showme", "Show me", false });
-                keys.push_back ({ "skip", "Skip", false });
                 if (lessonRunner.canContinue())
                     keys.push_back ({ "continue", (step->completion.alreadyLabel.isNotEmpty() ? step->completion.alreadyLabel : juce::String ("Already done")) + dot() + "Continue", true });
             }
@@ -457,7 +639,7 @@ void LearnController::refreshNote()
                 hideNote();
                 return;
             }
-            meta = "LEARN MODE";
+            meta = "INFO";
             title = help->title;
             body = help->body;
             const auto* target = registry.find (helpTarget);
@@ -476,7 +658,7 @@ void LearnController::refreshNote()
                 const auto quick = lessonRunner.catalog().quickStartLessonId;
                 const auto* first = lessonRunner.catalog().findLesson (quick.isNotEmpty() ? quick : lessonRunner.catalog().lessons.front().id);
                 keys.push_back ({ "notnow", "Not now", false });
-                keys.push_back ({ "browse", "Browse lessons", false });
+                keys.push_back ({ "browse", "Tutorials", false });
                 keys.push_back ({ "quickstart", quick.isNotEmpty() ? juce::String ("Quick Start") : first->title, true });
             }
             else
@@ -487,11 +669,76 @@ void LearnController::refreshNote()
             const auto* lesson = lessonRunner.lesson();
             meta = lesson != nullptr ? lesson->title.toUpperCase() : juce::String();
             title = "Lesson complete";
-            body = juce::String::fromUTF8 ("Your sound stays as you left it. More lessons are under Learn ANDOR\xe2\x80\xa6 in the menu.");
-            keys.push_back ({ "browse", "Browse lessons", false });
+            body = lesson != nullptr && lesson->completion.isNotEmpty()
+                       ? lesson->completion
+                       : juce::String::fromUTF8 ("Your sound stays as you left it. More lessons are under Tutorials\xe2\x80\xa6 in the menu.");
+            keys.push_back ({ "browse", "Tutorials", false });
+            if (hooks.canRestore != nullptr && hooks.canRestore())
+                keys.push_back ({ "restore", "Restore previous sound", false });
             keys.push_back ({ "close", "Close", true });
             break;
         }
+        case NoteKind::prepare:
+        {
+            const auto* lesson = lessonRunner.catalog().findLesson (preparingLesson);
+            if (lesson == nullptr)
+            {
+                hideNote();
+                return;
+            }
+            const auto& prep = lesson->preparation;
+            const bool ready = ! prep.ready.has_value() || conditionHolds (*prep.ready);
+            const bool canLoad = prep.exampleId.isNotEmpty() && hooks.loadExample != nullptr;
+            const auto example = prep.exampleName.isNotEmpty() ? prep.exampleName : juce::String ("the example");
+            meta = lesson->title.toUpperCase();
+            if (prepareFailed)
+            {
+                title = "The example could not be loaded";
+                body = "Your sound is unchanged. You can load a recording of your own and start the lesson again.";
+                keys.push_back ({ "close", "Close", true });
+                break;
+            }
+            title = ready ? "Use your sound or an example?" : "Before this lesson";
+            body = ready ? "The lesson works with the sound you have. " + example + " is prepared for it."
+                         : (prep.needs.isNotEmpty() ? prep.needs : juce::String ("This lesson needs a different sound."));
+            if (canLoad)
+                body << " Loading " << example << " keeps your current sound so you can restore it afterwards.";
+            if (ready)
+            {
+                keys.push_back ({ "loadexample", "Load " + example, false });
+                keys.push_back ({ "usemine", "Use my sound", true });
+            }
+            else
+            {
+                keys.push_back ({ "close", "Not now", ! canLoad });
+                if (canLoad)
+                    keys.push_back ({ "loadexample", "Load " + example, true });
+            }
+            break;
+        }
+        case NoteKind::preparing:
+        {
+            const auto* lesson = lessonRunner.catalog().findLesson (preparingLesson);
+            meta = lesson != nullptr ? lesson->title.toUpperCase() : juce::String();
+            title = "Preparing the example";
+            body = juce::String::fromUTF8 ("Loading and analysing the recording\xe2\x80\xa6 The lesson starts when it can be played.");
+            keys.push_back ({ "close", "Cancel", false });
+            break;
+        }
+        case NoteKind::restoreOffer:
+            meta = "TUTORIAL";
+            title = "Keep the example sound?";
+            body = "The tutorial example replaced your sound. Your previous sound was kept and can be restored now, or later from the menu.";
+            keys.push_back ({ "restore", "Restore previous sound", false });
+            keys.push_back ({ "keep", "Keep this sound", true });
+            break;
+        case NoteKind::confirmReset:
+            meta = "LEARN";
+            title = "Reset tutorials?";
+            body = "Every lesson of " + productName() + " starts again as not started. Your sound and settings are not changed.";
+            keys.push_back ({ "cancel", "Cancel", false });
+            keys.push_back ({ "reset", "Reset", true });
+            break;
         case NoteKind::none:
             return;
     }
@@ -658,8 +905,8 @@ void LearnController::layoutNow()
         ring->setTarget (target, quiet);
     if (notePanel != nullptr)
     {
-        if (shownNote == NoteKind::invitation || shownNote == NoteKind::complete)
-            placeBelowMenu (*notePanel);
+        if (shownNote != NoteKind::lesson && shownNote != NoteKind::help)
+            placeBelowMenu (*notePanel);   // (the invitation, completion, preparation and confirmations)
         else
             placeNote (target);
     }

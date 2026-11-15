@@ -52,4 +52,46 @@ void TouchWatcher::mouseUp (const juce::MouseEvent&)
 void TouchWatcher::mouseDoubleClick (const juce::MouseEvent&) { report(); }
 void TouchWatcher::mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) { report(); }
 
+//==============================================================================
+ParameterGestureBridge::ParameterGestureBridge (juce::AudioProcessor& p, std::function<void (const LearnEvent&)> sink, std::function<void (bool)> gestureActive)
+    : processor (p), emit (std::move (sink)), pressed (std::move (gestureActive))
+{
+    for (auto* parameter : processor.getParameters())
+        parameter->addListener (this);
+}
+
+ParameterGestureBridge::~ParameterGestureBridge()
+{
+    for (auto* parameter : processor.getParameters())
+        parameter->removeListener (this);
+}
+
+void ParameterGestureBridge::parameterGestureChanged (int parameterIndex, bool starting)
+{
+    // (A host thread never begins a plugin's gesture; only the editor's controls do.)
+    if (! enabled || ! juce::MessageManager::existsAndIsCurrentThread())
+        return;
+    const auto& all = processor.getParameters();
+    if (parameterIndex < 0 || parameterIndex >= all.size())
+        return;
+    auto* withId = dynamic_cast<juce::AudioProcessorParameterWithID*> (all[parameterIndex]);
+    if (withId == nullptr)
+        return;
+    if (starting)
+    {
+        if (open++ == 0 && pressed != nullptr)
+            pressed (true);
+        return;
+    }
+    LearnEvent e;
+    e.actionId = actions::parameterEdited (withId->paramID);
+    e.parameterId = withId->paramID;
+    e.origin = Origin::userPointer;
+    if (emit != nullptr)
+        emit (e);
+    open = std::max (0, open - 1);
+    if (open == 0 && pressed != nullptr)
+        pressed (false);
+}
+
 } // namespace andor::learn

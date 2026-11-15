@@ -102,6 +102,10 @@ public:
     juce::String currentBody() const;
     /** True if every step was done or continued (none skipped). */
     bool allDone() const noexcept;
+    /** The step's action came and its result is awaited (Completion::awaitResult). */
+    bool awaitingResult() const noexcept { return armed; }
+    /** The lesson's Preparation::ready holds (or it has none). */
+    bool lessonReady() const;
 
     /** Something to redraw. */
     std::function<void()> onChanged;
@@ -110,6 +114,7 @@ public:
 
 private:
     void enterStep (int);
+    void complete();
     void changed();
     bool holds (const Condition&) const;
     State settledState() const;
@@ -122,6 +127,7 @@ private:
     State beforePause = State::idle;
     std::uint64_t gen = 0;
     bool gesture = false;
+    bool armed = false;
     std::vector<StepStatus> statuses;
     std::map<juce::String, float> snapshot;
 };

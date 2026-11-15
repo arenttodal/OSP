@@ -1866,6 +1866,7 @@ namespace
             modeSelector->setPlain (true);
             modeSelector->setAccent (accent);
             modeSelector->setTooltip (tooltip);
+            binding::tag (*modeSelector, id);   // (ANDOR Learn finds it by its parameter)
             addAndMakeVisible (*modeSelector);
             return *modeSelector;
         }
@@ -5118,6 +5119,7 @@ namespace
             {
                 selectors.push_back (std::make_unique<ValueSelector> (*state.getParameter (keys[i].first), captions[i]));
                 selectors.back()->setTooltip (keys[i].second);
+                binding::tag (*selectors.back(), keys[i].first);
                 addAndMakeVisible (*selectors.back());
             }
             newTakes = std::make_unique<NewTakesButton> (*state.getParameter ("life.takesSeed"));

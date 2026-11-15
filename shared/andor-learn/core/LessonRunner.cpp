@@ -84,6 +84,7 @@ void LessonRunner::enterStep (int s)
     index = s;
     ++gen;   // events of the previous step are stale from here
     gesture = false;
+    armed = false;
     current = State::tourPreparing;
     const auto* st = step();
     snapshot.clear();
@@ -100,8 +101,23 @@ void LessonRunner::enterStep (int s)
         host.reveal (st->targetId);
     current = settledState();
     beforePause = current;
-    if (st->targetId.isNotEmpty() && ! host.targetReady (st->targetId))
+    if (! lessonReady() || (st->targetId.isNotEmpty() && ! host.targetReady (st->targetId)))
         current = State::paused;
+    changed();
+}
+
+bool LessonRunner::lessonReady() const
+{
+    return active == nullptr || ! active->preparation.ready.has_value() || holds (*active->preparation.ready);
+}
+
+void LessonRunner::complete()
+{
+    statuses[static_cast<std::size_t> (index)] = StepStatus::done;
+    current = State::stepComplete;
+    beforePause = current;
+    armed = false;
+    ++gen;   // the same event can never complete another step
     changed();
 }
 
@@ -147,12 +163,16 @@ bool LessonRunner::handle (const LearnEvent& e)
     if (st == nullptr || st->completion.kind != Completion::Kind::userAction || ! st->completion.actions.contains (e.actionId))
         return false;
     if (! holds (st->completion.postcondition))
+    {
+        // An action whose result comes later (a recording loading): armed in this step only.
+        if (st->completion.awaitResult && ! armed)
+        {
+            armed = true;
+            changed();
+        }
         return false;
-    statuses[static_cast<std::size_t> (index)] = StepStatus::done;
-    current = State::stepComplete;
-    beforePause = current;
-    ++gen;   // the same event can never complete another step
-    changed();
+    }
+    complete();
     return true;
 }
 
@@ -169,9 +189,14 @@ juce::String LessonRunner::currentBody() const
     const auto* st = step();
     if (st == nullptr)
         return {};
+    if (current == State::paused && ! lessonReady())
+        return active->preparation.needs.isNotEmpty() ? active->preparation.needs
+                                                      : juce::String::fromUTF8 ("This lesson needs the sound it was prepared for.");
     if (current == State::paused)
         return st->unavailableBody.isNotEmpty() ? st->unavailableBody
                                                 : juce::String::fromUTF8 ("This control isn\xe2\x80\x99t showing right now. Show me opens it.");
+    if (armed && current == State::waitingForAction && st->completion.awaitingBody.isNotEmpty())
+        return st->completion.awaitingBody;
     if (st->variantWhen.has_value() && holds (*st->variantWhen))
         return st->variantBody;
     return st->body;
@@ -266,22 +291,30 @@ void LessonRunner::update()
     const auto* st = step();
     if (st == nullptr)
         return;
-    if (! gesture && (current == State::waitingForAction || current == State::paused))
+    // (A step can pause while its result comes: a dropped file hides the drop zone it points at.)
+    if (armed && (current == State::waitingForAction || current == State::paused) && holds (st->completion.postcondition))
+    {
+        complete();   // the armed action's result has arrived (in its own step)
+        return;
+    }
+    if (! gesture && ! armed && (current == State::waitingForAction || current == State::paused))
         for (auto& [id, value] : snapshot)
             if (const auto now = host.parameterValue (id))
                 value = *now;
-    if (st->targetId.isEmpty())
+    const bool ready = lessonReady();
+    if (st->targetId.isEmpty() && ready && current != State::paused)
         return;
+    const bool shown = ready && (st->targetId.isEmpty() || host.targetReady (st->targetId));
     if (current == State::tourShowing || current == State::waitingForAction)
     {
-        if (! host.targetReady (st->targetId))
+        if (! shown)
         {
             beforePause = current;
             current = State::paused;
             changed();
         }
     }
-    else if (current == State::paused && host.targetReady (st->targetId))
+    else if (current == State::paused && shown)
     {
         current = beforePause == State::paused ? settledState() : beforePause;
         changed();

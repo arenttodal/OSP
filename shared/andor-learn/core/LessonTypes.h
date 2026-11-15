@@ -108,6 +108,12 @@ struct Completion
         "<alreadyLabel> · Continue" instead of making the task impossible. */
     std::optional<Condition> alreadyDone;
     juce::String alreadyLabel;
+    /** The result can follow the action later (a dropped recording still loading): an accepted
+        event arms the step, which completes once the postcondition holds, in the same step.
+        Off: the postcondition must hold when the event arrives (as before). */
+    bool awaitResult = false;
+    /** What the note says while an armed step waits for its result ("Loading the recording"). */
+    juce::String awaitingBody;
 
     static Completion manual() { return {}; }
     static Completion action (juce::StringArray accepted, Condition post)
@@ -123,6 +129,13 @@ struct Completion
         auto c = *this;
         c.alreadyDone = std::move (when);
         c.alreadyLabel = std::move (label);
+        return c;
+    }
+    Completion waitingForResult (juce::String whileWaiting) const
+    {
+        auto c = *this;
+        c.awaitResult = true;
+        c.awaitingBody = std::move (whileWaiting);
         return c;
     }
 };
@@ -142,6 +155,25 @@ struct Step
     juce::String variantBody;
 };
 
+/**
+    What a lesson needs before it can teach (a recording loaded and playable, GRANULAR on), and
+    how the product can prepare it with the musician's permission: an example it loads after
+    keeping the current sound so it can be restored. Nothing is loaded or changed unless the
+    musician chooses Load example.
+*/
+struct Preparation
+{
+    /** The current sound can run the lesson (checked before it starts and while it runs: while
+        it fails the lesson pauses and says `needs`). Unset: always. */
+    std::optional<Condition> ready;
+    juce::String needs;          ///< "This lesson needs a recording on a layer."
+    juce::String exampleId;      ///< an example the product can load (empty: none)
+    juce::String exampleName;    ///< "Bowed note"
+    /** While this holds and the sound is ready, the example is offered too ("Use my sound" /
+        "Load example"). Unset: never offered over a ready sound. */
+    std::optional<Condition> offerExampleWhen;
+};
+
 struct Lesson
 {
     juce::String id;          ///< "analog.arp.basics" (stable: progress is kept under it)
@@ -150,7 +182,11 @@ struct Lesson
     juce::String group;       ///< the browser's group ("Arpeggiator")
     juce::String capability;  ///< required product capability (empty: none)
     int minutes = 0;          ///< an estimate for the browser (0: none shown)
+    juce::String summary;     ///< the browser's one-line description (empty: none)
     std::vector<Step> steps;
+    Preparation preparation;
+    /** Said on the completion note (empty: a general line). */
+    juce::String completion;
 };
 
 /** Contextual help for a region in Learn mode. */
