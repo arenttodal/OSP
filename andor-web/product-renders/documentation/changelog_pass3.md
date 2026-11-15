@@ -52,3 +52,31 @@ rendered fluted cap since knob phase 1, so the fluted cap is the reference here.
 - **Buttons** keep the editor's 1–2 px drawn contact line under the raised key.
 - **Pitch and mod wheels** are still flat artwork (Round 2).
 - **Timber texture and colour** are unchanged (Round 2).
+
+# Pass 3.5, checkpoint 1: knob height (locked: G, 0.30 D) and timber (locked: 14.4 mm)
+
+Test: five heights with the same camera, lights, materials and exposure, each in four views (the round 1 close-up, a
+lower 22° inspection angle, the six macros, and the full product from camera B). Each knob is measured from the built
+mesh (`andor_scene.py --report`); see `renders/review_pass3_5_cp1/measurements.md` and `report_*.json`.
+
+| | H/D | Height (design, D = 28 mm) | Profile |
+|---|---|---|---|
+| E | 0.25 | 7.00 mm | round 1 (0.9 bevel, 0.4 crown, 1.1 base ring) |
+| F | 0.27 | 7.56 mm | official, only the height changed; flutes 0.252 mm |
+| **G** | **0.30** | **8.40 mm** | **official, only the height changed; flutes 0.252 mm (locked)** |
+| H | 0.33 | 9.24 mm | official, only the height changed; flutes 0.252 mm |
+| D | 0.393 | 11.00 mm | official, unchanged (flutes 0.42 mm) |
+
+- **Height convention:** the generator's own `height` runs from the mounting plane (z = 0) to the crown's top, base ring
+  included, so nothing is added twice. The profile is regenerated per height (never stretched), and then uniformly
+  scaled to the editor's knob radius (×0.889: D = 24.9 mm and G = 7.46 mm in the scene; proportions unchanged).
+- **Why G:** E reads low. F is a subtle step. G gives a visible, substantial sidewall with the crisp bevel and fine
+  flutes intact. H starts to read bulky, and D reads tall at the product-photography angle.
+- **Marketing vs plugin knob:** the marketing knob is 0.30 D with 0.252 mm flutes; the plugin's knob is
+  0.393 D with 0.42 mm flutes. The shipping sprites are unchanged.
+- **Timber:** default `--frame-h 14.4` (rails z 2.0–16.4 mm, all four equal; mitres regenerated, not scaled).
+- **Automated checks (all variants):** six macros; identical diameter and height; all 25 knobs seated with a 0 mm gap;
+  48 flutes counted on the mesh; the rails the same height; positive clearances (14 px to the lens LED, 53 px to the
+  neighbour); pointer angles identical across variants.
+- **Saved:** `andor_master_pass3_5.blend` (compressed, textures packed; regenerate with `--knob hd --hd 0.30
+  --frame-h 14.4 --save-blend`).

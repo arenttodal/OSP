@@ -1,0 +1,1190 @@
+{
+ "variant": "hd",
+ "hd": 0.3,
+ "frame_h_mm": 14.4,
+ "knob_config_design_mm": {
+  "units": "mm",
+  "diameter": 28.0,
+  "height": 8.4,
+  "taper": 0.07,
+  "topCurvature": 0.55,
+  "bevelWidth": 1.5,
+  "bevelSegments": 10,
+  "edgeRound": 0.25,
+  "angularSamples": 1440,
+  "flutes": {
+   "count": 48,
+   "depth": 0.252,
+   "sharpness": 1.15,
+   "fadeIn": 1.2,
+   "topFade": 0.55
+  },
+  "skirt": {
+   "enabled": true,
+   "height": 1.4,
+   "extraRadius": 0.45,
+   "gap": 0.35,
+   "gapDepth": 0.35,
+   "round": 0.3
+  }
+ },
+ "checks": {
+  "six_macros": true,
+  "macro_diameter_identical": true,
+  "macro_height_identical": true,
+  "all_knobs_seated_on_their_surface": true,
+  "flutes_48": true,
+  "rails_same_height": true,
+  "macro_clearances_positive": true
+ },
+ "rails": {
+  "Teak front fascia": {
+   "z_min_mm": 2.0,
+   "z_max_mm": 16.4
+  },
+  "Teak back rail": {
+   "z_min_mm": 2.0,
+   "z_max_mm": 16.4
+  },
+  "Teak side rail L": {
+   "z_min_mm": 2.0,
+   "z_max_mm": 16.4
+  },
+  "Teak side rail R": {
+   "z_min_mm": 2.0,
+   "z_max_mm": 16.4
+  }
+ },
+ "knobs": [
+  {
+   "kind": "layer",
+   "centre_px": [
+    100.5,
+    515.0
+   ],
+   "pointer_angle_rad": 3.926990985870361,
+   "design_mm": {
+    "cap_diameter_D": 28.0,
+    "overall_height": 8.4,
+    "H_over_D": 0.3,
+    "upper_face_radius": 13.02,
+    "base_ring_diameter": 28.9,
+    "bevel_width": 1.5,
+    "crown": 0.55,
+    "edge_round": 0.25,
+    "groove_top_z": 1.75,
+    "flute_depth": 0.252
+   },
+   "flutes_counted": 48,
+   "scale_scene_per_design": 0.000498,
+   "scene_mm": {
+    "cap_diameter": 13.947,
+    "overall_height": 4.184,
+    "base_ring_diameter": 14.396
+   },
+   "mounting_plane_m": 0.015865,
+   "object_base_m": 0.015865,
+   "base_gap_mm": -0.0,
+   "bbox_product_mm": {
+    "x": [
+     -179.44,
+     -165.04
+    ],
+    "y": [
+     0.54,
+     14.93
+    ],
+    "z": [
+     15.865,
+     20.05
+    ]
+   }
+  },
+  {
+   "kind": "layer",
+   "centre_px": [
+    180.5,
+    515.0
+   ],
+   "pointer_angle_rad": 6.283185958862305,
+   "design_mm": {
+    "cap_diameter_D": 28.0,
+    "overall_height": 8.4,
+    "H_over_D": 0.3,
+    "upper_face_radius": 13.02,
+    "base_ring_diameter": 28.9,
+    "bevel_width": 1.5,
+    "crown": 0.55,
+    "edge_round": 0.25,
+    "groove_top_z": 1.75,
+    "flute_depth": 0.252
+   },
+   "flutes_counted": 48,
+   "scale_scene_per_design": 0.000498,
+   "scene_mm": {
+    "cap_diameter": 13.947,
+    "overall_height": 4.184,
+    "base_ring_diameter": 14.396
+   },
+   "mounting_plane_m": 0.015865,
+   "object_base_m": 0.015865,
+   "base_gap_mm": -0.0,
+   "bbox_product_mm": {
+    "x": [
+     -157.34,
+     -142.94
+    ],
+    "y": [
+     0.54,
+     14.93
+    ],
+    "z": [
+     15.865,
+     20.05
+    ]
+   }
+  },
+  {
+   "kind": "layer",
+   "centre_px": [
+    260.5,
+    515.0
+   ],
+   "pointer_angle_rad": 6.283185958862305,
+   "design_mm": {
+    "cap_diameter_D": 28.0,
+    "overall_height": 8.4,
+    "H_over_D": 0.3,
+    "upper_face_radius": 13.02,
+    "base_ring_diameter": 28.9,
+    "bevel_width": 1.5,
+    "crown": 0.55,
+    "edge_round": 0.25,
+    "groove_top_z": 1.75,
+    "flute_depth": 0.252
+   },
+   "flutes_counted": 48,
+   "scale_scene_per_design": 0.000498,
+   "scene_mm": {
+    "cap_diameter": 13.947,
+    "overall_height": 4.184,
+    "base_ring_diameter": 14.396
+   },
+   "mounting_plane_m": 0.015865,
+   "object_base_m": 0.015865,
+   "base_gap_mm": -0.0,
+   "bbox_product_mm": {
+    "x": [
+     -135.24,
+     -120.84
+    ],
+    "y": [
+     0.54,
+     14.93
+    ],
+    "z": [
+     15.865,
+     20.05
+    ]
+   }
+  },
+  {
+   "kind": "layer",
+   "centre_px": [
+    340.5,
+    515.0
+   ],
+   "pointer_angle_rad": 7.779958724975586,
+   "design_mm": {
+    "cap_diameter_D": 28.0,
+    "overall_height": 8.4,
+    "H_over_D": 0.3,
+    "upper_face_radius": 13.02,
+    "base_ring_diameter": 28.9,
+    "bevel_width": 1.5,
+    "crown": 0.55,
+    "edge_round": 0.25,
+    "groove_top_z": 1.75,
+    "flute_depth": 0.252
+   },
+   "flutes_counted": 48,
+   "scale_scene_per_design": 0.000498,
+   "scene_mm": {
+    "cap_diameter": 13.947,
+    "overall_height": 4.184,
+    "base_ring_diameter": 14.396
+   },
+   "mounting_plane_m": 0.015865,
+   "object_base_m": 0.015865,
+   "base_gap_mm": -0.0,
+   "bbox_product_mm": {
+    "x": [
+     -113.14,
+     -98.74
+    ],
+    "y": [
+     0.54,
+     14.93
+    ],
+    "z": [
+     15.865,
+     20.05
+    ]
+   }
+  },
+  {
+   "kind": "layer",
+   "centre_px": [
+    420.5,
+    515.0
+   ],
+   "pointer_angle_rad": 5.057964324951172,
+   "design_mm": {
+    "cap_diameter_D": 28.0,
+    "overall_height": 8.4,
+    "H_over_D": 0.3,
+    "upper_face_radius": 13.02,
+    "base_ring_diameter": 28.9,
+    "bevel_width": 1.5,
+    "crown": 0.55,
+    "edge_round": 0.25,
+    "groove_top_z": 1.75,
+    "flute_depth": 0.252
+   },
+   "flutes_counted": 48,
+   "scale_scene_per_design": 0.000498,
+   "scene_mm": {
+    "cap_diameter": 13.947,
+    "overall_height": 4.184,
+    "base_ring_diameter": 14.396
+   },
+   "mounting_plane_m": 0.015865,
+   "object_base_m": 0.015865,
+   "base_gap_mm": -0.0,
+   "bbox_product_mm": {
+    "x": [
+     -91.04,
+     -76.64
+    ],
+    "y": [
+     0.54,
+     14.93
+    ],
+    "z": [
+     15.865,
+     20.05
+    ]
+   }
+  },
+  {
+   "kind": "layer",
+   "centre_px": [
+    563.5,
+    515.0
+   ],
+   "pointer_angle_rad": 3.926990985870361,
+   "design_mm": {
+    "cap_diameter_D": 28.0,
+    "overall_height": 8.4,
+    "H_over_D": 0.3,
+    "upper_face_radius": 13.02,
+    "base_ring_diameter": 28.9,
+    "bevel_width": 1.5,
+    "crown": 0.55,
+    "edge_round": 0.25,
+    "groove_top_z": 1.75,
+    "flute_depth": 0.252
+   },
+   "flutes_counted": 48,
+   "scale_scene_per_design": 0.000498,
+   "scene_mm": {
+    "cap_diameter": 13.947,
+    "overall_height": 4.184,
+    "base_ring_diameter": 14.396
+   },
+   "mounting_plane_m": 0.015865,
+   "object_base_m": 0.015865,
+   "base_gap_mm": -0.0,
+   "bbox_product_mm": {
+    "x": [
+     -51.53,
+     -37.14
+    ],
+    "y": [
+     0.54,
+     14.93
+    ],
+    "z": [
+     15.865,
+     20.05
+    ]
+   }
+  },
+  {
+   "kind": "layer",
+   "centre_px": [
+    643.5,
+    515.0
+   ],
+   "pointer_angle_rad": 6.283185958862305,
+   "design_mm": {
+    "cap_diameter_D": 28.0,
+    "overall_height": 8.4,
+    "H_over_D": 0.3,
+    "upper_face_radius": 13.02,
+    "base_ring_diameter": 28.9,
+    "bevel_width": 1.5,
+    "crown": 0.55,
+    "edge_round": 0.25,
+    "groove_top_z": 1.75,
+    "flute_depth": 0.252
+   },
+   "flutes_counted": 48,
+   "scale_scene_per_design": 0.000498,
+   "scene_mm": {
+    "cap_diameter": 13.947,
+    "overall_height": 4.184,
+    "base_ring_diameter": 14.396
+   },
+   "mounting_plane_m": 0.015865,
+   "object_base_m": 0.015865,
+   "base_gap_mm": -0.0,
+   "bbox_product_mm": {
+    "x": [
+     -29.44,
+     -15.04
+    ],
+    "y": [
+     0.54,
+     14.93
+    ],
+    "z": [
+     15.865,
+     20.05
+    ]
+   }
+  },
+  {
+   "kind": "layer",
+   "centre_px": [
+    723.5,
+    515.0
+   ],
+   "pointer_angle_rad": 6.283185958862305,
+   "design_mm": {
+    "cap_diameter_D": 28.0,
+    "overall_height": 8.4,
+    "H_over_D": 0.3,
+    "upper_face_radius": 13.02,
+    "base_ring_diameter": 28.9,
+    "bevel_width": 1.5,
+    "crown": 0.55,
+    "edge_round": 0.25,
+    "groove_top_z": 1.75,
+    "flute_depth": 0.252
+   },
+   "flutes_counted": 48,
+   "scale_scene_per_design": 0.000498,
+   "scene_mm": {
+    "cap_diameter": 13.947,
+    "overall_height": 4.184,
+    "base_ring_diameter": 14.396
+   },
+   "mounting_plane_m": 0.015865,
+   "object_base_m": 0.015865,
+   "base_gap_mm": -0.0,
+   "bbox_product_mm": {
+    "x": [
+     -7.34,
+     7.06
+    ],
+    "y": [
+     0.54,
+     14.93
+    ],
+    "z": [
+     15.865,
+     20.05
+    ]
+   }
+  },
+  {
+   "kind": "layer",
+   "centre_px": [
+    803.5,
+    515.0
+   ],
+   "pointer_angle_rad": 7.779958724975586,
+   "design_mm": {
+    "cap_diameter_D": 28.0,
+    "overall_height": 8.4,
+    "H_over_D": 0.3,
+    "upper_face_radius": 13.02,
+    "base_ring_diameter": 28.9,
+    "bevel_width": 1.5,
+    "crown": 0.55,
+    "edge_round": 0.25,
+    "groove_top_z": 1.75,
+    "flute_depth": 0.252
+   },
+   "flutes_counted": 48,
+   "scale_scene_per_design": 0.000498,
+   "scene_mm": {
+    "cap_diameter": 13.947,
+    "overall_height": 4.184,
+    "base_ring_diameter": 14.396
+   },
+   "mounting_plane_m": 0.015865,
+   "object_base_m": 0.015865,
+   "base_gap_mm": -0.0,
+   "bbox_product_mm": {
+    "x": [
+     14.76,
+     29.16
+    ],
+    "y": [
+     0.54,
+     14.93
+    ],
+    "z": [
+     15.865,
+     20.05
+    ]
+   }
+  },
+  {
+   "kind": "layer",
+   "centre_px": [
+    883.5,
+    515.0
+   ],
+   "pointer_angle_rad": 3.926990985870361,
+   "design_mm": {
+    "cap_diameter_D": 28.0,
+    "overall_height": 8.4,
+    "H_over_D": 0.3,
+    "upper_face_radius": 13.02,
+    "base_ring_diameter": 28.9,
+    "bevel_width": 1.5,
+    "crown": 0.55,
+    "edge_round": 0.25,
+    "groove_top_z": 1.75,
+    "flute_depth": 0.252
+   },
+   "flutes_counted": 48,
+   "scale_scene_per_design": 0.000498,
+   "scene_mm": {
+    "cap_diameter": 13.947,
+    "overall_height": 4.184,
+    "base_ring_diameter": 14.396
+   },
+   "mounting_plane_m": 0.015865,
+   "object_base_m": 0.015865,
+   "base_gap_mm": -0.0,
+   "bbox_product_mm": {
+    "x": [
+     36.86,
+     51.26
+    ],
+    "y": [
+     0.54,
+     14.93
+    ],
+    "z": [
+     15.865,
+     20.05
+    ]
+   }
+  },
+  {
+   "kind": "layer",
+   "centre_px": [
+    1026.5,
+    515.0
+   ],
+   "pointer_angle_rad": 3.926990985870361,
+   "design_mm": {
+    "cap_diameter_D": 28.0,
+    "overall_height": 8.4,
+    "H_over_D": 0.3,
+    "upper_face_radius": 13.02,
+    "base_ring_diameter": 28.9,
+    "bevel_width": 1.5,
+    "crown": 0.55,
+    "edge_round": 0.25,
+    "groove_top_z": 1.75,
+    "flute_depth": 0.252
+   },
+   "flutes_counted": 48,
+   "scale_scene_per_design": 0.000498,
+   "scene_mm": {
+    "cap_diameter": 13.947,
+    "overall_height": 4.184,
+    "base_ring_diameter": 14.396
+   },
+   "mounting_plane_m": 0.015865,
+   "object_base_m": 0.015865,
+   "base_gap_mm": -0.0,
+   "bbox_product_mm": {
+    "x": [
+     76.37,
+     90.76
+    ],
+    "y": [
+     0.54,
+     14.93
+    ],
+    "z": [
+     15.865,
+     20.05
+    ]
+   }
+  },
+  {
+   "kind": "layer",
+   "centre_px": [
+    1106.5,
+    515.0
+   ],
+   "pointer_angle_rad": 6.283185958862305,
+   "design_mm": {
+    "cap_diameter_D": 28.0,
+    "overall_height": 8.4,
+    "H_over_D": 0.3,
+    "upper_face_radius": 13.02,
+    "base_ring_diameter": 28.9,
+    "bevel_width": 1.5,
+    "crown": 0.55,
+    "edge_round": 0.25,
+    "groove_top_z": 1.75,
+    "flute_depth": 0.252
+   },
+   "flutes_counted": 48,
+   "scale_scene_per_design": 0.000498,
+   "scene_mm": {
+    "cap_diameter": 13.947,
+    "overall_height": 4.184,
+    "base_ring_diameter": 14.396
+   },
+   "mounting_plane_m": 0.015865,
+   "object_base_m": 0.015865,
+   "base_gap_mm": -0.0,
+   "bbox_product_mm": {
+    "x": [
+     98.47,
+     112.86
+    ],
+    "y": [
+     0.54,
+     14.93
+    ],
+    "z": [
+     15.865,
+     20.05
+    ]
+   }
+  },
+  {
+   "kind": "layer",
+   "centre_px": [
+    1186.5,
+    515.0
+   ],
+   "pointer_angle_rad": 6.283185958862305,
+   "design_mm": {
+    "cap_diameter_D": 28.0,
+    "overall_height": 8.4,
+    "H_over_D": 0.3,
+    "upper_face_radius": 13.02,
+    "base_ring_diameter": 28.9,
+    "bevel_width": 1.5,
+    "crown": 0.55,
+    "edge_round": 0.25,
+    "groove_top_z": 1.75,
+    "flute_depth": 0.252
+   },
+   "flutes_counted": 48,
+   "scale_scene_per_design": 0.000498,
+   "scene_mm": {
+    "cap_diameter": 13.947,
+    "overall_height": 4.184,
+    "base_ring_diameter": 14.396
+   },
+   "mounting_plane_m": 0.015865,
+   "object_base_m": 0.015865,
+   "base_gap_mm": -0.0,
+   "bbox_product_mm": {
+    "x": [
+     120.56,
+     134.96
+    ],
+    "y": [
+     0.54,
+     14.93
+    ],
+    "z": [
+     15.865,
+     20.05
+    ]
+   }
+  },
+  {
+   "kind": "layer",
+   "centre_px": [
+    1266.5,
+    515.0
+   ],
+   "pointer_angle_rad": 7.779958724975586,
+   "design_mm": {
+    "cap_diameter_D": 28.0,
+    "overall_height": 8.4,
+    "H_over_D": 0.3,
+    "upper_face_radius": 13.02,
+    "base_ring_diameter": 28.9,
+    "bevel_width": 1.5,
+    "crown": 0.55,
+    "edge_round": 0.25,
+    "groove_top_z": 1.75,
+    "flute_depth": 0.252
+   },
+   "flutes_counted": 48,
+   "scale_scene_per_design": 0.000498,
+   "scene_mm": {
+    "cap_diameter": 13.947,
+    "overall_height": 4.184,
+    "base_ring_diameter": 14.396
+   },
+   "mounting_plane_m": 0.015865,
+   "object_base_m": 0.015865,
+   "base_gap_mm": -0.0,
+   "bbox_product_mm": {
+    "x": [
+     142.66,
+     157.06
+    ],
+    "y": [
+     0.54,
+     14.93
+    ],
+    "z": [
+     15.865,
+     20.05
+    ]
+   }
+  },
+  {
+   "kind": "layer",
+   "centre_px": [
+    1346.5,
+    515.0
+   ],
+   "pointer_angle_rad": 3.926990985870361,
+   "design_mm": {
+    "cap_diameter_D": 28.0,
+    "overall_height": 8.4,
+    "H_over_D": 0.3,
+    "upper_face_radius": 13.02,
+    "base_ring_diameter": 28.9,
+    "bevel_width": 1.5,
+    "crown": 0.55,
+    "edge_round": 0.25,
+    "groove_top_z": 1.75,
+    "flute_depth": 0.252
+   },
+   "flutes_counted": 48,
+   "scale_scene_per_design": 0.000498,
+   "scene_mm": {
+    "cap_diameter": 13.947,
+    "overall_height": 4.184,
+    "base_ring_diameter": 14.396
+   },
+   "mounting_plane_m": 0.015865,
+   "object_base_m": 0.015865,
+   "base_gap_mm": -0.0,
+   "bbox_product_mm": {
+    "x": [
+     164.76,
+     179.16
+    ],
+    "y": [
+     0.54,
+     14.93
+    ],
+    "z": [
+     15.865,
+     20.05
+    ]
+   }
+  },
+  {
+   "kind": "macro",
+   "centre_px": [
+    128.0,
+    818.0
+   ],
+   "pointer_angle_rad": 6.848672389984131,
+   "design_mm": {
+    "cap_diameter_D": 28.0,
+    "overall_height": 8.4,
+    "H_over_D": 0.3,
+    "upper_face_radius": 13.02,
+    "base_ring_diameter": 28.9,
+    "bevel_width": 1.5,
+    "crown": 0.55,
+    "edge_round": 0.25,
+    "groove_top_z": 1.75,
+    "flute_depth": 0.252
+   },
+   "flutes_counted": 48,
+   "scale_scene_per_design": 0.000889,
+   "scene_mm": {
+    "cap_diameter": 24.879,
+    "overall_height": 7.464,
+    "base_ring_diameter": 25.679
+   },
+   "mounting_plane_m": 0.015598,
+   "object_base_m": 0.015598,
+   "base_gap_mm": -0.0,
+   "bbox_product_mm": {
+    "x": [
+     -177.48,
+     -151.8
+    ],
+    "y": [
+     -88.81,
+     -63.13
+    ],
+    "z": [
+     15.598,
+     23.062
+    ]
+   },
+   "clearance_px": {
+    "to_neighbour_knob": 53.04,
+    "to_lens_led": 14.02,
+    "to_macro_panel_bottom_edge": 32.02
+   }
+  },
+  {
+   "kind": "macro",
+   "centre_px": [
+    274.0,
+    818.0
+   ],
+   "pointer_angle_rad": 3.926990985870361,
+   "design_mm": {
+    "cap_diameter_D": 28.0,
+    "overall_height": 8.4,
+    "H_over_D": 0.3,
+    "upper_face_radius": 13.02,
+    "base_ring_diameter": 28.9,
+    "bevel_width": 1.5,
+    "crown": 0.55,
+    "edge_round": 0.25,
+    "groove_top_z": 1.75,
+    "flute_depth": 0.252
+   },
+   "flutes_counted": 48,
+   "scale_scene_per_design": 0.000889,
+   "scene_mm": {
+    "cap_diameter": 24.879,
+    "overall_height": 7.464,
+    "base_ring_diameter": 25.679
+   },
+   "mounting_plane_m": 0.015598,
+   "object_base_m": 0.015598,
+   "base_gap_mm": -0.0,
+   "bbox_product_mm": {
+    "x": [
+     -137.15,
+     -111.47
+    ],
+    "y": [
+     -88.81,
+     -63.13
+    ],
+    "z": [
+     15.598,
+     23.062
+    ]
+   },
+   "clearance_px": {
+    "to_neighbour_knob": 53.04,
+    "to_lens_led": 14.02,
+    "to_macro_panel_bottom_edge": 32.02
+   }
+  },
+  {
+   "kind": "macro",
+   "centre_px": [
+    420.0,
+    818.0
+   ],
+   "pointer_angle_rad": 7.414159297943115,
+   "design_mm": {
+    "cap_diameter_D": 28.0,
+    "overall_height": 8.4,
+    "H_over_D": 0.3,
+    "upper_face_radius": 13.02,
+    "base_ring_diameter": 28.9,
+    "bevel_width": 1.5,
+    "crown": 0.55,
+    "edge_round": 0.25,
+    "groove_top_z": 1.75,
+    "flute_depth": 0.252
+   },
+   "flutes_counted": 48,
+   "scale_scene_per_design": 0.000889,
+   "scene_mm": {
+    "cap_diameter": 24.879,
+    "overall_height": 7.464,
+    "base_ring_diameter": 25.679
+   },
+   "mounting_plane_m": 0.015598,
+   "object_base_m": 0.015598,
+   "base_gap_mm": -0.0,
+   "bbox_product_mm": {
+    "x": [
+     -96.82,
+     -71.14
+    ],
+    "y": [
+     -88.81,
+     -63.13
+    ],
+    "z": [
+     15.598,
+     23.062
+    ]
+   },
+   "clearance_px": {
+    "to_neighbour_knob": 53.04,
+    "to_lens_led": 14.02,
+    "to_macro_panel_bottom_edge": 32.02
+   }
+  },
+  {
+   "kind": "macro",
+   "centre_px": [
+    566.0,
+    818.0
+   ],
+   "pointer_angle_rad": 5.2464599609375,
+   "design_mm": {
+    "cap_diameter_D": 28.0,
+    "overall_height": 8.4,
+    "H_over_D": 0.3,
+    "upper_face_radius": 13.02,
+    "base_ring_diameter": 28.9,
+    "bevel_width": 1.5,
+    "crown": 0.55,
+    "edge_round": 0.25,
+    "groove_top_z": 1.75,
+    "flute_depth": 0.252
+   },
+   "flutes_counted": 48,
+   "scale_scene_per_design": 0.000889,
+   "scene_mm": {
+    "cap_diameter": 24.879,
+    "overall_height": 7.464,
+    "base_ring_diameter": 25.679
+   },
+   "mounting_plane_m": 0.015598,
+   "object_base_m": 0.015598,
+   "base_gap_mm": -0.0,
+   "bbox_product_mm": {
+    "x": [
+     -56.49,
+     -30.81
+    ],
+    "y": [
+     -88.81,
+     -63.13
+    ],
+    "z": [
+     15.598,
+     23.062
+    ]
+   },
+   "clearance_px": {
+    "to_neighbour_knob": 53.04,
+    "to_lens_led": 14.02,
+    "to_macro_panel_bottom_edge": 32.02
+   }
+  },
+  {
+   "kind": "macro",
+   "centre_px": [
+    858.0,
+    818.0
+   ],
+   "pointer_angle_rad": 6.094690322875977,
+   "design_mm": {
+    "cap_diameter_D": 28.0,
+    "overall_height": 8.4,
+    "H_over_D": 0.3,
+    "upper_face_radius": 13.02,
+    "base_ring_diameter": 28.9,
+    "bevel_width": 1.5,
+    "crown": 0.55,
+    "edge_round": 0.25,
+    "groove_top_z": 1.75,
+    "flute_depth": 0.252
+   },
+   "flutes_counted": 48,
+   "scale_scene_per_design": 0.000889,
+   "scene_mm": {
+    "cap_diameter": 24.879,
+    "overall_height": 7.464,
+    "base_ring_diameter": 25.679
+   },
+   "mounting_plane_m": 0.015598,
+   "object_base_m": 0.015598,
+   "base_gap_mm": -0.0,
+   "bbox_product_mm": {
+    "x": [
+     24.18,
+     49.86
+    ],
+    "y": [
+     -88.81,
+     -63.13
+    ],
+    "z": [
+     15.598,
+     23.062
+    ]
+   },
+   "clearance_px": {
+    "to_neighbour_knob": 53.04,
+    "to_lens_led": 14.02,
+    "to_macro_panel_bottom_edge": 32.02
+   }
+  },
+  {
+   "kind": "macro",
+   "centre_px": [
+    712.0,
+    818.0
+   ],
+   "pointer_angle_rad": 4.77522087097168,
+   "design_mm": {
+    "cap_diameter_D": 28.0,
+    "overall_height": 8.4,
+    "H_over_D": 0.3,
+    "upper_face_radius": 13.02,
+    "base_ring_diameter": 28.9,
+    "bevel_width": 1.5,
+    "crown": 0.55,
+    "edge_round": 0.25,
+    "groove_top_z": 1.75,
+    "flute_depth": 0.252
+   },
+   "flutes_counted": 48,
+   "scale_scene_per_design": 0.000889,
+   "scene_mm": {
+    "cap_diameter": 24.879,
+    "overall_height": 7.464,
+    "base_ring_diameter": 25.679
+   },
+   "mounting_plane_m": 0.015598,
+   "object_base_m": 0.015598,
+   "base_gap_mm": -0.0,
+   "bbox_product_mm": {
+    "x": [
+     -16.15,
+     9.52
+    ],
+    "y": [
+     -88.81,
+     -63.13
+    ],
+    "z": [
+     15.598,
+     23.062
+    ]
+   },
+   "clearance_px": {
+    "to_neighbour_knob": 53.04,
+    "to_lens_led": 14.02,
+    "to_macro_panel_bottom_edge": 32.02
+   }
+  },
+  {
+   "kind": "mini",
+   "centre_px": [
+    1018.0,
+    847.5
+   ],
+   "pointer_angle_rad": 5.213863849639893,
+   "design_mm": {
+    "cap_diameter_D": 28.0,
+    "overall_height": 8.4,
+    "H_over_D": 0.3,
+    "upper_face_radius": 13.02,
+    "base_ring_diameter": 28.9,
+    "bevel_width": 1.5,
+    "crown": 0.55,
+    "edge_round": 0.25,
+    "groove_top_z": 1.75,
+    "flute_depth": 0.252
+   },
+   "flutes_counted": 48,
+   "scale_scene_per_design": 0.000382,
+   "scene_mm": {
+    "cap_diameter": 10.706,
+    "overall_height": 3.212,
+    "base_ring_diameter": 11.05
+   },
+   "mounting_plane_m": 0.015598,
+   "object_base_m": 0.015598,
+   "base_gap_mm": -0.0,
+   "bbox_product_mm": {
+    "x": [
+     75.69,
+     86.74
+    ],
+    "y": [
+     -89.64,
+     -78.59
+    ],
+    "z": [
+     15.598,
+     18.81
+    ]
+   }
+  },
+  {
+   "kind": "mini",
+   "centre_px": [
+    1125.0,
+    847.5
+   ],
+   "pointer_angle_rad": 6.283185482025146,
+   "design_mm": {
+    "cap_diameter_D": 28.0,
+    "overall_height": 8.4,
+    "H_over_D": 0.3,
+    "upper_face_radius": 13.02,
+    "base_ring_diameter": 28.9,
+    "bevel_width": 1.5,
+    "crown": 0.55,
+    "edge_round": 0.25,
+    "groove_top_z": 1.75,
+    "flute_depth": 0.252
+   },
+   "flutes_counted": 48,
+   "scale_scene_per_design": 0.000382,
+   "scene_mm": {
+    "cap_diameter": 10.706,
+    "overall_height": 3.212,
+    "base_ring_diameter": 11.05
+   },
+   "mounting_plane_m": 0.015598,
+   "object_base_m": 0.015598,
+   "base_gap_mm": -0.0,
+   "bbox_product_mm": {
+    "x": [
+     105.25,
+     116.3
+    ],
+    "y": [
+     -89.64,
+     -78.59
+    ],
+    "z": [
+     15.598,
+     18.81
+    ]
+   }
+  },
+  {
+   "kind": "mini",
+   "centre_px": [
+    1234.0,
+    847.5
+   ],
+   "pointer_angle_rad": 8.63938045501709,
+   "design_mm": {
+    "cap_diameter_D": 28.0,
+    "overall_height": 8.4,
+    "H_over_D": 0.3,
+    "upper_face_radius": 13.02,
+    "base_ring_diameter": 28.9,
+    "bevel_width": 1.5,
+    "crown": 0.55,
+    "edge_round": 0.25,
+    "groove_top_z": 1.75,
+    "flute_depth": 0.252
+   },
+   "flutes_counted": 48,
+   "scale_scene_per_design": 0.000382,
+   "scene_mm": {
+    "cap_diameter": 10.706,
+    "overall_height": 3.212,
+    "base_ring_diameter": 11.05
+   },
+   "mounting_plane_m": 0.015598,
+   "object_base_m": 0.015598,
+   "base_gap_mm": -0.0,
+   "bbox_product_mm": {
+    "x": [
+     135.36,
+     146.41
+    ],
+    "y": [
+     -89.64,
+     -78.59
+    ],
+    "z": [
+     15.598,
+     18.81
+    ]
+   }
+  },
+  {
+   "kind": "mini",
+   "centre_px": [
+    1344.0,
+    847.5
+   ],
+   "pointer_angle_rad": 6.283185958862305,
+   "design_mm": {
+    "cap_diameter_D": 28.0,
+    "overall_height": 8.4,
+    "H_over_D": 0.3,
+    "upper_face_radius": 13.02,
+    "base_ring_diameter": 28.9,
+    "bevel_width": 1.5,
+    "crown": 0.55,
+    "edge_round": 0.25,
+    "groove_top_z": 1.75,
+    "flute_depth": 0.252
+   },
+   "flutes_counted": 48,
+   "scale_scene_per_design": 0.000382,
+   "scene_mm": {
+    "cap_diameter": 10.706,
+    "overall_height": 3.212,
+    "base_ring_diameter": 11.05
+   },
+   "mounting_plane_m": 0.015598,
+   "object_base_m": 0.015598,
+   "base_gap_mm": -0.0,
+   "bbox_product_mm": {
+    "x": [
+     165.75,
+     176.8
+    ],
+    "y": [
+     -89.64,
+     -78.59
+    ],
+    "z": [
+     15.598,
+     18.81
+    ]
+   }
+  }
+ ]
+}

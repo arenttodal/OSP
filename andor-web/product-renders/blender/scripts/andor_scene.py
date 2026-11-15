@@ -1050,7 +1050,7 @@ if args.border:
 
 if args.save_blend:
     bpy.ops.file.pack_all()
-    bpy.ops.wm.save_as_mainfile(filepath=os.path.abspath(args.save_blend))
+    bpy.ops.wm.save_as_mainfile(filepath=os.path.abspath(args.save_blend), compress=True)
 
 if args.out:
     out = os.path.abspath(args.out)
