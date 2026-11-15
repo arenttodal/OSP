@@ -6,6 +6,7 @@
 #include "EffectRack.h"
 #include "InstrumentFrame.h"
 #include "ShellEngine.h"
+#include "LessonTypes.h"
 
 #include <array>
 #include <map>
@@ -14,8 +15,31 @@
 #include <optional>
 #include <vector>
 
+namespace andor::learn
+{
+class TargetRegistry;
+}
+
 namespace andor::shell
 {
+
+class ShellEditor;
+
+/**
+    ANDOR Learn (opt-in, shared/andor-learn): a product's guided lessons and its Learn mode
+    help. The shell registers its own targets (preset bar, cards, macros, modulation, keyboard,
+    Advanced, the arpeggiator, the racks, the source view's key) and then calls registerTargets
+    for the product's own. Interface only: no parameter, no state, no sound.
+*/
+struct LearnDescriptor
+{
+    /** The catalog (immutable data: lessons, help regions). */
+    std::function<andor::learn::Catalog()> catalog;
+    /** The product's own targets and states (null: the shell's only). */
+    std::function<void (andor::learn::TargetRegistry&, ShellEditor&)> registerTargets;
+    /** Whether the product has a capability a lesson needs (null: none). */
+    std::function<bool (const juce::String& capability, osp::plugin::InstrumentHost&)> hasCapability;
+};
 
 /**
     What makes a product built from the ANDOR Instrument Shell itself: its identity and
@@ -216,6 +240,10 @@ struct ProductInfo
         std::function<std::unique_ptr<osp::plugin::MiniPanel> (osp::plugin::InstrumentHost&, int card)> panel;
     };
     std::optional<Satellite> satellite;
+    /** ANDOR Learn (opt-in): guided lessons and Learn mode, two items in the header menu.
+        Unset: no menu item, no invitation, no event, nothing drawn (ANDOR OSP and every
+        other product exactly as before). */
+    std::optional<LearnDescriptor> learn;
 };
 
 /** Defined by the product (Product.cpp). */

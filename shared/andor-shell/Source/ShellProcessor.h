@@ -145,6 +145,8 @@ public:
     {
         return ! referenceParity && product().satellite && product().satellite->panel != nullptr ? product().satellite->panel (*this, card) : nullptr;
     }
+    /** ANDOR Learn (the product's opt-in; never in the parity render). */
+    bool learnEnabled() const noexcept { return ! referenceParity && product().learn.has_value() && product().learn->catalog != nullptr; }
     bool generatorGranularToggle() const noexcept { return ! referenceParity && product().generatorGranularToggle; }
     juce::String cardArpNamespace() const override { return productInfo().slug + "."; }
     void setArpViewCard (int shown) noexcept override { arpViewLane.store (std::clamp (shown, 0, 2), std::memory_order_relaxed); }
