@@ -93,6 +93,8 @@ namespace
         }
         if (productInfo().addParameters != nullptr)
             productInfo().addParameters (layout);
+        // The MOD WHEEL's VIBRATO: after the product's own, so none of them moves.
+        InstrumentHost::addVibratoParameters (layout);
         return layout;
     }
 

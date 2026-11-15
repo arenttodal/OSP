@@ -269,7 +269,7 @@ TEST_CASE ("vibrato: listening demos (OSP_VIBRATO_DEMO_DIR)", "[unit][vibrato][d
         u32 (16); u16 (1); u16 (1); u32 (48000); u32 (96000); u16 (2); u16 (16);
         std::fwrite ("data", 1, 4, f); u32 (bytes);
         for (const float s : x)
-            u16 (static_cast<std::uint16_t> (static_cast<std::int16_t> (std::clamp (s * 1.4f, -1.0f, 1.0f) * 32767.0f)));
+            u16 (static_cast<std::uint16_t> (static_cast<std::int16_t> (std::clamp (s * 3.5f, -1.0f, 1.0f) * 32767.0f)));
         std::fclose (f);
     };
     auto take = testsignals::vowel (midiToHz (57), 6.0, rate, 7, 0.5, 1);

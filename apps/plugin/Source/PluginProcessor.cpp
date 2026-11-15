@@ -66,7 +66,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
 {
     // The ANDOR parameter schema (shared with every product built from the ANDOR Instrument
     // Shell): ANDOR OSP's own, frozen (tests/plugin/golden/osp-parameter-schema.txt).
-    return createParameterLayout();
+    auto layout = createParameterLayout();
+    addVibratoParameters (layout);   // (after everything: nothing before moves)
+    return layout;
 }
 
 const juce::StringArray& OspAudioProcessor::layerStateNames()

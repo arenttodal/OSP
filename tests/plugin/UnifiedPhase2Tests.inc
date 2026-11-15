@@ -157,7 +157,7 @@ TEST_CASE ("plugin: Phase 2's parameters are appended and neutral; the modulatio
     // Thirteen parameters, in order: per layer SCATTER, PAN, WINDOW, KEY DNA AMOUNT; the budget.
     // Only the routes' second destinations (version 21, MIX modulation), each layer's
     // SYNTHESIZE (version 22), its SYNTH page and SPACE's ABYSS (version 23) and SPACE's VINTAGE
-    // and BLOOM (version 24) come after them.
+    // and BLOOM (version 24) come after them, then the MOD WHEEL's VIBRATO (version 28).
     juce::StringArray expected;
     for (int l = 0; l < 3; ++l)
         for (const char* n : { "granular.scatter", "granular.pan", "granular.window", "keyDna.amount" })
@@ -174,7 +174,9 @@ TEST_CASE ("plugin: Phase 2's parameters are appended and neutral; the modulatio
                             "space.vintage.variant", "space.vintage.era", "space.vintage.diffusion", "space.bloom.variant",   // (version 24)
                             "space.bloom.sync", "space.bloom.division", "space.bloom.time", "space.bloom.diffusion",
                             "space.abyss.variant",   // (version 25)
-                            "echo.ascend.interval", "echo.ascend.motion" })   // (version 26)
+                            "echo.ascend.interval", "echo.ascend.motion",   // (version 26)
+                            "vibrato.enabled", "vibrato.depth", "vibrato.rate", "vibrato.delay", "vibrato.rise",   // (version 28: the
+                            "vibrato.control", "vibrato.amount", "vibrato.sourceA", "vibrato.sourceB", "vibrato.sourceC" })   // MOD WHEEL's VIBRATO)
         expected.add (id);
     REQUIRE (all.size() > expected.size());
     for (int i = 0; i < expected.size(); ++i)

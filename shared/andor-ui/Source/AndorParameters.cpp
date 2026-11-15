@@ -637,9 +637,18 @@ juce::AudioProcessorValueTreeState::ParameterLayout InstrumentHost::createParame
         layout.add (parameters::make<juce::AudioParameterChoice> (id26 (ids::echoMotion), "Echo Ascend Motion", juce::StringArray { "Rise", "Steady", "Late" },
                                                                   static_cast<int> (d26.echoMotion)));
     }
+    return layout;
+}
+
+void InstrumentHost::addVibratoParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout)
+{
+    using Range = juce::NormalisableRange<float>;
+    auto percent = juce::AudioParameterFloatAttributes().withLabel ("%");
+    const Range unit (0.0f, 100.0f, 0.1f);
     {
-        // The MOD WHEEL's VIBRATO (version hint 28), appended so nothing before moves. Off by
-        // default: sessions and presets from before it play exactly as they did.
+        // The MOD WHEEL's VIBRATO (version hint 28), appended after everything else - a product's
+        // own parameters included - so nothing before moves. Off by default: sessions and presets
+        // from before it play exactly as they did.
         auto id28 = [] (const juce::String& id) { return juce::ParameterID { id, 28 }; };
         const vibrato::Settings v;
         Range rate (0.5f, 12.0f, 0.01f);
@@ -669,7 +678,6 @@ juce::AudioProcessorValueTreeState::ParameterLayout InstrumentHost::createParame
         layout.add (parameters::make<juce::AudioParameterBool> (id28 (ids::vibratoSourceB), "Vibrato Source B", v.sources[1]));
         layout.add (parameters::make<juce::AudioParameterBool> (id28 (ids::vibratoSourceC), "Vibrato Source C", v.sources[2]));
     }
-    return layout;
 }
 
 } // namespace osp::plugin
