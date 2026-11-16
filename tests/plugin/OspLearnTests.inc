@@ -210,9 +210,30 @@ TEST_CASE ("learn: Quick Start, end to end, only the musician's own actions comp
     CHECK_FALSE (rig.stepDone());
     rig.userSet ("reimagined", 0.0f);
     REQUIRE (rig.stepDone());
+    rig.next();
+    // The last step: where Learn is found again (the INFO key, and the menu's Learn). It points
+    // at the key and turns nothing on.
+    CHECK (rig.stepId() == "learn.again");
+    REQUIRE (rig.learn.runner().isLastStep());
+    CHECK (rig.learn.runner().step()->body.contains ("i in the corner"));
+    CHECK (rig.learn.runner().step()->body.contains ("three-dot menu"));
+    CHECK_FALSE (rig.learn.learnMode());
+    {
+        auto& content = *rig.learn.highlight()->getParentComponent();
+        const auto key = rig.learn.targets().boundsIn ("keyboard.info", content);
+        REQUIRE (key.has_value());
+        auto* info = rig.ui.keyboardActions().button (osp::plugin::KeyboardUtilityActions::Action::info);
+        REQUIRE (info != nullptr);
+        CHECK (*key == content.getLocalArea (info, info->getLocalBounds()));
+        REQUIRE (rig.learn.highlight()->target().has_value());
+        CHECK (rig.learn.highlight()->target()->intersects (*key));
+    }
     rig.learn.noteAction ("finish");
     rig.tick();
-    CHECK (rig.learn.noteKind() == LearnNote::complete);
+    // Nothing to choose (no example was loaded): the lesson ends in the tutorials, its tick shown.
+    CHECK (rig.learn.noteKind() == LearnNote::none);
+    REQUIRE (rig.learn.browser() != nullptr);
+    CHECK (rig.learn.browser()->isVisible());
     // Progress: complete, under OSP's own name.
     const auto progress = rig.learn.store().read();
     CHECK (progress.product == "osp");
@@ -220,9 +241,36 @@ TEST_CASE ("learn: Quick Start, end to end, only the musician's own actions comp
     CHECK (progress.lessons.at ("osp.quickstart").status == "complete");
     // The example was never involved: nothing to restore.
     CHECK_FALSE (rig.p.canRestoreBeforeTutorial());
-    rig.learn.noteAction ("close");
+    rig.learn.closeBrowser();
     rig.tick();
     CHECK_FALSE (rig.learn.isActive());
+}
+
+TEST_CASE ("learn: a lesson played on its example asks Keep / Restore, then the tutorials open", "[plugin][learn]")
+{
+    LearnRig rig;
+    REQUIRE (rig.learn.startLesson ("osp.quickstart"));
+    rig.tick();
+    rig.learn.noteAction ("example");
+    rig.waitLoaded();
+    rig.tick();
+    rig.tick();
+    REQUIRE (rig.p.canRestoreBeforeTutorial());
+    // Straight to the last step (the lesson's own pages are tested above).
+    REQUIRE (rig.learn.startLesson ("osp.quickstart", static_cast<int> (rig.learn.catalog().findLesson ("osp.quickstart")->steps.size()) - 1));
+    rig.tick();
+    REQUIRE (rig.stepId() == "learn.again");
+    rig.learn.noteAction ("finish");
+    rig.tick();
+    REQUIRE (rig.learn.noteKind() == LearnNote::complete);
+    CHECK (rig.learn.note()->actionIds().contains ("keep"));
+    CHECK (rig.learn.note()->actionIds().contains ("restore"));
+    CHECK (rig.learn.browser() == nullptr);
+    rig.learn.noteAction ("keep");
+    rig.tick();
+    CHECK (rig.learn.noteKind() == LearnNote::none);
+    REQUIRE (rig.learn.browser() != nullptr);
+    rig.learn.closeBrowser();
 }
 
 TEST_CASE ("learn: a lesson that needs a sound asks first, loads the example only when chosen, and restores", "[plugin][learn]")
