@@ -307,13 +307,6 @@ void setUpKeyboard (OspKeyboard& keyboard)
     keyboard.setColour (juce::MidiKeyboardComponent::blackNoteColourId, palette::ebony);
 }
 
-void setUpStatusLabel (juce::Label& label)
-{
-    label.setFont (type::micro (16.0f));
-    label.setColour (juce::Label::textColourId, design::colour::textMicro.darker (0.15f));
-    label.setBorderSize ({ 0, 0, 0, 0 });
-}
-
 void place (const Parts& parts, bool arpShown)
 {
     using namespace design;
@@ -367,7 +360,6 @@ void place (const Parts& parts, bool arpShown)
         parts.keyboard->setBounds (low (layout::keyboard));
         parts.keyboard->setKeyWidth (layout::keyboard.getWidth() / 52.0f);   // 88 keys = 52 white keys
     }
-    set (parts.status, low (layout::status));
     set (parts.arpControl, low (layout::arpControl));
     set (parts.advanced, low (layout::advanced));
     set (parts.utilityActions, low (layout::advanced.expanded (static_cast<float> (KeyboardUtilityActions::margin))));
@@ -508,7 +500,9 @@ void placePopover (MiniPanel& popup, const juce::Component& content, juce::Point
     // Inside the instrument itself (never over the modulation bay).
     const auto limits = content.getLocalBounds().toFloat().withWidth (design::width).reduced (14.0f);
     x = juce::jlimit (limits.getX(), std::max (limits.getX(), limits.getRight() - size.x), x);
-    y = std::max (limits.getY(), y);
+    // ... and above its foot (the compact bottom edge leaves less room under a rack's keys):
+    // a popover that would run past it moves up, never further than the top.
+    y = std::max (limits.getY(), std::min (y, limits.getBottom() - size.y));
     popup.setTransform (juce::AffineTransform::scale (scale));
     const auto card = popup.cardSize();
     popup.setBounds (juce::roundToInt ((x - m) / scale), juce::roundToInt ((y - m) / scale),

@@ -317,8 +317,7 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     keyboard.tintOf = [this] (int note) { return keyTints[static_cast<std::size_t> (std::clamp (note, 0, 127))]; };
     content.addAndMakeVisible (keyboard);
 
-    frame::setUpStatusLabel (statusLabel);
-    content.addAndMakeVisible (statusLabel);
+    shownStatusMessage = ospProcessor.statusMessage();   // (an older message is not news to a new editor)
     // SETTINGS and INFO beneath ARP (the large Advanced key's place).
     utilityKeys.onClick = [this] (KeyboardUtilityActions::Action a) { utilityKeyClicked (a); };
     content.addAndMakeVisible (utilityKeys);
@@ -1360,7 +1359,6 @@ void OspAudioProcessorEditor::layoutInstrument()
     parts.pitchWheel = &pitchWheel;
     parts.modWheel = &modWheel;
     parts.keyboard = &keyboard;
-    parts.status = &statusLabel;
     parts.arpControl = &arpButton;
     parts.utilityActions = &utilityKeys;
     parts.headerMix = &headerMix;
@@ -1373,23 +1371,30 @@ void OspAudioProcessorEditor::layoutInstrument()
 
 void OspAudioProcessorEditor::updateStatus()
 {
+    // No footer line (the compact bottom edge): "Ready", "No sound loaded" and the notes held
+    // need no words, and the cards show their own loading. What matters - a file that could not
+    // load, a preset opened or saved, a warning about the sound - is the overlay's brief notice,
+    // once, when it happens.
     const int layer = ospProcessor.editLayer();
-    juce::String status;
-    switch (ospProcessor.loadState (layer))
+    const bool failed = ospProcessor.loadState (layer) == OspAudioProcessor::LoadState::failed;
+    if (failed && ! shownLoadFailed)
+        modOverlay.showStatusNotice ("Could not load that file");
+    shownLoadFailed = failed;
+    if (const auto message = ospProcessor.statusMessage(); message != shownStatusMessage)
     {
-        case OspAudioProcessor::LoadState::empty: status = shownCount > 0 ? "" : "No sound loaded"; break;
-        case OspAudioProcessor::LoadState::loading: status = juce::String::fromUTF8 ("Understanding the sound\xe2\x80\xa6"); break;
-        case OspAudioProcessor::LoadState::ready: status = ospProcessor.stageMessage(); break;
-        case OspAudioProcessor::LoadState::failed: status = "Could not load that file"; break;
+        shownStatusMessage = message;
+        if (message.isNotEmpty())
+            modOverlay.showStatusNotice (message);
     }
-    const int voices = ospProcessor.activeVoices.load();
-    if (voices > 0)
-        status << (status.isNotEmpty() ? dot : juce::String()) << voices << (voices == 1 ? " note" : " notes");
-    const auto message = ospProcessor.statusMessage();
-    if (message.isNotEmpty())
-        status << (status.isNotEmpty() ? dot : juce::String()) << message;
-    if (statusLabel.getText() != status)
-        statusLabel.setText (status, juce::dontSendNotification);
+    // ("Ready · Natural pitch needs ...": the part after "Ready" is a warning worth reading)
+    const auto stage = ospProcessor.stageMessage();
+    const auto warning = stage.startsWith ("Ready") ? stage.fromFirstOccurrenceOf (juce::String::fromUTF8 ("\xc2\xb7 "), false, false).trim() : juce::String();
+    if (warning != shownSoundWarning)
+    {
+        shownSoundWarning = warning;
+        if (warning.isNotEmpty())
+            modOverlay.showStatusNotice (warning);
+    }
 }
 
 void OspAudioProcessorEditor::updateKeyTints()

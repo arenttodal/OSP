@@ -8443,3 +8443,80 @@ TEST_CASE ("plugin: screenshots of the SETTINGS / INFO keys and the compact popo
         learn->runner().close();
     }
 }
+
+TEST_CASE ("plugin: screenshots of the bottom edge at the natural size, 869 / 1448 / 1810 wide (OSP_SCREENSHOT_DIR, OSP_SCREENSHOT_TAG)", "[.][screenshots-bottom]")
+{
+    const auto* dir = std::getenv ("OSP_SCREENSHOT_DIR");
+    REQUIRE (dir != nullptr);
+    const auto* tagEnv = std::getenv ("OSP_SCREENSHOT_TAG");
+    const juce::String tag = tagEnv != nullptr ? juce::String (tagEnv) : juce::String ("now");
+    const juce::File out (juce::String::fromUTF8 (dir));
+    out.createDirectory();
+    TempDir tmp;
+    OspAudioProcessor p;
+    loadAndWait (p, writeSource (tmp.dir, "vowel.wav", testsignals::vowel (midiToHz (57), 3.0, 44100.0, 3)));
+    std::unique_ptr<juce::AudioProcessorEditor> base (p.createEditorIfNeeded());
+    auto* editor = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (base.get());
+    REQUIRE (editor != nullptr);
+    editor->refreshNow();
+    // The natural height for a width: the editor's own (the window follows the instrument).
+    const float ratio = static_cast<float> (editor->getHeight()) / static_cast<float> (editor->getWidth());
+    for (const int width : { 1448, 869, 1810 })
+    {
+        editor->setSize (width, juce::roundToInt (static_cast<float> (width) * ratio));
+        editor->refreshNow();
+        const auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f);
+        const auto file = out.getChildFile ("osp-bottom-" + tag + "-" + juce::String (width) + "x" + juce::String (editor->getHeight()) + ".png");
+        file.deleteFile();
+        juce::FileOutputStream stream (file);
+        juce::PNGImageFormat().writeImageToStream (image, stream);
+    }
+}
+
+TEST_CASE ("plugin: the compact bottom edge - the housing ends 22 px under the keys, no footer line; messages are brief notices", "[ui][andor-ui][bottom]")
+{
+    namespace design = osp::plugin::design;
+    namespace layout = osp::plugin::design::layout;
+    OspAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> base (p.createEditorIfNeeded());
+    auto* editor = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (base.get());
+    REQUIRE (editor != nullptr);
+    editor->refreshNow();
+    // The window: the instrument's height for its width (1086 wide by default), nothing under it.
+    CHECK (std::abs (static_cast<float> (editor->getHeight()) - static_cast<float> (editor->getWidth()) * design::height / design::width) <= 1.0f);
+    editor->setSize (1448, juce::roundToInt (design::height));
+    editor->refreshNow();
+    const float foot = layout::housing.getBottom();
+    CHECK (foot == Approx (1036.0f));
+    // The keys where they always were, the same size.
+    const auto keys = editor->keyboardComponent().getBoundsInParent().toFloat();
+    CHECK (keys.getY() == Approx (layout::keyboard.getY()));
+    CHECK (keys.getBottom() == Approx (layout::keyboard.getBottom()));
+    // PITCH and MOD: their captions (and MOD's socket) whole, at least 15 px above the foot.
+    for (auto* wheel : { &editor->pitchBendWheel(), &editor->modulationWheel() })
+    {
+        CHECK (static_cast<float> (wheel->getY()) == Approx (layout::pitchWheel.getY()));
+        CHECK (static_cast<float> (wheel->getY()) + osp::plugin::Wheel::wheelHeight + 18.0f <= foot - 15.0f);
+        CHECK (static_cast<float> (wheel->getBottom()) <= foot);
+    }
+    CHECK (static_cast<float> (editor->arpControl().getY()) == Approx (layout::arpControl.getY()));
+    // No footer line: nothing that shows text lies below the keys.
+    std::function<void (juce::Component&)> walk = [&] (juce::Component& c) {
+        for (auto* child : c.getChildren())
+        {
+            if (child->isVisible() && dynamic_cast<juce::Label*> (child) != nullptr && child->getParentComponent() != nullptr
+                && child->getParentComponent()->getParentComponent() == editor)
+            {
+                INFO (child->getName() << " " << child->getBounds().toString());
+                CHECK (static_cast<float> (child->getY()) < keys.getBottom());
+            }
+            walk (*child);
+        }
+    };
+    walk (*editor);
+    // The processor's messages (an open, a save, a refusal): once each, as the overlay's notice.
+    CHECK (editor->modulationOverlay().currentNotice().isEmpty());
+    p.showMessage ("Opened Warm Hymn");
+    editor->refreshNow();
+    CHECK (editor->modulationOverlay().currentNotice() == "Opened Warm Hymn");
+}

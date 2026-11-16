@@ -332,7 +332,10 @@ private:
     float shownWheelPosition = -1.0f;
     std::array<float, 4> shownEnvelope {};   ///< the AMP envelope's values as last drawn
     osp::plugin::OspKeyboard keyboard;
-    juce::Label statusLabel;
+    /** What the footer's status line said that matters, now the overlay's notices: shown once
+        each, when it changes (never "Ready"). */
+    juce::String shownStatusMessage;
+    bool shownLoadFailed = false;
     osp::plugin::KeyboardUtilityActions utilityKeys;
     void utilityKeyClicked (osp::plugin::KeyboardUtilityActions::Action);
     /** The keys follow what they control (AUX shown, Advanced open, Info on). */

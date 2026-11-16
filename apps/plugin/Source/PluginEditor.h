@@ -251,7 +251,10 @@ private:
     bool tintedLoop = true;
     int tintedLayer = -1;
     void updateKeyTints();
-    juce::Label statusLabel;
+    /** What the footer's status line said that matters, now the overlay's notices: shown once
+        each, when it changes (never "Ready" or the notes held). */
+    juce::String shownStatusMessage, shownSoundWarning;
+    bool shownLoadFailed = false;
     /** SETTINGS (Advanced) and INFO (ANDOR Learn) beneath ARP: OSP has no AUX D, so no D. */
     KeyboardUtilityActions utilityKeys { { KeyboardUtilityActions::Action::settings, KeyboardUtilityActions::Action::info } };
     void utilityKeyClicked (KeyboardUtilityActions::Action);

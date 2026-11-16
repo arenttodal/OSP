@@ -23,9 +23,14 @@ constexpr bool showMixTriangle = false;
     editor scales that whole layout uniformly to the window. Every position, size and colour
     below is measured from the references (design/reference/palette.md); change them only
     against an overlay (scripts/visual-review.sh), never by eye.
+
+    The compact bottom edge (16 Nov 2026): the canvas ends 36 px sooner. The footer's status
+    line went (its messages are the overlay's brief notices now), and the housing ends 22 px
+    under the keys - about 20 px under the PITCH / MOD captions, like its side insets - with
+    the same 14 px surround and shadow below it. Nothing above the keyboard's foot moved.
 */
 constexpr float width = 1448.0f;
-constexpr float height = 1086.0f;
+constexpr float height = 1050.0f;
 
 //==============================================================================
 namespace colour
@@ -232,11 +237,14 @@ namespace colour
 }
 
 //==============================================================================
-/** Positions in reference pixels (the canonical 1448 x 1086 canvas). */
+/** Positions in reference pixels (the canonical 1448 x 1050 canvas: the 1448 x 1086
+    references with the compact bottom edge, every position above the keyboard's foot as it was). */
 namespace layout
 {
     using R = juce::Rectangle<float>;
-    const R housing { 25.0f, 19.0f, 1398.0f, 1053.0f };
+    /** The housing's foot: the keys' foot (keyboard.getBottom(), 1014) + 22 px of ivory; the
+        surround below it is the canvas' last 14 px (height - 1036). */
+    const R housing { 25.0f, 19.0f, 1398.0f, 1017.0f };
     constexpr float housingRadius = 26.0f;
 
     // Header
@@ -266,12 +274,11 @@ namespace layout
     /** Where the envelope's half of the macro panel starts (six macros left of it). */
     constexpr float envelopeX = 955.0f;
 
-    // Keyboard row and footer
+    // Keyboard row (the instrument's foot: no footer under it)
     const R pitchWheel { 42.0f, 913.0f, 36.0f, 88.0f };
     const R modWheel { 93.0f, 913.0f, 36.0f, 88.0f };
     /** The keyboard ends where the arpeggiator's card column begins (the approved mockup). */
     const R keyboard { 148.0f, 913.0f, 1150.0f, 101.0f };
-    const R status { 48.0f, 1038.0f, 600.0f, 24.0f };
     /** Right of the keyboard, level with it: the arpeggiator's card (light, ARP, chevron,
         pattern and rate) and the Advanced card under it. */
     const R arpControl { 1308.0f, 913.0f, 105.0f, 64.0f };

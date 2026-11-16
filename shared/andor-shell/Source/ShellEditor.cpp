@@ -366,8 +366,7 @@ ShellEditor::ShellEditor (ShellProcessor& p)
         };
     frame::setUpKeyboard (keyboard);
     content.addAndMakeVisible (keyboard);
-    frame::setUpStatusLabel (statusLabel);
-    content.addAndMakeVisible (statusLabel);
+    shownStatusMessage = shell.statusMessage();   // (an older message is not news to a new editor)
     // The keyboard's action keys beneath ARP (Advanced's old place): D (a product with an AUX
     // strip), SETTINGS (ANDOR OSP's Advanced popover) and INFO (with Learn: set again below).
     {
@@ -528,7 +527,6 @@ void ShellEditor::layoutInstrument()
     parts.pitchWheel = &pitchWheel;
     parts.modWheel = &modWheel;
     parts.keyboard = &keyboard;
-    parts.status = &statusLabel;
     parts.arpControl = &arpButton;
     parts.utilityActions = &utilityKeys;
     parts.headerMix = &headerMix;
@@ -1680,22 +1678,19 @@ void ShellEditor::placeKeyDna()
 
 void ShellEditor::updateStatus()
 {
-    juce::String status;
-    switch (shell.loadState (shell.editLayer()))
+    // No footer line (the compact bottom edge): "Ready" and "No sound loaded" need no words, and
+    // the cards show their own loading. A file that could not load and the product's messages
+    // (a preset opened or saved, a file left out) are the overlay's brief notice, once each.
+    const bool failed = shell.loadState (shell.editLayer()) == InstrumentHost::LoadState::failed;
+    if (failed && ! shownLoadFailed)
+        modOverlay.showStatusNotice ("Could not load that file");
+    shownLoadFailed = failed;
+    if (const auto message = shell.statusMessage(); message != shownStatusMessage)
     {
-        case InstrumentHost::LoadState::empty: status = shownCount > 0 ? "" : "No sound loaded"; break;
-        case InstrumentHost::LoadState::loading: status = juce::String::fromUTF8 ("Understanding the sound\xe2\x80\xa6"); break;
-        case InstrumentHost::LoadState::ready: status = "Ready"; break;
-        case InstrumentHost::LoadState::failed: status = "Could not load that file"; break;
+        shownStatusMessage = message;
+        if (message.isNotEmpty())
+            modOverlay.showStatusNotice (message);
     }
-    const auto dot = juce::String::fromUTF8 (" \xc2\xb7 ");
-    if (const auto message = shell.statusMessage(); message.isNotEmpty())
-        status << (status.isNotEmpty() ? dot : juce::String()) << message;
-    // A diagnostic engine always says what it is.
-    if (const auto& engine = shell.engineDescription(); engine.diagnostic && engine.statusLine.isNotEmpty())
-        status << (status.isNotEmpty() ? dot : juce::String()) << engine.statusLine;
-    if (statusLabel.getText() != status)
-        statusLabel.setText (status, juce::dontSendNotification);
 }
 
 void ShellEditor::updateHybridDoor()

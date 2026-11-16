@@ -1,5 +1,23 @@
 # Status
 
+> **16 Nov 2026, compact bottom edge (both instruments, shared):**
+> - `design::height` is now 1050 (was 1086), and `layout::housing` ends at 1036: 22 px of
+>   housing under the keys, about 20 px under the PITCH / MOD captions, then the same 14 px
+>   surround and shadow.
+> - Every position above the keys' foot is unchanged, and nothing is scaled.
+> - The footer status line (`layout::status`, `Parts::status`) is removed.
+>   - Its messages that matter now appear once in `ModulationOverlay::showStatusNotice`: a file
+>     that could not load, the processor's messages, and OSP's natural-pitch warning.
+>   - "Ready", "No sound loaded" and the note count are gone.
+> - `placePopover` now also keeps a popover above the instrument's foot.
+> - The visual regression drops the `status-line` mask.
+> - Verified:
+>   - Plugin tests: 4 / 4 shards (171 cases), including the new bottom-edge test.
+>   - The osp_visual_reference, andor_example_tests and example visual tests pass. The shell
+>     bottom-edge test runs for every product.
+>   - DAW and Mac checks are UNVERIFIED (OWNER TEST).
+> - ANDOR Analog: see its docs/BOTTOM_EDGE.md for before / after screenshots and measurements.
+
 > **16 Nov 2026, keyboard keys SETTINGS / INFO, and ANDOR Learn in OSP (both instruments,
 > shared):**
 > - `shared/andor-ui` `KeyboardUtilityActions` replaces the large Advanced key beneath ARP.
