@@ -188,6 +188,8 @@ struct ProductInfo
     {
         float height = 76.0f;   ///< design px
         juce::String name = "AUX";
+        /** Its letter (the keyboard's D key: "Show AUX D" / "Hide AUX D"). */
+        juce::String letter = "D";
         std::function<std::unique_ptr<juce::Component> (osp::plugin::InstrumentHost&)> create;
         /** A file dropped on neither a card nor a part that owns drops (empty space) does
             nothing (ANDOR ANALOG). Off: it is added as a layer, as ANDOR OSP does. */

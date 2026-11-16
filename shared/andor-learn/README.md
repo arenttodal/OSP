@@ -4,14 +4,14 @@ ANDOR Learn adds a temporary teaching layer to a product built from the ANDOR In
 
 - short **lessons** the musician does with the real controls, each step outlining the exact
   control in green and checking the real state before it moves on;
-- **Info** (Toggle Info: point to or click an area to read about it);
+- **Info** (the INFO key beneath ARP: point to a control to read about it; clicks still reach the control);
 - a **lesson browser** (Tutorials...);
 - a **one-time invitation**;
 - **per-user progress**;
 - optional **example sounds** a lesson can offer, loaded only on the musician's choice, with the
   sound before them kept for **Restore Previous Sound**.
 
-The menu has one entry, **Learn**, holding **Tutorials...**, **Toggle Info** and
+The menu has one entry, **Learn**, holding **Tutorials...** and
 **Reset Tutorials...** (and **Restore Previous Sound** while one is kept). There is no Skip: the X
 exits, Back goes back, Next / Continue move on once the task is done or already so.
 

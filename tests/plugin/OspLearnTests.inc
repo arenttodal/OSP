@@ -134,12 +134,12 @@ TEST_CASE ("learn: OSP's own plugin has the shared Learn, idle until asked; its 
     CHECK_FALSE (rig.learn.isActive());
     CHECK (rig.learn.note() == nullptr);
     CHECK (rig.learn.highlight() == nullptr);
-    // The menu: LEARN, Tutorials..., Toggle Info, Reset Tutorials... (no old labels).
+    // The menu: Learn, Tutorials..., Reset Tutorials... (no old labels; Info is the INFO key's).
     juce::PopupMenu menu;
     rig.learn.addMenuItems (menu);
     const auto dots = juce::String::fromUTF8 ("\xe2\x80\xa6");
     CHECK (menuHas (menu, "Tutorials" + dots));
-    CHECK (menuHas (menu, "Toggle Info"));
+    CHECK_FALSE (menuHas (menu, "Toggle Info"));
     CHECK (menuHas (menu, "Reset Tutorials" + dots));
     CHECK_FALSE (menuHas (menu, "Learn mode"));
     CHECK_FALSE (menuHas (menu, "Learn ANDOR" + dots));

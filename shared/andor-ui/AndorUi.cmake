@@ -17,6 +17,7 @@ set(ANDOR_UI_SOURCES
     ${ANDOR_UI_DIR}/Source/CeramicSkin.cpp
     ${ANDOR_UI_DIR}/Source/ShapingPopups.cpp
     ${ANDOR_UI_DIR}/Source/WheelPopups.cpp
+    ${ANDOR_UI_DIR}/Source/KeyboardUtilityActions.cpp
     ${ANDOR_UI_DIR}/Source/MacroPopups.cpp
     ${ANDOR_UI_DIR}/Source/EngineCard.cpp
     ${ANDOR_UI_DIR}/Source/MainSections.cpp

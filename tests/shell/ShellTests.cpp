@@ -719,6 +719,60 @@ TEST_CASE ("shell: the AUX strip is a product's opt-in view; without it nothing 
     CHECK (ui->instrumentHeight() == Approx (height));
 }
 
+TEST_CASE ("shell: the compact bottom edge - the housing ends 22 px under the keys, no footer line; a failed load is a brief notice", "[shell][editor][bottom]")
+{
+    namespace design = osp::plugin::design;
+    namespace layout = osp::plugin::design::layout;
+    // The canvas: the keys' foot + 22 px of housing + the 14 px surround.
+    CHECK (design::height == Approx (1050.0f));
+    CHECK (layout::keyboard.getBottom() == Approx (1014.0f));
+    CHECK (layout::housing.getBottom() == Approx (layout::keyboard.getBottom() + 22.0f));
+    CHECK (design::height - layout::housing.getBottom() == Approx (14.0f));
+
+    ShellProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<ShellEditor*> (editor.get());
+    REQUIRE (ui != nullptr);
+    ui->setArpExpanded (false);
+    ui->setAuxStripShown (false);
+    ui->refreshNow();
+    // In the product's own content (its cards may be trimmed: everything below moves up as one).
+    const float h = ui->instrumentHeight();
+    const float foot = h - (design::height - layout::housing.getBottom());   // the housing's foot
+    const auto keys = ui->keyboardComponent().getBoundsInParent().toFloat();
+    CHECK (h - keys.getBottom() == Approx (design::height - layout::keyboard.getBottom()));
+    CHECK (keys.getHeight() == Approx (layout::keyboard.getHeight()));   // (the keys never stretched)
+    // PITCH and MOD: their captions (and MOD's socket) whole, at least 15 px above the foot.
+    for (auto* wheel : { &ui->pitchBendWheel(), &ui->modulationWheel() })
+    {
+        // (the caption's box: under the 88 px wheel, 18 px tall, MOD's socket centred in it)
+        const float captionBottom = static_cast<float> (wheel->getY()) + osp::plugin::Wheel::wheelHeight + 18.0f;
+        INFO ("caption foot " << captionBottom << " housing foot " << foot);
+        CHECK (captionBottom <= foot - 15.0f);
+        CHECK (static_cast<float> (wheel->getBottom()) <= foot);
+    }
+    // The keys beneath ARP clear of the foot.
+    CHECK (static_cast<float> (ui->keyboardActions().getBottom() - osp::plugin::KeyboardUtilityActions::margin) <= foot - 20.0f);
+    // No footer line: nothing that shows text lies below the keys.
+    for (auto* child : ui->contentForTest().getChildren())
+        if (child->isVisible() && dynamic_cast<juce::Label*> (child) != nullptr)
+        {
+            INFO (child->getName() << " " << child->getBounds().toString());
+            CHECK (static_cast<float> (child->getY()) < keys.getBottom());
+        }
+
+    // A file that cannot load: said once, in the overlay's brief notice (no footer to say it in).
+    TempDir tmp;
+    const auto bogus = tmp.dir.getChildFile ("not-audio.wav");
+    bogus.replaceWithText ("this is not audio");
+    CHECK (ui->modulationOverlay().currentNotice().isEmpty());
+    p.loadFile (bogus, 0);
+    p.waitForLoads (10000);
+    p.pollLoads();
+    ui->refreshNow();
+    CHECK (ui->modulationOverlay().currentNotice().isNotEmpty());
+}
+
 TEST_CASE ("shell: the interface is ANDOR OSP's, pixel for pixel outside the approved dynamic regions", "[.][visual-regression]")
 {
     const char* referenceEnv = std::getenv ("ANDOR_VISUAL_REFERENCE_DIR");
@@ -749,7 +803,7 @@ TEST_CASE ("shell: the interface is ANDOR OSP's, pixel for pixel outside the app
     // every pixel outside the masks must be exactly ANDOR OSP's.
     constexpr int tolerance = 0;
     juce::StringArray report { "# Visual regression: " + andor::shell::productInfo().name + " vs ANDOR OSP", "",
-                               "Tolerance: " + juce::String (tolerance) + " (exact), masks: identity, preset-name, status-line (and, with the ARP panel open, arp-cards). Rendered with ANDOR OSP's materials (a product's own finish is its identity: see shipped/).", "",
+                               "Tolerance: " + juce::String (tolerance) + " (exact), masks: identity, preset-name, fx-routing, keyboard-actions (and, with the ARP panel open, arp-cards and arp-satellite). Rendered with ANDOR OSP's materials (a product's own finish is its identity: see shipped/).", "",
                                "| State | Differing pixels outside the masks | Inside the masks (allowed) |", "|---|---|---|" };
     int failures = 0;
     for (const auto& name : visualstates::names())

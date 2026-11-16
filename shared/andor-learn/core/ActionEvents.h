@@ -23,6 +23,10 @@ namespace andor::learn::actions
     // The shell.
     inline constexpr const char* sourceViewToggled = "sourceView.toggled";
     inline constexpr const char* rackToggled = "rack.toggled";
+    // The keyboard's action keys (KeyboardUtilityActions): D, SETTINGS, INFO (a click on the key).
+    inline constexpr const char* auxVisibilityToggled = "aux.visibility.toggled";
+    inline constexpr const char* settingsOpened = "settings.opened";
+    inline constexpr const char* infoToggled = "info.toggled";
     /** A control watched for touches (Target::watchTouches): "<targetId>.touched" after a
         press, drag, wheel or double-click on it. */
     inline juce::String touched (const juce::String& targetId) { return targetId + ".touched"; }

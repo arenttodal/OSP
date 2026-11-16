@@ -140,8 +140,6 @@ namespace frame
 
     /** The keyboard's range (A0..C8), naming (MIDI 60 = C4) and colours. */
     void setUpKeyboard (OspKeyboard& keyboard);
-    /** The footer's status line (its font and colour). */
-    void setUpStatusLabel (juce::Label& label);
 
     /** The parts every ANDOR instrument places the same way (null: not shown). */
     struct Parts
@@ -156,9 +154,11 @@ namespace frame
         juce::Component* pitchWheel = nullptr;
         juce::Component* modWheel = nullptr;
         juce::MidiKeyboardComponent* keyboard = nullptr;
-        juce::Component* status = nullptr;
         juce::Component* arpControl = nullptr;
         juce::Component* advanced = nullptr;
+        /** The keyboard's action keys (KeyboardUtilityActions: D, SETTINGS, INFO) in Advanced's
+            place, with their shadow margin around it. */
+        juce::Component* utilityActions = nullptr;
         juce::Component* headerMix = nullptr;
         /** The effects rack (opt-in) and how far it pushes what is under it (its height
             plus rackGap while a module is expanded; 0 without a rack: as before). */

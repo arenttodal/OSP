@@ -96,8 +96,14 @@ untouched.
 - the vibrato DSP (`osp::vibrato`), CC 1 routes, drag-to-assign and the wheels' spring-back;
 - the popovers' closing: Escape, a click elsewhere, the caption or key again.
 
-**Not present:** the Settings / Info keyboard icons from the shortcut redesign are not on this
-line. ADVANCED's key stays its entry point, and its placement follows that key.
+**SETTINGS and INFO.** The merge of `feature/aux-live-input` (`7984022`, `4489e33`) brings the
+keyboard's utility keys and the compact bottom edge:
+- SETTINGS opens ADVANCED, above the key and still clear of the ARP / SUB housing; INFO switches
+  Learn's Info.
+- The popovers are this line's (the specification's), not that branch's earlier compact versions
+  of the same three panels.
+- Learn: `keyboard.settings` (also `advanced` and `osp.advanced`) and `keyboard.info` point at the
+  keys. The menu no longer holds Advanced or Toggle Info.
 
 ## Learn
 
@@ -172,6 +178,5 @@ line. ADVANCED's key stays its entry point, and its placement follows that key.
     with ANALOG's own (`FxRouting.h` and others; NEXT in STATUS).
   - The shared SUB panel's file is named `AndorSubPanel.h` for this reason.
   - ANALOG's panels are the same shared code: `shell-1086.jpg` shows them in a shell product.
-- **The other OSP line.** `claude/friendly-pascal-0y48r0` (trimmed footer) also moves the
-  PITCH / MOD captions (into its apron). The two lines meet in `Wheel` / `frame::place` and need
-  a merge when both land.
+- **The other footer.** `claude/friendly-pascal-0y48r0` (the trimmed footer with an apron) is not
+  merged: the musician chose the compact bottom edge (`4489e33`, 1050 px) instead.

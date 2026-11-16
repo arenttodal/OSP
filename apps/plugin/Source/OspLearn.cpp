@@ -632,9 +632,11 @@ static Catalog ospCatalog()
     help ("osp.mod.halo", "Modulation ring", "The coloured ring shows how far a source moves this control. Drag it to change the depth; right-click for more.", "osp.modulation");
     help ("osp.header.preset", "Presets and Library", "The preset's name: arrows step through presets; the name opens the Library, starting states and the sound before the last load.",
           "osp.presets");
-    help ("osp.header.menu", "Menu", "Add layers, presets and instruments (Export instrument carries the recordings), undo, interface size, Advanced and the tutorials.");
+    help ("osp.header.menu", "Menu", "Add layers, presets and instruments (Export instrument carries the recordings), undo, interface size and the tutorials.");
     help ("osp.samples", "Samples", "How each file of a multi-sample sound is used: its role, its root note and its velocity layer. A change is yours and is kept.", "osp.multisample");
     help ("osp.advanced", "Advanced Settings", "Advanced contains instrument-wide settings for tuning, voice behavior, dynamics and supported MIDI expression.");
+    help ("keyboard.settings", "Advanced Settings", "Advanced contains instrument-wide settings for tuning, voice behavior, dynamics and supported MIDI expression.");
+    help ("keyboard.info", "Info", "Turn Info on to read explanations of OSP's controls as you point to them.");
     help ("osp.wheel.pitch", "Pitch Bend", "The pitch wheel bends notes up or down as you move it. Click PITCH beneath the wheel to set how far it bends.");
     help ("osp.wheel.mod", "Mod Wheel", "The modulation wheel controls assigned parameters while you play. Click MOD beneath the wheel to set up vibrato. The wheel can continue controlling other parameters at the same time.",
           "osp.vibrato");
@@ -664,7 +666,15 @@ struct OspLearnTargets
         t.add ({ "osp.header.mix", comp (e.headerMix), {}, {}, [&e] { return e.headerMix.isVisible(); }, true });
         t.add ({ "osp.source.dropZone", comp (e.dropZone), {}, {}, [&e] { return e.dropZone.isVisible(); } });
         t.add ({ "osp.keyboard", comp (e.keyboard), {}, {}, {}, true });
-        t.add ({ "osp.advanced", comp (e.advancedButton), {}, [&e] { e.openPopup (OspAudioProcessorEditor::advancedPopup); return e.popup != nullptr; }, {}, true });
+        // The keyboard's action keys beneath ARP: SETTINGS (Advanced) and INFO. "keyboard.settings",
+        // "keyboard.info" and "advanced" are the shared names every ANDOR instrument uses.
+        {
+            using UA = KeyboardUtilityActions::Action;
+            auto key = [&e] (UA a) { return [&e, a] { return static_cast<juce::Component*> (e.utilityKeys.button (a)); }; };
+            for (const char* id : { "osp.advanced", "keyboard.settings", "advanced" })
+                t.add ({ id, key (UA::settings), {}, {}, {}, true });
+            t.add ({ "keyboard.info", key (UA::info), {}, {}, {}, true });
+        }
         // The wheels' captions (their doors), and VIBRATO's controls in MOD's popover.
         t.add ({ "osp.wheel.pitch", comp (e.pitchWheel), [&e] (juce::Component&) { return e.pitchWheel.captionArea().expanded (3.0f).getSmallestIntegerContainer(); }, {}, {}, true });
         t.add ({ "osp.wheel.mod", comp (e.modWheel), [&e] (juce::Component&) { return e.modWheel.captionArea().expanded (3.0f).getSmallestIntegerContainer(); }, {}, {}, true });
@@ -967,7 +977,14 @@ void OspAudioProcessorEditor::createLearn()
     OspLearnTargets::add (*this, learn->targets());
     learn->finishSetup();
     if (! learn->isUsable())
+    {
+        // INFO only where Learn runs (never a key that looks as if it works).
+        learn.reset();
+        utilityKeys.setActions ({ KeyboardUtilityActions::Action::settings });
+        refreshUtilityKeys();
         return;
+    }
+    refreshUtilityKeys();
 
     // The musician's parameter edits: a gesture of the editor's own controls (never automation,
     // a preset or undo). The edited layer's are also reported as "layer{L}...".

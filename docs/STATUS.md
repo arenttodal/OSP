@@ -1,5 +1,60 @@
 # Status
 
+> **16 Nov 2026, merged into OSP's main line: the keyboard keys and the compact bottom edge
+> (`feature/aux-live-input` `7984022` and `4489e33`) with the wheels' line (`claude/osp-wheels`):**
+> - OSP's Learn stays Learn 2.0 (its thirteen lessons and Quick Start), not that branch's
+>   seven-step catalog. The two entries below describe that branch as it was.
+>   - SETTINGS and INFO are Learn targets (`keyboard.settings`, `advanced`, `osp.advanced`,
+>     `keyboard.info`) with help.
+>   - The menu's help text no longer mentions Advanced.
+> - PITCH BEND, MOD WHEEL and ADVANCED are the wheels' line's compact popovers
+>   (`docs/wheels/osp-wheels.md`). ADVANCED opens above SETTINGS, clear of the ARP / SUB housing.
+> - The trimmed footer (`claude/friendly-pascal-0y48r0`) is not merged. The musician chose this
+>   compact bottom edge instead.
+
+> **16 Nov 2026, compact bottom edge (both instruments, shared):**
+> - `design::height` is now 1050 (was 1086), and `layout::housing` ends at 1036: 22 px of
+>   housing under the keys, about 20 px under the PITCH / MOD captions, then the same 14 px
+>   surround and shadow.
+> - Every position above the keys' foot is unchanged, and nothing is scaled.
+> - The footer status line (`layout::status`, `Parts::status`) is removed.
+>   - Its messages that matter now appear once in `ModulationOverlay::showStatusNotice`: a file
+>     that could not load, the processor's messages, and OSP's natural-pitch warning.
+>   - "Ready", "No sound loaded" and the note count are gone.
+> - `placePopover` now also keeps a popover above the instrument's foot.
+> - The visual regression drops the `status-line` mask.
+> - Verified:
+>   - Plugin tests: 4 / 4 shards (171 cases), including the new bottom-edge test.
+>   - The osp_visual_reference, andor_example_tests and example visual tests pass. The shell
+>     bottom-edge test runs for every product.
+>   - DAW and Mac checks are UNVERIFIED (OWNER TEST).
+> - ANDOR Analog: see its docs/BOTTOM_EDGE.md for before / after screenshots and measurements.
+
+> **16 Nov 2026, keyboard keys SETTINGS / INFO, and ANDOR Learn in OSP (both instruments,
+> shared):**
+> - `shared/andor-ui` `KeyboardUtilityActions` replaces the large Advanced key beneath ARP.
+>   - The keys are small square ceramic keys with an icon each.
+>   - OSP has SETTINGS and INFO, centred. ANDOR Analog adds D (AUX D's visibility).
+>   - SETTINGS opens and closes the Advanced popover, now anchored to the key.
+>   - INFO turns Info on and off.
+> - OSP now has ANDOR Learn (`apps/plugin/Source/OspLearn.cpp`):
+>   - Info texts for its controls and a seven-step Quick Start, ending on SETTINGS.
+>   - The Learn submenu: Tutorials… and Reset Tutorials….
+>   - No first-run invitation (`EditorHooks::offerInvitation = false`).
+> - Info now follows the pointer. After a 300 ms rest it explains the control, and clicks pass
+>   through to it.
+> - Toggle Info, OSP's "Advanced settings" and the shell's Show / Hide AUX are gone from the
+>   menus.
+> - MOD WHEEL, PITCH BEND and ADVANCED use the compact MiniPanel proportions.
+> - The shell visual regression gains one approved product mask, `keyboard-actions`, because
+>   which keys exist is the product's choice. Every product is 0 pixels outside the masks.
+> - Verified (Linux):
+>   - osp_tests: 485 cases.
+>   - Plugin tests: 4 / 4 shards (170 cases). New: the utility keys' geometry, SETTINGS,
+>     INFO, the menus and OSP's Quick Start.
+>   - The osp_visual_reference, andor_example_tests and example visual tests pass.
+>   - DAW and Mac checks are UNVERIFIED (OWNER TEST).
+
 > **15 Nov 2026, the wheels' settings (both instruments, shared):**
 > - PITCH and MOD under the wheels are now doors, like a macro's name. A click opens their
 >   popover above the caption; a drag of 3 px or more from MOD still makes a modulation cable.
