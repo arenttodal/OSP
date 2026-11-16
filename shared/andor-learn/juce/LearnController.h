@@ -177,6 +177,11 @@ private:
     bool inspecting = false;
     bool invitationPending = false, invitationClaimed = false;
     bool exampleFailed = false;
+    /** A lesson just ended with nothing to choose: the tutorials open next (once the note that
+        finished it has returned). */
+    bool browserAfterLesson = false;
+    void openBrowserAfterLesson();
+    bool offersRestoreChoice() const;
     juce::String lastScrolledTarget;
     int showingTicks = 0;
 };
