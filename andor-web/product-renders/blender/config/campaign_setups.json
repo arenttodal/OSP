@@ -1,0 +1,543 @@
+{
+ "schemaVersion": 1,
+ "about": "Gate C campaign setups. Every setup renders the same product model as the approved Gate B master (andor_scene.py with --knob hd --hd 0.30 --frame-h 14.4 --finish refined --teak warm); only the stage, lights, camera, float height, exposure and output change. Used by: andor_scene.py --setup NAME --shot ID. Units: metres, degrees, watts; camera yaw/pitch as andor_scene.camera(): pitch from the face normal toward the front edge, yaw around the normal; target in editor px (u, v) and z in mm above the panel's reference height; shift as a fraction of the frame; light positions relative to the product's target point.",
+ "setups": {
+  "ANDOR_GALLERY": {
+   "purpose": "Website hero and product introduction: a premium editorial gallery, light.",
+   "stage": "gallery",
+   "float_m": 0.0,
+   "exposure": -0.42,
+   "world": {
+    "rgb": [
+     0.34,
+     0.325,
+     0.3
+    ],
+    "strength": 0.12
+   },
+   "floor": {
+    "rgb": [
+     0.62,
+     0.595,
+     0.555
+    ],
+    "roughness": 0.78,
+    "note": "warm pale stone, not white; tone from the light's falloff, no texture"
+   },
+   "lights": [
+    {
+     "name": "Key softbox",
+     "offset": [
+      -1.1,
+      0.25,
+      0.95
+     ],
+     "size": [
+      1.4,
+      1.0
+     ],
+     "power": 30,
+     "rgb": [
+      1.0,
+      0.97,
+      0.93
+     ],
+     "why": "large and soft from upper left: ivory keeps its shape; a long gradient across the stone"
+    },
+    {
+     "name": "Edge strip",
+     "offset": [
+      0.55,
+      1.0,
+      0.35
+     ],
+     "size": [
+      1.6,
+      0.08
+     ],
+     "power": 22,
+     "rgb": [
+      1.0,
+      0.95,
+      0.9
+     ],
+     "spread": 60,
+     "why": "narrow, behind right: thin highlights along the teak, the ceramic edges and the knob rims"
+    },
+    {
+     "name": "Overhead",
+     "offset": [
+      0.05,
+      0.1,
+      1.45
+     ],
+     "size": [
+      1.8,
+      1.2
+     ],
+     "power": 3.0,
+     "rgb": [
+      1.0,
+      0.985,
+      0.97
+     ]
+    },
+    {
+     "name": "Fill",
+     "offset": [
+      1.1,
+      -0.9,
+      0.5
+     ],
+     "size": [
+      1.6,
+      1.2
+     ],
+     "power": 2.0,
+     "rgb": [
+      0.93,
+      0.96,
+      1.0
+     ]
+    },
+    {
+     "name": "Front kicker",
+     "offset": [
+      -0.1,
+      -1.1,
+      0.02
+     ],
+     "size": [
+      1.4,
+      0.06
+     ],
+     "power": 6,
+     "rgb": [
+      1.0,
+      0.95,
+      0.9
+     ],
+     "spread": 50,
+     "why": "a line along every key front and the lip"
+    }
+   ],
+   "shots": {
+    "A1": {
+     "title": "Gallery A1 \u00b7 editorial hero (16:9, headline space left)",
+     "res": [
+      2560,
+      1440
+     ],
+     "rot": -11.0,
+     "camera": {
+      "yaw": -30,
+      "pitch": 52,
+      "dist": 1.78,
+      "lens": 85,
+      "target": [
+       724,
+       520,
+       0
+      ],
+      "fstop": 11,
+      "shift": [
+       -0.13,
+       -0.03
+      ],
+      "fit": "HORIZONTAL"
+     },
+     "text_safe": {
+      "x": [
+       0.06,
+       0.42
+      ],
+      "y": [
+       0.2,
+       0.62
+      ]
+     }
+    },
+    "A2": {
+     "title": "Gallery A2 \u00b7 product hero (3:2, full silhouette)",
+     "res": [
+      2400,
+      1600
+     ],
+     "rot": -11.0,
+     "camera": {
+      "yaw": -26,
+      "pitch": 50,
+      "dist": 1.36,
+      "lens": 85,
+      "target": [
+       724,
+       540,
+       0
+      ],
+      "fstop": 11,
+      "shift": [
+       0.02,
+       -0.01
+      ],
+      "fit": "HORIZONTAL"
+     }
+    }
+   }
+  },
+  "ANDOR_FLOATING": {
+   "purpose": "Instagram / Meta, launch announcements, dark website sections: the instrument floats above a dark architectural floor.",
+   "stage": "dark",
+   "float_m": 0.1,
+   "plank_rot": -95,
+   "exposure": 0.1,
+   "world": {
+    "rgb": [
+     0.02,
+     0.018,
+     0.016
+    ],
+    "strength": 0.12
+   },
+   "lights": [
+    {
+     "name": "Key softbox",
+     "offset": [
+      -0.75,
+      0.55,
+      0.75
+     ],
+     "size": [
+      0.9,
+      0.5
+     ],
+     "power": 20,
+     "rgb": [
+      1.0,
+      0.95,
+      0.88
+     ],
+     "link": "product",
+     "why": "raking from upper left-behind: knobs, flutes and card bevels model; short shadows toward the viewer"
+    },
+    {
+     "name": "Rim strip",
+     "offset": [
+      0.7,
+      0.95,
+      0.25
+     ],
+     "size": [
+      1.6,
+      0.08
+     ],
+     "power": 28,
+     "rgb": [
+      1.0,
+      0.92,
+      0.84
+     ],
+     "spread": 60,
+     "link": "product",
+     "why": "separates the silhouette and the teak from the dark floor"
+    },
+    {
+     "name": "Top line",
+     "offset": [
+      -0.1,
+      -0.35,
+      1.0
+     ],
+     "size": [
+      1.4,
+      0.12
+     ],
+     "power": 4.5,
+     "rgb": [
+      1.0,
+      0.97,
+      0.93
+     ],
+     "spread": 70,
+     "link": "product",
+     "why": "a long reflection line on the ceramic top bevels and the display glass edges"
+    },
+    {
+     "name": "Front kicker",
+     "offset": [
+      -0.1,
+      -1.1,
+      0.02
+     ],
+     "size": [
+      1.4,
+      0.06
+     ],
+     "power": 7,
+     "rgb": [
+      1.0,
+      0.95,
+      0.9
+     ],
+     "spread": 50,
+     "link": "product"
+    },
+    {
+     "name": "Fill",
+     "offset": [
+      1.05,
+      -0.85,
+      0.45
+     ],
+     "size": [
+      1.6,
+      1.2
+     ],
+     "power": 0.8,
+     "rgb": [
+      0.93,
+      0.96,
+      1.0
+     ],
+     "link": "product"
+    },
+    {
+     "name": "Floor overhead",
+     "world": [
+      -0.55,
+      0.45,
+      1.5
+     ],
+     "aim": [
+      0.08,
+      -0.08,
+      0.0
+     ],
+     "size": [
+      1.0,
+      0.9
+     ],
+     "power": 34,
+     "rgb": [
+      1.0,
+      0.95,
+      0.88
+     ],
+     "link": "floor",
+     "why": "from the key's side, so the floating shadow falls where the product's light says it should"
+    },
+    {
+     "name": "Floor rake",
+     "world": [
+      -1.6,
+      0.9,
+      0.05
+     ],
+     "aim": [
+      0.4,
+      -0.2,
+      0.0
+     ],
+     "size": [
+      2.8,
+      0.18
+     ],
+     "power": 26,
+     "rgb": [
+      1.0,
+      0.84,
+      0.68
+     ],
+     "spread": 50,
+     "link": "floor"
+    }
+   ],
+   "shots": {
+    "B1": {
+     "title": "Floating B1 \u00b7 cinematic product still (4:5)",
+     "res": [
+      1800,
+      2250
+     ],
+     "rot": -16.0,
+     "camera": {
+      "yaw": -36,
+      "pitch": 58,
+      "dist": 1.2,
+      "lens": 85,
+      "target": [
+       724,
+       560,
+       0
+      ],
+      "fstop": 9,
+      "shift": [
+       0.0,
+       -0.03
+      ],
+      "fit": "HORIZONTAL"
+     }
+    },
+    "B2": {
+     "title": "Floating B2 \u00b7 typography-safe advertising (9:16, copy top)",
+     "res": [
+      1440,
+      2560
+     ],
+     "rot": -16.0,
+     "camera": {
+      "yaw": -36,
+      "pitch": 58,
+      "dist": 1.36,
+      "lens": 85,
+      "target": [
+       724,
+       560,
+       0
+      ],
+      "fstop": 9,
+      "shift": [
+       0.07,
+       0.11
+      ],
+      "fit": "HORIZONTAL"
+     },
+     "text_safe": {
+      "x": [
+       0.08,
+       0.92
+      ],
+      "y": [
+       0.06,
+       0.3
+      ]
+     }
+    }
+   }
+  },
+  "ANDOR_MATERIAL": {
+   "purpose": "Feature transitions, storytelling, detail gallery, product film: macro photographs of real details.",
+   "stage": "gallery",
+   "float_m": 0.0,
+   "exposure": -0.45,
+   "world": {
+    "rgb": [
+     0.34,
+     0.325,
+     0.3
+    ],
+    "strength": 0.12
+   },
+   "floor": {
+    "rgb": [
+     0.62,
+     0.595,
+     0.555
+    ],
+    "roughness": 0.78
+   },
+   "lights": [
+    {
+     "name": "Grazing key",
+     "offset": [
+      -0.95,
+      0.3,
+      0.42
+     ],
+     "size": [
+      0.6,
+      0.4
+     ],
+     "power": 26,
+     "rgb": [
+      1.0,
+      0.96,
+      0.91
+     ],
+     "why": "low from the left: the 0.252 mm flutes and the engraved pointers read"
+    },
+    {
+     "name": "Edge strip",
+     "offset": [
+      0.55,
+      1.0,
+      0.35
+     ],
+     "size": [
+      1.6,
+      0.08
+     ],
+     "power": 18,
+     "rgb": [
+      1.0,
+      0.95,
+      0.9
+     ],
+     "spread": 60
+    },
+    {
+     "name": "Overhead",
+     "offset": [
+      0.05,
+      0.1,
+      1.45
+     ],
+     "size": [
+      1.8,
+      1.2
+     ],
+     "power": 4.0,
+     "rgb": [
+      1.0,
+      0.985,
+      0.97
+     ]
+    },
+    {
+     "name": "Fill",
+     "offset": [
+      1.1,
+      -0.9,
+      0.5
+     ],
+     "size": [
+      1.6,
+      1.2
+     ],
+     "power": 1.6,
+     "rgb": [
+      0.93,
+      0.96,
+      1.0
+     ]
+    }
+   ],
+   "shots": {
+    "C1": {
+     "title": "Material C1 \u00b7 macro knobs (1:1)",
+     "res": [
+      2000,
+      2000
+     ],
+     "rot": -11.0,
+     "camera": {
+      "yaw": -18,
+      "pitch": 60,
+      "dist": 0.185,
+      "lens": 100,
+      "target": [
+       493,
+       812,
+       5.5
+      ],
+      "fstop": 8.0,
+      "shift": [
+       0.0,
+       0.0
+      ],
+      "fit": "AUTO"
+     }
+    }
+   }
+  }
+ }
+}

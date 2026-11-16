@@ -32,13 +32,20 @@ os.makedirs(a.out, exist_ok=True)
 
 cap = Image.open(a.capture).convert("RGB")
 S = cap.width / 1448
+EW, EH = 1448, round(cap.height / S)
+# Checkpoint 2: the approved editor ends at 1046 px (keys, a 2 px reveal, the 20 px soft apron); the
+# old one at 1086 px (a "Ready" footer under the keyboard). Both are read here, so the old fascia can
+# still be rebuilt from the old capture for like-for-like comparisons.
+TRIMMED = EH < 1086
+APRON_TOP = 1024.0               # design::layout::apronTop (shared/andor-ui/Source/Design.h)
+TEAK_BOTTOM = 1020 if TRIMMED else 1072
 cap.save(os.path.join(a.out, "osp_face.png"))
 lum = Image.open(a.capture).convert("L")
 
 # Teak: the interior of both drawn cheeks (no drawn edge shading), stacked into one long strip
 # so a 400 mm rail does not repeat the grain.
-left = cap.crop((int(9.5 * S), int(17 * S), int(23 * S), int(1072 * S)))
-right = cap.crop((int(1425 * S), int(17 * S), int(1438.5 * S), int(1072 * S))).transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+left = cap.crop((int(9.5 * S), int(17 * S), int(23 * S), int(TEAK_BOTTOM * S)))
+right = cap.crop((int(1425 * S), int(17 * S), int(1438.5 * S), int(TEAK_BOTTOM * S))).transpose(Image.Transpose.FLIP_TOP_BOTTOM)
 strip = Image.new("RGB", (left.width, left.height + right.height))
 strip.paste(left, (0, 0))
 strip.paste(right.resize(left.size if right.width != left.width else right.size), (0, left.height))
@@ -101,16 +108,19 @@ for k in json.load(open(a.knobs))["knobs"]:
     knobs.append({"kind": kind, "c": [k["x"], k["y"]], "r": k["r"], "angle": k["angle"]})
 
 geometry = {
-    "editor_px": [1448, 1086],
+    "editor_px": [EW, EH],
     "capture_scale": S,
-    "panel": {"rect": [34.3, 19.0, 1412.3, 1071.5], "radius": 7.0},
+    "panel": {"rect": [34.3, 19.0, 1412.3, APRON_TOP if TRIMMED else 1071.5], "radius": 7.0},
     "cards": cards,
     "buttons": buttons,
     "displays": displays,
     "keyboard": {"bed": [kb["x"], kb["y"], kb["x"] + kb["w"], kb["y"] + kb["h"]], "black": black},
     "knobs": knobs,
-    "frame": {"cheek_x": [25.0, 1423.0], "back_y": 13.0, "front_y": 1076.0},
-    "colours": {"tray": colour_at(30, 540, 2), "panel": colour_at(700, 670, 4), "card": colour_at(250, 140, 3)},
+    "frame": {"cheek_x": [25.0, 1423.0], "back_y": 13.0, "front_y": float(EH) if TRIMMED else 1076.0},
+    "colours": {"tray": colour_at(30, 540, 2), "panel": colour_at(700, 670, 4), "card": colour_at(250, 140, 3),
+                "white_key": colour_at(158, 950, 2)},
+    **({"apron": {"top": APRON_TOP, "front": float(EH), "x": [25.0, 1423.0],
+                  "rgb_top": colour_at(700, 1028, 2), "rgb_front": colour_at(700, 1040, 2)}} if TRIMMED else {}),
     "notes": "Knobs from web-10-hero-3L-nocaps.json (editor geometry); surfaces from web-08 bounds; black keys detected in the capture.",
 }
 json.dump(geometry, open(os.path.join(a.out, "geometry.json"), "w"), indent=1)

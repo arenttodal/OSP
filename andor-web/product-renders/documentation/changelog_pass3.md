@@ -80,3 +80,105 @@ mesh (`andor_scene.py --report`); see `renders/review_pass3_5_cp1/measurements.m
   neighbour); pointer angles identical across variants.
 - **Saved:** `andor_master_pass3_5.blend` (compressed, textures packed; regenerate with `--knob hd --hd 0.30
   --frame-h 14.4 --save-blend`).
+
+# Checkpoint 2: final geometry synchronisation with the approved GUI (trimmed footer, ivory front return)
+
+**Reference.** The approved, locked OSP interface is commit `ef5c0c3` on `claude/friendly-pascal-0y48r0`. It is
+1448 × 1046 editor px: the keyboard is unchanged; PITCH/MOD are back in their original places; a 2 px reveal and a
+20 px soft apron sit under the keys; there is no footer. A fresh capture of that build (`[web-capture]`,
+`web-10-hero-3L-nocaps@4x` 5792 × 4184 + knob JSON, `web-08` bounds) drives the model. All 25 knobs, the cards,
+displays, buttons and keys come from it. Their editor geometry is identical to pass 3.5 above the keyboard (checked:
+the same 25 knob centres, radii and angles; the same keyboard rect 148, 913, 1150 × 101; the same 36 black keys).
+
+**Master.** `andor_master_cp2.blend` is a new file; `andor_master_pass3_5.blend` is kept unchanged. Both are built by
+`andor_scene.py` (regenerate with `--knob hd --hd 0.30 --frame-h 14.4 --save-blend`). Materials, lights, exposure and
+every existing camera are unchanged, so all differences in the review are geometry.
+
+## What changed (before → after)
+
+| Part | Pass 3.5 | Checkpoint 2 |
+|---|---|---|
+| Interface texture | 1448 × 1086 capture with the "Ready" footer below the keys | the approved 1448 × 1046 capture: keys, reveal, soft apron; no footer |
+| Texture diff (4x, old vs new) | | identical everywhere above y 1014 except x 41–131, y 916–1014: the PITCH/MOD captions, where the approved GUI shows the full MOD C caption and socket circle (pass 3.5's capture clipped them) |
+| Front of the housing | a full-width teak fascia (14.4 mm high), mitred to the cheeks, with 55 px (15 mm) of ceramic panel between the key fronts and the wood | **no fascia**. The ceramic panel ends 8 px (2.2 mm) after the keybed, then the **ivory front return** |
+| Ivory front return | (none) | one piece with the panel (so the soft apron has no part line, as in the GUI). Top: the apron, 22 px (6.1 mm) deep in plan, printed from the capture, flush with the panel; a 1.2 mm radius edge; a 6.0 mm vertical face (= the GUI apron's 22 px); a 0.45 mm round below. It spans cheek to cheek. Face colour: the GUI apron's front tone (212 204 190), so the ceramic falls off from the printed apron as the editor's soft shade does |
+| Underside | the plinth, inset 3 mm | a dark base set back 3.0 mm behind the return's face, flush with the plinth's front: the return reads as a shallow lip with a shadow line under it, not a front wall |
+| Side cheeks | mitred into the fascia at the front | run to the new front edge (1046 px) and end square: end grain at the front, flush with the return's face. Still 14.4 mm (z 2.0–16.4 mm), mitred to the back rail |
+| Ceramic tray | to the fascia | ends under the return |
+| World origin | the face centre of the 1086 px editor | unchanged (fixed at 543 px), so the old and new instruments share every camera and every pixel above the keyboard |
+
+Unchanged: the G macro knob (0.30 D, 8.40 mm design height, 7 % taper, 48 flutes 0.252 mm, pointer angles from the
+capture), all knob positions, cards, wells, buttons, badges, LEDs, fader, keybed pocket and black keys. The geometry
+report (`renders/review_checkpoint2/report_cp2.json`) repeats the pass 3.5 checks.
+
+## Like-for-like comparison
+
+The pass 3.5 instrument is rebuilt by the same script from the old capture (unpacked from
+`andor_master_pass3_5.blend`; `geometry.json` without an `apron` entry rebuilds the fascia). The old and new renders
+therefore share cameras, lights, materials, samples and resolution. Camera B "before" is pass 3.5's `G_neutral.png`
+(the same settings).
+
+## New cameras
+
+- `front_edge`: the product square to the camera, 8° above the floor, 135 mm lens (the straight-on bottom edge).
+- `keys34`: a three-quarter close-up of the key fronts and the return.
+- `corner_fl` / `corner`: the existing lower-left and lower-right corner cameras.
+
+## Known limitations (Round 2)
+
+- The white keys are still the capture on the pocket floor; only the 36 black keys are raised.
+- The PITCH/MOD wheels are still flat artwork.
+- The pale band along the cheek tops is the rim light on the teak's oiled sheen. It is the same in pass 3.5.
+
+# Keyboard + front body round (after checkpoint 2)
+
+Brief: the instrument read too thin, the white keys read as a printed strip, and the front return under the keys
+(a lip over a dark band) was unresolved. This round changes construction and proportion only. The plan footprint,
+the approved GUI, the keyboard span, the G knobs (0.30 D), the layout and the 14.4 mm teak cheeks are unchanged.
+Lights, exposure and cameras are also unchanged. The checkpoint 2 scene is frozen as `andor_scene_cp2.py`, and its
+renders are the "previous" side of the comparison.
+
+**Owner's decision (thickness):** the body gains mass in ivory, not wood. The cheeks stay 14.4 mm and stand on an
+ivory lower shell. The total height goes from 16.4 mm to 20.7 mm, about 5 % of the width.
+
+## Section (scene mm, from the floor of the feet; `report_r2.json` → `section_mm`)
+
+| Level | z (mm) | |
+|---|---|---|
+| teak cheek top | 20.70 | cheeks z 6.30–20.70 (14.4 mm, unchanged) |
+| black key tops | 20.76 | 2.0 mm above the white keys |
+| ivory top shell | 19.36 | 1.34 mm below the teak, as before |
+| white key tops | 18.76 | 0.6 mm below the shell, inside the keybed opening |
+| front return (ledge) top | 15.76 | 3.6 mm below the shell: 3.0 mm of every white key front shows above it |
+| white key bottoms | 15.36 | 3.4 mm bodies |
+| keybed floor (dark felt) | 14.76 | seen only through the key gaps and the slot under the key fronts |
+| lip bottom | 10.76 | the front return's 5.0 mm lip, 1.5 mm nose |
+| part line (lower shell top) | 6.30 | |
+| lower shell | 0.80–6.30 | 5.5 mm, 3.0 mm radius tuck-under, 0.4 mm inside the cheeks; at the front stepped back 2.0 mm with the body under the lip |
+| feet | 0–1.2 | four dark discs, 10 mm, 19 mm in from each corner |
+
+## Construction (before → after)
+
+| Part | Checkpoint 2 | This round |
+|---|---|---|
+| White keys | the capture on the pocket floor | **52 solids** (22.115 px pitch, measured from the capture): 3.4 mm bodies, a 0.5 mm nose on the top-front edge, 0.15 mm edge rounds, 0.24 mm gaps, cut-outs 0.3 mm clear of the black keys. Tops carry the capture (note names, zone colours) in a key-plastic finish (roughness 0.30, a little coat), sides and fronts in key-white plastic (246 242 234) |
+| Black keys | slabs 2.2 mm over the pocket floor, capture on top | **36 tapered solids** from the keybed floor (0.22 mm side draft, a 1.1 mm sloped front), 2.0 mm above the whites, 0.32 mm edge rounds, satin charcoal (roughness 0.52, specular 0.30), no printed top |
+| Keybed | a 1.07 mm pocket | an opening in the top shell (146–1300 px), open to the front; a dark felt floor; a real 0.8 mm shadow slot between the key fronts (1014 px) and the front return (1017 px) |
+| Top shell beside the keys | the panel to 1024 px, a 6 mm return in front of it | the shell runs at full height to the front edge as end blocks under PITCH/MOD and under ARP, with the same 1.5 mm nose. Only the keyboard section drops to the lip, like a keybed cut-out. Each front corner is one ivory block against the cheek |
+| Front return | one piece with the panel, a 6 mm face over a dark base | in the keyboard section, a ledge 3.6 mm below the shell, printed with the GUI's apron, 1.5 mm nose, 5.0 mm lip |
+| Under the lip | a dark base (plinth material) | the ivory body, stepped back 2.0 mm: the lip's shadow is cast by real construction. **No dark band** |
+| Base | dark plinth | the ivory lower shell (5.5 mm) with a 3 mm tuck-under on four small feet |
+| Side cheeks | 14.4 mm on the plinth | 14.4 mm on the lower shell (0.4 mm shadow line at the joint); front ends flush with the end blocks |
+| Teak tone | saturation 1.12, value 0.74 | hue +0.012, saturation 0.80, value 0.57: deeper golden brown, less orange and pink |
+| End grain | a scaled copy of the long grain (read as stacked layers) | quarter-sawn rings: fine near-vertical lines, darker and more matte, low contrast |
+
+## Review set
+
+A front low angle (`front_edge`) · B keyboard close-up (`keys34`) · C left-front corner (`corner_fl`) · D
+right-front corner (`corner`) · E neutral three-quarter (camera B) · F previous vs revised, same cameras. Saved as
+`andor_master_r2_keyboard_body.blend`.
+
+## Still open (next rounds)
+
+- PITCH/MOD wheels are still the capture (flat artwork) on the end block.
+- Lighting, broader materials and hero/campaign renders await approval of this geometry.
