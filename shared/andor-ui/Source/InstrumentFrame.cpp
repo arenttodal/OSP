@@ -3,6 +3,7 @@
 
 #include "CeramicSkin.h"
 #include "EngineCard.h"   // icons
+#include "MainSections.h"   // Wheel (caption line)
 #include "OspLookAndFeel.h"
 
 namespace osp::plugin
@@ -324,7 +325,7 @@ void setUpStatusLabel (juce::Label& label)
     label.setBorderSize ({ 0, 0, 0, 0 });
 }
 
-void place (const Parts& parts, bool arpShown)
+void place (const Parts& parts, bool arpShown, bool trimmedFooter)
 {
     using namespace design;
     auto set = [] (juce::Component* c, juce::Rectangle<int> r) {
@@ -360,8 +361,15 @@ void place (const Parts& parts, bool arpShown)
     auto low = [&] (juce::Rectangle<float> r) { return at (r.translated (0.0f, shift)); };
 
     // Keyboard row and footer.
-    set (parts.pitchWheel, low (layout::pitchWheel.withHeight (115.0f)));
-    set (parts.modWheel, low (layout::modWheel.withHeight (115.0f)));
+    // Trimmed footer: the slots stay; the wheels reach down to the edge and their captions
+    // (PITCH, MOD and its socket) sit centred in the front apron, clear of the seam above it.
+    const float wheelHeight = trimmedFooter ? layout::trimmedHeight - layout::pitchWheel.getY() : 115.0f;
+    const float captionTop = trimmedFooter ? layout::trimmedHeight - layout::pitchWheel.getY() - 0.5f * layout::apronHeight - 9.0f : 88.0f;
+    set (parts.pitchWheel, low (layout::pitchWheel.withHeight (wheelHeight)));
+    set (parts.modWheel, low (layout::modWheel.withHeight (wheelHeight)));
+    for (auto* w : { parts.pitchWheel, parts.modWheel })
+        if (auto* wheel = dynamic_cast<Wheel*> (w))
+            wheel->setCaptionTop (captionTop);
     if (parts.keyboard != nullptr)
     {
         parts.keyboard->setBounds (low (layout::keyboard));
@@ -444,19 +452,23 @@ void paint (juce::Graphics& g, juce::Component& content, const Identity& identit
     // top and its foot. No text, no controls, no border.
     if (trimmedFooter)
     {
-        const float top = keys.getBottom() + layout::underKeyReveal;
-        const auto apron = juce::Rectangle<float> (layout::housing.getX(), top, layout::housing.getWidth(), layout::apronHeight);
-        // The reveal: a soft shadow under the key fronts and along the top surface's edge.
-        g.setGradientFill (juce::ColourGradient (juce::Colour (0x38302418), 0.0f, keys.getBottom(), juce::Colour (0x10302418), 0.0f, top, false));
-        g.fillRect (juce::Rectangle<float> (apron.getX(), keys.getBottom(), apron.getWidth(), layout::underKeyReveal));
-        // The face: warm neutral ivory, a shade lighter where the light catches its top.
-        g.setGradientFill (juce::ColourGradient (juce::Colour (0xffd8d0c3), 0.0f, apron.getY(), juce::Colour (0xffcfc7ba), 0.0f, apron.getBottom(), false));
-        g.fillRect (apron);
-        g.setColour (juce::Colours::white.withAlpha (0.22f));
-        g.fillRect (apron.withHeight (1.0f));
-        // The foot: one darker line where the face turns under.
-        g.setColour (juce::Colour (0xffbdb4a7));
-        g.fillRect (apron.withTop (apron.getBottom() - 1.0f));
+        // No rule or stroke: the top surface (#e0d8ca) eases into the face over its first few
+        // pixels, the keys' fronts cast a soft shadow onto it, and the face turns under softly.
+        const float y0 = keys.getBottom();
+        const auto face = juce::Rectangle<float>::leftTopRightBottom (layout::housing.getX(), y0, layout::housing.getRight(),
+                                                                    y0 + layout::underKeyReveal + layout::apronHeight);
+        const float h = face.getHeight();
+        juce::ColourGradient tone (juce::Colour (0xffe0d8ca), 0.0f, face.getY(), juce::Colour (0xffd0c8bb), 0.0f, face.getBottom(), false);
+        tone.addColour (6.0 / h, juce::Colour (0xffd9d1c4));   // the turn into the face
+        tone.addColour (0.55, juce::Colour (0xffd6cec1));      // the face: warm neutral ivory, a touch darker
+        g.setGradientFill (tone);
+        g.fillRect (face);
+        // The keys' fronts: a soft shadow under them only (they stand proud of the face).
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0x1e302418), 0.0f, y0, juce::Colour (0x00302418), 0.0f, y0 + 5.0f, false));
+        g.fillRect (juce::Rectangle<float> (keys.getX() - 2.0f, y0, keys.getWidth() + 4.0f, 5.0f));
+        // The foot: the face turns under (a soft darkening over the last 3 px, no line).
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0x00302418), 0.0f, face.getBottom() - 3.0f, juce::Colour (0x24302418), 0.0f, face.getBottom(), false));
+        g.fillRect (face.withTop (face.getBottom() - 3.0f));
     }
 
     // The macros and the envelope share one panel.

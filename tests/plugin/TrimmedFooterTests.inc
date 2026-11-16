@@ -33,6 +33,14 @@ TEST_CASE ("plugin: OSP's trimmed footer - the instrument ends under the keys at
         CHECK (ui->arpControl().getBounds().toFloat() == layout::arpControl);
         CHECK (ui->advancedSettingsButton().getBottom() <= juce::roundToInt (layout::trimmedHeight));
         CHECK (ui->modulationWheel().getY() == juce::roundToInt (layout::modWheel.getY()));
+        // The wheels' captions sit in the apron (clear of the keyboard row's foot); the slots stay.
+        {
+            const auto& wheel = ui->modulationWheel();
+            const float captionTop = static_cast<float> (wheel.getY()) + wheel.captionLine();
+            CHECK (captionTop >= layout::keyboard.getBottom() + layout::underKeyReveal);
+            CHECK (captionTop + 18.0f <= layout::trimmedHeight);
+            CHECK (wheel.socketArea().getY() == Approx (wheel.captionLine()));   // the socket follows the caption
+        }
         // In instrument px the keys end the reveal plus the apron above the foot.
         const auto foot = keys.getParentComponent()->getLocalArea (ui, ui->getLocalBounds()).getBottom();
         CHECK (static_cast<float> (foot - keys.getBottom()) == Approx (layout::underKeyReveal + layout::apronHeight).margin (1.0f));

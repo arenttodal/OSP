@@ -163,7 +163,8 @@ namespace frame
     };
     /** Places the parts at the reference's places (the keyboard row and footer move down by
         the arpeggiator editor's height while it shows). */
-    void place (const Parts& parts, bool arpShown);
+    /** `trimmedFooter`: the wheels reach into the front apron and their captions sit centred in it. */
+    void place (const Parts& parts, bool arpShown, bool trimmedFooter = false);
     /** The source area (the A/B/C cards or the drop zone), in reference pixels. */
     juce::Rectangle<int> sourceArea();
     /** The source area's column `index` of `columns` (the cards' places). */

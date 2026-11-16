@@ -405,7 +405,7 @@ void ShellEditor::layoutInstrument()
     parts.arpControl = &arpButton;
     parts.advanced = &advancedButton;
     parts.headerMix = &headerMix;
-    frame::place (parts, arpShown);
+    frame::place (parts, arpShown, true);
     modOverlay.setBounds (content.getLocalBounds());
     sourceArea = frame::sourceArea();
     shownCount = -1;
