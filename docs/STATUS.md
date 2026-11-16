@@ -1,5 +1,15 @@
 # Status
 
+> **16 Nov 2026, Learn: every lesson ends in the tutorials; the Quick Start ends on INFO (both
+> instruments, shared `shared/andor-learn`):**
+> - A finished lesson opens the tutorials, with its tick, instead of the "Lesson complete" note.
+>   A lesson that played on its example first asks Keep / Restore, then the tutorials open.
+> - The Quick Start's last step (`findLearnAgainStep()`) points at the INFO key. Its text:
+>   - the i in the corner always brings back Learn mode;
+>   - every tutorial is under the three-dot menu, in Learn.
+> - In OSP it follows "Hear the original again". In ANDOR Analog it follows AUX D (lesson
+>   revision 5), on the OSP pin `claude/analog-learn-end` (4489e33 plus this shared change).
+
 > **16 Nov 2026, merged into OSP's main line: the keyboard keys and the compact bottom edge
 > (`feature/aux-live-input` `7984022` and `4489e33`) with the wheels' line (`claude/osp-wheels`):**
 > - OSP's Learn stays Learn 2.0 (its thirteen lessons and Quick Start), not that branch's
