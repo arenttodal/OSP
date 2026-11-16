@@ -149,6 +149,9 @@ public:
     /** The whole ANDOR parameter schema (ANDOR OSP's, frozen; AndorParameters.h has the IDs):
         every product that shows the shared components builds its parameters with it. */
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+    /** The MOD WHEEL's VIBRATO parameters (vibrato.*): appended by each instrument after all
+        its others (ANDOR OSP's schema, then a product's own), so no existing parameter moves. */
+    static void addVibratoParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout);
 
     /** A layer's EQ as its parameters set it now (from parameterValue). */
     eq::Settings layerEqSettings (int layer) const;

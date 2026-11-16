@@ -862,7 +862,7 @@ namespace
             // its place on the panel.
             auto* fine = state.getParameter ("fineTune");
             add ("fineTune", "FINE", [fine] (double) { return parameterText (fine); });
-            add ("bendRange", "BEND", [] (double v) { return juce::String (juce::roundToInt (v)) + " st"; });
+            // (The pitch wheel's RANGE lives in its own popover now: a click on PITCH.)
             add ("glide", "GLIDE", [] (double ms) { return ms < 0.5 ? juce::String ("Off") : format::milliseconds (ms); });
             glide = knobs.back().get();
 

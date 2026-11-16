@@ -456,6 +456,10 @@ public:
     const mod::Runtime& modulation() const noexcept { return modRuntime; }
     /** The mod wheel as a modulation source (0..1; the processor passes CC 1 and the screen's wheel). */
     void setModWheel (float value) noexcept { modRuntime.setModWheel (value); }
+    /** The MOD WHEEL's VIBRATO (Vibrato.h): every voice reads it at control rate. Audio thread
+        (or before rendering); `sources` are the layers A, B, C. */
+    void setVibrato (const vibrato::Settings& settings) noexcept { vibratoSettings = settings; }
+    const vibrato::Settings& vibrato() const noexcept { return vibratoSettings; }
     /** CC slot 0..3's controller (0..1) and channel pressure (0..1), as modulation sources. */
     void setModController (int slot, float value) noexcept { modRuntime.setController (slot, value); }
     void setModPressure (float value) noexcept { modRuntime.setPressure (value); }
@@ -728,6 +732,7 @@ private:
     int bufferSize = 0;
 
     mod::Runtime modRuntime;
+    vibrato::Settings vibratoSettings;
     std::array<double, 3> modReimaginedOffset {};   ///< global LFOs on each layer's REIMAGINED
     double modLifeOffset = 0.0;
     EffectiveValues effective;   ///< (published by applyGlobalModulation)

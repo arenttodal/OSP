@@ -8281,3 +8281,116 @@ TEST_CASE ("plugin: the AMP envelope's picture follows A D S R's modulation (VEL
     run (off, 400);
     CHECK (pixels (set, snapshot()) == 0);
 }
+
+TEST_CASE ("plugin: the wheels' captions - never clipped, a click opens their settings, a drag still makes MOD's cable", "[ui][andor-ui][wheels]")
+{
+    using Editor = osp::plugin::OspAudioProcessorEditor;
+    OspAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> base (p.createEditorIfNeeded());
+    auto* editor = dynamic_cast<Editor*> (base.get());
+    REQUIRE (editor != nullptr);
+    editor->refreshNow();
+    auto& pitch = editor->pitchBendWheel();
+    auto& modw = editor->modulationWheel();
+    auto event = [] (juce::Component& c, juce::Point<float> at, juce::Point<float> down, bool dragged) {
+        const auto now = juce::Time::getCurrentTime();
+        return juce::MouseEvent (juce::Desktop::getInstance().getMainMouseSource(), at, {}, juce::MouseInputSource::defaultPressure, 0.0f, 0.0f, 0.0f,
+                                 0.0f, &c, &c, now, down, now, 1, dragged);
+    };
+    auto click = [&] (osp::plugin::Wheel& w, juce::Point<float> at) {
+        w.mouseDown (event (w, at, at, false));
+        w.mouseUp (event (w, at, at, false));
+    };
+
+    // Geometry: each wheel exactly where it was (its 36 x 88 slot), the component wider by its
+    // caption's margin; the caption (MOD with its socket) wholly inside it - nothing clipped.
+    namespace layout = osp::plugin::design::layout;
+    for (auto [w, ref] : { std::pair<osp::plugin::Wheel*, juce::Rectangle<float>> { &pitch, layout::pitchWheel }, { &modw, layout::modWheel } })
+    {
+        CHECK (static_cast<float> (w->getX()) + osp::plugin::Wheel::sidePad == Approx (ref.getX()).margin (1.0));
+        const auto caption = w->captionArea();
+        CHECK (caption.getX() >= 0.0f);
+        CHECK (caption.getRight() <= static_cast<float> (w->getWidth()));
+        CHECK (caption.getY() >= osp::plugin::Wheel::wheelHeight - 0.5f);
+        CHECK (caption.getBottom() <= static_cast<float> (w->getHeight()));
+        // Only the wheel and its caption take the mouse; the margins beside them do not.
+        CHECK (w->hitTest (juce::roundToInt (caption.getCentreX()), juce::roundToInt (caption.getCentreY())));
+        CHECK (w->hitTest (w->getWidth() / 2, 40));
+        CHECK_FALSE (w->hitTest (1, 40));
+    }
+    CHECK_FALSE (pitch.getBounds().intersects (modw.getBounds().reduced (1, 0)));
+    CHECK (modw.getRight() < juce::roundToInt (layout::keyboard.getX()));
+
+    // A click on PITCH opens PITCH BEND above it; again closes it.
+    const auto pitchCaption = pitch.captionArea().getCentre();
+    click (pitch, pitchCaption);
+    REQUIRE (editor->openPopupIndex() == Editor::pitchWheelPopup);
+    click (pitch, pitchCaption);
+    CHECK (editor->openPopupIndex() == -1);
+
+    // MOD: a click opens MOD WHEEL (VIBRATO); switching to PITCH closes it; Escape closes.
+    const auto modCaption = modw.captionArea().getCentre();
+    click (modw, modCaption);
+    CHECK (editor->openPopupIndex() == Editor::modWheelPopup);
+    click (pitch, pitchCaption);
+    CHECK (editor->openPopupIndex() == Editor::pitchWheelPopup);
+    editor->closePopup();
+
+    // A drag of 3 px or more from MOD's caption is a cable (no popover); less is a click.
+    int drags = 0, drops = 0;
+    modw.onSourceDrag = [&drags] (juce::Point<int>) { ++drags; };
+    modw.onSourceDrop = [&drops] (juce::Point<int>) { ++drops; };
+    modw.mouseDown (event (modw, modCaption, modCaption, false));
+    modw.mouseDrag (event (modw, modCaption + juce::Point<float> (1.0f, -1.0f), modCaption, false));
+    CHECK (drags == 0);
+    modw.mouseDrag (event (modw, modCaption + juce::Point<float> (30.0f, -40.0f), modCaption, true));
+    modw.mouseUp (event (modw, modCaption + juce::Point<float> (30.0f, -40.0f), modCaption, true));
+    CHECK (drags == 1);
+    CHECK (drops == 1);
+    CHECK (editor->openPopupIndex() == -1);
+    // The wheel's body still turns the wheel (no popover).
+    const auto bodyAt = juce::Point<float> (0.5f * static_cast<float> (modw.getWidth()), 70.0f);
+    modw.mouseDown (event (modw, bodyAt, bodyAt, false));
+    modw.mouseDrag (event (modw, bodyAt.translated (0.0f, -60.0f), bodyAt, true));
+    modw.mouseUp (event (modw, bodyAt.translated (0.0f, -60.0f), bodyAt, true));
+    CHECK (editor->openPopupIndex() == -1);
+    {
+        // (The processor takes the screen wheel at its next block.)
+        p.prepareToPlay (48000.0, 512);
+        juce::AudioBuffer<float> buffer (2, 512);
+        juce::MidiBuffer midi;
+        p.processBlock (buffer, midi);
+    }
+    CHECK (p.modWheelPosition() > 0.5f);
+
+    // Rapid clicks: open, close, open... always one popover or none, never stale.
+    for (int i = 0; i < 9; ++i)
+        click (i % 2 == 0 ? modw : pitch, i % 2 == 0 ? modCaption : pitchCaption);
+    CHECK (editor->openPopupIndex() == Editor::modWheelPopup);
+    // The popover stays inside the instrument (the wheels sit near its left edge).
+    editor->openPopup (Editor::pitchWheelPopup);
+    juce::Component* shown = nullptr;
+    for (auto* c : modw.getParentComponent()->getChildren())
+        if (dynamic_cast<osp::plugin::MiniPanel*> (c) != nullptr)
+            shown = c;
+    REQUIRE (shown != nullptr);
+    const auto box = shown->getBoundsInParent();
+    CHECK (box.getX() > -osp::plugin::MiniPanel::shadowMargin * 2);
+    CHECK (box.getBottom() <= pitch.getY() + osp::plugin::MiniPanel::shadowMargin * 2);
+    editor->closePopup();
+
+    // Advanced no longer has BEND (its home is PITCH BEND's RANGE now).
+    editor->openPopup (Editor::advancedPopup);
+    bool bend = false;
+    std::function<void (juce::Component&)> walk = [&] (juce::Component& c) {
+        for (auto* child : c.getChildren())
+        {
+            if (auto* knob = dynamic_cast<osp::plugin::MiniKnob*> (child); knob != nullptr && knob->captionText() == "BEND")
+                bend = true;
+            walk (*child);
+        }
+    };
+    walk (*editor);
+    CHECK_FALSE (bend);
+    editor->closePopup();
+}

@@ -353,14 +353,30 @@ ShellEditor::ShellEditor (ShellProcessor& p)
 
     content.addAndMakeVisible (pitchWheel);
     content.addAndMakeVisible (modWheel);
+    // The wheels' captions are doors to their settings (as a macro's name): PITCH to the bend's
+    // RANGE, MOD to its VIBRATO. A press that just closed the popover does not reopen it.
+    pitchWheel.setCaptionAccent (juce::Colour (0xffcd5a1e));
+    modWheel.setCaptionAccent (modui::sourceColour (4));
+    for (auto [wheel, which] : { std::pair<Wheel*, int> { &pitchWheel, pitchWheelPopup }, { &modWheel, modWheelPopup } })
+        wheel->onCaptionClick = [this, which] {
+            if (closedByLabelPress == which)
+            {
+                closedByLabelPress = -1;
+                return;
+            }
+            if (popupIndex == which)
+                closePopup();
+            else
+                openPopup (which);
+        };
     frame::setUpKeyboard (keyboard);
     content.addAndMakeVisible (keyboard);
     frame::setUpStatusLabel (statusLabel);
     content.addAndMakeVisible (statusLabel);
     advancedButton.setTitle ("Advanced settings");
-    advancedButton.setTooltip ("Tuning, bend range, voices, pitch character, dynamics (how touch changes the sound), MPE, variation seed");
+    advancedButton.setTooltip ("Tuning, voices, pitch character, dynamics (how touch changes the sound), MPE, variation seed");
     // ANDOR OSP's Advanced popover (shared): enabled when the engine reads any of it.
-    binding::tag (advancedButton, "fineTune bendRange glide voiceMode pitchCharacter mpe seed dynamics dynamics.curve velocityRange dynamics.tone");
+    binding::tag (advancedButton, "fineTune glide voiceMode pitchCharacter mpe seed dynamics dynamics.curve velocityRange dynamics.tone");
     advancedButton.onClick = [this] {
         if (closedByLabelPress == advancedPopup)
         {
@@ -1154,6 +1170,13 @@ void ShellEditor::openPopup (int which, int source)
         popup = shell.product().hybridHeaderPopover (shell);
     else if (which == arpCompanionPopup && arpButton.hasSecondRow() && shell.product().arpCompanion.popover != nullptr)
         popup = shell.product().arpCompanion.popover (shell);
+    else if (which == pitchWheelPopup)
+        popup = osp::plugin::createPitchBendPopup (shell);
+    else if (which == modWheelPopup)
+    {
+        auto sources = shell.product().vibratoSources.empty() ? osp::plugin::defaultVibratoSources() : shell.product().vibratoSources;
+        popup = osp::plugin::createModWheelPopup (shell, std::move (sources), [this] { return shell.modWheelPosition(); });
+    }
     if (popup == nullptr)
         return;
     presentPopup (which);
@@ -1184,6 +1207,10 @@ void ShellEditor::presentPopup (int which)
         cards[ShellProcessor::hybridLayer]->setHeadingOpen (true);
     if (which == arpCompanionPopup)
         arpButton.setSecondRowOpen (true);
+    if (which == pitchWheelPopup)
+        pitchWheel.setCaptionOpen (true);
+    if (which == modWheelPopup)
+        modWheel.setCaptionOpen (true);
     applyBindings();   // the popover's controls follow the engine's bindings too
     if (isShowing())
         grabKeyboardFocus();
@@ -1234,6 +1261,8 @@ void ShellEditor::positionPopup()
         const auto anchor = arpButton.getBounds().toFloat();
         at = { anchor.getX(), anchor.getY() - 10.0f - size.y };
     }
+    else if (popupIndex == pitchWheelPopup || popupIndex == modWheelPopup)
+        at = frame::wheelPopoverOrigin ((popupIndex == pitchWheelPopup ? pitchWheel : modWheel).getBounds().toFloat(), size);
     else
         at = frame::modulationPopoverOrigin (modPanel.getBounds().toFloat(), size);
     frame::placePopover (*popup, content, at);
@@ -1257,6 +1286,10 @@ void ShellEditor::closePopup()
         cards[ShellProcessor::hybridLayer]->setHeadingOpen (false);
     if (popupIndex == arpCompanionPopup)
         arpButton.setSecondRowOpen (false);
+    if (popupIndex == pitchWheelPopup)
+        pitchWheel.setCaptionOpen (false);
+    if (popupIndex == modWheelPopup)
+        modWheel.setCaptionOpen (false);
     if (popupIndex == anchoredPopup)
     {
         content.removeChildComponent (&popupBackdrop);
@@ -1401,6 +1434,9 @@ void ShellEditor::mouseDownAnywhere (juce::Component* c)
         pressed = generatorHeaderPopup;
     if (cards[ShellProcessor::hybridLayer]->isHeading (c) && hybridDoorSet)
         pressed = hybridHeaderPopup;
+    for (auto [wheel, which] : { std::pair<Wheel*, int> { &pitchWheel, pitchWheelPopup }, { &modWheel, modWheelPopup } })
+        if (c == wheel && wheel->captionArea().contains (wheel->getLocalPoint (nullptr, juce::Desktop::getMousePosition().toFloat())))
+            pressed = which;
     closedByLabelPress = pressed == popupIndex ? pressed : -1;
     closePopup();
 }

@@ -383,6 +383,13 @@ void ParameterRack::add (std::unique_ptr<juce::Component> cell, rackui::Slot slo
     cells.push_back ({ std::move (cell), static_cast<int> (groups.size()) - 1, slot });
 }
 
+juce::Component& ParameterRack::customCell (std::unique_ptr<juce::Component> cell, rackui::Slot slot)
+{
+    auto& ref = *cell;
+    add (std::move (cell), slot);
+    return ref;
+}
+
 MiniKnob& ParameterRack::knob (const juce::String& id, const juce::String& caption, MiniKnob::Formatter f)
 {
     auto k = std::make_unique<MiniKnob> (host.apvts(), id, caption, std::move (f));

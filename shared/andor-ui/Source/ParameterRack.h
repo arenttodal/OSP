@@ -174,6 +174,9 @@ protected:
     rackui::SegmentedSwitch& segmentCell (const juce::String& id, const juce::String& caption, std::vector<rackui::Position> positions, const juce::String& tip,
                                           rackui::Slot slot = rackui::Slot::wide);
     rackui::VerticalSwitch& switchCell (const juce::String& id, const juce::String& caption, std::vector<rackui::Position> positions, const juce::String& tip);
+    /** In build(): a product's own cell in the row (a read-only status where a page has no
+        control to offer), in `slot`'s width. Opt-in: nothing in ANDOR OSP uses it. */
+    juce::Component& customCell (std::unique_ptr<juce::Component> cell, rackui::Slot slot = rackui::Slot::knob);
 
     InstrumentHost& host;
 

@@ -115,6 +115,8 @@ public:
     void openAnchoredPopover (std::unique_ptr<MiniPanel> panel, juce::Component& anchor) override;
     bool anchoredPopoverOpenFrom (const juce::Component& anchor) const override;
     void closeAnchoredPopover() override;
+    static constexpr int pitchWheelPopup = 15;   ///< PITCH BEND (a click on the PITCH caption)
+    static constexpr int modWheelPopup = 16;     ///< MOD WHEEL's VIBRATO (a click on the MOD caption)
     /** The macro (index into the macro row's data order: LIFE..SPACE, ECHO) a popup belongs to, or -1. */
     static int macroOfPopup (int popup) noexcept { return popup >= 0 && popup < 5 ? popup : (popup == echoPopup ? 5 : -1); }
     static int popupOfMacro (int macro) noexcept { return macro < 5 ? macro : echoPopup; }
@@ -177,6 +179,7 @@ public:
     int selectedModulationSource() const noexcept { return modSelSource; }
     int selectedModulationRoute() const noexcept { return modSelSlot; }
     Wheel& modulationWheel() noexcept { return modWheel; }
+    Wheel& pitchBendWheel() noexcept { return pitchWheel; }
     AdvancedCardButton& advancedSettingsButton() noexcept { return advancedButton; }
     HeaderMix& headerMixControl() noexcept { return headerMix; }
     EngineCard& engineCard (int layer) noexcept { return *cards[static_cast<std::size_t> (juce::jlimit (0, 2, layer))]; }
