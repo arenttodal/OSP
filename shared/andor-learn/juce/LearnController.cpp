@@ -124,6 +124,23 @@ void LearnController::userAction (const LearnEvent& event)
     // Stamped now, in the control's own handler: a step entered later can never take it.
     e.stepGeneration = lessonRunner.generation();
     lessonRunner.handle (e);
+    openBrowserAfterLesson();
+}
+
+bool LearnController::offersRestoreChoice() const
+{
+    const auto* lesson = lessonRunner.lesson();
+    return lesson != nullptr && lesson->exampleId.isNotEmpty() && hooks.canRestoreSound != nullptr && hooks.canRestoreSound();
+}
+
+void LearnController::openBrowserAfterLesson()
+{
+    // Every lesson ends in the tutorials (its tick shows it done): the next one is one click
+    // away. Only a lesson that played on its example asks first (keep it, or the sound before).
+    if (! browserAfterLesson)
+        return;
+    browserAfterLesson = false;
+    openBrowser();
 }
 
 bool LearnController::keyPressed (const juce::KeyPress& key)
@@ -152,6 +169,7 @@ void LearnController::tick()
 {
     if (! usable)
         return;
+    openBrowserAfterLesson();
     if (invitationPending)
     {
         // Once, after the editor is on screen and its layout settled (about half a second).
@@ -452,8 +470,9 @@ void LearnController::noteAction (const juce::String& id)
             if (id == "restore")
                 restorePreviousSound();
             hideNote();
-            if (id == "browse")
-                openBrowser();
+            // (the sound chosen, the tutorials follow; X alone leaves them closed)
+            if (id == "browse" || id == "restore" || id == "keep")
+                browserAfterLesson = true;
             break;
         case NoteKind::confirmReset:
             hideNote();
@@ -465,6 +484,7 @@ void LearnController::noteAction (const juce::String& id)
     }
     if (notePanel != nullptr)
         layoutNow();
+    openBrowserAfterLesson();
     releaseLayersIfIdle();
 }
 
@@ -505,7 +525,16 @@ void LearnController::refreshNote()
     {
         const auto state = lessonRunner.state();
         if (state == LessonRunner::State::tourComplete)
+        {
+            if (! offersRestoreChoice())
+            {
+                // Nothing to choose: straight back to the tutorials.
+                browserAfterLesson = true;
+                hideNote();
+                return;
+            }
             shownNote = NoteKind::complete;
+        }
         else if (! lessonRunner.inTour())
         {
             hideNote();
@@ -636,7 +665,7 @@ void LearnController::refreshNote()
             c.body = lesson != nullptr && lesson->completionText.isNotEmpty()
                          ? lesson->completionText
                          : juce::String::fromUTF8 ("You\xe2\x80\x99ve finished this lesson. Choose another tutorial or return to the instrument.");
-            if (lesson != nullptr && lesson->exampleId.isNotEmpty() && hooks.canRestoreSound != nullptr && hooks.canRestoreSound())
+            if (offersRestoreChoice())
             {
                 // The lesson played on its example: keep it, or bring back the sound from before.
                 keys.push_back ({ "restore", "Restore Previous Sound", false });
