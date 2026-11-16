@@ -438,6 +438,27 @@ void paint (juce::Graphics& g, juce::Component& content, const Identity& identit
         g.strokePath (frame, juce::PathStrokeType (1.0f));
     }
 
+    // Trimmed footer: the front apron. Under the keys a 2 px reveal (the recess's shadow), then
+    // the instrument's shallow front face across the whole housing (wheels, keys, ARP): a touch
+    // darker and more neutral than the top surface, lit from above, with a fine edge at its
+    // top and its foot. No text, no controls, no border.
+    if (trimmedFooter)
+    {
+        const float top = keys.getBottom() + layout::underKeyReveal;
+        const auto apron = juce::Rectangle<float> (layout::housing.getX(), top, layout::housing.getWidth(), layout::apronHeight);
+        // The reveal: a soft shadow under the key fronts and along the top surface's edge.
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0x38302418), 0.0f, keys.getBottom(), juce::Colour (0x10302418), 0.0f, top, false));
+        g.fillRect (juce::Rectangle<float> (apron.getX(), keys.getBottom(), apron.getWidth(), layout::underKeyReveal));
+        // The face: warm neutral ivory, a shade lighter where the light catches its top.
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xffd8d0c3), 0.0f, apron.getY(), juce::Colour (0xffcfc7ba), 0.0f, apron.getBottom(), false));
+        g.fillRect (apron);
+        g.setColour (juce::Colours::white.withAlpha (0.22f));
+        g.fillRect (apron.withHeight (1.0f));
+        // The foot: one darker line where the face turns under.
+        g.setColour (juce::Colour (0xffbdb4a7));
+        g.fillRect (apron.withTop (apron.getBottom() - 1.0f));
+    }
+
     // The macros and the envelope share one panel.
     {
         const auto r = layout::macroPanel;

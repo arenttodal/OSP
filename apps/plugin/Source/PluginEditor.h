@@ -110,7 +110,7 @@ public:
     void setArpExpanded (bool open);
     bool isArpExpanded() const noexcept { return arpShown; }
     /** The instrument's height in reference pixels (taller while the arpeggiator's editor shows). */
-    /** OSP draws the trimmed footer: the instrument ends 3 px under the keys (layout::trimmedHeight). */
+    /** OSP draws the trimmed footer: the keys, a 2 px reveal, a 20 px front apron (layout::trimmedHeight). */
     float instrumentHeight() const noexcept { return frame::instrumentHeight (arpShown, true); }
     ArpInlinePanel& arpInlinePanel() noexcept { return arpPanel; }
     ArpControl& arpControl() noexcept { return arpButton; }
