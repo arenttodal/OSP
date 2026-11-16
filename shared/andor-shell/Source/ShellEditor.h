@@ -94,6 +94,9 @@ public:
     /** The same trimmed footer as ANDOR OSP (keys, reveal, apron: layout::trimmedHeight), so a
         product stays ANDOR OSP's interface pixel for pixel. */
     float instrumentHeight() const noexcept { return osp::plugin::frame::instrumentHeight (arpShown, true); }
+    /** The wheels (tests: the trimmed footer's caption room and hit areas). */
+    osp::plugin::Wheel& pitchBendWheel() noexcept { return pitchWheel; }
+    osp::plugin::Wheel& modulationWheel() noexcept { return modWheel; }
     /** The popovers: a macro's (0..5, when the product has one), Advanced, a layer's
         REIMAGINED (7 + layer, when the engine reads it), a modulation source's routes or
         larger curve (source 0 LFO 1 .. 3 ENV 2). */

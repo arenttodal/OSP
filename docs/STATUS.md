@@ -736,22 +736,27 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
 
 ## Interface: trimmed footer with a front apron (16 Nov 2026)
 
-- [x] The instrument ends under the keyboard: the keys' fronts (1014), a 2 px reveal, a 20 px
-      front apron between the teak cheeks, then the edge. The canvas is 1448 x 1036 (was 1086;
-      `design::layout::trimmedHeight`, `frame::instrumentHeight (arpShown, true)`). Nothing above
-      moves or scales: the housing is drawn at its full 1086 px design and cut off below. GUI only,
-      no DSP; the window's resize limits and aspect follow the new height; ARP open adds `arpShift`
-      as before.
-- [x] The status line is gone (its text is still kept). What the player must know appears once in the
-      existing notice over the keyboard (`ModulationOverlay::showNoticeAt`): a failed load, an edit
-      not applied, the natural-pitch warning (OSP); the host's message and a diagnostic engine's
-      line (shell). Routine state (Ready, notes, background stages) is not shown.
+- [x] No status line and no empty foot. The keyboard row stays exactly as designed (keys to 1014
+      in their recess; PITCH and MOD under the wheels, caption line 1001-1019). Then 8-12 px of
+      room under the captions (measured: 9.2-10.7 px at every supported width), and the shallow
+      front apron from `layout::apronTop` 1024: a soft 6 px tonal turn into a warm neutral ivory
+      face (22 px), no line or border, empty. The canvas is 1448 x 1046 (was 1086;
+      `frame::instrumentHeight (arpShown, true)`). Nothing above moves or scales: the housing is
+      drawn at its full 1086 px design and cut off below. GUI only, no DSP. The window's resize
+      limits and aspect follow the new height; ARP open adds `arpShift` as before.
+- [x] The wheels' areas (MOD's socket included) end where the apron starts: nothing is clickable
+      in it.
+- [x] The status line's essential messages appear once in the existing notice over the keyboard
+      (`ModulationOverlay::showNoticeAt`): a failed load, an edit not applied, the natural-pitch
+      warning (OSP); the host's message and a diagnostic engine's line (shell). Routine state
+      (Ready, notes, background stages) is not shown.
 - [x] The shell (ANDOR ANALOG and every product) draws the same footer, so a product stays ANDOR
-      OSP's interface pixel for pixel (`[visual-regression]`). `frame::paint` and
+      OSP's interface pixel for pixel (`[visual-regression]`). `frame::paint`, `frame::place` and
       `frame::instrumentHeight` still default to the full design for any other caller.
-- [x] Tests: `TrimmedFooterTests.inc` ([ui]) checks every supported width (869, 1086, 1448,
-      1810) and ARP open. The design, website and visual-state captures use the instrument's own
-      height.
+- [x] Tests: `TrimmedFooterTests.inc` ([ui]) and a shell test ([shell][editor]) check every
+      supported width (869, 1086, 1448, 1810) and ARP open: geometry, caption clearance measured on
+      the rendered window, wheel hit areas. The design, website and visual-state captures use the
+      instrument's own height.
 
 ## Website: genuine captures for the ANDOR OSP site (9 Nov 2026)
 

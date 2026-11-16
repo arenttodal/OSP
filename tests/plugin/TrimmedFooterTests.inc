@@ -1,7 +1,7 @@
-// OSP's trimmed footer: under the keys' fronts a 2 px reveal and a 20 px front apron, then the
-// instrument's edge (layout::trimmedHeight 1036 instead of 1086), with nothing above it moved or
-// scaled. The status line is hidden (its essential messages go to the notice). Sister products
-// keep the full 1086 px design.
+// OSP's trimmed footer: the keyboard row as designed (keys in their recess, PITCH and MOD under
+// the wheels), 8-12 px of room under the captions, then the 22 px front apron and the edge
+// (layout::trimmedHeight 1046 instead of 1086), nothing above moved or scaled. The status line is
+// hidden (its essential messages go to the notice). The shell (sister products) draws the same.
 
 TEST_CASE ("plugin: OSP's trimmed footer - the instrument ends under the keys at every size", "[ui][andor-ui]")
 {
@@ -13,8 +13,8 @@ TEST_CASE ("plugin: OSP's trimmed footer - the instrument ends under the keys at
     auto* ui = dynamic_cast<Editor*> (base.get());
     REQUIRE (ui != nullptr);
 
-    // The canvas: the keyboard (its bottom 1014), the reveal and the apron; the sister products' stays 1086.
-    CHECK (ui->instrumentHeight() == Approx (layout::keyboard.getBottom() + layout::underKeyReveal + layout::apronHeight));
+    // The canvas: the keyboard row, the room under the captions and the apron (the full design stays 1086).
+    CHECK (ui->instrumentHeight() == Approx (layout::apronTop + layout::underKeyReveal + layout::apronHeight));
     CHECK (osp::plugin::frame::instrumentHeight (false) == Approx (design::height));
     CHECK (osp::plugin::frame::instrumentHeight (true, true) == Approx (layout::trimmedHeight + layout::arpShift));
 
@@ -33,17 +33,29 @@ TEST_CASE ("plugin: OSP's trimmed footer - the instrument ends under the keys at
         CHECK (ui->arpControl().getBounds().toFloat() == layout::arpControl);
         CHECK (ui->advancedSettingsButton().getBottom() <= juce::roundToInt (layout::trimmedHeight));
         CHECK (ui->modulationWheel().getY() == juce::roundToInt (layout::modWheel.getY()));
-        // The wheels' captions sit in the apron (clear of the keyboard row's foot); the slots stay.
+        // PITCH and MOD as designed (caption line 88 px under the wheel's top, MOD's socket with
+        // it), and the wheels' area ends where the apron starts: nothing clickable in the apron.
+        for (auto* wheel : { &ui->pitchBendWheel(), &ui->modulationWheel() })
         {
-            const auto& wheel = ui->modulationWheel();
-            const float captionTop = static_cast<float> (wheel.getY()) + wheel.captionLine();
-            CHECK (captionTop >= layout::keyboard.getBottom() + layout::underKeyReveal);
-            CHECK (captionTop + 18.0f <= layout::trimmedHeight);
-            CHECK (wheel.socketArea().getY() == Approx (wheel.captionLine()));   // the socket follows the caption
+            CHECK (wheel->getBottom() == juce::roundToInt (layout::apronTop));
+            CHECK (wheel->socketArea().getY() == Approx (88.0f));
         }
-        // In instrument px the keys end the reveal plus the apron above the foot.
-        const auto foot = keys.getParentComponent()->getLocalArea (ui, ui->getLocalBounds()).getBottom();
-        CHECK (static_cast<float> (foot - keys.getBottom()) == Approx (layout::underKeyReveal + layout::apronHeight).margin (1.0f));
+        // 8-12 px of clear room between the captions' lowest visible pixel and the apron, measured
+        // in the rendered window (converted to instrument px).
+        {
+            const auto shot = ui->createComponentSnapshot (ui->getLocalBounds(), true, 1.0f, juce::SoftwareImageType());
+            const float k = static_cast<float> (width) / design::width;
+            int lowest = -1;
+            for (int y = juce::roundToInt (1001.0f * k); y < juce::roundToInt (layout::apronTop * k); ++y)
+                for (int x = juce::roundToInt (layout::pitchWheel.getX() * k); x < juce::roundToInt (layout::modWheel.getRight() * k); ++x)
+                    if (shot.getPixelAt (x, y).getPerceivedBrightness() < 0.55f)
+                        lowest = y;
+            REQUIRE (lowest > 0);
+            const float clearance = layout::apronTop - (static_cast<float> (lowest) + 1.0f) / k;
+            INFO ("caption clearance " << clearance << " instrument px");
+            CHECK (clearance >= 7.5f);
+            CHECK (clearance <= 12.5f);
+        }
         if (auto* shape = ui->getConstrainer())
             CHECK (shape->getFixedAspectRatio() == Approx (design::width / layout::trimmedHeight));
     }

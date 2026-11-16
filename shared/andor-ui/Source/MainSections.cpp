@@ -1106,7 +1106,7 @@ void Wheel::setAssignable (juce::Colour colour)
 juce::Rectangle<float> Wheel::socketArea() const
 {
     // The caption's line under the wheel: the word and its socket.
-    return { 0.0f, captionTop, static_cast<float> (getWidth()), static_cast<float> (getHeight()) - captionTop };
+    return { 0.0f, 88.0f, static_cast<float> (getWidth()), static_cast<float> (getHeight()) - 88.0f };
 }
 
 void Wheel::mouseMove (const juce::MouseEvent& e)
@@ -1236,14 +1236,14 @@ void Wheel::paint (juce::Graphics& g)
     g.setFont (font);
     if (! assignable)
     {
-        g.drawText (caption, juce::Rectangle<float> (-12.0f, captionTop, static_cast<float> (getWidth()) + 24.0f, 18.0f), juce::Justification::centred, false);
+        g.drawText (caption, juce::Rectangle<float> (-12.0f, 88.0f, static_cast<float> (getWidth()) + 24.0f, 18.0f), juce::Justification::centred, false);
         return;
     }
     // MOD and its patch socket (the sources' assignment glyph), together centred under the wheel.
     const float textWidth = juce::GlyphArrangement::getStringWidth (font, caption);
     const float left = 0.5f * (static_cast<float> (getWidth()) - (textWidth + 13.0f));
-    g.drawText (caption, juce::Rectangle<float> (left, captionTop, textWidth + 1.0f, 18.0f), juce::Justification::centredLeft, false);
-    const juce::Point<float> c (left + textWidth + 8.5f, captionTop + 9.0f);
+    g.drawText (caption, juce::Rectangle<float> (left, 88.0f, textWidth + 1.0f, 18.0f), juce::Justification::centredLeft, false);
+    const juce::Point<float> c (left + textWidth + 8.5f, 97.0f);
     g.setColour (socket.withAlpha (overSocket ? 0.95f : 0.6f));
     g.drawEllipse (juce::Rectangle<float> (8.4f, 8.4f).withCentre (c), 1.25f);
     if (inUse)

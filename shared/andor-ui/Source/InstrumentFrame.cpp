@@ -3,7 +3,6 @@
 
 #include "CeramicSkin.h"
 #include "EngineCard.h"   // icons
-#include "MainSections.h"   // Wheel (caption line)
 #include "OspLookAndFeel.h"
 
 namespace osp::plugin
@@ -361,15 +360,11 @@ void place (const Parts& parts, bool arpShown, bool trimmedFooter)
     auto low = [&] (juce::Rectangle<float> r) { return at (r.translated (0.0f, shift)); };
 
     // Keyboard row and footer.
-    // Trimmed footer: the slots stay; the wheels reach down to the edge and their captions
-    // (PITCH, MOD and its socket) sit centred in the front apron, clear of the seam above it.
-    const float wheelHeight = trimmedFooter ? layout::trimmedHeight - layout::pitchWheel.getY() : 115.0f;
-    const float captionTop = trimmedFooter ? layout::trimmedHeight - layout::pitchWheel.getY() - 0.5f * layout::apronHeight - 9.0f : 88.0f;
+    // The wheels and their captions as designed; with the trimmed footer their area (caption and
+    // MOD's socket included) ends where the apron starts, so nothing is clickable in the apron.
+    const float wheelHeight = trimmedFooter ? layout::apronTop - layout::pitchWheel.getY() : 115.0f;
     set (parts.pitchWheel, low (layout::pitchWheel.withHeight (wheelHeight)));
     set (parts.modWheel, low (layout::modWheel.withHeight (wheelHeight)));
-    for (auto* w : { parts.pitchWheel, parts.modWheel })
-        if (auto* wheel = dynamic_cast<Wheel*> (w))
-            wheel->setCaptionTop (captionTop);
     if (parts.keyboard != nullptr)
     {
         parts.keyboard->setBounds (low (layout::keyboard));
@@ -427,16 +422,13 @@ void paint (juce::Graphics& g, juce::Component& content, const Identity& identit
     // recess cut into the housing (rendered at the keybed's place: 2 px left and right, 3
     // above and 2 below the keys).
     const auto keys = layout::keyboard.translated (0.0f, arpShown ? layout::arpShift : 0.0f);
-    // Trimmed footer: the recess opens at the front (its bottom lip runs past the window's foot),
-    // so the keys' fronts meet the edge with only the recess's shadow under them.
-    const float lipBleed = trimmedFooter ? 40.0f : 0.0f;
     if (auto* pieces = skin::active(); pieces != nullptr
-        && pieces->draw (g, "keybed", juce::Rectangle<float> (keys.getX() - 2.0f, keys.getY() - 3.0f, keys.getWidth() + 4.0f, keys.getHeight() + 5.0f + lipBleed)))
+        && pieces->draw (g, "keybed", juce::Rectangle<float> (keys.getX() - 2.0f, keys.getY() - 3.0f, keys.getWidth() + 4.0f, keys.getHeight() + 5.0f)))
     {
     }
     else
     {
-        const auto bed = keys.expanded (2.0f).withTrimmedBottom (-lipBleed);
+        const auto bed = keys.expanded (2.0f);
         juce::Path frame;
         frame.addRoundedRectangle (bed, 6.0f);
         design::CachedShadow (juce::Colour (0x22302418), 3, { 0, 1 }).drawForPath (g, frame);
@@ -446,15 +438,14 @@ void paint (juce::Graphics& g, juce::Component& content, const Identity& identit
         g.strokePath (frame, juce::PathStrokeType (1.0f));
     }
 
-    // Trimmed footer: the front apron. Under the keys a 2 px reveal (the recess's shadow), then
-    // the instrument's shallow front face across the whole housing (wheels, keys, ARP): a touch
-    // darker and more neutral than the top surface, lit from above, with a fine edge at its
-    // top and its foot. No text, no controls, no border.
+    // Trimmed footer: the front apron, under the keyboard row and the room left below PITCH and
+    // MOD (layout::apronTop): the instrument's shallow front face across the whole housing,
+    // a touch darker and more neutral than the top surface. Empty: no text, controls or border.
     if (trimmedFooter)
     {
-        // No rule or stroke: the top surface (#e0d8ca) eases into the face over its first few
-        // pixels, the keys' fronts cast a soft shadow onto it, and the face turns under softly.
-        const float y0 = keys.getBottom();
+        // No rule or stroke: the top surface (#e0d8ca) eases into the face over its first 6 px,
+        // and the face turns under softly at its foot.
+        const float y0 = layout::apronTop + (arpShown ? layout::arpShift : 0.0f);
         const auto face = juce::Rectangle<float>::leftTopRightBottom (layout::housing.getX(), y0, layout::housing.getRight(),
                                                                     y0 + layout::underKeyReveal + layout::apronHeight);
         const float h = face.getHeight();
@@ -463,9 +454,7 @@ void paint (juce::Graphics& g, juce::Component& content, const Identity& identit
         tone.addColour (0.55, juce::Colour (0xffd6cec1));      // the face: warm neutral ivory, a touch darker
         g.setGradientFill (tone);
         g.fillRect (face);
-        // The keys' fronts: a soft shadow under them only (they stand proud of the face).
-        g.setGradientFill (juce::ColourGradient (juce::Colour (0x1e302418), 0.0f, y0, juce::Colour (0x00302418), 0.0f, y0 + 5.0f, false));
-        g.fillRect (juce::Rectangle<float> (keys.getX() - 2.0f, y0, keys.getWidth() + 4.0f, 5.0f));
+        // (The keys' fronts keep their recess and its lip, with the recess's own shadow under them.)
         // The foot: the face turns under (a soft darkening over the last 3 px, no line).
         g.setGradientFill (juce::ColourGradient (juce::Colour (0x00302418), 0.0f, face.getBottom() - 3.0f, juce::Colour (0x24302418), 0.0f, face.getBottom(), false));
         g.fillRect (face.withTop (face.getBottom() - 3.0f));

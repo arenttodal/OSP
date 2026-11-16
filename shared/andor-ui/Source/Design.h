@@ -281,13 +281,16 @@ namespace layout
     /** The keyboard ends where the arpeggiator's card column begins (the approved mockup). */
     const R keyboard { 148.0f, 913.0f, 1150.0f, 101.0f };
     const R status { 48.0f, 1038.0f, 600.0f, 24.0f };
-    /** OSP's trimmed footer (opt-in, frame::instrumentHeight): no status line and no empty foot;
-        under the keys' fronts (keyboard bottom 1014) a 2 px reveal, then a shallow front apron
-        (the instrument's front face, between the teak cheeks), then the edge. Nothing above moves
-        or scales: the housing is drawn at its full 1086 px design height and cut off below. */
+    /** OSP's trimmed footer (opt-in, frame::instrumentHeight): no status line and no empty foot.
+        The keyboard row stays as designed (keys to 1014 in their recess; PITCH and MOD under the
+        wheels, their caption line 1001-1019, lowest text pixel at 1013.5); 10.5 px of room under
+        the captions, then the shallow front apron (the instrument's front face, between the teak
+        cheeks: a soft 2 px turn and 20 px face), then the edge. Nothing above moves or scales:
+        the housing is drawn at its full 1086 px design height and cut off below. */
+    constexpr float apronTop = 1024.0f;
     constexpr float underKeyReveal = 2.0f;
     constexpr float apronHeight = 20.0f;
-    constexpr float trimmedHeight = 1014.0f + underKeyReveal + apronHeight;   // 1036
+    constexpr float trimmedHeight = apronTop + underKeyReveal + apronHeight;   // 1046
     /** Right of the keyboard, level with it: the arpeggiator's card (light, ARP, chevron,
         pattern and rate) and the Advanced card under it. */
     const R arpControl { 1308.0f, 913.0f, 105.0f, 64.0f };

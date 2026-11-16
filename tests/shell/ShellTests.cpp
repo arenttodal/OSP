@@ -537,6 +537,41 @@ TEST_CASE ("shell: presets and sessions save and reload; another product's state
     }
 }
 
+TEST_CASE ("shell: the trimmed footer as ANDOR OSP's - captions clear of the apron at every size", "[shell][editor]")
+{
+    namespace design = osp::plugin::design;
+    namespace layout = osp::plugin::design::layout;
+    const ScopedLook ceramic (osp::plugin::skin::Look::ceramic);
+    ShellProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<ShellEditor*> (editor.get());
+    REQUIRE (ui != nullptr);
+    CHECK (ui->instrumentHeight() == Approx (layout::trimmedHeight));
+    for (const int width : { 869, 1086, 1448, 1810 })
+    {
+        INFO ("width " << width);
+        editor->setSize (width, juce::roundToInt (static_cast<float> (width) * layout::trimmedHeight / design::width));
+        ui->refreshNow();
+        for (auto* wheel : { &ui->pitchBendWheel(), &ui->modulationWheel() })
+        {
+            CHECK (wheel->getBottom() == juce::roundToInt (layout::apronTop));   // nothing clickable in the apron
+            CHECK (wheel->socketArea().getY() == Approx (88.0f));                 // captions as designed
+        }
+        const auto shot = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f, juce::SoftwareImageType());
+        const float k = static_cast<float> (width) / design::width;
+        int lowest = -1;
+        for (int y = juce::roundToInt (1001.0f * k); y < juce::roundToInt (layout::apronTop * k); ++y)
+            for (int x = juce::roundToInt (layout::pitchWheel.getX() * k); x < juce::roundToInt (layout::modWheel.getRight() * k); ++x)
+                if (shot.getPixelAt (x, y).getPerceivedBrightness() < 0.55f)
+                    lowest = y;
+        REQUIRE (lowest > 0);
+        const float clearance = layout::apronTop - (static_cast<float> (lowest) + 1.0f) / k;
+        INFO ("caption clearance " << clearance << " instrument px");
+        CHECK (clearance >= 7.5f);
+        CHECK (clearance <= 12.5f);
+    }
+}
+
 TEST_CASE ("shell: the interface binds what the engine reads and disables the rest", "[shell][editor]")
 {
     const ScopedLook ceramic (osp::plugin::skin::Look::ceramic);

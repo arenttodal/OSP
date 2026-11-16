@@ -262,10 +262,6 @@ public:
     void setValue (float newValue);
     /** The wheel as a modulation source (MOD): a drag socket beside its caption. Dragging the
         caption or socket carries a cable (screen positions); dragging the wheel still turns it. */
-    /** Where the caption's 18 px line starts (component px; the reference: 88, right under the
-        slot). OSP's trimmed footer moves it down into the front apron. */
-    void setCaptionTop (float y) { if (y != captionTop) { captionTop = y; repaint(); } }
-    float captionLine() const noexcept { return captionTop; }
     void setAssignable (juce::Colour socketColour);
     std::function<void (juce::Point<int>)> onSourceDrag, onSourceDrop;
     juce::Rectangle<float> socketArea() const;
@@ -282,7 +278,6 @@ private:
     float value = 0.0f;   // pitch -1..1, mod 0..1
     float dragStart = 0.0f;
     bool assignable = false, cabling = false, overSocket = false, inUse = false;
-    float captionTop = 88.0f;
     juce::Colour socket;
 };
 

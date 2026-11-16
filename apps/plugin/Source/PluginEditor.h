@@ -124,6 +124,7 @@ public:
     int selectedModulationSource() const noexcept { return modSelSource; }
     int selectedModulationRoute() const noexcept { return modSelSlot; }
     Wheel& modulationWheel() noexcept { return modWheel; }
+    Wheel& pitchBendWheel() noexcept { return pitchWheel; }
     AdvancedCardButton& advancedSettingsButton() noexcept { return advancedButton; }
     HeaderMix& headerMixControl() noexcept { return headerMix; }
     EngineCard& engineCard (int layer) noexcept { return *cards[static_cast<std::size_t> (juce::jlimit (0, 2, layer))]; }
