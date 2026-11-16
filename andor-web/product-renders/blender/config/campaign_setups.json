@@ -17,12 +17,12 @@
    },
    "floor": {
     "rgb": [
-     0.62,
-     0.595,
-     0.555
+     0.585,
+     0.556,
+     0.512
     ],
     "roughness": 0.78,
-    "note": "warm pale stone, not white; tone from the light's falloff, no texture"
+    "note": "C2: a touch darker and warmer than C1 (0.62/0.595/0.555), so the ivory instrument separates from the stone"
    },
    "lights": [
     {
@@ -61,8 +61,9 @@
       0.95,
       0.9
      ],
-     "spread": 60,
-     "why": "narrow, behind right: thin highlights along the teak, the ceramic edges and the knob rims"
+     "spread": 120,
+     "why": "narrow, behind right: thin highlights along the teak, the ceramic edges and the knob rims",
+     "note": "C2: spread 60 -> 120, so tall frames see no hard light boundary on the stone"
     },
     {
      "name": "Overhead",
@@ -111,7 +112,7 @@
       1.4,
       0.06
      ],
-     "power": 6,
+     "power": 7.5,
      "rgb": [
       1.0,
       0.95,
@@ -119,6 +120,26 @@
      ],
      "spread": 50,
      "why": "a line along every key front and the lip"
+    },
+    {
+     "name": "Low rake",
+     "offset": [
+      -1.25,
+      -0.3,
+      0.3
+     ],
+     "size": [
+      1.2,
+      0.3
+     ],
+     "power": 4.5,
+     "rgb": [
+      1.0,
+      0.95,
+      0.9
+     ],
+     "spread": 70,
+     "why": "C2: grazes the lower ceramic controls, the macro knobs' skirts and the keybed, for readability without contrast"
     }
    ],
    "shots": {
@@ -180,6 +201,41 @@
        -0.01
       ],
       "fit": "HORIZONTAL"
+     }
+    },
+    "A1M": {
+     "title": "Gallery A1M \u00b7 mobile hero (9:16, own composition, copy top)",
+     "res": [
+      1170,
+      2080
+     ],
+     "rot": -28.0,
+     "camera": {
+      "yaw": -30,
+      "pitch": 50,
+      "dist": 1.15,
+      "lens": 85,
+      "target": [
+       724,
+       540,
+       0
+      ],
+      "fstop": 11,
+      "shift": [
+       -0.03,
+       0.08
+      ],
+      "fit": "HORIZONTAL"
+     },
+     "text_safe": {
+      "x": [
+       0.08,
+       0.92
+      ],
+      "y": [
+       0.08,
+       0.3
+      ]
      }
     }
    }
@@ -407,12 +463,87 @@
        0.92
       ],
       "y": [
-       0.06,
-       0.3
+       0.14,
+       0.34
       ]
-     }
+     },
+     "note": "C2: copy clear of the platform's top UI (14 %); the product clear of the bottom 20 % (call to action)"
+    },
+    "B2_115": {
+     "title": "Floating B2_115 \u00b7 9:16, projected size x1.15",
+     "res": [
+      1440,
+      2560
+     ],
+     "rot": -26.0,
+     "camera": {
+      "yaw": -36,
+      "pitch": 58,
+      "dist": 1.183,
+      "lens": 85,
+      "target": [
+       724,
+       560,
+       0
+      ],
+      "fstop": 9,
+      "shift": [
+       0.07,
+       0.08
+      ],
+      "fit": "HORIZONTAL"
+     },
+     "text_safe": {
+      "x": [
+       0.08,
+       0.92
+      ],
+      "y": [
+       0.14,
+       0.34
+      ]
+     },
+     "note": "C2: copy clear of the platform's top UI (14 %); the product clear of the bottom 20 % (call to action)"
+    },
+    "B2_125": {
+     "title": "Floating B2_125 \u00b7 9:16, projected size x1.25",
+     "res": [
+      1440,
+      2560
+     ],
+     "rot": -34.0,
+     "camera": {
+      "yaw": -36,
+      "pitch": 58,
+      "dist": 1.088,
+      "lens": 85,
+      "target": [
+       724,
+       560,
+       0
+      ],
+      "fstop": 9,
+      "shift": [
+       0.05,
+       0.07
+      ],
+      "fit": "HORIZONTAL"
+     },
+     "text_safe": {
+      "x": [
+       0.08,
+       0.92
+      ],
+      "y": [
+       0.14,
+       0.34
+      ]
+     },
+     "note": "C2: recomposed (product turned -34 deg) so the larger size fits the phone frame without cropping a cheek"
     }
-   }
+   },
+   "product_light_ev": -0.3,
+   "note_c2": "C2: product lights -0.3 EV (key, rim, top line, kicker, fill); the floor lights unchanged"
   },
   "ANDOR_MATERIAL": {
    "purpose": "Feature transitions, storytelling, detail gallery, product film: macro photographs of real details.",
@@ -530,6 +661,31 @@
        5.5
       ],
       "fstop": 8.0,
+      "shift": [
+       0.0,
+       0.0
+      ],
+      "fit": "AUTO"
+     }
+    },
+    "C1S": {
+     "title": "Material C1S \u00b7 macro knobs, sharp (1:1, f/14)",
+     "res": [
+      2000,
+      2000
+     ],
+     "rot": -11.0,
+     "camera": {
+      "yaw": -18,
+      "pitch": 60,
+      "dist": 0.2,
+      "lens": 100,
+      "target": [
+       493,
+       812,
+       5.5
+      ],
+      "fstop": 14.0,
       "shift": [
        0.0,
        0.0

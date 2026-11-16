@@ -43,6 +43,9 @@ p.add_argument("--res", type=int, nargs=2, default=None, help="default 2000 x 15
 p.add_argument("--setup", choices=["ANDOR_GALLERY", "ANDOR_FLOATING", "ANDOR_MATERIAL"],
                help="Gate C: a campaign setup from config/campaign_setups.json (stage, lights, float, exposure); needs --shot")
 p.add_argument("--shot", help="Gate C: the setup's shot (camera, product rotation, resolution), e.g. A1, B2, C1")
+p.add_argument("--noise", type=float, default=0.012, help="adaptive-sampling noise threshold (masters: 0.005 keeps fine GUI text out of the denoiser's reach)")
+p.add_argument("--wheels", default="flat", choices=["flat", "physical"],
+               help="C2 test only: 'physical' models PITCH/MOD from the GUI (ivory bezel, slot, wheel, PITCH's orange band); default flat artwork")
 p.add_argument("--float", type=float, help="override the setup's float height (m), for floating-height studies")
 p.add_argument("--dist-scale", type=float, default=1.0, help="multiply the shot's camera distance (product-scale studies: 1/1.15, 1/1.25)")
 p.add_argument("--scale", type=float, default=1.0)
@@ -149,7 +152,7 @@ cy = scene.cycles
 cy.device = "CPU"
 cy.samples = args.samples
 cy.use_adaptive_sampling = True
-cy.adaptive_threshold = 0.012
+cy.adaptive_threshold = args.noise
 cy.use_denoising = True
 cy.denoiser = "OPENIMAGEDENOISE"
 cy.max_bounces = 10
@@ -1176,6 +1179,76 @@ if CLAY:
             o.data.materials.clear()
             o.data.materials.append(CLAY)
 
+# --- C2 test: physical PITCH / MOD wheels (from the approved GUI) ----------------------------
+def wheel_solid(name, u0, u1, v_c, zc, R, a0, a1, mat, seg=72):
+    """A wheel (or an arc of one) turning about the x axis: outer surface plus side caps.
+    u0/u1 editor px across, v_c editor px of the axle, zc the axle height, angles from +z toward the front."""
+    me = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    full = abs((a1 - a0) - 2 * math.pi) < 1e-6
+    n = seg if full else max(4, int(seg * (a1 - a0) / (2 * math.pi)) + 1)
+    rings = []
+    for x in (ex(u0), ex(u1)):
+        ring = []
+        for i in range(n):
+            a = a0 + (a1 - a0) * i / (n if full else n - 1)
+            ring.append(bm.verts.new((x, ey(v_c) - R * math.sin(a), zc + R * math.cos(a))))
+        rings.append(ring)
+    L, Rr = rings
+    m = n if full else n - 1
+    for i in range(m):
+        j = (i + 1) % n
+        bm.faces.new((L[i], L[j], Rr[j], Rr[i]))
+    if full:
+        bm.faces.new(list(reversed(L)))
+        bm.faces.new(Rr)
+    bm.normal_update()
+    bm.to_mesh(me)
+    bm.free()
+    o = obj(name, me)
+    me.materials.append(mat)
+    for poly in me.polygons:
+        poly.use_smooth = True
+    return o
+
+
+if args.wheels == "physical" and APRON:
+    P_ = PANEL_TOP
+    M_WHEEL = mat_solid("Wheel (charcoal, soft-touch)", (36, 34, 32), 0.58, spec=0.3, bump=0)
+    M_FLANGE = mat_solid("Wheel flange", (78, 74, 68), 0.45, spec=0.35, bump=0)
+    M_PITCH = mat_solid("PITCH band (orange satin)", (214, 104, 42), 0.40, spec=0.4, coat=0.1, bump=0)
+    M_SLOT = mat_solid("Wheel slot (charcoal)", (30, 28, 26), 0.75, spec=0.2, bump=0)
+    SLOT_DEPTH, R_W = 5.0 * MM, 8.0 * MM
+    WHEELS = [  # bezel (editor px), slot, PITCH band (None for MOD), from web-10-hero-3L-nocaps@4x
+        ((42.5, 913.75, 77.5, 1001.0), (46.0, 918.75, 74.0, 997.0), (52.5, 937.0, 65.0, 990.0)),
+        ((93.75, 913.75, 128.75, 1001.0), (97.5, 918.75, 125.0, 997.0), None),
+    ]
+    panel_o = bpy.data.objects["Ceramic panel"]
+    panel_o.data.materials.append(M_SLOT)
+    for k, (bz, sl, band) in enumerate(WHEELS):
+        cut = slab(f"Wheel slot cutter {k}", ex(sl[0]), ey(sl[3]), ex(sl[2]), ey(sl[1]), 5 * PX, P_ - SLOT_DEPTH, P_ + 3 * MM, [M_SLOT], seg=6)
+        cut.hide_render = cut.hide_viewport = True
+        b_ = panel_o.modifiers.new(f"Slot {k}", "BOOLEAN")
+        b_.operation, b_.solver, b_.object = "DIFFERENCE", "EXACT", cut
+        bezel = slab(f"Wheel bezel {k}", ex(bz[0]), ey(bz[3]), ex(bz[2]), ey(bz[1]), 7 * PX, P_ - 0.2 * MM, P_ + 0.6 * MM,
+                     [M_FACE, M_PANEL_SIDE], bevel=0.22 * MM, seg=8, cutters=[cut], bevel_segments=3)
+        bake(bezel, top_side(P_ + 0.6 * MM))
+        vc = (sl[1] + sl[3]) / 2
+        zc = P_ + 0.35 * MM - R_W
+        inset = 0.6 * MM / PX
+        wheel_solid(f"Wheel {k}", sl[0] + inset + 1.2, sl[2] - inset - 1.2, vc, zc, R_W, 0, 2 * math.pi, M_WHEEL)
+        for f0, f1 in ((sl[0] + inset, sl[0] + inset + 1.2), (sl[2] - inset - 1.2, sl[2] - inset)):
+            wheel_solid(f"Wheel flange {k}", f0, f1, vc, zc, R_W + 0.08 * MM, 0, 2 * math.pi, M_FLANGE)
+        if band:
+            a_lo = math.asin(max(-0.999, min(0.999, (ey(band[3]) - ey(vc)) / R_W)))
+            a_hi = math.asin(max(-0.999, min(0.999, (ey(band[1]) - ey(vc)) / R_W)))
+            wheel_solid("PITCH band", band[0], band[2], vc, zc, R_W + 0.06 * MM, -a_hi, -a_lo, M_PITCH, seg=240)
+    YT_ = ey(APRON["top"])
+    bake(panel_o, lambda c, n: 3 if (n.z < 0.9 and c.z < P_ - 0.05 * MM and c.y > YT_ and abs(c.x) > ex(140) * -1 and c.x < ex(135))
+         else (0 if n.z > 0.9 and c.z > P_ - 0.05 * MM else (2 if c.y < YT_ - 1e-4 else (3 if c.z < P_ - 0.05 * MM and c.x < ex(135) and c.y > YT_ else 1))))
+    for o_ in [o for o in bpy.data.objects if o.name.startswith("Wheel slot cutter")]:
+        bpy.data.objects.remove(o_)
+
 # --- pose ------------------------------------------------------------------------------------
 ROT = {"A": -9.0, "hero_A": -9.0, "front_edge": 0.0}.get(args.camera, -11.0)
 if SHOT:
@@ -1231,7 +1304,7 @@ if args.stage == "gallery":
     # Gate C gallery: warm pale stone, never white; its tone comes from the lights' falloff alone.
     fl = (SETUP or {}).get("floor", {"rgb": [0.62, 0.595, 0.555], "roughness": 0.78})
     m = floor_mat("Gallery stone", tuple(fl["rgb"]), fl["roughness"])
-    sweep = slab("Gallery floor", -4, -4, 4, 4, 0.01, -0.02, 0.0, [m], coll=STAGE)
+    sweep = slab("Gallery floor", -15, -15, 15, 15, 0.01, -0.02, 0.0, [m], coll=STAGE)   # wide: tall frames never see its edge
     floor_objs.append(sweep)
 elif args.stage == "neutral":
     # A warm light-grey studio floor (no wall: the camera looks down, and a lit wall would only
@@ -1305,7 +1378,9 @@ if SETUP:
         else:
             loc, aim = T + Vector(L["offset"]), T
         only = {"product": PRODUCT, "floor": STAGE}.get(L.get("link"))
-        area(L["name"], loc, aim, L["size"][0], L["size"][1], L["power"], tuple(L["rgb"]), spread=L.get("spread", 180), only=only)
+        # C2: the setup may trim only the product's lights (e.g. B1: -0.3 EV), never the floor's
+        power = L["power"] * (2.0 ** SETUP.get("product_light_ev", 0.0) if L.get("link") == "product" else 1.0)
+        area(L["name"], loc, aim, L["size"][0], L["size"][1], power, tuple(L["rgb"]), spread=L.get("spread", 180), only=only)
 elif args.light == "neutral":
     # The construction-review rig (passes 2-3.5, checkpoint 2, keyboard + front body round).
     # 1 key: a large soft box, upper left, slightly toward the camera side
