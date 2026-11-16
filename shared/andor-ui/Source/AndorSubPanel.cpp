@@ -1,4 +1,4 @@
-#include "SubPanel.h"
+#include "AndorSubPanel.h"
 
 #include "Binding.h"
 #include "Design.h"

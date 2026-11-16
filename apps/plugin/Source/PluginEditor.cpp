@@ -1,5 +1,8 @@
 #include "PluginEditor.h"
 #include "MacroPopups.h"
+#include "WheelPopups.h"
+#include "ActionEvents.h"
+#include "LearnController.h"
 
 #include "core/PitchMath.h"
 #include "io/AudioFileIO.h"
@@ -170,7 +173,7 @@ void OspAudioProcessorEditor::mouseDownAnywhere (juce::Component* c)
     for (int i = 0; i < static_cast<int> (macros.size()); ++i)
         if (c == macros[static_cast<std::size_t> (i)].label.get())
             pressed = popupOfMacro (i);
-    if (c == &advancedButton)
+    if (c == &advancedSettingsButton())
         pressed = advancedPopup;
     if (headerMix.isMixOpener (c))
         pressed = mixPopup;
@@ -182,6 +185,9 @@ void OspAudioProcessorEditor::mouseDownAnywhere (juce::Component* c)
             if (card.reimaginedLabelBounds().contains (at))
                 pressed = reimaginedPopup + l;
         }
+    for (auto [wheel, which] : { std::pair<Wheel*, int> { &pitchWheel, pitchWheelPopup }, { &modWheel, modWheelPopup } })
+        if (c == wheel && wheel->captionArea().contains (wheel->getLocalPoint (nullptr, juce::Desktop::getMousePosition().toFloat())))
+            pressed = which;
     closedByLabelPress = pressed == popupIndex ? pressed : -1;
     closePopup();
 }
@@ -340,23 +346,30 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
 
     content.addAndMakeVisible (pitchWheel);
     content.addAndMakeVisible (modWheel);
+    // The wheels' captions are doors to their settings (as a macro's name): PITCH to the bend's
+    // RANGE, MOD to its VIBRATO. A press that just closed the popover does not reopen it.
+    pitchWheel.setCaptionAccent (juce::Colour (0xffcd5a1e));
+    modWheel.setCaptionAccent (modui::sourceColour (4));
+    for (auto [wheel, which] : { std::pair<Wheel*, int> { &pitchWheel, pitchWheelPopup }, { &modWheel, modWheelPopup } })
+        wheel->onCaptionClick = [this, which] {
+            if (closedByLabelPress == which)
+            {
+                closedByLabelPress = -1;
+                return;
+            }
+            if (popupIndex == which)
+                closePopup();
+            else
+                openPopup (which);
+        };
     frame::setUpKeyboard (keyboard);
     keyboard.tintOf = [this] (int note) { return keyTints[static_cast<std::size_t> (std::clamp (note, 0, 127))]; };
     content.addAndMakeVisible (keyboard);
 
-    frame::setUpStatusLabel (statusLabel);
-    content.addAndMakeVisible (statusLabel);
-    advancedButton.setTitle ("Advanced settings");
-    advancedButton.setTooltip ("Tuning, bend range, voices, pitch character, dynamics (how touch changes the sound), MPE, variation seed");
-    advancedButton.onClick = [this] {
-        if (closedByLabelPress == advancedPopup)
-        {
-            closedByLabelPress = -1;
-            return;
-        }
-        openPopup (advancedPopup);
-    };
-    content.addAndMakeVisible (advancedButton);
+    shownStatusMessage = ospProcessor.statusMessage();   // (an older message is not news to a new editor)
+    // SETTINGS and INFO beneath ARP (the large Advanced key's place).
+    utilityKeys.onClick = [this] (KeyboardUtilityActions::Action a) { utilityKeyClicked (a); };
+    content.addAndMakeVisible (utilityKeys);
     arpButton.onToggleEditor = [this] { setArpExpanded (! arpShown); };
     // SUB: the housing's second row (its light switches SUB, the row opens its panel above).
     arpButton.setSecondRow ("SUB", OspAudioProcessor::subFieldId ("enabled"));
@@ -561,7 +574,8 @@ void OspAudioProcessorEditor::openPopup (int which)
         arpButton.setSecondRowOpen (true);
         return;
     }
-    if (which < 0 || which > lastPopup || (which >= reimaginedPopup + OspAudioProcessor::numLayers && which < echoPopup))
+    const bool wheelPopup = which == pitchWheelPopup || which == modWheelPopup;
+    if (which < 0 || (which > lastPopup && ! wheelPopup) || (which >= reimaginedPopup + OspAudioProcessor::numLayers && which < echoPopup))
         return;
     const bool reimagined = which >= reimaginedPopup && which < reimaginedPopup + OspAudioProcessor::numLayers;
     if (reimagined && ! cards[static_cast<std::size_t> (which - reimaginedPopup)]->isVisible())
@@ -581,6 +595,10 @@ void OspAudioProcessorEditor::openPopup (int which)
     }
     else if (which == curvePopup)
         popup = std::make_unique<ModCurvePopup> (ospProcessor, popupSource);
+    else if (which == pitchWheelPopup)
+        popup = createPitchBendPopup (ospProcessor);
+    else if (which == modWheelPopup)
+        popup = createModWheelPopup (ospProcessor, defaultVibratoSources(), [this] { return ospProcessor.modWheelPosition(); });
     else
         popup = createMacroPopup (static_cast<MacroPopup> (macroOfPopup (which)), ospProcessor);
     presentPopup (which);
@@ -588,10 +606,14 @@ void OspAudioProcessorEditor::openPopup (int which)
         macros[static_cast<std::size_t> (m)].label->setOpen (true);
     if (reimagined)
         cards[static_cast<std::size_t> (which - reimaginedPopup)]->setReimaginedOpen (true);
+    if (which == pitchWheelPopup)
+        pitchWheel.setCaptionOpen (true);
+    if (which == modWheelPopup)
+        modWheel.setCaptionOpen (true);
     if (keepAdvanced)
     {
         ospProcessor.setAdvancedOpen (true);
-        advancedButton.setToggleState (true, juce::dontSendNotification);
+        utilityKeys.setActive (KeyboardUtilityActions::Action::settings, true);
     }
 }
 
@@ -619,10 +641,14 @@ void OspAudioProcessorEditor::closePopup()
         macros[static_cast<std::size_t> (m)].label->setOpen (false);
     if (popupIndex >= reimaginedPopup && popupIndex < reimaginedPopup + OspAudioProcessor::numLayers)
         cards[static_cast<std::size_t> (popupIndex - reimaginedPopup)]->setReimaginedOpen (false);
+    if (popupIndex == pitchWheelPopup)
+        pitchWheel.setCaptionOpen (false);
+    if (popupIndex == modWheelPopup)
+        modWheel.setCaptionOpen (false);
     if (popupIndex == advancedPopup)
     {
         ospProcessor.setAdvancedOpen (false);
-        advancedButton.setToggleState (false, juce::dontSendNotification);
+        utilityKeys.setActive (KeyboardUtilityActions::Action::settings, false);
     }
     if (popupIndex == subPopup)
         arpButton.setSecondRowOpen (false);
@@ -709,6 +735,13 @@ void OspAudioProcessorEditor::positionPopup()
         x = anchor.getX();
         y = anchor.getY() - 10.0f - size.y;
     }
+    else if (popupIndex == pitchWheelPopup || popupIndex == modWheelPopup)
+    {
+        auto& wheel = popupIndex == pitchWheelPopup ? pitchWheel : modWheel;
+        const auto at = frame::wheelPopoverOrigin (wheel.getBounds().toFloat(), size);
+        x = at.x;
+        y = at.y;
+    }
     else if (popupIndex == mixPopup)
     {
         // The large MIX unfolds under the header's MIX.
@@ -718,7 +751,8 @@ void OspAudioProcessorEditor::positionPopup()
     }
     else
     {
-        const auto at = frame::advancedPopoverOrigin (advancedButton.getBounds().toFloat(), size);
+        const auto at = frame::advancedPopoverOrigin (content.getLocalArea (&utilityKeys, advancedSettingsButton().getBounds()).toFloat(), size,
+                                                      arpButton.getBounds().toFloat());
         x = at.x;
         y = at.y;
     }
@@ -1247,9 +1281,14 @@ void OspAudioProcessorEditor::showMenu()
                           safe->setScaleFactor (safe->ospProcessor.uiScale());
                       });
     menu.addSubMenu ("Interface size", size);
-    menu.addItem ("Advanced settings", [safe] { if (safe != nullptr) safe->openPopup (advancedPopup); });
+    // (Advanced is the SETTINGS key's, Info the INFO key's: beneath ARP.)
     if (learn != nullptr)
-        learn->addMenuItems (menu);   // LEARN: Tutorials..., Toggle Info, Reset Tutorials...
+        learn->addMenuItems (menu);   // LEARN: Tutorials..., Reset Tutorials...
+    if (showMenuForTest != nullptr)
+    {
+        showMenuForTest (menu);
+        return;
+    }
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (menuButton).withDeletionCheck (*this));
 }
 
@@ -1605,9 +1644,8 @@ void OspAudioProcessorEditor::layoutInstrument()
     parts.pitchWheel = &pitchWheel;
     parts.modWheel = &modWheel;
     parts.keyboard = &keyboard;
-    parts.status = &statusLabel;
     parts.arpControl = &arpButton;
-    parts.advanced = &advancedButton;
+    parts.utilityActions = &utilityKeys;
     parts.headerMix = &headerMix;
     parts.rack = &racks;
     parts.rackShift = rackShift();
@@ -1630,23 +1668,30 @@ void OspAudioProcessorEditor::layoutInstrument()
 
 void OspAudioProcessorEditor::updateStatus()
 {
+    // No footer line (the compact bottom edge): "Ready", "No sound loaded" and the notes held
+    // need no words, and the cards show their own loading. What matters - a file that could not
+    // load, a preset opened or saved, a warning about the sound - is the overlay's brief notice,
+    // once, when it happens.
     const int layer = ospProcessor.editLayer();
-    juce::String status;
-    switch (ospProcessor.loadState (layer))
+    const bool failed = ospProcessor.loadState (layer) == OspAudioProcessor::LoadState::failed;
+    if (failed && ! shownLoadFailed)
+        modOverlay.showStatusNotice ("Could not load that file");
+    shownLoadFailed = failed;
+    if (const auto message = ospProcessor.statusMessage(); message != shownStatusMessage)
     {
-        case OspAudioProcessor::LoadState::empty: status = shownCount > 0 ? "" : "No sound loaded"; break;
-        case OspAudioProcessor::LoadState::loading: status = juce::String::fromUTF8 ("Understanding the sound\xe2\x80\xa6"); break;
-        case OspAudioProcessor::LoadState::ready: status = ospProcessor.stageMessage(); break;
-        case OspAudioProcessor::LoadState::failed: status = "Could not load that file"; break;
+        shownStatusMessage = message;
+        if (message.isNotEmpty())
+            modOverlay.showStatusNotice (message);
     }
-    const int voices = ospProcessor.activeVoices.load();
-    if (voices > 0)
-        status << (status.isNotEmpty() ? dot : juce::String()) << voices << (voices == 1 ? " note" : " notes");
-    const auto message = ospProcessor.statusMessage();
-    if (message.isNotEmpty())
-        status << (status.isNotEmpty() ? dot : juce::String()) << message;
-    if (statusLabel.getText() != status)
-        statusLabel.setText (status, juce::dontSendNotification);
+    // ("Ready · Natural pitch needs ...": the part after "Ready" is a warning worth reading)
+    const auto stage = ospProcessor.stageMessage();
+    const auto warning = stage.startsWith ("Ready") ? stage.fromFirstOccurrenceOf (juce::String::fromUTF8 ("\xc2\xb7 "), false, false).trim() : juce::String();
+    if (warning != shownSoundWarning)
+    {
+        shownSoundWarning = warning;
+        if (warning.isNotEmpty())
+            modOverlay.showStatusNotice (warning);
+    }
 }
 
 void OspAudioProcessorEditor::updateKeyTints()
@@ -1675,8 +1720,42 @@ void OspAudioProcessorEditor::updateKeyTints()
         keyboard.repaint();
 }
 
+void OspAudioProcessorEditor::utilityKeyClicked (KeyboardUtilityActions::Action a)
+{
+    using Action = KeyboardUtilityActions::Action;
+    if (a == Action::settings)
+    {
+        if (closedByLabelPress == advancedPopup)
+            closedByLabelPress = -1;   // (that press closed it)
+        else if (popup != nullptr && popupIndex == advancedPopup)
+            closePopup();
+        else
+        {
+            openPopup (advancedPopup);
+            learnAction (andor::learn::actions::settingsOpened, "keyboard.settings");
+        }
+    }
+    else if (a == Action::info && learn != nullptr)
+    {
+        learn->setLearnMode (! learn->learnMode());
+        learnAction (andor::learn::actions::infoToggled, "keyboard.info");
+    }
+    refreshUtilityKeys();
+}
+
+void OspAudioProcessorEditor::refreshUtilityKeys()
+{
+    using Action = KeyboardUtilityActions::Action;
+    utilityKeys.setActive (Action::settings, popup != nullptr && popupIndex == advancedPopup);
+    utilityKeys.setTooltip (Action::settings, "Advanced Settings");
+    const bool on = learn != nullptr && learn->learnMode();
+    utilityKeys.setActive (Action::info, on);
+    utilityKeys.setTooltip (Action::info, on ? "Hide Info" : "Show Info");
+}
+
 void OspAudioProcessorEditor::timerCallback()
 {
+    refreshUtilityKeys();
     bool changed = false;
     int count = 0;
     for (int l = 0; l < OspAudioProcessor::numLayers; ++l)

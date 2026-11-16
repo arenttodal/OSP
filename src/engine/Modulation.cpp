@@ -167,6 +167,9 @@ namespace
         { "synthAmountA", "SYNTH A", Owner::voice, 0, Domain::unit, 1.0, Update::continuous },
         { "synthAmountB", "SYNTH B", Owner::voice, 1, Domain::unit, 1.0, Update::continuous },
         { "synthAmountC", "SYNTH C", Owner::voice, 2, Domain::unit, 1.0, Update::continuous },
+        // The MOD WHEEL's VIBRATO (per voice): DEPTH across its 0..100 cents, AMOUNT 0..1.
+        { "vibratoDepth", "VIBRATO DEPTH", Owner::voice, -1, Domain::cents, 100.0, Update::continuous },
+        { "vibratoAmount", "VIBRATO AMOUNT", Owner::voice, -1, Domain::unit, 1.0, Update::continuous },
     } };
 
     bool isEnvelope (Source s) noexcept { return s == Source::env1 || s == Source::env2; }

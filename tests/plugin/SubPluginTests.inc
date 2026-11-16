@@ -3,7 +3,7 @@
 // musician's own keys (before the arpeggiator), recall, and sessions from before opening off.
 // Included at the end of PluginProcessorTests.cpp.
 
-#include "SubPanel.h"
+#include "AndorSubPanel.h"
 
 #include <catch2/catch_approx.hpp>
 

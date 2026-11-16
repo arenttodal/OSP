@@ -2946,6 +2946,15 @@ void ModulationOverlay::showNotice (const juce::String& text)
     repaint (noticeArea().expanded (4.0f).getSmallestIntegerContainer());
 }
 
+void ModulationOverlay::showStatusNotice (const juce::String& text)
+{
+    repaint (noticeArea().expanded (4.0f).getSmallestIntegerContainer());   // (where an older one was)
+    // Its box is centred 30 px under the anchor's foot: over the macro row's foot, above the keys.
+    const auto& panel = design::layout::macroPanel;
+    noticeAnchor = juce::Rectangle<float> (panel.getCentreX() - 1.0f, panel.getBottom() - 62.0f, 2.0f, 2.0f);
+    showNotice (text);
+}
+
 juce::Rectangle<float> ModulationOverlay::noticeArea() const
 {
     // Beside the control the menu was opened on, kept inside the instrument.

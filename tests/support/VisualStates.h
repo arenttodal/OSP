@@ -9,6 +9,7 @@
 #include "Design.h"
 #include "ArpSection.h"
 #include "EngineCard.h"
+#include "KeyboardUtilityActions.h"
 
 #include "audio/utility/TestSignals.h"
 #include "core/PitchMath.h"
@@ -80,7 +81,7 @@ namespace visualstates
         };
         auto open = [] (Processor& p) {
             std::unique_ptr<juce::AudioProcessorEditor> e (p.createEditorIfNeeded());
-            e->setSize (1448, 1086);
+            e->setSize (1448, juce::roundToInt (osp::plugin::design::height));
             return e;
         };
         auto load = [&sounds] (Processor& p, int count) {
@@ -172,16 +173,17 @@ namespace visualstates
         const auto identity = juce::Rectangle<float>::leftTopRightBottom (logo.x - 6.0f, logo.y - 58.0f, presetBar.getX() - 6.0f, logoSubtitle.getBottom() + 6.0f);
         // The preset's name inside the bar (each product's presets are its own).
         const auto presetName = presetBar.reduced (46.0f, 4.0f);
-        // The footer's status line (it names the engine; the sounds' stages differ).
-        const auto statusLine = status.translated (0.0f, arpShift - sourceTrim).expanded (2.0f, 2.0f);
         // FX ROUTING's key after SAVE and the header MIX it moves right (ANDOR OSP and products
         // with the routing view; a product without one draws neither there).
         const auto routingKey = juce::Rectangle<float>::leftTopRightBottom (savePreset.getRight() + 2.0f, savePreset.getY() - 4.0f,
                                                                            headerMix.getRight(), savePreset.getBottom() + 4.0f);
+        // The keyboard's action keys beneath ARP (and their shadows): which keys there are is
+        // the product's (D for an AUX strip, INFO with ANDOR Learn, SETTINGS always).
+        const auto keyboardActions = advanced.translated (0.0f, arpShift - sourceTrim).expanded (static_cast<float> (osp::plugin::KeyboardUtilityActions::margin));
         std::vector<Mask> result { { "identity", "the product's name and tagline", identity },
                                    { "preset-name", "the product's own presets", presetName },
-                                   { "status-line", "the engine's and the sounds' state", statusLine },
-                                   { "fx-routing", "FX ROUTING's key and the MIX it moves (absent without the routing view)", routingKey } };
+                                   { "fx-routing", "FX ROUTING's key and the MIX it moves (absent without the routing view)", routingKey },
+                                   { "keyboard-actions", "the product's own keyboard action keys (D / SETTINGS / INFO)", keyboardActions } };
         // The open ARP panel's per-card row (PLAYS / LINK / EDIT): ANDOR OSP's arpeggiator plays
         // per card; a product with one engine (or one arpeggiator) draws nothing there.
         if (arpOpen)

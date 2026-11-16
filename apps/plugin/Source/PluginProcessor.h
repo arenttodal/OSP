@@ -804,6 +804,8 @@ private:
     std::atomic<float>* fineTuneParam = nullptr;
     std::atomic<float>* bendRangeParam = nullptr;
     std::array<std::atomic<float>*, 10> subParams {};   ///< SUB (subFields() order, version hint 33)
+    /** VIBRATO (enabled, depth, rate, delay, rise, control, amount, sources A-C). */
+    std::array<std::atomic<float>*, 10> vibratoParams {};
     std::atomic<float>* lifeParam = nullptr;
     std::atomic<float>* dynamicsParam = nullptr;
     std::atomic<float>* characterParam = nullptr;

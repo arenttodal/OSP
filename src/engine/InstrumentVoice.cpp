@@ -64,6 +64,7 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     currentNote = params.note;
     // VEL and NOTE for this note's life: the sounding note, the raw velocity it was played at.
     modState.note = params.note;
+    vibratoVoice.start();   // (each note's vibrato from its own start: DELAY, then RISE)
     modState.velocity = modRuntime != nullptr ? modRuntime->noteVelocity : params.velocity;
     midiChannel = params.channel;
     order = params.startOrder;
@@ -1109,6 +1110,7 @@ void InstrumentVoice::clearModulation() noexcept
     modDampenAmount = modDampenShelf = modDampenCutoff = 0.0;
     modGrainPosition = modGrainSpread = modGrainSize = modGrainDensity = 0.0;
     modKeyDnaAmount = modSynthAmount = 0.0;
+    modVibratoDepth = modVibratoAmount = 0.0;
     appliedSustain = -1.0;
 }
 
@@ -1163,6 +1165,8 @@ void InstrumentVoice::updateModulation (bool advance) noexcept
     modGrainSpread = modState.offset (rt, layerDest (mod::Dest::grainSpreadA));
     modKeyDnaAmount = modState.offset (rt, layerDest (mod::Dest::keyDnaAmountA));
     modSynthAmount = modState.offset (rt, layerDest (mod::Dest::synthAmountA));
+    modVibratoDepth = modState.offset (rt, mod::Dest::vibratoDepth);
+    modVibratoAmount = modState.offset (rt, mod::Dest::vibratoAmount);
     modGrainSize = modState.offset (rt, layerDest (mod::Dest::grainSizeA));
     modGrainDensity = modState.offset (rt, layerDest (mod::Dest::grainDensityA));
     modSustain = modState.offset (rt, mod::Dest::ampSustain);
@@ -1284,7 +1288,18 @@ void InstrumentVoice::updateControl() noexcept
         shared = 0.3 * shapingState->movement * shaping::driftPitchCents (s.driftPitch)
                  * shaping::sharedWander (shapingState->seed, static_cast<double> (clock) / sampleRate, shaping::driftSpeedHz (s.driftSpeed));
     }
-    const double cents = shape.pitchCents + settleCents + driftCentsValue + shared + static_cast<double> (modCents);
+    // VIBRATO: this note's, when its layer takes part (off: nothing added, exactly as before).
+    double vibratoCentsNow = 0.0;
+    if (vibratoSettings != nullptr)
+    {
+        const bool takesPart = vibratoSettings->sources[static_cast<std::size_t> (std::clamp (voiceLayer, 0, 2))];
+        const double wheel = modRuntime != nullptr ? static_cast<double> (modRuntime->modWheelNow) : 0.0;
+        vibratoCentsNow = vibratoVoice.advance (*vibratoSettings, static_cast<double> (controlInterval) / sampleRate, takesPart ? wheel : 0.0,
+                                                modStarted ? modVibratoDepth : 0.0, modStarted ? modVibratoAmount : 0.0);
+        if (! takesPart)
+            vibratoCentsNow = 0.0;
+    }
+    const double cents = shape.pitchCents + settleCents + driftCentsValue + shared + static_cast<double> (modCents) + vibratoCentsNow;
     pitchMod = cents != 0.0 ? std::exp2 (cents / 1200.0) : 1.0;
 
     // Expression follows quickly but smoothly (about 10 ms).

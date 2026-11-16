@@ -26,6 +26,9 @@ struct EditorHooks
     std::function<void()> closePopovers;
     /** The editor is on screen (the invitation waits for it). */
     std::function<bool()> showing;
+    /** The one-time invitation to the tutorials on a first run (an instrument that only wants
+        Info and the menu's Tutorials passes false: nothing then appears by itself). */
+    bool offerInvitation = true;
     /** A parameter's value in its real units, or nothing. */
     std::function<std::optional<float> (const juce::String&)> parameterValue;
     /** The product has a capability (lessons for absent features are not offered). */
@@ -69,7 +72,7 @@ public:
     const juce::StringArray& problems() const noexcept { return setupProblems; }
 
     // The editor's hooks.
-    /** The header menu's one Learn entry: a submenu with Tutorials..., Toggle Info and
+    /** The header menu's one Learn entry: a submenu with Tutorials... and
         Reset Tutorials... (and Restore Previous Sound while a sound kept before an example
         can be restored). */
     void addMenuItems (juce::PopupMenu&);
@@ -88,7 +91,8 @@ public:
     void closeBrowser();
     /** A lesson chosen in the browser: resumed where it was left (in progress), else from the start. */
     void chooseLesson (juce::String lessonId);
-    /** Info (Toggle Info): point to or click an area to read about it. Never changes the sound. */
+    /** Info (the keyboard's INFO key): point to a control to read about it; the controls keep
+        their clicks. Never changes the sound. */
     void setLearnMode (bool on);
     bool learnMode() const noexcept { return inspecting; }
     void inspect (const juce::String& targetId);
@@ -130,6 +134,10 @@ private:
     bool reveal (const juce::String&) override;
     bool loadExample (const juce::String&) override;
 
+    /** Info: follows the pointer (tick): outlines what it rests on, then explains it. */
+    void followPointer();
+    double hoverSince = 0.0;
+    static constexpr double hoverDelayMs = 300.0;
     void ensureLayers();
     void releaseLayersIfIdle();
     void refreshNote();

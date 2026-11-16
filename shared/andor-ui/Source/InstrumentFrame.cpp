@@ -3,6 +3,8 @@
 
 #include "CeramicSkin.h"
 #include "EngineCard.h"   // icons
+#include "MainSections.h"   // Wheel
+#include "KeyboardUtilityActions.h"
 #include "OspLookAndFeel.h"
 
 #include <algorithm>
@@ -320,13 +322,6 @@ void setUpKeyboard (OspKeyboard& keyboard)
     keyboard.setColour (juce::MidiKeyboardComponent::blackNoteColourId, palette::ebony);
 }
 
-void setUpStatusLabel (juce::Label& label)
-{
-    label.setFont (type::micro (16.0f));
-    label.setColour (juce::Label::textColourId, design::colour::textMicro.darker (0.15f));
-    label.setBorderSize ({ 0, 0, 0, 0 });
-}
-
 void place (const Parts& parts, bool arpShown)
 {
     using namespace design;
@@ -371,16 +366,18 @@ void place (const Parts& parts, bool arpShown)
     auto low = [&] (juce::Rectangle<float> r) { return at (r.translated (0.0f, shift)); };
 
     // Keyboard row and footer.
-    set (parts.pitchWheel, low (layout::pitchWheel.withHeight (115.0f)));
-    set (parts.modWheel, low (layout::modWheel.withHeight (115.0f)));
+    // (Each wheel's component is wider than the wheel by Wheel::sidePad either side: its caption
+    // - MOD with its socket - is wider than the wheel and is never cut off.)
+    set (parts.pitchWheel, low (layout::pitchWheel.withHeight (115.0f).expanded (Wheel::sidePad, 0.0f)));
+    set (parts.modWheel, low (layout::modWheel.withHeight (115.0f).expanded (Wheel::sidePad, 0.0f)));
     if (parts.keyboard != nullptr)
     {
         parts.keyboard->setBounds (low (layout::keyboard));
         parts.keyboard->setKeyWidth (layout::keyboard.getWidth() / 52.0f);   // 88 keys = 52 white keys
     }
-    set (parts.status, low (layout::status));
     set (parts.arpControl, low (layout::arpControl));
     set (parts.advanced, low (layout::advanced));
+    set (parts.utilityActions, low (layout::advanced.expanded (static_cast<float> (KeyboardUtilityActions::margin))));
     set (parts.headerMix, at (layout::headerMix));
 }
 
@@ -496,9 +493,22 @@ juce::Point<float> macroPopoverOrigin (juce::Rectangle<float> label, juce::Point
     return { label.getCentreX() - 0.5f * size.x, label.getY() - 10.0f - size.y };
 }
 
-juce::Point<float> advancedPopoverOrigin (juce::Rectangle<float> key, juce::Point<float> size)
+juce::Point<float> advancedPopoverOrigin (juce::Rectangle<float> key, juce::Point<float> size, juce::Rectangle<float> clearOf)
 {
-    return { key.getRight() - size.x, key.getY() - 8.0f - size.y };
+    // Above its key, right edges aligned; and clear of what sits above the key (the
+    // arpeggiator's housing: ARP and SUB stay in view and playable).
+    float y = key.getY() - 8.0f - size.y;
+    if (! clearOf.isEmpty())
+        y = std::min (y, clearOf.getY() - 10.0f - size.y);
+    return { key.getRight() - size.x, y };
+}
+
+juce::Point<float> wheelPopoverOrigin (juce::Rectangle<float> wheel, juce::Point<float> size)
+{
+    // Above the whole wheel (it stays in view and playable while its settings are open), its
+    // left edge a little left of the wheel's (the wheels sit near the instrument's left edge:
+    // placePopover keeps it inside), 10 px clear.
+    return { wheel.getX() - 7.0f, wheel.getY() - 10.0f - size.y };
 }
 
 void placePopover (MiniPanel& popup, const juce::Component& content, juce::Point<float> at)
@@ -510,7 +520,9 @@ void placePopover (MiniPanel& popup, const juce::Component& content, juce::Point
     // Inside the instrument itself (never over the modulation bay).
     const auto limits = content.getLocalBounds().toFloat().withWidth (design::width).reduced (14.0f);
     x = juce::jlimit (limits.getX(), std::max (limits.getX(), limits.getRight() - size.x), x);
-    y = std::max (limits.getY(), y);
+    // ... and above its foot (the compact bottom edge leaves less room under a rack's keys):
+    // a popover that would run past it moves up, never further than the top.
+    y = std::max (limits.getY(), std::min (y, limits.getBottom() - size.y));
     popup.setTransform (juce::AffineTransform::scale (scale));
     const auto card = popup.cardSize();
     popup.setBounds (juce::roundToInt ((x - m) / scale), juce::roundToInt ((y - m) / scale),

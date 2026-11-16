@@ -2019,7 +2019,8 @@ namespace
             return *knobs.back();
         }
 
-        static constexpr int headerTop = 32, gap = 8, tabsHeight = 21, cellHeight = 58, secondaryCellHeight = 46, bottom = 10;
+        static constexpr int headerTop = popover::headerTop, gap = popover::gap, tabsHeight = popover::tabsHeight, cellHeight = popover::cellHeight,
+                             secondaryCellHeight = popover::secondaryCellHeight, bottom = popover::bottom;
 
         juce::Point<int> cardSize() const override
         {
@@ -2062,7 +2063,7 @@ namespace
         {
             if (row.empty())
                 return;
-            const int cell = std::min (line.getWidth() / static_cast<int> (row.size()), 80);
+            const int cell = std::min (line.getWidth() / static_cast<int> (row.size()), popover::maxCellWidth);
             line = line.withSizeKeepingCentre (cell * static_cast<int> (row.size()), line.getHeight());
             for (auto* k : row)
                 k->setBounds (line.removeFromLeft (cell));

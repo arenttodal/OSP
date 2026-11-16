@@ -302,19 +302,39 @@ public:
     void mouseDown (const juce::MouseEvent&) override;
     void mouseDrag (const juce::MouseEvent&) override;
     void mouseUp (const juce::MouseEvent&) override;
+    void mouseMove (const juce::MouseEvent&) override;
+    void mouseExit (const juce::MouseEvent&) override;
+    bool hitTest (int x, int y) override;
     /** Shows a value set elsewhere (the processor's mod wheel); ignored while dragged. */
     void setValue (float newValue);
     /** The wheel as a modulation source (MOD): a drag socket beside its caption. Dragging the
         caption or socket carries a cable (screen positions); dragging the wheel still turns it. */
     void setAssignable (juce::Colour socketColour);
     std::function<void (juce::Point<int>)> onSourceDrag, onSourceDrop;
+    /** The caption is a door to the wheel's settings (as a macro's name to its popover): it
+        underlines under the pointer, and a click that stays put (under 3 px) opens them; on MOD
+        a drag from the caption or socket still carries a cable. Without it the caption is
+        only a word. */
+    std::function<void()> onCaptionClick;
+    /** The settings are open: the caption keeps its underline, in `accent`. */
+    void setCaptionOpen (bool open);
+    void setCaptionAccent (juce::Colour accent);
+    /** The caption's line (the word, and MOD's socket), in the component. */
     juce::Rectangle<float> socketArea() const;
+    juce::Rectangle<float> captionArea() const { return socketArea(); }
     /** The socket's centre fills while the wheel feeds a route. */
     void setInUse (bool used);
-    void mouseMove (const juce::MouseEvent&) override;
+
+    /** The component is wider than the wheel by this on either side, so its caption (MOD and
+        its socket are wider than the 36 px wheel) is never clipped; only the wheel and the
+        caption take the mouse. */
+    static constexpr float sidePad = 7.0f;
+    static constexpr float wheelWidth = 36.0f, wheelHeight = 88.0f;
 
 private:
     juce::Rectangle<float> slot() const;
+    juce::Rectangle<float> captionText() const;
+    juce::Point<float> socketCentre() const;
     bool dragging = false;
     juce::String caption;
     bool springBack;
@@ -322,7 +342,8 @@ private:
     float value = 0.0f;   // pitch -1..1, mod 0..1
     float dragStart = 0.0f;
     bool assignable = false, cabling = false, overSocket = false, inUse = false;
-    juce::Colour socket;
+    bool captionPress = false, overCaption = false, captionOpen = false;
+    juce::Colour socket, captionAccent { 0xffb0643a };
 };
 
 } // namespace osp::plugin

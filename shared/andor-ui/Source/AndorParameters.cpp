@@ -8,6 +8,7 @@
 #include "engine/RhythmicShaper.h"
 #include "engine/Shaping.h"
 #include "engine/SynthVoice.h"
+#include "engine/Vibrato.h"
 
 namespace osp::plugin
 {
@@ -799,6 +800,46 @@ juce::AudioProcessorValueTreeState::ParameterLayout InstrumentHost::createParame
                                                                   static_cast<int> (d26.echoMotion)));
     }
     return layout;
+}
+
+void InstrumentHost::addVibratoParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout)
+{
+    using Range = juce::NormalisableRange<float>;
+    auto percent = juce::AudioParameterFloatAttributes().withLabel ("%");
+    const Range unit (0.0f, 100.0f, 0.1f);
+    {
+        // The MOD WHEEL's VIBRATO (version hint 28), appended after everything else - a product's
+        // own parameters included - so nothing before moves. Off by default: sessions and presets
+        // from before it play exactly as they did.
+        auto id28 = [] (const juce::String& id) { return juce::ParameterID { id, 28 }; };
+        const vibrato::Settings v;
+        Range rate (0.5f, 12.0f, 0.01f);
+        rate.setSkewForCentre (5.5f);
+        Range delay (0.0f, 2000.0f, 1.0f);
+        delay.setSkewForCentre (400.0f);
+        Range rise (0.0f, 3000.0f, 1.0f);
+        rise.setSkewForCentre (600.0f);
+        const auto msText = juce::AudioParameterFloatAttributes().withLabel ("ms").withStringFromValueFunction ([] (float value, int) {
+            return value >= 1000.0f ? juce::String (value / 1000.0f, 2) + " s" : juce::String (juce::roundToInt (value)) + " ms";
+        });
+        layout.add (parameters::make<juce::AudioParameterBool> (id28 (ids::vibratoEnabled), "Vibrato", v.enabled));
+        layout.add (parameters::make<juce::AudioParameterFloat> (id28 (ids::vibratoDepth), "Vibrato Depth", Range (0.0f, 100.0f, 0.1f), static_cast<float> (v.depthCents),
+                                                                 juce::AudioParameterFloatAttributes().withLabel ("cents").withStringFromValueFunction ([] (float value, int) {
+                                                                     return juce::String (juce::roundToInt (value)) + " cents";
+                                                                 })));
+        layout.add (parameters::make<juce::AudioParameterFloat> (id28 (ids::vibratoRate), "Vibrato Rate", rate, static_cast<float> (v.rateHz),
+                                                                 juce::AudioParameterFloatAttributes().withLabel ("Hz").withStringFromValueFunction ([] (float value, int) {
+                                                                     return juce::String (value, 1) + " Hz";
+                                                                 })));
+        layout.add (parameters::make<juce::AudioParameterFloat> (id28 (ids::vibratoDelay), "Vibrato Delay", delay, static_cast<float> (1000.0 * v.delaySeconds), msText));
+        layout.add (parameters::make<juce::AudioParameterFloat> (id28 (ids::vibratoRise), "Vibrato Rise", rise, static_cast<float> (1000.0 * v.riseSeconds), msText));
+        layout.add (parameters::make<juce::AudioParameterChoice> (id28 (ids::vibratoControl), "Vibrato Control", juce::StringArray { "Mod Wheel", "Always On", "Assigned" },
+                                                                  static_cast<int> (v.control)));
+        layout.add (parameters::make<juce::AudioParameterFloat> (id28 (ids::vibratoAmount), "Vibrato Amount", unit, static_cast<float> (100.0 * v.amount), percent));
+        layout.add (parameters::make<juce::AudioParameterBool> (id28 (ids::vibratoSourceA), "Vibrato Source A", v.sources[0]));
+        layout.add (parameters::make<juce::AudioParameterBool> (id28 (ids::vibratoSourceB), "Vibrato Source B", v.sources[1]));
+        layout.add (parameters::make<juce::AudioParameterBool> (id28 (ids::vibratoSourceC), "Vibrato Source C", v.sources[2]));
+    }
 }
 
 } // namespace osp::plugin

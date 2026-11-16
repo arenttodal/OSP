@@ -5,6 +5,7 @@
 
 #include "EngineCard.h"
 #include "PluginEditor.h"
+#include "LearnController.h"
 #include "PluginProcessor.h"
 
 #include "analysis/Analyzer.h"
@@ -6659,11 +6660,11 @@ TEST_CASE ("plugin: MODULATION panel tabs and halos", "[.][ui][mod-ui]")
     }
     CHECK (p.modulationRoutes().size() == routeCount);
 
-    // The MOD button is gone (the tabs are always there): ADVANCED takes the whole width
-    // under ARP; the mod wheel carries a drag socket.
+    // The MOD button is gone (the tabs are always there): under ARP the small SETTINGS and
+    // INFO keys; the mod wheel carries a drag socket.
     {
-        CHECK (std::abs (static_cast<float> (editor->advancedSettingsButton().getWidth()) - osp::plugin::design::layout::advanced.getWidth()) <= 1.0f);
-        CHECK (editor->advancedSettingsButton().getWidth() > editor->arpControl().getWidth() - 4);
+        CHECK (editor->advancedSettingsButton().getWidth() <= editor->arpControl().getWidth() / 2);
+        CHECK (editor->advancedSettingsButton().getWidth() == editor->advancedSettingsButton().getHeight());
         CHECK (editor->modulationWheel().socketArea().getHeight() > 10.0f);
     }
 
@@ -6972,11 +6973,14 @@ TEST_CASE ("plugin: ANDOR/OSP refinement - assignment everywhere, wheel, START, 
         card.showSourceInfo (false);
     }
 
-    // 11. ADVANCED alone under ARP, full width.
+    // 11. SETTINGS and INFO under ARP (no AUX key in OSP), centred in ADVANCED's old place.
     {
         // (instrument coordinates: the reference canvas, scaled as a whole)
-        CHECK (std::abs (static_cast<float> (editor->advancedSettingsButton().getWidth()) - osp::plugin::design::layout::advanced.getWidth()) <= 1.0f);
+        using UA = osp::plugin::KeyboardUtilityActions::Action;
         CHECK (editor->advancedSettingsButton().isVisible());
+        CHECK_FALSE (editor->keyboardActions().has (UA::aux));
+        CHECK (editor->keyboardActions().has (UA::settings));
+        CHECK (editor->keyboardActions().has (UA::info));
     }
 
     // The MIX triangle (three layers) is hidden; two layers keep their A/B line; nothing in
@@ -8139,6 +8143,7 @@ TEST_CASE ("plugin: full-range modulation - 100 % reaches the knob's end; older 
 #include "OspLearnTests.inc"
 #include "SubPluginTests.inc"
 #include "ShortLoopPluginTests.inc"
+#include "PopoverScaleTests.inc"
 #include "EffectiveVisualTests.inc"
 
 TEST_CASE ("plugin: a plain right-click on a knob itself (the press a host gives the knob, not the halo overlay) opens its modulation menu", "[ui][andor-ui][rightclick]")
@@ -8280,4 +8285,369 @@ TEST_CASE ("plugin: the AMP envelope's picture follows A D S R's modulation (VEL
     off.addEvent (juce::MidiMessage::noteOff (1, 60), 0);
     run (off, 400);
     CHECK (pixels (set, snapshot()) == 0);
+}
+
+TEST_CASE ("plugin: the wheels' captions - never clipped, a click opens their settings, a drag still makes MOD's cable", "[ui][andor-ui][wheels]")
+{
+    using Editor = osp::plugin::OspAudioProcessorEditor;
+    OspAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> base (p.createEditorIfNeeded());
+    auto* editor = dynamic_cast<Editor*> (base.get());
+    REQUIRE (editor != nullptr);
+    editor->refreshNow();
+    auto& pitch = editor->pitchBendWheel();
+    auto& modw = editor->modulationWheel();
+    auto event = [] (juce::Component& c, juce::Point<float> at, juce::Point<float> down, bool dragged) {
+        const auto now = juce::Time::getCurrentTime();
+        return juce::MouseEvent (juce::Desktop::getInstance().getMainMouseSource(), at, {}, juce::MouseInputSource::defaultPressure, 0.0f, 0.0f, 0.0f,
+                                 0.0f, &c, &c, now, down, now, 1, dragged);
+    };
+    auto click = [&] (osp::plugin::Wheel& w, juce::Point<float> at) {
+        w.mouseDown (event (w, at, at, false));
+        w.mouseUp (event (w, at, at, false));
+    };
+
+    // Geometry: each wheel exactly where it was (its 36 x 88 slot), the component wider by its
+    // caption's margin; the caption (MOD with its socket) wholly inside it - nothing clipped.
+    namespace layout = osp::plugin::design::layout;
+    for (auto [w, ref] : { std::pair<osp::plugin::Wheel*, juce::Rectangle<float>> { &pitch, layout::pitchWheel }, { &modw, layout::modWheel } })
+    {
+        CHECK (static_cast<float> (w->getX()) + osp::plugin::Wheel::sidePad == Approx (ref.getX()).margin (1.0));
+        const auto caption = w->captionArea();
+        CHECK (caption.getX() >= 0.0f);
+        CHECK (caption.getRight() <= static_cast<float> (w->getWidth()));
+        CHECK (caption.getY() >= osp::plugin::Wheel::wheelHeight - 0.5f);
+        CHECK (caption.getBottom() <= static_cast<float> (w->getHeight()));
+        // Only the wheel and its caption take the mouse; the margins beside them do not.
+        CHECK (w->hitTest (juce::roundToInt (caption.getCentreX()), juce::roundToInt (caption.getCentreY())));
+        CHECK (w->hitTest (w->getWidth() / 2, 40));
+        CHECK_FALSE (w->hitTest (1, 40));
+    }
+    CHECK_FALSE (pitch.getBounds().intersects (modw.getBounds().reduced (1, 0)));
+    CHECK (modw.getRight() < juce::roundToInt (layout::keyboard.getX()));
+
+    // A click on PITCH opens PITCH BEND above it; again closes it.
+    const auto pitchCaption = pitch.captionArea().getCentre();
+    click (pitch, pitchCaption);
+    REQUIRE (editor->openPopupIndex() == Editor::pitchWheelPopup);
+    click (pitch, pitchCaption);
+    CHECK (editor->openPopupIndex() == -1);
+
+    // MOD: a click opens MOD WHEEL (VIBRATO); switching to PITCH closes it; Escape closes.
+    const auto modCaption = modw.captionArea().getCentre();
+    click (modw, modCaption);
+    CHECK (editor->openPopupIndex() == Editor::modWheelPopup);
+    click (pitch, pitchCaption);
+    CHECK (editor->openPopupIndex() == Editor::pitchWheelPopup);
+    editor->closePopup();
+
+    // A drag of 3 px or more from MOD's caption is a cable (no popover); less is a click.
+    int drags = 0, drops = 0;
+    modw.onSourceDrag = [&drags] (juce::Point<int>) { ++drags; };
+    modw.onSourceDrop = [&drops] (juce::Point<int>) { ++drops; };
+    modw.mouseDown (event (modw, modCaption, modCaption, false));
+    modw.mouseDrag (event (modw, modCaption + juce::Point<float> (1.0f, -1.0f), modCaption, false));
+    CHECK (drags == 0);
+    modw.mouseDrag (event (modw, modCaption + juce::Point<float> (30.0f, -40.0f), modCaption, true));
+    modw.mouseUp (event (modw, modCaption + juce::Point<float> (30.0f, -40.0f), modCaption, true));
+    CHECK (drags == 1);
+    CHECK (drops == 1);
+    CHECK (editor->openPopupIndex() == -1);
+    // The wheel's body still turns the wheel (no popover).
+    const auto bodyAt = juce::Point<float> (0.5f * static_cast<float> (modw.getWidth()), 70.0f);
+    modw.mouseDown (event (modw, bodyAt, bodyAt, false));
+    modw.mouseDrag (event (modw, bodyAt.translated (0.0f, -60.0f), bodyAt, true));
+    modw.mouseUp (event (modw, bodyAt.translated (0.0f, -60.0f), bodyAt, true));
+    CHECK (editor->openPopupIndex() == -1);
+    {
+        // (The processor takes the screen wheel at its next block.)
+        p.prepareToPlay (48000.0, 512);
+        juce::AudioBuffer<float> buffer (2, 512);
+        juce::MidiBuffer midi;
+        p.processBlock (buffer, midi);
+    }
+    CHECK (p.modWheelPosition() > 0.5f);
+
+    // Rapid clicks: open, close, open... always one popover or none, never stale.
+    for (int i = 0; i < 9; ++i)
+        click (i % 2 == 0 ? modw : pitch, i % 2 == 0 ? modCaption : pitchCaption);
+    CHECK (editor->openPopupIndex() == Editor::modWheelPopup);
+    // The popover stays inside the instrument (the wheels sit near its left edge).
+    editor->openPopup (Editor::pitchWheelPopup);
+    juce::Component* shown = nullptr;
+    for (auto* c : modw.getParentComponent()->getChildren())
+        if (dynamic_cast<osp::plugin::MiniPanel*> (c) != nullptr)
+            shown = c;
+    REQUIRE (shown != nullptr);
+    const auto box = shown->getBoundsInParent();
+    CHECK (box.getX() > -osp::plugin::MiniPanel::shadowMargin * 2);
+    CHECK (box.getBottom() <= pitch.getY() + osp::plugin::MiniPanel::shadowMargin * 2);
+    editor->closePopup();
+
+    // Advanced no longer has BEND (its home is PITCH BEND's RANGE now).
+    editor->openPopup (Editor::advancedPopup);
+    bool bend = false;
+    std::function<void (juce::Component&)> walk = [&] (juce::Component& c) {
+        for (auto* child : c.getChildren())
+        {
+            if (auto* knob = dynamic_cast<osp::plugin::MiniKnob*> (child); knob != nullptr && knob->captionText() == "BEND")
+                bend = true;
+            walk (*child);
+        }
+    };
+    walk (*editor);
+    CHECK_FALSE (bend);
+    editor->closePopup();
+}
+
+TEST_CASE ("plugin: keyboard utility keys - SETTINGS and INFO (no AUX key) centred beneath ARP; each opens its own thing; the menu no longer carries them", "[ui][andor-ui][utility-keys]")
+{
+    // OSP's lower-right keys: two of ANDOR's three (D is only for an instrument with an AUX
+    // strip), centred where the long Advanced key was, never a gap for D.
+    const auto learnDir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("osp-learn-test-" + juce::String (juce::Random::getSystemRandom().nextInt64()));
+    learnDir.createDirectory();
+    const auto previousLearnDir = juce::SystemStats::getEnvironmentVariable ("ANDOR_LEARN_DIR", {});
+#if JUCE_WINDOWS
+    _putenv_s ("ANDOR_LEARN_DIR", learnDir.getFullPathName().toRawUTF8());
+#else
+    setenv ("ANDOR_LEARN_DIR", learnDir.getFullPathName().toRawUTF8(), 1);
+#endif
+    {
+        using UA = osp::plugin::KeyboardUtilityActions::Action;
+        namespace layout = osp::plugin::design::layout;
+        OspAudioProcessor p;
+        std::unique_ptr<juce::AudioProcessorEditor> base (p.createEditorIfNeeded());
+        auto* editor = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (base.get());
+        REQUIRE (editor != nullptr);
+        editor->refreshNow();
+        auto& keys = editor->keyboardActions();
+
+        // Geometry: two square keys, 31 units, centred in Advanced's old 105 x 31 area.
+        CHECK_FALSE (keys.has (UA::aux));
+        REQUIRE (keys.has (UA::settings));
+        REQUIRE (keys.has (UA::info));
+        CHECK (keys.button (UA::aux) == nullptr);
+        auto* settings = keys.button (UA::settings);
+        auto* info = keys.button (UA::info);
+        CHECK (&editor->advancedSettingsButton() == settings);
+        const auto area = layout::advanced.expanded (static_cast<float> (osp::plugin::KeyboardUtilityActions::margin));
+        CHECK (std::abs (static_cast<float> (keys.getX()) - area.getX()) <= 1.0f);
+        CHECK (std::abs (static_cast<float> (keys.getWidth()) - area.getWidth()) <= 1.0f);
+        CHECK (settings->getWidth() == 31);
+        CHECK (settings->getHeight() == 31);
+        CHECK (info->getWidth() == 31);
+        CHECK (info->getX() - settings->getRight() == 6);
+        const float pairCentre = 0.5f * static_cast<float> (settings->getX() + info->getRight());
+        CHECK (std::abs (pairCentre - 0.5f * static_cast<float> (keys.getWidth())) <= 1.0f);
+        CHECK_FALSE (settings->getBoundsInParent().intersects (info->getBoundsInParent()));
+        CHECK_FALSE (keys.getBoundsInParent().reduced (osp::plugin::KeyboardUtilityActions::margin).intersects (editor->arpControl().getBoundsInParent()));
+        // Accessible: focusable buttons with names and tooltips.
+        CHECK (settings->getWantsKeyboardFocus());
+        CHECK (info->getWantsKeyboardFocus());
+        CHECK (settings->getTitle() == "Advanced Settings");
+        CHECK (info->getTitle() == "Info");
+        CHECK (settings->getTooltip() == "Advanced Settings");
+        CHECK (info->getTooltip() == "Show Info");
+
+        // SETTINGS opens the existing Advanced popover (pressed while open) and closes it.
+        auto values = [&p] {
+            std::vector<float> v;
+            for (auto* param : p.getParameters())
+                v.push_back (param->getValue());
+            return v;
+        };
+        const auto before = values();
+        REQUIRE (settings->onClick != nullptr);
+        settings->onClick();
+        editor->refreshNow();
+        CHECK (editor->openPopupIndex() == osp::plugin::OspAudioProcessorEditor::advancedPopup);
+        CHECK (keys.isActive (UA::settings));
+        settings->onClick();
+        editor->refreshNow();
+        CHECK (editor->openPopupIndex() != osp::plugin::OspAudioProcessorEditor::advancedPopup);
+        CHECK_FALSE (keys.isActive (UA::settings));
+
+        // INFO: OSP's Learn turns Info on and off; green (active) while on; nothing changes.
+        auto* learn = editor->learnController();
+        REQUIRE (learn != nullptr);
+        INFO (learn->problems().joinIntoString ("\n"));
+        REQUIRE (learn->isUsable());
+        info->onClick();
+        editor->refreshNow();
+        CHECK (learn->learnMode());
+        CHECK (keys.isActive (UA::info));
+        CHECK (info->getTooltip() == "Hide Info");
+        // (Info on closes an open popover: Advanced does not stay open under it)
+        CHECK (editor->openPopupIndex() != osp::plugin::OspAudioProcessorEditor::advancedPopup);
+        info->onClick();
+        editor->refreshNow();
+        CHECK_FALSE (learn->learnMode());
+        CHECK_FALSE (keys.isActive (UA::info));
+        CHECK (values() == before);
+
+        // The menu: no Advanced settings, no Toggle Info; Learn holds Tutorials / Reset Tutorials.
+        juce::PopupMenu shown;
+        editor->showMenuForTest = [&] (juce::PopupMenu& m) { shown = m; };
+        editor->openMainMenu();
+        juce::StringArray texts;
+        for (juce::PopupMenu::MenuItemIterator it (shown, true); it.next();)
+            texts.add (it.getItem().text);
+        CHECK (texts.contains ("Learn"));
+        CHECK (texts.contains (juce::String::fromUTF8 ("Tutorials\xe2\x80\xa6")));
+        CHECK (texts.contains (juce::String::fromUTF8 ("Reset Tutorials\xe2\x80\xa6")));
+        for (const auto& gone : { "Advanced settings", "Advanced Settings", "Toggle Info", "Show AUX", "Hide AUX" })
+            CHECK_FALSE (texts.contains (gone));
+
+        // Learn's names for the keys (OSP's Learn 2.0 catalog keeps its own Quick Start): each
+        // points at its key, with help.
+        const auto& catalog = learn->catalog();
+        REQUIRE (catalog.findLesson ("osp.quickstart") != nullptr);
+        for (const char* id : { "keyboard.settings", "advanced", "osp.advanced", "keyboard.info" })
+        {
+            INFO (id);
+            const auto* target = learn->targets().find (id);
+            REQUIRE (target != nullptr);
+            REQUIRE (target->component != nullptr);
+            CHECK (target->component() == (juce::String (id) == "keyboard.info" ? info : settings));
+        }
+        CHECK (catalog.findHelp ("keyboard.settings") != nullptr);
+        CHECK (catalog.findHelp ("keyboard.info") != nullptr);
+        for (const auto& lesson : catalog.lessons)
+            for (const auto& step : lesson.steps)
+            {
+                CHECK_FALSE (step.body.containsIgnoreCase ("AUX"));
+                CHECK_FALSE (step.body.containsIgnoreCase ("main menu"));
+            }
+        for (const auto& topic : catalog.help)
+            CHECK_FALSE (topic.body.containsIgnoreCase ("AUX"));
+        learn->runner().close();
+    }
+#if JUCE_WINDOWS
+    _putenv_s ("ANDOR_LEARN_DIR", previousLearnDir.toRawUTF8());
+#else
+    setenv ("ANDOR_LEARN_DIR", previousLearnDir.toRawUTF8(), 1);
+#endif
+    learnDir.deleteRecursively();
+}
+
+TEST_CASE ("plugin: screenshots of the SETTINGS / INFO keys and the compact popovers (OSP_SCREENSHOT_DIR)", "[.][screenshots-keys]")
+{
+    const auto* dir = std::getenv ("OSP_SCREENSHOT_DIR");
+    REQUIRE (dir != nullptr);
+    const juce::File out (juce::String::fromUTF8 (dir));
+    out.createDirectory();
+    using UA = osp::plugin::KeyboardUtilityActions::Action;
+    OspAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> base (p.createEditorIfNeeded());
+    auto* editor = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (base.get());
+    REQUIRE (editor != nullptr);
+    editor->refreshNow();
+    auto& keys = editor->keyboardActions();
+    auto write = [&] (const juce::Image& image, const juce::String& name) {
+        const auto file = out.getChildFile ("osp-keys-" + name + ".png");
+        file.deleteFile();
+        juce::FileOutputStream stream (file);
+        juce::PNGImageFormat().writeImageToStream (image, stream);
+    };
+    auto shoot = [&] (const juce::String& name) {
+        editor->refreshNow();
+        write (editor->createComponentSnapshot (editor->getLocalBounds(), true, 2.0f), name);
+        const auto around = editor->getLocalArea (&keys, keys.getLocalBounds()).expanded (60, 110).translated (0, -70)
+                                .getIntersection (editor->getLocalBounds());
+        write (editor->createComponentSnapshot (around, true, 3.0f), name + "-closeup");
+    };
+    shoot ("01-two-keys");
+    keys.button (UA::settings)->onClick();
+    shoot ("02-settings-open");
+    keys.button (UA::settings)->onClick();
+    keys.button (UA::info)->onClick();
+    if (auto* learn = editor->learnController())
+        learn->inspect ("keyboard.info");
+    shoot ("03-info-on");
+    keys.button (UA::info)->onClick();
+    if (auto* learn = editor->learnController())
+    {
+        const auto* lesson = learn->catalog().findLesson ("osp.quickstart");
+        REQUIRE (lesson != nullptr);
+        learn->startLesson ("osp.quickstart", static_cast<int> (lesson->steps.size()) - 1);
+        shoot ("04-quickstart-settings-step");
+        learn->runner().close();
+    }
+}
+
+TEST_CASE ("plugin: screenshots of the bottom edge at the natural size, 869 / 1448 / 1810 wide (OSP_SCREENSHOT_DIR, OSP_SCREENSHOT_TAG)", "[.][screenshots-bottom]")
+{
+    const auto* dir = std::getenv ("OSP_SCREENSHOT_DIR");
+    REQUIRE (dir != nullptr);
+    const auto* tagEnv = std::getenv ("OSP_SCREENSHOT_TAG");
+    const juce::String tag = tagEnv != nullptr ? juce::String (tagEnv) : juce::String ("now");
+    const juce::File out (juce::String::fromUTF8 (dir));
+    out.createDirectory();
+    TempDir tmp;
+    OspAudioProcessor p;
+    loadAndWait (p, writeSource (tmp.dir, "vowel.wav", testsignals::vowel (midiToHz (57), 3.0, 44100.0, 3)));
+    std::unique_ptr<juce::AudioProcessorEditor> base (p.createEditorIfNeeded());
+    auto* editor = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (base.get());
+    REQUIRE (editor != nullptr);
+    editor->refreshNow();
+    // The natural height for a width: the editor's own (the window follows the instrument).
+    const float ratio = static_cast<float> (editor->getHeight()) / static_cast<float> (editor->getWidth());
+    for (const int width : { 1448, 869, 1810 })
+    {
+        editor->setSize (width, juce::roundToInt (static_cast<float> (width) * ratio));
+        editor->refreshNow();
+        const auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f);
+        const auto file = out.getChildFile ("osp-bottom-" + tag + "-" + juce::String (width) + "x" + juce::String (editor->getHeight()) + ".png");
+        file.deleteFile();
+        juce::FileOutputStream stream (file);
+        juce::PNGImageFormat().writeImageToStream (image, stream);
+    }
+}
+
+TEST_CASE ("plugin: the compact bottom edge - the housing ends 22 px under the keys, no footer line; messages are brief notices", "[ui][andor-ui][bottom]")
+{
+    namespace design = osp::plugin::design;
+    namespace layout = osp::plugin::design::layout;
+    OspAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> base (p.createEditorIfNeeded());
+    auto* editor = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (base.get());
+    REQUIRE (editor != nullptr);
+    editor->refreshNow();
+    // The window: the instrument's height for its width (1086 wide by default), nothing under it.
+    CHECK (std::abs (static_cast<float> (editor->getHeight()) - static_cast<float> (editor->getWidth()) * design::height / design::width) <= 1.0f);
+    editor->setSize (1448, juce::roundToInt (design::height));
+    editor->refreshNow();
+    const float foot = layout::housing.getBottom();
+    CHECK (foot == Approx (1036.0f));
+    // The keys where they always were, the same size.
+    const auto keys = editor->keyboardComponent().getBoundsInParent().toFloat();
+    CHECK (keys.getY() == Approx (layout::keyboard.getY()));
+    CHECK (keys.getBottom() == Approx (layout::keyboard.getBottom()));
+    // PITCH and MOD: their captions (and MOD's socket) whole, at least 15 px above the foot.
+    for (auto* wheel : { &editor->pitchBendWheel(), &editor->modulationWheel() })
+    {
+        CHECK (static_cast<float> (wheel->getY()) == Approx (layout::pitchWheel.getY()));
+        CHECK (static_cast<float> (wheel->getY()) + osp::plugin::Wheel::wheelHeight + 18.0f <= foot - 15.0f);
+        CHECK (static_cast<float> (wheel->getBottom()) <= foot);
+    }
+    CHECK (static_cast<float> (editor->arpControl().getY()) == Approx (layout::arpControl.getY()));
+    // No footer line: nothing that shows text lies below the keys.
+    std::function<void (juce::Component&)> walk = [&] (juce::Component& c) {
+        for (auto* child : c.getChildren())
+        {
+            if (child->isVisible() && dynamic_cast<juce::Label*> (child) != nullptr && child->getParentComponent() != nullptr
+                && child->getParentComponent()->getParentComponent() == editor)
+            {
+                INFO (child->getName() << " " << child->getBounds().toString());
+                CHECK (static_cast<float> (child->getY()) < keys.getBottom());
+            }
+            walk (*child);
+        }
+    };
+    walk (*editor);
+    // The processor's messages (an open, a save, a refusal): once each, as the overlay's notice.
+    CHECK (editor->modulationOverlay().currentNotice().isEmpty());
+    p.showMessage ("Opened Warm Hymn");
+    editor->refreshNow();
+    CHECK (editor->modulationOverlay().currentNotice() == "Opened Warm Hymn");
 }

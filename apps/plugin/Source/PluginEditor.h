@@ -9,6 +9,7 @@
 #include "FxRouting.h"
 #include "InstrumentFrame.h"
 #include "KeyDnaEditor.h"
+#include "KeyboardUtilityActions.h"
 #include "LibraryPanel.h"
 #include "MacroPopups.h"
 #include "MainSections.h"
@@ -115,6 +116,8 @@ public:
     void openAnchoredPopover (std::unique_ptr<MiniPanel> panel, juce::Component& anchor) override;
     bool anchoredPopoverOpenFrom (const juce::Component& anchor) const override;
     void closeAnchoredPopover() override;
+    static constexpr int pitchWheelPopup = 15;   ///< PITCH BEND (a click on the PITCH caption)
+    static constexpr int modWheelPopup = 16;     ///< MOD WHEEL's VIBRATO (a click on the MOD caption)
     /** The macro (index into the macro row's data order: LIFE..SPACE, ECHO) a popup belongs to, or -1. */
     static int macroOfPopup (int popup) noexcept { return popup >= 0 && popup < 5 ? popup : (popup == echoPopup ? 5 : -1); }
     static int popupOfMacro (int macro) noexcept { return macro < 5 ? macro : echoPopup; }
@@ -167,6 +170,8 @@ public:
     juce::Button& sourceViewToggle() noexcept { return routingKey; }
     ArpInlinePanel& arpInlinePanel() noexcept { return arpPanel; }
     ArpControl& arpControl() noexcept { return arpButton; }
+    Wheel& pitchWheelControl() noexcept { return pitchWheel; }
+    Wheel& modWheelControl() noexcept { return modWheel; }
 
     /** The envelope panel (AMP, ENV 1, ENV 2, LFO 1, LFO 2) and the halos. */
     ModulationPanel& modulationPanel() noexcept { return modPanel; }
@@ -177,7 +182,14 @@ public:
     int selectedModulationSource() const noexcept { return modSelSource; }
     int selectedModulationRoute() const noexcept { return modSelSlot; }
     Wheel& modulationWheel() noexcept { return modWheel; }
-    AdvancedCardButton& advancedSettingsButton() noexcept { return advancedButton; }
+    Wheel& pitchBendWheel() noexcept { return pitchWheel; }
+    /** The keyboard's SETTINGS key (it opens Advanced). */
+    juce::Button& advancedSettingsButton() noexcept { return *utilityKeys.button (KeyboardUtilityActions::Action::settings); }
+    /** The keyboard's action keys (SETTINGS, INFO). */
+    KeyboardUtilityActions& keyboardActions() noexcept { return utilityKeys; }
+    /** Tests: the main menu (showMenu) is handed here instead of being shown. */
+    std::function<void (juce::PopupMenu&)> showMenuForTest;
+    void openMainMenu() { showMenu(); }
     HeaderMix& headerMixControl() noexcept { return headerMix; }
     EngineCard& engineCard (int layer) noexcept { return *cards[static_cast<std::size_t> (juce::jlimit (0, 2, layer))]; }
     /** A source (0..3 a tab, 4 the mod wheel) dragged to / released at a point (instrument
@@ -321,8 +333,14 @@ private:
     bool tintedLoop = true;
     int tintedLayer = -1;
     void updateKeyTints();
-    juce::Label statusLabel;
-    AdvancedCardButton advancedButton { "Advanced" };
+    /** What the footer's status line said that matters, now the overlay's notices: shown once
+        each, when it changes (never "Ready" or the notes held). */
+    juce::String shownStatusMessage, shownSoundWarning;
+    bool shownLoadFailed = false;
+    /** SETTINGS (Advanced) and INFO (ANDOR Learn) beneath ARP: OSP has no AUX D, so no D. */
+    KeyboardUtilityActions utilityKeys { { KeyboardUtilityActions::Action::settings, KeyboardUtilityActions::Action::info } };
+    void utilityKeyClicked (KeyboardUtilityActions::Action);
+    void refreshUtilityKeys();
     ArpControl arpButton { ospProcessor };
     ArpInlinePanel arpPanel { ospProcessor };
     bool arpShown = false;

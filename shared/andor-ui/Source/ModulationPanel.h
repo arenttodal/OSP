@@ -410,6 +410,10 @@ public:
     int dropOn (int source, const juce::String& parameterId, juce::Rectangle<float> area);
     /** A short message by the controls (a refused assignment), for a few seconds. */
     void showNotice (const juce::String& text);
+    /** The instrument's own news (a file that could not load, a preset opened or saved, a
+        warning about the sound): the same brief notice, centred above the keyboard row - the
+        instrument has no footer line for it. */
+    void showStatusNotice (const juce::String& text);
     juce::String currentNotice() const;
 
     /** META-MODULATION. What a point is over (root coordinates): a halo's route - its ring

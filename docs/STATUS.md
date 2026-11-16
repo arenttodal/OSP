@@ -1,5 +1,81 @@
 # Status
 
+> **16 Nov 2026, merged into OSP's main line: the keyboard keys and the compact bottom edge
+> (`feature/aux-live-input` `7984022` and `4489e33`) with the wheels' line (`claude/osp-wheels`):**
+> - OSP's Learn stays Learn 2.0 (its thirteen lessons and Quick Start), not that branch's
+>   seven-step catalog. The two entries below describe that branch as it was.
+>   - SETTINGS and INFO are Learn targets (`keyboard.settings`, `advanced`, `osp.advanced`,
+>     `keyboard.info`) with help.
+>   - The menu's help text no longer mentions Advanced.
+> - PITCH BEND, MOD WHEEL and ADVANCED are the wheels' line's compact popovers
+>   (`docs/wheels/osp-wheels.md`). ADVANCED opens above SETTINGS, clear of the ARP / SUB housing.
+> - The trimmed footer (`claude/friendly-pascal-0y48r0`) is not merged. The musician chose this
+>   compact bottom edge instead.
+
+> **16 Nov 2026, compact bottom edge (both instruments, shared):**
+> - `design::height` is now 1050 (was 1086), and `layout::housing` ends at 1036: 22 px of
+>   housing under the keys, about 20 px under the PITCH / MOD captions, then the same 14 px
+>   surround and shadow.
+> - Every position above the keys' foot is unchanged, and nothing is scaled.
+> - The footer status line (`layout::status`, `Parts::status`) is removed.
+>   - Its messages that matter now appear once in `ModulationOverlay::showStatusNotice`: a file
+>     that could not load, the processor's messages, and OSP's natural-pitch warning.
+>   - "Ready", "No sound loaded" and the note count are gone.
+> - `placePopover` now also keeps a popover above the instrument's foot.
+> - The visual regression drops the `status-line` mask.
+> - Verified:
+>   - Plugin tests: 4 / 4 shards (171 cases), including the new bottom-edge test.
+>   - The osp_visual_reference, andor_example_tests and example visual tests pass. The shell
+>     bottom-edge test runs for every product.
+>   - DAW and Mac checks are UNVERIFIED (OWNER TEST).
+> - ANDOR Analog: see its docs/BOTTOM_EDGE.md for before / after screenshots and measurements.
+
+> **16 Nov 2026, keyboard keys SETTINGS / INFO, and ANDOR Learn in OSP (both instruments,
+> shared):**
+> - `shared/andor-ui` `KeyboardUtilityActions` replaces the large Advanced key beneath ARP.
+>   - The keys are small square ceramic keys with an icon each.
+>   - OSP has SETTINGS and INFO, centred. ANDOR Analog adds D (AUX D's visibility).
+>   - SETTINGS opens and closes the Advanced popover, now anchored to the key.
+>   - INFO turns Info on and off.
+> - OSP now has ANDOR Learn (`apps/plugin/Source/OspLearn.cpp`):
+>   - Info texts for its controls and a seven-step Quick Start, ending on SETTINGS.
+>   - The Learn submenu: Tutorials… and Reset Tutorials….
+>   - No first-run invitation (`EditorHooks::offerInvitation = false`).
+> - Info now follows the pointer. After a 300 ms rest it explains the control, and clicks pass
+>   through to it.
+> - Toggle Info, OSP's "Advanced settings" and the shell's Show / Hide AUX are gone from the
+>   menus.
+> - MOD WHEEL, PITCH BEND and ADVANCED use the compact MiniPanel proportions.
+> - The shell visual regression gains one approved product mask, `keyboard-actions`, because
+>   which keys exist is the product's choice. Every product is 0 pixels outside the masks.
+> - Verified (Linux):
+>   - osp_tests: 485 cases.
+>   - Plugin tests: 4 / 4 shards (170 cases). New: the utility keys' geometry, SETTINGS,
+>     INFO, the menus and OSP's Quick Start.
+>   - The osp_visual_reference, andor_example_tests and example visual tests pass.
+>   - DAW and Mac checks are UNVERIFIED (OWNER TEST).
+
+> **15 Nov 2026, the wheels' settings (both instruments, shared):**
+> - PITCH and MOD under the wheels are now doors, like a macro's name. A click opens their
+>   popover above the caption; a drag of 3 px or more from MOD still makes a modulation cable.
+> - The captions are no longer clipped: each wheel's component is 7 px wider on either side,
+>   and the wheel itself is drawn where it always was.
+> - PITCH BEND holds RANGE (`bendRange`, unchanged), which moved out of Advanced.
+> - MOD WHEEL holds VIBRATO (`src/engine/Vibrato.h`): per note, DELAY then RISE, DEPTH in
+>   cents, RATE, and CONTROL (MOD WHEEL / ALWAYS ON / ASSIGNED, AMOUNT 0 by default), plus
+>   the sources.
+> - New parameters `vibrato.*` (version hint 28) are off by default, and off is
+>   bit-identical. VIBRATO DEPTH and AMOUNT are appended to `destExt`.
+> - ANDOR Analog ships it too (OSC 1, OSC 2, card C pitched, and SUB as its own source).
+> - Verified: osp_tests (481, plus the 4 vibrato cases), the plugin tests (4 / 4 shards, 169
+>   cases, the new wheels case included) and the example product (24) pass. The visual
+>   references (OSP's, the example's and Analog's) pass unchanged.
+
+> **15 Nov 2026:** `ParameterRack::customCell` (opt-in, shared): a product can place its own
+> read-only cell in a rack row. ANDOR Analog uses it for MORPH TO D's source and state (GLOBAL
+> MORPH 2.0). ANDOR OSP never calls it and is unchanged: 4 / 4 plugin-test shards and the example
+> product pass.
+
 _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in the plugin, listening test pending; overnight run working through Phases 4–8._
 
 ## Milestone checklist — Phase 0: research harness + baseline engine
@@ -1125,9 +1201,17 @@ the shared rack (done) and OSP's routing view and mixer (not started).
   item, no view attribute, no room (the shell test `[aux]`; the OSP captures). Should ANDOR OSP
   want a fourth source, it needs a product strip and an engine bus of its own.
 
+- **ANDOR ANALOG's product tests on OSP's current line.** Building ANDOR ANALOG with
+  external/osp at `claude/osp-wheels` compiles everything but `andor_analog_tests`.
+  - ANALOG's own `product/Source/FxRouting.h` (and the FX presets, FX EQ, SATELLITE rig and
+    SynthRack helpers its tests name as `andor::analog::`) are now shared in OSP as
+    `osp::plugin::` (Shared FX R1-R3).
+  - ANALOG's same-named headers shadow or are shadowed by OSP's.
+  - When its pin moves: delete ANALOG's copies, include the shared ones, and change the tests'
+    namespaces. No DSP change.
 - **ANDOR ANALOG on the shared SUB.** ANDOR OSP's SUB lives in shared code:
   `src/engine/sub` (`osp::sub::SubOsc`), `InstrumentHost::addSubParameters` /
-  `subSettingsFrom`, and `shared/andor-ui` `SubPanel`. ANDOR ANALOG still uses its own copies
+  `subSettingsFrom`, and `shared/andor-ui` `SubPanel` (in `AndorSubPanel.h`). ANDOR ANALOG still uses its own copies
   (`dsp/SubOsc`, `product/Source/SubPanel`). When its pin moves past `claude/osp-sub`:
   - its Synth switches to `osp::sub::SubOsc` (the same code);
   - `addSubTo` becomes `addSubParameters (layout, 30, "analog.sub." + field)`;
@@ -1520,6 +1604,37 @@ on the ADD place, or only the card dropped on. Audit, measured reproduction and 
   with SYNTH off are unchanged.
 - **Schema golden.** It follows the new defaults: three SHAPE lines and six IMPRINT / MOTION
   lines.
+
+## PITCH, MOD WHEEL and ADVANCED: the wheels in OSP, one popover scale (16 Nov 2026, branch claude/osp-wheels)
+
+- **The wheel line in OSP.** OSP's `feature/aux-live-input` wheel work (`9c97d21..cd2291d`:
+  PITCH / MOD caption popovers, per-voice VIBRATO) is merged onto OSP's current line, keeping
+  SUB, LOOP's fallback, Learn 2.0 and SATELLITE.
+  - `vibrato.*` is appended after SUB (version hint 28, ANDOR ANALOG's).
+  - `destExt` gains VIBRATO DEPTH and AMOUNT at its end; saved indices are unchanged.
+- **One popover scale.** The shared measures are in `ShapingPopups.h` `popover::`, used by the
+  macro popovers too (which are unchanged).
+  - PITCH BEND: 280 x 142 (was 436 x 350).
+  - MOD WHEEL: 340 x 256 (was 610 x 634). VIBRATO ON in the title row; DEPTH, RATE, DELAY,
+    RISE and AMOUNT in one row; CONTROL; SOURCES.
+  - ADVANCED: 340 x 249 (was 436 x 675). One view in two sections, PLAYING and DYNAMICS; no
+    BEND (under PITCH); placed clear of ARP / SUB.
+  - Every control and parameter is kept.
+- **Learn.** Help for Pitch Bend, Mod Wheel, Vibrato and Advanced Settings; exact caption and
+  VIBRATO targets; the lesson "Add vibrato to a recording".
+- **Tests.**
+  - `[popover-scale]` at 869, 1086, 1448 and 1810 px: scale, 58 px cells, no overlap, inside
+    the window, every control, clear of ARP / SUB;
+  - the vibrato lesson end to end;
+  - `[wheels]`, `[vibrato]`, `[sub]`, `[short-loop]`, `[learn]` and the schema golden
+    (`vibrato.*`, `destExt`: intentional).
+- **ANDOR ANALOG against this branch** (`feature/aux-live-input` with external/osp pointed here):
+  - its engine, plugin and standalone build, and `analog_dsp_tests` passes (321 cases, vibrato
+    and wheel included);
+  - its product tests do not compile yet (see NEXT);
+  - the shared SUB panel's file was renamed `AndorSubPanel.h`, so it no longer shadows
+    ANALOG's own `SubPanel.h`.
+- Report: `docs/wheels/osp-wheels.md`.
 
 ## LOOP holds short notes (15 Nov 2026, branch claude/osp-short-loop)
 

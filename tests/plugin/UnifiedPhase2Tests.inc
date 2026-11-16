@@ -158,7 +158,8 @@ TEST_CASE ("plugin: Phase 2's parameters are appended and neutral; the modulatio
     // Only the routes' second destinations (version 21, MIX modulation), each layer's
     // SYNTHESIZE (version 22), its SYNTH page and SPACE's ABYSS (version 23) and SPACE's VINTAGE
     // and BLOOM (version 24), ABYSS's variant (25), ECHO's ASCEND (26), the per-card
-    // arpeggiator (27), each layer's spectral imprint (28) and its PEDAL LOOP (29) come after them.
+    // arpeggiator (27), each layer's spectral imprint (28) and its PEDAL LOOP (29) come after them,
+    // then SATELLITE (32), SUB (33) and the MOD WHEEL's VIBRATO (28, appended last).
     juce::StringArray expected;
     for (int l = 0; l < 3; ++l)
         for (const char* n : { "granular.scatter", "granular.pan", "granular.window", "keyDna.amount" })
@@ -193,6 +194,9 @@ TEST_CASE ("plugin: Phase 2's parameters are appended and neutral; the modulatio
             expected.add (osp::plugin::InstrumentHost::satelliteFieldId (l, field));
     for (const auto* field : osp::plugin::InstrumentHost::subFields())   // (version 33: SUB)
         expected.add (osp::plugin::InstrumentHost::subFieldId (field));
+    for (const char* id : { "vibrato.enabled", "vibrato.depth", "vibrato.rate", "vibrato.delay", "vibrato.rise",   // (hint 28, last: the
+                            "vibrato.control", "vibrato.amount", "vibrato.sourceA", "vibrato.sourceB", "vibrato.sourceC" })   // MOD WHEEL's VIBRATO)
+        expected.add (id);
     REQUIRE (all.size() > expected.size());
     for (int i = 0; i < expected.size(); ++i)
     {

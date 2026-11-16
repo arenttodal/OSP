@@ -1,5 +1,6 @@
 #pragma once
 
+#include "KeyboardUtilityActions.h"
 #include "ArpSection.h"
 #include "DropOwner.h"
 #include "EngineCard.h"
@@ -158,7 +159,8 @@ public:
         REIMAGINED (7 + layer, when the engine reads it), a modulation source's routes or
         larger curve (source 0 LFO 1 .. 3 ENV 2). */
     static constexpr int advancedPopup = 6, reimaginedPopup = 7, routesPopup = 11, curvePopup = 12, startControlPopup = 13, generatorHeaderPopup = 14,
-                         hybridHeaderPopup = 15, arpCompanionPopup = 16, anchoredPopup = 17;
+                         hybridHeaderPopup = 15, arpCompanionPopup = 16, anchoredPopup = 17,
+                         pitchWheelPopup = 18, modWheelPopup = 19;
     // A product's panel anchored to a component (SATELLITE's from the arpeggiator's key, SHAPER DNA
     // from its rack key): placed by it,
     // over a transparent backdrop that takes the click which closes it (that click reaches no
@@ -170,6 +172,9 @@ public:
     void closePopup();
     static constexpr bool isReimaginedPopup (int which) noexcept { return which >= reimaginedPopup && which < reimaginedPopup + osp::plugin::InstrumentHost::numLayers; }
     int openPopupIndex() const noexcept { return popupIndex; }
+    /** The keyboard row's wheels (tests: their captions open PITCH BEND and MOD WHEEL). */
+    osp::plugin::Wheel& pitchBendWheel() noexcept { return pitchWheel; }
+    osp::plugin::Wheel& modulationWheel() noexcept { return modWheel; }
     osp::plugin::MiniPanel* openPopupPanel() noexcept { return popup.get(); }
     /** For tests: the arpeggiator's housing (and its second row, ProductInfo::arpCompanion). */
     osp::plugin::ArpControl& arpHousing() noexcept { return arpButton; }
@@ -232,7 +237,13 @@ public:
     bool arpExpanded() const noexcept { return arpShown; }
     juce::Component& keyboardComponent() noexcept { return keyboard; }
     juce::Component& presetBarComponent() noexcept { return presetBar; }
-    juce::Component& advancedComponent() noexcept { return advancedButton; }
+    /** The keyboard's SETTINGS key (it opens Advanced). */
+    juce::Component& advancedComponent() noexcept { return *utilityKeys.button (osp::plugin::KeyboardUtilityActions::Action::settings); }
+    /** The keyboard's action keys (D, SETTINGS, INFO). */
+    osp::plugin::KeyboardUtilityActions& keyboardActions() noexcept { return utilityKeys; }
+    /** Tests: the main menu (showMenu) is handed here instead of being shown. */
+    std::function<void (juce::PopupMenu&)> showMenuForTest;
+    void openMainMenu() { showMenu(); }
     juce::Component& menuComponent() noexcept { return menuButton; }
     juce::Slider* macroKnob (int macro) noexcept { return macro >= 0 && macro < osp::plugin::frame::macroCount ? &macros[static_cast<std::size_t> (macro)].slider : nullptr; }
 
@@ -319,8 +330,14 @@ private:
     float shownWheelPosition = -1.0f;
     std::array<float, 4> shownEnvelope {};   ///< the AMP envelope's values as last drawn
     osp::plugin::OspKeyboard keyboard;
-    juce::Label statusLabel;
-    osp::plugin::AdvancedCardButton advancedButton { "Advanced" };
+    /** What the footer's status line said that matters, now the overlay's notices: shown once
+        each, when it changes (never "Ready"). */
+    juce::String shownStatusMessage;
+    bool shownLoadFailed = false;
+    osp::plugin::KeyboardUtilityActions utilityKeys;
+    void utilityKeyClicked (osp::plugin::KeyboardUtilityActions::Action);
+    /** The keys follow what they control (AUX shown, Advanced open, Info on). */
+    void refreshUtilityKeys();
     osp::plugin::ArpControl arpButton { shell };
     osp::plugin::ArpInlinePanel arpPanel { shell };
     bool arpShown = false;

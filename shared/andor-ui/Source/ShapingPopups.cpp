@@ -825,7 +825,8 @@ void MiniPanel::resized()
     auto area = card().toFloat();
     if (compact())
     {
-        layoutContent (area.withTrimmedLeft (12.0f).withTrimmedRight (12.0f).withTrimmedTop (32.0f).withTrimmedBottom (10.0f).toNearestInt());
+        layoutContent (area.withTrimmedLeft (static_cast<float> (popover::side)).withTrimmedRight (static_cast<float> (popover::side))
+                           .withTrimmedTop (static_cast<float> (popover::headerTop)).withTrimmedBottom (static_cast<float> (popover::bottom)).toNearestInt());
         return;
     }
     area = area.withTrimmedLeft (25.0f * u).withTrimmedRight (23.0f * u).withTrimmedTop (91.0f * u).withTrimmedBottom (26.0f * u);
@@ -845,37 +846,44 @@ namespace
         return p->getCurrentValueAsText() + (label.isNotEmpty() ? " " + label : juce::String());
     }
 
-    /** Advanced (spec §13): what a musician rarely needs, out of the way. */
+    /** Advanced (spec §13): what a musician rarely needs, out of the way. A compact popover at
+        the macro popovers' scale (popover::), every setting in one view, in two sections:
+        PLAYING (FINE, GLIDE, voices, pitch character, MPE) and DYNAMICS (the velocity curve,
+        AMOUNT, RANGE, TONE, the variation seed). The pitch wheel's RANGE lives under PITCH. */
     class AdvancedPopup final : public MiniPanel
     {
     public:
-        explicit AdvancedPopup (InstrumentHost& p) : MiniPanel ("ADVANCED", "TUNING, VOICES & DYNAMICS"), processor (p)
+        static constexpr int width = 340;
+        static constexpr int selectorsHeight = 2 * (popover::captionHeight - 2 + popover::tabsHeight) + 4;   ///< VOICES and PITCH beside FINE / GLIDE
+
+        explicit AdvancedPopup (InstrumentHost& p) : MiniPanel ("ADVANCED"), processor (p)
         {
             auto& state = processor.apvts();
-            auto add = [this, &state] (const char* id, const char* caption, MiniKnob::Formatter f) {
-                knobs.push_back (std::make_unique<MiniKnob> (state, id, caption, std::move (f)));
-                knobs.back()->setBoxed (true);
-                addAndMakeVisible (*knobs.back());
+            auto add = [this, &state] (std::vector<std::unique_ptr<MiniKnob>>& into, const char* id, const char* caption, MiniKnob::Formatter f) {
+                into.push_back (std::make_unique<MiniKnob> (state, id, caption, std::move (f)));
+                addAndMakeVisible (*into.back());
+                return into.back().get();
             };
             // OUTPUT is the header's VOLUME, sustain each layer's LOOP: Advanced keeps what a
             // musician rarely needs, and DYNAMICS (how touch changes the sound) since DRIVE took
             // its place on the panel.
             auto* fine = state.getParameter ("fineTune");
-            add ("fineTune", "FINE", [fine] (double) { return parameterText (fine); });
-            add ("bendRange", "BEND", [] (double v) { return juce::String (juce::roundToInt (v)) + " st"; });
-            add ("glide", "GLIDE", [] (double ms) { return ms < 0.5 ? juce::String ("Off") : format::milliseconds (ms); });
-            glide = knobs.back().get();
+            add (knobs, "fineTune", "FINE", [fine] (double) { return parameterText (fine); });
+            // (The pitch wheel's RANGE lives in its own popover: a click on PITCH.)
+            glide = add (knobs, "glide", "GLIDE", [] (double ms) { return ms < 0.5 ? juce::String ("Off") : format::milliseconds (ms); });
 
             // Mono: one note at a time, legato (no restart while a key is held), last key
             // wins, GLIDE slides between notes. For basses and leads.
             voices = std::make_unique<SegmentedControl> (*state.getParameter ("voiceMode"), juce::StringArray { "POLY", "MONO" });
             voices->setTooltip ("Mono: one note at a time; a key played while another is held slides to it (legato) over GLIDE");
             voices->onChange = [this] (int) { updateGlide(); };
+            binding::tag (*voices, "voiceMode");
             addAndMakeVisible (*voices);
             updateGlide();
 
             pitch = std::make_unique<SegmentedControl> (*state.getParameter ("pitchCharacter"), juce::StringArray { "TAPE", "NATURAL" });
             pitch->setTooltip ("Pitch character: tape-like resampling or natural (formants kept)");
+            binding::tag (*pitch, "pitchCharacter");
             addAndMakeVisible (*pitch);
 
             mpe.setTooltip ("MPE controllers: per-note pitch bend (+/-48 st), pressure and slide");
@@ -898,67 +906,77 @@ namespace
             // DYNAMICS: the same parameters as ever (its amount, curve, range and tone).
             curve = std::make_unique<SegmentedControl> (*state.getParameter ("dynamics.curve"), juce::StringArray { "SOFT", "LINEAR", "HARD" });
             curve->setTooltip ("Velocity curve: soft reaches loud easily, hard needs a firm touch");
+            binding::tag (*curve, "dynamics.curve");
             addAndMakeVisible (*curve);
-            auto addDynamics = [this, &state] (const char* id, const char* caption, MiniKnob::Formatter f) {
-                dynamicsKnobs.push_back (std::make_unique<MiniKnob> (state, id, caption, std::move (f)));
-                dynamicsKnobs.back()->setBoxed (true);
-                addAndMakeVisible (*dynamicsKnobs.back());
-            };
             auto percent = [] (double v) { return format::percent (v) + " %"; };
-            addDynamics ("dynamics", "AMOUNT", percent);
-            addDynamics ("velocityRange", "RANGE", [] (double v) { return juce::String (v, 0) + " dB"; });
-            addDynamics ("dynamics.tone", "TONE", percent);
+            add (dynamicsKnobs, "dynamics", "AMOUNT", percent);
+            add (dynamicsKnobs, "velocityRange", "RANGE", [] (double v) { return juce::String (v, 0) + " dB"; });
+            add (dynamicsKnobs, "dynamics.tone", "TONE", percent);
         }
 
-        // Laid out at 0.69 of the reference's unit; the editor scales it up to match the macro popups.
-        float unit() const override { return 0.69f; }
+        bool compact() const override { return true; }
         juce::Point<int> cardSize() const override
         {
-            return { 300, headerHeight() + knobRow + 8 + 12 + 24 + 8 + 12 + 24 + 10 + 12 + 24 + 6 + knobRow + 10 + 26 + juce::roundToInt (26.0f * unit()) };
+            using namespace popover;
+            return { width, headerTop + captionHeight + selectorsHeight + rowGap + tabsHeight + gap + 1 + gap + tabsHeight + rowGap + cellHeight + bottom };
         }
 
         void paint (juce::Graphics& g) override
         {
             MiniPanel::paint (g);
             g.setColour (palette::textDim);
-            g.setFont (fonts::label (9.5f));
+            g.setFont (fonts::label (popover::captionFont));
+            g.drawText ("PLAYING", playingCaption, juce::Justification::centredLeft, false);
             g.drawText ("VOICES", voicesCaption, juce::Justification::centredLeft, false);
             g.drawText ("PITCH CHARACTER", pitchCaption, juce::Justification::centredLeft, false);
             g.drawText ("DYNAMICS", dynamicsCaption, juce::Justification::centredLeft, false);
+            g.drawText ("VELOCITY", curveCaption, juce::Justification::centredRight, false);
+            g.drawText ("PER-NOTE BEND, PRESSURE AND SLIDE", mpeCaption, juce::Justification::centredLeft, false);
             if (auto* seed = processor.apvts().getParameter ("seed"))
-                g.drawText ("SEED " + seed->getCurrentValueAsText(), seedCaption, juce::Justification::centredRight, false);
+                g.drawText ("SEED " + seed->getCurrentValueAsText(), seedCaption, juce::Justification::centred, false);
+            g.setColour (palette::hairline);
+            g.fillRect (divider);
         }
 
     private:
         void layoutContent (juce::Rectangle<int> area) override
         {
-            auto row = area.removeFromTop (knobRow);
-            const int cell = row.getWidth() / static_cast<int> (knobs.size());
+            using namespace popover;
+            // PLAYING: FINE and GLIDE, VOICES and PITCH CHARACTER beside them; MPE under.
+            playingCaption = area.removeFromTop (captionHeight);
+            auto playing = area.removeFromTop (selectorsHeight);
+            const int cell = 72;
             for (auto& k : knobs)
-                k->setBounds (row.removeFromLeft (cell));
-            area.removeFromTop (8);
-            voicesCaption = area.removeFromTop (12);
-            voices->setBounds (area.removeFromTop (24));
-            area.removeFromTop (8);
-            pitchCaption = area.removeFromTop (12);
-            pitch->setBounds (area.removeFromTop (24));
-            area.removeFromTop (10);
-            dynamicsCaption = area.removeFromTop (12);
-            curve->setBounds (area.removeFromTop (24));
-            area.removeFromTop (6);
-            auto dynamicsRow = area.removeFromTop (knobRow);
-            const int dynamicsCell = dynamicsRow.getWidth() / static_cast<int> (dynamicsKnobs.size());
+                k->setBounds (playing.removeFromLeft (cell).withSizeKeepingCentre (cell, cellHeight));
+            playing.removeFromLeft (gap);
+            voicesCaption = playing.removeFromTop (captionHeight - 2);
+            voices->setBounds (playing.removeFromTop (tabsHeight));
+            playing.removeFromTop (4);
+            pitchCaption = playing.removeFromTop (captionHeight - 2);
+            pitch->setBounds (playing.removeFromTop (tabsHeight));
+            area.removeFromTop (rowGap);
+            auto mpeRow = area.removeFromTop (tabsHeight);
+            mpe.setBounds (mpeRow.removeFromLeft (64));
+            mpeCaption = mpeRow;
+            area.removeFromTop (gap);
+            divider = area.removeFromTop (1).toFloat();
+            area.removeFromTop (gap);
+            // DYNAMICS: the velocity curve on its caption's row; AMOUNT, RANGE, TONE; the seed.
+            auto top = area.removeFromTop (tabsHeight);
+            dynamicsCaption = top.removeFromLeft (70);
+            curve->setBounds (top.removeFromRight (180));
+            top.removeFromRight (6);
+            curveCaption = top;
+            area.removeFromTop (rowGap);
+            auto row = area.removeFromTop (cellHeight);
             for (auto& k : dynamicsKnobs)
-                k->setBounds (dynamicsRow.removeFromLeft (dynamicsCell));
-            area.removeFromTop (10);
-            auto last = area.removeFromTop (26);
-            mpe.setBounds (last.removeFromLeft (80));
-            reseed.setBounds (last.removeFromRight (90));
-            last.removeFromRight (8);
-            seedCaption = last;
+                k->setBounds (row.removeFromLeft (cell));
+            row.removeFromLeft (gap);
+            auto seedArea = row.withSizeKeepingCentre (row.getWidth(), tabsHeight + 4 + 14);
+            seedCaption = seedArea.removeFromTop (14);
+            seedArea.removeFromTop (4);
+            reseed.setBounds (seedArea.withSizeKeepingCentre (std::min (90, seedArea.getWidth()), tabsHeight));
         }
-
-        static constexpr int knobRow = 104;   ///< the popups' boxed knob cells, at this panel's unit
 
         /** GLIDE only acts in Mono: dimmed (still adjustable) in Poly. */
         void updateGlide()
@@ -975,7 +993,8 @@ namespace
         juce::ToggleButton mpe { "MPE" };
         std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> mpeAttachment;
         juce::TextButton reseed { "Reseed" };
-        juce::Rectangle<int> voicesCaption, pitchCaption, dynamicsCaption, seedCaption;
+        juce::Rectangle<int> playingCaption, voicesCaption, pitchCaption, dynamicsCaption, curveCaption, seedCaption, mpeCaption;
+        juce::Rectangle<float> divider;
     };
 }
 

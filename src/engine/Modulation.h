@@ -250,6 +250,9 @@ enum class Dest : std::uint8_t
     mixPosition, mixTowardsC,
     // Each layer's SYNTHESIZE amount (per voice, live on sounding notes; Phase S2).
     synthAmountA, synthAmountB, synthAmountC,
+    // The MOD WHEEL's VIBRATO (per voice, the whole instrument): DEPTH in cents, AMOUNT the
+    // share of it CONTROL = ASSIGNED plays (Vibrato.h).
+    vibratoDepth, vibratoAmount,
     // An instrument's own controls: products built from the ANDOR Instrument Shell name them
     // (setProductDestinations); ANDOR OSP names none, so it never offers or reads these.
     product0,
@@ -355,8 +358,9 @@ inline int choiceOf (Dest d) noexcept
     in that parameter's choice order after "None" (append only): the frozen `dest` list keeps
     its automation, and a route whose `destExt` is set plays that destination instead.
 */
-inline constexpr std::array<Dest, 8> extendedDests { Dest::keyDnaAmountA, Dest::keyDnaAmountB, Dest::keyDnaAmountC, Dest::mixPosition, Dest::mixTowardsC,
-                                                     Dest::synthAmountA, Dest::synthAmountB, Dest::synthAmountC };
+inline constexpr std::array<Dest, 10> extendedDests { Dest::keyDnaAmountA, Dest::keyDnaAmountB, Dest::keyDnaAmountC, Dest::mixPosition, Dest::mixTowardsC,
+                                                      Dest::synthAmountA, Dest::synthAmountB, Dest::synthAmountC,
+                                                      Dest::vibratoDepth, Dest::vibratoAmount };
 constexpr int extendedChoiceCount = 1 + static_cast<int> (extendedDests.size());
 inline Dest destFromExtendedChoice (int choice) noexcept
 {

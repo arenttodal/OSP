@@ -140,8 +140,6 @@ namespace frame
 
     /** The keyboard's range (A0..C8), naming (MIDI 60 = C4) and colours. */
     void setUpKeyboard (OspKeyboard& keyboard);
-    /** The footer's status line (its font and colour). */
-    void setUpStatusLabel (juce::Label& label);
 
     /** The parts every ANDOR instrument places the same way (null: not shown). */
     struct Parts
@@ -156,9 +154,11 @@ namespace frame
         juce::Component* pitchWheel = nullptr;
         juce::Component* modWheel = nullptr;
         juce::MidiKeyboardComponent* keyboard = nullptr;
-        juce::Component* status = nullptr;
         juce::Component* arpControl = nullptr;
         juce::Component* advanced = nullptr;
+        /** The keyboard's action keys (KeyboardUtilityActions: D, SETTINGS, INFO) in Advanced's
+            place, with their shadow margin around it. */
+        juce::Component* utilityActions = nullptr;
         juce::Component* headerMix = nullptr;
         /** The effects rack (opt-in) and how far it pushes what is under it (its height
             plus rackGap while a module is expanded; 0 without a rack: as before). */
@@ -194,7 +194,10 @@ namespace frame
         10 px above (kept inside the instrument by placePopover). */
     juce::Point<float> macroPopoverOrigin (juce::Rectangle<float> label, juce::Point<float> size);
     /** Advanced unfolds above its key (`key`), right-aligned with it. */
-    juce::Point<float> advancedPopoverOrigin (juce::Rectangle<float> key, juce::Point<float> size);
+    juce::Point<float> advancedPopoverOrigin (juce::Rectangle<float> key, juce::Point<float> size, juce::Rectangle<float> clearOf = {});
+    /** A wheel's popover (PITCH BEND, MOD WHEEL) unfolds above the wheel (`wheel`: its
+        component, caption included, in the content), so the wheel stays in view and playable. */
+    juce::Point<float> wheelPopoverOrigin (juce::Rectangle<float> wheel, juce::Point<float> size);
     /** Places a popover's card at `at` (reference pixels), kept inside the instrument. */
     void placePopover (MiniPanel& popup, const juce::Component& content, juce::Point<float> at);
     /** Opening: a short fade and a 3 px settle (110 ms), nothing more. */

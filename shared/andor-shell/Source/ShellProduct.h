@@ -7,6 +7,7 @@
 #include "InstrumentFrame.h"
 #include "ShellEngine.h"
 #include "LessonTypes.h"
+#include "WheelPopups.h"
 
 #include <array>
 #include <map>
@@ -187,6 +188,8 @@ struct ProductInfo
     {
         float height = 76.0f;   ///< design px
         juce::String name = "AUX";
+        /** Its letter (the keyboard's D key: "Show AUX D" / "Hide AUX D"). */
+        juce::String letter = "D";
         std::function<std::unique_ptr<juce::Component> (osp::plugin::InstrumentHost&)> create;
         /** A file dropped on neither a card nor a part that owns drops (empty space) does
             nothing (ANDOR ANALOG). Off: it is added as a layer, as ANDOR OSP does. */
@@ -285,6 +288,9 @@ struct ProductInfo
         juce::String parameterId, tooltip;
     };
     std::vector<MacroSwitch> macroSwitches;
+    /** The MOD WHEEL's VIBRATO sources (the popover's SOURCES row: label and bool parameter).
+        Empty: ANDOR OSP's three layers, A, B and C (the shared vibrato.sourceA-C). */
+    std::vector<osp::plugin::VibratoSource> vibratoSources;
     /** SHAPER DNA (opt-in; ANDOR ANALOG): MOVEMENT lane A's SHAPER per note. Its switch (a bool
         parameter of the product's), its panel (opened from the rack's DNA key) and why it cannot
         play just now (the key's tooltip; empty when it can). Unset: no key, as in ANDOR OSP. */

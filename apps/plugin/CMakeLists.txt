@@ -35,7 +35,7 @@ juce_add_plugin(OSP_Plugin
 include(${PROJECT_SOURCE_DIR}/shared/andor-ui/AndorUi.cmake)
 andor_ui_add_to(OSP_Plugin)
 # ANDOR Learn (shared/andor-learn, as ANDOR ANALOG's): the same controller, browser, notes and
-# progress, with OSP's own lessons and targets (Source/OspLearn.*).
+# progress, with OSP's own lessons and targets (Source/OspLearn.*); Info is the keyboard's INFO key.
 include(${PROJECT_SOURCE_DIR}/shared/andor-learn/AndorLearn.cmake)
 
 target_sources(OSP_Plugin PRIVATE

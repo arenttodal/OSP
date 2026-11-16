@@ -15,6 +15,18 @@ namespace osp::plugin::ids
     inline const juce::String velocityRange = "velocityRange";
     inline const juce::String fineTune = "fineTune";
     inline const juce::String bendRange = "bendRange";
+    // The MOD WHEEL's VIBRATO (version hint 28; Vibrato.h). The sources are the instrument's
+    // own (ANDOR OSP: layers A, B, C; ANDOR ANALOG: OSC 1, OSC 2, pitched C).
+    inline const juce::String vibratoEnabled = "vibrato.enabled";
+    inline const juce::String vibratoDepth = "vibrato.depth";
+    inline const juce::String vibratoRate = "vibrato.rate";
+    inline const juce::String vibratoDelay = "vibrato.delay";
+    inline const juce::String vibratoRise = "vibrato.rise";
+    inline const juce::String vibratoControl = "vibrato.control";
+    inline const juce::String vibratoAmount = "vibrato.amount";
+    inline const juce::String vibratoSourceA = "vibrato.sourceA";
+    inline const juce::String vibratoSourceB = "vibrato.sourceB";
+    inline const juce::String vibratoSourceC = "vibrato.sourceC";
     inline const juce::String life = "life";
     inline const juce::String dynamics = "dynamics";
     inline const juce::String character = "character";
