@@ -4,6 +4,7 @@
 #include "CeramicSkin.h"
 #include "EngineCard.h"   // icons
 #include "MainSections.h"   // Wheel
+#include "KeyboardUtilityActions.h"
 #include "OspLookAndFeel.h"
 
 #include <algorithm>
@@ -369,6 +370,7 @@ void place (const Parts& parts, bool arpShown)
     set (parts.status, low (layout::status));
     set (parts.arpControl, low (layout::arpControl));
     set (parts.advanced, low (layout::advanced));
+    set (parts.utilityActions, low (layout::advanced.expanded (static_cast<float> (KeyboardUtilityActions::margin))));
     set (parts.headerMix, at (layout::headerMix));
 }
 

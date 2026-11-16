@@ -8,6 +8,7 @@
 #include "CeramicSkin.h"
 #include "Design.h"
 #include "EngineCard.h"
+#include "KeyboardUtilityActions.h"
 
 #include "audio/utility/TestSignals.h"
 #include "core/PitchMath.h"
@@ -168,8 +169,12 @@ namespace visualstates
         const auto presetName = presetBar.reduced (46.0f, 4.0f);
         // The footer's status line (it names the engine; the sounds' stages differ).
         const auto statusLine = status.translated (0.0f, arpShift).expanded (2.0f, 2.0f);
+        // The keyboard's action keys beneath ARP (and their shadows): which keys there are is
+        // the product's (D for an AUX strip, INFO with ANDOR Learn, SETTINGS always).
+        const auto keyboardActions = advanced.translated (0.0f, arpShift).expanded (static_cast<float> (osp::plugin::KeyboardUtilityActions::margin));
         return { { "identity", "the product's name and tagline", identity },
                  { "preset-name", "the product's own presets", presetName },
-                 { "status-line", "the engine's and the sounds' state", statusLine } };
+                 { "status-line", "the engine's and the sounds' state", statusLine },
+                 { "keyboard-actions", "the product's own keyboard action keys (D / SETTINGS / INFO)", keyboardActions } };
     }
 }

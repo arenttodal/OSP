@@ -1,6 +1,9 @@
 #include "PluginEditor.h"
 #include "MacroPopups.h"
 #include "WheelPopups.h"
+#include "OspLearn.h"
+#include "ActionEvents.h"
+#include "LearnController.h"
 
 #include "core/PitchMath.h"
 #include "io/AudioFileIO.h"
@@ -160,7 +163,7 @@ void OspAudioProcessorEditor::mouseDownAnywhere (juce::Component* c)
     for (int i = 0; i < static_cast<int> (macros.size()); ++i)
         if (c == macros[static_cast<std::size_t> (i)].label.get())
             pressed = popupOfMacro (i);
-    if (c == &advancedButton)
+    if (c == &advancedSettingsButton())
         pressed = advancedPopup;
     if (headerMix.isMixOpener (c))
         pressed = mixPopup;
@@ -316,17 +319,9 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
 
     frame::setUpStatusLabel (statusLabel);
     content.addAndMakeVisible (statusLabel);
-    advancedButton.setTitle ("Advanced settings");
-    advancedButton.setTooltip ("Tuning, voices, pitch character, dynamics (how touch changes the sound), MPE, variation seed");
-    advancedButton.onClick = [this] {
-        if (closedByLabelPress == advancedPopup)
-        {
-            closedByLabelPress = -1;
-            return;
-        }
-        openPopup (advancedPopup);
-    };
-    content.addAndMakeVisible (advancedButton);
+    // SETTINGS and INFO beneath ARP (the large Advanced key's place).
+    utilityKeys.onClick = [this] (KeyboardUtilityActions::Action a) { utilityKeyClicked (a); };
+    content.addAndMakeVisible (utilityKeys);
     arpButton.onToggleEditor = [this] { setArpExpanded (! arpShown); };
     arpPanel.onCollapse = [this] { setArpExpanded (false); };
     arpPanel.onOctavesMenu = [this] {
@@ -383,6 +378,7 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
 
     if (ospProcessor.advancedOpen())
         openPopup (advancedPopup);
+    createLearn();
     timerCallback();
     startTimerHz (30);   // grains and read heads move at the display rate
 }
@@ -390,6 +386,7 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
 OspAudioProcessorEditor::~OspAudioProcessorEditor()
 {
     stopTimer();
+    learn.reset();
     juce::Desktop::getInstance().removeGlobalMouseListener (&outsideClicks);
     for (auto& card : cards)
         juce::Desktop::getInstance().getAnimator().cancelAnimation (card.get(), false);
@@ -550,7 +547,7 @@ void OspAudioProcessorEditor::openPopup (int which)
     if (keepAdvanced)
     {
         ospProcessor.setAdvancedOpen (true);
-        advancedButton.setToggleState (true, juce::dontSendNotification);
+        utilityKeys.setActive (KeyboardUtilityActions::Action::settings, true);
     }
     if (isShowing())
         grabKeyboardFocus(); // Escape closes it
@@ -571,7 +568,7 @@ void OspAudioProcessorEditor::closePopup()
     if (popupIndex == advancedPopup)
     {
         ospProcessor.setAdvancedOpen (false);
-        advancedButton.setToggleState (false, juce::dontSendNotification);
+        utilityKeys.setActive (KeyboardUtilityActions::Action::settings, false);
     }
     juce::Desktop::getInstance().getAnimator().cancelAnimation (popup.get(), false);
     popup.reset();
@@ -622,7 +619,7 @@ void OspAudioProcessorEditor::positionPopup()
     }
     else
     {
-        const auto at = frame::advancedPopoverOrigin (advancedButton.getBounds().toFloat(), size);
+        const auto at = frame::advancedPopoverOrigin (content.getLocalArea (&utilityKeys, advancedSettingsButton().getBounds()).toFloat(), size);
         x = at.x;
         y = at.y;
     }
@@ -1066,7 +1063,14 @@ void OspAudioProcessorEditor::showMenu()
                           safe->setScaleFactor (safe->ospProcessor.uiScale());
                       });
     menu.addSubMenu ("Interface size", size);
-    menu.addItem ("Advanced settings", [safe] { if (safe != nullptr) safe->openPopup (advancedPopup); });
+    // (Advanced is the SETTINGS key's, Info the INFO key's: beneath ARP.)
+    if (learn != nullptr)
+        learn->addMenuItems (menu);   // Learn: Tutorials..., Reset Tutorials...
+    if (showMenuForTest != nullptr)
+    {
+        showMenuForTest (menu);
+        return;
+    }
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (menuButton).withDeletionCheck (*this));
 }
 
@@ -1144,6 +1148,9 @@ void OspAudioProcessorEditor::chooseFile (int layer, bool addAsNewLayer)
 
 bool OspAudioProcessorEditor::keyPressed (const juce::KeyPress& key)
 {
+    // Escape: Learn's note, browser and Info first (as in every ANDOR instrument), then a popover.
+    if (learn != nullptr && learn->keyPressed (key))
+        return true;
     if (key == juce::KeyPress::escapeKey && popup != nullptr)
     {
         // Closed asynchronously: the key may have come through one of the popup's children.
@@ -1355,7 +1362,7 @@ void OspAudioProcessorEditor::layoutInstrument()
     parts.keyboard = &keyboard;
     parts.status = &statusLabel;
     parts.arpControl = &arpButton;
-    parts.advanced = &advancedButton;
+    parts.utilityActions = &utilityKeys;
     parts.headerMix = &headerMix;
     frame::place (parts, arpShown);
 
@@ -1411,8 +1418,139 @@ void OspAudioProcessorEditor::updateKeyTints()
         keyboard.repaint();
 }
 
+void OspAudioProcessorEditor::utilityKeyClicked (KeyboardUtilityActions::Action a)
+{
+    using Action = KeyboardUtilityActions::Action;
+    if (a == Action::settings)
+    {
+        if (closedByLabelPress == advancedPopup)
+            closedByLabelPress = -1;   // (that press closed it)
+        else if (popup != nullptr && popupIndex == advancedPopup)
+            closePopup();
+        else
+        {
+            openPopup (advancedPopup);
+            learnAction (andor::learn::actions::settingsOpened, "keyboard.settings");
+        }
+    }
+    else if (a == Action::info && learn != nullptr)
+    {
+        learn->setLearnMode (! learn->learnMode());
+        learnAction (andor::learn::actions::infoToggled, "keyboard.info");
+    }
+    refreshUtilityKeys();
+}
+
+void OspAudioProcessorEditor::refreshUtilityKeys()
+{
+    using Action = KeyboardUtilityActions::Action;
+    utilityKeys.setActive (Action::settings, popup != nullptr && popupIndex == advancedPopup);
+    utilityKeys.setTooltip (Action::settings, "Advanced Settings");
+    const bool on = learn != nullptr && learn->learnMode();
+    utilityKeys.setActive (Action::info, on);
+    utilityKeys.setTooltip (Action::info, on ? "Hide Info" : "Show Info");
+}
+
+void OspAudioProcessorEditor::learnAction (const juce::String& actionId, const juce::String& targetId, const juce::String& parameterId)
+{
+    if (learn != nullptr)
+        learn->userAction (actionId, targetId, parameterId, andor::learn::Origin::userPointer);
+}
+
+void OspAudioProcessorEditor::createLearn()
+{
+    // ANDOR Learn in ANDOR OSP: Info (the INFO key) and the tutorials (the menu's Learn). The
+    // same controller as every ANDOR instrument; OSP's own catalog (OspLearn.cpp).
+    andor::learn::EditorHooks hooks;
+    hooks.content = &content;
+    hooks.menuAnchor = [this] { return menuButton.getBounds(); };
+    hooks.closePopovers = [this] { closePopup(); };
+    hooks.showing = [this] { return isShowing(); };
+    hooks.offerInvitation = false;   // (OSP: Info and the menu's Tutorials only; nothing pops up by itself)
+    hooks.parameterValue = [this] (const juce::String& id) -> std::optional<float> {
+        if (auto* p = ospProcessor.parameters.getParameter (id))
+            return p->convertFrom0to1 (p->getValue());
+        return std::nullopt;
+    };
+    hooks.hasCapability = [] (const juce::String&) { return false; };
+    hooks.visibleArea = [this] { return content.getLocalArea (this, getLocalBounds()); };
+    hooks.scrollIntoView = [this] (juce::Rectangle<int> r) {
+        if (! overflow.overflowing())
+            return;
+        const auto onEditor = getLocalArea (&content, r).toFloat();
+        overflow.scrollToShow (onEditor.getY() + overflow.offset(), onEditor.getBottom() + overflow.offset());
+    };
+    learn = std::make_unique<andor::learn::LearnController> (ospLearnCatalog(), std::move (hooks));
+    auto& targets = learn->targets();
+    using andor::learn::Target;
+    auto component = [] (juce::Component* c) { return [c] { return c; }; };
+    targets.add ({ "header.preset", component (&presetBar), {}, {}, {}, true });
+    targets.add ({ "header.menu", component (&menuButton) });
+    static const char* letters[] { "A", "B", "C" };
+    for (int layer = 0; layer < OspAudioProcessor::numLayers; ++layer)
+        targets.add ({ juce::String ("source.card.") + letters[layer], [this, layer] {
+                          auto* card = cards[static_cast<std::size_t> (layer)].get();
+                          return card != nullptr && card->isVisible() ? static_cast<juce::Component*> (card) : nullptr;
+                      },
+                       {}, {}, {}, true });
+    targets.add ({ "sources", component (&content), [this] (juce::Component&) {
+                      juce::Rectangle<int> all;
+                      for (auto& c : cards)
+                          if (c != nullptr && c->isVisible())
+                              all = all.isEmpty() ? c->getBounds() : all.getUnion (c->getBounds());
+                      return all;
+                  } });
+    for (int i = 0; i < frame::macroCount; ++i)
+    {
+        auto& m = macros[static_cast<std::size_t> (i)];
+        targets.add ({ "macro." + juce::String (i), [&m] { return static_cast<juce::Component*> (&m.slider); }, [this, &m] (juce::Component& knob) {
+                          auto r = m.slider.getBounds();
+                          if (m.label != nullptr)
+                              r = r.getUnion (m.label->getBounds());
+                          return knob.getLocalArea (&content, r);
+                      },
+                       {}, {}, true });
+    }
+    targets.add ({ "macros", component (&content), [this] (juce::Component&) {
+                      juce::Rectangle<int> all;
+                      for (auto& m : macros)
+                      {
+                          auto r = m.slider.getBounds();
+                          if (m.label != nullptr)
+                              r = r.getUnion (m.label->getBounds());
+                          all = all.isEmpty() ? r : all.getUnion (r);
+                      }
+                      return all;
+                  } });
+    targets.add ({ "mod.panel", component (&modPanel), {}, {}, {}, true });
+    targets.add ({ "keyboard", component (&keyboard), {}, {}, {}, true });
+    auto expandArp = [this] {
+        setArpExpanded (true);
+        return arpShown;
+    };
+    targets.add ({ "arp.control", component (&arpButton), {}, expandArp, {}, true });
+    targets.add ({ "arp.opener", component (&arpButton), {}, expandArp });
+    targets.add ({ "arp.panel", component (&arpPanel), {}, expandArp });
+    targets.addState ("arp.panel.open", [this] { return arpShown; });
+    using Action = KeyboardUtilityActions::Action;
+    for (const char* id : { "keyboard.settings", "advanced" })
+        targets.add ({ id, [this] { return static_cast<juce::Component*> (utilityKeys.button (Action::settings)); }, {}, {}, {}, true });
+    targets.add ({ "keyboard.info", [this] { return static_cast<juce::Component*> (utilityKeys.button (Action::info)); }, {}, {}, {}, true });
+    learn->finishSetup();
+    if (! learn->isUsable())
+    {
+        // INFO only where Learn runs (never a key that looks as if it works).
+        learn.reset();
+        utilityKeys.setActions ({ Action::settings });
+    }
+    refreshUtilityKeys();
+}
+
 void OspAudioProcessorEditor::timerCallback()
 {
+    if (learn != nullptr)
+        learn->tick();   // (returns at once while Learn shows nothing)
+    refreshUtilityKeys();
     bool changed = false;
     int count = 0;
     for (int l = 0; l < OspAudioProcessor::numLayers; ++l)

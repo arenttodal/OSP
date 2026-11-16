@@ -720,7 +720,7 @@ TEST_CASE ("shell: the interface is ANDOR OSP's, pixel for pixel outside the app
     // every pixel outside the masks must be exactly ANDOR OSP's.
     constexpr int tolerance = 0;
     juce::StringArray report { "# Visual regression: " + andor::shell::productInfo().name + " vs ANDOR OSP", "",
-                               "Tolerance: " + juce::String (tolerance) + " (exact), masks: identity, preset-name, status-line. Rendered with ANDOR OSP's materials (a product's own finish is its identity: see shipped/).", "",
+                               "Tolerance: " + juce::String (tolerance) + " (exact), masks: identity, preset-name, status-line, keyboard-actions. Rendered with ANDOR OSP's materials (a product's own finish is its identity: see shipped/).", "",
                                "| State | Differing pixels outside the masks | Inside the masks (allowed) |", "|---|---|---|" };
     int failures = 0;
     for (const auto& name : visualstates::names())

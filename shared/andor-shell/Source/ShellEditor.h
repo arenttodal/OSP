@@ -1,5 +1,6 @@
 #pragma once
 
+#include "KeyboardUtilityActions.h"
 #include "ArpSection.h"
 #include "DropOwner.h"
 #include "EngineCard.h"
@@ -227,7 +228,13 @@ public:
     bool arpExpanded() const noexcept { return arpShown; }
     juce::Component& keyboardComponent() noexcept { return keyboard; }
     juce::Component& presetBarComponent() noexcept { return presetBar; }
-    juce::Component& advancedComponent() noexcept { return advancedButton; }
+    /** The keyboard's SETTINGS key (it opens Advanced). */
+    juce::Component& advancedComponent() noexcept { return *utilityKeys.button (osp::plugin::KeyboardUtilityActions::Action::settings); }
+    /** The keyboard's action keys (D, SETTINGS, INFO). */
+    osp::plugin::KeyboardUtilityActions& keyboardActions() noexcept { return utilityKeys; }
+    /** Tests: the main menu (showMenu) is handed here instead of being shown. */
+    std::function<void (juce::PopupMenu&)> showMenuForTest;
+    void openMainMenu() { showMenu(); }
     juce::Component& menuComponent() noexcept { return menuButton; }
     juce::Slider* macroKnob (int macro) noexcept { return macro >= 0 && macro < osp::plugin::frame::macroCount ? &macros[static_cast<std::size_t> (macro)].slider : nullptr; }
 
@@ -326,7 +333,10 @@ private:
     std::array<float, 4> shownEnvelope {};   ///< the AMP envelope's values as last drawn
     osp::plugin::OspKeyboard keyboard;
     juce::Label statusLabel;
-    osp::plugin::AdvancedCardButton advancedButton { "Advanced" };
+    osp::plugin::KeyboardUtilityActions utilityKeys;
+    void utilityKeyClicked (osp::plugin::KeyboardUtilityActions::Action);
+    /** The keys follow what they control (AUX shown, Advanced open, Info on). */
+    void refreshUtilityKeys();
     osp::plugin::ArpControl arpButton { shell };
     osp::plugin::ArpInlinePanel arpPanel { shell };
     bool arpShown = false;

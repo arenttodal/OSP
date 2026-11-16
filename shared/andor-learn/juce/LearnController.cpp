@@ -1,5 +1,7 @@
 #include "LearnController.h"
 
+#include <limits>
+
 #include <algorithm>
 
 namespace andor::learn
@@ -58,7 +60,7 @@ void LearnController::finishSetup()
     lessonRunner.onChanged = [this] { refreshNote(); };
     lessonRunner.onProgress = [this] (const Lesson& l, int s, bool finished, bool all) { persist (l, s, finished, all); };
     progress = progressStore.read();
-    invitationPending = ! progress.firstInviteSeen;
+    invitationPending = hooks.offerInvitation && ! progress.firstInviteSeen;
     for (const auto& t : registry.all())
         if (t.watchTouches)
         {
@@ -78,17 +80,14 @@ void LearnController::addMenuItems (juce::PopupMenu& menu)
         menu.addItem ("Learn (unavailable)", false, false, [] {});
         return;
     }
-    // One entry: Learn, with Tutorials..., Toggle Info and Reset Tutorials... inside.
+    // One entry: Learn, with Tutorials... and Reset Tutorials... inside. (Info has its own key
+    // beneath ARP: KeyboardUtilityActions' INFO.)
     juce::WeakReference<LearnController> weak (this);
     juce::PopupMenu sub;
     sub.addSectionHeader ("LEARN");
     sub.addItem ("Tutorials" + ellipsis(), [weak] {
         if (weak != nullptr)
             weak->openBrowser();
-    });
-    sub.addItem ("Toggle Info", true, inspecting, [weak] {
-        if (weak != nullptr)
-            weak->setLearnMode (! weak->inspecting);
     });
     if (hooks.canRestoreSound != nullptr && hooks.canRestoreSound())
     {
@@ -169,6 +168,8 @@ void LearnController::tick()
     }
     if (! isActive())
         return;
+    if (inspecting)
+        followPointer();
     // Controls rebuilt since (a routing view created on demand) are watched again.
     for (auto& w : watchers)
         if (const auto* t = registry.find (w->targetId()))
@@ -273,7 +274,7 @@ void LearnController::setLearnMode (bool on)
         bannerNote = std::make_unique<Note>();
         Note::Content banner;
         banner.title = "Info";
-        banner.body = "Point to an area to outline it; click it to read about it." + dot() + "Esc to exit";
+        banner.body = "Point to a control to read about it. The controls keep working." + dot() + "Esc to exit";
         bannerNote->setContent (std::move (banner));
         bannerNote->onAction = [this] (const juce::String&) { setLearnMode (false); };
         hooks.content->addAndMakeVisible (*bannerNote);
@@ -295,6 +296,36 @@ void LearnController::setLearnMode (bool on)
         layoutNow();
     else
         releaseLayersIfIdle();
+}
+
+void LearnController::followPointer()
+{
+    // Info: what is under the pointer (the smallest area there) is outlined, and after a short
+    // rest its explanation shows - the controls themselves keep every click. Over the note or
+    // the banner nothing changes (their keys stay reachable).
+    if (hooks.content == nullptr || ! hooks.content->isShowing())
+        return;
+    const auto at = hooks.content->getLocalPoint (nullptr, juce::Desktop::getInstance().getMainMouseSource().getScreenPosition());
+    for (const juce::Component* over : { static_cast<const juce::Component*> (notePanel.get()), static_cast<const juce::Component*> (bannerNote.get()) })
+        if (over != nullptr && over->isVisible() && over->getBounds().toFloat().contains (at))
+            return;
+    juce::String under;
+    int smallest = std::numeric_limits<int>::max();
+    for (const auto& r : hitRegions)
+        if (r->isVisible() && r->getBounds().toFloat().contains (at) && r->getWidth() * r->getHeight() < smallest)
+        {
+            smallest = r->getWidth() * r->getHeight();
+            under = r->targetId();
+        }
+    const double now = juce::Time::getMillisecondCounterHiRes();
+    if (under != hoverTarget)
+    {
+        hoverTarget = under;
+        hoverSince = now;
+        layoutNow();
+    }
+    if (under.isNotEmpty() && (shownNote != NoteKind::help || helpTarget != under) && now - hoverSince >= hoverDelayMs)
+        inspect (under);
 }
 
 void LearnController::inspect (const juce::String& targetId)
@@ -689,6 +720,7 @@ void LearnController::updateRegions()
         if (it == hitRegions.end())
         {
             auto region = std::make_unique<HitRegion> (t.id);
+            region->setInterceptsMouseClicks (false, false);   // (the control under it keeps its clicks)
             region->onHover = [this] (const juce::String& id) {
                 hoverTarget = id;
                 layoutNow();

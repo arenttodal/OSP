@@ -849,12 +849,11 @@ namespace
     class AdvancedPopup final : public MiniPanel
     {
     public:
-        explicit AdvancedPopup (InstrumentHost& p) : MiniPanel ("ADVANCED", "TUNING, VOICES & DYNAMICS"), processor (p)
+        explicit AdvancedPopup (InstrumentHost& p) : MiniPanel ("ADVANCED"), processor (p)
         {
             auto& state = processor.apvts();
             auto add = [this, &state] (const char* id, const char* caption, MiniKnob::Formatter f) {
                 knobs.push_back (std::make_unique<MiniKnob> (state, id, caption, std::move (f)));
-                knobs.back()->setBoxed (true);
                 addAndMakeVisible (*knobs.back());
             };
             // OUTPUT is the header's VOLUME, sustain each layer's LOOP: Advanced keeps what a
@@ -901,7 +900,6 @@ namespace
             addAndMakeVisible (*curve);
             auto addDynamics = [this, &state] (const char* id, const char* caption, MiniKnob::Formatter f) {
                 dynamicsKnobs.push_back (std::make_unique<MiniKnob> (state, id, caption, std::move (f)));
-                dynamicsKnobs.back()->setBoxed (true);
                 addAndMakeVisible (*dynamicsKnobs.back());
             };
             auto percent = [] (double v) { return format::percent (v) + " %"; };
@@ -910,18 +908,19 @@ namespace
             addDynamics ("dynamics.tone", "TONE", percent);
         }
 
-        // Laid out at 0.69 of the reference's unit; the editor scales it up to match the macro popups.
-        float unit() const override { return 0.69f; }
+        /** A compact popover (as MOVEMENT's and SUB's): a small title, small knobs, the same
+            controls as ever. */
+        bool compact() const override { return true; }
         juce::Point<int> cardSize() const override
         {
-            return { 300, headerHeight() + knobRow + 8 + 12 + 24 + 8 + 12 + 24 + 10 + 12 + 24 + 6 + knobRow + 10 + 26 + juce::roundToInt (26.0f * unit()) };
+            return { 300, 32 + knobRow + 6 + captionRow + 21 + 6 + captionRow + 21 + 4 + knobRow + 6 + 22 + 10 };
         }
 
         void paint (juce::Graphics& g) override
         {
             MiniPanel::paint (g);
             g.setColour (palette::textDim);
-            g.setFont (fonts::label (9.5f));
+            g.setFont (fonts::label (9.0f));
             g.drawText ("VOICES", voicesCaption, juce::Justification::centredLeft, false);
             g.drawText ("PITCH CHARACTER", pitchCaption, juce::Justification::centredLeft, false);
             g.drawText ("DYNAMICS", dynamicsCaption, juce::Justification::centredLeft, false);
@@ -932,33 +931,38 @@ namespace
     private:
         void layoutContent (juce::Rectangle<int> area) override
         {
-            auto row = area.removeFromTop (knobRow);
-            const int cell = row.getWidth() / static_cast<int> (knobs.size());
-            for (auto& k : knobs)
-                k->setBounds (row.removeFromLeft (cell));
-            area.removeFromTop (8);
-            voicesCaption = area.removeFromTop (12);
-            voices->setBounds (area.removeFromTop (24));
-            area.removeFromTop (8);
-            pitchCaption = area.removeFromTop (12);
-            pitch->setBounds (area.removeFromTop (24));
-            area.removeFromTop (10);
-            dynamicsCaption = area.removeFromTop (12);
-            curve->setBounds (area.removeFromTop (24));
+            auto centredRow = [] (std::vector<std::unique_ptr<MiniKnob>>& row, juce::Rectangle<int> line) {
+                const int cell = std::min (line.getWidth() / static_cast<int> (row.size()), 80);
+                line = line.withSizeKeepingCentre (cell * static_cast<int> (row.size()), line.getHeight());
+                for (auto& k : row)
+                    k->setBounds (line.removeFromLeft (cell));
+            };
+            centredRow (knobs, area.removeFromTop (knobRow));
             area.removeFromTop (6);
-            auto dynamicsRow = area.removeFromTop (knobRow);
-            const int dynamicsCell = dynamicsRow.getWidth() / static_cast<int> (dynamicsKnobs.size());
-            for (auto& k : dynamicsKnobs)
-                k->setBounds (dynamicsRow.removeFromLeft (dynamicsCell));
-            area.removeFromTop (10);
-            auto last = area.removeFromTop (26);
-            mpe.setBounds (last.removeFromLeft (80));
-            reseed.setBounds (last.removeFromRight (90));
+            // VOICES and PITCH CHARACTER side by side.
+            auto captions = area.removeFromTop (captionRow);
+            auto keys = area.removeFromTop (21);
+            const int half = (area.getWidth() - 8) / 2;
+            voicesCaption = captions.removeFromLeft (half);
+            captions.removeFromLeft (8);
+            pitchCaption = captions;
+            voices->setBounds (keys.removeFromLeft (half));
+            keys.removeFromLeft (8);
+            pitch->setBounds (keys);
+            area.removeFromTop (6);
+            dynamicsCaption = area.removeFromTop (captionRow);
+            curve->setBounds (area.removeFromTop (21));
+            area.removeFromTop (4);
+            centredRow (dynamicsKnobs, area.removeFromTop (knobRow));
+            area.removeFromTop (6);
+            auto last = area.removeFromTop (22);
+            mpe.setBounds (last.removeFromLeft (64));
+            reseed.setBounds (last.removeFromRight (70));
             last.removeFromRight (8);
             seedCaption = last;
         }
 
-        static constexpr int knobRow = 104;   ///< the popups' boxed knob cells, at this panel's unit
+        static constexpr int knobRow = 58, captionRow = 12;   ///< the compact popovers' knob cells (as MOVEMENT's)
 
         /** GLIDE only acts in Mono: dimmed (still adjustable) in Poly. */
         void updateGlide()

@@ -31,6 +31,8 @@ juce_add_plugin(OSP_Plugin
 # interface in shared/andor-ui; OSP's own windows (editor, popovers, Library) stay here.
 include(${PROJECT_SOURCE_DIR}/shared/andor-ui/AndorUi.cmake)
 andor_ui_add_to(OSP_Plugin)
+# ANDOR Learn (shared/andor-learn): OSP's Info and tutorials (the keyboard's INFO key).
+include(${PROJECT_SOURCE_DIR}/shared/andor-learn/AndorLearn.cmake)
 
 target_sources(OSP_Plugin PRIVATE
     Source/PluginProcessor.cpp
@@ -41,9 +43,11 @@ target_sources(OSP_Plugin PRIVATE
     Source/LibraryPacks.cpp
     Source/LibraryPlaces.cpp
     Source/LibraryPanel.cpp
+    Source/OspLearn.cpp
+    ${ANDOR_LEARN_SOURCES}
     ${OSP_IO_SOURCES})
 
-target_include_directories(OSP_Plugin PRIVATE ${PROJECT_SOURCE_DIR}/src Source)
+target_include_directories(OSP_Plugin PRIVATE ${PROJECT_SOURCE_DIR}/src Source ${ANDOR_LEARN_INCLUDE_DIRS})
 
 target_compile_definitions(OSP_Plugin PUBLIC
     JUCE_WEB_BROWSER=0

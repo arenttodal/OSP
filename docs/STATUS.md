@@ -1,5 +1,30 @@
 # Status
 
+> **16 Nov 2026, keyboard keys SETTINGS / INFO, and ANDOR Learn in OSP (both instruments,
+> shared):**
+> - `shared/andor-ui` `KeyboardUtilityActions` replaces the large Advanced key beneath ARP.
+>   - The keys are small square ceramic keys with an icon each.
+>   - OSP has SETTINGS and INFO, centred. ANDOR Analog adds D (AUX D's visibility).
+>   - SETTINGS opens and closes the Advanced popover, now anchored to the key.
+>   - INFO turns Info on and off.
+> - OSP now has ANDOR Learn (`apps/plugin/Source/OspLearn.cpp`):
+>   - Info texts for its controls and a seven-step Quick Start, ending on SETTINGS.
+>   - The Learn submenu: Tutorials… and Reset Tutorials….
+>   - No first-run invitation (`EditorHooks::offerInvitation = false`).
+> - Info now follows the pointer. After a 300 ms rest it explains the control, and clicks pass
+>   through to it.
+> - Toggle Info, OSP's "Advanced settings" and the shell's Show / Hide AUX are gone from the
+>   menus.
+> - MOD WHEEL, PITCH BEND and ADVANCED use the compact MiniPanel proportions.
+> - The shell visual regression gains one approved product mask, `keyboard-actions`, because
+>   which keys exist is the product's choice. Every product is 0 pixels outside the masks.
+> - Verified (Linux):
+>   - osp_tests: 485 cases.
+>   - Plugin tests: 4 / 4 shards (170 cases). New: the utility keys' geometry, SETTINGS,
+>     INFO, the menus and OSP's Quick Start.
+>   - The osp_visual_reference, andor_example_tests and example visual tests pass.
+>   - DAW and Mac checks are UNVERIFIED (OWNER TEST).
+
 > **15 Nov 2026, the wheels' settings (both instruments, shared):**
 > - PITCH and MOD under the wheels are now doors, like a macro's name. A click opens their
 >   popover above the caption; a drag of 3 px or more from MOD still makes a modulation cable.

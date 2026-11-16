@@ -155,6 +155,9 @@ namespace frame
         juce::Component* status = nullptr;
         juce::Component* arpControl = nullptr;
         juce::Component* advanced = nullptr;
+        /** The keyboard's action keys (KeyboardUtilityActions: D, SETTINGS, INFO) in Advanced's
+            place, with their shadow margin around it. */
+        juce::Component* utilityActions = nullptr;
         juce::Component* headerMix = nullptr;
         /** The effects rack (opt-in) and how far it pushes what is under it (its height
             plus rackGap while a module is expanded; 0 without a rack: as before). */

@@ -5,6 +5,7 @@
 #include "EngineCard.h"
 #include "InstrumentFrame.h"
 #include "KeyDnaEditor.h"
+#include "KeyboardUtilityActions.h"
 #include "LibraryPanel.h"
 #include "MainSections.h"
 #include "ModulationPanel.h"
@@ -14,6 +15,11 @@
 
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_gui_basics/juce_gui_basics.h>
+
+namespace andor::learn
+{
+class LearnController;
+}
 
 namespace osp::plugin
 {
@@ -134,7 +140,15 @@ public:
     int selectedModulationRoute() const noexcept { return modSelSlot; }
     Wheel& modulationWheel() noexcept { return modWheel; }
     Wheel& pitchBendWheel() noexcept { return pitchWheel; }
-    AdvancedCardButton& advancedSettingsButton() noexcept { return advancedButton; }
+    /** The keyboard's SETTINGS key (it opens Advanced). */
+    juce::Button& advancedSettingsButton() noexcept { return *utilityKeys.button (KeyboardUtilityActions::Action::settings); }
+    /** The keyboard's action keys (SETTINGS, INFO). */
+    KeyboardUtilityActions& keyboardActions() noexcept { return utilityKeys; }
+    /** ANDOR Learn (OSP's Info and tutorials), or null where it cannot run. */
+    andor::learn::LearnController* learnController() noexcept { return learn.get(); }
+    /** Tests: the main menu (showMenu) is handed here instead of being shown. */
+    std::function<void (juce::PopupMenu&)> showMenuForTest;
+    void openMainMenu() { showMenu(); }
     HeaderMix& headerMixControl() noexcept { return headerMix; }
     EngineCard& engineCard (int layer) noexcept { return *cards[static_cast<std::size_t> (juce::jlimit (0, 2, layer))]; }
     /** A source (0..3 a tab, 4 the mod wheel) dragged to / released at a point (instrument
@@ -238,7 +252,13 @@ private:
     int tintedLayer = -1;
     void updateKeyTints();
     juce::Label statusLabel;
-    AdvancedCardButton advancedButton { "Advanced" };
+    /** SETTINGS (Advanced) and INFO (ANDOR Learn) beneath ARP: OSP has no AUX D, so no D. */
+    KeyboardUtilityActions utilityKeys { { KeyboardUtilityActions::Action::settings, KeyboardUtilityActions::Action::info } };
+    void utilityKeyClicked (KeyboardUtilityActions::Action);
+    void refreshUtilityKeys();
+    std::unique_ptr<andor::learn::LearnController> learn;
+    void createLearn();
+    void learnAction (const juce::String& actionId, const juce::String& targetId, const juce::String& parameterId = {});
     ArpControl arpButton { ospProcessor };
     ArpInlinePanel arpPanel { ospProcessor };
     bool arpShown = false;

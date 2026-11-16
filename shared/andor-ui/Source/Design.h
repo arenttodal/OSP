@@ -277,7 +277,7 @@ namespace layout
     const R arpControl { 1308.0f, 913.0f, 105.0f, 64.0f };
     /** Under the arpeggiator's card, side by side at its height of 31: Advanced (its popup)
         and MOD (the envelope panel's modulation editors). */
-    const R advanced { 1308.0f, 983.0f, 105.0f, 31.0f };   // the whole width under ARP (the MOD half went)
+    const R advanced { 1308.0f, 983.0f, 105.0f, 31.0f };   // the keyboard action keys beneath ARP (D / SETTINGS / INFO: KeyboardUtilityActions)
 
 
     /** The arpeggiator's inline editor, between the macros and the keyboard when open: the

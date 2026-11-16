@@ -18,7 +18,6 @@ std::vector<VibratoSource> defaultVibratoSources()
 
 namespace
 {
-    constexpr int knobRow = 104;   // the popups' boxed knob cells, at these panels' unit (as Advanced's)
     const juce::Colour wheelAmber { 0xffcd5a1e }, wheelBlue { 0xff4f7290 };
 
     float raw (const InstrumentHost& host, const juce::String& id, float fallback)
@@ -86,20 +85,22 @@ namespace
     class PitchBendPopup final : public MiniPanel
     {
     public:
-        explicit PitchBendPopup (InstrumentHost& h) : MiniPanel ("PITCH BEND", "THE PITCH WHEEL"), host (h), picture (h)
+        /** A compact popover (as MOVEMENT's and SUB's): a small title, RANGE beside a picture
+            of the wheel's reach, the help under them. */
+        explicit PitchBendPopup (InstrumentHost& h) : MiniPanel ("PITCH BEND"), host (h), picture (h)
         {
             range = std::make_unique<MiniKnob> (host.apvts(), ids::bendRange, "RANGE", [] (double v) {
                 const int st = juce::roundToInt (v);
                 return st == 0 ? juce::String ("0 st") : juce::String::fromUTF8 ("\xc2\xb1") + juce::String (st) + " st";
             });
-            range->setBoxed (true);
+            range->setArcColour (wheelAmber);
             addAndMakeVisible (*range);
             addAndMakeVisible (picture);
             picture.setInterceptsMouseClicks (false, false);
         }
 
-        float unit() const override { return 0.69f; }
-        juce::Point<int> cardSize() const override { return { 300, headerHeight() + knobRow + 10 + 46 + juce::roundToInt (26.0f * unit()) }; }
+        bool compact() const override { return true; }
+        juce::Point<int> cardSize() const override { return { 250, 32 + cellHeight + 6 + helpHeight + 10 }; }
         void refreshContent() override { picture.repaint(); }
         void settleNow() override { picture.repaint(); }
 
@@ -107,19 +108,21 @@ namespace
         {
             MiniPanel::paint (g);
             g.setColour (palette::textDim);
-            g.setFont (fonts::label (10.0f));
+            g.setFont (fonts::label (9.5f));
             g.drawFittedText (pitchBendHelp, help, juce::Justification::topLeft, 3, 1.0f);
         }
 
     private:
+        static constexpr int cellHeight = 58, helpHeight = 38;
+
         void layoutContent (juce::Rectangle<int> area) override
         {
-            auto row = area.removeFromTop (knobRow);
-            range->setBounds (row.removeFromLeft (110));
-            row.removeFromLeft (8);
-            picture.setBounds (row.reduced (0, 6));
-            area.removeFromTop (10);
-            help = area.removeFromTop (46);
+            auto row = area.removeFromTop (cellHeight);
+            range->setBounds (row.removeFromLeft (74));
+            row.removeFromLeft (6);
+            picture.setBounds (row.reduced (0, 3));
+            area.removeFromTop (6);
+            help = area.removeFromTop (helpHeight);
         }
 
         InstrumentHost& host;
@@ -222,7 +225,7 @@ namespace
     {
     public:
         ModWheelPopup (InstrumentHost& h, std::vector<VibratoSource> s, std::function<float()> w)
-            : MiniPanel ("MOD WHEEL", "VIBRATO"), host (h), sourceList (std::move (s)), picture (h, std::move (w))
+            : MiniPanel ("MOD WHEEL"), host (h), sourceList (std::move (s)), picture (h, std::move (w))
         {
             auto& state = host.apvts();
             enable = std::make_unique<SegmentedControl> (*state.getParameter (ids::vibratoEnabled), juce::StringArray { "OFF", "ON" });
@@ -231,7 +234,7 @@ namespace
             addAndMakeVisible (*enable);
             auto add = [this, &state] (const juce::String& id, const char* caption, MiniKnob::Formatter f) {
                 knobs.push_back (std::make_unique<MiniKnob> (state, id, caption, std::move (f)));
-                knobs.back()->setBoxed (true);
+                knobs.back()->setArcColour (wheelBlue);
                 addAndMakeVisible (*knobs.back());
                 return knobs.back().get();
             };
@@ -259,10 +262,12 @@ namespace
             update();
         }
 
-        float unit() const override { return 0.69f; }
+        /** A compact popover (as MOVEMENT's and SUB's): a small title with VIBRATO's OFF / ON
+            beside it, the picture, the knobs, CONTROL, SOURCES and a line of help. */
+        bool compact() const override { return true; }
         juce::Point<int> cardSize() const override
         {
-            return { 420, headerHeight() + 24 + 8 + 86 + 8 + knobRow + 8 + 12 + 24 + 8 + 12 + 24 + 8 + 30 + juce::roundToInt (26.0f * unit()) };
+            return { 330, 32 + pictureHeight + 8 + cellHeight + 6 + 21 + 6 + 20 + 4 + helpHeight + 10 };
         }
         void refreshContent() override
         {
@@ -275,11 +280,9 @@ namespace
         {
             MiniPanel::paint (g);
             g.setColour (palette::textDim);
-            g.setFont (fonts::label (9.5f));
-            g.drawText ("VIBRATO", enableCaption, juce::Justification::centredLeft, false);
-            g.drawText ("CONTROL", controlCaption, juce::Justification::centredLeft, false);
+            g.setFont (fonts::label (9.0f));
+            g.drawText ("VIBRATO", enableCaption, juce::Justification::centredRight, false);
             g.drawText ("SOURCES", sourcesCaption, juce::Justification::centredLeft, false);
-            g.setFont (fonts::label (9.5f));
             g.drawFittedText (helpText(), help, juce::Justification::topLeft, 2, 1.0f);
         }
 
@@ -307,29 +310,32 @@ namespace
             }
         }
 
+        static constexpr int pictureHeight = 62, cellHeight = 58, helpHeight = 24;
+
         void layoutContent (juce::Rectangle<int> area) override
         {
-            auto top = area.removeFromTop (24);
-            enableCaption = top.removeFromLeft (70);
-            enable->setBounds (top.removeFromLeft (120));
+            // VIBRATO's OFF / ON in the header, right of the title (where MOVEMENT has its mode).
+            const auto c = card();
+            const auto head = juce::Rectangle<int> (c.getRight() - 12 - 96, c.getY() + 7, 96, 20);
+            enable->setBounds (head);
+            enableCaption = head.withX (head.getX() - 64).withWidth (58);
+            picture.setBounds (area.removeFromTop (pictureHeight));
             area.removeFromTop (8);
-            picture.setBounds (area.removeFromTop (86));
-            area.removeFromTop (8);
-            auto row = area.removeFromTop (knobRow);
-            const int cell = row.getWidth() / static_cast<int> (knobs.size());
+            auto row = area.removeFromTop (cellHeight);
+            const int cell = std::min (row.getWidth() / static_cast<int> (knobs.size()), 80);
+            row = row.withSizeKeepingCentre (cell * static_cast<int> (knobs.size()), row.getHeight());
             for (auto& k : knobs)
                 k->setBounds (row.removeFromLeft (cell));
-            area.removeFromTop (8);
-            controlCaption = area.removeFromTop (12);
-            control->setBounds (area.removeFromTop (24));
-            area.removeFromTop (8);
-            sourcesCaption = area.removeFromTop (12);
-            auto line = area.removeFromTop (24);
-            const int each = sources.empty() ? 0 : std::min (90, line.getWidth() / static_cast<int> (sources.size()));
+            area.removeFromTop (6);
+            control->setBounds (area.removeFromTop (21));
+            area.removeFromTop (6);
+            auto line = area.removeFromTop (20);
+            sourcesCaption = line.removeFromLeft (58);
+            const int each = sources.empty() ? 0 : std::min (64, line.getWidth() / static_cast<int> (sources.size()));
             for (auto& b : sources)
                 b->setBounds (line.removeFromLeft (each));
-            area.removeFromTop (8);
-            help = area.removeFromTop (30);
+            area.removeFromTop (4);
+            help = area.removeFromTop (helpHeight);
         }
 
         InstrumentHost& host;
@@ -340,7 +346,7 @@ namespace
         MiniKnob* amount = nullptr;
         std::vector<std::unique_ptr<juce::ToggleButton>> sources;
         std::vector<std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment>> attachments;
-        juce::Rectangle<int> enableCaption, controlCaption, sourcesCaption, help;
+        juce::Rectangle<int> enableCaption, sourcesCaption, help;
         int shownControl = -1;
     };
 }

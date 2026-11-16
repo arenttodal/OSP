@@ -368,19 +368,24 @@ ShellEditor::ShellEditor (ShellProcessor& p)
     content.addAndMakeVisible (keyboard);
     frame::setUpStatusLabel (statusLabel);
     content.addAndMakeVisible (statusLabel);
-    advancedButton.setTitle ("Advanced settings");
-    advancedButton.setTooltip ("Tuning, voices, pitch character, dynamics (how touch changes the sound), MPE, variation seed");
-    // ANDOR OSP's Advanced popover (shared): enabled when the engine reads any of it.
-    binding::tag (advancedButton, "fineTune glide voiceMode pitchCharacter mpe seed dynamics dynamics.curve velocityRange dynamics.tone");
-    advancedButton.onClick = [this] {
-        if (closedByLabelPress == advancedPopup)
-        {
-            closedByLabelPress = -1;
-            return;
-        }
-        openPopup (advancedPopup);
-    };
-    content.addAndMakeVisible (advancedButton);
+    // The keyboard's action keys beneath ARP (Advanced's old place): D (a product with an AUX
+    // strip), SETTINGS (ANDOR OSP's Advanced popover) and INFO (with Learn: set again below).
+    {
+        using Action = osp::plugin::KeyboardUtilityActions::Action;
+        std::vector<Action> actions;
+        if (shell.hasAuxStrip())
+            actions.push_back (Action::aux);
+        actions.push_back (Action::settings);
+        if (shell.learnEnabled())
+            actions.push_back (Action::info);   // (taken away again below if Learn cannot run)
+        utilityKeys.setActions (actions);
+        utilityKeys.onClick = [this] (Action a) { utilityKeyClicked (a); };
+        // Advanced: enabled when the engine reads any of it.
+        if (auto* settings = utilityKeys.button (Action::settings))
+            binding::tag (*settings, "fineTune glide voiceMode pitchCharacter mpe seed dynamics dynamics.curve velocityRange dynamics.tone");
+        refreshUtilityKeys();
+    }
+    content.addAndMakeVisible (utilityKeys);
     arpButton.onToggleEditor = [this] {
         setArpExpanded (! arpShown);
         learnAction (arpShown ? andor::learn::actions::arpPanelOpened : andor::learn::actions::arpPanelClosed, "arp.panel");
@@ -468,6 +473,20 @@ ShellEditor::ShellEditor (ShellProcessor& p)
     // ANDOR Learn (opt-in): nothing is created for a product without a catalog.
     if (shell.learnEnabled())
         createLearn();
+    if (utilityKeys.has (osp::plugin::KeyboardUtilityActions::Action::info) && (learn == nullptr || ! learn->isUsable()))
+    {
+        // INFO only where Learn really runs: never a key that looks as if it works.
+        using Action = osp::plugin::KeyboardUtilityActions::Action;
+        std::vector<Action> actions;
+        if (shell.hasAuxStrip())
+            actions.push_back (Action::aux);
+        actions.push_back (Action::settings);
+        utilityKeys.setActions (actions);
+        if (auto* settings = utilityKeys.button (Action::settings))
+            binding::tag (*settings, "fineTune glide voiceMode pitchCharacter mpe seed dynamics dynamics.curve velocityRange dynamics.tone");
+        refreshUtilityKeys();
+        applyBindings();
+    }
     startTimerHz (30);
 }
 
@@ -511,7 +530,7 @@ void ShellEditor::layoutInstrument()
     parts.keyboard = &keyboard;
     parts.status = &statusLabel;
     parts.arpControl = &arpButton;
-    parts.advanced = &advancedButton;
+    parts.utilityActions = &utilityKeys;
     parts.headerMix = &headerMix;
     if (shell.showsRack())
     {
@@ -1011,20 +1030,19 @@ void ShellEditor::showMenu()
     menu.addItem ("Init", [this] { shell.initPatch(); timerCallback(); });
     menu.addItem ("Reset settings", [this] { shell.resetSettings(); timerCallback(); });
     menu.addSeparator();
-    if (shell.hasAuxStrip())
-    {
-        const auto& name = shell.product().auxStrip->name;
-        const bool shown = shell.auxStripShown();
-        menu.addItem ((shown ? "Hide " : "Show ") + name, [this, shown] { setAuxStripShown (! shown); });
-        menu.addSeparator();
-    }
+    // (Showing and hiding the AUX strip is D's, beneath ARP: no menu item for it.)
     menu.addItem ("Undo", shell.undoManager.canUndo(), false, [this] { shell.undoManager.undo(); });
     menu.addItem ("Redo", shell.undoManager.canRedo(), false, [this] { shell.undoManager.redo(); });
     if (learn != nullptr)
-        learn->addMenuItems (menu);   // Learn ANDOR..., Learn mode (the product's opt-in)
+        learn->addMenuItems (menu);   // Learn: Tutorials..., Reset Tutorials... (the product's opt-in)
     menu.addSeparator();
     const auto engine = shell.engineDescription();
     menu.addItem (juce::String ("Engine: ") + engine.name + (engine.diagnostic ? " (diagnostic)" : ""), false, false, [] {});
+    if (showMenuForTest != nullptr)
+    {
+        showMenuForTest (menu);
+        return;
+    }
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&menuButton));
 }
 
@@ -1210,7 +1228,7 @@ void ShellEditor::presentPopup (int which)
     if (which >= 0 && which < frame::macroCount)
         macros[static_cast<std::size_t> (which)].label->setOpen (true);
     if (which == advancedPopup)
-        advancedButton.setToggleState (true, juce::dontSendNotification);
+        utilityKeys.setActive (osp::plugin::KeyboardUtilityActions::Action::settings, true);
     if (isReimaginedPopup (which))
         cards[static_cast<std::size_t> (which - reimaginedPopup)]->setReimaginedOpen (true);
     if (which == startControlPopup)
@@ -1241,7 +1259,7 @@ void ShellEditor::positionPopup()
     if (popupIndex >= 0 && popupIndex < frame::macroCount)
         at = frame::macroPopoverOrigin (macros[static_cast<std::size_t> (popupIndex)].label->getBounds().toFloat(), size);
     else if (popupIndex == advancedPopup)
-        at = frame::advancedPopoverOrigin (advancedButton.getBounds().toFloat(), size);
+        at = frame::advancedPopoverOrigin (content.getLocalArea (&utilityKeys, utilityKeys.button (osp::plugin::KeyboardUtilityActions::Action::settings)->getBounds()).toFloat(), size);
     else if (isReimaginedPopup (popupIndex))
     {
         // A layer's REIMAGINED popover unfolds above that card's REIMAGINED name (as in ANDOR OSP).
@@ -1289,7 +1307,7 @@ void ShellEditor::closePopup()
     if (popupIndex >= 0 && popupIndex < frame::macroCount)
         macros[static_cast<std::size_t> (popupIndex)].label->setOpen (false);
     if (popupIndex == advancedPopup)
-        advancedButton.setToggleState (false, juce::dontSendNotification);
+        utilityKeys.setActive (osp::plugin::KeyboardUtilityActions::Action::settings, false);
     if (isReimaginedPopup (popupIndex))
         cards[static_cast<std::size_t> (popupIndex - reimaginedPopup)]->setReimaginedOpen (false);
     if (popupIndex == startControlPopup)
@@ -1436,7 +1454,7 @@ void ShellEditor::mouseDownAnywhere (juce::Component* c)
     for (int i = 0; i < frame::macroCount; ++i)
         if (c == macros[static_cast<std::size_t> (i)].label.get())
             pressed = i;
-    if (c == &advancedButton)
+    if (c == utilityKeys.button (osp::plugin::KeyboardUtilityActions::Action::settings))
         pressed = advancedPopup;
     for (int l = 0; l < InstrumentHost::numLayers; ++l)
         if (const auto& card = *cards[static_cast<std::size_t> (l)]; card.isReimaginedLabel (c)
@@ -1841,6 +1859,59 @@ void ShellEditor::timerCallback()
         popup->refreshContent();
     if (learn != nullptr)
         learn->tick();   // (returns at once while Learn shows nothing)
+    refreshUtilityKeys();
+}
+
+void ShellEditor::refreshUtilityKeys()
+{
+    using Action = osp::plugin::KeyboardUtilityActions::Action;
+    if (utilityKeys.has (Action::aux))
+    {
+        const bool shown = shell.auxStripShown();
+        utilityKeys.setActive (Action::aux, shown);
+        const auto& strip = *shell.product().auxStrip;
+        utilityKeys.setTooltip (Action::aux, (shown ? "Hide " : "Show ") + strip.name + " " + strip.letter);
+    }
+    utilityKeys.setActive (Action::settings, popup != nullptr && popupIndex == advancedPopup);
+    utilityKeys.setTooltip (Action::settings, "Advanced Settings");
+    if (utilityKeys.has (Action::info))
+    {
+        const bool on = learn != nullptr && learn->learnMode();
+        utilityKeys.setActive (Action::info, on);
+        utilityKeys.setTooltip (Action::info, on ? "Hide Info" : "Show Info");
+    }
+}
+
+void ShellEditor::utilityKeyClicked (osp::plugin::KeyboardUtilityActions::Action a)
+{
+    using Action = osp::plugin::KeyboardUtilityActions::Action;
+    switch (a)
+    {
+        case Action::aux:
+            // Visibility only: D's power, source, sound and routing stay exactly as they are.
+            setAuxStripShown (! shell.auxStripShown());
+            learnAction (andor::learn::actions::auxVisibilityToggled, "keyboard.auxToggle");
+            break;
+        case Action::settings:
+            if (closedByLabelPress == advancedPopup)
+                closedByLabelPress = -1;   // (that press closed it)
+            else if (popup != nullptr && popupIndex == advancedPopup)
+                closePopup();
+            else
+            {
+                openPopup (advancedPopup);
+                learnAction (andor::learn::actions::settingsOpened, "keyboard.settings");
+            }
+            break;
+        case Action::info:
+            if (learn != nullptr)
+            {
+                learn->setLearnMode (! learn->learnMode());
+                learnAction (andor::learn::actions::infoToggled, "keyboard.info");
+            }
+            break;
+    }
+    refreshUtilityKeys();
 }
 
 //==============================================================================
@@ -1937,8 +2008,22 @@ void ShellEditor::createLearn()
                   } });
     targets.add ({ "mod.panel", [this] { return static_cast<juce::Component*> (&modPanel); }, {}, {}, {}, true });
     targets.add ({ "keyboard", [this] { return static_cast<juce::Component*> (&keyboard); }, {}, {}, {}, true });
-    targets.add ({ "advanced", [this] { return static_cast<juce::Component*> (&advancedButton); }, {},
-                   [this] { openPopup (advancedPopup); return popup != nullptr; }, {}, true });
+    // The keyboard's action keys: SETTINGS (and "advanced", its older name), INFO and D. Showing
+    // AUX is D's own reveal (a view setting: D's power and sound never change).
+    using KeyAction = osp::plugin::KeyboardUtilityActions::Action;
+    auto keyOf = [this] (KeyAction a) { return [this, a] { return static_cast<juce::Component*> (utilityKeys.button (a)); }; };
+    for (const char* id : { "keyboard.settings", "advanced" })
+        targets.add ({ id, keyOf (KeyAction::settings), {}, {}, {}, true });
+    targets.add ({ "keyboard.info", keyOf (KeyAction::info), {}, {}, {}, true });
+    if (shell.hasAuxStrip())
+    {
+        targets.add ({ "keyboard.auxToggle", keyOf (KeyAction::aux), {}, [this] {
+                          setAuxStripShown (true);
+                          return shell.auxStripShown();
+                      },
+                       {}, true });
+        targets.addState ("aux.shown", [this] { return shell.auxStripShown(); });
+    }
 
     // The arpeggiator: the card by the keyboard, its light, the panel and its parts.
     auto expandArp = [this] {
