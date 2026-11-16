@@ -143,3 +143,10 @@ is kept for copy (`text_safe`). The copy is a separate transparent layer (`B2_ty
     off the campaign branch: either allow a new OSP branch (e.g. from `de3253c`) plus an ANALOG submodule bump, or name
     the branch to use.
 - **Rollback point:** ANALOG's current pin `de3253c` stays recorded.
+
+## Seen at 100 % in the C1 previews (for C2)
+
+- **B1/B2:** the ivory runs slightly hot under the floating key, and fine GUI labels (START, TUNE…) wash out. About
+  −0.3 EV on the product key, floor unchanged.
+- **C1:** f/8 at 0.185 m blurs the CHARACTER / MOVEMENT labels more than the brief allows. A sharp alternative at about
+  f/14 is needed for feature explanations; keep f/8 as the emotional version.

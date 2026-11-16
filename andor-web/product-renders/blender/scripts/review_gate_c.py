@@ -110,9 +110,9 @@ row_sheet([("Projected product size (camera distance only; geometry unchanged)",
 row_sheet([("Direction A · The Gallery", [(CFG["ANDOR_GALLERY"]["shots"]["A1"]["title"], load(src, "A1")),
                                          (CFG["ANDOR_GALLERY"]["shots"]["A2"]["title"], load(src, "A2"))]),
            ("Direction B · The Floating Instrument  ·  Direction C · The Material Study",
-            [(CFG["ANDOR_FLOATING"]["shots"]["B1"]["title"], load(src, "B1")),
-             (CFG["ANDOR_FLOATING"]["shots"]["B2"]["title"], load(src, "B2")),
-             (CFG["ANDOR_MATERIAL"]["shots"]["C1"]["title"], load(src, "C1"))]),
+            [("B1 · cinematic still (4:5)", load(src, "B1")),
+             ("B2 · type-safe (9:16)", load(src, "B2")),
+             ("C1 · macro knobs (1:1)", load(src, "C1"))]),
            ("Typography as separate layers (not in the masters)", [("A1 + type layer", type_a1), ("B2 + type layer", type_b2)])],
           "ANDOR OSP · Gate C · Checkpoint C1: art direction", os.path.join(review, "00_contact_sheet.jpg"), 820)
 print("ok", review)
