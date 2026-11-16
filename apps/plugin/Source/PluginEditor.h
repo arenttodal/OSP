@@ -111,6 +111,7 @@ public:
     static constexpr int curvePopup = 12;  ///< the larger curve editor (CUSTOM LFO, ONE SHOT envelope)
     static constexpr int lastPopup = curvePopup;
     static constexpr int anchoredPopup = 13;   ///< a panel anchored to a component (SATELLITE's, from the arpeggiator's key)
+    static constexpr int subPopup = 14;        ///< SUB's panel, from its row in the arpeggiator's housing (above it)
     void openAnchoredPopover (std::unique_ptr<MiniPanel> panel, juce::Component& anchor) override;
     bool anchoredPopoverOpenFrom (const juce::Component& anchor) const override;
     void closeAnchoredPopover() override;

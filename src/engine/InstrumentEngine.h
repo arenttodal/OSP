@@ -15,6 +15,7 @@
 #include "engine/Shaping.h"
 #include "engine/fx/Effects.h"
 #include "engine/fx/FxEngine.h"
+#include "engine/sub/SubOsc.h"
 #include "model/InstrumentModel.h"
 #include "model/InstrumentSet.h"
 
@@ -584,6 +585,26 @@ public:
     }
     void setFxSettings (const fx::Settings& settings) noexcept { fxRouter.setSettings (settings); }
     fx::FxEngine& fxRouting() noexcept { return fxRouter; }
+
+    /** SUB (ANDOR ANALOG's, src/engine/sub): an independent polyphonic sub-bass instrument. It
+        plays the keys the musician holds (the MIDI before the arpeggiator: handleSubMidi), joins
+        the output after the effects (never ECHO's or SPACE's input) and before the output gain,
+        and follows CHARACTER's low-pass cutoff and MOVEMENT's level (PULSE, SHAPER). Off (the
+        default) it renders nothing and the output is bit-identical. Audio thread. */
+    void setSub (const sub::SubSettings& s) noexcept
+    {
+        if (s != subOsc.settingsNow())
+            subOsc.setSettings (s);
+    }
+    /** One MIDI message of the musician's own input (note on / off, sustain, bend, 120, 121, 123). */
+    void handleSubMidi (const std::uint8_t* data, int size) noexcept { subOsc.handleMidi (data, size); }
+    /** The on-screen pitch wheel (-1..1 of the bend range), and the bend range in semitones. */
+    void setSubBend (float wheel) noexcept { subOsc.setBend (wheel); }
+    void setSubBendRange (double semitones) noexcept { subOsc.setBendRange (semitones); }
+    /** Tests and telemetry. */
+    const sub::SubOsc& subOscillator() const noexcept { return subOsc; }
+    /** The FILTER SUB follows, from CHARACTER as it is now (tests; the engine applies it per block). */
+    sub::SubFilterFollow subFollow() const noexcept;
     const fx::FxEngine& fxRouting() const noexcept { return fxRouter; }
     /** Samples the CUSTOM route adds (0 in CLASSIC). */
     int fxLatencySamples() const noexcept { return fxRouter.latencySamples(); }
@@ -751,6 +772,12 @@ private:
     fx::FxEngine fxRouter;
     std::atomic<bool> fxCustomWanted { false };   ///< the last route handed in is CUSTOM (mono output: a stereo pass)
     std::vector<float> fxMonoRight;               ///< mono output under a CUSTOM route: the right channel it needs
+    sub::SubOsc subOsc;
+    std::vector<float> subLeft, subRight, subGain;   ///< SUB's block (mono, centred) and MOVEMENT's level for it
+    fx::AlignLine subDelay;                         ///< SUB delayed by a CUSTOM route's latency, as the cards are
+    int subTail = 0;                                ///< samples the delay still drains after SUB stops
+    double subCutoffMoved = 0.0;                    ///< octaves the sounding voices' cutoff sits from CHARACTER's (smoothed)
+    void renderSub (float* left, float* right, int numSamples, bool mono) noexcept;
     bool mpe = false;
     bool cardRouting = false;
     std::array<double, 17> channelBendRatio {};   ///< index 1..16

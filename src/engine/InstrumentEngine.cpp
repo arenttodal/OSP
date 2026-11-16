@@ -72,6 +72,13 @@ void InstrumentEngine::prepare (double outputSampleRate, int maximumBlockSize, c
     post.prepare (outputSampleRate, maximumBlockSize, config.seed);
     fxRouter.prepare (outputSampleRate, maximumBlockSize);
     fxMonoRight.assign (static_cast<std::size_t> (std::max (1, maximumBlockSize)), 0.0f);
+    subLeft.assign (static_cast<std::size_t> (std::max (1, maximumBlockSize)), 0.0f);
+    subRight.assign (subLeft.size(), 0.0f);
+    subGain.assign (subLeft.size(), 1.0f);
+    subDelay.allocate (fx::CompiledGraph::alignCapacity);
+    subOsc.prepare (outputSampleRate);
+    subTail = 0;
+    subCutoffMoved = 0.0;
     for (std::size_t l = 0; l < slots.size(); ++l)   // each layer's formants wander their own way
         slots[l].reimagined.prepare (outputSampleRate, Prng::deriveSeed (config.seed, 0x7265696dull, l));
     for (auto& slot : slots)
@@ -179,6 +186,10 @@ void InstrumentEngine::resetPerformance() noexcept
     post.reset();
     fxRouter.reset();
     resetLayerStages();
+    subOsc.reset();
+    subDelay.clear();
+    subTail = 0;
+    subCutoffMoved = 0.0;
 }
 
 void InstrumentEngine::setEnvelope (const AdsrSettings& adsr) noexcept
@@ -1653,6 +1664,15 @@ void InstrumentEngine::renderBlock (float* const* output, int numChannels, int n
         post.setModel (main >= 0 ? slots[static_cast<std::size_t> (main)].model : nullptr);
     }
     post.setVoicesActive (activeVoiceCount() > 0);
+    // MOVEMENT's level gain, sample by sample, for SUB (it never enters MOVEMENT): PULSE and
+    // SHAPER move it with the rest; 1 where no MOVEMENT plays. Only while SUB sounds: otherwise
+    // nothing is traced and nothing changes.
+    if (subOsc.sounding() || subTail > 0)
+    {
+        std::fill (subGain.begin(), subGain.end(), 1.0f);
+        subOsc.setFilterFollow (subFollow());
+        post.beginMovementTrace (subGain.data(), static_cast<int> (subGain.size()));
+    }
     // The post stage through the FX router: CLASSIC is post.process (left, right, numSamples)
     // itself. A CUSTOM route on a mono output plays in stereo (its lanes need two channels),
     // then folds to the one.
@@ -1665,12 +1685,96 @@ void InstrumentEngine::renderBlock (float* const* output, int numChannels, int n
     }
     else
         fxRouter.process (post, left, right, numSamples);
+    post.endMovementTrace();
+    renderSub (left, right, numSamples, mono);
     publishGrains();
     for (int ch = 0; ch < std::min (numChannels, 2); ++ch)
         for (int i = 0; i < numSamples; ++i)
             output[ch][i] *= outputGain;
     for (int ch = 2; ch < numChannels; ++ch)
         std::memcpy (output[ch], output[ch % 2], sizeof (float) * static_cast<std::size_t> (numSamples));
+}
+
+sub::SubFilterFollow InstrumentEngine::subFollow() const noexcept
+{
+    // SUB follows CHARACTER while it is a low-pass (LP 24 / LP 12): its cutoff is CHARACTER's
+    // position on the filter's travel, plus what moves the sounding voices' cutoff beyond it
+    // (CUTOFF routes, velocity, drift: subCutoffMoved), with CHARACTER's envelope as SUB's own
+    // per key (the same depth, ATTACK and DECAY; it keeps decaying after the key is released, as
+    // CHARACTER's does). HP, BP and TILT have no low-pass to follow: SUB stays unfiltered.
+    // No resonance: SUB's follow is a flat 24 dB / octave low-pass.
+    sub::SubFilterFollow f;
+    const auto& sh = liveShaping.shaping;
+    f.on = sh.filterType == FilterType::lp24 || sh.filterType == FilterType::lp12;
+    if (! f.on)
+        return f;
+    const double octaves = shaping::cutoffOctaves (sh, liveShaping.character) + subCutoffMoved;
+    f.baseNote = static_cast<float> (69.0 + 12.0 * (octaves - std::log2 (440.0)));
+    f.keyTrack = 0.0f;
+    f.envDepth = static_cast<float> (12.0 * shaping::envelopeOctaves (sh.envAmount));
+    f.velocityToEnv = 0.0f;
+    f.attack = std::max (0.001, sh.envAttackSeconds);
+    f.decay = std::max (0.001, sh.envDecaySeconds);
+    f.sustain = 0.0;
+    f.release = std::max (0.001, sh.envDecaySeconds);
+    return f;
+}
+
+void InstrumentEngine::renderSub (float* left, float* right, int numSamples, bool mono) noexcept
+{
+    if (! subOsc.sounding() && subTail <= 0)
+        return;
+    // What moves the voices' cutoff beyond CHARACTER's position (their mean), smoothed per block.
+    {
+        const auto& sh = liveShaping.shaping;
+        const double base = shaping::cutoffOctaves (sh, liveShaping.character);
+        double moved = 0.0;
+        int counted = 0;
+        CharacterTap::Snapshot snap;
+        for (const auto& v : voices)
+            if (v.characterView (snap) && ! snap.released)
+            {
+                moved += static_cast<double> (snap.baseOctaves) - base;
+                ++counted;
+            }
+        if (counted > 0)
+            subCutoffMoved += 0.5 * (moved / counted - subCutoffMoved);
+    }
+    // After every effect, before the output gain: dry by construction. Held back by a CUSTOM
+    // route's latency, so it meets the voices the host aligns; MOVEMENT's gain is the voices' at
+    // the moment they passed it (applied before that delay).
+    const int capacity = static_cast<int> (subLeft.size());
+    const int lag = std::min (fxRouter.latencySamples(), fx::CompiledGraph::alignCapacity - 1);
+    for (int start = 0; start < numSamples; start += capacity)
+    {
+        const int n = std::min (capacity, numSamples - start);
+        const bool sounding = subOsc.sounding();
+        std::fill (subLeft.begin(), subLeft.begin() + n, 0.0f);
+        std::fill (subRight.begin(), subRight.begin() + n, 0.0f);
+        if (sounding)
+        {
+            subOsc.render (subLeft.data(), subRight.data(), n);
+            for (int i = 0; i < n; ++i)
+            {
+                const float g = start + i < capacity ? subGain[static_cast<std::size_t> (start + i)] : 1.0f;
+                subLeft[static_cast<std::size_t> (i)] *= g;
+                subRight[static_cast<std::size_t> (i)] *= g;
+            }
+        }
+        if (lag > 0)
+        {
+            subDelay.run (subLeft.data(), subRight.data(), n, lag);
+            subTail = sounding ? lag : std::max (0, subTail - n);
+        }
+        else
+            subTail = 0;
+        for (int i = 0; i < n; ++i)
+        {
+            left[start + i] += subLeft[static_cast<std::size_t> (i)];
+            if (! mono)
+                right[start + i] += subRight[static_cast<std::size_t> (i)];
+        }
+    }
 }
 
 } // namespace osp

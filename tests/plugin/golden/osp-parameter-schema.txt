@@ -844,3 +844,13 @@ layerC.satellite.width v32 float "Layer C Satellite Width" label="%" range=0.000
 layerC.satellite.phase v32 float "Layer C Satellite Phase" label="" range=0.0000..360.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0°|180°|360°
 layerC.satellite.offset v32 float "Layer C Satellite Offset" label="" range=-100.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=L 100|C|R 100
 layerC.satellite.retrigger v32 choice "Layer C Satellite Bounce" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=CYCLE|CYCLE|NOTE [CYCLE|NOTE]
+sub.enabled v33 bool "Sub On" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=Off|On|On
+sub.wave v33 choice "Sub Wave" label="" range=0.0000..3.0000/1.0000 skew=1.00000 default=0.0000 steps=4 texts=SINE|SQUARE|SAW [SINE|TRIANGLE|SQUARE|SAW]
+sub.octave v33 choice "Sub Octave" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=1.0000 steps=2 texts=-1|-1|-2 [-1|-2]
+sub.grit v33 float "Sub Grit" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0 %|50 %|100 %
+sub.level v33 float "Sub Level" label="dB" range=-48.0000..0.0000/0.1000 skew=1.00000 default=-18.0000 steps=2147483647 texts=-48.0 dB|-24.0 dB|0.0 dB
+sub.lowKey v33 int "Sub Low Key" label="" range=0.0000..127.0000/1.0000 skew=1.00000 default=48.0000 steps=128 texts=C-1|E4|G9
+sub.highKey v33 int "Sub High Key" label="" range=0.0000..127.0000/1.0000 skew=1.00000 default=84.0000 steps=128 texts=C-1|E4|G9
+sub.response v33 choice "Sub Response" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=1.0000 steps=2 texts=FLAT|FLAT|TAPER [FLAT|TAPER]
+sub.taperStart v33 int "Sub Taper Start" label="" range=0.0000..127.0000/1.0000 skew=1.00000 default=60.0000 steps=128 texts=C-1|E4|G9
+sub.taperSlope v33 float "Sub Taper Slope" label="dB/oct" range=0.0000..12.0000/0.1000 skew=1.00000 default=6.0000 steps=2147483647 texts=0.0 dB/oct|6.0 dB/oct|12.0 dB/oct

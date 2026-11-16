@@ -209,6 +209,9 @@ public:
     bool learnEnabled() const noexcept { return ! referenceParity && product().learn.has_value() && product().learn->catalog != nullptr; }
     bool generatorGranularToggle() const noexcept { return ! referenceParity && product().generatorGranularToggle; }
     bool arpCompanionShown() const noexcept { return ! referenceParity && product().arpCompanion.name.isNotEmpty(); }
+    /** The parity render draws ANDOR OSP's own second row (SUB, off) in the arpeggiator's
+        housing, as ANDOR OSP shows it, so the comparison sees only real differences. */
+    bool referenceSubRow() const noexcept { return referenceParity; }
     juce::String cardArpNamespace() const override { return productInfo().slug + "."; }
     void setArpViewCard (int shown) noexcept override { arpViewLane.store (std::clamp (shown, 0, 2), std::memory_order_relaxed); }
 

@@ -384,6 +384,8 @@ ShellEditor::ShellEditor (ShellProcessor& p)
                 openPopup (arpCompanionPopup);
         };
     }
+    else if (shell.referenceSubRow())
+        arpButton.setSecondRow ("SUB", {});   // (ANDOR OSP's housing, drawn; nothing to switch here)
     arpPanel.onCollapse = [this] { setArpExpanded (false); };
     arpPanel.setCrossClose (shell.crossCloseKeys());
     content.addAndMakeVisible (arpButton);

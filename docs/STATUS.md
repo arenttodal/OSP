@@ -1125,6 +1125,14 @@ the shared rack (done) and OSP's routing view and mixer (not started).
   item, no view attribute, no room (the shell test `[aux]`; the OSP captures). Should ANDOR OSP
   want a fourth source, it needs a product strip and an engine bus of its own.
 
+- **ANDOR ANALOG on the shared SUB.** ANDOR OSP's SUB lives in shared code:
+  `src/engine/sub` (`osp::sub::SubOsc`), `InstrumentHost::addSubParameters` /
+  `subSettingsFrom`, and `shared/andor-ui` `SubPanel`. ANDOR ANALOG still uses its own copies
+  (`dsp/SubOsc`, `product/Source/SubPanel`). When its pin moves past `claude/osp-sub`:
+  - its Synth switches to `osp::sub::SubOsc` (the same code);
+  - `addSubTo` becomes `addSubParameters (layout, 30, "analog.sub." + field)`;
+  - `createSubPopover` becomes `SubPanel (host, subview::Ids::from (...), shell keyboard)`;
+  - its copies are deleted, and its SUB and panel tests run unchanged.
 - **C RHYTHM in ANDOR OSP** (shared modulation, not a SPACE / ECHO / ARP feature). The source
   is appended to `osp::mod::Source` and offered only when a product asks
   (`ProductInfo::rhythmSource`). ANDOR OSP keeps its twelve sources and its golden is
@@ -1512,6 +1520,41 @@ on the ADD place, or only the card dropped on. Audit, measured reproduction and 
   with SYNTH off are unchanged.
 - **Schema golden.** It follows the new defaults: three SHAPE lines and six IMPRINT / MOTION
   lines.
+
+## SUB in ANDOR OSP (15 Nov 2026, branch claude/osp-sub)
+
+- **What.** ANDOR ANALOG's SUB (sub oscillator V6, popover V7) in ANDOR OSP. It plays one or two
+  octaves below the keys held, from the MIDI before the arpeggiator, so it holds a chord while
+  the cards arpeggiate. It joins after the effects and before the output gain, and is never sent
+  to ECHO or SPACE.
+  - It follows FILTER while FILTER is a low-pass, with an OSP mapping of CHARACTER.
+  - It follows MOVEMENT's PULSE and SHAPER.
+  - It is delayed by a CUSTOM route's latency.
+
+  Report: `docs/sub/osp-sub.md`.
+- **Shared code:**
+  - `src/engine/sub` (SubOsc, verbatim, `osp::sub`);
+  - `InstrumentHost::addSubParameters` / `subSettingsFrom` (ANDOR ANALOG's names, ranges and
+    defaults);
+  - `shared/andor-ui` `SubPanel` (V7; IDs and lit keys supplied by the product).
+
+  ANDOR ANALOG adopts them when its pin moves (NEXT).
+- **Parameters.** Ten `sub.*` at version hint 33, appended after SATELLITE. They are off by
+  default and off in sessions from before (absent IDs load the defaults). The schema golden gains
+  the ten lines (intentional).
+- **Interface.**
+  - The arpeggiator housing has two rows, ARP and SUB. SUB's light switches it; its row opens
+    the panel above. This is a deliberate visual change.
+  - The shell's parity render draws the same row, so the example product's visual check stays
+    at 0 px.
+  - Learn has a SUB Info topic, targets, and a six-step lesson (`osp.sub`).
+- **No sound change while off.** Bit-identical (tested). Every golden render is unchanged.
+- **Tests.** `osp_tests "[sub]"` (10 cases) and `osp_plugin_tests "[sub]"` (8) pass.
+  `[sub-shots]` makes the screenshots and five demo renders.
+- **Not done.**
+  - No DAW pass, and no listening on monitors.
+  - SUB treats CC64 as sustain even when a layer's PEDAL LOOP uses the pedal.
+  - ANDOR ANALOG is not switched to the shared copy yet.
 
 ## ANDOR Learn 2.0 in ANDOR OSP's own plugin (15 Nov 2026, branch claude/osp-learn-2)
 
