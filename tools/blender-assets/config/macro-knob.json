@@ -32,7 +32,7 @@
     "material": "satin-ivory",
     "variants": ["soft-ivory", "brushed-ivory", "satin-ivory"],
     "camera": "top-down",
-    "lighting": "studio-soft",
+    "lighting": "studio-sculpt",
 
     "render": {
         "engine": "CYCLES",

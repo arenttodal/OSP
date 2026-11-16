@@ -356,6 +356,10 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       the LIFE macro as pilot; Cmd+Option+K / OSP_KNOB_SKIN switches original / pilot / all
       macros (looks only: output bit-identical, state unchanged). `[plugin][sprite-knob]`.
       Next: judge it on the Mac; engine-card knobs from config/future.
+- [ ] RENDERED MACRO KNOB, gate 1 (docs/reports/knob-pilot-gate1.md): the six macro sprites
+      re-rendered at production height in the new `studio-sculpt` light (candidate C of A/B/C);
+      129 frames kept; arcs/halos still vector; real-editor before/after at 869/1086/1810 px and
+      1.5x/2x. Awaiting approval; the small knobs, buttons and keyboard follow after it.
 - [x] Layer knobs: each name sits as far above the dial's tick dots as the value sits below
       the lowest ones (the knob component grows upwards by `LayerKnob::labelLift`; dial and
       value unchanged). The MACROS title is gone from the macro panel.

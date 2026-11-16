@@ -1,0 +1,110 @@
+{
+ "A1": {
+  "background_mean_rgb": [
+   170,
+   164,
+   159
+  ],
+  "lines": [
+   {
+    "text": "ANDOR/OSP",
+    "rgb": [
+     36,
+     39,
+     35
+    ],
+    "contrast": 6.15
+   },
+   {
+    "text": "One sound.",
+    "rgb": [
+     36,
+     39,
+     35
+    ],
+    "contrast": 6.15
+   },
+   {
+    "text": "An entire instrument.",
+    "rgb": [
+     36,
+     39,
+     35
+    ],
+    "contrast": 6.15
+   }
+  ]
+ },
+ "A1M": {
+  "background_mean_rgb": [
+   189,
+   186,
+   180
+  ],
+  "lines": [
+   {
+    "text": "ANDOR/OSP",
+    "rgb": [
+     36,
+     39,
+     35
+    ],
+    "contrast": 7.78
+   },
+   {
+    "text": "One sound.",
+    "rgb": [
+     36,
+     39,
+     35
+    ],
+    "contrast": 7.78
+   },
+   {
+    "text": "An entire instrument.",
+    "rgb": [
+     36,
+     39,
+     35
+    ],
+    "contrast": 7.78
+   }
+  ]
+ },
+ "B2_115": {
+  "background_mean_rgb": [
+   5,
+   3,
+   1
+  ],
+  "lines": [
+   {
+    "text": "ANDOR/OSP",
+    "rgb": [
+     244,
+     240,
+     232
+    ],
+    "contrast": 18.11
+   },
+   {
+    "text": "One sound.",
+    "rgb": [
+     214,
+     206,
+     194
+    ],
+    "contrast": 13.2
+   },
+   {
+    "text": "An entire instrument.",
+    "rgb": [
+     214,
+     206,
+     194
+    ],
+    "contrast": 13.2
+   }
+  ]
+ }
+}
