@@ -12,6 +12,7 @@ add_executable(osp_tests
     unit/InterpolationTests.cpp
     unit/AdsrTests.cpp
     unit/SubTests.cpp
+    unit/ShortLoopTests.cpp
     unit/SamplerTests.cpp
     unit/AudioFileTests.cpp
     unit/JsonTests.cpp

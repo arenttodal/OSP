@@ -163,6 +163,7 @@ std::shared_ptr<InstrumentModel> addContinuation (const InstrumentModel& base, c
     auto model = std::make_shared<InstrumentModel> (base);
     model->stage = InstrumentModel::Stage::continued;
     model->original.continuation = analyseContinuation (audio, model->analysis, options.continuation);
+    model->original.fallbackContinuation = fallbackLoop (audio, model->analysis, model->original.continuation);
     addTransient (model->original, audio, model->rootMidi, model->playback, options.interpolationZeroCrossings);
     findResonances (*model, audio);
     model->character = estimateCharacter (model->analysis, &model->original.continuation);
@@ -197,6 +198,8 @@ std::shared_ptr<InstrumentModel> addAnchors (const InstrumentModel& base, const 
         layer.source = makeSource (shifted, model->rootMidi + offset, model->playback, options.interpolationZeroCrossings);
         addTransient (layer, shifted, model->rootMidi + offset, model->playback, options.interpolationZeroCrossings);
         layer.continuation = refineContinuationForLayer (model->original.continuation, shifted, rootHz * semitonesToRatio (offset));
+        if (model->original.fallbackContinuation.canSustain)
+            layer.fallbackContinuation = refineContinuationForLayer (model->original.fallbackContinuation, shifted, rootHz * semitonesToRatio (offset));
         model->anchors.push_back (std::move (layer));
     }
     return model;
